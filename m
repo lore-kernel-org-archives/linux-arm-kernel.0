@@ -1,167 +1,23 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 23 Apr 2018 17:26:50 +0800
-Subject: [PATCH] mmc: mediatek: add 64G DRAM DMA support
-In-Reply-To: <1524475610-22079-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1524475610-22079-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1524475610-22079-2-git-send-email-chaotian.jing@mediatek.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 23 Apr 2018 11:29:18 +0200
+Subject: [PATCH/RFC 7/8] ARM: shmobile: Remove the ARCH_SHMOBILE Kconfig
+ symbol
+In-Reply-To: <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
+References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
+ <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180423092917.h24b2gem6j24uhnk@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT2712 MSDC supports 64G DRAM DMA access, it needs update
-gpd/bd structure.
+On Fri, Apr 20, 2018 at 03:28:33PM +0200, Geert Uytterhoeven wrote:
+> All drivers for Renesas ARM SoCs have gained proper ARCH_RENESAS
+> platform dependencies.  Hence finish the conversion from ARCH_SHMOBILE
+> to ARCH_RENESAS for Renesas 32-bit ARM SoCs, as started by commit
+> 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS").
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> This depends on the previous patches in this series, hence the RFC.
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- drivers/mmc/host/mtk-sd.c | 44 +++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 39 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index d642e11..93269ac 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -228,6 +228,7 @@
- 
- #define MSDC_PATCH_BIT2_CFGRESP   (0x1 << 15)   /* RW */
- #define MSDC_PATCH_BIT2_CFGCRCSTS (0x1 << 28)   /* RW */
-+#define MSDC_PB2_SUPPORT_64G      (0x1 << 1)    /* RW */
- #define MSDC_PB2_RESPWAIT         (0x3 << 2)    /* RW */
- #define MSDC_PB2_RESPSTSENSEL     (0x7 << 16)   /* RW */
- #define MSDC_PB2_CRCSTSENSEL      (0x7 << 29)   /* RW */
-@@ -281,6 +282,8 @@ struct mt_gpdma_desc {
- #define GPDMA_DESC_BDP		(0x1 << 1)
- #define GPDMA_DESC_CHECKSUM	(0xff << 8) /* bit8 ~ bit15 */
- #define GPDMA_DESC_INT		(0x1 << 16)
-+#define GPDMA_DESC_NEXT_H4	(0xf << 24)
-+#define GPDMA_DESC_PTR_H4	(0xf << 28)
- 	u32 next;
- 	u32 ptr;
- 	u32 gpd_data_len;
-@@ -297,6 +300,8 @@ struct mt_bdma_desc {
- #define BDMA_DESC_CHECKSUM	(0xff << 8) /* bit8 ~ bit15 */
- #define BDMA_DESC_BLKPAD	(0x1 << 17)
- #define BDMA_DESC_DWPAD		(0x1 << 18)
-+#define BDMA_DESC_NEXT_H4	(0xf << 24)
-+#define BDMA_DESC_PTR_H4	(0xf << 28)
- 	u32 next;
- 	u32 ptr;
- 	u32 bd_data_len;
-@@ -335,6 +340,7 @@ struct mtk_mmc_compatible {
- 	bool busy_check;
- 	bool stop_clk_fix;
- 	bool enhance_rx;
-+	bool support_64g;
- };
- 
- struct msdc_tune_para {
-@@ -404,6 +410,7 @@ struct msdc_host {
- 	.busy_check = false,
- 	.stop_clk_fix = false,
- 	.enhance_rx = false,
-+	.support_64g = false,
- };
- 
- static const struct mtk_mmc_compatible mt8173_compat = {
-@@ -415,6 +422,7 @@ struct msdc_host {
- 	.busy_check = false,
- 	.stop_clk_fix = false,
- 	.enhance_rx = false,
-+	.support_64g = false,
- };
- 
- static const struct mtk_mmc_compatible mt2701_compat = {
-@@ -426,6 +434,7 @@ struct msdc_host {
- 	.busy_check = false,
- 	.stop_clk_fix = false,
- 	.enhance_rx = false,
-+	.support_64g = false,
- };
- 
- static const struct mtk_mmc_compatible mt2712_compat = {
-@@ -437,6 +446,7 @@ struct msdc_host {
- 	.busy_check = true,
- 	.stop_clk_fix = true,
- 	.enhance_rx = true,
-+	.support_64g = true,
- };
- 
- static const struct mtk_mmc_compatible mt7622_compat = {
-@@ -448,6 +458,7 @@ struct msdc_host {
- 	.busy_check = true,
- 	.stop_clk_fix = true,
- 	.enhance_rx = true,
-+	.support_64g = false,
- };
- 
- static const struct of_device_id msdc_of_ids[] = {
-@@ -558,6 +569,10 @@ static inline void msdc_dma_setup(struct msdc_host *host, struct msdc_dma *dma,
- 		bd[j].bd_info &= ~BDMA_DESC_BLKPAD;
- 		bd[j].bd_info &= ~BDMA_DESC_DWPAD;
- 		bd[j].ptr = (u32)dma_address;
-+		if (host->dev_comp->support_64g) {
-+			bd[j].bd_info &= ~BDMA_DESC_PTR_H4;
-+			bd[j].bd_info |= ((dma_address >> 32) & 0xf) << 28;
-+		}
- 		bd[j].bd_data_len &= ~BDMA_DESC_BUFLEN;
- 		bd[j].bd_data_len |= (dma_len & BDMA_DESC_BUFLEN);
- 
-@@ -1367,6 +1382,9 @@ static void msdc_init_hw(struct msdc_host *host)
- 			     MSDC_PATCH_BIT2_CFGCRCSTS);
- 	}
- 
-+	if (host->dev_comp->support_64g)
-+		sdr_set_bits(host->base + MSDC_PATCH_BIT2,
-+			     MSDC_PB2_SUPPORT_64G);
- 	if (host->dev_comp->data_tune) {
- 		sdr_set_bits(host->base + tune_reg,
- 			     MSDC_PAD_TUNE_RD_SEL | MSDC_PAD_TUNE_CMD_SEL);
-@@ -1408,19 +1426,32 @@ static void msdc_init_gpd_bd(struct msdc_host *host, struct msdc_dma *dma)
- {
- 	struct mt_gpdma_desc *gpd = dma->gpd;
- 	struct mt_bdma_desc *bd = dma->bd;
-+	dma_addr_t dma_addr;
- 	int i;
- 
- 	memset(gpd, 0, sizeof(struct mt_gpdma_desc) * 2);
- 
-+	dma_addr = dma->gpd_addr + sizeof(struct mt_gpdma_desc);
- 	gpd->gpd_info = GPDMA_DESC_BDP; /* hwo, cs, bd pointer */
--	gpd->ptr = (u32)dma->bd_addr; /* physical address */
- 	/* gpd->next is must set for desc DMA
- 	 * That's why must alloc 2 gpd structure.
- 	 */
--	gpd->next = (u32)dma->gpd_addr + sizeof(struct mt_gpdma_desc);
-+	gpd->next = (u32)dma_addr;
-+	if (host->dev_comp->support_64g)
-+		gpd->gpd_info |= ((dma_addr >> 32) & 0xf) << 24;
-+
-+	dma_addr = dma->bd_addr;
-+	gpd->ptr = (u32)dma->bd_addr; /* physical address */
-+	if (host->dev_comp->support_64g)
-+		gpd->gpd_info |= ((dma_addr >> 32) & 0xf) << 28;
-+
- 	memset(bd, 0, sizeof(struct mt_bdma_desc) * MAX_BD_NUM);
--	for (i = 0; i < (MAX_BD_NUM - 1); i++)
--		bd[i].next = (u32)dma->bd_addr + sizeof(*bd) * (i + 1);
-+	for (i = 0; i < (MAX_BD_NUM - 1); i++) {
-+		dma_addr = dma->bd_addr + sizeof(*bd) * (i + 1);
-+		bd[i].next = (u32)dma_addr;
-+		if (host->dev_comp->support_64g)
-+			bd[i].bd_info |= ((dma_addr >> 32) & 0xf) << 24;
-+	}
- }
- 
- static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-@@ -1913,7 +1944,10 @@ static int msdc_drv_probe(struct platform_device *pdev)
- 	mmc->max_blk_size = 2048;
- 	mmc->max_req_size = 512 * 1024;
- 	mmc->max_blk_count = mmc->max_req_size / 512;
--	host->dma_mask = DMA_BIT_MASK(32);
-+	if (host->dev_comp->support_64g)
-+		host->dma_mask = DMA_BIT_MASK(36);
-+	else
-+		host->dma_mask = DMA_BIT_MASK(32);
- 	mmc_dev(mmc)->dma_mask = &host->dma_mask;
- 
- 	host->timeout_clks = 3 * 1048576;
--- 
-1.8.1.1.dirty
+Thanks, I have marked this and the following patch as deferred.
+Please repost or otherwise ping me once the dependencies are in place.
