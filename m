@@ -1,76 +1,19 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 23 Apr 2018 10:48:10 +0200
-Subject: [PATCH] tty: serial: xuartps: Setup early console when uartclk
- is also passed
-In-Reply-To: <ebc1b162-c5bf-3963-05ab-4b236f89966a@monstr.eu>
-References: <2ef5ac478f8d32bc807ead758eb5d60744a44515.1523367208.git.michal.simek@xilinx.com>
- <20180423080641.GA20149@kroah.com>
- <ebc1b162-c5bf-3963-05ab-4b236f89966a@monstr.eu>
-Message-ID: <20180423084810.GA11893@kroah.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Apr 2018 16:48:51 +0800
+Subject: [PATCH v6] ARM: dts: tpc: Device tree description of the iMX6Q
+ TPC board
+In-Reply-To: <20180419143240.3717-1-lukma@denx.de>
+References: <20180405070939.22245-1-lukma@denx.de>
+ <20180419143240.3717-1-lukma@denx.de>
+Message-ID: <20180423084850.GA25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 10:37:12AM +0200, Michal Simek wrote:
-> On 23.4.2018 10:06, Greg Kroah-Hartman wrote:
-> > On Tue, Apr 10, 2018 at 03:33:30PM +0200, Michal Simek wrote:
-> >> Baudrate calculation depends on requested baudrate and uart clock.
-> >> This patch is checking that uartclk is also passed.
-> >>
-> >> The same logic is used 8250_early.c/init_port function.
-> >>
-> >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> >> ---
-> >>
-> >>  drivers/tty/serial/xilinx_uartps.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-> >> index b9b2bc76bcac..a654cda203c7 100644
-> >> --- a/drivers/tty/serial/xilinx_uartps.c
-> >> +++ b/drivers/tty/serial/xilinx_uartps.c
-> >> @@ -1181,7 +1181,7 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
-> >>  	/* only set baud if specified on command line - otherwise
-> >>  	 * assume it has been initialized by a boot loader.
-> >>  	 */
-> >> -	if (device->baud) {
-> >> +	if (port->uartclk && device->baud) {
-> >>  		u32 cd = 0, bdiv = 0;
-> >>  		u32 mr;
-> >>  		int div8;
-> >> -- 
-> >> 1.9.1
-> > 
-> > This patch conflicts with the previous patch you sent: Subject: [PATCH]
-> > serial: xuartps: Fix the early_console junk character issue
-> > 
-> > So, which one should I apply?
-> > 
-> > I've dropped both from my review queue now, please resend the one(s) you
-> > want applied, in a patch series if needed.
+On Thu, Apr 19, 2018 at 04:32:40PM +0200, Lukasz Majewski wrote:
+> This commit adds device tree description of Kieback & Peter GmbH
+> iMX6Q TPC board.
 > 
-> First of all thanks for dropping. I forget that I have sent it in past.
-> 
-> Both patches are targeting the same problem. The first one is more
-> destructive.
-> 
-> And this one is what 8250 is doing.
-> 
-> I have also sent
-> "[PATCH] earlycon: Initialize port->uartclk based on clock-frequency
-> property" which is filling uartclk based on DT to do proper divider
-> calculation.
-> 
-> It means when patch above is applied we can keep divider calculation in
-> the driver because it is using right values. If not we need to remove
-> that baudrate calculation because it is not correct (uartclk is
-> hardcoded to BASE_BAUD * 16 in of_setup_earlycon).
-> And it is really a question if "port->uartclk = BASE_BAUD * 16" should
-> be in of_setup_earlycon.
+> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Ok, but what should I do here?  My patch queue for serial drivers is now
-empty, so if you didn't get an automated email saying your patch was
-applied, please resend what you think needs to be applied.
-
-thanks,
-
-greg k-h
+Applied, thanks.
