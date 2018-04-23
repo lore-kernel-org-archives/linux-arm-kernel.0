@@ -1,75 +1,74 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 23 Apr 2018 19:41:06 +0200
-Subject: [PATCH v4 2/8] dt-bindings: display: atmel: optional
- video-interface of endpoints
-In-Reply-To: <20180423072301.11962-3-peda@axentia.se>
-References: <20180423072301.11962-1-peda@axentia.se>
- <20180423072301.11962-3-peda@axentia.se>
-Message-ID: <20180423194106.3b178211@bbrezillon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 23 Apr 2018 10:45:33 -0700
+Subject: [PATCH 00/16] ti-sysc driver changes to support more devices
+Message-ID: <20180423174549.57412-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Apr 2018 09:22:55 +0200
-Peter Rosin <peda@axentia.se> wrote:
+Hi all,
 
-> With bus-type/bus-width properties in the endpoint nodes, the video-
-> interface of the connection can be specified for cases where the
-> heuristic fails to select the correct output mode. This can happen
-> e.g. if not all RGB pins are routed on the PCB; the driver has no
-> way of knowing this, and needs to be told explicitly.
-> 
-> This is critical for the devices that have the "conflicting output
-> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
-> RGB bits move around depending on the selected output mode. For
-> devices that do not have the "conflicting output formats" issue
-> (SAMA5D2, SAMA5D4), this is completely irrelevant.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+This series contains improvments for ti-sysc driver to allow booting
+with more devices configured in device tree instead of the legacy
+platform data. Looks like some device drivers also need updating for
+suspend and resume, I'll be posting patches separately for those.
 
-Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
+Regards,
 
-> ---
->  .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-> index 82f2acb3d374..9de434a8f523 100644
-> --- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-> +++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-> @@ -15,6 +15,14 @@ Required children nodes:
->   to external devices using the OF graph reprensentation (see ../graph.txt).
->   At least one port node is required.
->  
-> +Optional properties in grandchild nodes:
-> + Any endpoint grandchild node may specify a desired video interface
-> + according to ../../media/video-interfaces.txt, specifically
-> + - bus-type: must be <0>.
-> + - bus-width: recognized values are <12>, <16>, <18> and <24>, and
-> +   override any output mode selection heuristic, forcing "rgb444",
-> +   "rgb565", "rgb666" and "rgb888" respectively.
-> +
->  Example:
->  
->  	hlcdc: hlcdc at f0030000 {
-> @@ -50,3 +58,21 @@ Example:
->  			#pwm-cells = <3>;
->  		};
->  	};
-> +
-> +
-> +Example 2: With a video interface override to force rgb565; as above
-> +but with these changes/additions:
-> +
-> +	&hlcdc {
-> +		hlcdc-display-controller {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
-> +
-> +			port at 0 {
-> +				hlcdc_panel_output: endpoint at 0 {
-> +					bus-type = <0>;
-> +					bus-width = <16>;
-> +				};
-> +			};
-> +		};
-> +	};
+Tony
+
+
+Tony Lindgren (16):
+  ARM: OMAP2+: Drop unused pm-noop
+  ARM: OMAP2+: Allow using ti-sysc for system timers
+  ARM: OMAP2+: Use signed value for sysc register offsets
+  ARM: OMAP2+: Only probe SDMA via ti-sysc if configured in dts
+  ARM: OMAP2+: Initialize SoC PM later
+  ARM: OMAP2+: Make display related init into device_initcall
+  bus: ti-sysc: Handle simple-bus for nested children
+  bus: ti-sysc: Make child clock alias handling more generic
+  bus: ti-sysc: Add handling for clkctrl opt clocks
+  bus: ti-sysc: Tag some modules resource providers for noirq suspend
+  bus: ti-sysc: Improve suspend and resume handling
+  bus: ti-sysc: Add initial support for external resets
+  bus: ti-sysc: Detect omap4 type timers for quirk
+  bus: ti-sysc: Detect UARTs for SYSC_QUIRK_LEGACY_IDLE quirk on omap4
+  bus: ti-sysc: Tag sdio and wdt with legacy mode for suspend
+  bus: ti-sysc: Show module information for suspend if DEBUG is enabled
+
+ .../devicetree/bindings/bus/ti-sysc.txt       |   6 +-
+ arch/arm/mach-omap2/Makefile                  |   1 -
+ arch/arm/mach-omap2/board-generic.c           |   2 -
+ arch/arm/mach-omap2/common.h                  |  18 +-
+ arch/arm/mach-omap2/display.c                 |  10 +-
+ arch/arm/mach-omap2/hsmmc.c                   |   1 -
+ arch/arm/mach-omap2/i2c.c                     |   1 -
+ arch/arm/mach-omap2/io.c                      |  70 +---
+ arch/arm/mach-omap2/omap-pm-noop.c            | 176 --------
+ arch/arm/mach-omap2/omap-pm.h                 | 161 --------
+ arch/arm/mach-omap2/omap_device.c             |  22 +-
+ arch/arm/mach-omap2/omap_hwmod.c              |  21 +-
+ arch/arm/mach-omap2/omap_hwmod.h              |   6 +-
+ .../omap_hwmod_33xx_43xx_ipblock_data.c       |   1 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |   4 +
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c    |   1 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c    |   4 +
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c    |   3 +
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c     |   6 +
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c    |   1 +
+ arch/arm/mach-omap2/pdata-quirks.c            |  15 -
+ arch/arm/mach-omap2/pm-debug.c                |   5 -
+ arch/arm/mach-omap2/pm.c                      |  21 +-
+ arch/arm/mach-omap2/pm33xx-core.c             |   4 +-
+ arch/arm/mach-omap2/timer.c                   |  68 ++-
+ arch/arm/plat-omap/Kconfig                    |  10 -
+ drivers/bus/ti-sysc.c                         | 388 ++++++++++++++++--
+ drivers/media/rc/ir-rx51.c                    |  17 +-
+ include/linux/platform_data/media/ir-rx51.h   |   9 -
+ include/linux/platform_data/ti-sysc.h         |   1 +
+ 30 files changed, 494 insertions(+), 559 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/omap-pm-noop.c
+ delete mode 100644 arch/arm/mach-omap2/omap-pm.h
+ delete mode 100644 include/linux/platform_data/media/ir-rx51.h
+
+-- 
+2.17.0
