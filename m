@@ -1,22 +1,33 @@
 From: lionel.debieve@st.com (Lionel Debieve)
-Date: Mon, 23 Apr 2018 17:19:43 +0200
-Subject: [PATCH 0/4] ARM: dts: Add cryptographic support for stm32mp157c
-Message-ID: <20180423151947.2526-1-lionel.debieve@st.com>
+Date: Mon, 23 Apr 2018 17:19:45 +0200
+Subject: [PATCH 2/4] ARM: dts: stm32: Enable RNG for stm32mp157c-ed1
+In-Reply-To: <20180423151947.2526-1-lionel.debieve@st.com>
+References: <20180423151947.2526-1-lionel.debieve@st.com>
+Message-ID: <20180423151947.2526-3-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patches serie add support or RNG, CRYP and CRC IPs for stm32mp157c SoC
-and add RNG default support for ev1 board.
+Enable stm32-hwrng for ed1 and ev1 boards
 
-Lionel Debieve (4):
-  ARM: dts: stm32: Add RNG support on stm32mp157c
-  ARM: dts: stm32: Enable RNG for stm32mp157c-ed1
-  ARM: dts: stm32: Add CRYP support on stm32mp157c
-  ARM: dts: stm32: Add CRC support on stm32mp157c
+Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+---
+ arch/arm/boot/dts/stm32mp157c-ed1.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
- arch/arm/boot/dts/stm32mp157c-ed1.dts |  4 ++++
- arch/arm/boot/dts/stm32mp157c.dtsi    | 25 +++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
-
+diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+index 9f90337a22e3..2a992525919c 100644
+--- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
++++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+@@ -25,6 +25,10 @@
+ 	};
+ };
+ 
++&rng1 {
++	status = "okay";
++};
++
+ &uart4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart4_pins_a>;
 -- 
 2.15.1
