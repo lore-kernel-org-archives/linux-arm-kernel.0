@@ -1,189 +1,143 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Mon, 23 Apr 2018 18:13:51 +0200
-Subject: [v2 02/10] drm/mediatek: Use regmap for register access
+Date: Mon, 23 Apr 2018 18:13:52 +0200
+Subject: [v2 03/10] mfd: mtk-mmsys: Add mmsys driver
 In-Reply-To: <cover.1524497268.git.mbrugger@suse.com>
 References: <cover.1524497268.git.mbrugger@suse.com>
-Message-ID: <7e20139c8dcc9fe80aa9e401c7bd84a3b9464ff2.1524497268.git.mbrugger@suse.com>
+Message-ID: <99bef17c57ad60eff6104da780cf59b785bd3e42.1524497268.git.mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Brugger <mbrugger@suse.com>
 
-The mmsys memory space is shared between the drm and the
-clk driver. Use regmap to access it.
+The MMSYS subsystem includes clocks and drm components.
+This patch adds a MFD device to probe both drivers from the same
+device tree compatible.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c |  4 ++--
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c  | 38 +++++++++++++--------------------
- drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |  4 ++--
- drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 13 ++++-------
- drivers/gpu/drm/mediatek/mtk_drm_drv.h  |  2 +-
- 5 files changed, 24 insertions(+), 37 deletions(-)
+ drivers/mfd/Kconfig     |  9 ++++++
+ drivers/mfd/Makefile    |  2 ++
+ drivers/mfd/mtk-mmsys.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 90 insertions(+)
+ create mode 100644 drivers/mfd/mtk-mmsys.c
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index 658b8dd45b83..4c65873b4867 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -33,7 +33,7 @@
-  * @enabled: records whether crtc_enable succeeded
-  * @planes: array of 4 drm_plane structures, one for each overlay plane
-  * @pending_planes: whether any plane has pending changes to be applied
-- * @config_regs: memory mapped mmsys configuration register space
-+ * @config_regs: regmap mapped mmsys configuration register space
-  * @mutex: handle to one of the ten disp_mutex streams
-  * @ddp_comp_nr: number of components in ddp_comp
-  * @ddp_comp: array of pointers the mtk_ddp_comp structures used by this crtc
-@@ -48,7 +48,7 @@ struct mtk_drm_crtc {
- 	struct drm_plane		planes[OVL_LAYER_NR];
- 	bool				pending_planes;
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index b860eb5aa194..a2c928e26026 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -378,6 +378,15 @@ config MFD_MC13XXX_I2C
+ 	help
+ 	  Select this if your MC13xxx is connected via an I2C bus.
  
--	void __iomem			*config_regs;
-+	struct regmap			*config_regs;
- 	struct mtk_disp_mutex		*mutex;
- 	unsigned int			ddp_comp_nr;
- 	struct mtk_ddp_comp		**ddp_comp;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 8130f3dab661..bafc5c77c4fb 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -185,53 +185,45 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
- 	return value;
- }
++config MFD_MEDIATEK_MMSYS
++	tristate "Mediatek MMSYS interface"
++	select MDF_CORE
++	select REGMAP_MMIO
++	help
++	  Select this if you have a MMSYS subsystem in your SoC. The
++	  MMSYS subsystem has at least a clock driver part and some
++	  DRM components.
++
+ config MFD_MXS_LRADC
+ 	tristate "Freescale i.MX23/i.MX28 LRADC"
+ 	depends on ARCH_MXS || COMPILE_TEST
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index d9d2cf0d32ef..b96118bd68d9 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -98,6 +98,8 @@ obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
+ obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
+ obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
  
--static void mtk_ddp_sout_sel(void __iomem *config_regs,
-+static void mtk_ddp_sout_sel(struct regmap *config_regs,
- 			     enum mtk_ddp_comp_id cur,
- 			     enum mtk_ddp_comp_id next)
- {
- 	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
--		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
--			       config_regs + DISP_REG_CONFIG_OUT_SEL);
-+		regmap_write(config_regs, DISP_REG_CONFIG_OUT_SEL,
-+				BLS_TO_DSI_RDMA1_TO_DPI1);
- }
++obj-$(CONFIG_MFD_MEDIATEK_MMSYS) += mtk-mmsys.o
++
+ obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
  
--void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
-+void mtk_ddp_add_comp_to_path(struct regmap *config_regs,
- 			      enum mtk_ddp_comp_id cur,
- 			      enum mtk_ddp_comp_id next)
- {
--	unsigned int addr, value, reg;
-+	unsigned int addr, value;
- 
- 	value = mtk_ddp_mout_en(cur, next, &addr);
--	if (value) {
--		reg = readl_relaxed(config_regs + addr) | value;
--		writel_relaxed(reg, config_regs + addr);
--	}
-+	if (value)
-+		regmap_update_bits(config_regs, addr, value, value);
- 
- 	mtk_ddp_sout_sel(config_regs, cur, next);
- 
- 	value = mtk_ddp_sel_in(cur, next, &addr);
--	if (value) {
--		reg = readl_relaxed(config_regs + addr) | value;
--		writel_relaxed(reg, config_regs + addr);
--	}
-+	if (value)
-+		regmap_update_bits(config_regs, addr, value, value);
- }
- 
--void mtk_ddp_remove_comp_from_path(void __iomem *config_regs,
-+void mtk_ddp_remove_comp_from_path(struct regmap *config_regs,
- 				   enum mtk_ddp_comp_id cur,
- 				   enum mtk_ddp_comp_id next)
- {
--	unsigned int addr, value, reg;
-+	unsigned int addr, value;
- 
- 	value = mtk_ddp_mout_en(cur, next, &addr);
--	if (value) {
--		reg = readl_relaxed(config_regs + addr) & ~value;
--		writel_relaxed(reg, config_regs + addr);
--	}
-+	if (value)
-+		regmap_update_bits(config_regs, addr, value, 0);
- 
- 	value = mtk_ddp_sel_in(cur, next, &addr);
--	if (value) {
--		reg = readl_relaxed(config_regs + addr) & ~value;
--		writel_relaxed(reg, config_regs + addr);
--	}
-+	if (value)
-+		regmap_update_bits(config_regs, addr, value, 0);
- }
- 
- struct mtk_disp_mutex *mtk_disp_mutex_get(struct device *dev, unsigned int id)
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-index f9a799168077..32e12f33b76a 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-@@ -20,10 +20,10 @@ struct regmap;
- struct device;
- struct mtk_disp_mutex;
- 
--void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
-+void mtk_ddp_add_comp_to_path(struct regmap *config_regs,
- 			      enum mtk_ddp_comp_id cur,
- 			      enum mtk_ddp_comp_id next);
--void mtk_ddp_remove_comp_from_path(void __iomem *config_regs,
-+void mtk_ddp_remove_comp_from_path(struct regmap *config_regs,
- 				   enum mtk_ddp_comp_id cur,
- 				   enum mtk_ddp_comp_id next);
- 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index a2ca90fc403c..a48e28adad09 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -21,6 +21,7 @@
- #include <drm/drm_of.h>
- #include <linux/component.h>
- #include <linux/iommu.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/pm_runtime.h>
-@@ -385,7 +386,6 @@ static int mtk_drm_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct mtk_drm_private *private;
--	struct resource *mem;
- 	struct device_node *node;
- 	struct component_match *match = NULL;
- 	int ret;
-@@ -399,14 +399,9 @@ static int mtk_drm_probe(struct platform_device *pdev)
- 	INIT_WORK(&private->commit.work, mtk_atomic_work);
- 	private->data = of_device_get_match_data(dev);
- 
--	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	private->config_regs = devm_ioremap_resource(dev, mem);
--	if (IS_ERR(private->config_regs)) {
--		ret = PTR_ERR(private->config_regs);
--		dev_err(dev, "Failed to ioremap mmsys-config resource: %d\n",
--			ret);
--		return ret;
--	}
-+	private->config_regs = syscon_node_to_regmap(dev->of_node);
-+	if (IS_ERR(private->config_regs))
-+		return PTR_ERR(private->config_regs);
- 
- 	/* Iterate over sibling DISP function blocks */
- 	for_each_child_of_node(dev->of_node->parent, node) {
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-index c3378c452c0a..c6fa0ad458e8 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-@@ -44,7 +44,7 @@ struct mtk_drm_private {
- 
- 	struct device_node *mutex_node;
- 	struct device *mutex_dev;
--	void __iomem *config_regs;
-+	struct regmap *config_regs;
- 	struct device_node *comp_node[DDP_COMPONENT_ID_MAX];
- 	struct mtk_ddp_comp *ddp_comp[DDP_COMPONENT_ID_MAX];
- 	const struct mtk_mmsys_driver_data *data;
+ obj-$(CONFIG_EZX_PCAP)		+= ezx-pcap.o
+diff --git a/drivers/mfd/mtk-mmsys.c b/drivers/mfd/mtk-mmsys.c
+new file mode 100644
+index 000000000000..c802343fb1c6
+--- /dev/null
++++ b/drivers/mfd/mtk-mmsys.c
+@@ -0,0 +1,79 @@
++// SPDX-License-Identifier: GPL-2.0+
++
++/*
++ * mtk-mmsys.c -- Mediatek MMSYS multi-function driver
++ *
++ * Copyright (c) 2018 Matthias Brugger <matthias.bgg@gmail.com>
++ *
++ * Author: Matthias Brugger <matthias.bgg@gmail.com>
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/mfd/core.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++
++enum {
++	MMSYS_MT2701 = 1,
++};
++
++static const struct mfd_cell mmsys_mt2701_devs[] = {
++	{ .name = "clk-mt2701-mm", },
++	{ .name = "drm-mt2701-mm", },
++};
++
++static int mmsys_probe(struct platform_device *pdev)
++{
++	const struct mfd_cell *mmsys_cells;
++	int nr_cells;
++	long id;
++	int ret;
++
++	id = (long) of_device_get_match_data(&pdev->dev);
++	if (!id) {
++		dev_err(&pdev->dev, "of_device_get match_data() failed\n");
++		return -EINVAL;
++	}
++
++	switch (id) {
++	case MMSYS_MT2701:
++		mmsys_cells = mmsys_mt2701_devs;
++		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
++		break;
++	default:
++		return -ENODEV;
++	}
++
++	ret = devm_mfd_add_devices(&pdev->dev, 0, mmsys_cells, nr_cells,
++					NULL, 0, NULL);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to add MFD devices %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++};
++
++static const struct of_device_id of_match_mmsys[] = {
++	{ .compatible = "mediatek,mt2701-mmsys",
++	  .data = (void *) MMSYS_MT2701,
++	},
++	{ /* sentinel */ },
++};
++
++static struct platform_driver mmsys_drv = {
++	.probe = mmsys_probe,
++	.driver = {
++		.name = "mediatek-mmysys",
++		.of_match_table = of_match_ptr(of_match_mmsys),
++	},
++};
++
++builtin_platform_driver(mmsys_drv);
++
++MODULE_DESCRIPTION("Mediatek MMSYS multi-function driver");
++MODULE_LICENSE("GPL");
 -- 
 2.16.3
