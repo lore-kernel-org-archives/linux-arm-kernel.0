@@ -1,72 +1,48 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 23 Apr 2018 19:35:46 +0200
-Subject: brcm, cyw_bt: Add latest Cypress/Murata firmware
-In-Reply-To: <CAD0U-hKMhgh9dgvBaEB66K_JomnkY82HDdtWu-tpYpNZw7mMMQ@mail.gmail.com>
-References: <1524146649-25267-1-git-send-email-ryan.harkin@linaro.org>
- <CA+5PVA57X8aPXXLBTfaWxhULY7EgWooWy1NQoNq+X=vLWm2Q2g@mail.gmail.com>
- <7b9d1310-e850-2331-a11b-b22de8282797@redhat.com>
- <CAD0U-hKiK62Efg=kj3=-MOeeVA-4g0HW-6TW8Jo-YNuUs5LEQg@mail.gmail.com>
- <da653c17-ea3d-8c97-64f3-b7c6ce80dcf1@redhat.com>
- <CAD0U-hJ5ebJa0s+myT-qdEhwCVraHake8-z5u7CVeo1G3gGwjQ@mail.gmail.com>
- <09bc0fb5-4cbb-f4cd-32e5-40eaaa576b6b@redhat.com>
- <CAD0U-hKMhgh9dgvBaEB66K_JomnkY82HDdtWu-tpYpNZw7mMMQ@mail.gmail.com>
-Message-ID: <85aa289a-4e11-403c-be01-f27d9a61f0bf@redhat.com>
+From: gustavo@embeddedor.com (Gustavo A. R. Silva)
+Date: Mon, 23 Apr 2018 12:37:41 -0500
+Subject: [PATCH 00/11] fix potential Spectre variant 1 issues
+Message-ID: <cover.1524499368.git.gustavo@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset aims to fix various media platform and media usb
+cases where we have user controlled array dereferences that could
+be exploited due to the Spectre variant 1 vulnerability. All were
+reported by Dan Carpenter.
 
-On 23-04-18 19:17, Ryan Harkin wrote:
-> 
-> 
-> On 23 April 2018 at 16:56, Hans de Goede <hdegoede at redhat.com <mailto:hdegoede@redhat.com>> wrote:
+Notice that given that speculation windows are large, the policy is
+to kill the speculation on the first load and not worry if it can be
+completed with a dependent load/store [1].
 
-<snip>
+[1] https://marc.info/?l=linux-kernel&m=152449131114778&w=2
 
->          ? ? As said before (sorry) NACK, we really must NOT distribute nvram
->          ? ? files under generic names.
-> 
-> 
->         That's fine. But I still think the generic files should be available in the repo for users who want to use them. Having them take an explicit step, like softlinking it to the board specific file, is fine by me. But I believe we should be able to get them if we wish to. At the very least, I would be interested in knowing how my board varies from the generic example given by Cypress/Murata/OEM.
-> 
->         So how about we add the files but either in a sub-dir, and/or with example/generic/sample as the board name? Eg, we could push this file:
-> 
->          ?? ? brcmfmac43430-sdio-generic.txt
-> 
->         As you suggested, the code could look for?brcmfmac43430-sdio-<board name>.txt, if it doesn't find it, fall back to brcmfmac43430-sdio.txt. In this case, brcmfmac43430-sdio-generic.txt will never automatically load.
-> 
-> 
->     Putting them in linux-firmware as brcmfmac4xxxx-sdio-generic.txt /
->     brcmfmac4xxx-pci-generic.txt is fine.
-> 
-> 
-> I've just started to re-work patch 2/3 and realised that there are already files like "brcmfmac43012-sdio.1LV.txt", where the 1LV is separated by '.' instead of "-", so I figured I'd leave those files as they are and only add ".generic" to the unlabelled/generic ones, unless you think I should add ".generic" to all of them?
-> 
-> Like this:
-> 
-> brcmfmac43012-sdio.1LV.txt
-> brcmfmac43012-sdio-generic.txt -> brcmfmac43012-sdio.1LV.txt
-> brcmfmac43340-sdio.1BW.txt
-> brcmfmac43340-sdio.txt -> brcmfmac43340-sdio.1BW.txt
-> brcmfmac43362-sdio.SN8000.txt
-> brcmfmac43362-sdio.txt -> brcmfmac43362-sdio.SN8000.txt
-> brcmfmac4339-sdio.1CK.txt
-> brcmfmac4339-sdio-generic.txt -> brcmfmac4339-sdio.ZP.txt
-> brcmfmac4339-sdio.ZP.txt
-> brcmfmac43430-sdio.1DX.txt
-> brcmfmac43430-sdio.1LN.txt -> brcmfmac43430-sdio.1DX.txt
-> brcmfmac43430-sdio.txt -> brcmfmac43430-sdio.1DX.txt
-> brcmfmac43455-sdio.1HK.txt
-> brcmfmac43455-sdio.1LC.txt
-> brcmfmac43455-sdio.1MW.txt
-> brcmfmac43455-sdio-generic.txt -> brcmfmac43455-sdio.1MW.txt
-> brcmfmac4354-sdio.1BB.txt
-> brcmfmac4354-sdio.txt -> brcmfmac4354-sdio.1BB.txt
-> brcmfmac4356-pcie.1CX.txt
-> brcmfmac4356-pcie-generic.txt -> brcmfmac4356-pcie.1CX.txt
+Thanks
 
-That is fine with me.
+Gustavo A. R. Silva (11):
+  media: tm6000: fix potential Spectre variant 1
+  exynos4-is: mipi-csis: fix potential Spectre variant 1
+  fsl-viu: fix potential Spectre variant 1
+  marvell-ccic: mcam-core: fix potential Spectre variant 1
+  omap_vout: fix potential Spectre variant 1
+  rcar-v4l2: fix potential Spectre variant 1
+  rcar_drif: fix potential Spectre variant 1
+  sh_vou: fix potential Spectre variant 1
+  vimc-debayer: fix potential Spectre variant 1
+  vivid-sdr-cap: fix potential Spectre variant 1
+  vsp1_rwpf: fix potential Spectre variant 1
 
-Regards,
+ drivers/media/platform/exynos4-is/mipi-csis.c   | 5 ++++-
+ drivers/media/platform/fsl-viu.c                | 8 ++++----
+ drivers/media/platform/marvell-ccic/mcam-core.c | 3 +++
+ drivers/media/platform/omap/omap_vout.c         | 3 +++
+ drivers/media/platform/rcar-vin/rcar-v4l2.c     | 4 +++-
+ drivers/media/platform/rcar_drif.c              | 4 +++-
+ drivers/media/platform/sh_vou.c                 | 3 +++
+ drivers/media/platform/vimc/vimc-debayer.c      | 5 ++++-
+ drivers/media/platform/vivid/vivid-sdr-cap.c    | 6 ++++++
+ drivers/media/platform/vsp1/vsp1_rwpf.c         | 3 +++
+ drivers/media/usb/tm6000/tm6000-video.c         | 2 ++
+ 11 files changed, 38 insertions(+), 8 deletions(-)
 
-Hans
+-- 
+2.7.4
