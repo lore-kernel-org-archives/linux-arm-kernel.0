@@ -1,25 +1,17 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 23 Apr 2018 11:03:18 +0100
-Subject: [PATCH v2 1/2] regmap: include <linux/ktime.h> from
- include/linux/regmap.h
-In-Reply-To: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
-References: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
-Message-ID: <20180423100318.GA19834@sirena.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 23 Apr 2018 12:08:10 +0200
+Subject: [PATCH v5 1/6] arm: shmobile: Add the RZ/N1D (R9A06G032) to the
+ shmobile Kconfig
+In-Reply-To: <1523963101-56725-2-git-send-email-michel.pollet@bp.renesas.com>
+References: <1523963101-56725-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1523963101-56725-2-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <20180423100810.g2tucr5bd6ftubmo@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 02:42:44PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Tue, Apr 17, 2018 at 12:04:16PM +0100, Michel Pollet wrote:
+> Add the RZ/N1D SoC to the reset of the Renesas SoC Collection.
 > 
-> Similar to the readx_poll_timeout() macro calling ktime_* and using
-> ktime_t type, which is declared in <linux/ktime.h>. So, make
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 
-I'm missing patch 2 here - what's the story, are there any
-dependencies?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/50ac5376/attachment.sig>
+Thanks, applied.
