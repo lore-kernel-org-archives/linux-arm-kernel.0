@@ -1,45 +1,83 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 23 Apr 2018 17:03:09 +0200
-Subject: [PATCH v3 3/3] ARM: dts: sun8i: h3: Add SY8106A regulator to
- Orange Pi PC
-In-Reply-To: <20180423144657.63264-4-icenowy@aosc.io>
-References: <20180423144657.63264-1-icenowy@aosc.io>
- <20180423144657.63264-4-icenowy@aosc.io>
-Message-ID: <20180423150309.dksr2rjazlrmlzx2@flea>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Apr 2018 16:04:06 +0100
+Subject: [PATCH] serial: mvebu-uart: Fix local flags handling on termios
+ update
+In-Reply-To: <20180422195803.GD16141@n2100.armlinux.org.uk>
+References: <20180422123346.15538-1-marc.zyngier@arm.com>
+ <20180422155515.GC16141@n2100.armlinux.org.uk>
+ <20180422180728.42d7b354@why.wild-wind.fr.eu.org>
+ <20180422195803.GD16141@n2100.armlinux.org.uk>
+Message-ID: <20180423150406.GE16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 10:46:57PM +0800, Icenowy Zheng wrote:
-> From: Ondrej Jirman <megous@megous.com>
+On Sun, Apr 22, 2018 at 08:58:04PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Apr 22, 2018 at 06:07:28PM +0100, Marc Zyngier wrote:
+> > On Sun, 22 Apr 2018 16:55:16 +0100
+> > Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> > 
+> > > On Sun, Apr 22, 2018 at 01:33:46PM +0100, Marc Zyngier wrote:
+> > > > Commit 68a0db1d7da2 reworked the baud rate selection, but also added
+> > > > a (not so) subtle change in the way the local flags (c_lflag in the
+> > > > termios structure) are handled, forcing the new flags to always be the
+> > > > same as the old ones.
+> > > > 
+> > > > The reason for that particular change is both obscure and undocumented.
+> > > > It also completely breaks userspace. Something as trivial as getty is
+> > > > unusable:
+> > > > 
+> > > > <example>
+> > > > 	Debian GNU/Linux 9 sy-borg ttyMV0
+> > > > 
+> > > > 	sy-borg login: root
+> > > > 	root
+> > > > 	[timeout]
+> > > > 
+> > > > 	Debian GNU/Linux 9 sy-borg ttyMV0
+> > > > </example>
+> > > > 
+> > > > which is quite obvious in retrospect: getty cannot get in control of
+> > > > the echo mode, is stuck in canonical mode, and times out without ever
+> > > > seeing anything valid. It also begs the question of how this change was
+> > > > ever tested.
+> > > > 
+> > > > The fix is pretty obvious: stop messing with c_lflag, and the world
+> > > > will be a happier place.  
+> > > 
+> > > The c_iflag code also looks suspicious as well.  Apparently, the driver
+> > > only supports INPCK and IGNPAR, but things such as ISTRIP, INLCR, IGNCR,
+> > > ICRNL, IUCLC, IMAXBEL and IUTF8 are all software things done by the TTY
+> > > layer and have nothing to do with the driver.
+> > 
+> > Indeed. I stuck with the most glaring issue (well, the one that
+> > prevented me from using this particular box), but the whole termios
+> > massaging is quite odd. Someone with a good understanding of the
+> > intricacies of the TTY layer should definitely have a look at this.
 > 
-> Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
-> Orange Pi PC, then set the power supply of the ARM cores to this
-> regulator, in order to enable DVFS.
+> Right, remember, I'm the author of the serial core layer (I took over
+> from tytso back in the 2.x era.)
 > 
-> Signed-off-by: Ondrej Jirman <megous@megous.com>
-> [Icenowy: Enable DVFS in this patch, slight changes and change commit
->  message]
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> [wens at csie.org: Rename regulator label]
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> POSIX requirements are:
+> 
+>   The tcsetattr() function shall return successfully if it
+>   was able to perform any of the requested actions, even if
+>   some of the requested actions could not be performed. It
+>   shall set all the attributes that the implementation
+>   supports as requested and leave all the attributes not
+>   supported by the implementation unchanged.
+> 
+> In other words, if the system does not support two stop bits, asking
+> for CSTOPB to be set results in CSTOPB being ignored but all other
+> supported modes being updated.  This is what the code in that commit
+> is trying to implement, but it forgets that the TTY layer implements
+> a whole load of termios modes that are not specific to the serial
+> driver.
 
-Why is there Chen-Yu's SoB? It doesn't really make much sense, unless
-Chen-Yu would have applied this patch already, but then you wouldn't
-post it, right?
-
-Maxime 
-
-> ---
+I've just been talking to Jon Nettleton about this, and it seems that
+he reported the exact same bug that you've found to Marvell a while
+back, yet it seems that the bug was still propagated into mainline.
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/8a982140/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
