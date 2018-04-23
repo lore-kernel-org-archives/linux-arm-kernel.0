@@ -1,38 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 23 Apr 2018 11:20:14 +0200
-Subject: [PATCH/RFC 7/8] ARM: shmobile: Remove the ARCH_SHMOBILE Kconfig
- symbol
-In-Reply-To: <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
-References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
- <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180423092011.qnhcorgcu2j5hrls@verge.net.au>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 23 Apr 2018 11:21:19 +0200
+Subject: [PATCH] Revert "drm/sun4i: add lvds mode_valid function"
+In-Reply-To: <20180421045155.15332-1-megous@megous.com>
+References: <20180421045155.15332-1-megous@megous.com>
+Message-ID: <20180423092119.5ssii67dtvsekwze@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 03:28:33PM +0200, Geert Uytterhoeven wrote:
-> All drivers for Renesas ARM SoCs have gained proper ARCH_RENESAS
-> platform dependencies.  Hence finish the conversion from ARCH_SHMOBILE
-> to ARCH_RENESAS for Renesas 32-bit ARM SoCs, as started by commit
-> 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS").
+On Sat, Apr 21, 2018 at 06:51:55AM +0200, megous at megous.com wrote:
+> From: Ondrej Jirman <megous@megous.com>
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> This depends on the previous patches in this series, hence the RFC.
+> The reverted commit broke LVDS output on TBS A711 Tablet. That tablet
+> has simple-panel node that has fixed pixel clock-frequency that A83T
+> SoC used in the tablet can't generate exactly.
 > 
-> JFTR, after this, the following symbols for drivers supporting only
-> Renesas SuperH "SH-Mobile" SoCs can no longer be selected:
->   - CONFIG_KEYBOARD_SH_KEYSC,
->   - CONFIG_VIDEO_SH_VOU,
->   - CONFIG_VIDEO_SH_MOBILE_CEU,
->   - CONFIG_DRM_SHMOBILE[*],
->   - CONFIG_FB_SH_MOBILE_MERAM.
-> (changes for a shmobile_defconfig .config)
+> Requested rate is 52000000 and rounded_rate is calculated as 51857142.
+> It's close enough for it to work in practice, but with strict check
+> in the reverted commit, the mode is rejected needlessly in this case.
 > 
-> [*] CONFIG_DRM_SHMOBILE has a dependency on ARM, but it was never wired
->     up.  From the use of sh_mobile_meram, I guess it was meant for
->     SH-Mobile AP4 on Mackerel or AP4EVB, which are long gone.
->     So the only remaining upstream platforms that could make use of it
->     are legacy SuperH SH-Mobile SoCs?
+> DT allows to specify a range of values for simple-panel/clock-frequency,
+> but driver doesn't respect that ATM. Given that TBS A711 is the single
+> user of sun4i-lvds driver, let's revert that commit for now, until
+> a better solution for the problem is found.
+> 
+> Also see: https://patchwork.kernel.org/patch/9446385/ for relevant
+> discussion (or search for "[RFC] drm/sun4i: rgb: Add 5% tolerance
+> to dot clock frequency check").
+> 
+> Fixes: e4e4b7ad50cf ("drm/sun4i: add lvds mode_valid function")
+> Reported-by: Ondrej Jirman <megous@megous.com>
+> Signed-off-by: Ondrej Jirman <megous@megous.com>
 
-That sounds about right. If there is interest I can sift through my mail
-archive and see if it yields any answers.
+Applied, thanks!
+Maxime
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/059befd1/attachment-0001.sig>
