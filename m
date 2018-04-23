@@ -1,122 +1,57 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 23 Apr 2018 12:27:52 +0200
-Subject: [PATCH v3 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
- Edition support
-In-Reply-To: <20180423072403.4ip5seys4xyll3yr@flea>
-References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
- <20180421164246.8477-3-miquel.raynal@bootlin.com>
- <20180423072403.4ip5seys4xyll3yr@flea>
-Message-ID: <20180423122752.364ee649@xps13>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 23 Apr 2018 11:29:09 +0100
+Subject: BUG: KASAN: global-out-of-bounds in unmap_kernel_at_el0+0x70/0x1a0
+In-Reply-To: <b14575e7-c862-fb7c-b776-86976e68f4b7@web.de>
+References: <97d99ad9-c5cf-a4d2-126a-2b39ffead0b3@web.de>
+ <20180422190639.lyfvgnzapo2mrpu6@salmiak>
+ <b14575e7-c862-fb7c-b776-86976e68f4b7@web.de>
+Message-ID: <20180423102909.ra2n6tqvwcn7oash@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Mon, Apr 23, 2018 at 07:00:52AM +0200, Jan Kiszka wrote:
+> On 2018-04-22 21:06, Mark Rutland wrote:
 
-On Mon, 23 Apr 2018 09:24:03 +0200, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
+> > Does the below help?
 
-> Hi,
-> 
-> On Sat, Apr 21, 2018 at 06:42:46PM +0200, Miquel Raynal wrote:
-> > The Nintendo NES/SuperNES features an R16 already well supported in
-> > mainline.
+> > From ade322407e3d6d1f50e558ebd50d2c1c7bd811c2 Mon Sep 17 00:00:00 2001
+> > From: Mark Rutland <mark.rutland@arm.com>
+> > Date: Sun, 22 Apr 2018 19:58:08 +0100
+> > Subject: [PATCH] arm64: add sentinel to kpti_safe_list
 > > 
-> > The console over UART0 may be wired on two ports of the R16, both
-> > available on the NES Classic PCB.
+> > We're missing a sentinel entry in kpti_safe_list. Thus is_midr_in_range_list()
+> > can walk past the end of kpti_safe_list. Depending on the contents of memory,
+> > this could erroneously match a CPU's MIDR, cause a data abort, or other bad
+> > outcomes.
 > > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > Add the sentinel entry to avoid this.
+> > 
+> > Fixes: be5b299830c63ed7 ("arm64: capabilities: Add support for checks based on a list of MIDRs")
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Reported-by: Jan Kiszka <jan.kiszka@web.de>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
 > > ---
-> >  arch/arm/boot/dts/Makefile                         |  2 +
-> >  arch/arm/boot/dts/sun8i-a23-a33.dtsi               |  2 +
-> >  .../boot/dts/sun8i-r16-nintendo-nes-classic.dts    | 56 ++++++++++++++++++++++
-> >  .../dts/sun8i-r16-nintendo-super-nes-classic.dts   | 19 ++++++++
-> >  4 files changed, 79 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic.dts
-> >  create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-super-nes-classic.dts
+> >  arch/arm64/kernel/cpufeature.c | 1 +
+> >  1 file changed, 1 insertion(+)
 > > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 7e2424957809..6813abc8399a 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -1010,6 +1010,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
-> >  	sun8i-h3-orangepi-plus.dtb \
-> >  	sun8i-h3-orangepi-plus2e.dtb \
-> >  	sun8i-r16-bananapi-m2m.dtb \
-> > +	sun8i-r16-nintendo-nes-classic.dtb \
-> > +	sun8i-r16-nintendo-supernes-classic.dtb \  
+> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> > index 536d572e5596..9d1b06d67c53 100644
+> > --- a/arch/arm64/kernel/cpufeature.c
+> > +++ b/arch/arm64/kernel/cpufeature.c
+> > @@ -868,6 +868,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+> >  	static const struct midr_range kpti_safe_list[] = {
+> >  		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
+> >  		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
+> > +		{ /* sentinel */ }
+> >  	};
+> >  	char const *str = "command line option";
+> >  
+> > 
 > 
-> This doesn't match your DTS name :)
+> Jep, all fine now!
 
-Ooooops /o\
+Cool. Can I take that as a Tested-by?
 
-> 
-> >  	sun8i-r16-parrot.dtb \
-> >  	sun8i-r40-bananapi-m2-ultra.dtb \
-> >  	sun8i-v3s-licheepi-zero.dtb \
-> > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > index 6b9e85b4ba0f..44f3cad3de75 100644
-> > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > @@ -198,6 +198,8 @@
-> >  			clock-names = "ahb", "mod";
-> >  			resets = <&ccu RST_BUS_NAND>;
-> >  			reset-names = "ahb";
-> > +			pinctrl-names = "default";
-> > +			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;  
-> 
-> This should be in your first patch I guess?
-
-Actually I think this should not be there but instead, because it is
-board-related, these two lines should be in the nes-classic.dts' nfc
-node, right? Other a23/a33/r16 based designs could use the second set
-of CS/RB pins.
-
-> 
-> > diff --git a/arch/arm/boot/dts/sun8i-r16-nintendo-super-nes-classic.dts b/arch/arm/boot/dts/sun8i-r16-nintendo-super-nes-classic.dts
-> > new file mode 100644
-> > index 000000000000..9cbe058feb6f
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/sun8i-r16-nintendo-super-nes-classic.dts
-> > @@ -0,0 +1,19 @@
-> > +// SPDX-License-Identifier: GPL-2.0 OR X11
-> > +/* Copyright (c) 2018 Miqu?l RAYNAL <miquel.raynal@bootlin.com> */
-> > +
-> > +/dts-v1/;
-> > +#include "sun8i-r16-nintendo-nes-classic.dts"
-> > +
-> > +/ {
-> > +	model = "Nintendo SuperNES Classic Edition";
-> > +	compatible = "nintendo,supernes-classic", "allwinner,sun8i-r16",  
-> 
-> 
-> We should have the same split in the compatible (ie,
-> super-nes-classic) and we should probably add the nes-classic
-> compatible in there as well.
-
-Sure.
-
-> 
-> > +		     "allwinner,sun8i-a33";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +	};
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial0:115200n8";  
-> 
-> Isn't that part of the NES DTSI already?
-
-Right, I was not sure if those two should be kept or not. Removed.
-
-> 
-> Maxime
-> 
-
-Thanks,
-Miqu?l
-
--- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Mark.
