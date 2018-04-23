@@ -1,34 +1,112 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Mon, 23 Apr 2018 09:22:57 +0200
-Subject: [PATCH v4 4/8] drm/i2c: tda998x: find the drm_device via the
- drm_connector
+Date: Mon, 23 Apr 2018 09:22:58 +0200
+Subject: [PATCH v4 5/8] drm/i2c: tda998x: split tda998x_encoder_dpms into
+ enable/disable
 In-Reply-To: <20180423072301.11962-1-peda@axentia.se>
 References: <20180423072301.11962-1-peda@axentia.se>
-Message-ID: <20180423072301.11962-5-peda@axentia.se>
+Message-ID: <20180423072301.11962-6-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This prepares for being a drm_bridge which will not register the
-encoder. That makes the connector the better choice.
+This fits better with the drm_bridge callbacks for when this
+driver becomes a drm_bridge.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Suggested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 64 ++++++++++++++++++++++-----------------
+ 1 file changed, 37 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index cd3f0873bbdd..8f6e013f2b87 100644
+index 8f6e013f2b87..f9028d567ec2 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -630,7 +630,7 @@ static void tda998x_detect_work(struct work_struct *work)
- {
- 	struct tda998x_priv *priv =
- 		container_of(work, struct tda998x_priv, detect_work);
--	struct drm_device *dev = priv->encoder.dev;
-+	struct drm_device *dev = priv->connector.dev;
+@@ -1163,36 +1163,42 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
  
- 	if (dev)
- 		drm_kms_helper_hotplug_event(dev);
+ /* DRM encoder functions */
+ 
+-static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
++static void tda998x_enable(struct tda998x_priv *priv)
+ {
+-	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
+-	bool on;
++	if (priv->is_on)
++		return;
+ 
+-	/* we only care about on or off: */
+-	on = mode == DRM_MODE_DPMS_ON;
++	/* enable video ports, audio will be enabled later */
++	reg_write(priv, REG_ENA_VP_0, 0xff);
++	reg_write(priv, REG_ENA_VP_1, 0xff);
++	reg_write(priv, REG_ENA_VP_2, 0xff);
++	/* set muxing after enabling ports: */
++	reg_write(priv, REG_VIP_CNTRL_0, priv->vip_cntrl_0);
++	reg_write(priv, REG_VIP_CNTRL_1, priv->vip_cntrl_1);
++	reg_write(priv, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
+ 
+-	if (on == priv->is_on)
+-		return;
++	priv->is_on = true;
++}
+ 
+-	if (on) {
+-		/* enable video ports, audio will be enabled later */
+-		reg_write(priv, REG_ENA_VP_0, 0xff);
+-		reg_write(priv, REG_ENA_VP_1, 0xff);
+-		reg_write(priv, REG_ENA_VP_2, 0xff);
+-		/* set muxing after enabling ports: */
+-		reg_write(priv, REG_VIP_CNTRL_0, priv->vip_cntrl_0);
+-		reg_write(priv, REG_VIP_CNTRL_1, priv->vip_cntrl_1);
+-		reg_write(priv, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
+-
+-		priv->is_on = true;
+-	} else {
+-		/* disable video ports */
+-		reg_write(priv, REG_ENA_VP_0, 0x00);
+-		reg_write(priv, REG_ENA_VP_1, 0x00);
+-		reg_write(priv, REG_ENA_VP_2, 0x00);
++static void tda998x_disable(struct tda998x_priv *priv)
++{
++	/* disable video ports */
++	reg_write(priv, REG_ENA_VP_0, 0x00);
++	reg_write(priv, REG_ENA_VP_1, 0x00);
++	reg_write(priv, REG_ENA_VP_2, 0x00);
+ 
+-		priv->is_on = false;
+-	}
++	priv->is_on = false;
++}
++
++static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
++{
++	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
++
++	/* we only care about on or off: */
++	if (mode == DRM_MODE_DPMS_ON)
++		tda998x_enable(priv);
++	else
++		tda998x_disable(priv);
+ }
+ 
+ static void
+@@ -1607,12 +1613,16 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+ 
+ static void tda998x_encoder_prepare(struct drm_encoder *encoder)
+ {
+-	tda998x_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
++	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
++
++	tda998x_disable(priv);
+ }
+ 
+ static void tda998x_encoder_commit(struct drm_encoder *encoder)
+ {
+-	tda998x_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
++	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
++
++	tda998x_enable(priv);
+ }
+ 
+ static const struct drm_encoder_helper_funcs tda998x_encoder_helper_funcs = {
 -- 
 2.11.0
