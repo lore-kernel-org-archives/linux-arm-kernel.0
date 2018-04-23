@@ -1,34 +1,39 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 23 Apr 2018 13:56:57 +0200
-Subject: [PATCH v6 01/11] dt-bindings: firmware: Add bindings for ZynqMP
- firmware
-In-Reply-To: <20180413151501.gvroqgbmwwyfy5pq@rob-hp-laptop>
-References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
- <1523389127-14243-2-git-send-email-jollys@xilinx.com>
- <20180413151501.gvroqgbmwwyfy5pq@rob-hp-laptop>
-Message-ID: <20180423115657.GB7951@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 23 Apr 2018 13:57:00 +0200
+Subject: [PATCH] ARM: s3c24xx: jive: Fix some GPIO names
+Message-ID: <20180423115700.13038-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2018 at 10:15:01AM -0500, Rob Herring wrote:
-> On Tue, Apr 10, 2018 at 12:38:37PM -0700, Jolly Shah wrote:
-> > From: Rajan Vaja <rajanv@xilinx.com>
-> > 
-> > Add documentation to describe Xilinx ZynqMP firmware driver
-> > bindings. Firmware driver provides an interface to firmware
-> > APIs. Interface APIs can be used by any driver to communicate
-> > to PMUFW (Platform Management Unit).
-> > 
-> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> > ---
-> >  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 29 ++++++++++++++++++++++
-> >  1 file changed, 29 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-> 
-> Please add acks/reviewed-by's when posting new versions.
+One of the bitbanged SPI hosts had wrongly named GPIO lines due to
+sloppiness by yours truly.
 
-I'll just wait for the resend with those acks before considering to
-merge these...
+Cc: arm at kernel.org
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC people:
+Please apply this directly for fixes if it is OK with
+everyone.
+---
+ arch/arm/mach-s3c24xx/mach-jive.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-greg k-h
+diff --git a/arch/arm/mach-s3c24xx/mach-jive.c b/arch/arm/mach-s3c24xx/mach-jive.c
+index 59589a4a0d4b..885e8f12e4b9 100644
+--- a/arch/arm/mach-s3c24xx/mach-jive.c
++++ b/arch/arm/mach-s3c24xx/mach-jive.c
+@@ -427,9 +427,9 @@ static struct gpiod_lookup_table jive_wm8750_gpiod_table = {
+ 	.dev_id         = "spi_gpio",
+ 	.table          = {
+ 		GPIO_LOOKUP("GPIOB", 4,
+-			    "gpio-sck", GPIO_ACTIVE_HIGH),
++			    "sck", GPIO_ACTIVE_HIGH),
+ 		GPIO_LOOKUP("GPIOB", 9,
+-			    "gpio-mosi", GPIO_ACTIVE_HIGH),
++			    "mosi", GPIO_ACTIVE_HIGH),
+ 		GPIO_LOOKUP("GPIOH", 10,
+ 			    "cs", GPIO_ACTIVE_HIGH),
+ 		{ },
+-- 
+2.14.3
