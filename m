@@ -1,45 +1,31 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 23 Apr 2018 09:39:53 -0500
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.18
-Message-ID: <1524494393-8052-1-git-send-email-dinguyen@kernel.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 23 Apr 2018 22:46:54 +0800
+Subject: [PATCH v3 0/3] SY8106 regulator support and enable it on Orange Pi PC
+Message-ID: <20180423144657.63264-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+This patchset adds dt-bindings and driver for Silergy SY8106A, and then
+utilize it on the Orange Pi PC board, which uses SY8016A as its CPUX
+(main ARM CPU cluster in an Allwinner SoC) power supply.
 
-Please full in these SoCFPGA Stratix10 DTS updates for v4.18.
+The driver's functionality is restricted now, mainly {en,dis}able function
+is not yet implemented, as it cannot be debugged on Orange Pi PC
+(disable it will kill Linux).
 
-Thanks,
-Dinh
+Ondrej Jirman (3):
+  dt-bindings: add binding for the SY8106A voltage regulator
+  regulator: add support for SY8106A regulator
+  ARM: dts: sun8i: h3: Add SY8106A regulator to Orange Pi PC
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+ .../bindings/regulator/sy8106a-regulator.txt       |  23 +++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  28 ++++
+ drivers/regulator/Kconfig                          |   8 +-
+ drivers/regulator/Makefile                         |   2 +-
+ drivers/regulator/sy8106a-regulator.c              | 183 +++++++++++++++++++++
+ 5 files changed, 242 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/regulator/sy8106a-regulator.txt
+ create mode 100644 drivers/regulator/sy8106a-regulator.c
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.18_part1
-
-for you to fetch changes up to ab50a44404a53b12554005ed4c5a1b3547ac9492:
-
-  arm64: dts: stratix10: Add PL330 DMAC to Stratix10 dts (2018-04-16 15:58:58 -0500)
-
-----------------------------------------------------------------
-SoCFPGA DTS updates for v4.18
-- Stratix10 platform updates
-  - Populate clock properties for platform
-  - Enable DMA and I2C
-
-----------------------------------------------------------------
-Alan Tull (1):
-      arm64: dts: stratix10: enable i2c, add i2c periperals
-
-Dinh Nguyen (1):
-      arm64: dts: stratix10: use clock bindings for the Stratix10 platform
-
-Graham Moore (1):
-      arm64: dts: stratix10: Add PL330 DMAC to Stratix10 dts
-
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 71 +++++++++++++++++++++-
- .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 42 +++++++++++++
- 2 files changed, 111 insertions(+), 2 deletions(-)
+-- 
+2.15.1
