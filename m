@@ -1,61 +1,44 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 23 Apr 2018 11:51:03 +0200
-Subject: [PATCH 4/4] serial: uartps: Remove static port array
-In-Reply-To: <cover.1524477059.git.michal.simek@xilinx.com>
-References: <cover.1524477059.git.michal.simek@xilinx.com>
-Message-ID: <f8baf0f2dae274bb1ee7662373fca43803651eb1.1524477059.git.michal.simek@xilinx.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 23 Apr 2018 12:02:52 +0200
+Subject: [PATCH v5 3/6] dt-bindings: arm: Document the RZN1D-DB board
+In-Reply-To: <CAMuHMdU4upXcYZ_yD2a_=J5VAUE28fni7_NotmchjpYUqCxV=A@mail.gmail.com>
+References: <1523963101-56725-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1523963101-56725-4-git-send-email-michel.pollet@bp.renesas.com>
+ <CAMuHMdU4upXcYZ_yD2a_=J5VAUE28fni7_NotmchjpYUqCxV=A@mail.gmail.com>
+Message-ID: <20180423100248.et7lsq25fmmxdhrn@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allocate uart port structure dynamically.
+On Tue, Apr 17, 2018 at 05:49:25PM +0200, Geert Uytterhoeven wrote:
+> Hi Michel,
+> 
+> On Tue, Apr 17, 2018 at 1:04 PM, Michel Pollet
+> <michel.pollet@bp.renesas.com> wrote:
+> > This documents the RZ/N1 bindings for the RZN1D-DB board.
+> >
+> > Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/shmobile.txt | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+> > index 61b486f..6efb3f1 100644
+> > --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> > +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> > @@ -51,7 +51,8 @@ SoCs:
+> >      compatible = "renesas,r8a77990"
+> >    - R-Car D3 (R8A77995)
+> >      compatible = "renesas,r8a77995"
+> > -
+> > +  - RZ/N1D (R9A06G032)
+> > +    compatible = "renesas,r9a06g032", "renesas,rzn1"
+> 
+> Why do you need a family-specific compatible value ("renesas,rzn1",
+> which is a marketing name)?
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-Reviewed-by: Alan Cox <alan@linux.intel.com>
----
+Thanks Michel, Thanks Geert,
 
- drivers/tty/serial/xilinx_uartps.c | 16 ++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index f7d527a1c532..0fc9de20843c 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1097,8 +1097,6 @@ static const struct uart_ops cdns_uart_ops = {
- #endif
- };
- 
--static struct uart_port cdns_uart_port[CDNS_UART_NR_PORTS];
--
- #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
- /**
-  * cdns_uart_console_wait_tx - Wait for the TX to be full
-@@ -1438,6 +1436,9 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 			GFP_KERNEL);
- 	if (!cdns_uart_data)
- 		return -ENOMEM;
-+	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
-+	if (!port)
-+		return -ENOMEM;
- 
- 	match = of_match_node(cdns_uart_of_match, pdev->dev.of_node);
- 	if (match && match->data) {
-@@ -1503,16 +1504,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	if (id < 0)
- 		id = 0;
- 
--	/* Try the given port id if failed use default method */
--	if (id < CDNS_UART_NR_PORTS && cdns_uart_port[id].mapbase != 0) {
--		/* Find the next unused port */
--		for (id = 0; id < CDNS_UART_NR_PORTS; id++)
--			if (cdns_uart_port[id].mapbase == 0)
--				break;
--	}
--
--	port = &cdns_uart_port[id];
--	if (!port || id >= CDNS_UART_NR_PORTS) {
-+	if (id >= CDNS_UART_NR_PORTS) {
- 		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
- 		rc = -ENODEV;
- 		goto err_out_notif_unreg;
--- 
-2.17.0
+it looks like this extra compatible value should be dropped.
+Its not consistent with the way other Renesas SoC families are handled
+and past experience has not lead us to want family-specific compatible
+values.
