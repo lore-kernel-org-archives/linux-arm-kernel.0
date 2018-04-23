@@ -1,35 +1,39 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 23 Apr 2018 14:49:30 +0100
-Subject: [RFC PATCH v3] tty: pl011: Avoid spuriously stuck-off interrupts
-In-Reply-To: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
-References: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAFEAcA8Q97YNKomCgkujgoY0MoES3edHoFEk_jjXGMCdzBpd9w@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 23 Apr 2018 15:50:24 +0200
+Subject: [PATCH] staging: bcm2835-audio: Disconnect and free
+ vchi_instance on module_exit()
+In-Reply-To: <20180417050028.19372-1-k.marinushkin@gmail.com>
+References: <20180417050028.19372-1-k.marinushkin@gmail.com>
+Message-ID: <20180423135024.GA2337@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2018 at 14:41, Dave Martin <Dave.Martin@arm.com> wrote:
-> This is an update to a previous RFC v2 [1], to fix a problem observed by
-> the qemu community that causes serial input to hang when booting a
-> simulated system with data already queued in the UART FIFO [2].
->
-> After discussion, I decided that the approach in [1] was over-
-> engineered: it tries to preserve a guarantee that people shouldn't be
-> relying on anyway, namely that data sent to the UART prior to kernel
-> boot will be received by the kernel; or more generally that data
-> received by the UART while the pl011 driver is not opened will be
-> received (either intact or at all) by the driver.
->
-> If anyone can please test the following and let me know the results,
-> that would be much appreciated!
->
->  a) Check that you can still reproduce the bug on mainline without this
->     patch.
->
->  b) Check whether this patch fixes the problem.
+On Tue, Apr 17, 2018 at 07:00:28AM +0200, Kirill Marinushkin wrote:
+> In the current implementation, vchi_instance is inited during the first
+> call of bcm2835_audio_open_connection(), and is never freed. It causes a
+> memory leak when the module `snd_bcm2835` is removed.
+> 
+> Here is how this commit fixes it:
+> 
+> * the VCHI context (including vchi_instance) is created once in the
+>   platform's devres
+> * the VCHI context is allocated and connected once during module_init()
+> * all created bcm2835_chips have a pointer to this VCHI context
+> * bcm2835_audio_open_connection() can access the VCHI context through the
+>   associated bcm2835_chip
+> * the VCHI context is disconnected and freed once during module_exit()
+> 
+> After this commit is applied, I don't see other issues with the module's
+> init/exit, so I also remove the associated TODO task.
+> 
+> Steps to reproduce the memory leak before this commit:
 
-Thanks. I'm cc'ing Ciro and Drew, who are the two people I
-recall reporting this issue to me.
-Link to the patch for their benefit:
- http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573120.html
+<snip>
 
--- PMM
+Patch dropped due to kbuild complaints.
+
+Please fix up and resend.
+
+thanks,
+
+greg k-h
