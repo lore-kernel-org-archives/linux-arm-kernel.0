@@ -1,85 +1,29 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 23 Apr 2018 10:37:12 +0200
-Subject: [PATCH] tty: serial: xuartps: Setup early console when uartclk is
- also passed
-In-Reply-To: <20180423080641.GA20149@kroah.com>
-References: <2ef5ac478f8d32bc807ead758eb5d60744a44515.1523367208.git.michal.simek@xilinx.com>
- <20180423080641.GA20149@kroah.com>
-Message-ID: <ebc1b162-c5bf-3963-05ab-4b236f89966a@monstr.eu>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 23 Apr 2018 10:37:20 +0200
+Subject: [PATCH 09/15] net: irda: pxaficp_ir: remove the dmaengine compat
+ need
+In-Reply-To: <20180402142656.26815-10-robert.jarzmik@free.fr>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-10-robert.jarzmik@free.fr>
+Message-ID: <20180423083720.GA25048@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.4.2018 10:06, Greg Kroah-Hartman wrote:
-> On Tue, Apr 10, 2018 at 03:33:30PM +0200, Michal Simek wrote:
->> Baudrate calculation depends on requested baudrate and uart clock.
->> This patch is checking that uartclk is also passed.
->>
->> The same logic is used 8250_early.c/init_port function.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->>  drivers/tty/serial/xilinx_uartps.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
->> index b9b2bc76bcac..a654cda203c7 100644
->> --- a/drivers/tty/serial/xilinx_uartps.c
->> +++ b/drivers/tty/serial/xilinx_uartps.c
->> @@ -1181,7 +1181,7 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
->>  	/* only set baud if specified on command line - otherwise
->>  	 * assume it has been initialized by a boot loader.
->>  	 */
->> -	if (device->baud) {
->> +	if (port->uartclk && device->baud) {
->>  		u32 cd = 0, bdiv = 0;
->>  		u32 mr;
->>  		int div8;
->> -- 
->> 1.9.1
+On Mon, Apr 02, 2018 at 04:26:50PM +0200, Robert Jarzmik wrote:
+> As the pxa architecture switched towards the dmaengine slave map, the
+> old compatibility mechanism to acquire the dma requestor line number and
+> priority are not needed anymore.
 > 
-> This patch conflicts with the previous patch you sent: Subject: [PATCH]
-> serial: xuartps: Fix the early_console junk character issue
+> This patch simplifies the dma resource acquisition, using the more
+> generic function dma_request_slave_channel().
 > 
-> So, which one should I apply?
-> 
-> I've dropped both from my review queue now, please resend the one(s) you
-> want applied, in a patch series if needed.
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>  drivers/staging/irda/drivers/pxaficp_ir.c | 14 ++------------
+>  1 file changed, 2 insertions(+), 12 deletions(-)
 
-First of all thanks for dropping. I forget that I have sent it in past.
+This file is no longer in Linus's tree :)
 
-Both patches are targeting the same problem. The first one is more
-destructive.
+thanks,
 
-And this one is what 8250 is doing.
-
-I have also sent
-"[PATCH] earlycon: Initialize port->uartclk based on clock-frequency
-property" which is filling uartclk based on DT to do proper divider
-calculation.
-
-It means when patch above is applied we can keep divider calculation in
-the driver because it is using right values. If not we need to remove
-that baudrate calculation because it is not correct (uartclk is
-hardcoded to BASE_BAUD * 16 in of_setup_earlycon).
-And it is really a question if "port->uartclk = BASE_BAUD * 16" should
-be in of_setup_earlycon.
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/1f89883d/attachment.sig>
+greg k-h
