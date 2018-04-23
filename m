@@ -1,338 +1,260 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Mon, 23 Apr 2018 09:23:00 +0200
-Subject: [PATCH v4 7/8] drm/i2c: tda998x: register as a drm bridge
+Date: Mon, 23 Apr 2018 09:23:01 +0200
+Subject: [RFC PATCH v4 8/8] drm/tilcdc: decomponentize now that tda998x is a
+ bridge
 In-Reply-To: <20180423072301.11962-1-peda@axentia.se>
 References: <20180423072301.11962-1-peda@axentia.se>
-Message-ID: <20180423072301.11962-8-peda@axentia.se>
+Message-ID: <20180423072301.11962-9-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes this driver work with all(?) drivers that are not
-componentized and instead expect to connect to a panel/bridge. That
-said, the only one tested is atmel-hlcdc.
-
-This hooks the relevant work function previously called by the encoder
-and the component also to the bridge, since the encoder goes away when
-connecting to the bridge interface of the driver and the equivalent of
-bind/unbind of the component is handled by bridge attach/detach.
-
-The lifetime requirements of a bridge and a component are slightly
-different, which is the reason for struct tda998x_bridge.
+The driver only registered as a component master when connected
+to a tda998x device, but that driver is now not only a component
+but also a drm_bridge. Since drm_bridges are also handled, it
+serves no purpose to register as a component master for the
+special case of tda998x (which is no longer special).
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 170 ++++++++++++++++++++++++++++++++------
- 1 file changed, 143 insertions(+), 27 deletions(-)
+ drivers/gpu/drm/tilcdc/tilcdc_crtc.c     | 11 ------
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c      | 67 +++-----------------------------
+ drivers/gpu/drm/tilcdc/tilcdc_drv.h      |  1 -
+ drivers/gpu/drm/tilcdc/tilcdc_external.c | 51 ------------------------
+ drivers/gpu/drm/tilcdc/tilcdc_external.h |  4 +-
+ 5 files changed, 6 insertions(+), 128 deletions(-)
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 53fd0be076b4..b8cb6237a38b 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -36,6 +36,14 @@ struct tda998x_audio_port {
- 	u8 config;		/* AP value */
- };
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+index 8bf6bb93dc79..b410939a3458 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
+@@ -1030,17 +1030,6 @@ int tilcdc_crtc_create(struct drm_device *dev)
+ 		goto fail;
  
-+struct tda998x_priv;
-+
-+struct tda998x_bridge {
-+	struct tda998x_priv *priv;
-+	struct device *dev;
-+	struct drm_bridge bridge;
-+};
-+
- struct tda998x_priv {
- 	struct i2c_client *cec;
- 	struct i2c_client *hdmi;
-@@ -63,6 +71,8 @@ struct tda998x_priv {
- 	wait_queue_head_t edid_delay_waitq;
- 	bool edid_delay_active;
- 
-+	struct tda998x_bridge *bridge;
-+	bool local_encoder;
- 	struct drm_encoder encoder;
- 	struct drm_connector connector;
- 
-@@ -75,6 +85,9 @@ struct tda998x_priv {
- #define enc_to_tda998x_priv(x) \
- 	container_of(x, struct tda998x_priv, encoder)
- 
-+#define bridge_to_tda998x_bridge(x) \
-+	container_of(x, struct tda998x_bridge, bridge)
-+
- /* The TDA9988 series of devices use a paged register scheme.. to simplify
-  * things we encode the page # in upper bits of the register #.  To read/
-  * write a given register, we need to make sure CURPAGE register is set
-@@ -842,7 +855,8 @@ static int tda998x_audio_hw_params(struct device *dev, void *data,
- 				   struct hdmi_codec_daifmt *daifmt,
- 				   struct hdmi_codec_params *params)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 	int i, ret;
- 	struct tda998x_audio_params audio = {
- 		.sample_width = params->sample_width,
-@@ -899,7 +913,8 @@ static int tda998x_audio_hw_params(struct device *dev, void *data,
- 
- static void tda998x_audio_shutdown(struct device *dev, void *data)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	mutex_lock(&priv->audio_mutex);
- 
-@@ -912,7 +927,8 @@ static void tda998x_audio_shutdown(struct device *dev, void *data)
- 
- int tda998x_audio_digital_mute(struct device *dev, void *data, bool enable)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	mutex_lock(&priv->audio_mutex);
- 
-@@ -925,7 +941,8 @@ int tda998x_audio_digital_mute(struct device *dev, void *data, bool enable)
- static int tda998x_audio_get_eld(struct device *dev, void *data,
- 				 uint8_t *buf, size_t len)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	mutex_lock(&priv->audio_mutex);
- 	memcpy(buf, priv->connector.eld,
-@@ -1126,7 +1143,10 @@ tda998x_connector_best_encoder(struct drm_connector *connector)
- {
- 	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
- 
--	return &priv->encoder;
-+	if (priv->local_encoder)
-+		return &priv->encoder;
-+	else
-+		return priv->bridge->bridge.encoder;
- }
- 
- static
-@@ -1140,6 +1160,7 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
- 				  struct drm_device *drm)
- {
- 	struct drm_connector *connector = &priv->connector;
-+	struct drm_encoder *encoder;
- 	int ret;
- 
- 	connector->interlace_allowed = 1;
-@@ -1156,7 +1177,8 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
- 	if (ret)
- 		return ret;
- 
--	drm_mode_connector_attach_encoder(&priv->connector, &priv->encoder);
-+	encoder = tda998x_connector_best_encoder(&priv->connector);
-+	drm_mode_connector_attach_encoder(&priv->connector, encoder);
- 
- 	return 0;
- }
-@@ -1672,8 +1694,10 @@ static void tda998x_set_config(struct tda998x_priv *priv,
- 	priv->audio_params = p->audio_params;
- }
- 
--static int tda998x_init(struct device *dev, struct drm_device *drm)
-+static int tda998x_init(struct device *dev, struct drm_device *drm,
-+			bool local_encoder)
- {
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
- 	struct tda998x_encoder_params *params = dev->platform_data;
- 	struct i2c_client *client = to_i2c_client(dev);
- 	struct tda998x_priv *priv;
-@@ -1684,18 +1708,22 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 	if (!priv)
- 		return -ENOMEM;
- 
--	dev_set_drvdata(dev, priv);
-+	bridge->priv = priv;
-+	priv->bridge = bridge;
-+	priv->local_encoder = local_encoder;
- 
--	if (dev->of_node)
--		crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
-+	if (local_encoder) {
-+		if (dev->of_node)
-+			crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
- 
--	/* If no CRTCs were found, fall back to our old behaviour */
--	if (crtcs == 0) {
--		dev_warn(dev, "Falling back to first CRTC\n");
--		crtcs = 1 << 0;
+ 	drm_crtc_helper_add(crtc, &tilcdc_crtc_helper_funcs);
+-
+-	if (priv->is_componentized) {
+-		crtc->port = of_graph_get_port_by_id(dev->dev->of_node, 0);
+-		if (!crtc->port) { /* This should never happen */
+-			dev_err(dev->dev, "Port node not found in %pOF\n",
+-				dev->dev->of_node);
+-			ret = -EINVAL;
+-			goto fail;
+-		}
 -	}
-+		/* If no CRTCs were found, fall back to our old behaviour */
-+		if (crtcs == 0) {
-+			dev_warn(dev, "Falling back to first CRTC\n");
-+			crtcs = 1 << 0;
-+		}
- 
--	priv->encoder.possible_crtcs = crtcs;
-+		priv->encoder.possible_crtcs = crtcs;
-+	}
- 
- 	ret = tda998x_create(client, priv);
- 	if (ret)
-@@ -1704,11 +1732,15 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 	if (!dev->of_node && params)
- 		tda998x_set_config(priv, params);
- 
--	drm_encoder_helper_add(&priv->encoder, &tda998x_encoder_helper_funcs);
--	ret = drm_encoder_init(drm, &priv->encoder, &tda998x_encoder_funcs,
--			       DRM_MODE_ENCODER_TMDS, NULL);
--	if (ret)
--		goto err_encoder;
-+	if (local_encoder) {
-+		drm_encoder_helper_add(&priv->encoder,
-+				       &tda998x_encoder_helper_funcs);
-+		ret = drm_encoder_init(drm, &priv->encoder,
-+				       &tda998x_encoder_funcs,
-+				       DRM_MODE_ENCODER_TMDS, NULL);
-+		if (ret)
-+			goto err_encoder;
-+	}
- 
- 	ret = tda998x_connector_init(priv, drm);
- 	if (ret)
-@@ -1717,7 +1749,8 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
+-
+ 	priv->crtc = crtc;
  	return 0;
  
- err_connector:
--	drm_encoder_cleanup(&priv->encoder);
-+	if (local_encoder)
-+		drm_encoder_cleanup(&priv->encoder);
- err_encoder:
- 	tda998x_destroy(priv);
- 	return ret;
-@@ -1725,10 +1758,12 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+index 1afde61f1247..d9d2e86c9430 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+@@ -17,7 +17,6 @@
  
- static void tda998x_fini(struct device *dev)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
+ /* LCDC DRM driver, based on da8xx-fb */
  
- 	drm_connector_cleanup(&priv->connector);
--	drm_encoder_cleanup(&priv->encoder);
-+	if (priv->local_encoder)
-+		drm_encoder_cleanup(&priv->encoder);
- 	tda998x_destroy(priv);
- }
+-#include <linux/component.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/suspend.h>
+ #include <drm/drm_atomic.h>
+@@ -246,9 +245,6 @@ static int tilcdc_init(struct drm_driver *ddrv, struct device *dev)
+ 	platform_set_drvdata(pdev, ddev);
+ 	drm_mode_config_init(ddev);
  
-@@ -1736,7 +1771,7 @@ static int tda998x_bind(struct device *dev, struct device *master, void *data)
- {
- 	struct drm_device *drm = data;
+-	priv->is_componentized =
+-		tilcdc_get_external_components(dev, NULL) > 0;
+-
+ 	priv->wq = alloc_ordered_workqueue("tilcdc", 0);
+ 	if (!priv->wq) {
+ 		ret = -ENOMEM;
+@@ -363,19 +359,9 @@ static int tilcdc_init(struct drm_driver *ddrv, struct device *dev)
+ 	}
+ 	modeset_init(ddev);
  
--	return tda998x_init(dev, drm);
-+	return tda998x_init(dev, drm, true);
- }
+-	if (priv->is_componentized) {
+-		ret = component_bind_all(dev, ddev);
+-		if (ret < 0)
+-			goto init_failed;
+-
+-		ret = tilcdc_add_component_encoder(ddev);
+-		if (ret < 0)
+-			goto init_failed;
+-	} else {
+-		ret = tilcdc_attach_external_device(ddev);
+-		if (ret)
+-			goto init_failed;
+-	}
++	ret = tilcdc_attach_external_device(ddev);
++	if (ret)
++		goto init_failed;
  
- static void tda998x_unbind(struct device *dev, struct device *master,
-@@ -1750,19 +1785,100 @@ static const struct component_ops tda998x_ops = {
- 	.unbind = tda998x_unbind,
+ 	if (!priv->external_connector &&
+ 	    ((priv->num_encoders == 0) || (priv->num_connectors == 0))) {
+@@ -586,63 +572,20 @@ static const struct dev_pm_ops tilcdc_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(tilcdc_pm_suspend, tilcdc_pm_resume)
  };
  
-+/* DRM bridge functions */
-+
-+static int tda998x_bridge_attach(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct device *dev = bridge->dev;
-+	struct drm_device *drm = bridge->bridge.dev;
-+
-+	return tda998x_init(dev, drm, false);
-+}
-+
-+static void tda998x_bridge_detach(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct device *dev = bridge->dev;
-+
-+	tda998x_fini(dev);
-+}
-+
-+static void tda998x_bridge_enable(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct tda998x_priv *priv = bridge->priv;
-+
-+	tda998x_enable(priv);
-+}
-+
-+static void tda998x_bridge_disable(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct tda998x_priv *priv = bridge->priv;
-+
-+	tda998x_disable(priv);
-+}
-+
-+static void tda998x_bridge_mode_set(struct drm_bridge *dbridge,
-+				    struct drm_display_mode *mode,
-+				    struct drm_display_mode *adjusted_mode)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct tda998x_priv *priv = bridge->priv;
-+
-+	tda998x_mode_set(priv, mode, adjusted_mode);
-+}
-+
-+static const struct drm_bridge_funcs tda998x_bridge_funcs = {
-+	.attach = tda998x_bridge_attach,
-+	.detach = tda998x_bridge_detach,
-+	.enable = tda998x_bridge_enable,
-+	.disable = tda998x_bridge_disable,
-+	.mode_set = tda998x_bridge_mode_set,
-+};
-+
- static int
- tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
+-/*
+- * Platform driver:
+- */
+-static int tilcdc_bind(struct device *dev)
+-{
+-	return tilcdc_init(&tilcdc_driver, dev);
+-}
+-
+-static void tilcdc_unbind(struct device *dev)
+-{
+-	struct drm_device *ddev = dev_get_drvdata(dev);
+-
+-	/* Check if a subcomponent has already triggered the unloading. */
+-	if (!ddev->dev_private)
+-		return;
+-
+-	tilcdc_fini(dev_get_drvdata(dev));
+-}
+-
+-static const struct component_master_ops tilcdc_comp_ops = {
+-	.bind = tilcdc_bind,
+-	.unbind = tilcdc_unbind,
+-};
+-
+ static int tilcdc_pdev_probe(struct platform_device *pdev)
  {
-+	struct device *dev = &client->dev;
-+	struct tda998x_bridge *bridge;
-+	int ret;
-+
- 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
- 		dev_warn(&client->dev, "adapter does not support I2C\n");
- 		return -EIO;
+-	struct component_match *match = NULL;
+-	int ret;
+-
+ 	/* bail out early if no DT data: */
+ 	if (!pdev->dev.of_node) {
+ 		dev_err(&pdev->dev, "device-tree data is missing\n");
+ 		return -ENXIO;
  	}
--	return component_add(&client->dev, &tda998x_ops);
-+
-+	bridge = devm_kzalloc(dev, sizeof(*bridge), GFP_KERNEL);
-+	if (!bridge)
-+		return -ENOMEM;
-+
-+	bridge->dev = dev;
-+	dev_set_drvdata(dev, bridge);
-+
-+	bridge->bridge.funcs = &tda998x_bridge_funcs;
-+#ifdef CONFIG_OF
-+	bridge->bridge.of_node = dev->of_node;
-+#endif
-+	drm_bridge_add(&bridge->bridge);
-+
-+	ret = component_add(dev, &tda998x_ops);
-+
-+	if (ret)
-+		drm_bridge_remove(&bridge->bridge);
-+
-+	return ret;
+ 
+-	ret = tilcdc_get_external_components(&pdev->dev, &match);
+-	if (ret < 0)
+-		return ret;
+-	else if (ret == 0)
+-		return tilcdc_init(&tilcdc_driver, &pdev->dev);
+-	else
+-		return component_master_add_with_match(&pdev->dev,
+-						       &tilcdc_comp_ops,
+-						       match);
++	return tilcdc_init(&tilcdc_driver, &pdev->dev);
  }
  
- static int tda998x_remove(struct i2c_client *client)
+ static int tilcdc_pdev_remove(struct platform_device *pdev)
  {
--	component_del(&client->dev, &tda998x_ops);
-+	struct device *dev = &client->dev;
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+
-+	drm_bridge_remove(&bridge->bridge);
-+	component_del(dev, &tda998x_ops);
-+
+-	int ret;
+-
+-	ret = tilcdc_get_external_components(&pdev->dev, NULL);
+-	if (ret < 0)
+-		return ret;
+-	else if (ret == 0)
+-		tilcdc_fini(platform_get_drvdata(pdev));
+-	else
+-		component_master_del(&pdev->dev, &tilcdc_comp_ops);
++	tilcdc_fini(platform_get_drvdata(pdev));
+ 
  	return 0;
  }
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.h b/drivers/gpu/drm/tilcdc/tilcdc_drv.h
+index ead512216669..c47a2b6e2a3a 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_drv.h
++++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.h
+@@ -92,7 +92,6 @@ struct tilcdc_drm_private {
+ 	const struct drm_connector_helper_funcs *connector_funcs;
  
+ 	bool is_registered;
+-	bool is_componentized;
+ };
+ 
+ /* Sub-module for display.  Since we don't know at compile time what panels
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_external.c b/drivers/gpu/drm/tilcdc/tilcdc_external.c
+index 711c7b3289d3..1471f5f8cb5c 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_external.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_external.c
+@@ -8,7 +8,6 @@
+  *
+  */
+ 
+-#include <linux/component.h>
+ #include <linux/of_graph.h>
+ #include <drm/drm_of.h>
+ 
+@@ -116,33 +115,6 @@ struct drm_connector *tilcdc_encoder_find_connector(struct drm_device *ddev,
+ 	return NULL;
+ }
+ 
+-int tilcdc_add_component_encoder(struct drm_device *ddev)
+-{
+-	struct tilcdc_drm_private *priv = ddev->dev_private;
+-	struct drm_connector *connector;
+-	struct drm_encoder *encoder;
+-
+-	list_for_each_entry(encoder, &ddev->mode_config.encoder_list, head)
+-		if (encoder->possible_crtcs & (1 << priv->crtc->index))
+-			break;
+-
+-	if (!encoder) {
+-		dev_err(ddev->dev, "%s: No suitable encoder found\n", __func__);
+-		return -ENODEV;
+-	}
+-
+-	connector = tilcdc_encoder_find_connector(ddev, encoder);
+-
+-	if (!connector)
+-		return -ENODEV;
+-
+-	/* Only tda998x is supported at the moment. */
+-	tilcdc_crtc_set_simulate_vesa_sync(priv->crtc, true);
+-	tilcdc_crtc_set_panel_info(priv->crtc, &panel_info_tda998x);
+-
+-	return tilcdc_add_external_connector(ddev, connector);
+-}
+-
+ void tilcdc_remove_external_device(struct drm_device *dev)
+ {
+ 	struct tilcdc_drm_private *priv = dev->dev_private;
+@@ -221,26 +193,3 @@ int tilcdc_attach_external_device(struct drm_device *ddev)
+ 
+ 	return ret;
+ }
+-
+-static int dev_match_of(struct device *dev, void *data)
+-{
+-	return dev->of_node == data;
+-}
+-
+-int tilcdc_get_external_components(struct device *dev,
+-				   struct component_match **match)
+-{
+-	struct device_node *node;
+-
+-	node = of_graph_get_remote_node(dev->of_node, 0, 0);
+-
+-	if (!of_device_is_compatible(node, "nxp,tda998x")) {
+-		of_node_put(node);
+-		return 0;
+-	}
+-
+-	if (match)
+-		drm_of_component_match_add(dev, match, dev_match_of, node);
+-	of_node_put(node);
+-	return 1;
+-}
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_external.h b/drivers/gpu/drm/tilcdc/tilcdc_external.h
+index 763d18f006c7..1df237e227c9 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_external.h
++++ b/drivers/gpu/drm/tilcdc/tilcdc_external.h
+@@ -18,9 +18,7 @@
+ #ifndef __TILCDC_EXTERNAL_H__
+ #define __TILCDC_EXTERNAL_H__
+ 
+-int tilcdc_add_component_encoder(struct drm_device *dev);
+ void tilcdc_remove_external_device(struct drm_device *dev);
+-int tilcdc_get_external_components(struct device *dev,
+-				   struct component_match **match);
+ int tilcdc_attach_external_device(struct drm_device *ddev);
++
+ #endif /* __TILCDC_SLAVE_H__ */
 -- 
 2.11.0
