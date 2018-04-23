@@ -1,36 +1,81 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Mon, 23 Apr 2018 11:48:26 +0200
-Subject: [PATCH v2 0/5] Add STM32F7 I2C Support on STM32MP157C
-Message-ID: <1524476911-19056-1-git-send-email-pierre-yves.mordret@st.com>
+Date: Mon, 23 Apr 2018 11:48:29 +0200
+Subject: [PATCH v2 3/5] ARM: dts: stm32: Add I2Cs pin control on STM32MP157C
+In-Reply-To: <1524476911-19056-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1524476911-19056-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1524476911-19056-4-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds a dedicated pin control applied on I2C1,2,4 & 5
 
-This patch adds STM32MP157C I2C support on STM32MP157C with configs and device
-tree.
-In the same way I2C4 is enabled for STM32MP157C ED1 Daughter bord.
-I2C2/5 is enabled on STM32MP157C EV1 Daughter board on Evaluation board.
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
   Version history:
      v1:
         * Initial
-     v2:
-        * Disambiguate subjects
 ---
+---
+ arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 40 +++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-Pierre-Yves MORDRET (5):
-  ARM: multi_v7_defconfig: Add STM32F7 I2C support
-  ARM: dts: stm32: Add STM32F7 I2C support for STM32MP157C SoC
-  ARM: dts: stm32: Add I2Cs pin control on STM32MP157C
-  ARM: dts: stm32: Add I2C4 support for STM32MP157C-ED1
-  ARM: dts: stm32: Add I2C2/5 support for STM32MP157C-EV1
-
- arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 40 ++++++++++++++++
- arch/arm/boot/dts/stm32mp157c-ed1.dts     |  8 ++++
- arch/arm/boot/dts/stm32mp157c-ev1.dts     | 17 +++++++
- arch/arm/boot/dts/stm32mp157c.dtsi        | 77 +++++++++++++++++++++++++++++++
- arch/arm/configs/multi_v7_defconfig       |  1 +
- 5 files changed, 143 insertions(+)
-
+diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+index 6f044100..862e626 100644
+--- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+@@ -146,6 +146,36 @@
+ 				gpio-ranges = <&pinctrl 0 160 8>;
+ 			};
+ 
++			i2c1_pins_a: i2c1 at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('D', 12, AF5)>, /* I2C1_SCL */
++						 <STM32_PINMUX('F', 15, AF5)>; /* I2C1_SDA */
++					bias-disable;
++					drive-open-drain;
++					slew-rate = <0>;
++				};
++			};
++
++			i2c2_pins_a: i2c2 at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('H', 4, AF4)>, /* I2C2_SCL */
++						 <STM32_PINMUX('H', 5, AF4)>; /* I2C2_SDA */
++					bias-disable;
++					drive-open-drain;
++					slew-rate = <0>;
++				};
++			};
++
++			i2c5_pins_a: i2c5 at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('A', 11, AF4)>, /* I2C5_SCL */
++						 <STM32_PINMUX('A', 12, AF4)>; /* I2C5_SDA */
++					bias-disable;
++					drive-open-drain;
++					slew-rate = <0>;
++				};
++			};
++
+ 			uart4_pins_a: uart4 at 0 {
+ 				pins1 {
+ 					pinmux = <STM32_PINMUX('G', 11, AF6)>; /* UART4_TX */
+@@ -180,6 +210,16 @@
+ 				ngpios = <8>;
+ 				gpio-ranges = <&pinctrl_z 0 400 8>;
+ 			};
++
++			i2c4_pins_a: i2c4 at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('Z', 4, AF6)>, /* I2C4_SCL */
++						 <STM32_PINMUX('Z', 5, AF6)>; /* I2C4_SDA */
++					bias-disable;
++					drive-open-drain;
++					slew-rate = <0>;
++				};
++			};
+ 		};
+ 	};
+ };
 -- 
 2.7.4
