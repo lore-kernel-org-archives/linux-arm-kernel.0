@@ -1,34 +1,68 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Mon, 23 Apr 2018 18:13:59 +0200
-Subject: [v2 10/10] MAINTAINERS: update Mediatek Soc entry
+Date: Mon, 23 Apr 2018 18:13:57 +0200
+Subject: [v2 08/10] clk: mediatek: mt8173-mm: switch to mfd device
 In-Reply-To: <cover.1524497268.git.mbrugger@suse.com>
 References: <cover.1524497268.git.mbrugger@suse.com>
-Message-ID: <0fd5bf87d227fdb44bd0ddd2f83c5595380957fb.1524497268.git.mbrugger@suse.com>
+Message-ID: <74bf4058534cf187e10ef041da1706878914aa45.1524497268.git.mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Brugger <mbrugger@suse.com>
 
-Mediatek SoCs include several soc specific drivers as well
-as a mfd device. Add these to the maintainers file.
+As the new mfd device is in place, switch probing
+for the MMSYS to support invocation from the mfd device.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clk/mediatek/clk-mt8173.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 0a1410d5a621..74f7ea345096 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1621,6 +1621,8 @@ F:	arch/arm/boot/dts/mt7*
- F:	arch/arm/boot/dts/mt8*
- F:	arch/arm/mach-mediatek/
- F:	arch/arm64/boot/dts/mediatek/
-+F:	drivers/soc/mediatek/
-+F:	drivers/mfd/mtk-mmsys.c
- N:	mtk
- K:	mediatek
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 96c292c3e440..abd2592078d4 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -15,6 +15,7 @@
+ #include <linux/clk.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/platform_device.h>
  
+ #include "clk-mtk.h"
+ #include "clk-gate.h"
+@@ -1152,10 +1153,13 @@ static void __init mtk_imgsys_init(struct device_node *node)
+ }
+ CLK_OF_DECLARE(mtk_imgsys, "mediatek,mt8173-imgsys", mtk_imgsys_init);
+ 
+-static void __init mtk_mmsys_init(struct device_node *node)
++static int mtk_mmsys_probe(struct platform_device *pdev)
+ {
+ 	struct clk_onecell_data *clk_data;
+ 	int r;
++	struct device_node *node;
++
++	node = pdev->dev.parent->of_node;
+ 
+ 	clk_data = mtk_alloc_clk_data(CLK_MM_NR_CLK);
+ 
+@@ -1166,8 +1170,17 @@ static void __init mtk_mmsys_init(struct device_node *node)
+ 	if (r)
+ 		pr_err("%s(): could not register clock provider: %d\n",
+ 			__func__, r);
++
++	return r;
+ }
+-CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt8173-mmsys", mtk_mmsys_init);
++
++static struct platform_driver clk_mt8173_mm_drv = {
++	.probe = mtk_mmsys_probe,
++	.driver = {
++		.name = "clk-mt8173-mm",
++	},
++};
++builtin_platform_driver(clk_mt8173_mm_drv);
+ 
+ static void __init mtk_vdecsys_init(struct device_node *node)
+ {
 -- 
 2.16.3
