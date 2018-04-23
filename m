@@ -1,20 +1,75 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Apr 2018 17:06:37 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-tx6: Remove 'bus-format-override'
- property
-In-Reply-To: <1523390626-12216-1-git-send-email-festevam@gmail.com>
-References: <1523390626-12216-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180423090636.GB25429@dragon>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 23 Apr 2018 11:11:36 +0200
+Subject: [PATCH] ACPI / button: make module loadable when booted in
+ non-ACPI mode
+In-Reply-To: <20180423082834.24617-1-ard.biesheuvel@linaro.org>
+References: <20180423082834.24617-1-ard.biesheuvel@linaro.org>
+Message-ID: <19815719.fbhg0N8B6c@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 05:03:46PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Monday, April 23, 2018 10:28:34 AM CEST Ard Biesheuvel wrote:
+> Modules such as nouveau.ko and i915.ko have a link time dependency on
+> acpi_lid_open(), and due to its use of acpi_bus_register_driver(),
+> the button.ko module that provides it is only loadable when booted in
+> ACPI mode. However, the ACPI button driver can be built into the core
+> kernel as well, in which case the dependency can always be satisfied,
+> and the dependent modules can be loaded regardless of whether the
+> system was booted in ACPI mode or not.
 > 
-> The 'bus-format-override' property is not documented nor used
-> anywhere else, so just remove it.
+> So let's fix this asymmetry by making the ACPI button driver loadable
+> as a module even if not booted in ACPI mode, so it can provide the
+> acpi_lid_open() symbol in the same way as when built into the kernel.
 > 
-> Reported-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> Could we perhaps get this into -stable as well? It is not a classic
+> regression, but it completely breaks, e.g., Fedora when booting in
+> DT mode on an ARM system.
+> 
+>  drivers/acpi/button.c | 23 +++++++++++++++++++-
+>  1 file changed, 22 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/acpi/button.c b/drivers/acpi/button.c
+> index e1eee7a60fad..0506ca56c615 100644
+> --- a/drivers/acpi/button.c
+> +++ b/drivers/acpi/button.c
+> @@ -635,4 +635,25 @@ module_param_call(lid_init_state,
+>  		  NULL, 0644);
+>  MODULE_PARM_DESC(lid_init_state, "Behavior for reporting LID initial state");
+>  
+> -module_acpi_driver(acpi_button_driver);
+> +/*
+> + * Modules such as nouveau.ko and i915.ko have a link time dependency on
+> + * acpi_lid_open(), and would therefore not be loadable on ACPI capable kernels
+> + * booted in non-ACPI mode if we use the ordinary acpi_bus_[un]register_driver
+> + * routines here (which only work when booted in ACPI mode) and build this
+> + * driver as a module. So provide our own versions instead.
+> + */
+> +static int __acpi_bus_register_driver(struct acpi_driver *driver)
+> +{
+> +	if (!acpi_disabled)
+> +		return acpi_bus_register_driver(driver);
+> +	return 0;
+> +}
 
-Applied, thanks.
+I would write this as:
+
+    if (acpi_disabled)
+            return 0;
+
+    return acpi_bus_register_driver(driver);
+
+and the comment can go above the (acpi_disabled) check then (bacause that's
+what makes the difference when ACPI is disabled).
+
+> +
+> +static void __acpi_bus_unregister_driver(struct acpi_driver *driver)
+> +{
+> +	if (!acpi_disabled)
+> +		acpi_bus_unregister_driver(driver);
+> +}
+> +
+> +module_driver(acpi_button_driver, __acpi_bus_register_driver,
+> +	      __acpi_bus_unregister_driver);
+> 
