@@ -1,43 +1,111 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 23 Apr 2018 09:53:43 +0530
-Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
- supported
-In-Reply-To: <52044000-513b-b5a1-27db-fb7fdb5ee04f@gmail.com>
-References: <20180418155643.36464-1-code@mmayer.net>
- <20180418155643.36464-3-code@mmayer.net>
- <20180419041632.GF24576@vireshk-i7>
- <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
- <20180420044259.GA2873@vireshk-i7>
- <d09b1f87-d467-72d0-cb5d-fd747c7e30c8@arm.com>
- <20180420093548.GA2989@vireshk-i7>
- <52044000-513b-b5a1-27db-fb7fdb5ee04f@gmail.com>
-Message-ID: <20180423042343.GB2989@vireshk-i7>
+Date: Mon, 23 Apr 2018 09:57:03 +0530
+Subject: [PATCH] cpufreq: add suspend/resume support in Armada 37xx DVFS
+ driver
+In-Reply-To: <20180421141943.25705-1-miquel.raynal@bootlin.com>
+References: <20180421141943.25705-1-miquel.raynal@bootlin.com>
+Message-ID: <20180423042703.GC2989@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-04-18, 09:50, Florian Fainelli wrote:
-> On 04/20/2018 02:35 AM, Viresh Kumar wrote:
-> > On 20-04-18, 10:15, Sudeep Holla wrote:
-> >> It still doesn't give the flexibility to switch between the two
-> >> implementations boot time based on some firmware config(e.g. DT status
-> >> property).
-> > 
-> > I agree, but it didn't look like they need flexibility :)
-> > 
-> > Lets see how the intend to use it. If they are *always* going to use SCPI if
-> > that is available, then it should be solved at Kconfig level only. Else they
-> > shouldn't put such code in the driver to quit early.
+On 21-04-18, 16:19, Miquel Raynal wrote:
+> Add suspend/resume hooks in Armada 37xx DVFS driver to handle S2RAM
+> operations. As there is currently no 'driver' structure, create one
+> to store both the regmap and the register values during suspend
+> operation.
 > 
-> We have both drivers (brcmstb-avs-cpufreq and scmi-cpufreq) enabled in
-> our kernel configuration, however, depending on the firmware version, we
-> may have a number of combinations:
+> A syscore_ops is used to export the suspend/resume hooks.
 > 
-> - arm,scmi DT node is present and enabled (status = okay) as well as
-> brcmstb-avs-cpufreq being present and enabled
-> - arm,scmi DT node is present but disabled (status = disabled) and
-> brcmstb-avs-cpufreq is being present and enabled
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/cpufreq/armada-37xx-cpufreq.c | 73 ++++++++++++++++++++++++++++++++++-
+>  1 file changed, 71 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
+> index 72a2975499db..9c9c3673cbbe 100644
+> --- a/drivers/cpufreq/armada-37xx-cpufreq.c
+> +++ b/drivers/cpufreq/armada-37xx-cpufreq.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/pm_opp.h>
+>  #include <linux/regmap.h>
+>  #include <linux/slab.h>
+> +#include <linux/syscore_ops.h>
+>  
+>  /* Power management in North Bridge register set */
+>  #define ARMADA_37XX_NB_L0L1	0x18
+> @@ -56,6 +57,18 @@
+>   */
+>  #define LOAD_LEVEL_NR	4
+>  
+> +#if defined(CONFIG_PM)
+> +struct armada37xx_cpufreq_state {
+> +	struct regmap *regmap;
+> +	u32 nb_l0l1;
+> +	u32 nb_l2l3;
+> +	u32 nb_dyn_mod;
+> +	u32 nb_cpu_load;
+> +};
+> +
+> +static struct armada37xx_cpufreq_state *armada37xx_cpufreq_state;
+> +#endif /* CONFIG_PM */
+> +
+>  struct armada_37xx_dvfs {
+>  	u32 cpu_freq_max;
+>  	u8 divider[LOAD_LEVEL_NR];
+> @@ -136,7 +149,7 @@ static void __init armada37xx_cpufreq_dvfs_setup(struct regmap *base,
+>  	clk_set_parent(clk, parent);
+>  }
+>  
+> -static void __init armada37xx_cpufreq_disable_dvfs(struct regmap *base)
+> +static void armada37xx_cpufreq_disable_dvfs(struct regmap *base)
+>  {
+>  	unsigned int reg = ARMADA_37XX_NB_DYN_MOD,
+>  		mask = ARMADA_37XX_NB_DFS_EN;
+> @@ -162,6 +175,46 @@ static void __init armada37xx_cpufreq_enable_dvfs(struct regmap *base)
+>  	regmap_update_bits(base, reg, mask, mask);
+>  }
+>  
+> +#if defined(CONFIG_PM)
+> +static int armada37xx_cpufreq_suspend(void)
+> +{
+> +	struct armada37xx_cpufreq_state *state = armada37xx_cpufreq_state;
+> +
+> +	regmap_read(state->regmap, ARMADA_37XX_NB_L0L1, &state->nb_l0l1);
+> +	regmap_read(state->regmap, ARMADA_37XX_NB_L2L3, &state->nb_l2l3);
+> +	regmap_read(state->regmap, ARMADA_37XX_NB_CPU_LOAD,
+> +		    &state->nb_cpu_load);
+> +	regmap_read(state->regmap, ARMADA_37XX_NB_DYN_MOD, &state->nb_dyn_mod);
+> +
+> +	return 0;
+> +}
+> +
+> +static void armada37xx_cpufreq_resume(void)
+> +{
+> +	struct armada37xx_cpufreq_state *state = armada37xx_cpufreq_state;
+> +
+> +	/* Ensure DVFS is disabled otherwise the following registers are RO */
+> +	armada37xx_cpufreq_disable_dvfs(state->regmap);
+> +
+> +	regmap_write(state->regmap, ARMADA_37XX_NB_L0L1, state->nb_l0l1);
+> +	regmap_write(state->regmap, ARMADA_37XX_NB_L2L3, state->nb_l2l3);
+> +	regmap_write(state->regmap, ARMADA_37XX_NB_CPU_LOAD,
+> +		     state->nb_cpu_load);
+> +
+> +	/*
+> +	 * NB_DYN_MOD register is the one that actually enable back DVFS if it
+> +	 * was enabled before the suspend operation. This must be done last
+> +	 * otherwise other registers are not writable.
+> +	 */
+> +	regmap_write(state->regmap, ARMADA_37XX_NB_DYN_MOD, state->nb_dyn_mod);
+> +}
+> +
+> +static struct syscore_ops armada37xx_cpufreq_syscore_pm_ops = {
+> +	.suspend = armada37xx_cpufreq_suspend,
+> +	.resume = armada37xx_cpufreq_resume,
+> +};
 
-In this case the Kconfig thing I have been talking about doesn't apply anymore.
+And why can't you use the suspend/resume callbacks present in the struct
+cpufreq_driver ?
 
 -- 
 viresh
