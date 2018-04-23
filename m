@@ -1,38 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Apr 2018 10:45:48 -0700
-Subject: [PATCH 15/16] bus: ti-sysc: Tag sdio and wdt with legacy mode for
- suspend
-In-Reply-To: <20180423174549.57412-1-tony@atomide.com>
-References: <20180423174549.57412-1-tony@atomide.com>
-Message-ID: <20180423174549.57412-16-tony@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 23 Apr 2018 19:05:04 +0100
+Subject: Applied "mfd: bd9571mwv: Allow DDR Backup Power register access" to
+ the regulator tree
+In-Reply-To: <1507649178-31473-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <E1fAfpo-0004D5-5n@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like these two device drivers don't yet behave properly for suspend
-unless configured with the legacy option.
+The patch
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+   mfd: bd9571mwv: Allow DDR Backup Power register access
+
+has been applied to the regulator tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 7b569bcb2a2f985fe2d1407aed705882af30cb77 Mon Sep 17 00:00:00 2001
+From: Geert Uytterhoeven <geert+renesas@glider.be>
+Date: Wed, 18 Apr 2018 15:18:03 +0200
+Subject: [PATCH] mfd: bd9571mwv: Allow DDR Backup Power register access
+
+Enable read/write access to the BD9571MWV_BKUP_MODE_CNT register, which
+is amongst others used to configure DDR Backup Power.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/bus/ti-sysc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/mfd/bd9571mwv.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
---- a/drivers/bus/ti-sysc.c
-+++ b/drivers/bus/ti-sysc.c
-@@ -883,6 +883,14 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
- 	/* Uarts on omap4 and later */
- 	SYSC_QUIRK("uart", 0, 0x50, 0x54, 0x58, 0x50411e03, 0xffffffff,
- 		   SYSC_QUIRK_LEGACY_IDLE),
-+
-+	/* These devices don't yet suspend properly without legacy setting */
-+	SYSC_QUIRK("sdio", 0, 0, 0x10, -1, 0x40202301, 0xffffffff,
-+		   SYSC_QUIRK_LEGACY_IDLE),
-+	SYSC_QUIRK("wdt", 0, 0, 0x10, 0x14, 0x502a0500, 0xffffffff,
-+		   SYSC_QUIRK_LEGACY_IDLE),
-+	SYSC_QUIRK("wdt", 0, 0, 0x10, 0x14, 0x502a0d00, 0xffffffff,
-+		   SYSC_QUIRK_LEGACY_IDLE),
+diff --git a/drivers/mfd/bd9571mwv.c b/drivers/mfd/bd9571mwv.c
+index 64e088dfe7b0..503979c81dae 100644
+--- a/drivers/mfd/bd9571mwv.c
++++ b/drivers/mfd/bd9571mwv.c
+@@ -29,6 +29,7 @@ static const struct mfd_cell bd9571mwv_cells[] = {
+ 
+ static const struct regmap_range bd9571mwv_readable_yes_ranges[] = {
+ 	regmap_reg_range(BD9571MWV_VENDOR_CODE, BD9571MWV_PRODUCT_REVISION),
++	regmap_reg_range(BD9571MWV_BKUP_MODE_CNT, BD9571MWV_BKUP_MODE_CNT),
+ 	regmap_reg_range(BD9571MWV_AVS_SET_MONI, BD9571MWV_AVS_DVFS_VID(3)),
+ 	regmap_reg_range(BD9571MWV_VD18_VID, BD9571MWV_VD33_VID),
+ 	regmap_reg_range(BD9571MWV_DVFS_VINIT, BD9571MWV_DVFS_VINIT),
+@@ -44,6 +45,7 @@ static const struct regmap_access_table bd9571mwv_readable_table = {
  };
  
- static void sysc_init_revision_quirks(struct sysc *ddata)
+ static const struct regmap_range bd9571mwv_writable_yes_ranges[] = {
++	regmap_reg_range(BD9571MWV_BKUP_MODE_CNT, BD9571MWV_BKUP_MODE_CNT),
+ 	regmap_reg_range(BD9571MWV_AVS_VD09_VID(0), BD9571MWV_AVS_VD09_VID(3)),
+ 	regmap_reg_range(BD9571MWV_DVFS_SETVID, BD9571MWV_DVFS_SETVID),
+ 	regmap_reg_range(BD9571MWV_GPIO_DIR, BD9571MWV_GPIO_OUT),
 -- 
 2.17.0
