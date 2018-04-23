@@ -1,60 +1,143 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Mon, 23 Apr 2018 14:13:58 -0500
-Subject: [PATCH 00/11] fix potential Spectre variant 1 issues
-In-Reply-To: <cover.1524499368.git.gustavo@embeddedor.com>
-References: <cover.1524499368.git.gustavo@embeddedor.com>
-Message-ID: <96bd3e25-9503-d23d-4e3c-091e68b6bf8f@embeddedor.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 23 Apr 2018 21:46:47 +0200
+Subject: [GIT PULL REQUEST v2] brcm: add fmac nvram files
+In-Reply-To: <1524507832-19288-1-git-send-email-ryan.harkin@linaro.org>
+References: <1524507832-19288-1-git-send-email-ryan.harkin@linaro.org>
+Message-ID: <d509fa7c-225d-9c3d-1dd9-5ba3352bbb87@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Please, drop this series. Further analysis is required as it seems all 
-these are False Positives.
+On 23-04-18 20:23, Ryan Harkin wrote:
+> Murata has created a github project for the firmware for their 43xx
+> family of devices:
+> 
+>    https://github.com/murata-wireless
+> 
+> This project contains firmware binaries for their WiFi and BT parts
+> containing the Cypress IP.
+> 
+> The binary files are licensed under the same LICENCE.cypress as present
+> in this repo already. The NVRAM files are text and are licensed under
+> GPLv2.
+> 
+> This series copies the files from the github project into
+> linux-firmware where other downstream projects may benefit.
+> 
+> v1->v2:
+> Hans de Goede:
+>   - rename generic .txt files to have ".generic" in their filename.
+>   - add a warning to the top of the .txt files
+> 
+> Ryan Harkin:
+>   - removed a comment about the "murata-master" folder from README_NVRAM
+>     that only applies to the original Murata github repo
 
-Sorry for the noise.
+We still don't have clarity about the licensing stuff though, right ?
 
-Thanks
---
-Gustavo
+It might be best to wait a bit with merging this until we've
+that cleared up too.
 
-On 04/23/2018 12:37 PM, Gustavo A. R. Silva wrote:
-> This patchset aims to fix various media platform and media usb
-> cases where we have user controlled array dereferences that could
-> be exploited due to the Spectre variant 1 vulnerability. All were
-> reported by Dan Carpenter.
+Regards,
+
+Hans
+
+
+
+
 > 
-> Notice that given that speculation windows are large, the policy is
-> to kill the speculation on the first load and not worry if it can be
-> completed with a dependent load/store [1].
+> ----------------------------------------------------------------
+> The following changes since commit b562d2f3583f19ecda22b08e514ced57dd1e5f4d:
 > 
-> [1] https://marc.info/?l=linux-kernel&m=152449131114778&w=2
+>    linux-firmware: update wil6210 firmware to 5.2.0.18 (2018-04-16 09:55:50 -0400)
 > 
-> Thanks
+> are available in the git repository at:
 > 
-> Gustavo A. R. Silva (11):
->    media: tm6000: fix potential Spectre variant 1
->    exynos4-is: mipi-csis: fix potential Spectre variant 1
->    fsl-viu: fix potential Spectre variant 1
->    marvell-ccic: mcam-core: fix potential Spectre variant 1
->    omap_vout: fix potential Spectre variant 1
->    rcar-v4l2: fix potential Spectre variant 1
->    rcar_drif: fix potential Spectre variant 1
->    sh_vou: fix potential Spectre variant 1
->    vimc-debayer: fix potential Spectre variant 1
->    vivid-sdr-cap: fix potential Spectre variant 1
->    vsp1_rwpf: fix potential Spectre variant 1
+>    https://git.linaro.org/landing-teams/working/mbl/linux-firmware.git
 > 
->   drivers/media/platform/exynos4-is/mipi-csis.c   | 5 ++++-
->   drivers/media/platform/fsl-viu.c                | 8 ++++----
->   drivers/media/platform/marvell-ccic/mcam-core.c | 3 +++
->   drivers/media/platform/omap/omap_vout.c         | 3 +++
->   drivers/media/platform/rcar-vin/rcar-v4l2.c     | 4 +++-
->   drivers/media/platform/rcar_drif.c              | 4 +++-
->   drivers/media/platform/sh_vou.c                 | 3 +++
->   drivers/media/platform/vimc/vimc-debayer.c      | 5 ++++-
->   drivers/media/platform/vivid/vivid-sdr-cap.c    | 6 ++++++
->   drivers/media/platform/vsp1/vsp1_rwpf.c         | 3 +++
->   drivers/media/usb/tm6000/tm6000-video.c         | 2 ++
->   11 files changed, 38 insertions(+), 8 deletions(-)
+> for you to fetch changes up to 96f197a7ef8865e44ea8b8e4c1626e6a8c5e715f:
+> 
+>    cyw_bt: add Cypress 43xx Bluetooth patch files (2018-04-23 19:11:33 +0100)
+> 
+> Ryan Harkin (3):
+>        brcm: update firmware from Murata repo
+>        brcm: add fmac nvram files
+>        cyw_bt: add Cypress 43xx Bluetooth patch files
+> 
+>   WHENCE                              |  57 ++++++++++++--
+>   brcm/README_NVRAM                   |  15 ++++
+>   brcm/brcmfmac43012-sdio.1LV.txt     | 125 +++++++++++++++++++++++++++++
+>   brcm/brcmfmac43012-sdio.bin         | Bin 0 -> 210254 bytes
+>   brcm/brcmfmac43012-sdio.clm_blob    | Bin 0 -> 7697 bytes
+>   brcm/brcmfmac43012-sdio.generic.txt |   1 +
+>   brcm/brcmfmac43340-sdio.1BW.txt     | 127 ++++++++++++++++++++++++++++++
+>   brcm/brcmfmac43340-sdio.bin         | Bin 402210 -> 400864 bytes
+>   brcm/brcmfmac43340-sdio.generic.txt |   1 +
+>   brcm/brcmfmac43362-sdio.SN8000.txt  |  54 +++++++++++++
+>   brcm/brcmfmac43362-sdio.bin         | Bin 219557 -> 201276 bytes
+>   brcm/brcmfmac43362-sdio.generic.txt |   1 +
+>   brcm/brcmfmac4339-sdio.1CK.txt      | 110 ++++++++++++++++++++++++++
+>   brcm/brcmfmac4339-sdio.ZP.txt       | 107 +++++++++++++++++++++++++
+>   brcm/brcmfmac4339-sdio.bin          | Bin 562183 -> 565481 bytes
+>   brcm/brcmfmac4339-sdio.generic.txt  |   1 +
+>   brcm/brcmfmac43430-sdio.1DX.txt     |  48 ++++++++++++
+>   brcm/brcmfmac43430-sdio.1LN.txt     |   1 +
+>   brcm/brcmfmac43430-sdio.bin         | Bin 369577 -> 388739 bytes
+>   brcm/brcmfmac43430-sdio.generic.txt |   1 +
+>   brcm/brcmfmac43455-sdio.1HK.txt     | 126 ++++++++++++++++++++++++++++++
+>   brcm/brcmfmac43455-sdio.1LC.txt     |  78 ++++++++++++++++++
+>   brcm/brcmfmac43455-sdio.1MW.txt     | 119 ++++++++++++++++++++++++++++
+>   brcm/brcmfmac43455-sdio.bin         | Bin 488193 -> 594969 bytes
+>   brcm/brcmfmac43455-sdio.clm_blob    | Bin 0 -> 11913 bytes
+>   brcm/brcmfmac43455-sdio.generic.txt |   1 +
+>   brcm/brcmfmac4354-sdio.1BB.txt      | 145 ++++++++++++++++++++++++++++++++++
+>   brcm/brcmfmac4354-sdio.bin          | Bin 626589 -> 605388 bytes
+>   brcm/brcmfmac4354-sdio.generic.txt  |   1 +
+>   brcm/brcmfmac4356-pcie.1CX.txt      | 152 ++++++++++++++++++++++++++++++++++++
+>   brcm/brcmfmac4356-pcie.bin          | Bin 661999 -> 648770 bytes
+>   brcm/brcmfmac4356-pcie.generic.txt  |   1 +
+>   cyw_bt/CYW43012C0.1LV.hcd           | Bin 0 -> 28063 bytes
+>   cyw_bt/CYW43341B0.1BW.hcd           | Bin 0 -> 40984 bytes
+>   cyw_bt/CYW4335C0.ZP.hcd             | Bin 0 -> 33465 bytes
+>   cyw_bt/CYW43430A1.1DX.1dB_Less.hcd  | Bin 0 -> 35322 bytes
+>   cyw_bt/CYW43430A1.1DX.2dB_Less.hcd  | Bin 0 -> 35322 bytes
+>   cyw_bt/CYW43430A1.1DX.hcd           | Bin 0 -> 14265 bytes
+>   cyw_bt/CYW4345C0.1MW.hcd            | Bin 0 -> 55105 bytes
+>   cyw_bt/CYW4350C0.1BB.hcd            | Bin 0 -> 78697 bytes
+>   cyw_bt/CYW4354A2.1CX.hcd            | Bin 0 -> 31178 bytes
+>   41 files changed, 1265 insertions(+), 7 deletions(-)
+>   create mode 100644 brcm/README_NVRAM
+>   create mode 100644 brcm/brcmfmac43012-sdio.1LV.txt
+>   create mode 100644 brcm/brcmfmac43012-sdio.bin
+>   create mode 100644 brcm/brcmfmac43012-sdio.clm_blob
+>   create mode 120000 brcm/brcmfmac43012-sdio.generic.txt
+>   create mode 100644 brcm/brcmfmac43340-sdio.1BW.txt
+>   create mode 120000 brcm/brcmfmac43340-sdio.generic.txt
+>   create mode 100644 brcm/brcmfmac43362-sdio.SN8000.txt
+>   create mode 120000 brcm/brcmfmac43362-sdio.generic.txt
+>   create mode 100644 brcm/brcmfmac4339-sdio.1CK.txt
+>   create mode 100644 brcm/brcmfmac4339-sdio.ZP.txt
+>   create mode 120000 brcm/brcmfmac4339-sdio.generic.txt
+>   create mode 100644 brcm/brcmfmac43430-sdio.1DX.txt
+>   create mode 120000 brcm/brcmfmac43430-sdio.1LN.txt
+>   create mode 120000 brcm/brcmfmac43430-sdio.generic.txt
+>   create mode 100644 brcm/brcmfmac43455-sdio.1HK.txt
+>   create mode 100644 brcm/brcmfmac43455-sdio.1LC.txt
+>   create mode 100644 brcm/brcmfmac43455-sdio.1MW.txt
+>   create mode 100644 brcm/brcmfmac43455-sdio.clm_blob
+>   create mode 120000 brcm/brcmfmac43455-sdio.generic.txt
+>   create mode 100644 brcm/brcmfmac4354-sdio.1BB.txt
+>   create mode 120000 brcm/brcmfmac4354-sdio.generic.txt
+>   create mode 100644 brcm/brcmfmac4356-pcie.1CX.txt
+>   create mode 120000 brcm/brcmfmac4356-pcie.generic.txt
+>   create mode 100644 cyw_bt/CYW43012C0.1LV.hcd
+>   create mode 100644 cyw_bt/CYW43341B0.1BW.hcd
+>   create mode 100644 cyw_bt/CYW4335C0.ZP.hcd
+>   create mode 100644 cyw_bt/CYW43430A1.1DX.1dB_Less.hcd
+>   create mode 100644 cyw_bt/CYW43430A1.1DX.2dB_Less.hcd
+>   create mode 100644 cyw_bt/CYW43430A1.1DX.hcd
+>   create mode 100644 cyw_bt/CYW4345C0.1MW.hcd
+>   create mode 100644 cyw_bt/CYW4350C0.1BB.hcd
+>   create mode 100644 cyw_bt/CYW4354A2.1CX.hcd
 > 
