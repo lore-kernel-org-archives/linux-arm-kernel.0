@@ -1,43 +1,73 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 23 Apr 2018 23:04:43 +0800
-Subject: [PATCH v3 3/3] ARM: dts: sun8i: h3: Add SY8106A regulator to
- Orange Pi PC
-In-Reply-To: <20180423150309.dksr2rjazlrmlzx2@flea>
-References: <20180423144657.63264-1-icenowy@aosc.io>
- <20180423144657.63264-4-icenowy@aosc.io>
- <20180423150309.dksr2rjazlrmlzx2@flea>
-Message-ID: <34DAE9CF-AB6D-4FB9-9FA6-FAE4E4D2D4C3@aosc.io>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Mon, 23 Apr 2018 17:15:59 +0200
+Subject: [PATCH] arm64: dts: marvell: armada-37xx: reserve memory for ATF
+In-Reply-To: <20180423144940.64fa884d@windsurf>
+References: <20180421140342.25082-1-miquel.raynal@bootlin.com>
+ <20180421161859.22d1ed18@windsurf> <20180423103127.5b9ac041@xps13>
+ <20180423144940.64fa884d@windsurf>
+Message-ID: <20180423171559.53bcc2d9@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
+
+On Mon, 23 Apr 2018 14:49:40 +0200, Thomas Petazzoni
+<thomas.petazzoni@bootlin.com> wrote:
+
+> Hello,
+> 
+> On Mon, 23 Apr 2018 10:31:27 +0200, Miquel Raynal wrote:
+> 
+> > > Shouldn't this be done automatically by the bootloader, before passing
+> > > the DTB to the kernel ?    
+> > 
+> > I am working with a 2017.09 mainline U-Boot.
+> > 
+> > I did not know the bootloader was supposedly in charge of that.  
+> 
+> I thought it should be the case, but I indeed see nothing in U-Boot
+> that does that, except for OMAP2 platforms.
+> 
+> > But what if it fails doing it?  
+> 
+> Well if something fails in the boot process, the platform fails to boot.
+> I find this question a bit weird/silly. It's like "and what if the user
+> used the wrong DT for the wrong platform ?"
+
+Sorry, I meant "what if the bootloader does not do it?", in other
+words: currently the bootloader does not do it, let's assume it should,
+shall we take into account that it does not and add this code to Linux
+too, or shall we say to people "upgrade your bootloader/ATF"? But from
+the rest of your answer I assume the latter is the right approach.
+
+> 
+> > Fixing the bootloader is one thing, I assume very few people would
+> > update it. Is it worth keeping this in Linux DT?  
+> 
+> The issue I see with having this in the Linux DT is that depending on
+> the bootloader, the memory area that is used to keep the PSCI firmware
+> may very well be different. It's really not a property of the HW
+> itself, but a pure software choice of the bootloader. For example, are
+> you sure the mainline U-Boot puts the PSCI firmware at the same place
+> as the vendor U-Boot ?
+> 
+> What are other platforms doing to solve this problem ?
+
+I will also check if it is actually U-Boot or ATF choice. My
+understanding is that ATF's handle the PSCI firmware but U-Boot should
+propagate a reserved node (for this firmware) in Linux's DTB. Let me
+check all of that.
+
+> 
+> Best regards,
+> 
+> Thomas
 
 
-? 2018?4?23? GMT+08:00 ??11:03:09, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Mon, Apr 23, 2018 at 10:46:57PM +0800, Icenowy Zheng wrote:
->> From: Ondrej Jirman <megous@megous.com>
->> 
->> Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
->> Orange Pi PC, then set the power supply of the ARM cores to this
->> regulator, in order to enable DVFS.
->> 
->> Signed-off-by: Ondrej Jirman <megous@megous.com>
->> [Icenowy: Enable DVFS in this patch, slight changes and change commit
->>  message]
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->> [wens at csie.org: Rename regulator label]
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
->Why is there Chen-Yu's SoB? It doesn't really make much sense, unless
->Chen-Yu would have applied this patch already, but then you wouldn't
->post it, right?
+Thanks,
+Miqu?l
 
-This is taken from sunxi/h3-h5-for-4.18 branch, which has
-label name change from wens, and then added microvolt property.
-
-So his SoB is from when he apply it for the first time.
-
->
->Maxime 
->
->> ---
+-- 
+Miquel Raynal, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
