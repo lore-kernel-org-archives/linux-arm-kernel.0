@@ -1,59 +1,38 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 23 Apr 2018 13:28:22 -0400
-Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
-In-Reply-To: <20180420090420.03fb1e6c@w520.home>
-References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
- <20180419202632.GE14063@ziepe.ca>
- <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
- <290e9530-dcde-9c10-7ae0-59ac4c509db4@codeaurora.org>
- <20180420140049.GP28657@bhelgaas-glaptop.roam.corp.google.com>
- <20180420090420.03fb1e6c@w520.home>
-Message-ID: <10d9cf68-29ed-d205-a25f-b8dade53cdd8@codeaurora.org>
+From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
+Date: Tue, 24 Apr 2018 02:31:40 +0900
+Subject: [PATCH 0/5] arm64: dts: renesas: r8a779xx: sort nodes
+In-Reply-To: <20180423102658.ezofcrgzzwvzdfor@verge.net.au>
+References: <1524082480-18163-1-git-send-email-ykaneko0929@gmail.com>
+ <20180423102658.ezofcrgzzwvzdfor@verge.net.au>
+Message-ID: <CAH1o70+1wfa1Vc1B_fjofhk4CALXtT-eyvXznDsDNypNOVfG1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/20/2018 11:04 AM, Alex Williamson wrote:
-> Is there a concern here about whether the endpoint device driver or the
-> PCI core really knows better about link retraining?  This makes me
-> remember my unfinished (and need to revisit) Pericom quirk[1] where
-> errata in the PCIe switch requires that upstream and downstream links
-> are balanced (ie. same link rate) or else enabling ACS results in
-> packets not properly flowing through the switch.  If an endpoint driver
-> starts deciding to retrain links, overriding quirks in the PCI core,
-> then such topology manipulation isn't possible.  Why does the
-> driver .probe() function think it can retrain at a higher link rate
-> than PCI core?  Thanks,
+Hi Simon-san,
 
-The example given is for some serdes firmware load to happen in probe and
-then performing a retrain to reach to a better speed.
+2018-04-23 19:26 GMT+09:00 Simon Horman <horms@verge.net.au>:
+> On Thu, Apr 19, 2018 at 05:14:35AM +0900, Yoshihiro Kaneko wrote:
+>> Sort nodes of the R-Car M3-N (r8a77965), V3M (r8a77970) and D3 (r8a77995) DTs.
+>>
+>> This is part of an ongoing effort to provide consistent node
+>> order in the DT of Renesas SoCs to improve maintainability.
+>>
+>> This should not have any run-time effect.
+>>
+>> Based on the devel branch of Simon Horman's renesas tree.
+>>
+>> Yoshihiro Kaneko (5):
+>>   arm64: dts: renesas: r8a77995: sort subnodes of the root node
+>>   arm64: dts: renesas: r8a77995: sort subnodes of the soc node
+>>   arm64: dts: renesas: r8a77965: sort subnodes of the root node
+>>   arm64: dts: renesas: r8a77965: sort subnodes of the soc node
+>>   arm64: dts: renesas: r8a77970: sort subnodes of the soc node
+>
+> Thanks, applied.
+>
+> There ware a few nodes added to r8a77970 between when you made
+> this patchset and when I applied it. I think the r8a77970 is still
+> sorted as desired. Could you double-check once I push a devel
+> branch later today?
 
-It becomes a chicken and egg problem. 
-
-1. Endpoint HW trains to gen1 by default pre-boot.
-2. PCI core enumerates the device.
-3. Endpoint driver gets loaded
-4. Driver does the firmware programming followed by a link retrain.
-
-I think it is the responsibility of the PCI core to provide reset APIs.
-However, expecting endpoint drivers to be knowledgeable about hotplug is
-too much.
-
-We can certainly contain AER change into pci directory by moving the slot
-reset function to drivers/pci.h file.
-
-But, we need to think about what to do about VFIO and other endpoint
-initiated reset cases. My suggestion was to move this into a single API and
-remove all other APIs from include/linux/pci.h.
-
-Coming back to this patch...
-
-Do we need a retrain API with the speed that driver wants to reach to?
-API can return what was actually accomplished. The quirk from Alex can
-run inside this API to make a decision on what speed do we actually want
-to reach to for a given PCI topology by reprogramming the target link speed
-field.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Yes, will do.
