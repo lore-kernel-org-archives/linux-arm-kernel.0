@@ -1,67 +1,37 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Mon, 23 Apr 2018 18:13:55 +0200
-Subject: [v2 06/10] mfd: mtk-mmsys: Add mt8173 nodes
+Date: Mon, 23 Apr 2018 18:13:58 +0200
+Subject: [v2 09/10] drm: mediatek: Omit warning on probe defers
 In-Reply-To: <cover.1524497268.git.mbrugger@suse.com>
 References: <cover.1524497268.git.mbrugger@suse.com>
-Message-ID: <ce7c173efe9929712af11ea38be7f3a4d515879b.1524497268.git.mbrugger@suse.com>
+Message-ID: <a698a40ce7723200fd55d0d98daff5a28a7d0039.1524497268.git.mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Brugger <mbrugger@suse.com>
 
-Add devices for the mt8173 SoC.
+When probe through the MFD, it can happen that the
+clock drivers wasn't probed before the ddp driver gets
+invoked. The driver used to omit a warning that the driver
+failed to get the clocks. Omit this error on the defered probe path.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/mfd/mtk-mmsys.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/mtk-mmsys.c b/drivers/mfd/mtk-mmsys.c
-index c802343fb1c6..5585a561a02f 100644
---- a/drivers/mfd/mtk-mmsys.c
-+++ b/drivers/mfd/mtk-mmsys.c
-@@ -19,6 +19,7 @@
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index bafc5c77c4fb..6b399348a2dc 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -374,7 +374,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
  
- enum {
- 	MMSYS_MT2701 = 1,
-+	MMSYS_MT8173,
- };
- 
- static const struct mfd_cell mmsys_mt2701_devs[] = {
-@@ -26,6 +27,12 @@ static const struct mfd_cell mmsys_mt2701_devs[] = {
- 	{ .name = "drm-mt2701-mm", },
- };
- 
-+static const struct mfd_cell mmsys_mt8173_devs[] = {
-+	{ .name = "clk-mt8173-mm", },
-+	{ .name = "drm-mt8173-mm", },
-+};
-+
-+
- static int mmsys_probe(struct platform_device *pdev)
- {
- 	const struct mfd_cell *mmsys_cells;
-@@ -44,6 +51,10 @@ static int mmsys_probe(struct platform_device *pdev)
- 		mmsys_cells = mmsys_mt2701_devs;
- 		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
- 		break;
-+	case MMSYS_MT8173:
-+		mmsys_cells = mmsys_mt8173_devs;
-+		nr_cells = ARRAY_SIZE(mmsys_mt8173_devs);
-+		break;
- 	default:
- 		return -ENODEV;
+ 	ddp->clk = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(ddp->clk)) {
+-		dev_err(dev, "Failed to get clock\n");
++		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
++			dev_err(dev, "Failed to get clock\n");
+ 		return PTR_ERR(ddp->clk);
  	}
-@@ -62,6 +73,9 @@ static const struct of_device_id of_match_mmsys[] = {
- 	{ .compatible = "mediatek,mt2701-mmsys",
- 	  .data = (void *) MMSYS_MT2701,
- 	},
-+	{ .compatible = "mediatek,mt8173-mmsys",
-+	  .data = (void *) MMSYS_MT8173,
-+	},
- 	{ /* sentinel */ },
- };
  
 -- 
 2.16.3
