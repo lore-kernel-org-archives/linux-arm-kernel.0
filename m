@@ -1,17 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Apr 2018 10:45:46 -0700
-Subject: [PATCH 13/16] bus: ti-sysc: Detect omap4 type timers for quirk
+Date: Mon, 23 Apr 2018 10:45:47 -0700
+Subject: [PATCH 14/16] bus: ti-sysc: Detect UARTs for SYSC_QUIRK_LEGACY_IDLE
+ quirk on omap4
 In-Reply-To: <20180423174549.57412-1-tony@atomide.com>
 References: <20180423174549.57412-1-tony@atomide.com>
-Message-ID: <20180423174549.57412-14-tony@atomide.com>
+Message-ID: <20180423174549.57412-15-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with omap4 some timers have different sysc registers (type2) compared
-to the omap2 timers (type1). We need to detect these to enable the quirk for
-SYSC_QUIRK_LEGACY_IDLE, otherwise these won't be idling properly.
+Starting with omap4, UARTs have different revision register that we need to
+detect to enable SYSC_QUIRK_LEGACY_IDLE. Otherwise UARTs won't idle properly.
 
-Siganed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
  drivers/bus/ti-sysc.c | 3 +++
  1 file changed, 3 insertions(+)
@@ -19,15 +19,15 @@ Siganed-off-by: Tony Lindgren <tony@atomide.com>
 diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
 --- a/drivers/bus/ti-sysc.c
 +++ b/drivers/bus/ti-sysc.c
-@@ -875,6 +875,9 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
+@@ -880,6 +880,9 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
  		   SYSC_QUIRK_LEGACY_IDLE),
- 	SYSC_QUIRK("timer", 0, 0, 0x10, 0x14, 0x00000015, 0xffffffff,
- 		   SYSC_QUIRK_LEGACY_IDLE),
-+	/* Some timers on omap4 and later */
-+	SYSC_QUIRK("timer", 0, 0, 0x10, -1, 0x4fff1301, 0xffffffff,
-+		   SYSC_QUIRK_LEGACY_IDLE),
  	SYSC_QUIRK("uart", 0, 0x50, 0x54, 0x58, 0x00000052, 0xffffffff,
  		   SYSC_QUIRK_LEGACY_IDLE),
++	/* Uarts on omap4 and later */
++	SYSC_QUIRK("uart", 0, 0x50, 0x54, 0x58, 0x50411e03, 0xffffffff,
++		   SYSC_QUIRK_LEGACY_IDLE),
  };
+ 
+ static void sysc_init_revision_quirks(struct sysc *ddata)
 -- 
 2.17.0
