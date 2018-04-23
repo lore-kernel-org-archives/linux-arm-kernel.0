@@ -1,31 +1,43 @@
-From: lionel.debieve@st.com (Lionel Debieve)
-Date: Mon, 23 Apr 2018 17:04:25 +0200
-Subject: [PATCH 1/2] hwrng: stm32 - define default state for rng driver
-In-Reply-To: <20180423150426.22198-1-lionel.debieve@st.com>
-References: <20180423150426.22198-1-lionel.debieve@st.com>
-Message-ID: <20180423150426.22198-2-lionel.debieve@st.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 23 Apr 2018 23:04:43 +0800
+Subject: [PATCH v3 3/3] ARM: dts: sun8i: h3: Add SY8106A regulator to
+ Orange Pi PC
+In-Reply-To: <20180423150309.dksr2rjazlrmlzx2@flea>
+References: <20180423144657.63264-1-icenowy@aosc.io>
+ <20180423144657.63264-4-icenowy@aosc.io>
+ <20180423150309.dksr2rjazlrmlzx2@flea>
+Message-ID: <34DAE9CF-AB6D-4FB9-9FA6-FAE4E4D2D4C3@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define default state for stm32_rng driver. It will
-be default selected with multi_v7_defconfig
 
-Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
----
- drivers/char/hw_random/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-index d53541e96bee..c34b257d852d 100644
---- a/drivers/char/hw_random/Kconfig
-+++ b/drivers/char/hw_random/Kconfig
-@@ -347,6 +347,7 @@ config HW_RANDOM_STM32
- 	tristate "STMicroelectronics STM32 random number generator"
- 	depends on HW_RANDOM && (ARCH_STM32 || COMPILE_TEST)
- 	depends on HAS_IOMEM
-+	default HW_RANDOM
- 	help
- 	  This driver provides kernel-side support for the Random Number
- 	  Generator hardware found on STM32 microcontrollers.
--- 
-2.15.1
+? 2018?4?23? GMT+08:00 ??11:03:09, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>On Mon, Apr 23, 2018 at 10:46:57PM +0800, Icenowy Zheng wrote:
+>> From: Ondrej Jirman <megous@megous.com>
+>> 
+>> Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
+>> Orange Pi PC, then set the power supply of the ARM cores to this
+>> regulator, in order to enable DVFS.
+>> 
+>> Signed-off-by: Ondrej Jirman <megous@megous.com>
+>> [Icenowy: Enable DVFS in this patch, slight changes and change commit
+>>  message]
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>> [wens at csie.org: Rename regulator label]
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+>Why is there Chen-Yu's SoB? It doesn't really make much sense, unless
+>Chen-Yu would have applied this patch already, but then you wouldn't
+>post it, right?
+
+This is taken from sunxi/h3-h5-for-4.18 branch, which has
+label name change from wens, and then added microvolt property.
+
+So his SoB is from when he apply it for the first time.
+
+>
+>Maxime 
+>
+>> ---
