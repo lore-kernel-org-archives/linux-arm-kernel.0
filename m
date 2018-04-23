@@ -1,62 +1,36 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 23 Apr 2018 07:46:31 +0200
-Subject: [PATCH 2/6] dmaengine: at_xdmac: simplify getting .drvdata
-In-Reply-To: <20180422091415.7587-3-wsa+renesas@sang-engineering.com>
-References: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
- <20180422091415.7587-3-wsa+renesas@sang-engineering.com>
-Message-ID: <20180423054631.GF13305@rfolt0960.corp.atmel.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 23 Apr 2018 08:04:48 +0200
+Subject: [PATCH 10/61] gpio: simplify getting .drvdata
+In-Reply-To: <20180421162333.d4jtidmbxrx76k4x@ninjato>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-11-wsa+renesas@sang-engineering.com>
+ <34f4679f-d306-073b-eae0-28c9e8965780@xilinx.com>
+ <20180421162333.d4jtidmbxrx76k4x@ninjato>
+Message-ID: <19e48035-917c-7bb0-eef3-a7d6db4c1db2@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 22, 2018 at 11:14:10AM +0200, Wolfram Sang wrote:
-> We should get drvdata from struct device directly. Going via
-> platform_device is an unneeded step back and forth.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Hi Wolfram,
 
-Thanks
-> ---
+On 21.4.2018 18:23, Wolfram Sang wrote:
+> Hi Michal,
 > 
-> Build tested only. buildbot is happy. Please apply to your tree directly.
+> Thanks for the reviews!
 > 
->  drivers/dma/at_xdmac.c | 9 +++------
->  1 file changed, 3 insertions(+), 6 deletions(-)
+>> There are two more occurences in this gpio-zynq driver.
+>> zynq_gpio_resume, zynq_gpio_suspend. It wasn't detected because these
+>> two lines are not together. But the same change can be applied for them too.
 > 
-> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index 94236ec9d410..4bf72561667c 100644
-> --- a/drivers/dma/at_xdmac.c
-> +++ b/drivers/dma/at_xdmac.c
-> @@ -1833,8 +1833,7 @@ static void at_xdmac_free_chan_resources(struct dma_chan *chan)
->  #ifdef CONFIG_PM
->  static int atmel_xdmac_prepare(struct device *dev)
->  {
-> -	struct platform_device	*pdev = to_platform_device(dev);
-> -	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
-> +	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
->  	struct dma_chan		*chan, *_chan;
->  
->  	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
-> @@ -1853,8 +1852,7 @@ static int atmel_xdmac_prepare(struct device *dev)
->  #ifdef CONFIG_PM_SLEEP
->  static int atmel_xdmac_suspend(struct device *dev)
->  {
-> -	struct platform_device	*pdev = to_platform_device(dev);
-> -	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
-> +	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
->  	struct dma_chan		*chan, *_chan;
->  
->  	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
-> @@ -1878,8 +1876,7 @@ static int atmel_xdmac_suspend(struct device *dev)
->  
->  static int atmel_xdmac_resume(struct device *dev)
->  {
-> -	struct platform_device	*pdev = to_platform_device(dev);
-> -	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
-> +	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
->  	struct at_xdmac_chan	*atchan;
->  	struct dma_chan		*chan, *_chan;
->  	int			i;
-> -- 
-> 2.11.0
+> Not really. The rule would have matched if there was just "something"
+> inbetween. It did not match because the "something" involves the
+> variable 'pdev', so we can't remove it. And just changing towards
+> 'dev_get_drvdata' and keeping 'pdev' was not worth the hazzle in my
+> book. Especially since I think the code should probably get refactored.
+> Calling platform_get_irq() in suspend/resume paths in order to get the
+> irq_data looks a little expensive to me, but I haven't tested it.
 > 
+
+ok. Thanks. I have overlooked that.
+
+Thanks,
+Michal
