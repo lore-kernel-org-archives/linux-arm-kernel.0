@@ -1,88 +1,191 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 23 Apr 2018 14:41:04 -0600
-Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
-In-Reply-To: <20180423202311.GA164898@bhelgaas-glaptop.roam.corp.google.com>
-References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
- <20180419202632.GE14063@ziepe.ca>
- <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
- <290e9530-dcde-9c10-7ae0-59ac4c509db4@codeaurora.org>
- <20180420140049.GP28657@bhelgaas-glaptop.roam.corp.google.com>
- <20180420090420.03fb1e6c@w520.home>
- <10d9cf68-29ed-d205-a25f-b8dade53cdd8@codeaurora.org>
- <20180423131044.53471670@w520.home>
- <20180423202311.GA164898@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180423144104.2dad7495@w520.home>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 23 Apr 2018 23:45:49 +0300
+Subject: [PATCH v3] arm64: dts: renesas: v3msk: add DU/LVDS/HDMI support
+In-Reply-To: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
+References: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
+Message-ID: <d18c4314-e6ad-1558-30fb-1a32397494b6@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Apr 2018 15:23:11 -0500
-Bjorn Helgaas <helgaas@kernel.org> wrote:
+Define the V3M Starter Kit board dependent part of the DU and LVDS device
+nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
+Analog Devices ADV7511W HDMI transmitter...
 
-> On Mon, Apr 23, 2018 at 01:10:44PM -0600, Alex Williamson wrote:
-> > On Mon, 23 Apr 2018 13:28:22 -0400
-> > Sinan Kaya <okaya@codeaurora.org> wrote:
-> >   
-> > > On 4/20/2018 11:04 AM, Alex Williamson wrote:  
-> > > > Is there a concern here about whether the endpoint device driver or the
-> > > > PCI core really knows better about link retraining?  This makes me
-> > > > remember my unfinished (and need to revisit) Pericom quirk[1] where
-> > > > errata in the PCIe switch requires that upstream and downstream links
-> > > > are balanced (ie. same link rate) or else enabling ACS results in
-> > > > packets not properly flowing through the switch.  If an endpoint driver
-> > > > starts deciding to retrain links, overriding quirks in the PCI core,
-> > > > then such topology manipulation isn't possible.  Why does the
-> > > > driver .probe() function think it can retrain at a higher link rate
-> > > > than PCI core?  Thanks,    
-> > > 
-> > > The example given is for some serdes firmware load to happen in probe and
-> > > then performing a retrain to reach to a better speed.
-> > > 
-> > > It becomes a chicken and egg problem. 
-> > > 
-> > > 1. Endpoint HW trains to gen1 by default pre-boot.
-> > > 2. PCI core enumerates the device.
-> > > 3. Endpoint driver gets loaded
-> > > 4. Driver does the firmware programming followed by a link retrain.
-> > > 
-> > > I think it is the responsibility of the PCI core to provide reset APIs.
-> > > However, expecting endpoint drivers to be knowledgeable about hotplug is
-> > > too much.
-> > > 
-> > > We can certainly contain AER change into pci directory by moving the slot
-> > > reset function to drivers/pci.h file.
-> > > 
-> > > But, we need to think about what to do about VFIO and other endpoint
-> > > initiated reset cases. My suggestion was to move this into a single API and
-> > > remove all other APIs from include/linux/pci.h.  
-> > 
-> > I'm a little confused about the relation between reset and retrain.
-> > AIUI we can retrain the link without any sort of endpoint reset and if
-> > some sort of driver/firmware setup is required on the endpoint to
-> > achieve the target link speed, then I'd think we only want to retrain.  
-> 
-> In hfi1, do_pcie_gen3_transition() resets the device.  I don't know if
-> retraining the link would be sufficient; maybe the reset is required
-> to make the device use the new firmware.  I guess we already export
-> reset interfaces, so if we add a retrain interface, drivers could
-> choose what they need.
-> 
-> > How this is going to work with vfio is an interesting question.  We're
-> > only providing access to the device, not the link to the device.  
-> 
-> > Multifunction endpoints become a big problem if one function starts
-> > requesting link retraining while another is in use elsewhere.  
-> 
-> Can we just make it the driver's problem by returning -EPERM if one
-> function requests a retrain while another function is in use?
+Based on the original (and large) patch by Vladimir Barinov.
 
-Yes, this is basically how we handle bus resets through vfio-pci, if
-there are multiple devices affected by a bus reset, slots or functions,
-the caller needs to prove ownership of all of them before we do a bus
-reset.  That's great for video cards where we have the GPU and audio
-functions typically assigned together anyway, but I don't know that
-it's a great solution for IB where you're more likely to want to assign
-separate functions to separate users and nobody can get the device to
-run at full speed unless all the functions are assigned to one user.
-Thanks,
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Alex
+---
+This patch is against the 'renesas-devel-20180423-v4.17-rc2' tag of Simon
+Horman's 'renesas.git' repo. It requires the Thine THC63LVD1024 driver in
+order to work (the same as the Eagle HDMI patch by Jacopo/Niklas).
+
+Changes in version 3:
+- added  Thine THC63LVD1024 device node, updating the respected endpoints;
+- merged the I2C pins subnode to the main PFC device node;
+- renamed the regulators;
+
+ arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts |  129 +++++++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
+
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+===================================================================
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
++++ renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+@@ -29,6 +29,65 @@
+ 		/* first 128MB is reserved for secure area. */
+ 		reg = <0x0 0x48000000 0x0 0x38000000>;
+ 	};
++
++	osc5_clk: osc5-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <148500000>;
++	};
++
++	vcc_d1_8v: regulator-0 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC_D1.8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	vcc_d3_3v: regulator-1 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC_D3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	lvds-decoder {
++		compatible = "thine,thc63lvd1024";
++		vcc-supply = <&vcc_d3_3v>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				thc63lvd1024_in: endpoint {
++					remote-endpoint = <&lvds0_out>;
++				};
++			};
++
++			port at 2 {
++				reg = <2>;
++				thc63lvd1024_out: endpoint {
++					remote-endpoint = <&adv7511_in>;
++				};
++			};
++		};
++	};
++
++	hdmi-out {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con: endpoint {
++				remote-endpoint = <&adv7511_out>;
++			};
++		};
++	};
+ };
+ 
+ &avb {
+@@ -46,6 +105,13 @@
+ 	};
+ };
+ 
++&du {
++	clocks = <&cpg CPG_MOD 724>,
++		 <&osc5_clk>;
++	clock-names = "du.0", "dclkin.0";
++	status = "okay";
++};
++
+ &extal_clk {
+ 	clock-frequency = <16666666>;
+ };
+@@ -60,12 +126,75 @@
+ 		function = "avb0";
+ 	};
+ 
++	i2c0_pins: i2c0 {
++		groups = "i2c0";
++		function = "i2c0";
++	};
++
+ 	scif0_pins: scif0 {
+ 		groups = "scif0_data";
+ 		function = "scif0";
+ 	};
+ };
+ 
++&i2c0 {
++	pinctrl-0 = <&i2c0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++	clock-frequency = <400000>;
++
++	hdmi at 39{
++		compatible = "adi,adv7511w";
++		#sound-dai-cells = <0>;
++		reg = <0x39>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
++		avdd-supply = <&vcc_d1_8v>;
++		dvdd-supply = <&vcc_d1_8v>;
++		pvdd-supply = <&vcc_d1_8v>;
++		bgvdd-supply = <&vcc_d1_8v>;
++		dvdd-3v-supply = <&vcc_d3_3v>;
++
++		adi,input-depth = <8>;
++		adi,input-colorspace = "rgb";
++		adi,input-clock = "1x";
++		adi,input-style = <1>;
++		adi,input-justification = "evenly";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7511_in: endpoint {
++					remote-endpoint = <&thc63lvd1024_out>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				adv7511_out: endpoint {
++					remote-endpoint = <&hdmi_con>;
++				};
++			};
++		};
++	};
++};
++
++&lvds0 {
++	status = "okay";
++
++	ports {
++		port at 1 {
++			lvds0_out: endpoint {
++				remote-endpoint = <&thc63lvd1024_in>;
++			};
++		};
++	};
++};
++
+ &scif0 {
+ 	pinctrl-0 = <&scif0_pins>;
+ 	pinctrl-names = "default";
