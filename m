@@ -1,44 +1,75 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 23 Apr 2018 10:40:53 -0700
-Subject: [PATCH v3 03/10] drivers/peci: Add support for PECI bus driver
- core
-In-Reply-To: <20180423105224.GA1444@kroah.com>
-References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
- <20180410183212.16787-4-jae.hyun.yoo@linux.intel.com>
- <20180423105224.GA1444@kroah.com>
-Message-ID: <09b1a8af-4d47-0714-8f68-d7fe35cc7a72@linux.intel.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 23 Apr 2018 19:41:06 +0200
+Subject: [PATCH v4 2/8] dt-bindings: display: atmel: optional
+ video-interface of endpoints
+In-Reply-To: <20180423072301.11962-3-peda@axentia.se>
+References: <20180423072301.11962-1-peda@axentia.se>
+ <20180423072301.11962-3-peda@axentia.se>
+Message-ID: <20180423194106.3b178211@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/23/2018 3:52 AM, Greg KH wrote:
-> On Tue, Apr 10, 2018 at 11:32:05AM -0700, Jae Hyun Yoo wrote:
->> +static void peci_adapter_dev_release(struct device *dev)
->> +{
->> +	/* do nothing */
->> +}
-> 
-> As per the in-kernel documentation, I am now allowed to make fun of you.
-> 
-> You are trying to "out smart" the kernel by getting rid of a warning
-> message that was explicitly put there for you to do something.  To think
-> that by just providing an "empty" function you are somehow fulfilling
-> the API requirement is quite bold, don't you think?
-> 
-> This has to be fixed.  I didn't put that warning in there for no good
-> reason.  Please go read the documentation again...
-> 
-> greg k-h
-> 
+On Mon, 23 Apr 2018 09:22:55 +0200
+Peter Rosin <peda@axentia.se> wrote:
 
-Hi Greg,
+> With bus-type/bus-width properties in the endpoint nodes, the video-
+> interface of the connection can be specified for cases where the
+> heuristic fails to select the correct output mode. This can happen
+> e.g. if not all RGB pins are routed on the PCB; the driver has no
+> way of knowing this, and needs to be told explicitly.
+> 
+> This is critical for the devices that have the "conflicting output
+> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
+> RGB bits move around depending on the selected output mode. For
+> devices that do not have the "conflicting output formats" issue
+> (SAMA5D2, SAMA5D4), this is completely irrelevant.
+> 
+> Signed-off-by: Peter Rosin <peda@axentia.se>
 
-Thanks a lot for your review.
+Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
-I think, it should contain actual device resource release code which is
-being done by peci_del_adapter(), or a coupling logic should be added
-between peci_adapter_dev_release() and peci_del_adapter().
-
-As you suggested, I'll check it again after reading documentation and
-understanding core.c code more deeply.
-
-Jae
+> ---
+>  .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+> index 82f2acb3d374..9de434a8f523 100644
+> --- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+> +++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+> @@ -15,6 +15,14 @@ Required children nodes:
+>   to external devices using the OF graph reprensentation (see ../graph.txt).
+>   At least one port node is required.
+>  
+> +Optional properties in grandchild nodes:
+> + Any endpoint grandchild node may specify a desired video interface
+> + according to ../../media/video-interfaces.txt, specifically
+> + - bus-type: must be <0>.
+> + - bus-width: recognized values are <12>, <16>, <18> and <24>, and
+> +   override any output mode selection heuristic, forcing "rgb444",
+> +   "rgb565", "rgb666" and "rgb888" respectively.
+> +
+>  Example:
+>  
+>  	hlcdc: hlcdc at f0030000 {
+> @@ -50,3 +58,21 @@ Example:
+>  			#pwm-cells = <3>;
+>  		};
+>  	};
+> +
+> +
+> +Example 2: With a video interface override to force rgb565; as above
+> +but with these changes/additions:
+> +
+> +	&hlcdc {
+> +		hlcdc-display-controller {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
+> +
+> +			port at 0 {
+> +				hlcdc_panel_output: endpoint at 0 {
+> +					bus-type = <0>;
+> +					bus-width = <16>;
+> +				};
+> +			};
+> +		};
+> +	};
