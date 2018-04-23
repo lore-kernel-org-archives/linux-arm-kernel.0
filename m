@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 23 Apr 2018 19:05:07 +0100
-Subject: Applied "mfd: bd9571mwv: Add DDR Backup Power register bit
- definitions" to the regulator tree
-In-Reply-To: <1507649178-31473-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <E1fAfpr-0004EG-QZ@debutante>
+Date: Mon, 23 Apr 2018 19:05:15 +0100
+Subject: Applied "regulator: axp20x: add drivevbus support for axp803" to the
+ regulator tree
+In-Reply-To: <1513011400-4120-1-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <E1fAfpz-0004Gb-3w@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   mfd: bd9571mwv: Add DDR Backup Power register bit definitions
+   regulator: axp20x: add drivevbus support for axp803
 
 has been applied to the regulator tree at
 
@@ -34,37 +34,58 @@ to this mail.
 Thanks,
 Mark
 
->From 2ff0dab80a8999e99a93fd70f8d701ec3deab207 Mon Sep 17 00:00:00 2001
-From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Wed, 18 Apr 2018 15:18:02 +0200
-Subject: [PATCH] mfd: bd9571mwv: Add DDR Backup Power register bit definitions
+>From 1f5d6462b5856ddd44d4500ac80b7862faff351b Mon Sep 17 00:00:00 2001
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Mon, 23 Apr 2018 12:02:37 +0530
+Subject: [PATCH] regulator: axp20x: add drivevbus support for axp803
 
-Add definitions for the KEEPON_* bits in the "BKUP Mode Cnt" register,
-which control the DDR rails to be kept powered when backup mode is
-enabled.
+Like axp221, axp223, axp813 the axp803 is also supporting external
+regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Add support for it.
+
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- include/linux/mfd/bd9571mwv.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 3 ++-
+ drivers/regulator/axp20x-regulator.c             | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/mfd/bd9571mwv.h b/include/linux/mfd/bd9571mwv.h
-index f0708ba4cbba..eb05569f752b 100644
---- a/include/linux/mfd/bd9571mwv.h
-+++ b/include/linux/mfd/bd9571mwv.h
-@@ -33,6 +33,11 @@
- #define BD9571MWV_I2C_MD2_E1_BIT_2		0x12
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 9455503b0299..d1762f3b30af 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -43,7 +43,7 @@ Optional properties:
+ 			  regulator to drive the OTG VBus, rather then
+ 			  as an input pin which signals whether the
+ 			  board is driving OTG VBus or not.
+-			  (axp221 / axp223 / axp813 only)
++			  (axp221 / axp223 / axp803/ axp813 only)
  
- #define BD9571MWV_BKUP_MODE_CNT			0x20
-+#define BD9571MWV_BKUP_MODE_CNT_KEEPON_MASK	GENMASK(3, 0)
-+#define BD9571MWV_BKUP_MODE_CNT_KEEPON_DDR0	BIT(0)
-+#define BD9571MWV_BKUP_MODE_CNT_KEEPON_DDR1	BIT(1)
-+#define BD9571MWV_BKUP_MODE_CNT_KEEPON_DDR0C	BIT(2)
-+#define BD9571MWV_BKUP_MODE_CNT_KEEPON_DDR1C	BIT(3)
- #define BD9571MWV_BKUP_MODE_STATUS		0x21
- #define BD9571MWV_BKUP_RECOVERY_CNT		0x22
- #define BD9571MWV_BKUP_CTRL_TIM_CNT		0x23
+ - x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
+ 			wired for master mode. The default is slave mode.
+@@ -132,6 +132,7 @@ FLDO2		: LDO		: fldoin-supply		: shared supply
+ LDO_IO0		: LDO		: ips-supply		: GPIO 0
+ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+ RTC_LDO		: LDO		: ips-supply		: always on
++DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
+ 
+ AXP806 regulators, type, and corresponding input supply names:
+ 
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 181622b2813d..91b8ff8bac15 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -721,6 +721,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 	case AXP803_ID:
+ 		regulators = axp803_regulators;
+ 		nregulators = AXP803_REG_ID_MAX;
++		drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
++						  "x-powers,drive-vbus-en");
+ 		break;
+ 	case AXP806_ID:
+ 		regulators = axp806_regulators;
 -- 
 2.17.0
