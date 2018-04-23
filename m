@@ -1,65 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Apr 2018 11:16:56 +0200
-Subject: [PATCH v2] ACPI / button: make module loadable when booted in
- non-ACPI mode
-Message-ID: <20180423091656.26257-1-ard.biesheuvel@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 23 Apr 2018 11:20:14 +0200
+Subject: [PATCH/RFC 7/8] ARM: shmobile: Remove the ARCH_SHMOBILE Kconfig
+ symbol
+In-Reply-To: <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
+References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
+ <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180423092011.qnhcorgcu2j5hrls@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modules such as nouveau.ko and i915.ko have a link time dependency on
-acpi_lid_open(), and due to its use of acpi_bus_register_driver(),
-the button.ko module that provides it is only loadable when booted in
-ACPI mode. However, the ACPI button driver can be built into the core
-kernel as well, in which case the dependency can always be satisfied,
-and the dependent modules can be loaded regardless of whether the
-system was booted in ACPI mode or not.
+On Fri, Apr 20, 2018 at 03:28:33PM +0200, Geert Uytterhoeven wrote:
+> All drivers for Renesas ARM SoCs have gained proper ARCH_RENESAS
+> platform dependencies.  Hence finish the conversion from ARCH_SHMOBILE
+> to ARCH_RENESAS for Renesas 32-bit ARM SoCs, as started by commit
+> 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS").
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> This depends on the previous patches in this series, hence the RFC.
+> 
+> JFTR, after this, the following symbols for drivers supporting only
+> Renesas SuperH "SH-Mobile" SoCs can no longer be selected:
+>   - CONFIG_KEYBOARD_SH_KEYSC,
+>   - CONFIG_VIDEO_SH_VOU,
+>   - CONFIG_VIDEO_SH_MOBILE_CEU,
+>   - CONFIG_DRM_SHMOBILE[*],
+>   - CONFIG_FB_SH_MOBILE_MERAM.
+> (changes for a shmobile_defconfig .config)
+> 
+> [*] CONFIG_DRM_SHMOBILE has a dependency on ARM, but it was never wired
+>     up.  From the use of sh_mobile_meram, I guess it was meant for
+>     SH-Mobile AP4 on Mackerel or AP4EVB, which are long gone.
+>     So the only remaining upstream platforms that could make use of it
+>     are legacy SuperH SH-Mobile SoCs?
 
-So let's fix this asymmetry by making the ACPI button driver loadable
-as a module even if not booted in ACPI mode, so it can provide the
-acpi_lid_open() symbol in the same way as when built into the kernel.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2: invert acpi_disabled logic and move comment into __acpi_bus_register_driver
-
-Could we perhaps get this into -stable as well? It is not a classic
-regression, but it completely breaks, e.g., Fedora when booting in
-DT mode on an ARM system.
-
- drivers/acpi/button.c | 24 +++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/acpi/button.c b/drivers/acpi/button.c
-index e1eee7a60fad..f33242e4fe6c 100644
---- a/drivers/acpi/button.c
-+++ b/drivers/acpi/button.c
-@@ -635,4 +635,26 @@ module_param_call(lid_init_state,
- 		  NULL, 0644);
- MODULE_PARM_DESC(lid_init_state, "Behavior for reporting LID initial state");
- 
--module_acpi_driver(acpi_button_driver);
-+static int __acpi_bus_register_driver(struct acpi_driver *driver)
-+{
-+	/*
-+	 * Modules such as nouveau.ko and i915.ko have a link time dependency
-+	 * on acpi_lid_open(), and would therefore not be loadable on ACPI
-+	 * capable kernels booted in non-ACPI mode if we use the ordinary
-+	 * acpi_bus_[un]register_driver routines here (which only work when
-+	 * booted in ACPI mode) and build this driver as a module. So provide
-+	 * our own versions instead.
-+	 */
-+	if (acpi_disabled)
-+		return 0;
-+	return acpi_bus_register_driver(driver);
-+}
-+
-+static void __acpi_bus_unregister_driver(struct acpi_driver *driver)
-+{
-+	if (!acpi_disabled)
-+		acpi_bus_unregister_driver(driver);
-+}
-+
-+module_driver(acpi_button_driver, __acpi_bus_register_driver,
-+	      __acpi_bus_unregister_driver);
--- 
-2.17.0
+That sounds about right. If there is interest I can sift through my mail
+archive and see if it yields any answers.
