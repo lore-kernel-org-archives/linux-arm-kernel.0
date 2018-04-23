@@ -1,44 +1,35 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 23 Apr 2018 14:41:27 +0100
-Subject: [RFC PATCH v3] tty: pl011: Avoid spuriously stuck-off interrupts
-Message-ID: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 23 Apr 2018 10:46:10 -0300
+Subject: [PATCH 1/5] ARM: dts: imx6qdl: Remove #address/#size-cells from
+ mipi_dsi
+Message-ID: <1524491174-16878-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an update to a previous RFC v2 [1], to fix a problem observed by
-the qemu community that causes serial input to hang when booting a
-simulated system with data already queued in the UART FIFO [2].
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-After discussion, I decided that the approach in [1] was over-
-engineered: it tries to preserve a guarantee that people shouldn't be
-relying on anyway, namely that data sent to the UART prior to kernel
-boot will be received by the kernel; or more generally that data
-received by the UART while the pl011 driver is not opened will be
-received (either intact or at all) by the driver.
+Remove unnecessary #address-cells/#size-cells to fix the following
+DTC warnings:
 
-If anyone can please test the following and let me know the results,
-that would be much appreciated!
+arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (avoid_unnecessary_addr_size): /soc/aips-bus at 2100000/mipi at 21e0000: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
 
- a) Check that you can still reproduce the bug on mainline without this
-    patch.
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
 
- b) Check whether this patch fixes the problem.
-
-Cheers
----Dave
-
-[1] [RFC PATCH v2] tty: pl011: Avoid spuriously stuck-off interrupts
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/556897.html
-
-[2] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
-before enabled the interruption
-https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
-
-Dave Martin (1):
-  tty: pl011: Avoid spuriously stuck-off interrupts
-
- drivers/tty/serial/amba-pl011.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index c003e62..1fbd970 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1187,8 +1187,6 @@
+ 			};
+ 
+ 			mipi_dsi: mipi at 21e0000 {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+ 				reg = <0x021e0000 0x4000>;
+ 				status = "disabled";
+ 
 -- 
-2.1.4
+2.7.4
