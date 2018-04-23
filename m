@@ -1,336 +1,134 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Mon, 23 Apr 2018 16:37:33 +0200
-Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
- HMI
-In-Reply-To: <20180322180508.my64gobhh5rc2x2m@flea>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
- <20180322180508.my64gobhh5rc2x2m@flea>
-Message-ID: <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Mon, 23 Apr 2018 16:38:43 +0200
+Subject: [PATCH] cpufreq: add suspend/resume support in Armada 37xx DVFS
+ driver
+In-Reply-To: <20180423042703.GC2989@vireshk-i7>
+References: <20180421141943.25705-1-miquel.raynal@bootlin.com>
+ <20180423042703.GC2989@vireshk-i7>
+Message-ID: <20180423163843.2b9e18b2@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Viresh,
 
-Il 22/03/2018 19:05, Maxime Ripard ha scritto:
-> On Wed, Mar 21, 2018 at 09:03:13PM +0100, Giulio Benetti wrote:
->> The A20-Linova1-7 HMI, also called Q027_2_F which is printed on production
->> label, is an industrial Human Machine Interface.
->> It features:
->> - 512MB DDR RAM
->> - 1 Sd-card >= 4GB
->> - 1 Usb otg(programmable via software) with A-Usb Connector
->> - 1 Usb host
->> - 1 Buzzer
->> - 1 Input for LiPo
->> - 1 Relay to signal absence of power supply
->> - 1 External Rtc with 56 bytes of ram + CR2032 battery
->> - 1 7" 24-bits Tft 800x480 with PCap on
->> - 1 Mono audio 1-watt amplifier
->> - 1 RS485 port
->> - 1 Power On Line through +12Vdc reaching 57.600baud,
->>    from where it can be supplied and placed in a network of 50 units
->> - exposed jtag pins
->>
->> HMI is supplied from +12Vdc.
->> Ethernet is absent, so for debugging, need to enable rndis on Usb otg
->> port through an A-A usb cable.
->> It comes in different flavours for connector types and can be found with
->> umounted features as requested by customers.
+On Mon, 23 Apr 2018 09:57:03 +0530, Viresh Kumar
+<viresh.kumar@linaro.org> wrote:
+
+> On 21-04-18, 16:19, Miquel Raynal wrote:
+> > Add suspend/resume hooks in Armada 37xx DVFS driver to handle S2RAM
+> > operations. As there is currently no 'driver' structure, create one
+> > to store both the regmap and the register values during suspend
+> > operation.
+> > 
+> > A syscore_ops is used to export the suspend/resume hooks.
+> > 
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > ---
+> >  drivers/cpufreq/armada-37xx-cpufreq.c | 73 ++++++++++++++++++++++++++++++++++-
+> >  1 file changed, 71 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
+> > index 72a2975499db..9c9c3673cbbe 100644
+> > --- a/drivers/cpufreq/armada-37xx-cpufreq.c
+> > +++ b/drivers/cpufreq/armada-37xx-cpufreq.c
+> > @@ -22,6 +22,7 @@
+> >  #include <linux/pm_opp.h>
+> >  #include <linux/regmap.h>
+> >  #include <linux/slab.h>
+> > +#include <linux/syscore_ops.h>
+> >  
+> >  /* Power management in North Bridge register set */
+> >  #define ARMADA_37XX_NB_L0L1	0x18
+> > @@ -56,6 +57,18 @@
+> >   */
+> >  #define LOAD_LEVEL_NR	4
+> >  
+> > +#if defined(CONFIG_PM)
+> > +struct armada37xx_cpufreq_state {
+> > +	struct regmap *regmap;
+> > +	u32 nb_l0l1;
+> > +	u32 nb_l2l3;
+> > +	u32 nb_dyn_mod;
+> > +	u32 nb_cpu_load;
+> > +};
+> > +
+> > +static struct armada37xx_cpufreq_state *armada37xx_cpufreq_state;
+> > +#endif /* CONFIG_PM */
+> > +
+> >  struct armada_37xx_dvfs {
+> >  	u32 cpu_freq_max;
+> >  	u8 divider[LOAD_LEVEL_NR];
+> > @@ -136,7 +149,7 @@ static void __init armada37xx_cpufreq_dvfs_setup(struct regmap *base,
+> >  	clk_set_parent(clk, parent);
+> >  }
+> >  
+> > -static void __init armada37xx_cpufreq_disable_dvfs(struct regmap *base)
+> > +static void armada37xx_cpufreq_disable_dvfs(struct regmap *base)
+> >  {
+> >  	unsigned int reg = ARMADA_37XX_NB_DYN_MOD,
+> >  		mask = ARMADA_37XX_NB_DFS_EN;
+> > @@ -162,6 +175,46 @@ static void __init armada37xx_cpufreq_enable_dvfs(struct regmap *base)
+> >  	regmap_update_bits(base, reg, mask, mask);
+> >  }
+> >  
+> > +#if defined(CONFIG_PM)
+> > +static int armada37xx_cpufreq_suspend(void)
+> > +{
+> > +	struct armada37xx_cpufreq_state *state = armada37xx_cpufreq_state;
+> > +
+> > +	regmap_read(state->regmap, ARMADA_37XX_NB_L0L1, &state->nb_l0l1);
+> > +	regmap_read(state->regmap, ARMADA_37XX_NB_L2L3, &state->nb_l2l3);
+> > +	regmap_read(state->regmap, ARMADA_37XX_NB_CPU_LOAD,
+> > +		    &state->nb_cpu_load);
+> > +	regmap_read(state->regmap, ARMADA_37XX_NB_DYN_MOD, &state->nb_dyn_mod);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void armada37xx_cpufreq_resume(void)
+> > +{
+> > +	struct armada37xx_cpufreq_state *state = armada37xx_cpufreq_state;
+> > +
+> > +	/* Ensure DVFS is disabled otherwise the following registers are RO */
+> > +	armada37xx_cpufreq_disable_dvfs(state->regmap);
+> > +
+> > +	regmap_write(state->regmap, ARMADA_37XX_NB_L0L1, state->nb_l0l1);
+> > +	regmap_write(state->regmap, ARMADA_37XX_NB_L2L3, state->nb_l2l3);
+> > +	regmap_write(state->regmap, ARMADA_37XX_NB_CPU_LOAD,
+> > +		     state->nb_cpu_load);
+> > +
+> > +	/*
+> > +	 * NB_DYN_MOD register is the one that actually enable back DVFS if it
+> > +	 * was enabled before the suspend operation. This must be done last
+> > +	 * otherwise other registers are not writable.
+> > +	 */
+> > +	regmap_write(state->regmap, ARMADA_37XX_NB_DYN_MOD, state->nb_dyn_mod);
+> > +}
+> > +
+> > +static struct syscore_ops armada37xx_cpufreq_syscore_pm_ops = {
+> > +	.suspend = armada37xx_cpufreq_suspend,
+> > +	.resume = armada37xx_cpufreq_resume,
+> > +};  
 > 
-> So this is essentially the same board than in patch 6, but with a
-> different screen?
+> And why can't you use the suspend/resume callbacks present in the struct
+> cpufreq_driver ?
 > 
-> You should have a single DT then, and handle the two different panels
-> using DT overlays.
 
-Ok for having different DT overlays.
-But do I have to submit them as patches? Or keep them in my company's repo?
-I ask you this because this involves sending also patches for displays
-and other little modifications to mainline ex:
-- rgb888 pins
-- 2 simple-panels
-- 1 uart iomux pins
-etc.
+I did not knew about this structure (not used in this driver).
 
-If I don't submit those overlays, the other patches wouldn't make sense 
-alone as I've seen, just like rgb888 pins.
+I checked the Documentation and wrote something to introduce the use
+of struct cpufreq_driver but this means that the driver has things
+to do during frequency switches, which is not the case here, explaining
+(I guess) the use of cpufreq-dt.
 
-> 
->> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->> ---
->>   .../devicetree/bindings/arm/micronova.txt          |   4 +
->>   arch/arm/boot/dts/Makefile                         |   1 +
->>   arch/arm/boot/dts/sun7i-a20-linova1-ctp-7i.dts     | 192 +++++++++++++++++++++
->>   3 files changed, 197 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/sun7i-a20-linova1-ctp-7i.dts
->>
->> diff --git a/Documentation/devicetree/bindings/arm/micronova.txt b/Documentation/devicetree/bindings/arm/micronova.txt
->> index 35c4127..9f5ac72 100644
->> --- a/Documentation/devicetree/bindings/arm/micronova.txt
->> +++ b/Documentation/devicetree/bindings/arm/micronova.txt
->> @@ -4,3 +4,7 @@ Micronova Device Tree Bindings
->>   A20-LiNova1-4_3 HMI
->>   Required root node properties:
->>       - compatible = "micronova,a20-linova1-ctp-4_3i", "allwinner,sun7i-a20";
->> +
->> +A20-LiNova1-7 HMI
->> +Required root node properties:
->> +    - compatible = "micronova,a20-linova1-ctp-7i", "allwinner,sun7i-a20";
-> 
-> These bindings are unnecessary, but the panel-simple bindings should
-> be sent to the DT maintainers as well.
+How would you proceed then? Shall I continue in this path? I checked
+all the drivers currently registering the cpufreq-dt driver, none of
+them use this structure, so I am open to suggestions.
 
-Ok, removed them and already sent the ones for display.
-
-> 
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index c45a4f25..eafa7cb 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -942,6 +942,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>   	sun7i-a20-m3.dtb \
->>   	sun7i-a20-mk808c.dtb \
->>   	sun7i-a20-linova1-ctp-4_3i.dtb\
->> +	sun7i-a20-linova1-ctp-7i.dtb\
-> 
-> You should have a space after dtb, and it should be ordered
-> alphabetically.
-
-Done.
-
-> 
->>   	sun7i-a20-olimex-som-evb.dtb \
->>   	sun7i-a20-olinuxino-lime.dtb \
->>   	sun7i-a20-olinuxino-lime2.dtb \
->> diff --git a/arch/arm/boot/dts/sun7i-a20-linova1-ctp-7i.dts b/arch/arm/boot/dts/sun7i-a20-linova1-ctp-7i.dts
->> new file mode 100644
->> index 0000000..7fd0d98
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun7i-a20-linova1-ctp-7i.dts
->> @@ -0,0 +1,192 @@
->> +/*
->> + * This is based on sun7i-a20-linova1-ctp-7i.dts
->> + *
->> + * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
->> + * Copyright (c) 2014 FUKAUMI Naoki <naobsd@gmail.com>
->> + * Copyright (c) 2018 Giulio Benetti <giulio.benetti@micronovasrl.com>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
-> 
-> You should use an SPDX license header here.
-
-Done
-
-> 
->> +
->> +/dts-v1/;
->> +#include "sun7i-a20.dtsi"
->> +#include "sunxi-common-regulators.dtsi"
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/interrupt-controller/irq.h>
->> +
->> +/ {
->> +	model = "Micronova srl LiNova1 CTP 7i";
->> +	compatible = "micronova,a20-linova1-ctp-7i", "allwinner,sun7i-a20";
->> +
->> +	aliases {
->> +		serial0 = &uart0;
->> +	};
->> +
->> +	chosen {
->> +		stdout-path = "serial0:115200n8";
->> +	};
->> +
->> +	panel: panel {
->> +		compatible = "cdtech,s070wv95-ct16", "simple-panel";
->> +		power-supply = <&reg_vcc3v3>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		port at 0 {
->> +			reg = <0>;
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +
->> +			panel_input: endpoint at 0 {
->> +				reg = <0>;
->> +				remote-endpoint = <&tcon0_out_panel>;
->> +			};
->> +		};
->> +	};
->> +};
->> +
->> +&ehci0 {
->> +	status = "okay";
->> +};
->> +
->> +&ehci1 {
->> +	status = "okay";
->> +};
->> +
->> +&i2c0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&i2c0_pins_a>;
->> +	status = "okay";
->> +
->> +	axp209: pmic at 34 {
->> +		compatible = "x-powers,axp209";
->> +		reg = <0x34>;
->> +		interrupt-parent = <&nmi_intc>;
->> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->> +
->> +		interrupt-controller;
->> +		#interrupt-cells = <1>;
->> +	};
->> +};
->> +
->> +&i2c2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&i2c2_pins_a>;
->> +	status = "okay";
->> +
->> +	ft5x: touchscreen at 38 {
->> +		compatible = "edt,edt-ft5206";
->> +		reg = <0x38>;
->> +		interrupt-parent = <&pio>;
->> +		interrupts = <7 2 IRQ_TYPE_EDGE_FALLING>; /* PH2 */
->> +		reset-gpios = <&pio 7 3 GPIO_ACTIVE_LOW>; /* PH3 */
->> +		touchscreen-size-x = <800>;
->> +		touchscreen-size-y = <480>;
->> +	};
->> +};
->> +
->> +&mmc0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc0_pins_a>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	bus-width = <4>;
->> +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
->> +	cd-inverted;
->> +	status = "okay";
->> +};
->> +
->> +&ohci0 {
->> +	status = "okay";
->> +};
->> +
->> +&ohci1 {
->> +	status = "okay";
->> +};
->> +
->> +&otg_sram {
->> +	status = "okay";
->> +};
->> +
->> +&reg_usb0_vbus {
->> +	status = "okay";
->> +};
->> +
->> +&reg_usb1_vbus {
->> +	status = "okay";
->> +};
-> 
-> Ideally you should be defining the regulators here too.
-
-Added.
-
-> 
->> +&uart0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart0_pins_a>;
->> +	status = "okay";
->> +};
->> +
->> +&usb_otg {
->> +	dr_mode = "otg";
-> 
-> You're saying that this is a USB-A connector? Then it's not OTG since
-> it doesn't have an ID pin, this is an host.
-
-Right, with a special overlay I will activate Usb Device for RNDIS,
-so modified as host
-
-> 
->> +	status = "okay";
->> +};
->> +
->> +&usbphy {
->> +	pinctrl-names = "default";
->> +	usb0_vbus-supply = <&reg_usb0_vbus>;
->> +	usb1_vbus-supply = <&reg_usb1_vbus>;
->> +	status = "okay";
->> +};
->> +
->> +&be0 {
->> +	status = "okay";
->> +};
->> +
->> +&de {
->> +	status = "okay";
->> +};
-> 
-> The nodes should be ordered by alphabetical order.
-
-Done.
-
-One last question:
-now I have some patch already reviewed-by.
-Do I have to re-submit entire patchset?
-
-Thank you very much.
+Thanks,
+Miqu?l
 
 -- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
-
-> 
-> Thanks!
-> Maxime
-> 
+Miquel Raynal, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
