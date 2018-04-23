@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 23 Apr 2018 19:05:04 +0100
-Subject: Applied "mfd: bd9571mwv: Allow DDR Backup Power register access" to
- the regulator tree
-In-Reply-To: <1507649178-31473-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <E1fAfpo-0004D5-5n@debutante>
+Date: Mon, 23 Apr 2018 19:05:07 +0100
+Subject: Applied "mfd: bd9571mwv: Add DDR Backup Power register bit
+ definitions" to the regulator tree
+In-Reply-To: <1507649178-31473-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <E1fAfpr-0004EG-QZ@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   mfd: bd9571mwv: Allow DDR Backup Power register access
+   mfd: bd9571mwv: Add DDR Backup Power register bit definitions
 
 has been applied to the regulator tree at
 
@@ -34,40 +34,37 @@ to this mail.
 Thanks,
 Mark
 
->From 7b569bcb2a2f985fe2d1407aed705882af30cb77 Mon Sep 17 00:00:00 2001
+>From 2ff0dab80a8999e99a93fd70f8d701ec3deab207 Mon Sep 17 00:00:00 2001
 From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Wed, 18 Apr 2018 15:18:03 +0200
-Subject: [PATCH] mfd: bd9571mwv: Allow DDR Backup Power register access
+Date: Wed, 18 Apr 2018 15:18:02 +0200
+Subject: [PATCH] mfd: bd9571mwv: Add DDR Backup Power register bit definitions
 
-Enable read/write access to the BD9571MWV_BKUP_MODE_CNT register, which
-is amongst others used to configure DDR Backup Power.
+Add definitions for the KEEPON_* bits in the "BKUP Mode Cnt" register,
+which control the DDR rails to be kept powered when backup mode is
+enabled.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/mfd/bd9571mwv.c | 2 ++
- 1 file changed, 2 insertions(+)
+ include/linux/mfd/bd9571mwv.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/mfd/bd9571mwv.c b/drivers/mfd/bd9571mwv.c
-index 64e088dfe7b0..503979c81dae 100644
---- a/drivers/mfd/bd9571mwv.c
-+++ b/drivers/mfd/bd9571mwv.c
-@@ -29,6 +29,7 @@ static const struct mfd_cell bd9571mwv_cells[] = {
+diff --git a/include/linux/mfd/bd9571mwv.h b/include/linux/mfd/bd9571mwv.h
+index f0708ba4cbba..eb05569f752b 100644
+--- a/include/linux/mfd/bd9571mwv.h
++++ b/include/linux/mfd/bd9571mwv.h
+@@ -33,6 +33,11 @@
+ #define BD9571MWV_I2C_MD2_E1_BIT_2		0x12
  
- static const struct regmap_range bd9571mwv_readable_yes_ranges[] = {
- 	regmap_reg_range(BD9571MWV_VENDOR_CODE, BD9571MWV_PRODUCT_REVISION),
-+	regmap_reg_range(BD9571MWV_BKUP_MODE_CNT, BD9571MWV_BKUP_MODE_CNT),
- 	regmap_reg_range(BD9571MWV_AVS_SET_MONI, BD9571MWV_AVS_DVFS_VID(3)),
- 	regmap_reg_range(BD9571MWV_VD18_VID, BD9571MWV_VD33_VID),
- 	regmap_reg_range(BD9571MWV_DVFS_VINIT, BD9571MWV_DVFS_VINIT),
-@@ -44,6 +45,7 @@ static const struct regmap_access_table bd9571mwv_readable_table = {
- };
- 
- static const struct regmap_range bd9571mwv_writable_yes_ranges[] = {
-+	regmap_reg_range(BD9571MWV_BKUP_MODE_CNT, BD9571MWV_BKUP_MODE_CNT),
- 	regmap_reg_range(BD9571MWV_AVS_VD09_VID(0), BD9571MWV_AVS_VD09_VID(3)),
- 	regmap_reg_range(BD9571MWV_DVFS_SETVID, BD9571MWV_DVFS_SETVID),
- 	regmap_reg_range(BD9571MWV_GPIO_DIR, BD9571MWV_GPIO_OUT),
+ #define BD9571MWV_BKUP_MODE_CNT			0x20
++#define BD9571MWV_BKUP_MODE_CNT_KEEPON_MASK	GENMASK(3, 0)
++#define BD9571MWV_BKUP_MODE_CNT_KEEPON_DDR0	BIT(0)
++#define BD9571MWV_BKUP_MODE_CNT_KEEPON_DDR1	BIT(1)
++#define BD9571MWV_BKUP_MODE_CNT_KEEPON_DDR0C	BIT(2)
++#define BD9571MWV_BKUP_MODE_CNT_KEEPON_DDR1C	BIT(3)
+ #define BD9571MWV_BKUP_MODE_STATUS		0x21
+ #define BD9571MWV_BKUP_RECOVERY_CNT		0x22
+ #define BD9571MWV_BKUP_CTRL_TIM_CNT		0x23
 -- 
 2.17.0
