@@ -1,31 +1,65 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 23 Apr 2018 22:46:54 +0800
-Subject: [PATCH v3 0/3] SY8106 regulator support and enable it on Orange Pi PC
-Message-ID: <20180423144657.63264-1-icenowy@aosc.io>
+Date: Mon, 23 Apr 2018 22:46:55 +0800
+Subject: [PATCH v3 1/3] dt-bindings: add binding for the SY8106A voltage
+ regulator
+In-Reply-To: <20180423144657.63264-1-icenowy@aosc.io>
+References: <20180423144657.63264-1-icenowy@aosc.io>
+Message-ID: <20180423144657.63264-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds dt-bindings and driver for Silergy SY8106A, and then
-utilize it on the Orange Pi PC board, which uses SY8016A as its CPUX
-(main ARM CPU cluster in an Allwinner SoC) power supply.
+From: Ondrej Jirman <megous@megous.com>
 
-The driver's functionality is restricted now, mainly {en,dis}able function
-is not yet implemented, as it cannot be debugged on Orange Pi PC
-(disable it will kill Linux).
+SY8106A is an I2C-controlled adjustable voltage regulator made by
+Silergy Corp.
 
-Ondrej Jirman (3):
-  dt-bindings: add binding for the SY8106A voltage regulator
-  regulator: add support for SY8106A regulator
-  ARM: dts: sun8i: h3: Add SY8106A regulator to Orange Pi PC
+Add its device tree binding.
 
- .../bindings/regulator/sy8106a-regulator.txt       |  23 +++
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  28 ++++
- drivers/regulator/Kconfig                          |   8 +-
- drivers/regulator/Makefile                         |   2 +-
- drivers/regulator/sy8106a-regulator.c              | 183 +++++++++++++++++++++
- 5 files changed, 242 insertions(+), 2 deletions(-)
+Signed-off-by: Ondrej Jirman <megous@megous.com>
+[Icenowy: Change commit message and slight fixes]
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes in v3:
+- Added silergy,fixed-microvolt property.
+
+Changes in v2:
+- Added Chen-Yu's Reviewed tag and Rob's ACK tag.
+- Specify regulator.txt's directory.
+
+ .../bindings/regulator/sy8106a-regulator.txt       | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/regulator/sy8106a-regulator.txt
- create mode 100644 drivers/regulator/sy8106a-regulator.c
 
+diff --git a/Documentation/devicetree/bindings/regulator/sy8106a-regulator.txt b/Documentation/devicetree/bindings/regulator/sy8106a-regulator.txt
+new file mode 100644
+index 000000000000..39a8ca73f572
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/sy8106a-regulator.txt
+@@ -0,0 +1,23 @@
++SY8106A Voltage regulator
++
++Required properties:
++- compatible: Must be "silergy,sy8106a"
++- reg: I2C slave address - must be <0x65>
++- silergy,fixed-microvolt - the voltage when I2C regulating is disabled (set
++  by external resistor like a fixed voltage)
++
++Any property defined as part of the core regulator binding, defined in
++./regulator.txt, can also be used.
++
++Example:
++
++	sy8106a {
++		compatible = "silergy,sy8106a";
++		reg = <0x65>;
++		regulator-name = "sy8106a-vdd";
++		silergy,fixed-microvolt = <1200000>;
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1400000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
 -- 
 2.15.1
