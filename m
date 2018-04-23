@@ -1,61 +1,44 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 23 Apr 2018 16:07:10 +0200
-Subject: [PATCH v2 1/2] regmap: include <linux/ktime.h> from
- include/linux/regmap.h
-In-Reply-To: <20180423115043.GD19834@sirena.org.uk>
-References: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
- <20180423100318.GA19834@sirena.org.uk>
- <d3e10dc5-55d3-40b8-a8de-d48aaaecf019@gmail.com>
- <20180423115043.GD19834@sirena.org.uk>
-Message-ID: <f4025431-be9a-32f9-06e1-9c6ac185c96a@gmail.com>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Mon, 23 Apr 2018 08:20:43 -0600
+Subject: Reporting more CPU features in /proc/cpuinfo
+In-Reply-To: <CAGXu5jKpU+pCi_S9PPqG9pYezkzjekXPohyBXJmXe87GqCEGnw@mail.gmail.com>
+References: <CAGXu5jKpU+pCi_S9PPqG9pYezkzjekXPohyBXJmXe87GqCEGnw@mail.gmail.com>
+Message-ID: <520006aa-4b67-eb77-253e-4c9dc4aa3329@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA256
-
-
-
-On 04/23/2018 01:50 PM, Mark Brown wrote:
-> On Mon, Apr 23, 2018 at 12:11:01PM +0200, Matthias Brugger wrote:
+On 4/20/2018 2:04 PM, Kees Cook wrote:
+> Hi!
 > 
->> On 04/23/2018 12:03 PM, Mark Brown wrote:
->>> On Mon, Apr 23, 2018 at 02:42:44PM +0800, sean.wang at mediatek.com
->>> wrote:
->>>> From: Sean Wang <sean.wang@mediatek.com>
+> I'd like to have more CPU features visible in /proc/cpuinfo so it's
+> possible to determine from userspace if the running system has various
+> defenses. For example, I'd like to know that a device has hardware PXN
+> and PAN. (I'd love to see emulated features listed separately too, but
+> I could imagine that not being a great match for /proc/cpuinfo.)
 > 
->>>> Similar to the readx_poll_timeout() macro calling ktime_* and using 
->>>> ktime_t type, which is declared in <linux/ktime.h>. So, make
+> One specific reason for this to do basic feature testing from
+> userspace without needing to catch the boot-time dmesg output. For
+> example, being able to answer the question "Does this system provide
+> PAN?" The answer is yes if either emulated PAN is visible in
+> /proc/config.gz or if hw PAN Is provided by the CPU (which I'd expect
+> to discover via /proc/cpuinfo like on x86 for things like SMAP).
 > 
->>> I'm missing patch 2 here - what's the story, are there any
->>> dependencies?
+> Thoughts?
 > 
->> You can find the second patch here: 
->> https://patchwork.kernel.org/patch/10356237/
-> 
-> So it looks like there is a dependency here...?
+> -Kees
 > 
 
-Yes, regmap_read_poll_timeout macro uses for example ktime_compare which is
-defined in linux/ktime.h
+I too, would like to see /proc/cpuinfo to be more useful, but last time 
+this was brought up by Al Stone[1], there was significant pushback from 
+Mark.
 
-That's my understanding.
+Maybe Mark has changed his position since then?
 
-Regards,
-Matthias
------BEGIN PGP SIGNATURE-----
+[1] https://lkml.org/lkml/2017/9/26/786
 
-iQIzBAEBCAAdFiEEiUuSfQSYnG8EMsBltDliWyzx00MFAlrd6IYACgkQtDliWyzx
-00MiNQ/5ASP4bK0FTkrulj6hCQbOaDXQcYB6wmrZGeWse4PXhAaehGBjursRlE96
-SjkAa/ZDXjDIhEDHNjO2QONdkDCBiUKp1/Mp8HJeeOTne5yy9V7mFrVxxLCIoqrk
-nlu8I9AY608fjUMiWHtt/nNa91QCjjYUfz/S74FhO0bB4tKBvIQb3zV0HGmqM2s2
-HSxPJhXhlfQIBO5rUcVPsrndfNMDMyCHdxWF7fjN8Gm9aSDIq/j0BvUlxJXm3CmP
-P3AsW1Wdom86IoLJAwCo8dAaPsHos3u7kCK1IWLxDIxl0x9ruHSTKrML01e9o0M9
-VlhqdM8GfoTG4cegRHiBQRVuHNbySpSw15WmuQtvPMKfHRpUThzHFiKawhpLvN5G
-Q/lnNehJvLQ/L7vaiy4kkq4PkppBGutIGobRmG5WU0NwI3sGzrAGev5IBUgkMn5w
-YfMyk/Yxn39aXdOZFSViA1zOYiEfjOnxkDQoxyW/TkyA5NCBG4tAn8Mz8qRH9Z5N
-G8lQ2UiLzxvhe007Ce0PXofkO6TbYoup4YebyOh7RIo13L5xsmmyenQxDb0DqpXH
-g1KDhz+hijenE6/ppEKBSFg8z1NMY+ZWjFWfTV6NB96WrG8Qh+EJ4gODIQCbvYY1
-xEGs3TLuyPuXAz+2pFOK5FEExskrzLnlJ+Mg1wXrJfqs3OWS2EE=
-=fHpR
------END PGP SIGNATURE-----
+-- 
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
