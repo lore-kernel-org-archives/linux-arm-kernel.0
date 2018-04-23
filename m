@@ -1,37 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 Apr 2018 16:50:33 -0300
-Subject: [PATCH 5/5] ARM: dts: imx6q-var-dt6customboard: Remove
- #address/#size-cells from gpio-keys
-In-Reply-To: <1524513033-21136-1-git-send-email-festevam@gmail.com>
-References: <1524513033-21136-1-git-send-email-festevam@gmail.com>
-Message-ID: <1524513033-21136-5-git-send-email-festevam@gmail.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 23 Apr 2018 16:09:30 -0400
+Subject: [PATCH 10/12] arm: don't build swiotlb by default
+In-Reply-To: <20180423170419.20330-11-hch@lst.de>
+References: <20180423170419.20330-1-hch@lst.de>
+ <20180423170419.20330-11-hch@lst.de>
+Message-ID: <20180423200930.GB5215@char.us.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, Apr 23, 2018 at 07:04:17PM +0200, Christoph Hellwig wrote:
+> swiotlb is only used as a library of helper for xen-swiotlb if Xen support
+> is enabled on arm, so don't build it by default.
+> 
 
-Remove unnecessary #address-cells/#size-cells to fix the following
-DTC warning:
-
-arch/arm/boot/dts/imx6q-var-dt6customboard.dtb: Warning (avoid_unnecessary_addr_size): /gpio-keys: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6q-var-dt6customboard.dts | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6q-var-dt6customboard.dts b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-index e0728d4..f2368a0 100644
---- a/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-+++ b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-@@ -26,8 +26,6 @@
- 
- 	gpio-keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		autorepeat;
- 
- 		back {
--- 
-2.7.4
+CCing Stefano
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arm/Kconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index aa1c187d756d..90b81a3a28a7 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1774,7 +1774,7 @@ config SECCOMP
+>  	  defined by each seccomp mode.
+>  
+>  config SWIOTLB
+> -	def_bool y
+> +	bool
+>  
+>  config PARAVIRT
+>  	bool "Enable paravirtualization code"
+> @@ -1807,6 +1807,7 @@ config XEN
+>  	depends on MMU
+>  	select ARCH_DMA_ADDR_T_64BIT
+>  	select ARM_PSCI
+> +	select SWIOTLB
+>  	select SWIOTLB_XEN
+>  	select PARAVIRT
+>  	help
+> -- 
+> 2.17.0
+> 
