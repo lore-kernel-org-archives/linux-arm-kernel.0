@@ -1,167 +1,101 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 23 Apr 2018 09:20:28 +0200
-Subject: [PATCH 2/2 v4] drm/pl111: Enable device-specific assigned memory
-Message-ID: <20180423072028.6739-1-linus.walleij@linaro.org>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 23 Apr 2018 09:22:53 +0200
+Subject: [PATCH v4 0/8] Add tda998x (HDMI) support to atmel-hlcdc
+Message-ID: <20180423072301.11962-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Versatile Express has 8 MB of dedicated video RAM (VRAM)
-on the motherboard, which is what we should be using for the
-PL111 if available. On this platform, the memory backplane
-is constructed so that only this memory will work properly
-with the CLCD on the motherboard, using any other memory
-area just gives random snow on the display.
+Hi!
 
-The CA9 Versatile Express also has a PL111 instance on its
-core tile that can address all memory, and this does not
-have the restriction.
+I naively thought that since there was support for both nxp,tda19988 (in
+the tda998x driver) and the atmel-hlcdc, things would be a smooth ride.
+But it wasn't, so I started looking around and realized I had to fix
+things.
 
-The memory is assigned to the device using the memory-region
-device tree property and a "shared-dma-pool" reserved
-memory pool like this:
+In v1 and v2 I fixed things by making the atmel-hlcdc driver a master
+component, but now I fix things by making the tda998x driver a bridge
+instead. This was after a suggestion from Boris Brezillon the
+atmel-hlcdc maintainer), so there was some risk of bias ... but after
+comparing what was needed, I too find the bridge approach better.
 
-reserved-memory {
-        #address-cells = <1>;
-        #size-cells = <1>;
-        ranges;
+In addition to the above, our PCB interface between the SAMA5D3 and the
+HDMI encoder is only using 16 bits, and this has to be described
+somewhere, or the atmel-hlcdc driver have no chance of selecting the
+correct output mode. Since I have similar problems with a ds90c185 lvds
+encoder I added patches to override the atmel-hlcdc output format via
+DT properties compatible with the media video-interface binding and
+things start to play together.
 
-        vram: vram at 48000000 {
-                compatible = "shared-dma-pool";
-                reg = <0x48000000 0x00800000>;
-                no-map;
-        };
-};
+Since this series superseeds the bridge series [1], I have included the
+leftover bindings patch for the ti,ds90c185 here.
 
-clcd at 1f000 {
-        compatible = "arm,pl111", "arm,primecell";
-	(...)
-        memory-region = <&vram>;
-}?;
+Anyway, this series solves some real issues for my HW.
 
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Mali DP Maintainers <malidp@foss.arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Reviewed-by: Eric Anholt <eric@anholt.net>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v3->v4:
-- Collect Eric's review-tag.
-ChangeLog v2->v3:
-- Fix error path so we uref the memory properly.
-- Augment the GEM buffer import to return an error pointer
-  if we try to import a buffer when using device-assigned
-  memory: we can only scan out the special memory and the
-  GEM buffers are not copied but referenced by pointer.
-ChangeLog v1->v2:
-- Make sure to also call of_reserved_mem_device_release() at
-  remove() and errorpath.
----
- drivers/gpu/drm/pl111/pl111_drm.h |  1 +
- drivers/gpu/drm/pl111/pl111_drv.c | 33 +++++++++++++++++++++++++++++++--
- 2 files changed, 32 insertions(+), 2 deletions(-)
+And as a last bit I remove the master component code from the tilcdc
+driver. It should no longer be needed, but I have only compile-tested
+the patch and there could easily be some gotcha. I marked it RFC, and
+it should get a Tested-by from someone with a tilcdc/tda998x combo
+before it is applied.
 
-diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-index 8639b2d4ddf7..ce4501d0ab48 100644
---- a/drivers/gpu/drm/pl111/pl111_drm.h
-+++ b/drivers/gpu/drm/pl111/pl111_drm.h
-@@ -79,6 +79,7 @@ struct pl111_drm_dev_private {
- 	const struct pl111_variant_data *variant;
- 	void (*variant_display_enable) (struct drm_device *drm, u32 format);
- 	void (*variant_display_disable) (struct drm_device *drm);
-+	bool use_device_memory;
- };
- 
- int pl111_display_init(struct drm_device *dev);
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 4621259d5387..5fcf21837746 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -60,6 +60,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_graph.h>
-+#include <linux/of_reserved_mem.h>
- 
- #include <drm/drmP.h>
- #include <drm/drm_atomic_helper.h>
-@@ -207,6 +208,23 @@ static int pl111_modeset_init(struct drm_device *dev)
- 	return ret;
- }
- 
-+struct drm_gem_object *pl111_gem_import_sg_table(struct drm_device *dev,
-+						 struct dma_buf_attachment *attach,
-+						 struct sg_table *sgt)
-+{
-+	struct pl111_drm_dev_private *priv = dev->dev_private;
-+
-+	/*
-+	 * When using device-specific reserved memory we can't import
-+	 * DMA buffers: those are passed by reference in any global
-+	 * memory and we can only handle a specific range of memory.
-+	 */
-+	if (priv->use_device_memory)
-+		return ERR_PTR(-EINVAL);
-+
-+	return drm_gem_cma_prime_import_sg_table(dev, attach, sgt);
-+}
-+
- DEFINE_DRM_GEM_CMA_FOPS(drm_fops);
- 
- static struct drm_driver pl111_drm_driver = {
-@@ -227,7 +245,7 @@ static struct drm_driver pl111_drm_driver = {
- 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
- 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
- 	.gem_prime_import = drm_gem_prime_import,
--	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
-+	.gem_prime_import_sg_table = pl111_gem_import_sg_table,
- 	.gem_prime_export = drm_gem_prime_export,
- 	.gem_prime_get_sg_table	= drm_gem_cma_prime_get_sg_table,
- 
-@@ -257,6 +275,12 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	drm->dev_private = priv;
- 	priv->variant = variant;
- 
-+	ret = of_reserved_mem_device_init(dev);
-+	if (!ret) {
-+		dev_info(dev, "using device-specific reserved memory\n");
-+		priv->use_device_memory = true;
-+	}
-+
- 	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
- 				 &priv->memory_bw)) {
- 		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
-@@ -275,7 +299,8 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	priv->regs = devm_ioremap_resource(dev, &amba_dev->res);
- 	if (IS_ERR(priv->regs)) {
- 		dev_err(dev, "%s failed mmio\n", __func__);
--		return PTR_ERR(priv->regs);
-+		ret = PTR_ERR(priv->regs);
-+		goto dev_unref;
- 	}
- 
- 	/* This may override some variant settings */
-@@ -305,11 +330,14 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 
- dev_unref:
- 	drm_dev_unref(drm);
-+	of_reserved_mem_device_release(dev);
-+
- 	return ret;
- }
- 
- static int pl111_amba_remove(struct amba_device *amba_dev)
- {
-+	struct device *dev = &amba_dev->dev;
- 	struct drm_device *drm = amba_get_drvdata(amba_dev);
- 	struct pl111_drm_dev_private *priv = drm->dev_private;
- 
-@@ -319,6 +347,7 @@ static int pl111_amba_remove(struct amba_device *amba_dev)
- 		drm_panel_bridge_remove(priv->bridge);
- 	drm_mode_config_cleanup(drm);
- 	drm_dev_unref(drm);
-+	of_reserved_mem_device_release(dev);
- 
- 	return 0;
- }
+Cheers,
+Peter
+
+Changes since v3   https://lkml.org/lkml/2018/4/19/736
+- moved the meat of the drm_of_media_bus_fmt function from patch 3/7
+  to a driver-local atmel_hlcdc_of_bus_fmt function, and squashed with
+  patch 4/7 (this is now patch 3/8).
+- patch 3/8 now parses and stores the DT bus format together with the
+  encoder in a reintroduced struct atmel_hlcdc_rgb_output instead of
+  allocating a separate encoder-indexed array for the bus formats.
+- patch 5/8 is new and splits tda988x_encoder_dpms into a pair of
+  functions to enable/disable separately. This fits better with both
+  the current code and for the followup drm_bridge patch (7/8).
+- adjust patch 6/8 and 7/8 to the above simplification.
+- added patch 8/8 that removes component master code from tilcdc.
+
+Changes since v2   https://lkml.org/lkml/2018/4/17/385
+- patch 2/7 fixed spelling and added an example
+- patch 4/7 parse the DT up front and store the result indexed by encoder
+- old patch 5/6 and 6/6 dropped
+- patch 5-7/7 are new and makes the tda998x driver a drm_bridge
+
+Changes since v1   https://lkml.org/lkml/2018/4/9/294
+- added reviewed-by from Rob to patch 1/6
+- patch 2/6 changed so that the bus format override is in the endpoint
+  DT node, and follows the binding of media video-interfaces.
+- patch 3/6 is new, it adds drm_of_media_bus_fmt which parses above
+  media video-interface binding (partially).
+- patch 4/6 now makes use of the above helper (and also fixes problems
+  with the 3/5 patch from v1 when no override was specified).
+- do not mention unrelated connector display_info details in the cover
+  letter and commit messages.
+
+[1]
+"Bridge" series v2   https://lkml.org/lkml/2018/3/26/610
+"Bridge" series v1   https://lkml.org/lkml/2018/3/17/221
+
+Peter Rosin (8):
+  dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
+  dt-bindings: display: atmel: optional video-interface of endpoints
+  drm/atmel-hlcdc: support bus-width (12/16/18/24) in endpoint nodes
+  drm/i2c: tda998x: find the drm_device via the drm_connector
+  drm/i2c: tda998x: split tda998x_encoder_dpms into enable/disable
+  drm/i2c: tda998x: split encoder and component functions from the work
+  drm/i2c: tda998x: register as a drm bridge
+  drm/tilcdc: decomponentize now that tda998x is a bridge
+
+ .../devicetree/bindings/display/atmel/hlcdc-dc.txt |  26 ++
+ .../bindings/display/bridge/lvds-transmitter.txt   |   8 +-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     |  70 ++++--
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       |   1 +
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   |  67 +++++-
+ drivers/gpu/drm/i2c/tda998x_drv.c                  | 268 ++++++++++++++++-----
+ drivers/gpu/drm/tilcdc/tilcdc_crtc.c               |  11 -
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c                |  67 +-----
+ drivers/gpu/drm/tilcdc/tilcdc_drv.h                |   1 -
+ drivers/gpu/drm/tilcdc/tilcdc_external.c           |  51 ----
+ drivers/gpu/drm/tilcdc/tilcdc_external.h           |   4 +-
+ 11 files changed, 357 insertions(+), 217 deletions(-)
+
 -- 
-2.14.3
+2.11.0
