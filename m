@@ -1,75 +1,60 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 23 Apr 2018 13:10:44 -0600
-Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
-In-Reply-To: <10d9cf68-29ed-d205-a25f-b8dade53cdd8@codeaurora.org>
-References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
- <20180419202632.GE14063@ziepe.ca>
- <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
- <290e9530-dcde-9c10-7ae0-59ac4c509db4@codeaurora.org>
- <20180420140049.GP28657@bhelgaas-glaptop.roam.corp.google.com>
- <20180420090420.03fb1e6c@w520.home>
- <10d9cf68-29ed-d205-a25f-b8dade53cdd8@codeaurora.org>
-Message-ID: <20180423131044.53471670@w520.home>
+From: gustavo@embeddedor.com (Gustavo A. R. Silva)
+Date: Mon, 23 Apr 2018 14:13:58 -0500
+Subject: [PATCH 00/11] fix potential Spectre variant 1 issues
+In-Reply-To: <cover.1524499368.git.gustavo@embeddedor.com>
+References: <cover.1524499368.git.gustavo@embeddedor.com>
+Message-ID: <96bd3e25-9503-d23d-4e3c-091e68b6bf8f@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Apr 2018 13:28:22 -0400
-Sinan Kaya <okaya@codeaurora.org> wrote:
+Hi,
 
-> On 4/20/2018 11:04 AM, Alex Williamson wrote:
-> > Is there a concern here about whether the endpoint device driver or the
-> > PCI core really knows better about link retraining?  This makes me
-> > remember my unfinished (and need to revisit) Pericom quirk[1] where
-> > errata in the PCIe switch requires that upstream and downstream links
-> > are balanced (ie. same link rate) or else enabling ACS results in
-> > packets not properly flowing through the switch.  If an endpoint driver
-> > starts deciding to retrain links, overriding quirks in the PCI core,
-> > then such topology manipulation isn't possible.  Why does the
-> > driver .probe() function think it can retrain at a higher link rate
-> > than PCI core?  Thanks,  
-> 
-> The example given is for some serdes firmware load to happen in probe and
-> then performing a retrain to reach to a better speed.
-> 
-> It becomes a chicken and egg problem. 
-> 
-> 1. Endpoint HW trains to gen1 by default pre-boot.
-> 2. PCI core enumerates the device.
-> 3. Endpoint driver gets loaded
-> 4. Driver does the firmware programming followed by a link retrain.
-> 
-> I think it is the responsibility of the PCI core to provide reset APIs.
-> However, expecting endpoint drivers to be knowledgeable about hotplug is
-> too much.
-> 
-> We can certainly contain AER change into pci directory by moving the slot
-> reset function to drivers/pci.h file.
-> 
-> But, we need to think about what to do about VFIO and other endpoint
-> initiated reset cases. My suggestion was to move this into a single API and
-> remove all other APIs from include/linux/pci.h.
+Please, drop this series. Further analysis is required as it seems all 
+these are False Positives.
 
-I'm a little confused about the relation between reset and retrain.
-AIUI we can retrain the link without any sort of endpoint reset and if
-some sort of driver/firmware setup is required on the endpoint to
-achieve the target link speed, then I'd think we only want to retrain.
-How this is going to work with vfio is an interesting question.  We're
-only providing access to the device, not the link to the device.
-Multifunction endpoints become a big problem if one function starts
-requesting link retraining while another is in use elsewhere.
- 
-> Coming back to this patch...
+Sorry for the noise.
+
+Thanks
+--
+Gustavo
+
+On 04/23/2018 12:37 PM, Gustavo A. R. Silva wrote:
+> This patchset aims to fix various media platform and media usb
+> cases where we have user controlled array dereferences that could
+> be exploited due to the Spectre variant 1 vulnerability. All were
+> reported by Dan Carpenter.
 > 
-> Do we need a retrain API with the speed that driver wants to reach to?
-> API can return what was actually accomplished. The quirk from Alex can
-> run inside this API to make a decision on what speed do we actually want
-> to reach to for a given PCI topology by reprogramming the target link speed
-> field.
-
-Yes, I think the core should provide a retraining API, that would also
-make the Pericom quirk easier to implement.  We'd want a field/flag on
-the pcidev that could be set by quirks to limit the highest target
-rate, but it makes sense that this should be an interface provided by
-and control point for the PCI core.  Thanks,
-
-Alex
+> Notice that given that speculation windows are large, the policy is
+> to kill the speculation on the first load and not worry if it can be
+> completed with a dependent load/store [1].
+> 
+> [1] https://marc.info/?l=linux-kernel&m=152449131114778&w=2
+> 
+> Thanks
+> 
+> Gustavo A. R. Silva (11):
+>    media: tm6000: fix potential Spectre variant 1
+>    exynos4-is: mipi-csis: fix potential Spectre variant 1
+>    fsl-viu: fix potential Spectre variant 1
+>    marvell-ccic: mcam-core: fix potential Spectre variant 1
+>    omap_vout: fix potential Spectre variant 1
+>    rcar-v4l2: fix potential Spectre variant 1
+>    rcar_drif: fix potential Spectre variant 1
+>    sh_vou: fix potential Spectre variant 1
+>    vimc-debayer: fix potential Spectre variant 1
+>    vivid-sdr-cap: fix potential Spectre variant 1
+>    vsp1_rwpf: fix potential Spectre variant 1
+> 
+>   drivers/media/platform/exynos4-is/mipi-csis.c   | 5 ++++-
+>   drivers/media/platform/fsl-viu.c                | 8 ++++----
+>   drivers/media/platform/marvell-ccic/mcam-core.c | 3 +++
+>   drivers/media/platform/omap/omap_vout.c         | 3 +++
+>   drivers/media/platform/rcar-vin/rcar-v4l2.c     | 4 +++-
+>   drivers/media/platform/rcar_drif.c              | 4 +++-
+>   drivers/media/platform/sh_vou.c                 | 3 +++
+>   drivers/media/platform/vimc/vimc-debayer.c      | 5 ++++-
+>   drivers/media/platform/vivid/vivid-sdr-cap.c    | 6 ++++++
+>   drivers/media/platform/vsp1/vsp1_rwpf.c         | 3 +++
+>   drivers/media/usb/tm6000/tm6000-video.c         | 2 ++
+>   11 files changed, 38 insertions(+), 8 deletions(-)
+> 
