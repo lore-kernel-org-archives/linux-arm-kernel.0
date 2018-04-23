@@ -1,37 +1,62 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 23 Apr 2018 10:53:17 +0530
-Subject: [RFC 4/6] dmaengine: xilinx_dma: Freeup active list based on
- descriptor completion bit
-In-Reply-To: <BN6PR02MB3282D60BCF6A4B40BCC7A5B8C7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
-References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
- <1522665546-10035-5-git-send-email-radheys@xilinx.com>
- <20180411091102.GZ6014@localhost>
- <BN6PR02MB3282D60BCF6A4B40BCC7A5B8C7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
-Message-ID: <20180423052317.GZ6014@localhost>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 23 Apr 2018 07:46:12 +0200
+Subject: [PATCH 1/6] dmaengine: at_hdmac: simplify getting .drvdata
+In-Reply-To: <20180422091415.7587-2-wsa+renesas@sang-engineering.com>
+References: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
+ <20180422091415.7587-2-wsa+renesas@sang-engineering.com>
+Message-ID: <20180423054612.GE13305@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 12:28:52PM +0000, Radhey Shyam Pandey wrote:
-
-> > > +		if ((seg->hw.status & XILINX_DMA_COMP_MASK) ||
-> > > +			(!chan->xdev->has_axieth_connected)) {
-> > 
-> > why the second case ? That is not expalined in log?
-> In the current implementation, delay timeout is enabled only for
-> has_axieth_connected usecase. For ethernet, we need real-time processing
-> while still having benefit of interrupt coalescing. Example: In RX interrupt
-> coalescing is set to 0x3.  Without delay timeout, DMA engine will wait for
-> all frames and then issue completion interrupt. In ethernet usecase, this
-> can introduce huge latencies. Delay timeout interrupt will trigger if delay
-> time period has expired and we can notify dma client with received frames.
+On Sun, Apr 22, 2018 at 11:14:09AM +0200, Wolfram Sang wrote:
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
 > 
-> The second case is added to keep the previous implementation as is.(i.e when
-> Delay timeout interrupt is not enabled - move all active desc to done list). 
-> Sure I will add a description for it in the commit log.
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com> 
 
-That should help, it didn't seem to have anything to do with log or other
-changes, please keep in mind again that changelog should describe the change
-and help ppl review...
-
--- 
-~Vinod
+Thanks
+> ---
+> 
+> Build tested only. buildbot is happy. Please apply to your tree directly.
+> 
+>  drivers/dma/at_hdmac.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index a861b5b4d443..75f38d19fcbe 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -2041,8 +2041,7 @@ static void at_dma_shutdown(struct platform_device *pdev)
+>  
+>  static int at_dma_prepare(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct at_dma *atdma = platform_get_drvdata(pdev);
+> +	struct at_dma *atdma = dev_get_drvdata(dev);
+>  	struct dma_chan *chan, *_chan;
+>  
+>  	list_for_each_entry_safe(chan, _chan, &atdma->dma_common.channels,
+> @@ -2076,8 +2075,7 @@ static void atc_suspend_cyclic(struct at_dma_chan *atchan)
+>  
+>  static int at_dma_suspend_noirq(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct at_dma *atdma = platform_get_drvdata(pdev);
+> +	struct at_dma *atdma = dev_get_drvdata(dev);
+>  	struct dma_chan *chan, *_chan;
+>  
+>  	/* preserve data */
+> @@ -2118,8 +2116,7 @@ static void atc_resume_cyclic(struct at_dma_chan *atchan)
+>  
+>  static int at_dma_resume_noirq(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct at_dma *atdma = platform_get_drvdata(pdev);
+> +	struct at_dma *atdma = dev_get_drvdata(dev);
+>  	struct dma_chan *chan, *_chan;
+>  
+>  	/* bring back DMA controller */
+> -- 
+> 2.11.0
+> 
