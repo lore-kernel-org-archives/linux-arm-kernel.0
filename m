@@ -1,52 +1,64 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Mon, 23 Apr 2018 15:33:10 +0800
-Subject: [PATCH resend] usb: chipidea: Don't select EXTCON
-In-Reply-To: <VI1PR04MB14558BCFB82A06C92F7AA0CA8BB40@VI1PR04MB1455.eurprd04.prod.outlook.com>
-References: <20180419160144.0412a510@xhacker.debian>
- <HE1PR04MB1450E11255E0828180B3E8188BB40@HE1PR04MB1450.eurprd04.prod.outlook.com>
- <20180420170126.732e093b@xhacker.debian>
- <VI1PR04MB14558BCFB82A06C92F7AA0CA8BB40@VI1PR04MB1455.eurprd04.prod.outlook.com>
-Message-ID: <20180423153310.47a20e6d@xhacker.debian>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 23 Apr 2018 09:39:32 +0200
+Subject: [PATCH] ACPI / bus: ignore rather than fail bus driver
+ registrations on non-ACPI boot
+In-Reply-To: <CAKv+Gu8PmKe+X5b0P_KuWfB6U-P-EngJw04JdJUkEkwrqNK97g@mail.gmail.com>
+References: <20180419165825.13008-1-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8xY-RvJKTKfv-e0qonL4oECDBK+ppxztvh9BgdpG8CUg@mail.gmail.com>
+ <CAKv+Gu8PmKe+X5b0P_KuWfB6U-P-EngJw04JdJUkEkwrqNK97g@mail.gmail.com>
+Message-ID: <1646053.XbTMSZpCTE@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Apr 2018 09:35:54 +0000 Peter Chen wrote:
-
->  
-> > >
-> > > Sorry to reply late, are you really care 2KB code side? Since many
-> > > users use EXTCON to handle vbus and id, it is hard just delete it. I
-> > > could accept patch for your specific platforms, like:
-> > >
-> > > +	select EXTCON if !ARCH_XXXX  
-> > 
-> > The patch doesn't remove extcon support from chipidea driver.
-> > I just want to not select EXTCON unconditionally, but let the users choose. If the
-> > users need extcon, they could enable EXTCON themselves
-> > 
-> > I just searched all the dts in arch/arm/boot/dts and arch/arm64/boot/dts only the four
-> > dts give extcon phandle to chipidea host, other users don't make use of it:
-> > 
-> > arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> > 
-> > arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
-> > 
-> > arch/arm/boot/dts/qcom-msm8974-fairphone-fp2.dts
-> > 
-> > arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
-> >   
+On Sunday, April 22, 2018 2:34:17 PM CEST Ard Biesheuvel wrote:
+> On 22 April 2018 at 11:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 22 April 2018 at 11:27, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> >> On Thu, Apr 19, 2018 at 6:58 PM, Ard Biesheuvel
+> >> <ard.biesheuvel@linaro.org> wrote:
+> >>> When building ACPI bus drivers such as button.ko into the core kernel,
+> >>> other drivers that depend on its symbols are loadable even when booting
+> >>> with ACPI disabled. For instance, nouveau.ko has a link time dependency
+> >>> on acpi_lid_open() on ACPI capable kernels, and calls it regardless of
+> >>> whether the system booted via ACPI.
+> >>>
+> >>> However, when building button.ko as a module, it will refuse to load if
+> >>> the system did not boot in ACPI mode, which subsequently prevents the
+> >>> nouveau driver from loading as well, resulting in broken graphics.
+> >>>
+> >>> Given that returning an error from an initcall() is ignored for drivers
+> >>> that are built into the kernel,
+> >>
+> >> Which makes sense, because they are present in the kernel anyway.
+> >>
+> >>> let's align the module case with this,
+> >>> and not return an error when registering an ACPI bus driver on a system
+> >>> that did not boot via ACPI.
+> >>
+> >> But why is loading a module that's never going to be used actually OK?
+> >>
+> >> Isn't this a problem with the assumptions made by the nouveau driver
+> >> that need not be met depending on what configuration the kernel is run
+> >> in?
+> >>
+> >> Honestly, it doesn't appear quite right to try to change the rest of
+> >> the kernel to follow the nouveau's expectations.
+> >>
+> >
+> > I don't disagree here, I am just unsure whether other options are any better.
+> >
+> > I think the alternative is to make acpi_lid_open() a non-modular
+> > function of the ACPI core that invokes the button ACPI bus driver if
+> > it was loaded, and always returns false otherwise. Would that work for
+> > you?
 > 
-> I see, but I do not want to break msm platforms. You may try to create Glue driver Kconfig
-> entry for chipidea like dwc3, and let msm depends on EXTCON.
+> BTW not only nouveau invokes acpi_lid_open(), i915 does it as well.
 
-Got your points. Since multi_v7_defconfig has selected EXTCON, and
-EXTCON_USB_GPIO(which depends on EXTCON) is enabled in arm64 defconfig, so
-what about:
+Clearly, the design is somewhat ad-hoc here.
 
-enable EXTCON explicitly in arm64 defconfig?
-then add this patch?
+It looks like using module_acpi_driver() in button.c is a mistake given the
+dependencies.  The module initialization should ignore the
+acpi_bus_register_driver() failure in there, but there's no reason for the
+other ACPI driver modules to be affected by that.
 
-Is it acceptable?
-
-Thanks,
-Jisheng
+And if you change that, please add a comment referring to the dependencies
+in question.
