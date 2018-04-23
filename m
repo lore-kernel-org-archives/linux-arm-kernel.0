@@ -1,114 +1,112 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 23 Apr 2018 14:42:45 +0800
-Subject: [PATCH v2 2/2] soc: mediatek: reuse regmap_read_poll_timeout helpers
-In-Reply-To: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
-References: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
-Message-ID: <ed866d3345a27b2c87b570562d9ad9132bca6062.1524465345.git.sean.wang@mediatek.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 23 Apr 2018 08:47:09 +0200
+Subject: [RFC 0/2] dw_mmc: add multislot support
+In-Reply-To: <1524239609.10138.47.camel@synopsys.com>
+References: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
+ <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
+ <1524239609.10138.47.camel@synopsys.com>
+Message-ID: <CAPDyKFpY7JsQukY=E2PRg=iVfmis4i1kvST+b2wtshNc5Jn+jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On 20 April 2018 at 17:53, Eugeniy Paltsev <Eugeniy.Paltsev@synopsys.com> wrote:
+> Hi Ulf,
+>
+> On Fri, 2018-04-20 at 09:35 +0200, Ulf Hansson wrote:
+>> [...]
+>>
+>> >
+>> > 2. Add missing stuff to support multislot mode in DesignWare MMC driver.
+>> >  * Add missing slot switch to __dw_mci_start_request() function.
+>> >  * Refactor set_ios function:
+>> >    a) Calculate common clock which is
+>> >       suitable for all slots instead of directly use clock value
+>> >       provided by mmc core. We calculate common clock as the minimum
+>> >       among each used slot clocks. This clock is calculated in
+>> >       dw_mci_calc_common_clock() function which is called
+>> >       from set_ios()
+>> >    b) Disable clock only if no other slots are ON.
+>> >    c) Setup clock directly in set_ios() only if no other slots
+>> >       are ON. Otherwise adjust clock in __dw_mci_start_request()
+>> >       function before slot switch.
+>> >    d) Move timings and bus_width setup to separate funcions.
+>> >  * Use timing field in each slot structure instead of common field in
+>> >    host structure.
+>> >  * Add locks to serialize access to registers.
+>>
+>> Sorry, but this is a hack to *try* to make multi-slot work and this
+>> isn't sufficient. There were good reasons to why the earlier
+>> non-working multi slot support was removed from dw_mmc.
+>
+> Previous multi slot implementation was removed as nobody used it and
+> nobody tested it. There are lots of mistakes in previous implementation
+> which are not related to request serialization
+> like lack of slot switch / lack of adding slot id to CIU commands / ets...
+> So obviously it was never tested and never used at real multi slot hardware.
+>
+>> Let me elaborate a bit for your understanding. The core uses a host
+>> lock (mmc_claim|release_host()) to serialize operations and commands,
+>> as to confirm to the SD/SDIO/(e)MMC specs. The above changes gives no
+>> guarantees for this. To make that work, we would need a "mmc bus lock"
+>> to be managed by the core.
+>
+> In current implementation data transfers and commands to different
+> hosts (slots) are serialized internally in the dw_mmc driver. We have
+> request queue and when .request() is called we add new request to the
+> queue. We take new request from the queue only if the previous one
+> has already finished.
 
-Reuse the common helpers regmap_read_poll_timeout provided by Linux core
-instead of an open-coded handling.
+That isn't sufficient. The core expects all calls to *any* of the host
+ops to be serialized for one host. It does so to conform to the specs.
 
-v1 -> v2:
- - use macro definitions MTK_POLL_DELAY_US and MTK_POLL_TIMEOUT for
-   arguments sleep_us and timeout_us passing in regmap_read_poll_timeout.
- - remove unnecessary linux/iopoll.h being included in.
+For example it may call:
+ ->set_ios()
+->request()
+->set_ios()
+->request()
+->request()
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Weiyi Lu <weiyi.lu@mediatek.com>
----
- drivers/soc/mediatek/mtk-infracfg.c | 46 ++++++++++---------------------------
- 1 file changed, 12 insertions(+), 34 deletions(-)
+>
+> So although hosts (slots) have separate locks (mmc_claim|release_host())
+> the requests to different slots are serialized by driver.
+>
+> Isn't that enough?
 
-diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
-index 8c310de..958861c 100644
---- a/drivers/soc/mediatek/mtk-infracfg.c
-+++ b/drivers/soc/mediatek/mtk-infracfg.c
-@@ -17,6 +17,9 @@
- #include <linux/soc/mediatek/infracfg.h>
- #include <asm/processor.h>
- 
-+#define MTK_POLL_DELAY_US   10
-+#define MTK_POLL_TIMEOUT    (jiffies_to_usecs(HZ))
-+
- #define INFRA_TOPAXI_PROTECTEN		0x0220
- #define INFRA_TOPAXI_PROTECTSTA1	0x0228
- #define INFRA_TOPAXI_PROTECTEN_SET	0x0260
-@@ -37,7 +40,6 @@
- int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
- 		bool reg_update)
- {
--	unsigned long expired;
- 	u32 val;
- 	int ret;
- 
-@@ -47,22 +49,11 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
- 	else
- 		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_SET, mask);
- 
--	expired = jiffies + HZ;
--
--	while (1) {
--		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
--		if (ret)
--			return ret;
--
--		if ((val & mask) == mask)
--			break;
-+	ret = regmap_read_poll_timeout(infracfg, INFRA_TOPAXI_PROTECTSTA1,
-+				       val, (val & mask) == mask,
-+				       MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
- 
--		cpu_relax();
--		if (time_after(jiffies, expired))
--			return -EIO;
--	}
--
--	return 0;
-+	return ret;
- }
- 
- /**
-@@ -80,30 +71,17 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
- int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask,
- 		bool reg_update)
- {
--	unsigned long expired;
- 	int ret;
-+	u32 val;
- 
- 	if (reg_update)
- 		regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
- 	else
- 		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_CLR, mask);
- 
--	expired = jiffies + HZ;
--
--	while (1) {
--		u32 val;
--
--		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
--		if (ret)
--			return ret;
--
--		if (!(val & mask))
--			break;
--
--		cpu_relax();
--		if (time_after(jiffies, expired))
--			return -EIO;
--	}
-+	ret = regmap_read_poll_timeout(infracfg, INFRA_TOPAXI_PROTECTSTA1,
-+				       val, !(val & mask),
-+				       MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
- 
--	return 0;
-+	return ret;
- }
--- 
-2.7.4
+Sorry, but no.
+
+> I'm not very familiar with SD/SDIO/(e)MMC specs so my assumptions might be wrong
+> in that case please correct me.
+
+Well, that kind of explains your simplistic approach.
+
+I would suggest you to study the specs and the behavior of the mmc
+core a bit more carefully, that should give you a better understanding
+of the problems.
+
+>
+>> However, inventing a "mmc bus lock" would lead to other problems
+>> related to I/O scheduling for upper layers - it simply breaks. For
+>> example, I/O requests for one card/slot can then starve I/O requests
+>> reaching another card/slot.
+>>
+>
+> Nevertheless we had to deal somehow with existing hardware which
+> has multislot dw mmc controller and both slots are used...
+>
+> This patch at least shouldn't break anything for current users (which use
+> it in single slot mode)
+>
+> Moreover we tested this dual-slot implementation and don't catch any problems
+> (probably yet) except bus performance decrease in dual-slot mode (which is
+> quite expected).
+
+Honestly, I don't think efforts of implementing this is worth it!
+
+Even if we would be able to solve the problem from an mmc subsystem
+point of view, we would still have the I/O scheduling problem to
+address. To solve that, we would need to be able to configure upper
+block layer code to run one scheduling instance over multiple block
+devices...
+
+Kind regards
+Uffe
