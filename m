@@ -1,140 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Apr 2018 10:45:43 -0700
-Subject: [PATCH 10/16] bus: ti-sysc: Tag some modules resource providers for
- noirq suspend
+Date: Mon, 23 Apr 2018 10:45:49 -0700
+Subject: [PATCH 16/16] bus: ti-sysc: Show module information for suspend if
+ DEBUG is enabled
 In-Reply-To: <20180423174549.57412-1-tony@atomide.com>
 References: <20180423174549.57412-1-tony@atomide.com>
-Message-ID: <20180423174549.57412-11-tony@atomide.com>
+Message-ID: <20180423174549.57412-17-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modules that provide resources for other modules need to be suspended
-and resumed in the noirq calls. Tag the resource providing modules.
+Let's show module info if DEBUG is enabled to make it easier to follow
+what happens on the suspend and resume path.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/bus/ti-sysc.c                 | 77 +++++++++++++++++++++++++++
- include/linux/platform_data/ti-sysc.h |  1 +
- 2 files changed, 78 insertions(+)
+ drivers/bus/ti-sysc.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
 --- a/drivers/bus/ti-sysc.c
 +++ b/drivers/bus/ti-sysc.c
-@@ -665,6 +665,10 @@ static int sysc_suspend(struct device *dev)
- 
- 	ddata = dev_get_drvdata(dev);
- 
-+	if (ddata->cfg.quirks & (SYSC_QUIRK_RESOURCE_PROVIDER |
-+				 SYSC_QUIRK_LEGACY_IDLE))
-+		return 0;
+@@ -891,6 +891,24 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
+ 		   SYSC_QUIRK_LEGACY_IDLE),
+ 	SYSC_QUIRK("wdt", 0, 0, 0x10, 0x14, 0x502a0d00, 0xffffffff,
+ 		   SYSC_QUIRK_LEGACY_IDLE),
 +
- 	if (!ddata->enabled)
- 		return 0;
- 
-@@ -678,6 +682,58 @@ static int sysc_resume(struct device *dev)
- 	struct sysc *ddata;
- 
- 	ddata = dev_get_drvdata(dev);
-+
-+	if (ddata->cfg.quirks & (SYSC_QUIRK_RESOURCE_PROVIDER |
-+				 SYSC_QUIRK_LEGACY_IDLE))
-+		return 0;
-+
-+	if (ddata->needs_resume) {
-+		dev_dbg(ddata->dev, "%s %s\n", __func__,
-+			ddata->name ? ddata->name : "");
-+
-+		ddata->needs_resume = false;
-+
-+		return sysc_runtime_resume(dev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int sysc_noirq_suspend(struct device *dev)
-+{
-+	struct sysc *ddata;
-+
-+	ddata = dev_get_drvdata(dev);
-+
-+	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
-+		return 0;
-+
-+	if (!(ddata->cfg.quirks & SYSC_QUIRK_RESOURCE_PROVIDER))
-+		return 0;
-+
-+	if (!ddata->enabled)
-+		return 0;
-+
-+	dev_dbg(ddata->dev, "%s %s\n", __func__,
-+		ddata->name ? ddata->name : "");
-+
-+	ddata->needs_resume = true;
-+
-+	return sysc_runtime_suspend(dev);
-+}
-+
-+static int sysc_noirq_resume(struct device *dev)
-+{
-+	struct sysc *ddata;
-+
-+	ddata = dev_get_drvdata(dev);
-+
-+	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
-+		return 0;
-+
-+	if (!(ddata->cfg.quirks & SYSC_QUIRK_RESOURCE_PROVIDER))
-+		return 0;
-+
- 	if (ddata->needs_resume) {
- 		ddata->needs_resume = false;
- 
-@@ -690,6 +746,7 @@ static int sysc_resume(struct device *dev)
- 
- static const struct dev_pm_ops sysc_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(sysc_suspend, sysc_resume)
-+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(sysc_noirq_suspend, sysc_noirq_resume)
- 	SET_RUNTIME_PM_OPS(sysc_runtime_suspend,
- 			   sysc_runtime_resume,
- 			   NULL)
-@@ -721,6 +778,26 @@ struct sysc_revision_quirk {
- 	}
- 
- static const struct sysc_revision_quirk sysc_revision_quirks[] = {
-+	/* These need to use noirq_suspend */
-+	SYSC_QUIRK("control", 0, 0, 0x10, -1, 0x40000900, 0xffffffff,
-+		   SYSC_QUIRK_RESOURCE_PROVIDER),
-+	SYSC_QUIRK("i2c", 0, 0, 0x10, 0x90, 0x5040000a, 0xffffffff,
-+		   SYSC_QUIRK_RESOURCE_PROVIDER),
-+	SYSC_QUIRK("mcspi", 0, 0, 0x10, -1, 0x40300a0b, 0xffffffff,
-+		   SYSC_QUIRK_RESOURCE_PROVIDER),
-+	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x40000100, 0xffffffff,
-+		   SYSC_QUIRK_RESOURCE_PROVIDER),
-+	SYSC_QUIRK("ocp2scp", 0, 0, 0x10, 0x14, 0x50060005, 0xffffffff,
-+		   SYSC_QUIRK_RESOURCE_PROVIDER),
-+	SYSC_QUIRK("padconf", 0, 0, 0x10, -1, 0x4fff0800, 0xffffffff,
-+		   SYSC_QUIRK_RESOURCE_PROVIDER),
-+	SYSC_QUIRK("scm", 0, 0, 0x10, -1, 0x40000900, 0xffffffff,
-+		   SYSC_QUIRK_RESOURCE_PROVIDER),
-+	SYSC_QUIRK("scrm", 0, 0, -1, -1, 0x00000010, 0xffffffff,
-+		   SYSC_QUIRK_RESOURCE_PROVIDER),
-+	SYSC_QUIRK("sdma", 0, 0, 0x2c, 0x28, 0x00010900, 0xffffffff,
-+		   SYSC_QUIRK_RESOURCE_PROVIDER),
-+
- 	/* These drivers need to be fixed to not use pm_runtime_irq_safe() */
- 	SYSC_QUIRK("gpio", 0, 0, 0x10, 0x114, 0x50600801, 0xffffffff,
- 		   SYSC_QUIRK_LEGACY_IDLE | SYSC_QUIRK_OPT_CLKS_IN_RESET),
-diff --git a/include/linux/platform_data/ti-sysc.h b/include/linux/platform_data/ti-sysc.h
---- a/include/linux/platform_data/ti-sysc.h
-+++ b/include/linux/platform_data/ti-sysc.h
-@@ -45,6 +45,7 @@ struct sysc_regbits {
- 	s8 emufree_shift;
++#ifdef DEBUG
++	SYSC_QUIRK("aess", 0, 0, 0x10, -1, 0x40000000, 0xffffffff, 0),
++	SYSC_QUIRK("gpu", 0, 0x1fc00, 0x1fc10, -1, 0, 0, 0),
++	SYSC_QUIRK("hdq1w", 0, 0, 0x14, 0x18, 0x00000006, 0xffffffff, 0),
++	SYSC_QUIRK("hsi", 0, 0, 0x10, 0x14, 0x50043101, 0xffffffff, 0),
++	SYSC_QUIRK("iss", 0, 0, 0x10, -1, 0x40000101, 0xffffffff, 0),
++	SYSC_QUIRK("mcasp", 0, 0, 0x4, -1, 0x44306302, 0xffffffff, 0),
++	SYSC_QUIRK("mcbsp", 0, -1, 0x8c, -1, 0, 0, 0),
++	SYSC_QUIRK("mailbox", 0, 0, 0x10, -1, 0x00000400, 0xffffffff, 0),
++	SYSC_QUIRK("slimbus", 0, 0, 0x10, -1, 0x40000902, 0xffffffff, 0),
++	SYSC_QUIRK("slimbus", 0, 0, 0x10, -1, 0x40002903, 0xffffffff, 0),
++	SYSC_QUIRK("spinlock", 0, 0, 0x10, -1, 0x50020000, 0xffffffff, 0),
++	SYSC_QUIRK("usbhstll", 0, 0, 0x10, 0x14, 0x00000004, 0xffffffff, 0),
++	SYSC_QUIRK("usb_host_hs", 0, 0, 0x10, 0x14, 0x50700100, 0xffffffff, 0),
++	SYSC_QUIRK("usb_otg_hs", 0, 0x400, 0x404, 0x408, 0x00000050,
++		   0xffffffff, 0),
++#endif
  };
  
-+#define SYSC_QUIRK_RESOURCE_PROVIDER	BIT(9)
- #define SYSC_QUIRK_LEGACY_IDLE		BIT(8)
- #define SYSC_QUIRK_RESET_STATUS		BIT(7)
- #define SYSC_QUIRK_NO_IDLE_ON_INIT	BIT(6)
+ static void sysc_init_revision_quirks(struct sysc *ddata)
 -- 
 2.17.0
