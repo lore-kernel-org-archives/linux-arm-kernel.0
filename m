@@ -1,54 +1,177 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 23 Apr 2018 14:24:44 +0200
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Fix incorrect clocks
- for displays
-In-Reply-To: <887c9144972ab75a4520141a17e1607b@pascalroeleven.nl>
-References: <20180420102112.2843-1-dev@pascalroeleven.nl>
- <20180423071421.byupsz4gxpmhfe44@flea>
- <887c9144972ab75a4520141a17e1607b@pascalroeleven.nl>
-Message-ID: <20180423122444.msxpe5e4ovr6eqqb@flea>
+From: yannick.fertre@st.com (Yannick FERTRE)
+Date: Mon, 23 Apr 2018 12:29:34 +0000
+Subject: [PATCH] drm/bridge/synopsys: dsi: use adjusted_mode in mode_set
+In-Reply-To: <2334482.mQhE6fZxKp@avalon>
+References: <20180125155504.8611-1-philippe.cornu@st.com>
+ <7ec671c2-a777-5dcd-dcc9-e026fff89900@st.com> <1802436.kt7XbhHcH5@avalon>
+ <2334482.mQhE6fZxKp@avalon>
+Message-ID: <5a214d57-0a1d-8cbe-eb9e-2f6a9ad1ddb8@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 01:01:03PM +0200, Pascal Roeleven wrote:
-> On 2018-04-23 09:14, Maxime Ripard wrote:
-> > On Fri, Apr 20, 2018 at 12:21:12PM +0200, Pascal Roeleven wrote:
-> > > Some displays on SUN4i devices wouldn't properly stay on unless
-> > > 'clk_ignore_unused' is used.
-> > > 
-> > > Change the duplicate clocks to the probably intended ones.
-> > > 
-> > > Signed-off-by: Pascal Roeleven <dev@pascalroeleven.nl>
-> > 
-> > What was the difference with the first patch you sent?
-> > 
-> > Anyway, I've applied it, thanks
-> > 
-> > Maxime
-> > 
-> > --
-> > Maxime Ripard, Bootlin (formerly Free Electrons)
-> > Embedded Linux and Kernel engineering
-> > https://bootlin.com
+Hi Philippe,
+I've tried your patch on both 4.17-rc1 & drm-misc-next and it works fine.
+So,
+
+Reviewed-by: Yannick Fertr? <yannick.fertre@st.com>
+Tested-by: Yannick Fertr? <yannick.fertre@st.com>
+
+BR
+
+Yannick Fertr?
+
+On 04/23/2018 12:10 PM, Laurent Pinchart wrote:
+> Hi Philippe,
 > 
-> I'm sorry there isn't any.
-> It's the first patch I have ever send so had some git-send-email issues and
-> didn't know the correct procedure to resend a patch.
-
-Just set RESEND in the subject prefix (using --subject-prefix="PATCH
-RESEND"), and say why you resent it in the patch / cover letter after
-the --- and before the diffstat.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/0ef32c25/attachment.sig>
+> On Thursday, 8 February 2018 15:15:40 EEST Laurent Pinchart wrote:
+>> On Saturday, 3 February 2018 00:41:26 EET Philippe CORNU wrote:
+>>> On 01/29/2018 11:40 AM, Laurent Pinchart wrote:
+>>>> On Monday, 29 January 2018 12:17:37 EET Philippe CORNU wrote:
+>>>>> On 01/29/2018 10:46 AM, Laurent Pinchart wrote:
+>>>>>> On Thursday, 25 January 2018 17:55:04 EET Philippe Cornu wrote:
+>>>>>>> The "adjusted_mode" clock value (ie the real pixel clock) is more
+>>>>>>> accurate than "mode" clock value (ie the panel/bridge requested
+>>>>>>> clock value). It offers a better preciseness for timing
+>>>>>>> computations and allows to reduce the extra dsi bandwidth in
+>>>>>>> burst mode (from ~20% to ~10-12%, hw platform dependant).
+>>>>>>>
+>>>>>>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>>>>>>
+>>>>>> The adjusted mode is documented as
+>>>>>>
+>>>>>>    /**
+>>>>>>    
+>>>>>>     * @adjusted_mode:
+>>>>>>     *
+>>>>>>     * Internal display timings which can be used by the driver to
+>>>>>>     handle
+>>>>>>     * differences between the mode requested by userspace in @mode and
+>>>>>>     what
+>>>>>>     * is actually programmed into the hardware. It is purely driver
+>>>>>>     * implementation defined what exactly this adjusted mode means.
+>>>>>>     Usually
+>>>>>>     * it is used to store the hardware display timings used between the
+>>>>>>     * CRTC and encoder blocks.
+>>>>>>     */
+>>>>>>
+>>>>>> This is easy to handle when the CRTC and encoder are controlled by the
+>>>>>> same driver, as the field is "implementation defined" by a single
+>>>>>> driver. However, when using bridges, there are two drivers involved,
+>>>>>> and
+>>>>>> they must both agree to meaningfully use the adjusted mode. I can't
+>>>>>> see
+>>>>>> how to do so without standardizing the meaning of the adjusted mode
+>>>>>> field.
+>>>>>
+>>>>> This is exactly the reason why my first implementation used the dsi
+>>>>> bridge "optional pixel clock" instead of the adjusted_mode (see [1])
+>>>>>
+>>>>> But after digging more into the drm source code, I think using
+>>>>> adjusted_mode instead of the pixel clock here brings more advantages
+>>>>> because:
+>>>>> * adjusted_mode is an argument of bridge mode_set() probably for being
+>>>>> used in any manner, maybe like this :)
+>>>>> * if the bridge "user" (crtc or a master bridge drivers) does not need
+>>>>> to modify its adjusted_mode then mode & adjusted_mode mode_set()
+>>>>> arguments will have the same values so "no consequence" for the bridge.
+>>>>> * if the bridge "user" (crtc or master bridge drivers) needs to adjust
+>>>>> any value of the mode then this adjustment is available for the bridge.
+>>>>
+>>>> Remember that there can be multiple chained bridges, and a single
+>>>> adjusted mode field.
+>>>>
+>>>>> * rockchip crtc updates a part of the mode (the clock), stm is doing
+>>>>> the
+>>>>> same (see [2]) but any future "user" of the dw_mipi_dsi bridge can
+>>>>> adjust something else (blankings...) and the dw_mipi_dsi bridge will be
+>>>>> then aware of...
+>>>>>
+>>>>> But maybe it is a wrong usage of the "adjusted_mode offer"...
+>>>>
+>>>> I don't disagree that there's a need for using adjusted values, but I
+>>>> believe we need to create a clear API to do so. Using the adjust_mode
+>>>> field as-is when it's clearly documented as being implementation-defined
+>>>> is asking for trouble.
+>>>
+>>> Laurent, do you think we can use "adjusted mode" here in this small
+>>> patch as the actual 2 "users" of this bridge (rockchip & stm) use both
+>>> "adjusted mode" in their crtc?
+>>
+>> The Synopsys DSI driver might only be used by two display controller drivers
+>> today, it is nonetheless a standard bridge driver that should not make any
+>> assumption of a particular use of the adjusted_mode in particular display
+>> controller drivers. To use the adjusted_mode value in bridge drivers we
+>> need to standardize its usage, otherwise we'll end up with
+>> incompatibilities between bridge drivers and display controller drivers.
+> 
+> Now that the documentation has been clarified I have no objection against this
+> patch anymore.
+> 
+>>>>> [1] https://patchwork.freedesktop.org/patch/200240/
+>>>>> [2] https://patchwork.freedesktop.org/patch/200720/
+>>>>>
+>>>>>> Daniel, what's your opinion on this ?
+>>>
+>>> Daniel, any opinion on the adjusted_mode usage?
+>>>
+>>>>>>> ---
+>>>>>>> Note: This patch replaces "drm/bridge/synopsys: dsi: add optional
+>>>>>>> pixel clock"
+>>>>>>>
+>>>>>>> drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 12 ++++++------
+>>>>>>> 1 file changed, 6 insertions(+), 6 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>>>>>>> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c index
+>>>>>>> ed8af32f8e52..b926b62e9e33 100644
+>>>>>>> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>>>>>>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>>>>>>> @@ -707,20 +707,20 @@ static void dw_mipi_dsi_bridge_mode_set(struct
+>>>>>>> drm_bridge *bridge,
+>>>>>>>
+>>>>>>>     	clk_prepare_enable(dsi->pclk);
+>>>>>>>
+>>>>>>> -	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
+>>>>>>> +	ret = phy_ops->get_lane_mbps(priv_data, adjusted_mode,
+>>>>>>> dsi->mode_flags,
+>>>>>>>
+>>>>>>>     				     dsi->lanes, dsi->format, &dsi->lane_mbps);
+>>>>>>>     
+>>>>>>>     if (ret)
+>>>>>>>     
+>>>>>>>     	DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
+>>>>>>>     
+>>>>>>>     pm_runtime_get_sync(dsi->dev);
+>>>>>>>     dw_mipi_dsi_init(dsi);
+>>>>>>>
+>>>>>>> -	dw_mipi_dsi_dpi_config(dsi, mode);
+>>>>>>> +	dw_mipi_dsi_dpi_config(dsi, adjusted_mode);
+>>>>>>>
+>>>>>>>     dw_mipi_dsi_packet_handler_config(dsi);
+>>>>>>>     dw_mipi_dsi_video_mode_config(dsi);
+>>>>>>>
+>>>>>>> -	dw_mipi_dsi_video_packet_config(dsi, mode);
+>>>>>>> +	dw_mipi_dsi_video_packet_config(dsi, adjusted_mode);
+>>>>>>>
+>>>>>>>     dw_mipi_dsi_command_mode_config(dsi);
+>>>>>>>
+>>>>>>> -	dw_mipi_dsi_line_timer_config(dsi, mode);
+>>>>>>> -	dw_mipi_dsi_vertical_timing_config(dsi, mode);
+>>>>>>> +	dw_mipi_dsi_line_timer_config(dsi, adjusted_mode);
+>>>>>>> +	dw_mipi_dsi_vertical_timing_config(dsi, adjusted_mode);
+>>>>>>>
+>>>>>>>     dw_mipi_dsi_dphy_init(dsi);
+>>>>>>>     dw_mipi_dsi_dphy_timing_config(dsi);
+>>>>>>>
+>>>>>>> @@ -734,7 +734,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct
+>>>>>>> drm_bridge *bridge,
+>>>>>>>
+>>>>>>>     dw_mipi_dsi_dphy_enable(dsi);
+>>>>>>>
+>>>>>>> -	dw_mipi_dsi_wait_for_two_frames(mode);
+>>>>>>> +	dw_mipi_dsi_wait_for_two_frames(adjusted_mode);
+>>>>>>>
+>>>>>>>     /* Switch to cmd mode for panel-bridge pre_enable & panel prepare
+>>>>>>>     */
+>>>>>>>     dw_mipi_dsi_set_mode(dsi, 0);
+> 
