@@ -1,91 +1,124 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 23 Apr 2018 19:05:15 +0100
-Subject: Applied "regulator: axp20x: add drivevbus support for axp803" to the
- regulator tree
-In-Reply-To: <1513011400-4120-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <E1fAfpz-0004Gb-3w@debutante>
+From: ryan.harkin@linaro.org (Ryan Harkin)
+Date: Mon, 23 Apr 2018 19:23:52 +0100
+Subject: [GIT PULL REQUEST v2] brcm: add fmac nvram files
+Message-ID: <1524507832-19288-1-git-send-email-ryan.harkin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Murata has created a github project for the firmware for their 43xx
+family of devices:
 
-   regulator: axp20x: add drivevbus support for axp803
+  https://github.com/murata-wireless
 
-has been applied to the regulator tree at
+This project contains firmware binaries for their WiFi and BT parts
+containing the Cypress IP.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+The binary files are licensed under the same LICENCE.cypress as present
+in this repo already. The NVRAM files are text and are licensed under
+GPLv2.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+This series copies the files from the github project into
+linux-firmware where other downstream projects may benefit.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+v1->v2:
+Hans de Goede:
+ - rename generic .txt files to have ".generic" in their filename.
+ - add a warning to the top of the .txt files
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Ryan Harkin:
+ - removed a comment about the "murata-master" folder from README_NVRAM
+   that only applies to the original Murata github repo
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+----------------------------------------------------------------
+The following changes since commit b562d2f3583f19ecda22b08e514ced57dd1e5f4d:
 
-Thanks,
-Mark
+  linux-firmware: update wil6210 firmware to 5.2.0.18 (2018-04-16 09:55:50 -0400)
 
->From 1f5d6462b5856ddd44d4500ac80b7862faff351b Mon Sep 17 00:00:00 2001
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Mon, 23 Apr 2018 12:02:37 +0530
-Subject: [PATCH] regulator: axp20x: add drivevbus support for axp803
+are available in the git repository at:
 
-Like axp221, axp223, axp813 the axp803 is also supporting external
-regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
+  https://git.linaro.org/landing-teams/working/mbl/linux-firmware.git 
 
-Add support for it.
+for you to fetch changes up to 96f197a7ef8865e44ea8b8e4c1626e6a8c5e715f:
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- Documentation/devicetree/bindings/mfd/axp20x.txt | 3 ++-
- drivers/regulator/axp20x-regulator.c             | 2 ++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+  cyw_bt: add Cypress 43xx Bluetooth patch files (2018-04-23 19:11:33 +0100)
 
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 9455503b0299..d1762f3b30af 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -43,7 +43,7 @@ Optional properties:
- 			  regulator to drive the OTG VBus, rather then
- 			  as an input pin which signals whether the
- 			  board is driving OTG VBus or not.
--			  (axp221 / axp223 / axp813 only)
-+			  (axp221 / axp223 / axp803/ axp813 only)
- 
- - x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
- 			wired for master mode. The default is slave mode.
-@@ -132,6 +132,7 @@ FLDO2		: LDO		: fldoin-supply		: shared supply
- LDO_IO0		: LDO		: ips-supply		: GPIO 0
- LDO_IO1		: LDO		: ips-supply		: GPIO 1
- RTC_LDO		: LDO		: ips-supply		: always on
-+DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
- 
- AXP806 regulators, type, and corresponding input supply names:
- 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 181622b2813d..91b8ff8bac15 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -721,6 +721,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 	case AXP803_ID:
- 		regulators = axp803_regulators;
- 		nregulators = AXP803_REG_ID_MAX;
-+		drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
-+						  "x-powers,drive-vbus-en");
- 		break;
- 	case AXP806_ID:
- 		regulators = axp806_regulators;
--- 
-2.17.0
+Ryan Harkin (3):
+      brcm: update firmware from Murata repo
+      brcm: add fmac nvram files
+      cyw_bt: add Cypress 43xx Bluetooth patch files
+
+ WHENCE                              |  57 ++++++++++++--
+ brcm/README_NVRAM                   |  15 ++++
+ brcm/brcmfmac43012-sdio.1LV.txt     | 125 +++++++++++++++++++++++++++++
+ brcm/brcmfmac43012-sdio.bin         | Bin 0 -> 210254 bytes
+ brcm/brcmfmac43012-sdio.clm_blob    | Bin 0 -> 7697 bytes
+ brcm/brcmfmac43012-sdio.generic.txt |   1 +
+ brcm/brcmfmac43340-sdio.1BW.txt     | 127 ++++++++++++++++++++++++++++++
+ brcm/brcmfmac43340-sdio.bin         | Bin 402210 -> 400864 bytes
+ brcm/brcmfmac43340-sdio.generic.txt |   1 +
+ brcm/brcmfmac43362-sdio.SN8000.txt  |  54 +++++++++++++
+ brcm/brcmfmac43362-sdio.bin         | Bin 219557 -> 201276 bytes
+ brcm/brcmfmac43362-sdio.generic.txt |   1 +
+ brcm/brcmfmac4339-sdio.1CK.txt      | 110 ++++++++++++++++++++++++++
+ brcm/brcmfmac4339-sdio.ZP.txt       | 107 +++++++++++++++++++++++++
+ brcm/brcmfmac4339-sdio.bin          | Bin 562183 -> 565481 bytes
+ brcm/brcmfmac4339-sdio.generic.txt  |   1 +
+ brcm/brcmfmac43430-sdio.1DX.txt     |  48 ++++++++++++
+ brcm/brcmfmac43430-sdio.1LN.txt     |   1 +
+ brcm/brcmfmac43430-sdio.bin         | Bin 369577 -> 388739 bytes
+ brcm/brcmfmac43430-sdio.generic.txt |   1 +
+ brcm/brcmfmac43455-sdio.1HK.txt     | 126 ++++++++++++++++++++++++++++++
+ brcm/brcmfmac43455-sdio.1LC.txt     |  78 ++++++++++++++++++
+ brcm/brcmfmac43455-sdio.1MW.txt     | 119 ++++++++++++++++++++++++++++
+ brcm/brcmfmac43455-sdio.bin         | Bin 488193 -> 594969 bytes
+ brcm/brcmfmac43455-sdio.clm_blob    | Bin 0 -> 11913 bytes
+ brcm/brcmfmac43455-sdio.generic.txt |   1 +
+ brcm/brcmfmac4354-sdio.1BB.txt      | 145 ++++++++++++++++++++++++++++++++++
+ brcm/brcmfmac4354-sdio.bin          | Bin 626589 -> 605388 bytes
+ brcm/brcmfmac4354-sdio.generic.txt  |   1 +
+ brcm/brcmfmac4356-pcie.1CX.txt      | 152 ++++++++++++++++++++++++++++++++++++
+ brcm/brcmfmac4356-pcie.bin          | Bin 661999 -> 648770 bytes
+ brcm/brcmfmac4356-pcie.generic.txt  |   1 +
+ cyw_bt/CYW43012C0.1LV.hcd           | Bin 0 -> 28063 bytes
+ cyw_bt/CYW43341B0.1BW.hcd           | Bin 0 -> 40984 bytes
+ cyw_bt/CYW4335C0.ZP.hcd             | Bin 0 -> 33465 bytes
+ cyw_bt/CYW43430A1.1DX.1dB_Less.hcd  | Bin 0 -> 35322 bytes
+ cyw_bt/CYW43430A1.1DX.2dB_Less.hcd  | Bin 0 -> 35322 bytes
+ cyw_bt/CYW43430A1.1DX.hcd           | Bin 0 -> 14265 bytes
+ cyw_bt/CYW4345C0.1MW.hcd            | Bin 0 -> 55105 bytes
+ cyw_bt/CYW4350C0.1BB.hcd            | Bin 0 -> 78697 bytes
+ cyw_bt/CYW4354A2.1CX.hcd            | Bin 0 -> 31178 bytes
+ 41 files changed, 1265 insertions(+), 7 deletions(-)
+ create mode 100644 brcm/README_NVRAM
+ create mode 100644 brcm/brcmfmac43012-sdio.1LV.txt
+ create mode 100644 brcm/brcmfmac43012-sdio.bin
+ create mode 100644 brcm/brcmfmac43012-sdio.clm_blob
+ create mode 120000 brcm/brcmfmac43012-sdio.generic.txt
+ create mode 100644 brcm/brcmfmac43340-sdio.1BW.txt
+ create mode 120000 brcm/brcmfmac43340-sdio.generic.txt
+ create mode 100644 brcm/brcmfmac43362-sdio.SN8000.txt
+ create mode 120000 brcm/brcmfmac43362-sdio.generic.txt
+ create mode 100644 brcm/brcmfmac4339-sdio.1CK.txt
+ create mode 100644 brcm/brcmfmac4339-sdio.ZP.txt
+ create mode 120000 brcm/brcmfmac4339-sdio.generic.txt
+ create mode 100644 brcm/brcmfmac43430-sdio.1DX.txt
+ create mode 120000 brcm/brcmfmac43430-sdio.1LN.txt
+ create mode 120000 brcm/brcmfmac43430-sdio.generic.txt
+ create mode 100644 brcm/brcmfmac43455-sdio.1HK.txt
+ create mode 100644 brcm/brcmfmac43455-sdio.1LC.txt
+ create mode 100644 brcm/brcmfmac43455-sdio.1MW.txt
+ create mode 100644 brcm/brcmfmac43455-sdio.clm_blob
+ create mode 120000 brcm/brcmfmac43455-sdio.generic.txt
+ create mode 100644 brcm/brcmfmac4354-sdio.1BB.txt
+ create mode 120000 brcm/brcmfmac4354-sdio.generic.txt
+ create mode 100644 brcm/brcmfmac4356-pcie.1CX.txt
+ create mode 120000 brcm/brcmfmac4356-pcie.generic.txt
+ create mode 100644 cyw_bt/CYW43012C0.1LV.hcd
+ create mode 100644 cyw_bt/CYW43341B0.1BW.hcd
+ create mode 100644 cyw_bt/CYW4335C0.ZP.hcd
+ create mode 100644 cyw_bt/CYW43430A1.1DX.1dB_Less.hcd
+ create mode 100644 cyw_bt/CYW43430A1.1DX.2dB_Less.hcd
+ create mode 100644 cyw_bt/CYW43430A1.1DX.hcd
+ create mode 100644 cyw_bt/CYW4345C0.1MW.hcd
+ create mode 100644 cyw_bt/CYW4350C0.1BB.hcd
+ create mode 100644 cyw_bt/CYW4354A2.1CX.hcd
