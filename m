@@ -1,70 +1,131 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 23 Apr 2018 12:49:59 +0200
-Subject: [RESEND PATCH v6 23/27] drm/rockchip: analogix_dp: Do not call
- Analogix code before bind
+Date: Mon, 23 Apr 2018 12:50:02 +0200
+Subject: [RESEND PATCH v6 26/27] drm/rockchip: Disallow PSR for the whole
+ atomic commit
 In-Reply-To: <20180423105003.9004-1-enric.balletbo@collabora.com>
 References: <20180423105003.9004-1-enric.balletbo@collabora.com>
-Message-ID: <20180423105003.9004-24-enric.balletbo@collabora.com>
+Message-ID: <20180423105003.9004-27-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tomasz Figa <tfiga@chromium.org>
 
-Driver callbacks, such as system suspend or resume can be called any
-time, specifically they can be called before the component bind
-callback. Let's use dp->adp pointer as a safeguard and skip calling
-Analogix entry points if it is an ERR_PTR().
+Currently PSR flush is triggered from CRTC's .atomic_begin() callback,
+which is executed after modeset disables and enables and before plane
+updates are committed. Since PSR flush and re-enable can be triggered
+asynchronously by external sources (input event, delayed work), it can
+race with hardware programming done in the aforementioned stages.
 
+This patch blocks the PSR completely before hardware programming part
+begins and unblock after it ends. This relies on reference counted PSR
+disable introduced with previous patch.
+
+Cc: Kristian H. Kristensen <hoegsberg@chromium.org>
 Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Archit Taneja <architt@codeaurora.org>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
 
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c  | 61 ++++++++++++++++++++-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  7 ---
+ 2 files changed, 60 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index 23317a2269e1..6d45d62466b3 100644
---- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -368,6 +368,8 @@ static void rockchip_dp_unbind(struct device *dev, struct device *master,
- 	analogix_dp_unbind(dp->adp);
- 	rockchip_drm_psr_unregister(&dp->encoder);
- 	dp->encoder.funcs->destroy(&dp->encoder);
-+
-+	dp->adp = ERR_PTR(-ENODEV);
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+index e266539e04e5..d4f4118b482d 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+@@ -167,8 +167,67 @@ rockchip_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
+ 	return ERR_PTR(ret);
  }
  
- static const struct component_ops rockchip_dp_component_ops = {
-@@ -391,6 +393,7 @@ static int rockchip_dp_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	dp->dev = dev;
-+	dp->adp = ERR_PTR(-ENODEV);
- 	dp->plat_data.panel = panel;
- 
- 	ret = rockchip_dp_of_probe(dp);
-@@ -414,6 +417,9 @@ static int rockchip_dp_suspend(struct device *dev)
- {
- 	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
- 
-+	if (IS_ERR(dp->adp))
-+		return 0;
++static void
++rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
++{
++	struct drm_crtc *crtc;
++	struct drm_crtc_state *crtc_state;
++	struct drm_encoder *encoder;
++	u32 encoder_mask = 0;
++	int i;
 +
- 	return analogix_dp_suspend(dp->adp);
++	for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
++		encoder_mask |= crtc_state->encoder_mask;
++		encoder_mask |= crtc->state->encoder_mask;
++	}
++
++	drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
++		rockchip_drm_psr_inhibit_get(encoder);
++}
++
++static void
++rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
++{
++	struct drm_crtc *crtc;
++	struct drm_crtc_state *crtc_state;
++	struct drm_encoder *encoder;
++	u32 encoder_mask = 0;
++	int i;
++
++	for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
++		encoder_mask |= crtc_state->encoder_mask;
++		encoder_mask |= crtc->state->encoder_mask;
++	}
++
++	drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
++		rockchip_drm_psr_inhibit_put(encoder);
++}
++
++static void
++rockchip_atomic_helper_commit_tail_rpm(struct drm_atomic_state *old_state)
++{
++	struct drm_device *dev = old_state->dev;
++
++	rockchip_drm_psr_inhibit_get_state(old_state);
++
++	drm_atomic_helper_commit_modeset_disables(dev, old_state);
++
++	drm_atomic_helper_commit_modeset_enables(dev, old_state);
++
++	drm_atomic_helper_commit_planes(dev, old_state,
++					DRM_PLANE_COMMIT_ACTIVE_ONLY);
++
++	rockchip_drm_psr_inhibit_put_state(old_state);
++
++	drm_atomic_helper_commit_hw_done(old_state);
++
++	drm_atomic_helper_wait_for_vblanks(dev, old_state);
++
++	drm_atomic_helper_cleanup_planes(dev, old_state);
++}
++
+ static const struct drm_mode_config_helper_funcs rockchip_mode_config_helpers = {
+-	.atomic_commit_tail = drm_atomic_helper_commit_tail_rpm,
++	.atomic_commit_tail = rockchip_atomic_helper_commit_tail_rpm,
+ };
+ 
+ static const struct drm_mode_config_funcs rockchip_drm_mode_config_funcs = {
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 00f7f3441cf6..f14a10ca4792 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1029,16 +1029,9 @@ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
+ 	}
  }
  
-@@ -421,6 +427,9 @@ static int rockchip_dp_resume(struct device *dev)
- {
- 	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
- 
-+	if (IS_ERR(dp->adp))
-+		return 0;
-+
- 	return analogix_dp_resume(dp->adp);
- }
- #endif
+-static void vop_crtc_atomic_begin(struct drm_crtc *crtc,
+-				  struct drm_crtc_state *old_crtc_state)
+-{
+-	rockchip_drm_psr_flush(crtc);
+-}
+-
+ static const struct drm_crtc_helper_funcs vop_crtc_helper_funcs = {
+ 	.mode_fixup = vop_crtc_mode_fixup,
+ 	.atomic_flush = vop_crtc_atomic_flush,
+-	.atomic_begin = vop_crtc_atomic_begin,
+ 	.atomic_enable = vop_crtc_atomic_enable,
+ 	.atomic_disable = vop_crtc_atomic_disable,
+ };
 -- 
 2.17.0
