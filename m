@@ -1,137 +1,32 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 23 Apr 2018 12:14:06 +0200
-Subject: [PATCH v5 4/6] ARM: dts: Renesas RZ/N1 SoC base device tree file
-In-Reply-To: <1523963101-56725-5-git-send-email-michel.pollet@bp.renesas.com>
-References: <1523963101-56725-1-git-send-email-michel.pollet@bp.renesas.com>
- <1523963101-56725-5-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <20180423101406.7vfx4yb525ycbk57@verge.net.au>
+Date: Mon, 23 Apr 2018 12:26:59 +0200
+Subject: [PATCH 0/5] arm64: dts: renesas: r8a779xx: sort nodes
+In-Reply-To: <1524082480-18163-1-git-send-email-ykaneko0929@gmail.com>
+References: <1524082480-18163-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <20180423102658.ezofcrgzzwvzdfor@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 12:04:19PM +0100, Michel Pollet wrote:
-> This adds the Renesas RZ/N1D (Part #R9A06G032) SoC bare
-> bone support.
+On Thu, Apr 19, 2018 at 05:14:35AM +0900, Yoshihiro Kaneko wrote:
+> Sort nodes of the R-Car M3-N (r8a77965), V3M (r8a77970) and D3 (r8a77995) DTs.
 > 
-> This currently only handles generic parts (gic, architected timer)
-> and a UART.
-> For simplicity sake, this also relies on the bootloader to set the
-> pinctrl and clocks.
+> This is part of an ongoing effort to provide consistent node
+> order in the DT of Renesas SoCs to improve maintainability.
 > 
-> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
-> ---
->  arch/arm/boot/dts/r9a06g032.dtsi | 89 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 89 insertions(+)
->  create mode 100644 arch/arm/boot/dts/r9a06g032.dtsi
+> This should not have any run-time effect.
 > 
-> diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
-> new file mode 100644
-> index 0000000..23c56d7
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/r9a06g032.dtsi
-> @@ -0,0 +1,89 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Base Device Tree Source for the Renesas RZ/N1D (R9A06G032)
-> + *
-> + * Copyright (C) 2018 Renesas Electronics Europe Limited
-> + *
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "renesas,r9a06g032", "renesas,rzn1";
-
-As discussed elsewhere, please drop "renesas,rzn1".
-
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	clkuarts: clkuarts {
-> +		#clock-cells = <0>;
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <47619047>;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <1>;
-> +		};
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		interrupt-parent = <&gic>;
-> +		ranges;
-> +
-> +		reboot at 4000c120 {
-> +			compatible = "renesas,r9a06g032-reboot",
-> +					"renesas,rzn1-reboot";
-> +			reg = <0x4000c120 4>,
-> +				<0x4000c198 4>;
-> +		};
-> +
-> +		uart0: serial at 40060000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x40060000 0x400>;
-> +			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&clkuarts>;
-> +			clock-names = "baudclk";
-> +			status = "disabled";
-> +		};
-> +
-> +		gic: gic at 44101000 {
-> +			compatible = "arm,cortex-a7-gic", "arm,gic-400";
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			reg = <0x44101000 0x1000>, /* Distributer */
-> +			      <0x44102000 0x2000>, /* CPU interface */
-> +			      <0x44104000 0x2000>, /* Virt interface control */
-> +			      <0x44106000 0x2000>; /* Virt CPU interface */
-> +			interrupts =
-> +				<GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		};
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,cortex-a7-timer",
-> +			     "arm,armv7-timer";
-> +		interrupt-parent = <&gic>;
-> +		arm,cpu-registers-not-fw-configured;
-> +		always-on;
-> +		interrupts =
-> +			<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-> +			<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-> +			<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-> +			<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-
-Rather than using interrupt-parent, please use interrupts-extended,
-something like this:
-
-		interrupts-extended =
-			<&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-			<&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-			<&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-			<&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-
-
-> +	};
-> +};
-> -- 
-> 2.7.4
+> Based on the devel branch of Simon Horman's renesas tree.
 > 
+> Yoshihiro Kaneko (5):
+>   arm64: dts: renesas: r8a77995: sort subnodes of the root node
+>   arm64: dts: renesas: r8a77995: sort subnodes of the soc node
+>   arm64: dts: renesas: r8a77965: sort subnodes of the root node
+>   arm64: dts: renesas: r8a77965: sort subnodes of the soc node
+>   arm64: dts: renesas: r8a77970: sort subnodes of the soc node
+
+Thanks, applied.
+
+There ware a few nodes added to r8a77970 between when you made
+this patchset and when I applied it. I think the r8a77970 is still
+sorted as desired. Could you double-check once I push a devel
+branch later today?
