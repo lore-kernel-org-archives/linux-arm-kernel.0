@@ -1,66 +1,88 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Tue, 24 Apr 2018 02:04:21 +0530
-Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
-In-Reply-To: <20180418115225.7hvhsua25rhfqvjs@lakrids.cambridge.arm.com>
-References: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
- <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
- <CACi5LpNKbSejFecV+G8X53t4VDwsTvJywWLgLVw9qsD7u6REvg@mail.gmail.com>
- <20180418115225.7hvhsua25rhfqvjs@lakrids.cambridge.arm.com>
-Message-ID: <CACi5LpPb-vSBu1fheroPFG1QJStwZ2nFATakTSFytyY8uOx4ow@mail.gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Mon, 23 Apr 2018 14:41:04 -0600
+Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
+In-Reply-To: <20180423202311.GA164898@bhelgaas-glaptop.roam.corp.google.com>
+References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
+ <20180419202632.GE14063@ziepe.ca>
+ <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
+ <290e9530-dcde-9c10-7ae0-59ac4c509db4@codeaurora.org>
+ <20180420140049.GP28657@bhelgaas-glaptop.roam.corp.google.com>
+ <20180420090420.03fb1e6c@w520.home>
+ <10d9cf68-29ed-d205-a25f-b8dade53cdd8@codeaurora.org>
+ <20180423131044.53471670@w520.home>
+ <20180423202311.GA164898@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180423144104.2dad7495@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Mon, 23 Apr 2018 15:23:11 -0500
+Bjorn Helgaas <helgaas@kernel.org> wrote:
 
-On Wed, Apr 18, 2018 at 5:22 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Sun, Apr 15, 2018 at 01:44:16AM +0530, Bhupesh Sharma wrote:
->> 4. Accordingly, I wanted to get opinions on whether arm64 timer count is a good
->> entropy source on platforms which indeed support EFI_RNG_PROTOCOL?
->
-> On its own, the timer is not a good entropy source.
->
-> If we have the EFI_RNG_PROTOCOL, we can use that directly.
->
->> And whether we should  be looking to extend 'arch_get_random_*' or
->> 'random_get_entropy' for arm64, to provide seed/entropy using APIs
->> like 'efi_random_get_seed'?
->
-> The EFI RNG protocol is only available during boot services, so we can't
-> call this during the usual operation of the kernel. The seed the stub
-> generates into the RNG table is already thrown into the entropy pool by
-> efi_config_parse_tables(). Look for LINUX_EFI_RANDOM_SEED_TABLE_GUID.
->
-> So any attemps to acquire a random number via the usual APIs will in
-> part be affects by this entropy, and nothing needs to be done to
-> arch_get_random_* to use this entropy.
+> On Mon, Apr 23, 2018 at 01:10:44PM -0600, Alex Williamson wrote:
+> > On Mon, 23 Apr 2018 13:28:22 -0400
+> > Sinan Kaya <okaya@codeaurora.org> wrote:
+> >   
+> > > On 4/20/2018 11:04 AM, Alex Williamson wrote:  
+> > > > Is there a concern here about whether the endpoint device driver or the
+> > > > PCI core really knows better about link retraining?  This makes me
+> > > > remember my unfinished (and need to revisit) Pericom quirk[1] where
+> > > > errata in the PCIe switch requires that upstream and downstream links
+> > > > are balanced (ie. same link rate) or else enabling ACS results in
+> > > > packets not properly flowing through the switch.  If an endpoint driver
+> > > > starts deciding to retrain links, overriding quirks in the PCI core,
+> > > > then such topology manipulation isn't possible.  Why does the
+> > > > driver .probe() function think it can retrain at a higher link rate
+> > > > than PCI core?  Thanks,    
+> > > 
+> > > The example given is for some serdes firmware load to happen in probe and
+> > > then performing a retrain to reach to a better speed.
+> > > 
+> > > It becomes a chicken and egg problem. 
+> > > 
+> > > 1. Endpoint HW trains to gen1 by default pre-boot.
+> > > 2. PCI core enumerates the device.
+> > > 3. Endpoint driver gets loaded
+> > > 4. Driver does the firmware programming followed by a link retrain.
+> > > 
+> > > I think it is the responsibility of the PCI core to provide reset APIs.
+> > > However, expecting endpoint drivers to be knowledgeable about hotplug is
+> > > too much.
+> > > 
+> > > We can certainly contain AER change into pci directory by moving the slot
+> > > reset function to drivers/pci.h file.
+> > > 
+> > > But, we need to think about what to do about VFIO and other endpoint
+> > > initiated reset cases. My suggestion was to move this into a single API and
+> > > remove all other APIs from include/linux/pci.h.  
+> > 
+> > I'm a little confused about the relation between reset and retrain.
+> > AIUI we can retrain the link without any sort of endpoint reset and if
+> > some sort of driver/firmware setup is required on the endpoint to
+> > achieve the target link speed, then I'd think we only want to retrain.  
+> 
+> In hfi1, do_pcie_gen3_transition() resets the device.  I don't know if
+> retraining the link would be sufficient; maybe the reset is required
+> to make the device use the new firmware.  I guess we already export
+> reset interfaces, so if we add a retrain interface, drivers could
+> choose what they need.
+> 
+> > How this is going to work with vfio is an interesting question.  We're
+> > only providing access to the device, not the link to the device.  
+> 
+> > Multifunction endpoints become a big problem if one function starts
+> > requesting link retraining while another is in use elsewhere.  
+> 
+> Can we just make it the driver's problem by returning -EPERM if one
+> function requests a retrain while another function is in use?
 
-Sorry for the late reply, it took me some time to have a relook at the
-code on the basis of your inputs.
+Yes, this is basically how we handle bus resets through vfio-pci, if
+there are multiple devices affected by a bus reset, slots or functions,
+the caller needs to prove ownership of all of them before we do a bus
+reset.  That's great for video cards where we have the GPU and audio
+functions typically assigned together anyway, but I don't know that
+it's a great solution for IB where you're more likely to want to assign
+separate functions to separate users and nobody can get the device to
+run at full speed unless all the functions are assigned to one user.
+Thanks,
 
-Actually I remember discussing this with a few folks some time back in
-one of the UEFI forum events, but its still not very clear to me why
-the UEFI specifications would not have the EFI RNG protocol as a
-runtime service and only as a boot-time service.
-
-I believe that getting the RNG number directly from the firmware (via
-a runtime service call) is probably better than relying on OS RNG
-sources like '/dev/random' and '/dev/urandom' which may have known
-limitations (which have been discussed time and again on several
-upstream threads on lkml).
-
-Also if the EFI RNG protocol is implemented as a runtime protocol in
-the UEFI specifications, perhaps we can use 'get_random_bytes_arch()'
-like APIs from the kernel to generate arch specific random numbers
-faster as compared to relying on the 'chacha20' like interfaces.
-
-Also, I now understand that with the early efi stub boot the following
-function call sequence adds initial/boot time randomness to the
-'/dev/urandom' pool, so thanks for sharing the pointers for the same:
-
-efi_config_parse_tables ()
-    -> add_device_randomness ()
-        ->     if (!crng_ready()) {
-                     crng_fast_load(buf, size);
-
-Regards,
-Bhupesh
+Alex
