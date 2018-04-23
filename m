@@ -1,28 +1,47 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 23 Apr 2018 12:49:55 +0200
-Subject: [RESEND PATCH v6 19/27] drm/bridge: analogix_dp: Properly log AUX CH
- errors
+Date: Mon, 23 Apr 2018 12:49:54 +0200
+Subject: [RESEND PATCH v6 18/27] drm/bridge: analogix_dp: Reorder
+ plat_data->power_off to happen sooner
 In-Reply-To: <20180423105003.9004-1-enric.balletbo@collabora.com>
 References: <20180423105003.9004-1-enric.balletbo@collabora.com>
-Message-ID: <20180423105003.9004-20-enric.balletbo@collabora.com>
+Message-ID: <20180423105003.9004-19-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Douglas Anderson <dianders@chromium.org>
 
-The code in analogix_dp_transfer() that was supposed to print out:
-  AUX CH error happened
+The current user of the analogix power_off is "analogix_dp-rockchip".
+That driver does this:
+- deactivate PSR
+- turn off a clock
 
-Was actually dead code. That's because the previous check (whether
-the interrupt status indicated any errors) would have hit for all
-errors anyway.
+Both of these things (especially deactive PSR) should be done before
+we turn the PHY power off and turn off analog power.  Let's move the
+callback up.
 
-Let's combine the two error checks so we can actually see AUX CH
-errors.  We'll also downgrade the message to a warning since some of
-these types of errors might be expected for some displays.  If this
-gets too noisy we can downgrade again to debug.
+Note that without this patch (and with
+https://patchwork.kernel.org/patch/9553349/ [seanpaul: this patch was
+not applied, but it seems like the race can still occur]), I experienced
+an error in reboot testing where one thread was at:
 
-Cc: ?? ? <wzz@rock-chips.com>
+  rockchip_drm_psr_deactivate
+  rockchip_dp_powerdown
+  analogix_dp_bridge_disable
+  drm_bridge_disable
+
+...and the other thread was at:
+
+  analogix_dp_send_psr_spd
+  analogix_dp_enable_psr
+  analogix_dp_psr_set
+  psr_flush_handler
+
+The flush handler thread was finding AUX channel errors and eventually
+reported "Failed to apply PSR", where I had a kgdb breakpoint. Presumably
+the device would have eventually given up and shut down anyway, but it
+seems better to fix the order to be more correct.
+
+Cc: Kristian H. Kristensen <hoegsberg@chromium.org>
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
@@ -32,41 +51,28 @@ Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 4eae206ec31b..58e8a28e99aa 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -1105,6 +1105,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
- 			     struct drm_dp_aux_msg *msg)
- {
- 	u32 reg;
-+	u32 status_reg;
- 	u8 *buffer = msg->buffer;
- 	unsigned int i;
- 	int num_transferred = 0;
-@@ -1193,16 +1194,12 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
- 
- 	/* Clear interrupt source for AUX CH access error */
- 	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
--	if (reg & AUX_ERR) {
-+	status_reg = readl(dp->reg_base + ANALOGIX_DP_AUX_CH_STA);
-+	if ((reg & AUX_ERR) || (status_reg & AUX_STATUS_MASK)) {
- 		writel(AUX_ERR, dp->reg_base + ANALOGIX_DP_INT_STA);
--		goto aux_error;
--	}
- 
--	/* Check AUX CH error access status */
--	reg = readl(dp->reg_base + ANALOGIX_DP_AUX_CH_STA);
--	if ((reg & AUX_STATUS_MASK)) {
--		dev_err(dp->dev, "AUX CH error happened: %d\n\n",
--			reg & AUX_STATUS_MASK);
-+		dev_warn(dp->dev, "AUX CH error happened: %#x (%d)\n",
-+			 status_reg & AUX_STATUS_MASK, !!(reg & AUX_ERR));
- 		goto aux_error;
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 69b2c16e5776..a260de4f0bd8 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -1337,12 +1337,13 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
  	}
  
+ 	disable_irq(dp->irq);
+-	analogix_dp_set_analog_power_down(dp, POWER_ALL, 1);
+-	phy_power_off(dp->phy);
+ 
+ 	if (dp->plat_data->power_off)
+ 		dp->plat_data->power_off(dp->plat_data);
+ 
++	analogix_dp_set_analog_power_down(dp, POWER_ALL, 1);
++	phy_power_off(dp->phy);
++
+ 	clk_disable_unprepare(dp->clock);
+ 
+ 	pm_runtime_put_sync(dp->dev);
 -- 
 2.17.0
