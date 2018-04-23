@@ -1,112 +1,127 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 23 Apr 2018 12:49:57 +0200
-Subject: [RESEND PATCH v6 21/27] drm/rockchip: pre dither down when output bpc
- is 8bit
+Date: Mon, 23 Apr 2018 12:49:58 +0200
+Subject: [RESEND PATCH v6 22/27] drm/bridge: analogix_dp: Split the
+ platform-specific poweron in two parts
 In-Reply-To: <20180423105003.9004-1-enric.balletbo@collabora.com>
 References: <20180423105003.9004-1-enric.balletbo@collabora.com>
-Message-ID: <20180423105003.9004-22-enric.balletbo@collabora.com>
+Message-ID: <20180423105003.9004-23-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Yao <mark.yao@rock-chips.com>
+From: Douglas Anderson <dianders@chromium.org>
 
-Some encoder have a crc verification check, crc check fail if
-input and output data is not equal.
+Some of the platform-specific stuff in rockchip_dp_poweron() needs to
+happen before the generic code.  Some needs to happen after.  Let's
+split the callback in two.
 
-That means encoder input and output need use same color depth,
-vop can output 10bit data to encoder, but some panel only support
-8bit depth, that would make crc check die.
+Specifically we can't start doing PSR work until _after_ the whole
+controller is up, so don't set the enable until the end.
 
-So pre dither down vop data to 8bit if panel's bpc is 8.
-
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-[seanpaul resolved conflict in rockchip_drm_vop.c]
+Cc: Kristian H. Kristensen <hoegsberg@chromium.org>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+[seanpaul added exynos change]
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 2 ++
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h     | 1 +
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 6 ++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h     | 1 +
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c     | 1 +
- 5 files changed, 11 insertions(+)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  7 +++++--
+ drivers/gpu/drm/exynos/exynos_dp.c                 |  2 +-
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 12 ++++++++++--
+ include/drm/bridge/analogix_dp.h                   |  3 ++-
+ 4 files changed, 18 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index a260de4f0bd8..2bcbfadb6ac5 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -1260,8 +1260,8 @@ static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
+ 		goto out_dp_clk_pre;
+ 	}
+ 
+-	if (dp->plat_data->power_on)
+-		dp->plat_data->power_on(dp->plat_data);
++	if (dp->plat_data->power_on_start)
++		dp->plat_data->power_on_start(dp->plat_data);
+ 
+ 	phy_power_on(dp->phy);
+ 
+@@ -1286,6 +1286,9 @@ static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
+ 		goto out_dp_init;
+ 	}
+ 
++	if (dp->plat_data->power_on_end)
++		dp->plat_data->power_on_end(dp->plat_data);
++
+ 	enable_irq(dp->irq);
+ 	return 0;
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_dp.c b/drivers/gpu/drm/exynos/exynos_dp.c
+index 964831dab102..86330f396784 100644
+--- a/drivers/gpu/drm/exynos/exynos_dp.c
++++ b/drivers/gpu/drm/exynos/exynos_dp.c
+@@ -162,7 +162,7 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
+ 	dp->drm_dev = drm_dev;
+ 
+ 	dp->plat_data.dev_type = EXYNOS_DP;
+-	dp->plat_data.power_on = exynos_dp_poweron;
++	dp->plat_data.power_on_start = exynos_dp_poweron;
+ 	dp->plat_data.power_off = exynos_dp_poweroff;
+ 	dp->plat_data.attach = exynos_dp_bridge_attach;
+ 	dp->plat_data.get_modes = exynos_dp_get_modes;
 diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index 8c884f9ce713..b3f46ed24cdc 100644
+index b3f46ed24cdc..23317a2269e1 100644
 --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -218,6 +218,7 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
- 				      struct drm_connector_state *conn_state)
- {
- 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
-+	struct drm_display_info *di = &conn_state->connector->display_info;
- 
- 	/*
- 	 * The hardware IC designed that VOP must output the RGB10 video
-@@ -229,6 +230,7 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
- 
- 	s->output_mode = ROCKCHIP_OUT_MODE_AAAA;
- 	s->output_type = DRM_MODE_CONNECTOR_eDP;
-+	s->output_bpc = di->bpc;
- 
+@@ -109,7 +109,7 @@ static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
  	return 0;
  }
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index 9c064a40458b..3a6ebfc26036 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -36,6 +36,7 @@ struct rockchip_crtc_state {
- 	struct drm_crtc_state base;
- 	int output_type;
- 	int output_mode;
-+	int output_bpc;
- };
- #define to_rockchip_crtc_state(s) \
- 		container_of(s, struct rockchip_crtc_state, base)
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 53d4afe15278..00f7f3441cf6 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -925,6 +925,12 @@ static void vop_crtc_atomic_enable(struct drm_crtc *crtc,
- 	if (s->output_mode == ROCKCHIP_OUT_MODE_AAAA &&
- 	    !(vop_data->feature & VOP_FEATURE_OUTPUT_RGB10))
- 		s->output_mode = ROCKCHIP_OUT_MODE_P888;
-+
-+	if (s->output_mode == ROCKCHIP_OUT_MODE_AAAA && s->output_bpc == 8)
-+		VOP_REG_SET(vop, common, pre_dither_down, 1);
-+	else
-+		VOP_REG_SET(vop, common, pre_dither_down, 0);
-+
- 	VOP_REG_SET(vop, common, out_mode, s->output_mode);
  
- 	VOP_REG_SET(vop, modeset, htotal_pw, (htotal << 16) | hsync_len);
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index 56bbd2e2a8ef..084acdd0019a 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -67,6 +67,7 @@ struct vop_common {
- 	struct vop_reg cfg_done;
- 	struct vop_reg dsp_blank;
- 	struct vop_reg data_blank;
-+	struct vop_reg pre_dither_down;
- 	struct vop_reg dither_down;
- 	struct vop_reg dither_up;
- 	struct vop_reg gate_en;
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index 2e4eea3459fe..08023d3ecb76 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -264,6 +264,7 @@ static const struct vop_common rk3288_common = {
- 	.standby = VOP_REG_SYNC(RK3288_SYS_CTRL, 0x1, 22),
- 	.gate_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 23),
- 	.mmu_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 20),
-+	.pre_dither_down = VOP_REG(RK3288_DSP_CTRL1, 0x1, 1),
- 	.dither_down = VOP_REG(RK3288_DSP_CTRL1, 0xf, 1),
- 	.dither_up = VOP_REG(RK3288_DSP_CTRL1, 0x1, 6),
- 	.data_blank = VOP_REG(RK3288_DSP_CTRL0, 0x1, 19),
+-static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
++static int rockchip_dp_poweron_start(struct analogix_dp_plat_data *plat_data)
+ {
+ 	struct rockchip_dp_device *dp = to_dp(plat_data);
+ 	int ret;
+@@ -127,6 +127,13 @@ static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
+ 		return ret;
+ 	}
+ 
++	return ret;
++}
++
++static int rockchip_dp_poweron_end(struct analogix_dp_plat_data *plat_data)
++{
++	struct rockchip_dp_device *dp = to_dp(plat_data);
++
+ 	return rockchip_drm_psr_activate(&dp->encoder);
+ }
+ 
+@@ -330,7 +337,8 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+ 	dp->plat_data.encoder = &dp->encoder;
+ 
+ 	dp->plat_data.dev_type = dp->data->chip_type;
+-	dp->plat_data.power_on = rockchip_dp_poweron;
++	dp->plat_data.power_on_start = rockchip_dp_poweron_start;
++	dp->plat_data.power_on_end = rockchip_dp_poweron_end;
+ 	dp->plat_data.power_off = rockchip_dp_powerdown;
+ 	dp->plat_data.get_modes = rockchip_dp_get_modes;
+ 
+diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
+index e9a1116d2f8e..475b706b49de 100644
+--- a/include/drm/bridge/analogix_dp.h
++++ b/include/drm/bridge/analogix_dp.h
+@@ -33,7 +33,8 @@ struct analogix_dp_plat_data {
+ 	struct drm_connector *connector;
+ 	bool skip_connector;
+ 
+-	int (*power_on)(struct analogix_dp_plat_data *);
++	int (*power_on_start)(struct analogix_dp_plat_data *);
++	int (*power_on_end)(struct analogix_dp_plat_data *);
+ 	int (*power_off)(struct analogix_dp_plat_data *);
+ 	int (*attach)(struct analogix_dp_plat_data *, struct drm_bridge *,
+ 		      struct drm_connector *);
 -- 
 2.17.0
