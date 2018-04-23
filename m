@@ -1,44 +1,33 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 Apr 2018 09:45:07 +0200
-Subject: [PATCH 0/8] arm: renesas: Change platform dependency to
- ARCH_RENESAS
-In-Reply-To: <20180420164811.GC22369@sirena.org.uk>
-References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
- <20180420164811.GC22369@sirena.org.uk>
-Message-ID: <CAMuHMdUt3ExAD7KEiBhntcOoSWSLMnpNT1Oix4tNRMAM=8g9jQ@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 23 Apr 2018 09:47:34 +0200
+Subject: [PATCH] arm64: allwinner: h6: restore the usage of CCU slice
+ macros
+In-Reply-To: <1524466728.25095.0.camel@aosc.io>
+References: <20180403134024.43156-1-icenowy@aosc.io>
+ <1524466728.25095.0.camel@aosc.io>
+Message-ID: <20180423074734.rb4ddxtymbxtrpzp@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Mon, Apr 23, 2018 at 02:58:48PM +0800, Icenowy Zheng wrote:
+> ? 2018-04-03?? 21:40 +0800?Icenowy Zheng???
+> > As the definition of CCU slice macros are already merged into the
+> > source
+> > tree, restore the usage of the macros now.
+> 
+> Maxime, could you check this patch and pick it?
 
-On Fri, Apr 20, 2018 at 6:48 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Apr 20, 2018 at 03:28:26PM +0200, Geert Uytterhoeven wrote:
->> The first 6 patches can be applied independently by subsystem
->> maintainers.
->> The last two patches depend on the first 6 patches, and are thus marked
->> RFC.
->
-> Would it not make sense to try to apply everything en masse rather than
-> delaying?  I'm happy to apply the subsystem stuff but if it gets things
-> done quicker or more efficiently I'm also happy to have the lot merged
-> as one series.
-
-In theory, yes.
-
-However, this touches multiple subsystems, and it's non-critical, so I don't
-want to spent the energy to get this done in a synchronized way.
-It's way easier to postpone the last (RFC) patches when everything else
-has been applied by subsystem maintainers.
-
-So please apply your part, thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
+Applied, thanks!
+maxime
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/f58ca7d1/attachment.sig>
