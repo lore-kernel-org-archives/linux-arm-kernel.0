@@ -1,49 +1,97 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Mon, 23 Apr 2018 14:49:40 +0200
-Subject: [PATCH] arm64: dts: marvell: armada-37xx: reserve memory for ATF
-In-Reply-To: <20180423103127.5b9ac041@xps13>
-References: <20180421140342.25082-1-miquel.raynal@bootlin.com>
- <20180421161859.22d1ed18@windsurf> <20180423103127.5b9ac041@xps13>
-Message-ID: <20180423144940.64fa884d@windsurf>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 23 Apr 2018 14:41:28 +0100
+Subject: [RFC PATCH v3] tty: pl011: Avoid spuriously stuck-off interrupts
+In-Reply-To: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
+References: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1524490888-849-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+clears the RX and receive timeout interrupts on pl011 startup, to
+avoid a screaming-interrupt scenario that can occur when the
+firmware or bootloader leaves these interrupts asserted.
 
-On Mon, 23 Apr 2018 10:31:27 +0200, Miquel Raynal wrote:
+This has been noted as an issue when running Linux on qemu [1].
 
-> > Shouldn't this be done automatically by the bootloader, before passing
-> > the DTB to the kernel ?  
-> 
-> I am working with a 2017.09 mainline U-Boot.
-> 
-> I did not know the bootloader was supposedly in charge of that.
+Unfortunately, the above fix seems to lead to potential
+misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
+on driver startup, if the RX FIFO is also already full to the
+trigger level.
 
-I thought it should be the case, but I indeed see nothing in U-Boot
-that does that, except for OMAP2 platforms.
+Clearing the RX FIFO interrupt does not change the FIFO fill level.
+In this scenario, because the interrupt is now clear and because
+the FIFO is already full to the trigger level, no new assertion of
+the RX FIFO interrupt can occur unless the FIFO is drained back
+below the trigger level.  This never occurs because the pl011
+driver is waiting for an RX FIFO interrupt to tell it that there is
+something to read, and does not read the FIFO at all until that
+interrupt occurs.
 
-> But what if it fails doing it?
+Thus, simply clearing "spurious" interrupts on startup may be
+misguided, since there is no way to be sure that the interrupts are
+truly spurious, and things can go wrong if they are not.
 
-Well if something fails in the boot process, the platform fails to boot.
-I find this question a bit weird/silly. It's like "and what if the user
-used the wrong DT for the wrong platform ?"
+This patch instead clears the interrupt condition by draining the
+RX FIFO during UART startup, after clearing any potentially
+spurious interrupt.  This should ensure that an interrupt will
+definitely be asserted if the RX FIFO subsequently becomes
+sufficiently full.
 
-> Fixing the bootloader is one thing, I assume very few people would
-> update it. Is it worth keeping this in Linux DT?
+This patch does not attempt to address the case where the RX FIFO
+fills faster than it can be drained: that is a pathological
+condition that is beyond the scope of the driver to work around.
+Users cannot expect this to work unless they enable hardware flow
+control.
 
-The issue I see with having this in the Linux DT is that depending on
-the bootloader, the memory area that is used to keep the PSCI firmware
-may very well be different. It's really not a property of the HW
-itself, but a pure software choice of the bootloader. For example, are
-you sure the mainline U-Boot puts the PSCI firmware at the same place
-as the vendor U-Boot ?
+[1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
+before enabled the interruption
+https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
 
-What are other platforms doing to solve this problem ?
+Reported-by: Wei Xu <xuwei5@hisilicon.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Peter Maydell <peter.maydell@linaro.org>
+Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Best regards,
+---
 
-Thomas
+Changes since RFC v2:
+
+ * Drain the RX FIFO explicitly on startup.
+
+   This reduces the complexity of the changes, but should still
+   fix the underlying problem.
+
+   Characters present in the RX FIFO before the kernel boots will
+   now be lost.  However it was always poor practice to rely on
+   such characters being processed by the kernel, since UART
+   initialisation and RX FIFO overruns can always lead to data
+   loss or corruption in any case.
+---
+ drivers/tty/serial/amba-pl011.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 4b40a5b..73e6f44 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1676,6 +1676,15 @@ static int pl011_hwinit(struct uart_port *port)
+ 		    uap, REG_ICR);
+ 
+ 	/*
++	 * RXIS is asserted only when the RX FIFO transitions from below
++	 * to above the trigger threshold.  If the RX FIFO is already
++	 * full to the threshold this can't happen and RXIS will now be
++	 * stuck off.  Drain the FIFO explicitly to fix this:
++	 */
++	while (!(pl011_read(uap, REG_FR) & UART01x_FR_RXFE))
++		pl011_read(uap, REG_DR);
++
++	/*
+ 	 * Save interrupts enable mask, and enable RX interrupts in case if
+ 	 * the interrupt is used for NMI entry.
+ 	 */
 -- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.1.4
