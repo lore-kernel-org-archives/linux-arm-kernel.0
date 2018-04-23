@@ -1,52 +1,48 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 23 Apr 2018 19:04:19 +0200
-Subject: [PATCH 12/12] swiotlb: remove the CONFIG_DMA_DIRECT_OPS ifdefs
-In-Reply-To: <20180423170419.20330-1-hch@lst.de>
-References: <20180423170419.20330-1-hch@lst.de>
-Message-ID: <20180423170419.20330-13-hch@lst.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 23 Apr 2018 18:07:01 +0100
+Subject: [RFC PATCH v2 1/3] arm64: stacktrace: Constify stacktrace.h functions
+In-Reply-To: <1524503223-17576-1-git-send-email-Dave.Martin@arm.com>
+References: <1524503223-17576-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1524503223-17576-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-swiotlb now selects the DMA_DIRECT_OPS config symbol, so this will
-always be true.
+on_accessible_stack() and on_task_stack() shouldn't (and don't)
+modify their task argument, so it can be const.
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
+This patch adds the appropriate modifiers.
+
+No functional change.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- lib/swiotlb.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm64/include/asm/stacktrace.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-index fece57566d45..6954f7ad200a 100644
---- a/lib/swiotlb.c
-+++ b/lib/swiotlb.c
-@@ -692,7 +692,6 @@ void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
- 	}
+diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+index 902f9ed..63c0379 100644
+--- a/arch/arm64/include/asm/stacktrace.h
++++ b/arch/arm64/include/asm/stacktrace.h
+@@ -50,7 +50,8 @@ static inline bool on_irq_stack(unsigned long sp)
+ 	return (low <= sp && sp < high);
  }
  
--#ifdef CONFIG_DMA_DIRECT_OPS
- static inline bool dma_coherent_ok(struct device *dev, dma_addr_t addr,
- 		size_t size)
+-static inline bool on_task_stack(struct task_struct *tsk, unsigned long sp)
++static inline bool on_task_stack(struct task_struct const *tsk,
++				 unsigned long sp)
  {
-@@ -764,7 +763,6 @@ static bool swiotlb_free_buffer(struct device *dev, size_t size,
- 				 DMA_ATTR_SKIP_CPU_SYNC);
- 	return true;
- }
--#endif
- 
- static void
- swiotlb_full(struct device *dev, size_t size, enum dma_data_direction dir,
-@@ -1045,7 +1043,6 @@ swiotlb_dma_supported(struct device *hwdev, u64 mask)
- 	return __phys_to_dma(hwdev, io_tlb_end - 1) <= mask;
- }
- 
--#ifdef CONFIG_DMA_DIRECT_OPS
- void *swiotlb_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
- 		gfp_t gfp, unsigned long attrs)
+ 	unsigned long low = (unsigned long)task_stack_page(tsk);
+ 	unsigned long high = low + THREAD_SIZE;
+@@ -76,7 +77,8 @@ static inline bool on_overflow_stack(unsigned long sp) { return false; }
+  * We can only safely access per-cpu stacks from current in a non-preemptible
+  * context.
+  */
+-static inline bool on_accessible_stack(struct task_struct *tsk, unsigned long sp)
++static inline bool on_accessible_stack(struct task_struct const *tsk,
++				       unsigned long sp)
  {
-@@ -1089,4 +1086,3 @@ const struct dma_map_ops swiotlb_dma_ops = {
- 	.unmap_page		= swiotlb_unmap_page,
- 	.dma_supported		= dma_direct_supported,
- };
--#endif /* CONFIG_DMA_DIRECT_OPS */
+ 	if (on_task_stack(tsk, sp))
+ 		return true;
 -- 
-2.17.0
+2.1.4
