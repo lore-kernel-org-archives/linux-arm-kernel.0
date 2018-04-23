@@ -1,41 +1,49 @@
-From: vgarodia@codeaurora.org (Vikash Garodia)
-Date: Mon, 23 Apr 2018 11:41:51 +0530
-Subject: qcom: add firmware file for Venus on SDM845
-Message-ID: <1524463911-19918-1-git-send-email-vgarodia@codeaurora.org>
+From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
+Date: Mon, 23 Apr 2018 08:23:33 +0200
+Subject: [PATCH] media: s5p-jpeg: don't return a value on a void function
+In-Reply-To: <4376a97a-bb22-056b-4a63-8838c0c2d3f8@gmail.com>
+References: <180af45d9964a4d9855066b8f74a8629625acfa2.1524250913.git.mchehab@s-opensource.com>
+ <CGME20180420191157epcas1p2daac97ef3159bea632c90da23da8063f@epcas1p2.samsung.com>
+ <4376a97a-bb22-056b-4a63-8838c0c2d3f8@gmail.com>
+Message-ID: <732007af-de97-084d-8e3f-2c9b7de700f4@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+Hi,
 
-This pull request adds firmware files for Venus h/w codec found on the Qualcomm SDM845 chipset.
+W dniu 20.04.2018 o?21:10, Jacek Anaszewski pisze:
+> Hi Mauro,
+> 
+> Thank you for the patch.
+> 
+> On 04/20/2018 09:01 PM, Mauro Carvalho Chehab wrote:
+>> Building this driver on arm64 gives this warning:
+>> 	drivers/media/platform/s5p-jpeg/jpeg-hw-exynos3250.c:430:16: error: return expression in void function
+>>
+>> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+>> ---
+>>   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos3250.c | 4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos3250.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos3250.c
+>> index 0974b9a7a584..0861842b2dfc 100644
+>> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos3250.c
+>> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos3250.c
+>> @@ -425,9 +425,9 @@ unsigned int exynos3250_jpeg_get_int_status(void __iomem *regs)
+>>   }
+>>   
+>>   void exynos3250_jpeg_clear_int_status(void __iomem *regs,
+>> -						unsigned int value)
+>> +				      unsigned int value)
+>>   {
+>> -	return writel(value, regs + EXYNOS3250_JPGINTST);
+>> +	writel(value, regs + EXYNOS3250_JPGINTST);
+>>   }
+>>   
+>>   unsigned int exynos3250_jpeg_operating(void __iomem *regs)
+>>
+> 
+> Reviewed-by: Jacek Anaszewski <jacek.anaszewski@gmail.com>
+> 
 
-The following changes since commit b562d2f3583f19ecda22b08e514ced57dd1e5f4d:
-
-  linux-firmware: update wil6210 firmware to 5.2.0.18 (2018-04-16 09:55:50 -0400)
-
-are available in the git repository at:
-
-  https://github.com/vgarodia/linux-firm.git master
-
-for you to fetch changes up to ffd7e7cf5611f82cbbc614ae53ff16f54c1b2df2:
-
-  qcom: add venus firmware files for v5.2 (2018-04-18 20:51:35 +0530)
-
-----------------------------------------------------------------
-Vikash Garodia (1):
-      qcom: add venus firmware files for v5.2
-
- WHENCE                   |   9 +++++++++
- qcom/venus-5.2/venus.b00 | Bin 0 -> 212 bytes
- qcom/venus-5.2/venus.b01 | Bin 0 -> 6600 bytes
- qcom/venus-5.2/venus.b02 | Bin 0 -> 809040 bytes
- qcom/venus-5.2/venus.b03 | Bin 0 -> 33536 bytes
- qcom/venus-5.2/venus.b04 |   1 +
- qcom/venus-5.2/venus.mdt | Bin 0 -> 6812 bytes
- 7 files changed, 10 insertions(+)
- create mode 100644 qcom/venus-5.2/venus.b00
- create mode 100644 qcom/venus-5.2/venus.b01
- create mode 100644 qcom/venus-5.2/venus.b02
- create mode 100644 qcom/venus-5.2/venus.b03
- create mode 100644 qcom/venus-5.2/venus.b04
- create mode 100644 qcom/venus-5.2/venus.mdt
+Acked-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
