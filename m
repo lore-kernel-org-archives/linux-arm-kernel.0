@@ -1,32 +1,25 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 23 Apr 2018 12:49:52 +0200
-Subject: [RESEND PATCH v6 16/27] drm/bridge: analogix_dp: Fix incorrect
- operations with register ANALOGIX_DP_FUNC_EN_1
+Date: Mon, 23 Apr 2018 12:49:53 +0200
+Subject: [RESEND PATCH v6 17/27] drm/bridge: analogix_dp: Move fast link
+ training detect to set_bridge
 In-Reply-To: <20180423105003.9004-1-enric.balletbo@collabora.com>
 References: <20180423105003.9004-1-enric.balletbo@collabora.com>
-Message-ID: <20180423105003.9004-17-enric.balletbo@collabora.com>
+Message-ID: <20180423105003.9004-18-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: zain wang <wzz@rock-chips.com>
 
-Register ANALOGIX_DP_FUNC_EN_1(offset 0x18), Rockchip is different to
-Exynos:
-
-on Exynos edp phy,
-BIT 7		MASTER_VID_FUNC_EN_N
-BIT 6		reserved
-BIT 5		SLAVE_VID_FUNC_EN_N
-
-on Rockchip edp phy,
-BIT 7		reserved
-BIT 6		RK_VID_CAP_FUNC_EN_N
-BIT 5		RK_VID_FIFO_FUNC_EN_N
-
-So, we should do some private operations to Rockchip.
+It's too early to detect fast link training, if other step after it
+failed, we will set fast_link flag to 1, and retry set_bridge again. In
+this case we will power down and power up panel power supply, and we
+will do fast link training since we have set fast_link flag to 1. In
+fact, we should do full link training now, not the fast link training.
+So we should move the fast link detection at the end of set_bridge.
 
 Cc: Tomasz Figa <tfiga@chromium.org>
 Signed-off-by: zain wang <wzz@rock-chips.com>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
@@ -35,60 +28,83 @@ Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- .../gpu/drm/bridge/analogix/analogix_dp_reg.c | 19 ++++++++++++++-----
- .../gpu/drm/bridge/analogix/analogix_dp_reg.h |  2 ++
- 2 files changed, 16 insertions(+), 5 deletions(-)
+ .../drm/bridge/analogix/analogix_dp_core.c    | 42 ++++++++++++-------
+ 1 file changed, 26 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 02ab1aaa9993..4eae206ec31b 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -126,9 +126,14 @@ void analogix_dp_reset(struct analogix_dp_device *dp)
- 	analogix_dp_stop_video(dp);
- 	analogix_dp_enable_video_mute(dp, 0);
- 
--	reg = MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N |
--		AUD_FIFO_FUNC_EN_N | AUD_FUNC_EN_N |
--		HDCP_FUNC_EN_N | SW_FUNC_EN_N;
-+	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type))
-+		reg = RK_VID_CAP_FUNC_EN_N | RK_VID_FIFO_FUNC_EN_N |
-+			SW_FUNC_EN_N;
-+	else
-+		reg = MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N |
-+			AUD_FIFO_FUNC_EN_N | AUD_FUNC_EN_N |
-+			HDCP_FUNC_EN_N | SW_FUNC_EN_N;
-+
- 	writel(reg, dp->reg_base + ANALOGIX_DP_FUNC_EN_1);
- 
- 	reg = SSC_FUNC_EN_N | AUX_FUNC_EN_N |
-@@ -971,8 +976,12 @@ void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp)
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index a72e454a7292..69b2c16e5776 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -601,7 +601,7 @@ static int analogix_dp_process_equalizer_training(struct analogix_dp_device *dp)
+ {
+ 	int lane, lane_count, retval;
  	u32 reg;
+-	u8 link_align, link_status[2], adjust_request[2], spread;
++	u8 link_align, link_status[2], adjust_request[2];
  
- 	reg = readl(dp->reg_base + ANALOGIX_DP_FUNC_EN_1);
--	reg &= ~(MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N);
--	reg |= MASTER_VID_FUNC_EN_N;
-+	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type)) {
-+		reg &= ~(RK_VID_CAP_FUNC_EN_N | RK_VID_FIFO_FUNC_EN_N);
-+	} else {
-+		reg &= ~(MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N);
-+		reg |= MASTER_VID_FUNC_EN_N;
+ 	usleep_range(400, 401);
+ 
+@@ -645,20 +645,6 @@ static int analogix_dp_process_equalizer_training(struct analogix_dp_device *dp)
+ 		dev_dbg(dp->dev, "final lane count = %.2x\n",
+ 			dp->link_train.lane_count);
+ 
+-		retval = drm_dp_dpcd_readb(&dp->aux, DP_MAX_DOWNSPREAD,
+-					   &spread);
+-		if (retval != 1) {
+-			dev_err(dp->dev, "failed to read downspread %d\n",
+-				retval);
+-			dp->fast_train_enable = false;
+-		} else {
+-			dp->fast_train_enable =
+-				(spread & DP_NO_AUX_HANDSHAKE_LINK_TRAINING) ?
+-					true : false;
+-		}
+-		dev_dbg(dp->dev, "fast link training %s\n",
+-			dp->fast_train_enable ? "supported" : "unsupported");
+-
+ 		dp->link_train.lt_state = FINISHED;
+ 
+ 		return 0;
+@@ -996,6 +982,22 @@ static irqreturn_t analogix_dp_irq_thread(int irq, void *arg)
+ 	return IRQ_HANDLED;
+ }
+ 
++static int analogix_dp_fast_link_train_detection(struct analogix_dp_device *dp)
++{
++	int ret;
++	u8 spread;
++
++	ret = drm_dp_dpcd_readb(&dp->aux, DP_MAX_DOWNSPREAD, &spread);
++	if (ret != 1) {
++		dev_err(dp->dev, "failed to read downspread %d\n", ret);
++		return ret;
 +	}
- 	writel(reg, dp->reg_base + ANALOGIX_DP_FUNC_EN_1);
++	dp->fast_train_enable = !!(spread & DP_NO_AUX_HANDSHAKE_LINK_TRAINING);
++	dev_dbg(dp->dev, "fast link training %s\n",
++		dp->fast_train_enable ? "supported" : "unsupported");
++	return 0;
++}
++
+ static int analogix_dp_commit(struct analogix_dp_device *dp)
+ {
+ 	int ret;
+@@ -1038,8 +1040,16 @@ static int analogix_dp_commit(struct analogix_dp_device *dp)
+ 	if (ret)
+ 		return ret;
  
- 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-index b633a4a5082a..0cf27c731727 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-@@ -127,7 +127,9 @@
+-	if (dp->psr_enable)
++	if (dp->psr_enable) {
+ 		ret = analogix_dp_enable_sink_psr(dp);
++		if (ret)
++			return ret;
++	}
++
++	/* Check whether panel supports fast training */
++	ret =  analogix_dp_fast_link_train_detection(dp);
++	if (ret)
++		dp->psr_enable = false;
  
- /* ANALOGIX_DP_FUNC_EN_1 */
- #define MASTER_VID_FUNC_EN_N			(0x1 << 7)
-+#define RK_VID_CAP_FUNC_EN_N			(0x1 << 6)
- #define SLAVE_VID_FUNC_EN_N			(0x1 << 5)
-+#define RK_VID_FIFO_FUNC_EN_N			(0x1 << 5)
- #define AUD_FIFO_FUNC_EN_N			(0x1 << 4)
- #define AUD_FUNC_EN_N				(0x1 << 3)
- #define HDCP_FUNC_EN_N				(0x1 << 2)
+ 	return ret;
+ }
 -- 
 2.17.0
