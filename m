@@ -1,34 +1,62 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 23 Apr 2018 10:24:51 +0200
-Subject: [PATCH V4] PM / core: fix deferred probe breaking suspend resume
- order
-In-Reply-To: <13159334.FbaSTEhggn@aspire.rjw.lan>
-References: <1523404626-1466-1-git-send-email-fkan@apm.com>
- <13159334.FbaSTEhggn@aspire.rjw.lan>
-Message-ID: <20180423082451.GA20822@kroah.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 23 Apr 2018 10:28:34 +0200
+Subject: [PATCH] ACPI / button: make module loadable when booted in non-ACPI
+ mode
+Message-ID: <20180423082834.24617-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 10:03:19AM +0200, Rafael J. Wysocki wrote:
-> On Wednesday, April 11, 2018 1:57:06 AM CEST Feng Kan wrote:
-> > When bridge and its endpoint is enumerated the devices are added to the
-> > dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
-> > This causes the bridge to be moved to the end of the dpm list when
-> > deferred probe kicks in. The order of the dpm list for bridge and
-> > endpoint is reversed.
-> > 
-> > Add reordering code to move the bridge and its children and consumers to
-> > the end of the pm list so the order for suspend and resume is not altered.
-> > The code also move device and its children and consumers to the tail of
-> > device_kset list if it is registered.
-> > 
-> > Signed-off-by: Feng Kan <fkan@apm.com>
-> > Signed-off-by: Toan Le <toanle@apm.com>
-> 
-> I'm going to queue this up for 4.18-rc1.
-> 
-> If anyone, and Greg in particular, has any objections of concerns regarding
-> that, please let me know.
+Modules such as nouveau.ko and i915.ko have a link time dependency on
+acpi_lid_open(), and due to its use of acpi_bus_register_driver(),
+the button.ko module that provides it is only loadable when booted in
+ACPI mode. However, the ACPI button driver can be built into the core
+kernel as well, in which case the dependency can always be satisfied,
+and the dependent modules can be loaded regardless of whether the
+system was booted in ACPI mode or not.
 
-No objection from me:
-	Reviewed-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+So let's fix this asymmetry by making the ACPI button driver loadable
+as a module even if not booted in ACPI mode, so it can provide the
+acpi_lid_open() symbol in the same way as when built into the kernel.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+Could we perhaps get this into -stable as well? It is not a classic
+regression, but it completely breaks, e.g., Fedora when booting in
+DT mode on an ARM system.
+
+ drivers/acpi/button.c | 23 +++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/acpi/button.c b/drivers/acpi/button.c
+index e1eee7a60fad..0506ca56c615 100644
+--- a/drivers/acpi/button.c
++++ b/drivers/acpi/button.c
+@@ -635,4 +635,25 @@ module_param_call(lid_init_state,
+ 		  NULL, 0644);
+ MODULE_PARM_DESC(lid_init_state, "Behavior for reporting LID initial state");
+ 
+-module_acpi_driver(acpi_button_driver);
++/*
++ * Modules such as nouveau.ko and i915.ko have a link time dependency on
++ * acpi_lid_open(), and would therefore not be loadable on ACPI capable kernels
++ * booted in non-ACPI mode if we use the ordinary acpi_bus_[un]register_driver
++ * routines here (which only work when booted in ACPI mode) and build this
++ * driver as a module. So provide our own versions instead.
++ */
++static int __acpi_bus_register_driver(struct acpi_driver *driver)
++{
++	if (!acpi_disabled)
++		return acpi_bus_register_driver(driver);
++	return 0;
++}
++
++static void __acpi_bus_unregister_driver(struct acpi_driver *driver)
++{
++	if (!acpi_disabled)
++		acpi_bus_unregister_driver(driver);
++}
++
++module_driver(acpi_button_driver, __acpi_bus_register_driver,
++	      __acpi_bus_unregister_driver);
+-- 
+2.17.0
