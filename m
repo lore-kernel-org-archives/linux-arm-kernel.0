@@ -1,95 +1,48 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 23 Apr 2018 12:02:39 +0530
-Subject: [PATCH v6 3/3] arm64: allwinner: a64: bananapi-m64: add usb otg
-In-Reply-To: <20180423063239.3988-1-jagan@amarulasolutions.com>
-References: <20180423063239.3988-1-jagan@amarulasolutions.com>
-Message-ID: <20180423063239.3988-3-jagan@amarulasolutions.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 23 Apr 2018 14:42:44 +0800
+Subject: [PATCH v2 1/2] regmap: include <linux/ktime.h> from
+ include/linux/regmap.h
+Message-ID: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usb otg support for bananapi-m64 board,
-- USB-ID connected with PH9
-- USB-DRVVBUS controlled by N_VBUSEN pin from PMIC
+From: Sean Wang <sean.wang@mediatek.com>
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Similar to the readx_poll_timeout() macro calling ktime_* and using
+ktime_t type, which is declared in <linux/ktime.h>. So, make
+include/linux/regmap.h explicitly include <linux/ktime.h>, like
+include/linux/iopoll.h does.  Otherwise, users of the macro will see
+below errors.
+
+error: implicit declaration of function ?ktime_add_us?
+[-Werror=implicit-function-declaration]
+
+error: implicit declaration of function ?ktime_get?
+[-Werror=implicit-function-declaration]
+
+error: implicit declaration of function ?ktime_compare?
+[-Werror=implicit-function-declaration]
+
+include/linux/regmap.h:128:2: error: unknown type name ?ktime_t?
+  ktime_t __timeout = ktime_add_us(ktime_get(), __timeout_us); \
+
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
-Changes for v6:
-- Rebase on master 
-Changes for v5:
-- Kept reg_drivevbus node in alphabetical order.
-- Collect Chen-Yu reviewed-by tag
-Changes for v4:
-- rebase on master
-- tested otg host mode.
-Changes for v3:
-- Move the position of reg_drivevbus as per binding documentation.
-Changes for v2:
-- add drvvbus regulator
-- add N_VBUSEN pin
+ include/linux/regmap.h | 1 +
+ 1 file changed, 1 insertion(+)
 
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts  | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 2250dec9974c..0716b1441187 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -86,6 +86,10 @@
- 	};
- };
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 5f7ad05..b6865f0 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -15,6 +15,7 @@
  
-+&ehci0 {
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
-@@ -155,6 +159,10 @@
- 	status = "okay";
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
-@@ -167,6 +175,7 @@
- 		reg = <0x3a3>;
- 		interrupt-parent = <&r_intc>;
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		x-powers,drive-vbus-en; /* set N_VBUSEN as output pin */
- 	};
- };
- 
-@@ -254,6 +263,11 @@
- 	regulator-name = "vcc-wifi-io";
- };
- 
-+&reg_drivevbus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
- &reg_eldo1 {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
-@@ -294,6 +308,13 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-+	usb0_vbus-supply = <&reg_drivevbus>;
- 	status = "okay";
- };
+ #include <linux/list.h>
+ #include <linux/rbtree.h>
++#include <linux/ktime.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/bug.h>
 -- 
-2.14.3
+2.7.4
