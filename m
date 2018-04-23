@@ -1,111 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Apr 2018 09:11:19 +0200
-Subject: random.c regression on arm64 EFI systems
-In-Reply-To: <20180422145036.GA5554@thunk.org>
-References: <CAKv+Gu9yKSF=XdHFD4bQEZar+RQxtPjR+a6NrSXCTdu_j6+iaw@mail.gmail.com>
- <20180422145036.GA5554@thunk.org>
-Message-ID: <CAKv+Gu_U_JWFD5J=fnibk8783G2t9sUqVwm+5HgkzUG9k==KZA@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 23 Apr 2018 09:14:21 +0200
+Subject: [PATCH] ARM: dts: sun4i: Fix incorrect clocks for displays
+In-Reply-To: <20180420102112.2843-1-dev@pascalroeleven.nl>
+References: <20180420102112.2843-1-dev@pascalroeleven.nl>
+Message-ID: <20180423071421.byupsz4gxpmhfe44@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 April 2018 at 16:50, Theodore Y. Ts'o <tytso@mit.edu> wrote:
-> On Sun, Apr 22, 2018 at 01:32:15PM +0200, Ard Biesheuvel wrote:
->> Hello all,
->>
->> Today's pull of random.c changes caused a regression on arm64 UEFI
->> systems that invoke EFI_RNG_PROTOCOL to obtain strong entropy from the
->> platform. (arm64 does not have an architected instruction a la RDRAND)
->
-> So this isn't exactly a regression.  Triggering these warning messages
-> after "fast init done" and before "crng_init_done" is working as
-> intended as far the changes are concerned:
->
+On Fri, Apr 20, 2018 at 12:21:12PM +0200, Pascal Roeleven wrote:
+> Some displays on SUN4i devices wouldn't properly stay on unless
+> 'clk_ignore_unused' is used.
+> 
+> Change the duplicate clocks to the probably intended ones.
+> 
+> Signed-off-by: Pascal Roeleven <dev@pascalroeleven.nl>
 
-That may be true, but a previously working system now produces ominous
-warning messages, so from a user pov, something did get broken.
+What was the difference with the first patch you sent?
 
->>   random: fast init done
->>   ...
->>   random: get_random_bytes called from start_kernel+0xb4/0x48c with crng_init=0
->>   random: systemd: uninitialized urandom read (16 bytes read)
->>   ...
->>   random: crng init done
->
->> The current EFI code uses add_device_randomness() to pass the firmware
->> provided strong random seed to the kernel, for lack of a more
->> appropriate interface (at the time, at least).
->
-> The original philosophical design is that we don't trust *any*
-> hardware-generated randomness.  This includes RDRAND.  The reason for
-> this is that we didn't want to make any assertions that some hardware
-> was definitely secure.  If you're in the US, you might not trust
-> hardware built in China --- maybe the MSS has inserted a backdoor into
-> the SOC built in a manufacturing line in China.  If you're in China,
-> you might not trust RDRAND or a hardware RNG since you never know if
-> the NSA has gotten to Intel or IBM or has had the Tailored Access
-> Operations team intercept hardware being shipped from point A to point
-> B to subvert the hardware in some way.
->
-> This used to apply even to the hardware RNG's as well, for similar
-> reasons.  Users had to explicitly set rng_core's default_quality to a
-> non-zero value, or explicitly set the actual hardware random number
-> generator's quality field to a non-zero value.  There has been _one_
-> example to this rule which is for virtio_rng.  The assumption is that
-> if the Host is not trustworthy, you're screwed anyway, and VM's badly
-> need real entropy.
->
->> I tried to switch to add_hwgenerator_randomness(), which seems more
->> appropriate, but it appears to me that it is impossible to get the
->> kernel entropy pool into the fully initialized state (crng_init=2)
->> using that without some dodgy tricks.
->
-> It's possible, but you have to set the quality to some non-zero
-> value.  See how it is done with drivers/char/hw_random/virtio-rng.c.
->
+Anyway, I've applied it, thanks
 
-The EFI code does not expose a hw random number generator that a
-driver can attach to. We only generate an initial seed when executing
-the stub in the UEFI context (where it has access to all boot time
-protocols) and pass this seed to the kernel proper using a EFI
-configuration table. This seed could be of arbitrary size, and it
-would be nice if we could figure out a way where incorporating this
-seed would fully initialize the kernel entropy pool.
+Maxime
 
-> The real question is the philosophical question.  Are we really sure
-> we want to assert that we *really* trust the UEFI RNG implementation,
-> for all UEFI implemntations?  I suppose you could make the claim that
-> at least with Intel implemntations, and completely incompetent Intel
-> Management Engine implementations, if you don't trust Intel (either in
-> the competence of their firmware engineers or their ethics about
-> adding NSA backdoors), you're toast anyway.  :-)
->
-> I was hoping though that ARM64 would be making a stronger statements
-> the easy/likelihood of backdoors in the mangemnt engine, at least as
-> far as the actual ARM64 *CPU*, and that the real risk would be come
-> from a particular motherboard's UEFI implementation.
->
-> So we could relax our standards, and make claims that we trust
-> UEFI_RNG_PROTOCOL.
->
-
-In the x86 world, UEFI == proprietary == evil backdoors, but in the
-ARM ecosystem, we are trying very hard to assert our influence to open
-up firmware implementations. We also contributed a UEFI driver for the
-ChaosKey, which should be usable on any UEFI implementation that
-supports USB (which should be the majority of them, given that it is
-needed for keyboard support).
-
-So the assumption that the platform is evil does not always hold.
-
-> Alternatively, maybe we should be pushing get the kernel and systemd
-> to avoid trying to use random numbers, or at least strong random
-> numbers super-early in the boot process.  If systemd is just using
-> getrandom() for something silly, like UUID's, perhaps we change it to
-> use a userspace psuedo-random number, or maybe we add a flag to
-> getrandom(2), GRND_BEST_EFFORTS or GRND_PSUEDORANDOM, which doesn't
-> trigger the warning.
->
-
-systemd could perhaps be taught to use rand(), but start_kernel()
-invokes get_random_bytes() for the initial stack canary value, so I
-suppose we do need some true entropy early on.
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/10a8cb19/attachment.sig>
