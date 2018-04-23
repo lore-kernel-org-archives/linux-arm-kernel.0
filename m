@@ -1,34 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 23 Apr 2018 12:50:43 +0100
-Subject: [PATCH v2 1/2] regmap: include <linux/ktime.h> from
- include/linux/regmap.h
-In-Reply-To: <d3e10dc5-55d3-40b8-a8de-d48aaaecf019@gmail.com>
-References: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
- <20180423100318.GA19834@sirena.org.uk>
- <d3e10dc5-55d3-40b8-a8de-d48aaaecf019@gmail.com>
-Message-ID: <20180423115043.GD19834@sirena.org.uk>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Mon, 23 Apr 2018 19:45:57 +0800
+Subject: [RFC 0/2] iommu/arm-smmu-v3: Support software retention for pm_resume
+Message-ID: <1524483959-54940-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 12:11:01PM +0200, Matthias Brugger wrote:
+- Backgroud:
+ Hisilicon's implement of smmuv3 do not support hardware retention if system
+ do power gating when system suspend, however for embed system, we do need
+ to do power gating at trust zone for lower power comsume. So software
+ retention is need.
 
-> On 04/23/2018 12:03 PM, Mark Brown wrote:
-> > On Mon, Apr 23, 2018 at 02:42:44PM +0800, sean.wang at mediatek.com wrote:
-> >> From: Sean Wang <sean.wang@mediatek.com>
+- Implement:
+ From the process of smmu probe, it will get the feature of smmu from IDR
+ registers and keep the status in struct arm_smmu_device, then
+ arm_smmu_device_reset() will initial(set) most of the registers according
+ to it. So we can use arm_smmu_device_reset() to re-initial the smmuv3
+ device to make it can works again.
+ 
+ To achieve this, patch 1 move the bypass parameter from arm_smmu_device_reset()
+ to struct arm_smmu_device to make arm_smmu_device_reset() re-usable. Patch 2
+ introduces probed parameter for struct arm_smmu_device, so once smmuv3 is probed
+ we can avoid request irqs once more. It also introduce a struct arm_smmu_msi_val
+ to keep the value of smmuv3's msi register which can be restore when reset device
+ after probed.
 
-> >> Similar to the readx_poll_timeout() macro calling ktime_* and using 
-> >> ktime_t type, which is declared in <linux/ktime.h>. So, make
+Yisheng Xie (2):
+  iommu/arm-smmu-v3: Remove bypass in arm_smmu_reset_device
+  iommu/arm-smmu-v3: Support software retention for pm_resume
 
-> > I'm missing patch 2 here - what's the story, are there any dependencies?
+ drivers/iommu/arm-smmu-v3.c | 80 ++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 72 insertions(+), 8 deletions(-)
 
-> You can find the second patch here:
-> https://patchwork.kernel.org/patch/10356237/
-
-So it looks like there is a dependency here...?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/7fc3ebb6/attachment.sig>
+-- 
+1.7.12.4
