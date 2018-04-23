@@ -1,99 +1,34 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 23 Apr 2018 10:16:09 +0200
-Subject: [PATCH v7 06/11] ARM: sunxi: Add initialization of CNTVOFF
-In-Reply-To: <20180420211022.11759-7-mylene.josserand@bootlin.com>
-References: <20180420211022.11759-1-mylene.josserand@bootlin.com>
- <20180420211022.11759-7-mylene.josserand@bootlin.com>
-Message-ID: <20180423081609.dirsitco3aeaqztx@flea>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 23 Apr 2018 10:24:51 +0200
+Subject: [PATCH V4] PM / core: fix deferred probe breaking suspend resume
+ order
+In-Reply-To: <13159334.FbaSTEhggn@aspire.rjw.lan>
+References: <1523404626-1466-1-git-send-email-fkan@apm.com>
+ <13159334.FbaSTEhggn@aspire.rjw.lan>
+Message-ID: <20180423082451.GA20822@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 11:10:17PM +0200, Myl?ne Josserand wrote:
-> Add the initialization of CNTVOFF for sun8i-a83t.
+On Mon, Apr 23, 2018 at 10:03:19AM +0200, Rafael J. Wysocki wrote:
+> On Wednesday, April 11, 2018 1:57:06 AM CEST Feng Kan wrote:
+> > When bridge and its endpoint is enumerated the devices are added to the
+> > dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+> > This causes the bridge to be moved to the end of the dpm list when
+> > deferred probe kicks in. The order of the dpm list for bridge and
+> > endpoint is reversed.
+> > 
+> > Add reordering code to move the bridge and its children and consumers to
+> > the end of the pm list so the order for suspend and resume is not altered.
+> > The code also move device and its children and consumers to the tail of
+> > device_kset list if it is registered.
+> > 
+> > Signed-off-by: Feng Kan <fkan@apm.com>
+> > Signed-off-by: Toan Le <toanle@apm.com>
 > 
-> For boot CPU, create a new machine that handles this
-> function's call in an "init_early" callback. We need to initialize
-> CNTVOFF before the arch timer's initialization otherwise, it will
-> not be taken into account and fails to boot correctly.
-> Because of that, this function can't be called in SMP's early_initcall
-> function which is called after timer's init.
+> I'm going to queue this up for 4.18-rc1.
 > 
-> For secondary CPUs, add this function into secondary_startup
-> assembly entry.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> ---
->  arch/arm/mach-sunxi/headsmp.S |  1 +
->  arch/arm/mach-sunxi/sunxi.c   | 20 +++++++++++++++++++-
->  2 files changed, 20 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> index 37dc772701f3..32d76be98541 100644
-> --- a/arch/arm/mach-sunxi/headsmp.S
-> +++ b/arch/arm/mach-sunxi/headsmp.S
-> @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
->  
->  ENTRY(sunxi_mc_smp_secondary_startup)
->  	bl	sunxi_mc_smp_cluster_cache_enable
-> +	bl	secure_cntvoff_init
->  	b	secondary_startup
->  ENDPROC(sunxi_mc_smp_secondary_startup)
->  
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 5e9602ce1573..ddc439f6269b 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -16,6 +16,7 @@
->  #include <linux/platform_device.h>
->  
->  #include <asm/mach/arch.h>
-> +#include <asm/secure_cntvoff.h>
->  
->  static const char * const sunxi_board_dt_compat[] = {
->  	"allwinner,sun4i-a10",
-> @@ -62,7 +63,6 @@ MACHINE_END
->  static const char * const sun8i_board_dt_compat[] = {
->  	"allwinner,sun8i-a23",
->  	"allwinner,sun8i-a33",
-> -	"allwinner,sun8i-a83t",
->  	"allwinner,sun8i-h2-plus",
->  	"allwinner,sun8i-h3",
->  	"allwinner,sun8i-r40",
-> @@ -75,6 +75,24 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
->  	.dt_compat	= sun8i_board_dt_compat,
->  MACHINE_END
->  
-> +void __init sun8i_cntvoff_init(void)
-> +{
-> +#ifdef CONFIG_SMP
-> +	secure_cntvoff_init();
-> +#endif
-> +}
-> +
-> +static const char * const sun8i_cntvoff_board_dt_compat[] = {
-> +	"allwinner,sun8i-a83t",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i-a83t board")
+> If anyone, and Greg in particular, has any objections of concerns regarding
+> that, please let me know.
 
-This name still doesn't really make much sense. It's an A83t, that's
-it.
-
-Apart from the other minor comment I had, and once that name has been
-fixed:
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/d3447bbd/attachment.sig>
+No objection from me:
+	Reviewed-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
