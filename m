@@ -1,95 +1,34 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 23 Apr 2018 10:52:32 +0200
-Subject: [PATCH] tty: serial: xuartps: Setup early console when uartclk is
- also passed
-In-Reply-To: <20180423084810.GA11893@kroah.com>
-References: <2ef5ac478f8d32bc807ead758eb5d60744a44515.1523367208.git.michal.simek@xilinx.com>
- <20180423080641.GA20149@kroah.com>
- <ebc1b162-c5bf-3963-05ab-4b236f89966a@monstr.eu>
- <20180423084810.GA11893@kroah.com>
-Message-ID: <85a4b544-cd1f-13c2-099b-b1d9835c0246@monstr.eu>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 23 Apr 2018 10:55:21 +0200
+Subject: [RESEND PATCH] tty: serial: xuartps: Setup early console when uartclk
+ is also passed
+Message-ID: <777dc4f87d27e9db383ef04bd21b8aebbb2b2015.1524473714.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.4.2018 10:48, Greg Kroah-Hartman wrote:
-> On Mon, Apr 23, 2018 at 10:37:12AM +0200, Michal Simek wrote:
->> On 23.4.2018 10:06, Greg Kroah-Hartman wrote:
->>> On Tue, Apr 10, 2018 at 03:33:30PM +0200, Michal Simek wrote:
->>>> Baudrate calculation depends on requested baudrate and uart clock.
->>>> This patch is checking that uartclk is also passed.
->>>>
->>>> The same logic is used 8250_early.c/init_port function.
->>>>
->>>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->>>> ---
->>>>
->>>>  drivers/tty/serial/xilinx_uartps.c | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
->>>> index b9b2bc76bcac..a654cda203c7 100644
->>>> --- a/drivers/tty/serial/xilinx_uartps.c
->>>> +++ b/drivers/tty/serial/xilinx_uartps.c
->>>> @@ -1181,7 +1181,7 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
->>>>  	/* only set baud if specified on command line - otherwise
->>>>  	 * assume it has been initialized by a boot loader.
->>>>  	 */
->>>> -	if (device->baud) {
->>>> +	if (port->uartclk && device->baud) {
->>>>  		u32 cd = 0, bdiv = 0;
->>>>  		u32 mr;
->>>>  		int div8;
->>>> -- 
->>>> 1.9.1
->>>
->>> This patch conflicts with the previous patch you sent: Subject: [PATCH]
->>> serial: xuartps: Fix the early_console junk character issue
->>>
->>> So, which one should I apply?
->>>
->>> I've dropped both from my review queue now, please resend the one(s) you
->>> want applied, in a patch series if needed.
->>
->> First of all thanks for dropping. I forget that I have sent it in past.
->>
->> Both patches are targeting the same problem. The first one is more
->> destructive.
->>
->> And this one is what 8250 is doing.
->>
->> I have also sent
->> "[PATCH] earlycon: Initialize port->uartclk based on clock-frequency
->> property" which is filling uartclk based on DT to do proper divider
->> calculation.
->>
->> It means when patch above is applied we can keep divider calculation in
->> the driver because it is using right values. If not we need to remove
->> that baudrate calculation because it is not correct (uartclk is
->> hardcoded to BASE_BAUD * 16 in of_setup_earlycon).
->> And it is really a question if "port->uartclk = BASE_BAUD * 16" should
->> be in of_setup_earlycon.
-> 
-> Ok, but what should I do here?  My patch queue for serial drivers is now
-> empty, so if you didn't get an automated email saying your patch was
-> applied, please resend what you think needs to be applied.
+Baudrate calculation depends on requested baudrate and uart clock.
+This patch is checking that uartclk is also passed.
 
-I got that email and patch was applied. I will send proper version.
+The same logic is used 8250_early.c/init_port function.
 
-Thanks,
-Michal
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
+ drivers/tty/serial/xilinx_uartps.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 19d370779767..0fc9de20843c 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1142,7 +1142,7 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
+ 	/* only set baud if specified on command line - otherwise
+ 	 * assume it has been initialized by a boot loader.
+ 	 */
+-	if (device->baud) {
++	if (port->uartclk && device->baud) {
+ 		u32 cd = 0, bdiv = 0;
+ 		u32 mr;
+ 		int div8;
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/611854da/attachment.sig>
+2.17.0
