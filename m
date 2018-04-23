@@ -1,268 +1,281 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Apr 2018 10:45:38 -0700
-Subject: [PATCH 05/16] ARM: OMAP2+: Initialize SoC PM later
+Date: Mon, 23 Apr 2018 10:45:42 -0700
+Subject: [PATCH 09/16] bus: ti-sysc: Add handling for clkctrl opt clocks
 In-Reply-To: <20180423174549.57412-1-tony@atomide.com>
 References: <20180423174549.57412-1-tony@atomide.com>
-Message-ID: <20180423174549.57412-6-tony@atomide.com>
+Message-ID: <20180423174549.57412-10-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to probe devices until at module_init time and we
-currently have at least PM trying to use I2C for PMICs early on.
+There can be up to eight optional device functional gate gate clocks for
+each clkctrl instance in clkctrl register bits 8 to 15. Some of them are
+only needed for module level reset while others may always be needed
+during use. Let's add support for those and update the binding doc
+accordingly.
 
-As only a part of the SoC init_early is SoC specific, we only need to call
-the SoC specific PM init function. And we can modify omap2_common_pm_late_init()
-so it becomes a late_initcall().
+Note that the optional clkctrl mux and divider clocks starting at bit 20
+can be directly mapped to the child devices, and ti-sysc does not need to
+manage those.
 
-Note that this changes am335x to call omap2_clk_enable_autoidle_all() that
-seems to be missing currently.
+And as GPIOs need the optional clocks for reset, we can now add it with
+SYSC_QUIRK_OPT_CLKS_IN_RESET.
 
-Cc: Keerthy <j-keerthy@ti.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh@kernel.org>
 Cc: Tero Kristo <t-kristo@ti.com>
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/common.h      | 16 ++++----
- arch/arm/mach-omap2/io.c          | 67 +++++--------------------------
- arch/arm/mach-omap2/pm.c          | 19 +++++++++
- arch/arm/mach-omap2/pm33xx-core.c |  4 +-
- 4 files changed, 40 insertions(+), 66 deletions(-)
+ .../devicetree/bindings/bus/ti-sysc.txt       |   6 +-
+ drivers/bus/ti-sysc.c                         | 140 ++++++++++++++----
+ 2 files changed, 120 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -44,6 +44,9 @@
+diff --git a/Documentation/devicetree/bindings/bus/ti-sysc.txt b/Documentation/devicetree/bindings/bus/ti-sysc.txt
+--- a/Documentation/devicetree/bindings/bus/ti-sysc.txt
++++ b/Documentation/devicetree/bindings/bus/ti-sysc.txt
+@@ -79,7 +79,11 @@ Optional properties:
+ 		mode as for example omap4 L4_CFG_CLKCTRL
  
- #define OMAP_INTC_START		NR_IRQS
+ - clock-names	should contain at least "fck", and optionally also "ick"
+-		depending on the SoC and the interconnect target module
++		depending on the SoC and the interconnect target module,
++		some interconnect target modules also need additional
++		optional clocks that can be specified as listed in TRM
++		for the related CLKCTRL register bits 8 to 15 such as
++		"dbclk" or "clk32k" depending on their role
  
-+extern int (*omap_pm_soc_init)(void);
-+int omap_pm_nop_init(void);
-+
- #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP2)
- int omap2_pm_init(void);
- #else
-@@ -79,9 +82,12 @@ static inline int omap4_pm_init_early(void)
+ - ti,hwmods	optional TI interconnect module name to use legacy
+ 		hwmod platform data
+diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
+--- a/drivers/bus/ti-sysc.c
++++ b/drivers/bus/ti-sysc.c
+@@ -32,10 +32,18 @@ static const char * const reg_names[] = { "rev", "sysc", "syss", };
+ enum sysc_clocks {
+ 	SYSC_FCK,
+ 	SYSC_ICK,
++	SYSC_OPTFCK0,
++	SYSC_OPTFCK1,
++	SYSC_OPTFCK2,
++	SYSC_OPTFCK3,
++	SYSC_OPTFCK4,
++	SYSC_OPTFCK5,
++	SYSC_OPTFCK6,
++	SYSC_OPTFCK7,
+ 	SYSC_MAX_CLOCKS,
+ };
  
- #if defined(CONFIG_PM) && (defined(CONFIG_SOC_AM33XX) || \
- 	defined(CONFIG_SOC_AM43XX))
--void amx3_common_pm_init(void);
-+int amx3_common_pm_init(void);
- #else
--static inline void amx3_common_pm_init(void) { }
-+static inline int amx3_common_pm_init(void)
+-static const char * const clock_names[] = { "fck", "ick", };
++static const char * const clock_names[SYSC_ICK + 1] = { "fck", "ick", };
+ 
+ #define SYSC_IDLEMODE_MASK		3
+ #define SYSC_CLOCKACTIVITY_MASK		3
+@@ -48,6 +56,8 @@ static const char * const clock_names[] = { "fck", "ick", };
+  * @module_va: virtual address of the interconnect target module
+  * @offsets: register offsets from module base
+  * @clocks: clocks used by the interconnect target module
++ * @clock_roles: clock role names for the found clocks
++ * @nr_clocks: number of clocks used by the interconnect target module
+  * @legacy_mode: configured for legacy mode if set
+  * @cap: interconnect target module capabilities
+  * @cfg: interconnect target module configuration
+@@ -61,7 +71,9 @@ struct sysc {
+ 	u32 module_size;
+ 	void __iomem *module_va;
+ 	int offsets[SYSC_MAX_REGS];
+-	struct clk *clocks[SYSC_MAX_CLOCKS];
++	struct clk **clocks;
++	const char **clock_roles;
++	int nr_clocks;
+ 	const char *legacy_mode;
+ 	const struct sysc_capabilities *cap;
+ 	struct sysc_config cfg;
+@@ -88,6 +100,11 @@ static u32 sysc_read(struct sysc *ddata, int offset)
+ 	return readl_relaxed(ddata->module_va + offset);
+ }
+ 
++static bool sysc_opt_clks_needed(struct sysc *ddata)
 +{
-+	return 0;
-+}
- #endif
- 
- extern void omap2_init_common_infrastructure(void);
-@@ -122,14 +128,10 @@ void am43xx_init_early(void);
- void am43xx_init_late(void);
- void omap4430_init_early(void);
- void omap5_init_early(void);
--void omap3_init_late(void);	/* Do not use this one */
-+void omap3_init_late(void);
- void omap4430_init_late(void);
- void omap2420_init_late(void);
- void omap2430_init_late(void);
--void omap3430_init_late(void);
--void omap35xx_init_late(void);
--void omap3630_init_late(void);
--void am35xx_init_late(void);
- void ti81xx_init_late(void);
- void am33xx_init_late(void);
- void omap5_init_late(void);
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -422,11 +422,6 @@ static void __init __maybe_unused omap_hwmod_init_postsetup(void)
- 	omap_hwmod_for_each(_set_hwmod_postsetup_state, &postsetup_state);
- }
- 
--static void __init __maybe_unused omap_common_late_init(void)
--{
--	omap2_common_pm_late_init();
--}
--
- #ifdef CONFIG_SOC_OMAP2420
- void __init omap2420_init_early(void)
- {
-@@ -447,9 +442,7 @@ void __init omap2420_init_early(void)
- 
- void __init omap2420_init_late(void)
- {
--	omap_common_late_init();
--	omap2_pm_init();
--	omap2_clk_enable_autoidle_all();
-+	omap_pm_soc_init = omap2_pm_init;
- }
- #endif
- 
-@@ -473,9 +466,7 @@ void __init omap2430_init_early(void)
- 
- void __init omap2430_init_late(void)
- {
--	omap_common_late_init();
--	omap2_pm_init();
--	omap2_clk_enable_autoidle_all();
-+	omap_pm_soc_init = omap2_pm_init;
- }
- #endif
- 
-@@ -526,43 +517,12 @@ void __init am35xx_init_early(void)
- 
- void __init omap3_init_late(void)
- {
--	omap_common_late_init();
--	omap3_pm_init();
--	omap2_clk_enable_autoidle_all();
--}
--
--void __init omap3430_init_late(void)
--{
--	omap_common_late_init();
--	omap3_pm_init();
--	omap2_clk_enable_autoidle_all();
--}
--
--void __init omap35xx_init_late(void)
--{
--	omap_common_late_init();
--	omap3_pm_init();
--	omap2_clk_enable_autoidle_all();
--}
--
--void __init omap3630_init_late(void)
--{
--	omap_common_late_init();
--	omap3_pm_init();
--	omap2_clk_enable_autoidle_all();
--}
--
--void __init am35xx_init_late(void)
--{
--	omap_common_late_init();
--	omap3_pm_init();
--	omap2_clk_enable_autoidle_all();
-+	omap_pm_soc_init = omap3_pm_init;
- }
- 
- void __init ti81xx_init_late(void)
- {
--	omap_common_late_init();
--	omap2_clk_enable_autoidle_all();
-+	omap_pm_soc_init = omap_pm_nop_init;
- }
- #endif
- 
-@@ -618,8 +578,7 @@ void __init am33xx_init_early(void)
- 
- void __init am33xx_init_late(void)
- {
--	omap_common_late_init();
--	amx3_common_pm_init();
-+	omap_pm_soc_init = amx3_common_pm_init;
- }
- #endif
- 
-@@ -642,9 +601,7 @@ void __init am43xx_init_early(void)
- 
- void __init am43xx_init_late(void)
- {
--	omap_common_late_init();
--	omap2_clk_enable_autoidle_all();
--	amx3_common_pm_init();
-+	omap_pm_soc_init = amx3_common_pm_init;
- }
- #endif
- 
-@@ -672,9 +629,7 @@ void __init omap4430_init_early(void)
- 
- void __init omap4430_init_late(void)
- {
--	omap_common_late_init();
--	omap4_pm_init();
--	omap2_clk_enable_autoidle_all();
-+	omap_pm_soc_init = omap4_pm_init;
- }
- #endif
- 
-@@ -700,9 +655,7 @@ void __init omap5_init_early(void)
- 
- void __init omap5_init_late(void)
- {
--	omap_common_late_init();
--	omap4_pm_init();
--	omap2_clk_enable_autoidle_all();
-+	omap_pm_soc_init = omap4_pm_init;
- }
- #endif
- 
-@@ -725,9 +678,7 @@ void __init dra7xx_init_early(void)
- 
- void __init dra7xx_init_late(void)
- {
--	omap_common_late_init();
--	omap4_pm_init();
--	omap2_clk_enable_autoidle_all();
-+	omap_pm_soc_init = omap4_pm_init;
- }
- #endif
- 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -230,8 +230,20 @@ static void __init omap4_init_voltages(void)
- 	omap2_set_init_voltage("iva", "dpll_iva_m5x2_ck", "iva");
- }
- 
-+int __maybe_unused omap_pm_nop_init(void)
-+{
-+	return 0;
++	return !!(ddata->cfg.quirks & SYSC_QUIRK_OPT_CLKS_NEEDED);
 +}
 +
-+int (*omap_pm_soc_init)(void);
-+
- int __init omap2_common_pm_late_init(void)
+ static u32 sysc_read_revision(struct sysc *ddata)
  {
-+	int error;
+ 	int offset = ddata->offsets[SYSC_REVISION];
+@@ -98,21 +115,28 @@ static u32 sysc_read_revision(struct sysc *ddata)
+ 	return sysc_read(ddata, offset);
+ }
+ 
+-static int sysc_get_one_clock(struct sysc *ddata,
+-			      enum sysc_clocks index)
++static int sysc_get_one_clock(struct sysc *ddata, const char *name)
+ {
+-	const char *name;
+-	int error;
++	int error, i, index = -ENODEV;
 +
-+	if (!omap_pm_soc_init)
++	if (!strncmp(clock_names[SYSC_FCK], name, 3))
++		index = SYSC_FCK;
++	else if (!strncmp(clock_names[SYSC_ICK], name, 3))
++		index = SYSC_ICK;
++
++	if (index < 0) {
++		for (i = SYSC_OPTFCK0; i < SYSC_MAX_CLOCKS; i++) {
++			if (!clock_names[i]) {
++				index = i;
++				break;
++			}
++		}
++	}
+ 
+-	switch (index) {
+-	case SYSC_FCK:
+-		break;
+-	case SYSC_ICK:
+-		break;
+-	default:
+-		return -EINVAL;
++	if (index < 0) {
++		dev_err(ddata->dev, "clock %s not added\n", name);
++		return index;
+ 	}
+-	name = clock_names[index];
+ 
+ 	ddata->clocks[index] = devm_clk_get(ddata->dev, name);
+ 	if (IS_ERR(ddata->clocks[index])) {
+@@ -138,10 +162,50 @@ static int sysc_get_one_clock(struct sysc *ddata,
+ 
+ static int sysc_get_clocks(struct sysc *ddata)
+ {
+-	int i, error;
++	struct device_node *np = ddata->dev->of_node;
++	struct property *prop;
++	const char *name;
++	int nr_fck = 0, nr_ick = 0, i, error = 0;
+ 
+-	for (i = 0; i < SYSC_MAX_CLOCKS; i++) {
+-		error = sysc_get_one_clock(ddata, i);
++	ddata->clock_roles = devm_kzalloc(ddata->dev,
++					  sizeof(*ddata->clock_roles) *
++					  SYSC_MAX_CLOCKS,
++					  GFP_KERNEL);
++	if (!ddata->clock_roles)
++		return -ENOMEM;
++
++	of_property_for_each_string(np, "clock-names", prop, name) {
++		if (!strncmp(clock_names[SYSC_FCK], name, 3))
++			nr_fck++;
++		if (!strncmp(clock_names[SYSC_ICK], name, 3))
++			nr_ick++;
++		ddata->clock_roles[ddata->nr_clocks] = name;
++		ddata->nr_clocks++;
++	}
++
++	if (ddata->nr_clocks < 1)
 +		return 0;
 +
- 	/* Init the voltage layer */
- 	omap3_twl_init();
- 	omap4_twl_init();
-@@ -244,5 +256,12 @@ int __init omap2_common_pm_late_init(void)
- 	/* Smartreflex device init */
- 	omap_devinit_smartreflex();
- 
-+	error = omap_pm_soc_init();
-+	if (error)
-+		pr_warn("%s: pm soc init failed: %i\n", __func__, error);
++	if (ddata->nr_clocks > SYSC_MAX_CLOCKS) {
++		dev_err(ddata->dev, "too many clocks for %pOF\n", np);
 +
-+	omap2_clk_enable_autoidle_all();
++		return -EINVAL;
++	}
 +
- 	return 0;
- }
-+omap_late_initcall(omap2_common_pm_late_init);
-diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
---- a/arch/arm/mach-omap2/pm33xx-core.c
-+++ b/arch/arm/mach-omap2/pm33xx-core.c
-@@ -173,7 +173,7 @@ static struct am33xx_pm_platform_data *am33xx_pm_get_pdata(void)
- 		return NULL;
++	if (nr_fck > 1 || nr_ick > 1) {
++		dev_err(ddata->dev, "max one fck and ick for %pOF\n", np);
++
++		return -EINVAL;
++	}
++
++	ddata->clocks = devm_kzalloc(ddata->dev,
++				     sizeof(*ddata->clocks) * ddata->nr_clocks,
++				     GFP_KERNEL);
++	if (!ddata->clocks)
++		return -ENOMEM;
++
++	for (i = 0; i < ddata->nr_clocks; i++) {
++		error = sysc_get_one_clock(ddata, ddata->clock_roles[i]);
+ 		if (error && error != -ENOENT)
+ 			return error;
+ 	}
+@@ -533,9 +597,13 @@ static int __maybe_unused sysc_runtime_suspend(struct device *dev)
+ 		goto idled;
+ 	}
+ 
+-	for (i = 0; i < SYSC_MAX_CLOCKS; i++) {
++	for (i = 0; i < ddata->nr_clocks; i++) {
+ 		if (IS_ERR_OR_NULL(ddata->clocks[i]))
+ 			continue;
++
++		if (i >= SYSC_OPTFCK0 && !sysc_opt_clks_needed(ddata))
++			break;
++
+ 		clk_disable(ddata->clocks[i]);
+ 	}
+ 
+@@ -572,9 +640,13 @@ static int __maybe_unused sysc_runtime_resume(struct device *dev)
+ 		goto awake;
+ 	}
+ 
+-	for (i = 0; i < SYSC_MAX_CLOCKS; i++) {
++	for (i = 0; i < ddata->nr_clocks; i++) {
+ 		if (IS_ERR_OR_NULL(ddata->clocks[i]))
+ 			continue;
++
++		if (i >= SYSC_OPTFCK0 && !sysc_opt_clks_needed(ddata))
++			break;
++
+ 		error = clk_enable(ddata->clocks[i]);
+ 		if (error)
+ 			return error;
+@@ -651,7 +723,7 @@ struct sysc_revision_quirk {
+ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
+ 	/* These drivers need to be fixed to not use pm_runtime_irq_safe() */
+ 	SYSC_QUIRK("gpio", 0, 0, 0x10, 0x114, 0x50600801, 0xffffffff,
+-		   SYSC_QUIRK_LEGACY_IDLE),
++		   SYSC_QUIRK_LEGACY_IDLE | SYSC_QUIRK_OPT_CLKS_IN_RESET),
+ 	SYSC_QUIRK("mmu", 0, 0, 0x10, 0x14, 0x00000020, 0xffffffff,
+ 		   SYSC_QUIRK_LEGACY_IDLE),
+ 	SYSC_QUIRK("mmu", 0, 0, 0x10, 0x14, 0x00000030, 0xffffffff,
+@@ -845,6 +917,26 @@ static int sysc_child_add_named_clock(struct sysc *ddata,
+ 	return error;
  }
  
--void __init amx3_common_pm_init(void)
-+int __init amx3_common_pm_init(void)
- {
- 	struct am33xx_pm_platform_data *pdata;
- 	struct platform_device_info devinfo;
-@@ -186,4 +186,6 @@ void __init amx3_common_pm_init(void)
- 	devinfo.size_data = sizeof(*pdata);
- 	devinfo.id = -1;
- 	platform_device_register_full(&devinfo);
++static int sysc_child_add_clocks(struct sysc *ddata,
++				 struct device *child)
++{
++	int i, error;
++
++	for (i = 0; i < ddata->nr_clocks; i++) {
++		error = sysc_child_add_named_clock(ddata,
++						   child,
++						   ddata->clock_roles[i]);
++		if (error && error != -EEXIST) {
++			dev_err(ddata->dev, "could not add child clock %s: %i\n",
++				ddata->clock_roles[i], error);
++
++			return error;
++		}
++	}
 +
 +	return 0;
- }
++}
++
+ static struct device_type sysc_device_type = {
+ };
+ 
+@@ -992,11 +1084,9 @@ static int sysc_notifier_call(struct notifier_block *nb,
+ 
+ 	switch (event) {
+ 	case BUS_NOTIFY_ADD_DEVICE:
+-		error = sysc_child_add_named_clock(ddata, dev,
+-						   clock_names[SYSC_FCK]);
+-		if (error && error != -EEXIST)
+-			dev_warn(ddata->dev, "could not add %s fck: %i\n",
+-				 dev_name(dev), error);
++		error = sysc_child_add_clocks(ddata, dev);
++		if (error)
++			return error;
+ 		sysc_legacy_idle_quirk(ddata, dev);
+ 		break;
+ 	default:
 -- 
 2.17.0
