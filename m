@@ -1,135 +1,255 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Apr 2018 18:39:04 +0100
-Subject: [PATCH] serial: mvebu-uart: Fix local flags handling on termios
- update
-In-Reply-To: <20180423150406.GE16141@n2100.armlinux.org.uk>
-References: <20180422123346.15538-1-marc.zyngier@arm.com>
- <20180422155515.GC16141@n2100.armlinux.org.uk>
- <20180422180728.42d7b354@why.wild-wind.fr.eu.org>
- <20180422195803.GD16141@n2100.armlinux.org.uk>
- <20180423150406.GE16141@n2100.armlinux.org.uk>
-Message-ID: <20180423173904.GG16141@n2100.armlinux.org.uk>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 23 Apr 2018 19:40:50 +0200
+Subject: [PATCH v4 3/8] drm/atmel-hlcdc: support bus-width (12/16/18/24)
+ in endpoint nodes
+In-Reply-To: <20180423072301.11962-4-peda@axentia.se>
+References: <20180423072301.11962-1-peda@axentia.se>
+ <20180423072301.11962-4-peda@axentia.se>
+Message-ID: <20180423194050.6e8be628@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 04:04:06PM +0100, Russell King - ARM Linux wrote:
-> On Sun, Apr 22, 2018 at 08:58:04PM +0100, Russell King - ARM Linux wrote:
-> > On Sun, Apr 22, 2018 at 06:07:28PM +0100, Marc Zyngier wrote:
-> > > On Sun, 22 Apr 2018 16:55:16 +0100
-> > > Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> > > 
-> > > > On Sun, Apr 22, 2018 at 01:33:46PM +0100, Marc Zyngier wrote:
-> > > > > Commit 68a0db1d7da2 reworked the baud rate selection, but also added
-> > > > > a (not so) subtle change in the way the local flags (c_lflag in the
-> > > > > termios structure) are handled, forcing the new flags to always be the
-> > > > > same as the old ones.
-> > > > > 
-> > > > > The reason for that particular change is both obscure and undocumented.
-> > > > > It also completely breaks userspace. Something as trivial as getty is
-> > > > > unusable:
-> > > > > 
-> > > > > <example>
-> > > > > 	Debian GNU/Linux 9 sy-borg ttyMV0
-> > > > > 
-> > > > > 	sy-borg login: root
-> > > > > 	root
-> > > > > 	[timeout]
-> > > > > 
-> > > > > 	Debian GNU/Linux 9 sy-borg ttyMV0
-> > > > > </example>
-> > > > > 
-> > > > > which is quite obvious in retrospect: getty cannot get in control of
-> > > > > the echo mode, is stuck in canonical mode, and times out without ever
-> > > > > seeing anything valid. It also begs the question of how this change was
-> > > > > ever tested.
-> > > > > 
-> > > > > The fix is pretty obvious: stop messing with c_lflag, and the world
-> > > > > will be a happier place.  
-> > > > 
-> > > > The c_iflag code also looks suspicious as well.  Apparently, the driver
-> > > > only supports INPCK and IGNPAR, but things such as ISTRIP, INLCR, IGNCR,
-> > > > ICRNL, IUCLC, IMAXBEL and IUTF8 are all software things done by the TTY
-> > > > layer and have nothing to do with the driver.
-> > > 
-> > > Indeed. I stuck with the most glaring issue (well, the one that
-> > > prevented me from using this particular box), but the whole termios
-> > > massaging is quite odd. Someone with a good understanding of the
-> > > intricacies of the TTY layer should definitely have a look at this.
-> > 
-> > Right, remember, I'm the author of the serial core layer (I took over
-> > from tytso back in the 2.x era.)
-> > 
-> > POSIX requirements are:
-> > 
-> >   The tcsetattr() function shall return successfully if it
-> >   was able to perform any of the requested actions, even if
-> >   some of the requested actions could not be performed. It
-> >   shall set all the attributes that the implementation
-> >   supports as requested and leave all the attributes not
-> >   supported by the implementation unchanged.
-> > 
-> > In other words, if the system does not support two stop bits, asking
-> > for CSTOPB to be set results in CSTOPB being ignored but all other
-> > supported modes being updated.  This is what the code in that commit
-> > is trying to implement, but it forgets that the TTY layer implements
-> > a whole load of termios modes that are not specific to the serial
-> > driver.
+On Mon, 23 Apr 2018 09:22:56 +0200
+Peter Rosin <peda@axentia.se> wrote:
+
+> This beats the heuristic that the connector is involved in what format
+> should be output for cases where this fails.
 > 
-> I've just been talking to Jon Nettleton about this, and it seems that
-> he reported the exact same bug that you've found to Marvell a while
-> back, yet it seems that the bug was still propagated into mainline.
+> E.g. if there is a bridge that changes format between the encoder and the
+> connector, or if some of the RGB pins between the lcd controller and the
+> encoder are not routed on the PCB.
+> 
+> This is critical for the devices that have the "conflicting output
+> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
+> RGB bits move around depending on the selected output mode. For
+> devices that do not have the "conflicting output formats" issue
+> (SAMA5D2, SAMA5D4), this is completely irrelevant.
+> 
+> Signed-off-by: Peter Rosin <peda@axentia.se>
 
-Erm...
+Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
-I wonder if anyone has _really_ looked at the commit?
-
-+       baud = uart_get_baud_rate(port, termios, old, 0, 230400);
-+       if (mvebu_uart_baud_rate_set(port, baud)) {
-+               /* No clock available, baudrate cannot be changed */
-+               if (old)
-+                       baud = uart_get_baud_rate(port, old, NULL, 0, 230400);
-+       } else {
-+               tty_termios_encode_baud_rate(termios, baud, baud);
-+               uart_update_timeout(port, termios->c_cflag, baud);
-+       }
-
-What is the effect if mvebu_uart_baud_rate_set() returns non-zero?  We
-get the baud rate for the _old_ termios correctly, but then what do we
-do with it?  "baud" is not used by this function after this point, so
-what's the point of making that second call to uart_get_baud_rate()?
-
-uart_get_baud_rate() already contains the logic to select the supported
-baud rate from the new or old termios depending on the supplied
-capabilities.
-
-If there is no UART clock provided, then the above quite simply becomes
-a complete no-op.
-
-The whole thing can be simplified to:
-
-	if (!IS_ERR(mvuart->clk)) {
-		baud = uart_get_baud_rate(port, termios, old, 0, 230400);
-		mvebu_uart_baud_rate_set(port, baud);
-		tty_termios_encode_baud_rate(termios, baud, baud);
-		uart_update_timeout(port, termios->c_cflag, baud);
-	}
-
-and the conditional in mvebu_uart_baud_rate_set() removed.
-
-However, I suspect that the real intention of the code is actually
-this:
-
-	if (!IS_ERR(mvuart->clk)) {
-		baud = uart_get_baud_rate(port, termios, old, 0, 230400);
-		mvebu_uart_baud_rate_set(port, baud);
-	} else {
-		baud = uart_get_baud_rate(port, old, NULL, 0, 230400);
-	}
-
-	tty_termios_encode_baud_rate(termios, baud, baud);
-	uart_update_timeout(port, termios->c_cflag, baud);
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> ---
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 70 +++++++++++++++++-------
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  1 +
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 67 ++++++++++++++++++++---
+>  3 files changed, 111 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> index d73281095fac..c38a479ada98 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> @@ -226,6 +226,55 @@ static void atmel_hlcdc_crtc_atomic_enable(struct drm_crtc *c,
+>  #define ATMEL_HLCDC_RGB888_OUTPUT	BIT(3)
+>  #define ATMEL_HLCDC_OUTPUT_MODE_MASK	GENMASK(3, 0)
+>  
+> +static int atmel_hlcdc_connector_output_mode(struct drm_connector_state *state)
+> +{
+> +	struct drm_connector *connector = state->connector;
+> +	struct drm_display_info *info = &connector->display_info;
+> +	struct drm_encoder *encoder;
+> +	unsigned int supported_fmts = 0;
+> +	int j;
+> +
+> +	encoder = state->best_encoder;
+> +	if (!encoder)
+> +		encoder = connector->encoder;
+> +
+> +	switch (atmel_hlcdc_encoder_get_bus_fmt(encoder)) {
+> +	case 0:
+> +		break;
+> +	case MEDIA_BUS_FMT_RGB444_1X12:
+> +		return ATMEL_HLCDC_RGB444_OUTPUT;
+> +	case MEDIA_BUS_FMT_RGB565_1X16:
+> +		return ATMEL_HLCDC_RGB565_OUTPUT;
+> +	case MEDIA_BUS_FMT_RGB666_1X18:
+> +		return ATMEL_HLCDC_RGB666_OUTPUT;
+> +	case MEDIA_BUS_FMT_RGB888_1X24:
+> +		return ATMEL_HLCDC_RGB888_OUTPUT;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	for (j = 0; j < info->num_bus_formats; j++) {
+> +		switch (info->bus_formats[j]) {
+> +		case MEDIA_BUS_FMT_RGB444_1X12:
+> +			supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
+> +			break;
+> +		case MEDIA_BUS_FMT_RGB565_1X16:
+> +			supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
+> +			break;
+> +		case MEDIA_BUS_FMT_RGB666_1X18:
+> +			supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
+> +			break;
+> +		case MEDIA_BUS_FMT_RGB888_1X24:
+> +			supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
+> +			break;
+> +		default:
+> +			break;
+> +		}
+> +	}
+> +
+> +	return supported_fmts;
+> +}
+> +
+>  static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+>  {
+>  	unsigned int output_fmts = ATMEL_HLCDC_OUTPUT_MODE_MASK;
+> @@ -238,31 +287,12 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+>  	crtc = drm_crtc_to_atmel_hlcdc_crtc(state->crtc);
+>  
+>  	for_each_new_connector_in_state(state->state, connector, cstate, i) {
+> -		struct drm_display_info *info = &connector->display_info;
+>  		unsigned int supported_fmts = 0;
+> -		int j;
+>  
+>  		if (!cstate->crtc)
+>  			continue;
+>  
+> -		for (j = 0; j < info->num_bus_formats; j++) {
+> -			switch (info->bus_formats[j]) {
+> -			case MEDIA_BUS_FMT_RGB444_1X12:
+> -				supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
+> -				break;
+> -			case MEDIA_BUS_FMT_RGB565_1X16:
+> -				supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
+> -				break;
+> -			case MEDIA_BUS_FMT_RGB666_1X18:
+> -				supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
+> -				break;
+> -			case MEDIA_BUS_FMT_RGB888_1X24:
+> -				supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
+> -				break;
+> -			default:
+> -				break;
+> -			}
+> -		}
+> +		supported_fmts = atmel_hlcdc_connector_output_mode(cstate);
+>  
+>  		if (crtc->dc->desc->conflicting_output_formats)
+>  			output_fmts &= supported_fmts;
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> index ab32d5b268d2..77bd2d0ae508 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> @@ -454,5 +454,6 @@ void atmel_hlcdc_crtc_irq(struct drm_crtc *c);
+>  int atmel_hlcdc_crtc_create(struct drm_device *dev);
+>  
+>  int atmel_hlcdc_create_outputs(struct drm_device *dev);
+> +int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder);
+>  
+>  #endif /* DRM_ATMEL_HLCDC_H */
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> index 8db51fb131db..db4d6aaaef93 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> @@ -27,33 +27,86 @@
+>  
+>  #include "atmel_hlcdc_dc.h"
+>  
+> +struct atmel_hlcdc_rgb_output {
+> +	struct drm_encoder encoder;
+> +	int bus_fmt;
+> +};
+> +
+>  static const struct drm_encoder_funcs atmel_hlcdc_panel_encoder_funcs = {
+>  	.destroy = drm_encoder_cleanup,
+>  };
+>  
+> +static struct atmel_hlcdc_rgb_output *
+> +atmel_hlcdc_encoder_to_rgb_output(struct drm_encoder *encoder)
+> +{
+> +	return container_of(encoder, struct atmel_hlcdc_rgb_output, encoder);
+> +}
+> +
+> +int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder)
+> +{
+> +	struct atmel_hlcdc_rgb_output *output;
+> +
+> +	output = atmel_hlcdc_encoder_to_rgb_output(encoder);
+> +
+> +	return output->bus_fmt;
+> +}
+> +
+> +static int atmel_hlcdc_of_bus_fmt(struct device_node *ep)
+> +{
+> +	u32 bus_width = 0;
+> +
+> +	of_property_read_u32(ep, "bus-width", &bus_width);
+> +
+> +	switch (bus_width) {
+> +	case 0:
+> +		return 0;
+> +	case 12:
+> +		return MEDIA_BUS_FMT_RGB444_1X12;
+> +	case 16:
+> +		return MEDIA_BUS_FMT_RGB565_1X16;
+> +	case 18:
+> +		return MEDIA_BUS_FMT_RGB666_1X18;
+> +	case 24:
+> +		return MEDIA_BUS_FMT_RGB888_1X24;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +}
+> +
+>  static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+>  {
+> -	struct drm_encoder *encoder;
+> +	struct atmel_hlcdc_rgb_output *output;
+> +	struct device_node *ep;
+>  	struct drm_panel *panel;
+>  	struct drm_bridge *bridge;
+>  	int ret;
+>  
+> +	ep = of_graph_get_endpoint_by_regs(dev->dev->of_node, 0, endpoint);
+> +	if (!ep)
+> +		return -ENODEV;
+> +
+>  	ret = drm_of_find_panel_or_bridge(dev->dev->of_node, 0, endpoint,
+>  					  &panel, &bridge);
+>  	if (ret)
+>  		return ret;
+>  
+> -	encoder = devm_kzalloc(dev->dev, sizeof(*encoder), GFP_KERNEL);
+> -	if (!encoder)
+> +	output = devm_kzalloc(dev->dev, sizeof(*output), GFP_KERNEL);
+> +	if (!output)
+>  		return -EINVAL;
+>  
+> -	ret = drm_encoder_init(dev, encoder,
+> +	output->bus_fmt = atmel_hlcdc_of_bus_fmt(ep);
+> +	if (output->bus_fmt < 0) {
+> +		dev_err(dev->dev, "invalid bus width\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = drm_encoder_init(dev, &output->encoder,
+>  			       &atmel_hlcdc_panel_encoder_funcs,
+>  			       DRM_MODE_ENCODER_NONE, NULL);
+>  	if (ret)
+>  		return ret;
+>  
+> -	encoder->possible_crtcs = 0x1;
+> +	output->encoder.possible_crtcs = 0x1;
+>  
+>  	if (panel) {
+>  		bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_Unknown);
+> @@ -62,7 +115,7 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+>  	}
+>  
+>  	if (bridge) {
+> -		ret = drm_bridge_attach(encoder, bridge, NULL);
+> +		ret = drm_bridge_attach(&output->encoder, bridge, NULL);
+>  		if (!ret)
+>  			return 0;
+>  
+> @@ -70,7 +123,7 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+>  			drm_panel_bridge_remove(bridge);
+>  	}
+>  
+> -	drm_encoder_cleanup(encoder);
+> +	drm_encoder_cleanup(&output->encoder);
+>  
+>  	return ret;
+>  }
