@@ -1,75 +1,124 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 24 Apr 2018 11:11:12 -0500
-Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <aa1c2e6f-793c-1d9e-366a-3496f500f946@ti.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-13-git-send-email-david@lechnology.com>
- <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
- <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
- <a4d84be0-e3d3-4e39-40f9-cae9006cb6ee@ti.com>
- <CAMRc=Mc228JAxxBXcObmokh2h-toojG8OHrmbunm_ORqbGWUnA@mail.gmail.com>
- <69bc0848-0698-b936-96a3-2257a5e27809@ti.com>
- <CAMRc=MenWp=2dtOs1yafnHVkCxfT7SDS0fS2UxUd+U0s_UDwVw@mail.gmail.com>
- <57f2182e-09b4-2cab-5602-9d0e029495be@ti.com>
- <152303318048.143116.2883441215887455211@swboyd.mtv.corp.google.com>
- <48c8531f-8cd9-a9f8-9c38-cbc4c921c4c9@lechnology.com>
- <aa1c2e6f-793c-1d9e-366a-3496f500f946@ti.com>
-Message-ID: <d32a4cd5-4344-6e20-fdca-1ed830a52466@lechnology.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 24 Apr 2018 17:08:57 +0100
+Subject: [RFC] arm64: extra entries in /proc/iomem for kexec
+In-Reply-To: <20180416100831.GF13168@linaro.org>
+References: <20180314082941.GM25863@linaro.org>
+ <2d2e1be6-b925-1595-9b6e-76dd270d396d@redhat.com>
+ <20180327101654.GB14737@linaro.org>
+ <da2989ec-7fa5-b044-3237-4e75f2fe6d98@arm.com>
+ <20180402015330.GA27603@linaro.org> <20180405024203.GD19607@linaro.org>
+ <4c59b4c3-cff4-ac69-9576-6bcbf507ef1f@arm.com>
+ <20180416100831.GF13168@linaro.org>
+Message-ID: <954d8b58-579a-c688-36f3-dc8d4b13cef8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2018 03:28 AM, Sekhar Nori wrote:
-> On Monday 23 April 2018 08:29 PM, David Lechner wrote:
->> On 04/06/2018 11:46 AM, Stephen Boyd wrote:
->>> Quoting Sekhar Nori (2018-04-06 02:37:03)
+Hi Akashi,
+
+On 16/04/18 11:08, AKASHI Takahiro wrote:
+> On Thu, Apr 12, 2018 at 05:01:52PM +0100, James Morse wrote:
+>> On 05/04/18 03:42, AKASHI Takahiro wrote:
+>>> On Mon, Apr 02, 2018 at 10:53:32AM +0900, AKASHI Takahiro wrote:
+>>>> Basically, changes that I made on /proc/iomem in my new format D were:
+>>>> 1. to move NOMAP region entries, formerly named "reserved" and now named
+>>>>    "reserved (no map)", under System RAM
+>>>> 2. to add new entries for firmware-reserved regions as "reserved" also
+>>>>    under System RAM
 >>>>
->>>> Can you please check that and confirm there is no issue with genpd and
->>>> using CLK_OF_DECLARE() to initialize clocks?
->>>>
->>>> Unless you report an issue back, or Mike and Stephen have ideas about
->>>> how to handle the dependency between PSC/PLL derived timer clock
->>>> initialization and and timer_probe(), I think we need to move back to
->>>> using CLK_OF_DECLARE().
->>>
->>> In such a case, please use the hybrid approach where the clks required
->>> for the clockevent and/or clocksource are registered in the early
->>> CLK_OF_DECLARE path but the rest of the clks get registered with a
->>> proper platform device and driver. There are examples of this approach
->>> on other platforms already.
->>>
+>>>> On the other hand, current kexec-tools, in particular kexec command,
+>>>> only scan top-level "System RAM" entries as well as "reserved" entries.
 >>
->> I looked at this a bit last week, but I didn't come up with any approach
->> that I was happy with. It seems like it would be nice to just register
->> the absolute minimum clocks needed. On DA8XX, that would just be the PLL0
->> AUXCLK. On most of the other SoCs, it would be the PLL AUXCLK plus one
->> LPSC clock. The AUXCLKs are easy because they are just a simple gate
->> from the oscillator. The LPSC clocks are a bit more tricky because they
->> have a complex sequence for turning on. Furthermore, on DM646X, we need
->> the whole PLL up to SYSCLK3 plus one LPSC clock, so things get a bit
->> messy there.
+>> as well as?
 > 
-> Things might change in the context of work being done here by Bartosz
-> for converting clocks to early platform devices.
+> I had few words here.
+> The current kexec-tools assumes that "reserved" entries appear only
+> at the top level. So,
 > 
-> But, keeping that development aside for a moment: I think this means the
-> PLLs and PSCs need to be CLK_OF_DECLARE(). What we can have as platform
-> devices are clocks that are not in the path to get timer clock working
-> (like CFGCHIP clocks).
+>> Does this mean kexec will pick up the reserved region if its written as:
+>> | 00001000-0009d7ff : System RAM
+>> |    00001000-00001fff  : reserved
+> 
+> if this is the case, the range "0x1000-0x1fff" is added to an internal
+> list of memory ranges 
 
-CLK_OF_DECLARE() only matters on DA850. None of the other SoCs use device
-tree. And on DA850, the timer0 clock is just the PLL0 AUXCLK, so PSCs can
-still be platform devices there. And in fact, one of the PSC clocks on
-DA850 depends on async3, which is a CFGCHIP clock, so if we made the PSCs
-CLK_OF_DECLARE(), then we also have to make at least the async3 CFGCHIP
-clock CLK_OF_DECLARE(). But, like I said, I think that can be avoided by
-leaving the PSC clocks as a platform device on DA850 (and DA830).
+I found this in get_memory_ranges_iomem_cb()...
 
-For everything else, we need the legacy board file equivalent of
-CLK_OF_DECLARE(), which is basically what I had here in v5 of the
-series.
 
-So, if we want this to keep moving before the if/when of Bartosz's
-early platform device stuff, I'm thinking that I will make the PLL
-and PSC drivers loadable with or without a platform device and let
-each SoC pick which one it should use.
+> but will later be *ignored* by locate_hole() function
+> due to its memory type.
+
+Ugh. Great.
+
+
+> That is, the range can potentially be overwritten by loaded kernel/initrd.
+
+So two kernel bugs, one user-space bug, all conspiring.
+
+
+>>>> either because
+>>>> a. new kernel (or initrd/dtb) may have been allocated on a NOMAP region
+>>>>    which are not suitable for usable memory, or
+>>>> b. new kernel (or initrd/dtb) may have been allocated on a reserved region
+>>>>    whose contents can be overwritten.
+>>>>
+>>>> While we see (b) even today, (a) is a backward compatibility issue.
+>>
+>> (a) doesn't happen because request_standard_resources() checks
+>> memblock_is_nomap(), and reports those regions as 'reserved'.
+> 
+> I might have confused you. The assumption here was that we adopt format (D),
+> where all NOMAP regions are sub nodes of "System RAM", but still use
+> the current kexec-tools.
+> As I said above, this will end up an un-expected behavior.
+
+I'd like to fix this without having to fix user-space at the same time. It looks
+like no-one else has second level reserved regions, so we can't blame
+kexec-tools for looking straight at them, then ignoring them.
+
+
+>> We can't expect user-space to upgrade to fix this issue.
+> 
+> I'm not sure what you mean here; we can't fix the issue anyway
+> without changing user-space/kexec-tools as kexec_load system call totally
+> relies on parameters passed by kexec-tools.
+> (The only difference is whether we need additional kernel changes or not.)
+
+It looks like this was always broken because the efi memory map isn't listed as
+'reserved' in /proc/iomem. The fallout for the new stuff is secondary.
+
+
+>>> # I don't know yet whether people are happy with this fix, and also have
+>>>   kernel patches for my other approaches. They are neither not much
+>>>   complicated.
+>>
+>> I don't think we should fix this in userspace, exporting all the
+>> memblock_reserved() regions as 'reserved' in /proc/iomem looks like the right
+>> thing to do.
+> 
+> Again, if you modify /proc/iomem, you have to update kexec-tools, too.
+
+If we squash the memblock_reserved() stuff down so it appears as a top level
+'reserved' region too, I don't think we do. This prevents the efi-memory-map
+being overwritten on kernels since kexec was merged.
+
+Its horribly fiddly to do this. The kernel code/data are special reserved
+regions that we already describe as a subset of system-ram, even though they are
+both also fragments of a bigger memblock_reserved() block.
+
+While we can walk memblock for regions that aren't reserved, allocating memory
+in the loop changes what is reserved. That one O(N) walk ends up being four...
+
+I'm almost done tearing my hair out, I should have a working patch soon...
+
+
+>> wasn't there going to be another version, with the core EFI
+>> stuff split out?
+> 
+> ? I don't remember well ...
+
+https://lkml.org/lkml/2018/2/1/496
+
+
+Thanks,
+
+James
