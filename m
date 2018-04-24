@@ -1,117 +1,66 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 24 Apr 2018 11:25:17 -0500
-Subject: [PATCH v5 21/23] ASoC: qdsp6: dt-bindings: Add apq8096 machine
- bindings
-In-Reply-To: <20180418153157.1960-22-srinivas.kandagatla@linaro.org>
-References: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
- <20180418153157.1960-22-srinivas.kandagatla@linaro.org>
-Message-ID: <20180424162517.msxscjfg36xc22mo@rob-hp-laptop>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Tue, 24 Apr 2018 09:26:44 -0700
+Subject: [PATCH v3 09/10] drivers/hwmon: Add PECI hwmon client drivers
+In-Reply-To: <1524585397.21176.502.camel@linux.intel.com>
+References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+ <20180410183212.16787-10-jae.hyun.yoo@linux.intel.com>
+ <1524585397.21176.502.camel@linux.intel.com>
+Message-ID: <c62f1c9a-1eae-49d9-2fde-c65452d5f0e6@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 04:31:55PM +0100, srinivas.kandagatla at linaro.org wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Hi Andy,
+
+Thanks a lot for your review. Please check my inline answers.
+
+On 4/24/2018 8:56 AM, Andy Shevchenko wrote:
+> On Tue, 2018-04-10 at 11:32 -0700, Jae Hyun Yoo wrote:
 > 
-> Add devicetree bindings documentation file for Qualcomm apq8096 sound card.
+>>   drivers/hwmon/peci-cputemp.c  | 783
+>> ++++++++++++++++++++++++++++++++++++++++++
+>>   drivers/hwmon/peci-dimmtemp.c | 432 +++++++++++++++++++++++
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  .../devicetree/bindings/sound/qcom,apq8096.txt     | 76 ++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/qcom,apq8096.txt
+> Does it make sense one driver per patch?
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/qcom,apq8096.txt b/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
-> new file mode 100644
-> index 000000000000..37e23d926b95
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
-> @@ -0,0 +1,76 @@
-> +* Qualcomm Technologies APQ8096 ASoC sound card driver
-> +
-> +This binding describes the APQ8096 sound card, which uses qdsp for audio.
-> +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: must be "qcom,apq8096-sndcard"
-> +
-> +- qcom,audio-routing:
-> +	Usage: Optional
-> +	Value type: <stringlist>
-> +	Definition:  A list of the connections between audio components.
-> +		  Each entry is a pair of strings, the first being the
-> +		  connection's sink, the second being the connection's
-> +		  source. Valid names could be power supplies, MicBias
-> +		  of codec and the jacks on the board:
 
-Please list out valid values here.
+Yes, I'll separate it into two patches.
 
-> +
-> += dailinks
-> +Each subnode of sndcard represents either a dailink, and subnodes of each
-> +dailinks would be cpu/codec/platform dais.
-> +
-> +- link-name:
-
-Not a standard property, but I guess that sneaked in with the 8016 
-binding...
-
-> +	Usage: required
-> +	Value type: <string>
-> +	Definition: User friendly name for dai link
-> +
-> += CPU, PLATFORM, CODEC dais subnodes
-> +- cpu:
-> +	Usage: required
-> +	Value type: <subnode>
-> +	Definition: cpu dai sub-node
-> +
-> +- codec:
-> +	Usage: Optional
-> +	Value type: <subnode>
-> +	Definition: codec dai sub-node
-> +
-> +- platform:
-> +	Usage: Optional
-> +	Value type: <subnode>
-> +	Definition: platform dai sub-node
-> +
-> +- sound-dai:
-> +	Usage: required
-> +	Value type: <phandle>
-
-phandle with args.
-
-> +	Definition: dai phandle/s and port of CPU/CODEC/PLATFORM node.
-> +
-> +Example:
-> +
-> +audio {
-> +	compatible = "qcom,apq8096-sndcard";
-> +	qcom,model = "DB820c";
-> +
-> +	mm1-dai-link {
-> +		link-name = "MultiMedia1";
-> +		cpu {
-> +			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
-> +		};
-> +	};
-> +
-> +	hdmi-dai-link {
-> +		link-name = "HDMI Playback";
-> +		cpu {
-> +			sound-dai = <&q6afe HDMI_RX>;
-> +		};
-> +
-> +		platform {
-> +			sound-dai = <&q6adm>;
-> +		};
-> +
-> +		codec {
-> +			sound-dai = <&hdmi 0>;
-> +		};
-> +	};
-> +};
-> -- 
-> 2.16.2
+>> +#define CLIENT_CPU_ID_MASK    0xf0ff0  /* Mask for Family / Model
+>> info */
 > 
+>> +struct cpu_gen_info {
+>> +	u32 type;
+>> +	u32 cpu_id;
+>> +	u32 core_max;
+>> +};
+>>
+> 
+>> +static const struct cpu_gen_info cpu_gen_info_table[] = {
+>> +	{ .type = CPU_GEN_HSX,
+>> +	  .cpu_id = 0x306f0, /* Family code: 6, Model number: 63
+>> (0x3f) */
+>> +	  .core_max = CORE_MAX_ON_HSX },
+>> +	{ .type = CPU_GEN_BRX,
+>> +	  .cpu_id = 0x406f0, /* Family code: 6, Model number: 79
+>> (0x4f) */
+>> +	  .core_max = CORE_MAX_ON_BDX },
+>> +	{ .type = CPU_GEN_SKX,
+>> +	  .cpu_id = 0x50650, /* Family code: 6, Model number: 85
+>> (0x55) */
+>> +	  .core_max = CORE_MAX_ON_SKX },
+>> +};
+> 
+> Are we talking about x86 CPU IDs here?
+> If so, why x86 corresponding headers, including intel-family.h are not
+> used?
+> 
+
+Yes, that would make more sense. I'll include the intel-family.h and 
+will use these defines instead:
+INTEL_FAM6_HASWELL_X
+INTEL_FAM6_BROADWELL_X
+INTEL_FAM6_SKYLAKE_X
+
+Thanks,
+
+Jae
