@@ -1,33 +1,47 @@
-From: joyce.ooi@intel.com (Ooi, Joyce)
-Date: Tue, 24 Apr 2018 11:01:58 +0800
-Subject: [PATCH] arm64: dts: stratix10: Change pad skew values for EMAC0 PHY
- driver
-Message-ID: <1524538918-21141-1-git-send-email-joyce.ooi@intel.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 23 Apr 2018 20:25:49 -0700
+Subject: [PATCH v5 2/2] drivers: soc: Add LLCC driver
+In-Reply-To: <1524524972-12014-3-git-send-email-rishabhb@codeaurora.org>
+References: <1524524972-12014-1-git-send-email-rishabhb@codeaurora.org>
+ <1524524972-12014-3-git-send-email-rishabhb@codeaurora.org>
+Message-ID: <4856aba7-4a06-eb15-57d5-abfd28f8a15f@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HPS EMAC0 drive strength is changed to 4mA because the initial 8mA
-drive strength has caused CE test to fail. This requires changes on the
-pad skew for EMAC0 PHY driver. Based on several measurements done, Tx
-clock does not require the extra 0.96ns delay.
+On 04/23/2018 04:09 PM, Rishabh Bhatnagar wrote:
 
-Signed-off-by: Ooi, Joyce <joyce.ooi@intel.com>
----
- .../boot/dts/altera/socfpga_stratix10_socdk.dts    |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+> index e050eb8..2b09321 100644
+> --- a/drivers/soc/qcom/Kconfig
+> +++ b/drivers/soc/qcom/Kconfig
+> @@ -21,6 +21,23 @@ config QCOM_GSBI
+>            functions for connecting the underlying serial UART, SPI, and I2C
+>            devices to the output pins.
+> 
+> +config QCOM_LLCC
+> +	tristate "Qualcomm Technologies, Inc. LLCC driver"
+> +	depends on ARCH_QCOM
+> +	help
+> +	  Qualcomm Technologies, Inc. platform specific
+> +	  Last Level Cache Controller(LLCC) driver. This provides interfaces
+> +	  to client's that use the LLCC. Say yes here to enable LLCC slice
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-index 0007564..8785f78 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-@@ -79,7 +79,7 @@
- 			rxd2-skew-ps = <420>; /* 0ps */
- 			rxd3-skew-ps = <420>; /* 0ps */
- 			txen-skew-ps = <0>; /* -420ps */
--			txc-skew-ps = <1860>; /* 960ps */
-+			txc-skew-ps = <900>; /* 0ps */
- 			rxdv-skew-ps = <420>; /* 0ps */
- 			rxc-skew-ps = <1680>; /* 780ps */
- 		};
+	  to clients
+
+> +	  driver.
+> +
+> +config QCOM_SDM845_LLCC
+> +	tristate "Qualcomm Technologies, Inc. SDM845 LLCC driver"
+> +	depends on QCOM_LLCC
+> +	help
+> +	  Say yes here to enable the LLCC driver for SDM845. This provides
+> +	  data required to configure LLCC so that clients can start using the
+> +	  LLCC slices.
+> +
+>  config QCOM_MDT_LOADER
+>  	tristate
+>  	select QCOM_SCM
+
+
 -- 
-1.7.1
+~Randy
