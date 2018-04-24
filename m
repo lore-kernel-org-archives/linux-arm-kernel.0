@@ -1,125 +1,77 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 24 Apr 2018 22:32:39 +0200
-Subject: [RFC 10/10] ARM: exynos: Remove support for Exynos5440
-In-Reply-To: <20180424203239.21885-1-krzk@kernel.org>
-References: <20180424203239.21885-1-krzk@kernel.org>
-Message-ID: <20180424203239.21885-11-krzk@kernel.org>
+From: collinsd@codeaurora.org (David Collins)
+Date: Tue, 24 Apr 2018 13:46:21 -0700
+Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <20180424174111.GH22073@sirena.org.uk>
+References: <cover.1521246069.git.collinsd@codeaurora.org>
+ <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
+ <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
+ <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
+ <152411734938.46528.9676451637772936597@swboyd.mtv.corp.google.com>
+ <20180419120813.GD27188@sirena.org.uk>
+ <38f42537-f801-115a-4120-1344a67a0462@codeaurora.org>
+ <20180424174111.GH22073@sirena.org.uk>
+Message-ID: <d82ef514-b94f-8ed9-6b1e-e07de2a5f455@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos5440 is not actively developed, there are no development
-boards available and probably there are no real products with it.
-Remove wide-tree support for Exynos5440.
+On 04/24/2018 10:41 AM, Mark Brown wrote:
+> On Fri, Apr 20, 2018 at 12:28:21PM -0700, David Collins wrote:
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/mach-exynos/Kconfig  | 12 ------------
- arch/arm/mach-exynos/common.h |  8 --------
- arch/arm/mach-exynos/exynos.c | 15 ++-------------
- 3 files changed, 2 insertions(+), 33 deletions(-)
+>> RPMh hardware enforces the requested minimum headroom voltage for all
+>> regulators with a parent.  It has full knowledge of the parent-child
+>> connections of regulators on the board (as programmed by the bootloader).
+>> It automatically reconfigures the parent voltage when needed as a result
+>> of requests changing the voltage of any of its child regulators.
+> 
+> If the hardware has full knowledge of all these constraints and enforces
+> them transparently then why does the kernel care that it's doing that?
+> Doesn't it defeat the point of it doing all this stuff if we have to
+> know about it?
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 647c319f9f5f..219d389a8521 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -108,18 +108,6 @@ config SOC_EXYNOS5420
- 	default y
- 	depends on ARCH_EXYNOS5
- 
--config SOC_EXYNOS5440
--	bool "SAMSUNG EXYNOS5440"
--	default y
--	depends on ARCH_EXYNOS5
--	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
--	select HAVE_ARM_ARCH_TIMER
--	select AUTO_ZRELADDR
--	select PINCTRL_EXYNOS5440
--	select PM_OPP
--	help
--	  Enable EXYNOS5440 SoC support
--
- config SOC_EXYNOS5800
- 	bool "SAMSUNG EXYNOS5800"
- 	default y
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 098f84a149a3..f332c654784b 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -21,7 +21,6 @@
- #define EXYNOS5250_SOC_ID	0x43520000
- #define EXYNOS5410_SOC_ID	0xE5410000
- #define EXYNOS5420_SOC_ID	0xE5420000
--#define EXYNOS5440_SOC_ID	0xE5440000
- #define EXYNOS5800_SOC_ID	0xE5422000
- #define EXYNOS5_SOC_MASK	0xFFFFF000
- 
-@@ -39,7 +38,6 @@ IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
- IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
- IS_SAMSUNG_CPU(exynos5410, EXYNOS5410_SOC_ID, EXYNOS5_SOC_MASK)
- IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
--IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
- IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
- 
- #if defined(CONFIG_SOC_EXYNOS3250)
-@@ -82,12 +80,6 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
- # define soc_is_exynos5420()	0
- #endif
- 
--#if defined(CONFIG_SOC_EXYNOS5440)
--# define soc_is_exynos5440()	is_samsung_exynos5440()
--#else
--# define soc_is_exynos5440()	0
--#endif
--
- #if defined(CONFIG_SOC_EXYNOS5800)
- # define soc_is_exynos5800()	is_samsung_exynos5800()
- #else
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 8c4f5e342dc1..460ae13b3145 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -63,15 +63,6 @@ void __init exynos_sysram_init(void)
- 	}
- }
- 
--static void __init exynos_init_late(void)
--{
--	if (of_machine_is_compatible("samsung,exynos5440"))
--		/* to be supported later */
--		return;
--
--	exynos_pm_init();
--}
--
- static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
- 					int depth, void *data)
- {
-@@ -79,8 +70,7 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
- 	const __be32 *reg;
- 	int len;
- 
--	if (!of_flat_dt_is_compatible(node, "samsung,exynos4210-chipid") &&
--		!of_flat_dt_is_compatible(node, "samsung,exynos5440-clock"))
-+	if (!of_flat_dt_is_compatible(node, "samsung,exynos4210-chipid"))
- 		return 0;
- 
- 	reg = of_get_flat_dt_prop(node, "reg", &len);
-@@ -209,7 +199,6 @@ static char const *const exynos_dt_compat[] __initconst = {
- 	"samsung,exynos5250",
- 	"samsung,exynos5260",
- 	"samsung,exynos5420",
--	"samsung,exynos5440",
- 	NULL
- };
- 
-@@ -232,7 +221,7 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
- 	.init_early	= exynos_firmware_init,
- 	.init_irq	= exynos_init_irq,
- 	.init_machine	= exynos_dt_machine_init,
--	.init_late	= exynos_init_late,
-+	.init_late	= exynos_pm_init,
- 	.dt_compat	= exynos_dt_compat,
- 	.dt_fixup	= exynos_dt_fixup,
- MACHINE_END
+The RPMh hardware is aware of the parent-child connections between
+regulators as well as minimum headroom to ensure stable LDO voltage output
+for subregulated LDOs.  The intention of having the headroom be a
+configurable property for processors is to support usecases in which
+subregulated LDO loads are particularly sensitive to noise and require
+additional headroom.  Such usecases are board dependent and beyond the
+baseline configurations set in RPMh hardware.
+
+
+>>> Ideally future versions of the RPM will have improved interfaces,
+>>> there's a bunch of problems like this :(
+> 
+>> Do you have a preference for qcom,regulator-initial-microvolt vs a generic
+>> framework supported regulator-initial-microvolt property for configuring a
+>> specific voltage at registration time?  We'll need to have support for one
+>> or the other in order for the qcom_rpmh-regulator driver to be functional.
+> 
+> This is basically specific to Qualcomm, I can't off hand think of any
+> other devices with similar issues.
+
+I will go with qcom,regulator-initial-microvolt then.
+
+
+>>> Yes, constraints that specify a single voltage are done by setting min
+>>> and max to the same value.  fixed_uV is *only* for regulators that have
+>>> a physically fixed voltage.
+> 
+>> XOB managed regulators physically cannot change voltage.  Therefore, do
+>> you agree that it is reasonable to use fixed_uV for them?  Note that I
+>> removed init_data->constraints.apply_uV manipulation in version 2 of this
+>> patch.
+> 
+> If these regulators can't change voltage then surely we know what
+> voltage they have without needing it to be specified in DT?
+
+In the case of XOB managed LDO regulators, the LDOs physically can be
+configured to different voltages by the bootloader.  However, the RPMh
+interface provides no mechanism for the application processor to read or
+change that voltage.  Therefore, we need a way to specify such voltages in
+a board specific (as opposed to driver specific) manner (i.e. device tree).
+
+Take care,
+David
+
 -- 
-2.14.1
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
