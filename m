@@ -1,82 +1,30 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 24 Apr 2018 19:04:12 +0530
-Subject: [RFC 00/13] arm64: allwinner: Add A64 DE2 pipeline support
-Message-ID: <20180424133425.24291-1-jagan@amarulasolutions.com>
+Date: Tue, 24 Apr 2018 19:04:13 +0530
+Subject: [RFC 01/13] dt-bindings: clock: Add compatible for A64 DE2 CCU
+In-Reply-To: <20180424133425.24291-1-jagan@amarulasolutions.com>
+References: <20180424133425.24291-1-jagan@amarulasolutions.com>
+Message-ID: <20180424133425.24291-2-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
+Allwinner A64 has DE2 CCU which is similar to H3/H5 SoC.
 
-A64 DE2 behaviour similar to Allwinner A83T where mixer0, connected to tcon0 with
-RGB, LVDS MIPI-DSI and mixer1, connected to tcon1 with HDMI.
-This series merely concentrated on HDMI pipeline and rest will add eventually.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ Documentation/devicetree/bindings/clock/sun8i-de2.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-patch 1: dt-bindings for a64 DE2 CCU
-
-patch 2: a64 DE2 CCU node addition
-
-patch 3: dt-bindings for a64 DE2 pipeline
-
-patch 4 - 5: dt-bindings for a64 mixer0 and tcon-lcd
-
-patch 6: a64 DE2 pipeline node addition
-
-patch 7 - 8: dt-bindings for a64 HDMI and HDMI PHY
-
-patch 9: a64 HDMI nodes addition
-
-patch 10 - 11: dt-bindings for a64 mixer1 and tcon-tv
-
-patch 12: a64 HDMI pipeline
-
-patch 13: enable HDMI out on bananpi-m64
-
-Tested HDMI on bananapi-m64 (along with DE2 SRAM C changes from [1]
-thread), able to detect the HDMI but, no penguins on screen.
-
-Request for any suggestions.
-
-Test log on Bananpi-m64:
-[    0.247631] sun4i-drm display-engine: bound 1100000.mixer (ops sun8i_mixer_ops)
-[    0.256717] sun4i-drm display-engine: bound 1200000.mixer (ops sun8i_mixer_ops)
-[    0.256783] sun4i-tcon 1c0c000.lcd-controller: Missing LVDS properties, Please upgrade your DT
-[    0.256792] sun4i-tcon 1c0c000.lcd-controller: LVDS output disabled
-[    0.257081] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
-[    0.257099] sun4i-drm display-engine: bound 1c0c000.lcd-controller (ops sun4i_tcon_ops)
-[    0.257273] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
-[    0.257288] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops sun4i_tcon_ops)
-[    0.258176] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX controller v1.32a with HDCP (sun8i_dw_hdmi_p)
-[    0.258596] sun8i-dw-hdmi 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver
-[    0.259188] sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops)
-[    0.259199] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-[    0.259205] [drm] No driver support for vblank timestamp query.
-[    0.259308] [drm] Cannot find any crtc or sizes
-[    0.259824] [drm] Initialized sun4i-drm 1.0.0 20150629 for display-engine on minor 0
-
-[1] https://lkml.org/lkml/2018/3/16/1096
-
-Jagan Teki (13):
-  dt-bindings: clock: Add compatible for A64 DE2 CCU
-  arm64: dts: allwinner: a64: Add DE2 CCU
-  bindings: display: Add compatible for A64 DE2 pipeline
-  bindings: display: Add compatible for A64 Mixer0
-  bindings: display: Add compatible for A64 tcon-lcd
-  arm64: dts: allwinner: a64: Add DE2 pipeline
-  bindings: display: Add compatible for A64 HDMI
-  bindings: display: Add compatible for A64 HDMI PHY
-  arm64: dts: allwinner: a64: Add HDMI support
-  bindings: display: Add compatible for A64 Mixer1
-  bindings: display: Add compatible for A64 tcon-tv
-  arm64: dts: allwinner: a64: Add HDMI pipeline
-  arm64: dts: allwinner: a64: bananapi-m64: Enable HDMI output
-
- .../devicetree/bindings/clock/sun8i-de2.txt        |   1 +
- .../bindings/display/sunxi/sun4i-drm.txt           |   7 +
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  26 +++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 181 +++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun4i_drv.c                  |   1 +
- include/dt-bindings/clock/sun50i-a64-ccu.h         |   2 +
- 6 files changed, 218 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+index f2fa87c4765c..7f425bc0e820 100644
+--- a/Documentation/devicetree/bindings/clock/sun8i-de2.txt
++++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+@@ -7,6 +7,7 @@ Required properties :
+ 		- "allwinner,sun8i-h3-de2-clk"
+ 		- "allwinner,sun8i-v3s-de2-clk"
+ 		- "allwinner,sun50i-h5-de2-clk"
++		- "allwinner,sun50i-a64-de2-clk"
+ 
+ - reg: Must contain the registers base address and length
+ - clocks: phandle to the clocks feeding the display engine subsystem.
 -- 
 2.14.3
