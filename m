@@ -1,169 +1,64 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Tue, 24 Apr 2018 17:38:41 +0300
-Subject: [PATCH] ARM: tegra: fix ulpi regression on tegra20
-In-Reply-To: <1524521136.4493.70.camel@toradex.com>
-References: <20180219151252.29289-1-marcel@ziswiler.com>
- <6600596.BijQW1iq1K@ax5200p> <4f2ac009-8618-4b4d-e137-a5fd4907a56f@gmail.com>
- <1524521136.4493.70.camel@toradex.com>
-Message-ID: <c0cb2620-91b5-8043-bb74-306dca0331eb@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 24 Apr 2018 09:39:07 -0500
+Subject: [PATCH v1 2/4] dt-bindings: clock: mediatek: add g3dsys bindings
+In-Reply-To: <4b5d243d33433f83874359794b796d4228574714.1524044917.git.sean.wang@mediatek.com>
+References: <cover.1524044917.git.sean.wang@mediatek.com>
+ <4b5d243d33433f83874359794b796d4228574714.1524044917.git.sean.wang@mediatek.com>
+Message-ID: <20180424143907.eewrpzdmkhhux3lb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcel,
-
-On 24.04.2018 01:05, Marcel Ziswiler wrote:
-> Hi Dmitry
+On Wed, Apr 18, 2018 at 06:24:54PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> On Fri, 2018-04-20 at 13:50 +0300, Dmitry Osipenko wrote:
->> ...
->> I managed to find CDEV clocks in TRM this time.
+> Add bindings to g3dsys providing necessary clock and reset control to
+> Mali-450.
 > 
-> And where exactly in which TRM? In all my attempts at finding anything
-> CDEV2 is just a pad group which includes the DAP_MCLK2 pad in question. 
-
-That's the DEV2 clock you're talking about below.
-
->> Seems assigning CDEV2 clock to
->> "ulpi-link" was correct
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  .../bindings/arm/mediatek/mediatek,g3dsys.txt      | 30 ++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,g3dsys.txt
 > 
-> Sorry, but I do really not see how you can get to any such conclusion.
+> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,g3dsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,g3dsys.txt
+> new file mode 100644
+> index 0000000..ff2d70c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,g3dsys.txt
+> @@ -0,0 +1,30 @@
+> +MediaTek g3dsys controller
+> +============================
+> +
+> +The MediaTek g3dsys controller provides various clocks and reset controller to
+> +the GPU.
+> +
+> +Required Properties:
+> +
+> +- compatible: Should be:
+> +	- "mediatek,mt2701-g3dsys", "syscon":
+> +		for MT2701 SoC
+> +	- "mediatek,mt7623-ethsys", "mediatek,mt2701-g3dsys", "syscon":
+> +		for MT7623 SoC
+
+ethsys?
+
+> +- #clock-cells: Must be 1
+> +- #reset-cells: Must be 1
+> +
+> +The ethsys controller uses the common clk binding from
+> +Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+> +
+> +Example:
+> +
+> +g3dsys: clock-controller at 13000000 {
+> +	compatible = "mediatek,mt7623-g3dsys",
+> +		     "mediatek,mt2701-g3dsys",
+> +		     "syscon";
+> +	reg = <0 0x13000000 0 0x200>;
+> +	#clock-cells = <1>;
+> +	#reset-cells = <1>;
+> +};
+> -- 
+> 2.7.4
 > 
-> Whatever that CDEV2 clock exactly is. Its offset 93 points towards the
-> CLK_RST_CONTROLLER_CLK_OUT_ENB_U_0 register which has CLK_ENB_DEV2_OUT
-> at bit position 29 reading "Enable clock to DEV2 pad". While the TRM
-> misses further documenting what exactly that DEV2 pad should be I guess
-> it may point towards our suspected DAP_MCLK2. So for some reason
-> besides PLL_P_OUT4 which is what that pad is actually muxed to also
-> some additional DEV2 pad clock needs enabling. In addition there would
-> be a CLK_RST_CONTROLLER_MISC_CLK_ENB_0 register where one could also
-> specify a DEV2_OSC_DIV_SEL but I would assume that one only applies if
-> the pad in question being muxed to OSC which is not the case at least
-> in all device trees I have looked at.
-> 
->> and both CDEV2 and PLL_P_OUT4 should be enabled,
-> 
-> Agreed, basically the DAP_MCLK2 pad seems gated by an additional enable
-> called CLK_ENB_DEV2_OUT.
-> 
->> CDEV2
->> should gate the PLL_P_OUT4 that feeds USB HW and PLL_P_OUT4 should be
->> always-enabled because it is enabled by init_table, but apparently it
->> is getting
->> disabled erroneously.
-> 
-> At least that was the case back when I had trouble getting ULPI to work
-> on T20. Strangely latest -next right now does no longer seem to suffer
-> from that same issue even if my patch is reverted but as mentioned
-> before nobody stops the required PLL_P_OUT4 which is what is actually
-> driving DAP_MCLK2 to not be changed behind the scenes breaking the
-> whole thing again.
-> 
->> Marcel, could you please revert your patch, add
->> "trace_event=clk_enable,clk_disable,clk_set_parent tp_printk" to
->> kernels cmdline
->> and post the log?
-> 
-> Yes, the only difference in those traces is whether or not that non-
-> existent CDEV2 clock is enabled or not:
-> 
-> [    1.897521] clk_enable: cdev2_fixed
-> [    1.901008] clk_enable: cdev2
-> 
-> I also do have an explanation why it kept working in my case. Probably
-> the boot ROM or U-Boot is already setting that bit.
-> 
->> It looks like there is some clk framework bug,
-> 
-> My conclusion is that there should be a DAP_MCLK2 clock which is gated
-> by that CLK_ENB_DEV2_OUT but really outputs a T20 internal clock
-> according to its pin muxing which if set to OSC may be further divided
-> down by DEV2_OSC_DIV_SEL.
-
-Could be that DEV2_OSC_DIV_SEL is only relevant when DAP_MCLK2 is mux'ed to OSC.
-Maybe Peter could clarify everything.
-
->> but just in case please also try
->> to apply this patch:
->>
->> diff --git a/drivers/clk/tegra/clk-tegra-periph.c
->> b/drivers/clk/tegra/clk-tegra-periph.c
->> index 2acba2986bc6..407bd0c0ac2f 100644
->> --- a/drivers/clk/tegra/clk-tegra-periph.c
->> +++ b/drivers/clk/tegra/clk-tegra-periph.c
->> @@ -1024,7 +1024,7 @@ static void __init init_pllp(void __iomem
->> *clk_base, void
->> __iomem *pmc_base,
->>                 if (dt_clk) {
->>                         clk =
->> tegra_clk_register_pll_out("pll_p_out4",
->>                                         "pll_p_out4_div", clk_base +
->> PLLP_OUTB,
->> -                                       17, 16, CLK_IGNORE_UNUSED |
->> +                                       17, 16, CLK_IS_CRITICAL |
->>                                         CLK_SET_RATE_PARENT, 0,
->>                                         &PLLP_OUTB_lock);
->>                         *dt_clk = clk;
-> 
-> I did not have to do any such but maybe that would at least prevent any
-> further issues on PLL_P_OUT4. However I still believe this is kind of
-> wrong as PLL_P_OUT4 is what drives DAP_MCLK2 in its current muxing
-> which is connected to the ULPI transceivers REFCLK pin.
-> 
-> BTW: That pin is usually to be driven at 24 MHz and not 26 MHz which
-> CDEV2 claims to be at.
-
-Pin is driven by the PLL_P_OUT4, which is set to 24 MHz via the init_table. The
-clock tree is invalid in that regards because Tegra's clock driver defines
-non-existent "cdev2_fixed" 26 MHz clock source and sets it as a parent for the
-"cdev2" clock, while "cdev2" should be a gate (and maybe divider?) for the real
-parent clock (PLL_P_OUT4 in our case).
-
-> What do you think?
-
-It looks to me that a clock signal coming from the mux'ed CDEV2 pin is routed to
-the DEV2 of CLK controller (which can gate it) and then it goes out to DAP_MCLK2.
-
-PLL_P_OUT4 ---> PINMUX_CDEV2 ---> CLK_DEV2 ---> DAP_MCLK2
-
-But it also could be that CLK_ENB_DEV2_OUT is indeed some internal
-pinmux-related clock-gate. I think Peter should have a clue.
-
-Anyway the implementation details do not really matter for us, what matters is
-that PLL_P_OUT4 clk and DEV2 clk-gate must be enabled.
-
-Seems indeed ideally would be to have DAP_MCLK2 for the USB controller's
-"ulpi-link" clock and then DEV2 will be enable bit for the DAP_MCLK2. But also
-information about parent clock of the DAP_MCLK2 needs to be conducted to the clk
-driver via DT, that probably would require backward-incompatible change of the
-binding which is undesirable.
-
-One tolerable solution could be to remove fake "cdev2_fixed" clock in the driver
-and hardcode PLL_P_OUT4 for the parent of "cdev2". (Note that cdev1 also has a
-fake parent)
-
-index 0ee56dd04cec..4708653dedeb 100644
---- a/drivers/clk/tegra/clk-tegra20.c
-+++ b/drivers/clk/tegra/clk-tegra20.c
-@@ -838,8 +838,7 @@ static void __init tegra20_periph_clk_init(void)
-        clks[TEGRA20_CLK_CDEV1] = clk;
-
-        /* cdev2 */
--       clk = clk_register_fixed_rate(NULL, "cdev2_fixed", NULL, 0, 26000000);
--       clk = tegra_clk_register_periph_gate("cdev2", "cdev2_fixed", 0,
-+       clk = tegra_clk_register_periph_gate("cdev2", "pll_p_out4", 0,
-                                    clk_base, 0, 93, periph_clk_enb_refcnt);
-        clks[TEGRA20_CLK_CDEV2] = clk;
-
-
-Now the real problem is that PLL_P_OUT4 was getting disabled. We had CDEV2 clock
-in the DT for "ulpi-link" and PLL_P_OUT4 was permanently enabled (supposedly) by
-the Tegra's clock driver using init_table. Apparently PLL_P_OUT4 was disabled on
-SCLK re-parenting, as you mentioned in the commit description. This should be
-considered as a bug because one of two purposes (permanently enable and setup
-default clock rate) of the init_table is defeated.
-
-Could you please try to bisect to the point when erroneous PLL_P_OUT4 disable
-issue is fixed->broken? It is quite important to know what commit changed the
-behaviour. If it was some common clk issue that got fixed - that should be a
-good case for us, if it was some unrelated change that obscured the issue -
-that's not good and we should go back and fix the real bug.
