@@ -1,38 +1,38 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Apr 2018 19:34:23 +0800
-Subject: [PATCH 6/7] arm64: dts: allwinner: Sort dtb entries in Makefile
-In-Reply-To: <20180424113424.13196-1-wens@csie.org>
-References: <20180424113424.13196-1-wens@csie.org>
-Message-ID: <20180424113424.13196-7-wens@csie.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 24 Apr 2018 13:47:12 +0200
+Subject: [PATCH v2 0/2] arm64: allwinner: Add support for Libre Computer Board
+ ALL-H3-CC H5 ver.
+Message-ID: <1524570434-17814-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dtb entries for NanoPi boards in the device tree makefile somehow
-ended up after the Orange Pi boards.
+The Libre Computer Board ALL-H3-CC from Libre Technology is a Raspberry
+Pi B+ form factor single board computer based on the Allwinner H2+, H3,
+or H5 SoCs with the same PCB.
+The board has 1GB DDR3 SDRAM, provided by 4 2Gb chips. The mounting holes
+and connectors are in the exact same position as on the Raspberry Pi B+.
 
-Move them so the list is properly sorted.
+This patchset enables the H5 variant by moving the H3 board definition to
+a common dtsi then include this common dtsi in the H5 dts variant then
+declares the correct compatible and model of the H5 variant.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm64/boot/dts/allwinner/Makefile | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changes since v1:
+- Rebase on sunxi-for-next
+- Fix commit log and subject
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 8bebe7da5ed9..6ec126e86183 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -6,10 +6,10 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
--dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
--dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-pine-h64.dtb
+Neil Armstrong (2):
+  arm: dts: sun8i: h3: libretech-all-h3-cc: Move board definition to
+    common dtsi
+  arm64: dts: allwinner: Add dts file for Libre Computer Board ALL-H3-CC
+    H5 ver.
+
+ arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 213 +-------------------
+ arch/arm/boot/dts/sunxi-libretech-all-h3-cc.dtsi   | 215 +++++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../allwinner/sun50i-h5-libretech-all-h3-cc.dts    |  14 ++
+ 4 files changed, 232 insertions(+), 211 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sunxi-libretech-all-h3-cc.dtsi
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts
+
 -- 
-2.17.0
+2.7.4
