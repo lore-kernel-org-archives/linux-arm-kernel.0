@@ -1,285 +1,96 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 24 Apr 2018 19:30:48 +0200
-Subject: [PATCH 08/11] of: platform: provide of_early_platform_populate()
+Date: Tue, 24 Apr 2018 19:30:45 +0200
+Subject: [PATCH 05/11] platform: use a dedicated list_head for early devices
 In-Reply-To: <20180424173051.15099-1-brgl@bgdev.pl>
 References: <20180424173051.15099-1-brgl@bgdev.pl>
-Message-ID: <20180424173051.15099-9-brgl@bgdev.pl>
+Message-ID: <20180424173051.15099-6-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Implement a variant of of_platform_populate() which scans child nodes
-of the root device node for the "earlydev" compatible fallback and
-registers the corresponding platform devices as early platform devices.
+The current implementation of early platform device support uses the
+devres list head in struct device. This causes problems when adding
+support for device tree based early devices. Use a dedicated list_head
+which is included in struct device conditionally in order to avoid
+adding bloat for all architectures.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/of/device.c         | 14 +++++-
- drivers/of/platform.c       | 89 +++++++++++++++++++++++++++++++------
- include/linux/of_device.h   |  5 +++
- include/linux/of_platform.h | 17 +++++++
- 4 files changed, 110 insertions(+), 15 deletions(-)
+ drivers/base/platform.c | 23 +++++++++++------------
+ include/linux/device.h  |  4 ++++
+ 2 files changed, 15 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 064c818105bd..cef13538d539 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -53,7 +53,7 @@ void of_dev_put(struct platform_device *dev)
- }
- EXPORT_SYMBOL(of_dev_put);
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index af440d703f0b..90526acdcb84 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -1264,12 +1264,10 @@ void __init early_platform_add_devices(struct platform_device **devs, int num)
+ 	for (i = 0; i < num; i++) {
+ 		dev = &devs[i]->dev;
  
--int of_device_add(struct platform_device *ofdev)
-+static void of_device_add_prepare(struct platform_device *ofdev)
- {
- 	BUG_ON(ofdev->dev.of_node == NULL);
- 
-@@ -68,10 +68,22 @@ int of_device_add(struct platform_device *ofdev)
- 	 * device is on the same node as the parent.
- 	 */
- 	set_dev_node(&ofdev->dev, of_node_to_nid(ofdev->dev.of_node));
-+}
- 
-+int of_device_add(struct platform_device *ofdev)
-+{
-+	of_device_add_prepare(ofdev);
- 	return device_add(&ofdev->dev);
- }
- 
-+#ifdef CONFIG_EARLY_PLATFORM_DEVICES
-+void of_device_add_early(struct platform_device *ofdev)
-+{
-+	of_device_add_prepare(ofdev);
-+	early_platform_add_device(ofdev);
-+}
-+#endif /* CONFIG_EARLY_PLATFORM_DEVICES */
-+
- /**
-  * of_dma_configure - Setup DMA configuration
-  * @dev:	Device to apply DMA configuration
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 60342209fbd8..4b55e568fe77 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -160,6 +160,7 @@ EXPORT_SYMBOL(of_device_alloc);
-  * @bus_id: name to assign device
-  * @platform_data: pointer to populate platform_data pointer with
-  * @parent: Linux device model parent device.
-+ * @early: create as an early platform device
-  *
-  * Returns pointer to created platform device, or NULL if a device was not
-  * registered.  Unavailable devices will not get registered.
-@@ -168,9 +169,11 @@ static struct platform_device *of_platform_device_create_pdata(
- 					struct device_node *np,
- 					const char *bus_id,
- 					void *platform_data,
--					struct device *parent)
-+					struct device *parent,
-+					bool early)
- {
- 	struct platform_device *pdev;
-+	int rc;
- 
- 	if (!of_device_is_available(np) ||
- 	    of_node_test_and_set_flag(np, OF_POPULATED))
-@@ -184,9 +187,14 @@ static struct platform_device *of_platform_device_create_pdata(
- 	pdev->dev.platform_data = platform_data;
- 	of_msi_configure(&pdev->dev, pdev->dev.of_node);
- 
--	if (of_device_add(pdev) != 0) {
--		platform_device_put(pdev);
--		goto err_clear_flag;
-+	if (unlikely(early)) {
-+		of_device_add_early(pdev);
-+	} else {
-+		rc = of_device_add(pdev);
-+		if (rc) {
-+			platform_device_put(pdev);
-+			goto err_clear_flag;
-+		}
+-		if (!dev->devres_head.next) {
+-			pm_runtime_early_init(dev);
+-			INIT_LIST_HEAD(&dev->devres_head);
+-			list_add_tail(&dev->devres_head,
+-				      &early_platform_device_list);
+-		}
++		pm_runtime_early_init(dev);
++		INIT_LIST_HEAD(&dev->early_dev_head);
++		list_add_tail(&dev->early_dev_head,
++			      &early_platform_device_list);
  	}
- 
- 	return pdev;
-@@ -209,7 +217,7 @@ struct platform_device *of_platform_device_create(struct device_node *np,
- 					    const char *bus_id,
- 					    struct device *parent)
- {
--	return of_platform_device_create_pdata(np, bus_id, NULL, parent);
-+	return of_platform_device_create_pdata(np, bus_id, NULL, parent, false);
  }
- EXPORT_SYMBOL(of_platform_device_create);
  
-@@ -333,6 +341,7 @@ static const struct of_dev_auxdata *of_dev_lookup(const struct of_dev_auxdata *l
-  * @lookup: auxdata table for matching id and platform_data with device nodes
-  * @parent: parent for new device, or NULL for top level.
-  * @strict: require compatible property
-+ * @early: register sub-devices as early platform devices
-  *
-  * Creates a platform_device for the provided device_node, and optionally
-  * recursively create devices for all the child nodes.
-@@ -340,7 +349,8 @@ static const struct of_dev_auxdata *of_dev_lookup(const struct of_dev_auxdata *l
- static int of_platform_bus_create(struct device_node *bus,
- 				  const struct of_device_id *matches,
- 				  const struct of_dev_auxdata *lookup,
--				  struct device *parent, bool strict)
-+				  struct device *parent,
-+				  bool strict, bool early)
+@@ -1310,7 +1308,7 @@ early_platform_match(struct early_platform_driver *epdrv, int id)
  {
- 	const struct of_dev_auxdata *auxdata;
- 	struct device_node *child;
-@@ -377,13 +387,15 @@ static int of_platform_bus_create(struct device_node *bus,
- 		return 0;
+ 	struct platform_device *pd;
+ 
+-	list_for_each_entry(pd, &early_platform_device_list, dev.devres_head)
++	list_for_each_entry(pd, &early_platform_device_list, dev.early_dev_head)
+ 		if (platform_match(&pd->dev, &epdrv->pdrv->driver))
+ 			if (pd->id == id)
+ 				return pd;
+@@ -1328,7 +1326,7 @@ static int __init early_platform_left(struct early_platform_driver *epdrv,
+ {
+ 	struct platform_device *pd;
+ 
+-	list_for_each_entry(pd, &early_platform_device_list, dev.devres_head)
++	list_for_each_entry(pd, &early_platform_device_list, dev.early_dev_head)
+ 		if (platform_match(&pd->dev, &epdrv->pdrv->driver))
+ 			if (pd->id >= id)
+ 				return 1;
+@@ -1465,11 +1463,12 @@ void __init early_platform_cleanup(void)
+ {
+ 	struct platform_device *pd, *pd2;
+ 
+-	/* clean up the devres list used to chain devices */
++	/* clean up the list used to chain devices */
+ 	list_for_each_entry_safe(pd, pd2, &early_platform_device_list,
+-				 dev.devres_head) {
+-		list_del(&pd->dev.devres_head);
+-		memset(&pd->dev.devres_head, 0, sizeof(pd->dev.devres_head));
++				 dev.early_dev_head) {
++		list_del(&pd->dev.early_dev_head);
++		memset(&pd->dev.early_dev_head, 0,
++		       sizeof(pd->dev.early_dev_head));
  	}
- 
--	pdev = of_platform_device_create_pdata(bus, bus_id, platform_data, parent);
-+	pdev = of_platform_device_create_pdata(bus, bus_id,
-+					       platform_data, parent, early);
- 	if (!pdev || !of_match_node(matches, bus))
- 		return 0;
- 
- 	for_each_child_of_node(bus, child) {
- 		pr_debug("   create child: %pOF\n", child);
--		rc = of_platform_bus_create(child, matches, lookup, &pdev->dev, strict);
-+		rc = of_platform_bus_create(child, matches, lookup,
-+					    &pdev->dev, strict, early);
- 		if (rc) {
- 			of_node_put(child);
- 			break;
-@@ -418,11 +430,13 @@ int of_platform_bus_probe(struct device_node *root,
- 
- 	/* Do a self check of bus type, if there's a match, create children */
- 	if (of_match_node(matches, root)) {
--		rc = of_platform_bus_create(root, matches, NULL, parent, false);
-+		rc = of_platform_bus_create(root, matches, NULL,
-+					    parent, false, false);
- 	} else for_each_child_of_node(root, child) {
- 		if (!of_match_node(matches, child))
- 			continue;
--		rc = of_platform_bus_create(child, matches, NULL, parent, false);
-+		rc = of_platform_bus_create(child, matches, NULL,
-+					    parent, false, false);
- 		if (rc) {
- 			of_node_put(child);
- 			break;
-@@ -454,9 +468,9 @@ EXPORT_SYMBOL(of_platform_bus_probe);
-  * Returns 0 on success, < 0 on failure.
-  */
- int of_platform_populate(struct device_node *root,
--			const struct of_device_id *matches,
--			const struct of_dev_auxdata *lookup,
--			struct device *parent)
-+			 const struct of_device_id *matches,
-+			 const struct of_dev_auxdata *lookup,
-+			 struct device *parent)
- {
- 	struct device_node *child;
- 	int rc = 0;
-@@ -469,7 +483,8 @@ int of_platform_populate(struct device_node *root,
- 	pr_debug(" starting at: %pOF\n", root);
- 
- 	for_each_child_of_node(root, child) {
--		rc = of_platform_bus_create(child, matches, lookup, parent, true);
-+		rc = of_platform_bus_create(child, matches, lookup,
-+					    parent, false, false);
- 		if (rc) {
- 			of_node_put(child);
- 			break;
-@@ -482,6 +497,52 @@ int of_platform_populate(struct device_node *root,
  }
- EXPORT_SYMBOL_GPL(of_platform_populate);
  
-+/**
-+ * of_early_platform_populate() - Populate platform_devices from device tree
-+ *                                data early in the boot process
-+ * @root: parent of the first level to probe or NULL for the root of the tree
-+ * @matches: match table, NULL to use the default
-+ * @lookup: auxdata table for matching id and platform_data with device nodes
-+ * @parent: parent to hook devices from, NULL for toplevel
-+ *
-+ * Virtually the same as of_platform_populate() except that it adds devices
-+ * as early platform devices.
-+ *
-+ * Returns 0 on success, < 0 on failure.
-+ */
-+#ifdef CONFIG_EARLY_PLATFORM_DEVICES
-+int of_early_platform_populate(struct device_node *root,
-+			       const struct of_device_id *matches,
-+			       const struct of_dev_auxdata *lookup,
-+			       struct device *parent)
-+{
-+	struct device_node *child;
-+	int rc = 0;
-+
-+	root = root ? of_node_get(root) : of_find_node_by_path("/");
-+	if (!root)
-+		return -EINVAL;
-+
-+	pr_debug("%s()\n", __func__);
-+	pr_debug(" starting at: %pOF\n", root);
-+
-+	for_each_compatible_child_node(child, NULL,
-+				       EARLY_PLATFORM_DEFAULT_CLASS, root) {
-+		rc = of_platform_bus_create(child, matches, lookup,
-+					    parent, false, true);
-+		if (rc) {
-+			of_node_put(child);
-+			break;
-+		}
-+	}
-+	of_node_set_flag(root, OF_POPULATED_BUS);
-+
-+	of_node_put(root);
-+	return rc;
-+}
-+EXPORT_SYMBOL_GPL(of_early_platform_populate);
-+#endif /* CONFIG_EARLY_PLATFORM_DEVICES */
-+
- int of_platform_default_populate(struct device_node *root,
- 				 const struct of_dev_auxdata *lookup,
- 				 struct device *parent)
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index 8da5a1b31ece..8a59a054a434 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -30,6 +30,11 @@ extern struct platform_device *of_dev_get(struct platform_device *dev);
- extern void of_dev_put(struct platform_device *dev);
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 0059b99e1f25..4fadba0f9a35 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -979,6 +979,10 @@ struct device {
+ 	spinlock_t		devres_lock;
+ 	struct list_head	devres_head;
  
- extern int of_device_add(struct platform_device *pdev);
 +#ifdef CONFIG_EARLY_PLATFORM_DEVICES
-+extern void of_device_add_early(struct platform_device *pdev);
-+#else /* CONFIG_EARLY_PLATFORM_DEVICES */
-+static inline void of_device_add_early(struct platform_device *pdev) {}
-+#endif /* CONFIG_EARLY_PLATFORM_DEVICES */
- extern int of_device_register(struct platform_device *ofdev);
- extern void of_device_unregister(struct platform_device *ofdev);
- 
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index 84a966623e78..2bf1013a3e89 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -75,6 +75,23 @@ extern int of_platform_populate(struct device_node *root,
- 				const struct of_device_id *matches,
- 				const struct of_dev_auxdata *lookup,
- 				struct device *parent);
++	struct list_head	early_dev_head;
++#endif
 +
-+#ifdef CONFIG_EARLY_PLATFORM_DEVICES
-+extern int of_early_platform_populate(struct device_node *root,
-+				      const struct of_device_id *matches,
-+				      const struct of_dev_auxdata *lookup,
-+				      struct device *parent);
-+#else /* CONFIG_EARLY_PLATFORM_DEVICES */
-+static inline int
-+of_early_platform_populate(struct device_node *root,
-+			   const struct of_device_id *matches,
-+			   const struct of_dev_auxdata *lookup,
-+			   struct device *parent)
-+{
-+	return -ENOSYS;
-+}
-+#endif /* CONFIG_EARLY_PLATFORM_DEVICES */
-+
- extern int of_platform_default_populate(struct device_node *root,
- 					const struct of_dev_auxdata *lookup,
- 					struct device *parent);
+ 	struct klist_node	knode_class;
+ 	struct class		*class;
+ 	const struct attribute_group **groups;	/* optional groups */
 -- 
 2.17.0
