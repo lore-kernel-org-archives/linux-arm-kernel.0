@@ -1,36 +1,32 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 24 Apr 2018 09:56:45 +0200
-Subject: [PATCH 11/12] swiotlb: move the SWIOTLB config symbol to
- lib/Kconfig
-In-Reply-To: <20180424074726.GI16141@n2100.armlinux.org.uk>
-References: <20180423170419.20330-1-hch@lst.de>
- <20180423170419.20330-12-hch@lst.de>
- <20180423235205.GH16141@n2100.armlinux.org.uk>
- <20180424065549.GA18468@lst.de>
- <20180424074726.GI16141@n2100.armlinux.org.uk>
-Message-ID: <20180424075645.GA19379@lst.de>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Tue, 24 Apr 2018 09:58:43 +0200
+Subject: [PATCH] clk: stm32mp1: Add CLK_IGNORE_UNUSED to ck_sys_dbg clock
+Message-ID: <1524556723-26926-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 08:47:27AM +0100, Russell King - ARM Linux wrote:
-> Therefore, the default state for SWIOTLB and hence NEED_SG_DMA_LENGTH
-> becomes 'y' on ARM, and any defconfig file that does not mention SWIOTLB
-> explicitly ends up with both these enabled.
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Indeed, sorry.
+Don't disable the dbg clock if was set by bootloader.
 
-> It does look a bit weird though - patch 10 arranged stuff so that we
-> didn't end up with SWIOTLB always enabled, but this patch reintroduces
-> that with the allowance that the user can disable if so desired.
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+---
+ drivers/clk/clk-stm32mp1.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-I am not very happy with that patch, but I have a hard time coming
-up with something saner.
-
-Bascially x86_64 and mips/loongson default to SWIOTLB=y but allow to
-deselect it, powerpc has it optional without any real dependency
-and defaults to n and everyone just selects it otherwise.
-
-I suspect the right thing is to just have it always one for x86_64
-and loongson and have a ppc-specific option to enable it on powerpc
-so that we can always use select statements.  I'll do that for the
-next round.
+diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
+index edd3cf4..35dabf1 100644
+--- a/drivers/clk/clk-stm32mp1.c
++++ b/drivers/clk/clk-stm32mp1.c
+@@ -1988,7 +1988,8 @@ enum {
+ 		  _DIV(RCC_MCO2CFGR, 4, 4, 0, NULL)),
+ 
+ 	/* Debug clocks */
+-	GATE(CK_DBG, "ck_sys_dbg", "ck_axi", 0, RCC_DBGCFGR, 8, 0),
++	GATE(CK_DBG, "ck_sys_dbg", "ck_axi", CLK_IGNORE_UNUSED,
++	     RCC_DBGCFGR, 8, 0),
+ 
+ 	COMPOSITE(CK_TRACE, "ck_trace", ck_trace_src, CLK_OPS_PARENT_ENABLE,
+ 		  _GATE(RCC_DBGCFGR, 9, 0),
+-- 
+1.9.1
