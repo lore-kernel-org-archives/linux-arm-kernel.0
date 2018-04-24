@@ -1,44 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 24 Apr 2018 09:16:17 +0200
-Subject: [PATCH] dt-bindings: arm: consistently name r8a77965 as M3-N
-In-Reply-To: <20180424055442.19710-1-horms+renesas@verge.net.au>
-References: <20180424055442.19710-1-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWZoXSJnuEiD4e9SpP+ASFgDCcwy16UFOeSEq5sNnsMSA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 24 Apr 2018 09:16:18 +0200
+Subject: [PATCH] staging: bcm2835-audio: Disconnect and free
+ vchi_instance on module_exit()
+In-Reply-To: <7e2dbb73-f93d-7b87-2fa0-d8b40f4a11a5@gmail.com>
+References: <20180417050028.19372-1-k.marinushkin@gmail.com>
+ <20180423135024.GA2337@kroah.com>
+ <7e2dbb73-f93d-7b87-2fa0-d8b40f4a11a5@gmail.com>
+Message-ID: <20180424071618.GB17825@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Tue, Apr 24, 2018 at 02:35:50AM +0200, Kirill Marinushkin wrote:
+> On 04/23/18 15:50, Greg Kroah-Hartman wrote:
+> > On Tue, Apr 17, 2018 at 07:00:28AM +0200, Kirill Marinushkin wrote:
+> >> In the current implementation, vchi_instance is inited during the first
+> >> call of bcm2835_audio_open_connection(), and is never freed. It causes a
+> >> memory leak when the module `snd_bcm2835` is removed.
+> >>
+> >> Here is how this commit fixes it:
+> >>
+> >> * the VCHI context (including vchi_instance) is created once in the
+> >>   platform's devres
+> >> * the VCHI context is allocated and connected once during module_init()
+> >> * all created bcm2835_chips have a pointer to this VCHI context
+> >> * bcm2835_audio_open_connection() can access the VCHI context through the
+> >>   associated bcm2835_chip
+> >> * the VCHI context is disconnected and freed once during module_exit()
+> >>
+> >> After this commit is applied, I don't see other issues with the module's
+> >> init/exit, so I also remove the associated TODO task.
+> >>
+> >> Steps to reproduce the memory leak before this commit:
+> > <snip>
+> >
+> > Patch dropped due to kbuild complaints.
+> >
+> > Please fix up and resend.
+> >
+> > thanks,
+> >
+> > greg k-h
+> 
+> Hello Greg,
+> 
+> Due to which complains of kbuild is the patch dropped?
+> I would like to fix the complains, but I don't see any errors or warnings on my
+> side.
+> Are you sure that the kbuild test robot did it's job correctly? The log says:
+> 
+> >> it may well be a FALSE warning
+> 
+> Please show me what is wrong in my patch.
 
-On Tue, Apr 24, 2018 at 7:54 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> There is an inconsistency between the use of M3N and M3-N.
-> This patch resolves this by consistently using the latter.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+I have no idea as the patch is long gone from my queue now.  If you
+think all is fine, please resend it and I will be glad to review it
+again.
 
-Note that this is for a custom Salvator-X board where the M3-W SiP was
-replaced by an M3-N SiP.  So I have no idea what's on the sticker, if it was
-replaced at all, and thus kept the text from the BSP.
+thanks,
 
-> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
-> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-> @@ -116,7 +116,7 @@ Boards:
->      compatible = "renesas,salvator-x", "renesas,r8a7795"
->    - Salvator-X (RTP0RC7796SIPB0011S)
->      compatible = "renesas,salvator-x", "renesas,r8a7796"
-> -  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
-> +  - Salvator-X (RTP0RC7796SIPB0011S (M3-N))
->      compatible = "renesas,salvator-x", "renesas,r8a77965"
->    - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
->      compatible = "renesas,salvator-xs", "renesas,r8a7795"
-\
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+greg k-h
