@@ -1,124 +1,114 @@
-From: ebiggers@google.com (Eric Biggers)
-Date: Tue, 24 Apr 2018 15:47:34 -0700
-Subject: [PATCH v2 0/5] crypto: Speck support
-In-Reply-To: <CAHmME9qG+nPmj5c7hU4+STUsmWmwSBsKe-0mOLEXH+hJ1z4z=g@mail.gmail.com>
-References: <20180212235209.117393-1-ebiggers@google.com>
- <CAHmME9oA4j=iGrrBYME92JfUsyi5r42PnAvzWiuXzGCRXMnXtA@mail.gmail.com>
- <20180424181623.GA174675@google.com>
- <CAHmME9qG+nPmj5c7hU4+STUsmWmwSBsKe-0mOLEXH+hJ1z4z=g@mail.gmail.com>
-Message-ID: <20180424224734.GA109345@google.com>
+From: marcheu@chromium.org (=?UTF-8?Q?St=C3=A9phane_Marchesin?=)
+Date: Tue, 24 Apr 2018 16:02:26 -0700
+Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
+ kevin panel
+In-Reply-To: <CAAEAJfAQMzUfM86o-xNoyBQzTiEMNH+W=9FyFpBy99nA3HrVgw@mail.gmail.com>
+References: <20180208174855.55620-1-seanpaul@chromium.org>
+ <20180208174855.55620-7-seanpaul@chromium.org>
+ <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
+ <CAAEAJfAQMzUfM86o-xNoyBQzTiEMNH+W=9FyFpBy99nA3HrVgw@mail.gmail.com>
+Message-ID: <CADMs+9a+dwKeKUDHYeiUON6q1UOnt84HoJ4bpjT=6aYm7OZG9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Tue, Apr 24, 2018 at 10:58:35PM +0200, Jason A. Donenfeld wrote:
-> Hi Eric,
-> 
-> On Tue, Apr 24, 2018 at 8:16 PM, Eric Biggers <ebiggers@google.com> wrote:
-> > So, what do you propose replacing it with?
-> 
-> Something more cryptographically justifiable.
-> 
-
-It's easy to say that, but do you have an actual suggestion?  As I mentioned,
-for disk encryption without AES instructions the main alternatives we've
-considered are ChaCha20 with reused nonces, an unpublished wide-block mode based
-on ChaCha20 and Poly1305 (with no external cryptanalysis yet, and probably
-actually using ChaCha8 or ChaCha12 to meet performance requirements), or the
-status quo of no encryption at all.
-
-It *might* be possible to add per-block metadata support to f2fs, in which it
-could be used with ChaCha20 in fscrypt.  But if feasible at all it would be
-quite difficult (requiring some significant filesystem surgery, and disabling
-conflicting filesystem features that allow data to be updated in-place) and
-would not cover dm-crypt, nor ext4.
-
-Note also that many other lightweight block ciphers are designed for hardware
-and perform poorly in software, e.g. PRESENT is even slower than AES.  Thus
-there really weren't many options.
-
-Any concrete suggestions are greatly appreciated!
-
-> > outside crypto review, vs. the many cryptanalysis papers on Speck.  (In that
-> > respect the controversy about Speck has actually become an advantage, as it has
-> > received much more cryptanalysis than other lightweight block ciphers.)
-> 
-> That's the thing that worries me, actually. Many of the design
-> decisions behind Speck haven't been justified.
-> 
-
-Originally that was true, but later there were significant clarifications
-released, e.g. the paper "Notes on the design and analysis of Simon and Speck"
-(https://eprint.iacr.org/2017/560.pdf).  In fact, from what I can see, many
-competing lightweight block ciphers don't have as much design justification
-available as Speck.  Daniel Bernstein's papers are excellent, but unfortunately
-he has only designed a stream cipher, not a block cipher or another algorithm
-that is applicable for disk encryption.
-
-> > The reason we chose Speck had nothing to do with the proposed ISO standard or
-> > any sociopolitical factors, but rather because it was the only algorithm we
-> > could find that met the performance and security requirements.
-> 
-> > Note that Linux
-> > doesn't bow down to any particular standards organization, and it offers
-> > algorithms that were specified in various places, even some with no more than a
-> > publication by the author.  In fact, support for SM4 was just added too, which
-> > is a Chinese government standard.  Are you going to send a patch to remove that
-> > too, or is it just NSA designed algorithms that are not okay?
-> 
-> No need to be belittling; I have much less tinfoil strapped around my
-> head than perhaps you think. I'm not blindly opposed to
-> government-designed algorithms. Take SHA2, for example -- built by the
-> NSA.
-> 
-> But I do care quite a bit about using ciphers that have acceptance of
-> the academic community and a large body of literature documenting its
-> design decisions and analyzing it. Some of the best symmetric
-> cryptographers in academia have expressed reservations about it, and
-> it was just rejected from a major standard's body. Linux, of course,
-> is free to disagree -- or "bow down" as you oddly put it -- but I'd
-> make sure you've got a pretty large bucket of justifications for that
-> disagreement.
-> 
-
-There have actually been many papers analyzing Speck.  As with other ciphers,
-reduced-round variants have been successfully attacked, while the full variants
-have held up.  This is expected.  It's true that some other ciphers such as
-ChaCha20 have a higher security margin, which has resulted in some criticism of
-Speck.  But the correct security margin is always debatable, and in a
-performance-oriented cipher it's desirable to not have an excessive number of
-rounds.  In fact it was even looking like ChaCha20 was not going to be fast
-enough on some CPUs, so if we went the ChaCha route we may have actually have
-had to use ChaCha12 or ChaCha8 instead.
-
-Also, some papers present results for just the weakest variants of Speck
-(Speck32 and Speck48) while omitting the strongest (Speck128, the one that's
-planned to be offered for Android), presumably because the authors weren't able
-to attack it as successfully.  I think that's causing some confusion.
-
-I don't see how the ISO standarization process means much for crypto algorithms.
-It seems very political, and actually it seems that people involved were pretty
-clear that Speck was rejected primarily for political reasons.  Interestingly,
-ChaCha20 is not an ISO standard either.  Does that mean ChaCha20 shouldn't be
-used?
-
-In any case, given that the status quo on low-end Android devices is no
-encryption, it would be great to start having them be encrypted.  It would be a
-shame if pushback for non-technical reasons prevents that from happening.
-
-> > (in fact, you'd
-> > probably have a different opinion of it if the authors had simply worked
-> > somewhere else and published the exact same algorithm);
-> 
-> Again, no need to patronize. I don't actually have a bias like that.
-> 
-> > But I hope you can understand that all *technical* indicators are that Speck is
-> > secure enough
-> 
-> That's the thing I'm worried about.
+On Tue, Apr 24, 2018 at 7:31 AM, Ezequiel Garcia
+<ezequiel@vanguardiasur.com.ar> wrote:
+> Hi Doug, Sean:
 >
+> I would like to move this forward.
+>
+> On 26 February 2018 at 15:23, Doug Anderson <dianders@chromium.org> wrote:
+>> Hi,
+>>
+>> On Thu, Feb 8, 2018 at 9:48 AM, Sean Paul <seanpaul@chromium.org> wrote:
+>>> This patch adds an override mode for kevin devices. The mode increases
+>>> both back porches to allow a pixel clock of 26666kHz as opposed to the
+>>> 'typical' value of 252750kHz. This is needed to avoid interference with
+>>> the touch digitizer on these laptops.
+>>>
+>>> Changes in v2:
+>>>  - Wrap the timing in display-timings node to match binding (Rob/Thierry)
+>>> Changes in v3:
+>>>  - Unwrap the timing from display-timings and rename panel-timing (Rob)
+>>>
+>>> Cc: Doug Anderson <dianders@chromium.org>
+>>> Cc: Eric Anholt <eric@anholt.net>
+>>> Cc: Heiko Stuebner <heiko@sntech.de>
+>>> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: St?phane Marchesin <marcheu@chromium.org>
+>>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>>> Cc: devicetree at vger.kernel.org
+>>> Cc: dri-devel at lists.freedesktop.org
+>>> Cc: linux-rockchip at lists.infradead.org
+>>> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+>>> ---
+>>>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
+>>>  1 file changed, 14 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>>> index 191a6bcb1704..658411ce37ea 100644
+>>> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>>> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>>> @@ -98,6 +98,20 @@
+>>>                 backlight = <&backlight>;
+>>>                 power-supply = <&pp3300_disp>;
+>>>
+>>> +               panel-timing {
+>>> +                       clock-frequency = <266604720>;
+>>> +                       hactive = <2400>;
+>>> +                       hfront-porch = <48>;
+>>> +                       hback-porch = <84>;
+>>> +                       hsync-len = <32>;
+>>> +                       hsync-active = <0>;
+>>> +                       vactive = <1600>;
+>>> +                       vfront-porch = <3>;
+>>> +                       vback-porch = <120>;
+>>> +                       vsync-len = <10>;
+>>> +                       vsync-active = <0>;
+>>> +               };
+>>> +
+>>>                 ports {
+>>>                         panel_in_edp: endpoint {
+>>>                                 remote-endpoint = <&edp_out_panel>;
+>>
+>> Kristian brought an old bug to my attention
+>> <https://bugs.chromium.org/p/chromium/issues/detail?id=750354> and it
+>> made me think.  Should we somehow adjust the bindings here to account
+>> for the fact that a board may source several different panels?
+>>
+>> AKA: on some boards an ODM may want to second source (or third source,
+>> or ...) the panel.  They'll randomly connect several different panels
+>> to the board and ship the boards out.  The panels are all compatible
+>> electrically (same power sequencing) but might need slightly different
+>> timings.  In this particular case there's no board-level strappings
+>> for the different panels--it's assumed that the EDID on the panels can
+>> be used to distinguish them.
+>>
+>> In that case it seems like it would be nice to allow specifying more
+>> than one "panel-timing" nodes.  Maybe keyed off some type of ID that's
+>> present in the EDID?
+>>
+>>
+>> Is that something we'd want to account for before we land this series?
+>>  It seems like it would just be adding an extra level of nodes?
+>>
+>
+> AFAICS, there is no EDID without a DDC bus, which we don't
+> seem to have on gru platforms, do we?
 
-Thanks,
+IIRC historically we've only done second sourcing when
+doable because either:
+1. the timings between all the panels we use are compatible, or
+2. we have a working DDC to figure it out for us.
 
-- Eric
+In other words, we haven't handled the case where timings are not
+compatible and we can't address this by reading EDIDs.
+
+St?phane
+
+>
+> Regards,
+> --
+> Ezequiel Garc?a, VanguardiaSur
+> www.vanguardiasur.com.ar
