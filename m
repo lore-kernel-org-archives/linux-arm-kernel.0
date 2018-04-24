@@ -1,24 +1,76 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 23 Apr 2018 18:02:33 -0700
-Subject: [PATCH V2 0/9] ARM: bcm283x: RPi 3 B+ support and other
- improvements
-In-Reply-To: <1524310122-9439-1-git-send-email-stefan.wahren@i2se.com>
-References: <1524310122-9439-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87zi1to1qu.fsf@anholt.net>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Mon, 23 Apr 2018 21:25:56 -0400
+Subject: [RESEND PATCH v6 14/27] drm/bridge: analogix_dp: Don't use
+ ANALOGIX_DP_PLL_CTL to control pll
+In-Reply-To: <20180423105003.9004-15-enric.balletbo@collabora.com>
+References: <20180423105003.9004-1-enric.balletbo@collabora.com>
+ <20180423105003.9004-15-enric.balletbo@collabora.com>
+Message-ID: <000001d3db6b$32a87200$97f95600$@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On Monday, April 23, 2018 6:50 AM, Enric Balletbo i Serra wrote:
+> 
+> From: zain wang <wzz@rock-chips.com>
+> 
+> There is no register named ANALOGIX_DP_PLL_CTL in Rockchip edp phy reg
+> list.  We should use BIT_4 in ANALOGIX_DP_PD to control the pll power
+> instead of ANALOGIX_DP_PLL_CTL.
+> 
+> Cc: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: zain wang <wzz@rock-chips.com>
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Archit Taneja <architt@codeaurora.org>
 
-> The main focus of the patch series is to provide support for the new
-> Raspberry Pi 3 B+ . The rest are parts which missed the merge window for 4.17.
+Acked-by: Jingoo Han <jingoohan1@gmail.com>
 
-I've merged this series to my -next branches, and once some kbuilds come
-back clean, I'll send PRs up.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/39c557ba/attachment.sig>
+Best regards,
+Jingoo Han
+
+> ---
+> 
+>  .../gpu/drm/bridge/analogix/analogix_dp_reg.c | 20 +++++++++++--------
+>  1 file changed, 12 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> index 7b7fd227e1f9..02ab1aaa9993 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+> @@ -230,16 +230,20 @@ enum pll_status
+> analogix_dp_get_pll_lock_status(struct analogix_dp_device *dp)
+>  void analogix_dp_set_pll_power_down(struct analogix_dp_device *dp, bool
+> enable)
+>  {
+>  	u32 reg;
+> +	u32 mask = DP_PLL_PD;
+> +	u32 pd_addr = ANALOGIX_DP_PLL_CTL;
+> 
+> -	if (enable) {
+> -		reg = readl(dp->reg_base + ANALOGIX_DP_PLL_CTL);
+> -		reg |= DP_PLL_PD;
+> -		writel(reg, dp->reg_base + ANALOGIX_DP_PLL_CTL);
+> -	} else {
+> -		reg = readl(dp->reg_base + ANALOGIX_DP_PLL_CTL);
+> -		reg &= ~DP_PLL_PD;
+> -		writel(reg, dp->reg_base + ANALOGIX_DP_PLL_CTL);
+> +	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type)) {
+> +		pd_addr = ANALOGIX_DP_PD;
+> +		mask = RK_PLL_PD;
+>  	}
+> +
+> +	reg = readl(dp->reg_base + pd_addr);
+> +	if (enable)
+> +		reg |= mask;
+> +	else
+> +		reg &= ~mask;
+> +	writel(reg, dp->reg_base + pd_addr);
+>  }
+> 
+>  void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+> --
+> 2.17.0
