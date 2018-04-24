@@ -1,114 +1,137 @@
-From: marcheu@chromium.org (=?UTF-8?Q?St=C3=A9phane_Marchesin?=)
-Date: Tue, 24 Apr 2018 16:02:26 -0700
-Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
- kevin panel
-In-Reply-To: <CAAEAJfAQMzUfM86o-xNoyBQzTiEMNH+W=9FyFpBy99nA3HrVgw@mail.gmail.com>
-References: <20180208174855.55620-1-seanpaul@chromium.org>
- <20180208174855.55620-7-seanpaul@chromium.org>
- <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
- <CAAEAJfAQMzUfM86o-xNoyBQzTiEMNH+W=9FyFpBy99nA3HrVgw@mail.gmail.com>
-Message-ID: <CADMs+9a+dwKeKUDHYeiUON6q1UOnt84HoJ4bpjT=6aYm7OZG9A@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Apr 2018 00:25:23 +0100
+Subject: [PATCH v4 7/8] drm/i2c: tda998x: register as a drm bridge
+In-Reply-To: <b7a7ffb6-b282-cbc5-435e-9ca1cd405e33@ti.com>
+References: <20180423072301.11962-1-peda@axentia.se>
+ <20180423072301.11962-8-peda@axentia.se>
+ <20180423160833.GF16141@n2100.armlinux.org.uk>
+ <5d6866d0-75bc-4de8-9b87-4fee5430e9dd@axentia.se>
+ <20180424080833.GJ16141@n2100.armlinux.org.uk>
+ <8448e90a-4562-b564-c160-1b5c67e0f92f@axentia.se>
+ <0cbee3bd-8987-5f2f-519d-f8d1b426f2a3@ti.com>
+ <20180424170625.GL16141@n2100.armlinux.org.uk>
+ <b7a7ffb6-b282-cbc5-435e-9ca1cd405e33@ti.com>
+Message-ID: <20180424232523.GN16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 7:31 AM, Ezequiel Garcia
-<ezequiel@vanguardiasur.com.ar> wrote:
-> Hi Doug, Sean:
->
-> I would like to move this forward.
->
-> On 26 February 2018 at 15:23, Doug Anderson <dianders@chromium.org> wrote:
->> Hi,
->>
->> On Thu, Feb 8, 2018 at 9:48 AM, Sean Paul <seanpaul@chromium.org> wrote:
->>> This patch adds an override mode for kevin devices. The mode increases
->>> both back porches to allow a pixel clock of 26666kHz as opposed to the
->>> 'typical' value of 252750kHz. This is needed to avoid interference with
->>> the touch digitizer on these laptops.
->>>
->>> Changes in v2:
->>>  - Wrap the timing in display-timings node to match binding (Rob/Thierry)
->>> Changes in v3:
->>>  - Unwrap the timing from display-timings and rename panel-timing (Rob)
->>>
->>> Cc: Doug Anderson <dianders@chromium.org>
->>> Cc: Eric Anholt <eric@anholt.net>
->>> Cc: Heiko Stuebner <heiko@sntech.de>
->>> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
->>> Cc: Rob Herring <robh+dt@kernel.org>
->>> Cc: St?phane Marchesin <marcheu@chromium.org>
->>> Cc: Thierry Reding <thierry.reding@gmail.com>
->>> Cc: devicetree at vger.kernel.org
->>> Cc: dri-devel at lists.freedesktop.org
->>> Cc: linux-rockchip at lists.infradead.org
->>> Signed-off-by: Sean Paul <seanpaul@chromium.org>
->>> ---
->>>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
->>>  1 file changed, 14 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
->>> index 191a6bcb1704..658411ce37ea 100644
->>> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
->>> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
->>> @@ -98,6 +98,20 @@
->>>                 backlight = <&backlight>;
->>>                 power-supply = <&pp3300_disp>;
->>>
->>> +               panel-timing {
->>> +                       clock-frequency = <266604720>;
->>> +                       hactive = <2400>;
->>> +                       hfront-porch = <48>;
->>> +                       hback-porch = <84>;
->>> +                       hsync-len = <32>;
->>> +                       hsync-active = <0>;
->>> +                       vactive = <1600>;
->>> +                       vfront-porch = <3>;
->>> +                       vback-porch = <120>;
->>> +                       vsync-len = <10>;
->>> +                       vsync-active = <0>;
->>> +               };
->>> +
->>>                 ports {
->>>                         panel_in_edp: endpoint {
->>>                                 remote-endpoint = <&edp_out_panel>;
->>
->> Kristian brought an old bug to my attention
->> <https://bugs.chromium.org/p/chromium/issues/detail?id=750354> and it
->> made me think.  Should we somehow adjust the bindings here to account
->> for the fact that a board may source several different panels?
->>
->> AKA: on some boards an ODM may want to second source (or third source,
->> or ...) the panel.  They'll randomly connect several different panels
->> to the board and ship the boards out.  The panels are all compatible
->> electrically (same power sequencing) but might need slightly different
->> timings.  In this particular case there's no board-level strappings
->> for the different panels--it's assumed that the EDID on the panels can
->> be used to distinguish them.
->>
->> In that case it seems like it would be nice to allow specifying more
->> than one "panel-timing" nodes.  Maybe keyed off some type of ID that's
->> present in the EDID?
->>
->>
->> Is that something we'd want to account for before we land this series?
->>  It seems like it would just be adding an extra level of nodes?
->>
->
-> AFAICS, there is no EDID without a DDC bus, which we don't
-> seem to have on gru platforms, do we?
+On Tue, Apr 24, 2018 at 09:25:44PM +0300, Jyri Sarha wrote:
+> On 24/04/18 20:06, Russell King - ARM Linux wrote:
+> > On Tue, Apr 24, 2018 at 07:04:16PM +0300, Jyri Sarha wrote:
+> >> On 24/04/18 13:14, Peter Rosin wrote:
+> >>> On 2018-04-24 10:08, Russell King - ARM Linux wrote:
+> >>>> On Tue, Apr 24, 2018 at 08:58:42AM +0200, Peter Rosin wrote:
+> >>>>> On 2018-04-23 18:08, Russell King - ARM Linux wrote:
+> >>>>>> On Mon, Apr 23, 2018 at 09:23:00AM +0200, Peter Rosin wrote:
+> >>>>>>>  static int tda998x_remove(struct i2c_client *client)
+> >>>>>>>  {
+> >>>>>>> -	component_del(&client->dev, &tda998x_ops);
+> >>>>>>> +	struct device *dev = &client->dev;
+> >>>>>>> +	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
+> >>>>>>> +
+> >>>>>>> +	drm_bridge_remove(&bridge->bridge);
+> >>>>>>> +	component_del(dev, &tda998x_ops);
+> >>>>>>> +
+> >>>>>>
+> >>>>>> I'd like to ask a rather fundamental question about DRM bridge support,
+> >>>>>> because I suspect that there's a major fsckup here.
+> >>>>>>
+> >>>>>> The above is the function that deals with the TDA998x device being
+> >>>>>> unbound from the driver.  With the component API, this results in the
+> >>>>>> DRM device correctly being torn down, because one of the hardware
+> >>>>>> devices has gone.
+> >>>>>>
+> >>>>>> With DRM bridge, the bridge is merely removed from the list of
+> >>>>>> bridges:
+> >>>>>>
+> >>>>>> void drm_bridge_remove(struct drm_bridge *bridge)
+> >>>>>> {
+> >>>>>>         mutex_lock(&bridge_lock);
+> >>>>>>         list_del_init(&bridge->list);
+> >>>>>>         mutex_unlock(&bridge_lock);
+> >>>>>> }
+> >>>>>> EXPORT_SYMBOL(drm_bridge_remove);
+> >>>>>>
+> >>>>>> and the memory backing the "struct tda998x_bridge" (which contains
+> >>>>>> the struct drm_bridge) will be freed by the devm subsystem.
+> >>>>>>
+> >>>>>> However, there is no notification into the rest of the DRM subsystem
+> >>>>>> that the device has gone away.  Worse, the memory that is still in
+> >>>>>> use by DRM has now been freed, so further use of the DRM device
+> >>>>>> results in a use-after-free bug.
+> >>>>>>
+> >>>>>> This is really not good, and to me looks like a fundamental problem
+> >>>>>> with the DRM bridge code.  I see nothing in the DRM bridge code that
+> >>>>>> deals with the lifetime of a "DRM bridge" or indeed the lifetime of
+> >>>>>> the actual device itself.
+> >>>>>>
+> >>>>>> So, from what I can see, there seems to be a fundamental lifetime
+> >>>>>> issue with the design of the DRM bridge code.  This needs to be
+> >>>>>> fixed.
+> >>>>>
+> >>>>> Oh crap. A gigantic can of worms...
+> >>>>
+> >>>> Yes, it's especially annoying for me, having put the effort in to
+> >>>> the component helper to cover all these cases.
+> >>>>
+> >>>>> Would a patch (completely untested btw) along this line of thinking make
+> >>>>> any difference whatsoever?
+> >>>>
+> >>>> It looks interesting - from what I can see of the device links code,
+> >>>> it would have the effect of unbinding the DRM device just before
+> >>>> TDA998x is unbound, so that's an improvement.
+> >>>>
+> >>>> However, from what I can see, the link vanishes at that point (as
+> >>>> DL_FLAG_AUTOREMOVE is set), and re-binding the TDA998x device results
+> >>>> in nothing further happening - the link will be recreated, but there
+> >>>> appears to be nothing that triggers the "consumer" to rebind at that
+> >>>> point.  Maybe I've missed something?
+> >>>
+> >>> Right, auto-remove is a no-go. So, improving on the previous...
+> >>>
+> >>> (I think drm_panel might suffer from this issue too?)
+> >>
+> >> Yes it does and I took a shot at trying to fix it at the end of the
+> >> previous merge window, but gave up as I run out of time. I re-spun the
+> >> work now after reading this thread. I add you and Russell to cc.
+> > 
+> > Right, and these exact problems are what the component helper is
+> > there to sort out, in a subsystem independent way.
+> > 
+> > What is the problem with the component helper that people seem to
+> > be soo loathed to use it, instead preferring to come up with sub-
+> > standard and broken alternatives?
+> > 
+> 
+> Nothing but time. Embedding component helpers seamlessly into drm
+> framework does not sound like a couple of days job. Right now I simply
+> do not have time to take on a challenge like that. If someone does it I
+> am all for it.
+> 
+> However, I would not call device links substandard. They are in the
+> device core after all.
 
-IIRC historically we've only done second sourcing when
-doable because either:
-1. the timings between all the panels we use are compatible, or
-2. we have a working DDC to figure it out for us.
+Umm, no, I was not talking about the device links, but the tendency to
+have subsystem or component specific solutions to this problem.
 
-In other words, we haven't handled the case where timings are not
-compatible and we can't address this by reading EDIDs.
+We're now heading down the path of trying to retrofit the functionality
+that one expects and is provided by the component helpers into DRM
+bridge and DRM panel by using device links, which appears to only
+partially resolve the problem.
 
-St?phane
+On the point of device links, I've been wondering whether the component
+helpers could take advantage of the device links, but at the moment
+that would cause a regression if there's no facility to re-probe the
+"consumer" when a "supplier" returns.
 
->
-> Regards,
-> --
-> Ezequiel Garc?a, VanguardiaSur
-> www.vanguardiasur.com.ar
+As you bring that up, I would say that they _are_ a substandard way to
+solve this problem _if_, as I suspect, they would cause a regression
+to the component helper if the component helper were to use them as a
+means to control the probing of the "master" device.  This is not a
+matter of which part of the kernel they are "in", but the functionality
+that they can offer vs what would be expected.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
