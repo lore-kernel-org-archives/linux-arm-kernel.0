@@ -1,119 +1,63 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 24 Apr 2018 17:55:03 +0200
-Subject: [PATCH v5 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
- Edition support
-In-Reply-To: <20180424155503.19518-1-miquel.raynal@bootlin.com>
-References: <20180424155503.19518-1-miquel.raynal@bootlin.com>
-Message-ID: <20180424155503.19518-3-miquel.raynal@bootlin.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Tue, 24 Apr 2018 17:13:36 +0200
+Subject: [PATCH 0/6] PCI: leak fixes, removable generic PCI host,
+ assorted stuff
+Message-ID: <cover.1524582822.git.jan.kiszka@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nintendo NES/SuperNES features an R16 already well supported in
-mainline.
+This primarily enables to unbind the generic PCI host controller without
+leaving lots of memory leaks behind. A previous proposal patch 5 was
+rejected because of those issues [1].
 
-The console over UART0 may be wired on two ports of the R16, both
-available on the NES Classic PCB.
+The fixes have been validated in the Jailhouse setup, where we add and
+remove a virtual PCI host controller on hypervisor activation/
+deactivation, with the help of kmemleak.
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- arch/arm/boot/dts/Makefile                         |  2 +
- .../boot/dts/sun8i-r16-nintendo-nes-classic.dts    | 56 ++++++++++++++++++++++
- .../dts/sun8i-r16-nintendo-super-nes-classic.dts   | 11 +++++
- 3 files changed, 69 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic.dts
- create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-super-nes-classic.dts
+Besides that, there is tiny PCI API cleanup at the beginning and
+support for manually enabled PCI domains at the end that enables the
+Jailhouse scenario.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7e2424957809..c904eb85d4d2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1010,6 +1010,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-orangepi-plus.dtb \
- 	sun8i-h3-orangepi-plus2e.dtb \
- 	sun8i-r16-bananapi-m2m.dtb \
-+	sun8i-r16-nintendo-nes-classic.dtb \
-+	sun8i-r16-nintendo-super-nes-classic.dtb \
- 	sun8i-r16-parrot.dtb \
- 	sun8i-r40-bananapi-m2-ultra.dtb \
- 	sun8i-v3s-licheepi-zero.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic.dts b/arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic.dts
-new file mode 100644
-index 000000000000..fc0658cfa319
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic.dts
-@@ -0,0 +1,56 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
-+/* Copyright (c) 2016 FUKAUMI Naoki <naobsd@gmail.com> */
-+
-+/dts-v1/;
-+#include "sun8i-a33.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "Nintendo NES Classic Edition";
-+	compatible = "nintendo,nes-classic", "allwinner,sun8i-r16",
-+		     "allwinner,sun8i-a33";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart0 {
-+	/*
-+	 * UART0 is available on two ports: PB and PF, both are accessible.
-+	 * PF can also be used for the SD card so PB is preferred.
-+	 */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&nfc {
-+	status = "okay";
-+
-+	/* 2Gb Macronix MX30LF2G18AC (3V) */
-+	nand at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0>;
-+		allwinner,rb = <0>;
-+		nand-ecc-mode = "hw";
-+		nand-ecc-strength = <16>;
-+		nand-ecc-step-size = <1024>;
-+	};
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+	dr_mode = "otg";
-+};
-+
-+&usbphy {
-+	/* VBUS is always on because it is wired to the power supply */
-+	usb1_vbus-supply = <&reg_vcc5v0>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/sun8i-r16-nintendo-super-nes-classic.dts b/arch/arm/boot/dts/sun8i-r16-nintendo-super-nes-classic.dts
-new file mode 100644
-index 000000000000..80761d7904ec
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-r16-nintendo-super-nes-classic.dts
-@@ -0,0 +1,11 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
-+/* Copyright (c) 2018 Miqu?l RAYNAL <miquel.raynal@bootlin.com> */
-+
-+/dts-v1/;
-+#include "sun8i-r16-nintendo-nes-classic.dts"
-+
-+/ {
-+	model = "Nintendo SuperNES Classic Edition";
-+	compatible = "nintendo,super-nes-classic", "nintendo,nes-classic",
-+		     "allwinner,sun8i-r16", "allwinner,sun8i-a33";
-+};
+Jan
+
+[1] http://lkml.iu.edu/hypermail/linux/kernel/1606.3/00072.html
+
+
+CC: Jingoo Han <jingoohan1@gmail.com>
+CC: Joao Pinto <Joao.Pinto@synopsys.com>
+CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+
+Jan Kiszka (6):
+  PCI: Make pci_get_new_domain_nr static
+  PCI: Fix memory leak of devm_pci_alloc_host_bridge
+  PCI: Introduce devm_of_pci_get_host_bridge_resources
+  PCI: Convert of_pci_get_host_bridge_resources users to devm variant
+  PCI: Add support for unbinding the generic PCI host controller
+  arm: Allow to enable PCI_DOMAINS manually
+
+ arch/arm/Kconfig                       |  7 ++-
+ drivers/pci/dwc/pcie-designware-host.c |  2 +-
+ drivers/pci/host/pci-aardvark.c        |  5 +-
+ drivers/pci/host/pci-ftpci100.c        |  4 +-
+ drivers/pci/host/pci-host-common.c     | 13 +++++
+ drivers/pci/host/pci-host-generic.c    |  1 +
+ drivers/pci/host/pci-v3-semi.c         |  3 +-
+ drivers/pci/host/pci-versatile.c       |  3 +-
+ drivers/pci/host/pci-xgene.c           |  3 +-
+ drivers/pci/host/pcie-altera.c         |  5 +-
+ drivers/pci/host/pcie-iproc-platform.c |  4 +-
+ drivers/pci/host/pcie-rcar.c           |  5 +-
+ drivers/pci/host/pcie-rockchip.c       |  4 +-
+ drivers/pci/host/pcie-xilinx-nwl.c     |  4 +-
+ drivers/pci/host/pcie-xilinx.c         |  4 +-
+ drivers/pci/of.c                       | 93 ++++++++++++++++++++++------------
+ drivers/pci/pci.c                      |  6 +--
+ drivers/pci/probe.c                    |  4 +-
+ include/linux/of_pci.h                 | 14 ++++-
+ include/linux/pci-ecam.h               |  1 +
+ include/linux/pci.h                    |  3 --
+ 21 files changed, 120 insertions(+), 68 deletions(-)
+
 -- 
-2.14.1
+2.13.6
