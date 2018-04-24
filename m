@@ -1,143 +1,87 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Tue, 24 Apr 2018 11:47:00 +0200
-Subject: [v2 resend 03/10] mfd: mtk-mmsys: Add mmsys driver
+Date: Tue, 24 Apr 2018 11:46:58 +0200
+Subject: [v2 resend 01/10] dt-bindings: mediatek: mmsys: Add support for mfd
 In-Reply-To: <cover.1524563001.git.mbrugger@suse.com>
 References: <cover.1524563001.git.mbrugger@suse.com>
-Message-ID: <99bef17c57ad60eff6104da780cf59b785bd3e42.1524563001.git.mbrugger@suse.com>
+Message-ID: <64ca273429d92f581568a48f3efe6035af65f579.1524563001.git.mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Brugger <mbrugger@suse.com>
 
-The MMSYS subsystem includes clocks and drm components.
-This patch adds a MFD device to probe both drivers from the same
-device tree compatible.
+Add binding description for the mmsys mfd for some Mediatek
+devices. mmsys has some registers to control clock gates (which is
+used in the clk driver) and some registers to set the routing and enable
+the differnet blocks of the display subsystem.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
- drivers/mfd/Kconfig     |  9 ++++++
- drivers/mfd/Makefile    |  2 ++
- drivers/mfd/mtk-mmsys.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 90 insertions(+)
- create mode 100644 drivers/mfd/mtk-mmsys.c
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |  2 --
+ .../bindings/display/mediatek/mediatek,disp.txt    |  2 +-
+ .../devicetree/bindings/mfd/mediatek,mmsys.txt     | 27 ++++++++++++++++++++++
+ 3 files changed, 28 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index b860eb5aa194..a2c928e26026 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -378,6 +378,15 @@ config MFD_MC13XXX_I2C
- 	help
- 	  Select this if your MC13xxx is connected via an I2C bus.
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+index 4eb8bbe15c01..4468345f8b1a 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+@@ -6,10 +6,8 @@ The Mediatek mmsys controller provides various clocks to the system.
+ Required Properties:
  
-+config MFD_MEDIATEK_MMSYS
-+	tristate "Mediatek MMSYS interface"
-+	select MDF_CORE
-+	select REGMAP_MMIO
-+	help
-+	  Select this if you have a MMSYS subsystem in your SoC. The
-+	  MMSYS subsystem has at least a clock driver part and some
-+	  DRM components.
-+
- config MFD_MXS_LRADC
- 	tristate "Freescale i.MX23/i.MX28 LRADC"
- 	depends on ARCH_MXS || COMPILE_TEST
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index d9d2cf0d32ef..b96118bd68d9 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -98,6 +98,8 @@ obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
- obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
- obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
+ - compatible: Should be one of:
+-	- "mediatek,mt2701-mmsys", "syscon"
+ 	- "mediatek,mt2712-mmsys", "syscon"
+ 	- "mediatek,mt6797-mmsys", "syscon"
+-	- "mediatek,mt8173-mmsys", "syscon"
+ - #clock-cells: Must be 1
  
-+obj-$(CONFIG_MFD_MEDIATEK_MMSYS) += mtk-mmsys.o
-+
- obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
+ The mmsys controller uses the common clk binding from
+diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+index 383183a89164..85a3b4ec06cd 100644
+--- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
++++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+@@ -9,7 +9,7 @@ function block.
  
- obj-$(CONFIG_EZX_PCAP)		+= ezx-pcap.o
-diff --git a/drivers/mfd/mtk-mmsys.c b/drivers/mfd/mtk-mmsys.c
+ All DISP device tree nodes must be siblings to the central MMSYS_CONFIG node.
+ For a description of the MMSYS_CONFIG binding, see
+-Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt.
++Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+ 
+ DISP function blocks
+ ====================
+diff --git a/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
 new file mode 100644
-index 000000000000..c802343fb1c6
+index 000000000000..2331ae16917e
 --- /dev/null
-+++ b/drivers/mfd/mtk-mmsys.c
-@@ -0,0 +1,79 @@
-+// SPDX-License-Identifier: GPL-2.0+
++++ b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+@@ -0,0 +1,27 @@
++MediaTek MMSYS Multifunction Device Driver
 +
-+/*
-+ * mtk-mmsys.c -- Mediatek MMSYS multi-function driver
-+ *
-+ * Copyright (c) 2018 Matthias Brugger <matthias.bgg@gmail.com>
-+ *
-+ * Author: Matthias Brugger <matthias.bgg@gmail.com>
-+ */
++MMSYS is a multifunction device with the following sub modules:
++- clocks for the multi-media subsystem
++- central node for the DRM subsystem.
 +
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/mfd/core.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
++This document describes the binding for MFD device. The MFD takes care to initailize
++the clock driver and the DRM driver. More info see
++Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
 +
-+enum {
-+	MMSYS_MT2701 = 1,
++Required properties:
++- compatible: Should be one of:
++	- "mediatek,mt2701-mmsys", "syscon"
++	- "mediatek,mt8173-mmsys", "syscon"
++- #clock-cells: Must be 1
++
++Optional properties:
++- power-domains: list of powerdomains needed for the subsystem to work
++
++Example:
++
++mmsys: clock-controller at 14000000 {
++	compatible = "mediatek,mt8173-mmsys", "syscon";
++	reg = <0 0x14000000 0 0x1000>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++	#clock-cells = <1>;
 +};
-+
-+static const struct mfd_cell mmsys_mt2701_devs[] = {
-+	{ .name = "clk-mt2701-mm", },
-+	{ .name = "drm-mt2701-mm", },
-+};
-+
-+static int mmsys_probe(struct platform_device *pdev)
-+{
-+	const struct mfd_cell *mmsys_cells;
-+	int nr_cells;
-+	long id;
-+	int ret;
-+
-+	id = (long) of_device_get_match_data(&pdev->dev);
-+	if (!id) {
-+		dev_err(&pdev->dev, "of_device_get match_data() failed\n");
-+		return -EINVAL;
-+	}
-+
-+	switch (id) {
-+	case MMSYS_MT2701:
-+		mmsys_cells = mmsys_mt2701_devs;
-+		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
-+		break;
-+	default:
-+		return -ENODEV;
-+	}
-+
-+	ret = devm_mfd_add_devices(&pdev->dev, 0, mmsys_cells, nr_cells,
-+					NULL, 0, NULL);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to add MFD devices %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+};
-+
-+static const struct of_device_id of_match_mmsys[] = {
-+	{ .compatible = "mediatek,mt2701-mmsys",
-+	  .data = (void *) MMSYS_MT2701,
-+	},
-+	{ /* sentinel */ },
-+};
-+
-+static struct platform_driver mmsys_drv = {
-+	.probe = mmsys_probe,
-+	.driver = {
-+		.name = "mediatek-mmysys",
-+		.of_match_table = of_match_ptr(of_match_mmsys),
-+	},
-+};
-+
-+builtin_platform_driver(mmsys_drv);
-+
-+MODULE_DESCRIPTION("Mediatek MMSYS multi-function driver");
-+MODULE_LICENSE("GPL");
 -- 
 2.16.3
