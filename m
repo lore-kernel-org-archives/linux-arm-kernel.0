@@ -1,34 +1,74 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Tue, 24 Apr 2018 12:13:28 +0300
-Subject: [PATCH v2 07/10] media: platform: Add Sunxi-Cedrus VPU decoder
- driver
-In-Reply-To: <20180419154536.17846-3-paul.kocialkowski@bootlin.com>
-References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
- <20180419154536.17846-3-paul.kocialkowski@bootlin.com>
-Message-ID: <20180424091328.jsqp36nxekuj23am@paasikivi.fi.intel.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 24 Apr 2018 11:16:55 +0200
+Subject: [PATCH v3 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
+ Edition support
+In-Reply-To: <20180424104911.42ae8864@xps13>
+References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
+ <20180421164246.8477-3-miquel.raynal@bootlin.com>
+ <20180423072403.4ip5seys4xyll3yr@flea>
+ <20180423122752.364ee649@xps13>
+ <20180424075505.p6e43yw2juw4fqqw@flea>
+ <20180424104911.42ae8864@xps13>
+Message-ID: <20180424111655.52065c5b@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul
 
-On Thu, Apr 19, 2018 at 05:45:33PM +0200, Paul Kocialkowski wrote:
-> This introduces the Sunxi-Cedrus VPU driver that supports the VPU found
-> in Allwinner SoCs, also known as Video Engine. It is implemented through
-> a v4l2 m2m decoder device and a media device (used for media requests).
-> So far, it only supports MPEG2 decoding.
+On Tue, 24 Apr 2018 10:49:11 +0200, Miquel Raynal
+<miquel.raynal@bootlin.com> wrote:
+
+> Hi Maxime,
 > 
-> Since this VPU is stateless, synchronization with media requests is
-> required in order to ensure consistency between frame headers that
-> contain metadata about the frame to process and the raw slice data that
-> is used to generate the frame.
+> On Tue, 24 Apr 2018 09:55:05 +0200, Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
 > 
-> This driver was made possible thanks to the long-standing effort
-> carried out by the linux-sunxi community in the interest of reverse
-> engineering, documenting and implementing support for Allwinner VPU.
+> > On Mon, Apr 23, 2018 at 12:27:52PM +0200, Miquel Raynal wrote:  
+> > > > >  	sun8i-r16-parrot.dtb \
+> > > > >  	sun8i-r40-bananapi-m2-ultra.dtb \
+> > > > >  	sun8i-v3s-licheepi-zero.dtb \
+> > > > > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > > > > index 6b9e85b4ba0f..44f3cad3de75 100644
+> > > > > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > > > > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > > > > @@ -198,6 +198,8 @@
+> > > > >  			clock-names = "ahb", "mod";
+> > > > >  			resets = <&ccu RST_BUS_NAND>;
+> > > > >  			reset-names = "ahb";
+> > > > > +			pinctrl-names = "default";
+> > > > > +			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;      
+> > > > 
+> > > > This should be in your first patch I guess?    
+> > > 
+> > > Actually I think this should not be there but instead, because it is
+> > > board-related, these two lines should be in the nes-classic.dts' nfc
+> > > node, right? Other a23/a33/r16 based designs could use the second set
+> > > of CS/RB pins.    
+> > 
+> > Does that ever happen?
+> > 
+> > On a theoretical level, then yeah, sure. But if all the boards seen
+> > out there are using the same setup (which is pretty common), then
+> > there's no reason not to do it in the DTSI.  
+> 
+> I compared the various boards configurations [1] with the R16 datasheet
+> [2], all the boards having a NAND configure all the related pins
+> (including CS1 and RB1). So I guess I can put both properties in the
+> DTSI.
 
-No code review yet, but DT bindings precede the driver. Please also add
-the appropriate MAINTAINERS entries.
+I forgot to add:
+[1] https://github.com/linux-sunxi/sunxi-boards/tree/master/sys_config/a33
+[2] http://linux-sunxi.org/images/b/b3/R16_Datasheet_V1.4_%281%29.pdf
 
--- 
-Sakari Ailus
-sakari.ailus at linux.intel.com
+Sorry for the spam :)
+
+Miqu?l
+
+> 
+> There is one case (sinlinx_sina33) where the NAND is not used and the
+> pins are used for an alternate function: SPI0; but I guess this is not
+> a problem as in this case, the NAND node would not exist in the
+> resulting DTB.
+> 
+> Regards,
+> Miqu?l
+> 
