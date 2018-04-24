@@ -1,45 +1,46 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 24 Apr 2018 20:05:04 +0530
-Subject: [PATCH 2/4] ARM: davinci: board-da850-evm: fix GPIO lookup for MMC/SD
+Date: Tue, 24 Apr 2018 20:05:06 +0530
+Subject: [PATCH 4/4] ARM: davinci: board-omapl138-hawk: fix GPIO numbers for
+ MMC/SD lookup
 In-Reply-To: <20180424143506.25793-1-nsekhar@ti.com>
 References: <20180424143506.25793-1-nsekhar@ti.com>
-Message-ID: <20180424143506.25793-3-nsekhar@ti.com>
+Message-ID: <20180424143506.25793-5-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
-mmc can correctly lookup the wp and cp gpios. Also fix the GPIO numbers
-as they are not offsets within a bank.
+commit c4dc56be7e26 ("ARM: davinci: fix the GPIO lookup for omapl138-hawk")
+fixed the GPIO chip name for look-up of MMC/SD CD and WP pins, but forgot
+to change the GPIO numbers passed.
 
-Note that it is the gpio-davinci driver that sets the gpiochip label to
-davinci_gpio.0.
+The GPIO numbers are not offsets from within a 32 GPIO bank. Fix the
+GPIO numbers as well as remove the misleading comment.
 
-Fixes: bdf0e8364fd3 ("ARM: davinci: da850-evm: use gpio descriptor for mmc pins")
+Fixes: c4dc56be7e26 ("ARM: davinci: fix the GPIO lookup for omapl138-hawk")
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/mach-davinci/board-omapl138-hawk.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 3063478bcc36..158ed9a1483f 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -763,12 +763,17 @@ static const short da850_evm_mcasp_pins[] __initconst = {
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index 0d32042b728f..be8b892a6ea7 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -123,12 +123,16 @@ static const short hawk_mmcsd0_pins[] = {
  	-1
  };
  
-+#define DA850_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
-+#define DA850_MMCSD_WP_PIN		GPIO_TO_PIN(4, 1)
++#define DA850_HAWK_MMCSD_CD_PIN		GPIO_TO_PIN(3, 12)
++#define DA850_HAWK_MMCSD_WP_PIN		GPIO_TO_PIN(3, 13)
 +
  static struct gpiod_lookup_table mmc_gpios_table = {
  	.dev_id = "da830-mmc.0",
  	.table = {
- 		/* gpio chip 2 contains gpio range 64-95 */
--		GPIO_LOOKUP("davinci_gpio.2", 0, "cd", GPIO_ACTIVE_LOW),
--		GPIO_LOOKUP("davinci_gpio.2", 1, "wp", GPIO_ACTIVE_LOW),
-+		GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_CD_PIN, "cd",
+-		/* CD: gpio3_12: gpio60: chip 1 contains gpio range 32-63*/
+-		GPIO_LOOKUP("davinci_gpio.0", 28, "cd", GPIO_ACTIVE_LOW),
+-		GPIO_LOOKUP("davinci_gpio.0", 29, "wp", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("davinci_gpio.0", DA850_HAWK_MMCSD_CD_PIN, "cd",
 +			    GPIO_ACTIVE_LOW),
-+		GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_WP_PIN, "wp",
++		GPIO_LOOKUP("davinci_gpio.0", DA850_HAWK_MMCSD_WP_PIN, "wp",
 +			    GPIO_ACTIVE_LOW),
  	},
  };
