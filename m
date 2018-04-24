@@ -1,7 +1,7 @@
 From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Tue, 24 Apr 2018 15:16:13 +0200
-Subject: [PATCH] can: xilinx: fix xcan_start_xmit()'s return type
-Message-ID: <20180424131614.3357-1-luc.vanoostenryck@gmail.com>
+Date: Tue, 24 Apr 2018 15:16:41 +0200
+Subject: [PATCH] net: gemini: fix gmac_start_xmit()'s return type
+Message-ID: <20180424131642.3806-1-luc.vanoostenryck@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,21 @@ Fix this by returning 'netdev_tx_t' in this driver too.
 
 Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 ---
- drivers/net/can/xilinx_can.c | 2 +-
+ drivers/net/ethernet/cortina/gemini.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-index 89aec07c2..a19648606 100644
---- a/drivers/net/can/xilinx_can.c
-+++ b/drivers/net/can/xilinx_can.c
-@@ -386,7 +386,7 @@ static int xcan_do_set_mode(struct net_device *ndev, enum can_mode mode)
-  *
-  * Return: 0 on success and failure value on error
-  */
--static int xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-+static netdev_tx_t xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+diff --git a/drivers/net/ethernet/cortina/gemini.c b/drivers/net/ethernet/cortina/gemini.c
+index bd3f6e4d1..564b9ceb1 100644
+--- a/drivers/net/ethernet/cortina/gemini.c
++++ b/drivers/net/ethernet/cortina/gemini.c
+@@ -1188,7 +1188,7 @@ static int gmac_map_tx_bufs(struct net_device *netdev, struct sk_buff *skb,
+ 	return -ENOMEM;
+ }
+ 
+-static int gmac_start_xmit(struct sk_buff *skb, struct net_device *netdev)
++static netdev_tx_t gmac_start_xmit(struct sk_buff *skb, struct net_device *netdev)
  {
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 	struct net_device_stats *stats = &ndev->stats;
+ 	struct gemini_ethernet_port *port = netdev_priv(netdev);
+ 	unsigned short m = (1 << port->txq_order) - 1;
 -- 
 2.17.0
