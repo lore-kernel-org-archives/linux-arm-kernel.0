@@ -1,47 +1,65 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 23 Apr 2018 20:25:49 -0700
-Subject: [PATCH v5 2/2] drivers: soc: Add LLCC driver
-In-Reply-To: <1524524972-12014-3-git-send-email-rishabhb@codeaurora.org>
-References: <1524524972-12014-1-git-send-email-rishabhb@codeaurora.org>
- <1524524972-12014-3-git-send-email-rishabhb@codeaurora.org>
-Message-ID: <4856aba7-4a06-eb15-57d5-abfd28f8a15f@infradead.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 24 Apr 2018 09:25:49 +0530
+Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
+ to netdev dma client
+In-Reply-To: <8c7a5ac8-0747-9dad-f6e5-74890b64f618@ti.com>
+References: <20180411090854.GY6014@localhost>
+ <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+ <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
+ <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
+ <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
+ <78828d31-e4cd-5211-f1b6-8918ac38f599@ti.com>
+ <e5a6c1ad-e263-7b9d-a5e2-744884c9d6de@metafoo.de>
+ <a6ac9ca8-91b4-c7b1-0f0c-c04dd10048e2@ti.com>
+ <d7432292-cedd-7d61-f219-8b63eb6c1d50@metafoo.de>
+ <8c7a5ac8-0747-9dad-f6e5-74890b64f618@ti.com>
+Message-ID: <20180424035548.GA6014@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2018 04:09 PM, Rishabh Bhatnagar wrote:
-
-> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-> index e050eb8..2b09321 100644
-> --- a/drivers/soc/qcom/Kconfig
-> +++ b/drivers/soc/qcom/Kconfig
-> @@ -21,6 +21,23 @@ config QCOM_GSBI
->            functions for connecting the underlying serial UART, SPI, and I2C
->            devices to the output pins.
+On Thu, Apr 19, 2018 at 02:40:26PM +0300, Peter Ujfalusi wrote:
 > 
-> +config QCOM_LLCC
-> +	tristate "Qualcomm Technologies, Inc. LLCC driver"
-> +	depends on ARCH_QCOM
-> +	help
-> +	  Qualcomm Technologies, Inc. platform specific
-> +	  Last Level Cache Controller(LLCC) driver. This provides interfaces
-> +	  to client's that use the LLCC. Say yes here to enable LLCC slice
+> On 2018-04-18 16:06, Lars-Peter Clausen wrote:
+> >> Hrm, true, but it is hardly the metadata use case. It is more like
+> >> different DMA transfer type.
+> > 
+> > When I look at this with my astronaut architect view from high high up above
+> > I do not see a difference between metadata and multi-planar data.
+> 
+> I tend to disagree.
 
-	  to clients
+and we will love to hear more :)
 
-> +	  driver.
-> +
-> +config QCOM_SDM845_LLCC
-> +	tristate "Qualcomm Technologies, Inc. SDM845 LLCC driver"
-> +	depends on QCOM_LLCC
-> +	help
-> +	  Say yes here to enable the LLCC driver for SDM845. This provides
-> +	  data required to configure LLCC so that clients can start using the
-> +	  LLCC slices.
-> +
->  config QCOM_MDT_LOADER
->  	tristate
->  	select QCOM_SCM
+> > Both split the data that is sent to the peripheral into multiple
+> > sub-streams, each carrying part of the data. I'm sure there are peripherals
+> > that interleave data and metadata on the same data stream. Similar to how we
+> > have left and right channel interleaved in a audio stream.
+> 
+> Slimbus, S/PDIF?
+> 
+> > What about metadata that is not contiguous and split into multiple segments.
+> > How do you handle passing a sgl to the metadata interface? And then it
+> > suddenly looks quite similar to the normal DMA descriptor interface.
+> 
+> Well, the metadata is for the descriptor. The descriptor describe the
+> data transfer _and_ can convey additional information. Nothing is
+> interleaved, the data and the descriptor are different things. It is
+> more like TCP headers detached from the data (but pointing to it).
+> 
+> > But maybe that's just one abstraction level to high.
+> 
+> I understand your point, but at the end the metadata needs to end up in
+> the descriptor which is describing the data that is going to be moved.
+> 
+> The descriptor is not sent as a separate DMA trasnfer, it is part of the
+> DMA transfer, it is handled internally by the DMA.
 
+That is bit confusing to me. I thought DMA was transparent to meta data and
+would blindly collect and transfer along with the descriptor. So at high
+level we are talking about two transfers (probably co-joined at hip and you
+want to call one transfer) but why can't we visualize this as just a DMA
+transfers. maybe you want to signal/attach to transfer, cant we do that with
+additional flag DMA_METADATA etc..?
 
 -- 
-~Randy
+~Vinod
