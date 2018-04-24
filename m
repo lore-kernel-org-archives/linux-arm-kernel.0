@@ -1,65 +1,82 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Apr 2018 18:45:07 +0100
-Subject: [PATCH v2 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
-References: <cover.1523673467.git.collinsd@codeaurora.org>
- <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
- <CAD=FV=XKYCDtF93RtYi+dokR2BcT-z6Ex3UjgJ0ia_kF=847eA@mail.gmail.com>
- <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
- <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
- <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
-Message-ID: <20180424174507.GI22073@sirena.org.uk>
+Date: Tue, 24 Apr 2018 18:46:14 +0100
+Subject: Applied "regmap: include <linux/ktime.h> from include/linux/regmap.h"
+ to the regmap tree
+In-Reply-To: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
+Message-ID: <E1fB218-0003Z3-Qt@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 03:08:57PM -0700, David Collins wrote:
-> On 04/19/2018 09:16 AM, Doug Anderson wrote:
-> > On Wed, Apr 18, 2018 at 4:30 PM, David Collins <collinsd@codeaurora.org> wrote:
+The patch
 
-Please delete unneeded context from mails when replying.  Doing this
-makes it much easier to find your reply in the message, helping ensure
-it won't be missed by people scrolling through the irrelevant quoted
-material.
+   regmap: include <linux/ktime.h> from include/linux/regmap.h
 
-> > You'd need to ask Mark if he's OK with it, but a option #3 is to add a
-> > patch to your series fix the regulator framework to try setting the
-> > voltage if _regulator_get_voltage() fails.  Presumably in
-> > machine_constraints_voltage() you'd now do something like:
-> > 
-> >   int target_min, target_max;
-> >   int current_uV = _regulator_get_voltage(rdev);
-> >   if (current_uV < 0) {
-> >     /* Maybe this regulator's hardware can't be read and needs to be initted */
-> >     _regulator_do_set_voltage(
-> >       rdev, rdev->constraints->min_uV, rdev->constraints->min_uV);
-> >     current_uV = _regulator_get_voltage(rdev);
-> >   }
-> >   if (current_uV < 0) {
-> >     rdev_err(rdev,
-> >       "failed to get the current voltage(%d)\n",
-> >       current_uV);
-> >       return current_uV;
-> >   }
+has been applied to the regmap tree at
 
-> > If Mark doesn't like that then I guess I'd be OK w/ initting it to 0
-> > but this needs to be documented _somewhere_ (unlike for bypass it's
-> > not obvious, so you need to find someplace to put it).  I'd rather not
-> > hack the DT to deal with our software limitations.
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git 
 
-> I'm not opposed to your option #3 though it does seem a little hacky and
-> tailored to the qcom_rpmh-regulator specific case.  Note that I think it
-> would be better to vote for min_uV to max_uV than min_uV to min_uV though.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-> Mark, what are your thoughts on the best way to handle this situation?
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-I think that's probably only OK if we have a specific error code for the
-regulator being limited in this way otherwise our error handling for I/O
-problems involves us trying to reconfigure supplies which seems like it
-would be risky.  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/09cd228d/attachment.sig>
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From f15cd6d99198e9c15229aefec639a34a6e8174c6 Mon Sep 17 00:00:00 2001
+From: Sean Wang <sean.wang@mediatek.com>
+Date: Mon, 23 Apr 2018 14:42:44 +0800
+Subject: [PATCH] regmap: include <linux/ktime.h> from include/linux/regmap.h
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Similar to the readx_poll_timeout() macro calling ktime_* and using
+ktime_t type, which is declared in <linux/ktime.h>. So, make
+include/linux/regmap.h explicitly include <linux/ktime.h>, like
+include/linux/iopoll.h does.  Otherwise, users of the macro will see
+below errors.
+
+error: implicit declaration of function ???ktime_add_us???
+[-Werror=implicit-function-declaration]
+
+error: implicit declaration of function ???ktime_get???
+[-Werror=implicit-function-declaration]
+
+error: implicit declaration of function ???ktime_compare???
+[-Werror=implicit-function-declaration]
+
+include/linux/regmap.h:128:2: error: unknown type name ???ktime_t???
+  ktime_t __timeout = ktime_add_us(ktime_get(), __timeout_us); \
+
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ include/linux/regmap.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 5f7ad0552c03..b6865f070464 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -15,6 +15,7 @@
+ 
+ #include <linux/list.h>
+ #include <linux/rbtree.h>
++#include <linux/ktime.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/bug.h>
+-- 
+2.17.0
