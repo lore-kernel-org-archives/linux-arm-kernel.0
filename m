@@ -1,47 +1,55 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Tue, 24 Apr 2018 12:31:50 -0700
-Subject: [PATCH 03/11] platform: make support for early platform devices
- conditional
-In-Reply-To: <20180424173051.15099-4-brgl@bgdev.pl>
-References: <20180424173051.15099-1-brgl@bgdev.pl>
- <20180424173051.15099-4-brgl@bgdev.pl>
-Message-ID: <aa459c94-bfc2-5cf8-0197-6487ea9152a8@infradead.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 24 Apr 2018 21:37:54 +0200
+Subject: [PATCH 2/7] ARM: dts: sun8i: h3: Split out common board design
+ for ALL-H3-CC
+In-Reply-To: <CAGb2v65iwbmOvQ2YA0e4QyTzQVj=F+5n6cWt2q6K80Y2b_3q3g@mail.gmail.com>
+References: <20180424113424.13196-1-wens@csie.org>
+ <20180424113424.13196-3-wens@csie.org>
+ <20180424121353.zxujyehsw3er2xq6@flea>
+ <CAGb2v65iwbmOvQ2YA0e4QyTzQVj=F+5n6cWt2q6K80Y2b_3q3g@mail.gmail.com>
+Message-ID: <20180424193754.jsuucbq57onhxhqe@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2018 10:30 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Tue, Apr 24, 2018 at 08:17:11PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Apr 24, 2018 at 8:13 PM, Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> > On Tue, Apr 24, 2018 at 07:34:19PM +0800, Chen-Yu Tsai wrote:
+> >> The Libre Computer Project ALL-H3-CC has three models, all using the
+> >> same board design, but with different pin compatible SoCs and amount of
+> >> DRAM.
+> >>
+> >> Currently only the H3 1GB DRAM variant is supported. To support the two
+> >> other variants, first split the original device tree into a common board
+> >> design part and an SoC specific part.
+> >>
+> >> The SoC part only defines which SoC is used and model name, and includes
+> >> the SoC specific dtsi file and the common design dtsi file.
+> >>
+> >> Also fix up the SPDX identifier line to use the correct comment style,
+> >> and place it on the first line.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  .../boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 213 +-----------------
+> >>  ....dts => sunxi-hx-libretech-all-h3-cc.dtsi} |  11 +-
+> >
+> > I think I prefer the name of Neil's DTSI better, and since pretty much
+> > the same patches (a couple of hours) before, we'll merge them (while
+> > merging the rest of your patches, obviously).
+> >
+> > Does that work for you?
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/sh/Kconfig                 |  1 +
->  drivers/base/Kconfig            |  4 ++++
->  drivers/base/platform.c         |  3 +++
->  include/linux/platform_device.h | 32 ++++++++++++++++++++++++++++++++
->  4 files changed, 40 insertions(+)
+> I would like for the regulator voltage fix to be merged before the split.
+> This will make it trivial to back port, instead of having to reverse the
+> split, and maybe failing.
 
-> index 29b0eb452b3a..37de5e1d6217 100644
-> --- a/drivers/base/Kconfig
-> +++ b/drivers/base/Kconfig
-> @@ -205,6 +205,10 @@ config DEBUG_TEST_DRIVER_REMOVE
->  	  unusable. You should say N here unless you are explicitly looking to
->  	  test this functionality.
->  
-> +config EARLY_PLATFORM_DEVICES
-> +	bool
-> +	default n
+Yes, I was just talking about replacing your two redundant patches,
+but keeping the order you have.
 
-The default value is already 'n', so we usually ask people to omit that
-value.  OTOH, you could combine those 2 lines into:
-
-	def_bool n
-
-
-> +
->  source "drivers/base/test/Kconfig"
->  
->  config SYS_HYPERVISOR
-
+Maxime
 
 -- 
-~Randy
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
