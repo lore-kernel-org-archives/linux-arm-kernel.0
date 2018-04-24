@@ -1,30 +1,49 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 24 Apr 2018 20:05:02 +0530
-Subject: [PATCH 0/4] ARM: davinci: GPIO look-up fixes for legacy boot
-Message-ID: <20180424143506.25793-1-nsekhar@ti.com>
+Date: Tue, 24 Apr 2018 20:05:03 +0530
+Subject: [PATCH 1/4] ARM: davinci: board-da830-evm: fix GPIO lookup for MMC/SD
+In-Reply-To: <20180424143506.25793-1-nsekhar@ti.com>
+References: <20180424143506.25793-1-nsekhar@ti.com>
+Message-ID: <20180424143506.25793-2-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
+mmc can correctly lookup the wp and cp gpios. Also fix the GPIO numbers
+as they are not offsets within a bank.
 
-I noticed that several GPIO lookup issues creeped up due
-to changes done in recent past. Here are fixes for these
-issues.
+Note that it is the gpio-davinci driver that sets the gpiochip label to
+davinci_gpio.0.
 
-Tested on DM644x, DM355, DA830 and DA850 EVMs.
+Fixes: b5e1438cf98a ("ARM: davinci: da830-evm: use gpio descriptor for mmc pins")
+Reported-by: David Lechner <david@lechnology.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/board-da830-evm.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-Sekhar Nori (4):
-  ARM: davinci: board-da830-evm: fix GPIO lookup for MMC/SD
-  ARM: davinci: board-da850-evm: fix GPIO lookup for MMC/SD
-  ARM: davinci: fix GPIO lookup for I2C
-  ARM: davinci: board-omapl138-hawk: fix GPIO numbers for MMC/SD lookup
-
- arch/arm/mach-davinci/board-da830-evm.c     |  9 +++++++--
- arch/arm/mach-davinci/board-da850-evm.c     |  9 +++++++--
- arch/arm/mach-davinci/board-dm355-evm.c     |  6 +++---
- arch/arm/mach-davinci/board-dm644x-evm.c    |  6 +++---
- arch/arm/mach-davinci/board-omapl138-hawk.c | 10 +++++++---
- 5 files changed, 27 insertions(+), 13 deletions(-)
-
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 004f9c8de032..d1e8ce7b4bd2 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -205,12 +205,17 @@ static const short da830_evm_mmc_sd_pins[] = {
+ 	-1
+ };
+ 
++#define DA830_MMCSD_WP_PIN		GPIO_TO_PIN(2, 1)
++#define DA830_MMCSD_CD_PIN		GPIO_TO_PIN(2, 2)
++
+ static struct gpiod_lookup_table mmc_gpios_table = {
+ 	.dev_id = "da830-mmc.0",
+ 	.table = {
+ 		/* gpio chip 1 contains gpio range 32-63 */
+-		GPIO_LOOKUP("davinci_gpio.1", 2, "cd", GPIO_ACTIVE_LOW),
+-		GPIO_LOOKUP("davinci_gpio.1", 1, "wp", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("davinci_gpio.0", DA830_MMCSD_CD_PIN, "cd",
++			    GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("davinci_gpio.0", DA830_MMCSD_WP_PIN, "wp",
++			    GPIO_ACTIVE_LOW),
+ 	},
+ };
+ 
 -- 
 2.16.2
