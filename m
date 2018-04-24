@@ -1,182 +1,94 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 24 Apr 2018 15:26:43 +0200
-Subject: [PATCH v4 7/8] drm/i2c: tda998x: register as a drm bridge
-In-Reply-To: <8448e90a-4562-b564-c160-1b5c67e0f92f@axentia.se>
-References: <20180423072301.11962-1-peda@axentia.se>
- <20180423072301.11962-8-peda@axentia.se>
- <20180423160833.GF16141@n2100.armlinux.org.uk>
- <5d6866d0-75bc-4de8-9b87-4fee5430e9dd@axentia.se>
- <20180424080833.GJ16141@n2100.armlinux.org.uk>
- <8448e90a-4562-b564-c160-1b5c67e0f92f@axentia.se>
-Message-ID: <ab0d5160-88db-3589-916f-ef973f7b506f@axentia.se>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Apr 2018 14:34:49 +0100
+Subject: [PATCH] arm64: export tishift functions to modules
+In-Reply-To: <20180415160416.28161-1-Jason@zx2c4.com>
+References: <20180415160416.28161-1-Jason@zx2c4.com>
+Message-ID: <20180424133449.GA24599@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-24 12:14, Peter Rosin wrote:
-> On 2018-04-24 10:08, Russell King - ARM Linux wrote:
->> On Tue, Apr 24, 2018 at 08:58:42AM +0200, Peter Rosin wrote:
->>> On 2018-04-23 18:08, Russell King - ARM Linux wrote:
->>>> On Mon, Apr 23, 2018 at 09:23:00AM +0200, Peter Rosin wrote:
->>>>>  static int tda998x_remove(struct i2c_client *client)
->>>>>  {
->>>>> -	component_del(&client->dev, &tda998x_ops);
->>>>> +	struct device *dev = &client->dev;
->>>>> +	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
->>>>> +
->>>>> +	drm_bridge_remove(&bridge->bridge);
->>>>> +	component_del(dev, &tda998x_ops);
->>>>> +
->>>>
->>>> I'd like to ask a rather fundamental question about DRM bridge support,
->>>> because I suspect that there's a major fsckup here.
->>>>
->>>> The above is the function that deals with the TDA998x device being
->>>> unbound from the driver.  With the component API, this results in the
->>>> DRM device correctly being torn down, because one of the hardware
->>>> devices has gone.
->>>>
->>>> With DRM bridge, the bridge is merely removed from the list of
->>>> bridges:
->>>>
->>>> void drm_bridge_remove(struct drm_bridge *bridge)
->>>> {
->>>>         mutex_lock(&bridge_lock);
->>>>         list_del_init(&bridge->list);
->>>>         mutex_unlock(&bridge_lock);
->>>> }
->>>> EXPORT_SYMBOL(drm_bridge_remove);
->>>>
->>>> and the memory backing the "struct tda998x_bridge" (which contains
->>>> the struct drm_bridge) will be freed by the devm subsystem.
->>>>
->>>> However, there is no notification into the rest of the DRM subsystem
->>>> that the device has gone away.  Worse, the memory that is still in
->>>> use by DRM has now been freed, so further use of the DRM device
->>>> results in a use-after-free bug.
->>>>
->>>> This is really not good, and to me looks like a fundamental problem
->>>> with the DRM bridge code.  I see nothing in the DRM bridge code that
->>>> deals with the lifetime of a "DRM bridge" or indeed the lifetime of
->>>> the actual device itself.
->>>>
->>>> So, from what I can see, there seems to be a fundamental lifetime
->>>> issue with the design of the DRM bridge code.  This needs to be
->>>> fixed.
->>>
->>> Oh crap. A gigantic can of worms...
->>
->> Yes, it's especially annoying for me, having put the effort in to
->> the component helper to cover all these cases.
->>
->>> Would a patch (completely untested btw) along this line of thinking make
->>> any difference whatsoever?
->>
->> It looks interesting - from what I can see of the device links code,
->> it would have the effect of unbinding the DRM device just before
->> TDA998x is unbound, so that's an improvement.
->>
->> However, from what I can see, the link vanishes at that point (as
->> DL_FLAG_AUTOREMOVE is set), and re-binding the TDA998x device results
->> in nothing further happening - the link will be recreated, but there
->> appears to be nothing that triggers the "consumer" to rebind at that
->> point.  Maybe I've missed something?
+Hi Jason,
+
+On Sun, Apr 15, 2018 at 06:04:16PM +0200, Jason A. Donenfeld wrote:
+> Otherwise modules that use these arithmetic operations will fail to
+> link. We accomplish this with EXPORT_SYMBOL in the .S file, but because
+> of symbol versioning, we actually need to have a declaration of these
+> too in C. So, we introduce asm-prototypes.h, which is the same file name
+> and technique used for similar reasons in the m68k arch tree.
 > 
-> Right, auto-remove is a no-go. So, improving on the previous...
-
-Heh, I didn't address the rebind triggering part at all, and while I'm by
-no means responsible or have any deep knowledge, I thought this was true:
-
-- driver .remove for the device owning the drm_bridge is what typically
-  calls drm_bridge_remove()
-- driver .remove is called as part of the device being unbound from the
-  driver by the bus (i2c in this case)
-- by registering a link to the consumer, this unbinding will trigger the
-  removal of this main drm consumer device as part of the unbinding
-- so everything aboput the drm device will be torn down, and everything
-  will thus have to be reprobed to get things back
-
-But I could easily have misunderstood just about everything in the above...
-
-And maybe it's really inconvenient to have to trigger a reprobe of the
-whole drm cluster? Maybe all drm driver parts should be components?
-
-I have no idea.
-
-Cheers,
-Peter
-
-PS. compile-tested the below and drm_bridge.c needs to
-#include <drm/drm_device.h>
-
-> (I think drm_panel might suffer from this issue too?)
+> While we're at it, we also fix this up to use SPDX, and I personally
+> choose to relicense this as GPL2||BSD so that these symbols don't need
+> to be export_symbol_gpl, so all modules can use the routines, since
+> these are important general purpose compiler-generated function calls.
 > 
-> Cheers,
-> Peter
-> 
-> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
-> index 1638bfe9627c..b1365cfee445 100644
-> --- a/drivers/gpu/drm/drm_bridge.c
-> +++ b/drivers/gpu/drm/drm_bridge.c
-> @@ -121,12 +121,17 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
->  	if (bridge->dev)
->  		return -EBUSY;
->  
-> +	bridge->link = device_link_add(encoder->dev->dev, bridge->owner, 0);
-> +	if (!bridge->link)
-> +		return -EINVAL;
+> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+> Reported-by: PaX Team <pageexec@freemail.hu>
+> Cc: stable at vger.kernel.org
+> ---
+>  arch/arm64/include/asm/asm-prototypes.h | 11 +++++++++++
+>  arch/arm64/lib/tishift.S                | 19 ++++++-------------
+>  2 files changed, 17 insertions(+), 13 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/asm-prototypes.h
+
+I've not run into any build issues here -- is this specifically with some
+out-of-tree module?
+
+> diff --git a/arch/arm64/include/asm/asm-prototypes.h b/arch/arm64/include/asm/asm-prototypes.h
+> new file mode 100644
+> index 000000000000..8f1919e44f51
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/asm-prototypes.h
+
+It would be better not to introduce a new header file just for this, I
+think. How about compiler.h instead?
+
+> @@ -0,0 +1,11 @@
+> +/* SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
+> + *
+> + * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+> + */
 > +
->  	bridge->dev = encoder->dev;
->  	bridge->encoder = encoder;
->  
->  	if (bridge->funcs->attach) {
->  		ret = bridge->funcs->attach(bridge);
->  		if (ret < 0) {
-> +			device_link_del(bridge->link);
->  			bridge->dev = NULL;
->  			bridge->encoder = NULL;
->  			return ret;
-> @@ -153,6 +158,8 @@ void drm_bridge_detach(struct drm_bridge *bridge)
->  	if (bridge->funcs->detach)
->  		bridge->funcs->detach(bridge);
->  
-> +	device_link_del(bridge->link);
-> +
->  	bridge->dev = NULL;
->  }
->  
-> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> index b8cb6237a38b..29eba4e9a39d 100644
-> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
-> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> @@ -1857,6 +1857,7 @@ tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
->  	bridge->dev = dev;
->  	dev_set_drvdata(dev, bridge);
->  
-> +	bridge->bridge.owner = dev;
->  	bridge->bridge.funcs = &tda998x_bridge_funcs;
->  #ifdef CONFIG_OF
->  	bridge->bridge.of_node = dev->of_node;
-> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-> index 682d01ba920c..b8f33aba3216 100644
-> --- a/include/drm/drm_bridge.h
-> +++ b/include/drm/drm_bridge.h
-> @@ -224,6 +224,8 @@ struct drm_bridge_funcs {
->  
->  /**
->   * struct drm_bridge - central DRM bridge control structure
-> + * @owner: device that owns the bridge
-> + * @link: drm consumer <-> bridge supplier
->   * @dev: DRM device this bridge belongs to
->   * @encoder: encoder to which this bridge is connected
->   * @next: the next bridge in the encoder chain
-> @@ -233,6 +235,8 @@ struct drm_bridge_funcs {
->   * @driver_private: pointer to the bridge driver's internal context
+> +/* These functions are defined in lib/tishift.S, but need to be declared
+> + * here so that symbol versioning picks them up.
+> + */
+> +extern long long __ashlti3(long long a, int b);
+> +extern long long __ashrti3(long long a, int b);
+> +extern long long __lshrti3(long long a, int b);
+> diff --git a/arch/arm64/lib/tishift.S b/arch/arm64/lib/tishift.S
+> index d3db9b2cd479..3bca433973cb 100644
+> --- a/arch/arm64/lib/tishift.S
+> +++ b/arch/arm64/lib/tishift.S
+> @@ -1,20 +1,10 @@
+> -/*
+> - * Copyright (C) 2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+> +/* SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
+>   *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - *
+> - * You should have received a copy of the GNU General Public License
+> - * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
 >   */
->  struct drm_bridge {
-> +	struct device *owner;
-> +	struct device_link *link;
->  	struct drm_device *dev;
->  	struct drm_encoder *encoder;
->  	struct drm_bridge *next;
-> 
-> 
+>  
+>  #include <linux/linkage.h>
+> +#include <asm-generic/export.h>
+>  
+>  ENTRY(__ashlti3)
+>  	cbz	x2, 1f
+> @@ -36,6 +26,7 @@ ENTRY(__ashlti3)
+>  	mov	x0, x2
+>  	ret
+>  ENDPROC(__ashlti3)
+> +EXPORT_SYMBOL(__ashlti3)
+
+We normally export asm symbols via arm64ksyms.c. In fact, would doing that
+remove the need for the explicit declarations completely?
+
+Will
