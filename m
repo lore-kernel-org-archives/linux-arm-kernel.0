@@ -1,29 +1,41 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 24 Apr 2018 09:29:48 -0700
-Subject: [PATCH v3 03/10] drivers/peci: Add support for PECI bus driver
- core
-In-Reply-To: <1524585717.21176.504.camel@linux.intel.com>
-References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
- <20180410183212.16787-4-jae.hyun.yoo@linux.intel.com>
- <1524585717.21176.504.camel@linux.intel.com>
-Message-ID: <af70513f-a827-9aaa-1acf-629ae1692d7c@linux.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 24 Apr 2018 11:42:07 -0500
+Subject: [PATCH 4/6] drm/panel: simple: Add support for Banana Pi 7"
+ S070WV20-CT16 panel
+In-Reply-To: <20180419093225.614-5-wens@csie.org>
+References: <20180419093225.614-1-wens@csie.org>
+ <20180419093225.614-5-wens@csie.org>
+Message-ID: <20180424164207.ay4ai6lbspgv6anw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/24/2018 9:01 AM, Andy Shevchenko wrote:
-> On Tue, 2018-04-10 at 11:32 -0700, Jae Hyun Yoo wrote:
->> This commit adds driver implementation for PECI bus core into linux
->> driver framework.
->>
+On Thu, Apr 19, 2018 at 05:32:23PM +0800, Chen-Yu Tsai wrote:
+> This panel is marketed as Banana Pi 7" LCD display. On the back is
+> a sticker denoting the model name S070WV20-CT16.
 > 
-> All comments you got for patch 6 are applicable here.
+> This is a 7" 800x480 panel connected through a 24-bit RGB interface.
+> However the panel only does 262k colors.
 > 
-> And perhaps in the rest of the series.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../display/panel/bananapi,s070wv20-ct16.txt  |  7 ++++++
+>  drivers/gpu/drm/panel/panel-simple.c          | 25 +++++++++++++++++++
+>  2 files changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
 > 
-> The rule of thumb: when you get even single comment in a certain place,
-> re-check _entire_ series for the same / similar patterns!
-> 
+> diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
+> new file mode 100644
+> index 000000000000..2ec35ce36e9a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
+> @@ -0,0 +1,7 @@
+> +Banana Pi 7" (S070WV20-CT16) TFT LCD Panel
+> +
+> +Required properties:
+> +- compatible: should be "bananapi,s070wv20-ct16"
+> +
+> +This binding is compatible with the simple-panel binding, which is specified
+> +in simple-panel.txt in this directory.
 
-Thanks for your advice. I'll keep that in mind.
-
-Jae
+Does this panel have a power supply (or more than 1) or backlight? I 
+can't know that by just refering to simple-panel.txt.
