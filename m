@@ -1,42 +1,50 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 24 Apr 2018 10:24:44 +0200
-Subject: [PATCH 0/5] arm64: dts: renesas: r8a779xx: sort nodes
-In-Reply-To: <CAH1o70+1wfa1Vc1B_fjofhk4CALXtT-eyvXznDsDNypNOVfG1A@mail.gmail.com>
-References: <1524082480-18163-1-git-send-email-ykaneko0929@gmail.com>
- <20180423102658.ezofcrgzzwvzdfor@verge.net.au>
- <CAH1o70+1wfa1Vc1B_fjofhk4CALXtT-eyvXznDsDNypNOVfG1A@mail.gmail.com>
-Message-ID: <20180424082443.svxfrb2lhzjh3g3z@verge.net.au>
+Date: Tue, 24 Apr 2018 10:26:23 +0200
+Subject: [PATCH] dt-bindings: arm: consistently name r8a77965 as M3-N
+In-Reply-To: <CAMuHMdWZoXSJnuEiD4e9SpP+ASFgDCcwy16UFOeSEq5sNnsMSA@mail.gmail.com>
+References: <20180424055442.19710-1-horms+renesas@verge.net.au>
+ <CAMuHMdWZoXSJnuEiD4e9SpP+ASFgDCcwy16UFOeSEq5sNnsMSA@mail.gmail.com>
+Message-ID: <20180424082623.y6d2unyo45wktkx2@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 02:31:40AM +0900, Yoshihiro Kaneko wrote:
-> Hi Simon-san,
+On Tue, Apr 24, 2018 at 09:16:17AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> 2018-04-23 19:26 GMT+09:00 Simon Horman <horms@verge.net.au>:
-> > On Thu, Apr 19, 2018 at 05:14:35AM +0900, Yoshihiro Kaneko wrote:
-> >> Sort nodes of the R-Car M3-N (r8a77965), V3M (r8a77970) and D3 (r8a77995) DTs.
-> >>
-> >> This is part of an ongoing effort to provide consistent node
-> >> order in the DT of Renesas SoCs to improve maintainability.
-> >>
-> >> This should not have any run-time effect.
-> >>
-> >> Based on the devel branch of Simon Horman's renesas tree.
-> >>
-> >> Yoshihiro Kaneko (5):
-> >>   arm64: dts: renesas: r8a77995: sort subnodes of the root node
-> >>   arm64: dts: renesas: r8a77995: sort subnodes of the soc node
-> >>   arm64: dts: renesas: r8a77965: sort subnodes of the root node
-> >>   arm64: dts: renesas: r8a77965: sort subnodes of the soc node
-> >>   arm64: dts: renesas: r8a77970: sort subnodes of the soc node
+> On Tue, Apr 24, 2018 at 7:54 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > There is an inconsistency between the use of M3N and M3-N.
+> > This patch resolves this by consistently using the latter.
 > >
-> > Thanks, applied.
-> >
-> > There ware a few nodes added to r8a77970 between when you made
-> > this patchset and when I applied it. I think the r8a77970 is still
-> > sorted as desired. Could you double-check once I push a devel
-> > branch later today?
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Yes, will do.
+> Note that this is for a custom Salvator-X board where the M3-W SiP was
+> replaced by an M3-N SiP.  So I have no idea what's on the sticker, if it was
+> replaced at all, and thus kept the text from the BSP.
 
-Thanks, you should now be able to check renesas-devel-20180423-v4.17-rc2
+Understood. But I think we should make the naming consistent regardless.
+
+> 
+> > --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> > +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> > @@ -116,7 +116,7 @@ Boards:
+> >      compatible = "renesas,salvator-x", "renesas,r8a7795"
+> >    - Salvator-X (RTP0RC7796SIPB0011S)
+> >      compatible = "renesas,salvator-x", "renesas,r8a7796"
+> > -  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
+> > +  - Salvator-X (RTP0RC7796SIPB0011S (M3-N))
+> >      compatible = "renesas,salvator-x", "renesas,r8a77965"
+> >    - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
+> >      compatible = "renesas,salvator-xs", "renesas,r8a7795"
+> \
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> -- 
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
