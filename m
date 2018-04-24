@@ -1,70 +1,47 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 24 Apr 2018 10:49:11 +0200
-Subject: [PATCH v3 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
- Edition support
-In-Reply-To: <20180424075505.p6e43yw2juw4fqqw@flea>
-References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
- <20180421164246.8477-3-miquel.raynal@bootlin.com>
- <20180423072403.4ip5seys4xyll3yr@flea>
- <20180423122752.364ee649@xps13>
- <20180424075505.p6e43yw2juw4fqqw@flea>
-Message-ID: <20180424104911.42ae8864@xps13>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 24 Apr 2018 14:21:00 +0530
+Subject: [PATCH v2 0/2] memory: aemif: add support for machine code
+In-Reply-To: <0f2903da-b670-dc85-e61b-64cac90a6c34@oracle.com>
+References: <20180419151252.26212-1-brgl@bgdev.pl>
+ <0f2903da-b670-dc85-e61b-64cac90a6c34@oracle.com>
+Message-ID: <4d72accf-7d63-c725-0b67-253ed6818ae0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Tue, 24 Apr 2018 09:55:05 +0200, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-
-> On Mon, Apr 23, 2018 at 12:27:52PM +0200, Miquel Raynal wrote:
-> > > >  	sun8i-r16-parrot.dtb \
-> > > >  	sun8i-r40-bananapi-m2-ultra.dtb \
-> > > >  	sun8i-v3s-licheepi-zero.dtb \
-> > > > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > index 6b9e85b4ba0f..44f3cad3de75 100644
-> > > > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > @@ -198,6 +198,8 @@
-> > > >  			clock-names = "ahb", "mod";
-> > > >  			resets = <&ccu RST_BUS_NAND>;
-> > > >  			reset-names = "ahb";
-> > > > +			pinctrl-names = "default";
-> > > > +			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;    
-> > > 
-> > > This should be in your first patch I guess?  
-> > 
-> > Actually I think this should not be there but instead, because it is
-> > board-related, these two lines should be in the nes-classic.dts' nfc
-> > node, right? Other a23/a33/r16 based designs could use the second set
-> > of CS/RB pins.  
+On Friday 20 April 2018 10:54 PM, santosh.shilimkar at oracle.com wrote:
+> On 4/19/18 8:12 AM, Bartosz Golaszewski wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> This is a follow-up to the series that contained both changes to the
+>> aemif driver and platform code. It contains only the driver changes.
+>>
+>> As the first step in removing duplicate support for aemif from the
+>> kernel we need to add support for board files to the aemif memory
+>> driver.
+>>
+>> First patch just uses a static string for the ti-aemif driver name.
+>>
+>> The second adds support for board files to the aemif driver.
+>>
+>> This series includes changes requested by Sekhar in his code review:
+>> - made aemif the parent of each sub-device before registering it
+>> - documented the new members in aemif_platform_data
+>>
+>> v1 -> v2:
+>> - actually iterate over abus entries instead of always accessing the
+>> ?? first one
+>>
+>> Bartosz Golaszewski (2):
+>> ?? memory: aemif: don't rely on kbuild for driver's name
+>> ?? memory: aemif: add support for board files
+>>
+> Applied. Should show up in next soon.
 > 
-> Does that ever happen?
+> Sekhar, You can use below branch.
 > 
-> On a theoretical level, then yeah, sure. But if all the boards seen
-> out there are using the same setup (which is pretty common), then
-> there's no reason not to do it in the DTSI.
+> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git ?'for_4.18/soc-drivers'
 
-I compared the various boards configurations [1] with the R16 datasheet
-[2], all the boards having a NAND configure all the related pins
-(including CS1 and RB1). So I guess I can put both properties in the
-DTSI.
-
-There is one case (sinlinx_sina33) where the NAND is not used and the
-pins are used for an alternate function: SPI0; but I guess this is not
-a problem as in this case, the NAND node would not exist in the
-resulting DTB.
+Thanks Santosh!
 
 Regards,
-Miqu?l
-
-> 
-> Maxime
-> 
-
-
-
--- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Sekhar
