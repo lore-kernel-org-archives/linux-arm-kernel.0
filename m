@@ -1,113 +1,76 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 24 Apr 2018 13:29:20 +0800
-Subject: [PATCH] mmc: mediatek: add 64G DRAM DMA support
-In-Reply-To: <1524475610-22079-2-git-send-email-chaotian.jing@mediatek.com>
-References: <1524475610-22079-2-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <201804241105.EZI8Ml1m%fengguang.wu@intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Apr 2018 06:48:54 +0100
+Subject: [v2 00/10] arm/arm64: mediatek: Fix mmsys device probing
+In-Reply-To: <cover.1524497268.git.mbrugger@suse.com>
+References: <cover.1524497268.git.mbrugger@suse.com>
+Message-ID: <20180424054854.bpd6h3imazhqnuy3@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chaotian,
+On Mon, 23 Apr 2018, matthias.bgg at kernel.org wrote:
 
-Thank you for the patch! Perhaps something to improve:
+> From: Matthias Brugger <mbrugger@suse.com>
+> 
+> Changes since v1:
+> - add binding documentation
+> - ddp: use regmap_update_bits
+> - ddp: ignore EPROBE_DEFER on clock probing
+> - mfd: delete mmsys_private
+> - add Reviewed-by and Acked-by tags
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.17-rc2 next-20180423]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I'm confused by the double submission.
 
-url:    https://github.com/0day-ci/linux/commits/Chaotian-Jing/mmc-mediatek-add-64G-DRAM-DMA-support/20180423-231743
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Please can you send it again completely detached from the first and
+the second submissions please?
 
-All warnings (new ones prefixed by >>):
+> ---
+> 
+> MMSYS in Mediatek SoCs has some registers to control clock gates (which is 
+> used in the clk driver) and some registers to set the routing and enable
+> the differnet blocks of the display subsystem.
+> 
+> Up to now both drivers, clock and drm are probed with the same device tree
+> compatible. But only the first driver get probed, which in effect breaks
+> graphics on mt8173 and mt2701.
+> 
+> This patch set introduces a new mfd device, which binds against the mmsys
+> compatible and takes care of probing the needed devices. It was tested on the
+> bananapi-r2 and the Acer R13 Chromebook.
+> 
+> 
+> Matthias Brugger (10):
+>   dt-bindings: mediatek: mmsys: Add support for mfd
+>   drm/mediatek: Use regmap for register access
+>   mfd: mtk-mmsys: Add mmsys driver
+>   drm/mediatek: mt2701: switch to mfd probing.
+>   clk: mediatek: mt2701-mm: switch to mfd device
+>   mfd: mtk-mmsys: Add mt8173 nodes
+>   drm/mediatek: Add mfd support for mt8173
+>   clk: mediatek: mt8173-mm: switch to mfd device
+>   drm: mediatek: Omit warning on probe defers
+>   MAINTAINERS: update Mediatek Soc entry
+> 
+>  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  2 -
+>  .../bindings/display/mediatek/mediatek,disp.txt    |  2 +-
+>  .../devicetree/bindings/mfd/mediatek,mmsys.txt     | 27 +++++++
+>  MAINTAINERS                                        |  2 +
+>  drivers/clk/mediatek/clk-mt2701-mm.c               | 10 +--
+>  drivers/clk/mediatek/clk-mt8173.c                  | 17 +++-
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |  4 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 41 ++++------
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.h             |  4 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c             | 33 ++++----
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h             |  2 +-
+>  drivers/mfd/Kconfig                                |  9 +++
+>  drivers/mfd/Makefile                               |  2 +
+>  drivers/mfd/mtk-mmsys.c                            | 93 ++++++++++++++++++++++
+>  14 files changed, 189 insertions(+), 59 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+>  create mode 100644 drivers/mfd/mtk-mmsys.c
+> 
 
-   drivers/mmc/host/mtk-sd.c: In function 'msdc_dma_setup':
->> drivers/mmc/host/mtk-sd.c:573:35: warning: right shift count >= width of type [-Wshift-count-overflow]
-       bd[j].bd_info |= ((dma_address >> 32) & 0xf) << 28;
-                                      ^~
-   drivers/mmc/host/mtk-sd.c: In function 'msdc_init_gpd_bd':
-   drivers/mmc/host/mtk-sd.c:1440:31: warning: right shift count >= width of type [-Wshift-count-overflow]
-      gpd->gpd_info |= ((dma_addr >> 32) & 0xf) << 24;
-                                  ^~
-   drivers/mmc/host/mtk-sd.c:1445:31: warning: right shift count >= width of type [-Wshift-count-overflow]
-      gpd->gpd_info |= ((dma_addr >> 32) & 0xf) << 28;
-                                  ^~
-   drivers/mmc/host/mtk-sd.c:1452:32: warning: right shift count >= width of type [-Wshift-count-overflow]
-       bd[i].bd_info |= ((dma_addr >> 32) & 0xf) << 24;
-                                   ^~
-
-vim +573 drivers/mmc/host/mtk-sd.c
-
-   539	
-   540	static inline void msdc_dma_setup(struct msdc_host *host, struct msdc_dma *dma,
-   541			struct mmc_data *data)
-   542	{
-   543		unsigned int j, dma_len;
-   544		dma_addr_t dma_address;
-   545		u32 dma_ctrl;
-   546		struct scatterlist *sg;
-   547		struct mt_gpdma_desc *gpd;
-   548		struct mt_bdma_desc *bd;
-   549	
-   550		sg = data->sg;
-   551	
-   552		gpd = dma->gpd;
-   553		bd = dma->bd;
-   554	
-   555		/* modify gpd */
-   556		gpd->gpd_info |= GPDMA_DESC_HWO;
-   557		gpd->gpd_info |= GPDMA_DESC_BDP;
-   558		/* need to clear first. use these bits to calc checksum */
-   559		gpd->gpd_info &= ~GPDMA_DESC_CHECKSUM;
-   560		gpd->gpd_info |= msdc_dma_calcs((u8 *) gpd, 16) << 8;
-   561	
-   562		/* modify bd */
-   563		for_each_sg(data->sg, sg, data->sg_count, j) {
-   564			dma_address = sg_dma_address(sg);
-   565			dma_len = sg_dma_len(sg);
-   566	
-   567			/* init bd */
-   568			bd[j].bd_info &= ~BDMA_DESC_BLKPAD;
-   569			bd[j].bd_info &= ~BDMA_DESC_DWPAD;
-   570			bd[j].ptr = (u32)dma_address;
-   571			if (host->dev_comp->support_64g) {
-   572				bd[j].bd_info &= ~BDMA_DESC_PTR_H4;
- > 573				bd[j].bd_info |= ((dma_address >> 32) & 0xf) << 28;
-   574			}
-   575			bd[j].bd_data_len &= ~BDMA_DESC_BUFLEN;
-   576			bd[j].bd_data_len |= (dma_len & BDMA_DESC_BUFLEN);
-   577	
-   578			if (j == data->sg_count - 1) /* the last bd */
-   579				bd[j].bd_info |= BDMA_DESC_EOL;
-   580			else
-   581				bd[j].bd_info &= ~BDMA_DESC_EOL;
-   582	
-   583			/* checksume need to clear first */
-   584			bd[j].bd_info &= ~BDMA_DESC_CHECKSUM;
-   585			bd[j].bd_info |= msdc_dma_calcs((u8 *)(&bd[j]), 16) << 8;
-   586		}
-   587	
-   588		sdr_set_field(host->base + MSDC_DMA_CFG, MSDC_DMA_CFG_DECSEN, 1);
-   589		dma_ctrl = readl_relaxed(host->base + MSDC_DMA_CTRL);
-   590		dma_ctrl &= ~(MSDC_DMA_CTRL_BRUSTSZ | MSDC_DMA_CTRL_MODE);
-   591		dma_ctrl |= (MSDC_BURST_64B << 12 | 1 << 8);
-   592		writel_relaxed(dma_ctrl, host->base + MSDC_DMA_CTRL);
-   593		writel((u32)dma->gpd_addr, host->base + MSDC_DMA_SA);
-   594	}
-   595	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 65221 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/63d658e9/attachment-0001.gz>
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
