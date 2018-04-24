@@ -1,77 +1,54 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Tue, 24 Apr 2018 13:46:21 -0700
-Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <20180424174111.GH22073@sirena.org.uk>
-References: <cover.1521246069.git.collinsd@codeaurora.org>
- <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
- <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
- <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
- <152411734938.46528.9676451637772936597@swboyd.mtv.corp.google.com>
- <20180419120813.GD27188@sirena.org.uk>
- <38f42537-f801-115a-4120-1344a67a0462@codeaurora.org>
- <20180424174111.GH22073@sirena.org.uk>
-Message-ID: <d82ef514-b94f-8ed9-6b1e-e07de2a5f455@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Apr 2018 22:50:58 +0200
+Subject: [RFC 00/10] ARM: Remove support for Exynos5440
+In-Reply-To: <20180424203239.21885-1-krzk@kernel.org>
+References: <20180424203239.21885-1-krzk@kernel.org>
+Message-ID: <CAK8P3a2CZU1CYFt0fdVSFFnj2Wg=mUcC=yuWAW7zDO0u2Q2dUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2018 10:41 AM, Mark Brown wrote:
-> On Fri, Apr 20, 2018 at 12:28:21PM -0700, David Collins wrote:
+On Tue, Apr 24, 2018 at 10:32 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> Hi,
+>
+>
+> Overview
+> ========
+> Let's continue the removal of old platforms. We already get rid of Exynos4212.
+> Now it's time for Exynos5440.
+>
+> The Exynos5440 (quad-core A15 with GMAC, PCIe, SATA) was targeting
+> server platforms but it did not make it to the market really.  There are
+> no development boards with it and probably there are no real products
+> neither.  The development for Exynos5440 ended in 2013 and since then
+> the platform is in maintenance mode.
+>
+> The only development happening around it is the PCIe driver for Exynos5433
+> (ARMv8). [1]
+>
+> Removing Exynos5440, makes our life slightly easier:
+> 1. Less maintenance,
+> 2. Smaller code, less quirks,
+> 3. No need to preserve (imaginary) backward-compatibility for Exynos PCIe
+>    driver (so it is easier to add support for Exynos5433).
+>
+>
+> Because of point (3) above - I left the PCIe and PCIe PHY drivers intact.
+>
+>
+> Dependencies
+> ============
+> I think about starting with removal of DTS in some kernel release (patch 1/10).
+> Then all drivers can be removed/updated - subsystem maintainers can pick their
+> patches freely.
+>
+> Finally, after getting rid of all Exynos5440 symbols, the last patch (10/10) will
+> end in arm-soc tree.
+>
+>
+> Any comments?
 
->> RPMh hardware enforces the requested minimum headroom voltage for all
->> regulators with a parent.  It has full knowledge of the parent-child
->> connections of regulators on the board (as programmed by the bootloader).
->> It automatically reconfigures the parent voltage when needed as a result
->> of requests changing the voltage of any of its child regulators.
-> 
-> If the hardware has full knowledge of all these constraints and enforces
-> them transparently then why does the kernel care that it's doing that?
-> Doesn't it defeat the point of it doing all this stuff if we have to
-> know about it?
+I don't see any hard dependency here, if this is all unused, I think we
+can apply both patches 1 and 10 into arm-soc at the same time as merging
+the other patches through the respective subsystem trees.
 
-The RPMh hardware is aware of the parent-child connections between
-regulators as well as minimum headroom to ensure stable LDO voltage output
-for subregulated LDOs.  The intention of having the headroom be a
-configurable property for processors is to support usecases in which
-subregulated LDO loads are particularly sensitive to noise and require
-additional headroom.  Such usecases are board dependent and beyond the
-baseline configurations set in RPMh hardware.
-
-
->>> Ideally future versions of the RPM will have improved interfaces,
->>> there's a bunch of problems like this :(
-> 
->> Do you have a preference for qcom,regulator-initial-microvolt vs a generic
->> framework supported regulator-initial-microvolt property for configuring a
->> specific voltage at registration time?  We'll need to have support for one
->> or the other in order for the qcom_rpmh-regulator driver to be functional.
-> 
-> This is basically specific to Qualcomm, I can't off hand think of any
-> other devices with similar issues.
-
-I will go with qcom,regulator-initial-microvolt then.
-
-
->>> Yes, constraints that specify a single voltage are done by setting min
->>> and max to the same value.  fixed_uV is *only* for regulators that have
->>> a physically fixed voltage.
-> 
->> XOB managed regulators physically cannot change voltage.  Therefore, do
->> you agree that it is reasonable to use fixed_uV for them?  Note that I
->> removed init_data->constraints.apply_uV manipulation in version 2 of this
->> patch.
-> 
-> If these regulators can't change voltage then surely we know what
-> voltage they have without needing it to be specified in DT?
-
-In the case of XOB managed LDO regulators, the LDOs physically can be
-configured to different voltages by the bootloader.  However, the RPMh
-interface provides no mechanism for the application processor to read or
-change that voltage.  Therefore, we need a way to specify such voltages in
-a board specific (as opposed to driver specific) manner (i.e. device tree).
-
-Take care,
-David
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+      Arnd
