@@ -1,57 +1,32 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 24 Apr 2018 16:30:47 +0900
-Subject: [PATCH 05/61] clk: samsung: simplify getting .drvdata
-In-Reply-To: <20180419140641.27926-6-wsa+renesas@sang-engineering.com>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <CGME20180419140651epcas5p22119a061c760dd54c0c3e630b053ec1b@epcas5p2.samsung.com>
- <20180419140641.27926-6-wsa+renesas@sang-engineering.com>
-Message-ID: <5ADEDD27.3070207@samsung.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 24 Apr 2018 09:35:24 +0200
+Subject: [PATCH 01/22] dma-debug: move initialization to common code
+In-Reply-To: <294a1469-01d6-10fb-5de1-b1d4513a066c@arm.com>
+References: <20180420080313.18796-1-hch@lst.de>
+ <20180420080313.18796-2-hch@lst.de>
+ <294a1469-01d6-10fb-5de1-b1d4513a066c@arm.com>
+Message-ID: <20180424073524.GB18945@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 20, 2018 at 11:23:43AM +0100, Robin Murphy wrote:
+>> -void dma_debug_init(u32 num_entries)
+>> +static int dma_debug_init(void)
+>>   {
+>> +	u32 num_entries;
+>
+> Maybe initialise it to PREALLOC_DMA_DEBUG_ENTRIES?
 
-On 2018? 04? 19? 23:05, Wolfram Sang wrote:
-> We should get drvdata from struct device directly. Going via
-> platform_device is an unneeded step back and forth.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> ---
-> 
-> Build tested only. buildbot is happy. Please apply individually.
-> 
->  drivers/clk/samsung/clk-s3c2410-dclk.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
-> index 077df3e539a7..f41d89cef0f1 100644
-> --- a/drivers/clk/samsung/clk-s3c2410-dclk.c
-> +++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
-> @@ -219,8 +219,7 @@ static int s3c24xx_dclk1_div_notify(struct notifier_block *nb,
->  #ifdef CONFIG_PM_SLEEP
->  static int s3c24xx_dclk_suspend(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct s3c24xx_dclk *s3c24xx_dclk = platform_get_drvdata(pdev);
-> +	struct s3c24xx_dclk *s3c24xx_dclk = dev_get_drvdata(dev);
->  
->  	s3c24xx_dclk->reg_save = readl_relaxed(s3c24xx_dclk->base);
->  	return 0;
-> @@ -228,8 +227,7 @@ static int s3c24xx_dclk_suspend(struct device *dev)
->  
->  static int s3c24xx_dclk_resume(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct s3c24xx_dclk *s3c24xx_dclk = platform_get_drvdata(pdev);
-> +	struct s3c24xx_dclk *s3c24xx_dclk = dev_get_drvdata(dev);
->  
->  	writel_relaxed(s3c24xx_dclk->reg_save, s3c24xx_dclk->base);
->  	return 0;
-> 
+We initialize it down in an if/else clause which seems a little more clear
+to me, at the cost of two extra lines of code.  But I suspect I should
+just go a little further and merge the global req_entries and the local
+num_entries into a single variable with a better name.
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> +core_initcall(dma_debug_init);
+>
+> I think it's worth noting that for most users this now happens much earlier 
+> than before. In general that's probably good (e.g. on arm64 it should 
+> prevent false-positives from the Arm SMMU drivers under ACPI), and I can't 
+> imagine it's high-risk, but it is a behaviour change.
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+I'll mention this in the changelog, thanks!
