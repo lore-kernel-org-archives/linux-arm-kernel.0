@@ -1,32 +1,38 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 24 Apr 2018 07:54:42 +0200
-Subject: [PATCH] dt-bindings: arm: consistently name r8a77965 as M3-N
-Message-ID: <20180424055442.19710-1-horms+renesas@verge.net.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 24 Apr 2018 11:37:33 +0530
+Subject: [PATCH 0/3] cpufreq: dt: Allow platforms to provide suspend/resume
+ hooks
+Message-ID: <cover.1524549644.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an inconsistency between the use of M3N and M3-N.
-This patch resolves this by consistently using the latter.
+Hi Miquel,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-Based on renesas-devel-20180423-v4.17-rc2
----
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This is in response to the patch[1] you sent.
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 61b486fb5793..02c5d261683f 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -116,7 +116,7 @@ Boards:
-     compatible = "renesas,salvator-x", "renesas,r8a7795"
-   - Salvator-X (RTP0RC7796SIPB0011S)
-     compatible = "renesas,salvator-x", "renesas,r8a7796"
--  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
-+  - Salvator-X (RTP0RC7796SIPB0011S (M3-N))
-     compatible = "renesas,salvator-x", "renesas,r8a77965"
-   - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
-     compatible = "renesas,salvator-xs", "renesas,r8a7795"
+I have updated the cpufreq-dt driver to allow platform specific
+suspend/resume hooks and done some minor cleanup in the driver. I have
+updated your patch and applied that on top of all this. I haven't tested
+any of this and would need your help to get that done.
+
+Thanks.
+
+--
+viresh
+
+[1] https://lkml.kernel.org/r/20180421141943.25705-1-miquel.raynal at bootlin.com
+
+Miquel Raynal (1):
+  cpufreq: add suspend/resume support in Armada 37xx DVFS driver
+
+Viresh Kumar (2):
+  cpufreq: dt: Allow platform specific suspend/resume callbacks
+  cpufreq: armada: Free resources on error paths
+
+ drivers/cpufreq/armada-37xx-cpufreq.c | 107 +++++++++++++++++++++++++++++-----
+ drivers/cpufreq/cpufreq-dt.c          |  10 +++-
+ drivers/cpufreq/cpufreq-dt.h          |   5 ++
+ 3 files changed, 104 insertions(+), 18 deletions(-)
+
 -- 
-2.11.0
+2.15.0.194.g9af6a3dea062
