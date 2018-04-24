@@ -1,39 +1,148 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 24 Apr 2018 16:02:35 +0200
-Subject: [PATCH 3/3] dma-debug: unexport dma_debug_resize_entries and
- debug_dma_dump_mappings
-In-Reply-To: <20180424140235.9125-1-hch@lst.de>
-References: <20180424140235.9125-1-hch@lst.de>
-Message-ID: <20180424140235.9125-4-hch@lst.de>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Tue, 24 Apr 2018 10:02:33 -0400
+Subject: [RESEND PATCH v6 22/27] drm/bridge: analogix_dp: Split the
+ platform-specific poweron in two parts
+In-Reply-To: <20180423105003.9004-23-enric.balletbo@collabora.com>
+References: <20180423105003.9004-1-enric.balletbo@collabora.com>
+ <20180423105003.9004-23-enric.balletbo@collabora.com>
+Message-ID: <000501d3dbd4$e6f238e0$b4d6aaa0$@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only used by the AMD GART driver, which must be built in.
+On Monday, April 23, 2018 6:50 AM, Enric Balletbo i Serra wrote:
+> 
+> From: Douglas Anderson <dianders@chromium.org>
+> 
+> Some of the platform-specific stuff in rockchip_dp_poweron() needs to
+> happen before the generic code.  Some needs to happen after.  Let's
+> split the callback in two.
+> 
+> Specifically we can't start doing PSR work until _after_ the whole
+> controller is up, so don't set the enable until the end.
+> 
+> Cc: Kristian H. Kristensen <hoegsberg@chromium.org>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> [seanpaul added exynos change]
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Archit Taneja <architt@codeaurora.org>
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- lib/dma-debug.c | 2 --
- 1 file changed, 2 deletions(-)
+Acked-by: Jingoo Han <jingoohan1@gmail.com>
 
-diff --git a/lib/dma-debug.c b/lib/dma-debug.c
-index 075253cb613b..6a1ebaa83623 100644
---- a/lib/dma-debug.c
-+++ b/lib/dma-debug.c
-@@ -444,7 +444,6 @@ void debug_dma_dump_mappings(struct device *dev)
- 		spin_unlock_irqrestore(&bucket->lock, flags);
- 	}
- }
--EXPORT_SYMBOL(debug_dma_dump_mappings);
- 
- /*
-  * For each mapping (initial cacheline in the case of
-@@ -753,7 +752,6 @@ int dma_debug_resize_entries(u32 num_entries)
- 
- 	return ret;
- }
--EXPORT_SYMBOL(dma_debug_resize_entries);
- 
- /*
-  * DMA-API debugging init code
--- 
-2.17.0
+Best regards,
+Jingoo Han
+
+> ---
+> 
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  7 +++++--
+>  drivers/gpu/drm/exynos/exynos_dp.c                 |  2 +-
+>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 12 ++++++++++--
+>  include/drm/bridge/analogix_dp.h                   |  3 ++-
+>  4 files changed, 18 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> index a260de4f0bd8..2bcbfadb6ac5 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> @@ -1260,8 +1260,8 @@ static int analogix_dp_set_bridge(struct
+> analogix_dp_device *dp)
+>  		goto out_dp_clk_pre;
+>  	}
+> 
+> -	if (dp->plat_data->power_on)
+> -		dp->plat_data->power_on(dp->plat_data);
+> +	if (dp->plat_data->power_on_start)
+> +		dp->plat_data->power_on_start(dp->plat_data);
+> 
+>  	phy_power_on(dp->phy);
+> 
+> @@ -1286,6 +1286,9 @@ static int analogix_dp_set_bridge(struct
+> analogix_dp_device *dp)
+>  		goto out_dp_init;
+>  	}
+> 
+> +	if (dp->plat_data->power_on_end)
+> +		dp->plat_data->power_on_end(dp->plat_data);
+> +
+>  	enable_irq(dp->irq);
+>  	return 0;
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_dp.c
+> b/drivers/gpu/drm/exynos/exynos_dp.c
+> index 964831dab102..86330f396784 100644
+> --- a/drivers/gpu/drm/exynos/exynos_dp.c
+> +++ b/drivers/gpu/drm/exynos/exynos_dp.c
+> @@ -162,7 +162,7 @@ static int exynos_dp_bind(struct device *dev, struct
+> device *master, void *data)
+>  	dp->drm_dev = drm_dev;
+> 
+>  	dp->plat_data.dev_type = EXYNOS_DP;
+> -	dp->plat_data.power_on = exynos_dp_poweron;
+> +	dp->plat_data.power_on_start = exynos_dp_poweron;
+>  	dp->plat_data.power_off = exynos_dp_poweroff;
+>  	dp->plat_data.attach = exynos_dp_bridge_attach;
+>  	dp->plat_data.get_modes = exynos_dp_get_modes;
+> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> index b3f46ed24cdc..23317a2269e1 100644
+> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> @@ -109,7 +109,7 @@ static int rockchip_dp_pre_init(struct
+> rockchip_dp_device *dp)
+>  	return 0;
+>  }
+> 
+> -static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
+> +static int rockchip_dp_poweron_start(struct analogix_dp_plat_data
+> *plat_data)
+>  {
+>  	struct rockchip_dp_device *dp = to_dp(plat_data);
+>  	int ret;
+> @@ -127,6 +127,13 @@ static int rockchip_dp_poweron(struct
+> analogix_dp_plat_data *plat_data)
+>  		return ret;
+>  	}
+> 
+> +	return ret;
+> +}
+> +
+> +static int rockchip_dp_poweron_end(struct analogix_dp_plat_data
+> *plat_data)
+> +{
+> +	struct rockchip_dp_device *dp = to_dp(plat_data);
+> +
+>  	return rockchip_drm_psr_activate(&dp->encoder);
+>  }
+> 
+> @@ -330,7 +337,8 @@ static int rockchip_dp_bind(struct device *dev, struct
+> device *master,
+>  	dp->plat_data.encoder = &dp->encoder;
+> 
+>  	dp->plat_data.dev_type = dp->data->chip_type;
+> -	dp->plat_data.power_on = rockchip_dp_poweron;
+> +	dp->plat_data.power_on_start = rockchip_dp_poweron_start;
+> +	dp->plat_data.power_on_end = rockchip_dp_poweron_end;
+>  	dp->plat_data.power_off = rockchip_dp_powerdown;
+>  	dp->plat_data.get_modes = rockchip_dp_get_modes;
+> 
+> diff --git a/include/drm/bridge/analogix_dp.h
+> b/include/drm/bridge/analogix_dp.h
+> index e9a1116d2f8e..475b706b49de 100644
+> --- a/include/drm/bridge/analogix_dp.h
+> +++ b/include/drm/bridge/analogix_dp.h
+> @@ -33,7 +33,8 @@ struct analogix_dp_plat_data {
+>  	struct drm_connector *connector;
+>  	bool skip_connector;
+> 
+> -	int (*power_on)(struct analogix_dp_plat_data *);
+> +	int (*power_on_start)(struct analogix_dp_plat_data *);
+> +	int (*power_on_end)(struct analogix_dp_plat_data *);
+>  	int (*power_off)(struct analogix_dp_plat_data *);
+>  	int (*attach)(struct analogix_dp_plat_data *, struct drm_bridge *,
+>  		      struct drm_connector *);
+> --
+> 2.17.0
