@@ -1,33 +1,100 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Apr 2018 15:17:29 +0100
-Subject: [PATCH] arm64: support __int128 with clang
-In-Reply-To: <20180424135608.m5uxhmclhnljpbau@lakrids.cambridge.arm.com>
-References: <20171223004323.1986-1-Jason@zx2c4.com>
- <CAHmME9otwT+14LhmebF8Osna7m_u6xvFEi7pMq2v1-k9WD5Lpw@mail.gmail.com>
- <20180424133527.GB24599@arm.com>
- <20180424135608.m5uxhmclhnljpbau@lakrids.cambridge.arm.com>
-Message-ID: <20180424141729.r7wfnos3p2kdt3ez@lakrids.cambridge.arm.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Tue, 24 Apr 2018 11:31:38 -0300
+Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
+ kevin panel
+In-Reply-To: <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
+References: <20180208174855.55620-1-seanpaul@chromium.org>
+ <20180208174855.55620-7-seanpaul@chromium.org>
+ <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
+Message-ID: <CAAEAJfAQMzUfM86o-xNoyBQzTiEMNH+W=9FyFpBy99nA3HrVgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 02:56:09PM +0100, Mark Rutland wrote:
-> I belevie that currently it is not possible to use a released version of
-> clang to build a working kernel without additional patches (at least
-> 5.0.0, there don't seem to be any 6.0.0 binaries that can target
-> AArch64). Issues include:
-> 
-> * Released versions of clang don't support the 's' constraint used in
->   some hyp code.
-> 
+Hi Doug, Sean:
 
-> * Released versions of clang don't support 'rX' as a register name, as
->   is used by some workaround code shared between arm/arm64.
+I would like to move this forward.
 
-This case will apparently be fixed for 6.0.1 (and presumably 7.0.0):
+On 26 February 2018 at 15:23, Doug Anderson <dianders@chromium.org> wrote:
+> Hi,
+>
+> On Thu, Feb 8, 2018 at 9:48 AM, Sean Paul <seanpaul@chromium.org> wrote:
+>> This patch adds an override mode for kevin devices. The mode increases
+>> both back porches to allow a pixel clock of 26666kHz as opposed to the
+>> 'typical' value of 252750kHz. This is needed to avoid interference with
+>> the touch digitizer on these laptops.
+>>
+>> Changes in v2:
+>>  - Wrap the timing in display-timings node to match binding (Rob/Thierry)
+>> Changes in v3:
+>>  - Unwrap the timing from display-timings and rename panel-timing (Rob)
+>>
+>> Cc: Doug Anderson <dianders@chromium.org>
+>> Cc: Eric Anholt <eric@anholt.net>
+>> Cc: Heiko Stuebner <heiko@sntech.de>
+>> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: St?phane Marchesin <marcheu@chromium.org>
+>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: dri-devel at lists.freedesktop.org
+>> Cc: linux-rockchip at lists.infradead.org
+>> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+>> ---
+>>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>> index 191a6bcb1704..658411ce37ea 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>> @@ -98,6 +98,20 @@
+>>                 backlight = <&backlight>;
+>>                 power-supply = <&pp3300_disp>;
+>>
+>> +               panel-timing {
+>> +                       clock-frequency = <266604720>;
+>> +                       hactive = <2400>;
+>> +                       hfront-porch = <48>;
+>> +                       hback-porch = <84>;
+>> +                       hsync-len = <32>;
+>> +                       hsync-active = <0>;
+>> +                       vactive = <1600>;
+>> +                       vfront-porch = <3>;
+>> +                       vback-porch = <120>;
+>> +                       vsync-len = <10>;
+>> +                       vsync-active = <0>;
+>> +               };
+>> +
+>>                 ports {
+>>                         panel_in_edp: endpoint {
+>>                                 remote-endpoint = <&edp_out_panel>;
+>
+> Kristian brought an old bug to my attention
+> <https://bugs.chromium.org/p/chromium/issues/detail?id=750354> and it
+> made me think.  Should we somehow adjust the bindings here to account
+> for the fact that a board may source several different panels?
+>
+> AKA: on some boards an ODM may want to second source (or third source,
+> or ...) the panel.  They'll randomly connect several different panels
+> to the board and ship the boards out.  The panels are all compatible
+> electrically (same power sequencing) but might need slightly different
+> timings.  In this particular case there's no board-level strappings
+> for the different panels--it's assumed that the EDID on the panels can
+> be used to distinguish them.
+>
+> In that case it seems like it would be nice to allow specifying more
+> than one "panel-timing" nodes.  Maybe keyed off some type of ID that's
+> present in the EDID?
+>
+>
+> Is that something we'd want to account for before we land this series?
+>  It seems like it would just be adding an extra level of nodes?
+>
 
-https://reviews.llvm.org/rL328829
-https://bugs.llvm.org/show_bug.cgi?id=36862
+AFAICS, there is no EDID without a DDC bus, which we don't
+seem to have on gru platforms, do we?
 
-Neither have been released yet.
-
-Mark.
+Regards,
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
