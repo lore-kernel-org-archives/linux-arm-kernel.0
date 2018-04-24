@@ -1,62 +1,25 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 24 Apr 2018 11:19:36 +0200
-Subject: [PATCH 2/2] ARM64: dts: allwinner: Add dts file for Libre Computer
- Board ALL-H3-CC H5 ver.
-In-Reply-To: <1524561576-2201-1-git-send-email-narmstrong@baylibre.com>
-References: <1524561576-2201-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1524561576-2201-3-git-send-email-narmstrong@baylibre.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 24 Apr 2018 11:20:32 +0200
+Subject: [PATCH 0/3] Add R8A77980/Condor PFC support
+In-Reply-To: <4b325d8a-f018-5279-17b9-7fa8aac5b4da@cogentembedded.com>
+References: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
+ <4b325d8a-f018-5279-17b9-7fa8aac5b4da@cogentembedded.com>
+Message-ID: <20180424092032.kuxk2irgh6y27kax@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Libre Computer Board ALL-H3-CC from Libre Technology is a Raspberry
-Pi B+ form factor single board computer based on the Allwinner H2+, H3, or H5
-SoCs with the same PCB.
-The board has 1GB DDR3 SDRAM, provided by 4 2Gb chips. The mounting holes
-and connectors are in the exact same position as on the Raspberry Pi B+.
+On Fri, Apr 20, 2018 at 08:33:20PM +0300, Sergei Shtylyov wrote:
+> On 03/09/2018 03:04 PM, Sergei Shtylyov wrote:
+> 
+> > Here's the set of 3 patches against Simon Horman's 'renesas.git' repo's
+> > 'renesas-devel-20180308-v4.16-rc4' tag.  We're adding the R8A77980 PFC node
+> > and then describing the pins for SCIF0 and EtherAVB devices declared earlier.
+> > These patches depend on the R8A77980 PFC support in order to work properly.
+> 
+>   ... and their time has finally come! Please merge.
+> 
+> > [1/3] arm64: dts: renesas: r8a77980: add PFC support
+> > [2/3] arm64: dts: renesas: condor: add SCIF0 pins
+> > [3/3] arm64: dts: renesas: condor: add EtherAVB pins
 
-This patch enables the H5 variant using the H3 board definition moved to
-a common dtsi in an earlier patch. The dts simply include the common dtsi
-and declares the correct compatible and model of the H5 variant.
-
-Suggested-by: Corentin Labbe <clabbe@baylibre.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/allwinner/Makefile                     |  1 +
- .../boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts   | 14 ++++++++++++++
- 2 files changed, 15 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts
-
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 8bebe7d..7e07c07 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -6,6 +6,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-teres-i.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-libretech-all-h3-cc.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts
-new file mode 100644
-index 0000000..95e113c
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts
-@@ -0,0 +1,14 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2018 BayLibre, SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ */
-+
-+/dts-v1/;
-+#include "sun50i-h5.dtsi"
-+#include <arm/sunxi-libretech-all-h3-cc.dtsi>
-+
-+/ {
-+	model = "Libre Computer Board ALL-H3-CC H5";
-+	compatible = "libretech,all-h3-cc-h5", "allwinner,sun50i-h5";
-+};
--- 
-2.7.4
+Thanks, applied.
