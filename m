@@ -1,49 +1,120 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Apr 2018 14:35:27 +0100
-Subject: [PATCH] arm64: support __int128 with clang
-In-Reply-To: <CAHmME9otwT+14LhmebF8Osna7m_u6xvFEi7pMq2v1-k9WD5Lpw@mail.gmail.com>
-References: <20171223004323.1986-1-Jason@zx2c4.com>
- <CAHmME9otwT+14LhmebF8Osna7m_u6xvFEi7pMq2v1-k9WD5Lpw@mail.gmail.com>
-Message-ID: <20180424133527.GB24599@arm.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 24 Apr 2018 19:04:18 +0530
+Subject: [RFC 06/13] arm64: dts: allwinner: a64: Add DE2 pipeline
+In-Reply-To: <20180424133425.24291-1-jagan@amarulasolutions.com>
+References: <20180424133425.24291-1-jagan@amarulasolutions.com>
+Message-ID: <20180424133425.24291-7-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 15, 2018 at 06:20:11PM +0200, Jason A. Donenfeld wrote:
-> Would you review/merge this when you have a chance?
+The display pipeline on A64 has similar behavior like A83T,
+so use A83 compatible strings for probing relevant drivers.
 
-No real objection from me, but does the arm64 kernel actually build with
-clang?
+Added Mixer0, tcon0 has initial support, rest will add eventually.
 
-Will
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 61 +++++++++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_drv.c             |  1 +
+ 2 files changed, 62 insertions(+)
 
-> On Sat, Dec 23, 2017 at 1:43 AM, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
-> > Commit fb8722735f50 ("arm64: support __int128 on gcc 5+") added support
-> > for arm64 __int128 with gcc with a version-conditional, but neglected to
-> > enable this for clang, which in fact appears to support aarch64 __int128.
-> > This commit therefore enables it if the compiler is clang, using the
-> > same type of makefile conditional used elsewhere in the tree.
-> >
-> > Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
-> > ---
-> >  arch/arm64/Makefile | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> > index b481b4a7c011..16c2e8b58546 100644
-> > --- a/arch/arm64/Makefile
-> > +++ b/arch/arm64/Makefile
-> > @@ -57,7 +57,11 @@ KBUILD_AFLAGS        += $(lseinstr) $(brokengasinst)
-> >  KBUILD_CFLAGS  += $(call cc-option,-mabi=lp64)
-> >  KBUILD_AFLAGS  += $(call cc-option,-mabi=lp64)
-> >
-> > +ifeq ($(cc-name),clang)
-> > +KBUILD_CFLAGS  += -DCONFIG_ARCH_SUPPORTS_INT128
-> > +else
-> >  KBUILD_CFLAGS  += $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
-> > +endif
-> >
-> >  ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
-> >  KBUILD_CPPFLAGS        += -mbig-endian
-> > --
-> > 2.15.1
-> >
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 67b80bbe5bf5..b8734319dc77 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -107,6 +107,12 @@
+ 		};
+ 	};
+ 
++	de: display-engine {
++		compatible = "allwinner,sun50i-a64-display-engine";
++		allwinner,pipelines = <&mixer0>;
++		status = "disabled";
++	};
++
+ 	osc24M: osc24M_clk {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+@@ -183,6 +189,30 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		mixer0: mixer at 1100000 {
++			compatible = "allwinner,sun50i-a64-de2-mixer-0",
++				     "allwinner,sun8i-a83t-de2-mixer-0";
++			reg = <0x01100000 0x100000>;
++			clocks = <&display_clocks CLK_BUS_MIXER0>,
++				 <&display_clocks CLK_MIXER0>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&display_clocks RST_MIXER0>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer0_out: port at 1 {
++					reg = <1>;
++
++					mixer0_out_tcon0: endpoint {
++						remote-endpoint = <&tcon0_in_mixer0>;
++					};
++				};
++			};
++		};
++
+ 		syscon: syscon at 1c00000 {
+ 			compatible = "allwinner,sun50i-a64-system-controller",
+ 				"syscon";
+@@ -200,6 +230,37 @@
+ 			#dma-cells = <1>;
+ 		};
+ 
++		tcon0: lcd-controller at 1c0c000 {
++			compatible = "allwinner,sun50i-a64-tcon-lcd",
++				     "allwinner,sun8i-a83t-tcon-lcd";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
++			clock-names = "ahb", "tcon-ch0";
++			clock-output-names = "tcon-pixel-clock";
++			resets = <&ccu RST_BUS_TCON0>;
++			reset-names = "lcd";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					reg = <0>;
++
++					tcon0_in_mixer0: endpoint {
++						remote-endpoint = <&mixer0_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		mmc0: mmc at 1c0f000 {
+ 			compatible = "allwinner,sun50i-a64-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 50d19605c38f..c84102a750f8 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -368,6 +368,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun8i-h3-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
+ 	{ .compatible = "allwinner,sun9i-a80-display-engine" },
++	{ .compatible = "allwinner,sun50i-a64-display-engine" },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_drv_of_table);
+-- 
+2.14.3
