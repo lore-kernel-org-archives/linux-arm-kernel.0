@@ -1,92 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 24 Apr 2018 22:25:24 +0300
-Subject: [PATCH v2] arm64: dts: renesas: condor: add eMMC support
-In-Reply-To: <611daf1f-42a2-d463-0814-ebf762871018@cogentembedded.com>
-References: <611daf1f-42a2-d463-0814-ebf762871018@cogentembedded.com>
-Message-ID: <bfa0f1e9-f6e1-c4e2-9c9a-0d25d7f56ad1@cogentembedded.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Tue, 24 Apr 2018 12:31:50 -0700
+Subject: [PATCH 03/11] platform: make support for early platform devices
+ conditional
+In-Reply-To: <20180424173051.15099-4-brgl@bgdev.pl>
+References: <20180424173051.15099-1-brgl@bgdev.pl>
+ <20180424173051.15099-4-brgl@bgdev.pl>
+Message-ID: <aa459c94-bfc2-5cf8-0197-6487ea9152a8@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Condor board dependent part of the MMC0 (connected to eMMC chip)
-device node along with the necessary voltage regulators...
+On 04/24/2018 10:30 AM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/sh/Kconfig                 |  1 +
+>  drivers/base/Kconfig            |  4 ++++
+>  drivers/base/platform.c         |  3 +++
+>  include/linux/platform_device.h | 32 ++++++++++++++++++++++++++++++++
+>  4 files changed, 40 insertions(+)
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> index 29b0eb452b3a..37de5e1d6217 100644
+> --- a/drivers/base/Kconfig
+> +++ b/drivers/base/Kconfig
+> @@ -205,6 +205,10 @@ config DEBUG_TEST_DRIVER_REMOVE
+>  	  unusable. You should say N here unless you are explicitly looking to
+>  	  test this functionality.
+>  
+> +config EARLY_PLATFORM_DEVICES
+> +	bool
+> +	default n
 
----
-This patch is against the 'renesas-devel-20180424-v4.17-rc2' tag of Simon
-Horman's 'renesas.git' repo.
+The default value is already 'n', so we usually ask people to omit that
+value.  OTOH, you could combine those 2 lines into:
 
-Changes in version 2:
-- renamed the pin groups and their labels, alos changing their order;
-- reordered this patch before the PCIe patch.
+	def_bool n
 
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   43 ++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -27,6 +27,24 @@
- 		/* first 128MB is reserved for secure area. */
- 		reg = <0 0x48000000 0 0x78000000>;
- 	};
-+
-+	d3_3v: regulator-0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	vddq_vin01: regulator-1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDQ_VIN01";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
- };
- 
- &avb {
-@@ -52,12 +70,37 @@
- 	clock-frequency = <32768>;
- };
- 
-+&mmc0 {
-+	pinctrl-0 = <&mmc_pins>;
-+	pinctrl-1 = <&mmc_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
-+
-+	vmmc-supply = <&d3_3v>;
-+	vqmmc-supply = <&vddq_vin01>;
-+	mmc-hs200-1_8v;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
- &pfc {
- 	avb_pins: avb {
- 		groups = "avb_mdio", "avb_rgmii";
- 		function = "avb";
- 	};
- 
-+	mmc_pins: mmc {
-+		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
-+		function = "mmc";
-+		power-source = <3300>;
-+	};
-+
-+	mmc_pins_uhs: mmc_uhs {
-+		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
-+		function = "mmc";
-+		power-source = <1800>;
-+	};
-+
- 	scif0_pins: scif0 {
- 		groups = "scif0_data";
- 		function = "scif0";
+> +
+>  source "drivers/base/test/Kconfig"
+>  
+>  config SYS_HYPERVISOR
+
+
+-- 
+~Randy
