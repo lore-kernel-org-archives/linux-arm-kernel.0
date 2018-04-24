@@ -1,94 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Apr 2018 14:34:49 +0100
-Subject: [PATCH] arm64: export tishift functions to modules
-In-Reply-To: <20180415160416.28161-1-Jason@zx2c4.com>
-References: <20180415160416.28161-1-Jason@zx2c4.com>
-Message-ID: <20180424133449.GA24599@arm.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 24 Apr 2018 19:04:12 +0530
+Subject: [RFC 00/13] arm64: allwinner: Add A64 DE2 pipeline support
+Message-ID: <20180424133425.24291-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
 
-On Sun, Apr 15, 2018 at 06:04:16PM +0200, Jason A. Donenfeld wrote:
-> Otherwise modules that use these arithmetic operations will fail to
-> link. We accomplish this with EXPORT_SYMBOL in the .S file, but because
-> of symbol versioning, we actually need to have a declaration of these
-> too in C. So, we introduce asm-prototypes.h, which is the same file name
-> and technique used for similar reasons in the m68k arch tree.
-> 
-> While we're at it, we also fix this up to use SPDX, and I personally
-> choose to relicense this as GPL2||BSD so that these symbols don't need
-> to be export_symbol_gpl, so all modules can use the routines, since
-> these are important general purpose compiler-generated function calls.
-> 
-> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
-> Reported-by: PaX Team <pageexec@freemail.hu>
-> Cc: stable at vger.kernel.org
-> ---
->  arch/arm64/include/asm/asm-prototypes.h | 11 +++++++++++
->  arch/arm64/lib/tishift.S                | 19 ++++++-------------
->  2 files changed, 17 insertions(+), 13 deletions(-)
->  create mode 100644 arch/arm64/include/asm/asm-prototypes.h
+A64 DE2 behaviour similar to Allwinner A83T where mixer0, connected to tcon0 with
+RGB, LVDS MIPI-DSI and mixer1, connected to tcon1 with HDMI.
+This series merely concentrated on HDMI pipeline and rest will add eventually.
 
-I've not run into any build issues here -- is this specifically with some
-out-of-tree module?
+patch 1: dt-bindings for a64 DE2 CCU
 
-> diff --git a/arch/arm64/include/asm/asm-prototypes.h b/arch/arm64/include/asm/asm-prototypes.h
-> new file mode 100644
-> index 000000000000..8f1919e44f51
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/asm-prototypes.h
+patch 2: a64 DE2 CCU node addition
 
-It would be better not to introduce a new header file just for this, I
-think. How about compiler.h instead?
+patch 3: dt-bindings for a64 DE2 pipeline
 
-> @@ -0,0 +1,11 @@
-> +/* SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
-> + *
-> + * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-> + */
-> +
-> +/* These functions are defined in lib/tishift.S, but need to be declared
-> + * here so that symbol versioning picks them up.
-> + */
-> +extern long long __ashlti3(long long a, int b);
-> +extern long long __ashrti3(long long a, int b);
-> +extern long long __lshrti3(long long a, int b);
-> diff --git a/arch/arm64/lib/tishift.S b/arch/arm64/lib/tishift.S
-> index d3db9b2cd479..3bca433973cb 100644
-> --- a/arch/arm64/lib/tishift.S
-> +++ b/arch/arm64/lib/tishift.S
-> @@ -1,20 +1,10 @@
-> -/*
-> - * Copyright (C) 2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-> +/* SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
->   *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License
-> - * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
->   */
->  
->  #include <linux/linkage.h>
-> +#include <asm-generic/export.h>
->  
->  ENTRY(__ashlti3)
->  	cbz	x2, 1f
-> @@ -36,6 +26,7 @@ ENTRY(__ashlti3)
->  	mov	x0, x2
->  	ret
->  ENDPROC(__ashlti3)
-> +EXPORT_SYMBOL(__ashlti3)
+patch 4 - 5: dt-bindings for a64 mixer0 and tcon-lcd
 
-We normally export asm symbols via arm64ksyms.c. In fact, would doing that
-remove the need for the explicit declarations completely?
+patch 6: a64 DE2 pipeline node addition
 
-Will
+patch 7 - 8: dt-bindings for a64 HDMI and HDMI PHY
+
+patch 9: a64 HDMI nodes addition
+
+patch 10 - 11: dt-bindings for a64 mixer1 and tcon-tv
+
+patch 12: a64 HDMI pipeline
+
+patch 13: enable HDMI out on bananpi-m64
+
+Tested HDMI on bananapi-m64 (along with DE2 SRAM C changes from [1]
+thread), able to detect the HDMI but, no penguins on screen.
+
+Request for any suggestions.
+
+Test log on Bananpi-m64:
+[    0.247631] sun4i-drm display-engine: bound 1100000.mixer (ops sun8i_mixer_ops)
+[    0.256717] sun4i-drm display-engine: bound 1200000.mixer (ops sun8i_mixer_ops)
+[    0.256783] sun4i-tcon 1c0c000.lcd-controller: Missing LVDS properties, Please upgrade your DT
+[    0.256792] sun4i-tcon 1c0c000.lcd-controller: LVDS output disabled
+[    0.257081] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
+[    0.257099] sun4i-drm display-engine: bound 1c0c000.lcd-controller (ops sun4i_tcon_ops)
+[    0.257273] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
+[    0.257288] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops sun4i_tcon_ops)
+[    0.258176] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX controller v1.32a with HDCP (sun8i_dw_hdmi_p)
+[    0.258596] sun8i-dw-hdmi 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver
+[    0.259188] sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops)
+[    0.259199] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+[    0.259205] [drm] No driver support for vblank timestamp query.
+[    0.259308] [drm] Cannot find any crtc or sizes
+[    0.259824] [drm] Initialized sun4i-drm 1.0.0 20150629 for display-engine on minor 0
+
+[1] https://lkml.org/lkml/2018/3/16/1096
+
+Jagan Teki (13):
+  dt-bindings: clock: Add compatible for A64 DE2 CCU
+  arm64: dts: allwinner: a64: Add DE2 CCU
+  bindings: display: Add compatible for A64 DE2 pipeline
+  bindings: display: Add compatible for A64 Mixer0
+  bindings: display: Add compatible for A64 tcon-lcd
+  arm64: dts: allwinner: a64: Add DE2 pipeline
+  bindings: display: Add compatible for A64 HDMI
+  bindings: display: Add compatible for A64 HDMI PHY
+  arm64: dts: allwinner: a64: Add HDMI support
+  bindings: display: Add compatible for A64 Mixer1
+  bindings: display: Add compatible for A64 tcon-tv
+  arm64: dts: allwinner: a64: Add HDMI pipeline
+  arm64: dts: allwinner: a64: bananapi-m64: Enable HDMI output
+
+ .../devicetree/bindings/clock/sun8i-de2.txt        |   1 +
+ .../bindings/display/sunxi/sun4i-drm.txt           |   7 +
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  26 +++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 181 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |   1 +
+ include/dt-bindings/clock/sun50i-a64-ccu.h         |   2 +
+ 6 files changed, 218 insertions(+)
+
+-- 
+2.14.3
