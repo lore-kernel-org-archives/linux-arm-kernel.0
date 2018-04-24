@@ -1,26 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 24 Apr 2018 09:22:52 -0300
-Subject: [PATCH 4/5] ARM: dts: imx6sx-sabreauto: add fec support
-In-Reply-To: <AM3PR04MB131566E1C8033D256686F192F5880@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <1524455219-6736-1-git-send-email-Anson.Huang@nxp.com>
- <1524455219-6736-4-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5CDAQtw7Q6NgSzKP4ogaqRaGSE0A+st1iqZ=cQsK49moQ@mail.gmail.com>
- <AM3PR04MB131566E1C8033D256686F192F5880@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <CAOMZO5Dm=MFRoh=y54Qf2RrncWfQPTUJ2ZNfvYnUD=idp8RPNA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 24 Apr 2018 20:24:51 +0800
+Subject: [PATCH v2 2/2] arm64: dts: allwinner: Add dts file for Libre
+ Computer Board ALL-H3-CC H5 ver.
+In-Reply-To: <20180424121440.qmiubwdgcisn4g4m@flea>
+References: <1524570434-17814-1-git-send-email-narmstrong@baylibre.com>
+ <1524570434-17814-3-git-send-email-narmstrong@baylibre.com>
+ <20180424121440.qmiubwdgcisn4g4m@flea>
+Message-ID: <CAGb2v65-SOfhf0B-cJhY-9bCWnFuw_r-c19TW0p9kcs7043McQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+On Tue, Apr 24, 2018 at 8:14 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Tue, Apr 24, 2018 at 01:47:14PM +0200, Neil Armstrong wrote:
+>> The Libre Computer Board ALL-H3-CC from Libre Technology is a Raspberry
+>> Pi B+ form factor single board computer based on the Allwinner H2+, H3,
+>> or H5 SoCs with the same PCB.
+>> The board has 1GB DDR3 SDRAM, provided by 4 2Gb chips. The mounting holes
 
-On Mon, Apr 23, 2018 at 11:09 PM, Anson Huang <anson.huang@nxp.com> wrote:
+The board has 2GB DDR3 SDRAM, provided by 4 4Gb chips. Copy-paste error?
 
-> Ah, yes, thanks for pointing out this issue, I just removed it and the function is still working,
-> already sent out V2 patch set, thanks.
+>> and connectors are in the exact same position as on the Raspberry Pi B+.
+>>
+>> This patch enables the H5 variant using the H3 board definition moved to
+>> a common dtsi in an earlier patch. The dts sinmply include the common dtsi
 
-So now maybe it is working only because the bootloader activated this
-GPIO, which is not good.
+                                              ^ Small typo here.
 
-I don't have access to the mx6sx sabreauto schematics to verify  where
-&max7322 0 connects to, but it would be better to make sure that you
-activate this pin in dts if it is needed for Ethernet, without relying
-on the bootloader.
+ChenYu
+
+>> and declares the correct compatible and model of the H5 variant.
+>>
+>> Suggested-by: Corentin Labbe <clabbe@baylibre.com>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
