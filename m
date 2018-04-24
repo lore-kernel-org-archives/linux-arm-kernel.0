@@ -1,77 +1,26 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Apr 2018 16:08:50 +0200
-Subject: [RFC 00/13] arm64: allwinner: Add A64 DE2 pipeline support
-In-Reply-To: <20180424133425.24291-1-jagan@amarulasolutions.com>
-References: <20180424133425.24291-1-jagan@amarulasolutions.com>
-Message-ID: <20180424140850.ptxpmtusour7u6nb@flea>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Tue, 24 Apr 2018 16:14:37 +0200
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Add Marvel NAND controller
+ support
+In-Reply-To: <20180424081528.25883-3-gregory.clement@bootlin.com>
+References: <20180424081528.25883-1-gregory.clement@bootlin.com>
+ <20180424081528.25883-3-gregory.clement@bootlin.com>
+Message-ID: <20180424161437.0124761e@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 07:04:12PM +0530, Jagan Teki wrote:
-> Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
-> 
-> A64 DE2 behaviour similar to Allwinner A83T where mixer0, connected to tcon0 with
-> RGB, LVDS MIPI-DSI and mixer1, connected to tcon1 with HDMI.
-> This series merely concentrated on HDMI pipeline and rest will add eventually.
-> 
-> patch 1: dt-bindings for a64 DE2 CCU
-> 
-> patch 2: a64 DE2 CCU node addition
-> 
-> patch 3: dt-bindings for a64 DE2 pipeline
-> 
-> patch 4 - 5: dt-bindings for a64 mixer0 and tcon-lcd
-> 
-> patch 6: a64 DE2 pipeline node addition
-> 
-> patch 7 - 8: dt-bindings for a64 HDMI and HDMI PHY
-> 
-> patch 9: a64 HDMI nodes addition
-> 
-> patch 10 - 11: dt-bindings for a64 mixer1 and tcon-tv
-> 
-> patch 12: a64 HDMI pipeline
-> 
-> patch 13: enable HDMI out on bananpi-m64
-> 
-> Tested HDMI on bananapi-m64 (along with DE2 SRAM C changes from [1]
-> thread), able to detect the HDMI but, no penguins on screen.
-> 
-> Request for any suggestions.
-> 
-> Test log on Bananpi-m64:
-> [    0.247631] sun4i-drm display-engine: bound 1100000.mixer (ops sun8i_mixer_ops)
-> [    0.256717] sun4i-drm display-engine: bound 1200000.mixer (ops sun8i_mixer_ops)
-> [    0.256783] sun4i-tcon 1c0c000.lcd-controller: Missing LVDS properties, Please upgrade your DT
-> [    0.256792] sun4i-tcon 1c0c000.lcd-controller: LVDS output disabled
+Hello,
 
-That doesn't seem to work so well for LVDS.
+On Tue, 24 Apr 2018 10:15:28 +0200, Gregory CLEMENT wrote:
+> Add Marvell NAND controller support used by some Marvell Armada based
+> boards.
 
-> [    0.257081] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
-> [    0.257099] sun4i-drm display-engine: bound 1c0c000.lcd-controller (ops sun4i_tcon_ops)
-> [    0.257273] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
-> [    0.257288] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops sun4i_tcon_ops)
-> [    0.258176] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX controller v1.32a with HDCP (sun8i_dw_hdmi_p)
-> [    0.258596] sun8i-dw-hdmi 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver
-> [    0.259188] sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops)
-> [    0.259199] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> [    0.259205] [drm] No driver support for vblank timestamp query.
-> [    0.259308] [drm] Cannot find any crtc or sizes
+Typo in title: Marvel -> Marvell
 
-A good guess would be that you can't get the EDIDs for some
-reason. Have you tried forcing a mode to see if the display part
-already works?
+You read too many comics :)
 
-Maxime
-
+Thomas
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
 https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/75952cc6/attachment.sig>
