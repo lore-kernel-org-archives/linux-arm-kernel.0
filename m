@@ -1,41 +1,38 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 24 Apr 2018 10:13:50 -0500
-Subject: [PATCH] arm64: dts: stratix10: Change pad skew values for EMAC0
- PHY driver
-In-Reply-To: <1524538918-21141-1-git-send-email-joyce.ooi@intel.com>
-References: <1524538918-21141-1-git-send-email-joyce.ooi@intel.com>
-Message-ID: <cb89395b-b3cc-c9f1-26d4-419803c93b86@kernel.org>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Tue, 24 Apr 2018 10:15:00 -0500
+Subject: [PATCH] efi/libstub/arm64: handle randomized TEXT_OFFSET
+In-Reply-To: <20180424110058.29344-1-mark.rutland@arm.com>
+References: <20180424110058.29344-1-mark.rutland@arm.com>
+Message-ID: <20180424101500.e5c032b91e87a354e92344c5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 24 Apr 2018 12:00:58 +0100
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-
-On 04/23/2018 10:01 PM, Ooi, Joyce wrote:
-> The HPS EMAC0 drive strength is changed to 4mA because the initial 8mA
-> drive strength has caused CE test to fail. This requires changes on the
-> pad skew for EMAC0 PHY driver. Based on several measurements done, Tx
-> clock does not require the extra 0.96ns delay.
+> When CONFIG_RANDOMIZE_TEXT_OFFSET is selected, TEXT_OFFSET is an
+> arbitrary multiple of PAGE_SIZE in the interval [0, 2MB).
 > 
-> Signed-off-by: Ooi, Joyce <joyce.ooi@intel.com>
+> The EFI stub doesn't accuont for this, and only handles the case where
+> TEXT_OFFSET is multiple of EFI_KIMG_ALIGN. This can result in the kernel
+> being loaded to an erroneous physical alignment. This has been observed
+> to result in spurious stack overflow reports and failure to make use of
+> the IRQ stacks, and theoretically could result in a number of other
+> issues.
+> 
+> We can OR in the low bits of TEXT_OFFSET to ensure that we have the
+> necessary offset (and hence have the necessary alignment), so let's do
+> that.
+> 
+> Fixes: 6f26b3671184c36d ("arm64: kaslr: increase randomization granularity")
+> Reported-by: Kim Phillips <kim.phillips@arm.com>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: linux-efi at vger.kernel.org
 > ---
->  .../boot/dts/altera/socfpga_stratix10_socdk.dts    |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> index 0007564..8785f78 100644
-> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> @@ -79,7 +79,7 @@
->  			rxd2-skew-ps = <420>; /* 0ps */
->  			rxd3-skew-ps = <420>; /* 0ps */
->  			txen-skew-ps = <0>; /* -420ps */
-> -			txc-skew-ps = <1860>; /* 960ps */
-> +			txc-skew-ps = <900>; /* 0ps */
->  			rxdv-skew-ps = <420>; /* 0ps */
->  			rxc-skew-ps = <1680>; /* 780ps */
->  		};
-> 
 
-Applied, thanks!
+Tested-by: Kim Phillips <kim.phillips@arm.com>
 
-Dinh
+Thanks,
+
+Kim
