@@ -1,26 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 24 Apr 2018 11:18:55 +0200
-Subject: [PATCH] arm64: dts: renesas: v3msk: add EtherAVB pins
-In-Reply-To: <ed7ddd72-4e52-0b2b-d2ef-1d407f638745@cogentembedded.com>
-References: <c42c9e9a-8fe8-5cad-0eeb-0c1fbd09f83c@cogentembedded.com>
- <ed7ddd72-4e52-0b2b-d2ef-1d407f638745@cogentembedded.com>
-Message-ID: <20180424091855.2ngzbiwvigragk5h@verge.net.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 24 Apr 2018 14:49:38 +0530
+Subject: [PATCH V2 3/3] cpufreq: add suspend/resume support in Armada
+ 37xx DVFS driver
+In-Reply-To: <20180424111046.704637d3@xps13>
+References: <cover.1524549644.git.viresh.kumar@linaro.org>
+ <4ca19364ff10083c3912ce428207c3f713f973b9.1524549644.git.viresh.kumar@linaro.org>
+ <20180424111046.704637d3@xps13>
+Message-ID: <20180424091938.kmbhmfjnem6cneb3@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 02:28:51PM +0300, Sergei Shtylyov wrote:
-> On 03/14/2018 11:30 PM, Sergei Shtylyov wrote:
+On 24-04-18, 11:10, Miquel Raynal wrote:
+> Hi Viresh,
 > 
-> > Add the (previously omitted) EtherAVB pin data to the V3M Starter Kit
-> > board's device tree.
-> > 
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > 
-> > ---
-> > The patch is against the 'renesas-devel-20180314-v4.16-rc5' tag of Simon's
-> > 'renesas.git repo. It depends on the R8A77970 PFC driver patch adding EtherAVB
-> > pin groups (posted yesterday) in order to work properly...
+> On Tue, 24 Apr 2018 11:37:36 +0530, Viresh Kumar
+> <viresh.kumar@linaro.org> wrote:
 > 
->    The dependency has been now met, please merge this patch.
+> > From: Miquel Raynal <miquel.raynal@bootlin.com>
+> > 
+> > Add suspend/resume hooks in Armada 37xx DVFS driver to handle S2RAM
+> > operations. As there is currently no 'driver' structure, create one
+> > to store both the regmap and the register values during suspend
+> > operation.
+> > 
+> > A syscore_ops is used to export the suspend/resume hooks.
+> 
+> I think you can remove this line too since there is no more syscore_ops.
 
-Thanks, applied.
+That was stupid of me.
+
+-- 
+viresh
