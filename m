@@ -1,28 +1,31 @@
 From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
-Date: Tue, 24 Apr 2018 20:48:37 +0200
-Subject: [PATCH v2 1/2] clk: meson: gxbb: expose VDEC_1 and VDEC_HEVC clocks
-In-Reply-To: <20180424184838.3406-1-maxi.jourdan@wanadoo.fr>
-References: <20180424184838.3406-1-maxi.jourdan@wanadoo.fr>
-Message-ID: <20180424184838.3406-2-maxi.jourdan@wanadoo.fr>
+Date: Tue, 24 Apr 2018 20:48:36 +0200
+Subject: [PATCH v2 0/2] clk: meson: gxbb: add the video decoder clocks
+Message-ID: <20180424184838.3406-1-maxi.jourdan@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
----
- include/dt-bindings/clock/gxbb-clkc.h | 2 ++
- 1 file changed, 2 insertions(+)
+This adds the necessary clocks for VDEC_1 and VDEC_HEVC.
 
-diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-index 8ba99a5e3fd3..7a892be90549 100644
---- a/include/dt-bindings/clock/gxbb-clkc.h
-+++ b/include/dt-bindings/clock/gxbb-clkc.h
-@@ -125,5 +125,7 @@
- #define CLKID_VAPB_1		138
- #define CLKID_VAPB_SEL		139
- #define CLKID_VAPB		140
-+#define CLKID_VDEC_1		153
-+#define CLKID_VDEC_HEVC		156
- 
- #endif /* __GXBB_CLKC_H */
+On Amlogic SoCs, VDEC1 is responsible for the decoding of:
+MPEG 1/2/4, H.263, H.264, MJPEG, VC1, Real Video
+
+VDEC_HEVC is responsible for the decoding of:
+HEVC, VP9
+
+Changes since v1:
+ - Drop CLK_IGNORE_UNUSED flags
+ - Change CLK_SET_RATE_NO_REPARENT to CLK_SET_RATE_PARENT for muxes
+ - Add CLK_MUX_ROUND_CLOSEST for muxes
+
+Maxime Jourdan (2):
+  clk: meson: gxbb: expose VDEC_1 and VDEC_HEVC clocks
+  clk: meson: gxbb: add the video decoder clocks
+
+ drivers/clk/meson/gxbb.c              | 114 ++++++++++++++++++++++++++
+ drivers/clk/meson/gxbb.h              |   6 +-
+ include/dt-bindings/clock/gxbb-clkc.h |   2 +
+ 3 files changed, 121 insertions(+), 1 deletion(-)
+
 -- 
 2.17.0
