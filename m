@@ -1,68 +1,57 @@
-From: ebiggers@google.com (Eric Biggers)
-Date: Tue, 24 Apr 2018 11:16:23 -0700
-Subject: [PATCH v2 0/5] crypto: Speck support
-In-Reply-To: <CAHmME9oA4j=iGrrBYME92JfUsyi5r42PnAvzWiuXzGCRXMnXtA@mail.gmail.com>
-References: <20180212235209.117393-1-ebiggers@google.com>
- <CAHmME9oA4j=iGrrBYME92JfUsyi5r42PnAvzWiuXzGCRXMnXtA@mail.gmail.com>
-Message-ID: <20180424181623.GA174675@google.com>
+From: dalias@libc.org (Rich Felker)
+Date: Tue, 24 Apr 2018 13:59:37 -0400
+Subject: [PATCH 00/11] platform: device tree support for early platform
+ drivers
+In-Reply-To: <20180424175544.uq7f5x63a5il36sh@lakrids.cambridge.arm.com>
+References: <20180424173051.15099-1-brgl@bgdev.pl>
+ <20180424175544.uq7f5x63a5il36sh@lakrids.cambridge.arm.com>
+Message-ID: <20180424175937.GD3094@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Tue, Apr 24, 2018 at 06:11:26PM +0200, Jason A. Donenfeld wrote:
-> Can we please not Speck?
+On Tue, Apr 24, 2018 at 06:55:45PM +0100, Mark Rutland wrote:
+> Hi bartosz,
 > 
-> It was just rejected by the ISO/IEC.
+> On Tue, Apr 24, 2018 at 07:30:40PM +0200, Bartosz Golaszewski wrote:
+> > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> > 
+> > Device tree based systems often use OF_DECLARE() macros for devices
+> > that need to be initialized early in the boot process such as clocks,
+> > timers etc. However platform devices are more desirable.
+> > 
+> > This series aims at introducing support for early platform drivers for
+> > OF-based systems.
+> > 
+> > The idea is to have a special compatible fallback string: "earlydev"
+> > that similarily to "syscon" would be added to device nodes that need
+> > early probing. We then need to call of_early_platform_populate() early
+> > in the boot process to actually probe the registered devices.
+> > 
+> > I am aware that this new compatible does not strictly correspond with
+> > the "hardware description only" rule of DT, but we already have many
+> > functionalities that break this rule: syscon, gpio hogs etc.
 > 
-> https://twitter.com/TomerAshur/status/988659711091228673
+> I don't think we need the "earlydev" string at all, and can still keep
+> the rest of this infrastrcuture if it is helpful.
+> 
+> So while I'm certainly oppposed to the "earlydev" string, I think that
+> the infrastrcuture could be useful.
 
-So, what do you propose replacing it with?
+Yes. I think this agrees with my objection -- I'm not opposed to the
+infrastructure in the kernel, but to semantically-wrong and
+backwards-incompatible changes to the device tree contract.
 
-As I explained in the patch, the purpose of adding Speck is to allow low-end
-Android devices -- ones that have CPUs without the ARMv8 Cryptography Extensions
--- to start using dm-crypt or fscrypt.  Currently such devices are unencrypted.
-So, Speck is replacing *no encryption*, not another encryption algorithm.  By
-removing Speck, you are removing encryption.  It's great that people are
-enthusiastic about debating choices of crypto algorithms.  But it's unfortunate
-that "no crypto" tends to pass by without comment from the same people.
+> > The first user of this new functionality will be the DaVinci platform
+> > for which we want to probe the pll, psc and timer drivers early in the
+> > boot sequence but keep them implemented as platform drivers.
+> 
+> Can we have early_paltform_driver() take a reference to the driver's
+> of_match_table, and put that in a special section?
+> 
+> Then instead of looking for "earlydev", we look for any compatible
+> string in that section. No magic string required in the DT, and we can
+> always mess around with probe ordering in future.
 
-We really wanted to use ChaCha20 instead.  But it would have been used in a
-context where IVs are reused (f2fs encryption on flash storage), which
-catastrophically breaks stream ciphers, but is less bad for a block cipher
-operating in XTS mode.  Thus, we had to use either a block cipher, or a
-wide-block encryption mode (pseudorandom permutation over the whole input).  Of
-course, we would have liked to store nonces instead, but that is not currently
-feasible with either dm-crypt or fscrypt.  It can be done with dm-crypt on top
-of dm-integrity, but that performs very poorly and would be especially
-inappropriate for low end mobile devices.
+Yes, this is pretty much exactly the change I had in mind.
 
-Paul Crowley actually designed a very neat wide-block encryption mode based on
-ChaCha20 and Poly1305, which we considered too.  But it would have been harder
-to implement, and we'd have had to be pushing it with zero or very little
-outside crypto review, vs. the many cryptanalysis papers on Speck.  (In that
-respect the controversy about Speck has actually become an advantage, as it has
-received much more cryptanalysis than other lightweight block ciphers.)
-
-The reason we chose Speck had nothing to do with the proposed ISO standard or
-any sociopolitical factors, but rather because it was the only algorithm we
-could find that met the performance and security requirements.  Note that Linux
-doesn't bow down to any particular standards organization, and it offers
-algorithms that were specified in various places, even some with no more than a
-publication by the author.  In fact, support for SM4 was just added too, which
-is a Chinese government standard.  Are you going to send a patch to remove that
-too, or is it just NSA designed algorithms that are not okay?
-
-It is unfortunate that we had to choose an algorithm that has some
-emotional/political baggage attached, and of course we did expect some pushback.
-But I hope you can understand that all *technical* indicators are that Speck is
-secure enough, and not really backdoor-able other than a new cryptoanalytical
-technique that would likely apply to other ARX ciphers as well (in fact, you'd
-probably have a different opinion of it if the authors had simply worked
-somewhere else and published the exact same algorithm); and also, the trend
-towards stream ciphers such as ChaCha20 has mostly ignored the disk encryption
-use case, where a block cipher is still needed.
-
-Thanks,
-
-Eric
+Rich
