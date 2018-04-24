@@ -1,41 +1,40 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Tue, 24 Apr 2018 17:13:38 +0200
-Subject: [PATCH 2/6] PCI: Fix memory leak of devm_pci_alloc_host_bridge
-In-Reply-To: <cover.1524582822.git.jan.kiszka@siemens.com>
-References: <cover.1524582822.git.jan.kiszka@siemens.com>
-Message-ID: <2a083b46d55687d01d43d4013cfb957cb3720db5.1524582822.git.jan.kiszka@siemens.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 24 Apr 2018 16:25:47 +0100
+Subject: [PATCH] arm64: Select ARCH_HAS_FAST_MULTIPLIER
+Message-ID: <877b532d8d240c1d9e9db923c84b924443a218ed.1524583390.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Kiszka <jan.kiszka@siemens.com>
+It is probably safe to assume that all Armv8-A implementations have a
+multiplier whose efficiency is comparable or better than a sequence of
+three or so register-dependent arithmetic instructions. Select
+ARCH_HAS_FAST_MULTIPLIER to get ever-so-slightly nicer codegen in the
+few dusty old corners which care.
 
-devm_pci_release_host_bridge_dev failed to release the resource list.
+In a contrived benchmark calling hweight64() in a loop, this does indeed
+turn out to be a small win overall, with no measurable impact on
+Cortex-A57 but about 5% performance improvement on Cortex-A53.
 
-Fixes: 5c3f18cce083 ("PCI: Add devm_pci_alloc_host_bridge() interface")
-Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/pci/probe.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index ac91b6fd0bcd..eccf204c9160 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -526,12 +526,14 @@ static void devm_pci_release_host_bridge_dev(struct device *dev)
- 
- 	if (bridge->release_fn)
- 		bridge->release_fn(bridge);
-+
-+	pci_free_resource_list(&bridge->windows);
- }
- 
- static void pci_release_host_bridge_dev(struct device *dev)
- {
- 	devm_pci_release_host_bridge_dev(dev);
--	pci_free_host_bridge(to_pci_host_bridge(dev));
-+	kfree(to_pci_host_bridge(dev));
- }
- 
- struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
+Apropos of stumbling across this option whilst digging down into some
+bitmap-juggling code...
+
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index eb2cf4938f6d..9c850f3b398f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -12,6 +12,7 @@ config ARM64
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
+ 	select ARCH_HAS_ELF_RANDOMIZE
++	select ARCH_HAS_FAST_MULTIPLIER
+ 	select ARCH_HAS_FORTIFY_SOURCE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+ 	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
 -- 
-2.13.6
+2.17.0.dirty
