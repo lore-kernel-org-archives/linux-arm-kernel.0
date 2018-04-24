@@ -1,49 +1,64 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 24 Apr 2018 20:05:03 +0530
-Subject: [PATCH 1/4] ARM: davinci: board-da830-evm: fix GPIO lookup for MMC/SD
+Date: Tue, 24 Apr 2018 20:05:05 +0530
+Subject: [PATCH 3/4] ARM: davinci: fix GPIO lookup for I2C
 In-Reply-To: <20180424143506.25793-1-nsekhar@ti.com>
 References: <20180424143506.25793-1-nsekhar@ti.com>
-Message-ID: <20180424143506.25793-2-nsekhar@ti.com>
+Message-ID: <20180424143506.25793-4-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
-mmc can correctly lookup the wp and cp gpios. Also fix the GPIO numbers
-as they are not offsets within a bank.
+I2C can correctly lookup the recovery gpios.
 
 Note that it is the gpio-davinci driver that sets the gpiochip label to
 davinci_gpio.0.
 
-Fixes: b5e1438cf98a ("ARM: davinci: da830-evm: use gpio descriptor for mmc pins")
-Reported-by: David Lechner <david@lechnology.com>
+Also, the I2C device uses an id of 1 on DM644x and DM355.
+
+Fixes: e53537653791 ("i2c/ARM: davinci: Deep refactoring of I2C recovery")
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/mach-davinci/board-dm355-evm.c  | 6 +++---
+ arch/arm/mach-davinci/board-dm644x-evm.c | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 004f9c8de032..d1e8ce7b4bd2 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -205,12 +205,17 @@ static const short da830_evm_mmc_sd_pins[] = {
- 	-1
+diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+index cb30637d9eaf..14557f893798 100644
+--- a/arch/arm/mach-davinci/board-dm355-evm.c
++++ b/arch/arm/mach-davinci/board-dm355-evm.c
+@@ -110,11 +110,11 @@ static struct platform_device davinci_nand_device = {
  };
  
-+#define DA830_MMCSD_WP_PIN		GPIO_TO_PIN(2, 1)
-+#define DA830_MMCSD_CD_PIN		GPIO_TO_PIN(2, 2)
-+
- static struct gpiod_lookup_table mmc_gpios_table = {
- 	.dev_id = "da830-mmc.0",
+ static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
+-	.dev_id = "i2c_davinci",
++	.dev_id = "i2c_davinci.1",
  	.table = {
- 		/* gpio chip 1 contains gpio range 32-63 */
--		GPIO_LOOKUP("davinci_gpio.1", 2, "cd", GPIO_ACTIVE_LOW),
--		GPIO_LOOKUP("davinci_gpio.1", 1, "wp", GPIO_ACTIVE_LOW),
-+		GPIO_LOOKUP("davinci_gpio.0", DA830_MMCSD_CD_PIN, "cd",
-+			    GPIO_ACTIVE_LOW),
-+		GPIO_LOOKUP("davinci_gpio.0", DA830_MMCSD_WP_PIN, "wp",
-+			    GPIO_ACTIVE_LOW),
+-		GPIO_LOOKUP("davinci_gpio", 15, "sda",
++		GPIO_LOOKUP("davinci_gpio.0", 15, "sda",
+ 			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+-		GPIO_LOOKUP("davinci_gpio", 14, "scl",
++		GPIO_LOOKUP("davinci_gpio.0", 14, "scl",
+ 			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
  	},
  };
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 5bf024784738..5b0b95e04cac 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -597,11 +597,11 @@ static struct i2c_board_info __initdata i2c_info[] =  {
+ };
  
+ static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
+-	.dev_id = "i2c_davinci",
++	.dev_id = "i2c_davinci.1",
+ 	.table = {
+-		GPIO_LOOKUP("davinci_gpio", 44, "sda",
++		GPIO_LOOKUP("davinci_gpio.0", 44, "sda",
+ 			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+-		GPIO_LOOKUP("davinci_gpio", 43, "scl",
++		GPIO_LOOKUP("davinci_gpio.0", 43, "scl",
+ 			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+ 	},
+ };
 -- 
 2.16.2
