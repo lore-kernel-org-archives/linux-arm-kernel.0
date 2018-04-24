@@ -1,66 +1,65 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Apr 2018 18:41:11 +0100
-Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <38f42537-f801-115a-4120-1344a67a0462@codeaurora.org>
-References: <cover.1521246069.git.collinsd@codeaurora.org>
- <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
- <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
- <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
- <152411734938.46528.9676451637772936597@swboyd.mtv.corp.google.com>
- <20180419120813.GD27188@sirena.org.uk>
- <38f42537-f801-115a-4120-1344a67a0462@codeaurora.org>
-Message-ID: <20180424174111.GH22073@sirena.org.uk>
+Date: Tue, 24 Apr 2018 18:45:07 +0100
+Subject: [PATCH v2 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
+References: <cover.1523673467.git.collinsd@codeaurora.org>
+ <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
+ <CAD=FV=XKYCDtF93RtYi+dokR2BcT-z6Ex3UjgJ0ia_kF=847eA@mail.gmail.com>
+ <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
+ <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
+ <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
+Message-ID: <20180424174507.GI22073@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 12:28:21PM -0700, David Collins wrote:
-> On 04/19/2018 05:08 AM, Mark Brown wrote:
+On Fri, Apr 20, 2018 at 03:08:57PM -0700, David Collins wrote:
+> On 04/19/2018 09:16 AM, Doug Anderson wrote:
+> > On Wed, Apr 18, 2018 at 4:30 PM, David Collins <collinsd@codeaurora.org> wrote:
 
-> > This doesn't sound like what the min_dropout_uV constraint is intended
-> > to handle - that's there for the regulator driver (not constraints) to
-> > indicate how much headroom the regulator needs in the supply voltage in
-> > order to provide regulation.  It's not something the regulator uses,
-> > it's something that gets fed into voltage requests made on the supply of
-> > the regulator which I can't see that the hardware is going to be able to
-> > handle unaided.
+Please delete unneeded context from mails when replying.  Doing this
+makes it much easier to find your reply in the message, helping ensure
+it won't be missed by people scrolling through the irrelevant quoted
+material.
 
-> RPMh hardware enforces the requested minimum headroom voltage for all
-> regulators with a parent.  It has full knowledge of the parent-child
-> connections of regulators on the board (as programmed by the bootloader).
-> It automatically reconfigures the parent voltage when needed as a result
-> of requests changing the voltage of any of its child regulators.
+> > You'd need to ask Mark if he's OK with it, but a option #3 is to add a
+> > patch to your series fix the regulator framework to try setting the
+> > voltage if _regulator_get_voltage() fails.  Presumably in
+> > machine_constraints_voltage() you'd now do something like:
+> > 
+> >   int target_min, target_max;
+> >   int current_uV = _regulator_get_voltage(rdev);
+> >   if (current_uV < 0) {
+> >     /* Maybe this regulator's hardware can't be read and needs to be initted */
+> >     _regulator_do_set_voltage(
+> >       rdev, rdev->constraints->min_uV, rdev->constraints->min_uV);
+> >     current_uV = _regulator_get_voltage(rdev);
+> >   }
+> >   if (current_uV < 0) {
+> >     rdev_err(rdev,
+> >       "failed to get the current voltage(%d)\n",
+> >       current_uV);
+> >       return current_uV;
+> >   }
 
-If the hardware has full knowledge of all these constraints and enforces
-them transparently then why does the kernel care that it's doing that?
-Doesn't it defeat the point of it doing all this stuff if we have to
-know about it?
+> > If Mark doesn't like that then I guess I'd be OK w/ initting it to 0
+> > but this needs to be documented _somewhere_ (unlike for bypass it's
+> > not obvious, so you need to find someplace to put it).  I'd rather not
+> > hack the DT to deal with our software limitations.
 
-> > Ideally future versions of the RPM will have improved interfaces,
-> > there's a bunch of problems like this :(
+> I'm not opposed to your option #3 though it does seem a little hacky and
+> tailored to the qcom_rpmh-regulator specific case.  Note that I think it
+> would be better to vote for min_uV to max_uV than min_uV to min_uV though.
 
-> Do you have a preference for qcom,regulator-initial-microvolt vs a generic
-> framework supported regulator-initial-microvolt property for configuring a
-> specific voltage at registration time?  We'll need to have support for one
-> or the other in order for the qcom_rpmh-regulator driver to be functional.
+> Mark, what are your thoughts on the best way to handle this situation?
 
-This is basically specific to Qualcomm, I can't off hand think of any
-other devices with similar issues.
-
-> > Yes, constraints that specify a single voltage are done by setting min
-> > and max to the same value.  fixed_uV is *only* for regulators that have
-> > a physically fixed voltage.
-
-> XOB managed regulators physically cannot change voltage.  Therefore, do
-> you agree that it is reasonable to use fixed_uV for them?  Note that I
-> removed init_data->constraints.apply_uV manipulation in version 2 of this
-> patch.
-
-If these regulators can't change voltage then surely we know what
-voltage they have without needing it to be specified in DT?
+I think that's probably only OK if we have a specific error code for the
+regulator being limited in this way otherwise our error handling for I/O
+problems involves us trying to reconfigure supplies which seems like it
+would be risky.  
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/591824aa/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/09cd228d/attachment.sig>
