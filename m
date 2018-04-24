@@ -1,58 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Apr 2018 18:31:06 +0100
-Subject: [PATCH v2 1/2] regmap: include <linux/ktime.h> from
- include/linux/regmap.h
-In-Reply-To: <f4025431-be9a-32f9-06e1-9c6ac185c96a@gmail.com>
-References: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
- <20180423100318.GA19834@sirena.org.uk>
- <d3e10dc5-55d3-40b8-a8de-d48aaaecf019@gmail.com>
- <20180423115043.GD19834@sirena.org.uk>
- <f4025431-be9a-32f9-06e1-9c6ac185c96a@gmail.com>
-Message-ID: <20180424173106.GE22073@sirena.org.uk>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 24 Apr 2018 19:30:40 +0200
+Subject: [PATCH 00/11] platform: device tree support for early platform drivers
+Message-ID: <20180424173051.15099-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 04:07:10PM +0200, Matthias Brugger wrote:
-> On 04/23/2018 01:50 PM, Mark Brown wrote:
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-> > So it looks like there is a dependency here...?
+Device tree based systems often use OF_DECLARE() macros for devices
+that need to be initialized early in the boot process such as clocks,
+timers etc. However platform devices are more desirable.
 
-> Yes, regmap_read_poll_timeout macro uses for example ktime_compare which is
-> defined in linux/ktime.h
+This series aims at introducing support for early platform drivers for
+OF-based systems.
 
-> That's my understanding.
+The idea is to have a special compatible fallback string: "earlydev"
+that similarily to "syscon" would be added to device nodes that need
+early probing. We then need to call of_early_platform_populate() early
+in the boot process to actually probe the registered devices.
 
-OK, it's important to make sure that people getting a patch series know
-about stuff like this as it will affect how things are reviewed and
-applied.  
+I am aware that this new compatible does not strictly correspond with
+the "hardware description only" rule of DT, but we already have many
+functionalities that break this rule: syscon, gpio hogs etc.
 
-The following changes since commit e241e3f2bf975788a1b70dff2eb5180ca395b28e:
+The first user of this new functionality will be the DaVinci platform
+for which we want to probe the pll, psc and timer drivers early in the
+boot sequence but keep them implemented as platform drivers.
 
-  Merge tag 'for_linus' of git://git.kernel.org/pub/scm/linux/kernel/git/mst/vhost (2018-04-11 18:58:27 -0700)
+In the future, if this series gets accepted, this could become and
+alternative to TIMER_OF_DECLARE, CLK_OF_DECLARE etc. and could lead
+to deprecating of those macros in favor of early platform drivers.
 
-are available in the Git repository at:
+Bartosz Golaszewski (11):
+  platform: early: provide early_platform_add_device()
+  platform: provide early_platform_driver_register_probe_all()
+  platform: make support for early platform devices conditional
+  of: platform: use pdev as name for vars of type struct platform_device
+  platform: use a dedicated list_head for early devices
+  of: provide for_each_compatible_child_node()
+  dt-bindings: add bindings for early devices
+  of: platform: provide of_early_platform_populate()
+  platform: provide early_platform_driver()
+  of: platform: provide of_early_platform_probe()
+  misc: implement a dummy early platform driver
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git tags/regmap-ktime-fix
+ Documentation/devicetree/bindings/early.txt |   7 +
+ arch/sh/Kconfig                             |   1 +
+ drivers/base/Kconfig                        |   4 +
+ drivers/base/platform.c                     |  26 ++--
+ drivers/misc/Kconfig                        |   8 ++
+ drivers/misc/Makefile                       |   1 +
+ drivers/misc/dummy-early.c                  |  40 ++++++
+ drivers/of/device.c                         |  14 +-
+ drivers/of/platform.c                       | 143 +++++++++++++++-----
+ include/linux/device.h                      |   4 +
+ include/linux/of.h                          |   3 +
+ include/linux/of_device.h                   |   5 +
+ include/linux/of_platform.h                 |  19 +++
+ include/linux/platform_device.h             |  52 +++++++
+ 14 files changed, 279 insertions(+), 48 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/early.txt
+ create mode 100644 drivers/misc/dummy-early.c
 
-for you to fetch changes up to f15cd6d99198e9c15229aefec639a34a6e8174c6:
-
-  regmap: include <linux/ktime.h> from include/linux/regmap.h (2018-04-24 18:11:50 +0100)
-
-----------------------------------------------------------------
-regmap: Fix missing include of ktime.h
-
-Required for some dependencies.
-
-----------------------------------------------------------------
-Sean Wang (1):
-      regmap: include <linux/ktime.h> from include/linux/regmap.h
-
- include/linux/regmap.h | 1 +
- 1 file changed, 1 insertion(+)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/738b2a74/attachment.sig>
+-- 
+2.17.0
