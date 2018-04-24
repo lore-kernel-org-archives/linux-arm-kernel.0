@@ -1,37 +1,28 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 24 Apr 2018 14:47:05 +0530
-Subject: [PATCH 0/3] cpufreq: dt: Allow platforms to provide
- suspend/resume hooks
-In-Reply-To: <20180424110825.50436168@xps13>
-References: <cover.1524549644.git.viresh.kumar@linaro.org>
- <20180424110825.50436168@xps13>
-Message-ID: <20180424091705.ar6vzzuljjz44qp5@vireshk-i7>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 24 Apr 2018 11:18:31 +0200
+Subject: [PATCH v2] arm64: dts: renesas: eagle: add EtherAVB pins
+In-Reply-To: <8495a934-62f1-3b2e-3125-78844aef04e1@cogentembedded.com>
+References: <382aeecb-c484-ec27-1ef1-8da1673c2c14@cogentembedded.com>
+ <8495a934-62f1-3b2e-3125-78844aef04e1@cogentembedded.com>
+Message-ID: <20180424091831.t3mpwmwiuht6nurc@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24-04-18, 11:08, Miquel Raynal wrote:
-> I tested on an EspressoBin (Armada 3720), it works.
+On Fri, Apr 20, 2018 at 02:25:46PM +0300, Sergei Shtylyov wrote:
+> Hello!
+> 
+> On 03/14/2018 10:58 PM, Sergei Shtylyov wrote:
+> 
+> > Add the (previously omitted) EtherAVB pin data to the Eagle board's
+> > device tree.
+> > 
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > 
+> > ---
+> > The patch is against the 'renesas-devel-20180314-v4.16-rc5' tag of Simon's
+> > 'renesas.git repo. It depends on the R8A77970 PFC driver patch adding EtherAVB
+> > pin groups (posted yesterday) in order to work properly...
+> 
+>    The dependency has been now met, please merge this patch.
 
-Great.
-
-> However, I first had a panic due to the clock being 'put' twice. I
-> suggest you to merge this [1] into the second patch. With this (or
-> something similar):
-
-NULL is a valid clock. I have fixed it now, a bit differently though.
-
-> Tested-by: Miquel Raynal <miquel.raynal@bootlin.com>
-
-Thanks.
-
-> And the path error was reached because I did not select the cpufreq-dt
-> driver in menuconfig, which I think should be selected by default when
-> enabling the armada37xx-cpufreq driver. I wrote a small patch for
-> that too, see [2]. Tell me if you want me to send it of if you want to
-> include it in the next version ?
-
-Maybe just send that separately (and you don't need to resend any of
-the patches which are part of this series).
-
--- 
-viresh
+Thanks, applied.
