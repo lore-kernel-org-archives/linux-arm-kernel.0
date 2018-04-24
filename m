@@ -1,46 +1,74 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Apr 2018 13:06:17 +0200
-Subject: [PATCH 1/2] ARM: dts: sun8i-h3-libretech-all-h3-cc: Move board
- definition to common dtsi
-In-Reply-To: <20d4b1f5-b300-37e2-8dca-e80f691440a9@baylibre.com>
-References: <1524561576-2201-1-git-send-email-narmstrong@baylibre.com>
- <1524561576-2201-2-git-send-email-narmstrong@baylibre.com>
- <20180424095656.oormsyru7nw6hypn@flea>
- <20d4b1f5-b300-37e2-8dca-e80f691440a9@baylibre.com>
-Message-ID: <20180424110617.pu3ibceramahodgn@flea>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 24 Apr 2018 13:11:40 +0200
+Subject: [PATCH] efi/libstub/arm64: handle randomized TEXT_OFFSET
+In-Reply-To: <20180424110058.29344-1-mark.rutland@arm.com>
+References: <20180424110058.29344-1-mark.rutland@arm.com>
+Message-ID: <CAKv+Gu813jnf1RPU0HKMXapeK04XhJMveeLb9uppx7recyUW5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 12:03:44PM +0200, Neil Armstrong wrote:
-> On 24/04/2018 11:56, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > On Tue, Apr 24, 2018 at 11:19:35AM +0200, Neil Armstrong wrote:
-> >> Since the libretech-all-h3-cc can use either the H2+, H3 or H5, move the
-> >> content of the dts file to a common dtsi file to be included by the H3 variant
-> >> and in a following patch the H5 variant.
-> >>
-> >> By the way, update the SPDX licence tag position.
-> >>
-> >> Suggested-by: Corentin Labbe <clabbe@baylibre.com>
-> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > 
-> > This patch looks fine, but doesn't apply anymore. Please resend it.
-> 
-> I based it on 4.17-rc2, should I rebase in your tree ?
+Hi Mark,
 
-Yep, thanks!
-Maxime
+On 24 April 2018 at 13:00, Mark Rutland <mark.rutland@arm.com> wrote:
+> When CONFIG_RANDOMIZE_TEXT_OFFSET is selected, TEXT_OFFSET is an
+> arbitrary multiple of PAGE_SIZE in the interval [0, 2MB).
+>
+> The EFI stub doesn't accuont for this, and only handles the case where
+
+'account'
+
+If you agree, I will add something here to clarify that the newly
+chosen offset should retain the misalignment of TEXT_OFFSET relative
+to EFI_KIMG_ALIGN, because it took me a while to figure that out.
+
+Other than that,
+
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+I will queue this as a fix
+
+Thanks,
+Ard.
 
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/39eb2865/attachment.sig>
+
+> TEXT_OFFSET is multiple of EFI_KIMG_ALIGN. This can result in the kernel
+> being loaded to an erroneous physical alignment. This has been observed
+> to result in spurious stack overflow reports and failure to make use of
+> the IRQ stacks, and theoretically could result in a number of other
+> issues.
+>
+> We can OR in the low bits of TEXT_OFFSET to ensure that we have the
+> necessary offset (and hence have the necessary alignment), so let's do
+> that.
+>
+> Fixes: 6f26b3671184c36d ("arm64: kaslr: increase randomization granularity")
+> Reported-by: Kim Phillips <kim.phillips@arm.com>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: linux-efi at vger.kernel.org
+> ---
+>  drivers/firmware/efi/libstub/arm64-stub.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
+> index b9bd827caa22..541b82fdc8a2 100644
+> --- a/drivers/firmware/efi/libstub/arm64-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm64-stub.c
+> @@ -98,6 +98,13 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
+>                              (phys_seed >> 32) & mask : TEXT_OFFSET;
+>
+>                 /*
+> +                * With CONFIG_RANDOMIZE_TEXT_OFFSET, TEXT_OFFSET may not be a
+> +                * multiple of EFI_KIMG_ALIGN, and we must ensure that we apply
+> +                * the offset below EFI_KIMG_ALIGN.
+> +                */
+> +               offset |= (TEXT_OFFSET % EFI_KIMG_ALIGN);
+> +
+> +               /*
+>                  * If KASLR is enabled, and we have some randomness available,
+>                  * locate the kernel at a randomized offset in physical memory.
+>                  */
+> --
+> 2.11.0
+>
