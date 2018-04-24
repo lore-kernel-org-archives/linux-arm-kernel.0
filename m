@@ -1,55 +1,42 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Apr 2018 21:37:54 +0200
-Subject: [PATCH 2/7] ARM: dts: sun8i: h3: Split out common board design
- for ALL-H3-CC
-In-Reply-To: <CAGb2v65iwbmOvQ2YA0e4QyTzQVj=F+5n6cWt2q6K80Y2b_3q3g@mail.gmail.com>
-References: <20180424113424.13196-1-wens@csie.org>
- <20180424113424.13196-3-wens@csie.org>
- <20180424121353.zxujyehsw3er2xq6@flea>
- <CAGb2v65iwbmOvQ2YA0e4QyTzQVj=F+5n6cWt2q6K80Y2b_3q3g@mail.gmail.com>
-Message-ID: <20180424193754.jsuucbq57onhxhqe@flea>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 24 Apr 2018 14:39:44 -0500
+Subject: [PATCH 00/11] platform: device tree support for early platform
+ drivers
+In-Reply-To: <20180424173051.15099-1-brgl@bgdev.pl>
+References: <20180424173051.15099-1-brgl@bgdev.pl>
+Message-ID: <CAL_JsqLcoPK-dDWjwrS82RRG-WLKePfDgHJcBKRQWZG5PszrKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 08:17:11PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Apr 24, 2018 at 8:13 PM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > On Tue, Apr 24, 2018 at 07:34:19PM +0800, Chen-Yu Tsai wrote:
-> >> The Libre Computer Project ALL-H3-CC has three models, all using the
-> >> same board design, but with different pin compatible SoCs and amount of
-> >> DRAM.
-> >>
-> >> Currently only the H3 1GB DRAM variant is supported. To support the two
-> >> other variants, first split the original device tree into a common board
-> >> design part and an SoC specific part.
-> >>
-> >> The SoC part only defines which SoC is used and model name, and includes
-> >> the SoC specific dtsi file and the common design dtsi file.
-> >>
-> >> Also fix up the SPDX identifier line to use the correct comment style,
-> >> and place it on the first line.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  .../boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 213 +-----------------
-> >>  ....dts => sunxi-hx-libretech-all-h3-cc.dtsi} |  11 +-
-> >
-> > I think I prefer the name of Neil's DTSI better, and since pretty much
-> > the same patches (a couple of hours) before, we'll merge them (while
-> > merging the rest of your patches, obviously).
-> >
-> > Does that work for you?
-> 
-> I would like for the regulator voltage fix to be merged before the split.
-> This will make it trivial to back port, instead of having to reverse the
-> split, and maybe failing.
+On Tue, Apr 24, 2018 at 12:30 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>
+> Device tree based systems often use OF_DECLARE() macros for devices
+> that need to be initialized early in the boot process such as clocks,
+> timers etc. However platform devices are more desirable.
 
-Yes, I was just talking about replacing your two redundant patches,
-but keeping the order you have.
+Yes, platform devices would be more desirable, but ...
+>
+> This series aims at introducing support for early platform drivers for
+> OF-based systems.
 
-Maxime
+... the whole early_platform_device infrastructure is not really a
+platform_device. Rather it kind of looks like one and I guess gets
+converted over during boot.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+This is not the first attempt to add DT support to early platform
+devices[1]. I think the same objections still apply. It has been
+pretty much only an SH thing (which as an arch, I'm told is pretty
+much unmaintained and broken).
+
+> The idea is to have a special compatible fallback string: "earlydev"
+> that similarily to "syscon" would be added to device nodes that need
+> early probing. We then need to call of_early_platform_populate() early
+> in the boot process to actually probe the registered devices.
+
+Others have sufficiently explained why this won't fly for DT, so I
+don't have more to add.
+
+Rob
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/054529.html
