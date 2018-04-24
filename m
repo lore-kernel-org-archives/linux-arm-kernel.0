@@ -1,13 +1,13 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 24 Apr 2018 19:04:23 +0530
-Subject: [RFC 11/13] bindings: display: Add compatible for A64 tcon-tv
+Date: Tue, 24 Apr 2018 19:04:22 +0530
+Subject: [RFC 10/13] bindings: display: Add compatible for A64 Mixer1
 In-Reply-To: <20180424133425.24291-1-jagan@amarulasolutions.com>
 References: <20180424133425.24291-1-jagan@amarulasolutions.com>
-Message-ID: <20180424133425.24291-12-jagan@amarulasolutions.com>
+Message-ID: <20180424133425.24291-11-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tcon-tv on Allwinner A64 has similar behavior like Allwinner A83T.
+Mixer1 on Allwinner A64 has similar behavior like Allwinner A83T.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
@@ -15,16 +15,16 @@ Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
  1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 3576006e9dbb..cf7c7e535d9c 100644
+index 448f99a91382..3576006e9dbb 100644
 --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
 +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -151,6 +151,7 @@ Required properties:
-    * allwinner,sun9i-a80-tcon-lcd
-    * allwinner,sun9i-a80-tcon-tv
-    * allwinner,sun50i-a64-tcon-lcd
-+   * allwinner,sun50i-a64-tcon-tv
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON.
+@@ -315,6 +315,7 @@ Required properties:
+     * allwinner,sun8i-h3-de2-mixer-0
+     * allwinner,sun8i-v3s-de2-mixer
+     * allwinner,sun50i-a64-de2-mixer-0
++    * allwinner,sun50i-a64-de2-mixer-1
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+     * bus: the mixer interface clock
 -- 
 2.14.3
