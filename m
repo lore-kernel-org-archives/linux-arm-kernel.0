@@ -1,74 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Apr 2018 13:11:40 +0200
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Apr 2018 12:13:23 +0100
 Subject: [PATCH] efi/libstub/arm64: handle randomized TEXT_OFFSET
-In-Reply-To: <20180424110058.29344-1-mark.rutland@arm.com>
+In-Reply-To: <CAKv+Gu813jnf1RPU0HKMXapeK04XhJMveeLb9uppx7recyUW5w@mail.gmail.com>
 References: <20180424110058.29344-1-mark.rutland@arm.com>
-Message-ID: <CAKv+Gu813jnf1RPU0HKMXapeK04XhJMveeLb9uppx7recyUW5w@mail.gmail.com>
+ <CAKv+Gu813jnf1RPU0HKMXapeK04XhJMveeLb9uppx7recyUW5w@mail.gmail.com>
+Message-ID: <20180424111323.ifqq7hathc3n54ne@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tue, Apr 24, 2018 at 01:11:40PM +0200, Ard Biesheuvel wrote:
+> Hi Mark,
+> 
+> On 24 April 2018 at 13:00, Mark Rutland <mark.rutland@arm.com> wrote:
+> > When CONFIG_RANDOMIZE_TEXT_OFFSET is selected, TEXT_OFFSET is an
+> > arbitrary multiple of PAGE_SIZE in the interval [0, 2MB).
+> >
+> > The EFI stub doesn't accuont for this, and only handles the case where
+> 
+> 'account'
+> 
+> If you agree, I will add something here to clarify that the newly
+> chosen offset should retain the misalignment of TEXT_OFFSET relative
+> to EFI_KIMG_ALIGN, because it took me a while to figure that out.
 
-On 24 April 2018 at 13:00, Mark Rutland <mark.rutland@arm.com> wrote:
-> When CONFIG_RANDOMIZE_TEXT_OFFSET is selected, TEXT_OFFSET is an
-> arbitrary multiple of PAGE_SIZE in the interval [0, 2MB).
->
-> The EFI stub doesn't accuont for this, and only handles the case where
+That makes sense to me. Sorry for the clumsy wording!
 
-'account'
+> 
+> Other than that,
+> 
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> I will queue this as a fix
 
-If you agree, I will add something here to clarify that the newly
-chosen offset should retain the misalignment of TEXT_OFFSET relative
-to EFI_KIMG_ALIGN, because it took me a while to figure that out.
+Great; thanks!
 
-Other than that,
-
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-I will queue this as a fix
-
-Thanks,
-Ard.
-
-
-
-> TEXT_OFFSET is multiple of EFI_KIMG_ALIGN. This can result in the kernel
-> being loaded to an erroneous physical alignment. This has been observed
-> to result in spurious stack overflow reports and failure to make use of
-> the IRQ stacks, and theoretically could result in a number of other
-> issues.
->
-> We can OR in the low bits of TEXT_OFFSET to ensure that we have the
-> necessary offset (and hence have the necessary alignment), so let's do
-> that.
->
-> Fixes: 6f26b3671184c36d ("arm64: kaslr: increase randomization granularity")
-> Reported-by: Kim Phillips <kim.phillips@arm.com>
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: linux-efi at vger.kernel.org
-> ---
->  drivers/firmware/efi/libstub/arm64-stub.c | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-> index b9bd827caa22..541b82fdc8a2 100644
-> --- a/drivers/firmware/efi/libstub/arm64-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm64-stub.c
-> @@ -98,6 +98,13 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
->                              (phys_seed >> 32) & mask : TEXT_OFFSET;
->
->                 /*
-> +                * With CONFIG_RANDOMIZE_TEXT_OFFSET, TEXT_OFFSET may not be a
-> +                * multiple of EFI_KIMG_ALIGN, and we must ensure that we apply
-> +                * the offset below EFI_KIMG_ALIGN.
-> +                */
-> +               offset |= (TEXT_OFFSET % EFI_KIMG_ALIGN);
-> +
-> +               /*
->                  * If KASLR is enabled, and we have some randomness available,
->                  * locate the kernel at a randomized offset in physical memory.
->                  */
-> --
-> 2.11.0
->
+Mark.
