@@ -1,173 +1,37 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 24 Apr 2018 19:45:58 +0200
-Subject: [PATCH 1/5] ARM: dts: exynos: Remove unnecessary address/size
- properties in Midas boards
-Message-ID: <20180424174602.3915-1-krzk@kernel.org>
+Date: Tue, 24 Apr 2018 19:46:02 +0200
+Subject: [PATCH 5/5] ARM: dts: exynos: Remove unnecessary address/size
+ properties in dp-controller of Exynos5
+In-Reply-To: <20180424174602.3915-1-krzk@kernel.org>
+References: <20180424174602.3915-1-krzk@kernel.org>
+Message-ID: <20180424174602.3915-5-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The children of regulators node do not have reg/ranges properties.  Move the
-children up one level, get rid of regulators node and remove
-address-cells and size-cells properties.  This fixes warnings for
-Exynos4412 Midas family boards:
+The "dp-controller" node is not a bus and it does not have children with
+reg/ranges properties so remove address-cells and size-cells properties.
+This fixes warnings for all Exynos5 boards:
 
-    arch/arm/boot/dts/exynos4412-i9300.dtb: Warning (avoid_unnecessary_addr_size):
-        /regulators: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
-    arch/arm/boot/dts/exynos4412-i9305.dtb: Warning (avoid_unnecessary_addr_size):
-        /regulators: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
-    arch/arm/boot/dts/exynos4412-n710x.dtb: Warning (avoid_unnecessary_addr_size):
-        /regulators: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+    arch/arm/boot/dts/exynos5250-arndale.dtb: Warning (avoid_unnecessary_addr_size):
+        /soc/dp-controller at 145b0000: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi | 32 +++++------
- arch/arm/boot/dts/exynos4412-midas.dtsi     | 86 ++++++++++++++---------------
- 2 files changed, 55 insertions(+), 63 deletions(-)
+ arch/arm/boot/dts/exynos5.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi b/arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi
-index ee8e1f445370..31cd5f6fd83c 100644
---- a/arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi
-@@ -15,24 +15,22 @@
- 		i2c10 = &i2c_cm36651;
- 	};
- 
--	regulators {
--		lcd_vdd3_reg: voltage-regulator-2 {
--			compatible = "regulator-fixed";
--			regulator-name = "LCD_VDD_2.2V";
--			regulator-min-microvolt = <2200000>;
--			regulator-max-microvolt = <2200000>;
--			gpio = <&gpc0 1 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--		};
-+	lcd_vdd3_reg: voltage-regulator-2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "LCD_VDD_2.2V";
-+		regulator-min-microvolt = <2200000>;
-+		regulator-max-microvolt = <2200000>;
-+		gpio = <&gpc0 1 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- 
--		ps_als_reg: voltage-regulator-5 {
--			compatible = "regulator-fixed";
--			regulator-name = "LED_A_3.0V";
--			regulator-min-microvolt = <3000000>;
--			regulator-max-microvolt = <3000000>;
--			gpio = <&gpj0 5 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--		};
-+	ps_als_reg: voltage-regulator-5 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "LED_A_3.0V";
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		gpio = <&gpj0 5 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
- 	};
- 
- 	i2c_ak8975: i2c-gpio-0 {
-diff --git a/arch/arm/boot/dts/exynos4412-midas.dtsi b/arch/arm/boot/dts/exynos4412-midas.dtsi
-index 76f2b30f1731..4b182e26cfc8 100644
---- a/arch/arm/boot/dts/exynos4412-midas.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-midas.dtsi
-@@ -46,56 +46,50 @@
+diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+index 359f49bdd4e2..5d2f0a06fbef 100644
+--- a/arch/arm/boot/dts/exynos5.dtsi
++++ b/arch/arm/boot/dts/exynos5.dtsi
+@@ -196,8 +196,6 @@
+ 			reg = <0x145B0000 0x1000>;
+ 			interrupts = <10 3>;
+ 			interrupt-parent = <&combiner>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+ 			status = "disabled";
  		};
- 	};
  
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		cam_io_reg: voltage-regulator-1 {
--			compatible = "regulator-fixed";
--			regulator-name = "CAM_SENSOR_A";
--			regulator-min-microvolt = <2800000>;
--			regulator-max-microvolt = <2800000>;
--			enable-active-high;
--			status = "disabled";
--		};
-+	cam_io_reg: voltage-regulator-1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "CAM_SENSOR_A";
-+		regulator-min-microvolt = <2800000>;
-+		regulator-max-microvolt = <2800000>;
-+		enable-active-high;
-+		status = "disabled";
-+	};
- 
--		cam_af_reg: voltage-regulator-3 {
--			compatible = "regulator-fixed";
--			regulator-name = "CAM_AF";
--			regulator-min-microvolt = <2800000>;
--			regulator-max-microvolt = <2800000>;
--			enable-active-high;
--			status = "disabled";
--		};
-+	cam_af_reg: voltage-regulator-3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "CAM_AF";
-+		regulator-min-microvolt = <2800000>;
-+		regulator-max-microvolt = <2800000>;
-+		enable-active-high;
-+		status = "disabled";
-+	};
- 
--		vsil12: voltage-regulator-6 {
--			compatible = "regulator-fixed";
--			regulator-name = "VSIL_1.2V";
--			regulator-min-microvolt = <1200000>;
--			regulator-max-microvolt = <1200000>;
--			gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--			vin-supply = <&buck7_reg>;
--		};
-+	vsil12: voltage-regulator-6 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VSIL_1.2V";
-+		regulator-min-microvolt = <1200000>;
-+		regulator-max-microvolt = <1200000>;
-+		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+		vin-supply = <&buck7_reg>;
-+	};
- 
--		vcc33mhl: voltage-regulator-7 {
--			compatible = "regulator-fixed";
--			regulator-name = "VCC_3.3_MHL";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--		};
-+	vcc33mhl: voltage-regulator-7 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_3.3_MHL";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- 
--		vcc18mhl: voltage-regulator-8 {
--			compatible = "regulator-fixed";
--			regulator-name = "VCC_1.8_MHL";
--			regulator-min-microvolt = <1800000>;
--			regulator-max-microvolt = <1800000>;
--			gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--		};
-+	vcc18mhl: voltage-regulator-8 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_1.8_MHL";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
- 	};
- 
- 	gpio-keys {
 -- 
 2.14.1
