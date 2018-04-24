@@ -1,38 +1,34 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 24 Apr 2018 11:10:46 +0200
-Subject: [PATCH V2 3/3] cpufreq: add suspend/resume support in Armada
- 37xx DVFS driver
-In-Reply-To: <4ca19364ff10083c3912ce428207c3f713f973b9.1524549644.git.viresh.kumar@linaro.org>
-References: <cover.1524549644.git.viresh.kumar@linaro.org>
- <4ca19364ff10083c3912ce428207c3f713f973b9.1524549644.git.viresh.kumar@linaro.org>
-Message-ID: <20180424111046.704637d3@xps13>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Tue, 24 Apr 2018 12:13:28 +0300
+Subject: [PATCH v2 07/10] media: platform: Add Sunxi-Cedrus VPU decoder
+ driver
+In-Reply-To: <20180419154536.17846-3-paul.kocialkowski@bootlin.com>
+References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+ <20180419154536.17846-3-paul.kocialkowski@bootlin.com>
+Message-ID: <20180424091328.jsqp36nxekuj23am@paasikivi.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi Paul
 
-On Tue, 24 Apr 2018 11:37:36 +0530, Viresh Kumar
-<viresh.kumar@linaro.org> wrote:
-
-> From: Miquel Raynal <miquel.raynal@bootlin.com>
+On Thu, Apr 19, 2018 at 05:45:33PM +0200, Paul Kocialkowski wrote:
+> This introduces the Sunxi-Cedrus VPU driver that supports the VPU found
+> in Allwinner SoCs, also known as Video Engine. It is implemented through
+> a v4l2 m2m decoder device and a media device (used for media requests).
+> So far, it only supports MPEG2 decoding.
 > 
-> Add suspend/resume hooks in Armada 37xx DVFS driver to handle S2RAM
-> operations. As there is currently no 'driver' structure, create one
-> to store both the regmap and the register values during suspend
-> operation.
+> Since this VPU is stateless, synchronization with media requests is
+> required in order to ensure consistency between frame headers that
+> contain metadata about the frame to process and the raw slice data that
+> is used to generate the frame.
 > 
-> A syscore_ops is used to export the suspend/resume hooks.
+> This driver was made possible thanks to the long-standing effort
+> carried out by the linux-sunxi community in the interest of reverse
+> engineering, documenting and implementing support for Allwinner VPU.
 
-I think you can remove this line too since there is no more syscore_ops.
-
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Regards,
-Miqu?l
+No code review yet, but DT bindings precede the driver. Please also add
+the appropriate MAINTAINERS entries.
 
 -- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Sakari Ailus
+sakari.ailus at linux.intel.com
