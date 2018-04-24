@@ -1,45 +1,26 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Apr 2018 20:17:11 +0800
-Subject: [PATCH 2/7] ARM: dts: sun8i: h3: Split out common board design
- for ALL-H3-CC
-In-Reply-To: <20180424121353.zxujyehsw3er2xq6@flea>
-References: <20180424113424.13196-1-wens@csie.org>
- <20180424113424.13196-3-wens@csie.org>
- <20180424121353.zxujyehsw3er2xq6@flea>
-Message-ID: <CAGb2v65iwbmOvQ2YA0e4QyTzQVj=F+5n6cWt2q6K80Y2b_3q3g@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 24 Apr 2018 09:22:52 -0300
+Subject: [PATCH 4/5] ARM: dts: imx6sx-sabreauto: add fec support
+In-Reply-To: <AM3PR04MB131566E1C8033D256686F192F5880@AM3PR04MB1315.eurprd04.prod.outlook.com>
+References: <1524455219-6736-1-git-send-email-Anson.Huang@nxp.com>
+ <1524455219-6736-4-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5CDAQtw7Q6NgSzKP4ogaqRaGSE0A+st1iqZ=cQsK49moQ@mail.gmail.com>
+ <AM3PR04MB131566E1C8033D256686F192F5880@AM3PR04MB1315.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5Dm=MFRoh=y54Qf2RrncWfQPTUJ2ZNfvYnUD=idp8RPNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 8:13 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Tue, Apr 24, 2018 at 07:34:19PM +0800, Chen-Yu Tsai wrote:
->> The Libre Computer Project ALL-H3-CC has three models, all using the
->> same board design, but with different pin compatible SoCs and amount of
->> DRAM.
->>
->> Currently only the H3 1GB DRAM variant is supported. To support the two
->> other variants, first split the original device tree into a common board
->> design part and an SoC specific part.
->>
->> The SoC part only defines which SoC is used and model name, and includes
->> the SoC specific dtsi file and the common design dtsi file.
->>
->> Also fix up the SPDX identifier line to use the correct comment style,
->> and place it on the first line.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  .../boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 213 +-----------------
->>  ....dts => sunxi-hx-libretech-all-h3-cc.dtsi} |  11 +-
->
-> I think I prefer the name of Neil's DTSI better, and since pretty much
-> the same patches (a couple of hours) before, we'll merge them (while
-> merging the rest of your patches, obviously).
->
-> Does that work for you?
+Hi Anson,
 
-I would like for the regulator voltage fix to be merged before the split.
-This will make it trivial to back port, instead of having to reverse the
-split, and maybe failing.
+On Mon, Apr 23, 2018 at 11:09 PM, Anson Huang <anson.huang@nxp.com> wrote:
 
-ChenYu
+> Ah, yes, thanks for pointing out this issue, I just removed it and the function is still working,
+> already sent out V2 patch set, thanks.
+
+So now maybe it is working only because the bootloader activated this
+GPIO, which is not good.
+
+I don't have access to the mx6sx sabreauto schematics to verify  where
+&max7322 0 connects to, but it would be better to make sure that you
+activate this pin in dts if it is needed for Ethernet, without relying
+on the bootloader.
