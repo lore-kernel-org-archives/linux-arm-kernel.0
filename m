@@ -1,64 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Apr 2018 13:11:22 +0100
-Subject: [PATCH] arm64: ptrace: remove addr_limit manipulation
-Message-ID: <20180424121122.30294-1-mark.rutland@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 24 Apr 2018 14:13:53 +0200
+Subject: [PATCH 2/7] ARM: dts: sun8i: h3: Split out common board design
+ for ALL-H3-CC
+In-Reply-To: <20180424113424.13196-3-wens@csie.org>
+References: <20180424113424.13196-1-wens@csie.org>
+ <20180424113424.13196-3-wens@csie.org>
+Message-ID: <20180424121353.zxujyehsw3er2xq6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We transiently switch to KERNEL_DS in compat_ptrace_gethbpregs() and
-compat_ptrace_sethbpregs(), but in either case this is pointless as we
-don't perform any uaccess during this window.
+On Tue, Apr 24, 2018 at 07:34:19PM +0800, Chen-Yu Tsai wrote:
+> The Libre Computer Project ALL-H3-CC has three models, all using the
+> same board design, but with different pin compatible SoCs and amount of
+> DRAM.
+> 
+> Currently only the H3 1GB DRAM variant is supported. To support the two
+> other variants, first split the original device tree into a common board
+> design part and an SoC specific part.
+> 
+> The SoC part only defines which SoC is used and model name, and includes
+> the SoC specific dtsi file and the common design dtsi file.
+> 
+> Also fix up the SPDX identifier line to use the correct comment style,
+> and place it on the first line.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 213 +-----------------
+>  ....dts => sunxi-hx-libretech-all-h3-cc.dtsi} |  11 +-
 
-let's rip out the redundant addr_limit manipulation.
+I think I prefer the name of Neil's DTSI better, and since pretty much
+the same patches (a couple of hours) before, we'll merge them (while
+merging the rest of your patches, obviously).
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/ptrace.c | 6 ------
- 1 file changed, 6 deletions(-)
+Does that work for you?
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 71d99af24ef2..7a832ce6552f 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -1458,9 +1458,7 @@ static int compat_ptrace_gethbpregs(struct task_struct *tsk, compat_long_t num,
- {
- 	int ret;
- 	u32 kdata;
--	mm_segment_t old_fs = get_fs();
- 
--	set_fs(KERNEL_DS);
- 	/* Watchpoint */
- 	if (num < 0) {
- 		ret = compat_ptrace_hbp_get(NT_ARM_HW_WATCH, tsk, num, &kdata);
-@@ -1471,7 +1469,6 @@ static int compat_ptrace_gethbpregs(struct task_struct *tsk, compat_long_t num,
- 	} else {
- 		ret = compat_ptrace_hbp_get(NT_ARM_HW_BREAK, tsk, num, &kdata);
- 	}
--	set_fs(old_fs);
- 
- 	if (!ret)
- 		ret = put_user(kdata, data);
-@@ -1484,7 +1481,6 @@ static int compat_ptrace_sethbpregs(struct task_struct *tsk, compat_long_t num,
- {
- 	int ret;
- 	u32 kdata = 0;
--	mm_segment_t old_fs = get_fs();
- 
- 	if (num == 0)
- 		return 0;
-@@ -1493,12 +1489,10 @@ static int compat_ptrace_sethbpregs(struct task_struct *tsk, compat_long_t num,
- 	if (ret)
- 		return ret;
- 
--	set_fs(KERNEL_DS);
- 	if (num < 0)
- 		ret = compat_ptrace_hbp_set(NT_ARM_HW_WATCH, tsk, num, &kdata);
- 	else
- 		ret = compat_ptrace_hbp_set(NT_ARM_HW_BREAK, tsk, num, &kdata);
--	set_fs(old_fs);
- 
- 	return ret;
- }
+Maxime
 -- 
-2.11.0
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/217c3fad/attachment.sig>
