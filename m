@@ -1,105 +1,54 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Tue, 24 Apr 2018 17:32:54 +0200
-Subject: [RFC 00/13] arm64: allwinner: Add A64 DE2 pipeline support
-In-Reply-To: <20180424133425.24291-1-jagan@amarulasolutions.com>
-References: <20180424133425.24291-1-jagan@amarulasolutions.com>
-Message-ID: <4355590.Ql03JAEh1C@jernej-laptop>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Tue, 24 Apr 2018 08:39:03 -0700
+Subject: [v2 resend 03/10] mfd: mtk-mmsys: Add mmsys driver
+In-Reply-To: <99bef17c57ad60eff6104da780cf59b785bd3e42.1524563001.git.mbrugger@suse.com>
+References: <cover.1524563001.git.mbrugger@suse.com>
+ <99bef17c57ad60eff6104da780cf59b785bd3e42.1524563001.git.mbrugger@suse.com>
+Message-ID: <9b023ba1-fb66-a955-e54d-d0a9cbbd7b45@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/24/2018 02:47 AM, matthias.bgg at kernel.org wrote:
+> From: Matthias Brugger <mbrugger@suse.com>
+> 
+> The MMSYS subsystem includes clocks and drm components.
+> This patch adds a MFD device to probe both drivers from the same
+> device tree compatible.
+> 
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> ---
+>  drivers/mfd/Kconfig     |  9 ++++++
+>  drivers/mfd/Makefile    |  2 ++
+>  drivers/mfd/mtk-mmsys.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 90 insertions(+)
+>  create mode 100644 drivers/mfd/mtk-mmsys.c
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index b860eb5aa194..a2c928e26026 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -378,6 +378,15 @@ config MFD_MC13XXX_I2C
+>  	help
+>  	  Select this if your MC13xxx is connected via an I2C bus.
+>  
+> +config MFD_MEDIATEK_MMSYS
+> +	tristate "Mediatek MMSYS interface"
+> +	select MDF_CORE
 
-Dne torek, 24. april 2018 ob 15:34:12 CEST je Jagan Teki napisal(a):
-> Allwinner A64 has display engine pipeline like other Allwinner SOC's
-> A83T/H3/H5.
-> 
-> A64 DE2 behaviour similar to Allwinner A83T where mixer0, connected to tcon0
-> with RGB, LVDS MIPI-DSI and mixer1, connected to tcon1 with HDMI.
-> This series merely concentrated on HDMI pipeline and rest will add
-> eventually.
-> 
-> patch 1: dt-bindings for a64 DE2 CCU
-> 
-> patch 2: a64 DE2 CCU node addition
-> 
-> patch 3: dt-bindings for a64 DE2 pipeline
-> 
-> patch 4 - 5: dt-bindings for a64 mixer0 and tcon-lcd
-> 
-> patch 6: a64 DE2 pipeline node addition
-> 
-> patch 7 - 8: dt-bindings for a64 HDMI and HDMI PHY
-> 
-> patch 9: a64 HDMI nodes addition
-> 
-> patch 10 - 11: dt-bindings for a64 mixer1 and tcon-tv
-> 
-> patch 12: a64 HDMI pipeline
-> 
-> patch 13: enable HDMI out on bananpi-m64
-> 
-> Tested HDMI on bananapi-m64 (along with DE2 SRAM C changes from [1]
-> thread), able to detect the HDMI but, no penguins on screen.
-> 
-> Request for any suggestions.
+	select MFD_CORE
 
-You are mising sunxi-ng clock patches. PLL_VIDEO0 and PLL_VIDEO1 need fixes by 
-setting minimum stable frequency. Please note that datasheet may have wrong 
-information. That was obvious in H3 case and I had to check minimum stable 
-PLL_VIDEO frequency in BSP driver.
+tested??
 
-Without clock fixes, you might not see anything on the screen.
+> +	select REGMAP_MMIO
+> +	help
+> +	  Select this if you have a MMSYS subsystem in your SoC. The
+> +	  MMSYS subsystem has at least a clock driver part and some
+> +	  DRM components.
+> +
+>  config MFD_MXS_LRADC
+>  	tristate "Freescale i.MX23/i.MX28 LRADC"
+>  	depends on ARCH_MXS || COMPILE_TEST
 
-Best regards,
-Jernej
 
-> 
-> Test log on Bananpi-m64:
-> [    0.247631] sun4i-drm display-engine: bound 1100000.mixer (ops
-> sun8i_mixer_ops) [    0.256717] sun4i-drm display-engine: bound
-> 1200000.mixer (ops sun8i_mixer_ops) [    0.256783] sun4i-tcon
-> 1c0c000.lcd-controller: Missing LVDS properties, Please upgrade your DT [  
->  0.256792] sun4i-tcon 1c0c000.lcd-controller: LVDS output disabled [   
-> 0.257081] sun4i-drm display-engine: No panel or bridge found... RGB output
-> disabled [    0.257099] sun4i-drm display-engine: bound
-> 1c0c000.lcd-controller (ops sun4i_tcon_ops) [    0.257273] sun4i-drm
-> display-engine: No panel or bridge found... RGB output disabled [   
-> 0.257288] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops
-> sun4i_tcon_ops) [    0.258176] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX
-> controller v1.32a with HDCP (sun8i_dw_hdmi_p) [    0.258596] sun8i-dw-hdmi
-> 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver [    0.259188]
-> sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops) [   
-> 0.259199] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013). [   
-> 0.259205] [drm] No driver support for vblank timestamp query. [   
-> 0.259308] [drm] Cannot find any crtc or sizes
-> [    0.259824] [drm] Initialized sun4i-drm 1.0.0 20150629 for display-engine
-> on minor 0
-> 
-> [1] https://lkml.org/lkml/2018/3/16/1096
-> 
-> Jagan Teki (13):
->   dt-bindings: clock: Add compatible for A64 DE2 CCU
->   arm64: dts: allwinner: a64: Add DE2 CCU
->   bindings: display: Add compatible for A64 DE2 pipeline
->   bindings: display: Add compatible for A64 Mixer0
->   bindings: display: Add compatible for A64 tcon-lcd
->   arm64: dts: allwinner: a64: Add DE2 pipeline
->   bindings: display: Add compatible for A64 HDMI
->   bindings: display: Add compatible for A64 HDMI PHY
->   arm64: dts: allwinner: a64: Add HDMI support
->   bindings: display: Add compatible for A64 Mixer1
->   bindings: display: Add compatible for A64 tcon-tv
->   arm64: dts: allwinner: a64: Add HDMI pipeline
->   arm64: dts: allwinner: a64: bananapi-m64: Enable HDMI output
-> 
->  .../devicetree/bindings/clock/sun8i-de2.txt        |   1 +
->  .../bindings/display/sunxi/sun4i-drm.txt           |   7 +
->  .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  26 +++
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 181
-> +++++++++++++++++++++ drivers/gpu/drm/sun4i/sun4i_drv.c                  | 
->  1 +
->  include/dt-bindings/clock/sun50i-a64-ccu.h         |   2 +
->  6 files changed, 218 insertions(+)
-> 
-> --
-> 2.14.3
+-- 
+~Randy
