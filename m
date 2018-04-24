@@ -1,63 +1,59 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Apr 2018 19:34:17 +0800
-Subject: [PATCH 0/7] ARM: dts: sunxi: Support ALL-H3-CC H2+/H5 variants
-Message-ID: <20180424113424.13196-1-wens@csie.org>
+Date: Tue, 24 Apr 2018 19:34:21 +0800
+Subject: [PATCH 4/7] ARM: dts: sun8i: h2+: Add Libre Computer Board ALL-H3-CC
+ H2+ ver.
+In-Reply-To: <20180424113424.13196-1-wens@csie.org>
+References: <20180424113424.13196-1-wens@csie.org>
+Message-ID: <20180424113424.13196-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds a device tree file for the H2+ version of the Libre
+Computer Board ALL-H3-CC. It is the same board first introduced in
+commit 6ca358645d4d ("ARM: dts: sun8i: h3: Add dts file for Libre
+Computer Board ALL-H3-CC H3 ver."), with the H3 SoC replaced with
+the H2+ SoC, and has only two 2Gb DDR3 chips instead of four.
 
-This series is adds support for the H2+ and H5 variants of the Libre
-Computer Project ALL-H3-CC board. The board uses the same board design
-with the H2+, H3, and H5 SoCs, with different memory capacities. The
-H3 version was supported in 4.16.
+The device tree utilizes the common board design file for ALL-H3-CC,
+providing just the model strings and SoC specifics.
 
-The H5 version is mostly the same as Neil's. I had the patches around
-for a few days and was waiting for stuff to calm down for the H3/H5
-branch. These patches are properly rebased.
-
-Patch 1 fixes the regulator voltage specified for the VCC-1V2 regulator,
-which is a fixed regulator and should obviously be outputting 1.2 volts,
-not 3.3 volts.
-
-Patch 2 splits out the common board design of the ALL-H3-CC.
-
-Patch 3 cleans up the H2+ section of the ARM dts Makefile.
-
-Patch 4 adds a device tree for the H2+ variant of ALL-H3-CC.
-
-Patch 5 adds a cpu0 label for the first core on the H5 SoC.
-This is needed so we can share the ALL-H3-CC device tree, which
-already has DVFS enabled and fixed regulator set for the CPU domain.
-
-Patch 6 cleans up the H5 section of the arm64 allwinner dts Makefile.
-
-Patch 7 adds a device tree for the H5 variant of ALL-H3-CC.
-
-Please have a look.
-
-ChenYu
-
-Chen-Yu Tsai (7):
-  ARM: dts: sun8i: h3: fix ALL-H3-CC H3 ver VCC-1V2 regulator voltage
-  ARM: dts: sun8i: h3: Split out common board design for ALL-H3-CC
-  ARM: dts: sun8i: h2-plus: Sort dtb entries in Makefile
-  ARM: dts: sun8i: h2+: Add Libre Computer Board ALL-H3-CC H2+ ver.
-  arm64: dts: allwinner: h5: Add cpu0 label for first cpu
-  arm64: dts: allwinner: Sort dtb entries in Makefile
-  arm64: dts: allwinner: h5: Add Libre Computer Board ALL-H3-CC H5 ver.
-
- arch/arm/boot/dts/Makefile                    |   3 +-
- .../dts/sun8i-h2-plus-libretech-all-h3-cc.dts |  13 ++
- .../boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 213 +-----------------
- ....dts => sunxi-hx-libretech-all-h3-cc.dtsi} |  15 +-
- arch/arm64/boot/dts/allwinner/Makefile        |   5 +-
- .../sun50i-h5-libretech-all-h3-cc.dts         |  14 ++
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi  |   2 +-
- 7 files changed, 40 insertions(+), 225 deletions(-)
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/Makefile                          |  1 +
+ .../boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dts  | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
  create mode 100644 arch/arm/boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dts
- copy arch/arm/boot/dts/{sun8i-h3-libretech-all-h3-cc.dts => sunxi-hx-libretech-all-h3-cc.dtsi} (93%)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5c979ed6c77b..1064d3acb607 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -993,6 +993,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a83t-cubietruck-plus.dtb \
+ 	sun8i-a83t-tbs-a711.dtb \
+ 	sun8i-h2-plus-bananapi-m2-zero.dtb \
++	sun8i-h2-plus-libretech-all-h3-cc.dtb \
+ 	sun8i-h2-plus-orangepi-r1.dtb \
+ 	sun8i-h2-plus-orangepi-zero.dtb \
+ 	sun8i-h3-bananapi-m2-plus.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dts b/arch/arm/boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dts
+new file mode 100644
+index 000000000000..2e7e13ab7eec
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dts
+@@ -0,0 +1,13 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2018 Chen-Yu Tsai <wens@csie.org>
++ */
++
++/dts-v1/;
++#include "sun8i-h3.dtsi"
++#include "sunxi-hx-libretech-all-h3-cc.dtsi"
++
++/ {
++	model = "Libre Computer Board ALL-H3-CC H2+";
++	compatible = "libretech,all-h3-cc-h2-plus", "allwinner,sun8i-h2-plus";
++};
 -- 
 2.17.0
