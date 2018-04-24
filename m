@@ -1,33 +1,49 @@
 From: christophe.roullier@st.com (Christophe Roullier)
-Date: Tue, 24 Apr 2018 17:02:00 +0200
-Subject: [PATCH  8/8] dt-bindings: stm32: add compatible for syscon
+Date: Tue, 24 Apr 2018 17:01:59 +0200
+Subject: [PATCH 7/8] ARM: dts: stm32: add support of ethernet on
+ stm32mp157c-ev1
 In-Reply-To: <1524582120-4451-1-git-send-email-christophe.roullier@st.com>
 References: <1524582120-4451-1-git-send-email-christophe.roullier@st.com>
-Message-ID: <1524582120-4451-9-git-send-email-christophe.roullier@st.com>
+Message-ID: <1524582120-4451-8-git-send-email-christophe.roullier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch describes syscon DT bindings.
+MAC is connected to a PHY in RGMII mode.
 
 Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
 ---
- Documentation/devicetree/bindings/arm/stm32.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/stm32mp157c-ev1.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
-index 6808ed9..a871a78 100644
---- a/Documentation/devicetree/bindings/arm/stm32.txt
-+++ b/Documentation/devicetree/bindings/arm/stm32.txt
-@@ -8,3 +8,10 @@ using one of the following compatible strings:
-   st,stm32f746
-   st,stm32h743
-   st,stm32mp157
+diff --git a/arch/arm/boot/dts/stm32mp157c-ev1.dts b/arch/arm/boot/dts/stm32mp157c-ev1.dts
+index 57e6dbc..a7fee5c 100644
+--- a/arch/arm/boot/dts/stm32mp157c-ev1.dts
++++ b/arch/arm/boot/dts/stm32mp157c-ev1.dts
+@@ -17,5 +17,25 @@
+ 
+ 	aliases {
+ 		serial0 = &uart4;
++		ethernet0 = &ethernet0;
++	};
++};
 +
-+Required nodes:
++&ethernet0 {
++	status = "okay";
++	pinctrl-0 = <&ethernet0_rgmii_pins_a>;
++	pinctrl-1 = <&ethernet0_rgmii_pins_sleep_a>;
++	pinctrl-names = "default", "sleep";
++	phy-mode = "rgmii";
++	max-speed = <1000>;
++	phy-handle = <&phy0>;
 +
-+- syscon: some subnode of the STM32 SoC node must be a
-+  system controller node pointing to the control registers,
-+  with the compatible string set to one of these tuples:
-+  "st,stm32-syscfg", "syscon"
++	mdio0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "snps,dwmac-mdio";
++		phy0: ethernet-phy at 0 {
++			reg = <0>;
++		};
+ 	};
+ };
 -- 
 1.9.1
