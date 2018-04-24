@@ -1,31 +1,33 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Tue, 24 Apr 2018 16:15:20 +0200
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Update with current
- configuration
-In-Reply-To: <20180424081528.25883-2-gregory.clement@bootlin.com>
-References: <20180424081528.25883-1-gregory.clement@bootlin.com>
- <20180424081528.25883-2-gregory.clement@bootlin.com>
-Message-ID: <20180424161520.304d0b73@windsurf>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Apr 2018 15:17:29 +0100
+Subject: [PATCH] arm64: support __int128 with clang
+In-Reply-To: <20180424135608.m5uxhmclhnljpbau@lakrids.cambridge.arm.com>
+References: <20171223004323.1986-1-Jason@zx2c4.com>
+ <CAHmME9otwT+14LhmebF8Osna7m_u6xvFEi7pMq2v1-k9WD5Lpw@mail.gmail.com>
+ <20180424133527.GB24599@arm.com>
+ <20180424135608.m5uxhmclhnljpbau@lakrids.cambridge.arm.com>
+Message-ID: <20180424141729.r7wfnos3p2kdt3ez@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, 24 Apr 2018 10:15:27 +0200, Gregory CLEMENT wrote:
-> During time, the multi_v7_defconfig file has diverged from the one
-
-During -> Over
-
-> generated with make savedefconfig. Update it by simply doing a:
+On Tue, Apr 24, 2018 at 02:56:09PM +0100, Mark Rutland wrote:
+> I belevie that currently it is not possible to use a released version of
+> clang to build a working kernel without additional patches (at least
+> 5.0.0, there don't seem to be any 6.0.0 binaries that can target
+> AArch64). Issues include:
 > 
-> make savedefconfig; cp deffconfig arch/arm/configs/multi_v7_defconfig
+> * Released versions of clang don't support the 's' constraint used in
+>   some hyp code.
+> 
 
-Typo: deffconfig -> defconfig
+> * Released versions of clang don't support 'rX' as a register name, as
+>   is used by some workaround code shared between arm/arm64.
 
-Best regards,
+This case will apparently be fixed for 6.0.1 (and presumably 7.0.0):
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+https://reviews.llvm.org/rL328829
+https://bugs.llvm.org/show_bug.cgi?id=36862
+
+Neither have been released yet.
+
+Mark.
