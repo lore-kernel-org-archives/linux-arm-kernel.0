@@ -1,62 +1,149 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 23 Apr 2018 21:32:33 -0400
-Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
-In-Reply-To: <20180212183352.22730-4-jean-philippe.brucker@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-4-jean-philippe.brucker@arm.com>
-Message-ID: <57d77955-caa7-ddac-df7d-7eef1f05dbb2@codeaurora.org>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Tue, 24 Apr 2018 10:04:57 +0800
+Subject: [PATCH V2 1/5] ARM: dts: imx6sx-sabreauto: add PMIC support
+Message-ID: <1524535501-8567-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
-> /**
->   * iommu_sva_device_init() - Initialize Shared Virtual Addressing for a device
->   * @dev: the device
-> @@ -129,7 +439,10 @@ EXPORT_SYMBOL_GPL(iommu_sva_device_shutdown);
->  int iommu_sva_bind_device(struct device *dev, struct mm_struct *mm, int *pasid,
->  			  unsigned long flags, void *drvdata)
->  {
-> +	int i, ret;
-> +	struct io_mm *io_mm = NULL;
->  	struct iommu_domain *domain;
-> +	struct iommu_bond *bond = NULL, *tmp;
->  	struct iommu_param *dev_param = dev->iommu_param;
->  
->  	domain = iommu_get_domain_for_dev(dev);
-> @@ -145,7 +458,42 @@ int iommu_sva_bind_device(struct device *dev, struct mm_struct *mm, int *pasid,
->  	if (flags != (IOMMU_SVA_FEAT_PASID | IOMMU_SVA_FEAT_IOPF))
->  		return -EINVAL;
->  
-> -	return -ENOSYS; /* TODO */
-> +	/* If an io_mm already exists, use it */
-> +	spin_lock(&iommu_sva_lock);
-> +	idr_for_each_entry(&iommu_pasid_idr, io_mm, i) {
-> +		if (io_mm->mm != mm || !io_mm_get_locked(io_mm))
-> +			continue;
-> +
-> +		/* Is it already bound to this device? */
-> +		list_for_each_entry(tmp, &io_mm->devices, mm_head) {
-> +			if (tmp->dev != dev)
-> +				continue;
-> +
-> +			bond = tmp;
-> +			refcount_inc(&bond->refs);
-> +			io_mm_put_locked(io_mm);
-> +			break;
-> +		}
-> +		break;
-> +	}
-> +	spin_unlock(&iommu_sva_lock);
-> +
-> +	if (bond)
+Add pfuze100 support on i.MX6SX Sabre Auto board.
 
-Please return pasid when you find an io_mm that is already bound. Something like
-*pasid = io_mm->pasid should do the work here when bond is true.
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+no changes since V1.
+ arch/arm/boot/dts/imx6sx-sabreauto.dts | 117 +++++++++++++++++++++++++++++++++
+ 1 file changed, 117 insertions(+)
 
-> +		return 0;
-
-
+diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+index 57d1ea0..2caca934 100644
+--- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+@@ -74,6 +74,14 @@
+ 
+ &iomuxc {
+ 	imx6x-sabreauto {
++
++		pinctrl_i2c2_1: i2c2grp-1 {
++			fsl,pins = <
++				MX6SX_PAD_GPIO1_IO03__I2C2_SDA          0x4001b8b1
++				MX6SX_PAD_GPIO1_IO02__I2C2_SCL          0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
+@@ -148,3 +156,112 @@
+ 		};
+ 	};
+ };
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2_1>;
++	status = "okay";
++
++	pmic: pfuze100 at 08 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++				regulator-always-on;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
