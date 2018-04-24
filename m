@@ -1,65 +1,52 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 24 Apr 2018 19:30:50 +0200
-Subject: [PATCH 10/11] of: platform: provide of_early_platform_probe()
+Date: Tue, 24 Apr 2018 19:30:49 +0200
+Subject: [PATCH 09/11] platform: provide early_platform_driver()
 In-Reply-To: <20180424173051.15099-1-brgl@bgdev.pl>
 References: <20180424173051.15099-1-brgl@bgdev.pl>
-Message-ID: <20180424173051.15099-11-brgl@bgdev.pl>
+Message-ID: <20180424173051.15099-10-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Implement a function that must be called from machine code early in
-the bo process in order to probe all registered early devices.
+Implement a macro similar to module_platform_driver() which allows to
+register early platform drivers with the default early class.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/of/platform.c       | 12 ++++++++++++
- include/linux/of_platform.h |  2 ++
- 2 files changed, 14 insertions(+)
+ include/linux/platform_device.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 4b55e568fe77..525a466b03d1 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -541,6 +541,18 @@ int of_early_platform_populate(struct device_node *root,
- 	return rc;
- }
- EXPORT_SYMBOL_GPL(of_early_platform_populate);
-+
-+/**
-+ * of_early_platform_probe() - Probe all registered early platform devices.
-+ *
-+ * Returns 0 on success, a negative error code on failure.
-+ */
-+int of_early_platform_probe(void)
-+{
-+	return early_platform_driver_register_probe_all(
-+				EARLY_PLATFORM_DEFAULT_CLASS, INT_MAX, 0);
-+}
-+EXPORT_SYMBOL_GPL(of_early_platform_probe);
- #endif /* CONFIG_EARLY_PLATFORM_DEVICES */
+diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+index 514ada776004..b565a1237fa6 100644
+--- a/include/linux/platform_device.h
++++ b/include/linux/platform_device.h
+@@ -297,6 +297,8 @@ struct early_platform_driver {
+ #define EARLY_PLATFORM_ID_UNSET -2
+ #define EARLY_PLATFORM_ID_ERROR -3
  
- int of_platform_default_populate(struct device_node *root,
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index 2bf1013a3e89..caa08e3bf3b7 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -81,6 +81,7 @@ extern int of_early_platform_populate(struct device_node *root,
- 				      const struct of_device_id *matches,
- 				      const struct of_dev_auxdata *lookup,
- 				      struct device *parent);
-+extern int of_early_platform_probe(void);
++#define EARLY_PLATFORM_DEFAULT_CLASS	"earlydev"
++
+ #ifdef CONFIG_EARLY_PLATFORM_DEVICES
+ 
+ extern int early_platform_driver_register(struct early_platform_driver *epdrv,
+@@ -352,6 +354,9 @@ static inline char *early_platform_driver_setup_func(void)		\
+ }
+ #endif /* MODULE */
+ 
++#define early_platform_driver(__platdrv)				\
++	early_platform_init(EARLY_PLATFORM_DEFAULT_CLASS, &(__platdrv))
++
  #else /* CONFIG_EARLY_PLATFORM_DEVICES */
  static inline int
- of_early_platform_populate(struct device_node *root,
-@@ -90,6 +91,7 @@ of_early_platform_populate(struct device_node *root,
- {
- 	return -ENOSYS;
- }
-+static inline void int of_early_platform_probe(void) {}
+ early_platform_driver_register(struct early_platform_driver *epdrv, char *buf)
+@@ -380,6 +385,7 @@ static inline int early_platform_driver_register_probe_all(char *class_str,
+ static inline void early_platform_cleanup(void) {}
+ #define early_platform_init(class_string, platdrv)
+ #define early_platform_init_buffer(class_string, platdrv, buf, bufsiz)
++#define early_platform_driver(__platdrv)
  #endif /* CONFIG_EARLY_PLATFORM_DEVICES */
  
- extern int of_platform_default_populate(struct device_node *root,
+ #ifdef CONFIG_SUSPEND
 -- 
 2.17.0
