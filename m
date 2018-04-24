@@ -1,53 +1,54 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 24 Apr 2018 12:01:48 +0200
-Subject: [PATCH 2/2] ARM64: dts: allwinner: Add dts file for Libre
- Computer Board ALL-H3-CC H5 ver.
-In-Reply-To: <20180424095914.cs362x4zdwxzo6ru@flea>
-References: <1524561576-2201-1-git-send-email-narmstrong@baylibre.com>
- <1524561576-2201-3-git-send-email-narmstrong@baylibre.com>
- <20180424095914.cs362x4zdwxzo6ru@flea>
-Message-ID: <a883629c-4533-e457-d108-0bd307392ec8@baylibre.com>
+From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
+Date: Tue, 24 Apr 2018 11:47:02 +0200
+Subject: [v2 resend 05/10] clk: mediatek: mt2701-mm: switch to mfd device
+In-Reply-To: <cover.1524563001.git.mbrugger@suse.com>
+References: <cover.1524563001.git.mbrugger@suse.com>
+Message-ID: <16dd3041d81069f87422fd29b26d9d74c8a36293.1524563001.git.mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/2018 11:59, Maxime Ripard wrote:
-> Hi,
-> 
-> On Tue, Apr 24, 2018 at 11:19:36AM +0200, Neil Armstrong wrote:
->> The Libre Computer Board ALL-H3-CC from Libre Technology is a Raspberry
->> Pi B+ form factor single board computer based on the Allwinner H2+, H3, or H5
->> SoCs with the same PCB.
->> The board has 1GB DDR3 SDRAM, provided by 4 2Gb chips. The mounting holes
->> and connectors are in the exact same position as on the Raspberry Pi B+.
->>
->> This patch enables the H5 variant using the H3 board definition moved to
->> a common dtsi in an earlier patch. The dts simply include the common dtsi
->> and declares the correct compatible and model of the H5 variant.
->>
->> Suggested-by: Corentin Labbe <clabbe@baylibre.com>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> prefix should be "arm64: dts: allwinner"
+From: Matthias Brugger <mbrugger@suse.com>
 
-Bad habit, will resend with arm64.
+As the new mfd device is in place, switch probing
+for the MMSYS to support invocation from the mfd device.
 
-> 
-> You had this issue with the first patch as well, your commit log
-> should be wrapped, checkpatch complains at the moment.
+Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/mediatek/clk-mt2701-mm.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
-Same.
-
-> 
-> Maxime
-> 
-
-Thanks,
-Neil
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/dfa3dbf2/attachment-0001.sig>
+diff --git a/drivers/clk/mediatek/clk-mt2701-mm.c b/drivers/clk/mediatek/clk-mt2701-mm.c
+index fe1f85072fc5..4517525887dd 100644
+--- a/drivers/clk/mediatek/clk-mt2701-mm.c
++++ b/drivers/clk/mediatek/clk-mt2701-mm.c
+@@ -87,16 +87,13 @@ static const struct mtk_gate mm_clks[] = {
+ 	GATE_DISP1(CLK_MM_TVE_FMM, "mm_tve_fmm", "mm_sel", 14),
+ };
+ 
+-static const struct of_device_id of_match_clk_mt2701_mm[] = {
+-	{ .compatible = "mediatek,mt2701-mmsys", },
+-	{}
+-};
+-
+ static int clk_mt2701_mm_probe(struct platform_device *pdev)
+ {
+ 	struct clk_onecell_data *clk_data;
+ 	int r;
+-	struct device_node *node = pdev->dev.of_node;
++	struct device_node *node;
++
++	node = pdev->dev.parent->of_node;
+ 
+ 	clk_data = mtk_alloc_clk_data(CLK_MM_NR);
+ 
+@@ -116,7 +113,6 @@ static struct platform_driver clk_mt2701_mm_drv = {
+ 	.probe = clk_mt2701_mm_probe,
+ 	.driver = {
+ 		.name = "clk-mt2701-mm",
+-		.of_match_table = of_match_clk_mt2701_mm,
+ 	},
+ };
+ 
+-- 
+2.16.3
