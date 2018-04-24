@@ -1,32 +1,51 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 24 Apr 2018 17:22:44 -0300
-Subject: [PATCH] ARM: dts: imx6q-pistachio: Use 'uart-has-rtscts' property
-Message-ID: <1524601364-23342-1-git-send-email-festevam@gmail.com>
+Date: Tue, 24 Apr 2018 17:25:19 -0300
+Subject: [PATCH] ARM: dts: imx7s: Pass the 'fsl,sec-era' property
+Message-ID: <1524601519-23502-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-The 'fsl,uart-has-rtscts' property is deprecated and it is recommended
-to use the generic 'uart-has-rtscts' property instead.
+Currently the following error is seen from the CAAM driver:
 
+caam 30900000.caam: device ID = 0x0a16030000000000 (Era -524)
+
+Pass the 'fsl,sec-era' property to properly describe the
+era information.
+
+This error happens because the 'fsl,sec-era' is not passed via
+device tree.
+
+The era information is used in various places inside drivers/crypto/caam,
+so pass the correct version via device tree.
+
+Fixes: 0eeabcad7da5 ("ARM: dts: imx7s: add CAAM device node")
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6q-pistachio.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I have sent a patch for 4.18 that allows retrieving the era information
+from the CAAM registers in run-time:
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/crypto/caam/ctrl.c?h=next-20180424&id=654f2b937b389295581bcb4aa26011a63db7bc8f
 
-diff --git a/arch/arm/boot/dts/imx6q-pistachio.dts b/arch/arm/boot/dts/imx6q-pistachio.dts
-index bd57b3b..a31e83c 100644
---- a/arch/arm/boot/dts/imx6q-pistachio.dts
-+++ b/arch/arm/boot/dts/imx6q-pistachio.dts
-@@ -614,7 +614,7 @@
- &uart5 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart5>;
--	fsl,uart-has-rtscts;
-+	uart-has-rtscts;
- 	status = "okay";
- };
+This will only be applied in 4.18 though.
+
+In order to avoid i.MX7 report the incorrect era version in 4.17,
+let's pass this property.
+
+ arch/arm/boot/dts/imx7s.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index a6fe324..b416d2b 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -884,6 +884,7 @@
  
+ 			crypto: caam at 30900000 {
+ 				compatible = "fsl,sec-v4.0";
++				fsl,sec-era = <8>;
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				reg = <0x30900000 0x40000>;
 -- 
 2.7.4
