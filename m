@@ -1,77 +1,215 @@
 From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Tue, 24 Apr 2018 17:13:37 +0200
-Subject: [PATCH 1/6] PCI: Make pci_get_new_domain_nr static
+Date: Tue, 24 Apr 2018 17:13:39 +0200
+Subject: [PATCH 3/6] PCI: Introduce devm_of_pci_get_host_bridge_resources
 In-Reply-To: <cover.1524582822.git.jan.kiszka@siemens.com>
 References: <cover.1524582822.git.jan.kiszka@siemens.com>
-Message-ID: <a21882288c4664cc983a5741e8cbf6d59abacd46.1524582822.git.jan.kiszka@siemens.com>
+Message-ID: <e387d04ea235c9a4879a897bb730adc383a96635.1524582822.git.jan.kiszka@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jan Kiszka <jan.kiszka@siemens.com>
 
-The only user of that function is of_pci_bus_find_domain_nr. Pure
-cleanup.
+of_pci_get_host_bridge_resources allocates the resource structures it
+fills dynamically, but none of its callers care to release them so far.
+Rather than requiring everyone to do this explicitly, introduce a
+managed version of that service. This differs API-wise only in taking a
+reference to the associated device, rather than to the device tree node.
+
+As of_pci_get_host_bridge_resources is an exported interface, we cannot
+simply drop it at this point. After converting all in-tree users to the
+new API, we could phase out the unmanaged one over some grace period.
 
 Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 ---
- drivers/pci/pci.c   | 6 ++----
- include/linux/pci.h | 3 ---
- 2 files changed, 2 insertions(+), 7 deletions(-)
+ drivers/pci/of.c       | 89 ++++++++++++++++++++++++++++++++------------------
+ include/linux/of_pci.h | 14 ++++++--
+ 2 files changed, 70 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index e597655a5643..695c2bb4e853 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -5702,15 +5702,14 @@ static void pci_no_domains(void)
- #endif
- }
+diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+index a28355c273ae..6eab0bde2ab3 100644
+--- a/drivers/pci/of.c
++++ b/drivers/pci/of.c
+@@ -243,26 +243,8 @@ void of_pci_check_probe_only(void)
+ EXPORT_SYMBOL_GPL(of_pci_check_probe_only);
  
--#ifdef CONFIG_PCI_DOMAINS
-+#ifdef CONFIG_PCI_DOMAINS_GENERIC
- static atomic_t __domain_nr = ATOMIC_INIT(-1);
- 
--int pci_get_new_domain_nr(void)
-+static int pci_get_new_domain_nr(void)
+ #if defined(CONFIG_OF_ADDRESS)
+-/**
+- * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
+- * @dev: device node of the host bridge having the range property
+- * @busno: bus number associated with the bridge root bus
+- * @bus_max: maximum number of buses for this bridge
+- * @resources: list where the range of resources will be added after DT parsing
+- * @io_base: pointer to a variable that will contain on return the physical
+- * address for the start of the I/O range. Can be NULL if the caller doesn't
+- * expect I/O ranges to be present in the device tree.
+- *
+- * It is the caller's job to free the @resources list.
+- *
+- * This function will parse the "ranges" property of a PCI host bridge device
+- * node and setup the resource mapping based on its content. It is expected
+- * that the property conforms with the Power ePAPR document.
+- *
+- * It returns zero if the range parsing has been successful or a standard error
+- * value if it failed.
+- */
+-int of_pci_get_host_bridge_resources(struct device_node *dev,
++static int __of_pci_get_host_bridge_resources(struct device *dev,
++			struct device_node *dev_node,
+ 			unsigned char busno, unsigned char bus_max,
+ 			struct list_head *resources, resource_size_t *io_base)
  {
- 	return atomic_inc_return(&__domain_nr);
- }
+@@ -277,19 +259,22 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 	if (io_base)
+ 		*io_base = (resource_size_t)OF_BAD_ADDR;
  
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
- static int of_pci_bus_find_domain_nr(struct device *parent)
- {
- 	static int use_dt_domains = -1;
-@@ -5765,7 +5764,6 @@ int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
- 			       acpi_pci_bus_find_domain_nr(bus);
+-	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
++	if (dev)
++		bus_range = devm_kzalloc(dev,sizeof(*bus_range), GFP_KERNEL);
++	else
++		bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
+ 	if (!bus_range)
+ 		return -ENOMEM;
+ 
+-	pr_info("host bridge %pOF ranges:\n", dev);
++	pr_info("host bridge %pOF ranges:\n", dev_node);
+ 
+-	err = of_pci_parse_bus_range(dev, bus_range);
++	err = of_pci_parse_bus_range(dev_node, bus_range);
+ 	if (err) {
+ 		bus_range->start = busno;
+ 		bus_range->end = bus_max;
+ 		bus_range->flags = IORESOURCE_BUS;
+ 		pr_info("  No bus range found for %pOF, using %pR\n",
+-			dev, bus_range);
++			dev_node, bus_range);
+ 	} else {
+ 		if (bus_range->end > bus_range->start + bus_max)
+ 			bus_range->end = bus_range->start + bus_max;
+@@ -297,7 +282,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 	pci_add_resource(resources, bus_range);
+ 
+ 	/* Check for ranges property */
+-	err = of_pci_range_parser_init(&parser, dev);
++	err = of_pci_range_parser_init(&parser, dev_node);
+ 	if (err)
+ 		goto parse_failed;
+ 
+@@ -321,13 +306,17 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+ 			continue;
+ 
+-		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
++		if (dev)
++			res = devm_kzalloc(dev, sizeof(struct resource),
++					   GFP_KERNEL);
++		else
++			res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+ 		if (!res) {
+ 			err = -ENOMEM;
+ 			goto parse_failed;
+ 		}
+ 
+-		err = of_pci_range_to_resource(&range, dev, res);
++		err = of_pci_range_to_resource(&range, dev_node, res);
+ 		if (err) {
+ 			kfree(res);
+ 			continue;
+@@ -336,13 +325,13 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 		if (resource_type(res) == IORESOURCE_IO) {
+ 			if (!io_base) {
+ 				pr_err("I/O range found for %pOF. Please provide an io_base pointer to save CPU base address\n",
+-					dev);
++					dev_node);
+ 				err = -EINVAL;
+ 				goto conversion_failed;
+ 			}
+ 			if (*io_base != (resource_size_t)OF_BAD_ADDR)
+ 				pr_warn("More than one I/O resource converted for %pOF. CPU base address for old range lost!\n",
+-					dev);
++					dev_node);
+ 			*io_base = range.cpu_addr;
+ 		}
+ 
+@@ -354,12 +343,50 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ conversion_failed:
+ 	kfree(res);
+ parse_failed:
+-	resource_list_for_each_entry(window, resources)
+-		kfree(window->res);
++	if (!dev);
++		resource_list_for_each_entry(window, resources)
++			kfree(window->res);
+ 	pci_free_resource_list(resources);
+ 	return err;
  }
- #endif
--#endif
++
++/**
++ * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
++ * @dev: device node of the host bridge having the range property
++ * @busno: bus number associated with the bridge root bus
++ * @bus_max: maximum number of buses for this bridge
++ * @resources: list where the range of resources will be added after DT parsing
++ * @io_base: pointer to a variable that will contain on return the physical
++ * address for the start of the I/O range. Can be NULL if the caller doesn't
++ * expect I/O ranges to be present in the device tree.
++ *
++ * It is the caller's job to free the @resources list.
++ *
++ * This function will parse the "ranges" property of a PCI host bridge device
++ * node and setup the resource mapping based on its content. It is expected
++ * that the property conforms with the Power ePAPR document.
++ *
++ * It returns zero if the range parsing has been successful or a standard error
++ * value if it failed.
++ */
++int of_pci_get_host_bridge_resources(struct device_node *dev_node,
++			unsigned char busno, unsigned char bus_max,
++			struct list_head *resources, resource_size_t *io_base)
++{
++	return __of_pci_get_host_bridge_resources(NULL, dev_node, busno,
++						  bus_max, resources, io_base);
++}
+ EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
++
++int devm_of_pci_get_host_bridge_resources(struct device *dev,
++			unsigned char busno, unsigned char bus_max,
++			struct list_head *resources, resource_size_t *io_base)
++{
++	return __of_pci_get_host_bridge_resources(dev, dev->of_node, busno,
++						  bus_max, resources, io_base);
++}
++EXPORT_SYMBOL_GPL(devm_of_pci_get_host_bridge_resources);
++
+ #endif /* CONFIG_OF_ADDRESS */
  
  /**
-  * pci_ext_cfg_avail - can we access extended PCI config space?
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 73178a2fcee0..963232a6cd2e 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1510,12 +1510,10 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
-  */
- #ifdef CONFIG_PCI_DOMAINS
- extern int pci_domains_supported;
--int pci_get_new_domain_nr(void);
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index 091033a6b836..08b8f02426a5 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -71,11 +71,21 @@ of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin)
+ #endif
+ 
+ #if defined(CONFIG_OF_ADDRESS)
+-int of_pci_get_host_bridge_resources(struct device_node *dev,
++int of_pci_get_host_bridge_resources(struct device_node *dev_node,
++			unsigned char busno, unsigned char bus_max,
++			struct list_head *resources, resource_size_t *io_base);
++int devm_of_pci_get_host_bridge_resources(struct device *dev,
+ 			unsigned char busno, unsigned char bus_max,
+ 			struct list_head *resources, resource_size_t *io_base);
  #else
- enum { pci_domains_supported = 0 };
- static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
- static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
--static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
- #endif /* CONFIG_PCI_DOMAINS */
- 
- /*
-@@ -1670,7 +1668,6 @@ static inline struct pci_dev *pci_get_domain_bus_and_slot(int domain,
- 
- static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
- static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
--static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
- 
- #define dev_is_pci(d) (false)
- #define dev_is_pf(d) (false)
+-static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
++static inline int of_pci_get_host_bridge_resources(struct device_node *dev_node,
++			unsigned char busno, unsigned char bus_max,
++			struct list_head *resources, resource_size_t *io_base)
++{
++	return -EINVAL;
++}
++
++static inline int devm_of_pci_get_host_bridge_resources(struct device *dev,
+ 			unsigned char busno, unsigned char bus_max,
+ 			struct list_head *resources, resource_size_t *io_base)
+ {
 -- 
 2.13.6
