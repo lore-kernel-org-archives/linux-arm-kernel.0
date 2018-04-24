@@ -1,9 +1,9 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 24 Apr 2018 22:32:33 +0200
-Subject: [RFC 04/10] clk: samsung: Remove support for Exynos5440
+Date: Tue, 24 Apr 2018 22:32:35 +0200
+Subject: [RFC 06/10] thermal: samsung: Remove support for Exynos5440
 In-Reply-To: <20180424203239.21885-1-krzk@kernel.org>
 References: <20180424203239.21885-1-krzk@kernel.org>
-Message-ID: <20180424203239.21885-5-krzk@kernel.org>
+Message-ID: <20180424203239.21885-7-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,283 +13,314 @@ Remove wide-tree support for Exynos5440.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- .../devicetree/bindings/clock/exynos5440-clock.txt |  28 ----
- drivers/clk/samsung/Makefile                       |   1 -
- drivers/clk/samsung/clk-exynos5440.c               | 167 ---------------------
- include/dt-bindings/clock/exynos5440.h             |  44 ------
- 4 files changed, 240 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/clock/exynos5440-clock.txt
- delete mode 100644 drivers/clk/samsung/clk-exynos5440.c
- delete mode 100644 include/dt-bindings/clock/exynos5440.h
+ .../devicetree/bindings/thermal/exynos-thermal.txt |  14 +-
+ drivers/thermal/samsung/exynos_tmu.c               | 155 +--------------------
+ drivers/thermal/samsung/exynos_tmu.h               |   1 -
+ 3 files changed, 4 insertions(+), 166 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos5440-clock.txt b/Documentation/devicetree/bindings/clock/exynos5440-clock.txt
-deleted file mode 100644
-index c7d227c31e95..000000000000
---- a/Documentation/devicetree/bindings/clock/exynos5440-clock.txt
-+++ /dev/null
-@@ -1,28 +0,0 @@
--* Samsung Exynos5440 Clock Controller
+diff --git a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+index b957acff57aa..ad648d93d961 100644
+--- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+@@ -12,7 +12,6 @@
+ 	       "samsung,exynos5420-tmu-ext-triminfo" for TMU channels 2, 3 and 4
+ 			Exynos5420 (Must pass triminfo base and triminfo clock)
+                "samsung,exynos5433-tmu"
+-	       "samsung,exynos5440-tmu"
+ 	       "samsung,exynos7-tmu"
+ - interrupt-parent : The phandle for the interrupt controller
+ - reg : Address range of the thermal registers. For soc's which has multiple
+@@ -68,18 +67,7 @@ Example 1):
+ 		#thermal-sensor-cells = <0>;
+ 	};
+ 
+-Example 2):
 -
--The Exynos5440 clock controller generates and supplies clock to various
--controllers within the Exynos5440 SoC.
--
--Required Properties:
--
--- compatible: should be "samsung,exynos5440-clock".
--
--- reg: physical base address of the controller and length of memory mapped
--  region.
--
--- #clock-cells: should be 1.
--
--Each clock is assigned an identifier and client nodes can use this identifier
--to specify the clock which they consume.
--
--All available clocks are defined as preprocessor macros in
--dt-bindings/clock/exynos5440.h header and can be used in device
--tree sources.
--
--Example: An example of a clock controller node is listed below.
--
--	clock: clock-controller at 10010000 {
--		compatible = "samsung,exynos5440-clock";
--		reg = <0x160000 0x10000>;
--		#clock-cells = <1>;
+-	tmuctrl_0: tmuctrl at 160118 {
+-		compatible = "samsung,exynos5440-tmu";
+-		reg = <0x160118 0x230>, <0x160368 0x10>;
+-		interrupts = <0 58 0>;
+-		clocks = <&clock 21>;
+-		clock-names = "tmu_apbif";
+-		#thermal-sensor-cells = <0>;
 -	};
-diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-index 513826393158..1a4e6b787978 100644
---- a/drivers/clk/samsung/Makefile
-+++ b/drivers/clk/samsung/Makefile
-@@ -14,7 +14,6 @@ obj-$(CONFIG_SOC_EXYNOS5410)	+= clk-exynos5410.o
- obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
- obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5-subcmu.o
- obj-$(CONFIG_EXYNOS_ARM64_COMMON_CLK)	+= clk-exynos5433.o
--obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
- obj-$(CONFIG_EXYNOS_AUDSS_CLK_CON) += clk-exynos-audss.o
- obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-clkout.o
- obj-$(CONFIG_EXYNOS_ARM64_COMMON_CLK)	+= clk-exynos7.o
-diff --git a/drivers/clk/samsung/clk-exynos5440.c b/drivers/clk/samsung/clk-exynos5440.c
-deleted file mode 100644
-index b08bd54c5e76..000000000000
---- a/drivers/clk/samsung/clk-exynos5440.c
-+++ /dev/null
-@@ -1,167 +0,0 @@
--/*
-- * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-- * Author: Thomas Abraham <thomas.ab@samsung.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * Common Clock Framework support for Exynos5440 SoC.
--*/
 -
--#include <dt-bindings/clock/exynos5440.h>
--#include <linux/clk-provider.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/notifier.h>
--#include <linux/reboot.h>
+-Example 3): (In case of Exynos5420 "with misplaced TRIMINFO register")
++Example 2): (In case of Exynos5420 "with misplaced TRIMINFO register")
+ 	tmu_cpu2: tmu at 10068000 {
+ 		compatible = "samsung,exynos5420-tmu-ext-triminfo";
+ 		reg = <0x10068000 0x100>, <0x1006c000 0x4>;
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index ed805c7c5ace..f92f470bce21 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -123,28 +123,6 @@
+ 
+ #define EXYNOS5433_PD_DET_EN			1
+ 
+-/*exynos5440 specific registers*/
+-#define EXYNOS5440_TMU_S0_7_TRIM		0x000
+-#define EXYNOS5440_TMU_S0_7_CTRL		0x020
+-#define EXYNOS5440_TMU_S0_7_DEBUG		0x040
+-#define EXYNOS5440_TMU_S0_7_TEMP		0x0f0
+-#define EXYNOS5440_TMU_S0_7_TH0			0x110
+-#define EXYNOS5440_TMU_S0_7_TH1			0x130
+-#define EXYNOS5440_TMU_S0_7_TH2			0x150
+-#define EXYNOS5440_TMU_S0_7_IRQEN		0x210
+-#define EXYNOS5440_TMU_S0_7_IRQ			0x230
+-/* exynos5440 common registers */
+-#define EXYNOS5440_TMU_IRQ_STATUS		0x000
+-#define EXYNOS5440_TMU_PMIN			0x004
 -
--#include "clk.h"
--#include "clk-pll.h"
+-#define EXYNOS5440_TMU_INTEN_RISE0_SHIFT	0
+-#define EXYNOS5440_TMU_INTEN_RISE1_SHIFT	1
+-#define EXYNOS5440_TMU_INTEN_RISE2_SHIFT	2
+-#define EXYNOS5440_TMU_INTEN_RISE3_SHIFT	3
+-#define EXYNOS5440_TMU_INTEN_FALL0_SHIFT	4
+-#define EXYNOS5440_TMU_TH_RISE4_SHIFT		24
+-#define EXYNOS5440_EFUSE_SWAP_OFFSET		8
 -
--#define CLKEN_OV_VAL		0xf8
--#define CPU_CLK_STATUS		0xfc
--#define MISC_DOUT1		0x558
--
--static void __iomem *reg_base;
--
--/* parent clock name list */
--PNAME(mout_armclk_p)	= { "cplla", "cpllb" };
--PNAME(mout_spi_p)	= { "div125", "div200" };
--
--/* fixed rate clocks generated outside the soc */
--static struct samsung_fixed_rate_clock exynos5440_fixed_rate_ext_clks[] __initdata = {
--	FRATE(0, "xtal", NULL, 0, 0),
--};
--
--/* fixed rate clocks */
--static const struct samsung_fixed_rate_clock exynos5440_fixed_rate_clks[] __initconst = {
--	FRATE(0, "ppll", NULL, 0, 1000000000),
--	FRATE(0, "usb_phy0", NULL, 0, 60000000),
--	FRATE(0, "usb_phy1", NULL, 0, 60000000),
--	FRATE(0, "usb_ohci12", NULL, 0, 12000000),
--	FRATE(0, "usb_ohci48", NULL, 0, 48000000),
--};
--
--/* fixed factor clocks */
--static const struct samsung_fixed_factor_clock exynos5440_fixed_factor_clks[] __initconst = {
--	FFACTOR(0, "div250", "ppll", 1, 4, 0),
--	FFACTOR(0, "div200", "ppll", 1, 5, 0),
--	FFACTOR(0, "div125", "div250", 1, 2, 0),
--};
--
--/* mux clocks */
--static const struct samsung_mux_clock exynos5440_mux_clks[] __initconst = {
--	MUX(0, "mout_spi", mout_spi_p, MISC_DOUT1, 5, 1),
--	MUX(CLK_ARM_CLK, "arm_clk", mout_armclk_p, CPU_CLK_STATUS, 0, 1),
--};
--
--/* divider clocks */
--static const struct samsung_div_clock exynos5440_div_clks[] __initconst = {
--	DIV(CLK_SPI_BAUD, "div_spi", "mout_spi", MISC_DOUT1, 3, 2),
--};
--
--/* gate clocks */
--static const struct samsung_gate_clock exynos5440_gate_clks[] __initconst = {
--	GATE(CLK_PB0_250, "pb0_250", "div250", CLKEN_OV_VAL, 3, 0, 0),
--	GATE(CLK_PR0_250, "pr0_250", "div250", CLKEN_OV_VAL, 4, 0, 0),
--	GATE(CLK_PR1_250, "pr1_250", "div250", CLKEN_OV_VAL, 5, 0, 0),
--	GATE(CLK_B_250, "b_250", "div250", CLKEN_OV_VAL, 9, 0, 0),
--	GATE(CLK_B_125, "b_125", "div125", CLKEN_OV_VAL, 10, 0, 0),
--	GATE(CLK_B_200, "b_200", "div200", CLKEN_OV_VAL, 11, 0, 0),
--	GATE(CLK_SATA, "sata", "div200", CLKEN_OV_VAL, 12, 0, 0),
--	GATE(CLK_USB, "usb", "div200", CLKEN_OV_VAL, 13, 0, 0),
--	GATE(CLK_GMAC0, "gmac0", "div200", CLKEN_OV_VAL, 14, 0, 0),
--	GATE(CLK_CS250, "cs250", "div250", CLKEN_OV_VAL, 19, 0, 0),
--	GATE(CLK_PB0_250_O, "pb0_250_o", "pb0_250", CLKEN_OV_VAL, 3, 0, 0),
--	GATE(CLK_PR0_250_O, "pr0_250_o", "pr0_250", CLKEN_OV_VAL, 4, 0, 0),
--	GATE(CLK_PR1_250_O, "pr1_250_o", "pr1_250", CLKEN_OV_VAL, 5, 0, 0),
--	GATE(CLK_B_250_O, "b_250_o", "b_250", CLKEN_OV_VAL, 9, 0, 0),
--	GATE(CLK_B_125_O, "b_125_o", "b_125", CLKEN_OV_VAL, 10, 0, 0),
--	GATE(CLK_B_200_O, "b_200_o", "b_200", CLKEN_OV_VAL, 11, 0, 0),
--	GATE(CLK_SATA_O, "sata_o", "sata", CLKEN_OV_VAL, 12, 0, 0),
--	GATE(CLK_USB_O, "usb_o", "usb", CLKEN_OV_VAL, 13, 0, 0),
--	GATE(CLK_GMAC0_O, "gmac0_o", "gmac", CLKEN_OV_VAL, 14, 0, 0),
--	GATE(CLK_CS250_O, "cs250_o", "cs250", CLKEN_OV_VAL, 19, 0, 0),
--};
--
--static const struct of_device_id ext_clk_match[] __initconst = {
--	{ .compatible = "samsung,clock-xtal", .data = (void *)0, },
--	{},
--};
--
--static int exynos5440_clk_restart_notify(struct notifier_block *this,
--		unsigned long code, void *unused)
+ /* Exynos7 specific registers */
+ #define EXYNOS7_THD_TEMP_RISE7_6		0x50
+ #define EXYNOS7_THD_TEMP_FALL7_6		0x60
+@@ -614,57 +592,6 @@ static int exynos5433_tmu_initialize(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static int exynos5440_tmu_initialize(struct platform_device *pdev)
 -{
--	u32 val, status;
+-	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+-	unsigned int trim_info = 0, con, rising_threshold;
+-	int threshold_code;
+-	int crit_temp = 0;
 -
--	status = readl_relaxed(reg_base + 0xbc);
--	val = readl_relaxed(reg_base + 0xcc);
--	val = (val & 0xffff0000) | (status & 0xffff);
--	writel_relaxed(val, reg_base + 0xcc);
--
--	return NOTIFY_DONE;
--}
--
--/*
-- * Exynos5440 Clock restart notifier, handles restart functionality
-- */
--static struct notifier_block exynos5440_clk_restart_handler = {
--	.notifier_call = exynos5440_clk_restart_notify,
--	.priority = 128,
--};
--
--static const struct samsung_pll_clock exynos5440_plls[] __initconst = {
--	PLL(pll_2550x, CLK_CPLLA, "cplla", "xtal", 0, 0x4c, NULL),
--	PLL(pll_2550x, CLK_CPLLB, "cpllb", "xtal", 0, 0x50, NULL),
--};
--
--/*
-- * Clock aliases for legacy clkdev look-up.
-- */
--static const struct samsung_clock_alias exynos5440_aliases[] __initconst = {
--	ALIAS(CLK_ARM_CLK, NULL, "armclk"),
--};
--
--/* register exynos5440 clocks */
--static void __init exynos5440_clk_init(struct device_node *np)
--{
--	struct samsung_clk_provider *ctx;
--
--	reg_base = of_iomap(np, 0);
--	if (!reg_base) {
--		pr_err("%s: failed to map clock controller registers,"
--			" aborting clock initialization\n", __func__);
--		return;
+-	/*
+-	 * For exynos5440 soc triminfo value is swapped between TMU0 and
+-	 * TMU2, so the below logic is needed.
+-	 */
+-	switch (data->id) {
+-	case 0:
+-		trim_info = readl(data->base + EXYNOS5440_EFUSE_SWAP_OFFSET +
+-				 EXYNOS5440_TMU_S0_7_TRIM);
+-		break;
+-	case 1:
+-		trim_info = readl(data->base + EXYNOS5440_TMU_S0_7_TRIM);
+-		break;
+-	case 2:
+-		trim_info = readl(data->base - EXYNOS5440_EFUSE_SWAP_OFFSET +
+-				  EXYNOS5440_TMU_S0_7_TRIM);
 -	}
+-	sanitize_temp_error(data, trim_info);
 -
--	ctx = samsung_clk_init(np, reg_base, CLK_NR_CLKS);
+-	/* Write temperature code for rising and falling threshold */
+-	rising_threshold = readl(data->base + EXYNOS5440_TMU_S0_7_TH0);
+-	rising_threshold = get_th_reg(data, rising_threshold, false);
+-	writel(rising_threshold, data->base + EXYNOS5440_TMU_S0_7_TH0);
+-	writel(0, data->base + EXYNOS5440_TMU_S0_7_TH1);
 -
--	samsung_clk_of_register_fixed_ext(ctx, exynos5440_fixed_rate_ext_clks,
--		ARRAY_SIZE(exynos5440_fixed_rate_ext_clks), ext_clk_match);
+-	data->tmu_clear_irqs(data);
 -
--	samsung_clk_register_pll(ctx, exynos5440_plls,
--			ARRAY_SIZE(exynos5440_plls), ctx->reg_base);
+-	/* if last threshold limit is also present */
+-	if (!data->tzd->ops->get_crit_temp(data->tzd, &crit_temp)) {
+-		threshold_code = temp_to_code(data, crit_temp / MCELSIUS);
+-		/* 5th level to be assigned in th2 reg */
+-		rising_threshold =
+-			threshold_code << EXYNOS5440_TMU_TH_RISE4_SHIFT;
+-		writel(rising_threshold, data->base + EXYNOS5440_TMU_S0_7_TH2);
+-		con = readl(data->base + EXYNOS5440_TMU_S0_7_CTRL);
+-		con |= (1 << EXYNOS_TMU_THERM_TRIP_EN_SHIFT);
+-		writel(con, data->base + EXYNOS5440_TMU_S0_7_CTRL);
+-	}
+-	/* Clear the PMIN in the common TMU register */
+-	if (!data->id)
+-		writel(0, data->base_second + EXYNOS5440_TMU_PMIN);
 -
--	samsung_clk_register_fixed_rate(ctx, exynos5440_fixed_rate_clks,
--			ARRAY_SIZE(exynos5440_fixed_rate_clks));
--	samsung_clk_register_fixed_factor(ctx, exynos5440_fixed_factor_clks,
--			ARRAY_SIZE(exynos5440_fixed_factor_clks));
--	samsung_clk_register_mux(ctx, exynos5440_mux_clks,
--			ARRAY_SIZE(exynos5440_mux_clks));
--	samsung_clk_register_div(ctx, exynos5440_div_clks,
--			ARRAY_SIZE(exynos5440_div_clks));
--	samsung_clk_register_gate(ctx, exynos5440_gate_clks,
--			ARRAY_SIZE(exynos5440_gate_clks));
--	samsung_clk_register_alias(ctx, exynos5440_aliases,
--						ARRAY_SIZE(exynos5440_aliases));
--
--	samsung_clk_of_add_provider(np, ctx);
--
--	if (register_restart_handler(&exynos5440_clk_restart_handler))
--		pr_warn("exynos5440 clock can't register restart handler\n");
--
--	pr_info("Exynos5440: arm_clk = %ldHz\n", _get_rate("arm_clk"));
--	pr_info("exynos5440 clock initialization complete\n");
+-	return 0;
 -}
--CLK_OF_DECLARE(exynos5440_clk, "samsung,exynos5440-clock", exynos5440_clk_init);
-diff --git a/include/dt-bindings/clock/exynos5440.h b/include/dt-bindings/clock/exynos5440.h
-deleted file mode 100644
-index 842cdc0adff1..000000000000
---- a/include/dt-bindings/clock/exynos5440.h
-+++ /dev/null
-@@ -1,44 +0,0 @@
--/*
-- * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-- * Author: Andrzej Hajda <a.hajda@samsung.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * Device Tree binding constants for Exynos5440 clock controller.
--*/
 -
--#ifndef _DT_BINDINGS_CLOCK_EXYNOS_5440_H
--#define _DT_BINDINGS_CLOCK_EXYNOS_5440_H
+ static int exynos7_tmu_initialize(struct platform_device *pdev)
+ {
+ 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+@@ -816,35 +743,6 @@ static void exynos5433_tmu_control(struct platform_device *pdev, bool on)
+ 	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
+ }
+ 
+-static void exynos5440_tmu_control(struct platform_device *pdev, bool on)
+-{
+-	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+-	struct thermal_zone_device *tz = data->tzd;
+-	unsigned int con, interrupt_en;
 -
--#define CLK_XTAL		1
--#define CLK_ARM_CLK		2
--#define CLK_CPLLA		3
--#define CLK_CPLLB		4
--#define CLK_SPI_BAUD		16
--#define CLK_PB0_250		17
--#define CLK_PR0_250		18
--#define CLK_PR1_250		19
--#define CLK_B_250		20
--#define CLK_B_125		21
--#define CLK_B_200		22
--#define CLK_SATA		23
--#define CLK_USB			24
--#define CLK_GMAC0		25
--#define CLK_CS250		26
--#define CLK_PB0_250_O		27
--#define CLK_PR0_250_O		28
--#define CLK_PR1_250_O		29
--#define CLK_B_250_O		30
--#define CLK_B_125_O		31
--#define CLK_B_200_O		32
--#define CLK_SATA_O		33
--#define CLK_USB_O		34
--#define CLK_GMAC0_O		35
--#define CLK_CS250_O		36
+-	con = get_con_reg(data, readl(data->base + EXYNOS5440_TMU_S0_7_CTRL));
 -
--/* must be greater than maximal clock id */
--#define CLK_NR_CLKS		37
+-	if (on) {
+-		con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
+-		interrupt_en =
+-			(of_thermal_is_trip_valid(tz, 3)
+-			 << EXYNOS5440_TMU_INTEN_RISE3_SHIFT) |
+-			(of_thermal_is_trip_valid(tz, 2)
+-			 << EXYNOS5440_TMU_INTEN_RISE2_SHIFT) |
+-			(of_thermal_is_trip_valid(tz, 1)
+-			 << EXYNOS5440_TMU_INTEN_RISE1_SHIFT) |
+-			(of_thermal_is_trip_valid(tz, 0)
+-			 << EXYNOS5440_TMU_INTEN_RISE0_SHIFT);
+-		interrupt_en |=
+-			interrupt_en << EXYNOS5440_TMU_INTEN_FALL0_SHIFT;
+-	} else {
+-		con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
+-		interrupt_en = 0; /* Disable all interrupts */
+-	}
+-	writel(interrupt_en, data->base + EXYNOS5440_TMU_S0_7_IRQEN);
+-	writel(con, data->base + EXYNOS5440_TMU_S0_7_CTRL);
+-}
 -
--#endif /* _DT_BINDINGS_CLOCK_EXYNOS_5440_H */
+ static void exynos7_tmu_control(struct platform_device *pdev, bool on)
+ {
+ 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+@@ -911,10 +809,8 @@ static u32 get_emul_con_reg(struct exynos_tmu_data *data, unsigned int val,
+ 	if (temp) {
+ 		temp /= MCELSIUS;
+ 
+-		if (data->soc != SOC_ARCH_EXYNOS5440) {
+-			val &= ~(EXYNOS_EMUL_TIME_MASK << EXYNOS_EMUL_TIME_SHIFT);
+-			val |= (EXYNOS_EMUL_TIME << EXYNOS_EMUL_TIME_SHIFT);
+-		}
++		val &= ~(EXYNOS_EMUL_TIME_MASK << EXYNOS_EMUL_TIME_SHIFT);
++		val |= (EXYNOS_EMUL_TIME << EXYNOS_EMUL_TIME_SHIFT);
+ 		if (data->soc == SOC_ARCH_EXYNOS7) {
+ 			val &= ~(EXYNOS7_EMUL_DATA_MASK <<
+ 				EXYNOS7_EMUL_DATA_SHIFT);
+@@ -955,16 +851,6 @@ static void exynos4412_tmu_set_emulation(struct exynos_tmu_data *data,
+ 	writel(val, data->base + emul_con);
+ }
+ 
+-static void exynos5440_tmu_set_emulation(struct exynos_tmu_data *data,
+-					 int temp)
+-{
+-	unsigned int val;
+-
+-	val = readl(data->base + EXYNOS5440_TMU_S0_7_DEBUG);
+-	val = get_emul_con_reg(data, val, temp);
+-	writel(val, data->base + EXYNOS5440_TMU_S0_7_DEBUG);
+-}
+-
+ static int exynos_tmu_set_emulation(void *drv_data, int temp)
+ {
+ 	struct exynos_tmu_data *data = drv_data;
+@@ -987,7 +873,6 @@ static int exynos_tmu_set_emulation(void *drv_data, int temp)
+ }
+ #else
+ #define exynos4412_tmu_set_emulation NULL
+-#define exynos5440_tmu_set_emulation NULL
+ static int exynos_tmu_set_emulation(void *drv_data, int temp)
+ 	{ return -EINVAL; }
+ #endif /* CONFIG_THERMAL_EMULATION */
+@@ -1005,11 +890,6 @@ static int exynos4412_tmu_read(struct exynos_tmu_data *data)
+ 	return readb(data->base + EXYNOS_TMU_REG_CURRENT_TEMP);
+ }
+ 
+-static int exynos5440_tmu_read(struct exynos_tmu_data *data)
+-{
+-	return readb(data->base + EXYNOS5440_TMU_S0_7_TEMP);
+-}
+-
+ static int exynos7_tmu_read(struct exynos_tmu_data *data)
+ {
+ 	return readw(data->base + EXYNOS_TMU_REG_CURRENT_TEMP) &
+@@ -1020,16 +900,9 @@ static void exynos_tmu_work(struct work_struct *work)
+ {
+ 	struct exynos_tmu_data *data = container_of(work,
+ 			struct exynos_tmu_data, irq_work);
+-	unsigned int val_type;
+ 
+ 	if (!IS_ERR(data->clk_sec))
+ 		clk_enable(data->clk_sec);
+-	/* Find which sensor generated this interrupt */
+-	if (data->soc == SOC_ARCH_EXYNOS5440) {
+-		val_type = readl(data->base_second + EXYNOS5440_TMU_IRQ_STATUS);
+-		if (!((val_type >> data->id) & 0x1))
+-			goto out;
+-	}
+ 	if (!IS_ERR(data->clk_sec))
+ 		clk_disable(data->clk_sec);
+ 
+@@ -1042,7 +915,6 @@ static void exynos_tmu_work(struct work_struct *work)
+ 
+ 	clk_disable(data->clk);
+ 	mutex_unlock(&data->lock);
+-out:
+ 	enable_irq(data->irq);
+ }
+ 
+@@ -1077,15 +949,6 @@ static void exynos4210_tmu_clear_irqs(struct exynos_tmu_data *data)
+ 	writel(val_irq, data->base + tmu_intclear);
+ }
+ 
+-static void exynos5440_tmu_clear_irqs(struct exynos_tmu_data *data)
+-{
+-	unsigned int val_irq;
+-
+-	val_irq = readl(data->base + EXYNOS5440_TMU_S0_7_IRQ);
+-	/* clear the interrupts */
+-	writel(val_irq, data->base + EXYNOS5440_TMU_S0_7_IRQ);
+-}
+-
+ static irqreturn_t exynos_tmu_irq(int irq, void *id)
+ {
+ 	struct exynos_tmu_data *data = id;
+@@ -1105,7 +968,6 @@ static const struct of_device_id exynos_tmu_match[] = {
+ 	{ .compatible = "samsung,exynos5420-tmu", },
+ 	{ .compatible = "samsung,exynos5420-tmu-ext-triminfo", },
+ 	{ .compatible = "samsung,exynos5433-tmu", },
+-	{ .compatible = "samsung,exynos5440-tmu", },
+ 	{ .compatible = "samsung,exynos7-tmu", },
+ 	{ /* sentinel */ },
+ };
+@@ -1130,8 +992,6 @@ static int exynos_of_get_soc_type(struct device_node *np)
+ 		return SOC_ARCH_EXYNOS5420_TRIMINFO;
+ 	else if (of_device_is_compatible(np, "samsung,exynos5433-tmu"))
+ 		return SOC_ARCH_EXYNOS5433;
+-	else if (of_device_is_compatible(np, "samsung,exynos5440-tmu"))
+-		return SOC_ARCH_EXYNOS5440;
+ 	else if (of_device_is_compatible(np, "samsung,exynos7-tmu"))
+ 		return SOC_ARCH_EXYNOS7;
+ 
+@@ -1242,14 +1102,6 @@ static int exynos_map_dt_data(struct platform_device *pdev)
+ 		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
+ 		data->ntrip = 8;
+ 		break;
+-	case SOC_ARCH_EXYNOS5440:
+-		data->tmu_initialize = exynos5440_tmu_initialize;
+-		data->tmu_control = exynos5440_tmu_control;
+-		data->tmu_read = exynos5440_tmu_read;
+-		data->tmu_set_emulation = exynos5440_tmu_set_emulation;
+-		data->tmu_clear_irqs = exynos5440_tmu_clear_irqs;
+-		data->ntrip = 4;
+-		break;
+ 	case SOC_ARCH_EXYNOS7:
+ 		data->tmu_initialize = exynos7_tmu_initialize;
+ 		data->tmu_control = exynos7_tmu_control;
+@@ -1267,8 +1119,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
+ 	 * Check if the TMU shares some registers and then try to map the
+ 	 * memory of common registers.
+ 	 */
+-	if (data->soc != SOC_ARCH_EXYNOS5420_TRIMINFO &&
+-	    data->soc != SOC_ARCH_EXYNOS5440)
++	if (data->soc != SOC_ARCH_EXYNOS5420_TRIMINFO)
+ 		return 0;
+ 
+ 	if (of_address_to_resource(pdev->dev.of_node, 1, &res)) {
+diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+index 5149c2a3030c..f3f830edd79a 100644
+--- a/drivers/thermal/samsung/exynos_tmu.h
++++ b/drivers/thermal/samsung/exynos_tmu.h
+@@ -34,7 +34,6 @@ enum soc_type {
+ 	SOC_ARCH_EXYNOS5420,
+ 	SOC_ARCH_EXYNOS5420_TRIMINFO,
+ 	SOC_ARCH_EXYNOS5433,
+-	SOC_ARCH_EXYNOS5440,
+ 	SOC_ARCH_EXYNOS7,
+ };
+ 
 -- 
 2.14.1
