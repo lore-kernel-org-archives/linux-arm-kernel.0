@@ -1,75 +1,78 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 24 Apr 2018 11:08:25 +0200
-Subject: [PATCH 0/3] cpufreq: dt: Allow platforms to provide
- suspend/resume hooks
-In-Reply-To: <cover.1524549644.git.viresh.kumar@linaro.org>
-References: <cover.1524549644.git.viresh.kumar@linaro.org>
-Message-ID: <20180424110825.50436168@xps13>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 24 Apr 2018 11:09:27 +0200
+Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
+In-Reply-To: <CAMuHMdVAi+rU3+TLSp7YQSHzJKFyMH8ZbS3-d8yADKmfz1KiTA@mail.gmail.com>
+References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdX=m9ui6GczF51SJH2X7Cw1OnxoH9pfk1DybpDX-A873Q@mail.gmail.com>
+ <20180221161326.ktvf3mlzzxith5kw@verge.net.au>
+ <CAMuHMdUTSmrWggMK4ehSL3Ux-JUzVpamTuToveuXogjuvGKkaw@mail.gmail.com>
+ <20180221183223.qacrmmuzoqlzzbpo@verge.net.au>
+ <CAMuHMdXCt1-coXGgtgFBm4rZLGBRMvSjbgeBSweiyKrOfCF0Xg@mail.gmail.com>
+ <20180223081443.ak6kl3z72kamcxob@verge.net.au>
+ <CAMuHMdVKPFSVTbnQy9RwAg13OC3R=H1PN9+1FyU0SDHQPa1cuQ@mail.gmail.com>
+ <20180313200548.fgexoxlha3coa7hs@verge.net.au>
+ <CAMuHMdVAi+rU3+TLSp7YQSHzJKFyMH8ZbS3-d8yADKmfz1KiTA@mail.gmail.com>
+Message-ID: <20180424090926.z7red3dg34rfteg6@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-On Tue, 24 Apr 2018 11:37:33 +0530, Viresh Kumar
-<viresh.kumar@linaro.org> wrote:
-
-> Hi Miquel,
+On Wed, Apr 18, 2018 at 03:37:29PM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> This is in response to the patch[1] you sent.
-
-Thank you very much for taking the time to look into it.
-
+> On Tue, Mar 13, 2018 at 9:05 PM, Simon Horman <horms@verge.net.au> wrote:
+> > I understand that the watchdog driver has been accepted and that as things
+> > currently stand if it is enabled in the build it will be enabled in DT and
+> > a crash will result. From my POV that is a regression so I have decided
+> > to adopt the alternate plan proposed by Geert above: in short drop DT
+> > patches (to avoid enabling broken driver) and enqueue mach-shmobile
+> > patches (which don't make things any worse.
+> >
+> > Patch-by-patch things are as follows.
+> >
+> > Dropped from "[PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1":
+> >
+> > 979d28f29742 ARM: dts: r8a7743: Adjust SMP routine size
+> > 0b205f679f5d ARM: dts: r8a7745: Adjust SMP routine size
+> > 2ad21a1d78b3 ARM: dts: r8a7790: Adjust SMP routine size
+> > 82c978459c77 ARM: dts: r8a7791: Adjust SMP routine size
+> > d303698e6ff3 ARM: dts: r8a7792: Adjust SMP routine size
+> > d8b8b9a1e295 ARM: dts: r8a7793: Adjust SMP routine size
+> > 70b3ab369773 ARM: dts: r8a7794: Adjust SMP routine size
+> >
+> > ebf26cf1b1de ARM: dts: r8a7743: Add watchdog support to SoC dtsi
+> > 5a4566ab3777 ARM: dts: r8a7745: Add watchdog support to SoC dtsi
+> > acd58e2bb1e5 ARM: dts: r8a7790: Add watchdog support to SoC dtsi
+> > e3f89168e72f ARM: dts: r8a7791: Add watchdog support to SoC dtsi
+> > e76a6a69a1fc ARM: dts: r8a7794: Add watchdog support to SoC dtsi
+> > 242cc1ab7f7c ARM: dts: iwg20m: Add watchdog support to SoM dtsi
+> > 748ed07f6c7c ARM: dts: iwg22m: Add watchdog support to SoM dtsi
+> >
+> >
+> > Dropped from "[PATCH/RFC 00/11] ARM: dts: rcar-gen2: Enable watchdog support":
+> >
+> > c257202482e2 ARM: dts: r8a7792: Add RWDT node
+> > 01ec04dec8eb ARM: dts: r8a7793: Add RWDT node
+> > 8e6ebe4f2f94 ARM: dts: lager: Enable watchdog support
+> > f223ad0198f6 ARM: dts: koelsch: Enable watchdog support
+> > 1d14d2bb700d ARM: dts: porter: Enable watchdog support
+> > bf71652fc955 ARM: dts: blanche: Enable watchdog support
+> > 13a0b10aeea4 ARM: dts: wheat: Enable watchdog support
+> > 4e247bf110b8 ARM: dts: gose: Enable watchdog support
+> > 2dcbd24bbf5e ARM: dts: alt: Enable watchdog support
+> > 7f6844c900b4 ARM: dts: silk: Enable watchdog support
+> >
+> > And applied:
+> >
+> > [v5] ARM: shmobile: rcar-gen2: Add watchdog support
+> > [v5] ARM: shmobile: Add watchdog support
+> >
+> > In the case of the last patch above I removed the #ifdef from the header file.
 > 
-> I have updated the cpufreq-dt driver to allow platform specific
-> suspend/resume hooks and done some minor cleanup in the driver. I have
-> updated your patch and applied that on top of all this. I haven't tested
-> any of this and would need your help to get that done.
-
-I tested on an EspressoBin (Armada 3720), it works.
-
-However, I first had a panic due to the clock being 'put' twice. I
-suggest you to merge this [1] into the second patch. With this (or
-something similar):
-
-Tested-by: Miquel Raynal <miquel.raynal@bootlin.com>
-
-And the path error was reached because I did not select the cpufreq-dt
-driver in menuconfig, which I think should be selected by default when
-enabling the armada37xx-cpufreq driver. I wrote a small patch for
-that too, see [2]. Tell me if you want me to send it of if you want to
-include it in the next version ?
-
-[1] http://code.bulix.org/auzdqa-323646
-[2] http://code.bulix.org/e1yk5h-323647
-
-Thank you,
-Miqu?l
-
-
+> I guess the time is ripe to apply the DTS patches again, in the following order:
+>   1. SMP routine size adjustments,
+>   2. Watchdog support additions to dtsi,
+>   3. Watchdog enablement for dts?
 > 
-> Thanks.
-> 
-> --
-> viresh
-> 
-> [1] https://lkml.kernel.org/r/20180421141943.25705-1-miquel.raynal at bootlin.com
-> 
-> Miquel Raynal (1):
->   cpufreq: add suspend/resume support in Armada 37xx DVFS driver
-> 
-> Viresh Kumar (2):
->   cpufreq: dt: Allow platform specific suspend/resume callbacks
->   cpufreq: armada: Free resources on error paths
-> 
->  drivers/cpufreq/armada-37xx-cpufreq.c | 107 +++++++++++++++++++++++++++++-----
->  drivers/cpufreq/cpufreq-dt.c          |  10 +++-
->  drivers/cpufreq/cpufreq-dt.h          |   5 ++
->  3 files changed, 104 insertions(+), 18 deletions(-)
-> 
+> Thanks!
 
-
-
--- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Thanks, I have tentatively reapplied all of the above.
