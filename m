@@ -1,54 +1,36 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Apr 2018 09:55:05 +0200
-Subject: [PATCH v3 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
- Edition support
-In-Reply-To: <20180423122752.364ee649@xps13>
-References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
- <20180421164246.8477-3-miquel.raynal@bootlin.com>
- <20180423072403.4ip5seys4xyll3yr@flea>
- <20180423122752.364ee649@xps13>
-Message-ID: <20180424075505.p6e43yw2juw4fqqw@flea>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 24 Apr 2018 09:56:45 +0200
+Subject: [PATCH 11/12] swiotlb: move the SWIOTLB config symbol to
+ lib/Kconfig
+In-Reply-To: <20180424074726.GI16141@n2100.armlinux.org.uk>
+References: <20180423170419.20330-1-hch@lst.de>
+ <20180423170419.20330-12-hch@lst.de>
+ <20180423235205.GH16141@n2100.armlinux.org.uk>
+ <20180424065549.GA18468@lst.de>
+ <20180424074726.GI16141@n2100.armlinux.org.uk>
+Message-ID: <20180424075645.GA19379@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 12:27:52PM +0200, Miquel Raynal wrote:
-> > >  	sun8i-r16-parrot.dtb \
-> > >  	sun8i-r40-bananapi-m2-ultra.dtb \
-> > >  	sun8i-v3s-licheepi-zero.dtb \
-> > > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > index 6b9e85b4ba0f..44f3cad3de75 100644
-> > > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > @@ -198,6 +198,8 @@
-> > >  			clock-names = "ahb", "mod";
-> > >  			resets = <&ccu RST_BUS_NAND>;
-> > >  			reset-names = "ahb";
-> > > +			pinctrl-names = "default";
-> > > +			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;  
-> > 
-> > This should be in your first patch I guess?
-> 
-> Actually I think this should not be there but instead, because it is
-> board-related, these two lines should be in the nes-classic.dts' nfc
-> node, right? Other a23/a33/r16 based designs could use the second set
-> of CS/RB pins.
+On Tue, Apr 24, 2018 at 08:47:27AM +0100, Russell King - ARM Linux wrote:
+> Therefore, the default state for SWIOTLB and hence NEED_SG_DMA_LENGTH
+> becomes 'y' on ARM, and any defconfig file that does not mention SWIOTLB
+> explicitly ends up with both these enabled.
 
-Does that ever happen?
+Indeed, sorry.
 
-On a theoretical level, then yeah, sure. But if all the boards seen
-out there are using the same setup (which is pretty common), then
-there's no reason not to do it in the DTSI.
+> It does look a bit weird though - patch 10 arranged stuff so that we
+> didn't end up with SWIOTLB always enabled, but this patch reintroduces
+> that with the allowance that the user can disable if so desired.
 
-Maxime
+I am not very happy with that patch, but I have a hard time coming
+up with something saner.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/522f47ed/attachment.sig>
+Bascially x86_64 and mips/loongson default to SWIOTLB=y but allow to
+deselect it, powerpc has it optional without any real dependency
+and defaults to n and everyone just selects it otherwise.
+
+I suspect the right thing is to just have it always one for x86_64
+and loongson and have a ppc-specific option to enable it on powerpc
+so that we can always use select statements.  I'll do that for the
+next round.
