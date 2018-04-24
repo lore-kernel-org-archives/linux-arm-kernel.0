@@ -1,63 +1,52 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Tue, 24 Apr 2018 17:13:36 +0200
-Subject: [PATCH 0/6] PCI: leak fixes, removable generic PCI host,
- assorted stuff
-Message-ID: <cover.1524582822.git.jan.kiszka@siemens.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Tue, 24 Apr 2018 17:56:39 +0200
+Subject: [PATCH] arm64: export tishift functions to modules
+In-Reply-To: <20180424154055.GC25964@arm.com>
+References: <CAHmME9oO_5X6M3NLe2tWp=ZY5EQY17GQ6BUomHLBscMejiXTvw@mail.gmail.com>
+ <20180424154055.GC25964@arm.com>
+Message-ID: <CAHmME9oa-DX721K_yRe14AbLk5-raOXEji2SWsf41UtUTP=guQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This primarily enables to unbind the generic PCI host controller without
-leaving lots of memory leaks behind. A previous proposal patch 5 was
-rejected because of those issues [1].
+On Tue, Apr 24, 2018 at 5:40 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Apr 24, 2018 at 03:43:04PM +0200, Jason A. Donenfeld wrote:
+>> On Tue, Apr 24, 2018 at 3:34 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > I've not run into any build issues here -- is this specifically with some
+>> > out-of-tree module?
+>>
+>> I received a bug report email about this. I'm not sure which specific
+>> module, and I assumed from the email that it was actually a result of
+>> in-tree configuration options rather than an out-of-tree module, but
+>> I'm not sure exactly. Either way, I was able to reproduce the problem
+>> by coding up a little PoC out-of-tree module, so it is certainly a
+>> real problem.
+>
+> Any chance you could share the module, please? I tried to write one but
+> the compiler just inlines the __in128 arithmetic.
 
-The fixes have been validated in the Jailhouse setup, where we add and
-remove a virtual PCI host controller on hypervisor activation/
-deactivation, with the help of kmemleak.
+Sure. I didn't save my original but just cooked a new one up and
+verified it errors out. The below will get these errors on mainline
+when compiled as a module, even as an in-tree module:
 
-Besides that, there is tiny PCI API cleanup at the beginning and
-support for manually enabled PCI domains at the end that enables the
-Jailhouse scenario.
-
-Jan
-
-[1] http://lkml.iu.edu/hypermail/linux/kernel/1606.3/00072.html
+ERROR: "__lshrti3" [uhohspehgettio.ko] undefined!
+ERROR: "__ashlti3" [uhohspehgettio.ko.ko] undefined!
 
 
-CC: Jingoo Han <jingoohan1@gmail.com>
-CC: Joao Pinto <Joao.Pinto@synopsys.com>
-CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
+#include <linux/module.h>
 
-Jan Kiszka (6):
-  PCI: Make pci_get_new_domain_nr static
-  PCI: Fix memory leak of devm_pci_alloc_host_bridge
-  PCI: Introduce devm_of_pci_get_host_bridge_resources
-  PCI: Convert of_pci_get_host_bridge_resources users to devm variant
-  PCI: Add support for unbinding the generic PCI host controller
-  arm: Allow to enable PCI_DOMAINS manually
+__uint128_t global1, global2;
+__uint128_t addrs[8];
 
- arch/arm/Kconfig                       |  7 ++-
- drivers/pci/dwc/pcie-designware-host.c |  2 +-
- drivers/pci/host/pci-aardvark.c        |  5 +-
- drivers/pci/host/pci-ftpci100.c        |  4 +-
- drivers/pci/host/pci-host-common.c     | 13 +++++
- drivers/pci/host/pci-host-generic.c    |  1 +
- drivers/pci/host/pci-v3-semi.c         |  3 +-
- drivers/pci/host/pci-versatile.c       |  3 +-
- drivers/pci/host/pci-xgene.c           |  3 +-
- drivers/pci/host/pcie-altera.c         |  5 +-
- drivers/pci/host/pcie-iproc-platform.c |  4 +-
- drivers/pci/host/pcie-rcar.c           |  5 +-
- drivers/pci/host/pcie-rockchip.c       |  4 +-
- drivers/pci/host/pcie-xilinx-nwl.c     |  4 +-
- drivers/pci/host/pcie-xilinx.c         |  4 +-
- drivers/pci/of.c                       | 93 ++++++++++++++++++++++------------
- drivers/pci/pci.c                      |  6 +--
- drivers/pci/probe.c                    |  4 +-
- include/linux/of_pci.h                 | 14 ++++-
- include/linux/pci-ecam.h               |  1 +
- include/linux/pci.h                    |  3 --
- 21 files changed, 120 insertions(+), 68 deletions(-)
+void do_something(__uint128_t a, unsigned int idx)
+{
+        addrs[idx] = a;
+}
 
--- 
-2.13.6
+static int __init mod_init(void)
+{
+        do_something(global1 >> global2, (global2 << global1) & 7);
+        return 0;
+}
+
+module_init(mod_init);
+MODULE_LICENSE("GPL v2");
