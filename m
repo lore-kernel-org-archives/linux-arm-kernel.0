@@ -1,34 +1,105 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 25 Apr 2018 00:28:45 +0900
-Subject: [PATCH 0/4] add additional required properties for UniPhier
- ethernet nodes
-In-Reply-To: <1524545223-5893-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1524545223-5893-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNAT2acPfF-mK47Lu3Qc89TrFmSCppLXqSxYiX+eJ=ZKXSg@mail.gmail.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Tue, 24 Apr 2018 17:32:54 +0200
+Subject: [RFC 00/13] arm64: allwinner: Add A64 DE2 pipeline support
+In-Reply-To: <20180424133425.24291-1-jagan@amarulasolutions.com>
+References: <20180424133425.24291-1-jagan@amarulasolutions.com>
+Message-ID: <4355590.Ql03JAEh1C@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-24 13:46 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> Add required clocks and their names, resets and their names, and system
-> controller properties to fix the activation issues for the ethernet
-> controllers implemented on some UniPhier SoCs.
->
-> Kunihiko Hayashi (4):
->   ARM: dts: uniphier: add required clocks and resets to Pro4 ethernet
->     node
->   arm64: dts: uniphier: add clock-names and reset-names to ethernet node
->   ARM: dts: uniphier: add syscon-phy-mode property to each ethernet node
->   arm64: dts: uniphier: add syscon-phy-mode property to each ethernet
->     node
+Hi,
 
-All applied to linux-uniphier.  Thanks!
+Dne torek, 24. april 2018 ob 15:34:12 CEST je Jagan Teki napisal(a):
+> Allwinner A64 has display engine pipeline like other Allwinner SOC's
+> A83T/H3/H5.
+> 
+> A64 DE2 behaviour similar to Allwinner A83T where mixer0, connected to tcon0
+> with RGB, LVDS MIPI-DSI and mixer1, connected to tcon1 with HDMI.
+> This series merely concentrated on HDMI pipeline and rest will add
+> eventually.
+> 
+> patch 1: dt-bindings for a64 DE2 CCU
+> 
+> patch 2: a64 DE2 CCU node addition
+> 
+> patch 3: dt-bindings for a64 DE2 pipeline
+> 
+> patch 4 - 5: dt-bindings for a64 mixer0 and tcon-lcd
+> 
+> patch 6: a64 DE2 pipeline node addition
+> 
+> patch 7 - 8: dt-bindings for a64 HDMI and HDMI PHY
+> 
+> patch 9: a64 HDMI nodes addition
+> 
+> patch 10 - 11: dt-bindings for a64 mixer1 and tcon-tv
+> 
+> patch 12: a64 HDMI pipeline
+> 
+> patch 13: enable HDMI out on bananpi-m64
+> 
+> Tested HDMI on bananapi-m64 (along with DE2 SRAM C changes from [1]
+> thread), able to detect the HDMI but, no penguins on screen.
+> 
+> Request for any suggestions.
 
+You are mising sunxi-ng clock patches. PLL_VIDEO0 and PLL_VIDEO1 need fixes by 
+setting minimum stable frequency. Please note that datasheet may have wrong 
+information. That was obvious in H3 case and I had to check minimum stable 
+PLL_VIDEO frequency in BSP driver.
 
+Without clock fixes, you might not see anything on the screen.
 
+Best regards,
+Jernej
 
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> 
+> Test log on Bananpi-m64:
+> [    0.247631] sun4i-drm display-engine: bound 1100000.mixer (ops
+> sun8i_mixer_ops) [    0.256717] sun4i-drm display-engine: bound
+> 1200000.mixer (ops sun8i_mixer_ops) [    0.256783] sun4i-tcon
+> 1c0c000.lcd-controller: Missing LVDS properties, Please upgrade your DT [  
+>  0.256792] sun4i-tcon 1c0c000.lcd-controller: LVDS output disabled [   
+> 0.257081] sun4i-drm display-engine: No panel or bridge found... RGB output
+> disabled [    0.257099] sun4i-drm display-engine: bound
+> 1c0c000.lcd-controller (ops sun4i_tcon_ops) [    0.257273] sun4i-drm
+> display-engine: No panel or bridge found... RGB output disabled [   
+> 0.257288] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops
+> sun4i_tcon_ops) [    0.258176] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX
+> controller v1.32a with HDCP (sun8i_dw_hdmi_p) [    0.258596] sun8i-dw-hdmi
+> 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver [    0.259188]
+> sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops) [   
+> 0.259199] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013). [   
+> 0.259205] [drm] No driver support for vblank timestamp query. [   
+> 0.259308] [drm] Cannot find any crtc or sizes
+> [    0.259824] [drm] Initialized sun4i-drm 1.0.0 20150629 for display-engine
+> on minor 0
+> 
+> [1] https://lkml.org/lkml/2018/3/16/1096
+> 
+> Jagan Teki (13):
+>   dt-bindings: clock: Add compatible for A64 DE2 CCU
+>   arm64: dts: allwinner: a64: Add DE2 CCU
+>   bindings: display: Add compatible for A64 DE2 pipeline
+>   bindings: display: Add compatible for A64 Mixer0
+>   bindings: display: Add compatible for A64 tcon-lcd
+>   arm64: dts: allwinner: a64: Add DE2 pipeline
+>   bindings: display: Add compatible for A64 HDMI
+>   bindings: display: Add compatible for A64 HDMI PHY
+>   arm64: dts: allwinner: a64: Add HDMI support
+>   bindings: display: Add compatible for A64 Mixer1
+>   bindings: display: Add compatible for A64 tcon-tv
+>   arm64: dts: allwinner: a64: Add HDMI pipeline
+>   arm64: dts: allwinner: a64: bananapi-m64: Enable HDMI output
+> 
+>  .../devicetree/bindings/clock/sun8i-de2.txt        |   1 +
+>  .../bindings/display/sunxi/sun4i-drm.txt           |   7 +
+>  .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  26 +++
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 181
+> +++++++++++++++++++++ drivers/gpu/drm/sun4i/sun4i_drv.c                  | 
+>  1 +
+>  include/dt-bindings/clock/sun50i-a64-ccu.h         |   2 +
+>  6 files changed, 218 insertions(+)
+> 
+> --
+> 2.14.3
