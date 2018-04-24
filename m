@@ -1,154 +1,77 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Tue, 24 Apr 2018 20:31:44 +0200
-Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
- HMI
-In-Reply-To: <20180424084137.7xfwji2gcibxavvt@flea>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
- <20180322180508.my64gobhh5rc2x2m@flea>
- <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
- <20180424084137.7xfwji2gcibxavvt@flea>
-Message-ID: <03a02abb-e95c-b4ec-748f-907c0af67969@micronovasrl.com>
+From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
+Date: Tue, 24 Apr 2018 13:35:57 -0500
+Subject: [PATCH 1/3] Documentation: dt: socfpga: Add Stratix10 ECC Manager
+ binding
+In-Reply-To: <1524594959-5259-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1524594959-5259-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <1524594959-5259-2-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime and all,
-I resend the e-mail since it was refused by some address(my phone 
-composed it in HTML). Sorry.
+From: Thor Thayer <thor.thayer@linux.intel.com>
 
-Il 24/04/2018 10:41, Maxime Ripard ha scritto:
-> Hi,
-> 
-> On Mon, Apr 23, 2018 at 04:37:33PM +0200, Giulio Benetti wrote:
->> Il 22/03/2018 19:05, Maxime Ripard ha scritto:
->>> On Wed, Mar 21, 2018 at 09:03:13PM +0100, Giulio Benetti wrote:
->>>> The A20-Linova1-7 HMI, also called Q027_2_F which is printed on production
->>>> label, is an industrial Human Machine Interface.
->>>> It features:
->>>> - 512MB DDR RAM
->>>> - 1 Sd-card >= 4GB
->>>> - 1 Usb otg(programmable via software) with A-Usb Connector
->>>> - 1 Usb host
->>>> - 1 Buzzer
->>>> - 1 Input for LiPo
->>>> - 1 Relay to signal absence of power supply
->>>> - 1 External Rtc with 56 bytes of ram + CR2032 battery
->>>> - 1 7" 24-bits Tft 800x480 with PCap on
->>>> - 1 Mono audio 1-watt amplifier
->>>> - 1 RS485 port
->>>> - 1 Power On Line through +12Vdc reaching 57.600baud,
->>>>     from where it can be supplied and placed in a network of 50 units
->>>> - exposed jtag pins
->>>>
->>>> HMI is supplied from +12Vdc.
->>>> Ethernet is absent, so for debugging, need to enable rndis on Usb otg
->>>> port through an A-A usb cable.
->>>> It comes in different flavours for connector types and can be found with
->>>> umounted features as requested by customers.
->>>
->>> So this is essentially the same board than in patch 6, but with a
->>> different screen?
->>>
->>> You should have a single DT then, and handle the two different panels
->>> using DT overlays.
->>
->> Ok for having different DT overlays.
->> But do I have to submit them as patches? Or keep them in my company's repo?
->> I ask you this because this involves sending also patches for displays
->> and other little modifications to mainline ex:
->> - rgb888 pins
->> - 2 simple-panels
->> - 1 uart iomux pins
->> etc.
->>
->> If I don't submit those overlays, the other patches wouldn't make sense
->> alone as I've seen, just like rgb888 pins.
-> 
-> We don't have a repo for overlays yet
+Add the device tree bindings needed to support the Stratix10
+ECC Manager and SDRAM ECC to the existing bindings.
 
-Ok I can provide them on my company Repo.
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+---
+ .../bindings/arm/altera/socfpga-eccmgr.txt         | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
-But, sorry if insist(please don't kill me! :) ), I would try to explain 
-better how it's made LiNova, because I think I didn't provide enough 
-information about it:
-LiNova1 is not a board with various headers to connect other peripherals 
-such display, pcap etc.
-It's an HMI that I would consider the same as a Tablet, because it has a 
-plastic enclosure also.
-
-So I would like to understand how to manage it in the best way.
-Try to consider LiNova1 as a Tablet series, with following list:
-LiNova1 4.3" ctp
-LiNova1 7" ctp
-LiNova1 10.1" ctp
-LiNova1 4.3" rtp
-LiNova1 7" rtp
-LiNova1 10.1" rtp
-
-Every of those has a slightly different BOM, so they are 6 different 
-boards with a common base(uP, ram). And same pcb.
-
-So I don't know if submit only the common base and provide separately on 
-our github DT-overlays, or provide as many dts patches as the HMI number 
-with a base dtsi.
-
-Basically Micronova provides entire system without the capability to 
-hack hardware adding shields of various type.
-
-There are also other 2 LiNova:
-LiNova2 and LiNova3
-
-So I understand that this could lead to 18 different dts files and 3 
-dtsi files.
-
-But with Tablet it should be the same way.
-For sure people would be more interested on famous tablets instead of 
-our HMI.
-
-In the case I need to use dt-overlays, you mean .dto files with 
-fragments inside loaded by u-boot or runtime, right?
-
-Sorry if I bother you again but I wanted to understand better.
-
-> 
->>>> +&usb_otg {
->>>> +	dr_mode = "otg";
->>>
->>> You're saying that this is a USB-A connector? Then it's not OTG since
->>> it doesn't have an ID pin, this is an host.
->>
->> Right, with a special overlay I will activate Usb Device for RNDIS,
->> so modified as host
-> 
-> That doesn't really make much sense. The USB OTG is wired only using a
-> daughter board?
-
-My fault, I've meant "peripheral" in one case and "host" in another case.
-Usually "host".
-Are there problem with this?
-There is no daughter board.
-
-Thank you very very much in advance for you patience :)
-
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+index 4a1714f96bab..fe48ad293a24 100644
+--- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+@@ -231,3 +231,50 @@ Example:
+ 				     <48 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 	};
++
++Stratix10 SoCFPGA ECC Manager
++The Stratix10 SoC ECC Manager handles the IRQs for each peripheral
++in a shared register similar to the Arria10. However, ECC requires
++access to registers that can only be read in EL3 with SMC calls.
++Therefore the device tree is slightly different.
++
++Required Properties:
++- compatible : Should be "altr,socfpga-s10-ecc-manager"
++- altr,sysgr-syscon : phandle to Stratix10 System Manager Block
++	containing the ECC manager registers.
++- #address-cells: must be 1
++- #size-cells: must be 1
++- interrupts : Should be single bit error interrupt, then double bit error
++	interrupt.
++- interrupt-controller : boolean indicator that ECC Manager is an interrupt controller
++- #interrupt-cells : must be set to 2.
++- ranges : standard definition, should translate from local addresses
++
++Subcomponents:
++
++SDRAM ECC
++Required Properties:
++- compatible : Should be "altr,sdram-edac-s10"
++- reg : Address and size for ECC error interrupt clear registers.
++- interrupts : Should be single bit error interrupt, then double bit error
++	interrupt, in this order.
++
++Example:
++
++	eccmgr: eccmgr at ffd12000 {
++		compatible = "altr,socfpga-s10-ecc-manager";
++		altr,sysmgr-syscon = <&sysmgr>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		interrupts = <0 15 4>, <0 95 4>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		ranges;
++
++		sdramedac at f8011100 {
++			compatible = "altr,sdram-edac-s10";
++			reg = <0xf8011100 0xC0>;
++			interrupts = <16 4>, <48 4>;
++		};
++	};
++
 -- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
-
-> 
-> 
->> One last question:
->> now I have some patch already reviewed-by.
->> Do I have to re-submit entire patchset?
-> 
-> Yes
-> 
-> Maxime
-> 
+2.7.4
