@@ -1,41 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Apr 2018 17:17:30 +0200
-Subject: [PATCH] efi/libstub/arm64: handle randomized TEXT_OFFSET
-In-Reply-To: <20180424101500.e5c032b91e87a354e92344c5@arm.com>
-References: <20180424110058.29344-1-mark.rutland@arm.com>
- <20180424101500.e5c032b91e87a354e92344c5@arm.com>
-Message-ID: <CAKv+Gu9vUFQVUyq7yNKvmXFLvh4yfJq6wE2wYbAEXWXZ4rQH+Q@mail.gmail.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Tue, 24 Apr 2018 17:13:38 +0200
+Subject: [PATCH 2/6] PCI: Fix memory leak of devm_pci_alloc_host_bridge
+In-Reply-To: <cover.1524582822.git.jan.kiszka@siemens.com>
+References: <cover.1524582822.git.jan.kiszka@siemens.com>
+Message-ID: <2a083b46d55687d01d43d4013cfb957cb3720db5.1524582822.git.jan.kiszka@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 April 2018 at 17:15, Kim Phillips <kim.phillips@arm.com> wrote:
-> On Tue, 24 Apr 2018 12:00:58 +0100
-> Mark Rutland <mark.rutland@arm.com> wrote:
->
->> When CONFIG_RANDOMIZE_TEXT_OFFSET is selected, TEXT_OFFSET is an
->> arbitrary multiple of PAGE_SIZE in the interval [0, 2MB).
->>
->> The EFI stub doesn't accuont for this, and only handles the case where
->> TEXT_OFFSET is multiple of EFI_KIMG_ALIGN. This can result in the kernel
->> being loaded to an erroneous physical alignment. This has been observed
->> to result in spurious stack overflow reports and failure to make use of
->> the IRQ stacks, and theoretically could result in a number of other
->> issues.
->>
->> We can OR in the low bits of TEXT_OFFSET to ensure that we have the
->> necessary offset (and hence have the necessary alignment), so let's do
->> that.
->>
->> Fixes: 6f26b3671184c36d ("arm64: kaslr: increase randomization granularity")
->> Reported-by: Kim Phillips <kim.phillips@arm.com>
->> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: linux-efi at vger.kernel.org
->> ---
->
-> Tested-by: Kim Phillips <kim.phillips@arm.com>
->
+From: Jan Kiszka <jan.kiszka@siemens.com>
 
-Thanks all
+devm_pci_release_host_bridge_dev failed to release the resource list.
 
-Queued in efi/urgent.
+Fixes: 5c3f18cce083 ("PCI: Add devm_pci_alloc_host_bridge() interface")
+Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+---
+ drivers/pci/probe.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index ac91b6fd0bcd..eccf204c9160 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -526,12 +526,14 @@ static void devm_pci_release_host_bridge_dev(struct device *dev)
+ 
+ 	if (bridge->release_fn)
+ 		bridge->release_fn(bridge);
++
++	pci_free_resource_list(&bridge->windows);
+ }
+ 
+ static void pci_release_host_bridge_dev(struct device *dev)
+ {
+ 	devm_pci_release_host_bridge_dev(dev);
+-	pci_free_host_bridge(to_pci_host_bridge(dev));
++	kfree(to_pci_host_bridge(dev));
+ }
+ 
+ struct pci_host_bridge *pci_alloc_host_bridge(size_t priv)
+-- 
+2.13.6
