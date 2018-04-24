@@ -1,51 +1,43 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 24 Apr 2018 12:03:44 +0200
-Subject: [PATCH 1/2] ARM: dts: sun8i-h3-libretech-all-h3-cc: Move board
- definition to common dtsi
-In-Reply-To: <20180424095656.oormsyru7nw6hypn@flea>
-References: <1524561576-2201-1-git-send-email-narmstrong@baylibre.com>
- <1524561576-2201-2-git-send-email-narmstrong@baylibre.com>
- <20180424095656.oormsyru7nw6hypn@flea>
-Message-ID: <20d4b1f5-b300-37e2-8dca-e80f691440a9@baylibre.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 24 Apr 2018 18:05:47 +0800
+Subject: [v2 08/10] clk: mediatek: mt8173-mm: switch to mfd device
+In-Reply-To: <74bf4058534cf187e10ef041da1706878914aa45.1524497268.git.mbrugger@suse.com>
+References: <74bf4058534cf187e10ef041da1706878914aa45.1524497268.git.mbrugger@suse.com>
+Message-ID: <201804241638.leHWZOjv%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/2018 11:56, Maxime Ripard wrote:
-> Hi,
-> 
-> On Tue, Apr 24, 2018 at 11:19:35AM +0200, Neil Armstrong wrote:
->> Since the libretech-all-h3-cc can use either the H2+, H3 or H5, move the
->> content of the dts file to a common dtsi file to be included by the H3 variant
->> and in a following patch the H5 variant.
->>
->> By the way, update the SPDX licence tag position.
->>
->> Suggested-by: Corentin Labbe <clabbe@baylibre.com>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> This patch looks fine, but doesn't apply anymore. Please resend it.
+Hi Matthias,
 
-I based it on 4.17-rc2, should I rebase in your tree ?
+I love your patch! Perhaps something to improve:
 
-> 
-> While you're at it, the prefix should be "arm: dts: sun8i: h3:" (with
-> arm being lowercase).
+[auto build test WARNING on drm/drm-next]
+[also build test WARNING on v4.17-rc2 next-20180424]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Good to know,
+url:    https://github.com/0day-ci/linux/commits/matthias-bgg-kernel-org/arm-arm64-mediatek-Fix-mmsys-device-probing/20180424-013521
+base:   git://people.freedesktop.org/~airlied/linux.git drm-next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-> 
-> Thanks!
-> Maxime
-> 
+All warnings (new ones prefixed by >>):
 
-Thanks,
-Neil
+>> WARNING: vmlinux.o(.text+0x501416): Section mismatch in reference from the function mtk_mmsys_probe() to the variable .init.rodata:mm_clks
+   The function mtk_mmsys_probe() references
+   the variable __initconst mm_clks.
+   This is often because mtk_mmsys_probe lacks a __initconst
+   annotation or the annotation of mm_clks is wrong.
 
-
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/3ab78794/attachment.sig>
+Name: .config.gz
+Type: application/gzip
+Size: 62881 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/00fa906b/attachment-0001.gz>
