@@ -1,70 +1,37 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Apr 2018 13:05:39 +0200
-Subject: [PATCH v3 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
- Edition support
-In-Reply-To: <20180424104911.42ae8864@xps13>
-References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
- <20180421164246.8477-3-miquel.raynal@bootlin.com>
- <20180423072403.4ip5seys4xyll3yr@flea>
- <20180423122752.364ee649@xps13>
- <20180424075505.p6e43yw2juw4fqqw@flea>
- <20180424104911.42ae8864@xps13>
-Message-ID: <20180424110539.tlni7mb4xpdsunrh@flea>
+Date: Tue, 24 Apr 2018 13:06:17 +0200
+Subject: [PATCH 1/2] ARM: dts: sun8i-h3-libretech-all-h3-cc: Move board
+ definition to common dtsi
+In-Reply-To: <20d4b1f5-b300-37e2-8dca-e80f691440a9@baylibre.com>
+References: <1524561576-2201-1-git-send-email-narmstrong@baylibre.com>
+ <1524561576-2201-2-git-send-email-narmstrong@baylibre.com>
+ <20180424095656.oormsyru7nw6hypn@flea>
+ <20d4b1f5-b300-37e2-8dca-e80f691440a9@baylibre.com>
+Message-ID: <20180424110617.pu3ibceramahodgn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 10:49:11AM +0200, Miquel Raynal wrote:
-> Hi Maxime,
-> 
-> On Tue, 24 Apr 2018 09:55:05 +0200, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> 
-> > On Mon, Apr 23, 2018 at 12:27:52PM +0200, Miquel Raynal wrote:
-> > > > >  	sun8i-r16-parrot.dtb \
-> > > > >  	sun8i-r40-bananapi-m2-ultra.dtb \
-> > > > >  	sun8i-v3s-licheepi-zero.dtb \
-> > > > > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > > index 6b9e85b4ba0f..44f3cad3de75 100644
-> > > > > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > > @@ -198,6 +198,8 @@
-> > > > >  			clock-names = "ahb", "mod";
-> > > > >  			resets = <&ccu RST_BUS_NAND>;
-> > > > >  			reset-names = "ahb";
-> > > > > +			pinctrl-names = "default";
-> > > > > +			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;    
-> > > > 
-> > > > This should be in your first patch I guess?  
-> > > 
-> > > Actually I think this should not be there but instead, because it is
-> > > board-related, these two lines should be in the nes-classic.dts' nfc
-> > > node, right? Other a23/a33/r16 based designs could use the second set
-> > > of CS/RB pins.  
+On Tue, Apr 24, 2018 at 12:03:44PM +0200, Neil Armstrong wrote:
+> On 24/04/2018 11:56, Maxime Ripard wrote:
+> > Hi,
 > > 
-> > Does that ever happen?
+> > On Tue, Apr 24, 2018 at 11:19:35AM +0200, Neil Armstrong wrote:
+> >> Since the libretech-all-h3-cc can use either the H2+, H3 or H5, move the
+> >> content of the dts file to a common dtsi file to be included by the H3 variant
+> >> and in a following patch the H5 variant.
+> >>
+> >> By the way, update the SPDX licence tag position.
+> >>
+> >> Suggested-by: Corentin Labbe <clabbe@baylibre.com>
+> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > > 
-> > On a theoretical level, then yeah, sure. But if all the boards seen
-> > out there are using the same setup (which is pretty common), then
-> > there's no reason not to do it in the DTSI.
+> > This patch looks fine, but doesn't apply anymore. Please resend it.
 > 
-> I compared the various boards configurations [1] with the R16 datasheet
-> [2], all the boards having a NAND configure all the related pins
-> (including CS1 and RB1). So I guess I can put both properties in the
-> DTSI.
+> I based it on 4.17-rc2, should I rebase in your tree ?
 
-I don't think we should until we have a clearer view of whether it's
-needed or not. If it turns out that they are not using it, and that we
-need to remove it from the DTSI, it's going to be a nightmare to track
-down what board actually needs what pin.
-
-> There is one case (sinlinx_sina33) where the NAND is not used and the
-> pins are used for an alternate function: SPI0; but I guess this is not
-> a problem as in this case, the NAND node would not exist in the
-> resulting DTB.
-
-Yeah, the sinA33 is using an eMMC, so it's not relevant here.
-
+Yep, thanks!
 Maxime
+
 
 -- 
 Maxime Ripard, Bootlin (formerly Free Electrons)
@@ -76,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/4d3c9e61/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/39eb2865/attachment.sig>
