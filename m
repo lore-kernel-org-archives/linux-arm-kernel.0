@@ -1,52 +1,104 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 24 Apr 2018 13:40:33 +0530
-Subject: [RFC work-in-progress 5/7] !WIP ARM: davinci: convert da850 to
- using the davinci clocksource driver
-In-Reply-To: <20180423183814.20615-6-brgl@bgdev.pl>
-References: <20180423183814.20615-1-brgl@bgdev.pl>
- <20180423183814.20615-6-brgl@bgdev.pl>
-Message-ID: <bed00d18-a4c1-5e8f-a15c-f2482e5ecb9a@ti.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 24 Apr 2018 10:14:16 +0200
+Subject: [PATCH] staging: bcm2835-audio: Disconnect and free vchi_instance
+ on module_exit()
+In-Reply-To: <7e2dbb73-f93d-7b87-2fa0-d8b40f4a11a5@gmail.com>
+References: <20180417050028.19372-1-k.marinushkin@gmail.com>
+ <20180423135024.GA2337@kroah.com>
+ <7e2dbb73-f93d-7b87-2fa0-d8b40f4a11a5@gmail.com>
+Message-ID: <20eae5c0-8e35-2295-f4c4-1d8f65ed63ea@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 April 2018 12:08 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/mach-davinci/da850.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 3f27d46ca43f..712964383bc2 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -757,13 +757,28 @@ void __init da850_init(void)
->  	WARN(!da8xx_syscfg1_base, "Unable to map syscfg1 module");
->  }
->  
-> +static struct platform_device da850_timer_device = {
-> +	.name			= "timer-davinci",
-> +	.id			= -1,
-> +};
-> +
->  void __init da850_init_time(void)
->  {
->  	struct clk *clk;
-> +	int ret;
->  
->  	clk = clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DA850_REF_FREQ);
->  
->  	davinci_timer_init(clk);
-> +
-> +	ret = clk_register_clkdev(clk, NULL, "timer-davinci");
-> +	if (ret) {
-> +		pr_err("%s: error registering ref_clk: %d", __func__, ret);
-> +		return;
-> +	}
+Hi Kirill,
 
-This part had to be added because you don't have clocks converted to
-early platform devices in your branch, right?
+Am 24.04.2018 um 02:35 schrieb Kirill Marinushkin:
+> On 04/23/18 15:50, Greg Kroah-Hartman wrote:
+>> On Tue, Apr 17, 2018 at 07:00:28AM +0200, Kirill Marinushkin wrote:
+>>> In the current implementation, vchi_instance is inited during the first
+>>> call of bcm2835_audio_open_connection(), and is never freed. It causes a
+>>> memory leak when the module `snd_bcm2835` is removed.
+>>>
+>>> Here is how this commit fixes it:
+>>>
+>>> * the VCHI context (including vchi_instance) is created once in the
+>>>    platform's devres
+>>> * the VCHI context is allocated and connected once during module_init()
+>>> * all created bcm2835_chips have a pointer to this VCHI context
+>>> * bcm2835_audio_open_connection() can access the VCHI context through the
+>>>    associated bcm2835_chip
+>>> * the VCHI context is disconnected and freed once during module_exit()
+>>>
+>>> After this commit is applied, I don't see other issues with the module's
+>>> init/exit, so I also remove the associated TODO task.
+>>>
+>>> Steps to reproduce the memory leak before this commit:
+>> <snip>
+>>
+>> Patch dropped due to kbuild complaints.
+>>
+>> Please fix up and resend.
+>>
+>> thanks,
+>>
+>> greg k-h
+> Hello Greg,
+>
+> Due to which complains of kbuild is the patch dropped?
+> I would like to fix the complains, but I don't see any errors or warnings on my
+> side.
+> Are you sure that the kbuild test robot did it's job correctly? The log says:
+>
+>>> it may well be a FALSE warning
+> Please show me what is wrong in my patch.
+>
+> The log from kbuild test robot says:
+>
+>>> [auto build test WARNING on staging/staging-testing]
+>>> [also build test WARNING on v4.17-rc1]
+>>> [cannot apply to anholt/for-next]
+>>> [if your patch is applied to the wrong git tree, please drop us a note to
+> help improve the system]
+>>> url:
+> https://github.com/0day-ci/linux/commits/Kirill-Marinushkin/staging-bcm2835-audio-Disconnect-and-free-vchi_instance-on-module_exit/20180417-193147
+>>> config: arm-allmodconfig
+>>> compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+>>> reproduce:
+>>> wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross
+> -O ~/bin/make.cross
+>>> chmod +x ~/bin/make.cross
+>>> make.cross ARCH=arm allmodconfig
+>>> make.cross ARCH=arm
+>>>
+>>> Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+>>> http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+> I cannot clone from the given url, because it does not exist.
+> I cannot use the compiler from the log, because it is built for x86_64, and my
+> host machine is i686.
+> Below are the steps how I tried to reproduce the issue, but errors or warnings
+> didn't happen.
+>
+> I applied the patch on top of the following upstream tag:
+> 60cc43fc8884 (tag: v4.17-rc1) Linux 4.17-rc1
+>
+> And executed:
+> make CROSS_COMPILE=arm-linux-gnueabihf- --jobs=4 ARCH=arm allmodconfig
+> make CROSS_COMPILE=arm-linux-gnueabihf- --jobs=4 ARCH=arm
+>
+> But the compilation succeed without any errors or warnings.
+>
+> My compiler version is:
+> arm-linux-gnueabihf-gcc (crosstool-NG linaro-1.13.1-4.8-2014.01 - Linaro GCC
+> 2013.11) 4.8.3 20140106 (prerelease)
 
-Thanks,
-Sekhar
+this is an old toolchain. You can download newer ones here (even for i686):
+
+https://releases.linaro.org/components/toolchain/binaries/7.2-2017.11/arm-linux-gnueabihf/
+
+Best regards
+Stefan
+
+>
+> Best Regards,
+> Kirill
+>
