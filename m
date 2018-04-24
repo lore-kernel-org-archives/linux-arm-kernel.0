@@ -1,51 +1,29 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 24 Apr 2018 11:27:21 -0500
-Subject: [PATCH 1/3] dt-bindings: iio: stm32-adc: add support for STM32MP1.
-In-Reply-To: <1524065874-434-2-git-send-email-fabrice.gasnier@st.com>
-References: <1524065874-434-1-git-send-email-fabrice.gasnier@st.com>
- <1524065874-434-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180424162721.qbfsc7j3syzzykeh@rob-hp-laptop>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Tue, 24 Apr 2018 09:29:48 -0700
+Subject: [PATCH v3 03/10] drivers/peci: Add support for PECI bus driver
+ core
+In-Reply-To: <1524585717.21176.504.camel@linux.intel.com>
+References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+ <20180410183212.16787-4-jae.hyun.yoo@linux.intel.com>
+ <1524585717.21176.504.camel@linux.intel.com>
+Message-ID: <af70513f-a827-9aaa-1acf-629ae1692d7c@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 05:37:52PM +0200, Fabrice Gasnier wrote:
-> Document support for STM32MP1 ADC. It's quite similar to STM32H7 ADC.
-> Introduce "st,stm32mp1-adc" compatible to handle variants of this
-> hardware such as vregready flag, interrupts, clock rate.
+On 4/24/2018 9:01 AM, Andy Shevchenko wrote:
+> On Tue, 2018-04-10 at 11:32 -0700, Jae Hyun Yoo wrote:
+>> This commit adds driver implementation for PECI bus core into linux
+>> driver framework.
+>>
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+> All comments you got for patch 6 are applicable here.
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> index e8bb824..9994384 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> @@ -24,8 +24,11 @@ Required properties:
->  - compatible: Should be one of:
->    "st,stm32f4-adc-core"
->    "st,stm32h7-adc-core"
-> +  "st,stm32mp1-adc-core"
->  - reg: Offset and length of the ADC block register set.
-> -- interrupts: Must contain the interrupt for ADC block.
-> +- interrupts: One or more interrupts for ADC block. Some parts like stm32f4
-> +  and stm32h7 share a common ADC interrupt line. stm32mp1 has separate
-> +  lines for each ADC within ADC block.
+> And perhaps in the rest of the series.
+> 
+> The rule of thumb: when you get even single comment in a certain place,
+> re-check _entire_ series for the same / similar patterns!
+> 
 
-How many interrupt lines is that?
+Thanks for your advice. I'll keep that in mind.
 
->  - clocks: Core can use up to two clocks, depending on part used:
->    - "adc" clock: for the analog circuitry, common to all ADCs.
->      It's required on stm32f4.
-> @@ -53,6 +56,7 @@ Required properties:
->  - compatible: Should be one of:
->    "st,stm32f4-adc"
->    "st,stm32h7-adc"
-> +  "st,stm32mp1-adc"
->  - reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
->  - clocks: Input clock private to this ADC instance. It's required only on
->    stm32f4, that has per instance clock input for registers access.
-> -- 
-> 1.9.1
-> 
+Jae
