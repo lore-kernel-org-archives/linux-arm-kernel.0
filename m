@@ -1,35 +1,48 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 24 Apr 2018 23:43:22 +0800
-Subject: [PATCH v1 3/4] clk: mediatek: add g3dsys support for MT2701 and
- MT7623
-In-Reply-To: <20180424144009.b66sxo3okjvsr4yc@rob-hp-laptop>
-References: <cover.1524044917.git.sean.wang@mediatek.com>
- <96dc02879c10388c2efa08b1cf33b77f938908ee.1524044917.git.sean.wang@mediatek.com>
- <20180424144009.b66sxo3okjvsr4yc@rob-hp-laptop>
-Message-ID: <1524584602.12322.16.camel@mtkswgap22>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 24 Apr 2018 10:44:31 -0500
+Subject: [PATCH v3 1/5] clk: Extract OF clock helpers in <linux/of_clk.h>
+In-Reply-To: <CAMuHMdUX9dJcGLgftAAeCOXYxKUOQ_dW7=oLwNt5VRbd6nQpuA@mail.gmail.com>
+References: <1524063005-1716-1-git-send-email-geert+renesas@glider.be>
+ <1524063005-1716-2-git-send-email-geert+renesas@glider.be>
+ <152417672470.46528.14790019208345640453@swboyd.mtv.corp.google.com>
+ <CAMuHMdUX9dJcGLgftAAeCOXYxKUOQ_dW7=oLwNt5VRbd6nQpuA@mail.gmail.com>
+Message-ID: <20180424154431.5bf35ck4z5xtusnm@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-04-24 at 09:40 -0500, Rob Herring wrote:
-> On Wed, Apr 18, 2018 at 06:24:55PM +0800, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > Add clock driver support for g3dsys on MT2701 and MT7623, which is
-> > providing essential clock gate and reset controller to Mali-450.
-> > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >  drivers/clk/mediatek/Kconfig              |  6 ++
-> >  drivers/clk/mediatek/Makefile             |  1 +
-> >  drivers/clk/mediatek/clk-mt2701-g3d.c     | 95 +++++++++++++++++++++++++++++++
+On Fri, Apr 20, 2018 at 08:28:28AM +0200, Geert Uytterhoeven wrote:
+> Hi Stephen, Rob,
 > 
-> >  include/dt-bindings/clock/mt2701-clk.h    |  4 ++
-> >  include/dt-bindings/reset/mt2701-resets.h |  3 +
+> On Fri, Apr 20, 2018 at 12:25 AM, Stephen Boyd <sboyd@kernel.org> wrote:
+> > Quoting Geert Uytterhoeven (2018-04-18 07:50:01)
+> >> The use of of_clk_get_parent_{count,name}() and of_clk_init() is not
+> >> limited to clock providers.
+> >>
+> >> Hence move these helpers into their own header file, so callers that are
+> >> not clock providers no longer have to include <linux/clk-provider.h>.
+> >>
+> >> Suggested-by: Stephen Boyd <sboyd@kernel.org>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> >> ---
+> >> v3:
+> >>   - Add Reviewed-by,
+> >>   - Add SPDX-License-Identifier,
+> >>   - Add to clock section in MAINTAINERS (note that Rob is still listed
+> >>     as a maintainer, too, due to the include/linux/of*.h catch-all
+> >>     rule),
+> >
+> > Can you X: out this file so Rob is happy? Or that doesn't work?
 > 
-> These below in the binding patch.
+> I guess that should work.
 > 
+> My point here is that due to the catch-all rule, he's listed as maintainer
+> for of_{dma,gpio,irq,iommu,mdio,net,pci} too, which are all helpers for
+> other subsystems. Perhaps these should be X'd-out too?
+> Or is it OK without X-ing them out, as the clock maintainers are now shown, too?
+> 
+> Rob: What's your preference?
 
-Thanks, I will split them out in the next version.
+It's fine as-is.
 
-> >  5 files changed, 109 insertions(+)
-> >  create mode 100644 drivers/clk/mediatek/clk-mt2701-g3d.c
+Rob
