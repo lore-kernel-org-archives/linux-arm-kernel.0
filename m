@@ -1,50 +1,92 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 24 Apr 2018 10:26:23 +0200
-Subject: [PATCH] dt-bindings: arm: consistently name r8a77965 as M3-N
-In-Reply-To: <CAMuHMdWZoXSJnuEiD4e9SpP+ASFgDCcwy16UFOeSEq5sNnsMSA@mail.gmail.com>
-References: <20180424055442.19710-1-horms+renesas@verge.net.au>
- <CAMuHMdWZoXSJnuEiD4e9SpP+ASFgDCcwy16UFOeSEq5sNnsMSA@mail.gmail.com>
-Message-ID: <20180424082623.y6d2unyo45wktkx2@verge.net.au>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Tue, 24 Apr 2018 11:28:32 +0300
+Subject: [PATCH v2 02/10] media-request: Add a request complete operation
+ to allow m2m scheduling
+In-Reply-To: <20180419154124.17512-3-paul.kocialkowski@bootlin.com>
+References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+ <20180419154124.17512-3-paul.kocialkowski@bootlin.com>
+Message-ID: <20180424082831.zfgzuvnop6md4iyf@paasikivi.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 09:16:17AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Tue, Apr 24, 2018 at 7:54 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > There is an inconsistency between the use of M3N and M3-N.
-> > This patch resolves this by consistently using the latter.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Note that this is for a custom Salvator-X board where the M3-W SiP was
-> replaced by an M3-N SiP.  So I have no idea what's on the sticker, if it was
-> replaced at all, and thus kept the text from the BSP.
+Hi Paul,
 
-Understood. But I think we should make the naming consistent regardless.
+On Thu, Apr 19, 2018 at 05:41:16PM +0200, Paul Kocialkowski wrote:
+> When using the request API in the context of a m2m driver, the
+> operations that come with a m2m run scheduling call in their
+> (m2m-specific) ioctl handler are delayed until the request is queued
+> (for instance, this includes queuing buffers and streamon).
+> 
+> Thus, the m2m run scheduling calls are not called in due time since the
+> request AP's internal plumbing will (rightfully) use the relevant core
+> functions directly instead of the ioctl handler.
+> 
+> This ends up in a situation where nothing happens if there is no
+> run-scheduling ioctl called after queuing the request.
+> 
+> In order to circumvent the issue, a new media operation is introduced,
+> called at the time of handling the media request queue ioctl. It gives
+> m2m drivers a chance to schedule a m2m device run at that time.
+> 
+> The existing req_queue operation cannot be used for this purpose, since
+> it is called with the request queue mutex held, that is eventually needed
+> in the device_run call to apply relevant controls.
+
+Based on the description I'm not entirely sure what's the intent here.
+
+What would be the purpose for acquiring the request queue mutex during
+the execution of the request? It is only intended for serialising access to
+the request objects while the request is being validated and queued.
+
+If a driver does a significant amount of processing that is not related to
+managing the request as such, then one option could be to add a work queue
+for it.
 
 > 
-> > --- a/Documentation/devicetree/bindings/arm/shmobile.txt
-> > +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-> > @@ -116,7 +116,7 @@ Boards:
-> >      compatible = "renesas,salvator-x", "renesas,r8a7795"
-> >    - Salvator-X (RTP0RC7796SIPB0011S)
-> >      compatible = "renesas,salvator-x", "renesas,r8a7796"
-> > -  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
-> > +  - Salvator-X (RTP0RC7796SIPB0011S (M3-N))
-> >      compatible = "renesas,salvator-x", "renesas,r8a77965"
-> >    - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
-> >      compatible = "renesas,salvator-xs", "renesas,r8a7795"
-> \
-> Gr{oetje,eeting}s,
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+>  drivers/media/media-request.c | 3 +++
+>  include/media/media-device.h  | 2 ++
+>  2 files changed, 5 insertions(+)
 > 
->                         Geert
-> 
+> diff --git a/drivers/media/media-request.c b/drivers/media/media-request.c
+> index 415f7e31019d..28ac5ccfe6a2 100644
+> --- a/drivers/media/media-request.c
+> +++ b/drivers/media/media-request.c
+> @@ -157,6 +157,9 @@ static long media_request_ioctl_queue(struct media_request *req)
+>  		media_request_get(req);
+>  	}
+>  
+> +	if (mdev->ops->req_complete)
+> +		mdev->ops->req_complete(req);
+> +
+>  	return ret;
+>  }
+>  
+> diff --git a/include/media/media-device.h b/include/media/media-device.h
+> index 07e323c57202..c7dcf2079cc9 100644
+> --- a/include/media/media-device.h
+> +++ b/include/media/media-device.h
+> @@ -55,6 +55,7 @@ struct media_entity_notify {
+>   * @req_alloc: Allocate a request
+>   * @req_free: Free a request
+>   * @req_queue: Queue a request
+> + * @req_complete: Complete a request
+>   */
+>  struct media_device_ops {
+>  	int (*link_notify)(struct media_link *link, u32 flags,
+> @@ -62,6 +63,7 @@ struct media_device_ops {
+>  	struct media_request *(*req_alloc)(struct media_device *mdev);
+>  	void (*req_free)(struct media_request *req);
+>  	int (*req_queue)(struct media_request *req);
+> +	void (*req_complete)(struct media_request *req);
+>  };
+>  
+>  /**
 > -- 
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 2.16.3
 > 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
+
+-- 
+Sakari Ailus
+sakari.ailus at linux.intel.com
