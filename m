@@ -1,49 +1,58 @@
-From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Wed, 25 Apr 2018 02:22:14 +0900
-Subject: [PATCH 0/5] arm64: dts: renesas: r8a779xx: sort nodes
-In-Reply-To: <20180424082443.svxfrb2lhzjh3g3z@verge.net.au>
-References: <1524082480-18163-1-git-send-email-ykaneko0929@gmail.com>
- <20180423102658.ezofcrgzzwvzdfor@verge.net.au>
- <CAH1o70+1wfa1Vc1B_fjofhk4CALXtT-eyvXznDsDNypNOVfG1A@mail.gmail.com>
- <20180424082443.svxfrb2lhzjh3g3z@verge.net.au>
-Message-ID: <CAH1o70+o2-Jb=s5GOkn1e0BJ8yLpz=rAowYBcgBD80m34u4bYg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Apr 2018 18:31:06 +0100
+Subject: [PATCH v2 1/2] regmap: include <linux/ktime.h> from
+ include/linux/regmap.h
+In-Reply-To: <f4025431-be9a-32f9-06e1-9c6ac185c96a@gmail.com>
+References: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
+ <20180423100318.GA19834@sirena.org.uk>
+ <d3e10dc5-55d3-40b8-a8de-d48aaaecf019@gmail.com>
+ <20180423115043.GD19834@sirena.org.uk>
+ <f4025431-be9a-32f9-06e1-9c6ac185c96a@gmail.com>
+Message-ID: <20180424173106.GE22073@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon-san,
+On Mon, Apr 23, 2018 at 04:07:10PM +0200, Matthias Brugger wrote:
+> On 04/23/2018 01:50 PM, Mark Brown wrote:
 
-2018-04-24 17:24 GMT+09:00 Simon Horman <horms@verge.net.au>:
-> On Tue, Apr 24, 2018 at 02:31:40AM +0900, Yoshihiro Kaneko wrote:
->> Hi Simon-san,
->>
->> 2018-04-23 19:26 GMT+09:00 Simon Horman <horms@verge.net.au>:
->> > On Thu, Apr 19, 2018 at 05:14:35AM +0900, Yoshihiro Kaneko wrote:
->> >> Sort nodes of the R-Car M3-N (r8a77965), V3M (r8a77970) and D3 (r8a77995) DTs.
->> >>
->> >> This is part of an ongoing effort to provide consistent node
->> >> order in the DT of Renesas SoCs to improve maintainability.
->> >>
->> >> This should not have any run-time effect.
->> >>
->> >> Based on the devel branch of Simon Horman's renesas tree.
->> >>
->> >> Yoshihiro Kaneko (5):
->> >>   arm64: dts: renesas: r8a77995: sort subnodes of the root node
->> >>   arm64: dts: renesas: r8a77995: sort subnodes of the soc node
->> >>   arm64: dts: renesas: r8a77965: sort subnodes of the root node
->> >>   arm64: dts: renesas: r8a77965: sort subnodes of the soc node
->> >>   arm64: dts: renesas: r8a77970: sort subnodes of the soc node
->> >
->> > Thanks, applied.
->> >
->> > There ware a few nodes added to r8a77970 between when you made
->> > this patchset and when I applied it. I think the r8a77970 is still
->> > sorted as desired. Could you double-check once I push a devel
->> > branch later today?
->>
->> Yes, will do.
->
-> Thanks, you should now be able to check renesas-devel-20180423-v4.17-rc2
+> > So it looks like there is a dependency here...?
 
-fcpvd0 should be after vspd0?
-It seems good to me except the above.
+> Yes, regmap_read_poll_timeout macro uses for example ktime_compare which is
+> defined in linux/ktime.h
+
+> That's my understanding.
+
+OK, it's important to make sure that people getting a patch series know
+about stuff like this as it will affect how things are reviewed and
+applied.  
+
+The following changes since commit e241e3f2bf975788a1b70dff2eb5180ca395b28e:
+
+  Merge tag 'for_linus' of git://git.kernel.org/pub/scm/linux/kernel/git/mst/vhost (2018-04-11 18:58:27 -0700)
+
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git tags/regmap-ktime-fix
+
+for you to fetch changes up to f15cd6d99198e9c15229aefec639a34a6e8174c6:
+
+  regmap: include <linux/ktime.h> from include/linux/regmap.h (2018-04-24 18:11:50 +0100)
+
+----------------------------------------------------------------
+regmap: Fix missing include of ktime.h
+
+Required for some dependencies.
+
+----------------------------------------------------------------
+Sean Wang (1):
+      regmap: include <linux/ktime.h> from include/linux/regmap.h
+
+ include/linux/regmap.h | 1 +
+ 1 file changed, 1 insertion(+)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/738b2a74/attachment.sig>
