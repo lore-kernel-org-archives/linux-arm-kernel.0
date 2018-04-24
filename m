@@ -1,75 +1,54 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Tue, 24 Apr 2018 13:47:01 +0900
-Subject: [PATCH 2/4] arm64: dts: uniphier: add clock-names and reset-names to
+Date: Tue, 24 Apr 2018 13:47:02 +0900
+Subject: [PATCH 3/4] ARM: dts: uniphier: add syscon-phy-mode property to each
  ethernet node
 In-Reply-To: <1524545223-5893-1-git-send-email-hayashi.kunihiko@socionext.com>
 References: <1524545223-5893-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1524545223-5893-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1524545223-5893-4-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock-names and reset-names because this node recognizes multiple
-clocks and resets.  ("ether", and so on, for each)
+Add syscon-phy-mode property specifying a phandle of system controller
+to each ethernet node.
 
-Suggested-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 ---
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 2 ++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 2 ++
- arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 4 ++++
- 3 files changed, 8 insertions(+)
+ arch/arm/boot/dts/uniphier-pro4.dtsi | 3 ++-
+ arch/arm/boot/dts/uniphier-pxs2.dtsi | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index e62bda1..540e012 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -549,7 +549,9 @@
- 			status = "disabled";
- 			reg = <0x65000000 0x8500>;
- 			interrupts = <0 66 4>;
-+			clock-names = "ether";
- 			clocks = <&sys_clk 6>;
-+			reset-names = "ether";
- 			resets = <&sys_rst 6>;
- 			phy-mode = "rmii";
- 			local-mac-address = [00 00 00 00 00 00];
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index 9efe20d..845b407 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -604,7 +604,9 @@
- 			interrupts = <0 66 4>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_ether_rgmii>;
-+			clock-names = "ether";
- 			clocks = <&sys_clk 6>;
-+			reset-names = "ether";
- 			resets = <&sys_rst 6>;
+diff --git a/arch/arm/boot/dts/uniphier-pro4.dtsi b/arch/arm/boot/dts/uniphier-pro4.dtsi
+index 392d7dd..49539f0 100644
+--- a/arch/arm/boot/dts/uniphier-pro4.dtsi
++++ b/arch/arm/boot/dts/uniphier-pro4.dtsi
+@@ -286,7 +286,7 @@
+ 			has-transaction-translator;
+ 		};
+ 
+-		soc-glue at 5f800000 {
++		soc_glue: soc-glue at 5f800000 {
+ 			compatible = "socionext,uniphier-pro4-soc-glue",
+ 				     "simple-mfd", "syscon";
+ 			reg = <0x5f800000 0x2000>;
+@@ -378,6 +378,7 @@
+ 			resets = <&sys_rst 12>, <&sys_rst 6>;
  			phy-mode = "rgmii";
  			local-mac-address = [00 00 00 00 00 00];
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
-index 7c8f710..4ff043e 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
-@@ -412,7 +412,9 @@
- 			interrupts = <0 66 4>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_ether_rgmii>;
-+			clock-names = "ether";
- 			clocks = <&sys_clk 6>;
-+			reset-names = "ether";
++			socionext,syscon-phy-mode = <&soc_glue 0>;
+ 
+ 			mdio: mdio {
+ 				#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+index a1839db..641d961 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
++++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+@@ -512,6 +512,7 @@
  			resets = <&sys_rst 6>;
  			phy-mode = "rgmii";
  			local-mac-address = [00 00 00 00 00 00];
-@@ -430,7 +432,9 @@
- 			interrupts = <0 67 4>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_ether1_rgmii>;
-+			clock-names = "ether";
- 			clocks = <&sys_clk 7>;
-+			reset-names = "ether";
- 			resets = <&sys_rst 7>;
- 			phy-mode = "rgmii";
- 			local-mac-address = [00 00 00 00 00 00];
++			socionext,syscon-phy-mode = <&soc_glue 0>;
+ 
+ 			mdio: mdio {
+ 				#address-cells = <1>;
 -- 
 2.7.4
