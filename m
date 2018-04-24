@@ -1,62 +1,83 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 24 Apr 2018 10:05:53 +0200
-Subject: [PATCH v3 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
- Edition support
-In-Reply-To: <20180424075505.p6e43yw2juw4fqqw@flea>
-References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
- <20180421164246.8477-3-miquel.raynal@bootlin.com>
- <20180423072403.4ip5seys4xyll3yr@flea>
- <20180423122752.364ee649@xps13>
- <20180424075505.p6e43yw2juw4fqqw@flea>
-Message-ID: <20180424100553.2e9e6151@xps13>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Apr 2018 09:08:33 +0100
+Subject: [PATCH v4 7/8] drm/i2c: tda998x: register as a drm bridge
+In-Reply-To: <5d6866d0-75bc-4de8-9b87-4fee5430e9dd@axentia.se>
+References: <20180423072301.11962-1-peda@axentia.se>
+ <20180423072301.11962-8-peda@axentia.se>
+ <20180423160833.GF16141@n2100.armlinux.org.uk>
+ <5d6866d0-75bc-4de8-9b87-4fee5430e9dd@axentia.se>
+Message-ID: <20180424080833.GJ16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Tue, 24 Apr 2018 09:55:05 +0200, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-
-> On Mon, Apr 23, 2018 at 12:27:52PM +0200, Miquel Raynal wrote:
-> > > >  	sun8i-r16-parrot.dtb \
-> > > >  	sun8i-r40-bananapi-m2-ultra.dtb \
-> > > >  	sun8i-v3s-licheepi-zero.dtb \
-> > > > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > index 6b9e85b4ba0f..44f3cad3de75 100644
-> > > > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > @@ -198,6 +198,8 @@
-> > > >  			clock-names = "ahb", "mod";
-> > > >  			resets = <&ccu RST_BUS_NAND>;
-> > > >  			reset-names = "ahb";
-> > > > +			pinctrl-names = "default";
-> > > > +			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;    
-> > > 
-> > > This should be in your first patch I guess?  
+On Tue, Apr 24, 2018 at 08:58:42AM +0200, Peter Rosin wrote:
+> On 2018-04-23 18:08, Russell King - ARM Linux wrote:
+> > On Mon, Apr 23, 2018 at 09:23:00AM +0200, Peter Rosin wrote:
+> >>  static int tda998x_remove(struct i2c_client *client)
+> >>  {
+> >> -	component_del(&client->dev, &tda998x_ops);
+> >> +	struct device *dev = &client->dev;
+> >> +	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
+> >> +
+> >> +	drm_bridge_remove(&bridge->bridge);
+> >> +	component_del(dev, &tda998x_ops);
+> >> +
 > > 
-> > Actually I think this should not be there but instead, because it is
-> > board-related, these two lines should be in the nes-classic.dts' nfc
-> > node, right? Other a23/a33/r16 based designs could use the second set
-> > of CS/RB pins.  
+> > I'd like to ask a rather fundamental question about DRM bridge support,
+> > because I suspect that there's a major fsckup here.
+> > 
+> > The above is the function that deals with the TDA998x device being
+> > unbound from the driver.  With the component API, this results in the
+> > DRM device correctly being torn down, because one of the hardware
+> > devices has gone.
+> > 
+> > With DRM bridge, the bridge is merely removed from the list of
+> > bridges:
+> > 
+> > void drm_bridge_remove(struct drm_bridge *bridge)
+> > {
+> >         mutex_lock(&bridge_lock);
+> >         list_del_init(&bridge->list);
+> >         mutex_unlock(&bridge_lock);
+> > }
+> > EXPORT_SYMBOL(drm_bridge_remove);
+> > 
+> > and the memory backing the "struct tda998x_bridge" (which contains
+> > the struct drm_bridge) will be freed by the devm subsystem.
+> > 
+> > However, there is no notification into the rest of the DRM subsystem
+> > that the device has gone away.  Worse, the memory that is still in
+> > use by DRM has now been freed, so further use of the DRM device
+> > results in a use-after-free bug.
+> > 
+> > This is really not good, and to me looks like a fundamental problem
+> > with the DRM bridge code.  I see nothing in the DRM bridge code that
+> > deals with the lifetime of a "DRM bridge" or indeed the lifetime of
+> > the actual device itself.
+> > 
+> > So, from what I can see, there seems to be a fundamental lifetime
+> > issue with the design of the DRM bridge code.  This needs to be
+> > fixed.
 > 
-> Does that ever happen?
-> 
-> On a theoretical level, then yeah, sure. But if all the boards seen
-> out there are using the same setup (which is pretty common), then
-> there's no reason not to do it in the DTSI.
+> Oh crap. A gigantic can of worms...
 
-Then I will add these two properties in the DTSI in the first patch.
+Yes, it's especially annoying for me, having put the effort in to
+the component helper to cover all these cases.
 
-Thanks,
-Miqu?l
+> Would a patch (completely untested btw) along this line of thinking make
+> any difference whatsoever?
 
-> 
-> Maxime
-> 
+It looks interesting - from what I can see of the device links code,
+it would have the effect of unbinding the DRM device just before
+TDA998x is unbound, so that's an improvement.
 
-
+However, from what I can see, the link vanishes at that point (as
+DL_FLAG_AUTOREMOVE is set), and re-binding the TDA998x device results
+in nothing further happening - the link will be recreated, but there
+appears to be nothing that triggers the "consumer" to rebind at that
+point.  Maybe I've missed something?
 
 -- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
