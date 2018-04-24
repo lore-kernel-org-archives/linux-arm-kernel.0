@@ -1,49 +1,32 @@
 From: christophe.roullier@st.com (Christophe Roullier)
-Date: Tue, 24 Apr 2018 17:01:59 +0200
-Subject: [PATCH 7/8] ARM: dts: stm32: add support of ethernet on
- stm32mp157c-ev1
+Date: Tue, 24 Apr 2018 17:01:58 +0200
+Subject: [PATCH  6/8] net: stmmac: add dwmac-4.20a compatible
 In-Reply-To: <1524582120-4451-1-git-send-email-christophe.roullier@st.com>
 References: <1524582120-4451-1-git-send-email-christophe.roullier@st.com>
-Message-ID: <1524582120-4451-8-git-send-email-christophe.roullier@st.com>
+Message-ID: <1524582120-4451-7-git-send-email-christophe.roullier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MAC is connected to a PHY in RGMII mode.
+Manage dwmac-4.20a version from synopsys
 
 Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
 ---
- arch/arm/boot/dts/stm32mp157c-ev1.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32mp157c-ev1.dts b/arch/arm/boot/dts/stm32mp157c-ev1.dts
-index 57e6dbc..a7fee5c 100644
---- a/arch/arm/boot/dts/stm32mp157c-ev1.dts
-+++ b/arch/arm/boot/dts/stm32mp157c-ev1.dts
-@@ -17,5 +17,25 @@
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index ebd3e5f..6d141f3 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -472,7 +472,8 @@ struct plat_stmmacenet_data *
+ 	}
  
- 	aliases {
- 		serial0 = &uart4;
-+		ethernet0 = &ethernet0;
-+	};
-+};
-+
-+&ethernet0 {
-+	status = "okay";
-+	pinctrl-0 = <&ethernet0_rgmii_pins_a>;
-+	pinctrl-1 = <&ethernet0_rgmii_pins_sleep_a>;
-+	pinctrl-names = "default", "sleep";
-+	phy-mode = "rgmii";
-+	max-speed = <1000>;
-+	phy-handle = <&phy0>;
-+
-+	mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "snps,dwmac-mdio";
-+		phy0: ethernet-phy at 0 {
-+			reg = <0>;
-+		};
- 	};
- };
+ 	if (of_device_is_compatible(np, "snps,dwmac-4.00") ||
+-	    of_device_is_compatible(np, "snps,dwmac-4.10a")) {
++	    of_device_is_compatible(np, "snps,dwmac-4.10a") ||
++	    of_device_is_compatible(np, "snps,dwmac-4.20a")) {
+ 		plat->has_gmac4 = 1;
+ 		plat->has_gmac = 0;
+ 		plat->pmt = 1;
 -- 
 1.9.1
