@@ -1,94 +1,70 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Apr 2018 10:41:37 +0200
-Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
- HMI
-In-Reply-To: <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
- <20180322180508.my64gobhh5rc2x2m@flea>
- <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
-Message-ID: <20180424084137.7xfwji2gcibxavvt@flea>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 24 Apr 2018 10:49:11 +0200
+Subject: [PATCH v3 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
+ Edition support
+In-Reply-To: <20180424075505.p6e43yw2juw4fqqw@flea>
+References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
+ <20180421164246.8477-3-miquel.raynal@bootlin.com>
+ <20180423072403.4ip5seys4xyll3yr@flea>
+ <20180423122752.364ee649@xps13>
+ <20180424075505.p6e43yw2juw4fqqw@flea>
+Message-ID: <20180424104911.42ae8864@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-On Mon, Apr 23, 2018 at 04:37:33PM +0200, Giulio Benetti wrote:
-> Il 22/03/2018 19:05, Maxime Ripard ha scritto:
-> > On Wed, Mar 21, 2018 at 09:03:13PM +0100, Giulio Benetti wrote:
-> > > The A20-Linova1-7 HMI, also called Q027_2_F which is printed on production
-> > > label, is an industrial Human Machine Interface.
-> > > It features:
-> > > - 512MB DDR RAM
-> > > - 1 Sd-card >= 4GB
-> > > - 1 Usb otg(programmable via software) with A-Usb Connector
-> > > - 1 Usb host
-> > > - 1 Buzzer
-> > > - 1 Input for LiPo
-> > > - 1 Relay to signal absence of power supply
-> > > - 1 External Rtc with 56 bytes of ram + CR2032 battery
-> > > - 1 7" 24-bits Tft 800x480 with PCap on
-> > > - 1 Mono audio 1-watt amplifier
-> > > - 1 RS485 port
-> > > - 1 Power On Line through +12Vdc reaching 57.600baud,
-> > >    from where it can be supplied and placed in a network of 50 units
-> > > - exposed jtag pins
+On Tue, 24 Apr 2018 09:55:05 +0200, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+
+> On Mon, Apr 23, 2018 at 12:27:52PM +0200, Miquel Raynal wrote:
+> > > >  	sun8i-r16-parrot.dtb \
+> > > >  	sun8i-r40-bananapi-m2-ultra.dtb \
+> > > >  	sun8i-v3s-licheepi-zero.dtb \
+> > > > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > > > index 6b9e85b4ba0f..44f3cad3de75 100644
+> > > > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > > > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > > > @@ -198,6 +198,8 @@
+> > > >  			clock-names = "ahb", "mod";
+> > > >  			resets = <&ccu RST_BUS_NAND>;
+> > > >  			reset-names = "ahb";
+> > > > +			pinctrl-names = "default";
+> > > > +			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;    
 > > > 
-> > > HMI is supplied from +12Vdc.
-> > > Ethernet is absent, so for debugging, need to enable rndis on Usb otg
-> > > port through an A-A usb cable.
-> > > It comes in different flavours for connector types and can be found with
-> > > umounted features as requested by customers.
+> > > This should be in your first patch I guess?  
 > > 
-> > So this is essentially the same board than in patch 6, but with a
-> > different screen?
-> > 
-> > You should have a single DT then, and handle the two different panels
-> > using DT overlays.
+> > Actually I think this should not be there but instead, because it is
+> > board-related, these two lines should be in the nes-classic.dts' nfc
+> > node, right? Other a23/a33/r16 based designs could use the second set
+> > of CS/RB pins.  
 > 
-> Ok for having different DT overlays.
-> But do I have to submit them as patches? Or keep them in my company's repo?
-> I ask you this because this involves sending also patches for displays
-> and other little modifications to mainline ex:
-> - rgb888 pins
-> - 2 simple-panels
-> - 1 uart iomux pins
-> etc.
+> Does that ever happen?
 > 
-> If I don't submit those overlays, the other patches wouldn't make sense
-> alone as I've seen, just like rgb888 pins.
+> On a theoretical level, then yeah, sure. But if all the boards seen
+> out there are using the same setup (which is pretty common), then
+> there's no reason not to do it in the DTSI.
 
-We don't have a repo for overlays yet
+I compared the various boards configurations [1] with the R16 datasheet
+[2], all the boards having a NAND configure all the related pins
+(including CS1 and RB1). So I guess I can put both properties in the
+DTSI.
 
-> > > +&usb_otg {
-> > > +	dr_mode = "otg";
-> > 
-> > You're saying that this is a USB-A connector? Then it's not OTG since
-> > it doesn't have an ID pin, this is an host.
+There is one case (sinlinx_sina33) where the NAND is not used and the
+pins are used for an alternate function: SPI0; but I guess this is not
+a problem as in this case, the NAND node would not exist in the
+resulting DTB.
+
+Regards,
+Miqu?l
+
 > 
-> Right, with a special overlay I will activate Usb Device for RNDIS,
-> so modified as host
-
-That doesn't really make much sense. The USB OTG is wired only using a
-daughter board?
+> Maxime
+> 
 
 
-> One last question:
-> now I have some patch already reviewed-by.
-> Do I have to re-submit entire patchset?
-
-Yes
-
-Maxime
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
+Miquel Raynal, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
 https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/3f76ff09/attachment.sig>
