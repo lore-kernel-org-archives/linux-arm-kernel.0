@@ -1,25 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Apr 2018 16:40:56 +0100
-Subject: [PATCH] arm64: export tishift functions to modules
-In-Reply-To: <CAHmME9oO_5X6M3NLe2tWp=ZY5EQY17GQ6BUomHLBscMejiXTvw@mail.gmail.com>
-References: <CAHmME9oO_5X6M3NLe2tWp=ZY5EQY17GQ6BUomHLBscMejiXTvw@mail.gmail.com>
-Message-ID: <20180424154055.GC25964@arm.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Tue, 24 Apr 2018 17:13:42 +0200
+Subject: [PATCH 6/6] arm: Allow to enable PCI_DOMAINS manually
+In-Reply-To: <cover.1524582822.git.jan.kiszka@siemens.com>
+References: <cover.1524582822.git.jan.kiszka@siemens.com>
+Message-ID: <4b97c00b9cd72f508aa27f0b58711d73de2cd397.1524582822.git.jan.kiszka@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 03:43:04PM +0200, Jason A. Donenfeld wrote:
-> On Tue, Apr 24, 2018 at 3:34 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > I've not run into any build issues here -- is this specifically with some
-> > out-of-tree module?
-> 
-> I received a bug report email about this. I'm not sure which specific
-> module, and I assumed from the email that it was actually a result of
-> in-tree configuration options rather than an out-of-tree module, but
-> I'm not sure exactly. Either way, I was able to reproduce the problem
-> by coding up a little PoC out-of-tree module, so it is certainly a
-> real problem.
+From: Jan Kiszka <jan.kiszka@siemens.com>
 
-Any chance you could share the module, please? I tried to write one but
-the compiler just inlines the __in128 arithmetic.
+Required when running over Jailhouse, and there is already a physical
+host controller that Jailhouse does not intercept and rather adds a
+virtual one. That is the case for the Tegra TK1, e.g.
 
-Will
+Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+---
+ arch/arm/Kconfig | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a7f8e7f4b88f..5f8190cb057d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1248,8 +1248,13 @@ config PCI
+ 	  VESA. If you have PCI, say Y, otherwise N.
+ 
+ config PCI_DOMAINS
+-	bool
++	bool "Support for multiple PCI domains"
+ 	depends on PCI
++	help
++	  Automatically enabled if the platform supports multiple PCI host
++	  controllers. Say Y if running over a hypervisor like Jailhouse that
++	  dynamically adds further host controllers while the system is
++	  running. Say N otherwise.
+ 
+ config PCI_DOMAINS_GENERIC
+ 	def_bool PCI_DOMAINS
+-- 
+2.13.6
