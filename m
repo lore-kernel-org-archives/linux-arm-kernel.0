@@ -1,37 +1,132 @@
-From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Tue, 24 Apr 2018 11:47:06 +0200
-Subject: [v2 resend 09/10] drm: mediatek: Omit warning on probe defers
-In-Reply-To: <cover.1524563001.git.mbrugger@suse.com>
-References: <cover.1524563001.git.mbrugger@suse.com>
-Message-ID: <a698a40ce7723200fd55d0d98daff5a28a7d0039.1524563001.git.mbrugger@suse.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 24 Apr 2018 12:50:43 +0300
+Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
+ to netdev dma client
+In-Reply-To: <20180424035548.GA6014@localhost>
+References: <20180411090854.GY6014@localhost>
+ <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+ <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
+ <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
+ <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
+ <78828d31-e4cd-5211-f1b6-8918ac38f599@ti.com>
+ <e5a6c1ad-e263-7b9d-a5e2-744884c9d6de@metafoo.de>
+ <a6ac9ca8-91b4-c7b1-0f0c-c04dd10048e2@ti.com>
+ <d7432292-cedd-7d61-f219-8b63eb6c1d50@metafoo.de>
+ <8c7a5ac8-0747-9dad-f6e5-74890b64f618@ti.com>
+ <20180424035548.GA6014@localhost>
+Message-ID: <ee1dc551-7c11-6d10-651d-01bf6520f049@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Brugger <mbrugger@suse.com>
+On 2018-04-24 06:55, Vinod Koul wrote:
+> On Thu, Apr 19, 2018 at 02:40:26PM +0300, Peter Ujfalusi wrote:
+>>
+>> On 2018-04-18 16:06, Lars-Peter Clausen wrote:
+>>>> Hrm, true, but it is hardly the metadata use case. It is more like
+>>>> different DMA transfer type.
+>>>
+>>> When I look at this with my astronaut architect view from high high up above
+>>> I do not see a difference between metadata and multi-planar data.
+>>
+>> I tend to disagree.
+> 
+> and we will love to hear more :)
 
-When probe through the MFD, it can happen that the
-clock drivers wasn't probed before the ddp driver gets
-invoked. The driver used to omit a warning that the driver
-failed to get the clocks. Omit this error on the defered probe path.
+It is getting pretty off topic from the subject ;) and I'm sorry about that.
 
-Signed-off-by: Matthias Brugger <mbrugger@suse.com>
----
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Multi-planar data is _data_, the metadata is
+parameters/commands/information on _how_ to use the data.
+It is more like a replacement or extension of:
+configure peripheral
+send data
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index bafc5c77c4fb..6b399348a2dc 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -374,7 +374,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
- 
- 	ddp->clk = devm_clk_get(dev, NULL);
- 	if (IS_ERR(ddp->clk)) {
--		dev_err(dev, "Failed to get clock\n");
-+		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
-+			dev_err(dev, "Failed to get clock\n");
- 		return PTR_ERR(ddp->clk);
- 	}
- 
--- 
-2.16.3
+to
+
+send data with configuration
+
+In both cases the same data is sent, but the configuration,
+parametrization is 'simplified' to allow per packet changes.
+
+>>> Both split the data that is sent to the peripheral into multiple
+>>> sub-streams, each carrying part of the data. I'm sure there are peripherals
+>>> that interleave data and metadata on the same data stream. Similar to how we
+>>> have left and right channel interleaved in a audio stream.
+>>
+>> Slimbus, S/PDIF?
+>>
+>>> What about metadata that is not contiguous and split into multiple segments.
+>>> How do you handle passing a sgl to the metadata interface? And then it
+>>> suddenly looks quite similar to the normal DMA descriptor interface.
+>>
+>> Well, the metadata is for the descriptor. The descriptor describe the
+>> data transfer _and_ can convey additional information. Nothing is
+>> interleaved, the data and the descriptor are different things. It is
+>> more like TCP headers detached from the data (but pointing to it).
+>>
+>>> But maybe that's just one abstraction level to high.
+>>
+>> I understand your point, but at the end the metadata needs to end up in
+>> the descriptor which is describing the data that is going to be moved.
+>>
+>> The descriptor is not sent as a separate DMA trasnfer, it is part of the
+>> DMA transfer, it is handled internally by the DMA.
+> 
+> That is bit confusing to me. I thought DMA was transparent to meta data and
+> would blindly collect and transfer along with the descriptor. So at high
+> level we are talking about two transfers (probably co-joined at hip and you
+> want to call one transfer)
+
+At the end yes, both the descriptor and the data is going to be sent to
+the other end.
+
+As a reference see [1]
+
+The metadata is not a separate entity, it is part of the descriptor
+(Host Packet Descriptor - HPD).
+Each transfer (packet) is described with a HPD. The HPD have optional
+fields, like EPIB (Extended Packet Info Block), PSdata (Protocol
+Specific data).
+
+When the DMA reads the HPD, is going to move the data described by the
+HPD to the entry point (or from the entry point to memory), copies the
+EPIB/PSdata from the HPD to a destination HPD. The other end will use
+the destination HPD to know the size of the data and to get the metadata
+from the descriptor.
+
+In essence every entity within the Multicore Navigator system have
+pktdma, they all work in a similar way, but their capabilities might
+differ. Our entry to this mesh is via the DMA.
+
+> but why can't we visualize this as just a DMA
+> transfers. maybe you want to signal/attach to transfer, cant we do that with
+> additional flag DMA_METADATA etc..?
+
+For the data we need to call dmaengine_prep_slave_* to create the
+descriptor (HPD). The metadata needs to be present in the HPD, hence I
+was thinking of the attach_metadata as per descriptor API.
+
+If separate dmaengine_prep_slave_* is used for allocating the HPD and
+place the metadata in it then the consequent dmaengine_prep_slave_* call
+must be for the data of the transfer and it is still unclear how the
+prepare call would have any idea where to look for the HPD it needs to
+update with the parameters for the data transfer.
+
+I guess the driver could store the HPD pointer in the channel data if
+the prepare is called with DMA_METADATA and it would be mandatory that
+the next prepare is for the data portion. The driver would pick the
+pointer to the HPD we stored away and update the descriptor belonging to
+different tx_desc.
+
+But if we are here, we could have a flag like DMA_DESCRIPTOR and let
+client drivers to allocate the whole descriptor, fill in the metadata
+and give that to the DMA driver, which will update the rest of the HPD.
+
+Well, let's see where this is going to go when I can send the patches
+for review.
+
+[1] http://www.ti.com/lit/ug/sprugr9h/sprugr9h.pdf
+
+- P?ter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
