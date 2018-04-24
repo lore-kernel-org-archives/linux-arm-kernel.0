@@ -1,74 +1,37 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 24 Apr 2018 11:16:55 +0200
-Subject: [PATCH v3 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
- Edition support
-In-Reply-To: <20180424104911.42ae8864@xps13>
-References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
- <20180421164246.8477-3-miquel.raynal@bootlin.com>
- <20180423072403.4ip5seys4xyll3yr@flea>
- <20180423122752.364ee649@xps13>
- <20180424075505.p6e43yw2juw4fqqw@flea>
- <20180424104911.42ae8864@xps13>
-Message-ID: <20180424111655.52065c5b@xps13>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 24 Apr 2018 14:47:05 +0530
+Subject: [PATCH 0/3] cpufreq: dt: Allow platforms to provide
+ suspend/resume hooks
+In-Reply-To: <20180424110825.50436168@xps13>
+References: <cover.1524549644.git.viresh.kumar@linaro.org>
+ <20180424110825.50436168@xps13>
+Message-ID: <20180424091705.ar6vzzuljjz44qp5@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 24-04-18, 11:08, Miquel Raynal wrote:
+> I tested on an EspressoBin (Armada 3720), it works.
 
-On Tue, 24 Apr 2018 10:49:11 +0200, Miquel Raynal
-<miquel.raynal@bootlin.com> wrote:
+Great.
 
-> Hi Maxime,
-> 
-> On Tue, 24 Apr 2018 09:55:05 +0200, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> 
-> > On Mon, Apr 23, 2018 at 12:27:52PM +0200, Miquel Raynal wrote:  
-> > > > >  	sun8i-r16-parrot.dtb \
-> > > > >  	sun8i-r40-bananapi-m2-ultra.dtb \
-> > > > >  	sun8i-v3s-licheepi-zero.dtb \
-> > > > > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > > index 6b9e85b4ba0f..44f3cad3de75 100644
-> > > > > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > > > > @@ -198,6 +198,8 @@
-> > > > >  			clock-names = "ahb", "mod";
-> > > > >  			resets = <&ccu RST_BUS_NAND>;
-> > > > >  			reset-names = "ahb";
-> > > > > +			pinctrl-names = "default";
-> > > > > +			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;      
-> > > > 
-> > > > This should be in your first patch I guess?    
-> > > 
-> > > Actually I think this should not be there but instead, because it is
-> > > board-related, these two lines should be in the nes-classic.dts' nfc
-> > > node, right? Other a23/a33/r16 based designs could use the second set
-> > > of CS/RB pins.    
-> > 
-> > Does that ever happen?
-> > 
-> > On a theoretical level, then yeah, sure. But if all the boards seen
-> > out there are using the same setup (which is pretty common), then
-> > there's no reason not to do it in the DTSI.  
-> 
-> I compared the various boards configurations [1] with the R16 datasheet
-> [2], all the boards having a NAND configure all the related pins
-> (including CS1 and RB1). So I guess I can put both properties in the
-> DTSI.
+> However, I first had a panic due to the clock being 'put' twice. I
+> suggest you to merge this [1] into the second patch. With this (or
+> something similar):
 
-I forgot to add:
-[1] https://github.com/linux-sunxi/sunxi-boards/tree/master/sys_config/a33
-[2] http://linux-sunxi.org/images/b/b3/R16_Datasheet_V1.4_%281%29.pdf
+NULL is a valid clock. I have fixed it now, a bit differently though.
 
-Sorry for the spam :)
+> Tested-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-Miqu?l
+Thanks.
 
-> 
-> There is one case (sinlinx_sina33) where the NAND is not used and the
-> pins are used for an alternate function: SPI0; but I guess this is not
-> a problem as in this case, the NAND node would not exist in the
-> resulting DTB.
-> 
-> Regards,
-> Miqu?l
-> 
+> And the path error was reached because I did not select the cpufreq-dt
+> driver in menuconfig, which I think should be selected by default when
+> enabling the armada37xx-cpufreq driver. I wrote a small patch for
+> that too, see [2]. Tell me if you want me to send it of if you want to
+> include it in the next version ?
+
+Maybe just send that separately (and you don't need to resend any of
+the patches which are part of this series).
+
+-- 
+viresh
