@@ -1,344 +1,117 @@
-From: k.marinushkin@gmail.com (Kirill Marinushkin)
-Date: Tue, 24 Apr 2018 20:27:06 +0200
-Subject: [RESEND PATCH] staging: bcm2835-audio: Disconnect and free
- vchi_instance on module_exit()
-In-Reply-To: <20180424074459.7215-1-k.marinushkin@gmail.com>
-References: <20180424071618.GB17825@kroah.com>
- <20180424074459.7215-1-k.marinushkin@gmail.com>
-Message-ID: <9e4fc4a0-370b-9101-2809-4040de58553c@gmail.com>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Tue, 24 Apr 2018 21:25:44 +0300
+Subject: [PATCH v4 7/8] drm/i2c: tda998x: register as a drm bridge
+In-Reply-To: <20180424170625.GL16141@n2100.armlinux.org.uk>
+References: <20180423072301.11962-1-peda@axentia.se>
+ <20180423072301.11962-8-peda@axentia.se>
+ <20180423160833.GF16141@n2100.armlinux.org.uk>
+ <5d6866d0-75bc-4de8-9b87-4fee5430e9dd@axentia.se>
+ <20180424080833.GJ16141@n2100.armlinux.org.uk>
+ <8448e90a-4562-b564-c160-1b5c67e0f92f@axentia.se>
+ <0cbee3bd-8987-5f2f-519d-f8d1b426f2a3@ti.com>
+ <20180424170625.GL16141@n2100.armlinux.org.uk>
+Message-ID: <b7a7ffb6-b282-cbc5-435e-9ca1cd405e33@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-@Greg
+On 24/04/18 20:06, Russell King - ARM Linux wrote:
+> On Tue, Apr 24, 2018 at 07:04:16PM +0300, Jyri Sarha wrote:
+>> On 24/04/18 13:14, Peter Rosin wrote:
+>>> On 2018-04-24 10:08, Russell King - ARM Linux wrote:
+>>>> On Tue, Apr 24, 2018 at 08:58:42AM +0200, Peter Rosin wrote:
+>>>>> On 2018-04-23 18:08, Russell King - ARM Linux wrote:
+>>>>>> On Mon, Apr 23, 2018 at 09:23:00AM +0200, Peter Rosin wrote:
+>>>>>>>  static int tda998x_remove(struct i2c_client *client)
+>>>>>>>  {
+>>>>>>> -	component_del(&client->dev, &tda998x_ops);
+>>>>>>> +	struct device *dev = &client->dev;
+>>>>>>> +	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
+>>>>>>> +
+>>>>>>> +	drm_bridge_remove(&bridge->bridge);
+>>>>>>> +	component_del(dev, &tda998x_ops);
+>>>>>>> +
+>>>>>>
+>>>>>> I'd like to ask a rather fundamental question about DRM bridge support,
+>>>>>> because I suspect that there's a major fsckup here.
+>>>>>>
+>>>>>> The above is the function that deals with the TDA998x device being
+>>>>>> unbound from the driver.  With the component API, this results in the
+>>>>>> DRM device correctly being torn down, because one of the hardware
+>>>>>> devices has gone.
+>>>>>>
+>>>>>> With DRM bridge, the bridge is merely removed from the list of
+>>>>>> bridges:
+>>>>>>
+>>>>>> void drm_bridge_remove(struct drm_bridge *bridge)
+>>>>>> {
+>>>>>>         mutex_lock(&bridge_lock);
+>>>>>>         list_del_init(&bridge->list);
+>>>>>>         mutex_unlock(&bridge_lock);
+>>>>>> }
+>>>>>> EXPORT_SYMBOL(drm_bridge_remove);
+>>>>>>
+>>>>>> and the memory backing the "struct tda998x_bridge" (which contains
+>>>>>> the struct drm_bridge) will be freed by the devm subsystem.
+>>>>>>
+>>>>>> However, there is no notification into the rest of the DRM subsystem
+>>>>>> that the device has gone away.  Worse, the memory that is still in
+>>>>>> use by DRM has now been freed, so further use of the DRM device
+>>>>>> results in a use-after-free bug.
+>>>>>>
+>>>>>> This is really not good, and to me looks like a fundamental problem
+>>>>>> with the DRM bridge code.  I see nothing in the DRM bridge code that
+>>>>>> deals with the lifetime of a "DRM bridge" or indeed the lifetime of
+>>>>>> the actual device itself.
+>>>>>>
+>>>>>> So, from what I can see, there seems to be a fundamental lifetime
+>>>>>> issue with the design of the DRM bridge code.  This needs to be
+>>>>>> fixed.
+>>>>>
+>>>>> Oh crap. A gigantic can of worms...
+>>>>
+>>>> Yes, it's especially annoying for me, having put the effort in to
+>>>> the component helper to cover all these cases.
+>>>>
+>>>>> Would a patch (completely untested btw) along this line of thinking make
+>>>>> any difference whatsoever?
+>>>>
+>>>> It looks interesting - from what I can see of the device links code,
+>>>> it would have the effect of unbinding the DRM device just before
+>>>> TDA998x is unbound, so that's an improvement.
+>>>>
+>>>> However, from what I can see, the link vanishes at that point (as
+>>>> DL_FLAG_AUTOREMOVE is set), and re-binding the TDA998x device results
+>>>> in nothing further happening - the link will be recreated, but there
+>>>> appears to be nothing that triggers the "consumer" to rebind at that
+>>>> point.  Maybe I've missed something?
+>>>
+>>> Right, auto-remove is a no-go. So, improving on the previous...
+>>>
+>>> (I think drm_panel might suffer from this issue too?)
+>>
+>> Yes it does and I took a shot at trying to fix it at the end of the
+>> previous merge window, but gave up as I run out of time. I re-spun the
+>> work now after reading this thread. I add you and Russell to cc.
+> 
+> Right, and these exact problems are what the component helper is
+> there to sort out, in a subsystem independent way.
+> 
+> What is the problem with the component helper that people seem to
+> be soo loathed to use it, instead preferring to come up with sub-
+> standard and broken alternatives?
+> 
 
-> I have no idea as the patch is long gone from my queue now. If you
-> think all is fine, please resend it and I will be glad to review it
-> again.
+Nothing but time. Embedding component helpers seamlessly into drm
+framework does not sound like a couple of days job. Right now I simply
+do not have time to take on a challenge like that. If someone does it I
+am all for it.
 
-Stefan, Dan and Andy explained me, what caused the compiler warning in my patch,
-and why I couldn't reproduce it. I will fix the root cause, and send the patch v2.
+However, I would not call device links substandard. They are in the
+device core after all.
 
+Best regards,
+Jyri
 
-@Stefan
-
-> this is an old toolchain. You can download newer ones here (even for i686):
->
-https://releases.linaro.org/components/toolchain/binaries/7.2-2017.11/arm-linux-gnueabihf/
-
-
-Thank you for the hint. Looks like I will be able to catch this compiler warning
-with the newer toolchain.
-
-
-@Dan
-
-> kbuild is complaining that "err" is uninitialized here but for some
-> reason the line numbers are off. It's a real bug.
-
-Thank you for the review. Yes, indeed, this is not correct. I will fix it.
-
-
-@Andy
-
-> AFAIR I gave you a tag and you again missed it.
-> Before sending anything just check twice if all prerequisites are fulfilled.
-
-I think you mix it up. This is a new patch, you didn't review it before.
-
-
-> And yes, kbuild bot is right. You need to return known value.
-
-Yes, that's right. I will fix it.
-
-
-Best Regards,
-Kirill
-
-
-On 04/24/18 09:44, Kirill Marinushkin wrote:
-> In the current implementation, vchi_instance is inited during the first
-> call of bcm2835_audio_open_connection(), and is never freed. It causes a
-> memory leak when the module `snd_bcm2835` is removed.
->
-> Here is how this commit fixes it:
->
-> * the VCHI context (including vchi_instance) is created once in the
->   platform's devres
-> * the VCHI context is allocated and connected once during module_init()
-> * all created bcm2835_chips have a pointer to this VCHI context
-> * bcm2835_audio_open_connection() can access the VCHI context through the
->   associated bcm2835_chip
-> * the VCHI context is disconnected and freed once during module_exit()
->
-> After this commit is applied, I don't see other issues with the module's
-> init/exit, so I also remove the associated TODO task.
->
-> Steps to reproduce the memory leak before this commit:
->
-> ~~~~
-> root at raspberrypi:/home/pi# aplay test0.wav
-> Playing WAVE 'test0.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Ster
-> ^CAborted by signal Interrupt...
-> root at raspberrypi:/home/pi# rmmod snd_bcm2835
-> root at raspberrypi:/home/pi# modprobe snd_bcm2835
-> root at raspberrypi:/home/pi# aplay test0.wav
-> Playing WAVE 'test0.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Ster
-> ^CAborted by signal Interrupt...
-> root at raspberrypi:/home/pi# echo scan > /sys/kernel/debug/kmemleak
-> root at raspberrypi:/home/pi# cat /sys/kernel/debug/kmemleak
-> unreferenced object 0xb6794c00 (size 128):
->   comm "aplay", pid 406, jiffies 36870 (age 116.650s)
->   hex dump (first 32 bytes):
->     08 a5 82 81 01 00 00 00 08 4c 79 b6 08 4c 79 b6  .........Ly..Ly.
->     00 00 00 00 00 00 00 00 ad 4e ad de ff ff ff ff  .........N......
->   backtrace:
->     [<802af5e0>] kmem_cache_alloc_trace+0x294/0x3d0
->     [<806ce620>] vchiq_initialise+0x98/0x1b0
->     [<806d0b34>] vchi_initialise+0x24/0x34
->     [<7f1311ec>] 0x7f1311ec
->     [<7f1303bc>] 0x7f1303bc
->     [<7f130590>] 0x7f130590
->     [<7f111fd8>] snd_pcm_open_substream+0x68/0xc4 [snd_pcm]
->     [<7f112108>] snd_pcm_open+0xd4/0x248 [snd_pcm]
->     [<7f112334>] snd_pcm_playback_open+0x4c/0x6c [snd_pcm]
->     [<7f0e250c>] snd_open+0xa8/0x14c [snd]
->     [<802ce590>] chrdev_open+0xac/0x188
->     [<802c57b4>] do_dentry_open+0x10c/0x314
->     [<802c6ba8>] vfs_open+0x5c/0x88
->     [<802d9a68>] path_openat+0x368/0x944
->     [<802dacd4>] do_filp_open+0x70/0xc4
->     [<802c6f70>] do_sys_open+0x110/0x1d4
-> ~~~~
->
-> Signed-off-by: Kirill Marinushkin <k.marinushkin@gmail.com>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Scott Branden <sbranden@broadcom.com>
-> Cc: Andy Shevchenko <andy.shevchenko@gmail.com>
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Cc: linux-rpi-kernel at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devel at driverdev.osuosl.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  .../vc04_services/bcm2835-audio/bcm2835-vchiq.c    | 64 +++++++++++++---------
->  .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 43 ++++++++++++++-
->  .../staging/vc04_services/bcm2835-audio/bcm2835.h  | 12 ++++
->  3 files changed, 91 insertions(+), 28 deletions(-)
->
-> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
-> index 3c6f1d91d22d..389a18f9350a 100644
-> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
-> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
-> @@ -33,7 +33,6 @@
->  
->  /* ---- Include Files -------------------------------------------------------- */
->  
-> -#include "interface/vchi/vchi.h"
->  #include "vc_vchi_audioserv_defs.h"
->  
->  /* ---- Private Constants and Types ------------------------------------------ */
-> @@ -371,14 +370,46 @@ static int vc_vchi_audio_deinit(struct bcm2835_audio_instance *instance)
->  	return 0;
->  }
->  
-> +int bcm2835_new_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx)
-> +{
-> +	int ret;
-> +
-> +	/* Initialize and create a VCHI connection */
-> +	ret = vchi_initialise(&vchi_ctx->vchi_instance);
-> +	if (ret) {
-> +		LOG_ERR("%s: failed to initialise VCHI instance (ret=%d)\n",
-> +			__func__, ret);
-> +
-> +		return -EIO;
-> +	}
-> +
-> +	ret = vchi_connect(NULL, 0, vchi_ctx->vchi_instance);
-> +	if (ret) {
-> +		LOG_ERR("%s: failed to connect VCHI instance (ret=%d)\n",
-> +			__func__, ret);
-> +
-> +		kfree(vchi_ctx->vchi_instance);
-> +		vchi_ctx->vchi_instance = NULL;
-> +
-> +		return -EIO;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +void bcm2835_free_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx)
-> +{
-> +	/* Close the VCHI connection - it will also free vchi_instance */
-> +	WARN_ON(vchi_disconnect(vchi_ctx->vchi_instance));
-> +
-> +	vchi_ctx->vchi_instance = NULL;
-> +}
-> +
->  static int bcm2835_audio_open_connection(struct bcm2835_alsa_stream *alsa_stream)
->  {
-> -	static VCHI_INSTANCE_T vchi_instance;
-> -	static VCHI_CONNECTION_T *vchi_connection;
-> -	static int initted;
->  	struct bcm2835_audio_instance *instance =
->  		(struct bcm2835_audio_instance *)alsa_stream->instance;
-> -	int ret;
-> +	struct bcm2835_vchi_ctx *vhci_ctx = alsa_stream->chip->vchi_ctx;
->  
->  	LOG_INFO("%s: start\n", __func__);
->  	BUG_ON(instance);
-> @@ -390,28 +421,9 @@ static int bcm2835_audio_open_connection(struct bcm2835_alsa_stream *alsa_stream
->  		return 0;
->  	}
->  
-> -	/* Initialize and create a VCHI connection */
-> -	if (!initted) {
-> -		ret = vchi_initialise(&vchi_instance);
-> -		if (ret) {
-> -			LOG_ERR("%s: failed to initialise VCHI instance (ret=%d)\n",
-> -				__func__, ret);
-> -
-> -			return -EIO;
-> -		}
-> -		ret = vchi_connect(NULL, 0, vchi_instance);
-> -		if (ret) {
-> -			LOG_ERR("%s: failed to connect VCHI instance (ret=%d)\n",
-> -				__func__, ret);
-> -
-> -			kfree(vchi_instance);
-> -			return -EIO;
-> -		}
-> -		initted = 1;
-> -	}
-> -
->  	/* Initialize an instance of the audio service */
-> -	instance = vc_vchi_audio_init(vchi_instance, &vchi_connection, 1);
-> +	instance = vc_vchi_audio_init(vhci_ctx->vchi_instance,
-> +				      &vhci_ctx->vchi_connection, 1);
->  
->  	if (IS_ERR(instance)) {
->  		LOG_ERR("%s: failed to initialize audio service\n", __func__);
-> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-> index 9030d71a3d0b..009c972d93d6 100644
-> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-> @@ -65,6 +65,36 @@ static int snd_devm_add_child(struct device *dev, struct device *child)
->  	return 0;
->  }
->  
-> +static void bcm2835_devm_free_vchi_ctx(struct device *dev, void *res)
-> +{
-> +	struct bcm2835_vchi_ctx *vchi_ctx = res;
-> +
-> +	bcm2835_free_vchi_ctx(vchi_ctx);
-> +}
-> +
-> +static int bcm2835_devm_add_vchi_ctx(struct device *dev)
-> +{
-> +	struct bcm2835_vchi_ctx *vchi_ctx;
-> +	int ret;
-> +
-> +	vchi_ctx = devres_alloc(bcm2835_devm_free_vchi_ctx, sizeof(*vchi_ctx),
-> +				GFP_KERNEL);
-> +	if (!vchi_ctx)
-> +		return -ENOMEM;
-> +
-> +	memset(vchi_ctx, 0, sizeof(*vchi_ctx));
-> +
-> +	ret = bcm2835_new_vchi_ctx(vchi_ctx);
-> +	if (ret) {
-> +		devres_free(vchi_ctx);
-> +		return ret;
-> +	}
-> +
-> +	devres_add(dev, vchi_ctx);
-> +
-> +	return 0;
-> +}
-> +
->  static void snd_bcm2835_release(struct device *dev)
->  {
->  	struct bcm2835_chip *chip = dev_get_drvdata(dev);
-> @@ -106,8 +136,6 @@ static int snd_bcm2835_dev_free(struct snd_device *device)
->  	struct bcm2835_chip *chip = device->device_data;
->  	struct snd_card *card = chip->card;
->  
-> -	/* TODO: free pcm, ctl */
-> -
->  	snd_device_free(card, chip);
->  
->  	return 0;
-> @@ -133,6 +161,13 @@ static int snd_bcm2835_create(struct snd_card *card,
->  
->  	chip->card = card;
->  
-> +	chip->vchi_ctx = devres_find(card->dev->parent,
-> +				     bcm2835_devm_free_vchi_ctx, NULL, NULL);
-> +	if (!chip->vchi_ctx) {
-> +		kfree(chip);
-> +		return err;
-> +	}
-> +
->  	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
->  	if (err) {
->  		kfree(chip);
-> @@ -403,6 +438,10 @@ static int snd_bcm2835_alsa_probe_dt(struct platform_device *pdev)
->  			 numchans);
->  	}
->  
-> +	err = bcm2835_devm_add_vchi_ctx(dev);
-> +	if (err)
-> +		return err;
-> +
->  	err = snd_add_child_devices(dev, numchans);
->  	if (err)
->  		return err;
-> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
-> index f1e43e45fd67..1c82c2ee47dc 100644
-> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
-> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
-> @@ -26,6 +26,8 @@
->  #include <sound/pcm-indirect.h>
->  #include <linux/workqueue.h>
->  
-> +#include "interface/vchi/vchi.h"
-> +
->  /*
->   * #define AUDIO_DEBUG_ENABLE
->   * #define AUDIO_VERBOSE_DEBUG_ENABLE
-> @@ -97,6 +99,11 @@ enum snd_bcm2835_ctrl {
->  	PCM_PLAYBACK_DEVICE,
->  };
->  
-> +struct bcm2835_vchi_ctx {
-> +	VCHI_INSTANCE_T vchi_instance;
-> +	VCHI_CONNECTION_T *vchi_connection;
-> +};
-> +
->  /* definition of the chip-specific record */
->  struct bcm2835_chip {
->  	struct snd_card *card;
-> @@ -115,6 +122,8 @@ struct bcm2835_chip {
->  	unsigned int opened;
->  	unsigned int spdif_status;
->  	struct mutex audio_mutex;
-> +
-> +	struct bcm2835_vchi_ctx *vchi_ctx;
->  };
->  
->  struct bcm2835_alsa_stream {
-> @@ -153,6 +162,9 @@ int snd_bcm2835_new_simple_pcm(struct bcm2835_chip *chip,
->  int snd_bcm2835_new_hdmi_ctl(struct bcm2835_chip *chip);
->  int snd_bcm2835_new_headphones_ctl(struct bcm2835_chip *chip);
->  
-> +int bcm2835_new_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx);
-> +void bcm2835_free_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx);
-> +
->  int bcm2835_audio_open(struct bcm2835_alsa_stream *alsa_stream);
->  int bcm2835_audio_close(struct bcm2835_alsa_stream *alsa_stream);
->  int bcm2835_audio_set_params(struct bcm2835_alsa_stream *alsa_stream,
+-- 
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
