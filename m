@@ -1,65 +1,181 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 24 Apr 2018 09:25:49 +0530
-Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
- to netdev dma client
-In-Reply-To: <8c7a5ac8-0747-9dad-f6e5-74890b64f618@ti.com>
-References: <20180411090854.GY6014@localhost>
- <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
- <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
- <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
- <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
- <78828d31-e4cd-5211-f1b6-8918ac38f599@ti.com>
- <e5a6c1ad-e263-7b9d-a5e2-744884c9d6de@metafoo.de>
- <a6ac9ca8-91b4-c7b1-0f0c-c04dd10048e2@ti.com>
- <d7432292-cedd-7d61-f219-8b63eb6c1d50@metafoo.de>
- <8c7a5ac8-0747-9dad-f6e5-74890b64f618@ti.com>
-Message-ID: <20180424035548.GA6014@localhost>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 24 Apr 2018 13:08:37 +0900
+Subject: [PATCH 6/6] devfreq: rk3399_dmc: register devfreq notification
+ to dmc driver.
+In-Reply-To: <20180419104019.24406-7-enric.balletbo@collabora.com>
+References: <20180419104019.24406-1-enric.balletbo@collabora.com>
+ <CGME20180419104130epcas2p4c40667908eb5aecbc80d7c19e4710065@epcas2p4.samsung.com>
+ <20180419104019.24406-7-enric.balletbo@collabora.com>
+Message-ID: <5ADEADC5.8000201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 02:40:26PM +0300, Peter Ujfalusi wrote:
-> 
-> On 2018-04-18 16:06, Lars-Peter Clausen wrote:
-> >> Hrm, true, but it is hardly the metadata use case. It is more like
-> >> different DMA transfer type.
-> > 
-> > When I look at this with my astronaut architect view from high high up above
-> > I do not see a difference between metadata and multi-planar data.
-> 
-> I tend to disagree.
+Hi,
 
-and we will love to hear more :)
+On 2018? 04? 19? 19:40, Enric Balletbo i Serra wrote:
+> From: Lin Huang <hl@rock-chips.com>
+> 
+> Because dmc may also access the PMU_BUS_IDLE_REQ register, we need to
+> ensure that the pd driver and the dmc driver will not access at this
+> register at the same time.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
+> 
+>  drivers/devfreq/rk3399_dmc.c      | 47 +----------------------
+>  drivers/soc/rockchip/pm_domains.c | 31 +++++++++++++++
+>  include/soc/rockchip/rk3399_dmc.h | 63 +++++++++++++++++++++++++++++++
+>  3 files changed, 96 insertions(+), 45 deletions(-)
+>  create mode 100644 include/soc/rockchip/rk3399_dmc.h
+> 
+> diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
+> index 5bfca028eaaf..a1f320634d69 100644
+> --- a/drivers/devfreq/rk3399_dmc.c
+> +++ b/drivers/devfreq/rk3399_dmc.c
+> @@ -27,51 +27,7 @@
+>  #include <linux/suspend.h>
+>  
+>  #include <soc/rockchip/rockchip_sip.h>
+> -
+> -struct dram_timing {
+> -	unsigned int ddr3_speed_bin;
+> -	unsigned int pd_idle;
+> -	unsigned int sr_idle;
+> -	unsigned int sr_mc_gate_idle;
+> -	unsigned int srpd_lite_idle;
+> -	unsigned int standby_idle;
+> -	unsigned int auto_pd_dis_freq;
+> -	unsigned int dram_dll_dis_freq;
+> -	unsigned int phy_dll_dis_freq;
+> -	unsigned int ddr3_odt_dis_freq;
+> -	unsigned int ddr3_drv;
+> -	unsigned int ddr3_odt;
+> -	unsigned int phy_ddr3_ca_drv;
+> -	unsigned int phy_ddr3_dq_drv;
+> -	unsigned int phy_ddr3_odt;
+> -	unsigned int lpddr3_odt_dis_freq;
+> -	unsigned int lpddr3_drv;
+> -	unsigned int lpddr3_odt;
+> -	unsigned int phy_lpddr3_ca_drv;
+> -	unsigned int phy_lpddr3_dq_drv;
+> -	unsigned int phy_lpddr3_odt;
+> -	unsigned int lpddr4_odt_dis_freq;
+> -	unsigned int lpddr4_drv;
+> -	unsigned int lpddr4_dq_odt;
+> -	unsigned int lpddr4_ca_odt;
+> -	unsigned int phy_lpddr4_ca_drv;
+> -	unsigned int phy_lpddr4_ck_cs_drv;
+> -	unsigned int phy_lpddr4_dq_drv;
+> -	unsigned int phy_lpddr4_odt;
+> -};
+> -
+> -struct rk3399_dmcfreq {
+> -	struct device *dev;
+> -	struct devfreq *devfreq;
+> -	struct devfreq_simple_ondemand_data ondemand_data;
+> -	struct clk *dmc_clk;
+> -	struct devfreq_event_dev *edev;
+> -	struct mutex lock;
+> -	struct dram_timing timing;
+> -	struct regulator *vdd_center;
+> -	unsigned long rate, target_rate;
+> -	unsigned long volt, target_volt;
+> -};
+> +#include <soc/rockchip/rk3399_dmc.h>
+>  
+>  static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
+>  				 u32 flags)
+> @@ -394,6 +350,7 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
+>  
+>  	data->dev = dev;
+>  	platform_set_drvdata(pdev, data);
+> +	pd_register_notify_to_dmc(data->devfreq);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+> index 53efc386b1ad..7acc836e7eb7 100644
+> --- a/drivers/soc/rockchip/pm_domains.c
+> +++ b/drivers/soc/rockchip/pm_domains.c
+> @@ -8,6 +8,7 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/devfreq.h>
+>  #include <linux/io.h>
+>  #include <linux/iopoll.h>
+>  #include <linux/err.h>
+> @@ -76,9 +77,13 @@ struct rockchip_pmu {
+>  	const struct rockchip_pmu_info *info;
+>  	struct mutex mutex; /* mutex lock for pmu */
+>  	struct genpd_onecell_data genpd_data;
+> +	struct devfreq *devfreq;
+> +	struct notifier_block dmc_nb;
+>  	struct generic_pm_domain *domains[];
+>  };
+>  
+> +static struct rockchip_pmu *dmc_pmu;
+> +
+>  #define to_rockchip_pd(gpd) container_of(gpd, struct rockchip_pm_domain, genpd)
+>  
+>  #define DOMAIN(pwr, status, req, idle, ack, wakeup)	\
+> @@ -601,6 +606,30 @@ static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
+>  	return error;
+>  }
+>  
+> +static int dmc_notify(struct notifier_block *nb, unsigned long event,
+> +		      void *data)
+> +{
+> +	if (event == DEVFREQ_PRECHANGE)
+> +		mutex_lock(&dmc_pmu->mutex);
+> +	else if (event == DEVFREQ_POSTCHANGE)
+> +		mutex_unlock(&dmc_pmu->mutex);
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +int pd_register_notify_to_dmc(struct devfreq *devfreq)
+> +{
+> +	if (!dmc_pmu)
+> +		return -EPROBE_DEFER;
+> +
+> +	dmc_pmu->devfreq = devfreq;
+> +	dmc_pmu->dmc_nb.notifier_call = dmc_notify;
+> +	devfreq_register_notifier(dmc_pmu->devfreq, &dmc_pmu->dmc_nb,
+> +				  DEVFREQ_TRANSITION_NOTIFIER);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(pd_register_notify_to_dmc);
 
-> > Both split the data that is sent to the peripheral into multiple
-> > sub-streams, each carrying part of the data. I'm sure there are peripherals
-> > that interleave data and metadata on the same data stream. Similar to how we
-> > have left and right channel interleaved in a audio stream.
-> 
-> Slimbus, S/PDIF?
-> 
-> > What about metadata that is not contiguous and split into multiple segments.
-> > How do you handle passing a sgl to the metadata interface? And then it
-> > suddenly looks quite similar to the normal DMA descriptor interface.
-> 
-> Well, the metadata is for the descriptor. The descriptor describe the
-> data transfer _and_ can convey additional information. Nothing is
-> interleaved, the data and the descriptor are different things. It is
-> more like TCP headers detached from the data (but pointing to it).
-> 
-> > But maybe that's just one abstraction level to high.
-> 
-> I understand your point, but at the end the metadata needs to end up in
-> the descriptor which is describing the data that is going to be moved.
-> 
-> The descriptor is not sent as a separate DMA trasnfer, it is part of the
-> DMA transfer, it is handled internally by the DMA.
+I think that it is not proper to define the nonstandard function
+for only specific device driver. Maybe, It makes the code more complicated.
+Between linux kernel frameworks, we have to use the defined function
+by linux kernel frameworks.
 
-That is bit confusing to me. I thought DMA was transparent to meta data and
-would blindly collect and transfer along with the descriptor. So at high
-level we are talking about two transfers (probably co-joined at hip and you
-want to call one transfer) but why can't we visualize this as just a DMA
-transfers. maybe you want to signal/attach to transfer, cant we do that with
-additional flag DMA_METADATA etc..?
+If drivers/soc/rockchip/pm_domains.c is able to get the devfreq instance
+through devicetree, the exported function is not necessary. Sorry for that
+I'm not sure the alternative.
+
+[snip]
+
+> diff --git a/include/soc/rockchip/rk3399_dmc.h b/include/soc/rockchip/rk3399_dmc.h
+> new file mode 100644
+> index 000000000000..7ccdfff1a154
+> --- /dev/null
+> +++ b/include/soc/rockchip/rk3399_dmc.h
+> @@ -0,0 +1,63 @@
+
+[snip]
+
+> +
+> +int pd_register_notify_to_dmc(struct devfreq *devfreq);
+> +
+> +#endif
+> 
+
 
 -- 
-~Vinod
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
