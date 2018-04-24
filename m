@@ -1,63 +1,147 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 24 Apr 2018 10:33:03 +0100
-Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
-In-Reply-To: <57d77955-caa7-ddac-df7d-7eef1f05dbb2@codeaurora.org>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-4-jean-philippe.brucker@arm.com>
- <57d77955-caa7-ddac-df7d-7eef1f05dbb2@codeaurora.org>
-Message-ID: <66ec18ca-ea4e-d224-c9c5-8dbee5da8a72@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 24 Apr 2018 15:09:47 +0530
+Subject: [PATCH V3 3/3] cpufreq: add suspend/resume support in Armada 37xx
+ DVFS driver
+In-Reply-To: <cover.1524561482.git.viresh.kumar@linaro.org>
+References: <cover.1524561482.git.viresh.kumar@linaro.org>
+Message-ID: <e98965068836e673ea826e8a03fd01e168fce3ed.1524561482.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/18 02:32, Sinan Kaya wrote:
-> On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
->> /**
->>   * iommu_sva_device_init() - Initialize Shared Virtual Addressing for a device
->>   * @dev: the device
->> @@ -129,7 +439,10 @@ EXPORT_SYMBOL_GPL(iommu_sva_device_shutdown);
->>  int iommu_sva_bind_device(struct device *dev, struct mm_struct *mm, int *pasid,
->>  			  unsigned long flags, void *drvdata)
->>  {
->> +	int i, ret;
->> +	struct io_mm *io_mm = NULL;
->>  	struct iommu_domain *domain;
->> +	struct iommu_bond *bond = NULL, *tmp;
->>  	struct iommu_param *dev_param = dev->iommu_param;
->>  
->>  	domain = iommu_get_domain_for_dev(dev);
->> @@ -145,7 +458,42 @@ int iommu_sva_bind_device(struct device *dev, struct mm_struct *mm, int *pasid,
->>  	if (flags != (IOMMU_SVA_FEAT_PASID | IOMMU_SVA_FEAT_IOPF))
->>  		return -EINVAL;
->>  
->> -	return -ENOSYS; /* TODO */
->> +	/* If an io_mm already exists, use it */
->> +	spin_lock(&iommu_sva_lock);
->> +	idr_for_each_entry(&iommu_pasid_idr, io_mm, i) {
->> +		if (io_mm->mm != mm || !io_mm_get_locked(io_mm))
->> +			continue;
->> +
->> +		/* Is it already bound to this device? */
->> +		list_for_each_entry(tmp, &io_mm->devices, mm_head) {
->> +			if (tmp->dev != dev)
->> +				continue;
->> +
->> +			bond = tmp;
->> +			refcount_inc(&bond->refs);
->> +			io_mm_put_locked(io_mm);
->> +			break;
->> +		}
->> +		break;
->> +	}
->> +	spin_unlock(&iommu_sva_lock);
->> +
->> +	if (bond)
-> 
-> Please return pasid when you find an io_mm that is already bound. Something like
-> *pasid = io_mm->pasid should do the work here when bond is true.
+From: Miquel Raynal <miquel.raynal@bootlin.com>
 
-Right. I think we should also keep returning 0, not switch to -EEXIST or
-similar. So in next version a driver can call bind(devX, mmY) multiple
-times, but the first unbind() removes the bond.
+Add suspend/resume hooks in Armada 37xx DVFS driver to handle S2RAM
+operations. As there is currently no 'driver' structure, create one
+to store both the regmap and the register values during suspend
+operation.
 
-Thanks,
-Jean
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/cpufreq/armada-37xx-cpufreq.c | 67 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 65 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
+index 1d5db6f6ace9..5b808882ac8b 100644
+--- a/drivers/cpufreq/armada-37xx-cpufreq.c
++++ b/drivers/cpufreq/armada-37xx-cpufreq.c
+@@ -23,6 +23,8 @@
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
+ 
++#include "cpufreq-dt.h"
++
+ /* Power management in North Bridge register set */
+ #define ARMADA_37XX_NB_L0L1	0x18
+ #define ARMADA_37XX_NB_L2L3	0x1C
+@@ -56,6 +58,16 @@
+  */
+ #define LOAD_LEVEL_NR	4
+ 
++struct armada37xx_cpufreq_state {
++	struct regmap *regmap;
++	u32 nb_l0l1;
++	u32 nb_l2l3;
++	u32 nb_dyn_mod;
++	u32 nb_cpu_load;
++};
++
++static struct armada37xx_cpufreq_state *armada37xx_cpufreq_state;
++
+ struct armada_37xx_dvfs {
+ 	u32 cpu_freq_max;
+ 	u8 divider[LOAD_LEVEL_NR];
+@@ -136,7 +148,7 @@ static void __init armada37xx_cpufreq_dvfs_setup(struct regmap *base,
+ 	clk_set_parent(clk, parent);
+ }
+ 
+-static void __init armada37xx_cpufreq_disable_dvfs(struct regmap *base)
++static void armada37xx_cpufreq_disable_dvfs(struct regmap *base)
+ {
+ 	unsigned int reg = ARMADA_37XX_NB_DYN_MOD,
+ 		mask = ARMADA_37XX_NB_DFS_EN;
+@@ -162,8 +174,44 @@ static void __init armada37xx_cpufreq_enable_dvfs(struct regmap *base)
+ 	regmap_update_bits(base, reg, mask, mask);
+ }
+ 
++static int armada37xx_cpufreq_suspend(struct cpufreq_policy *policy)
++{
++	struct armada37xx_cpufreq_state *state = armada37xx_cpufreq_state;
++
++	regmap_read(state->regmap, ARMADA_37XX_NB_L0L1, &state->nb_l0l1);
++	regmap_read(state->regmap, ARMADA_37XX_NB_L2L3, &state->nb_l2l3);
++	regmap_read(state->regmap, ARMADA_37XX_NB_CPU_LOAD,
++		    &state->nb_cpu_load);
++	regmap_read(state->regmap, ARMADA_37XX_NB_DYN_MOD, &state->nb_dyn_mod);
++
++	return 0;
++}
++
++static int armada37xx_cpufreq_resume(struct cpufreq_policy *policy)
++{
++	struct armada37xx_cpufreq_state *state = armada37xx_cpufreq_state;
++
++	/* Ensure DVFS is disabled otherwise the following registers are RO */
++	armada37xx_cpufreq_disable_dvfs(state->regmap);
++
++	regmap_write(state->regmap, ARMADA_37XX_NB_L0L1, state->nb_l0l1);
++	regmap_write(state->regmap, ARMADA_37XX_NB_L2L3, state->nb_l2l3);
++	regmap_write(state->regmap, ARMADA_37XX_NB_CPU_LOAD,
++		     state->nb_cpu_load);
++
++	/*
++	 * NB_DYN_MOD register is the one that actually enable back DVFS if it
++	 * was enabled before the suspend operation. This must be done last
++	 * otherwise other registers are not writable.
++	 */
++	regmap_write(state->regmap, ARMADA_37XX_NB_DYN_MOD, state->nb_dyn_mod);
++
++	return 0;
++}
++
+ static int __init armada37xx_cpufreq_driver_init(void)
+ {
++	struct cpufreq_dt_platform_data pdata;
+ 	struct armada_37xx_dvfs *dvfs;
+ 	struct platform_device *pdev;
+ 	unsigned long freq;
+@@ -213,6 +261,15 @@ static int __init armada37xx_cpufreq_driver_init(void)
+ 		return -EINVAL;
+ 	}
+ 
++	armada37xx_cpufreq_state = kmalloc(sizeof(*armada37xx_cpufreq_state),
++					   GFP_KERNEL);
++	if (!armada37xx_cpufreq_state) {
++		ret = -ENOMEM;
++		goto put_clk;
++	}
++
++	armada37xx_cpufreq_state->regmap = nb_pm_base;
++
+ 	armada37xx_cpufreq_dvfs_setup(nb_pm_base, clk, dvfs->divider);
+ 	clk_put(clk);
+ 
+@@ -228,7 +285,11 @@ static int __init armada37xx_cpufreq_driver_init(void)
+ 	/* Now that everything is setup, enable the DVFS at hardware level */
+ 	armada37xx_cpufreq_enable_dvfs(nb_pm_base);
+ 
+-	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
++	pdata.suspend = armada37xx_cpufreq_suspend;
++	pdata.resume = armada37xx_cpufreq_resume;
++
++	pdev = platform_device_register_data(NULL, "cpufreq-dt", -1, &pdata,
++					     sizeof(pdata));
+ 	ret = PTR_ERR_OR_ZERO(pdev);
+ 	if (ret)
+ 		goto disable_dvfs;
+@@ -244,6 +305,8 @@ static int __init armada37xx_cpufreq_driver_init(void)
+ 		dev_pm_opp_remove(cpu_dev, freq);
+ 	}
+ 
++	kfree(armada37xx_cpufreq_state);
++
+ 	return ret;
+ }
+ /* late_initcall, to guarantee the driver is loaded after A37xx clock driver */
+-- 
+2.15.0.194.g9af6a3dea062
