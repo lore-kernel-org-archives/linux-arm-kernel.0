@@ -1,49 +1,23 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 24 Apr 2018 20:05:06 +0530
-Subject: [PATCH 4/4] ARM: davinci: board-omapl138-hawk: fix GPIO numbers for
- MMC/SD lookup
-In-Reply-To: <20180424143506.25793-1-nsekhar@ti.com>
-References: <20180424143506.25793-1-nsekhar@ti.com>
-Message-ID: <20180424143506.25793-5-nsekhar@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 24 Apr 2018 09:37:59 -0500
+Subject: [PATCH v1 1/4] dt-bindings: gpu: mali-utgard: add
+ mediatek,mt7623-mali compatible
+In-Reply-To: <831e85ebdfdaba3c7b05ac8407a1584c20ba4a86.1524044917.git.sean.wang@mediatek.com>
+References: <cover.1524044917.git.sean.wang@mediatek.com>
+ <831e85ebdfdaba3c7b05ac8407a1584c20ba4a86.1524044917.git.sean.wang@mediatek.com>
+Message-ID: <20180424143759.tyveqnfxtkmanosn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit c4dc56be7e26 ("ARM: davinci: fix the GPIO lookup for omapl138-hawk")
-fixed the GPIO chip name for look-up of MMC/SD CD and WP pins, but forgot
-to change the GPIO numbers passed.
+On Wed, Apr 18, 2018 at 06:24:53PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> The MediaTek MT7623 SoC contains a Mali-450, so add a compatible for it
+> and define its own vendor-specific properties.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 
-The GPIO numbers are not offsets from within a 32 GPIO bank. Fix the
-GPIO numbers as well as remove the misleading comment.
-
-Fixes: c4dc56be7e26 ("ARM: davinci: fix the GPIO lookup for omapl138-hawk")
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/board-omapl138-hawk.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index 0d32042b728f..be8b892a6ea7 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -123,12 +123,16 @@ static const short hawk_mmcsd0_pins[] = {
- 	-1
- };
- 
-+#define DA850_HAWK_MMCSD_CD_PIN		GPIO_TO_PIN(3, 12)
-+#define DA850_HAWK_MMCSD_WP_PIN		GPIO_TO_PIN(3, 13)
-+
- static struct gpiod_lookup_table mmc_gpios_table = {
- 	.dev_id = "da830-mmc.0",
- 	.table = {
--		/* CD: gpio3_12: gpio60: chip 1 contains gpio range 32-63*/
--		GPIO_LOOKUP("davinci_gpio.0", 28, "cd", GPIO_ACTIVE_LOW),
--		GPIO_LOOKUP("davinci_gpio.0", 29, "wp", GPIO_ACTIVE_LOW),
-+		GPIO_LOOKUP("davinci_gpio.0", DA850_HAWK_MMCSD_CD_PIN, "cd",
-+			    GPIO_ACTIVE_LOW),
-+		GPIO_LOOKUP("davinci_gpio.0", DA850_HAWK_MMCSD_WP_PIN, "wp",
-+			    GPIO_ACTIVE_LOW),
- 	},
- };
- 
--- 
-2.16.2
+Reviewed-by: Rob Herring <robh@kernel.org>
