@@ -1,51 +1,92 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 24 Apr 2018 21:16:40 +0200
-Subject: [PATCH 13/22] nds32: use generic dma_noncoherent_ops
-In-Reply-To: <CAEbi=3fkakVD2vxGu6SgJM77JnNM8Y79xS8_o6m9d_85BJpMFQ@mail.gmail.com>
-References: <20180420080313.18796-1-hch@lst.de>
- <20180420080313.18796-14-hch@lst.de>
- <CAEbi=3fkakVD2vxGu6SgJM77JnNM8Y79xS8_o6m9d_85BJpMFQ@mail.gmail.com>
-Message-ID: <20180424191640.GA32495@lst.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 24 Apr 2018 22:25:24 +0300
+Subject: [PATCH v2] arm64: dts: renesas: condor: add eMMC support
+In-Reply-To: <611daf1f-42a2-d463-0814-ebf762871018@cogentembedded.com>
+References: <611daf1f-42a2-d463-0814-ebf762871018@cogentembedded.com>
+Message-ID: <bfa0f1e9-f6e1-c4e2-9c9a-0d25d7f56ad1@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greentime,
+Define the Condor board dependent part of the MMC0 (connected to eMMC chip)
+device node along with the necessary voltage regulators...
 
-thanks for testing the patch!
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-It looks like nds32 doesn't have a buildbot yet, so this code didn't
-even get syntax checkin, sorry.
+---
+This patch is against the 'renesas-devel-20180424-v4.17-rc2' tag of Simon
+Horman's 'renesas.git' repo.
 
-Below is the incremental fixes based on this thread.
+Changes in version 2:
+- renamed the pin groups and their labels, alos changing their order;
+- reordered this patch before the PCIe patch.
 
-Can you check if my tree works if you just revert the
-"nds32: use generic dma_noncoherent_ops" commit?
+ arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   43 ++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/arch/nds32/kernel/dma.c b/arch/nds32/kernel/dma.c
-index 688f1a03dee6..48018275e7f4 100644
---- a/arch/nds32/kernel/dma.c
-+++ b/arch/nds32/kernel/dma.c
-@@ -330,7 +330,7 @@ void arch_sync_dma_for_device(struct device *dev, phys_addr_t paddr,
- 	void *addr = kmap_atomic_pfn(PHYS_PFN(paddr));
- 	unsigned long start = (unsigned long)addr;
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+===================================================================
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
++++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+@@ -27,6 +27,24 @@
+ 		/* first 128MB is reserved for secure area. */
+ 		reg = <0 0x48000000 0 0x78000000>;
+ 	};
++
++	d3_3v: regulator-0 {
++		compatible = "regulator-fixed";
++		regulator-name = "D3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	vddq_vin01: regulator-1 {
++		compatible = "regulator-fixed";
++		regulator-name = "VDDQ_VIN01";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
+ };
  
--	switch (direction) {
-+	switch (dir) {
- 	case DMA_FROM_DEVICE:
- 		break;
- 	case DMA_TO_DEVICE:
-@@ -350,12 +350,12 @@ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
- 	void *addr = kmap_atomic_pfn(PHYS_PFN(paddr));
- 	unsigned long start = (unsigned long)addr;
+ &avb {
+@@ -52,12 +70,37 @@
+ 	clock-frequency = <32768>;
+ };
  
--	switch (direction) {
-+	switch (dir) {
- 	case DMA_TO_DEVICE:
- 		break;
- 	case DMA_FROM_DEVICE:
- 	case DMA_BIDIRECTIONAL:
--		cpu_dma_inval_range(start, end);
-+		cpu_dma_inval_range(start, start + size);
- 		break;
- 	default:
- 		BUG();
++&mmc0 {
++	pinctrl-0 = <&mmc_pins>;
++	pinctrl-1 = <&mmc_pins_uhs>;
++	pinctrl-names = "default", "state_uhs";
++
++	vmmc-supply = <&d3_3v>;
++	vqmmc-supply = <&vddq_vin01>;
++	mmc-hs200-1_8v;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
++
+ &pfc {
+ 	avb_pins: avb {
+ 		groups = "avb_mdio", "avb_rgmii";
+ 		function = "avb";
+ 	};
+ 
++	mmc_pins: mmc {
++		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
++		function = "mmc";
++		power-source = <3300>;
++	};
++
++	mmc_pins_uhs: mmc_uhs {
++		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
++		function = "mmc";
++		power-source = <1800>;
++	};
++
+ 	scif0_pins: scif0 {
+ 		groups = "scif0_data";
+ 		function = "scif0";
