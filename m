@@ -1,59 +1,42 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 24 Apr 2018 11:51:07 +0200
-Subject: [PATCH/RFC 7/8] ARM: shmobile: Remove the ARCH_SHMOBILE Kconfig
- symbol
-In-Reply-To: <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
-References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
- <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdXyEGY71v6EFDjBhFva_VRtO4p2BdG=HC5zfrwBXLXK0g@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 24 Apr 2018 11:56:56 +0200
+Subject: [PATCH 1/2] ARM: dts: sun8i-h3-libretech-all-h3-cc: Move board
+ definition to common dtsi
+In-Reply-To: <1524561576-2201-2-git-send-email-narmstrong@baylibre.com>
+References: <1524561576-2201-1-git-send-email-narmstrong@baylibre.com>
+ <1524561576-2201-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20180424095656.oormsyru7nw6hypn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Reducing/enhancing CC list)
+Hi,
 
-On Fri, Apr 20, 2018 at 3:28 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> All drivers for Renesas ARM SoCs have gained proper ARCH_RENESAS
-> platform dependencies.  Hence finish the conversion from ARCH_SHMOBILE
-> to ARCH_RENESAS for Renesas 32-bit ARM SoCs, as started by commit
-> 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS").
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> This depends on the previous patches in this series, hence the RFC.
->
-> JFTR, after this, the following symbols for drivers supporting only
-> Renesas SuperH "SH-Mobile" SoCs can no longer be selected:
->   - CONFIG_KEYBOARD_SH_KEYSC,
->   - CONFIG_VIDEO_SH_VOU,
->   - CONFIG_VIDEO_SH_MOBILE_CEU,
->   - CONFIG_DRM_SHMOBILE[*],
->   - CONFIG_FB_SH_MOBILE_MERAM.
-> (changes for a shmobile_defconfig .config)
+On Tue, Apr 24, 2018 at 11:19:35AM +0200, Neil Armstrong wrote:
+> Since the libretech-all-h3-cc can use either the H2+, H3 or H5, move the
+> content of the dts file to a common dtsi file to be included by the H3 variant
+> and in a following patch the H5 variant.
+> 
+> By the way, update the SPDX licence tag position.
+> 
+> Suggested-by: Corentin Labbe <clabbe@baylibre.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Apparently CONFIG_VIDEO_SH_MOBILE_CEU was set in the old
-armadillo800eva_defconfig, and used by the old board code.
+This patch looks fine, but doesn't apply anymore. Please resend it.
 
-While DT bindings do exist [1], some DT support has been added to the
-driver [2], and this even ended up as the example in [3], this was never
-enabled in the corresponding board DTS.
+While you're at it, the prefix should be "arm: dts: sun8i: h3:" (with
+arm being lowercase).
 
-Nevertheless, I understand that soc_camera-based driver is obsolete, and
-has been replaced by [4], but bindings for r8a7740 are lacking [5].
-
-[1] Documentation/devicetree/bindings/media/sh_mobile_ceu.txt
-[2] drivers/media/platform/soc_camera/sh_mobile_ceu_camera.c
-[3] Documentation/devicetree/bindings/media/video-interfaces.txt
-[4] drivers/media/platform/renesas-ceu.c
-[5] Documentation/devicetree/bindings/media/renesas,ceu.txt
-
-Gr{oetje,eeting}s,
-
-                        Geert
+Thanks!
+Maxime
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/d14142a9/attachment.sig>
