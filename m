@@ -1,118 +1,44 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 24 Apr 2018 08:58:42 +0200
-Subject: [PATCH v4 7/8] drm/i2c: tda998x: register as a drm bridge
-In-Reply-To: <20180423160833.GF16141@n2100.armlinux.org.uk>
-References: <20180423072301.11962-1-peda@axentia.se>
- <20180423072301.11962-8-peda@axentia.se>
- <20180423160833.GF16141@n2100.armlinux.org.uk>
-Message-ID: <5d6866d0-75bc-4de8-9b87-4fee5430e9dd@axentia.se>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 24 Apr 2018 09:16:17 +0200
+Subject: [PATCH] dt-bindings: arm: consistently name r8a77965 as M3-N
+In-Reply-To: <20180424055442.19710-1-horms+renesas@verge.net.au>
+References: <20180424055442.19710-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWZoXSJnuEiD4e9SpP+ASFgDCcwy16UFOeSEq5sNnsMSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-23 18:08, Russell King - ARM Linux wrote:
-> On Mon, Apr 23, 2018 at 09:23:00AM +0200, Peter Rosin wrote:
->>  static int tda998x_remove(struct i2c_client *client)
->>  {
->> -	component_del(&client->dev, &tda998x_ops);
->> +	struct device *dev = &client->dev;
->> +	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
->> +
->> +	drm_bridge_remove(&bridge->bridge);
->> +	component_del(dev, &tda998x_ops);
->> +
-> 
-> I'd like to ask a rather fundamental question about DRM bridge support,
-> because I suspect that there's a major fsckup here.
-> 
-> The above is the function that deals with the TDA998x device being
-> unbound from the driver.  With the component API, this results in the
-> DRM device correctly being torn down, because one of the hardware
-> devices has gone.
-> 
-> With DRM bridge, the bridge is merely removed from the list of
-> bridges:
-> 
-> void drm_bridge_remove(struct drm_bridge *bridge)
-> {
->         mutex_lock(&bridge_lock);
->         list_del_init(&bridge->list);
->         mutex_unlock(&bridge_lock);
-> }
-> EXPORT_SYMBOL(drm_bridge_remove);
-> 
-> and the memory backing the "struct tda998x_bridge" (which contains
-> the struct drm_bridge) will be freed by the devm subsystem.
-> 
-> However, there is no notification into the rest of the DRM subsystem
-> that the device has gone away.  Worse, the memory that is still in
-> use by DRM has now been freed, so further use of the DRM device
-> results in a use-after-free bug.
-> 
-> This is really not good, and to me looks like a fundamental problem
-> with the DRM bridge code.  I see nothing in the DRM bridge code that
-> deals with the lifetime of a "DRM bridge" or indeed the lifetime of
-> the actual device itself.
-> 
-> So, from what I can see, there seems to be a fundamental lifetime
-> issue with the design of the DRM bridge code.  This needs to be
-> fixed.
+Hi Simon,
 
-Oh crap. A gigantic can of worms...
+On Tue, Apr 24, 2018 at 7:54 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> There is an inconsistency between the use of M3N and M3-N.
+> This patch resolves this by consistently using the latter.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Would a patch (completely untested btw) along this line of thinking make
-any difference whatsoever?
+Note that this is for a custom Salvator-X board where the M3-W SiP was
+replaced by an M3-N SiP.  So I have no idea what's on the sticker, if it was
+replaced at all, and thus kept the text from the BSP.
 
-Yeah, I know, all other drm_bridges also need to fill in .owner, and
-the .of_node member could probably be ditched from struct drm_device
-etc, but this was just a quick sketch...
+> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> @@ -116,7 +116,7 @@ Boards:
+>      compatible = "renesas,salvator-x", "renesas,r8a7795"
+>    - Salvator-X (RTP0RC7796SIPB0011S)
+>      compatible = "renesas,salvator-x", "renesas,r8a7796"
+> -  - Salvator-X (RTP0RC7796SIPB0011S (M3N))
+> +  - Salvator-X (RTP0RC7796SIPB0011S (M3-N))
+>      compatible = "renesas,salvator-x", "renesas,r8a77965"
+>    - Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
+>      compatible = "renesas,salvator-xs", "renesas,r8a7795"
+\
+Gr{oetje,eeting}s,
 
-Cheers,
-Peter
+                        Geert
 
-diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
-index 1638bfe9627c..3577e50cc6c0 100644
---- a/drivers/gpu/drm/drm_bridge.c
-+++ b/drivers/gpu/drm/drm_bridge.c
-@@ -138,6 +138,10 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
- 	else
- 		encoder->bridge = bridge;
- 
-+	if (!device_link_add(encoder->dev->dev, bridge->owner,
-+			     DL_FLAG_AUTOREMOVE))
-+		return -EINVAL;
-+
- 	return 0;
- }
- EXPORT_SYMBOL(drm_bridge_attach);
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index b8cb6237a38b..29eba4e9a39d 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1857,6 +1857,7 @@ tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
- 	bridge->dev = dev;
- 	dev_set_drvdata(dev, bridge);
- 
-+	bridge->bridge.owner = dev;
- 	bridge->bridge.funcs = &tda998x_bridge_funcs;
- #ifdef CONFIG_OF
- 	bridge->bridge.of_node = dev->of_node;
-diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-index 682d01ba920c..f0f8b2a85c28 100644
---- a/include/drm/drm_bridge.h
-+++ b/include/drm/drm_bridge.h
-@@ -224,6 +224,7 @@ struct drm_bridge_funcs {
- 
- /**
-  * struct drm_bridge - central DRM bridge control structure
-+ * @owner: device that owns the bridge
-  * @dev: DRM device this bridge belongs to
-  * @encoder: encoder to which this bridge is connected
-  * @next: the next bridge in the encoder chain
-@@ -233,6 +234,7 @@ struct drm_bridge_funcs {
-  * @driver_private: pointer to the bridge driver's internal context
-  */
- struct drm_bridge {
-+	struct device *owner;
- 	struct drm_device *dev;
- 	struct drm_encoder *encoder;
- 	struct drm_bridge *next;
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
