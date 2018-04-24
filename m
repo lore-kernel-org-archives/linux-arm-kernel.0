@@ -1,51 +1,35 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 24 Apr 2018 17:25:19 -0300
-Subject: [PATCH] ARM: dts: imx7s: Pass the 'fsl,sec-era' property
-Message-ID: <1524601519-23502-1-git-send-email-festevam@gmail.com>
+Date: Tue, 24 Apr 2018 17:27:24 -0300
+Subject: [PATCH] arm64: dts: ls208xa-rdb: Pass unit name to SPI flash node
+Message-ID: <1524601644-23607-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Currently the following error is seen from the CAAM driver:
+Pass unit name to SPI flash node to match its 'reg' value and
+also avoid the following DTC warnings:
 
-caam 30900000.caam: device ID = 0x0a16030000000000 (Era -524)
+arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dtb: Warning (unit_address_vs_reg): /soc/dspi at 2100000/n25q512a: node has a reg or ranges property, but no unit name
+arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dtb: Warning (unit_address_vs_reg): /soc/dspi at 2100000/n25q512a: node has a reg or ranges property, but no unit name
 
-Pass the 'fsl,sec-era' property to properly describe the
-era information.
-
-This error happens because the 'fsl,sec-era' is not passed via
-device tree.
-
-The era information is used in various places inside drivers/crypto/caam,
-so pass the correct version via device tree.
-
-Fixes: 0eeabcad7da5 ("ARM: dts: imx7s: add CAAM device node")
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
-I have sent a patch for 4.18 that allows retrieving the era information
-from the CAAM registers in run-time:
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/crypto/caam/ctrl.c?h=next-20180424&id=654f2b937b389295581bcb4aa26011a63db7bc8f
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This will only be applied in 4.18 though.
-
-In order to avoid i.MX7 report the incorrect era version in 4.17,
-let's pass this property.
-
- arch/arm/boot/dts/imx7s.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index a6fe324..b416d2b 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -884,6 +884,7 @@
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+index 5498c70..061647b 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+@@ -134,7 +134,7 @@
  
- 			crypto: caam at 30900000 {
- 				compatible = "fsl,sec-v4.0";
-+				fsl,sec-era = <8>;
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 				reg = <0x30900000 0x40000>;
+ &dspi {
+ 	status = "okay";
+-	dflash0: n25q512a {
++	dflash0: n25q512a at 0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "st,m25p80";
 -- 
 2.7.4
