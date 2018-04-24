@@ -1,74 +1,92 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 24 Apr 2018 19:36:52 +0200
-Subject: [RFT][PATCH] arm64: dts: exynos: Remove unneeded address space
- mapping for soc node
-Message-ID: <20180424173652.14735-1-krzk@kernel.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Apr 2018 18:55:45 +0100
+Subject: [PATCH 00/11] platform: device tree support for early platform
+ drivers
+In-Reply-To: <20180424173051.15099-1-brgl@bgdev.pl>
+References: <20180424173051.15099-1-brgl@bgdev.pl>
+Message-ID: <20180424175544.uq7f5x63a5il36sh@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the address space mapping between root and soc nodes to fix
-DTC warnings in Exynos5433 and Exynos7 like:
+Hi bartosz,
 
-    arch/arm64/boot/dts/exynos/exynos5433-tm2.dtb:
-        Warning (unit_address_vs_reg): /soc: node has a reg or ranges property, but no unit name
+On Tue, Apr 24, 2018 at 07:30:40PM +0200, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Device tree based systems often use OF_DECLARE() macros for devices
+> that need to be initialized early in the boot process such as clocks,
+> timers etc. However platform devices are more desirable.
+> 
+> This series aims at introducing support for early platform drivers for
+> OF-based systems.
+> 
+> The idea is to have a special compatible fallback string: "earlydev"
+> that similarily to "syscon" would be added to device nodes that need
+> early probing. We then need to call of_early_platform_populate() early
+> in the boot process to actually probe the registered devices.
+> 
+> I am aware that this new compatible does not strictly correspond with
+> the "hardware description only" rule of DT, but we already have many
+> functionalities that break this rule: syscon, gpio hogs etc.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+I don't think we need the "earlydev" string at all, and can still keep
+the rest of this infrastrcuture if it is helpful.
 
----
+So while I'm certainly oppposed to the "earlydev" string, I think that
+the infrastrcuture could be useful.
 
-Not tested.
----
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 6 +++---
- arch/arm64/boot/dts/exynos/exynos7.dtsi    | 6 +++---
- 2 files changed, 6 insertions(+), 6 deletions(-)
+> The first user of this new functionality will be the DaVinci platform
+> for which we want to probe the pll, psc and timer drivers early in the
+> boot sequence but keep them implemented as platform drivers.
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 828996a06610..ba8157ceaa56 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -18,8 +18,8 @@
- 
- / {
- 	compatible = "samsung,exynos5433";
--	#address-cells = <2>;
--	#size-cells = <2>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	interrupt-parent = <&gic>;
- 
-@@ -235,7 +235,7 @@
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--		ranges = <0x0 0x0 0x0 0x18000000>;
-+		ranges;
- 
- 		arm_a53_pmu {
- 			compatible = "arm,cortex-a53-pmu", "arm,armv8-pmuv3";
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index 0b98d2334cad..93a84338938a 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -12,8 +12,8 @@
- / {
- 	compatible = "samsung,exynos7";
- 	interrupt-parent = <&gic>;
--	#address-cells = <2>;
--	#size-cells = <2>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	aliases {
- 		pinctrl0 = &pinctrl_alive;
-@@ -70,7 +70,7 @@
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--		ranges = <0 0 0 0x18000000>;
-+		ranges;
- 
- 		chipid at 10000000 {
- 			compatible = "samsung,exynos4210-chipid";
--- 
-2.14.1
+Can we have early_paltform_driver() take a reference to the driver's
+of_match_table, and put that in a special section?
+
+Then instead of looking for "earlydev", we look for any compatible
+string in that section. No magic string required in the DT, and we can
+always mess around with probe ordering in future.
+
+> In the future, if this series gets accepted, this could become and
+> alternative to TIMER_OF_DECLARE, CLK_OF_DECLARE etc. and could lead
+> to deprecating of those macros in favor of early platform drivers.
+
+IIRC we typically want to probe clocks before clocksources. Does using
+early platform drivers ensure the necessary ordering?
+
+Thanks,
+Mark.
+
+> Bartosz Golaszewski (11):
+>   platform: early: provide early_platform_add_device()
+>   platform: provide early_platform_driver_register_probe_all()
+>   platform: make support for early platform devices conditional
+>   of: platform: use pdev as name for vars of type struct platform_device
+>   platform: use a dedicated list_head for early devices
+>   of: provide for_each_compatible_child_node()
+>   dt-bindings: add bindings for early devices
+>   of: platform: provide of_early_platform_populate()
+>   platform: provide early_platform_driver()
+>   of: platform: provide of_early_platform_probe()
+>   misc: implement a dummy early platform driver
+> 
+>  Documentation/devicetree/bindings/early.txt |   7 +
+>  arch/sh/Kconfig                             |   1 +
+>  drivers/base/Kconfig                        |   4 +
+>  drivers/base/platform.c                     |  26 ++--
+>  drivers/misc/Kconfig                        |   8 ++
+>  drivers/misc/Makefile                       |   1 +
+>  drivers/misc/dummy-early.c                  |  40 ++++++
+>  drivers/of/device.c                         |  14 +-
+>  drivers/of/platform.c                       | 143 +++++++++++++++-----
+>  include/linux/device.h                      |   4 +
+>  include/linux/of.h                          |   3 +
+>  include/linux/of_device.h                   |   5 +
+>  include/linux/of_platform.h                 |  19 +++
+>  include/linux/platform_device.h             |  52 +++++++
+>  14 files changed, 279 insertions(+), 48 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/early.txt
+>  create mode 100644 drivers/misc/dummy-early.c
+> 
+> -- 
+> 2.17.0
+> 
