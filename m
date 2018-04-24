@@ -1,82 +1,173 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Apr 2018 18:46:14 +0100
-Subject: Applied "regmap: include <linux/ktime.h> from include/linux/regmap.h"
- to the regmap tree
-In-Reply-To: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
-Message-ID: <E1fB218-0003Z3-Qt@debutante>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 24 Apr 2018 19:45:58 +0200
+Subject: [PATCH 1/5] ARM: dts: exynos: Remove unnecessary address/size
+ properties in Midas boards
+Message-ID: <20180424174602.3915-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+The children of regulators node do not have reg/ranges properties.  Move the
+children up one level, get rid of regulators node and remove
+address-cells and size-cells properties.  This fixes warnings for
+Exynos4412 Midas family boards:
 
-   regmap: include <linux/ktime.h> from include/linux/regmap.h
+    arch/arm/boot/dts/exynos4412-i9300.dtb: Warning (avoid_unnecessary_addr_size):
+        /regulators: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+    arch/arm/boot/dts/exynos4412-i9305.dtb: Warning (avoid_unnecessary_addr_size):
+        /regulators: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+    arch/arm/boot/dts/exynos4412-n710x.dtb: Warning (avoid_unnecessary_addr_size):
+        /regulators: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
 
-has been applied to the regmap tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From f15cd6d99198e9c15229aefec639a34a6e8174c6 Mon Sep 17 00:00:00 2001
-From: Sean Wang <sean.wang@mediatek.com>
-Date: Mon, 23 Apr 2018 14:42:44 +0800
-Subject: [PATCH] regmap: include <linux/ktime.h> from include/linux/regmap.h
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-Similar to the readx_poll_timeout() macro calling ktime_* and using
-ktime_t type, which is declared in <linux/ktime.h>. So, make
-include/linux/regmap.h explicitly include <linux/ktime.h>, like
-include/linux/iopoll.h does.  Otherwise, users of the macro will see
-below errors.
-
-error: implicit declaration of function ???ktime_add_us???
-[-Werror=implicit-function-declaration]
-
-error: implicit declaration of function ???ktime_get???
-[-Werror=implicit-function-declaration]
-
-error: implicit declaration of function ???ktime_compare???
-[-Werror=implicit-function-declaration]
-
-include/linux/regmap.h:128:2: error: unknown type name ???ktime_t???
-  ktime_t __timeout = ktime_add_us(ktime_get(), __timeout_us); \
-
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- include/linux/regmap.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi | 32 +++++------
+ arch/arm/boot/dts/exynos4412-midas.dtsi     | 86 ++++++++++++++---------------
+ 2 files changed, 55 insertions(+), 63 deletions(-)
 
-diff --git a/include/linux/regmap.h b/include/linux/regmap.h
-index 5f7ad0552c03..b6865f070464 100644
---- a/include/linux/regmap.h
-+++ b/include/linux/regmap.h
-@@ -15,6 +15,7 @@
+diff --git a/arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi b/arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi
+index ee8e1f445370..31cd5f6fd83c 100644
+--- a/arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi
++++ b/arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi
+@@ -15,24 +15,22 @@
+ 		i2c10 = &i2c_cm36651;
+ 	};
  
- #include <linux/list.h>
- #include <linux/rbtree.h>
-+#include <linux/ktime.h>
- #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/bug.h>
+-	regulators {
+-		lcd_vdd3_reg: voltage-regulator-2 {
+-			compatible = "regulator-fixed";
+-			regulator-name = "LCD_VDD_2.2V";
+-			regulator-min-microvolt = <2200000>;
+-			regulator-max-microvolt = <2200000>;
+-			gpio = <&gpc0 1 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
++	lcd_vdd3_reg: voltage-regulator-2 {
++		compatible = "regulator-fixed";
++		regulator-name = "LCD_VDD_2.2V";
++		regulator-min-microvolt = <2200000>;
++		regulator-max-microvolt = <2200000>;
++		gpio = <&gpc0 1 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ 
+-		ps_als_reg: voltage-regulator-5 {
+-			compatible = "regulator-fixed";
+-			regulator-name = "LED_A_3.0V";
+-			regulator-min-microvolt = <3000000>;
+-			regulator-max-microvolt = <3000000>;
+-			gpio = <&gpj0 5 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
++	ps_als_reg: voltage-regulator-5 {
++		compatible = "regulator-fixed";
++		regulator-name = "LED_A_3.0V";
++		regulator-min-microvolt = <3000000>;
++		regulator-max-microvolt = <3000000>;
++		gpio = <&gpj0 5 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
+ 	};
+ 
+ 	i2c_ak8975: i2c-gpio-0 {
+diff --git a/arch/arm/boot/dts/exynos4412-midas.dtsi b/arch/arm/boot/dts/exynos4412-midas.dtsi
+index 76f2b30f1731..4b182e26cfc8 100644
+--- a/arch/arm/boot/dts/exynos4412-midas.dtsi
++++ b/arch/arm/boot/dts/exynos4412-midas.dtsi
+@@ -46,56 +46,50 @@
+ 		};
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		cam_io_reg: voltage-regulator-1 {
+-			compatible = "regulator-fixed";
+-			regulator-name = "CAM_SENSOR_A";
+-			regulator-min-microvolt = <2800000>;
+-			regulator-max-microvolt = <2800000>;
+-			enable-active-high;
+-			status = "disabled";
+-		};
++	cam_io_reg: voltage-regulator-1 {
++		compatible = "regulator-fixed";
++		regulator-name = "CAM_SENSOR_A";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		enable-active-high;
++		status = "disabled";
++	};
+ 
+-		cam_af_reg: voltage-regulator-3 {
+-			compatible = "regulator-fixed";
+-			regulator-name = "CAM_AF";
+-			regulator-min-microvolt = <2800000>;
+-			regulator-max-microvolt = <2800000>;
+-			enable-active-high;
+-			status = "disabled";
+-		};
++	cam_af_reg: voltage-regulator-3 {
++		compatible = "regulator-fixed";
++		regulator-name = "CAM_AF";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		enable-active-high;
++		status = "disabled";
++	};
+ 
+-		vsil12: voltage-regulator-6 {
+-			compatible = "regulator-fixed";
+-			regulator-name = "VSIL_1.2V";
+-			regulator-min-microvolt = <1200000>;
+-			regulator-max-microvolt = <1200000>;
+-			gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-			vin-supply = <&buck7_reg>;
+-		};
++	vsil12: voltage-regulator-6 {
++		compatible = "regulator-fixed";
++		regulator-name = "VSIL_1.2V";
++		regulator-min-microvolt = <1200000>;
++		regulator-max-microvolt = <1200000>;
++		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		vin-supply = <&buck7_reg>;
++	};
+ 
+-		vcc33mhl: voltage-regulator-7 {
+-			compatible = "regulator-fixed";
+-			regulator-name = "VCC_3.3_MHL";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
++	vcc33mhl: voltage-regulator-7 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC_3.3_MHL";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ 
+-		vcc18mhl: voltage-regulator-8 {
+-			compatible = "regulator-fixed";
+-			regulator-name = "VCC_1.8_MHL";
+-			regulator-min-microvolt = <1800000>;
+-			regulator-max-microvolt = <1800000>;
+-			gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
++	vcc18mhl: voltage-regulator-8 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC_1.8_MHL";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
+ 	};
+ 
+ 	gpio-keys {
 -- 
-2.17.0
+2.14.1
