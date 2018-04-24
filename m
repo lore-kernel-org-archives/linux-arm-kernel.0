@@ -1,107 +1,49 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 24 Apr 2018 10:05:00 +0800
-Subject: [PATCH V2 4/5] ARM: dts: imx6sx-sabreauto: add fec support
+Date: Tue, 24 Apr 2018 10:05:01 +0800
+Subject: [PATCH V2 5/5] ARM: dts: imx6sx-sabreauto: add wdog external reset
+ support
 In-Reply-To: <1524535501-8567-1-git-send-email-Anson.Huang@nxp.com>
 References: <1524535501-8567-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1524535501-8567-4-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1524535501-8567-5-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add FEC support on i.MX6SX Sabre Auto board.
+i.MX6SX Sabre Auto board has GPIO1_IO13 pin can be
+MUXed as WDOG output to reset PMIC, add this function
+support.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
-changes since V1:
-	remove unused property "pinctrl-assert-gpios" on fec1.
- arch/arm/boot/dts/imx6sx-sabreauto.dts | 69 ++++++++++++++++++++++++++++++++++
- 1 file changed, 69 insertions(+)
+no changes since V1.
+ arch/arm/boot/dts/imx6sx-sabreauto.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-index 812f40b..fdc642f 100644
+index fdc642f..ccf1cbb 100644
 --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
 +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-@@ -41,6 +41,39 @@
- 	clock-frequency = <24576000>;
+@@ -230,6 +230,12 @@
+ 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
+ 			>;
+ 		};
++
++		pinctrl_wdog: wdoggrp {
++			fsl,pins = <
++				MX6SX_PAD_GPIO1_IO13__WDOG1_WDOG_ANY 0x30b0
++			>;
++		};
+ 	};
  };
  
-+&fec1 {
+@@ -369,3 +375,9 @@
+ 		#gpio-cells = <2>;
+ 	};
+ };
++
++&wdog1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet1_1>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ethphy1>;
-+	fsl,magic-packet;
-+	status = "okay";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy0: ethernet-phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <0>;
-+		};
-+
-+		ethphy1: ethernet-phy at 1 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <1>;
-+		};
-+	};
++	pinctrl-0 = <&pinctrl_wdog>;
++	fsl,ext-reset-output;
 +};
-+
-+&fec2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet2_1>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ethphy0>;
-+	fsl,magic-packet;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -75,6 +108,42 @@
- &iomuxc {
- 	imx6x-sabreauto {
- 
-+		pinctrl_enet1_1: enet1grp-1 {
-+			fsl,pins = <
-+				MX6SX_PAD_ENET1_MDIO__ENET1_MDIO        0xa0b1
-+				MX6SX_PAD_ENET1_MDC__ENET1_MDC          0xa0b1
-+				MX6SX_PAD_RGMII1_TXC__ENET1_RGMII_TXC   0xa0b9
-+				MX6SX_PAD_RGMII1_TD0__ENET1_TX_DATA_0   0xa0b1
-+				MX6SX_PAD_RGMII1_TD1__ENET1_TX_DATA_1   0xa0b1
-+				MX6SX_PAD_RGMII1_TD2__ENET1_TX_DATA_2   0xa0b1
-+				MX6SX_PAD_RGMII1_TD3__ENET1_TX_DATA_3   0xa0b1
-+				MX6SX_PAD_RGMII1_TX_CTL__ENET1_TX_EN    0xa0b1
-+				MX6SX_PAD_RGMII1_RXC__ENET1_RX_CLK      0x3081
-+				MX6SX_PAD_RGMII1_RD0__ENET1_RX_DATA_0   0x3081
-+				MX6SX_PAD_RGMII1_RD1__ENET1_RX_DATA_1   0x3081
-+				MX6SX_PAD_RGMII1_RD2__ENET1_RX_DATA_2   0x3081
-+				MX6SX_PAD_RGMII1_RD3__ENET1_RX_DATA_3   0x3081
-+				MX6SX_PAD_RGMII1_RX_CTL__ENET1_RX_EN    0x3081
-+			>;
-+		};
-+
-+		pinctrl_enet2_1: enet2grp-1 {
-+			fsl,pins = <
-+				MX6SX_PAD_RGMII2_TXC__ENET2_RGMII_TXC   0xa0b9
-+				MX6SX_PAD_RGMII2_TD0__ENET2_TX_DATA_0   0xa0b1
-+				MX6SX_PAD_RGMII2_TD1__ENET2_TX_DATA_1   0xa0b1
-+				MX6SX_PAD_RGMII2_TD2__ENET2_TX_DATA_2   0xa0b1
-+				MX6SX_PAD_RGMII2_TD3__ENET2_TX_DATA_3   0xa0b1
-+				MX6SX_PAD_RGMII2_TX_CTL__ENET2_TX_EN    0xa0b1
-+				MX6SX_PAD_RGMII2_RXC__ENET2_RX_CLK      0x3081
-+				MX6SX_PAD_RGMII2_RD0__ENET2_RX_DATA_0   0x3081
-+				MX6SX_PAD_RGMII2_RD1__ENET2_RX_DATA_1   0x3081
-+				MX6SX_PAD_RGMII2_RD2__ENET2_RX_DATA_2   0x3081
-+				MX6SX_PAD_RGMII2_RD3__ENET2_RX_DATA_3   0x3081
-+				MX6SX_PAD_RGMII2_RX_CTL__ENET2_RX_EN    0x3081
-+			>;
-+		};
-+
- 		pinctrl_i2c2_1: i2c2grp-1 {
- 			fsl,pins = <
- 				MX6SX_PAD_GPIO1_IO03__I2C2_SDA          0x4001b8b1
 -- 
 2.7.4
