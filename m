@@ -1,78 +1,62 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Tue, 24 Apr 2018 10:01:03 +0200
-Subject: [PATCH 6/6] devfreq: rk3399_dmc: register devfreq notification to
- dmc driver.
-In-Reply-To: <20180424042233epcms1p7b27cb007b11ed467d773ce93d8bc7ed4@epcms1p7>
-References: <20180419104019.24406-7-enric.balletbo@collabora.com>
- <20180419104019.24406-1-enric.balletbo@collabora.com>
- <CGME20180419104059epcas2p3fe5aba95859e02307556200a42bc1ac2@epcms1p7>
- <20180424042233epcms1p7b27cb007b11ed467d773ce93d8bc7ed4@epcms1p7>
-Message-ID: <a213bb68-2a47-b7b9-d35f-cc5355f9c1be@collabora.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 24 Apr 2018 10:05:53 +0200
+Subject: [PATCH v3 2/2] ARM: dts: nes: add Nintendo NES/SuperNES Classic
+ Edition support
+In-Reply-To: <20180424075505.p6e43yw2juw4fqqw@flea>
+References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
+ <20180421164246.8477-3-miquel.raynal@bootlin.com>
+ <20180423072403.4ip5seys4xyll3yr@flea>
+ <20180423122752.364ee649@xps13>
+ <20180424075505.p6e43yw2juw4fqqw@flea>
+Message-ID: <20180424100553.2e9e6151@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Maxime,
 
-On 24/04/18 06:22, MyungJoo Ham wrote:
->> From: Lin Huang <hl@rock-chips.com>
->>
->> Because dmc may also access the PMU_BUS_IDLE_REQ register, we need to
->> ensure that the pd driver and the dmc driver will not access at this
->> register at the same time.
->>
->> Signed-off-by: Lin Huang <hl@rock-chips.com>
->> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> ---
->>
->> drivers/devfreq/rk3399_dmc.c      | 47 +----------------------
->> drivers/soc/rockchip/pm_domains.c | 31 +++++++++++++++
->> include/soc/rockchip/rk3399_dmc.h | 63 +++++++++++++++++++++++++++++++
->> 3 files changed, 96 insertions(+), 45 deletions(-)
->> create mode 100644 include/soc/rockchip/rk3399_dmc.h
->>
->> diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
->> index 5bfca028eaaf..a1f320634d69 100644
->> --- a/drivers/devfreq/rk3399_dmc.c
->> +++ b/drivers/devfreq/rk3399_dmc.c
-> []
->> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
->> index 53efc386b1ad..7acc836e7eb7 100644
->> --- a/drivers/soc/rockchip/pm_domains.c
->> +++ b/drivers/soc/rockchip/pm_domains.c
-> []
->> +static int dmc_notify(struct notifier_block *nb, unsigned long event,
->> +		      void *data)
->> +{
->> +	if (event == DEVFREQ_PRECHANGE)
->> +		mutex_lock(&dmc_pmu->mutex);
->> +	else if (event == DEVFREQ_POSTCHANGE)
->> +		mutex_unlock(&dmc_pmu->mutex);
->> +
->> +	return NOTIFY_OK;
->> +}
->> +
+On Tue, 24 Apr 2018 09:55:05 +0200, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+
+> On Mon, Apr 23, 2018 at 12:27:52PM +0200, Miquel Raynal wrote:
+> > > >  	sun8i-r16-parrot.dtb \
+> > > >  	sun8i-r40-bananapi-m2-ultra.dtb \
+> > > >  	sun8i-v3s-licheepi-zero.dtb \
+> > > > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > > > index 6b9e85b4ba0f..44f3cad3de75 100644
+> > > > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > > > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > > > @@ -198,6 +198,8 @@
+> > > >  			clock-names = "ahb", "mod";
+> > > >  			resets = <&ccu RST_BUS_NAND>;
+> > > >  			reset-names = "ahb";
+> > > > +			pinctrl-names = "default";
+> > > > +			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;    
+> > > 
+> > > This should be in your first patch I guess?  
+> > 
+> > Actually I think this should not be there but instead, because it is
+> > board-related, these two lines should be in the nes-classic.dts' nfc
+> > node, right? Other a23/a33/r16 based designs could use the second set
+> > of CS/RB pins.  
 > 
-> Doesn't this incur a deadlock?
+> Does that ever happen?
 > 
-> 1. devfreq.c:update_freq calls devfreq_notify_transition(DEVFREQ_PRECHANGE)
-> 2. pm_domain.c:dmc_notify calls mutex_lock(dmc_pmu->mutex)
-> 3. devfreq.c:update_freq calls target callback
-> 4. rk3399_dmc.c:rk3399_dmcfreq_target calls mutex_lock(&dmcfreq->lock)
->    >>>>>> update_freq cannot proceed. <<<<
-> 
+> On a theoretical level, then yeah, sure. But if all the boards seen
+> out there are using the same setup (which is pretty common), then
+> there's no reason not to do it in the DTSI.
 
-Mmm, makes sense, but I did not detect this deadlock.
+Then I will add these two properties in the DTSI in the first patch.
 
-As this patch is controversial let me remove this patch from these series and
-I'll send again with the other series that applies on top of these, the series I
-am working on are to add ddrfreq support in the drm rockchip driver. Thinking
-about it I guess makes more sense as 1-5 are just cleanups, 6 is a bit
-different, maybe more related to the work I am doing.
-
-Best regards,
-  Enric
+Thanks,
+Miqu?l
 
 > 
-> Cheers,
-> MyungJoo
+> Maxime
 > 
+
+
+
+-- 
+Miquel Raynal, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
