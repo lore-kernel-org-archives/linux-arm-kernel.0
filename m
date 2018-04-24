@@ -1,41 +1,28 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Apr 2018 14:13:53 +0200
-Subject: [PATCH 2/7] ARM: dts: sun8i: h3: Split out common board design
- for ALL-H3-CC
-In-Reply-To: <20180424113424.13196-3-wens@csie.org>
-References: <20180424113424.13196-1-wens@csie.org>
- <20180424113424.13196-3-wens@csie.org>
-Message-ID: <20180424121353.zxujyehsw3er2xq6@flea>
+Date: Tue, 24 Apr 2018 14:14:28 +0200
+Subject: [PATCH v2 1/2] arm: dts: sun8i: h3: libretech-all-h3-cc: Move
+ board definition to common dtsi
+In-Reply-To: <1524570434-17814-2-git-send-email-narmstrong@baylibre.com>
+References: <1524570434-17814-1-git-send-email-narmstrong@baylibre.com>
+ <1524570434-17814-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20180424121428.bd7zir646sl64t7t@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 07:34:19PM +0800, Chen-Yu Tsai wrote:
-> The Libre Computer Project ALL-H3-CC has three models, all using the
-> same board design, but with different pin compatible SoCs and amount of
-> DRAM.
+On Tue, Apr 24, 2018 at 01:47:13PM +0200, Neil Armstrong wrote:
+> Since the libretech-all-h3-cc can use either the H2+, H3 or H5, move the
+> content of the dts file to a common dtsi file to be included by the H3
+> variant and in a following patch the H5 variant.
 > 
-> Currently only the H3 1GB DRAM variant is supported. To support the two
-> other variants, first split the original device tree into a common board
-> design part and an SoC specific part.
+> By the way, update the SPDX licence tag position.
 > 
-> The SoC part only defines which SoC is used and model name, and includes
-> the SoC specific dtsi file and the common design dtsi file.
-> 
-> Also fix up the SPDX identifier line to use the correct comment style,
-> and place it on the first line.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  .../boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 213 +-----------------
->  ....dts => sunxi-hx-libretech-all-h3-cc.dtsi} |  11 +-
+> Suggested-by: Corentin Labbe <clabbe@baylibre.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-I think I prefer the name of Neil's DTSI better, and since pretty much
-the same patches (a couple of hours) before, we'll merge them (while
-merging the rest of your patches, obviously).
-
-Does that work for you?
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
 Maxime
+
 -- 
 Maxime Ripard, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
@@ -46,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/217c3fad/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180424/b6b68a39/attachment.sig>
