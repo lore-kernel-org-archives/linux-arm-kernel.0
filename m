@@ -1,117 +1,154 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Tue, 24 Apr 2018 21:25:44 +0300
-Subject: [PATCH v4 7/8] drm/i2c: tda998x: register as a drm bridge
-In-Reply-To: <20180424170625.GL16141@n2100.armlinux.org.uk>
-References: <20180423072301.11962-1-peda@axentia.se>
- <20180423072301.11962-8-peda@axentia.se>
- <20180423160833.GF16141@n2100.armlinux.org.uk>
- <5d6866d0-75bc-4de8-9b87-4fee5430e9dd@axentia.se>
- <20180424080833.GJ16141@n2100.armlinux.org.uk>
- <8448e90a-4562-b564-c160-1b5c67e0f92f@axentia.se>
- <0cbee3bd-8987-5f2f-519d-f8d1b426f2a3@ti.com>
- <20180424170625.GL16141@n2100.armlinux.org.uk>
-Message-ID: <b7a7ffb6-b282-cbc5-435e-9ca1cd405e33@ti.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Tue, 24 Apr 2018 20:31:44 +0200
+Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
+ HMI
+In-Reply-To: <20180424084137.7xfwji2gcibxavvt@flea>
+References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180322180508.my64gobhh5rc2x2m@flea>
+ <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
+ <20180424084137.7xfwji2gcibxavvt@flea>
+Message-ID: <03a02abb-e95c-b4ec-748f-907c0af67969@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/18 20:06, Russell King - ARM Linux wrote:
-> On Tue, Apr 24, 2018 at 07:04:16PM +0300, Jyri Sarha wrote:
->> On 24/04/18 13:14, Peter Rosin wrote:
->>> On 2018-04-24 10:08, Russell King - ARM Linux wrote:
->>>> On Tue, Apr 24, 2018 at 08:58:42AM +0200, Peter Rosin wrote:
->>>>> On 2018-04-23 18:08, Russell King - ARM Linux wrote:
->>>>>> On Mon, Apr 23, 2018 at 09:23:00AM +0200, Peter Rosin wrote:
->>>>>>>  static int tda998x_remove(struct i2c_client *client)
->>>>>>>  {
->>>>>>> -	component_del(&client->dev, &tda998x_ops);
->>>>>>> +	struct device *dev = &client->dev;
->>>>>>> +	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
->>>>>>> +
->>>>>>> +	drm_bridge_remove(&bridge->bridge);
->>>>>>> +	component_del(dev, &tda998x_ops);
->>>>>>> +
->>>>>>
->>>>>> I'd like to ask a rather fundamental question about DRM bridge support,
->>>>>> because I suspect that there's a major fsckup here.
->>>>>>
->>>>>> The above is the function that deals with the TDA998x device being
->>>>>> unbound from the driver.  With the component API, this results in the
->>>>>> DRM device correctly being torn down, because one of the hardware
->>>>>> devices has gone.
->>>>>>
->>>>>> With DRM bridge, the bridge is merely removed from the list of
->>>>>> bridges:
->>>>>>
->>>>>> void drm_bridge_remove(struct drm_bridge *bridge)
->>>>>> {
->>>>>>         mutex_lock(&bridge_lock);
->>>>>>         list_del_init(&bridge->list);
->>>>>>         mutex_unlock(&bridge_lock);
->>>>>> }
->>>>>> EXPORT_SYMBOL(drm_bridge_remove);
->>>>>>
->>>>>> and the memory backing the "struct tda998x_bridge" (which contains
->>>>>> the struct drm_bridge) will be freed by the devm subsystem.
->>>>>>
->>>>>> However, there is no notification into the rest of the DRM subsystem
->>>>>> that the device has gone away.  Worse, the memory that is still in
->>>>>> use by DRM has now been freed, so further use of the DRM device
->>>>>> results in a use-after-free bug.
->>>>>>
->>>>>> This is really not good, and to me looks like a fundamental problem
->>>>>> with the DRM bridge code.  I see nothing in the DRM bridge code that
->>>>>> deals with the lifetime of a "DRM bridge" or indeed the lifetime of
->>>>>> the actual device itself.
->>>>>>
->>>>>> So, from what I can see, there seems to be a fundamental lifetime
->>>>>> issue with the design of the DRM bridge code.  This needs to be
->>>>>> fixed.
->>>>>
->>>>> Oh crap. A gigantic can of worms...
+Hi Maxime and all,
+I resend the e-mail since it was refused by some address(my phone 
+composed it in HTML). Sorry.
+
+Il 24/04/2018 10:41, Maxime Ripard ha scritto:
+> Hi,
+> 
+> On Mon, Apr 23, 2018 at 04:37:33PM +0200, Giulio Benetti wrote:
+>> Il 22/03/2018 19:05, Maxime Ripard ha scritto:
+>>> On Wed, Mar 21, 2018 at 09:03:13PM +0100, Giulio Benetti wrote:
+>>>> The A20-Linova1-7 HMI, also called Q027_2_F which is printed on production
+>>>> label, is an industrial Human Machine Interface.
+>>>> It features:
+>>>> - 512MB DDR RAM
+>>>> - 1 Sd-card >= 4GB
+>>>> - 1 Usb otg(programmable via software) with A-Usb Connector
+>>>> - 1 Usb host
+>>>> - 1 Buzzer
+>>>> - 1 Input for LiPo
+>>>> - 1 Relay to signal absence of power supply
+>>>> - 1 External Rtc with 56 bytes of ram + CR2032 battery
+>>>> - 1 7" 24-bits Tft 800x480 with PCap on
+>>>> - 1 Mono audio 1-watt amplifier
+>>>> - 1 RS485 port
+>>>> - 1 Power On Line through +12Vdc reaching 57.600baud,
+>>>>     from where it can be supplied and placed in a network of 50 units
+>>>> - exposed jtag pins
 >>>>
->>>> Yes, it's especially annoying for me, having put the effort in to
->>>> the component helper to cover all these cases.
->>>>
->>>>> Would a patch (completely untested btw) along this line of thinking make
->>>>> any difference whatsoever?
->>>>
->>>> It looks interesting - from what I can see of the device links code,
->>>> it would have the effect of unbinding the DRM device just before
->>>> TDA998x is unbound, so that's an improvement.
->>>>
->>>> However, from what I can see, the link vanishes at that point (as
->>>> DL_FLAG_AUTOREMOVE is set), and re-binding the TDA998x device results
->>>> in nothing further happening - the link will be recreated, but there
->>>> appears to be nothing that triggers the "consumer" to rebind at that
->>>> point.  Maybe I've missed something?
+>>>> HMI is supplied from +12Vdc.
+>>>> Ethernet is absent, so for debugging, need to enable rndis on Usb otg
+>>>> port through an A-A usb cable.
+>>>> It comes in different flavours for connector types and can be found with
+>>>> umounted features as requested by customers.
 >>>
->>> Right, auto-remove is a no-go. So, improving on the previous...
+>>> So this is essentially the same board than in patch 6, but with a
+>>> different screen?
 >>>
->>> (I think drm_panel might suffer from this issue too?)
+>>> You should have a single DT then, and handle the two different panels
+>>> using DT overlays.
 >>
->> Yes it does and I took a shot at trying to fix it at the end of the
->> previous merge window, but gave up as I run out of time. I re-spun the
->> work now after reading this thread. I add you and Russell to cc.
+>> Ok for having different DT overlays.
+>> But do I have to submit them as patches? Or keep them in my company's repo?
+>> I ask you this because this involves sending also patches for displays
+>> and other little modifications to mainline ex:
+>> - rgb888 pins
+>> - 2 simple-panels
+>> - 1 uart iomux pins
+>> etc.
+>>
+>> If I don't submit those overlays, the other patches wouldn't make sense
+>> alone as I've seen, just like rgb888 pins.
 > 
-> Right, and these exact problems are what the component helper is
-> there to sort out, in a subsystem independent way.
+> We don't have a repo for overlays yet
+
+Ok I can provide them on my company Repo.
+
+But, sorry if insist(please don't kill me! :) ), I would try to explain 
+better how it's made LiNova, because I think I didn't provide enough 
+information about it:
+LiNova1 is not a board with various headers to connect other peripherals 
+such display, pcap etc.
+It's an HMI that I would consider the same as a Tablet, because it has a 
+plastic enclosure also.
+
+So I would like to understand how to manage it in the best way.
+Try to consider LiNova1 as a Tablet series, with following list:
+LiNova1 4.3" ctp
+LiNova1 7" ctp
+LiNova1 10.1" ctp
+LiNova1 4.3" rtp
+LiNova1 7" rtp
+LiNova1 10.1" rtp
+
+Every of those has a slightly different BOM, so they are 6 different 
+boards with a common base(uP, ram). And same pcb.
+
+So I don't know if submit only the common base and provide separately on 
+our github DT-overlays, or provide as many dts patches as the HMI number 
+with a base dtsi.
+
+Basically Micronova provides entire system without the capability to 
+hack hardware adding shields of various type.
+
+There are also other 2 LiNova:
+LiNova2 and LiNova3
+
+So I understand that this could lead to 18 different dts files and 3 
+dtsi files.
+
+But with Tablet it should be the same way.
+For sure people would be more interested on famous tablets instead of 
+our HMI.
+
+In the case I need to use dt-overlays, you mean .dto files with 
+fragments inside loaded by u-boot or runtime, right?
+
+Sorry if I bother you again but I wanted to understand better.
+
 > 
-> What is the problem with the component helper that people seem to
-> be soo loathed to use it, instead preferring to come up with sub-
-> standard and broken alternatives?
+>>>> +&usb_otg {
+>>>> +	dr_mode = "otg";
+>>>
+>>> You're saying that this is a USB-A connector? Then it's not OTG since
+>>> it doesn't have an ID pin, this is an host.
+>>
+>> Right, with a special overlay I will activate Usb Device for RNDIS,
+>> so modified as host
 > 
+> That doesn't really make much sense. The USB OTG is wired only using a
+> daughter board?
 
-Nothing but time. Embedding component helpers seamlessly into drm
-framework does not sound like a couple of days job. Right now I simply
-do not have time to take on a challenge like that. If someone does it I
-am all for it.
+My fault, I've meant "peripheral" in one case and "host" in another case.
+Usually "host".
+Are there problem with this?
+There is no daughter board.
 
-However, I would not call device links substandard. They are in the
-device core after all.
-
-Best regards,
-Jyri
+Thank you very very much in advance for you patience :)
 
 -- 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Giulio Benetti
+CTO
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
+
+> 
+> 
+>> One last question:
+>> now I have some patch already reviewed-by.
+>> Do I have to re-submit entire patchset?
+> 
+> Yes
+> 
+> Maxime
+> 
