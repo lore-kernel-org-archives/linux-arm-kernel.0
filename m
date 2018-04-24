@@ -1,26 +1,25 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 24 Apr 2018 17:39:53 +0200
-Subject: [PATCH  1/8] net: ethernet: stmmac: add adaptation for
- stm32mp157c.
-In-Reply-To: <1524582120-4451-2-git-send-email-christophe.roullier@st.com>
-References: <1524582120-4451-1-git-send-email-christophe.roullier@st.com>
- <1524582120-4451-2-git-send-email-christophe.roullier@st.com>
-Message-ID: <20180424153953.GB2360@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Apr 2018 16:40:56 +0100
+Subject: [PATCH] arm64: export tishift functions to modules
+In-Reply-To: <CAHmME9oO_5X6M3NLe2tWp=ZY5EQY17GQ6BUomHLBscMejiXTvw@mail.gmail.com>
+References: <CAHmME9oO_5X6M3NLe2tWp=ZY5EQY17GQ6BUomHLBscMejiXTvw@mail.gmail.com>
+Message-ID: <20180424154055.GC25964@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 05:01:53PM +0200, Christophe Roullier wrote:
+On Tue, Apr 24, 2018 at 03:43:04PM +0200, Jason A. Donenfeld wrote:
+> On Tue, Apr 24, 2018 at 3:34 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > I've not run into any build issues here -- is this specifically with some
+> > out-of-tree module?
+> 
+> I received a bug report email about this. I'm not sure which specific
+> module, and I assumed from the email that it was actually a result of
+> in-tree configuration options rather than an out-of-tree module, but
+> I'm not sure exactly. Either way, I was able to reproduce the problem
+> by coding up a little PoC out-of-tree module, so it is certainly a
+> real problem.
 
-> +	case PHY_INTERFACE_MODE_RGMII:
-> +		val = SYSCFG_PMCR_ETH_SEL_RGMII;
-> +		if (dwmac->int_phyclk)
-> +			val |= SYSCFG_PMCR_ETH_CLK_SEL;
-> +		pr_debug("SYSCFG init : PHY_INTERFACE_MODE_RGMII\n");
-> +		break;
+Any chance you could share the module, please? I tried to write one but
+the compiler just inlines the __in128 arithmetic.
 
-Hi Christophe
-
-What about PHY_INTERFACE_MODE_RGMII_ID, PHY_INTERFACE_MODE_RGMII_RXID
-and PHY_INTERFACE_MODE_RGMII_TXID.
-
-    Andrew
+Will
