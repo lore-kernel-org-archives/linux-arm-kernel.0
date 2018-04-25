@@ -1,98 +1,34 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 25 Apr 2018 16:50:39 +0200
-Subject: [PATCH 1/2] can: flexcan: fix endianess detection
-In-Reply-To: <20180425145040.22031-1-u.kleine-koenig@pengutronix.de>
-References: <20180425145040.22031-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20180425145040.22031-2-u.kleine-koenig@pengutronix.de>
+Date: Wed, 25 Apr 2018 16:50:38 +0200
+Subject: [PATCH 0/2] can: flexcan: fix regression from v4.16-rc1
+Message-ID: <20180425145040.22031-1-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 88462d2a7830 ("can: flexcan: Remodel FlexCAN register r/w APIs
-for big endian FlexCAN controllers.") the following logic was
-implemented:
+Hello,
 
-	if the dt property "big-endian" is given or
-	   the device is compatible to "fsl,p1010-flexcan":
-		use big-endian mode;
-	else
-		use little-endian mode;
+when porting the kernel from a i.MX25 based machine to 4.17-rc1 (but
+still using the old dtb) can failed to probe. After some research we
+noticed that a commit that was merged in the v4.16 merge window
+introduced a change that broke using an older device tree.
 
-This relies on commit d50f4630c2e1 ("arm: dts: Remove p1010-flexcan
-compatible from imx series dts") which was applied a few commits later.
-Without this commit (or an old device tree used for booting a new
-kernel) the flexcan devices on i.MX25, i.MX28, i.MX35 and i.MX53 match
-the 'the device is compatible to "fsl,p1010-flexcan"' test and so are
-switched erroneously to big endian mode.
+This series first commit fixes the issue.
+The second patch introduces a fallback compatible which matches the
+usual dt-style on i.MX. (Before v4.16-rc1 there was a wrong fallback
+compatible that was removed.)
 
-Instead of the check above put a flag into devtype data and rely on
-of_match_device yielding the most compatible match
+Best regards
+Uwe
 
-Fixes: 88462d2a7830 ("can: flexcan: Remodel FlexCAN register r/w APIs for big endian FlexCAN controllers.")
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/net/can/flexcan.c | 26 ++++++++++++++------------
- 1 file changed, 14 insertions(+), 12 deletions(-)
+Uwe Kleine-K?nig (2):
+  can: flexcan: fix endianess detection
+  arm: dts: imx[35]*: declare flexcan devices to be compatible to
+    imx25's flexcan
 
-diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-index 634c51e6b8ae..a6cbbe689eab 100644
---- a/drivers/net/can/flexcan.c
-+++ b/drivers/net/can/flexcan.c
-@@ -262,6 +262,7 @@ struct flexcan_regs {
- 
- struct flexcan_devtype_data {
- 	u32 quirks;		/* quirks needed for different IP cores */
-+	bool default_be;
- };
- 
- struct flexcan_priv {
-@@ -289,6 +290,12 @@ struct flexcan_priv {
- static const struct flexcan_devtype_data fsl_p1010_devtype_data = {
- 	.quirks = FLEXCAN_QUIRK_BROKEN_WERR_STATE |
- 		FLEXCAN_QUIRK_BROKEN_PERR_STATE,
-+	.default_be = true,
-+};
-+
-+static const struct flexcan_devtype_data fsl_imx25_devtype_data = {
-+	.quirks = FLEXCAN_QUIRK_BROKEN_WERR_STATE |
-+		FLEXCAN_QUIRK_BROKEN_PERR_STATE,
- };
- 
- static const struct flexcan_devtype_data fsl_imx28_devtype_data = {
-@@ -1251,9 +1258,9 @@ static void unregister_flexcandev(struct net_device *dev)
- static const struct of_device_id flexcan_of_match[] = {
- 	{ .compatible = "fsl,imx6q-flexcan", .data = &fsl_imx6q_devtype_data, },
- 	{ .compatible = "fsl,imx28-flexcan", .data = &fsl_imx28_devtype_data, },
--	{ .compatible = "fsl,imx53-flexcan", .data = &fsl_p1010_devtype_data, },
--	{ .compatible = "fsl,imx35-flexcan", .data = &fsl_p1010_devtype_data, },
--	{ .compatible = "fsl,imx25-flexcan", .data = &fsl_p1010_devtype_data, },
-+	{ .compatible = "fsl,imx53-flexcan", .data = &fsl_imx25_devtype_data, },
-+	{ .compatible = "fsl,imx35-flexcan", .data = &fsl_imx25_devtype_data, },
-+	{ .compatible = "fsl,imx25-flexcan", .data = &fsl_imx25_devtype_data, },
- 	{ .compatible = "fsl,p1010-flexcan", .data = &fsl_p1010_devtype_data, },
- 	{ .compatible = "fsl,vf610-flexcan", .data = &fsl_vf610_devtype_data, },
- 	{ .compatible = "fsl,ls1021ar2-flexcan", .data = &fsl_ls1021a_r2_devtype_data, },
-@@ -1337,18 +1344,13 @@ static int flexcan_probe(struct platform_device *pdev)
- 
- 	priv = netdev_priv(dev);
- 
--	if (of_property_read_bool(pdev->dev.of_node, "big-endian")) {
-+	if (of_property_read_bool(pdev->dev.of_node, "big-endian") ||
-+	    devtype_data->default_be) {
- 		priv->read = flexcan_read_be;
- 		priv->write = flexcan_write_be;
- 	} else {
--		if (of_device_is_compatible(pdev->dev.of_node,
--					    "fsl,p1010-flexcan")) {
--			priv->read = flexcan_read_be;
--			priv->write = flexcan_write_be;
--		} else {
--			priv->read = flexcan_read_le;
--			priv->write = flexcan_write_le;
--		}
-+		priv->read = flexcan_read_le;
-+		priv->write = flexcan_write_le;
- 	}
- 
- 	priv->can.clock.freq = clock_freq;
+ arch/arm/boot/dts/imx35.dtsi |  4 ++--
+ arch/arm/boot/dts/imx53.dtsi |  4 ++--
+ drivers/net/can/flexcan.c    | 26 ++++++++++++++------------
+ 3 files changed, 18 insertions(+), 16 deletions(-)
+
 -- 
 2.17.0
