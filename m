@@ -1,71 +1,25 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Wed, 25 Apr 2018 14:04:56 -0700
-Subject: [PATCH v2 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <20180425103136.GB24769@sirena.org.uk>
-References: <cover.1523673467.git.collinsd@codeaurora.org>
- <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
- <CAD=FV=XKYCDtF93RtYi+dokR2BcT-z6Ex3UjgJ0ia_kF=847eA@mail.gmail.com>
- <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
- <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
- <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
- <20180424174507.GI22073@sirena.org.uk>
- <20a8f736-2687-f14f-eaa1-2b2c06eed629@codeaurora.org>
- <20180425103136.GB24769@sirena.org.uk>
-Message-ID: <f98416ac-230c-0362-ed50-a7f92ff283d7@codeaurora.org>
+From: deller@gmx.de (Helge Deller)
+Date: Wed, 25 Apr 2018 23:07:57 +0200
+Subject: [PATCH 22/22] parisc: use generic dma_noncoherent_ops
+In-Reply-To: <20180425072105.GA12308@lst.de>
+References: <20180420080313.18796-1-hch@lst.de>
+ <20180420080313.18796-23-hch@lst.de>
+ <e0b4f3be-68b9-c3af-e432-fd20419e2d70@gmx.de> <20180425072105.GA12308@lst.de>
+Message-ID: <84d9e1ac-86c3-6f2e-377f-2be44783b933@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> I think that's probably only OK if we have a specific error code for the
->>> regulator being limited in this way otherwise our error handling for I/O
->>> problems involves us trying to reconfigure supplies which seems like it
->>> would be risky.  
+On 25.04.2018 09:21, Christoph Hellwig wrote:
+> On Sat, Apr 21, 2018 at 07:43:46PM +0200, Helge Deller wrote:
+>> This patch breaks a 32bit kernel on a B160L machine (PA7300LC CPU, "pcxl2").
+>> After applying this patch series the lasi82956 network driver works unreliable. 
+>> NIC gets IP, but ping doesn't work.
+>> See drivers/net/ethernet/i825xx/lasi_82596.c, it uses dma*sync() functions.
+> 
+> Just to confirm:  Without the series it is known to actually work?
 
->> Would you be ok with -EAGAIN being used for this purpose?
+Yes.
+I reverted this series from my tree, rebuilt, and then the issue was gone.
+I won't be able to test again earlier than next week.
 
-> Using -EAGAIN for "I can't ever read the configuration from this
-> regulator" doesn't seem right - it's not like any number of retries
-> will ever manage to read the value back.
-
-In this case, the _regulator_get_voltage() call can succeed, but only
-after a voltage is explicitly requested from the framework side.  The
-intention here would then be to call _regulator_do_set_voltage() with the
-constraint min_uV to max_uV range.  After that, subsequent
-_regulator_get_voltage() calls will be successful.
-
-Here is the general idea:
-
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 65f9b7c..e61983d 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -910,6 +910,19 @@ static int machine_constraints_voltage(struct
-regulator_dev *rdev,
- 	    rdev->constraints->min_uV && rdev->constraints->max_uV) {
- 		int target_min, target_max;
- 		int current_uV = _regulator_get_voltage(rdev);
-+		if (current_uV == -EAGAIN) {
-+			/*
-+			 * Regulator voltage cannot be read until after
-+			 * configuration; try setting constraint range.
-+			 */
-+			rdev_info(rdev, "Setting %d-%duV\n",
-+				  rdev->constraints->min_uV,
-+				  rdev->constraints->max_uV);
-+			_regulator_do_set_voltage(rdev,
-+						  rdev->constraints->min_uV,
-+						  rdev->constraints->max_uV);
-+			current_uV = _regulator_get_voltage(rdev);
-+		}
- 		if (current_uV < 0) {
- 			rdev_err(rdev,
- 				 "failed to get the current voltage(%d)\n",
-
-Do you still have reservations about using -EAGAIN for this purpose?  If
-so, which error code would you suggest using?
-
-Thanks,
-David
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Helge
