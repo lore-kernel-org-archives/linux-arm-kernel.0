@@ -1,516 +1,109 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 25 Apr 2018 12:19:59 +0800
-Subject: [PATCH 6/6] ASoC: mediatek: switch to SPDX license tag
-In-Reply-To: <07e845c2e7eb06c5f284d1bae3acbccba42e48fa.1524628914.git.ryder.lee@mediatek.com>
-References: <07e845c2e7eb06c5f284d1bae3acbccba42e48fa.1524628914.git.ryder.lee@mediatek.com>
-Message-ID: <4df7061e4eb1d7bc13b969e81eca4ac1face3366.1524628914.git.ryder.lee@mediatek.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 24 Apr 2018 21:29:51 -0700
+Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
+ kevin panel
+In-Reply-To: <CAAEAJfAQMzUfM86o-xNoyBQzTiEMNH+W=9FyFpBy99nA3HrVgw@mail.gmail.com>
+References: <20180208174855.55620-1-seanpaul@chromium.org>
+ <20180208174855.55620-7-seanpaul@chromium.org>
+ <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
+ <CAAEAJfAQMzUfM86o-xNoyBQzTiEMNH+W=9FyFpBy99nA3HrVgw@mail.gmail.com>
+Message-ID: <CAD=FV=W9LCeGAEuZDD9FUEKVMp8YUuCcW9uLcTZqTR1spA1gEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPDX identifiers to all remaining files in sound/soc/mediatek/
+Hi,
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- sound/soc/mediatek/Makefile                         |  1 +
- sound/soc/mediatek/common/Makefile                  | 14 +-------------
- sound/soc/mediatek/common/mtk-afe-fe-dai.c          | 10 +---------
- sound/soc/mediatek/common/mtk-afe-fe-dai.h          | 10 +---------
- sound/soc/mediatek/common/mtk-afe-platform-driver.c | 10 +---------
- sound/soc/mediatek/common/mtk-afe-platform-driver.h | 10 +---------
- sound/soc/mediatek/common/mtk-base-afe.h            | 10 +---------
- sound/soc/mediatek/mt2701/Makefile                  | 14 +-------------
- sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c   | 10 +---------
- sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h   | 10 +---------
- sound/soc/mediatek/mt2701/mt2701-afe-common.h       | 10 +---------
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c          | 10 +---------
- sound/soc/mediatek/mt2701/mt2701-cs42448.c          | 13 ++-----------
- sound/soc/mediatek/mt2701/mt2701-reg.h              | 10 +---------
- sound/soc/mediatek/mt2701/mt2701-wm8960.c           | 10 +---------
- sound/soc/mediatek/mt8173/mt8173-afe-common.h       | 10 +---------
- sound/soc/mediatek/mt8173/mt8173-afe-pcm.c          | 10 +---------
- sound/soc/mediatek/mt8173/mt8173-max98090.c         | 10 +---------
- sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c    | 10 +---------
- sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c    | 10 +---------
- sound/soc/mediatek/mt8173/mt8173-rt5650.c           | 10 +---------
- 21 files changed, 22 insertions(+), 190 deletions(-)
+On Tue, Apr 24, 2018 at 7:31 AM, Ezequiel Garcia
+<ezequiel@vanguardiasur.com.ar> wrote:
+> Hi Doug, Sean:
+>
+> I would like to move this forward.
+>
+> On 26 February 2018 at 15:23, Doug Anderson <dianders@chromium.org> wrote:
+>> Hi,
+>>
+>> On Thu, Feb 8, 2018 at 9:48 AM, Sean Paul <seanpaul@chromium.org> wrote:
+>>> This patch adds an override mode for kevin devices. The mode increases
+>>> both back porches to allow a pixel clock of 26666kHz as opposed to the
+>>> 'typical' value of 252750kHz. This is needed to avoid interference with
+>>> the touch digitizer on these laptops.
+>>>
+>>> Changes in v2:
+>>>  - Wrap the timing in display-timings node to match binding (Rob/Thierry)
+>>> Changes in v3:
+>>>  - Unwrap the timing from display-timings and rename panel-timing (Rob)
+>>>
+>>> Cc: Doug Anderson <dianders@chromium.org>
+>>> Cc: Eric Anholt <eric@anholt.net>
+>>> Cc: Heiko Stuebner <heiko@sntech.de>
+>>> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: St?phane Marchesin <marcheu@chromium.org>
+>>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>>> Cc: devicetree at vger.kernel.org
+>>> Cc: dri-devel at lists.freedesktop.org
+>>> Cc: linux-rockchip at lists.infradead.org
+>>> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+>>> ---
+>>>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
+>>>  1 file changed, 14 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>>> index 191a6bcb1704..658411ce37ea 100644
+>>> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>>> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>>> @@ -98,6 +98,20 @@
+>>>                 backlight = <&backlight>;
+>>>                 power-supply = <&pp3300_disp>;
+>>>
+>>> +               panel-timing {
+>>> +                       clock-frequency = <266604720>;
+>>> +                       hactive = <2400>;
+>>> +                       hfront-porch = <48>;
+>>> +                       hback-porch = <84>;
+>>> +                       hsync-len = <32>;
+>>> +                       hsync-active = <0>;
+>>> +                       vactive = <1600>;
+>>> +                       vfront-porch = <3>;
+>>> +                       vback-porch = <120>;
+>>> +                       vsync-len = <10>;
+>>> +                       vsync-active = <0>;
+>>> +               };
+>>> +
+>>>                 ports {
+>>>                         panel_in_edp: endpoint {
+>>>                                 remote-endpoint = <&edp_out_panel>;
+>>
+>> Kristian brought an old bug to my attention
+>> <https://bugs.chromium.org/p/chromium/issues/detail?id=750354> and it
+>> made me think.  Should we somehow adjust the bindings here to account
+>> for the fact that a board may source several different panels?
+>>
+>> AKA: on some boards an ODM may want to second source (or third source,
+>> or ...) the panel.  They'll randomly connect several different panels
+>> to the board and ship the boards out.  The panels are all compatible
+>> electrically (same power sequencing) but might need slightly different
+>> timings.  In this particular case there's no board-level strappings
+>> for the different panels--it's assumed that the EDID on the panels can
+>> be used to distinguish them.
+>>
+>> In that case it seems like it would be nice to allow specifying more
+>> than one "panel-timing" nodes.  Maybe keyed off some type of ID that's
+>> present in the EDID?
+>>
+>>
+>> Is that something we'd want to account for before we land this series?
+>>  It seems like it would just be adding an extra level of nodes?
+>>
+>
+> AFAICS, there is no EDID without a DDC bus, which we don't
+> seem to have on gru platforms, do we?
 
-diff --git a/sound/soc/mediatek/Makefile b/sound/soc/mediatek/Makefile
-index 6bcab35..2867958 100644
---- a/sound/soc/mediatek/Makefile
-+++ b/sound/soc/mediatek/Makefile
-@@ -1,3 +1,4 @@
-+# SPDX-License-Identifier: GPL-2.0
- obj-$(CONFIG_SND_SOC_MEDIATEK) += common/
- obj-$(CONFIG_SND_SOC_MT2701) += mt2701/
- obj-$(CONFIG_SND_SOC_MT8173) += mt8173/
-diff --git a/sound/soc/mediatek/common/Makefile b/sound/soc/mediatek/common/Makefile
-index a55d33b..cdadabc 100644
---- a/sound/soc/mediatek/common/Makefile
-+++ b/sound/soc/mediatek/common/Makefile
-@@ -1,16 +1,4 @@
--#
--# Copyright (C) 2015 MediaTek Inc.
--#
--# This program is free software: you can redistribute it and/or modify
--# it under the terms of the GNU General Public License version 2 as
--# published by the Free Software Foundation.
--#
--# This program is distributed in the hope that it will be useful,
--# but WITHOUT ANY WARRANTY; without even the implied warranty of
--# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
--# GNU General Public License for more details.
--#
--
-+# SPDX-License-Identifier: GPL-2.0
- # platform driver
- snd-soc-mtk-common-objs := mtk-afe-platform-driver.o mtk-afe-fe-dai.o
- obj-$(CONFIG_SND_SOC_MEDIATEK) += snd-soc-mtk-common.o
-diff --git a/sound/soc/mediatek/common/mtk-afe-fe-dai.c b/sound/soc/mediatek/common/mtk-afe-fe-dai.c
-index ac61ff3c..cf4978b 100644
---- a/sound/soc/mediatek/common/mtk-afe-fe-dai.c
-+++ b/sound/soc/mediatek/common/mtk-afe-fe-dai.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * mtk-afe-fe-dais.c  --  Mediatek afe fe dai operator
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/module.h>
-diff --git a/sound/soc/mediatek/common/mtk-afe-fe-dai.h b/sound/soc/mediatek/common/mtk-afe-fe-dai.h
-index 28cb178..55074fb 100644
---- a/sound/soc/mediatek/common/mtk-afe-fe-dai.h
-+++ b/sound/soc/mediatek/common/mtk-afe-fe-dai.h
-@@ -1,17 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * mtk-afe-fe-dais.h  --  Mediatek afe fe dai operator definition
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef _MTK_AFE_FE_DAI_H_
-diff --git a/sound/soc/mediatek/common/mtk-afe-platform-driver.c b/sound/soc/mediatek/common/mtk-afe-platform-driver.c
-index 53215b5..404fbe1 100644
---- a/sound/soc/mediatek/common/mtk-afe-platform-driver.c
-+++ b/sound/soc/mediatek/common/mtk-afe-platform-driver.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * mtk-afe-platform-driver.c  --  Mediatek afe platform driver
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/module.h>
-diff --git a/sound/soc/mediatek/common/mtk-afe-platform-driver.h b/sound/soc/mediatek/common/mtk-afe-platform-driver.h
-index 8dcdbed..1c81d91 100644
---- a/sound/soc/mediatek/common/mtk-afe-platform-driver.h
-+++ b/sound/soc/mediatek/common/mtk-afe-platform-driver.h
-@@ -1,17 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * mtk-afe-platform-driver.h  --  Mediatek afe platform driver definition
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef _MTK_AFE_PLATFORM_DRIVER_H_
-diff --git a/sound/soc/mediatek/common/mtk-base-afe.h b/sound/soc/mediatek/common/mtk-base-afe.h
-index e50adc9..c2c5a6c 100644
---- a/sound/soc/mediatek/common/mtk-base-afe.h
-+++ b/sound/soc/mediatek/common/mtk-base-afe.h
-@@ -1,17 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * mtk-base-afe.h  --  Mediatek base afe structure
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef _MTK_BASE_AFE_H_
-diff --git a/sound/soc/mediatek/mt2701/Makefile b/sound/soc/mediatek/mt2701/Makefile
-index c91deb6..21d5e69 100644
---- a/sound/soc/mediatek/mt2701/Makefile
-+++ b/sound/soc/mediatek/mt2701/Makefile
-@@ -1,16 +1,4 @@
--#
--# Copyright (C) 2015 MediaTek Inc.
--#
--# This program is free software: you can redistribute it and/or modify
--# it under the terms of the GNU General Public License version 2 as
--# published by the Free Software Foundation.
--#
--# This program is distributed in the hope that it will be useful,
--# but WITHOUT ANY WARRANTY; without even the implied warranty of
--# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
--# GNU General Public License for more details.
--#
--
-+# SPDX-License-Identifier: GPL-2.0
- # platform driver
- snd-soc-mt2701-afe-objs := mt2701-afe-pcm.o mt2701-afe-clock-ctrl.o
- obj-$(CONFIG_SND_SOC_MT2701) += snd-soc-mt2701-afe.o
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
-index 1793c8d..ae62089 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
-@@ -1,18 +1,10 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * mt2701-afe-clock-ctrl.c  --  Mediatek 2701 afe clock ctrl
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-  *	   Ryder Lee <ryder.lee@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include "mt2701-afe-common.h"
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h
-index 1957219..580fead 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.h
-@@ -1,18 +1,10 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * mt2701-afe-clock-ctrl.h  --  Mediatek 2701 afe clock ctrl definition
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-  *	   Ryder Lee <ryder.lee@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef _MT2701_AFE_CLOCK_CTRL_H_
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-common.h b/sound/soc/mediatek/mt2701/mt2701-afe-common.h
-index 1ebac4b..d44faba 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-common.h
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-common.h
-@@ -1,17 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * mt2701-afe-common.h  --  Mediatek 2701 audio driver definitions
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef _MT_2701_AFE_COMMON_H_
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-index 3bc13b3..236f313 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Mediatek ALSA SoC AFE platform driver for 2701
-  *
-@@ -5,15 +6,6 @@
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-  *	   Ir Lian <ir.lian@mediatek.com>
-  *	   Ryder Lee <ryder.lee@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/delay.h>
-diff --git a/sound/soc/mediatek/mt2701/mt2701-cs42448.c b/sound/soc/mediatek/mt2701/mt2701-cs42448.c
-index 70f61d5..666282b 100644
---- a/sound/soc/mediatek/mt2701/mt2701-cs42448.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-cs42448.c
-@@ -1,19 +1,10 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * mt2701-cs42448.c  --  MT2701 CS42448 ALSA SoC machine driver
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Ir Lian <ir.lian@mediatek.com>
-- *              Garlic Tseng <garlic.tseng@mediatek.com>
-- *
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-+ *	   Garlic Tseng <garlic.tseng@mediatek.com>
-  */
- 
- #include <linux/module.h>
-diff --git a/sound/soc/mediatek/mt2701/mt2701-reg.h b/sound/soc/mediatek/mt2701/mt2701-reg.h
-index dbe7d60..c84d14c 100644
---- a/sound/soc/mediatek/mt2701/mt2701-reg.h
-+++ b/sound/soc/mediatek/mt2701/mt2701-reg.h
-@@ -1,17 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * mt2701-reg.h  --  Mediatek 2701 audio driver reg definition
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Garlic Tseng <garlic.tseng@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef _MT2701_REG_H_
-diff --git a/sound/soc/mediatek/mt2701/mt2701-wm8960.c b/sound/soc/mediatek/mt2701/mt2701-wm8960.c
-index a08ce23..89f34ef 100644
---- a/sound/soc/mediatek/mt2701/mt2701-wm8960.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-wm8960.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * mt2701-wm8960.c  --  MT2701 WM8960 ALSA SoC machine driver
-  *
-  * Copyright (c) 2017 MediaTek Inc.
-  * Author: Ryder Lee <ryder.lee@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/module.h>
-diff --git a/sound/soc/mediatek/mt8173/mt8173-afe-common.h b/sound/soc/mediatek/mt8173/mt8173-afe-common.h
-index 9a4837c..396fe23 100644
---- a/sound/soc/mediatek/mt8173/mt8173-afe-common.h
-+++ b/sound/soc/mediatek/mt8173/mt8173-afe-common.h
-@@ -1,3 +1,4 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * mt8173_afe_common.h  --  Mediatek 8173 audio driver common definitions
-  *
-@@ -6,15 +7,6 @@
-  *             Sascha Hauer <s.hauer@pengutronix.de>
-  *             Hidalgo Huang <hidalgo.huang@mediatek.com>
-  *             Ir Lian <ir.lian@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef _MT8173_AFE_COMMON_H_
-diff --git a/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c b/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c
-index 22881a9..c0b6697 100644
---- a/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Mediatek 8173 ALSA SoC AFE platform driver
-  *
-@@ -6,15 +7,6 @@
-  *             Sascha Hauer <s.hauer@pengutronix.de>
-  *             Hidalgo Huang <hidalgo.huang@mediatek.com>
-  *             Ir Lian <ir.lian@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/delay.h>
-diff --git a/sound/soc/mediatek/mt8173/mt8173-max98090.c b/sound/soc/mediatek/mt8173/mt8173-max98090.c
-index b49b527..902d111 100644
---- a/sound/soc/mediatek/mt8173/mt8173-max98090.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-max98090.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * mt8173-max98090.c  --  MT8173 MAX98090 ALSA SoC machine driver
-  *
-  * Copyright (c) 2015 MediaTek Inc.
-  * Author: Koro Chen <koro.chen@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/module.h>
-diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
-index 904f3ee..582174d 100644
---- a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * mt8173-rt5650-rt5514.c  --  MT8173 machine driver with RT5650/5514 codecs
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Koro Chen <koro.chen@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/module.h>
-diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
-index 9c61b8c..b3670c8 100644
---- a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * mt8173-rt5650-rt5676.c  --  MT8173 machine driver with RT5650/5676 codecs
-  *
-  * Copyright (c) 2015 MediaTek Inc.
-  * Author: Koro Chen <koro.chen@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/module.h>
-diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650.c b/sound/soc/mediatek/mt8173/mt8173-rt5650.c
-index 84aa09d..7a89b4a 100644
---- a/sound/soc/mediatek/mt8173/mt8173-rt5650.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-rt5650.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * mt8173-rt5650.c  --  MT8173 machine driver with RT5650 codecs
-  *
-  * Copyright (c) 2016 MediaTek Inc.
-  * Author: Koro Chen <koro.chen@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/module.h>
--- 
-1.9.1
+I'm fairly certain we can read the EDID on gru devices.  I see the
+"aux" channel connected on the schematics.  That'll do it, right?
+...and I could have sworn that at some point in time I could read the
+EDID in the software.  My kevin devices are not connected for
+debugging so I can't check right now, but I'm pretty sure I was able
+to read the EDID in the past...
+
+-Doug
