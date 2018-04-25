@@ -1,22 +1,20 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 26 Apr 2018 08:08:15 +0200
-Subject: [PATCH 2/3] edac: altera: Add support for Stratix10 SDRAM EDAC
-In-Reply-To: <2d310ff0-fa0e-e432-ae11-ba34080b4f6e@kernel.org>
-References: <1524594959-5259-1-git-send-email-thor.thayer@linux.intel.com>
- <1524594959-5259-3-git-send-email-thor.thayer@linux.intel.com>
- <2d310ff0-fa0e-e432-ae11-ba34080b4f6e@kernel.org>
-Message-ID: <20180426060815.GA7931@pd.tnic>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 25 Apr 2018 08:10:10 +0200
+Subject: [PATCH] arm64: defconfig: enable R8A77990 SoC
+In-Reply-To: <CAMuHMdWCb6njE=-24+Yc2R7svuXS8OSTQvbwavwRGPWZkT6BOA@mail.gmail.com>
+References: <20180423104556.17636-1-horms+renesas@verge.net.au>
+ <CAMuHMdWCb6njE=-24+Yc2R7svuXS8OSTQvbwavwRGPWZkT6BOA@mail.gmail.com>
+Message-ID: <20180425061009.m2hcro4vkjpymqx3@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 09:14:27PM -0500, Dinh Nguyen wrote:
-> Does it make sense to have the support for this in separate files?
+On Tue, Apr 24, 2018 at 04:50:17PM +0200, Geert Uytterhoeven wrote:
+> On Mon, Apr 23, 2018 at 12:45 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Enable the Renesas R-Car E3 (R8A77990) SoC in the ARM64 defconfig.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-No. Per vendor or per uarch/processor type, standalone EDAC drivers are
-fine. But not per the RAS capability of a functional unit.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Thanks, applied.
