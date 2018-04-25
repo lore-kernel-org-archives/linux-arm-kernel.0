@@ -1,49 +1,34 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 25 Apr 2018 11:30:33 +0800
-Subject: [PATCH V3 4/4] ARM: dts: imx6sx-sabreauto: add wdog external reset
- support
-In-Reply-To: <1524627033-535-1-git-send-email-Anson.Huang@nxp.com>
-References: <1524627033-535-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1524627033-535-4-git-send-email-Anson.Huang@nxp.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Wed, 25 Apr 2018 12:19:58 +0800
+Subject: [PATCH 5/6] ASoC: mediatek: add MT7622 AFE compatible in documentation
+In-Reply-To: <07e845c2e7eb06c5f284d1bae3acbccba42e48fa.1524628914.git.ryder.lee@mediatek.com>
+References: <07e845c2e7eb06c5f284d1bae3acbccba42e48fa.1524628914.git.ryder.lee@mediatek.com>
+Message-ID: <43bf5fcef0edefef2524122e64400785243f4fdf.1524628914.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SX Sabre Auto board has GPIO1_IO13 pin can be
-MUXed as WDOG output to reset PMIC, add this function
-support.
+Add support for MT7622 AFE which shares the same binding with MT2701.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
-no changes since V2.
- arch/arm/boot/dts/imx6sx-sabreauto.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-index 812f40b..abe9054 100644
---- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-@@ -161,6 +161,12 @@
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6SX_PAD_GPIO1_IO13__WDOG1_WDOG_ANY 0x30b0
-+			>;
-+		};
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
+index e2f7f49..560762e 100644
+--- a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
++++ b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
+@@ -1,7 +1,9 @@
+ Mediatek AFE PCM controller for mt2701
  
-@@ -300,3 +306,9 @@
- 		#gpio-cells = <2>;
- 	};
- };
-+
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
+ Required properties:
+-- compatible = "mediatek,mt2701-audio";
++- compatible: should be one of the followings.
++	      - "mediatek,mt2701-audio"
++	      - "mediatek,mt7622-audio"
+ - interrupts: should contain AFE and ASYS interrupts
+ - interrupt-names: should be "afe" and "asys"
+ - power-domains: should define the power domain
 -- 
-2.7.4
+1.9.1
