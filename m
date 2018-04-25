@@ -1,28 +1,93 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Apr 2018 14:40:06 +0200
-Subject: [PATCH  1/8] net: ethernet: stmmac: add adaptation for
- stm32mp157c.
-In-Reply-To: <fa12bb221b1b4cf380812c0fed03f74d@SFHDAG5NODE3.st.com>
-References: <1524582120-4451-1-git-send-email-christophe.roullier@st.com>
- <1524582120-4451-2-git-send-email-christophe.roullier@st.com>
- <20180424153953.GB2360@lunn.ch>
- <fa12bb221b1b4cf380812c0fed03f74d@SFHDAG5NODE3.st.com>
-Message-ID: <20180425124006.GB13486@lunn.ch>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Wed, 25 Apr 2018 15:47:56 +0300
+Subject: [PATCH 1/2] crypto: sm4 - export encrypt/decrypt routines to
+ other drivers
+In-Reply-To: <20180425122046.12695-2-ard.biesheuvel@linaro.org>
+References: <20180425122046.12695-1-ard.biesheuvel@linaro.org>
+ <20180425122046.12695-2-ard.biesheuvel@linaro.org>
+Message-ID: <CAOtvUMdsncpGCpwibcnfPP2G+EMxDg630SdhvGTE+K2qiZkKLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 07:12:29AM +0000, Christophe ROULLIER wrote:
-> Hi Andrew,
-> 
-> For moment, I've only tested with PHY RGMII, RMII, MII, GMII, I do not have other kind of PHY interface.
-> Normally there is no impact in my glue, the value of syscfg register will be the same for RGMII/ID/TXID/RXID.
-> Do you think that I should add these interfaces in my case ?
-> 
-> 	case PHY_INTERFACE_MODE_RGMII:
-> > +	case PHY_INTERFACE_MODE_RGMII_ID:
-> > +	case PHY_INTERFACE_MODE_RGMII_RXID:
-> > +	case PHY_INTERFACE_MODE_RGMII_TXID:
+On Wed, Apr 25, 2018 at 3:20 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> In preparation of adding support for the SIMD based arm64 implementation
+> of arm64, which requires a fallback to non-SIMD code when invoked in
+> certain contexts, expose the generic SM4 encrypt and decrypt routines
+> to other drivers.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Yes
+Acked-by: Gilad Ben-Yossef <gilad@benyossef.com>
 
-	Andrew
+> ---
+>  crypto/sm4_generic.c | 10 ++++++----
+>  include/crypto/sm4.h |  3 +++
+>  2 files changed, 9 insertions(+), 4 deletions(-)
+>
+> diff --git a/crypto/sm4_generic.c b/crypto/sm4_generic.c
+> index f537a2766c55..c18eebfd5edd 100644
+> --- a/crypto/sm4_generic.c
+> +++ b/crypto/sm4_generic.c
+> @@ -190,21 +190,23 @@ static void sm4_do_crypt(const u32 *rk, u32 *out, const u32 *in)
+>
+>  /* encrypt a block of text */
+>
+> -static void sm4_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
+> +void crypto_sm4_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
+>  {
+>         const struct crypto_sm4_ctx *ctx = crypto_tfm_ctx(tfm);
+>
+>         sm4_do_crypt(ctx->rkey_enc, (u32 *)out, (u32 *)in);
+>  }
+> +EXPORT_SYMBOL_GPL(crypto_sm4_encrypt);
+>
+>  /* decrypt a block of text */
+>
+> -static void sm4_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
+> +void crypto_sm4_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
+>  {
+>         const struct crypto_sm4_ctx *ctx = crypto_tfm_ctx(tfm);
+>
+>         sm4_do_crypt(ctx->rkey_dec, (u32 *)out, (u32 *)in);
+>  }
+> +EXPORT_SYMBOL_GPL(crypto_sm4_decrypt);
+>
+>  static struct crypto_alg sm4_alg = {
+>         .cra_name               =       "sm4",
+> @@ -219,8 +221,8 @@ static struct crypto_alg sm4_alg = {
+>                         .cia_min_keysize        =       SM4_KEY_SIZE,
+>                         .cia_max_keysize        =       SM4_KEY_SIZE,
+>                         .cia_setkey             =       crypto_sm4_set_key,
+> -                       .cia_encrypt            =       sm4_encrypt,
+> -                       .cia_decrypt            =       sm4_decrypt
+> +                       .cia_encrypt            =       crypto_sm4_encrypt,
+> +                       .cia_decrypt            =       crypto_sm4_decrypt
+>                 }
+>         }
+>  };
+> diff --git a/include/crypto/sm4.h b/include/crypto/sm4.h
+> index b64e64d20b28..7afd730d16ff 100644
+> --- a/include/crypto/sm4.h
+> +++ b/include/crypto/sm4.h
+> @@ -25,4 +25,7 @@ int crypto_sm4_set_key(struct crypto_tfm *tfm, const u8 *in_key,
+>  int crypto_sm4_expand_key(struct crypto_sm4_ctx *ctx, const u8 *in_key,
+>                           unsigned int key_len);
+>
+> +void crypto_sm4_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in);
+> +void crypto_sm4_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in);
+> +
+>  #endif
+> --
+> 2.17.0
+>
+
+
+
+-- 
+Gilad Ben-Yossef
+Chief Coffee Drinker
+
+"If you take a class in large-scale robotics, can you end up in a
+situation where the homework eats your dog?"
+ -- Jean-Baptiste Queru
