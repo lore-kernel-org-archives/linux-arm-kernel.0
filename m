@@ -1,99 +1,39 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 25 Apr 2018 17:32:26 +0800
-Subject: [PATCH v2 00/17] Add support to MT6323 RTC and its power device
-Message-ID: <cover.1524646231.git.sean.wang@mediatek.com>
+Date: Wed, 25 Apr 2018 17:32:43 +0800
+Subject: [PATCH v2 17/17] MAINTAINERS: add an entry for MediaTek board level
+ shutdown driver
+In-Reply-To: <cover.1524646231.git.sean.wang@mediatek.com>
+References: <cover.1524646231.git.sean.wang@mediatek.com>
+Message-ID: <a356e91c593d600418c7a37cdae58bf2d80c0a94.1524646231.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-v2:
+Add an entry for the MediaTek board level shutdown driver.
 
-- The changes must be relative to the below tree since one critial patch
-  for the rtc-mt6397.c the series depends on was being applied into
-  the tree. Otherwise, for example, if the series are applied on the top
-  of [1], a build error must happen due to an implicit declaration of
-  function 'irq_create_mapping' as kbuild test robot was reporting in [2].
-  
-  tree    : https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
-  branch  : mfd/ib-mfd-input-rtc-4.18
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-- changes since v1:
-  * Define the power controller as a function of MT6323 MFD.
-  * Refine the whole series commit message and title.
-  * Add tag Reviewed-by and Acked-by got from v1 result.
-  * Reuse use the DEFINE_RES_* helpers in mfd driver.
-  * Remove an overdone patch rtc: mediatek: remove unnecessary parentheses.
-  * Use devm_rtc_allocate_device() and rtc_register_device instead of
-    devm_rtc_device_register.
-  * Have an improvement according to the license rule the SPDX notation
-    for C header file.
-  * Move a file from include/linux/rtc/mt6397.h to include/linux/mfd/mt6397/rtc.h
-  * Refine include/linux/mfd/mt6397/rtc.h
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git
-[2] http://lists.infradead.org/pipermail/linux-mediatek/2018-March/012548.html
-
-v1:
-
-Hi,
-
-The series keeps to extend the capability of BPI-R2 board with MT7623 and
-the result can as well bring benefits into the other MediaTek PMICs such
-as MT6397 or SoCs.
-
-The series sent across mfd, rtc, pm, dt-binding sub-system is for hoping
-to let people have a simple cross-reference to know the exact dependency
-and why those patches are being split in that way between each one.
-
-Patch 1-3: Add dt-binding to the related devices newly or already
-	   supported.
-Patch 4-5: Extend driver with the functionality of MT6323 RTC device.
-Patch 6-9 and 12-13: Add a few of trivial fixups, cleanups and
-	  improvements.
-Patch 10-11: It's a preparation for Patch 14 adding a new driver.
-Patch 14: Add a new driver for a power-off driver.
-Patch 15-16: Update MAINTAINERS with these new files being added.
-
-	Sean
-
-Sean Wang (17):
-  dt-bindings: power: reset: mt6323: add bindings for MT6323 power
-    controller
-  dt-bindings: rtc: mt6397: add bindings for MediaTek PMIC based RTC
-  dt-bindings: mfd: mt6397: add a description for MT6323 RTC
-  dt-bindings: mfd: mt6397: add a description for MT6323 power
-    controller
-  mfd: mt6397: add MT6323 RTC support into MT6397 driver
-  mfd: mt6397: add support for MT6323 power controller into MT6397
-    driver
-  mfd: mt6397: reuse DEFINE_RES_* helpers
-  rtc: mt6397: add MT6323 support to RTC driver
-  rtc: mt6397: replace a poll with regmap_read_poll_timeout
-  rtc: mt6397: remove unnecessary irq_dispose_mapping
-  rtc: mt6397: convert to use device managed functions
-  rtc: mt6397: move the declaration into a globally visible header file
-  rtc: mt6397: cleanup header files to include
-  rtc: mt6397: update license converting to using SPDX identifiers
-  power: reset: mt6323: add a driver for MT6323 power controller
-  MAINTAINERS: update entry for ARM/Mediatek RTC DRIVER
-  MAINTAINERS: add an entry for MediaTek board level shutdown driver
-
- Documentation/devicetree/bindings/mfd/mt6397.txt   |  10 +-
- .../bindings/power/reset/mt6323-poweroff.txt       |  20 +++
- .../devicetree/bindings/rtc/rtc-mt6397.txt         |  29 ++++
- MAINTAINERS                                        |   9 ++
- drivers/mfd/mt6397-core.c                          |  40 ++++--
- drivers/power/reset/Kconfig                        |  10 ++
- drivers/power/reset/Makefile                       |   1 +
- drivers/power/reset/mt6323-poweroff.c              |  97 ++++++++++++++
- drivers/rtc/rtc-mt6397.c                           | 146 +++++----------------
- include/linux/mfd/mt6397/rtc.h                     |  71 ++++++++++
- 10 files changed, 308 insertions(+), 125 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power/reset/mt6323-poweroff.txt
- create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mt6397.txt
- create mode 100644 drivers/power/reset/mt6323-poweroff.c
- create mode 100644 include/linux/mfd/mt6397/rtc.h
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a7ef37f..816554b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8912,6 +8912,13 @@ S:	Maintained
+ F:	drivers/net/dsa/mt7530.*
+ F:	net/dsa/tag_mtk.c
+ 
++MEDIATEK BOARD LEVEL SHUTDOWN DRIVERS
++M:	Sean Wang <sean.wang@mediatek.com>
++L:	linux-pm at vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/power/reset/mt6323-poweroff.txt
++F:	drivers/power/reset/mt6323-poweroff.c
++
+ MEDIATEK JPEG DRIVER
+ M:	Rick Chang <rick.chang@mediatek.com>
+ M:	Bin Liu <bin.liu@mediatek.com>
 -- 
 2.7.4
