@@ -1,134 +1,36 @@
-From: maxime.chevallier@bootlin.com (Maxime Chevallier)
-Date: Wed, 25 Apr 2018 13:07:30 +0200
-Subject: [PATCH net 2/3] net: mvpp2: Fix clock resource by adding missing
- mg_core_clk
-In-Reply-To: <20180425110731.20153-1-maxime.chevallier@bootlin.com>
-References: <20180425110731.20153-1-maxime.chevallier@bootlin.com>
-Message-ID: <20180425110731.20153-3-maxime.chevallier@bootlin.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 25 Apr 2018 12:13:13 +0100
+Subject: [PATCH v3 2/3] regulator: add support for SY8106A regulator
+In-Reply-To: <15C93A9B-6EEB-49EB-A942-35F761E86569@aosc.io>
+References: <20180423144657.63264-1-icenowy@aosc.io>
+ <20180423144657.63264-3-icenowy@aosc.io>
+ <20180424170733.GD22073@sirena.org.uk>
+ <C0C1F042-221A-420F-A8C1-5FADCFC687F1@aosc.io>
+ <20180425105309.GC24769@sirena.org.uk>
+ <15C93A9B-6EEB-49EB-A942-35F761E86569@aosc.io>
+Message-ID: <20180425111313.GD24769@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell's PPv2.2 IP needs an additional clock named "MG Core clock".
-This is required on Armada 7K and 8K.
+On Wed, Apr 25, 2018 at 06:55:10PM +0800, Icenowy Zheng wrote:
+> ? 2018?4?25? GMT+08:00 ??6:53:09, Mark Brown <broonie@kernel.org> ??:
 
-This commit adds the required clock, updates the devicetree and its
-documentation accordingly, also fixing a small typo in the
-marvell-mpp2.txt examples.
+> >> SPDX identifier is special -- it should be in a seperated
+> >> comment block.
 
-Fixes: c7e92def1ef4 ("clk: mvebu: cp110: Fix clock tree representation")
-Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
----
- .../devicetree/bindings/net/marvell-pp2.txt          |  9 +++++----
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi        |  5 +++--
- drivers/net/ethernet/marvell/mvpp2.c                 | 20 ++++++++++++++++++--
- 3 files changed, 26 insertions(+), 8 deletions(-)
+> >No, it just needs to be a C++ comment on the first line to ease machine
+> >parsing.  The rest of the file doesn't matter for that.
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-index 1814fa13f6ab..fc019df0d863 100644
---- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
-@@ -21,9 +21,10 @@ Required properties:
- 	- main controller clock (for both armada-375-pp2 and armada-7k-pp2)
- 	- GOP clock (for both armada-375-pp2 and armada-7k-pp2)
- 	- MG clock (only for armada-7k-pp2)
-+	- MG Core clock (only for armada-7k-pp2)
- 	- AXI clock (only for armada-7k-pp2)
--- clock-names: names of used clocks, must be "pp_clk", "gop_clk", "mg_clk"
--  and "axi_clk" (the 2 latter only for armada-7k-pp2).
-+- clock-names: names of used clocks, must be "pp_clk", "gop_clk", "mg_clk",
-+  "mg_core_clk" and "axi_clk" (the 3 latter only for armada-7k-pp2).
- 
- The ethernet ports are represented by subnodes. At least one port is
- required.
-@@ -80,8 +81,8 @@ cpm_ethernet: ethernet at 0 {
- 	compatible = "marvell,armada-7k-pp22";
- 	reg = <0x0 0x100000>, <0x129000 0xb000>;
- 	clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>,
--		 <&cpm_syscon0 1 5>, <&cpm_syscon0 1 18>;
--	clock-names = "pp_clk", "gop_clk", "gp_clk", "axi_clk";
-+		 <&cpm_syscon0 1 5>, <&cpm_syscon0 1 6>, <&cpm_syscon0 1 18>;
-+	clock-names = "pp_clk", "gop_clk", "mg_clk", "mg_core_clk", "axi_clk";
- 
- 	eth0: eth0 {
- 		interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-index 48cad7919efa..6c137ac656e9 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-@@ -38,9 +38,10 @@
- 			compatible = "marvell,armada-7k-pp22";
- 			reg = <0x0 0x100000>, <0x129000 0xb000>;
- 			clocks = <&CP110_LABEL(clk) 1 3>, <&CP110_LABEL(clk) 1 9>,
--				 <&CP110_LABEL(clk) 1 5>, <&CP110_LABEL(clk) 1 18>;
-+				 <&CP110_LABEL(clk) 1 5>, <&CP110_LABEL(clk) 1 6>,
-+				 <&CP110_LABEL(clk) 1 18>;
- 			clock-names = "pp_clk", "gop_clk",
--				      "mg_clk", "axi_clk";
-+				      "mg_clk", "mg_core_clk", "axi_clk";
- 			marvell,system-controller = <&CP110_LABEL(syscon0)>;
- 			status = "disabled";
- 			dma-coherent;
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 0c2f04813d42..6a17b67a0d61 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -942,6 +942,7 @@ struct mvpp2 {
- 	struct clk *pp_clk;
- 	struct clk *gop_clk;
- 	struct clk *mg_clk;
-+	struct clk *mg_core_clk;
- 	struct clk *axi_clk;
- 
- 	/* List of pointers to port structures */
-@@ -8768,18 +8769,28 @@ static int mvpp2_probe(struct platform_device *pdev)
- 			err = clk_prepare_enable(priv->mg_clk);
- 			if (err < 0)
- 				goto err_gop_clk;
-+
-+			priv->mg_core_clk = devm_clk_get(&pdev->dev, "mg_core_clk");
-+			if (IS_ERR(priv->mg_core_clk)) {
-+				err = PTR_ERR(priv->mg_core_clk);
-+				goto err_mg_clk;
-+			}
-+
-+			err = clk_prepare_enable(priv->mg_core_clk);
-+			if (err < 0)
-+				goto err_mg_clk;
- 		}
- 
- 		priv->axi_clk = devm_clk_get(&pdev->dev, "axi_clk");
- 		if (IS_ERR(priv->axi_clk)) {
- 			err = PTR_ERR(priv->axi_clk);
- 			if (err == -EPROBE_DEFER)
--				goto err_mg_clk;
-+				goto err_mg_core_clk;
- 			priv->axi_clk = NULL;
- 		} else {
- 			err = clk_prepare_enable(priv->axi_clk);
- 			if (err < 0)
--				goto err_mg_clk;
-+				goto err_mg_core_clk;
- 		}
- 
- 		/* Get system's tclk rate */
-@@ -8851,6 +8862,10 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	}
- err_axi_clk:
- 	clk_disable_unprepare(priv->axi_clk);
-+
-+err_mg_core_clk:
-+	if (priv->hw_version == MVPP22)
-+		clk_disable_unprepare(priv->mg_core_clk);
- err_mg_clk:
- 	if (priv->hw_version == MVPP22)
- 		clk_disable_unprepare(priv->mg_clk);
-@@ -8898,6 +8913,7 @@ static int mvpp2_remove(struct platform_device *pdev)
- 		return 0;
- 
- 	clk_disable_unprepare(priv->axi_clk);
-+	clk_disable_unprepare(priv->mg_core_clk);
- 	clk_disable_unprepare(priv->mg_clk);
- 	clk_disable_unprepare(priv->pp_clk);
- 	clk_disable_unprepare(priv->gop_clk);
--- 
-2.11.0
+> Okay. Thus I will use a seperate /* */ block for it in the
+> next revision, to follow the rule.
+
+Just make the whole copyright block a C++ comment.  It's much easier and
+even with a blank line between the SPDX line and the rest of it it'll
+still look messy and odd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180425/364e308d/attachment.sig>
