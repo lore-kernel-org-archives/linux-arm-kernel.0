@@ -1,91 +1,36 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 25 Apr 2018 12:14:39 +0200
-Subject: [PATCH] clocksource/drivers/timer-atmel-pit: properly handle error
- cases
-Message-ID: <20180425101439.28908-1-alexandre.belloni@bootlin.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 25 Apr 2018 11:31:36 +0100
+Subject: [PATCH v2 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <20a8f736-2687-f14f-eaa1-2b2c06eed629@codeaurora.org>
+References: <cover.1523673467.git.collinsd@codeaurora.org>
+ <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
+ <CAD=FV=XKYCDtF93RtYi+dokR2BcT-z6Ex3UjgJ0ia_kF=847eA@mail.gmail.com>
+ <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
+ <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
+ <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
+ <20180424174507.GI22073@sirena.org.uk>
+ <20a8f736-2687-f14f-eaa1-2b2c06eed629@codeaurora.org>
+Message-ID: <20180425103136.GB24769@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-smatch now reports a possible leak:
+On Tue, Apr 24, 2018 at 02:09:47PM -0700, David Collins wrote:
+> On 04/24/2018 10:45 AM, Mark Brown wrote:
 
-smatch warnings:
-drivers/clocksource/timer-atmel-pit.c:183 at91sam926x_pit_dt_init() warn: possible memory leak of 'data'
+> > I think that's probably only OK if we have a specific error code for the
+> > regulator being limited in this way otherwise our error handling for I/O
+> > problems involves us trying to reconfigure supplies which seems like it
+> > would be risky.  
 
-Ensure data is freed before exiting with an error.
+> Would you be ok with -EAGAIN being used for this purpose?
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
----
- drivers/clocksource/timer-atmel-pit.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-index ec8a4376f74f..2fab18fae4fc 100644
---- a/drivers/clocksource/timer-atmel-pit.c
-+++ b/drivers/clocksource/timer-atmel-pit.c
-@@ -180,26 +180,29 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
- 	data->base = of_iomap(node, 0);
- 	if (!data->base) {
- 		pr_err("Could not map PIT address\n");
--		return -ENXIO;
-+		ret = -ENXIO;
-+		goto exit;
- 	}
- 
- 	data->mck = of_clk_get(node, 0);
- 	if (IS_ERR(data->mck)) {
- 		pr_err("Unable to get mck clk\n");
--		return PTR_ERR(data->mck);
-+		ret = PTR_ERR(data->mck);
-+		goto exit;
- 	}
- 
- 	ret = clk_prepare_enable(data->mck);
- 	if (ret) {
- 		pr_err("Unable to enable mck\n");
--		return ret;
-+		goto exit;
- 	}
- 
- 	/* Get the interrupts property */
- 	data->irq = irq_of_parse_and_map(node, 0);
- 	if (!data->irq) {
- 		pr_err("Unable to get IRQ from DT\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto exit;
- 	}
- 
- 	/*
-@@ -227,7 +230,7 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
- 	ret = clocksource_register_hz(&data->clksrc, pit_rate);
- 	if (ret) {
- 		pr_err("Failed to register clocksource\n");
--		return ret;
-+		goto exit;
- 	}
- 
- 	/* Set up irq handler */
-@@ -236,7 +239,8 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
- 			  "at91_tick", data);
- 	if (ret) {
- 		pr_err("Unable to setup IRQ\n");
--		return ret;
-+		clocksource_unregister(&data->clksrc);
-+		goto exit;
- 	}
- 
- 	/* Set up and register clockevents */
-@@ -254,6 +258,10 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
- 	clockevents_register_device(&data->clkevt);
- 
- 	return 0;
-+
-+exit:
-+	kfree(data);
-+	return ret;
- }
- TIMER_OF_DECLARE(at91sam926x_pit, "atmel,at91sam9260-pit",
- 		       at91sam926x_pit_dt_init);
--- 
-2.17.0
+Using -EAGAIN for "I can't ever read the configuration from this
+regulator" doesn't seem right - it's not like any number of retries
+will ever manage to read the value back.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180425/2373cdee/attachment.sig>
