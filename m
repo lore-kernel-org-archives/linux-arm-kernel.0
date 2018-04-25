@@ -1,48 +1,17 @@
-From: maxime.chevallier@bootlin.com (Maxime Chevallier)
-Date: Wed, 25 Apr 2018 13:52:36 +0200
-Subject: [PATCH net 2/3] net: mvpp2: Fix clock resource by adding
- missing mg_core_clk
-In-Reply-To: <87in8feckt.fsf@bootlin.com>
-References: <20180425110731.20153-1-maxime.chevallier@bootlin.com>
- <20180425110731.20153-3-maxime.chevallier@bootlin.com>
- <87in8feckt.fsf@bootlin.com>
-Message-ID: <20180425135236.24bc0644@bootlin.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 25 Apr 2018 14:03:06 +0200
+Subject: [PATCH v2 2/2] clk: meson: gxbb: add the video decoder clocks
+In-Reply-To: <20180424184838.3406-3-maxi.jourdan@wanadoo.fr>
+References: <20180424184838.3406-1-maxi.jourdan@wanadoo.fr>
+ <20180424184838.3406-3-maxi.jourdan@wanadoo.fr>
+Message-ID: <1524657786.4026.63.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-On Wed, 25 Apr 2018 13:43:14 +0200
-Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
-
->Hi Maxime,
+On Tue, 2018-04-24 at 20:48 +0200, Maxime Jourdan wrote:
+> Add the SEL/DIV/GATE for VDEC_1 and VDEC_HEVC.
 > 
-> On mer., avril 25 2018, Maxime Chevallier
-> <maxime.chevallier@bootlin.com> wrote:
->
->> Marvell's PPv2.2 IP needs an additional clock named "MG Core clock".
->> This is required on Armada 7K and 8K.
->>
->> This commit adds the required clock, updates the devicetree and its
->> documentation accordingly, also fixing a small typo in the
->> marvell-mpp2.txt examples.
->>
->> Fixes: c7e92def1ef4 ("clk: mvebu: cp110: Fix clock tree
->> representation") Signed-off-by: Maxime Chevallier
->> <maxime.chevallier@bootlin.com> ---
->>  .../devicetree/bindings/net/marvell-pp2.txt          |  9 +++++----
->>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi        |  5 +++--  
->
->Could you remove the dtsi part and submit it as a separate patch. Then
->I will take care of it.
+> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
 
-Ok no problem, I'll split that and re-send it.
-
-Thanks,
-
-Maxime
-
--- 
-Maxime Chevallier, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
+Applied to next/drivers
+Thx
