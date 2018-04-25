@@ -1,54 +1,26 @@
-From: ciro.santilli@gmail.com (Ciro Santilli)
-Date: Wed, 25 Apr 2018 13:47:42 +0100
-Subject: [RFC PATCH v3] tty: pl011: Avoid spuriously stuck-off interrupts
-In-Reply-To: <20180425122000.cts26gtvjuje4j7f@kamzik.brq.redhat.com>
-References: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
- <CAFEAcA8Q97YNKomCgkujgoY0MoES3edHoFEk_jjXGMCdzBpd9w@mail.gmail.com>
- <20180425122000.cts26gtvjuje4j7f@kamzik.brq.redhat.com>
-Message-ID: <CAFXrp_djBYwrp664A8tLrqZDw=3L6w4Uadk-Rin_ZTwfE2QwGw@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 25 Apr 2018 14:49:24 +0200
+Subject: [RFC 04/10] clk: samsung: Remove support for Exynos5440
+In-Reply-To: <20180424203239.21885-5-krzk@kernel.org>
+References: <20180424203239.21885-1-krzk@kernel.org>
+ <CGME20180424203341epcas5p3a6db7d58b0ce8940d03711823fbf6e41@epcas5p3.samsung.com>
+ <20180424203239.21885-5-krzk@kernel.org>
+Message-ID: <8e4e4712-4b21-83f8-fa06-142e9557a251@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 1:20 PM, Andrew Jones <drjones@redhat.com> wrote:
-> On Mon, Apr 23, 2018 at 02:49:30PM +0100, Peter Maydell wrote:
->> On 23 April 2018 at 14:41, Dave Martin <Dave.Martin@arm.com> wrote:
->> > This is an update to a previous RFC v2 [1], to fix a problem observed by
->> > the qemu community that causes serial input to hang when booting a
->> > simulated system with data already queued in the UART FIFO [2].
->> >
->> > After discussion, I decided that the approach in [1] was over-
->> > engineered: it tries to preserve a guarantee that people shouldn't be
->> > relying on anyway, namely that data sent to the UART prior to kernel
->> > boot will be received by the kernel; or more generally that data
->> > received by the UART while the pl011 driver is not opened will be
->> > received (either intact or at all) by the driver.
->> >
->> > If anyone can please test the following and let me know the results,
->> > that would be much appreciated!
->> >
->> >  a) Check that you can still reproduce the bug on mainline without this
->> >     patch.
->> >
->> >  b) Check whether this patch fixes the problem.
->>
->> Thanks. I'm cc'ing Ciro and Drew, who are the two people I
->> recall reporting this issue to me.
->> Link to the patch for their benefit:
->>  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573120.html
->>
->
-> Hi Dave,
->
-> v3 does not resolve the issue for me. v2 does, and, fwiw, v3 applied on
-> top of v2 (i.e. applying both), still works.
->
+Cc: Jingoo Han
 
-I also confirm that v2 + v3 on top of Linux kernel v4.16, QEMU v2.11.0
-solves the problem on arm and aarch64, otherwise if I hit Ctrl + C
-during boot my terminal become irresponsive after boot. Test setup:
-https://github.com/cirosantilli/linux-kernel-module-cheat/tree/14965a40d27c8d9d1ff5b023ace827b288a024ef
+On 04/24/2018 10:32 PM, Krzysztof Kozlowski wrote:
+> The Exynos5440 is not actively developed, there are no development
+> boards available and probably there are no real products with it.
+> Remove wide-tree support for Exynos5440.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-> If you choose to go with v2, then you can add my tested-by.
->
-> Thanks,
-> drew
+Thanks Krzysztof, patch applied, assuming there is no issues with applying 
+patches from this series individually through the subsystem trees.
+
+-- 
+Regards,
+Sylwester
