@@ -1,56 +1,57 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 25 Apr 2018 11:19:20 +0800
-Subject: [PATCH 2/7] ARM: dts: sun8i: h3: Split out common board design
- for ALL-H3-CC
-In-Reply-To: <20180424193754.jsuucbq57onhxhqe@flea>
-References: <20180424113424.13196-1-wens@csie.org>
- <20180424113424.13196-3-wens@csie.org>
- <20180424121353.zxujyehsw3er2xq6@flea>
- <CAGb2v65iwbmOvQ2YA0e4QyTzQVj=F+5n6cWt2q6K80Y2b_3q3g@mail.gmail.com>
- <20180424193754.jsuucbq57onhxhqe@flea>
-Message-ID: <CAGb2v64MwS+q87z9_UiKxVtgeAenA_9+QSS=cfF42PGy4PeJwQ@mail.gmail.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Wed, 25 Apr 2018 03:30:11 +0000
+Subject: [PATCH 4/5] ARM: dts: imx6sx-sabreauto: add fec support
+In-Reply-To: <CAOMZO5Dm=MFRoh=y54Qf2RrncWfQPTUJ2ZNfvYnUD=idp8RPNA@mail.gmail.com>
+References: <1524455219-6736-1-git-send-email-Anson.Huang@nxp.com>
+ <1524455219-6736-4-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5CDAQtw7Q6NgSzKP4ogaqRaGSE0A+st1iqZ=cQsK49moQ@mail.gmail.com>
+ <AM3PR04MB131566E1C8033D256686F192F5880@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5Dm=MFRoh=y54Qf2RrncWfQPTUJ2ZNfvYnUD=idp8RPNA@mail.gmail.com>
+Message-ID: <AM3PR04MB1315ED599A20F67BB9FEFEE1F58F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 3:37 AM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Tue, Apr 24, 2018 at 08:17:11PM +0800, Chen-Yu Tsai wrote:
->> On Tue, Apr 24, 2018 at 8:13 PM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > On Tue, Apr 24, 2018 at 07:34:19PM +0800, Chen-Yu Tsai wrote:
->> >> The Libre Computer Project ALL-H3-CC has three models, all using the
->> >> same board design, but with different pin compatible SoCs and amount of
->> >> DRAM.
->> >>
->> >> Currently only the H3 1GB DRAM variant is supported. To support the two
->> >> other variants, first split the original device tree into a common board
->> >> design part and an SoC specific part.
->> >>
->> >> The SoC part only defines which SoC is used and model name, and includes
->> >> the SoC specific dtsi file and the common design dtsi file.
->> >>
->> >> Also fix up the SPDX identifier line to use the correct comment style,
->> >> and place it on the first line.
->> >>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> ---
->> >>  .../boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 213 +-----------------
->> >>  ....dts => sunxi-hx-libretech-all-h3-cc.dtsi} |  11 +-
->> >
->> > I think I prefer the name of Neil's DTSI better, and since pretty much
->> > the same patches (a couple of hours) before, we'll merge them (while
->> > merging the rest of your patches, obviously).
->> >
->> > Does that work for you?
->>
->> I would like for the regulator voltage fix to be merged before the split.
->> This will make it trivial to back port, instead of having to reverse the
->> split, and maybe failing.
->
-> Yes, I was just talking about replacing your two redundant patches,
-> but keeping the order you have.
+Hi, Fabio
 
-That works for me. Might require a little fixing up.
-Let me know if you need help with that.
+Anson Huang
+Best Regards!
 
-ChenYu
+
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Tuesday, April 24, 2018 8:23 PM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
+> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
+> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
+> dl-linux-imx <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC
+> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
+> FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
+> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>
+> Subject: Re: [PATCH 4/5] ARM: dts: imx6sx-sabreauto: add fec support
+> 
+> Hi Anson,
+> 
+> On Mon, Apr 23, 2018 at 11:09 PM, Anson Huang <anson.huang@nxp.com>
+> wrote:
+> 
+> > Ah, yes, thanks for pointing out this issue, I just removed it and the
+> > function is still working, already sent out V2 patch set, thanks.
+> 
+> So now maybe it is working only because the bootloader activated this GPIO,
+> which is not good.
+> 
+> I don't have access to the mx6sx sabreauto schematics to verify  where
+> &max7322 0 connects to, but it would be better to make sure that you activate
+> this pin in dts if it is needed for Ethernet, without relying on the bootloader.
+
+It is working by default hardware settings, but I agree we should do it in dts,
+I found it has a lot of dependency if we want to enable the gpio reset for FEC1,
+many gpio reset patch missed in upstream kernel, need patch work for MAX7322 first, so
+I plan to remove FEC support in this patch set, and will upstream the MAX7322
+reset patch first, then will add FEC support after MAX7322 patch done. Will send
+out V3 patch to drop fec support for now, thanks.
+
+Anson.
+
+ 
