@@ -1,59 +1,70 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Wed, 25 Apr 2018 09:28:49 -0600
-Subject: [PATCH v2 1/5] drm/nouveau: tegra: Detach from ARM DMA/IOMMU
- mapping
-In-Reply-To: <20180425101051.15349-1-thierry.reding@gmail.com>
-References: <20180425101051.15349-1-thierry.reding@gmail.com>
-Message-ID: <20180425152849.GA2447@jcrouse-lnx.qualcomm.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Wed, 25 Apr 2018 08:33:12 -0700
+Subject: noveau vs arm dma ops
+In-Reply-To: <20180425100429.GR25142@phenom.ffwll.local>
+References: <20180420152111.GR31310@phenom.ffwll.local>
+ <20180424184847.GA3247@infradead.org>
+ <CAKMK7uFL68pu+-9LODTgz+GQYvxpnXOGhxfz9zorJ_JKsPVw2g@mail.gmail.com>
+ <20180425054855.GA17038@infradead.org>
+ <CAKMK7uEFitkNQrD6cLX5Txe11XhVO=LC4YKJXH=VNdq+CY=DjQ@mail.gmail.com>
+ <CAKMK7uFx=KB1vup=WhPCyfUFairKQcRR4BEd7aXaX1Pj-vj3Cw@mail.gmail.com>
+ <20180425064335.GB28100@infradead.org> <20180425074151.GA2271@ulmo>
+ <20180425085439.GA29996@infradead.org>
+ <20180425100429.GR25142@phenom.ffwll.local>
+Message-ID: <20180425153312.GD27076@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 12:10:47PM +0200, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On Wed, Apr 25, 2018 at 12:04:29PM +0200, Daniel Vetter wrote:
+> > Coordinating the backport of a trivial helper in the arm tree is not
+> > the end of the world.  Really, this cowboy attitude is a good reason
+> > why graphics folks have such a bad rep.  You keep poking into random
+> > kernel internals, don't talk to anoyone and then complain if people
+> > are upset.  This shouldn't be surprising.
 > 
-> Depending on the kernel configuration, early ARM architecture setup code
-> may have attached the GPU to a DMA/IOMMU mapping that transparently uses
-> the IOMMU to back the DMA API. Tegra requires special handling for IOMMU
-> backed buffers (a special bit in the GPU's MMU page tables indicates the
-> memory path to take: via the SMMU or directly to the memory controller).
-> Transparently backing DMA memory with an IOMMU prevents Nouveau from
-> properly handling such memory accesses and causes memory access faults.
-> 
-> As a side-note: buffers other than those allocated in instance memory
-> don't need to be physically contiguous from the GPU's perspective since
-> the GPU can map them into contiguous buffers using its own MMU. Mapping
-> these buffers through the IOMMU is unnecessary and will even lead to
-> performance degradation because of the additional translation.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> I had already sent this out independently to fix a regression that was
-> introduced in v4.16, but then Christoph pointed out that it should've
-> been sent to a wider audience and should use a core API rather than
-> calling into architecture code directly.
-> 
-> I've added it to this series for easier reference and to show the need
-> for the new API.
+> Not really agreeing on the cowboy thing. The fundamental problem is that
+> the dma api provides abstraction that seriously gets in the way of writing
+> a gpu driver. Some examples:
 
-This is good stuff, I am struggling with something similar on ARM64. One
-problem that I wasn't able to fully solve cleanly was that for arm-smmu 
-the SMMU HW resources are not released until the domain itself is destroyed
-and I never quite figured out a way to swap the default domain cleanly.
+So talk to other people.  Maybe people share your frustation.  Or maybe
+other people have a way to help.
 
-This is a problem for the MSM GPU because not only do we run our own IOMMU as
-you do we also have a hardware dependency to use context bank 0 to
-asynchronously switch the pagetable during rendering.
+> - We never want bounce buffers, ever. dma_map_sg gives us that, so there's
+>   hacks to fall back to a cache of pages allocated using
+>   dma_alloc_coherent if you build a kernel with bounce buffers.
 
-I'm not sure if this is a problem you have encountered. In any event, this code
-gets us a little bit further down the path and at least there is somebody else
-out there in the cold dark world that understands my pain. :)
+get_required_mask() is supposed to tell you if you are safe.  However
+we are missing lots of implementations of it for iommus so you might get
+some false negatives, improvements welcome.  It's been on my list of
+things to fix in the DMA API, but it is nowhere near the top.
 
-For your interest, here was my half-hearted attempt to avoid creating DMA
-domains in the first place based on a blacklist to try to spur a bit of
-discussion: https://patchwork.freedesktop.org/series/41573/
+> - dma api hides the cache flushing requirements from us. GPUs love
+>   non-snooped access, and worse give userspace control over that. We want
+>   a strict separation between mapping stuff and flushing stuff. With the
+>   IOMMU api we mostly have the former, but for the later arch maintainers
+>   regularly tells they won't allow that. So we have drm_clflush.c.
 
-Jordan
+The problem is that a cache flushing API entirely separate is hard. That
+being said if you look at my generic dma-noncoherent API series it tries
+to move that way.  So far it is in early stages and apparently rather
+buggy unfortunately.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> - dma api hides how/where memory is allocated. Kinda similar problem,
+>   except now for CMA or address limits. So either we roll our own
+>   allocators and then dma_map_sg (and pray it doesn't bounce buffer), or
+>   we use dma_alloc_coherent and then grab the sgt to get at the CMA
+>   allocations because that's the only way. Which sucks, because we can't
+>   directly tell CMA how to back off if there's some way to make CMA memory
+>   available through other means (gpus love to hog all of memory, so we
+>   have shrinkers and everything).
+
+If you really care about doing explicitly cache flushing anyway (see
+above) allocating your own memory and mapping it where needed is by
+far the superior solution.  On cache coherent architectures
+dma_alloc_coherent is nothing but allocate memory + dma_map_single.
+On non coherent allocations the memory might come through a special
+pool or must be used through a special virtual address mapping that
+is set up either statically or dynamically.  For that case splitting
+allocation and mapping is a good idea in many ways, and I plan to move
+towards that once the number of dma mapping implementations is down
+to a reasonable number so that it can actually be done.
