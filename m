@@ -1,18 +1,65 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 25 Apr 2018 09:21:05 +0200
-Subject: [PATCH 22/22] parisc: use generic dma_noncoherent_ops
-In-Reply-To: <e0b4f3be-68b9-c3af-e432-fd20419e2d70@gmx.de>
-References: <20180420080313.18796-1-hch@lst.de>
- <20180420080313.18796-23-hch@lst.de>
- <e0b4f3be-68b9-c3af-e432-fd20419e2d70@gmx.de>
-Message-ID: <20180425072105.GA12308@lst.de>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 25 Apr 2018 09:22:02 +0200
+Subject: [PATCH 1/3] dt-bindings: iio: stm32-adc: add support for STM32MP1.
+In-Reply-To: <20180424162721.qbfsc7j3syzzykeh@rob-hp-laptop>
+References: <1524065874-434-1-git-send-email-fabrice.gasnier@st.com>
+ <1524065874-434-2-git-send-email-fabrice.gasnier@st.com>
+ <20180424162721.qbfsc7j3syzzykeh@rob-hp-laptop>
+Message-ID: <ee92eb8d-9675-3c94-1c0d-f6e8f091d878@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 21, 2018 at 07:43:46PM +0200, Helge Deller wrote:
-> This patch breaks a 32bit kernel on a B160L machine (PA7300LC CPU, "pcxl2").
-> After applying this patch series the lasi82956 network driver works unreliable. 
-> NIC gets IP, but ping doesn't work.
-> See drivers/net/ethernet/i825xx/lasi_82596.c, it uses dma*sync() functions.
+On 04/24/2018 06:27 PM, Rob Herring wrote:
+> On Wed, Apr 18, 2018 at 05:37:52PM +0200, Fabrice Gasnier wrote:
+>> Document support for STM32MP1 ADC. It's quite similar to STM32H7 ADC.
+>> Introduce "st,stm32mp1-adc" compatible to handle variants of this
+>> hardware such as vregready flag, interrupts, clock rate.
+>>
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> ---
+>>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 +++++-
+>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+>> index e8bb824..9994384 100644
+>> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+>> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+>> @@ -24,8 +24,11 @@ Required properties:
+>>  - compatible: Should be one of:
+>>    "st,stm32f4-adc-core"
+>>    "st,stm32h7-adc-core"
+>> +  "st,stm32mp1-adc-core"
+>>  - reg: Offset and length of the ADC block register set.
+>> -- interrupts: Must contain the interrupt for ADC block.
+>> +- interrupts: One or more interrupts for ADC block. Some parts like stm32f4
+>> +  and stm32h7 share a common ADC interrupt line. stm32mp1 has separate
+>> +  lines for each ADC within ADC block.
+> 
+> How many interrupt lines is that?
 
-Just to confirm:  Without the series it is known to actually work?
+Hi Rob, Jonathan,
+
+I should have mentioned this: stm32mp1 has two separate interrupt lines
+for each ADC within ADC block.
+
+Do you wish I send a V2 for this ? Or a patch to fix this ?
+
+Please let me know,
+BR,
+Fabrice
+
+> 
+>>  - clocks: Core can use up to two clocks, depending on part used:
+>>    - "adc" clock: for the analog circuitry, common to all ADCs.
+>>      It's required on stm32f4.
+>> @@ -53,6 +56,7 @@ Required properties:
+>>  - compatible: Should be one of:
+>>    "st,stm32f4-adc"
+>>    "st,stm32h7-adc"
+>> +  "st,stm32mp1-adc"
+>>  - reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
+>>  - clocks: Input clock private to this ADC instance. It's required only on
+>>    stm32f4, that has per instance clock input for registers access.
+>> -- 
+>> 1.9.1
+>>
