@@ -1,81 +1,62 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 25 Apr 2018 18:29:05 +0530
-Subject: [RFC 00/13] arm64: allwinner: Add A64 DE2 pipeline support
-In-Reply-To: <20180424140850.ptxpmtusour7u6nb@flea>
-References: <20180424133425.24291-1-jagan@amarulasolutions.com>
- <20180424140850.ptxpmtusour7u6nb@flea>
-Message-ID: <CAMty3ZCLOkdmCoh4uBhYKXgDEiAnw+b_z=d0Om2bjH7HLCa7Tg@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 25 Apr 2018 15:05:12 +0200
+Subject: [PATCH v6 0/7] clk: meson-axg: Add AO Cloclk and Reset driver
+In-Reply-To: <20180419135426.155794-1-yixun.lan@amlogic.com>
+References: <20180419135426.155794-1-yixun.lan@amlogic.com>
+Message-ID: <1524661512.4026.67.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 7:38 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Tue, Apr 24, 2018 at 07:04:12PM +0530, Jagan Teki wrote:
->> Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
->>
->> A64 DE2 behaviour similar to Allwinner A83T where mixer0, connected to tcon0 with
->> RGB, LVDS MIPI-DSI and mixer1, connected to tcon1 with HDMI.
->> This series merely concentrated on HDMI pipeline and rest will add eventually.
->>
->> patch 1: dt-bindings for a64 DE2 CCU
->>
->> patch 2: a64 DE2 CCU node addition
->>
->> patch 3: dt-bindings for a64 DE2 pipeline
->>
->> patch 4 - 5: dt-bindings for a64 mixer0 and tcon-lcd
->>
->> patch 6: a64 DE2 pipeline node addition
->>
->> patch 7 - 8: dt-bindings for a64 HDMI and HDMI PHY
->>
->> patch 9: a64 HDMI nodes addition
->>
->> patch 10 - 11: dt-bindings for a64 mixer1 and tcon-tv
->>
->> patch 12: a64 HDMI pipeline
->>
->> patch 13: enable HDMI out on bananpi-m64
->>
->> Tested HDMI on bananapi-m64 (along with DE2 SRAM C changes from [1]
->> thread), able to detect the HDMI but, no penguins on screen.
->>
->> Request for any suggestions.
->>
->> Test log on Bananpi-m64:
->> [    0.247631] sun4i-drm display-engine: bound 1100000.mixer (ops sun8i_mixer_ops)
->> [    0.256717] sun4i-drm display-engine: bound 1200000.mixer (ops sun8i_mixer_ops)
->> [    0.256783] sun4i-tcon 1c0c000.lcd-controller: Missing LVDS properties, Please upgrade your DT
->> [    0.256792] sun4i-tcon 1c0c000.lcd-controller: LVDS output disabled
->
-> That doesn't seem to work so well for LVDS.
->
->> [    0.257081] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
->> [    0.257099] sun4i-drm display-engine: bound 1c0c000.lcd-controller (ops sun4i_tcon_ops)
->> [    0.257273] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
->> [    0.257288] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops sun4i_tcon_ops)
->> [    0.258176] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX controller v1.32a with HDCP (sun8i_dw_hdmi_p)
->> [    0.258596] sun8i-dw-hdmi 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver
->> [    0.259188] sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops)
->> [    0.259199] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
->> [    0.259205] [drm] No driver support for vblank timestamp query.
->> [    0.259308] [drm] Cannot find any crtc or sizes
->
-> A good guess would be that you can't get the EDIDs for some
-> reason. Have you tried forcing a mode to see if the display part
-> already works?
+On Thu, 2018-04-19 at 21:54 +0800, Yixun Lan wrote:
+>   This patch try to add AO clock and Reset driver for Amlogic's
+> Meson-AXG SoC.
+>   Please note that patch 7 need to wait for the DTS changes[3] merged
+> into mainline first, otherwise it will break the serial console.
+> 
+>  patch 2: factor the common code into a dedicated file
+>  patch 3-5: add the aoclk driver for AXG SoC
+>  patch 6-7: drop unnecessary clock flags
+> 
+> changes since v5 at [6]: 
+>  - drop unnecessary header files
+>  - add 'axg_aoclk' prefix to clk driver, make them more consistent
+>  - add missing end new line..
+> 
+> changes since v4 at [5]: 
+>  - fix return err
+>  - introduce CONFIG_COMMON_CLK_MESON_AO
+>  - format/style minor fix
+> 
+> changes since v3 at [4]: 
+>  - add 'const' contraint to the read-only data
+>  - switch to devm_of_clk_add_hw_provider API
+>  - check return value of devm_reset_controller_register
+> 
+> changes since v2 at [2]: 
+>  - rework meson_aoclkc_probe() which leverage the of_match_data
+>  - merge patch 5-6 into this series
+>  - seperate DTS patch, will send to Kevin Hilman independently
+>  
+> changes since v1 at [0]: 
+>  - rebase to clk-meson's branch 'next/drivers' [1]
+>  - fix license, update to BSD-3-Clause
+>  - drop un-used include header file
+> 
+> [0] https://lkml.kernel.org/r/20180209070026.193879-1-yixun.lan at amlogic.com
+> [1] git://github.com/BayLibre/clk-meson.git branch: next-drivers
+> [2] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
+> [3] https://lkml.kernel.org/r/20180326081809.49493-4-yixun.lan at amlogic.com
+> [4] https://lkml.kernel.org/r/20180328025050.221585-1-yixun.lan at amlogic.com
+> [5] https://lkml.kernel.org/r/20180408031938.153474-1-yixun.lan at amlogic.com
+> [6] https://lkml.kernel.org/r/20180409143749.71197-1-yixun.lan at amlogic.com
 
-Yes I've forced and used custom EDID with 1024x786 bin and observed
-that the bin is able to load.
+Yixun
 
-[    0.262973] [drm] No driver support for vblank timestamp query.
-[    0.263842] [drm] Got built-in EDID base block and 0 extensions
-from "edid/1024x768.bin" for connector
+Please :
+ - Fix checkpatch error in patch 5 
+ - Collect Philip's Ack on patch 4
+ - Remove the extra new lines at EOF in patch 2 (maybe others, I did not check
+them all) - 1 new line at the end of each file, not 2.
 
-Jagan.
-
--- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Regards
+Jerome
