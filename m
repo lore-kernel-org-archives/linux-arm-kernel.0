@@ -1,27 +1,41 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 25 Apr 2018 09:03:18 +0200
-Subject: [PATCH v5 0/2] Add Nintendo NES/SuperNES classic support
-In-Reply-To: <20180424155503.19518-1-miquel.raynal@bootlin.com>
-References: <20180424155503.19518-1-miquel.raynal@bootlin.com>
-Message-ID: <20180425070318.fh3qxd5xyo3oks3a@flea>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 25 Apr 2018 09:10:37 +0200
+Subject: [PATCH] can: xilinx: fix xcan_start_xmit()'s return type
+In-Reply-To: <20180424131614.3357-1-luc.vanoostenryck@gmail.com>
+References: <20180424131614.3357-1-luc.vanoostenryck@gmail.com>
+Message-ID: <e55172a7-5003-e534-87ce-672291940114@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 05:55:01PM +0200, Miquel Raynal wrote:
-> This series adds support for the NES/SuperNES classic consoles from
-> Nintendo. Changes are done in A23/A33 DTSI to add NAND support.
+On 24.4.2018 15:16, Luc Van Oostenryck wrote:
+> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+> which is a typedef for an enum type, but the implementation in this
+> driver returns an 'int'.
+> 
+> Fix this by returning 'netdev_tx_t' in this driver too.
+> 
+> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+> ---
+>  drivers/net/can/xilinx_can.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+> index 89aec07c2..a19648606 100644
+> --- a/drivers/net/can/xilinx_can.c
+> +++ b/drivers/net/can/xilinx_can.c
+> @@ -386,7 +386,7 @@ static int xcan_do_set_mode(struct net_device *ndev, enum can_mode mode)
+>   *
+>   * Return: 0 on success and failure value on error
+>   */
+> -static int xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+> +static netdev_tx_t xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+>  {
+>  	struct xcan_priv *priv = netdev_priv(ndev);
+>  	struct net_device_stats *stats = &ndev->stats;
+> 
 
-Applied, thanks!
-Maxime
+Can you please also align kernel-doc format above?
+I see that the whole function is already returning proper enum values.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180425/8b33998d/attachment-0001.sig>
+Thanks,
+Michal
