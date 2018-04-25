@@ -1,19 +1,81 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 25 Apr 2018 14:56:48 +0200
-Subject: [RFC 05/10] i2c: s3c2410: Remove support for Exynos5440
-In-Reply-To: <20180424203239.21885-6-krzk@kernel.org>
-References: <20180424203239.21885-1-krzk@kernel.org>
- <CGME20180424203349epcas2p1a47060486c2e349b27fd0b2c4ea0394c@epcas2p1.samsung.com>
- <20180424203239.21885-6-krzk@kernel.org>
-Message-ID: <fe4ac171-e7dd-a643-35b6-7beebee81bdb@samsung.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 25 Apr 2018 18:29:05 +0530
+Subject: [RFC 00/13] arm64: allwinner: Add A64 DE2 pipeline support
+In-Reply-To: <20180424140850.ptxpmtusour7u6nb@flea>
+References: <20180424133425.24291-1-jagan@amarulasolutions.com>
+ <20180424140850.ptxpmtusour7u6nb@flea>
+Message-ID: <CAMty3ZCLOkdmCoh4uBhYKXgDEiAnw+b_z=d0Om2bjH7HLCa7Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2018 10:32 PM, Krzysztof Kozlowski wrote:
-> The Exynos5440 is not actively developed, there are no development
-> boards available and probably there are no real products with it.
-> Remove wide-tree support for Exynos5440.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+On Tue, Apr 24, 2018 at 7:38 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Tue, Apr 24, 2018 at 07:04:12PM +0530, Jagan Teki wrote:
+>> Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
+>>
+>> A64 DE2 behaviour similar to Allwinner A83T where mixer0, connected to tcon0 with
+>> RGB, LVDS MIPI-DSI and mixer1, connected to tcon1 with HDMI.
+>> This series merely concentrated on HDMI pipeline and rest will add eventually.
+>>
+>> patch 1: dt-bindings for a64 DE2 CCU
+>>
+>> patch 2: a64 DE2 CCU node addition
+>>
+>> patch 3: dt-bindings for a64 DE2 pipeline
+>>
+>> patch 4 - 5: dt-bindings for a64 mixer0 and tcon-lcd
+>>
+>> patch 6: a64 DE2 pipeline node addition
+>>
+>> patch 7 - 8: dt-bindings for a64 HDMI and HDMI PHY
+>>
+>> patch 9: a64 HDMI nodes addition
+>>
+>> patch 10 - 11: dt-bindings for a64 mixer1 and tcon-tv
+>>
+>> patch 12: a64 HDMI pipeline
+>>
+>> patch 13: enable HDMI out on bananpi-m64
+>>
+>> Tested HDMI on bananapi-m64 (along with DE2 SRAM C changes from [1]
+>> thread), able to detect the HDMI but, no penguins on screen.
+>>
+>> Request for any suggestions.
+>>
+>> Test log on Bananpi-m64:
+>> [    0.247631] sun4i-drm display-engine: bound 1100000.mixer (ops sun8i_mixer_ops)
+>> [    0.256717] sun4i-drm display-engine: bound 1200000.mixer (ops sun8i_mixer_ops)
+>> [    0.256783] sun4i-tcon 1c0c000.lcd-controller: Missing LVDS properties, Please upgrade your DT
+>> [    0.256792] sun4i-tcon 1c0c000.lcd-controller: LVDS output disabled
+>
+> That doesn't seem to work so well for LVDS.
+>
+>> [    0.257081] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
+>> [    0.257099] sun4i-drm display-engine: bound 1c0c000.lcd-controller (ops sun4i_tcon_ops)
+>> [    0.257273] sun4i-drm display-engine: No panel or bridge found... RGB output disabled
+>> [    0.257288] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops sun4i_tcon_ops)
+>> [    0.258176] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX controller v1.32a with HDCP (sun8i_dw_hdmi_p)
+>> [    0.258596] sun8i-dw-hdmi 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver
+>> [    0.259188] sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops)
+>> [    0.259199] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+>> [    0.259205] [drm] No driver support for vblank timestamp query.
+>> [    0.259308] [drm] Cannot find any crtc or sizes
+>
+> A good guess would be that you can't get the EDIDs for some
+> reason. Have you tried forcing a mode to see if the display part
+> already works?
 
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Yes I've forced and used custom EDID with 1024x786 bin and observed
+that the bin is able to load.
+
+[    0.262973] [drm] No driver support for vblank timestamp query.
+[    0.263842] [drm] Got built-in EDID base block and 0 extensions
+from "edid/1024x768.bin" for connector
+
+Jagan.
+
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
