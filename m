@@ -1,49 +1,31 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 25 Apr 2018 13:36:10 +0800
-Subject: [PATCH V4 5/6] ARM: dts: imx6sx-sabreauto: add wdog external reset
- support
+Date: Wed, 25 Apr 2018 13:36:11 +0800
+Subject: [PATCH V4 6/6] ARM: imx_v6_v7_defconfig: Select CONFIG_GPIO_MAX732X
+ by default
 In-Reply-To: <1524634571-5914-1-git-send-email-Anson.Huang@nxp.com>
 References: <1524634571-5914-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1524634571-5914-5-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1524634571-5914-6-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SX Sabre Auto board has GPIO1_IO13 pin can be
-MUXed as WDOG output to reset PMIC, add this function
-support.
+Enable max7320 IO expander for i.MX platforms.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
-no changes.
- arch/arm/boot/dts/imx6sx-sabreauto.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-index fdc642f..ccf1cbb 100644
---- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-@@ -230,6 +230,12 @@
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6SX_PAD_GPIO1_IO13__WDOG1_WDOG_ANY 0x30b0
-+			>;
-+		};
- 	};
- };
- 
-@@ -369,3 +375,9 @@
- 		#gpio-cells = <2>;
- 	};
- };
-+
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 3a30843..8455d39 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -199,6 +199,7 @@ CONFIG_SPI_GPIO=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_FSL_DSPI=y
+ CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_MAX732X=y
+ CONFIG_GPIO_MC9S08DZ60=y
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_GPIO_STMPE=y
 -- 
 2.7.4
