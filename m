@@ -1,68 +1,111 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 25 Apr 2018 16:50:40 +0200
-Subject: [PATCH 2/2] arm: dts: imx[35]*: declare flexcan devices to be
- compatible to imx25's flexcan
-In-Reply-To: <20180425145040.22031-1-u.kleine-koenig@pengutronix.de>
-References: <20180425145040.22031-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20180425145040.22031-3-u.kleine-koenig@pengutronix.de>
+From: Eugeniy.Paltsev@synopsys.com (Eugeniy Paltsev)
+Date: Wed, 25 Apr 2018 13:53:38 +0000
+Subject: [RFC 0/2] dw_mmc: add multislot support
+In-Reply-To: <CAPDyKFpY7JsQukY=E2PRg=iVfmis4i1kvST+b2wtshNc5Jn+jw@mail.gmail.com>
+References: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
+ <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
+ <1524239609.10138.47.camel@synopsys.com>
+ <CAPDyKFpY7JsQukY=E2PRg=iVfmis4i1kvST+b2wtshNc5Jn+jw@mail.gmail.com>
+Message-ID: <1524664417.18209.16.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d50f4630c2e1 ("arm: dts: Remove p1010-flexcan compatible from imx
-series dts") removed the fallback compatible "fsl,p1010-flexcan" from
-the imx device trees. As the flexcan cores on i.MX25, i.MX35 and i.MX53
-are identical, introduce the first as fallback for the two latter ones.
+On Mon, 2018-04-23 at 08:47 +0200, Ulf Hansson wrote:
+> On 20 April 2018 at 17:53, Eugeniy Paltsev <Eugeniy.Paltsev@synopsys.com> wrote:
+> > Hi Ulf,
+> > 
+> > On Fri, 2018-04-20 at 09:35 +0200, Ulf Hansson wrote:
+> > > [...]
+> > > 
+> > > > 
+> > > > 2. Add missing stuff to support multislot mode in DesignWare MMC driver.
+> > > >  * Add missing slot switch to __dw_mci_start_request() function.
+> > > >  * Refactor set_ios function:
+> > > >    a) Calculate common clock which is
+> > > >       suitable for all slots instead of directly use clock value
+> > > >       provided by mmc core. We calculate common clock as the minimum
+> > > >       among each used slot clocks. This clock is calculated in
+> > > >       dw_mci_calc_common_clock() function which is called
+> > > >       from set_ios()
+> > > >    b) Disable clock only if no other slots are ON.
+> > > >    c) Setup clock directly in set_ios() only if no other slots
+> > > >       are ON. Otherwise adjust clock in __dw_mci_start_request()
+> > > >       function before slot switch.
+> > > >    d) Move timings and bus_width setup to separate funcions.
+> > > >  * Use timing field in each slot structure instead of common field in
+> > > >    host structure.
+> > > >  * Add locks to serialize access to registers.
+> > > 
+> > > Sorry, but this is a hack to *try* to make multi-slot work and this
+> > > isn't sufficient. There were good reasons to why the earlier
+> > > non-working multi slot support was removed from dw_mmc.
+> > 
+> > Previous multi slot implementation was removed as nobody used it and
+> > nobody tested it. There are lots of mistakes in previous implementation
+> > which are not related to request serialization
+> > like lack of slot switch / lack of adding slot id to CIU commands / ets...
+> > So obviously it was never tested and never used at real multi slot hardware.
+> > 
+> > > Let me elaborate a bit for your understanding. The core uses a host
+> > > lock (mmc_claim|release_host()) to serialize operations and commands,
+> > > as to confirm to the SD/SDIO/(e)MMC specs. The above changes gives no
+> > > guarantees for this. To make that work, we would need a "mmc bus lock"
+> > > to be managed by the core.
+> > 
+> > In current implementation data transfers and commands to different
+> > hosts (slots) are serialized internally in the dw_mmc driver. We have
+> > request queue and when .request() is called we add new request to the
+> > queue. We take new request from the queue only if the previous one
+> > has already finished.
+> 
+> That isn't sufficient. The core expects all calls to *any* of the host
+> ops to be serialized for one host. It does so to conform to the specs.
+> 
+> For example it may call:
+>  ->set_ios()
+> ->request()
+> ->set_ios()
+> ->request()
+> ->request()
+> 
 
-Fixes: d50f4630c2e1 ("arm: dts: Remove p1010-flexcan compatible from imx series dts")
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/dts/imx35.dtsi | 4 ++--
- arch/arm/boot/dts/imx53.dtsi | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+A bit remark for better understanding:
 
-diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-index bf343195697e..54111ed218b1 100644
---- a/arch/arm/boot/dts/imx35.dtsi
-+++ b/arch/arm/boot/dts/imx35.dtsi
-@@ -303,7 +303,7 @@
- 			};
- 
- 			can1: can at 53fe4000 {
--				compatible = "fsl,imx35-flexcan";
-+				compatible = "fsl,imx35-flexcan", "fsl,imx25-flexcan";
- 				reg = <0x53fe4000 0x1000>;
- 				clocks = <&clks 33>, <&clks 33>;
- 				clock-names = "ipg", "per";
-@@ -312,7 +312,7 @@
- 			};
- 
- 			can2: can at 53fe8000 {
--				compatible = "fsl,imx35-flexcan";
-+				compatible = "fsl,imx35-flexcan", "fsl,imx25-flexcan";
- 				reg = <0x53fe8000 0x1000>;
- 				clocks = <&clks 34>, <&clks 34>;
- 				clock-names = "ipg", "per";
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 7d647d043f52..3d65c0192f69 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -551,7 +551,7 @@
- 			};
- 
- 			can1: can at 53fc8000 {
--				compatible = "fsl,imx53-flexcan";
-+				compatible = "fsl,imx53-flexcan", "fsl,imx25-flexcan";
- 				reg = <0x53fc8000 0x4000>;
- 				interrupts = <82>;
- 				clocks = <&clks IMX5_CLK_CAN1_IPG_GATE>,
-@@ -561,7 +561,7 @@
- 			};
- 
- 			can2: can at 53fcc000 {
--				compatible = "fsl,imx53-flexcan";
-+				compatible = "fsl,imx53-flexcan", "fsl,imx25-flexcan";
- 				reg = <0x53fcc000 0x4000>;
- 				interrupts = <83>;
- 				clocks = <&clks IMX5_CLK_CAN2_IPG_GATE>,
+All card settings change are serialized too. These settings are applied
+after slot switch before execution of new request for this slot.
+
+So situations like calling any host_0 ops while another host (host_1) is active
+are handled by current code.
+
+This is example of simultaneous ops calls for both slots:
+
+host (slot) 0    | host (slot) 1
+-----------------------------------
+h0->set_ios()    |    h1->set_ios()
+h0->request()    |    h1->request()
+h0->set_ios()    |    h1->set_ios()
+h0->request()    |    h1->request()
+h0->request()    |
+h0->request()    |
+h0->request()    |
+
+How it will be serialized in the mmc driver:
+
+h0->set_ios()   // h0 settings save
+h1->set_ios()   // h1 settings save
+h0->request()   // apply settings for h0 and do request
+------ slot switch to h1 ------
+h1->request()   // apply settings for h1 and do request
+h0->set_ios()   // h0 settings save
+h1->set_ios()   // h1 settings save
+------ slot switch to h0 ------
+h0->request()   // apply settings for h0 and do request
+------ slot switch to h1 ------
+h1->request()   // apply settings for h1 and do request
+------ slot switch to h0 ------
+h0->request()   // do request (no new settings to apply)
+h0->request()   // do request (no new settings to apply)
+h0->request()   // do request (no new settings to apply)
+
 -- 
-2.17.0
+ Eugeniy Paltsev
