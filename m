@@ -1,110 +1,75 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 25 Apr 2018 11:14:51 +0200
-Subject: [RESEND PATCH v2 3/4] ARM: davinci: add aemif & nand support to
- da850-lcdk in legacy mode
-In-Reply-To: <df39067d-a941-4099-2cfe-7602d4047c6f@ti.com>
-References: <20180417102917.7794-1-brgl@bgdev.pl>
- <20180417102917.7794-4-brgl@bgdev.pl>
- <df39067d-a941-4099-2cfe-7602d4047c6f@ti.com>
-Message-ID: <CAMRc=MfU4xBcbOevviV9vo8Oq5mtGkcjv8zCEacZXB0twhxUuQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 25 Apr 2018 11:18:12 +0200
+Subject: [PATCH 1/4] drm/nouveau: tegra: Detach from ARM DMA/IOMMU mapping
+Message-ID: <20180425091815.16264-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-17 16:09 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
-> On Tuesday 17 April 2018 03:59 PM, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> We now have support for aemif & nand from board files. As an example
->> add support for nand to da850-lcdk in legacy mode.
->
-> Hawkboard is a separate board of its own, although closely related to
-> LCDK. Lets refer to it as hawkboard itself, instead of "LCDK in legacy
-> mode". So:
->
-> ARM: davinci: omapl138-hawk: ...
->
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  arch/arm/mach-davinci/board-omapl138-hawk.c | 132 ++++++++++++++++++++
->>  1 file changed, 132 insertions(+)
->>
->> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
->> index 6c997c59a3cd..9c3de56b54e4 100644
->> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
->> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
->> @@ -16,6 +16,11 @@
->>  #include <linux/gpio.h>
->>  #include <linux/gpio/machine.h>
->>  #include <linux/platform_data/gpio-davinci.h>
->> +#include <linux/platform_data/ti-aemif.h>
->> +#include <linux/mtd/rawnand.h>
->> +#include <linux/mtd/partitions.h>
->> +#include <linux/platform_data/mtd-davinci.h>
->> +#include <linux/platform_data/mtd-davinci-aemif.h>
->>  #include <linux/regulator/machine.h>
->>
->>  #include <asm/mach-types.h>
->> @@ -162,6 +167,129 @@ static __init void omapl138_hawk_mmc_init(void)
->>       gpiod_remove_lookup_table(&mmc_gpios_table);
->>  }
->>
->> +static struct mtd_partition omapl138_hawk_nandflash_partition[] = {
->> +     {
->> +             .name           = "u-boot env",
->> +             .offset         = 0,
->> +             .size           = SZ_128K,
->> +             .mask_flags     = MTD_WRITEABLE,
->> +      },
->> +     {
->> +             .name           = "u-boot",
->> +             .offset         = MTDPART_OFS_APPEND,
->> +             .size           = SZ_128K,
->
-> Can you make it 512K as it is in da850-lcdk.dts ?
->
->> +             .mask_flags     = MTD_WRITEABLE,
->> +     },
->> +     {
->> +             .name           = "free space",
->> +             .offset         = MTDPART_OFS_APPEND,
->> +             .size           = MTDPART_SIZ_FULL,
->> +             .mask_flags     = 0,
->> +     },
->> +};
->
->> +static struct aemif_abus_data omapl138_hawk_aemif_abus_data[] = {
->> +     {
->> +             .cs     = 3,
->> +     }
->> +};
->> +
->> +static struct platform_device omapl138_hawk_aemif_devices[] = {
->> +     {
->> +             .name           = "davinci_nand",
->> +             .id             = 1,
->
-> Is there a reason for .id to be set to 1 here? Ideally it should be -1,
-> I think since there is a single NAND on the board.
->
+From: Thierry Reding <treding@nvidia.com>
 
-The davinci nand driver uses pdev->id as the chipselect number. I
-guess this should be in the platform data. I'll send a patch for that.
+Depending on the kernel configuration, early ARM architecture setup code
+may have attached the GPU to a DMA/IOMMU mapping that transparently uses
+the IOMMU to back the DMA API. Tegra requires special handling for IOMMU
+backed buffers (a special bit in the GPU's MMU page tables indicates the
+memory path to take: via the SMMU or directly to the memory controller).
+Transparently backing DMA memory with an IOMMU prevents Nouveau from
+properly handling such memory accesses and causes memory access faults.
 
-> Note that I sent a patch dropping AEMIF clock acquisition from DaVinci
-> NAND driver.
->
->> +             .dev            = {
->> +                     .platform_data  = &omapl138_hawk_nandflash_data,
->> +             },
->> +             .resource       = omapl138_hawk_nandflash_resource,
->> +             .num_resources  = ARRAY_SIZE(omapl138_hawk_nandflash_resource),
->> +             .id             = 0,
->
-> This should have resulted in a double init warning?
->
+As a side-note: buffers other than those allocated in instance memory
+don't need to be physically contiguous from the GPU's perspective since
+the GPU can map them into contiguous buffers using its own MMU. Mapping
+these buffers through the IOMMU is unnecessary and will even lead to
+performance degradation because of the additional translation.
 
-It should, strange it didn't - at least for me.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+I had already sent this out independently to fix a regression that was
+introduced in v4.16, but then Christoph pointed out that it should've
+been sent to a wider audience and should use a core API rather than
+calling into architecture code directly.
 
-Thanks,
-Bart
+I've added it to this series for easier reference and to show the need
+for the new API.
+
+ .../drm/nouveau/nvkm/engine/device/tegra.c    | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
+index 78597da6313a..23428a7056e9 100644
+--- a/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
++++ b/drivers/gpu/drm/nouveau/nvkm/engine/device/tegra.c
+@@ -19,6 +19,11 @@
+  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+  * DEALINGS IN THE SOFTWARE.
+  */
++
++#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
++#include <asm/dma-iommu.h>
++#endif
++
+ #include <core/tegra.h>
+ #ifdef CONFIG_NOUVEAU_PLATFORM_DRIVER
+ #include "priv.h"
+@@ -105,6 +110,20 @@ nvkm_device_tegra_probe_iommu(struct nvkm_device_tegra *tdev)
+ 	unsigned long pgsize_bitmap;
+ 	int ret;
+ 
++#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
++	if (dev->archdata.mapping) {
++		struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
++
++		arm_iommu_release_mapping(mapping);
++		arm_iommu_detach_device(dev);
++
++		if (dev->archdata.dma_coherent)
++			set_dma_ops(dev, &arm_coherent_dma_ops);
++		else
++			set_dma_ops(dev, &arm_dma_ops);
++	}
++#endif
++
+ 	if (!tdev->func->iommu_bit)
+ 		return;
+ 
+-- 
+2.17.0
