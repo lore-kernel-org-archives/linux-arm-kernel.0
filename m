@@ -1,61 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Apr 2018 16:03:54 +0100
-Subject: [PATCH] arm64: mm: Fix false positives in W+X checking
-In-Reply-To: <1524665611-14040-1-git-send-email-jhugo@codeaurora.org>
-References: <1524665611-14040-1-git-send-email-jhugo@codeaurora.org>
-Message-ID: <20180425150353.GG8383@arm.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Wed, 25 Apr 2018 16:50:50 +0200
+Subject: arm64: W+X mapping check failures
+In-Reply-To: <f3945f76-04ae-1823-a4bd-85af883f152f@codeaurora.org>
+References: <20180425133704.GA6474@hc>
+ <f3945f76-04ae-1823-a4bd-85af883f152f@codeaurora.org>
+Message-ID: <20180425145050.GB18651@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffrey,
-
-Thanks for the patch. Comment below.
-
-On Wed, Apr 25, 2018 at 08:13:31AM -0600, Jeffrey Hugo wrote:
-> load_module() creates W+X mappings via __vmalloc_node_range() (from
-> layout_and_allocate()->move_module()->module_alloc()) by using
-> PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
-> "call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
+On Wed, Apr 25, 2018 at 07:55:20AM -0600, Jeffrey Hugo wrote:
+> Hi Jan,
 > 
-> This is a problem because call_rcu_sched() queues work, which can be run
-> after debug_checkwx() is run, resulting in a race condition.  If hit, the
-> race results in a nasty splat about insecure W+X mappings, which results
-> in a poor user experience as these are not the mappings that
-> debug_checkwx() is intended to catch.
+> On 4/25/2018 7:37 AM, Jan Glauber wrote:
+> >Hi all,
+> >
+> >enabling CONFIG_DEBUG_WX we see insecure mappings reported across various kernel
+> >versions and machines. I've not yet seen this with upstream but that doesn't
+> >mean much as the issue is a race and I cannot trigger it reliably.
+> >
+> >The reported W+X mappings are gone after the boot is finished. The addresses
+> >all belong to .init.* sections of the first loaded kernel modules.
+> >
+> >Example log (I changed the warnings as I found the backtrace quite useless):
+> >
+> >[   39.157884] Freeing unused kernel memory: 5248K
+> >[   39.167997] note_prot_wx: Found insecure W+X mapping at start: ffff000000ab9000  addr: ffff000000abd000  pages: 4
+> >[   39.178246] note_prot_wx: Found insecure W+X mapping at start: ffff000000ac3000  addr: ffff000000ac5000  pages: 2
+> >[   39.188495] note_prot_wx: Found insecure W+X mapping at start: ffff000000acd000  addr: ffff000000ad0000  pages: 3
+> >[   39.198745] note_prot_wx: Found insecure W+X mapping at start: ffff000000af9000  addr: ffff000000afc000  pages: 3
+> >[   39.212981] Checked W+X mappings: FAILED, 12 W+X pages found, 0 non-UXN pages found
+> >
+> >I think this is a race between module loading and the ptdump_check_wx().
+> >The RCU'd do_free_init() can be delayed _after_ ptdump_check_wx() for a coming module.
+> >
+> >I tried using stop_machine() around the memory check similar to arm but that does not
+> >solve the race. It is not a critical issue as the .init sections are freed afterwards
+> >anyway but still the warning is a bit misleading.
+> >
+> >Any thoughts?
+> >
+> >--Jan
 > 
-> Address the race by flushing the queued work before running
-> debug_checkwx().
+> You are correct.  It appears you have independently found the issue
+> I was about to send a fix for.
 > 
-> Reported-by: Timur Tabi <timur@codeaurora.org>
-> Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
-> Fixes: 1404d6f13e47 ("arm64: dump: Add checking for writable and exectuable pages")
-> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
-> ---
->  arch/arm64/mm/mmu.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> I have a setup that can repro this 100% of the time, and have
+> confirmed there is a race between ptdump_check_wx() and
+> do_free_init().
+
+How did you manage to hit this every time? Just wondering...
+
+> My fix is to put rcu_barrier_sched() just before the call to
+> ptdump_check_wx().  This "flushes" the queued work, ensuring it runs
+> to completion before ptdump_check_wx().
+
+Looks good to me, I tried synchronize_sched() which did not help but
+I should have read the documentation first.
+
+> In my testing, it works, however this fix does not prevent
+> additional load_module() invocations from being triggered, and
+> recreating the race condition.  From my debugging, it appears this
+> might not be an issue in practice, as it looks like all modules that
+> are expected to be loaded in that phase of boot are loaded before
+> ptdump_check_wx() is called.
+
+Yes, the race would still be there. We would need some combination of
+stop_machine and the rcu barrier but I guess calling rcu_barrier_sched()
+inside stop_machine would be a very very bad idea.
+
+> The other alternative would be to remove the use of PAGE_KERNEL_EXEC
+> from module_alloc(), but based on the effort to clean that up
+> afterward in the module loading process, I suspect that is not
+> viable.
 > 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 2dbb2c9..40d45fd 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -503,6 +503,12 @@ void mark_rodata_ro(void)
->  	update_mapping_prot(__pa_symbol(__start_rodata), (unsigned long)__start_rodata,
->  			    section_size, PAGE_KERNEL_RO);
->  
-> +	/*
-> +	 * load_module() results in W+X mappings, which are cleaned up with
-> +	 * call_rcu_sched().  Let's make sure that queued work is flushed so
-> +	 * that we don't hit false positives.
-> +	 */
-> +	rcu_barrier_sched();
->  	debug_checkwx();
->  }
-
-Whilst this looks correct to me, it looks to me like other architectures
-(e.g. x86) would be affected by this problem as well. Perhaps it would be
-better to solve it in the core code before invoking mark_rodata_ro, or is
-there some reason that we only run into this on arm64?
-
-Cheers,
-
-Will
+> >
+> >_______________________________________________
+> >linux-arm-kernel mailing list
+> >linux-arm-kernel at lists.infradead.org
+> >http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> 
+> 
+> -- 
+> Jeffrey Hugo
+> Qualcomm Datacenter Technologies as an affiliate of Qualcomm
+> Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
