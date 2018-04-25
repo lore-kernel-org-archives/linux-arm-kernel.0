@@ -1,305 +1,151 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Wed, 25 Apr 2018 15:47:44 -0400
-Subject: [PATCH 4/6] PCI: Convert of_pci_get_host_bridge_resources users
- to devm variant
-In-Reply-To: <d76c32d535bb555076b3f7c010a6856ac97bbdae.1524582822.git.jan.kiszka@siemens.com>
-References: <cover.1524582822.git.jan.kiszka@siemens.com>
- <d76c32d535bb555076b3f7c010a6856ac97bbdae.1524582822.git.jan.kiszka@siemens.com>
-Message-ID: <000001d3dcce$48284a10$d878de30$@gmail.com>
+From: ebiggers@google.com (Eric Biggers)
+Date: Wed, 25 Apr 2018 12:49:19 -0700
+Subject: [PATCH v2 0/5] crypto: Speck support
+In-Reply-To: <CAEX_ruHB7=zUuAWvbC9f6pDNhA4B32PGEkHi3QnPjRmRknrJ7w@mail.gmail.com>
+References: <20180212235209.117393-1-ebiggers@google.com>
+ <CAHmME9oA4j=iGrrBYME92JfUsyi5r42PnAvzWiuXzGCRXMnXtA@mail.gmail.com>
+ <20180424181623.GA174675@google.com>
+ <CAHmME9qG+nPmj5c7hU4+STUsmWmwSBsKe-0mOLEXH+hJ1z4z=g@mail.gmail.com>
+ <20180424224734.GA109345@google.com>
+ <CAEX_ruHB7=zUuAWvbC9f6pDNhA4B32PGEkHi3QnPjRmRknrJ7w@mail.gmail.com>
+Message-ID: <20180425194919.GA79662@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Samuel,
 
+On Wed, Apr 25, 2018 at 03:33:16PM +0100, Samuel Neves wrote:
+> Let's put the provenance of Speck aside for a moment, and suppose that
+> it is an ideal block cipher. There are still some issues with this
+> patch as it stands.
+> 
+>  - The rationale seems off. Consider this bit from the commit message:
+> 
+> > Other AES alternatives such as Twofish, Threefish, Camellia, CAST6, and Serpent aren't
+> > fast enough either; it seems that only a modern ARX cipher can provide sufficient performance
+> > on these devices.
+> 
+> One of these things is very much not like the others. Threefish _is_ a
+> modern ARX cipher---a tweakable block cipher in fact, precluding the
+> need for XEX-style masking. Is it too slow? Does it not have the
+> correct block size?
+> 
+> > We've also considered a novel length-preserving encryption mode based on
+> > ChaCha20 and Poly1305.
+> 
+> I'm very curious about this, namely as to what the role of Poly1305
+> would be here. ChaCha20's underlying permutation could, of course, be
+> transformed into a 512-bit tweakable block cipher relatively
+> painlessly, retaining the performance of regular ChaCha20 with
+> marginal additional overhead. This would not be a standard
+> construction, but clearly that is not an issue.
+> 
+> But the biggest problem here, in my mind, is that for all the talk of
+> using 128-bit block Speck, this patch tacks on the 64-bit block
+> variant of Speck into the kernel, and speck64-xts as well! As far as I
+> can tell, this is the _only_ instance of a 64-bit XTS instance in the
+> entire codebase. Now, if you wanted a fast 64-bit ARX block cipher,
+> the kernel already had XTEA. Instead, this is adding yet another
+> 64-bit block cipher into the crypto API, in a disk-encryption mode no
+> less, so that it can be misused later. In the disk encryption setting,
+> it's particularly concerning to be using such a small block size, as
+> data volumes can quickly add up to the birthday bound.
+> 
+> > It's easy to say that, but do you have an actual suggestion?
+> 
+> I don't know how seriously you are actually asking this, but some
+> 128-bit software-friendly block ciphers could be SPARX, LEA, RC5, or
+> RC6. SPARX, in particular, has similarities to Speck but has some
+> further AES-like design guarantees that other prior ARX block ciphers
+> did not. Some other bitsliced designs, such as Noekeon or SKINNY, may
+> also work well with NEON, but I don't know much about their
+> performance there.
+> 
 
-> -----Original Message-----
-> From: Jan Kiszka <jan.kiszka@siemens.com>
-> Sent: Tuesday, April 24, 2018 11:14 AM
-> To: Bjorn Helgaas <bhelgaas@google.com>; Linux Kernel Mailing List <linux-
-> kernel at vger.kernel.org>; linux-pci at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: Jingoo Han <jingoohan1@gmail.com>; Joao Pinto
-> <Joao.Pinto@synopsys.com>; Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Subject: [PATCH 4/6] PCI: Convert of_pci_get_host_bridge_resources users
-> to devm variant
-> 
-> From: Jan Kiszka <jan.kiszka@siemens.com>
-> 
-> Straightforward for all of them, no more leaks afterwards.
-> 
-> CC: Jingoo Han <jingoohan1@gmail.com>
+I agree that my explanation should have been better, and should have considered
+more crypto algorithms.  The main difficulty is that we have extreme performance
+requirements -- it needs to be 50 MB/s at the very least on even low-end ARM
+devices like smartwatches.  And even with the NEON-accelerated Speck128-XTS
+performance exceeding that after much optimization, we've been getting a lot of
+pushback as people want closer to 100 MB/s.
 
-For drivers/pci/dwc/pcie-designware-host.c,
+That's why I also included Speck64-XTS in the patches, since it was
+straightforward to include, and some devices may really need that last 20-30% of
+performance for encryption to be feasible at all.  (And when the choice is
+between unencrypted and a 64-bit block cipher, used in a context where the
+weakest points in the cryptosystem are actually elsewhere such as the user's
+low-entropy PIN and the flash storage doing wear-leveling, I'd certainly take
+the 64-bit block cipher.)  So far we haven't had to use Speck64 though, and if
+that continues to be the case I'd be fine with Speck64 being removed, leaving
+just Speck128.
 
-Acked-by: Jingoo Han <jingoo1han@gmail.com>
+Note that in practice, to have any chance at meeting the performance requirement
+the cipher needed to be NEON accelerated.  That made benchmarking really hard
+and time-consuming, since to definitely know how an algorithm performs it can
+take upwards of a week to implement a NEON version.  It needs to be very well
+optimized too, to compare the algorithms fairly -- e.g. with Speck I got a 20%
+performance improvement on some CPUs just by changing the NEON instructions used
+to implement the 8-bit rotates, an optimization that is not possible with
+ciphers that don't use rotate amounts that are multiples of 8.  (This was an
+intentional design choice by the Speck designers; they do know what they're
+doing, actually.)
 
-Best regards,
-Jingoo Han
+Thus, we had to be pretty aggressive about dropping algorithms from
+consideration if there were preliminary indications that they wouldn't perform
+well, or had too little cryptanalysis, or had other issues such as an unclear
+patent situation.  Threefish for example I did test the C implementation at
+https://github.com/wernerd/Skein3Fish, but on ARM32 it was over 4 times slower
+than my NEON implementation of Speck128/256-XTS.  And I did not see a clear way
+that it could be improved over 4x with NEON, if at all, so I did not take the
+long time it would have taken to write an optimized NEON implementation to
+benchmark it properly.  Perhaps that was a mistake.  But, time is not unlimited.
 
-> CC: Joao Pinto <Joao.Pinto@synopsys.com>
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> ---
->  drivers/pci/dwc/pcie-designware-host.c | 2 +-
->  drivers/pci/host/pci-aardvark.c        | 5 ++---
->  drivers/pci/host/pci-ftpci100.c        | 4 ++--
->  drivers/pci/host/pci-v3-semi.c         | 3 ++-
->  drivers/pci/host/pci-versatile.c       | 3 +--
->  drivers/pci/host/pci-xgene.c           | 3 ++-
->  drivers/pci/host/pcie-altera.c         | 5 ++---
->  drivers/pci/host/pcie-iproc-platform.c | 4 ++--
->  drivers/pci/host/pcie-rcar.c           | 5 ++---
->  drivers/pci/host/pcie-rockchip.c       | 4 ++--
->  drivers/pci/host/pcie-xilinx-nwl.c     | 4 ++--
->  drivers/pci/host/pcie-xilinx.c         | 4 ++--
->  drivers/pci/of.c                       | 4 ++--
->  13 files changed, 24 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pcie-designware-host.c
-> b/drivers/pci/dwc/pcie-designware-host.c
-> index 6c409079d514..a8f6ab54b4c0 100644
-> --- a/drivers/pci/dwc/pcie-designware-host.c
-> +++ b/drivers/pci/dwc/pcie-designware-host.c
-> @@ -342,7 +342,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	if (!bridge)
->  		return -ENOMEM;
-> 
-> -	ret = of_pci_get_host_bridge_resources(np, 0, 0xff,
-> +	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
->  					&bridge->windows, &pp->io_base);
->  	if (ret)
->  		return ret;
-> diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-
-> aardvark.c
-> index b04d37b3c5de..709f0d69e35b 100644
-> --- a/drivers/pci/host/pci-aardvark.c
-> +++ b/drivers/pci/host/pci-aardvark.c
-> @@ -815,14 +815,13 @@ static int
-> advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
->  {
->  	int err, res_valid = 0;
->  	struct device *dev = &pcie->pdev->dev;
-> -	struct device_node *np = dev->of_node;
->  	struct resource_entry *win, *tmp;
->  	resource_size_t iobase;
-> 
->  	INIT_LIST_HEAD(&pcie->resources);
-> 
-> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie-
-> >resources,
-> -					       &iobase);
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-> +						    &pcie->resources,
-&iobase);
->  	if (err)
->  		return err;
-> 
-> diff --git a/drivers/pci/host/pci-ftpci100.c b/drivers/pci/host/pci-
-> ftpci100.c
-> index 5008fd87956a..87748eaeaaed 100644
-> --- a/drivers/pci/host/pci-ftpci100.c
-> +++ b/drivers/pci/host/pci-ftpci100.c
-> @@ -476,8 +476,8 @@ static int faraday_pci_probe(struct platform_device
-> *pdev)
->  	if (IS_ERR(p->base))
->  		return PTR_ERR(p->base);
-> 
-> -	ret = of_pci_get_host_bridge_resources(dev->of_node, 0, 0xff,
-> -					       &res, &io_base);
-> +	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-> +						    &res, &io_base);
->  	if (ret)
->  		return ret;
-> 
-> diff --git a/drivers/pci/host/pci-v3-semi.c b/drivers/pci/host/pci-v3-
-> semi.c
-> index 0a4dea796663..167bf6f6b378 100644
-> --- a/drivers/pci/host/pci-v3-semi.c
-> +++ b/drivers/pci/host/pci-v3-semi.c
-> @@ -791,7 +791,8 @@ static int v3_pci_probe(struct platform_device *pdev)
->  	if (IS_ERR(v3->config_base))
->  		return PTR_ERR(v3->config_base);
-> 
-> -	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &io_base);
-> +	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
-> +						    &io_base);
->  	if (ret)
->  		return ret;
-> 
-> diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-
-> versatile.c
-> index 5b3876f5312b..ff2cd12b3978 100644
-> --- a/drivers/pci/host/pci-versatile.c
-> +++ b/drivers/pci/host/pci-versatile.c
-> @@ -64,11 +64,10 @@ static int
-> versatile_pci_parse_request_of_pci_ranges(struct device *dev,
->  						     struct list_head *res)
->  {
->  	int err, mem = 1, res_valid = 0;
-> -	struct device_node *np = dev->of_node;
->  	resource_size_t iobase;
->  	struct resource_entry *win, *tmp;
-> 
-> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, res, &iobase);
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, res,
-> &iobase);
->  	if (err)
->  		return err;
-> 
-> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-> index 0a0d7ee6d3c9..7b3ed6e34b6c 100644
-> --- a/drivers/pci/host/pci-xgene.c
-> +++ b/drivers/pci/host/pci-xgene.c
-> @@ -632,7 +632,8 @@ static int xgene_pcie_probe(struct platform_device
-> *pdev)
->  	if (ret)
->  		return ret;
-> 
-> -	ret = of_pci_get_host_bridge_resources(dn, 0, 0xff, &res, &iobase);
-> +	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
-> +						    &iobase);
->  	if (ret)
->  		return ret;
-> 
-> diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-
-> altera.c
-> index a6af62e0256d..49410c7ba0cc 100644
-> --- a/drivers/pci/host/pcie-altera.c
-> +++ b/drivers/pci/host/pcie-altera.c
-> @@ -488,11 +488,10 @@ static int
-> altera_pcie_parse_request_of_pci_ranges(struct altera_pcie *pcie)
->  {
->  	int err, res_valid = 0;
->  	struct device *dev = &pcie->pdev->dev;
-> -	struct device_node *np = dev->of_node;
->  	struct resource_entry *win;
-> 
-> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie-
-> >resources,
-> -					       NULL);
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff
-> +						    &pcie->resources, NULL);
->  	if (err)
->  		return err;
-> 
-> diff --git a/drivers/pci/host/pcie-iproc-platform.c
-> b/drivers/pci/host/pcie-iproc-platform.c
-> index e764a2a2693c..99c2022813e4 100644
-> --- a/drivers/pci/host/pcie-iproc-platform.c
-> +++ b/drivers/pci/host/pcie-iproc-platform.c
-> @@ -99,8 +99,8 @@ static int iproc_pcie_pltfm_probe(struct platform_device
-> *pdev)
->  		pcie->phy = NULL;
->  	}
-> 
-> -	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &resources,
-> -					       &iobase);
-> +	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-> &resources,
-> +						    &iobase);
->  	if (ret) {
->  		dev_err(dev, "unable to get PCI host bridge resources\n");
->  		return ret;
-> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-> index 6ab28f29ac6a..6eb36c924983 100644
-> --- a/drivers/pci/host/pcie-rcar.c
-> +++ b/drivers/pci/host/pcie-rcar.c
-> @@ -1067,12 +1067,11 @@ static int
-> rcar_pcie_parse_request_of_pci_ranges(struct rcar_pcie *pci)
->  {
->  	int err;
->  	struct device *dev = pci->dev;
-> -	struct device_node *np = dev->of_node;
->  	resource_size_t iobase;
->  	struct resource_entry *win, *tmp;
-> 
-> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
-> -					       &iobase);
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-> +						    &pci->resources,
-&iobase);
->  	if (err)
->  		return err;
-> 
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-
-> rockchip.c
-> index f1e8f97ea1fb..27b97fcddf15 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -1560,8 +1560,8 @@ static int rockchip_pcie_probe(struct
-> platform_device *pdev)
->  	if (err < 0)
->  		goto err_deinit_port;
-> 
-> -	err = of_pci_get_host_bridge_resources(dev->of_node, 0, 0xff,
-> -					       &res, &io_base);
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-> +						    &res, &io_base);
->  	if (err)
->  		goto err_remove_irq_domain;
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-
-> xilinx-nwl.c
-> index 4839ae578711..64df768c795c 100644
-> --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> @@ -825,7 +825,6 @@ static const struct of_device_id nwl_pcie_of_match[] =
-> {
->  static int nwl_pcie_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> -	struct device_node *node = dev->of_node;
->  	struct nwl_pcie *pcie;
->  	struct pci_bus *bus;
->  	struct pci_bus *child;
-> @@ -855,7 +854,8 @@ static int nwl_pcie_probe(struct platform_device
-*pdev)
->  		return err;
->  	}
-> 
-> -	err = of_pci_get_host_bridge_resources(node, 0, 0xff, &res,
-> &iobase);
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
-> +						    &iobase);
->  	if (err) {
->  		dev_err(dev, "Getting bridge resources failed\n");
->  		return err;
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-
-> xilinx.c
-> index 0ad188effc09..88c96e5669e0 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -643,8 +643,8 @@ static int xilinx_pcie_probe(struct platform_device
-> *pdev)
->  		return err;
->  	}
-> 
-> -	err = of_pci_get_host_bridge_resources(dev->of_node, 0, 0xff, &res,
-> -					       &iobase);
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
-> +						    &iobase);
->  	if (err) {
->  		dev_err(dev, "Getting bridge resources failed\n");
->  		return err;
-> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-> index 6eab0bde2ab3..4f816c93e562 100644
-> --- a/drivers/pci/of.c
-> +++ b/drivers/pci/of.c
-> @@ -626,12 +626,12 @@ int pci_parse_request_of_pci_ranges(struct device
-> *dev,
->  				    struct resource **bus_range)
->  {
->  	int err, res_valid = 0;
-> -	struct device_node *np = dev->of_node;
->  	resource_size_t iobase;
->  	struct resource_entry *win, *tmp;
-> 
->  	INIT_LIST_HEAD(resources);
-> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, resources,
-> &iobase);
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, resources,
-> +						    &iobase);
->  	if (err)
->  		return err;
-> 
-> --
-> 2.13.6
+RC5 and RC6 use data-dependent rotates which won't perform too well on NEON,
+also historically those algorithms have been patented.  It sounds like the last
+patents expired last year, but we'd need to double check and be very sure that's
+really the case.
+
+As for the wide-block mode using ChaCha20 and Poly1305, you'd have to ask Paul
+Crowley to explain it properly, but briefly it's actually a pseudorandom
+permutation over an arbitrarily-sized message.  So with dm-crypt for example, it
+would operate on a whole 512-byte sector, and if any bit of the 512-byte
+plaintext is changed, then every bit in the 512-byte ciphertext would change
+with 50% probability.  To make this possible, the construction uses a polynomial
+evalution in GF(2^130-5) as a universal hash function, similar to the Poly1305
+mode.
+
+Using ChaCha20's underlying 512-bit permutation to build a tweakable block
+cipher is an interesting idea.  But maybe in my crypto-naivety, it is not
+obvious to me how to do so.  Do you have references to any relevant papers?
+Remember that we strongly prefer a published cipher to a custom one -- even if
+the core is reused, a mistake may be made in the way it is used.  Thus,
+similarly to Paul's wide-block mode, I'd be concerned that we'd have to
+self-publish a new construction, then use it with no outside crypto review.
+*Maybe* it would be straightforward enough to be okay, but to know I'd need to
+see the details of how it would actually work.
+
+But in the end, Speck seemed like the clear choice because it had multiple NEON
+implementations available already which showed it could be implemented very
+efficiently in NEON; it has over 70 cryptanalysis papers (far more than most
+ciphers) yet the security margin is still similar to AES; it has no intellectual
+property concerns; there is a paper clearly explaining the design decisions; it
+is naturally resistant to timing attacks; it supports a 128-bit block size, so
+it can be easily used in XTS mode; it supports the same key sizes as AES; and it
+has a simple and understandable design with no "magic numbers" besides 8 and 3
+(compare to an actual backdoored algorithm like Dual_EC_DRGB, which basically
+had a public key embedded in the algorithm).  Also as Paul mentioned he is
+confident in the construction, and he has published cryptanalysis on Salsa20, so
+his opinion is probably more significant than mine :-)
+
+But I will definitely take a closer look at SPARX and some of the other ciphers
+you mentioned in case I missed something.  I really do appreciate the
+suggestions, by the way, and in any case we do need to be very well prepared to
+justify our choices.  I just hope that people can understand that we are
+implementing real-world crypto which must operate under *very* tight performance
+constraints on ARM processors, and it must be compatible with dm-crypt and
+fscrypt with no room for ciphertext expansion.  Thus, many algorithms which may
+at first seem reasonable choices had to (unfortunately) be excluded.
+
+Thanks!
+
+Eric
