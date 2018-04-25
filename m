@@ -1,15 +1,13 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 25 Apr 2018 14:49:24 +0200
-Subject: [RFC 04/10] clk: samsung: Remove support for Exynos5440
-In-Reply-To: <20180424203239.21885-5-krzk@kernel.org>
+Date: Wed, 25 Apr 2018 14:49:41 +0200
+Subject: [RFC 08/10] spi: s3c64xx: samsung: Remove support for Exynos5440
+In-Reply-To: <20180424203239.21885-9-krzk@kernel.org>
 References: <20180424203239.21885-1-krzk@kernel.org>
- <CGME20180424203341epcas5p3a6db7d58b0ce8940d03711823fbf6e41@epcas5p3.samsung.com>
- <20180424203239.21885-5-krzk@kernel.org>
-Message-ID: <8e4e4712-4b21-83f8-fa06-142e9557a251@samsung.com>
+ <CGME20180424203409epcas2p45f55e5a5d211e78d4cadc3c4ffa5a9c0@epcas2p4.samsung.com>
+ <20180424203239.21885-9-krzk@kernel.org>
+Message-ID: <066e917b-7207-9c10-4d6c-07273c6f49d9@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Cc: Jingoo Han
 
 On 04/24/2018 10:32 PM, Krzysztof Kozlowski wrote:
 > The Exynos5440 is not actively developed, there are no development
@@ -18,9 +16,7 @@ On 04/24/2018 10:32 PM, Krzysztof Kozlowski wrote:
 > 
 > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Thanks Krzysztof, patch applied, assuming there is no issues with applying 
-patches from this series individually through the subsystem trees.
+It's good you didn't remove S3C64XX_SPI_QUIRK_POLL entirely as it will
+be needed for Exynos5433 ISP SPI controllers.
 
--- 
-Regards,
-Sylwester
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
