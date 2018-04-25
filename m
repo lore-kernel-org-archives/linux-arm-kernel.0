@@ -1,41 +1,50 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 25 Apr 2018 17:32:29 +0800
-Subject: [PATCH v2 03/17] dt-bindings: mfd: mt6397: add a description for
- MT6323 RTC
+Date: Wed, 25 Apr 2018 17:32:40 +0800
+Subject: [PATCH v2 14/17] rtc: mt6397: update license converting to using SPDX
+ identifiers
 In-Reply-To: <cover.1524646231.git.sean.wang@mediatek.com>
 References: <cover.1524646231.git.sean.wang@mediatek.com>
-Message-ID: <6c99566b38e51e102eefbef573b685500d04d39a.1524646231.git.sean.wang@mediatek.com>
+Message-ID: <b1d290e72ee060e70cac8a64ffedc16761efafe3.1524646231.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add a description for MT6323 RTC and link it to the detailed binding
-documentation.
+update the license and convert to using SPDX identifiers
 
-Cc: devicetree at vger.kernel.org
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/mfd/mt6397.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/rtc/rtc-mt6397.c | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-index d1df77f..11a748d 100644
---- a/Documentation/devicetree/bindings/mfd/mt6397.txt
-+++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-@@ -22,8 +22,10 @@ compatible: "mediatek,mt6397" or "mediatek,mt6323"
- Optional subnodes:
+diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+index 3672d622..1ebeaaf 100644
+--- a/drivers/rtc/rtc-mt6397.c
++++ b/drivers/rtc/rtc-mt6397.c
+@@ -1,16 +1,12 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+-* Copyright (c) 2014-2015 MediaTek Inc.
+-* Author: Tianping.Fang <tianping.fang@mediatek.com>
+-*
+-* This program is free software; you can redistribute it and/or modify
+-* it under the terms of the GNU General Public License version 2 as
+-* published by the Free Software Foundation.
+-*
+-* This program is distributed in the hope that it will be useful,
+-* but WITHOUT ANY WARRANTY; without even the implied warranty of
+-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-* GNU General Public License for more details.
+-*/
++ * MediaTek PMIC RTC driver
++ *
++ * Copyright (C) 2014-2018 MediaTek Inc.
++ *
++ * Author: Tianping.Fang <tianping.fang@mediatek.com>
++ *	   Sean Wang <sean.wang@mediatek.com>
++ */
  
- - rtc
--	Required properties:
-+	Required properties: Should be one of follows
-+		- compatible: "mediatek,mt6323-rtc"
- 		- compatible: "mediatek,mt6397-rtc"
-+	For details, see Documentation/devicetree/bindings/rtc/rtc-mt6397.txt
- - regulators
- 	Required properties:
- 		- compatible: "mediatek,mt6397-regulator"
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
 -- 
 2.7.4
