@@ -1,120 +1,176 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 25 Apr 2018 23:35:13 +0200
-Subject: noveau vs arm dma ops
-In-Reply-To: <20180425153312.GD27076@infradead.org>
-References: <20180420152111.GR31310@phenom.ffwll.local>
- <20180424184847.GA3247@infradead.org>
- <CAKMK7uFL68pu+-9LODTgz+GQYvxpnXOGhxfz9zorJ_JKsPVw2g@mail.gmail.com>
- <20180425054855.GA17038@infradead.org>
- <CAKMK7uEFitkNQrD6cLX5Txe11XhVO=LC4YKJXH=VNdq+CY=DjQ@mail.gmail.com>
- <CAKMK7uFx=KB1vup=WhPCyfUFairKQcRR4BEd7aXaX1Pj-vj3Cw@mail.gmail.com>
- <20180425064335.GB28100@infradead.org> <20180425074151.GA2271@ulmo>
- <20180425085439.GA29996@infradead.org>
- <20180425100429.GR25142@phenom.ffwll.local>
- <20180425153312.GD27076@infradead.org>
-Message-ID: <CAKMK7uH14qupTYDa1pr8UC434Vs+97eUXj+fYi=+2uijCLayMA@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 25 Apr 2018 23:37:32 +0200
+Subject: [PATCH v5 6/6] reset: Renesas RZ/N1 reboot driver
+In-Reply-To: <1523963101-56725-7-git-send-email-michel.pollet@bp.renesas.com>
+References: <1523963101-56725-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1523963101-56725-7-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <20180425213732.tdmla3kdeuc2jjke@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 5:33 PM, Christoph Hellwig <hch@infradead.org> wrote:
-> On Wed, Apr 25, 2018 at 12:04:29PM +0200, Daniel Vetter wrote:
->> > Coordinating the backport of a trivial helper in the arm tree is not
->> > the end of the world.  Really, this cowboy attitude is a good reason
->> > why graphics folks have such a bad rep.  You keep poking into random
->> > kernel internals, don't talk to anoyone and then complain if people
->> > are upset.  This shouldn't be surprising.
->>
->> Not really agreeing on the cowboy thing. The fundamental problem is that
->> the dma api provides abstraction that seriously gets in the way of writing
->> a gpu driver. Some examples:
->
-> So talk to other people.  Maybe people share your frustation.  Or maybe
-> other people have a way to help.
->
->> - We never want bounce buffers, ever. dma_map_sg gives us that, so there's
->>   hacks to fall back to a cache of pages allocated using
->>   dma_alloc_coherent if you build a kernel with bounce buffers.
->
-> get_required_mask() is supposed to tell you if you are safe.  However
-> we are missing lots of implementations of it for iommus so you might get
-> some false negatives, improvements welcome.  It's been on my list of
-> things to fix in the DMA API, but it is nowhere near the top.
+Hi,
 
-I hasn't come up in a while in some fireworks, so I honestly don't
-remember exactly what the issues have been. But
+On Tue, Apr 17, 2018 at 12:04:21PM +0100, Michel Pollet wrote:
+> The Renesas RZ/N1 Family (Part #R9A06G0xx) needs a small driver
+> to reboot the Cortex-A7 cores. This driver is a sub driver of
+> the sysctrl MFD.
+> 
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> ---
+>  drivers/power/reset/Kconfig       |  7 +++
+>  drivers/power/reset/Makefile      |  1 +
+>  drivers/power/reset/rzn1-reboot.c | 96 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 104 insertions(+)
+>  create mode 100644 drivers/power/reset/rzn1-reboot.c
+> 
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index df58fc8..1416d88 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -144,6 +144,13 @@ config POWER_RESET_RESTART
+>  	  Instead they restart, and u-boot holds the SoC until the
+>  	  user presses a key. u-boot then boots into Linux.
+>  
+> +config POWER_RESET_RZN1
+> +	bool "Renesas RZ/N1 reboot driver"
+> +	depends on ARCH_RZN1
+> +	help
+> +	  This driver allows rebooting the CA7 cores of the
+> +	  Renesas RZ/N1 Family of SoC (Part # R9A06G0xx).
+> +
+>  config POWER_RESET_ST
+>  	bool "ST restart driver"
+>  	depends on ARCH_STI
+> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> index 7778c74..bad9702 100644
+> --- a/drivers/power/reset/Makefile
+> +++ b/drivers/power/reset/Makefile
+> @@ -16,6 +16,7 @@ obj-$(CONFIG_POWER_RESET_PIIX4_POWEROFF) += piix4-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+> +obj-$(CONFIG_POWER_RESET_RZN1) += rzn1-reboot.o
+>  obj-$(CONFIG_POWER_RESET_ST) += st-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_VERSATILE) += arm-versatile-reboot.o
+>  obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
+> diff --git a/drivers/power/reset/rzn1-reboot.c b/drivers/power/reset/rzn1-reboot.c
+> new file mode 100644
+> index 0000000..43876d5
+> --- /dev/null
+> +++ b/drivers/power/reset/rzn1-reboot.c
+> @@ -0,0 +1,96 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * RZ/N1 reboot driver
+> + *
+> + * Copyright (C) 2018 Renesas Electronics Europe Limited
+> + *
+> + * Michel Pollet <michel.pollet@bp.renesas.com>, <buserror@gmail.com>
+> + * Derived from zx-reboot.c
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/notifier.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+> +
+> +/* Definitions from the SDK rzn1-sysctrl.h autogenerated file */
+> +#define RZN1_SYSCTRL_REG_RSTEN_MRESET_EN		0
+> +#define RZN1_SYSCTRL_REG_RSTEN_WDA7RST_EN		1
+> +#define RZN1_SYSCTRL_REG_RSTEN_WDA7RST_EN_MASK		0x6
+> +#define RZN1_SYSCTRL_REG_RSTEN_WDM3RST_EN		3
+> +#define RZN1_SYSCTRL_REG_RSTEN_CM3LOCKUPRST_EN		4
+> +#define RZN1_SYSCTRL_REG_RSTEN_CM3SYSRESET_EN		5
+> +#define RZN1_SYSCTRL_REG_RSTEN_SWRST_EN			6
+> +#define RZN1_SYSCTRL_REG_RSTCTRL_WDA7RST_REQ		1
+> +#define RZN1_SYSCTRL_REG_RSTCTRL_WDA7RST_REQ_MASK	0x6
+> +#define RZN1_SYSCTRL_REG_RSTCTRL_WDM3RST_REQ		3
+> +#define RZN1_SYSCTRL_REG_RSTCTRL_CM3LOCKUPRST_REQ	4
+> +#define RZN1_SYSCTRL_REG_RSTCTRL_CM3SYSRESET_REQ	5
+> +#define RZN1_SYSCTRL_REG_RSTCTRL_SWRST_REQ		6
+> +
+> +static void __iomem *reg_rsten, *reg_rstctrl;
 
-commit d766ef53006c2c38a7fe2bef0904105a793383f2
-Author: Chris Wilson <chris@chris-wilson.co.uk>
-Date:   Mon Dec 19 12:43:45 2016 +0000
+Please make this into a proper driver and allocate this dynamically.
+You can get device context from the notifier_block, see for example
+gpio-restart.
 
-    drm/i915: Fallback to single PAGE_SIZE segments for DMA remapping
+> +static int rzn1_reboot_handler(struct notifier_block *this,
+> +			      unsigned long mode, void *cmd)
+> +{
+> +	writel(readl(reg_rsten) |
+> +			BIT(RZN1_SYSCTRL_REG_RSTEN_SWRST_EN) |
+> +			BIT(RZN1_SYSCTRL_REG_RSTEN_MRESET_EN),
+> +		reg_rsten);
+> +	writel(readl(reg_rstctrl) |
+> +			BIT(RZN1_SYSCTRL_REG_RSTCTRL_SWRST_REQ),
+> +		reg_rstctrl);
+> +
+> +	mdelay(50);
+> +	pr_emerg("Unable to restart system\n");
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block rzn1_reboot_nb = {
+> +	.notifier_call = rzn1_reboot_handler,
+> +	.priority = 128,
+> +};
+> +
+> +static int rzn1_reboot_probe(struct platform_device *ofdev)
+> +{
+> +	int err;
+> +
+> +	reg_rsten = of_iomap(ofdev->dev.of_node, 0);
+> +	reg_rstctrl = of_iomap(ofdev->dev.of_node, 1);
 
-and the various bits of code that a
+Please use devm_ioremap().
 
-$ git grep SWIOTLB -- drivers/gpu
+> +
+> +	if (!reg_rsten || !reg_rstctrl) {
+> +		dev_err(&ofdev->dev, "invalid register mapping\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	err = register_restart_handler(&rzn1_reboot_nb);
+> +	if (err) {
+> +		dev_err(&ofdev->dev, "register restart handler failed(err=%d)\n",
+> +			err);
+> +	}
 
-turns up is what we're doing to hack around that stuff. And in general
-(there's some exceptions) gpus should be able to address everything,
-so I never fully understood where that's even coming from.
+Missing unregister_restart_handler() in .remove.
 
->> - dma api hides the cache flushing requirements from us. GPUs love
->>   non-snooped access, and worse give userspace control over that. We want
->>   a strict separation between mapping stuff and flushing stuff. With the
->>   IOMMU api we mostly have the former, but for the later arch maintainers
->>   regularly tells they won't allow that. So we have drm_clflush.c.
->
-> The problem is that a cache flushing API entirely separate is hard. That
-> being said if you look at my generic dma-noncoherent API series it tries
-> to move that way.  So far it is in early stages and apparently rather
-> buggy unfortunately.
+> +
+> +	return err;
+> +}
+> +
+> +static const struct of_device_id rzn1_reboot_of_match[] = {
+> +	{ .compatible = "renesas,rzn1-reboot" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, rzn1_reboot_of_match);
+> +
+> +static struct platform_driver rzn1_reboot_driver = {
+> +	.probe = rzn1_reboot_probe,
+> +	.driver = {
+> +		.name = "rzn1-reboot",
+> +		.of_match_table = rzn1_reboot_of_match,
+> +	},
+> +};
+> +module_platform_driver(rzn1_reboot_driver);
+> +
+> +MODULE_DESCRIPTION("RZ/N1 reboot driver");
+> +MODULE_AUTHOR("Michel Pollet <michel.pollet@bp.renesas.com>, <buserror@gmail.com>");
+> +MODULE_LICENSE("GPL v2");
 
-I'm assuming this stuff here?
-
-https://lkml.org/lkml/2018/4/20/146
-
-Anyway got lost in all that work a bit, looks really nice.
-
->> - dma api hides how/where memory is allocated. Kinda similar problem,
->>   except now for CMA or address limits. So either we roll our own
->>   allocators and then dma_map_sg (and pray it doesn't bounce buffer), or
->>   we use dma_alloc_coherent and then grab the sgt to get at the CMA
->>   allocations because that's the only way. Which sucks, because we can't
->>   directly tell CMA how to back off if there's some way to make CMA memory
->>   available through other means (gpus love to hog all of memory, so we
->>   have shrinkers and everything).
->
-> If you really care about doing explicitly cache flushing anyway (see
-> above) allocating your own memory and mapping it where needed is by
-> far the superior solution.  On cache coherent architectures
-> dma_alloc_coherent is nothing but allocate memory + dma_map_single.
-> On non coherent allocations the memory might come through a special
-> pool or must be used through a special virtual address mapping that
-> is set up either statically or dynamically.  For that case splitting
-> allocation and mapping is a good idea in many ways, and I plan to move
-> towards that once the number of dma mapping implementations is down
-> to a reasonable number so that it can actually be done.
-
-Yeah the above is pretty much what we do on x86. dma-api believes
-everything is coherent, so dma_map_sg does the mapping we want and
-nothing else (minus swiotlb fun). Cache flushing, allocations, all
-done by the driver.
-
-On arm that doesn't work. The iommu api seems like a good fit, except
-the dma-api tends to get in the way a bit (drm/msm apparently has
-similar problems like tegra), and if you need contiguous memory
-dma_alloc_coherent is the only way to get at contiguous memory. There
-was a huge discussion years ago about that, and direct cma access was
-shot down because it would have exposed too much of the caching
-attribute mangling required (most arm platforms need wc-pages to not
-be in the kernel's linear map apparently).
-
-Anything that separate these 3 things more (allocation pools, mapping
-through IOMMUs and flushing cpu caches) sounds like the right
-direction to me. Even if that throws some portability across platforms
-away - drivers who want to control things in this much detail aren't
-really portable (without some serious work) anyway.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180425/ff8cde27/attachment-0001.sig>
