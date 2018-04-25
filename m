@@ -1,84 +1,59 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 25 Apr 2018 17:32:35 +0800
-Subject: [PATCH v2 09/17] rtc: mt6397: replace a poll with
- regmap_read_poll_timeout
+Date: Wed, 25 Apr 2018 17:32:32 +0800
+Subject: [PATCH v2 06/17] mfd: mt6397: add support for MT6323 power controller
+ into MT6397 driver
 In-Reply-To: <cover.1524646231.git.sean.wang@mediatek.com>
 References: <cover.1524646231.git.sean.wang@mediatek.com>
-Message-ID: <de46e310a29fd63f66165e6f8296e949f392a370.1524646231.git.sean.wang@mediatek.com>
+Message-ID: <8ee68834240600125548155b063a2a4addfc5627.1524646231.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Reuse the helper regmap_read_poll_timeout instead of an open-coding
-handling to simpify the logic.
-
-Furthermore, the time for a wait in each iteration changed from cpu_relax
-to 20us is for matching the usage of the helper, but it wouldn't acctually
-break any the existent functionality according to a good test on MT6323
-PMIC.
+Add compatible string as "mt6323-pwrc" that will make the OF core spawn
+child devices for the power-controller subnode of that MT6323 MFD device.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/rtc/rtc-mt6397.c | 25 +++++++++++--------------
- 1 file changed, 11 insertions(+), 14 deletions(-)
+ drivers/mfd/mt6397-core.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-index 0df7ccd..efb9370 100644
---- a/drivers/rtc/rtc-mt6397.c
-+++ b/drivers/rtc/rtc-mt6397.c
-@@ -18,6 +18,7 @@
- #include <linux/regmap.h>
- #include <linux/rtc.h>
- #include <linux/irqdomain.h>
-+#include <linux/jiffies.h>
- #include <linux/platform_device.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -63,6 +64,9 @@
- #define RTC_NUM_YEARS		128
- #define RTC_MIN_YEAR_OFFSET	(RTC_MIN_YEAR - RTC_BASE_YEAR)
+diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+index c70d5b2..c4ad5c3 100644
+--- a/drivers/mfd/mt6397-core.c
++++ b/drivers/mfd/mt6397-core.c
+@@ -30,6 +30,9 @@
+ #define MT6397_RTC_BASE		0xe000
+ #define MT6397_RTC_SIZE		0x3e
  
-+#define MTK_RTC_POLL_DELAY_US	10
-+#define MTK_RTC_POLL_TIMEOUT	(jiffies_to_usecs(HZ))
++#define MT6323_PWRC_BASE	0x8000
++#define MT6323_PWRC_SIZE	0x40
 +
- struct mt6397_rtc {
- 	struct device		*dev;
- 	struct rtc_device	*rtc_dev;
-@@ -74,7 +78,6 @@ struct mt6397_rtc {
+ #define MT6323_CID_CODE		0x23
+ #define MT6391_CID_CODE		0x91
+ #define MT6397_CID_CODE		0x97
+@@ -62,6 +65,10 @@ static const struct resource mt6397_keys_resources[] = {
+ 	DEFINE_RES_IRQ(MT6397_IRQ_HOMEKEY),
+ };
  
- static int mtk_rtc_write_trigger(struct mt6397_rtc *rtc)
- {
--	unsigned long timeout = jiffies + HZ;
- 	int ret;
- 	u32 data;
++static const struct resource mt6323_pwrc_resources[] = {
++	DEFINE_RES_MEM(MT6323_PWRC_BASE, MT6323_PWRC_SIZE),
++};
++
+ static const struct mfd_cell mt6323_devs[] = {
+ 	{
+ 		.name = "mt6323-rtc",
+@@ -79,6 +86,11 @@ static const struct mfd_cell mt6323_devs[] = {
+ 		.num_resources = ARRAY_SIZE(mt6323_keys_resources),
+ 		.resources = mt6323_keys_resources,
+ 		.of_compatible = "mediatek,mt6323-keys"
++	}, {
++		.name = "mt6323-pwrc",
++		.num_resources = ARRAY_SIZE(mt6323_pwrc_resources),
++		.resources = mt6323_pwrc_resources,
++		.of_compatible = "mediatek,mt6323-pwrc"
+ 	},
+ };
  
-@@ -82,19 +85,13 @@ static int mtk_rtc_write_trigger(struct mt6397_rtc *rtc)
- 	if (ret < 0)
- 		return ret;
- 
--	while (1) {
--		ret = regmap_read(rtc->regmap, rtc->addr_base + RTC_BBPU,
--				  &data);
--		if (ret < 0)
--			break;
--		if (!(data & RTC_BBPU_CBUSY))
--			break;
--		if (time_after(jiffies, timeout)) {
--			ret = -ETIMEDOUT;
--			break;
--		}
--		cpu_relax();
--	}
-+	ret = regmap_read_poll_timeout(rtc->regmap,
-+				       rtc->addr_base + RTC_BBPU, data,
-+				       !(data & RTC_BBPU_CBUSY),
-+				       MTK_RTC_POLL_DELAY_US,
-+				       MTK_RTC_POLL_TIMEOUT);
-+	if (ret < 0)
-+		dev_err(rtc->dev, "failed to write WRTGE: %d\n", ret);
- 
- 	return ret;
- }
 -- 
 2.7.4
