@@ -1,72 +1,61 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Wed, 25 Apr 2018 22:32:08 +0800
-Subject: [PATCH v6 0/7] clk: meson-axg: Add AO Cloclk and Reset driver
-In-Reply-To: <1524661512.4026.67.camel@baylibre.com>
-References: <20180419135426.155794-1-yixun.lan@amlogic.com>
- <1524661512.4026.67.camel@baylibre.com>
-Message-ID: <2a307212-ea12-e7a1-cf6a-9fd7d9e9bb40@amlogic.com>
+From: samuel.c.p.neves@gmail.com (Samuel Neves)
+Date: Wed, 25 Apr 2018 15:33:16 +0100
+Subject: [PATCH v2 0/5] crypto: Speck support
+In-Reply-To: <20180424224734.GA109345@google.com>
+References: <20180212235209.117393-1-ebiggers@google.com>
+ <CAHmME9oA4j=iGrrBYME92JfUsyi5r42PnAvzWiuXzGCRXMnXtA@mail.gmail.com>
+ <20180424181623.GA174675@google.com>
+ <CAHmME9qG+nPmj5c7hU4+STUsmWmwSBsKe-0mOLEXH+hJ1z4z=g@mail.gmail.com>
+ <20180424224734.GA109345@google.com>
+Message-ID: <CAEX_ruHB7=zUuAWvbC9f6pDNhA4B32PGEkHi3QnPjRmRknrJ7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome:
+Let's put the provenance of Speck aside for a moment, and suppose that
+it is an ideal block cipher. There are still some issues with this
+patch as it stands.
 
-On 04/25/2018 09:05 PM, Jerome Brunet wrote:
-> On Thu, 2018-04-19 at 21:54 +0800, Yixun Lan wrote:
->>   This patch try to add AO clock and Reset driver for Amlogic's
->> Meson-AXG SoC.
->>   Please note that patch 7 need to wait for the DTS changes[3] merged
->> into mainline first, otherwise it will break the serial console.
->>
->>  patch 2: factor the common code into a dedicated file
->>  patch 3-5: add the aoclk driver for AXG SoC
->>  patch 6-7: drop unnecessary clock flags
->>
->> changes since v5 at [6]: 
->>  - drop unnecessary header files
->>  - add 'axg_aoclk' prefix to clk driver, make them more consistent
->>  - add missing end new line..
->>
->> changes since v4 at [5]: 
->>  - fix return err
->>  - introduce CONFIG_COMMON_CLK_MESON_AO
->>  - format/style minor fix
->>
->> changes since v3 at [4]: 
->>  - add 'const' contraint to the read-only data
->>  - switch to devm_of_clk_add_hw_provider API
->>  - check return value of devm_reset_controller_register
->>
->> changes since v2 at [2]: 
->>  - rework meson_aoclkc_probe() which leverage the of_match_data
->>  - merge patch 5-6 into this series
->>  - seperate DTS patch, will send to Kevin Hilman independently
->>  
->> changes since v1 at [0]: 
->>  - rebase to clk-meson's branch 'next/drivers' [1]
->>  - fix license, update to BSD-3-Clause
->>  - drop un-used include header file
->>
->> [0] https://lkml.kernel.org/r/20180209070026.193879-1-yixun.lan at amlogic.com
->> [1] git://github.com/BayLibre/clk-meson.git branch: next-drivers
->> [2] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
->> [3] https://lkml.kernel.org/r/20180326081809.49493-4-yixun.lan at amlogic.com
->> [4] https://lkml.kernel.org/r/20180328025050.221585-1-yixun.lan at amlogic.com
->> [5] https://lkml.kernel.org/r/20180408031938.153474-1-yixun.lan at amlogic.com
->> [6] https://lkml.kernel.org/r/20180409143749.71197-1-yixun.lan at amlogic.com
-> 
-> Yixun
-> 
-> Please :
->  - Fix checkpatch error in patch 5 
->  - Collect Philip's Ack on patch 4
-I've fixed above two
+ - The rationale seems off. Consider this bit from the commit message:
 
->  - Remove the extra new lines at EOF in patch 2 (maybe others, I did not check
-> them all) - 1 new line at the end of each file, not 2.
-> 
+> Other AES alternatives such as Twofish, Threefish, Camellia, CAST6, and Serpent aren't
+> fast enough either; it seems that only a modern ARX cipher can provide sufficient performance
+> on these devices.
 
-but, I just go back and check the patch, couldn't find any file which
-end with 2 new lines at EOF, could you point me out?
+One of these things is very much not like the others. Threefish _is_ a
+modern ARX cipher---a tweakable block cipher in fact, precluding the
+need for XEX-style masking. Is it too slow? Does it not have the
+correct block size?
 
+> We've also considered a novel length-preserving encryption mode based on
+> ChaCha20 and Poly1305.
 
-Yixun
+I'm very curious about this, namely as to what the role of Poly1305
+would be here. ChaCha20's underlying permutation could, of course, be
+transformed into a 512-bit tweakable block cipher relatively
+painlessly, retaining the performance of regular ChaCha20 with
+marginal additional overhead. This would not be a standard
+construction, but clearly that is not an issue.
+
+But the biggest problem here, in my mind, is that for all the talk of
+using 128-bit block Speck, this patch tacks on the 64-bit block
+variant of Speck into the kernel, and speck64-xts as well! As far as I
+can tell, this is the _only_ instance of a 64-bit XTS instance in the
+entire codebase. Now, if you wanted a fast 64-bit ARX block cipher,
+the kernel already had XTEA. Instead, this is adding yet another
+64-bit block cipher into the crypto API, in a disk-encryption mode no
+less, so that it can be misused later. In the disk encryption setting,
+it's particularly concerning to be using such a small block size, as
+data volumes can quickly add up to the birthday bound.
+
+> It's easy to say that, but do you have an actual suggestion?
+
+I don't know how seriously you are actually asking this, but some
+128-bit software-friendly block ciphers could be SPARX, LEA, RC5, or
+RC6. SPARX, in particular, has similarities to Speck but has some
+further AES-like design guarantees that other prior ARX block ciphers
+did not. Some other bitsliced designs, such as Noekeon or SKINNY, may
+also work well with NEON, but I don't know much about their
+performance there.
+
+Best regards,
+Samuel Neves
