@@ -1,89 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Apr 2018 17:27:45 +0100
-Subject: [PATCH 1/6] PCI: Make pci_get_new_domain_nr static
-In-Reply-To: <a21882288c4664cc983a5741e8cbf6d59abacd46.1524582822.git.jan.kiszka@siemens.com>
-References: <cover.1524582822.git.jan.kiszka@siemens.com>
- <a21882288c4664cc983a5741e8cbf6d59abacd46.1524582822.git.jan.kiszka@siemens.com>
-Message-ID: <20180425162745.GB21628@e107981-ln.cambridge.arm.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 25 Apr 2018 17:35:48 +0100
+Subject: [PATCH v2 09/17] kvm: arm64: Make stage2 page table layout dynamic
+In-Reply-To: <1522156531-28348-10-git-send-email-suzuki.poulose@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <2359e848-8068-ea25-e44e-e8cfcbc9b467@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 05:13:37PM +0200, Jan Kiszka wrote:
-> From: Jan Kiszka <jan.kiszka@siemens.com>
+Hi Suzuki,
+
+On 27/03/18 14:15, Suzuki K Poulose wrote:
+> So far we had a static stage2 page table handling code, based on a
+> fixed IPA of 40bits. As we prepare for a configurable IPA size per
+> VM, make the our stage2 page table code dynamic to do the right thing
+> for a given VM.
 > 
-> The only user of that function is of_pci_bus_find_domain_nr. Pure
-> cleanup.
-
-"The only user of pci_get_new_domain_nr() is of_pci_bus_find_domain_nr().
-Since they are defined in the same compilation unit,
-pci_get_new_domain_nr() can be made static, which also simplifies
-preprocessor conditionals.
-
-No functional change intended."
-
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> Support for the IPA size configuration needs other changes in the way
+> we configure the EL2 registers (VTTBR and VTCR). So, the IPA is still
+> fixed to 40bits. The patch also moves the kvm_page_empty() in asm/kvm_mmu.h
+> to the top, before including the asm/stage2_pgtable.h to avoid a forward
+> declaration.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  drivers/pci/pci.c   | 6 ++----
->  include/linux/pci.h | 3 ---
->  2 files changed, 2 insertions(+), 7 deletions(-)
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index e597655a5643..695c2bb4e853 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -5702,15 +5702,14 @@ static void pci_no_domains(void)
->  #endif
->  }
->  
-> -#ifdef CONFIG_PCI_DOMAINS
-> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
->  static atomic_t __domain_nr = ATOMIC_INIT(-1);
->  
-> -int pci_get_new_domain_nr(void)
-> +static int pci_get_new_domain_nr(void)
->  {
->  	return atomic_inc_return(&__domain_nr);
->  }
->  
-> -#ifdef CONFIG_PCI_DOMAINS_GENERIC
->  static int of_pci_bus_find_domain_nr(struct device *parent)
->  {
->  	static int use_dt_domains = -1;
-> @@ -5765,7 +5764,6 @@ int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
->  			       acpi_pci_bus_find_domain_nr(bus);
->  }
->  #endif
-> -#endif
->  
->  /**
->   * pci_ext_cfg_avail - can we access extended PCI config space?
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 73178a2fcee0..963232a6cd2e 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1510,12 +1510,10 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
->   */
->  #ifdef CONFIG_PCI_DOMAINS
->  extern int pci_domains_supported;
-> -int pci_get_new_domain_nr(void);
->  #else
->  enum { pci_domains_supported = 0 };
->  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
->  static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
-> -static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
->  #endif /* CONFIG_PCI_DOMAINS */
->  
->  /*
-> @@ -1670,7 +1668,6 @@ static inline struct pci_dev *pci_get_domain_bus_and_slot(int domain,
->  
->  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
->  static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
-> -static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
->  
->  #define dev_is_pci(d) (false)
->  #define dev_is_pf(d) (false)
-> -- 
-> 2.13.6
+>   arch/arm64/include/asm/kvm_mmu.h              |  16 +-
+>   arch/arm64/include/asm/stage2_pgtable-nopmd.h |  42 ------
+>   arch/arm64/include/asm/stage2_pgtable-nopud.h |  39 -----
+>   arch/arm64/include/asm/stage2_pgtable.h       | 203 +++++++++++++++++---------
+>   4 files changed, 145 insertions(+), 155 deletions(-)
+>   delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopmd.h
+>   delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopud.h
 > 
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 594c4e6..bc133ce 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -18,9 +18,10 @@
+>   #ifndef __ARM64_KVM_MMU_H__
+>   #define __ARM64_KVM_MMU_H__
+>   
+> +#include <asm/cpufeature.h>
+>   #include <asm/page.h>
+>   #include <asm/memory.h>
+> -#include <asm/cpufeature.h>
+
+OOI, why was the include of cpufeature.h moved earlier?
+
+Cheers,
+
+-- 
+Julien Grall
