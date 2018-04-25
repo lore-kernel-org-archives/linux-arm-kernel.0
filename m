@@ -1,61 +1,76 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 25 Apr 2018 16:45:37 +0200
-Subject: [PATCH 0/6] arm64: untag user pointers passed to the kernel
-In-Reply-To: <20180419093306.rn5bz264nxsn7d7c@node.shutemov.name>
-References: <cover.1524077494.git.andreyknvl@google.com>
- <20180419093306.rn5bz264nxsn7d7c@node.shutemov.name>
-Message-ID: <CAAeHK+yb-U3h0666i3u3fF3=8XVcZUo1nxZ5CnOd9oUiDFP=Ng@mail.gmail.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Wed, 25 Apr 2018 16:47:27 +0200
+Subject: arm64: W+X mapping check failures
+In-Reply-To: <20180425135702.zvt4vjoegqblgr7c@lakrids.cambridge.arm.com>
+References: <20180425133704.GA6474@hc>
+ <20180425135702.zvt4vjoegqblgr7c@lakrids.cambridge.arm.com>
+Message-ID: <20180425144727.GA18651@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 11:33 AM, Kirill A. Shutemov
-<kirill@shutemov.name> wrote:
-> On Wed, Apr 18, 2018 at 08:53:09PM +0200, Andrey Konovalov wrote:
->> Hi!
->>
->> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
->> tags into the top byte of each pointer. Userspace programs (such as
->> HWASan, a memory debugging tool [1]) might use this feature and pass
->> tagged user pointers to the kernel through syscalls or other interfaces.
->>
->> This patch makes a few of the kernel interfaces accept tagged user
->> pointers. The kernel is already able to handle user faults with tagged
->> pointers and has the untagged_addr macro, which this patchset reuses.
->>
->> We're not trying to cover all possible ways the kernel accepts user
->> pointers in one patchset, so this one should be considered as a start.
->
-> How many changes do you anticipate?
->
-> This patchset looks small and reasonable, but I see a potential to become a
-> boilerplate. Would we need to change every driver which implements ioctl()
-> to strip these bits?
+On Wed, Apr 25, 2018 at 02:57:02PM +0100, Mark Rutland wrote:
+> On Wed, Apr 25, 2018 at 03:37:04PM +0200, Jan Glauber wrote:
+> > Hi all,
+> 
+> Hi Jan,
+> 
+> > enabling CONFIG_DEBUG_WX we see insecure mappings reported across various kernel
+> > versions and machines. I've not yet seen this with upstream but that doesn't
+> > mean much as the issue is a race and I cannot trigger it reliably.
+> 
+> Can you please tell us which kernel version(s) you're seeing this with,
+> and with chich config options (if not defconfig)?
 
-I've replied to somewhat similar question in one of the previous
-versions of the patchset.
+Ubuntu artful and bionic at least, this are 4.13+ and 4.15+.
 
-"""
-There are two different approaches to untagging the user pointers that I see:
+> ... and if possible, on which machines.
 
-1. Untag user pointers right after they are passed to the kernel.
+ThunderX 1 and 2 and one other unspecified arm64 platform (would need to
+ask).
 
-While this might be possible for pointers that are passed to syscalls
-as arguments (Catalin's "hack"), this leaves user pointers, that are
-embedded into for example structs that are passed to the kernel. Since
-there's no specification of the interface between user space and the
-kernel, different kernel parts handle user pointers differently and I
-don't see an easy way to cover them all.
+> > The reported W+X mappings are gone after the boot is finished. The addresses
+> > all belong to .init.* sections of the first loaded kernel modules.
+> 
+> I'm afraid I haven't tried loading modules before getting to userspace,
+> and I'm not sure what I'd need to set up to test that.
 
-2. Untag user pointers where they are used in the kernel.
+Not much I guess, initramfs with early modules. For instance encrypted
+root should be a possible testcase. In my tests it was always cryptd and
+dependent modules (crypto_simd, aes_neon_blk, aes_neon_bs) that
+triggered the issue.
 
-Although there's no specification on the interface between the user
-space and the kernel, the kernel still has to use one of a few
-specific ways to access user data (copy_from_user, etc.). So the idea
-here is to add untagging into them. This patchset mostly takes this
-approach (with the exception of memory subsystem syscalls).
+> > Example log (I changed the warnings as I found the backtrace quite useless):
+> > 
+> > [   39.157884] Freeing unused kernel memory: 5248K
+> > [   39.167997] note_prot_wx: Found insecure W+X mapping at start: ffff000000ab9000  addr: ffff000000abd000  pages: 4
+> > [   39.178246] note_prot_wx: Found insecure W+X mapping at start: ffff000000ac3000  addr: ffff000000ac5000  pages: 2
+> > [   39.188495] note_prot_wx: Found insecure W+X mapping at start: ffff000000acd000  addr: ffff000000ad0000  pages: 3
+> > [   39.198745] note_prot_wx: Found insecure W+X mapping at start: ffff000000af9000  addr: ffff000000afc000  pages: 3
+> > [   39.212981] Checked W+X mappings: FAILED, 12 W+X pages found, 0 non-UXN pages found
+> > 
+> > I think this is a race between module loading and the ptdump_check_wx().
+> > The RCU'd do_free_init() can be delayed _after_ ptdump_check_wx() for a coming module.
+> 
+> Do we need some explicit RCU sync to complete this, prior to
+> ptdump_check_wx(), perhaps?
 
-If there's a better approach, I'm open to suggestions.
-"""
+Yes.
 
-So if we go with the first way, we'll need to go through every syscall
-and ioctl handler, which doesn't seem feasible.
+> > I tried using stop_machine() around the memory check similar to arm but that does not
+> > solve the race. It is not a critical issue as the .init sections are freed afterwards
+> > anyway but still the warning is a bit misleading.
+> > 
+> > Any thoughts?
+> 
+> I'm not sure if stop_machine() would complete an RCU grace period and
+> complete the freeing of module memory. As above, woudl some explicit RCU
+> sync help?
+
+Yes, I tried synchonize_sched() but without looking what it does first,
+Jeffreys rcu_barrier_sched() looks better suited here.
+
+thanks,
+Jan
+
+> Thanks,
+> Mark.
