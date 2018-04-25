@@ -1,91 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Apr 2018 10:04:54 -0500
-Subject: [PATCH v5 21/23] ASoC: qdsp6: dt-bindings: Add apq8096 machine
- bindings
-In-Reply-To: <655a593b-021c-3bf2-35c2-eb77cb0a4b95@linaro.org>
-References: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
- <20180418153157.1960-22-srinivas.kandagatla@linaro.org>
- <20180424162517.msxscjfg36xc22mo@rob-hp-laptop>
- <655a593b-021c-3bf2-35c2-eb77cb0a4b95@linaro.org>
-Message-ID: <CAL_JsqJXpei5vFUKwrQGaV4q3Twkg=SKF=Cx_my7KaLmOc42NQ@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 25 Apr 2018 17:07:28 +0200
+Subject: [PATCH 0/2] can: flexcan: fix regression from v4.16-rc1
+In-Reply-To: <20180425145040.22031-1-u.kleine-koenig@pengutronix.de>
+References: <20180425145040.22031-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <0ab617ff-c650-b1f9-7fb4-8940fec42c07@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 11:49 AM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
-> Thanks for the review.
->
->
-> On 24/04/18 17:25, Rob Herring wrote:
->>
->> On Wed, Apr 18, 2018 at 04:31:55PM +0100, srinivas.kandagatla at linaro.org
->> wrote:
->>>
->>> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>>
->>> Add devicetree bindings documentation file for Qualcomm apq8096 sound
->>> card.
->>>
->>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>> ---
->>>   .../devicetree/bindings/sound/qcom,apq8096.txt     | 76
->>> ++++++++++++++++++++++
->>>   1 file changed, 76 insertions(+)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/sound/qcom,apq8096.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
->>> b/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
->>> new file mode 100644
->>> index 000000000000..37e23d926b95
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
->>> @@ -0,0 +1,76 @@
->>> +* Qualcomm Technologies APQ8096 ASoC sound card driver
->>> +
->>> +This binding describes the APQ8096 sound card, which uses qdsp for
->>> audio.
->>> +
->>> +- compatible:
->>> +       Usage: required
->>> +       Value type: <stringlist>
->>> +       Definition: must be "qcom,apq8096-sndcard"
->>> +
->>> +- qcom,audio-routing:
->>> +       Usage: Optional
->>> +       Value type: <stringlist>
->>> +       Definition:  A list of the connections between audio components.
->>> +                 Each entry is a pair of strings, the first being the
->>> +                 connection's sink, the second being the connection's
->>> +                 source. Valid names could be power supplies, MicBias
->>> +                 of codec and the jacks on the board:
->>
->>
->> Please list out valid values here.
->
->
-> I can list the values for the HDMI playback use-case, but the list would
-> grow as we start adding wcd9335 codec support.
+On 04/25/2018 04:50 PM, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> when porting the kernel from a i.MX25 based machine to 4.17-rc1 (but
+> still using the old dtb) can failed to probe. After some research we
+> noticed that a commit that was merged in the v4.16 merge window
+> introduced a change that broke using an older device tree.
+> 
+> This series first commit fixes the issue.
+> The second patch introduces a fallback compatible which matches the
+> usual dt-style on i.MX. (Before v4.16-rc1 there was a wrong fallback
+> compatible that was removed.)
 
-If you don't have the values, then how does one validate a DT is correct?
+Applied both to linux-can + added stable on Cc.
 
-Honestly, a single property like this seems insufficient to describe
-audio routing.
+Marc
 
->>> +
->>> += dailinks
->>> +Each subnode of sndcard represents either a dailink, and subnodes of
->>> each
->>> +dailinks would be cpu/codec/platform dais.
->>> +
->>> +- link-name:
->>
->>
->> Not a standard property, but I guess that sneaked in with the 8016
->> binding...
->
-> Yes, I followed 8016 bindings.
->
-> Am happy to prefix this with qcom if that makes more sense.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-I'd just leave it to be consistent.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180425/e2d0e806/attachment-0001.sig>
