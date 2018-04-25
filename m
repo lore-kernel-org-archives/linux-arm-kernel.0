@@ -1,94 +1,127 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 25 Apr 2018 12:04:29 +0200
-Subject: noveau vs arm dma ops
-In-Reply-To: <20180425085439.GA29996@infradead.org>
-References: <20180420124625.GA31078@infradead.org>
- <20180420152111.GR31310@phenom.ffwll.local>
- <20180424184847.GA3247@infradead.org>
- <CAKMK7uFL68pu+-9LODTgz+GQYvxpnXOGhxfz9zorJ_JKsPVw2g@mail.gmail.com>
- <20180425054855.GA17038@infradead.org>
- <CAKMK7uEFitkNQrD6cLX5Txe11XhVO=LC4YKJXH=VNdq+CY=DjQ@mail.gmail.com>
- <CAKMK7uFx=KB1vup=WhPCyfUFairKQcRR4BEd7aXaX1Pj-vj3Cw@mail.gmail.com>
- <20180425064335.GB28100@infradead.org> <20180425074151.GA2271@ulmo>
- <20180425085439.GA29996@infradead.org>
-Message-ID: <20180425100429.GR25142@phenom.ffwll.local>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 25 Apr 2018 12:09:55 +0200
+Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
+ DA850 PSC
+In-Reply-To: <acce5103-6b72-ed67-7ac1-ffbbed268e9a@ti.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-13-git-send-email-david@lechnology.com>
+ <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
+ <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
+ <a4d84be0-e3d3-4e39-40f9-cae9006cb6ee@ti.com>
+ <CAMRc=Mc228JAxxBXcObmokh2h-toojG8OHrmbunm_ORqbGWUnA@mail.gmail.com>
+ <69bc0848-0698-b936-96a3-2257a5e27809@ti.com>
+ <CAMRc=MenWp=2dtOs1yafnHVkCxfT7SDS0fS2UxUd+U0s_UDwVw@mail.gmail.com>
+ <57f2182e-09b4-2cab-5602-9d0e029495be@ti.com>
+ <152303318048.143116.2883441215887455211@swboyd.mtv.corp.google.com>
+ <48c8531f-8cd9-a9f8-9c38-cbc4c921c4c9@lechnology.com>
+ <aa1c2e6f-793c-1d9e-366a-3496f500f946@ti.com>
+ <d32a4cd5-4344-6e20-fdca-1ed830a52466@lechnology.com>
+ <acce5103-6b72-ed67-7ac1-ffbbed268e9a@ti.com>
+Message-ID: <CAMRc=McpzVXy5BggV9t8UHJi4oO9_69_WKca+MzfsM-a+vCpPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 01:54:39AM -0700, Christoph Hellwig wrote:
-> [discussion about this patch, which should have been cced to the iommu
->  and linux-arm-kernel lists, but wasn't:
->  https://www.spinics.net/lists/dri-devel/msg173630.html]
-> 
-> On Wed, Apr 25, 2018 at 09:41:51AM +0200, Thierry Reding wrote:
-> > > API from the iommu/dma-mapping code.  Drivers have no business poking
-> > > into these details.
-> > 
-> > The interfaces that the above patch uses are all EXPORT_SYMBOL_GPL,
-> > which is rather misleading if they are not meant to be used by drivers
-> > directly.
-> 
-> The only reason the DMA ops are exported is because get_arch_dma_ops
-> references (or in case of the coherent ones used to reference).  We
-> don't let drivers assign random dma ops.
-> 
-> > 
-> > > Thierry, please resend this with at least the iommu list and
-> > > linux-arm-kernel in Cc to have a proper discussion on the right API.
-> > 
-> > I'm certainly open to help with finding a correct solution, but the
-> > patch above was purposefully terse because this is something that I
-> > hope we can get backported to v4.16 to unbreak Nouveau. Coordinating
-> > such a backport between ARM and DRM trees does not sound like something
-> > that would help getting this fixed in v4.16.
-> 
-> Coordinating the backport of a trivial helper in the arm tree is not
-> the end of the world.  Really, this cowboy attitude is a good reason
-> why graphics folks have such a bad rep.  You keep poking into random
-> kernel internals, don't talk to anoyone and then complain if people
-> are upset.  This shouldn't be surprising.
+2018-04-25 8:07 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+> On Tuesday 24 April 2018 09:41 PM, David Lechner wrote:
+>> On 04/24/2018 03:28 AM, Sekhar Nori wrote:
+>>> On Monday 23 April 2018 08:29 PM, David Lechner wrote:
+>>>> On 04/06/2018 11:46 AM, Stephen Boyd wrote:
+>>>>> Quoting Sekhar Nori (2018-04-06 02:37:03)
+>>>>>>
+>>>>>> Can you please check that and confirm there is no issue with genpd and
+>>>>>> using CLK_OF_DECLARE() to initialize clocks?
+>>>>>>
+>>>>>> Unless you report an issue back, or Mike and Stephen have ideas about
+>>>>>> how to handle the dependency between PSC/PLL derived timer clock
+>>>>>> initialization and and timer_probe(), I think we need to move back to
+>>>>>> using CLK_OF_DECLARE().
+>>>>>
+>>>>> In such a case, please use the hybrid approach where the clks required
+>>>>> for the clockevent and/or clocksource are registered in the early
+>>>>> CLK_OF_DECLARE path but the rest of the clks get registered with a
+>>>>> proper platform device and driver. There are examples of this approach
+>>>>> on other platforms already.
+>>>>>
+>>>>
+>>>> I looked at this a bit last week, but I didn't come up with any approach
+>>>> that I was happy with. It seems like it would be nice to just register
+>>>> the absolute minimum clocks needed. On DA8XX, that would just be the
+>>>> PLL0
+>>>> AUXCLK. On most of the other SoCs, it would be the PLL AUXCLK plus one
+>>>> LPSC clock. The AUXCLKs are easy because they are just a simple gate
+>>>> from the oscillator. The LPSC clocks are a bit more tricky because they
+>>>> have a complex sequence for turning on. Furthermore, on DM646X, we need
+>>>> the whole PLL up to SYSCLK3 plus one LPSC clock, so things get a bit
+>>>> messy there.
+>>>
+>>> Things might change in the context of work being done here by Bartosz
+>>> for converting clocks to early platform devices.
+>>>
+>>> But, keeping that development aside for a moment: I think this means the
+>>> PLLs and PSCs need to be CLK_OF_DECLARE(). What we can have as platform
+>>> devices are clocks that are not in the path to get timer clock working
+>>> (like CFGCHIP clocks).
+>>
+>> CLK_OF_DECLARE() only matters on DA850. None of the other SoCs use device
+>
+> Thats true today, but lets not make the assumption that none of the
+> other DaVinci SoCs will gain DT support ever. We don't want churn in CCF
+> support once someone tries to add DT support for other platforms.
+>
+> I already have people using DM365 in mainline, for example.
+>
+>> tree. And on DA850, the timer0 clock is just the PLL0 AUXCLK, so PSCs can> still be platform devices there. And in fact, one of the PSC clocks on
+>> DA850 depends on async3, which is a CFGCHIP clock, so if we made the PSCs
+>> CLK_OF_DECLARE(), then we also have to make at least the async3 CFGCHIP
+>> clock CLK_OF_DECLARE(). But, like I said, I think that can be avoided by
+>> leaving the PSC clocks as a platform device on DA850 (and DA830).
+>
+> Okay, I did not realize that there is a dependency between CFGCHIP clk
+> and PSC too.
+>
+>> For everything else, we need the legacy board file equivalent of
+>> CLK_OF_DECLARE(), which is basically what I had here in v5 of the
+>> series.
+>
+> Yeah. I did not realize the dependency with timer when platform devices
+> were suggested. Sorry.
+>
+>>
+>> So, if we want this to keep moving before the if/when of Bartosz's
+>> early platform device stuff, I'm thinking that I will make the PLL
+>
+> After looking at feedback to Bartosz's series, and the fact that
+> previous attempts at doing the same thing were rejected, I think there
+> is benefit in keeping CCF support moving independent Bartosz's work.
+> Otherwise, we have no chance of getting anything merged for v4.18.
+>
 
-Not really agreeing on the cowboy thing. The fundamental problem is that
-the dma api provides abstraction that seriously gets in the way of writing
-a gpu driver. Some examples:
+It's true, that the feedback was not very positive, but I'm still
+thinking I can come up with something that would get accepted. Last
+time someone came up with the idea, the problem it was supposed to
+solve was different (dependencies between devices) and was eventually
+fixed with introduction of probe deferral.
 
-- We never want bounce buffers, ever. dma_map_sg gives us that, so there's
-  hacks to fall back to a cache of pages allocated using
-  dma_alloc_coherent if you build a kernel with bounce buffers.
+This time around we really want these devices probed early. The main
+concern was using a device tree compatible. If I can instead just
+early probe all devices whose drivers are registered as early without
+touching the device tree (as Frank Rowand suggested) then maybe the
+response of the community would be better.
 
-- dma api hides the cache flushing requirements from us. GPUs love
-  non-snooped access, and worse give userspace control over that. We want
-  a strict separation between mapping stuff and flushing stuff. With the
-  IOMMU api we mostly have the former, but for the later arch maintainers
-  regularly tells they won't allow that. So we have drm_clflush.c.
+Thanks,
+Bart
 
-- dma api hides how/where memory is allocated. Kinda similar problem,
-  except now for CMA or address limits. So either we roll our own
-  allocators and then dma_map_sg (and pray it doesn't bounce buffer), or
-  we use dma_alloc_coherent and then grab the sgt to get at the CMA
-  allocations because that's the only way. Which sucks, because we can't
-  directly tell CMA how to back off if there's some way to make CMA memory
-  available through other means (gpus love to hog all of memory, so we
-  have shrinkers and everything).
-
-For display drivers the dma api mostly works, until you start sharing
-buffers with other devices.
-
-So from our perspective it looks fairly often that core folks just don't
-want to support gpu use-cases, so we play a bit more cowboy and get things
-done some other way. Since this has been going on for years now we often
-don't even bother to start a discussion first, since it tended to go
-nowhere useful.
--Daniel
-
-> > Granted, this issue could've been caught with a little more testing, but
-> > in retrospect I think it would've been a lot better if ARM_DMA_USE_IOMMU
-> > was just enabled unconditionally if it has side-effects that platforms
-> > don't opt in to but have to explicitly opt out of.
-> 
-> Agreed on that count.  Please send a patch.
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+> Early initialization of clocks and dependency with timer is a pretty
+> common theme across SoCs. As and when a better way to support is found,
+> I am sure DaVinci can be converted over along with rest of the devices.
+>
+>> and PSC drivers loadable with or without a platform device and let
+>> each SoC pick which one it should use.
+>
+> This sounds flexible. We have to see how the patches look. But I would
+> caution against adding a lot of dead code. If there is no way some of
+> the clocks will be useful as platform device, I see no point of
+> supporting them as such just in anticipation.
+>
+> Thanks,
+> Sekhar
