@@ -1,273 +1,223 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 25 Apr 2018 10:09:26 +0200
-Subject: [RESEND PATCH] arm64: acpi, efi: fix alignment fault in accessing
- ACPI tables at kdump
-In-Reply-To: <20180425063527.29763-1-takahiro.akashi@linaro.org>
-References: <20180425063527.29763-1-takahiro.akashi@linaro.org>
-Message-ID: <CAKv+Gu9eAYzTFGdiUOyCTVyG4F1faefrehxmvUpE2YbCWvio4Q@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 25 Apr 2018 11:45:03 +0300
+Subject: [PATCH] dmaengine: ti: New directory for Texas Instruments DMA drivers
+Message-ID: <20180425084503.15934-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2018 at 08:35, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> This is a fix against the issue that crash dump kernel may hang up
-> during booting, which can happen on any ACPI-based system with "ACPI
-> Reclaim Memory."
->
-> (kernel messages after panic kicked off kdump)
->            (snip...)
->         Bye!
->            (snip...)
->         ACPI: Core revision 20170728
->         pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
->         Internal error: Oops: 96000021 [#1] SMP
->         Modules linked in:
->         CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
->         task: ffff000008d05180 task.stack: ffff000008cc0000
->         PC is at acpi_ns_lookup+0x25c/0x3c0
->         LR is at acpi_ds_load1_begin_op+0xa4/0x294
->            (snip...)
->         Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
->         Call trace:
->            (snip...)
->         [<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
->         [<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
->         [<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
->         [<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
->         [<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
->         [<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
->         [<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
->         [<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
->         [<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
->         [<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
->         [<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
->         [<ffff000008badc20>] acpi_early_init+0x9c/0xd0
->         [<ffff000008b70d50>] start_kernel+0x3b4/0x43c
->         Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
->         ---[ end trace c46ed37f9651c58e ]---
->         Kernel panic - not syncing: Fatal exception
->         Rebooting in 10 seconds..
->
-> (diagnosis)
-> * This fault is a data abort, alignment fault (ESR=0x96000021)
->   during reading out ACPI table.
-> * Initial ACPI tables are normally stored in system ram and marked as
->   "ACPI Reclaim memory" by the firmware.
-> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
->   memory as MEMBLOCK_NOMAP"), those regions are differently handled
->   as they are "memblock-reserved", without NOMAP bit.
-> * So they are now excluded from device tree's "usable-memory-range"
->   which kexec-tools determines based on a current view of /proc/iomem.
-> * When crash dump kernel boots up, it tries to accesses ACPI tables by
->   mapping them with ioremap(), not ioremap_cache(), in acpi_os_ioremap()
->   since they are no longer part of mapped system ram.
-> * Given that ACPI accessor/helper functions are compiled in without
->   unaligned access support (ACPI_MISALIGNMENT_NOT_SUPPORTED),
->   any unaligned access to ACPI tables can cause a fatal panic.
->
-> With this patch, acpi_os_ioremap() always honors a memory attribute
-> provided by the firmware (efi). Hence retaining cacheability in said cases
-> allows the kernel safe access to ACPI tables.
->
-> Please note that arm_enable_runtime_services(), which is renamed to
-> efi_enter_virtual_mode() due to the similarity to x86's, is now called
-> earlier before acpi_early_init() since efi_mem_attributes() relies on
-> efi.memmap being mapped.
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Suggested-by: James Morse <james.morse@arm.com>
-> Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reported-by and Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
-> ---
->  arch/arm64/include/asm/acpi.h      | 23 ++++++++++++++++-------
->  arch/arm64/kernel/acpi.c           | 11 +++--------
->  drivers/firmware/efi/arm-runtime.c | 15 ++++++---------
->  init/main.c                        |  3 +++
->  4 files changed, 28 insertions(+), 24 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 32f465a80e4e..d53c95f4e1a9 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -12,10 +12,12 @@
->  #ifndef _ASM_ACPI_H
->  #define _ASM_ACPI_H
->
-> +#include <linux/efi.h>
->  #include <linux/memblock.h>
->  #include <linux/psci.h>
->
->  #include <asm/cputype.h>
-> +#include <asm/io.h>
->  #include <asm/smp_plat.h>
->  #include <asm/tlbflush.h>
->
-> @@ -29,18 +31,22 @@
->
->  /* Basic configuration for ACPI */
->  #ifdef CONFIG_ACPI
-> +pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
-> +
->  /* ACPI table mapping after acpi_permanent_mmap is set */
->  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
->                                             acpi_size size)
->  {
-> +       /* For normal memory we already have a cacheable mapping. */
-> +       if (memblock_is_map_memory(phys))
-> +               return (void __iomem *)__phys_to_virt(phys);
-> +
->         /*
-> -        * EFI's reserve_regions() call adds memory with the WB attribute
-> -        * to memblock via early_init_dt_add_memory_arch().
-> +        * We should still honor the memory's attribute here because
-> +        * crash dump kernel possibly excludes some ACPI (reclaim)
-> +        * regions from memblock list.
->          */
-> -       if (!memblock_is_memory(phys))
-> -               return ioremap(phys, size);
-> -
-> -       return ioremap_cache(phys, size);
-> +       return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
->  }
->  #define acpi_os_ioremap acpi_os_ioremap
->
-> @@ -125,7 +131,10 @@ static inline const char *acpi_get_enable_method(int cpu)
->   * for compatibility.
->   */
->  #define acpi_disable_cmcff 1
-> -pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-> +static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-> +{
-> +       return __acpi_get_mem_attribute(addr);
-> +}
->  #endif /* CONFIG_ACPI_APEI */
->
->  #ifdef CONFIG_ACPI_NUMA
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 7b09487ff8fb..7880076c1cf0 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -18,6 +18,7 @@
->  #include <linux/acpi.h>
->  #include <linux/bootmem.h>
->  #include <linux/cpumask.h>
-> +# include <linux/efi.h>
+Collect the Texas Instruments DMA drivers under drivers/dma/ti/
 
-Please drop the space after #
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/Kconfig                           | 31 +---------------
+ drivers/dma/Makefile                          |  5 +--
+ drivers/dma/ti/Kconfig                        | 37 +++++++++++++++++++
+ drivers/dma/ti/Makefile                       |  5 +++
+ drivers/dma/{ => ti}/cppi41.c                 |  2 +-
+ .../{ti-dma-crossbar.c => ti/dma-crossbar.c}  |  0
+ drivers/dma/{ => ti}/edma.c                   |  4 +-
+ drivers/dma/{ => ti}/omap-dma.c               |  2 +-
+ 8 files changed, 49 insertions(+), 37 deletions(-)
+ create mode 100644 drivers/dma/ti/Kconfig
+ create mode 100644 drivers/dma/ti/Makefile
+ rename drivers/dma/{ => ti}/cppi41.c (99%)
+ rename drivers/dma/{ti-dma-crossbar.c => ti/dma-crossbar.c} (100%)
+ rename drivers/dma/{ => ti}/edma.c (99%)
+ rename drivers/dma/{ => ti}/omap-dma.c (99%)
 
->  #include <linux/efi-bgrt.h>
->  #include <linux/init.h>
->  #include <linux/irq.h>
-> @@ -29,12 +30,8 @@
->
->  #include <asm/cputype.h>
->  #include <asm/cpu_ops.h>
-> -#include <asm/smp_plat.h>
-> -
-> -#ifdef CONFIG_ACPI_APEI
-> -# include <linux/efi.h>
->  # include <asm/pgtable.h>
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 6d61cd023633..ca1680afa20a 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -151,13 +151,6 @@ config DMA_JZ4780
+ 	  If you have a board based on such a SoC and wish to use DMA for
+ 	  devices which can use the DMA controller, say Y or M here.
+ 
+-config DMA_OMAP
+-	tristate "OMAP DMA support"
+-	depends on ARCH_OMAP || COMPILE_TEST
+-	select DMA_ENGINE
+-	select DMA_VIRTUAL_CHANNELS
+-	select TI_DMA_CROSSBAR if (SOC_DRA7XX || COMPILE_TEST)
+-
+ config DMA_SA11X0
+ 	tristate "SA-11x0 DMA support"
+ 	depends on ARCH_SA1100 || COMPILE_TEST
+@@ -574,28 +567,6 @@ config TIMB_DMA
+ 	help
+ 	  Enable support for the Timberdale FPGA DMA engine.
+ 
+-config TI_CPPI41
+-	tristate "CPPI 4.1 DMA support"
+-	depends on (ARCH_OMAP || ARCH_DAVINCI_DA8XX)
+-	select DMA_ENGINE
+-	help
+-	  The Communications Port Programming Interface (CPPI) 4.1 DMA engine
+-	  is currently used by the USB driver on AM335x and DA8xx platforms.
+-
+-config TI_DMA_CROSSBAR
+-	bool
+-
+-config TI_EDMA
+-	bool "TI EDMA support"
+-	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE || COMPILE_TEST
+-	select DMA_ENGINE
+-	select DMA_VIRTUAL_CHANNELS
+-	select TI_DMA_CROSSBAR if (ARCH_OMAP || COMPILE_TEST)
+-	default n
+-	help
+-	  Enable support for the TI EDMA controller. This DMA
+-	  engine is found on TI DaVinci and AM33xx parts.
+-
+ config XGENE_DMA
+ 	tristate "APM X-Gene DMA support"
+ 	depends on ARCH_XGENE || COMPILE_TEST
+@@ -653,6 +624,8 @@ source "drivers/dma/hsu/Kconfig"
+ 
+ source "drivers/dma/sh/Kconfig"
+ 
++source "drivers/dma/ti/Kconfig"
++
+ # clients
+ comment "DMA Clients"
+ 	depends on DMA_ENGINE
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 0f62a4d49aab..203a99d68315 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -24,7 +24,6 @@ obj-$(CONFIG_COH901318) += coh901318.o coh901318_lli.o
+ obj-$(CONFIG_DMA_BCM2835) += bcm2835-dma.o
+ obj-$(CONFIG_DMA_JZ4740) += dma-jz4740.o
+ obj-$(CONFIG_DMA_JZ4780) += dma-jz4780.o
+-obj-$(CONFIG_DMA_OMAP) += omap-dma.o
+ obj-$(CONFIG_DMA_SA11X0) += sa11x0-dma.o
+ obj-$(CONFIG_DMA_SUN4I) += sun4i-dma.o
+ obj-$(CONFIG_DMA_SUN6I) += sun6i-dma.o
+@@ -69,13 +68,11 @@ obj-$(CONFIG_TXX9_DMAC) += txx9dmac.o
+ obj-$(CONFIG_TEGRA20_APB_DMA) += tegra20-apb-dma.o
+ obj-$(CONFIG_TEGRA210_ADMA) += tegra210-adma.o
+ obj-$(CONFIG_TIMB_DMA) += timb_dma.o
+-obj-$(CONFIG_TI_CPPI41) += cppi41.o
+-obj-$(CONFIG_TI_DMA_CROSSBAR) += ti-dma-crossbar.o
+-obj-$(CONFIG_TI_EDMA) += edma.o
+ obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
+ obj-$(CONFIG_ZX_DMA) += zx_dma.o
+ obj-$(CONFIG_ST_FDMA) += st_fdma.o
+ 
+ obj-y += mediatek/
+ obj-y += qcom/
++obj-y += ti/
+ obj-y += xilinx/
+diff --git a/drivers/dma/ti/Kconfig b/drivers/dma/ti/Kconfig
+new file mode 100644
+index 000000000000..e5e74e1361dc
+--- /dev/null
++++ b/drivers/dma/ti/Kconfig
+@@ -0,0 +1,37 @@
++#
++# Texas Instruments DMA drivers
++#
++
++config TI_CPPI41
++	tristate "Texas Instruments CPPI 4.1 DMA support"
++	depends on (ARCH_OMAP || ARCH_DAVINCI_DA8XX)
++	select DMA_ENGINE
++	help
++	  The Communications Port Programming Interface (CPPI) 4.1 DMA engine
++	  is currently used by the USB driver on AM335x and DA8xx platforms.
++
++config TI_EDMA
++	tristate "Texas Instruments EDMA support"
++	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE || COMPILE_TEST
++	select DMA_ENGINE
++	select DMA_VIRTUAL_CHANNELS
++	select TI_DMA_CROSSBAR if (ARCH_OMAP || COMPILE_TEST)
++	default y
++	help
++	  Enable support for the TI EDMA (Enhanced DMA) controller. This DMA
++	  engine is found on TI DaVinci, AM33xx, AM43xx, DRA7xx and Keystone 2
++	  parts.
++
++config DMA_OMAP
++	tristate "Texas Instruments sDMA (omap-dma) support"
++	depends on ARCH_OMAP || COMPILE_TEST
++	select DMA_ENGINE
++	select DMA_VIRTUAL_CHANNELS
++	select TI_DMA_CROSSBAR if (SOC_DRA7XX || COMPILE_TEST)
++	default y
++	help
++	  Enable support for the TI sDMA (System DMA or DMA4) controller. This
++	  DMA engine is found on OMAP and DRA7xx parts.
++
++config TI_DMA_CROSSBAR
++	bool
+diff --git a/drivers/dma/ti/Makefile b/drivers/dma/ti/Makefile
+new file mode 100644
+index 000000000000..113e59ec9c32
+--- /dev/null
++++ b/drivers/dma/ti/Makefile
+@@ -0,0 +1,5 @@
++# SPDX-License-Identifier: GPL-2.0
++obj-$(CONFIG_TI_CPPI41) += cppi41.o
++obj-$(CONFIG_TI_EDMA) += edma.o
++obj-$(CONFIG_DMA_OMAP) += omap-dma.o
++obj-$(CONFIG_TI_DMA_CROSSBAR) += dma-crossbar.o
+diff --git a/drivers/dma/cppi41.c b/drivers/dma/ti/cppi41.c
+similarity index 99%
+rename from drivers/dma/cppi41.c
+rename to drivers/dma/ti/cppi41.c
+index d9bee65a18a4..1497da367710 100644
+--- a/drivers/dma/cppi41.c
++++ b/drivers/dma/ti/cppi41.c
+@@ -11,7 +11,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/of_address.h>
+ #include <linux/pm_runtime.h>
+-#include "dmaengine.h"
++#include "../dmaengine.h"
+ 
+ #define DESC_TYPE	27
+ #define DESC_TYPE_HOST	0x10
+diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti/dma-crossbar.c
+similarity index 100%
+rename from drivers/dma/ti-dma-crossbar.c
+rename to drivers/dma/ti/dma-crossbar.c
+diff --git a/drivers/dma/edma.c b/drivers/dma/ti/edma.c
+similarity index 99%
+rename from drivers/dma/edma.c
+rename to drivers/dma/ti/edma.c
+index 85ea92fcea54..93a5cbf13319 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/ti/edma.c
+@@ -33,8 +33,8 @@
+ 
+ #include <linux/platform_data/edma.h>
+ 
+-#include "dmaengine.h"
+-#include "virt-dma.h"
++#include "../dmaengine.h"
++#include "../virt-dma.h"
+ 
+ /* Offsets matching "struct edmacc_param" */
+ #define PARM_OPT		0x00
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/ti/omap-dma.c
+similarity index 99%
+rename from drivers/dma/omap-dma.c
+rename to drivers/dma/ti/omap-dma.c
+index d21c19822feb..b73fb51fbc81 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/ti/omap-dma.c
+@@ -21,7 +21,7 @@
+ #include <linux/of_dma.h>
+ #include <linux/of_device.h>
+ 
+-#include "virt-dma.h"
++#include "../virt-dma.h"
+ 
+ #define OMAP_SDMA_REQUESTS	127
+ #define OMAP_SDMA_CHANNELS	32
+-- 
+Peter
 
-And here
-
-> -#endif
-> +#include <asm/smp_plat.h>
->
->  int acpi_noirq = 1;            /* skip ACPI IRQ initialization */
->  int acpi_disabled = 1;
-> @@ -239,8 +236,7 @@ void __init acpi_boot_table_init(void)
->         }
->  }
->
-> -#ifdef CONFIG_ACPI_APEI
-> -pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-> +pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
->  {
->         /*
->          * According to "Table 8 Map: EFI memory types to AArch64 memory
-> @@ -261,4 +257,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
->                 return __pgprot(PROT_NORMAL_NC);
->         return __pgprot(PROT_DEVICE_nGnRnE);
->  }
-> -#endif
-> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> index 5889cbea60b8..1148ea5a0faa 100644
-> --- a/drivers/firmware/efi/arm-runtime.c
-> +++ b/drivers/firmware/efi/arm-runtime.c
-> @@ -106,23 +106,23 @@ static bool __init efi_virtmap_init(void)
->   * non-early mapping of the UEFI system table and virtual mappings for all
->   * EFI_MEMORY_RUNTIME regions.
->   */
-> -static int __init arm_enable_runtime_services(void)
-> +void __init efi_enter_virtual_mode(void)
->  {
->         u64 mapsize;
->
->         if (!efi_enabled(EFI_BOOT)) {
->                 pr_info("EFI services will not be available.\n");
-> -               return 0;
-> +               return;
->         }
->
->         if (efi_runtime_disabled()) {
->                 pr_info("EFI runtime services will be disabled.\n");
-> -               return 0;
-> +               return;
->         }
->
-
-This is a problem. If you are booting using efi=noruntime, the routine
-exits early and never sets up the mapping for the EFI memory map.
-So the efi_memmap_init_late() call should be moved before the
-efi_runtime_disabled() check, everything else can stay as is afaict
-
-Could you please move the changes to this file and init/main.c into a
-separate patch?
-
->         if (efi_enabled(EFI_RUNTIME_SERVICES)) {
->                 pr_info("EFI runtime services access via paravirt.\n");
-> -               return 0;
-> +               return;
->         }
->
->         pr_info("Remapping and enabling EFI services.\n");
-> @@ -131,21 +131,18 @@ static int __init arm_enable_runtime_services(void)
->
->         if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
->                 pr_err("Failed to remap EFI memory map\n");
-> -               return -ENOMEM;
-> +               return;
->         }
->
->         if (!efi_virtmap_init()) {
->                 pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
-> -               return -ENOMEM;
-> +               return;
->         }
->
->         /* Set up runtime services function pointers */
->         efi_native_runtime_setup();
->         set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
-> -
-> -       return 0;
->  }
-> -early_initcall(arm_enable_runtime_services);
->
->  void efi_virtmap_load(void)
->  {
-> diff --git a/init/main.c b/init/main.c
-> index b795aa341a3a..40d05b63960f 100644
-> --- a/init/main.c
-> +++ b/init/main.c
-> @@ -693,6 +693,9 @@ asmlinkage __visible void __init start_kernel(void)
->         debug_objects_mem_init();
->         setup_per_cpu_pageset();
->         numa_policy_init();
-> +       if (IS_ENABLED(CONFIG_EFI) &&
-> +           (IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_ARM)))
-> +               efi_enter_virtual_mode();
->         acpi_early_init();
->         if (late_time_init)
->                 late_time_init();
-> --
-> 2.17.0
->
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
