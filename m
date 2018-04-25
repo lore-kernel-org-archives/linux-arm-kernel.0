@@ -1,102 +1,70 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 25 Apr 2018 18:31:19 -0500
-Subject: [PATCH v8 11/13] arm64: topology: enable ACPI/PPTT based CPU topology
+Date: Wed, 25 Apr 2018 18:31:16 -0500
+Subject: [PATCH v8 08/13] arm64: Add support for ACPI based firmware tables
 In-Reply-To: <20180425233121.13270-1-jeremy.linton@arm.com>
 References: <20180425233121.13270-1-jeremy.linton@arm.com>
-Message-ID: <20180425233121.13270-12-jeremy.linton@arm.com>
+Message-ID: <20180425233121.13270-9-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Propagate the topology information from the PPTT tree to the
-cpu_topology array. We can get the thread id and core_id by assuming
-certain levels of the PPTT tree correspond to those concepts.
-The package_id is flagged in the tree and can be found by calling
-find_acpi_cpu_topology_package() which terminates
-its search when it finds an ACPI node flagged as the physical
-package. If the tree doesn't contain enough levels to represent
-all of the requested levels then the root node will be returned
-for all subsequent levels.
+The /sys cache entries should support ACPI/PPTT generated cache
+topology information. Lets detect ACPI systems and call
+an arch specific cache_setup_acpi() routine to update the hardware
+probed cache topology.
+
+For arm64, if ACPI is enabled, determine the max number of cache
+levels and populate them using the PPTT table if one is available.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/kernel/topology.c | 45 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 44 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/cacheinfo.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index dc18b1e53194..bd1aae438a31 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -11,6 +11,7 @@
-  * for more details.
+diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
+index 380f2e2fbed5..0bf0a835122f 100644
+--- a/arch/arm64/kernel/cacheinfo.c
++++ b/arch/arm64/kernel/cacheinfo.c
+@@ -17,6 +17,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
   */
  
 +#include <linux/acpi.h>
- #include <linux/arch_topology.h>
- #include <linux/cpu.h>
- #include <linux/cpumask.h>
-@@ -22,6 +23,7 @@
- #include <linux/sched.h>
- #include <linux/sched/topology.h>
- #include <linux/slab.h>
-+#include <linux/smp.h>
- #include <linux/string.h>
+ #include <linux/cacheinfo.h>
+ #include <linux/of.h>
  
- #include <asm/cpu.h>
-@@ -296,6 +298,45 @@ static void __init reset_cpu_topology(void)
- 	}
- }
+@@ -46,7 +47,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
  
-+#ifdef CONFIG_ACPI
-+/*
-+ * Propagate the topology information of the processor_topology_node tree to the
-+ * cpu_topology array.
-+ */
-+static int __init parse_acpi_topology(void)
-+{
-+	bool is_threaded;
-+	int cpu, topology_id;
-+
-+	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
-+
-+	for_each_possible_cpu(cpu) {
-+		topology_id = find_acpi_cpu_topology(cpu, 0);
-+		if (topology_id < 0)
-+			return topology_id;
-+
-+		if (is_threaded) {
-+			cpu_topology[cpu].thread_id = topology_id;
-+			topology_id = find_acpi_cpu_topology(cpu, 1);
-+			cpu_topology[cpu].core_id   = topology_id;
-+		} else {
-+			cpu_topology[cpu].thread_id  = -1;
-+			cpu_topology[cpu].core_id    = topology_id;
-+		}
-+		topology_id = find_acpi_cpu_topology_package(cpu);
-+		cpu_topology[cpu].package_id = topology_id;
-+	}
-+
-+	return 0;
-+}
-+
-+#else
-+static inline int __init parse_acpi_topology(void)
-+{
-+	return -EINVAL;
-+}
-+#endif
-+
- void __init init_cpu_topology(void)
+ static int __init_cache_level(unsigned int cpu)
  {
- 	reset_cpu_topology();
-@@ -304,6 +345,8 @@ void __init init_cpu_topology(void)
- 	 * Discard anything that was parsed if we hit an error so we
- 	 * don't use partial information.
- 	 */
--	if (of_have_populated_dt() && parse_dt_topology())
-+	if ((!acpi_disabled) && parse_acpi_topology())
-+		reset_cpu_topology();
-+	else if (of_have_populated_dt() && parse_dt_topology())
- 		reset_cpu_topology();
- }
+-	unsigned int ctype, level, leaves, of_level;
++	unsigned int ctype, level, leaves, fw_level;
+ 	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+ 
+ 	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
+@@ -59,15 +60,19 @@ static int __init_cache_level(unsigned int cpu)
+ 		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
+ 	}
+ 
+-	of_level = of_find_last_cache_level(cpu);
+-	if (level < of_level) {
++	if (acpi_disabled)
++		fw_level = of_find_last_cache_level(cpu);
++	else
++		fw_level = acpi_find_last_cache_level(cpu);
++
++	if (level < fw_level) {
+ 		/*
+ 		 * some external caches not specified in CLIDR_EL1
+ 		 * the information may be available in the device tree
+ 		 * only unified external caches are considered here
+ 		 */
+-		leaves += (of_level - level);
+-		level = of_level;
++		leaves += (fw_level - level);
++		level = fw_level;
+ 	}
+ 
+ 	this_cpu_ci->num_levels = level;
 -- 
 2.13.6
