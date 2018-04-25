@@ -1,151 +1,169 @@
-From: ebiggers@google.com (Eric Biggers)
-Date: Wed, 25 Apr 2018 12:49:19 -0700
-Subject: [PATCH v2 0/5] crypto: Speck support
-In-Reply-To: <CAEX_ruHB7=zUuAWvbC9f6pDNhA4B32PGEkHi3QnPjRmRknrJ7w@mail.gmail.com>
-References: <20180212235209.117393-1-ebiggers@google.com>
- <CAHmME9oA4j=iGrrBYME92JfUsyi5r42PnAvzWiuXzGCRXMnXtA@mail.gmail.com>
- <20180424181623.GA174675@google.com>
- <CAHmME9qG+nPmj5c7hU4+STUsmWmwSBsKe-0mOLEXH+hJ1z4z=g@mail.gmail.com>
- <20180424224734.GA109345@google.com>
- <CAEX_ruHB7=zUuAWvbC9f6pDNhA4B32PGEkHi3QnPjRmRknrJ7w@mail.gmail.com>
-Message-ID: <20180425194919.GA79662@google.com>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Wed, 25 Apr 2018 23:01:15 +0300
+Subject: [PATCH v4 7/8] drm/i2c: tda998x: register as a drm bridge
+In-Reply-To: <20180424232523.GN16141@n2100.armlinux.org.uk>
+References: <20180423072301.11962-1-peda@axentia.se>
+ <20180423072301.11962-8-peda@axentia.se>
+ <20180423160833.GF16141@n2100.armlinux.org.uk>
+ <5d6866d0-75bc-4de8-9b87-4fee5430e9dd@axentia.se>
+ <20180424080833.GJ16141@n2100.armlinux.org.uk>
+ <8448e90a-4562-b564-c160-1b5c67e0f92f@axentia.se>
+ <0cbee3bd-8987-5f2f-519d-f8d1b426f2a3@ti.com>
+ <20180424170625.GL16141@n2100.armlinux.org.uk>
+ <b7a7ffb6-b282-cbc5-435e-9ca1cd405e33@ti.com>
+ <20180424232523.GN16141@n2100.armlinux.org.uk>
+Message-ID: <7e8cdcf6-c816-1e01-24f1-a526fb0a591f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
-
-On Wed, Apr 25, 2018 at 03:33:16PM +0100, Samuel Neves wrote:
-> Let's put the provenance of Speck aside for a moment, and suppose that
-> it is an ideal block cipher. There are still some issues with this
-> patch as it stands.
+On 25/04/18 02:25, Russell King - ARM Linux wrote:
+> On Tue, Apr 24, 2018 at 09:25:44PM +0300, Jyri Sarha wrote:
+>> On 24/04/18 20:06, Russell King - ARM Linux wrote:
+>>> On Tue, Apr 24, 2018 at 07:04:16PM +0300, Jyri Sarha wrote:
+>>>> On 24/04/18 13:14, Peter Rosin wrote:
+>>>>> On 2018-04-24 10:08, Russell King - ARM Linux wrote:
+>>>>>> On Tue, Apr 24, 2018 at 08:58:42AM +0200, Peter Rosin wrote:
+>>>>>>> On 2018-04-23 18:08, Russell King - ARM Linux wrote:
+>>>>>>>> On Mon, Apr 23, 2018 at 09:23:00AM +0200, Peter Rosin wrote:
+>>>>>>>>>  static int tda998x_remove(struct i2c_client *client)
+>>>>>>>>>  {
+>>>>>>>>> -	component_del(&client->dev, &tda998x_ops);
+>>>>>>>>> +	struct device *dev = &client->dev;
+>>>>>>>>> +	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
+>>>>>>>>> +
+>>>>>>>>> +	drm_bridge_remove(&bridge->bridge);
+>>>>>>>>> +	component_del(dev, &tda998x_ops);
+>>>>>>>>> +
+>>>>>>>>
+>>>>>>>> I'd like to ask a rather fundamental question about DRM bridge support,
+>>>>>>>> because I suspect that there's a major fsckup here.
+>>>>>>>>
+>>>>>>>> The above is the function that deals with the TDA998x device being
+>>>>>>>> unbound from the driver.  With the component API, this results in the
+>>>>>>>> DRM device correctly being torn down, because one of the hardware
+>>>>>>>> devices has gone.
+>>>>>>>>
+>>>>>>>> With DRM bridge, the bridge is merely removed from the list of
+>>>>>>>> bridges:
+>>>>>>>>
+>>>>>>>> void drm_bridge_remove(struct drm_bridge *bridge)
+>>>>>>>> {
+>>>>>>>>         mutex_lock(&bridge_lock);
+>>>>>>>>         list_del_init(&bridge->list);
+>>>>>>>>         mutex_unlock(&bridge_lock);
+>>>>>>>> }
+>>>>>>>> EXPORT_SYMBOL(drm_bridge_remove);
+>>>>>>>>
+>>>>>>>> and the memory backing the "struct tda998x_bridge" (which contains
+>>>>>>>> the struct drm_bridge) will be freed by the devm subsystem.
+>>>>>>>>
+>>>>>>>> However, there is no notification into the rest of the DRM subsystem
+>>>>>>>> that the device has gone away.  Worse, the memory that is still in
+>>>>>>>> use by DRM has now been freed, so further use of the DRM device
+>>>>>>>> results in a use-after-free bug.
+>>>>>>>>
+>>>>>>>> This is really not good, and to me looks like a fundamental problem
+>>>>>>>> with the DRM bridge code.  I see nothing in the DRM bridge code that
+>>>>>>>> deals with the lifetime of a "DRM bridge" or indeed the lifetime of
+>>>>>>>> the actual device itself.
+>>>>>>>>
+>>>>>>>> So, from what I can see, there seems to be a fundamental lifetime
+>>>>>>>> issue with the design of the DRM bridge code.  This needs to be
+>>>>>>>> fixed.
+>>>>>>>
+>>>>>>> Oh crap. A gigantic can of worms...
+>>>>>>
+>>>>>> Yes, it's especially annoying for me, having put the effort in to
+>>>>>> the component helper to cover all these cases.
+>>>>>>
+>>>>>>> Would a patch (completely untested btw) along this line of thinking make
+>>>>>>> any difference whatsoever?
+>>>>>>
+>>>>>> It looks interesting - from what I can see of the device links code,
+>>>>>> it would have the effect of unbinding the DRM device just before
+>>>>>> TDA998x is unbound, so that's an improvement.
+>>>>>>
+>>>>>> However, from what I can see, the link vanishes at that point (as
+>>>>>> DL_FLAG_AUTOREMOVE is set), and re-binding the TDA998x device results
+>>>>>> in nothing further happening - the link will be recreated, but there
+>>>>>> appears to be nothing that triggers the "consumer" to rebind at that
+>>>>>> point.  Maybe I've missed something?
+>>>>>
+>>>>> Right, auto-remove is a no-go. So, improving on the previous...
+>>>>>
+>>>>> (I think drm_panel might suffer from this issue too?)
+>>>>
+>>>> Yes it does and I took a shot at trying to fix it at the end of the
+>>>> previous merge window, but gave up as I run out of time. I re-spun the
+>>>> work now after reading this thread. I add you and Russell to cc.
+>>>
+>>> Right, and these exact problems are what the component helper is
+>>> there to sort out, in a subsystem independent way.
+>>>
+>>> What is the problem with the component helper that people seem to
+>>> be soo loathed to use it, instead preferring to come up with sub-
+>>> standard and broken alternatives?
+>>>
+>>
+>> Nothing but time. Embedding component helpers seamlessly into drm
+>> framework does not sound like a couple of days job. Right now I simply
+>> do not have time to take on a challenge like that. If someone does it I
+>> am all for it.
+>>
+>> However, I would not call device links substandard. They are in the
+>> device core after all.
 > 
->  - The rationale seems off. Consider this bit from the commit message:
-> 
-> > Other AES alternatives such as Twofish, Threefish, Camellia, CAST6, and Serpent aren't
-> > fast enough either; it seems that only a modern ARX cipher can provide sufficient performance
-> > on these devices.
-> 
-> One of these things is very much not like the others. Threefish _is_ a
-> modern ARX cipher---a tweakable block cipher in fact, precluding the
-> need for XEX-style masking. Is it too slow? Does it not have the
-> correct block size?
-> 
-> > We've also considered a novel length-preserving encryption mode based on
-> > ChaCha20 and Poly1305.
-> 
-> I'm very curious about this, namely as to what the role of Poly1305
-> would be here. ChaCha20's underlying permutation could, of course, be
-> transformed into a 512-bit tweakable block cipher relatively
-> painlessly, retaining the performance of regular ChaCha20 with
-> marginal additional overhead. This would not be a standard
-> construction, but clearly that is not an issue.
-> 
-> But the biggest problem here, in my mind, is that for all the talk of
-> using 128-bit block Speck, this patch tacks on the 64-bit block
-> variant of Speck into the kernel, and speck64-xts as well! As far as I
-> can tell, this is the _only_ instance of a 64-bit XTS instance in the
-> entire codebase. Now, if you wanted a fast 64-bit ARX block cipher,
-> the kernel already had XTEA. Instead, this is adding yet another
-> 64-bit block cipher into the crypto API, in a disk-encryption mode no
-> less, so that it can be misused later. In the disk encryption setting,
-> it's particularly concerning to be using such a small block size, as
-> data volumes can quickly add up to the birthday bound.
-> 
-> > It's easy to say that, but do you have an actual suggestion?
-> 
-> I don't know how seriously you are actually asking this, but some
-> 128-bit software-friendly block ciphers could be SPARX, LEA, RC5, or
-> RC6. SPARX, in particular, has similarities to Speck but has some
-> further AES-like design guarantees that other prior ARX block ciphers
-> did not. Some other bitsliced designs, such as Noekeon or SKINNY, may
-> also work well with NEON, but I don't know much about their
-> performance there.
+> Umm, no, I was not talking about the device links, but the tendency to
+> have subsystem or component specific solutions to this problem.
 > 
 
-I agree that my explanation should have been better, and should have considered
-more crypto algorithms.  The main difficulty is that we have extreme performance
-requirements -- it needs to be 50 MB/s at the very least on even low-end ARM
-devices like smartwatches.  And even with the NEON-accelerated Speck128-XTS
-performance exceeding that after much optimization, we've been getting a lot of
-pushback as people want closer to 100 MB/s.
+Oh yes. But in this case the substandard solution is already there and
+it is already widely used, despite it being severely broken. I am merely
+trying to fix the existing substandard solution.
 
-That's why I also included Speck64-XTS in the patches, since it was
-straightforward to include, and some devices may really need that last 20-30% of
-performance for encryption to be feasible at all.  (And when the choice is
-between unencrypted and a 64-bit block cipher, used in a context where the
-weakest points in the cryptosystem are actually elsewhere such as the user's
-low-entropy PIN and the flash storage doing wear-leveling, I'd certainly take
-the 64-bit block cipher.)  So far we haven't had to use Speck64 though, and if
-that continues to be the case I'd be fine with Speck64 being removed, leaving
-just Speck128.
+I admit that a full integration with component helpers would probably be
+more elegant solution to the problem, but the amount of work is just too
+much. The change would impact the way all the master drm drivers pull
+them selves together. The drivers that already use the component helpers
+for some internal stuff will add their own challenge. Separate component
+matching implementations are needed for device-tree and ACPI (are ther
+more flavors?) etc. I just do not see this happening any time soon (am
+happy to be wrong about this).
 
-Note that in practice, to have any chance at meeting the performance requirement
-the cipher needed to be NEON accelerated.  That made benchmarking really hard
-and time-consuming, since to definitely know how an algorithm performs it can
-take upwards of a week to implement a NEON version.  It needs to be very well
-optimized too, to compare the algorithms fairly -- e.g. with Speck I got a 20%
-performance improvement on some CPUs just by changing the NEON instructions used
-to implement the 8-bit rotates, an optimization that is not possible with
-ciphers that don't use rotate amounts that are multiples of 8.  (This was an
-intentional design choice by the Speck designers; they do know what they're
-doing, actually.)
+> We're now heading down the path of trying to retrofit the functionality
+> that one expects and is provided by the component helpers into DRM
+> bridge and DRM panel by using device links, which appears to only
+> partially resolve the problem.
+> 
+> On the point of device links, I've been wondering whether the component
+> helpers could take advantage of the device links, but at the moment
+> that would cause a regression if there's no facility to re-probe the
+> "consumer" when a "supplier" returns.
+> 
 
-Thus, we had to be pretty aggressive about dropping algorithms from
-consideration if there were preliminary indications that they wouldn't perform
-well, or had too little cryptanalysis, or had other issues such as an unclear
-patent situation.  Threefish for example I did test the C implementation at
-https://github.com/wernerd/Skein3Fish, but on ARM32 it was over 4 times slower
-than my NEON implementation of Speck128/256-XTS.  And I did not see a clear way
-that it could be improved over 4x with NEON, if at all, so I did not take the
-long time it would have taken to write an optimized NEON implementation to
-benchmark it properly.  Perhaps that was a mistake.  But, time is not unlimited.
+I sent a patch[1] in February that solves the re-probing problem at
+least in my environment.
 
-RC5 and RC6 use data-dependent rotates which won't perform too well on NEON,
-also historically those algorithms have been patented.  It sounds like the last
-patents expired last year, but we'd need to double check and be very sure that's
-really the case.
+> As you bring that up, I would say that they _are_ a substandard way to
+> solve this problem _if_, as I suspect, they would cause a regression
+> to the component helper if the component helper were to use them as a
+> means to control the probing of the "master" device.  This is not a
+> matter of which part of the kernel they are "in", but the functionality
+> that they can offer vs what would be expected.
+> 
 
-As for the wide-block mode using ChaCha20 and Poly1305, you'd have to ask Paul
-Crowley to explain it properly, but briefly it's actually a pseudorandom
-permutation over an arbitrarily-sized message.  So with dm-crypt for example, it
-would operate on a whole 512-byte sector, and if any bit of the 512-byte
-plaintext is changed, then every bit in the 512-byte ciphertext would change
-with 50% probability.  To make this possible, the construction uses a polynomial
-evalution in GF(2^130-5) as a universal hash function, similar to the Poly1305
-mode.
+The component helpers certainly have many features in that are not
+(yet?) in device core's device links, but the amount of work needed to
+fix the most pressing problem of attached drm panels or bridges is
+couple of magnitudes less with device links when compared to full blown
+component helper usage.
 
-Using ChaCha20's underlying 512-bit permutation to build a tweakable block
-cipher is an interesting idea.  But maybe in my crypto-naivety, it is not
-obvious to me how to do so.  Do you have references to any relevant papers?
-Remember that we strongly prefer a published cipher to a custom one -- even if
-the core is reused, a mistake may be made in the way it is used.  Thus,
-similarly to Paul's wide-block mode, I'd be concerned that we'd have to
-self-publish a new construction, then use it with no outside crypto review.
-*Maybe* it would be straightforward enough to be okay, but to know I'd need to
-see the details of how it would actually work.
+Best regards,
+Jyri
 
-But in the end, Speck seemed like the clear choice because it had multiple NEON
-implementations available already which showed it could be implemented very
-efficiently in NEON; it has over 70 cryptanalysis papers (far more than most
-ciphers) yet the security margin is still similar to AES; it has no intellectual
-property concerns; there is a paper clearly explaining the design decisions; it
-is naturally resistant to timing attacks; it supports a 128-bit block size, so
-it can be easily used in XTS mode; it supports the same key sizes as AES; and it
-has a simple and understandable design with no "magic numbers" besides 8 and 3
-(compare to an actual backdoored algorithm like Dual_EC_DRGB, which basically
-had a public key embedded in the algorithm).  Also as Paul mentioned he is
-confident in the construction, and he has published cryptanalysis on Salsa20, so
-his opinion is probably more significant than mine :-)
+[1]
+https://lists.freedesktop.org/archives/dri-devel/2018-February/166907.html
 
-But I will definitely take a closer look at SPARX and some of the other ciphers
-you mentioned in case I missed something.  I really do appreciate the
-suggestions, by the way, and in any case we do need to be very well prepared to
-justify our choices.  I just hope that people can understand that we are
-implementing real-world crypto which must operate under *very* tight performance
-constraints on ARM processors, and it must be compatible with dm-crypt and
-fscrypt with no room for ciphertext expansion.  Thus, many algorithms which may
-at first seem reasonable choices had to (unfortunately) be excluded.
-
-Thanks!
-
-Eric
+-- 
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
