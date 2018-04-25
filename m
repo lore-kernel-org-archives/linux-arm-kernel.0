@@ -1,36 +1,62 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 25 Apr 2018 13:37:25 +0200
-Subject: [PATCH v2 1/2] clk: meson: gxbb: expose VDEC_1 and VDEC_HEVC
- clocks
-In-Reply-To: <20180424184838.3406-2-maxi.jourdan@wanadoo.fr>
-References: <20180424184838.3406-1-maxi.jourdan@wanadoo.fr>
- <20180424184838.3406-2-maxi.jourdan@wanadoo.fr>
-Message-ID: <1524656245.4026.61.camel@baylibre.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 25 Apr 2018 13:41:40 +0200
+Subject: [PATCH net 3/3] ARM64: dts: marvell: armada-cp110: Add clocks for
+ the xmdio node
+In-Reply-To: <20180425110731.20153-4-maxime.chevallier@bootlin.com> (Maxime
+ Chevallier's message of "Wed, 25 Apr 2018 13:07:31 +0200")
+References: <20180425110731.20153-1-maxime.chevallier@bootlin.com>
+ <20180425110731.20153-4-maxime.chevallier@bootlin.com>
+Message-ID: <87muxrecnf.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-04-24 at 20:48 +0200, Maxime Jourdan wrote:
-> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+Hi Maxime,
+ 
+ On mer., avril 25 2018, Maxime Chevallier <maxime.chevallier@bootlin.com> wrote:
 
-Even if the change is trivial, please add commit description.
-I'll do it for you this time.
+> The Marvell XSMI controller needs 3 clocks to operate correctly :
+>  - The MG clock (clk 5)
+>  - The MG Core clock (clk 6)
+>  - The GOP clock (clk 18)
+>
+>  This commit adds them, to avoid system hangs when using these
+>  interfaces.
+>
+> Fixes: c7e92def1ef4 ("clk: mvebu: cp110: Fix clock tree representation")
+> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 
-Applied to next/headers
-Thx
+This patch should not have been sent with the net prefix and should not
+be merge through the net subsystem.
+
+I will take care of it to avoid conflict in the devei tree file during
+the merge windows.
+
+Thanks,
+
+Gregory
 
 > ---
->  include/dt-bindings/clock/gxbb-clkc.h | 2 ++
+>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 2 ++
 >  1 file changed, 2 insertions(+)
-> 
-> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-> index 8ba99a5e3fd3..7a892be90549 100644
-> --- a/include/dt-bindings/clock/gxbb-clkc.h
-> +++ b/include/dt-bindings/clock/gxbb-clkc.h
-> @@ -125,5 +125,7 @@
->  #define CLKID_VAPB_1		138
->  #define CLKID_VAPB_SEL		139
->  #define CLKID_VAPB		140
-> +#define CLKID_VDEC_1		153
-> +#define CLKID_VDEC_HEVC		156
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> index 6c137ac656e9..ed2f1237ea1e 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> @@ -142,6 +142,8 @@
+>  			#size-cells = <0>;
+>  			compatible = "marvell,xmdio";
+>  			reg = <0x12a600 0x10>;
+> +			clocks = <&CP110_LABEL(clk) 1 5>,
+> +				 <&CP110_LABEL(clk) 1 6>, <&CP110_LABEL(clk) 1 18>;
+>  			status = "disabled";
+>  		};
 >  
->  #endif /* __GXBB_CLKC_H */
+> -- 
+> 2.11.0
+>
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
