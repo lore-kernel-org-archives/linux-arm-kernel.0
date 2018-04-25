@@ -1,35 +1,26 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Wed, 25 Apr 2018 15:37:04 +0200
-Subject: arm64: W+X mapping check failures
-Message-ID: <20180425133704.GA6474@hc>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Apr 2018 14:41:20 +0100
+Subject: [PATCH] arm64: Select ARCH_HAS_FAST_MULTIPLIER
+In-Reply-To: <877b532d8d240c1d9e9db923c84b924443a218ed.1524583390.git.robin.murphy@arm.com>
+References: <877b532d8d240c1d9e9db923c84b924443a218ed.1524583390.git.robin.murphy@arm.com>
+Message-ID: <20180425134119.GE8383@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Apr 24, 2018 at 04:25:47PM +0100, Robin Murphy wrote:
+> It is probably safe to assume that all Armv8-A implementations have a
+> multiplier whose efficiency is comparable or better than a sequence of
+> three or so register-dependent arithmetic instructions. Select
+> ARCH_HAS_FAST_MULTIPLIER to get ever-so-slightly nicer codegen in the
+> few dusty old corners which care.
+> 
+> In a contrived benchmark calling hweight64() in a loop, this does indeed
+> turn out to be a small win overall, with no measurable impact on
+> Cortex-A57 but about 5% performance improvement on Cortex-A53.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 
-enabling CONFIG_DEBUG_WX we see insecure mappings reported across various kernel
-versions and machines. I've not yet seen this with upstream but that doesn't
-mean much as the issue is a race and I cannot trigger it reliably.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-The reported W+X mappings are gone after the boot is finished. The addresses
-all belong to .init.* sections of the first loaded kernel modules.
-
-Example log (I changed the warnings as I found the backtrace quite useless):
-
-[   39.157884] Freeing unused kernel memory: 5248K
-[   39.167997] note_prot_wx: Found insecure W+X mapping at start: ffff000000ab9000  addr: ffff000000abd000  pages: 4
-[   39.178246] note_prot_wx: Found insecure W+X mapping at start: ffff000000ac3000  addr: ffff000000ac5000  pages: 2
-[   39.188495] note_prot_wx: Found insecure W+X mapping at start: ffff000000acd000  addr: ffff000000ad0000  pages: 3
-[   39.198745] note_prot_wx: Found insecure W+X mapping at start: ffff000000af9000  addr: ffff000000afc000  pages: 3
-[   39.212981] Checked W+X mappings: FAILED, 12 W+X pages found, 0 non-UXN pages found
-
-I think this is a race between module loading and the ptdump_check_wx().
-The RCU'd do_free_init() can be delayed _after_ ptdump_check_wx() for a coming module.
-
-I tried using stop_machine() around the memory check similar to arm but that does not
-solve the race. It is not a critical issue as the .init sections are freed afterwards
-anyway but still the warning is a bit misleading.
-
-Any thoughts?
-
---Jan
+Will
