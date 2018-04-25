@@ -1,81 +1,137 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 25 Apr 2018 14:30:26 +0200
-Subject: [PATCH net 3/3] ARM64: dts: marvell: armada-cp110: Add clocks for
- the xmdio node
-In-Reply-To: <87muxrecnf.fsf@bootlin.com> (Gregory CLEMENT's message of "Wed,
- 25 Apr 2018 13:41:40 +0200")
-References: <20180425110731.20153-1-maxime.chevallier@bootlin.com>
- <20180425110731.20153-4-maxime.chevallier@bootlin.com>
- <87muxrecnf.fsf@bootlin.com>
-Message-ID: <87a7treae5.fsf@bootlin.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 25 Apr 2018 09:36:26 -0300
+Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
+ kevin panel
+In-Reply-To: <CAD=FV=W9LCeGAEuZDD9FUEKVMp8YUuCcW9uLcTZqTR1spA1gEA@mail.gmail.com>
+References: <20180208174855.55620-1-seanpaul@chromium.org>
+ <20180208174855.55620-7-seanpaul@chromium.org>
+ <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
+ <CAAEAJfAQMzUfM86o-xNoyBQzTiEMNH+W=9FyFpBy99nA3HrVgw@mail.gmail.com>
+ <CAD=FV=W9LCeGAEuZDD9FUEKVMp8YUuCcW9uLcTZqTR1spA1gEA@mail.gmail.com>
+Message-ID: <CAAEAJfAgH_hw6yqbO__p=f2k-axBQXn141XiE-5j8mcmhRPWKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi agin,
- 
- On mer., avril 25 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
-
-> Hi Maxime,
->  
->  On mer., avril 25 2018, Maxime Chevallier <maxime.chevallier@bootlin.com> wrote:
+On 25 April 2018 at 01:29, Doug Anderson <dianders@chromium.org> wrote:
+> Hi,
 >
->> The Marvell XSMI controller needs 3 clocks to operate correctly :
->>  - The MG clock (clk 5)
->>  - The MG Core clock (clk 6)
->>  - The GOP clock (clk 18)
+> On Tue, Apr 24, 2018 at 7:31 AM, Ezequiel Garcia
+> <ezequiel@vanguardiasur.com.ar> wrote:
+>> Hi Doug, Sean:
 >>
->>  This commit adds them, to avoid system hangs when using these
->>  interfaces.
+>> I would like to move this forward.
 >>
->> Fixes: c7e92def1ef4 ("clk: mvebu: cp110: Fix clock tree representation")
->> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+>> On 26 February 2018 at 15:23, Doug Anderson <dianders@chromium.org> wrote:
+>>> Hi,
+>>>
+>>> On Thu, Feb 8, 2018 at 9:48 AM, Sean Paul <seanpaul@chromium.org> wrote:
+>>>> This patch adds an override mode for kevin devices. The mode increases
+>>>> both back porches to allow a pixel clock of 26666kHz as opposed to the
+>>>> 'typical' value of 252750kHz. This is needed to avoid interference with
+>>>> the touch digitizer on these laptops.
+>>>>
+>>>> Changes in v2:
+>>>>  - Wrap the timing in display-timings node to match binding (Rob/Thierry)
+>>>> Changes in v3:
+>>>>  - Unwrap the timing from display-timings and rename panel-timing (Rob)
+>>>>
+>>>> Cc: Doug Anderson <dianders@chromium.org>
+>>>> Cc: Eric Anholt <eric@anholt.net>
+>>>> Cc: Heiko Stuebner <heiko@sntech.de>
+>>>> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>> Cc: St?phane Marchesin <marcheu@chromium.org>
+>>>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>>>> Cc: devicetree at vger.kernel.org
+>>>> Cc: dri-devel at lists.freedesktop.org
+>>>> Cc: linux-rockchip at lists.infradead.org
+>>>> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+>>>> ---
+>>>>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
+>>>>  1 file changed, 14 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>>>> index 191a6bcb1704..658411ce37ea 100644
+>>>> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>>>> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+>>>> @@ -98,6 +98,20 @@
+>>>>                 backlight = <&backlight>;
+>>>>                 power-supply = <&pp3300_disp>;
+>>>>
+>>>> +               panel-timing {
+>>>> +                       clock-frequency = <266604720>;
+>>>> +                       hactive = <2400>;
+>>>> +                       hfront-porch = <48>;
+>>>> +                       hback-porch = <84>;
+>>>> +                       hsync-len = <32>;
+>>>> +                       hsync-active = <0>;
+>>>> +                       vactive = <1600>;
+>>>> +                       vfront-porch = <3>;
+>>>> +                       vback-porch = <120>;
+>>>> +                       vsync-len = <10>;
+>>>> +                       vsync-active = <0>;
+>>>> +               };
+>>>> +
+>>>>                 ports {
+>>>>                         panel_in_edp: endpoint {
+>>>>                                 remote-endpoint = <&edp_out_panel>;
+>>>
+>>> Kristian brought an old bug to my attention
+>>> <https://bugs.chromium.org/p/chromium/issues/detail?id=750354> and it
+>>> made me think.  Should we somehow adjust the bindings here to account
+>>> for the fact that a board may source several different panels?
+>>>
+>>> AKA: on some boards an ODM may want to second source (or third source,
+>>> or ...) the panel.  They'll randomly connect several different panels
+>>> to the board and ship the boards out.  The panels are all compatible
+>>> electrically (same power sequencing) but might need slightly different
+>>> timings.  In this particular case there's no board-level strappings
+>>> for the different panels--it's assumed that the EDID on the panels can
+>>> be used to distinguish them.
+>>>
+>>> In that case it seems like it would be nice to allow specifying more
+>>> than one "panel-timing" nodes.  Maybe keyed off some type of ID that's
+>>> present in the EDID?
+>>>
+>>>
+>>> Is that something we'd want to account for before we land this series?
+>>>  It seems like it would just be adding an extra level of nodes?
+>>>
+>>
+>> AFAICS, there is no EDID without a DDC bus, which we don't
+>> seem to have on gru platforms, do we?
 >
-> This patch should not have been sent with the net prefix and should not
-> be merge through the net subsystem.
+> I'm fairly certain we can read the EDID on gru devices.  I see the
+> "aux" channel connected on the schematics.  That'll do it, right?
+> ...and I could have sworn that at some point in time I could read the
+> EDID in the software.  My kevin devices are not connected for
+> debugging so I can't check right now, but I'm pretty sure I was able
+> to read the EDID in the past...
 >
-> I will take care of it to avoid conflict in the devei tree file during
-> the merge windows.
 
+Right.
 
-So, applied on mvebu/fixes
+Well, I've been trying to get some EDID without much success.
+Perhaps I am missing something? The I2C aux bus seems empty:
+
+root at linaro-developer:/sys/class/i2c-adapter/i2c-10# cat name
+DP-AUX
+root at linaro-developer:/sys/class/i2c-adapter/i2c-10# i2cdetect -y 10
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+
+In any case, perhaps it's better to not stall this series
+upstream - and work on second sourcing as follow up
+patches?
 
 Thanks,
-
-Gregory
-
-
->
-> Thanks,
->
-> Gregory
->
->> ---
->>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
->> index 6c137ac656e9..ed2f1237ea1e 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
->> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
->> @@ -142,6 +142,8 @@
->>  			#size-cells = <0>;
->>  			compatible = "marvell,xmdio";
->>  			reg = <0x12a600 0x10>;
->> +			clocks = <&CP110_LABEL(clk) 1 5>,
->> +				 <&CP110_LABEL(clk) 1 6>, <&CP110_LABEL(clk) 1 18>;
->>  			status = "disabled";
->>  		};
->>  
->> -- 
->> 2.11.0
->>
->
-> -- 
-> Gregory Clement, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> http://bootlin.com
-
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
