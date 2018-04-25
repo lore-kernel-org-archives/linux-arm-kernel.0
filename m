@@ -1,72 +1,28 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 25 Apr 2018 14:39:15 +0200
-Subject: [PATCH 2/7] ARM: dts: sun8i: h3: Split out common board design
- for ALL-H3-CC
-In-Reply-To: <CAGb2v64MwS+q87z9_UiKxVtgeAenA_9+QSS=cfF42PGy4PeJwQ@mail.gmail.com>
-References: <20180424113424.13196-1-wens@csie.org>
- <20180424113424.13196-3-wens@csie.org>
- <20180424121353.zxujyehsw3er2xq6@flea>
- <CAGb2v65iwbmOvQ2YA0e4QyTzQVj=F+5n6cWt2q6K80Y2b_3q3g@mail.gmail.com>
- <20180424193754.jsuucbq57onhxhqe@flea>
- <CAGb2v64MwS+q87z9_UiKxVtgeAenA_9+QSS=cfF42PGy4PeJwQ@mail.gmail.com>
-Message-ID: <20180425123915.twp3m73o5xap3m6j@flea>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Apr 2018 14:40:06 +0200
+Subject: [PATCH  1/8] net: ethernet: stmmac: add adaptation for
+ stm32mp157c.
+In-Reply-To: <fa12bb221b1b4cf380812c0fed03f74d@SFHDAG5NODE3.st.com>
+References: <1524582120-4451-1-git-send-email-christophe.roullier@st.com>
+ <1524582120-4451-2-git-send-email-christophe.roullier@st.com>
+ <20180424153953.GB2360@lunn.ch>
+ <fa12bb221b1b4cf380812c0fed03f74d@SFHDAG5NODE3.st.com>
+Message-ID: <20180425124006.GB13486@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 11:19:20AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Apr 25, 2018 at 3:37 AM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > On Tue, Apr 24, 2018 at 08:17:11PM +0800, Chen-Yu Tsai wrote:
-> >> On Tue, Apr 24, 2018 at 8:13 PM, Maxime Ripard
-> >> <maxime.ripard@bootlin.com> wrote:
-> >> > On Tue, Apr 24, 2018 at 07:34:19PM +0800, Chen-Yu Tsai wrote:
-> >> >> The Libre Computer Project ALL-H3-CC has three models, all using the
-> >> >> same board design, but with different pin compatible SoCs and amount of
-> >> >> DRAM.
-> >> >>
-> >> >> Currently only the H3 1GB DRAM variant is supported. To support the two
-> >> >> other variants, first split the original device tree into a common board
-> >> >> design part and an SoC specific part.
-> >> >>
-> >> >> The SoC part only defines which SoC is used and model name, and includes
-> >> >> the SoC specific dtsi file and the common design dtsi file.
-> >> >>
-> >> >> Also fix up the SPDX identifier line to use the correct comment style,
-> >> >> and place it on the first line.
-> >> >>
-> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >> ---
-> >> >>  .../boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 213 +-----------------
-> >> >>  ....dts => sunxi-hx-libretech-all-h3-cc.dtsi} |  11 +-
-> >> >
-> >> > I think I prefer the name of Neil's DTSI better, and since pretty much
-> >> > the same patches (a couple of hours) before, we'll merge them (while
-> >> > merging the rest of your patches, obviously).
-> >> >
-> >> > Does that work for you?
-> >>
-> >> I would like for the regulator voltage fix to be merged before the split.
-> >> This will make it trivial to back port, instead of having to reverse the
-> >> split, and maybe failing.
-> >
-> > Yes, I was just talking about replacing your two redundant patches,
-> > but keeping the order you have.
+On Wed, Apr 25, 2018 at 07:12:29AM +0000, Christophe ROULLIER wrote:
+> Hi Andrew,
 > 
-> That works for me. Might require a little fixing up.
-> Let me know if you need help with that.
+> For moment, I've only tested with PHY RGMII, RMII, MII, GMII, I do not have other kind of PHY interface.
+> Normally there is no impact in my glue, the value of syscfg register will be the same for RGMII/ID/TXID/RXID.
+> Do you think that I should add these interfaces in my case ?
+> 
+> 	case PHY_INTERFACE_MODE_RGMII:
+> > +	case PHY_INTERFACE_MODE_RGMII_ID:
+> > +	case PHY_INTERFACE_MODE_RGMII_RXID:
+> > +	case PHY_INTERFACE_MODE_RGMII_TXID:
 
-I did. You can double check if you want :)
+Yes
 
-maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180425/44c75ff3/attachment.sig>
+	Andrew
