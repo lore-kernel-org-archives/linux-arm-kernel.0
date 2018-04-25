@@ -1,55 +1,100 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Wed, 25 Apr 2018 17:35:48 +0100
-Subject: [PATCH v2 09/17] kvm: arm64: Make stage2 page table layout dynamic
-In-Reply-To: <1522156531-28348-10-git-send-email-suzuki.poulose@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-10-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <2359e848-8068-ea25-e44e-e8cfcbc9b467@arm.com>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Wed, 25 Apr 2018 10:36:25 -0600
+Subject: [PATCH] arm64: mm: Fix false positives in W+X checking
+In-Reply-To: <CAGXu5j+WhNdY09s_tPQ-BKqEqi_bbbp8XnRSnoGTN-HOPSJFPQ@mail.gmail.com>
+References: <1524665611-14040-1-git-send-email-jhugo@codeaurora.org>
+ <20180425150353.GG8383@arm.com>
+ <381aee7b-9caa-b16b-3f5e-a47737405c03@codeaurora.org>
+ <CAGXu5j+WhNdY09s_tPQ-BKqEqi_bbbp8XnRSnoGTN-HOPSJFPQ@mail.gmail.com>
+Message-ID: <3a105d2c-19b8-11fc-88d3-2da4fa846296@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-On 27/03/18 14:15, Suzuki K Poulose wrote:
-> So far we had a static stage2 page table handling code, based on a
-> fixed IPA of 40bits. As we prepare for a configurable IPA size per
-> VM, make the our stage2 page table code dynamic to do the right thing
-> for a given VM.
+On 4/25/2018 10:23 AM, Kees Cook wrote:
+> On Wed, Apr 25, 2018 at 8:12 AM, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
+>> On 4/25/2018 9:03 AM, Will Deacon wrote:
+>>>
+>>> Hi Jeffrey,
+>>>
+>>> Thanks for the patch. Comment below.
+>>>
+>>> On Wed, Apr 25, 2018 at 08:13:31AM -0600, Jeffrey Hugo wrote:
+>>>>
+>>>> load_module() creates W+X mappings via __vmalloc_node_range() (from
+>>>> layout_and_allocate()->move_module()->module_alloc()) by using
+>>>> PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
+>>>> "call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
+>>>>
+>>>> This is a problem because call_rcu_sched() queues work, which can be run
+>>>> after debug_checkwx() is run, resulting in a race condition.  If hit, the
+>>>> race results in a nasty splat about insecure W+X mappings, which results
+>>>> in a poor user experience as these are not the mappings that
+>>>> debug_checkwx() is intended to catch.
+>>>>
+>>>> Address the race by flushing the queued work before running
+>>>> debug_checkwx().
+>>>>
+>>>> Reported-by: Timur Tabi <timur@codeaurora.org>
+>>>> Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
+>>>> Fixes: 1404d6f13e47 ("arm64: dump: Add checking for writable and
+>>>> exectuable pages")
+>>>> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
+>>>> ---
+>>>>    arch/arm64/mm/mmu.c | 6 ++++++
+>>>>    1 file changed, 6 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>>>> index 2dbb2c9..40d45fd 100644
+>>>> --- a/arch/arm64/mm/mmu.c
+>>>> +++ b/arch/arm64/mm/mmu.c
+>>>> @@ -503,6 +503,12 @@ void mark_rodata_ro(void)
+>>>>          update_mapping_prot(__pa_symbol(__start_rodata), (unsigned
+>>>> long)__start_rodata,
+>>>>                              section_size, PAGE_KERNEL_RO);
+>>>>    +     /*
+>>>> +        * load_module() results in W+X mappings, which are cleaned up
+>>>> with
+>>>> +        * call_rcu_sched().  Let's make sure that queued work is flushed
+>>>> so
+>>>> +        * that we don't hit false positives.
+>>>> +        */
+>>>> +       rcu_barrier_sched();
+>>>>          debug_checkwx();
+>>>>    }
+>>>
+>>>
+>>> Whilst this looks correct to me, it looks to me like other architectures
+>>> (e.g. x86) would be affected by this problem as well. Perhaps it would be
+>>> better to solve it in the core code before invoking mark_rodata_ro, or is
+>>> there some reason that we only run into this on arm64?
+>>>
+>>
+>> Thanks for the review.
+>>
+>> I was actually pondering pushing this into ptdump_check_wx() so that the
+>> "barrier" hit is only observed with CONFIG_DEBUG_WX.
+>>
+>> I agree, in principal this is not an arm64 specific issue.  I do not have
+>> sufficient equipment to validate other architectures.  On QDF2400, the
+>> reproduction rate is very low, roughly 1-3 instances in 2000-3000 reboots.
+>> I do have a system simulator which happens to repro the issue 100% of the
+>> time, which is what I used to debug and test this fix, before applying it to
+>> QDF2400.
+>>
+>> I'm waffling.  I see the benefit of fixing this in common code, but the
+>> "core" functionality of mark_rodata_ro doesn't need this barrier...
+>>
+>> I suppose I can push it up to core code, and see what the rest of the
+>> community says.  Is that what you recommend?
 > 
-> Support for the IPA size configuration needs other changes in the way
-> we configure the EL2 registers (VTTBR and VTCR). So, the IPA is still
-> fixed to 40bits. The patch also moves the kvm_page_empty() in asm/kvm_mmu.h
-> to the top, before including the asm/stage2_pgtable.h to avoid a forward
-> declaration.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->   arch/arm64/include/asm/kvm_mmu.h              |  16 +-
->   arch/arm64/include/asm/stage2_pgtable-nopmd.h |  42 ------
->   arch/arm64/include/asm/stage2_pgtable-nopud.h |  39 -----
->   arch/arm64/include/asm/stage2_pgtable.h       | 203 +++++++++++++++++---------
->   4 files changed, 145 insertions(+), 155 deletions(-)
->   delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopmd.h
->   delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopud.h
-> 
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 594c4e6..bc133ce 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -18,9 +18,10 @@
->   #ifndef __ARM64_KVM_MMU_H__
->   #define __ARM64_KVM_MMU_H__
->   
-> +#include <asm/cpufeature.h>
->   #include <asm/page.h>
->   #include <asm/memory.h>
-> -#include <asm/cpufeature.h>
+> I think fixing this in the general case makes sense.
 
-OOI, why was the include of cpufeature.h moved earlier?
-
-Cheers,
+Ok.  I'll give it until Monday to see if Laura has any insights into 
+x86, and then spin a v2.
 
 -- 
-Julien Grall
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
