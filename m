@@ -1,94 +1,89 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 25 Apr 2018 09:23:53 -0700
-Subject: [PATCH] arm64: mm: Fix false positives in W+X checking
-In-Reply-To: <381aee7b-9caa-b16b-3f5e-a47737405c03@codeaurora.org>
-References: <1524665611-14040-1-git-send-email-jhugo@codeaurora.org>
- <20180425150353.GG8383@arm.com>
- <381aee7b-9caa-b16b-3f5e-a47737405c03@codeaurora.org>
-Message-ID: <CAGXu5j+WhNdY09s_tPQ-BKqEqi_bbbp8XnRSnoGTN-HOPSJFPQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 25 Apr 2018 17:27:45 +0100
+Subject: [PATCH 1/6] PCI: Make pci_get_new_domain_nr static
+In-Reply-To: <a21882288c4664cc983a5741e8cbf6d59abacd46.1524582822.git.jan.kiszka@siemens.com>
+References: <cover.1524582822.git.jan.kiszka@siemens.com>
+ <a21882288c4664cc983a5741e8cbf6d59abacd46.1524582822.git.jan.kiszka@siemens.com>
+Message-ID: <20180425162745.GB21628@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 8:12 AM, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
-> On 4/25/2018 9:03 AM, Will Deacon wrote:
->>
->> Hi Jeffrey,
->>
->> Thanks for the patch. Comment below.
->>
->> On Wed, Apr 25, 2018 at 08:13:31AM -0600, Jeffrey Hugo wrote:
->>>
->>> load_module() creates W+X mappings via __vmalloc_node_range() (from
->>> layout_and_allocate()->move_module()->module_alloc()) by using
->>> PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
->>> "call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
->>>
->>> This is a problem because call_rcu_sched() queues work, which can be run
->>> after debug_checkwx() is run, resulting in a race condition.  If hit, the
->>> race results in a nasty splat about insecure W+X mappings, which results
->>> in a poor user experience as these are not the mappings that
->>> debug_checkwx() is intended to catch.
->>>
->>> Address the race by flushing the queued work before running
->>> debug_checkwx().
->>>
->>> Reported-by: Timur Tabi <timur@codeaurora.org>
->>> Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
->>> Fixes: 1404d6f13e47 ("arm64: dump: Add checking for writable and
->>> exectuable pages")
->>> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
->>> ---
->>>   arch/arm64/mm/mmu.c | 6 ++++++
->>>   1 file changed, 6 insertions(+)
->>>
->>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->>> index 2dbb2c9..40d45fd 100644
->>> --- a/arch/arm64/mm/mmu.c
->>> +++ b/arch/arm64/mm/mmu.c
->>> @@ -503,6 +503,12 @@ void mark_rodata_ro(void)
->>>         update_mapping_prot(__pa_symbol(__start_rodata), (unsigned
->>> long)__start_rodata,
->>>                             section_size, PAGE_KERNEL_RO);
->>>   +     /*
->>> +        * load_module() results in W+X mappings, which are cleaned up
->>> with
->>> +        * call_rcu_sched().  Let's make sure that queued work is flushed
->>> so
->>> +        * that we don't hit false positives.
->>> +        */
->>> +       rcu_barrier_sched();
->>>         debug_checkwx();
->>>   }
->>
->>
->> Whilst this looks correct to me, it looks to me like other architectures
->> (e.g. x86) would be affected by this problem as well. Perhaps it would be
->> better to solve it in the core code before invoking mark_rodata_ro, or is
->> there some reason that we only run into this on arm64?
->>
->
-> Thanks for the review.
->
-> I was actually pondering pushing this into ptdump_check_wx() so that the
-> "barrier" hit is only observed with CONFIG_DEBUG_WX.
->
-> I agree, in principal this is not an arm64 specific issue.  I do not have
-> sufficient equipment to validate other architectures.  On QDF2400, the
-> reproduction rate is very low, roughly 1-3 instances in 2000-3000 reboots.
-> I do have a system simulator which happens to repro the issue 100% of the
-> time, which is what I used to debug and test this fix, before applying it to
-> QDF2400.
->
-> I'm waffling.  I see the benefit of fixing this in common code, but the
-> "core" functionality of mark_rodata_ro doesn't need this barrier...
->
-> I suppose I can push it up to core code, and see what the rest of the
-> community says.  Is that what you recommend?
+On Tue, Apr 24, 2018 at 05:13:37PM +0200, Jan Kiszka wrote:
+> From: Jan Kiszka <jan.kiszka@siemens.com>
+> 
+> The only user of that function is of_pci_bus_find_domain_nr. Pure
+> cleanup.
 
-I think fixing this in the general case makes sense.
+"The only user of pci_get_new_domain_nr() is of_pci_bus_find_domain_nr().
+Since they are defined in the same compilation unit,
+pci_get_new_domain_nr() can be made static, which also simplifies
+preprocessor conditionals.
 
--Kees
+No functional change intended."
 
--- 
-Kees Cook
-Pixel Security
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> ---
+>  drivers/pci/pci.c   | 6 ++----
+>  include/linux/pci.h | 3 ---
+>  2 files changed, 2 insertions(+), 7 deletions(-)
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index e597655a5643..695c2bb4e853 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -5702,15 +5702,14 @@ static void pci_no_domains(void)
+>  #endif
+>  }
+>  
+> -#ifdef CONFIG_PCI_DOMAINS
+> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
+>  static atomic_t __domain_nr = ATOMIC_INIT(-1);
+>  
+> -int pci_get_new_domain_nr(void)
+> +static int pci_get_new_domain_nr(void)
+>  {
+>  	return atomic_inc_return(&__domain_nr);
+>  }
+>  
+> -#ifdef CONFIG_PCI_DOMAINS_GENERIC
+>  static int of_pci_bus_find_domain_nr(struct device *parent)
+>  {
+>  	static int use_dt_domains = -1;
+> @@ -5765,7 +5764,6 @@ int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
+>  			       acpi_pci_bus_find_domain_nr(bus);
+>  }
+>  #endif
+> -#endif
+>  
+>  /**
+>   * pci_ext_cfg_avail - can we access extended PCI config space?
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 73178a2fcee0..963232a6cd2e 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1510,12 +1510,10 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
+>   */
+>  #ifdef CONFIG_PCI_DOMAINS
+>  extern int pci_domains_supported;
+> -int pci_get_new_domain_nr(void);
+>  #else
+>  enum { pci_domains_supported = 0 };
+>  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+>  static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
+> -static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
+>  #endif /* CONFIG_PCI_DOMAINS */
+>  
+>  /*
+> @@ -1670,7 +1668,6 @@ static inline struct pci_dev *pci_get_domain_bus_and_slot(int domain,
+>  
+>  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+>  static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
+> -static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
+>  
+>  #define dev_is_pci(d) (false)
+>  #define dev_is_pf(d) (false)
+> -- 
+> 2.13.6
+> 
