@@ -1,65 +1,30 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 25 Apr 2018 09:22:02 +0200
-Subject: [PATCH 1/3] dt-bindings: iio: stm32-adc: add support for STM32MP1.
-In-Reply-To: <20180424162721.qbfsc7j3syzzykeh@rob-hp-laptop>
-References: <1524065874-434-1-git-send-email-fabrice.gasnier@st.com>
- <1524065874-434-2-git-send-email-fabrice.gasnier@st.com>
- <20180424162721.qbfsc7j3syzzykeh@rob-hp-laptop>
-Message-ID: <ee92eb8d-9675-3c94-1c0d-f6e8f091d878@st.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 25 Apr 2018 15:45:27 +0800
+Subject: Add MediaTek XS-PHY driver
+Message-ID: <1524642329-12255-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2018 06:27 PM, Rob Herring wrote:
-> On Wed, Apr 18, 2018 at 05:37:52PM +0200, Fabrice Gasnier wrote:
->> Document support for STM32MP1 ADC. It's quite similar to STM32H7 ADC.
->> Introduce "st,stm32mp1-adc" compatible to handle variants of this
->> hardware such as vregready flag, interrupts, clock rate.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 +++++-
->>  1 file changed, 5 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->> index e8bb824..9994384 100644
->> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->> @@ -24,8 +24,11 @@ Required properties:
->>  - compatible: Should be one of:
->>    "st,stm32f4-adc-core"
->>    "st,stm32h7-adc-core"
->> +  "st,stm32mp1-adc-core"
->>  - reg: Offset and length of the ADC block register set.
->> -- interrupts: Must contain the interrupt for ADC block.
->> +- interrupts: One or more interrupts for ADC block. Some parts like stm32f4
->> +  and stm32h7 share a common ADC interrupt line. stm32mp1 has separate
->> +  lines for each ADC within ADC block.
-> 
-> How many interrupt lines is that?
+>From dfce031e29c5fddbd1ea46bb2db0cde0ba62bcb0 Mon Sep 17 00:00:00 2001
+From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Date: Wed, 25 Apr 2018 15:24:40 +0800
+Subject: [PATCH 0/2] Add MediaTek XS-PHY driver
 
-Hi Rob, Jonathan,
+This patch series support the SuperSpeedPlus XS-PHY transceiver for
+USB3.1 GEN2 controller on MediaTek chips. The driver supports multiple
+USB2.0, USB3.1 GEN2 ports.
 
-I should have mentioned this: stm32mp1 has two separate interrupt lines
-for each ADC within ADC block.
+Chunfeng Yun (2):
+  dt-bindings: add MediaTek XS-PHY binding
+  phy: mediatek: add XS-PHY driver
 
-Do you wish I send a V2 for this ? Or a patch to fix this ?
+ .../devicetree/bindings/phy/phy-mtk-xsphy.txt      | 127 +++++
+ drivers/phy/mediatek/Kconfig                       |   9 +
+ drivers/phy/mediatek/Makefile                      |   1 +
+ drivers/phy/mediatek/phy-mtk-xsphy.c               | 600 +++++++++++++++++++++
+ 4 files changed, 737 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
+ create mode 100644 drivers/phy/mediatek/phy-mtk-xsphy.c
 
-Please let me know,
-BR,
-Fabrice
-
-> 
->>  - clocks: Core can use up to two clocks, depending on part used:
->>    - "adc" clock: for the analog circuitry, common to all ADCs.
->>      It's required on stm32f4.
->> @@ -53,6 +56,7 @@ Required properties:
->>  - compatible: Should be one of:
->>    "st,stm32f4-adc"
->>    "st,stm32h7-adc"
->> +  "st,stm32mp1-adc"
->>  - reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
->>  - clocks: Input clock private to this ADC instance. It's required only on
->>    stm32f4, that has per instance clock input for registers access.
->> -- 
->> 1.9.1
->>
+-- 
+1.9.1
