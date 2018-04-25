@@ -1,61 +1,39 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 25 Apr 2018 18:55:10 +0800
-Subject: [PATCH v3 2/3] regulator: add support for SY8106A regulator
-In-Reply-To: <20180425105309.GC24769@sirena.org.uk>
-References: <20180423144657.63264-1-icenowy@aosc.io>
- <20180423144657.63264-3-icenowy@aosc.io>
- <20180424170733.GD22073@sirena.org.uk>
- <C0C1F042-221A-420F-A8C1-5FADCFC687F1@aosc.io>
- <20180425105309.GC24769@sirena.org.uk>
-Message-ID: <15C93A9B-6EEB-49EB-A942-35F761E86569@aosc.io>
+From: maxime.chevallier@bootlin.com (Maxime Chevallier)
+Date: Wed, 25 Apr 2018 13:07:31 +0200
+Subject: [PATCH net 3/3] ARM64: dts: marvell: armada-cp110: Add clocks for the
+ xmdio node
+In-Reply-To: <20180425110731.20153-1-maxime.chevallier@bootlin.com>
+References: <20180425110731.20153-1-maxime.chevallier@bootlin.com>
+Message-ID: <20180425110731.20153-4-maxime.chevallier@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Marvell XSMI controller needs 3 clocks to operate correctly :
+ - The MG clock (clk 5)
+ - The MG Core clock (clk 6)
+ - The GOP clock (clk 18)
 
+ This commit adds them, to avoid system hangs when using these
+ interfaces.
 
-? 2018?4?25? GMT+08:00 ??6:53:09, Mark Brown <broonie@kernel.org> ??:
->On Wed, Apr 25, 2018 at 07:41:35AM +0800, Icenowy Zheng wrote:
->> ? 2018?4?25? GMT+08:00 ??1:07:33, Mark Brown <broonie@kernel.org> ??:
->> >On Mon, Apr 23, 2018 at 10:46:56PM +0800, Icenowy Zheng wrote:
->
->> >> --- /dev/null
->> >> +++ b/drivers/regulator/sy8106a-regulator.c
->> >> @@ -0,0 +1,176 @@
->> >> +// SPDX-License-Identifier: GPL-2.0+
->> >> +/*
->> >> + * sy8106a-regulator.c - Regulator device driver for SY8106A
->
->> >Just make the entire thing a C++ comment so it looks consistent and
->> >joined up.
->
->> SPDX identifier is special -- it should be in a seperated
->> comment block.
->
->No, it just needs to be a C++ comment on the first line to ease machine
->parsing.  The rest of the file doesn't matter for that.
+Fixes: c7e92def1ef4 ("clk: mvebu: cp110: Fix clock tree representation")
+Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Okay. Thus I will use a seperate /* */ block for it in the
-next revision, to follow the rule.
-
->
->> >> +	if (reg & SY8106A_GO_BIT)
->> >> +		return reg & rdev->desc->vsel_mask;
->> >> +	else
->> >> +		return (chip->fixed_voltage - rdev->desc->min_uV) /
->> >> +		       rdev->desc->uV_step;
->
->> >You could use the standard get_voltage_sel() if you provide a
->mapping
->> >operation that set everything with _GO_BIT set to return the fixed
->> >voltage.  Though looking at this it seems that the fixed voltage
->will
->> >always be one that could be set via the register anyway so I'm
->> >wondering
->> >if the easiest thing here isn't to just have the driver turn off
->> >_GO_BIT
->
->> Do you mean "turn on" here?
->
->Yes.
-
-Okay. I will do it in this way and drop custom get/set_voltage_sel.
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+index 6c137ac656e9..ed2f1237ea1e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+@@ -142,6 +142,8 @@
+ 			#size-cells = <0>;
+ 			compatible = "marvell,xmdio";
+ 			reg = <0x12a600 0x10>;
++			clocks = <&CP110_LABEL(clk) 1 5>,
++				 <&CP110_LABEL(clk) 1 6>, <&CP110_LABEL(clk) 1 18>;
+ 			status = "disabled";
+ 		};
+ 
+-- 
+2.11.0
