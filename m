@@ -1,68 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Apr 2018 13:27:50 +0100
-Subject: [PATCHv3 11/11] arm64: docs: document pointer authentication
-In-Reply-To: <20180417183735.56985-12-mark.rutland@arm.com>
-References: <20180417183735.56985-1-mark.rutland@arm.com>
- <20180417183735.56985-12-mark.rutland@arm.com>
-Message-ID: <20180425122749.4eqhd2uiofoc7jyv@armageddon.cambridge.arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 25 Apr 2018 14:30:26 +0200
+Subject: [PATCH net 3/3] ARM64: dts: marvell: armada-cp110: Add clocks for
+ the xmdio node
+In-Reply-To: <87muxrecnf.fsf@bootlin.com> (Gregory CLEMENT's message of "Wed,
+ 25 Apr 2018 13:41:40 +0200")
+References: <20180425110731.20153-1-maxime.chevallier@bootlin.com>
+ <20180425110731.20153-4-maxime.chevallier@bootlin.com>
+ <87muxrecnf.fsf@bootlin.com>
+Message-ID: <87a7treae5.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 07:37:35PM +0100, Mark Rutland wrote:
-> +Basic support
-> +-------------
-> +
-> +When CONFIG_ARM64_PTR_AUTH is selected, and relevant HW support is
-> +present, the kernel will assign a random APIAKey value to each process
-> +at exec*() time. This key is shared by all threads within the process,
-> +and the key is preserved across fork(). Presence of functionality using
-> +APIAKey is advertised via HWCAP_APIA.
-> +
-> +Recent versions of GCC can compile code with APIAKey-based return
-> +address protection when passed the -msign-return-address option. This
-> +uses instructions in the HINT space, and such code can run on systems
-> +without the pointer authentication extension.
-> +
-> +The remaining instruction and data keys (APIBKey, APDAKey, APDBKey) are
-> +reserved for future use, and instructions using these keys must not be
-> +used by software until a purpose and scope for their use has been
-> +decided. To enable future software using these keys to function on
-> +contemporary kernels, where possible, instructions using these keys are
-> +made to behave as NOPs.
-> +
-> +The generic key (APGAKey) is currently unsupported. Instructions using
-> +the generic key must not be used by software.
-> +
-> +
-> +Debugging
-> +---------
-> +
-> +When CONFIG_ARM64_PTR_AUTH is selected, and relevant HW support is
-> +present, the kernel will expose the position of TTBR0 PAC bits in the
-> +NT_ARM_PAC_MASK regset (struct user_pac_mask), which userspace can
-> +acqure via PTRACE_GETREGSET.
-> +
-> +Separate masks are exposed for data pointers and instruction pointers,
-> +as the set of PAC bits can vary between the two. Debuggers should not
-> +expect that HWCAP_APIA implies the presence (or non-presence) of this
-> +regset -- in future the kernel may support the use of APIBKey, APDAKey,
-> +and/or APBAKey, even in the absence of APIAKey.
-> +
-> +Note that the masks apply to TTBR0 addresses, and are not valid to apply
-> +to TTBR1 addresses (e.g. kernel pointers).
+Hi agin,
+ 
+ On mer., avril 25 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
-I'm fine with the rest of the series but I'd like the toolchain guys to
-ack the ABI we are exposing (just this document is fine).
+> Hi Maxime,
+>  
+>  On mer., avril 25 2018, Maxime Chevallier <maxime.chevallier@bootlin.com> wrote:
+>
+>> The Marvell XSMI controller needs 3 clocks to operate correctly :
+>>  - The MG clock (clk 5)
+>>  - The MG Core clock (clk 6)
+>>  - The GOP clock (clk 18)
+>>
+>>  This commit adds them, to avoid system hangs when using these
+>>  interfaces.
+>>
+>> Fixes: c7e92def1ef4 ("clk: mvebu: cp110: Fix clock tree representation")
+>> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+>
+> This patch should not have been sent with the net prefix and should not
+> be merge through the net subsystem.
+>
+> I will take care of it to avoid conflict in the devei tree file during
+> the merge windows.
 
-> +Virtualization
-> +--------------
-> +
-> +Pointer authentication is not currently supported in KVM guests. KVM
-> +will mask the feature bits from ID_AA64ISAR1_EL1, and attempted use of
-> +the feature will result in an UNDEFINED exception being injected into
-> +the guest.
 
-I suspect at some point we'll see patches for KVM?
+So, applied on mvebu/fixes
+
+Thanks,
+
+Gregory
+
+
+>
+> Thanks,
+>
+> Gregory
+>
+>> ---
+>>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+>> index 6c137ac656e9..ed2f1237ea1e 100644
+>> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+>> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+>> @@ -142,6 +142,8 @@
+>>  			#size-cells = <0>;
+>>  			compatible = "marvell,xmdio";
+>>  			reg = <0x12a600 0x10>;
+>> +			clocks = <&CP110_LABEL(clk) 1 5>,
+>> +				 <&CP110_LABEL(clk) 1 6>, <&CP110_LABEL(clk) 1 18>;
+>>  			status = "disabled";
+>>  		};
+>>  
+>> -- 
+>> 2.11.0
+>>
+>
+> -- 
+> Gregory Clement, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> http://bootlin.com
 
 -- 
-Catalin
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
