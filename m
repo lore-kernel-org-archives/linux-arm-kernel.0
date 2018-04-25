@@ -1,89 +1,91 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Wed, 25 Apr 2018 16:50:50 +0200
-Subject: arm64: W+X mapping check failures
-In-Reply-To: <f3945f76-04ae-1823-a4bd-85af883f152f@codeaurora.org>
-References: <20180425133704.GA6474@hc>
- <f3945f76-04ae-1823-a4bd-85af883f152f@codeaurora.org>
-Message-ID: <20180425145050.GB18651@hc>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 Apr 2018 10:04:54 -0500
+Subject: [PATCH v5 21/23] ASoC: qdsp6: dt-bindings: Add apq8096 machine
+ bindings
+In-Reply-To: <655a593b-021c-3bf2-35c2-eb77cb0a4b95@linaro.org>
+References: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
+ <20180418153157.1960-22-srinivas.kandagatla@linaro.org>
+ <20180424162517.msxscjfg36xc22mo@rob-hp-laptop>
+ <655a593b-021c-3bf2-35c2-eb77cb0a4b95@linaro.org>
+Message-ID: <CAL_JsqJXpei5vFUKwrQGaV4q3Twkg=SKF=Cx_my7KaLmOc42NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 07:55:20AM -0600, Jeffrey Hugo wrote:
-> Hi Jan,
-> 
-> On 4/25/2018 7:37 AM, Jan Glauber wrote:
-> >Hi all,
-> >
-> >enabling CONFIG_DEBUG_WX we see insecure mappings reported across various kernel
-> >versions and machines. I've not yet seen this with upstream but that doesn't
-> >mean much as the issue is a race and I cannot trigger it reliably.
-> >
-> >The reported W+X mappings are gone after the boot is finished. The addresses
-> >all belong to .init.* sections of the first loaded kernel modules.
-> >
-> >Example log (I changed the warnings as I found the backtrace quite useless):
-> >
-> >[   39.157884] Freeing unused kernel memory: 5248K
-> >[   39.167997] note_prot_wx: Found insecure W+X mapping at start: ffff000000ab9000  addr: ffff000000abd000  pages: 4
-> >[   39.178246] note_prot_wx: Found insecure W+X mapping at start: ffff000000ac3000  addr: ffff000000ac5000  pages: 2
-> >[   39.188495] note_prot_wx: Found insecure W+X mapping at start: ffff000000acd000  addr: ffff000000ad0000  pages: 3
-> >[   39.198745] note_prot_wx: Found insecure W+X mapping at start: ffff000000af9000  addr: ffff000000afc000  pages: 3
-> >[   39.212981] Checked W+X mappings: FAILED, 12 W+X pages found, 0 non-UXN pages found
-> >
-> >I think this is a race between module loading and the ptdump_check_wx().
-> >The RCU'd do_free_init() can be delayed _after_ ptdump_check_wx() for a coming module.
-> >
-> >I tried using stop_machine() around the memory check similar to arm but that does not
-> >solve the race. It is not a critical issue as the .init sections are freed afterwards
-> >anyway but still the warning is a bit misleading.
-> >
-> >Any thoughts?
-> >
-> >--Jan
-> 
-> You are correct.  It appears you have independently found the issue
-> I was about to send a fix for.
-> 
-> I have a setup that can repro this 100% of the time, and have
-> confirmed there is a race between ptdump_check_wx() and
-> do_free_init().
+On Tue, Apr 24, 2018 at 11:49 AM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+> Thanks for the review.
+>
+>
+> On 24/04/18 17:25, Rob Herring wrote:
+>>
+>> On Wed, Apr 18, 2018 at 04:31:55PM +0100, srinivas.kandagatla at linaro.org
+>> wrote:
+>>>
+>>> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>>>
+>>> Add devicetree bindings documentation file for Qualcomm apq8096 sound
+>>> card.
+>>>
+>>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>>> ---
+>>>   .../devicetree/bindings/sound/qcom,apq8096.txt     | 76
+>>> ++++++++++++++++++++++
+>>>   1 file changed, 76 insertions(+)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/sound/qcom,apq8096.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
+>>> b/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
+>>> new file mode 100644
+>>> index 000000000000..37e23d926b95
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/sound/qcom,apq8096.txt
+>>> @@ -0,0 +1,76 @@
+>>> +* Qualcomm Technologies APQ8096 ASoC sound card driver
+>>> +
+>>> +This binding describes the APQ8096 sound card, which uses qdsp for
+>>> audio.
+>>> +
+>>> +- compatible:
+>>> +       Usage: required
+>>> +       Value type: <stringlist>
+>>> +       Definition: must be "qcom,apq8096-sndcard"
+>>> +
+>>> +- qcom,audio-routing:
+>>> +       Usage: Optional
+>>> +       Value type: <stringlist>
+>>> +       Definition:  A list of the connections between audio components.
+>>> +                 Each entry is a pair of strings, the first being the
+>>> +                 connection's sink, the second being the connection's
+>>> +                 source. Valid names could be power supplies, MicBias
+>>> +                 of codec and the jacks on the board:
+>>
+>>
+>> Please list out valid values here.
+>
+>
+> I can list the values for the HDMI playback use-case, but the list would
+> grow as we start adding wcd9335 codec support.
 
-How did you manage to hit this every time? Just wondering...
+If you don't have the values, then how does one validate a DT is correct?
 
-> My fix is to put rcu_barrier_sched() just before the call to
-> ptdump_check_wx().  This "flushes" the queued work, ensuring it runs
-> to completion before ptdump_check_wx().
+Honestly, a single property like this seems insufficient to describe
+audio routing.
 
-Looks good to me, I tried synchronize_sched() which did not help but
-I should have read the documentation first.
+>>> +
+>>> += dailinks
+>>> +Each subnode of sndcard represents either a dailink, and subnodes of
+>>> each
+>>> +dailinks would be cpu/codec/platform dais.
+>>> +
+>>> +- link-name:
+>>
+>>
+>> Not a standard property, but I guess that sneaked in with the 8016
+>> binding...
+>
+> Yes, I followed 8016 bindings.
+>
+> Am happy to prefix this with qcom if that makes more sense.
 
-> In my testing, it works, however this fix does not prevent
-> additional load_module() invocations from being triggered, and
-> recreating the race condition.  From my debugging, it appears this
-> might not be an issue in practice, as it looks like all modules that
-> are expected to be loaded in that phase of boot are loaded before
-> ptdump_check_wx() is called.
-
-Yes, the race would still be there. We would need some combination of
-stop_machine and the rcu barrier but I guess calling rcu_barrier_sched()
-inside stop_machine would be a very very bad idea.
-
-> The other alternative would be to remove the use of PAGE_KERNEL_EXEC
-> from module_alloc(), but based on the effort to clean that up
-> afterward in the module loading process, I suspect that is not
-> viable.
-> 
-> >
-> >_______________________________________________
-> >linux-arm-kernel mailing list
-> >linux-arm-kernel at lists.infradead.org
-> >http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> 
-> 
-> -- 
-> Jeffrey Hugo
-> Qualcomm Datacenter Technologies as an affiliate of Qualcomm
-> Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the
-> Code Aurora Forum, a Linux Foundation Collaborative Project.
+I'd just leave it to be consistent.
