@@ -1,89 +1,137 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 25 Apr 2018 18:31:15 -0500
-Subject: [PATCH v8 07/13] drivers: base cacheinfo: Add support for ACPI based
- firmware tables
+Date: Wed, 25 Apr 2018 18:31:21 -0500
+Subject: [PATCH v8 13/13] arm64: topology: divorce MC scheduling domain from
+ core_siblings
 In-Reply-To: <20180425233121.13270-1-jeremy.linton@arm.com>
 References: <20180425233121.13270-1-jeremy.linton@arm.com>
-Message-ID: <20180425233121.13270-8-jeremy.linton@arm.com>
+Message-ID: <20180425233121.13270-14-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call ACPI cache parsing routines from base cacheinfo code if ACPI
-is enable. Also stub out cache_setup_acpi() so that individual
-architectures can enable ACPI topology parsing.
+Now that we have an accurate view of the physical topology
+we need to represent it correctly to the scheduler. Generally MC
+should equal the LLC in the system, but there are a number of
+special cases that need to be dealt with.
+
+In the case of NUMA in socket, we need to assure that the sched
+domain we build for the MC layer isn't larger than the DIE above it.
+Similarly for LLC's that might exist in cross socket interconnect or
+directory hardware we need to assure that MC is shrunk to the socket
+or NUMA node.
+
+This patch builds a sibling mask for the LLC, and then picks the
+smallest of LLC, socket siblings, or NUMA node siblings, which
+gives us the behavior described above. This is ever so slightly
+different than the similar alternative where we look for a cache
+layer less than or equal to the socket/NUMA siblings.
+
+The logic to pick the MC layer affects all arm64 machines, but
+only changes the behavior for DT/MPIDR systems if the NUMA domain
+is smaller than the core siblings (generally set to the cluster).
+Potentially this fixes a possible bug in DT systems, but really
+it only affects ACPI systems where the core siblings is correctly
+set to the socket siblings. Thus all currently available ACPI
+systems should have MC equal to LLC, including the NUMA in socket
+machines where the LLC is partitioned between the NUMA nodes.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- drivers/base/cacheinfo.c  | 14 ++++++++++----
- include/linux/cacheinfo.h | 10 ++++++++++
- 2 files changed, 20 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/topology.h |  2 ++
+ arch/arm64/kernel/topology.c      | 32 +++++++++++++++++++++++++++++++-
+ 2 files changed, 33 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
-index 597aacb233fc..2880e2ab01f5 100644
---- a/drivers/base/cacheinfo.c
-+++ b/drivers/base/cacheinfo.c
-@@ -206,7 +206,7 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
- 					   struct cacheinfo *sib_leaf)
+diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+index 6b10459e6905..df48212f767b 100644
+--- a/arch/arm64/include/asm/topology.h
++++ b/arch/arm64/include/asm/topology.h
+@@ -8,8 +8,10 @@ struct cpu_topology {
+ 	int thread_id;
+ 	int core_id;
+ 	int package_id;
++	int llc_id;
+ 	cpumask_t thread_sibling;
+ 	cpumask_t core_sibling;
++	cpumask_t llc_siblings;
+ };
+ 
+ extern struct cpu_topology cpu_topology[NR_CPUS];
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index bd1aae438a31..20b4341dc527 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/acpi.h>
+ #include <linux/arch_topology.h>
++#include <linux/cacheinfo.h>
+ #include <linux/cpu.h>
+ #include <linux/cpumask.h>
+ #include <linux/init.h>
+@@ -214,7 +215,19 @@ EXPORT_SYMBOL_GPL(cpu_topology);
+ 
+ const struct cpumask *cpu_coregroup_mask(int cpu)
  {
- 	/*
--	 * For non-DT systems, assume unique level 1 cache, system-wide
-+	 * For non-DT/ACPI systems, assume unique level 1 caches, system-wide
- 	 * shared caches for all other levels. This will be used only if
- 	 * arch specific code has not populated shared_cpu_map
- 	 */
-@@ -214,6 +214,11 @@ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+-	return &cpu_topology[cpu].core_sibling;
++	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
++
++	/* Find the smaller of NUMA, core or LLC siblings */
++	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
++		/* not numa in package, lets use the package siblings */
++		core_mask = &cpu_topology[cpu].core_sibling;
++	}
++	if (cpu_topology[cpu].llc_id != -1) {
++		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
++			core_mask = &cpu_topology[cpu].llc_siblings;
++	}
++
++	return core_mask;
  }
- #endif
  
-+int __weak cache_setup_acpi(unsigned int cpu)
-+{
-+	return -ENOTSUPP;
-+}
-+
- static int cache_shared_cpu_map_setup(unsigned int cpu)
- {
- 	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
-@@ -227,8 +232,8 @@ static int cache_shared_cpu_map_setup(unsigned int cpu)
- 	if (of_have_populated_dt())
- 		ret = cache_setup_of_node(cpu);
- 	else if (!acpi_disabled)
--		/* No cache property/hierarchy support yet in ACPI */
--		ret = -ENOTSUPP;
-+		ret = cache_setup_acpi(cpu);
-+
- 	if (ret)
- 		return ret;
+ static void update_siblings_masks(unsigned int cpuid)
+@@ -226,6 +239,9 @@ static void update_siblings_masks(unsigned int cpuid)
+ 	for_each_possible_cpu(cpu) {
+ 		cpu_topo = &cpu_topology[cpu];
  
-@@ -279,7 +284,8 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
- 			cpumask_clear_cpu(cpu, &sib_leaf->shared_cpu_map);
- 			cpumask_clear_cpu(sibling, &this_leaf->shared_cpu_map);
++		if (cpuid_topo->llc_id == cpu_topo->llc_id)
++			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
++
+ 		if (cpuid_topo->package_id != cpu_topo->package_id)
+ 			continue;
+ 
+@@ -291,6 +307,10 @@ static void __init reset_cpu_topology(void)
+ 		cpu_topo->core_id = 0;
+ 		cpu_topo->package_id = -1;
+ 
++		cpu_topo->llc_id = -1;
++		cpumask_clear(&cpu_topo->llc_siblings);
++		cpumask_set_cpu(cpu, &cpu_topo->llc_siblings);
++
+ 		cpumask_clear(&cpu_topo->core_sibling);
+ 		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+ 		cpumask_clear(&cpu_topo->thread_sibling);
+@@ -311,6 +331,8 @@ static int __init parse_acpi_topology(void)
+ 	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+ 
+ 	for_each_possible_cpu(cpu) {
++		int i;
++
+ 		topology_id = find_acpi_cpu_topology(cpu, 0);
+ 		if (topology_id < 0)
+ 			return topology_id;
+@@ -325,6 +347,14 @@ static int __init parse_acpi_topology(void)
  		}
--		of_node_put(this_leaf->fw_token);
-+		if (of_have_populated_dt())
-+			of_node_put(this_leaf->fw_token);
+ 		topology_id = find_acpi_cpu_topology_package(cpu);
+ 		cpu_topology[cpu].package_id = topology_id;
++
++		i = acpi_find_last_cache_level(cpu);
++
++		if (i > 0) {
++			topology_id = find_acpi_cpu_cache_topology(cpu, i);
++			if (topology_id > 0)
++				cpu_topology[cpu].llc_id = topology_id;
++		}
  	}
- }
  
-diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
-index 0c6f658054d2..70ef44669fa3 100644
---- a/include/linux/cacheinfo.h
-+++ b/include/linux/cacheinfo.h
-@@ -97,6 +97,16 @@ int func(unsigned int cpu)					\
- struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu);
- int init_cache_level(unsigned int cpu);
- int populate_cache_leaves(unsigned int cpu);
-+int cache_setup_acpi(unsigned int cpu);
-+#ifndef CONFIG_ACPI
-+static inline int acpi_find_last_cache_level(unsigned int cpu)
-+{
-+	/* ACPI kernels should be built with PPTT support */
-+	return 0;
-+}
-+#else
-+int acpi_find_last_cache_level(unsigned int cpu);
-+#endif
- 
- const struct attribute_group *cache_get_priv_group(struct cacheinfo *this_leaf);
- 
+ 	return 0;
 -- 
 2.13.6
