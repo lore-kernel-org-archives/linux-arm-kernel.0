@@ -1,232 +1,214 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 25 Apr 2018 15:26:23 +0900
-Subject: [PATCH v9 05/11] arm64: kexec_file: load initrd and device-tree
+Date: Wed, 25 Apr 2018 15:26:24 +0900
+Subject: [PATCH v9 06/11] arm64: kexec_file: allow for loading Image-format
+ kernel
 In-Reply-To: <20180425062629.29404-1-takahiro.akashi@linaro.org>
 References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
-Message-ID: <20180425062629.29404-6-takahiro.akashi@linaro.org>
+Message-ID: <20180425062629.29404-7-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-load_other_segments() is expected to allocate and place all the necessary
-memory segments other than kernel, including initrd and device-tree
-blob (and elf core header for crash).
-While most of the code was borrowed from kexec-tools' counterpart,
-users may not be allowed to specify dtb explicitly, instead, the dtb
-presented by a boot loader is reused.
+This patch provides kexec_file_ops for "Image"-format kernel. In this
+implementation, a binary is always loaded with a fixed offset identified
+in text_offset field of its header.
 
-arch_kimage_kernel_post_load_cleanup() is responsible for freeing arm64-
-specific data allocated in load_other_segments().
+Regarding signature verification for trusted boot, this patch doesn't
+contains CONFIG_KEXEC_VERIFY_SIG support, which is to be added later
+in this series, but file-attribute-based verification is still a viable
+option by enabling IMA security subsystem.
+
+You can sign(label) a to-be-kexec'ed kernel image on target file system
+with:
+    $ evmctl ima_sign --key /path/to/private_key.pem Image
+
+On live system, you must have IMA enforced with, at least, the following
+security policy:
+    "appraise func=KEXEC_KERNEL_CHECK appraise_type=imasig"
+
+See more details about IMA here:
+    https://sourceforge.net/p/linux-ima/wiki/Home/
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/kexec.h         |  16 +++
- arch/arm64/kernel/machine_kexec_file.c | 160 +++++++++++++++++++++++++
- 2 files changed, 176 insertions(+)
+ arch/arm64/include/asm/kexec.h         | 50 ++++++++++++++++
+ arch/arm64/kernel/Makefile             |  2 +-
+ arch/arm64/kernel/kexec_image.c        | 79 ++++++++++++++++++++++++++
+ arch/arm64/kernel/machine_kexec_file.c |  1 +
+ 4 files changed, 131 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/kexec_image.c
 
 diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-index e17f0529a882..e4de1223715f 100644
+index e4de1223715f..3cba4161818a 100644
 --- a/arch/arm64/include/asm/kexec.h
 +++ b/arch/arm64/include/asm/kexec.h
-@@ -93,6 +93,22 @@ static inline void crash_prepare_suspend(void) {}
- static inline void crash_post_resume(void) {}
- #endif
+@@ -102,6 +102,56 @@ struct kimage_arch {
+ 	void *dtb_buf;
+ };
  
-+#ifdef CONFIG_KEXEC_FILE
-+#define ARCH_HAS_KIMAGE_ARCH
++/**
++ * struct arm64_image_header - arm64 kernel image header
++ *
++ * @pe_sig: Optional PE format 'MZ' signature
++ * @branch_code: Instruction to branch to stext
++ * @text_offset: Image load offset, little endian
++ * @image_size: Effective image size, little endian
++ * @flags:
++ *	Bit 0: Kernel endianness. 0=little endian, 1=big endian
++ * @reserved: Reserved
++ * @magic: Magic number, "ARM\x64"
++ * @pe_header: Optional offset to a PE format header
++ **/
 +
-+struct kimage_arch {
-+	int kern_segment;
-+	phys_addr_t dtb_mem;
-+	void *dtb_buf;
++struct arm64_image_header {
++	u8 pe_sig[2];
++	u8 pad[2];
++	u32 branch_code;
++	u64 text_offset;
++	u64 image_size;
++	u64 flags;
++	u64 reserved[3];
++	u8 magic[4];
++	u32 pe_header;
 +};
 +
-+struct kimage;
++static const u8 arm64_image_magic[4] = {'A', 'R', 'M', 0x64U};
 +
-+extern int load_other_segments(struct kimage *image,
-+		char *initrd, unsigned long initrd_len,
-+		char *cmdline, unsigned long cmdline_len);
-+#endif
++/**
++ * arm64_header_check_magic - Helper to check the arm64 image header.
++ *
++ * Returns non-zero if header is OK.
++ */
 +
- #endif /* __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-index f9ebf54ca247..b3b9b1725d8a 100644
---- a/arch/arm64/kernel/machine_kexec_file.c
-+++ b/arch/arm64/kernel/machine_kexec_file.c
-@@ -13,7 +13,26 @@
- #include <linux/ioport.h>
- #include <linux/kernel.h>
- #include <linux/kexec.h>
-+#include <linux/libfdt.h>
- #include <linux/memblock.h>
-+#include <linux/of_fdt.h>
-+#include <linux/types.h>
-+#include <asm/byteorder.h>
-+
-+static int __dt_root_addr_cells;
-+static int __dt_root_size_cells;
-+
-+const struct kexec_file_ops * const kexec_file_loaders[] = {
-+	NULL
-+};
-+
-+int arch_kimage_file_post_load_cleanup(struct kimage *image)
++static inline int arm64_header_check_magic(const struct arm64_image_header *h)
 +{
-+	vfree(image->arch.dtb_buf);
-+	image->arch.dtb_buf = NULL;
++	if (!h)
++		return 0;
 +
-+	return kexec_image_post_load_cleanup_default(image);
++	if (!h->text_offset)
++		return 0;
++
++	return (h->magic[0] == arm64_image_magic[0]
++		&& h->magic[1] == arm64_image_magic[1]
++		&& h->magic[2] == arm64_image_magic[2]
++		&& h->magic[3] == arm64_image_magic[3]);
 +}
- 
- int arch_kexec_walk_mem(struct kexec_buf *kbuf,
- 				int (*func)(struct resource *, void *))
-@@ -55,3 +74,144 @@ int arch_kexec_walk_mem(struct kexec_buf *kbuf,
- 
- 	return ret;
- }
 +
-+static int setup_dtb(struct kimage *image,
-+		unsigned long initrd_load_addr, unsigned long initrd_len,
-+		char *cmdline, unsigned long cmdline_len,
-+		char **dtb_buf, size_t *dtb_buf_len)
++extern const struct kexec_file_ops kexec_image_ops;
++
+ struct kimage;
+ 
+ extern int load_other_segments(struct kimage *image,
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 2f2b2757ae7a..1e110aa571dd 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -50,7 +50,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+ arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+ arm64-obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
+-arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o
++arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o kexec_image.o
+ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
+new file mode 100644
+index 000000000000..4dd524ad6611
+--- /dev/null
++++ b/arch/arm64/kernel/kexec_image.c
+@@ -0,0 +1,79 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Kexec image loader
++
++ * Copyright (C) 2018 Linaro Limited
++ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
++ */
++
++#define pr_fmt(fmt)	"kexec_file(Image): " fmt
++
++#include <linux/err.h>
++#include <linux/errno.h>
++#include <linux/kernel.h>
++#include <linux/kexec.h>
++#include <asm/byteorder.h>
++#include <asm/memory.h>
++
++static int image_probe(const char *kernel_buf, unsigned long kernel_len)
 +{
-+	char *buf = NULL;
-+	size_t buf_size;
-+	int nodeoffset;
-+	u64 value;
-+	int range_len;
-+	int ret;
++	const struct arm64_image_header *h;
 +
-+	/* duplicate dt blob */
-+	buf_size = fdt_totalsize(initial_boot_params);
-+	range_len = (__dt_root_addr_cells + __dt_root_size_cells) * sizeof(u32);
++	h = (const struct arm64_image_header *)(kernel_buf);
 +
-+	if (initrd_load_addr)
-+		buf_size += fdt_prop_len("linux,initrd-start", sizeof(u64))
-+				+ fdt_prop_len("linux,initrd-end", sizeof(u64));
-+
-+	if (cmdline)
-+		buf_size += fdt_prop_len("bootargs", cmdline_len + 1);
-+
-+	buf = vmalloc(buf_size);
-+	if (!buf) {
-+		ret = -ENOMEM;
-+		goto out_err;
-+	}
-+
-+	ret = fdt_open_into(initial_boot_params, buf, buf_size);
-+	if (ret)
-+		goto out_err;
-+
-+	nodeoffset = fdt_path_offset(buf, "/chosen");
-+	if (nodeoffset < 0)
-+		goto out_err;
-+
-+	/* add bootargs */
-+	if (cmdline) {
-+		ret = fdt_setprop(buf, nodeoffset, "bootargs",
-+						cmdline, cmdline_len + 1);
-+		if (ret)
-+			goto out_err;
-+	}
-+
-+	/* add initrd-* */
-+	if (initrd_load_addr) {
-+		value = cpu_to_fdt64(initrd_load_addr);
-+		ret = fdt_setprop(buf, nodeoffset, "linux,initrd-start",
-+				&value, sizeof(value));
-+		if (ret)
-+			goto out_err;
-+
-+		value = cpu_to_fdt64(initrd_load_addr + initrd_len);
-+		ret = fdt_setprop(buf, nodeoffset, "linux,initrd-end",
-+				&value, sizeof(value));
-+		if (ret)
-+			goto out_err;
-+	}
-+
-+	/* trim a buffer */
-+	fdt_pack(buf);
-+	*dtb_buf = buf;
-+	*dtb_buf_len = fdt_totalsize(buf);
++	if ((kernel_len < sizeof(*h)) || !arm64_header_check_magic(h))
++		return -EINVAL;
 +
 +	return 0;
-+
-+out_err:
-+	vfree(buf);
-+	return ret;
 +}
 +
-+int load_other_segments(struct kimage *image,
-+			char *initrd, unsigned long initrd_len,
-+			char *cmdline, unsigned long cmdline_len)
++static void *image_load(struct kimage *image,
++				char *kernel, unsigned long kernel_len,
++				char *initrd, unsigned long initrd_len,
++				char *cmdline, unsigned long cmdline_len)
 +{
-+	struct kexec_segment *kern_seg;
 +	struct kexec_buf kbuf;
-+	unsigned long initrd_load_addr = 0;
-+	char *dtb = NULL;
-+	unsigned long dtb_len = 0;
-+	int ret = 0;
++	struct arm64_image_header *h = (struct arm64_image_header *)kernel;
++	unsigned long text_offset;
++	int ret;
 +
-+	kern_seg = &image->segment[image->arch.kern_segment];
++	/* Load the kernel */
 +	kbuf.image = image;
-+	/* not allocate anything below the kernel */
-+	kbuf.buf_min = kern_seg->mem + kern_seg->memsz;
-+
-+	/* load initrd */
-+	if (initrd) {
-+		kbuf.buffer = initrd;
-+		kbuf.bufsz = initrd_len;
-+		kbuf.memsz = initrd_len;
-+		kbuf.buf_align = 0;
-+		/* within 1GB-aligned window of up to 32GB in size */
-+		kbuf.buf_max = round_down(kern_seg->mem, SZ_1G)
-+						+ (unsigned long)SZ_1G * 32;
-+		kbuf.top_down = false;
-+
-+		ret = kexec_add_buffer(&kbuf);
-+		if (ret)
-+			goto out_err;
-+		initrd_load_addr = kbuf.mem;
-+
-+		pr_debug("Loaded initrd at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
-+				initrd_load_addr, initrd_len, initrd_len);
-+	}
-+
-+	/* load dtb blob */
-+	ret = setup_dtb(image, initrd_load_addr, initrd_len,
-+				cmdline, cmdline_len, &dtb, &dtb_len);
-+	if (ret) {
-+		pr_err("Preparing for new dtb failed\n");
-+		goto out_err;
-+	}
-+
-+	kbuf.buffer = dtb;
-+	kbuf.bufsz = dtb_len;
-+	kbuf.memsz = dtb_len;
-+	/* not across 2MB boundary */
-+	kbuf.buf_align = SZ_2M;
++	kbuf.buf_min = 0;
 +	kbuf.buf_max = ULONG_MAX;
-+	kbuf.top_down = true;
++	kbuf.top_down = false;
++
++	kbuf.buffer = kernel;
++	kbuf.bufsz = kernel_len;
++	kbuf.memsz = le64_to_cpu(h->image_size);
++	text_offset = le64_to_cpu(h->text_offset);
++	kbuf.buf_align = SZ_2M;
++
++	/* Adjust kernel segment with TEXT_OFFSET */
++	kbuf.memsz += text_offset;
 +
 +	ret = kexec_add_buffer(&kbuf);
 +	if (ret)
-+		goto out_err;
-+	image->arch.dtb_mem = kbuf.mem;
-+	image->arch.dtb_buf = dtb;
++		goto out;
 +
-+	pr_debug("Loaded dtb at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
-+			kbuf.mem, dtb_len, dtb_len);
++	image->arch.kern_segment = image->nr_segments - 1;
++	image->segment[image->arch.kern_segment].mem += text_offset;
++	image->segment[image->arch.kern_segment].memsz -= text_offset;
++	image->start = image->segment[image->arch.kern_segment].mem;
 +
-+	return 0;
++	pr_debug("Loaded kernel at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
++				image->segment[image->arch.kern_segment].mem,
++				kbuf.bufsz, kbuf.memsz);
 +
-+out_err:
-+	vfree(dtb);
-+	image->arch.dtb_buf = NULL;
-+	return ret;
++	/* Load additional data */
++	ret = load_other_segments(image, initrd, initrd_len,
++				cmdline, cmdline_len);
++
++out:
++	return ERR_PTR(ret);
 +}
++
++const struct kexec_file_ops kexec_image_ops = {
++	.probe = image_probe,
++	.load = image_load,
++};
+diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+index b3b9b1725d8a..37c0a9dc2e47 100644
+--- a/arch/arm64/kernel/machine_kexec_file.c
++++ b/arch/arm64/kernel/machine_kexec_file.c
+@@ -23,6 +23,7 @@ static int __dt_root_addr_cells;
+ static int __dt_root_size_cells;
+ 
+ const struct kexec_file_ops * const kexec_file_loaders[] = {
++	&kexec_image_ops,
+ 	NULL
+ };
+ 
 -- 
 2.17.0
