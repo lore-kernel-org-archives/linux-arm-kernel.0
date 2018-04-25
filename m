@@ -1,51 +1,36 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 25 Apr 2018 17:08:53 +0200
-Subject: [PATCH] i2c: at91: Read all available bytes at once
-In-Reply-To: <20180418124055.21333-1-david.engraf@sysgo.com>
-References: <20180418124055.21333-1-david.engraf@sysgo.com>
-Message-ID: <20180425150853.GU13305@rfolt0960.corp.atmel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 Apr 2018 10:09:39 -0500
+Subject: [PATCH 3/8] ARM: dts: stm32: add ethernet pins to stm32mp157c
+In-Reply-To: <1524582120-4451-4-git-send-email-christophe.roullier@st.com>
+References: <1524582120-4451-1-git-send-email-christophe.roullier@st.com>
+ <1524582120-4451-4-git-send-email-christophe.roullier@st.com>
+Message-ID: <CAL_JsqL7bY=OSuzeVHH2UxxaBmCMzpFc8djnuZAY6VWcTgUmZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On Wed, Apr 18, 2018 at 02:40:55PM +0200, David Engraf wrote:
-> With FIFO enabled it is possible to read multiple bytes
-> at once in the interrupt handler as long as RXRDY is
-> set. This may also reduce the number of interrupts.
-> 
-> Signed-off-by: David Engraf <david.engraf@sysgo.com>
+On Tue, Apr 24, 2018 at 10:01 AM, Christophe Roullier
+<christophe.roullier@st.com> wrote:
+> Add ethernet pins on stm32mp157c.
+>
+> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
 > ---
->  drivers/i2c/busses/i2c-at91.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index bfd1fdff64a9..d01c2b2384bd 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -518,8 +518,12 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
->  	 * the RXRDY interrupt first in order to not keep garbage data in the
->  	 * Receive Holding Register for the next transfer.
->  	 */
-> -	if (irqstatus & AT91_TWI_RXRDY)
-> -		at91_twi_read_next_byte(dev);
-> +	if (irqstatus & AT91_TWI_RXRDY) {
-> +		/* read all available bytes at once when FIFO is used */
-> +		do {
-> +			at91_twi_read_next_byte(dev);
-> +		} while (at91_twi_read(dev, AT91_TWI_SR) & AT91_TWI_RXRDY);
+>  arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 46 +++++++++++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+> index 6f044100..86720a5 100644
+> --- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+> @@ -158,6 +158,52 @@
+>                                         bias-disable;
+>                                 };
+>                         };
+> +
+> +                       ethernet0_rgmii_pins_a: rgmii at 0 {
 
-You can avoid this check by using the RXFL field to know the number of
-data you can read. Did you try to use it? If yes, did you notice some issues?
+A unit-address without 'reg' property is not valid, so drop the '@0'.
 
-Regards
+Please build your dtb with W=1 or W=12 which will tell you this and
+other errors.
 
-Ludovic
-
-> +	}
->  
->  	/*
->  	 * When a NACK condition is detected, the I2C controller sets the NACK,
-> -- 
-> 2.14.1
-> 
+Rob
