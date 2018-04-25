@@ -1,96 +1,26 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Wed, 25 Apr 2018 19:21:12 +0200
-Subject: [PATCH 1/6] PCI: Make pci_get_new_domain_nr static
-In-Reply-To: <20180425162745.GB21628@e107981-ln.cambridge.arm.com>
-References: <cover.1524582822.git.jan.kiszka@siemens.com>
- <a21882288c4664cc983a5741e8cbf6d59abacd46.1524582822.git.jan.kiszka@siemens.com>
- <20180425162745.GB21628@e107981-ln.cambridge.arm.com>
-Message-ID: <db40716e-85ac-a91d-98a9-81accb2b6756@siemens.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 25 Apr 2018 11:17:00 -0700
+Subject: [PATCH/RFC v2] ARM: shmobile: defconfig: Enable LPAE
+In-Reply-To: <1524672875-14130-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1524672875-14130-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <90afbd8b-462d-8484-74e8-b983a9803fc4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-25 18:27, Lorenzo Pieralisi wrote:
-> On Tue, Apr 24, 2018 at 05:13:37PM +0200, Jan Kiszka wrote:
->> From: Jan Kiszka <jan.kiszka@siemens.com>
->>
->> The only user of that function is of_pci_bus_find_domain_nr. Pure
->> cleanup.
+On 04/25/2018 09:14 AM, Fabrizio Castro wrote:
+> On iWave's iwg20m DDR1 512MB memory cannot be accessed with 32-bit
+> addresses, hence we need LPAE.
 > 
-> "The only user of pci_get_new_domain_nr() is of_pci_bus_find_domain_nr().
-> Since they are defined in the same compilation unit,
-> pci_get_new_domain_nr() can be made static, which also simplifies
-> preprocessor conditionals.
-> 
-> No functional change intended."
-> 
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> ---
+> This information is mentioned in the "RZ/G Series User?s Manual: Hardware",
+> Chapter 2, Area Map. Is this patch going to break the functionality of other
+> boards? Comments welcome.
 
-Thanks, wording adopted for v2.
-
-Jan
-
->> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
->> ---
->>  drivers/pci/pci.c   | 6 ++----
->>  include/linux/pci.h | 3 ---
->>  2 files changed, 2 insertions(+), 7 deletions(-)
-> 
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
->> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->> index e597655a5643..695c2bb4e853 100644
->> --- a/drivers/pci/pci.c
->> +++ b/drivers/pci/pci.c
->> @@ -5702,15 +5702,14 @@ static void pci_no_domains(void)
->>  #endif
->>  }
->>  
->> -#ifdef CONFIG_PCI_DOMAINS
->> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
->>  static atomic_t __domain_nr = ATOMIC_INIT(-1);
->>  
->> -int pci_get_new_domain_nr(void)
->> +static int pci_get_new_domain_nr(void)
->>  {
->>  	return atomic_inc_return(&__domain_nr);
->>  }
->>  
->> -#ifdef CONFIG_PCI_DOMAINS_GENERIC
->>  static int of_pci_bus_find_domain_nr(struct device *parent)
->>  {
->>  	static int use_dt_domains = -1;
->> @@ -5765,7 +5764,6 @@ int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
->>  			       acpi_pci_bus_find_domain_nr(bus);
->>  }
->>  #endif
->> -#endif
->>  
->>  /**
->>   * pci_ext_cfg_avail - can we access extended PCI config space?
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index 73178a2fcee0..963232a6cd2e 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -1510,12 +1510,10 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
->>   */
->>  #ifdef CONFIG_PCI_DOMAINS
->>  extern int pci_domains_supported;
->> -int pci_get_new_domain_nr(void);
->>  #else
->>  enum { pci_domains_supported = 0 };
->>  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
->>  static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
->> -static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
->>  #endif /* CONFIG_PCI_DOMAINS */
->>  
->>  /*
->> @@ -1670,7 +1668,6 @@ static inline struct pci_dev *pci_get_domain_bus_and_slot(int domain,
->>  
->>  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
->>  static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
->> -static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
->>  
->>  #define dev_is_pci(d) (false)
->>  #define dev_is_pf(d) (false)
->> -- 
->> 2.13.6
->>
+LPAE is not supported by all Cortex-A class cores, for instance
+Cortex-A9 does not support LPAE, if you have boards using such cores,
+then this would result in a kernel that would not boot on these
+platforms. Can that be a problem with the shmobile_defconfig?
+-- 
+Florian
