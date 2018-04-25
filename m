@@ -1,130 +1,71 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 25 Apr 2018 22:08:06 +0200
-Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
- HMI
-In-Reply-To: <20180425184016.xktppxw7egddr7li@flea>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
- <20180322180508.my64gobhh5rc2x2m@flea>
- <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
- <20180424084137.7xfwji2gcibxavvt@flea>
- <03a02abb-e95c-b4ec-748f-907c0af67969@micronovasrl.com>
- <20180425184016.xktppxw7egddr7li@flea>
-Message-ID: <42feccc9-1d09-9ff2-3ccc-1dea63bacfb6@micronovasrl.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Wed, 25 Apr 2018 14:04:56 -0700
+Subject: [PATCH v2 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <20180425103136.GB24769@sirena.org.uk>
+References: <cover.1523673467.git.collinsd@codeaurora.org>
+ <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
+ <CAD=FV=XKYCDtF93RtYi+dokR2BcT-z6Ex3UjgJ0ia_kF=847eA@mail.gmail.com>
+ <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
+ <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
+ <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
+ <20180424174507.GI22073@sirena.org.uk>
+ <20a8f736-2687-f14f-eaa1-2b2c06eed629@codeaurora.org>
+ <20180425103136.GB24769@sirena.org.uk>
+Message-ID: <f98416ac-230c-0362-ed50-a7f92ff283d7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+>>> I think that's probably only OK if we have a specific error code for the
+>>> regulator being limited in this way otherwise our error handling for I/O
+>>> problems involves us trying to reconfigure supplies which seems like it
+>>> would be risky.  
 
-Il 25/04/2018 20:40, Maxime Ripard ha scritto:
-> Hi Giulio,
-> 
-> On Tue, Apr 24, 2018 at 08:31:44PM +0200, Giulio Benetti wrote:
->> LiNova1 is not a board with various headers to connect other peripherals
->> such display, pcap etc.
->> It's an HMI that I would consider the same as a Tablet, because it has a
->> plastic enclosure also.
->>
->> So I would like to understand how to manage it in the best way.
->> Try to consider LiNova1 as a Tablet series, with following list:
->> LiNova1 4.3" ctp
->> LiNova1 7" ctp
->> LiNova1 10.1" ctp
->> LiNova1 4.3" rtp
->> LiNova1 7" rtp
->> LiNova1 10.1" rtp
->>
->> Every of those has a slightly different BOM, so they are 6 different
->> boards with a common base(uP, ram). And same pcb.
-> 
-> So the LiNova1 is exactly the same in all these setups, the only
-> difference is that it has a connector that you connect a different
-> display / touchscreen to?
-> 
-> If so, that's definitely a case for device tree overlays.
+>> Would you be ok with -EAGAIN being used for this purpose?
 
-Yes it is that way. So I proceed with dt overlays.
+> Using -EAGAIN for "I can't ever read the configuration from this
+> regulator" doesn't seem right - it's not like any number of retries
+> will ever manage to read the value back.
 
-> 
->> So I don't know if submit only the common base and provide
->> separately on our github DT-overlays, or provide as many dts patches
->> as the HMI number with a base dtsi.
-> 
-> That's really up to you, but the overlays will make this much simpler
-> to handle precisely because it will reduce the amount of combinations
-> you have.
-> 
-> You can even reduce it in your case to 5 of them, 3 for each panel and
-> 2 for each touchscreen.
+In this case, the _regulator_get_voltage() call can succeed, but only
+after a voltage is explicitly requested from the framework side.  The
+intention here would then be to call _regulator_do_set_voltage() with the
+constraint min_uV to max_uV range.  After that, subsequent
+_regulator_get_voltage() calls will be successful.
 
-Ah, that's right! Good idea, more "encapsulation".
+Here is the general idea:
 
-> 
->> Basically Micronova provides entire system without the capability to hack
->> hardware adding shields of various type.
->>
->> There are also other 2 LiNova:
->> LiNova2 and LiNova3
-> 
-> Which SoCs are these boards based on?
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 65f9b7c..e61983d 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -910,6 +910,19 @@ static int machine_constraints_voltage(struct
+regulator_dev *rdev,
+ 	    rdev->constraints->min_uV && rdev->constraints->max_uV) {
+ 		int target_min, target_max;
+ 		int current_uV = _regulator_get_voltage(rdev);
++		if (current_uV == -EAGAIN) {
++			/*
++			 * Regulator voltage cannot be read until after
++			 * configuration; try setting constraint range.
++			 */
++			rdev_info(rdev, "Setting %d-%duV\n",
++				  rdev->constraints->min_uV,
++				  rdev->constraints->max_uV);
++			_regulator_do_set_voltage(rdev,
++						  rdev->constraints->min_uV,
++						  rdev->constraints->max_uV);
++			current_uV = _regulator_get_voltage(rdev);
++		}
+ 		if (current_uV < 0) {
+ 			rdev_err(rdev,
+ 				 "failed to get the current voltage(%d)\n",
 
-A20 on all three. They are slightly between each other.
-Some RS485 more, 1 USB more etc.
+Do you still have reservations about using -EAGAIN for this purpose?  If
+so, which error code would you suggest using?
 
-> 
->> So I understand that this could lead to 18 different dts files and 3
->> dtsi files.
-> 
-> Yeah, I'd really like to keep this under control :)
+Thanks,
+David
 
-:)
-
-> 
->> But with Tablet it should be the same way.  For sure people would be
->> more interested on famous tablets instead of our HMI.
->>
->> In the case I need to use dt-overlays, you mean .dto files with
->> fragments inside loaded by u-boot or runtime, right?
-> 
-> You don't have to handcode the fragments anymore with the new syntax,
-> and U-Boot makes it really trivial to use if you use the FIT image
-> format to have multiple overlays bundled in the same image. You can
-> choose to apply them dynamically, for example based on an EEPROM or
-> some other metric to see which combination you have.
-
-Ah, this is interesting. I'm going to experiment with that.
-
-> 
->>>>>> +&usb_otg {
->>>>>> +	dr_mode = "otg";
->>>>>
->>>>> You're saying that this is a USB-A connector? Then it's not OTG since
->>>>> it doesn't have an ID pin, this is an host.
->>>>
->>>> Right, with a special overlay I will activate Usb Device for RNDIS,
->>>> so modified as host
->>>
->>> That doesn't really make much sense. The USB OTG is wired only using a
->>> daughter board?
->>
->> My fault, I've meant "peripheral" in one case and "host" in another case.
->> Usually "host".
->> Are there problem with this?
->> There is no daughter board.
-> 
-> If you have an ID pin and the ability to control VBUS, then you don't
-> need to change the device tree, it's done automatically at runtime by
-> Linux.
-
-Unfortanetely I don't have ID pin and a common mosfet to control VBUS.
-"peripheral" mode should be used only in debug mode,
-so right dt-overlay can be written to sd-card by ourself or some of our 
-customers.
-
-Thank you very much for all clarifications!
-
-Giulio.
-
-> 
-> Maxime
-> 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
