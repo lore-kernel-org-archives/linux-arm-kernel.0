@@ -1,36 +1,95 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 25 Apr 2018 12:13:13 +0100
-Subject: [PATCH v3 2/3] regulator: add support for SY8106A regulator
-In-Reply-To: <15C93A9B-6EEB-49EB-A942-35F761E86569@aosc.io>
-References: <20180423144657.63264-1-icenowy@aosc.io>
- <20180423144657.63264-3-icenowy@aosc.io>
- <20180424170733.GD22073@sirena.org.uk>
- <C0C1F042-221A-420F-A8C1-5FADCFC687F1@aosc.io>
- <20180425105309.GC24769@sirena.org.uk>
- <15C93A9B-6EEB-49EB-A942-35F761E86569@aosc.io>
-Message-ID: <20180425111313.GD24769@sirena.org.uk>
+From: Alexey.Brodkin@synopsys.com (Alexey Brodkin)
+Date: Wed, 25 Apr 2018 11:17:01 +0000
+Subject: [PATCH 06/22] arc: use generic dma_noncoherent_ops
+In-Reply-To: <20180420080313.18796-7-hch@lst.de>
+References: <20180420080313.18796-1-hch@lst.de>
+ <20180420080313.18796-7-hch@lst.de>
+Message-ID: <1524655020.5315.9.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 06:55:10PM +0800, Icenowy Zheng wrote:
-> ? 2018?4?25? GMT+08:00 ??6:53:09, Mark Brown <broonie@kernel.org> ??:
+Hi Christoph,
 
-> >> SPDX identifier is special -- it should be in a seperated
-> >> comment block.
+On Fri, 2018-04-20 at 10:02 +0200, Christoph Hellwig wrote:
+> Switch to the generic noncoherent direct mapping implementation.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arc/Kconfig                   |   4 +
+>  arch/arc/include/asm/Kbuild        |   1 +
+>  arch/arc/include/asm/dma-mapping.h |  21 -----
+>  arch/arc/mm/dma.c                  | 141 +++--------------------------
+>  4 files changed, 19 insertions(+), 148 deletions(-)
+>  delete mode 100644 arch/arc/include/asm/dma-mapping.h
+> 
 
-> >No, it just needs to be a C++ comment on the first line to ease machine
-> >parsing.  The rest of the file doesn't matter for that.
+[snip]
 
-> Okay. Thus I will use a seperate /* */ block for it in the
-> next revision, to follow the rule.
+> @@ -135,7 +134,7 @@ static int arc_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>   * CPU accesses page via normal paddr, thus needs to explicitly made
+>   * consistent before each use
+>   */
+> -static void _dma_cache_sync(phys_addr_t paddr, size_t size,
+> +static void _dma_cache_sync(struct device *dev, phys_addr_t paddr size_t size,
+>  		enum dma_data_direction dir)
 
-Just make the whole copyright block a C++ comment.  It's much easier and
-even with a blank line between the SPDX line and the rest of it it'll
-still look messy and odd.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180425/364e308d/attachment.sig>
+Seems like there's a missing comma:
+----------------------------------->8------------------------------------
+--- a/arch/arc/mm/dma.c
++++ b/arch/arc/mm/dma.c
+@@ -134,7 +134,7 @@ int arch_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+  * CPU accesses page via normal paddr, thus needs to explicitly made
+  * consistent before each use
+  */
+-static void _dma_cache_sync(struct device *dev, phys_addr_t paddr size_t size,
++static void _dma_cache_sync(struct device *dev, phys_addr_t paddr, size_t size,
+                enum dma_data_direction dir)
+ {
+        switch (dir) {
+----------------------------------->8------------------------------------
+
+Which is actually strange as I would expect ARC code to be built by bots.
+
+Anyways with above fix I do see problems with both USB and Ethernet controllers
+on ARC HSDK board.
+----------------------------------->8------------------------------------
+usb 1-1: new high-speed USB device number 2 using ehci-platform
+usb 1-1: device descriptor read/64, error -32
+usb 1-1: device descriptor read/64, error -32
+usb 1-1: new high-speed USB device number 3 using ehci-platform
+usb 1-1: device descriptor read/64, error -32
+usb 1-1: device descriptor read/64, error -32
+usb usb1-port1: attempt power cycle
+usb 1-1: new high-speed USB device number 4 using ehci-platform
+usb 1-1: device not accepting address 4, error -32
+usb 1-1: new high-speed USB device number 5 using ehci-platform
+usb 1-1: device not accepting address 5, error -32
+
+...
+
+# wget ftp://ftp.denx.de/pub/u-boot/u-boot-1.0.0.tar.bz2
+Connecting to ftp.denx.de (81.169.202.6:21)
+wget: can't connect to remote host (81.169.202.6): No route to host
+----------------------------------->8------------------------------------
+
+Will all patches from the series reverted (i.e. with
+your base-line) all issues go away.
+
+I'll need to spend more time on checking what's actually wrong.
+
+-Alexey
+
+P.S. Note to my ARC colleagues - it's required to disable IO Coherency
+to get DMA ops really used, it could be obviously done with:
+----------------------------------->8------------------------------------
+--- a/arch/arc/mm/cache.c
++++ b/arch/arc/mm/cache.c
+@@ -27,7 +27,7 @@
+ 
+ static int l2_line_sz;
+ static int ioc_exists;
+-int slc_enable = 1, ioc_enable = 1;
++int slc_enable = 1, ioc_enable = 0;
+ unsigned long perip_base = ARC_UNCACHED_ADDR_SPACE; /* legacy value for boot */
+ unsigned long perip_end = 0xFFFFFFFF; /* legacy value */
+----------------------------------->8------------------------------------
