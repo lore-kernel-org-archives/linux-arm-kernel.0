@@ -1,55 +1,41 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 25 Apr 2018 01:54:39 -0700
-Subject: noveau vs arm dma ops
-In-Reply-To: <20180425074151.GA2271@ulmo>
-References: <f1100bd6-dd98-55a9-a92f-1cad919f235f@amd.com>
- <20180420124625.GA31078@infradead.org>
- <20180420152111.GR31310@phenom.ffwll.local>
- <20180424184847.GA3247@infradead.org>
- <CAKMK7uFL68pu+-9LODTgz+GQYvxpnXOGhxfz9zorJ_JKsPVw2g@mail.gmail.com>
- <20180425054855.GA17038@infradead.org>
- <CAKMK7uEFitkNQrD6cLX5Txe11XhVO=LC4YKJXH=VNdq+CY=DjQ@mail.gmail.com>
- <CAKMK7uFx=KB1vup=WhPCyfUFairKQcRR4BEd7aXaX1Pj-vj3Cw@mail.gmail.com>
- <20180425064335.GB28100@infradead.org> <20180425074151.GA2271@ulmo>
-Message-ID: <20180425085439.GA29996@infradead.org>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Wed, 25 Apr 2018 14:30:45 +0530
+Subject: [PATCH v4 0/2] Add ThunderX2 SoC Performance Monitoring Unit driver
+Message-ID: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[discussion about this patch, which should have been cced to the iommu
- and linux-arm-kernel lists, but wasn't:
- https://www.spinics.net/lists/dri-devel/msg173630.html]
+This patchset adds PMU driver for Cavium's ThunderX2 SoC UNCORE devices.
+The SoC has PMU support in L3 cache controller (L3C) and in the
+DDR4 Memory Controller (DMC).
 
-On Wed, Apr 25, 2018 at 09:41:51AM +0200, Thierry Reding wrote:
-> > API from the iommu/dma-mapping code.  Drivers have no business poking
-> > into these details.
-> 
-> The interfaces that the above patch uses are all EXPORT_SYMBOL_GPL,
-> which is rather misleading if they are not meant to be used by drivers
-> directly.
+v4:
+     -Incroporated review comments from Mark Rutland[1]
 
-The only reason the DMA ops are exported is because get_arch_dma_ops
-references (or in case of the coherent ones used to reference).  We
-don't let drivers assign random dma ops.
+[1] https://www.spinics.net/lists/arm-kernel/msg588563.html
 
-> 
-> > Thierry, please resend this with at least the iommu list and
-> > linux-arm-kernel in Cc to have a proper discussion on the right API.
-> 
-> I'm certainly open to help with finding a correct solution, but the
-> patch above was purposefully terse because this is something that I
-> hope we can get backported to v4.16 to unbreak Nouveau. Coordinating
-> such a backport between ARM and DRM trees does not sound like something
-> that would help getting this fixed in v4.16.
+v3:
+     - fixed warning reported by kbuild robot
 
-Coordinating the backport of a trivial helper in the arm tree is not
-the end of the world.  Really, this cowboy attitude is a good reason
-why graphics folks have such a bad rep.  You keep poking into random
-kernel internals, don't talk to anoyone and then complain if people
-are upset.  This shouldn't be surprising.
+v2:
+     - rebased to 4.12-rc1
+     - Removed Arch VULCAN dependency.
+     - update SMC call parameters as per latest firmware.
 
-> Granted, this issue could've been caught with a little more testing, but
-> in retrospect I think it would've been a lot better if ARM_DMA_USE_IOMMU
-> was just enabled unconditionally if it has side-effects that platforms
-> don't opt in to but have to explicitly opt out of.
+v1:
+     -Initial patch
 
-Agreed on that count.  Please send a patch.
+Ganapatrao Kulkarni (2):
+  perf: uncore: Adding documentation for ThunderX2 pmu uncore driver
+  ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU driver
+
+ Documentation/perf/thunderx2-pmu.txt |  66 +++
+ drivers/perf/Kconfig                 |   8 +
+ drivers/perf/Makefile                |   1 +
+ drivers/perf/thunderx2_pmu.c         | 958 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 1033 insertions(+)
+ create mode 100644 Documentation/perf/thunderx2-pmu.txt
+ create mode 100644 drivers/perf/thunderx2_pmu.c
+
+-- 
+2.9.4
