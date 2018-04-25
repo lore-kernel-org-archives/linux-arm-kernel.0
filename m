@@ -1,17 +1,22 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 25 Apr 2018 14:03:06 +0200
-Subject: [PATCH v2 2/2] clk: meson: gxbb: add the video decoder clocks
-In-Reply-To: <20180424184838.3406-3-maxi.jourdan@wanadoo.fr>
-References: <20180424184838.3406-1-maxi.jourdan@wanadoo.fr>
- <20180424184838.3406-3-maxi.jourdan@wanadoo.fr>
-Message-ID: <1524657786.4026.63.camel@baylibre.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 25 Apr 2018 14:04:07 +0200
+Subject: [RFC 09/10] usb: host: exynos: Remove support for Exynos5440
+In-Reply-To: <20180424203239.21885-10-krzk@kernel.org>
+References: <20180424203239.21885-1-krzk@kernel.org>
+ <20180424203239.21885-10-krzk@kernel.org>
+Message-ID: <20180425120407.GA6582@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-04-24 at 20:48 +0200, Maxime Jourdan wrote:
-> Add the SEL/DIV/GATE for VDEC_1 and VDEC_HEVC.
+On Tue, Apr 24, 2018 at 10:32:38PM +0200, Krzysztof Kozlowski wrote:
+> The Exynos5440 is not actively developed, there are no development
+> boards available and probably there are no real products with it.
+> Remove wide-tree support for Exynos5440.
 > 
-> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  drivers/usb/host/ehci-exynos.c | 7 -------
+>  drivers/usb/host/ohci-exynos.c | 6 ------
+>  2 files changed, 13 deletions(-)
 
-Applied to next/drivers
-Thx
+Reviewed-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
