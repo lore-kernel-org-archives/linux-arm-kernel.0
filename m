@@ -1,46 +1,33 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 25 Apr 2018 14:20:00 +0200
-Subject: [RFC PATCH v3] tty: pl011: Avoid spuriously stuck-off interrupts
-In-Reply-To: <CAFEAcA8Q97YNKomCgkujgoY0MoES3edHoFEk_jjXGMCdzBpd9w@mail.gmail.com>
-References: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
- <CAFEAcA8Q97YNKomCgkujgoY0MoES3edHoFEk_jjXGMCdzBpd9w@mail.gmail.com>
-Message-ID: <20180425122000.cts26gtvjuje4j7f@kamzik.brq.redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 25 Apr 2018 14:20:44 +0200
+Subject: [PATCH 0/2] crypto: implement SM4 for arm64 using special instructions
+Message-ID: <20180425122046.12695-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 02:49:30PM +0100, Peter Maydell wrote:
-> On 23 April 2018 at 14:41, Dave Martin <Dave.Martin@arm.com> wrote:
-> > This is an update to a previous RFC v2 [1], to fix a problem observed by
-> > the qemu community that causes serial input to hang when booting a
-> > simulated system with data already queued in the UART FIFO [2].
-> >
-> > After discussion, I decided that the approach in [1] was over-
-> > engineered: it tries to preserve a guarantee that people shouldn't be
-> > relying on anyway, namely that data sent to the UART prior to kernel
-> > boot will be received by the kernel; or more generally that data
-> > received by the UART while the pl011 driver is not opened will be
-> > received (either intact or at all) by the driver.
-> >
-> > If anyone can please test the following and let me know the results,
-> > that would be much appreciated!
-> >
-> >  a) Check that you can still reproduce the bug on mainline without this
-> >     patch.
-> >
-> >  b) Check whether this patch fixes the problem.
-> 
-> Thanks. I'm cc'ing Ciro and Drew, who are the two people I
-> recall reporting this issue to me.
-> Link to the patch for their benefit:
->  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573120.html
->
+Patch #1 makes some preparatory changes so the C routines can be used as
+a fallback by other drivers.
 
-Hi Dave,
+Patch #2 implements the SM4 core cipher using the special instructions
+introduced as an optional extension by revision 8.2 of the ARM architecture.
 
-v3 does not resolve the issue for me. v2 does, and, fwiw, v3 applied on
-top of v2 (i.e. applying both), still works.
+Note that this does not implement cipher+chaining mode combinations as we
+do for AES. This can be added later if desiresd.
 
-If you choose to go with v2, then you can add my tested-by.
+Ard Biesheuvel (2):
+  crypto: sm4 - export encrypt/decrypt routines to other drivers
+  crypto: arm64 - add support for SM4 encryption using special
+    instructions
 
-Thanks,
-drew
+ arch/arm64/crypto/Kconfig       |  6 ++
+ arch/arm64/crypto/Makefile      |  3 +
+ arch/arm64/crypto/sm4-ce-core.S | 36 ++++++++++
+ arch/arm64/crypto/sm4-ce-glue.c | 73 ++++++++++++++++++++
+ crypto/sm4_generic.c            | 10 +--
+ include/crypto/sm4.h            |  3 +
+ 6 files changed, 127 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm64/crypto/sm4-ce-core.S
+ create mode 100644 arch/arm64/crypto/sm4-ce-glue.c
+
+-- 
+2.17.0
