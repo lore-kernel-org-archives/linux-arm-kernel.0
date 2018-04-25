@@ -1,44 +1,85 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Apr 2018 18:54:46 +0100
-Subject: [PATCH 6/6] arm: Allow to enable PCI_DOMAINS manually
-In-Reply-To: <4b97c00b9cd72f508aa27f0b58711d73de2cd397.1524582822.git.jan.kiszka@siemens.com>
-References: <cover.1524582822.git.jan.kiszka@siemens.com>
- <4b97c00b9cd72f508aa27f0b58711d73de2cd397.1524582822.git.jan.kiszka@siemens.com>
-Message-ID: <20180425175446.GC21628@e107981-ln.cambridge.arm.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 25 Apr 2018 19:59:53 +0200
+Subject: [RFC 00/13] arm64: allwinner: Add A64 DE2 pipeline support
+In-Reply-To: <CAMty3ZCTtB__eWub2PbHK_DHSVQsf4V1eECX6bfwDq99pXaLJQ@mail.gmail.com>
+References: <20180424133425.24291-1-jagan@amarulasolutions.com>
+ <4355590.Ql03JAEh1C@jernej-laptop>
+ <CAMty3ZCTtB__eWub2PbHK_DHSVQsf4V1eECX6bfwDq99pXaLJQ@mail.gmail.com>
+Message-ID: <3749004.y60xFsjo5d@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 05:13:42PM +0200, Jan Kiszka wrote:
-> From: Jan Kiszka <jan.kiszka@siemens.com>
-> 
-> Required when running over Jailhouse, and there is already a physical
-> host controller that Jailhouse does not intercept and rather adds a
-> virtual one. That is the case for the Tegra TK1, e.g.
-> 
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> ---
->  arch/arm/Kconfig | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a7f8e7f4b88f..5f8190cb057d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1248,8 +1248,13 @@ config PCI
->  	  VESA. If you have PCI, say Y, otherwise N.
->  
->  config PCI_DOMAINS
-> -	bool
-> +	bool "Support for multiple PCI domains"
->  	depends on PCI
-> +	help
-> +	  Automatically enabled if the platform supports multiple PCI host
-> +	  controllers. Say Y if running over a hypervisor like Jailhouse that
-> +	  dynamically adds further host controllers while the system is
-> +	  running. Say N otherwise.
+Hi,
 
-Alternatively, you could select it under PCI_HOST_GENERIC if that's all
-you need in Jailhouse. Actually that's a change that makes sense anyway
-I think.
+Dne sreda, 25. april 2018 ob 12:34:09 CEST je Jagan Teki napisal(a):
+> On Tue, Apr 24, 2018 at 9:02 PM, Jernej ?krabec <jernej.skrabec@siol.net> 
+wrote:
+> > Hi,
+> > 
+> > Dne torek, 24. april 2018 ob 15:34:12 CEST je Jagan Teki napisal(a):
+> >> Allwinner A64 has display engine pipeline like other Allwinner SOC's
+> >> A83T/H3/H5.
+> >> 
+> >> A64 DE2 behaviour similar to Allwinner A83T where mixer0, connected to
+> >> tcon0 with RGB, LVDS MIPI-DSI and mixer1, connected to tcon1 with HDMI.
+> >> This series merely concentrated on HDMI pipeline and rest will add
+> >> eventually.
+> >> 
+> >> patch 1: dt-bindings for a64 DE2 CCU
+> >> 
+> >> patch 2: a64 DE2 CCU node addition
+> >> 
+> >> patch 3: dt-bindings for a64 DE2 pipeline
+> >> 
+> >> patch 4 - 5: dt-bindings for a64 mixer0 and tcon-lcd
+> >> 
+> >> patch 6: a64 DE2 pipeline node addition
+> >> 
+> >> patch 7 - 8: dt-bindings for a64 HDMI and HDMI PHY
+> >> 
+> >> patch 9: a64 HDMI nodes addition
+> >> 
+> >> patch 10 - 11: dt-bindings for a64 mixer1 and tcon-tv
+> >> 
+> >> patch 12: a64 HDMI pipeline
+> >> 
+> >> patch 13: enable HDMI out on bananpi-m64
+> >> 
+> >> Tested HDMI on bananapi-m64 (along with DE2 SRAM C changes from [1]
+> >> thread), able to detect the HDMI but, no penguins on screen.
+> >> 
+> >> Request for any suggestions.
+> > 
+> > You are mising sunxi-ng clock patches. PLL_VIDEO0 and PLL_VIDEO1 need
+> > fixes by setting minimum stable frequency. Please note that datasheet may
+> > have wrong information. That was obvious in H3 case and I had to check
+> > minimum stable PLL_VIDEO frequency in BSP driver.
+> 
+> Can you point me the clock patches? 
 
-Lorenzo
+Here is my A64 HDMI wip repo, which includes my clock changes:
+https://github.com/jernejsk/linux-1/tree/a64_hdmi_wip
+
+At some point HDMI output worked ok, I'm not sure in what state I left the 
+code.
+
+> I've phadled only CLK_PLL_VIDEO0
+> on hdmi_phy So we need CLK_PLL_VIDEO1 as fourth clock?
+
+I'm not sure what is the best way. I guess some research is needed. There is 
+even the possibility that one bit (SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL) in hdmi 
+phy needs to be toggled depending on which clock is selected as HDMI source. I 
+never finished my research since I'm waiting to SRAM C claiming patches.
+
+At the end, HDMI driver should be tested by both, PLL_VIDEO0 and PLL_VIDEO1 as 
+a HDMI clock source, otherwise there is no guarantee that we got binding 
+right. A83T, H3 and H5 has only one possible HDMI parent clock, so it was much 
+easier in this regard.
+
+Unfortunately, BSP driver is not much of a help, since it was always 
+distributed as a blob. Disassembly looks much like H3 driver, with few bits 
+added. However, BSP clocks are pretty much hardcoded so they don't tell all 
+the story.
+
+Best regards,
+Jernej
