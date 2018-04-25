@@ -1,100 +1,52 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 25 Apr 2018 14:50:11 +0530
-Subject: [RESEND PATCH v2 3/4] ARM: davinci: add aemif & nand support to
- da850-lcdk in legacy mode
-In-Reply-To: <CAMRc=MfU4xBcbOevviV9vo8Oq5mtGkcjv8zCEacZXB0twhxUuQ@mail.gmail.com>
-References: <20180417102917.7794-1-brgl@bgdev.pl>
- <20180417102917.7794-4-brgl@bgdev.pl>
- <df39067d-a941-4099-2cfe-7602d4047c6f@ti.com>
- <CAMRc=MfU4xBcbOevviV9vo8Oq5mtGkcjv8zCEacZXB0twhxUuQ@mail.gmail.com>
-Message-ID: <9c1cd548-29a1-8f4a-d05c-ec4884f60b72@ti.com>
+Date: Wed, 25 Apr 2018 14:53:23 +0530
+Subject: [PATCH] ARM: davinci: board-dm355-evm: fix broken networking
+Message-ID: <20180425092323.21898-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 April 2018 02:44 PM, Bartosz Golaszewski wrote:
-> 2018-04-17 16:09 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
->> On Tuesday 17 April 2018 03:59 PM, Bartosz Golaszewski wrote:
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> We now have support for aemif & nand from board files. As an example
->>> add support for nand to da850-lcdk in legacy mode.
->>
->> Hawkboard is a separate board of its own, although closely related to
->> LCDK. Lets refer to it as hawkboard itself, instead of "LCDK in legacy
->> mode". So:
->>
->> ARM: davinci: omapl138-hawk: ...
->>
->>>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> ---
->>>  arch/arm/mach-davinci/board-omapl138-hawk.c | 132 ++++++++++++++++++++
->>>  1 file changed, 132 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
->>> index 6c997c59a3cd..9c3de56b54e4 100644
->>> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
->>> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
->>> @@ -16,6 +16,11 @@
->>>  #include <linux/gpio.h>
->>>  #include <linux/gpio/machine.h>
->>>  #include <linux/platform_data/gpio-davinci.h>
->>> +#include <linux/platform_data/ti-aemif.h>
->>> +#include <linux/mtd/rawnand.h>
->>> +#include <linux/mtd/partitions.h>
->>> +#include <linux/platform_data/mtd-davinci.h>
->>> +#include <linux/platform_data/mtd-davinci-aemif.h>
->>>  #include <linux/regulator/machine.h>
->>>
->>>  #include <asm/mach-types.h>
->>> @@ -162,6 +167,129 @@ static __init void omapl138_hawk_mmc_init(void)
->>>       gpiod_remove_lookup_table(&mmc_gpios_table);
->>>  }
->>>
->>> +static struct mtd_partition omapl138_hawk_nandflash_partition[] = {
->>> +     {
->>> +             .name           = "u-boot env",
->>> +             .offset         = 0,
->>> +             .size           = SZ_128K,
->>> +             .mask_flags     = MTD_WRITEABLE,
->>> +      },
->>> +     {
->>> +             .name           = "u-boot",
->>> +             .offset         = MTDPART_OFS_APPEND,
->>> +             .size           = SZ_128K,
->>
->> Can you make it 512K as it is in da850-lcdk.dts ?
->>
->>> +             .mask_flags     = MTD_WRITEABLE,
->>> +     },
->>> +     {
->>> +             .name           = "free space",
->>> +             .offset         = MTDPART_OFS_APPEND,
->>> +             .size           = MTDPART_SIZ_FULL,
->>> +             .mask_flags     = 0,
->>> +     },
->>> +};
->>
->>> +static struct aemif_abus_data omapl138_hawk_aemif_abus_data[] = {
->>> +     {
->>> +             .cs     = 3,
->>> +     }
->>> +};
->>> +
->>> +static struct platform_device omapl138_hawk_aemif_devices[] = {
->>> +     {
->>> +             .name           = "davinci_nand",
->>> +             .id             = 1,
->>
->> Is there a reason for .id to be set to 1 here? Ideally it should be -1,
->> I think since there is a single NAND on the board.
->>
-> 
-> The davinci nand driver uses pdev->id as the chipselect number. I
-> guess this should be in the platform data. I'll send a patch for that.
+Since commit 09f3756bb9a8 ("dm9000: Return an ERR_PTR() in all
+error conditions of dm9000_parse_dt()"), passing either non-NULL
+platform data or device-tree for dm9000 driver to probe is
+mandatory.
 
-I remember that now. No need to change that, I think. Just a comment
-here would suffice.
+DM335 board was using none, so networking failed to initialize.
+Fix it by passing non-NULL (but empty) platform data.
 
-Thanks,
-Sekhar
+Fixes: 09f3756bb9a8 ("dm9000: Return an ERR_PTR() in all error conditions of dm9000_parse_dt()")
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/board-dm355-evm.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+index 14557f893798..d04381d3f05b 100644
+--- a/arch/arm/mach-davinci/board-dm355-evm.c
++++ b/arch/arm/mach-davinci/board-dm355-evm.c
+@@ -19,6 +19,7 @@
+ #include <linux/gpio.h>
+ #include <linux/gpio/machine.h>
+ #include <linux/clk.h>
++#include <linux/dm9000.h>
+ #include <linux/videodev2.h>
+ #include <media/i2c/tvp514x.h>
+ #include <linux/spi/spi.h>
+@@ -179,11 +180,16 @@ static struct resource dm355evm_dm9000_rsrc[] = {
+ 	},
+ };
+ 
++static struct dm9000_plat_data dm335evm_dm9000_platdata;
++
+ static struct platform_device dm355evm_dm9000 = {
+ 	.name		= "dm9000",
+ 	.id		= -1,
+ 	.resource	= dm355evm_dm9000_rsrc,
+ 	.num_resources	= ARRAY_SIZE(dm355evm_dm9000_rsrc),
++	.dev		= {
++		.platform_data = &dm335evm_dm9000_platdata,
++	},
+ };
+ 
+ static struct tvp514x_platform_data tvp5146_pdata = {
+-- 
+2.16.2
