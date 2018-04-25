@@ -1,36 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 25 Apr 2018 11:31:36 +0100
-Subject: [PATCH v2 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <20a8f736-2687-f14f-eaa1-2b2c06eed629@codeaurora.org>
-References: <cover.1523673467.git.collinsd@codeaurora.org>
- <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
- <CAD=FV=XKYCDtF93RtYi+dokR2BcT-z6Ex3UjgJ0ia_kF=847eA@mail.gmail.com>
- <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
- <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
- <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
- <20180424174507.GI22073@sirena.org.uk>
- <20a8f736-2687-f14f-eaa1-2b2c06eed629@codeaurora.org>
-Message-ID: <20180425103136.GB24769@sirena.org.uk>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 25 Apr 2018 16:04:09 +0530
+Subject: [RFC 00/13] arm64: allwinner: Add A64 DE2 pipeline support
+In-Reply-To: <4355590.Ql03JAEh1C@jernej-laptop>
+References: <20180424133425.24291-1-jagan@amarulasolutions.com>
+ <4355590.Ql03JAEh1C@jernej-laptop>
+Message-ID: <CAMty3ZCTtB__eWub2PbHK_DHSVQsf4V1eECX6bfwDq99pXaLJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 02:09:47PM -0700, David Collins wrote:
-> On 04/24/2018 10:45 AM, Mark Brown wrote:
+On Tue, Apr 24, 2018 at 9:02 PM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
+> Hi,
+>
+> Dne torek, 24. april 2018 ob 15:34:12 CEST je Jagan Teki napisal(a):
+>> Allwinner A64 has display engine pipeline like other Allwinner SOC's
+>> A83T/H3/H5.
+>>
+>> A64 DE2 behaviour similar to Allwinner A83T where mixer0, connected to tcon0
+>> with RGB, LVDS MIPI-DSI and mixer1, connected to tcon1 with HDMI.
+>> This series merely concentrated on HDMI pipeline and rest will add
+>> eventually.
+>>
+>> patch 1: dt-bindings for a64 DE2 CCU
+>>
+>> patch 2: a64 DE2 CCU node addition
+>>
+>> patch 3: dt-bindings for a64 DE2 pipeline
+>>
+>> patch 4 - 5: dt-bindings for a64 mixer0 and tcon-lcd
+>>
+>> patch 6: a64 DE2 pipeline node addition
+>>
+>> patch 7 - 8: dt-bindings for a64 HDMI and HDMI PHY
+>>
+>> patch 9: a64 HDMI nodes addition
+>>
+>> patch 10 - 11: dt-bindings for a64 mixer1 and tcon-tv
+>>
+>> patch 12: a64 HDMI pipeline
+>>
+>> patch 13: enable HDMI out on bananpi-m64
+>>
+>> Tested HDMI on bananapi-m64 (along with DE2 SRAM C changes from [1]
+>> thread), able to detect the HDMI but, no penguins on screen.
+>>
+>> Request for any suggestions.
+>
+> You are mising sunxi-ng clock patches. PLL_VIDEO0 and PLL_VIDEO1 need fixes by
+> setting minimum stable frequency. Please note that datasheet may have wrong
+> information. That was obvious in H3 case and I had to check minimum stable
+> PLL_VIDEO frequency in BSP driver.
 
-> > I think that's probably only OK if we have a specific error code for the
-> > regulator being limited in this way otherwise our error handling for I/O
-> > problems involves us trying to reconfigure supplies which seems like it
-> > would be risky.  
+Can you point me the clock patches? I've phadled only CLK_PLL_VIDEO0
+on hdmi_phy So we need CLK_PLL_VIDEO1 as fourth clock?
 
-> Would you be ok with -EAGAIN being used for this purpose?
+Jagan.
 
-Using -EAGAIN for "I can't ever read the configuration from this
-regulator" doesn't seem right - it's not like any number of retries
-will ever manage to read the value back.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180425/2373cdee/attachment.sig>
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
