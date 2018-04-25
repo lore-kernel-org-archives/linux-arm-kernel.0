@@ -1,26 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Apr 2018 14:41:20 +0100
-Subject: [PATCH] arm64: Select ARCH_HAS_FAST_MULTIPLIER
-In-Reply-To: <877b532d8d240c1d9e9db923c84b924443a218ed.1524583390.git.robin.murphy@arm.com>
-References: <877b532d8d240c1d9e9db923c84b924443a218ed.1524583390.git.robin.murphy@arm.com>
-Message-ID: <20180425134119.GE8383@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 25 Apr 2018 10:46:48 -0300
+Subject: [PATCH 4/5] ARM: dts: imx6sx-sabreauto: add fec support
+In-Reply-To: <AM3PR04MB1315B04BE46755E3EB82E04CF58F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+References: <1524455219-6736-1-git-send-email-Anson.Huang@nxp.com>
+ <1524455219-6736-4-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5CDAQtw7Q6NgSzKP4ogaqRaGSE0A+st1iqZ=cQsK49moQ@mail.gmail.com>
+ <AM3PR04MB131566E1C8033D256686F192F5880@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5Dm=MFRoh=y54Qf2RrncWfQPTUJ2ZNfvYnUD=idp8RPNA@mail.gmail.com>
+ <AM3PR04MB1315ED599A20F67BB9FEFEE1F58F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <AM3PR04MB1315B04BE46755E3EB82E04CF58F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5AS=aH8p1+tmgJ4ooeqExNqOALh7vbPAsQdqdky8CkXyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 04:25:47PM +0100, Robin Murphy wrote:
-> It is probably safe to assume that all Armv8-A implementations have a
-> multiplier whose efficiency is comparable or better than a sequence of
-> three or so register-dependent arithmetic instructions. Select
-> ARCH_HAS_FAST_MULTIPLIER to get ever-so-slightly nicer codegen in the
-> few dusty old corners which care.
-> 
-> In a contrived benchmark calling hweight64() in a loop, this does indeed
-> turn out to be a small win overall, with no measurable impact on
-> Cortex-A57 but about 5% performance improvement on Cortex-A53.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
+Hi Anson,
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+On Wed, Apr 25, 2018 at 2:36 AM, Anson Huang <anson.huang@nxp.com> wrote:
 
-Will
+> Sorry, I made a mistake here, the MAX7320 IO0 is for adjusting FEC1's voltage,
+
+In this case you need to pass the 'phy-supply' property inside the fec
+node and add a regulator that is controlled via MAX7320 IO0 pin.
