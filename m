@@ -1,93 +1,54 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Wed, 25 Apr 2018 15:47:56 +0300
-Subject: [PATCH 1/2] crypto: sm4 - export encrypt/decrypt routines to
- other drivers
-In-Reply-To: <20180425122046.12695-2-ard.biesheuvel@linaro.org>
-References: <20180425122046.12695-1-ard.biesheuvel@linaro.org>
- <20180425122046.12695-2-ard.biesheuvel@linaro.org>
-Message-ID: <CAOtvUMdsncpGCpwibcnfPP2G+EMxDg630SdhvGTE+K2qiZkKLA@mail.gmail.com>
+From: ciro.santilli@gmail.com (Ciro Santilli)
+Date: Wed, 25 Apr 2018 13:47:42 +0100
+Subject: [RFC PATCH v3] tty: pl011: Avoid spuriously stuck-off interrupts
+In-Reply-To: <20180425122000.cts26gtvjuje4j7f@kamzik.brq.redhat.com>
+References: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
+ <CAFEAcA8Q97YNKomCgkujgoY0MoES3edHoFEk_jjXGMCdzBpd9w@mail.gmail.com>
+ <20180425122000.cts26gtvjuje4j7f@kamzik.brq.redhat.com>
+Message-ID: <CAFXrp_djBYwrp664A8tLrqZDw=3L6w4Uadk-Rin_ZTwfE2QwGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 3:20 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> In preparation of adding support for the SIMD based arm64 implementation
-> of arm64, which requires a fallback to non-SIMD code when invoked in
-> certain contexts, expose the generic SM4 encrypt and decrypt routines
-> to other drivers.
+On Wed, Apr 25, 2018 at 1:20 PM, Andrew Jones <drjones@redhat.com> wrote:
+> On Mon, Apr 23, 2018 at 02:49:30PM +0100, Peter Maydell wrote:
+>> On 23 April 2018 at 14:41, Dave Martin <Dave.Martin@arm.com> wrote:
+>> > This is an update to a previous RFC v2 [1], to fix a problem observed by
+>> > the qemu community that causes serial input to hang when booting a
+>> > simulated system with data already queued in the UART FIFO [2].
+>> >
+>> > After discussion, I decided that the approach in [1] was over-
+>> > engineered: it tries to preserve a guarantee that people shouldn't be
+>> > relying on anyway, namely that data sent to the UART prior to kernel
+>> > boot will be received by the kernel; or more generally that data
+>> > received by the UART while the pl011 driver is not opened will be
+>> > received (either intact or at all) by the driver.
+>> >
+>> > If anyone can please test the following and let me know the results,
+>> > that would be much appreciated!
+>> >
+>> >  a) Check that you can still reproduce the bug on mainline without this
+>> >     patch.
+>> >
+>> >  b) Check whether this patch fixes the problem.
+>>
+>> Thanks. I'm cc'ing Ciro and Drew, who are the two people I
+>> recall reporting this issue to me.
+>> Link to the patch for their benefit:
+>>  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573120.html
+>>
 >
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Acked-by: Gilad Ben-Yossef <gilad@benyossef.com>
-
-> ---
->  crypto/sm4_generic.c | 10 ++++++----
->  include/crypto/sm4.h |  3 +++
->  2 files changed, 9 insertions(+), 4 deletions(-)
+> Hi Dave,
 >
-> diff --git a/crypto/sm4_generic.c b/crypto/sm4_generic.c
-> index f537a2766c55..c18eebfd5edd 100644
-> --- a/crypto/sm4_generic.c
-> +++ b/crypto/sm4_generic.c
-> @@ -190,21 +190,23 @@ static void sm4_do_crypt(const u32 *rk, u32 *out, const u32 *in)
->
->  /* encrypt a block of text */
->
-> -static void sm4_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
-> +void crypto_sm4_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
->  {
->         const struct crypto_sm4_ctx *ctx = crypto_tfm_ctx(tfm);
->
->         sm4_do_crypt(ctx->rkey_enc, (u32 *)out, (u32 *)in);
->  }
-> +EXPORT_SYMBOL_GPL(crypto_sm4_encrypt);
->
->  /* decrypt a block of text */
->
-> -static void sm4_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
-> +void crypto_sm4_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
->  {
->         const struct crypto_sm4_ctx *ctx = crypto_tfm_ctx(tfm);
->
->         sm4_do_crypt(ctx->rkey_dec, (u32 *)out, (u32 *)in);
->  }
-> +EXPORT_SYMBOL_GPL(crypto_sm4_decrypt);
->
->  static struct crypto_alg sm4_alg = {
->         .cra_name               =       "sm4",
-> @@ -219,8 +221,8 @@ static struct crypto_alg sm4_alg = {
->                         .cia_min_keysize        =       SM4_KEY_SIZE,
->                         .cia_max_keysize        =       SM4_KEY_SIZE,
->                         .cia_setkey             =       crypto_sm4_set_key,
-> -                       .cia_encrypt            =       sm4_encrypt,
-> -                       .cia_decrypt            =       sm4_decrypt
-> +                       .cia_encrypt            =       crypto_sm4_encrypt,
-> +                       .cia_decrypt            =       crypto_sm4_decrypt
->                 }
->         }
->  };
-> diff --git a/include/crypto/sm4.h b/include/crypto/sm4.h
-> index b64e64d20b28..7afd730d16ff 100644
-> --- a/include/crypto/sm4.h
-> +++ b/include/crypto/sm4.h
-> @@ -25,4 +25,7 @@ int crypto_sm4_set_key(struct crypto_tfm *tfm, const u8 *in_key,
->  int crypto_sm4_expand_key(struct crypto_sm4_ctx *ctx, const u8 *in_key,
->                           unsigned int key_len);
->
-> +void crypto_sm4_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in);
-> +void crypto_sm4_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in);
-> +
->  #endif
-> --
-> 2.17.0
+> v3 does not resolve the issue for me. v2 does, and, fwiw, v3 applied on
+> top of v2 (i.e. applying both), still works.
 >
 
+I also confirm that v2 + v3 on top of Linux kernel v4.16, QEMU v2.11.0
+solves the problem on arm and aarch64, otherwise if I hit Ctrl + C
+during boot my terminal become irresponsive after boot. Test setup:
+https://github.com/cirosantilli/linux-kernel-module-cheat/tree/14965a40d27c8d9d1ff5b023ace827b288a024ef
 
-
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
-
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+> If you choose to go with v2, then you can add my tested-by.
+>
+> Thanks,
+> drew
