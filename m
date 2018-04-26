@@ -1,57 +1,94 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 Apr 2018 16:47:25 +0100
-Subject: [PATCH 3/6] arm64: untag user addresses in copy_from_user and
- others
-In-Reply-To: <949c343a4b02b41b80f324c2b7cd56b75e6a04f3.1524077494.git.andreyknvl@google.com>
-References: <cover.1524077494.git.andreyknvl@google.com>
- <949c343a4b02b41b80f324c2b7cd56b75e6a04f3.1524077494.git.andreyknvl@google.com>
-Message-ID: <20180426154725.74a33tnevvbtqx63@armageddon.cambridge.arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 26 Apr 2018 17:53:35 +0200
+Subject: [PATCH v3 05/14] locking/qspinlock: Remove unbounded cmpxchg
+ loop from locking slowpath
+In-Reply-To: <1524738868-31318-6-git-send-email-will.deacon@arm.com>
+References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
+ <1524738868-31318-6-git-send-email-will.deacon@arm.com>
+Message-ID: <20180426155335.GL4064@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 08:53:12PM +0200, Andrey Konovalov wrote:
-> @@ -238,12 +239,15 @@ static inline void uaccess_enable_not_uao(void)
->  /*
->   * Sanitise a uaccess pointer such that it becomes NULL if above the
->   * current addr_limit.
-> + * Also untag user pointers that have the top byte tag set.
->   */
->  #define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
->  static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
->  {
->  	void __user *safe_ptr;
+On Thu, Apr 26, 2018 at 11:34:19AM +0100, Will Deacon wrote:
+> @@ -290,58 +312,50 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+>  	}
 >  
-> +	ptr = untagged_addr(ptr);
+>  	/*
+> +	 * If we observe any contention; queue.
+> +	 */
+> +	if (val & ~_Q_LOCKED_MASK)
+> +		goto queue;
 > +
->  	asm volatile(
->  	"	bics	xzr, %1, %2\n"
->  	"	csel	%0, %1, xzr, eq\n"
+> +	/*
+>  	 * trylock || pending
+>  	 *
+>  	 * 0,0,0 -> 0,0,1 ; trylock
+>  	 * 0,0,1 -> 0,1,1 ; pending
+>  	 */
+> +	val = atomic_fetch_or_acquire(_Q_PENDING_VAL, &lock->val);
+> +	if (!(val & ~_Q_LOCKED_MASK)) {
+>  		/*
+> +		 * we're pending, wait for the owner to go away.
+> +		 *
+> +		 * *,1,1 -> *,1,0
 
-First of all, passing a tagged user pointer throughout the kernel is
-safe with uaccess routines but not suitable for find_vma() etc.
+Tail must be 0 here, right?
 
-With this change, we may have an inconsistent behaviour on the tag
-masking, depending on whether the entry code uses __uaccess_mask_ptr()
-or not. We could preserve the tag with something like:
+> +		 *
+> +		 * this wait loop must be a load-acquire such that we match the
+> +		 * store-release that clears the locked bit and create lock
+> +		 * sequentiality; this is because not all
+> +		 * clear_pending_set_locked() implementations imply full
+> +		 * barriers.
+>  		 */
+> +		if (val & _Q_LOCKED_MASK) {
+> +			smp_cond_load_acquire(&lock->val.counter,
+> +					      !(VAL & _Q_LOCKED_MASK));
+> +		}
+>  
+>  		/*
+> +		 * take ownership and clear the pending bit.
+> +		 *
+> +		 * *,1,0 -> *,0,1
+>  		 */
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index e66b0fca99c2..ed15bfcbd797 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -244,10 +244,11 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
- 	void __user *safe_ptr;
- 
- 	asm volatile(
--	"	bics	xzr, %1, %2\n"
-+	"	bics	xzr, %3, %2\n"
- 	"	csel	%0, %1, xzr, eq\n"
- 	: "=&r" (safe_ptr)
--	: "r" (ptr), "r" (current_thread_info()->addr_limit)
-+	: "r" (ptr), "r" (current_thread_info()->addr_limit),
-+	  "r" (untagged_addr(ptr))
- 	: "cc");
- 
- 	csdb();
+Idem.
 
--- 
-Catalin
+> +		clear_pending_set_locked(lock);
+>  		return;
+> +	}
+>  
+>  	/*
+> +	 * If pending was clear but there are waiters in the queue, then
+> +	 * we need to undo our setting of pending before we queue ourselves.
+>  	 */
+> +	if (!(val & _Q_PENDING_MASK))
+> +		clear_pending(lock);
+
+This is the branch for when we have !0 tail.
+
+>  
+>  	/*
+>  	 * End of pending bit optimistic spinning and beginning of MCS
+
+> @@ -445,15 +459,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+>  	 * claim the lock:
+>  	 *
+>  	 * n,0,0 -> 0,0,1 : lock, uncontended
+> +	 * *,*,0 -> *,*,1 : lock, contended
+>  	 *
+> +	 * If the queue head is the only one in the queue (lock value == tail)
+> +	 * and nobody is pending, clear the tail code and grab the lock.
+> +	 * Otherwise, we only need to grab the lock.
+>  	 */
+>  	for (;;) {
+>  		/* In the PV case we might already have _Q_LOCKED_VAL set */
+> +		if ((val & _Q_TAIL_MASK) != tail || (val & _Q_PENDING_MASK)) {
+>  			set_locked(lock);
+>  			break;
+>  		}
+
+This one hunk is terrible on the brain. I'm fairly sure I get it, but I
+feel that comment can use help. Or at least, I need help reading it.
+
+I'll try and cook up something when my brain starts working again.
