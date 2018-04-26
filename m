@@ -1,82 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 27 Apr 2018 00:17:21 +0300
-Subject: [PATCH 13/17] arm64: dts: r8a77965: Add HDMI encoder instance
-In-Reply-To: <20180426165346.494-14-kieran.bingham+renesas@ideasonboard.com>
-References: <20180426165346.494-1-kieran.bingham+renesas@ideasonboard.com>
- <20180426165346.494-14-kieran.bingham+renesas@ideasonboard.com>
-Message-ID: <4835359.vC9i7RXgb2@avalon>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 26 Apr 2018 16:17:40 -0500
+Subject: [PATCH v6 02/24] soc: qcom: Add APR bus driver
+In-Reply-To: <20180426113911.GA21755@sirena.org.uk>
+References: <20180426094606.4775-1-srinivas.kandagatla@linaro.org>
+ <20180426094606.4775-3-srinivas.kandagatla@linaro.org>
+ <20180426113911.GA21755@sirena.org.uk>
+Message-ID: <20180426211740.GC25699@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kieran,
-
-Thank you for the patch.
-
-On Thursday, 26 April 2018 19:53:42 EEST Kieran Bingham wrote:
-> Add the HDMI encoder to the R8A77965 DT in disabled state.
+On Thu, Apr 26, 2018 at 12:39:11PM +0100, Mark Brown wrote:
+> On Thu, Apr 26, 2018 at 10:45:44AM +0100, srinivas.kandagatla at linaro.org wrote:
+> > From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> > 
+> > This patch adds support toi APR bus (Asynchronous Packet Router) driver.
+> > ARP driver is made as a bus driver so that the apr devices can added removed
 > 
-> Based on a similar patch of the R8A7796 device tree
-> by Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
+> What is the plan for getting this patch merged?  I think the only review
+> I've seen from maintainers thus far has been from Rob on the DT binding.
+> It's obviously going to be a dependency for everything else.
 > 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> [Kieran: Rebase to top of tree]
-> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> Also just saw ARP->APR there.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Mark,
 
-> ---
->  arch/arm64/boot/dts/renesas/r8a77965.dtsi | 28 +++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-> b/arch/arm64/boot/dts/renesas/r8a77965.dtsi index
-> 8a40bba53027..972be1460a32 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-> @@ -1105,6 +1105,33 @@
->  			};
->  		};
-> 
-> +		hdmi0: hdmi at fead0000 {
-> +			compatible = "renesas,r8a77965-hdmi",
-> +				     "renesas,rcar-gen3-hdmi";
-> +			reg = <0 0xfead0000 0 0x10000>;
-> +			interrupts = <GIC_SPI 389 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cpg CPG_MOD 729>,
-> +				 <&cpg CPG_CORE R8A77965_CLK_HDMI>;
-> +			clock-names = "iahb", "isfr";
-> +			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
-> +			resets = <&cpg 729>;
-> +			status = "disabled";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				port at 0 {
-> +					reg = <0>;
-> +					dw_hdmi0_in: endpoint {
-> +						remote-endpoint = <&du_out_hdmi0>;
-> +					};
-> +				};
-> +				port at 1 {
-> +					reg = <1>;
-> +				};
-> +			};
-> +		};
-> +
->  		du: display at feb00000 {
->  			compatible = "renesas,du-r8a77965";
->  			reg = <0 0xfeb00000 0 0x80000>,
-> @@ -1134,6 +1161,7 @@
->  				port at 1 {
->  					reg = <1>;
->  					du_out_hdmi0: endpoint {
-> +						remote-endpoint = <&dw_hdmi0_in>;
->  					};
->  				};
->  				port at 2 {
+I just acked this, so it'd be great if you took it along with the others.  If
+you don't want to do that, I can just pull it in with my pull requests.
 
--- 
-Regards,
+Up to you,
 
-Laurent Pinchart
+Andy
