@@ -1,130 +1,75 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Thu, 26 Apr 2018 02:09:42 -0700
-Subject: noveau vs arm dma ops
-In-Reply-To: <CAKMK7uH14qupTYDa1pr8UC434Vs+97eUXj+fYi=+2uijCLayMA@mail.gmail.com>
-References: <CAKMK7uFL68pu+-9LODTgz+GQYvxpnXOGhxfz9zorJ_JKsPVw2g@mail.gmail.com>
- <20180425054855.GA17038@infradead.org>
- <CAKMK7uEFitkNQrD6cLX5Txe11XhVO=LC4YKJXH=VNdq+CY=DjQ@mail.gmail.com>
- <CAKMK7uFx=KB1vup=WhPCyfUFairKQcRR4BEd7aXaX1Pj-vj3Cw@mail.gmail.com>
- <20180425064335.GB28100@infradead.org> <20180425074151.GA2271@ulmo>
- <20180425085439.GA29996@infradead.org>
- <20180425100429.GR25142@phenom.ffwll.local>
- <20180425153312.GD27076@infradead.org>
- <CAKMK7uH14qupTYDa1pr8UC434Vs+97eUXj+fYi=+2uijCLayMA@mail.gmail.com>
-Message-ID: <20180426090942.GA18811@infradead.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Apr 2018 11:12:21 +0200
+Subject: [PATCH v2] pinctrl: msm: fix gpio-hog related boot issues
+In-Reply-To: <2820412.JxDUeWI2ec@debian64>
+References: <20180402121005.10080-1-chunkeey@gmail.com>
+ <20180402150447.GH510@tuxbook-pro> <2820412.JxDUeWI2ec@debian64>
+Message-ID: <CACRpkda6nD_nb7D1s7KHX3CxzmAw3qzdEe6m+V+TbaZ5gaZhaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 11:35:13PM +0200, Daniel Vetter wrote:
-> > get_required_mask() is supposed to tell you if you are safe.  However
-> > we are missing lots of implementations of it for iommus so you might get
-> > some false negatives, improvements welcome.  It's been on my list of
-> > things to fix in the DMA API, but it is nowhere near the top.
-> 
-> I hasn't come up in a while in some fireworks, so I honestly don't
-> remember exactly what the issues have been. But
-> 
-> commit d766ef53006c2c38a7fe2bef0904105a793383f2
-> Author: Chris Wilson <chris@chris-wilson.co.uk>
-> Date:   Mon Dec 19 12:43:45 2016 +0000
-> 
->     drm/i915: Fallback to single PAGE_SIZE segments for DMA remapping
-> 
-> and the various bits of code that a
-> 
-> $ git grep SWIOTLB -- drivers/gpu
-> 
-> turns up is what we're doing to hack around that stuff. And in general
-> (there's some exceptions) gpus should be able to address everything,
-> so I never fully understood where that's even coming from.
+I see I might have missed this mail, sorry for that.
 
-I'm pretty sure I've seen some oddly low dma masks in GPU drivers.  E.g.
-duplicated in various AMD files:
+On Thu, Apr 5, 2018 at 6:35 PM, Christian Lamparter <chunkeey@gmail.com> wrote:
+> On Montag, 2. April 2018 17:04:47 CEST Bjorn Andersson wrote:
+>> On Mon 02 Apr 05:10 PDT 2018, Christian Lamparter wrote:
+>> > diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+>> > index 495432f3341b..258fa357d946 100644
+>> > --- a/drivers/pinctrl/qcom/pinctrl-msm.c
+>> > +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+>> > @@ -831,11 +831,22 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+>> >             return ret;
+>> >     }
+>> >
+>> > -   ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
+>> > -   if (ret) {
+>> > -           dev_err(pctrl->dev, "Failed to add pin range\n");
+>> > -           gpiochip_remove(&pctrl->chip);
+>> > -           return ret;
+>> > +   if (!is_of_node(pctrl->dev->fwnode)) {
+>>
+>> Afaict this still means that if I boot this kernel with yesterday's dtb
+>> (without gpio-ranges) I will not get any gpios. This isn't okay.
+> Ok, fair point. I drop this chunk.
+>
+>> @Linus, I count 24 callers of gpiochip_add_pin_range(). Is this
+>> suggestion reasonable?
+>>
+>> Can we make gpiochip_add_pin_range() check if there's already a
+>> gpio-range and return ok in some way?
 
-	adev->need_dma32 = false;
-        dma_bits = adev->need_dma32 ? 32 : 40;
-        r = pci_set_dma_mask(adev->pdev, DMA_BIT_MASK(dma_bits));
-        if (r) {
-                adev->need_dma32 = true;
-                dma_bits = 32;
-                dev_warn(adev->dev, "amdgpu: No suitable DMA available.\n");
-        }
+I think I replied in some other mail that I think we need to
+be backwards compatible and it's not too hard to do
+both. (Correct me if I'm wrong.)
 
-synopsis:
+> Looks like Linus is currently really busy updating the gemini
+> target (a lot of work went into it) for OpenWrt.
+> <https://lists.openwrt.org/pipermail/openwrt-devel/2018-April/043752.html>
+> (Kinda funny, because I do help to maintain the apm821xx and the new
+> ipq40xx target over there.)
 
-drivers/gpu/drm/bridge/synopsys/dw-hdmi-i2s-audio.c:    pdevinfo.dma_mask       = DMA_BIT_MASK(32);
-drivers/gpu/drm/bridge/synopsys/dw-hdmi.c:              pdevinfo.dma_mask = DMA_BIT_MASK(32);
-drivers/gpu/drm/bridge/synopsys/dw-hdmi.c:              pdevinfo.dma_mask = DMA_BIT_MASK(32);
+Yeah it was more of a hobby, partly research for a lecture
+on maintaining old ARM systems and all dangerous aftermarket
+devices that is littering the world.
 
-etnaviv gets it right:
+Since I have noticed that the adoption of OpenWRT/LEDE goes
+far beyond routers and it is one of the most prevalent
+distributions that is existing in the IoT of darkness on the
+planet being the most deployed OS for bitcoin mining and
+being picked up for functional safety (such as automotive)
+because of its minimalist userspace.
 
-drivers/gpu/drm/etnaviv/etnaviv_gpu.c:          u32 dma_mask = (u32)dma_get_required_mask(gpu->dev);
+I'm still amazed by the weirdness of our business.
 
+> In any case, I implemented your suggestion and it does look reasonable.
+> The gpiolib already uses the gpio_offset as an ID of some sorts. For
+> now I went with a simple ID value check, but this could be extended to
+> a range/intersection check if necessary. But then again, let's not
+> overengineer it. Comments are welcome, I'll wait around till sometime
+> next week before I post v3.
 
-But yes, the swiotlb hackery really irks me.  I just have some more
-important and bigger fires to fight first, but I plan to get back to the
-root cause of that eventually.
+I'm going through my mailbox now, sorry for delays in feedback
+and review :(
 
-> 
-> >> - dma api hides the cache flushing requirements from us. GPUs love
-> >>   non-snooped access, and worse give userspace control over that. We want
-> >>   a strict separation between mapping stuff and flushing stuff. With the
-> >>   IOMMU api we mostly have the former, but for the later arch maintainers
-> >>   regularly tells they won't allow that. So we have drm_clflush.c.
-> >
-> > The problem is that a cache flushing API entirely separate is hard. That
-> > being said if you look at my generic dma-noncoherent API series it tries
-> > to move that way.  So far it is in early stages and apparently rather
-> > buggy unfortunately.
-> 
-> I'm assuming this stuff here?
-> 
-> https://lkml.org/lkml/2018/4/20/146
-> 
-> Anyway got lost in all that work a bit, looks really nice.
-
-That url doesn't seem to work currently.  But I am talking about the
-thread titled '[RFC] common non-cache coherent direct dma mapping ops'
-
-> Yeah the above is pretty much what we do on x86. dma-api believes
-> everything is coherent, so dma_map_sg does the mapping we want and
-> nothing else (minus swiotlb fun). Cache flushing, allocations, all
-> done by the driver.
-
-Which sounds like the right thing to do to me.
-
-> On arm that doesn't work. The iommu api seems like a good fit, except
-> the dma-api tends to get in the way a bit (drm/msm apparently has
-> similar problems like tegra), and if you need contiguous memory
-> dma_alloc_coherent is the only way to get at contiguous memory. There
-> was a huge discussion years ago about that, and direct cma access was
-> shot down because it would have exposed too much of the caching
-> attribute mangling required (most arm platforms need wc-pages to not
-> be in the kernel's linear map apparently).
-
-Simple cma_alloc() doesn't do anything about cache handling, it
-just is a very dumb allocator for large contiguous regions inside
-a big pool.
-
-I'm not the CMA maintainer, but in general I'd love to see an
-EXPORT_SYMBOL_GPL slapped onto cma_alloc/release and drivers use
-that were needed.  Using that plus dma_map*/dma_unmap* sounds like
-a much saner interface than dma_alloc_attrs + DMA_ATTR_NON_CONSISTENT
-or DMA_ATTR_NO_KERNEL_MAPPING.
-
-You don't happen to have a pointer to that previous discussion?
-
-> Anything that separate these 3 things more (allocation pools, mapping
-> through IOMMUs and flushing cpu caches) sounds like the right
-> direction to me. Even if that throws some portability across platforms
-> away - drivers who want to control things in this much detail aren't
-> really portable (without some serious work) anyway.
-
-As long as we stay away from the dma coherent allocations separating
-them is fine, and I'm working towards it.  dma coherent allocations on
-the other hand are very hairy beasts, and provide by very different
-implementations depending on the architecture, or often even depending
-on the specifics of individual implementations inside the architecture.
-
-So for your GPU/media case it seems like you'd better stay away from
-them as much as you can.
+Yours,
+Linus Walleij
