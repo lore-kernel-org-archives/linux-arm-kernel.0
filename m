@@ -1,82 +1,51 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 26 Apr 2018 19:48:43 +0200
-Subject: [PATCH v4 1/6] ARM: at91: add TCB registers definitions
-In-Reply-To: <20180426165242.x5pvpyfirkmvvqjo@breakpoint.cc>
-References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
- <20180418105143.3577-2-alexandre.belloni@bootlin.com>
- <20180426165242.x5pvpyfirkmvvqjo@breakpoint.cc>
-Message-ID: <20180426174843.GT4813@piout.net>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 26 Apr 2018 17:49:58 +0000
+Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
+In-Reply-To: <20180426172327.GQ15462@8bytes.org>
+References: <20180314180155.19492-1-toshi.kani@hpe.com>
+ <20180314180155.19492-3-toshi.kani@hpe.com>
+ <20180426141926.GN15462@8bytes.org> <1524759629.2693.465.camel@hpe.com>
+ <20180426172327.GQ15462@8bytes.org>
+Message-ID: <1524764948.2693.478.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/2018 18:52:43+0200, Sebastian Andrzej Siewior wrote:
-> On 2018-04-18 12:51:38 [+0200], Alexandre Belloni wrote:
-> > diff --git a/include/soc/at91/atmel_tcb.h b/include/soc/at91/atmel_tcb.h
-> > new file mode 100644
-> > index 000000000000..d263ea677225
-> > --- /dev/null
-> > +++ b/include/soc/at91/atmel_tcb.h
-> ?
-> > +static inline struct clk *tcb_clk_get(struct device_node *node, int channel)
-> > +{
-> > +	struct clk *clk;
-> > +	char clk_name[] = "t0_clk";
-> > +
-> > +	clk_name[1] += channel;
-> > +	clk = of_clk_get_by_name(node->parent, clk_name);
-> > +	if (!IS_ERR(clk))
-> > +		return clk;
-> > +
-> > +	return of_clk_get_by_name(node->parent, "t0_clk");
-> > +}
-> > +
-> > +static inline int tcb_irq_get(struct device_node *node, int channel)
-> > +{
-> > +	int irq;
-> > +
-> > +	irq = of_irq_get(node->parent, channel);
-> > +	if (irq > 0)
-> > +		return irq;
-> > +
-> > +	return of_irq_get(node->parent, 0);
-> > +}
-> > +
-> > +static const u8 atmel_tc_divisors[5] = { 2, 8, 32, 128, 0, };
-> > +
-> > +struct atmel_tcb_info {
-> > +	int bits;
-> > +};
-> > +
-> > +static const struct atmel_tcb_info atmel_tcb_infos[] = {
-> > +	{ .bits = 16 },
-> > +	{ .bits = 32 },
-> > +};
-> > +
-> > +static const struct of_device_id atmel_tcb_dt_ids[] = {
-> > +	{
-> > +		.compatible = "atmel,at91rm9200-tcb",
-> > +		.data = &atmel_tcb_infos[0],
-> > +	}, {
-> > +		.compatible = "atmel,at91sam9x5-tcb",
-> > +		.data = &atmel_tcb_infos[1],
-> > +	}, {
-> > +		/* sentinel */
-> > +	}
-> > +};
+On Thu, 2018-04-26 at 19:23 +0200, joro at 8bytes.org wrote:
+> On Thu, Apr 26, 2018 at 04:21:19PM +0000, Kani, Toshi wrote:
+> > All pages under the pmd had been unmapped and then lazy TLB purged with
+> > INVLPG before coming to this code path.  Speculation is not allowed to
+> > pages without mapping.
 > 
-> After the series is applied, I see only one user of that file. The data
-> structures don't look like they belong here. Same goes for the static
-> inline of the code above.
+> CPUs have not only TLBs, but also page-walk caches which cache
+> intermediary results of page-table walks and which is flushed together
+> with the TLB.
 > 
+> So the PMD entry you clear can still be in a page-walk cache and this
+> needs to be flushed too before you can free the PTE page. Otherwise
+> page-walks might still go to the page you just freed. That is especially
+> bad when the page is already reallocated and filled with other data.
 
-There is another user coming later (the pwm driver) but I didn't repost,
-I'll do so after this series is applied.
+I do not understand why we need to flush processor caches here. x86
+processor caches are coherent with MESI.  So, clearing an PMD entry
+modifies a cache entry on the processor associated with the address,
+which in turn invalidates all stale cache entries on other processors.
 
-> > +#endif /* __SOC_ATMEL_TCB_H */
+> > > Further this needs synchronization with other page-tables in the system
+> > > when the kernel PMDs are not shared between processes. In x86-32 with
+> > > PAE this causes a BUG_ON() being triggered at arch/x86/mm/fault.c:268
+> > > because the page-tables are not correctly synchronized.
+> > 
+> > I think this is an issue with pmd mapping support on x86-32-PAE, not
+> > with this patch.  I think the code needed to be updated to sync at the
+> > pud level.
 > 
-> Sebastian
+> It is an issue with this patch, because this patch is for x86 and on x86
+> every change to the kernel page-tables potentially needs to by
+> synchronized to the other page-tables. And this patch doesn't implement
+> it, which triggers a BUG_ON() under certain conditions.
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+The issue was introduced when pmd mapping support was added on x86/32,
+which was made prior to this patch.
+
+Thanks,
+-Toshi
