@@ -1,59 +1,46 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 27 Apr 2018 00:22:32 +0300
-Subject: [PATCH 16/17] arm64: dts: r8a77965-salvator-xs: Add DU external
- dot clocks
-In-Reply-To: <20180426165346.494-17-kieran.bingham+renesas@ideasonboard.com>
-References: <20180426165346.494-1-kieran.bingham+renesas@ideasonboard.com>
- <20180426165346.494-17-kieran.bingham+renesas@ideasonboard.com>
-Message-ID: <2242585.ilfyDprk4a@avalon>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 26 Apr 2018 14:23:27 -0700
+Subject: [PATCH 20/61] input: keyboard: simplify getting .drvdata
+In-Reply-To: <20180426200401.lvqiy4gnchkwr4qw@ninjato>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-21-wsa+renesas@sang-engineering.com>
+ <20180426191947.GC162443@dtor-ws>
+ <20180426200401.lvqiy4gnchkwr4qw@ninjato>
+Message-ID: <20180426212327.GB210716@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kieran,
-
-Thank you for the patch.
-
-On Thursday, 26 April 2018 19:53:45 EEST Kieran Bingham wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On Thu, Apr 26, 2018 at 10:04:01PM +0200, Wolfram Sang wrote:
+> Hi Dmitry,
 > 
-> The DU1 external dot clock is provided by the fixed frequency clock
-> generator X21, while the DU0 and DU3 clocks are provided by the
-> programmable Versaclock6 clock generator.
+> > > We should get drvdata from struct device directly. Going via
+> > > platform_device is an unneeded step back and forth.
+> > 
+> > I consider the fact that platform device's driver data is accessible via
+> > device driver data being implementation detail that may or may not change
 > 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> ---
->  arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> Isn't it actually the other way around? platform_get_drvdata() is a
+> convenience function to access driver_data which is embedded in struct
+> device?
+
+I guess it depends on how you read it. I always considered it separate
+because none (?) of the bus implementation assert this in comments to
+XXX_get_drvdata().
+
 > 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
-> b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts index
-> a83a00deed9e..2223cc2bd6bc 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
-> @@ -19,3 +19,15 @@
->  		reg = <0x0 0x48000000 0x0 0x78000000>;
->  	};
->  };
-> +
-> +&du {
-> +	clocks = <&cpg CPG_MOD 724>,
-> +		 <&cpg CPG_MOD 723>,
-> +		 <&cpg CPG_MOD 721>,
-> +		 <&cpg CPG_MOD 727>,
-> +		 <&versaclock6 1>,
-> +		 <&x21_clk>,
-> +		 <&versaclock6 2>;
-> +	clock-names = "du.0", "du.1", "du.3", "lvds.0",
-> +		      "dclkin.0", "dclkin.1", "dclkin.3";
+> > in the future, so I'd prefer keep using the proper accessors for the
+> > objects we are dealing with.
+> 
+> Exactly. I'd just argue, the object we are dealing with, declared in the
+> PM functions, is a struct device.
 
-There's no LVDS clock in the DU anymore, you can drop it.
+No, the driver does not create a generic device, it actually creates a
+platform device, or i2c client, or spi, or something else. The fact that
+suspend and resume routines have generic device as their argument has
+more to do with the language limitation rather than reflection of true
+type of the objects we are dealing with.
 
-As for patch 14/17, I think you can squash this one with 17/17.
-
-> +};
+Thanks.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Dmitry
