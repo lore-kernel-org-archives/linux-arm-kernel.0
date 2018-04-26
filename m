@@ -1,87 +1,71 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 26 Apr 2018 10:06:37 -0500
-Subject: [PATCH 1/3] Documentation: dt: socfpga: Add Stratix10 ECC Manager
- binding
-In-Reply-To: <8f29ed5c-4e21-6200-23dc-4cadf86d2b96@kernel.org>
-References: <1524594959-5259-1-git-send-email-thor.thayer@linux.intel.com>
- <1524594959-5259-2-git-send-email-thor.thayer@linux.intel.com>
- <6528e94e-85ea-8015-5a3b-4e8a9ecc8dbd@kernel.org>
- <e9606cfb-cee6-2e0c-cfe5-c91a537cb8a2@linux.intel.com>
- <64ecc830-3674-6bb4-c2f9-c24e576c08c0@linux.intel.com>
- <8f29ed5c-4e21-6200-23dc-4cadf86d2b96@kernel.org>
-Message-ID: <CAL_JsqKSJ35Da9fDx0kzyC5Gi5ks8k_pDpnTF0beh7YV484o4w@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 26 Apr 2018 16:25:01 +0100
+Subject: [RFC PATCH v4] tty: pl011: Avoid spuriously stuck-off interrupts
+In-Reply-To: <20180426134201.mwnkib4ch4dcqnqi@kamzik.brq.redhat.com>
+References: <1524740081-4979-1-git-send-email-Dave.Martin@arm.com>
+ <CAFEAcA9aVWC2M4cExTgPdwGqAOofWgm-61FUuZHNFWvFeNiHJA@mail.gmail.com>
+ <20180426134201.mwnkib4ch4dcqnqi@kamzik.brq.redhat.com>
+Message-ID: <20180426152500.GS16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 10:01 AM, Dinh Nguyen <dinguyen@kernel.org> wrote:
->
->
-> On 04/26/2018 09:58 AM, Thor Thayer wrote:
->> On 04/26/2018 09:43 AM, Thor Thayer wrote:
->>> On 04/25/2018 09:16 PM, Dinh Nguyen wrote:
->>>>
->>>>
->>>> On 04/24/2018 01:35 PM, thor.thayer at linux.intel.com wrote:
->>>>> From: Thor Thayer <thor.thayer@linux.intel.com>
->>>>>
->>>>> Add the device tree bindings needed to support the Stratix10
->>>>> ECC Manager and SDRAM ECC to the existing bindings.
->>>>>
->>>>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
->>>>> ---
->>>>>   .../bindings/arm/altera/socfpga-eccmgr.txt         | 47
->>>>> ++++++++++++++++++++++
->>>>>   1 file changed, 47 insertions(+)
->>>>>
->>>>> diff --git
->>>>> a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->>>>> b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->>>>> index 4a1714f96bab..fe48ad293a24 100644
->>>>> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->>>>> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->>>>> @@ -231,3 +231,50 @@ Example:
->>>>>                        <48 IRQ_TYPE_LEVEL_HIGH>;
->>>>>           };
->>>>>       };
->>>>> +
->>>>> +Stratix10 SoCFPGA ECC Manager
->>>>> +The Stratix10 SoC ECC Manager handles the IRQs for each peripheral
->>>>> +in a shared register similar to the Arria10. However, ECC requires
->>>>> +access to registers that can only be read in EL3 with SMC calls.
->>>>> +Therefore the device tree is slightly different.
->>>>> +
->>>>> +Required Properties:
->>>>> +- compatible : Should be "altr,socfpga-s10-ecc-manager"
->>>>
->>>> Altera technically doesn't exist anymore, should this be
->>>> "intel,stratix10-ecc-manager"?
->>>>
->>> I was trying to be consistent with the older names but I agree with
->>> your argument. I will change this. Thanks
->>>
->> After looking at the Stratix10 device tree, there are only "altr," in
->> there. For instance the top node is:
->>
->> compatible = "altr,socfpga-stratix10";
->>
->> and even the directory that the device tree is in is named "altera"
->>
->> so I'll stick with the existing "altr," designation to be consistent.
->>
->
-> That's fine and I don't have any strong inclination for 1 way or
-> another. But it's not quite true that there are only "altr" in the dts file.
->
-> I did recently switch the clock manager to an intel designation. I
-> upstreamed the original stratix10 DTS file back in 2015, before Altera
-> was purchased by Intel.
->
-> My only argument is that if you're adding new support for devices, it
-> should be an intel binding.
+On Thu, Apr 26, 2018 at 03:42:01PM +0200, Andrew Jones wrote:
+> On Thu, Apr 26, 2018 at 01:11:41PM +0100, Peter Maydell wrote:
+> > On 26 April 2018 at 11:54, Dave Martin <Dave.Martin@arm.com> wrote:
+> > > This is an update to a previous RFC v3 [1], to fix a problem observed by
+> > > the qemu community that causes serial input to hang when booting a
+> > > simulated system with data already queued in the UART FIFO [2].
+> > >
+> > > RFC v3 did not solve the problem by itself, due to the problem being
+> > > triggered again in pl011_enable_interrupts() after working around it
+> > > in pl011_hwinit().  See the updated commit message in the patch for
+> > > details.
+> > >
+> > > This patch is intended to supersede the previous RFCs, so please test
+> > > _without_ RFC v2 (or 3) applied.
+> > >
+> > > If you can, please:
+> > >
+> > >  a) Check that you can still reproduce the bug on mainline without this
+> > >     patch.
+> > >
+> > >  b) Check whether this patch fixes the problem.
+> > 
+> > Adding back to the CC list the people who might be able to do
+> > this testing...
+> > Link to v4 patch:
+> > https://patchwork.kernel.org/patch/10365551/
+> >
+> 
+> Tested-by: Andrew Jones <drjones@redhat.com>
+> 
+> And
+>  
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
+> 
+> as this patch is consistent with what I expected was needed back
+> when I reported the issue[*]. I was just too dense to realize
+> that we didn't need to "reset" the FIFO, but rather just drain it.
 
-I think I would make the switch when you change it at the SoC level
-(for a new SoC). IOW, if the top level compatible is using 'intel',
-then use that for the device bindings otherwise stick with 'altr' for
-that SoC.
+Thanks for the testing and review!
 
-Rob
+There seem to be a few ways to solve this, and it's hard to know which 
+ne is best.  This at least looks simple now.
+
+Possibly there is a way to reset the FIFO on a real PL011, but I ignored
+the possibility since there is definitely no way to do that on e.g.,
+SBSA UART.  Draining the FIFO by hand ought to work on all variants IIUC.
+
+Cheers
+---Dave
+
+> 
+> Thanks,
+> drew
+> 
+> [*] https://lkml.org/lkml/2016/8/1/247
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
