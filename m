@@ -1,327 +1,609 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 26 Apr 2018 13:21:12 +0200
-Subject: [PATCH] thermal: samsung: Remove support for Exynos5440
-In-Reply-To: <1951102.VLysaozMLK@amdc3058>
-References: <20180424203239.21885-1-krzk@kernel.org>
- <20180424203239.21885-7-krzk@kernel.org> <1951102.VLysaozMLK@amdc3058>
- <CGME20180426112113eucas1p1b5bf6f093442154e29f5541b4aba6b00@eucas1p1.samsung.com>
-Message-ID: <2734003.UHSMxVLybj@amdc3058>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 26 Apr 2018 13:21:22 +0200
+Subject: [RFC PATCH 3/8] KVM: arm64: Optimise FPSIMD handling to reduce
+ guest/host thrashing
+In-Reply-To: <1524242802-21163-4-git-send-email-Dave.Martin@arm.com>
+References: <1524242802-21163-1-git-send-email-Dave.Martin@arm.com>
+ <1524242802-21163-4-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180426112122.GB13249@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Subject: [PATCH] thermal: samsung: Remove support for Exynos5440
+On Fri, Apr 20, 2018 at 05:46:37PM +0100, Dave Martin wrote:
+> This patch refactors KVM to align the host and guest FPSIMD
+> save/restore logic with each other for arm64.  This reduces the
+> number of redundant save/restore operations that must occur, and
+> reduces the common-case IRQ blackout time during guest exit storms
+> by saving the host state lazily and optimising away the need to
+> restore the host state before returning to the run loop.
+> 
+> Four hooks are defined in order to enable this:
+> 
+>  * kvm_arch_vcpu_run_map_fp():
+>    Called on PID change to map necessary bits of current to Hyp.
+> 
+>  * kvm_arch_vcpu_load_fp():
+>    Set up FP/SIMD for entering the KVM run loop (parse as
+>    "vcpu_load fp").
+> 
+>  * kvm_arch_vcpu_park_fp():
+>    Get FP/SIMD into a safe state for re-enabling interrupts after a
+>    guest exit back to the run loop.
+> 
+>    For arm64 specifically, this involves updating the host kernel's
+>    FPSIMD context tracking metadata so that kernel-mode NEON use
+>    will cause the vcpu's FPSIMD state to be saved back correctly
+>    into the vcpu struct.  This must be done before re-enabling
+>    interrupts because kernel-mode NEON may be used my softirqs.
+> 
+>  * kvm_arch_vcpu_put_fp():
+>    Save guest FP/SIMD state back to memory and dissociate from the
+>    CPU ("vcpu_put fp").
+> 
+> Also, the arm64 FPSIMD context switch code is updated to enable it
+> to save back FPSIMD state for a vcpu, not just current.  A few
+> helpers drive this:
+> 
+>  * fpsimd_bind_state_to_cpu(struct user_fpsimd_state *fp):
+>    mark this CPU as having context fp (which may belong to a vcpu)
+>    currently loaded in its registers.  This is the non-task
+>    equivalent of the static function fpsimd_bind_to_cpu() in
+>    fpsimd.c.
+> 
+>  * task_fpsimd_save():
+>    exported to allow KVM to save the guest's FPSIMD state back to
+>    memory on exit from the run loop.
+> 
+>  * fpsimd_flush_state():
+>    invalidate any context's FPSIMD state that is currently loaded.
+>    Used to disassociate the vcpu from the CPU regs on run loop exit.
+> 
+> These changes allow the run loop to enable interrupts (and thus
+> softirqs that may use kernel-mode NEON) without having to save the
+> guest's FPSIMD state eagerly.
+> 
+> Some new vcpu_arch fields are added to make all this work.  Because
+> host FPSIMD state can now be saved back directly into current's
+> thread_struct as appropriate, host_cpu_context is no longer used
+> for preserving the FPSIMD state.  However, it is still needed for
+> preserving other things such as the host's system registers.  To
+> avoid ABI churn, the redundant storage space in host_cpu_context is
+> not removed for now.
+> 
+> arch/arm is not addressed by this patch and continues to use its
+> current save/restore logic.  It could provide implementations of
+> the helpers later if desired.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
+> ---
+> 
+> Changes since RFC v3:
+> 
+> Requested by Christoffer Dall:
+> 
+>  * Remove fpsimd_flush_state(), which nothing uses.
+>    Inline it back into fpsimd_flush_task_state().
+> 
+>  * Add __hyp_text anootation to update_fp_enabled().
+> 
+> Other:
+> 
+>  * Remove fp_enabled().
+> 
+>    Now that we have an explicit field vcpu->arch.fp_enabled to
+>    indicate whether the guest's FPSIMD state is loaded, we can use
+>    this to determine when to save FPEXC_EL1 for 32-bit guests.
+>    This brings the logic for FPEXC_EL1 save back into line with the
+>    (updated) logic for restore of this register, and simplifies the
+>    code a bit.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h   |   8 +++
+>  arch/arm64/include/asm/fpsimd.h   |   5 ++
+>  arch/arm64/include/asm/kvm_host.h |  18 +++++++
+>  arch/arm64/kernel/fpsimd.c        |  24 ++++++---
+>  arch/arm64/kvm/Makefile           |   2 +-
+>  arch/arm64/kvm/fpsimd.c           | 109 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kvm/hyp/switch.c       |  50 +++++++++--------
+>  virt/kvm/arm/arm.c                |  14 ++---
+>  8 files changed, 187 insertions(+), 43 deletions(-)
+>  create mode 100644 arch/arm64/kvm/fpsimd.c
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index c6a7495..3fe01c7 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -300,6 +300,14 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+>  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>  			       struct kvm_device_attr *attr);
+>  
+> +/*
+> + * VFP/NEON switching is all done by the hyp switch code, so no need to
+> + * coordinate with host context handling for this state:
+> + */
+> +static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
+> +static inline void kvm_arch_vcpu_park_fp(struct kvm_vcpu *vcpu) {}
+> +static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
+> +
+>  /* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+>  static inline void kvm_fpsimd_flush_cpu_state(void) {}
+>  
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index aa7162a..a1c5127 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -41,6 +41,8 @@ struct task_struct;
+>  extern void fpsimd_save_state(struct user_fpsimd_state *state);
+>  extern void fpsimd_load_state(struct user_fpsimd_state *state);
+>  
+> +extern void task_fpsimd_save(void);
+> +
+>  extern void fpsimd_thread_switch(struct task_struct *next);
+>  extern void fpsimd_flush_thread(void);
+>  
+> @@ -49,7 +51,10 @@ extern void fpsimd_preserve_current_state(void);
+>  extern void fpsimd_restore_current_state(void);
+>  extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
+>  
+> +extern void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *state);
+> +
+>  extern void fpsimd_flush_task_state(struct task_struct *target);
+> +extern void fpsimd_flush_cpu_state(void);
+>  extern void sve_flush_cpu_state(void);
+>  
+>  /* Maximum VL that SVE VL-agnostic software can transparently support */
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index ab46bc7..2fbfbda 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -30,6 +30,7 @@
+>  #include <asm/kvm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
+> +#include <asm/thread_info.h>
+>  
+>  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+>  
+> @@ -235,6 +236,12 @@ struct kvm_vcpu_arch {
+>  
+>  	/* Pointer to host CPU context */
+>  	kvm_cpu_context_t *host_cpu_context;
+> +
+> +	struct thread_info *host_thread_info;	/* hyp VA */
+> +	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
+> +	bool host_sve_in_use;	/* backup for host TIF_SVE while in guest */
+> +	bool fp_enabled;
+> +
+>  	struct {
+>  		/* {Break,watch}point registers */
+>  		struct kvm_guest_debug_arch regs;
+> @@ -417,6 +424,17 @@ static inline void __cpu_init_stage2(void)
+>  		  "PARange is %d bits, unsupported configuration!", parange);
+>  }
+>  
+> +/* Guest/host FPSIMD coordination helpers */
+> +int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu);
+> +void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu);
+> +void kvm_arch_vcpu_park_fp(struct kvm_vcpu *vcpu);
+> +void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu);
+> +
+> +static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+> +{
+> +	return kvm_arch_vcpu_run_map_fp(vcpu);
+> +}
+> +
 
-The Exynos5440 is not actively developed, there are no development
-boards available and probably there are no real products with it.
-Remove wide-tree support for Exynos5440.
+nit: It would be nicer to only add the arm64 hook the way they should be
+in this patch, and remove the #ifdef CONFIG_ARM64 thing that gets
+removed in this patch from patch 1.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-[b.zolnierkie: ported over driver changes]
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-Eduardo, here is a version which applies on top of pending Exynos
-thermal changes (https://lkml.org/lkml/2018/4/16/256).
+>  /*
+>   * All host FP/SIMD state is restored on guest exit, so nothing needs
+>   * doing here except in the SVE case:
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 87a3536..7f74374 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -270,13 +270,15 @@ static void task_fpsimd_load(void)
+>  }
+>  
+>  /*
+> - * Ensure current's FPSIMD/SVE storage in thread_struct is up to date
+> + * Ensure current's FPSIMD/SVE storage in memory is up to date
+>   * with respect to the CPU registers.
+>   *
+>   * Softirqs (and preemption) must be disabled.
+>   */
+> -static void task_fpsimd_save(void)
+> +void task_fpsimd_save(void)
+>  {
+> +	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
+> +
+>  	WARN_ON(!in_softirq() && !irqs_disabled());
+>  
+>  	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> @@ -291,10 +293,9 @@ static void task_fpsimd_save(void)
+>  				return;
+>  			}
+>  
+> -			sve_save_state(sve_pffr(current),
+> -				       &current->thread.uw.fpsimd_state.fpsr);
+> +			sve_save_state(sve_pffr(current), &st->fpsr);
+>  		} else
+> -			fpsimd_save_state(&current->thread.uw.fpsimd_state);
+> +			fpsimd_save_state(st);
 
- Documentation/devicetree/bindings/thermal/exynos-thermal.txt |   14 
- drivers/thermal/samsung/exynos_tmu.c                         |  161 -----------
- 2 files changed, 4 insertions(+), 171 deletions(-)
+Is this equivalent to what we had before, because we'll have run
+something that sets this cpu's fpsimd_last_state to current's
+user_fpsimd_state, when scheduling this thread?
 
-Index: b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-===================================================================
---- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt	2018-04-26 12:29:42.716294204 +0200
-+++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt	2018-04-26 12:29:42.716294204 +0200
-@@ -12,7 +12,6 @@
- 	       "samsung,exynos5420-tmu-ext-triminfo" for TMU channels 2, 3 and 4
- 			Exynos5420 (Must pass triminfo base and triminfo clock)
-                "samsung,exynos5433-tmu"
--	       "samsung,exynos5440-tmu"
- 	       "samsung,exynos7-tmu"
- - interrupt-parent : The phandle for the interrupt controller
- - reg : Address range of the thermal registers. For soc's which has multiple
-@@ -68,18 +67,7 @@ Example 1):
- 		#thermal-sensor-cells = <0>;
- 	};
- 
--Example 2):
--
--	tmuctrl_0: tmuctrl at 160118 {
--		compatible = "samsung,exynos5440-tmu";
--		reg = <0x160118 0x230>, <0x160368 0x10>;
--		interrupts = <0 58 0>;
--		clocks = <&clock 21>;
--		clock-names = "tmu_apbif";
--		#thermal-sensor-cells = <0>;
--	};
--
--Example 3): (In case of Exynos5420 "with misplaced TRIMINFO register")
-+Example 2): (In case of Exynos5420 "with misplaced TRIMINFO register")
- 	tmu_cpu2: tmu at 10068000 {
- 		compatible = "samsung,exynos5420-tmu-ext-triminfo";
- 		reg = <0x10068000 0x100>, <0x1006c000 0x4>;
-Index: b/drivers/thermal/samsung/exynos_tmu.c
-===================================================================
---- a/drivers/thermal/samsung/exynos_tmu.c	2018-04-26 12:29:42.716294204 +0200
-+++ b/drivers/thermal/samsung/exynos_tmu.c	2018-04-26 12:30:52.648295965 +0200
-@@ -126,28 +126,6 @@
- 
- #define EXYNOS5433_G3D_BASE			0x10070000
- 
--/*exynos5440 specific registers*/
--#define EXYNOS5440_TMU_S0_7_TRIM		0x000
--#define EXYNOS5440_TMU_S0_7_CTRL		0x020
--#define EXYNOS5440_TMU_S0_7_DEBUG		0x040
--#define EXYNOS5440_TMU_S0_7_TEMP		0x0f0
--#define EXYNOS5440_TMU_S0_7_TH0			0x110
--#define EXYNOS5440_TMU_S0_7_TH1			0x130
--#define EXYNOS5440_TMU_S0_7_TH2			0x150
--#define EXYNOS5440_TMU_S0_7_IRQEN		0x210
--#define EXYNOS5440_TMU_S0_7_IRQ			0x230
--/* exynos5440 common registers */
--#define EXYNOS5440_TMU_IRQ_STATUS		0x000
--#define EXYNOS5440_TMU_PMIN			0x004
--
--#define EXYNOS5440_TMU_INTEN_RISE0_SHIFT	0
--#define EXYNOS5440_TMU_INTEN_RISE1_SHIFT	1
--#define EXYNOS5440_TMU_INTEN_RISE2_SHIFT	2
--#define EXYNOS5440_TMU_INTEN_RISE3_SHIFT	3
--#define EXYNOS5440_TMU_INTEN_FALL0_SHIFT	4
--#define EXYNOS5440_TMU_TH_RISE4_SHIFT		24
--#define EXYNOS5440_EFUSE_SWAP_OFFSET		8
--
- /* Exynos7 specific registers */
- #define EXYNOS7_THD_TEMP_RISE7_6		0x50
- #define EXYNOS7_THD_TEMP_FALL7_6		0x60
-@@ -184,7 +162,6 @@ enum soc_type {
- 	SOC_ARCH_EXYNOS5420,
- 	SOC_ARCH_EXYNOS5420_TRIMINFO,
- 	SOC_ARCH_EXYNOS5433,
--	SOC_ARCH_EXYNOS5440,
- 	SOC_ARCH_EXYNOS7,
- };
- 
-@@ -619,57 +596,6 @@ out:
- 	return ret;
- }
- 
--static int exynos5440_tmu_initialize(struct platform_device *pdev)
--{
--	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
--	unsigned int trim_info = 0, con, rising_threshold;
--	int threshold_code;
--	int crit_temp = 0;
--
--	/*
--	 * For exynos5440 soc triminfo value is swapped between TMU0 and
--	 * TMU2, so the below logic is needed.
--	 */
--	switch (data->id) {
--	case 0:
--		trim_info = readl(data->base + EXYNOS5440_EFUSE_SWAP_OFFSET +
--				 EXYNOS5440_TMU_S0_7_TRIM);
--		break;
--	case 1:
--		trim_info = readl(data->base + EXYNOS5440_TMU_S0_7_TRIM);
--		break;
--	case 2:
--		trim_info = readl(data->base - EXYNOS5440_EFUSE_SWAP_OFFSET +
--				  EXYNOS5440_TMU_S0_7_TRIM);
--	}
--	sanitize_temp_error(data, trim_info);
--
--	/* Write temperature code for rising and falling threshold */
--	rising_threshold = readl(data->base + EXYNOS5440_TMU_S0_7_TH0);
--	rising_threshold = get_th_reg(data, rising_threshold, false);
--	writel(rising_threshold, data->base + EXYNOS5440_TMU_S0_7_TH0);
--	writel(0, data->base + EXYNOS5440_TMU_S0_7_TH1);
--
--	data->tmu_clear_irqs(data);
--
--	/* if last threshold limit is also present */
--	if (!data->tzd->ops->get_crit_temp(data->tzd, &crit_temp)) {
--		threshold_code = temp_to_code(data, crit_temp / MCELSIUS);
--		/* 5th level to be assigned in th2 reg */
--		rising_threshold =
--			threshold_code << EXYNOS5440_TMU_TH_RISE4_SHIFT;
--		writel(rising_threshold, data->base + EXYNOS5440_TMU_S0_7_TH2);
--		con = readl(data->base + EXYNOS5440_TMU_S0_7_CTRL);
--		con |= (1 << EXYNOS_TMU_THERM_TRIP_EN_SHIFT);
--		writel(con, data->base + EXYNOS5440_TMU_S0_7_CTRL);
--	}
--	/* Clear the PMIN in the common TMU register */
--	if (!data->id)
--		writel(0, data->base_second + EXYNOS5440_TMU_PMIN);
--
--	return 0;
--}
--
- static int exynos7_tmu_initialize(struct platform_device *pdev)
- {
- 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-@@ -820,35 +746,6 @@ static void exynos5433_tmu_control(struc
- 	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
- }
- 
--static void exynos5440_tmu_control(struct platform_device *pdev, bool on)
--{
--	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
--	struct thermal_zone_device *tz = data->tzd;
--	unsigned int con, interrupt_en;
--
--	con = get_con_reg(data, readl(data->base + EXYNOS5440_TMU_S0_7_CTRL));
--
--	if (on) {
--		con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
--		interrupt_en =
--			(of_thermal_is_trip_valid(tz, 3)
--			 << EXYNOS5440_TMU_INTEN_RISE3_SHIFT) |
--			(of_thermal_is_trip_valid(tz, 2)
--			 << EXYNOS5440_TMU_INTEN_RISE2_SHIFT) |
--			(of_thermal_is_trip_valid(tz, 1)
--			 << EXYNOS5440_TMU_INTEN_RISE1_SHIFT) |
--			(of_thermal_is_trip_valid(tz, 0)
--			 << EXYNOS5440_TMU_INTEN_RISE0_SHIFT);
--		interrupt_en |=
--			interrupt_en << EXYNOS5440_TMU_INTEN_FALL0_SHIFT;
--	} else {
--		con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
--		interrupt_en = 0; /* Disable all interrupts */
--	}
--	writel(interrupt_en, data->base + EXYNOS5440_TMU_S0_7_IRQEN);
--	writel(con, data->base + EXYNOS5440_TMU_S0_7_CTRL);
--}
--
- static void exynos7_tmu_control(struct platform_device *pdev, bool on)
- {
- 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-@@ -920,10 +817,8 @@ static u32 get_emul_con_reg(struct exyno
- 	if (temp) {
- 		temp /= MCELSIUS;
- 
--		if (data->soc != SOC_ARCH_EXYNOS5440) {
--			val &= ~(EXYNOS_EMUL_TIME_MASK << EXYNOS_EMUL_TIME_SHIFT);
--			val |= (EXYNOS_EMUL_TIME << EXYNOS_EMUL_TIME_SHIFT);
--		}
-+		val &= ~(EXYNOS_EMUL_TIME_MASK << EXYNOS_EMUL_TIME_SHIFT);
-+		val |= (EXYNOS_EMUL_TIME << EXYNOS_EMUL_TIME_SHIFT);
- 		if (data->soc == SOC_ARCH_EXYNOS7) {
- 			val &= ~(EXYNOS7_EMUL_DATA_MASK <<
- 				EXYNOS7_EMUL_DATA_SHIFT);
-@@ -964,16 +859,6 @@ static void exynos4412_tmu_set_emulation
- 	writel(val, data->base + emul_con);
- }
- 
--static void exynos5440_tmu_set_emulation(struct exynos_tmu_data *data,
--					 int temp)
--{
--	unsigned int val;
--
--	val = readl(data->base + EXYNOS5440_TMU_S0_7_DEBUG);
--	val = get_emul_con_reg(data, val, temp);
--	writel(val, data->base + EXYNOS5440_TMU_S0_7_DEBUG);
--}
--
- static int exynos_tmu_set_emulation(void *drv_data, int temp)
- {
- 	struct exynos_tmu_data *data = drv_data;
-@@ -996,7 +881,6 @@ out:
- }
- #else
- #define exynos4412_tmu_set_emulation NULL
--#define exynos5440_tmu_set_emulation NULL
- static int exynos_tmu_set_emulation(void *drv_data, int temp)
- 	{ return -EINVAL; }
- #endif /* CONFIG_THERMAL_EMULATION */
-@@ -1014,11 +898,6 @@ static int exynos4412_tmu_read(struct ex
- 	return readb(data->base + EXYNOS_TMU_REG_CURRENT_TEMP);
- }
- 
--static int exynos5440_tmu_read(struct exynos_tmu_data *data)
--{
--	return readb(data->base + EXYNOS5440_TMU_S0_7_TEMP);
--}
--
- static int exynos7_tmu_read(struct exynos_tmu_data *data)
- {
- 	return readw(data->base + EXYNOS_TMU_REG_CURRENT_TEMP) &
-@@ -1029,16 +908,9 @@ static void exynos_tmu_work(struct work_
- {
- 	struct exynos_tmu_data *data = container_of(work,
- 			struct exynos_tmu_data, irq_work);
--	unsigned int val_type;
- 
- 	if (!IS_ERR(data->clk_sec))
- 		clk_enable(data->clk_sec);
--	/* Find which sensor generated this interrupt */
--	if (data->soc == SOC_ARCH_EXYNOS5440) {
--		val_type = readl(data->base_second + EXYNOS5440_TMU_IRQ_STATUS);
--		if (!((val_type >> data->id) & 0x1))
--			goto out;
--	}
- 	if (!IS_ERR(data->clk_sec))
- 		clk_disable(data->clk_sec);
- 
-@@ -1051,7 +923,6 @@ static void exynos_tmu_work(struct work_
- 
- 	clk_disable(data->clk);
- 	mutex_unlock(&data->lock);
--out:
- 	enable_irq(data->irq);
- }
- 
-@@ -1086,15 +957,6 @@ static void exynos4210_tmu_clear_irqs(st
- 	writel(val_irq, data->base + tmu_intclear);
- }
- 
--static void exynos5440_tmu_clear_irqs(struct exynos_tmu_data *data)
--{
--	unsigned int val_irq;
--
--	val_irq = readl(data->base + EXYNOS5440_TMU_S0_7_IRQ);
--	/* clear the interrupts */
--	writel(val_irq, data->base + EXYNOS5440_TMU_S0_7_IRQ);
--}
--
- static irqreturn_t exynos_tmu_irq(int irq, void *id)
- {
- 	struct exynos_tmu_data *data = id;
-@@ -1131,9 +993,6 @@ static const struct of_device_id exynos_
- 		.compatible = "samsung,exynos5433-tmu",
- 		.data = (const void *)SOC_ARCH_EXYNOS5433,
- 	}, {
--		.compatible = "samsung,exynos5440-tmu",
--		.data = (const void *)SOC_ARCH_EXYNOS5440,
--	}, {
- 		.compatible = "samsung,exynos7-tmu",
- 		.data = (const void *)SOC_ARCH_EXYNOS7,
- 	},
-@@ -1223,19 +1082,6 @@ static int exynos_map_dt_data(struct pla
- 		data->min_efuse_value = 40;
- 		data->max_efuse_value = 150;
- 		break;
--	case SOC_ARCH_EXYNOS5440:
--		data->tmu_initialize = exynos5440_tmu_initialize;
--		data->tmu_control = exynos5440_tmu_control;
--		data->tmu_read = exynos5440_tmu_read;
--		data->tmu_set_emulation = exynos5440_tmu_set_emulation;
--		data->tmu_clear_irqs = exynos5440_tmu_clear_irqs;
--		data->ntrip = 4;
--		data->gain = 5;
--		data->reference_voltage = 16;
--		data->efuse_value = 0x5d2d;
--		data->min_efuse_value = 16;
--		data->max_efuse_value = 76;
--		break;
- 	case SOC_ARCH_EXYNOS7:
- 		data->tmu_initialize = exynos7_tmu_initialize;
- 		data->tmu_control = exynos7_tmu_control;
-@@ -1260,8 +1106,7 @@ static int exynos_map_dt_data(struct pla
- 	 * Check if the TMU shares some registers and then try to map the
- 	 * memory of common registers.
- 	 */
--	if (data->soc != SOC_ARCH_EXYNOS5420_TRIMINFO &&
--	    data->soc != SOC_ARCH_EXYNOS5440)
-+	if (data->soc != SOC_ARCH_EXYNOS5420_TRIMINFO)
- 		return 0;
- 
- 	if (of_address_to_resource(pdev->dev.of_node, 1, &res)) {
+>  	}
+>  }
+>  
+> @@ -1012,6 +1013,17 @@ static void fpsimd_bind_to_cpu(void)
+>  	current->thread.fpsimd_cpu = smp_processor_id();
+>  }
+>  
+> +void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
+> +{
+> +	struct fpsimd_last_state_struct *last =
+> +		this_cpu_ptr(&fpsimd_last_state);
+> +
+> +	WARN_ON(!in_softirq() && !irqs_disabled());
+> +
+> +	last->st = st;
+> +	last->sve_in_use = false;
+> +}
+> +
+>  /*
+>   * Load the userland FPSIMD state of 'current' from memory, but only if the
+>   * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
+> @@ -1064,7 +1076,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
+>  	t->thread.fpsimd_cpu = NR_CPUS;
+>  }
+>  
+> -static inline void fpsimd_flush_cpu_state(void)
+> +void fpsimd_flush_cpu_state(void)
+>  {
+>  	__this_cpu_write(fpsimd_last_state.st, NULL);
+>  }
+
+You could consider factoring out all changes to kernel/fpsimd.c into a
+separate patch explaining why it's correct, which may make bisecting
+potential bugs easier, but on the other hand it keeps the changes in the
+patch where they're used.  Just a thought.
+
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index 93afff9..0f2a135 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -19,7 +19,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o va_layout.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
+> -kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o
+> +kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o fpsimd.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/aarch32.o
+>  
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
+> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+> new file mode 100644
+> index 0000000..cc7a068
+> --- /dev/null
+> +++ b/arch/arm64/kvm/fpsimd.c
+> @@ -0,0 +1,109 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * arch/arm64/kvm/fpsimd.c: Guest/host FPSIMD context coordination helpers
+> + *
+> + * Copyright 2018 Arm Limited
+> + * Author: Dave Martin <Dave.Martin@arm.com>
+> + */
+> +#include <linux/bottom_half.h>
+> +#include <linux/sched.h>
+> +#include <linux/thread_info.h>
+> +#include <linux/kvm_host.h>
+> +#include <asm/kvm_host.h>
+> +#include <asm/kvm_mmu.h>
+> +
+> +/*
+> + * Called on entry to KVM_RUN unless this vcpu previously ran at least
+> + * once and the most recent prior KVM_RUN for this vcpu was called from
+> + * the same task as current (highly likely).
+> + *
+> + * This is guaranteed to execute before kvm_arch_vcpu_load_fp(vcpu),
+> + * such that on entering hyp the relevant parts of current are already
+> + * mapped.
+> + */
+> +int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+> +{
+> +	int ret;
+> +
+> +	struct thread_info *ti = &current->thread_info;
+> +	struct user_fpsimd_state *fpsimd = &current->thread.uw.fpsimd_state;
+> +
+> +	/*
+> +	 * Make sure the host task thread flags and fpsimd state are
+> +	 * visible to hyp:
+> +	 */
+> +	ret = create_hyp_mappings(ti, ti + 1, PAGE_HYP);
+> +	if (ret)
+> +		goto error;
+> +
+> +	ret = create_hyp_mappings(fpsimd, fpsimd + 1, PAGE_HYP);
+> +	if (ret)
+> +		goto error;
+> +
+> +	vcpu->arch.host_thread_info = kern_hyp_va(ti);
+> +	vcpu->arch.host_fpsimd_state = kern_hyp_va(fpsimd);
+> +error:
+> +	return ret;
+> +}
+> +
+> +/*
+> + * Prepare vcpu for saving the host's FPSIMD state and loading the guest's.
+> + * The actual loading is done by the FPSIMD access trap taken to hyp.
+> + *
+> + * Here, we just set the correct metadata to indicate that the FPSIMD
+> + * state in the cpu regs (if any) belongs to current, and where to write
+> + * it back to if/when a FPSIMD access trap is taken.
+> + *
+> + * TIF_SVE is backed up here, since it may get clobbered with guest state.
+> + * This flag is restored by kvm_arch_vcpu_put_fp(vcpu).
+
+I don't fully understand how TIF_SVE gets clobbered, but perhaps that's
+in preparation for a future patch.  (Me keeps reading).
+
+> + */
+> +void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
+> +{
+> +	BUG_ON(system_supports_sve());
+> +	BUG_ON(!current->mm);
+> +
+> +	vcpu->arch.fp_enabled = false;
+> +	vcpu->arch.host_fpsimd_state =
+> +		kern_hyp_va(&current->thread.uw.fpsimd_state);
+> +	vcpu->arch.host_sve_in_use = !!test_thread_flag(TIF_SVE);
+> +}
+> +
+> +/*
+> + * If the guest FPSIMD state was loaded, mark the CPU FPSIMD regs as
+> + * dirty for vcpu so that they will be written back if the kernel
+> + * clobbers them due to kernel-mode NEON before re-entry into the guest.
+> + */
+> +void kvm_arch_vcpu_park_fp(struct kvm_vcpu *vcpu)
+> +{
+> +	WARN_ON_ONCE(!irqs_disabled());
+> +
+> +	if (vcpu->arch.fp_enabled) {
+> +		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs);
+> +		clear_thread_flag(TIF_FOREIGN_FPSTATE);
+> +		clear_thread_flag(TIF_SVE);
+> +	}
+> +}
+> +
+> +/*
+> + * Write back the vcpu FPSIMD regs if they are dirty, and invalidate the
+> + * cpu FPSIMD regs so that they can't be spuriously reused if this vcpu
+> + * disappears and another task or vcpu appears that recycles the same
+> + * struct fpsimd_state.
+> + */
+> +void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+> +{
+> +	local_bh_disable();
+> +
+> +	if (vcpu->arch.fp_enabled) {
+> +		task_fpsimd_save();
+
+Just to make sure I'm getting this right: This is safe, because even if
+after we exited the VM, before we call this function, if we take a
+softirq that has overwritten our fpsimd state, then kernel_neon_begin()
+will have set TIF_FOREIGN_FPSTATE, and task_fpsimd_save() won't actually
+do anything, and kernel_neon_begin() will have alreay saved the VCPU's
+fpsimd state.  Is that right?
+
+> +		fpsimd_flush_cpu_state();
+> +		set_thread_flag(TIF_FOREIGN_FPSTATE);
+> +	}
+> +
+> +	if (vcpu->arch.host_sve_in_use)
+> +		set_thread_flag(TIF_SVE);
+> +	else
+> +		clear_thread_flag(TIF_SVE);
+> +
+> +	local_bh_enable();
+> +}
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index c438ad8..0900c2a 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -27,15 +27,16 @@
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/fpsimd.h>
+>  #include <asm/debug-monitors.h>
+> +#include <asm/thread_info.h>
+>  
+> -static bool __hyp_text __fpsimd_enabled_nvhe(void)
+> +static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
+>  {
+> -	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
+> -}
+> +	if (vcpu->arch.host_thread_info->flags & _TIF_FOREIGN_FPSTATE) {
+> +		vcpu->arch.host_fpsimd_state = NULL;
+> +		vcpu->arch.fp_enabled = false;
+> +	}
+>  
+> -static bool fpsimd_enabled_vhe(void)
+> -{
+> -	return !!(read_sysreg(cpacr_el1) & CPACR_EL1_FPEN);
+> +	return vcpu->arch.fp_enabled;
+>  }
+>  
+>  /* Save the 32-bit only FPSIMD system register state */
+> @@ -92,7 +93,10 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
+>  
+>  	val = read_sysreg(cpacr_el1);
+>  	val |= CPACR_EL1_TTA;
+> -	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+> +	val &= ~CPACR_EL1_ZEN;
+> +	if (!update_fp_enabled(vcpu))
+> +		val &= ~CPACR_EL1_FPEN;
+> +
+>  	write_sysreg(val, cpacr_el1);
+>  
+>  	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
+> @@ -105,7 +109,10 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+>  	__activate_traps_common(vcpu);
+>  
+>  	val = CPTR_EL2_DEFAULT;
+> -	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
+> +	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+> +	if (!update_fp_enabled(vcpu))
+> +		val |= CPTR_EL2_TFP;
+> +
+>  	write_sysreg(val, cptr_el2);
+>  }
+>  
+> @@ -394,7 +401,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm_cpu_context *host_ctxt;
+>  	struct kvm_cpu_context *guest_ctxt;
+> -	bool fp_enabled;
+>  	u64 exit_code;
+>  
+>  	host_ctxt = vcpu->arch.host_cpu_context;
+> @@ -416,19 +422,14 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  		/* And we're baaack! */
+>  	} while (fixup_guest_exit(vcpu, &exit_code));
+>  
+> -	fp_enabled = fpsimd_enabled_vhe();
+> -
+>  	sysreg_save_guest_state_vhe(guest_ctxt);
+>  
+>  	__deactivate_traps(vcpu);
+>  
+>  	sysreg_restore_host_state_vhe(host_ctxt);
+>  
+> -	if (fp_enabled) {
+> -		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+> -		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> +	if (vcpu->arch.fp_enabled)
+>  		__fpsimd_save_fpexc32(vcpu);
+> -	}
+>  
+>  	__debug_switch_to_host(vcpu);
+>  
+> @@ -440,7 +441,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm_cpu_context *host_ctxt;
+>  	struct kvm_cpu_context *guest_ctxt;
+> -	bool fp_enabled;
+>  	u64 exit_code;
+>  
+>  	vcpu = kern_hyp_va(vcpu);
+> @@ -472,8 +472,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  		/* And we're baaack! */
+>  	} while (fixup_guest_exit(vcpu, &exit_code));
+>  
+> -	fp_enabled = __fpsimd_enabled_nvhe();
+> -
+>  	__sysreg_save_state_nvhe(guest_ctxt);
+>  	__sysreg32_save_state(vcpu);
+>  	__timer_disable_traps(vcpu);
+> @@ -484,11 +482,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  
+>  	__sysreg_restore_state_nvhe(host_ctxt);
+>  
+> -	if (fp_enabled) {
+> -		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+> -		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> +	if (vcpu->arch.fp_enabled)
+>  		__fpsimd_save_fpexc32(vcpu);
+> -	}
+>  
+>  	/*
+>  	 * This must come after restoring the host sysregs, since a non-VHE
+> @@ -502,8 +497,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  				    struct kvm_vcpu *vcpu)
+>  {
+> -	kvm_cpu_context_t *host_ctxt;
+> -
+>  	if (has_vhe())
+>  		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+>  			     cpacr_el1);
+> @@ -513,14 +506,19 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  
+>  	isb();
+>  
+> -	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> -	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
+> +	if (vcpu->arch.host_fpsimd_state) {
+> +		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
+> +		vcpu->arch.host_fpsimd_state = NULL;
+> +	}
+> +
+>  	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
+>  
+>  	/* Skip restoring fpexc32 for AArch64 guests */
+>  	if (!(read_sysreg(hcr_el2) & HCR_RW))
+>  		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
+>  			     fpexc32_el2);
+> +
+> +	vcpu->arch.fp_enabled = true;
+>  }
+>  
+>  static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index cd38d7d..4fcf6fe 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -363,10 +363,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  	kvm_vgic_load(vcpu);
+>  	kvm_timer_vcpu_load(vcpu);
+>  	kvm_vcpu_load_sysregs(vcpu);
+> +	kvm_arch_vcpu_load_fp(vcpu);
+>  }
+>  
+>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  {
+> +	kvm_arch_vcpu_put_fp(vcpu);
+>  	kvm_vcpu_put_sysregs(vcpu);
+>  	kvm_timer_vcpu_put(vcpu);
+>  	kvm_vgic_put(vcpu);
+> @@ -773,6 +775,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		if (static_branch_unlikely(&userspace_irqchip_in_use))
+>  			kvm_timer_sync_hwstate(vcpu);
+>  
+> +		kvm_arch_vcpu_park_fp(vcpu);
+> +
+>  		/*
+>  		 * We may have taken a host interrupt in HYP mode (ie
+>  		 * while executing the guest). This interrupt is still
+> @@ -816,16 +820,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	return ret;
+>  }
+>  
+> -#ifdef CONFIG_ARM64
+> -int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+> -{
+> -	struct task_struct *tsk = current;
+> -
+> -	/* Make sure the host task fpsimd state is visible to hyp: */
+> -	return create_hyp_mappings(tsk, tsk + 1, PAGE_HYP);
+> -}
+> -#endif
+> -
+>  static int vcpu_interrupt_line(struct kvm_vcpu *vcpu, int number, bool level)
+>  {
+>  	int bit_index;
+> -- 
+> 2.1.4
+> 
+Besides the cosmetic comments and questions above, this all looks good
+to me!
+
+Thanks,
+-Christoffer
