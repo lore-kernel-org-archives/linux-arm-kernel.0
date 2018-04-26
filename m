@@ -1,52 +1,65 @@
-From: hch@lst.de (hch at lst.de)
-Date: Thu, 26 Apr 2018 08:45:00 +0200
-Subject: [PATCH 06/22] arc: use generic dma_noncoherent_ops
-In-Reply-To: <1524655020.5315.9.camel@synopsys.com>
-References: <20180420080313.18796-1-hch@lst.de>
- <20180420080313.18796-7-hch@lst.de> <1524655020.5315.9.camel@synopsys.com>
-Message-ID: <20180426064500.GB13895@lst.de>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Thu, 26 Apr 2018 14:53:37 +0800
+Subject: [GIT PULL] Immutable branch between MFD, Input and RTC due for
+ the v4.18 merge window
+In-Reply-To: <20180416141809.34l2ofmeljqvyicm@dell>
+References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+ <20180416141809.34l2ofmeljqvyicm@dell>
+Message-ID: <1524725617.31521.0.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 11:17:01AM +0000, Alexey Brodkin wrote:
-> Which is actually strange as I would expect ARC code to be built by bots.
+On Mon, 2018-04-16 at 15:18 +0100, Lee Jones wrote:
+> Enjoy!
+> 
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+> 
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-input-rtc-v4.18
+> 
+> for you to fetch changes up to 55d1d1547ab5e52269988af5e7c553796ff68e97:
+> 
+>   mfd: mt6397: Add PMIC keys support to MT6397 driver (2018-04-16 15:16:11 +0100)
+> 
+> ----------------------------------------------------------------
+> Immutable branch between MFD, Input and RTC due for the v4.18 merge window
+> 
+> ----------------------------------------------------------------
+> Chen Zhong (5):
+>       mfd: mt6397: Create irq mappings in mfd core driver
+>       dt-bindings: input: Add document bindings for mtk-pmic-keys
+>       dt-bindings: mfd: Add bindings for the keys as subnode of PMIC
+>       input: Add MediaTek PMIC keys support
+>       mfd: mt6397: Add PMIC keys support to MT6397 driver
+> 
+>  .../devicetree/bindings/input/mtk-pmic-keys.txt    |  43 +++
+>  Documentation/devicetree/bindings/mfd/mt6397.txt   |   6 +
+>  drivers/input/keyboard/Kconfig                     |   9 +
+>  drivers/input/keyboard/Makefile                    |   1 +
+>  drivers/input/keyboard/mtk-pmic-keys.c             | 339 +++++++++++++++++++++
+>  drivers/mfd/mt6397-core.c                          |  26 +-
+>  drivers/rtc/rtc-mt6397.c                           |   7 +-
+>  7 files changed, 424 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+>  create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
+> 
 
-I don't think I got any notification.  Thank for the fixes!
+Hi Lee,
 
-I think I found the bug, based on the fact that so far all tests for
-architectures that also need a cache op for device to cpu transitions
-failed.  I did a stupid typo when changing kconfig symbols, so please
-try the patch below.
+I?m sorry that I found this patch
+https://patchwork.kernel.org/patch/10026705/
 
->  
->  static int l2_line_sz;
->  static int ioc_exists;
-> -int slc_enable = 1, ioc_enable = 1;
-> +int slc_enable = 1, ioc_enable = 0;
+is missing in the git repository at:
 
-Hmm.  It seems if ioc_enable is 0 we should simply be using
-dma_direct_ops on arc, but that is a different discussion.
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
+ib-mfd-input-rtc-v4.18
 
----
-diff --git a/lib/dma-noncoherent.c b/lib/dma-noncoherent.c
-index f4b8532c20ac..a2c192b3508d 100644
---- a/lib/dma-noncoherent.c
-+++ b/lib/dma-noncoherent.c
-@@ -48,7 +48,7 @@ static int dma_noncoherent_map_sg(struct device *dev, struct scatterlist *sgl,
- 	return nents;
- }
- 
--#ifdef CONFIG_DMA_NONCOHERENT_SYNC_FOR_CPU
-+#ifdef CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU
- static void dma_noncoherent_sync_single_for_cpu(struct device *dev,
- 		dma_addr_t addr, size_t size, enum dma_data_direction dir)
- {
-@@ -88,7 +88,7 @@ const struct dma_map_ops dma_noncoherent_ops = {
- 	.sync_sg_for_device	= dma_noncoherent_sync_sg_for_device,
- 	.map_page		= dma_noncoherent_map_page,
- 	.map_sg			= dma_noncoherent_map_sg,
--#ifdef CONFIG_DMA_NONCOHERENT_SYNC_FOR_CPU
-+#ifdef CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU
- 	.sync_single_for_cpu	= dma_noncoherent_sync_single_for_cpu,
- 	.sync_sg_for_cpu	= dma_noncoherent_sync_sg_for_cpu,
- 	.unmap_page		= dma_noncoherent_unmap_page,
+Could you please take this patch up?
+
+Thanks.
+
+Best regards,
+Chen Zhong
