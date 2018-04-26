@@ -1,70 +1,40 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 26 Apr 2018 08:33:02 +0200
-Subject: [PATCH] drm/bridge/synopsys: dsi: use adjusted_mode in mode_set
-In-Reply-To: <20180125155504.8611-1-philippe.cornu@st.com>
-References: <CGME20180125155556epcas2p107973eb77ab08c436dbddcb66fcb7c89@epcas2p1.samsung.com>
- <20180125155504.8611-1-philippe.cornu@st.com>
-Message-ID: <e85bee37-11da-5fe0-38fe-3b2536b10c22@samsung.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 26 Apr 2018 08:42:39 +0200
+Subject: [PATCH 13/22] nds32: use generic dma_noncoherent_ops
+In-Reply-To: <CAEbi=3fcd8E=xi_hbef45LnPsBZhZv37yPO-xfZmU1gMaWnDvg@mail.gmail.com>
+References: <20180420080313.18796-1-hch@lst.de>
+ <20180420080313.18796-14-hch@lst.de>
+ <CAEbi=3fkakVD2vxGu6SgJM77JnNM8Y79xS8_o6m9d_85BJpMFQ@mail.gmail.com>
+ <20180424191640.GA32495@lst.de>
+ <CAEbi=3f7yzE+KAM2GOh6QahC_E6BAUfB3ys3U-WdBSUf3DPZqg@mail.gmail.com>
+ <20180425064055.GA11460@lst.de>
+ <CAEbi=3fcd8E=xi_hbef45LnPsBZhZv37yPO-xfZmU1gMaWnDvg@mail.gmail.com>
+Message-ID: <20180426064239.GA13895@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.01.2018 16:55, Philippe Cornu wrote:
-> The "adjusted_mode" clock value (ie the real pixel clock) is more
-> accurate than "mode" clock value (ie the panel/bridge requested
-> clock value). It offers a better preciseness for timing
-> computations and allows to reduce the extra dsi bandwidth in
-> burst mode (from ~20% to ~10-12%, hw platform dependant).
->
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> ---
-> Note: This patch replaces "drm/bridge/synopsys: dsi: add optional pixel clock"
+Can you try this patch ontop of either the new or original one?
 
-Queued to drm-misc-next.
-
---
-Regards
-Andrzej
-
->
->  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> index ed8af32f8e52..b926b62e9e33 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -707,20 +707,20 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
->  
->  	clk_prepare_enable(dsi->pclk);
->  
-> -	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
-> +	ret = phy_ops->get_lane_mbps(priv_data, adjusted_mode, dsi->mode_flags,
->  				     dsi->lanes, dsi->format, &dsi->lane_mbps);
->  	if (ret)
->  		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
->  
->  	pm_runtime_get_sync(dsi->dev);
->  	dw_mipi_dsi_init(dsi);
-> -	dw_mipi_dsi_dpi_config(dsi, mode);
-> +	dw_mipi_dsi_dpi_config(dsi, adjusted_mode);
->  	dw_mipi_dsi_packet_handler_config(dsi);
->  	dw_mipi_dsi_video_mode_config(dsi);
-> -	dw_mipi_dsi_video_packet_config(dsi, mode);
-> +	dw_mipi_dsi_video_packet_config(dsi, adjusted_mode);
->  	dw_mipi_dsi_command_mode_config(dsi);
-> -	dw_mipi_dsi_line_timer_config(dsi, mode);
-> -	dw_mipi_dsi_vertical_timing_config(dsi, mode);
-> +	dw_mipi_dsi_line_timer_config(dsi, adjusted_mode);
-> +	dw_mipi_dsi_vertical_timing_config(dsi, adjusted_mode);
->  
->  	dw_mipi_dsi_dphy_init(dsi);
->  	dw_mipi_dsi_dphy_timing_config(dsi);
-> @@ -734,7 +734,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
->  
->  	dw_mipi_dsi_dphy_enable(dsi);
->  
-> -	dw_mipi_dsi_wait_for_two_frames(mode);
-> +	dw_mipi_dsi_wait_for_two_frames(adjusted_mode);
->  
->  	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
->  	dw_mipi_dsi_set_mode(dsi, 0);
+---
+diff --git a/lib/dma-noncoherent.c b/lib/dma-noncoherent.c
+index f4b8532c20ac..a2c192b3508d 100644
+--- a/lib/dma-noncoherent.c
++++ b/lib/dma-noncoherent.c
+@@ -48,7 +48,7 @@ static int dma_noncoherent_map_sg(struct device *dev, struct scatterlist *sgl,
+ 	return nents;
+ }
+ 
+-#ifdef CONFIG_DMA_NONCOHERENT_SYNC_FOR_CPU
++#ifdef CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU
+ static void dma_noncoherent_sync_single_for_cpu(struct device *dev,
+ 		dma_addr_t addr, size_t size, enum dma_data_direction dir)
+ {
+@@ -88,7 +88,7 @@ const struct dma_map_ops dma_noncoherent_ops = {
+ 	.sync_sg_for_device	= dma_noncoherent_sync_sg_for_device,
+ 	.map_page		= dma_noncoherent_map_page,
+ 	.map_sg			= dma_noncoherent_map_sg,
+-#ifdef CONFIG_DMA_NONCOHERENT_SYNC_FOR_CPU
++#ifdef CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU
+ 	.sync_single_for_cpu	= dma_noncoherent_sync_single_for_cpu,
+ 	.sync_sg_for_cpu	= dma_noncoherent_sync_sg_for_cpu,
+ 	.unmap_page		= dma_noncoherent_unmap_page,
