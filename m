@@ -1,80 +1,155 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Thu, 26 Apr 2018 09:58:47 -0500
-Subject: [PATCH 1/3] Documentation: dt: socfpga: Add Stratix10 ECC Manager
- binding
-In-Reply-To: <e9606cfb-cee6-2e0c-cfe5-c91a537cb8a2@linux.intel.com>
-References: <1524594959-5259-1-git-send-email-thor.thayer@linux.intel.com>
- <1524594959-5259-2-git-send-email-thor.thayer@linux.intel.com>
- <6528e94e-85ea-8015-5a3b-4e8a9ecc8dbd@kernel.org>
- <e9606cfb-cee6-2e0c-cfe5-c91a537cb8a2@linux.intel.com>
-Message-ID: <64ecc830-3674-6bb4-c2f9-c24e576c08c0@linux.intel.com>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Thu, 26 Apr 2018 16:58:03 +0200
+Subject: [PATCH] arm: port KCOV to arm
+In-Reply-To: <20180426142948.n74p52esmbvsqrow@lakrids.cambridge.arm.com>
+References: <20180426130846.130976-1-dvyukov@google.com>
+ <20180426134057.4sahhqrbkltwmfsk@lakrids.cambridge.arm.com>
+ <CACT4Y+Z35mOAybskjxVhxvW+GrbOZ4c9s2LT+Ca_fE9ZufoiGQ@mail.gmail.com>
+ <20180426142948.n74p52esmbvsqrow@lakrids.cambridge.arm.com>
+Message-ID: <CACT4Y+b+kHWstEWDDOh6unGSHnetnyJ-Gut1E494XGM1rFozBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2018 09:43 AM, Thor Thayer wrote:
-> On 04/25/2018 09:16 PM, Dinh Nguyen wrote:
+On Thu, Apr 26, 2018 at 4:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Apr 26, 2018 at 03:47:49PM +0200, 'Dmitry Vyukov' via syzkaller wrote:
+>> On Thu, Apr 26, 2018 at 3:40 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > Hi Dmitry,
+>> >
+>> > On Thu, Apr 26, 2018 at 03:08:46PM +0200, Dmitry Vyukov wrote:
+>> >> KCOV is code coverage collection facility used, in particular, by syzkaller
+>> >> system call fuzzer. There is some interest in using syzkaller on arm devices.
+>> >> So port KCOV to arm.
+>> >>
+>> >> On implementation level this merely declares that KCOV is supported and
+>> >> disables instrumentation of 3 special cases. Reasons for disabling are
+>> >> commented in code.
+>> >>
+>> >> Tested with qemu-system-arm/vexpress-a15.
+>> >>
+>> >> Signed-off-by: Dmitry Vyukov <dvyukov@google.com>
+>> >> Cc: Russell King <linux@armlinux.org.uk>
+>> >> Cc: Mark Rutland <mark.rutland@arm.com>
+>> >> Cc: Abbott Liu <liuwenliang@huawei.com>
+>> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> >> Cc: Koguchi Takuo <takuo.koguchi.sw@hitachi.com>
+>> >> Cc: Atul Prakash <atulp@google.com>
+>> >> Cc: linux at armlinux.org.uk
+>> >> Cc: linux-arm-kernel at lists.infradead.org
+>> >> Cc: syzkaller at googlegroups.com
+>> >> ---
+>> >>  arch/arm/Kconfig                  | 1 +
+>> >>  arch/arm/boot/compressed/Makefile | 3 +++
+>> >>  arch/arm/mm/Makefile              | 4 ++++
+>> >>  arch/arm/vdso/Makefile            | 3 +++
+>> >>  4 files changed, 11 insertions(+)
+>> >
+>> > The hyp code will also need to opt-out of KCOV instrumentation.
+>> >
+>> > i.e. arch/arm/kvm/hyp/Makefile will need:
+>> >
+>> > KCOV_INSTRUMENT := n
+>> >
+>> > ... and we should probably pick up the other bits from the arm64 hyp
+>> > Makefile, i.e. all of:
+>> >
+>> > # KVM code is run at a different exception code with a different map, so
+>> > # compiler instrumentation that inserts callbacks or checks into the code may
+>> > # cause crashes. Just disable it.
+>> > GCOV_PROFILE    := n
+>> > KASAN_SANITIZE  := n
+>> > UBSAN_SANITIZE  := n
+>> > KCOV_INSTRUMENT := n
 >>
+>> I can blindly add them if you wish, but I don't have a way to test it.
+>> I also need an explanatory comment as to why we disable this.
+>> Otherwise I have to say "Mark said so" :)
+>
+> The rationale is that this code runs at hyp, with minimal code/data
+> mapped in its page tables (which are not the usual kernel page tables).
+> Instrumented code may call functions or access data structures which
+> aren't mapped, which will bring down the system.
+>
+>> p.s. KASAN does not exist on arm (yet).
+>
+> Sure. We can drop that line for now, or keep it -- it does no harm.
+>
+> [...]
+>
+>> >> +# Instrumenting fault.c causes infinite recursion between:
+>> >> +# __dabt_svc -> do_DataAbort -> __sanitizer_cov_trace_pc -> __dabt_svc
+>> >> +KCOV_INSTRUMENT_fault.o := n
+>> >
+>> > Why does __sanitizer_cov_trace_pc() cause a data abort?
+>> >
+>> > We don't seem to have this issue on arm64, where our fault handling is
+>> > instrumented, so this seems suspect.
 >>
->> On 04/24/2018 01:35 PM, thor.thayer at linux.intel.com wrote:
->>> From: Thor Thayer <thor.thayer@linux.intel.com>
->>>
->>> Add the device tree bindings needed to support the Stratix10
->>> ECC Manager and SDRAM ECC to the existing bindings.
->>>
->>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
->>> ---
->>> ? .../bindings/arm/altera/socfpga-eccmgr.txt???????? | 47 
->>> ++++++++++++++++++++++
->>> ? 1 file changed, 47 insertions(+)
->>>
->>> diff --git 
->>> a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt 
->>> b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->>> index 4a1714f96bab..fe48ad293a24 100644
->>> --- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->>> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->>> @@ -231,3 +231,50 @@ Example:
->>> ?????????????????????? <48 IRQ_TYPE_LEVEL_HIGH>;
->>> ????????? };
->>> ????? };
->>> +
->>> +Stratix10 SoCFPGA ECC Manager
->>> +The Stratix10 SoC ECC Manager handles the IRQs for each peripheral
->>> +in a shared register similar to the Arria10. However, ECC requires
->>> +access to registers that can only be read in EL3 with SMC calls.
->>> +Therefore the device tree is slightly different.
->>> +
->>> +Required Properties:
->>> +- compatible : Should be "altr,socfpga-s10-ecc-manager"
->>
->> Altera technically doesn't exist anymore, should this be
->> "intel,stratix10-ecc-manager"?
->>
-> I was trying to be consistent with the older names but I agree with your 
-> argument. I will change this. Thanks
-> 
-After looking at the Stratix10 device tree, there are only "altr," in 
-there. For instance the top node is:
+>> I don't have an explanation. That's just what me and Takuo observed.
+>> We've seen that it happens when __sanitizer_cov_trace_pc tries to
+>> dereference current to check kcov mode.
+>
+> Huh. The only reason I can imagine that might happen is if the
+> compiler's generating a misaligned access requiring fixup. If your
+> compiler's doing that, it could presumably do that in the fault handling
+> code too, which would be a big problem.
+>
+> If you happen to have a binary around, can you dump the disassembly for
+> your __sanitizer_cov_trace_pc?
+>
+> Using the Linaro 17.05 arm-linux-gnueabhif-gcc 6.3 toolchain I get the
+> following:
+>
+> 00000000 <__sanitizer_cov_trace_pc>:
+>    0:   e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
+>    4:   e1a0300d        mov     r3, sp
+>    8:   e3c33d7f        bic     r3, r3, #8128   ; 0x1fc0
+>    c:   e3a02c01        mov     r2, #256        ; 0x100
+>   10:   e3c3303f        bic     r3, r3, #63     ; 0x3f
+>   14:   e340201f        movt    r2, #31
+>   18:   e5931004        ldr     r1, [r3, #4]
+>   1c:   e1110002        tst     r1, r2
+>   20:   149df004        popne   {pc}            ; (ldrne pc, [sp], #4)
+>   24:   e593300c        ldr     r3, [r3, #12]
+>   28:   e5932508        ldr     r2, [r3, #1288] ; 0x508
+>   2c:   e3520002        cmp     r2, #2
+>   30:   149df004        popne   {pc}            ; (ldrne pc, [sp], #4)
+>   34:   e5932510        ldr     r2, [r3, #1296] ; 0x510
+>   38:   e593150c        ldr     r1, [r3, #1292] ; 0x50c
+>   3c:   e5923000        ldr     r3, [r2]
+>   40:   e2833001        add     r3, r3, #1
+>   44:   e1530001        cmp     r3, r1
+>   48:   3782e103        strcc   lr, [r2, r3, lsl #2]
+>   4c:   35823000        strcc   r3, [r2]
+>   50:   e49df004        pop     {pc}            ; (ldr pc, [sp], #4)
+>
+> ... which looks sane/safe to me.
 
-compatible = "altr,socfpga-stratix10";
+Here is my disasm:
 
-and even the directory that the device tree is in is named "altera"
+801dc1b0 <__sanitizer_cov_trace_pc>:
+801dc1b0:       e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
+801dc1b4:       e1a0300d        mov     r3, sp
+801dc1b8:       e3c33d7f        bic     r3, r3, #8128   ; 0x1fc0
+801dc1bc:       e3a02c01        mov     r2, #256        ; 0x100
+801dc1c0:       e3c3303f        bic     r3, r3, #63     ; 0x3f
+801dc1c4:       e340201f        movt    r2, #31
+801dc1c8:       e5931004        ldr     r1, [r3, #4]
+801dc1cc:       e1110002        tst     r1, r2
+801dc1d0:       149df004        popne   {pc}            ; (ldrne pc, [sp], #4)
+801dc1d4:       e593300c        ldr     r3, [r3, #12]
+801dc1d8:       e5932be0        ldr     r2, [r3, #3040] ; 0xbe0
+801dc1dc:       e3520002        cmp     r2, #2
+801dc1e0:       149df004        popne   {pc}            ; (ldrne pc, [sp], #4)
+801dc1e4:       e5932be8        ldr     r2, [r3, #3048] ; 0xbe8
+801dc1e8:       e5931be4        ldr     r1, [r3, #3044] ; 0xbe4
+801dc1ec:       e5923000        ldr     r3, [r2]
+801dc1f0:       e2833001        add     r3, r3, #1
+801dc1f4:       e1510003        cmp     r1, r3
+801dc1f8:       8782e103        strhi   lr, [r2, r3, lsl #2]
+801dc1fc:       85823000        strhi   r3, [r2]
+801dc200:       e49df004        pop     {pc}            ; (ldr pc, [sp], #4)
 
-so I'll stick with the existing "altr," designation to be consistent.
+Compiler is gcc version 7.2.0 (Debian 7.2.0-7).
 
-Thanks,
-
-Thor
-
->> Dinh
->> -- 
->> To unsubscribe from this list: send the line "unsubscribe linux-edac" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at? http://vger.kernel.org/majordomo-info.html
->>
-> 
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-edac" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at? http://vger.kernel.org/majordomo-info.html
-> 
+I've now rebuilt without that change and will hopefully soon get
+crashes to reconfirm.
