@@ -1,112 +1,84 @@
-From: zi.yan@sent.com (Zi Yan)
-Date: Thu, 26 Apr 2018 10:27:55 -0400
-Subject: [RFC PATCH 0/9] Enable THP migration for all possible architectures
-Message-ID: <20180426142804.180152-1-zi.yan@sent.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 26 Apr 2018 15:26:29 +0100
+Subject: [RFC] arm64: extra entries in /proc/iomem for kexec
+In-Reply-To: <20180426074043.GD21197@linaro.org>
+References: <2d2e1be6-b925-1595-9b6e-76dd270d396d@redhat.com>
+ <20180327101654.GB14737@linaro.org>
+ <da2989ec-7fa5-b044-3237-4e75f2fe6d98@arm.com>
+ <20180402015330.GA27603@linaro.org> <20180405024203.GD19607@linaro.org>
+ <4c59b4c3-cff4-ac69-9576-6bcbf507ef1f@arm.com>
+ <20180416100831.GF13168@linaro.org>
+ <954d8b58-579a-c688-36f3-dc8d4b13cef8@arm.com>
+ <20180425092011.GC21197@linaro.org>
+ <4ae3fefb-5800-ab86-5bcd-2638602c5c3d@arm.com>
+ <20180426074043.GD21197@linaro.org>
+Message-ID: <4ed4afed-06a4-0079-8bf9-5fb31601f180@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zi Yan <zi.yan@cs.rutgers.edu>
+Hi Akashi,
 
-Hi all,
+On 26/04/18 08:40, AKASHI Takahiro wrote:
+> On Wed, Apr 25, 2018 at 02:22:07PM +0100, James Morse wrote:
+>> On 25/04/18 10:20, AKASHI Takahiro wrote:
+>>> On Tue, Apr 24, 2018 at 05:08:57PM +0100, James Morse wrote:
+>>>> If we squash the memblock_reserved() stuff down so it appears as a top level
+>>>> 'reserved' region too, I don't think we do.
+>>>
+>>> If I correctly understand, you're talking about my format (E).
+>>> As I said, it will fix the issue without modifying user-space, but
+>>>
+>>> || This does not only look quite noisy but also ignores the fact that
+>>> || reserved regions are part of System RAM (or memblock.memory).
+>>
+>> I agree its noisy, there are significantly more 'reserved' areas, but these are
+>> all either nomap or memblock_reserved().
+>>
+>> Why does it matter if a reserved-region is nomap or memblock_reserved()? Any new
+>> kernel will learn the difference from the EFI memory map and make its own decisions.
+> 
+> Yeah, kernel can do (though kernel won't look though system resources list
+> for this purpose anyway), what about kexec-like user applications?
+> It may want to seek /proc/iomem to identify all the *usable* memory on
+> the system, that is "System RAM", but doesn't care whether some range is
+> reserved or not (for some reason) yet does care !NOMAP.
 
-THP migration is only enabled on x86_64 with a special
-ARCH_ENABLE_THP_MIGRATION macro. This patchset enables THP migration for
-all architectures that uses transparent hugepage, so that special macro can
-be dropped. Instead, THP migration is enabled/disabled via
-/sys/kernel/mm/transparent_hugepage/enable_thp_migration.
+Do you have an example application?
+This would have to be a program digging in /dev/mem where it wants to touch
+memory the kernel has reserved, but doesn't want to receive a signal if it
+touches memory that's nomap. This doesn't seem a likely use-case.
 
-I grepped for TRANSPARENT_HUGEPAGE in arch folder and got 9 architectures that
-are supporting transparent hugepage. I mechanically add __pmd_to_swp_entry() and
-__swp_entry_to_pmd() based on existing __pte_to_swp_entry() and
-__swp_entry_to_pte() for all these architectures, except tile which is going to
-be dropped.
-
-I have successfully compiled all these architectures, but have NOT tested them
-due to lack of real hardware. I appreciate your help, if the maintainers of
-these architectures can do a quick test with the code from
-https://github.com/x-y-z/thp-migration-bench . Please apply patch 9 as well
-to enable THP migration.
-
-By enabling THP migration, migrating a 2MB THP on x86_64 machines takes only 1/3
-time of migrating equivalent 512 4KB pages.
-
-Hi Naoya, I also add soft dirty support for powerpc and s390. It would be great
-if you can take a look at patch 6 & 7.
-
-Feel free to give comments. Thanks.
-
-Cc: linux-mm at kvack.org
-Cc: Vineet Gupta <vgupta@synopsys.com>
-Cc: linux-snps-arc at lists.infradead.org
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Steve Capper <steve.capper@arm.com>
-Cc: Kristina Martsenko <kristina.martsenko@arm.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
-Cc: x86 at kernel.org
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: James Hogan <jhogan@kernel.org>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: linux-mips at linux-mips.org
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
-Cc: Ram Pai <linuxram@us.ibm.com>
-Cc: Balbir Singh <bsingharora@gmail.com>
-Cc: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Janosch Frank <frankja@linux.vnet.ibm.com>
-Cc: linux-s390 at vger.kernel.org
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: sparclinux at vger.kernel.org
-Cc: "Huang, Ying" <ying.huang@intel.com>
+We could change the names for the memblock_reserved()/nomap entries, but as
+kexec-tools spots 'reserved' and almost does the right thing, I kept it as it is.
 
 
-Zi Yan (9):
-  arc: mm: migrate: add pmd swap entry to support thp migration.
-  arm: mm: migrate: add pmd swap entry to support thp migration.
-  arm64: mm: migrate: add pmd swap entry to support thp migration.
-  i386: mm: migrate: add pmd swap entry to support thp migration.
-  mips: mm: migrate: add pmd swap entry to support thp migration.
-  powerpc: mm: migrate: add pmd swap entry to support thp migration.
-  s390: mm: migrate: add pmd swap entry to support thp migration.
-  sparc: mm: migrate: add pmd swap entry to support thp migration.
-  mm: migrate: enable thp migration for all possible architectures.
+>>>> This prevents the efi-memory-map
+>>>> being overwritten on kernels since kexec was merged.
+>>>>
+>>>> Its horribly fiddly to do this. The kernel code/data are special reserved
+>>>> regions that we already describe as a subset of system-ram, even though they are
+>>>> both also fragments of a bigger memblock_reserved() block.
+>>>
+>>> Actually, we don't have to avoid kernel code/data regions as copying
+>>> loaded data to the final destinations will be done at the very end of kexec.
+>>
+>> For kexec yes, but that is the existing format of the file, which we shouldn't
+>> change, otherwise we break something else.
+> 
+> One trivial downside in this approach is that a secondary kernel will be
+> loaded at an address different from the one of current kernel.
+> While it is sane, it looks a bit odd that, every time kexec'ed, a new> kernel (code/data) is located back and forth :)
 
- arch/arc/include/asm/pgtable.h               |  2 ++
- arch/arm/include/asm/pgtable.h               |  2 ++
- arch/arm64/include/asm/pgtable.h             |  2 ++
- arch/mips/include/asm/pgtable-64.h           |  2 ++
- arch/powerpc/include/asm/book3s/32/pgtable.h |  2 ++
- arch/powerpc/include/asm/book3s/64/pgtable.h | 17 ++++++++++++
- arch/powerpc/include/asm/nohash/32/pgtable.h |  2 ++
- arch/powerpc/include/asm/nohash/64/pgtable.h |  2 ++
- arch/s390/include/asm/pgtable.h              |  5 ++++
- arch/sparc/include/asm/pgtable_32.h          |  2 ++
- arch/sparc/include/asm/pgtable_64.h          |  2 ++
- arch/x86/Kconfig                             |  4 ---
- arch/x86/include/asm/pgtable-2level.h        |  2 ++
- arch/x86/include/asm/pgtable-3level.h        |  2 ++
- arch/x86/include/asm/pgtable.h               |  2 --
- fs/proc/task_mmu.c                           |  2 --
- include/asm-generic/pgtable.h                | 21 ++-------------
- include/linux/huge_mm.h                      |  9 +++----
- include/linux/swapops.h                      |  4 +--
- mm/Kconfig                                   |  3 ---
- mm/huge_memory.c                             | 27 +++++++++++++-------
- mm/migrate.c                                 |  6 ++---
- mm/rmap.c                                    |  5 ++--
- 23 files changed, 73 insertions(+), 54 deletions(-)
+Yes, but all versions of the kernel that support kexec will be quite happy with
+this. The memory below the kernel could be re-used since KASLR support was
+merged before kexec.
 
--- 
-2.17.0
+I was more worried that the extra fragmentation would cause kexec-tools to stop
+searching early, as it seems to have a #defined'd limit of how much of that file
+it will parse. But, this would be an existing bug, because there could be many
+nomap regions up-front before any large-enough chunk of system-ram appears.
+
+
+Thanks,
+
+James
