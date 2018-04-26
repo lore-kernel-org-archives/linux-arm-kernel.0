@@ -1,69 +1,112 @@
-From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
-Date: Thu, 26 Apr 2018 17:53:42 +0100
-Subject: [PATCH 13/17] arm64: dts: r8a77965: Add HDMI encoder instance
-In-Reply-To: <20180426165346.494-1-kieran.bingham+renesas@ideasonboard.com>
-References: <20180426165346.494-1-kieran.bingham+renesas@ideasonboard.com>
-Message-ID: <20180426165346.494-14-kieran.bingham+renesas@ideasonboard.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Apr 2018 17:55:19 +0100
+Subject: [PATCH v3 05/14] locking/qspinlock: Remove unbounded cmpxchg
+ loop from locking slowpath
+In-Reply-To: <20180426155335.GL4064@hirez.programming.kicks-ass.net>
+References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
+ <1524738868-31318-6-git-send-email-will.deacon@arm.com>
+ <20180426155335.GL4064@hirez.programming.kicks-ass.net>
+Message-ID: <20180426165518.GC898@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the HDMI encoder to the R8A77965 DT in disabled state.
+Hi Peter,
 
-Based on a similar patch of the R8A7796 device tree
-by Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
+On Thu, Apr 26, 2018 at 05:53:35PM +0200, Peter Zijlstra wrote:
+> On Thu, Apr 26, 2018 at 11:34:19AM +0100, Will Deacon wrote:
+> > @@ -290,58 +312,50 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+> >  	}
+> >  
+> >  	/*
+> > +	 * If we observe any contention; queue.
+> > +	 */
+> > +	if (val & ~_Q_LOCKED_MASK)
+> > +		goto queue;
+> > +
+> > +	/*
+> >  	 * trylock || pending
+> >  	 *
+> >  	 * 0,0,0 -> 0,0,1 ; trylock
+> >  	 * 0,0,1 -> 0,1,1 ; pending
+> >  	 */
+> > +	val = atomic_fetch_or_acquire(_Q_PENDING_VAL, &lock->val);
+> > +	if (!(val & ~_Q_LOCKED_MASK)) {
+> >  		/*
+> > +		 * we're pending, wait for the owner to go away.
+> > +		 *
+> > +		 * *,1,1 -> *,1,0
+> 
+> Tail must be 0 here, right?
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[Kieran: Rebase to top of tree]
-Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
----
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 28 +++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Not necessarily. If we're concurrently setting pending with another slowpath
+locker, they could queue in the tail behind us, so we can't mess with those
+upper bits.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 8a40bba53027..972be1460a32 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -1105,6 +1105,33 @@
- 			};
- 		};
- 
-+		hdmi0: hdmi at fead0000 {
-+			compatible = "renesas,r8a77965-hdmi",
-+				     "renesas,rcar-gen3-hdmi";
-+			reg = <0 0xfead0000 0 0x10000>;
-+			interrupts = <GIC_SPI 389 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 729>,
-+				 <&cpg CPG_CORE R8A77965_CLK_HDMI>;
-+			clock-names = "iahb", "isfr";
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
-+			resets = <&cpg 729>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				port at 0 {
-+					reg = <0>;
-+					dw_hdmi0_in: endpoint {
-+						remote-endpoint = <&du_out_hdmi0>;
-+					};
-+				};
-+				port at 1 {
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		du: display at feb00000 {
- 			compatible = "renesas,du-r8a77965";
- 			reg = <0 0xfeb00000 0 0x80000>,
-@@ -1134,6 +1161,7 @@
- 				port at 1 {
- 					reg = <1>;
- 					du_out_hdmi0: endpoint {
-+						remote-endpoint = <&dw_hdmi0_in>;
- 					};
- 				};
- 				port at 2 {
--- 
-2.17.0
+> > +		 *
+> > +		 * this wait loop must be a load-acquire such that we match the
+> > +		 * store-release that clears the locked bit and create lock
+> > +		 * sequentiality; this is because not all
+> > +		 * clear_pending_set_locked() implementations imply full
+> > +		 * barriers.
+> >  		 */
+> > +		if (val & _Q_LOCKED_MASK) {
+> > +			smp_cond_load_acquire(&lock->val.counter,
+> > +					      !(VAL & _Q_LOCKED_MASK));
+> > +		}
+> >  
+> >  		/*
+> > +		 * take ownership and clear the pending bit.
+> > +		 *
+> > +		 * *,1,0 -> *,0,1
+> >  		 */
+> 
+> Idem.
+
+Same here, hence why clear_pending_set_locked is either a 16-bit store or an
+RmW (we can't just clobber the tail with 0).
+
+> > +		clear_pending_set_locked(lock);
+> >  		return;
+> > +	}
+> >  
+> >  	/*
+> > +	 * If pending was clear but there are waiters in the queue, then
+> > +	 * we need to undo our setting of pending before we queue ourselves.
+> >  	 */
+> > +	if (!(val & _Q_PENDING_MASK))
+> > +		clear_pending(lock);
+> 
+> This is the branch for when we have !0 tail.
+
+That's the case where "val" has a !0 tail, but I think the comments are
+trying to talk about the status of the lockword in memory, no?
+
+> >  	/*
+> >  	 * End of pending bit optimistic spinning and beginning of MCS
+> 
+> > @@ -445,15 +459,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+> >  	 * claim the lock:
+> >  	 *
+> >  	 * n,0,0 -> 0,0,1 : lock, uncontended
+> > +	 * *,*,0 -> *,*,1 : lock, contended
+> >  	 *
+> > +	 * If the queue head is the only one in the queue (lock value == tail)
+> > +	 * and nobody is pending, clear the tail code and grab the lock.
+> > +	 * Otherwise, we only need to grab the lock.
+> >  	 */
+> >  	for (;;) {
+> >  		/* In the PV case we might already have _Q_LOCKED_VAL set */
+> > +		if ((val & _Q_TAIL_MASK) != tail || (val & _Q_PENDING_MASK)) {
+> >  			set_locked(lock);
+> >  			break;
+> >  		}
+> 
+> This one hunk is terrible on the brain. I'm fairly sure I get it, but I
+> feel that comment can use help. Or at least, I need help reading it.
+> 
+> I'll try and cook up something when my brain starts working again.
+
+Cheers. I think the code is a bit easier to read if you look at it after the
+whole series is applied, but the comments could probably still be improved.
+
+Will
