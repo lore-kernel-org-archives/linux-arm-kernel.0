@@ -1,125 +1,71 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 26 Apr 2018 16:40:44 +0900
-Subject: [RFC] arm64: extra entries in /proc/iomem for kexec
-In-Reply-To: <4ae3fefb-5800-ab86-5bcd-2638602c5c3d@arm.com>
-References: <2d2e1be6-b925-1595-9b6e-76dd270d396d@redhat.com>
- <20180327101654.GB14737@linaro.org>
- <da2989ec-7fa5-b044-3237-4e75f2fe6d98@arm.com>
- <20180402015330.GA27603@linaro.org>
- <20180405024203.GD19607@linaro.org>
- <4c59b4c3-cff4-ac69-9576-6bcbf507ef1f@arm.com>
- <20180416100831.GF13168@linaro.org>
- <954d8b58-579a-c688-36f3-dc8d4b13cef8@arm.com>
- <20180425092011.GC21197@linaro.org>
- <4ae3fefb-5800-ab86-5bcd-2638602c5c3d@arm.com>
-Message-ID: <20180426074043.GD21197@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Apr 2018 09:52:52 +0200
+Subject: [PATCH 1/2 v4] drm/pl111: Support the Versatile Express
+In-Reply-To: <4255fd6b-caf7-1347-b97b-ab7b229a08ba@arm.com>
+References: <20180423072017.6690-1-linus.walleij@linaro.org>
+ <4255fd6b-caf7-1347-b97b-ab7b229a08ba@arm.com>
+Message-ID: <CACRpkdYpMsGOTPU81cO92DFSrzt659UmD_p5uKehBWnZk-cjnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
+On Mon, Apr 23, 2018 at 2:04 PM, Robin Murphy <robin.murphy@arm.com> wrote:
 
-On Wed, Apr 25, 2018 at 02:22:07PM +0100, James Morse wrote:
-> Hi Akashi,
-> 
-> On 25/04/18 10:20, AKASHI Takahiro wrote:
-> > On Tue, Apr 24, 2018 at 05:08:57PM +0100, James Morse wrote:
-> >> On 16/04/18 11:08, AKASHI Takahiro wrote:
-> >>> On Thu, Apr 12, 2018 at 05:01:52PM +0100, James Morse wrote:
-> >>>> On 05/04/18 03:42, AKASHI Takahiro wrote:
-> >>>>> On Mon, Apr 02, 2018 at 10:53:32AM +0900, AKASHI Takahiro wrote:
-> >>>>>> either because
-> >>>>>> a. new kernel (or initrd/dtb) may have been allocated on a NOMAP region
-> >>>>>>    which are not suitable for usable memory, or
-> >>>>>> b. new kernel (or initrd/dtb) may have been allocated on a reserved region
-> >>>>>>    whose contents can be overwritten.
-> >>>>>>
-> >>>>>> While we see (b) even today, (a) is a backward compatibility issue.
-> >>>>
-> >>>> (a) doesn't happen because request_standard_resources() checks
-> >>>> memblock_is_nomap(), and reports those regions as 'reserved'.
-> >>>
-> >>> I might have confused you. The assumption here was that we adopt format (D),
-> >>> where all NOMAP regions are sub nodes of "System RAM", but still use
-> >>> the current kexec-tools.
-> >>> As I said above, this will end up an un-expected behavior.
-> >>
-> >> I'd like to fix this without having to fix user-space at the same time. It looks
-> >> like no-one else has second level reserved regions,
-> > 
-> > This was my assumption when I sent out a patch to kexec-tools.
-> 
-> But this would still leave user-space that isn't updated broken.
-> 
-> 
-> >>>>> # I don't know yet whether people are happy with this fix, and also have
-> >>>>>   kernel patches for my other approaches. They are neither not much
-> >>>>>   complicated.
-> >>>>
-> >>>> I don't think we should fix this in userspace, exporting all the
-> >>>> memblock_reserved() regions as 'reserved' in /proc/iomem looks like the right
-> >>>> thing to do.
-> >>>
-> >>> Again, if you modify /proc/iomem, you have to update kexec-tools, too.
-> >>
-> >> If we squash the memblock_reserved() stuff down so it appears as a top level
-> >> 'reserved' region too, I don't think we do.
-> > 
-> > If I correctly understand, you're talking about my format (E).
-> > As I said, it will fix the issue without modifying user-space, but
-> > 
-> > || This does not only look quite noisy but also ignores the fact that
-> > || reserved regions are part of System RAM (or memblock.memory).
-> 
-> I agree its noisy, there are significantly more 'reserved' areas, but these are
-> all either nomap or memblock_reserved().
-> 
-> Why does it matter if a reserved-region is nomap or memblock_reserved()? Any new
-> kernel will learn the difference from the EFI memory map and make its own decisions.
+> I've given this a go on the nearest VExpress (with CA15_A7 tile) and sadly
+> it doesn't quite work for me :( With the HDLCD driver configure out, the
+> PL111 driver seems to repeatedly defer somewhere past
+> pl111_versatile_init():
+>
+> root at jet-set-radio:~# dmesg | grep -i lcd
+> [    2.739358] drm-clcd-pl111 1c1f0000.clcd: sysreg has not yet probed
+> [    3.406534] drm-clcd-pl111 1c1f0000.clcd: initializing Versatile Express
+> PL111
+> [    3.428218] drm-clcd-pl111 1c1f0000.clcd: DVI muxed to motherboard CLCD
+> [    3.898768] drm-clcd-pl111 1c1f0000.clcd: initializing Versatile Express
+> PL111
+> [    3.920441] drm-clcd-pl111 1c1f0000.clcd: DVI muxed to motherboard CLCD
+> [   10.896158] drm-clcd-pl111 1c1f0000.clcd: initializing Versatile Express
+> PL111
+> [   10.917839] drm-clcd-pl111 1c1f0000.clcd: DVI muxed to motherboard CLCD
+> [   18.513233] drm-clcd-pl111 1c1f0000.clcd: initializing Versatile Express
+> PL111
+> [   18.535007] drm-clcd-pl111 1c1f0000.clcd: DVI muxed to motherboard CLCD
+> root at jet-set-radio:~# ls /sys/bus/amba/drivers/drm-clcd-pl111/
+> bind  uevent  unbind
+>
+>
+> There's no obvious indication of what's missing, but it does still manage to
+> do enough to make the external display come on (still showing the
+> motherboard PoST screen). By comparison, the old fbdev driver probes OK and
+> thinks it's set up a 640x480 console but doesn't actually turn the monitor
+> on (and HDLCD doesn't probe at all due to vexpress-v2p-ca15_a7.dts lacking
+> any graph endpoint).
+>
+> Config attached, just in case I'm missing something trivially dumb.
 
-Yeah, kernel can do (though kernel won't look though system resources list
-for this purpose anyway), what about kexec-like user applications?
-It may want to seek /proc/iomem to identify all the *usable* memory on
-the system, that is "System RAM", but doesn't care whether some range is
-reserved or not (for some reason) yet does care !NOMAP.
+Hm you definately need CONFIG_CMA and CONFIG_DMA_CMA so
+the driver actually uses the special memory.
 
-> Kexec-tools only needs to know what it can overwrite without clobbering
-> important data like the UEFI memory map, or the APCI tables covered by the
-> linear map.
-> 
-> 
-> >> This prevents the efi-memory-map
-> >> being overwritten on kernels since kexec was merged.
-> >>
-> >> Its horribly fiddly to do this. The kernel code/data are special reserved
-> >> regions that we already describe as a subset of system-ram, even though they are
-> >> both also fragments of a bigger memblock_reserved() block.
-> > 
-> > Actually, we don't have to avoid kernel code/data regions as copying
-> > loaded data to the final destinations will be done at the very end of kexec.
-> 
-> For kexec yes, but that is the existing format of the file, which we shouldn't
-> change, otherwise we break something else.
+I have all these:
 
-One trivial downside in this approach is that a secondary kernel will be
-loaded at an address different from the one of current kernel.
-While it is sane, it looks a bit odd that, every time kexec'ed, a new
-kernel (code/data) is located back and forth :)
+config-drm: config-base
+        $(CURDIR)/scripts/config --file $(config_file) \
+        --disable FB_ARMCLCD \
+        --enable CMA \
+        --enable CMA_DEBUG \
+        --enable CMA_DEBUGFS \
+        --enable DMA_CMA \
+        --enable DRM \
+        --enable DRM_PL111 \
+        --enable FRAMEBUFFER_CONSOLE \
+        --enable DRM_PANEL \
+        --enable DRM_PANEL_SIMPLE \
+        --enable DRM_BRIDGE \
+        --enable DRM_PANEL_BRIDGE \
+        --enable DRM_SII902X \
+        --enable LOGO
 
-> 
-> >> While we can walk memblock for regions that aren't reserved, allocating memory
-> >> in the loop changes what is reserved. That one O(N) walk ends up being four...
-> > 
-> > At most O(n^2)?
-> 
-> I think for_each_free_mem_range() is smart enough not to do that. Patch incoming...
+Please try with the stuff above, when I switch the mainline platforms
+I plan to update the defconfigs with all the above.
 
-Yes, my v9 of kexec_file patch makes use of it.
-
-Thanks,
--Takahiro AKASHI
-
-
-> 
-> Thanks,
-> 
-> James
+Yours,
+Linus Walleij
