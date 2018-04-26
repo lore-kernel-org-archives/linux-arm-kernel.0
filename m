@@ -1,44 +1,37 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Thu, 26 Apr 2018 19:23:28 +0200
-Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
-In-Reply-To: <1524759629.2693.465.camel@hpe.com>
-References: <20180314180155.19492-1-toshi.kani@hpe.com>
- <20180314180155.19492-3-toshi.kani@hpe.com>
- <20180426141926.GN15462@8bytes.org>
- <1524759629.2693.465.camel@hpe.com>
-Message-ID: <20180426172327.GQ15462@8bytes.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 26 Apr 2018 14:24:26 -0300
+Subject: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
+ max7310 support
+In-Reply-To: <DB5PR04MB13205A0A7134C969748560B4F58E0@DB5PR04MB1320.eurprd04.prod.outlook.com>
+References: <1524634571-5914-1-git-send-email-Anson.Huang@nxp.com>
+ <1524634571-5914-3-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5Dm6rcEe=zAJ9_nqKce3g2tdyWPqb=Uv-N5nfc_96jc-g@mail.gmail.com>
+ <AM3PR04MB13150654494B8D251988F76CF58E0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5AZLbUoL7FWgUFA7qc3q3wcz9UBLSQhMXXkUJeiRz8X4A@mail.gmail.com>
+ <DB5PR04MB13205A0A7134C969748560B4F58E0@DB5PR04MB1320.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5DWeYCbWn9LEi1e+tc4gZsjBBpXtiwzmwLbYp=E4TERrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 04:21:19PM +0000, Kani, Toshi wrote:
-> All pages under the pmd had been unmapped and then lazy TLB purged with
-> INVLPG before coming to this code path.  Speculation is not allowed to
-> pages without mapping.
+On Thu, Apr 26, 2018 at 3:31 AM, Anson Huang <anson.huang@nxp.com> wrote:
 
-CPUs have not only TLBs, but also page-walk caches which cache
-intermediary results of page-table walks and which is flushed together
-with the TLB.
+> I searched the mail I sent, I can NOT found where I said "MAX7310 controls the ethernet phy"....
 
-So the PMD entry you clear can still be in a page-walk cache and this
-needs to be flushed too before you can free the PTE page. Otherwise
-page-walks might still go to the page you just freed. That is especially
-bad when the page is already reallocated and filled with other data.
+Initially you passed:  pinctrl-assert-gpios = <&max7322 0
+GPIO_ACTIVE_HIGH> inside the fec1 node.
 
-> > Further this needs synchronization with other page-tables in the system
-> > when the kernel PMDs are not shared between processes. In x86-32 with
-> > PAE this causes a BUG_ON() being triggered at arch/x86/mm/fault.c:268
-> > because the page-tables are not correctly synchronized.
-> 
-> I think this is an issue with pmd mapping support on x86-32-PAE, not
-> with this patch.  I think the code needed to be updated to sync at the
-> pud level.
+Then I explained that 'pinctrl-assert-gpios' is not a valid property
+in mainline. It only exists in NXP vendor tree.
 
-It is an issue with this patch, because this patch is for x86 and on x86
-every change to the kernel page-tables potentially needs to by
-synchronized to the other page-tables. And this patch doesn't implement
-it, which triggers a BUG_ON() under certain conditions.
+Then you explained:
 
+"Sorry, I made a mistake here, the MAX7320 IO0 is for adjusting FEC1's voltage"
 
-Regards,
+> There are MAX7310 users, it is just because currently those users are NOT enabled, so I can
+> NOT verify them. MAX7310 is an independent I2C device, why we can NOT enable it first?
+> I tested it from sysfs interface, we can control the MAX7310's IO output via echo different value
+> to GPIO value, that means MAX7310 itself as an IO expander chip is working just fine, similar with PMIC,
+> it is a I2C device, can be enabled independently, then consumers can be added later when they are enabled.
+> Just my personal opinion, thanks.
 
-	Joerg
+Right, but if FEC needs max7322 IO0 at level 1 then better describe it in dts.
