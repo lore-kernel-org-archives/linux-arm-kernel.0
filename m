@@ -1,67 +1,43 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 26 Apr 2018 20:01:08 +0200
-Subject: [PATCH] mtd: nand: davinci: don't acquire and enable clock
-In-Reply-To: <20180330143051.26423-1-nsekhar@ti.com>
-References: <20180330143051.26423-1-nsekhar@ti.com>
-Message-ID: <20180426200108.2afb375c@bbrezillon>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 27 Apr 2018 02:25:23 +0800
+Subject: [PATCH v7 01/11] ARM: sunxi: smp: Move assembly code into a file
+In-Reply-To: <20180420211022.11759-2-mylene.josserand@bootlin.com>
+References: <20180420211022.11759-2-mylene.josserand@bootlin.com>
+Message-ID: <201804270202.0Krw6Gih%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Hi Myl?ne,
 
-On Fri, 30 Mar 2018 20:00:51 +0530
-Sekhar Nori <nsekhar@ti.com> wrote:
+Thank you for the patch! Yet something to improve:
 
-> NAND itself is an asynchronous interface, it does not have any
-> clock input. DaVinci NAND driver acquires clock for AEMIF
-> (asynchronous external memory interface) which is an on-chip
-> IP to which NAND is connected.
-> 
-> The same clock is also enabled in AEMIF driver (either present
-> drivers/memory or from machine code for some older platforms).
-> AEMIF timing must be initialized before NAND can be accessed.
-> This ensures that AEMIF clock is enabled too.
-> 
-> Remove the superfluous clock acquisition and enable in DaVinci
-> NAND driver.
-> 
-> Tested on K2L, K2HK, K2E, DA850 EVM, DA850 LCDK in device-tree
-> boot and DM644x EVM in legacy boot.
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
-> Hi Boris,
-> 
-> If/when this patch gets accepted, it will nice to put this on
-> an immutable branch others can merge. There is potential cleanup
-> in drivers/clock and in DaVinci machine code that will depend
-> on this.
+[auto build test ERROR on arm-soc/for-next]
+[also build test ERROR on v4.17-rc2 next-20180426]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I prepared the nand/davinci-clock tag for you to fetch if needed. I'll
-merge it into the nand/next branch soon.
+url:    https://github.com/0day-ci/linux/commits/Myl-ne-Josserand/Sunxi-Add-SMP-support-on-A83T/20180423-051823
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Thanks,
+All errors (new ones prefixed by >>):
 
-Boris 
+   /tmp/ccQKy2ZB.s: Assembler messages:
+>> /tmp/ccQKy2ZB.s:73: Error: selected processor does not support `isb' in ARM mode
+>> /tmp/ccQKy2ZB.s:74: Error: selected processor does not support `dsb' in ARM mode
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mtd.git tags/nand/davinci-clock
-
-for you to fetch changes up to a8e3923ab57192547ffad01d78939c5c0d5d0c30:
-
-  mtd: rawnand: davinci: don't acquire and enable clock (2018-04-26 19:55:40 +0200)
-
-----------------------------------------------------------------
-Prepare things for davinci clk driver cleanup
-
-----------------------------------------------------------------
-Sekhar Nori (1):
-      mtd: rawnand: davinci: don't acquire and enable clock
-
- drivers/mtd/nand/raw/davinci_nand.c | 25 +------------------------
- 1 file changed, 1 insertion(+), 24 deletions(-)
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 65017 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180427/a13e87ab/attachment-0001.gz>
