@@ -1,71 +1,149 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Thu, 26 Apr 2018 06:57:07 +0000
-Subject: [PATCH 4/5] ARM: dts: imx6sx-sabreauto: add fec support
-In-Reply-To: <CAOMZO5AS=aH8p1+tmgJ4ooeqExNqOALh7vbPAsQdqdky8CkXyQ@mail.gmail.com>
-References: <1524455219-6736-1-git-send-email-Anson.Huang@nxp.com>
- <1524455219-6736-4-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5CDAQtw7Q6NgSzKP4ogaqRaGSE0A+st1iqZ=cQsK49moQ@mail.gmail.com>
- <AM3PR04MB131566E1C8033D256686F192F5880@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5Dm=MFRoh=y54Qf2RrncWfQPTUJ2ZNfvYnUD=idp8RPNA@mail.gmail.com>
- <AM3PR04MB1315ED599A20F67BB9FEFEE1F58F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <AM3PR04MB1315B04BE46755E3EB82E04CF58F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5AS=aH8p1+tmgJ4ooeqExNqOALh7vbPAsQdqdky8CkXyQ@mail.gmail.com>
-Message-ID: <DB5PR04MB132072FEDCAFEDF6592C6A32F58E0@DB5PR04MB1320.eurprd04.prod.outlook.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Thu, 26 Apr 2018 14:58:13 +0800
+Subject: [PATCH V5 1/6] ARM: dts: imx6sx-sabreauto: add PMIC support
+Message-ID: <1524725898-27974-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio
+Add pfuze100 support on i.MX6SX Sabre Auto board.
 
-Anson Huang
-Best Regards!
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+no changes since V4.
+ arch/arm/boot/dts/imx6sx-sabreauto.dts | 117 +++++++++++++++++++++++++++++++++
+ 1 file changed, 117 insertions(+)
 
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Wednesday, April 25, 2018 9:47 PM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
-> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> dl-linux-imx <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC
-> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
-> FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
-> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH 4/5] ARM: dts: imx6sx-sabreauto: add fec support
-> 
-> Hi Anson,
-> 
-> On Wed, Apr 25, 2018 at 2:36 AM, Anson Huang <anson.huang@nxp.com>
-> wrote:
-> 
-> > Sorry, I made a mistake here, the MAX7320 IO0 is for adjusting FEC1's
-> > voltage,
-> 
-> In this case you need to pass the 'phy-supply' property inside the fec node and
-> add a regulator that is controlled via MAX7320 IO0 pin.
-
-The 'phy-supply' is for enabling/disabling phy regulator, but here the MAX7322 IO0 is NOT for
-enabling/disabling PHY regulator, it is for IO voltage switch between 1.5V and 1.8V, our ENET
-IO can work with both 1.5V and 1.8V, so any config is OK for ENET function.
-
-The 1.5V/1.8V selection is a one time setting thing, that means we only need to
-config it once during boot up, most of i.MX platforms does NOT provide such voltage
-switch function for ENET IO, on this 6SX sabre auto board, it is more like a backup or
-validation purpose. With default settings, ENET's function is NOT impacted at all.
-
-I think we can add a gpio regulator for it and let the regulator initialization set the GPIO
-Level for fec, such below, with " enable-active-high " present, GPIO will be at LOW and voltage
-is 1.5V, without this property, GPIO will be HIGH and voltage will be 1.8V.
-+               reg_fec: fec_io_supply {
-+                       compatible = "regulator-gpio";
-+                       regulator-name = "1.8V_1.5V_FEC";
-+                       regulator-min-microvolt = <1500000>;
-+                       regulator-max-microvolt = <1800000>;
-+                       states = <1500000 0x0 1800000 0x1>;
-+                       enable-gpio = <&max7322 0 GPIO_ACTIVE_HIGH>;
-+                       vin-supply = <&sw2_reg>;
-+                       enable-active-high;
-+               };
+diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+index 57d1ea0..2caca934 100644
+--- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+@@ -74,6 +74,14 @@
+ 
+ &iomuxc {
+ 	imx6x-sabreauto {
 +
-
-Anson.
++		pinctrl_i2c2_1: i2c2grp-1 {
++			fsl,pins = <
++				MX6SX_PAD_GPIO1_IO03__I2C2_SDA          0x4001b8b1
++				MX6SX_PAD_GPIO1_IO02__I2C2_SCL          0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
+@@ -148,3 +156,112 @@
+ 		};
+ 	};
+ };
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2_1>;
++	status = "okay";
++
++	pmic: pfuze100 at 08 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++				regulator-always-on;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
+-- 
+2.7.4
