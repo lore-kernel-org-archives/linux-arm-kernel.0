@@ -1,104 +1,93 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Apr 2018 00:26:46 +0100
-Subject: noveau vs arm dma ops
-In-Reply-To: <CAKMK7uH14qupTYDa1pr8UC434Vs+97eUXj+fYi=+2uijCLayMA@mail.gmail.com>
-References: <CAKMK7uFL68pu+-9LODTgz+GQYvxpnXOGhxfz9zorJ_JKsPVw2g@mail.gmail.com>
- <20180425054855.GA17038@infradead.org>
- <CAKMK7uEFitkNQrD6cLX5Txe11XhVO=LC4YKJXH=VNdq+CY=DjQ@mail.gmail.com>
- <CAKMK7uFx=KB1vup=WhPCyfUFairKQcRR4BEd7aXaX1Pj-vj3Cw@mail.gmail.com>
- <20180425064335.GB28100@infradead.org> <20180425074151.GA2271@ulmo>
- <20180425085439.GA29996@infradead.org>
- <20180425100429.GR25142@phenom.ffwll.local>
- <20180425153312.GD27076@infradead.org>
- <CAKMK7uH14qupTYDa1pr8UC434Vs+97eUXj+fYi=+2uijCLayMA@mail.gmail.com>
-Message-ID: <20180425232646.GR16141@n2100.armlinux.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 26 Apr 2018 08:00:21 +0800
+Subject: [PATCH 5/6 v2] bus: fsl-mc: supoprt dma configure for devices on
+ fsl-mc bus
+In-Reply-To: <1523960514-25457-6-git-send-email-nipun.gupta@nxp.com>
+References: <1523960514-25457-6-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <201804260718.cbz91zDr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 11:35:13PM +0200, Daniel Vetter wrote:
-> On arm that doesn't work. The iommu api seems like a good fit, except
-> the dma-api tends to get in the way a bit (drm/msm apparently has
-> similar problems like tegra), and if you need contiguous memory
-> dma_alloc_coherent is the only way to get at contiguous memory. There
-> was a huge discussion years ago about that, and direct cma access was
-> shot down because it would have exposed too much of the caching
-> attribute mangling required (most arm platforms need wc-pages to not
-> be in the kernel's linear map apparently).
+Hi Nipun,
 
-I think you completely misunderstand ARM from what you've written above,
-and this worries me greatly about giving DRM the level of control that
-is being asked for.
+Thank you for the patch! Yet something to improve:
 
-Modern ARMs have a PIPT cache or a non-aliasing VIPT cache, and cache
-attributes are stored in the page tables.  These caches are inherently
-non-aliasing when there are multiple mappings (which is a great step
-forward compared to the previous aliasing caches.)
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.17-rc2 next-20180424]
+[cannot apply to iommu/next glikely/devicetree/next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-As the cache attributes are stored in the page tables, this in theory
-allows different virtual mappings of the same physical memory to have
-different cache attributes.  However, there's a problem, and that's
-called speculative prefetching.
+url:    https://github.com/0day-ci/linux/commits/Nipun-Gupta/Support-for-fsl-mc-bus-and-its-devices-in-SMMU/20180418-034931
+config: powerpc64-allmodconfig (attached as .config)
+compiler: powerpc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=powerpc64 
 
-Let's say you have one mapping which is cacheable, and another that is
-marked as write combining.  If a cache line is speculatively prefetched
-through the cacheable mapping of this memory, and then you read the
-same physical location through the write combining mapping, it is
-possible that you could read cached data.
+All errors (new ones prefixed by >>):
 
-So, it is generally accepted that all mappings of any particular
-physical bit of memory should have the same cache attributes to avoid
-unpredictable behaviour.
+   drivers/bus/fsl-mc/fsl-mc-bus.c: In function 'fsl_mc_dma_configure':
+>> drivers/bus/fsl-mc/fsl-mc-bus.c:137:9: error: too many arguments to function 'of_dma_configure'
+     return of_dma_configure(dev, dma_dev->of_node, 0);
+            ^~~~~~~~~~~~~~~~
+   In file included from drivers/bus/fsl-mc/fsl-mc-bus.c:13:0:
+   include/linux/of_device.h:58:5: note: declared here
+    int of_dma_configure(struct device *dev, struct device_node *np);
+        ^~~~~~~~~~~~~~~~
+   drivers/bus/fsl-mc/fsl-mc-bus.c: At top level:
+>> drivers/bus/fsl-mc/fsl-mc-bus.c:161:3: error: 'struct bus_type' has no member named 'dma_configure'
+     .dma_configure  = fsl_mc_dma_configure,
+      ^~~~~~~~~~~~~
 
-This presents a problem with what is generally called "lowmem" where
-the memory is mapped in kernel virtual space with cacheable
-attributes.  It can also happen with highmem if the memory is
-kmapped.
+vim +/of_dma_configure +137 drivers/bus/fsl-mc/fsl-mc-bus.c
 
-This is why, on ARM, you can't use something like get_free_pages() to
-grab some pages from the system, pass it to the GPU, map it into
-userspace as write-combining, etc.  It _might_ work for some CPUs,
-but ARM CPUs vary in how much prefetching they do, and what may work
-for one particular CPU is in no way guaranteed to work for another
-ARM CPU.
+   129	
+   130	static int fsl_mc_dma_configure(struct device *dev)
+   131	{
+   132		struct device *dma_dev = dev;
+   133	
+   134		while (dev_is_fsl_mc(dma_dev))
+   135			dma_dev = dma_dev->parent;
+   136	
+ > 137		return of_dma_configure(dev, dma_dev->of_node, 0);
+   138	}
+   139	
+   140	static ssize_t modalias_show(struct device *dev, struct device_attribute *attr,
+   141				     char *buf)
+   142	{
+   143		struct fsl_mc_device *mc_dev = to_fsl_mc_device(dev);
+   144	
+   145		return sprintf(buf, "fsl-mc:v%08Xd%s\n", mc_dev->obj_desc.vendor,
+   146			       mc_dev->obj_desc.type);
+   147	}
+   148	static DEVICE_ATTR_RO(modalias);
+   149	
+   150	static struct attribute *fsl_mc_dev_attrs[] = {
+   151		&dev_attr_modalias.attr,
+   152		NULL,
+   153	};
+   154	
+   155	ATTRIBUTE_GROUPS(fsl_mc_dev);
+   156	
+   157	struct bus_type fsl_mc_bus_type = {
+   158		.name = "fsl-mc",
+   159		.match = fsl_mc_bus_match,
+   160		.uevent = fsl_mc_bus_uevent,
+ > 161		.dma_configure  = fsl_mc_dma_configure,
+   162		.dev_groups = fsl_mc_dev_groups,
+   163	};
+   164	EXPORT_SYMBOL_GPL(fsl_mc_bus_type);
+   165	
 
-The official line from architecture folk is to assume that the caches
-infinitely speculate, are of infinite size, and can writeback *dirty*
-data at any moment.
-
-The way to stop things like speculative prefetches to particular
-physical memory is to, quite "simply", not have any cacheable
-mappings of that physical memory anywhere in the system.
-
-Now, cache flushes on ARM tend to be fairly expensive for GPU buffers.
-If you have, say, an 8MB buffer (for a 1080p frame) and you need to
-do a cache operation on that buffer, you'll be iterating over it
-32 or maybe 64 bytes at a time "just in case" there's a cache line
-present.  Referring to my previous email, where I detailed the
-potential need for _two_ flushes, one before the GPU operation and
-one after, and this becomes _really_ expensive.  At that point, you're
-probably way better off using write-combine memory where you don't
-need to spend CPU cycles performing cache flushing - potentially
-across all CPUs in the system if cache operations aren't broadcasted.
-
-This isn't a simple matter of "just provide some APIs for cache
-operations" - there's much more that needs to be understood by
-all parties here, especially when we have GPU drivers that can be
-used with quite different CPUs.
-
-It may well be that for some combinations of CPUs and workloads, it's
-better to use write-combine memory without cache flushing, but for
-other CPUs that tradeoff (for the same workload) could well be
-different.
-
-Older ARMs get more interesting, because they have aliasing caches.
-That means the CPU cache aliases across different virtual space
-mappings in some way, which complicates (a) the mapping of memory
-and (b) handling the cache operations on it.
-
-It's too late for me to go into that tonight, and I probably won't
-be reading mail for the next week and a half, sorry.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 56229 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180426/3bed7b4d/attachment-0001.gz>
