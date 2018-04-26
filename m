@@ -1,64 +1,59 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 26 Apr 2018 08:28:04 +0200
-Subject: [RFC 0/2] dw_mmc: add multislot support
-In-Reply-To: <1524664417.18209.16.camel@synopsys.com>
-References: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
- <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
- <1524239609.10138.47.camel@synopsys.com>
- <CAPDyKFpY7JsQukY=E2PRg=iVfmis4i1kvST+b2wtshNc5Jn+jw@mail.gmail.com>
- <1524664417.18209.16.camel@synopsys.com>
-Message-ID: <CAPDyKFr4WXgFEDLGztRoSrAFMrHC7ASJxaxCTKMeGN8i-Ns86w@mail.gmail.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Thu, 26 Apr 2018 06:31:08 +0000
+Subject: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
+ max7310 support
+In-Reply-To: <CAOMZO5AZLbUoL7FWgUFA7qc3q3wcz9UBLSQhMXXkUJeiRz8X4A@mail.gmail.com>
+References: <1524634571-5914-1-git-send-email-Anson.Huang@nxp.com>
+ <1524634571-5914-3-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5Dm6rcEe=zAJ9_nqKce3g2tdyWPqb=Uv-N5nfc_96jc-g@mail.gmail.com>
+ <AM3PR04MB13150654494B8D251988F76CF58E0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5AZLbUoL7FWgUFA7qc3q3wcz9UBLSQhMXXkUJeiRz8X4A@mail.gmail.com>
+Message-ID: <DB5PR04MB13205A0A7134C969748560B4F58E0@DB5PR04MB1320.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
 
-> A bit remark for better understanding:
->
-> All card settings change are serialized too. These settings are applied
-> after slot switch before execution of new request for this slot.
->
-> So situations like calling any host_0 ops while another host (host_1) is active
-> are handled by current code.
->
-> This is example of simultaneous ops calls for both slots:
->
-> host (slot) 0    | host (slot) 1
-> -----------------------------------
-> h0->set_ios()    |    h1->set_ios()
-> h0->request()    |    h1->request()
-> h0->set_ios()    |    h1->set_ios()
-> h0->request()    |    h1->request()
-> h0->request()    |
-> h0->request()    |
-> h0->request()    |
->
-> How it will be serialized in the mmc driver:
->
-> h0->set_ios()   // h0 settings save
-> h1->set_ios()   // h1 settings save
-> h0->request()   // apply settings for h0 and do request
 
-This doesn't work as it would mean violation of the specs in some
-scenarios. Particular during the card initialization and card power
-off.
+Anson Huang
+Best Regards!
 
-> ------ slot switch to h1 ------
-> h1->request()   // apply settings for h1 and do request
 
-Ditto. Etc...
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Thursday, April 26, 2018 2:21 PM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
+> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
+> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
+> Russell King - ARM Linux <linux@armlinux.org.uk>; dl-linux-imx
+> <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC ARM
+> ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
+> FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
+> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>
+> Subject: Re: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
+> max7310 support
+> 
+> On Thu, Apr 26, 2018 at 12:06 AM, Anson Huang <anson.huang@nxp.com>
+> wrote:
+> 
+> > MAX7310 pins are for PCIe, CAN, MLB. GPS etc., these modules are NOT
+> > enabled yet, so I can NOT test it, I think we should add MAX7310 users
+> > when these modules are enabled, ethernet PHY is NOT controlled by it.
+> 
+> You said previously that MAX7310 also controls the Ethernet PHY. Is the vendor
+> dts wrong then?
+> 
+> If there are no MAX7310 users, why are you adding support for MAX7310 then?
+> 
+> Confused.
 
-> h0->set_ios()   // h0 settings save
-> h1->set_ios()   // h1 settings save
-> ------ slot switch to h0 ------
-> h0->request()   // apply settings for h0 and do request
-> ------ slot switch to h1 ------
-> h1->request()   // apply settings for h1 and do request
-> ------ slot switch to h0 ------
-> h0->request()   // do request (no new settings to apply)
-> h0->request()   // do request (no new settings to apply)
-> h0->request()   // do request (no new settings to apply)
->
+I searched the mail I sent, I can NOT found where I said "MAX7310 controls the ethernet phy"....
 
-Kind regards
-Uffe
+There are MAX7310 users, it is just because currently those users are NOT enabled, so I can
+NOT verify them. MAX7310 is an independent I2C device, why we can NOT enable it first?
+I tested it from sysfs interface, we can control the MAX7310's IO output via echo different value
+to GPIO value, that means MAX7310 itself as an IO expander chip is working just fine, similar with PMIC,
+it is a I2C device, can be enabled independently, then consumers can be added later when they are enabled.
+Just my personal opinion, thanks.
+
+Anson.
