@@ -1,87 +1,45 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Thu, 26 Apr 2018 10:25:58 +0200
-Subject: [PATCH] i2c: at91: Read all available bytes at once
-In-Reply-To: <cab9e509-a506-5852-6b0d-ed3e4751eeb6@sysgo.com>
-References: <20180418124055.21333-1-david.engraf@sysgo.com>
- <20180425150853.GU13305@rfolt0960.corp.atmel.com>
- <cab9e509-a506-5852-6b0d-ed3e4751eeb6@sysgo.com>
-Message-ID: <20180426082558.GX13305@rfolt0960.corp.atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Apr 2018 09:31:48 +0100
+Subject: [PATCH] arm64: export tishift functions to modules
+In-Reply-To: <CAHmME9oa-DX721K_yRe14AbLk5-raOXEji2SWsf41UtUTP=guQ@mail.gmail.com>
+References: <CAHmME9oO_5X6M3NLe2tWp=ZY5EQY17GQ6BUomHLBscMejiXTvw@mail.gmail.com>
+ <20180424154055.GC25964@arm.com>
+ <CAHmME9oa-DX721K_yRe14AbLk5-raOXEji2SWsf41UtUTP=guQ@mail.gmail.com>
+Message-ID: <20180426083147.GB27583@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Jason,
 
-On Wed, Apr 25, 2018 at 05:43:09PM +0200, David Engraf wrote:
-> Hi Ludovic,
+On Tue, Apr 24, 2018 at 05:56:39PM +0200, Jason A. Donenfeld wrote:
+> On Tue, Apr 24, 2018 at 5:40 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Apr 24, 2018 at 03:43:04PM +0200, Jason A. Donenfeld wrote:
+> >> On Tue, Apr 24, 2018 at 3:34 PM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > I've not run into any build issues here -- is this specifically with some
+> >> > out-of-tree module?
+> >>
+> >> I received a bug report email about this. I'm not sure which specific
+> >> module, and I assumed from the email that it was actually a result of
+> >> in-tree configuration options rather than an out-of-tree module, but
+> >> I'm not sure exactly. Either way, I was able to reproduce the problem
+> >> by coding up a little PoC out-of-tree module, so it is certainly a
+> >> real problem.
+> >
+> > Any chance you could share the module, please? I tried to write one but
+> > the compiler just inlines the __in128 arithmetic.
 > 
-> Am 25.04.2018 um 17:08 schrieb Ludovic Desroches:
-> > Hi David,
-> > 
-> > On Wed, Apr 18, 2018 at 02:40:55PM +0200, David Engraf wrote:
-> > > With FIFO enabled it is possible to read multiple bytes
-> > > at once in the interrupt handler as long as RXRDY is
-> > > set. This may also reduce the number of interrupts.
-> > > 
-> > > Signed-off-by: David Engraf <david.engraf@sysgo.com>
-> > > ---
-> > >   drivers/i2c/busses/i2c-at91.c | 8 ++++++--
-> > >   1 file changed, 6 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> > > index bfd1fdff64a9..d01c2b2384bd 100644
-> > > --- a/drivers/i2c/busses/i2c-at91.c
-> > > +++ b/drivers/i2c/busses/i2c-at91.c
-> > > @@ -518,8 +518,12 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
-> > >   	 * the RXRDY interrupt first in order to not keep garbage data in the
-> > >   	 * Receive Holding Register for the next transfer.
-> > >   	 */
-> > > -	if (irqstatus & AT91_TWI_RXRDY)
-> > > -		at91_twi_read_next_byte(dev);
-> > > +	if (irqstatus & AT91_TWI_RXRDY) {
-> > > +		/* read all available bytes at once when FIFO is used */
-> > > +		do {
-> > > +			at91_twi_read_next_byte(dev);
-> > > +		} while (at91_twi_read(dev, AT91_TWI_SR) & AT91_TWI_RXRDY);
-> > 
-> > You can avoid this check by using the RXFL field to know the number of
-> > data you can read. Did you try to use it? If yes, did you notice some issues?
-> 
-> I did a quick test by reading RXFL and it worked as well but I decided to
-> use the more readable solution by polling RXRDY. Also I don't need to check
-> if the FIFO has been enabled.
-> 
-> If you prefer using RXFL I can create a new patch.
+> Sure. I didn't save my original but just cooked a new one up and
+> verified it errors out. The below will get these errors on mainline
+> when compiled as a module, even as an in-tree module:
 
-Honestly, I have no strong opinion about it. As you said you approach is
-simple and easy to read.
+Thanks for sharing the module source, I can reproduce the issue on my
+machine. Putting both the prototype and the EXPORT_SYMBOL in arm64ksyms.c
+appears to resolve the issue and is my preference since these functions
+shouldn't be called directly anyway. Would you be able to spin a v2 doing
+that, please? I can take it as fix.
 
-About performances, I assume that both solutions are pretty the same for
-small number of data. If the number increases, using the RXFL field
-should give better results.
+I've also queued your clang int128 patch.
 
-So I would say, maybe add a note in the commit log or in the code to
-keep in mind there is this solution to go further.
+Cheers,
 
-Otherwise
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-
-Regards
-
-Ludovic
-
-> 
-> Best regards
-> - David
-> 
-> 
-> > Regards
-> > 
-> > Ludovic
-> > 
-> > > +	}
-> > >   	/*
-> > >   	 * When a NACK condition is detected, the I2C controller sets the NACK,
-> > > -- 
-> > > 2.14.1
-> > > 
-> 
+Will
