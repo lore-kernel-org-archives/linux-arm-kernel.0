@@ -1,155 +1,80 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Thu, 26 Apr 2018 18:18:26 +0200
-Subject: [PATCH 03/11] irqchip: stm32: add falling pending register support
+Date: Thu, 26 Apr 2018 18:18:24 +0200
+Subject: [PATCH 01/11] irqchip: stm32: Optimizes and cleans up stm32-exti
+ irq_domain
 In-Reply-To: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
 References: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1524759514-12392-4-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1524759514-12392-2-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+From: radek <radoslaw.pietrzyk@gmail.com>
 
-This patch adds support of rising/falling pending registers.
-Falling pending register (fpr) is needed for next revision.
+- In stm32_exti_alloc function, discards irq_domain_set_info
+  with handle_simple_irq. This overwrite the setting defined while init
+  of generic chips. Exti controller manages edge irq type.
+- Removes acking in chained irq handler as this is done by
+  irq_chip itself inside handle_edge_irq
+- removes unneeded irq_domain_ops.xlate callback
 
+Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+Acked-by: Ludovic Barre <ludovic.barre@st.com>
+Tested-by: Ludovic Barre <ludovic.barre@st.com>
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/irqchip/irq-stm32-exti.c | 47 ++++++++++++++++++++++++++++++----------
- 1 file changed, 36 insertions(+), 11 deletions(-)
+ drivers/irqchip/irq-stm32-exti.c | 13 -------------
+ 1 file changed, 13 deletions(-)
 
 diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-index b91a8c2..69a4453 100644
+index 36f0fbe..8013a87 100644
 --- a/drivers/irqchip/irq-stm32-exti.c
 +++ b/drivers/irqchip/irq-stm32-exti.c
-@@ -23,16 +23,20 @@ struct stm32_exti_bank {
- 	u32 rtsr_ofst;
- 	u32 ftsr_ofst;
- 	u32 swier_ofst;
--	u32 pr_ofst;
-+	u32 rpr_ofst;
-+	u32 fpr_ofst;
- };
- 
-+#define UNDEF_REG ~0
-+
- static const struct stm32_exti_bank stm32f4xx_exti_b1 = {
- 	.imr_ofst	= 0x00,
- 	.emr_ofst	= 0x04,
- 	.rtsr_ofst	= 0x08,
- 	.ftsr_ofst	= 0x0C,
- 	.swier_ofst	= 0x10,
--	.pr_ofst	= 0x14,
-+	.rpr_ofst	= 0x14,
-+	.fpr_ofst	= UNDEF_REG,
- };
- 
- static const struct stm32_exti_bank *stm32f4xx_exti_banks[] = {
-@@ -45,7 +49,8 @@ static const struct stm32_exti_bank stm32h7xx_exti_b1 = {
- 	.rtsr_ofst	= 0x00,
- 	.ftsr_ofst	= 0x04,
- 	.swier_ofst	= 0x08,
--	.pr_ofst	= 0x88,
-+	.rpr_ofst	= 0x88,
-+	.fpr_ofst	= UNDEF_REG,
- };
- 
- static const struct stm32_exti_bank stm32h7xx_exti_b2 = {
-@@ -54,7 +59,8 @@ static const struct stm32_exti_bank stm32h7xx_exti_b2 = {
- 	.rtsr_ofst	= 0x20,
- 	.ftsr_ofst	= 0x24,
- 	.swier_ofst	= 0x28,
--	.pr_ofst	= 0x98,
-+	.rpr_ofst	= 0x98,
-+	.fpr_ofst	= UNDEF_REG,
- };
- 
- static const struct stm32_exti_bank stm32h7xx_exti_b3 = {
-@@ -63,7 +69,8 @@ static const struct stm32_exti_bank stm32h7xx_exti_b3 = {
- 	.rtsr_ofst	= 0x40,
- 	.ftsr_ofst	= 0x44,
- 	.swier_ofst	= 0x48,
--	.pr_ofst	= 0xA8,
-+	.rpr_ofst	= 0xA8,
-+	.fpr_ofst	= UNDEF_REG,
- };
- 
- static const struct stm32_exti_bank *stm32h7xx_exti_banks[] = {
-@@ -75,8 +82,13 @@ static const struct stm32_exti_bank *stm32h7xx_exti_banks[] = {
- static unsigned long stm32_exti_pending(struct irq_chip_generic *gc)
- {
- 	const struct stm32_exti_bank *stm32_bank = gc->private;
-+	unsigned long pending;
-+
-+	pending = irq_reg_readl(gc, stm32_bank->rpr_ofst);
-+	if (stm32_bank->fpr_ofst != UNDEF_REG)
-+		pending |= irq_reg_readl(gc, stm32_bank->fpr_ofst);
- 
--	return irq_reg_readl(gc, stm32_bank->pr_ofst);
-+	return pending;
+@@ -79,13 +79,6 @@ static unsigned long stm32_exti_pending(struct irq_chip_generic *gc)
+ 	return irq_reg_readl(gc, stm32_bank->pr_ofst);
  }
  
+-static void stm32_exti_irq_ack(struct irq_chip_generic *gc, u32 mask)
+-{
+-	const struct stm32_exti_bank *stm32_bank = gc->private;
+-
+-	irq_reg_writel(gc, mask, stm32_bank->pr_ofst);
+-}
+-
  static void stm32_irq_handler(struct irq_desc *desc)
-@@ -85,7 +97,6 @@ static void stm32_irq_handler(struct irq_desc *desc)
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
- 	unsigned int virq, nbanks = domain->gc->num_chips;
- 	struct irq_chip_generic *gc;
--	const struct stm32_exti_bank *stm32_bank;
- 	unsigned long pending;
- 	int n, i, irq_base = 0;
- 
-@@ -93,7 +104,6 @@ static void stm32_irq_handler(struct irq_desc *desc)
- 
- 	for (i = 0; i < nbanks; i++, irq_base += IRQS_PER_BANK) {
- 		gc = irq_get_domain_generic_chip(domain, irq_base);
--		stm32_bank = gc->private;
- 
- 		while ((pending = stm32_exti_pending(gc))) {
+ {
+ 	struct irq_domain *domain = irq_desc_get_handler_data(desc);
+@@ -106,7 +99,6 @@ static void stm32_irq_handler(struct irq_desc *desc)
  			for_each_set_bit(n, &pending, IRQS_PER_BANK) {
-@@ -192,6 +202,20 @@ static const struct irq_domain_ops irq_exti_domain_ops = {
+ 				virq = irq_find_mapping(domain, irq_base + n);
+ 				generic_handle_irq(virq);
+-				stm32_exti_irq_ack(gc, BIT(n));
+ 			}
+ 		}
+ 	}
+@@ -176,16 +168,12 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
+ static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
+ 			    unsigned int nr_irqs, void *data)
+ {
+-	struct irq_chip_generic *gc;
+ 	struct irq_fwspec *fwspec = data;
+ 	irq_hw_number_t hwirq;
+ 
+ 	hwirq = fwspec->param[0];
+-	gc = irq_get_domain_generic_chip(d, hwirq);
+ 
+ 	irq_map_generic_chip(d, virq, hwirq);
+-	irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
+-			    handle_simple_irq, NULL, NULL);
+ 
+ 	return 0;
+ }
+@@ -200,7 +188,6 @@ static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
+ 
+ struct irq_domain_ops irq_exti_domain_ops = {
+ 	.map	= irq_map_generic_chip,
+-	.xlate	= irq_domain_xlate_onetwocell,
+ 	.alloc  = stm32_exti_alloc,
  	.free	= stm32_exti_free,
  };
- 
-+static void stm32_irq_ack(struct irq_data *d)
-+{
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	const struct stm32_exti_bank *stm32_bank = gc->private;
-+
-+	irq_gc_lock(gc);
-+
-+	irq_reg_writel(gc, d->mask, stm32_bank->rpr_ofst);
-+	if (stm32_bank->fpr_ofst != UNDEF_REG)
-+		irq_reg_writel(gc, d->mask, stm32_bank->fpr_ofst);
-+
-+	irq_gc_unlock(gc);
-+}
-+
- static int
- __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
- 		       int bank_nr, struct device_node *node)
-@@ -233,12 +257,11 @@ __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
- 
- 		gc->reg_base = base;
- 		gc->chip_types->type = IRQ_TYPE_EDGE_BOTH;
--		gc->chip_types->chip.irq_ack = irq_gc_ack_set_bit;
-+		gc->chip_types->chip.irq_ack = stm32_irq_ack;
- 		gc->chip_types->chip.irq_mask = irq_gc_mask_clr_bit;
- 		gc->chip_types->chip.irq_unmask = irq_gc_mask_set_bit;
- 		gc->chip_types->chip.irq_set_type = stm32_irq_set_type;
- 		gc->chip_types->chip.irq_set_wake = stm32_irq_set_wake;
--		gc->chip_types->regs.ack = stm32_bank->pr_ofst;
- 		gc->chip_types->regs.mask = stm32_bank->imr_ofst;
- 		gc->private = (void *)stm32_bank;
- 
-@@ -255,7 +278,9 @@ __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
- 		writel_relaxed(0, base + stm32_bank->emr_ofst);
- 		writel_relaxed(0, base + stm32_bank->rtsr_ofst);
- 		writel_relaxed(0, base + stm32_bank->ftsr_ofst);
--		writel_relaxed(~0UL, base + stm32_bank->pr_ofst);
-+		writel_relaxed(~0UL, base + stm32_bank->rpr_ofst);
-+		if (stm32_bank->fpr_ofst != UNDEF_REG)
-+			writel_relaxed(~0UL, base + stm32_bank->fpr_ofst);
- 
- 		pr_info("%s: bank%d, External IRQs available:%#x\n",
- 			node->full_name, i, irqs_mask);
 -- 
 2.7.4
