@@ -1,93 +1,71 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 26 Apr 2018 17:46:26 +0100
-Subject: [linux-sunxi] [PATCH 3/3] arm64: allwinner: h6: enable MMC0/2 on
- Pine H64
-In-Reply-To: <20180426140728.43155-4-icenowy@aosc.io>
-References: <20180426140728.43155-1-icenowy@aosc.io>
- <20180426140728.43155-4-icenowy@aosc.io>
-Message-ID: <03cc2e8c-4a35-3fb4-b408-fd8d4ba3e407@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 26 Apr 2018 18:52:43 +0200
+Subject: [PATCH v4 1/6] ARM: at91: add TCB registers definitions
+In-Reply-To: <20180418105143.3577-2-alexandre.belloni@bootlin.com>
+References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
+ <20180418105143.3577-2-alexandre.belloni@bootlin.com>
+Message-ID: <20180426165242.x5pvpyfirkmvvqjo@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 26/04/18 15:07, Icenowy Zheng wrote:
-> The Pine H64 board have a MicroSD slot connected to MMC0 controller of
-> the H6 SoC and a eMMC slot connected to MMC2.
-> 
-> Enable them in the device tree.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 32 ++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-> index d36de5eb81f3..78b1cd54687c 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-> @@ -20,6 +20,38 @@
->  	chosen {
->  		stdout-path = "serial0:115200n8";
->  	};
+On 2018-04-18 12:51:38 [+0200], Alexandre Belloni wrote:
+> diff --git a/include/soc/at91/atmel_tcb.h b/include/soc/at91/atmel_tcb.h
+> new file mode 100644
+> index 000000000000..d263ea677225
+> --- /dev/null
+> +++ b/include/soc/at91/atmel_tcb.h
+?
+> +static inline struct clk *tcb_clk_get(struct device_node *node, int channel)
+> +{
+> +	struct clk *clk;
+> +	char clk_name[] = "t0_clk";
 > +
-> +	reg_vcc3v3: vcc3v3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc3v3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
+> +	clk_name[1] += channel;
+> +	clk = of_clk_get_by_name(node->parent, clk_name);
+> +	if (!IS_ERR(clk))
+> +		return clk;
 > +
-> +	reg_vcc1v8: vcc1v8 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc1v8";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +	};
+> +	return of_clk_get_by_name(node->parent, "t0_clk");
+> +}
+> +
+> +static inline int tcb_irq_get(struct device_node *node, int channel)
+> +{
+> +	int irq;
+> +
+> +	irq = of_irq_get(node->parent, channel);
+> +	if (irq > 0)
+> +		return irq;
+> +
+> +	return of_irq_get(node->parent, 0);
+> +}
+> +
+> +static const u8 atmel_tc_divisors[5] = { 2, 8, 32, 128, 0, };
+> +
+> +struct atmel_tcb_info {
+> +	int bits;
 > +};
 > +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-
-So this is actually CLDO1 on the AXP, correct?
-
-
-> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
-> +	status = "okay";
+> +static const struct atmel_tcb_info atmel_tcb_infos[] = {
+> +	{ .bits = 16 },
+> +	{ .bits = 32 },
 > +};
 > +
-> +&mmc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc2_pins>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	vqmmc-supply = <&reg_vcc1v8>;
+> +static const struct of_device_id atmel_tcb_dt_ids[] = {
+> +	{
+> +		.compatible = "atmel,at91rm9200-tcb",
+> +		.data = &atmel_tcb_infos[0],
+> +	}, {
+> +		.compatible = "atmel,at91sam9x5-tcb",
+> +		.data = &atmel_tcb_infos[1],
+> +	}, {
+> +		/* sentinel */
+> +	}
+> +};
 
-And this is BLDO2?
+After the series is applied, I see only one user of that file. The data
+structures don't look like they belong here. Same goes for the static
+inline of the code above.
 
-I am just asking because I want to avoid running into the same problem
-as with the A64 before: that future DTs become incompatible with older
-kernels, because we change the power supply to point to the AXP
-regulators, which this kernel does not support yet.
+> +#endif /* __SOC_ATMEL_TCB_H */
 
-It looks like there are more users of those power rails, so we could
-keep those supplies connected to these fixed regulators here, even with
-AXP-805 support in the kernel.
-
-Or we keep this back until we get proper AXP support in the kernel? I
-guess it's quite close to the existing PMICs, so it might be more a
-copy&paste exercise to support the AXP-805?
-
-But apart from this this looks correct to me.
-
-Cheers,
-Andre.
-
-> +	non-removable;
-> +	cap-mmc-hw-reset;
-> +	status = "okay";
->  };
->  
->  &uart0 {
-> 
+Sebastian
