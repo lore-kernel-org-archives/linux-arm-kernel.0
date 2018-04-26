@@ -1,75 +1,101 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 26 Apr 2018 15:35:26 +0200
-Subject: [PATCH] gpio: zynq: Setup chip->base based on alias ID
-In-Reply-To: <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
-References: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
- <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
-Message-ID: <f9dd4f64-4026-f495-5810-32affb5b0944@xilinx.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Apr 2018 14:40:58 +0100
+Subject: [PATCH] arm: port KCOV to arm
+In-Reply-To: <20180426130846.130976-1-dvyukov@google.com>
+References: <20180426130846.130976-1-dvyukov@google.com>
+Message-ID: <20180426134057.4sahhqrbkltwmfsk@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Dmitry,
 
-On 26.4.2018 15:08, Linus Walleij wrote:
-> On Wed, Apr 11, 2018 at 3:55 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+On Thu, Apr 26, 2018 at 03:08:46PM +0200, Dmitry Vyukov wrote:
+> KCOV is code coverage collection facility used, in particular, by syzkaller
+> system call fuzzer. There is some interest in using syzkaller on arm devices.
+> So port KCOV to arm.
 > 
-> Thanks for your patch!
+> On implementation level this merely declares that KCOV is supported and
+> disables instrumentation of 3 special cases. Reasons for disabling are
+> commented in code.
 > 
->> In past Xilinx gpio-zynq driver was setting up gpio chip->base as 0
->> which was chagned to autodetection when driver was upstreamed. Older
->> systems, which were using this old version, setup SW stack which expects
->> zynq gpio base as 0 and right now there is no way how to set this up.
->>
->> The patch is adding an option to setup chip->base based on aliases which
->> is something what some other drivers are doing too.
->> It means when gpio0 alias is setup then chip->base is 0. When gpio alias
->> is not setup gpiochip_find_base() set it up properly which is current
->> behavior.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Tested with qemu-system-arm/vexpress-a15.
 > 
-> In general, we stopped any controlling of the GPIO base.
+> Signed-off-by: Dmitry Vyukov <dvyukov@google.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Abbott Liu <liuwenliang@huawei.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Koguchi Takuo <takuo.koguchi.sw@hitachi.com>
+> Cc: Atul Prakash <atulp@google.com>
+> Cc: linux at armlinux.org.uk
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: syzkaller at googlegroups.com
+> ---
+>  arch/arm/Kconfig                  | 1 +
+>  arch/arm/boot/compressed/Makefile | 3 +++
+>  arch/arm/mm/Makefile              | 4 ++++
+>  arch/arm/vdso/Makefile            | 3 +++
+>  4 files changed, 11 insertions(+)
 
-I know.
+The hyp code will also need to opt-out of KCOV instrumentation.
 
-> 
-> Also this use would have to be OK with the DT maintainers
-> as I never saw this use of alias before.
+i.e. arch/arm/kvm/hyp/Makefile will need:
 
-If you grep gpio drivers you will see that these gpio-zx, gpio-mvebu,
-gpio-mxc, gpio-mxs, gpio-vf610 are using that.
+KCOV_INSTRUMENT := n
 
-> 
-> Please describe the use case for this.
-> 
-> The only use case which I can think about is userspace sysfs
-> and then I would really like to know why these userspace
-> users cannot use the character device that is nowadays
-> supported by libgpiod and there is even patches for some
-> IoT libraries to use it. The character device makes the
-> GPIO Linux "base" irrelevant for userspace.
-> 
-> GPIO sysfs is deprecated and moved to the obsolete ABI.
-> 
-> If there are legacy applications that use this I would have
-> to consider it, but since this has been -1 since the driver
-> was merged I find that unlikely.
+... and we should probably pick up the other bits from the arm64 hyp
+Makefile, i.e. all of:
 
-Yes, it is about legacy application which I have seen recently and there
-is no source code for application calls it because board vendor doesn't
-provide it.
+# KVM code is run at a different exception code with a different map, so
+# compiler instrumentation that inserts callbacks or checks into the code may
+# cause crashes. Just disable it.
+GCOV_PROFILE	:= n
+KASAN_SANITIZE	:= n
+UBSAN_SANITIZE	:= n
+KCOV_INSTRUMENT	:= n
 
-You are right that -1 was used from the beginning in mainline but
-unfortunately this driver was in vendor tree for a while and it uses 0
-there.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a7f8e7f4b88f..60558a6bb744 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -105,6 +105,7 @@ config ARM
+>  	select REFCOUNT_FULL
+>  	select RTC_LIB
+>  	select SYS_SUPPORTS_APM_EMULATION
+> +	select ARCH_HAS_KCOV
+>  	# Above selects are sorted alphabetically; please add new ones
+>  	# according to that.  Thanks.
+>  	help
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index 45a6b9b7af2a..5219700e9161 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -25,6 +25,9 @@ endif
+>  
+>  GCOV_PROFILE		:= n
+>  
+> +# Prevents link failures: __sanitizer_cov_trace_pc() is not linked in.
+> +KCOV_INSTRUMENT		:= n
+> +
+>  #
+>  # Architecture dependencies
+>  #
+> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+> index 9dbb84923e12..e8be5d904ac7 100644
+> --- a/arch/arm/mm/Makefile
+> +++ b/arch/arm/mm/Makefile
+> @@ -8,6 +8,10 @@ obj-y				+= dma-mapping$(MMUEXT).o
+>  obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
+>  				   mmap.o pgd.o mmu.o pageattr.o
+>  
+> +# Instrumenting fault.c causes infinite recursion between:
+> +# __dabt_svc -> do_DataAbort -> __sanitizer_cov_trace_pc -> __dabt_svc
+> +KCOV_INSTRUMENT_fault.o := n
 
-In upstreaming this was changed to -1 but customers have a lot of code
-which developed against vendor tree and they want to use
-latest&greatest. And without this they are not able to run that
-applications.
+Why does __sanitizer_cov_trace_pc() cause a data abort?
 
-I found that this logic is already in 5 drivers in mainline that's why I
-send this patch to be +1.
+We don't seem to have this issue on arm64, where our fault handling is
+instrumented, so this seems suspect.
 
 Thanks,
-Michal
+Mark.
