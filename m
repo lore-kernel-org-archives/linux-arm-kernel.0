@@ -1,17 +1,90 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 26 Apr 2018 08:38:00 +0300
-Subject: [PATCH v2] staging: bcm2835-audio: Disconnect and free
- vchi_instance on module_exit()
-In-Reply-To: <d2690e90-f3ff-8a3a-38bc-edf0a0c7c754@gmail.com>
-References: <9e4fc4a0-370b-9101-2809-4040de58553c@gmail.com>
- <20180424195729.8433-1-k.marinushkin@gmail.com>
- <20180425061638.GA1450@kroah.com>
- <d2690e90-f3ff-8a3a-38bc-edf0a0c7c754@gmail.com>
-Message-ID: <20180426053758.egezzrh7maz2zbhw@mwanda>
+From: david.engraf@sysgo.com (David Engraf)
+Date: Thu, 26 Apr 2018 07:52:17 +0200
+Subject: [PATCH] i2c: at91: Read all available bytes at once
+In-Reply-To: <20180425150853.GU13305@rfolt0960.corp.atmel.com>
+References: <20180418124055.21333-1-david.engraf@sysgo.com>
+ <20180425150853.GU13305@rfolt0960.corp.atmel.com>
+Message-ID: <ddc4beb3-5620-dc69-5b16-bce2737fb59f@sysgo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg deleted your patch already...
+Hi Ludovic,
 
-regards,
-dan carpenter
+Am 25.04.2018 um 17:08 schrieb Ludovic Desroches:
+> Hi David,
+> 
+> On Wed, Apr 18, 2018 at 02:40:55PM +0200, David Engraf wrote:
+>> With FIFO enabled it is possible to read multiple bytes
+>> at once in the interrupt handler as long as RXRDY is
+>> set. This may also reduce the number of interrupts.
+>>
+>> Signed-off-by: David Engraf <david.engraf@sysgo.com>
+>> ---
+>>   drivers/i2c/busses/i2c-at91.c | 8 ++++++--
+>>   1 file changed, 6 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+>> index bfd1fdff64a9..d01c2b2384bd 100644
+>> --- a/drivers/i2c/busses/i2c-at91.c
+>> +++ b/drivers/i2c/busses/i2c-at91.c
+>> @@ -518,8 +518,12 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
+>>   	 * the RXRDY interrupt first in order to not keep garbage data in the
+>>   	 * Receive Holding Register for the next transfer.
+>>   	 */
+>> -	if (irqstatus & AT91_TWI_RXRDY)
+>> -		at91_twi_read_next_byte(dev);
+>> +	if (irqstatus & AT91_TWI_RXRDY) {
+>> +		/* read all available bytes at once when FIFO is used */
+>> +		do {
+>> +			at91_twi_read_next_byte(dev);
+>> +		} while (at91_twi_read(dev, AT91_TWI_SR) & AT91_TWI_RXRDY);
+> 
+> You can avoid this check by using the RXFL field to know the number of
+> data you can read. Did you try to use it? If yes, did you notice some issues?
+
+I did a quick test by reading RXFL and it worked as well but I decided 
+to use the more readable solution by polling RXRDY. Also I don't need to 
+check if the FIFO has been enabled.
+
+If you prefer using RXFL I can create a new patch.
+
+Best regards
+- David
+
+
+> Regards
+> 
+> Ludovic
+> 
+>> +	}
+>>   
+>>   	/*
+>>   	 * When a NACK condition is detected, the I2C controller sets the NACK,
+>> -- 
+>> 2.14.1
+>>
+
+-- 
+Mit freundlichen Gr??en/Best regards,
+
+David Engraf
+Product Engineer
+
+SYSGO AG
+Office Mainz
+Am Pfaffenstein 14 / D-55270 Klein-Winternheim / Germany
+
+Phone: +49-6136-9948-0 / Fax: +49-6136-9948-10
+E-mail: david.engraf at sysgo.com
+_________________________________________________________________________________
+
+Web: https://www.sysgo.com
+Blog: https://www.sysgo.com/blog
+Events: https://www.sysgo.com/events
+Newsletter: https://www.sysgo.com/newsletter
+_________________________________________________________________________________
+
+Handelsregister/Commercial Registry: HRB Mainz 90 HRB 8066
+Vorstand/Executive Board: Etienne Butery (CEO), Kai Sablotny (COO)
+Aufsichtsratsvorsitzender/Supervisory Board Chairman: Marc Darmon
+USt-Id-Nr./VAT-Id-No.: DE 149062328
