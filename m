@@ -1,76 +1,95 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Apr 2018 14:03:45 +0200
-Subject: [PATCH v4] pinctrl: msm: fix gpio-hog related boot issues
-In-Reply-To: <20180412190138.12372-1-chunkeey@gmail.com>
-References: <20180412190138.12372-1-chunkeey@gmail.com>
-Message-ID: <CACRpkdZPEHvnQdwh5Uu5kwqK7yVGTaw_cZR+GOzsG9pg4oEktA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 26 Apr 2018 14:05:28 +0200
+Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
+ kevin panel
+In-Reply-To: <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
+References: <20180208174855.55620-1-seanpaul@chromium.org>
+ <20180208174855.55620-7-seanpaul@chromium.org>
+ <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
+Message-ID: <20180426120528.GA11985@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 9:01 PM, Christian Lamparter <chunkeey@gmail.com> wrote:
+On Mon, Feb 26, 2018 at 10:23:00AM -0800, Doug Anderson wrote:
+> Hi,
+> 
+> On Thu, Feb 8, 2018 at 9:48 AM, Sean Paul <seanpaul@chromium.org> wrote:
+> > This patch adds an override mode for kevin devices. The mode increases
+> > both back porches to allow a pixel clock of 26666kHz as opposed to the
+> > 'typical' value of 252750kHz. This is needed to avoid interference with
+> > the touch digitizer on these laptops.
+> >
+> > Changes in v2:
+> >  - Wrap the timing in display-timings node to match binding (Rob/Thierry)
+> > Changes in v3:
+> >  - Unwrap the timing from display-timings and rename panel-timing (Rob)
+> >
+> > Cc: Doug Anderson <dianders@chromium.org>
+> > Cc: Eric Anholt <eric@anholt.net>
+> > Cc: Heiko Stuebner <heiko@sntech.de>
+> > Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: St?phane Marchesin <marcheu@chromium.org>
+> > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > Cc: devicetree at vger.kernel.org
+> > Cc: dri-devel at lists.freedesktop.org
+> > Cc: linux-rockchip at lists.infradead.org
+> > Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> > ---
+> >  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> > index 191a6bcb1704..658411ce37ea 100644
+> > --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> > +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> > @@ -98,6 +98,20 @@
+> >                 backlight = <&backlight>;
+> >                 power-supply = <&pp3300_disp>;
+> >
+> > +               panel-timing {
+> > +                       clock-frequency = <266604720>;
+> > +                       hactive = <2400>;
+> > +                       hfront-porch = <48>;
+> > +                       hback-porch = <84>;
+> > +                       hsync-len = <32>;
+> > +                       hsync-active = <0>;
+> > +                       vactive = <1600>;
+> > +                       vfront-porch = <3>;
+> > +                       vback-porch = <120>;
+> > +                       vsync-len = <10>;
+> > +                       vsync-active = <0>;
+> > +               };
+> > +
+> >                 ports {
+> >                         panel_in_edp: endpoint {
+> >                                 remote-endpoint = <&edp_out_panel>;
+> 
+> Kristian brought an old bug to my attention
+> <https://bugs.chromium.org/p/chromium/issues/detail?id=750354> and it
+> made me think.  Should we somehow adjust the bindings here to account
+> for the fact that a board may source several different panels?
+> 
+> AKA: on some boards an ODM may want to second source (or third source,
+> or ...) the panel.  They'll randomly connect several different panels
+> to the board and ship the boards out.  The panels are all compatible
+> electrically (same power sequencing) but might need slightly different
+> timings.  In this particular case there's no board-level strappings
+> for the different panels--it's assumed that the EDID on the panels can
+> be used to distinguish them.
+> 
+> In that case it seems like it would be nice to allow specifying more
+> than one "panel-timing" nodes.  Maybe keyed off some type of ID that's
+> present in the EDID?
 
-> Sven Eckelmann reported an issue with the current IPQ4019 pinctrl.
-> Setting up any gpio-hog in the device-tree for his device would
-> "kill the bootup completely":
->
-> | [    0.477838] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
-> | [    0.499828] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferring probe
-> | [    1.298883] requesting hog GPIO enable USB2 power (chip 1000000.pinctrl, offset 58) failed, -517
-> | [    1.299609] gpiochip_add_data: GPIOs 0..99 (1000000.pinctrl) failed to register
-> | [    1.308589] ipq4019-pinctrl 1000000.pinctrl: Failed register gpiochip
-> | [    1.316586] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
-> | [    1.322415] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferri
->
-> This was also verified on a RT-AC58U (IPQ4018) which would
-> no longer boot, if a gpio-hog was specified. (Tried forcing
-> the USB LED PIN (GPIO0) to high.).
->
-> The problem is that Pinctrl+GPIO registration is currently
-> peformed in the following order in pinctrl-msm.c:
->         1. pinctrl_register()
->         2. gpiochip_add()
->         3. gpiochip_add_pin_range()
->
-> The actual error code -517 == -EPROBE_DEFER is coming from
-> pinctrl_get_device_gpio_range(), which is called through:
->         gpiochip_add
->             of_gpiochip_add
->                 of_gpiochip_scan_gpios
->                     gpiod_hog
->                         gpiochip_request_own_desc
->                             __gpiod_request
->                                 chip->request
->                                     gpiochip_generic_request
->                                        pinctrl_gpio_request
->                                           pinctrl_get_device_gpio_range
->
-> pinctrl_get_device_gpio_range() is unable to find any valid
-> pin ranges, since nothing has been added to the pinctrldev_list yet.
-> so the range can't be found, and the operation fails with -EPROBE_DEFER.
->
-> This patch fixes the issue by adding the "gpio-ranges" property to
-> the pinctrl device node of all upstream Qcom SoC. The pin ranges are
-> then added by the gpio core.
->
-> In order to remain compatible with older, existing DTs (and ACPI)
-> a check for the "gpio-ranges" property has been added to
-> msm_gpio_init(). This prevents the driver of adding the same entry
-> to the pinctrldev_list twice.
->
-> Reported-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
-> Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
+If you've got an EDID you should be relying on the EDID to provide the
+timings. No need to have any timings in the DT in that case.
 
-This patch looks VERY good to me.
-
-I am fine in merging it into pin control including the ranges
-fixes.
-
-I need Andy's and Bjorn's ACKs on it though!
-
-Can you guys provide that?
-
-It might be that Andy want the DTS changes separately to avoid
-any collisions, so I'm fine with splitting it as well.
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180426/439f5bec/attachment.sig>
