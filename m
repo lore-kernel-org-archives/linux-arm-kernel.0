@@ -1,83 +1,71 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Thu, 26 Apr 2018 16:21:19 +0000
-Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
-In-Reply-To: <20180426141926.GN15462@8bytes.org>
-References: <20180314180155.19492-1-toshi.kani@hpe.com>
- <20180314180155.19492-3-toshi.kani@hpe.com>
- <20180426141926.GN15462@8bytes.org>
-Message-ID: <1524759629.2693.465.camel@hpe.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 26 Apr 2018 09:23:31 -0700
+Subject: [PATCH linux dev-4.13] clk:aspeed: Fix reset bits for PCI/VGA and
+ PECI
+In-Reply-To: <CACPK8Xe99zZ9Q0Y2HqoaGDXigBaZpkTcbfRe=gvsR5x6XMWzYA@mail.gmail.com>
+References: <20180424224056.23384-1-jae.hyun.yoo@linux.intel.com>
+ <CACPK8Xe99zZ9Q0Y2HqoaGDXigBaZpkTcbfRe=gvsR5x6XMWzYA@mail.gmail.com>
+Message-ID: <5d5faa4a-bffe-5a3f-39e6-b45eebcbb4db@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-04-26 at 16:19 +0200, Joerg Roedel wrote:
-> Hi Toshi, Andrew,
-> 
-> this patch(-set) is broken in several ways, please see below.
-> 
-> On Wed, Mar 14, 2018 at 12:01:55PM -0600, Toshi Kani wrote:
-> > Implement pud_free_pmd_page() and pmd_free_pte_page() on x86, which
-> > clear a given pud/pmd entry and free up lower level page table(s).
-> > Address range associated with the pud/pmd entry must have been purged
-> > by INVLPG.
-> 
-> An INVLPG before actually unmapping the page is useless, as other cores
-> or even speculative instruction execution can bring the TLB entry back
-> before the code actually unmaps the page.
+Hello Joel,
 
-Hi Joerg,
+On 4/25/2018 6:55 PM, Joel Stanley wrote:
+> Hello Jae,
+> 
+> On 25 April 2018 at 08:10, Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
+>> This commit fixes incorrect setting of reset bits for PCI/VGA and
+>> PECI modules.
+>>
+>> 1. Reset bit for PCI/VGA is 8.
+>> 2. PECI reset logic is missing so added bit 10 as its reset bit.
+> 
+> Great find!
+> 
+> Can you please send these upstream as a fix? Apply to 4.17-rc2, and
+> use get_maintainers.pl to identify the lists to send it to.
+> 
+> Also add:
+> 
+> Fixes: 15ed8ce5f84e ("clk: aspeed: Register gated clocks")
+> Cc: stable <stable@vger.kernel.org>
+> 
 
-All pages under the pmd had been unmapped and then lazy TLB purged with
-INVLPG before coming to this code path.  Speculation is not allowed to
-pages without mapping.  
+Thanks! I'll send it to upstream maintainers after adding the tags.
 
-> >  int pud_free_pmd_page(pud_t *pud)
-> >  {
-> > -	return pud_none(*pud);
-> > +	pmd_t *pmd;
-> > +	int i;
-> > +
-> > +	if (pud_none(*pud))
-> > +		return 1;
-> > +
-> > +	pmd = (pmd_t *)pud_page_vaddr(*pud);
-> > +
-> > +	for (i = 0; i < PTRS_PER_PMD; i++)
-> > +		if (!pmd_free_pte_page(&pmd[i]))
-> > +			return 0;
-> > +
-> > +	pud_clear(pud);
+>> +++ b/include/dt-bindings/clock/aspeed-clock.h
+>> @@ -43,8 +43,8 @@
+>>   #define ASPEED_RESET_ADC               2
+>>   #define ASPEED_RESET_JTAG_MASTER       3
+>>   #define ASPEED_RESET_MIC               4
+>> -#define ASPEED_RESET_PWM               5
+>> -#define ASPEED_RESET_PCIVGA            6
+>> +#define ASPEED_RESET_PECI              5
+>> +#define ASPEED_RESET_PWM               6
 > 
-> TLB flush needed here, before the page is freed.
+> This numbers form the kernel ABI, so we shouldn't be changing them.
+> However, none of the mainline device trees use PCIVGA, so we can
+> rename that without breaking any one.
 > 
-> > +	free_page((unsigned long)pmd);
-> > +
-> > +	return 1;
-> >  }
-> >  
-> >  /**
-> > @@ -724,6 +739,15 @@ int pud_free_pmd_page(pud_t *pud)
-> >   */
-> >  int pmd_free_pte_page(pmd_t *pmd)
-> >  {
-> > -	return pmd_none(*pmd);
-> > +	pte_t *pte;
-> > +
-> > +	if (pmd_none(*pmd))
-> > +		return 1;
-> > +
-> > +	pte = (pte_t *)pmd_page_vaddr(*pmd);
-> > +	pmd_clear(pmd);
+> If we leave PWM as 5, and rename PCIVGA to PECI, we won't break any
+> existing device trees.
 > 
-> Same here, TLB flush needed.
+> Cheers,
 > 
-> Further this needs synchronization with other page-tables in the system
-> when the kernel PMDs are not shared between processes. In x86-32 with
-> PAE this causes a BUG_ON() being triggered at arch/x86/mm/fault.c:268
-> because the page-tables are not correctly synchronized.
+> Joel
+> 
 
-I think this is an issue with pmd mapping support on x86-32-PAE, not
-with this patch.  I think the code needed to be updated to sync at the
-pud level.
+Got it. I'll rename the PCIVGA to PECI with Keeping the PWM.
 
 Thanks,
--Toshi
+
+Jae
+
+> 
+>>   #define ASPEED_RESET_I2C               7
+>>   #define ASPEED_RESET_AHB               8
+>>   #define ASPEED_RESET_CRT1              9
+>> --
+>> 2.7.4
+>>
