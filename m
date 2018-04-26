@@ -1,59 +1,70 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Thu, 26 Apr 2018 06:31:08 +0000
-Subject: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
- max7310 support
-In-Reply-To: <CAOMZO5AZLbUoL7FWgUFA7qc3q3wcz9UBLSQhMXXkUJeiRz8X4A@mail.gmail.com>
-References: <1524634571-5914-1-git-send-email-Anson.Huang@nxp.com>
- <1524634571-5914-3-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5Dm6rcEe=zAJ9_nqKce3g2tdyWPqb=Uv-N5nfc_96jc-g@mail.gmail.com>
- <AM3PR04MB13150654494B8D251988F76CF58E0@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5AZLbUoL7FWgUFA7qc3q3wcz9UBLSQhMXXkUJeiRz8X4A@mail.gmail.com>
-Message-ID: <DB5PR04MB13205A0A7134C969748560B4F58E0@DB5PR04MB1320.eurprd04.prod.outlook.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 26 Apr 2018 08:33:02 +0200
+Subject: [PATCH] drm/bridge/synopsys: dsi: use adjusted_mode in mode_set
+In-Reply-To: <20180125155504.8611-1-philippe.cornu@st.com>
+References: <CGME20180125155556epcas2p107973eb77ab08c436dbddcb66fcb7c89@epcas2p1.samsung.com>
+ <20180125155504.8611-1-philippe.cornu@st.com>
+Message-ID: <e85bee37-11da-5fe0-38fe-3b2536b10c22@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 25.01.2018 16:55, Philippe Cornu wrote:
+> The "adjusted_mode" clock value (ie the real pixel clock) is more
+> accurate than "mode" clock value (ie the panel/bridge requested
+> clock value). It offers a better preciseness for timing
+> computations and allows to reduce the extra dsi bandwidth in
+> burst mode (from ~20% to ~10-12%, hw platform dependant).
+>
+> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+> ---
+> Note: This patch replaces "drm/bridge/synopsys: dsi: add optional pixel clock"
 
+Queued to drm-misc-next.
 
-Anson Huang
-Best Regards!
+--
+Regards
+Andrzej
 
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Thursday, April 26, 2018 2:21 PM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
-> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Russell King - ARM Linux <linux@armlinux.org.uk>; dl-linux-imx
-> <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC ARM
-> ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
-> FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
-> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
-> max7310 support
-> 
-> On Thu, Apr 26, 2018 at 12:06 AM, Anson Huang <anson.huang@nxp.com>
-> wrote:
-> 
-> > MAX7310 pins are for PCIe, CAN, MLB. GPS etc., these modules are NOT
-> > enabled yet, so I can NOT test it, I think we should add MAX7310 users
-> > when these modules are enabled, ethernet PHY is NOT controlled by it.
-> 
-> You said previously that MAX7310 also controls the Ethernet PHY. Is the vendor
-> dts wrong then?
-> 
-> If there are no MAX7310 users, why are you adding support for MAX7310 then?
-> 
-> Confused.
-
-I searched the mail I sent, I can NOT found where I said "MAX7310 controls the ethernet phy"....
-
-There are MAX7310 users, it is just because currently those users are NOT enabled, so I can
-NOT verify them. MAX7310 is an independent I2C device, why we can NOT enable it first?
-I tested it from sysfs interface, we can control the MAX7310's IO output via echo different value
-to GPIO value, that means MAX7310 itself as an IO expander chip is working just fine, similar with PMIC,
-it is a I2C device, can be enabled independently, then consumers can be added later when they are enabled.
-Just my personal opinion, thanks.
-
-Anson.
+>
+>  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> index ed8af32f8e52..b926b62e9e33 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> @@ -707,20 +707,20 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
+>  
+>  	clk_prepare_enable(dsi->pclk);
+>  
+> -	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
+> +	ret = phy_ops->get_lane_mbps(priv_data, adjusted_mode, dsi->mode_flags,
+>  				     dsi->lanes, dsi->format, &dsi->lane_mbps);
+>  	if (ret)
+>  		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
+>  
+>  	pm_runtime_get_sync(dsi->dev);
+>  	dw_mipi_dsi_init(dsi);
+> -	dw_mipi_dsi_dpi_config(dsi, mode);
+> +	dw_mipi_dsi_dpi_config(dsi, adjusted_mode);
+>  	dw_mipi_dsi_packet_handler_config(dsi);
+>  	dw_mipi_dsi_video_mode_config(dsi);
+> -	dw_mipi_dsi_video_packet_config(dsi, mode);
+> +	dw_mipi_dsi_video_packet_config(dsi, adjusted_mode);
+>  	dw_mipi_dsi_command_mode_config(dsi);
+> -	dw_mipi_dsi_line_timer_config(dsi, mode);
+> -	dw_mipi_dsi_vertical_timing_config(dsi, mode);
+> +	dw_mipi_dsi_line_timer_config(dsi, adjusted_mode);
+> +	dw_mipi_dsi_vertical_timing_config(dsi, adjusted_mode);
+>  
+>  	dw_mipi_dsi_dphy_init(dsi);
+>  	dw_mipi_dsi_dphy_timing_config(dsi);
+> @@ -734,7 +734,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
+>  
+>  	dw_mipi_dsi_dphy_enable(dsi);
+>  
+> -	dw_mipi_dsi_wait_for_two_frames(mode);
+> +	dw_mipi_dsi_wait_for_two_frames(adjusted_mode);
+>  
+>  	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
+>  	dw_mipi_dsi_set_mode(dsi, 0);
