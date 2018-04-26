@@ -1,29 +1,125 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 26 Apr 2018 22:07:25 +0800
-Subject: [PATCH 0/3] Enable basic MMC support on Allwinner H6
-Message-ID: <20180426140728.43155-1-icenowy@aosc.io>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 26 Apr 2018 16:08:16 +0200
+Subject: [RFC PATCH 0/3] serial: uartps: Add run time support for more IPs
+ than hardcoded 2
+Message-ID: <cover.1524751696.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H6 features 3 SD/MMC controllers. The first and second ones
-are similar to the ones on the Allwinner A64/H5 SoCs, and the third one
-adds the function to use EMCE (EMbedded Crypto Engine) on the Allwinner
-H6 chip to do full-disk encryption.
+Hi,
 
-Enable basic MMC support on Allwinner H6. Higher speed bins are not
-supported, similar to A64/H5. EMCE is also not supported, and keeps its
-bypassed status by default.
+this series is trying to address discussion I had with Alan in past
+https://patchwork.kernel.org/patch/9738445/.
 
-Icenowy Zheng (3):
-  mmc: sunxi: add support for the MMC controller on H6
-  arm64: allwinner: h6: add device tree nodes for MMC controllers
-  arm64: allwinner: h6: enable MMC0/2 on Pine H64
+It is moving uart_register_driver() to probe function like it is done in
+pl011 driver.
+And also introducing new function for alias compatibility checking to
+resolve cases where some IPs have alias and some of them not.
+This case is detected in pl011_probe_dt_alias() but not properly solved.
 
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |  2 +
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 32 +++++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       | 56 ++++++++++++++++++++++
- drivers/mmc/host/sunxi-mmc.c                       | 16 +++++++
- 4 files changed, 106 insertions(+)
+Also keep status of free ids/minor numbers in bitmap to know what's the
+next unallocated number.
+
+The same solution can be used in pl011, uart16550 and uartlite to really
+get unified kernel.
+
+Tested on these use cases:
+Notes:
+ff000000 is the first PS uart listed in dtsi
+ff010000 is the second PS uart listed in dtsi
+
+Standard zcu102 setting
+		serial0 = &uart0;
+		serial1 = &uart1;
+[    0.196628] ff000000.serial: ttyPS0 at MMIO 0xff000000 (irq = 33,
+base_baud = 6250000) is a xuartps
+[    0.642542] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
+base_baud = 6250000) is a xuartps
+
+Swapped zcu102 setting
+		serial0 = &uart1;
+		serial1 = &uart0;
+[    0.196472] ff000000.serial: ttyPS1 at MMIO 0xff000000 (irq = 33,
+base_baud = 6250000) is a xuartps
+[    0.196824] ff010000.serial: ttyPS0 at MMIO 0xff010000 (irq = 34,
+base_baud = 6250000) is a xuartps
+
+uart0 on alias higher then MAX uart ports
+		serial0 = &uart1;
+		serial200 = &uart0;
+[    0.176793] ff000000.serial: ttyPS200 at MMIO 0xff000000 (irq = 33,
+base_baud = 6250000) is a xuartps
+[    0.177288] ff010000.serial: ttyPS0 at MMIO 0xff010000 (irq = 34,
+base_baud = 6250000) is a xuartps
+
+Both uarts on higher aliases
+		serial1 = &uart1;
+		serial2 = &uart0;
+[    0.196470] ff000000.serial: ttyPS2 at MMIO 0xff000000 (irq = 33,
+base_baud = 6250000) is a xuartps
+[    0.196823] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
+base_baud = 6250000) is a xuartps
+
+uart0 not listed but it is probed first that's why should be ttyPS0 but
+there is uart1 via alias
+		serial0 = &uart1;
+[    0.176656] xuartps ff000000.serial: No serial alias passed. Using
+the first free id
+[    0.176671] xuartps ff000000.serial: Validate id 0
+[    0.176680] xuartps ff000000.serial: The empty id is 0
+[    0.176692] xuartps ff000000.serial: ID 0 already taken - skipped
+[    0.176701] xuartps ff000000.serial: Validate id 1
+[    0.176710] xuartps ff000000.serial: The empty id is 1
+[    0.176719] xuartps ff000000.serial: Selected ID 1 allocation passed
+[    0.176760] ff000000.serial: ttyPS1 at MMIO 0xff000000 (irq = 33,
+base_baud = 6250000) is a xuartps
+[    0.177104] ff010000.serial: ttyPS0 at MMIO 0xff010000 (irq = 34,
+base_baud = 6250000) is a xuartps
+
+uart0 not listed but it is probed first that's why should be ttyPS0
+		serial1 = &uart1;
+[    0.176661] xuartps ff000000.serial: No serial alias passed. Using
+the first free id
+[    0.176676] xuartps ff000000.serial: Validate id 0
+[    0.176686] xuartps ff000000.serial: The empty id is 0
+[    0.176696] xuartps ff000000.serial: Selected ID 0 allocation passed
+[    0.176737] ff000000.serial: ttyPS0 at MMIO 0xff000000 (irq = 33,
+base_baud = 6250000) is a xuartps
+[    0.177069] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
+base_baud = 6250000) is a xuartps
+
+uarts not listed in aliases list
+[    0.176673] xuartps ff000000.serial: No serial alias passed. Using
+the first free id
+[    0.176687] xuartps ff000000.serial: Validate id 0
+[    0.176697] xuartps ff000000.serial: The empty id is 0
+[    0.176707] xuartps ff000000.serial: Selected ID 0 allocation passed
+[    0.176746] ff000000.serial: ttyPS0 at MMIO 0xff000000 (irq = 33,
+base_baud = 6250000) is a xuartps
+[    0.177057] xuartps ff010000.serial: No serial alias passed. Using
+the first free id
+[    0.177070] xuartps ff010000.serial: Validate id 0
+[    0.177079] xuartps ff010000.serial: The empty id is 0
+[    0.177089] xuartps ff010000.serial: Selected ID 0 allocation failed
+[    0.177098] xuartps ff010000.serial: Validate id 1
+[    0.177107] xuartps ff010000.serial: The empty id is 1
+[    0.177116] xuartps ff010000.serial: Selected ID 1 allocation passed
+[    0.177149] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
+base_baud = 6250000) is a xuartps
+
+Thanks,
+Michal
+
+
+Michal Simek (3):
+  of: base: Introduce of_alias_check_id() to check alias IDs
+  serial: uartps: Move register to probe based on run time detection
+  serial: uartps: Change uart ports allocation
+
+ drivers/of/base.c                  |  49 +++++++++++
+ drivers/tty/serial/xilinx_uartps.c | 128 +++++++++++++++++++++++------
+ include/linux/of.h                 |   2 +
+ 3 files changed, 153 insertions(+), 26 deletions(-)
 
 -- 
-2.15.1
+2.17.0
