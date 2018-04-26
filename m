@@ -1,212 +1,40 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 25 Apr 2018 18:31:17 -0500
-Subject: [PATCH v8 09/13] ACPI/PPTT: Add topology parsing code
-In-Reply-To: <20180425233121.13270-1-jeremy.linton@arm.com>
-References: <20180425233121.13270-1-jeremy.linton@arm.com>
-Message-ID: <20180425233121.13270-10-jeremy.linton@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 26 Apr 2018 09:58:41 +0900
+Subject: [RFC 04/10] clk: samsung: Remove support for Exynos5440
+In-Reply-To: <20180424203239.21885-5-krzk@kernel.org>
+References: <20180424203239.21885-1-krzk@kernel.org>
+ <CGME20180424203341epcas5p3a6db7d58b0ce8940d03711823fbf6e41@epcas5p3.samsung.com>
+ <20180424203239.21885-5-krzk@kernel.org>
+Message-ID: <5AE12441.2090506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PPTT can be used to determine the groupings of CPU's at
-given levels in the system. Lets add a few routines to the PPTT
-parsing code to return a unique id for each unique level in the
-processor hierarchy. This can then be matched to build
-thread/core/cluster/die/package/etc mappings for each processing
-element in the system.
+Hi Krzysztof,
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- drivers/acpi/pptt.c  | 160 +++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/acpi.h |   4 ++
- 2 files changed, 164 insertions(+)
+On 2018? 04? 25? 05:32, Krzysztof Kozlowski wrote:
+> The Exynos5440 is not actively developed, there are no development
+> boards available and probably there are no real products with it.
+> Remove wide-tree support for Exynos5440.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  .../devicetree/bindings/clock/exynos5440-clock.txt |  28 ----
+>  drivers/clk/samsung/Makefile                       |   1 -
+>  drivers/clk/samsung/clk-exynos5440.c               | 167 ---------------------
+>  include/dt-bindings/clock/exynos5440.h             |  44 ------
+>  4 files changed, 240 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/clock/exynos5440-clock.txt
+>  delete mode 100644 drivers/clk/samsung/clk-exynos5440.c
+>  delete mode 100644 include/dt-bindings/clock/exynos5440.h
+> 
 
-diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
-index cced71ef851a..0fc4b2654665 100644
---- a/drivers/acpi/pptt.c
-+++ b/drivers/acpi/pptt.c
-@@ -453,6 +453,86 @@ static void cache_setup_acpi_cpu(struct acpi_table_header *table,
- 	}
- }
- 
-+/* Passing level values greater than this will result in search termination */
-+#define PPTT_ABORT_PACKAGE 0xFF
-+
-+/**
-+ * acpi_find_processor_package_id() - Locate the processor structure for a cpu
-+ *
-+ * Given an acpi_pptt_processor node, walk up until we identify the
-+ * package that the node is associated with, or we run out of levels
-+ * to request or the search is terminated with a flag match
-+ * The level parameter also serves to limit possible loops within the tree.
-+ *
-+ * Return: acpi_pptt_processor* describing the passed core or NULL
-+ */
-+static struct acpi_pptt_processor *acpi_find_processor_package_id(struct acpi_table_header *table_hdr,
-+								  struct acpi_pptt_processor *cpu,
-+								  int level, int flag)
-+{
-+	struct acpi_pptt_processor *prev_node;
-+
-+	while (cpu && level) {
-+		if (cpu->flags & flag)
-+			break;
-+		pr_debug("level %d\n", level);
-+		prev_node = fetch_pptt_node(table_hdr, cpu->parent);
-+		if (prev_node == NULL)
-+			break;
-+		cpu = prev_node;
-+		level--;
-+	}
-+	return cpu;
-+}
-+
-+/**
-+ * topology_get_acpi_cpu_tag() - Find a unique topology value for a feature
-+ *
-+ * Get a unique value given a cpu, and a topology level, that can be
-+ * matched to determine which cpus share common topological features
-+ * at that level.
-+ *
-+ * Return: Unique value, or -ENOENT if unable to locate cpu
-+ */
-+static int topology_get_acpi_cpu_tag(struct acpi_table_header *table,
-+				     unsigned int cpu, int level, int flag)
-+{
-+	struct acpi_pptt_processor *cpu_node;
-+	u32 acpi_cpu_id = get_acpi_id_for_cpu(cpu);
-+
-+	cpu_node = acpi_find_processor_node(table, acpi_cpu_id);
-+	if (cpu_node) {
-+		cpu_node = acpi_find_processor_package_id(table, cpu_node,
-+							  level, flag);
-+		/* Only the first level has a guaranteed id */
-+		if (level == 0)
-+			return cpu_node->acpi_processor_id;
-+		return ACPI_PTR_DIFF(cpu_node, table);
-+	}
-+	pr_warn_once("PPTT table found, but unable to locate core %d (%d)\n",
-+		    cpu, acpi_cpu_id);
-+	return -ENOENT;
-+}
-+
-+static int find_acpi_cpu_topology_tag(unsigned int cpu, int level, int flag)
-+{
-+	struct acpi_table_header *table;
-+	acpi_status status;
-+	int retval;
-+
-+	status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
-+	if (ACPI_FAILURE(status)) {
-+		pr_warn_once("No PPTT table found, cpu topology may be inaccurate\n");
-+		return -ENOENT;
-+	}
-+	retval = topology_get_acpi_cpu_tag(table, cpu, level, flag);
-+	pr_debug("Topology Setup ACPI cpu %d, level %d ret = %d\n",
-+		 cpu, level, retval);
-+	acpi_put_table(table);
-+
-+	return retval;
-+}
-+
- /**
-  * acpi_find_last_cache_level() - Determines the number of cache levels for a PE
-  * @cpu: Kernel logical cpu number
-@@ -516,3 +596,83 @@ int cache_setup_acpi(unsigned int cpu)
- 
- 	return status;
- }
-+
-+/**
-+ * find_acpi_cpu_topology() - Determine a unique topology value for a given cpu
-+ * @cpu: Kernel logical cpu number
-+ * @level: The topological level for which we would like a unique ID
-+ *
-+ * Determine a topology unique ID for each thread/core/cluster/mc_grouping
-+ * /socket/etc. This ID can then be used to group peers, which will have
-+ * matching ids.
-+ *
-+ * The search terminates when either the requested level is found or
-+ * we reach a root node. Levels beyond the termination point will return the
-+ * same unique ID. The unique id for level 0 is the acpi processor id. All
-+ * other levels beyond this use a generated value to uniquely identify
-+ * a topological feature.
-+ *
-+ * Return: -ENOENT if the PPTT doesn't exist, or the cpu cannot be found.
-+ * Otherwise returns a value which represents a unique topological feature.
-+ */
-+int find_acpi_cpu_topology(unsigned int cpu, int level)
-+{
-+	return find_acpi_cpu_topology_tag(cpu, level, 0);
-+}
-+
-+/**
-+ * find_acpi_cpu_cache_topology() - Determine a unique cache topology value
-+ * @cpu: Kernel logical cpu number
-+ * @level: The cache level for which we would like a unique ID
-+ *
-+ * Determine a unique ID for each unified cache in the system
-+ *
-+ * Return: -ENOENT if the PPTT doesn't exist, or the cpu cannot be found.
-+ * Otherwise returns a value which represents a unique topological feature.
-+ */
-+int find_acpi_cpu_cache_topology(unsigned int cpu, int level)
-+{
-+	struct acpi_table_header *table;
-+	struct acpi_pptt_cache *found_cache;
-+	acpi_status status;
-+	u32 acpi_cpu_id = get_acpi_id_for_cpu(cpu);
-+	struct acpi_pptt_processor *cpu_node = NULL;
-+	int ret = -1;
-+
-+	status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
-+	if (ACPI_FAILURE(status)) {
-+		pr_warn_once("No PPTT table found, topology may be inaccurate\n");
-+		return -ENOENT;
-+	}
-+
-+	found_cache = acpi_find_cache_node(table, acpi_cpu_id,
-+					   CACHE_TYPE_UNIFIED,
-+					   level,
-+					   &cpu_node);
-+	if (found_cache)
-+		ret = ACPI_PTR_DIFF(cpu_node, table);
-+
-+	acpi_put_table(table);
-+
-+	return ret;
-+}
-+
-+
-+/**
-+ * find_acpi_cpu_topology_package() - Determine a unique cpu package value
-+ * @cpu: Kernel logical cpu number
-+ *
-+ * Determine a topology unique package ID for the given cpu.
-+ * This ID can then be used to group peers, which will have matching ids.
-+ *
-+ * The search terminates when either a level is found with the PHYSICAL_PACKAGE
-+ * flag set or we reach a root node.
-+ *
-+ * Return: -ENOENT if the PPTT doesn't exist, or the cpu cannot be found.
-+ * Otherwise returns a value which represents the package for this cpu.
-+ */
-+int find_acpi_cpu_topology_package(unsigned int cpu)
-+{
-+	return find_acpi_cpu_topology_tag(cpu, PPTT_ABORT_PACKAGE,
-+					  ACPI_PPTT_PHYSICAL_PACKAGE);
-+}
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 15bfb15c2fa5..032e12a2fdc2 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -1297,4 +1297,8 @@ static inline int lpit_read_residency_count_address(u64 *address)
- }
- #endif
- 
-+int find_acpi_cpu_topology(unsigned int cpu, int level);
-+int find_acpi_cpu_topology_package(unsigned int cpu);
-+int find_acpi_cpu_cache_topology(unsigned int cpu, int level);
-+
- #endif	/*_LINUX_ACPI_H*/
+Looks good to me. Thanks.
+
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+[snip]
+
 -- 
-2.13.6
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
