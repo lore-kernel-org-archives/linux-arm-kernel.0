@@ -1,84 +1,89 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 26 Apr 2018 16:08:18 +0200
-Subject: [RFC PATCH 2/3] serial: uartps: Move register to probe based on run
- time detection
-In-Reply-To: <cover.1524751696.git.michal.simek@xilinx.com>
-References: <cover.1524751696.git.michal.simek@xilinx.com>
-Message-ID: <7dc0d444ddfae465a80e509af6ceb6be5b42881a.1524751696.git.michal.simek@xilinx.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 26 Apr 2018 15:08:55 +0100
+Subject: [kvmtool PATCH 21/17] kvmtool: arm: Add support for creating VM
+ with PA size
+In-Reply-To: <1522156531-28348-22-git-send-email-suzuki.poulose@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-22-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <c660b148-34ae-5409-665f-aadc94669752@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Find out the highest serial alias and allocate that amount of
-structures/minor numbers to be able to handle all of them.
-Origin setting that there are two prealocated CDNS_UART_NR_PORTS is kept
-there.
+Hi Suzuki,
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+On 27/03/18 14:15, Suzuki K Poulose wrote:
+> Specify the physical size for the VM encoded in the vm type.
+> 
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>   arm/include/arm-common/kvm-arch.h |  6 +++++-
+>   arm/kvm.c                         | 21 +++++++++++++++++++++
+>   2 files changed, 26 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+> index ca7ab0f..64bc92a 100644
+> --- a/arm/include/arm-common/kvm-arch.h
+> +++ b/arm/include/arm-common/kvm-arch.h
+> @@ -42,7 +42,11 @@
+>   
+>   #define KVM_IRQ_OFFSET		GIC_SPI_IRQ_BASE
+>   
+> -#define KVM_VM_TYPE		0
+> +extern unsigned long		kvm_arm_type;
+> +extern void kvm__arch_init_hyp(struct kvm *kvm);
+> +
+> +#define KVM_VM_TYPE		kvm_arm_type
+> +#define kvm__arch_init_hyp	kvm__arch_init_hyp
+>   
+>   #define VIRTIO_DEFAULT_TRANS(kvm)	\
+>   	((kvm)->cfg.arch.virtio_trans_pci ? VIRTIO_PCI : VIRTIO_MMIO)
+> diff --git a/arm/kvm.c b/arm/kvm.c
+> index 5701d41..a9a9140 100644
+> --- a/arm/kvm.c
+> +++ b/arm/kvm.c
+> @@ -11,6 +11,8 @@
+>   #include <linux/kvm.h>
+>   #include <linux/sizes.h>
+>   
+> +unsigned long kvm_arm_type;
+> +
+>   struct kvm_ext kvm_req_ext[] = {
+>   	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
+>   	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
+> @@ -18,6 +20,25 @@ struct kvm_ext kvm_req_ext[] = {
+>   	{ 0, 0 },
+>   };
+>   
+> +#ifndef KVM_ARM_GET_MAX_VM_PHYS_SHIFT
+> +#define KVM_ARM_GET_MAX_VM_PHYS_SHIFT		_IO(KVMIO, 0x0a)
+> +#endif
 
-Discussed here: https://patchwork.kernel.org/patch/9738445/
+Once the IOCTL is agreed, I think you would need to update 
+include/linux/kvm.h.
 
-The same solution is done in pl011 driver.
----
- drivers/tty/serial/xilinx_uartps.c | 32 ++++++++++++++++--------------
- 1 file changed, 17 insertions(+), 15 deletions(-)
+> +
+> +void kvm__arch_init_hyp(struct kvm *kvm)
+> +{
+> +	unsigned max_ipa;
+> +
+> +	max_ipa = ioctl(kvm->sys_fd, KVM_ARM_GET_MAX_VM_PHYS_SHIFT);
+> +	if (max_ipa < 0)
+> +		max_ipa = 40;
+> +	if (!kvm->cfg.arch.phys_shift)
+> +		kvm->cfg.arch.phys_shift = 40;
+> +	if (kvm->cfg.arch.phys_shift > max_ipa)
+> +		die("Requested PA size (%u) is not supported by the host (%ubits)\n",
+> +		    kvm->cfg.arch.phys_shift, max_ipa);
+> +	kvm_arm_type = kvm->cfg.arch.phys_shift;
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 0fc9de20843c..ffb5b66a05b5 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1432,6 +1432,22 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	struct cdns_uart *cdns_uart_data;
- 	const struct of_device_id *match;
- 
-+	if (!cdns_uart_uart_driver.state) {
-+		rc = of_alias_get_highest_id("serial");
-+		if (rc >= CDNS_UART_NR_PORTS) {
-+			/* serial2 means 3 ports that's why rc(2) + 1 here */
-+			rc += 1;
-+			/* Rewrite default setup which is using 2 ports */
-+			cdns_uart_uart_driver.nr = rc;
-+		}
-+
-+		rc = uart_register_driver(&cdns_uart_uart_driver);
-+		if (rc < 0) {
-+			dev_err(&pdev->dev, "Failed to register driver\n");
-+			return rc;
-+		}
-+	}
-+
- 	cdns_uart_data = devm_kzalloc(&pdev->dev, sizeof(*cdns_uart_data),
- 			GFP_KERNEL);
- 	if (!cdns_uart_data)
-@@ -1622,28 +1638,14 @@ static struct platform_driver cdns_uart_platform_driver = {
- 
- static int __init cdns_uart_init(void)
- {
--	int retval = 0;
--
--	/* Register the cdns_uart driver with the serial core */
--	retval = uart_register_driver(&cdns_uart_uart_driver);
--	if (retval)
--		return retval;
--
- 	/* Register the platform driver */
--	retval = platform_driver_register(&cdns_uart_platform_driver);
--	if (retval)
--		uart_unregister_driver(&cdns_uart_uart_driver);
--
--	return retval;
-+	return platform_driver_register(&cdns_uart_platform_driver);
- }
- 
- static void __exit cdns_uart_exit(void)
- {
- 	/* Unregister the platform driver */
- 	platform_driver_unregister(&cdns_uart_platform_driver);
--
--	/* Unregister the cdns_uart driver */
--	uart_unregister_driver(&cdns_uart_uart_driver);
- }
- 
- arch_initcall(cdns_uart_init);
+FWIW, older Linux will not accept a KVM type other than 0. So I think 
+the best would be to bail out if KVM_ARM_GET_MAX_VM_PHYS_SHIFT does not 
+exist.
+
+For safety, you could even check that arch.phys_shift is always 40 when 
+running under older Linux.
+
+Cheers,
+
 -- 
-2.17.0
+Julien Grall
