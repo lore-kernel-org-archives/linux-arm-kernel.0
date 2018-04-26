@@ -1,49 +1,32 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Thu, 26 Apr 2018 14:58:17 +0800
-Subject: [PATCH V5 5/6] ARM: dts: imx6sx-sabreauto: add wdog external reset
- support
+Date: Thu, 26 Apr 2018 14:58:18 +0800
+Subject: [PATCH V5 6/6] ARM: imx_v6_v7_defconfig: Select CONFIG_GPIO_MAX732X
+ by default
 In-Reply-To: <1524725898-27974-1-git-send-email-Anson.Huang@nxp.com>
 References: <1524725898-27974-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1524725898-27974-5-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1524725898-27974-6-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SX Sabre Auto board has GPIO1_IO13 pin can be
-MUXed as WDOG output to reset PMIC, add this function
-support.
+Enable max7320 IO expander for i.MX platforms.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
 no changes since V4.
- arch/arm/boot/dts/imx6sx-sabreauto.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-index 088a66c..eb1452c 100644
---- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-@@ -241,6 +241,12 @@
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6SX_PAD_GPIO1_IO13__WDOG1_WDOG_ANY 0x30b0
-+			>;
-+		};
- 	};
- };
- 
-@@ -380,3 +386,9 @@
- 		#gpio-cells = <2>;
- 	};
- };
-+
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 3a30843..8455d39 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -199,6 +199,7 @@ CONFIG_SPI_GPIO=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_FSL_DSPI=y
+ CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_MAX732X=y
+ CONFIG_GPIO_MC9S08DZ60=y
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_GPIO_STMPE=y
 -- 
 2.7.4
