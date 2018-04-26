@@ -1,50 +1,57 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 26 Apr 2018 10:41:30 +0900
-Subject: [RFC 06/10] thermal: samsung: Remove support for Exynos5440
-In-Reply-To: <20180424203239.21885-7-krzk@kernel.org>
-References: <20180424203239.21885-1-krzk@kernel.org>
- <CGME20180424203603epcas5p4cdd2039eabe7039e4daf286ed4c1ecc0@epcas5p4.samsung.com>
- <20180424203239.21885-7-krzk@kernel.org>
-Message-ID: <5AE12E4A.90907@samsung.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 26 Apr 2018 11:25:33 +0930
+Subject: [PATCH linux dev-4.13] clk:aspeed: Fix reset bits for PCI/VGA and
+ PECI
+In-Reply-To: <20180424224056.23384-1-jae.hyun.yoo@linux.intel.com>
+References: <20180424224056.23384-1-jae.hyun.yoo@linux.intel.com>
+Message-ID: <CACPK8Xe99zZ9Q0Y2HqoaGDXigBaZpkTcbfRe=gvsR5x6XMWzYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hello Jae,
 
-On 2018? 04? 25? 05:32, Krzysztof Kozlowski wrote:
-> The Exynos5440 is not actively developed, there are no development
-> boards available and probably there are no real products with it.
-> Remove wide-tree support for Exynos5440.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  .../devicetree/bindings/thermal/exynos-thermal.txt |  14 +-
->  drivers/thermal/samsung/exynos_tmu.c               | 155 +--------------------
->  drivers/thermal/samsung/exynos_tmu.h               |   1 -
->  3 files changed, 4 insertions(+), 166 deletions(-)
+On 25 April 2018 at 08:10, Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
+> This commit fixes incorrect setting of reset bits for PCI/VGA and
+> PECI modules.
+>
+> 1. Reset bit for PCI/VGA is 8.
+> 2. PECI reset logic is missing so added bit 10 as its reset bit.
+
+Great find!
+
+Can you please send these upstream as a fix? Apply to 4.17-rc2, and
+use get_maintainers.pl to identify the lists to send it to.
+
+Also add:
+
+Fixes: 15ed8ce5f84e ("clk: aspeed: Register gated clocks")
+Cc: stable <stable@vger.kernel.org>
+
+> +++ b/include/dt-bindings/clock/aspeed-clock.h
+> @@ -43,8 +43,8 @@
+>  #define ASPEED_RESET_ADC               2
+>  #define ASPEED_RESET_JTAG_MASTER       3
+>  #define ASPEED_RESET_MIC               4
+> -#define ASPEED_RESET_PWM               5
+> -#define ASPEED_RESET_PCIVGA            6
+> +#define ASPEED_RESET_PECI              5
+> +#define ASPEED_RESET_PWM               6
+
+This numbers form the kernel ABI, so we shouldn't be changing them.
+However, none of the mainline device trees use PCIVGA, so we can
+rename that without breaking any one.
+
+If we leave PWM as 5, and rename PCIVGA to PECI, we won't break any
+existing device trees.
+
+Cheers,
+
+Joel
 
 
-After applied this patch, I tested the build and found out
-'exynos5440' keyword. There is one comment including 'exynos5440' as following:
-
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index f92f470bce21..cb525228cfe1 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -943,7 +943,7 @@ static void exynos4210_tmu_clear_irqs(struct exynos_tmu_data *data)
-         * Exynos3250, Exynos4412, Exynos5250 and Exynos5260 incorrectly
-         * states that INTCLEAR register has a different placing of bits
-         * responsible for FALL IRQs than INTSTAT register.  Exynos5420
--        * and Exynos5440 documentation is correct (Exynos4210 doesn't
-+        * documentation is correct (Exynos4210 doesn't
-         * support FALL IRQs at all).
-         */
-        writel(val_irq, data->base + tmu_intclear);
-
-After removing it, looks good to me.
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+>  #define ASPEED_RESET_I2C               7
+>  #define ASPEED_RESET_AHB               8
+>  #define ASPEED_RESET_CRT1              9
+> --
+> 2.7.4
+>
