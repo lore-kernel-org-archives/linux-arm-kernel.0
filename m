@@ -1,157 +1,98 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Thu, 26 Apr 2018 18:18:29 +0200
-Subject: [PATCH 06/11] irqchip: stm32: prepare common functions
-In-Reply-To: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
-References: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1524759514-12392-7-git-send-email-ludovic.Barre@st.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 26 Apr 2018 17:45:24 +0100
+Subject: [linux-sunxi] [PATCH 1/3] mmc: sunxi: add support for the MMC
+ controller on H6
+In-Reply-To: <20180426140728.43155-2-icenowy@aosc.io>
+References: <20180426140728.43155-1-icenowy@aosc.io>
+ <20180426140728.43155-2-icenowy@aosc.io>
+Message-ID: <f722ce51-2391-620c-df65-48f047b5f3d5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Hi,
 
-This patch prepares functions which could be reused by
-next variant of stm32 exti controller.
+On 26/04/18 15:07, Icenowy Zheng wrote:
+> The new Allwinner H6 SoC have 3 MMC controllers. The first and second
+> ones are similar to the ones on A64, but the third one adds EMCE
+> (Embedded Crypto Engine) support which does hardware transparent crypto
+> on the eMMC.
+> 
+> As we still do not have support for EMCE, and the support of it is
+> disabled by defualt, we just duplicate the A64 mmc configurations and
+> change the compatible string.
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/irqchip/irq-stm32-exti.c | 91 +++++++++++++++++++++++++---------------
- 1 file changed, 58 insertions(+), 33 deletions(-)
+So if the A64 MMC part is compatible, we should express it like this:
 
-diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-index 9655a57..b38c655 100644
---- a/drivers/irqchip/irq-stm32-exti.c
-+++ b/drivers/irqchip/irq-stm32-exti.c
-@@ -145,37 +145,50 @@ static void stm32_irq_handler(struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
--static int stm32_irq_set_type(struct irq_data *data, unsigned int type)
-+static int stm32_exti_set_type(struct irq_data *d,
-+			       unsigned int type, u32 *rtsr, u32 *ftsr)
- {
--	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
--	struct stm32_exti_chip_data *chip_data = gc->private;
--	const struct stm32_exti_bank *stm32_bank = chip_data->reg_bank;
--	int pin = data->hwirq % IRQS_PER_BANK;
--	u32 rtsr, ftsr;
--
--	irq_gc_lock(gc);
--
--	rtsr = irq_reg_readl(gc, stm32_bank->rtsr_ofst);
--	ftsr = irq_reg_readl(gc, stm32_bank->ftsr_ofst);
-+	u32 mask = BIT(d->hwirq % IRQS_PER_BANK);
- 
- 	switch (type) {
- 	case IRQ_TYPE_EDGE_RISING:
--		rtsr |= BIT(pin);
--		ftsr &= ~BIT(pin);
-+		*rtsr |= mask;
-+		*ftsr &= ~mask;
- 		break;
- 	case IRQ_TYPE_EDGE_FALLING:
--		rtsr &= ~BIT(pin);
--		ftsr |= BIT(pin);
-+		*rtsr &= ~mask;
-+		*ftsr |= mask;
- 		break;
- 	case IRQ_TYPE_EDGE_BOTH:
--		rtsr |= BIT(pin);
--		ftsr |= BIT(pin);
-+		*rtsr |= mask;
-+		*ftsr |= mask;
- 		break;
- 	default:
--		irq_gc_unlock(gc);
- 		return -EINVAL;
- 	}
- 
-+	return 0;
-+}
-+
-+static int stm32_irq_set_type(struct irq_data *d, unsigned int type)
-+{
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct stm32_exti_chip_data *chip_data = gc->private;
-+	const struct stm32_exti_bank *stm32_bank = chip_data->reg_bank;
-+	u32 rtsr, ftsr;
-+	int err;
-+
-+	irq_gc_lock(gc);
-+
-+	rtsr = irq_reg_readl(gc, stm32_bank->rtsr_ofst);
-+	ftsr = irq_reg_readl(gc, stm32_bank->ftsr_ofst);
-+
-+	err = stm32_exti_set_type(d, type, &rtsr, &ftsr);
-+	if (err) {
-+		irq_gc_unlock(gc);
-+		return err;
-+	}
-+
- 	irq_reg_writel(gc, rtsr, stm32_bank->rtsr_ofst);
- 	irq_reg_writel(gc, ftsr, stm32_bank->ftsr_ofst);
- 
-@@ -184,35 +197,47 @@ static int stm32_irq_set_type(struct irq_data *data, unsigned int type)
- 	return 0;
- }
- 
--static void stm32_irq_suspend(struct irq_chip_generic *gc)
-+static void stm32_chip_suspend(struct stm32_exti_chip_data *chip_data,
-+			       u32 wake_active)
- {
--	struct stm32_exti_chip_data *chip_data = gc->private;
- 	const struct stm32_exti_bank *stm32_bank = chip_data->reg_bank;
--
--	irq_gc_lock(gc);
-+	void __iomem *base = chip_data->host_data->base;
- 
- 	/* save rtsr, ftsr registers */
--	chip_data->rtsr_cache = irq_reg_readl(gc, stm32_bank->rtsr_ofst);
--	chip_data->ftsr_cache = irq_reg_readl(gc, stm32_bank->ftsr_ofst);
-+	chip_data->rtsr_cache = readl_relaxed(base + stm32_bank->rtsr_ofst);
-+	chip_data->ftsr_cache = readl_relaxed(base + stm32_bank->ftsr_ofst);
- 
--	irq_reg_writel(gc, gc->wake_active, stm32_bank->imr_ofst);
-+	writel_relaxed(wake_active, base + stm32_bank->imr_ofst);
-+}
- 
--	irq_gc_unlock(gc);
-+static void stm32_chip_resume(struct stm32_exti_chip_data *chip_data,
-+			      u32 mask_cache)
-+{
-+	const struct stm32_exti_bank *stm32_bank = chip_data->reg_bank;
-+	void __iomem *base = chip_data->host_data->base;
-+
-+	/* restore rtsr, ftsr, registers */
-+	writel_relaxed(chip_data->rtsr_cache, base + stm32_bank->rtsr_ofst);
-+	writel_relaxed(chip_data->ftsr_cache, base + stm32_bank->ftsr_ofst);
-+
-+	writel_relaxed(mask_cache, base + stm32_bank->imr_ofst);
- }
- 
--static void stm32_irq_resume(struct irq_chip_generic *gc)
-+static void stm32_irq_suspend(struct irq_chip_generic *gc)
- {
- 	struct stm32_exti_chip_data *chip_data = gc->private;
--	const struct stm32_exti_bank *stm32_bank = chip_data->reg_bank;
- 
- 	irq_gc_lock(gc);
-+	stm32_chip_suspend(chip_data, gc->wake_active);
-+	irq_gc_unlock(gc);
-+}
- 
--	/* restore rtsr, ftsr registers */
--	irq_reg_writel(gc, chip_data->rtsr_cache, stm32_bank->rtsr_ofst);
--	irq_reg_writel(gc, chip_data->ftsr_cache, stm32_bank->ftsr_ofst);
--
--	irq_reg_writel(gc, gc->mask_cache, stm32_bank->imr_ofst);
-+static void stm32_irq_resume(struct irq_chip_generic *gc)
-+{
-+	struct stm32_exti_chip_data *chip_data = gc->private;
- 
-+	irq_gc_lock(gc);
-+	stm32_chip_resume(chip_data, gc->mask_cache);
- 	irq_gc_unlock(gc);
- }
- 
--- 
-2.7.4
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  2 ++
+>  drivers/mmc/host/sunxi-mmc.c                        | 16 ++++++++++++++++
+>  2 files changed, 18 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> index 132e0007d7d6..e6aa5c7a5e12 100644
+> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> @@ -16,6 +16,8 @@ Required properties:
+>     * "allwinner,sun9i-a80-mmc"
+>     * "allwinner,sun50i-a64-emmc"
+>     * "allwinner,sun50i-a64-mmc"
+> +   * "allwinner,sun50i-h6-emmc"
+> +   * "allwinner,sun50i-h6-mmc"
+
+This should be changed to:
+
+      * "allwinner,sun50i-h6-emmc", "allwinner,sun50i-a64-emmc"
+      * "allwinner,sun50i-h6-mmc", "allwinner,sun50i-a64-mmc"
+
+>   - reg : mmc controller base registers
+>   - clocks : a list with 4 phandle + clock specifier pairs
+>   - clock-names : must contain "ahb", "mmc", "output" and "sample"
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 97c6b79b7d6f..05e2b5fd7aa4 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -1168,6 +1168,20 @@ static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
+>  	.can_calibrate = true,
+>  };
+>  
+> +static const struct sunxi_mmc_cfg sun50i_h6_cfg = {
+> +	.idma_des_size_bits = 16,
+> +	.clk_delays = NULL,
+> +	.can_calibrate = true,
+> +	.mask_data0 = true,
+> +	.needs_new_timings = true,
+> +};
+> +
+> +static const struct sunxi_mmc_cfg sun50i_h6_emmc_cfg = {
+> +	.idma_des_size_bits = 13,
+> +	.clk_delays = NULL,
+> +	.can_calibrate = true,
+> +};
+> +
+
+... and then we don't need those changes ...
+
+>  static const struct of_device_id sunxi_mmc_of_match[] = {
+>  	{ .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg },
+>  	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
+> @@ -1176,6 +1190,8 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
+>  	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
+>  	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
+>  	{ .compatible = "allwinner,sun50i-a64-emmc", .data = &sun50i_a64_emmc_cfg },
+> +	{ .compatible = "allwinner,sun50i-h6-mmc", .data = &sun50i_h6_cfg },
+> +	{ .compatible = "allwinner,sun50i-h6-emmc", .data = &sun50i_h6_emmc_cfg },
+
+... and those, at least yet.
+Should we ever extend the driver to support the EMCE, we can add them at
+this occasion.
+
+So this patch would just add the compatible pairs to the binding doc.
+
+Cheers,
+Andre.
+
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
+> 
