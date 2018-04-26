@@ -1,113 +1,97 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 26 Apr 2018 13:55:59 -0700
-Subject: [PATCH v4 1/2] perf: uncore: Adding documentation for ThunderX2
- pmu uncore driver
-In-Reply-To: <20180425090047.6485-2-ganapatrao.kulkarni@cavium.com>
-References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
- <20180425090047.6485-2-ganapatrao.kulkarni@cavium.com>
-Message-ID: <7c8ff675-2b27-8e7b-f046-513b73f1ae5f@infradead.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 27 Apr 2018 05:00:07 +0800
+Subject: [PATCH 3/4] ARM: dma-mapping: Implement arch_iommu_detach_device()
+In-Reply-To: <20180425091815.16264-3-thierry.reding@gmail.com>
+References: <20180425091815.16264-3-thierry.reding@gmail.com>
+Message-ID: <201804270211.gKsBUvoQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thierry,
 
-Just a few typo corrections...
+I love your patch! Yet something to improve:
 
-On 04/25/2018 02:00 AM, Ganapatrao Kulkarni wrote:
-> Documentation for the UNCORE PMUs on Cavium's ThunderX2 SoC.
-> The SoC has PMU support in its L3 cache controller (L3C) and in the
-> DDR4 Memory Controller (DMC).
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  Documentation/perf/thunderx2-pmu.txt | 66 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
->  create mode 100644 Documentation/perf/thunderx2-pmu.txt
-> 
-> diff --git a/Documentation/perf/thunderx2-pmu.txt b/Documentation/perf/thunderx2-pmu.txt
-> new file mode 100644
-> index 0000000..9e9f535
-> --- /dev/null
-> +++ b/Documentation/perf/thunderx2-pmu.txt
-> @@ -0,0 +1,66 @@
-> +
-> +Cavium ThunderX2 SoC Performance Monitoring Unit (PMU UNCORE)
-> +==========================================================================
-> +
-> +ThunderX2 SoC PMU consists of independent system wide per Socket PMUs such
-> +as Level 3 Cache(L3C) and DDR4 Memory Controller(DMC).
-> +
-> +It has 8 independent DMC PMUs to capture performance events corresponding
-> +to 8 channels of DDR4 Memory Controller. There are 16 independent L3C PMUs
-> +to capture events corresponding to 16 tiles of L3 cache. Each PMU supports
-> +up to 4 counters.
-> +
-> +Counters are independent programmable and can be started and stopped
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.17-rc2 next-20180424]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-                independently
+url:    https://github.com/0day-ci/linux/commits/Thierry-Reding/drm-nouveau-tegra-Detach-from-ARM-DMA-IOMMU-mapping/20180426-140854
+config: arm-omap2plus_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> +individually. Each counter can be set to sample specific perf events.
-> +Counters are 32 bit and does not support overflow interrupt, they are
+All error/warnings (new ones prefixed by >>):
 
-                           do not                    interrupt; they are
+   arch/arm/mm/dma-mapping.c: In function 'arch_iommu_detach_device':
+>> arch/arm/mm/dma-mapping.c:2380:12: error: implicit declaration of function 'arm_get_dma_map_ops'; did you mean 'arm_get_iommu_dma_map_ops'? [-Werror=implicit-function-declaration]
+     dma_ops = arm_get_dma_map_ops(dev->archdata.dma_coherent);
+               ^~~~~~~~~~~~~~~~~~~
+               arm_get_iommu_dma_map_ops
+>> arch/arm/mm/dma-mapping.c:2380:10: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     dma_ops = arm_get_dma_map_ops(dev->archdata.dma_coherent);
+             ^
+   arch/arm/mm/dma-mapping.c: At top level:
+>> arch/arm/mm/dma-mapping.c:2402:34: error: conflicting types for 'arm_get_dma_map_ops'
+    static const struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
+                                     ^~~~~~~~~~~~~~~~~~~
+   arch/arm/mm/dma-mapping.c:2380:12: note: previous implicit declaration of 'arm_get_dma_map_ops' was here
+     dma_ops = arm_get_dma_map_ops(dev->archdata.dma_coherent);
+               ^~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
+vim +2380 arch/arm/mm/dma-mapping.c
 
-> +sampled at every 2 seconds. The Counters register access are multiplexed
-> +across channels of DMC and L3C. The muxing(select channel) is done through
-> +write to a Secure register using smcc calls.
-> +
-> +PMU UNCORE (perf) driver:
-> +
-> +The thunderx2-pmu driver registers several perf PMUs for DMC and L3C devices.
-> +Each of the PMU provides description of its available events
+  2368	
+  2369	void arch_iommu_detach_device(struct device *dev)
+  2370	{
+  2371		struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+  2372		const struct dma_map_ops *dma_ops;
+  2373	
+  2374		if (!mapping)
+  2375			return;
+  2376	
+  2377		arm_iommu_release_mapping(mapping);
+  2378		arm_iommu_detach_device(dev);
+  2379	
+> 2380		dma_ops = arm_get_dma_map_ops(dev->archdata.dma_coherent);
+  2381		set_dma_ops(dev, dma_ops);
+  2382	}
+  2383	
+  2384	#else
+  2385	
+  2386	static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+  2387					    const struct iommu_ops *iommu)
+  2388	{
+  2389		return false;
+  2390	}
+  2391	
+  2392	static void arm_teardown_iommu_dma_ops(struct device *dev) { }
+  2393	
+  2394	#define arm_get_iommu_dma_map_ops arm_get_dma_map_ops
+  2395	
+  2396	void arch_iommu_detach_device(struct device *dev)
+  2397	{
+  2398	}
+  2399	
+  2400	#endif	/* CONFIG_ARM_DMA_USE_IOMMU */
+  2401	
+> 2402	static const struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
+  2403	{
+  2404		return coherent ? &arm_coherent_dma_ops : &arm_dma_ops;
+  2405	}
+  2406	
 
-        of the PMUs
-
-> +and configuration options in sysfs.
-> +	see /sys/devices/uncore_<l3c_S_X/dmc_S_X/>
-> +
-> +S is socket id and X represents channel number.
-> +Each PMU can be used to sample up to 4 events simultaneously.
-> +
-> +The "format" directory describes format of the config (event ID).
-> +The "events" directory provides configuration templates for all
-> +supported event types that can be used with perf tool.
-> +
-> +For example, "uncore_dmc_0_0/cnt_cycles/" is an
-> +equivalent of "uncore_dmc_0_0/config=0x1/".
-> +
-> +Each perf driver also provides a "cpumask" sysfs attribute, which contains a
-> +single CPU ID of the processor which is likely to be used to handle all the
-> +PMU events. It will be the first online CPU from the NUMA node of PMU device.
-> +
-> +Example for perf tool use:
-> +
-> +perf stat -a -e \
-> +uncore_dmc_0_0/cnt_cycles/,\
-> +uncore_dmc_0_1/cnt_cycles/,\
-> +uncore_dmc_0_2/cnt_cycles/,\
-> +uncore_dmc_0_3/cnt_cycles/,\
-> +uncore_dmc_0_4/cnt_cycles/,\
-> +uncore_dmc_0_5/cnt_cycles/,\
-> +uncore_dmc_0_6/cnt_cycles/,\
-> +uncore_dmc_0_7/cnt_cycles/ sleep 1
-> +
-> +perf stat -a -e \
-> +uncore_dmc_0_0/cancelled_read_txns/,\
-> +uncore_dmc_0_0/cnt_cycles/,\
-> +uncore_dmc_0_0/consumed_read_txns/,\
-> +uncore_dmc_0_0/data_transfers/ sleep 1
-> +
-> +perf stat -a -e \
-> +uncore_l3c_0_0/l3_retry/,\
-> +uncore_l3c_0_0/read_hit/,\
-> +uncore_l3c_0_0/read_request/,\
-> +uncore_l3c_0_0/inv_request/ sleep 1
-> +
-> +The driver does not support sampling, therefore "perf record" will
-> +not work. Per-task (without "-a") perf sessions are not supported.
-> 
-
-
--- 
-~Randy
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 33598 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180427/3a09a331/attachment-0001.gz>
