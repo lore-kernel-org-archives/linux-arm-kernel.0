@@ -1,58 +1,80 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 26 Apr 2018 13:56:54 +0100
-Subject: [PATCH] boot-wrapper-aarch64: Do not hardcode TEXT_LIMIT
-In-Reply-To: <1524661564-8789-1-git-send-email-suzuki.poulose@arm.com>
-References: <1524661564-8789-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180426125654.4t7qcz7nfq2oxhzk@lakrids.cambridge.arm.com>
+Date: Thu, 26 Apr 2018 13:57:02 +0100
+Subject: [PATCH boot-wrapper] Fix out-of-tree build
+In-Reply-To: <20180423163206.17071-1-jean-philippe.brucker@arm.com>
+References: <20180423163206.17071-1-jean-philippe.brucker@arm.com>
+Message-ID: <20180426125701.6h27qvxw2645o7vb@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 02:06:04PM +0100, Suzuki K Poulose wrote:
-> We hard code TEXT_LIMIT to check for image overflow, assuming the memory
-> is always at 0x80000000, which may not always be true. Instead use the
-> offset from the PHYS_OFFSET, which is actually dependent on the DT.
+On Mon, Apr 23, 2018 at 05:32:06PM +0100, Jean-Philippe Brucker wrote:
+> Adding AArch32 support to the boot-wrapper changed the source layout and
+> broke out-of-tree build. This patch allows to put all generated files
+> into a separate directory again, and build multiple images in parallel:
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>     mkdir build/ && cd build/
+>     ~/src/boot-wrapper-aarch64/configure ...
+>     make
+> 
+> Make attempts to output object files into build/arch/aarchXX/, but fails
+> because that folder doesn't exist in the build directory. Add mkdir as
+> prerequisite for any *.o target in the arch folder.
+> 
+> So that Make doesn't confuse the destination folder with the source,
+> override VPATH to only affect .S and .c sources.
+> 
+> And set $(ARCH_SRC) as order-only-prerequisite (after a '|'). Otherwise
+> Make would rebuild all objects whenever the timestamp of $(ARCH_SRC)
+> changes, which is every time an object is rebuilt...
+> 
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 
 Applied, thanks!
 
 Mark.
 
 > ---
->  Makefile.am | 4 ++--
->  model.lds.S | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
+>  Makefile.am | 13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
 > 
 > diff --git a/Makefile.am b/Makefile.am
-> index 49cfa84..6940a99 100644
+> index 49cfa84..d3b5188 100644
 > --- a/Makefile.am
 > +++ b/Makefile.am
-> @@ -75,11 +75,11 @@ endif
->  if KERNEL_32
->  MBOX_OFFSET	:= 0x7ff8
->  KERNEL_OFFSET	:= 0x8000
-> -TEXT_LIMIT	:= 0x80003000
-> +TEXT_LIMIT	:= 0x3000
->  else
->  MBOX_OFFSET	:= 0xfff8
->  KERNEL_OFFSET	:= 0x80000
-> -TEXT_LIMIT	:= 0x80080000
-> +TEXT_LIMIT	:= 0x80000
->  endif
+> @@ -118,7 +118,7 @@ CHOSEN_NODE	:= chosen {						\
+>  		   };
 >  
->  LD_SCRIPT	:= model.lds.S
-> diff --git a/model.lds.S b/model.lds.S
-> index 511f552..370ff56 100644
-> --- a/model.lds.S
-> +++ b/model.lds.S
-> @@ -76,5 +76,5 @@ SECTIONS
->  		QUAD(0x0)
->  	}
+>  CPPFLAGS	+= $(INITRD_FLAGS)
+> -CFLAGS		+= -Iinclude/ -I$(ARCH_SRC)/include/
+> +CFLAGS		+= -I$(top_srcdir)/include/ -I$(top_srcdir)/$(ARCH_SRC)/include/
+>  CFLAGS		+= -Wall -fomit-frame-pointer
+>  CFLAGS		+= -ffunction-sections -fdata-sections
+>  LDFLAGS		+= --gc-sections
+> @@ -126,6 +126,12 @@ LDFLAGS		+= --gc-sections
+>  OFILES		+= boot_common.o bakery_lock.o platform.o $(GIC) cache.o lib.o
+>  OFILES		+= $(addprefix $(ARCH_SRC),boot.o stack.o $(BOOTMETHOD) utils.o)
 >  
-> -	ASSERT(etext <= TEXT_LIMIT, ".text overflow!")
-> +	ASSERT(etext <= (PHYS_OFFSET + TEXT_LIMIT), ".text overflow!")
->  }
+> +# Don't lookup all prerequisites in $(top_srcdir), only the source files. When
+> +# building outside the source tree $(ARCH_SRC) needs to be created.
+> +VPATH		=
+> +vpath %.c $(top_srcdir)
+> +vpath %.S $(top_srcdir)
+> +
+>  all: $(IMAGE)
+>  
+>  CLEANFILES = $(IMAGE) linux-system.axf xen-system.axf $(OFILES) model.lds fdt.dtb
+> @@ -133,7 +139,10 @@ CLEANFILES = $(IMAGE) linux-system.axf xen-system.axf $(OFILES) model.lds fdt.dt
+>  $(IMAGE): $(OFILES) model.lds fdt.dtb $(KERNEL_IMAGE) $(FILESYSTEM) $(XEN_IMAGE)
+>  	$(LD) $(LDFLAGS) $(OFILES) -o $@ --script=model.lds
+>  
+> -%.o: %.S Makefile
+> +$(ARCH_SRC):
+> +	$(MKDIR_P) $@
+> +
+> +%.o: %.S Makefile | $(ARCH_SRC)
+>  	$(CC) $(CPPFLAGS) -D__ASSEMBLY__ $(CFLAGS) $(DEFINES) -c -o $@ $<
+>  
+>  %.o: %.c Makefile
 > -- 
-> 2.7.4
+> 2.17.0
 > 
