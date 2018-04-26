@@ -1,94 +1,41 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 26 Apr 2018 22:07:27 +0800
-Subject: [PATCH 2/3] arm64: allwinner: h6: add device tree nodes for MMC
- controllers
-In-Reply-To: <20180426140728.43155-1-icenowy@aosc.io>
-References: <20180426140728.43155-1-icenowy@aosc.io>
-Message-ID: <20180426140728.43155-3-icenowy@aosc.io>
+From: zi.yan@sent.com (Zi Yan)
+Date: Thu, 26 Apr 2018 10:27:58 -0400
+Subject: [RFC PATCH 3/9] arm64: mm: migrate: add pmd swap entry to support thp
+ migration.
+In-Reply-To: <20180426142804.180152-1-zi.yan@sent.com>
+References: <20180426142804.180152-1-zi.yan@sent.com>
+Message-ID: <20180426142804.180152-4-zi.yan@sent.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner H6 SoC have 3 MMC controllers.
+From: Zi Yan <zi.yan@cs.rutgers.edu>
 
-Add device tree nodes for them.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Zi Yan <zi.yan@cs.rutgers.edu>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Steve Capper <steve.capper@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Kristina Martsenko <kristina.martsenko@arm.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mm at kvack.org
 ---
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 56 ++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ arch/arm64/include/asm/pgtable.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-index 4debc3962830..3cbfc035c979 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-@@ -124,12 +124,68 @@
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 7e2c27e63cd8..1cdc9d3db2c7 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -742,7 +742,9 @@ extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
+ #define __swp_entry(type,offset) ((swp_entry_t) { ((type) << __SWP_TYPE_SHIFT) | ((offset) << __SWP_OFFSET_SHIFT) })
  
-+			mmc0_pins: mmc0-pins {
-+				pins = "PF0", "PF1", "PF2", "PF3",
-+				       "PF4", "PF5";
-+				function = "mmc0";
-+				drive-strength = <30>;
-+				bias-pull-up;
-+			};
-+
-+			mmc2_pins: mmc2-pins {
-+				pins = "PC1", "PC4", "PC5", "PC6",
-+				       "PC7", "PC8", "PC9", "PC10",
-+				       "PC11", "PC12", "PC13", "PC14";
-+				function = "mmc2";
-+				drive-strength = <30>;
-+				bias-pull-up;
-+			};
-+
- 			uart0_ph_pins: uart0-ph {
- 				pins = "PH0", "PH1";
- 				function = "uart0";
- 			};
- 		};
+ #define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
++#define __pmd_to_swp_entry(pmd)	((swp_entry_t) { pmd_val(pmd) })
+ #define __swp_entry_to_pte(swp)	((pte_t) { (swp).val })
++#define __swp_entry_to_pmd(swp)	((pmd_t) { (swp).val })
  
-+		mmc0: mmc at 4020000 {
-+			compatible = "allwinner,sun50i-h6-mmc";
-+			reg = <0x04020000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC0>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc1: mmc at 4021000 {
-+			compatible = "allwinner,sun50i-h6-mmc";
-+			reg = <0x04021000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC1>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc2: mmc at 4022000 {
-+			compatible = "allwinner,sun50i-h6-emmc";
-+			reg = <0x04022000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC2>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		uart0: serial at 5000000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x05000000 0x400>;
+ /*
+  * Ensure that there are not more swap files than can be encoded in the kernel
 -- 
-2.15.1
+2.17.0
