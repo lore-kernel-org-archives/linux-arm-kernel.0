@@ -1,41 +1,48 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 26 Apr 2018 14:01:22 +0100
-Subject: [RFC PATCH v4] tty: pl011: Avoid spuriously stuck-off interrupts
-In-Reply-To: <CAFEAcA9aVWC2M4cExTgPdwGqAOofWgm-61FUuZHNFWvFeNiHJA@mail.gmail.com>
-References: <1524740081-4979-1-git-send-email-Dave.Martin@arm.com>
- <CAFEAcA9aVWC2M4cExTgPdwGqAOofWgm-61FUuZHNFWvFeNiHJA@mail.gmail.com>
-Message-ID: <20180426130122.GQ16308@e103592.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Apr 2018 15:08:24 +0200
+Subject: [PATCH] gpio: zynq: Setup chip->base based on alias ID
+In-Reply-To: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
+References: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
+Message-ID: <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 01:11:41PM +0100, Peter Maydell wrote:
-> On 26 April 2018 at 11:54, Dave Martin <Dave.Martin@arm.com> wrote:
-> > This is an update to a previous RFC v3 [1], to fix a problem observed by
-> > the qemu community that causes serial input to hang when booting a
-> > simulated system with data already queued in the UART FIFO [2].
-> >
-> > RFC v3 did not solve the problem by itself, due to the problem being
-> > triggered again in pl011_enable_interrupts() after working around it
-> > in pl011_hwinit().  See the updated commit message in the patch for
-> > details.
-> >
-> > This patch is intended to supersede the previous RFCs, so please test
-> > _without_ RFC v2 (or 3) applied.
-> >
-> > If you can, please:
-> >
-> >  a) Check that you can still reproduce the bug on mainline without this
-> >     patch.
-> >
-> >  b) Check whether this patch fixes the problem.
-> 
-> Adding back to the CC list the people who might be able to do
-> this testing...
-> Link to v4 patch:
-> https://patchwork.kernel.org/patch/10365551/
+On Wed, Apr 11, 2018 at 3:55 PM, Michal Simek <michal.simek@xilinx.com> wrote:
 
-Dang.  Thanks!
+Thanks for your patch!
 
-(Sorry guys)
+> In past Xilinx gpio-zynq driver was setting up gpio chip->base as 0
+> which was chagned to autodetection when driver was upstreamed. Older
+> systems, which were using this old version, setup SW stack which expects
+> zynq gpio base as 0 and right now there is no way how to set this up.
+>
+> The patch is adding an option to setup chip->base based on aliases which
+> is something what some other drivers are doing too.
+> It means when gpio0 alias is setup then chip->base is 0. When gpio alias
+> is not setup gpiochip_find_base() set it up properly which is current
+> behavior.
+>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
----Dave
+In general, we stopped any controlling of the GPIO base.
+
+Also this use would have to be OK with the DT maintainers
+as I never saw this use of alias before.
+
+Please describe the use case for this.
+
+The only use case which I can think about is userspace sysfs
+and then I would really like to know why these userspace
+users cannot use the character device that is nowadays
+supported by libgpiod and there is even patches for some
+IoT libraries to use it. The character device makes the
+GPIO Linux "base" irrelevant for userspace.
+
+GPIO sysfs is deprecated and moved to the obsolete ABI.
+
+If there are legacy applications that use this I would have
+to consider it, but since this has been -1 since the driver
+was merged I find that unlikely.
+
+Yours,
+Linus Walleij
