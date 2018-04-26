@@ -1,7 +1,7 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Thu, 26 Apr 2018 02:13:10 -0700
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 26 Apr 2018 11:17:46 +0200
 Subject: noveau vs arm dma ops
-In-Reply-To: <20180425225443.GQ16141@n2100.armlinux.org.uk>
+In-Reply-To: <20180425232646.GR16141@n2100.armlinux.org.uk>
 References: <CAKMK7uFL68pu+-9LODTgz+GQYvxpnXOGhxfz9zorJ_JKsPVw2g@mail.gmail.com>
  <20180425054855.GA17038@infradead.org>
  <CAKMK7uEFitkNQrD6cLX5Txe11XhVO=LC4YKJXH=VNdq+CY=DjQ@mail.gmail.com>
@@ -10,55 +10,103 @@ References: <CAKMK7uFL68pu+-9LODTgz+GQYvxpnXOGhxfz9zorJ_JKsPVw2g@mail.gmail.com>
  <20180425085439.GA29996@infradead.org>
  <20180425100429.GR25142@phenom.ffwll.local>
  <20180425153312.GD27076@infradead.org>
- <20180425225443.GQ16141@n2100.armlinux.org.uk>
-Message-ID: <20180426091310.GB18811@infradead.org>
+ <CAKMK7uH14qupTYDa1pr8UC434Vs+97eUXj+fYi=+2uijCLayMA@mail.gmail.com>
+ <20180425232646.GR16141@n2100.armlinux.org.uk>
+Message-ID: <CAKMK7uGF9HAkBPK1+p9fPqP-fdSUOE+i=RGdUPfUiJh8uSnKRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 11:54:43PM +0100, Russell King - ARM Linux wrote:
-> 
-> if the memory was previously dirty (iow, CPU has written), you need to
-> flush the dirty cache lines _before_ the GPU writes happen, but you
-> don't know whether the CPU has speculatively prefetched, so you need
-> to flush any prefetched cache lines before reading from the cacheable
-> memory _after_ the GPU has finished writing.
-> 
-> Also note that "flush" there can be "clean the cache", "clean and
-> invalidate the cache" or "invalidate the cache" as appropriate - some
-> CPUs are able to perform those three operations, and the appropriate
-> one depends on not only where in the above sequence it's being used,
-> but also on what the operations are.
+On Thu, Apr 26, 2018 at 1:26 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, Apr 25, 2018 at 11:35:13PM +0200, Daniel Vetter wrote:
+>> On arm that doesn't work. The iommu api seems like a good fit, except
+>> the dma-api tends to get in the way a bit (drm/msm apparently has
+>> similar problems like tegra), and if you need contiguous memory
+>> dma_alloc_coherent is the only way to get at contiguous memory. There
+>> was a huge discussion years ago about that, and direct cma access was
+>> shot down because it would have exposed too much of the caching
+>> attribute mangling required (most arm platforms need wc-pages to not
+>> be in the kernel's linear map apparently).
+>
+> I think you completely misunderstand ARM from what you've written above,
+> and this worries me greatly about giving DRM the level of control that
+> is being asked for.
+>
+> Modern ARMs have a PIPT cache or a non-aliasing VIPT cache, and cache
+> attributes are stored in the page tables.  These caches are inherently
+> non-aliasing when there are multiple mappings (which is a great step
+> forward compared to the previous aliasing caches.)
+>
+> As the cache attributes are stored in the page tables, this in theory
+> allows different virtual mappings of the same physical memory to have
+> different cache attributes.  However, there's a problem, and that's
+> called speculative prefetching.
+>
+> Let's say you have one mapping which is cacheable, and another that is
+> marked as write combining.  If a cache line is speculatively prefetched
+> through the cacheable mapping of this memory, and then you read the
+> same physical location through the write combining mapping, it is
+> possible that you could read cached data.
+>
+> So, it is generally accepted that all mappings of any particular
+> physical bit of memory should have the same cache attributes to avoid
+> unpredictable behaviour.
+>
+> This presents a problem with what is generally called "lowmem" where
+> the memory is mapped in kernel virtual space with cacheable
+> attributes.  It can also happen with highmem if the memory is
+> kmapped.
+>
+> This is why, on ARM, you can't use something like get_free_pages() to
+> grab some pages from the system, pass it to the GPU, map it into
+> userspace as write-combining, etc.  It _might_ work for some CPUs,
+> but ARM CPUs vary in how much prefetching they do, and what may work
+> for one particular CPU is in no way guaranteed to work for another
+> ARM CPU.
+>
+> The official line from architecture folk is to assume that the caches
+> infinitely speculate, are of infinite size, and can writeback *dirty*
+> data at any moment.
+>
+> The way to stop things like speculative prefetches to particular
+> physical memory is to, quite "simply", not have any cacheable
+> mappings of that physical memory anywhere in the system.
+>
+> Now, cache flushes on ARM tend to be fairly expensive for GPU buffers.
+> If you have, say, an 8MB buffer (for a 1080p frame) and you need to
+> do a cache operation on that buffer, you'll be iterating over it
+> 32 or maybe 64 bytes at a time "just in case" there's a cache line
+> present.  Referring to my previous email, where I detailed the
+> potential need for _two_ flushes, one before the GPU operation and
+> one after, and this becomes _really_ expensive.  At that point, you're
+> probably way better off using write-combine memory where you don't
+> need to spend CPU cycles performing cache flushing - potentially
+> across all CPUs in the system if cache operations aren't broadcasted.
+>
+> This isn't a simple matter of "just provide some APIs for cache
+> operations" - there's much more that needs to be understood by
+> all parties here, especially when we have GPU drivers that can be
+> used with quite different CPUs.
+>
+> It may well be that for some combinations of CPUs and workloads, it's
+> better to use write-combine memory without cache flushing, but for
+> other CPUs that tradeoff (for the same workload) could well be
+> different.
+>
+> Older ARMs get more interesting, because they have aliasing caches.
+> That means the CPU cache aliases across different virtual space
+> mappings in some way, which complicates (a) the mapping of memory
+> and (b) handling the cache operations on it.
+>
+> It's too late for me to go into that tonight, and I probably won't
+> be reading mail for the next week and a half, sorry.
 
-Agreed on all these counts.
-
-> If we can agree a set of interfaces that allows _proper_ use of these
-> facilities, one which can be used appropriately, then there shouldn't
-> be a problem.  The DMA API does that via it's ideas about who owns a
-> particular buffer (because of the above problem) and that's something
-> which would need to be carried over to such a cache flushing API (it
-> should be pretty obvious that having a GPU read or write memory while
-> the cache for that memory is being cleaned will lead to unexpected
-> results.)
-
-I've been trying to come up with such an interface, for now only for
-internal use in a generic set of noncoherent ops.  The API is basically
-a variant of the existing dma_sync_single_to_device/cpu calls:
-
-http://git.infradead.org/users/hch/misc.git/commitdiff/044dae5f94509288f4655de2f22cb0bea85778af
-
-Review welcome!
-
-> The next issue, which I've brought up before, is that exposing cache
-> flushing to userspace on architectures where it isn't already exposed
-> comes.  As has been shown by Google Project Zero, this risks exposing
-> those architectures to Spectre and Meltdown exploits where they weren't
-> at such a risk before.  (I've pretty much shown here that you _do_
-> need to control which cache lines get flushed to make these exploits
-> work, and flushing the cache by reading lots of data in liu of having
-> the ability to explicitly flush bits of cache makes it very difficult
-> to impossible for them to work.)
-
-Extending dma coherence to userspace is going to be the next major
-nightmare indeed.  I'm not sure how much of that actually still is
-going on in the graphics world, but we'll need a coherent (pun intended)
-plan how to deal with it.
+I didn't know all the details well enough (and neither had the time to
+write a few paragraphs like you did), but the above is what I had in
+mind and meant. Sorry if my sloppy reply sounded like I'm mixing stuff
+up.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
