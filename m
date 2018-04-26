@@ -1,129 +1,49 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 26 Apr 2018 11:58:19 +0100
-Subject: [PATCH v2 05/17] arm64: Helper for parange to PASize
-In-Reply-To: <1522156531-28348-6-git-send-email-suzuki.poulose@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <2910d406-315f-6f0f-7456-df9d80a08087@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 26 Apr 2018 12:00:06 +0100
+Subject: arm64: W+X mapping check failures
+In-Reply-To: <20180425144727.GA18651@hc>
+References: <20180425133704.GA6474@hc>
+ <20180425135702.zvt4vjoegqblgr7c@lakrids.cambridge.arm.com>
+ <20180425144727.GA18651@hc>
+Message-ID: <46a204a8-491a-a7f0-0989-cc223ee78bc2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi guys,
 
-On 27/03/18 14:15, Suzuki K Poulose wrote:
-> Add a helper to convert ID_AA64MMFR0_EL1:PARange to they physical
-> size shift. Limit the size to the maximum supported by the kernel.
-> We are about to move the user of this code and this helps to
-> keep the changes cleaner.
-
-It is probably worth to mention that you are also adding 52-bit support 
-in the patch.
-
-Cheers,
-
+On 25/04/18 15:47, Jan Glauber wrote:
+> On Wed, Apr 25, 2018 at 02:57:02PM +0100, Mark Rutland wrote:
+>> On Wed, Apr 25, 2018 at 03:37:04PM +0200, Jan Glauber wrote:
+>>> The reported W+X mappings are gone after the boot is finished. The addresses
+>>> all belong to .init.* sections of the first loaded kernel modules.
+>>
+>> I'm afraid I haven't tried loading modules before getting to userspace,
+>> and I'm not sure what I'd need to set up to test that.
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->   arch/arm64/include/asm/cpufeature.h | 16 ++++++++++++++++
->   arch/arm64/kvm/hyp/s2-setup.c       | 28 +++++-----------------------
->   2 files changed, 21 insertions(+), 23 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index fbf0aab..1f2a5dd 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -311,6 +311,22 @@ static inline u64 read_zcr_features(void)
->   	return zcr;
->   }
->   
-> +static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
-> +{
-> +	switch (parange) {
-> +	case 0: return 32;
-> +	case 1: return 36;
-> +	case 2: return 40;
-> +	case 3: return 42;
-> +	case 4: return 44;
-> +	/* Report 48 bit if the kernel doesn't support 52bit */
-> +	default:
-> +	case 5: return 48;
-> +#ifdef CONFIG_ARM64_PA_BITS_52
-> +	case 6: return 52;
-> +#endif
-> +	}
-> +}
->   #endif /* __ASSEMBLY__ */
->   
->   #endif
-> diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
-> index 603e1ee..b1129c8 100644
-> --- a/arch/arm64/kvm/hyp/s2-setup.c
-> +++ b/arch/arm64/kvm/hyp/s2-setup.c
-> @@ -19,11 +19,13 @@
->   #include <asm/kvm_arm.h>
->   #include <asm/kvm_asm.h>
->   #include <asm/kvm_hyp.h>
-> +#include <asm/cpufeature.h>
->   
->   u32 __hyp_text __init_stage2_translation(void)
->   {
->   	u64 val = VTCR_EL2_FLAGS;
->   	u64 parange;
-> +	u32 phys_shift;
->   	u64 tmp;
->   
->   	/*
-> @@ -37,27 +39,7 @@ u32 __hyp_text __init_stage2_translation(void)
->   	val |= parange << 16;
->   
->   	/* Compute the actual PARange... */
-> -	switch (parange) {
-> -	case 0:
-> -		parange = 32;
-> -		break;
-> -	case 1:
-> -		parange = 36;
-> -		break;
-> -	case 2:
-> -		parange = 40;
-> -		break;
-> -	case 3:
-> -		parange = 42;
-> -		break;
-> -	case 4:
-> -		parange = 44;
-> -		break;
-> -	case 5:
-> -	default:
-> -		parange = 48;
-> -		break;
-> -	}
-> +	phys_shift = id_aa64mmfr0_parange_to_phys_shift(parange);
->   
->   	/*
->   	 * ... and clamp it to 40 bits, unless we have some braindead
-> @@ -65,7 +47,7 @@ u32 __hyp_text __init_stage2_translation(void)
->   	 * return that value for the rest of the kernel to decide what
->   	 * to do.
->   	 */
-> -	val |= 64 - (parange > 40 ? 40 : parange);
-> +	val |= 64 - (phys_shift > 40 ? 40 : phys_shift);
->   
->   	/*
->   	 * Check the availability of Hardware Access Flag / Dirty Bit
-> @@ -86,5 +68,5 @@ u32 __hyp_text __init_stage2_translation(void)
->   
->   	write_sysreg(val, vtcr_el2);
->   
-> -	return parange;
-> +	return phys_shift;
->   }
-> 
+> Not much I guess, initramfs with early modules. For instance encrypted
+> root should be a possible testcase. In my tests it was always cryptd and
+> dependent modules (crypto_simd, aes_neon_blk, aes_neon_bs) that
+> triggered the issue.
 
--- 
-Julien Grall
+I've used "elevator=deadline" on the kernel cmdline as something that takes less
+setup. This will cause deadline-iosched.ko to be loaded during
+kernel_init_freeable() if its not built-in.
+
+dmesg shows:
+| [   10.195409] I/O scheduler deadline not found
+
+| [   10.204365] scsi 4:0:0:0: Direct-Access     ATA      WDC WD5000AAKX-0
+| [   10.222301] sd 4:0:0:0: [sda] 976773168 512-byte logical blocks:
+| [   10.237494] sd 4:0:0:0: [sda] Write Protect is off
+| [   10.247130] sd 4:0:0:0: [sda] Mode Sense: 00 3a 00 00
+| [   10.257365] sd 4:0:0:0: [sda] Write cache: enabled, read cache: enabled,
+| [   10.336133]  sda: sda1 sda2 sda3 sda4 sda5
+
+| [   11.723286] io scheduler deadline registered (default)
+| [   11.738017] Freeing unused kernel memory: 5824K
+
+
+
+Thanks,
+
+James
