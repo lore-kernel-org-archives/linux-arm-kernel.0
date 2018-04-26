@@ -1,43 +1,23 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 26 Apr 2018 10:53:10 +0200
-Subject: [PATCH 11/11] spi: Respect all error codes from dev_pm_domain_attach()
-In-Reply-To: <1524732790-2234-1-git-send-email-ulf.hansson@linaro.org>
-References: <1524732790-2234-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1524732790-2234-12-git-send-email-ulf.hansson@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 26 Apr 2018 10:59:39 +0200
+Subject: [PATCH v7 4/7] dt-bindings: clock: reset: Add AXG AO Clock and
+ Reset Bindings
+In-Reply-To: <20180426084437.192394-5-yixun.lan@amlogic.com>
+References: <20180426084437.192394-1-yixun.lan@amlogic.com>
+ <20180426084437.192394-5-yixun.lan@amlogic.com>
+Message-ID: <1524733179.3408.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The limitation of being able to check only for -EPROBE_DEFER from
-dev_pm_domain_attach() has been removed. Hence let's respect all error
-codes and bail out accordingly.
+On Thu, 2018-04-26 at 16:44 +0800, Yixun Lan wrote:
+> Add dt-bindings headers for the Meson-AXG's AO clock and
+> reset controller.
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/spi/spi.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+This one is
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 7b213fa..eeab67f 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -356,11 +356,12 @@ static int spi_drv_probe(struct device *dev)
- 	}
- 
- 	ret = dev_pm_domain_attach(dev, true);
--	if (ret != -EPROBE_DEFER) {
--		ret = sdrv->probe(spi);
--		if (ret)
--			dev_pm_domain_detach(dev, true);
--	}
-+	if (ret)
-+		return ret;
-+
-+	ret = sdrv->probe(spi);
-+	if (ret)
-+		dev_pm_domain_detach(dev, true);
- 
- 	return ret;
- }
--- 
-2.7.4
+regards
+Philipp
