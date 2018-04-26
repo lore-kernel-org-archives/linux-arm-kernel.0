@@ -1,276 +1,88 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 26 Apr 2018 10:36:28 +0200
-Subject: [PATCH] ARM64: dts: meson-axg: add tdm pins
-In-Reply-To: <20180417064035.28776-1-jbrunet@baylibre.com>
-References: <20180417064035.28776-1-jbrunet@baylibre.com>
-Message-ID: <49f6e142-f958-c86a-e951-a3eb7aa4e720@baylibre.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 26 Apr 2018 16:44:30 +0800
+Subject: [PATCH v7 0/7] clk: meson-axg: Add AO Cloclk and Reset driver
+Message-ID: <20180426084437.192394-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/04/2018 08:40, Jerome Brunet wrote:
-> Add tdm pins to amlogic's A113 device tree
-> 
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 245 +++++++++++++++++++++++++++++
->  1 file changed, 245 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index b58808eb3cc8..74013965e86a 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -660,6 +660,251 @@
->  						function = "uart_ao_b_z";
->  					};
->  				};
-> +
-> +				mclk_b_pins: mclk_b {
-> +					mux {
-> +						groups = "mclk_b";
-> +						function = "mclk_b";
-> +					};
-> +				};
-> +
-> +				mclk_c_pins: mclk_c {
-> +					mux {
-> +						groups = "mclk_c";
-> +						function = "mclk_c";
-> +					};
-> +				};
-> +
-> +				tdma_sclk_pins: tdma_sclk {
-> +					mux {
-> +						groups = "tdma_sclk";
-> +						function = "tdma";
-> +					};
-> +				};
-> +
-> +				tdma_sclk_slv_pins: tdma_sclk_slv {
-> +					mux {
-> +						groups = "tdma_sclk_slv";
-> +						function = "tdma";
-> +					};
-> +				};
-> +
-> +				tdma_fs_pins: tdma_fs {
-> +					mux {
-> +						groups = "tdma_fs";
-> +						function = "tdma";
-> +					};
-> +				};
-> +
-> +				tdma_fs_slv_pins: tdma_fs_slv {
-> +					mux {
-> +						groups = "tdma_fs_slv";
-> +						function = "tdma";
-> +					};
-> +				};
-> +
-> +				tdma_din0_pins: tdma_din0 {
-> +					mux {
-> +						groups = "tdma_din0";
-> +						function = "tdma";
-> +					};
-> +				};
-> +
-> +				tdma_dout0_x14_pins: tdma_dout0_x14 {
-> +					mux {
-> +						groups = "tdma_dout0_x14";
-> +						function = "tdma";
-> +					};
-> +				};
-> +
-> +				tdma_dout0_x15_pins: tdma_dout0_x15 {
-> +					mux {
-> +						groups = "tdma_dout0_x15";
-> +						function = "tdma";
-> +					};
-> +				};
-> +
-> +				tdma_dout1_pins: tdma_dout1 {
-> +					mux {
-> +						groups = "tdma_dout1";
-> +						function = "tdma";
-> +					};
-> +				};
-> +
-> +				tdma_din1_pins: tdma_din1 {
-> +					mux {
-> +						groups = "tdma_din1";
-> +						function = "tdma";
-> +					};
-> +				};
-> +
-> +				tdmb_sclk_pins: tdmb_sclk {
-> +					mux {
-> +						groups = "tdmb_sclk";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_sclk_slv_pins: tdmb_sclk_slv {
-> +					mux {
-> +						groups = "tdmb_sclk_slv";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_fs_pins: tdmb_fs {
-> +					mux {
-> +						groups = "tdmb_fs";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_fs_slv_pins: tdmb_fs_slv {
-> +					mux {
-> +						groups = "tdmb_fs_slv";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_din0_pins: tdmb_din0 {
-> +					mux {
-> +						groups = "tdmb_din0";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_dout0_pins: tdmb_dout0 {
-> +					mux {
-> +						groups = "tdmb_dout0";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_din1_pins: tdmb_din1 {
-> +					mux {
-> +						groups = "tdmb_din1";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_dout1_pins: tdmb_dout1 {
-> +					mux {
-> +						groups = "tdmb_dout1";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_din2_pins: tdmb_din2 {
-> +					mux {
-> +						groups = "tdmb_din2";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_dout2_pins: tdmb_dout2 {
-> +					mux {
-> +						groups = "tdmb_dout2";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_din3_pins: tdmb_din3 {
-> +					mux {
-> +						groups = "tdmb_din3";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmb_dout3_pins: tdmb_dout3 {
-> +					mux {
-> +						groups = "tdmb_dout3";
-> +						function = "tdmb";
-> +					};
-> +				};
-> +
-> +				tdmc_sclk_pins: tdmc_sclk {
-> +					mux {
-> +						groups = "tdmc_sclk";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_sclk_slv_pins: tdmc_sclk_slv {
-> +					mux {
-> +						groups = "tdmc_sclk_slv";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_fs_pins: tdmc_fs {
-> +					mux {
-> +						groups = "tdmc_fs";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_fs_slv_pins: tdmc_fs_slv {
-> +					mux {
-> +						groups = "tdmc_fs_slv";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_din0_pins: tdmc_din0 {
-> +					mux {
-> +						groups = "tdmc_din0";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_dout0_pins: tdmc_dout0 {
-> +					mux {
-> +						groups = "tdmc_dout0";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_din1_pins: tdmc_din1 {
-> +					mux {
-> +						groups = "tdmc_din1";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_dout1_pins: tdmc_dout1 {
-> +					mux {
-> +						groups = "tdmc_dout1";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_din2_pins: tdmc_din2 {
-> +					mux {
-> +						groups = "tdmc_din2";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_dout2_pins: tdmc_dout2 {
-> +					mux {
-> +						groups = "tdmc_dout2";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_din3_pins: tdmc_din3 {
-> +					mux {
-> +						groups = "tdmc_din3";
-> +						function = "tdmc";
-> +					};
-> +				};
-> +
-> +				tdmc_dout3_pins: tdmc_dout3 {
-> +					mux {
-> +						groups = "tdmc_dout3";
-> +						function = "tdmc";
-> +					};
-> +				};
->  			};
->  		};
->  
-> 
+  This patch try to add AO clock and Reset driver for Amlogic's
+Meson-AXG SoC.
+  Please note that patch 7 need to wait for the DTS changes[3] merged
+into mainline first, otherwise it will break the serial console.
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+ patch 2: factor the common code into a dedicated file
+ patch 3-5: add the aoclk driver for AXG SoC
+ patch 6-7: drop unnecessary clock flags
+
+changes since v6 at [7]: 
+ - fix over 80 chars chechpatch error
+ - add Philip's Ack on patch 5
+ - drop extra end of newline
+
+changes since v5 at [6]: 
+ - drop unnecessary header files
+ - add 'axg_aoclk' prefix to clk driver, make them more consistent
+ - add missing end new line..
+
+changes since v4 at [5]: 
+ - fix return err
+ - introduce CONFIG_COMMON_CLK_MESON_AO
+ - format/style minor fix
+
+changes since v3 at [4]: 
+ - add 'const' contraint to the read-only data
+ - switch to devm_of_clk_add_hw_provider API
+ - check return value of devm_reset_controller_register
+
+changes since v2 at [2]: 
+ - rework meson_aoclkc_probe() which leverage the of_match_data
+ - merge patch 5-6 into this series
+ - seperate DTS patch, will send to Kevin Hilman independently
+ 
+changes since v1 at [0]: 
+ - rebase to clk-meson's branch 'next/drivers' [1]
+ - fix license, update to BSD-3-Clause
+ - drop un-used include header file
+
+[0] https://lkml.kernel.org/r/20180209070026.193879-1-yixun.lan at amlogic.com
+[1] git://github.com/BayLibre/clk-meson.git branch: next-drivers
+[2] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
+[3] https://lkml.kernel.org/r/20180326081809.49493-4-yixun.lan at amlogic.com
+[4] https://lkml.kernel.org/r/20180328025050.221585-1-yixun.lan at amlogic.com
+[5] https://lkml.kernel.org/r/20180408031938.153474-1-yixun.lan at amlogic.com
+[6] https://lkml.kernel.org/r/20180409143749.71197-1-yixun.lan at amlogic.com
+[7] https://lkml.kernel.org/r/20180419135426.155794-1-yixun.lan at amlogic.com
+
+
+Qiufang Dai (1):
+  clk: meson-axg: Add AO Clock and Reset controller driver
+
+Yixun Lan (6):
+  clk: meson: migrate to devm_of_clk_add_hw_provider API
+  clk: meson: aoclk: refactor common code into dedicated file
+  dt-bindings: clock: axg-aoclkc: New binding for Meson-AXG SoC
+  dt-bindings: clock: reset: Add AXG AO Clock and Reset Bindings
+  clk: meson: drop CLK_SET_RATE_PARENT flag
+  clk: meson: drop CLK_IGNORE_UNUSED flag
+
+ .../bindings/clock/amlogic,gxbb-aoclkc.txt    |   1 +
+ drivers/clk/meson/Kconfig                     |   8 +
+ drivers/clk/meson/Makefile                    |   3 +-
+ drivers/clk/meson/axg-aoclk.c                 | 163 ++++++++++++++++++
+ drivers/clk/meson/axg-aoclk.h                 |  29 ++++
+ drivers/clk/meson/gxbb-aoclk.c                |  95 ++++------
+ drivers/clk/meson/gxbb-aoclk.h                |   5 +
+ drivers/clk/meson/meson-aoclk.c               |  81 +++++++++
+ drivers/clk/meson/meson-aoclk.h               |  34 ++++
+ include/dt-bindings/clock/axg-aoclkc.h        |  26 +++
+ include/dt-bindings/reset/axg-aoclkc.h        |  20 +++
+ 11 files changed, 401 insertions(+), 64 deletions(-)
+ create mode 100644 drivers/clk/meson/axg-aoclk.c
+ create mode 100644 drivers/clk/meson/axg-aoclk.h
+ create mode 100644 drivers/clk/meson/meson-aoclk.c
+ create mode 100644 drivers/clk/meson/meson-aoclk.h
+ create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
+ create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
+
+-- 
+2.17.0
