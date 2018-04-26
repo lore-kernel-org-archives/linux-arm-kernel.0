@@ -1,36 +1,43 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 26 Apr 2018 13:11:41 +0100
-Subject: [RFC PATCH v4] tty: pl011: Avoid spuriously stuck-off interrupts
-In-Reply-To: <1524740081-4979-1-git-send-email-Dave.Martin@arm.com>
-References: <1524740081-4979-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAFEAcA9aVWC2M4cExTgPdwGqAOofWgm-61FUuZHNFWvFeNiHJA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 26 Apr 2018 14:14:09 +0200
+Subject: [PATCH v2 3/5] ARM: dma-mapping: Implement
+ arch_iommu_detach_device()
+In-Reply-To: <20180425152049.GD16075@infradead.org>
+References: <20180425101051.15349-1-thierry.reding@gmail.com>
+ <20180425101051.15349-3-thierry.reding@gmail.com>
+ <20180425152049.GD16075@infradead.org>
+Message-ID: <20180426121409.GE11985@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 April 2018 at 11:54, Dave Martin <Dave.Martin@arm.com> wrote:
-> This is an update to a previous RFC v3 [1], to fix a problem observed by
-> the qemu community that causes serial input to hang when booting a
-> simulated system with data already queued in the UART FIFO [2].
->
-> RFC v3 did not solve the problem by itself, due to the problem being
-> triggered again in pl011_enable_interrupts() after working around it
-> in pl011_hwinit().  See the updated commit message in the patch for
-> details.
->
-> This patch is intended to supersede the previous RFCs, so please test
-> _without_ RFC v2 (or 3) applied.
->
-> If you can, please:
->
->  a) Check that you can still reproduce the bug on mainline without this
->     patch.
->
->  b) Check whether this patch fixes the problem.
+On Wed, Apr 25, 2018 at 08:20:49AM -0700, Christoph Hellwig wrote:
+> > +void arch_iommu_detach_device(struct device *dev)
+> > +{
+> > +#ifdef CONFIG_ARM_DMA_USE_IOMMU
+> > +	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+> > +	const struct dma_map_ops *dma_ops;
+> > +
+> > +	if (!mapping)
+> > +		return;
+> > +
+> > +	arm_iommu_release_mapping(mapping);
+> > +	arm_iommu_detach_device(dev);
+> > +
+> > +	dma_ops = arm_get_dma_map_ops(dev->archdata.dma_coherent);
+> > +	set_dma_ops(dev, dma_ops);
+> 
+> Why not simply:
+> 
+> 	set_dma_ops(dev, arm_get_dma_map_ops(dev->archdata.dma_coherent));
 
-Adding back to the CC list the people who might be able to do
-this testing...
-Link to v4 patch:
-https://patchwork.kernel.org/patch/10365551/
+I had that initially, but it looked cluttered to me, so I split it up.
+I don't care much either way, so I can revert to that if you prefer.
 
-thanks
--- PMM
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180426/c380f505/attachment.sig>
