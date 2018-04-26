@@ -1,29 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Apr 2018 16:50:56 +0200
-Subject: [PATCH] ARM: dts: Fix NAS4220B pin config
-In-Reply-To: <39fa170a0b20c73c4ae45975202ead2f@advem.lv>
-References: <20180417085311.13829-1-linus.walleij@linaro.org>
- <39fa170a0b20c73c4ae45975202ead2f@advem.lv>
-Message-ID: <CAK8P3a0dfk32eaMVXraC53r=7q_-32V+_waJ49grkQCupFcxPw@mail.gmail.com>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Thu, 26 Apr 2018 16:52:13 +0200
+Subject: [PATCH 07/10] ARM: dts: kzm9d: Drop unnecessary address
+ properties from gpio_keys node
+In-Reply-To: <20180426102951.8683-8-horms+renesas@verge.net.au>
+References: <20180426102951.8683-1-horms+renesas@verge.net.au>
+ <20180426102951.8683-8-horms+renesas@verge.net.au>
+Message-ID: <20180426145213.GD3315@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 10:33 PM, Roman Yeryomin <roman@advem.lv> wrote:
-> On 2018-04-17 11:53, Linus Walleij wrote:
->>
->> The DTS file for the NAS4220B had the pin config for the
->> ethernet interface set to the pins in the SL3512 SoC while
->> this system is using SL3516. Fix it by referencing the
->> right SL3516 pins instead of the SL3512 pins.
->>
->> Cc: stable at vger.kernel.org
->> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
->> Reported-by: Andreas Fiedler <andreas.fiedler@gmx.net>
->> Reported-by: Roman Yeryomin <roman@advem.lv>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Tested-by: Roman Yeryomin <roman@advem.lv>
+Hi Simon,
 
-Applied to fixes, thanks!
+Thanks for your work.
 
-        Arnd
+On 2018-04-26 12:29:48 +0200, Simon Horman wrote:
+> The gpio_keys node does not have an address and thus does not need
+> address-cells or address size-properties.
+> 
+> This is flagged by dtc as follows:
+>  # make dtbs W=1
+>  arch/arm/boot/dts/r8a7794-silk.dtb: Warning (avoid_unnecessary_addr_size): /soc/video at e6ef0000/port: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+
+This warning don't seem to match with the change nor the rest of the 
+commit message :-)
+
+With that addressed and for the whole series:
+
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/emev2-kzm9d.dts | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+> index c238407133bf..0af44b7eadb9 100644
+> --- a/arch/arm/boot/dts/emev2-kzm9d.dts
+> +++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+> @@ -34,9 +34,6 @@
+>  
+>  	gpio_keys {
+>  		compatible = "gpio-keys";
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -
+>  		one {
+>  			debounce-interval = <50>;
+>  			wakeup-source;
+> -- 
+> 2.11.0
+> 
+
+-- 
+Regards,
+Niklas S?derlund
