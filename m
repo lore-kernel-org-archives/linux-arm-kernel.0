@@ -1,85 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 Apr 2018 18:47:14 +0100
-Subject: [PATCH 4/6] mm, arm64: untag user addresses in mm/gup.c
-In-Reply-To: <0db34d04fa16be162336106e3b4a94f3dacc0af4.1524077494.git.andreyknvl@google.com>
-References: <cover.1524077494.git.andreyknvl@google.com>
- <0db34d04fa16be162336106e3b4a94f3dacc0af4.1524077494.git.andreyknvl@google.com>
-Message-ID: <20180426174714.4jtb72q56w3xonsa@armageddon.cambridge.arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 26 Apr 2018 19:48:43 +0200
+Subject: [PATCH v4 1/6] ARM: at91: add TCB registers definitions
+In-Reply-To: <20180426165242.x5pvpyfirkmvvqjo@breakpoint.cc>
+References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
+ <20180418105143.3577-2-alexandre.belloni@bootlin.com>
+ <20180426165242.x5pvpyfirkmvvqjo@breakpoint.cc>
+Message-ID: <20180426174843.GT4813@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 08:53:13PM +0200, Andrey Konovalov wrote:
-> diff --git a/mm/gup.c b/mm/gup.c
-> index 76af4cfeaf68..fb375de7d40d 100644
-> --- a/mm/gup.c
-> +++ b/mm/gup.c
-> @@ -386,6 +386,8 @@ struct page *follow_page_mask(struct vm_area_struct *vma,
->  	struct page *page;
->  	struct mm_struct *mm = vma->vm_mm;
->  
-> +	address = untagged_addr(address);
-> +
->  	*page_mask = 0;
->  
->  	/* make this handle hugepd */
+On 26/04/2018 18:52:43+0200, Sebastian Andrzej Siewior wrote:
+> On 2018-04-18 12:51:38 [+0200], Alexandre Belloni wrote:
+> > diff --git a/include/soc/at91/atmel_tcb.h b/include/soc/at91/atmel_tcb.h
+> > new file mode 100644
+> > index 000000000000..d263ea677225
+> > --- /dev/null
+> > +++ b/include/soc/at91/atmel_tcb.h
+> ?
+> > +static inline struct clk *tcb_clk_get(struct device_node *node, int channel)
+> > +{
+> > +	struct clk *clk;
+> > +	char clk_name[] = "t0_clk";
+> > +
+> > +	clk_name[1] += channel;
+> > +	clk = of_clk_get_by_name(node->parent, clk_name);
+> > +	if (!IS_ERR(clk))
+> > +		return clk;
+> > +
+> > +	return of_clk_get_by_name(node->parent, "t0_clk");
+> > +}
+> > +
+> > +static inline int tcb_irq_get(struct device_node *node, int channel)
+> > +{
+> > +	int irq;
+> > +
+> > +	irq = of_irq_get(node->parent, channel);
+> > +	if (irq > 0)
+> > +		return irq;
+> > +
+> > +	return of_irq_get(node->parent, 0);
+> > +}
+> > +
+> > +static const u8 atmel_tc_divisors[5] = { 2, 8, 32, 128, 0, };
+> > +
+> > +struct atmel_tcb_info {
+> > +	int bits;
+> > +};
+> > +
+> > +static const struct atmel_tcb_info atmel_tcb_infos[] = {
+> > +	{ .bits = 16 },
+> > +	{ .bits = 32 },
+> > +};
+> > +
+> > +static const struct of_device_id atmel_tcb_dt_ids[] = {
+> > +	{
+> > +		.compatible = "atmel,at91rm9200-tcb",
+> > +		.data = &atmel_tcb_infos[0],
+> > +	}, {
+> > +		.compatible = "atmel,at91sam9x5-tcb",
+> > +		.data = &atmel_tcb_infos[1],
+> > +	}, {
+> > +		/* sentinel */
+> > +	}
+> > +};
+> 
+> After the series is applied, I see only one user of that file. The data
+> structures don't look like they belong here. Same goes for the static
+> inline of the code above.
+> 
 
-Does having a tagged address here makes any difference? I couldn't hit a
-failure with my simple tests (LD_PRELOAD a library that randomly adds
-tags to pointers returned by malloc).
+There is another user coming later (the pwm driver) but I didn't repost,
+I'll do so after this series is applied.
 
-> @@ -647,6 +649,8 @@ static long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
->  	if (!nr_pages)
->  		return 0;
->  
-> +	start = untagged_addr(start);
-> +
->  	VM_BUG_ON(!!pages != !!(gup_flags & FOLL_GET));
->  
->  	/*
-> @@ -801,6 +805,8 @@ int fixup_user_fault(struct task_struct *tsk, struct mm_struct *mm,
->  	struct vm_area_struct *vma;
->  	int ret, major = 0;
->  
-> +	address = untagged_addr(address);
-> +
->  	if (unlocked)
->  		fault_flags |= FAULT_FLAG_ALLOW_RETRY;
->  
-> @@ -854,6 +860,8 @@ static __always_inline long __get_user_pages_locked(struct task_struct *tsk,
->  	long ret, pages_done;
->  	bool lock_dropped;
->  
-> +	start = untagged_addr(start);
-> +
->  	if (locked) {
->  		/* if VM_FAULT_RETRY can be returned, vmas become invalid */
->  		BUG_ON(vmas);
-
-Isn't __get_user_pages() untagging enough to cover this case as well?
-Can this function not cope with tagged pointers?
-
-> @@ -1751,6 +1759,8 @@ int __get_user_pages_fast(unsigned long start, int nr_pages, int write,
->  	unsigned long flags;
->  	int nr = 0;
->  
-> +	start = untagged_addr(start);
-> +
->  	start &= PAGE_MASK;
->  	addr = start;
->  	len = (unsigned long) nr_pages << PAGE_SHIFT;
-> @@ -1803,6 +1813,8 @@ int get_user_pages_fast(unsigned long start, int nr_pages, int write,
->  	unsigned long addr, len, end;
->  	int nr = 0, ret = 0;
->  
-> +	start = untagged_addr(start);
-> +
->  	start &= PAGE_MASK;
->  	addr = start;
->  	len = (unsigned long) nr_pages << PAGE_SHIFT;
-
-Have you hit a problem with the fast gup functions and tagged pointers?
-The page table walking macros (e.g. p*d_index()) should mask the tag out
-already.
+> > +#endif /* __SOC_ATMEL_TCB_H */
+> 
+> Sebastian
 
 -- 
-Catalin
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
