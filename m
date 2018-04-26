@@ -1,47 +1,110 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 26 Apr 2018 08:29:17 -0700
-Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for
- kevin panel
-In-Reply-To: <20180426120528.GA11985@ulmo>
-References: <20180208174855.55620-1-seanpaul@chromium.org>
- <20180208174855.55620-7-seanpaul@chromium.org>
- <CAD=FV=WGU+s015DQbNeWHkpqpHLFz+9AjHKAd0N3HWag0p5FWA@mail.gmail.com>
- <20180426120528.GA11985@ulmo>
-Message-ID: <CAD=FV=U-CL6msCicDhE28huONe0T_ChE+FKZ1CkEJOK=WKryGQ@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 26 Apr 2018 17:29:20 +0200
+Subject: [PATCH RFC PoC 2/2] misc: implement a dummy early platform driver
+In-Reply-To: <20180426152920.21569-1-brgl@bgdev.pl>
+References: <20180426152920.21569-1-brgl@bgdev.pl>
+Message-ID: <20180426152920.21569-3-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-On Thu, Apr 26, 2018 at 5:05 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> If you've got an EDID you should be relying on the EDID to provide the
-> timings. No need to have any timings in the DT in that case.
+Implement a very simple early platform driver. Its purpose is to show
+how such drivers can be registered and to emit a message when probed.
 
-The problem that's specifically trying to be solved by Sean's series
-is when we have to use timings other than the one suggested by the
-EDID.  Specifically:
+It can be then added to the device tree or machine code to verify that
+the early platform devices work as expected.
 
-* On many Rockchip SoCs there is only one "extra" PLL available.  This
-extra PLL can only be used by one of the two displays (eDP for
-internal panel or HDMI/DP for external display).  The other display
-has to use one of the "shared" PLLs in the system.  These PLLs have
-their rate set at boot and aren't changed.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/misc/Kconfig       |  8 +++++++
+ drivers/misc/Makefile      |  1 +
+ drivers/misc/dummy-early.c | 46 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 55 insertions(+)
+ create mode 100644 drivers/misc/dummy-early.c
 
-* In order to provide maximum flexibility to connect external
-displays, we always want the "extra" PLL dedicated to the external
-display port.  Then we can make lots of pixel clocks.
-
-* We work with device and display manufacturers to figure out a pixel
-clock that is achievable with the shared PLLs and that has valid
-timings.  This is the the pixel clock that was used when testing EMI,
-etc.  It is the one that should be used.
-
-* Panel manufacturers agreed that this pixel clock was good to use,
-but we didn't get an updated EDID that suggested this mode.  It's my
-understanding that panels were already available and it didn't really
-make sense to program in an EDID to work around a certain board.
-
-
-
--Doug
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index 5d713008749b..99cde8aefdb0 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -91,6 +91,14 @@ config DUMMY_IRQ
+ 	  The sole purpose of this module is to help with debugging of systems on
+ 	  which spurious IRQs would happen on disabled IRQ vector.
+ 
++config DUMMY_EARLY
++	bool "Dummy early platform driver"
++	select EARLYDEV
++	default n
++	help
++	  This module's only function is to register itself with the early
++	  platform device framework and be probed early in the boot process.
++
+ config IBM_ASM
+ 	tristate "Device driver for IBM RSA service processor"
+ 	depends on X86 && PCI && INPUT
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index 20be70c3f118..84ad0225eb14 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_INTEL_MID_PTI)	+= pti.o
+ obj-$(CONFIG_ATMEL_SSC)		+= atmel-ssc.o
+ obj-$(CONFIG_ATMEL_TCLIB)	+= atmel_tclib.o
+ obj-$(CONFIG_DUMMY_IRQ)		+= dummy-irq.o
++obj-$(CONFIG_DUMMY_EARLY)	+= dummy-early.o
+ obj-$(CONFIG_ICS932S401)	+= ics932s401.o
+ obj-$(CONFIG_LKDTM)		+= lkdtm/
+ obj-$(CONFIG_TIFM_CORE)       	+= tifm_core.o
+diff --git a/drivers/misc/dummy-early.c b/drivers/misc/dummy-early.c
+new file mode 100644
+index 000000000000..f00fb1fbd5fa
+--- /dev/null
++++ b/drivers/misc/dummy-early.c
+@@ -0,0 +1,46 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2018 Texas Instruments
++ *
++ * Author:
++ *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
++ *
++ * Dummy testing driver whose only purpose is to be registered and probed
++ * using the early platform device mechanism.
++ */
++
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/earlydev.h>
++
++static int dummy_early_probe(struct platform_device *pdev)
++{
++	if (earlydev_probing_early())
++		dev_notice(&pdev->dev, "dummy-early driver probed early!\n");
++	else
++		dev_notice(&pdev->dev, "dummy-early driver probed late!\n");
++
++	return 0;
++}
++
++static const struct of_device_id dummy_early_of_match[] = {
++	{ .compatible = "none,dummy-early", },
++	{ },
++};
++
++static struct earlydev_driver dummy_early_driver = {
++	.plat_drv = {
++		.probe = dummy_early_probe,
++		.driver = {
++			.name = "dummy-early",
++			.of_match_table = dummy_early_of_match,
++		},
++	}
++};
++earlydev_platform_driver(dummy_early_driver);
++
++MODULE_AUTHOR("Bartosz Golaszewski <bgolaszewski@baylibre.com>");
++MODULE_DESCRIPTION("Dummy early platform device driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.17.0
