@@ -1,122 +1,49 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 26 Apr 2018 20:52:33 +0200
-Subject: [PATCH v4 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <20180426164623.tlv6kz5yopk6voxx@breakpoint.cc>
-References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
- <20180426164623.tlv6kz5yopk6voxx@breakpoint.cc>
-Message-ID: <20180426185233.GU4813@piout.net>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 26 Apr 2018 13:57:00 -0500
+Subject: [PATCH v8 07/13] drivers: base cacheinfo: Add support for ACPI
+ based firmware tables
+In-Reply-To: <c3306746-aacd-5ed8-95d6-a3186ec2089f@arm.com>
+References: <20180425233121.13270-1-jeremy.linton@arm.com>
+ <20180425233121.13270-8-jeremy.linton@arm.com>
+ <c3306746-aacd-5ed8-95d6-a3186ec2089f@arm.com>
+Message-ID: <48bd3299-a95a-8aa6-524d-b3aa01dd9ef2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/2018 18:46:23+0200, Sebastian Andrzej Siewior wrote:
-> On 2018-04-18 12:51:37 [+0200], Alexandre Belloni wrote:
-> > Hi,
+Hi,
+
+On 04/26/2018 06:05 AM, Sudeep Holla wrote:
 > 
-> Hi,
 > 
-> please keep on Cc if you intend to repost this.
+> On 26/04/18 00:31, Jeremy Linton wrote:
+>> Call ACPI cache parsing routines from base cacheinfo code if ACPI
+>> is enable. Also stub out cache_setup_acpi() so that individual
+>> architectures can enable ACPI topology parsing.
+>>
 > 
-
-Sure, I'll do.
-
-> > This series gets back on the TCB drivers rework. It introduces a new driver to
-> > handle the clocksource and clockevent devices.
+> [...]
 > 
-> So you don't want the old thing we have in -RT. I remember you (the
-> atmel folks) wanted something different the last time I posted the
-> patches.
+>> +#ifndef CONFIG_ACPI
+>> +static inline int acpi_find_last_cache_level(unsigned int cpu)
+>> +{
+>> +	/* ACPI kernels should be built with PPTT support */
 > 
-
-I don't remember you posted anything for the TCB. Wasn't it focused on
-getting rid of the PIT irq?
-
-As said below, this is solving multiple issues, including the one for
-SoCs that don't have the PIT.
-
-> > As a reminder, this is necessary because:
-> >  - the current tcb_clksrc driver is probed too late to be able to be used at
-> >    boot and we now have SoCs that don't have a PIT. They currently are not able
-> >    to boot a mainline kernel.
-> >  - using the PIT doesn't work well with preempt-rt because its interrupt is
-> >    shared (in particular with the UART and their interrupt flags are
-> >    incompatible)
+> This sounds incorrect for x86. But I understand why you have it there.
+> Does it makes sense to change above to .. ?
 > 
-> If you could get rid of this:
-> | clocksource: Switched to clocksource timer at f0010000:0
-> | BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:974
-> | in_atomic(): 1, irqs_disabled(): 128, pid: 1, name: swapper
-> | Preemption disabled at:
-> | [<c014f7ac>] __handle_domain_irq+0x40/0xdc
-> | Hardware name: Atmel SAMA5
-> | [<c010e14c>] (unwind_backtrace) from [<c010bd74>] (show_stack+0x10/0x14)
-> | [<c010bd74>] (show_stack) from [<c013b314>] (___might_sleep+0x16c/0x1c0)
-> | [<c013b314>] (___might_sleep) from [<c06696f0>] (rt_spin_lock+0x40/0x80)
-> | [<c06696f0>] (rt_spin_lock) from [<c046e030>] (clk_enable_lock+0x30/0xe4)
-> | [<c046e030>] (clk_enable_lock) from [<c046ea4c>] (clk_core_disable_lock+0xc/0x1c)
-> | [<c046ea4c>] (clk_core_disable_lock) from [<c059d07c>] (tc_clkevt2_shutdown+0x64/0x6c)
-> | [<c059d07c>] (tc_clkevt2_shutdown) from [<c059d09c>] (tc_clkevt2_set_oneshot+0x18/0x78)
-> | [<c059d09c>] (tc_clkevt2_set_oneshot) from [<c0172a00>] (clockevents_switch_state+0xb8/0x130)
-> | [<c0172a00>] (clockevents_switch_state) from [<c0173a60>] (tick_switch_to_oneshot+0x48/0xb8)
-> | [<c0173a60>] (tick_switch_to_oneshot) from [<c0165a0c>] (hrtimer_run_queues+0xf0/0x15c)
-> | [<c0165a0c>] (hrtimer_run_queues) from [<c0164010>] (run_local_timers+0x8/0x38)
-> | [<c0164010>] (run_local_timers) from [<c0164070>] (update_process_times+0x30/0x60)
-> | [<c0164070>] (update_process_times) from [<c0173008>] (tick_handle_periodic+0x1c/0x90)
-> | [<c0173008>] (tick_handle_periodic) from [<c059c954>] (tc_clkevt2_irq+0x38/0x48)
-> | [<c059c954>] (tc_clkevt2_irq) from [<c014fe6c>] (__handle_irq_event_percpu+0x7c/0x28c)
+> #if !defined(CONFIG_ACPI) || (defined(CONFIG_ACPI) && !(CONFIG_ACPI_PPTT))
 > 
-> that would be so awesome.
-> 
+I'm not sure what that buys us, if anything you want more non-users of 
+the function to be falling through to the function prototype rather than 
+the static inline. The only place any of this matters (as long as the 
+compiler/linker is tossing the static inline) is arm64 because its the 
+only arch making a call to acpi_find_last_cache_level(). ACPI_PPTT is 
+also only visible on arm64 at the moment due to being wrapped in a if 
+ARM64 in the Kconfig
 
-Ok, if I understand correctly tc_clkevt2_set_oneshot is called from
-atomic context so it shouldn't call tc_clkevt2_shutdown.
-
-Back in 2016, tglx said:
-"There was an earlier discussion about the clk stuff. Actually the lock
-protecting disable/enable should be made raw, but there was some crap going on
-in some of the clk callbacks which made that impossible. We realy should
-revisit this."
-
-Anyway, I'll try to avoid disabling the clock just to reenable it
-afterwards.
-
-(Actually, I've just checked before sending and I've found your patch,
-I'll do something similar)
-
-> >  - the current solution is wasting some TCB channels
-> > 
-> > The plan is to get this driver upstream, then convert the TCB PWM driver to be
-> > able to get rid of the tcb_clksrc driver along with atmel_tclib.
-> 
-> The config options are now less than optimal (for me at least). On
-> oldconfig it asks you for PIT and I say selected no because I wanted the
-> new one. So I end up with nothing.
-> Not sure you want do something about it?
-> 
-
-I don't think you ending up with nothing but probably you removed the
-PIT and kept ATMEL_TCLIB which is the combination that is really
-difficult to protect from. I don't think it is worth the added Kconfig
-complexity.
-
-> Is the resolution more or the same compared what we have in -RT? On an
-> idle system this clocks goes up to 180us/ 190us while the old clock
-> started at 160us and moved to around 180us after one hackbench
-> invocation. This could be nothing, it could be a lower frequency of the
-> clockevents device.
-> 
-
-The driver shouldn't change anything on that side.
-
-> If you intend to stick with this driver then I would replace the current
-> hack in -RT with this series.
-> 
-
-That is one of the goal, yes.
-
-The remaining one would be "clocksource: TCLIB: Allow higher clock rates
-for clock events"
-
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Put another way, I wouldn't expect an arch to have a 'user' visible 
+option to enable/disable parsing the PPTT. If an arch can handle 
+ACPI/PPTT topology then I would expect it to be fixed to the CONFIG_ACPI 
+state. What happens when acpi_find_last_cache_level() is called should 
+only be dependent on whether ACPI is enabled, the PPTT parser itself 
+will handle the cases of a missing table.
