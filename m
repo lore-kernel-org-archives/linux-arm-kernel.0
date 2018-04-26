@@ -1,81 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Apr 2018 11:34:17 +0100
-Subject: [PATCH v3 03/14] locking/qspinlock: Bound spinning on pending->locked
- transition in slowpath
-In-Reply-To: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
-References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1524738868-31318-4-git-send-email-will.deacon@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 26 Apr 2018 15:42:42 +0530
+Subject: [PATCH V3 3/3] cpufreq: add suspend/resume support in Armada
+ 37xx DVFS driver
+In-Reply-To: <201804261439.n2Ff25A0%fengguang.wu@intel.com>
+References: <e98965068836e673ea826e8a03fd01e168fce3ed.1524561482.git.viresh.kumar@linaro.org>
+ <201804261439.n2Ff25A0%fengguang.wu@intel.com>
+Message-ID: <20180426101242.vaqdclizsnohoqr7@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a locker taking the qspinlock slowpath reads a lock value indicating
-that only the pending bit is set, then it will spin whilst the
-concurrent pending->locked transition takes effect.
+On 26-04-18, 17:32, kbuild test robot wrote:
+> Hi Miquel,
+> 
+> I love your patch! Yet something to improve:
+> 
+> [auto build test ERROR on pm/linux-next]
+> [also build test ERROR on v4.17-rc2 next-20180424]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Viresh-Kumar/cpufreq-dt-Allow-platforms-to-provide-suspend-resume-hooks/20180426-101030
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+> config: arm-allmodconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+> reproduce:
+>         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    drivers/cpufreq/armada-37xx-cpufreq.c: In function 'armada37xx_cpufreq_driver_init':
+> >> drivers/cpufreq/armada-37xx-cpufreq.c:268:3: error: label 'put_clk' used but not defined
+>       goto put_clk;
+>       ^~~~
 
-Unfortunately, there is no guarantee that such a transition will ever be
-observed since concurrent lockers could continuously set pending and
-hand over the lock amongst themselves, leading to starvation. Whilst
-this would probably resolve in practice, it means that it is not
-possible to prove liveness properties about the lock and means that lock
-acquisition time is unbounded.
+Fixed, thanks.
 
-Rather than removing the pending->locked spinning from the slowpath
-altogether (which has been shown to heavily penalise a 2-threaded
-locking stress test on x86), this patch replaces the explicit spinning
-with a call to atomic_cond_read_relaxed and allows the architecture to
-provide a bound on the number of spins. For architectures that can
-respond to changes in cacheline state in their smp_cond_load implementation,
-it should be sufficient to use the default bound of 1.
-
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Suggested-by: Waiman Long <longman@redhat.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- kernel/locking/qspinlock.c | 20 +++++++++++++++++---
- 1 file changed, 17 insertions(+), 3 deletions(-)
-
-diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
-index f5b0e59f6d14..a0f7976348f8 100644
---- a/kernel/locking/qspinlock.c
-+++ b/kernel/locking/qspinlock.c
-@@ -77,6 +77,18 @@
- #endif
- 
- /*
-+ * The pending bit spinning loop count.
-+ * This heuristic is used to limit the number of lockword accesses
-+ * made by atomic_cond_read_relaxed when waiting for the lock to
-+ * transition out of the "== _Q_PENDING_VAL" state. We don't spin
-+ * indefinitely because there's no guarantee that we'll make forward
-+ * progress.
-+ */
-+#ifndef _Q_PENDING_LOOPS
-+#define _Q_PENDING_LOOPS	1
-+#endif
-+
-+/*
-  * Per-CPU queue node structures; we can never have more than 4 nested
-  * contexts: task, softirq, hardirq, nmi.
-  *
-@@ -266,13 +278,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 		return;
- 
- 	/*
--	 * wait for in-progress pending->locked hand-overs
-+	 * Wait for in-progress pending->locked hand-overs with a bounded
-+	 * number of spins so that we guarantee forward progress.
- 	 *
- 	 * 0,1,0 -> 0,0,1
- 	 */
- 	if (val == _Q_PENDING_VAL) {
--		while ((val = atomic_read(&lock->val)) == _Q_PENDING_VAL)
--			cpu_relax();
-+		int cnt = _Q_PENDING_LOOPS;
-+		val = atomic_cond_read_relaxed(&lock->val,
-+					       (VAL != _Q_PENDING_VAL) || !cnt--);
- 	}
- 
- 	/*
 -- 
-2.1.4
+viresh
