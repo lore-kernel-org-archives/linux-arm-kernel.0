@@ -1,63 +1,79 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Thu, 26 Apr 2018 03:06:15 +0000
-Subject: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
- max7310 support
-In-Reply-To: <CAOMZO5Dm6rcEe=zAJ9_nqKce3g2tdyWPqb=Uv-N5nfc_96jc-g@mail.gmail.com>
-References: <1524634571-5914-1-git-send-email-Anson.Huang@nxp.com>
- <1524634571-5914-3-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5Dm6rcEe=zAJ9_nqKce3g2tdyWPqb=Uv-N5nfc_96jc-g@mail.gmail.com>
-Message-ID: <AM3PR04MB13150654494B8D251988F76CF58E0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 26 Apr 2018 11:46:13 +0800
+Subject: [PATCH 10/11] of: platform: provide of_early_platform_probe()
+In-Reply-To: <20180424173051.15099-11-brgl@bgdev.pl>
+References: <20180424173051.15099-11-brgl@bgdev.pl>
+Message-ID: <201804261118.s6yOi7MR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio
+Hi Bartosz,
 
-Anson Huang
-Best Regards!
+I love your patch! Yet something to improve:
 
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.17-rc2]
+[cannot apply to next-20180424]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Thursday, April 26, 2018 5:46 AM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
-> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Russell King - ARM Linux <linux@armlinux.org.uk>; dl-linux-imx
-> <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC ARM
-> ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
-> FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
-> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
-> max7310 support
-> 
-> On Wed, Apr 25, 2018 at 2:36 AM, Anson Huang <Anson.Huang@nxp.com>
-> wrote:
-> 
-> > +&i2c3 {
-> > +       clock-frequency = <100000>;
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_i2c3_2>;
-> > +       status = "okay";
-> > +
-> > +       max7310_a: gpio at 30 {
-> > +               compatible = "maxim,max7310";
-> > +               reg = <0x30>;
-> > +               gpio-controller;
-> > +               #gpio-cells = <2>;
-> > +       };
-> > +
-> > +       max7310_b: gpio at 32 {
-> > +               compatible = "maxim,max7310";
-> > +               reg = <0x32>;
-> > +               gpio-controller;
-> > +               #gpio-cells = <2>;
-> > +       };
-> 
-> Please also add the users for the MAX7310 pins, such as Ethernet PHY.
- 
-MAX7310 pins are for PCIe, CAN, MLB. GPS etc., these modules are NOT enabled yet, so
-I can NOT test it, I think we should add MAX7310 users when these modules are enabled,
-ethernet PHY is NOT controlled by it.
+url:    https://github.com/0day-ci/linux/commits/Bartosz-Golaszewski/platform-device-tree-support-for-early-platform-drivers/20180426-003135
+config: i386-randconfig-x015-201816 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Anson.
+All errors (new ones prefixed by >>):
+
+   In file included from arch/x86/kernel/devicetree.c:12:0:
+>> include/linux/of_platform.h:94:20: error: two or more data types in declaration specifiers
+    static inline void int of_early_platform_probe(void) {}
+                       ^~~
+
+vim +94 include/linux/of_platform.h
+
+    63	
+    64	/* Platform devices and busses creation */
+    65	extern struct platform_device *of_platform_device_create(struct device_node *np,
+    66							   const char *bus_id,
+    67							   struct device *parent);
+    68	
+    69	extern int of_platform_device_destroy(struct device *dev, void *data);
+    70	extern int of_platform_bus_probe(struct device_node *root,
+    71					 const struct of_device_id *matches,
+    72					 struct device *parent);
+    73	#ifdef CONFIG_OF_ADDRESS
+    74	extern int of_platform_populate(struct device_node *root,
+    75					const struct of_device_id *matches,
+    76					const struct of_dev_auxdata *lookup,
+    77					struct device *parent);
+    78	
+    79	#ifdef CONFIG_EARLY_PLATFORM_DEVICES
+    80	extern int of_early_platform_populate(struct device_node *root,
+    81					      const struct of_device_id *matches,
+    82					      const struct of_dev_auxdata *lookup,
+    83					      struct device *parent);
+    84	extern int of_early_platform_probe(void);
+    85	#else /* CONFIG_EARLY_PLATFORM_DEVICES */
+    86	static inline int
+    87	of_early_platform_populate(struct device_node *root,
+    88				   const struct of_device_id *matches,
+    89				   const struct of_dev_auxdata *lookup,
+    90				   struct device *parent)
+    91	{
+    92		return -ENOSYS;
+    93	}
+  > 94	static inline void int of_early_platform_probe(void) {}
+    95	#endif /* CONFIG_EARLY_PLATFORM_DEVICES */
+    96	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 24971 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180426/af3b99d0/attachment-0001.gz>
