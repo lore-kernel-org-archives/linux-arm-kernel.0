@@ -1,114 +1,176 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 26 Apr 2018 14:41:03 +0200
-Subject: [PATCH v2 1/5] drm/nouveau: tegra: Detach from ARM DMA/IOMMU
- mapping
-In-Reply-To: <20180425152849.GA2447@jcrouse-lnx.qualcomm.com>
-References: <20180425101051.15349-1-thierry.reding@gmail.com>
- <20180425152849.GA2447@jcrouse-lnx.qualcomm.com>
-Message-ID: <20180426124103.GF11985@ulmo>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Apr 2018 14:48:13 +0200
+Subject: [PATCH 2/5] pinctrl: Add STMFX GPIO expander Pinctrl/GPIO driver
+In-Reply-To: <1523440025-18077-3-git-send-email-amelie.delaunay@st.com>
+References: <1523440025-18077-1-git-send-email-amelie.delaunay@st.com>
+ <1523440025-18077-3-git-send-email-amelie.delaunay@st.com>
+Message-ID: <CACRpkdb-=QU74-MZxMdB6QPqMLZr97WxN80iyOoTFqXPicL75w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 09:28:49AM -0600, Jordan Crouse wrote:
-> On Wed, Apr 25, 2018 at 12:10:47PM +0200, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > Depending on the kernel configuration, early ARM architecture setup code
-> > may have attached the GPU to a DMA/IOMMU mapping that transparently uses
-> > the IOMMU to back the DMA API. Tegra requires special handling for IOMMU
-> > backed buffers (a special bit in the GPU's MMU page tables indicates the
-> > memory path to take: via the SMMU or directly to the memory controller).
-> > Transparently backing DMA memory with an IOMMU prevents Nouveau from
-> > properly handling such memory accesses and causes memory access faults.
-> > 
-> > As a side-note: buffers other than those allocated in instance memory
-> > don't need to be physically contiguous from the GPU's perspective since
-> > the GPU can map them into contiguous buffers using its own MMU. Mapping
-> > these buffers through the IOMMU is unnecessary and will even lead to
-> > performance degradation because of the additional translation.
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> > I had already sent this out independently to fix a regression that was
-> > introduced in v4.16, but then Christoph pointed out that it should've
-> > been sent to a wider audience and should use a core API rather than
-> > calling into architecture code directly.
-> > 
-> > I've added it to this series for easier reference and to show the need
-> > for the new API.
-> 
-> This is good stuff, I am struggling with something similar on ARM64. One
-> problem that I wasn't able to fully solve cleanly was that for arm-smmu 
-> the SMMU HW resources are not released until the domain itself is destroyed
-> and I never quite figured out a way to swap the default domain cleanly.
-> 
-> This is a problem for the MSM GPU because not only do we run our own IOMMU as
-> you do we also have a hardware dependency to use context bank 0 to
-> asynchronously switch the pagetable during rendering.
-> 
-> I'm not sure if this is a problem you have encountered.
+On Wed, Apr 11, 2018 at 11:47 AM, Amelie Delaunay
+<amelie.delaunay@st.com> wrote:
 
-I don't think I have. Recent chips have similar capabilities, but they
-don't have the restriction to a context bank, as far as I understand.
-Adding Mikko who's had more exposure to this.
+Hi Amelie, thanks for your patch!
 
-> In any event, this code
-> gets us a little bit further down the path and at least there is somebody else
-> out there in the cold dark world that understands my pain. :)
+> This patch adds pinctrl/GPIO driver for STMicroelectronics
+> Multi-Function eXpander (STMFX) GPIO expander.
+> STMFX is an I2C slave controller, offering up to 24 GPIOs.
+> The driver relies on generic pin config interface to configure the GPIOs.
+>
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 
-This doesn't actually fix anything on 64-bit ARM, and oddly enough I
-haven't run into this issue myself on 64-bit ARM either. I think the
-reason is that I haven't tested Nouveau on Tegra186 yet, which is the
-first SoC which has an ARM SMMU. On prior 64-bit ARM chips we've used
-the custom Tegra SMMU and that driver simply forbids creating any DMA
-domains, so it will allow only explicit usage of the IOMMU API. There
-is code in the generic DMA/IOMMU integration layer to not use the DMA
-API with non-DMA IOMMU domains, but that's not true on 32-bit ARM,
-unfortunately. It's entirely possible that Tegra186 will show exactly
-the same problem that you are describing.
+This is looking very good.
 
-We do use the IOMMU API explicitly in the Tegra DRM driver as well,
-and that is something that I've tested on Tegra186 and that I know to
-be working. However, the reason why it works there is that the IOMMU
-group will contain multiple display controllers, which will again
-trigger a special case that will prevent the DMA/IOMMU integration
-from setting up a DMA domain for use with those devices.
+The overall architecture of this patch set is excellent.
 
-> For your interest, here was my half-hearted attempt to avoid creating DMA
-> domains in the first place based on a blacklist to try to spur a bit of
-> discussion: https://patchwork.freedesktop.org/series/41573/
+I have only one major question about whether this should be
+a MFD parent and GPIO-pinctrl-child split driver, see below.
 
-This looks very interesting and simple, but I can imagine that it will
-see significant pushback from the ARM SMMU maintainers (if not complete
-silence), because it adds SoC-specific knowledge to an otherwise fully
-generic driver. Having the GPU driver explicitly detach from the IOMMU
-domain sounds like a better option, but I don't see how that would help
-with the context bank issue that you're seeing.
+> +config PINCTRL_STMFX
+> +       tristate "STMicroelectronics STMFX I2C GPIO expander pinctrl driver"
+> +       depends on GPIOLIB && I2C=y
+> +       select GENERIC_PINCONF
+> +       select GPIOLIB_IRQCHIP
+> +       select REGMAP_I2C
 
-One other possibility that I can imagine is to add something to struct
-device that could be used by arch_setup_dma_ops() to not attach any of
-the IOMMU-backed DMA operations to the device. Unfortunately that code
-is called before the driver's ->probe() implementation is called, so a
-driver doesn't have an opportunity to set it. Something like
-of_dma_configure() could still set that up, perhaps based on some DT
-property, though I can already hear the NAK from DT maintainers because
-this is, after all, policy, not hardware description.
+Thanks for using all the helpers, it makes the code very small and
+consistent and easy to review and maintain.
 
-The last solution that I can think of that might allow us to do this is
-to add a flag to struct device_driver (bool explicit_iommu?) that will
-be used by the DMA/IOMMU setup code to decide whether or not to attach
-to the IOMMU automatically.
+> +#include <linux/bitfield.h>
+> +#include <linux/gpio.h>
 
-Though, again, I'm not sure that would actually solve your bank problem.
-That's really something I don't see any other solution than to fix it in
-the ARM SMMU driver. Perhaps context bank 0 can always be reserved for
-non-DMA domains?
+Please just use:
+ #include <linux/gpio/driver.h>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180426/86bf02b0/attachment-0001.sig>
+> +static void stmfx_gpio_irq_toggle_trigger(struct stmfx_pinctrl *pctl,
+> +                                         unsigned int offset)
+> +{
+> +       u32 reg = get_reg(offset);
+> +       u32 mask = get_mask(offset);
+> +       int val;
+> +
+> +       if (!(pctl->irq_toggle_edge[reg] & mask))
+> +               return;
+> +
+> +       val = stmfx_gpio_get(&pctl->gpio_chip, offset);
+> +       if (val < 0)
+> +               return;
+> +
+> +       if (val) {
+> +               pctl->irq_gpi_type[reg] &= mask;
+> +               regmap_write_bits(pctl->regmap, STMFX_REG_IRQ_GPI_TYPE + reg,
+> +                                 get_mask(offset), 0);
+> +
+> +       } else {
+> +               pctl->irq_gpi_type[reg] |= mask;
+> +               regmap_write_bits(pctl->regmap, STMFX_REG_IRQ_GPI_TYPE + reg,
+> +                                 get_mask(offset), get_mask(offset));
+> +       }
+> +}
+
+We had a bit of discussion about edge trigger emulation on the
+mailing list. Strange that these HW engineers didn't think of this,
+I thought it was widely known that double-edge trigger (not just one
+or the other) is needed in contemporary GPIO HW.
+
+> +       if (!of_find_property(np, "gpio-ranges", NULL)) {
+> +               ret = gpiochip_add_pin_range(&pctl->gpio_chip,
+> +                                            dev_name(pctl->dev),
+> +                                            0, 0, pctl->pctl_desc.npins);
+> +               if (ret)
+> +                       return ret;
+
+Do you really need to support DTBs without gpio-ranges?
+
+I.e. can't you just print an error and exit if there is no range?
+
+I think other drivers has this handling because of older
+DT bindings and trees drifting around.
+
+> +static const struct regmap_config stmfx_regmap_config = {
+> +       .reg_bits = 8,
+> +       .val_bits = 8,
+> +};
+
+This can probably be improved in the future.
+Or are there really exactly 255 registers?
+
+> +static int stmfx_probe(struct i2c_client *client,
+> +                      const struct i2c_device_id *id)
+> +{
+> +       struct device_node *np = client->dev.of_node, *child;
+> +       struct stmfx *stmfx;
+> +       int ret;
+> +
+> +       stmfx = devm_kzalloc(&client->dev, sizeof(*stmfx), GFP_KERNEL);
+> +       if (!stmfx)
+> +               return -ENOMEM;
+> +
+> +       i2c_set_clientdata(client, stmfx);
+> +
+> +       stmfx->dev = &client->dev;
+> +
+> +       stmfx->regmap = devm_regmap_init_i2c(client, &stmfx_regmap_config);
+> +       if (IS_ERR(stmfx->regmap)) {
+> +               ret = PTR_ERR(stmfx->regmap);
+> +               dev_err(stmfx->dev,
+> +                       "Failed to allocate register map: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       ret = stmfx_chip_init(stmfx, client);
+> +       if (ret) {
+> +               if (ret == -ETIMEDOUT)
+> +                       return -EPROBE_DEFER;
+> +               return ret;
+> +       }
+> +
+> +       stmfx->irq = client->irq;
+> +       ret = stmfx_irq_init(stmfx);
+> +       if (ret)
+> +               return ret;
+> +
+> +       for_each_available_child_of_node(np, child) {
+> +               if (of_property_read_bool(child, "gpio-controller")) {
+> +                       ret = stmfx_gpio_init(stmfx, child);
+> +                       if (ret)
+> +                               goto err;
+> +               }
+> +       }
+
+Hm so you do not use a MFD driver for the core of the driver?
+
+Instead this driver becomes the core driver?
+
+I guess it is fine as long as the chip is only doing GPIO
+and pin control. If the chip has more abilities (such as PWM,
+LED...) then the core should be an MFD driver that spawns
+GPIO/pinctrl driver as a child, then this child looks up the
+regmap from the parent MFD driver.
+
+See for example how the simple STw481x driver does things:
+drivers/mfd/stw481x.c
+drivers/regulator/stw481x-vmmc.c
+
+This MFD has no GPIO/pin control but it illustrates a simple
+parent/child instantiation with an MFD core driver.
+
+It has this DTS entry:
+
+                stw4811 at 2d {
+                        compatible = "st,stw4811";
+                        reg = <0x2d>;
+                        vmmc_regulator: vmmc {
+                                compatible = "st,stw481x-vmmc";
+                                regulator-name = "VMMC";
+                                regulator-min-microvolt = <1800000>;
+                                regulator-max-microvolt = <3300000>;
+                        };
+                };
+
+The MFD driver matches and spawns the VMMC child
+then that driver mathes to the vmmc node.
+
+Yours,
+Linus Walleij
