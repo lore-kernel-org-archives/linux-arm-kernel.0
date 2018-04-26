@@ -1,23 +1,64 @@
-From: andi@etezian.org (andi at etezian.org)
-Date: Thu, 26 Apr 2018 13:35:03 +0900
-Subject: [RFC 08/10] spi: s3c64xx: samsung: Remove support for Exynos5440
-In-Reply-To: <20180424203239.21885-9-krzk@kernel.org>
-References: <20180424203239.21885-1-krzk@kernel.org>
- <20180424203239.21885-9-krzk@kernel.org>
-Message-ID: <f47ea49afb9301d33383143056ed11a7@etezian.org>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Thu, 26 Apr 2018 12:49:29 +0800
+Subject: [PATCH] iommu/io-pgtable-arm: Use for_each_set_bit to simplify code
+Message-ID: <20180426044929.16896-1-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+We can use for_each_set_bit() to simplify code slightly in the
+ARM io-pgtable self tests while unmapping.
 
-On 25.04.2018 05:32, Krzysztof Kozlowski wrote:
-> The Exynos5440 is not actively developed, there are no development
-> boards available and probably there are no real products with it.
-> Remove wide-tree support for Exynos5440.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+---
+ drivers/iommu/io-pgtable-arm-v7s.c | 5 +----
+ drivers/iommu/io-pgtable-arm.c     | 5 +----
+ 2 files changed, 2 insertions(+), 8 deletions(-)
 
-Reviewed-by: Andi Shyti <andi@etezian.org>
-
-Thanks,
-Andi
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index 10e4a3d..50e3a9f 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -898,8 +898,7 @@ static int __init arm_v7s_do_selftests(void)
+ 
+ 	/* Full unmap */
+ 	iova = 0;
+-	i = find_first_bit(&cfg.pgsize_bitmap, BITS_PER_LONG);
+-	while (i != BITS_PER_LONG) {
++	for_each_set_bit(i, &cfg.pgsize_bitmap, BITS_PER_LONG) {
+ 		size = 1UL << i;
+ 
+ 		if (ops->unmap(ops, iova, size) != size)
+@@ -916,8 +915,6 @@ static int __init arm_v7s_do_selftests(void)
+ 			return __FAIL(ops);
+ 
+ 		iova += SZ_16M;
+-		i++;
+-		i = find_next_bit(&cfg.pgsize_bitmap, BITS_PER_LONG, i);
+ 	}
+ 
+ 	free_io_pgtable_ops(ops);
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 39c2a05..4ffdd88 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -1120,8 +1120,7 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
+ 
+ 		/* Full unmap */
+ 		iova = 0;
+-		j = find_first_bit(&cfg->pgsize_bitmap, BITS_PER_LONG);
+-		while (j != BITS_PER_LONG) {
++		for_each_set_bit(j, &cfg->pgsize_bitmap, BITS_PER_LONG) {
+ 			size = 1UL << j;
+ 
+ 			if (ops->unmap(ops, iova, size) != size)
+@@ -1138,8 +1137,6 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
+ 				return __FAIL(ops, i);
+ 
+ 			iova += SZ_1G;
+-			j++;
+-			j = find_next_bit(&cfg->pgsize_bitmap, BITS_PER_LONG, j);
+ 		}
+ 
+ 		free_io_pgtable_ops(ops);
+-- 
+2.7.0
