@@ -1,66 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Apr 2018 12:29:49 +0200
-Subject: [PATCH 08/10] arm64: dts: renesas: r8a7795: Add address properties to
- rcar_sound port nodes
+Date: Thu, 26 Apr 2018 12:29:46 +0200
+Subject: [PATCH 05/10] ARM: dts: alt: Drop unnecessary address properties from
+ vin port node
 In-Reply-To: <20180426102951.8683-1-horms+renesas@verge.net.au>
 References: <20180426102951.8683-1-horms+renesas@verge.net.au>
-Message-ID: <20180426102951.8683-9-horms+renesas@verge.net.au>
+Message-ID: <20180426102951.8683-6-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rcar_sound port nodes have unit names and thus should have register
-properties.
+The vin port node does not have an address and thus does not need
+address-cells or address size-properties.
 
 This is flagged by dtc as follows:
  # make dtbs W=1
- ...
- DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 0: node has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 1: node has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 2: node has a unit name, but no reg property
-  ...
-  DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb
-arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 0: node has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 1: node has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 2: node has a unit name, but no reg property
-  DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb
-arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 0: node has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 1: node has a unit name, but no reg property
-arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 2: node has a unit name, but no reg property
-
-Prior to this patch the port nodes only defined in board DTS files.
-As the register properties are common this patch defines the port nodes
-and provides register properties in the SoC DTS file.
+ arch/arm/boot/dts/r8a7794-alt.dtb: Warning (avoid_unnecessary_addr_size): /soc/video at e6ef0000/port: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/r8a7794-alt.dts | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index b1c52dae4d49..9b080a864ea1 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1711,6 +1711,20 @@
- 					dma-names = "rx", "tx", "rxu", "txu";
- 				};
- 			};
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				port at 0 {
-+					reg = <0>;
-+				};
-+				port at 1 {
-+					reg = <1>;
-+				};
-+				port at 2 {
-+					reg = <2>;
-+				};
-+			};
- 		};
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index 1ecc5b9135f3..c210412f80ec 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -380,9 +380,6 @@
+ 	pinctrl-names = "default";
  
- 		audma0: dma-controller at ec700000 {
+ 	port {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+ 		vin0ep: endpoint {
+ 			remote-endpoint = <&adv7180>;
+ 			bus-width = <8>;
 -- 
 2.11.0
