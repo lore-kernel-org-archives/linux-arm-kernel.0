@@ -1,51 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Apr 2018 16:57:18 +0200
-Subject: [PATCH v2] ARM: defconfig: Update Gemini defconfig
-In-Reply-To: <20180420090044.17036-1-linus.walleij@linaro.org>
-References: <20180420090044.17036-1-linus.walleij@linaro.org>
-Message-ID: <CAK8P3a1X_hKLo3o1YmkxayncUGbTuTR+HKftmvbCtwQegO7zHw@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 26 Apr 2018 17:06:26 +0200
+Subject: [PATCH] tty/serial: atmel: use port->name as name in request_irq()
+Message-ID: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 11:00 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> This updates the Gemini defconfig with a config that will bring
-> up most of the recently merged and updated devices to some
-> functional level:
->
-> - We enable high resolution timers (the right thing to do)
-> - Enable CMA for the framebuffer, and the new TVE200
->   framebuffer driver and the Ilitek ILI9322 driver for
->   graphics on the D-Link DIR-685. HIGHMEM support comes in
->   as part of this.
-> - Enable networking and the new Cortina Gemini ethernet
->   driver.
-> - Enable MDIO over GPIO and the Realtek PHY devices used on
->   several of these systems.
-> - Enable I2C over GPIO and SPI over GPIO which is used on
->   several of these devices.
-> - Enable the Thermal framework, GPIO fan control and LM75 sensor
->   adding cooling on the D-Link DNS-313 with no userspace
->   involved even if only the kernel is working, rock solid
->   thermal for this platform.
-> - Enable JEDEC flash probing to support the Eon flash chip in
->   D-Link DNS-313.
-> - Enable LED disk triggers for the NAS type devices.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - This update didn't get applied for v4.16 so we gained even
->   more stuff in v4.17
-> - Drop the wireless devices: it is better if people configure
->   those in themselves, and it is also what OpenWRT does.
-> - Drop UHCI and EHCI configs as these may conflict with the
->   SoC intrinsic FTOTG adapter.
->
-> ARM SoC folks: please apply this for fixes.
+I was puzzled while looking at /proc/interrupts and random things showed
+up between reboots. This occurred more often but I realised it later. The
+"correct" output should be:
+|38:      11861  atmel-aic5   2 Level     ttyS0
 
-I've applied it to the fixes branch now, but I don't see why I didn't
-get the patch before the merge window when you already
-had a version for the v4.16 window.
+but I saw sometimes
+|38:       6426  atmel-aic5   2 Level     tty1
 
-       Arnd
+and I accounted it wrongly as correct. This is use after free and the
+former example randomly got the "old" pointer which pointed to the same
+content. With SLAB_FREELIST_RANDOM and HARDENED I even got
+|38:       7067  atmel-aic5   2 Level     E=Started User Manager for UID 0
+
+or other nonsense.
+As it turns out the tty, pointer that is accessed in atmel_startup(), is
+freed() before atmel_shutdown(). It seems to happen quite often that the
+tty for ttyS0 is allocated and freed while ->shutdown is not invoked. I
+don't do anything special - just a systemd boot :)
+
+It seems not to happen in v4.1.51 but it happens in v4.9 and v4.17-rc2
+so if it broke accidentally it was not recently.
+
+Use port->name as the IRQ name for request_irq(). This exists as long as
+the driver is loaded so no use-after-free here.
+
+Cc: stable at vger.kernel.org
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/tty/serial/atmel_serial.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index e287fe8f10fc..d3189816740e 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1757,7 +1757,6 @@ static int atmel_startup(struct uart_port *port)
+ {
+ 	struct platform_device *pdev = to_platform_device(port->dev);
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+-	struct tty_struct *tty = port->state->port.tty;
+ 	int retval;
+ 
+ 	/*
+@@ -1772,8 +1771,7 @@ static int atmel_startup(struct uart_port *port)
+ 	 * Allocate the IRQ
+ 	 */
+ 	retval = request_irq(port->irq, atmel_interrupt,
+-			IRQF_SHARED | IRQF_COND_SUSPEND,
+-			tty ? tty->name : "atmel_serial", port);
++			     IRQF_SHARED | IRQF_COND_SUSPEND, port->name, port);
+ 	if (retval) {
+ 		dev_err(port->dev, "atmel_startup - Can't get irq\n");
+ 		return retval;
+-- 
+2.17.0
