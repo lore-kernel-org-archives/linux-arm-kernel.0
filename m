@@ -1,74 +1,75 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 26 Apr 2018 14:35:10 +0100
-Subject: [PATCH v2 08/17] kvm: arm/arm64: Prepare for VM specific stage2
- translations
-In-Reply-To: <1522156531-28348-9-git-send-email-suzuki.poulose@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <7f67fca2-b936-25d9-0fe8-aece1fadafdc@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 26 Apr 2018 15:35:26 +0200
+Subject: [PATCH] gpio: zynq: Setup chip->base based on alias ID
+In-Reply-To: <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
+References: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
+ <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
+Message-ID: <f9dd4f64-4026-f495-5810-32affb5b0944@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi Linus,
 
-On 27/03/18 14:15, Suzuki K Poulose wrote:
-> Right now the stage2 page table for a VM is hard coded, assuming
-> an IPA of 40bits. As we are about to add support for per VM IPA,
-> prepare the stage2 page table helpers to accept the kvm instance
-> to make the right decision for the VM. No functional changes.
+On 26.4.2018 15:08, Linus Walleij wrote:
+> On Wed, Apr 11, 2018 at 3:55 PM, Michal Simek <michal.simek@xilinx.com> wrote:
 > 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->   arch/arm/include/asm/kvm_arm.h                |   3 +-
->   arch/arm/include/asm/kvm_mmu.h                |  15 +++-
->   arch/arm/include/asm/stage2_pgtable.h         |  42 ++++-----
->   arch/arm64/include/asm/kvm_mmu.h              |   7 +-
->   arch/arm64/include/asm/stage2_pgtable-nopmd.h |  18 ++--
->   arch/arm64/include/asm/stage2_pgtable-nopud.h |  16 ++--
->   arch/arm64/include/asm/stage2_pgtable.h       |  49 ++++++-----
->   virt/kvm/arm/arm.c                            |   2 +-
->   virt/kvm/arm/mmu.c                            | 119 +++++++++++++-------------
->   virt/kvm/arm/vgic/vgic-kvm-device.c           |   2 +-
->   10 files changed, 148 insertions(+), 125 deletions(-)
+> Thanks for your patch!
 > 
-> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-> index 3ab8b37..c3f1f9b 100644
-> --- a/arch/arm/include/asm/kvm_arm.h
-> +++ b/arch/arm/include/asm/kvm_arm.h
-> @@ -133,8 +133,7 @@
->    * space.
->    */
->   #define KVM_PHYS_SHIFT	(40)
-> -#define KVM_PHYS_SIZE	(_AC(1, ULL) << KVM_PHYS_SHIFT)
-> -#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - _AC(1, ULL))
+>> In past Xilinx gpio-zynq driver was setting up gpio chip->base as 0
+>> which was chagned to autodetection when driver was upstreamed. Older
+>> systems, which were using this old version, setup SW stack which expects
+>> zynq gpio base as 0 and right now there is no way how to set this up.
+>>
+>> The patch is adding an option to setup chip->base based on aliases which
+>> is something what some other drivers are doing too.
+>> It means when gpio0 alias is setup then chip->base is 0. When gpio alias
+>> is not setup gpiochip_find_base() set it up properly which is current
+>> behavior.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> 
+> In general, we stopped any controlling of the GPIO base.
 
-I assume you are moving them to kvm_mmu.h in order to match the arm64 
-side, right? If so, would not it make sense to make KVM_PHYS_SHIFT with it?
+I know.
 
-[...]
+> 
+> Also this use would have to be OK with the DT maintainers
+> as I never saw this use of alias before.
 
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 7faed6e..594c4e6 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -134,8 +134,11 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
->    * We currently only support a 40bit IPA.
->    */
->   #define KVM_PHYS_SHIFT	(40)
-> -#define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
-> -#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
-> +
-> +#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
-> +#define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
+If you grep gpio drivers you will see that these gpio-zx, gpio-mvebu,
+gpio-mxc, gpio-mxs, gpio-vf610 are using that.
 
-NIT: is the _AC(...) necessary? It does not look like this function is 
-going to be usable in assembly.
+> 
+> Please describe the use case for this.
+> 
+> The only use case which I can think about is userspace sysfs
+> and then I would really like to know why these userspace
+> users cannot use the character device that is nowadays
+> supported by libgpiod and there is even patches for some
+> IoT libraries to use it. The character device makes the
+> GPIO Linux "base" irrelevant for userspace.
+> 
+> GPIO sysfs is deprecated and moved to the obsolete ABI.
+> 
+> If there are legacy applications that use this I would have
+> to consider it, but since this has been -1 since the driver
+> was merged I find that unlikely.
 
-> +#define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
+Yes, it is about legacy application which I have seen recently and there
+is no source code for application calls it because board vendor doesn't
+provide it.
 
-Same here.
+You are right that -1 was used from the beginning in mainline but
+unfortunately this driver was in vendor tree for a while and it uses 0
+there.
 
--- 
-Julien Grall
+In upstreaming this was changed to -1 but customers have a lot of code
+which developed against vendor tree and they want to use
+latest&greatest. And without this they are not able to run that
+applications.
+
+I found that this logic is already in 5 drivers in mainline that's why I
+send this patch to be +1.
+
+Thanks,
+Michal
