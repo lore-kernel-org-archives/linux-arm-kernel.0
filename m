@@ -1,167 +1,115 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 26 Apr 2018 13:45:21 +0300
-Subject: [PATCH 2/2] arm64: dts: renesas: r8a77980: use SYSC power domain
- macros
-In-Reply-To: <ea6d3e8a-71a9-9998-f364-7dc82b97c2c0@cogentembedded.com>
-References: <ea6d3e8a-71a9-9998-f364-7dc82b97c2c0@cogentembedded.com>
-Message-ID: <df17ca8f-7942-3cdb-04d5-5d73e0259be5@cogentembedded.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Apr 2018 11:34:15 +0100
+Subject: [PATCH v3 01/14] barriers: Introduce smp_cond_load_relaxed and
+ atomic_cond_read_relaxed
+In-Reply-To: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
+References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1524738868-31318-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the commit 7755b40d07a8 ("dt-bindings: power: add R8A77980 SYSC
-power domain definitions") has hit Linus' tree, we can replace  the bare
-numbers (we had to use to avoid a cross tree dependency) with these macro
-definitions...
+Whilst we currently provide smp_cond_load_acquire and
+atomic_cond_read_acquire, there are cases where the ACQUIRE semantics are
+not required because of a subsequent fence or release operation once the
+conditional loop has exited.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+This patch adds relaxed versions of the conditional spinning primitives
+to avoid unnecessary barrier overhead on architectures such as arm64.
 
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/boot/dts/renesas/r8a77980.dtsi |   31 +++++++++++++++---------------
- 1 file changed, 16 insertions(+), 15 deletions(-)
+ include/asm-generic/atomic-long.h |  2 ++
+ include/asm-generic/barrier.h     | 27 +++++++++++++++++++++------
+ include/linux/atomic.h            |  2 ++
+ 3 files changed, 25 insertions(+), 6 deletions(-)
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -9,6 +9,7 @@
- #include <dt-bindings/clock/r8a77980-cpg-mssr.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/power/r8a77980-sysc.h>
+diff --git a/include/asm-generic/atomic-long.h b/include/asm-generic/atomic-long.h
+index 34a028a7bcc5..5b2b0b5ea06d 100644
+--- a/include/asm-generic/atomic-long.h
++++ b/include/asm-generic/atomic-long.h
+@@ -244,6 +244,8 @@ static inline long atomic_long_add_unless(atomic_long_t *l, long a, long u)
+ #define atomic_long_inc_not_zero(l) \
+ 	ATOMIC_LONG_PFX(_inc_not_zero)((ATOMIC_LONG_PFX(_t) *)(l))
  
- / {
- 	compatible = "renesas,r8a77980";
-@@ -24,14 +25,14 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0>;
- 			clocks = <&cpg CPG_CORE R8A77980_CLK_Z2>;
--			power-domains = <&sysc 5>;
-+			power-domains = <&sysc R8A77980_PD_CA53_CPU0>;
- 			next-level-cache = <&L2_CA53>;
- 			enable-method = "psci";
- 		};
++#define atomic_long_cond_read_relaxed(v, c) \
++	ATOMIC_LONG_PFX(_cond_read_relaxed)((ATOMIC_LONG_PFX(_t) *)(v), (c))
+ #define atomic_long_cond_read_acquire(v, c) \
+ 	ATOMIC_LONG_PFX(_cond_read_acquire)((ATOMIC_LONG_PFX(_t) *)(v), (c))
  
- 		L2_CA53: cache-controller {
- 			compatible = "cache";
--			power-domains = <&sysc 21>;
-+			power-domains = <&sysc R8A77980_PD_CA53_SCU>;
- 			cache-unified;
- 			cache-level = <2>;
- 		};
-@@ -110,7 +111,7 @@
- 			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
- 			       <&dmac2 0x31>, <&dmac2 0x30>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 520>;
- 			status = "disabled";
- 		};
-@@ -128,7 +129,7 @@
- 			dmas = <&dmac1 0x33>, <&dmac1 0x32>,
- 			       <&dmac2 0x33>, <&dmac2 0x32>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 519>;
- 			status = "disabled";
- 		};
-@@ -146,7 +147,7 @@
- 			dmas = <&dmac1 0x35>, <&dmac1 0x34>,
- 			       <&dmac2 0x35>, <&dmac2 0x34>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 518>;
- 			status = "disabled";
- 		};
-@@ -164,7 +165,7 @@
- 			dmas = <&dmac1 0x37>, <&dmac1 0x36>,
- 			       <&dmac2 0x37>, <&dmac2 0x36>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 517>;
- 			status = "disabled";
- 		};
-@@ -206,7 +207,7 @@
- 					  "ch20", "ch21", "ch22", "ch23",
- 					  "ch24";
- 			clocks = <&cpg CPG_MOD 812>;
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 812>;
- 			phy-mode = "rgmii";
- 			#address-cells = <1>;
-@@ -226,7 +227,7 @@
- 			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
- 			       <&dmac2 0x51>, <&dmac2 0x50>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 207>;
- 			status = "disabled";
- 		};
-@@ -244,7 +245,7 @@
- 			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
- 			       <&dmac2 0x53>, <&dmac2 0x52>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 206>;
- 			status = "disabled";
- 		};
-@@ -262,7 +263,7 @@
- 			dmas = <&dmac1 0x57>, <&dmac1 0x56>,
- 			       <&dmac2 0x57>, <&dmac2 0x56>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 204>;
- 			status = "disabled";
- 		};
-@@ -280,7 +281,7 @@
- 			dmas = <&dmac1 0x59>, <&dmac1 0x58>,
- 			       <&dmac2 0x59>, <&dmac2 0x58>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 203>;
- 			status = "disabled";
- 		};
-@@ -313,7 +314,7 @@
- 					  "ch12", "ch13", "ch14", "ch15";
- 			clocks = <&cpg CPG_MOD 218>;
- 			clock-names = "fck";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 218>;
- 			#dma-cells = <1>;
- 			dma-channels = <16>;
-@@ -347,7 +348,7 @@
- 					  "ch12", "ch13", "ch14", "ch15";
- 			clocks = <&cpg CPG_MOD 217>;
- 			clock-names = "fck";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 217>;
- 			#dma-cells = <1>;
- 			dma-channels = <16>;
-@@ -359,7 +360,7 @@
- 			reg = <0 0xee140000 0 0x2000>;
- 			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 314>;
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 314>;
- 			max-frequency = <200000000>;
- 			status = "disabled";
-@@ -378,7 +379,7 @@
- 				      IRQ_TYPE_LEVEL_HIGH)>;
- 			clocks = <&cpg CPG_MOD 408>;
- 			clock-names = "clk";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 408>;
- 		};
+diff --git a/include/asm-generic/barrier.h b/include/asm-generic/barrier.h
+index 29458bbb2fa0..2cafdbb9ae4c 100644
+--- a/include/asm-generic/barrier.h
++++ b/include/asm-generic/barrier.h
+@@ -221,18 +221,17 @@ do {									\
+ #endif
  
+ /**
+- * smp_cond_load_acquire() - (Spin) wait for cond with ACQUIRE ordering
++ * smp_cond_load_relaxed() - (Spin) wait for cond with no ordering guarantees
+  * @ptr: pointer to the variable to wait on
+  * @cond: boolean expression to wait for
+  *
+- * Equivalent to using smp_load_acquire() on the condition variable but employs
+- * the control dependency of the wait to reduce the barrier on many platforms.
++ * Equivalent to using READ_ONCE() on the condition variable.
+  *
+  * Due to C lacking lambda expressions we load the value of *ptr into a
+  * pre-named variable @VAL to be used in @cond.
+  */
+-#ifndef smp_cond_load_acquire
+-#define smp_cond_load_acquire(ptr, cond_expr) ({		\
++#ifndef smp_cond_load_relaxed
++#define smp_cond_load_relaxed(ptr, cond_expr) ({		\
+ 	typeof(ptr) __PTR = (ptr);				\
+ 	typeof(*ptr) VAL;					\
+ 	for (;;) {						\
+@@ -241,10 +240,26 @@ do {									\
+ 			break;					\
+ 		cpu_relax();					\
+ 	}							\
+-	smp_acquire__after_ctrl_dep();				\
+ 	VAL;							\
+ })
+ #endif
+ 
++/**
++ * smp_cond_load_acquire() - (Spin) wait for cond with ACQUIRE ordering
++ * @ptr: pointer to the variable to wait on
++ * @cond: boolean expression to wait for
++ *
++ * Equivalent to using smp_load_acquire() on the condition variable but employs
++ * the control dependency of the wait to reduce the barrier on many platforms.
++ */
++#ifndef smp_cond_load_acquire
++#define smp_cond_load_acquire(ptr, cond_expr) ({		\
++	typeof(*ptr) _val;					\
++	_val = smp_cond_load_relaxed(ptr, cond_expr);		\
++	smp_acquire__after_ctrl_dep();				\
++	_val;							\
++})
++#endif
++
+ #endif /* !__ASSEMBLY__ */
+ #endif /* __ASM_GENERIC_BARRIER_H */
+diff --git a/include/linux/atomic.h b/include/linux/atomic.h
+index 8b276fd9a127..01ce3997cb42 100644
+--- a/include/linux/atomic.h
++++ b/include/linux/atomic.h
+@@ -654,6 +654,7 @@ static inline int atomic_dec_if_positive(atomic_t *v)
+ }
+ #endif
+ 
++#define atomic_cond_read_relaxed(v, c)	smp_cond_load_relaxed(&(v)->counter, (c))
+ #define atomic_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
+ 
+ #ifdef CONFIG_GENERIC_ATOMIC64
+@@ -1075,6 +1076,7 @@ static inline long long atomic64_fetch_andnot_release(long long i, atomic64_t *v
+ }
+ #endif
+ 
++#define atomic64_cond_read_relaxed(v, c)	smp_cond_load_relaxed(&(v)->counter, (c))
+ #define atomic64_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
+ 
+ #include <asm-generic/atomic-long.h>
+-- 
+2.1.4
