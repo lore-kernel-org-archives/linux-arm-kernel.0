@@ -1,76 +1,93 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 26 Apr 2018 18:46:23 +0200
-Subject: [PATCH v4 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
-References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180426164623.tlv6kz5yopk6voxx@breakpoint.cc>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 26 Apr 2018 17:46:26 +0100
+Subject: [linux-sunxi] [PATCH 3/3] arm64: allwinner: h6: enable MMC0/2 on
+ Pine H64
+In-Reply-To: <20180426140728.43155-4-icenowy@aosc.io>
+References: <20180426140728.43155-1-icenowy@aosc.io>
+ <20180426140728.43155-4-icenowy@aosc.io>
+Message-ID: <03cc2e8c-4a35-3fb4-b408-fd8d4ba3e407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-18 12:51:37 [+0200], Alexandre Belloni wrote:
-> Hi,
-
 Hi,
 
-please keep on Cc if you intend to repost this.
-
-> This series gets back on the TCB drivers rework. It introduces a new driver to
-> handle the clocksource and clockevent devices.
-
-So you don't want the old thing we have in -RT. I remember you (the
-atmel folks) wanted something different the last time I posted the
-patches.
-
-> As a reminder, this is necessary because:
->  - the current tcb_clksrc driver is probed too late to be able to be used at
->    boot and we now have SoCs that don't have a PIT. They currently are not able
->    to boot a mainline kernel.
->  - using the PIT doesn't work well with preempt-rt because its interrupt is
->    shared (in particular with the UART and their interrupt flags are
->    incompatible)
-
-If you could get rid of this:
-| clocksource: Switched to clocksource timer at f0010000:0
-| BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:974
-| in_atomic(): 1, irqs_disabled(): 128, pid: 1, name: swapper
-| Preemption disabled at:
-| [<c014f7ac>] __handle_domain_irq+0x40/0xdc
-| Hardware name: Atmel SAMA5
-| [<c010e14c>] (unwind_backtrace) from [<c010bd74>] (show_stack+0x10/0x14)
-| [<c010bd74>] (show_stack) from [<c013b314>] (___might_sleep+0x16c/0x1c0)
-| [<c013b314>] (___might_sleep) from [<c06696f0>] (rt_spin_lock+0x40/0x80)
-| [<c06696f0>] (rt_spin_lock) from [<c046e030>] (clk_enable_lock+0x30/0xe4)
-| [<c046e030>] (clk_enable_lock) from [<c046ea4c>] (clk_core_disable_lock+0xc/0x1c)
-| [<c046ea4c>] (clk_core_disable_lock) from [<c059d07c>] (tc_clkevt2_shutdown+0x64/0x6c)
-| [<c059d07c>] (tc_clkevt2_shutdown) from [<c059d09c>] (tc_clkevt2_set_oneshot+0x18/0x78)
-| [<c059d09c>] (tc_clkevt2_set_oneshot) from [<c0172a00>] (clockevents_switch_state+0xb8/0x130)
-| [<c0172a00>] (clockevents_switch_state) from [<c0173a60>] (tick_switch_to_oneshot+0x48/0xb8)
-| [<c0173a60>] (tick_switch_to_oneshot) from [<c0165a0c>] (hrtimer_run_queues+0xf0/0x15c)
-| [<c0165a0c>] (hrtimer_run_queues) from [<c0164010>] (run_local_timers+0x8/0x38)
-| [<c0164010>] (run_local_timers) from [<c0164070>] (update_process_times+0x30/0x60)
-| [<c0164070>] (update_process_times) from [<c0173008>] (tick_handle_periodic+0x1c/0x90)
-| [<c0173008>] (tick_handle_periodic) from [<c059c954>] (tc_clkevt2_irq+0x38/0x48)
-| [<c059c954>] (tc_clkevt2_irq) from [<c014fe6c>] (__handle_irq_event_percpu+0x7c/0x28c)
-
-that would be so awesome.
-
->  - the current solution is wasting some TCB channels
+On 26/04/18 15:07, Icenowy Zheng wrote:
+> The Pine H64 board have a MicroSD slot connected to MMC0 controller of
+> the H6 SoC and a eMMC slot connected to MMC2.
 > 
-> The plan is to get this driver upstream, then convert the TCB PWM driver to be
-> able to get rid of the tcb_clksrc driver along with atmel_tclib.
+> Enable them in the device tree.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 32 ++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+> index d36de5eb81f3..78b1cd54687c 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+> @@ -20,6 +20,38 @@
+>  	chosen {
+>  		stdout-path = "serial0:115200n8";
+>  	};
+> +
+> +	reg_vcc3v3: vcc3v3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc3v3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	reg_vcc1v8: vcc1v8 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc1v8";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +	};
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins>;
+> +	vmmc-supply = <&reg_vcc3v3>;
 
-The config options are now less than optimal (for me at least). On
-oldconfig it asks you for PIT and I say selected no because I wanted the
-new one. So I end up with nothing.
-Not sure you want do something about it?
+So this is actually CLDO1 on the AXP, correct?
 
-Is the resolution more or the same compared what we have in -RT? On an
-idle system this clocks goes up to 180us/ 190us while the old clock
-started at 160us and moved to around 180us after one hackbench
-invocation. This could be nothing, it could be a lower frequency of the
-clockevents device.
 
-If you intend to stick with this driver then I would replace the current
-hack in -RT with this series.
+> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
+> +	status = "okay";
+> +};
+> +
+> +&mmc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc2_pins>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	vqmmc-supply = <&reg_vcc1v8>;
 
-Sebastian
+And this is BLDO2?
+
+I am just asking because I want to avoid running into the same problem
+as with the A64 before: that future DTs become incompatible with older
+kernels, because we change the power supply to point to the AXP
+regulators, which this kernel does not support yet.
+
+It looks like there are more users of those power rails, so we could
+keep those supplies connected to these fixed regulators here, even with
+AXP-805 support in the kernel.
+
+Or we keep this back until we get proper AXP support in the kernel? I
+guess it's quite close to the existing PMICs, so it might be more a
+copy&paste exercise to support the AXP-805?
+
+But apart from this this looks correct to me.
+
+Cheers,
+Andre.
+
+> +	non-removable;
+> +	cap-mmc-hw-reset;
+> +	status = "okay";
+>  };
+>  
+>  &uart0 {
+> 
