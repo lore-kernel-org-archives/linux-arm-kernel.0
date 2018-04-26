@@ -1,38 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Apr 2018 11:34:28 +0100
-Subject: [PATCH v3 14/14] MAINTAINERS: Add myself as a co-maintainer for
- LOCKING PRIMITIVES
+Date: Thu, 26 Apr 2018 11:34:26 +0100
+Subject: [PATCH v3 12/14] locking/qspinlock: Use try_cmpxchg instead of
+ cmpxchg when locking
 In-Reply-To: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
 References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1524738868-31318-15-git-send-email-will.deacon@arm.com>
+Message-ID: <1524738868-31318-13-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been heavily involved with concurrency and memory ordering stuff
-(see ATOMIC INFRASTRUCTURE and LINUX KERNEL MEMORY CONSISTENCY MODEL)
-and with arm64 now using qrwlock with a view to using qspinlock in the
-near future, I'm going to continue being involved with the core locking
-primitives. Reflect this by adding myself as a co-maintainer alongside
-Ingo and Peter.
+When reaching the head of an uncontended queue on the qspinlock slow-path,
+using a try_cmpxchg instead of a cmpxchg operation to transition the
+lock work to _Q_LOCKED_VAL generates slightly better code for x86 and
+pretty much identical code for arm64.
 
 Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
+Reported-by: Peter Zijlstra <peterz@infradead.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+ kernel/locking/qspinlock.c | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 92be777d060a..2509c20a979e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8328,6 +8328,7 @@ F:	Documentation/admin-guide/LSM/LoadPin.rst
- LOCKING PRIMITIVES
- M:	Peter Zijlstra <peterz@infradead.org>
- M:	Ingo Molnar <mingo@redhat.com>
-+M:	Will Deacon <will.deacon@arm.com>
- L:	linux-kernel at vger.kernel.org
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git locking/core
- S:	Maintained
+diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
+index fa5d2ab369f9..1e3ddc42135e 100644
+--- a/kernel/locking/qspinlock.c
++++ b/kernel/locking/qspinlock.c
+@@ -467,16 +467,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+ 	 * Otherwise, we only need to grab the lock.
+ 	 */
+ 
+-	/* In the PV case we might already have _Q_LOCKED_VAL set */
+-	if ((val & _Q_TAIL_MASK) == tail) {
+-		/*
+-		 * The atomic_cond_read_acquire() call above has provided the
+-		 * necessary acquire semantics required for locking.
+-		 */
+-		old = atomic_cmpxchg_relaxed(&lock->val, val, _Q_LOCKED_VAL);
+-		if (old == val)
+-			goto release; /* No contention */
+-	}
++	/*
++	 * In the PV case we might already have _Q_LOCKED_VAL set.
++	 *
++	 * The atomic_cond_read_acquire() call above has provided the
++	 * necessary acquire semantics required for locking.
++	 */
++	if (((val & _Q_TAIL_MASK) == tail) &&
++	    atomic_try_cmpxchg_relaxed(&lock->val, &val, _Q_LOCKED_VAL))
++		goto release; /* No contention */
+ 
+ 	/* Either somebody is queued behind us or _Q_PENDING_VAL is set */
+ 	set_locked(lock);
 -- 
 2.1.4
