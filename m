@@ -1,11 +1,11 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 26 Apr 2018 09:58:41 +0900
-Subject: [RFC 04/10] clk: samsung: Remove support for Exynos5440
-In-Reply-To: <20180424203239.21885-5-krzk@kernel.org>
+Date: Thu, 26 Apr 2018 10:05:06 +0900
+Subject: [RFC 03/10] cpufreq: exynos: Remove support for Exynos5440
+In-Reply-To: <20180424203239.21885-4-krzk@kernel.org>
 References: <20180424203239.21885-1-krzk@kernel.org>
- <CGME20180424203341epcas5p3a6db7d58b0ce8940d03711823fbf6e41@epcas5p3.samsung.com>
- <20180424203239.21885-5-krzk@kernel.org>
-Message-ID: <5AE12441.2090506@samsung.com>
+ <CGME20180424203335epcas5p3bfd2172f68574b67818c1d2bc74041bb@epcas5p3.samsung.com>
+ <20180424203239.21885-4-krzk@kernel.org>
+Message-ID: <5AE125C2.70105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,21 +18,19 @@ On 2018? 04? 25? 05:32, Krzysztof Kozlowski wrote:
 > 
 > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
->  .../devicetree/bindings/clock/exynos5440-clock.txt |  28 ----
->  drivers/clk/samsung/Makefile                       |   1 -
->  drivers/clk/samsung/clk-exynos5440.c               | 167 ---------------------
->  include/dt-bindings/clock/exynos5440.h             |  44 ------
->  4 files changed, 240 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/clock/exynos5440-clock.txt
->  delete mode 100644 drivers/clk/samsung/clk-exynos5440.c
->  delete mode 100644 include/dt-bindings/clock/exynos5440.h
+>  .../bindings/cpufreq/cpufreq-exynos5440.txt        |  28 --
+>  drivers/cpufreq/Kconfig.arm                        |  14 -
+>  drivers/cpufreq/Makefile                           |   1 -
+>  drivers/cpufreq/exynos5440-cpufreq.c               | 452 ---------------------
+>  4 files changed, 495 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-exynos5440.txt
+>  delete mode 100644 drivers/cpufreq/exynos5440-cpufreq.c
 > 
 
-Looks good to me. Thanks.
-
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
 [snip]
+
 
 -- 
 Best Regards,
