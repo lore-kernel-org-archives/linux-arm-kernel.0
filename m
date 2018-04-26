@@ -1,65 +1,81 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Apr 2018 11:34:14 +0100
-Subject: [PATCH v3 00/14] kernel/locking: qspinlock improvements
-Message-ID: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 26 Apr 2018 11:34:17 +0100
+Subject: [PATCH v3 03/14] locking/qspinlock: Bound spinning on pending->locked
+ transition in slowpath
+In-Reply-To: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
+References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1524738868-31318-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+If a locker taking the qspinlock slowpath reads a lock value indicating
+that only the pending bit is set, then it will spin whilst the
+concurrent pending->locked transition takes effect.
 
-This is version three of the qspinlock patches I posted previously:
+Unfortunately, there is no guarantee that such a transition will ever be
+observed since concurrent lockers could continuously set pending and
+hand over the lock amongst themselves, leading to starvation. Whilst
+this would probably resolve in practice, it means that it is not
+possible to prove liveness properties about the lock and means that lock
+acquisition time is unbounded.
 
-  v1: https://lkml.org/lkml/2018/4/5/496
-  v2: https://lkml.org/lkml/2018/4/11/618
+Rather than removing the pending->locked spinning from the slowpath
+altogether (which has been shown to heavily penalise a 2-threaded
+locking stress test on x86), this patch replaces the explicit spinning
+with a call to atomic_cond_read_relaxed and allows the architecture to
+provide a bound on the number of spins. For architectures that can
+respond to changes in cacheline state in their smp_cond_load implementation,
+it should be sufficient to use the default bound of 1.
 
-Changes since v2 include:
-  * Fixed bisection issues
-  * Fixed x86 PV build
-  * Added patch proposing me as a co-maintainer
-  * Rebased onto -rc2
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@kernel.org>
+Suggested-by: Waiman Long <longman@redhat.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ kernel/locking/qspinlock.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
-All feedback welcome,
-
-Will
-
---->8
-
-Jason Low (1):
-  locking/mcs: Use smp_cond_load_acquire() in mcs spin loop
-
-Waiman Long (1):
-  locking/qspinlock: Add stat tracking for pending vs slowpath
-
-Will Deacon (12):
-  barriers: Introduce smp_cond_load_relaxed and atomic_cond_read_relaxed
-  locking/qspinlock: Merge struct __qspinlock into struct qspinlock
-  locking/qspinlock: Bound spinning on pending->locked transition in
-    slowpath
-  locking/qspinlock/x86: Increase _Q_PENDING_LOOPS upper bound
-  locking/qspinlock: Remove unbounded cmpxchg loop from locking slowpath
-  locking/qspinlock: Kill cmpxchg loop when claiming lock from head of
-    queue
-  locking/qspinlock: Use atomic_cond_read_acquire
-  locking/qspinlock: Use smp_cond_load_relaxed to wait for next node
-  locking/qspinlock: Make queued_spin_unlock use smp_store_release
-  locking/qspinlock: Elide back-to-back RELEASE operations with
-    smp_wmb()
-  locking/qspinlock: Use try_cmpxchg instead of cmpxchg when locking
-  MAINTAINERS: Add myself as a co-maintainer for LOCKING PRIMITIVES
-
- MAINTAINERS                               |   1 +
- arch/x86/include/asm/qspinlock.h          |  21 ++-
- arch/x86/include/asm/qspinlock_paravirt.h |   3 +-
- include/asm-generic/atomic-long.h         |   2 +
- include/asm-generic/barrier.h             |  27 +++-
- include/asm-generic/qspinlock.h           |   2 +-
- include/asm-generic/qspinlock_types.h     |  32 +++-
- include/linux/atomic.h                    |   2 +
- kernel/locking/mcs_spinlock.h             |  10 +-
- kernel/locking/qspinlock.c                | 247 ++++++++++++++----------------
- kernel/locking/qspinlock_paravirt.h       |  44 ++----
- kernel/locking/qspinlock_stat.h           |   9 +-
- 12 files changed, 209 insertions(+), 191 deletions(-)
-
+diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
+index f5b0e59f6d14..a0f7976348f8 100644
+--- a/kernel/locking/qspinlock.c
++++ b/kernel/locking/qspinlock.c
+@@ -77,6 +77,18 @@
+ #endif
+ 
+ /*
++ * The pending bit spinning loop count.
++ * This heuristic is used to limit the number of lockword accesses
++ * made by atomic_cond_read_relaxed when waiting for the lock to
++ * transition out of the "== _Q_PENDING_VAL" state. We don't spin
++ * indefinitely because there's no guarantee that we'll make forward
++ * progress.
++ */
++#ifndef _Q_PENDING_LOOPS
++#define _Q_PENDING_LOOPS	1
++#endif
++
++/*
+  * Per-CPU queue node structures; we can never have more than 4 nested
+  * contexts: task, softirq, hardirq, nmi.
+  *
+@@ -266,13 +278,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+ 		return;
+ 
+ 	/*
+-	 * wait for in-progress pending->locked hand-overs
++	 * Wait for in-progress pending->locked hand-overs with a bounded
++	 * number of spins so that we guarantee forward progress.
+ 	 *
+ 	 * 0,1,0 -> 0,0,1
+ 	 */
+ 	if (val == _Q_PENDING_VAL) {
+-		while ((val = atomic_read(&lock->val)) == _Q_PENDING_VAL)
+-			cpu_relax();
++		int cnt = _Q_PENDING_LOOPS;
++		val = atomic_cond_read_relaxed(&lock->val,
++					       (VAL != _Q_PENDING_VAL) || !cnt--);
+ 	}
+ 
+ 	/*
 -- 
 2.1.4
