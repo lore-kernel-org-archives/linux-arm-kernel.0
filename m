@@ -1,23 +1,25 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Apr 2018 08:02:25 +0200
-Subject: [PATCH] arm64: renesas_defconfig: enable R8A77980 SoC
-In-Reply-To: <CAMuHMdXMZ3bb6qFSeQhb5tmqHXwJQt8Pni4=aHYtYTRDXGZgHQ@mail.gmail.com>
-References: <20180423104635.18129-1-horms+renesas@verge.net.au>
- <CAMuHMdXMZ3bb6qFSeQhb5tmqHXwJQt8Pni4=aHYtYTRDXGZgHQ@mail.gmail.com>
-Message-ID: <20180425060224.bk6ibdecnjcuju5m@verge.net.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 26 Apr 2018 03:21:21 -0300
+Subject: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
+ max7310 support
+In-Reply-To: <AM3PR04MB13150654494B8D251988F76CF58E0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+References: <1524634571-5914-1-git-send-email-Anson.Huang@nxp.com>
+ <1524634571-5914-3-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5Dm6rcEe=zAJ9_nqKce3g2tdyWPqb=Uv-N5nfc_96jc-g@mail.gmail.com>
+ <AM3PR04MB13150654494B8D251988F76CF58E0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5AZLbUoL7FWgUFA7qc3q3wcz9UBLSQhMXXkUJeiRz8X4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 04:51:50PM +0200, Geert Uytterhoeven wrote:
-> On Mon, Apr 23, 2018 at 12:46 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Enable the Renesas R-Car V3H (R8A77980) SoC in the ARM64 renesas_defconfig.
-> 
-> "E3 (R8A77990)", also in the one-line summary.
-> 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> With the above fixed:
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Apr 26, 2018 at 12:06 AM, Anson Huang <anson.huang@nxp.com> wrote:
 
-Thanks, applied with that fixed.
+> MAX7310 pins are for PCIe, CAN, MLB. GPS etc., these modules are NOT enabled yet, so
+> I can NOT test it, I think we should add MAX7310 users when these modules are enabled,
+> ethernet PHY is NOT controlled by it.
+
+You said previously that MAX7310 also controls the Ethernet PHY. Is
+the vendor dts wrong then?
+
+If there are no MAX7310 users, why are you adding support for MAX7310 then?
+
+Confused.
