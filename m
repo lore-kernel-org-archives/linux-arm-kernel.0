@@ -1,41 +1,79 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 26 Apr 2018 15:42:42 +0530
-Subject: [PATCH V3 3/3] cpufreq: add suspend/resume support in Armada
- 37xx DVFS driver
-In-Reply-To: <201804261439.n2Ff25A0%fengguang.wu@intel.com>
-References: <e98965068836e673ea826e8a03fd01e168fce3ed.1524561482.git.viresh.kumar@linaro.org>
- <201804261439.n2Ff25A0%fengguang.wu@intel.com>
-Message-ID: <20180426101242.vaqdclizsnohoqr7@vireshk-i7>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Apr 2018 11:34:24 +0100
+Subject: [PATCH v3 10/14] locking/qspinlock: Make queued_spin_unlock use
+ smp_store_release
+In-Reply-To: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
+References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1524738868-31318-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26-04-18, 17:32, kbuild test robot wrote:
-> Hi Miquel,
-> 
-> I love your patch! Yet something to improve:
-> 
-> [auto build test ERROR on pm/linux-next]
-> [also build test ERROR on v4.17-rc2 next-20180424]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Viresh-Kumar/cpufreq-dt-Allow-platforms-to-provide-suspend-resume-hooks/20180426-101030
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-> config: arm-allmodconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-> reproduce:
->         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
-> 
-> All errors (new ones prefixed by >>):
-> 
->    drivers/cpufreq/armada-37xx-cpufreq.c: In function 'armada37xx_cpufreq_driver_init':
-> >> drivers/cpufreq/armada-37xx-cpufreq.c:268:3: error: label 'put_clk' used but not defined
->       goto put_clk;
->       ^~~~
+A qspinlock can be unlocked simply by writing zero to the locked byte.
+This can be implemented in the generic code, so do that and remove the
+arch-specific override for x86 in the !PV case.
 
-Fixed, thanks.
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/x86/include/asm/qspinlock.h | 17 ++++++-----------
+ include/asm-generic/qspinlock.h  |  2 +-
+ 2 files changed, 7 insertions(+), 12 deletions(-)
 
+diff --git a/arch/x86/include/asm/qspinlock.h b/arch/x86/include/asm/qspinlock.h
+index da1370ad206d..3e70bed8a978 100644
+--- a/arch/x86/include/asm/qspinlock.h
++++ b/arch/x86/include/asm/qspinlock.h
+@@ -9,6 +9,12 @@
+ 
+ #define _Q_PENDING_LOOPS	(1 << 9)
+ 
++#ifdef CONFIG_PARAVIRT_SPINLOCKS
++extern void native_queued_spin_lock_slowpath(struct qspinlock *lock, u32 val);
++extern void __pv_init_lock_hash(void);
++extern void __pv_queued_spin_lock_slowpath(struct qspinlock *lock, u32 val);
++extern void __raw_callee_save___pv_queued_spin_unlock(struct qspinlock *lock);
++
+ #define	queued_spin_unlock queued_spin_unlock
+ /**
+  * queued_spin_unlock - release a queued spinlock
+@@ -21,12 +27,6 @@ static inline void native_queued_spin_unlock(struct qspinlock *lock)
+ 	smp_store_release(&lock->locked, 0);
+ }
+ 
+-#ifdef CONFIG_PARAVIRT_SPINLOCKS
+-extern void native_queued_spin_lock_slowpath(struct qspinlock *lock, u32 val);
+-extern void __pv_init_lock_hash(void);
+-extern void __pv_queued_spin_lock_slowpath(struct qspinlock *lock, u32 val);
+-extern void __raw_callee_save___pv_queued_spin_unlock(struct qspinlock *lock);
+-
+ static inline void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+ {
+ 	pv_queued_spin_lock_slowpath(lock, val);
+@@ -42,11 +42,6 @@ static inline bool vcpu_is_preempted(long cpu)
+ {
+ 	return pv_vcpu_is_preempted(cpu);
+ }
+-#else
+-static inline void queued_spin_unlock(struct qspinlock *lock)
+-{
+-	native_queued_spin_unlock(lock);
+-}
+ #endif
+ 
+ #ifdef CONFIG_PARAVIRT
+diff --git a/include/asm-generic/qspinlock.h b/include/asm-generic/qspinlock.h
+index b37b4ad7eb94..a8ed0a352d75 100644
+--- a/include/asm-generic/qspinlock.h
++++ b/include/asm-generic/qspinlock.h
+@@ -100,7 +100,7 @@ static __always_inline void queued_spin_unlock(struct qspinlock *lock)
+ 	/*
+ 	 * unlock() needs release semantics:
+ 	 */
+-	(void)atomic_sub_return_release(_Q_LOCKED_VAL, &lock->val);
++	smp_store_release(&lock->locked, 0);
+ }
+ #endif
+ 
 -- 
-viresh
+2.1.4
