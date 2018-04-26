@@ -1,42 +1,50 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 26 Apr 2018 11:27:01 +0100
-Subject: [PATCH v8 04/13] arm64/acpi: Create arch specific cpu to acpi id
- helper
-In-Reply-To: <20180425233121.13270-5-jeremy.linton@arm.com>
-References: <20180425233121.13270-1-jeremy.linton@arm.com>
- <20180425233121.13270-5-jeremy.linton@arm.com>
-Message-ID: <16324b54-42d4-d9bc-6d57-de52431dc209@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 26 Apr 2018 12:29:41 +0200
+Subject: [PATCH 00/10] ARM, arm64: dts: renesas: update register properties
+Message-ID: <20180426102951.8683-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+this series:
 
-On 26/04/18 00:31, Jeremy Linton wrote:
-> Its helpful to be able to lookup the acpi_processor_id associated
-> with a logical cpu. Provide an arm64 helper to do this.
-> 
+1. Drops unnecessary address properties from VIN port nodes
+   on Renesas R-Car Gen2 SoC board DTSes. These are unnecessary
+   as the nodes to not have bus addresses.
 
-As I pointed out in the earlier version, this patch is not required.
-The acpi_id stored in the acpi_processor can be used for this.
-Won't the below change make it work ? I can't think of any reason why it
-shouldn't.
+2. And adds address properties to R-Car Sound port nodes on
+   Renesas R-Car Gen2 SoC DTSes. These are necessary as the nodes
+   have unit names.
 
-Regards,
-Sudeep
+Simon Horman (10):
+  ARM: dts: lager: Drop unnecessary address properties from port node
+  ARM: dts: porter: Drop unnecessary address properties from vin port
+    node
+  ARM: dts: gose: Drop unnecessary address properties from port nodes
+  ARM: dts: koelsch: Drop unnecessary address properties from port nodes
+  ARM: dts: alt: Drop unnecessary address properties from vin port node
+  ARM: dts: silk: Drop unnecessary address properties from vin port node
+  ARM: dts: kzm9d: Drop unnecessary address properties from gpio_keys
+    node
+  arm64: dts: renesas: r8a7795: Add address properties to rcar_sound
+    port nodes
+  arm64: dts: renesas: r8a7796: Add address properties to rcar_sound
+    port nodes
+  arm64: dts: renesas: r8a77965: Add address properties to rcar_sound
+    port nodes
 
--->8
+ arch/arm/boot/dts/emev2-kzm9d.dts         |  3 ---
+ arch/arm/boot/dts/r8a7790-lager.dts       |  3 ---
+ arch/arm/boot/dts/r8a7791-koelsch.dts     |  6 ------
+ arch/arm/boot/dts/r8a7791-porter.dts      |  3 ---
+ arch/arm/boot/dts/r8a7793-gose.dts        |  6 ------
+ arch/arm/boot/dts/r8a7794-alt.dts         |  3 ---
+ arch/arm/boot/dts/r8a7794-silk.dts        |  3 ---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi  | 14 ++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi  | 11 +++++++++++
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi |  8 ++++++++
+ 10 files changed, 33 insertions(+), 27 deletions(-)
 
-diff --git i/drivers/acpi/pptt.c w/drivers/acpi/pptt.c
-index 0fc4b2654665..f421f58b4ae6 100644
---- i/drivers/acpi/pptt.c
-+++ w/drivers/acpi/pptt.c
-@@ -432,7 +432,7 @@ static void cache_setup_acpi_cpu(struct
-acpi_table_header *table,
- {
-        struct acpi_pptt_cache *found_cache;
-        struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
--       u32 acpi_cpu_id = get_acpi_id_for_cpu(cpu);
-+       u32 acpi_cpu_id = per_cpu(processors, cpu)->acpi_id;
-        struct cacheinfo *this_leaf;
-        unsigned int index = 0;
-        struct acpi_pptt_processor *cpu_node = NULL;
+-- 
+2.11.0
