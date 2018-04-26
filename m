@@ -1,110 +1,80 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 26 Apr 2018 17:29:20 +0200
-Subject: [PATCH RFC PoC 2/2] misc: implement a dummy early platform driver
-In-Reply-To: <20180426152920.21569-1-brgl@bgdev.pl>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
-Message-ID: <20180426152920.21569-3-brgl@bgdev.pl>
+Date: Thu, 26 Apr 2018 17:29:18 +0200
+Subject: [PATCH RFC PoC 0/2] platform: different approach to early platform
+ drivers
+Message-ID: <20180426152920.21569-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Implement a very simple early platform driver. Its purpose is to show
-how such drivers can be registered and to emit a message when probed.
+This is a follow to my series[1] the aim of which was to introduce device tree
+support for early platform devices.
 
-It can be then added to the device tree or machine code to verify that
-the early platform devices work as expected.
+It was received rather negatively. Aside from using device tree to pass
+implementation specific details to the system, two important concerns were
+raised: no probe deferral support and the fact that currently the early devices
+never get converted to actual platform drivers. This series is a
+proof-of-concept that's trying to address those issues.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- drivers/misc/Kconfig       |  8 +++++++
- drivers/misc/Makefile      |  1 +
- drivers/misc/dummy-early.c | 46 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 55 insertions(+)
+The only user of the current version of early platform drivers is the SuperH
+architecture. If this series eventually gets merged, we could simply replace
+the other solution.
+
+The current implementation of early platform drivers is pretty much a hack
+built on top of the early_param mechanism. The devices only look like platform
+devices and use the same structures but never actually get registered with the
+driver model.
+
+The idea behind this series is to allow users to probe platform devices very
+early in the boot sequence and then switch the early devices to actual platform
+devices and the early drivers to platform drivers in during device_initcall.
+
+If any of the early registration functions is called after device_initcall,
+we'll just end up calling the normal platform_driver/device_register routines.
+
+The user can specify if he wants the device to be probed the second time after
+this conversion and the check if it's an early or a normal probe from the
+driver code.
+
+We also support a simple version of probe deferral: initially each new
+registered device is added to the head of the early devices list. If it matches
+an early driver, it will be probed. If probe return -EPROBE_DEFER, it will be
+moved to the tail of the list and reprobed the next time we match a device
+but after all other devices.
+
+This implementation has certain shortcomings that will be addressed if the
+feedback is at least somewhat positive. For instance: the driver registration
+happens in early_initcall(). This may be too late for certain clocksource or
+clk drivers. The solution for that would be defining a new section in which the
+init callbacks of the drivers would reside and let the architecture call the
+actual registration function whenever it's needed.
+
+I also need to figure out if any locking is needed.
+
+We don't support DT in this series either. The proposed approach would be to
+walk over the devices nodes early in the boot sequence and allocate and probe
+the matching early devices and then register them with the driver model later.
+
+[1] https://lkml.org/lkml/2018/4/24/937
+
+Bartosz Golaszewski (2):
+  earlydev: implement a new way to probe platform devices early
+  misc: implement a dummy early platform driver
+
+ drivers/base/Kconfig            |   3 +
+ drivers/base/Makefile           |   1 +
+ drivers/base/earlydev.c         | 175 ++++++++++++++++++++++++++++++++
+ drivers/base/platform.c         |  11 ++
+ drivers/misc/Kconfig            |   8 ++
+ drivers/misc/Makefile           |   1 +
+ drivers/misc/dummy-early.c      |  46 +++++++++
+ include/linux/earlydev.h        |  63 ++++++++++++
+ include/linux/platform_device.h |   4 +
+ 9 files changed, 312 insertions(+)
+ create mode 100644 drivers/base/earlydev.c
  create mode 100644 drivers/misc/dummy-early.c
+ create mode 100644 include/linux/earlydev.h
 
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 5d713008749b..99cde8aefdb0 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -91,6 +91,14 @@ config DUMMY_IRQ
- 	  The sole purpose of this module is to help with debugging of systems on
- 	  which spurious IRQs would happen on disabled IRQ vector.
- 
-+config DUMMY_EARLY
-+	bool "Dummy early platform driver"
-+	select EARLYDEV
-+	default n
-+	help
-+	  This module's only function is to register itself with the early
-+	  platform device framework and be probed early in the boot process.
-+
- config IBM_ASM
- 	tristate "Device driver for IBM RSA service processor"
- 	depends on X86 && PCI && INPUT
-diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index 20be70c3f118..84ad0225eb14 100644
---- a/drivers/misc/Makefile
-+++ b/drivers/misc/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_INTEL_MID_PTI)	+= pti.o
- obj-$(CONFIG_ATMEL_SSC)		+= atmel-ssc.o
- obj-$(CONFIG_ATMEL_TCLIB)	+= atmel_tclib.o
- obj-$(CONFIG_DUMMY_IRQ)		+= dummy-irq.o
-+obj-$(CONFIG_DUMMY_EARLY)	+= dummy-early.o
- obj-$(CONFIG_ICS932S401)	+= ics932s401.o
- obj-$(CONFIG_LKDTM)		+= lkdtm/
- obj-$(CONFIG_TIFM_CORE)       	+= tifm_core.o
-diff --git a/drivers/misc/dummy-early.c b/drivers/misc/dummy-early.c
-new file mode 100644
-index 000000000000..f00fb1fbd5fa
---- /dev/null
-+++ b/drivers/misc/dummy-early.c
-@@ -0,0 +1,46 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2018 Texas Instruments
-+ *
-+ * Author:
-+ *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
-+ *
-+ * Dummy testing driver whose only purpose is to be registered and probed
-+ * using the early platform device mechanism.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/earlydev.h>
-+
-+static int dummy_early_probe(struct platform_device *pdev)
-+{
-+	if (earlydev_probing_early())
-+		dev_notice(&pdev->dev, "dummy-early driver probed early!\n");
-+	else
-+		dev_notice(&pdev->dev, "dummy-early driver probed late!\n");
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id dummy_early_of_match[] = {
-+	{ .compatible = "none,dummy-early", },
-+	{ },
-+};
-+
-+static struct earlydev_driver dummy_early_driver = {
-+	.plat_drv = {
-+		.probe = dummy_early_probe,
-+		.driver = {
-+			.name = "dummy-early",
-+			.of_match_table = dummy_early_of_match,
-+		},
-+	}
-+};
-+earlydev_platform_driver(dummy_early_driver);
-+
-+MODULE_AUTHOR("Bartosz Golaszewski <bgolaszewski@baylibre.com>");
-+MODULE_DESCRIPTION("Dummy early platform device driver");
-+MODULE_LICENSE("GPL v2");
 -- 
 2.17.0
