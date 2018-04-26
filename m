@@ -1,35 +1,76 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Apr 2018 13:57:58 +0200
-Subject: [PATCH v3 5/5] pinctrl: sunxi: Use of_clk_get_parent_count()
- instead of open coding
-In-Reply-To: <1524063005-1716-6-git-send-email-geert+renesas@glider.be>
-References: <1524063005-1716-1-git-send-email-geert+renesas@glider.be>
- <1524063005-1716-6-git-send-email-geert+renesas@glider.be>
-Message-ID: <CACRpkdYdkb0WRLr55dT1ZbgjCy6d+xj0tbhf6OnXMuM5ktJ9xQ@mail.gmail.com>
+Date: Thu, 26 Apr 2018 14:03:45 +0200
+Subject: [PATCH v4] pinctrl: msm: fix gpio-hog related boot issues
+In-Reply-To: <20180412190138.12372-1-chunkeey@gmail.com>
+References: <20180412190138.12372-1-chunkeey@gmail.com>
+Message-ID: <CACRpkdZPEHvnQdwh5Uu5kwqK7yVGTaw_cZR+GOzsG9pg4oEktA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 4:50 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
+On Thu, Apr 12, 2018 at 9:01 PM, Christian Lamparter <chunkeey@gmail.com> wrote:
 
-> A new open coder has crept in since 470b73a38470e8ba ("pinctrl: sunxi:
-> Use of_clk_get_parent_count() instead of open coding"), replace it.
+> Sven Eckelmann reported an issue with the current IPQ4019 pinctrl.
+> Setting up any gpio-hog in the device-tree for his device would
+> "kill the bootup completely":
 >
-> of_clk_get_parent_count() was moved to <linux/of_clk.h>, so include that
-> instead of <linux/clk-provider.h>.
+> | [    0.477838] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
+> | [    0.499828] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferring probe
+> | [    1.298883] requesting hog GPIO enable USB2 power (chip 1000000.pinctrl, offset 58) failed, -517
+> | [    1.299609] gpiochip_add_data: GPIOs 0..99 (1000000.pinctrl) failed to register
+> | [    1.308589] ipq4019-pinctrl 1000000.pinctrl: Failed register gpiochip
+> | [    1.316586] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
+> | [    1.322415] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferri
 >
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
-> This depends on "[PATCH v3 1/5] clk: Extract OF clock helpers in
-> <linux/of_clk.h>".
+> This was also verified on a RT-AC58U (IPQ4018) which would
+> no longer boot, if a gpio-hog was specified. (Tried forcing
+> the USB LED PIN (GPIO0) to high.).
 >
-> v3:
->   - Add Acked-by,
+> The problem is that Pinctrl+GPIO registration is currently
+> peformed in the following order in pinctrl-msm.c:
+>         1. pinctrl_register()
+>         2. gpiochip_add()
+>         3. gpiochip_add_pin_range()
+>
+> The actual error code -517 == -EPROBE_DEFER is coming from
+> pinctrl_get_device_gpio_range(), which is called through:
+>         gpiochip_add
+>             of_gpiochip_add
+>                 of_gpiochip_scan_gpios
+>                     gpiod_hog
+>                         gpiochip_request_own_desc
+>                             __gpiod_request
+>                                 chip->request
+>                                     gpiochip_generic_request
+>                                        pinctrl_gpio_request
+>                                           pinctrl_get_device_gpio_range
+>
+> pinctrl_get_device_gpio_range() is unable to find any valid
+> pin ranges, since nothing has been added to the pinctrldev_list yet.
+> so the range can't be found, and the operation fails with -EPROBE_DEFER.
+>
+> This patch fixes the issue by adding the "gpio-ranges" property to
+> the pinctrl device node of all upstream Qcom SoC. The pin ranges are
+> then added by the gpio core.
+>
+> In order to remain compatible with older, existing DTs (and ACPI)
+> a check for the "gpio-ranges" property has been added to
+> msm_gpio_init(). This prevents the driver of adding the same entry
+> to the pinctrldev_list twice.
+>
+> Reported-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
+> Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+This patch looks VERY good to me.
 
-Please merge this through the clk tree.
+I am fine in merging it into pin control including the ranges
+fixes.
+
+I need Andy's and Bjorn's ACKs on it though!
+
+Can you guys provide that?
+
+It might be that Andy want the DTS changes separately to avoid
+any collisions, so I'm fine with splitting it as well.
 
 Yours,
 Linus Walleij
