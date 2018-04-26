@@ -1,64 +1,98 @@
-From: yuehaibing@huawei.com (YueHaibing)
-Date: Thu, 26 Apr 2018 12:49:29 +0800
-Subject: [PATCH] iommu/io-pgtable-arm: Use for_each_set_bit to simplify code
-Message-ID: <20180426044929.16896-1-yuehaibing@huawei.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 26 Apr 2018 13:29:58 +0800
+Subject: [PATCH v1 2/7] serdev: add dev_pm_domain_attach|detach()
+In-Reply-To: <FD85DED4-589C-4113-8A8B-BC5A39494130@holtmann.org>
+References: <cover.1522736996.git.sean.wang@mediatek.com>
+ <f976766cd499c8d7053a1f442aba1494b4d3314f.1522736996.git.sean.wang@mediatek.com>
+ <FD85DED4-589C-4113-8A8B-BC5A39494130@holtmann.org>
+Message-ID: <1524720598.12322.37.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can use for_each_set_bit() to simplify code slightly in the
-ARM io-pgtable self tests while unmapping.
+On Tue, 2018-04-03 at 12:29 +0200, Marcel Holtmann wrote:
+> Hi Sean,
+> 
+> > In order to open up the required power gate before any operation can be
+> > effectively performed over the serial bus between CPU and serdev, it's
+> > clearly essential to add common attach functions for PM domains to serdev
+> > at the probe phase.
+> > 
+> > Similarly, the relevant dettach function for the PM domains should be
+> > properly and reversely added at the remove phase.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > Cc: Rob Herring <robh@kernel.org>
+> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: Jiri Slaby <jslaby@suse.com>
+> > Cc: linux-serial at vger.kernel.org
+> > ---
+> > drivers/tty/serdev/core.c | 14 +++++++++++++-
+> > 1 file changed, 13 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/tty/serdev/core.c b/drivers/tty/serdev/core.c
+> > index df93b72..c93d8ee 100644
+> > --- a/drivers/tty/serdev/core.c
+> > +++ b/drivers/tty/serdev/core.c
+> > @@ -13,6 +13,7 @@
+> > #include <linux/module.h>
+> > #include <linux/of.h>
+> > #include <linux/of_device.h>
+> > +#include <linux/pm_domain.h>
+> > #include <linux/serdev.h>
+> > #include <linux/slab.h>
+> > 
+> > @@ -330,8 +331,16 @@ EXPORT_SYMBOL_GPL(serdev_device_set_tiocm);
+> > static int serdev_drv_probe(struct device *dev)
+> > {
+> > 	const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
+> > +	int ret;
+> > +
+> > +	ret = dev_pm_domain_attach(dev, true);
+> > +	if (ret != -EPROBE_DEFER) {
+> > +		ret = sdrv->probe(to_serdev_device(dev));
+> > +		if (ret)
+> > +			dev_pm_domain_detach(dev, true);
+> > +	}
+> 
+> so if this is deferred, when does the serdev device gets probed?
+> 
 
-Signed-off-by: YueHaibing <yuehaibing@huawei.com>
----
- drivers/iommu/io-pgtable-arm-v7s.c | 5 +----
- drivers/iommu/io-pgtable-arm.c     | 5 +----
- 2 files changed, 2 insertions(+), 8 deletions(-)
+driver probe deferral mechanism is supported in driver core
 
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index 10e4a3d..50e3a9f 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -898,8 +898,7 @@ static int __init arm_v7s_do_selftests(void)
- 
- 	/* Full unmap */
- 	iova = 0;
--	i = find_first_bit(&cfg.pgsize_bitmap, BITS_PER_LONG);
--	while (i != BITS_PER_LONG) {
-+	for_each_set_bit(i, &cfg.pgsize_bitmap, BITS_PER_LONG) {
- 		size = 1UL << i;
- 
- 		if (ops->unmap(ops, iova, size) != size)
-@@ -916,8 +915,6 @@ static int __init arm_v7s_do_selftests(void)
- 			return __FAIL(ops);
- 
- 		iova += SZ_16M;
--		i++;
--		i = find_next_bit(&cfg.pgsize_bitmap, BITS_PER_LONG, i);
- 	}
- 
- 	free_io_pgtable_ops(ops);
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 39c2a05..4ffdd88 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -1120,8 +1120,7 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
- 
- 		/* Full unmap */
- 		iova = 0;
--		j = find_first_bit(&cfg->pgsize_bitmap, BITS_PER_LONG);
--		while (j != BITS_PER_LONG) {
-+		for_each_set_bit(j, &cfg->pgsize_bitmap, BITS_PER_LONG) {
- 			size = 1UL << j;
- 
- 			if (ops->unmap(ops, iova, size) != size)
-@@ -1138,8 +1137,6 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
- 				return __FAIL(ops, i);
- 
- 			iova += SZ_1G;
--			j++;
--			j = find_next_bit(&cfg->pgsize_bitmap, BITS_PER_LONG, j);
- 		}
- 
- 		free_io_pgtable_ops(ops);
--- 
-2.7.0
+deferred_probe_initcall makes sure that deferred probing is
+delayed until late_initcall time.
+
+
+Below is a few of word I got from drivers/base/core.c I thought it helps
+to understand the mechanism in complete picture
+
+* If a required resource is not available yet, a driver can
+request probing to be deferred by returning -EPROBE_DEFER from
+its probe hook.
+
+* A driver returning -EPROBE_DEFER causes the device to be added to the
+pending list.  A successful driver probe will trigger moving all devices
+from the pending to the active list so that the workqueue will
+eventually retry them.
+
+> > 
+> > -	return sdrv->probe(to_serdev_device(dev));
+> > +	return ret;
+> > }
+> > 
+> > static int serdev_drv_remove(struct device *dev)
+> > @@ -339,6 +348,9 @@ static int serdev_drv_remove(struct device *dev)
+> > 	const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
+> > 	if (sdrv->remove)
+> > 		sdrv->remove(to_serdev_device(dev));
+> > +
+> > +	dev_pm_domain_detach(dev, true);
+> > +
+> > 	return 0;
+> > }
+> 
+> Regards
+> 
+> Marcel
+> 
