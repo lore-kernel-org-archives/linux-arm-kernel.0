@@ -1,58 +1,44 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu, 26 Apr 2018 10:22:32 -0700
-Subject: [PATCH] clk:aspeed: Fix reset bits for PCI/VGA and PECI
-Message-ID: <20180426172232.12535-1-jae.hyun.yoo@linux.intel.com>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Thu, 26 Apr 2018 19:23:28 +0200
+Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
+In-Reply-To: <1524759629.2693.465.camel@hpe.com>
+References: <20180314180155.19492-1-toshi.kani@hpe.com>
+ <20180314180155.19492-3-toshi.kani@hpe.com>
+ <20180426141926.GN15462@8bytes.org>
+ <1524759629.2693.465.camel@hpe.com>
+Message-ID: <20180426172327.GQ15462@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes incorrect setting of reset bits for PCI/VGA and
-PECI modules.
+On Thu, Apr 26, 2018 at 04:21:19PM +0000, Kani, Toshi wrote:
+> All pages under the pmd had been unmapped and then lazy TLB purged with
+> INVLPG before coming to this code path.  Speculation is not allowed to
+> pages without mapping.
 
-1. Reset bit for PCI/VGA is 8.
-2. PECI reset bit is missing so added bit 10 as its reset bit.
+CPUs have not only TLBs, but also page-walk caches which cache
+intermediary results of page-table walks and which is flushed together
+with the TLB.
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-Fixes: 15ed8ce5f84e ("clk: aspeed: Register gated clocks")
-Cc: stable <stable@vger.kernel.org>
----
- drivers/clk/clk-aspeed.c                 | 4 ++--
- include/dt-bindings/clock/aspeed-clock.h | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+So the PMD entry you clear can still be in a page-walk cache and this
+needs to be flushed too before you can free the PTE page. Otherwise
+page-walks might still go to the page you just freed. That is especially
+bad when the page is already reallocated and filled with other data.
 
-diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-index 5eb50c31e455..2c23e7d7ba28 100644
---- a/drivers/clk/clk-aspeed.c
-+++ b/drivers/clk/clk-aspeed.c
-@@ -88,7 +88,7 @@ static const struct aspeed_gate_data aspeed_gates[] = {
- 	[ASPEED_CLK_GATE_GCLK] =	{  1,  7, "gclk-gate",		NULL,	0 }, /* 2D engine */
- 	[ASPEED_CLK_GATE_MCLK] =	{  2, -1, "mclk-gate",		"mpll",	CLK_IS_CRITICAL }, /* SDRAM */
- 	[ASPEED_CLK_GATE_VCLK] =	{  3,  6, "vclk-gate",		NULL,	0 }, /* Video Capture */
--	[ASPEED_CLK_GATE_BCLK] =	{  4, 10, "bclk-gate",		"bclk",	0 }, /* PCIe/PCI */
-+	[ASPEED_CLK_GATE_BCLK] =	{  4,  8, "bclk-gate",		"bclk",	0 }, /* PCIe/PCI */
- 	[ASPEED_CLK_GATE_DCLK] =	{  5, -1, "dclk-gate",		NULL,	0 }, /* DAC */
- 	[ASPEED_CLK_GATE_REFCLK] =	{  6, -1, "refclk-gate",	"clkin", CLK_IS_CRITICAL },
- 	[ASPEED_CLK_GATE_USBPORT2CLK] =	{  7,  3, "usb-port2-gate",	NULL,	0 }, /* USB2.0 Host port 2 */
-@@ -297,7 +297,7 @@ static const u8 aspeed_resets[] = {
- 	[ASPEED_RESET_JTAG_MASTER] = 22,
- 	[ASPEED_RESET_MIC]	= 18,
- 	[ASPEED_RESET_PWM]	=  9,
--	[ASPEED_RESET_PCIVGA]	=  8,
-+	[ASPEED_RESET_PECI]	= 10,
- 	[ASPEED_RESET_I2C]	=  2,
- 	[ASPEED_RESET_AHB]	=  1,
- };
-diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
-index d3558d897a4d..8d69b9134bef 100644
---- a/include/dt-bindings/clock/aspeed-clock.h
-+++ b/include/dt-bindings/clock/aspeed-clock.h
-@@ -45,7 +45,7 @@
- #define ASPEED_RESET_JTAG_MASTER	3
- #define ASPEED_RESET_MIC		4
- #define ASPEED_RESET_PWM		5
--#define ASPEED_RESET_PCIVGA		6
-+#define ASPEED_RESET_PECI		6
- #define ASPEED_RESET_I2C		7
- #define ASPEED_RESET_AHB		8
- 
--- 
-2.17.0
+> > Further this needs synchronization with other page-tables in the system
+> > when the kernel PMDs are not shared between processes. In x86-32 with
+> > PAE this causes a BUG_ON() being triggered at arch/x86/mm/fault.c:268
+> > because the page-tables are not correctly synchronized.
+> 
+> I think this is an issue with pmd mapping support on x86-32-PAE, not
+> with this patch.  I think the code needed to be updated to sync at the
+> pud level.
+
+It is an issue with this patch, because this patch is for x86 and on x86
+every change to the kernel page-tables potentially needs to by
+synchronized to the other page-tables. And this patch doesn't implement
+it, which triggers a BUG_ON() under certain conditions.
+
+
+Regards,
+
+	Joerg
