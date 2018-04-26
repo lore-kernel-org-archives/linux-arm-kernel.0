@@ -1,37 +1,30 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 26 Apr 2018 13:05:39 +0100
-Subject: [PATCH v6 02/24] soc: qcom: Add APR bus driver
-In-Reply-To: <20180426113911.GA21755@sirena.org.uk>
-References: <20180426094606.4775-1-srinivas.kandagatla@linaro.org>
- <20180426094606.4775-3-srinivas.kandagatla@linaro.org>
- <20180426113911.GA21755@sirena.org.uk>
-Message-ID: <35bf7a17-8d76-285f-987b-bf74e2b8e5b8@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 26 Apr 2018 14:09:41 +0200
+Subject: [PATCH v2 1/5] drm/nouveau: tegra: Detach from ARM DMA/IOMMU
+ mapping
+In-Reply-To: <20180425151815.GB16075@infradead.org>
+References: <20180425101051.15349-1-thierry.reding@gmail.com>
+ <20180425151815.GB16075@infradead.org>
+Message-ID: <20180426120941.GC11985@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 26/04/18 12:39, Mark Brown wrote:
-> On Thu, Apr 26, 2018 at 10:45:44AM +0100, srinivas.kandagatla at linaro.org wrote:
->> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>
->> This patch adds support toi APR bus (Asynchronous Packet Router) driver.
->> ARP driver is made as a bus driver so that the apr devices can added removed
+On Wed, Apr 25, 2018 at 08:18:15AM -0700, Christoph Hellwig wrote:
+> The series seems to miss a cover letter.
 > 
-> What is the plan for getting this patch merged?  I think the only review
-> I've seen from maintainers thus far has been from Rob on the DT binding.
-It was initially reviewed by Bjorn and Rohit. I requested Andy to have 
-quick look at this.
+> Also I really think this patch original patch shouldn't be in the proper
+> series.
 
-I was hoping that APR driver would go via Andy's ARM patches. And the 
-rest via your tree.
+I added a note explaining why I included this. Not everyone in this
+discussion had seen the patch and therefore may not be aware of the
+problem that the series attempts to fix. I agree that it shouldn't
+be merged as part of the series, though.
 
-"depends on QCOM_APR" should prevent drivers from building without apr.
-
-> It's obviously going to be a dependency for everything else.
-> 
-> Also just saw ARP->APR there.
-I will fix that!
-> 
-
---srini
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180426/a91efdbf/attachment.sig>
