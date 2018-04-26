@@ -1,49 +1,34 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 26 Apr 2018 10:52:59 +0200
-Subject: [PATCH 00/11] PM / Domains: Fixup error paths with
+Date: Thu, 26 Apr 2018 10:53:08 +0200
+Subject: [PATCH 09/11] mmc: sdio: Respect all error codes from
  dev_pm_domain_attach()
-Message-ID: <1524732790-2234-1-git-send-email-ulf.hansson@linaro.org>
+In-Reply-To: <1524732790-2234-1-git-send-email-ulf.hansson@linaro.org>
+References: <1524732790-2234-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1524732790-2234-10-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While I was on working adding support for multiple PM domains to genpd, I
-stumbled over several problems in the error path related to
-dev_pm_domain_attach(). Hence, I decided to fix these problems first, which is
-what this series intends to address.
+The limitation of being able to check only for -EPROBE_DEFER from
+dev_pm_domain_attach() has been removed. Hence let's respect all error
+codes and bail out accordingly.
 
-There first patch is material for stable, as it fixes a real bug in genpd,
-while the rest may be considered as improvement of the error paths when devices
-fails to be attached to their PM domains.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/mmc/core/sdio_bus.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I am seeking acks from subsystem maintainers and suggest with funnel the hole
-series through Rafael's linux-pm tree, unless there are objections to that of
-course.
-
-Ulf Hansson (11):
-  PM / Domains: Fix error path during attach in genpd
-  PM / Domains: Drop comment in genpd about legacy Samsung DT binding
-  PM / Domains: Drop redundant code in genpd while attaching devices
-  PM / Domains: Check for existing PM domain in dev_pm_domain_attach()
-  PM / Domains: Allow a better error handling of dev_pm_domain_attach()
-  amba: Respect all error codes from dev_pm_domain_attach()
-  driver core: Respect all error codes from dev_pm_domain_attach()
-  i2c: Respect all error codes from dev_pm_domain_attach()
-  mmc: sdio: Respect all error codes from dev_pm_domain_attach()
-  soundwire: Respect all error codes from dev_pm_domain_attach()
-  spi: Respect all error codes from dev_pm_domain_attach()
-
- drivers/acpi/device_pm.c     |  9 +++------
- drivers/amba/bus.c           |  4 ++--
- drivers/base/platform.c      | 17 ++++++++---------
- drivers/base/power/common.c  | 10 +++++++---
- drivers/base/power/domain.c  | 45 +++++++++++++++-----------------------------
- drivers/i2c/i2c-core-base.c  |  2 +-
- drivers/mmc/core/sdio_bus.c  |  2 +-
- drivers/soundwire/bus_type.c | 15 +++++++--------
- drivers/spi/spi.c            | 11 ++++++-----
- include/linux/acpi.h         |  2 +-
- include/linux/pm_domain.h    |  2 +-
- 11 files changed, 52 insertions(+), 67 deletions(-)
-
+diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
+index 2b32b88..b6d8203 100644
+--- a/drivers/mmc/core/sdio_bus.c
++++ b/drivers/mmc/core/sdio_bus.c
+@@ -139,7 +139,7 @@ static int sdio_bus_probe(struct device *dev)
+ 		return -ENODEV;
+ 
+ 	ret = dev_pm_domain_attach(dev, false);
+-	if (ret == -EPROBE_DEFER)
++	if (ret)
+ 		return ret;
+ 
+ 	/* Unbound SDIO functions are always suspended.
 -- 
 2.7.4
