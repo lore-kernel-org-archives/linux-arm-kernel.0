@@ -1,51 +1,75 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Thu, 26 Apr 2018 17:49:58 +0000
-Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
-In-Reply-To: <20180426172327.GQ15462@8bytes.org>
-References: <20180314180155.19492-1-toshi.kani@hpe.com>
- <20180314180155.19492-3-toshi.kani@hpe.com>
- <20180426141926.GN15462@8bytes.org> <1524759629.2693.465.camel@hpe.com>
- <20180426172327.GQ15462@8bytes.org>
-Message-ID: <1524764948.2693.478.camel@hpe.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Apr 2018 18:56:53 +0100
+Subject: [PATCH 0/6] arm64: untag user pointers passed to the kernel
+In-Reply-To: <CAAeHK+yb-U3h0666i3u3fF3=8XVcZUo1nxZ5CnOd9oUiDFP=Ng@mail.gmail.com>
+References: <cover.1524077494.git.andreyknvl@google.com>
+ <20180419093306.rn5bz264nxsn7d7c@node.shutemov.name>
+ <CAAeHK+yb-U3h0666i3u3fF3=8XVcZUo1nxZ5CnOd9oUiDFP=Ng@mail.gmail.com>
+Message-ID: <20180426175653.q7mqzzqvdoihn5so@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-04-26 at 19:23 +0200, joro at 8bytes.org wrote:
-> On Thu, Apr 26, 2018 at 04:21:19PM +0000, Kani, Toshi wrote:
-> > All pages under the pmd had been unmapped and then lazy TLB purged with
-> > INVLPG before coming to this code path.  Speculation is not allowed to
-> > pages without mapping.
+On Wed, Apr 25, 2018 at 04:45:37PM +0200, Andrey Konovalov wrote:
+> On Thu, Apr 19, 2018 at 11:33 AM, Kirill A. Shutemov
+> <kirill@shutemov.name> wrote:
+> > On Wed, Apr 18, 2018 at 08:53:09PM +0200, Andrey Konovalov wrote:
+> >> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
+> >> tags into the top byte of each pointer. Userspace programs (such as
+> >> HWASan, a memory debugging tool [1]) might use this feature and pass
+> >> tagged user pointers to the kernel through syscalls or other interfaces.
+> >>
+> >> This patch makes a few of the kernel interfaces accept tagged user
+> >> pointers. The kernel is already able to handle user faults with tagged
+> >> pointers and has the untagged_addr macro, which this patchset reuses.
+> >>
+> >> We're not trying to cover all possible ways the kernel accepts user
+> >> pointers in one patchset, so this one should be considered as a start.
+> >
+> > How many changes do you anticipate?
+> >
+> > This patchset looks small and reasonable, but I see a potential to become a
+> > boilerplate. Would we need to change every driver which implements ioctl()
+> > to strip these bits?
 > 
-> CPUs have not only TLBs, but also page-walk caches which cache
-> intermediary results of page-table walks and which is flushed together
-> with the TLB.
+> I've replied to somewhat similar question in one of the previous
+> versions of the patchset.
 > 
-> So the PMD entry you clear can still be in a page-walk cache and this
-> needs to be flushed too before you can free the PTE page. Otherwise
-> page-walks might still go to the page you just freed. That is especially
-> bad when the page is already reallocated and filled with other data.
-
-I do not understand why we need to flush processor caches here. x86
-processor caches are coherent with MESI.  So, clearing an PMD entry
-modifies a cache entry on the processor associated with the address,
-which in turn invalidates all stale cache entries on other processors.
-
-> > > Further this needs synchronization with other page-tables in the system
-> > > when the kernel PMDs are not shared between processes. In x86-32 with
-> > > PAE this causes a BUG_ON() being triggered at arch/x86/mm/fault.c:268
-> > > because the page-tables are not correctly synchronized.
-> > 
-> > I think this is an issue with pmd mapping support on x86-32-PAE, not
-> > with this patch.  I think the code needed to be updated to sync at the
-> > pud level.
+> """
+> There are two different approaches to untagging the user pointers that I see:
 > 
-> It is an issue with this patch, because this patch is for x86 and on x86
-> every change to the kernel page-tables potentially needs to by
-> synchronized to the other page-tables. And this patch doesn't implement
-> it, which triggers a BUG_ON() under certain conditions.
+> 1. Untag user pointers right after they are passed to the kernel.
+> 
+> While this might be possible for pointers that are passed to syscalls
+> as arguments (Catalin's "hack"), this leaves user pointers, that are
+> embedded into for example structs that are passed to the kernel. Since
+> there's no specification of the interface between user space and the
+> kernel, different kernel parts handle user pointers differently and I
+> don't see an easy way to cover them all.
+> 
+> 2. Untag user pointers where they are used in the kernel.
+> 
+> Although there's no specification on the interface between the user
+> space and the kernel, the kernel still has to use one of a few
+> specific ways to access user data (copy_from_user, etc.). So the idea
+> here is to add untagging into them. This patchset mostly takes this
+> approach (with the exception of memory subsystem syscalls).
+> 
+> If there's a better approach, I'm open to suggestions.
+> """
+> 
+> So if we go with the first way, we'll need to go through every syscall
+> and ioctl handler, which doesn't seem feasible.
 
-The issue was introduced when pmd mapping support was added on x86/32,
-which was made prior to this patch.
+I agree with you that (1) isn't feasible. My hack is sufficient for the
+pointer arguments but doesn't help with pointers in user structures
+passed to the kernel.
 
-Thanks,
--Toshi
+Now, since the hardware allows access to user pointers with non-zero top
+8-bit, the kernel uaccess routines can also use such pointers directly.
+What's needed, as per your patches, is the access_ok() macro and
+whatever ends up calling find_vma() (at a first look, there may be other
+cases). I don't think drivers need changing as long as the in-kernel API
+they use performs the untagging (e.g. get_user_pages()).
+
+-- 
+Catalin
