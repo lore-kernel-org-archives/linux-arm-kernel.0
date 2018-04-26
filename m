@@ -1,40 +1,34 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 26 Apr 2018 22:04:01 +0200
-Subject: [PATCH 20/61] input: keyboard: simplify getting .drvdata
-In-Reply-To: <20180426191947.GC162443@dtor-ws>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <20180419140641.27926-21-wsa+renesas@sang-engineering.com>
- <20180426191947.GC162443@dtor-ws>
-Message-ID: <20180426200401.lvqiy4gnchkwr4qw@ninjato>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Thu, 26 Apr 2018 22:07:37 +0200
+Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
+In-Reply-To: <1524764948.2693.478.camel@hpe.com>
+References: <20180314180155.19492-1-toshi.kani@hpe.com>
+ <20180314180155.19492-3-toshi.kani@hpe.com>
+ <20180426141926.GN15462@8bytes.org>
+ <1524759629.2693.465.camel@hpe.com>
+ <20180426172327.GQ15462@8bytes.org>
+ <1524764948.2693.478.camel@hpe.com>
+Message-ID: <20180426200737.GS15462@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
-
-> > We should get drvdata from struct device directly. Going via
-> > platform_device is an unneeded step back and forth.
+On Thu, Apr 26, 2018 at 05:49:58PM +0000, Kani, Toshi wrote:
+> On Thu, 2018-04-26 at 19:23 +0200, joro at 8bytes.org wrote:
+> > So the PMD entry you clear can still be in a page-walk cache and this
+> > needs to be flushed too before you can free the PTE page. Otherwise
+> > page-walks might still go to the page you just freed. That is especially
+> > bad when the page is already reallocated and filled with other data.
 > 
-> I consider the fact that platform device's driver data is accessible via
-> device driver data being implementation detail that may or may not change
+> I do not understand why we need to flush processor caches here. x86
+> processor caches are coherent with MESI.  So, clearing an PMD entry
+> modifies a cache entry on the processor associated with the address,
+> which in turn invalidates all stale cache entries on other processors.
 
-Isn't it actually the other way around? platform_get_drvdata() is a
-convenience function to access driver_data which is embedded in struct
-device?
+A page walk cache is not about the processors data cache, its a cache
+similar to the TLB to speed up page-walks by caching intermediate
+results of previous page walks.
 
-> in the future, so I'd prefer keep using the proper accessors for the
-> objects we are dealing with.
 
-Exactly. I'd just argue, the object we are dealing with, declared in the
-PM functions, is a struct device.
+Thanks,
 
-Thanks for the comment,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180426/dce32dd3/attachment.sig>
+	Joerg
