@@ -1,313 +1,247 @@
-From: k.marinushkin@gmail.com (Kirill Marinushkin)
-Date: Thu, 26 Apr 2018 19:34:48 +0200
-Subject: [PATCH v3] staging: bcm2835-audio: Disconnect and free vchi_instance
- on module_exit()
-In-Reply-To: <20180425061638.GA1450@kroah.com>
-References: <20180425061638.GA1450@kroah.com>
-Message-ID: <20180426173448.4413-1-k.marinushkin@gmail.com>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Thu, 26 Apr 2018 13:44:04 -0400
+Subject: [PATCH] arm64: export memblock_reserve()d regions via /proc/iomem
+In-Reply-To: <20180425132250.9397-1-james.morse@arm.com>
+References: <20180425132250.9397-1-james.morse@arm.com>
+Message-ID: <95db4343-845e-2f91-261c-b1eb36889a52@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the current implementation, vchi_instance is inited during the first
-call of bcm2835_audio_open_connection(), and is never freed. It causes a
-memory leak when the module `snd_bcm2835` is removed.
+On 4/25/2018 9:22 AM, James Morse wrote:
+> There has been some confusion around what is necessary to prevent kexec
+> overwriting important memory regions. memblock: reserve, or nomap?
+> Only memblock nomap regions are reported via /proc/iomem, kexec's
+> user-space doesn't know about memblock_reserve()d regions.
+>
+> Until commit f56ab9a5b73ca ("efi/arm: Don't mark ACPI reclaim memory
+> as MEMBLOCK_NOMAP") the ACPI tables were nomap, now they are reserved
+> and thus possible for kexec to overwrite with the new kernel or initrd.
+> But this was always broken, as the UEFI memory map is also reserved
+> and not marked as nomap.
+>
+> It turns out that while kexec-tools will pick up reserved sections in
+> iomem that look like:
+> | 80000000-dfffffff : System RAM
+> |   81000000-8158ffff : reserved
+>
+> The reserved section is ignored by its 'locate_hole()' code. To fix
+> this, we need to describe memblock_reserved() and nomap regions as
+> 'reserved' at the top level:
+> | 80000000-80ffffff : System RAM
+> | 81000000-8158ffff : reserved
+> | 81590000-dfffffff : System RAM
+>
+> To complicate matters, our existing named sections are described as
+> being part of 'System RAM', but they are also memblock_reserve()d.
+> We need to keep this in-case something is depending on it. To do this
+> involves walking memblock multiple times:
+>
+> First add the 'System RAM' sections that are memory and not-reserved.
+> These may be smaller than a page if part of the page is reserved. In
+> this case we want to describe the page as reserved, so we round these
+> regions down to the smallest page-size region, which may be empty.
+> (We round-up the memblock_reserved() regions to fill in the gaps).
+>
+> The boundaries for kernel_data are changed because paging_init() punches
+> holes in the _sdata -> _edata region, and this code can't add a named
+> region that crosses memblock_reserve()d<->normal-memory regions. The
+> new helpers will catch any more overlapping regions that occur.
+>
+> Lastly, we add the memblock_reserved() regions using
+> reserve_region_with_split(), which will fill in the gaps between the
+> existing named regions. (e.g. the regions occupied by the __init code).
+> This call uses the slab allocator, so has to run from an initcall.
+>
+> Reported-by: Bhupesh Sharma <bhupesh.linux@gmail.com>
+> Reported-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Suggested-by: Akashi Takahiro <takahiro.akashi@linaro.org>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> CC: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 
-Here is how this commit fixes it:
+This patch resolves the overwriting of the ESRT memory region without the need
+to edit/update kexec.
 
-* the VCHI context (including vchi_instance) is created once in the
-  platform's devres
-* the VCHI context is allocated and connected once during module_init()
-* all created bcm2835_chips have a pointer to this VCHI context
-* bcm2835_audio_open_connection() can access the VCHI context through the
-  associated bcm2835_chip
-* the VCHI context is disconnected and freed once during module_exit()
+Thanks!
+>
+> ---
+> If we do send this to stable:
+> Fixes: d28f6df1305a ("arm64/kexec: Add core kexec support")
+>
+> If we're happy to modify user-sapce, we can do much neater things.
+>
+> It looks like UEFI's careful 'memory map not mapped' code had me convinced
+> it was nomap.
+>
+>   arch/arm64/kernel/setup.c | 136 ++++++++++++++++++++++++++++++++++++++--------
+>   1 file changed, 113 insertions(+), 23 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 30ad2f085d1f..e82c0d5c70f8 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -202,45 +202,135 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+>   	dump_stack_set_arch_desc("%s (DT)", name);
+>   }
+>   
+> +static struct resource * __init add_standard_resources(phys_addr_t start,
+> +						       phys_addr_t end,
+> +						       bool reserved)
+> +{
+> +	struct resource *res;
+> +
+> +	res = alloc_bootmem_low(sizeof(*res));
+> +
+> +	if (reserved) {
+> +		res->name  = "reserved";
+> +		res->flags = IORESOURCE_MEM;
+> +	} else {
+> +		res->name  = "System RAM";
+> +		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+> +	}
+> +	res->start = start;
+> +	res->end = end;
+> +
+> +	if (request_resource_conflict(&iomem_resource, res)) {
+> +		pr_warn_once("Attempted to add overlapping resources\n");
+> +		return NULL;
+> +	}
+> +
+> +	return res;
+> +}
+> +
+> +static void __init add_named_resources(struct resource *named_resource)
+> +{
+> +	phys_addr_t start, end;
+> +	struct resource *res;
+> +
+> +	start = __pfn_to_phys(PFN_DOWN(named_resource->start));
+> +	end = __pfn_to_phys(PFN_UP(named_resource->end)) - 1;
+> +	res = add_standard_resources(start, end, false);
+> +	if (res)
+> +		request_resource(res, named_resource);
+> +}
+> +
+>   static void __init request_standard_resources(void)
+>   {
+> +	phys_addr_t start, end;
+>   	struct memblock_region *region;
+>   	struct resource *res;
+> +	u64 i;
+> +	int num_res = 0;
+>   
+>   	kernel_code.start   = __pa_symbol(_text);
+>   	kernel_code.end     = __pa_symbol(__init_begin - 1);
+>   	kernel_data.start   = __pa_symbol(_sdata);
+> -	kernel_data.end     = __pa_symbol(_end - 1);
+> +	kernel_data.end     = __pa_symbol(_edata - 1);
+>   
+> -	for_each_memblock(memory, region) {
+> -		res = alloc_bootmem_low(sizeof(*res));
+> -		if (memblock_is_nomap(region)) {
+> -			res->name  = "reserved";
+> -			res->flags = IORESOURCE_MEM;
+> -		} else {
+> -			res->name  = "System RAM";
+> -			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+> -		}
+> -		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+> -		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
+> +	/*
+> +	 * We can't allocate memory while walking free memory, count the number
+> +	 * of struct resource's we will need. Round start/end to the smallest
+> +	 * page-size region as we round the reserved regions up.
+> +	 */
+> +	for_each_free_mem_range(i, NUMA_NO_NODE, 0, &start, &end, NULL) {
+> +		start = ALIGN(start, PAGE_SIZE);
+> +		end = ALIGN_DOWN(end, PAGE_SIZE) - 1;
+> +		if (end > start)
+> +			num_res++;
+> +	}
+> +
+> +	/* our allocation may split a free memblock */
+> +	num_res++;
+> +	res = alloc_bootmem_low(num_res * sizeof(*res));
+>   
+> -		request_resource(&iomem_resource, res);
+> +	/*
+> +	 * Add the non-reserved memory regions. flag=0 means we skip nomap
+> +	 * regions too.
+> +	 */
+> +	for_each_free_mem_range(i, NUMA_NO_NODE, 0, &start, &end, NULL) {
+> +		if (WARN_ON(!num_res))
+> +			return;
+> +
+> +		res->name  = "System RAM";
+> +		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+> +
+> +		res->start = ALIGN(start, PAGE_SIZE);
+> +		res->end = ALIGN_DOWN(end, PAGE_SIZE) - 1;
+> +		if (res->end > res->start) {
+> +			request_resource(&iomem_resource, res);
+> +			res++;
+> +			num_res--;
+> +		}
+> +	}
+>   
+> -		if (kernel_code.start >= res->start &&
+> -		    kernel_code.end <= res->end)
+> -			request_resource(res, &kernel_code);
+> -		if (kernel_data.start >= res->start &&
+> -		    kernel_data.end <= res->end)
+> -			request_resource(res, &kernel_data);
+> +	/* Add the named reserved regions and their system-ram parents */
+> +	add_named_resources(&kernel_code);
+> +	add_named_resources(&kernel_data);
+>   #ifdef CONFIG_KEXEC_CORE
+> -		/* Userspace will find "Crash kernel" region in /proc/iomem. */
+> -		if (crashk_res.end && crashk_res.start >= res->start &&
+> -		    crashk_res.end <= res->end)
+> -			request_resource(res, &crashk_res);
+> +	if (crashk_res.end)
+> +		add_named_resources(&crashk_res);
+>   #endif
+> +
+> +	/* Add the nomap regions */
+> +	for_each_memblock(memory, region) {
+> +		if (!memblock_is_nomap(region))
+> +			continue;
+> +
+> +		start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+> +		end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
+> +		add_standard_resources(start, end, true);
+>   	}
+>   }
+>   
+> +static int __init reserve_memblock_reserved_regions(void)
+> +{
+> +	phys_addr_t start, end, roundup_end = 0;
+> +	u64 i;
+> +
+> +	for_each_reserved_mem_region(i, &start, &end) {
+> +		if (end <= roundup_end)
+> +			continue; /* done already */
+> +
+> +		start = __pfn_to_phys(PFN_DOWN(start));
+> +		end = __pfn_to_phys(PFN_UP(end)) - 1;
+> +		roundup_end = end;
+> +
+> +		reserve_region_with_split(&iomem_resource, start, end,
+> +					  "reserved");
+> +	}
+> +
+> +	return 0;
+> +}
+> +/* reserve_region_with_split() requires the slab allocator: */
+> +arch_initcall(reserve_memblock_reserved_regions);
+> +
+> +
+>   u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+>   
+>   void __init setup_arch(char **cmdline_p)
 
-After this commit is applied, I don't see other issues with the module's
-init/exit, so I also remove the associated TODO task.
-
-Steps to reproduce the memory leak before this commit:
-
-~~~~
-root at raspberrypi:/home/pi# aplay test0.wav
-Playing WAVE 'test0.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Ster
-^CAborted by signal Interrupt...
-root at raspberrypi:/home/pi# rmmod snd_bcm2835
-root at raspberrypi:/home/pi# modprobe snd_bcm2835
-root at raspberrypi:/home/pi# aplay test0.wav
-Playing WAVE 'test0.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Ster
-^CAborted by signal Interrupt...
-root at raspberrypi:/home/pi# echo scan > /sys/kernel/debug/kmemleak
-root at raspberrypi:/home/pi# cat /sys/kernel/debug/kmemleak
-unreferenced object 0xb6794c00 (size 128):
-  comm "aplay", pid 406, jiffies 36870 (age 116.650s)
-  hex dump (first 32 bytes):
-    08 a5 82 81 01 00 00 00 08 4c 79 b6 08 4c 79 b6  .........Ly..Ly.
-    00 00 00 00 00 00 00 00 ad 4e ad de ff ff ff ff  .........N......
-  backtrace:
-    [<802af5e0>] kmem_cache_alloc_trace+0x294/0x3d0
-    [<806ce620>] vchiq_initialise+0x98/0x1b0
-    [<806d0b34>] vchi_initialise+0x24/0x34
-    [<7f1311ec>] 0x7f1311ec
-    [<7f1303bc>] 0x7f1303bc
-    [<7f130590>] 0x7f130590
-    [<7f111fd8>] snd_pcm_open_substream+0x68/0xc4 [snd_pcm]
-    [<7f112108>] snd_pcm_open+0xd4/0x248 [snd_pcm]
-    [<7f112334>] snd_pcm_playback_open+0x4c/0x6c [snd_pcm]
-    [<7f0e250c>] snd_open+0xa8/0x14c [snd]
-    [<802ce590>] chrdev_open+0xac/0x188
-    [<802c57b4>] do_dentry_open+0x10c/0x314
-    [<802c6ba8>] vfs_open+0x5c/0x88
-    [<802d9a68>] path_openat+0x368/0x944
-    [<802dacd4>] do_filp_open+0x70/0xc4
-    [<802c6f70>] do_sys_open+0x110/0x1d4
-~~~~
-
-Signed-off-by: Kirill Marinushkin <k.marinushkin@gmail.com>
-Cc: Eric Anholt <eric@anholt.net>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Cc: Andy Shevchenko <andy.shevchenko@gmail.com>
-Cc: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: bcm-kernel-feedback-list at broadcom.com
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devel at driverdev.osuosl.org
-Cc: linux-kernel at vger.kernel.org
----
-Chagelog
-
-v1: Initial patch
-
-v2: Fixed the compiler warning
-@drivers/staging/vc04_services/bcm2835-audio/bcm2835.c:168
-        if (!chip->vchi_ctx) {
-                kfree(chip);
--               return err;
-+               return -ENODEV;
-        }
-
-v3: Appended this changelog
-
- .../vc04_services/bcm2835-audio/bcm2835-vchiq.c    | 64 +++++++++++++---------
- .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 43 ++++++++++++++-
- .../staging/vc04_services/bcm2835-audio/bcm2835.h  | 12 ++++
- 3 files changed, 91 insertions(+), 28 deletions(-)
-
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
-index 3c6f1d91d22d..389a18f9350a 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
-@@ -33,7 +33,6 @@
- 
- /* ---- Include Files -------------------------------------------------------- */
- 
--#include "interface/vchi/vchi.h"
- #include "vc_vchi_audioserv_defs.h"
- 
- /* ---- Private Constants and Types ------------------------------------------ */
-@@ -371,14 +370,46 @@ static int vc_vchi_audio_deinit(struct bcm2835_audio_instance *instance)
- 	return 0;
- }
- 
-+int bcm2835_new_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx)
-+{
-+	int ret;
-+
-+	/* Initialize and create a VCHI connection */
-+	ret = vchi_initialise(&vchi_ctx->vchi_instance);
-+	if (ret) {
-+		LOG_ERR("%s: failed to initialise VCHI instance (ret=%d)\n",
-+			__func__, ret);
-+
-+		return -EIO;
-+	}
-+
-+	ret = vchi_connect(NULL, 0, vchi_ctx->vchi_instance);
-+	if (ret) {
-+		LOG_ERR("%s: failed to connect VCHI instance (ret=%d)\n",
-+			__func__, ret);
-+
-+		kfree(vchi_ctx->vchi_instance);
-+		vchi_ctx->vchi_instance = NULL;
-+
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+void bcm2835_free_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx)
-+{
-+	/* Close the VCHI connection - it will also free vchi_instance */
-+	WARN_ON(vchi_disconnect(vchi_ctx->vchi_instance));
-+
-+	vchi_ctx->vchi_instance = NULL;
-+}
-+
- static int bcm2835_audio_open_connection(struct bcm2835_alsa_stream *alsa_stream)
- {
--	static VCHI_INSTANCE_T vchi_instance;
--	static VCHI_CONNECTION_T *vchi_connection;
--	static int initted;
- 	struct bcm2835_audio_instance *instance =
- 		(struct bcm2835_audio_instance *)alsa_stream->instance;
--	int ret;
-+	struct bcm2835_vchi_ctx *vhci_ctx = alsa_stream->chip->vchi_ctx;
- 
- 	LOG_INFO("%s: start\n", __func__);
- 	BUG_ON(instance);
-@@ -390,28 +421,9 @@ static int bcm2835_audio_open_connection(struct bcm2835_alsa_stream *alsa_stream
- 		return 0;
- 	}
- 
--	/* Initialize and create a VCHI connection */
--	if (!initted) {
--		ret = vchi_initialise(&vchi_instance);
--		if (ret) {
--			LOG_ERR("%s: failed to initialise VCHI instance (ret=%d)\n",
--				__func__, ret);
--
--			return -EIO;
--		}
--		ret = vchi_connect(NULL, 0, vchi_instance);
--		if (ret) {
--			LOG_ERR("%s: failed to connect VCHI instance (ret=%d)\n",
--				__func__, ret);
--
--			kfree(vchi_instance);
--			return -EIO;
--		}
--		initted = 1;
--	}
--
- 	/* Initialize an instance of the audio service */
--	instance = vc_vchi_audio_init(vchi_instance, &vchi_connection, 1);
-+	instance = vc_vchi_audio_init(vhci_ctx->vchi_instance,
-+				      &vhci_ctx->vchi_connection, 1);
- 
- 	if (IS_ERR(instance)) {
- 		LOG_ERR("%s: failed to initialize audio service\n", __func__);
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-index 9030d71a3d0b..662e05bd8f05 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
-@@ -65,6 +65,36 @@ static int snd_devm_add_child(struct device *dev, struct device *child)
- 	return 0;
- }
- 
-+static void bcm2835_devm_free_vchi_ctx(struct device *dev, void *res)
-+{
-+	struct bcm2835_vchi_ctx *vchi_ctx = res;
-+
-+	bcm2835_free_vchi_ctx(vchi_ctx);
-+}
-+
-+static int bcm2835_devm_add_vchi_ctx(struct device *dev)
-+{
-+	struct bcm2835_vchi_ctx *vchi_ctx;
-+	int ret;
-+
-+	vchi_ctx = devres_alloc(bcm2835_devm_free_vchi_ctx, sizeof(*vchi_ctx),
-+				GFP_KERNEL);
-+	if (!vchi_ctx)
-+		return -ENOMEM;
-+
-+	memset(vchi_ctx, 0, sizeof(*vchi_ctx));
-+
-+	ret = bcm2835_new_vchi_ctx(vchi_ctx);
-+	if (ret) {
-+		devres_free(vchi_ctx);
-+		return ret;
-+	}
-+
-+	devres_add(dev, vchi_ctx);
-+
-+	return 0;
-+}
-+
- static void snd_bcm2835_release(struct device *dev)
- {
- 	struct bcm2835_chip *chip = dev_get_drvdata(dev);
-@@ -106,8 +136,6 @@ static int snd_bcm2835_dev_free(struct snd_device *device)
- 	struct bcm2835_chip *chip = device->device_data;
- 	struct snd_card *card = chip->card;
- 
--	/* TODO: free pcm, ctl */
--
- 	snd_device_free(card, chip);
- 
- 	return 0;
-@@ -133,6 +161,13 @@ static int snd_bcm2835_create(struct snd_card *card,
- 
- 	chip->card = card;
- 
-+	chip->vchi_ctx = devres_find(card->dev->parent,
-+				     bcm2835_devm_free_vchi_ctx, NULL, NULL);
-+	if (!chip->vchi_ctx) {
-+		kfree(chip);
-+		return -ENODEV;
-+	}
-+
- 	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
- 	if (err) {
- 		kfree(chip);
-@@ -403,6 +438,10 @@ static int snd_bcm2835_alsa_probe_dt(struct platform_device *pdev)
- 			 numchans);
- 	}
- 
-+	err = bcm2835_devm_add_vchi_ctx(dev);
-+	if (err)
-+		return err;
-+
- 	err = snd_add_child_devices(dev, numchans);
- 	if (err)
- 		return err;
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
-index f1e43e45fd67..1c82c2ee47dc 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
-@@ -26,6 +26,8 @@
- #include <sound/pcm-indirect.h>
- #include <linux/workqueue.h>
- 
-+#include "interface/vchi/vchi.h"
-+
- /*
-  * #define AUDIO_DEBUG_ENABLE
-  * #define AUDIO_VERBOSE_DEBUG_ENABLE
-@@ -97,6 +99,11 @@ enum snd_bcm2835_ctrl {
- 	PCM_PLAYBACK_DEVICE,
- };
- 
-+struct bcm2835_vchi_ctx {
-+	VCHI_INSTANCE_T vchi_instance;
-+	VCHI_CONNECTION_T *vchi_connection;
-+};
-+
- /* definition of the chip-specific record */
- struct bcm2835_chip {
- 	struct snd_card *card;
-@@ -115,6 +122,8 @@ struct bcm2835_chip {
- 	unsigned int opened;
- 	unsigned int spdif_status;
- 	struct mutex audio_mutex;
-+
-+	struct bcm2835_vchi_ctx *vchi_ctx;
- };
- 
- struct bcm2835_alsa_stream {
-@@ -153,6 +162,9 @@ int snd_bcm2835_new_simple_pcm(struct bcm2835_chip *chip,
- int snd_bcm2835_new_hdmi_ctl(struct bcm2835_chip *chip);
- int snd_bcm2835_new_headphones_ctl(struct bcm2835_chip *chip);
- 
-+int bcm2835_new_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx);
-+void bcm2835_free_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx);
-+
- int bcm2835_audio_open(struct bcm2835_alsa_stream *alsa_stream);
- int bcm2835_audio_close(struct bcm2835_alsa_stream *alsa_stream);
- int bcm2835_audio_set_params(struct bcm2835_alsa_stream *alsa_stream,
 -- 
-2.13.6
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
