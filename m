@@ -1,53 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 26 Apr 2018 23:34:35 +0300
-Subject: [PATCH 2/2] arm64: dts: renesas: eagle: add CAN-FD support
-In-Reply-To: <4e5216bc-5f1b-ace4-1aea-02269cd206ac@cogentembedded.com>
-References: <4e5216bc-5f1b-ace4-1aea-02269cd206ac@cogentembedded.com>
-Message-ID: <87aa94b9-5f5f-f23e-3852-b71caeeae7b5@cogentembedded.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 26 Apr 2018 23:53:57 +0300
+Subject: [PATCH 08/17] arm64: dts: r8a77965: Provide sysc header
+ definitions
+In-Reply-To: <20180426165346.494-9-kieran.bingham+renesas@ideasonboard.com>
+References: <20180426165346.494-1-kieran.bingham+renesas@ideasonboard.com>
+ <20180426165346.494-9-kieran.bingham+renesas@ideasonboard.com>
+Message-ID: <2073410.9lt478HeGL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Eagle board dependent part of the CAN-FD device node.
+Hi Kieran,
 
-Based on the original (and large) patch by Vladimir Barinov.
+Thank you for the patch.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Thursday, 26 April 2018 19:53:37 EEST Kieran Bingham wrote:
+> Include the r8a77965-sysc header to provide power domain enumerations
+> and definitions.
 
----
- arch/arm64/boot/dts/renesas/r8a77970-eagle.dts |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+I think you can squash this with the first patch that will use the header.
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-@@ -95,6 +95,16 @@
- 	};
- };
- 
-+&canfd {
-+	pinctrl-0 = <&canfd0_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	channel0 {
-+		status = "okay";
-+	};
-+};
-+
- &extal_clk {
- 	clock-frequency = <16666666>;
- };
-@@ -156,6 +166,11 @@
- 		function = "avb0";
- 	};
- 
-+	canfd0_pins: canfd0 {
-+		groups = "canfd0_data_a";
-+		function = "canfd0";
-+	};
-+
- 	i2c0_pins: i2c0 {
- 		groups = "i2c0";
- 		function = "i2c0";
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> ---
+>  arch/arm64/boot/dts/renesas/r8a77965.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> b/arch/arm64/boot/dts/renesas/r8a77965.dtsi index
+> b12f41755aea..02de36b9e581 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> @@ -10,6 +10,7 @@
+> 
+>  #include <dt-bindings/clock/renesas-cpg-mssr.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/power/r8a77965-sysc.h>
+> 
+>  #define CPG_AUDIO_CLK_I		10
+
+-- 
+Regards,
+
+Laurent Pinchart
