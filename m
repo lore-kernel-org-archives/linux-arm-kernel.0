@@ -1,46 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Apr 2018 11:34:18 +0100
-Subject: [PATCH v3 04/14] locking/qspinlock/x86: Increase _Q_PENDING_LOOPS
- upper bound
-In-Reply-To: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
-References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1524738868-31318-5-git-send-email-will.deacon@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 26 Apr 2018 11:54:40 +0100
+Subject: [RFC PATCH v4] tty: pl011: Avoid spuriously stuck-off interrupts
+Message-ID: <1524740081-4979-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On x86, atomic_cond_read_relaxed will busy-wait with a cpu_relax() loop,
-so it is desirable to increase the number of times we spin on the qspinlock
-lockword when it is found to be transitioning from pending to locked.
+This is an update to a previous RFC v3 [1], to fix a problem observed by
+the qemu community that causes serial input to hang when booting a
+simulated system with data already queued in the UART FIFO [2].
 
-According to Waiman Long:
+RFC v3 did not solve the problem by itself, due to the problem being
+triggered again in pl011_enable_interrupts() after working around it
+in pl011_hwinit().  See the updated commit message in the patch for
+details.
 
-| Ideally, the spinning times should be at least a few times the typical
-| cacheline load time from memory which I think can be down to 100ns or
-| so for each cacheline load with the newest systems or up to several
-| hundreds ns for older systems.
+This patch is intended to supersede the previous RFCs, so please test
+_without_ RFC v2 (or 3) applied.
 
-which in his benchmarking corresponded to 512 iterations.
+If you can, please:
 
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Suggested-by: Waiman Long <longman@redhat.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/x86/include/asm/qspinlock.h | 2 ++
- 1 file changed, 2 insertions(+)
+ a) Check that you can still reproduce the bug on mainline without this
+    patch.
 
-diff --git a/arch/x86/include/asm/qspinlock.h b/arch/x86/include/asm/qspinlock.h
-index 90b0b0ed8161..da1370ad206d 100644
---- a/arch/x86/include/asm/qspinlock.h
-+++ b/arch/x86/include/asm/qspinlock.h
-@@ -7,6 +7,8 @@
- #include <asm-generic/qspinlock_types.h>
- #include <asm/paravirt.h>
- 
-+#define _Q_PENDING_LOOPS	(1 << 9)
-+
- #define	queued_spin_unlock queued_spin_unlock
- /**
-  * queued_spin_unlock - release a queued spinlock
+ b) Check whether this patch fixes the problem.
+
+Cheers
+---Dave
+
+[1] [RFC PATCH v3] tty: pl011: Avoid spuriously stuck-off interrupts
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573120.html
+
+[2] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
+before enabled the interruption
+https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
+
+Dave Martin (1):
+  tty: pl011: Avoid spuriously stuck-off interrupts
+
+ drivers/tty/serial/amba-pl011.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
 -- 
 2.1.4
