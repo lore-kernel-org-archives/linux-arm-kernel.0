@@ -1,300 +1,231 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Thu, 26 Apr 2018 10:46:05 +0100
-Subject: [PATCH v6 23/24] ASoC: qcom: apq8096: Add db820c machine driver
+Date: Thu, 26 Apr 2018 10:45:49 +0100
+Subject: [PATCH v6 07/24] ASoC: qdsp6: q6common: Add qdsp6 helper functions
 In-Reply-To: <20180426094606.4775-1-srinivas.kandagatla@linaro.org>
 References: <20180426094606.4775-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180426094606.4775-24-srinivas.kandagatla@linaro.org>
+Message-ID: <20180426094606.4775-8-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds support to DB820c machine driver.
+This patch adds some common helper functions like translating dsp error
+to linux error codes and channel mappings etc.
+
+These functions are used in all the following qdsp6 drivers.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 ---
- sound/soc/qcom/Kconfig   |   9 ++
- sound/soc/qcom/Makefile  |   2 +
- sound/soc/qcom/apq8096.c | 238 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 249 insertions(+)
- create mode 100644 sound/soc/qcom/apq8096.c
+ sound/soc/qcom/Kconfig              | 13 ++++++++
+ sound/soc/qcom/Makefile             |  3 ++
+ sound/soc/qcom/qdsp6/Makefile       |  1 +
+ sound/soc/qcom/qdsp6/q6dsp-common.c | 66 +++++++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6dsp-common.h | 24 ++++++++++++++
+ sound/soc/qcom/qdsp6/q6dsp-errno.h  | 51 ++++++++++++++++++++++++++++
+ 6 files changed, 158 insertions(+)
+ create mode 100644 sound/soc/qcom/qdsp6/Makefile
+ create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.h
+ create mode 100644 sound/soc/qcom/qdsp6/q6dsp-errno.h
 
 diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index a424430af391..87a66c9aa414 100644
+index 8ec9a074b38b..8247ade16dbe 100644
 --- a/sound/soc/qcom/Kconfig
 +++ b/sound/soc/qcom/Kconfig
-@@ -84,3 +84,12 @@ config SND_SOC_QDSP6
- 	 This will enable sound soc platform specific
- 	 audio drivers. This includes q6asm, q6adm,
- 	 q6afe interfaces to DSP using apr.
+@@ -43,3 +43,16 @@ config SND_SOC_APQ8016_SBC
+           Support for Qualcomm Technologies LPASS audio block in
+           APQ8016 SOC-based systems.
+           Say Y if you want to use audio devices on MI2S.
 +
-+config SND_SOC_MSM8996
-+	tristate "SoC Machine driver for MSM8996 and APQ8096 boards"
-+	depends on QCOM_APR
-+	select SND_SOC_QDSP6
++config SND_SOC_QDSP6_COMMON
++	tristate
++
++config SND_SOC_QDSP6
++	tristate "SoC ALSA audio driver for QDSP6"
++	depends on QCOM_APR && HAS_DMA
++	select SND_SOC_QDSP6_COMMON
 +	help
-+          Support for Qualcomm Technologies LPASS audio block in
-+          APQ8096 SoC-based systems.
-+          Say Y if you want to use audio device on this SoCs
++	 To add support for MSM QDSP6 Soc Audio.
++	 This will enable sound soc platform specific
++	 audio drivers. This includes q6asm, q6adm,
++	 q6afe interfaces to DSP using apr.
 diff --git a/sound/soc/qcom/Makefile b/sound/soc/qcom/Makefile
-index 0276717917c0..206945bb9ba1 100644
+index d5280355c24f..0276717917c0 100644
 --- a/sound/soc/qcom/Makefile
 +++ b/sound/soc/qcom/Makefile
-@@ -13,9 +13,11 @@ obj-$(CONFIG_SND_SOC_LPASS_APQ8016) += snd-soc-lpass-apq8016.o
- # Machine
- snd-soc-storm-objs := storm.o
- snd-soc-apq8016-sbc-objs := apq8016_sbc.o
-+snd-soc-apq8096-objs := apq8096.o
+@@ -16,3 +16,6 @@ snd-soc-apq8016-sbc-objs := apq8016_sbc.o
  
  obj-$(CONFIG_SND_SOC_STORM) += snd-soc-storm.o
  obj-$(CONFIG_SND_SOC_APQ8016_SBC) += snd-soc-apq8016-sbc.o
-+obj-$(CONFIG_SND_SOC_MSM8996) += snd-soc-apq8096.o
- 
- #DSP lib
- obj-$(CONFIG_SND_SOC_QDSP6) += qdsp6/
-diff --git a/sound/soc/qcom/apq8096.c b/sound/soc/qcom/apq8096.c
++
++#DSP lib
++obj-$(CONFIG_SND_SOC_QDSP6) += qdsp6/
+diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
 new file mode 100644
-index 000000000000..73abf862db94
+index 000000000000..accebdb49306
 --- /dev/null
-+++ b/sound/soc/qcom/apq8096.c
-@@ -0,0 +1,238 @@
++++ b/sound/soc/qcom/qdsp6/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
+diff --git a/sound/soc/qcom/qdsp6/q6dsp-common.c b/sound/soc/qcom/qdsp6/q6dsp-common.c
+new file mode 100644
+index 000000000000..fc86a747cc7b
+--- /dev/null
++++ b/sound/soc/qcom/qdsp6/q6dsp-common.c
+@@ -0,0 +1,66 @@
 +// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
 +// Copyright (c) 2018, Linaro Limited
 +
-+#include <linux/soc/qcom/apr.h>
++#include "q6dsp-common.h"
++#include <linux/kernel.h>
 +#include <linux/module.h>
-+#include <linux/component.h>
-+#include <linux/platform_device.h>
-+#include <linux/of_device.h>
-+#include <sound/soc.h>
-+#include <sound/soc-dapm.h>
-+#include <sound/pcm.h>
++#include <linux/string.h>
++#include <linux/errno.h>
 +
-+static int apq8096_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
-+				      struct snd_pcm_hw_params *params)
++int q6dsp_map_channels(u8 ch_map[PCM_FORMAT_MAX_NUM_CHANNEL], int ch)
 +{
-+	struct snd_interval *rate = hw_param_interval(params,
-+					SNDRV_PCM_HW_PARAM_RATE);
-+	struct snd_interval *channels = hw_param_interval(params,
-+					SNDRV_PCM_HW_PARAM_CHANNELS);
++	memset(ch_map, 0, PCM_FORMAT_MAX_NUM_CHANNEL);
 +
-+	rate->min = rate->max = 48000;
-+	channels->min = channels->max = 2;
-+
-+	return 0;
-+}
-+
-+static int apq8096_sbc_parse_of(struct snd_soc_card *card)
-+{
-+	struct device_node *np, *codec, *platform, *cpu, *node;
-+	struct device *dev = card->dev;
-+	struct snd_soc_dai_link *link;
-+	int ret, num_links;
-+
-+	ret = snd_soc_of_parse_card_name(card, "qcom,model");
-+	if (ret) {
-+		dev_err(dev, "Error parsing card name: %d\n", ret);
-+		return ret;
-+	}
-+
-+	node = dev->of_node;
-+
-+	/* DAPM routes */
-+	if (of_property_read_bool(node, "qcom,audio-routing")) {
-+		ret = snd_soc_of_parse_audio_routing(card,
-+					"qcom,audio-routing");
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* Populate links */
-+	num_links = of_get_child_count(node);
-+
-+	/* Allocate the DAI link array */
-+	card->dai_link = kcalloc(num_links, sizeof(*link), GFP_KERNEL);
-+	if (!card->dai_link)
-+		return -ENOMEM;
-+
-+	card->num_links	= num_links;
-+	link = card->dai_link;
-+
-+	for_each_child_of_node(node, np) {
-+		cpu = of_get_child_by_name(np, "cpu");
-+		platform = of_get_child_by_name(np, "platform");
-+		codec = of_get_child_by_name(np, "codec");
-+
-+		if (!cpu) {
-+			dev_err(dev, "Can't find cpu DT node\n");
-+			return -EINVAL;
-+		}
-+
-+		link->cpu_of_node = of_parse_phandle(cpu, "sound-dai", 0);
-+		if (!link->cpu_of_node) {
-+			dev_err(card->dev, "error getting cpu phandle\n");
-+			return -EINVAL;
-+		}
-+
-+		ret = snd_soc_of_get_dai_name(cpu, &link->cpu_dai_name);
-+		if (ret) {
-+			dev_err(card->dev, "error getting cpu dai name\n");
-+			return ret;
-+		}
-+
-+		if (codec && platform) {
-+			link->platform_of_node = of_parse_phandle(platform,
-+								  "sound-dai",
-+								   0);
-+			if (!link->platform_of_node) {
-+				dev_err(card->dev, "platform dai not found\n");
-+				return -EINVAL;
-+			}
-+
-+			ret = snd_soc_of_get_dai_link_codecs(dev, codec, link);
-+			if (ret < 0) {
-+				dev_err(card->dev, "codec dai not found\n");
-+				return ret;
-+			}
-+			link->no_pcm = 1;
-+			link->ignore_suspend = 1;
-+			link->ignore_pmdown_time = 1;
-+			link->be_hw_params_fixup = apq8096_be_hw_params_fixup;
-+		} else {
-+			link->platform_of_node = link->cpu_of_node;
-+			link->codec_dai_name = "snd-soc-dummy-dai";
-+			link->codec_name = "snd-soc-dummy";
-+			link->dynamic = 1;
-+		}
-+
-+		ret = of_property_read_string(np, "link-name", &link->name);
-+		if (ret) {
-+			dev_err(card->dev, "error getting codec dai_link name\n");
-+			return ret;
-+		}
-+
-+		link->dpcm_playback = 1;
-+		link->dpcm_capture = 1;
-+		link->stream_name = link->name;
-+		link++;
-+	}
-+
-+	return ret;
-+}
-+
-+static int apq8096_bind(struct device *dev)
-+{
-+	struct snd_soc_card *card;
-+	int ret;
-+
-+	card = kzalloc(sizeof(*card), GFP_KERNEL);
-+	if (!card)
-+		return -ENOMEM;
-+
-+	component_bind_all(dev, card);
-+	card->dev = dev;
-+	ret = apq8096_sbc_parse_of(card);
-+	if (ret) {
-+		dev_err(dev, "Error parsing OF data\n");
-+		component_unbind_all(dev, card);
-+		return ret;
-+	}
-+
-+	return snd_soc_register_card(card);
-+}
-+
-+static void apq8096_unbind(struct device *dev)
-+{
-+	struct snd_soc_card *card = dev_get_drvdata(dev);
-+
-+	component_unbind_all(dev, card);
-+	snd_soc_unregister_card(card);
-+	kfree(card->dai_link);
-+	kfree(card);
-+}
-+
-+static const struct component_master_ops apq8096_ops = {
-+	.bind = apq8096_bind,
-+	.unbind = apq8096_unbind,
-+};
-+
-+static int apq8016_compare_of(struct device *dev, void *data)
-+{
-+	return dev->of_node == data;
-+}
-+
-+static void apq8016_release_of(struct device *dev, void *data)
-+{
-+	of_node_put(data);
-+}
-+
-+static int add_audio_components(struct device *dev,
-+				struct component_match **matchptr)
-+{
-+	struct device_node *np, *platform, *cpu, *node, *dai_node;
-+
-+	node = dev->of_node;
-+
-+	for_each_child_of_node(node, np) {
-+		cpu = of_get_child_by_name(np, "cpu");
-+		if (cpu) {
-+			dai_node = of_parse_phandle(cpu, "sound-dai", 0);
-+			of_node_get(dai_node);
-+			component_match_add_release(dev, matchptr,
-+						    apq8016_release_of,
-+						    apq8016_compare_of,
-+						    dai_node);
-+		}
-+
-+		platform = of_get_child_by_name(np, "platform");
-+		if (platform) {
-+			dai_node = of_parse_phandle(platform, "sound-dai", 0);
-+			component_match_add_release(dev, matchptr,
-+						    apq8016_release_of,
-+						    apq8016_compare_of,
-+						    dai_node);
-+		}
++	switch (ch) {
++	case 1:
++		ch_map[0] = PCM_CHANNEL_FC;
++		break;
++	case 2:
++		ch_map[0] = PCM_CHANNEL_FL;
++		ch_map[1] = PCM_CHANNEL_FR;
++		break;
++	case 3:
++		ch_map[0] = PCM_CHANNEL_FL;
++		ch_map[1] = PCM_CHANNEL_FR;
++		ch_map[2] = PCM_CHANNEL_FC;
++		break;
++	case 4:
++		ch_map[0] = PCM_CHANNEL_FL;
++		ch_map[1] = PCM_CHANNEL_FR;
++		ch_map[2] = PCM_CHANNEL_LS;
++		ch_map[3] = PCM_CHANNEL_RS;
++		break;
++	case 5:
++		ch_map[0] = PCM_CHANNEL_FL;
++		ch_map[1] = PCM_CHANNEL_FR;
++		ch_map[2] = PCM_CHANNEL_FC;
++		ch_map[3] = PCM_CHANNEL_LS;
++		ch_map[4] = PCM_CHANNEL_RS;
++		break;
++	case 6:
++		ch_map[0] = PCM_CHANNEL_FL;
++		ch_map[1] = PCM_CHANNEL_FR;
++		ch_map[2] = PCM_CHANNEL_LFE;
++		ch_map[3] = PCM_CHANNEL_FC;
++		ch_map[4] = PCM_CHANNEL_LS;
++		ch_map[5] = PCM_CHANNEL_RS;
++		break;
++	case 8:
++		ch_map[0] = PCM_CHANNEL_FL;
++		ch_map[1] = PCM_CHANNEL_FR;
++		ch_map[2] = PCM_CHANNEL_LFE;
++		ch_map[3] = PCM_CHANNEL_FC;
++		ch_map[4] = PCM_CHANNEL_LS;
++		ch_map[5] = PCM_CHANNEL_RS;
++		ch_map[6] = PCM_CHANNEL_LB;
++		ch_map[7] = PCM_CHANNEL_RB;
++		break;
++	default:
++		return -EINVAL;
 +	}
 +
 +	return 0;
 +}
-+
-+static int apq8096_platform_probe(struct platform_device *pdev)
-+{
-+	struct component_match *match = NULL;
-+	int ret;
-+
-+	ret = add_audio_components(&pdev->dev, &match);
-+	if (ret)
-+		return ret;
-+
-+	return component_master_add_with_match(&pdev->dev, &apq8096_ops, match);
-+}
-+
-+static int apq8096_platform_remove(struct platform_device *pdev)
-+{
-+	component_master_del(&pdev->dev, &apq8096_ops);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id msm_snd_apq8096_dt_match[] = {
-+	{.compatible = "qcom,apq8096-sndcard"},
-+	{}
-+};
-+
-+MODULE_DEVICE_TABLE(of, msm_snd_apq8096_dt_match);
-+
-+static struct platform_driver msm_snd_apq8096_driver = {
-+	.probe  = apq8096_platform_probe,
-+	.remove = apq8096_platform_remove,
-+	.driver = {
-+		.name = "msm-snd-apq8096",
-+		.owner = THIS_MODULE,
-+		.of_match_table = msm_snd_apq8096_dt_match,
-+	},
-+};
-+module_platform_driver(msm_snd_apq8096_driver);
-+MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org");
-+MODULE_DESCRIPTION("APQ8096 ASoC Machine Driver");
++EXPORT_SYMBOL_GPL(q6dsp_map_channels);
 +MODULE_LICENSE("GPL v2");
+diff --git a/sound/soc/qcom/qdsp6/q6dsp-common.h b/sound/soc/qcom/qdsp6/q6dsp-common.h
+new file mode 100644
+index 000000000000..f0f0bd247bb1
+--- /dev/null
++++ b/sound/soc/qcom/qdsp6/q6dsp-common.h
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#ifndef __Q6DSP_COMMON_H__
++#define __Q6DSP_COMMON_H__
++
++#include <linux/kernel.h>
++
++#define PCM_FORMAT_MAX_NUM_CHANNEL  8
++#define PCM_CHANNEL_NULL 0
++
++#define PCM_CHANNEL_FL    1	/* Front left channel. */
++#define PCM_CHANNEL_FR    2	/* Front right channel. */
++#define PCM_CHANNEL_FC    3	/* Front center channel. */
++#define PCM_CHANNEL_LS   4	/* Left surround channel. */
++#define PCM_CHANNEL_RS   5	/* Right surround channel. */
++#define PCM_CHANNEL_LFE  6	/* Low frequency effect channel. */
++#define PCM_CHANNEL_CS   7	/* Center surround channel; Rear center ch */
++#define PCM_CHANNEL_LB   8	/* Left back channel; Rear left channel. */
++#define PCM_CHANNEL_RB   9	/* Right back channel; Rear right channel. */
++#define PCM_CHANNELS   10	/* Top surround channel. */
++
++int q6dsp_map_channels(u8 ch_map[PCM_FORMAT_MAX_NUM_CHANNEL], int ch);
++
++#endif /* __Q6DSP_COMMON_H__ */
+diff --git a/sound/soc/qcom/qdsp6/q6dsp-errno.h b/sound/soc/qcom/qdsp6/q6dsp-errno.h
+new file mode 100644
+index 000000000000..1ec00ff8c1d2
+--- /dev/null
++++ b/sound/soc/qcom/qdsp6/q6dsp-errno.h
+@@ -0,0 +1,51 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#ifndef __Q6DSP_ERR_NO_H__
++#define __Q6DSP_ERR_NO_H__
++#include <linux/kernel.h>
++
++/* Success. The operation completed with no errors. */
++#define ADSP_EOK          0x00000000
++/* General failure. */
++#define ADSP_EFAILED      0x00000001
++/* Bad operation parameter. */
++#define ADSP_EBADPARAM    0x00000002
++/* Unsupported routine or operation. */
++#define ADSP_EUNSUPPORTED 0x00000003
++/* Unsupported version. */
++#define ADSP_EVERSION     0x00000004
++/* Unexpected problem encountered. */
++#define ADSP_EUNEXPECTED  0x00000005
++/* Unhandled problem occurred. */
++#define ADSP_EPANIC       0x00000006
++/* Unable to allocate resource. */
++#define ADSP_ENORESOURCE  0x00000007
++/* Invalid handle. */
++#define ADSP_EHANDLE      0x00000008
++/* Operation is already processed. */
++#define ADSP_EALREADY     0x00000009
++/* Operation is not ready to be processed. */
++#define ADSP_ENOTREADY    0x0000000A
++/* Operation is pending completion. */
++#define ADSP_EPENDING     0x0000000B
++/* Operation could not be accepted or processed. */
++#define ADSP_EBUSY        0x0000000C
++/* Operation aborted due to an error. */
++#define ADSP_EABORTED     0x0000000D
++/* Operation preempted by a higher priority. */
++#define ADSP_EPREEMPTED   0x0000000E
++/* Operation requests intervention to complete. */
++#define ADSP_ECONTINUE    0x0000000F
++/* Operation requests immediate intervention to complete. */
++#define ADSP_EIMMEDIATE   0x00000010
++/* Operation is not implemented. */
++#define ADSP_ENOTIMPL     0x00000011
++/* Operation needs more data or resources. */
++#define ADSP_ENEEDMORE    0x00000012
++/* Operation does not have memory. */
++#define ADSP_ENOMEMORY    0x00000014
++/* Item does not exist. */
++#define ADSP_ENOTEXIST    0x00000015
++/* Max count for adsp error code sent to HLOS*/
++
++#endif /*__Q6DSP_ERR_NO_H__ */
 -- 
 2.16.2
