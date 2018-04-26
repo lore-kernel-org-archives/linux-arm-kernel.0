@@ -1,43 +1,83 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Thu, 26 Apr 2018 18:18:25 +0200
-Subject: [PATCH 02/11] irqchip: stm32: checkpatch fix
-In-Reply-To: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
-References: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1524759514-12392-3-git-send-email-ludovic.Barre@st.com>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 26 Apr 2018 16:21:19 +0000
+Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
+In-Reply-To: <20180426141926.GN15462@8bytes.org>
+References: <20180314180155.19492-1-toshi.kani@hpe.com>
+ <20180314180155.19492-3-toshi.kani@hpe.com>
+ <20180426141926.GN15462@8bytes.org>
+Message-ID: <1524759629.2693.465.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+On Thu, 2018-04-26 at 16:19 +0200, Joerg Roedel wrote:
+> Hi Toshi, Andrew,
+> 
+> this patch(-set) is broken in several ways, please see below.
+> 
+> On Wed, Mar 14, 2018 at 12:01:55PM -0600, Toshi Kani wrote:
+> > Implement pud_free_pmd_page() and pmd_free_pte_page() on x86, which
+> > clear a given pud/pmd entry and free up lower level page table(s).
+> > Address range associated with the pud/pmd entry must have been purged
+> > by INVLPG.
+> 
+> An INVLPG before actually unmapping the page is useless, as other cores
+> or even speculative instruction execution can bring the TLB entry back
+> before the code actually unmaps the page.
 
--WARNING: struct irq_domain_ops should normally be const
--CHECK: Alignment should match open parenthesis
+Hi Joerg,
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/irqchip/irq-stm32-exti.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+All pages under the pmd had been unmapped and then lazy TLB purged with
+INVLPG before coming to this code path.  Speculation is not allowed to
+pages without mapping.  
 
-diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-index 8013a87..b91a8c2 100644
---- a/drivers/irqchip/irq-stm32-exti.c
-+++ b/drivers/irqchip/irq-stm32-exti.c
-@@ -186,7 +186,7 @@ static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
- 	irq_domain_reset_irq_data(data);
- }
- 
--struct irq_domain_ops irq_exti_domain_ops = {
-+static const struct irq_domain_ops irq_exti_domain_ops = {
- 	.map	= irq_map_generic_chip,
- 	.alloc  = stm32_exti_alloc,
- 	.free	= stm32_exti_free,
-@@ -221,7 +221,7 @@ __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
- 					     handle_edge_irq, clr, 0, 0);
- 	if (ret) {
- 		pr_err("%pOF: Could not allocate generic interrupt chip.\n",
--			node);
-+		       node);
- 		goto out_free_domain;
- 	}
- 
--- 
-2.7.4
+> >  int pud_free_pmd_page(pud_t *pud)
+> >  {
+> > -	return pud_none(*pud);
+> > +	pmd_t *pmd;
+> > +	int i;
+> > +
+> > +	if (pud_none(*pud))
+> > +		return 1;
+> > +
+> > +	pmd = (pmd_t *)pud_page_vaddr(*pud);
+> > +
+> > +	for (i = 0; i < PTRS_PER_PMD; i++)
+> > +		if (!pmd_free_pte_page(&pmd[i]))
+> > +			return 0;
+> > +
+> > +	pud_clear(pud);
+> 
+> TLB flush needed here, before the page is freed.
+> 
+> > +	free_page((unsigned long)pmd);
+> > +
+> > +	return 1;
+> >  }
+> >  
+> >  /**
+> > @@ -724,6 +739,15 @@ int pud_free_pmd_page(pud_t *pud)
+> >   */
+> >  int pmd_free_pte_page(pmd_t *pmd)
+> >  {
+> > -	return pmd_none(*pmd);
+> > +	pte_t *pte;
+> > +
+> > +	if (pmd_none(*pmd))
+> > +		return 1;
+> > +
+> > +	pte = (pte_t *)pmd_page_vaddr(*pmd);
+> > +	pmd_clear(pmd);
+> 
+> Same here, TLB flush needed.
+> 
+> Further this needs synchronization with other page-tables in the system
+> when the kernel PMDs are not shared between processes. In x86-32 with
+> PAE this causes a BUG_ON() being triggered at arch/x86/mm/fault.c:268
+> because the page-tables are not correctly synchronized.
+
+I think this is an issue with pmd mapping support on x86-32-PAE, not
+with this patch.  I think the code needed to be updated to sync at the
+pud level.
+
+Thanks,
+-Toshi
