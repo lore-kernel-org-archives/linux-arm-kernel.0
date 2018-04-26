@@ -1,49 +1,85 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Thu, 26 Apr 2018 22:30:14 +0000
-Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
-In-Reply-To: <20180426200737.GS15462@8bytes.org>
-References: <20180314180155.19492-1-toshi.kani@hpe.com>
- <20180314180155.19492-3-toshi.kani@hpe.com>
- <20180426141926.GN15462@8bytes.org> <1524759629.2693.465.camel@hpe.com>
- <20180426172327.GQ15462@8bytes.org> <1524764948.2693.478.camel@hpe.com>
- <20180426200737.GS15462@8bytes.org>
-Message-ID: <1524781764.2693.503.camel@hpe.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 27 Apr 2018 00:31:15 +0200
+Subject: [PATCH 00/24] device link, bridge supplier <-> drm device
+Message-ID: <20180426223139.16740-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-04-26 at 22:07 +0200, joro at 8bytes.org wrote:
-> On Thu, Apr 26, 2018 at 05:49:58PM +0000, Kani, Toshi wrote:
-> > On Thu, 2018-04-26 at 19:23 +0200, joro at 8bytes.org wrote:
-> > > So the PMD entry you clear can still be in a page-walk cache and this
-> > > needs to be flushed too before you can free the PTE page. Otherwise
-> > > page-walks might still go to the page you just freed. That is especially
-> > > bad when the page is already reallocated and filled with other data.
-> > 
-> > I do not understand why we need to flush processor caches here. x86
-> > processor caches are coherent with MESI.  So, clearing an PMD entry
-> > modifies a cache entry on the processor associated with the address,
-> > which in turn invalidates all stale cache entries on other processors.
-> 
-> A page walk cache is not about the processors data cache, its a cache
-> similar to the TLB to speed up page-walks by caching intermediate
-> results of previous page walks.
+Hi!
 
-Thanks for the clarification. After reading through SDM one more time, I
-agree that we need a TLB purge here. Here is my current understanding. 
+It was noted by Russel King [1] that bridges (not using components)
+might disappear unexpectedly if the owner of the bridge was unbound.
+Jyri Sarha had previously noted the same thing with panels [2]. Jyri
+came up with using device links to resolve the panel issue, which
+was also my (independent) reaction to the note from Russel.
 
- - INVLPG purges both TLB and paging-structure caches. So, PMD cache was
-purged once.
- - However, processor may cache this PMD entry later in speculation
-since it has p-bit set. (This is where my misunderstanding was.
-Speculation is not allowed to access a target address, but it may still
-cache this PMD entry.)
- - A single INVLPG on each processor purges this PMD cache. It does not
-need a range purge (which was already done).
+This series builds up to the addition of that link in the last
+patch, but in my opinion the other 23 patches do have merit on their
+own.
 
-Does it sound right to you?
+The last patch needs testing, while the others look trivial. That
+said, I might have missed some subtlety.
 
-As for the BUG_ON issue, are you able to reproduce this issue?  If so,
-would you be able to test the fix?
+Cheers,
+Peter
 
-Regards,
--Toshi
+[1] https://lkml.org/lkml/2018/4/23/769
+[2] https://www.spinics.net/lists/dri-devel/msg174275.html
+
+Peter Rosin (24):
+  drm/bridge: allow optionally specifying an .owner device
+  drm/bridge: adv7511: provide an .owner device
+  drm/bridge/analogix: core: specify the .owner of the bridge
+  drm/bridge: analogix-anx78xx: provide an .owner device
+  drm/bridge: vga-dac: provide an .owner device
+  drm/bridge: lvds-encoder: provide an .owner device
+  drm/bridge: megachips-stdpxxxx-ge-b850v3-fw: provide an .owner device
+  drm/bridge: nxp-ptn3460: provide an .owner device
+  drm/bridge: panel: provide an .owner device
+  drm/bridge: ps8622: provide an .owner device
+  drm/bridge: sii902x: provide an .owner device
+  drm/bridge: sii9234: provide an .owner device
+  drm/bridge: sii8620: provide an .owner device
+  drm/bridge: synopsys: provide an .owner device for the bridges
+  drm/bridge: tc358767: provide an .owner device
+  drm/bridge: ti-tfp410: provide an .owner device
+  drm/exynos: mic: provide an .owner device for the bridge
+  drm/mediatek: hdmi: provide an .owner device for the bridge
+  drm/msm: specify the .owner of the bridges
+  drm/rcar-du: lvds: provide an .owner device for the bridge
+  drm/sti: provide an .owner device for the bridges
+  drm/bridge: remove the .of_node member
+  drm/bridge: require the .owner to be filled in on drm_bridge_attach
+  drm/bridge: establish a link between the bridge supplier and consumer
+
+ drivers/gpu/drm/bridge/adv7511/adv7511_drv.c       |  2 +-
+ drivers/gpu/drm/bridge/analogix-anx78xx.c          |  5 +----
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  1 +
+ drivers/gpu/drm/bridge/dumb-vga-dac.c              |  2 +-
+ drivers/gpu/drm/bridge/lvds-encoder.c              |  2 +-
+ .../drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c   |  2 +-
+ drivers/gpu/drm/bridge/nxp-ptn3460.c               |  2 +-
+ drivers/gpu/drm/bridge/panel.c                     |  4 +---
+ drivers/gpu/drm/bridge/parade-ps8622.c             |  2 +-
+ drivers/gpu/drm/bridge/sii902x.c                   |  2 +-
+ drivers/gpu/drm/bridge/sii9234.c                   |  2 +-
+ drivers/gpu/drm/bridge/sil-sii8620.c               |  2 +-
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |  4 +---
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c      |  4 +---
+ drivers/gpu/drm/bridge/tc358767.c                  |  2 +-
+ drivers/gpu/drm/bridge/ti-tfp410.c                 |  2 +-
+ drivers/gpu/drm/drm_bridge.c                       | 23 +++++++++++++++++++++-
+ drivers/gpu/drm/exynos/exynos_drm_mic.c            |  2 +-
+ drivers/gpu/drm/mediatek/mtk_hdmi.c                |  2 +-
+ drivers/gpu/drm/msm/dsi/dsi_manager.c              |  1 +
+ drivers/gpu/drm/msm/edp/edp_bridge.c               |  1 +
+ drivers/gpu/drm/msm/hdmi/hdmi_bridge.c             |  1 +
+ drivers/gpu/drm/rcar-du/rcar_lvds.c                |  2 +-
+ drivers/gpu/drm/sti/sti_dvo.c                      |  2 +-
+ drivers/gpu/drm/sti/sti_hda.c                      |  1 +
+ drivers/gpu/drm/sti/sti_hdmi.c                     |  1 +
+ include/drm/drm_bridge.h                           |  8 ++++----
+ 27 files changed, 51 insertions(+), 33 deletions(-)
+
+-- 
+2.11.0
