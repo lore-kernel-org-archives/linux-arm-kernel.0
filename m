@@ -1,43 +1,43 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Thu, 26 Apr 2018 09:34:28 +0000
-Subject: [PATCH/RFC v2] ARM: shmobile: defconfig: Enable LPAE
-In-Reply-To: <90afbd8b-462d-8484-74e8-b983a9803fc4@gmail.com>
-References: <1524672875-14130-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <90afbd8b-462d-8484-74e8-b983a9803fc4@gmail.com>
-Message-ID: <TY1PR01MB177054B9D9E465A3B7932273C08E0@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+From: daniel.vetter@ffwll.ch (Daniel Vetter)
+Date: Thu, 26 Apr 2018 11:39:09 +0200
+Subject: [Linaro-mm-sig] noveau vs arm dma ops
+In-Reply-To: <20180426092422.GA26825@infradead.org>
+References: <20180425054855.GA17038@infradead.org>
+ <CAKMK7uEFitkNQrD6cLX5Txe11XhVO=LC4YKJXH=VNdq+CY=DjQ@mail.gmail.com>
+ <CAKMK7uFx=KB1vup=WhPCyfUFairKQcRR4BEd7aXaX1Pj-vj3Cw@mail.gmail.com>
+ <20180425064335.GB28100@infradead.org> <20180425074151.GA2271@ulmo>
+ <20180425085439.GA29996@infradead.org>
+ <20180425100429.GR25142@phenom.ffwll.local>
+ <20180425153312.GD27076@infradead.org>
+ <20180425225443.GQ16141@n2100.armlinux.org.uk>
+ <CAKMK7uG9R6paoP4BmvqDVUP_4Db4Dz8MSXeLwUBMYaORa5-kVw@mail.gmail.com>
+ <20180426092422.GA26825@infradead.org>
+Message-ID: <CAKMK7uEK_KjjWUwsiFPW1KmUkjy2j8tA_R4zc5u1gJ6BHRfAVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Florian,
-
-Thank you for your feedback!
-
-> Subject: Re: [PATCH/RFC v2] ARM: shmobile: defconfig: Enable LPAE
+On Thu, Apr 26, 2018 at 11:24 AM, Christoph Hellwig <hch@infradead.org> wrote:
+> On Thu, Apr 26, 2018 at 11:20:44AM +0200, Daniel Vetter wrote:
+>> The above is already what we're implementing in i915, at least
+>> conceptually (it all boils down to clflush instructions because those
+>> both invalidate and flush).
 >
-> On 04/25/2018 09:14 AM, Fabrizio Castro wrote:
-> > On iWave's iwg20m DDR1 512MB memory cannot be accessed with 32-bit
-> > addresses, hence we need LPAE.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > ---
-> > This information is mentioned in the "RZ/G Series User?s Manual: Hardware",
-> > Chapter 2, Area Map. Is this patch going to break the functionality of other
-> > boards? Comments welcome.
->
-> LPAE is not supported by all Cortex-A class cores, for instance
-> Cortex-A9 does not support LPAE, if you have boards using such cores,
-> then this would result in a kernel that would not boot on these
-> platforms. Can that be a problem with the shmobile_defconfig?
+> The clwb instruction that just writes back dirty cache lines might
+> be very interesting for the x86 non-coherent dma case.  A lot of
+> architectures use their equivalent to prepare to to device transfers.
 
-It definitely is, therefore I am going to drop this patch as it would break things.
+Iirc didn't help for i915 use-cases much. Either data gets streamed
+between cpu and gpu, and then keeping the clean cacheline around
+doesn't buy you anything. In other cases we need to flush because the
+gpu really wants to use non-snooped transactions (faster/lower
+latency/less power required for display because you can shut down the
+caches), and then there's also no benefit with keeping the cacheline
+around (no one will ever need it again).
 
-Best regards,
-Fab
-
-> --
-> Florian
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+I think clwb is more for persistent memory and stuff like that, not so
+much for gpus.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
