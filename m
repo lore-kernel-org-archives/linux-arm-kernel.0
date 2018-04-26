@@ -1,175 +1,445 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Thu, 26 Apr 2018 21:02:39 +0200
-Subject: [RFC PATCH 7/8] KVM: arm64: Save host SVE context as appropriate
-In-Reply-To: <1524242802-21163-8-git-send-email-Dave.Martin@arm.com>
-References: <1524242802-21163-1-git-send-email-Dave.Martin@arm.com>
- <1524242802-21163-8-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180426190239.GG13249@C02W217FHV2R.local>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 26 Apr 2018 12:19:47 -0700
+Subject: [PATCH 20/61] input: keyboard: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-21-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-21-wsa+renesas@sang-engineering.com>
+Message-ID: <20180426191947.GC162443@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 05:46:41PM +0100, Dave Martin wrote:
-> This patch adds SVE context saving to the hyp FPSIMD context switch
-> path.  This means that it is no longer necessary to save the host
-> SVE state in advance of entering the guest, when in use.
-> 
-> In order to avoid adding pointless complexity to the code, VHE is
-> assumed if SVE is in use.  VHE is an architectural prerequisite for
-> SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
-> kernels that support both SVE and KVM.
-> 
-> Historically, software models exist that can expose the
-> architecturally invalid configuration of SVE without VHE, so if
-> this situation is detected this patch warns and refuses to create a
-> VM.  Doing this check at VM creation time avoids race issues
-> between KVM and SVE initialisation.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/Kconfig          |  7 +++++++
->  arch/arm64/kvm/fpsimd.c     |  1 -
->  arch/arm64/kvm/hyp/switch.c | 21 +++++++++++++++++++--
->  virt/kvm/arm/arm.c          | 18 ++++++++++++++++++
->  4 files changed, 44 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index eb2cf49..b0d3820 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1130,6 +1130,7 @@ endmenu
->  config ARM64_SVE
->  	bool "ARM Scalable Vector Extension support"
->  	default y
-> +	depends on !KVM || ARM64_VHE
->  	help
->  	  The Scalable Vector Extension (SVE) is an extension to the AArch64
->  	  execution state which complements and extends the SIMD functionality
-> @@ -1155,6 +1156,12 @@ config ARM64_SVE
->  	  booting the kernel.  If unsure and you are not observing these
->  	  symptoms, you should assume that it is safe to say Y.
->  
-> +	  CPUs that support SVE are architecturally required to support the
-> +	  Virtualization Host Extensions (VHE), so the kernel makes no
-> +	  provision for supporting SVE alongside KVM without VHE enabled.
-> +	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
-> +	  KVM in the same kernel image.
-> +
->  config ARM64_MODULE_PLTS
->  	bool
->  	select HAVE_MOD_ARCH_SPECIFIC
-> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-> index cc7a068..c166954 100644
-> --- a/arch/arm64/kvm/fpsimd.c
-> +++ b/arch/arm64/kvm/fpsimd.c
-> @@ -59,7 +59,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
->   */
->  void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
->  {
-> -	BUG_ON(system_supports_sve());
->  	BUG_ON(!current->mm);
->  
->  	vcpu->arch.fp_enabled = false;
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 0900c2a..959d634 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -21,12 +21,14 @@
->  
->  #include <kvm/arm_psci.h>
->  
-> +#include <asm/cpufeature.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_hyp.h>
->  #include <asm/kvm_mmu.h>
->  #include <asm/fpsimd.h>
->  #include <asm/debug-monitors.h>
-> +#include <asm/processor.h>
->  #include <asm/thread_info.h>
->  
->  static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
-> @@ -497,6 +499,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
->  				    struct kvm_vcpu *vcpu)
->  {
-> +	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
-> +
->  	if (has_vhe())
->  		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
->  			     cpacr_el1);
-> @@ -506,8 +510,21 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
->  
->  	isb();
->  
-> -	if (vcpu->arch.host_fpsimd_state) {
-> -		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
-> +	if (host_fpsimd) {
-> +		/*
-> +		 * In the SVE case, VHE is assumed: it is enforced by
-> +		 * Kconfig and kvm_arch_init_vm().
-> +		 */
-> +		if (system_supports_sve() && vcpu->arch.host_sve_in_use) {
-> +			struct thread_struct *thread = container_of(
-> +				host_fpsimd,
-> +				struct thread_struct, uw.fpsimd_state);
-> +
-> +			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
-> +		} else {
-> +			__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
-> +		}
-> +
->  		vcpu->arch.host_fpsimd_state = NULL;
->  	}
->  
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 4fcf6fe..147d9d9 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -16,6 +16,7 @@
->   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
->   */
->  
-> +#include <linux/bug.h>
->  #include <linux/cpu_pm.h>
->  #include <linux/errno.h>
->  #include <linux/err.h>
-> @@ -41,6 +42,7 @@
->  #include <asm/mman.h>
->  #include <asm/tlbflush.h>
->  #include <asm/cacheflush.h>
-> +#include <asm/cpufeature.h>
->  #include <asm/virt.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_asm.h>
-> @@ -120,6 +122,22 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
->  	if (type)
->  		return -EINVAL;
->  
-> +	/*
-> +	 * VHE is a prerequisite for SVE in the Arm architecture, and
-> +	 * Kconfig ensures that if system_supports_sve() here then
-> +	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
-> +	 * detected and enabled, the CPU is architecturally
-> +	 * noncompliant.
-> +	 *
-> +	 * Just in case this mismatch is seen, detect it, warn and give
-> +	 * up.  Supporting this forbidden configuration in Hyp would be
-> +	 * pointless.
-> +	 */
-> +	if (system_supports_sve() && !has_vhe()) {
-> +		kvm_pr_unimpl("Cannot create VMs on SVE system without VHE.  Broken cpu?");
-> +		return -ENXIO;
-> +	}
-> +
->  	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
->  	if (!kvm->arch.last_vcpu_ran)
->  		return -ENOMEM;
-> -- 
-> 2.1.4
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Hi Wolfram,
 
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+On Thu, Apr 19, 2018 at 04:05:50PM +0200, Wolfram Sang wrote:
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
+
+I consider the fact that platform device's driver data is accessible via
+device driver data being implementation detail that may or may not change
+in the future, so I'd prefer keep using the proper accessors for the
+objects we are dealing with.
+
+Thanks.
+
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
+> 
+> Build tested only. buildbot is happy. Please apply individually.
+> 
+>  drivers/input/keyboard/ep93xx_keypad.c   | 10 ++++------
+>  drivers/input/keyboard/imx_keypad.c      | 10 ++++------
+>  drivers/input/keyboard/lpc32xx-keys.c    |  6 ++----
+>  drivers/input/keyboard/matrix_keypad.c   | 10 ++++------
+>  drivers/input/keyboard/omap4-keypad.c    | 10 ++++------
+>  drivers/input/keyboard/pmic8xxx-keypad.c |  6 ++----
+>  drivers/input/keyboard/pxa27x_keypad.c   | 10 ++++------
+>  drivers/input/keyboard/samsung-keypad.c  | 12 ++++--------
+>  drivers/input/keyboard/snvs_pwrkey.c     | 10 ++++------
+>  drivers/input/keyboard/spear-keyboard.c  | 10 ++++------
+>  drivers/input/keyboard/st-keyscan.c      |  6 ++----
+>  drivers/input/keyboard/tegra-kbc.c       | 10 ++++------
+>  12 files changed, 42 insertions(+), 68 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/ep93xx_keypad.c b/drivers/input/keyboard/ep93xx_keypad.c
+> index f77b295e0123..7584a03db4b3 100644
+> --- a/drivers/input/keyboard/ep93xx_keypad.c
+> +++ b/drivers/input/keyboard/ep93xx_keypad.c
+> @@ -185,8 +185,7 @@ static void ep93xx_keypad_close(struct input_dev *pdev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int ep93xx_keypad_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct ep93xx_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct ep93xx_keypad *keypad = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = keypad->input_dev;
+>  
+>  	mutex_lock(&input_dev->mutex);
+> @@ -198,7 +197,7 @@ static int ep93xx_keypad_suspend(struct device *dev)
+>  
+>  	mutex_unlock(&input_dev->mutex);
+>  
+> -	if (device_may_wakeup(&pdev->dev))
+> +	if (device_may_wakeup(dev))
+>  		enable_irq_wake(keypad->irq);
+>  
+>  	return 0;
+> @@ -206,11 +205,10 @@ static int ep93xx_keypad_suspend(struct device *dev)
+>  
+>  static int ep93xx_keypad_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct ep93xx_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct ep93xx_keypad *keypad = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = keypad->input_dev;
+>  
+> -	if (device_may_wakeup(&pdev->dev))
+> +	if (device_may_wakeup(dev))
+>  		disable_irq_wake(keypad->irq);
+>  
+>  	mutex_lock(&input_dev->mutex);
+> diff --git a/drivers/input/keyboard/imx_keypad.c b/drivers/input/keyboard/imx_keypad.c
+> index 25d61d8d4fc4..56328ced81e2 100644
+> --- a/drivers/input/keyboard/imx_keypad.c
+> +++ b/drivers/input/keyboard/imx_keypad.c
+> @@ -532,8 +532,7 @@ static int imx_keypad_probe(struct platform_device *pdev)
+>  
+>  static int __maybe_unused imx_kbd_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct imx_keypad *kbd = platform_get_drvdata(pdev);
+> +	struct imx_keypad *kbd = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = kbd->input_dev;
+>  
+>  	/* imx kbd can wake up system even clock is disabled */
+> @@ -544,7 +543,7 @@ static int __maybe_unused imx_kbd_suspend(struct device *dev)
+>  
+>  	mutex_unlock(&input_dev->mutex);
+>  
+> -	if (device_may_wakeup(&pdev->dev))
+> +	if (device_may_wakeup(dev))
+>  		enable_irq_wake(kbd->irq);
+>  
+>  	return 0;
+> @@ -552,12 +551,11 @@ static int __maybe_unused imx_kbd_suspend(struct device *dev)
+>  
+>  static int __maybe_unused imx_kbd_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct imx_keypad *kbd = platform_get_drvdata(pdev);
+> +	struct imx_keypad *kbd = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = kbd->input_dev;
+>  	int ret = 0;
+>  
+> -	if (device_may_wakeup(&pdev->dev))
+> +	if (device_may_wakeup(dev))
+>  		disable_irq_wake(kbd->irq);
+>  
+>  	mutex_lock(&input_dev->mutex);
+> diff --git a/drivers/input/keyboard/lpc32xx-keys.c b/drivers/input/keyboard/lpc32xx-keys.c
+> index 1dd57ac0e7a2..0831a6f2a9d4 100644
+> --- a/drivers/input/keyboard/lpc32xx-keys.c
+> +++ b/drivers/input/keyboard/lpc32xx-keys.c
+> @@ -279,8 +279,7 @@ static int lpc32xx_kscan_probe(struct platform_device *pdev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int lpc32xx_kscan_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
+> +	struct lpc32xx_kscan_drv *kscandat = dev_get_drvdata(dev);
+>  	struct input_dev *input = kscandat->input;
+>  
+>  	mutex_lock(&input->mutex);
+> @@ -297,8 +296,7 @@ static int lpc32xx_kscan_suspend(struct device *dev)
+>  
+>  static int lpc32xx_kscan_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct lpc32xx_kscan_drv *kscandat = platform_get_drvdata(pdev);
+> +	struct lpc32xx_kscan_drv *kscandat = dev_get_drvdata(dev);
+>  	struct input_dev *input = kscandat->input;
+>  	int retval = 0;
+>  
+> diff --git a/drivers/input/keyboard/matrix_keypad.c b/drivers/input/keyboard/matrix_keypad.c
+> index 41614c185918..73ca55e4babe 100644
+> --- a/drivers/input/keyboard/matrix_keypad.c
+> +++ b/drivers/input/keyboard/matrix_keypad.c
+> @@ -276,12 +276,11 @@ static void matrix_keypad_disable_wakeup(struct matrix_keypad *keypad)
+>  
+>  static int matrix_keypad_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct matrix_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct matrix_keypad *keypad = dev_get_drvdata(dev);
+>  
+>  	matrix_keypad_stop(keypad->input_dev);
+>  
+> -	if (device_may_wakeup(&pdev->dev))
+> +	if (device_may_wakeup(dev))
+>  		matrix_keypad_enable_wakeup(keypad);
+>  
+>  	return 0;
+> @@ -289,10 +288,9 @@ static int matrix_keypad_suspend(struct device *dev)
+>  
+>  static int matrix_keypad_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct matrix_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct matrix_keypad *keypad = dev_get_drvdata(dev);
+>  
+> -	if (device_may_wakeup(&pdev->dev))
+> +	if (device_may_wakeup(dev))
+>  		matrix_keypad_disable_wakeup(keypad);
+>  
+>  	matrix_keypad_start(keypad->input_dev);
+> diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
+> index 940d38b08e6b..13578b884ace 100644
+> --- a/drivers/input/keyboard/omap4-keypad.c
+> +++ b/drivers/input/keyboard/omap4-keypad.c
+> @@ -422,11 +422,10 @@ MODULE_DEVICE_TABLE(of, omap_keypad_dt_match);
+>  #ifdef CONFIG_PM_SLEEP
+>  static int omap4_keypad_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+> +	struct omap4_keypad *keypad_data = dev_get_drvdata(dev);
+>  	int error;
+>  
+> -	if (device_may_wakeup(&pdev->dev)) {
+> +	if (device_may_wakeup(dev)) {
+>  		error = enable_irq_wake(keypad_data->irq);
+>  		if (!error)
+>  			keypad_data->irq_wake_enabled = true;
+> @@ -437,10 +436,9 @@ static int omap4_keypad_suspend(struct device *dev)
+>  
+>  static int omap4_keypad_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+> +	struct omap4_keypad *keypad_data = dev_get_drvdata(dev);
+>  
+> -	if (device_may_wakeup(&pdev->dev) && keypad_data->irq_wake_enabled) {
+> +	if (device_may_wakeup(dev) && keypad_data->irq_wake_enabled) {
+>  		disable_irq_wake(keypad_data->irq);
+>  		keypad_data->irq_wake_enabled = false;
+>  	}
+> diff --git a/drivers/input/keyboard/pmic8xxx-keypad.c b/drivers/input/keyboard/pmic8xxx-keypad.c
+> index 98b24ed18752..048a39321298 100644
+> --- a/drivers/input/keyboard/pmic8xxx-keypad.c
+> +++ b/drivers/input/keyboard/pmic8xxx-keypad.c
+> @@ -636,8 +636,7 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int pmic8xxx_kp_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct pmic8xxx_kp *kp = platform_get_drvdata(pdev);
+> +	struct pmic8xxx_kp *kp = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = kp->input;
+>  
+>  	if (device_may_wakeup(dev)) {
+> @@ -656,8 +655,7 @@ static int pmic8xxx_kp_suspend(struct device *dev)
+>  
+>  static int pmic8xxx_kp_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct pmic8xxx_kp *kp = platform_get_drvdata(pdev);
+> +	struct pmic8xxx_kp *kp = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = kp->input;
+>  
+>  	if (device_may_wakeup(dev)) {
+> diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
+> index d0bdaeadf86d..1f54a3162124 100644
+> --- a/drivers/input/keyboard/pxa27x_keypad.c
+> +++ b/drivers/input/keyboard/pxa27x_keypad.c
+> @@ -666,14 +666,13 @@ static void pxa27x_keypad_close(struct input_dev *dev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int pxa27x_keypad_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct pxa27x_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct pxa27x_keypad *keypad = dev_get_drvdata(dev);
+>  
+>  	/*
+>  	 * If the keypad is used a wake up source, clock can not be disabled.
+>  	 * Or it can not detect the key pressing.
+>  	 */
+> -	if (device_may_wakeup(&pdev->dev))
+> +	if (device_may_wakeup(dev))
+>  		enable_irq_wake(keypad->irq);
+>  	else
+>  		clk_disable_unprepare(keypad->clk);
+> @@ -683,8 +682,7 @@ static int pxa27x_keypad_suspend(struct device *dev)
+>  
+>  static int pxa27x_keypad_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct pxa27x_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct pxa27x_keypad *keypad = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = keypad->input_dev;
+>  	int ret = 0;
+>  
+> @@ -692,7 +690,7 @@ static int pxa27x_keypad_resume(struct device *dev)
+>  	 * If the keypad is used as wake up source, the clock is not turned
+>  	 * off. So do not need configure it again.
+>  	 */
+> -	if (device_may_wakeup(&pdev->dev)) {
+> +	if (device_may_wakeup(dev)) {
+>  		disable_irq_wake(keypad->irq);
+>  	} else {
+>  		mutex_lock(&input_dev->mutex);
+> diff --git a/drivers/input/keyboard/samsung-keypad.c b/drivers/input/keyboard/samsung-keypad.c
+> index 316414465c77..27790a8a44f5 100644
+> --- a/drivers/input/keyboard/samsung-keypad.c
+> +++ b/drivers/input/keyboard/samsung-keypad.c
+> @@ -466,8 +466,7 @@ static int samsung_keypad_remove(struct platform_device *pdev)
+>  #ifdef CONFIG_PM
+>  static int samsung_keypad_runtime_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct samsung_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct samsung_keypad *keypad = dev_get_drvdata(dev);
+>  	unsigned int val;
+>  	int error;
+>  
+> @@ -490,8 +489,7 @@ static int samsung_keypad_runtime_suspend(struct device *dev)
+>  
+>  static int samsung_keypad_runtime_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct samsung_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct samsung_keypad *keypad = dev_get_drvdata(dev);
+>  	unsigned int val;
+>  
+>  	if (keypad->stopped)
+> @@ -535,8 +533,7 @@ static void samsung_keypad_toggle_wakeup(struct samsung_keypad *keypad,
+>  
+>  static int samsung_keypad_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct samsung_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct samsung_keypad *keypad = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = keypad->input_dev;
+>  
+>  	mutex_lock(&input_dev->mutex);
+> @@ -553,8 +550,7 @@ static int samsung_keypad_suspend(struct device *dev)
+>  
+>  static int samsung_keypad_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct samsung_keypad *keypad = platform_get_drvdata(pdev);
+> +	struct samsung_keypad *keypad = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = keypad->input_dev;
+>  
+>  	mutex_lock(&input_dev->mutex);
+> diff --git a/drivers/input/keyboard/snvs_pwrkey.c b/drivers/input/keyboard/snvs_pwrkey.c
+> index 53c768b95939..f439f7bd2f5f 100644
+> --- a/drivers/input/keyboard/snvs_pwrkey.c
+> +++ b/drivers/input/keyboard/snvs_pwrkey.c
+> @@ -180,10 +180,9 @@ static int imx_snvs_pwrkey_probe(struct platform_device *pdev)
+>  
+>  static int __maybe_unused imx_snvs_pwrkey_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
+> +	struct pwrkey_drv_data *pdata = dev_get_drvdata(dev);
+>  
+> -	if (device_may_wakeup(&pdev->dev))
+> +	if (device_may_wakeup(dev))
+>  		enable_irq_wake(pdata->irq);
+>  
+>  	return 0;
+> @@ -191,10 +190,9 @@ static int __maybe_unused imx_snvs_pwrkey_suspend(struct device *dev)
+>  
+>  static int __maybe_unused imx_snvs_pwrkey_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
+> +	struct pwrkey_drv_data *pdata = dev_get_drvdata(dev);
+>  
+> -	if (device_may_wakeup(&pdev->dev))
+> +	if (device_may_wakeup(dev))
+>  		disable_irq_wake(pdata->irq);
+>  
+>  	return 0;
+> diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
+> index 7d25fa338ab4..a0276a3376d2 100644
+> --- a/drivers/input/keyboard/spear-keyboard.c
+> +++ b/drivers/input/keyboard/spear-keyboard.c
+> @@ -288,8 +288,7 @@ static int spear_kbd_remove(struct platform_device *pdev)
+>  
+>  static int __maybe_unused spear_kbd_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct spear_kbd *kbd = platform_get_drvdata(pdev);
+> +	struct spear_kbd *kbd = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = kbd->input;
+>  	unsigned int rate = 0, mode_ctl_reg, val;
+>  
+> @@ -300,7 +299,7 @@ static int __maybe_unused spear_kbd_suspend(struct device *dev)
+>  
+>  	mode_ctl_reg = readl_relaxed(kbd->io_base + MODE_CTL_REG);
+>  
+> -	if (device_may_wakeup(&pdev->dev)) {
+> +	if (device_may_wakeup(dev)) {
+>  		if (!enable_irq_wake(kbd->irq))
+>  			kbd->irq_wake_enabled = true;
+>  
+> @@ -341,13 +340,12 @@ static int __maybe_unused spear_kbd_suspend(struct device *dev)
+>  
+>  static int __maybe_unused spear_kbd_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct spear_kbd *kbd = platform_get_drvdata(pdev);
+> +	struct spear_kbd *kbd = dev_get_drvdata(dev);
+>  	struct input_dev *input_dev = kbd->input;
+>  
+>  	mutex_lock(&input_dev->mutex);
+>  
+> -	if (device_may_wakeup(&pdev->dev)) {
+> +	if (device_may_wakeup(dev)) {
+>  		if (kbd->irq_wake_enabled) {
+>  			kbd->irq_wake_enabled = false;
+>  			disable_irq_wake(kbd->irq);
+> diff --git a/drivers/input/keyboard/st-keyscan.c b/drivers/input/keyboard/st-keyscan.c
+> index babcfb165e4f..3b4727e4b411 100644
+> --- a/drivers/input/keyboard/st-keyscan.c
+> +++ b/drivers/input/keyboard/st-keyscan.c
+> @@ -218,8 +218,7 @@ static int keyscan_probe(struct platform_device *pdev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int keyscan_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct st_keyscan *keypad = platform_get_drvdata(pdev);
+> +	struct st_keyscan *keypad = dev_get_drvdata(dev);
+>  	struct input_dev *input = keypad->input_dev;
+>  
+>  	mutex_lock(&input->mutex);
+> @@ -235,8 +234,7 @@ static int keyscan_suspend(struct device *dev)
+>  
+>  static int keyscan_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct st_keyscan *keypad = platform_get_drvdata(pdev);
+> +	struct st_keyscan *keypad = dev_get_drvdata(dev);
+>  	struct input_dev *input = keypad->input_dev;
+>  	int retval = 0;
+>  
+> diff --git a/drivers/input/keyboard/tegra-kbc.c b/drivers/input/keyboard/tegra-kbc.c
+> index 875205f445b5..861bfcbd817d 100644
+> --- a/drivers/input/keyboard/tegra-kbc.c
+> +++ b/drivers/input/keyboard/tegra-kbc.c
+> @@ -744,11 +744,10 @@ static void tegra_kbc_set_keypress_interrupt(struct tegra_kbc *kbc, bool enable)
+>  
+>  static int tegra_kbc_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct tegra_kbc *kbc = platform_get_drvdata(pdev);
+> +	struct tegra_kbc *kbc = dev_get_drvdata(dev);
+>  
+>  	mutex_lock(&kbc->idev->mutex);
+> -	if (device_may_wakeup(&pdev->dev)) {
+> +	if (device_may_wakeup(dev)) {
+>  		disable_irq(kbc->irq);
+>  		del_timer_sync(&kbc->timer);
+>  		tegra_kbc_set_fifo_interrupt(kbc, false);
+> @@ -781,12 +780,11 @@ static int tegra_kbc_suspend(struct device *dev)
+>  
+>  static int tegra_kbc_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct tegra_kbc *kbc = platform_get_drvdata(pdev);
+> +	struct tegra_kbc *kbc = dev_get_drvdata(dev);
+>  	int err = 0;
+>  
+>  	mutex_lock(&kbc->idev->mutex);
+> -	if (device_may_wakeup(&pdev->dev)) {
+> +	if (device_may_wakeup(dev)) {
+>  		disable_irq_wake(kbc->irq);
+>  		tegra_kbc_setup_wakekeys(kbc, false);
+>  		/* We will use fifo interrupts for key detection. */
+> -- 
+> 2.11.0
+> 
+
+-- 
+Dmitry
