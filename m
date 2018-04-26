@@ -1,14 +1,30 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 26 Apr 2018 17:54:27 +0200
-Subject: [PATCH v3 00/14] kernel/locking: qspinlock improvements
-In-Reply-To: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
-References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180426155427.GM4064@hirez.programming.kicks-ass.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Apr 2018 16:58:03 +0100
+Subject: [PATCH 0/3] arm64/kvm spectre-v1 fixes
+In-Reply-To: <20180425161342.38133-1-mark.rutland@arm.com>
+References: <20180425161342.38133-1-mark.rutland@arm.com>
+Message-ID: <20180426155803.GA898@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 25, 2018 at 05:13:39PM +0100, Mark Rutland wrote:
+> These patches fix arm64-specific potential spectre-v1 gadgets found by
+> smatch when run over v4.17-rc2.
+> 
+> I'm still building up my smatch database, so it's possible that there are
+> further gadgets to be found.
+> 
+> For the moment I've ignored issues which appear to be cross-architecture.
+> 
+> Thanks,
+> Mark.
+> 
+> Mark Rutland (3):
+>   arm64: fix possible spectre-v1 in ptrace_hbp_get_event()
+>   KVM: arm/arm64: vgic: fix possible spectre-v1 in vgic_get_irq()
+>   KVM: arm/arm64: vgic: fix possible spectre-v1 in vgic_mmio_read_apr()
 
+Thanks, I'll pick these up as fixes with Christoffer and Marc's acks on the
+kvm parts.
 
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-
-Ingo, please queue.
+Will
