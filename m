@@ -1,32 +1,153 @@
-From: green.hu@gmail.com (Greentime Hu)
-Date: Thu, 26 Apr 2018 17:39:20 +0800
-Subject: [PATCH 13/22] nds32: use generic dma_noncoherent_ops
-In-Reply-To: <20180426082429.GA15580@lst.de>
-References: <20180420080313.18796-1-hch@lst.de>
- <20180420080313.18796-14-hch@lst.de>
- <CAEbi=3fkakVD2vxGu6SgJM77JnNM8Y79xS8_o6m9d_85BJpMFQ@mail.gmail.com>
- <20180424191640.GA32495@lst.de>
- <CAEbi=3f7yzE+KAM2GOh6QahC_E6BAUfB3ys3U-WdBSUf3DPZqg@mail.gmail.com>
- <20180425064055.GA11460@lst.de>
- <CAEbi=3fcd8E=xi_hbef45LnPsBZhZv37yPO-xfZmU1gMaWnDvg@mail.gmail.com>
- <20180426064239.GA13895@lst.de>
- <CAEbi=3e3gM_WpQOtKZXP4Xj2Az4bLf_u6BjDELqXy6-d9HurMQ@mail.gmail.com>
- <20180426082429.GA15580@lst.de>
-Message-ID: <CAEbi=3dnduyq3k8hkoLu180EtwCQ5-Hz0jc1iviv70WXp7yUJg@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 26 Apr 2018 11:45:26 +0200
+Subject: noveau vs arm dma ops
+In-Reply-To: <20180426090942.GA18811@infradead.org>
+References: <CAKMK7uFL68pu+-9LODTgz+GQYvxpnXOGhxfz9zorJ_JKsPVw2g@mail.gmail.com>
+ <20180425054855.GA17038@infradead.org>
+ <CAKMK7uEFitkNQrD6cLX5Txe11XhVO=LC4YKJXH=VNdq+CY=DjQ@mail.gmail.com>
+ <CAKMK7uFx=KB1vup=WhPCyfUFairKQcRR4BEd7aXaX1Pj-vj3Cw@mail.gmail.com>
+ <20180425064335.GB28100@infradead.org> <20180425074151.GA2271@ulmo>
+ <20180425085439.GA29996@infradead.org>
+ <20180425100429.GR25142@phenom.ffwll.local>
+ <20180425153312.GD27076@infradead.org>
+ <CAKMK7uH14qupTYDa1pr8UC434Vs+97eUXj+fYi=+2uijCLayMA@mail.gmail.com>
+ <20180426090942.GA18811@infradead.org>
+Message-ID: <CAKMK7uF9UpFe=nuV29as54mvO7s-kJV4nLa-Uju3jqZU9Ebw6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-26 16:24 GMT+08:00 Christoph Hellwig <hch@lst.de>:
-> On Thu, Apr 26, 2018 at 04:06:34PM +0800, Greentime Hu wrote:
->> It works!!!
+On Thu, Apr 26, 2018 at 11:09 AM, Christoph Hellwig <hch@infradead.org> wrote:
+> On Wed, Apr 25, 2018 at 11:35:13PM +0200, Daniel Vetter wrote:
+>> > get_required_mask() is supposed to tell you if you are safe.  However
+>> > we are missing lots of implementations of it for iommus so you might get
+>> > some false negatives, improvements welcome.  It's been on my list of
+>> > things to fix in the DMA API, but it is nowhere near the top.
+>>
+>> I hasn't come up in a while in some fireworks, so I honestly don't
+>> remember exactly what the issues have been. But
+>>
+>> commit d766ef53006c2c38a7fe2bef0904105a793383f2
+>> Author: Chris Wilson <chris@chris-wilson.co.uk>
+>> Date:   Mon Dec 19 12:43:45 2016 +0000
+>>
+>>     drm/i915: Fallback to single PAGE_SIZE segments for DMA remapping
+>>
+>> and the various bits of code that a
+>>
+>> $ git grep SWIOTLB -- drivers/gpu
+>>
+>> turns up is what we're doing to hack around that stuff. And in general
+>> (there's some exceptions) gpus should be able to address everything,
+>> so I never fully understood where that's even coming from.
 >
-> Thanks!
+> I'm pretty sure I've seen some oddly low dma masks in GPU drivers.  E.g.
+> duplicated in various AMD files:
 >
-> Can you retest the updated tree here with all the fixes and give me
-> your Tested-by: for the generic and nds32 patches?
+>         adev->need_dma32 = false;
+>         dma_bits = adev->need_dma32 ? 32 : 40;
+>         r = pci_set_dma_mask(adev->pdev, DMA_BIT_MASK(dma_bits));
+>         if (r) {
+>                 adev->need_dma32 = true;
+>                 dma_bits = 32;
+>                 dev_warn(adev->dev, "amdgpu: No suitable DMA available.\n");
+>         }
 >
-> git://git.infradead.org/users/hch/misc.git generic-dma-noncoherent
+> synopsis:
+>
+> drivers/gpu/drm/bridge/synopsys/dw-hdmi-i2s-audio.c:    pdevinfo.dma_mask       = DMA_BIT_MASK(32);
+> drivers/gpu/drm/bridge/synopsys/dw-hdmi.c:              pdevinfo.dma_mask = DMA_BIT_MASK(32);
+> drivers/gpu/drm/bridge/synopsys/dw-hdmi.c:              pdevinfo.dma_mask = DMA_BIT_MASK(32);
+>
+> etnaviv gets it right:
+>
+> drivers/gpu/drm/etnaviv/etnaviv_gpu.c:          u32 dma_mask = (u32)dma_get_required_mask(gpu->dev);
+>
+>
+> But yes, the swiotlb hackery really irks me.  I just have some more
+> important and bigger fires to fight first, but I plan to get back to the
+> root cause of that eventually.
+>
+>>
+>> >> - dma api hides the cache flushing requirements from us. GPUs love
+>> >>   non-snooped access, and worse give userspace control over that. We want
+>> >>   a strict separation between mapping stuff and flushing stuff. With the
+>> >>   IOMMU api we mostly have the former, but for the later arch maintainers
+>> >>   regularly tells they won't allow that. So we have drm_clflush.c.
+>> >
+>> > The problem is that a cache flushing API entirely separate is hard. That
+>> > being said if you look at my generic dma-noncoherent API series it tries
+>> > to move that way.  So far it is in early stages and apparently rather
+>> > buggy unfortunately.
+>>
+>> I'm assuming this stuff here?
+>>
+>> https://lkml.org/lkml/2018/4/20/146
+>>
+>> Anyway got lost in all that work a bit, looks really nice.
+>
+> That url doesn't seem to work currently.  But I am talking about the
+> thread titled '[RFC] common non-cache coherent direct dma mapping ops'
+>
+>> Yeah the above is pretty much what we do on x86. dma-api believes
+>> everything is coherent, so dma_map_sg does the mapping we want and
+>> nothing else (minus swiotlb fun). Cache flushing, allocations, all
+>> done by the driver.
+>
+> Which sounds like the right thing to do to me.
+>
+>> On arm that doesn't work. The iommu api seems like a good fit, except
+>> the dma-api tends to get in the way a bit (drm/msm apparently has
+>> similar problems like tegra), and if you need contiguous memory
+>> dma_alloc_coherent is the only way to get at contiguous memory. There
+>> was a huge discussion years ago about that, and direct cma access was
+>> shot down because it would have exposed too much of the caching
+>> attribute mangling required (most arm platforms need wc-pages to not
+>> be in the kernel's linear map apparently).
+>
+> Simple cma_alloc() doesn't do anything about cache handling, it
+> just is a very dumb allocator for large contiguous regions inside
+> a big pool.
+>
+> I'm not the CMA maintainer, but in general I'd love to see an
+> EXPORT_SYMBOL_GPL slapped onto cma_alloc/release and drivers use
+> that were needed.  Using that plus dma_map*/dma_unmap* sounds like
+> a much saner interface than dma_alloc_attrs + DMA_ATTR_NON_CONSISTENT
+> or DMA_ATTR_NO_KERNEL_MAPPING.
+>
+> You don't happen to have a pointer to that previous discussion?
 
-Sorry Christoph. I found the previous mail I said it works was wrong
-because I used a wrong vmlinux.
-It still failed. >,<
+I'll try to dig them up, I tried to stay as far away from that
+discussion as possible (since I have the luxury to not care for intel
+gpus).
+
+>> Anything that separate these 3 things more (allocation pools, mapping
+>> through IOMMUs and flushing cpu caches) sounds like the right
+>> direction to me. Even if that throws some portability across platforms
+>> away - drivers who want to control things in this much detail aren't
+>> really portable (without some serious work) anyway.
+>
+> As long as we stay away from the dma coherent allocations separating
+> them is fine, and I'm working towards it.  dma coherent allocations on
+> the other hand are very hairy beasts, and provide by very different
+> implementations depending on the architecture, or often even depending
+> on the specifics of individual implementations inside the architecture.
+>
+> So for your GPU/media case it seems like you'd better stay away from
+> them as much as you can.
+
+Hm, at least on x86 we do set up write-combine mappings ourselves (by
+calling relevant functions, which also changes the kernel mapping to
+avoid aliasing fun). Of course that means the gpu drivers are less
+portable, but then they're not really all that portable anyway - the
+buffer handling code always needs to be tuned for the platform you're
+running on. GPUs really love write-combining everything (we do the
+same for our mmio mappings to kernel/userspace, see stuff like
+io-mapping.h.
+
+But in many other cases dma_alloc_coherent is only used because it's
+the convenient/only way to allocate the memory we need.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
