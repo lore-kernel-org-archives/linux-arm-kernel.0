@@ -1,30 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Apr 2018 16:58:03 +0100
-Subject: [PATCH 0/3] arm64/kvm spectre-v1 fixes
-In-Reply-To: <20180425161342.38133-1-mark.rutland@arm.com>
-References: <20180425161342.38133-1-mark.rutland@arm.com>
-Message-ID: <20180426155803.GA898@arm.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Thu, 26 Apr 2018 18:18:34 +0200
+Subject: [PATCH 11/11] ARM: dts: stm32: add exti support to stm32mp157 pinctrl
+In-Reply-To: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
+References: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1524759514-12392-12-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 05:13:39PM +0100, Mark Rutland wrote:
-> These patches fix arm64-specific potential spectre-v1 gadgets found by
-> smatch when run over v4.17-rc2.
-> 
-> I'm still building up my smatch database, so it's possible that there are
-> further gadgets to be found.
-> 
-> For the moment I've ignored issues which appear to be cross-architecture.
-> 
-> Thanks,
-> Mark.
-> 
-> Mark Rutland (3):
->   arm64: fix possible spectre-v1 in ptrace_hbp_get_event()
->   KVM: arm/arm64: vgic: fix possible spectre-v1 in vgic_get_irq()
->   KVM: arm/arm64: vgic: fix possible spectre-v1 in vgic_mmio_read_apr()
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Thanks, I'll pick these up as fixes with Christoffer and Marc's acks on the
-kvm parts.
+This patch adds support of external interrupt for
+gpio[a..k], gpioz
 
-Will
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+index 6f044100..2f6872b 100644
+--- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+@@ -12,6 +12,8 @@
+ 			#size-cells = <1>;
+ 			compatible = "st,stm32mp157-pinctrl";
+ 			ranges = <0 0x50002000 0xa400>;
++			interrupt-parent = <&exti>;
++			st,syscfg = <&exti 0x60 0xff>;
+ 			pins-are-numbered;
+ 
+ 			gpioa: gpio at 50002000 {
+@@ -166,6 +168,8 @@
+ 			compatible = "st,stm32mp157-z-pinctrl";
+ 			ranges = <0 0x54004000 0x400>;
+ 			pins-are-numbered;
++			interrupt-parent = <&exti>;
++			st,syscfg = <&exti 0x60 0xff>;
+ 			status = "disabled";
+ 
+ 			gpioz: gpio at 54004000 {
+-- 
+2.7.4
