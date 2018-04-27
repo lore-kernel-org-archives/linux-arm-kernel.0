@@ -1,11 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 27 Apr 2018 12:11:05 +0900
-Subject: [PATCH v2 2/2] pinctrl: uniphier: add LD11 MPEG2-TS I/O pin-mux
+Date: Fri, 27 Apr 2018 12:11:50 +0900
+Subject: [PATCH v2 1/2] pinctrl: uniphier: add LD20 MPEG2-TS I/O pin-mux
  settings
-In-Reply-To: <20180427014905.19520-2-suzuki.katsuhiro@socionext.com>
+In-Reply-To: <20180427014905.19520-1-suzuki.katsuhiro@socionext.com>
 References: <20180427014905.19520-1-suzuki.katsuhiro@socionext.com>
- <20180427014905.19520-2-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAK7LNASaoMmRtwbvjj1v9bbvKQZ_2AH2uGvmZO5U53vSW-WKbA@mail.gmail.com>
+Message-ID: <CAK7LNARSB3q6aheYNjzC4BAP6C+SZE+arDbqbpaK8F31iR82aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,6 +15,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >   hscin0_s : HS0DOUT[0-3]
 >   hscin1_s : HS0DOUT[4-7]
 >   hscin2_s : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN0
+>   hscin3_s : HS1DIN[2-5]
 >   hscout0_s: HS0DOUT[0-3]
 >   hscout1_s: HS0DOUT[4-7]
 >
@@ -40,6 +40,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 This version looks good to me.
 
 Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
 
 
 
