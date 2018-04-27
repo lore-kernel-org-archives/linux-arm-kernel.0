@@ -1,81 +1,38 @@
-From: marcin@ziemianowicz.com (Marcin Ziemianowicz)
-Date: Fri, 27 Apr 2018 13:56:09 -0400
-Subject: [PATCH v3] clk: at91: PLL recalc_rate() now using cached MUL+DIV
- values
-Message-ID: <20180427175609.GA83298@hak8or>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 27 Apr 2018 11:26:21 -0700
+Subject: [PATCH 2/4] fpga: manager: change api, don't use drvdata
+In-Reply-To: <20180427012605.28981-3-mdf@kernel.org>
+References: <20180427012605.28981-1-mdf@kernel.org>
+ <20180427012605.28981-3-mdf@kernel.org>
+Message-ID: <152cb232-ea4d-292b-8b60-8bdc1732dc23@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@kernel.org>,
-linux-clk at vger.kernel.org,
-linux-arm-kernel at lists.infradead.org,
-linux-kernel at vger.kernel.org
-Bcc: 
-Subject: [PATCH v3] clk: at91: PLL recalc_rate() now using cached MUL and DIV
- values
-Reply-To: 
+On 04/26/2018 06:26 PM, Moritz Fischer wrote:
+> From: Alan Tull <atull@kernel.org>
+> 
+> Change fpga_mgr_register to not set or use drvdata.  This supports
+> the case where a PCIe device has more than one manager.
+> 
+> Add fpga_mgr_create/free functions.  Change fpga_mgr_register and
+> fpga_mgr_unregister functions to take the mgr struct as their only
+> parameter.
+> 
+>   struct fpga_manager *fpga_mgr_create(struct device *dev,
+>                 const char *name,
+>                 const struct fpga_manager_ops *mops,
+>                 void *priv);
+>   void fpga_mgr_free(struct fpga_manager *mgr);
+>   int fpga_mgr_register(struct fpga_manager *mgr);
+>   void fpga_mgr_unregister(struct fpga_manager *mgr);
+> 
+> Update the drivers that call fpga_mgr_register with the new API.
 
-When a USB device is connected to the USB host port on the SAM9N12 then
-you get "-62" error which seems to indicate USB replies from the device
-are timing out. Based on a logic sniffer, I saw the USB bus was running
-at half speed.
+Apologies for chiming in so late, this commit does not make it clear
+that fpga_mgr_unregister() now also free the 'mgr' argument by calling
+fpga_mgr_free(), this is kind of detail, but an API should make that
+clear IMHO.
 
-The PLL code uses cached MUL and DIV values which get set in set_rate()
-and applied in prepare(), but the recalc_rate() function instead
-queries the hardware instead of using these cached values. Therefore,
-if recalc_rate() is called between a set_rate() and prepare(), the
-wrong frequency is calculated and later the USB clock divider for the
-SAM9N12 SOC will be configured for an incorrect clock.
-
-In my case, the PLL hardware was set to 96 Mhz before the OHCI
-driver loads, and therefore the usb clock divider was being set
-to /2 even though the OHCI driver set the PLL to 48 Mhz.
-
-As an alternative explanation, I noticed this was fixed in the past:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283502.html
-but was later changed back via a large patch (maybe by mistake?):
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=1bdf02326b71eae7e9b4b335b881856aaf9d1af6
-
-Thank you for bearing with me about this Boris.
-
-Changes since V2:
-  Removed all logging/debug messages I added
-  > Comment by Boris Brezillon about my fix being wrong addressed
-Changes since V1:
-  Added patch set cover letter
-  Shortened lines which were over >80 characters long
-  > Comment by Greg Kroah-Hartman about "from" field in email addressed
-  > Comment by Alan Stern about redundant debug lines addressed
-
-Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
----
- drivers/clk/at91/clk-pll.c | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
-
-diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-index 7d3223fc..cc6e0364 100644
---- a/drivers/clk/at91/clk-pll.c
-+++ b/drivers/clk/at91/clk-pll.c
-@@ -132,19 +132,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
- 					 unsigned long parent_rate)
- {
- 	struct clk_pll *pll = to_clk_pll(hw);
--	unsigned int pllr;
--	u16 mul;
--	u8 div;
--
--	regmap_read(pll->regmap, PLL_REG(pll->id), &pllr);
--
--	div = PLL_DIV(pllr);
--	mul = PLL_MUL(pllr, pll->layout);
--
--	if (!div || !mul)
--		return 0;
- 
--	return (parent_rate / div) * (mul + 1);
-+	return return (parent_rate / pll->div) * (pll->mul + 1);
- }
- 
- static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
+Thanks
 -- 
-2.17.0
+Florian
