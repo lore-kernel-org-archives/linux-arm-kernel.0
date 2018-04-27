@@ -1,92 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Apr 2018 12:18:09 +0200
-Subject: [PATCH RFC PoC 0/2] platform: different approach to early
- platform drivers
-In-Reply-To: <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
- <20180426173151.GJ3094@brightrain.aerifal.cx>
- <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
- <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
- <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
-Message-ID: <CAK8P3a2xtTLx-VHVWok-b19=o1z5FbTNcaWq7Y_HSdaH6pWnZg@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 27 Apr 2018 12:20:33 +0200
+Subject: [PATCH 20/61] input: keyboard: simplify getting .drvdata
+In-Reply-To: <20180426212327.GB210716@dtor-ws>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-21-wsa+renesas@sang-engineering.com>
+ <20180426191947.GC162443@dtor-ws>
+ <20180426200401.lvqiy4gnchkwr4qw@ninjato>
+ <20180426212327.GB210716@dtor-ws>
+Message-ID: <20180427102033.msrr5sourxrtypg7@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 10:57 AM, Bartosz Golaszewski
-<bgolaszewski@baylibre.com> wrote:
-> 2018-04-27 9:52 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->> On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
->>> On 04/26/2018 12:31 PM, Rich Felker wrote:
->
-> We have platforms out there which still use both board files and
-> device tree. They are still comercially supported and are not going
-> anywhere anytime soon. Some of these platforms are being actively
-> maintained and cleaned-up. An example is the DaVinci platform: David
-> has recently converted all the SoCs and boards to using the common
-> clock framework. I'm cleaning up some other parts too.
->
-> The problem with the legacy board code is that a lot of things that
-> should be platform drivers ended up in arch/arm/mach-*. We're now
-> slowly moving this code to drivers/ but some initialization code
-> (timers, critical clocks, irqs) needs to be called early in the boot
-> sequence.
+Hi Dmitry,
 
-Right, and that's very good work.
+> > Isn't it actually the other way around? platform_get_drvdata() is a
+> > convenience function to access driver_data which is embedded in struct
+> > device?
+> 
+> I guess it depends on how you read it. I always considered it separate
+> because none (?) of the bus implementation assert this in comments to
+> XXX_get_drvdata().
 
-> When you're saying that we already have all the OF_DECLARE macros, it
-> seems to me that you're forgetting that we also want to keep
-> supporting the board files. So without the early platform drivers we
-> need to use a mix of OF_DECLARE and handcrafted initialization in
-> arch/arm/mach-* since we can't call platform_device_register() that
-> early. This blocks us from completely moving the should-be-driver code
-> to drivers/, because these drivers *need* to support both cases.
+Well, even in the case somebody will implement a custom driver_data for
+platform_devices, this person will need to convert all current users to
+'dev_get_drvdata(&pdev->dev);' first in order to avoid regressions, I'd
+think. This is what my patch does right now (but merely for overhead
+reasons). Or?
 
-The OF_DECLARE_* functions were initially added as a way to
-remove board files that just consist of callbacks into early
-initialization for some subsystems. As long as you still have
-board files and you are looking for a way to reuse code between
-OF_DECLARE_* functions and board files, why not just leave
-those functions globally visible and call them from the non-DT
-board files?
+> > > in the future, so I'd prefer keep using the proper accessors for the
+> > > objects we are dealing with.
+> > 
+> > Exactly. I'd just argue, the object we are dealing with, declared in the
+> > PM functions, is a struct device.
+> 
+> No, the driver does not create a generic device, it actually creates a
+> platform device, or i2c client, or spi, or something else. The fact that
 
-> The main problem with OF_DECLARE is that although we have
-> corresponding device nodes, we never actually register any real linux
-> devices. If we add to this the fact that current early platform
-> drivers implementation is broken (for reasons I mentioned in the cover
-> letter) the support gets really messy, since we can have up to three
-> entry points to the driver's code. Other issues come to mind as well:
-> if we're using OF_DECLARE we can't benefit from devm* routines.
+True.
 
-Right, the devm_* problem has come up before.
+> suspend and resume routines have generic device as their argument has
+> more to do with the language limitation rather than reflection of true
+> type of the objects we are dealing with.
 
-> My aim is to provide a clean, robust and generic way of probing
-> certain devices early and then converting them to actual platform
-> devices when we're advanced enough into the boot sequence. If we
-> merged such a framework, we could work towards removing both the
-> previous early platform devices (in favor of the new mechanism) and
-> maybe even deprecating and replacing OF_DECLARE(), since we could
-> simply early probe the DT drivers. Personally I see OF_DECLARE as a
-> bigger hack than early devices.
->
-> My patch tries to address exactly the use cases we're facing - for
-> example by providing means to probe devices twice (early and late) and
-> to check the state we're at in order for users to be able to just do
-> the critical initialization early on and then continue with regular
-> stuff later.
+Ok, can be argued. I'd personally still go for the gain, but I won't
+push harder than this mail.
 
-Maybe the problem is reusing the name and some of the code from
-an existing functionality that we've been trying to get rid of.
+Regards,
 
-If what you want to do is completely different from the existing
-early_platform implementation, how about starting by moving that
-out of drivers/base/platform.c into something under arch/sh/
-and renaming it to something with an sh_ prefix.
+   Wolfram
 
-Let's just leave the non-DT part out of it by making it sh specific.
-Then we can come up with improvements to the current
-platform_device handling for DT based platforms that you can
-use on DT-based davinci to replace what currently happens on
-board-file based davinci systems, without mixing up those
-two code paths too much in the base driver support.
-
-       Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180427/c040aa09/attachment.sig>
