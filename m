@@ -1,52 +1,206 @@
-From: dalias@libc.org (Rich Felker)
-Date: Thu, 26 Apr 2018 22:54:21 -0400
-Subject: [PATCH RFC PoC 0/2] platform: different approach to early
- platform drivers
-In-Reply-To: <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
- <20180426173151.GJ3094@brightrain.aerifal.cx>
- <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
-Message-ID: <20180427025421.GN3094@brightrain.aerifal.cx>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Fri, 27 Apr 2018 11:09:59 +0800
+Subject: [PATCH 2/2] net: stmmac: dwmac-meson: extend phy mode setting
+In-Reply-To: <1524732426.4026.84.camel@baylibre.com>
+References: <20180426160508.29380-1-yixun.lan@amlogic.com>
+ <20180426160508.29380-3-yixun.lan@amlogic.com>
+ <1524732426.4026.84.camel@baylibre.com>
+Message-ID: <daa6e325-ce4d-7b6b-dc43-2a884d485139@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 09:28:39PM -0500, David Lechner wrote:
-> On 04/26/2018 12:31 PM, Rich Felker wrote:
-> >On Thu, Apr 26, 2018 at 05:29:18PM +0200, Bartosz Golaszewski wrote:
-> >>From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> >>
-> >>This is a follow to my series[1] the aim of which was to introduce device tree
-> >>support for early platform devices.
-> >>
-> >>It was received rather negatively. Aside from using device tree to pass
-> >>implementation specific details to the system, two important concerns were
-> >>raised: no probe deferral support and the fact that currently the early devices
-> >>never get converted to actual platform drivers. This series is a
-> >>proof-of-concept that's trying to address those issues.
-> >>
-> >>The only user of the current version of early platform drivers is the SuperH
-> >>architecture. If this series eventually gets merged, we could simply replace
-> >>the other solution.
-> >
-> >Looking at a quick output of:
-> >
-> >	grep -r -A10 early_devices[[] arch/sh/kernel/
-> >
-> >it looks like all of the existing early platform devices are serial
-> >ports, clocks, and clocksources. The switch to device tree should pick
-> >them all up from CLK_OF_DECLARE, TIMER_OF_DECLARE, and
-> >EARLYCON_DECLARE. Until that's complete, the existing code works
-> >as-is. I don't see what problem you're trying to solve.
+Hi Jerome
+On 04/26/18 16:47, Jerome Brunet wrote:
+> On Thu, 2018-04-26 at 16:05 +0000, Yixun Lan wrote:
+>>   In the Meson-AXG SoC, the phy mode setting of PRG_ETH0 in the glue layer
+>> is extended from bit[0] to bit[2:0].
+>>   There is no problem if we configure it to the RGMII 1000M PHY mode,
+>> since the register setting is coincidentally compatible with previous one,
+>> but for the RMII 100M PHY mode, the configuration need to be changed to
+>> value - b100.
+>>   This patch was verified with a RTL8201F 100M ethernet PHY.
+>>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  .../ethernet/stmicro/stmmac/dwmac-meson8b.c   | 95 ++++++++++++++++---
+>>  1 file changed, 84 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
+>> index 7cb794094a70..e3688b6dd87c 100644
+>> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
+>> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
+>> @@ -18,6 +18,7 @@
+>>  #include <linux/io.h>
+>>  #include <linux/ioport.h>
+>>  #include <linux/module.h>
+>> +#include <linux/of_device.h>
+>>  #include <linux/of_net.h>
+>>  #include <linux/mfd/syscon.h>
+>>  #include <linux/platform_device.h>
+>> @@ -29,6 +30,10 @@
+>>  
+>>  #define PRG_ETH0_RGMII_MODE		BIT(0)
+>>  
+>> +#define PRG_ETH0_EXT_PHY_MODE_MASK	GENMASK(2, 0)
+>> +#define PRG_ETH0_EXT_RGMII_MODE		1
+>> +#define PRG_ETH0_EXT_RMII_MODE		4
+>> +
+>>  /* mux to choose between fclk_div2 (bit unset) and mpll2 (bit set) */
+>>  #define PRG_ETH0_CLK_M250_SEL_SHIFT	4
+>>  #define PRG_ETH0_CLK_M250_SEL_MASK	GENMASK(4, 4)
+>> @@ -46,10 +51,16 @@
+>>  #define PRG_ETH0_TX_AND_PHY_REF_CLK	BIT(12)
+>>  
+>>  #define MUX_CLK_NUM_PARENTS		2
+>> +struct meson8b_dwmac_data {
+>> +	bool ext_phy_mode;
+>> +};
+>>  
+>>  struct meson8b_dwmac {
+>>  	struct device		*dev;
+>>  	void __iomem		*regs;
+>> +
+>> +	const struct meson8b_dwmac_data *data;
+>> +
+>>  	phy_interface_t		phy_mode;
+>>  	struct clk		*rgmii_tx_clk;
+>>  	u32			tx_delay_ns;
+>> @@ -171,6 +182,46 @@ static int meson8b_init_rgmii_tx_clk(struct meson8b_dwmac *dwmac)
+>>  	return 0;
+>>  }
+>>  
+>> +static int meson8b_init_set_mode(struct meson8b_dwmac *dwmac)
+>> +{
+>> +	bool ext_phy_mode = dwmac->data->ext_phy_mode;
+>> +
+>> +	switch (dwmac->phy_mode) {
+>> +	case PHY_INTERFACE_MODE_RGMII:
+>> +	case PHY_INTERFACE_MODE_RGMII_RXID:
+>> +	case PHY_INTERFACE_MODE_RGMII_ID:
+>> +	case PHY_INTERFACE_MODE_RGMII_TXID:
+>> +		/* enable RGMII mode */
+>> +		if (ext_phy_mode)
 > 
-> The problem for us is that clk maintainers don't want new drivers to use
-> CLK_OF_DECLARE and instead use platform devices. I have just written such
-> a new driver that is shared by 6 different SoCs. For some combinations of
-> SoCs and clocks, using a platform device is fine but on others we need to
-> register early, so the drivers now have to handle both cases, which is
-> kind of messy and fragile. If there is a generic way to register platform
-> devices early, then the code is simplified because we only have to handle
-> one method of registering the clocks instead of two.
+> Looks weird to have this if target at a specific SoC withing a function named
+> after another SoC
+> 
+> Couldn't you make one function per soc type, and pass that function pointer in
+> the match data ?
+> 
+sounds good, I can do this
 
-Can you get them to explain why? This sounds wrong.
-
-Rich
+>> +			meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+>> +						PRG_ETH0_EXT_PHY_MODE_MASK,
+>> +						PRG_ETH0_EXT_RGMII_MODE);
+>> +		else
+>> +			meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+>> +						PRG_ETH0_RGMII_MODE,
+>> +						PRG_ETH0_RGMII_MODE);
+>> +
+>> +		break;
+>> +	case PHY_INTERFACE_MODE_RMII:
+>> +		/* disable RGMII mode -> enables RMII mode */
+>> +		if (ext_phy_mode)
+>> +			meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+>> +						PRG_ETH0_EXT_PHY_MODE_MASK,
+>> +						PRG_ETH0_EXT_RMII_MODE);
+>> +		else
+>> +			meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+>> +						PRG_ETH0_RGMII_MODE, 0);
+>> +
+>> +		break;
+>> +	default:
+>> +		dev_err(dwmac->dev, "fail to set phy-mode %s\n",
+>> +			phy_modes(dwmac->phy_mode));
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
+>>  {
+>>  	int ret;
+>> @@ -188,10 +239,6 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
+>>  
+>>  	case PHY_INTERFACE_MODE_RGMII_ID:
+>>  	case PHY_INTERFACE_MODE_RGMII_TXID:
+>> -		/* enable RGMII mode */
+>> -		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_RGMII_MODE,
+>> -					PRG_ETH0_RGMII_MODE);
+>> -
+>>  		/* only relevant for RMII mode -> disable in RGMII mode */
+>>  		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+>>  					PRG_ETH0_INVERTED_RMII_CLK, 0);
+>> @@ -224,10 +271,6 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
+>>  		break;
+>>  
+>>  	case PHY_INTERFACE_MODE_RMII:
+>> -		/* disable RGMII mode -> enables RMII mode */
+>> -		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_RGMII_MODE,
+>> -					0);
+>> -
+>>  		/* invert internal clk_rmii_i to generate 25/2.5 tx_rx_clk */
+>>  		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+>>  					PRG_ETH0_INVERTED_RMII_CLK,
+>> @@ -274,6 +317,11 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
+>>  		goto err_remove_config_dt;
+>>  	}
+>>  
+>> +	dwmac->data = (const struct meson8b_dwmac_data *)
+>> +		of_device_get_match_data(&pdev->dev);
+>> +	if (!dwmac->data)
+>> +		return -EINVAL;
+>> +
+>>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>>  	dwmac->regs = devm_ioremap_resource(&pdev->dev, res);
+>>  	if (IS_ERR(dwmac->regs)) {
+>> @@ -298,6 +346,10 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
+>>  	if (ret)
+>>  		goto err_remove_config_dt;
+>>  
+>> +	ret = meson8b_init_set_mode(dwmac);
+>> +	if (ret)
+>> +		goto err_remove_config_dt;
+>> +
+>>  	ret = meson8b_init_prg_eth(dwmac);
+>>  	if (ret)
+>>  		goto err_remove_config_dt;
+>> @@ -316,10 +368,31 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
+>>  	return ret;
+>>  }
+>>  
+>> +static const struct meson8b_dwmac_data meson8b_dwmac_data = {
+>> +	.ext_phy_mode = false,
+>> +};
+>> +
+>> +static const struct meson8b_dwmac_data meson_axg_dwmac_data = {
+>> +	.ext_phy_mode = true,
+>> +};
+>> +
+>>  static const struct of_device_id meson8b_dwmac_match[] = {
+>> -	{ .compatible = "amlogic,meson8b-dwmac" },
+>> -	{ .compatible = "amlogic,meson8m2-dwmac" },
+>> -	{ .compatible = "amlogic,meson-gxbb-dwmac" },
+>> +	{
+>> +		.compatible = "amlogic,meson8b-dwmac",
+>> +		.data = &meson8b_dwmac_data,
+>> +	},
+>> +	{
+>> +		.compatible = "amlogic,meson8m2-dwmac",
+>> +		.data = &meson8b_dwmac_data,
+>> +	},
+>> +	{
+>> +		.compatible = "amlogic,meson-gxbb-dwmac",
+>> +		.data = &meson8b_dwmac_data,
+>> +	},
+>> +	{
+>> +		.compatible = "amlogic,meson-axg-dwmac",
+>> +		.data = &meson_axg_dwmac_data,
+>> +	},
+>>  	{ }
+>>  };
+>>  MODULE_DEVICE_TABLE(of, meson8b_dwmac_match);
+> 
+> .
+> 
