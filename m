@@ -1,58 +1,73 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 27 Apr 2018 09:51:46 +0200
-Subject: [PATCH 00/24] device link, bridge supplier <-> drm device
-In-Reply-To: <7d4bceeb-9611-cbf9-3906-fef5db88aad8@axentia.se>
-References: <CGME20180426223215epcas2p38fe3b0b7b1ea1c8190805f9e2a89e11e@epcas2p3.samsung.com>
- <20180426223139.16740-1-peda@axentia.se>
- <25d8e621-b3f8-094f-32a2-d22efc2163a4@samsung.com>
- <7d4bceeb-9611-cbf9-3906-fef5db88aad8@axentia.se>
-Message-ID: <8d747088-3214-97af-4616-bf5d2602892a@axentia.se>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Apr 2018 09:52:51 +0200
+Subject: [PATCH RFC PoC 0/2] platform: different approach to early
+ platform drivers
+In-Reply-To: <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
+References: <20180426152920.21569-1-brgl@bgdev.pl>
+ <20180426173151.GJ3094@brightrain.aerifal.cx>
+ <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
+Message-ID: <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-27 09:37, Peter Rosin wrote:
-> On 2018-04-27 09:11, Andrzej Hajda wrote:
->> Hi Peter,
+On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
+> On 04/26/2018 12:31 PM, Rich Felker wrote:
 >>
->> On 27.04.2018 00:31, Peter Rosin wrote:
->>> Hi!
+>> On Thu, Apr 26, 2018 at 05:29:18PM +0200, Bartosz Golaszewski wrote:
 >>>
->>> It was noted by Russel King [1] that bridges (not using components)
->>> might disappear unexpectedly if the owner of the bridge was unbound.
->>> Jyri Sarha had previously noted the same thing with panels [2]. Jyri
->>> came up with using device links to resolve the panel issue, which
->>> was also my (independent) reaction to the note from Russel.
+>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >>>
->>> This series builds up to the addition of that link in the last
->>> patch, but in my opinion the other 23 patches do have merit on their
->>> own.
+>>> This is a follow to my series[1] the aim of which was to introduce device
+>>> tree
+>>> support for early platform devices.
 >>>
->>> The last patch needs testing, while the others look trivial. That
->>> said, I might have missed some subtlety.
+>>> It was received rather negatively. Aside from using device tree to pass
+>>> implementation specific details to the system, two important concerns
+>>> were
+>>> raised: no probe deferral support and the fact that currently the early
+>>> devices
+>>> never get converted to actual platform drivers. This series is a
+>>> proof-of-concept that's trying to address those issues.
+>>>
+>>> The only user of the current version of early platform drivers is the
+>>> SuperH
+>>> architecture. If this series eventually gets merged, we could simply
+>>> replace
+>>> the other solution.
 >>
->> of_node is used as an identifier of the bridge in the kernel. If you
->> replace it with device pointer there will be potential problem with
->> devices having two or more bridges, how do you differentiate bridges if
->> the owner is the same? If I remember correctly current bridge code does
->> not allow to have multiple bridges in one device, but that should be
->> quite easy to fix if necessary. After this change it will become more
->> difficult.
-> 
-> I don't see how it will be more difficult?
-> 
->> Anyway I remember discussion that in DT world bridge should be
->> identified rather by of_graph port node, not by parent node as it is
->> now. If you want to translate this relation to device owner, you should
->> add also port number to have full identification of the bridge, ie pair
->> (owner, port_number) would be equivalent of port node.
-> 
-> You even state the trivial solution here, just add the port/endpoint ID
-> when/if it is needed. So, what is the significant difference?
+>>
+>> Looking at a quick output of:
+>>
+>>         grep -r -A10 early_devices[[] arch/sh/kernel/
+>>
+>> it looks like all of the existing early platform devices are serial
+>> ports, clocks, and clocksources. The switch to device tree should pick
+>> them all up from CLK_OF_DECLARE, TIMER_OF_DECLARE, and
+>> EARLYCON_DECLARE. Until that's complete, the existing code works
+>> as-is. I don't see what problem you're trying to solve.
+>
+>
+> The problem for us is that clk maintainers don't want new drivers to use
+> CLK_OF_DECLARE and instead use platform devices. I have just written such
+> a new driver that is shared by 6 different SoCs. For some combinations of
+> SoCs and clocks, using a platform device is fine but on others we need to
+> register early, so the drivers now have to handle both cases, which is
+> kind of messy and fragile. If there is a generic way to register platform
+> devices early, then the code is simplified because we only have to handle
+> one method of registering the clocks instead of two.
 
-Or, since this is apparently a rare requirement, you could make the owners
-that do need it fix it themselves. E.g. by embedding the struct drm_bridge
-in another struct that contains the needed ID, and use container_of to get
-to that containing struct with the ID.
+The early_platform code is certainly not a way to make things simpler,
+it just adds one more way of doing the same thing that OF_CLK_DECLARE
+already does. We removed the last early_platform users on ARM a few
+years ago, and I would hope to leave it like that.
 
-Cheers,
-Peter
+I haven't seen the discussion about your clock drivers, but I know that
+usually only a very small subset of the clocks on an SoC are needed
+that 'early', and you should use a regular platform driver for the rest.
+
+Can you elaborate on which devices need to access your clocks before
+you are able to initialize the clk driver through the regular platform_driver
+framework? Do any of these need complex interactions with the clk
+subsystem, or do you just need to ensure they are turned on?
+
+     Arnd
