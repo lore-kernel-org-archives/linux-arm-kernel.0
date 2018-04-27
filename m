@@ -1,102 +1,175 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 26 Apr 2018 19:17:20 -0500
-Subject: [PATCH v9 02/27] clk: davinci: da850-pll: change PLL0 to
- CLK_OF_DECLARE
+Date: Thu, 26 Apr 2018 19:17:26 -0500
+Subject: [PATCH v9 08/27] ARM: davinci: dm365: add new clock init using common
+ clock framework
 In-Reply-To: <20180427001745.4116-1-david@lechnology.com>
 References: <20180427001745.4116-1-david@lechnology.com>
-Message-ID: <20180427001745.4116-3-david@lechnology.com>
+Message-ID: <20180427001745.4116-9-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PLL0 on davinci/da850-type device needs to be registered early in boot
-because it is needed for clocksource/clockevent. Change the driver
-to use CLK_OF_DECLARE for this special case.
+This adds the new board-specific clock init in mach-davinci/dm365.c
+using the new common clock framework drivers.
+
+The #ifdefs are needed to prevent compile errors until the entire
+ARCH_DAVINCI is converted.
+
+Also clean up the #includes since we are adding some here.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v9 changes:
-- new patch in v9
+- register PLL1 and PSC in dm365_init_time() instead of as platform device so
+  that we get the correct timer0 clock for davinci_timer_init()
+- Fixed size of PLL memory block
+
+v8 changes:
+- none
+
+v7 changes:
+- add clock platform device declarations
+- register platform devices instead of registering clocks directly
+- add davinci prefix to commit description
+
+v6 changes:
+- add blank lines between function calls
 
 
- drivers/clk/davinci/pll-da850.c | 26 ++++++++++++++++++++++----
- drivers/clk/davinci/pll.c       |  4 +++-
- drivers/clk/davinci/pll.h       |  2 +-
- 3 files changed, 26 insertions(+), 6 deletions(-)
+ arch/arm/mach-davinci/board-dm365-evm.c |  2 +
+ arch/arm/mach-davinci/davinci.h         |  1 +
+ arch/arm/mach-davinci/dm365.c           | 56 +++++++++++++++++++------
+ 3 files changed, 47 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/clk/davinci/pll-da850.c b/drivers/clk/davinci/pll-da850.c
-index 00a6ece7b524..743527de1da2 100644
---- a/drivers/clk/davinci/pll-da850.c
-+++ b/drivers/clk/davinci/pll-da850.c
-@@ -12,6 +12,8 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/mfd/da8xx-cfgchip.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_address.h>
- #include <linux/of.h>
- #include <linux/types.h>
- 
-@@ -135,11 +137,27 @@ static const struct davinci_pll_sysclk_info *da850_pll0_sysclk_info[] = {
- 	NULL
- };
- 
--int of_da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
-+void of_da850_pll0_init(struct device_node *node)
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 0ac085b58a2b..36b69a131cfa 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -741,6 +741,8 @@ static __init void dm365_evm_init(void)
  {
--	return of_davinci_pll_init(dev, dev->of_node, &da850_pll0_info,
--				   &da850_pll0_obsclk_info,
--				   da850_pll0_sysclk_info, 7, base, cfgchip);
-+	void __iomem *base;
-+	struct regmap *cfgchip;
-+
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: ioremap failed\n", __func__);
-+		return;
-+	}
-+
-+	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
-+	if (IS_ERR(cfgchip)) {
-+		pr_warn("%s: failed to get cfgchip (%ld)\n", __func__,
-+			PTR_ERR(cfgchip));
-+		cfgchip = NULL;
-+	}
-+
-+	of_davinci_pll_init(NULL, node, &da850_pll0_info,
-+			    &da850_pll0_obsclk_info,
-+			    da850_pll0_sysclk_info, 7, base, cfgchip);
- }
+ 	int ret;
  
- static const struct davinci_pll_clk_info da850_pll1_info = {
-diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
-index 7c4d808b8fdb..7d55e7470005 100644
---- a/drivers/clk/davinci/pll.c
-+++ b/drivers/clk/davinci/pll.c
-@@ -794,8 +794,10 @@ static struct davinci_pll_platform_data *davinci_pll_get_pdata(struct device *de
- 	return pdata;
- }
- 
-+/* needed in early boot for clocksource/clockevent */
-+CLK_OF_DECLARE(da850_pll0, "ti,da850-pll0", of_da850_pll0_init);
++	dm365_register_clocks();
 +
- static const struct of_device_id davinci_pll_of_match[] = {
--	{ .compatible = "ti,da850-pll0", .data = of_da850_pll0_init },
- 	{ .compatible = "ti,da850-pll1", .data = of_da850_pll1_init },
- 	{ }
+ 	ret = dm365_gpio_register();
+ 	if (ret)
+ 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+index c2c634b6578e..a799b5266d4b 100644
+--- a/arch/arm/mach-davinci/davinci.h
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -94,6 +94,7 @@ int dm355_gpio_register(void);
+ /* DM365 function declarations */
+ void dm365_init(void);
+ void dm365_init_time(void);
++void dm365_register_clocks(void);
+ void dm365_init_asp(void);
+ void dm365_init_vc(void);
+ void dm365_init_ks(struct davinci_ks_platform_data *pdata);
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 871372a59da8..76de426a0e41 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -12,32 +12,38 @@
+  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/serial_8250.h>
+-#include <linux/platform_device.h>
++
++#include <linux/clk-provider.h>
++#include <linux/clk/davinci.h>
++#include <linux/clkdev.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+-#include <linux/spi/spi.h>
++#include <linux/init.h>
+ #include <linux/platform_data/edma.h>
+ #include <linux/platform_data/gpio-davinci.h>
+ #include <linux/platform_data/keyscan-davinci.h>
+ #include <linux/platform_data/spi-davinci.h>
++#include <linux/platform_device.h>
++#include <linux/serial_8250.h>
++#include <linux/spi/spi.h>
+ 
+ #include <asm/mach/map.h>
+ 
++#include <mach/common.h>
+ #include <mach/cputype.h>
+-#include "psc.h"
+-#include <mach/mux.h>
+ #include <mach/irqs.h>
+-#include <mach/time.h>
++#include <mach/mux.h>
+ #include <mach/serial.h>
+-#include <mach/common.h>
++#include <mach/time.h>
+ 
++#include "asp.h"
+ #include "davinci.h"
+-#include "clock.h"
+ #include "mux.h"
+-#include "asp.h"
++
++#ifndef CONFIG_COMMON_CLK
++#include "clock.h"
++#include "psc.h"
++#endif
+ 
+ #define DM365_REF_FREQ		24000000	/* 24 MHz on the DM365 EVM */
+ #define DM365_RTC_BASE			0x01c69000
+@@ -54,6 +60,7 @@
+ #define DM365_EMAC_CNTRL_RAM_OFFSET	0x1000
+ #define DM365_EMAC_CNTRL_RAM_SIZE	0x2000
+ 
++#ifndef CONFIG_COMMON_CLK
+ static struct pll_data pll1_data = {
+ 	.num		= 1,
+ 	.phys_base	= DAVINCI_PLL1_BASE,
+@@ -485,7 +492,7 @@ static struct clk_lookup dm365_clks[] = {
+ 	CLK(NULL, "mjcp", &mjcp_clk),
+ 	CLK(NULL, NULL, NULL),
  };
-diff --git a/drivers/clk/davinci/pll.h b/drivers/clk/davinci/pll.h
-index 92a0978a7d29..5fe59ca45638 100644
---- a/drivers/clk/davinci/pll.h
-+++ b/drivers/clk/davinci/pll.h
-@@ -126,7 +126,7 @@ int da830_pll_init(struct device *dev, void __iomem *base, struct regmap *cfgchi
+-
++#endif
+ /*----------------------------------------------------------------------*/
  
- int da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
- int da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
--int of_da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
-+void of_da850_pll0_init(struct device_node *node);
- int of_da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+ #define INTMUX		0x18
+@@ -1171,8 +1178,33 @@ void __init dm365_init(void)
  
- int dm355_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+ void __init dm365_init_time(void)
+ {
++#ifdef CONFIG_COMMON_CLK
++	void __iomem *pll1, *pll2, *psc;
++	struct clk *clk;
++
++	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM365_REF_FREQ);
++
++	pll1 = ioremap(DAVINCI_PLL1_BASE, SZ_1K);
++	dm365_pll1_init(NULL, pll1, NULL);
++
++	pll2 = ioremap(DAVINCI_PLL2_BASE, SZ_1K);
++	dm365_pll2_init(NULL, pll2, NULL);
++
++	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
++	dm365_psc_init(NULL, psc);
++
++	clk = clk_get(NULL, "timer0");
++
++	davinci_timer_init(clk);
++#else
+ 	davinci_clk_init(dm365_clks);
+ 	davinci_timer_init(&timer0_clk);
++#endif
++}
++
++void __init dm365_register_clocks(void)
++{
++	/* all clocks are currently registered in dm365_init_time() */
+ }
+ 
+ static struct resource dm365_vpss_resources[] = {
 -- 
 2.17.0
