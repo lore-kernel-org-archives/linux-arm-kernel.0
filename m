@@ -1,117 +1,190 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Fri, 27 Apr 2018 11:56:25 -0500
-Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <20180427160914.GA5286@arm.com>
-References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
- <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
- <20180426170624.bfcba885431d57d0de2a3ddd@arm.com>
- <20180427093027.ngtuoezyh6mtz26p@lakrids.cambridge.arm.com>
- <20180427081525.f9dcc756678baf3bb6e6e473@arm.com>
- <20180427143719.GA5093@arm.com>
- <20180427104629.2bff4b4b683a93ddf39f8df5@arm.com>
- <20180427160914.GA5286@arm.com>
-Message-ID: <20180427115625.b5191d381cd41e7ee092fea1@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 27 Apr 2018 11:56:27 -0500
+Subject: LS1043A : "synchronous abort" at boot due to PCI config read
+In-Reply-To: <5AE317AB.4020404@kontron.com>
+References: <5AD0E995.3090802@kontron.com>
+ <CAKv+Gu_v4V8DUa6f4WxvjZHoJbbqT0mKpOwYVmaLaE20CB3U_g@mail.gmail.com>
+ <5AE317AB.4020404@kontron.com>
+Message-ID: <20180427165627.GA8199@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Apr 2018 17:09:14 +0100
-Will Deacon <will.deacon@arm.com> wrote:
+On Fri, Apr 27, 2018 at 12:29:32PM +0000, Gilles Buloz wrote:
+> Le 27/04/2018 10:43, Ard Biesheuvel a ?crit :
+> > (add Bjorn and linux-pci)
+> >
+> > On 13 April 2018 at 19:32, Gilles Buloz <Gilles.Buloz@kontron.com> wrote:
+> >> Dear developers,
+> >>
+> >> I currently have two functional workarounds for this issue but
+> >> would like to know which one you would recommend, if any :-) I'm
+> >> using a LS1043A CPU (NXP QorIQ Layerscape) and get a "synchronous
+> >> external abort" when booting because of a PCI config read during
+> >> PCI scan.
+> >>
+> >> I'm using a custom hardware (based on LS1043ARDB) having a
+> >> PEX8112 PCIe-to-PCI bridge connected to the LS1043A to have a PCI
+> >> slot for legacy devices. This bridge only supports PCI-Compatible
+> >> config accesses (offset 0x00-0xFF).
 
-> Kim,
-> 
-> [Ganapat: please don't let this discussion disrupt your PMU driver
->  development. You can safely ignore it for now :)]
-> 
-> On Fri, Apr 27, 2018 at 10:46:29AM -0500, Kim Phillips wrote:
-> > On Fri, 27 Apr 2018 15:37:20 +0100
-> > Will Deacon <will.deacon@arm.com> wrote:
-> > 
-> > > On Fri, Apr 27, 2018 at 08:15:25AM -0500, Kim Phillips wrote:
-> > > > On Fri, 27 Apr 2018 10:30:27 +0100
-> > > > Mark Rutland <mark.rutland@arm.com> wrote:
-> > > > > On Thu, Apr 26, 2018 at 05:06:24PM -0500, Kim Phillips wrote:
-> > > > > > On Wed, 25 Apr 2018 14:30:47 +0530
-> > > > > > Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com> wrote:
-> > > > > > 
-> > > > > > > +static int thunderx2_uncore_event_init(struct perf_event *event)
-> > > > > 
-> > > > > > This PMU driver can be made more user-friendly by not just silently
-> > > > > > returning an error code such as -EINVAL, but by emitting a useful
-> > > > > > message describing the specific error via dmesg.
-> > > > > 
-> > > > > As has previously been discussed on several occasions, patches which log
-> > > > > to dmesg in a pmu::event_init() path at any level above pr_debug() are
-> > > > > not acceptable -- dmesg is not intended as a mechanism to inform users
-> > > > > of driver-specific constraints.
-> > > > 
-> > > > I disagree - drivers do it all the time, using dev_err(), dev_warn(), etc.
-> > > > 
-> > > > > I would appreciate if in future you could qualify your suggestion with
-> > > > > the requirement that pr_debug() is used.
-> > > > 
-> > > > It shouldn't - the driver isn't being debugged, it's in regular use.
-> > > 
-> > > For anything under drivers/perf/, I'd prefer not to have these prints
-> > > and instead see efforts to improve error reporting via the perf system
-> > > call interface.
-> > 
-> > We'd all prefer that, and for all PMU drivers, why should ones under
-> > drivers/perf be treated differently?
-> 
-> Because they're the ones I maintain...
+I would guess the PEX8112 itself has 4K of config space, but it only
+forwards 256 bytes of config space to the conventional PCI secondary
+bus.
 
-You represent a minority on your opinion on this matter though.
+> >> On this PCI slot I connect a PCI module made of a PCI-to-PCIe
+> >> bridge plus PCIe devices behind.
+> >>
+> >> The problem occurs when the kernel probes the PCIe devices : as
+> >> they are PCIe devices, the kernel does a PCI config read access
+> >> at offset 0x100 to check if "PCIe extended capability registers"
+> >> are accessible (see drivers/pci/probe.c, function
+> >> pci_cfg_space_size_ext()). Unfortunately the PEX8112 PCIe-to-PCI
+> >> bridge that is in the path reports an error to the CPU for this
+> >> access, and it seems there's no way to disable that on this
+> >> bridge.
+> >>
+> >> The first workaround I found was to patch
+> >> drivers/pci/host/pci-layerscape.c to have PCIE_ABSERR_SETTING set
+> >> to 0x9400 instead of 0x9401 (for PCIE_ABSERR register) to disable
+> >> error reporting. This only impacts an NXP part of the Linux
+> >> kernel code, but I'm not sure this is a good idea (however it
+> >> seems to be like that on Intel platforms where even MEM accesses
+> >> to a no-device address return FF without any error).
+> >>
+> >> I've also tried another workaround that works : patch
+> >> drivers/pci/probe.c to use bus_flags to remember if a bus is
+> >> behind a bridge without extended address capability, to avoid PCi
+> >> config read accesses at offset 0x100 in pci_cfg_space_size() /
+> >> pci_cfg_space_size_ext(). But this patch impacts the generic PCI
+> >> probe method of Linux.
+> >>
+> >> Any Idea to properly handle that issue ?
+> >>
+> > This seems like a rather unusual configuration, but I guess that
+> > if the first bridge/switch advertises its inability to support
+> > extended config space accesses, we should not be performing them
+> > on any of its subordinate buses. How does the PEX8112 advertise
+> > this limitation?
+> >
+> > That said, I wonder if it is reasonable in the first place to
+> > expect that a PCIe device works as expected passing through a
+> > legacy PCI layer like that.
+> >
+> The PEX8112 PCIe-to-PCI bridge has capability PCI_CAP_ID_EXP, but
+> has no PCI_CAP_ID_PCIX capability.  As I understand the lack of
+> PCI_CAP_ID_PCIX is advertising this limitation on the PCI side (no
+> support for PCI config offset >=0x100).
 
-> > As you are already aware, I've personally tried to fix this problem -
-> > that has existed since before the introduction of the perf tool (I
-> > consider it a syscall-independent enhanced error interface), multiple
-> > times, and failed.
-> 
-> Why is that my problem? Try harder?
+Sounds right to me.
 
-It's your problem because we're here reviewing a patch that happens to
-fall under your maintainership.  I'll be the first person to tell you
-I'm obviously incompetent and haven't been able to come up with a
-solution that is acceptable for everyone up to and including Linus
-Torvalds.  I'm just noticing a chronic usability problem that can be
-easily alleviated in the context of this patch review.
+> Also I guess in the case of a bridge having PCI_CAP_ID_PCIX, this
+> limitation would be advertised by the lack of PCI_X_STATUS_266MHZ
+> and PCI_X_STATUS_533MHZ (as done in drivers/pci/probe.c at
+> pci_cfg_space_size())
 
-> > So until someone comes up with a solution that works for everyone
-> > up to and including Linus Torvalds (who hasn't put up a problem
-> > pulling PMU drivers emitting things to dmesg so far, by the way), this
-> > keep PMU drivers' errors silent preference of yours is unnecessarily
-> > impeding people trying to measure system performance on Arm based
-> > machines - all other archs' maintainers are fine with PMU drivers using
-> > dmesg.
-> 
-> Good for them, although I'm pretty sure that at least the x86 folks are
-> against this crap too.
+Also sounds right.  Per the PCI-X spec, checking for PCI_X_STATUS_266MHZ
+should be enough, but it shouldn't hurt to check for either
+PCI_X_STATUS_266MHZ or PCI_X_STATUS_533MHZ.
 
-Unfortunately, it doesn't affect them nearly as much as it does our
-more diverse platforms, which is why I don't think they care to do
-much about it.
+> I'm currently using the attached patch (for kernel 4.1.35-rt41 from
+> NXP Yocto BSP). It uses bus_flags to remember if a bus is behind a
+> bridge without extended address capability to avoid PCi config
+> accesses at offset >= 0x100. Thanks to this patch I now have a
+> functional system with functional PCI/PCIe devices.
 
-> > > Anyway, I think this driver has bigger problems that need addressing.
-> > 
-> > To me it represents yet another PMU driver submission - as the years go
-> > by - that is lacking in the user messaging area.  Which reminds me, can
-> > you take another look at applying this?:
-> 
-> As I said before, I'm not going to take anything that logs above pr_debug
-> for things that are directly triggerable from userspace. Spin a version
+The patch seems like it's looking at the right things, but I don't
+want to build it into pci_scan_bridge_extend() because that function
+is much too complicated already.
 
-Why?  There are plenty of things that emit stuff into dmesg that are
-directly triggerable from userspace.  Is it because it upsets fuzzing
-tests?  How about those be run with a patched kernel that somehow
-mitigates the printing?
+I'd rather build it into pci_cfg_space_size() or
+pci_cfg_space_size_ext() somehow.  Maybe something along these lines?
+This doesn't account for the case of a PCIe-to-PCI-X Mode 2 bridge; in
+that case, I think all 4K would be accessible on the PCI-X side.
 
-> using pr_debug and I'll queue it.
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index ac91b6fd0bcd..d8b091f0bcd1 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1367,7 +1367,7 @@ static bool pci_ext_cfg_is_aliased(struct pci_dev *dev)
+  * pci_cfg_space_size - Get the configuration space size of the PCI device
+  * @dev: PCI device
+  *
+- * Regular PCI devices have 256 bytes, but PCI-X 2 and PCI Express devices
++ * Regular PCI devices have 256 bytes, but PCI-X Mode 2 and PCI Express devices
+  * have 4096 bytes.  Even if the device is capable, that doesn't mean we can
+  * access it.  Maybe we don't have a way to generate extended config space
+  * accesses, or the device is behind a reverse Express bridge.  So we try
+@@ -1376,9 +1376,14 @@ static bool pci_ext_cfg_is_aliased(struct pci_dev *dev)
+  */
+ static int pci_cfg_space_size_ext(struct pci_dev *dev)
+ {
++	struct pci_dev *bridge = pci_upstream_bridge(dev);
+ 	u32 status;
+ 	int pos = PCI_CFG_SPACE_SIZE;
+ 
++	if (bridge && pci_is_pcie(bridge) &&
++	    pci_pcie_type(bridge) == PCI_EXP_TYPE_PCI_BRIDGE)
++		return PCI_CFG_SPACE_SIZE;
++
+ 	if (pci_read_config_dword(dev, pos, &status) != PCIBIOS_SUCCESSFUL)
+ 		return PCI_CFG_SPACE_SIZE;
+ 	if (status == 0xffffffff || pci_ext_cfg_is_aliased(dev))
 
-How about using a ratelimited dev_err variant?
+> --- include/linux/pci.h.orig	2018-03-26 16:51:18.050000000 +0000
+> +++ include/linux/pci.h	2018-03-26 16:51:27.660000000 +0000
+> @@ -193,6 +193,7 @@
+>  enum pci_bus_flags {
+>  	PCI_BUS_FLAGS_NO_MSI   = (__force pci_bus_flags_t) 1,
+>  	PCI_BUS_FLAGS_NO_MMRBC = (__force pci_bus_flags_t) 2,
+> +	PCI_BUS_FLAGS_COMPAT_CFG_SPACE = (__force pci_bus_flags_t) 4,
+>  };
+>  
+>  /* These values come from the PCI Express Spec */
+> --- drivers/pci/probe.c.orig	2018-01-22 09:29:52.000000000 +0000
+> +++ drivers/pci/probe.c	2018-03-26 16:54:30.830000000 +0000
+> @@ -827,6 +827,28 @@
+>  			child->primary = primary;
+>  			pci_bus_insert_busn_res(child, secondary, subordinate);
+>  			child->bridge_ctl = bctl;
+> +
+> +			{
+> +				int pos;
+> +				u32 status;
+> +				bool pci_compat_cfg_space = false;
+> +
+> +				if (!pci_is_pcie(dev) || (pci_pcie_type(dev) == PCI_EXP_TYPE_PCIE_BRIDGE) || (pci_pcie_type(dev) == PCI_EXP_TYPE_PCI_BRIDGE)) {
+> +					/* for PCI/PCI bridges, or PCIe/PCI bridge in forward or reverse mode, we have to check for PCI-X capabilities */
+> +					pos = pci_find_capability(dev, PCI_CAP_ID_PCIX);
+> +					if (pos) {
+> +						pci_read_config_dword(dev, pos + PCI_X_STATUS, &status);
+> +						if (!(status & (PCI_X_STATUS_266MHZ | PCI_X_STATUS_533MHZ)))
+> +							pci_compat_cfg_space = true;
+> +					} else {
+> +						pci_compat_cfg_space = true;
+> +					}
+> +					if (pci_compat_cfg_space) {
+> +						dev_info(&dev->dev, "[%04x:%04x] Child bus limited to PCI-Compatible config space\n", dev->vendor, dev->device);
+> +						child->bus_flags |= PCI_BUS_FLAGS_COMPAT_CFG_SPACE;
+> +					}
+> +				}
+> +			}
+>  		}
+>  
+>  		cmax = pci_scan_child_bus(child);
+> @@ -1098,6 +1120,11 @@
+>  			goto fail;
+>  	}
+>  
+> +	if (dev->bus->bus_flags & PCI_BUS_FLAGS_COMPAT_CFG_SPACE) {
+> +		dev_info(&dev->dev, "[%04x:%04x] PCI-Compatible config space only due to parent bus(es)\n", dev->vendor, dev->device);
+> +		return PCI_CFG_SPACE_SIZE;
+> +	}
+> +
+>  	return pci_cfg_space_size_ext(dev);
+>  
+>   fail:
 
-> Have a good weekend,
-
-You too.
-
-Kim
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
