@@ -1,74 +1,63 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sat, 28 Apr 2018 02:46:15 +0800
-Subject: [PATCH 3/4] dt-bindings: arm: fsl: add scu binding doc
-In-Reply-To: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
-References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1524854776-14863-4-git-send-email-aisheng.dong@nxp.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 27 Apr 2018 11:49:35 -0700
+Subject: [PATCH v7 0/7] clk: meson-axg: Add AO Cloclk and Reset driver
+In-Reply-To: <ab754711-f727-133c-7bc3-a9f3243c2278@amlogic.com> (Yixun Lan's
+ message of "Fri, 27 Apr 2018 20:33:42 +0800")
+References: <20180426084437.192394-1-yixun.lan@amlogic.com>
+ <1524820841.4026.112.camel@baylibre.com>
+ <fbd24a73-6793-76be-3ca5-04cbac5db198@amlogic.com>
+ <1524823154.4026.123.camel@baylibre.com>
+ <ab754711-f727-133c-7bc3-a9f3243c2278@amlogic.com>
+Message-ID: <7hsh7g1o3k.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The System Controller Firmware (SCFW) is a low-level system function
-which runs on a dedicated Cortex-M core to provide power, clock, and
-resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-(QM, QP), and i.MX8QX (QXP, DX).
+Hi Yixun,
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+Yixun Lan <yixun.lan@amlogic.com> writes:
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-new file mode 100644
-index 0000000..3b51d82
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-@@ -0,0 +1,40 @@
-+NXP i.MX System Controller Firmware (SCFW)
-+--------------------------------------------------------------------
-+
-+The System Controller Firmware (SCFW) is a low-level system function
-+which runs on a dedicated Cortex-M core to provide power, clock, and
-+resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-+(QM, QP), and i.MX8QX (QXP, DX).
-+
-+The AP communicates with the SC using a multi-ported MU module found
-+in the LSIO subsystem. The current definition of this MU module provides
-+5 remote AP connections to the SC to support up to 5 execution environments
-+(TZ, HV, standard Linux, etc.). The SC side of this MU module interfaces
-+with the LSIO DSC IP bus. The SC firmware will communicate with this MU
-+using the MSI bus.
-+
-+System Controller Device Node:
-+=============================
-+
-+Required properties:
-+-------------------
-+- compatible: should be "fsl,imx8qxp-scu" or "fsl,imx8qm-scu"
-+- fsl,mu: a phandle to the Message Unit used by SCU. Should be
-+	  one of LSIO MU0~M4 for imx8qxp and imx8qm. Users need
-+	  to make sure not use the one which is conflict with
-+	  other execution environments. e.g. ATF.
-+
-+Examples:
-+--------
-+lsio_mu0: mu at 5d1b0000 {
-+	compatible = "fsl,imx8qxp-mu", "fsl,imx6sx-mu";
-+	reg = <0x0 0x5d1b0000 0x0 0x10000>;
-+	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-+	status = "okay";
-+};
-+
-+scu {
-+	compatible = "fsl,imx8qxp-scu";
-+	fsl,mu = <&lsio_mu0>;
-+	status = "okay";
-+};
--- 
-2.7.4
+> On 04/27/2018 05:59 PM, Jerome Brunet wrote:
+
+[...]
+
+>> 
+>> Looks to be the problem indeed. But it is still an issue with how your patchset
+>> in organized.
+>> 
+>> I can't merge this until Kevin merges the patch above, which he can't merge
+>> until there is the clkc_ao support in axg, which is given by this series.
+>> 
+>> 1# You should remove the axg part of the patch above. Kevin will be able to
+>> merge it w/o any dependencies. (BTW, the patch is broken for axg because 1) you
+>> did not include the dt-binding header for the clkc_ao in axg and 2) the clkc_ao
+>> does not exist at this stage)
+>> 2# I can then safely merge this series - w/o breaking gxbb and gxl.
+>> 3# Finally you'll have to make a DT change for the axg, enabling the clkc_ao and
+>> changes the uart clocks at the same time.
+>> 
+>
+>   I didn't make myself clear in previous email
+>
+>   I mean, could you merge patch 1-6, just exclude the patch 7
+> then kevin can merge the DT part (there are three patches) [1]
+> after the DT patches merged, then you can take this patch 7
+> This way, it won't break gxl or any other SoCs
+>
+>   I'm sending patch 7 along with this series, it would be better if I
+> give a warning about it.
+
+Your proposal requires extra work from a couple different maintainers to
+track all the dependencies, and is very error prone.  Sometimes
+maintainers may do this for you if they have time and are feeling
+generous, but you will have much more success if you can ease the
+process.
+
+Jerome has provided lots of guidance throughout this series and just
+above has provided you with a very good proposal above which minimizes
+the dependencies, and provides the changes in the right order.
+
+Please follow Jerome's suggestion,
+
+Thanks,
+
+Kevin
