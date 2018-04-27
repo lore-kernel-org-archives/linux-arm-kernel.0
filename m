@@ -1,137 +1,87 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 27 Apr 2018 10:23:35 +0100
-Subject: [linux-sunxi] [PATCH 1/3] mmc: sunxi: add support for the MMC
- controller on H6
-In-Reply-To: <EECAFDD1-FEAC-42DF-BB17-F11C1C8612DE@aosc.io>
-References: <20180426140728.43155-1-icenowy@aosc.io>
- <20180426140728.43155-2-icenowy@aosc.io>
- <f722ce51-2391-620c-df65-48f047b5f3d5@arm.com>
- <EECAFDD1-FEAC-42DF-BB17-F11C1C8612DE@aosc.io>
-Message-ID: <fbc00944-71f3-fb38-e4c9-582bc2ff3dc9@arm.com>
+From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
+Date: Fri, 27 Apr 2018 11:23:53 +0200
+Subject: [v3 01/10] dt-bindings: mediatek: mmsys: Add support for mfd
+In-Reply-To: <cover.1524820923.git.mbrugger@suse.com>
+References: <cover.1524820923.git.mbrugger@suse.com>
+Message-ID: <64ca273429d92f581568a48f3efe6035af65f579.1524820923.git.mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Matthias Brugger <mbrugger@suse.com>
 
-On 27/04/18 09:38, Icenowy Zheng wrote:
-> 
-> 
-> ? 2018?4?27? GMT+08:00 ??12:45:24, Andre Przywara <andre.przywara@arm.com> ??:
->> Hi,
->>
->> On 26/04/18 15:07, Icenowy Zheng wrote:
->>> The new Allwinner H6 SoC have 3 MMC controllers. The first and second
->>> ones are similar to the ones on A64, but the third one adds EMCE
->>> (Embedded Crypto Engine) support which does hardware transparent
->> crypto
->>> on the eMMC.
->>>
->>> As we still do not have support for EMCE, and the support of it is
->>> disabled by defualt, we just duplicate the A64 mmc configurations and
->>> change the compatible string.
->>
->> So if the A64 MMC part is compatible, we should express it like this:
->>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> ---
->>>  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  2 ++
->>>  drivers/mmc/host/sunxi-mmc.c                        | 16
->> ++++++++++++++++
->>>  2 files changed, 18 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
->> b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
->>> index 132e0007d7d6..e6aa5c7a5e12 100644
->>> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
->>> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
->>> @@ -16,6 +16,8 @@ Required properties:
->>>     * "allwinner,sun9i-a80-mmc"
->>>     * "allwinner,sun50i-a64-emmc"
->>>     * "allwinner,sun50i-a64-mmc"
->>> +   * "allwinner,sun50i-h6-emmc"
->>> +   * "allwinner,sun50i-h6-mmc"
->>
->> This should be changed to:
->>
->>      * "allwinner,sun50i-h6-emmc", "allwinner,sun50i-a64-emmc"
->>      * "allwinner,sun50i-h6-mmc", "allwinner,sun50i-a64-mmc"
-> 
-> This list shouldn't list pairs,
+Add binding description for the mmsys mfd for some Mediatek
+devices. mmsys has some registers to control clock gates (which is
+used in the clk driver) and some registers to set the routing and enable
+the differnet blocks of the display subsystem.
 
-It should, as this is what Rob suggested the other day:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-March/564752.html
+Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+---
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |  2 --
+ .../bindings/display/mediatek/mediatek,disp.txt    |  2 +-
+ .../devicetree/bindings/mfd/mediatek,mmsys.txt     | 27 ++++++++++++++++++++++
+ 3 files changed, 28 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
 
-Cheers,
-Andre.
-
-> and as I said in the reply,
-> these pairs are not valid.
-> 
->>
->>>   - reg : mmc controller base registers
->>>   - clocks : a list with 4 phandle + clock specifier pairs
->>>   - clock-names : must contain "ahb", "mmc", "output" and "sample"
->>> diff --git a/drivers/mmc/host/sunxi-mmc.c
->> b/drivers/mmc/host/sunxi-mmc.c
->>> index 97c6b79b7d6f..05e2b5fd7aa4 100644
->>> --- a/drivers/mmc/host/sunxi-mmc.c
->>> +++ b/drivers/mmc/host/sunxi-mmc.c
->>> @@ -1168,6 +1168,20 @@ static const struct sunxi_mmc_cfg
->> sun50i_a64_emmc_cfg = {
->>>  	.can_calibrate = true,
->>>  };
->>>  
->>> +static const struct sunxi_mmc_cfg sun50i_h6_cfg = {
->>> +	.idma_des_size_bits = 16,
->>> +	.clk_delays = NULL,
->>> +	.can_calibrate = true,
->>> +	.mask_data0 = true,
->>> +	.needs_new_timings = true,
->>> +};
->>> +
->>> +static const struct sunxi_mmc_cfg sun50i_h6_emmc_cfg = {
->>> +	.idma_des_size_bits = 13,
->>> +	.clk_delays = NULL,
->>> +	.can_calibrate = true,
->>> +};
->>> +
->>
->> ... and then we don't need those changes ...
->>
->>>  static const struct of_device_id sunxi_mmc_of_match[] = {
->>>  	{ .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg
->> },
->>>  	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg
->> },
->>> @@ -1176,6 +1190,8 @@ static const struct of_device_id
->> sunxi_mmc_of_match[] = {
->>>  	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg
->> },
->>>  	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg
->> },
->>>  	{ .compatible = "allwinner,sun50i-a64-emmc", .data =
->> &sun50i_a64_emmc_cfg },
->>> +	{ .compatible = "allwinner,sun50i-h6-mmc", .data = &sun50i_h6_cfg
->> },
->>> +	{ .compatible = "allwinner,sun50i-h6-emmc", .data =
->> &sun50i_h6_emmc_cfg },
->>
->> ... and those, at least yet.
->> Should we ever extend the driver to support the EMCE, we can add them
->> at
->> this occasion.
->>
->> So this patch would just add the compatible pairs to the binding doc.
->>
->> Cheers,
->> Andre.
->>
->>>  	{ /* sentinel */ }
->>>  };
->>>  MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
->>>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+index 4eb8bbe15c01..4468345f8b1a 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+@@ -6,10 +6,8 @@ The Mediatek mmsys controller provides various clocks to the system.
+ Required Properties:
+ 
+ - compatible: Should be one of:
+-	- "mediatek,mt2701-mmsys", "syscon"
+ 	- "mediatek,mt2712-mmsys", "syscon"
+ 	- "mediatek,mt6797-mmsys", "syscon"
+-	- "mediatek,mt8173-mmsys", "syscon"
+ - #clock-cells: Must be 1
+ 
+ The mmsys controller uses the common clk binding from
+diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+index 383183a89164..85a3b4ec06cd 100644
+--- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
++++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+@@ -9,7 +9,7 @@ function block.
+ 
+ All DISP device tree nodes must be siblings to the central MMSYS_CONFIG node.
+ For a description of the MMSYS_CONFIG binding, see
+-Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt.
++Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+ 
+ DISP function blocks
+ ====================
+diff --git a/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+new file mode 100644
+index 000000000000..2331ae16917e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+@@ -0,0 +1,27 @@
++MediaTek MMSYS Multifunction Device Driver
++
++MMSYS is a multifunction device with the following sub modules:
++- clocks for the multi-media subsystem
++- central node for the DRM subsystem.
++
++This document describes the binding for MFD device. The MFD takes care to initailize
++the clock driver and the DRM driver. More info see
++Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
++
++Required properties:
++- compatible: Should be one of:
++	- "mediatek,mt2701-mmsys", "syscon"
++	- "mediatek,mt8173-mmsys", "syscon"
++- #clock-cells: Must be 1
++
++Optional properties:
++- power-domains: list of powerdomains needed for the subsystem to work
++
++Example:
++
++mmsys: clock-controller at 14000000 {
++	compatible = "mediatek,mt8173-mmsys", "syscon";
++	reg = <0 0x14000000 0 0x1000>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++	#clock-cells = <1>;
++};
+-- 
+2.16.3
