@@ -1,60 +1,32 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 27 Apr 2018 10:59:15 +0200
-Subject: [PATCH RFC PoC 0/2] platform: different approach to early
- platform drivers
-In-Reply-To: <CAK8P3a394ig-OSzZLj+50gnBw1x_c41EicuM7mF_ubswweQoSg@mail.gmail.com>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
- <20180426173151.GJ3094@brightrain.aerifal.cx>
- <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
- <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
- <6194511c-b649-8c02-7db0-3514bfb292f5@ti.com>
- <CAK8P3a394ig-OSzZLj+50gnBw1x_c41EicuM7mF_ubswweQoSg@mail.gmail.com>
-Message-ID: <CAMpxmJVtq0joL1r9WJUC2BNX4mQdy0kMvmpfSv7hNZn8a3Lxxg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Apr 2018 11:05:15 +0200
+Subject: [GIT PULL] Broadcom devicetree-arm64 fixes for 4.17
+In-Reply-To: <20180427003841.16217-1-f.fainelli@gmail.com>
+References: <20180427003841.16217-1-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a1x-gx_oN3zR0vGC=iDbq3ZpvtSFskQ4tmLubxo+WZDdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-27 10:55 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Fri, Apr 27, 2018 at 10:29 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->> On Friday 27 April 2018 01:22 PM, Arnd Bergmann wrote:
->>> On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
->>>> On 04/26/2018 12:31 PM, Rich Felker wrote:
+On Fri, Apr 27, 2018 at 2:38 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 >
->>>
->>> I haven't seen the discussion about your clock drivers, but I know that
->>> usually only a very small subset of the clocks on an SoC are needed
->>> that 'early', and you should use a regular platform driver for the rest.
->>
->> Its true that the subset is small, but they are either PLL bypass clocks
->> or clocks derived out of the main clock gate controller on the Soc
->> (DaVinci PSC). So we need some non-platform-device based initialization
->> support in the two main clock drivers used on mach-davinci anyway.
->>
->>> Can you elaborate on which devices need to access your clocks before
->>> you are able to initialize the clk driver through the regular platform_driver
->>> framework? Do any of these need complex interactions with the clk
->>> subsystem, or do you just need to ensure they are turned on?
->>
->> Its just the timer IP. There is no complex interaction, just need to
->> ensure that the clock is registered with the framework and also switched
->> on when there is a gate clock.
->>
->> The latest attempt by David for this was posted last night here:
->>
->> https://lkml.org/lkml/2018/4/26/1093
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 >
-> Ok, so the workaround in that series is to set up the timer clk manually
-> in the SoC specific code (dm365_init_time etc) and register it to the
-> clk subsystem, right?
+> are available in the git repository at:
 >
-> That seems to be a much more appropriate workaround than adding
-> back early_platform devices. We can always try to do something better
-> later, but for now I'm happy with that as a workaround.
+>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.17/devicetree-arm64-fixes
 >
+> for you to fetch changes up to 4555a5021fe88fc4f19ff53d1e58b410cf30a49a:
+>
+>   arm64: dts: correct SATA addresses for Stingray (2018-04-18 11:31:16 -0700)
+>
+> ----------------------------------------------------------------
+> This pull request contains Broadcom ARM64-based SoCs Device Tree fixes
+> for 4.17, please pull the following:
+>
+> - Srinath fixes the register base address of all SATA controllers on
+>   Stingray
 
-Just to clarify: this is not bringing back the hacky early platform
-devices from before. It's a new approach that actually uses the linux
-platform driver model (unlike the current mechanism which only uses
-the same data structures).
+Pulled into fixes, thanks!
 
-Thanks,
-Bart
+        Arnd
