@@ -1,117 +1,77 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 27 Apr 2018 16:05:39 +0200
-Subject: [PATCH RFC PoC 0/2] platform: different approach to early
- platform drivers
-In-Reply-To: <CAK8P3a0tMp2QURp-9WuHehqE0b6-BO1wJ38siTdxhxgwCb-ERw@mail.gmail.com>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
- <20180426173151.GJ3094@brightrain.aerifal.cx>
- <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
- <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
- <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
- <CAK8P3a2xtTLx-VHVWok-b19=o1z5FbTNcaWq7Y_HSdaH6pWnZg@mail.gmail.com>
- <CAMRc=MdomjLCq-bJyktaToH00kNQAuTLgkSFRrY9Jmre8McT3A@mail.gmail.com>
- <CAK8P3a0tMp2QURp-9WuHehqE0b6-BO1wJ38siTdxhxgwCb-ERw@mail.gmail.com>
-Message-ID: <CAMpxmJVkRDLkpcgzhMb41z=Tp6zvszLd0vqfdTtZBNGT6Trtqw@mail.gmail.com>
+From: npcomplete13@gmail.com (Vivek Unune)
+Date: Fri, 27 Apr 2018 10:05:42 -0400
+Subject: [PATCH] ARM: BCM5301X: Fix NAND ECC parameters for Linksys
+ Panamera
+In-Reply-To: <00df9ee9-2bd2-ad2b-fdf8-682efdb9a4d1@gmail.com>
+References: <20180310171244.70299-1-npcomplete13@gmail.com>
+ <CACna6rz1TeRbPq-60HkHz9A0TDn+iXtmXniE6FCiANpUmV-qrw@mail.gmail.com>
+ <20180311100313.znonhesgh462rz65@osboxes>
+ <2ef6e4fc-cce7-372e-e35f-578fd6ada9ca@gmail.com>
+ <20180313010210.ws4dugy3rrpqwzmk@osboxes>
+ <00df9ee9-2bd2-ad2b-fdf8-682efdb9a4d1@gmail.com>
+Message-ID: <20180427140542.c3t5taztkciimfny@osboxes>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-27 14:40 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Fri, Apr 27, 2018 at 1:53 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->> 2018-04-27 12:18 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->>> On Fri, Apr 27, 2018 at 10:57 AM, Bartosz Golaszewski
->>> <bgolaszewski@baylibre.com> wrote:
->>>> 2018-04-27 9:52 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->>>>> On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
->>>> My patch tries to address exactly the use cases we're facing - for
->>>> example by providing means to probe devices twice (early and late) and
->>>> to check the state we're at in order for users to be able to just do
->>>> the critical initialization early on and then continue with regular
->>>> stuff later.
->>>
->>> Maybe the problem is reusing the name and some of the code from
->>> an existing functionality that we've been trying to get rid of.
->>>
->>
->> I'm not reusing the name - in fact I set the prefix to earlydev_
->> exactly in order to not confuse anyone. I'm also not reusing any code
->> in the second series.
->
-> Ok.
->
->>> If what you want to do is completely different from the existing
->>> early_platform implementation, how about starting by moving that
->>> out of drivers/base/platform.c into something under arch/sh/
->>> and renaming it to something with an sh_ prefix.
->>>
->>
->> Yes, this is a good idea, but what about the sh-specific drivers that
->> rely on it? Is including headers from arch/ in driver code still an
->> accepted practice?
->
-> I think it's fine here, since we're just move it out of the way and
-> there are only very few drivers using it:
->
-> drivers/clocksource/sh_cmt.c:early_platform_init("earlytimer",
-> &sh_cmt_device_driver);
-> drivers/clocksource/sh_mtu2.c:early_platform_init("earlytimer",
-> &sh_mtu2_device_driver);
-> drivers/clocksource/sh_tmu.c:early_platform_init("earlytimer",
-> &sh_tmu_device_driver);
-> drivers/clocksource/timer-ti-dm.c:early_platform_init("earlytimer",
-> &omap_dm_timer_driver);
-> drivers/tty/serial/sh-sci.c:early_platform_init_buffer("earlyprintk",
-> &sci_driver,
->
-> For timer-ti-dm, it seems like a leftover from old times that can
-> be removed. The other four are shared between arch/sh and
-> arch/arm/mach-shmobile and already have some #ifdef
-> to handle those two cases.
->
+On Wed, Apr 25, 2018 at 11:02:04AM +0200, Rafa? Mi?ecki wrote:
+> > [   13.530863] ubi0 warning: 0xc037c9e4: error -74 (ECC error) while reading 64 bytes from PEB 115:0, read only 64 bytes, retry
+> > [   13.542763] ubi0 warning: 0xc037c9e4: error -74 (ECC error) while reading 64 bytes from PEB 115:0, read only 64 bytes, retry
+> > [   13.554659] ubi0 warning: 0xc037c9e4: error -74 (ECC error) while reading 64 bytes from PEB 115:0, read only 64 bytes, retry
+> > [   13.566548] ubi0 error: 0xc037ca08: error -74 (ECC error) while reading 64 bytes from PEB 115:0, read 64 bytes
+> > [   13.576574] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.14.25 #0
+> > [   13.582589] Hardware name: BCM5301X
+> > [   13.586078] Backtrace:
+> > [   13.588526] Function entered at [<c0105ccc>] from [<c0105fb4>]
+> > [   13.594368]  r7:00000000 r6:60000013 r5:00000000 r4:c081d988
+> > [   13.600032] Function entered at [<c0105f9c>] from [<c04f29a8>]
+> > [   13.605872] Function entered at [<c04f2918>] from [<c037ca0c>]
+> > [   13.611714]  r7:00000000 r6:00000040 r5:c7954000 r4:ffffffb6
+> > [   13.617378] Function entered at [<c037c7dc>] from [<c037cd1c>]
+> > [   13.623223]  r10:00000000 r9:00000040 r8:00000073 r7:c7954000 r6:c7979000 r5:c7036180
+> > [   13.631071]  r4:c7b72900
+> > [   13.633604] Function entered at [<c037cca4>] from [<c0381c5c>]
+> > [   13.639447]  r10:00000000 r9:c7979800 r8:c7954000 r7:c7979000 r6:00000073 r5:c7036180
+> > [   13.647286]  r4:c7b72900
+> > [   13.649819] Function entered at [<c0381a84>] from [<c0376d74>]
+> > [   13.655663]  r10:c7954040 r9:00000840 r8:c702e400 r7:00000000 r6:c702e400 r5:c7954000
+> > [   13.663510]  r4:fffff800
+> > [   13.666042] Function entered at [<c0376720>] from [<c0717b9c>]
+> > [   13.671886]  r10:c0813a88 r9:c0651c18 r8:c0651bec r7:c084ff48 r6:c081e440 r5:c7823ea4
+> > [   13.679725]  r4:c702e400
+> > [   13.682258] Function entered at [<c0717954>] from [<c0101a8c>]
+> > [   13.688103]  r10:c072e83c r9:c07366b8 r8:c0717954 r7:c072e838 r6:c081e440 r5:00000000
+> > [   13.695949]  r4:c0803c08
+> > [   13.698482] Function entered at [<c01019dc>] from [<c0700e38>]
+> > [   13.704327]  r9:c07366b8 r8:c0700594 r7:c072e838 r6:c081e440 r5:c081e440 r4:00000008
+> > [   13.712087] Function entered at [<c0700cf8>] from [<c0506adc>]
+> > [   13.717930]  r10:00000000 r9:00000000 r8:00000000 r7:00000000 r6:00000000 r5:c0506acc
+> > [   13.725769]  r4:00000000
+> > [   13.728303] Function entered at [<c0506acc>] from [<c0102788>]
+> > [   13.734144]  r5:c0506acc r4:00000000
+> 
+> This is expected if you previously were using firmware programming flash
+> in non-BCH8 mode. The main reason for what you're seeing is that when
+> flashing image with CFE it doesn't erase all NAND pages.
+> 
+> If previously you were using firmware programming flash in BCH1 mode, it
+> means that after flashing firmware using BCH8 you'll end up with mess in
+> ECC.
+> 
+> Part of NAND flash programmed by CFE will use BCH8.
+> Part of NAND flash that remained from previous fw will use BCH1.
+> Linux will fail to read part of NAND flash from prev installation.
+> 
+> The cleanest solution: erase all NAND content of firmware partition
+> before flashing firmware using BCH8.
+> 
+> The easiest solution: ignore all these "error -74 (ECC error) while
+> reading" errors (they may last for few minutes!). I believe UBI should
+> simply recreate all pages it couldn't access and once you wait long
+> enough, all your NAND flash will be using BCH8.
 
-I'm also seeing that we also call early_platform_cleanup() from
-platform_bus_init(). Any ideas for this one?
+Let me build the firmware with BCH-8 and wait it out. I'll report back my
+results.
 
->>> Let's just leave the non-DT part out of it by making it sh specific.
->>> Then we can come up with improvements to the current
->>> platform_device handling for DT based platforms that you can
->>> use on DT-based davinci to replace what currently happens on
->>> board-file based davinci systems, without mixing up those
->>> two code paths too much in the base driver support.
->>
->> I don't see why we wouldn't want to unify these two cases. The best
->> solution to me seems having only one entry point into the driver code
->> - the probe() function stored in platform_driver - whether we're
->> probing it from DT, platform data, ACPI or early boot code.
->
-> I'd rather keep those separate and would prefer not to have
-> that many different ways of getting there instead. DT and
-> board files can already share most of the code through the
-> use of platform_device, especially when you start using
-> device properties instead of platform_data, and the other
-> two are rare corner cases and ideally left that way.
->
-> The early boot code is always special and instead of making
-> it easier to use, we should focus on using it as little as
-> possible: every line of code that we call before even
-> initializing timers and consoles means it gets harder to
-> debug when something goes wrong.
->
+Thanks,
 
-I'm afraid I don't quite understand your reasoning. I fully agree that
-devices that need to be initialized that early are a rare corner case.
-We should limit any such uses to the absolute minimum. But when we do
-need to go this way, we should do it right. Having a unified mechanism
-for early devices will allow maintainers to enforce good practices
-(using resources for register mapping, devres, reusing driver code for
-reading/writing to registers). Having initialization code in machine
-code will make everybody use different APIs and duplicate solutions. I
-normally assume that code consolidation is always good.
-
-If we add a way for DT-based platform devices to be probed early - it
-would be based on platform device/driver structures anyway. Why would
-we even want to not convert the board code into a simple call to
-early_platform_device_register() if we'll already offer this API for
-device tree?
-
-Best regards,
-Bartosz Golaszewski
+Vivek
