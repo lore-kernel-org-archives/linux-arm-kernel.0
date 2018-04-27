@@ -1,91 +1,234 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 27 Apr 2018 16:35:06 +0100
-Subject: [PATCH v3 08/12] ACPI / APEI: Split fixmap pages for arm64 NMI-like
- notifications
+Date: Fri, 27 Apr 2018 16:35:04 +0100
+Subject: [PATCH v3 06/12] arm64: KVM/mm: Move SEA handling behind a single
+ 'claim' interface
 In-Reply-To: <20180427153510.5799-1-james.morse@arm.com>
 References: <20180427153510.5799-1-james.morse@arm.com>
-Message-ID: <20180427153510.5799-9-james.morse@arm.com>
+Message-ID: <20180427153510.5799-7-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that ghes uses the fixmap addresses and locks via some indirection
-we can support multiple NMI-like notifications on arm64.
+To split up APEIs in_nmi() path, we need the nmi-like callers to always
+be in_nmi(). Add a helper to do the work and claim the notification.
 
-These should be named after their notification method. x86's
-NOTIFY_NMI already is, change the SEA fixmap entry to be called
-FIX_APEI_GHES_SEA.
+When KVM or the arch code takes an exception that might be a RAS
+notification, it asks the APEI firmware-first code whether it wants
+to claim the exception. We can then go on to see if (a future)
+kernel-first mechanism wants to claim the notification, before
+falling through to the existing default behaviour.
 
-Future patches can add support for FIX_APEI_GHES_SEI and
-FIX_APEI_GHES_SDEI_{NORMAL,CRITICAL}.
+The NOTIFY_SEA code was merged before we had multiple, possibly
+interacting, NMI-like notifications and the need to consider kernel
+first in the future. Make the 'claiming' behaviour explicit.
+
+As we're restructuring the APEI code to allow multiple NMI-like
+notifications, any notification that might interrupt interrupts-masked
+code must always be wrapped in nmi_enter()/nmi_exit(). This allows APEI
+to use in_nmi() to choose between the raw/regular spinlock routines.
+
+We mask SError over this window to prevent an asynchronous RAS error
+arriving and tripping 'nmi_enter()'s BUG_ON(in_nmi()).
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/fixmap.h |  4 +++-
- drivers/acpi/apei/ghes.c        | 11 ++++++-----
- 2 files changed, 9 insertions(+), 6 deletions(-)
+Why does apei_claim_sea() take a pt_regs? This gets used later to take
+APEI by the hand through NMI->IRQ context, depending on what we
+interrupted.
 
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index ec1e6d6fa14c..c3974517c2cb 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -55,7 +55,9 @@ enum fixed_addresses {
- #ifdef CONFIG_ACPI_APEI_GHES
- 	/* Used for GHES mapping from assorted contexts */
- 	FIX_APEI_GHES_IRQ,
--	FIX_APEI_GHES_NMI,
-+#ifdef CONFIG_ACPI_APEI_SEA
-+	FIX_APEI_GHES_SEA,
-+#endif
- #endif /* CONFIG_ACPI_APEI_GHES */
+Changes since v2:
+ * Added dummy definition for !ACPI and culled IS_ENABLED() checks.
+
+ arch/arm64/include/asm/acpi.h      |  5 ++++-
+ arch/arm64/include/asm/daifflags.h |  1 +
+ arch/arm64/include/asm/kvm_ras.h   | 15 ++++++++++++++-
+ arch/arm64/kernel/acpi.c           | 30 ++++++++++++++++++++++++++++++
+ arch/arm64/mm/fault.c              | 29 +++++------------------------
+ 5 files changed, 54 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 32f465a80e4e..e8e4f05b4776 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -16,6 +16,7 @@
+ #include <linux/psci.h>
  
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 48d9eb55ebb8..3ddccd170240 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -118,7 +118,6 @@ static DEFINE_MUTEX(ghes_list_mutex);
-  * handler, but general ioremap can not be used in atomic context, so
-  * the fixmap is used instead.
+ #include <asm/cputype.h>
++#include <asm/ptrace.h>
+ #include <asm/smp_plat.h>
+ #include <asm/tlbflush.h>
+ 
+@@ -89,7 +90,6 @@ struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu);
+ 
+ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+ void __init acpi_init_cpus(void);
+-
+ #else
+ static inline void acpi_init_cpus(void) { }
+ #endif /* CONFIG_ACPI */
+@@ -126,6 +126,9 @@ static inline const char *acpi_get_enable_method(int cpu)
   */
--static DEFINE_RAW_SPINLOCK(ghes_fixmap_lock_nmi);
- static DEFINE_SPINLOCK(ghes_fixmap_lock_irq);
+ #define acpi_disable_cmcff 1
+ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
++int apei_claim_sea(struct pt_regs *regs);
++#else
++static inline int apei_claim_sea(struct pt_regs *regs) { return -ENOENT; }
+ #endif /* CONFIG_ACPI_APEI */
  
- static struct gen_pool *ghes_estatus_pool;
-@@ -948,6 +947,7 @@ static struct notifier_block ghes_notifier_hed = {
+ #ifdef CONFIG_ACPI_NUMA
+diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
+index 22e4c83de5a5..cbd753855bf3 100644
+--- a/arch/arm64/include/asm/daifflags.h
++++ b/arch/arm64/include/asm/daifflags.h
+@@ -20,6 +20,7 @@
  
- #ifdef CONFIG_ACPI_APEI_SEA
- static LIST_HEAD(ghes_sea);
-+static DEFINE_RAW_SPINLOCK(ghes_fixmap_lock_sea);
+ #define DAIF_PROCCTX		0
+ #define DAIF_PROCCTX_NOIRQ	PSR_I_BIT
++#define DAIF_ERRCTX		(PSR_I_BIT | PSR_A_BIT)
  
- /*
-  * Return 0 only if one of the SEA error sources successfully reported an error
-@@ -960,8 +960,8 @@ int ghes_notify_sea(void)
+ /* mask/save/unmask/restore all exceptions, including interrupts. */
+ static inline void local_daif_mask(void)
+diff --git a/arch/arm64/include/asm/kvm_ras.h b/arch/arm64/include/asm/kvm_ras.h
+index 5f72b07b7912..52edc9b3b937 100644
+--- a/arch/arm64/include/asm/kvm_ras.h
++++ b/arch/arm64/include/asm/kvm_ras.h
+@@ -4,8 +4,21 @@
+ #ifndef __ARM64_KVM_RAS_H__
+ #define __ARM64_KVM_RAS_H__
  
- static void ghes_sea_add(struct ghes *ghes)
- {
--	ghes->nmi_fixmap_lock = &ghes_fixmap_lock_nmi;
--	ghes->nmi_fixmap_idx = FIX_APEI_GHES_NMI;
-+	ghes->nmi_fixmap_lock = &ghes_fixmap_lock_sea;
-+	ghes->nmi_fixmap_idx = FIX_APEI_GHES_SEA;
- 	ghes_estatus_queue_grow_pool(ghes);
++#include <linux/acpi.h>
++#include <linux/errno.h>
+ #include <linux/types.h>
  
- 	mutex_lock(&ghes_list_mutex);
-@@ -985,12 +985,13 @@ static inline void ghes_sea_remove(struct ghes *ghes) { }
+-int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr);
++#include <asm/acpi.h>
++
++/*
++ * Was this synchronous external abort a RAS notification?
++ * Returns '0' for errors handled by some RAS subsystem, or -ENOENT.
++ *
++ * Call with irqs unmasked.
++ */
++static inline int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
++{
++	return apei_claim_sea(NULL);
++}
  
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
- /*
-- * NMI may be triggered on any CPU, so ghes_in_nmi is used for
-- * having only one concurrent reader.
-+ * NOTIFY_NMI may be triggered on any CPU, so ghes_in_nmi is
-+ * used for having only one concurrent reader.
+ #endif /* __ARM64_KVM_RAS_H__ */
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 7b09487ff8fb..6a4823a3eb5e 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -33,6 +33,8 @@
+ 
+ #ifdef CONFIG_ACPI_APEI
+ # include <linux/efi.h>
++# include <acpi/ghes.h>
++# include <asm/daifflags.h>
+ # include <asm/pgtable.h>
+ #endif
+ 
+@@ -261,4 +263,32 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+ 		return __pgprot(PROT_NORMAL_NC);
+ 	return __pgprot(PROT_DEVICE_nGnRnE);
+ }
++
++
++/*
++ * Claim Synchronous External Aborts as a firmware first notification.
++ *
++ * Used by KVM and the arch do_sea handler.
++ * @regs may be NULL when called from process context.
++ */
++int apei_claim_sea(struct pt_regs *regs)
++{
++	int err = -ENOENT;
++	unsigned long current_flags = arch_local_save_flags();
++
++	if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
++		return err;
++
++	/*
++	 * APEI expects an NMI-like notification to always be called
++	 * in NMI context.
++	 */
++	local_daif_restore(DAIF_ERRCTX);
++	nmi_enter();
++	err = ghes_notify_sea();
++	nmi_exit();
++	local_daif_restore(current_flags);
++
++	return err;
++}
+ #endif
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index d61a886afec7..d7e89da0e5df 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -18,6 +18,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
   */
- static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
  
- static LIST_HEAD(ghes_nmi);
-+static DEFINE_RAW_SPINLOCK(ghes_fixmap_lock_nmi);
++#include <linux/acpi.h>
+ #include <linux/extable.h>
+ #include <linux/signal.h>
+ #include <linux/mm.h>
+@@ -33,6 +34,7 @@
+ #include <linux/preempt.h>
+ #include <linux/hugetlb.h>
  
- static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
++#include <asm/acpi.h>
+ #include <asm/bug.h>
+ #include <asm/cmpxchg.h>
+ #include <asm/cpufeature.h>
+@@ -45,8 +47,6 @@
+ #include <asm/tlbflush.h>
+ #include <asm/traps.h>
+ 
+-#include <acpi/ghes.h>
+-
+ struct fault_info {
+ 	int	(*fn)(unsigned long addr, unsigned int esr,
+ 		      struct pt_regs *regs);
+@@ -569,19 +569,10 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+ 	inf = esr_to_fault_info(esr);
+ 
+ 	/*
+-	 * Synchronous aborts may interrupt code which had interrupts masked.
+-	 * Before calling out into the wider kernel tell the interested
+-	 * subsystems.
++	 * Return value ignored as we rely on signal merging.
++	 * Future patches will make this more robust.
+ 	 */
+-	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+-		if (interrupts_enabled(regs))
+-			nmi_enter();
+-
+-		ghes_notify_sea();
+-
+-		if (interrupts_enabled(regs))
+-			nmi_exit();
+-	}
++	apei_claim_sea(regs);
+ 
+ 	info.si_signo = inf->sig;
+ 	info.si_errno = 0;
+@@ -662,16 +653,6 @@ static const struct fault_info fault_info[] = {
+ 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 63"			},
+ };
+ 
+-int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
+-{
+-	int ret = -ENOENT;
+-
+-	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+-		ret = ghes_notify_sea();
+-
+-	return ret;
+-}
+-
+ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+ 					 struct pt_regs *regs)
  {
 -- 
 2.16.2
