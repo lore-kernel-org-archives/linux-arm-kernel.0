@@ -1,15 +1,13 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sat, 28 Apr 2018 02:56:35 +0800
-Subject: [PATCH 04/12] clk: imx: scu: add scu clock gpr divider
+Date: Sat, 28 Apr 2018 02:56:36 +0800
+Subject: [PATCH 05/12] clk: imx: scu: add scu clock gate
 In-Reply-To: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
 References: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1524855403-15301-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1524855403-15301-6-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add scu based clock gpr divider. Unlike the normal scu divider, such
-dividers are controlled by GPR bits through SCU sc_misc_set_control
-API.
+Add scu based clock gate.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -18,29 +16,29 @@ Cc: Stephen Boyd <sboyd@kernel.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/imx/scu/Makefile              |   3 +-
- drivers/clk/imx/scu/clk-divider-gpr-scu.c | 131 ++++++++++++++++++++++++++++++
- drivers/clk/imx/scu/clk-scu.h             |   3 +
- 3 files changed, 136 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/imx/scu/clk-divider-gpr-scu.c
+ drivers/clk/imx/scu/Makefile       |   3 +-
+ drivers/clk/imx/scu/clk-gate-scu.c | 193 +++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/scu/clk-scu.h      |  23 +++++
+ 3 files changed, 218 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/imx/scu/clk-gate-scu.c
 
 diff --git a/drivers/clk/imx/scu/Makefile b/drivers/clk/imx/scu/Makefile
-index 7e360e2..9e7f4aa 100644
+index 9e7f4aa..2abed17 100644
 --- a/drivers/clk/imx/scu/Makefile
 +++ b/drivers/clk/imx/scu/Makefile
-@@ -2,4 +2,5 @@
- 
+@@ -3,4 +3,5 @@
  obj-$(CONFIG_MXC_CLK_SCU) += \
  	clk-scu.o \
--	clk-divider-scu.o
-+	clk-divider-scu.o \
-+	clk-divider-gpr-scu.o
-diff --git a/drivers/clk/imx/scu/clk-divider-gpr-scu.c b/drivers/clk/imx/scu/clk-divider-gpr-scu.c
+ 	clk-divider-scu.o \
+-	clk-divider-gpr-scu.o
++	clk-divider-gpr-scu.o \
++	clk-gate-scu.o
+diff --git a/drivers/clk/imx/scu/clk-gate-scu.c b/drivers/clk/imx/scu/clk-gate-scu.c
 new file mode 100644
-index 0000000..1307c1a
+index 0000000..584df38
 --- /dev/null
-+++ b/drivers/clk/imx/scu/clk-divider-gpr-scu.c
-@@ -0,0 +1,131 @@
++++ b/drivers/clk/imx/scu/clk-gate-scu.c
+@@ -0,0 +1,193 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
@@ -56,132 +54,214 @@ index 0000000..1307c1a
 +
 +#include "clk-scu.h"
 +
-+struct clk_divider_gpr_scu {
++/*
++ * basic gatable clock which can gate and ungate it's output
++ *
++ * Traits of this clock:
++ * prepare - clk_(un)prepare only ensures parent is (un)prepared
++ * enable - clk_enable and clk_disable are functional & control gating
++ * rate - inherits rate from parent.  No clk_set_rate support
++ * parent - fixed parent.  No clk_set_parent support
++ */
++
++#define CLK_GATE_SCU_LPCG_MASK		0x3
++#define CLK_GATE_SCU_LPCG_HW_SEL	BIT(0)
++#define CLK_GATE_SCU_LPCG_SW_SEL	BIT(1)
++
++struct clk_gate_scu {
 +	struct clk_hw	hw;
++	void __iomem	*reg;
++	u8		bit_idx;
++	bool		hw_gate;
 +	sc_rsrc_t	rsrc_id;
-+	sc_ctrl_t	gpr_id;
++	sc_pm_clk_t	clk_type;
 +};
 +
-+static inline struct clk_divider_gpr_scu *to_clk_divider_gpr_scu(struct clk_hw *hw)
++#define to_clk_gate_scu(_hw) container_of(_hw, struct clk_gate_scu, hw)
++
++/* Write to the LPCG bits. */
++static int clk_gate_scu_enable(struct clk_hw *hw)
 +{
-+	return container_of(hw, struct clk_divider_gpr_scu, hw);
++	struct clk_gate_scu *gate = to_clk_gate_scu(hw);
++	u32 reg;
++
++	if (gate->reg) {
++		reg = readl(gate->reg);
++		reg &= ~(CLK_GATE_SCU_LPCG_MASK << gate->bit_idx);
++		if (gate->hw_gate)
++			reg |= (CLK_GATE_SCU_LPCG_HW_SEL |
++				CLK_GATE_SCU_LPCG_SW_SEL) << gate->bit_idx;
++		else
++			reg |= (CLK_GATE_SCU_LPCG_SW_SEL << gate->bit_idx);
++		writel(reg, gate->reg);
++	}
++
++	return 0;
 +}
 +
-+/*
-+ * clk_divider_scu_recalc_rate - Get clock rate for a SCU clock
-+ * @hw: clock to get rate for
-+ * @parent_rate: parent rate provided by common clock framework
-+ *
-+ * Gets the current clock rate of a SCU clock. Returns the current
-+ * clock rate, or zero in failure.
-+ */
-+static unsigned long clk_divider_gpr_scu_recalc_rate(struct clk_hw *hw,
-+						     unsigned long parent_rate)
++static void clk_gate_scu_disable(struct clk_hw *hw)
 +{
-+	struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
-+	sc_pm_clock_rate_t rate = 0;
-+	sc_err_t sci_err;
-+	uint32_t val;
++	struct clk_gate_scu *gate = to_clk_gate_scu(hw);
++	u32 reg;
 +
-+	sci_err = sc_misc_get_control(ccm_ipc_handle, clk->rsrc_id,
-+				      clk->gpr_id, &val);
-+
-+	rate  = val ? parent_rate / 2 : parent_rate;
-+
-+	return sci_err ? 0 : rate;
++	if (gate->reg) {
++		reg = readl(gate->reg);
++		reg &= ~(CLK_GATE_SCU_LPCG_MASK << gate->bit_idx);
++		writel(reg, gate->reg);
++	}
 +}
 +
-+/*
-+ * clk_divider_scu_round_rate - Round clock rate for a SCU clock
-+ * @hw: clock to round rate for
-+ * @rate: rate to round
-+ * @parent_rate: parent rate provided by common clock framework
-+ *
-+ * Gets the current clock rate of a SCU clock. Returns the current
-+ * clock rate, or zero in failure.
-+ */
-+static long clk_divider_gpr_scu_round_rate(struct clk_hw *hw, unsigned long rate,
-+					   unsigned long *prate)
++static int clk_gate_scu_prepare(struct clk_hw *hw)
 +{
-+	if (rate < *prate)
-+		rate = *prate / 2;
-+	else
-+		rate = *prate;
++	struct clk_gate_scu *gate = to_clk_gate_scu(hw);
++	sc_err_t sci_err = SC_ERR_NONE;
 +
-+	return rate;
++	/* Enable the clock at the DSC slice level */
++	sci_err = sc_pm_clock_enable(ccm_ipc_handle, gate->rsrc_id,
++				     gate->clk_type, true, gate->hw_gate);
++
++	return sci_err;
 +}
 +
-+/*
-+ * clk_divider_scu_set_rate - Set rate for a SCU clock
-+ * @hw: clock to change rate for
-+ * @rate: target rate for the clock
-+ * @parent_rate: rate of the clock parent
-+ *
-+ * Sets a clock frequency for a SCU clock. Returns the SCU
-+ * protocol status.
-+ */
-+static int clk_divider_gpr_scu_set_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long parent_rate)
++static void clk_gate_scu_unprepare(struct clk_hw *hw)
 +{
-+	struct clk_divider_gpr_scu *clk = to_clk_divider_gpr_scu(hw);
-+	uint32_t val;
++	struct clk_gate_scu *gate = to_clk_gate_scu(hw);
 +	sc_err_t sci_err;
 +
-+	val = (rate < parent_rate) ? 1 : 0;
-+	sci_err = sc_misc_set_control(ccm_ipc_handle, clk->rsrc_id,
-+		clk->gpr_id, val);
-+
-+	return sci_err ? -EINVAL : 0;
++	sci_err = sc_pm_clock_enable(ccm_ipc_handle, gate->rsrc_id,
++				     gate->clk_type, false, false);
++	if (sci_err)
++		pr_err("%s: %s: clk unprepare failed %d\n",
++			__func__, clk_hw_get_name(hw), sci_err);
 +}
 +
-+static struct clk_ops clk_divider_gpr_scu_ops = {
-+	.recalc_rate = clk_divider_gpr_scu_recalc_rate,
-+	.round_rate = clk_divider_gpr_scu_round_rate,
-+	.set_rate = clk_divider_gpr_scu_set_rate,
++static const struct clk_ops clk_gate_scu_ops = {
++	.prepare = clk_gate_scu_prepare,
++	.unprepare = clk_gate_scu_unprepare,
++	.enable = clk_gate_scu_enable,
++	.disable = clk_gate_scu_disable,
 +};
 +
-+struct clk_hw *imx_clk_divider_gpr_scu(const char *name, const char *parent_name,
-+				       sc_rsrc_t rsrc_id, sc_ctrl_t gpr_id)
++struct clk_hw *clk_register_gate_scu(const char *name, const char *parent_name,
++				     unsigned long flags, sc_rsrc_t rsrc_id,
++				     sc_pm_clk_t clk_type, void __iomem *reg,
++				     u8 bit_idx, bool hw_gate)
 +{
-+	struct clk_divider_gpr_scu *div;
++	struct clk_gate_scu *gate;
 +	struct clk_init_data init;
 +	struct clk_hw *hw;
 +	int ret;
 +
-+	div = kzalloc(sizeof(*div), GFP_KERNEL);
-+	if (!div)
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
 +		return ERR_PTR(-ENOMEM);
 +
-+	div->rsrc_id = rsrc_id;
-+	div->gpr_id = gpr_id;
++	gate->rsrc_id = rsrc_id;
++	gate->clk_type = clk_type;
++	if (reg) {
++		gate->reg = ioremap((phys_addr_t)reg, SZ_64K);
++		if (!gate->reg) {
++			kfree(gate);
++			return ERR_PTR(-ENOMEM);
++		}
++	}
++
++	gate->bit_idx = bit_idx;
++	gate->hw_gate = hw_gate;
 +
 +	init.name = name;
-+	init.ops = &clk_divider_gpr_scu_ops;
-+	init.flags = CLK_GET_RATE_NOCACHE;
++	init.ops = &clk_gate_scu_ops;
++	init.flags = flags;
 +	init.parent_names = parent_name ? &parent_name : NULL;
 +	init.num_parents = parent_name ? 1 : 0;
 +
-+	div->hw.init = &init;
++	gate->hw.init = &init;
 +
-+	hw = &div->hw;
++	hw = &gate->hw;
 +	ret = clk_hw_register(NULL, hw);
 +	if (ret) {
-+		kfree(div);
++		iounmap(gate->reg);
++		kfree(gate);
++		hw = ERR_PTR(ret);
++	}
++
++	return hw;
++}
++
++static const struct clk_ops clk_gate2_scu_ops = {
++	.enable = clk_gate_scu_enable,
++	.disable = clk_gate_scu_disable,
++};
++
++struct clk_hw *clk_register_gate2_scu(const char *name, const char *parent_name,
++				      unsigned long flags, void __iomem *reg,
++				      u8 bit_idx, bool hw_gate)
++{
++	struct clk_gate_scu *gate;
++	struct clk_init_data init;
++	struct clk_hw *hw;
++	int ret;
++
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
++		return ERR_PTR(-ENOMEM);
++
++	gate->reg = ioremap((phys_addr_t)reg, SZ_64K);
++	if (!gate->reg) {
++		kfree(gate);
++		return ERR_PTR(-ENOMEM);
++	}
++	gate->bit_idx = bit_idx;
++	gate->hw_gate = hw_gate;
++
++	init.name = name;
++	init.ops = &clk_gate2_scu_ops;
++	init.flags = flags;
++	init.parent_names = parent_name ? &parent_name : NULL;
++	init.num_parents = parent_name ? 1 : 0;
++
++	gate->hw.init = &init;
++
++	hw = &gate->hw;
++	ret = clk_hw_register(NULL, hw);
++	if (ret) {
++		iounmap(gate->reg);
++		kfree(gate);
 +		hw = ERR_PTR(ret);
 +	}
 +
 +	return hw;
 +}
 diff --git a/drivers/clk/imx/scu/clk-scu.h b/drivers/clk/imx/scu/clk-scu.h
-index ee197f9..cb9a723 100644
+index cb9a723..c08dca1 100644
 --- a/drivers/clk/imx/scu/clk-scu.h
 +++ b/drivers/clk/imx/scu/clk-scu.h
-@@ -33,4 +33,7 @@ static inline struct clk_hw *imx_clk_divider2_scu(const char *name,
- 	return imx_clk_register_divider_scu(name, parent_name, rsrc_id, clk_type);
- }
+@@ -36,4 +36,27 @@ static inline struct clk_hw *imx_clk_divider2_scu(const char *name,
+ struct clk_hw *imx_clk_divider_gpr_scu(const char *name, const char *parent_name,
+ 				sc_rsrc_t rsrc_id, sc_ctrl_t gpr_id);
  
-+struct clk_hw *imx_clk_divider_gpr_scu(const char *name, const char *parent_name,
-+				sc_rsrc_t rsrc_id, sc_ctrl_t gpr_id);
++struct clk_hw *clk_register_gate_scu(const char *name, const char *parent_name,
++				unsigned long flags, sc_rsrc_t rsrc_id,
++				sc_pm_clk_t clk_type, void __iomem *reg,
++				u8 bit_idx, bool hw_gate);
++
++struct clk_hw *clk_register_gate2_scu(const char *name, const char *parent_name,
++				unsigned long flags, void __iomem *reg,
++				u8 bit_idx, bool hw_gate);
++
++static inline struct clk_hw *imx_clk_gate_scu(const char *name, const char *parent,
++				sc_rsrc_t rsrc_id, sc_pm_clk_t clk_type,
++				void __iomem *reg, u8 bit_idx, bool hw_gate)
++{
++	return clk_register_gate_scu(name, parent, CLK_SET_RATE_PARENT,
++				     rsrc_id, clk_type, reg, bit_idx, hw_gate);
++}
++
++static inline struct clk_hw *imx_clk_gate2_scu(const char *name, const char *parent,
++				void __iomem *reg, u8 bit_idx, bool hw_gate)
++{
++	return clk_register_gate2_scu(name, parent, 0, reg, bit_idx, hw_gate);
++}
 +
  #endif
 -- 
