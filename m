@@ -1,67 +1,126 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 26 Apr 2018 20:43:04 -0500
-Subject: [PATCH 3/4] ARM: davinci: fix GPIO lookup for I2C
-In-Reply-To: <20180424143506.25793-4-nsekhar@ti.com>
-References: <20180424143506.25793-1-nsekhar@ti.com>
- <20180424143506.25793-4-nsekhar@ti.com>
-Message-ID: <2a6e2e81-05f9-1759-c921-3891adcfb854@lechnology.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Fri, 27 Apr 2018 10:49:04 +0900
+Subject: [PATCH v2 1/2] pinctrl: uniphier: add LD20 MPEG2-TS I/O pin-mux
+ settings
+Message-ID: <20180427014905.19520-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2018 09:35 AM, Sekhar Nori wrote:
-> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
-> I2C can correctly lookup the recovery gpios.
-> 
-> Note that it is the gpio-davinci driver that sets the gpiochip label to
-> davinci_gpio.0.
-> 
-> Also, the I2C device uses an id of 1 on DM644x and DM355.
-> 
-> Fixes: e53537653791 ("i2c/ARM: davinci: Deep refactoring of I2C recovery")
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
->   arch/arm/mach-davinci/board-dm355-evm.c  | 6 +++---
->   arch/arm/mach-davinci/board-dm644x-evm.c | 6 +++---
->   2 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-> index cb30637d9eaf..14557f893798 100644
-> --- a/arch/arm/mach-davinci/board-dm355-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
-> @@ -110,11 +110,11 @@ static struct platform_device davinci_nand_device = {
->   };
->   
->   static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
-> -	.dev_id = "i2c_davinci",
-> +	.dev_id = "i2c_davinci.1",
->   	.table = {
-> -		GPIO_LOOKUP("davinci_gpio", 15, "sda",
-> +		GPIO_LOOKUP("davinci_gpio.0", 15, "sda",
->   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
-> -		GPIO_LOOKUP("davinci_gpio", 14, "scl",
-> +		GPIO_LOOKUP("davinci_gpio.0", 14, "scl",
->   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
->   	},
->   };
-> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-> index 5bf024784738..5b0b95e04cac 100644
-> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-> @@ -597,11 +597,11 @@ static struct i2c_board_info __initdata i2c_info[] =  {
->   };
->   
->   static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
-> -	.dev_id = "i2c_davinci",
-> +	.dev_id = "i2c_davinci.1",
->   	.table = {
-> -		GPIO_LOOKUP("davinci_gpio", 44, "sda",
-> +		GPIO_LOOKUP("davinci_gpio.0", 44, "sda",
->   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
-> -		GPIO_LOOKUP("davinci_gpio", 43, "scl",
-> +		GPIO_LOOKUP("davinci_gpio.0", 43, "scl",
->   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
->   	},
->   };
-> 
+The MPEG2-TS input/output core both accepts serial TS and parallel TS.
 
-Why not use the GPIO_TO_PIN() macro like the previous patches?
+The serial TS interface uses following pins:
+  hscin0_s : HS0DOUT[0-3]
+  hscin1_s : HS0DOUT[4-7]
+  hscin2_s : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN0
+  hscin3_s : HS1DIN[2-5]
+  hscout0_s: HS0DOUT[0-3]
+  hscout1_s: HS0DOUT[4-7]
+
+And the parallel TS interface uses following pins:
+  hscin0_p : HS0BCLKIN, HS0SYNCIN, HS0VALIN, HS0DIN[0-7]
+  hscin1_p : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN[0-7]
+  hscout0_p: HS0BCLKOUT, HS0SYNCOUT, HS0VALOUT, HS0DOUT[0-7]
+
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+
+---
+
+Changes in v2:
+
+  - Fix indent
+  - Sort alphabetically
+  - Fix wrong grouping
+    - Fix hsc'out'0_ci -> hsc'in'0_ci of hscin0 group
+    - Fix hscin'0'_s -> hscin'1'_s of hscin1 group
+---
+ .../pinctrl/uniphier/pinctrl-uniphier-ld20.c  | 54 +++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
+index bf8f0c3bea5e..9f449b35e300 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
+@@ -566,6 +566,33 @@ static const int ether_rgmii_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ static const unsigned ether_rmii_pins[] = {30, 31, 32, 33, 34, 35, 36, 37, 39,
+ 					   41, 42, 45};
+ static const int ether_rmii_muxvals[] = {0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1};
++static const unsigned hscin0_ci_pins[] = {102, 103, 104, 105, 106, 107, 108,
++					  109, 110, 111, 112};
++static const int hscin0_ci_muxvals[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
++static const unsigned hscin0_p_pins[] = {102, 103, 104, 105, 106, 107, 108, 109,
++					 110, 111, 112};
++static const int hscin0_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
++static const unsigned hscin0_s_pins[] = {116, 117, 118, 119};
++static const int hscin0_s_muxvals[] = {3, 3, 3, 3};
++static const unsigned hscin1_p_pins[] = {124, 125, 126, 127, 128, 129, 130, 131,
++					 132, 133, 134};
++static const int hscin1_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
++static const unsigned hscin1_s_pins[] = {120, 121, 122, 123};
++static const int hscin1_s_muxvals[] = {3, 3, 3, 3};
++static const unsigned hscin2_s_pins[] = {124, 125, 126, 127};
++static const int hscin2_s_muxvals[] = {3, 3, 3, 3};
++static const unsigned hscin3_s_pins[] = {129, 130, 131, 132};
++static const int hscin3_s_muxvals[] = {3, 3, 3, 3};
++static const unsigned hscout0_ci_pins[] = {113, 114, 115, 116, 117, 118, 119,
++					   120, 121, 122, 123};
++static const int hscout0_ci_muxvals[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
++static const unsigned hscout0_p_pins[] = {113, 114, 115, 116, 117, 118, 119,
++					  120, 121, 122, 123};
++static const int hscout0_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
++static const unsigned hscout0_s_pins[] = {116, 117, 118, 119};
++static const int hscout0_s_muxvals[] = {4, 4, 4, 4};
++static const unsigned hscout1_s_pins[] = {120, 121, 122, 123};
++static const int hscout1_s_muxvals[] = {4, 4, 4, 4};
+ static const unsigned i2c0_pins[] = {63, 64};
+ static const int i2c0_muxvals[] = {0, 0};
+ static const unsigned i2c1_pins[] = {65, 66};
+@@ -641,6 +668,17 @@ static const struct uniphier_pinctrl_group uniphier_ld20_groups[] = {
+ 	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
+ 	UNIPHIER_PINCTRL_GROUP(ether_rgmii),
+ 	UNIPHIER_PINCTRL_GROUP(ether_rmii),
++	UNIPHIER_PINCTRL_GROUP(hscin0_ci),
++	UNIPHIER_PINCTRL_GROUP(hscin0_p),
++	UNIPHIER_PINCTRL_GROUP(hscin0_s),
++	UNIPHIER_PINCTRL_GROUP(hscin1_p),
++	UNIPHIER_PINCTRL_GROUP(hscin1_s),
++	UNIPHIER_PINCTRL_GROUP(hscin2_s),
++	UNIPHIER_PINCTRL_GROUP(hscin3_s),
++	UNIPHIER_PINCTRL_GROUP(hscout0_ci),
++	UNIPHIER_PINCTRL_GROUP(hscout0_p),
++	UNIPHIER_PINCTRL_GROUP(hscout0_s),
++	UNIPHIER_PINCTRL_GROUP(hscout1_s),
+ 	UNIPHIER_PINCTRL_GROUP(i2c0),
+ 	UNIPHIER_PINCTRL_GROUP(i2c1),
+ 	UNIPHIER_PINCTRL_GROUP(i2c3),
+@@ -668,6 +706,16 @@ static const char * const aoutiec1_groups[] = {"aoutiec1"};
+ static const char * const emmc_groups[] = {"emmc", "emmc_dat8"};
+ static const char * const ether_rgmii_groups[] = {"ether_rgmii"};
+ static const char * const ether_rmii_groups[] = {"ether_rmii"};
++static const char * const hscin0_groups[] = {"hscin0_ci",
++					     "hscin0_p",
++					     "hscin0_s"};
++static const char * const hscin1_groups[] = {"hscin1_p", "hscin1_s"};
++static const char * const hscin2_groups[] = {"hscin2_s"};
++static const char * const hscin3_groups[] = {"hscin3_s"};
++static const char * const hscout0_groups[] = {"hscout0_ci",
++					      "hscout0_p",
++					      "hscout0_s"};
++static const char * const hscout1_groups[] = {"hscout1_s"};
+ static const char * const i2c0_groups[] = {"i2c0"};
+ static const char * const i2c1_groups[] = {"i2c1"};
+ static const char * const i2c3_groups[] = {"i2c3"};
+@@ -691,6 +739,12 @@ static const struct uniphier_pinmux_function uniphier_ld20_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(emmc),
+ 	UNIPHIER_PINMUX_FUNCTION(ether_rgmii),
+ 	UNIPHIER_PINMUX_FUNCTION(ether_rmii),
++	UNIPHIER_PINMUX_FUNCTION(hscin0),
++	UNIPHIER_PINMUX_FUNCTION(hscin1),
++	UNIPHIER_PINMUX_FUNCTION(hscin2),
++	UNIPHIER_PINMUX_FUNCTION(hscin3),
++	UNIPHIER_PINMUX_FUNCTION(hscout0),
++	UNIPHIER_PINMUX_FUNCTION(hscout1),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c0),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c1),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c3),
+-- 
+2.17.0
