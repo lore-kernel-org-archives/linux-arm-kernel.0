@@ -1,90 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Apr 2018 17:09:14 +0100
-Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <20180427104629.2bff4b4b683a93ddf39f8df5@arm.com>
-References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
- <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
- <20180426170624.bfcba885431d57d0de2a3ddd@arm.com>
- <20180427093027.ngtuoezyh6mtz26p@lakrids.cambridge.arm.com>
- <20180427081525.f9dcc756678baf3bb6e6e473@arm.com>
- <20180427143719.GA5093@arm.com>
- <20180427104629.2bff4b4b683a93ddf39f8df5@arm.com>
-Message-ID: <20180427160914.GA5286@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Apr 2018 17:18:10 +0100
+Subject: [PATCH] arm: port KCOV to arm
+In-Reply-To: <CACT4Y+b_cAKf80y5a8KaV7P=-KtcB83E7x-SXv-Uq_kxzy_7wA@mail.gmail.com>
+References: <20180426130846.130976-1-dvyukov@google.com>
+ <20180426134057.4sahhqrbkltwmfsk@lakrids.cambridge.arm.com>
+ <CACT4Y+Z35mOAybskjxVhxvW+GrbOZ4c9s2LT+Ca_fE9ZufoiGQ@mail.gmail.com>
+ <20180426142948.n74p52esmbvsqrow@lakrids.cambridge.arm.com>
+ <CACT4Y+b+kHWstEWDDOh6unGSHnetnyJ-Gut1E494XGM1rFozBQ@mail.gmail.com>
+ <CACT4Y+ZfQyCd+dBNJEUvVquM8EN51JoOrrENJ+Q7Hpb0wF5xrA@mail.gmail.com>
+ <20180427130643.klvm4rqxhv7w5f2o@lakrids.cambridge.arm.com>
+ <CACT4Y+b_cAKf80y5a8KaV7P=-KtcB83E7x-SXv-Uq_kxzy_7wA@mail.gmail.com>
+Message-ID: <20180427161810.kuncq7rtcpyl7pql@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kim,
-
-[Ganapat: please don't let this discussion disrupt your PMU driver
- development. You can safely ignore it for now :)]
-
-On Fri, Apr 27, 2018 at 10:46:29AM -0500, Kim Phillips wrote:
-> On Fri, 27 Apr 2018 15:37:20 +0100
-> Will Deacon <will.deacon@arm.com> wrote:
+On Fri, Apr 27, 2018 at 03:51:22PM +0200, Dmitry Vyukov wrote:
+> On Fri, Apr 27, 2018 at 3:06 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Can you share your kernel config?
 > 
-> > On Fri, Apr 27, 2018 at 08:15:25AM -0500, Kim Phillips wrote:
-> > > On Fri, 27 Apr 2018 10:30:27 +0100
-> > > Mark Rutland <mark.rutland@arm.com> wrote:
-> > > > On Thu, Apr 26, 2018 at 05:06:24PM -0500, Kim Phillips wrote:
-> > > > > On Wed, 25 Apr 2018 14:30:47 +0530
-> > > > > Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com> wrote:
-> > > > > 
-> > > > > > +static int thunderx2_uncore_event_init(struct perf_event *event)
-> > > > 
-> > > > > This PMU driver can be made more user-friendly by not just silently
-> > > > > returning an error code such as -EINVAL, but by emitting a useful
-> > > > > message describing the specific error via dmesg.
-> > > > 
-> > > > As has previously been discussed on several occasions, patches which log
-> > > > to dmesg in a pmu::event_init() path at any level above pr_debug() are
-> > > > not acceptable -- dmesg is not intended as a mechanism to inform users
-> > > > of driver-specific constraints.
-> > > 
-> > > I disagree - drivers do it all the time, using dev_err(), dev_warn(), etc.
-> > > 
-> > > > I would appreciate if in future you could qualify your suggestion with
-> > > > the requirement that pr_debug() is used.
-> > > 
-> > > It shouldn't - the driver isn't being debugged, it's in regular use.
-> > 
-> > For anything under drivers/perf/, I'd prefer not to have these prints
-> > and instead see efforts to improve error reporting via the perf system
-> > call interface.
+> Attached. It's pretty much vexpress_defconfig with few minor
+> additions. Here is full description of what I am doing:
+> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
+
+Cheers!
+
+> FWIW when I do "KCOV_INSTRUMENT_fault.o := n" everything works and I
+> see reasonable coverage.
+
+While this may be the case, I think it's papering over a bug rather than
+solving it.
+
+[...]
+
+> > I can't reproduce the issue on real hardware atop of v4.17-rc2, when
+> > booting and running a standard ARMv7 buildroot userspace. So the kcov
+> > mode check seems fine to me.
 > 
-> We'd all prefer that, and for all PMU drivers, why should ones under
-> drivers/perf be treated differently?
+> It happens after brief fuzzing with syzkaller. So it's both kcov
+> opened and some weird syscall workload. Again, here is everything what
+> I am doing:
+> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
 
-Because they're the ones I maintain...
+I've set this up, and while I see RCU stalls and "no output from test
+machine" warnings, I'm not seeing any reports with KCOV splats.
 
-> As you are already aware, I've personally tried to fix this problem -
-> that has existed since before the introduction of the perf tool (I
-> consider it a syscall-independent enhanced error interface), multiple
-> times, and failed.
+Are you somehow connecting to a VM which failed with no output?
 
-Why is that my problem? Try harder?
-
-> So until someone comes up with a solution that works for everyone
-> up to and including Linus Torvalds (who hasn't put up a problem
-> pulling PMU drivers emitting things to dmesg so far, by the way), this
-> keep PMU drivers' errors silent preference of yours is unnecessarily
-> impeding people trying to measure system performance on Arm based
-> machines - all other archs' maintainers are fine with PMU drivers using
-> dmesg.
-
-Good for them, although I'm pretty sure that at least the x86 folks are
-against this crap too.
-
-> > Anyway, I think this driver has bigger problems that need addressing.
-> 
-> To me it represents yet another PMU driver submission - as the years go
-> by - that is lacking in the user messaging area.  Which reminds me, can
-> you take another look at applying this?:
-
-As I said before, I'm not going to take anything that logs above pr_debug
-for things that are directly triggerable from userspace. Spin a version
-using pr_debug and I'll queue it.
-
-Have a good weekend,
-
-Will
+Thanks,
+Mark.
