@@ -1,106 +1,43 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 27 Apr 2018 18:40:40 +0530
-Subject: [PATCH v2 1/4] drm/panel: simple: Add support for Rocktech
- RK070ER9427 LCD panel
-Message-ID: <20180427131040.28775-1-jagan@amarulasolutions.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Fri, 27 Apr 2018 08:15:25 -0500
+Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
+ driver
+In-Reply-To: <20180427093027.ngtuoezyh6mtz26p@lakrids.cambridge.arm.com>
+References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
+ <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
+ <20180426170624.bfcba885431d57d0de2a3ddd@arm.com>
+ <20180427093027.ngtuoezyh6mtz26p@lakrids.cambridge.arm.com>
+Message-ID: <20180427081525.f9dcc756678baf3bb6e6e473@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Rocktech Display Ltd. RK070ER9427
-800(RGB)x480 TFT LCD panel, which can be supported by the
-simple panel driver.
+On Fri, 27 Apr 2018 10:30:27 +0100
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v2:
-- included drm drm panel maintainers
+> Hi Kim,
+> 
+> On Thu, Apr 26, 2018 at 05:06:24PM -0500, Kim Phillips wrote:
+> > On Wed, 25 Apr 2018 14:30:47 +0530
+> > Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com> wrote:
+> > 
+> > > +static int thunderx2_uncore_event_init(struct perf_event *event)
+> 
+> > This PMU driver can be made more user-friendly by not just silently
+> > returning an error code such as -EINVAL, but by emitting a useful
+> > message describing the specific error via dmesg.
+> 
+> As has previously been discussed on several occasions, patches which log
+> to dmesg in a pmu::event_init() path at any level above pr_debug() are
+> not acceptable -- dmesg is not intended as a mechanism to inform users
+> of driver-specific constraints.
 
- .../display/panel/rocktech,rk070er9427.txt         | 25 ++++++++++++++++
- drivers/gpu/drm/panel/panel-simple.c               | 33 ++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/rocktech,rk070er9427.txt
+I disagree - drivers do it all the time, using dev_err(), dev_warn(), etc.
 
-diff --git a/Documentation/devicetree/bindings/display/panel/rocktech,rk070er9427.txt b/Documentation/devicetree/bindings/display/panel/rocktech,rk070er9427.txt
-new file mode 100644
-index 000000000000..eb1fb9f8d1f4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/rocktech,rk070er9427.txt
-@@ -0,0 +1,25 @@
-+Rocktech Display Ltd. RK070ER9427 800(RGB)x480 TFT LCD panel
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-+
-+Required properties:
-+- compatible: should be "rocktech,rk070er9427"
-+
-+Optional properties:
-+- backlight: phandle of the backlight device attached to the panel
-+
-+Optional nodes:
-+- Video port for LCD panel input.
-+
-+Example:
-+	panel {
-+		compatible = "rocktech,rk070er9427";
-+		backlight = <&backlight_lcd>;
-+
-+		port {
-+			lcd_panel_in: endpoint {
-+				remote-endpoint = <&lcd_display_out>;
-+			};
-+		};
-+	};
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index cbf1ab404ee7..a6c633fd0559 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -745,6 +745,36 @@ static const struct panel_desc avic_tm070ddh03 = {
- 	},
- };
- 
-+static const struct display_timing rocktech_rk070er9427_timing = {
-+	.pixelclock = { 26400000, 33300000, 46800000 },
-+	.hactive = { 800, 800, 800 },
-+	.hfront_porch = { 16, 210, 354 },
-+	.hback_porch = { 46, 46, 46 },
-+	.hsync_len = { 1, 1, 1 },
-+	.vactive = { 480, 480, 480 },
-+	.vfront_porch = { 7, 22, 147 },
-+	.vback_porch = { 23, 23, 23 },
-+	.vsync_len = { 1, 1, 1 },
-+	.flags = DISPLAY_FLAGS_DE_HIGH,
-+};
-+
-+static const struct panel_desc rocktech_rk070er9427 = {
-+	.timings = &rocktech_rk070er9427_timing,
-+	.num_timings = 1,
-+	.bpc = 6,
-+	.size = {
-+		.width = 154,
-+		.height = 86,
-+	},
-+	.delay = {
-+		.prepare = 41,
-+		.enable = 50,
-+		.unprepare = 41,
-+		.disable = 50,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-+};
-+
- static const struct drm_display_mode boe_nv101wxmn51_modes[] = {
- 	{
- 		.clock = 71900,
-@@ -2226,6 +2256,9 @@ static const struct of_device_id platform_of_match[] = {
- 	}, {
- 		.compatible = "qiaodian,qd43003c0-40",
- 		.data = &qd43003c0_40,
-+	}, {
-+		.compatible = "rocktech,rk070er9427",
-+		.data = &rocktech_rk070er9427,
- 	}, {
- 		.compatible = "samsung,lsn122dl01-c01",
- 		.data = &samsung_lsn122dl01_c01,
--- 
-2.14.3
+> I would appreciate if in future you could qualify your suggestion with
+> the requirement that pr_debug() is used.
+
+It shouldn't - the driver isn't being debugged, it's in regular use.
+
+Thanks,
+
+Kim
