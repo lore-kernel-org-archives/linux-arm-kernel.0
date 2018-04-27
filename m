@@ -1,74 +1,49 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Fri, 27 Apr 2018 10:46:29 -0500
-Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <20180427143719.GA5093@arm.com>
-References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
- <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
- <20180426170624.bfcba885431d57d0de2a3ddd@arm.com>
- <20180427093027.ngtuoezyh6mtz26p@lakrids.cambridge.arm.com>
- <20180427081525.f9dcc756678baf3bb6e6e473@arm.com>
- <20180427143719.GA5093@arm.com>
-Message-ID: <20180427104629.2bff4b4b683a93ddf39f8df5@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 27 Apr 2018 16:58:13 +0100
+Subject: [PATCH v2 08/17] kvm: arm/arm64: Prepare for VM specific stage2
+ translations
+In-Reply-To: <59fc0fe3-2c7e-b5ae-702b-0c21f0051c6b@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-9-git-send-email-suzuki.poulose@arm.com>
+ <7f67fca2-b936-25d9-0fe8-aece1fadafdc@arm.com>
+ <59fc0fe3-2c7e-b5ae-702b-0c21f0051c6b@arm.com>
+Message-ID: <c12f7bb9-2a9f-ae30-4d69-f3e229e04f7c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Apr 2018 15:37:20 +0100
-Will Deacon <will.deacon@arm.com> wrote:
-
-> On Fri, Apr 27, 2018 at 08:15:25AM -0500, Kim Phillips wrote:
-> > On Fri, 27 Apr 2018 10:30:27 +0100
-> > Mark Rutland <mark.rutland@arm.com> wrote:
-> > > On Thu, Apr 26, 2018 at 05:06:24PM -0500, Kim Phillips wrote:
-> > > > On Wed, 25 Apr 2018 14:30:47 +0530
-> > > > Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com> wrote:
-> > > > 
-> > > > > +static int thunderx2_uncore_event_init(struct perf_event *event)
-> > > 
-> > > > This PMU driver can be made more user-friendly by not just silently
-> > > > returning an error code such as -EINVAL, but by emitting a useful
-> > > > message describing the specific error via dmesg.
-> > > 
-> > > As has previously been discussed on several occasions, patches which log
-> > > to dmesg in a pmu::event_init() path at any level above pr_debug() are
-> > > not acceptable -- dmesg is not intended as a mechanism to inform users
-> > > of driver-specific constraints.
-> > 
-> > I disagree - drivers do it all the time, using dev_err(), dev_warn(), etc.
-> > 
-> > > I would appreciate if in future you could qualify your suggestion with
-> > > the requirement that pr_debug() is used.
-> > 
-> > It shouldn't - the driver isn't being debugged, it's in regular use.
+On 27/04/18 16:22, Suzuki K Poulose wrote:
+> On 26/04/18 14:35, Julien Grall wrote:
+>> Hi Suzuki,
+>>
+>> On 27/03/18 14:15, Suzuki K Poulose wrote:
+>>> Right now the stage2 page table for a VM is hard coded, assuming
+>>> an IPA of 40bits. As we are about to add support for per VM IPA,
+>>> prepare the stage2 page table helpers to accept the kvm instance
+>>> to make the right decision for the VM. No functional changes.
 > 
-> For anything under drivers/perf/, I'd prefer not to have these prints
-> and instead see efforts to improve error reporting via the perf system
-> call interface.
+> 
+>>> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+>>> index 3ab8b37..c3f1f9b 100644
+>>> --- a/arch/arm/include/asm/kvm_arm.h
+>>> +++ b/arch/arm/include/asm/kvm_arm.h
+>>> @@ -133,8 +133,7 @@
+>>> ?? * space.
+>>> ?? */
+>>> ? #define KVM_PHYS_SHIFT??? (40)
+>>> -#define KVM_PHYS_SIZE??? (_AC(1, ULL) << KVM_PHYS_SHIFT)
+>>> -#define KVM_PHYS_MASK??? (KVM_PHYS_SIZE - _AC(1, ULL))
+>>
+>> I assume you are moving them to kvm_mmu.h in order to match the arm64 side, right? If so, would not it make sense to make KVM_PHYS_SHIFT with it?
+>>
+>> [...]
+> 
+> I am moving all the macros that depend on the "kvm" instance to kvm_mmu.h.
+> I will see if I can move the KVM_PHYS_SHIFT without much trouble.
 
-We'd all prefer that, and for all PMU drivers, why should ones under
-drivers/perf be treated differently?
+It looks like we can't do that easily. KVM_PHYS_SHIFT is used for KVM_T0SZ
+on arm, even though that can be simply hard coded to avoid the dependency on
+KVM_PHYS_SHIFT (like we did for arm64, T0SZ is defined to 24). I would leave it
+as it is to avoid the noise.
 
-As you are already aware, I've personally tried to fix this problem -
-that has existed since before the introduction of the perf tool (I
-consider it a syscall-independent enhanced error interface), multiple
-times, and failed.
-
-So until someone comes up with a solution that works for everyone
-up to and including Linus Torvalds (who hasn't put up a problem
-pulling PMU drivers emitting things to dmesg so far, by the way), this
-keep PMU drivers' errors silent preference of yours is unnecessarily
-impeding people trying to measure system performance on Arm based
-machines - all other archs' maintainers are fine with PMU drivers using
-dmesg.
-
-> Anyway, I think this driver has bigger problems that need addressing.
-
-To me it represents yet another PMU driver submission - as the years go
-by - that is lacking in the user messaging area.  Which reminds me, can
-you take another look at applying this?:
-
-https://patchwork.kernel.org/patch/10068535/
-
-Thanks,
-
-Kim
+Cheers
+Suzuki
