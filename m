@@ -1,130 +1,125 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 27 Apr 2018 16:36:26 +0800
-Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: h6: add device tree
- nodes for MMC controllers
-In-Reply-To: <9571735d-929f-a2ef-ed97-dc9193420b73@arm.com>
+Date: Fri, 27 Apr 2018 16:38:29 +0800
+Subject: [linux-sunxi] [PATCH 1/3] mmc: sunxi: add support for the MMC
+ controller on H6
+In-Reply-To: <f722ce51-2391-620c-df65-48f047b5f3d5@arm.com>
 References: <20180426140728.43155-1-icenowy@aosc.io>
- <20180426140728.43155-3-icenowy@aosc.io>
- <9571735d-929f-a2ef-ed97-dc9193420b73@arm.com>
-Message-ID: <77DF7884-8DA8-4ED5-BB51-941CFDE4A123@aosc.io>
+ <20180426140728.43155-2-icenowy@aosc.io>
+ <f722ce51-2391-620c-df65-48f047b5f3d5@arm.com>
+Message-ID: <EECAFDD1-FEAC-42DF-BB17-F11C1C8612DE@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2018?4?27? GMT+08:00 ??12:45:38, Andre Przywara <andre.przywara@arm.com> ??:
+? 2018?4?27? GMT+08:00 ??12:45:24, Andre Przywara <andre.przywara@arm.com> ??:
 >Hi,
 >
 >On 26/04/18 15:07, Icenowy Zheng wrote:
->> The Allwinner H6 SoC have 3 MMC controllers.
+>> The new Allwinner H6 SoC have 3 MMC controllers. The first and second
+>> ones are similar to the ones on A64, but the third one adds EMCE
+>> (Embedded Crypto Engine) support which does hardware transparent
+>crypto
+>> on the eMMC.
 >> 
->> Add device tree nodes for them.
->> 
+>> As we still do not have support for EMCE, and the support of it is
+>> disabled by defualt, we just duplicate the A64 mmc configurations and
+>> change the compatible string.
+>
+>So if the A64 MMC part is compatible, we should express it like this:
+>
 >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 >> ---
->>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 56
->++++++++++++++++++++++++++++
->>  1 file changed, 56 insertions(+)
+>>  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  2 ++
+>>  drivers/mmc/host/sunxi-mmc.c                        | 16
+>++++++++++++++++
+>>  2 files changed, 18 insertions(+)
 >> 
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> index 4debc3962830..3cbfc035c979 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> @@ -124,12 +124,68 @@
->>  			interrupt-controller;
->>  			#interrupt-cells = <3>;
+>> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+>b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+>> index 132e0007d7d6..e6aa5c7a5e12 100644
+>> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+>> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+>> @@ -16,6 +16,8 @@ Required properties:
+>>     * "allwinner,sun9i-a80-mmc"
+>>     * "allwinner,sun50i-a64-emmc"
+>>     * "allwinner,sun50i-a64-mmc"
+>> +   * "allwinner,sun50i-h6-emmc"
+>> +   * "allwinner,sun50i-h6-mmc"
+>
+>This should be changed to:
+>
+>      * "allwinner,sun50i-h6-emmc", "allwinner,sun50i-a64-emmc"
+>      * "allwinner,sun50i-h6-mmc", "allwinner,sun50i-a64-mmc"
+
+This list shouldn't list pairs, and as I said in the reply,
+these pairs are not valid.
+
+>
+>>   - reg : mmc controller base registers
+>>   - clocks : a list with 4 phandle + clock specifier pairs
+>>   - clock-names : must contain "ahb", "mmc", "output" and "sample"
+>> diff --git a/drivers/mmc/host/sunxi-mmc.c
+>b/drivers/mmc/host/sunxi-mmc.c
+>> index 97c6b79b7d6f..05e2b5fd7aa4 100644
+>> --- a/drivers/mmc/host/sunxi-mmc.c
+>> +++ b/drivers/mmc/host/sunxi-mmc.c
+>> @@ -1168,6 +1168,20 @@ static const struct sunxi_mmc_cfg
+>sun50i_a64_emmc_cfg = {
+>>  	.can_calibrate = true,
+>>  };
 >>  
->> +			mmc0_pins: mmc0-pins {
->> +				pins = "PF0", "PF1", "PF2", "PF3",
->> +				       "PF4", "PF5";
->> +				function = "mmc0";
->> +				drive-strength = <30>;
->> +				bias-pull-up;
->> +			};
+>> +static const struct sunxi_mmc_cfg sun50i_h6_cfg = {
+>> +	.idma_des_size_bits = 16,
+>> +	.clk_delays = NULL,
+>> +	.can_calibrate = true,
+>> +	.mask_data0 = true,
+>> +	.needs_new_timings = true,
+>> +};
 >> +
->> +			mmc2_pins: mmc2-pins {
->> +				pins = "PC1", "PC4", "PC5", "PC6",
->> +				       "PC7", "PC8", "PC9", "PC10",
->> +				       "PC11", "PC12", "PC13", "PC14";
->> +				function = "mmc2";
->> +				drive-strength = <30>;
->> +				bias-pull-up;
->> +			};
+>> +static const struct sunxi_mmc_cfg sun50i_h6_emmc_cfg = {
+>> +	.idma_des_size_bits = 13,
+>> +	.clk_delays = NULL,
+>> +	.can_calibrate = true,
+>> +};
 >> +
->>  			uart0_ph_pins: uart0-ph {
->>  				pins = "PH0", "PH1";
->>  				function = "uart0";
->>  			};
->>  		};
->>  
->> +		mmc0: mmc at 4020000 {
->> +			compatible = "allwinner,sun50i-h6-mmc";
 >
->This should be:
->			compatible = "allwinner,sun50i-h6-mmc",
->				     "allwinner,sun50i-a64-mmc";
-
-I'm intended to not add A64 compatible, as
-H6 is a quite new design
-(new process) and there might be different behavior, even on mmc0/1.
-
+>... and then we don't need those changes ...
 >
->> +			reg = <0x04020000 0x1000>;
->> +			clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
->> +			clock-names = "ahb", "mmc";
->> +			resets = <&ccu RST_BUS_MMC0>;
->> +			reset-names = "ahb";
->> +			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
->> +			status = "disabled";
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +		};
->> +
->> +		mmc1: mmc at 4021000 {
->> +			compatible = "allwinner,sun50i-h6-mmc";
+>>  static const struct of_device_id sunxi_mmc_of_match[] = {
+>>  	{ .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg
+>},
+>>  	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg
+>},
+>> @@ -1176,6 +1190,8 @@ static const struct of_device_id
+>sunxi_mmc_of_match[] = {
+>>  	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg
+>},
+>>  	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg
+>},
+>>  	{ .compatible = "allwinner,sun50i-a64-emmc", .data =
+>&sun50i_a64_emmc_cfg },
+>> +	{ .compatible = "allwinner,sun50i-h6-mmc", .data = &sun50i_h6_cfg
+>},
+>> +	{ .compatible = "allwinner,sun50i-h6-emmc", .data =
+>&sun50i_h6_emmc_cfg },
 >
->same here
+>... and those, at least yet.
+>Should we ever extend the driver to support the EMCE, we can add them
+>at
+>this occasion.
 >
->> +			reg = <0x04021000 0x1000>;
->> +			clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
->> +			clock-names = "ahb", "mmc";
->> +			resets = <&ccu RST_BUS_MMC1>;
->> +			reset-names = "ahb";
->> +			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
->> +			status = "disabled";
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +		};
->> +
->> +		mmc2: mmc at 4022000 {
->> +			compatible = "allwinner,sun50i-h6-emmc";
->
->and here:
->			compatible = "allwinner,sun50i-h6-emmc",
->				     "allwinner,sun50i-a64-emmc";
-
-MMC2 on H6 has EMCE capability, so surely there should
-only be H6 compatible, and no A64 one.
-
->
->The rest looks correct to me.
+>So this patch would just add the compatible pairs to the binding doc.
 >
 >Cheers,
 >Andre.
 >
->> +			reg = <0x04022000 0x1000>;
->> +			clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
->> +			clock-names = "ahb", "mmc";
->> +			resets = <&ccu RST_BUS_MMC2>;
->> +			reset-names = "ahb";
->> +			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
->> +			status = "disabled";
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +		};
->> +
->>  		uart0: serial at 5000000 {
->>  			compatible = "snps,dw-apb-uart";
->>  			reg = <0x05000000 0x400>;
+>>  	{ /* sentinel */ }
+>>  };
+>>  MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
 >> 
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
