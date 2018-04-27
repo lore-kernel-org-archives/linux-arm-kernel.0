@@ -1,42 +1,64 @@
-From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
-Date: Fri, 27 Apr 2018 14:00:44 +0000
-Subject: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-Message-ID: <8898674D84E3B24BA3A2D289B872026A69EED0B0@G01JPEXMBKW03>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 27 Apr 2018 09:05:22 -0500
+Subject: [PATCH v9 24/27] dt-bindings: timer: new bindings for TI DaVinci
+ timer
+In-Reply-To: <20180427001745.4116-25-david@lechnology.com>
+References: <20180427001745.4116-1-david@lechnology.com>
+ <20180427001745.4116-25-david@lechnology.com>
+Message-ID: <20180427140522.npmhjamhwxgp7y73@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I want to talk about the implementation of GIC-ITS driver.
-The current implementation of irq-gic-v3-its driver allocates at least 32 LPIs (interrupt numbers) for each Device ID even if the number of requested LPIs is only one.
-I think it is a waste for LPI resource.
-And if we use many devices over ITS, this implementation may cause a shortage of LPI .
+On Thu, Apr 26, 2018 at 07:17:42PM -0500, David Lechner wrote:
+> This adds new device tree bindings for the timer IP block of TI
+> DaVinci-like SoCs.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+> 
+> v9 changes:
+> - new patch in v9
+> 
+> 
+>  .../bindings/timer/ti,davinci-timer.txt       | 24 +++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt b/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
+> new file mode 100644
+> index 000000000000..2091eca46981
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
+> @@ -0,0 +1,24 @@
+> +* Device tree bindings for Texas Instruments DaVinci timer
+> +
+> +This document provides bindings for the 64-bit timer in the DaVinci
+> +architecture devices. The timer can be configured as a general-purpose 64-bit
+> +timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
+> +timers, each half can operate in conjunction (chain mode) or independently
+> +(unchained mode) of each other.
+> +
+> +It is global timer is a free running up-counter and can generate interrupt
 
-I have a patch to avoid this problem by reducing the number of LPIs from 32 to 2 per chunk.
-The points of this patch are as follows.
-Point1:Each Device ID can still allocate enough LPIs by increasing chunk number.
-Point2:The size of memory for the bitmap (lpi_bitmap) to manage the free chunks becomes larger(256B -> 4KiB).But I think it is not a problem, because the max size of lpi_bitmap is 4KiB.
+Doesn't make sense, too many 'is'.
 
-Signed-off-by: Lei Zhang <zhang.lei@jp.fujitsu.com>
+There's no interrupt property listed.
 
-The follow is my patch. the patch is based on kernel 4.16.5
--------------------------------------
---- drivers/irqchip/irq-gic-v3-its.c       2018-01-29 06:20:33.000000000 +0900
-+++ drivers/irqchip/irq-gic-v3-its.c    2018-04-25 15:05:26.078956980 +0900
-@@ -1406,12 +1406,12 @@
-  *
-  * The GIC has id_bits bits for interrupt identifiers. From there, we
-  * must subtract 8192 which are reserved for SGIs/PPIs/SPIs. Then, as
-- * we allocate LPIs by chunks of 32, we can shift the whole thing by 5
-+ * we allocate LPIs by chunks of 2, we can shift the whole thing by 1
-  * bits to the right.
-  *
-  * This gives us (((1UL << id_bits) - 8192) >> 5) possible allocations.
-  */
--#define IRQS_PER_CHUNK_SHIFT   5
-+#define IRQS_PER_CHUNK_SHIFT   1
- #define IRQS_PER_CHUNK         (1 << IRQS_PER_CHUNK_SHIFT)
- #define ITS_MAX_LPI_NRBITS     16 /* 64K LPIs */
-
-Regards,
-Lei Zhang
---
-e-mail: zhang.lei@jp.fujitsu.com 
+> +when the counter reaches preset counter values.
+> +
+> +Required properties:
+> +
+> +- compatible : should be "ti,davinci-timer".
+> +- reg : specifies base physical address and count of the registers.
+> +- clocks : the clock feeding the timer clock.
+> +
+> +Example:
+> +
+> +	clocksource: timer at 20000 {
+> +		compatible = "ti,davinci-timer";
+> +		reg = <0x20000 0x1000>;
+> +		clocks = <&pll0_auxclk>;
+> +	};
+> -- 
+> 2.17.0
+> 
