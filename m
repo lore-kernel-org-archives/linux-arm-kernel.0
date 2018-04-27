@@ -1,30 +1,84 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 27 Apr 2018 16:59:48 +0200
-Subject: [PATCH v4 3/4] staging:fsl-mc: Move DPIO from staging to
- drivers/soc/fsl
-In-Reply-To: <1522174414-30380-4-git-send-email-roy.pledge@nxp.com>
-References: <1522174414-30380-1-git-send-email-roy.pledge@nxp.com>
- <1522174414-30380-4-git-send-email-roy.pledge@nxp.com>
-Message-ID: <20180427145948.GB12750@kroah.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 27 Apr 2018 16:02:53 +0100
+Subject: [PATCH 1/2 v4] drm/pl111: Support the Versatile Express
+In-Reply-To: <CACRpkdYpMsGOTPU81cO92DFSrzt659UmD_p5uKehBWnZk-cjnw@mail.gmail.com>
+References: <20180423072017.6690-1-linus.walleij@linaro.org>
+ <4255fd6b-caf7-1347-b97b-ab7b229a08ba@arm.com>
+ <CACRpkdYpMsGOTPU81cO92DFSrzt659UmD_p5uKehBWnZk-cjnw@mail.gmail.com>
+Message-ID: <c9d69109-1220-b201-e1bd-255c31c1a214@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 02:13:33PM -0400, Roy Pledge wrote:
-> Move the NXP DPIO (Datapath I/O Driver) out of the
-> drivers/staging directory and into the drivers/soc/fsl directory.
+On 26/04/18 08:52, Linus Walleij wrote:
+> On Mon, Apr 23, 2018 at 2:04 PM, Robin Murphy <robin.murphy@arm.com> wrote:
 > 
-> The DPIO driver enables access to Queue and Buffer Manager (QBMAN)
-> hardware on NXP DPAA2 devices. This is a prerequisite to moving the
-> DPAA2 Ethernet driver out of staging.
+>> I've given this a go on the nearest VExpress (with CA15_A7 tile) and sadly
+>> it doesn't quite work for me :( With the HDLCD driver configure out, the
+>> PL111 driver seems to repeatedly defer somewhere past
+>> pl111_versatile_init():
+>>
+>> root at jet-set-radio:~# dmesg | grep -i lcd
+>> [    2.739358] drm-clcd-pl111 1c1f0000.clcd: sysreg has not yet probed
+>> [    3.406534] drm-clcd-pl111 1c1f0000.clcd: initializing Versatile Express
+>> PL111
+>> [    3.428218] drm-clcd-pl111 1c1f0000.clcd: DVI muxed to motherboard CLCD
+>> [    3.898768] drm-clcd-pl111 1c1f0000.clcd: initializing Versatile Express
+>> PL111
+>> [    3.920441] drm-clcd-pl111 1c1f0000.clcd: DVI muxed to motherboard CLCD
+>> [   10.896158] drm-clcd-pl111 1c1f0000.clcd: initializing Versatile Express
+>> PL111
+>> [   10.917839] drm-clcd-pl111 1c1f0000.clcd: DVI muxed to motherboard CLCD
+>> [   18.513233] drm-clcd-pl111 1c1f0000.clcd: initializing Versatile Express
+>> PL111
+>> [   18.535007] drm-clcd-pl111 1c1f0000.clcd: DVI muxed to motherboard CLCD
+>> root at jet-set-radio:~# ls /sys/bus/amba/drivers/drm-clcd-pl111/
+>> bind  uevent  unbind
+>>
+>>
+>> There's no obvious indication of what's missing, but it does still manage to
+>> do enough to make the external display come on (still showing the
+>> motherboard PoST screen). By comparison, the old fbdev driver probes OK and
+>> thinks it's set up a 640x480 console but doesn't actually turn the monitor
+>> on (and HDLCD doesn't probe at all due to vexpress-v2p-ca15_a7.dts lacking
+>> any graph endpoint).
+>>
+>> Config attached, just in case I'm missing something trivially dumb.
 > 
-> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+> Hm you definately need CONFIG_CMA and CONFIG_DMA_CMA so
+> the driver actually uses the special memory.
 
-Ah, this needs to go in before the ethernet driver can move out, sorry
-about that.
+Argh, missing CMA was exactly the kind of idiocy I predicted...
 
-Can you redo these last two patches against my staging-next branch so
-that we have a chance that they will apply?
+> I have all these:
+> 
+> config-drm: config-base
+>          $(CURDIR)/scripts/config --file $(config_file) \
+>          --disable FB_ARMCLCD \
+>          --enable CMA \
+>          --enable CMA_DEBUG \
+>          --enable CMA_DEBUGFS \
+>          --enable DMA_CMA \
+>          --enable DRM \
+>          --enable DRM_PL111 \
+>          --enable FRAMEBUFFER_CONSOLE \
+>          --enable DRM_PANEL \
+>          --enable DRM_PANEL_SIMPLE \
+>          --enable DRM_BRIDGE \
+>          --enable DRM_PANEL_BRIDGE \
+>          --enable DRM_SII902X \
+>          --enable LOGO
+> 
+> Please try with the stuff above, when I switch the mainline platforms
+> I plan to update the defconfigs with all the above.
 
-thanks,
+...however even ensuring all of the above options I still see the same 
+behaviour, i.e. the driver fails to bind with no visible reason why.
 
-greg k-h
+I dug a little bit and it seems pl111_modeset_init() is deferring 
+because it can't find endpoint 0. And given that that's apparently 
+pointing at some non-existent panel rather than the DVI encoder as I 
+would (naively) expect, I can at least form a self-consistent 
+explanation and give up on the grounds that I'm probably missing some 
+important DT changes.
+
+Robin.
