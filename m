@@ -1,51 +1,51 @@
-From: jan.tuerk@emtrion.com (jan.tuerk at emtrion.com)
-Date: Fri, 27 Apr 2018 15:24:42 +0200
-Subject: [PATCH v4 7/7] ARM: imx_v6_v7_defconfig: Enable DA0963 PMIC support.
-In-Reply-To: <20180427132445.3458-1-jan.tuerk@emtrion.com>
-References: <20180420125108.14197-1-jan.tuerk@emtrion.com>
- <20180427132445.3458-1-jan.tuerk@emtrion.com>
-Message-ID: <20180427132445.3458-8-jan.tuerk@emtrion.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Fri, 27 Apr 2018 19:12:57 +0530
+Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
+In-Reply-To: <20180427124828.GW15462@8bytes.org>
+References: <20180314180155.19492-1-toshi.kani@hpe.com>
+ <20180314180155.19492-3-toshi.kani@hpe.com>
+ <20180426141926.GN15462@8bytes.org> <1524759629.2693.465.camel@hpe.com>
+ <20180426172327.GQ15462@8bytes.org> <1524764948.2693.478.camel@hpe.com>
+ <20180426200737.GS15462@8bytes.org> <1524781764.2693.503.camel@hpe.com>
+ <20180427073719.GT15462@8bytes.org>
+ <5b237058-6617-6af3-8499-8836d95f538d@codeaurora.org>
+ <20180427124828.GW15462@8bytes.org>
+Message-ID: <fb4771ca-694b-8a52-d239-1c730617600b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Tuerk <jan.tuerk@emtrion.com>
 
-All recent emtrion modules based on i.mx6 make use of the DA0963.
-Therefore enable it with the following defaults:
-	- CONFIG_MFD_DA9063=y
-	- CONFIG_REGULATOR_DA9063=y
-	- CONFIG_DA9063_WATCHDOG=m
-MFD and REGULATOR are built-in to have it at Kernel boot-time.
-The WATCHDOG is optional and could be loaded from userspace.
 
-Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+On 4/27/2018 6:18 PM, joro at 8bytes.org wrote:
+> On Fri, Apr 27, 2018 at 05:22:28PM +0530, Chintan Pandya wrote:
+>> I'm bit confused here. Are you pointing to race within ioremap/vmalloc
+>> framework while updating the page table or race during tlb ops. Since
+>> later is arch dependent, I would not comment. But if the race being
+>> discussed here while altering page tables, I'm not on the same page.
+> 
+> The race condition is between hardware and software. It is not
+> sufficient to just remove the software references to the page that is
+> about to be freed (by clearing the PMD/PUD), also the hardware
+> references in the page-walk cache need to be removed with a TLB flush.
+> Otherwise the hardware can use the freed (and possibly reused) page to
+> establish new TLB entries.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 3a308437b088..691d431250d4 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -214,9 +214,11 @@ CONFIG_CPU_THERMAL=y
- CONFIG_IMX_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_DA9062_WATCHDOG=y
-+CONFIG_DA9063_WATCHDOG=m
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_DA9052_I2C=y
- CONFIG_MFD_DA9062=y
-+CONFIG_MFD_DA9063=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_MFD_MC13XXX_I2C=y
- CONFIG_MFD_STMPE=y
-@@ -225,6 +227,7 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_DA9052=y
- CONFIG_REGULATOR_DA9062=y
-+CONFIG_REGULATOR_DA9063=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
+Sure ! This is my understanding too (from arm64 context).
+
+> 
+> 
+> 
+> 	Joerg
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+Chintan
 -- 
-2.11.0
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
