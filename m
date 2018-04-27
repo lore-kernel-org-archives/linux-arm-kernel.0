@@ -1,63 +1,144 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Fri, 27 Apr 2018 17:04:42 +0100
-Subject: [PATCH v2 08/17] kvm: arm/arm64: Prepare for VM specific stage2
- translations
-In-Reply-To: <c12f7bb9-2a9f-ae30-4d69-f3e229e04f7c@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-9-git-send-email-suzuki.poulose@arm.com>
- <7f67fca2-b936-25d9-0fe8-aece1fadafdc@arm.com>
- <59fc0fe3-2c7e-b5ae-702b-0c21f0051c6b@arm.com>
- <c12f7bb9-2a9f-ae30-4d69-f3e229e04f7c@arm.com>
-Message-ID: <9fd71f6a-9b87-3357-ed5d-1e29402f8e96@arm.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 27 Apr 2018 18:05:25 +0200
+Subject: [PATCH RFC PoC 0/2] platform: different approach to early
+ platform drivers
+In-Reply-To: <CAK8P3a22DKpqMGdjYoBzKfNHc2GvAbvaZowZpz=SFeQHVSWjsg@mail.gmail.com>
+References: <20180426152920.21569-1-brgl@bgdev.pl>
+ <20180426173151.GJ3094@brightrain.aerifal.cx>
+ <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
+ <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
+ <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
+ <CAK8P3a2xtTLx-VHVWok-b19=o1z5FbTNcaWq7Y_HSdaH6pWnZg@mail.gmail.com>
+ <CAMRc=MdomjLCq-bJyktaToH00kNQAuTLgkSFRrY9Jmre8McT3A@mail.gmail.com>
+ <CAK8P3a0tMp2QURp-9WuHehqE0b6-BO1wJ38siTdxhxgwCb-ERw@mail.gmail.com>
+ <CAMpxmJVkRDLkpcgzhMb41z=Tp6zvszLd0vqfdTtZBNGT6Trtqw@mail.gmail.com>
+ <CAK8P3a22DKpqMGdjYoBzKfNHc2GvAbvaZowZpz=SFeQHVSWjsg@mail.gmail.com>
+Message-ID: <CAMpxmJUovyhsiHByA3MZX5H6AcU4k9shX45Z60NpDkOFTxg_eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-On 27/04/18 16:58, Suzuki K Poulose wrote:
-> On 27/04/18 16:22, Suzuki K Poulose wrote:
->> On 26/04/18 14:35, Julien Grall wrote:
->>> Hi Suzuki,
+2018-04-27 16:48 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> On Fri, Apr 27, 2018 at 4:05 PM, Bartosz Golaszewski
+> <bgolaszewski@baylibre.com> wrote:
+>> 2018-04-27 14:40 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>
+>>> For timer-ti-dm, it seems like a leftover from old times that can
+>>> be removed. The other four are shared between arch/sh and
+>>> arch/arm/mach-shmobile and already have some #ifdef
+>>> to handle those two cases.
 >>>
->>> On 27/03/18 14:15, Suzuki K Poulose wrote:
->>>> Right now the stage2 page table for a VM is hard coded, assuming
->>>> an IPA of 40bits. As we are about to add support for per VM IPA,
->>>> prepare the stage2 page table helpers to accept the kvm instance
->>>> to make the right decision for the VM. No functional changes.
 >>
->>
->>>> diff --git a/arch/arm/include/asm/kvm_arm.h 
->>>> b/arch/arm/include/asm/kvm_arm.h
->>>> index 3ab8b37..c3f1f9b 100644
->>>> --- a/arch/arm/include/asm/kvm_arm.h
->>>> +++ b/arch/arm/include/asm/kvm_arm.h
->>>> @@ -133,8 +133,7 @@
->>>> ?? * space.
->>>> ?? */
->>>> ? #define KVM_PHYS_SHIFT??? (40)
->>>> -#define KVM_PHYS_SIZE??? (_AC(1, ULL) << KVM_PHYS_SHIFT)
->>>> -#define KVM_PHYS_MASK??? (KVM_PHYS_SIZE - _AC(1, ULL))
+>> I'm also seeing that we also call early_platform_cleanup() from
+>> platform_bus_init(). Any ideas for this one?
+>
+> My first idea would be to call it immediately after registering all
+> devices and drivers. It looks like it's only needed to make all
+> devm_ allocations persistent by removing them from the list,
+> so we have to call early_platform_cleanup() before getting
+> to the real platform code, but it could be done much earlier
+> if we want to, at least after both setup_arch() and sh_late_time_init()
+> are complete.
+>
+>>> I'd rather keep those separate and would prefer not to have
+>>> that many different ways of getting there instead. DT and
+>>> board files can already share most of the code through the
+>>> use of platform_device, especially when you start using
+>>> device properties instead of platform_data, and the other
+>>> two are rare corner cases and ideally left that way.
 >>>
->>> I assume you are moving them to kvm_mmu.h in order to match the arm64 
->>> side, right? If so, would not it make sense to make KVM_PHYS_SHIFT 
->>> with it?
+>>> The early boot code is always special and instead of making
+>>> it easier to use, we should focus on using it as little as
+>>> possible: every line of code that we call before even
+>>> initializing timers and consoles means it gets harder to
+>>> debug when something goes wrong.
 >>>
->>> [...]
 >>
->> I am moving all the macros that depend on the "kvm" instance to 
->> kvm_mmu.h.
->> I will see if I can move the KVM_PHYS_SHIFT without much trouble.
-> 
-> It looks like we can't do that easily. KVM_PHYS_SHIFT is used for KVM_T0SZ
-> on arm, even though that can be simply hard coded to avoid the 
-> dependency on
-> KVM_PHYS_SHIFT (like we did for arm64, T0SZ is defined to 24). I would 
-> leave it
-> as it is to avoid the noise.
+>> I'm afraid I don't quite understand your reasoning. I fully agree that
+>> devices that need to be initialized that early are a rare corner case.
+>> We should limit any such uses to the absolute minimum. But when we do
+>> need to go this way, we should do it right. Having a unified mechanism
+>> for early devices will allow maintainers to enforce good practices
+>> (using resources for register mapping, devres, reusing driver code for
+>> reading/writing to registers). Having initialization code in machine
+>> code will make everybody use different APIs and duplicate solutions. I
+>> normally assume that code consolidation is always good.
+>>
+>> If we add a way for DT-based platform devices to be probed early - it
+>> would be based on platform device/driver structures anyway. Why would
+>> we even want to not convert the board code into a simple call to
+>> early_platform_device_register() if we'll already offer this API for
+>> device tree?
+>
+> I think we first need to define what we really want to achieve here.
+> It sounds like you still want to recreate a lot of what early_platform
+> devices do, but it seems more important to me to add the missing
+> functionality to the OF_DECLARE infrastructure. The most
+> important pieces that seem to be missing are solved by finding
+> a way to provide a platform_device pointer with the following
+> properties:
+>
+> - allow being passed into dev_print()
+> - allow using the pointer as a token for devres unwinding
+> - access to device_private data that remains persistent
+>   until real a platform_driver gets loaded
+>
+> That can probably be done as an extension to the current
+> infrastructure.
+>
+> However, I'd be very cautious about the resource portion:
+> filling the platform resources (registers, irqs, ...) the way
+> we do for regular devices is much harder and can introduce
+> additional (or circular) dependencies on other devices.
+> OTOH, not using those resources means you have a hard
+> time passing information from board files.
+>
+>           Arnd
 
-Fine. That was only a suggestion :).
+So speaking in pseudo-C we basically have two ways for an imaginary
+future timer driver:
 
-Cheers,
+int foo_probe(struct platform_device *pdev)
+{
+    struct clk *clk;
 
--- 
-Julien Grall
+    if (probing_early(pdev)) {
+        clk = devm_clk_get(dev, "earlyclock");
+
+       /* Do early stuff. */
+        return 0;
+    }
+
+    /* Do late stuff. */
+
+    return 0;
+}
+
+    --- vs ---
+
+int foo_probe(struct platform_device *pdev)
+{
+    /* Do late stuff. */
+
+    return 0;
+}
+
+static int foo_init(struct device_node *np)
+{
+    struct clk *clk;
+    struct device *dev = device_from_device_node(np);
+
+    /* Do early stuff. */
+    clk = devm_clk_get(dev, "earlyclock");
+
+    return 0;
+}
+
+TIMER_OF_DECLARE(foo, "bar,foo", foo_init);
+
+I still believe the first approach is easier to implement and has the
+added benefit of supporting board files.
+
+I'll give it a thought and will be back at it next week.
+
+Best regards,
+Bartosz Golaszewski
