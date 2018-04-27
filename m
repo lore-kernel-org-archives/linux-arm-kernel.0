@@ -1,189 +1,157 @@
-From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Fri, 27 Apr 2018 11:23:54 +0200
-Subject: [v3 02/10] drm/mediatek: Use regmap for register access
-In-Reply-To: <cover.1524820923.git.mbrugger@suse.com>
-References: <cover.1524820923.git.mbrugger@suse.com>
-Message-ID: <7e20139c8dcc9fe80aa9e401c7bd84a3b9464ff2.1524820923.git.mbrugger@suse.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 27 Apr 2018 17:23:46 +0800
+Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: h6: add device tree
+ nodes for MMC controllers
+In-Reply-To: <0ae1b6ce-c1cf-61e8-e09b-abec47b089b2@arm.com>
+References: <20180426140728.43155-1-icenowy@aosc.io>
+ <20180426140728.43155-3-icenowy@aosc.io>
+ <9571735d-929f-a2ef-ed97-dc9193420b73@arm.com>
+ <77DF7884-8DA8-4ED5-BB51-941CFDE4A123@aosc.io>
+ <0ae1b6ce-c1cf-61e8-e09b-abec47b089b2@arm.com>
+Message-ID: <6EBD7D16-E985-4345-B2C2-D0CE7B32F8C5@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Brugger <mbrugger@suse.com>
 
-The mmsys memory space is shared between the drm and the
-clk driver. Use regmap to access it.
 
-Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c |  4 ++--
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c  | 38 +++++++++++++--------------------
- drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |  4 ++--
- drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 13 ++++-------
- drivers/gpu/drm/mediatek/mtk_drm_drv.h  |  2 +-
- 5 files changed, 24 insertions(+), 37 deletions(-)
+? 2018?4?27? GMT+08:00 ??5:18:23, Andre Przywara <andre.przywara@arm.com> ??:
+>Hi,
+>
+>On 27/04/18 09:36, Icenowy Zheng wrote:
+>> 
+>> 
+>> ? 2018?4?27? GMT+08:00 ??12:45:38, Andre Przywara
+><andre.przywara@arm.com> ??:
+>>> Hi,
+>>>
+>>> On 26/04/18 15:07, Icenowy Zheng wrote:
+>>>> The Allwinner H6 SoC have 3 MMC controllers.
+>>>>
+>>>> Add device tree nodes for them.
+>>>>
+>>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>>> ---
+>>>>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 56
+>>> ++++++++++++++++++++++++++++
+>>>>  1 file changed, 56 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>>> b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>>>> index 4debc3962830..3cbfc035c979 100644
+>>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>>>> @@ -124,12 +124,68 @@
+>>>>  			interrupt-controller;
+>>>>  			#interrupt-cells = <3>;
+>>>>  
+>>>> +			mmc0_pins: mmc0-pins {
+>>>> +				pins = "PF0", "PF1", "PF2", "PF3",
+>>>> +				       "PF4", "PF5";
+>>>> +				function = "mmc0";
+>>>> +				drive-strength = <30>;
+>>>> +				bias-pull-up;
+>>>> +			};
+>>>> +
+>>>> +			mmc2_pins: mmc2-pins {
+>>>> +				pins = "PC1", "PC4", "PC5", "PC6",
+>>>> +				       "PC7", "PC8", "PC9", "PC10",
+>>>> +				       "PC11", "PC12", "PC13", "PC14";
+>>>> +				function = "mmc2";
+>>>> +				drive-strength = <30>;
+>>>> +				bias-pull-up;
+>>>> +			};
+>>>> +
+>>>>  			uart0_ph_pins: uart0-ph {
+>>>>  				pins = "PH0", "PH1";
+>>>>  				function = "uart0";
+>>>>  			};
+>>>>  		};
+>>>>  
+>>>> +		mmc0: mmc at 4020000 {
+>>>> +			compatible = "allwinner,sun50i-h6-mmc";
+>>>
+>>> This should be:
+>>> 			compatible = "allwinner,sun50i-h6-mmc",
+>>> 				     "allwinner,sun50i-a64-mmc";
+>> 
+>> I'm intended to not add A64 compatible, as
+>> H6 is a quite new design
+>> (new process) and there might be different behavior, even on mmc0/1.
+>
+>But as your patch proves, it is fully backwards compatible: An A64
+>driver works with this device.
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index 658b8dd45b83..4c65873b4867 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -33,7 +33,7 @@
-  * @enabled: records whether crtc_enable succeeded
-  * @planes: array of 4 drm_plane structures, one for each overlay plane
-  * @pending_planes: whether any plane has pending changes to be applied
-- * @config_regs: memory mapped mmsys configuration register space
-+ * @config_regs: regmap mapped mmsys configuration register space
-  * @mutex: handle to one of the ten disp_mutex streams
-  * @ddp_comp_nr: number of components in ddp_comp
-  * @ddp_comp: array of pointers the mtk_ddp_comp structures used by this crtc
-@@ -48,7 +48,7 @@ struct mtk_drm_crtc {
- 	struct drm_plane		planes[OVL_LAYER_NR];
- 	bool				pending_planes;
- 
--	void __iomem			*config_regs;
-+	struct regmap			*config_regs;
- 	struct mtk_disp_mutex		*mutex;
- 	unsigned int			ddp_comp_nr;
- 	struct mtk_ddp_comp		**ddp_comp;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 8130f3dab661..bafc5c77c4fb 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -185,53 +185,45 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
- 	return value;
- }
- 
--static void mtk_ddp_sout_sel(void __iomem *config_regs,
-+static void mtk_ddp_sout_sel(struct regmap *config_regs,
- 			     enum mtk_ddp_comp_id cur,
- 			     enum mtk_ddp_comp_id next)
- {
- 	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
--		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
--			       config_regs + DISP_REG_CONFIG_OUT_SEL);
-+		regmap_write(config_regs, DISP_REG_CONFIG_OUT_SEL,
-+				BLS_TO_DSI_RDMA1_TO_DPI1);
- }
- 
--void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
-+void mtk_ddp_add_comp_to_path(struct regmap *config_regs,
- 			      enum mtk_ddp_comp_id cur,
- 			      enum mtk_ddp_comp_id next)
- {
--	unsigned int addr, value, reg;
-+	unsigned int addr, value;
- 
- 	value = mtk_ddp_mout_en(cur, next, &addr);
--	if (value) {
--		reg = readl_relaxed(config_regs + addr) | value;
--		writel_relaxed(reg, config_regs + addr);
--	}
-+	if (value)
-+		regmap_update_bits(config_regs, addr, value, value);
- 
- 	mtk_ddp_sout_sel(config_regs, cur, next);
- 
- 	value = mtk_ddp_sel_in(cur, next, &addr);
--	if (value) {
--		reg = readl_relaxed(config_regs + addr) | value;
--		writel_relaxed(reg, config_regs + addr);
--	}
-+	if (value)
-+		regmap_update_bits(config_regs, addr, value, value);
- }
- 
--void mtk_ddp_remove_comp_from_path(void __iomem *config_regs,
-+void mtk_ddp_remove_comp_from_path(struct regmap *config_regs,
- 				   enum mtk_ddp_comp_id cur,
- 				   enum mtk_ddp_comp_id next)
- {
--	unsigned int addr, value, reg;
-+	unsigned int addr, value;
- 
- 	value = mtk_ddp_mout_en(cur, next, &addr);
--	if (value) {
--		reg = readl_relaxed(config_regs + addr) & ~value;
--		writel_relaxed(reg, config_regs + addr);
--	}
-+	if (value)
-+		regmap_update_bits(config_regs, addr, value, 0);
- 
- 	value = mtk_ddp_sel_in(cur, next, &addr);
--	if (value) {
--		reg = readl_relaxed(config_regs + addr) & ~value;
--		writel_relaxed(reg, config_regs + addr);
--	}
-+	if (value)
-+		regmap_update_bits(config_regs, addr, value, 0);
- }
- 
- struct mtk_disp_mutex *mtk_disp_mutex_get(struct device *dev, unsigned int id)
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-index f9a799168077..32e12f33b76a 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-@@ -20,10 +20,10 @@ struct regmap;
- struct device;
- struct mtk_disp_mutex;
- 
--void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
-+void mtk_ddp_add_comp_to_path(struct regmap *config_regs,
- 			      enum mtk_ddp_comp_id cur,
- 			      enum mtk_ddp_comp_id next);
--void mtk_ddp_remove_comp_from_path(void __iomem *config_regs,
-+void mtk_ddp_remove_comp_from_path(struct regmap *config_regs,
- 				   enum mtk_ddp_comp_id cur,
- 				   enum mtk_ddp_comp_id next);
- 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index a2ca90fc403c..a48e28adad09 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -21,6 +21,7 @@
- #include <drm/drm_of.h>
- #include <linux/component.h>
- #include <linux/iommu.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/pm_runtime.h>
-@@ -385,7 +386,6 @@ static int mtk_drm_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct mtk_drm_private *private;
--	struct resource *mem;
- 	struct device_node *node;
- 	struct component_match *match = NULL;
- 	int ret;
-@@ -399,14 +399,9 @@ static int mtk_drm_probe(struct platform_device *pdev)
- 	INIT_WORK(&private->commit.work, mtk_atomic_work);
- 	private->data = of_device_get_match_data(dev);
- 
--	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	private->config_regs = devm_ioremap_resource(dev, mem);
--	if (IS_ERR(private->config_regs)) {
--		ret = PTR_ERR(private->config_regs);
--		dev_err(dev, "Failed to ioremap mmsys-config resource: %d\n",
--			ret);
--		return ret;
--	}
-+	private->config_regs = syscon_node_to_regmap(dev->of_node);
-+	if (IS_ERR(private->config_regs))
-+		return PTR_ERR(private->config_regs);
- 
- 	/* Iterate over sibling DISP function blocks */
- 	for_each_child_of_node(dev->of_node->parent, node) {
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-index c3378c452c0a..c6fa0ad458e8 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-@@ -44,7 +44,7 @@ struct mtk_drm_private {
- 
- 	struct device_node *mutex_node;
- 	struct device *mutex_dev;
--	void __iomem *config_regs;
-+	struct regmap *config_regs;
- 	struct device_node *comp_node[DDP_COMPONENT_ID_MAX];
- 	struct mtk_ddp_comp *ddp_comp[DDP_COMPONENT_ID_MAX];
- 	const struct mtk_mmsys_driver_data *data;
--- 
-2.16.3
+No, my patch only proves "the current A64 driver works
+with this device", not "Any A64 driver works with device", as
+the current driver doesn't fully use the capability provided
+by A64 MMC cobtrollers.
+
+>And this is what this compatible string list says: If your system does
+>not have a specific H6 driver, you can use an A64 driver.
+>You might not get all the (potentially) new features, but it covers
+>everything the A64 has.
+>
+>And a new silicon process doesn't matter here, since the software
+>interface is unchanged. *If* we find bugs, we can add quirks matching
+
+I think there's timing parameters for higher speed bins which
+are different among chips. As we have currently no support
+for speed bins higher than DDR50, they're not added yet.
+
+>on
+>the H6 compatible string - that's why we put it here already, despite
+>having a matching string in the kernel at the moment.
+
+Device tree is not driver data but hardware description, so
+it should follow "how the device is formed" rather than
+"how the device works".
+
+>
+>>>> +			reg = <0x04020000 0x1000>;
+>>>> +			clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
+>>>> +			clock-names = "ahb", "mmc";
+>>>> +			resets = <&ccu RST_BUS_MMC0>;
+>>>> +			reset-names = "ahb";
+>>>> +			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+>>>> +			status = "disabled";
+>>>> +			#address-cells = <1>;
+>>>> +			#size-cells = <0>;
+>>>> +		};
+>>>> +
+>>>> +		mmc1: mmc at 4021000 {
+>>>> +			compatible = "allwinner,sun50i-h6-mmc";
+>>>
+>>> same here
+>>>
+>>>> +			reg = <0x04021000 0x1000>;
+>>>> +			clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
+>>>> +			clock-names = "ahb", "mmc";
+>>>> +			resets = <&ccu RST_BUS_MMC1>;
+>>>> +			reset-names = "ahb";
+>>>> +			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+>>>> +			status = "disabled";
+>>>> +			#address-cells = <1>;
+>>>> +			#size-cells = <0>;
+>>>> +		};
+>>>> +
+>>>> +		mmc2: mmc at 4022000 {
+>>>> +			compatible = "allwinner,sun50i-h6-emmc";
+>>>
+>>> and here:
+>>> 			compatible = "allwinner,sun50i-h6-emmc",
+>>> 				     "allwinner,sun50i-a64-emmc";
+>> 
+>> MMC2 on H6 has EMCE capability, so surely there should
+>> only be H6 compatible, and no A64 one.
+>
+>Same as above, the A64 eMMC is a subset of the H6 eMMC, so the A64 eMMC
+>driver can drive the H6 as well. And again your code proves that,
+>because it behaves exactly the same as for the A64.
+>In case we ever get support for the EMCE, we add the new compatible
+>string to the driver and tie it to the new feature. So newer kernels
+>can
+>use this feature, older kernel will just not, but can happily use the
+>eMMC anyway.
+>
+>Cheers,
+>Andre.
