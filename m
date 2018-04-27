@@ -1,26 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Apr 2018 11:27:05 +0100
-Subject: [PATCH v8 0/4] Fix issues with huge mapping in ioremap for ARM64
-In-Reply-To: <b2ea9760-cad4-8f30-98ac-86a04c4d42a4@codeaurora.org>
-References: <1522742446-5084-1-git-send-email-cpandya@codeaurora.org>
- <b2ea9760-cad4-8f30-98ac-86a04c4d42a4@codeaurora.org>
-Message-ID: <20180427102705.giwkzgqp43qiptws@armageddon.cambridge.arm.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Fri, 27 Apr 2018 15:57:00 +0530
+Subject: [PATCH 0/6 v3] Support for fsl-mc bus and its devices in SMMU
+Message-ID: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 03:55:08PM +0530, Chintan Pandya wrote:
-> Ping...
-> 
-> On 4/3/2018 1:30 PM, Chintan Pandya wrote:
-> > This series of patches are follow up work (and depends on)
-> > Toshi Kani <toshi.kani@hpe.com>'s patches "fix memory leak/
-> > panic in ioremap huge pages".
+This patchset defines IOMMU DT binding for fsl-mc bus and adds
+support in SMMU for fsl-mc bus.
 
-First of all, you'd need to post patches against the latest mainline
-(4.17-rcX).
+This patch series is dependent on patset:
+https://patchwork.kernel.org/patch/10317337/
 
-Second, since they depend on another series, we'd have to wait for the
-comments on that series to settle.
+These patches
+  - Define property 'iommu-map' for fsl-mc bus (patch 1)
+  - Integrates the fsl-mc bus with the SMMU using this
+    IOMMU binding (patch 2,3,4)
+  - Adds the dma configuration support for fsl-mc bus (patch 5)
+  - Updates the fsl-mc device node with iommu/dma related changes (patch6)
+
+Changes in v2:
+  - use iommu-map property for fsl-mc bus
+  - rebase over patchset https://patchwork.kernel.org/patch/10317337/
+    and make corresponding changes for dma configuration of devices on
+    fsl-mc bus
+
+Changes in v3:
+  - move of_map_rid in drivers/of/address.c
+
+Nipun Gupta (6):
+  Docs: dt: add fsl-mc iommu-map device-tree binding
+  iommu: of: make of_pci_map_rid() available for other devices too
+  iommu: support iommu configuration for fsl-mc devices
+  iommu: arm-smmu: Add support for the fsl-mc bus
+  bus: fsl-mc: supoprt dma configure for devices on fsl-mc bus
+  arm64: dts: ls208xa: comply with the iommu map binding for fsl_mc
+
+ .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |  39 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |   6 +-
+ drivers/bus/fsl-mc/fsl-mc-bus.c                    |  16 +++-
+ drivers/iommu/arm-smmu.c                           |   7 ++
+ drivers/iommu/iommu.c                              |  21 +++++
+ drivers/iommu/of_iommu.c                           |  26 +++++-
+ drivers/of/address.c                               | 102 +++++++++++++++++++++
+ drivers/of/irq.c                                   |   7 +-
+ drivers/pci/of.c                                   | 101 --------------------
+ include/linux/fsl/mc.h                             |   8 ++
+ include/linux/iommu.h                              |   2 +
+ include/linux/of_address.h                         |  11 +++
+ include/linux/of_pci.h                             |  10 --
+ 13 files changed, 234 insertions(+), 122 deletions(-)
 
 -- 
-Catalin
+1.9.1
