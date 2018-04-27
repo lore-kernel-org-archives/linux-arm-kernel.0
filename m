@@ -1,91 +1,130 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 27 Apr 2018 13:59:39 +0530
-Subject: [PATCH RFC PoC 0/2] platform: different approach to early
- platform drivers
-In-Reply-To: <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
- <20180426173151.GJ3094@brightrain.aerifal.cx>
- <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
- <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
-Message-ID: <6194511c-b649-8c02-7db0-3514bfb292f5@ti.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 27 Apr 2018 16:36:26 +0800
+Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: h6: add device tree
+ nodes for MMC controllers
+In-Reply-To: <9571735d-929f-a2ef-ed97-dc9193420b73@arm.com>
+References: <20180426140728.43155-1-icenowy@aosc.io>
+ <20180426140728.43155-3-icenowy@aosc.io>
+ <9571735d-929f-a2ef-ed97-dc9193420b73@arm.com>
+Message-ID: <77DF7884-8DA8-4ED5-BB51-941CFDE4A123@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
 
-On Friday 27 April 2018 01:22 PM, Arnd Bergmann wrote:
-> On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
->> On 04/26/2018 12:31 PM, Rich Felker wrote:
->>>
->>> On Thu, Apr 26, 2018 at 05:29:18PM +0200, Bartosz Golaszewski wrote:
->>>>
->>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>
->>>> This is a follow to my series[1] the aim of which was to introduce device
->>>> tree
->>>> support for early platform devices.
->>>>
->>>> It was received rather negatively. Aside from using device tree to pass
->>>> implementation specific details to the system, two important concerns
->>>> were
->>>> raised: no probe deferral support and the fact that currently the early
->>>> devices
->>>> never get converted to actual platform drivers. This series is a
->>>> proof-of-concept that's trying to address those issues.
->>>>
->>>> The only user of the current version of early platform drivers is the
->>>> SuperH
->>>> architecture. If this series eventually gets merged, we could simply
->>>> replace
->>>> the other solution.
->>>
->>>
->>> Looking at a quick output of:
->>>
->>>         grep -r -A10 early_devices[[] arch/sh/kernel/
->>>
->>> it looks like all of the existing early platform devices are serial
->>> ports, clocks, and clocksources. The switch to device tree should pick
->>> them all up from CLK_OF_DECLARE, TIMER_OF_DECLARE, and
->>> EARLYCON_DECLARE. Until that's complete, the existing code works
->>> as-is. I don't see what problem you're trying to solve.
->>
->>
->> The problem for us is that clk maintainers don't want new drivers to use
->> CLK_OF_DECLARE and instead use platform devices. I have just written such
->> a new driver that is shared by 6 different SoCs. For some combinations of
->> SoCs and clocks, using a platform device is fine but on others we need to
->> register early, so the drivers now have to handle both cases, which is
->> kind of messy and fragile. If there is a generic way to register platform
->> devices early, then the code is simplified because we only have to handle
->> one method of registering the clocks instead of two.
-> 
-> The early_platform code is certainly not a way to make things simpler,
-> it just adds one more way of doing the same thing that OF_CLK_DECLARE
-> already does. We removed the last early_platform users on ARM a few
-> years ago, and I would hope to leave it like that.
-> 
-> I haven't seen the discussion about your clock drivers, but I know that
-> usually only a very small subset of the clocks on an SoC are needed
-> that 'early', and you should use a regular platform driver for the rest.
 
-Its true that the subset is small, but they are either PLL bypass clocks
-or clocks derived out of the main clock gate controller on the Soc
-(DaVinci PSC). So we need some non-platform-device based initialization
-support in the two main clock drivers used on mach-davinci anyway.
+? 2018?4?27? GMT+08:00 ??12:45:38, Andre Przywara <andre.przywara@arm.com> ??:
+>Hi,
+>
+>On 26/04/18 15:07, Icenowy Zheng wrote:
+>> The Allwinner H6 SoC have 3 MMC controllers.
+>> 
+>> Add device tree nodes for them.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 56
+>++++++++++++++++++++++++++++
+>>  1 file changed, 56 insertions(+)
+>> 
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>> index 4debc3962830..3cbfc035c979 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>> @@ -124,12 +124,68 @@
+>>  			interrupt-controller;
+>>  			#interrupt-cells = <3>;
+>>  
+>> +			mmc0_pins: mmc0-pins {
+>> +				pins = "PF0", "PF1", "PF2", "PF3",
+>> +				       "PF4", "PF5";
+>> +				function = "mmc0";
+>> +				drive-strength = <30>;
+>> +				bias-pull-up;
+>> +			};
+>> +
+>> +			mmc2_pins: mmc2-pins {
+>> +				pins = "PC1", "PC4", "PC5", "PC6",
+>> +				       "PC7", "PC8", "PC9", "PC10",
+>> +				       "PC11", "PC12", "PC13", "PC14";
+>> +				function = "mmc2";
+>> +				drive-strength = <30>;
+>> +				bias-pull-up;
+>> +			};
+>> +
+>>  			uart0_ph_pins: uart0-ph {
+>>  				pins = "PH0", "PH1";
+>>  				function = "uart0";
+>>  			};
+>>  		};
+>>  
+>> +		mmc0: mmc at 4020000 {
+>> +			compatible = "allwinner,sun50i-h6-mmc";
+>
+>This should be:
+>			compatible = "allwinner,sun50i-h6-mmc",
+>				     "allwinner,sun50i-a64-mmc";
 
-> Can you elaborate on which devices need to access your clocks before
-> you are able to initialize the clk driver through the regular platform_driver
-> framework? Do any of these need complex interactions with the clk
-> subsystem, or do you just need to ensure they are turned on?
+I'm intended to not add A64 compatible, as
+H6 is a quite new design
+(new process) and there might be different behavior, even on mmc0/1.
 
-Its just the timer IP. There is no complex interaction, just need to
-ensure that the clock is registered with the framework and also switched
-on when there is a gate clock.
+>
+>> +			reg = <0x04020000 0x1000>;
+>> +			clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
+>> +			clock-names = "ahb", "mmc";
+>> +			resets = <&ccu RST_BUS_MMC0>;
+>> +			reset-names = "ahb";
+>> +			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+>> +			status = "disabled";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +		};
+>> +
+>> +		mmc1: mmc at 4021000 {
+>> +			compatible = "allwinner,sun50i-h6-mmc";
+>
+>same here
+>
+>> +			reg = <0x04021000 0x1000>;
+>> +			clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
+>> +			clock-names = "ahb", "mmc";
+>> +			resets = <&ccu RST_BUS_MMC1>;
+>> +			reset-names = "ahb";
+>> +			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+>> +			status = "disabled";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +		};
+>> +
+>> +		mmc2: mmc at 4022000 {
+>> +			compatible = "allwinner,sun50i-h6-emmc";
+>
+>and here:
+>			compatible = "allwinner,sun50i-h6-emmc",
+>				     "allwinner,sun50i-a64-emmc";
 
-The latest attempt by David for this was posted last night here:
+MMC2 on H6 has EMCE capability, so surely there should
+only be H6 compatible, and no A64 one.
 
-https://lkml.org/lkml/2018/4/26/1093
-
-Thanks,
-Sekhar
+>
+>The rest looks correct to me.
+>
+>Cheers,
+>Andre.
+>
+>> +			reg = <0x04022000 0x1000>;
+>> +			clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
+>> +			clock-names = "ahb", "mmc";
+>> +			resets = <&ccu RST_BUS_MMC2>;
+>> +			reset-names = "ahb";
+>> +			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>> +			status = "disabled";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +		};
+>> +
+>>  		uart0: serial at 5000000 {
+>>  			compatible = "snps,dw-apb-uart";
+>>  			reg = <0x05000000 0x400>;
+>> 
