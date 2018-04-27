@@ -1,88 +1,61 @@
-From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
-Date: Fri, 27 Apr 2018 22:40:33 +0100
-Subject: [PATCH v2 11/11] arm64: dts: r8a77965-salvator-xs: Enable DU
- external clocks and HDMI
-In-Reply-To: <35470587.gVktJpfmq0@avalon>
-References: <20180427165722.19445-1-kieran.bingham+renesas@ideasonboard.com>
- <20180427165722.19445-12-kieran.bingham+renesas@ideasonboard.com>
- <35470587.gVktJpfmq0@avalon>
-Message-ID: <9566c920-daf7-e470-4552-309f6082524b@ideasonboard.com>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Fri, 27 Apr 2018 15:55:45 -0600
+Subject: [PATCH v2] init: Fix false positives in W+X checking
+Message-ID: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+load_module() creates W+X mappings via __vmalloc_node_range() (from
+layout_and_allocate()->move_module()->module_alloc()) by using
+PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
+"call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
 
-On 27/04/18 22:32, Laurent Pinchart wrote:
-> Hi Kieran,
-> 
-> Thank you for the patch.
-> 
-> On Friday, 27 April 2018 19:57:22 EEST Kieran Bingham wrote:
->> The DU1 external dot clock is provided by the fixed frequency clock
->> generator X21, while the DU0 and DU3 clocks are provided by the
->> programmable Versaclock6 clock generator.
->>
->> Enable the clocks, and the HDMI encoder for the M3-N Salvator-XS, and
->> hook it up to the HDMI connector
->>
->> Based on patches from Takeshi Kihara <takeshi.kihara.df@renesas.com>
->>
->> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
->> ---
->>  .../boot/dts/renesas/r8a77965-salvator-xs.dts | 29 +++++++++++++++++++
->>  1 file changed, 29 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
->> b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts index
->> a83a00deed9e..dcf1849f1a67 100644
->> --- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
->> +++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
->> @@ -19,3 +19,32 @@
->>  		reg = <0x0 0x48000000 0x0 0x78000000>;
->>  	};
->>  };
->> +
->> +&du {
->> +	clocks = <&cpg CPG_MOD 724>,
->> +		 <&cpg CPG_MOD 723>,
->> +		 <&cpg CPG_MOD 721>,
->> +		 <&cpg CPG_MOD 727>,
->> +		 <&versaclock6 1>,
->> +		 <&x21_clk>,
->> +		 <&versaclock6 2>;
->> +	clock-names = "du.0", "du.1", "du.3", "lvds.0",
->> +		      "dclkin.0", "dclkin.1", "dclkin.3";
-> 
-> You should remove the LVDS clock from here too.
+This is a problem because call_rcu_sched() queues work, which can be run
+after debug_checkwx() is run, resulting in a race condition.  If hit, the
+race results in a nasty splat about insecure W+X mappings, which results
+in a poor user experience as these are not the mappings that
+debug_checkwx() is intended to catch.
 
-Aha, I missed one - thanks.
+This issue is observed on multiple arm64 platforms, and has been
+artificially triggered on an x86 platform.
 
-> 
-> Apart from that,
-> 
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Address the race by flushing the queued work before running the
+arch-defined mark_rodata_ro() which then calls debug_checkwx().
 
-Collected. Thanks.
+Reported-by: Timur Tabi <timur@codeaurora.org>
+Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
+Fixes: e1a58320a38d ("x86/mm: Warn on W^X mappings")
+Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
+---
 
+v1:
+-was "arm64: mm: Fix false positives in W+X checking" (see [1])
+-moved to common code based on review and confirmation of issue on x86
 
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573776.html
 
-> 
->> +};
->> +
->> +&hdmi0 {
->> +	status = "okay";
->> +
->> +	ports {
->> +		port at 1 {
->> +			reg = <1>;
->> +			rcar_dw_hdmi0_out: endpoint {
->> +				remote-endpoint = <&hdmi0_con>;
->> +			};
->> +		};
->> +	};
->> +};
->> +
->> +&hdmi0_con {
->> +	remote-endpoint = <&rcar_dw_hdmi0_out>;
->> +};
-> 
+ init/main.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/init/main.c b/init/main.c
+index b795aa3..499d957 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -1034,6 +1034,13 @@ static int __init set_debug_rodata(char *str)
+ static void mark_readonly(void)
+ {
+ 	if (rodata_enabled) {
++		/*
++		 * load_module() results in W+X mappings, which are cleaned up
++		 * with call_rcu_sched().  Let's make sure that queued work is
++		 * flushed so that we don't hit false positives looking for
++		 * insecure pages which are W+X.
++		 */
++		rcu_barrier_sched();
+ 		mark_rodata_ro();
+ 		rodata_test();
+ 	} else
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
