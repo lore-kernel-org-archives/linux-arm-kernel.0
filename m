@@ -1,105 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Apr 2018 11:27:03 +0100
-Subject: [PATCHv3 07/11] arm64: add basic pointer authentication support
-In-Reply-To: <20180425112331.hke7afxnslyrwf3h@armageddon.cambridge.arm.com>
-References: <20180417183735.56985-1-mark.rutland@arm.com>
- <20180417183735.56985-8-mark.rutland@arm.com>
- <20180425112331.hke7afxnslyrwf3h@armageddon.cambridge.arm.com>
-Message-ID: <20180427102703.7azck754cnjm232p@lakrids.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Apr 2018 11:27:05 +0100
+Subject: [PATCH v8 0/4] Fix issues with huge mapping in ioremap for ARM64
+In-Reply-To: <b2ea9760-cad4-8f30-98ac-86a04c4d42a4@codeaurora.org>
+References: <1522742446-5084-1-git-send-email-cpandya@codeaurora.org>
+ <b2ea9760-cad4-8f30-98ac-86a04c4d42a4@codeaurora.org>
+Message-ID: <20180427102705.giwkzgqp43qiptws@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 12:23:32PM +0100, Catalin Marinas wrote:
-> Hi Mark,
+On Tue, Apr 17, 2018 at 03:55:08PM +0530, Chintan Pandya wrote:
+> Ping...
 > 
-> On Tue, Apr 17, 2018 at 07:37:31PM +0100, Mark Rutland wrote:
-> > diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> > index 39ec0b8a689e..caf0d3010112 100644
-> > --- a/arch/arm64/include/asm/mmu_context.h
-> > +++ b/arch/arm64/include/asm/mmu_context.h
-> > @@ -29,7 +29,6 @@
-> >  #include <asm/cacheflush.h>
-> >  #include <asm/cpufeature.h>
-> >  #include <asm/proc-fns.h>
-> > -#include <asm-generic/mm_hooks.h>
-> >  #include <asm/cputype.h>
-> >  #include <asm/pgtable.h>
-> >  #include <asm/sysreg.h>
-> > @@ -168,7 +167,14 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
-> >  #define destroy_context(mm)		do { } while(0)
-> >  void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
-> >  
-> > -#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
-> > +static inline int init_new_context(struct task_struct *tsk,
-> > +			struct mm_struct *mm)
-> > +{
-> > +	atomic64_set(&mm->context.id, 0);
-> > +	mm_ctx_ptrauth_init(&mm->context);
-> > +
-> > +	return 0;
-> > +}
-> >  
-> >  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
-> >  static inline void update_saved_ttbr0(struct task_struct *tsk,
-> > @@ -216,6 +222,8 @@ static inline void __switch_mm(struct mm_struct *next)
-> >  		return;
-> >  	}
-> >  
-> > +	mm_ctx_ptrauth_switch(&next->context);
-> > +
-> >  	check_and_switch_context(next, cpu);
-> >  }
-> >  
-> > @@ -241,6 +249,19 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
-> >  void verify_cpu_asid_bits(void);
-> >  void post_ttbr_update_workaround(void);
-> >  
-> > +static inline void arch_dup_mmap(struct mm_struct *oldmm,
-> > +				 struct mm_struct *mm)
-> > +{
-> > +	mm_ctx_ptrauth_dup(&oldmm->context, &mm->context);
-> > +}
-> > +#define arch_dup_mmap arch_dup_mmap
-> 
-> IIUC, we could skip the arch_dup_mmap() and init_new_context() here for
-> the fork() case since the ptrauth_keys would be copied as part of the
-> dup_mm().
+> On 4/3/2018 1:30 PM, Chintan Pandya wrote:
+> > This series of patches are follow up work (and depends on)
+> > Toshi Kani <toshi.kani@hpe.com>'s patches "fix memory leak/
+> > panic in ioremap huge pages".
 
-If we can hook into the exec*() path to init the keys, then I agree we
-can do this...
+First of all, you'd need to post patches against the latest mainline
+(4.17-rcX).
 
-> There is another situation where init_new_context() is called
-> bprm_mm_init() -> mm_alloc() -> mm_init() -> init_new_context().
-> However, in this case the core code also calls arch_bprm_mm_init(). So I
-> think we only need to update the latter to get a new random key.
+Second, since they depend on another series, we'd have to wait for the
+comments on that series to settle.
 
-... and this seems to be the right place to do it, so I'll have a go.
-
-> > diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-> > new file mode 100644
-> > index 000000000000..a2e8fb91fdee
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/pointer_auth.h
-> > @@ -0,0 +1,89 @@
-> > +/*
-> > + * Copyright (C) 2016 ARM Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> 
-> Nitpick: 2018. You could also use the SPDX header, save some lines.
-
-Sure, I'll replace this with a SPDX GPL-2.0 line.
-
-Thanks,
-Mark.
+-- 
+Catalin
