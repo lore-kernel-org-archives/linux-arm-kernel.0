@@ -1,108 +1,121 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 27 Apr 2018 09:11:10 +0200
-Subject: [PATCH 00/24] device link, bridge supplier <-> drm device
-In-Reply-To: <20180426223139.16740-1-peda@axentia.se>
-References: <CGME20180426223215epcas2p38fe3b0b7b1ea1c8190805f9e2a89e11e@epcas2p3.samsung.com>
- <20180426223139.16740-1-peda@axentia.se>
-Message-ID: <25d8e621-b3f8-094f-32a2-d22efc2163a4@samsung.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 27 Apr 2018 15:12:42 +0800
+Subject: [linux-sunxi] [PATCH 3/3] arm64: allwinner: h6: enable MMC0/2 on
+ Pine H64
+In-Reply-To: <03cc2e8c-4a35-3fb4-b408-fd8d4ba3e407@arm.com>
+References: <20180426140728.43155-1-icenowy@aosc.io>
+ <20180426140728.43155-4-icenowy@aosc.io>
+ <03cc2e8c-4a35-3fb4-b408-fd8d4ba3e407@arm.com>
+Message-ID: <83EDF187-5EB2-4FEB-99BC-9D5B728D3A45@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On 27.04.2018 00:31, Peter Rosin wrote:
-> Hi!
->
-> It was noted by Russel King [1] that bridges (not using components)
-> might disappear unexpectedly if the owner of the bridge was unbound.
-> Jyri Sarha had previously noted the same thing with panels [2]. Jyri
-> came up with using device links to resolve the panel issue, which
-> was also my (independent) reaction to the note from Russel.
->
-> This series builds up to the addition of that link in the last
-> patch, but in my opinion the other 23 patches do have merit on their
-> own.
->
-> The last patch needs testing, while the others look trivial. That
-> said, I might have missed some subtlety.
-
-of_node is used as an identifier of the bridge in the kernel. If you
-replace it with device pointer there will be potential problem with
-devices having two or more bridges, how do you differentiate bridges if
-the owner is the same? If I remember correctly current bridge code does
-not allow to have multiple bridges in one device, but that should be
-quite easy to fix if necessary. After this change it will become more
-difficult.
-
-Anyway I remember discussion that in DT world bridge should be
-identified rather by of_graph port node, not by parent node as it is
-now. If you want to translate this relation to device owner, you should
-add also port number to have full identification of the bridge, ie pair
-(owner, port_number) would be equivalent of port node.
-
-Regards
-Andrzej
 
 
+? 2018?4?27? GMT+08:00 ??12:46:26, Andre Przywara <andre.przywara@arm.com> ??:
+>Hi,
 >
-> Cheers,
-> Peter
+>On 26/04/18 15:07, Icenowy Zheng wrote:
+>> The Pine H64 board have a MicroSD slot connected to MMC0 controller
+>of
+>> the H6 SoC and a eMMC slot connected to MMC2.
+>> 
+>> Enable them in the device tree.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>>  .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 32
+>++++++++++++++++++++++
+>>  1 file changed, 32 insertions(+)
+>> 
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+>b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+>> index d36de5eb81f3..78b1cd54687c 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+>> @@ -20,6 +20,38 @@
+>>  	chosen {
+>>  		stdout-path = "serial0:115200n8";
+>>  	};
+>> +
+>> +	reg_vcc3v3: vcc3v3 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc3v3";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +	};
+>> +
+>> +	reg_vcc1v8: vcc1v8 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc1v8";
+>> +		regulator-min-microvolt = <1800000>;
+>> +		regulator-max-microvolt = <1800000>;
+>> +	};
+>> +};
+>> +
+>> +&mmc0 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&mmc0_pins>;
+>> +	vmmc-supply = <&reg_vcc3v3>;
 >
-> [1] https://lkml.org/lkml/2018/4/23/769
-> [2] https://www.spinics.net/lists/dri-devel/msg174275.html
+>So this is actually CLDO1 on the AXP, correct?
+
+I remember it's coupled between two LDOs, to provide enough power.
+
 >
-> Peter Rosin (24):
->   drm/bridge: allow optionally specifying an .owner device
->   drm/bridge: adv7511: provide an .owner device
->   drm/bridge/analogix: core: specify the .owner of the bridge
->   drm/bridge: analogix-anx78xx: provide an .owner device
->   drm/bridge: vga-dac: provide an .owner device
->   drm/bridge: lvds-encoder: provide an .owner device
->   drm/bridge: megachips-stdpxxxx-ge-b850v3-fw: provide an .owner device
->   drm/bridge: nxp-ptn3460: provide an .owner device
->   drm/bridge: panel: provide an .owner device
->   drm/bridge: ps8622: provide an .owner device
->   drm/bridge: sii902x: provide an .owner device
->   drm/bridge: sii9234: provide an .owner device
->   drm/bridge: sii8620: provide an .owner device
->   drm/bridge: synopsys: provide an .owner device for the bridges
->   drm/bridge: tc358767: provide an .owner device
->   drm/bridge: ti-tfp410: provide an .owner device
->   drm/exynos: mic: provide an .owner device for the bridge
->   drm/mediatek: hdmi: provide an .owner device for the bridge
->   drm/msm: specify the .owner of the bridges
->   drm/rcar-du: lvds: provide an .owner device for the bridge
->   drm/sti: provide an .owner device for the bridges
->   drm/bridge: remove the .of_node member
->   drm/bridge: require the .owner to be filled in on drm_bridge_attach
->   drm/bridge: establish a link between the bridge supplier and consumer
 >
->  drivers/gpu/drm/bridge/adv7511/adv7511_drv.c       |  2 +-
->  drivers/gpu/drm/bridge/analogix-anx78xx.c          |  5 +----
->  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  1 +
->  drivers/gpu/drm/bridge/dumb-vga-dac.c              |  2 +-
->  drivers/gpu/drm/bridge/lvds-encoder.c              |  2 +-
->  .../drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c   |  2 +-
->  drivers/gpu/drm/bridge/nxp-ptn3460.c               |  2 +-
->  drivers/gpu/drm/bridge/panel.c                     |  4 +---
->  drivers/gpu/drm/bridge/parade-ps8622.c             |  2 +-
->  drivers/gpu/drm/bridge/sii902x.c                   |  2 +-
->  drivers/gpu/drm/bridge/sii9234.c                   |  2 +-
->  drivers/gpu/drm/bridge/sil-sii8620.c               |  2 +-
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |  4 +---
->  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c      |  4 +---
->  drivers/gpu/drm/bridge/tc358767.c                  |  2 +-
->  drivers/gpu/drm/bridge/ti-tfp410.c                 |  2 +-
->  drivers/gpu/drm/drm_bridge.c                       | 23 +++++++++++++++++++++-
->  drivers/gpu/drm/exynos/exynos_drm_mic.c            |  2 +-
->  drivers/gpu/drm/mediatek/mtk_hdmi.c                |  2 +-
->  drivers/gpu/drm/msm/dsi/dsi_manager.c              |  1 +
->  drivers/gpu/drm/msm/edp/edp_bridge.c               |  1 +
->  drivers/gpu/drm/msm/hdmi/hdmi_bridge.c             |  1 +
->  drivers/gpu/drm/rcar-du/rcar_lvds.c                |  2 +-
->  drivers/gpu/drm/sti/sti_dvo.c                      |  2 +-
->  drivers/gpu/drm/sti/sti_hda.c                      |  1 +
->  drivers/gpu/drm/sti/sti_hdmi.c                     |  1 +
->  include/drm/drm_bridge.h                           |  8 ++++----
->  27 files changed, 51 insertions(+), 33 deletions(-)
+>> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&mmc2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&mmc2_pins>;
+>> +	vmmc-supply = <&reg_vcc3v3>;
+>> +	vqmmc-supply = <&reg_vcc1v8>;
 >
+>And this is BLDO2?
+
+Yes.
+
+>
+>I am just asking because I want to avoid running into the same problem
+>as with the A64 before: that future DTs become incompatible with older
+>kernels, because we change the power supply to point to the AXP
+>regulators, which this kernel does not support yet.
+
+The answer is just not to keep this compatibility, as it's not
+supported option to update DT without updating kernel.
+
+P.S. I think the DT will update twice on the kernel side, the
+first time keep reg_vcc3v3 (as it's coupled) but use real
+regulator for reg_vcc1v8, the second time use the real
+coupled regulator for reg_vcc3v3.
+
+>
+>It looks like there are more users of those power rails, so we could
+>keep those supplies connected to these fixed regulators here, even with
+>AXP-805 support in the kernel.
+
+It's not a good choice.
+
+>
+>Or we keep this back until we get proper AXP support in the kernel? I
+>guess it's quite close to the existing PMICs, so it might be more a
+>copy&paste exercise to support the AXP-805?
+
+It's not a reason to keep it back.
+
+>
+>But apart from this this looks correct to me.
+>
+>Cheers,
+>Andre.
+>
+>> +	non-removable;
+>> +	cap-mmc-hw-reset;
+>> +	status = "okay";
+>>  };
+>>  
+>>  &uart0 {
+>> 
