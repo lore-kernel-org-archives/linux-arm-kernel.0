@@ -1,131 +1,65 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 27 Apr 2018 11:20:44 -0500
-Subject: [PATCH v8 05/13] ACPI/PPTT: Add Processor Properties Topology
- Table parsing
-In-Reply-To: <CAJZ5v0jjPnyC0vm-Fb8y2hw1B9Uc2J5sZrtZYzt_ENT2Sini3A@mail.gmail.com>
-References: <20180425233121.13270-1-jeremy.linton@arm.com>
- <20180425233121.13270-6-jeremy.linton@arm.com>
- <CAJZ5v0jjPnyC0vm-Fb8y2hw1B9Uc2J5sZrtZYzt_ENT2Sini3A@mail.gmail.com>
-Message-ID: <b750e86b-bc51-0440-b48d-0e8d3177fa8d@arm.com>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Fri, 27 Apr 2018 18:21:53 +0200
+Subject: [PATCH] arm: port KCOV to arm
+In-Reply-To: <20180427161810.kuncq7rtcpyl7pql@lakrids.cambridge.arm.com>
+References: <20180426130846.130976-1-dvyukov@google.com>
+ <20180426134057.4sahhqrbkltwmfsk@lakrids.cambridge.arm.com>
+ <CACT4Y+Z35mOAybskjxVhxvW+GrbOZ4c9s2LT+Ca_fE9ZufoiGQ@mail.gmail.com>
+ <20180426142948.n74p52esmbvsqrow@lakrids.cambridge.arm.com>
+ <CACT4Y+b+kHWstEWDDOh6unGSHnetnyJ-Gut1E494XGM1rFozBQ@mail.gmail.com>
+ <CACT4Y+ZfQyCd+dBNJEUvVquM8EN51JoOrrENJ+Q7Hpb0wF5xrA@mail.gmail.com>
+ <20180427130643.klvm4rqxhv7w5f2o@lakrids.cambridge.arm.com>
+ <CACT4Y+b_cAKf80y5a8KaV7P=-KtcB83E7x-SXv-Uq_kxzy_7wA@mail.gmail.com>
+ <20180427161810.kuncq7rtcpyl7pql@lakrids.cambridge.arm.com>
+Message-ID: <CACT4Y+ZPnCx-Wm7=JwiYdbUcDjjD_c_wqdWsW4u7toEv_EGbAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Thanks for taking a look at this.
-
-On 04/27/2018 06:02 AM, Rafael J. Wysocki wrote:
-> On Thu, Apr 26, 2018 at 1:31 AM, Jeremy Linton <jeremy.linton@arm.com> wrote:
->> ACPI 6.2 adds a new table, which describes how processing units
->> are related to each other in tree like fashion. Caches are
->> also sprinkled throughout the tree and describe the properties
->> of the caches in relation to other caches and processing units.
+On Fri, Apr 27, 2018 at 6:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Apr 27, 2018 at 03:51:22PM +0200, Dmitry Vyukov wrote:
+>> On Fri, Apr 27, 2018 at 3:06 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > Can you share your kernel config?
 >>
->> Add the code to parse the cache hierarchy and report the total
->> number of levels of cache for a given core using
->> acpi_find_last_cache_level() as well as fill out the individual
->> cores cache information with cache_setup_acpi() once the
->> cpu_cacheinfo structure has been populated by the arch specific
->> code.
+>> Attached. It's pretty much vexpress_defconfig with few minor
+>> additions. Here is full description of what I am doing:
+>> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
+>
+> Cheers!
+>
+>> FWIW when I do "KCOV_INSTRUMENT_fault.o := n" everything works and I
+>> see reasonable coverage.
+>
+> While this may be the case, I think it's papering over a bug rather than
+> solving it.
+>
+> [...]
+>
+>> > I can't reproduce the issue on real hardware atop of v4.17-rc2, when
+>> > booting and running a standard ARMv7 buildroot userspace. So the kcov
+>> > mode check seems fine to me.
 >>
->> An additional patch later in the set adds the ability to report
->> peers in the topology using find_acpi_cpu_topology()
->> to report a unique ID for each processing unit at a given level
->> in the tree. These unique id's can then be used to match related
->> processing units which exist as threads, within a given
->> package, etc.
->>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>   drivers/acpi/pptt.c | 518 ++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 518 insertions(+)
->>   create mode 100644 drivers/acpi/pptt.c
->>
->> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
->> new file mode 100644
->> index 000000000000..cced71ef851a
->> --- /dev/null
->> +++ b/drivers/acpi/pptt.c
->> @@ -0,0 +1,518 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * pptt.c - parsing of Processor Properties Topology Table
->> + *
->> + * Copyright (C) 2018, ARM
->> + *
->> + * This file implements parsing of Processor Properties Topology Table (PPTT)
->> + * which is optionally used to describe the processor and cache topology.
->> + * Due to the relative pointers used throughout the table, this doesn't
->> + * leverage the existing subtable parsing in the kernel.
->> + *
->> + * The PPTT structure is an inverted tree, with each node potentially
->> + * holding one or two inverted tree data structures describing
->> + * the caches available at that level. Each cache structure optionally
->> + * contains properties describing the cache at a given level which can be
->> + * used to override hardware probed values.
->> + */
->> +#define pr_fmt(fmt) "ACPI PPTT: " fmt
->> +
->> +#include <linux/acpi.h>
->> +#include <linux/cacheinfo.h>
->> +#include <acpi/processor.h>
->> +
->> +/**
->> + * fetch_pptt_subtable() - Find/Verify that the PPTT ref is a valid subtable
-> 
-> The parens above are at least redundant (if not harmful).  Everywhere
-> else in a similar context too.
+>> It happens after brief fuzzing with syzkaller. So it's both kcov
+>> opened and some weird syscall workload. Again, here is everything what
+>> I am doing:
+>> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
+>
+> I've set this up, and while I see RCU stalls and "no output from test
+> machine" warnings, I'm not seeing any reports with KCOV splats.
+>
+> Are you somehow connecting to a VM which failed with no output?
 
-The kerneldoc ones? I guess i'm confused the kernel doc example in 
-doc-guide/kernel-doc has
+I've started seeing assorted crashes like these:
 
-* function_name() - Brief description of function.
+kernel panic: Fatal exception
+unable to handle kernel paging request in migrate_task_rq_fair
+BUG: spinlock bad magic in corrupted
+unable to handle kernel paging request in trace_hardirqs_off_caller
+unable to handle kernel paging request in kick_process
+kernel panic: stack-protector: Kernel stack is corrupted in: do_futex
+unable to handle kernel paging request in __sanitizer_cov_trace_pc
+Unable to handle kernel paging request at virtual address ADDR
 
+Do you see code coverage increasing?
 
-> 
-> Also kerneldoc comments document function arguments too as a rule, so
-> please do that here and wherever you use kerneldoc comments in the
-> patchset.
-
-Ok, sure.
-
-> 
->> + *
->> + * Given the PPTT table, find and verify that the subtable entry
->> + * is located within the table
->> + *
->> + * Return: acpi_subtable_header* or NULL
->> + */
->> +static struct acpi_subtable_header *fetch_pptt_subtable(struct acpi_table_header *table_hdr,
->> +                                                       u32 pptt_ref)
->> +{
->> +       struct acpi_subtable_header *entry;
->> +
->> +       /* there isn't a subtable at reference 0 */
->> +       if (pptt_ref < sizeof(struct acpi_subtable_header))
->> +               return NULL;
->> +
->> +       if (pptt_ref + sizeof(struct acpi_subtable_header) > table_hdr->length)
->> +               return NULL;
->> +
->> +       entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr, pptt_ref);
->> +
->> +       if (entry->length == 0)
->> +               return NULL;
->> +
->> +       if (pptt_ref + entry->length > table_hdr->length)
->> +               return NULL;
->> +
->> +       return entry;
->> +}
-> 
-> Apart from the above I'm not entirely sure why you need the changes in
-> patch [09/13] to go in a separate patch.  All of them are new code
-> going into the file created by this patch, so why not to put them
-> here?
-
-
-Ok, I was doing that because Lorenzo asked for it, but he hasn't said 
-much so I will collapse it back together. That makes me happy, as 
-splitting chunks between patches is a pain anyway.
+Besides compiler I am not sure what else can be different between our
+setups (mine is Debian's 7.2).
