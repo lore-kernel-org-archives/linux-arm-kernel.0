@@ -1,39 +1,30 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 27 Apr 2018 12:00:52 +0200
-Subject: [PATCH v7 1/7] clk: meson: migrate to
- devm_of_clk_add_hw_provider API
-In-Reply-To: <20180426084437.192394-2-yixun.lan@amlogic.com>
-References: <20180426084437.192394-1-yixun.lan@amlogic.com>
- <20180426084437.192394-2-yixun.lan@amlogic.com>
-Message-ID: <1524823252.4026.124.camel@baylibre.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 27 Apr 2018 12:04:02 +0200
+Subject: [PATCH] reset: uniphier: fix USB clock line for LD20
+In-Reply-To: <CAK7LNAQKVD3aKTo_z=zkOdoL--RogoFm0bt-dCBsWFN8BEPpSg@mail.gmail.com>
+References: <1523499370-17757-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNAQKVD3aKTo_z=zkOdoL--RogoFm0bt-dCBsWFN8BEPpSg@mail.gmail.com>
+Message-ID: <1524823442.17614.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-04-26 at 16:44 +0800, Yixun Lan wrote:
-> There is a protential memory leak, as of_clk_del_provider is
-> never called if of_clk_add_hw_provider has been executed.
-> Fix this by using devm variant API.
+On Fri, 2018-04-27 at 18:42 +0900, Masahiro Yamada wrote:
+> Philipp,
 > 
-> Fixes: f8c11f79912d ("clk: meson: Add GXBB AO Clock and Reset controller driver")
-> Suggested-by: Stephen Boyd <sboyd@kernel.org>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  drivers/clk/meson/gxbb-aoclk.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> 2018-04-12 11:16 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> > For LD20, the bit 5 of the offset 0x200c turned out to be a USB3
+> > reset.  The hardware document says it is the GIO reset despite LD20
+> > has no GIO bus, confusingly.
+> > 
+> > Also, fix confusing comments for PXs3.
+> > 
+> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > ---
 > 
-> diff --git a/drivers/clk/meson/gxbb-aoclk.c b/drivers/clk/meson/gxbb-aoclk.c
-> index 9ec23ae9a219..eebb580b9e0f 100644
-> --- a/drivers/clk/meson/gxbb-aoclk.c
-> +++ b/drivers/clk/meson/gxbb-aoclk.c
-> @@ -191,7 +191,7 @@ static int gxbb_aoclkc_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> -	return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-> +	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
->  			&gxbb_aoclk_onecell_data);
->  }
->  
+> Can you take a look at this, please?
 
-Applied
-Thx
+Thank you for the reminder, I've applied it to reset/fixes and rebased
+reset/next on top to include it.
+
+regards
+Philipp
