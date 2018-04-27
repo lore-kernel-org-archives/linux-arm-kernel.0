@@ -1,226 +1,110 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 27 Apr 2018 11:53:38 +0100
-Subject: Applied "ASoC: uniphier: remove boilerplate from lisence comment" to
- the asoc tree
-In-Reply-To: <20180427052734.3506-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <E1fC10U-0003Q0-5e@debutante>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 27 Apr 2018 13:02:00 +0200
+Subject: [PATCH v8 05/13] ACPI/PPTT: Add Processor Properties Topology
+ Table parsing
+In-Reply-To: <20180425233121.13270-6-jeremy.linton@arm.com>
+References: <20180425233121.13270-1-jeremy.linton@arm.com>
+ <20180425233121.13270-6-jeremy.linton@arm.com>
+Message-ID: <CAJZ5v0jjPnyC0vm-Fb8y2hw1B9Uc2J5sZrtZYzt_ENT2Sini3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Thu, Apr 26, 2018 at 1:31 AM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> ACPI 6.2 adds a new table, which describes how processing units
+> are related to each other in tree like fashion. Caches are
+> also sprinkled throughout the tree and describe the properties
+> of the caches in relation to other caches and processing units.
+>
+> Add the code to parse the cache hierarchy and report the total
+> number of levels of cache for a given core using
+> acpi_find_last_cache_level() as well as fill out the individual
+> cores cache information with cache_setup_acpi() once the
+> cpu_cacheinfo structure has been populated by the arch specific
+> code.
+>
+> An additional patch later in the set adds the ability to report
+> peers in the topology using find_acpi_cpu_topology()
+> to report a unique ID for each processing unit at a given level
+> in the tree. These unique id's can then be used to match related
+> processing units which exist as threads, within a given
+> package, etc.
+>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/acpi/pptt.c | 518 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 518 insertions(+)
+>  create mode 100644 drivers/acpi/pptt.c
+>
+> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+> new file mode 100644
+> index 000000000000..cced71ef851a
+> --- /dev/null
+> +++ b/drivers/acpi/pptt.c
+> @@ -0,0 +1,518 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * pptt.c - parsing of Processor Properties Topology Table
+> + *
+> + * Copyright (C) 2018, ARM
+> + *
+> + * This file implements parsing of Processor Properties Topology Table (PPTT)
+> + * which is optionally used to describe the processor and cache topology.
+> + * Due to the relative pointers used throughout the table, this doesn't
+> + * leverage the existing subtable parsing in the kernel.
+> + *
+> + * The PPTT structure is an inverted tree, with each node potentially
+> + * holding one or two inverted tree data structures describing
+> + * the caches available at that level. Each cache structure optionally
+> + * contains properties describing the cache at a given level which can be
+> + * used to override hardware probed values.
+> + */
+> +#define pr_fmt(fmt) "ACPI PPTT: " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/cacheinfo.h>
+> +#include <acpi/processor.h>
+> +
+> +/**
+> + * fetch_pptt_subtable() - Find/Verify that the PPTT ref is a valid subtable
 
-   ASoC: uniphier: remove boilerplate from lisence comment
+The parens above are at least redundant (if not harmful).  Everywhere
+else in a similar context too.
 
-has been applied to the asoc tree at
+Also kerneldoc comments document function arguments too as a rule, so
+please do that here and wherever you use kerneldoc comments in the
+patchset.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+> + *
+> + * Given the PPTT table, find and verify that the subtable entry
+> + * is located within the table
+> + *
+> + * Return: acpi_subtable_header* or NULL
+> + */
+> +static struct acpi_subtable_header *fetch_pptt_subtable(struct acpi_table_header *table_hdr,
+> +                                                       u32 pptt_ref)
+> +{
+> +       struct acpi_subtable_header *entry;
+> +
+> +       /* there isn't a subtable at reference 0 */
+> +       if (pptt_ref < sizeof(struct acpi_subtable_header))
+> +               return NULL;
+> +
+> +       if (pptt_ref + sizeof(struct acpi_subtable_header) > table_hdr->length)
+> +               return NULL;
+> +
+> +       entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr, pptt_ref);
+> +
+> +       if (entry->length == 0)
+> +               return NULL;
+> +
+> +       if (pptt_ref + entry->length > table_hdr->length)
+> +               return NULL;
+> +
+> +       return entry;
+> +}
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From e19f77ee0e8ade56564dad07f904b75dd5c37e31 Mon Sep 17 00:00:00 2001
-From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Date: Fri, 27 Apr 2018 14:27:34 +0900
-Subject: [PATCH] ASoC: uniphier: remove boilerplate from lisence comment
-
-This patch removes boilerplate of GPLv2, use only SPDX identifier as
-same as other recently ASoC DAI drivers.
-
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/uniphier/aio-compress.c | 13 -------------
- sound/soc/uniphier/aio-core.c     | 13 -------------
- sound/soc/uniphier/aio-cpu.c      | 13 -------------
- sound/soc/uniphier/aio-dma.c      | 13 -------------
- sound/soc/uniphier/aio-ld11.c     | 13 -------------
- sound/soc/uniphier/aio-reg.h      | 13 -------------
- sound/soc/uniphier/aio.h          | 13 -------------
- 7 files changed, 91 deletions(-)
-
-diff --git a/sound/soc/uniphier/aio-compress.c b/sound/soc/uniphier/aio-compress.c
-index 4c1027aa615e..17f773ac5ca1 100644
---- a/sound/soc/uniphier/aio-compress.c
-+++ b/sound/soc/uniphier/aio-compress.c
-@@ -3,19 +3,6 @@
- // Socionext UniPhier AIO Compress Audio driver.
- //
- // Copyright (c) 2017-2018 Socionext Inc.
--//
--// This program is free software; you can redistribute it and/or
--// modify it under the terms of the GNU General Public License
--// as published by the Free Software Foundation; version 2
--// of the License.
--//
--// This program is distributed in the hope that it will be useful,
--// but WITHOUT ANY WARRANTY; without even the implied warranty of
--// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
--// GNU General Public License for more details.
--//
--// You should have received a copy of the GNU General Public License
--// along with this program; if not, see <http://www.gnu.org/licenses/>.
- 
- #include <linux/bitfield.h>
- #include <linux/circ_buf.h>
-diff --git a/sound/soc/uniphier/aio-core.c b/sound/soc/uniphier/aio-core.c
-index 6d50042a4571..e37b80921abb 100644
---- a/sound/soc/uniphier/aio-core.c
-+++ b/sound/soc/uniphier/aio-core.c
-@@ -3,19 +3,6 @@
- // Socionext UniPhier AIO ALSA common driver.
- //
- // Copyright (c) 2016-2018 Socionext Inc.
--//
--// This program is free software; you can redistribute it and/or
--// modify it under the terms of the GNU General Public License
--// as published by the Free Software Foundation; version 2
--// of the License.
--//
--// This program is distributed in the hope that it will be useful,
--// but WITHOUT ANY WARRANTY; without even the implied warranty of
--// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
--// GNU General Public License for more details.
--//
--// You should have received a copy of the GNU General Public License
--// along with this program; if not, see <http://www.gnu.org/licenses/>.
- 
- #include <linux/bitfield.h>
- #include <linux/errno.h>
-diff --git a/sound/soc/uniphier/aio-cpu.c b/sound/soc/uniphier/aio-cpu.c
-index 1e5eb8e6f8c7..00b6441bf195 100644
---- a/sound/soc/uniphier/aio-cpu.c
-+++ b/sound/soc/uniphier/aio-cpu.c
-@@ -3,19 +3,6 @@
- // Socionext UniPhier AIO ALSA CPU DAI driver.
- //
- // Copyright (c) 2016-2018 Socionext Inc.
--//
--// This program is free software; you can redistribute it and/or
--// modify it under the terms of the GNU General Public License
--// as published by the Free Software Foundation; version 2
--// of the License.
--//
--// This program is distributed in the hope that it will be useful,
--// but WITHOUT ANY WARRANTY; without even the implied warranty of
--// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
--// GNU General Public License for more details.
--//
--// You should have received a copy of the GNU General Public License
--// along with this program; if not, see <http://www.gnu.org/licenses/>.
- 
- #include <linux/clk.h>
- #include <linux/errno.h>
-diff --git a/sound/soc/uniphier/aio-dma.c b/sound/soc/uniphier/aio-dma.c
-index ef7bafa8e171..4ec6b65bfb44 100644
---- a/sound/soc/uniphier/aio-dma.c
-+++ b/sound/soc/uniphier/aio-dma.c
-@@ -3,19 +3,6 @@
- // Socionext UniPhier AIO DMA driver.
- //
- // Copyright (c) 2016-2018 Socionext Inc.
--//
--// This program is free software; you can redistribute it and/or
--// modify it under the terms of the GNU General Public License
--// as published by the Free Software Foundation; version 2
--// of the License.
--//
--// This program is distributed in the hope that it will be useful,
--// but WITHOUT ANY WARRANTY; without even the implied warranty of
--// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
--// GNU General Public License for more details.
--//
--// You should have received a copy of the GNU General Public License
--// along with this program; if not, see <http://www.gnu.org/licenses/>.
- 
- #include <linux/dma-mapping.h>
- #include <linux/errno.h>
-diff --git a/sound/soc/uniphier/aio-ld11.c b/sound/soc/uniphier/aio-ld11.c
-index 4c4dd3dd4dee..ab04d3331be9 100644
---- a/sound/soc/uniphier/aio-ld11.c
-+++ b/sound/soc/uniphier/aio-ld11.c
-@@ -3,19 +3,6 @@
- // Socionext UniPhier AIO ALSA driver for LD11/LD20.
- //
- // Copyright (c) 2016-2018 Socionext Inc.
--//
--// This program is free software; you can redistribute it and/or
--// modify it under the terms of the GNU General Public License
--// as published by the Free Software Foundation; version 2
--// of the License.
--//
--// This program is distributed in the hope that it will be useful,
--// but WITHOUT ANY WARRANTY; without even the implied warranty of
--// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
--// GNU General Public License for more details.
--//
--// You should have received a copy of the GNU General Public License
--// along with this program; if not, see <http://www.gnu.org/licenses/>.
- 
- #include <linux/module.h>
- 
-diff --git a/sound/soc/uniphier/aio-reg.h b/sound/soc/uniphier/aio-reg.h
-index 136d3563cf44..511ea3c01847 100644
---- a/sound/soc/uniphier/aio-reg.h
-+++ b/sound/soc/uniphier/aio-reg.h
-@@ -3,19 +3,6 @@
-  * Socionext UniPhier AIO ALSA driver.
-  *
-  * Copyright (c) 2016-2018 Socionext Inc.
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; version 2
-- * of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef SND_UNIPHIER_AIO_REG_H__
-diff --git a/sound/soc/uniphier/aio.h b/sound/soc/uniphier/aio.h
-index 8cab4a553a97..52670126084f 100644
---- a/sound/soc/uniphier/aio.h
-+++ b/sound/soc/uniphier/aio.h
-@@ -3,19 +3,6 @@
-  * Socionext UniPhier AIO ALSA driver.
-  *
-  * Copyright (c) 2016-2018 Socionext Inc.
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; version 2
-- * of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef SND_UNIPHIER_AIO_H__
--- 
-2.17.0
+Apart from the above I'm not entirely sure why you need the changes in
+patch [09/13] to go in a separate patch.  All of them are new code
+going into the file created by this patch, so why not to put them
+here?
