@@ -1,83 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Apr 2018 11:16:19 +0100
-Subject: [PATCH v3 05/14] locking/qspinlock: Remove unbounded cmpxchg
- loop from locking slowpath
-In-Reply-To: <1adce90b-7627-ed71-fd34-bb33388790d5@redhat.com>
-References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
- <1524738868-31318-6-git-send-email-will.deacon@arm.com>
- <1adce90b-7627-ed71-fd34-bb33388790d5@redhat.com>
-Message-ID: <20180427101619.GB21705@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Apr 2018 12:18:09 +0200
+Subject: [PATCH RFC PoC 0/2] platform: different approach to early
+ platform drivers
+In-Reply-To: <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
+References: <20180426152920.21569-1-brgl@bgdev.pl>
+ <20180426173151.GJ3094@brightrain.aerifal.cx>
+ <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
+ <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
+ <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
+Message-ID: <CAK8P3a2xtTLx-VHVWok-b19=o1z5FbTNcaWq7Y_HSdaH6pWnZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Waiman,
+On Fri, Apr 27, 2018 at 10:57 AM, Bartosz Golaszewski
+<bgolaszewski@baylibre.com> wrote:
+> 2018-04-27 9:52 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>> On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
+>>> On 04/26/2018 12:31 PM, Rich Felker wrote:
+>
+> We have platforms out there which still use both board files and
+> device tree. They are still comercially supported and are not going
+> anywhere anytime soon. Some of these platforms are being actively
+> maintained and cleaned-up. An example is the DaVinci platform: David
+> has recently converted all the SoCs and boards to using the common
+> clock framework. I'm cleaning up some other parts too.
+>
+> The problem with the legacy board code is that a lot of things that
+> should be platform drivers ended up in arch/arm/mach-*. We're now
+> slowly moving this code to drivers/ but some initialization code
+> (timers, critical clocks, irqs) needs to be called early in the boot
+> sequence.
 
-On Thu, Apr 26, 2018 at 04:16:30PM -0400, Waiman Long wrote:
-> On 04/26/2018 06:34 AM, Will Deacon wrote:
-> > diff --git a/kernel/locking/qspinlock_paravirt.h b/kernel/locking/qspinlock_paravirt.h
-> > index 2711940429f5..2dbad2f25480 100644
-> > --- a/kernel/locking/qspinlock_paravirt.h
-> > +++ b/kernel/locking/qspinlock_paravirt.h
-> > @@ -118,11 +118,6 @@ static __always_inline void set_pending(struct qspinlock *lock)
-> >  	WRITE_ONCE(lock->pending, 1);
-> >  }
-> >  
-> > -static __always_inline void clear_pending(struct qspinlock *lock)
-> > -{
-> > -	WRITE_ONCE(lock->pending, 0);
-> > -}
-> > -
-> >  /*
-> >   * The pending bit check in pv_queued_spin_steal_lock() isn't a memory
-> >   * barrier. Therefore, an atomic cmpxchg_acquire() is used to acquire the
-> 
-> There is another clear_pending() function after the "#else /*
-> _Q_PENDING_BITS == 8 */" line that need to be removed as well.
+Right, and that's very good work.
 
-Bugger, sorry I missed that one. Is the >= 16K CPUs case supported elsewhere
-in Linux? The x86 Kconfig appears to clamp NR_CPUS to 8192 iiuc.
+> When you're saying that we already have all the OF_DECLARE macros, it
+> seems to me that you're forgetting that we also want to keep
+> supporting the board files. So without the early platform drivers we
+> need to use a mix of OF_DECLARE and handcrafted initialization in
+> arch/arm/mach-* since we can't call platform_device_register() that
+> early. This blocks us from completely moving the should-be-driver code
+> to drivers/, because these drivers *need* to support both cases.
 
-Anyway, additional patch below. Ingo -- please can you apply this on top?
+The OF_DECLARE_* functions were initially added as a way to
+remove board files that just consist of callbacks into early
+initialization for some subsystems. As long as you still have
+board files and you are looking for a way to reuse code between
+OF_DECLARE_* functions and board files, why not just leave
+those functions globally visible and call them from the non-DT
+board files?
 
-Thanks,
+> The main problem with OF_DECLARE is that although we have
+> corresponding device nodes, we never actually register any real linux
+> devices. If we add to this the fact that current early platform
+> drivers implementation is broken (for reasons I mentioned in the cover
+> letter) the support gets really messy, since we can have up to three
+> entry points to the driver's code. Other issues come to mind as well:
+> if we're using OF_DECLARE we can't benefit from devm* routines.
 
-Will
+Right, the devm_* problem has come up before.
 
---->8
+> My aim is to provide a clean, robust and generic way of probing
+> certain devices early and then converting them to actual platform
+> devices when we're advanced enough into the boot sequence. If we
+> merged such a framework, we could work towards removing both the
+> previous early platform devices (in favor of the new mechanism) and
+> maybe even deprecating and replacing OF_DECLARE(), since we could
+> simply early probe the DT drivers. Personally I see OF_DECLARE as a
+> bigger hack than early devices.
+>
+> My patch tries to address exactly the use cases we're facing - for
+> example by providing means to probe devices twice (early and late) and
+> to check the state we're at in order for users to be able to just do
+> the critical initialization early on and then continue with regular
+> stuff later.
 
->From ef6aa51e47047fe1a57dfdbe2f45caf63fa95be4 Mon Sep 17 00:00:00 2001
-From: Will Deacon <will.deacon@arm.com>
-Date: Fri, 27 Apr 2018 10:40:13 +0100
-Subject: [PATCH] locking/qspinlock: Remove duplicate clear_pending function
- from PV code
+Maybe the problem is reusing the name and some of the code from
+an existing functionality that we've been trying to get rid of.
 
-The native clear_pending function is identical to the PV version, so the
-latter can simply be removed. This fixes the build for systems with >=
-16K CPUs using the PV lock implementation.
+If what you want to do is completely different from the existing
+early_platform implementation, how about starting by moving that
+out of drivers/base/platform.c into something under arch/sh/
+and renaming it to something with an sh_ prefix.
 
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Reported-by: Waiman Long <longman@redhat.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- kernel/locking/qspinlock_paravirt.h | 5 -----
- 1 file changed, 5 deletions(-)
+Let's just leave the non-DT part out of it by making it sh specific.
+Then we can come up with improvements to the current
+platform_device handling for DT based platforms that you can
+use on DT-based davinci to replace what currently happens on
+board-file based davinci systems, without mixing up those
+two code paths too much in the base driver support.
 
-diff --git a/kernel/locking/qspinlock_paravirt.h b/kernel/locking/qspinlock_paravirt.h
-index 25730b2ac022..5a0cf5f9008c 100644
---- a/kernel/locking/qspinlock_paravirt.h
-+++ b/kernel/locking/qspinlock_paravirt.h
-@@ -130,11 +130,6 @@ static __always_inline void set_pending(struct qspinlock *lock)
- 	atomic_or(_Q_PENDING_VAL, &lock->val);
- }
- 
--static __always_inline void clear_pending(struct qspinlock *lock)
--{
--	atomic_andnot(_Q_PENDING_VAL, &lock->val);
--}
--
- static __always_inline int trylock_clear_pending(struct qspinlock *lock)
- {
- 	int val = atomic_read(&lock->val);
--- 
-2.1.4
+       Arnd
