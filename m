@@ -1,93 +1,55 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 26 Apr 2018 19:17:43 -0500
-Subject: [PATCH v9 25/27] ARM: davinci: add device tree support to timer
+Date: Thu, 26 Apr 2018 19:17:42 -0500
+Subject: [PATCH v9 24/27] dt-bindings: timer: new bindings for TI DaVinci timer
 In-Reply-To: <20180427001745.4116-1-david@lechnology.com>
 References: <20180427001745.4116-1-david@lechnology.com>
-Message-ID: <20180427001745.4116-26-david@lechnology.com>
+Message-ID: <20180427001745.4116-25-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree support to the davinci timer so that when clocks
-are moved to device tree, the timer will still work.
+This adds new device tree bindings for the timer IP block of TI
+DaVinci-like SoCs.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v9 changes:
-- none (there were supposed to be changed, but apparently they got squashed
-  into the next commit - will fix on the next round)
+- new patch in v9
 
-v8 changes:
-- none
 
-v7 changes:
-- rebased
-- add davinci prefix to commit message
+ .../bindings/timer/ti,davinci-timer.txt       | 24 +++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
 
-v6 changes:
-- rebased
-
- arch/arm/mach-davinci/Kconfig |  1 +
- arch/arm/mach-davinci/time.c  | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
-
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index ba9912b4dfab..da8a039d65f9 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -59,6 +59,7 @@ config MACH_DA8XX_DT
- 	default y
- 	depends on ARCH_DAVINCI_DA850
- 	select PINCTRL
-+	select TIMER_OF
- 	help
- 	  Say y here to include support for TI DaVinci DA850 based using
- 	  Flattened Device Tree. More information at Documentation/devicetree
-diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-index 7ea3db0ff062..7a8c6fada644 100644
---- a/arch/arm/mach-davinci/time.c
-+++ b/arch/arm/mach-davinci/time.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/sched_clock.h>
- 
-@@ -397,3 +398,33 @@ void __init davinci_timer_init(struct clk *timer_clk)
- 	for (i=0; i< ARRAY_SIZE(timers); i++)
- 		timer32_config(&timers[i]);
- }
+diff --git a/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt b/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
+new file mode 100644
+index 000000000000..2091eca46981
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
+@@ -0,0 +1,24 @@
++* Device tree bindings for Texas Instruments DaVinci timer
 +
-+static int __init of_davinci_timer_init(struct device_node *np)
-+{
-+	struct clk *clk;
++This document provides bindings for the 64-bit timer in the DaVinci
++architecture devices. The timer can be configured as a general-purpose 64-bit
++timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
++timers, each half can operate in conjunction (chain mode) or independently
++(unchained mode) of each other.
 +
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk)) {
-+		struct of_phandle_args clkspec;
++It is global timer is a free running up-counter and can generate interrupt
++when the counter reaches preset counter values.
 +
-+		/*
-+		 * Fall back to using ref_clk if the actual clock is not
-+		 * available. This currently always happens because platform
-+		 * clocks (i.e PLLs and PSCs) are registered as platform
-+		 * devices and therefore are not available@this point in
-+		 * the boot process.
-+		 */
-+		clkspec.np = of_find_node_by_name(NULL, "ref_clk");
-+		if (IS_ERR(clkspec.np)) {
-+			pr_err("%s: No clock available for timer!\n", __func__);
-+			return PTR_ERR(clkspec.np);
-+		}
-+		clk = of_clk_get_from_provider(&clkspec);
-+		of_node_put(clkspec.np);
-+	}
++Required properties:
 +
-+	davinci_timer_init(clk);
++- compatible : should be "ti,davinci-timer".
++- reg : specifies base physical address and count of the registers.
++- clocks : the clock feeding the timer clock.
 +
-+	return 0;
-+}
-+TIMER_OF_DECLARE(davinci_timer, "ti,davinci-timer", of_davinci_timer_init);
++Example:
++
++	clocksource: timer at 20000 {
++		compatible = "ti,davinci-timer";
++		reg = <0x20000 0x1000>;
++		clocks = <&pll0_auxclk>;
++	};
 -- 
 2.17.0
