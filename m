@@ -1,16 +1,18 @@
 From: anson.huang@nxp.com (Anson Huang)
-Date: Fri, 27 Apr 2018 01:33:00 +0000
-Subject: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
- max7310 support
-In-Reply-To: <CAOMZO5DWeYCbWn9LEi1e+tc4gZsjBBpXtiwzmwLbYp=E4TERrg@mail.gmail.com>
-References: <1524634571-5914-1-git-send-email-Anson.Huang@nxp.com>
- <1524634571-5914-3-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5Dm6rcEe=zAJ9_nqKce3g2tdyWPqb=Uv-N5nfc_96jc-g@mail.gmail.com>
- <AM3PR04MB13150654494B8D251988F76CF58E0@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5AZLbUoL7FWgUFA7qc3q3wcz9UBLSQhMXXkUJeiRz8X4A@mail.gmail.com>
- <DB5PR04MB13205A0A7134C969748560B4F58E0@DB5PR04MB1320.eurprd04.prod.outlook.com>
- <CAOMZO5DWeYCbWn9LEi1e+tc4gZsjBBpXtiwzmwLbYp=E4TERrg@mail.gmail.com>
-Message-ID: <AM3PR04MB1315E21D05BC3EA5F9E6D2EAF58D0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+Date: Fri, 27 Apr 2018 01:37:19 +0000
+Subject: [PATCH 4/5] ARM: dts: imx6sx-sabreauto: add fec support
+In-Reply-To: <CAOMZO5Df__UpcLXVUrW0sT24g=Kmu2132QeQSBE9aZrjcyqsCw@mail.gmail.com>
+References: <1524455219-6736-1-git-send-email-Anson.Huang@nxp.com>
+ <1524455219-6736-4-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5CDAQtw7Q6NgSzKP4ogaqRaGSE0A+st1iqZ=cQsK49moQ@mail.gmail.com>
+ <AM3PR04MB131566E1C8033D256686F192F5880@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5Dm=MFRoh=y54Qf2RrncWfQPTUJ2ZNfvYnUD=idp8RPNA@mail.gmail.com>
+ <AM3PR04MB1315ED599A20F67BB9FEFEE1F58F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <AM3PR04MB1315B04BE46755E3EB82E04CF58F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5AS=aH8p1+tmgJ4ooeqExNqOALh7vbPAsQdqdky8CkXyQ@mail.gmail.com>
+ <DB5PR04MB132072FEDCAFEDF6592C6A32F58E0@DB5PR04MB1320.eurprd04.prod.outlook.com>
+ <CAOMZO5Df__UpcLXVUrW0sT24g=Kmu2132QeQSBE9aZrjcyqsCw@mail.gmail.com>
+Message-ID: <AM3PR04MB1315F80C9B5190F4E26DC723F58D0@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,61 +24,71 @@ Best Regards!
 
 > -----Original Message-----
 > From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Friday, April 27, 2018 1:24 AM
+> Sent: Friday, April 27, 2018 1:29 AM
 > To: Anson Huang <anson.huang@nxp.com>
 > Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
 > <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
 > Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Russell King - ARM Linux <linux@armlinux.org.uk>; dl-linux-imx
-> <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC ARM
-> ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
+> dl-linux-imx <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC
+> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
 > FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
-> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH V4 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
-> max7310 support
+> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>;
+> Andy Duan <fugang.duan@nxp.com>
+> Subject: Re: [PATCH 4/5] ARM: dts: imx6sx-sabreauto: add fec support
 > 
-> On Thu, Apr 26, 2018 at 3:31 AM, Anson Huang <anson.huang@nxp.com>
+> On Thu, Apr 26, 2018 at 3:57 AM, Anson Huang <anson.huang@nxp.com>
 > wrote:
 > 
-> > I searched the mail I sent, I can NOT found where I said "MAX7310 controls
-> the ethernet phy"....
+> > The 'phy-supply' is for enabling/disabling phy regulator, but here the
+> > MAX7322 IO0 is NOT for enabling/disabling PHY regulator, it is for IO
+> > voltage switch between 1.5V and 1.8V, our ENET IO can work with both 1.5V
+> and 1.8V, so any config is OK for ENET function.
 > 
-> Initially you passed:  pinctrl-assert-gpios = <&max7322 0 GPIO_ACTIVE_HIGH>
-> inside the fec1 node.
+> Thanks for the clarification.
 > 
-> Then I explained that 'pinctrl-assert-gpios' is not a valid property in mainline. It
-> only exists in NXP vendor tree.
+> > The 1.5V/1.8V selection is a one time setting thing, that means we
+> > only need to config it once during boot up, most of i.MX platforms
+> > does NOT provide such voltage switch function for ENET IO, on this 6SX
+> > sabre auto board, it is more like a backup or validation purpose. With default
+> settings, ENET's function is NOT impacted at all.
+> >
+> > I think we can add a gpio regulator for it and let the regulator
+> > initialization set the GPIO Level for fec, such below, with "
+> > enable-active-high " present, GPIO will be at LOW and voltage is 1.5V, without
+> this property, GPIO will be HIGH and voltage will be 1.8V.
+> > +               reg_fec: fec_io_supply {
+> > +                       compatible = "regulator-gpio";
+> > +                       regulator-name = "1.8V_1.5V_FEC";
+> > +                       regulator-min-microvolt = <1500000>;
+> > +                       regulator-max-microvolt = <1800000>;
+> > +                       states = <1500000 0x0 1800000 0x1>;
+> > +                       enable-gpio = <&max7322 0
+> GPIO_ACTIVE_HIGH>;
+> > +                       vin-supply = <&sw2_reg>;
+> > +                       enable-active-high;
 > 
-> Then you explained:
+> If there is no consumer for this regulator, the regulator API will disable it.
 > 
-> "Sorry, I made a mistake here, the MAX7320 IO0 is for adjusting FEC1's voltage"
+> It seems you need a 'regulator-always-on;'.
 
-The ' pinctrl-assert-gpios ' is ONLY in NXP local tree, FEC owner added it because he
-wants to set this GPIO ONCE during kernel boot up, but upstream kernel does NOT
-support the pinctrl-assert-gpio, so we have to drop it, the MAX7322 IO0 is for adjusting
-FEC's voltage, I meant for FEC IO's voltage, 1.5V or 1.8V. If I made any confuse, I am
-sorry for that, I think it should be clear now, all we want/need is to set this GPIO ONCE
-to get the IO voltage we want.
-
-> 
-> > There are MAX7310 users, it is just because currently those users are
-> > NOT enabled, so I can NOT verify them. MAX7310 is an independent I2C
-> device, why we can NOT enable it first?
-> > I tested it from sysfs interface, we can control the MAX7310's IO
-> > output via echo different value to GPIO value, that means MAX7310
-> > itself as an IO expander chip is working just fine, similar with PMIC, it is a I2C
-> device, can be enabled independently, then consumers can be added later when
-> they are enabled.
-> > Just my personal opinion, thanks.
-> 
-> Right, but if FEC needs max7322 IO0 at level 1 then better describe it in dts.
+GPIO regulator is slight different when regulator framework try to disable
+those unused regulator in late phase, in _regulator_do_disable, the GPIO
+regulator only got disabled when it is explicitly enabled before (ena_gpio_state
+is set when regulator is enabled), but this reg_fec is NOT getting enabled, since
+it only has voltage switch function. But I agree that we can anyway add 'regulator-always-on'
+to avoid any confusion, will send out new patch, thanks!
  
-Agree, since currently our FEC driver does NOT support adjusting such IO voltage in driver, 
-and there is NO such requirement of runtime switching IO voltage for FEC, so I think it
-should be good here, just use the default settings of MAX7322 IO0 described in 'reg_fec',
-if there is any further requirement of runtime adjusting FEC IO voltage, I think FEC driver
-needs to add such support, and there will be new patch for it.
+         if (rdev->ena_pin) {
+                 if (rdev->ena_gpio_state) {
+                         ret = regulator_ena_gpio_ctrl(rdev, false);
 
-Thanks.
 
-Anson.  
+Anson.
+
+> 
+> 
+> > +               };
+> > +
+> >
+> > Anson.
+> >
