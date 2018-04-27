@@ -1,115 +1,162 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Fri, 27 Apr 2018 09:38:43 +0900
-Subject: [PATCH 1/2] pinctrl: uniphier: add LD20 MPEG2-TS I/O pin-mux settings
-Message-ID: <20180427003844.3937-1-suzuki.katsuhiro@socionext.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 26 Apr 2018 19:17:44 -0500
+Subject: [PATCH v9 26/27] ARM: davinci: da8xx-dt: switch to device tree clocks
+In-Reply-To: <20180427001745.4116-1-david@lechnology.com>
+References: <20180427001745.4116-1-david@lechnology.com>
+Message-ID: <20180427001745.4116-27-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MPEG2-TS input/output core both accepts serial TS and parallel TS.
+This removes all of the clock init code from da8xx-dt.c. This includes
+all of the OF_DEV_AUXDATA that was just used for looking up clocks.
 
-The serial TS interface uses following pins:
-  hscin0_s : HS0DOUT[0-3]
-  hscin1_s : HS0DOUT[4-7]
-  hscin2_s : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN0
-  hscin3_s : HS1DIN[2-5]
-  hscout0_s: HS0DOUT[0-3]
-  hscout1_s: HS0DOUT[4-7]
-
-And the parallel TS interface uses following pins:
-  hscin0_p : HS0BCLKIN, HS0SYNCIN, HS0VALIN, HS0DIN[0-7]
-  hscin1_p : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN[0-7]
-  hscout0_p: HS0BCLKOUT, HS0SYNCOUT, HS0VALOUT, HS0DOUT[0-7]
-
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Signed-off-by: David Lechner <david@lechnology.com>
 ---
- .../pinctrl/uniphier/pinctrl-uniphier-ld20.c  | 54 +++++++++++++++++++
- 1 file changed, 54 insertions(+)
 
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-index bf8f0c3bea5e..6528c13ea4bd 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-@@ -566,6 +566,33 @@ static const int ether_rgmii_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- static const unsigned ether_rmii_pins[] = {30, 31, 32, 33, 34, 35, 36, 37, 39,
- 					   41, 42, 45};
- static const int ether_rmii_muxvals[] = {0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1};
-+static const unsigned hscin0_ci_pins[] = {102, 103, 104, 105, 106, 107, 108,
-+					    109, 110, 111, 112};
-+static const int hscin0_ci_muxvals[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-+static const unsigned hscin0_p_pins[] = {102, 103, 104, 105, 106, 107, 108, 109,
-+					 110, 111, 112};
-+static const int hscin0_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-+static const unsigned hscin1_p_pins[] = {124, 125, 126, 127, 128, 129, 130, 131,
-+					 132, 133, 134};
-+static const int hscin1_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-+static const unsigned hscin0_s_pins[] = {116, 117, 118, 119};
-+static const int hscin0_s_muxvals[] = {3, 3, 3, 3};
-+static const unsigned hscin1_s_pins[] = {120, 121, 122, 123};
-+static const int hscin1_s_muxvals[] = {3, 3, 3, 3};
-+static const unsigned hscin2_s_pins[] = {124, 125, 126, 127};
-+static const int hscin2_s_muxvals[] = {3, 3, 3, 3};
-+static const unsigned hscin3_s_pins[] = {129, 130, 131, 132};
-+static const int hscin3_s_muxvals[] = {3, 3, 3, 3};
-+static const unsigned hscout0_ci_pins[] = {113, 114, 115, 116, 117, 118, 119,
-+					   120, 121, 122, 123};
-+static const int hscout0_ci_muxvals[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-+static const unsigned hscout0_p_pins[] = {113, 114, 115, 116, 117, 118, 119,
-+					  120, 121, 122, 123};
-+static const int hscout0_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-+static const unsigned hscout0_s_pins[] = {116, 117, 118, 119};
-+static const int hscout0_s_muxvals[] = {4, 4, 4, 4};
-+static const unsigned hscout1_s_pins[] = {120, 121, 122, 123};
-+static const int hscout1_s_muxvals[] = {4, 4, 4, 4};
- static const unsigned i2c0_pins[] = {63, 64};
- static const int i2c0_muxvals[] = {0, 0};
- static const unsigned i2c1_pins[] = {65, 66};
-@@ -641,6 +668,17 @@ static const struct uniphier_pinctrl_group uniphier_ld20_groups[] = {
- 	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
- 	UNIPHIER_PINCTRL_GROUP(ether_rgmii),
- 	UNIPHIER_PINCTRL_GROUP(ether_rmii),
-+	UNIPHIER_PINCTRL_GROUP(hscin0_ci),
-+	UNIPHIER_PINCTRL_GROUP(hscin0_p),
-+	UNIPHIER_PINCTRL_GROUP(hscin1_p),
-+	UNIPHIER_PINCTRL_GROUP(hscin0_s),
-+	UNIPHIER_PINCTRL_GROUP(hscin1_s),
-+	UNIPHIER_PINCTRL_GROUP(hscin2_s),
-+	UNIPHIER_PINCTRL_GROUP(hscin3_s),
-+	UNIPHIER_PINCTRL_GROUP(hscout0_ci),
-+	UNIPHIER_PINCTRL_GROUP(hscout0_p),
-+	UNIPHIER_PINCTRL_GROUP(hscout0_s),
-+	UNIPHIER_PINCTRL_GROUP(hscout1_s),
- 	UNIPHIER_PINCTRL_GROUP(i2c0),
- 	UNIPHIER_PINCTRL_GROUP(i2c1),
- 	UNIPHIER_PINCTRL_GROUP(i2c3),
-@@ -668,6 +706,16 @@ static const char * const aoutiec1_groups[] = {"aoutiec1"};
- static const char * const emmc_groups[] = {"emmc", "emmc_dat8"};
- static const char * const ether_rgmii_groups[] = {"ether_rgmii"};
- static const char * const ether_rmii_groups[] = {"ether_rmii"};
-+static const char * const hscin0_groups[] = {"hscin0_s",
-+					     "hscin0_p",
-+					     "hscout0_ci"};
-+static const char * const hscin1_groups[] = {"hscin1_s", "hscin0_p"};
-+static const char * const hscin2_groups[] = {"hscin2_s"};
-+static const char * const hscin3_groups[] = {"hscin3_s"};
-+static const char * const hscout0_groups[] = {"hscout0_s",
-+					      "hscout0_p",
-+					      "hscout0_ci"};
-+static const char * const hscout1_groups[] = {"hscout1_s"};
- static const char * const i2c0_groups[] = {"i2c0"};
- static const char * const i2c1_groups[] = {"i2c1"};
- static const char * const i2c3_groups[] = {"i2c3"};
-@@ -691,6 +739,12 @@ static const struct uniphier_pinmux_function uniphier_ld20_functions[] = {
- 	UNIPHIER_PINMUX_FUNCTION(emmc),
- 	UNIPHIER_PINMUX_FUNCTION(ether_rgmii),
- 	UNIPHIER_PINMUX_FUNCTION(ether_rmii),
-+	UNIPHIER_PINMUX_FUNCTION(hscin0),
-+	UNIPHIER_PINMUX_FUNCTION(hscin1),
-+	UNIPHIER_PINMUX_FUNCTION(hscin2),
-+	UNIPHIER_PINMUX_FUNCTION(hscin3),
-+	UNIPHIER_PINMUX_FUNCTION(hscout0),
-+	UNIPHIER_PINMUX_FUNCTION(hscout1),
- 	UNIPHIER_PINMUX_FUNCTION(i2c0),
- 	UNIPHIER_PINMUX_FUNCTION(i2c1),
- 	UNIPHIER_PINMUX_FUNCTION(i2c3),
+v9 changes:
+- changes to arch/arm/mach-davinci/time.c accidentally got squashed into this
+  commit. will drop this later.
+
+v8 changes:
+- none
+
+v7 changes:
+- rebased
+- drop of_platform_default_populate(NULL, NULL, NULL)
+- add change in pm_domain.c
+
+v6 changes:
+- removed misleading statement from commit message
+
+
+ arch/arm/mach-davinci/da8xx-dt.c  | 58 -------------------------------
+ arch/arm/mach-davinci/pm_domain.c |  5 +++
+ arch/arm/mach-davinci/time.c      |  9 ++---
+ 3 files changed, 10 insertions(+), 62 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 088bc5c0318b..23ac4108f812 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -19,67 +19,10 @@
+ #include "cp_intc.h"
+ #include <mach/da8xx.h>
+ 
+-static struct of_dev_auxdata da850_aemif_auxdata_lookup[] = {
+-	OF_DEV_AUXDATA("ti,davinci-nand", 0x62000000, "davinci-nand.0", NULL),
+-	{}
+-};
+-
+-static struct aemif_platform_data aemif_data = {
+-	.dev_lookup = da850_aemif_auxdata_lookup,
+-};
+-
+-static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+-	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+-	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01e28000, "i2c_davinci.2", NULL),
+-	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "davinci-wdt", NULL),
+-	OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
+-	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm.0", NULL),
+-	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm.1", NULL),
+-	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap.0", NULL),
+-	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap.1", NULL),
+-	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap.2", NULL),
+-	OF_DEV_AUXDATA("ti,da830-spi", 0x01c41000, "spi_davinci.0", NULL),
+-	OF_DEV_AUXDATA("ti,da830-spi", 0x01f0e000, "spi_davinci.1", NULL),
+-	OF_DEV_AUXDATA("ns16550a", 0x01c42000, "serial8250.0", NULL),
+-	OF_DEV_AUXDATA("ns16550a", 0x01d0c000, "serial8250.1", NULL),
+-	OF_DEV_AUXDATA("ns16550a", 0x01d0d000, "serial8250.2", NULL),
+-	OF_DEV_AUXDATA("ti,davinci_mdio", 0x01e24000, "davinci_mdio.0", NULL),
+-	OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
+-		       NULL),
+-	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
+-	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", &aemif_data),
+-	OF_DEV_AUXDATA("ti,da850-tilcdc", 0x01e13000, "da8xx_lcdc.0", NULL),
+-	OF_DEV_AUXDATA("ti,da830-ohci", 0x01e25000, "ohci-da8xx", NULL),
+-	OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
+-	OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
+-	OF_DEV_AUXDATA("ti,da850-ahci", 0x01e18000, "ahci_da850", NULL),
+-	OF_DEV_AUXDATA("ti,da850-vpif", 0x01e17000, "vpif", NULL),
+-	OF_DEV_AUXDATA("ti,da850-dsp", 0x11800000, "davinci-rproc.0", NULL),
+-	{}
+-};
+-
+ #ifdef CONFIG_ARCH_DAVINCI_DA850
+ 
+ static void __init da850_init_machine(void)
+ {
+-	/* All existing boards use 100MHz SATA refclkpn */
+-	static const unsigned long sata_refclkpn = 100 * 1000 * 1000;
+-
+-	int ret;
+-
+-	da850_register_clocks();
+-
+-	ret = da8xx_register_usb_phy_clocks();
+-	if (ret)
+-		pr_warn("%s: USB PHY CLK registration failed: %d\n",
+-			__func__, ret);
+-
+-	ret = da850_register_sata_refclk(sata_refclkpn);
+-	if (ret)
+-		pr_warn("%s: registering SATA REFCLK failed: %d",
+-			__func__, ret);
+-
+-	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
+ 	davinci_pm_init();
+ 	pdata_quirks_init();
+ }
+@@ -94,7 +37,6 @@ static const char *const da850_boards_compat[] __initconst = {
+ 
+ DT_MACHINE_START(DA850_DT, "Generic DA850/OMAP-L138/AM18x")
+ 	.map_io		= da850_init,
+-	.init_time	= da850_init_time,
+ 	.init_machine	= da850_init_machine,
+ 	.dt_compat	= da850_boards_compat,
+ 	.init_late	= davinci_init_late,
+diff --git a/arch/arm/mach-davinci/pm_domain.c b/arch/arm/mach-davinci/pm_domain.c
+index 78eac2c0c146..e251fd593bfd 100644
+--- a/arch/arm/mach-davinci/pm_domain.c
++++ b/arch/arm/mach-davinci/pm_domain.c
+@@ -13,6 +13,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/pm_clock.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
+ 
+ static struct dev_pm_domain davinci_pm_domain = {
+ 	.ops = {
+@@ -28,6 +29,10 @@ static struct pm_clk_notifier_block platform_bus_notifier = {
+ 
+ static int __init davinci_pm_runtime_init(void)
+ {
++	if (of_have_populated_dt())
++		return 0;
++
++	/* Use pm_clk as fallback if we're not using genpd. */
+ 	pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+index 7a8c6fada644..77ad95913dfa 100644
+--- a/arch/arm/mach-davinci/time.c
++++ b/arch/arm/mach-davinci/time.c
+@@ -409,11 +409,12 @@ static int __init of_davinci_timer_init(struct device_node *np)
+ 
+ 		/*
+ 		 * Fall back to using ref_clk if the actual clock is not
+-		 * available. This currently always happens because platform
+-		 * clocks (i.e PLLs and PSCs) are registered as platform
+-		 * devices and therefore are not available at this point in
+-		 * the boot process.
++		 * available. There will be problems later if the real clock
++		 * source is disabled.
+ 		 */
++
++		pr_warn("%s: falling back to ref_clk\n", __func__);
++
+ 		clkspec.np = of_find_node_by_name(NULL, "ref_clk");
+ 		if (IS_ERR(clkspec.np)) {
+ 			pr_err("%s: No clock available for timer!\n", __func__);
 -- 
 2.17.0
