@@ -1,19 +1,46 @@
-From: corbet@lwn.net (Jonathan Corbet)
-Date: Fri, 27 Apr 2018 17:00:43 -0600
-Subject: [PATCH v2 0/3] coresight: Refresh documenation
-In-Reply-To: <1523981287-15370-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1523981287-15370-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20180427170043.739d4c32@lwn.net>
+From: atull@kernel.org (Alan Tull)
+Date: Fri, 27 Apr 2018 18:30:42 -0500
+Subject: [PATCH 2/4] fpga: manager: change api, don't use drvdata
+In-Reply-To: <152cb232-ea4d-292b-8b60-8bdc1732dc23@gmail.com>
+References: <20180427012605.28981-1-mdf@kernel.org>
+ <20180427012605.28981-3-mdf@kernel.org>
+ <152cb232-ea4d-292b-8b60-8bdc1732dc23@gmail.com>
+Message-ID: <CANk1AXTZhCA78eX9j5dg1VeNyg8G4+hsiSgG_CYpZObjJw+wfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Apr 2018 10:08:04 -0600
-Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+On Fri, Apr 27, 2018 at 1:26 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 04/26/2018 06:26 PM, Moritz Fischer wrote:
+>> From: Alan Tull <atull@kernel.org>
+>>
+>> Change fpga_mgr_register to not set or use drvdata.  This supports
+>> the case where a PCIe device has more than one manager.
+>>
+>> Add fpga_mgr_create/free functions.  Change fpga_mgr_register and
+>> fpga_mgr_unregister functions to take the mgr struct as their only
+>> parameter.
+>>
+>>   struct fpga_manager *fpga_mgr_create(struct device *dev,
+>>                 const char *name,
+>>                 const struct fpga_manager_ops *mops,
+>>                 void *priv);
+>>   void fpga_mgr_free(struct fpga_manager *mgr);
+>>   int fpga_mgr_register(struct fpga_manager *mgr);
+>>   void fpga_mgr_unregister(struct fpga_manager *mgr);
+>>
+>> Update the drivers that call fpga_mgr_register with the new API.
+>
+> Apologies for chiming in so late, this commit does not make it clear
+> that fpga_mgr_unregister() now also free the 'mgr' argument by calling
+> fpga_mgr_free(), this is kind of detail, but an API should make that
+> clear IMHO.
 
-> Now that the perf tools CoreSight support is upstream this set adds
-> documentation to go with it and move things around so that topics 
-> are located together.
+If people follow the usage information, in
+Documentation/fpga/fpga-mgr.txt, they'll do the right thing.  But I
+can add a patch that clarifies the description of fpga_mgr_unregister
+in fpga-mgr.c that it "unregisters and frees" the manager.
 
-I've applied the set, thanks.
-
-jon
+>
+> Thanks
+> --
+> Florian
