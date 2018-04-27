@@ -1,144 +1,90 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 27 Apr 2018 18:05:25 +0200
-Subject: [PATCH RFC PoC 0/2] platform: different approach to early
- platform drivers
-In-Reply-To: <CAK8P3a22DKpqMGdjYoBzKfNHc2GvAbvaZowZpz=SFeQHVSWjsg@mail.gmail.com>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
- <20180426173151.GJ3094@brightrain.aerifal.cx>
- <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
- <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
- <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
- <CAK8P3a2xtTLx-VHVWok-b19=o1z5FbTNcaWq7Y_HSdaH6pWnZg@mail.gmail.com>
- <CAMRc=MdomjLCq-bJyktaToH00kNQAuTLgkSFRrY9Jmre8McT3A@mail.gmail.com>
- <CAK8P3a0tMp2QURp-9WuHehqE0b6-BO1wJ38siTdxhxgwCb-ERw@mail.gmail.com>
- <CAMpxmJVkRDLkpcgzhMb41z=Tp6zvszLd0vqfdTtZBNGT6Trtqw@mail.gmail.com>
- <CAK8P3a22DKpqMGdjYoBzKfNHc2GvAbvaZowZpz=SFeQHVSWjsg@mail.gmail.com>
-Message-ID: <CAMpxmJUovyhsiHByA3MZX5H6AcU4k9shX45Z60NpDkOFTxg_eQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Apr 2018 17:09:14 +0100
+Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
+ driver
+In-Reply-To: <20180427104629.2bff4b4b683a93ddf39f8df5@arm.com>
+References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
+ <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
+ <20180426170624.bfcba885431d57d0de2a3ddd@arm.com>
+ <20180427093027.ngtuoezyh6mtz26p@lakrids.cambridge.arm.com>
+ <20180427081525.f9dcc756678baf3bb6e6e473@arm.com>
+ <20180427143719.GA5093@arm.com>
+ <20180427104629.2bff4b4b683a93ddf39f8df5@arm.com>
+Message-ID: <20180427160914.GA5286@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-27 16:48 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Fri, Apr 27, 2018 at 4:05 PM, Bartosz Golaszewski
-> <bgolaszewski@baylibre.com> wrote:
->> 2018-04-27 14:40 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->
->>> For timer-ti-dm, it seems like a leftover from old times that can
->>> be removed. The other four are shared between arch/sh and
->>> arch/arm/mach-shmobile and already have some #ifdef
->>> to handle those two cases.
->>>
->>
->> I'm also seeing that we also call early_platform_cleanup() from
->> platform_bus_init(). Any ideas for this one?
->
-> My first idea would be to call it immediately after registering all
-> devices and drivers. It looks like it's only needed to make all
-> devm_ allocations persistent by removing them from the list,
-> so we have to call early_platform_cleanup() before getting
-> to the real platform code, but it could be done much earlier
-> if we want to, at least after both setup_arch() and sh_late_time_init()
-> are complete.
->
->>> I'd rather keep those separate and would prefer not to have
->>> that many different ways of getting there instead. DT and
->>> board files can already share most of the code through the
->>> use of platform_device, especially when you start using
->>> device properties instead of platform_data, and the other
->>> two are rare corner cases and ideally left that way.
->>>
->>> The early boot code is always special and instead of making
->>> it easier to use, we should focus on using it as little as
->>> possible: every line of code that we call before even
->>> initializing timers and consoles means it gets harder to
->>> debug when something goes wrong.
->>>
->>
->> I'm afraid I don't quite understand your reasoning. I fully agree that
->> devices that need to be initialized that early are a rare corner case.
->> We should limit any such uses to the absolute minimum. But when we do
->> need to go this way, we should do it right. Having a unified mechanism
->> for early devices will allow maintainers to enforce good practices
->> (using resources for register mapping, devres, reusing driver code for
->> reading/writing to registers). Having initialization code in machine
->> code will make everybody use different APIs and duplicate solutions. I
->> normally assume that code consolidation is always good.
->>
->> If we add a way for DT-based platform devices to be probed early - it
->> would be based on platform device/driver structures anyway. Why would
->> we even want to not convert the board code into a simple call to
->> early_platform_device_register() if we'll already offer this API for
->> device tree?
->
-> I think we first need to define what we really want to achieve here.
-> It sounds like you still want to recreate a lot of what early_platform
-> devices do, but it seems more important to me to add the missing
-> functionality to the OF_DECLARE infrastructure. The most
-> important pieces that seem to be missing are solved by finding
-> a way to provide a platform_device pointer with the following
-> properties:
->
-> - allow being passed into dev_print()
-> - allow using the pointer as a token for devres unwinding
-> - access to device_private data that remains persistent
->   until real a platform_driver gets loaded
->
-> That can probably be done as an extension to the current
-> infrastructure.
->
-> However, I'd be very cautious about the resource portion:
-> filling the platform resources (registers, irqs, ...) the way
-> we do for regular devices is much harder and can introduce
-> additional (or circular) dependencies on other devices.
-> OTOH, not using those resources means you have a hard
-> time passing information from board files.
->
->           Arnd
+Kim,
 
-So speaking in pseudo-C we basically have two ways for an imaginary
-future timer driver:
+[Ganapat: please don't let this discussion disrupt your PMU driver
+ development. You can safely ignore it for now :)]
 
-int foo_probe(struct platform_device *pdev)
-{
-    struct clk *clk;
+On Fri, Apr 27, 2018 at 10:46:29AM -0500, Kim Phillips wrote:
+> On Fri, 27 Apr 2018 15:37:20 +0100
+> Will Deacon <will.deacon@arm.com> wrote:
+> 
+> > On Fri, Apr 27, 2018 at 08:15:25AM -0500, Kim Phillips wrote:
+> > > On Fri, 27 Apr 2018 10:30:27 +0100
+> > > Mark Rutland <mark.rutland@arm.com> wrote:
+> > > > On Thu, Apr 26, 2018 at 05:06:24PM -0500, Kim Phillips wrote:
+> > > > > On Wed, 25 Apr 2018 14:30:47 +0530
+> > > > > Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com> wrote:
+> > > > > 
+> > > > > > +static int thunderx2_uncore_event_init(struct perf_event *event)
+> > > > 
+> > > > > This PMU driver can be made more user-friendly by not just silently
+> > > > > returning an error code such as -EINVAL, but by emitting a useful
+> > > > > message describing the specific error via dmesg.
+> > > > 
+> > > > As has previously been discussed on several occasions, patches which log
+> > > > to dmesg in a pmu::event_init() path at any level above pr_debug() are
+> > > > not acceptable -- dmesg is not intended as a mechanism to inform users
+> > > > of driver-specific constraints.
+> > > 
+> > > I disagree - drivers do it all the time, using dev_err(), dev_warn(), etc.
+> > > 
+> > > > I would appreciate if in future you could qualify your suggestion with
+> > > > the requirement that pr_debug() is used.
+> > > 
+> > > It shouldn't - the driver isn't being debugged, it's in regular use.
+> > 
+> > For anything under drivers/perf/, I'd prefer not to have these prints
+> > and instead see efforts to improve error reporting via the perf system
+> > call interface.
+> 
+> We'd all prefer that, and for all PMU drivers, why should ones under
+> drivers/perf be treated differently?
 
-    if (probing_early(pdev)) {
-        clk = devm_clk_get(dev, "earlyclock");
+Because they're the ones I maintain...
 
-       /* Do early stuff. */
-        return 0;
-    }
+> As you are already aware, I've personally tried to fix this problem -
+> that has existed since before the introduction of the perf tool (I
+> consider it a syscall-independent enhanced error interface), multiple
+> times, and failed.
 
-    /* Do late stuff. */
+Why is that my problem? Try harder?
 
-    return 0;
-}
+> So until someone comes up with a solution that works for everyone
+> up to and including Linus Torvalds (who hasn't put up a problem
+> pulling PMU drivers emitting things to dmesg so far, by the way), this
+> keep PMU drivers' errors silent preference of yours is unnecessarily
+> impeding people trying to measure system performance on Arm based
+> machines - all other archs' maintainers are fine with PMU drivers using
+> dmesg.
 
-    --- vs ---
+Good for them, although I'm pretty sure that at least the x86 folks are
+against this crap too.
 
-int foo_probe(struct platform_device *pdev)
-{
-    /* Do late stuff. */
+> > Anyway, I think this driver has bigger problems that need addressing.
+> 
+> To me it represents yet another PMU driver submission - as the years go
+> by - that is lacking in the user messaging area.  Which reminds me, can
+> you take another look at applying this?:
 
-    return 0;
-}
+As I said before, I'm not going to take anything that logs above pr_debug
+for things that are directly triggerable from userspace. Spin a version
+using pr_debug and I'll queue it.
 
-static int foo_init(struct device_node *np)
-{
-    struct clk *clk;
-    struct device *dev = device_from_device_node(np);
+Have a good weekend,
 
-    /* Do early stuff. */
-    clk = devm_clk_get(dev, "earlyclock");
-
-    return 0;
-}
-
-TIMER_OF_DECLARE(foo, "bar,foo", foo_init);
-
-I still believe the first approach is easier to implement and has the
-added benefit of supporting board files.
-
-I'll give it a thought and will be back at it next week.
-
-Best regards,
-Bartosz Golaszewski
+Will
