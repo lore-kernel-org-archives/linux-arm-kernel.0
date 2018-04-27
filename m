@@ -1,154 +1,108 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 27 Apr 2018 16:14:46 +0800
-Subject: [PATCH v2 5/6] clk: mediatek: add g3dsys support for MT2701 and MT7623
-In-Reply-To: <cover.1524816502.git.sean.wang@mediatek.com>
-References: <cover.1524816502.git.sean.wang@mediatek.com>
-Message-ID: <caf1cbbd0758cbb9c25c081f4d8fdb9f64769a44.1524816502.git.sean.wang@mediatek.com>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Fri, 27 Apr 2018 10:25:28 +0200
+Subject: [PATCH v7 06/11] ARM: sunxi: Add initialization of CNTVOFF
+In-Reply-To: <20180423081609.dirsitco3aeaqztx@flea>
+References: <20180420211022.11759-1-mylene.josserand@bootlin.com>
+ <20180420211022.11759-7-mylene.josserand@bootlin.com>
+ <20180423081609.dirsitco3aeaqztx@flea>
+Message-ID: <20180427102528.04b8e5c1@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hello Maxime,
 
-Add clock driver support for g3dsys on MT2701 and MT7623, which is
-providing essential clock gate and reset controller to Mali-450.
+Thanks for your review.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/clk/mediatek/Kconfig          |  6 +++
- drivers/clk/mediatek/Makefile         |  1 +
- drivers/clk/mediatek/clk-mt2701-g3d.c | 95 +++++++++++++++++++++++++++++++++++
- 3 files changed, 102 insertions(+)
- create mode 100644 drivers/clk/mediatek/clk-mt2701-g3d.c
+On Mon, 23 Apr 2018 10:16:09 +0200
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
-diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
-index 92afe59..3dd1dab 100644
---- a/drivers/clk/mediatek/Kconfig
-+++ b/drivers/clk/mediatek/Kconfig
-@@ -60,6 +60,12 @@ config COMMON_CLK_MT2701_AUDSYS
- 	---help---
- 	  This driver supports Mediatek MT2701 audsys clocks.
- 
-+config COMMON_CLK_MT2701_G3DSYS
-+	bool "Clock driver for MediaTek MT2701 g3dsys"
-+	depends on COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports MediaTek MT2701 g3dsys clocks.
-+
- config COMMON_CLK_MT2712
- 	bool "Clock driver for MediaTek MT2712"
- 	depends on (ARCH_MEDIATEK && ARM64) || COMPILE_TEST
-diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-index b80eff2..844b55d 100644
---- a/drivers/clk/mediatek/Makefile
-+++ b/drivers/clk/mediatek/Makefile
-@@ -9,6 +9,7 @@ obj-$(CONFIG_COMMON_CLK_MT2701) += clk-mt2701.o
- obj-$(CONFIG_COMMON_CLK_MT2701_AUDSYS) += clk-mt2701-aud.o
- obj-$(CONFIG_COMMON_CLK_MT2701_BDPSYS) += clk-mt2701-bdp.o
- obj-$(CONFIG_COMMON_CLK_MT2701_ETHSYS) += clk-mt2701-eth.o
-+obj-$(CONFIG_COMMON_CLK_MT2701_G3DSYS) += clk-mt2701-g3d.o
- obj-$(CONFIG_COMMON_CLK_MT2701_HIFSYS) += clk-mt2701-hif.o
- obj-$(CONFIG_COMMON_CLK_MT2701_IMGSYS) += clk-mt2701-img.o
- obj-$(CONFIG_COMMON_CLK_MT2701_MMSYS) += clk-mt2701-mm.o
-diff --git a/drivers/clk/mediatek/clk-mt2701-g3d.c b/drivers/clk/mediatek/clk-mt2701-g3d.c
-new file mode 100644
-index 0000000..1328c11
---- /dev/null
-+++ b/drivers/clk/mediatek/clk-mt2701-g3d.c
-@@ -0,0 +1,95 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Sean Wang <sean.wang@mediatek.com>
-+ *
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+
-+#include "clk-mtk.h"
-+#include "clk-gate.h"
-+
-+#include <dt-bindings/clock/mt2701-clk.h>
-+
-+#define GATE_G3D(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &g3d_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_setclr,	\
-+	}
-+
-+static const struct mtk_gate_regs g3d_cg_regs = {
-+	.sta_ofs = 0x0,
-+	.set_ofs = 0x4,
-+	.clr_ofs = 0x8,
-+};
-+
-+static const struct mtk_gate g3d_clks[] = {
-+	GATE_G3D(CLK_G3DSYS_CORE, "g3d_core", "mfg_sel", 0),
-+};
-+
-+static int clk_mt2701_g3dsys_init(struct platform_device *pdev)
-+{
-+	struct clk_onecell_data *clk_data;
-+	struct device_node *node = pdev->dev.of_node;
-+	int r;
-+
-+	clk_data = mtk_alloc_clk_data(CLK_G3DSYS_NR);
-+
-+	mtk_clk_register_gates(node, g3d_clks, ARRAY_SIZE(g3d_clks),
-+			       clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (r)
-+		dev_err(&pdev->dev,
-+			"could not register clock provider: %s: %d\n",
-+			pdev->name, r);
-+
-+	mtk_register_reset_controller(node, 1, 0xc);
-+
-+	return r;
-+}
-+
-+static const struct of_device_id of_match_clk_mt2701_g3d[] = {
-+	{
-+		.compatible = "mediatek,mt2701-g3dsys",
-+		.data = clk_mt2701_g3dsys_init,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+
-+static int clk_mt2701_g3d_probe(struct platform_device *pdev)
-+{
-+	int (*clk_init)(struct platform_device *);
-+	int r;
-+
-+	clk_init = of_device_get_match_data(&pdev->dev);
-+	if (!clk_init)
-+		return -EINVAL;
-+
-+	r = clk_init(pdev);
-+	if (r)
-+		dev_err(&pdev->dev,
-+			"could not register clock provider: %s: %d\n",
-+			pdev->name, r);
-+
-+	return r;
-+}
-+
-+static struct platform_driver clk_mt2701_g3d_drv = {
-+	.probe = clk_mt2701_g3d_probe,
-+	.driver = {
-+		.name = "clk-mt2701-g3d",
-+		.of_match_table = of_match_clk_mt2701_g3d,
-+	},
-+};
-+
-+builtin_platform_driver(clk_mt2701_g3d_drv);
+> On Fri, Apr 20, 2018 at 11:10:17PM +0200, Myl?ne Josserand wrote:
+> > Add the initialization of CNTVOFF for sun8i-a83t.
+> > 
+> > For boot CPU, create a new machine that handles this
+> > function's call in an "init_early" callback. We need to initialize
+> > CNTVOFF before the arch timer's initialization otherwise, it will
+> > not be taken into account and fails to boot correctly.
+> > Because of that, this function can't be called in SMP's early_initcall
+> > function which is called after timer's init.
+> > 
+> > For secondary CPUs, add this function into secondary_startup
+> > assembly entry.
+> > 
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > ---
+> >  arch/arm/mach-sunxi/headsmp.S |  1 +
+> >  arch/arm/mach-sunxi/sunxi.c   | 20 +++++++++++++++++++-
+> >  2 files changed, 20 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+> > index 37dc772701f3..32d76be98541 100644
+> > --- a/arch/arm/mach-sunxi/headsmp.S
+> > +++ b/arch/arm/mach-sunxi/headsmp.S
+> > @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+> >  
+> >  ENTRY(sunxi_mc_smp_secondary_startup)
+> >  	bl	sunxi_mc_smp_cluster_cache_enable
+> > +	bl	secure_cntvoff_init
+> >  	b	secondary_startup
+> >  ENDPROC(sunxi_mc_smp_secondary_startup)
+> >  
+> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> > index 5e9602ce1573..ddc439f6269b 100644
+> > --- a/arch/arm/mach-sunxi/sunxi.c
+> > +++ b/arch/arm/mach-sunxi/sunxi.c
+> > @@ -16,6 +16,7 @@
+> >  #include <linux/platform_device.h>
+> >  
+> >  #include <asm/mach/arch.h>
+> > +#include <asm/secure_cntvoff.h>
+> >  
+> >  static const char * const sunxi_board_dt_compat[] = {
+> >  	"allwinner,sun4i-a10",
+> > @@ -62,7 +63,6 @@ MACHINE_END
+> >  static const char * const sun8i_board_dt_compat[] = {
+> >  	"allwinner,sun8i-a23",
+> >  	"allwinner,sun8i-a33",
+> > -	"allwinner,sun8i-a83t",
+> >  	"allwinner,sun8i-h2-plus",
+> >  	"allwinner,sun8i-h3",
+> >  	"allwinner,sun8i-r40",
+> > @@ -75,6 +75,24 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+> >  	.dt_compat	= sun8i_board_dt_compat,
+> >  MACHINE_END
+> >  
+> > +void __init sun8i_cntvoff_init(void)
+> > +{
+> > +#ifdef CONFIG_SMP
+> > +	secure_cntvoff_init();
+> > +#endif
+> > +}
+> > +
+> > +static const char * const sun8i_cntvoff_board_dt_compat[] = {
+> > +	"allwinner,sun8i-a83t",
+> > +	NULL,
+> > +};
+> > +
+> > +DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i-a83t board")  
+> 
+> This name still doesn't really make much sense. It's an A83t, that's
+> it.
+
+True, I forgot this one, sorry.
+
+> 
+> Apart from the other minor comment I had, and once that name has been
+> fixed:
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> 
+> Maxime
+> 
+
+Thank you!
+
+Best regards,
+
 -- 
-2.7.4
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
