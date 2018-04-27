@@ -1,37 +1,57 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sat, 28 Apr 2018 03:06:12 +0800
-Subject: [PATCH 0/5] arm64: imx: add imx8qxp support
-Message-ID: <1524855977-15719-1-git-send-email-aisheng.dong@nxp.com>
+Date: Sat, 28 Apr 2018 03:06:14 +0800
+Subject: [PATCH 2/5] arm64: imx: add imx8qxp support
+In-Reply-To: <1524855977-15719-1-git-send-email-aisheng.dong@nxp.com>
+References: <1524855977-15719-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1524855977-15719-3-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx8qxp support
+Add imx8qxp support.
 
-Dong Aisheng (5):
-  soc: imx: add imx8 soc device support
-  arm64: imx: add imx8qxp support
-  arm64: dts: imx: add imx8qxp support
-  defconfig: arm64: add imx8qxp support
-  MAINTAINERS: imx: add NXP linux team upstream maillist as reviewer
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Fabio Estevam <festevam@gmail.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ arch/arm64/Kconfig.platforms | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
- Documentation/devicetree/bindings/arm/fsl.txt     |   5 +
- MAINTAINERS                                       |   1 +
- arch/arm64/Kconfig.platforms                      |  23 +
- arch/arm64/boot/dts/freescale/Makefile            |   1 +
- arch/arm64/boot/dts/freescale/fsl-imx8-ca35.dtsi  |  66 ++
- arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts | 138 ++++
- arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi    | 794 ++++++++++++++++++++++
- arch/arm64/configs/defconfig                      |   6 +
- drivers/soc/imx/Kconfig                           |   4 +
- drivers/soc/imx/Makefile                          |   1 +
- drivers/soc/imx/soc-imx8.c                        | 106 +++
- include/dt-bindings/power/imx-rsrc.h              | 558 +++++++++++++++
- 12 files changed, 1703 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-imx8-ca35.dtsi
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi
- create mode 100644 drivers/soc/imx/soc-imx8.c
- create mode 100644 include/dt-bindings/power/imx-rsrc.h
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 2b1535c..8527def 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -132,6 +132,29 @@ config ARCH_MVEBU
+ 	   - Armada 7K SoC Family
+ 	   - Armada 8K SoC Family
+ 
++config ARCH_MXC
++	bool "ARMv8 based NXP i.MX SoC family"
++	select GPIOLIB
++	select PINCTRL
++	select PM
++	select PM_GENERIC_DOMAINS
++	select SOC_BUS
++	help
++	  This enables support for the ARMv8 based SoCs in the
++	  NXP i.MX family.
++
++config SOC_IMX8QXP
++	bool "i.MX8QXP"
++	depends on ARCH_MXC
++	select HAVE_IMX_MU
++	select HAVE_IMX_SCU
++	select HAVE_IMX_SC_PD
++	select HAVE_IMX8_SOC
++	select MXC_CLK_SCU
++	select PINCTRL_IMX8QXP
++	help
++	  This enables support for NXP i.MX8QXP SoC.
++
+ config ARCH_QCOM
+ 	bool "Qualcomm Platforms"
+ 	select GPIOLIB
 -- 
 2.7.4
