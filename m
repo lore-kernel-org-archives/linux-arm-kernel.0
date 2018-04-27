@@ -1,34 +1,120 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Apr 2018 10:30:27 +0100
-Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <20180426170624.bfcba885431d57d0de2a3ddd@arm.com>
-References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
- <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
- <20180426170624.bfcba885431d57d0de2a3ddd@arm.com>
-Message-ID: <20180427093027.ngtuoezyh6mtz26p@lakrids.cambridge.arm.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Fri, 27 Apr 2018 17:31:44 +0800
+Subject: [PATCH v7 0/7] clk: meson-axg: Add AO Cloclk and Reset driver
+In-Reply-To: <1524820841.4026.112.camel@baylibre.com>
+References: <20180426084437.192394-1-yixun.lan@amlogic.com>
+ <1524820841.4026.112.camel@baylibre.com>
+Message-ID: <fbd24a73-6793-76be-3ca5-04cbac5db198@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kim,
+hi Jerome:
 
-On Thu, Apr 26, 2018 at 05:06:24PM -0500, Kim Phillips wrote:
-> On Wed, 25 Apr 2018 14:30:47 +0530
-> Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com> wrote:
+
+On 04/27/18 17:20, Jerome Brunet wrote:
+> On Thu, 2018-04-26 at 16:44 +0800, Yixun Lan wrote:
+>>   This patch try to add AO clock and Reset driver for Amlogic's
+>> Meson-AXG SoC.
+>>   Please note that patch 7 need to wait for the DTS changes[3] merged
+>> into mainline first, otherwise it will break the serial console.
+>>
+>>  patch 2: factor the common code into a dedicated file
+>>  patch 3-5: add the aoclk driver for AXG SoC
+>>  patch 6-7: drop unnecessary clock flags
+>>
+>> changes since v6 at [7]: 
+>>  - fix over 80 chars chechpatch error
+>>  - add Philip's Ack on patch 5
+>>  - drop extra end of newline
+>>
+>> changes since v5 at [6]: 
+>>  - drop unnecessary header files
+>>  - add 'axg_aoclk' prefix to clk driver, make them more consistent
+>>  - add missing end new line..
+>>
+>> changes since v4 at [5]: 
+>>  - fix return err
+>>  - introduce CONFIG_COMMON_CLK_MESON_AO
+>>  - format/style minor fix
+>>
+>> changes since v3 at [4]: 
+>>  - add 'const' contraint to the read-only data
+>>  - switch to devm_of_clk_add_hw_provider API
+>>  - check return value of devm_reset_controller_register
+>>
+>> changes since v2 at [2]: 
+>>  - rework meson_aoclkc_probe() which leverage the of_match_data
+>>  - merge patch 5-6 into this series
+>>  - seperate DTS patch, will send to Kevin Hilman independently
+>>  
+>> changes since v1 at [0]: 
+>>  - rebase to clk-meson's branch 'next/drivers' [1]
+>>  - fix license, update to BSD-3-Clause
+>>  - drop un-used include header file
+>>
+>> [0] https://lkml.kernel.org/r/20180209070026.193879-1-yixun.lan at amlogic.com
+>> [1] git://github.com/BayLibre/clk-meson.git branch: next-drivers
+>> [2] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
+>> [3] https://lkml.kernel.org/r/20180326081809.49493-4-yixun.lan at amlogic.com
+>> [4] https://lkml.kernel.org/r/20180328025050.221585-1-yixun.lan at amlogic.com
+>> [5] https://lkml.kernel.org/r/20180408031938.153474-1-yixun.lan at amlogic.com
+>> [6] https://lkml.kernel.org/r/20180409143749.71197-1-yixun.lan at amlogic.com
+>> [7] https://lkml.kernel.org/r/20180419135426.155794-1-yixun.lan at amlogic.com
 > 
-> > +static int thunderx2_uncore_event_init(struct perf_event *event)
+> Yixun,
+> 
+> Your series looks mostly Ok to me, apart from the problem reported by Philipp.
+> 
+> However, once applied, if the clkc ao controller is enabled, both gxl and axg
+> fail to complete the boot. Could you please explain how this was tested ??
+> 
 
-> This PMU driver can be made more user-friendly by not just silently
-> returning an error code such as -EINVAL, but by emitting a useful
-> message describing the specific error via dmesg.
+isn't this caused by the patch 7?
+ [PATCH v7 7/7] clk: meson: drop CLK_IGNORE_UNUSED flag
 
-As has previously been discussed on several occasions, patches which log
-to dmesg in a pmu::event_init() path at any level above pr_debug() are
-not acceptable -- dmesg is not intended as a mechanism to inform users
-of driver-specific constraints.
 
-I would appreciate if in future you could qualify your suggestion with
-the requirement that pr_debug() is used.
+you need to also apply this DT patch which I've sent[1]:
+ [PATCH v3 3/3] ARM64: dts: meson: fix clock source of the pclk for UART_AO
 
-Thanks,
-Mark.
+could you exclude the patch 7 for now until Kevin merged the DT part?
+
+[1] https://lkml.kernel.org/r/20180328030130.240336-4-yixun.lan at amlogic.com
+
+
+> Not merging it until we get to the bottom of this.
+> 
+>>
+>>
+>> Qiufang Dai (1):
+>>   clk: meson-axg: Add AO Clock and Reset controller driver
+>>
+>> Yixun Lan (6):
+>>   clk: meson: migrate to devm_of_clk_add_hw_provider API
+>>   clk: meson: aoclk: refactor common code into dedicated file
+>>   dt-bindings: clock: axg-aoclkc: New binding for Meson-AXG SoC
+>>   dt-bindings: clock: reset: Add AXG AO Clock and Reset Bindings
+>>   clk: meson: drop CLK_SET_RATE_PARENT flag
+>>   clk: meson: drop CLK_IGNORE_UNUSED flag
+>>
+>>  .../bindings/clock/amlogic,gxbb-aoclkc.txt    |   1 +
+>>  drivers/clk/meson/Kconfig                     |   8 +
+>>  drivers/clk/meson/Makefile                    |   3 +-
+>>  drivers/clk/meson/axg-aoclk.c                 | 163 ++++++++++++++++++
+>>  drivers/clk/meson/axg-aoclk.h                 |  29 ++++
+>>  drivers/clk/meson/gxbb-aoclk.c                |  95 ++++------
+>>  drivers/clk/meson/gxbb-aoclk.h                |   5 +
+>>  drivers/clk/meson/meson-aoclk.c               |  81 +++++++++
+>>  drivers/clk/meson/meson-aoclk.h               |  34 ++++
+>>  include/dt-bindings/clock/axg-aoclkc.h        |  26 +++
+>>  include/dt-bindings/reset/axg-aoclkc.h        |  20 +++
+>>  11 files changed, 401 insertions(+), 64 deletions(-)
+>>  create mode 100644 drivers/clk/meson/axg-aoclk.c
+>>  create mode 100644 drivers/clk/meson/axg-aoclk.h
+>>  create mode 100644 drivers/clk/meson/meson-aoclk.c
+>>  create mode 100644 drivers/clk/meson/meson-aoclk.h
+>>  create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
+>>  create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
+>>
+> 
+> .
+> 
