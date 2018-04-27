@@ -1,178 +1,139 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 27 Apr 2018 11:53:47 +0200
-Subject: [PATCH v9 26/27] ARM: davinci: da8xx-dt: switch to device tree
- clocks
-In-Reply-To: <20180427001745.4116-27-david@lechnology.com>
-References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-27-david@lechnology.com>
-Message-ID: <CAMpxmJXNSagsNMgftQPQ8Fyt2mbsq3xTHU9u30ggoorgEQD1iw@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 27 Apr 2018 11:59:14 +0200
+Subject: [PATCH v7 0/7] clk: meson-axg: Add AO Cloclk and Reset driver
+In-Reply-To: <fbd24a73-6793-76be-3ca5-04cbac5db198@amlogic.com>
+References: <20180426084437.192394-1-yixun.lan@amlogic.com>
+ <1524820841.4026.112.camel@baylibre.com>
+ <fbd24a73-6793-76be-3ca5-04cbac5db198@amlogic.com>
+Message-ID: <1524823154.4026.123.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-27 2:17 GMT+02:00 David Lechner <david@lechnology.com>:
-> This removes all of the clock init code from da8xx-dt.c. This includes
-> all of the OF_DEV_AUXDATA that was just used for looking up clocks.
->
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->
-> v9 changes:
-> - changes to arch/arm/mach-davinci/time.c accidentally got squashed into this
->   commit. will drop this later.
->
-> v8 changes:
-> - none
->
-> v7 changes:
-> - rebased
-> - drop of_platform_default_populate(NULL, NULL, NULL)
-> - add change in pm_domain.c
->
-> v6 changes:
-> - removed misleading statement from commit message
->
->
->  arch/arm/mach-davinci/da8xx-dt.c  | 58 -------------------------------
->  arch/arm/mach-davinci/pm_domain.c |  5 +++
->  arch/arm/mach-davinci/time.c      |  9 ++---
->  3 files changed, 10 insertions(+), 62 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> index 088bc5c0318b..23ac4108f812 100644
-> --- a/arch/arm/mach-davinci/da8xx-dt.c
-> +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> @@ -19,67 +19,10 @@
->  #include "cp_intc.h"
->  #include <mach/da8xx.h>
->
-> -static struct of_dev_auxdata da850_aemif_auxdata_lookup[] = {
-> -       OF_DEV_AUXDATA("ti,davinci-nand", 0x62000000, "davinci-nand.0", NULL),
-> -       {}
-> -};
-> -
-> -static struct aemif_platform_data aemif_data = {
-> -       .dev_lookup = da850_aemif_auxdata_lookup,
-> -};
-> -
-> -static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
-> -       OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
-> -       OF_DEV_AUXDATA("ti,davinci-i2c", 0x01e28000, "i2c_davinci.2", NULL),
-> -       OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "davinci-wdt", NULL),
-> -       OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
-> -       OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm.0", NULL),
-> -       OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm.1", NULL),
-> -       OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap.0", NULL),
-> -       OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap.1", NULL),
-> -       OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap.2", NULL),
-> -       OF_DEV_AUXDATA("ti,da830-spi", 0x01c41000, "spi_davinci.0", NULL),
-> -       OF_DEV_AUXDATA("ti,da830-spi", 0x01f0e000, "spi_davinci.1", NULL),
-> -       OF_DEV_AUXDATA("ns16550a", 0x01c42000, "serial8250.0", NULL),
-> -       OF_DEV_AUXDATA("ns16550a", 0x01d0c000, "serial8250.1", NULL),
-> -       OF_DEV_AUXDATA("ns16550a", 0x01d0d000, "serial8250.2", NULL),
-> -       OF_DEV_AUXDATA("ti,davinci_mdio", 0x01e24000, "davinci_mdio.0", NULL),
-> -       OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
-> -                      NULL),
-> -       OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
-> -       OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", &aemif_data),
-> -       OF_DEV_AUXDATA("ti,da850-tilcdc", 0x01e13000, "da8xx_lcdc.0", NULL),
-> -       OF_DEV_AUXDATA("ti,da830-ohci", 0x01e25000, "ohci-da8xx", NULL),
-> -       OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
-> -       OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
-> -       OF_DEV_AUXDATA("ti,da850-ahci", 0x01e18000, "ahci_da850", NULL),
-> -       OF_DEV_AUXDATA("ti,da850-vpif", 0x01e17000, "vpif", NULL),
-> -       OF_DEV_AUXDATA("ti,da850-dsp", 0x11800000, "davinci-rproc.0", NULL),
-> -       {}
-> -};
-> -
->  #ifdef CONFIG_ARCH_DAVINCI_DA850
->
->  static void __init da850_init_machine(void)
->  {
-> -       /* All existing boards use 100MHz SATA refclkpn */
-> -       static const unsigned long sata_refclkpn = 100 * 1000 * 1000;
-> -
-> -       int ret;
-> -
-> -       da850_register_clocks();
-> -
-> -       ret = da8xx_register_usb_phy_clocks();
-> -       if (ret)
-> -               pr_warn("%s: USB PHY CLK registration failed: %d\n",
-> -                       __func__, ret);
-> -
-> -       ret = da850_register_sata_refclk(sata_refclkpn);
-> -       if (ret)
-> -               pr_warn("%s: registering SATA REFCLK failed: %d",
-> -                       __func__, ret);
-> -
-> -       of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
->         davinci_pm_init();
->         pdata_quirks_init();
->  }
-> @@ -94,7 +37,6 @@ static const char *const da850_boards_compat[] __initconst = {
->
->  DT_MACHINE_START(DA850_DT, "Generic DA850/OMAP-L138/AM18x")
->         .map_io         = da850_init,
-> -       .init_time      = da850_init_time,
->         .init_machine   = da850_init_machine,
->         .dt_compat      = da850_boards_compat,
->         .init_late      = davinci_init_late,
-> diff --git a/arch/arm/mach-davinci/pm_domain.c b/arch/arm/mach-davinci/pm_domain.c
-> index 78eac2c0c146..e251fd593bfd 100644
-> --- a/arch/arm/mach-davinci/pm_domain.c
-> +++ b/arch/arm/mach-davinci/pm_domain.c
-> @@ -13,6 +13,7 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/pm_clock.h>
->  #include <linux/platform_device.h>
-> +#include <linux/of.h>
->
->  static struct dev_pm_domain davinci_pm_domain = {
->         .ops = {
-> @@ -28,6 +29,10 @@ static struct pm_clk_notifier_block platform_bus_notifier = {
->
->  static int __init davinci_pm_runtime_init(void)
->  {
-> +       if (of_have_populated_dt())
-> +               return 0;
-> +
-> +       /* Use pm_clk as fallback if we're not using genpd. */
->         pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
->
->         return 0;
-> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-> index 7a8c6fada644..77ad95913dfa 100644
-> --- a/arch/arm/mach-davinci/time.c
-> +++ b/arch/arm/mach-davinci/time.c
-> @@ -409,11 +409,12 @@ static int __init of_davinci_timer_init(struct device_node *np)
->
->                 /*
->                  * Fall back to using ref_clk if the actual clock is not
-> -                * available. This currently always happens because platform
-> -                * clocks (i.e PLLs and PSCs) are registered as platform
-> -                * devices and therefore are not available at this point in
-> -                * the boot process.
-> +                * available. There will be problems later if the real clock
-> +                * source is disabled.
->                  */
-> +
-> +               pr_warn("%s: falling back to ref_clk\n", __func__);
-> +
->                 clkspec.np = of_find_node_by_name(NULL, "ref_clk");
->                 if (IS_ERR(clkspec.np)) {
->                         pr_err("%s: No clock available for timer!\n", __func__);
-> --
-> 2.17.0
->
+On Fri, 2018-04-27 at 17:31 +0800, Yixun Lan wrote:
+> hi Jerome:
+> 
+> 
+> On 04/27/18 17:20, Jerome Brunet wrote:
+> > On Thu, 2018-04-26 at 16:44 +0800, Yixun Lan wrote:
+> > >   This patch try to add AO clock and Reset driver for Amlogic's
+> > > Meson-AXG SoC.
+> > >   Please note that patch 7 need to wait for the DTS changes[3] merged
+> > > into mainline first, otherwise it will break the serial console.
+> > > 
+> > >  patch 2: factor the common code into a dedicated file
+> > >  patch 3-5: add the aoclk driver for AXG SoC
+> > >  patch 6-7: drop unnecessary clock flags
+> > > 
+> > > changes since v6 at [7]: 
+> > >  - fix over 80 chars chechpatch error
+> > >  - add Philip's Ack on patch 5
+> > >  - drop extra end of newline
+> > > 
+> > > changes since v5 at [6]: 
+> > >  - drop unnecessary header files
+> > >  - add 'axg_aoclk' prefix to clk driver, make them more consistent
+> > >  - add missing end new line..
+> > > 
+> > > changes since v4 at [5]: 
+> > >  - fix return err
+> > >  - introduce CONFIG_COMMON_CLK_MESON_AO
+> > >  - format/style minor fix
+> > > 
+> > > changes since v3 at [4]: 
+> > >  - add 'const' contraint to the read-only data
+> > >  - switch to devm_of_clk_add_hw_provider API
+> > >  - check return value of devm_reset_controller_register
+> > > 
+> > > changes since v2 at [2]: 
+> > >  - rework meson_aoclkc_probe() which leverage the of_match_data
+> > >  - merge patch 5-6 into this series
+> > >  - seperate DTS patch, will send to Kevin Hilman independently
+> > >  
+> > > changes since v1 at [0]: 
+> > >  - rebase to clk-meson's branch 'next/drivers' [1]
+> > >  - fix license, update to BSD-3-Clause
+> > >  - drop un-used include header file
+> > > 
+> > > [0] https://lkml.kernel.org/r/20180209070026.193879-1-yixun.lan at amlogic.com
+> > > [1] git://github.com/BayLibre/clk-meson.git branch: next-drivers
+> > > [2] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
+> > > [3] https://lkml.kernel.org/r/20180326081809.49493-4-yixun.lan at amlogic.com
+> > > [4] https://lkml.kernel.org/r/20180328025050.221585-1-yixun.lan at amlogic.com
+> > > [5] https://lkml.kernel.org/r/20180408031938.153474-1-yixun.lan at amlogic.com
+> > > [6] https://lkml.kernel.org/r/20180409143749.71197-1-yixun.lan at amlogic.com
+> > > [7] https://lkml.kernel.org/r/20180419135426.155794-1-yixun.lan at amlogic.com
+> > 
+> > Yixun,
+> > 
+> > Your series looks mostly Ok to me, apart from the problem reported by Philipp.
+> > 
+> > However, once applied, if the clkc ao controller is enabled, both gxl and axg
+> > fail to complete the boot. Could you please explain how this was tested ??
+> > 
+> 
+> isn't this caused by the patch 7?
+>  [PATCH v7 7/7] clk: meson: drop CLK_IGNORE_UNUSED flag
+> 
+> 
+> you need to also apply this DT patch which I've sent[1]:
+>  [PATCH v3 3/3] ARM64: dts: meson: fix clock source of the pclk for UART_AO
+> 
+> could you exclude the patch 7 for now until Kevin merged the DT part?
+> 
+> [1] https://lkml.kernel.org/r/20180328030130.240336-4-yixun.lan at amlogic.com
 
-The following headers can be removed:
+Looks to be the problem indeed. But it is still an issue with how your patchset
+in organized.
 
--#include <linux/io.h>
--#include <linux/of_irq.h>
--#include <linux/of_platform.h>
--#include <linux/irqdomain.h>
--#include <linux/platform_data/ti-aemif.h>
--#include "cp_intc.h"
+I can't merge this until Kevin merges the patch above, which he can't merge
+until there is the clkc_ao support in axg, which is given by this series.
 
-Thanks,
-Bart
+1# You should remove the axg part of the patch above. Kevin will be able to
+merge it w/o any dependencies. (BTW, the patch is broken for axg because 1) you
+did not include the dt-binding header for the clkc_ao in axg and 2) the clkc_ao
+does not exist at this stage)
+2# I can then safely merge this series - w/o breaking gxbb and gxl.
+3# Finally you'll have to make a DT change for the axg, enabling the clkc_ao and
+changes the uart clocks at the same time.
+
+> 
+> 
+> > Not merging it until we get to the bottom of this.
+> > 
+> > > 
+> > > 
+> > > Qiufang Dai (1):
+> > >   clk: meson-axg: Add AO Clock and Reset controller driver
+> > > 
+> > > Yixun Lan (6):
+> > >   clk: meson: migrate to devm_of_clk_add_hw_provider API
+> > >   clk: meson: aoclk: refactor common code into dedicated file
+> > >   dt-bindings: clock: axg-aoclkc: New binding for Meson-AXG SoC
+> > >   dt-bindings: clock: reset: Add AXG AO Clock and Reset Bindings
+> > >   clk: meson: drop CLK_SET_RATE_PARENT flag
+> > >   clk: meson: drop CLK_IGNORE_UNUSED flag
+> > > 
+> > >  .../bindings/clock/amlogic,gxbb-aoclkc.txt    |   1 +
+> > >  drivers/clk/meson/Kconfig                     |   8 +
+> > >  drivers/clk/meson/Makefile                    |   3 +-
+> > >  drivers/clk/meson/axg-aoclk.c                 | 163 ++++++++++++++++++
+> > >  drivers/clk/meson/axg-aoclk.h                 |  29 ++++
+> > >  drivers/clk/meson/gxbb-aoclk.c                |  95 ++++------
+> > >  drivers/clk/meson/gxbb-aoclk.h                |   5 +
+> > >  drivers/clk/meson/meson-aoclk.c               |  81 +++++++++
+> > >  drivers/clk/meson/meson-aoclk.h               |  34 ++++
+> > >  include/dt-bindings/clock/axg-aoclkc.h        |  26 +++
+> > >  include/dt-bindings/reset/axg-aoclkc.h        |  20 +++
+> > >  11 files changed, 401 insertions(+), 64 deletions(-)
+> > >  create mode 100644 drivers/clk/meson/axg-aoclk.c
+> > >  create mode 100644 drivers/clk/meson/axg-aoclk.h
+> > >  create mode 100644 drivers/clk/meson/meson-aoclk.c
+> > >  create mode 100644 drivers/clk/meson/meson-aoclk.h
+> > >  create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
+> > >  create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
+> > > 
+> > 
+> > .
+> > 
+> 
+> 
