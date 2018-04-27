@@ -1,58 +1,105 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 27 Apr 2018 12:20:33 +0200
-Subject: [PATCH 20/61] input: keyboard: simplify getting .drvdata
-In-Reply-To: <20180426212327.GB210716@dtor-ws>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <20180419140641.27926-21-wsa+renesas@sang-engineering.com>
- <20180426191947.GC162443@dtor-ws>
- <20180426200401.lvqiy4gnchkwr4qw@ninjato>
- <20180426212327.GB210716@dtor-ws>
-Message-ID: <20180427102033.msrr5sourxrtypg7@ninjato>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Apr 2018 11:27:03 +0100
+Subject: [PATCHv3 07/11] arm64: add basic pointer authentication support
+In-Reply-To: <20180425112331.hke7afxnslyrwf3h@armageddon.cambridge.arm.com>
+References: <20180417183735.56985-1-mark.rutland@arm.com>
+ <20180417183735.56985-8-mark.rutland@arm.com>
+ <20180425112331.hke7afxnslyrwf3h@armageddon.cambridge.arm.com>
+Message-ID: <20180427102703.7azck754cnjm232p@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
-
-> > Isn't it actually the other way around? platform_get_drvdata() is a
-> > convenience function to access driver_data which is embedded in struct
-> > device?
+On Wed, Apr 25, 2018 at 12:23:32PM +0100, Catalin Marinas wrote:
+> Hi Mark,
 > 
-> I guess it depends on how you read it. I always considered it separate
-> because none (?) of the bus implementation assert this in comments to
-> XXX_get_drvdata().
-
-Well, even in the case somebody will implement a custom driver_data for
-platform_devices, this person will need to convert all current users to
-'dev_get_drvdata(&pdev->dev);' first in order to avoid regressions, I'd
-think. This is what my patch does right now (but merely for overhead
-reasons). Or?
-
-> > > in the future, so I'd prefer keep using the proper accessors for the
-> > > objects we are dealing with.
-> > 
-> > Exactly. I'd just argue, the object we are dealing with, declared in the
-> > PM functions, is a struct device.
+> On Tue, Apr 17, 2018 at 07:37:31PM +0100, Mark Rutland wrote:
+> > diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> > index 39ec0b8a689e..caf0d3010112 100644
+> > --- a/arch/arm64/include/asm/mmu_context.h
+> > +++ b/arch/arm64/include/asm/mmu_context.h
+> > @@ -29,7 +29,6 @@
+> >  #include <asm/cacheflush.h>
+> >  #include <asm/cpufeature.h>
+> >  #include <asm/proc-fns.h>
+> > -#include <asm-generic/mm_hooks.h>
+> >  #include <asm/cputype.h>
+> >  #include <asm/pgtable.h>
+> >  #include <asm/sysreg.h>
+> > @@ -168,7 +167,14 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
+> >  #define destroy_context(mm)		do { } while(0)
+> >  void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
+> >  
+> > -#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
+> > +static inline int init_new_context(struct task_struct *tsk,
+> > +			struct mm_struct *mm)
+> > +{
+> > +	atomic64_set(&mm->context.id, 0);
+> > +	mm_ctx_ptrauth_init(&mm->context);
+> > +
+> > +	return 0;
+> > +}
+> >  
+> >  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+> >  static inline void update_saved_ttbr0(struct task_struct *tsk,
+> > @@ -216,6 +222,8 @@ static inline void __switch_mm(struct mm_struct *next)
+> >  		return;
+> >  	}
+> >  
+> > +	mm_ctx_ptrauth_switch(&next->context);
+> > +
+> >  	check_and_switch_context(next, cpu);
+> >  }
+> >  
+> > @@ -241,6 +249,19 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+> >  void verify_cpu_asid_bits(void);
+> >  void post_ttbr_update_workaround(void);
+> >  
+> > +static inline void arch_dup_mmap(struct mm_struct *oldmm,
+> > +				 struct mm_struct *mm)
+> > +{
+> > +	mm_ctx_ptrauth_dup(&oldmm->context, &mm->context);
+> > +}
+> > +#define arch_dup_mmap arch_dup_mmap
 > 
-> No, the driver does not create a generic device, it actually creates a
-> platform device, or i2c client, or spi, or something else. The fact that
+> IIUC, we could skip the arch_dup_mmap() and init_new_context() here for
+> the fork() case since the ptrauth_keys would be copied as part of the
+> dup_mm().
 
-True.
+If we can hook into the exec*() path to init the keys, then I agree we
+can do this...
 
-> suspend and resume routines have generic device as their argument has
-> more to do with the language limitation rather than reflection of true
-> type of the objects we are dealing with.
+> There is another situation where init_new_context() is called
+> bprm_mm_init() -> mm_alloc() -> mm_init() -> init_new_context().
+> However, in this case the core code also calls arch_bprm_mm_init(). So I
+> think we only need to update the latter to get a new random key.
 
-Ok, can be argued. I'd personally still go for the gain, but I won't
-push harder than this mail.
+... and this seems to be the right place to do it, so I'll have a go.
 
-Regards,
+> > diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
+> > new file mode 100644
+> > index 000000000000..a2e8fb91fdee
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/pointer_auth.h
+> > @@ -0,0 +1,89 @@
+> > +/*
+> > + * Copyright (C) 2016 ARM Ltd.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> > + */
+> 
+> Nitpick: 2018. You could also use the SPDX header, save some lines.
 
-   Wolfram
+Sure, I'll replace this with a SPDX GPL-2.0 line.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180427/c040aa09/attachment.sig>
+Thanks,
+Mark.
