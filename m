@@ -1,84 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Apr 2018 17:23:39 +0100
-Subject: [GIT PULL] arm64: fixes for -rc3
-Message-ID: <20180427162339.GB5286@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Apr 2018 17:33:43 +0100
+Subject: [PATCH] arm: port KCOV to arm
+In-Reply-To: <CACT4Y+ZPnCx-Wm7=JwiYdbUcDjjD_c_wqdWsW4u7toEv_EGbAw@mail.gmail.com>
+References: <20180426130846.130976-1-dvyukov@google.com>
+ <20180426134057.4sahhqrbkltwmfsk@lakrids.cambridge.arm.com>
+ <CACT4Y+Z35mOAybskjxVhxvW+GrbOZ4c9s2LT+Ca_fE9ZufoiGQ@mail.gmail.com>
+ <20180426142948.n74p52esmbvsqrow@lakrids.cambridge.arm.com>
+ <CACT4Y+b+kHWstEWDDOh6unGSHnetnyJ-Gut1E494XGM1rFozBQ@mail.gmail.com>
+ <CACT4Y+ZfQyCd+dBNJEUvVquM8EN51JoOrrENJ+Q7Hpb0wF5xrA@mail.gmail.com>
+ <20180427130643.klvm4rqxhv7w5f2o@lakrids.cambridge.arm.com>
+ <CACT4Y+b_cAKf80y5a8KaV7P=-KtcB83E7x-SXv-Uq_kxzy_7wA@mail.gmail.com>
+ <20180427161810.kuncq7rtcpyl7pql@lakrids.cambridge.arm.com>
+ <CACT4Y+ZPnCx-Wm7=JwiYdbUcDjjD_c_wqdWsW4u7toEv_EGbAw@mail.gmail.com>
+Message-ID: <20180427163343.7fbzlnv477dnyg4m@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Apr 27, 2018 at 06:21:53PM +0200, 'Dmitry Vyukov' via syzkaller wrote:
+> On Fri, Apr 27, 2018 at 6:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Apr 27, 2018 at 03:51:22PM +0200, Dmitry Vyukov wrote:
+> >> On Fri, Apr 27, 2018 at 3:06 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > Can you share your kernel config?
+> >>
+> >> Attached. It's pretty much vexpress_defconfig with few minor
+> >> additions. Here is full description of what I am doing:
+> >> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
+> >
+> > Cheers!
+> >
+> >> FWIW when I do "KCOV_INSTRUMENT_fault.o := n" everything works and I
+> >> see reasonable coverage.
+> >
+> > While this may be the case, I think it's papering over a bug rather than
+> > solving it.
+> >
+> > [...]
+> >
+> >> > I can't reproduce the issue on real hardware atop of v4.17-rc2, when
+> >> > booting and running a standard ARMv7 buildroot userspace. So the kcov
+> >> > mode check seems fine to me.
+> >>
+> >> It happens after brief fuzzing with syzkaller. So it's both kcov
+> >> opened and some weird syscall workload. Again, here is everything what
+> >> I am doing:
+> >> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
+> >
+> > I've set this up, and while I see RCU stalls and "no output from test
+> > machine" warnings, I'm not seeing any reports with KCOV splats.
+> >
+> > Are you somehow connecting to a VM which failed with no output?
+> 
+> I've started seeing assorted crashes like these:
+> 
+> kernel panic: Fatal exception
+> unable to handle kernel paging request in migrate_task_rq_fair
+> BUG: spinlock bad magic in corrupted
+> unable to handle kernel paging request in trace_hardirqs_off_caller
+> unable to handle kernel paging request in kick_process
+> kernel panic: stack-protector: Kernel stack is corrupted in: do_futex
+> unable to handle kernel paging request in __sanitizer_cov_trace_pc
+> Unable to handle kernel paging request at virtual address ADDR
 
-Please pull these arm64 fixes for -rc3. Nothing too bad, but the spectre
-updates to smatch identified a few places that may need sanitising so we've
-got those covered. As per usual, details are in the tag.
+Just to check, is that with or without instrumentation in fault.c?
 
-It's worth noting that we had some DMARC hiccups this week which should be
-resolved now, so hopefully this won't go into your spam folder.
+It might be worth enabling HARDENED_USERCOPY -- that should scream if we
+corrupt task_struct via a uaccess.
+
+> Do you see code coverage increasing?
+
+Not so far. QEMU TCG on this machine is rather slow, so it might just be
+that VMs are timing out at boot time.
+
+> Besides compiler I am not sure what else can be different between our
+> setups (mine is Debian's 7.2).
+
+Could you give mine [1] a go? It's the Linaro 17.11
+arm-linux-gnueabihf-gcc 7.2.1 toolchain.
+
+I don't ahve a Debian 7 install up at the moment.
+
+[1] https://releases.linaro.org/components/toolchain/binaries/latest/arm-linux-gnueabihf/gcc-linaro-7.2.1-2017.11-x86_64_arm-linux-gnueabihf.tar.xz
 
 Thanks,
-
-Will
-
---->8
-
-The following changes since commit 6d08b06e67cd117f6992c46611dfb4ce267cd71e:
-
-  Linux 4.17-rc2 (2018-04-22 19:20:09 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 3789c122d0a016b947ce5c05d3f1fbafa5db8f26:
-
-  arm64: avoid instrumenting atomic_ll_sc.o (2018-04-27 12:14:44 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Close some potential spectre-v1 vulnerabilities found by smatch
-
-- Add missing list sentinel for CPUs that don't require KPTI
-
-- Removal of unused 'addr' parameter for I/D cache coherency
-
-- Removal of redundant set_fs(KERNEL_DS) calls in ptrace
-
-- Fix single-stepping state machine handling in response to kernel traps
-
-- Clang support for 128-bit integers
-
-- Avoid instrumenting our out-of-line atomics in preparation for enabling
-  LSE atomics by default in 4.18
-
-----------------------------------------------------------------
-Jason A. Donenfeld (1):
-      arm64: support __int128 with clang
-
-Kim Phillips (1):
-      arm64/kernel: rename module_emit_adrp_veneer->module_emit_veneer_for_adrp
-
-Mark Rutland (7):
-      arm64: add sentinel to kpti_safe_list
-      arm64: ptrace: remove addr_limit manipulation
-      arm64: only advance singlestep for user instruction traps
-      arm64: fix possible spectre-v1 in ptrace_hbp_get_event()
-      KVM: arm/arm64: vgic: fix possible spectre-v1 in vgic_get_irq()
-      KVM: arm/arm64: vgic: fix possible spectre-v1 in vgic_mmio_read_apr()
-      arm64: avoid instrumenting atomic_ll_sc.o
-
-Shaokun Zhang (1):
-      arm64: mm: drop addr parameter from sync icache and dcache
-
- arch/arm64/Makefile              |  4 ++++
- arch/arm64/include/asm/module.h  |  2 +-
- arch/arm64/include/asm/pgtable.h |  4 ++--
- arch/arm64/kernel/cpufeature.c   |  1 +
- arch/arm64/kernel/module-plts.c  |  2 +-
- arch/arm64/kernel/module.c       |  2 +-
- arch/arm64/kernel/ptrace.c       | 20 ++++++++++----------
- arch/arm64/kernel/traps.c        |  3 ++-
- arch/arm64/lib/Makefile          |  4 ++++
- arch/arm64/mm/flush.c            |  2 +-
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  5 +++++
- virt/kvm/arm/vgic/vgic.c         | 14 ++++++++++----
- 12 files changed, 42 insertions(+), 21 deletions(-)
+Mark.
