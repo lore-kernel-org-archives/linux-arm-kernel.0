@@ -1,18 +1,19 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 26 Apr 2018 19:17:31 -0500
-Subject: [PATCH v9 13/27] ARM: davinci: remove CONFIG_DAVINCI_RESET_CLOCKS
+Date: Thu, 26 Apr 2018 19:17:33 -0500
+Subject: [PATCH v9 15/27] ARM: davinci: switch to common clock framework
 In-Reply-To: <20180427001745.4116-1-david@lechnology.com>
 References: <20180427001745.4116-1-david@lechnology.com>
-Message-ID: <20180427001745.4116-14-david@lechnology.com>
+Message-ID: <20180427001745.4116-16-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common clock framework will take care of disabling unused clocks when
-we switch from the legacy davinci clocks and having this enabled will
-cause compile errors after we switch, so remove it now.
+This switches ARCH_DAVINCI to use the common clock framework. The legacy
+clock code in arch/arm/mach-davinci/ is no longer used. New drivers in
+drivers/clk/davinci/ are used instead.
+
+A few macros had to be moved to prevent compilation errors.
 
 Signed-off-by: David Lechner <david@lechnology.com>
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 ---
 
 v9 changes:
@@ -22,66 +23,99 @@ v8 changes:
 - none
 
 v7 changes:
-- none
+- s/compile/compilation and space instead of tab
+- add PM_GENERIC_DOMAINS dependencies
 
 v6 changes:
-- none
+- clean up indent on Common objects section
 
 
- arch/arm/mach-davinci/Kconfig               | 12 ------------
- arch/arm/mach-davinci/common.c              |  1 -
- arch/arm/mach-davinci/include/mach/common.h |  6 ------
- 3 files changed, 19 deletions(-)
+ arch/arm/Kconfig                | 5 ++++-
+ arch/arm/mach-davinci/Makefile  | 4 ++--
+ arch/arm/mach-davinci/clock.h   | 4 ----
+ arch/arm/mach-davinci/davinci.h | 4 ++++
+ arch/arm/mach-davinci/psc.h     | 2 --
+ 5 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index 05c3eecf47cb..ba9912b4dfab 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -231,18 +231,6 @@ config DAVINCI_MUX_WARNINGS
- 	  to change the pin multiplexing setup. When there are no warnings
- 	  printed, it's safe to deselect DAVINCI_MUX for your product.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a7f8e7f4b88f..a57ad13810c8 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -609,13 +609,16 @@ config ARCH_S3C24XX
+ config ARCH_DAVINCI
+ 	bool "TI DaVinci"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+-	select CLKDEV_LOOKUP
++	select COMMON_CLK
+ 	select CPU_ARM926T
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_IRQ_CHIP
+ 	select GPIOLIB
+ 	select HAVE_IDE
++	select PM_GENERIC_DOMAINS if PM
++	select PM_GENERIC_DOMAINS_OF if PM && OF
++	select RESET_CONTROLLER
+ 	select USE_OF
+ 	select ZONE_DMA
+ 	help
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index 4e8178050027..8725d8bea567 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -5,8 +5,8 @@
+ #
  
--config DAVINCI_RESET_CLOCKS
--	bool "Reset unused clocks during boot"
--	depends on ARCH_DAVINCI
--	help
--	  Say Y if you want to reset unused clocks during boot.
--	  This option saves power, but assumes all drivers are
--	  using the clock framework. Broken drivers that do not
--	  yet use clock framework may not work with this option.
--	  If you are booting from another operating system, you
--	  probably do not want this option enabled until your
--	  device drivers work properly.
+ # Common objects
+-obj-y 			:= time.o clock.o serial.o psc.o \
+-			   usb.o common.o sram.o aemif.o
++obj-y 					:= time.o serial.o usb.o \
++					   common.o sram.o aemif.o
+ 
+ obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
+ 
+diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
+index d7894d5aaa25..2d058568e004 100644
+--- a/arch/arm/mach-davinci/clock.h
++++ b/arch/arm/mach-davinci/clock.h
+@@ -12,10 +12,6 @@
+ #ifndef __ARCH_ARM_DAVINCI_CLOCK_H
+ #define __ARCH_ARM_DAVINCI_CLOCK_H
+ 
+-#define DAVINCI_PLL1_BASE 0x01c40800
+-#define DAVINCI_PLL2_BASE 0x01c40c00
+-#define MAX_PLL 2
 -
- endmenu
+ /* PLL/Reset register offsets */
+ #define PLLCTL          0x100
+ #define PLLCTL_PLLEN    BIT(0)
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+index fa99197d36f9..db4c95ef4d5c 100644
+--- a/arch/arm/mach-davinci/davinci.h
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -35,6 +35,10 @@
+ #include <media/davinci/vpbe.h>
+ #include <media/davinci/vpbe_osd.h>
  
- endif
-diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index bcb6a7ba84e9..e03f95ccd95c 100644
---- a/arch/arm/mach-davinci/common.c
-+++ b/arch/arm/mach-davinci/common.c
-@@ -118,5 +118,4 @@ void __init davinci_common_init(const struct davinci_soc_info *soc_info)
- void __init davinci_init_late(void)
- {
- 	davinci_cpufreq_init();
--	davinci_clk_disable_unused();
- }
-diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index 5f45d0ac66a8..ded8f5f42725 100644
---- a/arch/arm/mach-davinci/include/mach/common.h
-+++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -83,12 +83,6 @@ extern void davinci_common_init(const struct davinci_soc_info *soc_info);
- extern void davinci_init_ide(void);
- void davinci_init_late(void);
++#define DAVINCI_PLL1_BASE		0x01c40800
++#define DAVINCI_PLL2_BASE		0x01c40c00
++#define DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01c41000
++
+ #define DAVINCI_SYSTEM_MODULE_BASE	0x01c40000
+ #define SYSMOD_VDAC_CONFIG		0x2c
+ #define SYSMOD_VIDCLKCTL		0x38
+diff --git a/arch/arm/mach-davinci/psc.h b/arch/arm/mach-davinci/psc.h
+index 8af9f09fc10c..b58707cf7033 100644
+--- a/arch/arm/mach-davinci/psc.h
++++ b/arch/arm/mach-davinci/psc.h
+@@ -27,8 +27,6 @@
+ #ifndef __ASM_ARCH_PSC_H
+ #define __ASM_ARCH_PSC_H
  
--#ifdef CONFIG_DAVINCI_RESET_CLOCKS
--int davinci_clk_disable_unused(void);
--#else
--static inline int davinci_clk_disable_unused(void) { return 0; }
--#endif
+-#define	DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01C41000
 -
- #ifdef CONFIG_CPU_FREQ
- int davinci_cpufreq_init(void);
- #else
+ /* Power and Sleep Controller (PSC) Domains */
+ #define DAVINCI_GPSC_ARMDOMAIN		0
+ #define DAVINCI_GPSC_DSPDOMAIN		1
 -- 
 2.17.0
