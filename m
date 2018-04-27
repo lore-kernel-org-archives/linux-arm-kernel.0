@@ -1,50 +1,38 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 27 Apr 2018 16:14:42 +0800
-Subject: [PATCH v2 1/6] dt-bindings: gpu: mali-utgard: add mediatek,
- mt7623-mali compatible
+Date: Fri, 27 Apr 2018 16:14:44 +0800
+Subject: [PATCH v2 3/6] dt-bindings: clock: mediatek: add entry for Mali-450
+ node to refer
 In-Reply-To: <cover.1524816502.git.sean.wang@mediatek.com>
 References: <cover.1524816502.git.sean.wang@mediatek.com>
-Message-ID: <7ab060c2e9ef2b220fc62913b8936b706dfaf202.1524816502.git.sean.wang@mediatek.com>
+Message-ID: <082c3040e2be27d30e0642943f6df35ff4de5666.1524816502.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-The MediaTek MT7623 SoC contains a Mali-450, so add a compatible for it
-and define its own vendor-specific properties.
+Just add binding for a required clock referenced by Mali-450 on MT7623
+or MT2701 SoC.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ include/dt-bindings/clock/mt2701-clk.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-index 99d1c0a..656068f 100644
---- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-+++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-@@ -19,6 +19,7 @@ Required properties:
-       + rockchip,rk3228-mali
-       + rockchip,rk3328-mali
-       + stericsson,db8500-mali
-+      + mediatek,mt7623-mali
+diff --git a/include/dt-bindings/clock/mt2701-clk.h b/include/dt-bindings/clock/mt2701-clk.h
+index 24e93df..2ac62a6 100644
+--- a/include/dt-bindings/clock/mt2701-clk.h
++++ b/include/dt-bindings/clock/mt2701-clk.h
+@@ -431,6 +431,10 @@
+ #define CLK_ETHSYS_CRYPTO			8
+ #define CLK_ETHSYS_NR				9
  
-   - reg: Physical base address and length of the GPU registers
- 
-@@ -89,6 +90,14 @@ to specify one more vendor-specific compatible, among:
-       * interrupt-names and interrupts:
-         + combined: combined interrupt of all of the above lines
- 
-+  - mediatek,mt7623-mali
-+     Required properties:
-+      * resets: phandle to the reset line for the GPU
-+      * mediatek,larb: phandle pointed to the local arbiter used to control the
-+	access to external memory on the SoC.
-+	see Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
-+	for details
++/* G3DSYS */
++#define CLK_G3DSYS_CORE				1
++#define CLK_G3DSYS_NR				2
 +
- Example:
+ /* BDP */
  
- mali: gpu at 1c40000 {
+ #define CLK_BDP_BRG_BA				1
 -- 
 2.7.4
