@@ -1,37 +1,66 @@
-From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Fri, 27 Apr 2018 11:24:01 +0200
-Subject: [v3 09/10] drm: mediatek: Omit warning on probe defers
-In-Reply-To: <cover.1524820923.git.mbrugger@suse.com>
-References: <cover.1524820923.git.mbrugger@suse.com>
-Message-ID: <9d514a4ab45f0700663fa756d5aa3913922b6fb7.1524820923.git.mbrugger@suse.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Fri, 27 Apr 2018 17:28:32 +0800
+Subject: [PATCH] ARM: dts: berlin2q: add interrupt-affinity to pmu node
+Message-ID: <20180427172832.48840c3c@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Brugger <mbrugger@suse.com>
+Add interrupt-affinity property to fix below warning:
+[    0.429642] CPU PMU: Failed to parse /soc/pmu/interrupt-affinity[0]
 
-When probe through the MFD, it can happen that the
-clock drivers wasn't probed before the ddp driver gets
-invoked. The driver used to omit a warning that the driver
-failed to get the clocks. Omit this error on the defered probe path.
-
-Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index bafc5c77c4fb..6b399348a2dc 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -374,7 +374,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index bf3a6c9a1d34..e23c49ae3ec2 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -53,7 +53,7 @@
+ 		#size-cells = <0>;
+ 		enable-method = "marvell,berlin-smp";
  
- 	ddp->clk = devm_clk_get(dev, NULL);
- 	if (IS_ERR(ddp->clk)) {
--		dev_err(dev, "Failed to get clock\n");
-+		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
-+			dev_err(dev, "Failed to get clock\n");
- 		return PTR_ERR(ddp->clk);
- 	}
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+@@ -71,21 +71,21 @@
+ 			>;
+ 		};
  
+-		cpu at 1 {
++		cpu1: cpu at 1 {
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <1>;
+ 		};
+ 
+-		cpu at 2 {
++		cpu2: cpu at 2 {
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <2>;
+ 		};
+ 
+-		cpu at 3 {
++		cpu3: cpu at 3 {
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+@@ -113,6 +113,10 @@
+ 				     <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-affinity = <&cpu0>,
++					     <&cpu1>,
++					     <&cpu2>,
++					     <&cpu3>;
+ 		};
+ 
+ 		sdhci0: sdhci at ab0000 {
 -- 
-2.16.3
+2.17.0
