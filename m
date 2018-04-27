@@ -1,141 +1,80 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Fri, 27 Apr 2018 22:25:49 +0100
-Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: h6: add device tree
- nodes for MMC controllers
-In-Reply-To: <6EBD7D16-E985-4345-B2C2-D0CE7B32F8C5@aosc.io>
-References: <20180426140728.43155-1-icenowy@aosc.io>
- <20180426140728.43155-3-icenowy@aosc.io>
- <9571735d-929f-a2ef-ed97-dc9193420b73@arm.com>
- <77DF7884-8DA8-4ED5-BB51-941CFDE4A123@aosc.io>
- <0ae1b6ce-c1cf-61e8-e09b-abec47b089b2@arm.com>
- <6EBD7D16-E985-4345-B2C2-D0CE7B32F8C5@aosc.io>
-Message-ID: <8259b2d9-be02-68fb-90bb-bd0ebdee0b05@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 28 Apr 2018 00:32:49 +0300
+Subject: [PATCH v2 11/11] arm64: dts: r8a77965-salvator-xs: Enable DU
+ external clocks and HDMI
+In-Reply-To: <20180427165722.19445-12-kieran.bingham+renesas@ideasonboard.com>
+References: <20180427165722.19445-1-kieran.bingham+renesas@ideasonboard.com>
+ <20180427165722.19445-12-kieran.bingham+renesas@ideasonboard.com>
+Message-ID: <35470587.gVktJpfmq0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/04/18 10:23, Icenowy Zheng wrote:
+Hi Kieran,
+
+Thank you for the patch.
+
+On Friday, 27 April 2018 19:57:22 EEST Kieran Bingham wrote:
+> The DU1 external dot clock is provided by the fixed frequency clock
+> generator X21, while the DU0 and DU3 clocks are provided by the
+> programmable Versaclock6 clock generator.
 > 
+> Enable the clocks, and the HDMI encoder for the M3-N Salvator-XS, and
+> hook it up to the HDMI connector
 > 
-> ? 2018?4?27? GMT+08:00 ??5:18:23, Andre Przywara <andre.przywara@arm.com> ??:
->> Hi,
->>
->> On 27/04/18 09:36, Icenowy Zheng wrote:
->>>
->>>
->>> ? 2018?4?27? GMT+08:00 ??12:45:38, Andre Przywara
->> <andre.przywara@arm.com> ??:
->>>> Hi,
->>>>
->>>> On 26/04/18 15:07, Icenowy Zheng wrote:
->>>>> The Allwinner H6 SoC have 3 MMC controllers.
->>>>>
->>>>> Add device tree nodes for them.
->>>>>
->>>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>>>> ---
->>>>>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 56
->>>> ++++++++++++++++++++++++++++
->>>>>  1 file changed, 56 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->>>> b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->>>>> index 4debc3962830..3cbfc035c979 100644
->>>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->>>>> @@ -124,12 +124,68 @@
->>>>>  			interrupt-controller;
->>>>>  			#interrupt-cells = <3>;
->>>>>  
->>>>> +			mmc0_pins: mmc0-pins {
->>>>> +				pins = "PF0", "PF1", "PF2", "PF3",
->>>>> +				       "PF4", "PF5";
->>>>> +				function = "mmc0";
->>>>> +				drive-strength = <30>;
->>>>> +				bias-pull-up;
->>>>> +			};
->>>>> +
->>>>> +			mmc2_pins: mmc2-pins {
->>>>> +				pins = "PC1", "PC4", "PC5", "PC6",
->>>>> +				       "PC7", "PC8", "PC9", "PC10",
->>>>> +				       "PC11", "PC12", "PC13", "PC14";
->>>>> +				function = "mmc2";
->>>>> +				drive-strength = <30>;
->>>>> +				bias-pull-up;
->>>>> +			};
->>>>> +
->>>>>  			uart0_ph_pins: uart0-ph {
->>>>>  				pins = "PH0", "PH1";
->>>>>  				function = "uart0";
->>>>>  			};
->>>>>  		};
->>>>>  
->>>>> +		mmc0: mmc at 4020000 {
->>>>> +			compatible = "allwinner,sun50i-h6-mmc";
->>>>
->>>> This should be:
->>>> 			compatible = "allwinner,sun50i-h6-mmc",
->>>> 				     "allwinner,sun50i-a64-mmc";
->>>
->>> I'm intended to not add A64 compatible, as
->>> H6 is a quite new design
->>> (new process) and there might be different behavior, even on mmc0/1.
->>
->> But as your patch proves, it is fully backwards compatible: An A64
->> driver works with this device.
+> Based on patches from Takeshi Kihara <takeshi.kihara.df@renesas.com>
 > 
-> No, my patch only proves "the current A64 driver works
-> with this device", not "Any A64 driver works with device", as
-> the current driver doesn't fully use the capability provided
-> by A64 MMC cobtrollers.
-
-Good point, but I still believe every A64 driver would be capable of
-driving an H6 MMC controller, ....
-
->> And this is what this compatible string list says: If your system does
->> not have a specific H6 driver, you can use an A64 driver.
->> You might not get all the (potentially) new features, but it covers
->> everything the A64 has.
->>
->> And a new silicon process doesn't matter here, since the software
->> interface is unchanged. *If* we find bugs, we can add quirks matching
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> ---
+>  .../boot/dts/renesas/r8a77965-salvator-xs.dts | 29 +++++++++++++++++++
+>  1 file changed, 29 insertions(+)
 > 
-> I think there's timing parameters for higher speed bins which
-> are different among chips. As we have currently no support
-> for speed bins higher than DDR50, they're not added yet.
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
+> b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts index
+> a83a00deed9e..dcf1849f1a67 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
+> @@ -19,3 +19,32 @@
+>  		reg = <0x0 0x48000000 0x0 0x78000000>;
+>  	};
+>  };
+> +
+> +&du {
+> +	clocks = <&cpg CPG_MOD 724>,
+> +		 <&cpg CPG_MOD 723>,
+> +		 <&cpg CPG_MOD 721>,
+> +		 <&cpg CPG_MOD 727>,
+> +		 <&versaclock6 1>,
+> +		 <&x21_clk>,
+> +		 <&versaclock6 2>;
+> +	clock-names = "du.0", "du.1", "du.3", "lvds.0",
+> +		      "dclkin.0", "dclkin.1", "dclkin.3";
 
-True, but what are those differences? I compared the A64 and H6 manuals
-side by side, the differences I found are:
-SMHC_FIFOTH[+0x40]:
-	BSIZE_OF_TRANS[30:28]:
-	- H6 supports 16 transfers for SMHC0 also.
-	other parameters:
-	- H6 recommends better values for SMHC0 also
-SMHC_CSDC[+0x54]:
-	- H6 doesn't mention restriction to SMHC2
-	(though this might be a mistake)
-SMHC_NTSR_REG[+0x5C]:
-	- H6 defines fields for bits[24:8]
-SMHC_EMCE[+0x64] and SMHC_EMCE_DBG[+0x68]:
-	- H6 adds, for EMCE support
-EMMC_DDR_SBIT_DET_REG[0x10c]:
-	- A64 doesn't mention restriction to SMHC2,
-	  but I believe this is a mistake
-SMHC_EMCE_BMn[0x150 + 0x4 * 0..31]
-	- H6 adds, for EMCE support
+You should remove the LVDS clock from here too.
 
-All those pieces are only *additions* to the H6 over the A64, so don't
-affect backwards compatibility.
+Apart from that,
 
->> on
->> the H6 compatible string - that's why we put it here already, despite
->> having a matching string in the kernel at the moment.
-> 
-> Device tree is not driver data but hardware description, so
-> it should follow "how the device is formed" rather than
-> "how the device works".
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-True, but as shown above, the compatibility is really at the device level.
-Unless you have any other information ...
+> +};
+> +
+> +&hdmi0 {
+> +	status = "okay";
+> +
+> +	ports {
+> +		port at 1 {
+> +			reg = <1>;
+> +			rcar_dw_hdmi0_out: endpoint {
+> +				remote-endpoint = <&hdmi0_con>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&hdmi0_con {
+> +	remote-endpoint = <&rcar_dw_hdmi0_out>;
+> +};
 
-Cheers,
-Andre.
+-- 
+Regards,
+
+Laurent Pinchart
