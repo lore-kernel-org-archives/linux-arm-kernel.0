@@ -1,62 +1,326 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 27 Apr 2018 18:42:27 +0900
-Subject: [PATCH] reset: uniphier: fix USB clock line for LD20
-In-Reply-To: <1523499370-17757-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1523499370-17757-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQKVD3aKTo_z=zkOdoL--RogoFm0bt-dCBsWFN8BEPpSg@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 27 Apr 2018 11:43:52 +0200
+Subject: [PATCH v2 1/2] soc: mediatek: introduce a CAPS flag for
+ scp_domain_data
+In-Reply-To: <2e16481e1477dfae0cfb24568d8111da81d92628.1524472331.git.sean.wang@mediatek.com>
+References: <2e16481e1477dfae0cfb24568d8111da81d92628.1524472331.git.sean.wang@mediatek.com>
+Message-ID: <b956be98-95d2-50c8-af5c-cfbb4666d7ae@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philipp,
 
-2018-04-12 11:16 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> For LD20, the bit 5 of the offset 0x200c turned out to be a USB3
-> reset.  The hardware document says it is the GIO reset despite LD20
-> has no GIO bus, confusingly.
->
-> Also, fix confusing comments for PXs3.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+On 04/23/2018 10:36 AM, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> Instead of adding more and more fields to scp_domain_data which get
+> checked in the code flow, add a caps field used for an indication the
+> characteristics for each SCP domain.
+> 
+> At present, type u8 for the caps field is selected which can satisfy the
+> current situation and doesn't take up extra space against type bool
+> previously used.
+> 
+> Suggested-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 > ---
+>  drivers/soc/mediatek/mtk-scpsys.c | 65 ++++++++++++++++++++-------------------
+>  1 file changed, 34 insertions(+), 31 deletions(-)
 
-Can you take a look at this, please?
+pushed to v4.17-next/soc
 
+Thanks.
 
-
-
->  drivers/reset/reset-uniphier.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-> index 360e06b..ac18f2f 100644
-> --- a/drivers/reset/reset-uniphier.c
-> +++ b/drivers/reset/reset-uniphier.c
-> @@ -110,7 +110,7 @@ static const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
->         UNIPHIER_RESETX(4, 0x200c, 2),          /* eMMC */
->         UNIPHIER_RESETX(6, 0x200c, 6),          /* Ether */
->         UNIPHIER_RESETX(8, 0x200c, 8),          /* STDMAC (HSC) */
-> -       UNIPHIER_RESETX(12, 0x200c, 5),         /* GIO (PCIe, USB3) */
-> +       UNIPHIER_RESETX(14, 0x200c, 5),         /* USB30 */
->         UNIPHIER_RESETX(16, 0x200c, 12),        /* USB30-PHY0 */
->         UNIPHIER_RESETX(17, 0x200c, 13),        /* USB30-PHY1 */
->         UNIPHIER_RESETX(18, 0x200c, 14),        /* USB30-PHY2 */
-> @@ -127,8 +127,8 @@ static const struct uniphier_reset_data uniphier_pxs3_sys_reset_data[] = {
->         UNIPHIER_RESETX(6, 0x200c, 9),          /* Ether0 */
->         UNIPHIER_RESETX(7, 0x200c, 10),         /* Ether1 */
->         UNIPHIER_RESETX(8, 0x200c, 12),         /* STDMAC */
-> -       UNIPHIER_RESETX(12, 0x200c, 4),         /* USB30 link (GIO0) */
-> -       UNIPHIER_RESETX(13, 0x200c, 5),         /* USB31 link (GIO1) */
-> +       UNIPHIER_RESETX(12, 0x200c, 4),         /* USB30 link */
-> +       UNIPHIER_RESETX(13, 0x200c, 5),         /* USB31 link */
->         UNIPHIER_RESETX(16, 0x200c, 16),        /* USB30-PHY0 */
->         UNIPHIER_RESETX(17, 0x200c, 18),        /* USB30-PHY1 */
->         UNIPHIER_RESETX(18, 0x200c, 20),        /* USB30-PHY2 */
-> --
-> 2.7.4
->
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> 
+> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> index f140e71..b1b45e4 100644
+> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> @@ -31,6 +31,9 @@
+>  #define MTK_POLL_DELAY_US   10
+>  #define MTK_POLL_TIMEOUT    (jiffies_to_usecs(HZ))
+>  
+> +#define MTK_SCPD_ACTIVE_WAKEUP		BIT(0)
+> +#define MTK_SCPD_CAPS(_scpd, _x)	((_scpd)->data->caps & (_x))
+> +
+>  #define SPM_VDE_PWR_CON			0x0210
+>  #define SPM_MFG_PWR_CON			0x0214
+>  #define SPM_VEN_PWR_CON			0x0230
+> @@ -120,7 +123,7 @@ struct scp_domain_data {
+>  	u32 sram_pdn_ack_bits;
+>  	u32 bus_prot_mask;
+>  	enum clk_id clk_id[MAX_CLKS];
+> -	bool active_wakeup;
+> +	u8 caps;
+>  };
+>  
+>  struct scp;
+> @@ -424,7 +427,7 @@ static struct scp *init_scp(struct platform_device *pdev,
+>  		genpd->name = data->name;
+>  		genpd->power_off = scpsys_power_off;
+>  		genpd->power_on = scpsys_power_on;
+> -		if (scpd->data->active_wakeup)
+> +		if (MTK_SCPD_CAPS(scpd, MTK_SCPD_ACTIVE_WAKEUP))
+>  			genpd->flags |= GENPD_FLAG_ACTIVE_WAKEUP;
+>  	}
+>  
+> @@ -477,7 +480,7 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+>  		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_CONN_M |
+>  				 MT2701_TOP_AXI_PROT_EN_CONN_S,
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2701_POWER_DOMAIN_DISP] = {
+>  		.name = "disp",
+> @@ -486,7 +489,7 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.clk_id = {CLK_MM},
+>  		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_MM_M0,
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2701_POWER_DOMAIN_MFG] = {
+>  		.name = "mfg",
+> @@ -495,7 +498,7 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(12, 12),
+>  		.clk_id = {CLK_MFG},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2701_POWER_DOMAIN_VDEC] = {
+>  		.name = "vdec",
+> @@ -504,7 +507,7 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(12, 12),
+>  		.clk_id = {CLK_MM},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2701_POWER_DOMAIN_ISP] = {
+>  		.name = "isp",
+> @@ -513,7 +516,7 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(13, 12),
+>  		.clk_id = {CLK_MM},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2701_POWER_DOMAIN_BDP] = {
+>  		.name = "bdp",
+> @@ -521,7 +524,7 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+>  		.ctl_offs = SPM_BDP_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2701_POWER_DOMAIN_ETH] = {
+>  		.name = "eth",
+> @@ -530,7 +533,7 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_ETHIF},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2701_POWER_DOMAIN_HIF] = {
+>  		.name = "hif",
+> @@ -539,14 +542,14 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_ETHIF},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2701_POWER_DOMAIN_IFR_MSC] = {
+>  		.name = "ifr_msc",
+>  		.sta_mask = PWR_STATUS_IFR_MSC,
+>  		.ctl_offs = SPM_IFR_MSC_PWR_CON,
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  };
+>  
+> @@ -561,7 +564,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(8, 8),
+>  		.sram_pdn_ack_bits = GENMASK(12, 12),
+>  		.clk_id = {CLK_MM},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_VDEC] = {
+>  		.name = "vdec",
+> @@ -570,7 +573,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(8, 8),
+>  		.sram_pdn_ack_bits = GENMASK(12, 12),
+>  		.clk_id = {CLK_MM, CLK_VDEC},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_VENC] = {
+>  		.name = "venc",
+> @@ -579,7 +582,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_MM, CLK_VENC, CLK_JPGDEC},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_ISP] = {
+>  		.name = "isp",
+> @@ -588,7 +591,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(13, 12),
+>  		.clk_id = {CLK_MM},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_AUDIO] = {
+>  		.name = "audio",
+> @@ -597,7 +600,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_AUDIO},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_USB] = {
+>  		.name = "usb",
+> @@ -606,7 +609,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(10, 8),
+>  		.sram_pdn_ack_bits = GENMASK(14, 12),
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_USB2] = {
+>  		.name = "usb2",
+> @@ -615,7 +618,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(10, 8),
+>  		.sram_pdn_ack_bits = GENMASK(14, 12),
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_MFG] = {
+>  		.name = "mfg",
+> @@ -625,7 +628,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_ack_bits = GENMASK(16, 16),
+>  		.clk_id = {CLK_MFG},
+>  		.bus_prot_mask = BIT(14) | BIT(21) | BIT(23),
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_MFG_SC1] = {
+>  		.name = "mfg_sc1",
+> @@ -634,7 +637,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(8, 8),
+>  		.sram_pdn_ack_bits = GENMASK(16, 16),
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_MFG_SC2] = {
+>  		.name = "mfg_sc2",
+> @@ -643,7 +646,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(8, 8),
+>  		.sram_pdn_ack_bits = GENMASK(16, 16),
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT2712_POWER_DOMAIN_MFG_SC3] = {
+>  		.name = "mfg_sc3",
+> @@ -652,7 +655,7 @@ static const struct scp_domain_data scp_domain_data_mt2712[] = {
+>  		.sram_pdn_bits = GENMASK(8, 8),
+>  		.sram_pdn_ack_bits = GENMASK(16, 16),
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  };
+>  
+> @@ -752,7 +755,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_NONE},
+>  		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_ETHSYS,
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT7622_POWER_DOMAIN_HIF0] = {
+>  		.name = "hif0",
+> @@ -762,7 +765,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_HIFSEL},
+>  		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF0,
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT7622_POWER_DOMAIN_HIF1] = {
+>  		.name = "hif1",
+> @@ -772,7 +775,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_HIFSEL},
+>  		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF1,
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT7622_POWER_DOMAIN_WB] = {
+>  		.name = "wb",
+> @@ -782,7 +785,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
+>  		.sram_pdn_ack_bits = 0,
+>  		.clk_id = {CLK_NONE},
+>  		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  };
+>  
+> @@ -798,7 +801,7 @@ static const struct scp_domain_data scp_domain_data_mt7623a[] = {
+>  		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_CONN_M |
+>  				 MT2701_TOP_AXI_PROT_EN_CONN_S,
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT7623A_POWER_DOMAIN_ETH] = {
+>  		.name = "eth",
+> @@ -807,7 +810,7 @@ static const struct scp_domain_data scp_domain_data_mt7623a[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_ETHIF},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT7623A_POWER_DOMAIN_HIF] = {
+>  		.name = "hif",
+> @@ -816,14 +819,14 @@ static const struct scp_domain_data scp_domain_data_mt7623a[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_ETHIF},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT7623A_POWER_DOMAIN_IFR_MSC] = {
+>  		.name = "ifr_msc",
+>  		.sta_mask = PWR_STATUS_IFR_MSC,
+>  		.ctl_offs = SPM_IFR_MSC_PWR_CON,
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  };
+>  
+> @@ -889,7 +892,7 @@ static const struct scp_domain_data scp_domain_data_mt8173[] = {
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+>  		.clk_id = {CLK_NONE},
+> -		.active_wakeup = true,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+>  	},
+>  	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
+>  		.name = "mfg_async",
+> 
