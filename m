@@ -1,47 +1,77 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 27 Apr 2018 17:28:27 +0200
-Subject: [PATCH] arm64: defconfig: enable CONFIG_SPI_ARMADA_3700
-In-Reply-To: <20180406140048.4602-1-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Fri, 6 Apr 2018 16:00:48 +0200")
-References: <20180406140048.4602-1-gregory.clement@bootlin.com>
-Message-ID: <87a7tod5yc.fsf@bootlin.com>
+From: dalias@libc.org (Rich Felker)
+Date: Fri, 27 Apr 2018 11:22:12 -0400
+Subject: [PATCH RFC PoC 0/2] platform: different approach to early
+ platform drivers
+In-Reply-To: <CAK8P3a0tMp2QURp-9WuHehqE0b6-BO1wJ38siTdxhxgwCb-ERw@mail.gmail.com>
+References: <20180426152920.21569-1-brgl@bgdev.pl>
+ <20180426173151.GJ3094@brightrain.aerifal.cx>
+ <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
+ <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
+ <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
+ <CAK8P3a2xtTLx-VHVWok-b19=o1z5FbTNcaWq7Y_HSdaH6pWnZg@mail.gmail.com>
+ <CAMRc=MdomjLCq-bJyktaToH00kNQAuTLgkSFRrY9Jmre8McT3A@mail.gmail.com>
+ <CAK8P3a0tMp2QURp-9WuHehqE0b6-BO1wJ38siTdxhxgwCb-ERw@mail.gmail.com>
+Message-ID: <20180427152212.GO3094@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On ven., avril 06 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+On Fri, Apr 27, 2018 at 02:40:34PM +0200, Arnd Bergmann wrote:
+> On Fri, Apr 27, 2018 at 1:53 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> > 2018-04-27 12:18 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> >> On Fri, Apr 27, 2018 at 10:57 AM, Bartosz Golaszewski
+> >> <bgolaszewski@baylibre.com> wrote:
+> >>> 2018-04-27 9:52 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> >>>> On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
+> >>> My patch tries to address exactly the use cases we're facing - for
+> >>> example by providing means to probe devices twice (early and late) and
+> >>> to check the state we're at in order for users to be able to just do
+> >>> the critical initialization early on and then continue with regular
+> >>> stuff later.
+> >>
+> >> Maybe the problem is reusing the name and some of the code from
+> >> an existing functionality that we've been trying to get rid of.
+> >>
+> >
+> > I'm not reusing the name - in fact I set the prefix to earlydev_
+> > exactly in order to not confuse anyone. I'm also not reusing any code
+> > in the second series.
+> 
+> Ok.
+> 
+> >> If what you want to do is completely different from the existing
+> >> early_platform implementation, how about starting by moving that
+> >> out of drivers/base/platform.c into something under arch/sh/
+> >> and renaming it to something with an sh_ prefix.
+> >>
+> >
+> > Yes, this is a good idea, but what about the sh-specific drivers that
+> > rely on it? Is including headers from arch/ in driver code still an
+> > accepted practice?
+> 
+> I think it's fine here, since we're just move it out of the way and
+> there are only very few drivers using it:
+> 
+> drivers/clocksource/sh_cmt.c:early_platform_init("earlytimer",
+> &sh_cmt_device_driver);
+> drivers/clocksource/sh_mtu2.c:early_platform_init("earlytimer",
+> &sh_mtu2_device_driver);
+> drivers/clocksource/sh_tmu.c:early_platform_init("earlytimer",
+> &sh_tmu_device_driver);
+> drivers/clocksource/timer-ti-dm.c:early_platform_init("earlytimer",
+> &omap_dm_timer_driver);
+> drivers/tty/serial/sh-sci.c:early_platform_init_buffer("earlyprintk",
+> &sci_driver,
+> 
+> For timer-ti-dm, it seems like a leftover from old times that can
+> be removed. The other four are shared between arch/sh and
+> arch/arm/mach-shmobile and already have some #ifdef
+> to handle those two cases.
 
-> The SPI is used on many boards (especially for the serial
-> flashes). Enable it by default.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+FWIW if arch/sh is the only remaining user of the earlyprintk part,
+please don't go to any trouble to preserve it. I want to move to
+earlycon exclusively. Not sure if that is possible before moving the
+boards that are using it to device tree; if so and it's easy, please
+consider sending a patch or a sketch of what it should look like so I
+can do it.
 
-Applied on mvebu/arm64
-
-Gregory
-
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 634b373785c4..c8aabed6672f 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -285,6 +285,7 @@ CONFIG_I2C_UNIPHIER_F=y
->  CONFIG_I2C_RCAR=y
->  CONFIG_I2C_CROS_EC_TUNNEL=y
->  CONFIG_SPI=y
-> +CONFIG_SPI_ARMADA_3700=y
->  CONFIG_SPI_MESON_SPICC=m
->  CONFIG_SPI_MESON_SPIFC=m
->  CONFIG_SPI_BCM2835=m
-> -- 
-> 2.16.3
->
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Rich
