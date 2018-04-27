@@ -1,64 +1,144 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sat, 28 Apr 2018 02:56:31 +0800
-Subject: [PATCH 00/12] clk: imx: add imx8qxp clock support
-Message-ID: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
+Date: Sat, 28 Apr 2018 02:56:32 +0800
+Subject: [PATCH 01/12] clk: imx: add configuration option for mmio clks
+In-Reply-To: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
+References: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1524855403-15301-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds i.MX8QXP clock support which is based
-on the clock service provided by SCU firmware.
-It depends on SCU APIs patch set.
+The patch introduces CONFIG_MXC_CLK option for legacy MMIO clocks,
+this is required to compile legacy MMIO clock conditionally when adding
+SCU based clocks for MX8 platforms later.
 
-Dong Aisheng (12):
-  clk: imx: add configuration option for mmio clks
-  clk: imx: scu: add scu clock common part
-  clk: imx: scu: add scu clock divider
-  clk: imx: scu: add scu clock gpr divider
-  clk: imx: scu: add scu clock gate
-  clk: imx: scu: add scu clock gpr gate
-  clk: imx: scu: add scu clock mux
-  clk: imx: scu: add scu clock gpr mux
-  clk: imx: add common imx_clk_hw_fixed functions
-  clk: imx: add imx_check_clk_hws helper function
-  dt-bindings: clock: add imx8qxp clock binding doc
-  clk: imx: add imx8qxp clk driver
-
- .../devicetree/bindings/clock/imx8qxp-clk.txt      |  39 ++
- arch/arm/mach-imx/Kconfig                          |  10 +
- drivers/clk/Kconfig                                |   1 +
- drivers/clk/imx/Kconfig                            |   7 +
- drivers/clk/imx/Makefile                           |   4 +-
- drivers/clk/imx/clk-common.h                       |  27 ++
- drivers/clk/imx/scu/Kconfig                        |   5 +
- drivers/clk/imx/scu/Makefile                       |  12 +
- drivers/clk/imx/scu/clk-divider-gpr-scu.c          | 131 +++++++
- drivers/clk/imx/scu/clk-divider-scu.c              | 129 +++++++
- drivers/clk/imx/scu/clk-gate-gpr-scu.c             |  84 ++++
- drivers/clk/imx/scu/clk-gate-scu.c                 | 193 ++++++++++
- drivers/clk/imx/scu/clk-imx8qxp.c                  | 426 +++++++++++++++++++++
- drivers/clk/imx/scu/clk-mux-gpr-scu.c              |  90 +++++
- drivers/clk/imx/scu/clk-mux-scu.c                  |  89 +++++
- drivers/clk/imx/scu/clk-scu.c                      |  25 ++
- drivers/clk/imx/scu/clk-scu.h                      |  97 +++++
- include/dt-bindings/clock/imx8qxp-clock.h          | 362 +++++++++++++++++
- include/soc/imx/imx8qxp/lpcg.h                     | 186 +++++++++
- 19 files changed, 1916 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Stephen Boyd <sboyd@kernel.org>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ arch/arm/mach-imx/Kconfig | 10 ++++++++++
+ drivers/clk/Kconfig       |  1 +
+ drivers/clk/imx/Kconfig   |  5 +++++
+ drivers/clk/imx/Makefile  |  2 +-
+ 4 files changed, 17 insertions(+), 1 deletion(-)
  create mode 100644 drivers/clk/imx/Kconfig
- create mode 100644 drivers/clk/imx/clk-common.h
- create mode 100644 drivers/clk/imx/scu/Kconfig
- create mode 100644 drivers/clk/imx/scu/Makefile
- create mode 100644 drivers/clk/imx/scu/clk-divider-gpr-scu.c
- create mode 100644 drivers/clk/imx/scu/clk-divider-scu.c
- create mode 100644 drivers/clk/imx/scu/clk-gate-gpr-scu.c
- create mode 100644 drivers/clk/imx/scu/clk-gate-scu.c
- create mode 100644 drivers/clk/imx/scu/clk-imx8qxp.c
- create mode 100644 drivers/clk/imx/scu/clk-mux-gpr-scu.c
- create mode 100644 drivers/clk/imx/scu/clk-mux-scu.c
- create mode 100644 drivers/clk/imx/scu/clk-scu.c
- create mode 100644 drivers/clk/imx/scu/clk-scu.h
- create mode 100644 include/dt-bindings/clock/imx8qxp-clock.h
- create mode 100644 include/soc/imx/imx8qxp/lpcg.h
 
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index e47fa13..45f2a08 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -57,23 +57,27 @@ config SOC_IMX21
+ 	select CPU_ARM926T
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MXC_AVIC
++	select MXC_CLK
+ 
+ config SOC_IMX27
+ 	bool
+ 	select CPU_ARM926T
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MXC_AVIC
++	select MXC_CLK
+ 	select PINCTRL_IMX27
+ 
+ config SOC_IMX31
+ 	bool
+ 	select CPU_V6
+ 	select MXC_AVIC
++	select MXC_CLK
+ 
+ config SOC_IMX35
+ 	bool
+ 	select ARCH_MXC_IOMUX_V3
+ 	select MXC_AVIC
++	select MXC_CLK
+ 	select PINCTRL_IMX35
+ 
+ if ARCH_MULTI_V5
+@@ -417,6 +421,7 @@ config SOC_IMX1
+ 	bool "i.MX1 support"
+ 	select CPU_ARM920T
+ 	select MXC_AVIC
++	select MXC_CLK
+ 	select PINCTRL_IMX1
+ 	help
+ 	  This enables support for Freescale i.MX1 processor
+@@ -430,6 +435,7 @@ config SOC_IMX25
+ 	select ARCH_MXC_IOMUX_V3
+ 	select CPU_ARM926T
+ 	select MXC_AVIC
++	select MXC_CLK
+ 	select PINCTRL_IMX25
+ 	help
+ 	  This enables support for Freescale i.MX25 processor
+@@ -442,6 +448,7 @@ comment "Cortex-A platforms"
+ config SOC_IMX5
+ 	bool
+ 	select HAVE_IMX_SRC
++	select MXC_CLK
+ 	select MXC_TZIC
+ 
+ config	SOC_IMX50
+@@ -478,6 +485,7 @@ config SOC_IMX6
+ 	select HAVE_IMX_MMDC
+ 	select HAVE_IMX_SRC
+ 	select MFD_SYSCON
++	select MXC_CLK
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+ 
+ config SOC_IMX6Q
+@@ -531,6 +539,7 @@ config SOC_IMX7D
+ 	select HAVE_IMX_MMDC
+ 	select HAVE_IMX_SRC
+ 	select IMX_GPCV2
++	select MXC_CLK
+ 	help
+ 		This enables support for Freescale i.MX7 Dual processor.
+ 
+@@ -551,6 +560,7 @@ if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+ config SOC_VF610
+ 	bool "Vybrid Family VF610 support"
+ 	select ARM_GIC if ARCH_MULTI_V7
++	select MXC_CLK
+ 	select PINCTRL_VF610
+ 
+ 	help
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 41492e9..5b2e74f 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -282,6 +282,7 @@ config COMMON_CLK_STM32H7
+ source "drivers/clk/bcm/Kconfig"
+ source "drivers/clk/hisilicon/Kconfig"
+ source "drivers/clk/imgtec/Kconfig"
++source "drivers/clk/imx/Kconfig"
+ source "drivers/clk/keystone/Kconfig"
+ source "drivers/clk/mediatek/Kconfig"
+ source "drivers/clk/meson/Kconfig"
+diff --git a/drivers/clk/imx/Kconfig b/drivers/clk/imx/Kconfig
+new file mode 100644
+index 0000000..43a3ecc
+--- /dev/null
++++ b/drivers/clk/imx/Kconfig
+@@ -0,0 +1,5 @@
++# SPDX-License-Identifier: GPL-2.0
++# common clock support for NXP i.MX SoC family.
++config MXC_CLK
++	bool
++	depends on ARCH_MXC
+diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+index 8c3baa7..d447f8c 100644
+--- a/drivers/clk/imx/Makefile
++++ b/drivers/clk/imx/Makefile
+@@ -1,6 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ 
+-obj-y += \
++obj-$(CONFIG_MXC_CLK) += \
+ 	clk.o \
+ 	clk-busy.o \
+ 	clk-cpu.o \
 -- 
 2.7.4
