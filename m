@@ -1,73 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Apr 2018 09:52:51 +0200
-Subject: [PATCH RFC PoC 0/2] platform: different approach to early
- platform drivers
-In-Reply-To: <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
- <20180426173151.GJ3094@brightrain.aerifal.cx>
- <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
-Message-ID: <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 27 Apr 2018 09:55:16 +0200
+Subject: [PATCH 3/3] can: xilinx: fix xcan_start_xmit()'s return type
+In-Reply-To: <79ea4ab6-a12a-21ad-b586-6a1dad176c0a@xilinx.com>
+References: <20180426211339.30821-1-luc.vanoostenryck@gmail.com>
+ <20180426211339.30821-4-luc.vanoostenryck@gmail.com>
+ <79ea4ab6-a12a-21ad-b586-6a1dad176c0a@xilinx.com>
+Message-ID: <02e9be66-1345-2af7-c343-9f94d71e1d10@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
-> On 04/26/2018 12:31 PM, Rich Felker wrote:
+On 04/27/2018 09:49 AM, Michal Simek wrote:
+> On 26.4.2018 23:13, Luc Van Oostenryck wrote:
+>> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+>> which is a typedef for an enum type, but the implementation in this
+>> driver returns an 'int'.
 >>
->> On Thu, Apr 26, 2018 at 05:29:18PM +0200, Bartosz Golaszewski wrote:
->>>
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> This is a follow to my series[1] the aim of which was to introduce device
->>> tree
->>> support for early platform devices.
->>>
->>> It was received rather negatively. Aside from using device tree to pass
->>> implementation specific details to the system, two important concerns
->>> were
->>> raised: no probe deferral support and the fact that currently the early
->>> devices
->>> never get converted to actual platform drivers. This series is a
->>> proof-of-concept that's trying to address those issues.
->>>
->>> The only user of the current version of early platform drivers is the
->>> SuperH
->>> architecture. If this series eventually gets merged, we could simply
->>> replace
->>> the other solution.
+>> Fix this by returning 'netdev_tx_t' in this driver too.
 >>
+>> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+>> ---
+>>  drivers/net/can/xilinx_can.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> Looking at a quick output of:
+>> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+>> index 89aec07c2..a19648606 100644
+>> --- a/drivers/net/can/xilinx_can.c
+>> +++ b/drivers/net/can/xilinx_can.c
+>> @@ -386,7 +386,7 @@ static int xcan_do_set_mode(struct net_device *ndev, enum can_mode mode)
+>>   *
+>>   * Return: 0 on success and failure value on error
+>>   */
+>> -static int xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+>> +static netdev_tx_t xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+>>  {
+>>  	struct xcan_priv *priv = netdev_priv(ndev);
+>>  	struct net_device_stats *stats = &ndev->stats;
 >>
->>         grep -r -A10 early_devices[[] arch/sh/kernel/
->>
->> it looks like all of the existing early platform devices are serial
->> ports, clocks, and clocksources. The switch to device tree should pick
->> them all up from CLK_OF_DECLARE, TIMER_OF_DECLARE, and
->> EARLYCON_DECLARE. Until that's complete, the existing code works
->> as-is. I don't see what problem you're trying to solve.
->
->
-> The problem for us is that clk maintainers don't want new drivers to use
-> CLK_OF_DECLARE and instead use platform devices. I have just written such
-> a new driver that is shared by 6 different SoCs. For some combinations of
-> SoCs and clocks, using a platform device is fine but on others we need to
-> register early, so the drivers now have to handle both cases, which is
-> kind of messy and fragile. If there is a generic way to register platform
-> devices early, then the code is simplified because we only have to handle
-> one method of registering the clocks instead of two.
+> 
+> It was applied already but there should be also kernel-doc update too to
+> use enum values instead of 0.
 
-The early_platform code is certainly not a way to make things simpler,
-it just adds one more way of doing the same thing that OF_CLK_DECLARE
-already does. We removed the last early_platform users on ARM a few
-years ago, and I would hope to leave it like that.
+Like this:
 
-I haven't seen the discussion about your clock drivers, but I know that
-usually only a very small subset of the clocks on an SoC are needed
-that 'early', and you should use a regular platform driver for the rest.
+> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+> index f07ce4945356..d0ad1473f689 100644
+> --- a/drivers/net/can/xilinx_can.c
+> +++ b/drivers/net/can/xilinx_can.c
+> @@ -398,7 +398,7 @@ static int xcan_do_set_mode(struct net_device *ndev, enum can_mode mode)
+>   * function uses the next available free txbuff and populates their fields to
+>   * start the transmission.
+>   *
+> - * Return: 0 on success and failure value on error
+> + * Return: NETDEV_TX_OK on success and NETDEV_TX_BUSY when the tx queue is full
+>   */
+>  static netdev_tx_t xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+>  {
 
-Can you elaborate on which devices need to access your clocks before
-you are able to initialize the clk driver through the regular platform_driver
-framework? Do any of these need complex interactions with the clk
-subsystem, or do you just need to ensure they are turned on?
+I can squash in that change.
 
-     Arnd
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180427/8df4fed8/attachment-0001.sig>
