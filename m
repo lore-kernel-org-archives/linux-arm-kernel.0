@@ -1,67 +1,178 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Fri, 27 Apr 2018 11:52:05 +0200
-Subject: [PATCHv3 04/11] arm64: Don't trap host pointer auth use to EL2
-In-Reply-To: <20180417183735.56985-5-mark.rutland@arm.com>
-References: <20180417183735.56985-1-mark.rutland@arm.com>
- <20180417183735.56985-5-mark.rutland@arm.com>
-Message-ID: <20180427095205.GJ13249@C02W217FHV2R.local>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 27 Apr 2018 11:53:47 +0200
+Subject: [PATCH v9 26/27] ARM: davinci: da8xx-dt: switch to device tree
+ clocks
+In-Reply-To: <20180427001745.4116-27-david@lechnology.com>
+References: <20180427001745.4116-1-david@lechnology.com>
+ <20180427001745.4116-27-david@lechnology.com>
+Message-ID: <CAMpxmJXNSagsNMgftQPQ8Fyt2mbsq3xTHU9u30ggoorgEQD1iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 07:37:28PM +0100, Mark Rutland wrote:
-> To allow EL0 (and/or EL1) to use pointer authentication functionality,
-> we must ensure that pointer authentication instructions and accesses to
-> pointer authentication keys are not trapped to EL2.
-> 
-> This patch ensures that HCR_EL2 is configured appropriately when the
-> kernel is booted at EL2. For non-VHE kernels we set HCR_EL2.{API,APK},
-> ensuring that EL1 can access keys and permit EL0 use of instructions.
-> For VHE kernels host EL0 (TGE && E2H) is unaffected by these settings,
-> and it doesn't matter how we configure HCR_EL2.{API,APK}, so we don't
-> bother setting them.
-> 
-> This does not enable support for KVM guests, since KVM manages HCR_EL2
-> itself when running VMs.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: kvmarm at lists.cs.columbia.edu
-
-FWIW: Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-
+2018-04-27 2:17 GMT+02:00 David Lechner <david@lechnology.com>:
+> This removes all of the clock init code from da8xx-dt.c. This includes
+> all of the OF_DEV_AUXDATA that was just used for looking up clocks.
+>
+> Signed-off-by: David Lechner <david@lechnology.com>
 > ---
->  arch/arm64/include/asm/kvm_arm.h | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 89b3dda7e3cb..4d57e1e58323 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -23,6 +23,8 @@
->  #include <asm/types.h>
->  
->  /* Hyp Configuration Register (HCR) bits */
-> +#define HCR_API		(UL(1) << 41)
-> +#define HCR_APK		(UL(1) << 40)
->  #define HCR_TEA		(UL(1) << 37)
->  #define HCR_TERR	(UL(1) << 36)
->  #define HCR_TLOR	(UL(1) << 35)
-> @@ -86,7 +88,7 @@
->  			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | HCR_TLOR | \
->  			 HCR_FMO | HCR_IMO)
->  #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
-> -#define HCR_HOST_NVHE_FLAGS (HCR_RW)
-> +#define HCR_HOST_NVHE_FLAGS (HCR_RW | HCR_API | HCR_APK)
->  #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
->  
->  /* TCR_EL2 Registers bits */
-> -- 
-> 2.11.0
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>
+> v9 changes:
+> - changes to arch/arm/mach-davinci/time.c accidentally got squashed into this
+>   commit. will drop this later.
+>
+> v8 changes:
+> - none
+>
+> v7 changes:
+> - rebased
+> - drop of_platform_default_populate(NULL, NULL, NULL)
+> - add change in pm_domain.c
+>
+> v6 changes:
+> - removed misleading statement from commit message
+>
+>
+>  arch/arm/mach-davinci/da8xx-dt.c  | 58 -------------------------------
+>  arch/arm/mach-davinci/pm_domain.c |  5 +++
+>  arch/arm/mach-davinci/time.c      |  9 ++---
+>  3 files changed, 10 insertions(+), 62 deletions(-)
+>
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> index 088bc5c0318b..23ac4108f812 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -19,67 +19,10 @@
+>  #include "cp_intc.h"
+>  #include <mach/da8xx.h>
+>
+> -static struct of_dev_auxdata da850_aemif_auxdata_lookup[] = {
+> -       OF_DEV_AUXDATA("ti,davinci-nand", 0x62000000, "davinci-nand.0", NULL),
+> -       {}
+> -};
+> -
+> -static struct aemif_platform_data aemif_data = {
+> -       .dev_lookup = da850_aemif_auxdata_lookup,
+> -};
+> -
+> -static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+> -       OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+> -       OF_DEV_AUXDATA("ti,davinci-i2c", 0x01e28000, "i2c_davinci.2", NULL),
+> -       OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "davinci-wdt", NULL),
+> -       OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
+> -       OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm.0", NULL),
+> -       OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm.1", NULL),
+> -       OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap.0", NULL),
+> -       OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap.1", NULL),
+> -       OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap.2", NULL),
+> -       OF_DEV_AUXDATA("ti,da830-spi", 0x01c41000, "spi_davinci.0", NULL),
+> -       OF_DEV_AUXDATA("ti,da830-spi", 0x01f0e000, "spi_davinci.1", NULL),
+> -       OF_DEV_AUXDATA("ns16550a", 0x01c42000, "serial8250.0", NULL),
+> -       OF_DEV_AUXDATA("ns16550a", 0x01d0c000, "serial8250.1", NULL),
+> -       OF_DEV_AUXDATA("ns16550a", 0x01d0d000, "serial8250.2", NULL),
+> -       OF_DEV_AUXDATA("ti,davinci_mdio", 0x01e24000, "davinci_mdio.0", NULL),
+> -       OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
+> -                      NULL),
+> -       OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
+> -       OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", &aemif_data),
+> -       OF_DEV_AUXDATA("ti,da850-tilcdc", 0x01e13000, "da8xx_lcdc.0", NULL),
+> -       OF_DEV_AUXDATA("ti,da830-ohci", 0x01e25000, "ohci-da8xx", NULL),
+> -       OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
+> -       OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
+> -       OF_DEV_AUXDATA("ti,da850-ahci", 0x01e18000, "ahci_da850", NULL),
+> -       OF_DEV_AUXDATA("ti,da850-vpif", 0x01e17000, "vpif", NULL),
+> -       OF_DEV_AUXDATA("ti,da850-dsp", 0x11800000, "davinci-rproc.0", NULL),
+> -       {}
+> -};
+> -
+>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+>
+>  static void __init da850_init_machine(void)
+>  {
+> -       /* All existing boards use 100MHz SATA refclkpn */
+> -       static const unsigned long sata_refclkpn = 100 * 1000 * 1000;
+> -
+> -       int ret;
+> -
+> -       da850_register_clocks();
+> -
+> -       ret = da8xx_register_usb_phy_clocks();
+> -       if (ret)
+> -               pr_warn("%s: USB PHY CLK registration failed: %d\n",
+> -                       __func__, ret);
+> -
+> -       ret = da850_register_sata_refclk(sata_refclkpn);
+> -       if (ret)
+> -               pr_warn("%s: registering SATA REFCLK failed: %d",
+> -                       __func__, ret);
+> -
+> -       of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
+>         davinci_pm_init();
+>         pdata_quirks_init();
+>  }
+> @@ -94,7 +37,6 @@ static const char *const da850_boards_compat[] __initconst = {
+>
+>  DT_MACHINE_START(DA850_DT, "Generic DA850/OMAP-L138/AM18x")
+>         .map_io         = da850_init,
+> -       .init_time      = da850_init_time,
+>         .init_machine   = da850_init_machine,
+>         .dt_compat      = da850_boards_compat,
+>         .init_late      = davinci_init_late,
+> diff --git a/arch/arm/mach-davinci/pm_domain.c b/arch/arm/mach-davinci/pm_domain.c
+> index 78eac2c0c146..e251fd593bfd 100644
+> --- a/arch/arm/mach-davinci/pm_domain.c
+> +++ b/arch/arm/mach-davinci/pm_domain.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pm_clock.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/of.h>
+>
+>  static struct dev_pm_domain davinci_pm_domain = {
+>         .ops = {
+> @@ -28,6 +29,10 @@ static struct pm_clk_notifier_block platform_bus_notifier = {
+>
+>  static int __init davinci_pm_runtime_init(void)
+>  {
+> +       if (of_have_populated_dt())
+> +               return 0;
+> +
+> +       /* Use pm_clk as fallback if we're not using genpd. */
+>         pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
+>
+>         return 0;
+> diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+> index 7a8c6fada644..77ad95913dfa 100644
+> --- a/arch/arm/mach-davinci/time.c
+> +++ b/arch/arm/mach-davinci/time.c
+> @@ -409,11 +409,12 @@ static int __init of_davinci_timer_init(struct device_node *np)
+>
+>                 /*
+>                  * Fall back to using ref_clk if the actual clock is not
+> -                * available. This currently always happens because platform
+> -                * clocks (i.e PLLs and PSCs) are registered as platform
+> -                * devices and therefore are not available at this point in
+> -                * the boot process.
+> +                * available. There will be problems later if the real clock
+> +                * source is disabled.
+>                  */
+> +
+> +               pr_warn("%s: falling back to ref_clk\n", __func__);
+> +
+>                 clkspec.np = of_find_node_by_name(NULL, "ref_clk");
+>                 if (IS_ERR(clkspec.np)) {
+>                         pr_err("%s: No clock available for timer!\n", __func__);
+> --
+> 2.17.0
+>
+
+The following headers can be removed:
+
+-#include <linux/io.h>
+-#include <linux/of_irq.h>
+-#include <linux/of_platform.h>
+-#include <linux/irqdomain.h>
+-#include <linux/platform_data/ti-aemif.h>
+-#include "cp_intc.h"
+
+Thanks,
+Bart
