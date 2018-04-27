@@ -1,65 +1,40 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Fri, 27 Apr 2018 15:57:05 +0530
-Subject: [PATCH 5/6 v3] bus: fsl-mc: supoprt dma configure for devices on
- fsl-mc bus
-In-Reply-To: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
-References: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <1524824826-29473-6-git-send-email-nipun.gupta@nxp.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Apr 2018 11:29:01 +0100
+Subject: [PATCH v8 2/4] arm64: tlbflush: Introduce
+ __flush_tlb_kernel_pgtable
+In-Reply-To: <1522742446-5084-3-git-send-email-cpandya@codeaurora.org>
+References: <1522742446-5084-1-git-send-email-cpandya@codeaurora.org>
+ <1522742446-5084-3-git-send-email-cpandya@codeaurora.org>
+Message-ID: <20180427102900.4e63lo4eksk23vtn@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
----
- drivers/bus/fsl-mc/fsl-mc-bus.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+On Tue, Apr 03, 2018 at 01:30:44PM +0530, Chintan Pandya wrote:
+> Add an interface to invalidate intermediate page tables
+> from TLB for kernel.
+> 
+> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+> ---
+>  arch/arm64/include/asm/tlbflush.h | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+> index 9e82dd7..6a4816d 100644
+> --- a/arch/arm64/include/asm/tlbflush.h
+> +++ b/arch/arm64/include/asm/tlbflush.h
+> @@ -209,6 +209,12 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+>  	dsb(ish);
+>  }
+>  
+> +static inline void __flush_tlb_kernel_pgtable(unsigned long addr)
+> +{
+> +	addr >>= 12;
+> +	__tlbi(vaae1is, addr);
+> +	dsb(ish);
+> +}
+>  #endif
 
-diff --git a/drivers/bus/fsl-mc/fsl-mc-bus.c b/drivers/bus/fsl-mc/fsl-mc-bus.c
-index 5d8266c..624828b 100644
---- a/drivers/bus/fsl-mc/fsl-mc-bus.c
-+++ b/drivers/bus/fsl-mc/fsl-mc-bus.c
-@@ -127,6 +127,16 @@ static int fsl_mc_bus_uevent(struct device *dev, struct kobj_uevent_env *env)
- 	return 0;
- }
- 
-+static int fsl_mc_dma_configure(struct device *dev)
-+{
-+	struct device *dma_dev = dev;
-+
-+	while (dev_is_fsl_mc(dma_dev))
-+		dma_dev = dma_dev->parent;
-+
-+	return of_dma_configure(dev, dma_dev->of_node, 0);
-+}
-+
- static ssize_t modalias_show(struct device *dev, struct device_attribute *attr,
- 			     char *buf)
- {
-@@ -148,6 +158,7 @@ struct bus_type fsl_mc_bus_type = {
- 	.name = "fsl-mc",
- 	.match = fsl_mc_bus_match,
- 	.uevent = fsl_mc_bus_uevent,
-+	.dma_configure  = fsl_mc_dma_configure,
- 	.dev_groups = fsl_mc_dev_groups,
- };
- EXPORT_SYMBOL_GPL(fsl_mc_bus_type);
-@@ -616,6 +627,7 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc *obj_desc,
- 		mc_dev->icid = parent_mc_dev->icid;
- 		mc_dev->dma_mask = FSL_MC_DEFAULT_DMA_MASK;
- 		mc_dev->dev.dma_mask = &mc_dev->dma_mask;
-+		mc_dev->dev.coherent_dma_mask = mc_dev->dma_mask;
- 		dev_set_msi_domain(&mc_dev->dev,
- 				   dev_get_msi_domain(&parent_mc_dev->dev));
- 	}
-@@ -633,10 +645,6 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc *obj_desc,
- 			goto error_cleanup_dev;
- 	}
- 
--	/* Objects are coherent, unless 'no shareability' flag set. */
--	if (!(obj_desc->flags & FSL_MC_OBJ_FLAG_NO_MEM_SHAREABILITY))
--		arch_setup_dma_ops(&mc_dev->dev, 0, 0, NULL, true);
--
- 	/*
- 	 * The device-specific probe callback will get invoked by device_add()
- 	 */
+Please use __TLBI_VADDR here as it does some additional masking.
+
 -- 
-1.9.1
+Catalin
