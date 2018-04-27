@@ -1,41 +1,58 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 27 Apr 2018 09:49:41 +0200
-Subject: [PATCH 3/3] can: xilinx: fix xcan_start_xmit()'s return type
-In-Reply-To: <20180426211339.30821-4-luc.vanoostenryck@gmail.com>
-References: <20180426211339.30821-1-luc.vanoostenryck@gmail.com>
- <20180426211339.30821-4-luc.vanoostenryck@gmail.com>
-Message-ID: <79ea4ab6-a12a-21ad-b586-6a1dad176c0a@xilinx.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 27 Apr 2018 09:51:46 +0200
+Subject: [PATCH 00/24] device link, bridge supplier <-> drm device
+In-Reply-To: <7d4bceeb-9611-cbf9-3906-fef5db88aad8@axentia.se>
+References: <CGME20180426223215epcas2p38fe3b0b7b1ea1c8190805f9e2a89e11e@epcas2p3.samsung.com>
+ <20180426223139.16740-1-peda@axentia.se>
+ <25d8e621-b3f8-094f-32a2-d22efc2163a4@samsung.com>
+ <7d4bceeb-9611-cbf9-3906-fef5db88aad8@axentia.se>
+Message-ID: <8d747088-3214-97af-4616-bf5d2602892a@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.4.2018 23:13, Luc Van Oostenryck wrote:
-> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
-> which is a typedef for an enum type, but the implementation in this
-> driver returns an 'int'.
+On 2018-04-27 09:37, Peter Rosin wrote:
+> On 2018-04-27 09:11, Andrzej Hajda wrote:
+>> Hi Peter,
+>>
+>> On 27.04.2018 00:31, Peter Rosin wrote:
+>>> Hi!
+>>>
+>>> It was noted by Russel King [1] that bridges (not using components)
+>>> might disappear unexpectedly if the owner of the bridge was unbound.
+>>> Jyri Sarha had previously noted the same thing with panels [2]. Jyri
+>>> came up with using device links to resolve the panel issue, which
+>>> was also my (independent) reaction to the note from Russel.
+>>>
+>>> This series builds up to the addition of that link in the last
+>>> patch, but in my opinion the other 23 patches do have merit on their
+>>> own.
+>>>
+>>> The last patch needs testing, while the others look trivial. That
+>>> said, I might have missed some subtlety.
+>>
+>> of_node is used as an identifier of the bridge in the kernel. If you
+>> replace it with device pointer there will be potential problem with
+>> devices having two or more bridges, how do you differentiate bridges if
+>> the owner is the same? If I remember correctly current bridge code does
+>> not allow to have multiple bridges in one device, but that should be
+>> quite easy to fix if necessary. After this change it will become more
+>> difficult.
 > 
-> Fix this by returning 'netdev_tx_t' in this driver too.
+> I don't see how it will be more difficult?
 > 
-> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
-> ---
->  drivers/net/can/xilinx_can.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>> Anyway I remember discussion that in DT world bridge should be
+>> identified rather by of_graph port node, not by parent node as it is
+>> now. If you want to translate this relation to device owner, you should
+>> add also port number to have full identification of the bridge, ie pair
+>> (owner, port_number) would be equivalent of port node.
 > 
-> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-> index 89aec07c2..a19648606 100644
-> --- a/drivers/net/can/xilinx_can.c
-> +++ b/drivers/net/can/xilinx_can.c
-> @@ -386,7 +386,7 @@ static int xcan_do_set_mode(struct net_device *ndev, enum can_mode mode)
->   *
->   * Return: 0 on success and failure value on error
->   */
-> -static int xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-> +static netdev_tx_t xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->  {
->  	struct xcan_priv *priv = netdev_priv(ndev);
->  	struct net_device_stats *stats = &ndev->stats;
-> 
+> You even state the trivial solution here, just add the port/endpoint ID
+> when/if it is needed. So, what is the significant difference?
 
-It was applied already but there should be also kernel-doc update too to
-use enum values instead of 0.
+Or, since this is apparently a rare requirement, you could make the owners
+that do need it fix it themselves. E.g. by embedding the struct drm_bridge
+in another struct that contains the needed ID, and use container_of to get
+to that containing struct with the ID.
 
-M
+Cheers,
+Peter
