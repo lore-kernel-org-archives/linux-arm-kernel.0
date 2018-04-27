@@ -1,52 +1,67 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 26 Apr 2018 20:40:48 -0500
-Subject: [PATCH 2/4] ARM: davinci: board-da850-evm: fix GPIO lookup for
- MMC/SD
-In-Reply-To: <20180424143506.25793-3-nsekhar@ti.com>
+Date: Thu, 26 Apr 2018 20:43:04 -0500
+Subject: [PATCH 3/4] ARM: davinci: fix GPIO lookup for I2C
+In-Reply-To: <20180424143506.25793-4-nsekhar@ti.com>
 References: <20180424143506.25793-1-nsekhar@ti.com>
- <20180424143506.25793-3-nsekhar@ti.com>
-Message-ID: <fa8feb04-2231-88b8-4d2b-10264187ba7e@lechnology.com>
+ <20180424143506.25793-4-nsekhar@ti.com>
+Message-ID: <2a6e2e81-05f9-1759-c921-3891adcfb854@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/24/2018 09:35 AM, Sekhar Nori wrote:
 > The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
-> mmc can correctly lookup the wp and cp gpios. Also fix the GPIO numbers
-> as they are not offsets within a bank.
+> I2C can correctly lookup the recovery gpios.
 > 
 > Note that it is the gpio-davinci driver that sets the gpiochip label to
 > davinci_gpio.0.
 > 
-> Fixes: bdf0e8364fd3 ("ARM: davinci: da850-evm: use gpio descriptor for mmc pins")
+> Also, the I2C device uses an id of 1 on DM644x and DM355.
+> 
+> Fixes: e53537653791 ("i2c/ARM: davinci: Deep refactoring of I2C recovery")
 > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 > ---
->   arch/arm/mach-davinci/board-da850-evm.c | 9 +++++++--
->   1 file changed, 7 insertions(+), 2 deletions(-)
+>   arch/arm/mach-davinci/board-dm355-evm.c  | 6 +++---
+>   arch/arm/mach-davinci/board-dm644x-evm.c | 6 +++---
+>   2 files changed, 6 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 3063478bcc36..158ed9a1483f 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -763,12 +763,17 @@ static const short da850_evm_mcasp_pins[] __initconst = {
->   	-1
+> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+> index cb30637d9eaf..14557f893798 100644
+> --- a/arch/arm/mach-davinci/board-dm355-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+> @@ -110,11 +110,11 @@ static struct platform_device davinci_nand_device = {
 >   };
 >   
-> +#define DA850_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
-> +#define DA850_MMCSD_WP_PIN		GPIO_TO_PIN(4, 1)
-> +
->   static struct gpiod_lookup_table mmc_gpios_table = {
->   	.dev_id = "da830-mmc.0",
+>   static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
+> -	.dev_id = "i2c_davinci",
+> +	.dev_id = "i2c_davinci.1",
 >   	.table = {
->   		/* gpio chip 2 contains gpio range 64-95 */
-> -		GPIO_LOOKUP("davinci_gpio.2", 0, "cd", GPIO_ACTIVE_LOW),
-> -		GPIO_LOOKUP("davinci_gpio.2", 1, "wp", GPIO_ACTIVE_LOW),
-> +		GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_CD_PIN, "cd",
-> +			    GPIO_ACTIVE_LOW),
-> +		GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_WP_PIN, "wp",
-> +			    GPIO_ACTIVE_LOW),
+> -		GPIO_LOOKUP("davinci_gpio", 15, "sda",
+> +		GPIO_LOOKUP("davinci_gpio.0", 15, "sda",
+>   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+> -		GPIO_LOOKUP("davinci_gpio", 14, "scl",
+> +		GPIO_LOOKUP("davinci_gpio.0", 14, "scl",
+>   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
 >   	},
 >   };
+> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> index 5bf024784738..5b0b95e04cac 100644
+> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> @@ -597,11 +597,11 @@ static struct i2c_board_info __initdata i2c_info[] =  {
+>   };
 >   
+>   static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
+> -	.dev_id = "i2c_davinci",
+> +	.dev_id = "i2c_davinci.1",
+>   	.table = {
+> -		GPIO_LOOKUP("davinci_gpio", 44, "sda",
+> +		GPIO_LOOKUP("davinci_gpio.0", 44, "sda",
+>   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+> -		GPIO_LOOKUP("davinci_gpio", 43, "scl",
+> +		GPIO_LOOKUP("davinci_gpio.0", 43, "scl",
+>   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+>   	},
+>   };
 > 
 
-Reviewed-by: David Lechner <david@lechnology.com>
+Why not use the GPIO_TO_PIN() macro like the previous patches?
