@@ -1,65 +1,74 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Fri, 27 Apr 2018 18:21:53 +0200
-Subject: [PATCH] arm: port KCOV to arm
-In-Reply-To: <20180427161810.kuncq7rtcpyl7pql@lakrids.cambridge.arm.com>
-References: <20180426130846.130976-1-dvyukov@google.com>
- <20180426134057.4sahhqrbkltwmfsk@lakrids.cambridge.arm.com>
- <CACT4Y+Z35mOAybskjxVhxvW+GrbOZ4c9s2LT+Ca_fE9ZufoiGQ@mail.gmail.com>
- <20180426142948.n74p52esmbvsqrow@lakrids.cambridge.arm.com>
- <CACT4Y+b+kHWstEWDDOh6unGSHnetnyJ-Gut1E494XGM1rFozBQ@mail.gmail.com>
- <CACT4Y+ZfQyCd+dBNJEUvVquM8EN51JoOrrENJ+Q7Hpb0wF5xrA@mail.gmail.com>
- <20180427130643.klvm4rqxhv7w5f2o@lakrids.cambridge.arm.com>
- <CACT4Y+b_cAKf80y5a8KaV7P=-KtcB83E7x-SXv-Uq_kxzy_7wA@mail.gmail.com>
- <20180427161810.kuncq7rtcpyl7pql@lakrids.cambridge.arm.com>
-Message-ID: <CACT4Y+ZPnCx-Wm7=JwiYdbUcDjjD_c_wqdWsW4u7toEv_EGbAw@mail.gmail.com>
+From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
+Date: Fri, 27 Apr 2018 17:22:06 +0100
+Subject: [PATCH 15/17] arm64: dts: r8a77965-salvator-x: Enable HDMI output
+In-Reply-To: <2345148.J1marZVneP@avalon>
+References: <20180426165346.494-1-kieran.bingham+renesas@ideasonboard.com>
+ <20180426165346.494-16-kieran.bingham+renesas@ideasonboard.com>
+ <2345148.J1marZVneP@avalon>
+Message-ID: <5af7b6a6-8a40-880d-3346-8c90bd700957@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 6:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Apr 27, 2018 at 03:51:22PM +0200, Dmitry Vyukov wrote:
->> On Fri, Apr 27, 2018 at 3:06 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > Can you share your kernel config?
+Hi Laurent,
+
+On 26/04/18 22:21, Laurent Pinchart wrote:
+> Hi Kieran,
+> 
+> Thank you for the patch.
+> 
+> On Thursday, 26 April 2018 19:53:44 EEST Kieran Bingham wrote:
+>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 >>
->> Attached. It's pretty much vexpress_defconfig with few minor
->> additions. Here is full description of what I am doing:
->> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
->
-> Cheers!
->
->> FWIW when I do "KCOV_INSTRUMENT_fault.o := n" everything works and I
->> see reasonable coverage.
->
-> While this may be the case, I think it's papering over a bug rather than
-> solving it.
->
-> [...]
->
->> > I can't reproduce the issue on real hardware atop of v4.17-rc2, when
->> > booting and running a standard ARMv7 buildroot userspace. So the kcov
->> > mode check seems fine to me.
+>> Enable the HDMI encoder for the M3N Salvator-X board and hook it up to
+>> the HDMI connector.
 >>
->> It happens after brief fuzzing with syzkaller. So it's both kcov
->> opened and some weird syscall workload. Again, here is everything what
->> I am doing:
->> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
->
-> I've set this up, and while I see RCU stalls and "no output from test
-> machine" warnings, I'm not seeing any reports with KCOV splats.
->
-> Are you somehow connecting to a VM which failed with no output?
+>> Based on a similar patches of the the Salvator-X board
+>> on the R8A7796 SoC device tree
+>> by Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-I've started seeing assorted crashes like these:
+Thanks, collected.
 
-kernel panic: Fatal exception
-unable to handle kernel paging request in migrate_task_rq_fair
-BUG: spinlock bad magic in corrupted
-unable to handle kernel paging request in trace_hardirqs_off_caller
-unable to handle kernel paging request in kick_process
-kernel panic: stack-protector: Kernel stack is corrupted in: do_futex
-unable to handle kernel paging request in __sanitizer_cov_trace_pc
-Unable to handle kernel paging request at virtual address ADDR
+> 
+> How about adding the VGA output too ? I think you can add both VGA and HDMI in 
+> a single patch that enables display in one go for the board. Same comment for 
+> the Salvator-XS.
 
-Do you see code coverage increasing?
+I believe the VGA output is handled by the salvator-common.dtsi, and thus
+doesn't need to be included in this patch.
 
-Besides compiler I am not sure what else can be different between our
-setups (mine is Debian's 7.2).
+> 
+>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>> ---
+>>  .../boot/dts/renesas/r8a77965-salvator-x.dts    | 17 +++++++++++++++++
+>>  1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+>> b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts index
+>> a2b8fb20fef8..11e8d43e9e11 100644
+>> --- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+>> +++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
+>> @@ -31,3 +31,20 @@
+>>  	clock-names = "du.0", "du.1", "du.3", "lvds.0",
+>>  		      "dclkin.0", "dclkin.1", "dclkin.3";
+>>  };
+>> +
+>> +&hdmi0 {
+>> +	status = "okay";
+>> +
+>> +	ports {
+>> +		port at 1 {
+>> +			reg = <1>;
+>> +			rcar_dw_hdmi0_out: endpoint {
+>> +				remote-endpoint = <&hdmi0_con>;
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&hdmi0_con {
+>> +	remote-endpoint = <&rcar_dw_hdmi0_out>;
+>> +};
+> 
