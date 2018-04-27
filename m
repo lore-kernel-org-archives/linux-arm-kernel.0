@@ -1,115 +1,446 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 27 Apr 2018 12:30:47 -0700
-Subject: [PATCH] arm64: mm: Fix false positives in W+X checking
-In-Reply-To: <20180425163745.GJ8383@arm.com>
-References: <1524665611-14040-1-git-send-email-jhugo@codeaurora.org>
- <20180425150353.GG8383@arm.com>
- <381aee7b-9caa-b16b-3f5e-a47737405c03@codeaurora.org>
- <CAGXu5j+WhNdY09s_tPQ-BKqEqi_bbbp8XnRSnoGTN-HOPSJFPQ@mail.gmail.com>
- <3a105d2c-19b8-11fc-88d3-2da4fa846296@codeaurora.org>
- <20180425163745.GJ8383@arm.com>
-Message-ID: <d4ca1cff-0975-983d-b587-e4c65fc5c3c7@redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Apr 2018 21:54:11 +0200
+Subject: [PATCH 2/2] ARM: dts: Modernize the Vexpress PL111 integration
+Message-ID: <20180427195411.19610-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2018 09:37 AM, Will Deacon wrote:
-> On Wed, Apr 25, 2018 at 10:36:25AM -0600, Jeffrey Hugo wrote:
->> On 4/25/2018 10:23 AM, Kees Cook wrote:
->>> On Wed, Apr 25, 2018 at 8:12 AM, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
->>>> On 4/25/2018 9:03 AM, Will Deacon wrote:
->>>>> On Wed, Apr 25, 2018 at 08:13:31AM -0600, Jeffrey Hugo wrote:
->>>>>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->>>>>> index 2dbb2c9..40d45fd 100644
->>>>>> --- a/arch/arm64/mm/mmu.c
->>>>>> +++ b/arch/arm64/mm/mmu.c
->>>>>> @@ -503,6 +503,12 @@ void mark_rodata_ro(void)
->>>>>>          update_mapping_prot(__pa_symbol(__start_rodata), (unsigned
->>>>>> long)__start_rodata,
->>>>>>                              section_size, PAGE_KERNEL_RO);
->>>>>>    +     /*
->>>>>> +        * load_module() results in W+X mappings, which are cleaned up
->>>>>> with
->>>>>> +        * call_rcu_sched().  Let's make sure that queued work is flushed
->>>>>> so
->>>>>> +        * that we don't hit false positives.
->>>>>> +        */
->>>>>> +       rcu_barrier_sched();
->>>>>>          debug_checkwx();
->>>>>>    }
->>>>>
->>>>>
->>>>> Whilst this looks correct to me, it looks to me like other architectures
->>>>> (e.g. x86) would be affected by this problem as well. Perhaps it would be
->>>>> better to solve it in the core code before invoking mark_rodata_ro, or is
->>>>> there some reason that we only run into this on arm64?
->>>>>
->>>>
->>>> Thanks for the review.
->>>>
->>>> I was actually pondering pushing this into ptdump_check_wx() so that the
->>>> "barrier" hit is only observed with CONFIG_DEBUG_WX.
->>>>
->>>> I agree, in principal this is not an arm64 specific issue.  I do not have
->>>> sufficient equipment to validate other architectures.  On QDF2400, the
->>>> reproduction rate is very low, roughly 1-3 instances in 2000-3000 reboots.
->>>> I do have a system simulator which happens to repro the issue 100% of the
->>>> time, which is what I used to debug and test this fix, before applying it to
->>>> QDF2400.
->>>>
->>>> I'm waffling.  I see the benefit of fixing this in common code, but the
->>>> "core" functionality of mark_rodata_ro doesn't need this barrier...
->>>>
->>>> I suppose I can push it up to core code, and see what the rest of the
->>>> community says.  Is that what you recommend?
->>>
->>> I think fixing this in the general case makes sense.
->>
->> Ok.  I'll give it until Monday to see if Laura has any insights into x86,
->> and then spin a v2.
-> 
-> Thanks, Jeffrey.
-> 
-> Will
-> 
+The Versatile Express was submitted with the actual display
+bridges unconnected (but defined in the device tree) and
+mock "panels" encoded in the device tree node of the PL111
+controller.
 
-I set up some test code that does request_module in a late_initcall
-and stuck a delay and print in do_free_init and triggered it:
+This doesn't even remotely describe the actual Versatile
+Express hardware. Exploit the SiI9022 bridge by connecting
+the PL111 pads to it, making it use EDID or fallback values
+to drive the monitor.
 
-[    6.115319]  ? module_memfree+0x10/0x10
-[    6.116082]  rcu_process_callbacks+0x1bd/0x7f0
-[    6.116895]  __do_softirq+0xd9/0x2af
-[    6.117588]  irq_exit+0xa9/0xb0
-[    6.118193]  smp_apic_timer_interrupt+0x67/0x120
-[    6.118993]  apic_timer_interrupt+0xf/0x20
-[    6.119732]  </IRQ>
-[    6.120265] RIP: 0010:__change_page_attr_set_clr+0x667/0xc80
-[    6.121363] RSP: 0018:ffffc90000197c60 EFLAGS: 00000246 ORIG_RAX: ffffffffffffff13
-[    6.123417] RAX: 00000000000001e8 RBX: 80000000000000e3 RCX: ffffffff81c031d1
-[    6.124677] RDX: 0000000000000000 RSI: ffffc90000197dd8 RDI: 80000000028000e3
-[    6.125905] RBP: ffff8800029e7000 R08: 00000000ffffd801 R09: 000ffffffffff000
-[    6.127114] R10: 0000000000000001 R11: 000ffffffffff000 R12: 80000000000000e3
-[    6.128350] R13: 00000000000029e7 R14: 0000000000000200 R15: 80000000000000e3
-[    6.129522]  ? __alloc_pages_nodemask+0xfc/0x220
-[    6.130218]  ? smp_call_function_many+0x1e7/0x230
-[    6.130935]  ? load_new_mm_cr3+0xe0/0xe0
-[    6.131566]  __change_page_attr_set_clr+0xc59/0xc80
-[    6.132293]  ? cpumask_next+0x16/0x20
-[    6.132894]  change_page_attr_set_clr+0x131/0x470
-[    6.133601]  set_memory_rw+0x21/0x30
-[    6.134172]  free_init_pages+0x59/0x80
-[    6.134766]  ? rest_init+0xb0/0xb0
-[    6.135322]  kernel_init+0x14/0x100
-[    6.135885]  ret_from_fork+0x35/0x40
+The  also has to use the reserved memory through the
+CMA pool rather than by open coding a memory region and
+remapping it explicitly in the driver. To achieve this,
+a reserved-memory node must exist in the root of the
+device tree, so we need to pull that out of the
+motherboard .dtsi include files, and push it into each
+top-level device tree instead.
 
-This is part way through mark_rodata_ro which does the debug_checkwx()
-so I think it could still be an issue on x86. The set_memory_* functions
-on x86 are a bit more involved than arm64 and may provide more
-opportunities for the rcu callbacks to run. I'm guessing arm64 may just
-be loading modules that could be particularly likely to load other
-modules.
+We do the same manouver for all the Versatile Express
+boards, taking into account the different location of the
+video RAM depending on which chip select is used on
+each platform.
 
-So if you're willing to take some of my hand waving, I think this
-should go in generic code since this is difficult to reproduce.
+This plays nicely with the new PL111 DRM driver and
+follows the standard ways of assigning bridges and
+memory pools for graphics.
 
-Thanks,
-Laura
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Mali DP Maintainers <malidp@foss.arm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi          | 51 +++++++++--------------
+ arch/arm/boot/dts/vexpress-v2m.dtsi              | 52 ++++++++++--------------
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts      | 14 +++++++
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts       | 14 +++++++
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts          | 14 +++++++
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts           | 41 ++++++++-----------
+ arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts       | 14 +++++++
+ arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi | 37 +++--------------
+ 8 files changed, 119 insertions(+), 118 deletions(-)
+
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index 7b8ff5b3b912..51517c832b9b 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -43,11 +43,6 @@
+ 				bank-width = <4>;
+ 			};
+ 
+-			v2m_video_ram: vram at 2,00000000 {
+-				compatible = "arm,vexpress-vram";
+-				reg = <2 0x00000000 0x00800000>;
+-			};
+-
+ 			ethernet at 2,02000000 {
+ 				compatible = "smsc,lan9118", "smsc,lan9115";
+ 				reg = <2 0x02000000 0x10000>;
+@@ -224,6 +219,21 @@
+ 					dvi-transmitter at 39 {
+ 						compatible = "sil,sii9022-tpi", "sil,sii9022";
+ 						reg = <0x39>;
++						#address-cells = <1>;
++						#size-cells = <0>;
++
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++
++							port at 0 {
++								reg = <0>;
++
++								dvi_bridge_in: endpoint {
++									remote-endpoint = <&clcd_pads>;
++								};
++							};
++						};
+ 					};
+ 
+ 					dvi-transmitter at 60 {
+@@ -254,37 +264,16 @@
+ 					interrupts = <14>;
+ 					clocks = <&v2m_oscclk1>, <&smbclk>;
+ 					clock-names = "clcdclk", "apb_pclk";
+-					memory-region = <&v2m_video_ram>;
+-					max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
++					/* 800x600 16bpp @36MHz works fine */
++					max-memory-bandwidth = <54000000>;
++					memory-region = <&vram>;
+ 
+ 					port {
+-						v2m_clcd_pads: endpoint {
+-							remote-endpoint = <&v2m_clcd_panel>;
++						clcd_pads: endpoint {
++							remote-endpoint = <&dvi_bridge_in>;
+ 							arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
+ 						};
+ 					};
+-
+-					panel {
+-						compatible = "panel-dpi";
+-
+-						port {
+-							v2m_clcd_panel: endpoint {
+-								remote-endpoint = <&v2m_clcd_pads>;
+-							};
+-						};
+-
+-						panel-timing {
+-							clock-frequency = <25175000>;
+-							hactive = <640>;
+-							hback-porch = <40>;
+-							hfront-porch = <24>;
+-							hsync-len = <96>;
+-							vactive = <480>;
+-							vback-porch = <32>;
+-							vfront-porch = <11>;
+-							vsync-len = <2>;
+-						};
+-					};
+ 				};
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index 9cd5e146abd5..39e2b1b648b2 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -43,11 +43,6 @@
+ 				bank-width = <4>;
+ 			};
+ 
+-			v2m_video_ram: vram at 3,00000000 {
+-				compatible = "arm,vexpress-vram";
+-				reg = <3 0x00000000 0x00800000>;
+-			};
+-
+ 			ethernet at 3,02000000 {
+ 				compatible = "smsc,lan9118", "smsc,lan9115";
+ 				reg = <3 0x02000000 0x10000>;
+@@ -224,6 +219,21 @@
+ 					dvi-transmitter at 39 {
+ 						compatible = "sil,sii9022-tpi", "sil,sii9022";
+ 						reg = <0x39>;
++						#address-cells = <1>;
++						#size-cells = <0>;
++
++						ports {
++							#address-cells = <1>;
++							#size-cells = <0>;
++
++							port at 0 {
++								reg = <0>;
++
++								dvi_bridge_in: endpoint {
++									remote-endpoint = <&clcd_pads>;
++								};
++							};
++						};
+ 					};
+ 
+ 					dvi-transmitter at 60 {
+@@ -247,6 +257,7 @@
+ 					reg-shift = <2>;
+ 				};
+ 
++
+ 				clcd at 1f000 {
+ 					compatible = "arm,pl111", "arm,primecell";
+ 					reg = <0x1f000 0x1000>;
+@@ -254,37 +265,16 @@
+ 					interrupts = <14>;
+ 					clocks = <&v2m_oscclk1>, <&smbclk>;
+ 					clock-names = "clcdclk", "apb_pclk";
+-					memory-region = <&v2m_video_ram>;
+-					max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
++					/* 800x600 16bpp @36MHz works fine */
++					max-memory-bandwidth = <54000000>;
++					memory-region = <&vram>;
+ 
+ 					port {
+-						v2m_clcd_pads: endpoint {
+-							remote-endpoint = <&v2m_clcd_panel>;
++						clcd_pads_mb: endpoint {
++							remote-endpoint = <&dvi_bridge_in>;
+ 							arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
+ 						};
+ 					};
+-
+-					panel {
+-						compatible = "panel-dpi";
+-
+-						port {
+-							v2m_clcd_panel: endpoint {
+-								remote-endpoint = <&v2m_clcd_pads>;
+-							};
+-						};
+-
+-						panel-timing {
+-							clock-frequency = <25175000>;
+-							hactive = <640>;
+-							hback-porch = <40>;
+-							hfront-porch = <24>;
+-							hsync-len = <96>;
+-							vactive = <480>;
+-							vback-porch = <32>;
+-							vfront-porch = <11>;
+-							vsync-len = <2>;
+-						};
+-					};
+ 				};
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+index 3971427a105b..62f2a7ff356a 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+@@ -53,6 +53,20 @@
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		/* Chipselect 2 is physically at 0x48000000 */
++		vram: vram at 48000000 {
++			/* 8 MB of designated video RAM */
++			compatible = "shared-dma-pool";
++			reg = <0 0x48000000 0 0x00800000>;
++			no-map;
++		};
++	};
++
+ 	hdlcd at 2b000000 {
+ 		compatible = "arm,hdlcd";
+ 		reg = <0 0x2b000000 0 0x1000>;
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index 65a874ea66be..3ae06f406c9a 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -104,6 +104,20 @@
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		/* Chipselect 2 is physically at 0x48000000 */
++		vram: vram at 48000000 {
++			/* 8 MB of designated video RAM */
++			compatible = "shared-dma-pool";
++			reg = <0 0x48000000 0 0x00800000>;
++			no-map;
++		};
++	};
++
+ 	wdt at 2a490000 {
+ 		compatible = "arm,sp805", "arm,primecell";
+ 		reg = <0 0x2a490000 0 0x1000>;
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+index e5b4a7570a01..a79185ecc059 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -55,6 +55,20 @@
+ 		reg = <0x80000000 0x40000000>;
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* Chipselect 2 is physically at 0x48000000 */
++		vram: vram at 48000000 {
++			/* 8 MB of designated video RAM */
++			compatible = "shared-dma-pool";
++			reg = <0x48000000 0x00800000>;
++			no-map;
++		};
++	};
++
+ 	hdlcd at 2a110000 {
+ 		compatible = "arm,hdlcd";
+ 		reg = <0x2a110000 0x1000>;
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 7ec3dac1f61d..7252bcce2086 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -69,6 +69,20 @@
+ 		reg = <0x60000000 0x40000000>;
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* Chipselect 3 is physically at 0x4c000000 */
++		vram: vram at 4c000000 {
++			/* 8 MB of designated video RAM */
++			compatible = "shared-dma-pool";
++			reg = <0x4c000000 0x00800000>;
++			no-map;
++		};
++	};
++
+ 	clcd at 10020000 {
+ 		compatible = "arm,pl111", "arm,primecell";
+ 		reg = <0x10020000 0x1000>;
+@@ -76,36 +90,15 @@
+ 		interrupts = <0 44 4>;
+ 		clocks = <&oscclk1>, <&oscclk2>;
+ 		clock-names = "clcdclk", "apb_pclk";
+-		max-memory-bandwidth = <130000000>; /* 16bpp @ 63.5MHz */
++		/* 1024x768 16bpp @65MHz */
++		max-memory-bandwidth = <95000000>;
+ 
+ 		port {
+ 			clcd_pads: endpoint {
+-				remote-endpoint = <&clcd_panel>;
++				remote-endpoint = <&dvi_bridge_in>;
+ 				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
+ 			};
+ 		};
+-
+-		panel {
+-			compatible = "panel-dpi";
+-
+-			port {
+-				clcd_panel: endpoint {
+-					remote-endpoint = <&clcd_pads>;
+-				};
+-			};
+-
+-			panel-timing {
+-				clock-frequency = <63500127>;
+-				hactive = <1024>;
+-				hback-porch = <152>;
+-				hfront-porch = <48>;
+-				hsync-len = <104>;
+-				vactive = <768>;
+-				vback-porch = <23>;
+-				vfront-porch = <3>;
+-				vsync-len = <4>;
+-			};
+-		};
+ 	};
+ 
+ 	memory-controller at 100e0000 {
+diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+index 06c8117e812a..e9423a099573 100644
+--- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
++++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+@@ -76,6 +76,20 @@
+ 		      <0x00000008 0x80000000 0 0x80000000>;
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* Chipselect 2 is physically at 0x48000000 */
++		vram: vram at 48000000 {
++			/* 8 MB of designated video RAM */
++			compatible = "shared-dma-pool";
++			reg = <0x48000000 0x00800000>;
++			no-map;
++		};
++	};
++
+ 	gic: interrupt-controller at 2c001000 {
+ 		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
+index 1134e5d8df18..737d0a0c0854 100644
+--- a/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
++++ b/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
+@@ -23,11 +23,6 @@
+ 			bank-width = <4>;
+ 		};
+ 
+-		v2m_video_ram: vram at 2,00000000 {
+-			compatible = "arm,vexpress-vram";
+-			reg = <2 0x00000000 0x00800000>;
+-		};
+-
+ 		ethernet at 2,02000000 {
+ 			compatible = "smsc,lan91c111";
+ 			reg = <2 0x02000000 0x10000>;
+@@ -186,38 +181,16 @@
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
+ 				clock-names = "clcdclk", "apb_pclk";
+-				arm,pl11x,framebuffer = <0x18000000 0x00180000>;
+-				memory-region = <&v2m_video_ram>;
+-				max-memory-bandwidth = <130000000>; /* 16bpp @ 63.5MHz */
++				/* 800x600 16bpp @36MHz works fine */
++				max-memory-bandwidth = <54000000>;
++				memory-region = <&vram>;
+ 
+ 				port {
+-					v2m_clcd_pads: endpoint {
+-						remote-endpoint = <&v2m_clcd_panel>;
++					clcd_pads: endpoint {
++						remote-endpoint = <&dvi_bridge_in>;
+ 						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
+ 					};
+ 				};
+-
+-				panel {
+-					compatible = "panel-dpi";
+-
+-					port {
+-						v2m_clcd_panel: endpoint {
+-							remote-endpoint = <&v2m_clcd_pads>;
+-						};
+-					};
+-
+-					panel-timing {
+-						clock-frequency = <63500127>;
+-						hactive = <1024>;
+-						hback-porch = <152>;
+-						hfront-porch = <48>;
+-						hsync-len = <104>;
+-						vactive = <768>;
+-						vback-porch = <23>;
+-						vfront-porch = <3>;
+-						vsync-len = <4>;
+-					};
+-				};
+ 			};
+ 
+ 			virtio-block at 130000 {
+-- 
+2.14.3
