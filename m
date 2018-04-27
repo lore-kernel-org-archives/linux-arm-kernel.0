@@ -1,58 +1,43 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Fri, 27 Apr 2018 15:57:06 +0530
-Subject: [PATCH 6/6 v3] arm64: dts: ls208xa: comply with the iommu map binding
- for fsl_mc
-In-Reply-To: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
-References: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <1524824826-29473-7-git-send-email-nipun.gupta@nxp.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 27 Apr 2018 12:31:52 +0200
+Subject: [PATCH] tty/serial: atmel: use port->name as name in request_irq()
+In-Reply-To: <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
+References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
+ <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
+Message-ID: <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fsl-mc bus support the new iommu-map property. Comply to this binding
-for fsl_mc bus.
+Hi Sebastian,
 
-Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+On 26/04/2018 17:12, Sebastian Andrzej Siewior wrote:
+> On 2018-04-26 17:06:25 [+0200], To linux-serial at vger.kernel.org wrote:
+>> It seems not to happen in v4.1.51 but it happens in v4.9 and v4.17-rc2
+>> so if it broke accidentally it was not recently.
+> 
+> This is what I used to check:
+> 
+> diff --git a/drivers/tty/tty_io.c b/drivers/tty/tty_io.c
+> --- a/drivers/tty/tty_io.c
+> +++ b/drivers/tty/tty_io.c
+> @@ -170,7 +170,7 @@ void free_tty_struct(struct tty_struct *tty)
+>  	put_device(tty->dev);
+>  	kfree(tty->write_buf);
+>  	tty->magic = 0xDEADDEAD;
+> -	kfree(tty);
+> +	strcpy(tty->name, "GONE");
+>  }
+>  
+>  static inline struct tty_struct *file_tty(struct file *file)
+> 
+> If this is unknown and a bisect is requested, please let me know.
+Indeed, this will be appreciated.
+I'm quite curious to find the commit that led to this.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-index 137ef4d..6010505 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-@@ -184,6 +184,7 @@
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-+		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
- 
- 		clockgen: clocking at 1300000 {
- 			compatible = "fsl,ls2080a-clockgen";
-@@ -357,6 +358,8 @@
- 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
- 			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
- 			msi-parent = <&its>;
-+			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
-+			dma-coherent;
- 			#address-cells = <3>;
- 			#size-cells = <1>;
- 
-@@ -460,6 +463,8 @@
- 			compatible = "arm,mmu-500";
- 			reg = <0 0x5000000 0 0x800000>;
- 			#global-interrupts = <12>;
-+			#iommu-cells = <1>;
-+			stream-match-mask = <0x7C00>;
- 			interrupts = <0 13 4>, /* global secure fault */
- 				     <0 14 4>, /* combined secure interrupt */
- 				     <0 15 4>, /* global non-secure fault */
-@@ -502,7 +507,6 @@
- 				     <0 204 4>, <0 205 4>,
- 				     <0 206 4>, <0 207 4>,
- 				     <0 208 4>, <0 209 4>;
--			mmu-masters = <&fsl_mc 0x300 0>;
- 		};
- 
- 		dspi: dspi at 2100000 {
--- 
-1.9.1
+Thanks !
+
+> 
+> Sebastian
+> 
+
+Richard
