@@ -1,541 +1,111 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 26 Apr 2018 19:17:45 -0500
-Subject: [PATCH v9 27/27] ARM: dts: da850: Add clocks
-In-Reply-To: <20180427001745.4116-1-david@lechnology.com>
-References: <20180427001745.4116-1-david@lechnology.com>
-Message-ID: <20180427001745.4116-28-david@lechnology.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Fri, 27 Apr 2018 09:38:44 +0900
+Subject: [PATCH 2/2] pinctrl: uniphier: add LD11 MPEG2-TS I/O pin-mux settings
+In-Reply-To: <20180427003844.3937-1-suzuki.katsuhiro@socionext.com>
+References: <20180427003844.3937-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180427003844.3937-2-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds clock provider nodes for da850 and wires them up to all of the
-devices.
+The MPEG2-TS input/output core both accepts serial TS and parallel TS.
 
-Signed-off-by: David Lechner <david@lechnology.com>
+The serial TS interface uses following pins:
+  hscin0_s : HS0DOUT[0-3]
+  hscin1_s : HS0DOUT[4-7]
+  hscin2_s : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN0
+  hscout0_s: HS0DOUT[0-3]
+  hscout1_s: HS0DOUT[4-7]
+
+And the parallel TS interface uses following pins:
+  hscin0_p : HS0BCLKIN, HS0SYNCIN, HS0VALIN, HS0DIN[0-7]
+  hscin1_p : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN[0-7]
+  hscout0_p: HS0BCLKOUT, HS0SYNCOUT, HS0VALOUT, HS0DOUT[0-7]
+
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
+ .../pinctrl/uniphier/pinctrl-uniphier-ld11.c  | 49 +++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-v9 changes:
-- change mcasp and vpif nodes from clocks to power-domains
-
-v8 changes:
-- fix typo in clock-names property of psc0
-- added power-domains properties to nodes that define that property in their
-  device tree bindings
-
-v7 changes:
-- move ref_clk frequency to board-specific DT files
-- enable sata_refclk in da850-lcdk.dts
-- drop async2 fixed factor clock
-- add power-domains for devices that use them
-- fix USB PHY clock-names property
-- move assigned-clocks to PSC device node
-- drop clocks property from devices that don't use it (e.g. EDMA)
-- add clock to RTC node
-- add clock-ranges to usb0 and aemif nodes
-- add clock-names property to aemif node
-- fix typo in psc1 clock-names
-
-v6 changes:
-- updated for device tree bindings changes earlier in this series
-- use single async2 clock instead of duplicate fixed factor clocks
-- add clock-names property to mdio node
-
-
- arch/arm/boot/dts/da850-enbw-cmc.dts |   4 +
- arch/arm/boot/dts/da850-evm.dts      |   4 +
- arch/arm/boot/dts/da850-lcdk.dts     |   9 ++
- arch/arm/boot/dts/da850-lego-ev3.dts |   4 +
- arch/arm/boot/dts/da850.dtsi         | 166 +++++++++++++++++++++++++++
- 5 files changed, 187 insertions(+)
-
-diff --git a/arch/arm/boot/dts/da850-enbw-cmc.dts b/arch/arm/boot/dts/da850-enbw-cmc.dts
-index 14dff3e188ed..0102ffc5aa53 100644
---- a/arch/arm/boot/dts/da850-enbw-cmc.dts
-+++ b/arch/arm/boot/dts/da850-enbw-cmc.dts
-@@ -35,6 +35,10 @@
- 	};
- };
- 
-+&ref_clk {
-+	clock-frequency = <24000000>;
-+};
-+
- &edma0 {
- 	ti,edma-reserved-slot-ranges = <32 50>;
- };
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 11cf3765214f..48f6318f4c69 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -200,6 +200,10 @@
- 	};
- };
- 
-+&ref_clk {
-+	clock-frequency = <24000000>;
-+};
-+
- /include/ "tps6507x.dtsi"
- 
- &tps {
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 0edf769ea95c..0177e3ed20fe 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -123,6 +123,10 @@
- 	};
- };
- 
-+&ref_clk {
-+	clock-frequency = <24000000>;
-+};
-+
- &pmx_core {
- 	status = "okay";
- 
-@@ -175,6 +179,11 @@
- 	status = "okay";
- };
- 
-+&sata_refclk {
-+	status = "okay";
-+	clock-frequency = <100000000>;
-+};
-+
- &sata {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/da850-lego-ev3.dts b/arch/arm/boot/dts/da850-lego-ev3.dts
-index 0a7cfa48b17e..9252ea2c3d3b 100644
---- a/arch/arm/boot/dts/da850-lego-ev3.dts
-+++ b/arch/arm/boot/dts/da850-lego-ev3.dts
-@@ -193,6 +193,10 @@
- 	};
- };
- 
-+&ref_clk {
-+	clock-frequency = <24000000>;
-+};
-+
- &pmx_core {
- 	status = "okay";
- 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index f6f1597b03df..acf71973fec7 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -32,6 +32,25 @@
- 			reg = <0xfffee000 0x2000>;
- 		};
- 	};
-+	clocks: clocks {
-+		ref_clk: ref_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-output-names = "ref_clk";
-+		};
-+		sata_refclk: sata_refclk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-output-names = "sata_refclk";
-+			status = "disabled";
-+		};
-+		usb_refclkin: usb_refclkin {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-output-names = "usb_refclkin";
-+			status = "disabled";
-+		};
-+	};
- 	dsp: dsp at 11800000 {
- 		compatible = "ti,da850-dsp";
- 		reg = <0x11800000 0x40000>,
-@@ -42,6 +61,7 @@
- 		reg-names = "l2sram", "l1pram", "l1dram", "host1cfg", "chipsig";
- 		interrupt-parent = <&intc>;
- 		interrupts = <28>;
-+		clocks = <&psc0 15>;
- 		status = "disabled";
- 	};
- 	soc at 1c00000 {
-@@ -52,6 +72,37 @@
- 		ranges = <0x0 0x01c00000 0x400000>;
- 		interrupt-parent = <&intc>;
- 
-+		psc0: clock-controller at 10000 {
-+			compatible = "ti,da850-psc0";
-+			reg = <0x10000 0x1000>;
-+			#clock-cells = <1>;
-+			#power-domain-cells = <1>;
-+			clocks = <&pll0_sysclk 1>, <&pll0_sysclk 2>,
-+				 <&pll0_sysclk 4>, <&pll0_sysclk 6>,
-+				 <&async1_clk>;
-+			clock-names = "pll0_sysclk1", "pll0_sysclk2",
-+				      "pll0_sysclk4", "pll0_sysclk6",
-+				      "async1";
-+		};
-+		pll0: clock-controller at 11000 {
-+			compatible = "ti,da850-pll0";
-+			reg = <0x11000 0x1000>;
-+			clocks = <&ref_clk>, <&pll1_sysclk 3>;
-+			clock-names = "clksrc", "extclksrc";
-+
-+			pll0_pllout: pllout {
-+				#clock-cells = <0>;
-+			};
-+			pll0_sysclk: sysclk {
-+				#clock-cells = <1>;
-+			};
-+			pll0_auxclk: auxclk {
-+				#clock-cells = <0>;
-+			};
-+			pll0_obsclk: obsclk {
-+				#clock-cells = <0>;
-+			};
-+		};
- 		pmx_core: pinmux at 14120 {
- 			compatible = "pinctrl-single";
- 			reg = <0x14120 0x50>;
-@@ -281,8 +332,41 @@
- 			usb_phy: usb-phy {
- 				compatible = "ti,da830-usb-phy";
- 				#phy-cells = <1>;
-+				clocks = <&usb_phy_clk 0>, <&usb_phy_clk 1>;
-+				clock-names = "usb0_clk48", "usb1_clk48";
- 				status = "disabled";
- 			};
-+			usb_phy_clk: usb-phy-clocks {
-+				compatible = "ti,da830-usb-phy-clocks";
-+				#clock-cells = <1>;
-+				clocks = <&psc1 1>, <&usb_refclkin>,
-+					 <&pll0_auxclk>;
-+				clock-names = "fck", "usb_refclkin", "auxclk";
-+			};
-+			ehrpwm_tbclk: ehrpwm_tbclk {
-+				compatible = "ti,da830-tbclksync";
-+				#clock-cells = <0>;
-+				clocks = <&psc1 17>;
-+				clock-names = "fck";
-+			};
-+			div4p5_clk: div4.5 {
-+				compatible = "ti,da830-div4p5ena";
-+				#clock-cells = <0>;
-+				clocks = <&pll0_pllout>;
-+				clock-names = "pll0_pllout";
-+			};
-+			async1_clk: async1 {
-+				compatible = "ti,da850-async1-clksrc";
-+				#clock-cells = <0>;
-+				clocks = <&pll0_sysclk 3>, <&div4p5_clk>;
-+				clock-names = "pll0_sysclk3", "div4.5";
-+			};
-+			async3_clk: async3 {
-+				compatible = "ti,da850-async3-clksrc";
-+				#clock-cells = <0>;
-+				clocks = <&pll0_sysclk 2>, <&pll1_sysclk 2>;
-+				clock-names = "pll0_sysclk2", "pll1_sysclk2";
-+			};
- 		};
- 		edma0: edma at 0 {
- 			compatible = "ti,edma3-tpcc";
-@@ -294,18 +378,21 @@
- 			#dma-cells = <2>;
- 
- 			ti,tptcs = <&edma0_tptc0 7>, <&edma0_tptc1 0>;
-+			power-domains = <&psc0 0>;
- 		};
- 		edma0_tptc0: tptc at 8000 {
- 			compatible = "ti,edma3-tptc";
- 			reg =	<0x8000 0x400>;
- 			interrupts = <13>;
- 			interrupt-names = "edm3_tcerrint";
-+			power-domains = <&psc0 1>;
- 		};
- 		edma0_tptc1: tptc at 8400 {
- 			compatible = "ti,edma3-tptc";
- 			reg =	<0x8400 0x400>;
- 			interrupts = <32>;
- 			interrupt-names = "edm3_tcerrint";
-+			power-domains = <&psc0 2>;
- 		};
- 		edma1: edma at 230000 {
- 			compatible = "ti,edma3-tpcc";
-@@ -317,12 +404,14 @@
- 			#dma-cells = <2>;
- 
- 			ti,tptcs = <&edma1_tptc0 7>;
-+			power-domains = <&psc1 0>;
- 		};
- 		edma1_tptc0: tptc at 238000 {
- 			compatible = "ti,edma3-tptc";
- 			reg =	<0x238000 0x400>;
- 			interrupts = <95>;
- 			interrupt-names = "edm3_tcerrint";
-+			power-domains = <&psc1 21>;
- 		};
- 		serial0: serial at 42000 {
- 			compatible = "ti,da830-uart", "ns16550a";
-@@ -330,6 +419,8 @@
- 			reg-io-width = <4>;
- 			reg-shift = <2>;
- 			interrupts = <25>;
-+			clocks = <&psc0 9>;
-+			power-domains = <&psc0 9>;
- 			status = "disabled";
- 		};
- 		serial1: serial at 10c000 {
-@@ -338,6 +429,8 @@
- 			reg-io-width = <4>;
- 			reg-shift = <2>;
- 			interrupts = <53>;
-+			clocks = <&psc1 12>;
-+			power-domains = <&psc1 12>;
- 			status = "disabled";
- 		};
- 		serial2: serial at 10d000 {
-@@ -346,6 +439,8 @@
- 			reg-io-width = <4>;
- 			reg-shift = <2>;
- 			interrupts = <61>;
-+			clocks = <&psc1 13>;
-+			power-domains = <&psc1 13>;
- 			status = "disabled";
- 		};
- 		rtc0: rtc at 23000 {
-@@ -353,6 +448,8 @@
- 			reg = <0x23000 0x1000>;
- 			interrupts = <19
- 				      19>;
-+			clocks = <&pll0_auxclk>;
-+			clock-names = "int-clk";
- 			status = "disabled";
- 		};
- 		i2c0: i2c at 22000 {
-@@ -361,6 +458,7 @@
- 			interrupts = <15>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			clocks = <&pll0_auxclk>;
- 			status = "disabled";
- 		};
- 		i2c1: i2c at 228000 {
-@@ -369,11 +467,19 @@
- 			interrupts = <51>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			clocks = <&psc1 11>;
-+			power-domains = <&psc1 11>;
- 			status = "disabled";
- 		};
-+		clocksource: timer at 20000 {
-+			compatible = "ti,davinci-timer";
-+			reg = <0x20000 0x1000>;
-+			clocks = <&pll0_auxclk>;
-+		};
- 		wdt: wdt at 21000 {
- 			compatible = "ti,davinci-wdt";
- 			reg = <0x21000 0x1000>;
-+			clocks = <&pll0_auxclk>;
- 			status = "disabled";
- 		};
- 		mmc0: mmc at 40000 {
-@@ -384,12 +490,14 @@
- 			interrupts = <16>;
- 			dmas = <&edma0 16 0>, <&edma0 17 0>;
- 			dma-names = "rx", "tx";
-+			clocks = <&psc0 5>;
- 			status = "disabled";
- 		};
- 		vpif: video at 217000 {
- 			compatible = "ti,da850-vpif";
- 			reg = <0x217000 0x1000>;
- 			interrupts = <92>;
-+			power-domains = <&psc1 9>;
- 			status = "disabled";
- 
- 			/* VPIF capture port */
-@@ -412,6 +520,7 @@
- 			interrupts = <72>;
- 			dmas = <&edma1 28 0>, <&edma1 29 0>;
- 			dma-names = "rx", "tx";
-+			clocks = <&psc1 18>;
- 			status = "disabled";
- 		};
- 		ehrpwm0: pwm at 300000 {
-@@ -419,6 +528,8 @@
- 				     "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x300000 0x2000>;
-+			clocks = <&psc1 17>, <&ehrpwm_tbclk>;
-+			clock-names = "fck", "tbclk";
- 			status = "disabled";
- 		};
- 		ehrpwm1: pwm at 302000 {
-@@ -426,6 +537,8 @@
- 				     "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x302000 0x2000>;
-+			clocks = <&psc1 17>, <&ehrpwm_tbclk>;
-+			clock-names = "fck", "tbclk";
- 			status = "disabled";
- 		};
- 		ecap0: ecap at 306000 {
-@@ -433,6 +546,8 @@
- 				     "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x306000 0x80>;
-+			clocks = <&psc1 20>;
-+			clock-names = "fck";
- 			status = "disabled";
- 		};
- 		ecap1: ecap at 307000 {
-@@ -440,6 +555,8 @@
- 				     "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x307000 0x80>;
-+			clocks = <&psc1 20>;
-+			clock-names = "fck";
- 			status = "disabled";
- 		};
- 		ecap2: ecap at 308000 {
-@@ -447,6 +564,8 @@
- 				     "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x308000 0x80>;
-+			clocks = <&psc1 20>;
-+			clock-names = "fck";
- 			status = "disabled";
- 		};
- 		spi0: spi at 41000 {
-@@ -459,6 +578,8 @@
- 			interrupts = <20>;
- 			dmas = <&edma0 14 0>, <&edma0 15 0>;
- 			dma-names = "rx", "tx";
-+			clocks = <&psc0 4>;
-+			power-domains = <&psc0 4>;
- 			status = "disabled";
- 		};
- 		spi1: spi at 30e000 {
-@@ -471,6 +592,8 @@
- 			interrupts = <56>;
- 			dmas = <&edma0 18 0>, <&edma0 19 0>;
- 			dma-names = "rx", "tx";
-+			clocks = <&psc1 10>;
-+			power-domains = <&psc1 10>;
- 			status = "disabled";
- 		};
- 		usb0: usb at 200000 {
-@@ -482,6 +605,8 @@
- 			dr_mode = "otg";
- 			phys = <&usb_phy 0>;
- 			phy-names = "usb-phy";
-+			clocks = <&psc1 1>;
-+			clock-ranges;
- 			status = "disabled";
- 
- 			#address-cells = <1>;
-@@ -512,13 +637,31 @@
- 			compatible = "ti,da850-ahci";
- 			reg = <0x218000 0x2000>, <0x22c018 0x4>;
- 			interrupts = <67>;
-+			clocks = <&psc1 8>, <&sata_refclk>;
-+			clock-names = "fck", "refclk";
- 			status = "disabled";
- 		};
-+		pll1: clock-controller at 21a000 {
-+			compatible = "ti,da850-pll1";
-+			reg = <0x21a000 0x1000>;
-+			clocks = <&ref_clk>;
-+			clock-names = "clksrc";
-+
-+			pll1_sysclk: sysclk {
-+				#clock-cells = <1>;
-+			};
-+			pll1_obsclk: obsclk {
-+				#clock-cells = <0>;
-+			};
-+		};
- 		mdio: mdio at 224000 {
- 			compatible = "ti,davinci_mdio";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			reg = <0x224000 0x1000>;
-+			clocks = <&psc1 5>;
-+			clock-names = "fck";
-+			power-domains = <&psc1 5>;
- 			status = "disabled";
- 		};
- 		eth0: ethernet at 220000 {
-@@ -534,6 +677,8 @@
- 					35
- 					36
- 					>;
-+			clocks = <&psc1 5>;
-+			power-domains = <&psc1 5>;
- 			status = "disabled";
- 		};
- 		usb1: usb at 225000 {
-@@ -542,6 +687,7 @@
- 			interrupts = <59>;
- 			phys = <&usb_phy 1>;
- 			phy-names = "usb-phy";
-+			clocks = <&psc1 2>;
- 			status = "disabled";
- 		};
- 		gpio: gpio at 226000 {
-@@ -556,6 +702,8 @@
- 				49 IRQ_TYPE_EDGE_BOTH 50 IRQ_TYPE_EDGE_BOTH>;
- 			ti,ngpio = <144>;
- 			ti,davinci-gpio-unbanked = <0>;
-+			clocks = <&psc1 3>;
-+			clock-names = "gpio";
- 			status = "disabled";
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-@@ -704,6 +852,17 @@
- 				      <&pmx_core 142 147 1>,
- 				      <&pmx_core 143 146 1>;
- 		};
-+		psc1: clock-controller at 227000 {
-+			compatible = "ti,da850-psc1";
-+			reg = <0x227000 0x1000>;
-+			#clock-cells = <1>;
-+			#power-domain-cells = <1>;
-+			clocks = <&pll0_sysclk 2>, <&pll0_sysclk 4>,
-+				 <&async3_clk>;
-+			clock-names = "pll0_sysclk2", "pll0_sysclk4", "async3";
-+			assigned-clocks = <&async3_clk>;
-+			assigned-clock-parents = <&pll1_sysclk 2>;
-+		};
- 		pinconf: pin-controller at 22c00c {
- 			compatible = "ti,da850-pupd";
- 			reg = <0x22c00c 0x8>;
-@@ -717,6 +876,7 @@
- 			reg-names = "mpu", "dat";
- 			interrupts = <54>;
- 			interrupt-names = "common";
-+			power-domains = <&psc1 7>;
- 			status = "disabled";
- 			dmas = <&edma0 1 1>,
- 				<&edma0 0 1>;
-@@ -728,6 +888,9 @@
- 			reg = <0x213000 0x1000>;
- 			interrupts = <52>;
- 			max-pixelclock = <37500>;
-+			clocks = <&psc1 16>;
-+			clock-names = "fck";
-+			power-domains = <&psc1 16>;
- 			status = "disabled";
- 		};
- 	};
-@@ -739,6 +902,9 @@
- 		reg = <0x68000000 0x00008000>;
- 		ranges = <0 0 0x60000000 0x08000000
- 			  1 0 0x68000000 0x00008000>;
-+		clocks = <&psc0 3>;
-+		clock-names = "aemif";
-+		clock-ranges;
- 		status = "disabled";
- 	};
- 	memctrl: memory-controller at b0000000 {
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
+index 0976fbfecd50..5b5864efb514 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
+@@ -481,6 +481,31 @@ static const int emmc_dat8_muxvals[] = {0, 0, 0, 0};
+ static const unsigned ether_rmii_pins[] = {6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+ 					   16, 17};
+ static const int ether_rmii_muxvals[] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
++static const unsigned hscin0_ci_pins[] = {102, 103, 104, 105, 106, 107, 108,
++					    109, 110, 111, 112};
++static const int hscin0_ci_muxvals[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
++static const unsigned hscin0_p_pins[] = {102, 103, 104, 105, 106, 107, 108, 109,
++					 110, 111, 112};
++static const int hscin0_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
++static const unsigned hscin1_p_pins[] = {124, 125, 126, 127, 128, 129, 130, 131,
++					 132, 133, 134};
++static const int hscin1_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
++static const unsigned hscin0_s_pins[] = {116, 117, 118, 119};
++static const int hscin0_s_muxvals[] = {3, 3, 3, 3};
++static const unsigned hscin1_s_pins[] = {120, 121, 122, 123};
++static const int hscin1_s_muxvals[] = {3, 3, 3, 3};
++static const unsigned hscin2_s_pins[] = {124, 125, 126, 127};
++static const int hscin2_s_muxvals[] = {3, 3, 3, 3};
++static const unsigned hscout0_ci_pins[] = {113, 114, 115, 116, 117, 118, 119,
++					   120, 121, 122, 123};
++static const int hscout0_ci_muxvals[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
++static const unsigned hscout0_p_pins[] = {113, 114, 115, 116, 117, 118, 119,
++					  120, 121, 122, 123};
++static const int hscout0_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
++static const unsigned hscout0_s_pins[] = {116, 117, 118, 119};
++static const int hscout0_s_muxvals[] = {4, 4, 4, 4};
++static const unsigned hscout1_s_pins[] = {120, 121, 122, 123};
++static const int hscout1_s_muxvals[] = {4, 4, 4, 4};
+ static const unsigned i2c0_pins[] = {63, 64};
+ static const int i2c0_muxvals[] = {0, 0};
+ static const unsigned i2c1_pins[] = {65, 66};
+@@ -556,6 +581,16 @@ static const struct uniphier_pinctrl_group uniphier_ld11_groups[] = {
+ 	UNIPHIER_PINCTRL_GROUP(emmc),
+ 	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
+ 	UNIPHIER_PINCTRL_GROUP(ether_rmii),
++	UNIPHIER_PINCTRL_GROUP(hscin0_ci),
++	UNIPHIER_PINCTRL_GROUP(hscin0_p),
++	UNIPHIER_PINCTRL_GROUP(hscin1_p),
++	UNIPHIER_PINCTRL_GROUP(hscin0_s),
++	UNIPHIER_PINCTRL_GROUP(hscin1_s),
++	UNIPHIER_PINCTRL_GROUP(hscin2_s),
++	UNIPHIER_PINCTRL_GROUP(hscout0_ci),
++	UNIPHIER_PINCTRL_GROUP(hscout0_p),
++	UNIPHIER_PINCTRL_GROUP(hscout0_s),
++	UNIPHIER_PINCTRL_GROUP(hscout1_s),
+ 	UNIPHIER_PINCTRL_GROUP(i2c0),
+ 	UNIPHIER_PINCTRL_GROUP(i2c1),
+ 	UNIPHIER_PINCTRL_GROUP(i2c3),
+@@ -583,6 +618,15 @@ static const char * const aout1_groups[] = {"aout1"};
+ static const char * const aoutiec1_groups[] = {"aoutiec1"};
+ static const char * const emmc_groups[] = {"emmc", "emmc_dat8"};
+ static const char * const ether_rmii_groups[] = {"ether_rmii"};
++static const char * const hscin0_groups[] = {"hscin0_s",
++					     "hscin0_p",
++					     "hscout0_ci"};
++static const char * const hscin1_groups[] = {"hscin1_s", "hscin0_p"};
++static const char * const hscin2_groups[] = {"hscin2_s"};
++static const char * const hscout0_groups[] = {"hscout0_s",
++					      "hscout0_p",
++					      "hscout0_ci"};
++static const char * const hscout1_groups[] = {"hscout1_s"};
+ static const char * const i2c0_groups[] = {"i2c0"};
+ static const char * const i2c1_groups[] = {"i2c1"};
+ static const char * const i2c3_groups[] = {"i2c3"};
+@@ -603,6 +647,11 @@ static const struct uniphier_pinmux_function uniphier_ld11_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(aoutiec1),
+ 	UNIPHIER_PINMUX_FUNCTION(emmc),
+ 	UNIPHIER_PINMUX_FUNCTION(ether_rmii),
++	UNIPHIER_PINMUX_FUNCTION(hscin0),
++	UNIPHIER_PINMUX_FUNCTION(hscin1),
++	UNIPHIER_PINMUX_FUNCTION(hscin2),
++	UNIPHIER_PINMUX_FUNCTION(hscout0),
++	UNIPHIER_PINMUX_FUNCTION(hscout1),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c0),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c1),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c3),
 -- 
 2.17.0
