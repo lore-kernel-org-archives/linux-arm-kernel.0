@@ -1,43 +1,54 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 27 Apr 2018 09:21:38 +0200
-Subject: [PATCH 0/3] can: fix ndo_start_xmit()'s return type
-In-Reply-To: <20180426211339.30821-1-luc.vanoostenryck@gmail.com>
-References: <20180426211339.30821-1-luc.vanoostenryck@gmail.com>
-Message-ID: <62fdb875-0940-3396-612c-06ef7533399b@pengutronix.de>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Fri, 27 Apr 2018 15:20:50 +0800
+Subject: [PATCH] ARM: dts: imx6sx-sabreauto: add egalax touch screen support
+Message-ID: <1524813650-19241-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2018 11:13 PM, Luc Van Oostenryck wrote:
-> ndo_start_xmit() is defined as returing an 'netdev_tx_t'.
-> However, several can drivers use 'int' as the return type
-> of their start_xmit() method.
-> This series contains the fix for all three of them.
-> 
-> Luc Van Oostenryck (3):
->   can: janz-ican3: fix ican3_xmit()'s return type
->   can: sun4i: fix sun4ican_start_xmit()'s return type
->   can: xilinx: fix xcan_start_xmit()'s return type
-> 
->  drivers/net/can/janz-ican3.c | 2 +-
->  drivers/net/can/sun4i_can.c  | 2 +-
->  drivers/net/can/xilinx_can.c | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+From: Haibo Chen <haibo.chen@nxp.com>
 
-Applied all 3 to linux-can-next, added similar patch for the flexcan driver.
+Add egalax touch screen support on i2c2 bus.
 
-Tnx,
-Marc
+Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+this patch is based on patch (ARM: dts: imx6sx-sabreauto: add debug LED support) I sent out for review.
+ arch/arm/boot/dts/imx6sx-sabreauto.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+index 6b94f24..2f6e474 100644
+--- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+@@ -131,6 +131,12 @@
+ &iomuxc {
+ 	imx6x-sabreauto {
+ 
++		pinctrl_egalax_int: egalax_intgrp {
++			fsl,pins = <
++				MX6SX_PAD_SD4_RESET_B__GPIO6_IO_22      0x80000000
++			>;
++		};
++
+ 		pinctrl_led: ledgrp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_CSI_PIXCLK__GPIO1_IO_24 0x17059
+@@ -274,6 +280,16 @@
+ 	pinctrl-0 = <&pinctrl_i2c2_1>;
+ 	status = "okay";
+ 
++	egalax_ts at 04 {
++		compatible = "eeti,egalax_ts";
++		reg = <0x04>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_egalax_int>;
++		interrupt-parent = <&gpio6>;
++		interrupts = <22 IRQ_TYPE_EDGE_FALLING>;
++		wakeup-gpios = <&gpio6 22 GPIO_ACTIVE_HIGH>;
++	};
++
+ 	max7322: gpio at 68 {
+ 		compatible = "maxim,max7322";
+ 		reg = <0x68>;
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180427/35ebe084/attachment.sig>
+2.7.4
