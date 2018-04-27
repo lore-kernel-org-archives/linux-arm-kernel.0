@@ -1,78 +1,41 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Fri, 27 Apr 2018 09:37:20 +0200
-Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
-In-Reply-To: <1524781764.2693.503.camel@hpe.com>
-References: <20180314180155.19492-1-toshi.kani@hpe.com>
- <20180314180155.19492-3-toshi.kani@hpe.com>
- <20180426141926.GN15462@8bytes.org>
- <1524759629.2693.465.camel@hpe.com>
- <20180426172327.GQ15462@8bytes.org>
- <1524764948.2693.478.camel@hpe.com>
- <20180426200737.GS15462@8bytes.org>
- <1524781764.2693.503.camel@hpe.com>
-Message-ID: <20180427073719.GT15462@8bytes.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 27 Apr 2018 09:49:41 +0200
+Subject: [PATCH 3/3] can: xilinx: fix xcan_start_xmit()'s return type
+In-Reply-To: <20180426211339.30821-4-luc.vanoostenryck@gmail.com>
+References: <20180426211339.30821-1-luc.vanoostenryck@gmail.com>
+ <20180426211339.30821-4-luc.vanoostenryck@gmail.com>
+Message-ID: <79ea4ab6-a12a-21ad-b586-6a1dad176c0a@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 10:30:14PM +0000, Kani, Toshi wrote:
-> Thanks for the clarification. After reading through SDM one more time, I
-> agree that we need a TLB purge here. Here is my current understanding. 
+On 26.4.2018 23:13, Luc Van Oostenryck wrote:
+> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+> which is a typedef for an enum type, but the implementation in this
+> driver returns an 'int'.
 > 
->  - INVLPG purges both TLB and paging-structure caches. So, PMD cache was
-> purged once.
->  - However, processor may cache this PMD entry later in speculation
-> since it has p-bit set. (This is where my misunderstanding was.
-> Speculation is not allowed to access a target address, but it may still
-> cache this PMD entry.)
->  - A single INVLPG on each processor purges this PMD cache. It does not
-> need a range purge (which was already done).
+> Fix this by returning 'netdev_tx_t' in this driver too.
 > 
-> Does it sound right to you?
+> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+> ---
+>  drivers/net/can/xilinx_can.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+> index 89aec07c2..a19648606 100644
+> --- a/drivers/net/can/xilinx_can.c
+> +++ b/drivers/net/can/xilinx_can.c
+> @@ -386,7 +386,7 @@ static int xcan_do_set_mode(struct net_device *ndev, enum can_mode mode)
+>   *
+>   * Return: 0 on success and failure value on error
+>   */
+> -static int xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+> +static netdev_tx_t xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+>  {
+>  	struct xcan_priv *priv = netdev_priv(ndev);
+>  	struct net_device_stats *stats = &ndev->stats;
+> 
 
-The right fix is to first synchronize the changes when the PMD/PUD is
-cleared and then flush the TLB system-wide. After that is done you can
-free the page.
+It was applied already but there should be also kernel-doc update too to
+use enum values instead of 0.
 
-But doing all that in the pud/pmd_free_pmd/pte_page() functions is too
-expensive, as the TLB flush requires to send IPIs to all cores in the
-system, and that every time the function is called.
-
-So what needs to be done is to fix this from high-level ioremap code to
-first unmap all required PTE/PMD pages and collect them in a list. When
-that is done you can synchronize the changes with the other page-tables
-in the system and do one system-wide TLB flush. When that is complete
-you can free the pages on the list that were collected while unmapping.
-
-Then the new mappings can be established and again synchronized with the
-other page-tables in the system.
-
-> As for the BUG_ON issue, are you able to reproduce this issue?  If so,
-> would you be able to test the fix?
-
-Yes, I can reproduce the BUG_ON with my PTI patches and a fedora-i386
-VM.
-
-I already ran into the issue before your patches were merged upstream,
-but my "fix" is different because it just prevents huge-mappings when
-there were smaller mappings before. See
-
-	e3e288121408 x86/pgtable: Don't set huge PUD/PMD on non-leaf entries
-
-for details. This patch does not fix the base-problem, but hides it
-again, as the real fix needs some more work across architectures.
-
-Your patch actually makes the problem worse, without it the PTE/PMD pages
-were just leaked, so that they could not be reused. But with your patch
-the pages can be used again and the page-walker might establish TLB
-entries based on random content the new owner writes to it. This can
-lead to all kinds of random and very hard to debug data corruption
-issues.
-
-So until we make the generic ioremap code in lib/ioremap.c smarter about
-unmapping/remapping ranges the best solution is making my fix work again
-by reverting your patch.
-
-
-Thanks,
-
-	Joerg
+M
