@@ -1,111 +1,131 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 27 Apr 2018 13:53:16 +0200
-Subject: [PATCH RFC PoC 0/2] platform: different approach to early
- platform drivers
-In-Reply-To: <CAK8P3a2xtTLx-VHVWok-b19=o1z5FbTNcaWq7Y_HSdaH6pWnZg@mail.gmail.com>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
- <20180426173151.GJ3094@brightrain.aerifal.cx>
- <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
- <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
- <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
- <CAK8P3a2xtTLx-VHVWok-b19=o1z5FbTNcaWq7Y_HSdaH6pWnZg@mail.gmail.com>
-Message-ID: <CAMRc=MdomjLCq-bJyktaToH00kNQAuTLgkSFRrY9Jmre8McT3A@mail.gmail.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 27 Apr 2018 14:04:19 +0200
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v9_00=2F27=5D_ARM=3A_davinci=3A_convert_to_common?=
+ =?UTF-8?Q?_clock_framework=E2=80=8B?=
+In-Reply-To: <20180427001745.4116-1-david@lechnology.com>
+References: <20180427001745.4116-1-david@lechnology.com>
+Message-ID: <CAMpxmJUCOHqds-zVz736fma7EDZ_o6PpbHMwtFF8wRXJMHCqzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-27 12:18 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Fri, Apr 27, 2018 at 10:57 AM, Bartosz Golaszewski
-> <bgolaszewski@baylibre.com> wrote:
->> 2018-04-27 9:52 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->>> On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
->>>> On 04/26/2018 12:31 PM, Rich Felker wrote:
->>
->> We have platforms out there which still use both board files and
->> device tree. They are still comercially supported and are not going
->> anywhere anytime soon. Some of these platforms are being actively
->> maintained and cleaned-up. An example is the DaVinci platform: David
->> has recently converted all the SoCs and boards to using the common
->> clock framework. I'm cleaning up some other parts too.
->>
->> The problem with the legacy board code is that a lot of things that
->> should be platform drivers ended up in arch/arm/mach-*. We're now
->> slowly moving this code to drivers/ but some initialization code
->> (timers, critical clocks, irqs) needs to be called early in the boot
->> sequence.
+2018-04-27 2:17 GMT+02:00 David Lechner <david@lechnology.com>:
+> This series converts mach-davinci to use the common clock framework.
 >
-> Right, and that's very good work.
+> The series works like this, the first 3 patches fix some issues with the clock
+> drivers that have already been accepted into the mainline kernel.
 >
->> When you're saying that we already have all the OF_DECLARE macros, it
->> seems to me that you're forgetting that we also want to keep
->> supporting the board files. So without the early platform drivers we
->> need to use a mix of OF_DECLARE and handcrafted initialization in
->> arch/arm/mach-* since we can't call platform_device_register() that
->> early. This blocks us from completely moving the should-be-driver code
->> to drivers/, because these drivers *need* to support both cases.
+> Then, starting with "ARM: davinci: pass clock as parameter to
+> davinci_timer_init()", we get the mach code ready for the switch by adding the
+> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
+> around the legacy clocks so that we can switch easily between the old and the
+> new.
 >
-> The OF_DECLARE_* functions were initially added as a way to
-> remove board files that just consist of callbacks into early
-> initialization for some subsystems. As long as you still have
-> board files and you are looking for a way to reuse code between
-> OF_DECLARE_* functions and board files, why not just leave
-> those functions globally visible and call them from the non-DT
-> board files?
+> "ARM: davinci: switch to common clock framework" actually flips the switch
+> to start using the new clock drivers. Then the next 8 patches remove all
+> of the old clock code.
 >
->> The main problem with OF_DECLARE is that although we have
->> corresponding device nodes, we never actually register any real linux
->> devices. If we add to this the fact that current early platform
->> drivers implementation is broken (for reasons I mentioned in the cover
->> letter) the support gets really messy, since we can have up to three
->> entry points to the driver's code. Other issues come to mind as well:
->> if we're using OF_DECLARE we can't benefit from devm* routines.
+> The final four patches add device tree clock support to the one SoC that
+> supports it.
 >
-> Right, the devm_* problem has come up before.
+> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
+> board file).
 >
->> My aim is to provide a clean, robust and generic way of probing
->> certain devices early and then converting them to actual platform
->> devices when we're advanced enough into the boot sequence. If we
->> merged such a framework, we could work towards removing both the
->> previous early platform devices (in favor of the new mechanism) and
->> maybe even deprecating and replacing OF_DECLARE(), since we could
->> simply early probe the DT drivers. Personally I see OF_DECLARE as a
->> bigger hack than early devices.
->>
->> My patch tries to address exactly the use cases we're facing - for
->> example by providing means to probe devices twice (early and late) and
->> to check the state we're at in order for users to be able to just do
->> the critical initialization early on and then continue with regular
->> stuff later.
 >
-> Maybe the problem is reusing the name and some of the code from
-> an existing functionality that we've been trying to get rid of.
+> Changes:
+>
+> v9 changes (also see individual patches for details):
+> - Rebased on linux-davnci/master (f5e3203bb775)
+> - Dropped drivers/clk patches that landed in v4.17
+> - New drivers/clk patches for early boot special case
+> - New patch for ti,davinci-timer device tree bindings
+> - Updated mach/davinci patches to register clocks in early boot when needed
+>
+> v8 changes (also see individual patches for details):
+> - Rebased on linux-davinci/master
+> - Dropped use of __init and __initconst attributes in clk drivers
+> - Add clkdev lookups for PLL SYSCLKs
+> - Fix genpd clock reference counting issue
+> - Fix PSC clock driver loading order issue
+> - Fix typo in device tree and add more power-domains properties
+>
+> v7 changes (also see individual patches for details):
+> - Rebased on linux-davinci/master (v4.16-rc)
+> - Convert clock drivers to platform devices
+> - New patch "ARM: davinci: pass clock as parameter to davinci_timer_init()"
+> - Fix issues with lcdk and aemif clock lookups and power domains
+> - Fixed other minor issues brought up in v6 review
+>
+> v6 changes (also see individual patches for details):
+> - All of the device tree bindings are changed
+> - All of the clock drivers are changed significantly
+> - Fixed issues brought up during review of v5
+> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
+>   series and submitted separately
+>
+> v5 changes:
+> - Basically, this is an entirely new series
+> - Patches are broken up into bite-sized pieces
+> - Converted PSC clock driver to use regmap
+> - Restored "force" flag for certain DA850 clocks
+> - Added device tree bindings
+> - Moved more of the clock init to drivers/clk
+> - Fixed frequency scaling (maybe*)
+>
+> * I have frequency scaling using cpufreq-dt, so I know the clocks are doing
+>   what they need to do to make this work, but I haven't figured out how to
+>   test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
+>   sent separately after this series has landed.)
+>
+>
+> Dependencies:
+>
+> Only one dependency didn't land in v4.17. It is just a runtime dependency for
+> the LCDK board to make the display work.
+>
+> - "drm/tilcdc: Fix setting clock divider for omap-l138"[1]
+>
+> [1]: https://patchwork.freedesktop.org/patch/210696/
+>
+> You can find a working branch with everything included (plus a few extras, like
+> cpufreq-dt) in the "common-clk-v8" branch of https://github.com/dlech/ev3dev-kernel.git.
+>
+>
+> Testing/debugging for the uninitiated:
+>
+> I only have one device to test with, which is based on da850, so I will
+> have to rely on others to do some testing here. Since we are dealing with
+> clocks, if something isn't working, you most likely won't see output on
+> the serial port. To figure out what is going on, you need to enable...
+>
+>         CONFIG_DEBUG_LL=y
+>         CONFIG_EARLY_PRINTK=y
+>
+> and add "earlyprintk clk_ignore_unused" to the kernel command line options.
+> You may need to select a different UART for this depending on your board. I
+> think UART1 is the default in the kernel configuration.
+>
+> On da850 devices comment out the lines:
+>
+>         else
+>                 clk_set_parent(clk, parent->clk);
+>
+> in da850.c or, if using device tree, comment out the lines:
+>
+>         assigned-clocks = <&async3_clk>;
+>         assigned-clock-parents = <&pll1_sysclk 2>;
+>
+> in da850.dtsi when doing earlyprintk, otherwise the UART1 and UART2 clock
+> source will change during boot and cause garbled output after a point.
+>
 >
 
-I'm not reusing the name - in fact I set the prefix to earlydev_
-exactly in order to not confuse anyone. I'm also not reusing any code
-in the second series.
+Hi David, Sekhar,
 
-> If what you want to do is completely different from the existing
-> early_platform implementation, how about starting by moving that
-> out of drivers/base/platform.c into something under arch/sh/
-> and renaming it to something with an sh_ prefix.
->
+Patches 3-5 from the reset series[1] should go in before this series
+or we'll be getting WARN's from the common clock framework core about
+unprepared clocks on boards using the remoteproc driver.
 
-Yes, this is a good idea, but what about the sh-specific drivers that
-rely on it? Is including headers from arch/ in driver code still an
-accepted practice?
+Thanks,
+Bartosz
 
-> Let's just leave the non-DT part out of it by making it sh specific.
-> Then we can come up with improvements to the current
-> platform_device handling for DT based platforms that you can
-> use on DT-based davinci to replace what currently happens on
-> board-file based davinci systems, without mixing up those
-> two code paths too much in the base driver support.
->
-
-I don't see why we wouldn't want to unify these two cases. The best
-solution to me seems having only one entry point into the driver code
-- the probe() function stored in platform_driver - whether we're
-probing it from DT, platform data, ACPI or early boot code.
-
-Best regards,
-Bartosz Golaszewski
+[1] https://lkml.org/lkml/2018/4/17/1000
