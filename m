@@ -1,121 +1,62 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 27 Apr 2018 11:35:23 +0200
-Subject: [PATCH v2 2/2] soc: mediatek: reuse regmap_read_poll_timeout
- helpers
-In-Reply-To: <ed866d3345a27b2c87b570562d9ad9132bca6062.1524465345.git.sean.wang@mediatek.com>
-References: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
- <ed866d3345a27b2c87b570562d9ad9132bca6062.1524465345.git.sean.wang@mediatek.com>
-Message-ID: <4274d8f7-dc1f-b0f9-026f-1a6196dcb730@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 27 Apr 2018 18:42:27 +0900
+Subject: [PATCH] reset: uniphier: fix USB clock line for LD20
+In-Reply-To: <1523499370-17757-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1523499370-17757-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQKVD3aKTo_z=zkOdoL--RogoFm0bt-dCBsWFN8BEPpSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Philipp,
 
-
-On 04/23/2018 08:42 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Reuse the common helpers regmap_read_poll_timeout provided by Linux core
-> instead of an open-coded handling.
-> 
-> v1 -> v2:
->  - use macro definitions MTK_POLL_DELAY_US and MTK_POLL_TIMEOUT for
->    arguments sleep_us and timeout_us passing in regmap_read_poll_timeout.
->  - remove unnecessary linux/iopoll.h being included in.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Weiyi Lu <weiyi.lu@mediatek.com>
+2018-04-12 11:16 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> For LD20, the bit 5 of the offset 0x200c turned out to be a USB3
+> reset.  The hardware document says it is the GIO reset despite LD20
+> has no GIO bus, confusingly.
+>
+> Also, fix confusing comments for PXs3.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
->  drivers/soc/mediatek/mtk-infracfg.c | 46 ++++++++++---------------------------
->  1 file changed, 12 insertions(+), 34 deletions(-)
-> 
 
-pushed to v4.17-next/soc
+Can you take a look at this, please?
 
-> diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
-> index 8c310de..958861c 100644
-> --- a/drivers/soc/mediatek/mtk-infracfg.c
-> +++ b/drivers/soc/mediatek/mtk-infracfg.c
-> @@ -17,6 +17,9 @@
->  #include <linux/soc/mediatek/infracfg.h>
->  #include <asm/processor.h>
->  
-> +#define MTK_POLL_DELAY_US   10
-> +#define MTK_POLL_TIMEOUT    (jiffies_to_usecs(HZ))
-> +
->  #define INFRA_TOPAXI_PROTECTEN		0x0220
->  #define INFRA_TOPAXI_PROTECTSTA1	0x0228
->  #define INFRA_TOPAXI_PROTECTEN_SET	0x0260
-> @@ -37,7 +40,6 @@
->  int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
->  		bool reg_update)
->  {
-> -	unsigned long expired;
->  	u32 val;
->  	int ret;
->  
-> @@ -47,22 +49,11 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
->  	else
->  		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_SET, mask);
->  
-> -	expired = jiffies + HZ;
-> -
-> -	while (1) {
-> -		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
-> -		if (ret)
-> -			return ret;
-> -
-> -		if ((val & mask) == mask)
-> -			break;
-> +	ret = regmap_read_poll_timeout(infracfg, INFRA_TOPAXI_PROTECTSTA1,
-> +				       val, (val & mask) == mask,
-> +				       MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
->  
-> -		cpu_relax();
-> -		if (time_after(jiffies, expired))
-> -			return -EIO;
-> -	}
-> -
-> -	return 0;
-> +	return ret;
->  }
->  
->  /**
-> @@ -80,30 +71,17 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
->  int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask,
->  		bool reg_update)
->  {
-> -	unsigned long expired;
->  	int ret;
-> +	u32 val;
->  
->  	if (reg_update)
->  		regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
->  	else
->  		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_CLR, mask);
->  
-> -	expired = jiffies + HZ;
-> -
-> -	while (1) {
-> -		u32 val;
-> -
-> -		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
-> -		if (ret)
-> -			return ret;
-> -
-> -		if (!(val & mask))
-> -			break;
-> -
-> -		cpu_relax();
-> -		if (time_after(jiffies, expired))
-> -			return -EIO;
-> -	}
-> +	ret = regmap_read_poll_timeout(infracfg, INFRA_TOPAXI_PROTECTSTA1,
-> +				       val, !(val & mask),
-> +				       MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
->  
-> -	return 0;
-> +	return ret;
->  }
-> 
+
+
+
+>  drivers/reset/reset-uniphier.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+> index 360e06b..ac18f2f 100644
+> --- a/drivers/reset/reset-uniphier.c
+> +++ b/drivers/reset/reset-uniphier.c
+> @@ -110,7 +110,7 @@ static const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
+>         UNIPHIER_RESETX(4, 0x200c, 2),          /* eMMC */
+>         UNIPHIER_RESETX(6, 0x200c, 6),          /* Ether */
+>         UNIPHIER_RESETX(8, 0x200c, 8),          /* STDMAC (HSC) */
+> -       UNIPHIER_RESETX(12, 0x200c, 5),         /* GIO (PCIe, USB3) */
+> +       UNIPHIER_RESETX(14, 0x200c, 5),         /* USB30 */
+>         UNIPHIER_RESETX(16, 0x200c, 12),        /* USB30-PHY0 */
+>         UNIPHIER_RESETX(17, 0x200c, 13),        /* USB30-PHY1 */
+>         UNIPHIER_RESETX(18, 0x200c, 14),        /* USB30-PHY2 */
+> @@ -127,8 +127,8 @@ static const struct uniphier_reset_data uniphier_pxs3_sys_reset_data[] = {
+>         UNIPHIER_RESETX(6, 0x200c, 9),          /* Ether0 */
+>         UNIPHIER_RESETX(7, 0x200c, 10),         /* Ether1 */
+>         UNIPHIER_RESETX(8, 0x200c, 12),         /* STDMAC */
+> -       UNIPHIER_RESETX(12, 0x200c, 4),         /* USB30 link (GIO0) */
+> -       UNIPHIER_RESETX(13, 0x200c, 5),         /* USB31 link (GIO1) */
+> +       UNIPHIER_RESETX(12, 0x200c, 4),         /* USB30 link */
+> +       UNIPHIER_RESETX(13, 0x200c, 5),         /* USB31 link */
+>         UNIPHIER_RESETX(16, 0x200c, 16),        /* USB30-PHY0 */
+>         UNIPHIER_RESETX(17, 0x200c, 18),        /* USB30-PHY1 */
+>         UNIPHIER_RESETX(18, 0x200c, 20),        /* USB30-PHY2 */
+> --
+> 2.7.4
+>
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
