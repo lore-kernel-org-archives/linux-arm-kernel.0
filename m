@@ -1,136 +1,76 @@
 From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
-Date: Fri, 27 Apr 2018 17:33:46 +0100
-Subject: [PATCH 11/17] arm64: dts: r8a77965: Add VSP instances
-In-Reply-To: <1787243.JuNJAuBqMb@avalon>
+Date: Fri, 27 Apr 2018 17:34:20 +0100
+Subject: [PATCH 12/17] arm64: dts: r8a77965: Populate the DU instance
+ placeholder
+In-Reply-To: <1778997.DCq8dSVpMV@avalon>
 References: <20180426165346.494-1-kieran.bingham+renesas@ideasonboard.com>
- <20180426165346.494-12-kieran.bingham+renesas@ideasonboard.com>
- <1787243.JuNJAuBqMb@avalon>
-Message-ID: <81161c97-2be8-2b5a-14a2-3db8709f5ff7@ideasonboard.com>
+ <20180426165346.494-13-kieran.bingham+renesas@ideasonboard.com>
+ <1778997.DCq8dSVpMV@avalon>
+Message-ID: <d773d7b4-f600-6d8f-017c-2bf0b60ee4cb@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On 26/04/18 22:11, Laurent Pinchart wrote:
+On 26/04/18 22:15, Laurent Pinchart wrote:
 > Hi Kieran,
 > 
 > Thank you for the patch.
 > 
-> On Thursday, 26 April 2018 19:53:40 EEST Kieran Bingham wrote:
->> The r8a77965 has 4 VSP instances.
+> On Thursday, 26 April 2018 19:53:41 EEST Kieran Bingham wrote:
+>> The DU entity node has been previously added but only as a placeholder.
+>> Populate the node with the properties to use the device.
 >>
->> Based on a similar patch of the R8A7796 device tree
->> by Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
->>
->> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> [Kieran: Rebased to top of tree, fixed sort orders]
 >> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 >> ---
->>  arch/arm64/boot/dts/renesas/r8a77965.dtsi | 44 +++++++++++++++++++++++
->>  1 file changed, 44 insertions(+)
+>>  arch/arm64/boot/dts/renesas/r8a77965.dtsi | 14 +++++++++++++-
+>>  1 file changed, 13 insertions(+), 1 deletion(-)
 >>
 >> diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
 >> b/arch/arm64/boot/dts/renesas/r8a77965.dtsi index
->> 1f44ed7c1b1c..e92e6b03333a 100644
+>> e92e6b03333a..8a40bba53027 100644
 >> --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
 >> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
->> @@ -1009,6 +1009,17 @@
->>  			resets = <&cpg 615>;
+>> @@ -1106,9 +1106,21 @@
 >>  		};
 >>
->> +		vspb: vsp at fe960000 {
->> +			compatible = "renesas,vsp2";
->> +			reg = <0 0xfe960000 0 0x8000>;
->> +			interrupts = <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&cpg CPG_MOD 626>;
->> +			power-domains = <&sysc R8A77965_PD_A3VP>;
->> +			resets = <&cpg 626>;
->> +
->> +			renesas,fcp = <&fcpvb0>;
->> +		};
->> +
->>  		fcpvb0: fcp at fe96f000 {
->>  			compatible = "renesas,fcpv";
->>  			reg = <0 0xfe96f000 0 0x200>;
->> @@ -1017,6 +1028,17 @@
->>  			resets = <&cpg 607>;
->>  		};
->>
->> +		vspi0: vsp at fe9a0000 {
->> +			compatible = "renesas,vsp2";
->> +			reg = <0 0xfe9a0000 0 0x8000>;
->> +			interrupts = <GIC_SPI 444 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&cpg CPG_MOD 631>;
->> +			power-domains = <&sysc R8A77965_PD_A3VP>;
->> +			resets = <&cpg 631>;
->> +
->> +			renesas,fcp = <&fcpvi0>;
->> +		};
->> +
->>  		fcpvi0: fcp at fe9af000 {
->>  			compatible = "renesas,fcpv";
->>  			reg = <0 0xfe9af000 0 0x200>;
->> @@ -1025,6 +1047,17 @@
->>  			resets = <&cpg 611>;
->>  		};
->>
->> +		vspd0: vsp at fea20000 {
->> +			compatible = "renesas,vsp2";
->> +			reg = <0 0xfea20000 0 0x4000>;
+>>  		du: display at feb00000 {
+>> +			compatible = "renesas,du-r8a77965";
+>>  			reg = <0 0xfeb00000 0 0x80000>,
+>>  			      <0 0xfeb90000 0 0x14>;
+>> -			/* placeholder */
+>> +			reg-names = "du", "lvds.0";
 > 
-> RFP2 has a CLUT so the register range needs to be extended. I'd recommend 
-> covering the entire space (0x8000) even if no LUT or CLU module is present.
+> The LVDS encoder has been split to a separate node in current bindings. You 
+> can remove the reg-names property and the second reg entry.
 
-Ah yes, of course.
-Updated.
+Done.
 
 > 
->> +			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&cpg CPG_MOD 623>;
->> +			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
->> +			resets = <&cpg 623>;
->> +
->> +			renesas,fcp = <&fcpvd0>;
->> +		};
->> +
->>  		fcpvd0: fcp at fea27000 {
->>  			compatible = "renesas,fcpv";
->>  			reg = <0 0xfea27000 0 0x200>;
->> @@ -1033,6 +1066,17 @@
->>  			resets = <&cpg 603>;
->>  		};
->>
->> +		vspd1: vsp at fea28000 {
->> +			compatible = "renesas,vsp2";
->> +			reg = <0 0xfea28000 0 0x4000>;
+>> +			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 270 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 724>,
+>> +				 <&cpg CPG_MOD 723>,
+>> +				 <&cpg CPG_MOD 721>,
+>> +				 <&cpg CPG_MOD 727>;
+>> +			clock-names = "du.0", "du.1", "du.3", "lvds.0";
 > 
-> Same here.
+> And you can remove the LVDS clock as well (from both clocks and clock-names).
 > 
-
-And here...
-
-
 > With this fixed,
 > 
 > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Collected.
+Collected, thanks.
 
 --
 Kieran
 
 
 > 
->> +			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&cpg CPG_MOD 622>;
->> +			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
->> +			resets = <&cpg 622>;
+>> +			status = "disabled";
 >> +
->> +			renesas,fcp = <&fcpvd1>;
->> +		};
->> +
->>  		fcpvd1: fcp at fea2f000 {
->>  			compatible = "renesas,fcpv";
->>  			reg = <0 0xfea2f000 0 0x200>;
-> 
+>> +			vsps = <&vspd0 0 &vspd1 0 &vspd0 1>;
+>>
+>>  			ports {
+>>  				#address-cells = <1>;
 > 
