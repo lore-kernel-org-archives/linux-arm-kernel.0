@@ -1,139 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Apr 2018 14:19:52 +0200
-Subject: [GIT PULL] ARM: SoC fixes for 4.17
-Message-ID: <CAK8P3a1RdJskX_+8z8cQ=xeG8BgOPoCCZy125C1qjKWAHecg=w@mail.gmail.com>
+From: Gilles.Buloz@kontron.com (Gilles Buloz)
+Date: Fri, 27 Apr 2018 12:29:32 +0000
+Subject: LS1043A : "synchronous abort" at boot due to PCI config read
+In-Reply-To: <CAKv+Gu_v4V8DUa6f4WxvjZHoJbbqT0mKpOwYVmaLaE20CB3U_g@mail.gmail.com>
+References: <5AD0E995.3090802@kontron.com>
+ <CAKv+Gu_v4V8DUa6f4WxvjZHoJbbqT0mKpOwYVmaLaE20CB3U_g@mail.gmail.com>
+Message-ID: <5AE317AB.4020404@kontron.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6d08b06e67cd117f6992c46611dfb4ce267cd71e:
+Le 27/04/2018 10:43, Ard Biesheuvel a ?crit :
+> (add Bjorn and linux-pci)
+>
+> On 13 April 2018 at 19:32, Gilles Buloz <Gilles.Buloz@kontron.com> wrote:
+>> Dear developers,
+>>
+>> I currently have two functional workarounds for this issue but would like to know which one you would recommend, if any :-)
+>> I'm using a LS1043A CPU (NXP QorIQ Layerscape) and get a "synchronous external abort" when booting because of a PCI config read
+>> during PCI scan.
+>>
+>> I'm using a custom hardware (based on LS1043ARDB) having a PEX8112 PCIe-to-PCI bridge connected to the LS1043A to have a PCI slot
+>> for legacy devices. This bridge only supports PCI-Compatible config accesses (offset 0x00-0xFF).
+>> On this PCI slot I connect a PCI module made of a PCI-to-PCIe bridge plus PCIe devices behind.
+>> The problem occurs when the kernel probes the PCIe devices : as they are PCIe devices, the kernel does a PCI config read access at
+>> offset 0x100 to check if "PCIe extended capability registers" are accessible (see drivers/pci/probe.c, function
+>> pci_cfg_space_size_ext()). Unfortunately the PEX8112 PCIe-to-PCI bridge that is in the path reports an error to the CPU for this
+>> access, and it seems there's no way to disable that on this bridge.
+>>
+>> The first workaround I found was to patch drivers/pci/host/pci-layerscape.c to have PCIE_ABSERR_SETTING set to 0x9400 instead of
+>> 0x9401 (for PCIE_ABSERR register) to disable error reporting. This only impacts an NXP part of the Linux kernel code, but I'm not
+>> sure this is a good idea (however it seems to be like that on Intel platforms where even MEM accesses to a no-device address return
+>> FF without any error).
+>>
+>> I've also tried another workaround that works : patch drivers/pci/probe.c to use bus_flags to remember if a bus is behind a bridge
+>> without extended address capability, to avoid PCi config read accesses at offset 0x100 in
+>> pci_cfg_space_size() / pci_cfg_space_size_ext(). But this patch impacts the generic PCI probe method of Linux.
+>>
+>> Any Idea to properly handle that issue ?
+>>
+> This seems like a rather unusual configuration, but I guess that if
+> the first bridge/switch advertises its inability to support extended
+> config space accesses, we should not be performing them on any of its
+> subordinate buses. How does the PEX8112 advertise this limitation?
+>
+> That said, I wonder if it is reasonable in the first place to expect
+> that a PCIe device works as expected passing through a legacy PCI
+> layer like that.
+>
+> .
+The PEX8112 PCIe-to-PCI bridge has capability PCI_CAP_ID_EXP, but has no PCI_CAP_ID_PCIX capability.
+As I understand the lack of PCI_CAP_ID_PCIX is advertising this limitation on the PCI side (no support for PCI config offset >=0x100).
+Also I guess in the case of a bridge having PCI_CAP_ID_PCIX, this limitation would be advertised by the lack of PCI_X_STATUS_266MHZ 
+and PCI_X_STATUS_533MHZ (as done in drivers/pci/probe.c at pci_cfg_space_size())
 
-  Linux 4.17-rc2 (2018-04-22 19:20:09 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/armsoc-fixes
-
-for you to fetch changes up to 4ea3f05614926fea280befaa693ba494a500c2c4:
-
-  Merge tag 'arm-soc/for-4.17/devicetree-arm64-fixes' of
-https://github.com/Broadcom/stblinux into fixes (2018-04-27 10:21:18
-+0200)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 4.17
-
-This round of fixes has two larger changes that came in last week:
-
-- A set of a couple of patches all intended to finally turn on
-  USB support on various Amlogic SoC based boards. The respective
-  driver were not finalized until very late before the merge window
-  and the DT portion is the last bit now.
-- A defconfig update for gemini that had repeatedly missed the
-  cut but that is required to actually boot any real machines
-  with the default build.
-
-The rest are the usual small changes:
-
-- A fix for a nasty build regression on the OMAP memory drivers
-- A fix for a boot problem on Intel/Altera SocFPGA
-- A MAINTAINER file update
-- A couple of fixes for issues found by automated testing
-  (kernelci, coverity, sparse, ...)
-- A few incorrect DT entries are updated to match the hardware
-
-----------------------------------------------------------------
-Arnd Bergmann (7):
-      Merge tag 'socfpga_defconfig_fix_v4.17' of
-git://git.kernel.org/.../dinguyen/linux into fixes
-      Merge tag 'arm-soc/for-4.17/drivers-fixes' of
-https://github.com/Broadcom/stblinux into fixes
-      Merge tag 'juno-fixes-4.17' of
-ssh://gitolite.kernel.org/.../sudeep.holla/linux into fixes
-      Merge tag 'scmi-fixes-4.17' of
-ssh://gitolite.kernel.org/.../sudeep.holla/linux into fixes
-      Merge tag 'amlogic-fixes' of
-git://git.kernel.org/.../khilman/linux-amlogic into fixes
-      Merge tag 'omap-for-v4.17/fixes-signed' of
-git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'arm-soc/for-4.17/devicetree-arm64-fixes' of
-https://github.com/Broadcom/stblinux into fixes
-
-Colin Ian King (1):
-      firmware: arm_scmi: remove redundant null check on array
-
-Dave Gerlach (1):
-      ARM: OMAP2+: Fix build when using split object directories
-
-Florian Fainelli (1):
-      soc: bcm: raspberrypi-power: Fix use of __packed
-
-Geert Uytterhoeven (1):
-      soc: bcm2835: Make !RASPBERRYPI_FIRMWARE dummies return failure
-
-John Garry (1):
-      HISI LPC: Add Kconfig MFD_CORE dependency
-
-Linus Walleij (3):
-      ARM: dts: Fix NAS4220B pin config
-      ARM: s3c24xx: jive: Fix some GPIO names
-      ARM: defconfig: Update Gemini defconfig
-
-Martin Blumenstingl (7):
-      ARM64: dts: meson-gxl: add USB host support
-      ARM64: dts: meson-gxm: add GXM specific USB host configuration
-      ARM64: dts: meson-gxl-s905x-p212: enable the USB controller
-      ARM64: dts: meson-gx-p23x-q20x: enable the USB controller
-      ARM64: dts: meson-gxl-s905x-libretech-cc: enable the USB controller
-      ARM64: dts: meson-gxl-nexbox-a95x: enable the USB controller
-      ARM64: dts: meson-gxm-khadas-vim2: enable the USB controller
-
-Niklas Cassel (1):
-      MAINTAINERS: Remove myself as maintainer
-
-Srinath Mannam (1):
-      arm64: dts: correct SATA addresses for Stingray
-
-Sudeep Holla (1):
-      arm64: dts: juno: drop unnecessary address-cells and size-cells properties
-
-Thor Thayer (1):
-      ARM: socfpga_defconfig: Remove QSPI Sector 4K size force
-
-Tony Lindgren (2):
-      ARM: dts: Fix cm2 and prm sizes for omap4
-      Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes
-
- MAINTAINERS                                                  |  2 --
- arch/arm/boot/dts/gemini-nas4220b.dts                        | 28
-++++++++++++++--------------
- arch/arm/boot/dts/omap4.dtsi                                 |  8 ++++----
- arch/arm/configs/gemini_defconfig                            | 27
-+++++++++++++++++++++++++--
- arch/arm/configs/socfpga_defconfig                           |  1 +
- arch/arm/mach-omap2/Makefile                                 |  6 +-----
- arch/arm/mach-omap2/pm-asm-offsets.c                         |  3 +++
- arch/arm/mach-omap2/sleep33xx.S                              |  1 -
- arch/arm/mach-omap2/sleep43xx.S                              |  1 -
- arch/arm/mach-s3c24xx/mach-jive.c                            |  4 ++--
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi          |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 12 ++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts  |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi        |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                   | 61
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts        |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi                   | 17
-+++++++++++++++++
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi                |  2 --
- arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi     | 80
-++++++++++++++++++++++++++++++++++++++++----------------------------------------
- drivers/bus/Kconfig                                          |  1 +
- drivers/firmware/arm_scmi/clock.c                            |  2 +-
- drivers/memory/emif-asm-offsets.c                            | 72
-+-----------------------------------------------------------------------
- drivers/soc/bcm/raspberrypi-power.c                          |  2 +-
- include/linux/ti-emif-sram.h                                 | 75
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- include/soc/bcm2835/raspberrypi-firmware.h                   |  4 ++--
- 25 files changed, 277 insertions(+), 148 deletions(-)
+I'm currently using the attached patch (for kernel 4.1.35-rt41 from NXP Yocto BSP). It uses bus_flags to remember if a bus is behind 
+a bridge without extended address capability to avoid PCi config accesses at offset >= 0x100. Thanks to this patch I now have a 
+functional system with functional PCI/PCIe devices.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: cfgspace.patch
+Type: text/x-patch
+Size: 1943 bytes
+Desc: cfgspace.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180427/ac2bb836/attachment.bin>
