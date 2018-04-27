@@ -1,46 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Apr 2018 10:43:56 +0200
-Subject: LS1043A : "synchronous abort" at boot due to PCI config read
-In-Reply-To: <5AD0E995.3090802@kontron.com>
-References: <5AD0E995.3090802@kontron.com>
-Message-ID: <CAKv+Gu_v4V8DUa6f4WxvjZHoJbbqT0mKpOwYVmaLaE20CB3U_g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Apr 2018 10:55:50 +0200
+Subject: [PATCH RFC PoC 0/2] platform: different approach to early
+ platform drivers
+In-Reply-To: <6194511c-b649-8c02-7db0-3514bfb292f5@ti.com>
+References: <20180426152920.21569-1-brgl@bgdev.pl>
+ <20180426173151.GJ3094@brightrain.aerifal.cx>
+ <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
+ <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
+ <6194511c-b649-8c02-7db0-3514bfb292f5@ti.com>
+Message-ID: <CAK8P3a394ig-OSzZLj+50gnBw1x_c41EicuM7mF_ubswweQoSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(add Bjorn and linux-pci)
+On Fri, Apr 27, 2018 at 10:29 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On Friday 27 April 2018 01:22 PM, Arnd Bergmann wrote:
+>> On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
+>>> On 04/26/2018 12:31 PM, Rich Felker wrote:
 
-On 13 April 2018 at 19:32, Gilles Buloz <Gilles.Buloz@kontron.com> wrote:
-> Dear developers,
+>>
+>> I haven't seen the discussion about your clock drivers, but I know that
+>> usually only a very small subset of the clocks on an SoC are needed
+>> that 'early', and you should use a regular platform driver for the rest.
 >
-> I currently have two functional workarounds for this issue but would like to know which one you would recommend, if any :-)
-> I'm using a LS1043A CPU (NXP QorIQ Layerscape) and get a "synchronous external abort" when booting because of a PCI config read
-> during PCI scan.
+> Its true that the subset is small, but they are either PLL bypass clocks
+> or clocks derived out of the main clock gate controller on the Soc
+> (DaVinci PSC). So we need some non-platform-device based initialization
+> support in the two main clock drivers used on mach-davinci anyway.
 >
-> I'm using a custom hardware (based on LS1043ARDB) having a PEX8112 PCIe-to-PCI bridge connected to the LS1043A to have a PCI slot
-> for legacy devices. This bridge only supports PCI-Compatible config accesses (offset 0x00-0xFF).
-> On this PCI slot I connect a PCI module made of a PCI-to-PCIe bridge plus PCIe devices behind.
-> The problem occurs when the kernel probes the PCIe devices : as they are PCIe devices, the kernel does a PCI config read access at
-> offset 0x100 to check if "PCIe extended capability registers" are accessible (see drivers/pci/probe.c, function
-> pci_cfg_space_size_ext()). Unfortunately the PEX8112 PCIe-to-PCI bridge that is in the path reports an error to the CPU for this
-> access, and it seems there's no way to disable that on this bridge.
+>> Can you elaborate on which devices need to access your clocks before
+>> you are able to initialize the clk driver through the regular platform_driver
+>> framework? Do any of these need complex interactions with the clk
+>> subsystem, or do you just need to ensure they are turned on?
 >
-> The first workaround I found was to patch drivers/pci/host/pci-layerscape.c to have PCIE_ABSERR_SETTING set to 0x9400 instead of
-> 0x9401 (for PCIE_ABSERR register) to disable error reporting. This only impacts an NXP part of the Linux kernel code, but I'm not
-> sure this is a good idea (however it seems to be like that on Intel platforms where even MEM accesses to a no-device address return
-> FF without any error).
+> Its just the timer IP. There is no complex interaction, just need to
+> ensure that the clock is registered with the framework and also switched
+> on when there is a gate clock.
 >
-> I've also tried another workaround that works : patch drivers/pci/probe.c to use bus_flags to remember if a bus is behind a bridge
-> without extended address capability, to avoid PCi config read accesses at offset 0x100 in
-> pci_cfg_space_size() / pci_cfg_space_size_ext(). But this patch impacts the generic PCI probe method of Linux.
+> The latest attempt by David for this was posted last night here:
 >
-> Any Idea to properly handle that issue ?
->
+> https://lkml.org/lkml/2018/4/26/1093
 
-This seems like a rather unusual configuration, but I guess that if
-the first bridge/switch advertises its inability to support extended
-config space accesses, we should not be performing them on any of its
-subordinate buses. How does the PEX8112 advertise this limitation?
+Ok, so the workaround in that series is to set up the timer clk manually
+in the SoC specific code (dm365_init_time etc) and register it to the
+clk subsystem, right?
 
-That said, I wonder if it is reasonable in the first place to expect
-that a PCIe device works as expected passing through a legacy PCI
-layer like that.
+That seems to be a much more appropriate workaround than adding
+back early_platform devices. We can always try to do something better
+later, but for now I'm happy with that as a workaround.
+
+Please clarify: do we have to set up the clk registers for the timer
+here just because we can't rely on the bootloader to have it set up
+initially, or is there some other reason? I think what some other
+platforms do is to treat the timer clock as a fixed-rate clock that
+is not managed by the actual clk driver but is set up by uboot
+before we enter the kernel, and then the clk driver just makes sure
+it doesn't turn that clk off later.
+
+        Arnd
