@@ -1,143 +1,67 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Fri, 27 Apr 2018 11:23:55 +0200
-Subject: [v3 03/10] mfd: mtk-mmsys: Add mmsys driver
+Date: Fri, 27 Apr 2018 11:23:58 +0200
+Subject: [v3 06/10] mfd: mtk-mmsys: Add mt8173 nodes
 In-Reply-To: <cover.1524820923.git.mbrugger@suse.com>
 References: <cover.1524820923.git.mbrugger@suse.com>
-Message-ID: <e0894c97775e46ce6d9a441dc05e2e2479a4b612.1524820923.git.mbrugger@suse.com>
+Message-ID: <fb942cf83613f75299cff6df1791c63ad7b02e3a.1524820923.git.mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Brugger <mbrugger@suse.com>
 
-The MMSYS subsystem includes clocks and drm components.
-This patch adds a MFD device to probe both drivers from the same
-device tree compatible.
+Add devices for the mt8173 SoC.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/mfd/Kconfig     |  9 ++++++
- drivers/mfd/Makefile    |  2 ++
- drivers/mfd/mtk-mmsys.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 90 insertions(+)
- create mode 100644 drivers/mfd/mtk-mmsys.c
+ drivers/mfd/mtk-mmsys.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index b860eb5aa194..d23a3b9a2c58 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -378,6 +378,15 @@ config MFD_MC13XXX_I2C
- 	help
- 	  Select this if your MC13xxx is connected via an I2C bus.
- 
-+config MFD_MEDIATEK_MMSYS
-+	tristate "Mediatek MMSYS interface"
-+	select MFD_CORE
-+	select REGMAP_MMIO
-+	help
-+	  Select this if you have a MMSYS subsystem in your SoC. The
-+	  MMSYS subsystem has at least a clock driver part and some
-+	  DRM components.
-+
- config MFD_MXS_LRADC
- 	tristate "Freescale i.MX23/i.MX28 LRADC"
- 	depends on ARCH_MXS || COMPILE_TEST
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index d9d2cf0d32ef..b96118bd68d9 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -98,6 +98,8 @@ obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
- obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
- obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
- 
-+obj-$(CONFIG_MFD_MEDIATEK_MMSYS) += mtk-mmsys.o
-+
- obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
- 
- obj-$(CONFIG_EZX_PCAP)		+= ezx-pcap.o
 diff --git a/drivers/mfd/mtk-mmsys.c b/drivers/mfd/mtk-mmsys.c
-new file mode 100644
-index 000000000000..c802343fb1c6
---- /dev/null
+index c802343fb1c6..5585a561a02f 100644
+--- a/drivers/mfd/mtk-mmsys.c
 +++ b/drivers/mfd/mtk-mmsys.c
-@@ -0,0 +1,79 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+
-+/*
-+ * mtk-mmsys.c -- Mediatek MMSYS multi-function driver
-+ *
-+ * Copyright (c) 2018 Matthias Brugger <matthias.bgg@gmail.com>
-+ *
-+ * Author: Matthias Brugger <matthias.bgg@gmail.com>
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/mfd/core.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+
-+enum {
-+	MMSYS_MT2701 = 1,
+@@ -19,6 +19,7 @@
+ 
+ enum {
+ 	MMSYS_MT2701 = 1,
++	MMSYS_MT8173,
+ };
+ 
+ static const struct mfd_cell mmsys_mt2701_devs[] = {
+@@ -26,6 +27,12 @@ static const struct mfd_cell mmsys_mt2701_devs[] = {
+ 	{ .name = "drm-mt2701-mm", },
+ };
+ 
++static const struct mfd_cell mmsys_mt8173_devs[] = {
++	{ .name = "clk-mt8173-mm", },
++	{ .name = "drm-mt8173-mm", },
 +};
 +
-+static const struct mfd_cell mmsys_mt2701_devs[] = {
-+	{ .name = "clk-mt2701-mm", },
-+	{ .name = "drm-mt2701-mm", },
-+};
 +
-+static int mmsys_probe(struct platform_device *pdev)
-+{
-+	const struct mfd_cell *mmsys_cells;
-+	int nr_cells;
-+	long id;
-+	int ret;
-+
-+	id = (long) of_device_get_match_data(&pdev->dev);
-+	if (!id) {
-+		dev_err(&pdev->dev, "of_device_get match_data() failed\n");
-+		return -EINVAL;
-+	}
-+
-+	switch (id) {
-+	case MMSYS_MT2701:
-+		mmsys_cells = mmsys_mt2701_devs;
-+		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
+ static int mmsys_probe(struct platform_device *pdev)
+ {
+ 	const struct mfd_cell *mmsys_cells;
+@@ -44,6 +51,10 @@ static int mmsys_probe(struct platform_device *pdev)
+ 		mmsys_cells = mmsys_mt2701_devs;
+ 		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
+ 		break;
++	case MMSYS_MT8173:
++		mmsys_cells = mmsys_mt8173_devs;
++		nr_cells = ARRAY_SIZE(mmsys_mt8173_devs);
 +		break;
-+	default:
-+		return -ENODEV;
-+	}
-+
-+	ret = devm_mfd_add_devices(&pdev->dev, 0, mmsys_cells, nr_cells,
-+					NULL, 0, NULL);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to add MFD devices %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+};
-+
-+static const struct of_device_id of_match_mmsys[] = {
-+	{ .compatible = "mediatek,mt2701-mmsys",
-+	  .data = (void *) MMSYS_MT2701,
+ 	default:
+ 		return -ENODEV;
+ 	}
+@@ -62,6 +73,9 @@ static const struct of_device_id of_match_mmsys[] = {
+ 	{ .compatible = "mediatek,mt2701-mmsys",
+ 	  .data = (void *) MMSYS_MT2701,
+ 	},
++	{ .compatible = "mediatek,mt8173-mmsys",
++	  .data = (void *) MMSYS_MT8173,
 +	},
-+	{ /* sentinel */ },
-+};
-+
-+static struct platform_driver mmsys_drv = {
-+	.probe = mmsys_probe,
-+	.driver = {
-+		.name = "mediatek-mmysys",
-+		.of_match_table = of_match_ptr(of_match_mmsys),
-+	},
-+};
-+
-+builtin_platform_driver(mmsys_drv);
-+
-+MODULE_DESCRIPTION("Mediatek MMSYS multi-function driver");
-+MODULE_LICENSE("GPL");
+ 	{ /* sentinel */ },
+ };
+ 
 -- 
 2.16.3
