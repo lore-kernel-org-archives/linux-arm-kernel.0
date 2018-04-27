@@ -1,58 +1,226 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Apr 2018 11:50:36 +0100
-Subject: [PATCHv2] arm64: avoid instrumenting atomic_ll_sc.o
-Message-ID: <20180427105036.35953-1-mark.rutland@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 27 Apr 2018 11:53:38 +0100
+Subject: Applied "ASoC: uniphier: remove boilerplate from lisence comment" to
+ the asoc tree
+In-Reply-To: <20180427052734.3506-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <E1fC10U-0003Q0-5e@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our out-of-line atomics are built with a special calling convention,
-preventing pointless stack spilling, and allowing us to patch call sites
-with ARMv8.1 atomic instructions.
+The patch
 
-Instrumentation inserted by the compiler may result in calls to
-functions not following this special calling convention, resulting in
-registers being unexpectedly clobbered, and various problems resulting
-from this.
+   ASoC: uniphier: remove boilerplate from lisence comment
 
-For example, if a kernel is built with KCOV and ARM64_LSE_ATOMICS, the
-compiler inserts calls to __sanitizer_cov_trace_pc in the prologues of
-the atomic functions. This has been observed to result in spurious
-cmpxchg failures, leading to a hang early on in the boot process.
+has been applied to the asoc tree at
 
-This patch avoids such issues by preventing instrumentation of our
-out-of-line atomics.
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From e19f77ee0e8ade56564dad07f904b75dd5c37e31 Mon Sep 17 00:00:00 2001
+From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Date: Fri, 27 Apr 2018 14:27:34 +0900
+Subject: [PATCH] ASoC: uniphier: remove boilerplate from lisence comment
+
+This patch removes boilerplate of GPLv2, use only SPDX identifier as
+same as other recently ASoC DAI drivers.
+
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- arch/arm64/lib/Makefile | 4 ++++
- 1 file changed, 4 insertions(+)
+ sound/soc/uniphier/aio-compress.c | 13 -------------
+ sound/soc/uniphier/aio-core.c     | 13 -------------
+ sound/soc/uniphier/aio-cpu.c      | 13 -------------
+ sound/soc/uniphier/aio-dma.c      | 13 -------------
+ sound/soc/uniphier/aio-ld11.c     | 13 -------------
+ sound/soc/uniphier/aio-reg.h      | 13 -------------
+ sound/soc/uniphier/aio.h          | 13 -------------
+ 7 files changed, 91 deletions(-)
 
-Since v1 [1]:
-* rebase to v4.17-rc2
-
-To test this I built a v4.17-rc2 kernel with this applied, with GCOV, KASAN,
-KCOV, UBSAN, CONFIG_FTRACE, and CONFIG_FUNCTION_TRACER enabled, and verified
-the disassembly of atomic_ll_sc.o was safe.
-
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-September/533105.html
-
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 0ead8a1d1679..137710f4dac3 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -19,5 +19,9 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
- 		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
- 		   -fcall-saved-x18 -fomit-frame-pointer
- CFLAGS_REMOVE_atomic_ll_sc.o := -pg
-+GCOV_PROFILE_atomic_ll_sc.o	:= n
-+KASAN_SANITIZE_atomic_ll_sc.o	:= n
-+KCOV_INSTRUMENT_atomic_ll_sc.o	:= n
-+UBSAN_SANITIZE_atomic_ll_sc.o	:= n
+diff --git a/sound/soc/uniphier/aio-compress.c b/sound/soc/uniphier/aio-compress.c
+index 4c1027aa615e..17f773ac5ca1 100644
+--- a/sound/soc/uniphier/aio-compress.c
++++ b/sound/soc/uniphier/aio-compress.c
+@@ -3,19 +3,6 @@
+ // Socionext UniPhier AIO Compress Audio driver.
+ //
+ // Copyright (c) 2017-2018 Socionext Inc.
+-//
+-// This program is free software; you can redistribute it and/or
+-// modify it under the terms of the GNU General Public License
+-// as published by the Free Software Foundation; version 2
+-// of the License.
+-//
+-// This program is distributed in the hope that it will be useful,
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU General Public License for more details.
+-//
+-// You should have received a copy of the GNU General Public License
+-// along with this program; if not, see <http://www.gnu.org/licenses/>.
  
- lib-$(CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE) += uaccess_flushcache.o
+ #include <linux/bitfield.h>
+ #include <linux/circ_buf.h>
+diff --git a/sound/soc/uniphier/aio-core.c b/sound/soc/uniphier/aio-core.c
+index 6d50042a4571..e37b80921abb 100644
+--- a/sound/soc/uniphier/aio-core.c
++++ b/sound/soc/uniphier/aio-core.c
+@@ -3,19 +3,6 @@
+ // Socionext UniPhier AIO ALSA common driver.
+ //
+ // Copyright (c) 2016-2018 Socionext Inc.
+-//
+-// This program is free software; you can redistribute it and/or
+-// modify it under the terms of the GNU General Public License
+-// as published by the Free Software Foundation; version 2
+-// of the License.
+-//
+-// This program is distributed in the hope that it will be useful,
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU General Public License for more details.
+-//
+-// You should have received a copy of the GNU General Public License
+-// along with this program; if not, see <http://www.gnu.org/licenses/>.
+ 
+ #include <linux/bitfield.h>
+ #include <linux/errno.h>
+diff --git a/sound/soc/uniphier/aio-cpu.c b/sound/soc/uniphier/aio-cpu.c
+index 1e5eb8e6f8c7..00b6441bf195 100644
+--- a/sound/soc/uniphier/aio-cpu.c
++++ b/sound/soc/uniphier/aio-cpu.c
+@@ -3,19 +3,6 @@
+ // Socionext UniPhier AIO ALSA CPU DAI driver.
+ //
+ // Copyright (c) 2016-2018 Socionext Inc.
+-//
+-// This program is free software; you can redistribute it and/or
+-// modify it under the terms of the GNU General Public License
+-// as published by the Free Software Foundation; version 2
+-// of the License.
+-//
+-// This program is distributed in the hope that it will be useful,
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU General Public License for more details.
+-//
+-// You should have received a copy of the GNU General Public License
+-// along with this program; if not, see <http://www.gnu.org/licenses/>.
+ 
+ #include <linux/clk.h>
+ #include <linux/errno.h>
+diff --git a/sound/soc/uniphier/aio-dma.c b/sound/soc/uniphier/aio-dma.c
+index ef7bafa8e171..4ec6b65bfb44 100644
+--- a/sound/soc/uniphier/aio-dma.c
++++ b/sound/soc/uniphier/aio-dma.c
+@@ -3,19 +3,6 @@
+ // Socionext UniPhier AIO DMA driver.
+ //
+ // Copyright (c) 2016-2018 Socionext Inc.
+-//
+-// This program is free software; you can redistribute it and/or
+-// modify it under the terms of the GNU General Public License
+-// as published by the Free Software Foundation; version 2
+-// of the License.
+-//
+-// This program is distributed in the hope that it will be useful,
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU General Public License for more details.
+-//
+-// You should have received a copy of the GNU General Public License
+-// along with this program; if not, see <http://www.gnu.org/licenses/>.
+ 
+ #include <linux/dma-mapping.h>
+ #include <linux/errno.h>
+diff --git a/sound/soc/uniphier/aio-ld11.c b/sound/soc/uniphier/aio-ld11.c
+index 4c4dd3dd4dee..ab04d3331be9 100644
+--- a/sound/soc/uniphier/aio-ld11.c
++++ b/sound/soc/uniphier/aio-ld11.c
+@@ -3,19 +3,6 @@
+ // Socionext UniPhier AIO ALSA driver for LD11/LD20.
+ //
+ // Copyright (c) 2016-2018 Socionext Inc.
+-//
+-// This program is free software; you can redistribute it and/or
+-// modify it under the terms of the GNU General Public License
+-// as published by the Free Software Foundation; version 2
+-// of the License.
+-//
+-// This program is distributed in the hope that it will be useful,
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU General Public License for more details.
+-//
+-// You should have received a copy of the GNU General Public License
+-// along with this program; if not, see <http://www.gnu.org/licenses/>.
+ 
+ #include <linux/module.h>
+ 
+diff --git a/sound/soc/uniphier/aio-reg.h b/sound/soc/uniphier/aio-reg.h
+index 136d3563cf44..511ea3c01847 100644
+--- a/sound/soc/uniphier/aio-reg.h
++++ b/sound/soc/uniphier/aio-reg.h
+@@ -3,19 +3,6 @@
+  * Socionext UniPhier AIO ALSA driver.
+  *
+  * Copyright (c) 2016-2018 Socionext Inc.
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; version 2
+- * of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #ifndef SND_UNIPHIER_AIO_REG_H__
+diff --git a/sound/soc/uniphier/aio.h b/sound/soc/uniphier/aio.h
+index 8cab4a553a97..52670126084f 100644
+--- a/sound/soc/uniphier/aio.h
++++ b/sound/soc/uniphier/aio.h
+@@ -3,19 +3,6 @@
+  * Socionext UniPhier AIO ALSA driver.
+  *
+  * Copyright (c) 2016-2018 Socionext Inc.
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; version 2
+- * of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #ifndef SND_UNIPHIER_AIO_H__
 -- 
-2.11.0
+2.17.0
