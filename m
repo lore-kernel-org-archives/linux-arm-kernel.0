@@ -1,43 +1,58 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 27 Apr 2018 12:31:52 +0200
-Subject: [PATCH] tty/serial: atmel: use port->name as name in request_irq()
-In-Reply-To: <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
-References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
- <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
-Message-ID: <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Apr 2018 11:50:36 +0100
+Subject: [PATCHv2] arm64: avoid instrumenting atomic_ll_sc.o
+Message-ID: <20180427105036.35953-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Our out-of-line atomics are built with a special calling convention,
+preventing pointless stack spilling, and allowing us to patch call sites
+with ARMv8.1 atomic instructions.
 
-On 26/04/2018 17:12, Sebastian Andrzej Siewior wrote:
-> On 2018-04-26 17:06:25 [+0200], To linux-serial at vger.kernel.org wrote:
->> It seems not to happen in v4.1.51 but it happens in v4.9 and v4.17-rc2
->> so if it broke accidentally it was not recently.
-> 
-> This is what I used to check:
-> 
-> diff --git a/drivers/tty/tty_io.c b/drivers/tty/tty_io.c
-> --- a/drivers/tty/tty_io.c
-> +++ b/drivers/tty/tty_io.c
-> @@ -170,7 +170,7 @@ void free_tty_struct(struct tty_struct *tty)
->  	put_device(tty->dev);
->  	kfree(tty->write_buf);
->  	tty->magic = 0xDEADDEAD;
-> -	kfree(tty);
-> +	strcpy(tty->name, "GONE");
->  }
->  
->  static inline struct tty_struct *file_tty(struct file *file)
-> 
-> If this is unknown and a bisect is requested, please let me know.
-Indeed, this will be appreciated.
-I'm quite curious to find the commit that led to this.
+Instrumentation inserted by the compiler may result in calls to
+functions not following this special calling convention, resulting in
+registers being unexpectedly clobbered, and various problems resulting
+from this.
 
-Thanks !
+For example, if a kernel is built with KCOV and ARM64_LSE_ATOMICS, the
+compiler inserts calls to __sanitizer_cov_trace_pc in the prologues of
+the atomic functions. This has been observed to result in spurious
+cmpxchg failures, leading to a hang early on in the boot process.
 
-> 
-> Sebastian
-> 
+This patch avoids such issues by preventing instrumentation of our
+out-of-line atomics.
 
-Richard
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/lib/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+Since v1 [1]:
+* rebase to v4.17-rc2
+
+To test this I built a v4.17-rc2 kernel with this applied, with GCOV, KASAN,
+KCOV, UBSAN, CONFIG_FTRACE, and CONFIG_FUNCTION_TRACER enabled, and verified
+the disassembly of atomic_ll_sc.o was safe.
+
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-September/533105.html
+
+diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+index 0ead8a1d1679..137710f4dac3 100644
+--- a/arch/arm64/lib/Makefile
++++ b/arch/arm64/lib/Makefile
+@@ -19,5 +19,9 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
+ 		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
+ 		   -fcall-saved-x18 -fomit-frame-pointer
+ CFLAGS_REMOVE_atomic_ll_sc.o := -pg
++GCOV_PROFILE_atomic_ll_sc.o	:= n
++KASAN_SANITIZE_atomic_ll_sc.o	:= n
++KCOV_INSTRUMENT_atomic_ll_sc.o	:= n
++UBSAN_SANITIZE_atomic_ll_sc.o	:= n
+ 
+ lib-$(CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE) += uaccess_flushcache.o
+-- 
+2.11.0
