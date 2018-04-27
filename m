@@ -1,209 +1,139 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 27 Apr 2018 14:05:08 +0200
-Subject: [PATCH v2] mmc: mediatek: add 64G DRAM DMA support
-In-Reply-To: <1524640743-11732-2-git-send-email-chaotian.jing@mediatek.com>
-References: <1524640743-11732-1-git-send-email-chaotian.jing@mediatek.com>
- <1524640743-11732-2-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFocJrbH2AGER3mwdCyzOnRfNC6peG_ZeHrKUA_voxM=dQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Apr 2018 14:19:52 +0200
+Subject: [GIT PULL] ARM: SoC fixes for 4.17
+Message-ID: <CAK8P3a1RdJskX_+8z8cQ=xeG8BgOPoCCZy125C1qjKWAHecg=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2018 at 09:19, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> MT2712 MSDC supports 64G DRAM DMA access, it needs update
-> gpd/bd structure.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+The following changes since commit 6d08b06e67cd117f6992c46611dfb4ce267cd71e:
 
-Thanks, applied for next!
+  Linux 4.17-rc2 (2018-04-22 19:20:09 -0700)
 
-Kind regards
-Uffe
+are available in the git repository at:
 
-> ---
->  drivers/mmc/host/mtk-sd.c | 56 +++++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 49 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index d642e11..0484138 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -71,6 +71,7 @@
->  #define SDC_ADV_CFG0     0x64
->  #define EMMC_IOCON       0x7c
->  #define SDC_ACMD_RESP    0x80
-> +#define DMA_SA_H4BIT     0x8c
->  #define MSDC_DMA_SA      0x90
->  #define MSDC_DMA_CTRL    0x98
->  #define MSDC_DMA_CFG     0x9c
-> @@ -195,6 +196,9 @@
->  /* SDC_ADV_CFG0 mask */
->  #define SDC_RX_ENHANCE_EN      (0x1 << 20)     /* RW */
->
-> +/* DMA_SA_H4BIT mask */
-> +#define DMA_ADDR_HIGH_4BIT      (0xf << 0)      /* RW */
-> +
->  /* MSDC_DMA_CTRL mask */
->  #define MSDC_DMA_CTRL_START     (0x1 << 0)     /* W */
->  #define MSDC_DMA_CTRL_STOP      (0x1 << 1)     /* W */
-> @@ -228,6 +232,7 @@
->
->  #define MSDC_PATCH_BIT2_CFGRESP   (0x1 << 15)   /* RW */
->  #define MSDC_PATCH_BIT2_CFGCRCSTS (0x1 << 28)   /* RW */
-> +#define MSDC_PB2_SUPPORT_64G      (0x1 << 1)    /* RW */
->  #define MSDC_PB2_RESPWAIT         (0x3 << 2)    /* RW */
->  #define MSDC_PB2_RESPSTSENSEL     (0x7 << 16)   /* RW */
->  #define MSDC_PB2_CRCSTSENSEL      (0x7 << 29)   /* RW */
-> @@ -281,6 +286,8 @@ struct mt_gpdma_desc {
->  #define GPDMA_DESC_BDP         (0x1 << 1)
->  #define GPDMA_DESC_CHECKSUM    (0xff << 8) /* bit8 ~ bit15 */
->  #define GPDMA_DESC_INT         (0x1 << 16)
-> +#define GPDMA_DESC_NEXT_H4     (0xf << 24)
-> +#define GPDMA_DESC_PTR_H4      (0xf << 28)
->         u32 next;
->         u32 ptr;
->         u32 gpd_data_len;
-> @@ -297,6 +304,8 @@ struct mt_bdma_desc {
->  #define BDMA_DESC_CHECKSUM     (0xff << 8) /* bit8 ~ bit15 */
->  #define BDMA_DESC_BLKPAD       (0x1 << 17)
->  #define BDMA_DESC_DWPAD                (0x1 << 18)
-> +#define BDMA_DESC_NEXT_H4      (0xf << 24)
-> +#define BDMA_DESC_PTR_H4       (0xf << 28)
->         u32 next;
->         u32 ptr;
->         u32 bd_data_len;
-> @@ -335,6 +344,7 @@ struct mtk_mmc_compatible {
->         bool busy_check;
->         bool stop_clk_fix;
->         bool enhance_rx;
-> +       bool support_64g;
->  };
->
->  struct msdc_tune_para {
-> @@ -404,6 +414,7 @@ struct msdc_host {
->         .busy_check = false,
->         .stop_clk_fix = false,
->         .enhance_rx = false,
-> +       .support_64g = false,
->  };
->
->  static const struct mtk_mmc_compatible mt8173_compat = {
-> @@ -415,6 +426,7 @@ struct msdc_host {
->         .busy_check = false,
->         .stop_clk_fix = false,
->         .enhance_rx = false,
-> +       .support_64g = false,
->  };
->
->  static const struct mtk_mmc_compatible mt2701_compat = {
-> @@ -426,6 +438,7 @@ struct msdc_host {
->         .busy_check = false,
->         .stop_clk_fix = false,
->         .enhance_rx = false,
-> +       .support_64g = false,
->  };
->
->  static const struct mtk_mmc_compatible mt2712_compat = {
-> @@ -437,6 +450,7 @@ struct msdc_host {
->         .busy_check = true,
->         .stop_clk_fix = true,
->         .enhance_rx = true,
-> +       .support_64g = true,
->  };
->
->  static const struct mtk_mmc_compatible mt7622_compat = {
-> @@ -448,6 +462,7 @@ struct msdc_host {
->         .busy_check = true,
->         .stop_clk_fix = true,
->         .enhance_rx = true,
-> +       .support_64g = false,
->  };
->
->  static const struct of_device_id msdc_of_ids[] = {
-> @@ -557,7 +572,12 @@ static inline void msdc_dma_setup(struct msdc_host *host, struct msdc_dma *dma,
->                 /* init bd */
->                 bd[j].bd_info &= ~BDMA_DESC_BLKPAD;
->                 bd[j].bd_info &= ~BDMA_DESC_DWPAD;
-> -               bd[j].ptr = (u32)dma_address;
-> +               bd[j].ptr = lower_32_bits(dma_address);
-> +               if (host->dev_comp->support_64g) {
-> +                       bd[j].bd_info &= ~BDMA_DESC_PTR_H4;
-> +                       bd[j].bd_info |= (upper_32_bits(dma_address) & 0xf)
-> +                                        << 28;
-> +               }
->                 bd[j].bd_data_len &= ~BDMA_DESC_BUFLEN;
->                 bd[j].bd_data_len |= (dma_len & BDMA_DESC_BUFLEN);
->
-> @@ -576,7 +596,10 @@ static inline void msdc_dma_setup(struct msdc_host *host, struct msdc_dma *dma,
->         dma_ctrl &= ~(MSDC_DMA_CTRL_BRUSTSZ | MSDC_DMA_CTRL_MODE);
->         dma_ctrl |= (MSDC_BURST_64B << 12 | 1 << 8);
->         writel_relaxed(dma_ctrl, host->base + MSDC_DMA_CTRL);
-> -       writel((u32)dma->gpd_addr, host->base + MSDC_DMA_SA);
-> +       if (host->dev_comp->support_64g)
-> +               sdr_set_field(host->base + DMA_SA_H4BIT, DMA_ADDR_HIGH_4BIT,
-> +                             upper_32_bits(dma->gpd_addr) & 0xf);
-> +       writel(lower_32_bits(dma->gpd_addr), host->base + MSDC_DMA_SA);
->  }
->
->  static void msdc_prepare_data(struct msdc_host *host, struct mmc_request *mrq)
-> @@ -1367,6 +1390,9 @@ static void msdc_init_hw(struct msdc_host *host)
->                              MSDC_PATCH_BIT2_CFGCRCSTS);
->         }
->
-> +       if (host->dev_comp->support_64g)
-> +               sdr_set_bits(host->base + MSDC_PATCH_BIT2,
-> +                            MSDC_PB2_SUPPORT_64G);
->         if (host->dev_comp->data_tune) {
->                 sdr_set_bits(host->base + tune_reg,
->                              MSDC_PAD_TUNE_RD_SEL | MSDC_PAD_TUNE_CMD_SEL);
-> @@ -1408,19 +1434,32 @@ static void msdc_init_gpd_bd(struct msdc_host *host, struct msdc_dma *dma)
->  {
->         struct mt_gpdma_desc *gpd = dma->gpd;
->         struct mt_bdma_desc *bd = dma->bd;
-> +       dma_addr_t dma_addr;
->         int i;
->
->         memset(gpd, 0, sizeof(struct mt_gpdma_desc) * 2);
->
-> +       dma_addr = dma->gpd_addr + sizeof(struct mt_gpdma_desc);
->         gpd->gpd_info = GPDMA_DESC_BDP; /* hwo, cs, bd pointer */
-> -       gpd->ptr = (u32)dma->bd_addr; /* physical address */
->         /* gpd->next is must set for desc DMA
->          * That's why must alloc 2 gpd structure.
->          */
-> -       gpd->next = (u32)dma->gpd_addr + sizeof(struct mt_gpdma_desc);
-> +       gpd->next = lower_32_bits(dma_addr);
-> +       if (host->dev_comp->support_64g)
-> +               gpd->gpd_info |= (upper_32_bits(dma_addr) & 0xf) << 24;
-> +
-> +       dma_addr = dma->bd_addr;
-> +       gpd->ptr = lower_32_bits(dma->bd_addr); /* physical address */
-> +       if (host->dev_comp->support_64g)
-> +               gpd->gpd_info |= (upper_32_bits(dma_addr) & 0xf) << 28;
-> +
->         memset(bd, 0, sizeof(struct mt_bdma_desc) * MAX_BD_NUM);
-> -       for (i = 0; i < (MAX_BD_NUM - 1); i++)
-> -               bd[i].next = (u32)dma->bd_addr + sizeof(*bd) * (i + 1);
-> +       for (i = 0; i < (MAX_BD_NUM - 1); i++) {
-> +               dma_addr = dma->bd_addr + sizeof(*bd) * (i + 1);
-> +               bd[i].next = lower_32_bits(dma_addr);
-> +               if (host->dev_comp->support_64g)
-> +                       bd[i].bd_info |= (upper_32_bits(dma_addr) & 0xf) << 24;
-> +       }
->  }
->
->  static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-> @@ -1913,7 +1952,10 @@ static int msdc_drv_probe(struct platform_device *pdev)
->         mmc->max_blk_size = 2048;
->         mmc->max_req_size = 512 * 1024;
->         mmc->max_blk_count = mmc->max_req_size / 512;
-> -       host->dma_mask = DMA_BIT_MASK(32);
-> +       if (host->dev_comp->support_64g)
-> +               host->dma_mask = DMA_BIT_MASK(36);
-> +       else
-> +               host->dma_mask = DMA_BIT_MASK(32);
->         mmc_dev(mmc)->dma_mask = &host->dma_mask;
->
->         host->timeout_clks = 3 * 1048576;
-> --
-> 1.8.1.1.dirty
->
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/armsoc-fixes
+
+for you to fetch changes up to 4ea3f05614926fea280befaa693ba494a500c2c4:
+
+  Merge tag 'arm-soc/for-4.17/devicetree-arm64-fixes' of
+https://github.com/Broadcom/stblinux into fixes (2018-04-27 10:21:18
++0200)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 4.17
+
+This round of fixes has two larger changes that came in last week:
+
+- A set of a couple of patches all intended to finally turn on
+  USB support on various Amlogic SoC based boards. The respective
+  driver were not finalized until very late before the merge window
+  and the DT portion is the last bit now.
+- A defconfig update for gemini that had repeatedly missed the
+  cut but that is required to actually boot any real machines
+  with the default build.
+
+The rest are the usual small changes:
+
+- A fix for a nasty build regression on the OMAP memory drivers
+- A fix for a boot problem on Intel/Altera SocFPGA
+- A MAINTAINER file update
+- A couple of fixes for issues found by automated testing
+  (kernelci, coverity, sparse, ...)
+- A few incorrect DT entries are updated to match the hardware
+
+----------------------------------------------------------------
+Arnd Bergmann (7):
+      Merge tag 'socfpga_defconfig_fix_v4.17' of
+git://git.kernel.org/.../dinguyen/linux into fixes
+      Merge tag 'arm-soc/for-4.17/drivers-fixes' of
+https://github.com/Broadcom/stblinux into fixes
+      Merge tag 'juno-fixes-4.17' of
+ssh://gitolite.kernel.org/.../sudeep.holla/linux into fixes
+      Merge tag 'scmi-fixes-4.17' of
+ssh://gitolite.kernel.org/.../sudeep.holla/linux into fixes
+      Merge tag 'amlogic-fixes' of
+git://git.kernel.org/.../khilman/linux-amlogic into fixes
+      Merge tag 'omap-for-v4.17/fixes-signed' of
+git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'arm-soc/for-4.17/devicetree-arm64-fixes' of
+https://github.com/Broadcom/stblinux into fixes
+
+Colin Ian King (1):
+      firmware: arm_scmi: remove redundant null check on array
+
+Dave Gerlach (1):
+      ARM: OMAP2+: Fix build when using split object directories
+
+Florian Fainelli (1):
+      soc: bcm: raspberrypi-power: Fix use of __packed
+
+Geert Uytterhoeven (1):
+      soc: bcm2835: Make !RASPBERRYPI_FIRMWARE dummies return failure
+
+John Garry (1):
+      HISI LPC: Add Kconfig MFD_CORE dependency
+
+Linus Walleij (3):
+      ARM: dts: Fix NAS4220B pin config
+      ARM: s3c24xx: jive: Fix some GPIO names
+      ARM: defconfig: Update Gemini defconfig
+
+Martin Blumenstingl (7):
+      ARM64: dts: meson-gxl: add USB host support
+      ARM64: dts: meson-gxm: add GXM specific USB host configuration
+      ARM64: dts: meson-gxl-s905x-p212: enable the USB controller
+      ARM64: dts: meson-gx-p23x-q20x: enable the USB controller
+      ARM64: dts: meson-gxl-s905x-libretech-cc: enable the USB controller
+      ARM64: dts: meson-gxl-nexbox-a95x: enable the USB controller
+      ARM64: dts: meson-gxm-khadas-vim2: enable the USB controller
+
+Niklas Cassel (1):
+      MAINTAINERS: Remove myself as maintainer
+
+Srinath Mannam (1):
+      arm64: dts: correct SATA addresses for Stingray
+
+Sudeep Holla (1):
+      arm64: dts: juno: drop unnecessary address-cells and size-cells properties
+
+Thor Thayer (1):
+      ARM: socfpga_defconfig: Remove QSPI Sector 4K size force
+
+Tony Lindgren (2):
+      ARM: dts: Fix cm2 and prm sizes for omap4
+      Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes
+
+ MAINTAINERS                                                  |  2 --
+ arch/arm/boot/dts/gemini-nas4220b.dts                        | 28
+++++++++++++++--------------
+ arch/arm/boot/dts/omap4.dtsi                                 |  8 ++++----
+ arch/arm/configs/gemini_defconfig                            | 27
++++++++++++++++++++++++++--
+ arch/arm/configs/socfpga_defconfig                           |  1 +
+ arch/arm/mach-omap2/Makefile                                 |  6 +-----
+ arch/arm/mach-omap2/pm-asm-offsets.c                         |  3 +++
+ arch/arm/mach-omap2/sleep33xx.S                              |  1 -
+ arch/arm/mach-omap2/sleep43xx.S                              |  1 -
+ arch/arm/mach-s3c24xx/mach-jive.c                            |  4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi          |  4 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts  |  4 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi        |  4 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                   | 61
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts        |  4 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxm.dtsi                   | 17
++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi                |  2 --
+ arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi     | 80
+++++++++++++++++++++++++++++++++++++++++----------------------------------------
+ drivers/bus/Kconfig                                          |  1 +
+ drivers/firmware/arm_scmi/clock.c                            |  2 +-
+ drivers/memory/emif-asm-offsets.c                            | 72
++-----------------------------------------------------------------------
+ drivers/soc/bcm/raspberrypi-power.c                          |  2 +-
+ include/linux/ti-emif-sram.h                                 | 75
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/soc/bcm2835/raspberrypi-firmware.h                   |  4 ++--
+ 25 files changed, 277 insertions(+), 148 deletions(-)
