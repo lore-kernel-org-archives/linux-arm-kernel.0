@@ -1,67 +1,43 @@
-From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
-Date: Fri, 27 Apr 2018 17:57:21 +0100
-Subject: [PATCH v2 10/11] arm64: dts: r8a77965-salvator-x: Enable DU external
- clocks and HDMI
-In-Reply-To: <20180427165722.19445-1-kieran.bingham+renesas@ideasonboard.com>
-References: <20180427165722.19445-1-kieran.bingham+renesas@ideasonboard.com>
-Message-ID: <20180427165722.19445-11-kieran.bingham+renesas@ideasonboard.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 27 Apr 2018 12:11:54 -0500
+Subject: [PATCH v6 5/7] remoteproc/davinci: use octal permissions for
+ module_param()
+In-Reply-To: <20180417173038.25510-6-brgl@bgdev.pl>
+References: <20180417173038.25510-1-brgl@bgdev.pl>
+ <20180417173038.25510-6-brgl@bgdev.pl>
+Message-ID: <0bd29608-fe2c-50c8-3f8c-eb1b2f001a6d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DU1 external dot clock is provided by the fixed frequency clock
-generator X21, while the DU0 and DU3 clocks are provided by the
-programmable Versaclock5 clock generator.
+On 04/17/2018 12:30 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Checkpatch recommends to use octal perms instead of S_IRUGO.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Enable the clocks, and the HDMI encoder for the M3-N Salvator-X board
-and hook it up to the HDMI connector.
+Looks like you missed by Acked-by from v3, so adding it back
 
-Based on patches from Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Acked-by: Suman Anna <s-anna@ti.com>
 
-Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+regards
+Suman
 
----
-v2:
- - Remove LVDS clocks from DU node
- - Merge DU Clocks and HDMI enablement
----
- .../boot/dts/renesas/r8a77965-salvator-x.dts  | 28 +++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
-index 75d890d91df9..340a3c72b65a 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
-@@ -19,3 +19,31 @@
- 		reg = <0x0 0x48000000 0x0 0x78000000>;
- 	};
- };
-+
-+&du {
-+	clocks = <&cpg CPG_MOD 724>,
-+		 <&cpg CPG_MOD 723>,
-+		 <&cpg CPG_MOD 721>,
-+		 <&versaclock5 1>,
-+		 <&x21_clk>,
-+		 <&versaclock5 2>;
-+	clock-names = "du.0", "du.1", "du.3",
-+		      "dclkin.0", "dclkin.1", "dclkin.3";
-+};
-+
-+&hdmi0 {
-+	status = "okay";
-+
-+	ports {
-+		port at 1 {
-+			reg = <1>;
-+			rcar_dw_hdmi0_out: endpoint {
-+				remote-endpoint = <&hdmi0_con>;
-+			};
-+		};
-+	};
-+};
-+
-+&hdmi0_con {
-+	remote-endpoint = <&rcar_dw_hdmi0_out>;
-+};
--- 
-2.17.0
+> ---
+>  drivers/remoteproc/da8xx_remoteproc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+> index f134192922e0..b668e32996e2 100644
+> --- a/drivers/remoteproc/da8xx_remoteproc.c
+> +++ b/drivers/remoteproc/da8xx_remoteproc.c
+> @@ -25,7 +25,7 @@
+>  #include "remoteproc_internal.h"
+>  
+>  static char *da8xx_fw_name;
+> -module_param(da8xx_fw_name, charp, S_IRUGO);
+> +module_param(da8xx_fw_name, charp, 0444);
+>  MODULE_PARM_DESC(da8xx_fw_name,
+>  		 "Name of DSP firmware file in /lib/firmware (if not specified defaults to 'rproc-dsp-fw')");
+>  
+> 
