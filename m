@@ -1,30 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 27 Apr 2018 11:23:21 -0400 (EDT)
-Subject: [PATCH net v2 0/2] net: mvpp2: Fix hangs when starting some
- interfaces on 7k/8k
-In-Reply-To: <20180425182117.28826-1-maxime.chevallier@bootlin.com>
-References: <20180425182117.28826-1-maxime.chevallier@bootlin.com>
-Message-ID: <20180427.112321.1722845947622725407.davem@davemloft.net>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 27 Apr 2018 17:28:27 +0200
+Subject: [PATCH] arm64: defconfig: enable CONFIG_SPI_ARMADA_3700
+In-Reply-To: <20180406140048.4602-1-gregory.clement@bootlin.com> (Gregory
+ CLEMENT's message of "Fri, 6 Apr 2018 16:00:48 +0200")
+References: <20180406140048.4602-1-gregory.clement@bootlin.com>
+Message-ID: <87a7tod5yc.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Chevallier <maxime.chevallier@bootlin.com>
-Date: Wed, 25 Apr 2018 20:21:15 +0200
+Hi,
+ 
+ On ven., avril 06 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
-> Armada 7K / 8K clock management has recently been reworked, see :
-> 
-> commit c7e92def1ef4 ("clk: mvebu: cp110: Fix clock tree representation")
-> 
-> I have been experiencing overall system hangs on MacchiatoBin when starting
-> the eth1 interface since then. It turns out some clocks dependencies were
-> missing in the PPv2 and xmdio driver, the clock rework made this visible.
-> 
-> This is the V2 series, that adds support for the missing 'MG Core clock' in
-> mvpp2, and fixes an issue with the error path for the axi_clk.
-> 
-> Thanks to Gregory Clement for finding the root cause of this bug.
-> 
-> V2 : Remove all DT patches from this series, they will be merged through
->      the mvebu tree.
+> The SPI is used on many boards (especially for the serial
+> flashes). Enable it by default.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 
-Series applied, thank you.
+Applied on mvebu/arm64
+
+Gregory
+
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 634b373785c4..c8aabed6672f 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -285,6 +285,7 @@ CONFIG_I2C_UNIPHIER_F=y
+>  CONFIG_I2C_RCAR=y
+>  CONFIG_I2C_CROS_EC_TUNNEL=y
+>  CONFIG_SPI=y
+> +CONFIG_SPI_ARMADA_3700=y
+>  CONFIG_SPI_MESON_SPICC=m
+>  CONFIG_SPI_MESON_SPIFC=m
+>  CONFIG_SPI_BCM2835=m
+> -- 
+> 2.16.3
+>
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
