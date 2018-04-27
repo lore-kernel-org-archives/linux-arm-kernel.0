@@ -1,51 +1,78 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 27 Apr 2018 09:37:11 +0200
-Subject: [PATCH 00/24] device link, bridge supplier <-> drm device
-In-Reply-To: <25d8e621-b3f8-094f-32a2-d22efc2163a4@samsung.com>
-References: <CGME20180426223215epcas2p38fe3b0b7b1ea1c8190805f9e2a89e11e@epcas2p3.samsung.com>
- <20180426223139.16740-1-peda@axentia.se>
- <25d8e621-b3f8-094f-32a2-d22efc2163a4@samsung.com>
-Message-ID: <7d4bceeb-9611-cbf9-3906-fef5db88aad8@axentia.se>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Fri, 27 Apr 2018 09:37:20 +0200
+Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
+In-Reply-To: <1524781764.2693.503.camel@hpe.com>
+References: <20180314180155.19492-1-toshi.kani@hpe.com>
+ <20180314180155.19492-3-toshi.kani@hpe.com>
+ <20180426141926.GN15462@8bytes.org>
+ <1524759629.2693.465.camel@hpe.com>
+ <20180426172327.GQ15462@8bytes.org>
+ <1524764948.2693.478.camel@hpe.com>
+ <20180426200737.GS15462@8bytes.org>
+ <1524781764.2693.503.camel@hpe.com>
+Message-ID: <20180427073719.GT15462@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-27 09:11, Andrzej Hajda wrote:
-> Hi Peter,
+On Thu, Apr 26, 2018 at 10:30:14PM +0000, Kani, Toshi wrote:
+> Thanks for the clarification. After reading through SDM one more time, I
+> agree that we need a TLB purge here. Here is my current understanding. 
 > 
-> On 27.04.2018 00:31, Peter Rosin wrote:
->> Hi!
->>
->> It was noted by Russel King [1] that bridges (not using components)
->> might disappear unexpectedly if the owner of the bridge was unbound.
->> Jyri Sarha had previously noted the same thing with panels [2]. Jyri
->> came up with using device links to resolve the panel issue, which
->> was also my (independent) reaction to the note from Russel.
->>
->> This series builds up to the addition of that link in the last
->> patch, but in my opinion the other 23 patches do have merit on their
->> own.
->>
->> The last patch needs testing, while the others look trivial. That
->> said, I might have missed some subtlety.
+>  - INVLPG purges both TLB and paging-structure caches. So, PMD cache was
+> purged once.
+>  - However, processor may cache this PMD entry later in speculation
+> since it has p-bit set. (This is where my misunderstanding was.
+> Speculation is not allowed to access a target address, but it may still
+> cache this PMD entry.)
+>  - A single INVLPG on each processor purges this PMD cache. It does not
+> need a range purge (which was already done).
 > 
-> of_node is used as an identifier of the bridge in the kernel. If you
-> replace it with device pointer there will be potential problem with
-> devices having two or more bridges, how do you differentiate bridges if
-> the owner is the same? If I remember correctly current bridge code does
-> not allow to have multiple bridges in one device, but that should be
-> quite easy to fix if necessary. After this change it will become more
-> difficult.
+> Does it sound right to you?
 
-I don't see how it will be more difficult?
+The right fix is to first synchronize the changes when the PMD/PUD is
+cleared and then flush the TLB system-wide. After that is done you can
+free the page.
 
-> Anyway I remember discussion that in DT world bridge should be
-> identified rather by of_graph port node, not by parent node as it is
-> now. If you want to translate this relation to device owner, you should
-> add also port number to have full identification of the bridge, ie pair
-> (owner, port_number) would be equivalent of port node.
+But doing all that in the pud/pmd_free_pmd/pte_page() functions is too
+expensive, as the TLB flush requires to send IPIs to all cores in the
+system, and that every time the function is called.
 
-You even state the trivial solution here, just add the port/endpoint ID
-when/if it is needed. So, what is the significant difference?
+So what needs to be done is to fix this from high-level ioremap code to
+first unmap all required PTE/PMD pages and collect them in a list. When
+that is done you can synchronize the changes with the other page-tables
+in the system and do one system-wide TLB flush. When that is complete
+you can free the pages on the list that were collected while unmapping.
 
-Cheers,
-Peter
+Then the new mappings can be established and again synchronized with the
+other page-tables in the system.
+
+> As for the BUG_ON issue, are you able to reproduce this issue?  If so,
+> would you be able to test the fix?
+
+Yes, I can reproduce the BUG_ON with my PTI patches and a fedora-i386
+VM.
+
+I already ran into the issue before your patches were merged upstream,
+but my "fix" is different because it just prevents huge-mappings when
+there were smaller mappings before. See
+
+	e3e288121408 x86/pgtable: Don't set huge PUD/PMD on non-leaf entries
+
+for details. This patch does not fix the base-problem, but hides it
+again, as the real fix needs some more work across architectures.
+
+Your patch actually makes the problem worse, without it the PTE/PMD pages
+were just leaked, so that they could not be reused. But with your patch
+the pages can be used again and the page-walker might establish TLB
+entries based on random content the new owner writes to it. This can
+lead to all kinds of random and very hard to debug data corruption
+issues.
+
+So until we make the generic ioremap code in lib/ioremap.c smarter about
+unmapping/remapping ranges the best solution is making my fix work again
+by reverting your patch.
+
+
+Thanks,
+
+	Joerg
