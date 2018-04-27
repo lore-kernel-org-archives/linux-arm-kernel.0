@@ -1,112 +1,30 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 27 Apr 2018 11:46:14 +0200
-Subject: [PATCH v2 2/2] soc: mediatek: add a fixed wait for SRAM stable
-In-Reply-To: <1524476340.12322.14.camel@mtkswgap22>
-References: <2e16481e1477dfae0cfb24568d8111da81d92628.1524472331.git.sean.wang@mediatek.com>
- <0ef8e87ba7156e626d1a1a48388f222ce917099b.1524472331.git.sean.wang@mediatek.com>
- <51840588-96e4-2520-f3d7-a61e74da6814@gmail.com>
- <1524476340.12322.14.camel@mtkswgap22>
-Message-ID: <0ec15c8a-ca90-26c3-1ea6-00bf0d48b62a@gmail.com>
+From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
+Date: Fri, 27 Apr 2018 09:46:19 +0000
+Subject: [PATCH 0/2] Add R8A77970/Eagle CAN-FD support
+In-Reply-To: <4e5216bc-5f1b-ace4-1aea-02269cd206ac@cogentembedded.com>
+References: <4e5216bc-5f1b-ace4-1aea-02269cd206ac@cogentembedded.com>
+Message-ID: <TY2PR01MB19620E4689C0B881B540E4D4C38D0@TY2PR01MB1962.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi Sergei,
 
-On 04/23/2018 11:39 AM, Sean Wang wrote:
-> On Mon, 2018-04-23 at 11:31 +0200, Matthias Brugger wrote:
->>
->> On 04/23/2018 10:36 AM, sean.wang at mediatek.com wrote:
->>> From: Sean Wang <sean.wang@mediatek.com>
->>>
->>> MT7622_POWER_DOMAIN_WB doesn't send an ACK when its managed SRAM becomes
->>> stable, which is not like the behavior the other power domains should
->>> have. Therefore, it's necessary for such a power domain to have a fixed
->>> and well-predefined duration to wait until its managed SRAM can be allowed
->>> to access by all functions running on the top.
->>>
->>> v1 -> v2:
->>>  - use MTK_SCPD_FWAIT_SRAM flag as an indication requiring force waiting.
->>>
->>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->>> Cc: Matthias Brugger <matthias.bgg@gmail.com>
->>> Cc: Ulf Hansson <ulf.hansson@linaro.org>
->>> Cc: Weiyi Lu <weiyi.lu@mediatek.com>
->>> ---
->>>  drivers/soc/mediatek/mtk-scpsys.c | 24 ++++++++++++++++++------
->>>  1 file changed, 18 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
->>> index b1b45e4..d4f1a63 100644
->>> --- a/drivers/soc/mediatek/mtk-scpsys.c
->>> +++ b/drivers/soc/mediatek/mtk-scpsys.c
->>> @@ -32,6 +32,7 @@
->>>  #define MTK_POLL_TIMEOUT    (jiffies_to_usecs(HZ))
->>>  
->>>  #define MTK_SCPD_ACTIVE_WAKEUP		BIT(0)
->>> +#define MTK_SCPD_FWAIT_SRAM		BIT(1)
->>>  #define MTK_SCPD_CAPS(_scpd, _x)	((_scpd)->data->caps & (_x))
->>>  
->>>  #define SPM_VDE_PWR_CON			0x0210
->>> @@ -237,11 +238,22 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
->>>  	val &= ~scpd->data->sram_pdn_bits;
->>>  	writel(val, ctl_addr);
->>>  
->>> -	/* wait until SRAM_PDN_ACK all 0 */
->>> -	ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
->>> -				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
->>> -	if (ret < 0)
->>> -		goto err_pwr_ack;
->>> +	/* Either wait until SRAM_PDN_ACK all 0 or have a force wait */
->>> +	if (!MTK_SCPD_CAPS(scpd, MTK_SCPD_FWAIT_SRAM)) {
+Thank you for your patch. 
+Could you also update the dt bindings please? A separate patch or part of this series.
 
-After having another look on the patch, could you change the order of the if:
-So that we check for the existence of the MTK_SCPD_FWAIT_SRAM and sleep and in
-the else branch we to the readl_poll_timeout.
-
-I think in the future this will make the code easier to understand as you can
-easily oversee the '!' negation in the if.
-
-Regards,
-Matthias
-
-
->>> +		ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
->>> +					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
->>> +		if (ret < 0)
->>> +			goto err_pwr_ack;
->>> +	} else {
->>> +		/*
->>> +		 * Currently, MTK_SCPD_FWAIT_SRAM is necessary only for
->>> +		 * MT7622_POWER_DOMAIN_WB and thus just a trivial setup is
->>> +		 * applied here. If there're more domains which need to force
->>> +		 * waiting for its own pre-defined value, the duration should
->>> +		 * be coded in the caps field.
->>> +		 */
->>
->> I would say, if necessary in the future we can add a switch statement here.
->> Other then that the patches look good. If you are OK, I'll just delete the last
->> sentence when applying the patch.
->>
+> Subject: [PATCH 0/2] Add R8A77970/Eagle CAN-FD support
 > 
-> yes, it's okay for me. 
+> Hello!
 > 
->> Regards,
->> Matthias
->>
->>> +		usleep_range(12000, 12100);
->>> +	};
->>>  
->>>  	if (scpd->data->bus_prot_mask) {
->>>  		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
->>> @@ -785,7 +797,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
->>>  		.sram_pdn_ack_bits = 0,
->>>  		.clk_id = {CLK_NONE},
->>>  		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
->>> -		.caps = MTK_SCPD_ACTIVE_WAKEUP,
->>> +		.caps = MTK_SCPD_ACTIVE_WAKEUP | MTK_SCPD_FWAIT_SRAM,
->>>  	},
->>>  };
->>>  
->>>
+> Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20180426-v4.17-rc2' tag. We're adding the R8A77970 CAN-FD
+> device node and then enable single chnanel CAN-FD support on the Eagle
+> board.
 > 
+> [1/2] arm64: dts: renesas: r8a77970: add CAN-FD support
+> [2/2] arm64: dts: renesas: eagle: add CAN-FD support
 > 
+> WBR, Sergei
+
+Thanks,
+Ramesh
