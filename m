@@ -1,96 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Apr 2018 13:32:13 -0500
-Subject: [PATCH v6 04/24] ASoC: qdsp6: dt-bindings: Add q6afe dt bindings
-In-Reply-To: <dd30b0ed-d958-9bf8-13cf-55d100b645ab@linaro.org>
-References: <20180426094606.4775-1-srinivas.kandagatla@linaro.org>
- <20180426094606.4775-5-srinivas.kandagatla@linaro.org>
- <20180427141323.2ykh676xpdf7b6bl@rob-hp-laptop>
- <dd30b0ed-d958-9bf8-13cf-55d100b645ab@linaro.org>
-Message-ID: <CAL_JsqLLqr87F53rbR+DU9Qj9=9SWWrw45TWZaG6f_gnYfPNgw@mail.gmail.com>
+From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
+Date: Fri, 27 Apr 2018 13:37:16 -0500
+Subject: [PATCHv2 1/3] Documentation: dt: socfpga: Add Stratix10 ECC Manager
+ binding
+In-Reply-To: <1524854238-19394-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1524854238-19394-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <1524854238-19394-2-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 9:58 AM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
-> Thanks for the review.
->
->
-> On 27/04/18 15:13, Rob Herring wrote:
->>
->> On Thu, Apr 26, 2018 at 10:45:46AM +0100, srinivas.kandagatla at linaro.org
->> wrote:
->>>
->>> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>>
->>> This patch add DT bindings for AFE (Audio Frontend) DSP module.
->>>
->>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>> Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
->>> ---
->>>   .../devicetree/bindings/sound/qcom,q6afe.txt       | 88
->>> ++++++++++++++++++++++
->>>   include/dt-bindings/sound/qcom,q6afe.h             | 31 ++++++++
->>>   2 files changed, 119 insertions(+)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/sound/qcom,q6afe.txt
->>>   create mode 100644 include/dt-bindings/sound/qcom,q6afe.h
->>>
->>> diff --git a/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
->>> b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
->>> new file mode 100644
->>> index 000000000000..05208a63dd3c
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
->>> @@ -0,0 +1,88 @@
->>> +Qualcomm Audio Front End (Q6AFE) binding
->>> +
->>> +AFE is one of the APR audio service on Q6DSP
->>> +Please refer to qcom,apr.txt for details of the common apr service
->>> bindings
->>> +used by all apr services.
->>> +
->>> +- but must contain the following property:
->>> +
->>> +- compatible:
->>> +       Usage: required
->>> +       Value type: <stringlist>
->>> +       Definition: must be "qcom,q6afe-v<MAJOR-NUMBER>.<MINOR-NUMBER>"
->>> +                 Or "qcom,q6afe" where the version number can be queried
->>> +                 from DSP.
->>> +                 example "qcom,q6afe"
->>
->>
->> reg too.
->
->
-> I did not want to repeat what is already mandated for apr children in
-> qcom,apr.txt
-> So skipped repeating reg property in here.
+From: Thor Thayer <thor.thayer@linux.intel.com>
 
-Okay.
+Add the device tree bindings needed to support the Stratix10
+ECC Manager and SDRAM ECC.
 
->>> +
->>> += AFE DAIs (Digial Audio Interface)
->>> +"dais" subnode of the AFE node represents dai specific configuration
->>> +
->>> +- #sound-dai-cells
->>> +       Usage: required
->>> +       Value type: <u32>
->>> +       Definition: Must be 1
->>> +
->>> +- reg
->>
->>
->> It's not clear here these are in a grandchild node.
->>
-> Every afe port/dai has some board specifics, to allow that we need dai
-> specific child nodes.
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+---
+v2  Remove unused System Manager syscon.
+    Remove unused SDRAM ECC register defines.
+    Remove unused address, size and range from bindings.
+---
+ .../bindings/arm/altera/socfpga-eccmgr.txt         | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-Yes, but what I mean is #sound-dai-cells is a property of the dais
-node, but reg and qcom,sd-lines are properties of child nodes under
-the dais node. It is evident in the example, but not without the
-example.
-
-Also, anywhere with reg needs #address-cells and #size-cells in the parent node.
-
-Rob
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+index 4a1714f96bab..5626560a6cfd 100644
+--- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+@@ -231,3 +231,38 @@ Example:
+ 				     <48 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 	};
++
++Stratix10 SoCFPGA ECC Manager
++The Stratix10 SoC ECC Manager handles the IRQs for each peripheral
++in a shared register similar to the Arria10. However, ECC requires
++access to registers that can only be read from Secure Monitor with
++SMC calls. Therefore the device tree is slightly different.
++
++Required Properties:
++- compatible : Should be "altr,socfpga-s10-ecc-manager"
++- interrupts : Should be single bit error interrupt, then double bit error
++	interrupt.
++- interrupt-controller : boolean indicator that ECC Manager is an interrupt controller
++- #interrupt-cells : must be set to 2.
++
++Subcomponents:
++
++SDRAM ECC
++Required Properties:
++- compatible : Should be "altr,sdram-edac-s10"
++- interrupts : Should be single bit error interrupt, then double bit error
++	interrupt, in this order.
++
++Example:
++
++	eccmgr {
++		compatible = "altr,socfpga-s10-ecc-manager";
++		interrupts = <0 15 4>, <0 95 4>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++
++		sdramedac {
++			compatible = "altr,sdram-edac-s10";
++			interrupts = <16 4>, <48 4>;
++		};
++	};
+-- 
+2.7.4
