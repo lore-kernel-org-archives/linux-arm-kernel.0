@@ -1,85 +1,136 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Apr 2018 17:33:43 +0100
-Subject: [PATCH] arm: port KCOV to arm
-In-Reply-To: <CACT4Y+ZPnCx-Wm7=JwiYdbUcDjjD_c_wqdWsW4u7toEv_EGbAw@mail.gmail.com>
-References: <20180426130846.130976-1-dvyukov@google.com>
- <20180426134057.4sahhqrbkltwmfsk@lakrids.cambridge.arm.com>
- <CACT4Y+Z35mOAybskjxVhxvW+GrbOZ4c9s2LT+Ca_fE9ZufoiGQ@mail.gmail.com>
- <20180426142948.n74p52esmbvsqrow@lakrids.cambridge.arm.com>
- <CACT4Y+b+kHWstEWDDOh6unGSHnetnyJ-Gut1E494XGM1rFozBQ@mail.gmail.com>
- <CACT4Y+ZfQyCd+dBNJEUvVquM8EN51JoOrrENJ+Q7Hpb0wF5xrA@mail.gmail.com>
- <20180427130643.klvm4rqxhv7w5f2o@lakrids.cambridge.arm.com>
- <CACT4Y+b_cAKf80y5a8KaV7P=-KtcB83E7x-SXv-Uq_kxzy_7wA@mail.gmail.com>
- <20180427161810.kuncq7rtcpyl7pql@lakrids.cambridge.arm.com>
- <CACT4Y+ZPnCx-Wm7=JwiYdbUcDjjD_c_wqdWsW4u7toEv_EGbAw@mail.gmail.com>
-Message-ID: <20180427163343.7fbzlnv477dnyg4m@lakrids.cambridge.arm.com>
+From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
+Date: Fri, 27 Apr 2018 17:33:46 +0100
+Subject: [PATCH 11/17] arm64: dts: r8a77965: Add VSP instances
+In-Reply-To: <1787243.JuNJAuBqMb@avalon>
+References: <20180426165346.494-1-kieran.bingham+renesas@ideasonboard.com>
+ <20180426165346.494-12-kieran.bingham+renesas@ideasonboard.com>
+ <1787243.JuNJAuBqMb@avalon>
+Message-ID: <81161c97-2be8-2b5a-14a2-3db8709f5ff7@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 06:21:53PM +0200, 'Dmitry Vyukov' via syzkaller wrote:
-> On Fri, Apr 27, 2018 at 6:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Apr 27, 2018 at 03:51:22PM +0200, Dmitry Vyukov wrote:
-> >> On Fri, Apr 27, 2018 at 3:06 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > Can you share your kernel config?
-> >>
-> >> Attached. It's pretty much vexpress_defconfig with few minor
-> >> additions. Here is full description of what I am doing:
-> >> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
-> >
-> > Cheers!
-> >
-> >> FWIW when I do "KCOV_INSTRUMENT_fault.o := n" everything works and I
-> >> see reasonable coverage.
-> >
-> > While this may be the case, I think it's papering over a bug rather than
-> > solving it.
-> >
-> > [...]
-> >
-> >> > I can't reproduce the issue on real hardware atop of v4.17-rc2, when
-> >> > booting and running a standard ARMv7 buildroot userspace. So the kcov
-> >> > mode check seems fine to me.
-> >>
-> >> It happens after brief fuzzing with syzkaller. So it's both kcov
-> >> opened and some weird syscall workload. Again, here is everything what
-> >> I am doing:
-> >> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm-kernel.md
-> >
-> > I've set this up, and while I see RCU stalls and "no output from test
-> > machine" warnings, I'm not seeing any reports with KCOV splats.
-> >
-> > Are you somehow connecting to a VM which failed with no output?
+Hi Laurent,
+
+On 26/04/18 22:11, Laurent Pinchart wrote:
+> Hi Kieran,
 > 
-> I've started seeing assorted crashes like these:
+> Thank you for the patch.
 > 
-> kernel panic: Fatal exception
-> unable to handle kernel paging request in migrate_task_rq_fair
-> BUG: spinlock bad magic in corrupted
-> unable to handle kernel paging request in trace_hardirqs_off_caller
-> unable to handle kernel paging request in kick_process
-> kernel panic: stack-protector: Kernel stack is corrupted in: do_futex
-> unable to handle kernel paging request in __sanitizer_cov_trace_pc
-> Unable to handle kernel paging request at virtual address ADDR
+> On Thursday, 26 April 2018 19:53:40 EEST Kieran Bingham wrote:
+>> The r8a77965 has 4 VSP instances.
+>>
+>> Based on a similar patch of the R8A7796 device tree
+>> by Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
+>>
+>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> [Kieran: Rebased to top of tree, fixed sort orders]
+>> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>> ---
+>>  arch/arm64/boot/dts/renesas/r8a77965.dtsi | 44 +++++++++++++++++++++++
+>>  1 file changed, 44 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+>> b/arch/arm64/boot/dts/renesas/r8a77965.dtsi index
+>> 1f44ed7c1b1c..e92e6b03333a 100644
+>> --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+>> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+>> @@ -1009,6 +1009,17 @@
+>>  			resets = <&cpg 615>;
+>>  		};
+>>
+>> +		vspb: vsp at fe960000 {
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfe960000 0 0x8000>;
+>> +			interrupts = <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 626>;
+>> +			power-domains = <&sysc R8A77965_PD_A3VP>;
+>> +			resets = <&cpg 626>;
+>> +
+>> +			renesas,fcp = <&fcpvb0>;
+>> +		};
+>> +
+>>  		fcpvb0: fcp at fe96f000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfe96f000 0 0x200>;
+>> @@ -1017,6 +1028,17 @@
+>>  			resets = <&cpg 607>;
+>>  		};
+>>
+>> +		vspi0: vsp at fe9a0000 {
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfe9a0000 0 0x8000>;
+>> +			interrupts = <GIC_SPI 444 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 631>;
+>> +			power-domains = <&sysc R8A77965_PD_A3VP>;
+>> +			resets = <&cpg 631>;
+>> +
+>> +			renesas,fcp = <&fcpvi0>;
+>> +		};
+>> +
+>>  		fcpvi0: fcp at fe9af000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfe9af000 0 0x200>;
+>> @@ -1025,6 +1047,17 @@
+>>  			resets = <&cpg 611>;
+>>  		};
+>>
+>> +		vspd0: vsp at fea20000 {
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfea20000 0 0x4000>;
+> 
+> RFP2 has a CLUT so the register range needs to be extended. I'd recommend 
+> covering the entire space (0x8000) even if no LUT or CLU module is present.
 
-Just to check, is that with or without instrumentation in fault.c?
+Ah yes, of course.
+Updated.
 
-It might be worth enabling HARDENED_USERCOPY -- that should scream if we
-corrupt task_struct via a uaccess.
+> 
+>> +			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 623>;
+>> +			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 623>;
+>> +
+>> +			renesas,fcp = <&fcpvd0>;
+>> +		};
+>> +
+>>  		fcpvd0: fcp at fea27000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfea27000 0 0x200>;
+>> @@ -1033,6 +1066,17 @@
+>>  			resets = <&cpg 603>;
+>>  		};
+>>
+>> +		vspd1: vsp at fea28000 {
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfea28000 0 0x4000>;
+> 
+> Same here.
+> 
 
-> Do you see code coverage increasing?
+And here...
 
-Not so far. QEMU TCG on this machine is rather slow, so it might just be
-that VMs are timing out at boot time.
 
-> Besides compiler I am not sure what else can be different between our
-> setups (mine is Debian's 7.2).
+> With this fixed,
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Could you give mine [1] a go? It's the Linaro 17.11
-arm-linux-gnueabihf-gcc 7.2.1 toolchain.
+Collected.
 
-I don't ahve a Debian 7 install up at the moment.
+--
+Kieran
 
-[1] https://releases.linaro.org/components/toolchain/binaries/latest/arm-linux-gnueabihf/gcc-linaro-7.2.1-2017.11-x86_64_arm-linux-gnueabihf.tar.xz
 
-Thanks,
-Mark.
+> 
+>> +			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 622>;
+>> +			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 622>;
+>> +
+>> +			renesas,fcp = <&fcpvd1>;
+>> +		};
+>> +
+>>  		fcpvd1: fcp at fea2f000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfea2f000 0 0x200>;
+> 
+> 
