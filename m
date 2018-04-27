@@ -1,122 +1,52 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Fri, 27 Apr 2018 10:49:05 +0900
-Subject: [PATCH v2 2/2] pinctrl: uniphier: add LD11 MPEG2-TS I/O pin-mux
- settings
-In-Reply-To: <20180427014905.19520-1-suzuki.katsuhiro@socionext.com>
-References: <20180427014905.19520-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20180427014905.19520-2-suzuki.katsuhiro@socionext.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 26 Apr 2018 20:58:01 -0500
+Subject: [PATCH 4/4] ARM: davinci: board-omapl138-hawk: fix GPIO numbers
+ for MMC/SD lookup
+In-Reply-To: <20180424143506.25793-5-nsekhar@ti.com>
+References: <20180424143506.25793-1-nsekhar@ti.com>
+ <20180424143506.25793-5-nsekhar@ti.com>
+Message-ID: <2b4b0262-0383-7512-4db1-d4f69170c429@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MPEG2-TS input/output core both accepts serial TS and parallel TS.
+On 04/24/2018 09:35 AM, Sekhar Nori wrote:
+> commit c4dc56be7e26 ("ARM: davinci: fix the GPIO lookup for omapl138-hawk")
+> fixed the GPIO chip name for look-up of MMC/SD CD and WP pins, but forgot
+> to change the GPIO numbers passed.
+> 
+> The GPIO numbers are not offsets from within a 32 GPIO bank. Fix the
+> GPIO numbers as well as remove the misleading comment.
+> 
+> Fixes: c4dc56be7e26 ("ARM: davinci: fix the GPIO lookup for omapl138-hawk")
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+>   arch/arm/mach-davinci/board-omapl138-hawk.c | 10 +++++++---
+>   1 file changed, 7 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> index 0d32042b728f..be8b892a6ea7 100644
+> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> @@ -123,12 +123,16 @@ static const short hawk_mmcsd0_pins[] = {
+>   	-1
+>   };
+>   
+> +#define DA850_HAWK_MMCSD_CD_PIN		GPIO_TO_PIN(3, 12)
+> +#define DA850_HAWK_MMCSD_WP_PIN		GPIO_TO_PIN(3, 13)
+> +
+>   static struct gpiod_lookup_table mmc_gpios_table = {
+>   	.dev_id = "da830-mmc.0",
+>   	.table = {
+> -		/* CD: gpio3_12: gpio60: chip 1 contains gpio range 32-63*/
+> -		GPIO_LOOKUP("davinci_gpio.0", 28, "cd", GPIO_ACTIVE_LOW),
+> -		GPIO_LOOKUP("davinci_gpio.0", 29, "wp", GPIO_ACTIVE_LOW),
+> +		GPIO_LOOKUP("davinci_gpio.0", DA850_HAWK_MMCSD_CD_PIN, "cd",
+> +			    GPIO_ACTIVE_LOW),
+> +		GPIO_LOOKUP("davinci_gpio.0", DA850_HAWK_MMCSD_WP_PIN, "wp",
+> +			    GPIO_ACTIVE_LOW),
+>   	},
+>   };
+>   
+> 
 
-The serial TS interface uses following pins:
-  hscin0_s : HS0DOUT[0-3]
-  hscin1_s : HS0DOUT[4-7]
-  hscin2_s : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN0
-  hscout0_s: HS0DOUT[0-3]
-  hscout1_s: HS0DOUT[4-7]
-
-And the parallel TS interface uses following pins:
-  hscin0_p : HS0BCLKIN, HS0SYNCIN, HS0VALIN, HS0DIN[0-7]
-  hscin1_p : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN[0-7]
-  hscout0_p: HS0BCLKOUT, HS0SYNCOUT, HS0VALOUT, HS0DOUT[0-7]
-
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-
----
-
-Changes in v2:
-
-  - Fix indent
-  - Sort alphabetically
-  - Fix wrong grouping
-    - Fix hsc'out'0_ci -> hsc'in'0_ci of hscin0 group
-    - Fix hscin'0'_s -> hscin'1'_s of hscin1 group
----
- .../pinctrl/uniphier/pinctrl-uniphier-ld11.c  | 49 +++++++++++++++++++
- 1 file changed, 49 insertions(+)
-
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-index 0976fbfecd50..58825f68b58b 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-@@ -481,6 +481,31 @@ static const int emmc_dat8_muxvals[] = {0, 0, 0, 0};
- static const unsigned ether_rmii_pins[] = {6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
- 					   16, 17};
- static const int ether_rmii_muxvals[] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
-+static const unsigned hscin0_ci_pins[] = {102, 103, 104, 105, 106, 107, 108,
-+					  109, 110, 111, 112};
-+static const int hscin0_ci_muxvals[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-+static const unsigned hscin0_p_pins[] = {102, 103, 104, 105, 106, 107, 108, 109,
-+					 110, 111, 112};
-+static const int hscin0_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-+static const unsigned hscin0_s_pins[] = {116, 117, 118, 119};
-+static const int hscin0_s_muxvals[] = {3, 3, 3, 3};
-+static const unsigned hscin1_p_pins[] = {124, 125, 126, 127, 128, 129, 130, 131,
-+					 132, 133, 134};
-+static const int hscin1_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-+static const unsigned hscin1_s_pins[] = {120, 121, 122, 123};
-+static const int hscin1_s_muxvals[] = {3, 3, 3, 3};
-+static const unsigned hscin2_s_pins[] = {124, 125, 126, 127};
-+static const int hscin2_s_muxvals[] = {3, 3, 3, 3};
-+static const unsigned hscout0_ci_pins[] = {113, 114, 115, 116, 117, 118, 119,
-+					   120, 121, 122, 123};
-+static const int hscout0_ci_muxvals[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-+static const unsigned hscout0_p_pins[] = {113, 114, 115, 116, 117, 118, 119,
-+					  120, 121, 122, 123};
-+static const int hscout0_p_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-+static const unsigned hscout0_s_pins[] = {116, 117, 118, 119};
-+static const int hscout0_s_muxvals[] = {4, 4, 4, 4};
-+static const unsigned hscout1_s_pins[] = {120, 121, 122, 123};
-+static const int hscout1_s_muxvals[] = {4, 4, 4, 4};
- static const unsigned i2c0_pins[] = {63, 64};
- static const int i2c0_muxvals[] = {0, 0};
- static const unsigned i2c1_pins[] = {65, 66};
-@@ -556,6 +581,16 @@ static const struct uniphier_pinctrl_group uniphier_ld11_groups[] = {
- 	UNIPHIER_PINCTRL_GROUP(emmc),
- 	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
- 	UNIPHIER_PINCTRL_GROUP(ether_rmii),
-+	UNIPHIER_PINCTRL_GROUP(hscin0_ci),
-+	UNIPHIER_PINCTRL_GROUP(hscin0_p),
-+	UNIPHIER_PINCTRL_GROUP(hscin0_s),
-+	UNIPHIER_PINCTRL_GROUP(hscin1_p),
-+	UNIPHIER_PINCTRL_GROUP(hscin1_s),
-+	UNIPHIER_PINCTRL_GROUP(hscin2_s),
-+	UNIPHIER_PINCTRL_GROUP(hscout0_ci),
-+	UNIPHIER_PINCTRL_GROUP(hscout0_p),
-+	UNIPHIER_PINCTRL_GROUP(hscout0_s),
-+	UNIPHIER_PINCTRL_GROUP(hscout1_s),
- 	UNIPHIER_PINCTRL_GROUP(i2c0),
- 	UNIPHIER_PINCTRL_GROUP(i2c1),
- 	UNIPHIER_PINCTRL_GROUP(i2c3),
-@@ -583,6 +618,15 @@ static const char * const aout1_groups[] = {"aout1"};
- static const char * const aoutiec1_groups[] = {"aoutiec1"};
- static const char * const emmc_groups[] = {"emmc", "emmc_dat8"};
- static const char * const ether_rmii_groups[] = {"ether_rmii"};
-+static const char * const hscin0_groups[] = {"hscin0_ci",
-+					     "hscin0_p",
-+					     "hscin0_s"};
-+static const char * const hscin1_groups[] = {"hscin1_p", "hscin1_s"};
-+static const char * const hscin2_groups[] = {"hscin2_s"};
-+static const char * const hscout0_groups[] = {"hscout0_ci",
-+					      "hscout0_p",
-+					      "hscout0_s"};
-+static const char * const hscout1_groups[] = {"hscout1_s"};
- static const char * const i2c0_groups[] = {"i2c0"};
- static const char * const i2c1_groups[] = {"i2c1"};
- static const char * const i2c3_groups[] = {"i2c3"};
-@@ -603,6 +647,11 @@ static const struct uniphier_pinmux_function uniphier_ld11_functions[] = {
- 	UNIPHIER_PINMUX_FUNCTION(aoutiec1),
- 	UNIPHIER_PINMUX_FUNCTION(emmc),
- 	UNIPHIER_PINMUX_FUNCTION(ether_rmii),
-+	UNIPHIER_PINMUX_FUNCTION(hscin0),
-+	UNIPHIER_PINMUX_FUNCTION(hscin1),
-+	UNIPHIER_PINMUX_FUNCTION(hscin2),
-+	UNIPHIER_PINMUX_FUNCTION(hscout0),
-+	UNIPHIER_PINMUX_FUNCTION(hscout1),
- 	UNIPHIER_PINMUX_FUNCTION(i2c0),
- 	UNIPHIER_PINMUX_FUNCTION(i2c1),
- 	UNIPHIER_PINMUX_FUNCTION(i2c3),
--- 
-2.17.0
+Reviewed-by: David Lechner <david@lechnology.com>
