@@ -1,36 +1,46 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Apr 2018 09:35:50 -0500
-Subject: [PATCH v4 1/7] dt-bindings: display: Document the EDT et*
- displays in one file.
-In-Reply-To: <20180427132445.3458-2-jan.tuerk@emtrion.com>
-References: <20180420125108.14197-1-jan.tuerk@emtrion.com>
- <20180427132445.3458-1-jan.tuerk@emtrion.com>
- <20180427132445.3458-2-jan.tuerk@emtrion.com>
-Message-ID: <20180427143550.yzc3rnunjeudevhi@rob-hp-laptop>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Apr 2018 15:37:20 +0100
+Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
+ driver
+In-Reply-To: <20180427081525.f9dcc756678baf3bb6e6e473@arm.com>
+References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
+ <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
+ <20180426170624.bfcba885431d57d0de2a3ddd@arm.com>
+ <20180427093027.ngtuoezyh6mtz26p@lakrids.cambridge.arm.com>
+ <20180427081525.f9dcc756678baf3bb6e6e473@arm.com>
+Message-ID: <20180427143719.GA5093@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 03:24:36PM +0200, jan.tuerk at emtrion.com wrote:
-> From: Jan Tuerk <jan.tuerk@emtrion.com>
+On Fri, Apr 27, 2018 at 08:15:25AM -0500, Kim Phillips wrote:
+> On Fri, 27 Apr 2018 10:30:27 +0100
+> Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Apr 26, 2018 at 05:06:24PM -0500, Kim Phillips wrote:
+> > > On Wed, 25 Apr 2018 14:30:47 +0530
+> > > Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com> wrote:
+> > > 
+> > > > +static int thunderx2_uncore_event_init(struct perf_event *event)
+> > 
+> > > This PMU driver can be made more user-friendly by not just silently
+> > > returning an error code such as -EINVAL, but by emitting a useful
+> > > message describing the specific error via dmesg.
+> > 
+> > As has previously been discussed on several occasions, patches which log
+> > to dmesg in a pmu::event_init() path at any level above pr_debug() are
+> > not acceptable -- dmesg is not intended as a mechanism to inform users
+> > of driver-specific constraints.
 > 
-> Document the Emerging Display Technology Corp. (EDT) using the
-> simple-panel binding in one single file.
+> I disagree - drivers do it all the time, using dev_err(), dev_warn(), etc.
 > 
-> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
-> ---
-> Changes for v4:
->   - re-arrange the Patch-series to match the DT-submitting-patches
->   - Additional patch for the Documentation of the new DT-bindings
->   - no change (re-arranged 3/6 => 1/7)
+> > I would appreciate if in future you could qualify your suggestion with
+> > the requirement that pr_debug() is used.
 > 
->  .../bindings/display/panel/edt,et-series.txt       | 39 ++++++++++++++++++++++
->  .../bindings/display/panel/edt,et057090dhu.txt     |  7 ----
->  .../bindings/display/panel/edt,et070080dh6.txt     | 10 ------
->  .../bindings/display/panel/edt,etm0700g0dh6.txt    | 10 ------
->  4 files changed, 39 insertions(+), 27 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/edt,et-series.txt
->  delete mode 100644 Documentation/devicetree/bindings/display/panel/edt,et057090dhu.txt
->  delete mode 100644 Documentation/devicetree/bindings/display/panel/edt,et070080dh6.txt
->  delete mode 100644 Documentation/devicetree/bindings/display/panel/edt,etm0700g0dh6.txt
+> It shouldn't - the driver isn't being debugged, it's in regular use.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+For anything under drivers/perf/, I'd prefer not to have these prints
+and instead see efforts to improve error reporting via the perf system
+call interface.
+
+Anyway, I think this driver has bigger problems that need addressing.
+
+Will
