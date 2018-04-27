@@ -1,69 +1,52 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Sat, 28 Apr 2018 00:42:52 +0200
-Subject: [PATCH v2] arm64: export tishift functions to modules
-In-Reply-To: <20180426083147.GB27583@arm.com>
-References: <20180426083147.GB27583@arm.com>
-Message-ID: <20180427224252.6970-1-Jason@zx2c4.com>
+From: rishabhb@codeaurora.org (rishabhb at codeaurora.org)
+Date: Fri, 27 Apr 2018 15:57:02 -0700
+Subject: [PATCH v5 1/2] dt-bindings: Documentation for qcom, llcc
+In-Reply-To: <20180427142144.tvy5xamuwz6jnxk5@rob-hp-laptop>
+References: <1524524972-12014-1-git-send-email-rishabhb@codeaurora.org>
+ <1524524972-12014-2-git-send-email-rishabhb@codeaurora.org>
+ <20180427142144.tvy5xamuwz6jnxk5@rob-hp-laptop>
+Message-ID: <b458e2bf5b23a4af996e80d81ceabaa4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise modules that use these arithmetic operations will fail to
-link. We accomplish this with the usual EXPORT_SYMBOL, which on most
-architectures goes in the .S file but the ARM64 maintainers prefer that
-insead it goes into arm64ksyms.
+On 2018-04-27 07:21, Rob Herring wrote:
+> On Mon, Apr 23, 2018 at 04:09:31PM -0700, Rishabh Bhatnagar wrote:
+>> Documentation for last level cache controller device tree bindings,
+>> client bindings usage examples.
+>> 
+>> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+>> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 60 
+>> ++++++++++++++++++++++
+>>  1 file changed, 60 insertions(+)
+>>  create mode 100644 
+>> Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+> 
+> My comments on v4 still apply.
+> 
+> Rob
 
-While we're at it, we also fix this up to use SPDX, and I personally
-choose to relicense this as GPL2||BSD so that these symbols don't need
-to be export_symbol_gpl, so all modules can use the routines, since
-these are important general purpose compiler-generated function calls.
+Hi Rob,
+Reposting our replies to your comments on v4:
 
-Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
-Reported-by: PaX Team <pageexec@freemail.hu>
-Cc: stable at vger.kernel.org
----
- arch/arm64/kernel/arm64ksyms.c |  8 ++++++++
- arch/arm64/lib/tishift.S       | 15 ++-------------
- 2 files changed, 10 insertions(+), 13 deletions(-)
+This is partially true, a bunch of SoCs would support this design but
+clients IDs are not expected to change. So Ideally client drivers could
+hard code these IDs.
 
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 66be504edb6c..d894a20b70b2 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -75,3 +75,11 @@ NOKPROBE_SYMBOL(_mcount);
- 	/* arm-smccc */
- EXPORT_SYMBOL(__arm_smccc_smc);
- EXPORT_SYMBOL(__arm_smccc_hvc);
-+
-+	/* tishift.S */
-+extern long long __ashlti3(long long a, int b);
-+EXPORT_SYMBOL(__ashlti3);
-+extern long long __ashrti3(long long a, int b);
-+EXPORT_SYMBOL(__ashrti3);
-+extern long long __lshrti3(long long a, int b);
-+EXPORT_SYMBOL(__lshrti3);
-diff --git a/arch/arm64/lib/tishift.S b/arch/arm64/lib/tishift.S
-index d3db9b2cd479..0fdff97794de 100644
---- a/arch/arm64/lib/tishift.S
-+++ b/arch/arm64/lib/tishift.S
-@@ -1,17 +1,6 @@
--/*
-- * Copyright (C) 2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-+/* SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-  */
- 
- #include <linux/linkage.h>
--- 
-2.17.0
+However I have other concerns of moving the client Ids in the driver.
+The way the APIs implemented today are as follows:
+#1. Client calls into system cache driver to get cache slice handle
+with the usecase Id as input.
+#2. System cache driver gets the phandle of system cache instance from
+the client device to obtain the private data.
+#3. Based on the usecase Id perform look up in the private data to get
+cache slice handle.
+#4. Return the cache slice handle to client
+
+If we don't have the connection between client & system cache then the
+  private data needs to declared as static global in the system cache 
+driver,
+that limits us to have just once instance of system cache block.
+
+Please let us know what you think.
