@@ -1,91 +1,54 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 27 Apr 2018 16:35:02 +0100
-Subject: [PATCH v3 04/12] ACPI / APEI: Switch NOTIFY_SEA to use the estatus
- queue
+Date: Fri, 27 Apr 2018 16:35:01 +0100
+Subject: [PATCH v3 03/12] ACPI / APEI: don't wait to serialise with oops
+ messages when panic()ing
 In-Reply-To: <20180427153510.5799-1-james.morse@arm.com>
 References: <20180427153510.5799-1-james.morse@arm.com>
-Message-ID: <20180427153510.5799-5-james.morse@arm.com>
+Message-ID: <20180427153510.5799-4-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the estatus queue can be used by more than one notification
-method, we can move notifications that have NMI-like behaviour over to
-it, and start abstracting GHES's single in_nmi() path.
+oops_begin() exists to group printk() messages with the oops message
+printed by die(). To reach this caller we know that platform firmware
+took this error first, then notified the OS via NMI with a 'panic'
+severity.
 
-Switch NOTIFY_SEA over to use the estatus queue. This makes it behave
-in the same way as x86's NOTIFY_NMI.
+Don't wait for another CPU to release the die-lock before we can
+panic(), our only goal is to print this fatal error and panic().
 
+This code is always called in_nmi(), and since 42a0bb3f7138 ("printk/nmi:
+generic solution for safe printk in NMI"), it has been safe to call
+printk() from this context. Messages are batched in a per-cpu buffer
+and printed via irq-work, or a call back from panic().
+
+Link: https://patchwork.kernel.org/patch/10313555/
+Acked-by: Borislav Petkov <bp@suse.de>
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
 ---
- drivers/acpi/apei/ghes.c | 23 +++++++++++------------
- 1 file changed, 11 insertions(+), 12 deletions(-)
+ drivers/acpi/apei/ghes.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index ed8ad9898365..1859f27c37ff 100644
+index c8a6c5b0516e..ed8ad9898365 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -58,6 +58,10 @@
+@@ -33,7 +33,6 @@
+ #include <linux/interrupt.h>
+ #include <linux/timer.h>
+ #include <linux/cper.h>
+-#include <linux/kdebug.h>
+ #include <linux/platform_device.h>
+ #include <linux/mutex.h>
+ #include <linux/ratelimit.h>
+@@ -758,9 +757,6 @@ static int _in_nmi_notify_one(struct ghes *ghes)
  
- #define GHES_PFX	"GHES: "
- 
-+#if defined(CONFIG_HAVE_ACPI_APEI_NMI) || defined(CONFIG_ACPI_APEI_SEA)
-+#define WANT_NMI_ESTATUS_QUEUE	1
-+#endif
-+
- #define GHES_ESTATUS_MAX_SIZE		65536
- #define GHES_ESOURCE_PREALLOC_MAX_SIZE	65536
- 
-@@ -681,7 +685,7 @@ static void ghes_estatus_cache_add(
- 	rcu_read_unlock();
- }
- 
--#ifdef CONFIG_HAVE_ACPI_APEI_NMI
-+#ifdef WANT_NMI_ESTATUS_QUEUE
- /*
-  * Handlers for CPER records may not be NMI safe. For example,
-  * memory_failure_queue() takes spinlocks and calls schedule_work_on().
-@@ -861,7 +865,7 @@ static void ghes_nmi_init_cxt(void)
- 
- #else
- static inline void ghes_nmi_init_cxt(void) { }
--#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
-+#endif /* WANT_NMI_ESTATUS_QUEUE */
- 
- static int ghes_ack_error(struct acpi_hest_generic_v2 *gv2)
- {
-@@ -977,20 +981,13 @@ static LIST_HEAD(ghes_sea);
-  */
- int ghes_notify_sea(void)
- {
--	struct ghes *ghes;
--	int ret = -ENOENT;
--
--	rcu_read_lock();
--	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
--		if (!ghes_proc(ghes))
--			ret = 0;
--	}
--	rcu_read_unlock();
--	return ret;
-+	return ghes_estatus_queue_notified(&ghes_sea);
- }
- 
- static void ghes_sea_add(struct ghes *ghes)
- {
-+	ghes_estatus_queue_grow_pool(ghes);
-+
- 	mutex_lock(&ghes_list_mutex);
- 	list_add_rcu(&ghes->list, &ghes_sea);
- 	mutex_unlock(&ghes_list_mutex);
-@@ -1002,6 +999,8 @@ static void ghes_sea_remove(struct ghes *ghes)
- 	list_del_rcu(&ghes->list);
- 	mutex_unlock(&ghes_list_mutex);
- 	synchronize_rcu();
-+
-+	ghes_estatus_queue_shrink_pool(ghes);
- }
- #else /* CONFIG_ACPI_APEI_SEA */
- static inline void ghes_sea_add(struct ghes *ghes) { }
+ 	sev = ghes_severity(ghes->estatus->error_severity);
+ 	if (sev >= GHES_SEV_PANIC) {
+-#ifdef CONFIG_X86
+-		oops_begin();
+-#endif
+ 		ghes_print_queued_estatus();
+ 		__ghes_panic(ghes);
+ 	}
 -- 
 2.16.2
