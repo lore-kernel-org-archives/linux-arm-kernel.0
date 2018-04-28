@@ -1,39 +1,47 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 28 Apr 2018 08:44:04 +0200
-Subject: [PATCH] ARM: BCM5301X: Fix NAND ECC parameters for Linksys
- Panamera
-In-Reply-To: <CAChtp74P5iXZjtooR5e1PgmNYU7qD07GSyKo9GV-3ObR1zGvHw@mail.gmail.com>
-References: <20180310171244.70299-1-npcomplete13@gmail.com>
- <CACna6rz1TeRbPq-60HkHz9A0TDn+iXtmXniE6FCiANpUmV-qrw@mail.gmail.com>
- <20180311100313.znonhesgh462rz65@osboxes>
- <2ef6e4fc-cce7-372e-e35f-578fd6ada9ca@gmail.com>
- <20180313010210.ws4dugy3rrpqwzmk@osboxes>
- <00df9ee9-2bd2-ad2b-fdf8-682efdb9a4d1@gmail.com>
- <20180427140542.c3t5taztkciimfny@osboxes>
- <CAChtp74P5iXZjtooR5e1PgmNYU7qD07GSyKo9GV-3ObR1zGvHw@mail.gmail.com>
-Message-ID: <CACna6rzxXt-v=kwMHsBSmALDEJrN27OTRN9WAyPoc1FkjwxAhg@mail.gmail.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Sat, 28 Apr 2018 09:28:47 +0200
+Subject: [PATCH 3/6] PCI: Introduce devm_of_pci_get_host_bridge_resources
+In-Reply-To: <20180427222427.GB73638@bhelgaas-glaptop.roam.corp.google.com>
+References: <cover.1524582822.git.jan.kiszka@siemens.com>
+ <e387d04ea235c9a4879a897bb730adc383a96635.1524582822.git.jan.kiszka@siemens.com>
+ <20180427222427.GB73638@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <869a8ad9-dd2f-8462-c0c4-2d8a62d74185@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 April 2018 at 06:19, Vivek Unune <npcomplete13@gmail.com> wrote:
-> On Fri, Apr 27, 2018 at 10:05 AM, Vivek Unune <npcomplete13@gmail.com> wrote:
->> On Wed, Apr 25, 2018 at 11:02:04AM +0200, Rafa? Mi?ecki wrote:
->>>
->>> The easiest solution: ignore all these "error -74 (ECC error) while
->>> reading" errors (they may last for few minutes!). I believe UBI should
->>> simply recreate all pages it couldn't access and once you wait long
->>> enough, all your NAND flash will be using BCH8.
+On 2018-04-28 00:24, Bjorn Helgaas wrote:
+> On Tue, Apr 24, 2018 at 05:13:39PM +0200, Jan Kiszka wrote:
+>> From: Jan Kiszka <jan.kiszka@siemens.com>
 >>
->> Let me build the firmware with BCH-8 and wait it out. I'll report back my
->> results.
->
-> I can confirm that BCH-8 indeed works after letting it run through those
-> ECC errors.
->
-> Thanks!
+>> of_pci_get_host_bridge_resources allocates the resource structures it
+>> fills dynamically, but none of its callers care to release them so far.
+>> Rather than requiring everyone to do this explicitly, introduce a
+>> managed version of that service. This differs API-wise only in taking a
+>> reference to the associated device, rather than to the device tree node.
+>>
+>> As of_pci_get_host_bridge_resources is an exported interface, we cannot
+>> simply drop it at this point. After converting all in-tree users to the
+>> new API, we could phase out the unmanaged one over some grace period.
+> 
+> It looks like it might be possible to split this into three or four
+> patches:
+> 
+>   1) Factor __of_pci_get_host_bridge_resources() out of
+>      of_pci_get_host_bridge_resources()
+> 
+>   2) Add struct device * argument
+> 
+>   3) Convert pr_info() to dev_info()
+> 
+>   4) Add devm_of_pci_get_host_bridge_resources()
 
-Great, thanks! That controller behavior (reading BCH8 fine while
-working in BCH4 mode) is really confusing.
+Will do. I'm even considering
+
+5) mark of_pci_get_host_bridge_resources() __deprecated, due to the leak
+   and no remaining in-tree user - what do you think?
+
+Jan
 
 -- 
-Rafa?
+Siemens AG, Corporate Technology, CT RDA IOT SES-DE
+Corporate Competence Center Embedded Linux
