@@ -1,213 +1,45 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Sat, 28 Apr 2018 10:21:11 +0000
-Subject: [PATCH v2 2/2] net: stmmac: dwmac-meson: extend phy mode setting
-In-Reply-To: <20180428102111.18384-1-yixun.lan@amlogic.com>
-References: <20180428102111.18384-1-yixun.lan@amlogic.com>
-Message-ID: <20180428102111.18384-3-yixun.lan@amlogic.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 28 Apr 2018 10:34:46 +0800
+Subject: [PATCH v4 0/7] Add basic support for emtrion emCON-MX6 modules
+In-Reply-To: <20180427132445.3458-1-jan.tuerk@emtrion.com>
+References: <20180420125108.14197-1-jan.tuerk@emtrion.com>
+ <20180427132445.3458-1-jan.tuerk@emtrion.com>
+Message-ID: <20180428023445.GA3693@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  In the Meson-AXG SoC, the phy mode setting of PRG_ETH0 in the glue layer
-is extended from bit[0] to bit[2:0].
-  There is no problem if we configure it to the RGMII 1000M PHY mode,
-since the register setting is coincidentally compatible with previous one,
-but for the RMII 100M PHY mode, the configuration need to be changed to
-value - b100.
-  This patch was verified with a RTL8201F 100M ethernet PHY.
+On Fri, Apr 27, 2018 at 03:24:35PM +0200, jan.tuerk at emtrion.com wrote:
+> From: Jan Tuerk <jan.tuerk@emtrion.com>
+> 
+> Changes for v4:
+>   - re-arrange the Patch-series to match the DT-submitting-patches
+>   - Additional patch for the Documentation of the new DT-bindings
+> 
+> [PATCH v4 1/7] dt-bindings: display: Document the EDT et* displays in one file.
+>   - no change (re-arranged 3/6 => 1/7)
+> 
+> [PATCH v4 2/7] drm/panel: Add support for the EDT ETM0700G0BDH6
+>   - no change (re-arranged 1/6 => 2/7)
+> 
+> [PATCH v4 3/7] drm/panel: Add support for the EDT ETM0700G0EDH6
+>   - no change (re-arranged 2/6 => 3/7)
 
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- .../ethernet/stmicro/stmmac/dwmac-meson8b.c   | 120 +++++++++++++++---
- 1 file changed, 104 insertions(+), 16 deletions(-)
+Please split the series into two, DRM driver (above) and platform part
+(below), to avoid posting one part over and over again with zero
+changes, but only because the other part needs update.
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-index 7cb794094a70..4ff231df7322 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-@@ -18,6 +18,7 @@
- #include <linux/io.h>
- #include <linux/ioport.h>
- #include <linux/module.h>
-+#include <linux/of_device.h>
- #include <linux/of_net.h>
- #include <linux/mfd/syscon.h>
- #include <linux/platform_device.h>
-@@ -29,6 +30,10 @@
- 
- #define PRG_ETH0_RGMII_MODE		BIT(0)
- 
-+#define PRG_ETH0_EXT_PHY_MODE_MASK	GENMASK(2, 0)
-+#define PRG_ETH0_EXT_RGMII_MODE		1
-+#define PRG_ETH0_EXT_RMII_MODE		4
-+
- /* mux to choose between fclk_div2 (bit unset) and mpll2 (bit set) */
- #define PRG_ETH0_CLK_M250_SEL_SHIFT	4
- #define PRG_ETH0_CLK_M250_SEL_MASK	GENMASK(4, 4)
-@@ -47,12 +52,20 @@
- 
- #define MUX_CLK_NUM_PARENTS		2
- 
-+struct meson8b_dwmac;
-+
-+struct meson8b_dwmac_data {
-+	int (*set_phy_mode)(struct meson8b_dwmac *dwmac);
-+};
-+
- struct meson8b_dwmac {
--	struct device		*dev;
--	void __iomem		*regs;
--	phy_interface_t		phy_mode;
--	struct clk		*rgmii_tx_clk;
--	u32			tx_delay_ns;
-+	struct device			*dev;
-+	void __iomem			*regs;
-+
-+	const struct meson8b_dwmac_data	*data;
-+	phy_interface_t			phy_mode;
-+	struct clk			*rgmii_tx_clk;
-+	u32				tx_delay_ns;
- };
- 
- struct meson8b_dwmac_clk_configs {
-@@ -171,6 +184,59 @@ static int meson8b_init_rgmii_tx_clk(struct meson8b_dwmac *dwmac)
- 	return 0;
- }
- 
-+static int meson8b_set_phy_mode(struct meson8b_dwmac *dwmac)
-+{
-+	switch (dwmac->phy_mode) {
-+	case PHY_INTERFACE_MODE_RGMII:
-+	case PHY_INTERFACE_MODE_RGMII_RXID:
-+	case PHY_INTERFACE_MODE_RGMII_ID:
-+	case PHY_INTERFACE_MODE_RGMII_TXID:
-+		/* enable RGMII mode */
-+		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
-+					PRG_ETH0_RGMII_MODE,
-+					PRG_ETH0_RGMII_MODE);
-+		break;
-+	case PHY_INTERFACE_MODE_RMII:
-+		/* disable RGMII mode -> enables RMII mode */
-+		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
-+					PRG_ETH0_RGMII_MODE, 0);
-+		break;
-+	default:
-+		dev_err(dwmac->dev, "fail to set phy-mode %s\n",
-+			phy_modes(dwmac->phy_mode));
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int meson_axg_set_phy_mode(struct meson8b_dwmac *dwmac)
-+{
-+	switch (dwmac->phy_mode) {
-+	case PHY_INTERFACE_MODE_RGMII:
-+	case PHY_INTERFACE_MODE_RGMII_RXID:
-+	case PHY_INTERFACE_MODE_RGMII_ID:
-+	case PHY_INTERFACE_MODE_RGMII_TXID:
-+		/* enable RGMII mode */
-+		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
-+					PRG_ETH0_EXT_PHY_MODE_MASK,
-+					PRG_ETH0_EXT_RGMII_MODE);
-+		break;
-+	case PHY_INTERFACE_MODE_RMII:
-+		/* disable RGMII mode -> enables RMII mode */
-+		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
-+					PRG_ETH0_EXT_PHY_MODE_MASK,
-+					PRG_ETH0_EXT_RMII_MODE);
-+		break;
-+	default:
-+		dev_err(dwmac->dev, "fail to set phy-mode %s\n",
-+			phy_modes(dwmac->phy_mode));
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- {
- 	int ret;
-@@ -188,10 +254,6 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- 
- 	case PHY_INTERFACE_MODE_RGMII_ID:
- 	case PHY_INTERFACE_MODE_RGMII_TXID:
--		/* enable RGMII mode */
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_RGMII_MODE,
--					PRG_ETH0_RGMII_MODE);
--
- 		/* only relevant for RMII mode -> disable in RGMII mode */
- 		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
- 					PRG_ETH0_INVERTED_RMII_CLK, 0);
-@@ -224,10 +286,6 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- 		break;
- 
- 	case PHY_INTERFACE_MODE_RMII:
--		/* disable RGMII mode -> enables RMII mode */
--		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_RGMII_MODE,
--					0);
--
- 		/* invert internal clk_rmii_i to generate 25/2.5 tx_rx_clk */
- 		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
- 					PRG_ETH0_INVERTED_RMII_CLK,
-@@ -274,6 +332,11 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
- 		goto err_remove_config_dt;
- 	}
- 
-+	dwmac->data = (const struct meson8b_dwmac_data *)
-+		of_device_get_match_data(&pdev->dev);
-+	if (!dwmac->data)
-+		return -EINVAL;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
- 	dwmac->regs = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(dwmac->regs)) {
-@@ -298,6 +361,10 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_remove_config_dt;
- 
-+	ret = dwmac->data->set_phy_mode(dwmac);
-+	if (ret)
-+		goto err_remove_config_dt;
-+
- 	ret = meson8b_init_prg_eth(dwmac);
- 	if (ret)
- 		goto err_remove_config_dt;
-@@ -316,10 +383,31 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
-+static const struct meson8b_dwmac_data meson8b_dwmac_data = {
-+	.set_phy_mode = meson8b_set_phy_mode,
-+};
-+
-+static const struct meson8b_dwmac_data meson_axg_dwmac_data = {
-+	.set_phy_mode = meson_axg_set_phy_mode,
-+};
-+
- static const struct of_device_id meson8b_dwmac_match[] = {
--	{ .compatible = "amlogic,meson8b-dwmac" },
--	{ .compatible = "amlogic,meson8m2-dwmac" },
--	{ .compatible = "amlogic,meson-gxbb-dwmac" },
-+	{
-+		.compatible = "amlogic,meson8b-dwmac",
-+		.data = &meson8b_dwmac_data,
-+	},
-+	{
-+		.compatible = "amlogic,meson8m2-dwmac",
-+		.data = &meson8b_dwmac_data,
-+	},
-+	{
-+		.compatible = "amlogic,meson-gxbb-dwmac",
-+		.data = &meson8b_dwmac_data,
-+	},
-+	{
-+		.compatible = "amlogic,meson-axg-dwmac",
-+		.data = &meson_axg_dwmac_data,
-+	},
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, meson8b_dwmac_match);
--- 
-2.17.0
+Shawn
+
+> 
+> [PATCH v4 4/7] ARM: dts: imx: Add an cpu0 label for imx6dl devices.
+>   - no change
+> 
+> [PATCH v4 5/7] dt-bindings: arm: Document emtrion emCON-MX6 bindings
+>   - separate patch for the emtrion emCON-MX6 DT-bindings
+> 
+> [PATCH v4 6/7] ARM: dts: Add support for emtrion emCON-MX6 series
+>   - alphabetically sort the DT
+>   - moved duplicated Avari baseboard code into separate file.
+> 
+> [PATCH v4 7/7] ARM: imx_v6_v7_defconfig: Enable DA0963 PMIC support.
+>   - unchaged
