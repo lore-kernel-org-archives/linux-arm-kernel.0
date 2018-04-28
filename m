@@ -1,82 +1,50 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 28 Apr 2018 16:18:22 +0100
-Subject: [PATCH 1/3] dt-bindings: iio: stm32-adc: add support for STM32MP1.
-In-Reply-To: <ee92eb8d-9675-3c94-1c0d-f6e8f091d878@st.com>
-References: <1524065874-434-1-git-send-email-fabrice.gasnier@st.com>
- <1524065874-434-2-git-send-email-fabrice.gasnier@st.com>
- <20180424162721.qbfsc7j3syzzykeh@rob-hp-laptop>
- <ee92eb8d-9675-3c94-1c0d-f6e8f091d878@st.com>
-Message-ID: <20180428161822.6100bb07@archlinux>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 29 Apr 2018 00:47:00 +0900
+Subject: [GIT PULL] ARM: uniphier: fixes for v4.17
+Message-ID: <CAK7LNASuFh4wcSJ7HTW-+ZQCjZWt0QtjrOQQogoqzbM2W9n+nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Apr 2018 09:22:02 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+Hi Arnd, Olof,
 
-> On 04/24/2018 06:27 PM, Rob Herring wrote:
-> > On Wed, Apr 18, 2018 at 05:37:52PM +0200, Fabrice Gasnier wrote:  
-> >> Document support for STM32MP1 ADC. It's quite similar to STM32H7 ADC.
-> >> Introduce "st,stm32mp1-adc" compatible to handle variants of this
-> >> hardware such as vregready flag, interrupts, clock rate.
-> >>
-> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 +++++-
-> >>  1 file changed, 5 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> >> index e8bb824..9994384 100644
-> >> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> >> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> >> @@ -24,8 +24,11 @@ Required properties:
-> >>  - compatible: Should be one of:
-> >>    "st,stm32f4-adc-core"
-> >>    "st,stm32h7-adc-core"
-> >> +  "st,stm32mp1-adc-core"
-> >>  - reg: Offset and length of the ADC block register set.
-> >> -- interrupts: Must contain the interrupt for ADC block.
-> >> +- interrupts: One or more interrupts for ADC block. Some parts like stm32f4
-> >> +  and stm32h7 share a common ADC interrupt line. stm32mp1 has separate
-> >> +  lines for each ADC within ADC block.  
-> > 
-> > How many interrupt lines is that?  
-> 
-> Hi Rob, Jonathan,
-> 
-> I should have mentioned this: stm32mp1 has two separate interrupt lines
-> for each ADC within ADC block.
-> 
-> Do you wish I send a V2 for this ? Or a patch to fix this ?
-Hmm. I haven't pushed this out as non rebasing so I'll revert this
-and the associated support so you can clean this corner up.
+Please pull some fixes of ARM UniPhier DT.
 
-So please send a V2.
 
-Thanks,
 
-Jonathan
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-> 
-> Please let me know,
-> BR,
-> Fabrice
-> 
-> >   
-> >>  - clocks: Core can use up to two clocks, depending on part used:
-> >>    - "adc" clock: for the analog circuitry, common to all ADCs.
-> >>      It's required on stm32f4.
-> >> @@ -53,6 +56,7 @@ Required properties:
-> >>  - compatible: Should be one of:
-> >>    "st,stm32f4-adc"
-> >>    "st,stm32h7-adc"
-> >> +  "st,stm32mp1-adc"
-> >>  - reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
-> >>  - clocks: Input clock private to this ADC instance. It's required only on
-> >>    stm32f4, that has per instance clock input for registers access.
-> >> -- 
-> >> 1.9.1
-> >>  
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+tags/uniphier-fixes-v4.17
+
+for you to fetch changes up to 8b82b66e68b32dd8e22a04db6a0494bfdd65156f:
+
+  arm64: dts: uniphier: stabilize ethernet of LD20 reference board
+(2018-04-29 00:33:42 +0900)
+
+----------------------------------------------------------------
+UniPhier ARM SoC fixes for v4.17
+
+- Fix input delay parameter of eMMC PHY
+- Weaken drive-strength of ethernet PHY pins of LD20 reference board
+
+----------------------------------------------------------------
+Masahiro Yamada (2):
+      arm64: dts: uniphier: fix input delay value for legacy mode of eMMC
+      arm64: dts: uniphier: stabilize ethernet of LD20 reference board
+
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi    | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 8 ++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi    | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi    | 2 +-
+ 4 files changed, 11 insertions(+), 3 deletions(-)
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
