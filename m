@@ -1,31 +1,19 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 28 Apr 2018 14:38:38 +0200
-Subject: [PATCH v2] i2c: at91: Read all available bytes at once
-In-Reply-To: <20180426095314.12758-1-david.engraf@sysgo.com>
-References: <20180426082558.GX13305@rfolt0960.corp.atmel.com>
- <20180426095314.12758-1-david.engraf@sysgo.com>
-Message-ID: <20180428123838.abxiht7k4egv7iel@ninjato>
+Date: Sat, 28 Apr 2018 14:44:07 +0200
+Subject: [RFC 05/10] i2c: s3c2410: Remove support for Exynos5440
+In-Reply-To: <20180424203239.21885-6-krzk@kernel.org>
+References: <20180424203239.21885-1-krzk@kernel.org>
+ <20180424203239.21885-6-krzk@kernel.org>
+Message-ID: <20180428124407.bpc47bo7ojebahpz@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 11:53:14AM +0200, David Engraf wrote:
-> With FIFO enabled it is possible to read multiple bytes
-> at once in the interrupt handler as long as RXRDY is
-> set. This may also reduce the number of interrupts.
+On Tue, Apr 24, 2018 at 10:32:34PM +0200, Krzysztof Kozlowski wrote:
+> The Exynos5440 is not actively developed, there are no development
+> boards available and probably there are no real products with it.
+> Remove wide-tree support for Exynos5440.
 > 
-> This patch polls RXRDY and reads all available bytes at
-> once.
-> 
-> Signed-off-by: David Engraf <david.engraf@sysgo.com>
-
-checkpatch said twice:
-
-WARNING: line over 80 characters
-
-While I am not super-strict with this limit, it makes sense here IMO.
-The comment stays readable, and we don't even lose a line.
-
-Fixed it this time for you.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
 Applied to for-next, thanks!
 
@@ -35,4 +23,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180428/2eee6e2b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180428/957a4be4/attachment-0001.sig>
