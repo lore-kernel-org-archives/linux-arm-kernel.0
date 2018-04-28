@@ -1,27 +1,33 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Sat, 28 Apr 2018 10:21:09 +0000
-Subject: [PATCH v2 0/2] net: stmmac: dwmac-meson: 100M phy mode support for
+Date: Sat, 28 Apr 2018 10:21:10 +0000
+Subject: [PATCH v2 1/2] dt-bindings: net: meson-dwmac: new compatible name for
  AXG SoC
-Message-ID: <20180428102111.18384-1-yixun.lan@amlogic.com>
+In-Reply-To: <20180428102111.18384-1-yixun.lan@amlogic.com>
+References: <20180428102111.18384-1-yixun.lan@amlogic.com>
+Message-ID: <20180428102111.18384-2-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the dwmac glue layer register changed, we need to 
-introduce a new compatible name for the Meson-AXG SoC
-to support for the RMII 100M ethernet PHY.
+We need to introduce a new compatible name for the Meson-AXG SoC
+in order to support the RMII 100M ethernet PHY, since the PRG_ETH0
+register of the dwmac glue layer is changed from previous old SoC.
 
-Change since v1 at [1]:
-  - implement set_phy_mode() for each SoC
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ Documentation/devicetree/bindings/net/meson-dwmac.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-[1] https://lkml.kernel.org/r/20180426160508.29380-1-yixun.lan at amlogic.com
-
-Yixun Lan (2):
-  dt-bindings: net: meson-dwmac: new compatible name for AXG SoC
-  net: stmmac: dwmac-meson: extend phy mode setting
-
- .../devicetree/bindings/net/meson-dwmac.txt   |   1 +
- .../ethernet/stmicro/stmmac/dwmac-meson8b.c   | 120 +++++++++++++++---
- 2 files changed, 105 insertions(+), 16 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/net/meson-dwmac.txt b/Documentation/devicetree/bindings/net/meson-dwmac.txt
+index 61cada22ae6c..1321bb194ed9 100644
+--- a/Documentation/devicetree/bindings/net/meson-dwmac.txt
++++ b/Documentation/devicetree/bindings/net/meson-dwmac.txt
+@@ -11,6 +11,7 @@ Required properties on all platforms:
+ 			- "amlogic,meson8b-dwmac"
+ 			- "amlogic,meson8m2-dwmac"
+ 			- "amlogic,meson-gxbb-dwmac"
++			- "amlogic,meson-axg-dwmac"
+ 		Additionally "snps,dwmac" and any applicable more
+ 		detailed version number described in net/stmmac.txt
+ 		should be used.
 -- 
 2.17.0
