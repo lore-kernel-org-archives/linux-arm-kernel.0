@@ -1,45 +1,76 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 28 Apr 2018 10:34:46 +0800
-Subject: [PATCH v4 0/7] Add basic support for emtrion emCON-MX6 modules
-In-Reply-To: <20180427132445.3458-1-jan.tuerk@emtrion.com>
-References: <20180420125108.14197-1-jan.tuerk@emtrion.com>
- <20180427132445.3458-1-jan.tuerk@emtrion.com>
-Message-ID: <20180428023445.GA3693@dragon>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 27 Apr 2018 20:05:16 -0700
+Subject: [PATCH v2] init: Fix false positives in W+X checking
+In-Reply-To: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
+References: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
+Message-ID: <CAGXu5jKL2AqVhQ7ghVuBTVh9aWBbu8iWn0GPf=nhKi8_QbwTkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 03:24:35PM +0200, jan.tuerk at emtrion.com wrote:
-> From: Jan Tuerk <jan.tuerk@emtrion.com>
-> 
-> Changes for v4:
->   - re-arrange the Patch-series to match the DT-submitting-patches
->   - Additional patch for the Documentation of the new DT-bindings
-> 
-> [PATCH v4 1/7] dt-bindings: display: Document the EDT et* displays in one file.
->   - no change (re-arranged 3/6 => 1/7)
-> 
-> [PATCH v4 2/7] drm/panel: Add support for the EDT ETM0700G0BDH6
->   - no change (re-arranged 1/6 => 2/7)
-> 
-> [PATCH v4 3/7] drm/panel: Add support for the EDT ETM0700G0EDH6
->   - no change (re-arranged 2/6 => 3/7)
+On Fri, Apr 27, 2018 at 2:55 PM, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
+> load_module() creates W+X mappings via __vmalloc_node_range() (from
+> layout_and_allocate()->move_module()->module_alloc()) by using
+> PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
+> "call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
+>
+> This is a problem because call_rcu_sched() queues work, which can be run
+> after debug_checkwx() is run, resulting in a race condition.  If hit, the
+> race results in a nasty splat about insecure W+X mappings, which results
+> in a poor user experience as these are not the mappings that
+> debug_checkwx() is intended to catch.
+>
+> This issue is observed on multiple arm64 platforms, and has been
+> artificially triggered on an x86 platform.
+>
+> Address the race by flushing the queued work before running the
+> arch-defined mark_rodata_ro() which then calls debug_checkwx().
+>
+> Reported-by: Timur Tabi <timur@codeaurora.org>
+> Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
+> Fixes: e1a58320a38d ("x86/mm: Warn on W^X mappings")
+> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
 
-Please split the series into two, DRM driver (above) and platform part
-(below), to avoid posting one part over and over again with zero
-changes, but only because the other part needs update.
+Acked-by: Kees Cook <keescook@chromium.org>
 
-Shawn
+-Kees
 
-> 
-> [PATCH v4 4/7] ARM: dts: imx: Add an cpu0 label for imx6dl devices.
->   - no change
-> 
-> [PATCH v4 5/7] dt-bindings: arm: Document emtrion emCON-MX6 bindings
->   - separate patch for the emtrion emCON-MX6 DT-bindings
-> 
-> [PATCH v4 6/7] ARM: dts: Add support for emtrion emCON-MX6 series
->   - alphabetically sort the DT
->   - moved duplicated Avari baseboard code into separate file.
-> 
-> [PATCH v4 7/7] ARM: imx_v6_v7_defconfig: Enable DA0963 PMIC support.
->   - unchaged
+> ---
+>
+> v1:
+> -was "arm64: mm: Fix false positives in W+X checking" (see [1])
+> -moved to common code based on review and confirmation of issue on x86
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573776.html
+>
+>  init/main.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/init/main.c b/init/main.c
+> index b795aa3..499d957 100644
+> --- a/init/main.c
+> +++ b/init/main.c
+> @@ -1034,6 +1034,13 @@ static int __init set_debug_rodata(char *str)
+>  static void mark_readonly(void)
+>  {
+>         if (rodata_enabled) {
+> +               /*
+> +                * load_module() results in W+X mappings, which are cleaned up
+> +                * with call_rcu_sched().  Let's make sure that queued work is
+> +                * flushed so that we don't hit false positives looking for
+> +                * insecure pages which are W+X.
+> +                */
+> +               rcu_barrier_sched();
+>                 mark_rodata_ro();
+>                 rodata_test();
+>         } else
+> --
+> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+
+
+
+-- 
+Kees Cook
+Pixel Security
