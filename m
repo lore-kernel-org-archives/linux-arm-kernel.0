@@ -1,68 +1,39 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Sat, 28 Apr 2018 08:14:01 +0200
-Subject: [PATCH v2] init: Fix false positives in W+X checking
-In-Reply-To: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
-References: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
-Message-ID: <20180428061401.oj4tytn6yy277f7y@gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sat, 28 Apr 2018 08:44:04 +0200
+Subject: [PATCH] ARM: BCM5301X: Fix NAND ECC parameters for Linksys
+ Panamera
+In-Reply-To: <CAChtp74P5iXZjtooR5e1PgmNYU7qD07GSyKo9GV-3ObR1zGvHw@mail.gmail.com>
+References: <20180310171244.70299-1-npcomplete13@gmail.com>
+ <CACna6rz1TeRbPq-60HkHz9A0TDn+iXtmXniE6FCiANpUmV-qrw@mail.gmail.com>
+ <20180311100313.znonhesgh462rz65@osboxes>
+ <2ef6e4fc-cce7-372e-e35f-578fd6ada9ca@gmail.com>
+ <20180313010210.ws4dugy3rrpqwzmk@osboxes>
+ <00df9ee9-2bd2-ad2b-fdf8-682efdb9a4d1@gmail.com>
+ <20180427140542.c3t5taztkciimfny@osboxes>
+ <CAChtp74P5iXZjtooR5e1PgmNYU7qD07GSyKo9GV-3ObR1zGvHw@mail.gmail.com>
+Message-ID: <CACna6rzxXt-v=kwMHsBSmALDEJrN27OTRN9WAyPoc1FkjwxAhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 28 April 2018 at 06:19, Vivek Unune <npcomplete13@gmail.com> wrote:
+> On Fri, Apr 27, 2018 at 10:05 AM, Vivek Unune <npcomplete13@gmail.com> wrote:
+>> On Wed, Apr 25, 2018 at 11:02:04AM +0200, Rafa? Mi?ecki wrote:
+>>>
+>>> The easiest solution: ignore all these "error -74 (ECC error) while
+>>> reading" errors (they may last for few minutes!). I believe UBI should
+>>> simply recreate all pages it couldn't access and once you wait long
+>>> enough, all your NAND flash will be using BCH8.
+>>
+>> Let me build the firmware with BCH-8 and wait it out. I'll report back my
+>> results.
+>
+> I can confirm that BCH-8 indeed works after letting it run through those
+> ECC errors.
+>
+> Thanks!
 
-* Jeffrey Hugo <jhugo@codeaurora.org> wrote:
+Great, thanks! That controller behavior (reading BCH8 fine while
+working in BCH4 mode) is really confusing.
 
-> load_module() creates W+X mappings via __vmalloc_node_range() (from
-> layout_and_allocate()->move_module()->module_alloc()) by using
-> PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
-> "call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
-> 
-> This is a problem because call_rcu_sched() queues work, which can be run
-> after debug_checkwx() is run, resulting in a race condition.  If hit, the
-> race results in a nasty splat about insecure W+X mappings, which results
-> in a poor user experience as these are not the mappings that
-> debug_checkwx() is intended to catch.
-> 
-> This issue is observed on multiple arm64 platforms, and has been
-> artificially triggered on an x86 platform.
-> 
-> Address the race by flushing the queued work before running the
-> arch-defined mark_rodata_ro() which then calls debug_checkwx().
-> 
-> Reported-by: Timur Tabi <timur@codeaurora.org>
-> Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
-> Fixes: e1a58320a38d ("x86/mm: Warn on W^X mappings")
-> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
-> ---
-> 
-> v1:
-> -was "arm64: mm: Fix false positives in W+X checking" (see [1])
-> -moved to common code based on review and confirmation of issue on x86
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573776.html
-> 
->  init/main.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/init/main.c b/init/main.c
-> index b795aa3..499d957 100644
-> --- a/init/main.c
-> +++ b/init/main.c
-> @@ -1034,6 +1034,13 @@ static int __init set_debug_rodata(char *str)
->  static void mark_readonly(void)
->  {
->  	if (rodata_enabled) {
-> +		/*
-> +		 * load_module() results in W+X mappings, which are cleaned up
-> +		 * with call_rcu_sched().  Let's make sure that queued work is
-> +		 * flushed so that we don't hit false positives looking for
-> +		 * insecure pages which are W+X.
-> +		 */
-> +		rcu_barrier_sched();
-
-I'd suggest adding a matching comment to the module loading portion as well,
-to make sure this connection does not get lost. With that:
-
-Acked-by: Ingo Molnar <mingo@kernel.org>
-
-Thanks,
-
-	Ingo
+-- 
+Rafa?
