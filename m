@@ -1,269 +1,68 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 27 Apr 2018 22:42:48 -0700
-Subject: [PATCH v2 2/2] arm64: dts: qcom: msm8998: Add rpm and regulators for
- MTP
-In-Reply-To: <20180428054248.22387-1-bjorn.andersson@linaro.org>
-References: <20180428054248.22387-1-bjorn.andersson@linaro.org>
-Message-ID: <20180428054248.22387-2-bjorn.andersson@linaro.org>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Sat, 28 Apr 2018 08:14:01 +0200
+Subject: [PATCH v2] init: Fix false positives in W+X checking
+In-Reply-To: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
+References: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
+Message-ID: <20180428061401.oj4tytn6yy277f7y@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the rpm and rpm regulators to the msm8998 platform and mtp.
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi | 142 ++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8998.dtsi     |  83 +++++++++++++++++
- 2 files changed, 225 insertions(+)
+* Jeffrey Hugo <jhugo@codeaurora.org> wrote:
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi b/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi
-index e30c95f63a05..4780751b560e 100644
---- a/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi
-@@ -18,3 +18,145 @@
- 		status = "okay";
- 	};
- };
-+
-+&rpm_glink {
-+	rpm_requests {
-+		pm8998-regulators {
-+			s2 {
-+				regulator-min-microvolt = <1128000>;
-+				regulator-max-microvolt = <1128000>;
-+			};
-+			s3 {
-+				regulator-min-microvolt = <1352000>;
-+				regulator-max-microvolt = <1352000>;
-+			};
-+			s4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+			s5 {
-+				regulator-min-microvolt = <1904000>;
-+				regulator-max-microvolt = <2040000>;
-+			};
-+			s7 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1028000>;
-+			};
-+			s8 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <800000>;
-+			};
-+			l1 {
-+				regulator-min-microvolt = <880000>;
-+				regulator-max-microvolt = <880000>;
-+			};
-+			l2 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+			l3 {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+			};
-+			l5 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <800000>;
-+			};
-+			l6 {
-+				regulator-min-microvolt = <1808000>;
-+				regulator-max-microvolt = <1808000>;
-+			};
-+			l7 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+			l8 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+			l9 {
-+				regulator-min-microvolt = <1808000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l10 {
-+				regulator-min-microvolt = <1808000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l11 {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+			};
-+			l12 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+			l13 {
-+				regulator-min-microvolt = <1808000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l14 {
-+				regulator-min-microvolt = <1880000>;
-+				regulator-max-microvolt = <1880000>;
-+			};
-+			l15 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+			l16 {
-+				regulator-min-microvolt = <2704000>;
-+				regulator-max-microvolt = <2704000>;
-+			};
-+			l17 {
-+				regulator-min-microvolt = <1304000>;
-+				regulator-max-microvolt = <1304000>;
-+			};
-+			l18 {
-+				regulator-min-microvolt = <2704000>;
-+				regulator-max-microvolt = <2704000>;
-+			};
-+			l19 {
-+				regulator-min-microvolt = <3008000>;
-+				regulator-max-microvolt = <3008000>;
-+			};
-+			l20 {
-+				regulator-min-microvolt = <2960000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l21 {
-+				regulator-min-microvolt = <2960000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l22 {
-+				regulator-min-microvolt = <2864000>;
-+				regulator-max-microvolt = <2864000>;
-+			};
-+			l23 {
-+				regulator-min-microvolt = <3312000>;
-+				regulator-max-microvolt = <3312000>;
-+			};
-+			l24 {
-+				regulator-min-microvolt = <3088000>;
-+				regulator-max-microvolt = <3088000>;
-+			};
-+			l25 {
-+				regulator-min-microvolt = <3104000>;
-+				regulator-max-microvolt = <3312000>;
-+			};
-+			l26 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+			l28 {
-+				regulator-min-microvolt = <3008000>;
-+				regulator-max-microvolt = <3008000>;
-+			};
-+		};
-+
-+		pmi8998-regulators {
-+			bob {
-+				regulator-min-microvolt = <3312000>;
-+				regulator-max-microvolt = <3600000>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
-index d6665e4f801f..ccbf6347aacb 100644
---- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
-@@ -220,6 +220,16 @@
- 		method = "smc";
- 	};
- 
-+	rpm_glink: rpm-glink {
-+		compatible = "qcom,glink-rpm";
-+
-+		interrupts = <GIC_SPI 168 IRQ_TYPE_EDGE_RISING>;
-+
-+		qcom,rpm-msg-ram = <&rpm_msg_ram>;
-+
-+		mboxes = <&apcs_glb 0>;
-+	};
-+
- 	soc: soc {};
- };
- 
-@@ -337,4 +347,77 @@
- 		#interrupt-cells = <4>;
- 		cell-index = <0>;
- 	};
-+
-+	rpm_msg_ram: memory at 68000 {
-+		compatible = "qcom,rpm-msg-ram";
-+		reg = <0x778000 0x7000>;
-+	};
-+
-+	apcs_glb: mailbox at 9820000 {
-+		compatible = "qcom,msm8998-apcs-hmss-global";
-+		reg = <0x17911000 0x1000>;
-+
-+		#mbox-cells = <1>;
-+	};
-+};
-+
-+&rpm_glink {
-+	rpm_requests {
-+		compatible = "qcom,rpm-msm8998";
-+		qcom,glink-channels = "rpm_requests";
-+
-+		pm8998-regulators {
-+			compatible = "qcom,rpm-pm8998-regulators";
-+
-+			pm8998_s1: s1 {};
-+			pm8998_s2: s2 {};
-+			pm8998_s3: s3 {};
-+			pm8998_s4: s4 {};
-+			pm8998_s5: s5 {};
-+			pm8998_s6: s6 {};
-+			pm8998_s7: s7 {};
-+			pm8998_s8: s8 {};
-+			pm8998_s9: s9 {};
-+			pm8998_s10: s10 {};
-+			pm8998_s11: s11 {};
-+			pm8998_s12: s12 {};
-+			pm8998_s13: s13 {};
-+			pm8998_l1: l1 {};
-+			pm8998_l2: l2 {};
-+			pm8998_l3: l3 {};
-+			pm8998_l4: l4 {};
-+			pm8998_l5: l5 {};
-+			pm8998_l6: l6 {};
-+			pm8998_l7: l7 {};
-+			pm8998_l8: l8 {};
-+			pm8998_l9: l9 {};
-+			pm8998_l10: l10 {};
-+			pm8998_l11: l11 {};
-+			pm8998_l12: l12 {};
-+			pm8998_l13: l13 {};
-+			pm8998_l14: l14 {};
-+			pm8998_l15: l15 {};
-+			pm8998_l16: l16 {};
-+			pm8998_l17: l17 {};
-+			pm8998_l18: l18 {};
-+			pm8998_l19: l19 {};
-+			pm8998_l20: l20 {};
-+			pm8998_l21: l21 {};
-+			pm8998_l22: l22 {};
-+			pm8998_l23: l23 {};
-+			pm8998_l24: l24 {};
-+			pm8998_l25: l25 {};
-+			pm8998_l26: l26 {};
-+			pm8998_l27: l27 {};
-+			pm8998_l28: l28 {};
-+			pm8998_lvs1: lvs1 {};
-+			pm8998_lvs2: lvs2 {};
-+		};
-+
-+		pmi8998-regulators {
-+			compatible = "qcom,rpm-pmi8998-regulators";
-+
-+			pmi8998_bob: bob {};
-+		};
-+	};
- };
--- 
-2.16.2
+> load_module() creates W+X mappings via __vmalloc_node_range() (from
+> layout_and_allocate()->move_module()->module_alloc()) by using
+> PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
+> "call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
+> 
+> This is a problem because call_rcu_sched() queues work, which can be run
+> after debug_checkwx() is run, resulting in a race condition.  If hit, the
+> race results in a nasty splat about insecure W+X mappings, which results
+> in a poor user experience as these are not the mappings that
+> debug_checkwx() is intended to catch.
+> 
+> This issue is observed on multiple arm64 platforms, and has been
+> artificially triggered on an x86 platform.
+> 
+> Address the race by flushing the queued work before running the
+> arch-defined mark_rodata_ro() which then calls debug_checkwx().
+> 
+> Reported-by: Timur Tabi <timur@codeaurora.org>
+> Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
+> Fixes: e1a58320a38d ("x86/mm: Warn on W^X mappings")
+> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
+> ---
+> 
+> v1:
+> -was "arm64: mm: Fix false positives in W+X checking" (see [1])
+> -moved to common code based on review and confirmation of issue on x86
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573776.html
+> 
+>  init/main.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/init/main.c b/init/main.c
+> index b795aa3..499d957 100644
+> --- a/init/main.c
+> +++ b/init/main.c
+> @@ -1034,6 +1034,13 @@ static int __init set_debug_rodata(char *str)
+>  static void mark_readonly(void)
+>  {
+>  	if (rodata_enabled) {
+> +		/*
+> +		 * load_module() results in W+X mappings, which are cleaned up
+> +		 * with call_rcu_sched().  Let's make sure that queued work is
+> +		 * flushed so that we don't hit false positives looking for
+> +		 * insecure pages which are W+X.
+> +		 */
+> +		rcu_barrier_sched();
+
+I'd suggest adding a matching comment to the module loading portion as well,
+to make sure this connection does not get lost. With that:
+
+Acked-by: Ingo Molnar <mingo@kernel.org>
+
+Thanks,
+
+	Ingo
