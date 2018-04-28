@@ -1,99 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 28 Apr 2018 21:42:30 +0800
-Subject: [linux-sunxi] Re: [PATCH 1/5] dt-bindings: allow dwmac-sun8i to
- use other devices' exported regmap
-In-Reply-To: <04C9F795-2680-4220-A39A-7B7D5FD74C4A@aosc.io>
-References: <20180411141641.14675-1-icenowy@aosc.io>
- <20180411141641.14675-2-icenowy@aosc.io>
- <20180416184745.tqxyvojtcbage4fu@rob-hp-laptop>
- <04C9F795-2680-4220-A39A-7B7D5FD74C4A@aosc.io>
-Message-ID: <CAGb2v64LcyfffBFfrnUd5XOyA1POphMMgEXLoTiTQAc9tjpzgw@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 28 Apr 2018 16:07:06 +0100
+Subject: [PATCH 6/7] iio: adc: stm32-dfsdm: add check on max filter id
+In-Reply-To: <1519390261-25453-7-git-send-email-fabrice.gasnier@st.com>
+References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
+ <1519390261-25453-7-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180428160706.2aafad5b@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Fri, 23 Feb 2018 13:51:00 +0100
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-On Tue, Apr 17, 2018 at 7:17 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
->
->
-> ? 2018?4?17? GMT+08:00 ??2:47:45, Rob Herring <robh@kernel.org> ??:
->>On Wed, Apr 11, 2018 at 10:16:37PM +0800, Icenowy Zheng wrote:
->>> On some Allwinner SoCs the EMAC clock register needed by dwmac-sun8i
->>is
->>> in another device's memory space. In this situation dwmac-sun8i can
->>use
->>> a regmap exported by the other device with only the EMAC clock
->>register.
->>
->>If this is a clock, then why not use the clock binding?
->
-> EMAC clock register is only the datasheet name. It contains
-> MII mode selection and delay chain configuration.
+> reg property should be checked against number of available filters.
+> BTW, dfsdm->num_fls wasn't used. But it can be used for this purpose.
+> This prevents using data out of allocated dfsdm->fl_list array.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Applied to the togreg branch of iio.git and pushed out as testing for
+the autobuilders to play with it.
 
-As Icenowy already mentioned, this is likely a misnomer.
+Thanks,
 
-The register contains controls on how to route the TX and RX clock
-lines, and also what interface mode to use. The former includes things
-like the delays mentioned in the device tree binding, and also whether
-to invert the signals or not. The latter influences whether the TXC
-line is an input or an output (or maybe what decoding module to send
-all the signals to). On the H3/H5, it even contains controls for the
-embedded PHY.
+Jonathan
 
-The settings only make sense to the MAC. To expose it as a generic
-clock line would not be a good fit. You can look at what we did for
-sun7i-a20-gmac, which is not pretty. All other DWMAC platforms that
-were introduced after sun7i-a20-gmac also use a syscon, instead of
-clocks, even though they probably cover the same set of RXC/TXC
-controls.
-
-ChenYu
-
->>
->>>
->>> Document this situation in the dwmac-sun8i device tree binding
->>> documentation.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> ---
->>>  Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 5 +++--
->>>  1 file changed, 3 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
->>b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
->>> index 3d6d5fa0c4d5..0c5f63a80617 100644
->>> --- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
->>> +++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
->>> @@ -20,8 +20,9 @@ Required properties:
->>>  - phy-handle: See ethernet.txt
->>>  - #address-cells: shall be 1
->>>  - #size-cells: shall be 0
->>> -- syscon: A phandle to the syscon of the SoC with one of the
->>following
->>> - compatible string:
->>> +- syscon: A phandle to a device which exports the EMAC clock
->>register as a
->>> + regmap or to the syscon of the SoC with one of the following
->>compatible
->>> + string:
->>>    - allwinner,sun8i-h3-system-controller
->>>    - allwinner,sun8i-v3s-system-controller
->>>    - allwinner,sun50i-a64-system-controller
->>> --
->>> 2.15.1
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe devicetree"
->>in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>_______________________________________________
->>linux-arm-kernel mailing list
->>linux-arm-kernel at lists.infradead.org
->>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> ---
+>  drivers/iio/adc/stm32-dfsdm-adc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
+> index 57bcb45..1b78bec 100644
+> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
+> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+> @@ -1111,8 +1111,8 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
+>  	platform_set_drvdata(pdev, adc);
+>  
+>  	ret = of_property_read_u32(dev->of_node, "reg", &adc->fl_id);
+> -	if (ret != 0) {
+> -		dev_err(dev, "Missing reg property\n");
+> +	if (ret != 0 || adc->fl_id >= adc->dfsdm->num_fls) {
+> +		dev_err(dev, "Missing or bad reg property\n");
+>  		return -EINVAL;
+>  	}
+>  
