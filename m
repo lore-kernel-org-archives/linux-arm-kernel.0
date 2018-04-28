@@ -1,44 +1,95 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Sat, 28 Apr 2018 12:50:31 +0200
-Subject: [PATCH 13/17] dt-bindings/interrupt-controller: update Marvell
- ICU bindings
-In-Reply-To: <20180428124204.3f305405@xps13>
-References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
- <20180421135537.24716-14-miquel.raynal@bootlin.com>
- <20180427204723.hz2ef5f7fhaid3aj@rob-hp-laptop>
- <20180428124204.3f305405@xps13>
-Message-ID: <20180428125031.6f46c448@windsurf>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Sat, 28 Apr 2018 13:07:14 +0200
+Subject: [PATCH 17/27] dt-bindings: ap806: add the thermal node in the
+ syscon file
+In-Reply-To: <20180427210722.obyujepjvqc5hwcd@rob-hp-laptop>
+References: <20180421151255.29929-1-miquel.raynal@bootlin.com>
+ <20180421151255.29929-18-miquel.raynal@bootlin.com>
+ <20180427210722.obyujepjvqc5hwcd@rob-hp-laptop>
+Message-ID: <20180428130714.3ee3883b@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Rob,
 
-On Sat, 28 Apr 2018 12:42:04 +0200, Miquel Raynal wrote:
+On Fri, 27 Apr 2018 16:07:22 -0500, Rob Herring <robh@kernel.org> wrote:
 
-> On Fri, 27 Apr 2018 15:47:23 -0500, Rob Herring <robh@kernel.org> wrote:
-> 
-> > On Sat, Apr 21, 2018 at 03:55:33PM +0200, Miquel Raynal wrote:  
-> > > Change the documentation to reflect the new bindings used for Marvell
-> > > ICU. This involves describing each interrupt group as a subnode of the
-> > > ICU node. Each of them having their own compatible.    
+> On Sat, Apr 21, 2018 at 05:12:45PM +0200, Miquel Raynal wrote:
+> > Explain the thermal bindings now that the thermal IP is described being
+> > inside of a system controller. Add a reference to the thermal-zone node.
 > > 
-> > Why?
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > ---
+> >  .../arm/marvell/ap806-system-controller.txt        | 43 ++++++++++++++++++++++
+> >  1 file changed, 43 insertions(+)
 > > 
-> > This breaks compatibility.  
+> > diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+> > index a856eb9a4e05..c95f3ac5c728 100644
+> > --- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+> > +++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+> > @@ -11,6 +11,9 @@ For the top level node:
+> >   - compatible: must be: "syscon", "simple-mfd";
+> >   - reg: register area of the AP806 system controller
+> >  
+> > +SYSTEM CONTROLLER 0
+> > +===================
+> > +
+> >  Clocks:
+> >  -------
+> >  
+> > @@ -98,3 +101,43 @@ ap_syscon: system-controller at 6f4000 {
+> >  		gpio-ranges = <&ap_pinctrl 0 0 19>;
+> >  	};
+> >  };
+> > +
+> > +SYSTEM CONTROLLER 1
+> > +===================
+> > +
+> > +Thermal:
+> > +--------
+> > +
+> > +For common binding part and usage, refer to
+> > +Documentation/devicetree/bindings/thermal/thermal.txt
+> > +
+> > +The thermal IP can probe the temperature all around the processor. It
+> > +may feature several channels, each of them wired to one sensor.
+> > +
+> > +It is possible to setup an overheat interrupt by giving at least one
+> > +critical point to any subnode of the thermal-zone node.
+> > +
+> > +Required properties:
+> > +- compatible: "marvell,armada-ap806-thermal"
+> > +
+> > +Optional properties:
+> > +- interrupt-parent/interrupts: overheat interrupt handle. Should point to
+> > +  line 18 of the SEI irqchip.
+> > +  See interrupt-controller/interrupts.txt
+> > +- #thermal-sensor-cells: shall be <1> when thermal-zones subnodes refer
+> > +  to this IP and represents the channel ID. There is one sensor per
+> > +  channel. O refers to the thermal IP internal channel, while positive
+> > +  IDs refer to each CPU.
+> > +
+> > +Example:
+> > +ap_syscon1: system-controller at 6f8000 {
+> > +	compatible = "syscon", "simple-mfd";
+> > +	reg = <0x6f8000 0x1000>;
+> > +
+> > +	ap_thermal: ap-thermal {
+> > +		compatible = "marvell,armada-ap806-thermal";  
 > 
-> It does indeed.
+> Is there a register range associated with the thermal functions?
 
-Well, yes and no: your driver supports both the old and new binding, so
-the compatibility is not broken. So, yes the binding is changed in an
-incompatible way, but the driver continues to support the old binding.
+Yes, I will add it.
 
-Perhaps the binding documentation should continue to document the
-legacy binding, mark it as still supported but deprecated.
+Thanks,
+Miqu?l
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> 
+> > +		interrupt-parent = <&sei>;
+> > +		interrupts = <18>;
+> > +		#thermal-sensor-cells = <1>;
+> > +	};
+> > +};
+> > -- 
+> > 2.14.1
+> >   
