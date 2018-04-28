@@ -1,63 +1,52 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Sat, 28 Apr 2018 17:45:26 +0800
-Subject: [PATCH v9 02/11] kexec_file: make
- kexec_image_post_load_cleanup_default() global
-In-Reply-To: <20180425062629.29404-3-takahiro.akashi@linaro.org>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-3-takahiro.akashi@linaro.org>
-Message-ID: <20180428094526.GA2854@dhcp-128-65.nay.redhat.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Sat, 28 Apr 2018 12:42:04 +0200
+Subject: [PATCH 13/17] dt-bindings/interrupt-controller: update Marvell
+ ICU bindings
+In-Reply-To: <20180427204723.hz2ef5f7fhaid3aj@rob-hp-laptop>
+References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
+ <20180421135537.24716-14-miquel.raynal@bootlin.com>
+ <20180427204723.hz2ef5f7fhaid3aj@rob-hp-laptop>
+Message-ID: <20180428124204.3f305405@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/18 at 03:26pm, AKASHI Takahiro wrote:
-> Change this function from static to global so that arm64 can implement
-> its own arch_kimage_file_post_load_cleanup() later using
-> kexec_image_post_load_cleanup_default().
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Dave Young <dyoung@redhat.com>
-> Cc: Vivek Goyal <vgoyal@redhat.com>
-> Cc: Baoquan He <bhe@redhat.com>
-> ---
->  include/linux/kexec.h | 1 +
->  kernel/kexec_file.c   | 2 +-
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-> index 9e4e638fb505..49ab758f4d91 100644
-> --- a/include/linux/kexec.h
-> +++ b/include/linux/kexec.h
-> @@ -143,6 +143,7 @@ extern const struct kexec_file_ops * const kexec_file_loaders[];
->  
->  int kexec_image_probe_default(struct kimage *image, void *buf,
->  			      unsigned long buf_len);
-> +int kexec_image_post_load_cleanup_default(struct kimage *image);
->  
->  /**
->   * struct kexec_buf - parameters for finding a place for a buffer in memory
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 75d8e7cf040e..eef89d9b1f03 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -78,7 +78,7 @@ void * __weak arch_kexec_kernel_image_load(struct kimage *image)
->  	return kexec_image_load_default(image);
->  }
->  
-> -static int kexec_image_post_load_cleanup_default(struct kimage *image)
-> +int kexec_image_post_load_cleanup_default(struct kimage *image)
->  {
->  	if (!image->fops || !image->fops->cleanup)
->  		return 0;
-> -- 
-> 2.17.0
-> 
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
+Hi Rob,
 
-Acked-by: Dave Young <dyoung@redhat.com>
+On Fri, 27 Apr 2018 15:47:23 -0500, Rob Herring <robh@kernel.org> wrote:
 
-Thanks
-Dave
+> On Sat, Apr 21, 2018 at 03:55:33PM +0200, Miquel Raynal wrote:
+> > Change the documentation to reflect the new bindings used for Marvell
+> > ICU. This involves describing each interrupt group as a subnode of the
+> > ICU node. Each of them having their own compatible.  
+> 
+> Why?
+> 
+> This breaks compatibility.
+
+It does indeed.
+
+The problem comes from the inability to handle multiple MSI parents
+for one device and the fact that the API was not designed in this way
+at all. I would not risk myself to explain the MSI arcana but I suggest
+you to have a look at this thread which led to this series:
+
+https://www.spinics.net/lists/arm-kernel/msg645115.html
+
+Of course I am open to suggestions.
+
+Thanks,
+Miqu?l
+ 
+> 
+> > 
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > ---
+> >  .../bindings/interrupt-controller/marvell,icu.txt  | 60 ++++++++++++++++------
+> >  1 file changed, 43 insertions(+), 17 deletions(-)  
+
+
+
+-- 
+Miquel Raynal, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
