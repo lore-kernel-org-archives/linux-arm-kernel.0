@@ -1,37 +1,63 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Sat, 28 Apr 2018 11:02:17 +0200
-Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
-In-Reply-To: <1524839460.2693.531.camel@hpe.com>
-References: <20180314180155.19492-1-toshi.kani@hpe.com>
- <20180314180155.19492-3-toshi.kani@hpe.com>
- <20180426141926.GN15462@8bytes.org>
- <1524759629.2693.465.camel@hpe.com>
- <20180426172327.GQ15462@8bytes.org>
- <1524764948.2693.478.camel@hpe.com>
- <20180426200737.GS15462@8bytes.org>
- <1524781764.2693.503.camel@hpe.com>
- <20180427073719.GT15462@8bytes.org>
- <1524839460.2693.531.camel@hpe.com>
-Message-ID: <20180428090217.n2l3w4vobmtkvz6k@8bytes.org>
+From: dyoung@redhat.com (Dave Young)
+Date: Sat, 28 Apr 2018 17:45:26 +0800
+Subject: [PATCH v9 02/11] kexec_file: make
+ kexec_image_post_load_cleanup_default() global
+In-Reply-To: <20180425062629.29404-3-takahiro.akashi@linaro.org>
+References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
+ <20180425062629.29404-3-takahiro.akashi@linaro.org>
+Message-ID: <20180428094526.GA2854@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 02:31:51PM +0000, Kani, Toshi wrote:
-> So, we can add the step 2 on top of this patch.
->  1. Clear pud/pmd entry.
->  2. System wide TLB flush <-- TO BE ADDED BY NEW PATCH
->  3. Free its underlining pmd/pte page.
+On 04/25/18 at 03:26pm, AKASHI Takahiro wrote:
+> Change this function from static to global so that arm64 can implement
+> its own arch_kimage_file_post_load_cleanup() later using
+> kexec_image_post_load_cleanup_default().
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Dave Young <dyoung@redhat.com>
+> Cc: Vivek Goyal <vgoyal@redhat.com>
+> Cc: Baoquan He <bhe@redhat.com>
+> ---
+>  include/linux/kexec.h | 1 +
+>  kernel/kexec_file.c   | 2 +-
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+> index 9e4e638fb505..49ab758f4d91 100644
+> --- a/include/linux/kexec.h
+> +++ b/include/linux/kexec.h
+> @@ -143,6 +143,7 @@ extern const struct kexec_file_ops * const kexec_file_loaders[];
+>  
+>  int kexec_image_probe_default(struct kimage *image, void *buf,
+>  			      unsigned long buf_len);
+> +int kexec_image_post_load_cleanup_default(struct kimage *image);
+>  
+>  /**
+>   * struct kexec_buf - parameters for finding a place for a buffer in memory
+> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> index 75d8e7cf040e..eef89d9b1f03 100644
+> --- a/kernel/kexec_file.c
+> +++ b/kernel/kexec_file.c
+> @@ -78,7 +78,7 @@ void * __weak arch_kexec_kernel_image_load(struct kimage *image)
+>  	return kexec_image_load_default(image);
+>  }
+>  
+> -static int kexec_image_post_load_cleanup_default(struct kimage *image)
+> +int kexec_image_post_load_cleanup_default(struct kimage *image)
+>  {
+>  	if (!image->fops || !image->fops->cleanup)
+>  		return 0;
+> -- 
+> 2.17.0
+> 
+> 
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
 
-This still lacks the page-table synchronization and will thus not fix
-the BUG_ON being triggered.
+Acked-by: Dave Young <dyoung@redhat.com>
 
-> We do not need to revert this patch.  We can make the above change I
-> mentioned.
-
-Please note that we are not in the merge window anymore and that any fix
-needs to be simple and obviously correct.
-
-
-Thanks,
-
-	Joerg
+Thanks
+Dave
