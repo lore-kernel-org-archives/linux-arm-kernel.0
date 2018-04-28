@@ -1,113 +1,81 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 28 Apr 2018 15:52:56 +0100
-Subject: [PATCH 5/7] iio: adc: stm32-dfsdm: misc style improvements and
- fixes
-In-Reply-To: <453b8fe0-3b32-b9b7-001f-78a3b1d0b56f@st.com>
-References: <1519390261-25453-1-git-send-email-fabrice.gasnier@st.com>
- <1519390261-25453-6-git-send-email-fabrice.gasnier@st.com>
- <20180224130309.7129e79f@archlinux>
- <453b8fe0-3b32-b9b7-001f-78a3b1d0b56f@st.com>
-Message-ID: <20180428155256.39884313@archlinux>
+Date: Sat, 28 Apr 2018 16:18:22 +0100
+Subject: [PATCH 1/3] dt-bindings: iio: stm32-adc: add support for STM32MP1.
+In-Reply-To: <ee92eb8d-9675-3c94-1c0d-f6e8f091d878@st.com>
+References: <1524065874-434-1-git-send-email-fabrice.gasnier@st.com>
+ <1524065874-434-2-git-send-email-fabrice.gasnier@st.com>
+ <20180424162721.qbfsc7j3syzzykeh@rob-hp-laptop>
+ <ee92eb8d-9675-3c94-1c0d-f6e8f091d878@st.com>
+Message-ID: <20180428161822.6100bb07@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Apr 2018 09:48:56 +0200
+On Wed, 25 Apr 2018 09:22:02 +0200
 Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> On 02/24/2018 02:03 PM, Jonathan Cameron wrote:
-> > On Fri, 23 Feb 2018 13:50:59 +0100
-> > Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> >   
-> >> Misc fixes & style improvements:
-> >> - checkpatch warns about line over 80 characters.
-> >> - remove extra spaces and a blank line (e.g. checkpatch --strict)
-> >> - remove bad error message always printed in probe routine.
+> On 04/24/2018 06:27 PM, Rob Herring wrote:
+> > On Wed, Apr 18, 2018 at 05:37:52PM +0200, Fabrice Gasnier wrote:  
+> >> Document support for STM32MP1 ADC. It's quite similar to STM32H7 ADC.
+> >> Introduce "st,stm32mp1-adc" compatible to handle variants of this
+> >> hardware such as vregready flag, interrupts, clock rate.
 > >>
-> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>  
-> > I'd have preferred this as 3 patches doing one type fo fix each.
+> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> >> ---
+> >>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 +++++-
+> >>  1 file changed, 5 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> >> index e8bb824..9994384 100644
+> >> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> >> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> >> @@ -24,8 +24,11 @@ Required properties:
+> >>  - compatible: Should be one of:
+> >>    "st,stm32f4-adc-core"
+> >>    "st,stm32h7-adc-core"
+> >> +  "st,stm32mp1-adc-core"
+> >>  - reg: Offset and length of the ADC block register set.
+> >> -- interrupts: Must contain the interrupt for ADC block.
+> >> +- interrupts: One or more interrupts for ADC block. Some parts like stm32f4
+> >> +  and stm32h7 share a common ADC interrupt line. stm32mp1 has separate
+> >> +  lines for each ADC within ADC block.  
 > > 
-> > Anyhow, I'll need to hold this until the fixes have made there
-> > way upstream.  Give me a poke if I seem to have forgotten
-> > and the dependencies have made it back to my togreg branch.  
+> > How many interrupt lines is that?  
 > 
-> Hi Jonathan,
+> Hi Rob, Jonathan,
 > 
-> There are few pending patches in this series. I'm not sure everything
-> have been merged yet.
-> Do you wish I resend those patches as separate series ?
+> I should have mentioned this: stm32mp1 has two separate interrupt lines
+> for each ADC within ADC block.
 > 
-> Please let me know,
-> Thanks in advance,
-> BR,
-> Fabrice
-Thanks for the reminder, I'll pick them up from this original series.
+> Do you wish I send a V2 for this ? Or a patch to fix this ?
+Hmm. I haven't pushed this out as non rebasing so I'll revert this
+and the associated support so you can clean this corner up.
 
-For this one, applied to the togreg branch of iio.git and pushed out as
-testing for the autobuilders to play with it.
+So please send a V2.
 
 Thanks,
 
 Jonathan
 
 > 
-> > 
-> > Thanks,
-> > 
-> > Jonathan
+> Please let me know,
+> BR,
+> Fabrice
+> 
 > >   
-> >> ---
-> >>  drivers/iio/adc/stm32-dfsdm-adc.c | 9 ++++-----
-> >>  1 file changed, 4 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
-> >> index 01422d1..57bcb45 100644
-> >> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
-> >> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-> >> @@ -253,7 +253,8 @@ static int stm32_dfsdm_start_filter(struct stm32_dfsdm *dfsdm,
-> >>  				  DFSDM_CR1_RSWSTART(1));
-> >>  }
+> >>  - clocks: Core can use up to two clocks, depending on part used:
+> >>    - "adc" clock: for the analog circuitry, common to all ADCs.
+> >>      It's required on stm32f4.
+> >> @@ -53,6 +56,7 @@ Required properties:
+> >>  - compatible: Should be one of:
+> >>    "st,stm32f4-adc"
+> >>    "st,stm32h7-adc"
+> >> +  "st,stm32mp1-adc"
+> >>  - reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
+> >>  - clocks: Input clock private to this ADC instance. It's required only on
+> >>    stm32f4, that has per instance clock input for registers access.
+> >> -- 
+> >> 1.9.1
 > >>  
-> >> -static void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm, unsigned int fl_id)
-> >> +static void stm32_dfsdm_stop_filter(struct stm32_dfsdm *dfsdm,
-> >> +				    unsigned int fl_id)
-> >>  {
-> >>  	/* Disable conversion */
-> >>  	regmap_update_bits(dfsdm->regmap, DFSDM_CR1(fl_id),
-> >> @@ -337,7 +338,7 @@ static int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
-> >>  					    "st,adc-channel-types", chan_idx,
-> >>  					    &of_str);
-> >>  	if (!ret) {
-> >> -		val  = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_type);
-> >> +		val = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_type);
-> >>  		if (val < 0)
-> >>  			return val;
-> >>  	} else {
-> >> @@ -349,7 +350,7 @@ static int stm32_dfsdm_channel_parse_of(struct stm32_dfsdm *dfsdm,
-> >>  					    "st,adc-channel-clk-src", chan_idx,
-> >>  					    &of_str);
-> >>  	if (!ret) {
-> >> -		val  = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_src);
-> >> +		val = stm32_dfsdm_str2val(of_str, stm32_dfsdm_chan_src);
-> >>  		if (val < 0)
-> >>  			return val;
-> >>  	} else {
-> >> @@ -1093,7 +1094,6 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
-> >>  	char *name;
-> >>  	int ret, irq, val;
-> >>  
-> >> -
-> >>  	dev_data = of_device_get_match_data(dev);
-> >>  	iio = devm_iio_device_alloc(dev, sizeof(*adc));
-> >>  	if (!iio) {
-> >> @@ -1161,7 +1161,6 @@ static int stm32_dfsdm_adc_probe(struct platform_device *pdev)
-> >>  	if (ret < 0)
-> >>  		goto err_cleanup;
-> >>  
-> >> -	dev_err(dev, "of_platform_populate\n");
-> >>  	if (dev_data->type == DFSDM_AUDIO) {
-> >>  		ret = of_platform_populate(np, NULL, NULL, dev);
-> >>  		if (ret < 0) {  
-> >   
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-iio" in
 > the body of a message to majordomo at vger.kernel.org
