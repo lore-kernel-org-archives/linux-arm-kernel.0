@@ -1,50 +1,42 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 29 Apr 2018 00:47:00 +0900
-Subject: [GIT PULL] ARM: uniphier: fixes for v4.17
-Message-ID: <CAK7LNASuFh4wcSJ7HTW-+ZQCjZWt0QtjrOQQogoqzbM2W9n+nA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 28 Apr 2018 18:57:23 +0200
+Subject: [PATCH 0/7] Defconfig updates for RK3399
+In-Reply-To: <20180416144002.15569-1-ezequiel@collabora.com>
+References: <20180416144002.15569-1-ezequiel@collabora.com>
+Message-ID: <2336918.1QqQk43mrl@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Am Montag, 16. April 2018, 16:39:55 CEST schrieb Ezequiel Garcia:
+> This series collects some pending defconfig patches
+> from Enric, namely:
+> 
+> https://patchwork.kernel.org/patch/10302033/
+> https://patchwork.kernel.org/patch/10247583/
+> https://patchwork.kernel.org/patch/10269255/
+> 
+> And adds some more defconfig changes, required to
+> support other peripherals:
+> 
+>  * Touchscreen, touchpad and stylus
+>  * WiFi and Bluetooth
+> 
+> Series tested on RK3399 Kevin Chromebook.
+> 
+> Enric Balletbo i Serra (3):
+>   arm64: defconfig: Enable typec-phy and extcon-usbc-cros-ec for rk3399
+>   arm64: defconfig: Enable Rockchip io-domain driver
+>   arm64: defconfig: Enable ChromeOS EC drivers for supported
+>     Chromebooks.
+> 
+> Ezequiel Garcia (4):
+>   arm64: defconfig: Enable HID over I2C drivers
+>   arm64: defconfig: Enable Atmel Maxtouch driver
+>   arm64: defconfig: Enable Marvell WiFi-Ex PCIe driver
+>   arm64: defconfig: Enable bluetooth USB support
 
-Please pull some fixes of ARM UniPhier DT.
-
-
-
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-fixes-v4.17
-
-for you to fetch changes up to 8b82b66e68b32dd8e22a04db6a0494bfdd65156f:
-
-  arm64: dts: uniphier: stabilize ethernet of LD20 reference board
-(2018-04-29 00:33:42 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM SoC fixes for v4.17
-
-- Fix input delay parameter of eMMC PHY
-- Weaken drive-strength of ethernet PHY pins of LD20 reference board
-
-----------------------------------------------------------------
-Masahiro Yamada (2):
-      arm64: dts: uniphier: fix input delay value for legacy mode of eMMC
-      arm64: dts: uniphier: stabilize ethernet of LD20 reference board
-
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi    | 2 +-
- arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 8 ++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi    | 2 +-
- arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi    | 2 +-
- 4 files changed, 11 insertions(+), 3 deletions(-)
+applied all 7 for 4.18
 
 
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks
+Heiko
