@@ -1,142 +1,51 @@
-From: marcin@ziemianowicz.com (Marcin Ziemianowicz)
-Date: Sun, 29 Apr 2018 11:25:12 -0400
-Subject: [PATCH v3] clk: at91: PLL recalc_rate() now using cached MUL+DIV
- values
-In-Reply-To: <20180429151935.21df0784@bbrezillon>
-References: <20180427175609.GA83298@hak8or>
- <20180429151710.4ca68978@bbrezillon>
- <20180429151935.21df0784@bbrezillon>
-Message-ID: <20180429152512.GB742@hak8or>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sun, 29 Apr 2018 17:37:32 +0200
+Subject: [PATCH] ARM: dts: imx6qdl-cubox-i: Move card-detect GPIO to 1.5
+ SOM devices only
+In-Reply-To: <CABdtJHun8DWbr-bUgwQEK61UXMLh5pPkwvUTF+KxhHmJaXEr-A@mail.gmail.com>
+References: <20180422142151.17910-1-contact@paulk.fr>
+ <20180422143911.GB16141@n2100.armlinux.org.uk>
+ <8012696a7bf0132dd2361a896bf0abfbe8a3084e.camel@paulk.fr>
+ <d167cc6987fdb7f04493c634873d430dcd216887.camel@paulk.fr>
+ <CABdtJHun8DWbr-bUgwQEK61UXMLh5pPkwvUTF+KxhHmJaXEr-A@mail.gmail.com>
+Message-ID: <b7aca3a0e1f90e5048c5ca81c42bf41b318b260b.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 29, 2018 at 03:19:35PM +0200, Boris Brezillon wrote:
-> On Sun, 29 Apr 2018 15:17:10 +0200
-> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> 
-> > Hi Marcin,
-> > 
-> > On Fri, 27 Apr 2018 13:56:09 -0400
-> > Marcin Ziemianowicz <marcin@ziemianowicz.com> wrote:
-> > 
-> > > Stephen Boyd <sboyd@kernel.org>,
-> > > linux-clk at vger.kernel.org,
-> > > linux-arm-kernel at lists.infradead.org,
-> > > linux-kernel at vger.kernel.org
-> > > Bcc: 
-> > > Subject: [PATCH v3] clk: at91: PLL recalc_rate() now using cached MUL and DIV
-> > >  values
-> > > Reply-To:  
-> > 
-> > Hm, I don't know how you prepared and sent your patch, but you shouldn't
-> > have these fields in the body of your email. Please use git format-patch
-> > to prepare the patch and then git send-email to send it.
-> >  
-> > > 
-> > > When a USB device is connected to the USB host port on the SAM9N12 then
-> > > you get "-62" error which seems to indicate USB replies from the device
-> > > are timing out. Based on a logic sniffer, I saw the USB bus was running
-> > > at half speed.
-> > > 
-> > > The PLL code uses cached MUL and DIV values which get set in set_rate()
-> > > and applied in prepare(), but the recalc_rate() function instead
-> > > queries the hardware instead of using these cached values. Therefore,
-> > > if recalc_rate() is called between a set_rate() and prepare(), the
-> > > wrong frequency is calculated and later the USB clock divider for the
-> > > SAM9N12 SOC will be configured for an incorrect clock.
-> > > 
-> > > In my case, the PLL hardware was set to 96 Mhz before the OHCI
-> > > driver loads, and therefore the usb clock divider was being set
-> > > to /2 even though the OHCI driver set the PLL to 48 Mhz.
-> > > 
-> > > As an alternative explanation, I noticed this was fixed in the past:
-> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283502.html
-> > > but was later changed back via a large patch (maybe by mistake?):
-> > > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=1bdf02326b71eae7e9b4b335b881856aaf9d1af6  
-> > 
-> > Yep, probably by mistake. I started this rework long before it has been
-> > submitted to the ML, so I probably messed something up when rebasing.
-> > 
-> > Also, prefer commit IDs to links to the ML archive. The above would
-> > sentence would give:
-> > 
-> > "
-> > As an alternative explanation, I noticed this was fixed in the past by
-> > 87e2ed338f1b ("clk: at91: fix recalc_rate implementation of PLL
-> > driver") but the bug was later re-introduced by 1bdf02326b71 ("clk:
-> > at91: make use of syscon/regmap internally").
-> > "
-> > 
-> > 
-> > The following comment and the changelog should be placed after the
-> > '---' line, so that it's not part of the commit message.
-> > 
-> > > Thank you for bearing with me about this Boris.
-> > > 
-> > > Changes since V2:
-> > >   Removed all logging/debug messages I added  
-> > >   > Comment by Boris Brezillon about my fix being wrong addressed    
-> > > Changes since V1:
-> > >   Added patch set cover letter
-> > >   Shortened lines which were over >80 characters long  
-> > >   > Comment by Greg Kroah-Hartman about "from" field in email addressed
-> > >   > Comment by Alan Stern about redundant debug lines addressed    
-> > >   
-> > 
-> > You should add Fixes and Cc-stable tags so that the fix is backported
-> > to stable branches:
-> > 
-> > Fixes: 1bdf02326b71 ("clk: at91: make use of syscon/regmap internally)
-> > Cc: <stable@vger.kernel.org>
-> > 
-> > > Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
-> > > ---
-> > >  drivers/clk/at91/clk-pll.c | 13 +------------
-> > >  1 file changed, 1 insertion(+), 12 deletions(-)
-> > > 
-> > > diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-> > > index 7d3223fc..cc6e0364 100644
-> > > --- a/drivers/clk/at91/clk-pll.c
-> > > +++ b/drivers/clk/at91/clk-pll.c
-> > > @@ -132,19 +132,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
-> > >  					 unsigned long parent_rate)
-> > >  {
-> > >  	struct clk_pll *pll = to_clk_pll(hw);
-> > > -	unsigned int pllr;
-> > > -	u16 mul;
-> > > -	u8 div;
-> > > -
-> > > -	regmap_read(pll->regmap, PLL_REG(pll->id), &pllr);
-> > > -
-> > > -	div = PLL_DIV(pllr);
-> > > -	mul = PLL_MUL(pllr, pll->layout);
-> > > -
-> > > -	if (!div || !mul)
-> > > -		return 0;
-> > >  
-> > > -	return (parent_rate / div) * (mul + 1);
-> > > +	return return (parent_rate / pll->div) * (pll->mul + 1);
-> 
-> Oops, one too many return as reported by kbuild test robot.
+Hi,
 
-That's what I get for bug fixing in a buildroot generated kernel
-directory and then copying it over to a new git clone'd kernel directory
-by hand. I will fix this in addition to all the problems you raised in
-the earlier email. Thank you again!
+Le dimanche 29 avril 2018 ? 16:09 +0200, Jon Nettleton a ?crit :
+> You have either an initial early developer unit (pre-production) that
+> was assembled like this for testing, or a unit that someone
+> specifically ordered assembled this way.  You can see from the
+> schematic that this option does not have a CD-pin because it is meant
+> to be a more permanent storage option.
 
-> 
-> > 
-> > The fix looks good. Let me know if you struggle with git
-> > format-patch/send-email and I'll try to help you (or send the patch for
-> > you if you don't care learning the process, but I think it's better if
-> > you learn how to submit patches).
-> > 
-> > Thanks,
-> > 
-> > Boris
-> > 
-> > >  }
-> > >  
-> > >  static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,  
-> > 
-> 
+It turns out that the card-detection mechanism was somewhat broken on my
+device (which does have a regular push slot). It would report card-
+detect only when the card was not fully inserted, and stop asserting
+card-detect when it was pushed fully.
+
+I used a fitting tweezer to move the mechanical parts around and got it
+to also detect the card when it is pushed all the way.
+
+So no change is necessary after all, it was just my device that needed
+fixing.
+
+Thanks for the helpful answers!
+
+-- 
+Paul Kocialkowski,
+
+developer of free digital technology and hardware support.
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180429/b820f562/attachment-0001.sig>
