@@ -1,51 +1,68 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sun, 29 Apr 2018 16:00:28 +0200
-Subject: [PATCH] arm64: vgic-v2: Fix proxying of cpuif access
-In-Reply-To: <20180429140507.60bfe2dc@why.wild-wind.fr.eu.org>
-References: <20180427145102.5645-1-marc.zyngier@arm.com>
- <20180429123432.GA7512@C02W217FHV2R.local>
- <20180429140507.60bfe2dc@why.wild-wind.fr.eu.org>
-Message-ID: <20180429140028.GA7760@C02W217FHV2R.local>
+From: jon@solid-run.com (Jon Nettleton)
+Date: Sun, 29 Apr 2018 16:09:31 +0200
+Subject: [PATCH] ARM: dts: imx6qdl-cubox-i: Move card-detect GPIO to 1.5
+ SOM devices only
+In-Reply-To: <d167cc6987fdb7f04493c634873d430dcd216887.camel@paulk.fr>
+References: <20180422142151.17910-1-contact@paulk.fr>
+ <20180422143911.GB16141@n2100.armlinux.org.uk>
+ <8012696a7bf0132dd2361a896bf0abfbe8a3084e.camel@paulk.fr>
+ <d167cc6987fdb7f04493c634873d430dcd216887.camel@paulk.fr>
+Message-ID: <CABdtJHun8DWbr-bUgwQEK61UXMLh5pPkwvUTF+KxhHmJaXEr-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 29, 2018 at 02:05:07PM +0100, Marc Zyngier wrote:
-> On Sun, 29 Apr 2018 14:34:32 +0200
-> Christoffer Dall <christoffer.dall@arm.com> wrote:
-> 
-> > On Fri, Apr 27, 2018 at 03:51:02PM +0100, Marc Zyngier wrote:
-> > > Proxying the cpuif accesses at EL2 makes use of vcpu_data_guest_to_host
-> > > and co, which check the endianness, which call into vcpu_read_sys_reg...
-> > > which isn't mapped at EL2 (it was inlined before, and got moved OoL
-> > > with the VHE optimizations).  
-> > 
-> > I thought we relied on static inline functions to always be inlined, but
-> > apparently not?  Does this mean we have potential other bugs looming
-> > depending on the mood of the compiler, or was there something special
-> > that went wrong here?
-> 
-> We do rely on that behaviour. And that was the case until you moved
-> vcpu_read_sys_reg() to be entirely out of line (see d47533dab9f5).
+On Sun, Apr 29, 2018 at 3:47 PM, Paul Kocialkowski <contact@paulk.fr> wrote:
+> Hi,
+>
+> Le dimanche 22 avril 2018 ? 19:22 +0200, Paul Kocialkowski a ?crit :
+>> Are all CuBox-i units that have ever been sold supposed to have a
+>> connector with a CD line? I find it hard to believe that it's broken
+>> specifically on mine.
+>
+> Do you have a clue whether there should, in fact, be a CD line on all
+> CuBox-i models out there? Although you seemed to imply that my device
+> might be broken, I am still confused about whether this issue concerns
+> my device only or a specific revision of the CuBox-i.
+>
+>> If that's really needed, I could open up the device, check whether the
+>> R8 pull is in place and check the voltage there.
+>
+> In case there is a doubt, I will proceed with opening the device so we
+> can have a clear idea, but I'd rather avoid it as much as possible.
+>
+> Cheers,
+>
+> --
+> Paul Kocialkowski,
+>
+> developer of free digital technology and hardware support.
+>
+> Website: https://www.paulk.fr/
+> Coding blog: https://code.paulk.fr/
+> Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
 
-ah, now I see, kvm_vcpu_is_be() calls vcpu_read_sys_reg(), I somehow
-missed this even though you spelled it out in the commit message.
-Sorry.
+Paul,
 
-> 
-> At that point, kvm_vcpu_is_be() becomes a death trap.
-> 
-> We missed it for two reasons:
-> - It was only indirectly called, making it quite hard to notice the
->   potential breakage
-> - Nobody gives a damn about 64k pages, specially on something like Juno
-> 
-> What we'd need is a way to find cross-section calls (text -> hyp-text
-> should allowed, but not the reverse). We already have similar things in
-> the kernel, it is probably only a matter of reusing the infrastructure
-> for our own purpose.
-> 
+You can see on our schematics that the hinged sdhc card slot is an
+assembly option and not the default.
+https://wiki.solid-run.com/lib/exe/fetch.php?media=imx6:cubox-i:schematics-rev-1.1:cubox-i-lower.pdf
 
-That would be good indeed...
+You have either an initial early developer unit (pre-production) that
+was assembled like this for testing, or a unit that someone
+specifically ordered assembled this way.  You can see from the
+schematic that this option does not have a CD-pin because it is meant
+to be a more permanent storage option.
 
-Thanks for the further explanation.
--Christoffer
+That being said, this is not a default option and therefore should not
+be merged into the mainline device-tree.  Our soms and carriers are
+designed to be very flexible regarding the assembly options and we try
+to mainline device-tree files that represent the most common assembly
+options.  Once there is a common accepted mainlining for device-tree
+fragments for overlays, that would be the proper place to make this
+change.  Although in this case you would also need a custom u-boot so
+it is probably best to just handle the change there.  If you would
+like touch base with me off list and I can point you at the required
+u-boot changes.
+
+Thanks,
+Jon
