@@ -1,34 +1,77 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 29 Apr 2018 19:28:28 +0200
-Subject: [PATCH 1/5] ARM: dts: exynos: Remove unnecessary address/size
- properties in Midas boards
-In-Reply-To: <20180424174602.3915-1-krzk@kernel.org>
-References: <20180424174602.3915-1-krzk@kernel.org>
-Message-ID: <20180429172828.2j2qjuwl6z2oipup@kozik-lap>
+From: marcin@ziemianowicz.com (Marcin Ziemianowicz)
+Date: Sun, 29 Apr 2018 15:01:11 -0400
+Subject: [PATCH V4] clk: at91: PLL recalc_rate() now using cached MUL and DIV
+ values
+Message-ID: <20180429190111.14247-1-marcin@ziemianowicz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 07:45:58PM +0200, Krzysztof Kozlowski wrote:
-> The children of regulators node do not have reg/ranges properties.  Move the
-> children up one level, get rid of regulators node and remove
-> address-cells and size-cells properties.  This fixes warnings for
-> Exynos4412 Midas family boards:
-> 
->     arch/arm/boot/dts/exynos4412-i9300.dtb: Warning (avoid_unnecessary_addr_size):
->         /regulators: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
->     arch/arm/boot/dts/exynos4412-i9305.dtb: Warning (avoid_unnecessary_addr_size):
->         /regulators: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
->     arch/arm/boot/dts/exynos4412-n710x.dtb: Warning (avoid_unnecessary_addr_size):
->         /regulators: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  arch/arm/boot/dts/exynos4412-galaxy-s3.dtsi | 32 +++++------
->  arch/arm/boot/dts/exynos4412-midas.dtsi     | 86 ++++++++++++++---------------
->  2 files changed, 55 insertions(+), 63 deletions(-)
+When a USB device is connected to the USB host port on the SAM9N12 then
+you get "-62" error which seems to indicate USB replies from the device
+are timing out. Based on a logic sniffer, I saw the USB bus was running
+at half speed.
 
-Applied entire series.
+The PLL code uses cached MUL and DIV values which get set in set_rate()
+and applied in prepare(), but the recalc_rate() function instead
+queries the hardware instead of using these cached values. Therefore,
+if recalc_rate() is called between a set_rate() and prepare(), the
+wrong frequency is calculated and later the USB clock divider for the
+SAM9N12 SOC will be configured for an incorrect clock.
 
+In my case, the PLL hardware was set to 96 Mhz before the OHCI
+driver loads, and therefore the usb clock divider was being set
+to /2 even though the OHCI driver set the PLL to 48 Mhz.
 
-Best regards,
-Krzysztof
+As an alternative explanation, I noticed this was fixed in the past by
+87e2ed338f1b ("clk: at91: fix recalc_rate implementation of PLL
+driver") but the bug was later re-introduced by 1bdf02326b71 ("clk:
+at91: make use of syscon/regmap internally").
+
+Fixes: 1bdf02326b71 ("clk: at91: make use of syscon/regmap internally)
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
+---
+Thank you for bearing with me about this Boris.
+
+Changes since V3:
+  Fix for double returns found by kbluild test robot
+  > Comments by Boris Brezillon about email formatting issues
+Changes since V2:
+  Removed all logging/debug messages I added
+  > Comment by Boris Brezillon about my fix being wrong addressed
+Changes since V1:
+  Added patch set cover letter
+  Shortened lines which were over >80 characters long
+  > Comment by Greg Kroah-Hartman about "from" field in email addressed
+  > Comment by Alan Stern about redundant debug lines addressed
+
+ drivers/clk/at91/clk-pll.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
+
+diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
+index 7d3223fc..72b6091e 100644
+--- a/drivers/clk/at91/clk-pll.c
++++ b/drivers/clk/at91/clk-pll.c
+@@ -132,19 +132,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+ 					 unsigned long parent_rate)
+ {
+ 	struct clk_pll *pll = to_clk_pll(hw);
+-	unsigned int pllr;
+-	u16 mul;
+-	u8 div;
+-
+-	regmap_read(pll->regmap, PLL_REG(pll->id), &pllr);
+-
+-	div = PLL_DIV(pllr);
+-	mul = PLL_MUL(pllr, pll->layout);
+-
+-	if (!div || !mul)
+-		return 0;
+ 
+-	return (parent_rate / div) * (mul + 1);
++	return (parent_rate / pll->div) * (pll->mul + 1);
+ }
+ 
+ static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
+-- 
+2.17.0
