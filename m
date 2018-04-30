@@ -1,65 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 30 Apr 2018 09:33:25 -0500
-Subject: [PATCH v5 1/2] dt-bindings: Documentation for qcom, llcc
-In-Reply-To: <b458e2bf5b23a4af996e80d81ceabaa4@codeaurora.org>
-References: <1524524972-12014-1-git-send-email-rishabhb@codeaurora.org>
- <1524524972-12014-2-git-send-email-rishabhb@codeaurora.org>
- <20180427142144.tvy5xamuwz6jnxk5@rob-hp-laptop>
- <b458e2bf5b23a4af996e80d81ceabaa4@codeaurora.org>
-Message-ID: <CAL_JsqJEQU-BysQ7LmQRJ5ySPpUXYCMPAQ1JqeboGoQL-SyAqg@mail.gmail.com>
+From: colin.king@canonical.com (Colin King)
+Date: Mon, 30 Apr 2018 15:48:01 +0100
+Subject: [PATCH] cpufreq: s3c2440: fix spelling mistake: "divsiors" ->
+ "divisors"
+Message-ID: <20180430144801.6727-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 5:57 PM,  <rishabhb@codeaurora.org> wrote:
-> On 2018-04-27 07:21, Rob Herring wrote:
->>
->> On Mon, Apr 23, 2018 at 04:09:31PM -0700, Rishabh Bhatnagar wrote:
->>>
->>> Documentation for last level cache controller device tree bindings,
->>> client bindings usage examples.
->>>
->>> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
->>> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
->>> ---
->>>  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 60
->>> ++++++++++++++++++++++
->>>  1 file changed, 60 insertions(+)
->>>  create mode 100644
->>> Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
->>
->>
->> My comments on v4 still apply.
->>
->> Rob
->
->
-> Hi Rob,
-> Reposting our replies to your comments on v4:
->
-> This is partially true, a bunch of SoCs would support this design but
-> clients IDs are not expected to change. So Ideally client drivers could
-> hard code these IDs.
->
-> However I have other concerns of moving the client Ids in the driver.
-> The way the APIs implemented today are as follows:
-> #1. Client calls into system cache driver to get cache slice handle
-> with the usecase Id as input.
-> #2. System cache driver gets the phandle of system cache instance from
-> the client device to obtain the private data.
-> #3. Based on the usecase Id perform look up in the private data to get
-> cache slice handle.
-> #4. Return the cache slice handle to client
->
-> If we don't have the connection between client & system cache then the
->  private data needs to declared as static global in the system cache driver,
-> that limits us to have just once instance of system cache block.
+From: Colin Ian King <colin.king@canonical.com>
 
-How many instances do you have?
+Trivial fix to spelling mistake in s3c_freq_dbg debug message text.
 
-It is easier to put the data into the kernel and move it to DT later
-than vice-versa. I don't think it is a good idea to do a custom
-binding here and one that only addresses caches and nothing else in
-the interconnect. So either we define an extensible and future-proof
-binding or put the data into the kernel for now.
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/cpufreq/s3c2440-cpufreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Rob
+diff --git a/drivers/cpufreq/s3c2440-cpufreq.c b/drivers/cpufreq/s3c2440-cpufreq.c
+index d0d75b65ddd6..d2f67b7a20dd 100644
+--- a/drivers/cpufreq/s3c2440-cpufreq.c
++++ b/drivers/cpufreq/s3c2440-cpufreq.c
+@@ -143,7 +143,7 @@ static void s3c2440_cpufreq_setdivs(struct s3c_cpufreq_config *cfg)
+ {
+ 	unsigned long clkdiv, camdiv;
+ 
+-	s3c_freq_dbg("%s: divsiors: h=%d, p=%d\n", __func__,
++	s3c_freq_dbg("%s: divisors: h=%d, p=%d\n", __func__,
+ 		     cfg->divs.h_divisor, cfg->divs.p_divisor);
+ 
+ 	clkdiv = __raw_readl(S3C2410_CLKDIVN);
+-- 
+2.17.0
