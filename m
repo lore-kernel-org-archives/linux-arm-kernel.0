@@ -1,38 +1,59 @@
-From: david.engraf@sysgo.com (David Engraf)
-Date: Mon, 30 Apr 2018 08:11:05 +0200
-Subject: [PATCH v2] i2c: at91: Read all available bytes at once
-In-Reply-To: <20180428123838.abxiht7k4egv7iel@ninjato>
-References: <20180426082558.GX13305@rfolt0960.corp.atmel.com>
- <20180426095314.12758-1-david.engraf@sysgo.com>
- <20180428123838.abxiht7k4egv7iel@ninjato>
-Message-ID: <d728f2ac-5763-48af-03b5-571a75265281@sysgo.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Mon, 30 Apr 2018 11:57:15 +0530
+Subject: [PATCH v4 0/6] Support for fsl-mc bus and its devices in SMMU
+In-Reply-To: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
+References: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <1525069641-8523-1-git-send-email-nipun.gupta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.04.2018 um 14:38 schrieb Wolfram Sang:
-> On Thu, Apr 26, 2018 at 11:53:14AM +0200, David Engraf wrote:
->> With FIFO enabled it is possible to read multiple bytes
->> at once in the interrupt handler as long as RXRDY is
->> set. This may also reduce the number of interrupts.
->>
->> This patch polls RXRDY and reads all available bytes at
->> once.
->>
->> Signed-off-by: David Engraf <david.engraf@sysgo.com>
-> 
-> checkpatch said twice:
-> 
-> WARNING: line over 80 characters
-> 
-> While I am not super-strict with this limit, it makes sense here IMO.
-> The comment stays readable, and we don't even lose a line.
+This patchset defines IOMMU DT binding for fsl-mc bus and adds
+support in SMMU for fsl-mc bus.
 
-Sorry for that.
+This patch series is dependent on patset:
+https://patchwork.kernel.org/patch/10317337/
 
-> Fixed it this time for you.
+These patches
+  - Define property 'iommu-map' for fsl-mc bus (patch 1)
+  - Integrates the fsl-mc bus with the SMMU using this
+    IOMMU binding (patch 2,3,4)
+  - Adds the dma configuration support for fsl-mc bus (patch 5)
+  - Updates the fsl-mc device node with iommu/dma related changes (patch6)
 
-Thanks
-- David
+Changes in v2:
+  - use iommu-map property for fsl-mc bus
+  - rebase over patchset https://patchwork.kernel.org/patch/10317337/
+    and make corresponding changes for dma configuration of devices on
+    fsl-mc bus
 
-> Applied to for-next, thanks!
-> 
+Changes in v3:
+  - move of_map_rid in drivers/of/address.c
+
+Changes in v4:
+  - move of_map_rid in drivers/of/base.c
+
+Nipun Gupta (6):
+  Docs: dt: add fsl-mc iommu-map device-tree binding
+  iommu: of: make of_pci_map_rid() available for other devices too
+  iommu: support iommu configuration for fsl-mc devices
+  iommu: arm-smmu: Add support for the fsl-mc bus
+  bus: fsl-mc: supoprt dma configure for devices on fsl-mc bus
+  arm64: dts: ls208xa: comply with the iommu map binding for fsl_mc
+
+ .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |  39 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |   6 +-
+ drivers/bus/fsl-mc/fsl-mc-bus.c                    |  16 +++-
+ drivers/iommu/arm-smmu.c                           |   7 ++
+ drivers/iommu/iommu.c                              |  21 +++++
+ drivers/iommu/of_iommu.c                           |  25 ++++-
+ drivers/of/base.c                                  | 102 +++++++++++++++++++++
+ drivers/of/irq.c                                   |   5 +-
+ drivers/pci/of.c                                   | 101 --------------------
+ include/linux/fsl/mc.h                             |   8 ++
+ include/linux/iommu.h                              |   2 +
+ include/linux/of.h                                 |  11 +++
+ include/linux/of_pci.h                             |  10 --
+ 13 files changed, 231 insertions(+), 122 deletions(-)
+
+-- 
+1.9.1
