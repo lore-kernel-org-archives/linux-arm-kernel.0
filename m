@@ -1,53 +1,71 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 30 Apr 2018 11:40:42 -0700
-Subject: [PATCH v3] init: Fix false positives in W+X checking
-In-Reply-To: <e87810b2-db26-ee13-731a-cde53185e977@redhat.com>
-References: <1525103946-29526-1-git-send-email-jhugo@codeaurora.org>
- <e87810b2-db26-ee13-731a-cde53185e977@redhat.com>
-Message-ID: <CAGXu5jJFjH4hiRqovOtaMOuKUQbGYWjBiGGDV-bjWSmTvZp9Pw@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 30 Apr 2018 14:43:08 -0400
+Subject: [PATCH 3/6] PCI: Introduce devm_of_pci_get_host_bridge_resources
+In-Reply-To: <20180430184007.GC95643@bhelgaas-glaptop.roam.corp.google.com>
+References: <cover.1524582822.git.jan.kiszka@siemens.com>
+ <e387d04ea235c9a4879a897bb730adc383a96635.1524582822.git.jan.kiszka@siemens.com>
+ <20180427222427.GB73638@bhelgaas-glaptop.roam.corp.google.com>
+ <869a8ad9-dd2f-8462-c0c4-2d8a62d74185@siemens.com>
+ <20180430184007.GC95643@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <5e218659-b512-b622-25e0-5bb5a8f4b87d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 10:19 AM, Laura Abbott <labbott@redhat.com> wrote:
-> On 04/30/2018 08:59 AM, Jeffrey Hugo wrote:
+On 4/30/2018 2:40 PM, Bjorn Helgaas wrote:
+> On Sat, Apr 28, 2018 at 09:28:47AM +0200, Jan Kiszka wrote:
+>> On 2018-04-28 00:24, Bjorn Helgaas wrote:
+>>> On Tue, Apr 24, 2018 at 05:13:39PM +0200, Jan Kiszka wrote:
+>>>> From: Jan Kiszka <jan.kiszka@siemens.com>
+>>>>
+>>>> of_pci_get_host_bridge_resources allocates the resource structures it
+>>>> fills dynamically, but none of its callers care to release them so far.
+>>>> Rather than requiring everyone to do this explicitly, introduce a
+>>>> managed version of that service. This differs API-wise only in taking a
+>>>> reference to the associated device, rather than to the device tree node.
+>>>>
+>>>> As of_pci_get_host_bridge_resources is an exported interface, we cannot
+>>>> simply drop it at this point. After converting all in-tree users to the
+>>>> new API, we could phase out the unmanaged one over some grace period.
+>>>
+>>> It looks like it might be possible to split this into three or four
+>>> patches:
+>>>
+>>>   1) Factor __of_pci_get_host_bridge_resources() out of
+>>>      of_pci_get_host_bridge_resources()
+>>>
+>>>   2) Add struct device * argument
+>>>
+>>>   3) Convert pr_info() to dev_info()
+>>>
+>>>   4) Add devm_of_pci_get_host_bridge_resources()
 >>
->> load_module() creates W+X mappings via __vmalloc_node_range() (from
->> layout_and_allocate()->move_module()->module_alloc()) by using
->> PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
->> "call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
+>> Will do. I'm even considering
 >>
->> This is a problem because call_rcu_sched() queues work, which can be run
->> after debug_checkwx() is run, resulting in a race condition.  If hit, the
->> race results in a nasty splat about insecure W+X mappings, which results
->> in a poor user experience as these are not the mappings that
->> debug_checkwx() is intended to catch.
->>
->> This issue is observed on multiple arm64 platforms, and has been
->> artificially triggered on an x86 platform.
->>
->> Address the race by flushing the queued work before running the
->> arch-defined mark_rodata_ro() which then calls debug_checkwx().
->>
->> Reported-by: Timur Tabi <timur@codeaurora.org>
->> Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
->> Fixes: e1a58320a38d ("x86/mm: Warn on W^X mappings")
->> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
->> Acked-by: Kees Cook <keescook@chromium.org>
->> Acked-by: Ingo Molnar <mingo@kernel.org>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->> ---
->>
->
-> Acked-by: Laura Abbott <labbott@redhat.com>
->
-> If you don't have a tree for this to go through, I might suggest having
-> Kees take it.
+>> 5) mark of_pci_get_host_bridge_resources() __deprecated, due to the leak
+>>    and no remaining in-tree user - what do you think?
+> 
+> Sounds good.
+> 
+> It'd be nice if we had some guideline about deprecation -- whether we
+> actually need to mark things __deprecated, and then how long to wait
+> before actually removing them, but I don't see anything in
+> Documentation/.
 
-akpm has taken the W^X stuff in the past, but I'm happy to do so. Just
-let me know either way. :)
+I'm under the impression that we don't quite care about out-of-tree drivers.
+I have seen many times out-of-tree drivers to be broken due to API changes,
+renames or even parameter meaning change. 
 
--Kees
+If the plan is to remove the API, just remove the API today.
+
+> 
+> Looks like it was added by cbe4097f8ae6 ("of/pci: Add support for
+> parsing PCI host bridge resources from DT") in v3.18, so it's been
+> around for a while and I guess it would be nice to have a grace period
+> before removing it.
+> 
+
 
 -- 
-Kees Cook
-Pixel Security
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
