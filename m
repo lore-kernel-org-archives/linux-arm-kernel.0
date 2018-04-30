@@ -1,88 +1,71 @@
 From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Mon, 30 Apr 2018 07:48:39 +0200
-Subject: [PATCH v2 05/10] PCI: Replace pr_*() with dev_*() in
+Date: Mon, 30 Apr 2018 07:48:38 +0200
+Subject: [PATCH v2 04/10] PCI: Add dev parameter to
  __of_pci_get_host_bridge_resources()
 In-Reply-To: <cover.1525067324.git.jan.kiszka@siemens.com>
 References: <cover.1525067324.git.jan.kiszka@siemens.com>
-Message-ID: <63f2e316090ea3284b4be62e446b3b28f998ac55.1525067324.git.jan.kiszka@siemens.com>
+Message-ID: <cfab525f3d0436f75187fbd65907ada909d7692f.1525067324.git.jan.kiszka@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jan Kiszka <jan.kiszka@siemens.com>
 
-Now that we have a device reference, make use of it for printing. And as
-long as dev can still be NULL, we will still get some reasonable output
-nevertheless.
+When non-NULL, use the new dev parameter of
+__of_pci_get_host_bridge_resources() to allocate the resource data
+structures via devm_kzalloc. That allows to release them automatically
+during device destruction.
 
 Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 ---
- drivers/pci/of.c | 22 ++++++++++++----------
- 1 file changed, 12 insertions(+), 10 deletions(-)
+ drivers/pci/of.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index bfa282b538d5..8f6cbf13e18d 100644
+index 375de447a58e..bfa282b538d5 100644
 --- a/drivers/pci/of.c
 +++ b/drivers/pci/of.c
-@@ -266,15 +266,15 @@ static int __of_pci_get_host_bridge_resources(struct device *dev,
+@@ -243,7 +243,7 @@ void of_pci_check_probe_only(void)
+ EXPORT_SYMBOL_GPL(of_pci_check_probe_only);
+ 
+ #if defined(CONFIG_OF_ADDRESS)
+-static int __of_pci_get_host_bridge_resources(
++static int __of_pci_get_host_bridge_resources(struct device *dev,
+ 			struct device_node *dev_node,
+ 			unsigned char busno, unsigned char bus_max,
+ 			struct list_head *resources, resource_size_t *io_base)
+@@ -259,7 +259,10 @@ static int __of_pci_get_host_bridge_resources(
+ 	if (io_base)
+ 		*io_base = (resource_size_t)OF_BAD_ADDR;
+ 
+-	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
++	if (dev)
++		bus_range = devm_kzalloc(dev,sizeof(*bus_range), GFP_KERNEL);
++	else
++		bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
  	if (!bus_range)
  		return -ENOMEM;
  
--	pr_info("host bridge %pOF ranges:\n", dev_node);
-+	dev_info(dev, "host bridge %pOF ranges:\n", dev_node);
+@@ -303,7 +306,11 @@ static int __of_pci_get_host_bridge_resources(
+ 		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+ 			continue;
  
- 	err = of_pci_parse_bus_range(dev_node, bus_range);
- 	if (err) {
- 		bus_range->start = busno;
- 		bus_range->end = bus_max;
- 		bus_range->flags = IORESOURCE_BUS;
--		pr_info("  No bus range found for %pOF, using %pR\n",
--			dev_node, bus_range);
-+		dev_info(dev, "  No bus range found for %pOF, using %pR\n",
-+			 dev_node, bus_range);
- 	} else {
- 		if (bus_range->end > bus_range->start + bus_max)
- 			bus_range->end = bus_range->start + bus_max;
-@@ -286,7 +286,7 @@ static int __of_pci_get_host_bridge_resources(struct device *dev,
- 	if (err)
- 		goto parse_failed;
- 
--	pr_debug("Parsing ranges property...\n");
-+	dev_dbg(dev, "Parsing ranges property...\n");
- 	for_each_of_pci_range(&parser, &range) {
- 		/* Read next ranges element */
- 		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
-@@ -295,9 +295,9 @@ static int __of_pci_get_host_bridge_resources(struct device *dev,
- 			snprintf(range_type, 4, "MEM");
- 		else
- 			snprintf(range_type, 4, "err");
--		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
--			range.cpu_addr, range.cpu_addr + range.size - 1,
--			range.pci_addr);
-+		dev_info(dev, "  %s %#010llx..%#010llx -> %#010llx\n",
-+			 range_type, range.cpu_addr,
-+			 range.cpu_addr + range.size - 1, range.pci_addr);
- 
- 		/*
- 		 * If we failed translation or got a zero-sized region
-@@ -324,14 +324,16 @@ static int __of_pci_get_host_bridge_resources(struct device *dev,
- 
- 		if (resource_type(res) == IORESOURCE_IO) {
- 			if (!io_base) {
--				pr_err("I/O range found for %pOF. Please provide an io_base pointer to save CPU base address\n",
-+				dev_err(dev,
-+					"I/O range found for %pOF. Please provide an io_base pointer to save CPU base address\n",
- 					dev_node);
- 				err = -EINVAL;
- 				goto conversion_failed;
- 			}
- 			if (*io_base != (resource_size_t)OF_BAD_ADDR)
--				pr_warn("More than one I/O resource converted for %pOF. CPU base address for old range lost!\n",
--					dev_node);
-+				dev_warn(dev,
-+					 "More than one I/O resource converted for %pOF. CPU base address for old range lost!\n",
-+					 dev_node);
- 			*io_base = range.cpu_addr;
- 		}
- 
+-		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
++		if (dev)
++			res = devm_kzalloc(dev, sizeof(struct resource),
++					   GFP_KERNEL);
++		else
++			res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+ 		if (!res) {
+ 			err = -ENOMEM;
+ 			goto parse_failed;
+@@ -365,7 +372,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev_node,
+ 			unsigned char busno, unsigned char bus_max,
+ 			struct list_head *resources, resource_size_t *io_base)
+ {
+-	return __of_pci_get_host_bridge_resources(dev_node, busno,
++	return __of_pci_get_host_bridge_resources(NULL, dev_node, busno,
+ 						  bus_max, resources, io_base);
+ }
+ EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
 -- 
 2.13.6
