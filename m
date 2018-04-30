@@ -1,55 +1,112 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Mon, 30 Apr 2018 15:58:32 +0200
-Subject: [PATCH 06/17] irqchip/irq-mvebu-icu: switch to regmap
-In-Reply-To: <20180421135537.24716-7-miquel.raynal@bootlin.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 30 Apr 2018 09:09:10 -0500
+Subject: [PATCH 14/17] dt-bindings/interrupt-controller: add description
+ for Marvell SEI node
+In-Reply-To: <20180428124827.3992b1ee@xps13>
 References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
- <20180421135537.24716-7-miquel.raynal@bootlin.com>
-Message-ID: <20180430155832.62510f26@windsurf>
+ <20180421135537.24716-15-miquel.raynal@bootlin.com>
+ <20180427205032.6u5zzf7265wpgppg@rob-hp-laptop>
+ <20180428124827.3992b1ee@xps13>
+Message-ID: <CAL_JsqJ51riH+9Any7Bc6DN0Dx+WJdDAvOQ1gJCXTTUW0EUWsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Apr 28, 2018 at 5:48 AM, Miquel Raynal
+<miquel.raynal@bootlin.com> wrote:
+> Hi Rob,
+>
+> On Fri, 27 Apr 2018 15:50:32 -0500, Rob Herring <robh@kernel.org> wrote:
+>
+>> On Sat, Apr 21, 2018 at 03:55:34PM +0200, Miquel Raynal wrote:
+>> > Describe the SEI (System Error Interrupt) controller driver. The
+>> > controller is part of the GIC. It aggregates two types of interrupts,
+>> > wired and MSIs from respectively the AP and the CPs, into a single SPI
+>> > interrupt.
+>> >
+>> > Suggested-by: Haim Boot <hayim@marvell.com>
+>> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+>> > ---
+>> >  .../bindings/interrupt-controller/marvell,sei.txt  | 54 ++++++++++++++++++++++
+>> >  1 file changed, 54 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+>> > new file mode 100644
+>> > index 000000000000..a246d59552b1
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+>> > @@ -0,0 +1,54 @@
+>> > +Marvell SEI (System Error Interrupt) Controller
+>> > +-----------------------------------------------
+>> > +
+>> > +Marvell SEI (System Error Interrupt) controller is an interrupt aggregator.
+>> > +It receives interrupts from several sources and aggregates them to a single
+>> > +interrupt line (an SPI) on the primary interrupt controller.
+>> > +
+>> > +The IRQ chip can handle up to 64 SEIs, a set comes from the AP and is
+>> > +wired while a second set comes from the CPs by the mean of MSIs. Each
+>> > +'domain' is represented as a subnode.
+>> > +
+>> > +Required properties:
+>> > +
+>> > +- compatible: should be "marvell,armada-8k-sei".
+>> > +- reg: SEI registers location and length.
+>> > +- interrupts: identifies the parent IRQ that will be triggered.
+>> > +- #address-cells: should be '1', represents the position of the first
+>> > +                  IRQ of a given type in the SEI range.
+>> > +- #size-cells: should be '1', represents the number of a given type of
+>> > +               IRQs.
+>> > +
+>> > +Child node 'sei-wired-controller' required properties:
+>> > +
+>> > +- reg: the range of wired interrupts.
+>> > +- #interrupt-cells: number of cells to define an SEI wired interrupt
+>> > +                    coming from the AP, should be 1. The cell is the IRQ
+>> > +                    number.
+>> > +- interrupt-controller: identifies the node as an interrupt controller.
+>> > +
+>> > +Child node 'sei-msi-controller' required properties:
+>> > +
+>> > +- reg: the range of non-wired interrupts triggered by way of MSIs.
+>> > +- msi-controller: identifies the node as an MSI controller.
+>> > +
+>> > +Example:
+>> > +
+>> > +        sei: sei at 3f0200 {
+>> > +               compatible = "marvell,armada-8k-sei";
+>> > +               reg = <0x3f0200 0x40>;
+>> > +               interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+>> > +               #address-cells = <1>;
+>> > +               #size-cells = <1>;
+>> > +
+>> > +               sei_wired_controller: sei-wired-controller at 0 {
+>> > +                       reg = <0 21>;
+>>
+>> Using interrupt numbers in reg is strange.
+>
+> I thought the reg property was the one to choose here, I can of course
+> change it, what would you suggest?
+>
+>>
+>> > +                       #interrupt-cells = <1>;
+>> > +                       interrupt-controller;
+>> > +               };
+>> > +
+>> > +               sei_msi_controller: sei-msi-controller at 21 {
+>> > +                       reg = <21 43>;
+>> > +                       msi-controller;
+>>
+>> Can't the parent be both an interrupt-controller and msi-controller?
+>
+> We need to know which one aggregates interrupts, which one receives
+> MSIs and most importantly which interrupt is what (within the 64
+> that are handled by the SEI).
 
-On Sat, 21 Apr 2018 15:55:26 +0200, Miquel Raynal wrote:
+You mean that 0-20 are wired and 21-63 are msi? "marvell,msi-base =
+<21>;" in the parent would be sufficient for that though you may want
+something more flexible to have multiple ranges.
 
-> +	icu->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, NULL);
-> +	if (IS_ERR(icu->regmap))
-> +		return PTR_ERR(icu->regmap);
-> +
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	icu->base = devm_ioremap_resource(&pdev->dev, res);
-> -	if (IS_ERR(icu->base)) {
-> -		dev_err(&pdev->dev, "Failed to map icu base address.\n");
-> -		return PTR_ERR(icu->base);
-> -	}
-> +	if (!res)
-> +		return -ENODEV;
+It looks like there may already be similar bindings. See
+'msi-available-ranges" and "{al,arm},msi-base-spi".
 
-Another issue with relying on the "syscon" compatible string: your ICU
-driver now *requires* that the DT has the "syscon" compatible string.
-Otherwise, no regmap is created, and your
-syscon_regmap_lookup_by_phandle() call will fail.
-
-In fact, there is a very good hint that something is wrong in terms of
-backward compatibility: your patch
-
-  arm64: dts: marvell: add syscon compatible to CP110 ICU node
-
-comes early in the series, separated from other DT changes. It should
-come at the end of the series, with the rest of the DT changes. By
-doing this, you could test your series with the driver changes, but not
-the DT changes, and would have realized that the driver change in this
-patch (PATCH 06/17) breaks DT backward compatibility.
-
-This is IMO another good reason to not use the "syscon" property, but
-simply have the driver initialize the regmap by itself. This will work
-even with old DTs, as it will become just an internal implementation
-detail of the driver.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Rob
