@@ -1,89 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Apr 2018 09:53:08 +0100
-Subject: [PATCH v3 05/14] locking/qspinlock: Remove unbounded cmpxchg
- loop from locking slowpath
-In-Reply-To: <20180428124537.GD4082@hirez.programming.kicks-ass.net>
-References: <1524738868-31318-1-git-send-email-will.deacon@arm.com>
- <1524738868-31318-6-git-send-email-will.deacon@arm.com>
- <20180426155335.GL4064@hirez.programming.kicks-ass.net>
- <20180426165518.GC898@arm.com>
- <20180428124537.GD4082@hirez.programming.kicks-ass.net>
-Message-ID: <20180430085307.GB15504@arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 30 Apr 2018 10:24:53 +0200
+Subject: [PATCH 12/12] ARM: davinci: aemif: stop using pdev->id as nand
+ chipselect
+In-Reply-To: <20180430082453.8091-1-brgl@bgdev.pl>
+References: <20180430082453.8091-1-brgl@bgdev.pl>
+Message-ID: <20180430082453.8091-13-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2018 at 02:45:37PM +0200, Peter Zijlstra wrote:
-> On Thu, Apr 26, 2018 at 05:55:19PM +0100, Will Deacon wrote:
-> > On Thu, Apr 26, 2018 at 05:53:35PM +0200, Peter Zijlstra wrote:
-> > > On Thu, Apr 26, 2018 at 11:34:19AM +0100, Will Deacon wrote:
-> > > > @@ -290,58 +312,50 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
-> > > >  	}
-> > > >  
-> > > >  	/*
-> > > > +	 * If we observe any contention; queue.
-> > > > +	 */
-> > > > +	if (val & ~_Q_LOCKED_MASK)
-> > > > +		goto queue;
-> > > > +
-> > > > +	/*
-> > > >  	 * trylock || pending
-> > > >  	 *
-> > > >  	 * 0,0,0 -> 0,0,1 ; trylock
-> > > >  	 * 0,0,1 -> 0,1,1 ; pending
-> > > >  	 */
-> > > > +	val = atomic_fetch_or_acquire(_Q_PENDING_VAL, &lock->val);
-> > > > +	if (!(val & ~_Q_LOCKED_MASK)) {
-> > > >  		/*
-> > > > +		 * we're pending, wait for the owner to go away.
-> > > > +		 *
-> > > > +		 * *,1,1 -> *,1,0
-> > > 
-> > > Tail must be 0 here, right?
-> > 
-> > Not necessarily. If we're concurrently setting pending with another slowpath
-> > locker, they could queue in the tail behind us, so we can't mess with those
-> > upper bits.
-> 
-> Could be my brain just entirely stopped working; but I read that as:
-> 
-> 	!(val & ~0xFF) := !(val & 0xFFFFFF00)
-> 
-> which then pretty much mandates the top bits are empty, no?
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Only if there isn't a concurrent locker. For example:
+All platforms now use the core_chipsel field in platform_data. Stop
+using pdev->id in the aemif code.
 
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/aemif.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-T0:
-// fastpath fails to acquire the lock, returns val == _Q_LOCKED_VAL
-
-if (val & ~_Q_LOCKED_MASK)
-	goto queue;
-
-// Fallthrough
-
-T1:
-// fastpath fails to acquire the lock, returns val == _Q_LOCKED_VAL
-
-if (val & ~_Q_LOCKED_MASK)
-	goto queue;
-
-// Fallthrough
-
-T0:
-val = atomic_fetch_or_acquire(_Q_PENDING_VAL, &lock->val);
-// val == _Q_LOCKED_VAL
-
-T1:
-val = atomic_fetch_or_acquire(_Q_PENDING_VAL, &lock->val);
-// val == _Q_PENDING_VAL | _Q_LOCKED_VAL
-// Queue into tail
-
-T0:
-// Spins for _Q_LOCKED_MASK to go to zero, but tail is *non-zero*
-
-
-So it's really down to whether the state transitions in the comments refer
-to the lockword in memory, or the local "val" variable. I think the former
-is more instructive, because the whole thing is concurrent.
-
-Will
+diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
+index ff8b7e76b6e9..e4ab3f3a2a1f 100644
+--- a/arch/arm/mach-davinci/aemif.c
++++ b/arch/arm/mach-davinci/aemif.c
+@@ -189,7 +189,7 @@ int davinci_aemif_setup(struct platform_device *pdev)
+ 	 * Setup Async configuration register in case we did not boot
+ 	 * from NAND and so bootloader did not bother to set it up.
+ 	 */
+-	val = davinci_aemif_readl(base, A1CR_OFFSET + pdev->id * 4);
++	val = davinci_aemif_readl(base, A1CR_OFFSET + pdata->core_chipsel * 4);
+ 	/*
+ 	 * Extended Wait is not valid and Select Strobe mode is not
+ 	 * used
+@@ -198,13 +198,13 @@ int davinci_aemif_setup(struct platform_device *pdev)
+ 	if (pdata->options & NAND_BUSWIDTH_16)
+ 		val |= 0x1;
+ 
+-	davinci_aemif_writel(base, A1CR_OFFSET + pdev->id * 4, val);
++	davinci_aemif_writel(base, A1CR_OFFSET + pdata->core_chipsel * 4, val);
+ 
+ 	clkrate = clk_get_rate(clk);
+ 
+ 	if (pdata->timing)
+-		ret = davinci_aemif_setup_timing(pdata->timing, base, pdev->id,
+-						 clkrate);
++		ret = davinci_aemif_setup_timing(pdata->timing, base,
++						 pdata->core_chipsel, clkrate);
+ 
+ 	if (ret < 0)
+ 		dev_dbg(&pdev->dev, "NAND timing values setup fail\n");
+-- 
+2.17.0
