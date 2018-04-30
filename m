@@ -1,75 +1,51 @@
-From: jhugo@codeaurora.org (Jeffrey Hugo)
-Date: Mon, 30 Apr 2018 08:10:05 -0600
-Subject: [PATCH v2] init: Fix false positives in W+X checking
-In-Reply-To: <20180428061401.oj4tytn6yy277f7y@gmail.com>
-References: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
- <20180428061401.oj4tytn6yy277f7y@gmail.com>
-Message-ID: <d81d6d59-ce38-7051-8481-980daa4246d6@codeaurora.org>
+From: julien.grall@arm.com (Julien Grall)
+Date: Mon, 30 Apr 2018 15:17:01 +0100
+Subject: [kvmtool PATCH 21/17] kvmtool: arm: Add support for creating VM
+ with PA size
+In-Reply-To: <1522156531-28348-22-git-send-email-suzuki.poulose@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-22-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <21da5232-5be6-7d48-a5a6-2d89f3c0f682@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/28/2018 12:14 AM, Ingo Molnar wrote:
-> 
-> * Jeffrey Hugo <jhugo@codeaurora.org> wrote:
-> 
->> load_module() creates W+X mappings via __vmalloc_node_range() (from
->> layout_and_allocate()->move_module()->module_alloc()) by using
->> PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
->> "call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
->>
->> This is a problem because call_rcu_sched() queues work, which can be run
->> after debug_checkwx() is run, resulting in a race condition.  If hit, the
->> race results in a nasty splat about insecure W+X mappings, which results
->> in a poor user experience as these are not the mappings that
->> debug_checkwx() is intended to catch.
->>
->> This issue is observed on multiple arm64 platforms, and has been
->> artificially triggered on an x86 platform.
->>
->> Address the race by flushing the queued work before running the
->> arch-defined mark_rodata_ro() which then calls debug_checkwx().
->>
->> Reported-by: Timur Tabi <timur@codeaurora.org>
->> Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
->> Fixes: e1a58320a38d ("x86/mm: Warn on W^X mappings")
->> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
->> ---
->>
->> v1:
->> -was "arm64: mm: Fix false positives in W+X checking" (see [1])
->> -moved to common code based on review and confirmation of issue on x86
->>
->> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573776.html
->>
->>   init/main.c | 7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git a/init/main.c b/init/main.c
->> index b795aa3..499d957 100644
->> --- a/init/main.c
->> +++ b/init/main.c
->> @@ -1034,6 +1034,13 @@ static int __init set_debug_rodata(char *str)
->>   static void mark_readonly(void)
->>   {
->>   	if (rodata_enabled) {
->> +		/*
->> +		 * load_module() results in W+X mappings, which are cleaned up
->> +		 * with call_rcu_sched().  Let's make sure that queued work is
->> +		 * flushed so that we don't hit false positives looking for
->> +		 * insecure pages which are W+X.
->> +		 */
->> +		rcu_barrier_sched();
-> 
-> I'd suggest adding a matching comment to the module loading portion as well,
-> to make sure this connection does not get lost. With that:
-> 
-> Acked-by: Ingo Molnar <mingo@kernel.org>
+Hi,
 
-Sure.  Will add that in a v3.
+On 27/03/18 14:15, Suzuki K Poulose wrote:
+> diff --git a/arm/kvm.c b/arm/kvm.c
+> index 5701d41..a9a9140 100644
+> --- a/arm/kvm.c
+> +++ b/arm/kvm.c
+> @@ -11,6 +11,8 @@
+>   #include <linux/kvm.h>
+>   #include <linux/sizes.h>
+>   
+> +unsigned long kvm_arm_type;
+> +
+>   struct kvm_ext kvm_req_ext[] = {
+>   	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
+>   	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
+> @@ -18,6 +20,25 @@ struct kvm_ext kvm_req_ext[] = {
+>   	{ 0, 0 },
+>   };
+>   
+> +#ifndef KVM_ARM_GET_MAX_VM_PHYS_SHIFT
+> +#define KVM_ARM_GET_MAX_VM_PHYS_SHIFT		_IO(KVMIO, 0x0a)
+> +#endif
+> +
+> +void kvm__arch_init_hyp(struct kvm *kvm)
+> +{
+> +	unsigned max_ipa;
+> +
+> +	max_ipa = ioctl(kvm->sys_fd, KVM_ARM_GET_MAX_VM_PHYS_SHIFT);
+> +	if (max_ipa < 0)
+
+Another issues spotted while doing some testing. This will always be 
+false because max_ipa is unsigned.
+
+I think we want to turn max_ipa to signed.
+
+Cheers,
 
 -- 
-Jeffrey Hugo
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Julien Grall
