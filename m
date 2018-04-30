@@ -1,83 +1,38 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 30 Apr 2018 07:58:47 +0200
-Subject: [PATCH V4] clk: at91: PLL recalc_rate() now using cached MUL
- and DIV values
-In-Reply-To: <20180429190111.14247-1-marcin@ziemianowicz.com>
-References: <20180429190111.14247-1-marcin@ziemianowicz.com>
-Message-ID: <20180430075847.29706679@bbrezillon>
+From: david.engraf@sysgo.com (David Engraf)
+Date: Mon, 30 Apr 2018 08:11:05 +0200
+Subject: [PATCH v2] i2c: at91: Read all available bytes at once
+In-Reply-To: <20180428123838.abxiht7k4egv7iel@ninjato>
+References: <20180426082558.GX13305@rfolt0960.corp.atmel.com>
+ <20180426095314.12758-1-david.engraf@sysgo.com>
+ <20180428123838.abxiht7k4egv7iel@ninjato>
+Message-ID: <d728f2ac-5763-48af-03b5-571a75265281@sysgo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 29 Apr 2018 15:01:11 -0400
-Marcin Ziemianowicz <marcin@ziemianowicz.com> wrote:
+Am 28.04.2018 um 14:38 schrieb Wolfram Sang:
+> On Thu, Apr 26, 2018 at 11:53:14AM +0200, David Engraf wrote:
+>> With FIFO enabled it is possible to read multiple bytes
+>> at once in the interrupt handler as long as RXRDY is
+>> set. This may also reduce the number of interrupts.
+>>
+>> This patch polls RXRDY and reads all available bytes at
+>> once.
+>>
+>> Signed-off-by: David Engraf <david.engraf@sysgo.com>
+> 
+> checkpatch said twice:
+> 
+> WARNING: line over 80 characters
+> 
+> While I am not super-strict with this limit, it makes sense here IMO.
+> The comment stays readable, and we don't even lose a line.
 
-> When a USB device is connected to the USB host port on the SAM9N12 then
-> you get "-62" error which seems to indicate USB replies from the device
-> are timing out. Based on a logic sniffer, I saw the USB bus was running
-> at half speed.
-> 
-> The PLL code uses cached MUL and DIV values which get set in set_rate()
-> and applied in prepare(), but the recalc_rate() function instead
-> queries the hardware instead of using these cached values. Therefore,
-> if recalc_rate() is called between a set_rate() and prepare(), the
-> wrong frequency is calculated and later the USB clock divider for the
-> SAM9N12 SOC will be configured for an incorrect clock.
-> 
-> In my case, the PLL hardware was set to 96 Mhz before the OHCI
-> driver loads, and therefore the usb clock divider was being set
-> to /2 even though the OHCI driver set the PLL to 48 Mhz.
-> 
-> As an alternative explanation, I noticed this was fixed in the past by
-> 87e2ed338f1b ("clk: at91: fix recalc_rate implementation of PLL
-> driver") but the bug was later re-introduced by 1bdf02326b71 ("clk:
-> at91: make use of syscon/regmap internally").
-> 
-> Fixes: 1bdf02326b71 ("clk: at91: make use of syscon/regmap internally)
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
+Sorry for that.
 
-Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> Fixed it this time for you.
 
-> ---
-> Thank you for bearing with me about this Boris.
+Thanks
+- David
+
+> Applied to for-next, thanks!
 > 
-> Changes since V3:
->   Fix for double returns found by kbluild test robot
->   > Comments by Boris Brezillon about email formatting issues  
-> Changes since V2:
->   Removed all logging/debug messages I added
->   > Comment by Boris Brezillon about my fix being wrong addressed  
-> Changes since V1:
->   Added patch set cover letter
->   Shortened lines which were over >80 characters long
->   > Comment by Greg Kroah-Hartman about "from" field in email addressed
->   > Comment by Alan Stern about redundant debug lines addressed  
-> 
->  drivers/clk/at91/clk-pll.c | 13 +------------
->  1 file changed, 1 insertion(+), 12 deletions(-)
-> 
-> diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-> index 7d3223fc..72b6091e 100644
-> --- a/drivers/clk/at91/clk-pll.c
-> +++ b/drivers/clk/at91/clk-pll.c
-> @@ -132,19 +132,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
->  					 unsigned long parent_rate)
->  {
->  	struct clk_pll *pll = to_clk_pll(hw);
-> -	unsigned int pllr;
-> -	u16 mul;
-> -	u8 div;
-> -
-> -	regmap_read(pll->regmap, PLL_REG(pll->id), &pllr);
-> -
-> -	div = PLL_DIV(pllr);
-> -	mul = PLL_MUL(pllr, pll->layout);
-> -
-> -	if (!div || !mul)
-> -		return 0;
->  
-> -	return (parent_rate / div) * (mul + 1);
-> +	return (parent_rate / pll->div) * (pll->mul + 1);
->  }
->  
->  static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
