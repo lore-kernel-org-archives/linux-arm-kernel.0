@@ -1,100 +1,153 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 30 Apr 2018 10:46:50 +0100
-Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <CAEi0qNk7pVtfcrFU4gM35sajPb09xjR8d6cJkgoSr-H0Tgo+QA@mail.gmail.com>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <CAEi0qNk7pVtfcrFU4gM35sajPb09xjR8d6cJkgoSr-H0Tgo+QA@mail.gmail.com>
-Message-ID: <cc4347d0-995d-6921-a796-374a214cdce9@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 30 Apr 2018 10:47:35 +0100
+Subject: [linux-sunxi] [PATCH 3/3] arm64: allwinner: h6: enable MMC0/2 on
+ Pine H64
+In-Reply-To: <83EDF187-5EB2-4FEB-99BC-9D5B728D3A45@aosc.io>
+References: <20180426140728.43155-1-icenowy@aosc.io>
+ <20180426140728.43155-4-icenowy@aosc.io>
+ <03cc2e8c-4a35-3fb4-b408-fd8d4ba3e407@arm.com>
+ <83EDF187-5EB2-4FEB-99BC-9D5B728D3A45@aosc.io>
+Message-ID: <45956397-a593-e51e-8637-655178c5901c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joel,
+Hi Icenowy,
 
-Thanks for the interest.
-
-On 29/04/18 07:35, Joel Fernandes wrote:
-> Hi Julien,
+On 27/04/18 08:12, Icenowy Zheng wrote:
 > 
-> I am interested in evaluating if using this is feasible for our
-> Android devices. There is quite a usecase for lockup detection that it
-> seems worthwhile if it works well. Atleast I feel this can be used a
-> debug option considering the performance downgrade.
 > 
-> Do you have more details of if any GICv3 based system will work, or is
-> there a way an SoC can be misconfigured so that this series will not
-> work? I think Marc told me that's possible, but I wasn't sure. I will
-> be quite happy if it works on SoC as long as they have the requisite
-> GIC version.
-> 
-> Some more questions below:
-> 
-> On Wed, Jan 17, 2018 at 3:54 AM, Julien Thierry <julien.thierry@arm.com> wrote:
+> ? 2018?4?27? GMT+08:00 ??12:46:26, Andre Przywara <andre.przywara@arm.com> ??:
 >> Hi,
 >>
->> This series is a continuation of the work started by Daniel [1]. The goal
->> is to use GICv3 interrupt priorities to simulate an NMI.
+>> On 26/04/18 15:07, Icenowy Zheng wrote:
+>>> The Pine H64 board have a MicroSD slot connected to MMC0 controller
+>> of
+>>> the H6 SoC and a eMMC slot connected to MMC2.
+>>>
+>>> Enable them in the device tree.
+>>>
+>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>> ---
+>>>  .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 32
+>> ++++++++++++++++++++++
+>>>  1 file changed, 32 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+>> b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+>>> index d36de5eb81f3..78b1cd54687c 100644
+>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+>>> @@ -20,6 +20,38 @@
+>>>  	chosen {
+>>>  		stdout-path = "serial0:115200n8";
+>>>  	};
+>>> +
+>>> +	reg_vcc3v3: vcc3v3 {
+>>> +		compatible = "regulator-fixed";
+>>> +		regulator-name = "vcc3v3";
+>>> +		regulator-min-microvolt = <3300000>;
+>>> +		regulator-max-microvolt = <3300000>;
+>>> +	};
+>>> +
+>>> +	reg_vcc1v8: vcc1v8 {
+>>> +		compatible = "regulator-fixed";
+>>> +		regulator-name = "vcc1v8";
+>>> +		regulator-min-microvolt = <1800000>;
+>>> +		regulator-max-microvolt = <1800000>;
+>>> +	};
+>>> +};
+>>> +
+>>> +&mmc0 {
+>>> +	pinctrl-names = "default";
+>>> +	pinctrl-0 = <&mmc0_pins>;
+>>> +	vmmc-supply = <&reg_vcc3v3>;
 >>
->> To achieve this, set two priorities, one for standard interrupts and
->> another, higher priority, for NMIs. Whenever we want to disable interrupts,
->> we mask the standard priority instead so NMIs can still be raised. Some
->> corner cases though still require to actually mask all interrupts
->> effectively disabling the NMI.
->>
->> Of course, using priority masking instead of PSR.I comes at some cost. On
->> hackbench, the drop of performance seems to be >1% on average for this
->> version. I can only attribute that to recent changes in the kernel as
+>> So this is actually CLDO1 on the AXP, correct?
 > 
-> Do you have more specific performance data on the performance overhead
-> with this series?
+> I remember it's coupled between two LDOs, to provide enough power.
 > 
-
-Not at the moment. I was planning on doing a v3 anyway considering this 
-series is getting a bit old and the GICv3 driver has had some modifications.
-
-Once I get to it I can try to have more detailed performance data on a 
-recent kernel. I've really only measured the performance on hackbench 
-and on kernel build from defconfig (and for the kernel build the 
-performance difference was completely hidden by the noise).
-
->> hackbench seems slightly slower compared to my other benchmarks while the
->> runs with the use of GICv3 priorities have stayed in the same time frames.
->> KVM Guests do not seem to be affected preformance-wise by the host using
->> PMR to mask interrupts or not.
->>
->> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
->> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
->> for now. I don't think there is any reason LPIs should be allowed to be set
->> as NMI as they do not have an active state.
->> When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
 >>
 >>
->> Requirements to use this:
->> - Have GICv3
->> - SCR_EL3.FIQ is set to 1 when linux runs
+>>> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
+>>> +	status = "okay";
+>>> +};
+>>> +
+>>> +&mmc2 {
+>>> +	pinctrl-names = "default";
+>>> +	pinctrl-0 = <&mmc2_pins>;
+>>> +	vmmc-supply = <&reg_vcc3v3>;
+>>> +	vqmmc-supply = <&reg_vcc1v8>;
+>>
+>> And this is BLDO2?
 > 
-> Ah I see it mentioned here. Again, can you clarify if this is
-> something that can be misconfigured? Is it something that the
-> bootloader sets?
+> Yes.
 > 
-
-Yes, this is something that the bootloader sets and we have seen a few 
-cases where it is set to 0, so it can be "misconfigured".
-
-It is not impossible to handle this case, but this bit affects the view 
-the GICv3 CPU interface has on interrupt priority values. However it 
-requires to add some conditions in both the interrupt handling and 
-masking/unmasking code, so ideally we would avoid adding things to this.
-
-But the idea is that Linux only deals with group 1 interrupts, and group 
-1 interrupts are only signaled as FIQs when the execution state is 
-secure or at EL3, which should never happen in Linux's case. So ideally 
-we'd like firmwares to set up this bit properly rather than to have to 
-deal with both cases when only one of them makes sense for Linux.
-
-> Sorry if these questions sound premature, I haven't yet taken a closer
-> look at the series.
+>>
+>> I am just asking because I want to avoid running into the same problem
+>> as with the A64 before: that future DTs become incompatible with older
+>> kernels, because we change the power supply to point to the AXP
+>> regulators, which this kernel does not support yet.
 > 
+> The answer is just not to keep this compatibility, as it's not
+> supported option to update DT without updating kernel.
+
+Well, I recognise that statement.. ;-) and I understand that it's far
+easier to handle it this way. But:
+- Which .dtb are we going to write into the SPI flash? An older one,
+which covers all kernels, but lacks features? Or a newer one, which
+limits the bootable kernels to recent versions?
+- Which DT are we going to give to EFI applications?
+- Which DT are the BSDs suspected to take? They don't ship their own DTs
+(which is good!).
+
+So I understand that "shipping the DT with the kernel" is the old
+(embedded!) way of doing things, but I really believe we should stop
+relying on this and try to come up with backwards compatible DTs, which
+live in the firmware and get updated there. Because this is what the
+distros seem to expect from ARM64 boards these days.
+
+> P.S. I think the DT will update twice on the kernel side, the
+> first time keep reg_vcc3v3 (as it's coupled) but use real
+> regulator for reg_vcc1v8, the second time use the real
+> coupled regulator for reg_vcc3v3.
+> 
+>>
+>> It looks like there are more users of those power rails, so we could
+>> keep those supplies connected to these fixed regulators here, even with
+>> AXP-805 support in the kernel.
+> 
+> It's not a good choice.
+> 
+>>
+>> Or we keep this back until we get proper AXP support in the kernel? I
+>> guess it's quite close to the existing PMICs, so it might be more a
+>> copy&paste exercise to support the AXP-805?
+> 
+> It's not a reason to keep it back.
+
+So I compared the manuals of the AXP806 and the AXP805, the register
+interface looks identical to me. I only have a (somewhat) Chinese
+version of the AXP806 manual, so couldn't really find the difference
+between the two. Do you know more about it? Is it just maybe the
+packaging and the electrical properties (like max current supported)?
+
+If the I2C register interface is really the same, we could just add the
+DT nodes for the regulator and be done.
+
 Cheers,
+Andre.
 
--- 
-Julien Thierry
+> 
+>>
+>> But apart from this this looks correct to me.
+>>
+>> Cheers,
+>> Andre.
+>>
+>>> +	non-removable;
+>>> +	cap-mmc-hw-reset;
+>>> +	status = "okay";
+>>>  };
+>>>  
+>>>  &uart0 {
+>>>
