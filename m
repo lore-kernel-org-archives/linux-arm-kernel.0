@@ -1,32 +1,70 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 30 Apr 2018 17:10:50 +0530
-Subject: [PATCH 13/21] drm/sun4i: Enable DE2 Mixer for Allwinner 64-bit SoCs
+Date: Mon, 30 Apr 2018 17:10:53 +0530
+Subject: [PATCH 16/21] arm64: dts: allwinner: a64: bananapi-m64: Enable HDMI
+ output
 In-Reply-To: <20180430114058.5061-1-jagan@amarulasolutions.com>
 References: <20180430114058.5061-1-jagan@amarulasolutions.com>
-Message-ID: <20180430114058.5061-14-jagan@amarulasolutions.com>
+Message-ID: <20180430114058.5061-17-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner 64-bit SoC like H5/A64 has DE2 Mixer so enable them
-as default.
+Enable HDMI output on Bananpi-m64 board.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
-index 60468a779a63..95ae04964756 100644
---- a/drivers/gpu/drm/sun4i/Kconfig
-+++ b/drivers/gpu/drm/sun4i/Kconfig
-@@ -52,7 +52,7 @@ config DRM_SUN8I_DW_HDMI
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 2250dec9974c..69063c1fbddf 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -60,6 +60,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
  
- config DRM_SUN8I_MIXER
- 	tristate "Support for Allwinner Display Engine 2.0 Mixer"
--	default MACH_SUN8I
-+	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
- 	help
- 	  Choose this option if you have an Allwinner SoC with the
- 	  Allwinner Display Engine 2.0, which has a mixer to do some
++	connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -86,6 +97,10 @@
+ 	};
+ };
+ 
++&de {
++	status = "okay";
++};
++
+ &ehci1 {
+ 	status = "okay";
+ };
+@@ -99,6 +114,17 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	hvcc-supply = <&reg_dldo1>;
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
 -- 
 2.14.3
