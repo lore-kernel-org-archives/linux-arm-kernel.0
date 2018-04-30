@@ -1,9 +1,11 @@
 From: chandan.vn@samsung.com (CHANDAN VN)
-Date: Mon, 30 Apr 2018 09:43:45 +0530
+Date: Mon, 30 Apr 2018 09:50:18 +0530
 Subject: [PATCHv2 1/1] arm64: To remove initrd reserved area entry from
  memblock
-References: <CGME20180430041448epcas1p228a727858328da77c67c01c25802b86d@epcas1p2.samsung.com>
-Message-ID: <1525061625-7940-1-git-send-email-chandan.vn@samsung.com>
+In-Reply-To: <1522990390-30804-1-git-send-email-chandan.vn@samsung.com>
+References: <1522990390-30804-1-git-send-email-chandan.vn@samsung.com>
+ <CGME20180430042028epcas2p24418c10ebe7b2c656cdfc31e98ed540b@epcas2p2.samsung.com>
+Message-ID: <1525062018-8065-1-git-send-email-chandan.vn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
