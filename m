@@ -1,100 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 30 Apr 2018 11:30:29 +0100
-Subject: [v3 01/10] dt-bindings: mediatek: mmsys: Add support for mfd
-In-Reply-To: <64ca273429d92f581568a48f3efe6035af65f579.1524820923.git.mbrugger@suse.com>
-References: <cover.1524820923.git.mbrugger@suse.com>
- <64ca273429d92f581568a48f3efe6035af65f579.1524820923.git.mbrugger@suse.com>
-Message-ID: <20180430103029.GD5147@dell>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Mon, 30 Apr 2018 13:32:09 +0300
+Subject: [PATCH v4 3/9] dt-bindings: input: touchscreen: add pressure
+ threshold touchscreen property
+In-Reply-To: <1525084335-11276-1-git-send-email-eugen.hristev@microchip.com>
+References: <1525084335-11276-1-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1525084335-11276-4-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Apr 2018, matthias.bgg at kernel.org wrote:
+Add a common touchscreen optional property that will specify
+the minimum pressure applied to the screen that is needed
+such that the driver will report the touch event.
 
-> From: Matthias Brugger <mbrugger@suse.com>
-> 
-> Add binding description for the mmsys mfd for some Mediatek
-> devices. mmsys has some registers to control clock gates (which is
-> used in the clk driver) and some registers to set the routing and enable
-> the differnet blocks of the display subsystem.
-> 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> ---
->  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  2 --
->  .../bindings/display/mediatek/mediatek,disp.txt    |  2 +-
->  .../devicetree/bindings/mfd/mediatek,mmsys.txt     | 27 ++++++++++++++++++++++
->  3 files changed, 28 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-> index 4eb8bbe15c01..4468345f8b1a 100644
-> --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-> @@ -6,10 +6,8 @@ The Mediatek mmsys controller provides various clocks to the system.
->  Required Properties:
->  
->  - compatible: Should be one of:
-> -	- "mediatek,mt2701-mmsys", "syscon"
->  	- "mediatek,mt2712-mmsys", "syscon"
->  	- "mediatek,mt6797-mmsys", "syscon"
-> -	- "mediatek,mt8173-mmsys", "syscon"
->  - #clock-cells: Must be 1
->  
->  The mmsys controller uses the common clk binding from
-> diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-> index 383183a89164..85a3b4ec06cd 100644
-> --- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-> +++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-> @@ -9,7 +9,7 @@ function block.
->  
->  All DISP device tree nodes must be siblings to the central MMSYS_CONFIG node.
->  For a description of the MMSYS_CONFIG binding, see
-> -Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt.
-> +Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
->  
->  DISP function blocks
->  ====================
-> diff --git a/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
-> new file mode 100644
-> index 000000000000..2331ae16917e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
-> @@ -0,0 +1,27 @@
-> +MediaTek MMSYS Multifunction Device Driver
+Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-What is "MMSYS"?
-
-"Multi-Function Driver"s are specific to Linux.
-
-What actually is the device?
-
-> +MMSYS is a multifunction device with the following sub modules:
-> +- clocks for the multi-media subsystem
-> +- central node for the DRM subsystem.
-> +
-> +This document describes the binding for MFD device. The MFD takes care to initailize
-> +the clock driver and the DRM driver. More info see
-> +Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-> +
-> +Required properties:
-> +- compatible: Should be one of:
-> +	- "mediatek,mt2701-mmsys", "syscon"
-> +	- "mediatek,mt8173-mmsys", "syscon"
-> +- #clock-cells: Must be 1
-> +
-> +Optional properties:
-> +- power-domains: list of powerdomains needed for the subsystem to work
-> +
-> +Example:
-> +
-> +mmsys: clock-controller at 14000000 {
-> +	compatible = "mediatek,mt8173-mmsys", "syscon";
-> +	reg = <0 0x14000000 0 0x1000>;
-> +	power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> +	#clock-cells = <1>;
-> +};
-
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt b/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
+index 537643e..c84047a 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
+@@ -7,6 +7,9 @@ Optional properties for Touchscreens:
+ 				  (in pixels)
+  - touchscreen-max-pressure	: maximum reported pressure (arbitrary range
+ 				  dependent on the controller)
++ - touchscreen-threshold-pressure: minimum pressure on the touchscreen to be
++				  achieved in order for the touchscreen
++				  driver to report a touch event.
+  - touchscreen-fuzz-x		: horizontal noise value of the absolute input
+ 				  device (in pixels)
+  - touchscreen-fuzz-y		: vertical noise value of the absolute input
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
