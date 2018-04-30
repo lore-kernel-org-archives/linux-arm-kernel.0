@@ -1,60 +1,79 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 30 Apr 2018 14:12:26 +0200
-Subject: [PATCH v2 2/5] dma-mapping: Introduce dma_iommu_detach_device()
- API
-In-Reply-To: <e549979d-9f53-a329-da1a-ed5139958762@arm.com>
-References: <20180425101051.15349-1-thierry.reding@gmail.com>
- <20180425101051.15349-2-thierry.reding@gmail.com>
- <20180425151934.GC16075@infradead.org>
- <20180426121136.GD11985@ulmo> <20180430110231.GF2476@ulmo>
- <e549979d-9f53-a329-da1a-ed5139958762@arm.com>
-Message-ID: <20180430121226.GA6487@ulmo>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 30 Apr 2018 20:15:31 +0800
+Subject: [PATCH] ASoC: mediatek: add the .probe() callback in
+ mt2701_afe_pcm_dai_component
+Message-ID: <2bcfa1a389ff00a00204c2ddf3a94882195fd19d.1525090110.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 12:41:52PM +0100, Robin Murphy wrote:
-> On 30/04/18 12:02, Thierry Reding wrote:
-> > On Thu, Apr 26, 2018 at 02:11:36PM +0200, Thierry Reding wrote:
-> > > On Wed, Apr 25, 2018 at 08:19:34AM -0700, Christoph Hellwig wrote:
-> > > > On Wed, Apr 25, 2018 at 12:10:48PM +0200, Thierry Reding wrote:
-> > > > > From: Thierry Reding <treding@nvidia.com>
-> > > > > 
-> > > > > The dma_iommu_detach_device() API can be used by drivers to forcibly
-> > > > > detach a device from an IOMMU that architecture code might have attached
-> > > > > to. This is useful for drivers that need explicit control over the IOMMU
-> > > > > using the IOMMU API directly.
-> > > > 
-> > > > Given that no one else implements it making it a generic API seems
-> > > > rather confusing.  For now I'd rename it to
-> > > > arm_dma_iommu_detach_device() and only implement it in arm.
-> > > 
-> > > That'd be suboptimal because this code is used on both 32-bit and 64-bit
-> > > ARM. If we make the function 32-bit ARM specific then the driver code
-> > > would need to use an #ifdef to make sure compilation doesn't break on
-> > > 64-bit ARM.
-> > 
-> > Do you still want me to make this ARM specific? While I haven't
-> > encountered this issue on 64-bit ARM yet, I think it would happen there
-> > as well, under the right circumstances. I could take a shot at
-> > implementing the equivalent there (which means essentially implementing
-> > it for drivers/iommu/dma-iommu.c and calling that from 64-bit ARM code).
-> 
-> It sounds like things are getting a bit backwards here: iommu-dma should
-> have nothing to do with this, since if you've explicitly attached the device
-> to your own IOMMU domain then you're already bypassing everything it knows
-> about and has control over. Arch code calling into iommu-dma to do something
-> which makes arch code not use iommu-dma makes very little sense.
+For the sake of uniformity, this patch adds a callback mt2701_afe_pcm_probe()
+in mt2701_afe_pcm_dai_component to retrieve the regmap - the canonical way to 
+obtain the pointer..
 
-My understanding is that iommu-dma will set up an IOMMU domain at device
-probe time anyway. So even if attaching to an own IOMMU domain will end
-up bypassing iommu-dma, we'd still want to clear up the IOMMU domain and
-any associated resources, right?
+Doing so, we could switch to use devm_snd_soc_register_component() to register
+the component driver.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180430/7b66e2f7/attachment.sig>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 31 ++++++++++++++----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
+
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index d6eeb4c..828d11c 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -958,7 +958,17 @@ static int mt2701_irq_fs(struct snd_pcm_substream *substream, unsigned int rate)
+ 	{ "O31", "I35 Switch", "I35" },
+ };
+ 
++static int mt2701_afe_pcm_probe(struct snd_soc_component *component)
++{
++	struct mtk_base_afe *afe = snd_soc_component_get_drvdata(component);
++
++	snd_soc_component_init_regmap(component, afe->regmap);
++
++	return 0;
++}
++
+ static const struct snd_soc_component_driver mt2701_afe_pcm_dai_component = {
++	.probe = mt2701_afe_pcm_probe,
+ 	.name = "mt2701-afe-pcm-dai",
+ 	.dapm_widgets = mt2701_afe_pcm_widgets,
+ 	.num_dapm_widgets = ARRAY_SIZE(mt2701_afe_pcm_widgets),
+@@ -1316,22 +1326,6 @@ static int mt2701_afe_runtime_resume(struct device *dev)
+ 	return mt2701_afe_enable_clock(afe);
+ }
+ 
+-static int mt2701_afe_add_component(struct mtk_base_afe *afe)
+-{
+-	struct snd_soc_component *component;
+-
+-	component = kzalloc(sizeof(*component), GFP_KERNEL);
+-	if (!component)
+-		return -ENOMEM;
+-
+-	component->regmap = afe->regmap;
+-
+-	return snd_soc_add_component(afe->dev, component,
+-				     &mt2701_afe_pcm_dai_component,
+-				     mt2701_afe_pcm_dais,
+-				     ARRAY_SIZE(mt2701_afe_pcm_dais));
+-}
+-
+ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ {
+ 	struct mtk_base_afe *afe;
+@@ -1442,7 +1436,10 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 		goto err_platform;
+ 	}
+ 
+-	ret = mt2701_afe_add_component(afe);
++	ret = devm_snd_soc_register_component(&pdev->dev,
++					 &mt2701_afe_pcm_dai_component,
++					 mt2701_afe_pcm_dais,
++					 ARRAY_SIZE(mt2701_afe_pcm_dais));
+ 	if (ret) {
+ 		dev_warn(dev, "err_dai_component\n");
+ 		goto err_platform;
+-- 
+1.9.1
