@@ -1,154 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 30 Apr 2018 11:18:26 +0100
-Subject: [v3 03/10] mfd: mtk-mmsys: Add mmsys driver
-In-Reply-To: <e0894c97775e46ce6d9a441dc05e2e2479a4b612.1524820923.git.mbrugger@suse.com>
-References: <cover.1524820923.git.mbrugger@suse.com>
- <e0894c97775e46ce6d9a441dc05e2e2479a4b612.1524820923.git.mbrugger@suse.com>
-Message-ID: <20180430101826.GC5147@dell>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Apr 2018 11:20:22 +0100
+Subject: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+In-Reply-To: <8898674D84E3B24BA3A2D289B872026A69EF9AF9@G01JPEXMBKW03>
+References: <8898674D84E3B24BA3A2D289B872026A69EECF90@G01JPEXMBKW03>
+ <ce2c6191-1f74-4cec-9009-0a770d32673a@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A69EF9AF9@G01JPEXMBKW03>
+Message-ID: <7862f544-cd4f-8c48-ee04-fa8c628354ea@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Apr 2018, matthias.bgg at kernel.org wrote:
+Hi Lei,
 
-> From: Matthias Brugger <mbrugger@suse.com>
+On 30/04/18 08:53, Zhang, Lei wrote:
+> Hi Marc
 > 
-> The MMSYS subsystem includes clocks and drm components.
-> This patch adds a MFD device to probe both drivers from the same
-> device tree compatible.
+> thanks for your opinions.
 > 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> ---
->  drivers/mfd/Kconfig     |  9 ++++++
->  drivers/mfd/Makefile    |  2 ++
->  drivers/mfd/mtk-mmsys.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 90 insertions(+)
->  create mode 100644 drivers/mfd/mtk-mmsys.c
+>> How many is many? Are they PCI? Or something else?
+>  
+>> As it is, this patch will break Multi-MSI and some other platforms that
+>> do require a higher allocation granule.
+>>
+>> Depending on whether you're using PCI or some other bus, we can probably
+>> come up with a solution that works for everyone. But I need more
+>> information on this.
 > 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index b860eb5aa194..d23a3b9a2c58 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -378,6 +378,15 @@ config MFD_MC13XXX_I2C
->  	help
->  	  Select this if your MC13xxx is connected via an I2C bus.
->  
-> +config MFD_MEDIATEK_MMSYS
-> +	tristate "Mediatek MMSYS interface"
-> +	select MFD_CORE
-> +	select REGMAP_MMIO
-> +	help
-> +	  Select this if you have a MMSYS subsystem in your SoC. The
-> +	  MMSYS subsystem has at least a clock driver part and some
-> +	  DRM components.
-> +
->  config MFD_MXS_LRADC
->  	tristate "Freescale i.MX23/i.MX28 LRADC"
->  	depends on ARCH_MXS || COMPILE_TEST
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index d9d2cf0d32ef..b96118bd68d9 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -98,6 +98,8 @@ obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
->  obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
->  obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
->  
-> +obj-$(CONFIG_MFD_MEDIATEK_MMSYS) += mtk-mmsys.o
-> +
->  obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
->  
->  obj-$(CONFIG_EZX_PCAP)		+= ezx-pcap.o
-> diff --git a/drivers/mfd/mtk-mmsys.c b/drivers/mfd/mtk-mmsys.c
-> new file mode 100644
-> index 000000000000..c802343fb1c6
-> --- /dev/null
-> +++ b/drivers/mfd/mtk-mmsys.c
-> @@ -0,0 +1,79 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +
-> +/*
-> + * mtk-mmsys.c -- Mediatek MMSYS multi-function driver
-> + *
-> + * Copyright (c) 2018 Matthias Brugger <matthias.bgg@gmail.com>
-> + *
-> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/init.h>
-> +#include <linux/mfd/core.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +
-> +enum {
-> +	MMSYS_MT2701 = 1,
-> +};
-> +
-> +static const struct mfd_cell mmsys_mt2701_devs[] = {
-> +	{ .name = "clk-mt2701-mm", },
-> +	{ .name = "drm-mt2701-mm", },
-> +};
-> +
-> +static int mmsys_probe(struct platform_device *pdev)
-> +{
-> +	const struct mfd_cell *mmsys_cells;
-> +	int nr_cells;
-> +	long id;
-> +	int ret;
-> +
-> +	id = (long) of_device_get_match_data(&pdev->dev);
-> +	if (!id) {
-> +		dev_err(&pdev->dev, "of_device_get match_data() failed\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	switch (id) {
-> +	case MMSYS_MT2701:
-> +		mmsys_cells = mmsys_mt2701_devs;
-> +		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
-> +		break;
-> +	default:
-> +		return -ENODEV;
-> +	}
-> +
-> +	ret = devm_mfd_add_devices(&pdev->dev, 0, mmsys_cells, nr_cells,
-> +					NULL, 0, NULL);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to add MFD devices %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +};
+> Actually it is our original interconnect device not on PCI but on our
+> original bus. This device has many sub devices around one thousand,
+> and each sub device requires only a few LPIs.
 
-This driver is pretty pointless.  It doesn't actually do anything.
+OK. Have you implemented your own glue layer for this (like we already
+have for PCI, platform and FSL-MC)? Or are you directly using the
+platform MSI infrastructure?
 
-I think you just want to use "simple-mfd" instead.
+> As I explained in point1, each Device ID can still allocate enough
+> LPIs more than IRQS_PER_CHUNK by increasing chunks. So I couldn't
+> understand why this patch will break Multi-MSI.
 
-> +static const struct of_device_id of_match_mmsys[] = {
-> +	{ .compatible = "mediatek,mt2701-mmsys",
-> +	  .data = (void *) MMSYS_MT2701,
-> +	},
-> +	{ /* sentinel */ },
-> +};
-> +
-> +static struct platform_driver mmsys_drv = {
-> +	.probe = mmsys_probe,
-> +	.driver = {
-> +		.name = "mediatek-mmysys",
-> +		.of_match_table = of_match_ptr(of_match_mmsys),
-> +	},
-> +};
-> +
-> +builtin_platform_driver(mmsys_drv);
-> +
-> +MODULE_DESCRIPTION("Mediatek MMSYS multi-function driver");
-> +MODULE_LICENSE("GPL");
+Unfortunately, Multi-MSI has more requirements than just allocating
+multiple MSIs. The allocated MSIs must be allocated as a contiguous
+range, be a power of two, aligned on the size of the range, with a
+maximum of 32 interrupts. Your approach breaks the alignment requirement.
 
+> By the way, 32 seems a good default value for IRQS_PER_CHUNK.
+> So, I want to write another patch to make IRQ_PER_CHUNK a variable
+> which can be changed by kernel parameter.
+> What do you think of this idea?
+
+It is not great, because it prevents two buses with different
+requirements from being used concurrently in the same system. It may not
+be an issue for you right now, but I want the ITS driver to be
+independent of the bus requirements.
+
+Another, more involved (but also more correct) approach would be to
+teach the various glue layers about the requirements of the bus they
+support, and pass on the allocation requirements to the core ITS driver.
+That way, we would keep the heterogeneous case working.
+
+I can probably help you with that, but this assumes that you've
+implemented support for your own bus by providing a glue layer
+equivalent to the one we have for other buses.
+
+Thanks,
+
+	M.
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
