@@ -1,32 +1,72 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 30 Apr 2018 17:10:47 +0530
-Subject: [PATCH 10/21] drm/sun4i: Enable DesignWare HDMI for Allwinner 64-bit
- SoCs
+Date: Mon, 30 Apr 2018 17:10:46 +0530
+Subject: [PATCH 09/21] arm64: dts: allwinner: a64: Add HDMI support
 In-Reply-To: <20180430114058.5061-1-jagan@amarulasolutions.com>
 References: <20180430114058.5061-1-jagan@amarulasolutions.com>
-Message-ID: <20180430114058.5061-11-jagan@amarulasolutions.com>
+Message-ID: <20180430114058.5061-10-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner 64-bit SoC like H5/A64 has DesignWare HDMI so
-enable them as default.
+HDMI on Allwinner A64 has similar behavior like H3/H5, so
+reuse the same dts node details for A64.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 28 +++++++++++++++++++++++++++
+ include/dt-bindings/clock/sun50i-a64-ccu.h    |  2 ++
+ 2 files changed, 30 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
-index eee6bc0eaf97..60468a779a63 100644
---- a/drivers/gpu/drm/sun4i/Kconfig
-+++ b/drivers/gpu/drm/sun4i/Kconfig
-@@ -42,6 +42,7 @@ config DRM_SUN4I_BACKEND
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 67b80bbe5bf5..da9128ae836d 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -644,6 +644,34 @@
+ 			#interrupt-cells = <3>;
+ 		};
  
- config DRM_SUN8I_DW_HDMI
- 	tristate "Support for Allwinner version of DesignWare HDMI"
-+	default ARM64 && ARCH_SUNXI
- 	depends on DRM_SUN4I
- 	select DRM_DW_HDMI
- 	help
++		hdmi: hdmi at 1ee0000 {
++			compatible = "allwinner,sun50i-a64-dw-hdmi",
++				     "allwinner,sun8i-a83t-dw-hdmi";
++			reg = <0x01ee0000 0x10000>;
++			reg-io-width = <1>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
++				 <&ccu CLK_HDMI>;
++			clock-names = "iahb", "isfr", "tmds";
++			resets = <&ccu RST_BUS_HDMI1>;
++			reset-names = "ctrl";
++			phys = <&hdmi_phy>;
++			phy-names = "hdmi-phy";
++			status = "disabled";
++		};
++
++		hdmi_phy: hdmi-phy at 1ef0000 {
++			compatible = "allwinner,sun50i-a64-hdmi-phy",
++				     "allwinner,sun8i-h3-hdmi-phy";
++			reg = <0x01ef0000 0x10000>;
++			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
++				 <&ccu CLK_PLL_VIDEO1>;
++			clock-names = "bus", "mod", "pll-0";
++			resets = <&ccu RST_BUS_HDMI0>;
++			reset-names = "phy";
++			#phy-cells = <0>;
++		};
++
+ 		rtc: rtc at 1f00000 {
+ 			compatible = "allwinner,sun6i-a31-rtc";
+ 			reg = <0x01f00000 0x54>;
+diff --git a/include/dt-bindings/clock/sun50i-a64-ccu.h b/include/dt-bindings/clock/sun50i-a64-ccu.h
+index d66432c6e675..41c09df797ef 100644
+--- a/include/dt-bindings/clock/sun50i-a64-ccu.h
++++ b/include/dt-bindings/clock/sun50i-a64-ccu.h
+@@ -45,6 +45,8 @@
+ 
+ #define CLK_PLL_PERIPH0		11
+ 
++#define CLK_PLL_VIDEO1		15
++
+ #define CLK_BUS_MIPI_DSI	28
+ #define CLK_BUS_CE		29
+ #define CLK_BUS_DMA		30
 -- 
 2.14.3
