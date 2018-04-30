@@ -1,40 +1,42 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Apr 2018 15:46:30 +0200
-Subject: [PATCH v3 5/5] pinctrl: sunxi: Use of_clk_get_parent_count()
- instead of open coding
-In-Reply-To: <1524063005-1716-6-git-send-email-geert+renesas@glider.be>
-References: <1524063005-1716-1-git-send-email-geert+renesas@glider.be>
- <1524063005-1716-6-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180430134630.GF11457@mai>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Mon, 30 Apr 2018 15:49:13 +0200
+Subject: [PATCH 04/17] irqchip/irq-mvebu-icu: fix wrong user data retrieval
+In-Reply-To: <20180421135537.24716-5-miquel.raynal@bootlin.com>
+References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
+ <20180421135537.24716-5-miquel.raynal@bootlin.com>
+Message-ID: <20180430154913.64d94375@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 04:50:05PM +0200, Geert Uytterhoeven wrote:
-> A new open coder has crept in since 470b73a38470e8ba ("pinctrl: sunxi:
-> Use of_clk_get_parent_count() instead of open coding"), replace it.
-> 
-> of_clk_get_parent_count() was moved to <linux/of_clk.h>, so include that
-> instead of <linux/clk-provider.h>.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
-> This depends on "[PATCH v3 1/5] clk: Extract OF clock helpers in
-> <linux/of_clk.h>".
-> 
-> v3:
->   - Add Acked-by,
-> 
-> v2:
->   - New.
-> ---
+Hello,
 
-Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+In the title, I think "user data" is not really appropriate. "private
+date" or "device private data" maybe ?
 
+On Sat, 21 Apr 2018 15:55:24 +0200, Miquel Raynal wrote:
+> The irq_domain structure has an host_data pointer that just stores user
+> data. It is meant to not be touched by the IRQ core. However, when it
+> comes to MSI, the MSI layer adds its own private data there with a
+> structure that also has a host_data pointer.
+> 
+> Because this IRQ domain is an MSI domain, to access user data we should
+> do a d->host_data->host_data, also wrapped as
+> 'platform_msi_get_host_data()'.
+> 
+> This bug was lying there silently because the 'icu' structure retrieved
+> this way was just called by dev_err(), only producing a
+> '(NULL device *):' output on the console.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+
+Otherwise:
+
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+
+Thanks!
+
+Thomas
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
