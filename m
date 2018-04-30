@@ -1,10 +1,9 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Tue, 1 May 2018 07:15:37 +0800
-Subject: [PATCH 2/3] platform: move the early platform device support to
- arch/sh
-In-Reply-To: <20180430163556.2560-3-brgl@bgdev.pl>
-References: <20180430163556.2560-3-brgl@bgdev.pl>
-Message-ID: <201805010502.8vPPYqY1%fengguang.wu@intel.com>
+Date: Tue, 1 May 2018 07:52:12 +0800
+Subject: [PATCH 3/3] sh: add the sh_ prefix to early platform symbols
+In-Reply-To: <20180430163556.2560-4-brgl@bgdev.pl>
+References: <20180430163556.2560-4-brgl@bgdev.pl>
+Message-ID: <201805010735.DbWU1fzw%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,82 +16,77 @@ I love your patch! Yet something to improve:
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
 url:    https://github.com/0day-ci/linux/commits/Bartosz-Golaszewski/sh-make-early_platform-code-SuperH-specific/20180501-025442
-config: arm-shmobile_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+config: powerpc64-allmodconfig (attached as .config)
+compiler: powerpc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
 reproduce:
         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+        make.cross ARCH=powerpc64 
 
-All error/warnings (new ones prefixed by >>):
+All errors (new ones prefixed by >>):
 
-   drivers/tty/serial/sh-sci.c: In function 'sci_probe':
-   drivers/tty/serial/sh-sci.c:3196:6: error: implicit declaration of function 'is_early_platform_device'; did you mean 'to_platform_device'? [-Werror=implicit-function-declaration]
-     if (is_early_platform_device(dev))
-         ^~~~~~~~~~~~~~~~~~~~~~~~
-         to_platform_device
-   drivers/tty/serial/sh-sci.c: At top level:
-   drivers/tty/serial/sh-sci.c:3294:28: error: expected declaration specifiers or '...' before string constant
-    early_platform_init_buffer("earlyprintk", &sci_driver,
-                               ^~~~~~~~~~~~~
-   drivers/tty/serial/sh-sci.c:3294:43: error: expected declaration specifiers or '...' before '&' token
-    early_platform_init_buffer("earlyprintk", &sci_driver,
-                                              ^
-   drivers/tty/serial/sh-sci.c:3295:7: error: expected declaration specifiers or '...' before 'early_serial_buf'
-          early_serial_buf, ARRAY_SIZE(early_serial_buf));
-          ^~~~~~~~~~~~~~~~
-   In file included from include/linux/clk.h:16:0,
-                    from drivers/tty/serial/sh-sci.c:24:
->> include/linux/kernel.h:71:25: error: expected declaration specifiers or '...' before '(' token
-    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
-                            ^
->> drivers/tty/serial/sh-sci.c:3295:25: note: in expansion of macro 'ARRAY_SIZE'
-          early_serial_buf, ARRAY_SIZE(early_serial_buf));
-                            ^~~~~~~~~~
+   drivers/clocksource/sh_cmt.c: In function 'sh_cmt_probe':
+>> drivers/clocksource/sh_cmt.c:1046:7: error: implicit declaration of function 'is_sh_early_platform_device'; did you mean 'to_platform_device'? [-Werror=implicit-function-declaration]
+     if (!is_sh_early_platform_device(pdev)) {
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+          to_platform_device
+   drivers/clocksource/sh_cmt.c: At top level:
+   drivers/clocksource/sh_cmt.c:1103:24: error: expected declaration specifiers or '...' before string constant
+    sh_early_platform_init("earlytimer", &sh_cmt_device_driver);
+                           ^~~~~~~~~~~~
+   drivers/clocksource/sh_cmt.c:1103:38: error: expected declaration specifiers or '...' before '&' token
+    sh_early_platform_init("earlytimer", &sh_cmt_device_driver);
+                                         ^
    cc1: some warnings being treated as errors
 --
-   drivers/tty//serial/sh-sci.c: In function 'sci_probe':
-   drivers/tty//serial/sh-sci.c:3196:6: error: implicit declaration of function 'is_early_platform_device'; did you mean 'to_platform_device'? [-Werror=implicit-function-declaration]
-     if (is_early_platform_device(dev))
-         ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/tty/serial/sh-sci.c: In function 'sci_probe':
+>> drivers/tty/serial/sh-sci.c:3196:6: error: implicit declaration of function 'is_sh_early_platform_device'; did you mean 'to_platform_device'? [-Werror=implicit-function-declaration]
+     if (is_sh_early_platform_device(dev))
+         ^~~~~~~~~~~~~~~~~~~~~~~~~~~
          to_platform_device
-   drivers/tty//serial/sh-sci.c: At top level:
-   drivers/tty//serial/sh-sci.c:3294:28: error: expected declaration specifiers or '...' before string constant
-    early_platform_init_buffer("earlyprintk", &sci_driver,
-                               ^~~~~~~~~~~~~
-   drivers/tty//serial/sh-sci.c:3294:43: error: expected declaration specifiers or '...' before '&' token
-    early_platform_init_buffer("earlyprintk", &sci_driver,
-                                              ^
-   drivers/tty//serial/sh-sci.c:3295:7: error: expected declaration specifiers or '...' before 'early_serial_buf'
-          early_serial_buf, ARRAY_SIZE(early_serial_buf));
-          ^~~~~~~~~~~~~~~~
-   In file included from include/linux/clk.h:16:0,
-                    from drivers/tty//serial/sh-sci.c:24:
->> include/linux/kernel.h:71:25: error: expected declaration specifiers or '...' before '(' token
-    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
-                            ^
-   drivers/tty//serial/sh-sci.c:3295:25: note: in expansion of macro 'ARRAY_SIZE'
-          early_serial_buf, ARRAY_SIZE(early_serial_buf));
-                            ^~~~~~~~~~
    cc1: some warnings being treated as errors
 
-vim +/ARRAY_SIZE +3295 drivers/tty/serial/sh-sci.c
+vim +1046 drivers/clocksource/sh_cmt.c
 
-^1da177e drivers/serial/sh-sci.c     Linus Torvalds    2005-04-16  3292  
-7b6fd3bf drivers/serial/sh-sci.c     Magnus Damm       2009-12-14  3293  #ifdef CONFIG_SERIAL_SH_SCI_CONSOLE
-7b6fd3bf drivers/serial/sh-sci.c     Magnus Damm       2009-12-14  3294  early_platform_init_buffer("earlyprintk", &sci_driver,
-7b6fd3bf drivers/serial/sh-sci.c     Magnus Damm       2009-12-14 @3295  			   early_serial_buf, ARRAY_SIZE(early_serial_buf));
-7b6fd3bf drivers/serial/sh-sci.c     Magnus Damm       2009-12-14  3296  #endif
-0b0cced1 drivers/tty/serial/sh-sci.c Yoshinori Sato    2015-12-24  3297  #ifdef CONFIG_SERIAL_SH_SCI_EARLYCON
-dd076cff drivers/tty/serial/sh-sci.c Matthias Kaehlcke 2017-10-09  3298  static struct plat_sci_port port_cfg __initdata;
-0b0cced1 drivers/tty/serial/sh-sci.c Yoshinori Sato    2015-12-24  3299  
-
-:::::: The code at line 3295 was first introduced by commit
-:::::: 7b6fd3bf82c4901f6ba0101ba71a5c507c24f9cf sh-sci: Extend sh-sci driver with early console V2
-
-:::::: TO: Magnus Damm <damm@opensource.se>
-:::::: CC: Paul Mundt <lethal@linux-sh.org>
+  1040	
+  1041	static int sh_cmt_probe(struct platform_device *pdev)
+  1042	{
+  1043		struct sh_cmt_device *cmt = platform_get_drvdata(pdev);
+  1044		int ret;
+  1045	
+> 1046		if (!is_sh_early_platform_device(pdev)) {
+  1047			pm_runtime_set_active(&pdev->dev);
+  1048			pm_runtime_enable(&pdev->dev);
+  1049		}
+  1050	
+  1051		if (cmt) {
+  1052			dev_info(&pdev->dev, "kept as earlytimer\n");
+  1053			goto out;
+  1054		}
+  1055	
+  1056		cmt = kzalloc(sizeof(*cmt), GFP_KERNEL);
+  1057		if (cmt == NULL)
+  1058			return -ENOMEM;
+  1059	
+  1060		ret = sh_cmt_setup(cmt, pdev);
+  1061		if (ret) {
+  1062			kfree(cmt);
+  1063			pm_runtime_idle(&pdev->dev);
+  1064			return ret;
+  1065		}
+  1066		if (is_sh_early_platform_device(pdev))
+  1067			return 0;
+  1068	
+  1069	 out:
+  1070		if (cmt->has_clockevent || cmt->has_clocksource)
+  1071			pm_runtime_irq_safe(&pdev->dev);
+  1072		else
+  1073			pm_runtime_idle(&pdev->dev);
+  1074	
+  1075		return 0;
+  1076	}
+  1077	
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -101,6 +95,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 27660 bytes
+Size: 56210 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180501/82333889/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180501/d9a49b1e/attachment-0001.gz>
