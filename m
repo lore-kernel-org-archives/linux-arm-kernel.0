@@ -1,52 +1,34 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 30 Apr 2018 10:24:52 +0200
-Subject: [PATCH 11/12] mtd: nand: davinci: stop using pdev->id as chipselect
+Date: Mon, 30 Apr 2018 10:24:48 +0200
+Subject: [PATCH 07/12] ARM: davinci: dm644x-evm: specify the chipselect in
+ davinci_nand_pdata
 In-Reply-To: <20180430082453.8091-1-brgl@bgdev.pl>
 References: <20180430082453.8091-1-brgl@bgdev.pl>
-Message-ID: <20180430082453.8091-12-brgl@bgdev.pl>
+Message-ID: <20180430082453.8091-8-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-All platform now use the core_chipsel field in platform data. Stop
-using pdev->id in the driver.
+We now have the core_chipsel field in davinci_nand_pdata. Use it
+instead of the platform_device id number.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/mtd/nand/raw/davinci_nand.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-davinci/board-dm644x-evm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mtd/nand/raw/davinci_nand.c b/drivers/mtd/nand/raw/davinci_nand.c
-index 7255a0d94374..cd12e5abafde 100644
---- a/drivers/mtd/nand/raw/davinci_nand.c
-+++ b/drivers/mtd/nand/raw/davinci_nand.c
-@@ -545,7 +545,7 @@ static struct davinci_nand_pdata
- 			return ERR_PTR(-ENOMEM);
- 		if (!of_property_read_u32(pdev->dev.of_node,
- 			"ti,davinci-chipselect", &prop))
--			pdev->id = prop;
-+			pdata->core_chipsel = prop;
- 		else
- 			return ERR_PTR(-EINVAL);
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 190a28cc91bd..f76e22069e4b 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -152,6 +152,7 @@ static struct davinci_aemif_timing davinci_evm_nandflash_timing = {
+ };
  
-@@ -627,7 +627,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 
- 	/* which external chipselect will we be managing? */
--	if (pdev->id < 0 || pdev->id > 3)
-+	if (pdata->core_chipsel < 0 || pdata->core_chipsel > 3)
- 		return -ENODEV;
- 
- 	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
-@@ -683,7 +683,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 	info->ioaddr		= (uint32_t __force) vaddr;
- 
- 	info->current_cs	= info->ioaddr;
--	info->core_chipsel	= pdev->id;
-+	info->core_chipsel	= pdata->core_chipsel;
- 	info->mask_chipsel	= pdata->mask_chipsel;
- 
- 	/* use nandboot-capable ALE/CLE masks by default */
+ static struct davinci_nand_pdata davinci_evm_nandflash_data = {
++	.core_chipsel	= 0,
+ 	.parts		= davinci_evm_nandflash_partition,
+ 	.nr_parts	= ARRAY_SIZE(davinci_evm_nandflash_partition),
+ 	.ecc_mode	= NAND_ECC_HW,
 -- 
 2.17.0
