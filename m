@@ -1,68 +1,74 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Mon, 30 Apr 2018 15:34:23 +0800
-Subject: [PATCH v2 01/17] dt-bindings: power: reset: mt6323: add
- bindings for MT6323 power controller
-In-Reply-To: <20180427200225.lq63ex7eiukc6egl@rob-hp-laptop>
-References: <cover.1524646231.git.sean.wang@mediatek.com>
- <0b3123e42c8a47e3fa8b21aa2e139e6d3dc69f41.1524646231.git.sean.wang@mediatek.com>
- <20180427200225.lq63ex7eiukc6egl@rob-hp-laptop>
-Message-ID: <1525073663.12322.219.camel@mtkswgap22>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Mon, 30 Apr 2018 13:11:30 +0530
+Subject: [PATCH v9 0/4] Fix issues with huge mapping in ioremap for ARM64
+Message-ID: <1525074094-25839-1-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-04-27 at 15:02 -0500, Rob Herring wrote:
-> On Wed, Apr 25, 2018 at 05:32:27PM +0800, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > Adding device-tree binding for the power controller which is a tiny
-> > circuit block present as a part of MT6323 PMIC and is responsible for
-> > externally powering off or on a remote SoC the PMIC is connected to.
-> > 
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >  .../bindings/power/reset/mt6323-poweroff.txt         | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/power/reset/mt6323-poweroff.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/power/reset/mt6323-poweroff.txt b/Documentation/devicetree/bindings/power/reset/mt6323-poweroff.txt
-> > new file mode 100644
-> > index 0000000..6f7c590
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/power/reset/mt6323-poweroff.txt
-> > @@ -0,0 +1,20 @@
-> > +Device Tree Bindings for Power Controller on MediaTek PMIC
-> > +
-> > +The power controller which could be found on PMIC is responsible for externally
-> > +powering off or on the remote MediaTek SoC through the circuit BBPU.
-> > +
-> > +Required properties:
-> > +- compatible: Should be one of follows
-> > +	"mediatek,mt6323-pwrc": for MT6323 PMIC
-> > +
-> > +Example:
-> > +
-> > +	pmic {
-> > +		compatible = "mediatek,mt6323";
-> > +
-> > +		...
-> > +
-> > +		power-controller {
-> > +			compatible = "mediatek,mt6323-pwrc";
-> 
-> Why do you need this in DT? It doesn't define any resources. The parent 
-> can just as well register a reset or poweroff handler.
-> 
-> Rob
-> 
+This series of patches takes Toshi Kani <toshi.kani@hpe.com>'s
+patches ("fix memory leak/panic in ioremap huge pages") as base
+and re-bring huge_vmap back for arm64.
 
-Yes, those binding can be removed. 
+This series of patches are tested on 4.16 kernel with Cortex-A75
+based SoC.
 
-I tend to use platform_device_register_data embedded in mfd driver
-to probe the existent poweroff driver in the next version.
+The test used for verifying these patches is a stress test on
+ioremap/unmap which tries to re-use same io-address but changes
+size of mapping randomly i.e. 4K to 2M to 16K etc. The same test
+used to reproduce 3rd level translation fault without these fixes
+(and also of course with Revert "arm64: Enforce BBM for huge IO/VMAP
+mappings" being part of the tree).
 
-> > +		};
-> > +	}
-> > -- 
-> > 2.7.4
-> > 
+These patches can also go into '-stable' branch (if accepted)
+for 4.6 onwards.
+
+>From V8->V9:
+ - Used __TLBI_VADDR macros in new TLB flush API
+
+>From V7->V8:
+ - Properly fixed compilation issue in x86 file
+
+>From V6->V7:
+ - Fixed compilation issue in x86 case
+ - V6 patches were not properly enumarated
+
+>From V5->V6:
+ - Use __flush_tlb_kernel_pgtable() for both PUD and PMD. Remove
+   "bool tlb_inv" based variance as it is not need now
+ - Re-naming for consistency
+
+>From V4->V5:
+ - Add new API __flush_tlb_kernel_pgtable(unsigned long addr)
+   for kernel addresses
+
+>From V3->V4:
+ - Add header for 'addr' in x86 implementation
+ - Re-order pmd/pud clear and table free
+ - Avoid redundant TLB invalidatation in one perticular case
+
+>From V2->V3:
+ - Use the exisiting page table free interface to do arm64
+   specific things
+
+>From V1->V2:
+ - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
+   Add interfaces to free unmapped page table"
+ - Honored BBM for ARM64
+
+Chintan Pandya (4):
+  ioremap: Update pgtable free interfaces with addr
+  arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
+  arm64: Implement page table free interfaces
+  Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
+
+ arch/arm64/include/asm/tlbflush.h |  6 ++++++
+ arch/arm64/mm/mmu.c               | 37 +++++++++++++++++++++++++------------
+ arch/x86/mm/pgtable.c             |  8 +++++---
+ include/asm-generic/pgtable.h     |  8 ++++----
+ lib/ioremap.c                     |  4 ++--
+ 5 files changed, 42 insertions(+), 21 deletions(-)
+
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
+Collaborative Project
