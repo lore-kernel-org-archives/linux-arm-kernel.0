@@ -1,36 +1,66 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Mon, 30 Apr 2018 15:53:52 +0200
-Subject: [PATCH 06/17] irqchip/irq-mvebu-icu: switch to regmap
-In-Reply-To: <20180421135537.24716-7-miquel.raynal@bootlin.com>
-References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
- <20180421135537.24716-7-miquel.raynal@bootlin.com>
-Message-ID: <20180430155352.1b24d1d8@windsurf>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Mon, 30 Apr 2018 15:49:16 +0200
+Subject: [PATCH] pinctrl: armada-37xx: add suspend/resume support
+In-Reply-To: <20180421141731.25556-1-miquel.raynal@bootlin.com> (Miquel
+ Raynal's message of "Sat, 21 Apr 2018 16:17:31 +0200")
+References: <20180421141731.25556-1-miquel.raynal@bootlin.com>
+Message-ID: <87a7tkby8z.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Miquel,
+ 
+ On sam., avril 21 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-On Sat, 21 Apr 2018 15:55:26 +0200, Miquel Raynal wrote:
-> The ICU DT nodes have now the 'syscon' compatible, we can switch to
+> From: Ken Ma <make@marvell.com>
+>
+> Add suspend/resume hooks in pinctrl driver to handle S2RAM operations.
+>
+> Beyond the traditional register save/restore operations, these hooks
+> also keep the GPIOs used for both-edge IRQ synchronized between their
+> level (low/high) and expected IRQ polarity (falling/rising edge).
+>
+> Since pinctrl is an infrastructure module, its resume should be issued
+> prior to other IO drivers. The pinctrl PM is registered as syscore
+> level to make sure of it. A postcore initcall is added to register
+> syscore operation. Because of the use of such syscore_ops, the
+> suspend/resume hooks do not have access to a device pointer, and thus
+> need to use a global list in order to keep track of the probed devices
+> for which registers have to be saved/restored.
 
-have now -> now have
+Did you consider to use SET_LATE_SYSTEM_SLEEP_PM_OPS ?
 
-> regmap before splitting the code to support multiple platform devices to
-> be probed (one for the ICU, one per interrupt group).
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+[...]
 
-As I explained in the review of PATCH 03/17, I think we could simply
-create the regmap in the ->probe() of the parent device, instead of
-using the "syscon" property, which is mainly useful when there is no
-parent device.
+> +#if defined(CONFIG_PM)
+> +static int armada_3700_pinctrl_suspend(void)
+> +{
+> +	struct armada_37xx_pinctrl *info;
+> +
+> +	list_for_each_entry(info, &device_list, node) {
+> +		/* Save GPIO state */
+> +		regmap_read(info->regmap, OUTPUT_EN, &info->pm.out_en_l);
+> +		regmap_read(info->regmap, OUTPUT_EN + sizeof(u32),
+> +			    &info->pm.out_en_h);
+> +		regmap_read(info->regmap, OUTPUT_VAL, &info->pm.out_val_l);
+> +		regmap_read(info->regmap, OUTPUT_VAL + sizeof(u32),
+> +			    &info->pm.out_val_h);
+> +
+> +		info->pm.irq_en_l = readl(info->base + IRQ_EN);
+> +		info->pm.irq_en_h = readl(info->base + IRQ_EN + sizeof(u32));
+> +		info->pm.irq_pol_l = readl(info->base + IRQ_POL);
+> +		info->pm.irq_pol_h = readl(info->base + IRQ_POL + sizeof(u32));
+> +
+> +		/* Save pinctrl state */
+> +		regmap_read(info->regmap, SELECTION, &info->pm.selection);
 
-The rest of the conversion to regmap looks good otherwise.
+I thought there was an API with regmap which allow to save all the
+register in one call. If it is the case it woudl be nice to use it.
 
-Best regards,
 
-Thomas
+Gregory
+
 -- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Gregory Clement, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
-https://bootlin.com
+http://bootlin.com
