@@ -1,59 +1,65 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Mon, 30 Apr 2018 11:57:21 +0530
-Subject: [PATCH v4 6/6] arm64: dts: ls208xa: comply with the iommu map binding
- for fsl_mc
-In-Reply-To: <1525069641-8523-1-git-send-email-nipun.gupta@nxp.com>
-References: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
- <1525069641-8523-1-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <1525069641-8523-7-git-send-email-nipun.gupta@nxp.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 30 Apr 2018 09:07:48 +0200
+Subject: [PATCH 07/10] ARM: dts: kzm9d: Drop unnecessary address
+ properties from gpio_keys node
+In-Reply-To: <20180426145213.GD3315@bigcity.dyn.berto.se>
+References: <20180426102951.8683-1-horms+renesas@verge.net.au>
+ <20180426102951.8683-8-horms+renesas@verge.net.au>
+ <20180426145213.GD3315@bigcity.dyn.berto.se>
+Message-ID: <20180430070747.tyc2p5xhzvv3ja6o@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fsl-mc bus support the new iommu-map property. Comply to this binding
-for fsl_mc bus.
+On Thu, Apr 26, 2018 at 04:52:13PM +0200, Niklas S?derlund wrote:
+> Hi Simon,
+> 
+> Thanks for your work.
+> 
+> On 2018-04-26 12:29:48 +0200, Simon Horman wrote:
+> > The gpio_keys node does not have an address and thus does not need
+> > address-cells or address size-properties.
+> > 
+> > This is flagged by dtc as follows:
+> >  # make dtbs W=1
+> >  arch/arm/boot/dts/r8a7794-silk.dtb: Warning (avoid_unnecessary_addr_size): /soc/video at e6ef0000/port: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+> 
+> This warning don't seem to match with the change nor the rest of the 
+> commit message :-)
+> 
+> With that addressed and for the whole series:
+> 
+> Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
-Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Thanks!
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-index 137ef4d..6010505 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-@@ -184,6 +184,7 @@
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-+		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
- 
- 		clockgen: clocking at 1300000 {
- 			compatible = "fsl,ls2080a-clockgen";
-@@ -357,6 +358,8 @@
- 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
- 			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
- 			msi-parent = <&its>;
-+			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
-+			dma-coherent;
- 			#address-cells = <3>;
- 			#size-cells = <1>;
- 
-@@ -460,6 +463,8 @@
- 			compatible = "arm,mmu-500";
- 			reg = <0 0x5000000 0 0x800000>;
- 			#global-interrupts = <12>;
-+			#iommu-cells = <1>;
-+			stream-match-mask = <0x7C00>;
- 			interrupts = <0 13 4>, /* global secure fault */
- 				     <0 14 4>, /* combined secure interrupt */
- 				     <0 15 4>, /* global non-secure fault */
-@@ -502,7 +507,6 @@
- 				     <0 204 4>, <0 205 4>,
- 				     <0 206 4>, <0 207 4>,
- 				     <0 208 4>, <0 209 4>;
--			mmu-masters = <&fsl_mc 0x300 0>;
- 		};
- 
- 		dspi: dspi at 2100000 {
--- 
-1.9.1
+The fix is:
+
+arch/arm/boot/dts/emev2-kzm9d.dtb: Warning (avoid_unnecessary_addr_size): /gpio_keys: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/boot/dts/emev2-kzm9d.dts | 3 ---
+> >  1 file changed, 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+> > index c238407133bf..0af44b7eadb9 100644
+> > --- a/arch/arm/boot/dts/emev2-kzm9d.dts
+> > +++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+> > @@ -34,9 +34,6 @@
+> >  
+> >  	gpio_keys {
+> >  		compatible = "gpio-keys";
+> > -		#address-cells = <1>;
+> > -		#size-cells = <0>;
+> > -
+> >  		one {
+> >  			debounce-interval = <50>;
+> >  			wakeup-source;
+> > -- 
+> > 2.11.0
+> > 
+> 
+> -- 
+> Regards,
+> Niklas S?derlund
+> 
