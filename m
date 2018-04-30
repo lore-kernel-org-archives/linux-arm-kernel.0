@@ -1,48 +1,46 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 30 Apr 2018 18:58:36 +0800
-Subject: [v3 09/10] drm: mediatek: Omit warning on probe defers
-In-Reply-To: <9d514a4ab45f0700663fa756d5aa3913922b6fb7.1524820923.git.mbrugger@suse.com>
-References: <cover.1524820923.git.mbrugger@suse.com>
- <9d514a4ab45f0700663fa756d5aa3913922b6fb7.1524820923.git.mbrugger@suse.com>
-Message-ID: <1525085916.25456.8.camel@mtksdaap41>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 30 Apr 2018 13:02:31 +0200
+Subject: [PATCH v2 2/5] dma-mapping: Introduce dma_iommu_detach_device()
+ API
+In-Reply-To: <20180426121136.GD11985@ulmo>
+References: <20180425101051.15349-1-thierry.reding@gmail.com>
+ <20180425101051.15349-2-thierry.reding@gmail.com>
+ <20180425151934.GC16075@infradead.org>
+ <20180426121136.GD11985@ulmo>
+Message-ID: <20180430110231.GF2476@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Matthias:
-
-On Fri, 2018-04-27 at 11:24 +0200, matthias.bgg at kernel.org wrote:
-> From: Matthias Brugger <mbrugger@suse.com>
+On Thu, Apr 26, 2018 at 02:11:36PM +0200, Thierry Reding wrote:
+> On Wed, Apr 25, 2018 at 08:19:34AM -0700, Christoph Hellwig wrote:
+> > On Wed, Apr 25, 2018 at 12:10:48PM +0200, Thierry Reding wrote:
+> > > From: Thierry Reding <treding@nvidia.com>
+> > > 
+> > > The dma_iommu_detach_device() API can be used by drivers to forcibly
+> > > detach a device from an IOMMU that architecture code might have attached
+> > > to. This is useful for drivers that need explicit control over the IOMMU
+> > > using the IOMMU API directly.
+> > 
+> > Given that no one else implements it making it a generic API seems
+> > rather confusing.  For now I'd rename it to
+> > arm_dma_iommu_detach_device() and only implement it in arm.
 > 
-> When probe through the MFD, it can happen that the
-> clock drivers wasn't probed before the ddp driver gets
-> invoked. The driver used to omit a warning that the driver
-> failed to get the clocks. Omit this error on the defered probe path.
-> 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> That'd be suboptimal because this code is used on both 32-bit and 64-bit
+> ARM. If we make the function 32-bit ARM specific then the driver code
+> would need to use an #ifdef to make sure compilation doesn't break on
+> 64-bit ARM.
 
-It's better to use 'drm/mediatek:' for title to align drm commits.
-For the modification,
+Do you still want me to make this ARM specific? While I haven't
+encountered this issue on 64-bit ARM yet, I think it would happen there
+as well, under the right circumstances. I could take a shot at
+implementing the equivalent there (which means essentially implementing
+it for drivers/iommu/dma-iommu.c and calling that from 64-bit ARM code).
 
-Acked-by: CK Hu <ck.hu@mediatek.com>
-
-Regards,
-CK
-
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index bafc5c77c4fb..6b399348a2dc 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -374,7 +374,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
->  
->  	ddp->clk = devm_clk_get(dev, NULL);
->  	if (IS_ERR(ddp->clk)) {
-> -		dev_err(dev, "Failed to get clock\n");
-> +		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
-> +			dev_err(dev, "Failed to get clock\n");
->  		return PTR_ERR(ddp->clk);
->  	}
->  
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180430/c99db340/attachment.sig>
