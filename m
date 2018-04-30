@@ -1,66 +1,55 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Mon, 30 Apr 2018 15:49:16 +0200
-Subject: [PATCH] pinctrl: armada-37xx: add suspend/resume support
-In-Reply-To: <20180421141731.25556-1-miquel.raynal@bootlin.com> (Miquel
- Raynal's message of "Sat, 21 Apr 2018 16:17:31 +0200")
-References: <20180421141731.25556-1-miquel.raynal@bootlin.com>
-Message-ID: <87a7tkby8z.fsf@bootlin.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Mon, 30 Apr 2018 15:58:32 +0200
+Subject: [PATCH 06/17] irqchip/irq-mvebu-icu: switch to regmap
+In-Reply-To: <20180421135537.24716-7-miquel.raynal@bootlin.com>
+References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
+ <20180421135537.24716-7-miquel.raynal@bootlin.com>
+Message-ID: <20180430155832.62510f26@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On sam., avril 21 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+Hello,
 
-> From: Ken Ma <make@marvell.com>
->
-> Add suspend/resume hooks in pinctrl driver to handle S2RAM operations.
->
-> Beyond the traditional register save/restore operations, these hooks
-> also keep the GPIOs used for both-edge IRQ synchronized between their
-> level (low/high) and expected IRQ polarity (falling/rising edge).
->
-> Since pinctrl is an infrastructure module, its resume should be issued
-> prior to other IO drivers. The pinctrl PM is registered as syscore
-> level to make sure of it. A postcore initcall is added to register
-> syscore operation. Because of the use of such syscore_ops, the
-> suspend/resume hooks do not have access to a device pointer, and thus
-> need to use a global list in order to keep track of the probed devices
-> for which registers have to be saved/restored.
+On Sat, 21 Apr 2018 15:55:26 +0200, Miquel Raynal wrote:
 
-Did you consider to use SET_LATE_SYSTEM_SLEEP_PM_OPS ?
-
-[...]
-
-> +#if defined(CONFIG_PM)
-> +static int armada_3700_pinctrl_suspend(void)
-> +{
-> +	struct armada_37xx_pinctrl *info;
+> +	icu->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, NULL);
+> +	if (IS_ERR(icu->regmap))
+> +		return PTR_ERR(icu->regmap);
 > +
-> +	list_for_each_entry(info, &device_list, node) {
-> +		/* Save GPIO state */
-> +		regmap_read(info->regmap, OUTPUT_EN, &info->pm.out_en_l);
-> +		regmap_read(info->regmap, OUTPUT_EN + sizeof(u32),
-> +			    &info->pm.out_en_h);
-> +		regmap_read(info->regmap, OUTPUT_VAL, &info->pm.out_val_l);
-> +		regmap_read(info->regmap, OUTPUT_VAL + sizeof(u32),
-> +			    &info->pm.out_val_h);
-> +
-> +		info->pm.irq_en_l = readl(info->base + IRQ_EN);
-> +		info->pm.irq_en_h = readl(info->base + IRQ_EN + sizeof(u32));
-> +		info->pm.irq_pol_l = readl(info->base + IRQ_POL);
-> +		info->pm.irq_pol_h = readl(info->base + IRQ_POL + sizeof(u32));
-> +
-> +		/* Save pinctrl state */
-> +		regmap_read(info->regmap, SELECTION, &info->pm.selection);
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	icu->base = devm_ioremap_resource(&pdev->dev, res);
+> -	if (IS_ERR(icu->base)) {
+> -		dev_err(&pdev->dev, "Failed to map icu base address.\n");
+> -		return PTR_ERR(icu->base);
+> -	}
+> +	if (!res)
+> +		return -ENODEV;
 
-I thought there was an API with regmap which allow to save all the
-register in one call. If it is the case it woudl be nice to use it.
+Another issue with relying on the "syscon" compatible string: your ICU
+driver now *requires* that the DT has the "syscon" compatible string.
+Otherwise, no regmap is created, and your
+syscon_regmap_lookup_by_phandle() call will fail.
 
+In fact, there is a very good hint that something is wrong in terms of
+backward compatibility: your patch
 
-Gregory
+  arm64: dts: marvell: add syscon compatible to CP110 ICU node
 
+comes early in the series, separated from other DT changes. It should
+come at the end of the series, with the rest of the DT changes. By
+doing this, you could test your series with the driver changes, but not
+the DT changes, and would have realized that the driver change in this
+patch (PATCH 06/17) breaks DT backward compatibility.
+
+This is IMO another good reason to not use the "syscon" property, but
+simply have the driver initialize the regmap by itself. This will work
+even with old DTs, as it will become just an internal implementation
+detail of the driver.
+
+Best regards,
+
+Thomas
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
-http://bootlin.com
+https://bootlin.com
