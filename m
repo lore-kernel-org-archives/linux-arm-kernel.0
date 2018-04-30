@@ -1,71 +1,75 @@
 From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Mon, 30 Apr 2018 07:48:38 +0200
-Subject: [PATCH v2 04/10] PCI: Add dev parameter to
- __of_pci_get_host_bridge_resources()
-In-Reply-To: <cover.1525067324.git.jan.kiszka@siemens.com>
-References: <cover.1525067324.git.jan.kiszka@siemens.com>
-Message-ID: <cfab525f3d0436f75187fbd65907ada909d7692f.1525067324.git.jan.kiszka@siemens.com>
+Date: Mon, 30 Apr 2018 07:48:34 +0200
+Subject: [PATCH v2 00/10] PCI: leak fixes, removable generic PCI host,
+ assorted stuff
+Message-ID: <cover.1525067324.git.jan.kiszka@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Kiszka <jan.kiszka@siemens.com>
+Changes in v2:
+ - patch 1: commit message reworking as suggested by Lorenzo
+ - patch 3-6: split-up as suggested by Bjorn
+ - patch 8: new
+ - patch 10: select PCI_DOMAINS from PCI_HOST_GENERIC, rather than
+   allowing manual choice, as suggested by Lorenzo
 
-When non-NULL, use the new dev parameter of
-__of_pci_get_host_bridge_resources() to allocate the resource data
-structures via devm_kzalloc. That allows to release them automatically
-during device destruction.
+This primarily enables to unbind the generic PCI host controller without
+leaving lots of memory leaks behind. A previous proposal patch 5 was
+rejected because of those issues [1].
 
-Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
----
- drivers/pci/of.c | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+The fixes have been validated in the Jailhouse setup, where we add and
+remove a virtual PCI host controller on hypervisor activation/
+deactivation, with the help of kmemleak.
 
-diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index 375de447a58e..bfa282b538d5 100644
---- a/drivers/pci/of.c
-+++ b/drivers/pci/of.c
-@@ -243,7 +243,7 @@ void of_pci_check_probe_only(void)
- EXPORT_SYMBOL_GPL(of_pci_check_probe_only);
- 
- #if defined(CONFIG_OF_ADDRESS)
--static int __of_pci_get_host_bridge_resources(
-+static int __of_pci_get_host_bridge_resources(struct device *dev,
- 			struct device_node *dev_node,
- 			unsigned char busno, unsigned char bus_max,
- 			struct list_head *resources, resource_size_t *io_base)
-@@ -259,7 +259,10 @@ static int __of_pci_get_host_bridge_resources(
- 	if (io_base)
- 		*io_base = (resource_size_t)OF_BAD_ADDR;
- 
--	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-+	if (dev)
-+		bus_range = devm_kzalloc(dev,sizeof(*bus_range), GFP_KERNEL);
-+	else
-+		bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
- 	if (!bus_range)
- 		return -ENOMEM;
- 
-@@ -303,7 +306,11 @@ static int __of_pci_get_host_bridge_resources(
- 		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
- 			continue;
- 
--		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-+		if (dev)
-+			res = devm_kzalloc(dev, sizeof(struct resource),
-+					   GFP_KERNEL);
-+		else
-+			res = kzalloc(sizeof(struct resource), GFP_KERNEL);
- 		if (!res) {
- 			err = -ENOMEM;
- 			goto parse_failed;
-@@ -365,7 +372,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev_node,
- 			unsigned char busno, unsigned char bus_max,
- 			struct list_head *resources, resource_size_t *io_base)
- {
--	return __of_pci_get_host_bridge_resources(dev_node, busno,
-+	return __of_pci_get_host_bridge_resources(NULL, dev_node, busno,
- 						  bus_max, resources, io_base);
- }
- EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+Besides that, there is tiny PCI API cleanup at the beginning and
+support for manually enabled PCI domains at the end that enables the
+Jailhouse scenario.
+
+Jan
+
+[1] http://lkml.iu.edu/hypermail/linux/kernel/1606.3/00072.html
+
+
+CC: Jingoo Han <jingoohan1@gmail.com>
+CC: Joao Pinto <Joao.Pinto@synopsys.com>
+CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+
+Jan Kiszka (10):
+  PCI: Make pci_get_new_domain_nr() static
+  PCI: Fix memory leak of devm_pci_alloc_host_bridge()
+  PCI: Factor out __of_pci_get_host_bridge_resources()
+  PCI: Add dev parameter to __of_pci_get_host_bridge_resources()
+  PCI: Replace pr_*() with dev_*() in
+    __of_pci_get_host_bridge_resources()
+  PCI: Introduce devm_of_pci_get_host_bridge_resources()
+  PCI: Convert of_pci_get_host_bridge_resources() users to devm variant
+  PCI: Deprecate of_pci_get_host_bridge_resources()
+  PCI: Add support for unbinding the generic PCI host controller
+  PCI: Enable PCI_DOMAINS along with generic PCI host controller
+
+ drivers/pci/dwc/pcie-designware-host.c |   2 +-
+ drivers/pci/host/Kconfig               |   1 +
+ drivers/pci/host/pci-aardvark.c        |   5 +-
+ drivers/pci/host/pci-ftpci100.c        |   4 +-
+ drivers/pci/host/pci-host-common.c     |  13 ++++
+ drivers/pci/host/pci-host-generic.c    |   1 +
+ drivers/pci/host/pci-v3-semi.c         |   3 +-
+ drivers/pci/host/pci-versatile.c       |   3 +-
+ drivers/pci/host/pci-xgene.c           |   3 +-
+ drivers/pci/host/pcie-altera.c         |   5 +-
+ drivers/pci/host/pcie-iproc-platform.c |   4 +-
+ drivers/pci/host/pcie-rcar.c           |   5 +-
+ drivers/pci/host/pcie-rockchip.c       |   4 +-
+ drivers/pci/host/pcie-xilinx-nwl.c     |   4 +-
+ drivers/pci/host/pcie-xilinx.c         |   4 +-
+ drivers/pci/of.c                       | 105 +++++++++++++++++++++------------
+ drivers/pci/pci.c                      |   6 +-
+ drivers/pci/probe.c                    |   4 +-
+ include/linux/of_pci.h                 |  42 ++++++++++++-
+ include/linux/pci-ecam.h               |   1 +
+ include/linux/pci.h                    |   3 -
+ 21 files changed, 149 insertions(+), 73 deletions(-)
+
 -- 
 2.13.6
