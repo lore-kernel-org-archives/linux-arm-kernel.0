@@ -1,142 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Apr 2018 06:54:39 +0100
-Subject: [PATCH 3/5] arm64: dts: imx: add imx8qxp support
-In-Reply-To: <1524855977-15719-4-git-send-email-aisheng.dong@nxp.com>
-References: <1524855977-15719-1-git-send-email-aisheng.dong@nxp.com>
- <1524855977-15719-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20180430055429.zkyhn7w7ppnqs2pp@salmiak>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 30 Apr 2018 07:58:47 +0200
+Subject: [PATCH V4] clk: at91: PLL recalc_rate() now using cached MUL
+ and DIV values
+In-Reply-To: <20180429190111.14247-1-marcin@ziemianowicz.com>
+References: <20180429190111.14247-1-marcin@ziemianowicz.com>
+Message-ID: <20180430075847.29706679@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, 29 Apr 2018 15:01:11 -0400
+Marcin Ziemianowicz <marcin@ziemianowicz.com> wrote:
 
-On Sat, Apr 28, 2018 at 03:06:15AM +0800, Dong Aisheng wrote:
-> +/{
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		/* We have 1 clusters having 4 Cortex-A35 cores */
+> When a USB device is connected to the USB host port on the SAM9N12 then
+> you get "-62" error which seems to indicate USB replies from the device
+> are timing out. Based on a logic sniffer, I saw the USB bus was running
+> at half speed.
+> 
+> The PLL code uses cached MUL and DIV values which get set in set_rate()
+> and applied in prepare(), but the recalc_rate() function instead
+> queries the hardware instead of using these cached values. Therefore,
+> if recalc_rate() is called between a set_rate() and prepare(), the
+> wrong frequency is calculated and later the USB clock divider for the
+> SAM9N12 SOC will be configured for an incorrect clock.
+> 
+> In my case, the PLL hardware was set to 96 Mhz before the OHCI
+> driver loads, and therefore the usb clock divider was being set
+> to /2 even though the OHCI driver set the PLL to 48 Mhz.
+> 
+> As an alternative explanation, I noticed this was fixed in the past by
+> 87e2ed338f1b ("clk: at91: fix recalc_rate implementation of PLL
+> driver") but the bug was later re-introduced by 1bdf02326b71 ("clk:
+> at91: make use of syscon/regmap internally").
+> 
+> Fixes: 1bdf02326b71 ("clk: at91: make use of syscon/regmap internally)
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
 
-> +	};
-> +
-> +	pmu {
-> +		compatible = "arm,armv8-pmuv3";
-> +		interrupts = <GIC_PPI 7
-> +			(GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		interrupt-affinity = <&A35_0>, <&A35_1>, <&A35_2>, <&A35_3>;
-> +	};
+Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
-If using a PPI and all cores are identical, interrupt-affinity isn't necessary.
-
-I note you're using GICv3, whihch doesn't encode a cpumask in its PPI
-specifier. All instances of GIC_CPU_MASK_SIMPLE should go from dts{i,} files
-for this platform.
-
-> +
-> +	psci {
-> +		compatible = "arm,psci-1.0";
-> +		method = "smc";
-> +		cpu_suspend   = <0xc4000001>;
-> +		cpu_off	      = <0xc4000002>;
-> +		cpu_on	      = <0xc4000003>;
-
-You can drop the cpu_* function IDs if you only have "arm,psci-1.0" in the
-compatible list. These IDs (and more) are implied by PSCI 1.0+.
-
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts b/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts
-> new file mode 100644
-> index 0000000..920018e
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts
-> @@ -0,0 +1,138 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright 2017~2018 NXP
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "fsl-imx8qxp.dtsi"
-> +
-> +/ {
-> +	model = "Freescale i.MX8QXP MEK";
-> +	compatible = "fsl,imx8qxp-mek", "fsl,imx8qxp";
-> +
-> +	chosen {
-> +		stdout-path = &dma_lpuart0;
-> +	};
-
-No baud-rate configuration?
-
-[...]
-
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi
-> new file mode 100644
-> index 0000000..d7cc836
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi
-> @@ -0,0 +1,794 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + * Copyright 2017~2018 NXP
-> + *	Dong Aisheng <aisheng.dong@nxp.com>
-> + */
-> +
-> +#include <dt-bindings/clock/imx8qxp-clock.h>
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/pinctrl/pads-imx8qxp.h>
-> +#include <dt-bindings/power/imx-rsrc.h>
-> +
-> +#include "fsl-imx8-ca35.dtsi"
-> +
-> +/ {
-> +	compatible = "fsl,imx8qxp";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	aliases {
-> +		serial0 = &dma_lpuart0;
-> +		mmc0 = &usdhc1;
-> +		mmc1 = &usdhc2;
-> +		mmc2 = &usdhc3;
-> +	};
-> +
-> +	memory at 80000000 {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x80000000 0 0x40000000>;
-> +	};
-> +
-> +	gic: interrupt-controller at 51a00000 {
-> +		compatible = "arm,gic-v3";
-> +		reg = <0x0 0x51a00000 0 0x10000>, /* GIC Dist */
-> +		      <0x0 0x51b00000 0 0xC0000>; /* GICR (RD_base + SGI_base) */
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		interrupts = <GIC_PPI 9
-> +			(GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
-
-As above, GIC_CPU_MASK_SIMPLE does not apply to GICv3, and should go.
-
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Physical Secure */
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Physical Non-Secure */
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Virtual */
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>; /* Hypervisor */
-
-... likewise.
-
-> +		clock-frequency = <8000000>;
-
-Your firmware should be configuring CNTFRQ, so this clock-frequency property
-should go.
-
-Thanks,
-Mark.
+> ---
+> Thank you for bearing with me about this Boris.
+> 
+> Changes since V3:
+>   Fix for double returns found by kbluild test robot
+>   > Comments by Boris Brezillon about email formatting issues  
+> Changes since V2:
+>   Removed all logging/debug messages I added
+>   > Comment by Boris Brezillon about my fix being wrong addressed  
+> Changes since V1:
+>   Added patch set cover letter
+>   Shortened lines which were over >80 characters long
+>   > Comment by Greg Kroah-Hartman about "from" field in email addressed
+>   > Comment by Alan Stern about redundant debug lines addressed  
+> 
+>  drivers/clk/at91/clk-pll.c | 13 +------------
+>  1 file changed, 1 insertion(+), 12 deletions(-)
+> 
+> diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
+> index 7d3223fc..72b6091e 100644
+> --- a/drivers/clk/at91/clk-pll.c
+> +++ b/drivers/clk/at91/clk-pll.c
+> @@ -132,19 +132,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+>  					 unsigned long parent_rate)
+>  {
+>  	struct clk_pll *pll = to_clk_pll(hw);
+> -	unsigned int pllr;
+> -	u16 mul;
+> -	u8 div;
+> -
+> -	regmap_read(pll->regmap, PLL_REG(pll->id), &pllr);
+> -
+> -	div = PLL_DIV(pllr);
+> -	mul = PLL_MUL(pllr, pll->layout);
+> -
+> -	if (!div || !mul)
+> -		return 0;
+>  
+> -	return (parent_rate / div) * (mul + 1);
+> +	return (parent_rate / pll->div) * (pll->mul + 1);
+>  }
+>  
+>  static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
