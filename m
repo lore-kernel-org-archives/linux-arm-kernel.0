@@ -1,130 +1,71 @@
 From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Mon, 30 Apr 2018 07:48:42 +0200
-Subject: [PATCH v2 08/10] PCI: Deprecate of_pci_get_host_bridge_resources()
+Date: Mon, 30 Apr 2018 07:48:43 +0200
+Subject: [PATCH v2 09/10] PCI: Add support for unbinding the generic PCI host
+ controller
 In-Reply-To: <cover.1525067324.git.jan.kiszka@siemens.com>
 References: <cover.1525067324.git.jan.kiszka@siemens.com>
-Message-ID: <aca0d89cd8c1551a83b87ffab29fcd6e1d59a61c.1525067324.git.jan.kiszka@siemens.com>
+Message-ID: <c0f1b44f4b1fda35e3e8d2666ba7961571c31980.1525067324.git.jan.kiszka@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jan Kiszka <jan.kiszka@siemens.com>
 
-There are no in-tree users remaining, all are converted to the managed
-variant. And it is unlikely that any out-of-tree user got the resource
-management right as well. So deprecate the interface and push users to
-the managed version instead.
+Particularly useful when working in virtual environments where the
+controller may come and go, but possibly not only there.
 
-To avoid raising a warning when exporting a deprecated symbol, wrap the
-API with an inline and export an internal name.
-
+CC: Will Deacon <will.deacon@arm.com>
+CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 ---
- drivers/pci/of.c       | 23 ++---------------------
- include/linux/of_pci.h | 36 ++++++++++++++++++++++++++++++++----
- 2 files changed, 34 insertions(+), 25 deletions(-)
+ drivers/pci/host/pci-host-common.c  | 13 +++++++++++++
+ drivers/pci/host/pci-host-generic.c |  1 +
+ include/linux/pci-ecam.h            |  1 +
+ 3 files changed, 15 insertions(+)
 
-diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index 5a88d46a41b7..ccf8c7544e10 100644
---- a/drivers/pci/of.c
-+++ b/drivers/pci/of.c
-@@ -351,33 +351,14 @@ static int __of_pci_get_host_bridge_resources(struct device *dev,
- 	return err;
- }
+diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
+index 5d028f53fdcd..d8f10451f273 100644
+--- a/drivers/pci/host/pci-host-common.c
++++ b/drivers/pci/host/pci-host-common.c
+@@ -101,5 +101,18 @@ int pci_host_common_probe(struct platform_device *pdev,
+ 		return ret;
+ 	}
  
--/**
-- * of_pci_get_host_bridge_resources() - Parse PCI host bridge resources from DT
-- * @dev_node: device node of the host bridge having the range property
-- * @busno: bus number associated with the bridge root bus
-- * @bus_max: maximum number of buses for this bridge
-- * @resources: list where the range of resources will be added after DT parsing
-- * @io_base: pointer to a variable that will contain on return the physical
-- * address for the start of the I/O range. Can be NULL if the caller doesn't
-- * expect I/O ranges to be present in the device tree.
-- *
-- * It is the caller's job to free the @resources list.
-- *
-- * This function will parse the "ranges" property of a PCI host bridge device
-- * node and setup the resource mapping based on its content. It is expected
-- * that the property conforms with the Power ePAPR document.
-- *
-- * It returns zero if the range parsing has been successful or a standard error
-- * value if it failed.
-- */
--int of_pci_get_host_bridge_resources(struct device_node *dev_node,
-+int __of_pci_get_host_bridge_resources_deprecated(struct device_node *dev_node,
- 			unsigned char busno, unsigned char bus_max,
- 			struct list_head *resources, resource_size_t *io_base)
- {
- 	return __of_pci_get_host_bridge_resources(NULL, dev_node, busno,
- 						  bus_max, resources, io_base);
- }
--EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-+EXPORT_SYMBOL_GPL(__of_pci_get_host_bridge_resources_deprecated);
- 
- /**
-  * of_pci_get_host_bridge_resources() - Resource-managed parsing of PCI host
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 08b8f02426a5..c6408bd6f862 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -71,26 +71,54 @@ of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin)
- #endif
- 
- #if defined(CONFIG_OF_ADDRESS)
--int of_pci_get_host_bridge_resources(struct device_node *dev_node,
-+int __of_pci_get_host_bridge_resources_deprecated(struct device_node *dev_node,
- 			unsigned char busno, unsigned char bus_max,
- 			struct list_head *resources, resource_size_t *io_base);
- int devm_of_pci_get_host_bridge_resources(struct device *dev,
- 			unsigned char busno, unsigned char bus_max,
- 			struct list_head *resources, resource_size_t *io_base);
- #else
--static inline int of_pci_get_host_bridge_resources(struct device_node *dev_node,
-+static inline int devm_of_pci_get_host_bridge_resources(struct device *dev,
- 			unsigned char busno, unsigned char bus_max,
- 			struct list_head *resources, resource_size_t *io_base)
- {
- 	return -EINVAL;
- }
-+#endif
- 
--static inline int devm_of_pci_get_host_bridge_resources(struct device *dev,
-+/**
-+ * of_pci_get_host_bridge_resources() - Parse PCI host bridge resources from DT
-+ * @dev_node: device node of the host bridge having the range property
-+ * @busno: bus number associated with the bridge root bus
-+ * @bus_max: maximum number of buses for this bridge
-+ * @resources: list where the range of resources will be added after DT parsing
-+ * @io_base: pointer to a variable that will contain on return the physical
-+ * address for the start of the I/O range. Can be NULL if the caller doesn't
-+ * expect I/O ranges to be present in the device tree.
-+ *
-+ * It is the caller's job to free the @resources list.
-+ *
-+ * This function will parse the "ranges" property of a PCI host bridge device
-+ * node and setup the resource mapping based on its content. It is expected
-+ * that the property conforms with the Power ePAPR document.
-+ *
-+ * It returns zero if the range parsing has been successful or a standard error
-+ * value if it failed.
-+ *
-+ * Note: This function is deprecated and will eventually be removed. Use
-+ * devm_of_pci_get_host_bridge_resources() instead.
-+ */
-+static inline int __deprecated of_pci_get_host_bridge_resources(
-+			struct device_node *dev_node,
- 			unsigned char busno, unsigned char bus_max,
- 			struct list_head *resources, resource_size_t *io_base)
- {
-+#if defined(CONFIG_OF_ADDRESS)
-+	return __of_pci_get_host_bridge_resources_deprecated(dev_node, busno,
-+			bus_max, resources, io_base);
-+#else
- 	return -EINVAL;
--}
- #endif
++	platform_set_drvdata(pdev, bridge->bus);
++	return 0;
 +}
- 
++
++int pci_host_common_remove(struct platform_device *pdev)
++{
++	struct pci_bus *bus = platform_get_drvdata(pdev);
++
++	pci_lock_rescan_remove();
++	pci_stop_root_bus(bus);
++	pci_remove_root_bus(bus);
++	pci_unlock_rescan_remove();
++
+ 	return 0;
+ }
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 45319ee3b484..dea3ec7592a2 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -95,5 +95,6 @@ static struct platform_driver gen_pci_driver = {
+ 		.suppress_bind_attrs = true,
+ 	},
+ 	.probe = gen_pci_probe,
++	.remove = pci_host_common_remove,
+ };
+ builtin_platform_driver(gen_pci_driver);
+diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+index baadad1aabbc..29efa09d686b 100644
+--- a/include/linux/pci-ecam.h
++++ b/include/linux/pci-ecam.h
+@@ -62,5 +62,6 @@ extern struct pci_ecam_ops xgene_v2_pcie_ecam_ops; /* APM X-Gene PCIe v2.x */
+ /* for DT-based PCI controllers that support ECAM */
+ int pci_host_common_probe(struct platform_device *pdev,
+ 			  struct pci_ecam_ops *ops);
++int pci_host_common_remove(struct platform_device *pdev);
+ #endif
  #endif
 -- 
 2.13.6
