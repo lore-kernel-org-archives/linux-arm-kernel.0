@@ -1,56 +1,63 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 30 Apr 2018 10:02:26 +0800
-Subject: [PATCH v6 0/2] PCI: mediatek: Fixups for the IRQ handle routine
- and MT7622's class code
-In-Reply-To: <1524201910-22836-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1524201910-22836-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1525053746.5013.8.camel@mtkswgap22>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Mon, 30 Apr 2018 03:27:16 +0000
+Subject: [PATCH 2/6 v3] iommu: of: make of_pci_map_rid() available for
+ other devices too
+In-Reply-To: <20180427171537.lvzygghnuolk6cnh@rob-hp-laptop>
+References: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
+ <1524824826-29473-3-git-send-email-nipun.gupta@nxp.com>
+ <20180427171537.lvzygghnuolk6cnh@rob-hp-laptop>
+Message-ID: <DB6PR0401MB2424DEAB9AE3C3A78ED348C5E6820@DB6PR0401MB2424.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-04-20 at 13:25 +0800, Honghui Zhang (???) wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> Two fixups for mediatek's host bridge:
-> The first patch fixup class type and vendor ID for MT7622.
-> The second patch fixup the IRQ handle routine by using irq_chip solution
-> to avoid IRQ reentry which may exist for both MT2712 and MT7622.
-> 
-> Change since v5:
->  - Make the comments consistend with the code modification in the first patch.
->  - Using writew to performing a 16-bit write.
->  - Using irq_chip solution to fix the IRQ issue.
-> 
-> The v5 patchset could be found in:
->  https://patchwork.kernel.org/patch/10133303
->  https://patchwork.kernel.org/patch/10133305
-> 
-> Change since v4:
->  - Only setup vendor ID for MT7622, igorning the device ID since mediatek's
->    host bridge driver does not cares about the device ID.
-> 
-> Change since v3:
->  - Setup the class type and vendor ID at the beginning of startup instead
->    of in a quirk.
->  - Add mediatek's vendor ID, it could be found in:
->    https://pcisig.com/membership/member-companies?combine=&page=4
-> 
-> Change since v2:
->  - Move the initialize of the iterate before the loop to fix an
->    INTx IRQ issue in the first patch
-> 
-> Change since v1:
->  - Add the second patch.
->  - Make the first patch's commit message more standard.
-> Honghui Zhang (2):
->   PCI: mediatek: Set up vendor ID and class type for MT7622
->   PCI: mediatek: Using chained IRQ to setup IRQ handle
-> 
->  drivers/pci/host/pcie-mediatek.c | 220 +++++++++++++++++++++++----------------
->  include/linux/pci_ids.h          |   2 +
->  2 files changed, 133 insertions(+), 89 deletions(-)
 
 
-Acked-by: Ryder Lee <ryder.lee@mediatek.com> for the series.
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Friday, April 27, 2018 10:46 PM
+> To: Nipun Gupta <nipun.gupta@nxp.com>
+> Cc: robin.murphy at arm.com; will.deacon at arm.com; mark.rutland at arm.com;
+> catalin.marinas at arm.com; hch at lst.de; gregkh at linuxfoundation.org;
+> joro at 8bytes.org; m.szyprowski at samsung.com; shawnguo at kernel.org;
+> frowand.list at gmail.com; bhelgaas at google.com; iommu at lists.linux-
+> foundation.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; linux-
+> pci at vger.kernel.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
+> stuyoder at gmail.com; Laurentiu Tudor <laurentiu.tudor@nxp.com>; Leo Li
+> <leoyang.li@nxp.com>
+> Subject: Re: [PATCH 2/6 v3] iommu: of: make of_pci_map_rid() available for
+> other devices too
+> 
+> On Fri, Apr 27, 2018 at 03:57:02PM +0530, Nipun Gupta wrote:
+> > iommu-map property is also used by devices with fsl-mc. This
+> > patch moves the of_pci_map_rid to generic location, so that it
+> > can be used by other busses too.
+> >
+> > 'of_pci_map_rid' is renamed here to 'of_map_rid' and there is no
+> > functional change done in the API.
+> >
+> > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> > ---
+> >  drivers/iommu/of_iommu.c   |   6 +--
+> >  drivers/of/address.c       | 102
+> +++++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/of/irq.c           |   7 ++--
+> >  drivers/pci/of.c           | 101 --------------------------------------------
+> >  include/linux/of_address.h |  11 +++++
+> >  include/linux/of_pci.h     |  10 -----
+> >  6 files changed, 120 insertions(+), 117 deletions(-)
+> 
+> of/address.c isn't really the best fit either, though I don't have a
+> better suggestion.
+> 
+> I'm guessing this breaks on Sparc which doesn't build of/address.c.
+> I guess move it to base.c and of.h if that is the case.
 
-Thanks
+Sure, that makes sense. Thank you for the suggestion !!
+I'll spin off new version with this change.
+
+Regards,
+Nipun
+
+> 
+> Rob
