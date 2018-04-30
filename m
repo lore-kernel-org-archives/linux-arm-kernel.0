@@ -1,99 +1,66 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 30 Apr 2018 10:29:32 +0200
-Subject: [PATCH V4] PM / core: fix deferred probe breaking suspend resume
- order
-In-Reply-To: <1523404626-1466-1-git-send-email-fkan@apm.com>
-References: <1523404626-1466-1-git-send-email-fkan@apm.com>
-Message-ID: <18377612.ebzVR88hgL@aspire.rjw.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Apr 2018 09:31:45 +0100
+Subject: [PATCH v2] init: Fix false positives in W+X checking
+In-Reply-To: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
+References: <1524866145-20337-1-git-send-email-jhugo@codeaurora.org>
+Message-ID: <20180430083144.GA15504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 11, 2018 1:57:06 AM CEST Feng Kan wrote:
-> When bridge and its endpoint is enumerated the devices are added to the
-> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
-> This causes the bridge to be moved to the end of the dpm list when
-> deferred probe kicks in. The order of the dpm list for bridge and
-> endpoint is reversed.
+On Fri, Apr 27, 2018 at 03:55:45PM -0600, Jeffrey Hugo wrote:
+> load_module() creates W+X mappings via __vmalloc_node_range() (from
+> layout_and_allocate()->move_module()->module_alloc()) by using
+> PAGE_KERNEL_EXEC.  These mappings are later cleaned up via
+> "call_rcu_sched(&freeinit->rcu, do_free_init)" from do_init_module().
 > 
-> Add reordering code to move the bridge and its children and consumers to
-> the end of the pm list so the order for suspend and resume is not altered.
-> The code also move device and its children and consumers to the tail of
-> device_kset list if it is registered.
+> This is a problem because call_rcu_sched() queues work, which can be run
+> after debug_checkwx() is run, resulting in a race condition.  If hit, the
+> race results in a nasty splat about insecure W+X mappings, which results
+> in a poor user experience as these are not the mappings that
+> debug_checkwx() is intended to catch.
 > 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Toan Le <toanle@apm.com>
+> This issue is observed on multiple arm64 platforms, and has been
+> artificially triggered on an x86 platform.
+> 
+> Address the race by flushing the queued work before running the
+> arch-defined mark_rodata_ro() which then calls debug_checkwx().
+> 
+> Reported-by: Timur Tabi <timur@codeaurora.org>
+> Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
+> Fixes: e1a58320a38d ("x86/mm: Warn on W^X mappings")
+> Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
 > ---
->  V4:
-> 	1. additional comment change from Rafael
->  V3:
-> 	1. additional code comment changes
->  V2:
->         1. change patch title from "move device and its children..."
->         2. move define based on Bjorn's comment
->         3. rename function name and comment content
 > 
->  drivers/base/base.h |  3 +++
->  drivers/base/core.c | 20 ++++++++++++++++++++
->  drivers/base/dd.c   |  4 +---
->  3 files changed, 24 insertions(+), 3 deletions(-)
+> v1:
+> -was "arm64: mm: Fix false positives in W+X checking" (see [1])
+> -moved to common code based on review and confirmation of issue on x86
 > 
-> diff --git a/drivers/base/base.h b/drivers/base/base.h
-> index d800de6..a75c302 100644
-> --- a/drivers/base/base.h
-> +++ b/drivers/base/base.h
-> @@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
->  extern void device_links_no_driver(struct device *dev);
->  extern bool device_links_busy(struct device *dev);
->  extern void device_links_unbind_consumers(struct device *dev);
-> +
-> +/* device pm support */
-> +void device_pm_move_to_tail(struct device *dev);
-> diff --git a/drivers/base/core.c b/drivers/base/core.c
-> index 110230d..eaa5d9f 100644
-> --- a/drivers/base/core.c
-> +++ b/drivers/base/core.c
-> @@ -148,6 +148,26 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
->  }
->  
->  /**
-> + * device_pm_move_to_tail - Move set of devices to the end of device lists
-> + * @dev: Device to move
-> + *
-> + * This is a device_reorder_to_tail() wrapper taking the requisite locks.
-> + *
-> + * It moves the @dev along with all of its children and all of its consumers
-> + * to the ends of the device_kset and dpm_list, recursively.
-> + */
-> +void device_pm_move_to_tail(struct device *dev)
-> +{
-> +	int idx;
-> +
-> +	idx = device_links_read_lock();
-> +	device_pm_lock();
-> +	device_reorder_to_tail(dev, NULL);
-> +	device_pm_unlock();
-> +	device_links_read_unlock(idx);
-> +}
-> +
-> +/**
->   * device_link_add - Create a link between two devices.
->   * @consumer: Consumer end of the link.
->   * @supplier: Supplier end of the link.
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 2c964f5..96fab29 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -123,9 +123,7 @@ static void deferred_probe_work_func(struct work_struct *work)
->  		 * the list is a good order for suspend but deferred
->  		 * probe makes that very unsafe.
->  		 */
-> -		device_pm_lock();
-> -		device_pm_move_last(dev);
-> -		device_pm_unlock();
-> +		device_pm_move_to_tail(dev);
->  
->  		dev_dbg(dev, "Retrying from deferred list\n");
->  		if (initcall_debug && !initcalls_done)
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573776.html
 > 
+>  init/main.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/init/main.c b/init/main.c
+> index b795aa3..499d957 100644
+> --- a/init/main.c
+> +++ b/init/main.c
+> @@ -1034,6 +1034,13 @@ static int __init set_debug_rodata(char *str)
+>  static void mark_readonly(void)
+>  {
+>  	if (rodata_enabled) {
+> +		/*
+> +		 * load_module() results in W+X mappings, which are cleaned up
+> +		 * with call_rcu_sched().  Let's make sure that queued work is
+> +		 * flushed so that we don't hit false positives looking for
+> +		 * insecure pages which are W+X.
+> +		 */
+> +		rcu_barrier_sched();
+>  		mark_rodata_ro();
+>  		rodata_test();
+>  	} else
 
-Queued up for 4.18 with the Greg's ACK.
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks for solving this for all architectures, Jeffrey.
+
+Will
