@@ -1,54 +1,48 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 30 Apr 2018 11:55:59 +0100
-Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <07a0b8c1-3d87-0cae-61df-dbff782be301@arm.com>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <e0b5ae90-f21e-f5db-a4af-52900a2e8c07@arm.com>
- <CAEi0qNkt75cqF=03HrQ81+pDdWVOpzGiHrk8_cTNTJo9os9D8Q@mail.gmail.com>
- <07a0b8c1-3d87-0cae-61df-dbff782be301@arm.com>
-Message-ID: <20180430105559.ys6kcfoy76o3qpoj@holly.lan>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 30 Apr 2018 18:58:36 +0800
+Subject: [v3 09/10] drm: mediatek: Omit warning on probe defers
+In-Reply-To: <9d514a4ab45f0700663fa756d5aa3913922b6fb7.1524820923.git.mbrugger@suse.com>
+References: <cover.1524820923.git.mbrugger@suse.com>
+ <9d514a4ab45f0700663fa756d5aa3913922b6fb7.1524820923.git.mbrugger@suse.com>
+Message-ID: <1525085916.25456.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 10:53:17AM +0100, Julien Thierry wrote:
+Hi, Matthias:
+
+On Fri, 2018-04-27 at 11:24 +0200, matthias.bgg at kernel.org wrote:
+> From: Matthias Brugger <mbrugger@suse.com>
 > 
+> When probe through the MFD, it can happen that the
+> clock drivers wasn't probed before the ddp driver gets
+> invoked. The driver used to omit a warning that the driver
+> failed to get the clocks. Omit this error on the defered probe path.
 > 
-> On 29/04/18 07:37, Joel Fernandes wrote:
-> > On Wed, Jan 17, 2018 at 4:10 AM, Julien Thierry <julien.thierry@arm.com> wrote:
-> > > Hi,
-> > > 
-> > > On 17/01/18 11:54, Julien Thierry wrote:
-> > > > 
-> > > > This series is a continuation of the work started by Daniel [1]. The goal
-> > > > is to use GICv3 interrupt priorities to simulate an NMI.
-> > > > 
-> > > 
-> > > 
-> > > I have submitted a separate series making use of this feature for the ARM
-> > > PMUv3 interrupt [1].
-> > 
-> > I guess the hard lockup detector using NMI could be a nice next step
-> > to see how well it works with lock up detection. That's the main
-> > usecase for my interest. However, perf profiling is also a strong one.
-> > 
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+
+It's better to use 'drm/mediatek:' for title to align drm commits.
+For the modification,
+
+Acked-by: CK Hu <ck.hu@mediatek.com>
+
+Regards,
+CK
+
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> From my understanding, Linux's hardlockup detector already uses the ARM PMU
-> interrupt to check whether some task is stuck. I haven't looked at the
-> details of the implementation yet, but in theory having the PMU interrupt as
-> NMI should make the hard lockup detector use the NMI.
-> 
-> When I do the v3, I'll have a look at this to check whether the hardlockup
-> detector works fine when using NMI.
-
-That's what I saw on arch/arm (with some of the much older FIQ work).
-
-Once you have PMU and the appropriate config to *admit* to supporting
-hard lockup then it will "just work" and be setup automatically during
-kernel boot.
-
-Actually the problem then becomes that if you want to use the PMU 
-for anything else then you may end up having to disable the hard 
-lockup detector.
-
-
-Daniel.
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index bafc5c77c4fb..6b399348a2dc 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -374,7 +374,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
+>  
+>  	ddp->clk = devm_clk_get(dev, NULL);
+>  	if (IS_ERR(ddp->clk)) {
+> -		dev_err(dev, "Failed to get clock\n");
+> +		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
+> +			dev_err(dev, "Failed to get clock\n");
+>  		return PTR_ERR(ddp->clk);
+>  	}
+>  
