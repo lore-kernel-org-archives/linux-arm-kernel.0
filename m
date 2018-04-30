@@ -1,28 +1,29 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 30 Apr 2018 17:10:53 +0530
-Subject: [PATCH 16/21] arm64: dts: allwinner: a64: bananapi-m64: Enable HDMI
+Date: Mon, 30 Apr 2018 17:10:54 +0530
+Subject: [PATCH 17/21] arm64: dts: allwinner: a64: nanopi-a64: Enable HDMI
  output
 In-Reply-To: <20180430114058.5061-1-jagan@amarulasolutions.com>
 References: <20180430114058.5061-1-jagan@amarulasolutions.com>
-Message-ID: <20180430114058.5061-17-jagan@amarulasolutions.com>
+Message-ID: <20180430114058.5061-18-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable HDMI output on Bananpi-m64 board.
+Enable HDMI output on nanopi-a64 board.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 26 ++++++++++++++++++++++
+ .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 26 ++++++++++++++++++++++
  1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 2250dec9974c..69063c1fbddf 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -60,6 +60,17 @@
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+index e2dce48fa29a..19fe7eed45e9 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+@@ -57,6 +57,21 @@
+ 	chosen {
  		stdout-path = "serial0:115200n8";
  	};
- 
++
 +	connector {
 +		compatible = "hdmi-connector";
 +		type = "a";
@@ -33,22 +34,14 @@ index 2250dec9974c..69063c1fbddf 100644
 +			};
 +		};
 +	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -86,6 +97,10 @@
- 	};
- };
- 
-+&de {
-+	status = "okay";
 +};
 +
- &ehci1 {
- 	status = "okay";
++&de {
++	status = "okay";
  };
-@@ -99,6 +114,17 @@
+ 
+ &ehci0 {
+@@ -67,6 +82,17 @@
  	status = "okay";
  };
  
@@ -63,8 +56,8 @@ index 2250dec9974c..69063c1fbddf 100644
 +	};
 +};
 +
+ /* i2c1 connected with gpio headers like pine64, bananapi */
  &i2c1 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins>;
 -- 
 2.14.3
