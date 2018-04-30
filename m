@@ -1,40 +1,25 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Apr 2018 15:44:20 +0200
-Subject: [PATCH v3 4/5] soc/tegra: pmc: Use of_clk_get_parent_count()
- instead of open coding
-In-Reply-To: <1524063005-1716-5-git-send-email-geert+renesas@glider.be>
-References: <1524063005-1716-1-git-send-email-geert+renesas@glider.be>
- <1524063005-1716-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180430134420.GE11457@mai>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Mon, 30 Apr 2018 15:44:37 +0200
+Subject: [PATCH 02/17] arm64: dts: marvell: fix CP110 ICU node size
+In-Reply-To: <20180421135537.24716-3-miquel.raynal@bootlin.com>
+References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
+ <20180421135537.24716-3-miquel.raynal@bootlin.com>
+Message-ID: <20180430154437.59025f2e@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 04:50:04PM +0200, Geert Uytterhoeven wrote:
-> As of_clk_get_parent_count() returns zero on failure, while
-> of_count_phandle_with_args() might return a negative error code, this
-> also fixes the issue of possibly using a very big number in the
-> allocation below.
+Hello,
+
+On Sat, 21 Apr 2018 15:55:22 +0200, Miquel Raynal wrote:
+> ICU size in CP110 is not 0x10 but at least 0x440 bytes long (from the
+> specification).
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
-> This depends on "[PATCH v3 1/5] clk: Extract OF clock helpers in
-> <linux/of_clk.h>".
-> 
-> v3:
->   - Add Acked-by,
-> 
-> v2:
->   - of_clk_get_parent_count() was moved to <linux/of_clk.h>.
-> ---
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 
-
-
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
