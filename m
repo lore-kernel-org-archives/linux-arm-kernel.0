@@ -1,41 +1,31 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 30 Apr 2018 23:12:56 +0200
-Subject: [PATCH 24/24] drm/bridge: establish a link between the bridge
- supplier and consumer
-In-Reply-To: <20180430153236.GP12521@phenom.ffwll.local>
-References: <20180426223139.16740-1-peda@axentia.se>
- <20180426223139.16740-25-peda@axentia.se>
- <20180430153236.GP12521@phenom.ffwll.local>
-Message-ID: <e2562f6f-f7b0-477c-db38-a3bf6c956fa7@axentia.se>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 30 Apr 2018 14:27:50 -0700
+Subject: [GIT PULL 3/3] bcm2835-defconfig-64-next-2018-04-30
+In-Reply-To: <20180430212750.12303-1-eric@anholt.net>
+References: <20180430212750.12303-1-eric@anholt.net>
+Message-ID: <20180430212750.12303-3-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-30 17:32, Daniel Vetter wrote:
-> On Fri, Apr 27, 2018 at 12:31:39AM +0200, Peter Rosin wrote:
->> If the bridge supplier is unbound, this will bring the bridge consumer
->> down along with the bridge. Thus, there will no longer linger any
->> dangling pointers from the bridge consumer (the drm_device) to some
->> non-existent bridge supplier.
->>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
-> 
-> Minus the ->owner bikeshed I brought up in the previous patch I agree with
-> this approach as the best way to move forward for now.
-> 
-> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-Thanks, let's see if Laurent is also on-board...
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-> One small suggestion below, for merging I'd say pls get Jyri's
-> review/tested-by too, since you're both working on the same problem it
-> seems.
+are available in the Git repository at:
 
-Yes, I too would be very happy to see a tested-by from someone.
+  git://github.com/anholt/linux tags/bcm2835-defconfig-64-next-2018-04-30
 
-> Aside: Do you want commit rights to drm-misc to be able to push work like
-> this?
+for you to fetch changes up to 69bc5b2c056b4e784b49a8c9c5049561b62352f7:
 
-If that makes life easier, sure.
+  arm64: defconfig: Enable LAN and BT support for RPi 3 B+ (2018-04-23 13:28:33 -0700)
 
-Cheers,
-Peter
+----------------------------------------------------------------
+This pull request enables the Raspberry Pi 3 B+'s LAN and bluetooth in
+the arm64 defconfig.
+
+----------------------------------------------------------------
+Stefan Wahren (1):
+      arm64: defconfig: Enable LAN and BT support for RPi 3 B+
+
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
