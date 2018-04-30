@@ -1,28 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Apr 2018 09:13:52 +0200
-Subject: [PATCH v2] ARM: defconfig: Update Gemini defconfig
-In-Reply-To: <CAK8P3a1X_hKLo3o1YmkxayncUGbTuTR+HKftmvbCtwQegO7zHw@mail.gmail.com>
-References: <20180420090044.17036-1-linus.walleij@linaro.org>
- <CAK8P3a1X_hKLo3o1YmkxayncUGbTuTR+HKftmvbCtwQegO7zHw@mail.gmail.com>
-Message-ID: <CACRpkdZM1sTC47htB4dP_PgLuzd57C2n==6g=8H_UgzuMrWzfA@mail.gmail.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 30 Apr 2018 15:26:36 +0800
+Subject: [PATCH] spi: mediatek: Use of_device_get_match_data()
+In-Reply-To: <94cba80f703be048666afde1ed53c15c3704c533.1523347340.git.ryder.lee@mediatek.com>
+References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
+ <94cba80f703be048666afde1ed53c15c3704c533.1523347340.git.ryder.lee@mediatek.com>
+Message-ID: <1525073196.21494.3.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 4:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Mark,
 
->> ARM SoC folks: please apply this for fixes.
->
-> I've applied it to the fixes branch now, but I don't see why I didn't
-> get the patch before the merge window when you already
-> had a version for the v4.16 window.
+Is it okay with you?
 
-It's because of my ways of working: I work on a target and then right after
-the merge window at -rc1 I usually check what new drivers I managed
-to get upstream and then for those that made it I send a patch enabling
-them in in the defconfig in the target system.
-
-After sending the defconfig patch for v4.16-rc1 I simply forgot about
-it until the next -rc1...
-
-Yours,
-Linus Walleij
+On Mon, 2018-04-16 at 10:33 +0800, Ryder Lee (???V) wrote:
+> The usage of of_device_get_match_data() reduce the code size a bit.
+> 
+> Also, the only way to call mtk_spi_probe() is to match an entry in
+> mtk_spi_of_match[], so of_id cannot be NULL.
+> 
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  drivers/spi/spi-mt65xx.c | 12 +++---------
+>  1 file changed, 3 insertions(+), 9 deletions(-)
+> 
