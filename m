@@ -1,44 +1,51 @@
-From: dalias@libc.org (Rich Felker)
-Date: Mon, 30 Apr 2018 12:42:50 -0400
-Subject: [PATCH 0/3] sh: make early_platform code SuperH-specific
-In-Reply-To: <20180430163556.2560-1-brgl@bgdev.pl>
-References: <20180430163556.2560-1-brgl@bgdev.pl>
-Message-ID: <20180430164250.GN1392@brightrain.aerifal.cx>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 30 Apr 2018 18:45:06 +0200
+Subject: [PATCH 00/12] mtd: nand: davinci: stop using pdev->id as
+ chipselect
+In-Reply-To: <20180430120930.4768a7cb@bbrezillon>
+References: <20180430082453.8091-1-brgl@bgdev.pl>
+ <20180430120930.4768a7cb@bbrezillon>
+Message-ID: <CAMRc=Mf2TKsuiudxPdEFStrstHH65jHb6JFJ0Ort9GvWDSo9bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 06:35:53PM +0200, Bartosz Golaszewski wrote:
-> I recently started a discussion about the need for a proper early device
-> probing mechanism[1]. One that would be based on real platform drivers
-> and support both platform data and device tree.
-> 
-> While we're far from reaching any consensus on the implementation, Arnd
-> suggested that I start off by moving the SuperH-specific early platform
-> drivers implementation to arch/sh[2].
-> 
-> This series is the first attempt at making way for a new, less hacky
-> implementation.
-> 
-> The first patch removes the last instance of a non-sh driver using the
-> early_platform API. It can be removed since ARM no longer probes early
-> drivers.
-> 
-> The second patch moves all the early_platform code to arch/sh.
-> 
-> The last patch prefixes all early_platform symbols with 'sh_'.
-> 
-> [1] https://lkml.org/lkml/2018/4/26/657
-> [2] https://lkml.org/lkml/2018/4/27/239
-> 
-> Bartosz Golaszewski (3):
->   clocksource: timer-ti-dm: remove the early platform driver
->     registration
->   platform: move the early platform device support to arch/sh
->   sh: add the sh_ prefix to early platform symbols
+2018-04-30 12:09 GMT+02:00 Boris Brezillon <boris.brezillon@bootlin.com>:
+> Hi Bartosz,
+>
+> On Mon, 30 Apr 2018 10:24:41 +0200
+> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+>
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> We have the 'ti,davinci-chipselect' property in the device tree, but
+>> when using platform data the driver silently uses the id field of
+>> struct platform_device as the chipselect. This is confusing and we
+>> almost broke the nand support again recently after converting the
+>> platform to common clock framework (which changed the device id in the
+>> clock lookup - the problem is gone now that we no longer acquire the
+>> clock in the nand driver.
+>>
+>> This series adds a new field to davinci-nand platform data, then makes
+>> all board use it and finally modifies the two drivers that make use of
+>> it.
+>>
+>> Bartosz Golaszewski (12):
+>>   mtd: nand: davinci: store the core chipselect number in platform data
+>
+> Raw NAND related patches (that is, everything that is not onenand or
+> SPI NAND) should use the "mtd: rawnand: " prefix now. Other than that,
+> I'm fine with the patch series, just let me know how you want to have it
+> merged (through the MTD tree or the davinci tree).
+>
+> Thanks,
+>
+> Boris
 
-I can't say I like it, because I really want to be just removing all
-this code, but I don't necessarily object and it might be the most
-appropriate short-term action to clean up this mess without breaking
-things.
+I think Sekhar could pick all those patches up for 4.18.
 
-Rich
+Sekhar - do you want me to resend the series with the commit message
+changed as requested by Boris, or can you fix it when applying the
+series?
+
+Best regards,
+Bartosz Golaszewski
