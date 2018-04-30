@@ -1,30 +1,32 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 30 Apr 2018 17:10:49 +0530
-Subject: [PATCH 12/21] bindings: display: Add compatible for A64 tcon-tv
+Date: Mon, 30 Apr 2018 17:10:50 +0530
+Subject: [PATCH 13/21] drm/sun4i: Enable DE2 Mixer for Allwinner 64-bit SoCs
 In-Reply-To: <20180430114058.5061-1-jagan@amarulasolutions.com>
 References: <20180430114058.5061-1-jagan@amarulasolutions.com>
-Message-ID: <20180430114058.5061-13-jagan@amarulasolutions.com>
+Message-ID: <20180430114058.5061-14-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tcon-tv on Allwinner A64 has similar behavior like Allwinner A83T.
+Allwinner 64-bit SoC like H5/A64 has DE2 Mixer so enable them
+as default.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/sun4i/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 5d448ef2132f..8b6b4bc43d98 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -150,6 +150,7 @@ Required properties:
-    * allwinner,sun8i-v3s-tcon
-    * allwinner,sun9i-a80-tcon-lcd
-    * allwinner,sun9i-a80-tcon-tv
-+   * allwinner,sun50i-a64-tcon-tv
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON.
+diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
+index 60468a779a63..95ae04964756 100644
+--- a/drivers/gpu/drm/sun4i/Kconfig
++++ b/drivers/gpu/drm/sun4i/Kconfig
+@@ -52,7 +52,7 @@ config DRM_SUN8I_DW_HDMI
+ 
+ config DRM_SUN8I_MIXER
+ 	tristate "Support for Allwinner Display Engine 2.0 Mixer"
+-	default MACH_SUN8I
++	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
+ 	help
+ 	  Choose this option if you have an Allwinner SoC with the
+ 	  Allwinner Display Engine 2.0, which has a mixer to do some
 -- 
 2.14.3
