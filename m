@@ -1,99 +1,54 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 30 Apr 2018 18:42:42 +0800
-Subject: [v3 04/10] drm/mediatek: mt2701: switch to mfd probing.
-In-Reply-To: <b50d32fb140dcf25ac467f0b5e7a84353c8d31d3.1524820923.git.mbrugger@suse.com>
-References: <cover.1524820923.git.mbrugger@suse.com>
- <b50d32fb140dcf25ac467f0b5e7a84353c8d31d3.1524820923.git.mbrugger@suse.com>
-Message-ID: <1525084962.25456.2.camel@mtksdaap41>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 30 Apr 2018 11:55:59 +0100
+Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <07a0b8c1-3d87-0cae-61df-dbff782be301@arm.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <e0b5ae90-f21e-f5db-a4af-52900a2e8c07@arm.com>
+ <CAEi0qNkt75cqF=03HrQ81+pDdWVOpzGiHrk8_cTNTJo9os9D8Q@mail.gmail.com>
+ <07a0b8c1-3d87-0cae-61df-dbff782be301@arm.com>
+Message-ID: <20180430105559.ys6kcfoy76o3qpoj@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Matthias:
-
-
-On Fri, 2018-04-27 at 11:23 +0200, matthias.bgg at kernel.org wrote:
-> From: Matthias Brugger <mbrugger@suse.com>
+On Mon, Apr 30, 2018 at 10:53:17AM +0100, Julien Thierry wrote:
 > 
-> With the mtk-mmsys MFD device in place, we switch the probing for
-> mt2701 from device-tree to mfd.
 > 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
-
-Regards,
-CK
-
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 30 +++++++++++++++++++++++-------
->  1 file changed, 23 insertions(+), 7 deletions(-)
+> On 29/04/18 07:37, Joel Fernandes wrote:
+> > On Wed, Jan 17, 2018 at 4:10 AM, Julien Thierry <julien.thierry@arm.com> wrote:
+> > > Hi,
+> > > 
+> > > On 17/01/18 11:54, Julien Thierry wrote:
+> > > > 
+> > > > This series is a continuation of the work started by Daniel [1]. The goal
+> > > > is to use GICv3 interrupt priorities to simulate an NMI.
+> > > > 
+> > > 
+> > > 
+> > > I have submitted a separate series making use of this feature for the ARM
+> > > PMUv3 interrupt [1].
+> > 
+> > I guess the hard lockup detector using NMI could be a nice next step
+> > to see how well it works with lock up detection. That's the main
+> > usecase for my interest. However, perf profiling is also a strong one.
+> > 
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index a48e28adad09..88ee35907744 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -386,7 +386,7 @@ static int mtk_drm_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
->  	struct mtk_drm_private *private;
-> -	struct device_node *node;
-> +	struct device_node *node, *parent_node, *mmsys_node;
->  	struct component_match *match = NULL;
->  	int ret;
->  	int i;
-> @@ -399,12 +399,23 @@ static int mtk_drm_probe(struct platform_device *pdev)
->  	INIT_WORK(&private->commit.work, mtk_atomic_work);
->  	private->data = of_device_get_match_data(dev);
->  
-> -	private->config_regs = syscon_node_to_regmap(dev->of_node);
-> -	if (IS_ERR(private->config_regs))
-> -		return PTR_ERR(private->config_regs);
-> +	/* Check if called from mfd */
-> +	if (!dev->of_node) {
-> +		mmsys_node = pdev->dev.parent->of_node;
-> +		private->data = (struct mtk_mmsys_driver_data *)
-> +				platform_get_device_id(pdev)->driver_data;
-> +		private->config_regs =
-> +			syscon_node_to_regmap(mmsys_node);
-> +		parent_node = mmsys_node->parent;
-> +	} else {
-> +		private->config_regs = syscon_node_to_regmap(dev->of_node);
-> +		if (IS_ERR(private->config_regs))
-> +			return PTR_ERR(private->config_regs);
-> +		parent_node = dev->of_node->parent;
-> +	}
->  
->  	/* Iterate over sibling DISP function blocks */
-> -	for_each_child_of_node(dev->of_node->parent, node) {
-> +	for_each_child_of_node(parent_node, node) {
->  		const struct of_device_id *of_id;
->  		enum mtk_ddp_comp_type comp_type;
->  		int comp_id;
-> @@ -545,13 +556,17 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
->  			 mtk_drm_sys_resume);
->  
->  static const struct of_device_id mtk_drm_of_ids[] = {
-> -	{ .compatible = "mediatek,mt2701-mmsys",
-> -	  .data = &mt2701_mmsys_driver_data},
->  	{ .compatible = "mediatek,mt8173-mmsys",
->  	  .data = &mt8173_mmsys_driver_data},
->  	{ }
->  };
->  
-> +static const struct platform_device_id mtk_drm_ids[] = {
-> +	{ "drm-mt2701-mm", (kernel_ulong_t)&mt2701_mmsys_driver_data },
-> +	{ /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(platform, mtk_drm_ids);
-> +
->  static struct platform_driver mtk_drm_platform_driver = {
->  	.probe	= mtk_drm_probe,
->  	.remove	= mtk_drm_remove,
-> @@ -560,6 +575,7 @@ static struct platform_driver mtk_drm_platform_driver = {
->  		.of_match_table = mtk_drm_of_ids,
->  		.pm     = &mtk_drm_pm_ops,
->  	},
-> +	.id_table = mtk_drm_ids,
->  };
->  
->  static struct platform_driver * const mtk_drm_drivers[] = {
+> From my understanding, Linux's hardlockup detector already uses the ARM PMU
+> interrupt to check whether some task is stuck. I haven't looked at the
+> details of the implementation yet, but in theory having the PMU interrupt as
+> NMI should make the hard lockup detector use the NMI.
+> 
+> When I do the v3, I'll have a look at this to check whether the hardlockup
+> detector works fine when using NMI.
+
+That's what I saw on arch/arm (with some of the much older FIQ work).
+
+Once you have PMU and the appropriate config to *admit* to supporting
+hard lockup then it will "just work" and be setup automatically during
+kernel boot.
+
+Actually the problem then becomes that if you want to use the PMU 
+for anything else then you may end up having to disable the hard 
+lockup detector.
+
+
+Daniel.
