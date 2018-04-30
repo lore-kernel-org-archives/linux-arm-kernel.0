@@ -1,32 +1,40 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Mon, 30 Apr 2018 15:45:51 +0200
-Subject: [PATCH 03/17] arm64: dts: marvell: add syscon compatible to
- CP110 ICU node
-In-Reply-To: <20180421135537.24716-4-miquel.raynal@bootlin.com>
-References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
- <20180421135537.24716-4-miquel.raynal@bootlin.com>
-Message-ID: <20180430154551.616cba0f@windsurf>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Apr 2018 15:46:30 +0200
+Subject: [PATCH v3 5/5] pinctrl: sunxi: Use of_clk_get_parent_count()
+ instead of open coding
+In-Reply-To: <1524063005-1716-6-git-send-email-geert+renesas@glider.be>
+References: <1524063005-1716-1-git-send-email-geert+renesas@glider.be>
+ <1524063005-1716-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180430134630.GF11457@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Sat, 21 Apr 2018 15:55:23 +0200, Miquel Raynal wrote:
-> Prepare the migration to new bindings where the ICU node has several
-> subnodes: one per interrupt group (NSR, SEI, REI, etc). The code for
-> each node will share the same set of registers. Turning the ICU node
-> into a syscon is a clean solution to handle that.
+On Wed, Apr 18, 2018 at 04:50:05PM +0200, Geert Uytterhoeven wrote:
+> A new open coder has crept in since 470b73a38470e8ba ("pinctrl: sunxi:
+> Use of_clk_get_parent_count() instead of open coding"), replace it.
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> of_clk_get_parent_count() was moved to <linux/of_clk.h>, so include that
+> instead of <linux/clk-provider.h>.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+> This depends on "[PATCH v3 1/5] clk: Extract OF clock helpers in
+> <linux/of_clk.h>".
+> 
+> v3:
+>   - Add Acked-by,
+> 
+> v2:
+>   - New.
+> ---
 
-In fact, I am wondering if this is really necessary. Can't we instead
-just create the regmap() for the ICU MMIO region in the ->probe() of
-the parent ICU device ?
+Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
