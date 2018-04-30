@@ -1,68 +1,100 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Apr 2018 11:20:22 +0100
-Subject: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-In-Reply-To: <8898674D84E3B24BA3A2D289B872026A69EF9AF9@G01JPEXMBKW03>
-References: <8898674D84E3B24BA3A2D289B872026A69EECF90@G01JPEXMBKW03>
- <ce2c6191-1f74-4cec-9009-0a770d32673a@arm.com>
- <8898674D84E3B24BA3A2D289B872026A69EF9AF9@G01JPEXMBKW03>
-Message-ID: <7862f544-cd4f-8c48-ee04-fa8c628354ea@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 30 Apr 2018 11:30:29 +0100
+Subject: [v3 01/10] dt-bindings: mediatek: mmsys: Add support for mfd
+In-Reply-To: <64ca273429d92f581568a48f3efe6035af65f579.1524820923.git.mbrugger@suse.com>
+References: <cover.1524820923.git.mbrugger@suse.com>
+ <64ca273429d92f581568a48f3efe6035af65f579.1524820923.git.mbrugger@suse.com>
+Message-ID: <20180430103029.GD5147@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lei,
+On Fri, 27 Apr 2018, matthias.bgg at kernel.org wrote:
 
-On 30/04/18 08:53, Zhang, Lei wrote:
-> Hi Marc
+> From: Matthias Brugger <mbrugger@suse.com>
 > 
-> thanks for your opinions.
+> Add binding description for the mmsys mfd for some Mediatek
+> devices. mmsys has some registers to control clock gates (which is
+> used in the clk driver) and some registers to set the routing and enable
+> the differnet blocks of the display subsystem.
 > 
->> How many is many? Are they PCI? Or something else?
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> ---
+>  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  2 --
+>  .../bindings/display/mediatek/mediatek,disp.txt    |  2 +-
+>  .../devicetree/bindings/mfd/mediatek,mmsys.txt     | 27 ++++++++++++++++++++++
+>  3 files changed, 28 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+> index 4eb8bbe15c01..4468345f8b1a 100644
+> --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+> @@ -6,10 +6,8 @@ The Mediatek mmsys controller provides various clocks to the system.
+>  Required Properties:
 >  
->> As it is, this patch will break Multi-MSI and some other platforms that
->> do require a higher allocation granule.
->>
->> Depending on whether you're using PCI or some other bus, we can probably
->> come up with a solution that works for everyone. But I need more
->> information on this.
-> 
-> Actually it is our original interconnect device not on PCI but on our
-> original bus. This device has many sub devices around one thousand,
-> and each sub device requires only a few LPIs.
+>  - compatible: Should be one of:
+> -	- "mediatek,mt2701-mmsys", "syscon"
+>  	- "mediatek,mt2712-mmsys", "syscon"
+>  	- "mediatek,mt6797-mmsys", "syscon"
+> -	- "mediatek,mt8173-mmsys", "syscon"
+>  - #clock-cells: Must be 1
+>  
+>  The mmsys controller uses the common clk binding from
+> diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> index 383183a89164..85a3b4ec06cd 100644
+> --- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> +++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> @@ -9,7 +9,7 @@ function block.
+>  
+>  All DISP device tree nodes must be siblings to the central MMSYS_CONFIG node.
+>  For a description of the MMSYS_CONFIG binding, see
+> -Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt.
+> +Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+>  
+>  DISP function blocks
+>  ====================
+> diff --git a/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+> new file mode 100644
+> index 000000000000..2331ae16917e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
+> @@ -0,0 +1,27 @@
+> +MediaTek MMSYS Multifunction Device Driver
 
-OK. Have you implemented your own glue layer for this (like we already
-have for PCI, platform and FSL-MC)? Or are you directly using the
-platform MSI infrastructure?
+What is "MMSYS"?
 
-> As I explained in point1, each Device ID can still allocate enough
-> LPIs more than IRQS_PER_CHUNK by increasing chunks. So I couldn't
-> understand why this patch will break Multi-MSI.
+"Multi-Function Driver"s are specific to Linux.
 
-Unfortunately, Multi-MSI has more requirements than just allocating
-multiple MSIs. The allocated MSIs must be allocated as a contiguous
-range, be a power of two, aligned on the size of the range, with a
-maximum of 32 interrupts. Your approach breaks the alignment requirement.
+What actually is the device?
 
-> By the way, 32 seems a good default value for IRQS_PER_CHUNK.
-> So, I want to write another patch to make IRQ_PER_CHUNK a variable
-> which can be changed by kernel parameter.
-> What do you think of this idea?
+> +MMSYS is a multifunction device with the following sub modules:
+> +- clocks for the multi-media subsystem
+> +- central node for the DRM subsystem.
+> +
+> +This document describes the binding for MFD device. The MFD takes care to initailize
+> +the clock driver and the DRM driver. More info see
+> +Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+> +
+> +Required properties:
+> +- compatible: Should be one of:
+> +	- "mediatek,mt2701-mmsys", "syscon"
+> +	- "mediatek,mt8173-mmsys", "syscon"
+> +- #clock-cells: Must be 1
+> +
+> +Optional properties:
+> +- power-domains: list of powerdomains needed for the subsystem to work
+> +
+> +Example:
+> +
+> +mmsys: clock-controller at 14000000 {
+> +	compatible = "mediatek,mt8173-mmsys", "syscon";
+> +	reg = <0 0x14000000 0 0x1000>;
+> +	power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +	#clock-cells = <1>;
+> +};
 
-It is not great, because it prevents two buses with different
-requirements from being used concurrently in the same system. It may not
-be an issue for you right now, but I want the ITS driver to be
-independent of the bus requirements.
-
-Another, more involved (but also more correct) approach would be to
-teach the various glue layers about the requirements of the bus they
-support, and pass on the allocation requirements to the core ITS driver.
-That way, we would keep the heterogeneous case working.
-
-I can probably help you with that, but this assumes that you've
-implemented support for your own bus by providing a glue layer
-equivalent to the one we have for other buses.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
