@@ -1,254 +1,142 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Mon, 30 Apr 2018 07:48:41 +0200
-Subject: [PATCH v2 07/10] PCI: Convert of_pci_get_host_bridge_resources()
- users to devm variant
-In-Reply-To: <cover.1525067324.git.jan.kiszka@siemens.com>
-References: <cover.1525067324.git.jan.kiszka@siemens.com>
-Message-ID: <ed3e6df4feca5febefa14716d62aaddd5b4a39d1.1525067324.git.jan.kiszka@siemens.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Apr 2018 06:54:39 +0100
+Subject: [PATCH 3/5] arm64: dts: imx: add imx8qxp support
+In-Reply-To: <1524855977-15719-4-git-send-email-aisheng.dong@nxp.com>
+References: <1524855977-15719-1-git-send-email-aisheng.dong@nxp.com>
+ <1524855977-15719-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20180430055429.zkyhn7w7ppnqs2pp@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Kiszka <jan.kiszka@siemens.com>
+Hi,
 
-Straightforward for all of them, no more leaks afterwards.
+On Sat, Apr 28, 2018 at 03:06:15AM +0800, Dong Aisheng wrote:
+> +/{
+> +	cpus {
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		/* We have 1 clusters having 4 Cortex-A35 cores */
 
-CC: Jingoo Han <jingoohan1@gmail.com>
-CC: Joao Pinto <Joao.Pinto@synopsys.com>
-CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-Acked-by: Jingoo Han <jingoo1han@gmail.com>
----
- drivers/pci/dwc/pcie-designware-host.c | 2 +-
- drivers/pci/host/pci-aardvark.c        | 5 ++---
- drivers/pci/host/pci-ftpci100.c        | 4 ++--
- drivers/pci/host/pci-v3-semi.c         | 3 ++-
- drivers/pci/host/pci-versatile.c       | 3 +--
- drivers/pci/host/pci-xgene.c           | 3 ++-
- drivers/pci/host/pcie-altera.c         | 5 ++---
- drivers/pci/host/pcie-iproc-platform.c | 4 ++--
- drivers/pci/host/pcie-rcar.c           | 5 ++---
- drivers/pci/host/pcie-rockchip.c       | 4 ++--
- drivers/pci/host/pcie-xilinx-nwl.c     | 4 ++--
- drivers/pci/host/pcie-xilinx.c         | 4 ++--
- drivers/pci/of.c                       | 4 ++--
- 13 files changed, 24 insertions(+), 26 deletions(-)
+> +	};
+> +
+> +	pmu {
+> +		compatible = "arm,armv8-pmuv3";
+> +		interrupts = <GIC_PPI 7
+> +			(GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
+> +		interrupt-affinity = <&A35_0>, <&A35_1>, <&A35_2>, <&A35_3>;
+> +	};
 
-diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
-index 6c409079d514..a8f6ab54b4c0 100644
---- a/drivers/pci/dwc/pcie-designware-host.c
-+++ b/drivers/pci/dwc/pcie-designware-host.c
-@@ -342,7 +342,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	if (!bridge)
- 		return -ENOMEM;
- 
--	ret = of_pci_get_host_bridge_resources(np, 0, 0xff,
-+	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
- 					&bridge->windows, &pp->io_base);
- 	if (ret)
- 		return ret;
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 9abf549631b4..1e048dd806dc 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -822,14 +822,13 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
- {
- 	int err, res_valid = 0;
- 	struct device *dev = &pcie->pdev->dev;
--	struct device_node *np = dev->of_node;
- 	struct resource_entry *win, *tmp;
- 	resource_size_t iobase;
- 
- 	INIT_LIST_HEAD(&pcie->resources);
- 
--	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie->resources,
--					       &iobase);
-+	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-+						    &pcie->resources, &iobase);
- 	if (err)
- 		return err;
- 
-diff --git a/drivers/pci/host/pci-ftpci100.c b/drivers/pci/host/pci-ftpci100.c
-index 5008fd87956a..87748eaeaaed 100644
---- a/drivers/pci/host/pci-ftpci100.c
-+++ b/drivers/pci/host/pci-ftpci100.c
-@@ -476,8 +476,8 @@ static int faraday_pci_probe(struct platform_device *pdev)
- 	if (IS_ERR(p->base))
- 		return PTR_ERR(p->base);
- 
--	ret = of_pci_get_host_bridge_resources(dev->of_node, 0, 0xff,
--					       &res, &io_base);
-+	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-+						    &res, &io_base);
- 	if (ret)
- 		return ret;
- 
-diff --git a/drivers/pci/host/pci-v3-semi.c b/drivers/pci/host/pci-v3-semi.c
-index 0a4dea796663..167bf6f6b378 100644
---- a/drivers/pci/host/pci-v3-semi.c
-+++ b/drivers/pci/host/pci-v3-semi.c
-@@ -791,7 +791,8 @@ static int v3_pci_probe(struct platform_device *pdev)
- 	if (IS_ERR(v3->config_base))
- 		return PTR_ERR(v3->config_base);
- 
--	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &io_base);
-+	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
-+						    &io_base);
- 	if (ret)
- 		return ret;
- 
-diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
-index 5b3876f5312b..ff2cd12b3978 100644
---- a/drivers/pci/host/pci-versatile.c
-+++ b/drivers/pci/host/pci-versatile.c
-@@ -64,11 +64,10 @@ static int versatile_pci_parse_request_of_pci_ranges(struct device *dev,
- 						     struct list_head *res)
- {
- 	int err, mem = 1, res_valid = 0;
--	struct device_node *np = dev->of_node;
- 	resource_size_t iobase;
- 	struct resource_entry *win, *tmp;
- 
--	err = of_pci_get_host_bridge_resources(np, 0, 0xff, res, &iobase);
-+	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, res, &iobase);
- 	if (err)
- 		return err;
- 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index 0a0d7ee6d3c9..7b3ed6e34b6c 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -632,7 +632,8 @@ static int xgene_pcie_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	ret = of_pci_get_host_bridge_resources(dn, 0, 0xff, &res, &iobase);
-+	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
-+						    &iobase);
- 	if (ret)
- 		return ret;
- 
-diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-altera.c
-index a6af62e0256d..49410c7ba0cc 100644
---- a/drivers/pci/host/pcie-altera.c
-+++ b/drivers/pci/host/pcie-altera.c
-@@ -488,11 +488,10 @@ static int altera_pcie_parse_request_of_pci_ranges(struct altera_pcie *pcie)
- {
- 	int err, res_valid = 0;
- 	struct device *dev = &pcie->pdev->dev;
--	struct device_node *np = dev->of_node;
- 	struct resource_entry *win;
- 
--	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pcie->resources,
--					       NULL);
-+	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff
-+						    &pcie->resources, NULL);
- 	if (err)
- 		return err;
- 
-diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
-index e764a2a2693c..99c2022813e4 100644
---- a/drivers/pci/host/pcie-iproc-platform.c
-+++ b/drivers/pci/host/pcie-iproc-platform.c
-@@ -99,8 +99,8 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
- 		pcie->phy = NULL;
- 	}
- 
--	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &resources,
--					       &iobase);
-+	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &resources,
-+						    &iobase);
- 	if (ret) {
- 		dev_err(dev, "unable to get PCI host bridge resources\n");
- 		return ret;
-diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-index 6ab28f29ac6a..6eb36c924983 100644
---- a/drivers/pci/host/pcie-rcar.c
-+++ b/drivers/pci/host/pcie-rcar.c
-@@ -1067,12 +1067,11 @@ static int rcar_pcie_parse_request_of_pci_ranges(struct rcar_pcie *pci)
- {
- 	int err;
- 	struct device *dev = pci->dev;
--	struct device_node *np = dev->of_node;
- 	resource_size_t iobase;
- 	struct resource_entry *win, *tmp;
- 
--	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
--					       &iobase);
-+	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-+						    &pci->resources, &iobase);
- 	if (err)
- 		return err;
- 
-diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-index f1e8f97ea1fb..27b97fcddf15 100644
---- a/drivers/pci/host/pcie-rockchip.c
-+++ b/drivers/pci/host/pcie-rockchip.c
-@@ -1560,8 +1560,8 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
- 	if (err < 0)
- 		goto err_deinit_port;
- 
--	err = of_pci_get_host_bridge_resources(dev->of_node, 0, 0xff,
--					       &res, &io_base);
-+	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-+						    &res, &io_base);
- 	if (err)
- 		goto err_remove_irq_domain;
- 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index 4839ae578711..64df768c795c 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -825,7 +825,6 @@ static const struct of_device_id nwl_pcie_of_match[] = {
- static int nwl_pcie_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
--	struct device_node *node = dev->of_node;
- 	struct nwl_pcie *pcie;
- 	struct pci_bus *bus;
- 	struct pci_bus *child;
-@@ -855,7 +854,8 @@ static int nwl_pcie_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
--	err = of_pci_get_host_bridge_resources(node, 0, 0xff, &res, &iobase);
-+	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
-+						    &iobase);
- 	if (err) {
- 		dev_err(dev, "Getting bridge resources failed\n");
- 		return err;
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index 0ad188effc09..88c96e5669e0 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -643,8 +643,8 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
--	err = of_pci_get_host_bridge_resources(dev->of_node, 0, 0xff, &res,
--					       &iobase);
-+	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
-+						    &iobase);
- 	if (err) {
- 		dev_err(dev, "Getting bridge resources failed\n");
- 		return err;
-diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index f16b343d3b85..5a88d46a41b7 100644
---- a/drivers/pci/of.c
-+++ b/drivers/pci/of.c
-@@ -645,12 +645,12 @@ int pci_parse_request_of_pci_ranges(struct device *dev,
- 				    struct resource **bus_range)
- {
- 	int err, res_valid = 0;
--	struct device_node *np = dev->of_node;
- 	resource_size_t iobase;
- 	struct resource_entry *win, *tmp;
- 
- 	INIT_LIST_HEAD(resources);
--	err = of_pci_get_host_bridge_resources(np, 0, 0xff, resources, &iobase);
-+	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, resources,
-+						    &iobase);
- 	if (err)
- 		return err;
- 
--- 
-2.13.6
+If using a PPI and all cores are identical, interrupt-affinity isn't necessary.
+
+I note you're using GICv3, whihch doesn't encode a cpumask in its PPI
+specifier. All instances of GIC_CPU_MASK_SIMPLE should go from dts{i,} files
+for this platform.
+
+> +
+> +	psci {
+> +		compatible = "arm,psci-1.0";
+> +		method = "smc";
+> +		cpu_suspend   = <0xc4000001>;
+> +		cpu_off	      = <0xc4000002>;
+> +		cpu_on	      = <0xc4000003>;
+
+You can drop the cpu_* function IDs if you only have "arm,psci-1.0" in the
+compatible list. These IDs (and more) are implied by PSCI 1.0+.
+
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts b/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts
+> new file mode 100644
+> index 0000000..920018e
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-imx8qxp-mek.dts
+> @@ -0,0 +1,138 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright 2017~2018 NXP
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "fsl-imx8qxp.dtsi"
+> +
+> +/ {
+> +	model = "Freescale i.MX8QXP MEK";
+> +	compatible = "fsl,imx8qxp-mek", "fsl,imx8qxp";
+> +
+> +	chosen {
+> +		stdout-path = &dma_lpuart0;
+> +	};
+
+No baud-rate configuration?
+
+[...]
+
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi
+> new file mode 100644
+> index 0000000..d7cc836
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-imx8qxp.dtsi
+> @@ -0,0 +1,794 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017~2018 NXP
+> + *	Dong Aisheng <aisheng.dong@nxp.com>
+> + */
+> +
+> +#include <dt-bindings/clock/imx8qxp-clock.h>
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/pinctrl/pads-imx8qxp.h>
+> +#include <dt-bindings/power/imx-rsrc.h>
+> +
+> +#include "fsl-imx8-ca35.dtsi"
+> +
+> +/ {
+> +	compatible = "fsl,imx8qxp";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	aliases {
+> +		serial0 = &dma_lpuart0;
+> +		mmc0 = &usdhc1;
+> +		mmc1 = &usdhc2;
+> +		mmc2 = &usdhc3;
+> +	};
+> +
+> +	memory at 80000000 {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x80000000 0 0x40000000>;
+> +	};
+> +
+> +	gic: interrupt-controller at 51a00000 {
+> +		compatible = "arm,gic-v3";
+> +		reg = <0x0 0x51a00000 0 0x10000>, /* GIC Dist */
+> +		      <0x0 0x51b00000 0 0xC0000>; /* GICR (RD_base + SGI_base) */
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		interrupts = <GIC_PPI 9
+> +			(GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
+
+As above, GIC_CPU_MASK_SIMPLE does not apply to GICv3, and should go.
+
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Physical Secure */
+> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Physical Non-Secure */
+> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Virtual */
+> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>; /* Hypervisor */
+
+... likewise.
+
+> +		clock-frequency = <8000000>;
+
+Your firmware should be configuring CNTFRQ, so this clock-frequency property
+should go.
+
+Thanks,
+Mark.
