@@ -1,65 +1,132 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 30 Apr 2018 09:07:48 +0200
-Subject: [PATCH 07/10] ARM: dts: kzm9d: Drop unnecessary address
- properties from gpio_keys node
-In-Reply-To: <20180426145213.GD3315@bigcity.dyn.berto.se>
-References: <20180426102951.8683-1-horms+renesas@verge.net.au>
- <20180426102951.8683-8-horms+renesas@verge.net.au>
- <20180426145213.GD3315@bigcity.dyn.berto.se>
-Message-ID: <20180430070747.tyc2p5xhzvv3ja6o@verge.net.au>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Mon, 30 Apr 2018 15:08:00 +0800
+Subject: [PATCH v2 2/2] soc: mediatek: add a fixed wait for SRAM stable
+In-Reply-To: <0ec15c8a-ca90-26c3-1ea6-00bf0d48b62a@gmail.com>
+References: <2e16481e1477dfae0cfb24568d8111da81d92628.1524472331.git.sean.wang@mediatek.com>
+ <0ef8e87ba7156e626d1a1a48388f222ce917099b.1524472331.git.sean.wang@mediatek.com>
+ <51840588-96e4-2520-f3d7-a61e74da6814@gmail.com>
+ <1524476340.12322.14.camel@mtkswgap22>
+ <0ec15c8a-ca90-26c3-1ea6-00bf0d48b62a@gmail.com>
+Message-ID: <1525072080.12322.212.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 04:52:13PM +0200, Niklas S?derlund wrote:
-> Hi Simon,
+On Fri, 2018-04-27 at 11:46 +0200, Matthias Brugger wrote:
+> Hi Sean,
 > 
-> Thanks for your work.
+> On 04/23/2018 11:39 AM, Sean Wang wrote:
+> > On Mon, 2018-04-23 at 11:31 +0200, Matthias Brugger wrote:
+> >>
+> >> On 04/23/2018 10:36 AM, sean.wang at mediatek.com wrote:
+> >>> From: Sean Wang <sean.wang@mediatek.com>
+> >>>
+> >>> MT7622_POWER_DOMAIN_WB doesn't send an ACK when its managed SRAM becomes
+> >>> stable, which is not like the behavior the other power domains should
+> >>> have. Therefore, it's necessary for such a power domain to have a fixed
+> >>> and well-predefined duration to wait until its managed SRAM can be allowed
+> >>> to access by all functions running on the top.
+> >>>
+> >>> v1 -> v2:
+> >>>  - use MTK_SCPD_FWAIT_SRAM flag as an indication requiring force waiting.
+> >>>
+> >>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> >>> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> >>> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> >>> Cc: Weiyi Lu <weiyi.lu@mediatek.com>
+> >>> ---
+> >>>  drivers/soc/mediatek/mtk-scpsys.c | 24 ++++++++++++++++++------
+> >>>  1 file changed, 18 insertions(+), 6 deletions(-)
+> >>>
+> >>> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> >>> index b1b45e4..d4f1a63 100644
+> >>> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> >>> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> >>> @@ -32,6 +32,7 @@
+> >>>  #define MTK_POLL_TIMEOUT    (jiffies_to_usecs(HZ))
+> >>>  
+> >>>  #define MTK_SCPD_ACTIVE_WAKEUP		BIT(0)
+> >>> +#define MTK_SCPD_FWAIT_SRAM		BIT(1)
+> >>>  #define MTK_SCPD_CAPS(_scpd, _x)	((_scpd)->data->caps & (_x))
+> >>>  
+> >>>  #define SPM_VDE_PWR_CON			0x0210
+> >>> @@ -237,11 +238,22 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+> >>>  	val &= ~scpd->data->sram_pdn_bits;
+> >>>  	writel(val, ctl_addr);
+> >>>  
+> >>> -	/* wait until SRAM_PDN_ACK all 0 */
+> >>> -	ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
+> >>> -				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
+> >>> -	if (ret < 0)
+> >>> -		goto err_pwr_ack;
+> >>> +	/* Either wait until SRAM_PDN_ACK all 0 or have a force wait */
+> >>> +	if (!MTK_SCPD_CAPS(scpd, MTK_SCPD_FWAIT_SRAM)) {
 > 
-> On 2018-04-26 12:29:48 +0200, Simon Horman wrote:
-> > The gpio_keys node does not have an address and thus does not need
-> > address-cells or address size-properties.
-> > 
-> > This is flagged by dtc as follows:
-> >  # make dtbs W=1
-> >  arch/arm/boot/dts/r8a7794-silk.dtb: Warning (avoid_unnecessary_addr_size): /soc/video at e6ef0000/port: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+> After having another look on the patch, could you change the order of the if:
+> So that we check for the existence of the MTK_SCPD_FWAIT_SRAM and sleep and in
+> the else branch we to the readl_poll_timeout.
 > 
-> This warning don't seem to match with the change nor the rest of the 
-> commit message :-)
+> I think in the future this will make the code easier to understand as you can
+> easily oversee the '!' negation in the if.
 > 
-> With that addressed and for the whole series:
-> 
-> Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-
-Thanks!
-
-The fix is:
-
-arch/arm/boot/dts/emev2-kzm9d.dtb: Warning (avoid_unnecessary_addr_size): /gpio_keys: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
-
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/boot/dts/emev2-kzm9d.dts | 3 ---
-> >  1 file changed, 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-> > index c238407133bf..0af44b7eadb9 100644
-> > --- a/arch/arm/boot/dts/emev2-kzm9d.dts
-> > +++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-> > @@ -34,9 +34,6 @@
-> >  
-> >  	gpio_keys {
-> >  		compatible = "gpio-keys";
-> > -		#address-cells = <1>;
-> > -		#size-cells = <0>;
-> > -
-> >  		one {
-> >  			debounce-interval = <50>;
-> >  			wakeup-source;
-> > -- 
-> > 2.11.0
-> > 
-> 
-> -- 
 > Regards,
-> Niklas S?derlund
+> Matthias
 > 
+
+Initial thought on the patch is that I would like to save a branch
+instruction for a most possibly executed block. Or would it be better to
+add a compiler to branch prediction information? something like that  
+
+        /* Either wait until SRAM_PDN_ACK all 0 or have a force wait */
+        if (unlikely(MTK_SCPD_CAPS(scpd, MTK_SCPD_FWAIT_SRAM))) {
+                /*
+                 * Currently, MTK_SCPD_FWAIT_SRAM is necessary only for
+                 * MT7622_POWER_DOMAIN_WB and thus just a trivial setup
+is
+                 * applied here.
+                 */
+                usleep_range(12000, 12100);
+...
+ 
+
+
+> 
+> >>> +		ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
+> >>> +					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
+> >>> +		if (ret < 0)
+> >>> +			goto err_pwr_ack;
+> >>> +	} else {
+> >>> +		/*
+> >>> +		 * Currently, MTK_SCPD_FWAIT_SRAM is necessary only for
+> >>> +		 * MT7622_POWER_DOMAIN_WB and thus just a trivial setup is
+> >>> +		 * applied here. If there're more domains which need to force
+> >>> +		 * waiting for its own pre-defined value, the duration should
+> >>> +		 * be coded in the caps field.
+> >>> +		 */
+> >>
+> >> I would say, if necessary in the future we can add a switch statement here.
+> >> Other then that the patches look good. If you are OK, I'll just delete the last
+> >> sentence when applying the patch.
+> >>
+> > 
+> > yes, it's okay for me. 
+> > 
+> >> Regards,
+> >> Matthias
+> >>
+> >>> +		usleep_range(12000, 12100);
+> >>> +	};
+> >>>  
+> >>>  	if (scpd->data->bus_prot_mask) {
+> >>>  		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
+> >>> @@ -785,7 +797,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
+> >>>  		.sram_pdn_ack_bits = 0,
+> >>>  		.clk_id = {CLK_NONE},
+> >>>  		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
+> >>> -		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+> >>> +		.caps = MTK_SCPD_ACTIVE_WAKEUP | MTK_SCPD_FWAIT_SRAM,
+> >>>  	},
+> >>>  };
+> >>>  
+> >>>
+> > 
+> > 
