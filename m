@@ -1,43 +1,30 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 1 May 2018 13:50:43 +0100
-Subject: [PATCH v3 01/12] ACPI / APEI: Move the estatus queue code up, and
- under its own ifdef
-In-Reply-To: <877eonr708.fsf@e105922-lin.cambridge.arm.com>
-References: <20180427153510.5799-1-james.morse@arm.com>
- <20180427153510.5799-2-james.morse@arm.com>
- <877eonr708.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <4d3b63b0-66ad-8903-ea9a-6fa590a017d5@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 1 May 2018 07:54:42 -0500
+Subject: [PATCHv2 1/3] Documentation: dt: socfpga: Add Stratix10 ECC
+ Manager binding
+In-Reply-To: <1524854238-19394-2-git-send-email-thor.thayer@linux.intel.com>
+References: <1524854238-19394-1-git-send-email-thor.thayer@linux.intel.com>
+ <1524854238-19394-2-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <20180501125442.GA12012@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Punit,
-
-On 01/05/18 11:43, Punit Agrawal wrote:
-> James Morse <james.morse@arm.com> writes:
->> Notes for cover letter:
->> ghes.c has three things all called 'estatus'. One is a pool of memory
->> that has a static size, and is grown/shrunk when new NMI users are
->> allocated.
->> The second is the cache, this holds recent notifications so we can
->> suppress notifications we've already handled.
->> The last is the queue, which hold data from NMI notifications (in pool
->> memory) that can't be handled immediatly.
+On Fri, Apr 27, 2018 at 01:37:16PM -0500, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
 > 
+> Add the device tree bindings needed to support the Stratix10
+> ECC Manager and SDRAM ECC.
 > 
-> I am guessing you intended to drop the notes before sending the patch
-> out.
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+> v2  Remove unused System Manager syscon.
+>     Remove unused SDRAM ECC register defines.
+>     Remove unused address, size and range from bindings.
+> ---
+>  .../bindings/arm/altera/socfpga-eccmgr.txt         | 35 ++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
 
-Ha, oops!
+This should move to bindings/edac/. Can you do that as a follow-up 
+patch?
 
-> Calling this out as it'd make sense to clean-this up if the series is
-> ready for merging.
-
-Yes, thanks for calling that out.
-
-I've deleted them now (copy-paste cover-letter serves the same purpose), so any
-v4 will drop this.
-
-
-Thanks,
-
-James
+Reviewed-by: Rob Herring <robh@kernel.org>
