@@ -1,24 +1,33 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 1 May 2018 15:40:46 +0100
-Subject: [PATCH v8 10/13] arm64: topology: rename cluster_id
-In-Reply-To: <20180425233121.13270-11-jeremy.linton@arm.com>
-References: <20180425233121.13270-1-jeremy.linton@arm.com>
- <20180425233121.13270-11-jeremy.linton@arm.com>
-Message-ID: <06cdff18-8544-8748-4164-9adb20cfb304@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 1 May 2018 09:45:16 -0500
+Subject: [PATCH] thermal: samsung: Remove support for Exynos5440
+In-Reply-To: <2734003.UHSMxVLybj@amdc3058>
+References: <20180424203239.21885-1-krzk@kernel.org>
+ <20180424203239.21885-7-krzk@kernel.org>
+ <1951102.VLysaozMLK@amdc3058>
+ <CGME20180426112113eucas1p1b5bf6f093442154e29f5541b4aba6b00@eucas1p1.samsung.com>
+ <2734003.UHSMxVLybj@amdc3058>
+Message-ID: <20180501144516.GA519@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 26, 2018 at 01:21:12PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> From: Krzysztof Kozlowski <krzk@kernel.org>
+> Subject: [PATCH] thermal: samsung: Remove support for Exynos5440
+> 
+> The Exynos5440 is not actively developed, there are no development
+> boards available and probably there are no real products with it.
+> Remove wide-tree support for Exynos5440.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> [b.zolnierkie: ported over driver changes]
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+> Eduardo, here is a version which applies on top of pending Exynos
+> thermal changes (https://lkml.org/lkml/2018/4/16/256).
+> 
+>  Documentation/devicetree/bindings/thermal/exynos-thermal.txt |   14 
+>  drivers/thermal/samsung/exynos_tmu.c                         |  161 -----------
+>  2 files changed, 4 insertions(+), 171 deletions(-)
 
-
-On 26/04/18 00:31, Jeremy Linton wrote:
-> Lets match the name of the arm64 topology field
-> to the kernel macro that uses it.
-
-[nit] You can add a note that cluster id is not architectural defined
-for ARM platforms just to elaborate on the intention for this change.
-
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
--- 
-Regards,
-Sudeep
+Reviewed-by: Rob Herring <robh@kernel.org>
