@@ -1,80 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  1 May 2018 10:45:53 +0100
-Subject: [PATCH 1/1] mfd: tps65911-comparator: Fix an off by one bug
-Message-ID: <20180501094553.31545-1-lee.jones@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 1 May 2018 15:23:31 +0530
+Subject: [PATCH 01/12] mtd: nand: davinci: store the core chipselect
+ number in platform data
+In-Reply-To: <3dccc5af-2df1-8374-e4e8-0a8b9ea1ae99@ti.com>
+References: <20180430082453.8091-1-brgl@bgdev.pl>
+ <20180430082453.8091-2-brgl@bgdev.pl>
+ <3dccc5af-2df1-8374-e4e8-0a8b9ea1ae99@ti.com>
+Message-ID: <8b7e4588-5a35-6c18-fe60-148d6ccf778c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The COMP1 and COMP2 elements are in 0 and 1 respectively so this code is
-accessing the wrong elements and one space beyond the end of the array.
+On Tuesday 01 May 2018 02:55 PM, Sekhar Nori wrote:
+> On Monday 30 April 2018 01:54 PM, Bartosz Golaszewski wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> We have the 'ti,davinci-chipselect' property in the device tree, but
+>> when using platform data the driver silently uses the id field of
+>> struct platform_device as the chipselect. This is confusing and we
+>> almost broke the nand support again recently after converting the
+>> platform to common clock framework (which changed the device id in the
+>> clock lookup - the problem is gone now that we no longer acquire the
+>> clock in the nand driver.
+>>
+>> This patch adds a new filed - core_chipsel - to the platform_data.
+> 
+> s/filed/field
+> 
+>> Subsequent patches will convert the platforms to using this new field.
+> 
+> Can you add a comment for this new field too, like how we have for most
+> other fields?
+> 
+> Curious on what 'core' in core_chipsel means. Something to do with
+> chip-select offset we have on DA850?
 
-The "id" variable is never COMP (0) so that code can be removed.
+Looks like you may have just picked the terminology from DaVinci NAND
+driver (introduced back in 2009). But in this context, it means the
+0-indexed chip-select number that of the asynchronous memory interface
+to which the NAND device is connected.
 
-Fixes: 6851ad3ab346 ("TPS65911: Comparator: Add comparator driver")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
+So, may be a comment here will suffice.
 
-History:
-
-Dan was the originator of this patch and the author of the commit log,
-but produced 2 code solutions which I wasn't happy with.  The first
-submission [0] introduced a COMP device, which after a quick check of
-the datasheet [1] appeared to be fictitious.  A subsequent submission
-[2] conducted arithmetic in array indexes.
-
-It is my belief that the correct solution is to roll which the
-situation the hardware engineers presented us with and define COMP1
-at position 0 and COMP2 at position 1 such that we can use the
-simplest code possible to select them.
-
-Dan wasn't happy to put his name to this, which I completely
-understand.  Calling SOMETHING1 0 (zero) is a little unnatural.
-
-However, since I have no shame, I offered to submit it.
-
-[0] https://lkml.org/lkml/2018/4/19/449
-[1] http://www.ti.com/lit/ds/symlink/tps65911.pdf (page 52)
-[2] https://lkml.org/lkml/2018/4/20/204
-
-drivers/mfd/tps65911-comparator.c | 11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/mfd/tps65911-comparator.c b/drivers/mfd/tps65911-comparator.c
-index d223857fb4ad..33591767fb9b 100644
---- a/drivers/mfd/tps65911-comparator.c
-+++ b/drivers/mfd/tps65911-comparator.c
-@@ -22,9 +22,8 @@
- #include <linux/gpio.h>
- #include <linux/mfd/tps65910.h>
- 
--#define COMP					0
--#define COMP1					1
--#define COMP2					2
-+#define COMP1					0
-+#define COMP2					1
- 
- /* Comparator 1 voltage selection table in millivolts */
- static const u16 COMP_VSEL_TABLE[] = {
-@@ -63,9 +62,6 @@ static int comp_threshold_set(struct tps65910 *tps65910, int id, int voltage)
- 	int ret;
- 	u8 index = 0, val;
- 
--	if (id == COMP)
--		return 0;
--
- 	while (curr_voltage < tps_comp.uV_max) {
- 		curr_voltage = tps_comp.vsel_table[index];
- 		if (curr_voltage >= voltage)
-@@ -89,9 +85,6 @@ static int comp_threshold_get(struct tps65910 *tps65910, int id)
- 	unsigned int val;
- 	int ret;
- 
--	if (id == COMP)
--		return 0;
--
- 	ret = tps65910_reg_read(tps65910, tps_comp.reg, &val);
- 	if (ret < 0)
- 		return ret;
--- 
-2.17.0
+Thanks,
+Sekhar
