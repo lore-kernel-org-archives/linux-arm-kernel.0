@@ -1,118 +1,229 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 01 May 2018 14:00:43 +0100
-Subject: [PATCH v2 2/4] KVM: arm/arm64: Introduce helpers to manupulate
- page table entries
-In-Reply-To: <3eab5997-30b2-c51a-ca8e-5545bbadffc0@arm.com> (Suzuki
- K. Poulose's message of "Tue, 1 May 2018 11:36:26 +0100")
-References: <20180501102659.13188-1-punit.agrawal@arm.com>
- <20180501102659.13188-3-punit.agrawal@arm.com>
- <3eab5997-30b2-c51a-ca8e-5545bbadffc0@arm.com>
-Message-ID: <871sevr0n8.fsf@e105922-lin.cambridge.arm.com>
+From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Tue,  1 May 2018 14:31:21 +0200
+Subject: [PATCH v8 02/12] ARM: sunxi: smp: Move assembly code into a file
+In-Reply-To: <20180501123131.7738-1-mylene.josserand@bootlin.com>
+References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
+Message-ID: <20180501123131.7738-3-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Move the assembly code for cluster cache enabling and resuming
+into an assembly file instead of having it directly in C code.
 
-Thanks for having a look.
+Remove the CFLAGS because we are using the ARM directive "arch"
+instead.
 
-Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
+Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+---
+ arch/arm/mach-sunxi/Makefile  |  2 +-
+ arch/arm/mach-sunxi/headsmp.S | 80 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-sunxi/mc_smp.c  | 82 +++----------------------------------------
+ 3 files changed, 85 insertions(+), 79 deletions(-)
+ create mode 100644 arch/arm/mach-sunxi/headsmp.S
 
-> On 01/05/18 11:26, Punit Agrawal wrote:
->> Introduce helpers to abstract architectural handling of the conversion
->> of pfn to page table entries and marking a PMD page table entry as a
->> block entry.
->>
->> The helpers are introduced in preparation for supporting PUD hugepages
->> at stage 2 - which are supported on arm64 but do not exist on arm.
->
-> Punit,
->
-> The change are fine by me. However, we usually do not define kvm_*
-> accessors for something which we know matches with the host variant.
-> i.e, PMD and PTE helpers, which are always present and we make use
-> of them directly. (see unmap_stage2_pmds for e.g)
-
-In general, I agree - it makes sense to avoid duplication.
-
-Having said that, the helpers here allow following a common pattern for
-handling the various page sizes - pte, pmd and pud - during stage 2
-fault handling (see patch 4).
-
-As you've said you're OK with this change, I'd prefer to keep this patch
-but will drop it if any others reviewers are concerned about the
-duplication as well.
-
-Thanks,
-Punit
-
->
-> Cheers
-> Suzuki
->
->>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm/include/asm/kvm_mmu.h   | 5 +++++
->>   arch/arm64/include/asm/kvm_mmu.h | 5 +++++
->>   virt/kvm/arm/mmu.c               | 7 ++++---
->>   3 files changed, 14 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index 707a1f06dc5d..5907a81ad5c1 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -75,6 +75,11 @@ phys_addr_t kvm_get_idmap_vector(void);
->>   int kvm_mmu_init(void);
->>   void kvm_clear_hyp_idmap(void);
->>   +#define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
->> +#define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
->> +
->> +#define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
->> +
->>   static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
->>   {
->>   	*pmd = new_pmd;
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index 082110993647..d962508ce4b3 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -173,6 +173,11 @@ void kvm_clear_hyp_idmap(void);
->>   #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
->>   #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
->>   +#define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
->> +#define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
->> +
->> +#define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
->> +
->>   static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
->>   {
->>   	pte_val(pte) |= PTE_S2_RDWR;
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 686fc6a4b866..74750236f445 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1554,8 +1554,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>   		invalidate_icache_guest_page(pfn, vma_pagesize);
->>     	if (hugetlb) {
->> -		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
->> -		new_pmd = pmd_mkhuge(new_pmd);
->> +		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
->> +
->> +		new_pmd = kvm_pmd_mkhuge(new_pmd);
->>   		if (writable)
->>   			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
->>   @@ -1564,7 +1565,7 @@ static int user_mem_abort(struct kvm_vcpu
->> *vcpu, phys_addr_t fault_ipa,
->>     		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa,
->> &new_pmd);
->>   	} else {
->> -		pte_t new_pte = pfn_pte(pfn, mem_type);
->> +		pte_t new_pte = kvm_pfn_pte(pfn, mem_type);
->>     		if (writable) {
->>   			new_pte = kvm_s2pte_mkwrite(new_pte);
->>
+diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
+index 7de9cc286d53..71429aa85143 100644
+--- a/arch/arm/mach-sunxi/Makefile
++++ b/arch/arm/mach-sunxi/Makefile
+@@ -1,5 +1,5 @@
+ CFLAGS_mc_smp.o	+= -march=armv7-a
+ 
+ obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
+-obj-$(CONFIG_ARCH_SUNXI_MC_SMP) += mc_smp.o
++obj-$(CONFIG_ARCH_SUNXI_MC_SMP) += mc_smp.o headsmp.o
+ obj-$(CONFIG_SMP) += platsmp.o
+diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+new file mode 100644
+index 000000000000..37dc772701f3
+--- /dev/null
++++ b/arch/arm/mach-sunxi/headsmp.S
+@@ -0,0 +1,80 @@
++/* SPDX-License-Identifier: GPL-2.0
++ *
++ * Copyright (c) 2018 Chen-Yu Tsai
++ * Copyright (c) 2018 Bootlin
++ *
++ * Chen-Yu Tsai <wens@csie.org>
++ * Myl?ne Josserand <mylene.josserand@bootlin.com>
++ *
++ * SMP support for sunxi based systems with Cortex A7/A15
++ *
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <asm/cputype.h>
++
++ENTRY(sunxi_mc_smp_cluster_cache_enable)
++	.arch	armv7-a
++	/*
++	 * Enable cluster-level coherency, in preparation for turning on the MMU.
++	 *
++	 * Also enable regional clock gating and L2 data latency settings for
++	 * Cortex-A15. These settings are from the vendor kernel.
++	 */
++	mrc	p15, 0, r1, c0, c0, 0
++	movw	r2, #(ARM_CPU_PART_MASK & 0xffff)
++	movt	r2, #(ARM_CPU_PART_MASK >> 16)
++	and	r1, r1, r2
++	movw	r2, #(ARM_CPU_PART_CORTEX_A15 & 0xffff)
++	movt	r2, #(ARM_CPU_PART_CORTEX_A15 >> 16)
++	cmp	r1, r2
++	bne	not_a15
++
++	/* The following is Cortex-A15 specific */
++
++	/* ACTLR2: Enable CPU regional clock gates */
++	mrc p15, 1, r1, c15, c0, 4
++	orr r1, r1, #(0x1 << 31)
++	mcr p15, 1, r1, c15, c0, 4
++
++	/* L2ACTLR */
++	mrc p15, 1, r1, c15, c0, 0
++	/* Enable L2, GIC, and Timer regional clock gates */
++	orr r1, r1, #(0x1 << 26)
++	/* Disable clean/evict from being pushed to external */
++	orr r1, r1, #(0x1<<3)
++	mcr p15, 1, r1, c15, c0, 0
++
++	/* L2CTRL: L2 data RAM latency */
++	mrc p15, 1, r1, c9, c0, 2
++	bic r1, r1, #(0x7 << 0)
++	orr r1, r1, #(0x3 << 0)
++	mcr p15, 1, r1, c9, c0, 2
++
++	/* End of Cortex-A15 specific setup */
++	not_a15:
++
++	/* Get value of sunxi_mc_smp_first_comer */
++	adr	r1, first
++	ldr	r0, [r1]
++	ldr	r0, [r1, r0]
++
++	/* Skip cci_enable_port_for_self if not first comer */
++	cmp	r0, #0
++	bxeq	lr
++	b	cci_enable_port_for_self
++
++	.align 2
++	first: .word sunxi_mc_smp_first_comer - .
++ENDPROC(sunxi_mc_smp_cluster_cache_enable)
++
++ENTRY(sunxi_mc_smp_secondary_startup)
++	bl	sunxi_mc_smp_cluster_cache_enable
++	b	secondary_startup
++ENDPROC(sunxi_mc_smp_secondary_startup)
++
++ENTRY(sunxi_mc_smp_resume)
++	bl	sunxi_mc_smp_cluster_cache_enable
++	b	cpu_resume
++ENDPROC(sunxi_mc_smp_resume)
+diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
+index c0246ec54a0a..727968d6a3e5 100644
+--- a/arch/arm/mach-sunxi/mc_smp.c
++++ b/arch/arm/mach-sunxi/mc_smp.c
+@@ -72,6 +72,9 @@ static void __iomem *cpucfg_base;
+ static void __iomem *prcm_base;
+ static void __iomem *sram_b_smp_base;
+ 
++extern void sunxi_mc_smp_secondary_startup(void);
++extern void sunxi_mc_smp_resume(void);
++
+ static bool sunxi_core_is_cortex_a15(unsigned int core, unsigned int cluster)
+ {
+ 	struct device_node *node;
+@@ -300,74 +303,7 @@ static void sunxi_cluster_cache_disable_without_axi(void)
+ }
+ 
+ static int sunxi_mc_smp_cpu_table[SUNXI_NR_CLUSTERS][SUNXI_CPUS_PER_CLUSTER];
+-static int sunxi_mc_smp_first_comer;
+-
+-/*
+- * Enable cluster-level coherency, in preparation for turning on the MMU.
+- *
+- * Also enable regional clock gating and L2 data latency settings for
+- * Cortex-A15. These settings are from the vendor kernel.
+- */
+-static void __naked sunxi_mc_smp_cluster_cache_enable(void)
+-{
+-	asm volatile (
+-		"mrc	p15, 0, r1, c0, c0, 0\n"
+-		"movw	r2, #" __stringify(ARM_CPU_PART_MASK & 0xffff) "\n"
+-		"movt	r2, #" __stringify(ARM_CPU_PART_MASK >> 16) "\n"
+-		"and	r1, r1, r2\n"
+-		"movw	r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 & 0xffff) "\n"
+-		"movt	r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 >> 16) "\n"
+-		"cmp	r1, r2\n"
+-		"bne	not_a15\n"
+-
+-		/* The following is Cortex-A15 specific */
+-
+-		/* ACTLR2: Enable CPU regional clock gates */
+-		"mrc p15, 1, r1, c15, c0, 4\n"
+-		"orr r1, r1, #(0x1<<31)\n"
+-		"mcr p15, 1, r1, c15, c0, 4\n"
+-
+-		/* L2ACTLR */
+-		"mrc p15, 1, r1, c15, c0, 0\n"
+-		/* Enable L2, GIC, and Timer regional clock gates */
+-		"orr r1, r1, #(0x1<<26)\n"
+-		/* Disable clean/evict from being pushed to external */
+-		"orr r1, r1, #(0x1<<3)\n"
+-		"mcr p15, 1, r1, c15, c0, 0\n"
+-
+-		/* L2CTRL: L2 data RAM latency */
+-		"mrc p15, 1, r1, c9, c0, 2\n"
+-		"bic r1, r1, #(0x7<<0)\n"
+-		"orr r1, r1, #(0x3<<0)\n"
+-		"mcr p15, 1, r1, c9, c0, 2\n"
+-
+-		/* End of Cortex-A15 specific setup */
+-		"not_a15:\n"
+-
+-		/* Get value of sunxi_mc_smp_first_comer */
+-		"adr	r1, first\n"
+-		"ldr	r0, [r1]\n"
+-		"ldr	r0, [r1, r0]\n"
+-
+-		/* Skip cci_enable_port_for_self if not first comer */
+-		"cmp	r0, #0\n"
+-		"bxeq	lr\n"
+-		"b	cci_enable_port_for_self\n"
+-
+-		".align 2\n"
+-		"first: .word sunxi_mc_smp_first_comer - .\n"
+-	);
+-}
+-
+-static void __naked sunxi_mc_smp_secondary_startup(void)
+-{
+-	asm volatile(
+-		"bl	sunxi_mc_smp_cluster_cache_enable\n"
+-		"b	secondary_startup"
+-		/* Let compiler know about sunxi_mc_smp_cluster_cache_enable */
+-		:: "i" (sunxi_mc_smp_cluster_cache_enable)
+-	);
+-}
++int sunxi_mc_smp_first_comer;
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+@@ -637,16 +573,6 @@ static bool __init sunxi_mc_smp_cpu_table_init(void)
+  */
+ typedef typeof(cpu_reset) phys_reset_t;
+ 
+-static void __init __naked sunxi_mc_smp_resume(void)
+-{
+-	asm volatile(
+-		"bl	sunxi_mc_smp_cluster_cache_enable\n"
+-		"b	cpu_resume"
+-		/* Let compiler know about sunxi_mc_smp_cluster_cache_enable */
+-		:: "i" (sunxi_mc_smp_cluster_cache_enable)
+-	);
+-}
+-
+ static int __init nocache_trampoline(unsigned long __unused)
+ {
+ 	phys_reset_t phys_reset;
+-- 
+2.11.0
