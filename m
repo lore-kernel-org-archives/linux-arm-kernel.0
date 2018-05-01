@@ -1,21 +1,91 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 1 May 2018 16:10:36 +0300
-Subject: [PATCH 1/1] mfd: tps65911-comparator: Fix an off by one bug
-In-Reply-To: <54e604bd-61cd-63a8-1d35-864137a5b19a@arm.com>
-References: <20180501094553.31545-1-lee.jones@linaro.org>
- <54e604bd-61cd-63a8-1d35-864137a5b19a@arm.com>
-Message-ID: <20180501131036.bm7rcujohxi5devs@mwanda>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 1 May 2018 08:10:57 -0500
+Subject: [PATCH v2 05/27] dts: bindings: Document device tree binding for
+ CATU
+In-Reply-To: <1525165857-11096-6-git-send-email-suzuki.poulose@arm.com>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+ <1525165857-11096-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180501131057.GA15706@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The background is that no one noticed that this driver stopped being
-buildable in 2012 until I fixed it last week.  This is the third
-proposed patch to fix the off by one.  All three patches fix the bug,
-but Lee refused to accept my style and I refused to use Lee's style...
-Absolutely *no way*!  LOL.  But really neither of us take it personally
-and we've met in person before and collaborate over email and get along.
+On Tue, May 01, 2018 at 10:10:35AM +0100, Suzuki K Poulose wrote:
+> Document CATU device-tree bindings. CATU augments the TMC-ETR
+> by providing an improved Scatter Gather mechanism for streaming
+> trace data to non-contiguous system RAM pages.
+> 
+> Cc: devicetree at vger.kernel.org
+> Cc: frowand.list at gmail.com
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Mathieu Poirier <mathieu.poirier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  .../devicetree/bindings/arm/coresight.txt          | 52 ++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+> index 15ac8e8..cdd84d0 100644
+> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+> @@ -39,6 +39,8 @@ its hardware characteristcs.
+>  
+>  		- System Trace Macrocell:
+>  			"arm,coresight-stm", "arm,primecell"; [1]
+> +		- Coresight Address Translation Unit (CATU)
+> +			"arm, coresight-catu", "arm,primecell";
 
-This thread has been pretty amusing for me, but let's move on.  :P
+spurious space               ^
 
-regards,
-dan carpenter
+>  
+>  	* reg: physical base address and length of the register
+>  	  set(s) of the component.
+> @@ -86,6 +88,9 @@ its hardware characteristcs.
+>  	* arm,buffer-size: size of contiguous buffer space for TMC ETR
+>  	 (embedded trace router)
+>  
+> +* Optional property for CATU :
+> +	* interrupts : Exactly one SPI may be listed for reporting the address
+> +	  error
+
+Somewhere you need to define the ports for the CATU.
+
+>  
+>  Example:
+>  
+> @@ -118,6 +123,35 @@ Example:
+>  		};
+>  	};
+>  
+> +	etr at 20070000 {
+> +		compatible = "arm,coresight-tmc", "arm,primecell";
+> +		reg = <0 0x20070000 0 0x1000>;
+> +
+> +		clocks = <&oscclk6a>;
+> +		clock-names = "apb_pclk";
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			/* input port */
+> +			port at 0 {
+> +				reg =  <0>;
+> +				etr_in_port: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&replicator2_out_port0>;
+> +				};
+> +			};
+> +
+> +			/* CATU link represented by output port */
+> +			port at 1 {
+> +				reg = <0>;
+
+While common in the Coresight bindings, having unit-address and reg not 
+match is an error. Mathieu and I discussed this a bit as dtc now warns 
+on these.
+
+Either reg should be 1 here, or 'ports' needs to be split into input and 
+output ports. My preference would be the former, but Mathieu objected to 
+this not reflecting the the h/w numbering.
+
+Rob
