@@ -1,31 +1,81 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 1 May 2018 10:36:26 +0200
-Subject: [PATCH] clocksource/drivers/timer-atmel-pit: properly handle
- error cases
-In-Reply-To: <20180425101439.28908-1-alexandre.belloni@bootlin.com>
-References: <20180425101439.28908-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180501083626.GE27619@mai>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Tue, 1 May 2018 09:41:39 +0100
+Subject: [PATCH 1/2 v4] drm/pl111: Support the Versatile Express
+In-Reply-To: <14c7fb88-120c-5aa6-e1f3-a26650e857c3@arm.com>
+References: <20180423072017.6690-1-linus.walleij@linaro.org>
+ <4255fd6b-caf7-1347-b97b-ab7b229a08ba@arm.com>
+ <CACRpkdYpMsGOTPU81cO92DFSrzt659UmD_p5uKehBWnZk-cjnw@mail.gmail.com>
+ <c9d69109-1220-b201-e1bd-255c31c1a214@arm.com>
+ <CACRpkdaQ+9+6OHk7s=vsTF=CesMLyKQmN2O3U3pVUa0RRSnxOA@mail.gmail.com>
+ <14c7fb88-120c-5aa6-e1f3-a26650e857c3@arm.com>
+Message-ID: <20180501084139.GC1027@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 12:14:39PM +0200, Alexandre Belloni wrote:
-> smatch now reports a possible leak:
+On Mon, Apr 30, 2018 at 03:55:41PM +0100, Robin Murphy wrote:
+> On 27/04/18 19:51, Linus Walleij wrote:
+> > On Fri, Apr 27, 2018 at 5:02 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > 
+> > > I dug a little bit and it seems pl111_modeset_init() is deferring because it
+> > > can't find endpoint 0. And given that that's apparently pointing at some
+> > > non-existent panel rather than the DVI encoder as I would (naively) expect,
+> > > I can at least form a self-consistent explanation and give up on the grounds
+> > > that I'm probably missing some important DT changes.
+> > 
+> > Yeah it does help if I also send the required DT changes :/
+> > 
+> > Sorry for my absentmindedness, I'll shoot it off right now so you
+> > can test it.
 > 
-> smatch warnings:
-> drivers/clocksource/timer-atmel-pit.c:183 at91sam926x_pit_dt_init() warn: possible memory leak of 'data'
+> Hooray, thanks for that.
 > 
-> Ensure data is freed before exiting with an error.
+> For these 2 patches with a V2P-CA15_A7 tile and the DT fixed up,
 > 
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> ---
+> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> Framebuffer console and /dev/fb0 access for the motherboard CLCD works, and
+> it keeps out of the way as expected with CONFIG_DRM_HDLCD=y. I can't
+> convince an X session to start, but that appears more to do with sii902x
+> falling apart*, which I can't be bothered to even try debugging.
+> 
+> Robin.
+> 
+> 
+> *specifically, lots of this, which I imagine is related to xorg trying to
+> either read the EDID or change mode:
+> ...
+> [  243.439669] i2c i2c-0: sendbytes: NAK bailout.
+> [  243.454247] i2c i2c-0: sendbytes: NAK bailout.
+> [  247.743261] i2c i2c-0: sendbytes: NAK bailout.
+> [  247.770281] sii902x 0-0039: failed to read status (-6)
+> [  247.786609] i2c i2c-0: sendbytes: NAK bailout.
+> [  248.118522] i2c i2c-0: sendbytes: NAK bailout.
+> [  248.145485] sii902x 0-0039: failed to read status (-6)
+> [  248.177800] i2c i2c-0: sendbytes: NAK bailout.
+> [  258.256500] i2c i2c-0: sendbytes: NAK bailout.
+> [  258.274763] i2c i2c-0: sendbytes: NAK bailout.
+> [  268.499637] i2c i2c-0: sendbytes: NAK bailout.
+> [  268.517899] i2c i2c-0: sendbytes: NAK bailout.
 
-Applied for 4.17-rc
+That's a long standing issue that I've never got to the bottom of. The
+sii902x seems to have been wired in a curious way on the VExpress board
+and it is struggling to pass-through the I2C connection to the monitor.
+
+Best regards,
+Liviu
+
+> ...
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
