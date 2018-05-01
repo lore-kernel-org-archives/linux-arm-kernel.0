@@ -1,60 +1,21 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue,  1 May 2018 14:31:20 +0200
-Subject: [PATCH v8 01/12] ARM: Allow this header to be included by assembly
- files
-In-Reply-To: <20180501123131.7738-1-mylene.josserand@bootlin.com>
-References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
-Message-ID: <20180501123131.7738-2-mylene.josserand@bootlin.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Tue, 1 May 2018 16:10:36 +0300
+Subject: [PATCH 1/1] mfd: tps65911-comparator: Fix an off by one bug
+In-Reply-To: <54e604bd-61cd-63a8-1d35-864137a5b19a@arm.com>
+References: <20180501094553.31545-1-lee.jones@linaro.org>
+ <54e604bd-61cd-63a8-1d35-864137a5b19a@arm.com>
+Message-ID: <20180501131036.bm7rcujohxi5devs@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Berger <opendmb@gmail.com>
+The background is that no one noticed that this driver stopped being
+buildable in 2012 until I fixed it last week.  This is the third
+proposed patch to fix the off by one.  All three patches fix the bug,
+but Lee refused to accept my style and I refused to use Lee's style...
+Absolutely *no way*!  LOL.  But really neither of us take it personally
+and we've met in person before and collaborate over email and get along.
 
-The constants defined in this file are equally useful in assembly and C
-source files. The arm64 architecture version of this file allows
-inclusion in both assembly and C source files, so this this commit adds
-that capability to the arm architecture version so that the constants
-don't need to be defined in multiple places.
+This thread has been pretty amusing for me, but let's move on.  :P
 
-Signed-off-by: Doug Berger <opendmb@gmail.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
----
- arch/arm/include/asm/cputype.h | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cb546425da8a..e7632f536633 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -2,9 +2,6 @@
- #ifndef __ASM_ARM_CPUTYPE_H
- #define __ASM_ARM_CPUTYPE_H
- 
--#include <linux/stringify.h>
--#include <linux/kernel.h>
--
- #define CPUID_ID	0
- #define CPUID_CACHETYPE	1
- #define CPUID_TCM	2
-@@ -98,6 +95,11 @@
- /* Qualcomm implemented cores */
- #define ARM_CPU_PART_SCORPION		0x510002d0
- 
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/stringify.h>
-+#include <linux/kernel.h>
-+
- extern unsigned int processor_id;
- 
- #ifdef CONFIG_CPU_CP15
-@@ -326,4 +328,6 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u32 features,
- #define cpuid_feature_extract(reg, field) \
- 	cpuid_feature_extract_field(read_cpuid_ext(reg), field)
- 
-+#endif /* __ASSEMBLY__ */
-+
- #endif
--- 
-2.11.0
+regards,
+dan carpenter
