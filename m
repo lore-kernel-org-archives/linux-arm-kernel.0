@@ -1,34 +1,104 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 2 May 2018 05:35:31 +0900
-Subject: [PATCH] spi: mediatek: Use of_device_get_match_data()
-In-Reply-To: <1525073196.21494.3.camel@mtkswgap22>
-References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
- <94cba80f703be048666afde1ed53c15c3704c533.1523347340.git.ryder.lee@mediatek.com>
- <1525073196.21494.3.camel@mtkswgap22>
-Message-ID: <20180501203531.GA2714@sirena.org.uk>
+From: joelaf@google.com (Joel Fernandes)
+Date: Tue, 01 May 2018 20:51:45 +0000
+Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <cc4347d0-995d-6921-a796-374a214cdce9@arm.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <CAEi0qNk7pVtfcrFU4gM35sajPb09xjR8d6cJkgoSr-H0Tgo+QA@mail.gmail.com>
+ <cc4347d0-995d-6921-a796-374a214cdce9@arm.com>
+Message-ID: <CAJWu+orJPfY4OMbNa5BqgteyYL+-r2vj+5O_ohbHe5_F-7TWTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 03:26:36PM +0800, Ryder Lee wrote:
-> Hi Mark,
-> 
-> Is it okay with you?
-> 
-> On Mon, 2018-04-16 at 10:33 +0800, Ryder Lee (???V) wrote:
-> > The usage of of_device_get_match_data() reduce the code size a bit.
+On Mon, Apr 30, 2018 at 2:46 AM Julien Thierry <julien.thierry@arm.com>
+wrote:
+[...]
+> > On Wed, Jan 17, 2018 at 3:54 AM, Julien Thierry <julien.thierry@arm.com>
+wrote:
+> >> Hi,
+> >>
+> >> This series is a continuation of the work started by Daniel [1]. The
+goal
+> >> is to use GICv3 interrupt priorities to simulate an NMI.
+> >>
+> >> To achieve this, set two priorities, one for standard interrupts and
+> >> another, higher priority, for NMIs. Whenever we want to disable
+interrupts,
+> >> we mask the standard priority instead so NMIs can still be raised. Some
+> >> corner cases though still require to actually mask all interrupts
+> >> effectively disabling the NMI.
+> >>
+> >> Of course, using priority masking instead of PSR.I comes at some cost.
+On
+> >> hackbench, the drop of performance seems to be >1% on average for this
+> >> version. I can only attribute that to recent changes in the kernel as
+> >
+> > Do you have more specific performance data on the performance overhead
+> > with this series?
+> >
 
-Please don't send content free pings and please allow a reasonable time
-for review.  People get busy, go on holiday, attend conferences and so 
-on so unless there is some reason for urgency (like critical bug fixes)
-please allow at least a couple of weeks for review.  If there have been
-review comments then people may be waiting for those to be addressed.
-Sending content free pings just adds to the mail volume (if they are
-seen at all) and if something has gone wrong you'll have to resend the
-patches anyway.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/faa27638/attachment.sig>
+> Not at the moment. I was planning on doing a v3 anyway considering this
+> series is getting a bit old and the GICv3 driver has had some
+modifications.
+
+Great! Looking forward to it, will try to find some time to review this set
+as well.
+
+> Once I get to it I can try to have more detailed performance data on a
+> recent kernel. I've really only measured the performance on hackbench
+> and on kernel build from defconfig (and for the kernel build the
+> performance difference was completely hidden by the noise).
+
+> >> hackbench seems slightly slower compared to my other benchmarks while
+the
+> >> runs with the use of GICv3 priorities have stayed in the same time
+frames.
+> >> KVM Guests do not seem to be affected preformance-wise by the host
+using
+> >> PMR to mask interrupts or not.
+> >>
+> >> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+> >> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as
+NMI
+> >> for now. I don't think there is any reason LPIs should be allowed to
+be set
+> >> as NMI as they do not have an active state.
+> >> When an NMI is active on a CPU, no other NMI can be triggered on the
+CPU.
+> >>
+> >>
+> >> Requirements to use this:
+> >> - Have GICv3
+> >> - SCR_EL3.FIQ is set to 1 when linux runs
+> >
+> > Ah I see it mentioned here. Again, can you clarify if this is
+> > something that can be misconfigured? Is it something that the
+> > bootloader sets?
+> >
+
+> Yes, this is something that the bootloader sets and we have seen a few
+> cases where it is set to 0, so it can be "misconfigured".
+
+> It is not impossible to handle this case, but this bit affects the view
+> the GICv3 CPU interface has on interrupt priority values. However it
+> requires to add some conditions in both the interrupt handling and
+> masking/unmasking code, so ideally we would avoid adding things to this.
+
+> But the idea is that Linux only deals with group 1 interrupts, and group
+> 1 interrupts are only signaled as FIQs when the execution state is
+> secure or at EL3, which should never happen in Linux's case. So ideally
+> we'd like firmwares to set up this bit properly rather than to have to
+> deal with both cases when only one of them makes sense for Linux.
+
+ From what I see, on all our platforms, FIQs are delivered to the secure
+monitor only. Which is the reason for this patchset in the first place. I
+can't imagine a usecase that is not designed like this (and have not come
+across this), so its probably Ok to just assume SCR_EL3.FIQ is to 1.
+
+In the future, if SCR_EL3.FIQ is set 0, then the NMI should use the FIQ
+mechanism delivered to the non-secure OS.
+
+Does what I say make sense or was I just shooting arrows in the dark? :-P
+
+thanks,
+
+- Joel
