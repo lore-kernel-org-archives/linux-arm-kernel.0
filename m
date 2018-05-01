@@ -1,37 +1,49 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 1 May 2018 15:48:33 -0700
-Subject: [PATCH] ARM: dts: at91: sama5d4ek: use canonical compatible for
- touchscreen
-Message-ID: <20180501224833.GA151132@dtor-ws>
+Date: Tue, 1 May 2018 15:49:20 -0700
+Subject: [PATCH v2] Input: atmel_mxt_ts - add missing compatible strings
+ to OF device table
+In-Reply-To: <CAL_JsqKs7Jb0yCM+mUHwqRfrhzCPar1rHq4J+cCyxne=rVoV3g@mail.gmail.com>
+References: <20180410095340.24074-1-javierm@redhat.com>
+ <20180501184853.GB52077@dtor-ws>
+ <CAL_JsqJ-UTGrPm2tiS1yVFweWB_LH2JSBpOpMtogTYFi7pCsGA@mail.gmail.com>
+ <20180501205713.GA130399@dtor-ws>
+ <CAL_JsqKs7Jb0yCM+mUHwqRfrhzCPar1rHq4J+cCyxne=rVoV3g@mail.gmail.com>
+Message-ID: <20180501224920.GB130399@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The canonical compatible string is "atmel,maxtouch", let's use it. Also,
-change the node name to be "touchscreen" rather than driver name.
+On Tue, May 01, 2018 at 04:33:07PM -0500, Rob Herring wrote:
+> On Tue, May 1, 2018 at 3:57 PM, Dmitry Torokhov
+> <dmitry.torokhov@gmail.com> wrote:
+> > From: Javier Martinez Canillas <javierm@redhat.com>
+> >
+> > Commit af503716ac14 ("i2c: core: report OF style module alias for devices
+> > registered via OF") fixed how the I2C core reports the module alias when
+> > devices are registered via OF.
+> >
+> > But the atmel_mxt_ts driver only has an "atmel,maxtouch" compatible in its
+> > OF device ID table, so if a Device Tree is using a different one, autoload
+> > won't be working for the module (the matching works because the I2C device
+> > ID table is used as a fallback).
+> >
+> > So add compatible strings for each of the entries in the I2C device table.
+> >
+> > Fixes: af503716ac14 ("i2c: core: report OF style module alias for devices registered via OF")
+> > Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+> > Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > [dtor: document which compatibles are deprecated and should not be used]
+> > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > ---
+> >  .../devicetree/bindings/input/atmel,maxtouch.txt   |    7 +++++++
+> >  drivers/input/touchscreen/atmel_mxt_ts.c           |    5 +++++
+> >  2 files changed, 12 insertions(+)
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> 
+> Someone is going to make the dts updates, right?
 
-Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
- arch/arm/boot/dts/at91-sama5d4ek.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
-index 7887a7160a54e..0702a2f2b336c 100644
---- a/arch/arm/boot/dts/at91-sama5d4ek.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
-@@ -129,8 +129,8 @@
- 					wakeup-source;
- 				};
- 
--				atmel_mxt_ts at 4c {
--					compatible = "atmel,atmel_mxt_ts";
-+				touchscreen at 4c {
-+					compatible = "atmel,maxtouch";
- 					reg = <0x4c>;
- 					interrupt-parent = <&pioE>;
- 					interrupts = <24 0x0>;
--- 
-2.17.0.441.gb46fe60e1d-goog
-
+I sent out 2 patches...
 
 -- 
 Dmitry
