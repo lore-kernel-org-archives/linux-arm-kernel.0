@@ -1,48 +1,83 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  2 May 2018 00:12:18 +0800
-Subject: [PATCH net-next v2 06/15] dt-bindings: net: dwmac-sun8i: Add binding
- for GMAC on Allwinner R40 SoC
+Date: Wed,  2 May 2018 00:12:25 +0800
+Subject: [PATCH net-next v2 13/15] ARM: dts: sun8i: r40: bananapi-m2-ultra:
+ Enable GMAC ethernet controller
 In-Reply-To: <20180501161227.2110-1-wens@csie.org>
 References: <20180501161227.2110-1-wens@csie.org>
-Message-ID: <20180501161227.2110-7-wens@csie.org>
+Message-ID: <20180501161227.2110-14-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner R40 SoC has the EMAC controller supported by dwmac-sun8i.
-It is named "GMAC", while EMAC refers to the 10/100 Mbps Ethernet
-controller supported by sun4i-emac. The controller is the same, but
-the R40 has the glue layer controls in the clock control unit (CCU),
-with a reduced RX delay chain, and no TX delay chain.
-
-This patch adds the R40 specific bits to the dwmac-sun8i binding.
+The Bananapi M2 Ultra has a Realtek RTL8211E RGMII PHY tied to the GMAC.
+The PMIC's DC1SW output provides power for the PHY, while the ALDO2
+output provides I/O voltages on both sides.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ .../boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 30 +++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-index 1c0906a5c02b..cfe724398a12 100644
---- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-+++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-@@ -7,6 +7,7 @@ Required properties:
- - compatible: must be one of the following string:
- 		"allwinner,sun8i-a83t-emac"
- 		"allwinner,sun8i-h3-emac"
-+		"allwinner,sun8i-r40-gmac"
- 		"allwinner,sun8i-v3s-emac"
- 		"allwinner,sun50i-a64-emac"
- - reg: address and length of the register for the device.
-@@ -25,8 +26,10 @@ Required properties:
- Optional properties:
- - allwinner,tx-delay-ps: TX clock delay chain value in ps.
- 			 Range is 0-700. Default is 0.
-+			 Unavailable for allwinner,sun8i-r40-gmac
- - allwinner,rx-delay-ps: RX clock delay chain value in ps.
- 			 Range is 0-3100. Default is 0.
-+			 Range is 0-700 for allwinner,sun8i-r40-gmac
- Both delay properties need to be a multiple of 100. They control the
- clock delay for external RGMII PHY. They do not apply to the internal
- PHY or external non-RGMII PHYs.
+diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+index c6da21e43572..25fb048c7df2 100644
+--- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
++++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+@@ -51,6 +51,7 @@
+ 	compatible = "sinovoip,bpi-m2-ultra", "allwinner,sun8i-r40";
+ 
+ 	aliases {
++		ethernet0 = &gmac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -101,6 +102,22 @@
+ 	status = "okay";
+ };
+ 
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_rgmii_pins>;
++	phy-handle = <&phy1>;
++	phy-mode = "rgmii";
++	phy-supply = <&reg_dc1sw>;
++	status = "okay";
++};
++
++&gmac_mdio {
++	phy1: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 
+@@ -149,6 +166,13 @@
+ 	status = "okay";
+ };
+ 
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <2500000>;
++	regulator-max-microvolt = <2500000>;
++	regulator-name = "vcc-pa";
++};
++
+ &reg_aldo3 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <2700000>;
+@@ -156,6 +180,12 @@
+ 	regulator-name = "avcc";
+ };
+ 
++&reg_dc1sw {
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-gmac-phy";
++};
++
+ &reg_dcdc1 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <3000000>;
 -- 
 2.17.0
