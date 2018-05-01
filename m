@@ -1,63 +1,84 @@
-From: joelaf@google.com (Joel Fernandes)
-Date: Tue, 01 May 2018 18:18:44 +0000
-Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <20180430105559.ys6kcfoy76o3qpoj@holly.lan>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <e0b5ae90-f21e-f5db-a4af-52900a2e8c07@arm.com>
- <CAEi0qNkt75cqF=03HrQ81+pDdWVOpzGiHrk8_cTNTJo9os9D8Q@mail.gmail.com>
- <07a0b8c1-3d87-0cae-61df-dbff782be301@arm.com>
- <20180430105559.ys6kcfoy76o3qpoj@holly.lan>
-Message-ID: <CAJWu+oqH0-nwBNSXiuuf1gPK62rstSYBaus89dmanoCw1QYv7A@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 1 May 2018 11:48:53 -0700
+Subject: [PATCH] Input: atmel_mxt_ts - add missing compatible strings to
+ OF device table
+In-Reply-To: <20180410095340.24074-1-javierm@redhat.com>
+References: <20180410095340.24074-1-javierm@redhat.com>
+Message-ID: <20180501184853.GB52077@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > On 29/04/18 07:37, Joel Fernandes wrote:
-> > > On Wed, Jan 17, 2018 at 4:10 AM, Julien Thierry <
-julien.thierry@arm.com> wrote:
-> > > > Hi,
-> > > >
-> > > > On 17/01/18 11:54, Julien Thierry wrote:
-> > > > >
-> > > > > This series is a continuation of the work started by Daniel [1].
-The goal
-> > > > > is to use GICv3 interrupt priorities to simulate an NMI.
-> > > > >
-> > > >
-> > > >
-> > > > I have submitted a separate series making use of this feature for
-the ARM
-> > > > PMUv3 interrupt [1].
-> > >
-> > > I guess the hard lockup detector using NMI could be a nice next step
-> > > to see how well it works with lock up detection. That's the main
-> > > usecase for my interest. However, perf profiling is also a strong one.
-> > >
-> >
-> > From my understanding, Linux's hardlockup detector already uses the ARM
-PMU
-> > interrupt to check whether some task is stuck. I haven't looked at the
-> > details of the implementation yet, but in theory having the PMU
-interrupt as
-> > NMI should make the hard lockup detector use the NMI.
-> >
-> > When I do the v3, I'll have a look at this to check whether the
-hardlockup
-> > detector works fine when using NMI.
+On Tue, Apr 10, 2018 at 11:53:40AM +0200, Javier Martinez Canillas wrote:
+> Commit af503716ac14 ("i2c: core: report OF style module alias for devices
+> registered via OF") fixed how the I2C core reports the module alias when
+> devices are registered via OF.
+> 
+> But the atmel_mxt_ts driver only has an "atmel,maxtouch" compatible in its
+> OF device ID table, so if a Device Tree is using a different one, autoload
+> won't be working for the module (the matching works because the I2C device
+> ID table is used as a fallback).
+> 
+> So add compatible strings for each of the entries in the I2C device table.
+> 
+> Fixes: af503716ac14 ("i2c: core: report OF style module alias for devices registered via OF")
+> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+> ---
+> 
+>  Documentation/devicetree/bindings/input/atmel,maxtouch.txt | 6 +++++-
+>  drivers/input/touchscreen/atmel_mxt_ts.c                   | 4 ++++
+>  2 files changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+> index 23e3abc3fdef..cd43fb8bc2ce 100644
+> --- a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+> +++ b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+> @@ -1,8 +1,12 @@
+>  Atmel maXTouch touchscreen/touchpad
+>  
+>  Required properties:
+> -- compatible:
+> +- compatible: Must be one of the following
+> +    atmel,qt602240_ts
+> +    atmel,atmel_mxt_ts
+> +    atmel,atmel_mxt_tp
+>      atmel,maxtouch
+> +    atmel,mXT224
 
-> That's what I saw on arch/arm (with some of the much older FIQ work).
+I do not think we should document ad-hoc compatible strings that were
+introduced by various vendors as the documented ones, so I'd rather
+dropped this chunk and leave only "atmel,maxtouch" as compatible that
+everyone should be using.
 
-> Once you have PMU and the appropriate config to *admit* to supporting
-> hard lockup then it will "just work" and be setup automatically during
-> kernel boot.
+The changes to the driver to support the existing DTSes can of course be
+applied.
 
-> Actually the problem then becomes that if you want to use the PMU
-> for anything else then you may end up having to disable the hard
-> lockup detector.
+Rob, any objections?
 
-This problem is not anything pseudo-NMI specific though right?
-Contention/constraints on PMU resources should be a problem even on
-platforms with real NMI.
+>  
+>  - reg: The I2C address of the device
+>  
+> diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
+> index 7659bc48f1db..e8ef83f168d6 100644
+> --- a/drivers/input/touchscreen/atmel_mxt_ts.c
+> +++ b/drivers/input/touchscreen/atmel_mxt_ts.c
+> @@ -3238,7 +3238,11 @@ static int __maybe_unused mxt_resume(struct device *dev)
+>  static SIMPLE_DEV_PM_OPS(mxt_pm_ops, mxt_suspend, mxt_resume);
+>  
+>  static const struct of_device_id mxt_of_match[] = {
+> +	{ .compatible = "atmel,qt602240_ts", },
+> +	{ .compatible = "atmel,atmel_mxt_ts", },
+> +	{ .compatible = "atmel,atmel_mxt_tp", },
+>  	{ .compatible = "atmel,maxtouch", },
+> +	{ .compatible = "atmel,mXT224", },
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, mxt_of_match);
+> -- 
+> 2.14.3
+> 
 
-thanks,
+Thanks.
 
-- Joel
+-- 
+Dmitry
