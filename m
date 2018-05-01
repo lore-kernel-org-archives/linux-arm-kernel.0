@@ -1,81 +1,69 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Tue, 1 May 2018 09:41:39 +0100
-Subject: [PATCH 1/2 v4] drm/pl111: Support the Versatile Express
-In-Reply-To: <14c7fb88-120c-5aa6-e1f3-a26650e857c3@arm.com>
-References: <20180423072017.6690-1-linus.walleij@linaro.org>
- <4255fd6b-caf7-1347-b97b-ab7b229a08ba@arm.com>
- <CACRpkdYpMsGOTPU81cO92DFSrzt659UmD_p5uKehBWnZk-cjnw@mail.gmail.com>
- <c9d69109-1220-b201-e1bd-255c31c1a214@arm.com>
- <CACRpkdaQ+9+6OHk7s=vsTF=CesMLyKQmN2O3U3pVUa0RRSnxOA@mail.gmail.com>
- <14c7fb88-120c-5aa6-e1f3-a26650e857c3@arm.com>
-Message-ID: <20180501084139.GC1027@e110455-lin.cambridge.arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue,  1 May 2018 10:10:31 +0100
+Subject: [PATCH v2 01/27] coresight: ETM: Add support for ARM Cortex-A73
+In-Reply-To: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1525165857-11096-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 03:55:41PM +0100, Robin Murphy wrote:
-> On 27/04/18 19:51, Linus Walleij wrote:
-> > On Fri, Apr 27, 2018 at 5:02 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> > 
-> > > I dug a little bit and it seems pl111_modeset_init() is deferring because it
-> > > can't find endpoint 0. And given that that's apparently pointing at some
-> > > non-existent panel rather than the DVI encoder as I would (naively) expect,
-> > > I can at least form a self-consistent explanation and give up on the grounds
-> > > that I'm probably missing some important DT changes.
-> > 
-> > Yeah it does help if I also send the required DT changes :/
-> > 
-> > Sorry for my absentmindedness, I'll shoot it off right now so you
-> > can test it.
-> 
-> Hooray, thanks for that.
-> 
-> For these 2 patches with a V2P-CA15_A7 tile and the DT fixed up,
-> 
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> Framebuffer console and /dev/fb0 access for the motherboard CLCD works, and
-> it keeps out of the way as expected with CONFIG_DRM_HDLCD=y. I can't
-> convince an X session to start, but that appears more to do with sii902x
-> falling apart*, which I can't be bothered to even try debugging.
-> 
-> Robin.
-> 
-> 
-> *specifically, lots of this, which I imagine is related to xorg trying to
-> either read the EDID or change mode:
-> ...
-> [  243.439669] i2c i2c-0: sendbytes: NAK bailout.
-> [  243.454247] i2c i2c-0: sendbytes: NAK bailout.
-> [  247.743261] i2c i2c-0: sendbytes: NAK bailout.
-> [  247.770281] sii902x 0-0039: failed to read status (-6)
-> [  247.786609] i2c i2c-0: sendbytes: NAK bailout.
-> [  248.118522] i2c i2c-0: sendbytes: NAK bailout.
-> [  248.145485] sii902x 0-0039: failed to read status (-6)
-> [  248.177800] i2c i2c-0: sendbytes: NAK bailout.
-> [  258.256500] i2c i2c-0: sendbytes: NAK bailout.
-> [  258.274763] i2c i2c-0: sendbytes: NAK bailout.
-> [  268.499637] i2c i2c-0: sendbytes: NAK bailout.
-> [  268.517899] i2c i2c-0: sendbytes: NAK bailout.
+Add ARM Cortex A-73 ETM PIDs to the known ETM ips. While at it
+also add description of the CPU to which the ETM belongs, to make
+it easier to identify the ETM devices.
 
-That's a long standing issue that I've never got to the bottom of. The
-sii902x seems to have been wired in a curious way on the VExpress board
-and it is struggling to pass-through the I2C connection to the monitor.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 24 +++++++++++++++---------
+ 1 file changed, 15 insertions(+), 9 deletions(-)
 
-Best regards,
-Liviu
-
-> ...
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index cf364a5..e84d80b 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -1034,7 +1034,8 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 	}
+ 
+ 	pm_runtime_put(&adev->dev);
+-	dev_info(dev, "%s initialized\n", (char *)id->data);
++	dev_info(dev, "CPU%d: %s initialized\n",
++			drvdata->cpu, (char *)id->data);
+ 
+ 	if (boot_enable) {
+ 		coresight_enable(drvdata->csdev);
+@@ -1053,20 +1054,25 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ }
+ 
+ static const struct amba_id etm4_ids[] = {
+-	{       /* ETM 4.0 - Cortex-A53  */
++	{
+ 		.id	= 0x000bb95d,
+ 		.mask	= 0x000fffff,
+-		.data	= "ETM 4.0",
++		.data	= "Cortex-A53 ETM v4.0",
+ 	},
+-	{       /* ETM 4.0 - Cortex-A57 */
++	{
+ 		.id	= 0x000bb95e,
+ 		.mask	= 0x000fffff,
+-		.data	= "ETM 4.0",
++		.data	= "Cortex-A57 ETM v4.0",
+ 	},
+-	{       /* ETM 4.0 - A72, Maia, HiSilicon */
+-		.id = 0x000bb95a,
+-		.mask = 0x000fffff,
+-		.data = "ETM 4.0",
++	{
++		.id	= 0x000bb95a,
++		.mask	= 0x000fffff,
++		.data	= "Cortex-A72 ETM v4.0",
++	},
++	{
++		.id	= 0x000bb959,
++		.mask	= 0x000fffff,
++		.data	= "Cortex-A73 ETM v4.0",
+ 	},
+ 	{ 0, 0},
+ };
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+2.7.4
