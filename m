@@ -1,49 +1,88 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue,  1 May 2018 11:26:55 +0100
-Subject: [PATCH v2 0/4] KVM: Support PUD hugepages at stage 2
-Message-ID: <20180501102659.13188-1-punit.agrawal@arm.com>
+Date: Tue,  1 May 2018 11:26:57 +0100
+Subject: [PATCH v2 2/4] KVM: arm/arm64: Introduce helpers to manupulate page
+ table entries
+In-Reply-To: <20180501102659.13188-1-punit.agrawal@arm.com>
+References: <20180501102659.13188-1-punit.agrawal@arm.com>
+Message-ID: <20180501102659.13188-3-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Introduce helpers to abstract architectural handling of the conversion
+of pfn to page table entries and marking a PMD page table entry as a
+block entry.
 
-This patchset adds support for PUD hugepages at stage 2. This feature
-is useful on cores that have support for large sized TLB mappings
-(e.g., 1GB for 4K granule). Previous postings can be found at [0][1].
+The helpers are introduced in preparation for supporting PUD hugepages
+at stage 2 - which are supported on arm64 but do not exist on arm.
 
-Support is added to code that is shared between arm and arm64. Dummy
-helpers for arm are provided as the port does not support PUD hugepage
-sizes.
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/kvm_mmu.h   | 5 +++++
+ arch/arm64/include/asm/kvm_mmu.h | 5 +++++
+ virt/kvm/arm/mmu.c               | 7 ++++---
+ 3 files changed, 14 insertions(+), 3 deletions(-)
 
-There is a small conflict with the series to add support for 52 bit
-IPA[2]. The patches have been functionally tested on an A57 based
-system. The patchset is based on v4.17-rc3 and incorporates feedback
-received on the previous version.
-
-Thanks,
-Punit
-
-Changes v2:
-* Create helper to check if the page should have exec permission [1/4]
-* Fix broken condition to detect THP hugepage [1/4]
-* Fix in-correct hunk resulting from a rebase [4/4]
-
-[0] https://www.spinics.net/lists/arm-kernel/msg628053.html
-[1] https://lkml.org/lkml/2018/4/20/566
-[2] https://lwn.net/Articles/750176/
-
-Punit Agrawal (4):
-  KVM: arm/arm64: Share common code in user_mem_abort()
-  KVM: arm/arm64: Introduce helpers to manupulate page table entries
-  KVM: arm64: Support dirty page tracking for PUD hugepages
-  KVM: arm64: Add support for PUD hugepages at stage 2
-
- arch/arm/include/asm/kvm_mmu.h         |  40 +++++++++
- arch/arm64/include/asm/kvm_mmu.h       |  30 +++++++
- arch/arm64/include/asm/pgtable-hwdef.h |   4 +
- arch/arm64/include/asm/pgtable.h       |   2 +
- virt/kvm/arm/mmu.c                     | 120 +++++++++++++++++--------
- 5 files changed, 161 insertions(+), 35 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 707a1f06dc5d..5907a81ad5c1 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -75,6 +75,11 @@ phys_addr_t kvm_get_idmap_vector(void);
+ int kvm_mmu_init(void);
+ void kvm_clear_hyp_idmap(void);
+ 
++#define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
++#define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
++
++#define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
++
+ static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
+ {
+ 	*pmd = new_pmd;
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 082110993647..d962508ce4b3 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -173,6 +173,11 @@ void kvm_clear_hyp_idmap(void);
+ #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
+ #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
+ 
++#define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
++#define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
++
++#define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
++
+ static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+ {
+ 	pte_val(pte) |= PTE_S2_RDWR;
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 686fc6a4b866..74750236f445 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1554,8 +1554,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		invalidate_icache_guest_page(pfn, vma_pagesize);
+ 
+ 	if (hugetlb) {
+-		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
+-		new_pmd = pmd_mkhuge(new_pmd);
++		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
++
++		new_pmd = kvm_pmd_mkhuge(new_pmd);
+ 		if (writable)
+ 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
+ 
+@@ -1564,7 +1565,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+-		pte_t new_pte = pfn_pte(pfn, mem_type);
++		pte_t new_pte = kvm_pfn_pte(pfn, mem_type);
+ 
+ 		if (writable) {
+ 			new_pte = kvm_s2pte_mkwrite(new_pte);
 -- 
 2.17.0
