@@ -1,108 +1,87 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  1 May 2018 10:10:35 +0100
-Subject: [PATCH v2 05/27] dts: bindings: Document device tree binding for CATU
+Date: Tue,  1 May 2018 10:10:40 +0100
+Subject: [PATCH v2 10/27] dts: bindings: Restrict coresight tmc-etr
+ scatter-gather mode
 In-Reply-To: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
 References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1525165857-11096-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1525165857-11096-11-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document CATU device-tree bindings. CATU augments the TMC-ETR
-by providing an improved Scatter Gather mechanism for streaming
-trace data to non-contiguous system RAM pages.
+We are about to add the support for ETR builtin scatter-gather mode
+for dealing with large amount of trace buffers. However, on some of
+the platforms, using the ETR SG mode can lock up the system due to
+the way the ETR is connected to the memory subsystem.
 
+In SG mode, the ETR performs READ from the scatter-gather table to
+fetch the next page and regular WRITE of trace data. If the READ
+operation doesn't complete(due to the memory subsystem issues,
+which we have seen on a couple of platforms) the trace WRITE
+cannot proceed leading to issues. So, we by default do not
+use the SG mode, unless it is known to be safe on the platform.
+We define a DT property for the TMC node to specify whether we
+have a proper SG mode.
+
+Cc: Mathieu Poirier <matheiu.poirier@linaro.org>
+Cc: Mike Leach <mike.leach@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: John Horley <john.horley@arm.com>
+Cc: Robert Walker <robert.walker@arm.com>
 Cc: devicetree at vger.kernel.org
 Cc: frowand.list at gmail.com
 Cc: Rob Herring <robh@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Mathieu Poirier <mathieu.poirier@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../devicetree/bindings/arm/coresight.txt          | 52 ++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ Documentation/devicetree/bindings/arm/coresight.txt | 3 +++
+ drivers/hwtracing/coresight/coresight-tmc.c         | 8 +++++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 15ac8e8..cdd84d0 100644
+index cdd84d0..7c0c8f0 100644
 --- a/Documentation/devicetree/bindings/arm/coresight.txt
 +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -39,6 +39,8 @@ its hardware characteristcs.
- 
- 		- System Trace Macrocell:
- 			"arm,coresight-stm", "arm,primecell"; [1]
-+		- Coresight Address Translation Unit (CATU)
-+			"arm, coresight-catu", "arm,primecell";
- 
- 	* reg: physical base address and length of the register
- 	  set(s) of the component.
-@@ -86,6 +88,9 @@ its hardware characteristcs.
+@@ -88,6 +88,9 @@ its hardware characteristcs.
  	* arm,buffer-size: size of contiguous buffer space for TMC ETR
  	 (embedded trace router)
  
-+* Optional property for CATU :
-+	* interrupts : Exactly one SPI may be listed for reporting the address
-+	  error
++	* scatter-gather: boolean. Indicates that the TMC-ETR can safely
++	  use the SG mode on this system.
++
+ * Optional property for CATU :
+ 	* interrupts : Exactly one SPI may be listed for reporting the address
+ 	  error
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 7a4e84f..e38379c 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -20,6 +20,7 @@
+ #include <linux/err.h>
+ #include <linux/fs.h>
+ #include <linux/miscdevice.h>
++#include <linux/property.h>
+ #include <linux/uaccess.h>
+ #include <linux/slab.h>
+ #include <linux/dma-mapping.h>
+@@ -304,6 +305,11 @@ const struct attribute_group *coresight_tmc_groups[] = {
+ 	NULL,
+ };
  
- Example:
++static inline bool tmc_etr_can_use_sg(struct tmc_drvdata *drvdata)
++{
++	return fwnode_property_present(drvdata->dev->fwnode, "scatter-gather");
++}
++
+ /* Detect and initialise the capabilities of a TMC ETR */
+ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
+ 			     u32 devid, void *dev_caps)
+@@ -313,7 +319,7 @@ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
+ 	/* Set the unadvertised capabilities */
+ 	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
  
-@@ -118,6 +123,35 @@ Example:
- 		};
- 	};
+-	if (!(devid & TMC_DEVID_NOSCAT))
++	if (!(devid & TMC_DEVID_NOSCAT) && tmc_etr_can_use_sg(drvdata))
+ 		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
  
-+	etr at 20070000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20070000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* input port */
-+			port at 0 {
-+				reg =  <0>;
-+				etr_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&replicator2_out_port0>;
-+				};
-+			};
-+
-+			/* CATU link represented by output port */
-+			port at 1 {
-+				reg = <0>;
-+				etr_out_port: endpoint {
-+					remote-endpoint = <&catu_in_port>;
-+				};
-+			};
-+		};
-+	};
-+
- 2. Links
- 	replicator {
- 		/* non-configurable replicators don't show up on the
-@@ -247,5 +281,23 @@ Example:
- 		};
- 	};
- 
-+5. CATU
-+
-+	catu at 207e0000 {
-+		compatible = "arm,coresight-catu", "arm,primecell";
-+		reg = <0 0x207e0000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+		port {
-+			catu_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&etr_out_port>;
-+			};
-+		};
-+	};
-+
- [1]. There is currently two version of STM: STM32 and STM500.  Both
- have the same HW interface and as such don't need an explicit binding name.
+ 	/* Check if the AXI address width is available */
 -- 
 2.7.4
