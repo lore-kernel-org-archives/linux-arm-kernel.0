@@ -1,87 +1,313 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  1 May 2018 10:10:42 +0100
-Subject: [PATCH v2 12/27] coresight: tmc-etr: Allow commandline option to
- override SG use
+Date: Tue,  1 May 2018 10:10:44 +0100
+Subject: [PATCH v2 14/27] coresight: Add support for TMC ETR SG unit
 In-Reply-To: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
 References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1525165857-11096-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1525165857-11096-15-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Coresight TMC-ETR SG mode could be unsafe on a platform where
-the ETR is not properly connected to account for READ operations.
-We use a DT node property to indicate if the system is safe.
-This patch also provides a command line parameter to "force"
-the use of SG mode to override the firmware information.
+This patch adds support for setting up an SG table used by the
+TMC ETR inbuilt SG unit. The TMC ETR uses 4K page sized tables
+to hold pointers to the 4K data pages with the last entry in a
+table pointing to the next table with the entries, by kind of
+chaining. The 2 LSBs determine the type of the table entry, to
+one of :
+
+ Normal - Points to a 4KB data page.
+ Last   - Points to a 4KB data page, but is the last entry in the
+          page table.
+ Link   - Points to another 4KB table page with pointers to data.
+
+The code takes care of handling the system page size which could
+be different than 4K. So we could end up putting multiple ETR
+SG tables in a single system page, vice versa for the data pages.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mike Leach <mike.leach@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Hi
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 262 ++++++++++++++++++++++++
+ 1 file changed, 262 insertions(+)
 
-This is more of a debug patch for people who may want to
-test their platform without too much of hacking. I am not
-too keen on pushing this patch in.
----
- Documentation/admin-guide/kernel-parameters.txt | 8 ++++++++
- drivers/hwtracing/coresight/coresight-tmc.c     | 7 ++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 11fc28e..03b51c3 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -675,6 +675,14 @@
- 			Enable/disable the CPU sampling based debugging.
- 			0: default value, disable debugging
- 			1: enable debugging at boot time
-+	coresight_tmc.etr_force_sg
-+			[ARM, ARM64]
-+			Format: <bool>
-+			Force using the TMC ETR builtin scatter-gather mode
-+			even when it may be unsafe to use.
-+			Default : 0, do not force using the builtin SG mode.
-+				  1, Allow using the SG, ignoring the firmware
-+				     provided information.
- 
- 	cpuidle.off=1	[CPU_IDLE]
- 			disable the cpuidle sub-system
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index e38379c..c7bc681 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -20,6 +20,7 @@
- #include <linux/err.h>
- #include <linux/fs.h>
- #include <linux/miscdevice.h>
-+#include <linux/module.h>
- #include <linux/property.h>
- #include <linux/uaccess.h>
- #include <linux/slab.h>
-@@ -33,6 +34,8 @@
- #include "coresight-priv.h"
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 57a8fe1..a003cfc 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -23,6 +23,87 @@
  #include "coresight-tmc.h"
  
-+static bool etr_force_sg;
+ /*
++ * The TMC ETR SG has a page size of 4K. The SG table contains pointers
++ * to 4KB buffers. However, the OS may use a PAGE_SIZE different from
++ * 4K (i.e, 16KB or 64KB). This implies that a single OS page could
++ * contain more than one SG buffer and tables.
++ *
++ * A table entry has the following format:
++ *
++ * ---Bit31------------Bit4-------Bit1-----Bit0--
++ * |     Address[39:12]    | SBZ |  Entry Type  |
++ * ----------------------------------------------
++ *
++ * Address: Bits [39:12] of a physical page address. Bits [11:0] are
++ *	    always zero.
++ *
++ * Entry type:
++ *	b00 - Reserved.
++ *	b01 - Last entry in the tables, points to 4K page buffer.
++ *	b10 - Normal entry, points to 4K page buffer.
++ *	b11 - Link. The address points to the base of next table.
++ */
 +
- void tmc_wait_for_tmcready(struct tmc_drvdata *drvdata)
- {
- 	/* Ensure formatter, unformatter and hardware fifo are empty */
-@@ -307,7 +310,8 @@ const struct attribute_group *coresight_tmc_groups[] = {
- 
- static inline bool tmc_etr_can_use_sg(struct tmc_drvdata *drvdata)
- {
--	return fwnode_property_present(drvdata->dev->fwnode, "scatter-gather");
-+	return etr_force_sg ||
-+	       fwnode_property_present(drvdata->dev->fwnode, "scatter-gather");
++typedef u32 sgte_t;
++
++#define ETR_SG_PAGE_SHIFT		12
++#define ETR_SG_PAGE_SIZE		(1UL << ETR_SG_PAGE_SHIFT)
++#define ETR_SG_PAGES_PER_SYSPAGE	(PAGE_SIZE / ETR_SG_PAGE_SIZE)
++#define ETR_SG_PTRS_PER_PAGE		(ETR_SG_PAGE_SIZE / sizeof(sgte_t))
++#define ETR_SG_PTRS_PER_SYSPAGE		(PAGE_SIZE / sizeof(sgte_t))
++
++#define ETR_SG_ET_MASK			0x3
++#define ETR_SG_ET_LAST			0x1
++#define ETR_SG_ET_NORMAL		0x2
++#define ETR_SG_ET_LINK			0x3
++
++#define ETR_SG_ADDR_SHIFT		4
++
++#define ETR_SG_ENTRY(addr, type) \
++	(sgte_t)((((addr) >> ETR_SG_PAGE_SHIFT) << ETR_SG_ADDR_SHIFT) | \
++		 (type & ETR_SG_ET_MASK))
++
++#define ETR_SG_ADDR(entry) \
++	(((dma_addr_t)(entry) >> ETR_SG_ADDR_SHIFT) << ETR_SG_PAGE_SHIFT)
++#define ETR_SG_ET(entry)		((entry) & ETR_SG_ET_MASK)
++
++/*
++ * struct etr_sg_table : ETR SG Table
++ * @sg_table:		Generic SG Table holding the data/table pages.
++ * @hwaddr:		hwaddress used by the TMC, which is the base
++ *			address of the table.
++ */
++struct etr_sg_table {
++	struct tmc_sg_table	*sg_table;
++	dma_addr_t		hwaddr;
++};
++
++/*
++ * tmc_etr_sg_table_entries: Total number of table entries required to map
++ * @nr_pages system pages.
++ *
++ * We need to map @nr_pages * ETR_SG_PAGES_PER_SYSPAGE data pages.
++ * Each TMC page can map (ETR_SG_PTRS_PER_PAGE - 1) buffer pointers,
++ * with the last entry pointing to another page of table entries.
++ * If we spill over to a new page for mapping 1 entry, we could as
++ * well replace the link entry of the previous page with the last entry.
++ */
++static inline unsigned long __attribute_const__
++tmc_etr_sg_table_entries(int nr_pages)
++{
++	unsigned long nr_sgpages = nr_pages * ETR_SG_PAGES_PER_SYSPAGE;
++	unsigned long nr_sglinks = nr_sgpages / (ETR_SG_PTRS_PER_PAGE - 1);
++	/*
++	 * If we spill over to a new page for 1 entry, we could as well
++	 * make it the LAST entry in the previous page, skipping the Link
++	 * address.
++	 */
++	if (nr_sglinks && (nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1) < 2))
++		nr_sglinks--;
++	return nr_sgpages + nr_sglinks;
++}
++
++/*
+  * tmc_pages_get_offset:  Go through all the pages in the tmc_pages
+  * and map the device address @addr to an offset within the virtual
+  * contiguous buffer.
+@@ -305,6 +386,187 @@ ssize_t tmc_sg_table_get_data(struct tmc_sg_table *sg_table,
+ 	return len;
  }
  
- /* Detect and initialise the capabilities of a TMC ETR */
-@@ -482,3 +486,4 @@ static struct amba_driver tmc_driver = {
- 	.id_table	= tmc_ids,
- };
- builtin_amba_driver(tmc_driver);
-+module_param(etr_force_sg, bool, 0);
++#ifdef ETR_SG_DEBUG
++/* Map a dma address to virtual address */
++static unsigned long
++tmc_sg_daddr_to_vaddr(struct tmc_sg_table *sg_table,
++			dma_addr_t addr, bool table)
++{
++	long offset;
++	unsigned long base;
++	struct tmc_pages *tmc_pages;
++
++	if (table) {
++		tmc_pages = &sg_table->table_pages;
++		base = (unsigned long)sg_table->table_vaddr;
++	} else {
++		tmc_pages = &sg_table->data_pages;
++		base = (unsigned long)sg_table->data_vaddr;
++	}
++
++	offset = tmc_pages_get_offset(tmc_pages, addr);
++	if (offset < 0)
++		return 0;
++	return base + offset;
++}
++
++/* Dump the given sg_table */
++static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
++{
++	sgte_t *ptr;
++	int i = 0;
++	dma_addr_t addr;
++	struct tmc_sg_table *sg_table = etr_table->sg_table;
++
++	ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
++					      etr_table->hwaddr, true);
++	while (ptr) {
++		addr = ETR_SG_ADDR(*ptr);
++		switch (ETR_SG_ET(*ptr)) {
++		case ETR_SG_ET_NORMAL:
++			dev_dbg(sg_table->dev,
++				"%05d: %p\t:[N] 0x%llx\n", i, ptr, addr);
++			ptr++;
++			break;
++		case ETR_SG_ET_LINK:
++			dev_dbg(sg_table->dev,
++				"%05d: *** %p\t:{L} 0x%llx ***\n",
++				 i, ptr, addr);
++			ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
++							      addr, true);
++			break;
++		case ETR_SG_ET_LAST:
++			dev_dbg(sg_table->dev,
++				"%05d: ### %p\t:[L] 0x%llx ###\n",
++				 i, ptr, addr);
++			return;
++		default:
++			dev_dbg(sg_table->dev,
++				"%05d: xxx %p\t:[INVALID] 0x%llx xxx\n",
++				 i, ptr, addr);
++			return;
++		}
++		i++;
++	}
++	dev_dbg(sg_table->dev, "******* End of Table *****\n");
++}
++#endif
++
++/*
++ * Populate the SG Table page table entries from table/data
++ * pages allocated. Each Data page has ETR_SG_PAGES_PER_SYSPAGE SG pages.
++ * So does a Table page. So we keep track of indices of the tables
++ * in each system page and move the pointers accordingly.
++ */
++#define INC_IDX_ROUND(idx, size) ((idx) = ((idx) + 1) % (size))
++static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
++{
++	dma_addr_t paddr;
++	int i, type, nr_entries;
++	int tpidx = 0; /* index to the current system table_page */
++	int sgtidx = 0;	/* index to the sg_table within the current syspage */
++	int sgtentry = 0; /* the entry within the sg_table */
++	int dpidx = 0; /* index to the current system data_page */
++	int spidx = 0; /* index to the SG page within the current data page */
++	sgte_t *ptr; /* pointer to the table entry to fill */
++	struct tmc_sg_table *sg_table = etr_table->sg_table;
++	dma_addr_t *table_daddrs = sg_table->table_pages.daddrs;
++	dma_addr_t *data_daddrs = sg_table->data_pages.daddrs;
++
++	nr_entries = tmc_etr_sg_table_entries(sg_table->data_pages.nr_pages);
++	/*
++	 * Use the contiguous virtual address of the table to update entries.
++	 */
++	ptr = sg_table->table_vaddr;
++	/*
++	 * Fill all the entries, except the last entry to avoid special
++	 * checks within the loop.
++	 */
++	for (i = 0; i < nr_entries - 1; i++) {
++		if (sgtentry == ETR_SG_PTRS_PER_PAGE - 1) {
++			/*
++			 * Last entry in a sg_table page is a link address to
++			 * the next table page. If this sg_table is the last
++			 * one in the system page, it links to the first
++			 * sg_table in the next system page. Otherwise, it
++			 * links to the next sg_table page within the system
++			 * page.
++			 */
++			if (sgtidx == ETR_SG_PAGES_PER_SYSPAGE - 1) {
++				paddr = table_daddrs[tpidx + 1];
++			} else {
++				paddr = table_daddrs[tpidx] +
++					(ETR_SG_PAGE_SIZE * (sgtidx + 1));
++			}
++			type = ETR_SG_ET_LINK;
++		} else {
++			/*
++			 * Update the indices to the data_pages to point to the
++			 * next sg_page in the data buffer.
++			 */
++			type = ETR_SG_ET_NORMAL;
++			paddr = data_daddrs[dpidx] + spidx * ETR_SG_PAGE_SIZE;
++			if (!INC_IDX_ROUND(spidx, ETR_SG_PAGES_PER_SYSPAGE))
++				dpidx++;
++		}
++		*ptr++ = ETR_SG_ENTRY(paddr, type);
++		/*
++		 * Move to the next table pointer, moving the table page index
++		 * if necessary
++		 */
++		if (!INC_IDX_ROUND(sgtentry, ETR_SG_PTRS_PER_PAGE)) {
++			if (!INC_IDX_ROUND(sgtidx, ETR_SG_PAGES_PER_SYSPAGE))
++				tpidx++;
++		}
++	}
++
++	/* Set up the last entry, which is always a data pointer */
++	paddr = data_daddrs[dpidx] + spidx * ETR_SG_PAGE_SIZE;
++	*ptr++ = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
++}
++
++/*
++ * tmc_init_etr_sg_table: Allocate a TMC ETR SG table, data buffer of @size and
++ * populate the table.
++ *
++ * @dev		- Device pointer for the TMC
++ * @node	- NUMA node where the memory should be allocated
++ * @size	- Total size of the data buffer
++ * @pages	- Optional list of page virtual address
++ */
++static struct etr_sg_table __maybe_unused *
++tmc_init_etr_sg_table(struct device *dev, int node,
++		  unsigned long size, void **pages)
++{
++	int nr_entries, nr_tpages;
++	int nr_dpages = size >> PAGE_SHIFT;
++	struct tmc_sg_table *sg_table;
++	struct etr_sg_table *etr_table;
++
++	etr_table = kzalloc(sizeof(*etr_table), GFP_KERNEL);
++	if (!etr_table)
++		return ERR_PTR(-ENOMEM);
++	nr_entries = tmc_etr_sg_table_entries(nr_dpages);
++	nr_tpages = DIV_ROUND_UP(nr_entries, ETR_SG_PTRS_PER_SYSPAGE);
++
++	sg_table = tmc_alloc_sg_table(dev, node, nr_tpages, nr_dpages, pages);
++	if (IS_ERR(sg_table)) {
++		kfree(etr_table);
++		return ERR_PTR(PTR_ERR(sg_table));
++	}
++
++	etr_table->sg_table = sg_table;
++	/* TMC should use table base address for DBA */
++	etr_table->hwaddr = sg_table->table_daddr;
++	tmc_etr_sg_table_populate(etr_table);
++	/* Sync the table pages for the HW */
++	tmc_sg_table_sync_table(sg_table);
++#ifdef ETR_SG_DEBUG
++	tmc_etr_sg_table_dump(etr_table);
++#endif
++	return etr_table;
++}
++
+ static inline void tmc_etr_enable_catu(struct tmc_drvdata *drvdata)
+ {
+ 	struct coresight_device *catu = tmc_etr_get_catu_device(drvdata);
 -- 
 2.7.4
