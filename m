@@ -1,118 +1,102 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  2 May 2018 00:12:21 +0800
-Subject: [PATCH net-next v2 09/15] net: stmmac: dwmac-sun8i: Support different
- ranges for TX/RX delay chains
-In-Reply-To: <20180501161227.2110-1-wens@csie.org>
-References: <20180501161227.2110-1-wens@csie.org>
-Message-ID: <20180501161227.2110-10-wens@csie.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 1 May 2018 18:15:46 +0200
+Subject: [PATCH 04/25] arm: exynos/s3c: dts: Remove leading 0x and 0s
+ from bindings notation
+In-Reply-To: <CA+7wUsxp_n6V--PE9PQSsT1xu3b0HJn5gWBhnp=ngRNqBSVvFg@mail.gmail.com>
+References: <20171215124630.30082-1-malat@debian.org>
+ <CAJKOXPdkYLisej5965rh2SbOjbFms-RK2VnXt=L==MW_JcA+OA@mail.gmail.com>
+ <CA+7wUsxp_n6V--PE9PQSsT1xu3b0HJn5gWBhnp=ngRNqBSVvFg@mail.gmail.com>
+Message-ID: <20180501161546.6w3fkenk7q6s4kqe@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the R40 SoC, the RX delay chain only has a range of 0~7 (hundred
-picoseconds), instead of 0~31. Also the TX delay chain is completely
-absent.
+On Mon, Dec 18, 2017 at 11:17:24AM +0100, Mathieu Malaterre wrote:
+> On Mon, Dec 18, 2017 at 10:40 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > On Fri, Dec 15, 2017 at 1:46 PM, Mathieu Malaterre <malat@debian.org> wrote:
+> >> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> >> following dtc warnings:
+> >>
+> >> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+> >>
+> >> and
+> >>
+> >> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+> >>
+> >> Converted using the following command:
+> >>
+> >> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+> >>
+> >> For simplicity, two sed expressions were used to solve each warnings separately.
+> >>
+> >> To make the regex expression more robust a few other issues were resolved,
+> >> namely setting unit-address to lower case, and adding a whitespace before the
+> >> the opening curly brace:
+> >>
+> >> https://elinux.org/Device_Tree_Linux#Linux_conventions
+> >>
+> >> This will solve as a side effect warning:
+> >>
+> >> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> >>
+> >> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+> >>
+> >> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> >> Suggested-by: Rob Herring <robh@kernel.org>
+> >> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> >
+> > Ack was for different patchset, touching only three files...
+> 
+> So sorry, when I read your email:
+> 
+> https://lkml.org/lkml/2017/12/15/152
+> 
+> I assumed you meant for all the Exynos* and S3C* DTS files, but I did
+> not check carefully which files were touched originally.
+> 
+> >> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+> >> ---
+> >>  arch/arm/boot/dts/exynos3250.dtsi             | 34 ++++++------
+> >>  arch/arm/boot/dts/exynos4.dtsi                | 56 +++++++++----------
+> >>  arch/arm/boot/dts/exynos4210.dtsi             |  8 +--
+> >>  arch/arm/boot/dts/exynos4412-pinctrl.dtsi     |  2 +-
+> >>  arch/arm/boot/dts/exynos4412.dtsi             | 22 ++++----
+> >>  arch/arm/boot/dts/exynos5.dtsi                | 22 ++++----
+> >>  arch/arm/boot/dts/exynos5250.dtsi             | 64 +++++++++++-----------
+> >>  arch/arm/boot/dts/exynos5260.dtsi             | 26 ++++-----
+> >>  arch/arm/boot/dts/exynos5420.dtsi             | 78 +++++++++++++--------------
+> >>  arch/arm/boot/dts/exynos5422-odroid-core.dtsi |  2 +-
+> >>  arch/arm/boot/dts/exynos5440.dtsi             | 14 ++---
+> >>  arch/arm/boot/dts/s3c2416.dtsi                |  8 +--
+> >>  12 files changed, 168 insertions(+), 168 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+> >> index 2bd3872221a1..8d47571b3984 100644
+> >> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> >> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> >> @@ -164,31 +164,31 @@
+> >>                         syscon = <&pmu_system_controller>;
+> >>                 };
+> >>
+> >> -               pd_cam: cam-power-domain at 10023C00 {
+> >> +               pd_cam: cam-power-domain at 10023c00 {
+> >
+> > This is not related to this patch and it was not present in the
+> > version I acked. I also already fixed this here:
+> > https://patchwork.kernel.org/patch/10113323/
+> >
+> > There is no changelog explaining the difference in patches. Original
+> > patch was okay, why changing it?
+> 
+> Accept my sincere apologizes I really messed this series. I discover
+> my original ARM patch did not apply lower case to all unit-address
+> equally, so I added at last minute a sed expression to make all
+> unit-address lower case.
+> 
+> I guess you can just drop this one for now.
 
-This patch adds support for different ranges by adding per-compatible
-maximum values in the variant data. A maximum of 0 indicates that the
-delay chain is not supported or absent.
+Hi Mathieu,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- .../net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 32 +++++++++++++------
- 1 file changed, 23 insertions(+), 9 deletions(-)
+Do you plan to resend this in its original form (removing 0)?
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index 79e104a20e20..4f5612a3c855 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -47,6 +47,12 @@
-  * @support_mii:		Does the MAC handle MII
-  * @support_rmii:		Does the MAC handle RMII
-  * @support_rgmii:		Does the MAC handle RGMII
-+ *
-+ * @rx_delay_max:		Maximum raw value for RX delay chain
-+ * @tx_delay_max:		Maximum raw value for TX delay chain
-+ *				These two also indicate the bitmask for
-+ *				the RX and TX delay chain registers. A
-+ *				value of zero indicates this is not supported.
-  */
- struct emac_variant {
- 	u32 default_syscon_value;
-@@ -55,6 +61,8 @@ struct emac_variant {
- 	bool support_mii;
- 	bool support_rmii;
- 	bool support_rgmii;
-+	u8 rx_delay_max;
-+	u8 tx_delay_max;
- };
- 
- /* struct sunxi_priv_data - hold all sunxi private data
-@@ -91,7 +99,9 @@ static const struct emac_variant emac_variant_h3 = {
- 	.soc_has_internal_phy = true,
- 	.support_mii = true,
- 	.support_rmii = true,
--	.support_rgmii = true
-+	.support_rgmii = true,
-+	.rx_delay_max = 31,
-+	.tx_delay_max = 7,
- };
- 
- static const struct emac_variant emac_variant_v3s = {
-@@ -106,7 +116,9 @@ static const struct emac_variant emac_variant_a83t = {
- 	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = false,
- 	.support_mii = true,
--	.support_rgmii = true
-+	.support_rgmii = true,
-+	.rx_delay_max = 31,
-+	.tx_delay_max = 7,
- };
- 
- static const struct emac_variant emac_variant_a64 = {
-@@ -115,7 +127,9 @@ static const struct emac_variant emac_variant_a64 = {
- 	.soc_has_internal_phy = false,
- 	.support_mii = true,
- 	.support_rmii = true,
--	.support_rgmii = true
-+	.support_rgmii = true,
-+	.rx_delay_max = 31,
-+	.tx_delay_max = 7,
- };
- 
- #define EMAC_BASIC_CTL0 0x00
-@@ -219,9 +233,7 @@ static const struct emac_variant emac_variant_a64 = {
- #define SYSCON_RMII_EN		BIT(13) /* 1: enable RMII (overrides EPIT) */
- 
- /* Generic system control EMAC_CLK bits */
--#define SYSCON_ETXDC_MASK		GENMASK(2, 0)
- #define SYSCON_ETXDC_SHIFT		10
--#define SYSCON_ERXDC_MASK		GENMASK(4, 0)
- #define SYSCON_ERXDC_SHIFT		5
- /* EMAC PHY Interface Type */
- #define SYSCON_EPIT			BIT(2) /* 1: RGMII, 0: MII */
-@@ -847,8 +859,9 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
- 		}
- 		val /= 100;
- 		dev_dbg(priv->device, "set tx-delay to %x\n", val);
--		if (val <= SYSCON_ETXDC_MASK) {
--			reg &= ~(SYSCON_ETXDC_MASK << SYSCON_ETXDC_SHIFT);
-+		if (val <= gmac->variant->tx_delay_max) {
-+			reg &= ~(gmac->variant->tx_delay_max <<
-+				 SYSCON_ETXDC_SHIFT);
- 			reg |= (val << SYSCON_ETXDC_SHIFT);
- 		} else {
- 			dev_err(priv->device, "Invalid TX clock delay: %d\n",
-@@ -864,8 +877,9 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
- 		}
- 		val /= 100;
- 		dev_dbg(priv->device, "set rx-delay to %x\n", val);
--		if (val <= SYSCON_ERXDC_MASK) {
--			reg &= ~(SYSCON_ERXDC_MASK << SYSCON_ERXDC_SHIFT);
-+		if (val <= gmac->variant->rx_delay_max) {
-+			reg &= ~(gmac->variant->rx_delay_max <<
-+				 SYSCON_ERXDC_SHIFT);
- 			reg |= (val << SYSCON_ERXDC_SHIFT);
- 		} else {
- 			dev_err(priv->device, "Invalid RX clock delay: %d\n",
--- 
-2.17.0
+Best regards,
+Krzysztof
