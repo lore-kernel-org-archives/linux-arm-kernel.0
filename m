@@ -1,42 +1,26 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 16:33:07 -0500
-Subject: [PATCH v2] Input: atmel_mxt_ts - add missing compatible strings
- to OF device table
-In-Reply-To: <20180501205713.GA130399@dtor-ws>
-References: <20180410095340.24074-1-javierm@redhat.com>
- <20180501184853.GB52077@dtor-ws>
- <CAL_JsqJ-UTGrPm2tiS1yVFweWB_LH2JSBpOpMtogTYFi7pCsGA@mail.gmail.com>
- <20180501205713.GA130399@dtor-ws>
-Message-ID: <CAL_JsqKs7Jb0yCM+mUHwqRfrhzCPar1rHq4J+cCyxne=rVoV3g@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 1 May 2018 14:46:04 -0700
+Subject: [PATCH] proc/kcore: Don't bounds check against address 0
+In-Reply-To: <20180501201143.15121-1-labbott@redhat.com>
+References: <1039518799.26129578.1525185916272.JavaMail.zimbra@redhat.com>
+ <20180501201143.15121-1-labbott@redhat.com>
+Message-ID: <20180501144604.1cf872e7938bffc01a26349f@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 1, 2018 at 3:57 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> From: Javier Martinez Canillas <javierm@redhat.com>
->
-> Commit af503716ac14 ("i2c: core: report OF style module alias for devices
-> registered via OF") fixed how the I2C core reports the module alias when
-> devices are registered via OF.
->
-> But the atmel_mxt_ts driver only has an "atmel,maxtouch" compatible in its
-> OF device ID table, so if a Device Tree is using a different one, autoload
-> won't be working for the module (the matching works because the I2C device
-> ID table is used as a fallback).
->
-> So add compatible strings for each of the entries in the I2C device table.
->
-> Fixes: af503716ac14 ("i2c: core: report OF style module alias for devices registered via OF")
-> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
-> Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> [dtor: document which compatibles are deprecated and should not be used]
-> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+On Tue,  1 May 2018 13:11:43 -0700 Laura Abbott <labbott@redhat.com> wrote:
+
+> The existing kcore code checks for bad addresses against
+> __va(0) with the assumption that this is the lowest address
+> on the system. This may not hold true on some systems (e.g.
+> arm64) and produce overflows and crashes. Switch to using
+> other functions to validate the address range.
+> 
+> Tested-by: Dave Anderson <anderson@redhat.com>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 > ---
->  .../devicetree/bindings/input/atmel,maxtouch.txt   |    7 +++++++
->  drivers/input/touchscreen/atmel_mxt_ts.c           |    5 +++++
->  2 files changed, 12 insertions(+)
+> I took your previous comments as a tested by, please let me know if that
+> was wrong. This should probably just go through -mm. I don't think this
+> is necessary for stable but I can request it later if necessary.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-
-Someone is going to make the dts updates, right?
+I'm surprised.  "overflows and crashes" sounds rather serious??
