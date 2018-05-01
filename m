@@ -1,46 +1,76 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed,  2 May 2018 00:29:02 +0530
-Subject: [PATCH 2/2] ARM64: dts: meson: update maximum frequency for sdcard to
- 200MHz
-In-Reply-To: <20180501185902.3556-1-linux.amoon@gmail.com>
-References: <20180501185902.3556-1-linux.amoon@gmail.com>
-Message-ID: <20180501185902.3556-2-linux.amoon@gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 1 May 2018 14:42:08 -0500
+Subject: [PATCH] Input: atmel_mxt_ts - add missing compatible strings to
+ OF device table
+In-Reply-To: <20180501184853.GB52077@dtor-ws>
+References: <20180410095340.24074-1-javierm@redhat.com>
+ <20180501184853.GB52077@dtor-ws>
+Message-ID: <CAL_JsqJ-UTGrPm2tiS1yVFweWB_LH2JSBpOpMtogTYFi7pCsGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-update the maximum frequency of the sdcard to 200Mhz
-to support high speed read/write with uhs mode.
+On Tue, May 1, 2018 at 1:48 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Tue, Apr 10, 2018 at 11:53:40AM +0200, Javier Martinez Canillas wrote:
+>> Commit af503716ac14 ("i2c: core: report OF style module alias for devices
+>> registered via OF") fixed how the I2C core reports the module alias when
+>> devices are registered via OF.
+>>
+>> But the atmel_mxt_ts driver only has an "atmel,maxtouch" compatible in its
+>> OF device ID table, so if a Device Tree is using a different one, autoload
+>> won't be working for the module (the matching works because the I2C device
+>> ID table is used as a fallback).
+>>
+>> So add compatible strings for each of the entries in the I2C device table.
+>>
+>> Fixes: af503716ac14 ("i2c: core: report OF style module alias for devices registered via OF")
+>> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+>> ---
+>>
+>>  Documentation/devicetree/bindings/input/atmel,maxtouch.txt | 6 +++++-
+>>  drivers/input/touchscreen/atmel_mxt_ts.c                   | 4 ++++
+>>  2 files changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+>> index 23e3abc3fdef..cd43fb8bc2ce 100644
+>> --- a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+>> +++ b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+>> @@ -1,8 +1,12 @@
+>>  Atmel maXTouch touchscreen/touchpad
+>>
+>>  Required properties:
+>> -- compatible:
+>> +- compatible: Must be one of the following
+>> +    atmel,qt602240_ts
+>> +    atmel,atmel_mxt_ts
+>> +    atmel,atmel_mxt_tp
+>>      atmel,maxtouch
+>> +    atmel,mXT224
+>
+> I do not think we should document ad-hoc compatible strings that were
+> introduced by various vendors as the documented ones, so I'd rather
+> dropped this chunk and leave only "atmel,maxtouch" as compatible that
+> everyone should be using.
+>
+> The changes to the driver to support the existing DTSes can of course be
+> applied.
+>
+> Rob, any objections?
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
-odroid at odroid64:~$ sudo cat /sys/kernel/debug/mmc1/ios
-[sudo] password for odroid:
-clock:          200000000 Hz
-actual clock:   200000000 Hz
-vdd:            21 (3.3 ~ 3.4 V)
-bus mode:       2 (push-pull)
-chip select:    0 (don't care)
-power mode:     2 (on)
-bus width:      2 (4 bits)
-timing spec:    6 (sd uhs SDR104)
-signal voltage: 1 (1.80 V)
-driver type:    0 (driver type B)
----
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'd prefer we list them in the binding as deprecated. Then we document
+somewhere besides this thread to not use them.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index c90f8b46c60c..ab868eaddb46 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -256,7 +256,7 @@
- 
- 	bus-width = <4>;
- 	cap-sd-highspeed;
--	max-frequency = <100000000>;
-+	max-frequency = <200000000>;
- 	disable-wp;
- 	sd-uhs-sdr12;
- 	sd-uhs-sdr25;
--- 
-2.17.0
+And there are 3 dts changes needed as well:
+
+$ git grep atmel,mXT224
+$ git grep atmel,qt6
+$ git grep atmel,atmel_mxt
+arch/arm/boot/dts/at91-sama5d4ek.dts:
+ compatible = "atmel,atmel_mxt_ts";
+arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:
+compatible = "atmel,atmel_mxt_tp";
+arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:
+compatible = "atmel,atmel_mxt_ts";
+
+Rob
