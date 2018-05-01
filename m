@@ -1,124 +1,26 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 1 May 2018 18:46:09 +0100
-Subject: [PATCH v9 04/11] arm64: kexec_file: allocate memory walking
- through memblock list
-In-Reply-To: <20180425062629.29404-5-takahiro.akashi@linaro.org>
+Date: Tue, 1 May 2018 18:46:04 +0100
+Subject: [PATCH v9 02/11] kexec_file: make
+ kexec_image_post_load_cleanup_default() global
+In-Reply-To: <20180425062629.29404-3-takahiro.akashi@linaro.org>
 References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-5-takahiro.akashi@linaro.org>
-Message-ID: <648656ef-1f1e-b0ac-581c-aba1e62f4eee@arm.com>
+ <20180425062629.29404-3-takahiro.akashi@linaro.org>
+Message-ID: <cbf66675-1671-32f9-1410-a76986becf85@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Akashi,
 
 On 25/04/18 07:26, AKASHI Takahiro wrote:
-> We need to prevent firmware-reserved memory regions, particularly EFI
-> memory map as well as ACPI tables, from being corrupted by loading
-> kernel/initrd (or other kexec buffers). We also want to support memory
-> allocation in top-down manner in addition to default bottom-up.
-> So let's have arm64 specific arch_kexec_walk_mem() which will search
-> for available memory ranges in usable memblock list,
-> i.e. !NOMAP & !reserved, 
+> Change this function from static to global so that arm64 can implement
+> its own arch_kimage_file_post_load_cleanup() later using
+> kexec_image_post_load_cleanup_default().
 
-> instead of system resource tree.
+Do we need to call kexec_image_post_load_cleanup_default()? All it does is call
+the image-type fops->cleanup(), which you don't implement in this series.
 
-Didn't we try to fix the system-resource-tree in order to fix regular-kexec to
-be safe in the EFI-memory-map/ACPI-tables case?
-
-It would be good to avoid having two ways of doing this, and I would like to
-avoid having extra arch code...
-
-
-> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-> new file mode 100644
-> index 000000000000..f9ebf54ca247
-> --- /dev/null
-> +++ b/arch/arm64/kernel/machine_kexec_file.c
-> @@ -0,0 +1,57 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * kexec_file for arm64
-> + *
-> + * Copyright (C) 2018 Linaro Limited
-> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> + *
-
-> + * Most code is derived from arm64 port of kexec-tools
-
-How does kexec-tools walk memblock?
-
-
-> + */
-> +
-> +#define pr_fmt(fmt) "kexec_file: " fmt
-> +
-> +#include <linux/ioport.h>
-> +#include <linux/kernel.h>
-> +#include <linux/kexec.h>
-> +#include <linux/memblock.h>
-> +
-> +int arch_kexec_walk_mem(struct kexec_buf *kbuf,
-> +				int (*func)(struct resource *, void *))
-> +{
-> +	phys_addr_t start, end;
-> +	struct resource res;
-> +	u64 i;
-> +	int ret = 0;
-> +
-> +	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-> +		return func(&crashk_res, kbuf);
-> +
-> +	if (kbuf->top_down)
-> +		for_each_mem_range_rev(i, &memblock.memory, &memblock.reserved,
-> +				NUMA_NO_NODE, MEMBLOCK_NONE,
-> +				&start, &end, NULL) {
-
-for_each_free_mem_range_reverse() is a more readable version of this helper.
-
-> +			if (!memblock_is_map_memory(start))
-> +				continue;
-
-Passing MEMBLOCK_NONE means this walk will never find MEMBLOCK_NOMAP memory.
-
-
-> +			res.start = start;
-> +			res.end = end;
-> +			ret = func(&res, kbuf);
-> +			if (ret)
-> +				break;
-> +		}
-> +	else
-> +		for_each_mem_range(i, &memblock.memory, &memblock.reserved,
-> +				NUMA_NO_NODE, MEMBLOCK_NONE,
-> +				&start, &end, NULL) {
-
-for_each_free_mem_range()?
-
-> +			if (!memblock_is_map_memory(start))
-> +				continue;
-> +
-> +			res.start = start;
-> +			res.end = end;
-> +			ret = func(&res, kbuf);
-> +			if (ret)
-> +				break;
-> +		}
-> +
-> +	return ret;
-> +}
-> 
-
-With these changes, what we have is almost:
-arch/powerpc/kernel/machine_kexec_file_64.c::arch_kexec_walk_mem() !
-(the difference being powerpc doesn't yet support crash-kernels here)
-
-If the argument is walking memblock gives a better answer than the stringy
-walk_system_ram_res() thing, is there any mileage in moving this code into
-kexec_file.c, and using it if !IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK)?
-
-This would save arm64/powerpc having near-identical implementations.
-32bit arm keeps memblock if it has kexec, so it may be useful there too if
-kexec_file_load() support is added.
+Is this just-in-case someone adds cleanup() later and is surprised only the
+arch-level helper is called?
 
 
 Thanks,
