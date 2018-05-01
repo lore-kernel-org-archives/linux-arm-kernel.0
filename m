@@ -1,76 +1,72 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 14:42:08 -0500
-Subject: [PATCH] Input: atmel_mxt_ts - add missing compatible strings to
- OF device table
-In-Reply-To: <20180501184853.GB52077@dtor-ws>
-References: <20180410095340.24074-1-javierm@redhat.com>
- <20180501184853.GB52077@dtor-ws>
-Message-ID: <CAL_JsqJ-UTGrPm2tiS1yVFweWB_LH2JSBpOpMtogTYFi7pCsGA@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue,  1 May 2018 13:11:43 -0700
+Subject: [PATCH] proc/kcore: Don't bounds check against address 0
+In-Reply-To: <1039518799.26129578.1525185916272.JavaMail.zimbra@redhat.com>
+Message-ID: <20180501201143.15121-1-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 1, 2018 at 1:48 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Tue, Apr 10, 2018 at 11:53:40AM +0200, Javier Martinez Canillas wrote:
->> Commit af503716ac14 ("i2c: core: report OF style module alias for devices
->> registered via OF") fixed how the I2C core reports the module alias when
->> devices are registered via OF.
->>
->> But the atmel_mxt_ts driver only has an "atmel,maxtouch" compatible in its
->> OF device ID table, so if a Device Tree is using a different one, autoload
->> won't be working for the module (the matching works because the I2C device
->> ID table is used as a fallback).
->>
->> So add compatible strings for each of the entries in the I2C device table.
->>
->> Fixes: af503716ac14 ("i2c: core: report OF style module alias for devices registered via OF")
->> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
->> ---
->>
->>  Documentation/devicetree/bindings/input/atmel,maxtouch.txt | 6 +++++-
->>  drivers/input/touchscreen/atmel_mxt_ts.c                   | 4 ++++
->>  2 files changed, 9 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
->> index 23e3abc3fdef..cd43fb8bc2ce 100644
->> --- a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
->> +++ b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
->> @@ -1,8 +1,12 @@
->>  Atmel maXTouch touchscreen/touchpad
->>
->>  Required properties:
->> -- compatible:
->> +- compatible: Must be one of the following
->> +    atmel,qt602240_ts
->> +    atmel,atmel_mxt_ts
->> +    atmel,atmel_mxt_tp
->>      atmel,maxtouch
->> +    atmel,mXT224
->
-> I do not think we should document ad-hoc compatible strings that were
-> introduced by various vendors as the documented ones, so I'd rather
-> dropped this chunk and leave only "atmel,maxtouch" as compatible that
-> everyone should be using.
->
-> The changes to the driver to support the existing DTSes can of course be
-> applied.
->
-> Rob, any objections?
+The existing kcore code checks for bad addresses against
+__va(0) with the assumption that this is the lowest address
+on the system. This may not hold true on some systems (e.g.
+arm64) and produce overflows and crashes. Switch to using
+other functions to validate the address range.
 
-I'd prefer we list them in the binding as deprecated. Then we document
-somewhere besides this thread to not use them.
+Tested-by: Dave Anderson <anderson@redhat.com>
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+I took your previous comments as a tested by, please let me know if that
+was wrong. This should probably just go through -mm. I don't think this
+is necessary for stable but I can request it later if necessary.
+---
+ fs/proc/kcore.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
-And there are 3 dts changes needed as well:
-
-$ git grep atmel,mXT224
-$ git grep atmel,qt6
-$ git grep atmel,atmel_mxt
-arch/arm/boot/dts/at91-sama5d4ek.dts:
- compatible = "atmel,atmel_mxt_ts";
-arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:
-compatible = "atmel,atmel_mxt_tp";
-arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts:
-compatible = "atmel,atmel_mxt_ts";
-
-Rob
+diff --git a/fs/proc/kcore.c b/fs/proc/kcore.c
+index d1e82761de81..e64ecb9f2720 100644
+--- a/fs/proc/kcore.c
++++ b/fs/proc/kcore.c
+@@ -209,25 +209,34 @@ kclist_add_private(unsigned long pfn, unsigned long nr_pages, void *arg)
+ {
+ 	struct list_head *head = (struct list_head *)arg;
+ 	struct kcore_list *ent;
++	struct page *p;
++
++	if (!pfn_valid(pfn))
++		return 1;
++
++	p = pfn_to_page(pfn);
++	if (!memmap_valid_within(pfn, p, page_zone(p)))
++		return 1;
+ 
+ 	ent = kmalloc(sizeof(*ent), GFP_KERNEL);
+ 	if (!ent)
+ 		return -ENOMEM;
+-	ent->addr = (unsigned long)__va((pfn << PAGE_SHIFT));
++	ent->addr = (unsigned long)page_to_virt(p);
+ 	ent->size = nr_pages << PAGE_SHIFT;
+ 
+-	/* Sanity check: Can happen in 32bit arch...maybe */
+-	if (ent->addr < (unsigned long) __va(0))
++	if (!virt_addr_valid(ent->addr))
+ 		goto free_out;
+ 
+ 	/* cut not-mapped area. ....from ppc-32 code. */
+ 	if (ULONG_MAX - ent->addr < ent->size)
+ 		ent->size = ULONG_MAX - ent->addr;
+ 
+-	/* cut when vmalloc() area is higher than direct-map area */
+-	if (VMALLOC_START > (unsigned long)__va(0)) {
+-		if (ent->addr > VMALLOC_START)
+-			goto free_out;
++	/*
++	 * We've already checked virt_addr_valid so we know this address
++	 * is a valid pointer, therefore we can check against it to determine
++	 * if we need to trim
++	 */
++	if (VMALLOC_START > ent->addr) {
+ 		if (VMALLOC_START - ent->addr < ent->size)
+ 			ent->size = VMALLOC_START - ent->addr;
+ 	}
+-- 
+2.14.3
