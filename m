@@ -1,46 +1,27 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 2 May 2018 00:23:38 +0800
-Subject: [PATCH 03/21] clk: sunxi-ng: Enable DE2_CCU for Allwinner 64-bit
- SoCs
-In-Reply-To: <20180430114058.5061-4-jagan@amarulasolutions.com>
-References: <20180430114058.5061-1-jagan@amarulasolutions.com>
- <20180430114058.5061-4-jagan@amarulasolutions.com>
-Message-ID: <CAGb2v66MKooAAroCzYdsXZDY0Oh66Dydpy59xj80QfiY+5mz_A@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 1 May 2018 11:26:15 -0500
+Subject: [PATCH net-next v2 03/15] dt-bindings: net: dwmac-sun8i: Clean
+ up clock delay chain descriptions
+In-Reply-To: <20180501161227.2110-4-wens@csie.org>
+References: <20180501161227.2110-1-wens@csie.org>
+ <20180501161227.2110-4-wens@csie.org>
+Message-ID: <20180501162615.GA11761@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 7:40 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> Allwinner 64-bit SoC like H5/A64 has DE2 CCU so enable them
-> as default.
->
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+On Wed, May 02, 2018 at 12:12:15AM +0800, Chen-Yu Tsai wrote:
+> The clock delay chains found in the glue layer for dwmac-sun8i are only
+> used with RGMII PHYs. They are not intended for non-RGMII PHYs, such as
+> MII external PHYs or the internal PHY. Also, a recent SoC has a smaller
+> range of possible values for the delay chain.
+> 
+> This patch reformats the delay chain section of the device tree binding
+> to make it clear that the delay chains only apply to RGMII PHYs, and
+> make it easier to add the R40-specific bits later.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  drivers/clk/sunxi-ng/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-> index 79dfd296c3d1..1fffd3bf6ff3 100644
-> --- a/drivers/clk/sunxi-ng/Kconfig
-> +++ b/drivers/clk/sunxi-ng/Kconfig
-> @@ -58,6 +58,8 @@ config SUN8I_V3S_CCU
->
->  config SUN8I_DE2_CCU
->         bool "Support for the Allwinner SoCs DE2 CCU"
-> +       default ARM64 && ARCH_SUNXI
-> +       depends on (DRM_SUN4I && (ARM64 && ARCH_SUNXI)) || COMPILE_TEST
+>  Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
 
-There is no reason to depend on DRM_SUN4I. There is no compile dependency.
-
-Also, this is needed on SUN8I as well, pretty much anything with DE 2.0.
-So you shouldn't limit it to ARM64. That pretty much breaks things for
-people with A83T's or H3's. In fact you should enable it by default for
-these as well.
-
-ChenYu
-
->
->  config SUN8I_R40_CCU
->         bool "Support for the Allwinner R40 CCU"
-> --
-> 2.14.3
->
+Reviewed-by: Rob Herring <robh@kernel.org>
