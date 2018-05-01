@@ -1,148 +1,169 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue,  1 May 2018 13:07:57 +0100
-Subject: [PATCH v7 01/24] soc: qcom dt-bindings: Add APR bus bindings
+Date: Tue,  1 May 2018 13:08:00 +0100
+Subject: [PATCH v7 04/24] ASoC: qdsp6: dt-bindings: Add q6afe dt bindings
 In-Reply-To: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
 References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180501120820.11016-2-srinivas.kandagatla@linaro.org>
+Message-ID: <20180501120820.11016-5-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add dt bindings for Qualcomm APR (Asynchronous Packet Router)
-bus driver. This bus is used for communicating with DSP which provides
-audio and various other services to cpu.
+This patch add DT bindings for AFE (Audio Frontend) DSP module.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 ---
- .../devicetree/bindings/soc/qcom/qcom,apr.txt      | 84 ++++++++++++++++++++++
- include/dt-bindings/soc/qcom,apr.h                 | 28 ++++++++
- 2 files changed, 112 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
- create mode 100644 include/dt-bindings/soc/qcom,apr.h
+ .../devicetree/bindings/sound/qcom,q6afe.txt       | 104 +++++++++++++++++++++
+ include/dt-bindings/sound/qcom,q6afe.h             |  31 ++++++
+ 2 files changed, 135 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6afe.txt
+ create mode 100644 include/dt-bindings/sound/qcom,q6afe.h
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+diff --git a/Documentation/devicetree/bindings/sound/qcom,q6afe.txt b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
 new file mode 100644
-index 000000000000..bcc612cc7423
+index 000000000000..14335a08b963
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
-@@ -0,0 +1,84 @@
-+Qualcomm APR (Asynchronous Packet Router) binding
++++ b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
+@@ -0,0 +1,104 @@
++Qualcomm Audio Front End (Q6AFE) binding
 +
-+This binding describes the Qualcomm APR. APR is a IPC protocol for
-+communication between Application processor and QDSP. APR is mainly
-+used for audio/voice services on the QDSP.
++AFE is one of the APR audio service on Q6DSP
++Please refer to qcom,apr.txt for details of the common apr service bindings
++used by all apr services. Must contain the following properties.
 +
 +- compatible:
 +	Usage: required
 +	Value type: <stringlist>
-+	Definition: must be "qcom,apr-v<VERSION-NUMBER>", example "qcom,apr-v2"
++	Definition: must be "qcom,q6afe-v<MAJOR-NUMBER>.<MINOR-NUMBER>"
++		  Or "qcom,q6afe" where the version number can be queried
++		  from DSP.
++		  example "qcom,q6afe"
++
++= AFE DAIs (Digial Audio Interface)
++"dais" subnode of the AFE node. It represents afe dais, each afe dai is a
++subnode of "dais" representing board specific dai setup.
++"dais" node should have following properties followed by dai children.
++
++- #sound-dai-cells
++	Usage: required
++	Value type: <u32>
++	Definition: Must be 1
++
++- #address-cells
++	Usage: required
++	Value type: <u32>
++	Definition: Must be 1
++
++- #size-cells
++	Usage: required
++	Value type: <u32>
++	Definition: Must be 0
++
++== AFE DAI is subnode of "dais" and represent a dai, it includes board specific
++configuration of each dai. Must contain the following properties.
 +
 +- reg
 +	Usage: required
 +	Value type: <u32>
-+	Definition: Destination processor ID.
-+	Possible values are :
-+			1 - APR simulator
-+			2 - PC
-+			3 - MODEM
-+			4 - ADSP
-+			5 - APPS
-+			6 - MODEM2
-+			7 - APPS2
++	Definition: Must be dai id
 +
-+= APR SERVICES
-+Each subnode of the APR node represents service tied to this apr. The name
-+of the nodes are not important. The properties of these nodes are defined
-+by the individual bindings for the specific service
-+- All APR services MUST contain the following property:
-+
-+- reg
-+	Usage: required
-+	Value type: <u32>
-+	Definition: APR Service ID
-+	Possible values are :
-+			3 - DSP Core Service
-+			4 - Audio Front End Service.
-+			5 - Voice Stream Manager Service.
-+			6 - Voice processing manager.
-+			7 - Audio Stream Manager Service.
-+			8 - Audio Device Manager Service.
-+			9 - Multimode voice manager.
-+			10 - Core voice stream.
-+			11 - Core voice processor.
-+			12 - Ultrasound stream manager.
-+			13 - Listen stream manager.
++- qcom,sd-lines
++	Usage: required for mi2s interface
++	Value type: <prop-encoded-array>
++	Definition: Must be list of serial data lines used by this dai.
++	should be one or more of the 1-4 sd lines.
 +
 += EXAMPLE
-+The following example represents a QDSP based sound card on a MSM8996 device
-+which uses apr as communication between Apps and QDSP.
 +
-+	apr at 4 {
-+		compatible = "qcom,apr-v2";
-+		reg = <APR_DOMAIN_ADSP>;
++q6afe at 4 {
++	compatible = "qcom,q6afe";
++	reg = <APR_SVC_AFE>;
 +
-+		q6core at 3 {
-+			compatible = "qcom,q6core";
-+			reg = <APR_SVC_ADSP_CORE>;
++	dais {
++		#sound-dai-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		hdmi at 1 {
++			reg = <1>;
 +		};
 +
-+		q6afe at 4 {
-+			compatible = "qcom,q6afe";
-+			reg = <APR_SVC_AFE>;
-+
-+			dais {
-+				#sound-dai-cells = <1>;
-+				hdmi at 1 {
-+					reg = <1>;
-+				};
-+			};
++		prim-mi2s-rx at 16 {
++			reg = <16>;
++			qcom,sd-lines = <1 3>;
 +		};
 +
-+		q6asm at 7 {
-+			compatible = "qcom,q6asm";
-+			reg = <APR_SVC_ASM>;
-+			...
++		prim-mi2s-tx at 17 {
++			reg = <17>;
++			qcom,sd-lines = <2>;
 +		};
 +
-+		q6adm at 8 {
-+			compatible = "qcom,q6adm";
-+			reg = <APR_SVC_ADM>;
-+			...
++		sec-mi2s-rx at 18 {
++			reg = <18>;
++			qcom,sd-lines = <1 4>;
++		};
++
++		sec-mi2s-tx at 19 {
++			reg = <19>;
++			qcom,sd-lines = <2>;
++		};
++
++		tert-mi2s-rx at 20 {
++			reg = <20>;
++			qcom,sd-lines = <2 4>;
++		};
++
++		tert-mi2s-tx at 21 {
++			reg = <21>;
++			qcom,sd-lines = <1>;
++		};
++
++		quat-mi2s-rx at 22 {
++			reg = <22>;
++			qcom,sd-lines = <1>;
++		};
++
++		quat-mi2s-tx at 23 {
++			reg = <23>;
++			qcom,sd-lines = <2>;
 +		};
 +	};
-diff --git a/include/dt-bindings/soc/qcom,apr.h b/include/dt-bindings/soc/qcom,apr.h
++};
+diff --git a/include/dt-bindings/sound/qcom,q6afe.h b/include/dt-bindings/sound/qcom,q6afe.h
 new file mode 100644
-index 000000000000..006362400c0f
+index 000000000000..e162045f5dc9
 --- /dev/null
-+++ b/include/dt-bindings/soc/qcom,apr.h
-@@ -0,0 +1,28 @@
++++ b/include/dt-bindings/sound/qcom,q6afe.h
+@@ -0,0 +1,31 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __DT_BINDINGS_QCOM_APR_H
-+#define __DT_BINDINGS_QCOM_APR_H
++#ifndef __DT_BINDINGS_Q6_AFE_H__
++#define __DT_BINDINGS_Q6_AFE_H__
 +
-+/* Domain IDs */
-+#define APR_DOMAIN_SIM		0x1
-+#define APR_DOMAIN_PC		0x2
-+#define APR_DOMAIN_MODEM	0x3
-+#define APR_DOMAIN_ADSP		0x4
-+#define APR_DOMAIN_APPS		0x5
-+#define APR_DOMAIN_MAX		0x6
++/* Audio Front End (AFE) virtual ports IDs */
++#define HDMI_RX		1
++#define SLIMBUS_0_RX    2
++#define SLIMBUS_0_TX    3
++#define SLIMBUS_1_RX    4
++#define SLIMBUS_1_TX    5
++#define SLIMBUS_2_RX    6
++#define SLIMBUS_2_TX    7
++#define SLIMBUS_3_RX    8
++#define SLIMBUS_3_TX    9
++#define SLIMBUS_4_RX    10
++#define SLIMBUS_4_TX    11
++#define SLIMBUS_5_RX    12
++#define SLIMBUS_5_TX    13
++#define SLIMBUS_6_RX    14
++#define SLIMBUS_6_TX    15
++#define PRIMARY_MI2S_RX		16
++#define PRIMARY_MI2S_TX		17
++#define SECONDARY_MI2S_RX	18
++#define SECONDARY_MI2S_TX	19
++#define TERTIARY_MI2S_RX	20
++#define TERTIARY_MI2S_TX	21
++#define QUATERNARY_MI2S_RX	22
++#define QUATERNARY_MI2S_TX	23
 +
-+/* ADSP service IDs */
-+#define APR_SVC_ADSP_CORE	0x3
-+#define APR_SVC_AFE		0x4
-+#define APR_SVC_VSM		0x5
-+#define APR_SVC_VPM		0x6
-+#define APR_SVC_ASM		0x7
-+#define APR_SVC_ADM		0x8
-+#define APR_SVC_ADSP_MVM	0x09
-+#define APR_SVC_ADSP_CVS	0x0A
-+#define APR_SVC_ADSP_CVP	0x0B
-+#define APR_SVC_USM		0x0C
-+#define APR_SVC_LSM		0x0D
-+#define APR_SVC_VIDC		0x16
-+#define APR_SVC_MAX		0x17
++#endif /* __DT_BINDINGS_Q6_AFE_H__ */
 +
-+#endif /* __DT_BINDINGS_QCOM_APR_H */
 -- 
 2.16.2
