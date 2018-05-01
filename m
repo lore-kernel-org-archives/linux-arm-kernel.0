@@ -1,78 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 10:37:27 -0500
-Subject: [PATCH 11/12] dt-bindings: clock: add imx8qxp clock binding doc
-In-Reply-To: <1524855403-15301-12-git-send-email-aisheng.dong@nxp.com>
-References: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
- <1524855403-15301-12-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20180501153727.GA21845@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 1 May 2018 08:39:56 -0700
+Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add fixed 26MHz clock as fck
+ for twl
+In-Reply-To: <CAHCN7x+Ow7B4kTmd+4PkDd=azn-qKMYmEyjqfb8GkXA7Y7pEPA@mail.gmail.com>
+References: <20180405115239.17370-1-peter.ujfalusi@ti.com>
+ <CAHCN7x+Ow7B4kTmd+4PkDd=azn-qKMYmEyjqfb8GkXA7Y7pEPA@mail.gmail.com>
+Message-ID: <20180501153956.GG98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2018 at 02:56:42AM +0800, Dong Aisheng wrote:
-> Add imx8qxp clock binding doc.
+* Adam Ford <aford173@gmail.com> [180501 15:32]:
+> On Thu, Apr 5, 2018 at 6:52 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> > The board uses 26MHz oscillator for the twl4030 HFCLK.
+> > This way we will not depend on the bootloader to configure the
+> > CFG_BOOT:HFCLK_FREQ
+> >
+> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > ---
+> > Hi,
+> >
+> > there might be other boards (all omap3 boards with twl4030?) which uses the same
+> > setup, but I only have schematics for beagle-xm.
+> >
 > 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Stephen Boyd <sboyd@kernel.org>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  .../devicetree/bindings/clock/imx8qxp-clk.txt      |  39 +++
->  include/dt-bindings/clock/imx8qxp-clock.h          | 362 +++++++++++++++++++++
->  2 files changed, 401 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
->  create mode 100644 include/dt-bindings/clock/imx8qxp-clock.h
+> I know I am late coming into this, but we have twl4030_omap3.dtsi for
+> the items common to omap3. Can we put the clock reference in that
+> file?
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/imx8qxp-clk.txt b/Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
-> new file mode 100644
-> index 0000000..5e365d7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
-> @@ -0,0 +1,39 @@
-> +NXP i.MX8QXP Clocks Based on SCFW
-> +--------------------------------------------------------------------
-> +
-> +Some i.MX SoCs contain a system controller that is responsible for
-> +providing clock control service for the IPs. Communication between
-> +the host processor running an OS and the system controller happens
-> +through a SCU protocol [1].
-> +
-> +[1] Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> +
-> +Required properties:
-> +
-> +- compatible:	Should be "fsl,imx8qxp-clock".
-> +- #clock-cells:	Should be <1>.
+> It seems like it would be cleaner than having a dozen boards or so
+> boards having the exact same copy of the same stuff. SHould something
+> change in the future, I would think it would make
+> maintenance easier too.  Just my two cents.
 
-There's no reason for this node. Just make the parent (SCU) a clock 
-provider.
+Well we don't know if it's a 26MiHz clock on all of them. Some use
+38MiHz at least. Sure the board can override it but let's first
+fix up each board then later on add the common node.
 
-> +
-> +The clock consumer should specify the desired clock by having the clock
-> +ID in its "clocks" phandle cell.
-> +See include/dt-bindings/clock/imx8qxp-clock.h
-> +for the full list of i.MX8QXP clock IDs.
-> +
-> +Examples:
-> +
-> +#include <dt-bindings/clock/imx8qxp-clock.h>
-> +
-> +clk: clk {
-> +	compatible = "fsl,imx8qxp-clk";
-> +	#clock-cells = <1>;
-> +};
-> +
-> +i2c0: i2c at 5a800000 {
-> +	compatible = "fsl,imx8qxp-lpi2c", "fsl,imx7ulp-lpi2c";
-> +	reg = <0x0 0x5a800000 0x0 0x4000>;
-> +	interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH>;
-> +	interrupt-parent = <&gic>;
-> +	clocks = <&clk IMX8QXP_I2C0_CLK>,
-> +		 <&clk IMX8QXP_I2C0_IPG_CLK>;
-> +	clock-names = "per", "ipg";
-> +	...
-> +};
+Regards,
+
+Tony
