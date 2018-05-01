@@ -1,204 +1,55 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 1 May 2018 14:56:28 +0200
-Subject: [PATCH v2 15/17] power: reset: mt6323: add a driver for MT6323
- power controller
-In-Reply-To: <51d4fbe0d6a22986ddd2df66c9db39aa1eaab74a.1524646231.git.sean.wang@mediatek.com>
-References: <cover.1524646231.git.sean.wang@mediatek.com>
- <51d4fbe0d6a22986ddd2df66c9db39aa1eaab74a.1524646231.git.sean.wang@mediatek.com>
-Message-ID: <20180501125628.44nyx25tqsrxkvsl@earth.universe>
+From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Tue,  1 May 2018 14:31:27 +0200
+Subject: [PATCH v8 08/12] ARM: sun9i: smp: Rename clusters's power-off
+In-Reply-To: <20180501123131.7738-1-mylene.josserand@bootlin.com>
+References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
+Message-ID: <20180501123131.7738-9-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+To prepare the support for sun8i-a83t, rename the macro that handles
+the power-off of clusters because it is different from sun9i-a80 to
+sun8i-a83t.
 
-On Wed, Apr 25, 2018 at 05:32:41PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> The power device is responsible for externally down or up the power
-> of the remote MediaTek SoC through the tiny circuit BBPU inside PMIC RTC.
-> 
-> Though it's a part of RTC device, it would be better to be a standalone
-> driver than to be a part of existent RTC driver so as to let us make
-> concentration on works about power-controlling topic and to obtain
-> improvements while the subsystem power/reset constantly growing.
+The power off register for clusters are different from a80 and a83t.
 
-I don't understand the above sentence. (I'm fine with adding the
-driver)
+Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/mach-sunxi/mc_smp.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> Currently, the most basic functionality supported is to just power off
-> the system by writing to a special bit field in BBPU register after the
-> system has reached pm_poweroff.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  drivers/power/reset/Kconfig           | 10 ++++
->  drivers/power/reset/Makefile          |  1 +
->  drivers/power/reset/mt6323-poweroff.c | 97 +++++++++++++++++++++++++++++++++++
->  include/linux/mfd/mt6397/rtc.h        |  1 +
->  4 files changed, 109 insertions(+)
->  create mode 100644 drivers/power/reset/mt6323-poweroff.c
-> 
-> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-> index df58fc8..7b49d71 100644
-> --- a/drivers/power/reset/Kconfig
-> +++ b/drivers/power/reset/Kconfig
-> @@ -128,6 +128,16 @@ config POWER_RESET_LTC2952
->  	  This driver supports an external powerdown trigger and board power
->  	  down via the LTC2952. Bindings are made in the device tree.
->  
-> +config POWER_RESET_MT6323
-> +	bool "MediaTek MT6323 power-off driver"
-> +	depends on MFD_MT6397
-> +	help
-> +	  The power-off driver is responsible for externally shutdown down
-> +	  the power of a remote MediaTek SoC MT6323 is connected to through
-> +	  controlling a tiny circuit BBPU inside MT6323 RTC.
-> +
-> +	  Say Y if you have a board where MT6323 could be found.
-> +
->  config POWER_RESET_QNAP
->  	bool "QNAP power-off driver"
->  	depends on OF_GPIO && PLAT_ORION
-> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-> index 7778c74..8836172 100644
-> --- a/drivers/power/reset/Makefile
-> +++ b/drivers/power/reset/Makefile
-> @@ -11,6 +11,7 @@ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
->  obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
->  obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
->  obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
-> +obj-$(CONFIG_POWER_RESET_MT6323) += mt6323-poweroff.o
->  obj-$(CONFIG_POWER_RESET_OCELOT_RESET) += ocelot-reset.o
->  obj-$(CONFIG_POWER_RESET_PIIX4_POWEROFF) += piix4-poweroff.o
->  obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
-> diff --git a/drivers/power/reset/mt6323-poweroff.c b/drivers/power/reset/mt6323-poweroff.c
-> new file mode 100644
-> index 0000000..c195766
-> --- /dev/null
-> +++ b/drivers/power/reset/mt6323-poweroff.c
-> @@ -0,0 +1,97 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Power off through MediaTek PMIC
-> + *
-> + * Copyright (C) 2018 MediaTek Inc.
-> + *
-> + * Author: Sean Wang <sean.wang@mediatek.com>
-> + *
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-
-Not needed
-
-> +#include <linux/platform_device.h>
-> +#include <linux/mfd/mt6397/core.h>
-> +#include <linux/mfd/mt6397/rtc.h>
-> +
-> +struct mt6323_pwrc {
-> +	struct device *dev;
-> +	struct regmap *regmap;
-> +	u32 base;
-> +};
-> +
-> +static struct mt6323_pwrc *mt_pwrc;
-> +
-> +static void mt6323_do_pwroff(void)
-> +{
-> +	struct mt6323_pwrc *pwrc = mt_pwrc;
-> +	unsigned int val;
-> +	int ret;
-> +
-> +	regmap_write(pwrc->regmap, pwrc->base + RTC_BBPU, RTC_BBPU_KEY);
-> +	regmap_write(pwrc->regmap, pwrc->base + RTC_WRTGR, 1);
-> +
-> +	ret = regmap_read_poll_timeout(pwrc->regmap,
-> +				       pwrc->base + RTC_BBPU, val,
-> +				       !(val & RTC_BBPU_CBUSY),
-> +				       MTK_RTC_POLL_DELAY_US,
-> +				       MTK_RTC_POLL_TIMEOUT);
-> +	if (ret)
-> +		dev_err(pwrc->dev, "failed to write BBPU: %d\n", ret);
-> +
-> +	/* Wait some time until system down, otherwise, notice with a warn */
-> +	mdelay(1000);
-> +
-> +	WARN_ONCE(1, "Unable to power off system\n");
-> +}
-> +
-> +static int mt6323_pwrc_probe(struct platform_device *pdev)
-> +{
-> +	struct mt6397_chip *mt6397_chip = dev_get_drvdata(pdev->dev.parent);
-> +	struct mt6323_pwrc *pwrc;
-> +	struct resource *res;
-> +
-> +	pwrc = devm_kzalloc(&pdev->dev, sizeof(*pwrc), GFP_KERNEL);
-> +	if (!pwrc)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	pwrc->base = res->start;
-> +	pwrc->regmap = mt6397_chip->regmap;
-> +	pwrc->dev = &pdev->dev;
-> +	mt_pwrc = pwrc;
-> +
-> +	pm_power_off = &mt6323_do_pwroff;
-> +
-> +	return 0;
-> +}
-> +
-> +static int mt6323_pwrc_remove(struct platform_device *pdev)
-> +{
-> +	if (pm_power_off == &mt6323_do_pwroff)
-> +		pm_power_off = NULL;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id mt6323_pwrc_dt_match[] = {
-> +	{ .compatible = "mediatek,mt6323-pwrc" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, mt6323_pwrc_dt_match);
-
-Don't forget to remove the DT table when you respin the series for
-the requested binding changes.
-
-> +static struct platform_driver mt6323_pwrc_driver = {
-> +	.probe		= mt6323_pwrc_probe,
-> +	.remove		= mt6323_pwrc_remove,
-> +	.driver		= {
-> +		.name	= "mt6323-pwrc",
-> +		.of_match_table = mt6323_pwrc_dt_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(mt6323_pwrc_driver);
-> +
-> +MODULE_DESCRIPTION("Poweroff driver for MT6323 PMIC");
-> +MODULE_AUTHOR("Sean Wang <sean.wang@mediatek.com>");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/mfd/mt6397/rtc.h b/include/linux/mfd/mt6397/rtc.h
-> index 480977c..ac932c9 100644
-> --- a/include/linux/mfd/mt6397/rtc.h
-> +++ b/include/linux/mfd/mt6397/rtc.h
-> @@ -16,6 +16,7 @@
->  
->  #define RTC_BBPU		0x0000
->  #define RTC_BBPU_CBUSY		BIT(6)
-> +#define RTC_BBPU_KEY            (0x43 << 8)
->  
->  #define RTC_WRTGR		0x003c
-
-The driver looks fine otherwise.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180501/4f8022fa/attachment.sig>
+diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
+index 727968d6a3e5..03f021d0c73e 100644
+--- a/arch/arm/mach-sunxi/mc_smp.c
++++ b/arch/arm/mach-sunxi/mc_smp.c
+@@ -60,7 +60,7 @@
+ #define PRCM_CPU_PO_RST_CTRL_CORE(n)	BIT(n)
+ #define PRCM_CPU_PO_RST_CTRL_CORE_ALL	0xf
+ #define PRCM_PWROFF_GATING_REG(c)	(0x100 + 0x4 * (c))
+-#define PRCM_PWROFF_GATING_REG_CLUSTER	BIT(4)
++#define PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I	BIT(4)
+ #define PRCM_PWROFF_GATING_REG_CORE(n)	BIT(n)
+ #define PRCM_PWR_SWITCH_REG(c, cpu)	(0x140 + 0x10 * (c) + 0x4 * (cpu))
+ #define PRCM_CPU_SOFT_ENTRY_REG		0x164
+@@ -255,7 +255,7 @@ static int sunxi_cluster_powerup(unsigned int cluster)
+ 
+ 	/* clear cluster power gate */
+ 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+-	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
++	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
+ 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+ 	udelay(20);
+ 
+@@ -452,7 +452,7 @@ static int sunxi_cluster_powerdown(unsigned int cluster)
+ 	/* gate cluster power */
+ 	pr_debug("%s: gate cluster power\n", __func__);
+ 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+-	reg |= PRCM_PWROFF_GATING_REG_CLUSTER;
++	reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
+ 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
+ 	udelay(20);
+ 
+-- 
+2.11.0
