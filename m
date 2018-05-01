@@ -1,29 +1,93 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 May 2018 07:50:40 -0700
-Subject: [PATCH] ARM: OMAP2+: powerdomain: use raw_smp_processor_id() for
- trace
-In-Reply-To: <1520589020-14018-1-git-send-email-t-kristo@ti.com>
-References: <1520589020-14018-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20180501145040.GH5671@atomide.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue,  1 May 2018 15:51:28 +0100
+Subject: [PATCH] firmware/psci: add support for SYSTEM_RESET2
+Message-ID: <1525186288-536-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [180309 01:51]:
-> smp_processor_id() checks preemption if CONFIG_DEBUG_PREEMPT is enabled,
-> causing a warning dump during boot:
-> 
-> [    5.042377] BUG: using smp_processor_id() in preemptible [00000000] code: swapper/0/1
-> [    5.050281] caller is pwrdm_set_next_pwrst+0x48/0x88
-> [    5.055330] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.14.24-g57341df0b4 #1
-> 
-> Use the raw_smp_processor_id() for the trace instead, this value does
-> not need to be perfectly correct. The alternative of disabling preempt
-> is too heavy weight operation to be applied in PM hot path for just
-> tracing purposes.
+PSCI v1.1 introduced SYSTEM_RESET2 to allow both architectural resets
+where the semantics are described by the PSCI specification itself as
+well as vendor-specific resets. Currently only system warm reset
+semantics is defined as part of architectural resets by the specification.
 
-Sorry just noticed this is still pending while looking through
-my inbox. Applying into omap-for-v4.17/fixes.
+This patch implements support for SYSTEM_RESET2 by making using of
+reboot_mode passed by the reboot infrastructure in the kernel.
 
-Regards,
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/firmware/psci.c   | 21 +++++++++++++++++++++
+ include/uapi/linux/psci.h |  2 ++
+ 2 files changed, 23 insertions(+)
 
-Tony
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index c80ec1d03274..216b1950bbd5 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -88,6 +88,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
+ 				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
+
+ static u32 psci_cpu_suspend_feature;
++bool psci_system_reset2_supported;
+
+ static inline bool psci_has_ext_power_state(void)
+ {
+@@ -253,6 +254,15 @@ static int get_set_conduit_method(struct device_node *np)
+
+ static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+ {
++	if ((reboot_mode == REBOOT_WARM || reboot_mode == REBOOT_SOFT) &&
++	    psci_system_reset2_supported)
++		/*
++		 * reset_type[31] = 0 (architectural)
++		 * reset_type[30:0] = 0 (SYSTEM_WARM_RESET)
++		 * cookie = 0 (ignored by the implementation
++		 */
++		invoke_psci_fn(PSCI_FN_NATIVE(1_1, SYSTEM_RESET2), 0, 0, 0);
++
+ 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+ }
+
+@@ -451,6 +461,16 @@ static const struct platform_suspend_ops psci_suspend_ops = {
+ 	.enter          = psci_system_suspend_enter,
+ };
+
++static void __init psci_init_system_reset2(void)
++{
++	int ret;
++
++	ret = psci_features(PSCI_FN_NATIVE(1_1, SYSTEM_RESET2));
++
++	if (ret != PSCI_RET_NOT_SUPPORTED)
++		psci_system_reset2_supported = true;
++}
++
+ static void __init psci_init_system_suspend(void)
+ {
+ 	int ret;
+@@ -588,6 +608,7 @@ static int __init psci_probe(void)
+ 		psci_init_smccc();
+ 		psci_init_cpu_suspend();
+ 		psci_init_system_suspend();
++		psci_init_system_reset2();
+ 	}
+
+ 	return 0;
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index b3bcabe380da..5b0ba0062541 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -49,8 +49,10 @@
+
+ #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
+ #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
++#define PSCI_1_1_FN_SYSTEM_RESET2		PSCI_0_2_FN(18)
+
+ #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
++#define PSCI_1_1_FN64_SYSTEM_RESET2		PSCI_0_2_FN64(18)
+
+ /* PSCI v0.2 power state encoding for CPU_SUSPEND function */
+ #define PSCI_0_2_POWER_STATE_ID_MASK		0xffff
+-- 
+2.7.4
