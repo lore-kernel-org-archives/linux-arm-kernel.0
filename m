@@ -1,53 +1,43 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 01 May 2018 11:43:19 +0100
-Subject: [PATCH v3 01/12] ACPI / APEI: Move the estatus queue code up,
- and under its own ifdef
-In-Reply-To: <20180427153510.5799-2-james.morse@arm.com> (James Morse's
- message of "Fri, 27 Apr 2018 16:34:59 +0100")
-References: <20180427153510.5799-1-james.morse@arm.com>
- <20180427153510.5799-2-james.morse@arm.com>
-Message-ID: <877eonr708.fsf@e105922-lin.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 1 May 2018 16:01:42 +0530
+Subject: [PATCH 00/12] mtd: nand: davinci: stop using pdev->id as
+ chipselect
+In-Reply-To: <20180430120930.4768a7cb@bbrezillon>
+References: <20180430082453.8091-1-brgl@bgdev.pl>
+ <20180430120930.4768a7cb@bbrezillon>
+Message-ID: <276f8b2b-34a1-ec00-e348-21b5bcb2f0c0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Monday 30 April 2018 03:39 PM, Boris Brezillon wrote:
+> Hi Bartosz,
+> 
+> On Mon, 30 Apr 2018 10:24:41 +0200
+> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> 
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> We have the 'ti,davinci-chipselect' property in the device tree, but
+>> when using platform data the driver silently uses the id field of
+>> struct platform_device as the chipselect. This is confusing and we
+>> almost broke the nand support again recently after converting the
+>> platform to common clock framework (which changed the device id in the
+>> clock lookup - the problem is gone now that we no longer acquire the
+>> clock in the nand driver.
+>>
+>> This series adds a new field to davinci-nand platform data, then makes
+>> all board use it and finally modifies the two drivers that make use of
+>> it.
+>>
+>> Bartosz Golaszewski (12):
+>>   mtd: nand: davinci: store the core chipselect number in platform data
+> 
+> Raw NAND related patches (that is, everything that is not onenand or
+> SPI NAND) should use the "mtd: rawnand: " prefix now. Other than that,
+> I'm fine with the patch series, just let me know how you want to have it
 
-James Morse <james.morse@arm.com> writes:
-
-> To support asynchronous NMI-like notifications on arm64 we need to use
-> the estatus-queue. These patches refactor it to allow multiple APEI
-> notification types to use it.
->
-> First we move the estatus-queue code higher in the file so that any
-> notify_foo() handler can make use of it.
->
-> This patch moves code around ... and makes the following trivial change:
-> Freshen the dated comment above ghes_estatus_llist. printk() is no
-> longer the issue, its the helpers like memory_failure_queue() that
-> still aren't nmi safe.
->
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
->
-
-
-> Notes for cover letter:
-> ghes.c has three things all called 'estatus'. One is a pool of memory
-> that has a static size, and is grown/shrunk when new NMI users are
-> allocated.
-> The second is the cache, this holds recent notifications so we can
-> suppress notifications we've already handled.
-> The last is the queue, which hold data from NMI notifications (in pool
-> memory) that can't be handled immediatly.
-
-
-I am guessing you intended to drop the notes before sending the patch
-out.
-
-Calling this out as it'd make sense to clean-this up if the series is
-ready for merging.
+Hi Boris, should I convert the "I'm fine" to some sort of formal tag? If
+yes, what is the tag and for which patches?
 
 Thanks,
-Punit
-
-[...]
+Sekhar
