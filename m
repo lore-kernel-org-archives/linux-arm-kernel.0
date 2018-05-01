@@ -1,210 +1,91 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue,  1 May 2018 11:26:59 +0100
-Subject: [PATCH v2 4/4] KVM: arm64: Add support for PUD hugepages at stage 2
-In-Reply-To: <20180501102659.13188-1-punit.agrawal@arm.com>
-References: <20180501102659.13188-1-punit.agrawal@arm.com>
-Message-ID: <20180501102659.13188-5-punit.agrawal@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 1 May 2018 15:59:40 +0530
+Subject: [PATCH 01/12] mtd: nand: davinci: store the core chipselect
+ number in platform data
+In-Reply-To: <8b7e4588-5a35-6c18-fe60-148d6ccf778c@ti.com>
+References: <20180430082453.8091-1-brgl@bgdev.pl>
+ <20180430082453.8091-2-brgl@bgdev.pl>
+ <3dccc5af-2df1-8374-e4e8-0a8b9ea1ae99@ti.com>
+ <8b7e4588-5a35-6c18-fe60-148d6ccf778c@ti.com>
+Message-ID: <447b4f2f-27c8-f552-d058-3b2eba71a765@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM currently supports PMD hugepages at stage 2. Extend the stage 2
-fault handling to add support for PUD hugepages.
+On Tuesday 01 May 2018 03:23 PM, Sekhar Nori wrote:
+> On Tuesday 01 May 2018 02:55 PM, Sekhar Nori wrote:
+>> On Monday 30 April 2018 01:54 PM, Bartosz Golaszewski wrote:
+>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>
+>>> We have the 'ti,davinci-chipselect' property in the device tree, but
+>>> when using platform data the driver silently uses the id field of
+>>> struct platform_device as the chipselect. This is confusing and we
+>>> almost broke the nand support again recently after converting the
+>>> platform to common clock framework (which changed the device id in the
+>>> clock lookup - the problem is gone now that we no longer acquire the
+>>> clock in the nand driver.
+>>>
+>>> This patch adds a new filed - core_chipsel - to the platform_data.
+>>
+>> s/filed/field
+>>
+>>> Subsequent patches will convert the platforms to using this new field.
+>>
+>> Can you add a comment for this new field too, like how we have for most
+>> other fields?
+>>
+>> Curious on what 'core' in core_chipsel means. Something to do with
+>> chip-select offset we have on DA850?
+> 
+> Looks like you may have just picked the terminology from DaVinci NAND
+> driver (introduced back in 2009). But in this context, it means the
+> 0-indexed chip-select number that of the asynchronous memory interface
+> to which the NAND device is connected.
+> 
+> So, may be a comment here will suffice.
 
-Addition of pud hugepage support enables additional hugepage
-sizes (e.g., 1G with 4K granule) which can be useful on cores that
-support mapping larger block sizes in the TLB entries.
+This is what I committed:
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h         | 19 ++++++++++++
- arch/arm64/include/asm/kvm_mmu.h       | 15 ++++++++++
- arch/arm64/include/asm/pgtable-hwdef.h |  4 +++
- arch/arm64/include/asm/pgtable.h       |  2 ++
- virt/kvm/arm/mmu.c                     | 40 ++++++++++++++++++++++++--
- 5 files changed, 77 insertions(+), 3 deletions(-)
+--8<--
+commit 533d93703fa717fdf74c4fb711c868c4fdc8b475 (HEAD -> refs/heads/v4.18/nand-cs-simplification)
+Author:     Bartosz Golaszewski <bgolaszewski@baylibre.com>
+AuthorDate: Mon Apr 30 10:24:42 2018 +0200
+Commit:     Sekhar Nori <nsekhar@ti.com>
+CommitDate: Tue May 1 15:57:47 2018 +0530
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 224c22c0a69c..155916dbdd7e 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -77,8 +77,11 @@ void kvm_clear_hyp_idmap(void);
+    mtd: nand: davinci: store the core chipselect number in platform data
+    
+    We have the 'ti,davinci-chipselect' property in the device tree, but
+    when using platform data the driver silently uses the id field of
+    struct platform_device as the chipselect. This is confusing and we
+    almost broke the nand support again recently after converting the
+    platform to common clock framework (which changed the device id in the
+    clock lookup - the problem is gone now that we no longer acquire the
+    clock in the nand driver.
+    
+    This patch adds a new field - core_chipsel - to the platform_data.
+    Subsequent patches will convert the platforms to using this new field.
+    
+    Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+    Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+
+diff --git a/include/linux/platform_data/mtd-davinci.h b/include/linux/platform_data/mtd-davinci.h
+index f1a2cf655bdb..1bbfa27cccb4 100644
+--- a/include/linux/platform_data/mtd-davinci.h
++++ b/include/linux/platform_data/mtd-davinci.h
+@@ -56,6 +56,16 @@ struct davinci_nand_pdata {		/* platform_data */
+ 	uint32_t		mask_ale;
+ 	uint32_t		mask_cle;
  
- #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
- #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
-+#define kvm_pfn_pud(pfn, prot)	(__pud(0))
- 
- #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
-+/* No support for pud hugepages */
-+#define kvm_pud_mkhuge(pud)	(pud)
- 
- /*
-  * The following kvm_*pud*() functionas are provided strictly to allow
-@@ -95,6 +98,22 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
- 	return false;
- }
- 
-+static inline void kvm_set_pud(pud_t *pud, pud_t new_pud)
-+{
-+	BUG();
-+}
++	/*
++	 * 0-indexed chip-select number of the asynchronous
++	 * interface to which the NAND device has been connected.
++	 *
++	 * So, if you have NAND connected to CS3 of DA850, you
++	 * will pass '1' here. Since the asynchronous interface
++	 * on DA850 starts from CS2.
++	 */
++	uint32_t		core_chipsel;
 +
-+static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
-+{
-+	BUG();
-+	return pud;
-+}
-+
-+static inline pud_t kvm_s2pud_mkexec(pud_t pud)
-+{
-+	BUG();
-+	return pud;
-+}
+ 	/* for packages using two chipselects */
+ 	uint32_t		mask_chipsel;
  
- static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
- {
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index f440cf216a23..f49a68fcbf26 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -172,11 +172,14 @@ void kvm_clear_hyp_idmap(void);
- 
- #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
- #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
-+#define kvm_set_pud(pudp, pud)		set_pud(pudp, pud)
- 
- #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
- #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
-+#define kvm_pfn_pud(pfn, prot)		pfn_pud(pfn, prot)
- 
- #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
-+#define kvm_pud_mkhuge(pud)		pud_mkhuge(pud)
- 
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
-@@ -190,6 +193,12 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
- 	return pmd;
- }
- 
-+static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
-+{
-+	pud_val(pud) |= PUD_S2_RDWR;
-+	return pud;
-+}
-+
- static inline pte_t kvm_s2pte_mkexec(pte_t pte)
- {
- 	pte_val(pte) &= ~PTE_S2_XN;
-@@ -202,6 +211,12 @@ static inline pmd_t kvm_s2pmd_mkexec(pmd_t pmd)
- 	return pmd;
- }
- 
-+static inline pud_t kvm_s2pud_mkexec(pud_t pud)
-+{
-+	pud_val(pud) &= ~PUD_S2_XN;
-+	return pud;
-+}
-+
- static inline void kvm_set_s2pte_readonly(pte_t *ptep)
- {
- 	pteval_t old_pteval, pteval;
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index fd208eac9f2a..e327665e94d1 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -193,6 +193,10 @@
- #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
- #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
- 
-+#define PUD_S2_RDONLY		(_AT(pudval_t, 1) << 6)   /* HAP[2:1] */
-+#define PUD_S2_RDWR		(_AT(pudval_t, 3) << 6)   /* HAP[2:1] */
-+#define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0] */
-+
- /*
-  * Memory Attribute override for Stage-2 (MemAttr[3:0])
-  */
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 7c4c8f318ba9..31ea9fda07e3 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -386,6 +386,8 @@ static inline int pmd_protnone(pmd_t pmd)
- 
- #define pud_write(pud)		pte_write(pud_pte(pud))
- 
-+#define pud_mkhuge(pud)		(__pud(pud_val(pud) & ~PUD_TABLE_BIT))
-+
- #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
- #define __phys_to_pud_val(phys)	__phys_to_pte_val(phys)
- #define pud_pfn(pud)		((__pud_to_phys(pud) & PUD_MASK) >> PAGE_SHIFT)
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 3afbf693e045..1fb108d47dbd 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1036,6 +1036,26 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- 	return 0;
- }
- 
-+static int stage2_set_pud_huge(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-+			       phys_addr_t addr, const pud_t *new_pud)
-+{
-+	pud_t *pud, old_pud;
-+
-+	pud = stage2_get_pud(kvm, cache, addr);
-+	VM_BUG_ON(!pud);
-+
-+	old_pud = *pud;
-+	if (pud_present(old_pud)) {
-+		pud_clear(pud);
-+		kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	} else {
-+		get_page(virt_to_page(pud));
-+	}
-+
-+	kvm_set_pud(pud, *new_pud);
-+	return 0;
-+}
-+
- static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
- {
- 	pmd_t *pmdp;
-@@ -1467,9 +1487,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	}
- 
- 	vma_pagesize = vma_kernel_pagesize(vma);
--	if (vma_pagesize == PMD_SIZE && !logging_active) {
-+	if ((vma_pagesize == PMD_SIZE || vma_pagesize == PUD_SIZE) &&
-+	    !logging_active) {
-+		struct hstate *h = hstate_vma(vma);
-+
- 		hugetlb = true;
--		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
-+		gfn = (fault_ipa & huge_page_mask(h)) >> PAGE_SHIFT;
- 	} else {
- 		/*
- 		 * Pages belonging to memslots that don't have the same
-@@ -1556,7 +1579,18 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (exec_fault)
- 		invalidate_icache_guest_page(pfn, vma_pagesize);
- 
--	if (hugetlb) {
-+	if (vma_pagesize == PUD_SIZE) {
-+		pud_t new_pud = kvm_pfn_pud(pfn, mem_type);
-+
-+		new_pud = kvm_pud_mkhuge(new_pud);
-+		if (writable)
-+			new_pud = kvm_s2pud_mkwrite(new_pud);
-+
-+		if (stage2_should_exec(kvm, fault_ipa, exec_fault, fault_status))
-+			new_pud = kvm_s2pud_mkexec(new_pud);
-+
-+		ret = stage2_set_pud_huge(kvm, memcache, fault_ipa, &new_pud);
-+	} else if (vma_pagesize == PMD_SIZE) {
- 		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
- 
- 		new_pmd = kvm_pmd_mkhuge(new_pmd);
--- 
-2.17.0
