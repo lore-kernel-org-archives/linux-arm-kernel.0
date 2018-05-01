@@ -1,37 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 2 May 2018 00:20:48 +0800
-Subject: [PATCH 10/21] drm/sun4i: Enable DesignWare HDMI for Allwinner
- 64-bit SoCs
-In-Reply-To: <20180430114058.5061-11-jagan@amarulasolutions.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 1 May 2018 11:21:30 -0500
+Subject: [PATCH 11/21] bindings: display: Add compatible for A64 Mixer1
+In-Reply-To: <20180430114058.5061-12-jagan@amarulasolutions.com>
 References: <20180430114058.5061-1-jagan@amarulasolutions.com>
- <20180430114058.5061-11-jagan@amarulasolutions.com>
-Message-ID: <CAGb2v67_WjVOfz0maTU7K9WWEChGjQoYqpc=xZkmy4W64+9DLw@mail.gmail.com>
+ <20180430114058.5061-12-jagan@amarulasolutions.com>
+Message-ID: <20180501162130.GA6219@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 7:40 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> Allwinner 64-bit SoC like H5/A64 has DesignWare HDMI so
-> enable them as default.
-
-Should we not also enable it by default for SUN8I (A83T, H3, R40?, etc.)
-
+On Mon, Apr 30, 2018 at 05:10:48PM +0530, Jagan Teki wrote:
+> Mixer1 on Allwinner A64 has similar behavior like Allwinner A83T.
+> 
 > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > ---
->  drivers/gpu/drm/sun4i/Kconfig | 1 +
+>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
 >  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
-> index eee6bc0eaf97..60468a779a63 100644
-> --- a/drivers/gpu/drm/sun4i/Kconfig
-> +++ b/drivers/gpu/drm/sun4i/Kconfig
-> @@ -42,6 +42,7 @@ config DRM_SUN4I_BACKEND
->
->  config DRM_SUN8I_DW_HDMI
->         tristate "Support for Allwinner version of DesignWare HDMI"
-> +       default ARM64 && ARCH_SUNXI
->         depends on DRM_SUN4I
->         select DRM_DW_HDMI
->         help
-> --
+> 
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> index 7dcd1d64dfe4..5d448ef2132f 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> @@ -313,6 +313,7 @@ Required properties:
+>      * allwinner,sun8i-a83t-de2-mixer-1
+>      * allwinner,sun8i-h3-de2-mixer-0
+>      * allwinner,sun8i-v3s-de2-mixer
+> +    * allwinner,sun50i-a64-de2-mixer-1
+
+Need to capture fallbacks here.
+
+>    - reg: base address and size of the memory-mapped region.
+>    - clocks: phandles to the clocks feeding the mixer
+>      * bus: the mixer interface clock
+> -- 
 > 2.14.3
->
+> 
