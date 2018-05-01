@@ -1,75 +1,54 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 09:56:11 -0500
-Subject: [PATCH 07/11] irqchip: stm32: add stm32mp1 support with
- hierarchy domain
-In-Reply-To: <1524759514-12392-8-git-send-email-ludovic.Barre@st.com>
-References: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
- <1524759514-12392-8-git-send-email-ludovic.Barre@st.com>
-Message-ID: <20180501145611.GA6842@rob-hp-laptop>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 1 May 2018 17:02:01 +0200
+Subject: [PATCH 00/12] mtd: nand: davinci: stop using pdev->id as
+ chipselect
+In-Reply-To: <276f8b2b-34a1-ec00-e348-21b5bcb2f0c0@ti.com>
+References: <20180430082453.8091-1-brgl@bgdev.pl>
+ <20180430120930.4768a7cb@bbrezillon>
+ <276f8b2b-34a1-ec00-e348-21b5bcb2f0c0@ti.com>
+Message-ID: <20180501170201.6b3c034a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 06:18:30PM +0200, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> Exti controller has been differently integrated on stm32mp1 SoC.
-> A parent irq has only one external interrupt. A hierachy domain could
-> be used. Handlers are call by parent, each parent interrupt could be
-> masked and unmasked according to the needs.
-> 
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> ---
->  .../interrupt-controller/st,stm32-exti.txt         |   3 +
->  drivers/irqchip/irq-stm32-exti.c                   | 322 +++++++++++++++++++++
->  2 files changed, 325 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
-> index edf03f0..136bd61 100644
-> --- a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
-> @@ -5,11 +5,14 @@ Required properties:
->  - compatible: Should be:
->      "st,stm32-exti"
->      "st,stm32h7-exti"
-> +    "st,stm32mp1-exti"
->  - reg: Specifies base physical address and size of the registers
->  - interrupt-controller: Indentifies the node as an interrupt controller
->  - #interrupt-cells: Specifies the number of cells to encode an interrupt
->    specifier, shall be 2
->  - interrupts: interrupts references to primary interrupt controller
-> +  (only needed for exti controller with multiple exti under
-> +  same parent interrupt: st,stm32-exti and st,stm32h7-exti")
->  
->  Example:
->  
-> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-> index b38c655..ebf7146 100644
-> --- a/drivers/irqchip/irq-stm32-exti.c
-> +++ b/drivers/irqchip/irq-stm32-exti.c
+On Tue, 1 May 2018 16:01:42 +0530
+Sekhar Nori <nsekhar@ti.com> wrote:
 
-[...]
+> On Monday 30 April 2018 03:39 PM, Boris Brezillon wrote:
+> > Hi Bartosz,
+> > 
+> > On Mon, 30 Apr 2018 10:24:41 +0200
+> > Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> >   
+> >> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> >>
+> >> We have the 'ti,davinci-chipselect' property in the device tree, but
+> >> when using platform data the driver silently uses the id field of
+> >> struct platform_device as the chipselect. This is confusing and we
+> >> almost broke the nand support again recently after converting the
+> >> platform to common clock framework (which changed the device id in the
+> >> clock lookup - the problem is gone now that we no longer acquire the
+> >> clock in the nand driver.
+> >>
+> >> This series adds a new field to davinci-nand platform data, then makes
+> >> all board use it and finally modifies the two drivers that make use of
+> >> it.
+> >>
+> >> Bartosz Golaszewski (12):
+> >>   mtd: nand: davinci: store the core chipselect number in platform data  
+> > 
+> > Raw NAND related patches (that is, everything that is not onenand or
+> > SPI NAND) should use the "mtd: rawnand: " prefix now. Other than that,
+> > I'm fine with the patch series, just let me know how you want to have it  
+> 
+> Hi Boris, should I convert the "I'm fine" to some sort of formal tag? If
+> yes, what is the tag and for which patches?
 
-> +static const struct stm32_desc_irq stm32mp1_desc_irq[] = {
-> +	{ .exti = 1, .irq_parent = 7 },
-> +	{ .exti = 2, .irq_parent = 8 },
-> +	{ .exti = 3, .irq_parent = 9 },
-> +	{ .exti = 4, .irq_parent = 10 },
-> +	{ .exti = 5, .irq_parent = 23 },
-> +	{ .exti = 6, .irq_parent = 64 },
-> +	{ .exti = 7, .irq_parent = 65 },
-> +	{ .exti = 8, .irq_parent = 66 },
-> +	{ .exti = 9, .irq_parent = 67 },
-> +	{ .exti = 10, .irq_parent = 40 },
-> +	{ .exti = 11, .irq_parent = 42 },
-> +	{ .exti = 12, .irq_parent = 76 },
-> +	{ .exti = 13, .irq_parent = 77 },
-> +	{ .exti = 14, .irq_parent = 121 },
-> +	{ .exti = 15, .irq_parent = 127 },
-> +	{ .exti = 16, .irq_parent = 1 },
-> +	{ .exti = 65, .irq_parent = 144 },
-> +	{ .exti = 68, .irq_parent = 143 },
-> +	{ .exti = 73, .irq_parent = 129 },
-> +};
+Yep, you can add
 
-You can use an interrupt-map property rather than put this into the 
-driver.
+Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
+
+on patches 1 and 11.
+
+Thanks,
+
+Boris
