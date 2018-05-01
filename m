@@ -1,26 +1,38 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 1 May 2018 19:43:55 +0530
-Subject: [PATCH v9 05/27] ARM: davinci: da830: add new clock init using
- common clock framework
-In-Reply-To: <20180427001745.4116-6-david@lechnology.com>
-References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-6-david@lechnology.com>
-Message-ID: <0e0aac5a-70b5-e90a-2ae4-7209003da922@ti.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Tue,  1 May 2018 10:14:50 -0400
+Subject: [PATCH V1] irqchip/qcom: Fix check for spurious interrupts
+Message-ID: <1525184090-26143-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 April 2018 05:47 AM, David Lechner wrote:
-> This adds the new board-specific clock init in mach-davinci/da830.c
-> using the new common clock framework drivers.
-> 
-> The #ifdefs are needed to prevent compile errors until the entire
-> ARCH_DAVINCI is converted.
-> 
-> Also clean up the #includes since we are adding some here.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+When the interrupts for a combiner span multiple registers we need
+to check if any interrupts have been asserted on each register
+before checking for spurious interrupts.
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+---
+ drivers/irqchip/qcom-irq-combiner.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks,
-Sekhar
+diff --git a/drivers/irqchip/qcom-irq-combiner.c b/drivers/irqchip/qcom-irq-combiner.c
+index f312659..7f0c0be 100644
+--- a/drivers/irqchip/qcom-irq-combiner.c
++++ b/drivers/irqchip/qcom-irq-combiner.c
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -68,7 +68,7 @@ static void combiner_handle_irq(struct irq_desc *desc)
+ 
+ 		bit = readl_relaxed(combiner->regs[reg].addr);
+ 		status = bit & combiner->regs[reg].enabled;
+-		if (!status)
++		if (bit && !status)
+ 			pr_warn_ratelimited("Unexpected IRQ on CPU%d: (%08x %08lx %p)\n",
+ 					    smp_processor_id(), bit,
+ 					    combiner->regs[reg].enabled,
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
