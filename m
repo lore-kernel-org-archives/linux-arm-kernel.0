@@ -1,60 +1,63 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 1 May 2018 10:59:07 -0700
-Subject: [PATCH] firmware/psci: add support for SYSTEM_RESET2
-In-Reply-To: <1525186288-536-1-git-send-email-sudeep.holla@arm.com>
-References: <1525186288-536-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <ef2f0c7c-eb2d-157d-e215-ced1ce984aa5@gmail.com>
+From: joelaf@google.com (Joel Fernandes)
+Date: Tue, 01 May 2018 18:18:44 +0000
+Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <20180430105559.ys6kcfoy76o3qpoj@holly.lan>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <e0b5ae90-f21e-f5db-a4af-52900a2e8c07@arm.com>
+ <CAEi0qNkt75cqF=03HrQ81+pDdWVOpzGiHrk8_cTNTJo9os9D8Q@mail.gmail.com>
+ <07a0b8c1-3d87-0cae-61df-dbff782be301@arm.com>
+ <20180430105559.ys6kcfoy76o3qpoj@holly.lan>
+Message-ID: <CAJWu+oqH0-nwBNSXiuuf1gPK62rstSYBaus89dmanoCw1QYv7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2018 07:51 AM, Sudeep Holla wrote:
-> PSCI v1.1 introduced SYSTEM_RESET2 to allow both architectural resets
-> where the semantics are described by the PSCI specification itself as
-> well as vendor-specific resets. Currently only system warm reset
-> semantics is defined as part of architectural resets by the specification.
-> 
-> This patch implements support for SYSTEM_RESET2 by making using of
-> reboot_mode passed by the reboot infrastructure in the kernel.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/firmware/psci.c   | 21 +++++++++++++++++++++
->  include/uapi/linux/psci.h |  2 ++
->  2 files changed, 23 insertions(+)
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index c80ec1d03274..216b1950bbd5 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -88,6 +88,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
->  				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
-> 
->  static u32 psci_cpu_suspend_feature;
-> +bool psci_system_reset2_supported;
+> > On 29/04/18 07:37, Joel Fernandes wrote:
+> > > On Wed, Jan 17, 2018 at 4:10 AM, Julien Thierry <
+julien.thierry@arm.com> wrote:
+> > > > Hi,
+> > > >
+> > > > On 17/01/18 11:54, Julien Thierry wrote:
+> > > > >
+> > > > > This series is a continuation of the work started by Daniel [1].
+The goal
+> > > > > is to use GICv3 interrupt priorities to simulate an NMI.
+> > > > >
+> > > >
+> > > >
+> > > > I have submitted a separate series making use of this feature for
+the ARM
+> > > > PMUv3 interrupt [1].
+> > >
+> > > I guess the hard lockup detector using NMI could be a nice next step
+> > > to see how well it works with lock up detection. That's the main
+> > > usecase for my interest. However, perf profiling is also a strong one.
+> > >
+> >
+> > From my understanding, Linux's hardlockup detector already uses the ARM
+PMU
+> > interrupt to check whether some task is stuck. I haven't looked at the
+> > details of the implementation yet, but in theory having the PMU
+interrupt as
+> > NMI should make the hard lockup detector use the NMI.
+> >
+> > When I do the v3, I'll have a look at this to check whether the
+hardlockup
+> > detector works fine when using NMI.
 
-Should this be static? It does not appear to be used in another
-translation unit.
+> That's what I saw on arch/arm (with some of the much older FIQ work).
 
-> 
->  static inline bool psci_has_ext_power_state(void)
->  {
-> @@ -253,6 +254,15 @@ static int get_set_conduit_method(struct device_node *np)
-> 
->  static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
->  {
-> +	if ((reboot_mode == REBOOT_WARM || reboot_mode == REBOOT_SOFT) &&
-> +	    psci_system_reset2_supported)
-> +		/*
-> +		 * reset_type[31] = 0 (architectural)
-> +		 * reset_type[30:0] = 0 (SYSTEM_WARM_RESET)
-> +		 * cookie = 0 (ignored by the implementation
+> Once you have PMU and the appropriate config to *admit* to supporting
+> hard lockup then it will "just work" and be setup automatically during
+> kernel boot.
 
-Missing closing parenthesis
+> Actually the problem then becomes that if you want to use the PMU
+> for anything else then you may end up having to disable the hard
+> lockup detector.
 
-> +		 */
-> +		invoke_psci_fn(PSCI_FN_NATIVE(1_1, SYSTEM_RESET2), 0, 0, 0);
+This problem is not anything pseudo-NMI specific though right?
+Contention/constraints on PMU resources should be a problem even on
+platforms with real NMI.
 
--- 
-Florian
+thanks,
+
+- Joel
