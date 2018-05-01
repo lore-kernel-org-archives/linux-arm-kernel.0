@@ -1,39 +1,87 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue,  1 May 2018 14:31:23 +0200
-Subject: [PATCH v8 04/12] ARM: dts: sun8i: Add R_CPUCFG device node for the
- A83T dtsi
+Date: Tue,  1 May 2018 14:31:26 +0200
+Subject: [PATCH v8 07/12] ARM: sunxi: Add initialization of CNTVOFF
 In-Reply-To: <20180501123131.7738-1-mylene.josserand@bootlin.com>
 References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
-Message-ID: <20180501123131.7738-5-mylene.josserand@bootlin.com>
+Message-ID: <20180501123131.7738-8-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The R_CPUCFG is a collection of registers needed for SMP bringup
-on clusters and cluster's reset.
-For the moment, documentation about this register is found in
-Allwinner's code only.
+Add the initialization of CNTVOFF for sun8i-a83t.
+
+For boot CPU, create a new machine that handles this
+function's call in an "init_early" callback. We need to initialize
+CNTVOFF before the arch timer's initialization otherwise, it will
+not be taken into account and fails to boot correctly.
+Because of that, this function can't be called in SMP's early_initcall
+function which is called after timer's init.
+
+For secondary CPUs, add this function into secondary_startup
+assembly entry.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-sunxi/headsmp.S |  1 +
+ arch/arm/mach-sunxi/sunxi.c   | 20 +++++++++++++++++++-
+ 2 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index a50ccb475de8..53ace066b7dc 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -938,6 +938,11 @@
- 			#reset-cells = <1>;
- 		};
+diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+index 37dc772701f3..32d76be98541 100644
+--- a/arch/arm/mach-sunxi/headsmp.S
++++ b/arch/arm/mach-sunxi/headsmp.S
+@@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
  
-+		r_cpucfg at 1f01c00 {
-+			compatible = "allwinner,sun8i-a83t-r-cpucfg";
-+			reg = <0x1f01c00 0x400>;
-+		};
+ ENTRY(sunxi_mc_smp_secondary_startup)
+ 	bl	sunxi_mc_smp_cluster_cache_enable
++	bl	secure_cntvoff_init
+ 	b	secondary_startup
+ ENDPROC(sunxi_mc_smp_secondary_startup)
+ 
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 5e9602ce1573..2770a31a9278 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -16,6 +16,7 @@
+ #include <linux/platform_device.h>
+ 
+ #include <asm/mach/arch.h>
++#include <asm/secure_cntvoff.h>
+ 
+ static const char * const sunxi_board_dt_compat[] = {
+ 	"allwinner,sun4i-a10",
+@@ -62,7 +63,6 @@ MACHINE_END
+ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-a23",
+ 	"allwinner,sun8i-a33",
+-	"allwinner,sun8i-a83t",
+ 	"allwinner,sun8i-h2-plus",
+ 	"allwinner,sun8i-h3",
+ 	"allwinner,sun8i-r40",
+@@ -75,6 +75,24 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+ 	.dt_compat	= sun8i_board_dt_compat,
+ MACHINE_END
+ 
++void __init sun8i_a83t_cntvoff_init(void)
++{
++#ifdef CONFIG_SMP
++	secure_cntvoff_init();
++#endif
++}
 +
- 		r_pio: pinctrl at 1f02c00 {
- 			compatible = "allwinner,sun8i-a83t-r-pinctrl";
- 			reg = <0x01f02c00 0x400>;
++static const char * const sun8i_a83t_cntvoff_board_dt_compat[] = {
++	"allwinner,sun8i-a83t",
++	NULL,
++};
++
++DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i-a83t board")
++	.init_early	= sun8i_a83t_cntvoff_init,
++	.init_time	= sun6i_timer_init,
++	.dt_compat	= sun8i_a83t_cntvoff_board_dt_compat,
++MACHINE_END
++
+ static const char * const sun9i_board_dt_compat[] = {
+ 	"allwinner,sun9i-a80",
+ 	NULL,
 -- 
 2.11.0
