@@ -1,400 +1,234 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue,  1 May 2018 13:08:08 +0100
-Subject: [PATCH v7 12/24] ASoC: qdsp6: q6afe: Add support to MI2S sysclks
+Date: Tue,  1 May 2018 13:08:06 +0100
+Subject: [PATCH v7 10/24] ASoC: qdsp6: qdafe: Add SLIMBus port Support
 In-Reply-To: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
 References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180501120820.11016-13-srinivas.kandagatla@linaro.org>
+Message-ID: <20180501120820.11016-11-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to LPASS Bit clock, LPASS Digital
-core clock and OSR clock. These clocks are required for both
-MI2S and PCM setup.
+This patch adds support to 6 SLIMBus AFE ports, which are used as
+backend dais.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 ---
- sound/soc/qcom/qdsp6/q6afe.c | 171 +++++++++++++++++++++++++++++++++++++++++--
- sound/soc/qcom/qdsp6/q6afe.h | 131 +++++++++++++++++++++++++++++++++
- 2 files changed, 295 insertions(+), 7 deletions(-)
+ sound/soc/qcom/qdsp6/q6afe.c | 129 +++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6afe.h |  14 +++++
+ 2 files changed, 143 insertions(+)
 
 diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
-index ceb18aaa5af4..c2af806fbb93 100644
+index 635c51126dc3..be55b3ab045f 100644
 --- a/sound/soc/qcom/qdsp6/q6afe.c
 +++ b/sound/soc/qcom/qdsp6/q6afe.c
-@@ -33,6 +33,9 @@
+@@ -27,9 +27,45 @@
+ #define AFE_PARAM_ID_HDMI_CONFIG	0x00010210
+ #define AFE_MODULE_AUDIO_DEV_INTERFACE	0x0001020C
  
- #define AFE_PARAM_ID_CDC_SLIMBUS_SLAVE_CFG 0x00010235
- 
-+#define AFE_PARAM_ID_LPAIF_CLK_CONFIG	0x00010238
-+#define AFE_PARAM_ID_INT_DIGITAL_CDC_CLK_CONFIG	0x00010239
++#define AFE_PARAM_ID_CDC_SLIMBUS_SLAVE_CFG 0x00010235
 +
- #define AFE_PARAM_ID_SLIMBUS_CONFIG    0x00010212
- #define AFE_PARAM_ID_I2S_CONFIG	0x0001020D
- 
-@@ -66,6 +69,11 @@
++#define AFE_PARAM_ID_SLIMBUS_CONFIG    0x00010212
++
+ /* Port IDs */
+ #define AFE_API_VERSION_HDMI_CONFIG	0x1
  #define AFE_PORT_ID_MULTICHAN_HDMI_RX	0x100E
- 
- #define AFE_API_VERSION_SLIMBUS_CONFIG 0x1
-+/* Clock set API version */
-+#define AFE_API_VERSION_CLOCK_SET 1
-+#define Q6AFE_LPASS_CLK_CONFIG_API_VERSION	0x1
-+#define AFE_MODULE_CLOCK_SET		0x0001028F
-+#define AFE_PARAM_ID_CLOCK_SET		0x00010290
- 
- /* SLIMbus Rx port on channel 0. */
- #define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX      0x4000
-@@ -142,6 +150,13 @@ struct afe_port_param_data_v2 {
++
++#define AFE_API_VERSION_SLIMBUS_CONFIG 0x1
++
++/* SLIMbus Rx port on channel 0. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX      0x4000
++/* SLIMbus Tx port on channel 0. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_TX      0x4001
++/* SLIMbus Rx port on channel 1. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX      0x4002
++/* SLIMbus Tx port on channel 1. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_TX      0x4003
++/* SLIMbus Rx port on channel 2. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX      0x4004
++/* SLIMbus Tx port on channel 2. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_TX      0x4005
++/* SLIMbus Rx port on channel 3. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_RX      0x4006
++/* SLIMbus Tx port on channel 3. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_TX      0x4007
++/* SLIMbus Rx port on channel 4. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_RX      0x4008
++/* SLIMbus Tx port on channel 4. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_TX      0x4009
++/* SLIMbus Rx port on channel 5. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX      0x400a
++/* SLIMbus Tx port on channel 5. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_TX      0x400b
++/* SLIMbus Rx port on channel 6. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX      0x400c
++/* SLIMbus Tx port on channel 6. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_TX      0x400d
++
+ #define TIMEOUT_MS 1000
+ #define AFE_CMD_RESP_AVAIL	0
+ #define AFE_CMD_RESP_NONE	1
+@@ -80,8 +116,53 @@ struct afe_param_id_hdmi_multi_chan_audio_cfg {
  	u16 reserved;
  } __packed;
  
-+struct afe_svc_cmd_set_param {
-+	uint32_t payload_size;
-+	uint32_t payload_address_lsw;
-+	uint32_t payload_address_msw;
-+	uint32_t mem_map_handle;
++struct afe_param_id_slimbus_cfg {
++	u32                  sb_cfg_minor_version;
++/* Minor version used for tracking the version of the SLIMBUS
++ * configuration interface.
++ * Supported values: #AFE_API_VERSION_SLIMBUS_CONFIG
++ */
++
++	u16                  slimbus_dev_id;
++/* SLIMbus hardware device ID, which is required to handle
++ * multiple SLIMbus hardware blocks.
++ * Supported values: - #AFE_SLIMBUS_DEVICE_1 - #AFE_SLIMBUS_DEVICE_2
++ */
++	u16                  bit_width;
++/* Bit width of the sample.
++ * Supported values: 16, 24
++ */
++	u16                  data_format;
++/* Data format supported by the SLIMbus hardware. The default is
++ * 0 (#AFE_SB_DATA_FORMAT_NOT_INDICATED), which indicates the
++ * hardware does not perform any format conversions before the data
++ * transfer.
++ */
++	u16                  num_channels;
++/* Number of channels.
++ * Supported values: 1 to #AFE_PORT_MAX_AUDIO_CHAN_CNT
++ */
++	u8  shared_ch_mapping[AFE_PORT_MAX_AUDIO_CHAN_CNT];
++/* Mapping of shared channel IDs (128 to 255) to which the
++ * master port is to be connected.
++ * Shared_channel_mapping[i] represents the shared channel assigned
++ * for audio channel i in multichannel audio data.
++ */
++	u32              sample_rate;
++/* Sampling rate of the port.
++ * Supported values:
++ * - #AFE_PORT_SAMPLE_RATE_8K
++ * - #AFE_PORT_SAMPLE_RATE_16K
++ * - #AFE_PORT_SAMPLE_RATE_48K
++ * - #AFE_PORT_SAMPLE_RATE_96K
++ * - #AFE_PORT_SAMPLE_RATE_192K
++ */
 +} __packed;
 +
- struct afe_port_cmd_set_param_v2 {
- 	u16 port_id;
- 	u16 payload_size;
-@@ -202,6 +217,23 @@ struct afe_param_id_slimbus_cfg {
-  */
++
+ union afe_port_config {
+ 	struct afe_param_id_hdmi_multi_chan_audio_cfg hdmi_multi_ch;
++	struct afe_param_id_slimbus_cfg           slim_cfg;
  } __packed;
  
-+struct afe_clk_cfg {
-+	u32                  i2s_cfg_minor_version;
-+	u32                  clk_val1;
-+	u32                  clk_val2;
-+	u16                  clk_src;
-+	u16                  clk_root;
-+	u16                  clk_set_mode;
-+	u16                  reserved;
-+} __packed;
-+
-+struct afe_digital_clk_cfg {
-+	u32                  i2s_cfg_minor_version;
-+	u32                  clk_val;
-+	u16                  clk_root;
-+	u16                  reserved;
-+} __packed;
-+
- struct afe_param_id_i2s_cfg {
- 	u32	i2s_cfg_minor_version;
- 	u16	bit_width;
-@@ -219,6 +251,16 @@ union afe_port_config {
- 	struct afe_param_id_i2s_cfg	i2s_cfg;
- } __packed;
- 
-+
-+struct afe_clk_set {
-+	uint32_t clk_set_minor_version;
-+	uint32_t clk_id;
-+	uint32_t clk_freq_in_hz;
-+	uint16_t clk_attri;
-+	uint16_t clk_root;
-+	uint32_t enable;
-+};
-+
  struct q6afe_port {
- 	wait_queue_head_t wait;
- 	union afe_port_config port_cfg;
-@@ -230,13 +272,6 @@ struct q6afe_port {
- 	struct list_head	node;
+@@ -117,6 +198,20 @@ struct afe_port_map {
+ 
+ static struct afe_port_map port_maps[AFE_PORT_MAX] = {
+ 	[HDMI_RX] = { AFE_PORT_ID_MULTICHAN_HDMI_RX, HDMI_RX, 1, 1},
++	[SLIMBUS_0_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX,
++				SLIMBUS_0_RX, 1, 1},
++	[SLIMBUS_1_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX,
++				SLIMBUS_1_RX, 1, 1},
++	[SLIMBUS_2_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX,
++				SLIMBUS_2_RX, 1, 1},
++	[SLIMBUS_3_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_RX,
++				SLIMBUS_3_RX, 1, 1},
++	[SLIMBUS_4_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_RX,
++				SLIMBUS_4_RX, 1, 1},
++	[SLIMBUS_5_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX,
++				SLIMBUS_5_RX, 1, 1},
++	[SLIMBUS_6_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX,
++				SLIMBUS_6_RX, 1, 1},
  };
  
--struct afe_audioif_config_command {
--	struct apr_hdr hdr;
--	struct afe_port_cmd_set_param_v2 param;
--	struct afe_port_param_data_v2 pdata;
--	union afe_port_config pcfg;
--} __packed;
--
- struct afe_port_map {
- 	int port_id;
- 	int token;
-@@ -394,6 +429,54 @@ static int afe_apr_send_pkt(struct q6afe *afe, struct apr_pkt *pkt,
- 	return ret;
+ static struct q6afe_port *afe_find_port(struct q6afe *afe, int token)
+@@ -330,6 +425,31 @@ int q6afe_port_stop(struct q6afe_port *port)
  }
+ EXPORT_SYMBOL_GPL(q6afe_port_stop);
  
-+static int q6afe_port_set_param(struct q6afe_port *port, void *data,
-+				int param_id, int module_id, int psize)
++/**
++ * q6afe_slim_port_prepare() - Prepare slim afe port.
++ *
++ * @port: Instance of afe port
++ * @cfg: SLIM configuration for the afe port
++ *
++ */
++void q6afe_slim_port_prepare(struct q6afe_port *port,
++			     struct q6afe_slim_cfg *cfg)
 +{
-+	struct afe_svc_cmd_set_param *param;
-+	struct afe_port_param_data_v2 *pdata;
-+	struct q6afe *afe = port->afe;
-+	struct apr_pkt *pkt;
-+	u16 port_id = port->id;
-+	int ret, pkt_size;
-+	void *p, *pl;
++	union afe_port_config *pcfg = &port->port_cfg;
 +
-+	pkt_size = APR_HDR_SIZE + sizeof(*param) + sizeof(*pdata) + psize;
-+	p = kzalloc(pkt_size, GFP_KERNEL);
-+	if (!p)
-+		return -ENOMEM;
++	pcfg->slim_cfg.sb_cfg_minor_version = AFE_API_VERSION_SLIMBUS_CONFIG;
++	pcfg->slim_cfg.sample_rate = cfg->sample_rate;
++	pcfg->slim_cfg.bit_width = cfg->bit_width;
++	pcfg->slim_cfg.num_channels = cfg->num_channels;
++	pcfg->slim_cfg.data_format = cfg->data_format;
++	pcfg->slim_cfg.shared_ch_mapping[0] = cfg->ch_mapping[0];
++	pcfg->slim_cfg.shared_ch_mapping[1] = cfg->ch_mapping[1];
++	pcfg->slim_cfg.shared_ch_mapping[2] = cfg->ch_mapping[2];
++	pcfg->slim_cfg.shared_ch_mapping[3] = cfg->ch_mapping[3];
 +
-+	pkt = p;
-+	param = p + APR_HDR_SIZE;
-+	pdata = p + APR_HDR_SIZE + sizeof(*param);
-+	pl = p + APR_HDR_SIZE + sizeof(*param) + sizeof(*pdata);
-+	memcpy(pl, data, psize);
-+
-+	pkt->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-+					   APR_HDR_LEN(APR_HDR_SIZE),
-+					   APR_PKT_VER);
-+	pkt->hdr.pkt_size = pkt_size;
-+	pkt->hdr.src_port = 0;
-+	pkt->hdr.dest_port = 0;
-+	pkt->hdr.token = port->token;
-+	pkt->hdr.opcode = AFE_SVC_CMD_SET_PARAM;
-+
-+	param->payload_size = sizeof(*pdata) + psize;
-+	param->payload_address_lsw = 0x00;
-+	param->payload_address_msw = 0x00;
-+	param->mem_map_handle = 0x00;
-+	pdata->module_id = module_id;
-+	pdata->param_id = param_id;
-+	pdata->param_size = psize;
-+
-+	ret = afe_apr_send_pkt(afe, pkt, port);
-+	if (ret)
-+		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
-+		       port_id, ret);
-+
-+	kfree(pkt);
-+	return ret;
 +}
-+
- static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
- 				   int param_id, int psize)
- {
-@@ -443,6 +526,80 @@ static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
- 	return ret;
- }
- 
-+static int q6afe_set_lpass_clock(struct q6afe_port *port,
-+				 struct afe_clk_cfg *cfg)
-+{
-+	return q6afe_port_set_param_v2(port, cfg,
-+				       AFE_PARAM_ID_LPAIF_CLK_CONFIG,
-+				       sizeof(*cfg));
-+}
-+
-+static int q6afe_set_lpass_clock_v2(struct q6afe_port *port,
-+				 struct afe_clk_set *cfg)
-+{
-+	return q6afe_port_set_param(port, cfg, AFE_PARAM_ID_CLOCK_SET,
-+				    AFE_MODULE_CLOCK_SET, sizeof(*cfg));
-+}
-+
-+static int q6afe_set_digital_codec_core_clock(struct q6afe_port *port,
-+					      struct afe_digital_clk_cfg *cfg)
-+{
-+	return q6afe_port_set_param_v2(port, cfg,
-+				       AFE_PARAM_ID_INT_DIGITAL_CDC_CLK_CONFIG,
-+				       sizeof(*cfg));
-+}
-+
-+int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
-+			  int clk_src, int clk_root,
-+			  unsigned int freq, int dir)
-+{
-+	struct afe_clk_cfg ccfg = {0,};
-+	struct afe_clk_set cset = {0,};
-+	struct afe_digital_clk_cfg dcfg = {0,};
-+	int ret;
-+
-+	switch (clk_id) {
-+	case LPAIF_DIG_CLK:
-+		dcfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
-+		dcfg.clk_val = freq;
-+		dcfg.clk_root = clk_root;
-+		ret = q6afe_set_digital_codec_core_clock(port, &dcfg);
-+		break;
-+	case LPAIF_BIT_CLK:
-+		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
-+		ccfg.clk_val1 = freq;
-+		ccfg.clk_src = clk_src;
-+		ccfg.clk_root = clk_root;
-+		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK1_VALID;
-+		ret = q6afe_set_lpass_clock(port, &ccfg);
-+		break;
-+
-+	case LPAIF_OSR_CLK:
-+		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
-+		ccfg.clk_val2 = freq;
-+		ccfg.clk_src = clk_src;
-+		ccfg.clk_root = clk_root;
-+		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK2_VALID;
-+		ret = q6afe_set_lpass_clock(port, &ccfg);
-+		break;
-+	case Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT ... Q6AFE_LPASS_CLK_ID_INT_MCLK_1:
-+		cset.clk_set_minor_version = AFE_API_VERSION_CLOCK_SET;
-+		cset.clk_id = clk_id;
-+		cset.clk_freq_in_hz = freq;
-+		cset.clk_attri = clk_src;
-+		cset.clk_root = clk_root;
-+		cset.enable = !!freq;
-+		ret = q6afe_set_lpass_clock_v2(port, &cset);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(q6afe_port_set_sysclk);
++EXPORT_SYMBOL_GPL(q6afe_slim_port_prepare);
 +
  /**
-  * q6afe_port_stop() - Stop a afe port
+  * q6afe_hdmi_port_prepare() - Prepare hdmi afe port.
   *
+@@ -433,6 +553,15 @@ struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
+ 	case AFE_PORT_ID_MULTICHAN_HDMI_RX:
+ 		cfg_type = AFE_PARAM_ID_HDMI_CONFIG;
+ 		break;
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX:
++		cfg_type = AFE_PARAM_ID_SLIMBUS_CONFIG;
++		break;
+ 	default:
+ 		dev_err(dev, "Invalid port id 0x%x\n", port_id);
+ 		return ERR_PTR(-EINVAL);
 diff --git a/sound/soc/qcom/qdsp6/q6afe.h b/sound/soc/qcom/qdsp6/q6afe.h
-index 3cb3bb4985a9..5ca54a9bdfd5 100644
+index 3bd991a7c42d..5659966c6b1e 100644
 --- a/sound/soc/qcom/qdsp6/q6afe.h
 +++ b/sound/soc/qcom/qdsp6/q6afe.h
-@@ -16,6 +16,134 @@
- #define AFE_MAX_CHAN_COUNT	8
- #define AFE_PORT_MAX_AUDIO_CHAN_CNT	0x8
+@@ -11,6 +11,9 @@
+ #define MSM_AFE_PORT_TYPE_TX 1
+ #define AFE_MAX_PORTS AFE_PORT_MAX
  
-+#define Q6AFE_LPASS_CLK_SRC_INTERNAL 1
-+#define Q6AFE_LPASS_CLK_ROOT_DEFAULT 0
-+
-+#define LPAIF_DIG_CLK	1
-+#define LPAIF_BIT_CLK	2
-+#define LPAIF_OSR_CLK	3
-+
-+/* Clock ID for Primary I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT                          0x100
-+/* Clock ID for Primary I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_MI2S_EBIT                          0x101
-+/* Clock ID for Secondary I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_MI2S_IBIT                          0x102
-+/* Clock ID for Secondary I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_MI2S_EBIT                          0x103
-+/* Clock ID for Tertiary I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_MI2S_IBIT                          0x104
-+/* Clock ID for Tertiary I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_MI2S_EBIT                          0x105
-+/* Clock ID for Quartnery I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_MI2S_IBIT                         0x106
-+/* Clock ID for Quartnery I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_MI2S_EBIT                         0x107
-+/* Clock ID for Speaker I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_IBIT                       0x108
-+/* Clock ID for Speaker I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_EBIT                       0x109
-+/* Clock ID for Speaker I2S OSR */
-+#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_OSR                        0x10A
-+
-+/* Clock ID for QUINARY  I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_IBIT			0x10B
-+/* Clock ID for QUINARY  I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_EBIT			0x10C
-+/* Clock ID for SENARY  I2S IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEN_MI2S_IBIT			0x10D
-+/* Clock ID for SENARY  I2S EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEN_MI2S_EBIT			0x10E
-+/* Clock ID for INT0 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT0_MI2S_IBIT                       0x10F
-+/* Clock ID for INT1 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT1_MI2S_IBIT                       0x110
-+/* Clock ID for INT2 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT2_MI2S_IBIT                       0x111
-+/* Clock ID for INT3 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT3_MI2S_IBIT                       0x112
-+/* Clock ID for INT4 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT4_MI2S_IBIT                       0x113
-+/* Clock ID for INT5 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT5_MI2S_IBIT                       0x114
-+/* Clock ID for INT6 I2S IBIT  */
-+#define Q6AFE_LPASS_CLK_ID_INT6_MI2S_IBIT                       0x115
-+
-+/* Clock ID for QUINARY MI2S OSR CLK  */
-+#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_OSR                         0x116
-+
-+/* Clock ID for Primary PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_PCM_IBIT                           0x200
-+/* Clock ID for Primary PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_PCM_EBIT                           0x201
-+/* Clock ID for Secondary PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_PCM_IBIT                           0x202
-+/* Clock ID for Secondary PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_PCM_EBIT                           0x203
-+/* Clock ID for Tertiary PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_PCM_IBIT                           0x204
-+/* Clock ID for Tertiary PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_PCM_EBIT                           0x205
-+/* Clock ID for Quartery PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_PCM_IBIT                          0x206
-+/* Clock ID for Quartery PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_PCM_EBIT                          0x207
-+/* Clock ID for Quinary PCM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_PCM_IBIT                          0x208
-+/* Clock ID for Quinary PCM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_PCM_EBIT                          0x209
-+/* Clock ID for QUINARY PCM OSR  */
-+#define Q6AFE_LPASS_CLK_ID_QUI_PCM_OSR                            0x20A
-+
-+/** Clock ID for Primary TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_TDM_IBIT                           0x200
-+/** Clock ID for Primary TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_PRI_TDM_EBIT                           0x201
-+/** Clock ID for Secondary TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_TDM_IBIT                           0x202
-+/** Clock ID for Secondary TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_SEC_TDM_EBIT                           0x203
-+/** Clock ID for Tertiary TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_TDM_IBIT                           0x204
-+/** Clock ID for Tertiary TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_TER_TDM_EBIT                           0x205
-+/** Clock ID for Quartery TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_TDM_IBIT                          0x206
-+/** Clock ID for Quartery TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUAD_TDM_EBIT                          0x207
-+/** Clock ID for Quinary TDM IBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_IBIT                          0x208
-+/** Clock ID for Quinary TDM EBIT */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_EBIT                          0x209
-+/** Clock ID for Quinary TDM OSR */
-+#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_OSR                           0x20A
-+
-+/* Clock ID for MCLK1 */
-+#define Q6AFE_LPASS_CLK_ID_MCLK_1                                 0x300
-+/* Clock ID for MCLK2 */
-+#define Q6AFE_LPASS_CLK_ID_MCLK_2                                 0x301
-+/* Clock ID for MCLK3 */
-+#define Q6AFE_LPASS_CLK_ID_MCLK_3                                 0x302
-+/* Clock ID for MCLK4 */
-+#define Q6AFE_LPASS_CLK_ID_MCLK_4                                 0x304
-+/* Clock ID for Internal Digital Codec Core */
-+#define Q6AFE_LPASS_CLK_ID_INTERNAL_DIGITAL_CODEC_CORE            0x303
-+/* Clock ID for INT MCLK0 */
-+#define Q6AFE_LPASS_CLK_ID_INT_MCLK_0                             0x305
-+/* Clock ID for INT MCLK1 */
-+#define Q6AFE_LPASS_CLK_ID_INT_MCLK_1                             0x306
-+
-+/* Clock attribute for invalid use (reserved for internal usage) */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_INVALID		0x0
-+/* Clock attribute for no couple case */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_NO		0x1
-+/* Clock attribute for dividend couple case */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_DIVIDEND	0x2
-+/* Clock attribute for divisor couple case */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_DIVISOR	0x3
-+/* Clock attribute for invert and no couple case */
-+#define Q6AFE_LPASS_CLK_ATTRIBUTE_INVERT_COUPLE_NO	0x4
++#define AFE_MAX_CHAN_COUNT	8
++#define AFE_PORT_MAX_AUDIO_CHAN_CNT	0x8
 +
  struct q6afe_hdmi_cfg {
  	u16                  datatype;
  	u16                  channel_allocation;
-@@ -59,4 +187,7 @@ void q6afe_slim_port_prepare(struct q6afe_port *port,
- 			  struct q6afe_slim_cfg *cfg);
- int q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg);
+@@ -18,8 +21,17 @@ struct q6afe_hdmi_cfg {
+ 	u16                  bit_width;
+ };
  
-+int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
-+			  int clk_src, int clk_root,
-+			  unsigned int freq, int dir);
++struct q6afe_slim_cfg {
++	u32	sample_rate;
++	u16	bit_width;
++	u16	data_format;
++	u16	num_channels;
++	u8	ch_mapping[AFE_MAX_CHAN_COUNT];
++};
++
+ struct q6afe_port_config {
+ 	struct q6afe_hdmi_cfg hdmi;
++	struct q6afe_slim_cfg slim;
+ };
+ 
+ struct q6afe_port;
+@@ -31,5 +43,7 @@ void q6afe_port_put(struct q6afe_port *port);
+ int q6afe_get_port_id(int index);
+ void q6afe_hdmi_port_prepare(struct q6afe_port *port,
+ 			    struct q6afe_hdmi_cfg *cfg);
++void q6afe_slim_port_prepare(struct q6afe_port *port,
++			  struct q6afe_slim_cfg *cfg);
+ 
  #endif /* __Q6AFE_H__ */
 -- 
 2.16.2
