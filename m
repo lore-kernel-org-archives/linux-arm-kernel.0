@@ -1,41 +1,170 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 May 2018 08:39:56 -0700
-Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add fixed 26MHz clock as fck
- for twl
-In-Reply-To: <CAHCN7x+Ow7B4kTmd+4PkDd=azn-qKMYmEyjqfb8GkXA7Y7pEPA@mail.gmail.com>
-References: <20180405115239.17370-1-peter.ujfalusi@ti.com>
- <CAHCN7x+Ow7B4kTmd+4PkDd=azn-qKMYmEyjqfb8GkXA7Y7pEPA@mail.gmail.com>
-Message-ID: <20180501153956.GG98604@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  1 May 2018 12:47:29 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-wandboard: Switch to SPDX identifier
+Message-ID: <1525189650-5826-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Adam Ford <aford173@gmail.com> [180501 15:32]:
-> On Thu, Apr 5, 2018 at 6:52 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> > The board uses 26MHz oscillator for the twl4030 HFCLK.
-> > This way we will not depend on the bootloader to configure the
-> > CFG_BOOT:HFCLK_FREQ
-> >
-> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > ---
-> > Hi,
-> >
-> > there might be other boards (all omap3 boards with twl4030?) which uses the same
-> > setup, but I only have schematics for beagle-xm.
-> >
-> 
-> I know I am late coming into this, but we have twl4030_omap3.dtsi for
-> the items common to omap3. Can we put the clock reference in that
-> file?
-> 
-> It seems like it would be cleaner than having a dozen boards or so
-> boards having the exact same copy of the same stuff. SHould something
-> change in the future, I would think it would make
-> maintenance easier too.  Just my two cents.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Well we don't know if it's a 26MiHz clock on all of them. Some use
-38MiHz at least. Sure the board can override it but let's first
-fix up each board then later on add the common node.
+Adopt the SPDX license identifier headers to ease license compliance
+management.
 
-Regards,
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6dl-wandboard-revb1.dts | 6 +-----
+ arch/arm/boot/dts/imx6dl-wandboard-revd1.dts | 6 +-----
+ arch/arm/boot/dts/imx6dl-wandboard.dts       | 6 +-----
+ arch/arm/boot/dts/imx6q-wandboard-revb1.dts  | 6 +-----
+ arch/arm/boot/dts/imx6q-wandboard-revd1.dts  | 6 +-----
+ arch/arm/boot/dts/imx6q-wandboard.dts        | 6 +-----
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi     | 6 +-----
+ arch/arm/boot/dts/imx6qp-wandboard-revd1.dts | 6 +-----
+ 8 files changed, 8 insertions(+), 40 deletions(-)
 
-Tony
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts b/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
+index 5727fa4..738db4f 100644
+--- a/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
++++ b/arch/arm/boot/dts/imx6dl-wandboard-revb1.dts
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright 2013 Freescale Semiconductor, Inc.
+  *
+  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  */
+ /dts-v1/;
+ #include "imx6dl.dtsi"
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard-revd1.dts b/arch/arm/boot/dts/imx6dl-wandboard-revd1.dts
+index a72c07d..51de6b4 100644
+--- a/arch/arm/boot/dts/imx6dl-wandboard-revd1.dts
++++ b/arch/arm/boot/dts/imx6dl-wandboard-revd1.dts
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright 2013 Freescale Semiconductor, Inc.
+  *
+  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  */
+ /dts-v1/;
+ #include "imx6dl.dtsi"
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
+index a09f274..b43454d 100644
+--- a/arch/arm/boot/dts/imx6dl-wandboard.dts
++++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright 2013 Freescale Semiconductor, Inc.
+  *
+  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  */
+ /dts-v1/;
+ #include "imx6dl.dtsi"
+diff --git a/arch/arm/boot/dts/imx6q-wandboard-revb1.dts b/arch/arm/boot/dts/imx6q-wandboard-revb1.dts
+index b763352..be85b98 100644
+--- a/arch/arm/boot/dts/imx6q-wandboard-revb1.dts
++++ b/arch/arm/boot/dts/imx6q-wandboard-revb1.dts
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright 2013 Freescale Semiconductor, Inc.
+  *
+  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  */
+ /dts-v1/;
+ #include "imx6q.dtsi"
+diff --git a/arch/arm/boot/dts/imx6q-wandboard-revd1.dts b/arch/arm/boot/dts/imx6q-wandboard-revd1.dts
+index 8691fab..fcfba28 100644
+--- a/arch/arm/boot/dts/imx6q-wandboard-revd1.dts
++++ b/arch/arm/boot/dts/imx6q-wandboard-revd1.dts
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright 2013 Freescale Semiconductor, Inc.
+  *
+  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  */
+ /dts-v1/;
+ #include "imx6q.dtsi"
+diff --git a/arch/arm/boot/dts/imx6q-wandboard.dts b/arch/arm/boot/dts/imx6q-wandboard.dts
+index 2a3d98c..fa36fe18 100644
+--- a/arch/arm/boot/dts/imx6q-wandboard.dts
++++ b/arch/arm/boot/dts/imx6q-wandboard.dts
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright 2013 Freescale Semiconductor, Inc.
+  *
+  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  */
+ /dts-v1/;
+ #include "imx6q.dtsi"
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index 6b0a86f..e1afa54 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright 2013 Freescale Semiconductor, Inc.
+  *
+  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  */
+ 
+ #include <dt-bindings/gpio/gpio.h>
+diff --git a/arch/arm/boot/dts/imx6qp-wandboard-revd1.dts b/arch/arm/boot/dts/imx6qp-wandboard-revd1.dts
+index 907ba0c..bcca5ac 100644
+--- a/arch/arm/boot/dts/imx6qp-wandboard-revd1.dts
++++ b/arch/arm/boot/dts/imx6qp-wandboard-revd1.dts
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright 2013 Freescale Semiconductor, Inc.
+  *
+  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  */
+ /dts-v1/;
+ #include "imx6qp.dtsi"
+-- 
+2.7.4
