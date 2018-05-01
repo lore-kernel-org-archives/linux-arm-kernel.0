@@ -1,36 +1,46 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 11:22:12 -0500
-Subject: [PATCH 12/21] bindings: display: Add compatible for A64 tcon-tv
-In-Reply-To: <20180430114058.5061-13-jagan@amarulasolutions.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 2 May 2018 00:23:38 +0800
+Subject: [PATCH 03/21] clk: sunxi-ng: Enable DE2_CCU for Allwinner 64-bit
+ SoCs
+In-Reply-To: <20180430114058.5061-4-jagan@amarulasolutions.com>
 References: <20180430114058.5061-1-jagan@amarulasolutions.com>
- <20180430114058.5061-13-jagan@amarulasolutions.com>
-Message-ID: <20180501162212.GA6950@rob-hp-laptop>
+ <20180430114058.5061-4-jagan@amarulasolutions.com>
+Message-ID: <CAGb2v66MKooAAroCzYdsXZDY0Oh66Dydpy59xj80QfiY+5mz_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 05:10:49PM +0530, Jagan Teki wrote:
-> tcon-tv on Allwinner A64 has similar behavior like Allwinner A83T.
-> 
+On Mon, Apr 30, 2018 at 7:40 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+> Allwinner 64-bit SoC like H5/A64 has DE2 CCU so enable them
+> as default.
+>
 > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> index 5d448ef2132f..8b6b4bc43d98 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> @@ -150,6 +150,7 @@ Required properties:
->     * allwinner,sun8i-v3s-tcon
->     * allwinner,sun9i-a80-tcon-lcd
->     * allwinner,sun9i-a80-tcon-tv
-> +   * allwinner,sun50i-a64-tcon-tv
+>  drivers/clk/sunxi-ng/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+> index 79dfd296c3d1..1fffd3bf6ff3 100644
+> --- a/drivers/clk/sunxi-ng/Kconfig
+> +++ b/drivers/clk/sunxi-ng/Kconfig
+> @@ -58,6 +58,8 @@ config SUN8I_V3S_CCU
+>
+>  config SUN8I_DE2_CCU
+>         bool "Support for the Allwinner SoCs DE2 CCU"
+> +       default ARM64 && ARCH_SUNXI
+> +       depends on (DRM_SUN4I && (ARM64 && ARCH_SUNXI)) || COMPILE_TEST
 
-Fallback?
+There is no reason to depend on DRM_SUN4I. There is no compile dependency.
 
->   - reg: base address and size of memory-mapped region
->   - interrupts: interrupt associated to this IP
->   - clocks: phandles to the clocks feeding the TCON.
-> -- 
+Also, this is needed on SUN8I as well, pretty much anything with DE 2.0.
+So you shouldn't limit it to ARM64. That pretty much breaks things for
+people with A83T's or H3's. In fact you should enable it by default for
+these as well.
+
+ChenYu
+
+>
+>  config SUN8I_R40_CCU
+>         bool "Support for the Allwinner R40 CCU"
+> --
 > 2.14.3
-> 
+>
