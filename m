@@ -1,26 +1,35 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 11:28:01 -0500
-Subject: [PATCH net-next v2 06/15] dt-bindings: net: dwmac-sun8i: Add
- binding for GMAC on Allwinner R40 SoC
-In-Reply-To: <20180501161227.2110-7-wens@csie.org>
-References: <20180501161227.2110-1-wens@csie.org>
- <20180501161227.2110-7-wens@csie.org>
-Message-ID: <20180501162801.GA14124@rob-hp-laptop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 2 May 2018 00:31:04 +0800
+Subject: [PATCH 04/21] bindings: display: Add compatible for A64 DE2
+ pipeline
+In-Reply-To: <20180501161723.GA376@rob-hp-laptop>
+References: <20180430114058.5061-1-jagan@amarulasolutions.com>
+ <20180430114058.5061-5-jagan@amarulasolutions.com>
+ <20180501161723.GA376@rob-hp-laptop>
+Message-ID: <CAGb2v66bx2TguLjnMi2R0KFU4=aYC8xveexybnWdWPDd+xwOvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 12:12:18AM +0800, Chen-Yu Tsai wrote:
-> The Allwinner R40 SoC has the EMAC controller supported by dwmac-sun8i.
-> It is named "GMAC", while EMAC refers to the 10/100 Mbps Ethernet
-> controller supported by sun4i-emac. The controller is the same, but
-> the R40 has the glue layer controls in the clock control unit (CCU),
-> with a reduced RX delay chain, and no TX delay chain.
-> 
-> This patch adds the R40 specific bits to the dwmac-sun8i binding.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 3 +++
->  1 file changed, 3 insertions(+)
+On Wed, May 2, 2018 at 12:17 AM, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Apr 30, 2018 at 05:10:41PM +0530, Jagan Teki wrote:
+>> Allwinner A64 has DE2 pipeline similar to other Allwinner
+>> SOC's like A83T, H3/H5.
+>
+> 'dt-bindings: ' for the subject prefix.
+>
+>>
+>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>> ---
+>>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
+>>  1 file changed, 1 insertion(+)
+>
+> Otherwise,
+>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Would it make sense to put all the display component related compatible
+string additions in the same patch? i.e. "Add compatible strings for all
+documented display component blocks". MIPI-DSI is missing, but it's not
+documented.
+
+ChenYu
