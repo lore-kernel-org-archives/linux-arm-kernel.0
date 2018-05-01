@@ -1,85 +1,47 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  1 May 2018 10:10:50 +0100
-Subject: [PATCH v2 20/27] coresight: tmc: Add configuration support for trace
- buffer size
+Date: Tue,  1 May 2018 10:10:52 +0100
+Subject: [PATCH v2 22/27] coresight: tmc-etr: Track if the device is coherent
 In-Reply-To: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
 References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1525165857-11096-21-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1525165857-11096-23-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can dynamically switch between contiguous memory and
-SG table depending on the trace buffer size, provide the support
-for selecting an appropriate buffer size.
+Track if the ETR is dma-coherent or not. This will be useful
+in deciding if we should use software buffering for perf.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../ABI/testing/sysfs-bus-coresight-devices-tmc    |  8 ++++++
- drivers/hwtracing/coresight/coresight-tmc.c        | 33 ++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
+ drivers/hwtracing/coresight/coresight-tmc.c | 3 +++
+ drivers/hwtracing/coresight/coresight-tmc.h | 1 +
+ 2 files changed, 4 insertions(+)
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc b/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc
-index 4fe677e..ea78714 100644
---- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc
-+++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc
-@@ -83,3 +83,11 @@ KernelVersion:	4.7
- Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
- Description:	(R) Indicates the capabilities of the Coresight TMC.
- 		The value is read directly from the DEVID register, 0xFC8,
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.tmc/buffer_size
-+Date:		August 2018
-+KernelVersion:	4.18
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Size of the trace buffer for TMC-ETR when used in SYSFS
-+		mode. Writable only for TMC-ETR configurations. The value
-+		should be aligned to the kernel pagesize.
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index c7bc681..4d41b4b 100644
+index 7adcde3..91a8f7b 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -288,8 +288,41 @@ static ssize_t trigger_cntr_store(struct device *dev,
- }
- static DEVICE_ATTR_RW(trigger_cntr);
+@@ -359,6 +359,9 @@ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
+ 	if (!(devid & TMC_DEVID_NOSCAT) && tmc_etr_can_use_sg(drvdata))
+ 		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
  
-+static ssize_t buffer_size_show(struct device *dev,
-+				struct device_attribute *attr, char *buf)
-+{
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
++	if (device_get_dma_attr(drvdata->dev) == DEV_DMA_COHERENT)
++		tmc_etr_set_cap(drvdata, TMC_ETR_COHERENT);
 +
-+	return sprintf(buf, "%#x\n", drvdata->size);
-+}
-+
-+static ssize_t buffer_size_store(struct device *dev,
-+				 struct device_attribute *attr,
-+				 const char *buf, size_t size)
-+{
-+	int ret;
-+	unsigned long val;
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	/* Only permitted for TMC-ETRs */
-+	if (drvdata->config_type != TMC_CONFIG_TYPE_ETR)
-+		return -EPERM;
-+
-+	ret = kstrtoul(buf, 0, &val);
-+	if (ret)
-+		return ret;
-+	/* The buffer size should be page aligned */
-+	if (val & (PAGE_SIZE - 1))
-+		return -EINVAL;
-+	drvdata->size = val;
-+	return size;
-+}
-+
-+static DEVICE_ATTR_RW(buffer_size);
-+
- static struct attribute *coresight_tmc_attrs[] = {
- 	&dev_attr_trigger_cntr.attr,
-+	&dev_attr_buffer_size.attr,
- 	NULL,
- };
+ 	/* Check if the AXI address width is available */
+ 	if (devid & TMC_DEVID_AXIAW_VALID)
+ 		dma_mask = ((devid >> TMC_DEVID_AXIAW_SHIFT) &
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index 1f6aa49..76a89a6 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -131,6 +131,7 @@ enum tmc_mem_intf_width {
+  * so we have to rely on PID of the IP to detect the functionality.
+  */
+ #define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
++#define TMC_ETR_COHERENT		(0x1U << 3)
  
+ /* Coresight SoC-600 TMC-ETR unadvertised capabilities */
+ #define CORESIGHT_SOC_600_ETR_CAPS	\
 -- 
 2.7.4
