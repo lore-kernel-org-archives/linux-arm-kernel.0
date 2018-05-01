@@ -1,88 +1,26 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 1 May 2018 09:27:32 -0700
-Subject: [PATCH] clk:aspeed: Fix reset bits for PCI/VGA and PECI
-In-Reply-To: <20180501150236.GA15330@rob-hp-laptop>
-References: <20180426172232.12535-1-jae.hyun.yoo@linux.intel.com>
- <20180501150236.GA15330@rob-hp-laptop>
-Message-ID: <5a449d93-eef0-4243-9889-bd13786edde1@linux.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 1 May 2018 11:28:01 -0500
+Subject: [PATCH net-next v2 06/15] dt-bindings: net: dwmac-sun8i: Add
+ binding for GMAC on Allwinner R40 SoC
+In-Reply-To: <20180501161227.2110-7-wens@csie.org>
+References: <20180501161227.2110-1-wens@csie.org>
+ <20180501161227.2110-7-wens@csie.org>
+Message-ID: <20180501162801.GA14124@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-Thanks for your review. Please see my answers inline.
-
-On 5/1/2018 8:02 AM, Rob Herring wrote:
-> On Thu, Apr 26, 2018 at 10:22:32AM -0700, Jae Hyun Yoo wrote:
->> This commit fixes incorrect setting of reset bits for PCI/VGA and
->> PECI modules.
->>
->> 1. Reset bit for PCI/VGA is 8.
->> 2. PECI reset bit is missing so added bit 10 as its reset bit.
->>
->> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
->> Fixes: 15ed8ce5f84e ("clk: aspeed: Register gated clocks")
->> Cc: stable <stable@vger.kernel.org>
->> ---
->>   drivers/clk/clk-aspeed.c                 | 4 ++--
->>   include/dt-bindings/clock/aspeed-clock.h | 2 +-
->>   2 files changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
->> index 5eb50c31e455..2c23e7d7ba28 100644
->> --- a/drivers/clk/clk-aspeed.c
->> +++ b/drivers/clk/clk-aspeed.c
->> @@ -88,7 +88,7 @@ static const struct aspeed_gate_data aspeed_gates[] = {
->>   	[ASPEED_CLK_GATE_GCLK] =	{  1,  7, "gclk-gate",		NULL,	0 }, /* 2D engine */
->>   	[ASPEED_CLK_GATE_MCLK] =	{  2, -1, "mclk-gate",		"mpll",	CLK_IS_CRITICAL }, /* SDRAM */
->>   	[ASPEED_CLK_GATE_VCLK] =	{  3,  6, "vclk-gate",		NULL,	0 }, /* Video Capture */
->> -	[ASPEED_CLK_GATE_BCLK] =	{  4, 10, "bclk-gate",		"bclk",	0 }, /* PCIe/PCI */
->> +	[ASPEED_CLK_GATE_BCLK] =	{  4,  8, "bclk-gate",		"bclk",	0 }, /* PCIe/PCI */
-
-This is the clk/reset combined setting for PCI/VGA and '8' is the reset
-bit for itself so no additional reset bit setting is needed. A reset
-will be triggered when BCLK is enabled.
-
->>   	[ASPEED_CLK_GATE_DCLK] =	{  5, -1, "dclk-gate",		NULL,	0 }, /* DAC */
->>   	[ASPEED_CLK_GATE_REFCLK] =	{  6, -1, "refclk-gate",	"clkin", CLK_IS_CRITICAL },
->>   	[ASPEED_CLK_GATE_USBPORT2CLK] =	{  7,  3, "usb-port2-gate",	NULL,	0 }, /* USB2.0 Host port 2 */
->> @@ -297,7 +297,7 @@ static const u8 aspeed_resets[] = {
->>   	[ASPEED_RESET_JTAG_MASTER] = 22,
->>   	[ASPEED_RESET_MIC]	= 18,
->>   	[ASPEED_RESET_PWM]	=  9,
->> -	[ASPEED_RESET_PCIVGA]	=  8,
->> +	[ASPEED_RESET_PECI]	= 10,
->>   	[ASPEED_RESET_I2C]	=  2,
->>   	[ASPEED_RESET_AHB]	=  1,
->>   };
->> diff --git a/include/dt-bindings/clock/aspeed-clock.h b/include/dt-bindings/clock/aspeed-clock.h
->> index d3558d897a4d..8d69b9134bef 100644
->> --- a/include/dt-bindings/clock/aspeed-clock.h
->> +++ b/include/dt-bindings/clock/aspeed-clock.h
->> @@ -45,7 +45,7 @@
->>   #define ASPEED_RESET_JTAG_MASTER	3
->>   #define ASPEED_RESET_MIC		4
->>   #define ASPEED_RESET_PWM		5
->> -#define ASPEED_RESET_PCIVGA		6
->> +#define ASPEED_RESET_PECI		6
+On Wed, May 02, 2018 at 12:12:18AM +0800, Chen-Yu Tsai wrote:
+> The Allwinner R40 SoC has the EMAC controller supported by dwmac-sun8i.
+> It is named "GMAC", while EMAC refers to the 10/100 Mbps Ethernet
+> controller supported by sun4i-emac. The controller is the same, but
+> the R40 has the glue layer controls in the clock control unit (CCU),
+> with a reduced RX delay chain, and no TX delay chain.
 > 
-> You can't really be changing these as they represent an ABI.
+> This patch adds the R40 specific bits to the dwmac-sun8i binding.
 > 
-> Is there no PCIVGA reset?
-> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 
-This is a bug fixing. Previously, PCI/VGA used PECI reset bit so this
-patch corrects the reset bit for PCI/VGA from bit '10' to bit '8', and
-it adds PECI reset bit '10' here as it can't be combined with a clock
-gate bit.
-
-Thanks,
-
-Jae
-
->>   #define ASPEED_RESET_I2C		7
->>   #define ASPEED_RESET_AHB		8
->>   
->> -- 
->> 2.17.0
->>
+Reviewed-by: Rob Herring <robh@kernel.org>
