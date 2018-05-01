@@ -1,55 +1,39 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue,  1 May 2018 14:31:27 +0200
-Subject: [PATCH v8 08/12] ARM: sun9i: smp: Rename clusters's power-off
+Date: Tue,  1 May 2018 14:31:23 +0200
+Subject: [PATCH v8 04/12] ARM: dts: sun8i: Add R_CPUCFG device node for the
+ A83T dtsi
 In-Reply-To: <20180501123131.7738-1-mylene.josserand@bootlin.com>
 References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
-Message-ID: <20180501123131.7738-9-mylene.josserand@bootlin.com>
+Message-ID: <20180501123131.7738-5-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare the support for sun8i-a83t, rename the macro that handles
-the power-off of clusters because it is different from sun9i-a80 to
-sun8i-a83t.
-
-The power off register for clusters are different from a80 and a83t.
+The R_CPUCFG is a collection of registers needed for SMP bringup
+on clusters and cluster's reset.
+For the moment, documentation about this register is found in
+Allwinner's code only.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/mach-sunxi/mc_smp.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-index 727968d6a3e5..03f021d0c73e 100644
---- a/arch/arm/mach-sunxi/mc_smp.c
-+++ b/arch/arm/mach-sunxi/mc_smp.c
-@@ -60,7 +60,7 @@
- #define PRCM_CPU_PO_RST_CTRL_CORE(n)	BIT(n)
- #define PRCM_CPU_PO_RST_CTRL_CORE_ALL	0xf
- #define PRCM_PWROFF_GATING_REG(c)	(0x100 + 0x4 * (c))
--#define PRCM_PWROFF_GATING_REG_CLUSTER	BIT(4)
-+#define PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I	BIT(4)
- #define PRCM_PWROFF_GATING_REG_CORE(n)	BIT(n)
- #define PRCM_PWR_SWITCH_REG(c, cpu)	(0x140 + 0x10 * (c) + 0x4 * (cpu))
- #define PRCM_CPU_SOFT_ENTRY_REG		0x164
-@@ -255,7 +255,7 @@ static int sunxi_cluster_powerup(unsigned int cluster)
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index a50ccb475de8..53ace066b7dc 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -938,6 +938,11 @@
+ 			#reset-cells = <1>;
+ 		};
  
- 	/* clear cluster power gate */
- 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
--	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
-+	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
- 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
- 	udelay(20);
- 
-@@ -452,7 +452,7 @@ static int sunxi_cluster_powerdown(unsigned int cluster)
- 	/* gate cluster power */
- 	pr_debug("%s: gate cluster power\n", __func__);
- 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
--	reg |= PRCM_PWROFF_GATING_REG_CLUSTER;
-+	reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
- 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
- 	udelay(20);
- 
++		r_cpucfg at 1f01c00 {
++			compatible = "allwinner,sun8i-a83t-r-cpucfg";
++			reg = <0x1f01c00 0x400>;
++		};
++
+ 		r_pio: pinctrl at 1f02c00 {
+ 			compatible = "allwinner,sun8i-a83t-r-pinctrl";
+ 			reg = <0x01f02c00 0x400>;
 -- 
 2.11.0
