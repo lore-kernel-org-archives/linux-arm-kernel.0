@@ -1,33 +1,53 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 09:45:16 -0500
-Subject: [PATCH] thermal: samsung: Remove support for Exynos5440
-In-Reply-To: <2734003.UHSMxVLybj@amdc3058>
-References: <20180424203239.21885-1-krzk@kernel.org>
- <20180424203239.21885-7-krzk@kernel.org>
- <1951102.VLysaozMLK@amdc3058>
- <CGME20180426112113eucas1p1b5bf6f093442154e29f5541b4aba6b00@eucas1p1.samsung.com>
- <2734003.UHSMxVLybj@amdc3058>
-Message-ID: <20180501144516.GA519@rob-hp-laptop>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 1 May 2018 20:15:19 +0530
+Subject: =?UTF-8?Q?Re:_[PATCH_v9_00/27]_ARM:_davinci:_convert_to_common_cloc?=
+ =?UTF-8?Q?k_framework=e2=80=8b?=
+In-Reply-To: <20180427001745.4116-1-david@lechnology.com>
+References: <20180427001745.4116-1-david@lechnology.com>
+Message-ID: <1ea1b841-24da-e74a-50a8-98b0793e61a5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 01:21:12PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> From: Krzysztof Kozlowski <krzk@kernel.org>
-> Subject: [PATCH] thermal: samsung: Remove support for Exynos5440
+On Friday 27 April 2018 05:47 AM, David Lechner wrote:
+> This series converts mach-davinci to use the common clock framework.
 > 
-> The Exynos5440 is not actively developed, there are no development
-> boards available and probably there are no real products with it.
-> Remove wide-tree support for Exynos5440.
+> The series works like this, the first 3 patches fix some issues with the clock
+> drivers that have already been accepted into the mainline kernel.
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> [b.zolnierkie: ported over driver changes]
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
-> Eduardo, here is a version which applies on top of pending Exynos
-> thermal changes (https://lkml.org/lkml/2018/4/16/256).
+> Then, starting with "ARM: davinci: pass clock as parameter to
+> davinci_timer_init()", we get the mach code ready for the switch by adding the
+> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
+> around the legacy clocks so that we can switch easily between the old and the
+> new.
 > 
->  Documentation/devicetree/bindings/thermal/exynos-thermal.txt |   14 
->  drivers/thermal/samsung/exynos_tmu.c                         |  161 -----------
->  2 files changed, 4 insertions(+), 171 deletions(-)
+> "ARM: davinci: switch to common clock framework" actually flips the switch
+> to start using the new clock drivers. Then the next 8 patches remove all
+> of the old clock code.
+> 
+> The final four patches add device tree clock support to the one SoC that
+> supports it.
+> 
+> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
+> board file).
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+I have reviewed this series and looks good to me except some comments I
+gave and some issues you have identified yourself in patches 25 and 26.
+
+I think this is a good compromise to achieve platform device based
+clocks as far as possible with current kernel framework. I know Bartosz
+is working on solving the problem generically and I guess once thats
+agreed upon, DaVinci can convert too.
+
+But I think this series has been in the works for far too long and
+should be merged (the remoteproc dependencies that Bartosz pointed out
+should be resolved too). You can wait for clock maintainers opinion
+though before spinning another version.
+
+I have not tested this series yet, will do so soon.
+
+Thanks,
+Sekhar
+
+PS: I started giving a Reviewed-by: for the mach-davinci patches before
+realizing the futility of doing so and stopped mid-way. They will have
+my sign-off anyway once I test and merge them.
