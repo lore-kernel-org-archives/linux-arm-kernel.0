@@ -1,25 +1,22 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 1 May 2018 19:39:56 +0530
-Subject: [PATCH v9 04/27] ARM: davinci: pass clock as parameter to
- davinci_timer_init()
-In-Reply-To: <20180427001745.4116-5-david@lechnology.com>
+Date: Tue, 1 May 2018 19:43:55 +0530
+Subject: [PATCH v9 05/27] ARM: davinci: da830: add new clock init using
+ common clock framework
+In-Reply-To: <20180427001745.4116-6-david@lechnology.com>
 References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-5-david@lechnology.com>
-Message-ID: <29a9a03c-93f5-dddf-2a6e-da7fd83e0c4f@ti.com>
+ <20180427001745.4116-6-david@lechnology.com>
+Message-ID: <0e0aac5a-70b5-e90a-2ae4-7209003da922@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 27 April 2018 05:47 AM, David Lechner wrote:
-> This changes davinci_timer_init() so that we pass the clock as a
-> parameter instead of using clk_get(). This is done in preparation
-> for converting to the common clock framework.
+> This adds the new board-specific clock init in mach-davinci/da830.c
+> using the new common clock framework drivers.
 > 
-> It removes the requirement that we have to have a clock with con_id
-> of "timer0", which will be good for DT bindings since clock-names =
-> "timer0" doesn't really make sense.
+> The #ifdefs are needed to prevent compile errors until the entire
+> ARCH_DAVINCI is converted.
 > 
-> Also, drop use of extern in header file since we are touching the
-> definition.
+> Also clean up the #includes since we are adding some here.
 > 
 > Signed-off-by: David Lechner <david@lechnology.com>
 
