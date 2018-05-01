@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue,  1 May 2018 22:07:53 +0100 (BST)
-Subject: Applied "ASoC: cirrus: i2s: Fix LRCLK configuration" to the asoc tree
-In-Reply-To: <20180428205142.31921-2-alexander.sverdlin@gmail.com>
-Message-ID: <20180501210753.DB47444007A@finisterre.ee.mobilebroadband>
+Date: Tue,  1 May 2018 22:08:36 +0100 (BST)
+Subject: Applied "ASoC: mediatek: add the .probe() callback in
+ mt2701_afe_pcm_dai_component" to the asoc tree
+In-Reply-To: <2bcfa1a389ff00a00204c2ddf3a94882195fd19d.1525090110.git.ryder.lee@mediatek.com>
+Message-ID: <20180501210836.ED3D144007A@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: cirrus: i2s: Fix LRCLK configuration
+   ASoC: mediatek: add the .probe() callback in mt2701_afe_pcm_dai_component
 
 has been applied to the asoc tree at
 
@@ -33,85 +34,81 @@ to this mail.
 Thanks,
 Mark
 
->From 2d534113be9a2aa532a1ae127a57e83558aed358 Mon Sep 17 00:00:00 2001
-From: Alexander Sverdlin <alexander.sverdlin@gmail.com>
-Date: Sat, 28 Apr 2018 22:51:38 +0200
-Subject: [PATCH] ASoC: cirrus: i2s: Fix LRCLK configuration
+>From 10abdc7c149a058c74be803f33c9ffb1080ad07e Mon Sep 17 00:00:00 2001
+From: Ryder Lee <ryder.lee@mediatek.com>
+Date: Mon, 30 Apr 2018 20:15:31 +0800
+Subject: [PATCH] ASoC: mediatek: add the .probe() callback in
+ mt2701_afe_pcm_dai_component
 
-The bit responsible for LRCLK polarity is i2s_tlrs (0), not i2s_trel (2)
-(refer to "EP93xx User's Guide").
+For the sake of uniformity, this patch adds a callback mt2701_afe_pcm_probe()
+in mt2701_afe_pcm_dai_component to retrieve the regmap - the canonical way to
+obtain the pointer..
 
-Previously card drivers which specified SND_SOC_DAIFMT_NB_IF actually got
-SND_SOC_DAIFMT_NB_NF, an adaptation is necessary to retain the old
-behavior.
+Doing so, we could switch to use devm_snd_soc_register_component() to register
+the component driver.
 
-Signed-off-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
-Cc: stable at vger.kernel.org
 ---
- sound/soc/cirrus/edb93xx.c     | 2 +-
- sound/soc/cirrus/ep93xx-i2s.c  | 8 ++++----
- sound/soc/cirrus/snappercl15.c | 2 +-
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 31 ++++++++++------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
 
-diff --git a/sound/soc/cirrus/edb93xx.c b/sound/soc/cirrus/edb93xx.c
-index c53bd6f2c2d7..3d011abaa266 100644
---- a/sound/soc/cirrus/edb93xx.c
-+++ b/sound/soc/cirrus/edb93xx.c
-@@ -67,7 +67,7 @@ static struct snd_soc_dai_link edb93xx_dai = {
- 	.cpu_dai_name	= "ep93xx-i2s",
- 	.codec_name	= "spi0.0",
- 	.codec_dai_name	= "cs4271-hifi",
--	.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_IF |
-+	.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			  SND_SOC_DAIFMT_CBS_CFS,
- 	.ops		= &edb93xx_ops,
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+index d6eeb4c36fcc..828d11c30c6a 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+@@ -958,7 +958,17 @@ static const struct snd_soc_dapm_route mt2701_afe_pcm_routes[] = {
+ 	{ "O31", "I35 Switch", "I35" },
  };
-diff --git a/sound/soc/cirrus/ep93xx-i2s.c b/sound/soc/cirrus/ep93xx-i2s.c
-index 934f8aefdd90..38c240c97041 100644
---- a/sound/soc/cirrus/ep93xx-i2s.c
-+++ b/sound/soc/cirrus/ep93xx-i2s.c
-@@ -213,24 +213,24 @@ static int ep93xx_i2s_set_dai_fmt(struct snd_soc_dai *cpu_dai,
- 	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
- 	case SND_SOC_DAIFMT_NB_NF:
- 		/* Negative bit clock, lrclk low on left word */
--		clk_cfg &= ~(EP93XX_I2S_CLKCFG_CKP | EP93XX_I2S_CLKCFG_REL);
-+		clk_cfg &= ~(EP93XX_I2S_CLKCFG_CKP | EP93XX_I2S_CLKCFG_LRS);
- 		break;
  
- 	case SND_SOC_DAIFMT_NB_IF:
- 		/* Negative bit clock, lrclk low on right word */
- 		clk_cfg &= ~EP93XX_I2S_CLKCFG_CKP;
--		clk_cfg |= EP93XX_I2S_CLKCFG_REL;
-+		clk_cfg |= EP93XX_I2S_CLKCFG_LRS;
- 		break;
++static int mt2701_afe_pcm_probe(struct snd_soc_component *component)
++{
++	struct mtk_base_afe *afe = snd_soc_component_get_drvdata(component);
++
++	snd_soc_component_init_regmap(component, afe->regmap);
++
++	return 0;
++}
++
+ static const struct snd_soc_component_driver mt2701_afe_pcm_dai_component = {
++	.probe = mt2701_afe_pcm_probe,
+ 	.name = "mt2701-afe-pcm-dai",
+ 	.dapm_widgets = mt2701_afe_pcm_widgets,
+ 	.num_dapm_widgets = ARRAY_SIZE(mt2701_afe_pcm_widgets),
+@@ -1316,22 +1326,6 @@ static int mt2701_afe_runtime_resume(struct device *dev)
+ 	return mt2701_afe_enable_clock(afe);
+ }
  
- 	case SND_SOC_DAIFMT_IB_NF:
- 		/* Positive bit clock, lrclk low on left word */
- 		clk_cfg |= EP93XX_I2S_CLKCFG_CKP;
--		clk_cfg &= ~EP93XX_I2S_CLKCFG_REL;
-+		clk_cfg &= ~EP93XX_I2S_CLKCFG_LRS;
- 		break;
- 
- 	case SND_SOC_DAIFMT_IB_IF:
- 		/* Positive bit clock, lrclk low on right word */
--		clk_cfg |= EP93XX_I2S_CLKCFG_CKP | EP93XX_I2S_CLKCFG_REL;
-+		clk_cfg |= EP93XX_I2S_CLKCFG_CKP | EP93XX_I2S_CLKCFG_LRS;
- 		break;
+-static int mt2701_afe_add_component(struct mtk_base_afe *afe)
+-{
+-	struct snd_soc_component *component;
+-
+-	component = kzalloc(sizeof(*component), GFP_KERNEL);
+-	if (!component)
+-		return -ENOMEM;
+-
+-	component->regmap = afe->regmap;
+-
+-	return snd_soc_add_component(afe->dev, component,
+-				     &mt2701_afe_pcm_dai_component,
+-				     mt2701_afe_pcm_dais,
+-				     ARRAY_SIZE(mt2701_afe_pcm_dais));
+-}
+-
+ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ {
+ 	struct mtk_base_afe *afe;
+@@ -1442,7 +1436,10 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
+ 		goto err_platform;
  	}
  
-diff --git a/sound/soc/cirrus/snappercl15.c b/sound/soc/cirrus/snappercl15.c
-index 2334ec19e7eb..11ff7b2672b2 100644
---- a/sound/soc/cirrus/snappercl15.c
-+++ b/sound/soc/cirrus/snappercl15.c
-@@ -72,7 +72,7 @@ static struct snd_soc_dai_link snappercl15_dai = {
- 	.codec_dai_name	= "tlv320aic23-hifi",
- 	.codec_name	= "tlv320aic23-codec.0-001a",
- 	.platform_name	= "ep93xx-i2s",
--	.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_IF |
-+	.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			  SND_SOC_DAIFMT_CBS_CFS,
- 	.ops		= &snappercl15_ops,
- };
+-	ret = mt2701_afe_add_component(afe);
++	ret = devm_snd_soc_register_component(&pdev->dev,
++					 &mt2701_afe_pcm_dai_component,
++					 mt2701_afe_pcm_dais,
++					 ARRAY_SIZE(mt2701_afe_pcm_dais));
+ 	if (ret) {
+ 		dev_warn(dev, "err_dai_component\n");
+ 		goto err_platform;
 -- 
 2.17.0
