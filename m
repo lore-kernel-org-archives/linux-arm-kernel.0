@@ -1,114 +1,111 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue,  1 May 2018 22:08:36 +0100 (BST)
-Subject: Applied "ASoC: mediatek: add the .probe() callback in
- mt2701_afe_pcm_dai_component" to the asoc tree
-In-Reply-To: <2bcfa1a389ff00a00204c2ddf3a94882195fd19d.1525090110.git.ryder.lee@mediatek.com>
-Message-ID: <20180501210836.ED3D144007A@finisterre.ee.mobilebroadband>
+From: robh@kernel.org (Rob Herring)
+Date: Tue,  1 May 2018 16:31:14 -0500
+Subject: [RFC PATCH] driver core: make deferring probe forever optional
+Message-ID: <20180501213114.20183-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Deferred probe will currently wait forever on dependent devices to probe,
+but sometimes a driver will never exist. It's also not always critical for
+a driver to exist. Platforms can rely on default configuration from the
+bootloader or reset defaults for things such as pinctrl and power domains.
+This is often the case with initial platform support until various drivers
+get enabled. There's at least 2 scenarios where deferred probe can render
+a platform broken. Both involve using a DT which has more devices and
+dependencies than the kernel supports. The 1st case is a driver may be
+disabled in the kernel config. The 2nd case is the kernel version may
+simply not have the dependent driver. This can happen if using a newer DT
+(provided by firmware perhaps) with a stable kernel version.
 
-   ASoC: mediatek: add the .probe() callback in mt2701_afe_pcm_dai_component
+Unfortunately, this change breaks with modules as we have no way of
+knowing when modules are done loading. One possibility is to make this
+opt in or out based on compatible strings rather than at a subsystem level.
+Ideally this information could be extracted automatically somehow. OTOH,
+maybe the lists are pretty small. There's only a handful of subsystems
+that can be optional, and then only so many drivers in those that can be
+modules (at least for pinctrl, many drivers are built-in only).
 
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 10abdc7c149a058c74be803f33c9ffb1080ad07e Mon Sep 17 00:00:00 2001
-From: Ryder Lee <ryder.lee@mediatek.com>
-Date: Mon, 30 Apr 2018 20:15:31 +0800
-Subject: [PATCH] ASoC: mediatek: add the .probe() callback in
- mt2701_afe_pcm_dai_component
-
-For the sake of uniformity, this patch adds a callback mt2701_afe_pcm_probe()
-in mt2701_afe_pcm_dai_component to retrieve the regmap - the canonical way to
-obtain the pointer..
-
-Doing so, we could switch to use devm_snd_soc_register_component() to register
-the component driver.
-
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Cc: Alexander Graf <agraf@suse.de>
+Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 31 ++++++++++------------
- 1 file changed, 14 insertions(+), 17 deletions(-)
+This patch came out of a discussion on the ARM boot-architecture 
+list[1] about DT forwards and backwards compatibility issues. There are 
+issues with newer DTs breaking on older, stable kernels. Some of these 
+are difficult to solve, but cases of optional devices not having 
+kernel support should be solvable.
 
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-index d6eeb4c36fcc..828d11c30c6a 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-@@ -958,7 +958,17 @@ static const struct snd_soc_dapm_route mt2701_afe_pcm_routes[] = {
- 	{ "O31", "I35 Switch", "I35" },
- };
- 
-+static int mt2701_afe_pcm_probe(struct snd_soc_component *component)
-+{
-+	struct mtk_base_afe *afe = snd_soc_component_get_drvdata(component);
-+
-+	snd_soc_component_init_regmap(component, afe->regmap);
-+
-+	return 0;
-+}
-+
- static const struct snd_soc_component_driver mt2701_afe_pcm_dai_component = {
-+	.probe = mt2701_afe_pcm_probe,
- 	.name = "mt2701-afe-pcm-dai",
- 	.dapm_widgets = mt2701_afe_pcm_widgets,
- 	.num_dapm_widgets = ARRAY_SIZE(mt2701_afe_pcm_widgets),
-@@ -1316,22 +1326,6 @@ static int mt2701_afe_runtime_resume(struct device *dev)
- 	return mt2701_afe_enable_clock(afe);
+I tested this on a RPi3 B with the pinctrl driver forced off. With this 
+change, the MMC/SD and UART drivers can function without the pinctrl 
+driver.
+
+Rob
+
+[1] https://lists.linaro.org/pipermail/boot-architecture/2018-April/000466.html
+
+ drivers/base/dd.c            | 16 ++++++++++++++++
+ drivers/pinctrl/devicetree.c |  2 +-
+ include/linux/device.h       |  2 ++
+ 3 files changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index c9f54089429b..5848808b9d7a 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -226,6 +226,15 @@ void device_unblock_probing(void)
+ 	driver_deferred_probe_trigger();
  }
  
--static int mt2701_afe_add_component(struct mtk_base_afe *afe)
--{
--	struct snd_soc_component *component;
--
--	component = kzalloc(sizeof(*component), GFP_KERNEL);
--	if (!component)
--		return -ENOMEM;
--
--	component->regmap = afe->regmap;
--
--	return snd_soc_add_component(afe->dev, component,
--				     &mt2701_afe_pcm_dai_component,
--				     mt2701_afe_pcm_dais,
--				     ARRAY_SIZE(mt2701_afe_pcm_dais));
--}
--
- static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- {
- 	struct mtk_base_afe *afe;
-@@ -1442,7 +1436,10 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 		goto err_platform;
- 	}
++
++int driver_deferred_probe_optional(void)
++{
++	if (initcalls_done)
++		return -ENODEV;
++
++	return -EPROBE_DEFER;
++}
++
+ /**
+  * deferred_probe_initcall() - Enable probing of deferred devices
+  *
+@@ -240,6 +249,13 @@ static int deferred_probe_initcall(void)
+ 	/* Sort as many dependencies as possible before exiting initcalls */
+ 	flush_work(&deferred_probe_work);
+ 	initcalls_done = true;
++
++	/*
++	 * Trigger deferred probe again, this time we won't defer anything
++	 * that is optional
++	 */
++	driver_deferred_probe_trigger();
++	flush_work(&deferred_probe_work);
+ 	return 0;
+ }
+ late_initcall(deferred_probe_initcall);
+diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+index b601039d6c69..096e52a5c506 100644
+--- a/drivers/pinctrl/devicetree.c
++++ b/drivers/pinctrl/devicetree.c
+@@ -120,7 +120,7 @@ static int dt_to_map_one_config(struct pinctrl *p,
+ 				np_config);
+ 			of_node_put(np_pctldev);
+ 			/* OK let's just assume this will appear later then */
+-			return -EPROBE_DEFER;
++			return driver_deferred_probe_optional();
+ 		}
+ 		/* If we're creating a hog we can use the passed pctldev */
+ 		if (pctldev && (np_pctldev == p->dev->of_node))
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 0059b99e1f25..8de920442bc1 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -332,6 +332,8 @@ struct device *driver_find_device(struct device_driver *drv,
+ 				  struct device *start, void *data,
+ 				  int (*match)(struct device *dev, void *data));
  
--	ret = mt2701_afe_add_component(afe);
-+	ret = devm_snd_soc_register_component(&pdev->dev,
-+					 &mt2701_afe_pcm_dai_component,
-+					 mt2701_afe_pcm_dais,
-+					 ARRAY_SIZE(mt2701_afe_pcm_dais));
- 	if (ret) {
- 		dev_warn(dev, "err_dai_component\n");
- 		goto err_platform;
++int driver_deferred_probe_optional(void);
++
+ /**
+  * struct subsys_interface - interfaces to device functions
+  * @name:       name of the device function
 -- 
 2.17.0
