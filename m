@@ -1,303 +1,400 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue,  1 May 2018 13:08:10 +0100
-Subject: [PATCH v7 14/24] ASoC: qdsp6: q6asm: Add q6asm driver
+Date: Tue,  1 May 2018 13:08:08 +0100
+Subject: [PATCH v7 12/24] ASoC: qdsp6: q6afe: Add support to MI2S sysclks
 In-Reply-To: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
 References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180501120820.11016-15-srinivas.kandagatla@linaro.org>
+Message-ID: <20180501120820.11016-13-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic support to Q6 ASM (Audio Stream Manager) module on
-Q6DSP. ASM supports up to 8 concurrent streams. each stream can be setup
-as playback/capture. ASM provides top control functions like
-Pause/flush/resume for playback and record. ASM can Create/destroy encoder,
-decoder and also provides POPP dynamic services.
-
-This patch adds support to basic features to allow hdmi playback.
+This patch adds support to LPASS Bit clock, LPASS Digital
+core clock and OSR clock. These clocks are required for both
+MI2S and PCM setup.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 ---
- sound/soc/qcom/Kconfig        |   4 +
- sound/soc/qcom/qdsp6/Makefile |   1 +
- sound/soc/qcom/qdsp6/q6asm.c  | 215 ++++++++++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6asm.h  |  15 +++
- 4 files changed, 235 insertions(+)
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.c
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.h
+ sound/soc/qcom/qdsp6/q6afe.c | 171 +++++++++++++++++++++++++++++++++++++++++--
+ sound/soc/qcom/qdsp6/q6afe.h | 131 +++++++++++++++++++++++++++++++++
+ 2 files changed, 295 insertions(+), 7 deletions(-)
 
-diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 971127edbc23..941774abd94f 100644
---- a/sound/soc/qcom/Kconfig
-+++ b/sound/soc/qcom/Kconfig
-@@ -53,6 +53,9 @@ config SND_SOC_QDSP6_AFE
- config SND_SOC_QDSP6_ADM
- 	tristate
+diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
+index ceb18aaa5af4..c2af806fbb93 100644
+--- a/sound/soc/qcom/qdsp6/q6afe.c
++++ b/sound/soc/qcom/qdsp6/q6afe.c
+@@ -33,6 +33,9 @@
  
-+config SND_SOC_QDSP6_ASM
-+	tristate
+ #define AFE_PARAM_ID_CDC_SLIMBUS_SLAVE_CFG 0x00010235
+ 
++#define AFE_PARAM_ID_LPAIF_CLK_CONFIG	0x00010238
++#define AFE_PARAM_ID_INT_DIGITAL_CDC_CLK_CONFIG	0x00010239
 +
- config SND_SOC_QDSP6
- 	tristate "SoC ALSA audio driver for QDSP6"
- 	depends on QCOM_APR && HAS_DMA
-@@ -60,6 +63,7 @@ config SND_SOC_QDSP6
- 	select SND_SOC_QDSP6_CORE
- 	select SND_SOC_QDSP6_AFE
- 	select SND_SOC_QDSP6_ADM
-+	select SND_SOC_QDSP6_ASM
- 	help
- 	 To add support for MSM QDSP6 Soc Audio.
- 	 This will enable sound soc platform specific
-diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-index 95cdb3a12694..01d9dcf3375c 100644
---- a/sound/soc/qcom/qdsp6/Makefile
-+++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -2,3 +2,4 @@ obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
- obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
- obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
- obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
-+obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
-diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
-new file mode 100644
-index 000000000000..c9526d2e59d2
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6asm.c
-@@ -0,0 +1,215 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
-+// Copyright (c) 2018, Linaro Limited
+ #define AFE_PARAM_ID_SLIMBUS_CONFIG    0x00010212
+ #define AFE_PARAM_ID_I2S_CONFIG	0x0001020D
+ 
+@@ -66,6 +69,11 @@
+ #define AFE_PORT_ID_MULTICHAN_HDMI_RX	0x100E
+ 
+ #define AFE_API_VERSION_SLIMBUS_CONFIG 0x1
++/* Clock set API version */
++#define AFE_API_VERSION_CLOCK_SET 1
++#define Q6AFE_LPASS_CLK_CONFIG_API_VERSION	0x1
++#define AFE_MODULE_CLOCK_SET		0x0001028F
++#define AFE_PARAM_ID_CLOCK_SET		0x00010290
+ 
+ /* SLIMbus Rx port on channel 0. */
+ #define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX      0x4000
+@@ -142,6 +150,13 @@ struct afe_port_param_data_v2 {
+ 	u16 reserved;
+ } __packed;
+ 
++struct afe_svc_cmd_set_param {
++	uint32_t payload_size;
++	uint32_t payload_address_lsw;
++	uint32_t payload_address_msw;
++	uint32_t mem_map_handle;
++} __packed;
 +
-+#include <linux/mutex.h>
-+#include <linux/wait.h>
-+#include <linux/module.h>
-+#include <linux/soc/qcom/apr.h>
-+#include <linux/device.h>
-+#include <linux/of_platform.h>
-+#include <linux/spinlock.h>
-+#include <linux/of.h>
-+#include <linux/delay.h>
-+#include <linux/slab.h>
-+#include <linux/mm.h>
-+#include "q6asm.h"
-+#include "q6core.h"
-+#include "q6dsp-errno.h"
-+#include "q6dsp-common.h"
+ struct afe_port_cmd_set_param_v2 {
+ 	u16 port_id;
+ 	u16 payload_size;
+@@ -202,6 +217,23 @@ struct afe_param_id_slimbus_cfg {
+  */
+ } __packed;
+ 
++struct afe_clk_cfg {
++	u32                  i2s_cfg_minor_version;
++	u32                  clk_val1;
++	u32                  clk_val2;
++	u16                  clk_src;
++	u16                  clk_root;
++	u16                  clk_set_mode;
++	u16                  reserved;
++} __packed;
 +
-+#define ASM_SYNC_IO_MODE		0x0001
-+#define ASM_ASYNC_IO_MODE		0x0002
-+#define ASM_TUN_READ_IO_MODE		0x0004	/* tunnel read write mode */
-+#define ASM_TUN_WRITE_IO_MODE		0x0008	/* tunnel read write mode */
++struct afe_digital_clk_cfg {
++	u32                  i2s_cfg_minor_version;
++	u32                  clk_val;
++	u16                  clk_root;
++	u16                  reserved;
++} __packed;
 +
-+struct audio_client {
-+	int session;
-+	q6asm_cb cb;
-+	void *priv;
-+	uint32_t io_mode;
-+	struct apr_device *adev;
-+	struct mutex lock;
-+	spinlock_t buf_lock;
-+	wait_queue_head_t cmd_wait;
-+	struct aprv2_ibasic_rsp_result_t result;
-+	int perf_mode;
-+	int stream_id;
-+	struct device *dev;
+ struct afe_param_id_i2s_cfg {
+ 	u32	i2s_cfg_minor_version;
+ 	u16	bit_width;
+@@ -219,6 +251,16 @@ union afe_port_config {
+ 	struct afe_param_id_i2s_cfg	i2s_cfg;
+ } __packed;
+ 
++
++struct afe_clk_set {
++	uint32_t clk_set_minor_version;
++	uint32_t clk_id;
++	uint32_t clk_freq_in_hz;
++	uint16_t clk_attri;
++	uint16_t clk_root;
++	uint32_t enable;
 +};
 +
-+struct q6asm {
-+	struct apr_device *adev;
-+	struct device *dev;
-+	struct q6core_svc_api_info ainfo;
-+	wait_queue_head_t mem_wait;
-+	struct platform_device *pcmdev;
-+	struct audio_client *session[MAX_SESSIONS + 1];
-+	struct platform_device *pdev_dais;
-+};
-+
-+/**
-+ * q6asm_audio_client_free() - Freee allocated audio client
-+ *
-+ * @ac: audio client to free
-+ */
-+void q6asm_audio_client_free(struct audio_client *ac)
+ struct q6afe_port {
+ 	wait_queue_head_t wait;
+ 	union afe_port_config port_cfg;
+@@ -230,13 +272,6 @@ struct q6afe_port {
+ 	struct list_head	node;
+ };
+ 
+-struct afe_audioif_config_command {
+-	struct apr_hdr hdr;
+-	struct afe_port_cmd_set_param_v2 param;
+-	struct afe_port_param_data_v2 pdata;
+-	union afe_port_config pcfg;
+-} __packed;
+-
+ struct afe_port_map {
+ 	int port_id;
+ 	int token;
+@@ -394,6 +429,54 @@ static int afe_apr_send_pkt(struct q6afe *afe, struct apr_pkt *pkt,
+ 	return ret;
+ }
+ 
++static int q6afe_port_set_param(struct q6afe_port *port, void *data,
++				int param_id, int module_id, int psize)
 +{
-+	struct q6asm *a = dev_get_drvdata(ac->dev->parent);
++	struct afe_svc_cmd_set_param *param;
++	struct afe_port_param_data_v2 *pdata;
++	struct q6afe *afe = port->afe;
++	struct apr_pkt *pkt;
++	u16 port_id = port->id;
++	int ret, pkt_size;
++	void *p, *pl;
 +
-+	a->session[ac->session] = NULL;
-+	kfree(ac);
-+}
-+EXPORT_SYMBOL_GPL(q6asm_audio_client_free);
-+
-+static struct audio_client *q6asm_get_audio_client(struct q6asm *a,
-+						   int session_id)
-+{
-+	if ((session_id <= 0) || (session_id > MAX_SESSIONS)) {
-+		dev_err(a->dev, "invalid session: %d\n", session_id);
-+		return NULL;
-+	}
-+
-+	if (!a->session[session_id]) {
-+		dev_err(a->dev, "session not active: %d\n", session_id);
-+		return NULL;
-+	}
-+
-+	return a->session[session_id];
-+}
-+
-+static int q6asm_srvc_callback(struct apr_device *adev,
-+			       struct apr_resp_pkt *data)
-+{
-+	struct aprv2_ibasic_rsp_result_t *result;
-+	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
-+	struct audio_client *ac = NULL;
-+	struct apr_hdr *hdr = &data->hdr;
-+	uint32_t sid = 0;
-+
-+	result = data->payload;
-+	sid = (hdr->token >> 8) & 0x0F;
-+	ac = q6asm_get_audio_client(q6asm, sid);
-+	if (!ac) {
-+		dev_err(&adev->dev, "Audio Client not active\n");
-+		return 0;
-+	}
-+
-+	if (ac->cb)
-+		ac->cb(hdr->opcode, hdr->token, data->payload, ac->priv);
-+
-+	return 0;
-+}
-+
-+/**
-+ * q6asm_get_session_id() - get session id for audio client
-+ *
-+ * @ac: audio client pointer
-+ *
-+ * Return: Will be an session id of the audio client.
-+ */
-+int q6asm_get_session_id(struct audio_client *c)
-+{
-+	return c->session;
-+}
-+EXPORT_SYMBOL_GPL(q6asm_get_session_id);
-+
-+/**
-+ * q6asm_audio_client_alloc() - Allocate a new audio client
-+ *
-+ * @dev: Pointer to asm child device.
-+ * @cb: event callback.
-+ * @priv: private data associated with this client.
-+ *
-+ * Return: Will be an error pointer on error or a valid audio client
-+ * on success.
-+ */
-+struct audio_client *q6asm_audio_client_alloc(struct device *dev, q6asm_cb cb,
-+					      void *priv, int stream_id,
-+					      int perf_mode)
-+{
-+	struct q6asm *a = dev_get_drvdata(dev->parent);
-+	struct audio_client *ac;
-+
-+	if (stream_id + 1 > MAX_SESSIONS)
-+		return ERR_PTR(-EINVAL);
-+
-+	ac = kzalloc(sizeof(*ac), GFP_KERNEL);
-+	if (!ac)
-+		return ERR_PTR(-ENOMEM);
-+
-+	a->session[stream_id + 1] = ac;
-+	ac->session = stream_id + 1;
-+	ac->cb = cb;
-+	ac->dev = dev;
-+	ac->priv = priv;
-+	ac->io_mode = ASM_SYNC_IO_MODE;
-+	ac->perf_mode = perf_mode;
-+	/* DSP expects stream id from 1 */
-+	ac->stream_id = 1;
-+	ac->adev = a->adev;
-+
-+	init_waitqueue_head(&ac->cmd_wait);
-+	mutex_init(&ac->lock);
-+	spin_lock_init(&ac->buf_lock);
-+
-+	return ac;
-+}
-+EXPORT_SYMBOL_GPL(q6asm_audio_client_alloc);
-+
-+
-+static int q6asm_probe(struct apr_device *adev)
-+{
-+	struct device *dev = &adev->dev;
-+	struct device_node *dais_np;
-+	struct q6asm *q6asm;
-+
-+	q6asm = devm_kzalloc(dev, sizeof(*q6asm), GFP_KERNEL);
-+	if (!q6asm)
++	pkt_size = APR_HDR_SIZE + sizeof(*param) + sizeof(*pdata) + psize;
++	p = kzalloc(pkt_size, GFP_KERNEL);
++	if (!p)
 +		return -ENOMEM;
 +
-+	q6core_get_svc_api_info(adev->svc_id, &q6asm->ainfo);
++	pkt = p;
++	param = p + APR_HDR_SIZE;
++	pdata = p + APR_HDR_SIZE + sizeof(*param);
++	pl = p + APR_HDR_SIZE + sizeof(*param) + sizeof(*pdata);
++	memcpy(pl, data, psize);
 +
-+	q6asm->dev = dev;
-+	q6asm->adev = adev;
-+	init_waitqueue_head(&q6asm->mem_wait);
-+	dev_set_drvdata(dev, q6asm);
++	pkt->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
++					   APR_HDR_LEN(APR_HDR_SIZE),
++					   APR_PKT_VER);
++	pkt->hdr.pkt_size = pkt_size;
++	pkt->hdr.src_port = 0;
++	pkt->hdr.dest_port = 0;
++	pkt->hdr.token = port->token;
++	pkt->hdr.opcode = AFE_SVC_CMD_SET_PARAM;
 +
-+	dais_np = of_get_child_by_name(dev->of_node, "dais");
-+	if (dais_np) {
-+		q6asm->pdev_dais = of_platform_device_create(dais_np,
-+							   "q6asm-dai", dev);
-+		of_node_put(dais_np);
++	param->payload_size = sizeof(*pdata) + psize;
++	param->payload_address_lsw = 0x00;
++	param->payload_address_msw = 0x00;
++	param->mem_map_handle = 0x00;
++	pdata->module_id = module_id;
++	pdata->param_id = param_id;
++	pdata->param_size = psize;
++
++	ret = afe_apr_send_pkt(afe, pkt, port);
++	if (ret)
++		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
++		       port_id, ret);
++
++	kfree(pkt);
++	return ret;
++}
++
+ static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
+ 				   int param_id, int psize)
+ {
+@@ -443,6 +526,80 @@ static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
+ 	return ret;
+ }
+ 
++static int q6afe_set_lpass_clock(struct q6afe_port *port,
++				 struct afe_clk_cfg *cfg)
++{
++	return q6afe_port_set_param_v2(port, cfg,
++				       AFE_PARAM_ID_LPAIF_CLK_CONFIG,
++				       sizeof(*cfg));
++}
++
++static int q6afe_set_lpass_clock_v2(struct q6afe_port *port,
++				 struct afe_clk_set *cfg)
++{
++	return q6afe_port_set_param(port, cfg, AFE_PARAM_ID_CLOCK_SET,
++				    AFE_MODULE_CLOCK_SET, sizeof(*cfg));
++}
++
++static int q6afe_set_digital_codec_core_clock(struct q6afe_port *port,
++					      struct afe_digital_clk_cfg *cfg)
++{
++	return q6afe_port_set_param_v2(port, cfg,
++				       AFE_PARAM_ID_INT_DIGITAL_CDC_CLK_CONFIG,
++				       sizeof(*cfg));
++}
++
++int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
++			  int clk_src, int clk_root,
++			  unsigned int freq, int dir)
++{
++	struct afe_clk_cfg ccfg = {0,};
++	struct afe_clk_set cset = {0,};
++	struct afe_digital_clk_cfg dcfg = {0,};
++	int ret;
++
++	switch (clk_id) {
++	case LPAIF_DIG_CLK:
++		dcfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
++		dcfg.clk_val = freq;
++		dcfg.clk_root = clk_root;
++		ret = q6afe_set_digital_codec_core_clock(port, &dcfg);
++		break;
++	case LPAIF_BIT_CLK:
++		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
++		ccfg.clk_val1 = freq;
++		ccfg.clk_src = clk_src;
++		ccfg.clk_root = clk_root;
++		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK1_VALID;
++		ret = q6afe_set_lpass_clock(port, &ccfg);
++		break;
++
++	case LPAIF_OSR_CLK:
++		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
++		ccfg.clk_val2 = freq;
++		ccfg.clk_src = clk_src;
++		ccfg.clk_root = clk_root;
++		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK2_VALID;
++		ret = q6afe_set_lpass_clock(port, &ccfg);
++		break;
++	case Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT ... Q6AFE_LPASS_CLK_ID_INT_MCLK_1:
++		cset.clk_set_minor_version = AFE_API_VERSION_CLOCK_SET;
++		cset.clk_id = clk_id;
++		cset.clk_freq_in_hz = freq;
++		cset.clk_attri = clk_src;
++		cset.clk_root = clk_root;
++		cset.enable = !!freq;
++		ret = q6afe_set_lpass_clock_v2(port, &cset);
++		break;
++	default:
++		ret = -EINVAL;
++		break;
 +	}
 +
-+	return 0;
++	return ret;
 +}
++EXPORT_SYMBOL_GPL(q6afe_port_set_sysclk);
 +
-+static int q6asm_remove(struct apr_device *adev)
-+{
-+	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
+ /**
+  * q6afe_port_stop() - Stop a afe port
+  *
+diff --git a/sound/soc/qcom/qdsp6/q6afe.h b/sound/soc/qcom/qdsp6/q6afe.h
+index 3cb3bb4985a9..5ca54a9bdfd5 100644
+--- a/sound/soc/qcom/qdsp6/q6afe.h
++++ b/sound/soc/qcom/qdsp6/q6afe.h
+@@ -16,6 +16,134 @@
+ #define AFE_MAX_CHAN_COUNT	8
+ #define AFE_PORT_MAX_AUDIO_CHAN_CNT	0x8
+ 
++#define Q6AFE_LPASS_CLK_SRC_INTERNAL 1
++#define Q6AFE_LPASS_CLK_ROOT_DEFAULT 0
 +
-+	if (q6asm->pdev_dais)
-+		of_platform_device_destroy(&q6asm->pdev_dais->dev, NULL);
++#define LPAIF_DIG_CLK	1
++#define LPAIF_BIT_CLK	2
++#define LPAIF_OSR_CLK	3
 +
-+	return 0;
-+}
-+static const struct of_device_id q6asm_device_id[]  = {
-+	{ .compatible = "qcom,q6asm" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, q6asm_device_id);
++/* Clock ID for Primary I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT                          0x100
++/* Clock ID for Primary I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_MI2S_EBIT                          0x101
++/* Clock ID for Secondary I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_MI2S_IBIT                          0x102
++/* Clock ID for Secondary I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_MI2S_EBIT                          0x103
++/* Clock ID for Tertiary I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_MI2S_IBIT                          0x104
++/* Clock ID for Tertiary I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_MI2S_EBIT                          0x105
++/* Clock ID for Quartnery I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_MI2S_IBIT                         0x106
++/* Clock ID for Quartnery I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_MI2S_EBIT                         0x107
++/* Clock ID for Speaker I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_IBIT                       0x108
++/* Clock ID for Speaker I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_EBIT                       0x109
++/* Clock ID for Speaker I2S OSR */
++#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_OSR                        0x10A
 +
-+static struct apr_driver qcom_q6asm_driver = {
-+	.probe = q6asm_probe,
-+	.remove = q6asm_remove,
-+	.callback = q6asm_srvc_callback,
-+	.driver = {
-+		.name = "qcom-q6asm",
-+		.of_match_table = of_match_ptr(q6asm_device_id),
-+	},
-+};
++/* Clock ID for QUINARY  I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_IBIT			0x10B
++/* Clock ID for QUINARY  I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_EBIT			0x10C
++/* Clock ID for SENARY  I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_SEN_MI2S_IBIT			0x10D
++/* Clock ID for SENARY  I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_SEN_MI2S_EBIT			0x10E
++/* Clock ID for INT0 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT0_MI2S_IBIT                       0x10F
++/* Clock ID for INT1 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT1_MI2S_IBIT                       0x110
++/* Clock ID for INT2 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT2_MI2S_IBIT                       0x111
++/* Clock ID for INT3 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT3_MI2S_IBIT                       0x112
++/* Clock ID for INT4 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT4_MI2S_IBIT                       0x113
++/* Clock ID for INT5 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT5_MI2S_IBIT                       0x114
++/* Clock ID for INT6 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT6_MI2S_IBIT                       0x115
 +
-+module_apr_driver(qcom_q6asm_driver);
-+MODULE_DESCRIPTION("Q6 Audio Stream Manager driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/sound/soc/qcom/qdsp6/q6asm.h b/sound/soc/qcom/qdsp6/q6asm.h
-new file mode 100644
-index 000000000000..92cc0efaa2c8
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6asm.h
-@@ -0,0 +1,15 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __Q6_ASM_H__
-+#define __Q6_ASM_H__
++/* Clock ID for QUINARY MI2S OSR CLK  */
++#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_OSR                         0x116
 +
-+#define MAX_SESSIONS	16
++/* Clock ID for Primary PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_PCM_IBIT                           0x200
++/* Clock ID for Primary PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_PCM_EBIT                           0x201
++/* Clock ID for Secondary PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_PCM_IBIT                           0x202
++/* Clock ID for Secondary PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_PCM_EBIT                           0x203
++/* Clock ID for Tertiary PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_PCM_IBIT                           0x204
++/* Clock ID for Tertiary PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_PCM_EBIT                           0x205
++/* Clock ID for Quartery PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_PCM_IBIT                          0x206
++/* Clock ID for Quartery PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_PCM_EBIT                          0x207
++/* Clock ID for Quinary PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUIN_PCM_IBIT                          0x208
++/* Clock ID for Quinary PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUIN_PCM_EBIT                          0x209
++/* Clock ID for QUINARY PCM OSR  */
++#define Q6AFE_LPASS_CLK_ID_QUI_PCM_OSR                            0x20A
 +
-+typedef void (*q6asm_cb) (uint32_t opcode, uint32_t token,
-+			  void *payload, void *priv);
-+struct audio_client;
-+struct audio_client *q6asm_audio_client_alloc(struct device *dev,
-+					      q6asm_cb cb, void *priv,
-+					      int session_id, int perf_mode);
-+void q6asm_audio_client_free(struct audio_client *ac);
-+int q6asm_get_session_id(struct audio_client *ac);
-+#endif /* __Q6_ASM_H__ */
++/** Clock ID for Primary TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_TDM_IBIT                           0x200
++/** Clock ID for Primary TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_TDM_EBIT                           0x201
++/** Clock ID for Secondary TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_TDM_IBIT                           0x202
++/** Clock ID for Secondary TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_TDM_EBIT                           0x203
++/** Clock ID for Tertiary TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_TDM_IBIT                           0x204
++/** Clock ID for Tertiary TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_TDM_EBIT                           0x205
++/** Clock ID for Quartery TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_TDM_IBIT                          0x206
++/** Clock ID for Quartery TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_TDM_EBIT                          0x207
++/** Clock ID for Quinary TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_IBIT                          0x208
++/** Clock ID for Quinary TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_EBIT                          0x209
++/** Clock ID for Quinary TDM OSR */
++#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_OSR                           0x20A
++
++/* Clock ID for MCLK1 */
++#define Q6AFE_LPASS_CLK_ID_MCLK_1                                 0x300
++/* Clock ID for MCLK2 */
++#define Q6AFE_LPASS_CLK_ID_MCLK_2                                 0x301
++/* Clock ID for MCLK3 */
++#define Q6AFE_LPASS_CLK_ID_MCLK_3                                 0x302
++/* Clock ID for MCLK4 */
++#define Q6AFE_LPASS_CLK_ID_MCLK_4                                 0x304
++/* Clock ID for Internal Digital Codec Core */
++#define Q6AFE_LPASS_CLK_ID_INTERNAL_DIGITAL_CODEC_CORE            0x303
++/* Clock ID for INT MCLK0 */
++#define Q6AFE_LPASS_CLK_ID_INT_MCLK_0                             0x305
++/* Clock ID for INT MCLK1 */
++#define Q6AFE_LPASS_CLK_ID_INT_MCLK_1                             0x306
++
++/* Clock attribute for invalid use (reserved for internal usage) */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_INVALID		0x0
++/* Clock attribute for no couple case */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_NO		0x1
++/* Clock attribute for dividend couple case */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_DIVIDEND	0x2
++/* Clock attribute for divisor couple case */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_DIVISOR	0x3
++/* Clock attribute for invert and no couple case */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_INVERT_COUPLE_NO	0x4
++
+ struct q6afe_hdmi_cfg {
+ 	u16                  datatype;
+ 	u16                  channel_allocation;
+@@ -59,4 +187,7 @@ void q6afe_slim_port_prepare(struct q6afe_port *port,
+ 			  struct q6afe_slim_cfg *cfg);
+ int q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg);
+ 
++int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
++			  int clk_src, int clk_root,
++			  unsigned int freq, int dir);
+ #endif /* __Q6AFE_H__ */
 -- 
 2.16.2
