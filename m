@@ -1,173 +1,62 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue,  1 May 2018 13:07:56 +0100
-Subject: [PATCH v7 00/24] ASoC: qcom: Add support to QDSP based Audio
-Message-ID: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
+Date: Tue,  1 May 2018 13:08:01 +0100
+Subject: [PATCH v7 05/24] ASoC: qdsp6: dt-bindings: Add q6adm dt bindings
+In-Reply-To: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
+References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180501120820.11016-6-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thankyou everyone for providing feedback and testing v6 patchset.
-This patchset aims to provide a basic version of QCOM DSP based
-audio support which is available in downstream andriod kernels.
-This patchset support audio playback on HDMI-RX, MI2S, SLIMBus and
-will add support to other features as we move on.
+This patch add DT bindings for ADM (Audio Device Manager) DSP module.
+This module implements mixer controls to setup the connections between
+AFE ports and ASM streams.
 
-QDSP has both static and dynamic modules. static modules like AFE
-(Audio FrontEnd), ADM (Audio Device Manager), ASM(Audio Stream Manager)
-and CORE to provide this audio services.
-All these services use APR (Asynchronous Packet Router) protocol
-via smd/glink transport to communicate with Application processor.
-More details on each module is availble in there respective patch.
-
-This patchset is tested on DB820c, with HDMI audio playback, MI2S on
-DB410c on top of mainline, Also tested SLIMBus analog audio using
-wcd9355 with an additional patches. Patches are also tested on
-SDM845 by Rohit.
-
-Here is my test branch incase someone want to try these patches
-https://git.linaro.org/people/srinivas.kandagatla/linux.git/log/?h=v4.17-qdsp6
-
-Here is block diagram to give a quick overview of the components
-
-
-  +---------+          +---------+         +---------+   
-  |  q6asm  |          |q6routing|         | q6afe   | 
-  |   dais  | <------> |  mixers | <-----> |  dais   |  
-  +---------+          +---------+         +---------+   
-      ^                     ^                   ^
-      |                     |                   |
-      |  +------------------+----------------+  |       
-      |  |                  |                |  |       
-      v  v                  v                v  v       
-  +---------+          +---------+         +---------+ 
-  |   q6ASM |          |  q6ADM  |         |   q6AFE |  
-  +---------+          +---------+         +---------+  
-      ^                     ^                   ^          ^
-      |                     |                   | CPU Side |
-------+---------------------+-------------------+--------
-      |                     |                   |
-      |                     |APR(smd/glink)     | 
-      |                     |                   |
-      |  +------------------+----------------+  |
-      |  |                  |                |  |
-+-----+--+-----------------------------------+--+-------
-      |  |                  |                |  | QDSP Side |
-      v  v                  v                v  v           v
- +---------+          +---------+         +---------+
- |   ASM   | <------> |   ADM   | <-----> |   AFE   |
- +---------+          +---------+         +---------+
-                                               ^
-                                               | 
-                           +-------------------+
-                           |
----------------------------+--------------------------
-                           |            Audio I/O |
-                           v                      v
-    +--------------------------------------------------+
-    |                Audio devices                     |
-    | CODEC | HDMI-TX | PCM  | SLIMBUS | I2S |MI2S |...|
-    |                                                  |
-    +--------------------------------------------------+
-
-
-Changes since v6 (https://lkml.org/lkml/2018/4/26/264)
-- Added relevant acks and reviewed-by tags.
-- Update apr_pkt_send and callbacks to take structures
- instead of void * suggested by Bjorn
-- Updated q6afe bindings to explain clearly on grandchild
- dai node bindings, suggested by Rob H.
-- Fixed few typos in APR commit msg spotted by Mark B.
-- rebased patchset on top of
-https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/?h=for-next
-
-Srinivas Kandagatla (24):
-  soc: qcom dt-bindings: Add APR bus bindings
-  soc: qcom: Add APR bus driver
-  ASoC: qdsp6: dt-bindings: Add q6core dt bindings
-  ASoC: qdsp6: dt-bindings: Add q6afe dt bindings
-  ASoC: qdsp6: dt-bindings: Add q6adm dt bindings
-  ASoC: qdsp6: dt-bindings: Add q6asm dt bindings
-  ASoC: qdsp6: q6common: Add qdsp6 helper functions
-  ASoC: qdsp6: q6core: Add q6core driver
-  ASoC: qdsp6: q6afe: Add q6afe driver
-  ASoC: qdsp6: qdafe: Add SLIMBus port Support
-  ASoC: qdsp6: q6afe: Add support to MI2S ports
-  ASoC: qdsp6: q6afe: Add support to MI2S sysclks
-  ASoC: qdsp6: q6adm: Add q6adm driver
-  ASoC: qdsp6: q6asm: Add q6asm driver
-  ASoC: qdsp6: q6asm: Add support to memory map and unmap
-  ASoC: qdsp6: q6asm: Add support to audio stream apis
-  ASoC: qdsp6: q6routing: Add q6routing driver
-  ASoC: qdsp6: q6routing: Add support to all SLIMBus Mixers
-  ASoC: qdsp6: q6routing: Add support to MI2S Mixers
-  ASoC: qdsp6: q6afe: Add q6afe dai driver
-  ASoC: qdsp6: q6asm: Add q6asm dai driver
-  ASoC: qdsp6: dt-bindings: Add apq8096 machine bindings
-  ASoC: qcom: apq8096: Add db820c machine driver
-  MAINTAINERS: Add myself as co-maintainer of qcom audio
-
- .../devicetree/bindings/soc/qcom/qcom,apr.txt      |   84 ++
- .../devicetree/bindings/sound/qcom,apq8096.txt     |  109 ++
- .../devicetree/bindings/sound/qcom,q6adm.txt       |   33 +
- .../devicetree/bindings/sound/qcom,q6afe.txt       |  104 ++
- .../devicetree/bindings/sound/qcom,q6asm.txt       |   33 +
- .../devicetree/bindings/sound/qcom,q6core.txt      |   21 +
- MAINTAINERS                                        |    1 +
- drivers/soc/qcom/Kconfig                           |    9 +
- drivers/soc/qcom/Makefile                          |    1 +
- drivers/soc/qcom/apr.c                             |  378 ++++++
- include/dt-bindings/soc/qcom,apr.h                 |   28 +
- include/dt-bindings/sound/qcom,q6afe.h             |   31 +
- include/dt-bindings/sound/qcom,q6asm.h             |   22 +
- include/linux/mod_devicetable.h                    |   11 +
- include/linux/soc/qcom/apr.h                       |  128 ++
- sound/soc/qcom/Kconfig                             |   50 +
- sound/soc/qcom/Makefile                            |    5 +
- sound/soc/qcom/apq8096.c                           |  238 ++++
- sound/soc/qcom/qdsp6/Makefile                      |    8 +
- sound/soc/qcom/qdsp6/q6adm.c                       |  636 +++++++++
- sound/soc/qcom/qdsp6/q6adm.h                       |   25 +
- sound/soc/qcom/qdsp6/q6afe-dai.c                   |  752 +++++++++++
- sound/soc/qcom/qdsp6/q6afe.c                       | 1046 +++++++++++++++
- sound/soc/qcom/qdsp6/q6afe.h                       |  193 +++
- sound/soc/qcom/qdsp6/q6asm-dai.c                   |  628 +++++++++
- sound/soc/qcom/qdsp6/q6asm.c                       | 1401 ++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6asm.h                       |   69 +
- sound/soc/qcom/qdsp6/q6core.c                      |  380 ++++++
- sound/soc/qcom/qdsp6/q6core.h                      |   15 +
- sound/soc/qcom/qdsp6/q6dsp-common.c                |   66 +
- sound/soc/qcom/qdsp6/q6dsp-common.h                |   24 +
- sound/soc/qcom/qdsp6/q6dsp-errno.h                 |   51 +
- sound/soc/qcom/qdsp6/q6routing.c                   |  983 ++++++++++++++
- sound/soc/qcom/qdsp6/q6routing.h                   |    9 +
- 34 files changed, 7572 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,apq8096.txt
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/sound/qcom,q6adm.txt       | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6adm.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6afe.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6asm.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6core.txt
- create mode 100644 drivers/soc/qcom/apr.c
- create mode 100644 include/dt-bindings/soc/qcom,apr.h
- create mode 100644 include/dt-bindings/sound/qcom,q6afe.h
- create mode 100644 include/dt-bindings/sound/qcom,q6asm.h
- create mode 100644 include/linux/soc/qcom/apr.h
- create mode 100644 sound/soc/qcom/apq8096.c
- create mode 100644 sound/soc/qcom/qdsp6/Makefile
- create mode 100644 sound/soc/qcom/qdsp6/q6adm.c
- create mode 100644 sound/soc/qcom/qdsp6/q6adm.h
- create mode 100644 sound/soc/qcom/qdsp6/q6afe-dai.c
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.c
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.h
- create mode 100644 sound/soc/qcom/qdsp6/q6asm-dai.c
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.c
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.h
- create mode 100644 sound/soc/qcom/qdsp6/q6core.c
- create mode 100644 sound/soc/qcom/qdsp6/q6core.h
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.c
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.h
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-errno.h
- create mode 100644 sound/soc/qcom/qdsp6/q6routing.c
- create mode 100644 sound/soc/qcom/qdsp6/q6routing.h
 
+diff --git a/Documentation/devicetree/bindings/sound/qcom,q6adm.txt b/Documentation/devicetree/bindings/sound/qcom,q6adm.txt
+new file mode 100644
+index 000000000000..cb709e5dbc44
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/qcom,q6adm.txt
+@@ -0,0 +1,33 @@
++Qualcomm Audio Device Manager (Q6ADM) binding
++
++Q6ADM is one of the APR audio service on Q6DSP.
++Please refer to qcom,apr.txt for details of the coommon apr service bindings
++used by the apr service device.
++
++- but must contain the following property:
++
++- compatible:
++	Usage: required
++	Value type: <stringlist>
++	Definition: must be "qcom,q6adm-v<MAJOR-NUMBER>.<MINOR-NUMBER>".
++		   Or "qcom,q6adm" where the version number can be queried
++		   from DSP.
++		   example "qcom,q6adm-v2.0"
++
++
++= ADM routing
++"routing" subnode of the ADM node represents adm routing specific configuration
++
++- #sound-dai-cells
++	Usage: required
++	Value type: <u32>
++	Definition: Must be 0
++
++= EXAMPLE
++q6adm at 8 {
++	compatible = "qcom,q6adm";
++	reg = <APR_SVC_ADM>;
++	q6routing: routing {
++		#sound-dai-cells = <0>;
++	};
++};
 -- 
 2.16.2
