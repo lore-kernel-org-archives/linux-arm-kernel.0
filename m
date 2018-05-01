@@ -1,53 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 1 May 2018 20:15:19 +0530
-Subject: =?UTF-8?Q?Re:_[PATCH_v9_00/27]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <20180427001745.4116-1-david@lechnology.com>
-References: <20180427001745.4116-1-david@lechnology.com>
-Message-ID: <1ea1b841-24da-e74a-50a8-98b0793e61a5@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 1 May 2018 15:46:22 +0100
+Subject: [PATCH v8 11/13] arm64: topology: enable ACPI/PPTT based CPU
+ topology
+In-Reply-To: <20180425233121.13270-12-jeremy.linton@arm.com>
+References: <20180425233121.13270-1-jeremy.linton@arm.com>
+ <20180425233121.13270-12-jeremy.linton@arm.com>
+Message-ID: <ab8357f0-61d5-2996-46ca-5bc5d3e097cf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 April 2018 05:47 AM, David Lechner wrote:
-> This series converts mach-davinci to use the common clock framework.
+
+
+On 26/04/18 00:31, Jeremy Linton wrote:
+> Propagate the topology information from the PPTT tree to the
+> cpu_topology array. We can get the thread id and core_id by assuming
+> certain levels of the PPTT tree correspond to those concepts.
+> The package_id is flagged in the tree and can be found by calling
+> find_acpi_cpu_topology_package() which terminates
+> its search when it finds an ACPI node flagged as the physical
+> package. If the tree doesn't contain enough levels to represent
+> all of the requested levels then the root node will be returned
+> for all subsequent levels.
 > 
-> The series works like this, the first 3 patches fix some issues with the clock
-> drivers that have already been accepted into the mainline kernel.
-> 
-> Then, starting with "ARM: davinci: pass clock as parameter to
-> davinci_timer_init()", we get the mach code ready for the switch by adding the
-> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
-> around the legacy clocks so that we can switch easily between the old and the
-> new.
-> 
-> "ARM: davinci: switch to common clock framework" actually flips the switch
-> to start using the new clock drivers. Then the next 8 patches remove all
-> of the old clock code.
-> 
-> The final four patches add device tree clock support to the one SoC that
-> supports it.
-> 
-> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
-> board file).
 
-I have reviewed this series and looks good to me except some comments I
-gave and some issues you have identified yourself in patches 25 and 26.
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-I think this is a good compromise to achieve platform device based
-clocks as far as possible with current kernel framework. I know Bartosz
-is working on solving the problem generically and I guess once thats
-agreed upon, DaVinci can convert too.
+[..]
 
-But I think this series has been in the works for far too long and
-should be merged (the remoteproc dependencies that Bartosz pointed out
-should be resolved too). You can wait for clock maintainers opinion
-though before spinning another version.
+> @@ -304,6 +345,8 @@ void __init init_cpu_topology(void)
+>  	 * Discard anything that was parsed if we hit an error so we
+>  	 * don't use partial information.
+>  	 */
+> -	if (of_have_populated_dt() && parse_dt_topology())
+> +	if ((!acpi_disabled) && parse_acpi_topology())
 
-I have not tested this series yet, will do so soon.
+[nit] not sure if extra () is need above, but I am fine either way.
 
-Thanks,
-Sekhar
-
-PS: I started giving a Reviewed-by: for the mach-davinci patches before
-realizing the futility of doing so and stopped mid-way. They will have
-my sign-off anyway once I test and merge them.
+-- 
+Regards,
+Sudeep
