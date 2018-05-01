@@ -1,28 +1,37 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 1 May 2018 19:32:22 +0530
-Subject: [PATCH v9 03/27] clk: davinci: psc: allow for dev == NULL
-In-Reply-To: <20180427001745.4116-4-david@lechnology.com>
-References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-4-david@lechnology.com>
-Message-ID: <8940259b-5811-ce9f-8262-17d39ca0a46f@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 1 May 2018 09:07:25 -0500
+Subject: [RFC 01/10] ARM: dts: exynos: Remove Exynos5440
+In-Reply-To: <20180424203239.21885-2-krzk@kernel.org>
+References: <20180424203239.21885-1-krzk@kernel.org>
+ <20180424203239.21885-2-krzk@kernel.org>
+Message-ID: <20180501140725.GA25487@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 April 2018 05:47 AM, David Lechner wrote:
-> +static inline void *_devm_kzalloc(struct device *dev, size_t size, gfp_t flags)
-> +{
-> +	if (dev)
-> +		return devm_kzalloc(dev, size, flags);
-> +
-> +	return kzalloc(size, flags);
-> +}
+On Tue, Apr 24, 2018 at 10:32:30PM +0200, Krzysztof Kozlowski wrote:
+> The Exynos5440 (quad-core A15 with GMAC, PCIe, SATA) was targeting
+> server platforms but it did not make it to the market really.  There are
+> no development boards with it and probably there are no real products
+> neither.  The development for Exynos5440 ended in 2013 and since then
+> the platform is in maintenance mode.
+> 
+> Remove all Device Tree sources for Exynos5440, as first step of removal
+> of the platform to simplify the code and drivers.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  .../bindings/arm/samsung/samsung-boards.txt        |   2 -
+>  arch/arm/boot/dts/Makefile                         |   2 -
+>  arch/arm/boot/dts/exynos5440-sd5v1.dts             |  42 ---
+>  arch/arm/boot/dts/exynos5440-ssdk5440.dts          |  81 -----
+>  arch/arm/boot/dts/exynos5440-tmu-sensor-conf.dtsi  |  20 --
+>  arch/arm/boot/dts/exynos5440-trip-points.dtsi      |  21 --
+>  arch/arm/boot/dts/exynos5440.dtsi                  | 355 ---------------------
+>  7 files changed, 523 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/exynos5440-sd5v1.dts
+>  delete mode 100644 arch/arm/boot/dts/exynos5440-ssdk5440.dts
+>  delete mode 100644 arch/arm/boot/dts/exynos5440-tmu-sensor-conf.dtsi
+>  delete mode 100644 arch/arm/boot/dts/exynos5440-trip-points.dtsi
+>  delete mode 100644 arch/arm/boot/dts/exynos5440.dtsi
 
-I have the same question on the utility of this. A memory allocation
-error so early on is not going to result in a bootable system anyway.
-So, I wonder if its better to just BUG() in such cases. That will
-actually help faster debug than returning an error back. I know the push
-back on using BUG(), but clock drivers are special, and I think thats
-why its seems to be used quite a bit already.
-
-Thanks,
-Sekhar
+Reviewed-by: Rob Herring <robh@kernel.org>
