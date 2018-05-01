@@ -1,130 +1,89 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue, 1 May 2018 10:06:20 +0200
-Subject: [PATCH 00/12] clk: imx: add imx8qxp clock support
-In-Reply-To: <61f81e36a71f5c02f77163c8f32e1e5b@agner.ch>
-References: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
- <20180501060330.l5j6rztqal2whgge@pengutronix.de>
- <61f81e36a71f5c02f77163c8f32e1e5b@agner.ch>
-Message-ID: <20180501080620.vid3i5dqni4ld6uk@pengutronix.de>
+From: tali.perry1@gmail.com (Tali Perry)
+Date: Tue,  1 May 2018 10:23:27 +0300
+Subject: [PATCH v1 1/1] clk: npcm750: fix base address and of_clk_get_by_name
+ error handling. Also update error messages to be more informative
+In-Reply-To: <1525159407-31708-1-git-send-email-tali.perry1@gmail.com>
+References: <1525159407-31708-1-git-send-email-tali.perry1@gmail.com>
+Message-ID: <1525159407-31708-2-git-send-email-tali.perry1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 09:32:11AM +0200, Stefan Agner wrote:
-> On 01.05.2018 08:03, Oleksij Rempel wrote:
-> > Hi,
-> > 
-> > same functionality is actually needed on iMX7d and many other non NXP
-> > socs.
-> 
-> How is this needed on iMX7D?
-> 
-> Afaik, on i.MX8QXP Linux does not have any direct access to the clock
-> registers. It is all managed by SCU. However, on i.MX 7 Linux as is
-> today accesses the clocks registers directly...
 
-iMX7D and iMX6SX provide access to same register set from Cortex A and
-Cortex M side. Since it is just dangerous to toggle same bits from two
-systems, only one should control it. After implementing imx_rproc
-driver and bringing up system on Cortex M4 side, we faced a problem of
-needing to properly control clocks and pins for other side. Clocks and
-pins should be configured only if some functionality is requested, so we
-can't just force defaults which will always work.
-I assume that only right solution for this problem is to introduce some
-generic clock-to-rpmsg, pinmux-to-rpmsg bridge. So far I know, many
-system vendors have same problem with different SoCs (Renesas, TI, ST, QCOM) and
-I assume it is a generic AMP issue. If each vendor will upstream firmware
-specific kernel side implementation to solve common problem, we will have
-tons on unmaintainable SoC/Firmware specific code.
+Nuvoton NPCM7XX Clock Controller
+fix base address and of_clk_get_by_name error handling.
+    Also update error messages to be more informative.
+    
+    In case clk_base allocation is erronoeous the return value is null.
+    Also fix handling of of_clk_get_by_name returns an error. 
+    Print a better error message pointing to the dt-binding documention.
 
-> > IMO proper solution is to introduce generic clock proxy or some thing
-> > like this on top of rpmsg/virtio 
-> 
-> Given that NXP already used rpmsg in the past, I was wondering too why a
-> new messaging mechanism had to be invented.
-> 
-> Dong, do you know why?
-> 
-> --
-> Stefan
-> 
-> > 
-> > On Sat, Apr 28, 2018 at 02:56:31AM +0800, Dong Aisheng wrote:
-> >> This patch series adds i.MX8QXP clock support which is based
-> >> on the clock service provided by SCU firmware.
-> >> It depends on SCU APIs patch set.
-> >>
-> >> Dong Aisheng (12):
-> >>   clk: imx: add configuration option for mmio clks
-> >>   clk: imx: scu: add scu clock common part
-> >>   clk: imx: scu: add scu clock divider
-> >>   clk: imx: scu: add scu clock gpr divider
-> >>   clk: imx: scu: add scu clock gate
-> >>   clk: imx: scu: add scu clock gpr gate
-> >>   clk: imx: scu: add scu clock mux
-> >>   clk: imx: scu: add scu clock gpr mux
-> >>   clk: imx: add common imx_clk_hw_fixed functions
-> >>   clk: imx: add imx_check_clk_hws helper function
-> >>   dt-bindings: clock: add imx8qxp clock binding doc
-> >>   clk: imx: add imx8qxp clk driver
-> >>
-> >>  .../devicetree/bindings/clock/imx8qxp-clk.txt      |  39 ++
-> >>  arch/arm/mach-imx/Kconfig                          |  10 +
-> >>  drivers/clk/Kconfig                                |   1 +
-> >>  drivers/clk/imx/Kconfig                            |   7 +
-> >>  drivers/clk/imx/Makefile                           |   4 +-
-> >>  drivers/clk/imx/clk-common.h                       |  27 ++
-> >>  drivers/clk/imx/scu/Kconfig                        |   5 +
-> >>  drivers/clk/imx/scu/Makefile                       |  12 +
-> >>  drivers/clk/imx/scu/clk-divider-gpr-scu.c          | 131 +++++++
-> >>  drivers/clk/imx/scu/clk-divider-scu.c              | 129 +++++++
-> >>  drivers/clk/imx/scu/clk-gate-gpr-scu.c             |  84 ++++
-> >>  drivers/clk/imx/scu/clk-gate-scu.c                 | 193 ++++++++++
-> >>  drivers/clk/imx/scu/clk-imx8qxp.c                  | 426 +++++++++++++++++++++
-> >>  drivers/clk/imx/scu/clk-mux-gpr-scu.c              |  90 +++++
-> >>  drivers/clk/imx/scu/clk-mux-scu.c                  |  89 +++++
-> >>  drivers/clk/imx/scu/clk-scu.c                      |  25 ++
-> >>  drivers/clk/imx/scu/clk-scu.h                      |  97 +++++
-> >>  include/dt-bindings/clock/imx8qxp-clock.h          | 362 +++++++++++++++++
-> >>  include/soc/imx/imx8qxp/lpcg.h                     | 186 +++++++++
-> >>  19 files changed, 1916 insertions(+), 1 deletion(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
-> >>  create mode 100644 drivers/clk/imx/Kconfig
-> >>  create mode 100644 drivers/clk/imx/clk-common.h
-> >>  create mode 100644 drivers/clk/imx/scu/Kconfig
-> >>  create mode 100644 drivers/clk/imx/scu/Makefile
-> >>  create mode 100644 drivers/clk/imx/scu/clk-divider-gpr-scu.c
-> >>  create mode 100644 drivers/clk/imx/scu/clk-divider-scu.c
-> >>  create mode 100644 drivers/clk/imx/scu/clk-gate-gpr-scu.c
-> >>  create mode 100644 drivers/clk/imx/scu/clk-gate-scu.c
-> >>  create mode 100644 drivers/clk/imx/scu/clk-imx8qxp.c
-> >>  create mode 100644 drivers/clk/imx/scu/clk-mux-gpr-scu.c
-> >>  create mode 100644 drivers/clk/imx/scu/clk-mux-scu.c
-> >>  create mode 100644 drivers/clk/imx/scu/clk-scu.c
-> >>  create mode 100644 drivers/clk/imx/scu/clk-scu.h
-> >>  create mode 100644 include/dt-bindings/clock/imx8qxp-clock.h
-> >>  create mode 100644 include/soc/imx/imx8qxp/lpcg.h
-> >>
-> >> --
-> >> 2.7.4
-> >>
-> >>
-> >>
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
 
+Signed-off-by: Tali Perry <tali.perry1@gmail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+
+Tali Perry (2):
+ 
+---
+ drivers/clk/clk-npcm7xx.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/clk/clk-npcm7xx.c b/drivers/clk/clk-npcm7xx.c
+index 7e4964b9e5c8..6ff97f79fcd7 100644
+--- a/drivers/clk/clk-npcm7xx.c
++++ b/drivers/clk/clk-npcm7xx.c
+@@ -583,7 +583,7 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
+ 
+ 
+ 	clk_base = ioremap(res.start, resource_size(&res));
+-	if (IS_ERR(clk_base))
++	if (!clk_base)
+ 		goto npcm7xx_init_error;
+ 
+ 
+@@ -604,24 +604,27 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
+ 
+ 	/* Read fixed clocks. These 3 clocks must be defined in DT */
+ 	clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_REFCLK);
+-	if (!IS_ERR(clk)) {
+-		pr_err("failed to find external REFCLK: %ld\n",
++	if (IS_ERR(clk)) {
++		pr_err("failed to find external REFCLK on device tree, err=%ld\n",
+ 			PTR_ERR(clk));
+ 		clk_put(clk);
++		goto npcm7xx_init_fail_no_clk_on_dt;
+ 	}
+ 
+ 	clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_SYSBYPCK);
+-	if (!IS_ERR(clk)) {
+-		pr_err("failed to find external SYSBYPCK: %ld\n",
++	if (IS_ERR(clk)) {
++		pr_err("failed to find external SYSBYPCK on device tree, err=%ld\n",
+ 			PTR_ERR(clk));
+ 		clk_put(clk);
++		goto npcm7xx_init_fail_no_clk_on_dt;
+ 	}
+ 
+ 	clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_MCBYPCK);
+-	if (!IS_ERR(clk)) {
+-		pr_err("failed to find external MCBYPCK: %ld\n",
++	if (IS_ERR(clk)) {
++		pr_err("failed to find external MCBYPCK on device tree, err=%ld\n",
+ 			PTR_ERR(clk));
+ 		clk_put(clk);
++		goto npcm7xx_init_fail_no_clk_on_dt;
+ 	}
+ 
+ 	/* Register plls */
+@@ -705,6 +708,9 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
+ 
+ 	return;
+ 
++npcm7xx_init_fail_no_clk_on_dt:
++	pr_err("see Documentation/devicetree/bindings/clock/"
++					"nuvoton,npcm750-clk.txt  for details\n");
+ npcm7xx_init_fail:
+ 	if (npcm7xx_clk_data->num)
+ 		kfree(npcm7xx_clk_data->hws);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180501/5ea31b9b/attachment.sig>
+2.14.1
