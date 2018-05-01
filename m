@@ -1,83 +1,78 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 1 May 2018 21:01:35 +0530
-Subject: [PATCH v2] ARM: davinci: fix GPIO lookup for I2C
-Message-ID: <20180501153135.32746-1-nsekhar@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 1 May 2018 10:37:27 -0500
+Subject: [PATCH 11/12] dt-bindings: clock: add imx8qxp clock binding doc
+In-Reply-To: <1524855403-15301-12-git-send-email-aisheng.dong@nxp.com>
+References: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
+ <1524855403-15301-12-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20180501153727.GA21845@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
-I2C can correctly lookup the recovery gpios.
+On Sat, Apr 28, 2018 at 02:56:42AM +0800, Dong Aisheng wrote:
+> Add imx8qxp clock binding doc.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Stephen Boyd <sboyd@kernel.org>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  .../devicetree/bindings/clock/imx8qxp-clk.txt      |  39 +++
+>  include/dt-bindings/clock/imx8qxp-clock.h          | 362 +++++++++++++++++++++
+>  2 files changed, 401 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
+>  create mode 100644 include/dt-bindings/clock/imx8qxp-clock.h
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/imx8qxp-clk.txt b/Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
+> new file mode 100644
+> index 0000000..5e365d7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
+> @@ -0,0 +1,39 @@
+> +NXP i.MX8QXP Clocks Based on SCFW
+> +--------------------------------------------------------------------
+> +
+> +Some i.MX SoCs contain a system controller that is responsible for
+> +providing clock control service for the IPs. Communication between
+> +the host processor running an OS and the system controller happens
+> +through a SCU protocol [1].
+> +
+> +[1] Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> +
+> +Required properties:
+> +
+> +- compatible:	Should be "fsl,imx8qxp-clock".
+> +- #clock-cells:	Should be <1>.
 
-Note that it is the gpio-davinci driver that sets the gpiochip label to
-davinci_gpio.0.
+There's no reason for this node. Just make the parent (SCU) a clock 
+provider.
 
-Also, the I2C device uses an id of 1 on DM644x and DM355.
-
-While at it, convert to using GPIO_TO_PIN() for referring to GPIO pin
-numbers, like it is done in rest of the board support files.
-
-Fixes: e53537653791 ("i2c/ARM: davinci: Deep refactoring of I2C recovery")
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
-v2: use GPIO_TO_PIN() to fix comment by David Lechner.
-
- arch/arm/mach-davinci/board-dm355-evm.c  |  9 ++++++---
- arch/arm/mach-davinci/board-dm644x-evm.c | 10 +++++++---
- 2 files changed, 13 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-index 762d29683a3a..23ab9e8bc04c 100644
---- a/arch/arm/mach-davinci/board-dm355-evm.c
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c
-@@ -110,12 +110,15 @@ static struct platform_device davinci_nand_device = {
- 	},
- };
- 
-+#define DM355_I2C_SDA_PIN	GPIO_TO_PIN(0, 15)
-+#define DM355_I2C_SCL_PIN	GPIO_TO_PIN(0, 14)
-+
- static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
--	.dev_id = "i2c_davinci",
-+	.dev_id = "i2c_davinci.1",
- 	.table = {
--		GPIO_LOOKUP("davinci_gpio", 15, "sda",
-+		GPIO_LOOKUP("davinci_gpio.0", DM355_I2C_SDA_PIN, "sda",
- 			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
--		GPIO_LOOKUP("davinci_gpio", 14, "scl",
-+		GPIO_LOOKUP("davinci_gpio.0", DM355_I2C_SCL_PIN, "scl",
- 			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
- 	},
- };
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 95b55aae1366..509e64ab1994 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -17,6 +17,7 @@
- #include <linux/i2c.h>
- #include <linux/platform_data/pcf857x.h>
- #include <linux/platform_data/at24.h>
-+#include <linux/platform_data/gpio-davinci.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -596,12 +597,15 @@ static struct i2c_board_info __initdata i2c_info[] =  {
- 	},
- };
- 
-+#define DM644X_I2C_SDA_PIN	GPIO_TO_PIN(2, 12)
-+#define DM644X_I2C_SCL_PIN	GPIO_TO_PIN(2, 11)
-+
- static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
--	.dev_id = "i2c_davinci",
-+	.dev_id = "i2c_davinci.1",
- 	.table = {
--		GPIO_LOOKUP("davinci_gpio", 44, "sda",
-+		GPIO_LOOKUP("davinci_gpio.0", DM644X_I2C_SDA_PIN, "sda",
- 			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
--		GPIO_LOOKUP("davinci_gpio", 43, "scl",
-+		GPIO_LOOKUP("davinci_gpio.0", DM644X_I2C_SCL_PIN, "scl",
- 			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
- 	},
- };
--- 
-2.16.2
+> +
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.
+> +See include/dt-bindings/clock/imx8qxp-clock.h
+> +for the full list of i.MX8QXP clock IDs.
+> +
+> +Examples:
+> +
+> +#include <dt-bindings/clock/imx8qxp-clock.h>
+> +
+> +clk: clk {
+> +	compatible = "fsl,imx8qxp-clk";
+> +	#clock-cells = <1>;
+> +};
+> +
+> +i2c0: i2c at 5a800000 {
+> +	compatible = "fsl,imx8qxp-lpi2c", "fsl,imx7ulp-lpi2c";
+> +	reg = <0x0 0x5a800000 0x0 0x4000>;
+> +	interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-parent = <&gic>;
+> +	clocks = <&clk IMX8QXP_I2C0_CLK>,
+> +		 <&clk IMX8QXP_I2C0_IPG_CLK>;
+> +	clock-names = "per", "ipg";
+> +	...
+> +};
