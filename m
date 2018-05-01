@@ -1,102 +1,68 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 1 May 2018 18:15:46 +0200
-Subject: [PATCH 04/25] arm: exynos/s3c: dts: Remove leading 0x and 0s
- from bindings notation
-In-Reply-To: <CA+7wUsxp_n6V--PE9PQSsT1xu3b0HJn5gWBhnp=ngRNqBSVvFg@mail.gmail.com>
-References: <20171215124630.30082-1-malat@debian.org>
- <CAJKOXPdkYLisej5965rh2SbOjbFms-RK2VnXt=L==MW_JcA+OA@mail.gmail.com>
- <CA+7wUsxp_n6V--PE9PQSsT1xu3b0HJn5gWBhnp=ngRNqBSVvFg@mail.gmail.com>
-Message-ID: <20180501161546.6w3fkenk7q6s4kqe@kozik-lap>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  2 May 2018 00:12:27 +0800
+Subject: [PATCH net-next v2 15/15] arm64: dts: allwinner: a64: add SRAM
+ controller device tree node
+In-Reply-To: <20180501161227.2110-1-wens@csie.org>
+References: <20180501161227.2110-1-wens@csie.org>
+Message-ID: <20180501161227.2110-16-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 18, 2017 at 11:17:24AM +0100, Mathieu Malaterre wrote:
-> On Mon, Dec 18, 2017 at 10:40 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > On Fri, Dec 15, 2017 at 1:46 PM, Mathieu Malaterre <malat@debian.org> wrote:
-> >> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> >> following dtc warnings:
-> >>
-> >> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
-> >>
-> >> and
-> >>
-> >> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
-> >>
-> >> Converted using the following command:
-> >>
-> >> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> >>
-> >> For simplicity, two sed expressions were used to solve each warnings separately.
-> >>
-> >> To make the regex expression more robust a few other issues were resolved,
-> >> namely setting unit-address to lower case, and adding a whitespace before the
-> >> the opening curly brace:
-> >>
-> >> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> >>
-> >> This will solve as a side effect warning:
-> >>
-> >> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> >>
-> >> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> >>
-> >> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> >> Suggested-by: Rob Herring <robh@kernel.org>
-> >> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> >
-> > Ack was for different patchset, touching only three files...
-> 
-> So sorry, when I read your email:
-> 
-> https://lkml.org/lkml/2017/12/15/152
-> 
-> I assumed you meant for all the Exynos* and S3C* DTS files, but I did
-> not check carefully which files were touched originally.
-> 
-> >> Signed-off-by: Mathieu Malaterre <malat@debian.org>
-> >> ---
-> >>  arch/arm/boot/dts/exynos3250.dtsi             | 34 ++++++------
-> >>  arch/arm/boot/dts/exynos4.dtsi                | 56 +++++++++----------
-> >>  arch/arm/boot/dts/exynos4210.dtsi             |  8 +--
-> >>  arch/arm/boot/dts/exynos4412-pinctrl.dtsi     |  2 +-
-> >>  arch/arm/boot/dts/exynos4412.dtsi             | 22 ++++----
-> >>  arch/arm/boot/dts/exynos5.dtsi                | 22 ++++----
-> >>  arch/arm/boot/dts/exynos5250.dtsi             | 64 +++++++++++-----------
-> >>  arch/arm/boot/dts/exynos5260.dtsi             | 26 ++++-----
-> >>  arch/arm/boot/dts/exynos5420.dtsi             | 78 +++++++++++++--------------
-> >>  arch/arm/boot/dts/exynos5422-odroid-core.dtsi |  2 +-
-> >>  arch/arm/boot/dts/exynos5440.dtsi             | 14 ++---
-> >>  arch/arm/boot/dts/s3c2416.dtsi                |  8 +--
-> >>  12 files changed, 168 insertions(+), 168 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> >> index 2bd3872221a1..8d47571b3984 100644
-> >> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> >> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> >> @@ -164,31 +164,31 @@
-> >>                         syscon = <&pmu_system_controller>;
-> >>                 };
-> >>
-> >> -               pd_cam: cam-power-domain at 10023C00 {
-> >> +               pd_cam: cam-power-domain at 10023c00 {
-> >
-> > This is not related to this patch and it was not present in the
-> > version I acked. I also already fixed this here:
-> > https://patchwork.kernel.org/patch/10113323/
-> >
-> > There is no changelog explaining the difference in patches. Original
-> > patch was okay, why changing it?
-> 
-> Accept my sincere apologizes I really messed this series. I discover
-> my original ARM patch did not apply lower case to all unit-address
-> equally, so I added at last minute a sed expression to make all
-> unit-address lower case.
-> 
-> I guess you can just drop this one for now.
+From: Icenowy Zheng <icenowy@aosc.io>
 
-Hi Mathieu,
+Allwinner A64 has a SRAM controller, and in the device tree currently
+we have a syscon node to enable EMAC driver to access the EMAC clock
+register. As SRAM controller driver can now export regmap for this
+register, replace the syscon node to the SRAM controller device node,
+and let EMAC driver to acquire its EMAC clock regmap.
 
-Do you plan to resend this in its original form (removing 0)?
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 23 +++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 1b2ef28c42bd..1c37659d9d41 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -168,10 +168,25 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
+-		syscon: syscon at 1c00000 {
+-			compatible = "allwinner,sun50i-a64-system-controller",
+-				"syscon";
++		sram_controller: sram-controller at 1c00000 {
++			compatible = "allwinner,sun50i-a64-sram-controller";
+ 			reg = <0x01c00000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			sram_c: sram at 18000 {
++				compatible = "mmio-sram";
++				reg = <0x00018000 0x28000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00018000 0x28000>;
++
++				de2_sram: sram-section at 0 {
++					compatible = "allwinner,sun50i-a64-sram-c";
++					reg = <0x0000 0x28000>;
++				};
++			};
+ 		};
+ 
+ 		dma: dma-controller at 1c02000 {
+@@ -599,7 +614,7 @@
+ 
+ 		emac: ethernet at 1c30000 {
+ 			compatible = "allwinner,sun50i-a64-emac";
+-			syscon = <&syscon>;
++			syscon = <&sram_controller>;
+ 			reg = <0x01c30000 0x10000>;
+ 			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "macirq";
+-- 
+2.17.0
