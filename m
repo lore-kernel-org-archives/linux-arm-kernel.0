@@ -1,41 +1,29 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 1 May 2018 15:46:22 +0100
-Subject: [PATCH v8 11/13] arm64: topology: enable ACPI/PPTT based CPU
- topology
-In-Reply-To: <20180425233121.13270-12-jeremy.linton@arm.com>
-References: <20180425233121.13270-1-jeremy.linton@arm.com>
- <20180425233121.13270-12-jeremy.linton@arm.com>
-Message-ID: <ab8357f0-61d5-2996-46ca-5bc5d3e097cf@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 1 May 2018 07:50:40 -0700
+Subject: [PATCH] ARM: OMAP2+: powerdomain: use raw_smp_processor_id() for
+ trace
+In-Reply-To: <1520589020-14018-1-git-send-email-t-kristo@ti.com>
+References: <1520589020-14018-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20180501145040.GH5671@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 26/04/18 00:31, Jeremy Linton wrote:
-> Propagate the topology information from the PPTT tree to the
-> cpu_topology array. We can get the thread id and core_id by assuming
-> certain levels of the PPTT tree correspond to those concepts.
-> The package_id is flagged in the tree and can be found by calling
-> find_acpi_cpu_topology_package() which terminates
-> its search when it finds an ACPI node flagged as the physical
-> package. If the tree doesn't contain enough levels to represent
-> all of the requested levels then the root node will be returned
-> for all subsequent levels.
+* Tero Kristo <t-kristo@ti.com> [180309 01:51]:
+> smp_processor_id() checks preemption if CONFIG_DEBUG_PREEMPT is enabled,
+> causing a warning dump during boot:
 > 
+> [    5.042377] BUG: using smp_processor_id() in preemptible [00000000] code: swapper/0/1
+> [    5.050281] caller is pwrdm_set_next_pwrst+0x48/0x88
+> [    5.055330] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.14.24-g57341df0b4 #1
+> 
+> Use the raw_smp_processor_id() for the trace instead, this value does
+> not need to be perfectly correct. The alternative of disabling preempt
+> is too heavy weight operation to be applied in PM hot path for just
+> tracing purposes.
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Sorry just noticed this is still pending while looking through
+my inbox. Applying into omap-for-v4.17/fixes.
 
-[..]
-
-> @@ -304,6 +345,8 @@ void __init init_cpu_topology(void)
->  	 * Discard anything that was parsed if we hit an error so we
->  	 * don't use partial information.
->  	 */
-> -	if (of_have_populated_dt() && parse_dt_topology())
-> +	if ((!acpi_disabled) && parse_acpi_topology())
-
-[nit] not sure if extra () is need above, but I am fine either way.
-
--- 
 Regards,
-Sudeep
+
+Tony
