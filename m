@@ -1,39 +1,110 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  2 May 2018 00:12:16 +0800
-Subject: [PATCH net-next v2 04/15] dt-bindings: net: dwmac-sun8i: Sort syscon
- compatibles by alphabetical order
+Date: Wed,  2 May 2018 00:12:23 +0800
+Subject: [PATCH net-next v2 11/15] ARM: dts: sun8i: r40: bananapi-m2-ultra:
+ Sort device node dereferences
 In-Reply-To: <20180501161227.2110-1-wens@csie.org>
 References: <20180501161227.2110-1-wens@csie.org>
-Message-ID: <20180501161227.2110-5-wens@csie.org>
+Message-ID: <20180501161227.2110-12-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T syscon compatible was appended to the syscon compatibles list,
-instead of inserted in to preserve the ordering.
+The device nodes dereference (&foo) usages should be sorted by the label
+names, barring any parsing order issues such as the #include statement
+for the PMIC's .dtsi file that must come after the PMIC.
 
-Move it to the proper place to keep the list sorted.
+Move the mmc and ohci blocks in front of the PMIC's regulator blocks.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 69 ++++++++++---------
+ 1 file changed, 35 insertions(+), 34 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-index e04ce75e24a3..1b8e33e71651 100644
---- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-+++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-@@ -22,10 +22,10 @@ Required properties:
- - #size-cells: shall be 0
- - syscon: A phandle to the syscon of the SoC with one of the following
-  compatible string:
-+  - allwinner,sun8i-a83t-system-controller
-   - allwinner,sun8i-h3-system-controller
-   - allwinner,sun8i-v3s-system-controller
-   - allwinner,sun50i-a64-system-controller
--  - allwinner,sun8i-a83t-system-controller
+diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+index 27d9ccd0ef2f..c6da21e43572 100644
+--- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
++++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+@@ -114,6 +114,41 @@
  
- Optional properties:
- - allwinner,tx-delay-ps: TX clock delay chain value in ps.
+ #include "axp22x.dtsi"
+ 
++&mmc0 {
++	vmmc-supply = <&reg_dcdc1>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>; /* PH13 */
++	cd-inverted;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pg_pins>;
++	vmmc-supply = <&reg_dldo2>;
++	vqmmc-supply = <&reg_dldo1>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&mmc2 {
++	vmmc-supply = <&reg_dcdc1>;
++	vqmmc-supply = <&reg_dcdc1>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&ohci2 {
++	status = "okay";
++};
++
+ &reg_aldo3 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <2700000>;
+@@ -161,40 +196,6 @@
+ 	regulator-name = "vcc-wifi";
+ };
+ 
+-&mmc0 {
+-	vmmc-supply = <&reg_dcdc1>;
+-	bus-width = <4>;
+-	cd-gpios = <&pio 7 13 GPIO_ACTIVE_LOW>; /* PH13 */
+-	status = "okay";
+-};
+-
+-&mmc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc1_pg_pins>;
+-	vmmc-supply = <&reg_dldo2>;
+-	vqmmc-supply = <&reg_dldo1>;
+-	mmc-pwrseq = <&wifi_pwrseq>;
+-	bus-width = <4>;
+-	non-removable;
+-	status = "okay";
+-};
+-
+-&mmc2 {
+-	vmmc-supply = <&reg_dcdc1>;
+-	vqmmc-supply = <&reg_dcdc1>;
+-	bus-width = <8>;
+-	non-removable;
+-	status = "okay";
+-};
+-
+-&ohci1 {
+-	status = "okay";
+-};
+-
+-&ohci2 {
+-	status = "okay";
+-};
+-
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
 -- 
 2.17.0
