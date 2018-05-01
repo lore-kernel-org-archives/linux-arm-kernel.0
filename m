@@ -1,57 +1,227 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 08:13:00 -0500
-Subject: [PATCH v2 10/27] dts: bindings: Restrict coresight tmc-etr
- scatter-gather mode
-In-Reply-To: <1525165857-11096-11-git-send-email-suzuki.poulose@arm.com>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-11-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180501131300.GA31425@rob-hp-laptop>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 1 May 2018 15:20:02 +0200
+Subject: [PATCH v2 2/2] net: stmmac: dwmac-meson: extend phy mode setting
+In-Reply-To: <20180428102111.18384-3-yixun.lan@amlogic.com>
+References: <20180428102111.18384-1-yixun.lan@amlogic.com>
+ <20180428102111.18384-3-yixun.lan@amlogic.com>
+Message-ID: <CAFBinCA6N=q6ZtuA9nfd=8VJjZMg9v8bdqZabVWiyc2-sGB0Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 10:10:40AM +0100, Suzuki K Poulose wrote:
-> We are about to add the support for ETR builtin scatter-gather mode
-> for dealing with large amount of trace buffers. However, on some of
-> the platforms, using the ETR SG mode can lock up the system due to
-> the way the ETR is connected to the memory subsystem.
-> 
-> In SG mode, the ETR performs READ from the scatter-gather table to
-> fetch the next page and regular WRITE of trace data. If the READ
-> operation doesn't complete(due to the memory subsystem issues,
-> which we have seen on a couple of platforms) the trace WRITE
-> cannot proceed leading to issues. So, we by default do not
-> use the SG mode, unless it is known to be safe on the platform.
-> We define a DT property for the TMC node to specify whether we
-> have a proper SG mode.
-> 
-> Cc: Mathieu Poirier <matheiu.poirier@linaro.org>
-> Cc: Mike Leach <mike.leach@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: John Horley <john.horley@arm.com>
-> Cc: Robert Walker <robert.walker@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: frowand.list at gmail.com
-> Cc: Rob Herring <robh@kernel.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Hello Yixun,
+
+On Sat, Apr 28, 2018 at 12:21 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+>   In the Meson-AXG SoC, the phy mode setting of PRG_ETH0 in the glue layer
+> is extended from bit[0] to bit[2:0].
+>   There is no problem if we configure it to the RGMII 1000M PHY mode,
+> since the register setting is coincidentally compatible with previous one,
+> but for the RMII 100M PHY mode, the configuration need to be changed to
+> value - b100.
+>   This patch was verified with a RTL8201F 100M ethernet PHY.
+>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 > ---
->  Documentation/devicetree/bindings/arm/coresight.txt | 3 +++
->  drivers/hwtracing/coresight/coresight-tmc.c         | 8 +++++++-
->  2 files changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> index cdd84d0..7c0c8f0 100644
-> --- a/Documentation/devicetree/bindings/arm/coresight.txt
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -88,6 +88,9 @@ its hardware characteristcs.
->  	* arm,buffer-size: size of contiguous buffer space for TMC ETR
->  	 (embedded trace router)
->  
-> +	* scatter-gather: boolean. Indicates that the TMC-ETR can safely
-> +	  use the SG mode on this system.
+>  .../ethernet/stmicro/stmmac/dwmac-meson8b.c   | 120 +++++++++++++++---
+>  1 file changed, 104 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
+> index 7cb794094a70..4ff231df7322 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/io.h>
+>  #include <linux/ioport.h>
+>  #include <linux/module.h>
+> +#include <linux/of_device.h>
+>  #include <linux/of_net.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/platform_device.h>
+> @@ -29,6 +30,10 @@
+>
+>  #define PRG_ETH0_RGMII_MODE            BIT(0)
+>
+> +#define PRG_ETH0_EXT_PHY_MODE_MASK     GENMASK(2, 0)
+> +#define PRG_ETH0_EXT_RGMII_MODE                1
+> +#define PRG_ETH0_EXT_RMII_MODE         4
 > +
+>  /* mux to choose between fclk_div2 (bit unset) and mpll2 (bit set) */
+>  #define PRG_ETH0_CLK_M250_SEL_SHIFT    4
+>  #define PRG_ETH0_CLK_M250_SEL_MASK     GENMASK(4, 4)
+> @@ -47,12 +52,20 @@
+>
+>  #define MUX_CLK_NUM_PARENTS            2
+>
+> +struct meson8b_dwmac;
+> +
+> +struct meson8b_dwmac_data {
+> +       int (*set_phy_mode)(struct meson8b_dwmac *dwmac);
+> +};
+> +
+>  struct meson8b_dwmac {
+> -       struct device           *dev;
+> -       void __iomem            *regs;
+> -       phy_interface_t         phy_mode;
+> -       struct clk              *rgmii_tx_clk;
+> -       u32                     tx_delay_ns;
+> +       struct device                   *dev;
+> +       void __iomem                    *regs;
+> +
+> +       const struct meson8b_dwmac_data *data;
+> +       phy_interface_t                 phy_mode;
+> +       struct clk                      *rgmii_tx_clk;
+> +       u32                             tx_delay_ns;
+>  };
+>
+>  struct meson8b_dwmac_clk_configs {
+> @@ -171,6 +184,59 @@ static int meson8b_init_rgmii_tx_clk(struct meson8b_dwmac *dwmac)
+>         return 0;
+>  }
+>
+> +static int meson8b_set_phy_mode(struct meson8b_dwmac *dwmac)
+> +{
+> +       switch (dwmac->phy_mode) {
+> +       case PHY_INTERFACE_MODE_RGMII:
+> +       case PHY_INTERFACE_MODE_RGMII_RXID:
+> +       case PHY_INTERFACE_MODE_RGMII_ID:
+> +       case PHY_INTERFACE_MODE_RGMII_TXID:
+> +               /* enable RGMII mode */
+> +               meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+> +                                       PRG_ETH0_RGMII_MODE,
+> +                                       PRG_ETH0_RGMII_MODE);
+> +               break;
+> +       case PHY_INTERFACE_MODE_RMII:
+> +               /* disable RGMII mode -> enables RMII mode */
+> +               meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+> +                                       PRG_ETH0_RGMII_MODE, 0);
+> +               break;
+> +       default:
+> +               dev_err(dwmac->dev, "fail to set phy-mode %s\n",
+> +                       phy_modes(dwmac->phy_mode));
+> +               return -EINVAL;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int meson_axg_set_phy_mode(struct meson8b_dwmac *dwmac)
+> +{
+> +       switch (dwmac->phy_mode) {
+> +       case PHY_INTERFACE_MODE_RGMII:
+> +       case PHY_INTERFACE_MODE_RGMII_RXID:
+> +       case PHY_INTERFACE_MODE_RGMII_ID:
+> +       case PHY_INTERFACE_MODE_RGMII_TXID:
+> +               /* enable RGMII mode */
+> +               meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+> +                                       PRG_ETH0_EXT_PHY_MODE_MASK,
+> +                                       PRG_ETH0_EXT_RGMII_MODE);
+> +               break;
+> +       case PHY_INTERFACE_MODE_RMII:
+> +               /* disable RGMII mode -> enables RMII mode */
+if you have to re-send it for whatever reason:
+maybe you could remove the comments from meson_axg_set_phy_mode. the
+"older" register layout requires un-setting RGMII mode to enable RMII
+mode. however, for AXG there seem to be two dedicated values (1 and 4)
+for each mode
 
-Needs a vendor prefix.
+apart from that:
+Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
->  * Optional property for CATU :
->  	* interrupts : Exactly one SPI may be listed for reporting the address
->  	  error
+> +               meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+> +                                       PRG_ETH0_EXT_PHY_MODE_MASK,
+> +                                       PRG_ETH0_EXT_RMII_MODE);
+> +               break;
+> +       default:
+> +               dev_err(dwmac->dev, "fail to set phy-mode %s\n",
+> +                       phy_modes(dwmac->phy_mode));
+> +               return -EINVAL;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
+>  {
+>         int ret;
+> @@ -188,10 +254,6 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
+>
+>         case PHY_INTERFACE_MODE_RGMII_ID:
+>         case PHY_INTERFACE_MODE_RGMII_TXID:
+> -               /* enable RGMII mode */
+> -               meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_RGMII_MODE,
+> -                                       PRG_ETH0_RGMII_MODE);
+> -
+>                 /* only relevant for RMII mode -> disable in RGMII mode */
+>                 meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+>                                         PRG_ETH0_INVERTED_RMII_CLK, 0);
+> @@ -224,10 +286,6 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
+>                 break;
+>
+>         case PHY_INTERFACE_MODE_RMII:
+> -               /* disable RGMII mode -> enables RMII mode */
+> -               meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_RGMII_MODE,
+> -                                       0);
+> -
+>                 /* invert internal clk_rmii_i to generate 25/2.5 tx_rx_clk */
+>                 meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
+>                                         PRG_ETH0_INVERTED_RMII_CLK,
+> @@ -274,6 +332,11 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
+>                 goto err_remove_config_dt;
+>         }
+>
+> +       dwmac->data = (const struct meson8b_dwmac_data *)
+> +               of_device_get_match_data(&pdev->dev);
+> +       if (!dwmac->data)
+> +               return -EINVAL;
+> +
+>         res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>         dwmac->regs = devm_ioremap_resource(&pdev->dev, res);
+>         if (IS_ERR(dwmac->regs)) {
+> @@ -298,6 +361,10 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
+>         if (ret)
+>                 goto err_remove_config_dt;
+>
+> +       ret = dwmac->data->set_phy_mode(dwmac);
+> +       if (ret)
+> +               goto err_remove_config_dt;
+> +
+>         ret = meson8b_init_prg_eth(dwmac);
+>         if (ret)
+>                 goto err_remove_config_dt;
+> @@ -316,10 +383,31 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
+>         return ret;
+>  }
+>
+> +static const struct meson8b_dwmac_data meson8b_dwmac_data = {
+> +       .set_phy_mode = meson8b_set_phy_mode,
+> +};
+> +
+> +static const struct meson8b_dwmac_data meson_axg_dwmac_data = {
+> +       .set_phy_mode = meson_axg_set_phy_mode,
+> +};
+> +
+>  static const struct of_device_id meson8b_dwmac_match[] = {
+> -       { .compatible = "amlogic,meson8b-dwmac" },
+> -       { .compatible = "amlogic,meson8m2-dwmac" },
+> -       { .compatible = "amlogic,meson-gxbb-dwmac" },
+> +       {
+> +               .compatible = "amlogic,meson8b-dwmac",
+> +               .data = &meson8b_dwmac_data,
+> +       },
+> +       {
+> +               .compatible = "amlogic,meson8m2-dwmac",
+> +               .data = &meson8b_dwmac_data,
+> +       },
+> +       {
+> +               .compatible = "amlogic,meson-gxbb-dwmac",
+> +               .data = &meson8b_dwmac_data,
+> +       },
+> +       {
+> +               .compatible = "amlogic,meson-axg-dwmac",
+> +               .data = &meson_axg_dwmac_data,
+> +       },
+>         { }
+>  };
+>  MODULE_DEVICE_TABLE(of, meson8b_dwmac_match);
+> --
+> 2.17.0
+>
