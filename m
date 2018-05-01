@@ -1,30 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 07:54:42 -0500
-Subject: [PATCHv2 1/3] Documentation: dt: socfpga: Add Stratix10 ECC
- Manager binding
-In-Reply-To: <1524854238-19394-2-git-send-email-thor.thayer@linux.intel.com>
-References: <1524854238-19394-1-git-send-email-thor.thayer@linux.intel.com>
- <1524854238-19394-2-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <20180501125442.GA12012@rob-hp-laptop>
+Date: Tue, 1 May 2018 07:55:19 -0500
+Subject: [PATCH v2 1/2] dt-bindings: net: meson-dwmac: new compatible
+ name for AXG SoC
+In-Reply-To: <20180428102111.18384-2-yixun.lan@amlogic.com>
+References: <20180428102111.18384-1-yixun.lan@amlogic.com>
+ <20180428102111.18384-2-yixun.lan@amlogic.com>
+Message-ID: <20180501125519.GA14984@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 01:37:16PM -0500, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+On Sat, Apr 28, 2018 at 10:21:10AM +0000, Yixun Lan wrote:
+> We need to introduce a new compatible name for the Meson-AXG SoC
+> in order to support the RMII 100M ethernet PHY, since the PRG_ETH0
+> register of the dwmac glue layer is changed from previous old SoC.
 > 
-> Add the device tree bindings needed to support the Stratix10
-> ECC Manager and SDRAM ECC.
-> 
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 > ---
-> v2  Remove unused System Manager syscon.
->     Remove unused SDRAM ECC register defines.
->     Remove unused address, size and range from bindings.
-> ---
->  .../bindings/arm/altera/socfpga-eccmgr.txt         | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
-
-This should move to bindings/edac/. Can you do that as a follow-up 
-patch?
+>  Documentation/devicetree/bindings/net/meson-dwmac.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
