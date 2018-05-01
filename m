@@ -1,188 +1,151 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 09:24:59 -0500
-Subject: [PATCH 1/2] dt-bindings: add MediaTek XS-PHY binding
-In-Reply-To: <1524642329-12255-2-git-send-email-chunfeng.yun@mediatek.com>
-References: <1524642329-12255-1-git-send-email-chunfeng.yun@mediatek.com>
- <1524642329-12255-2-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <20180501142459.GA10534@rob-hp-laptop>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 1 May 2018 15:33:33 +0100
+Subject: [PATCH v8 13/13] arm64: topology: divorce MC scheduling domain
+ from core_siblings
+In-Reply-To: <20180425233121.13270-14-jeremy.linton@arm.com>
+References: <20180425233121.13270-1-jeremy.linton@arm.com>
+ <20180425233121.13270-14-jeremy.linton@arm.com>
+Message-ID: <62677b95-faf5-4908-abc9-428ef39ea912@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 03:45:28PM +0800, Chunfeng Yun wrote:
-> Add a DT binding documentation of XS-PHY for MediaTek SoCs
-> with USB3.1 GEN2 controller
+
+
+On 26/04/18 00:31, Jeremy Linton wrote:
+> Now that we have an accurate view of the physical topology
+> we need to represent it correctly to the scheduler. Generally MC
+> should equal the LLC in the system, but there are a number of
+> special cases that need to be dealt with.
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> In the case of NUMA in socket, we need to assure that the sched
+> domain we build for the MC layer isn't larger than the DIE above it.
+> Similarly for LLC's that might exist in cross socket interconnect or
+> directory hardware we need to assure that MC is shrunk to the socket
+> or NUMA node.
+> 
+> This patch builds a sibling mask for the LLC, and then picks the
+> smallest of LLC, socket siblings, or NUMA node siblings, which
+> gives us the behavior described above. This is ever so slightly
+> different than the similar alternative where we look for a cache
+> layer less than or equal to the socket/NUMA siblings.
+> 
+> The logic to pick the MC layer affects all arm64 machines, but
+> only changes the behavior for DT/MPIDR systems if the NUMA domain
+> is smaller than the core siblings (generally set to the cluster).
+> Potentially this fixes a possible bug in DT systems, but really
+> it only affects ACPI systems where the core siblings is correctly
+> set to the socket siblings. Thus all currently available ACPI
+> systems should have MC equal to LLC, including the NUMA in socket
+> machines where the LLC is partitioned between the NUMA nodes.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 > ---
->  .../devicetree/bindings/phy/phy-mtk-xsphy.txt      |  127 ++++++++++++++++++++
->  1 file changed, 127 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
+>  arch/arm64/include/asm/topology.h |  2 ++
+>  arch/arm64/kernel/topology.c      | 32 +++++++++++++++++++++++++++++++-
+>  2 files changed, 33 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
-> new file mode 100644
-> index 0000000..23c51a0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
-> @@ -0,0 +1,127 @@
-> +MediaTek XS-PHY binding
-> +--------------------------
+> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+> index 6b10459e6905..df48212f767b 100644
+> --- a/arch/arm64/include/asm/topology.h
+> +++ b/arch/arm64/include/asm/topology.h
+> @@ -8,8 +8,10 @@ struct cpu_topology {
+>  	int thread_id;
+>  	int core_id;
+>  	int package_id;
+> +	int llc_id;
+>  	cpumask_t thread_sibling;
+>  	cpumask_t core_sibling;
+> +	cpumask_t llc_siblings;
+>  };
+>  
+>  extern struct cpu_topology cpu_topology[NR_CPUS];
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index bd1aae438a31..20b4341dc527 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -13,6 +13,7 @@
+>  
+>  #include <linux/acpi.h>
+>  #include <linux/arch_topology.h>
+> +#include <linux/cacheinfo.h>
+>  #include <linux/cpu.h>
+>  #include <linux/cpumask.h>
+>  #include <linux/init.h>
+> @@ -214,7 +215,19 @@ EXPORT_SYMBOL_GPL(cpu_topology);
+>  
+>  const struct cpumask *cpu_coregroup_mask(int cpu)
+>  {
+> -	return &cpu_topology[cpu].core_sibling;
+> +	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
 > +
-> +The XS-PHY controller supports physical layer functionality for USB3.1
-> +GEN2 controller on MediaTek SoCs.
+> +	/* Find the smaller of NUMA, core or LLC siblings */
+> +	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
+> +		/* not numa in package, lets use the package siblings */
+> +		core_mask = &cpu_topology[cpu].core_sibling;
+> +	}
+> +	if (cpu_topology[cpu].llc_id != -1) {
+> +		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
+> +			core_mask = &cpu_topology[cpu].llc_siblings;
+> +	}
 > +
-> +Required properties (controller (parent) node):
-> + - compatible	: should be "mediatek,<soc-model>-xsphy", "mediatek,xsphy",
-> + 		  soc-model is the name of SoC, such as mt2712 etc;
-
-Please list all valid SoCs.
-
-> +		  when using "mediatek,xsphy" compatible string, you need SoC specific
-> +		  ones in addition.
-> +
-> +Required nodes	: a sub-node is required for each port the controller
-> +		  provides. Address range information including the usual
-> +		  'reg' property is used inside these nodes to describe
-> +		  the controller's topology.
-
-This should go afer the parent optional properties.
-
-> +
-> +Optional properties (controller (parent) node):
-> + - reg		: offset and length of register shared by multiple U3 ports,
-> +		  exclude port's private register, if only U2 ports provided,
-> +		  shouldn't use the property.
-> + - mediatek,src-ref-clk-mhz	: u32, frequency of reference clock for slew rate
-> +		  calibrate
-> + - mediatek,src-coef	: u32, coefficient for slew rate calibrate, depends on
-> +		  SoC process
-> +
-> +Required properties (port (child) node):
-> +- reg		: address and length of the register set for the port.
-> +- clocks	: a list of phandle + clock-specifier pairs, one for each
-> +		  entry in clock-names
-> +- clock-names	: must contain
-> +		  "ref": 48M reference clock for HighSpeed analog phy; and 26M
-> +			reference clock for SuperSpeedPlus analog phy, sometimes is
-> +			24M, 25M or 27M, depended on platform.
-> +- #phy-cells	: should be 1 (See second example)
-> +		  cell after port phandle is phy type from:
-> +			- PHY_TYPE_USB2
-> +			- PHY_TYPE_USB3
-
-Is the type a property of the connection to the host? If not, this 
-shouldn't be part of the phy cells. I would add compatible strings to 
-the child nodes to define this. I think that would simplify the driver 
-too as then you can parse DT properties in probe rather than phy_init.
-
-> +
-> +The following optional properties are only for debug or HQA test
-> +Optional properties (PHY_TYPE_USB2 port (child) node):
-> +- mediatek,eye-src	: u32, the value of slew rate calibrate
-> +- mediatek,eye-vrt	: u32, the selection of VRT reference voltage
-> +- mediatek,eye-term	: u32, the selection of HS_TX TERM reference voltage
-> +- mediatek,efuse-intr	: u32, the selection of Internal Resistor
-> +
-> +Optional properties (PHY_TYPE_USB3 port (child) node):
-> +- mediatek,efuse-intr	: u32, the selection of Internal Resistor
-> +- mediatek,efuse-tx-imp	: u32, the selection of TX Impedance
-> +- mediatek,efuse-rx-imp	: u32, the selection of RX Impedance
-> +
-> +Example:
-> +
-> +u3phy: usb-phy at 11c40000 {
-> +	compatible = "mediatek,mt36xx-xsphy", "mediatek,xsphy";
-
-Is mt36xx a specific SoC? Don't use wildcards in compatible strings.
-
-> +	reg = <0 0x11c43000 0 0x0200>;
-> +	mediatek,src-ref-clk-mhz = <26>;
-> +	mediatek,src-coef = <17>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-
-Really need 64-bit sizes?
-
-> +	ranges;
-
-Limiting the range to only the phy addresses is preferred.
-
-> +	status = "disabled";
-
-Don't show status in examples.
-
-> +
-> +	u2port0: usb-phy at 11c40000 {
-> +		reg = <0 0x11c40000 0 0x0400>;
-> +		clocks = <&clk48m>;
-> +		clock-names = "ref";
-> +		mediatek,eye-src = <4>;
-> +		#phy-cells = <1>;
-> +		status = "okay";
-> +	};
-> +
-> +	u3port0: usb-phy at 11c43000 {
-> +		reg = <0 0x11c43400 0 0x0500>;
-> +		clocks = <&clk26m>;
-> +		clock-names = "ref";
-> +		mediatek,efuse-intr = <28>;
-> +		#phy-cells = <1>;
-> +		status = "okay";
-> +	};
-> +};
+> +	return core_mask;
+>  }
+>  
+>  static void update_siblings_masks(unsigned int cpuid)
+> @@ -226,6 +239,9 @@ static void update_siblings_masks(unsigned int cpuid)
+>  	for_each_possible_cpu(cpu) {
+>  		cpu_topo = &cpu_topology[cpu];
+>  
+> +		if (cpuid_topo->llc_id == cpu_topo->llc_id)
+> +			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
 > +
 
-> +Specifying phy control of devices
-> +---------------------------------
-> +
-> +Device nodes should specify the configuration required in their "phys"
-> +property, containing a phandle to the phy port node and a device type;
-> +phy-names for each port are optional.
-> +
-> +Example:
-> +
-> +#include <dt-bindings/phy/phy.h>
-> +
-> +ssusb: usb at 112a0000 {
-> +	...
-> +	phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
-> +	phy-names = "usb2-0", "usb3-0";
-> +	...
-> +};
+Would this not result in cpuid_topo->llc_siblings = cpu_possible_mask
+on DT systems where llc_id is not set/defaults to -1 and still pass the
+condition. Does it make sense to add additional -1 check ?
 
-This section is not necessary. We've already explained how to use the 
-phy binding elsewhere.
-
+>  		if (cpuid_topo->package_id != cpu_topo->package_id)
+>  			continue;
+>  
+> @@ -291,6 +307,10 @@ static void __init reset_cpu_topology(void)
+>  		cpu_topo->core_id = 0;
+>  		cpu_topo->package_id = -1;
+>  
+> +		cpu_topo->llc_id = -1;
+> +		cpumask_clear(&cpu_topo->llc_siblings);
+> +		cpumask_set_cpu(cpu, &cpu_topo->llc_siblings);
 > +
+>  		cpumask_clear(&cpu_topo->core_sibling);
+>  		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+>  		cpumask_clear(&cpu_topo->thread_sibling);
+> @@ -311,6 +331,8 @@ static int __init parse_acpi_topology(void)
+>  	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+>  
+>  	for_each_possible_cpu(cpu) {
+> +		int i;
 > +
-> +Banks layout of xsphy
-
-Put this before the example.
-
-> +-------------------------------------------------------------
-> +port        offset    bank
-> +u2 port0    0x0000    MISC
-> +            0x0100    FMREG
-> +            0x0300    U2PHY_COM
-> +u2 port1    0x1000    MISC
-> +            0x1100    FMREG
-> +            0x1300    U2PHY_COM
-> +u2 port2    0x2000    MISC
-> +            ...
-> +u31 common  0x3000    DIG_GLB
-> +            0x3100    PHYA_GLB
-> +u31 port0   0x3400    DIG_LN_TOP
-> +            0x3500    DIG_LN_TX0
-> +            0x3600    DIG_LN_RX0
-> +            0x3700    DIG_LN_DAIF
-> +            0x3800    PHYA_LN
-> +u31 port1   0x3a00    DIG_LN_TOP
-> +            0x3b00    DIG_LN_TX0
-> +            0x3c00    DIG_LN_RX0
-> +            0x3d00    DIG_LN_DAIF
-> +            0x3e00    PHYA_LN
-> +            ...
+>  		topology_id = find_acpi_cpu_topology(cpu, 0);
+>  		if (topology_id < 0)
+>  			return topology_id;
+> @@ -325,6 +347,14 @@ static int __init parse_acpi_topology(void)
+>  		}
+>  		topology_id = find_acpi_cpu_topology_package(cpu);
+>  		cpu_topology[cpu].package_id = topology_id;
 > +
-> +DIG_GLB & PHYA_GLB are shared by U31 ports.
-> -- 
-> 1.7.9.5
-> 
+> +		i = acpi_find_last_cache_level(cpu);
+> +
+> +		if (i > 0) {
+> +			topology_id = find_acpi_cpu_cache_topology(cpu, i);
+> +			if (topology_id > 0)
+> +				cpu_topology[cpu].llc_id = topology_id;
+> +		}
+
+[nit] s/topology_id/cache_id/ or s/topology_id/cache_topology_id/ ?
+
+Otherwise looks fine to me. You can add with above things fixed.
+
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+
+-- 
+Regards,
+Sudeep
