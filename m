@@ -1,87 +1,82 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 May 2018 10:29:01 -0500
-Subject: [PATCH 3/4] dt-bindings: arm: fsl: add scu binding doc
-In-Reply-To: <1524854776-14863-4-git-send-email-aisheng.dong@nxp.com>
-References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
- <1524854776-14863-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20180501152901.GA12831@rob-hp-laptop>
+From: aford173@gmail.com (Adam Ford)
+Date: Tue, 1 May 2018 10:30:15 -0500
+Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add fixed 26MHz clock as fck
+ for twl
+In-Reply-To: <20180405115239.17370-1-peter.ujfalusi@ti.com>
+References: <20180405115239.17370-1-peter.ujfalusi@ti.com>
+Message-ID: <CAHCN7x+Ow7B4kTmd+4PkDd=azn-qKMYmEyjqfb8GkXA7Y7pEPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2018 at 02:46:15AM +0800, Dong Aisheng wrote:
-> The System Controller Firmware (SCFW) is a low-level system function
-> which runs on a dedicated Cortex-M core to provide power, clock, and
-> resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-> (QM, QP), and i.MX8QX (QXP, DX).
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+On Thu, Apr 5, 2018 at 6:52 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> The board uses 26MHz oscillator for the twl4030 HFCLK.
+> This way we will not depend on the bootloader to configure the
+> CFG_BOOT:HFCLK_FREQ
+>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > ---
->  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 40 ++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> new file mode 100644
-> index 0000000..3b51d82
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> @@ -0,0 +1,40 @@
-> +NXP i.MX System Controller Firmware (SCFW)
-> +--------------------------------------------------------------------
-> +
-> +The System Controller Firmware (SCFW) is a low-level system function
-> +which runs on a dedicated Cortex-M core to provide power, clock, and
-> +resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-> +(QM, QP), and i.MX8QX (QXP, DX).
-> +
-> +The AP communicates with the SC using a multi-ported MU module found
-> +in the LSIO subsystem. The current definition of this MU module provides
-> +5 remote AP connections to the SC to support up to 5 execution environments
-> +(TZ, HV, standard Linux, etc.). The SC side of this MU module interfaces
-> +with the LSIO DSC IP bus. The SC firmware will communicate with this MU
-> +using the MSI bus.
-> +
-> +System Controller Device Node:
-> +=============================
-> +
-> +Required properties:
-> +-------------------
-> +- compatible: should be "fsl,imx8qxp-scu" or "fsl,imx8qm-scu"
-> +- fsl,mu: a phandle to the Message Unit used by SCU. Should be
+> Hi,
+>
+> there might be other boards (all omap3 boards with twl4030?) which uses the same
+> setup, but I only have schematics for beagle-xm.
+>
 
-Use the mailbox binding.
+I know I am late coming into this, but we have twl4030_omap3.dtsi for
+the items common to omap3. Can we put the clock reference in that
+file?
 
-> +	  one of LSIO MU0~M4 for imx8qxp and imx8qm. Users need
-> +	  to make sure not use the one which is conflict with
-> +	  other execution environments. e.g. ATF.
+It seems like it would be cleaner than having a dozen boards or so
+boards having the exact same copy of the same stuff. SHould something
+change in the future, I would think it would make
+maintenance easier too.  Just my two cents.
+
+adam
+
+> In order for the driver to actually use the clock the
+> [PATCH] mfd: twl-core: Fix clock initialization
+> need to be applied. W/o the twl-core patch the clock is just ignored.
+>
+> Regards,
+> Peter
+>
+>  arch/arm/boot/dts/omap3-beagle-xm.dts | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> index 0349fcc9dc26..d80587de0bbf 100644
+> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> @@ -30,6 +30,13 @@
+>                 ethernet = &ethernet;
+>         };
+>
+> +       /* fixed 26MHz oscillator */
+> +       hfclk_26m: oscillator {
+> +               #clock-cells = <0>;
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <26000000>;
+> +       };
 > +
-> +Examples:
-> +--------
-> +lsio_mu0: mu at 5d1b0000 {
-> +	compatible = "fsl,imx8qxp-mu", "fsl,imx6sx-mu";
-> +	reg = <0x0 0x5d1b0000 0x0 0x10000>;
-> +	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-> +	status = "okay";
-> +};
+>         leds {
+>                 compatible = "gpio-leds";
+>
+> @@ -274,6 +281,9 @@
+>                 interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+>                 interrupt-parent = <&intc>;
+>
+> +               clocks = <&hfclk_26m>;
+> +               clock-names = "fck";
 > +
-> +scu {
-> +	compatible = "fsl,imx8qxp-scu";
-> +	fsl,mu = <&lsio_mu0>;
-> +	status = "okay";
-
-Don't show status in examples.
-
-> +};
-> -- 
-> 2.7.4
-> 
+>                 twl_audio: audio {
+>                         compatible = "ti,twl4030-audio";
+>                         codec {
 > --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> Peter
+>
+> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
