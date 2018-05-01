@@ -1,104 +1,70 @@
-From: joelaf@google.com (Joel Fernandes)
-Date: Tue, 01 May 2018 20:51:45 +0000
-Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <cc4347d0-995d-6921-a796-374a214cdce9@arm.com>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <CAEi0qNk7pVtfcrFU4gM35sajPb09xjR8d6cJkgoSr-H0Tgo+QA@mail.gmail.com>
- <cc4347d0-995d-6921-a796-374a214cdce9@arm.com>
-Message-ID: <CAJWu+orJPfY4OMbNa5BqgteyYL+-r2vj+5O_ohbHe5_F-7TWTg@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 1 May 2018 13:57:13 -0700
+Subject: [PATCH v2] Input: atmel_mxt_ts - add missing compatible strings to
+ OF device table
+In-Reply-To: <CAL_JsqJ-UTGrPm2tiS1yVFweWB_LH2JSBpOpMtogTYFi7pCsGA@mail.gmail.com>
+References: <20180410095340.24074-1-javierm@redhat.com>
+ <20180501184853.GB52077@dtor-ws>
+ <CAL_JsqJ-UTGrPm2tiS1yVFweWB_LH2JSBpOpMtogTYFi7pCsGA@mail.gmail.com>
+Message-ID: <20180501205713.GA130399@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 2:46 AM Julien Thierry <julien.thierry@arm.com>
-wrote:
-[...]
-> > On Wed, Jan 17, 2018 at 3:54 AM, Julien Thierry <julien.thierry@arm.com>
-wrote:
-> >> Hi,
-> >>
-> >> This series is a continuation of the work started by Daniel [1]. The
-goal
-> >> is to use GICv3 interrupt priorities to simulate an NMI.
-> >>
-> >> To achieve this, set two priorities, one for standard interrupts and
-> >> another, higher priority, for NMIs. Whenever we want to disable
-interrupts,
-> >> we mask the standard priority instead so NMIs can still be raised. Some
-> >> corner cases though still require to actually mask all interrupts
-> >> effectively disabling the NMI.
-> >>
-> >> Of course, using priority masking instead of PSR.I comes at some cost.
-On
-> >> hackbench, the drop of performance seems to be >1% on average for this
-> >> version. I can only attribute that to recent changes in the kernel as
-> >
-> > Do you have more specific performance data on the performance overhead
-> > with this series?
-> >
+From: Javier Martinez Canillas <javierm@redhat.com>
 
-> Not at the moment. I was planning on doing a v3 anyway considering this
-> series is getting a bit old and the GICv3 driver has had some
-modifications.
+Commit af503716ac14 ("i2c: core: report OF style module alias for devices
+registered via OF") fixed how the I2C core reports the module alias when
+devices are registered via OF.
 
-Great! Looking forward to it, will try to find some time to review this set
-as well.
+But the atmel_mxt_ts driver only has an "atmel,maxtouch" compatible in its
+OF device ID table, so if a Device Tree is using a different one, autoload
+won't be working for the module (the matching works because the I2C device
+ID table is used as a fallback).
 
-> Once I get to it I can try to have more detailed performance data on a
-> recent kernel. I've really only measured the performance on hackbench
-> and on kernel build from defconfig (and for the kernel build the
-> performance difference was completely hidden by the noise).
+So add compatible strings for each of the entries in the I2C device table.
 
-> >> hackbench seems slightly slower compared to my other benchmarks while
-the
-> >> runs with the use of GICv3 priorities have stayed in the same time
-frames.
-> >> KVM Guests do not seem to be affected preformance-wise by the host
-using
-> >> PMR to mask interrupts or not.
-> >>
-> >> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
-> >> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as
-NMI
-> >> for now. I don't think there is any reason LPIs should be allowed to
-be set
-> >> as NMI as they do not have an active state.
-> >> When an NMI is active on a CPU, no other NMI can be triggered on the
-CPU.
-> >>
-> >>
-> >> Requirements to use this:
-> >> - Have GICv3
-> >> - SCR_EL3.FIQ is set to 1 when linux runs
-> >
-> > Ah I see it mentioned here. Again, can you clarify if this is
-> > something that can be misconfigured? Is it something that the
-> > bootloader sets?
-> >
+Fixes: af503716ac14 ("i2c: core: report OF style module alias for devices registered via OF")
+Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+[dtor: document which compatibles are deprecated and should not be used]
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+ .../devicetree/bindings/input/atmel,maxtouch.txt   |    7 +++++++
+ drivers/input/touchscreen/atmel_mxt_ts.c           |    5 +++++
+ 2 files changed, 12 insertions(+)
 
-> Yes, this is something that the bootloader sets and we have seen a few
-> cases where it is set to 0, so it can be "misconfigured".
-
-> It is not impossible to handle this case, but this bit affects the view
-> the GICv3 CPU interface has on interrupt priority values. However it
-> requires to add some conditions in both the interrupt handling and
-> masking/unmasking code, so ideally we would avoid adding things to this.
-
-> But the idea is that Linux only deals with group 1 interrupts, and group
-> 1 interrupts are only signaled as FIQs when the execution state is
-> secure or at EL3, which should never happen in Linux's case. So ideally
-> we'd like firmwares to set up this bit properly rather than to have to
-> deal with both cases when only one of them makes sense for Linux.
-
- From what I see, on all our platforms, FIQs are delivered to the secure
-monitor only. Which is the reason for this patchset in the first place. I
-can't imagine a usecase that is not designed like this (and have not come
-across this), so its probably Ok to just assume SCR_EL3.FIQ is to 1.
-
-In the future, if SCR_EL3.FIQ is set 0, then the NMI should use the FIQ
-mechanism delivered to the non-secure OS.
-
-Does what I say make sense or was I just shooting arrows in the dark? :-P
-
-thanks,
-
-- Joel
+diff --git a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+index 23e3abc3fdef0..c88919480d373 100644
+--- a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
++++ b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+@@ -4,6 +4,13 @@ Required properties:
+ - compatible:
+     atmel,maxtouch
+ 
++    The following compatibles have been used in various products but are
++    deprecated:
++	atmel,qt602240_ts
++	atmel,atmel_mxt_ts
++	atmel,atmel_mxt_tp
++	atmel,mXT224
++
+ - reg: The I2C address of the device
+ 
+ - interrupts: The sink for the touchpad's IRQ output
+diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
+index 5f41c1860f403..779dbfcc0eded 100644
+--- a/drivers/input/touchscreen/atmel_mxt_ts.c
++++ b/drivers/input/touchscreen/atmel_mxt_ts.c
+@@ -3297,6 +3297,11 @@ static SIMPLE_DEV_PM_OPS(mxt_pm_ops, mxt_suspend, mxt_resume);
+ 
+ static const struct of_device_id mxt_of_match[] = {
+ 	{ .compatible = "atmel,maxtouch", },
++	/* Compatibles listed below are deprecated */
++	{ .compatible = "atmel,qt602240_ts", },
++	{ .compatible = "atmel,atmel_mxt_ts", },
++	{ .compatible = "atmel,atmel_mxt_tp", },
++	{ .compatible = "atmel,mXT224", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, mxt_of_match);
