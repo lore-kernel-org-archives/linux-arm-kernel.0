@@ -1,87 +1,127 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue,  1 May 2018 14:31:26 +0200
-Subject: [PATCH v8 07/12] ARM: sunxi: Add initialization of CNTVOFF
+Date: Tue,  1 May 2018 14:31:24 +0200
+Subject: [PATCH v8 05/12] ARM: dts: sun8i: a83t: Add CCI-400 node
 In-Reply-To: <20180501123131.7738-1-mylene.josserand@bootlin.com>
 References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
-Message-ID: <20180501123131.7738-8-mylene.josserand@bootlin.com>
+Message-ID: <20180501123131.7738-6-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initialization of CNTVOFF for sun8i-a83t.
-
-For boot CPU, create a new machine that handles this
-function's call in an "init_early" callback. We need to initialize
-CNTVOFF before the arch timer's initialization otherwise, it will
-not be taken into account and fails to boot correctly.
-Because of that, this function can't be called in SMP's early_initcall
-function which is called after timer's init.
-
-For secondary CPUs, add this function into secondary_startup
-assembly entry.
+Add CCI-400 node and control-port on CPUs needed by SMP bringup.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/mach-sunxi/headsmp.S |  1 +
- arch/arm/mach-sunxi/sunxi.c   | 20 +++++++++++++++++++-
- 2 files changed, 20 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 41 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-index 37dc772701f3..32d76be98541 100644
---- a/arch/arm/mach-sunxi/headsmp.S
-+++ b/arch/arm/mach-sunxi/headsmp.S
-@@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 53ace066b7dc..0669b8dc499d 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -66,6 +66,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			cci-control-port = <&cci_control0>;
+ 			reg = <0>;
+ 		};
  
- ENTRY(sunxi_mc_smp_secondary_startup)
- 	bl	sunxi_mc_smp_cluster_cache_enable
-+	bl	secure_cntvoff_init
- 	b	secondary_startup
- ENDPROC(sunxi_mc_smp_secondary_startup)
+@@ -73,6 +74,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			cci-control-port = <&cci_control0>;
+ 			reg = <1>;
+ 		};
  
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 5e9602ce1573..2770a31a9278 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -16,6 +16,7 @@
- #include <linux/platform_device.h>
+@@ -80,6 +82,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			cci-control-port = <&cci_control0>;
+ 			reg = <2>;
+ 		};
  
- #include <asm/mach/arch.h>
-+#include <asm/secure_cntvoff.h>
+@@ -87,6 +90,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			cci-control-port = <&cci_control0>;
+ 			reg = <3>;
+ 		};
  
- static const char * const sunxi_board_dt_compat[] = {
- 	"allwinner,sun4i-a10",
-@@ -62,7 +63,6 @@ MACHINE_END
- static const char * const sun8i_board_dt_compat[] = {
- 	"allwinner,sun8i-a23",
- 	"allwinner,sun8i-a33",
--	"allwinner,sun8i-a83t",
- 	"allwinner,sun8i-h2-plus",
- 	"allwinner,sun8i-h3",
- 	"allwinner,sun8i-r40",
-@@ -75,6 +75,24 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
- 	.dt_compat	= sun8i_board_dt_compat,
- MACHINE_END
+@@ -96,6 +100,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			operating-points-v2 = <&cpu1_opp_table>;
++			cci-control-port = <&cci_control1>;
+ 			reg = <0x100>;
+ 		};
  
-+void __init sun8i_a83t_cntvoff_init(void)
-+{
-+#ifdef CONFIG_SMP
-+	secure_cntvoff_init();
-+#endif
-+}
+@@ -103,6 +108,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			operating-points-v2 = <&cpu1_opp_table>;
++			cci-control-port = <&cci_control1>;
+ 			reg = <0x101>;
+ 		};
+ 
+@@ -110,6 +116,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			operating-points-v2 = <&cpu1_opp_table>;
++			cci-control-port = <&cci_control1>;
+ 			reg = <0x102>;
+ 		};
+ 
+@@ -117,6 +124,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			operating-points-v2 = <&cpu1_opp_table>;
++			cci-control-port = <&cci_control1>;
+ 			reg = <0x103>;
+ 		};
+ 	};
+@@ -354,6 +362,39 @@
+ 			reg = <0x01700000 0x400>;
+ 		};
+ 
++		cci at 1790000 {
++			compatible = "arm,cci-400";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x01790000 0x10000>;
++			ranges = <0x0 0x01790000 0x10000>;
 +
-+static const char * const sun8i_a83t_cntvoff_board_dt_compat[] = {
-+	"allwinner,sun8i-a83t",
-+	NULL,
-+};
++			cci_control0: slave-if at 4000 {
++				compatible = "arm,cci-400-ctrl-if";
++				interface-type = "ace";
++				reg = <0x4000 0x1000>;
++			};
 +
-+DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i-a83t board")
-+	.init_early	= sun8i_a83t_cntvoff_init,
-+	.init_time	= sun6i_timer_init,
-+	.dt_compat	= sun8i_a83t_cntvoff_board_dt_compat,
-+MACHINE_END
++			cci_control1: slave-if at 5000 {
++				compatible = "arm,cci-400-ctrl-if";
++				interface-type = "ace";
++				reg = <0x5000 0x1000>;
++			};
 +
- static const char * const sun9i_board_dt_compat[] = {
- 	"allwinner,sun9i-a80",
- 	NULL,
++			pmu at 9000 {
++				compatible = "arm,cci-400-pmu,r1";
++				reg = <0x9000 0x5000>;
++				interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
++			};
++		};
++
+ 		syscon: syscon at 1c00000 {
+ 			compatible = "allwinner,sun8i-a83t-system-controller",
+ 				"syscon";
 -- 
 2.11.0
