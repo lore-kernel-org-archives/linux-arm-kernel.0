@@ -1,82 +1,48 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  2 May 2018 00:12:14 +0800
-Subject: [PATCH net-next v2 02/15] clk: sunxi-ng: r40: export a regmap to
- access the GMAC register
+Date: Wed,  2 May 2018 00:12:15 +0800
+Subject: [PATCH net-next v2 03/15] dt-bindings: net: dwmac-sun8i: Clean up
+ clock delay chain descriptions
 In-Reply-To: <20180501161227.2110-1-wens@csie.org>
 References: <20180501161227.2110-1-wens@csie.org>
-Message-ID: <20180501161227.2110-3-wens@csie.org>
+Message-ID: <20180501161227.2110-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
+The clock delay chains found in the glue layer for dwmac-sun8i are only
+used with RGMII PHYs. They are not intended for non-RGMII PHYs, such as
+MII external PHYs or the internal PHY. Also, a recent SoC has a smaller
+range of possible values for the delay chain.
 
-There's a GMAC configuration register, which exists on A64/A83T/H3/H5 in
-the syscon part, in the CCU of R40 SoC.
+This patch reformats the delay chain section of the device tree binding
+to make it clear that the delay chains only apply to RGMII PHYs, and
+make it easier to add the R40-specific bits later.
 
-Export a regmap of the CCU.
-
-Read access is not restricted to all registers, but only the GMAC
-register is allowed to be written.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 33 ++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-index c3aa839a453d..65ba6455feb7 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-@@ -1251,9 +1251,37 @@ static struct ccu_mux_nb sun8i_r40_cpu_nb = {
- 	.bypass_index	= 1, /* index of 24 MHz oscillator */
- };
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+index 3d6d5fa0c4d5..e04ce75e24a3 100644
+--- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -28,10 +28,13 @@ Required properties:
+   - allwinner,sun8i-a83t-system-controller
  
-+/*
-+ * Add a regmap for the GMAC driver (dwmac-sun8i) to access the
-+ * GMAC configuration register.
-+ * Only this register is allowed to be written, in order to
-+ * prevent overriding critical clock configuration.
-+ */
-+
-+#define SUN8I_R40_GMAC_CFG_REG 0x164
-+static bool sun8i_r40_ccu_regmap_accessible_reg(struct device *dev,
-+						unsigned int reg)
-+{
-+	if (reg == SUN8I_R40_GMAC_CFG_REG)
-+		return true;
-+	return false;
-+}
-+
-+static struct regmap_config sun8i_r40_ccu_regmap_config = {
-+	.reg_bits	= 32,
-+	.val_bits	= 32,
-+	.reg_stride	= 4,
-+	.max_register	= 0x320, /* PLL_LOCK_CTRL_REG */
-+
-+	/* other devices have no business accessing other registers */
-+	.readable_reg	= sun8i_r40_ccu_regmap_accessible_reg,
-+	.writeable_reg	= sun8i_r40_ccu_regmap_accessible_reg,
-+};
-+
- static int sun8i_r40_ccu_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-+	struct regmap *regmap;
- 	void __iomem *reg;
- 	u32 val;
- 	int ret;
-@@ -1278,6 +1306,11 @@ static int sun8i_r40_ccu_probe(struct platform_device *pdev)
- 	val &= ~GENMASK(25, 20);
- 	writel(val, reg + SUN8I_R40_USB_CLK_REG);
+ Optional properties:
+-- allwinner,tx-delay-ps: TX clock delay chain value in ps. Range value is 0-700. Default is 0)
+-- allwinner,rx-delay-ps: RX clock delay chain value in ps. Range value is 0-3100. Default is 0)
+-Both delay properties need to be a multiple of 100. They control the delay for
+-external PHY.
++- allwinner,tx-delay-ps: TX clock delay chain value in ps.
++			 Range is 0-700. Default is 0.
++- allwinner,rx-delay-ps: RX clock delay chain value in ps.
++			 Range is 0-3100. Default is 0.
++Both delay properties need to be a multiple of 100. They control the
++clock delay for external RGMII PHY. They do not apply to the internal
++PHY or external non-RGMII PHYs.
  
-+	regmap = devm_regmap_init_mmio(&pdev->dev, reg,
-+				       &sun8i_r40_ccu_regmap_config);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
-+
- 	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, &sun8i_r40_ccu_desc);
- 	if (ret)
- 		return ret;
+ Optional properties for the following compatibles:
+   - "allwinner,sun8i-h3-emac",
 -- 
 2.17.0
