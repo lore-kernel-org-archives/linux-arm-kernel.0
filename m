@@ -1,31 +1,90 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 1 May 2018 08:00:05 +0200
-Subject: [PATCH v3] arm64: dts: renesas: v3msk: add DU/LVDS/HDMI support
-In-Reply-To: <d18c4314-e6ad-1558-30fb-1a32397494b6@cogentembedded.com>
-References: <23a6ac28-134b-b5dd-69a7-910774c4b8c1@cogentembedded.com>
- <d18c4314-e6ad-1558-30fb-1a32397494b6@cogentembedded.com>
-Message-ID: <20180501060005.sgzgdfqt6t4smco2@verge.net.au>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 1 May 2018 08:03:30 +0200
+Subject: [PATCH 00/12] clk: imx: add imx8qxp clock support
+In-Reply-To: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
+References: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20180501060330.l5j6rztqal2whgge@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 23, 2018 at 11:45:49PM +0300, Sergei Shtylyov wrote:
-> Define the V3M Starter Kit board dependent part of the DU and LVDS device
-> nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
-> Analog Devices ADV7511W HDMI transmitter...
-> 
-> Based on the original (and large) patch by Vladimir Barinov.
-> 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
-> This patch is against the 'renesas-devel-20180423-v4.17-rc2' tag of Simon
-> Horman's 'renesas.git' repo. It requires the Thine THC63LVD1024 driver in
-> order to work (the same as the Eagle HDMI patch by Jacopo/Niklas).
-> 
-> Changes in version 3:
-> - added  Thine THC63LVD1024 device node, updating the respected endpoints;
-> - merged the I2C pins subnode to the main PFC device node;
-> - renamed the regulators;
+Hi,
 
-Thanks, applied.
+same functionality is actually needed on iMX7d and many other non NXP
+socs.
+IMO proper solution is to introduce generic clock proxy or some thing
+like this on top of rpmsg/virtio 
+
+On Sat, Apr 28, 2018 at 02:56:31AM +0800, Dong Aisheng wrote:
+> This patch series adds i.MX8QXP clock support which is based
+> on the clock service provided by SCU firmware.
+> It depends on SCU APIs patch set.
+> 
+> Dong Aisheng (12):
+>   clk: imx: add configuration option for mmio clks
+>   clk: imx: scu: add scu clock common part
+>   clk: imx: scu: add scu clock divider
+>   clk: imx: scu: add scu clock gpr divider
+>   clk: imx: scu: add scu clock gate
+>   clk: imx: scu: add scu clock gpr gate
+>   clk: imx: scu: add scu clock mux
+>   clk: imx: scu: add scu clock gpr mux
+>   clk: imx: add common imx_clk_hw_fixed functions
+>   clk: imx: add imx_check_clk_hws helper function
+>   dt-bindings: clock: add imx8qxp clock binding doc
+>   clk: imx: add imx8qxp clk driver
+> 
+>  .../devicetree/bindings/clock/imx8qxp-clk.txt      |  39 ++
+>  arch/arm/mach-imx/Kconfig                          |  10 +
+>  drivers/clk/Kconfig                                |   1 +
+>  drivers/clk/imx/Kconfig                            |   7 +
+>  drivers/clk/imx/Makefile                           |   4 +-
+>  drivers/clk/imx/clk-common.h                       |  27 ++
+>  drivers/clk/imx/scu/Kconfig                        |   5 +
+>  drivers/clk/imx/scu/Makefile                       |  12 +
+>  drivers/clk/imx/scu/clk-divider-gpr-scu.c          | 131 +++++++
+>  drivers/clk/imx/scu/clk-divider-scu.c              | 129 +++++++
+>  drivers/clk/imx/scu/clk-gate-gpr-scu.c             |  84 ++++
+>  drivers/clk/imx/scu/clk-gate-scu.c                 | 193 ++++++++++
+>  drivers/clk/imx/scu/clk-imx8qxp.c                  | 426 +++++++++++++++++++++
+>  drivers/clk/imx/scu/clk-mux-gpr-scu.c              |  90 +++++
+>  drivers/clk/imx/scu/clk-mux-scu.c                  |  89 +++++
+>  drivers/clk/imx/scu/clk-scu.c                      |  25 ++
+>  drivers/clk/imx/scu/clk-scu.h                      |  97 +++++
+>  include/dt-bindings/clock/imx8qxp-clock.h          | 362 +++++++++++++++++
+>  include/soc/imx/imx8qxp/lpcg.h                     | 186 +++++++++
+>  19 files changed, 1916 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
+>  create mode 100644 drivers/clk/imx/Kconfig
+>  create mode 100644 drivers/clk/imx/clk-common.h
+>  create mode 100644 drivers/clk/imx/scu/Kconfig
+>  create mode 100644 drivers/clk/imx/scu/Makefile
+>  create mode 100644 drivers/clk/imx/scu/clk-divider-gpr-scu.c
+>  create mode 100644 drivers/clk/imx/scu/clk-divider-scu.c
+>  create mode 100644 drivers/clk/imx/scu/clk-gate-gpr-scu.c
+>  create mode 100644 drivers/clk/imx/scu/clk-gate-scu.c
+>  create mode 100644 drivers/clk/imx/scu/clk-imx8qxp.c
+>  create mode 100644 drivers/clk/imx/scu/clk-mux-gpr-scu.c
+>  create mode 100644 drivers/clk/imx/scu/clk-mux-scu.c
+>  create mode 100644 drivers/clk/imx/scu/clk-scu.c
+>  create mode 100644 drivers/clk/imx/scu/clk-scu.h
+>  create mode 100644 include/dt-bindings/clock/imx8qxp-clock.h
+>  create mode 100644 include/soc/imx/imx8qxp/lpcg.h
+> 
+> -- 
+> 2.7.4
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180501/ca47fb4d/attachment.sig>
