@@ -1,204 +1,133 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 2 May 2018 15:04:20 +0800
-Subject: [PATCH 1/2] dt-bindings: add MediaTek XS-PHY binding
-In-Reply-To: <20180501142459.GA10534@rob-hp-laptop>
-References: <1524642329-12255-1-git-send-email-chunfeng.yun@mediatek.com>
- <1524642329-12255-2-git-send-email-chunfeng.yun@mediatek.com>
- <20180501142459.GA10534@rob-hp-laptop>
-Message-ID: <1525244660.25162.12.camel@mhfsdcap03>
+From: hejianet@gmail.com (Jia He)
+Date: Wed,  2 May 2018 15:08:31 +0800
+Subject: [PATCH] KVM: arm/arm64: fix unaligned hva start and end in
+ handle_hva_to_gpa
+Message-ID: <1525244911-5519-1-git-send-email-hejianet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-On Tue, 2018-05-01 at 09:24 -0500, Rob Herring wrote:
-> On Wed, Apr 25, 2018 at 03:45:28PM +0800, Chunfeng Yun wrote:
-> > Add a DT binding documentation of XS-PHY for MediaTek SoCs
-> > with USB3.1 GEN2 controller
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/phy/phy-mtk-xsphy.txt      |  127 ++++++++++++++++++++
-> >  1 file changed, 127 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
-> > new file mode 100644
-> > index 0000000..23c51a0
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
-> > @@ -0,0 +1,127 @@
-> > +MediaTek XS-PHY binding
-> > +--------------------------
-> > +
-> > +The XS-PHY controller supports physical layer functionality for USB3.1
-> > +GEN2 controller on MediaTek SoCs.
-> > +
-> > +Required properties (controller (parent) node):
-> > + - compatible	: should be "mediatek,<soc-model>-xsphy", "mediatek,xsphy",
-> > + 		  soc-model is the name of SoC, such as mt2712 etc;
-> 
-> Please list all valid SoCs.
-Ok
-> 
-> > +		  when using "mediatek,xsphy" compatible string, you need SoC specific
-> > +		  ones in addition.
-> > +
-> > +Required nodes	: a sub-node is required for each port the controller
-> > +		  provides. Address range information including the usual
-> > +		  'reg' property is used inside these nodes to describe
-> > +		  the controller's topology.
-> 
-> This should go afer the parent optional properties.
-Ok
-> 
-> > +
-> > +Optional properties (controller (parent) node):
-> > + - reg		: offset and length of register shared by multiple U3 ports,
-> > +		  exclude port's private register, if only U2 ports provided,
-> > +		  shouldn't use the property.
-> > + - mediatek,src-ref-clk-mhz	: u32, frequency of reference clock for slew rate
-> > +		  calibrate
-> > + - mediatek,src-coef	: u32, coefficient for slew rate calibrate, depends on
-> > +		  SoC process
-> > +
-> > +Required properties (port (child) node):
-> > +- reg		: address and length of the register set for the port.
-> > +- clocks	: a list of phandle + clock-specifier pairs, one for each
-> > +		  entry in clock-names
-> > +- clock-names	: must contain
-> > +		  "ref": 48M reference clock for HighSpeed analog phy; and 26M
-> > +			reference clock for SuperSpeedPlus analog phy, sometimes is
-> > +			24M, 25M or 27M, depended on platform.
-> > +- #phy-cells	: should be 1 (See second example)
-> > +		  cell after port phandle is phy type from:
-> > +			- PHY_TYPE_USB2
-> > +			- PHY_TYPE_USB3
-> 
-> Is the type a property of the connection to the host? If not, this 
-> shouldn't be part of the phy cells. I would add compatible strings to 
-> the child nodes to define this. I think that would simplify the driver 
-> too as then you can parse DT properties in probe rather than phy_init.
-Yes, it is.
-It's parsed when the phy is got by the host driver.
-> 
-> > +
-> > +The following optional properties are only for debug or HQA test
-> > +Optional properties (PHY_TYPE_USB2 port (child) node):
-> > +- mediatek,eye-src	: u32, the value of slew rate calibrate
-> > +- mediatek,eye-vrt	: u32, the selection of VRT reference voltage
-> > +- mediatek,eye-term	: u32, the selection of HS_TX TERM reference voltage
-> > +- mediatek,efuse-intr	: u32, the selection of Internal Resistor
-> > +
-> > +Optional properties (PHY_TYPE_USB3 port (child) node):
-> > +- mediatek,efuse-intr	: u32, the selection of Internal Resistor
-> > +- mediatek,efuse-tx-imp	: u32, the selection of TX Impedance
-> > +- mediatek,efuse-rx-imp	: u32, the selection of RX Impedance
-> > +
-> > +Example:
-> > +
-> > +u3phy: usb-phy at 11c40000 {
-> > +	compatible = "mediatek,mt36xx-xsphy", "mediatek,xsphy";
-> 
-> Is mt36xx a specific SoC? Don't use wildcards in compatible strings.
-No, will use a specific one
+From: Jia He <jia.he@hxt-semitech.com>
 
-> 
-> > +	reg = <0 0x11c43000 0 0x0200>;
-> > +	mediatek,src-ref-clk-mhz = <26>;
-> > +	mediatek,src-coef = <17>;
-> > +	#address-cells = <2>;
-> > +	#size-cells = <2>;
-> 
-> Really need 64-bit sizes?
-Just an example, 32-bit is also ok, but it's better to use the same
-value as the root node
-> 
-> > +	ranges;
-> 
-> Limiting the range to only the phy addresses is preferred.
-> 
-> > +	status = "disabled";
-> 
-> Don't show status in examples.
-Ok
-> 
-> > +
-> > +	u2port0: usb-phy at 11c40000 {
-> > +		reg = <0 0x11c40000 0 0x0400>;
-> > +		clocks = <&clk48m>;
-> > +		clock-names = "ref";
-> > +		mediatek,eye-src = <4>;
-> > +		#phy-cells = <1>;
-> > +		status = "okay";
-> > +	};
-> > +
-> > +	u3port0: usb-phy at 11c43000 {
-> > +		reg = <0 0x11c43400 0 0x0500>;
-> > +		clocks = <&clk26m>;
-> > +		clock-names = "ref";
-> > +		mediatek,efuse-intr = <28>;
-> > +		#phy-cells = <1>;
-> > +		status = "okay";
-> > +	};
-> > +};
-> > +
-> 
-> > +Specifying phy control of devices
-> > +---------------------------------
-> > +
-> > +Device nodes should specify the configuration required in their "phys"
-> > +property, containing a phandle to the phy port node and a device type;
-> > +phy-names for each port are optional.
-> > +
-> > +Example:
-> > +
-> > +#include <dt-bindings/phy/phy.h>
-> > +
-> > +ssusb: usb at 112a0000 {
-> > +	...
-> > +	phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
-> > +	phy-names = "usb2-0", "usb3-0";
-> > +	...
-> > +};
-> 
-> This section is not necessary. We've already explained how to use the 
-> phy binding elsewhere.
-Will remove it in next version
-> 
-> > +
-> > +
-> > +Banks layout of xsphy
-> 
-> Put this before the example.
-Ok
+In our armv8a server (QDF2400), I noticed a WARN_ON as follows:
 
-Thanks a lot.
-> 
-> > +-------------------------------------------------------------
-> > +port        offset    bank
-> > +u2 port0    0x0000    MISC
-> > +            0x0100    FMREG
-> > +            0x0300    U2PHY_COM
-> > +u2 port1    0x1000    MISC
-> > +            0x1100    FMREG
-> > +            0x1300    U2PHY_COM
-> > +u2 port2    0x2000    MISC
-> > +            ...
-> > +u31 common  0x3000    DIG_GLB
-> > +            0x3100    PHYA_GLB
-> > +u31 port0   0x3400    DIG_LN_TOP
-> > +            0x3500    DIG_LN_TX0
-> > +            0x3600    DIG_LN_RX0
-> > +            0x3700    DIG_LN_DAIF
-> > +            0x3800    PHYA_LN
-> > +u31 port1   0x3a00    DIG_LN_TOP
-> > +            0x3b00    DIG_LN_TX0
-> > +            0x3c00    DIG_LN_RX0
-> > +            0x3d00    DIG_LN_DAIF
-> > +            0x3e00    PHYA_LN
-> > +            ...
-> > +
-> > +DIG_GLB & PHYA_GLB are shared by U31 ports.
-> > -- 
-> > 1.7.9.5
-> > 
+[  800.202850] WARNING: CPU: 33 PID: 255 at arch/arm64/kvm/../../../virt/kvm/arm/mmu.c:1670 kvm_age_hva_handler+0xcc/0xd4
+[  800.213535] Modules linked in: vhost_net vhost tap xt_CHECKSUM ipt_MASQUERADE nf_nat_masquerade_ipv4 ip6t_rpfilter ipt_REJECT nf_reject_ipv4 ip6t_REJECT nf_reject_ipv6 xt_conntrack ip_set nfnetlink ebtable_nat ebtable_broute bridge stp llc ip6table_nat nf_conntrack_ipv6 nf_defrag_ipv6 nf_nat_ipv6 ip6table_mangle ip6table_security ip6table_raw iptable_nat nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 nf_nat nf_conntrack iptable_mangle iptable_security iptable_raw ebtable_filter ebtables ip6table_filter ip6_tables iptable_filter rpcrdma ib_isert iscsi_target_mod ib_iser libiscsi scsi_transport_iscsi ib_srpt target_core_mod ib_srp scsi_transport_srp ib_ipoib rdma_ucm ib_ucm ib_uverbs ib_umad rdma_cm ib_cm vfat fat iw_cm mlx5_ib ib_core dm_mirror dm_region_hash dm_log dm_mod crc32_ce ipmi_ssif sg nfsd
+[  800.284115]  auth_rpcgss nfs_acl lockd grace sunrpc ip_tables xfs libcrc32c mlx5_core ixgbe mlxfw devlink mdio ahci_platform libahci_platform qcom_emac libahci hdma hdma_mgmt i2c_qup
+[  800.300382] CPU: 33 PID: 255 Comm: khugepaged Tainted: G        W       4.14.36+ #6
+[  800.308030] Hardware name: <snip for confidential issues>
+[  800.318717] task: ffff8017c949c000 task.stack: ffff8017c9498000
+[  800.324629] PC is at kvm_age_hva_handler+0xcc/0xd4
+[  800.329412] LR is at handle_hva_to_gpa+0xec/0x15c
+[  800.334109] pc : [<ffff0000080b4f2c>] lr : [<ffff0000080b4838>] pstate: 20400145
+[  800.341496] sp : ffff8017c949b260
+[  800.344804] x29: ffff8017c949b260 x28: ffff801663e25008
+[  800.350110] x27: 0000000000020000 x26: 00000001fb1a0000
+[  800.355416] x25: 0000ffff605b0200 x24: 0000ffff605a0200
+[  800.360722] x23: 0000000000000000 x22: 000000000000ffff
+[  800.366028] x21: 00000001fb1a0000 x20: ffff8017c085a000
+[  800.371334] x19: ffff801663e20008 x18: 0000000000000000
+[  800.376641] x17: 0000000000000000 x16: 0000000000000000
+[  800.381947] x15: 0000000000000000 x14: 3d646e655f617668
+[  800.387254] x13: 2c30303230623530 x12: 36666666663d646e
+[  800.392560] x11: 652c303032306135 x10: 3036666666663d74
+[  800.397867] x9 : 0000000000003796 x8 : 655f6e66672c3030
+[  800.403173] x7 : ffff00000859434c x6 : ffff8017f9c30cb8
+[  800.408479] x5 : ffff8017f9c30cb8 x4 : ffff0000080b4e60
+[  800.413786] x3 : 0000000000000000 x2 : 0000000000020000
+[  800.419092] x1 : 00000001fb1a0000 x0 : 0000000020000000
+[  800.424398] Call trace:
+[  800.426838] Exception stack(0xffff8017c949b120 to 0xffff8017c949b260)
+[  800.433272] b120: 0000000020000000 00000001fb1a0000 0000000000020000 0000000000000000
+[  800.441095] b140: ffff0000080b4e60 ffff8017f9c30cb8 ffff8017f9c30cb8 ffff00000859434c
+[  800.448918] b160: 655f6e66672c3030 0000000000003796 3036666666663d74 652c303032306135
+[  800.456740] b180: 36666666663d646e 2c30303230623530 3d646e655f617668 0000000000000000
+[  800.464563] b1a0: 0000000000000000 0000000000000000 0000000000000000 ffff801663e20008
+[  800.472385] b1c0: ffff8017c085a000 00000001fb1a0000 000000000000ffff 0000000000000000
+[  800.480208] b1e0: 0000ffff605a0200 0000ffff605b0200 00000001fb1a0000 0000000000020000
+[  800.488030] b200: ffff801663e25008 ffff8017c949b260 ffff0000080b4838 ffff8017c949b260
+[  800.495853] b220: ffff0000080b4f2c 0000000020400145 0000000000000001 ffff8017c949b2a0
+[  800.503676] b240: ffffffffffffffff ffff8017c949b260 ffff8017c949b260 ffff0000080b4f2c
+[  800.511498] [<ffff0000080b4f2c>] kvm_age_hva_handler+0xcc/0xd4
+[  800.517324] [<ffff0000080b4838>] handle_hva_to_gpa+0xec/0x15c
+[  800.523063] [<ffff0000080b6c5c>] kvm_age_hva+0x5c/0xcc
+[  800.528194] [<ffff0000080a7c3c>] kvm_mmu_notifier_clear_flush_young+0x54/0x90
+[  800.535324] [<ffff00000827a0e8>] __mmu_notifier_clear_flush_young+0x6c/0xa8
+[  800.542279] [<ffff00000825a644>] page_referenced_one+0x1e0/0x1fc
+[  800.548279] [<ffff00000827e8f8>] rmap_walk_ksm+0x124/0x1a0
+[  800.553759] [<ffff00000825c974>] rmap_walk+0x94/0x98
+[  800.558717] [<ffff00000825ca98>] page_referenced+0x120/0x180
+[  800.564369] [<ffff000008228c58>] shrink_active_list+0x218/0x4a4
+[  800.570281] [<ffff000008229470>] shrink_node_memcg+0x58c/0x6fc
+[  800.576107] [<ffff0000082296c4>] shrink_node+0xe4/0x328
+[  800.581325] [<ffff000008229c9c>] do_try_to_free_pages+0xe4/0x3b8
+[  800.587324] [<ffff00000822a094>] try_to_free_pages+0x124/0x234
+[  800.593150] [<ffff000008216aa0>] __alloc_pages_nodemask+0x564/0xf7c
+[  800.599412] [<ffff000008292814>] khugepaged_alloc_page+0x38/0xb8
+[  800.605411] [<ffff0000082933bc>] collapse_huge_page+0x74/0xd70
+[  800.611238] [<ffff00000829470c>] khugepaged_scan_mm_slot+0x654/0xa98
+[  800.617585] [<ffff000008294e0c>] khugepaged+0x2bc/0x49c
+[  800.622803] [<ffff0000080ffb70>] kthread+0x124/0x150
+[  800.627762] [<ffff0000080849f0>] ret_from_fork+0x10/0x1c
+[  800.633066] ---[ end trace 944c130b5252fb01 ]---
+-------------------------------------------------------------------------
+
+The root cause might be: we can't guarantee that the parameter start and end
+in handle_hva_to_gpa is PAGE_SIZE aligned, let alone hva_start and hva_end.
+
+This bug is introduced by commit 056aad67f836 ("kvm: arm/arm64: Rework gpa
+callback handlers")
+
+It fixes the bug by use pfn size converted.
+
+Fixes: 056aad67f836 ("kvm: arm/arm64: Rework gpa callback handlers")
+
+Signed-off-by: jia.he at hxt-semitech.com
+Signed-off-by: li.zhang at hxt-semitech.com
+---
+ virt/kvm/arm/mmu.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 7f6a944..9dd7ae4 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1744,7 +1744,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+ 	/* we only care about the pages that the guest sees */
+ 	kvm_for_each_memslot(memslot, slots) {
+ 		unsigned long hva_start, hva_end;
+-		gfn_t gpa;
++		gpa_t gpa, gpa_end;
+ 
+ 		hva_start = max(start, memslot->userspace_addr);
+ 		hva_end = min(end, memslot->userspace_addr +
+@@ -1753,7 +1753,9 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+ 			continue;
+ 
+ 		gpa = hva_to_gfn_memslot(hva_start, memslot) << PAGE_SHIFT;
+-		ret |= handler(kvm, gpa, (u64)(hva_end - hva_start), data);
++		gpa_end = hva_to_gfn_memslot(hva_end + PAGE_SIZE - 1, memslot)
++							 << PAGE_SHIFT;
++		ret |= handler(kvm, gpa, (u64)(gpa_end - gpa), data);
+ 	}
+ 
+ 	return ret;
+@@ -1823,7 +1825,7 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 
+-	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
++	WARN_ON((size & ~PAGE_MASK) != 0);
+ 	pmd = stage2_get_pmd(kvm, NULL, gpa);
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
+@@ -1843,7 +1845,7 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 
+-	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
++	WARN_ON((size & ~PAGE_MASK) != 0);
+ 	pmd = stage2_get_pmd(kvm, NULL, gpa);
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
+-- 
+1.8.3.1
