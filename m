@@ -1,39 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 2 May 2018 15:10:18 +0200
-Subject: [PATCH 00/10] ARM, arm64: dts: renesas: update register properties
-In-Reply-To: <20180426102951.8683-1-horms+renesas@verge.net.au>
-References: <20180426102951.8683-1-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUBtNrny+DPqamKSL6nmiyuF38BQdD0eqc7kzDhuMSQqg@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 2 May 2018 15:14:31 +0200
+Subject: [PATCH v8 10/12] ARM: sun8i: smp: Add support for A83T
+In-Reply-To: <20180501123131.7738-11-mylene.josserand@bootlin.com>
+References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
+ <20180501123131.7738-11-mylene.josserand@bootlin.com>
+Message-ID: <20180502131431.j7jaz74ko5ueotwn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Tue, May 01, 2018 at 02:31:29PM +0200, Myl?ne Josserand wrote:
+> Add the support for A83T.
+> 
+> A83T SoC has an additional register than A80 to handle CPU configurations:
+> R_CPUS_CFG. Information about the register comes from Allwinner's BSP
+> driver.
+> An important difference is the Power Off Gating register for clusters
+> which is BIT(4) in case of SUN9I-A80 and BIT(0) in case of SUN8I-A83T.
+> There is also a bit swap between sun8i-a83t and sun9i-a80 that must be
+> handled.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 
-On Thu, Apr 26, 2018 at 12:29 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> this series:
->
-> 1. Drops unnecessary address properties from VIN port nodes
->    on Renesas R-Car Gen2 SoC board DTSes. These are unnecessary
->    as the nodes to not have bus addresses.
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-I guess the example in Documentation/devicetree/bindings/media/rcar_vin.txt
-should be updated, too?
-
-> 2. And adds address properties to R-Car Sound port nodes on
->    Renesas R-Car Gen2 SoC DTSes. These are necessary as the nodes
->    have unit names.
-
-Documentation/devicetree/bindings/sound/renesas,rsnd.txt doesn't say
-anything about the presence of ports?
-
-Gr{oetje,eeting}s,
-
-                        Geert
+Maxime
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/8c1ae706/attachment-0001.sig>
