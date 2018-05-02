@@ -1,82 +1,39 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 2 May 2018 14:10:39 +0800
-Subject: [PATCH] coresight: Remove %px for printing pcsr value
-In-Reply-To: <CAGXu5jJjCJuDNOJPMHmu94naQvKke47LVv-Y=t9vji88FtkRDw@mail.gmail.com>
-References: <1525237251-32496-1-git-send-email-leo.yan@linaro.org>
- <CAGXu5jJjCJuDNOJPMHmu94naQvKke47LVv-Y=t9vji88FtkRDw@mail.gmail.com>
-Message-ID: <20180502061039.GB332@leoy-ThinkPad-X240s>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 2 May 2018 11:57:22 +0530
+Subject: [PATCH 08/21] bindings: display: Add compatible for A64 HDMI PHY
+In-Reply-To: <20180501161909.GA1728@rob-hp-laptop>
+References: <20180430114058.5061-1-jagan@amarulasolutions.com>
+ <20180430114058.5061-9-jagan@amarulasolutions.com>
+ <20180501161909.GA1728@rob-hp-laptop>
+Message-ID: <CAMty3ZBBo41Odbife0WtPG__3qWaHZtkqUfOLTmqhzc_of+iYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 10:29:46PM -0700, Kees Cook wrote:
-> On Tue, May 1, 2018 at 10:00 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> > The driver prints pcsr twice: the first time it uses specifier %px to
-> > print hexadecimal pcsr value and the second time uses specifier %pS for
-> > output kernel symbols.
-> >
-> > As suggested by Kees, using %pS should be sufficient and %px isn't
-> > necessary; the reason is if the pcsr is a kernel space address, we can
-> > easily get to know the code line from %pS format, on the other hand, if
-> > the pcsr value doesn't fall into kernel space range (e.g. if the CPU is
-> > stuck in firmware), %pS also gives out pcsr hexadecimal value.
-> >
-> > So this commit removes useless %px and update section "Output format"
-> > in the document for alignment between the code and document.
-> >
-> > Suggested-by: Kees Cook <keescook@chromium.org>
-> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> 
-> Thanks!
-> 
-> Reviewed-by: Kees Cook <keescook@chromium.org>
+Hi Rob,
 
-Thanks for reviewing, Kees.
-
-> -Kees
-> 
+On Tue, May 1, 2018 at 9:49 PM, Rob Herring <robh@kernel.org> wrote:
+>
+> On Mon, Apr 30, 2018 at 05:10:45PM +0530, Jagan Teki wrote:
+> > HDMI PHY on Allwinner A64 has similar like H3/H5.
+> >
+> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > > ---
-> >  Documentation/trace/coresight-cpu-debug.txt       | 4 ++--
-> >  drivers/hwtracing/coresight/coresight-cpu-debug.c | 2 +-
-> >  2 files changed, 3 insertions(+), 3 deletions(-)
+> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
+> >  1 file changed, 1 insertion(+)
 > >
-> > diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
-> > index 2b9b51c..89ab09e 100644
-> > --- a/Documentation/trace/coresight-cpu-debug.txt
-> > +++ b/Documentation/trace/coresight-cpu-debug.txt
-> > @@ -177,11 +177,11 @@ Here is an example of the debugging output format:
-> >  ARM external debug module:
-> >  coresight-cpu-debug 850000.debug: CPU[0]:
-> >  coresight-cpu-debug 850000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
-> > -coresight-cpu-debug 850000.debug:  EDPCSR:  [<ffff00000808e9bc>] handle_IPI+0x174/0x1d8
-> > +coresight-cpu-debug 850000.debug:  EDPCSR:  handle_IPI+0x174/0x1d8
-> >  coresight-cpu-debug 850000.debug:  EDCIDSR: 00000000
-> >  coresight-cpu-debug 850000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
-> >  coresight-cpu-debug 852000.debug: CPU[1]:
-> >  coresight-cpu-debug 852000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
-> > -coresight-cpu-debug 852000.debug:  EDPCSR:  [<ffff0000087fab34>] debug_notifier_call+0x23c/0x358
-> > +coresight-cpu-debug 852000.debug:  EDPCSR:  debug_notifier_call+0x23c/0x358
-> >  coresight-cpu-debug 852000.debug:  EDCIDSR: 00000000
-> >  coresight-cpu-debug 852000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
-> > diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> > index 9cdb3fb..78a054e 100644
-> > --- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> > +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> > @@ -315,7 +315,7 @@ static void debug_dump_regs(struct debug_drvdata *drvdata)
-> >         }
-> >
-> >         pc = debug_adjust_pc(drvdata);
-> > -       dev_emerg(dev, " EDPCSR:  [<%px>] %pS\n", (void *)pc, (void *)pc);
-> > +       dev_emerg(dev, " EDPCSR:  %pS\n", (void *)pc);
-> >
-> >         if (drvdata->edcidsr_present)
-> >                 dev_emerg(dev, " EDCIDSR: %08x\n", drvdata->edcidsr);
-> > --
-> > 2.7.4
-> >
-> 
-> 
-> 
-> -- 
-> Kees Cook
-> Pixel Security
+> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > index 9ea4353caadd..7dcd1d64dfe4 100644
+> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > @@ -104,6 +104,7 @@ Required properties:
+> >    - compatible: value must be one of:
+> >      * allwinner,sun8i-a83t-hdmi-phy
+> >      * allwinner,sun8i-h3-hdmi-phy
+> > +    * allwinner,sun50i-a64-hdmi-phy
+>
+> This should be one valid combination per line. The dts shows that the h3
+> string is a fallback which should be captured in the binding doc.
+
+The fallback compatible "allwinner,sun8i-h3-hdmi-phy" is already
+documented above, what we need to capture here? or did I miss anything
+here?
