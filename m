@@ -1,20 +1,61 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 2 May 2018 09:59:10 +0530
-Subject: [PATCH][V2] dmaengine: stm32-mdma: fix spelling mistake:
- "avalaible" -> "available"
-In-Reply-To: <20180428220352.19601-1-colin.king@canonical.com>
-References: <20180428220352.19601-1-colin.king@canonical.com>
-Message-ID: <20180502042910.GP6014@localhost>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed,  2 May 2018 13:00:51 +0800
+Subject: [PATCH] coresight: Remove %px for printing pcsr value
+Message-ID: <1525237251-32496-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2018 at 11:03:52PM +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> Trivial fix to spelling mistake in dev_err error message text and make
-> channel plural.
+The driver prints pcsr twice: the first time it uses specifier %px to
+print hexadecimal pcsr value and the second time uses specifier %pS for
+output kernel symbols.
 
-Applied, thanks
+As suggested by Kees, using %pS should be sufficient and %px isn't
+necessary; the reason is if the pcsr is a kernel space address, we can
+easily get to know the code line from %pS format, on the other hand, if
+the pcsr value doesn't fall into kernel space range (e.g. if the CPU is
+stuck in firmware), %pS also gives out pcsr hexadecimal value.
 
+So this commit removes useless %px and update section "Output format"
+in the document for alignment between the code and document.
+
+Suggested-by: Kees Cook <keescook@chromium.org>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ Documentation/trace/coresight-cpu-debug.txt       | 4 ++--
+ drivers/hwtracing/coresight/coresight-cpu-debug.c | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
+index 2b9b51c..89ab09e 100644
+--- a/Documentation/trace/coresight-cpu-debug.txt
++++ b/Documentation/trace/coresight-cpu-debug.txt
+@@ -177,11 +177,11 @@ Here is an example of the debugging output format:
+ ARM external debug module:
+ coresight-cpu-debug 850000.debug: CPU[0]:
+ coresight-cpu-debug 850000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
+-coresight-cpu-debug 850000.debug:  EDPCSR:  [<ffff00000808e9bc>] handle_IPI+0x174/0x1d8
++coresight-cpu-debug 850000.debug:  EDPCSR:  handle_IPI+0x174/0x1d8
+ coresight-cpu-debug 850000.debug:  EDCIDSR: 00000000
+ coresight-cpu-debug 850000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+ coresight-cpu-debug 852000.debug: CPU[1]:
+ coresight-cpu-debug 852000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
+-coresight-cpu-debug 852000.debug:  EDPCSR:  [<ffff0000087fab34>] debug_notifier_call+0x23c/0x358
++coresight-cpu-debug 852000.debug:  EDPCSR:  debug_notifier_call+0x23c/0x358
+ coresight-cpu-debug 852000.debug:  EDCIDSR: 00000000
+ coresight-cpu-debug 852000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+index 9cdb3fb..78a054e 100644
+--- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
++++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+@@ -315,7 +315,7 @@ static void debug_dump_regs(struct debug_drvdata *drvdata)
+ 	}
+ 
+ 	pc = debug_adjust_pc(drvdata);
+-	dev_emerg(dev, " EDPCSR:  [<%px>] %pS\n", (void *)pc, (void *)pc);
++	dev_emerg(dev, " EDPCSR:  %pS\n", (void *)pc);
+ 
+ 	if (drvdata->edcidsr_present)
+ 		dev_emerg(dev, " EDCIDSR: %08x\n", drvdata->edcidsr);
 -- 
-~Vinod
+2.7.4
