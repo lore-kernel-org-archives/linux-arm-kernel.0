@@ -1,93 +1,72 @@
 From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Wed,  2 May 2018 23:08:00 +0200
-Subject: [PATCH v14 8/8] ASoC: sun4i-codec: Add Left Capture Select,
- Right Capture Select
+Date: Wed,  2 May 2018 23:07:59 +0200
+Subject: [PATCH v14 7/8] ASoC: sun4i-codec: Add Differential Line Source
 In-Reply-To: <20180502210800.1971-1-dannym@scratchpost.org>
 References: <20180502210800.1971-1-dannym@scratchpost.org>
-Message-ID: <20180502210800.1971-9-dannym@scratchpost.org>
+Message-ID: <20180502210800.1971-8-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Left Capture Select and Right Capture Select for Allwinner A10 and
-Allwinner A20.
+Add Differential Line Source for Allwinner A10 and Allwinner A20.
 
 Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 ---
- sound/soc/sunxi/sun4i-codec.c | 50 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+ sound/soc/sunxi/sun4i-codec.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 45dcb80a1da9..1a4ba3bae5da 100644
+index 4125d9ef0eb6..45dcb80a1da9 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -706,6 +706,25 @@ static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
+@@ -110,6 +110,7 @@
+ #define SUN4I_CODEC_ADC_ACTL_VADCG			(20)
+ #define SUN4I_CODEC_ADC_ACTL_ADCIS			(17)
+ #define SUN4I_CODEC_ADC_ACTL_LNPREG			(13)
++#define SUN4I_CODEC_ADC_ACTL_LNRDF			(16)
+ #define SUN4I_CODEC_ADC_ACTL_PA_EN			(4)
+ #define SUN4I_CODEC_ADC_ACTL_DDE			(3)
+ #define SUN4I_CODEC_ADC_DEBUG			(0x2c)
+@@ -705,6 +706,20 @@ static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
  			    0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
  			    1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0));
  
-+static const char * const sun4i_codec_capture_source[] = {
-+	"Line",
-+	"FM",
-+	"Mic1",
-+	"Mic2",
-+	"Mic1,Mic2",
-+	"Mic1+Mic2",
-+	"Output Mixer",
-+	"Line,Mic1",
++static const char * const sun4i_codec_difflinein_source[] = {
++	"Stereo",
++	"Differential",
 +};
 +
-+static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_capture_source,
++static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_difflinein_source,
 +			    SUN4I_CODEC_ADC_ACTL,
-+			    SUN4I_CODEC_ADC_ACTL_ADCIS,
-+			    sun4i_codec_capture_source);
++			    SUN4I_CODEC_ADC_ACTL_LNRDF,
++			    sun4i_codec_difflinein_source);
 +
-+static const struct snd_kcontrol_new sun4i_codec_capture_source_controls =
-+	SOC_DAPM_ENUM("Capture Source", sun4i_codec_enum_capture_source);
++static const struct snd_kcontrol_new sun4i_codec_difflinein_source_controls =
++	SOC_DAPM_ENUM("Differential Line Source",
++		      sun4i_codec_enum_difflinein_source);
 +
- static const char * const sun4i_codec_difflinein_source[] = {
- 	"Stereo",
- 	"Differential",
-@@ -841,6 +860,10 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+ static const struct snd_kcontrol_new sun4i_codec_controls[] = {
+ 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
+ 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
+@@ -825,6 +840,11 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+ 	SND_SOC_DAPM_SWITCH("Power Amplifier Mute", SND_SOC_NOPM, 0, 0,
  			    &sun4i_codec_pa_mute),
  
- 	/* MUX */
-+	SND_SOC_DAPM_MUX("Left Capture Select", SND_SOC_NOPM, 0, 0,
-+			 &sun4i_codec_capture_source_controls),
-+	SND_SOC_DAPM_MUX("Right Capture Select", SND_SOC_NOPM, 0, 0,
-+			 &sun4i_codec_capture_source_controls),
- 	SND_SOC_DAPM_MUX("Differential Line Source", SND_SOC_NOPM,
- 			 0, 0,
- 			 &sun4i_codec_difflinein_source_controls),
-@@ -908,6 +931,33 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 	/* LNRDF Routes */
- 	{ "Differential Line Source", "Differential", "Line Left" },
- 	{ "Differential Line Source", "Differential", "Line Right" },
++	/* MUX */
++	SND_SOC_DAPM_MUX("Differential Line Source", SND_SOC_NOPM,
++			 0, 0,
++			 &sun4i_codec_difflinein_source_controls),
 +
-+	/* Right ADC Input Routes */
-+	{ "Right Capture Select", "Line", "Line Right" },
-+	{ "Right Capture Select", "Line", "Differential Line Capture Switch" },
-+	{ "Right Capture Select", "FM", "FM Right" },
-+	{ "Right Capture Select", "Mic1", "MIC1 Pre-Amplifier" },
-+	{ "Right Capture Select", "Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Right Capture Select", "Mic1,Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Right Capture Select", "Mic1+Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Right Capture Select", "Mic1+Mic2", "MIC1 Pre-Amplifier" },
-+	{ "Right Capture Select", "Output Mixer", "Right Mixer" },
-+	{ "Right Capture Select", "Line,Mic1", "MIC1 Pre-Amplifier" },
-+	{ "Right ADC", NULL, "Right Capture Select" },
+ 	SND_SOC_DAPM_INPUT("Line Right"),
+ 	SND_SOC_DAPM_INPUT("Line Left"),
+ 	SND_SOC_DAPM_INPUT("FM Right"),
+@@ -884,6 +904,10 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+ 	{ "Right ADC", NULL, "MIC2 Pre-Amplifier" },
+ 	{ "MIC2 Pre-Amplifier", NULL, "Mic2"},
+ 	{ "Mic2", NULL, "VMIC" },
 +
-+	/* Left ADC Input Routes */
-+	{ "Left Capture Select", "Line", "Line Left" },
-+	{ "Left Capture Select", "Line", "Differential Line Capture Switch" },
-+	{ "Left Capture Select", "FM", "FM Left" },
-+	{ "Left Capture Select", "Mic1", "MIC1 Pre-Amplifier" },
-+	{ "Left Capture Select", "Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Left Capture Select", "Mic1,Mic2", "MIC1 Pre-Amplifier" },
-+	{ "Left Capture Select", "Mic1+Mic2", "MIC1 Pre-Amplifier" },
-+	{ "Left Capture Select", "Mic1+Mic2", "MIC2 Pre-Amplifier" },
-+	{ "Left Capture Select", "Output Mixer", "Left Mixer" },
-+	{ "Left Capture Select", "Line,Mic1", "Line Left" },
-+	{ "Left Capture Select", "Line,Mic1", "Differential Line Capture Switch" },
-+	{ "Left ADC", NULL, "Left Capture Select" },
++	/* LNRDF Routes */
++	{ "Differential Line Source", "Differential", "Line Left" },
++	{ "Differential Line Source", "Differential", "Line Right" },
  };
  
  struct sun4i_codec_quirks {
