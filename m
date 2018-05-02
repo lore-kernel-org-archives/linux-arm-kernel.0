@@ -1,91 +1,94 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 2 May 2018 16:19:35 +0200
-Subject: [PATCH] gpio: zynq: Setup chip->base based on alias ID
-In-Reply-To: <CACRpkdaNJzW+LO97oxavzYJwfkj0xu7wxTNRaGiaKm98ON5JMA@mail.gmail.com>
-References: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
- <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
- <f9dd4f64-4026-f495-5810-32affb5b0944@xilinx.com>
- <CACRpkdaxwRc0zoDKogVGisXTPJ0EwLbOQjHzz1pSEjvWCsSCTQ@mail.gmail.com>
- <cc8d864a-e8e6-d30d-ae54-91819e5d0b8d@xilinx.com>
- <CACRpkdYgw+HaC5bUCZKiD7j+2ZLYbCTG+DdPdAEkRDq0xF5b3w@mail.gmail.com>
- <60652f48-2a98-414b-5cff-25890a6da37f@xilinx.com>
- <CACRpkdaNJzW+LO97oxavzYJwfkj0xu7wxTNRaGiaKm98ON5JMA@mail.gmail.com>
-Message-ID: <57e4bbdd-1e30-0352-f758-998b64a6b77f@xilinx.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Wed, 02 May 2018 10:20:19 -0400
+Subject: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
+In-Reply-To: <c1f9230b-8ff0-5b2e-def9-cbf6b2e2e99c@huawei.com>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <1501876754-1064-3-git-send-email-nleeder@codeaurora.org>
+ <883d32ce-6581-ecf6-5088-ecb238322ebe@huawei.com>
+ <e55ab4404143ea0b3cc4795a93e37480@codeaurora.org>
+ <14f90cc6-f2c1-5a63-67c6-a5c8ddb4799e@gmail.com>
+ <c1f9230b-8ff0-5b2e-def9-cbf6b2e2e99c@huawei.com>
+Message-ID: <93b3738c386c528193b158da0f85fd27@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2.5.2018 15:56, Linus Walleij wrote:
-> On Wed, May 2, 2018 at 3:41 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+On 2018-04-02 02:37, Yisheng Xie wrote:
+> Hi Neil,
 > 
->> If you don't want this patch I understand that and it will become just
->> another soc vendor patch out of mainline.
+> On 2018/4/1 13:44, Neil Leeder wrote:
+>> Hi Yisheng Xie,
+>> 
+>> On 3/29/2018 03:03 AM, Yisheng Xie wrote:
+>>> 
+>>> Hi Neil,
+>>> 
+>>> On 2017/8/5 3:59, Neil Leeder wrote:
+>>>> +    mem_resource_0 = platform_get_resource(pdev, IORESOURCE_MEM, 
+>>>> 0);
+>>>> +    mem_map_0 = devm_ioremap_resource(&pdev->dev, mem_resource_0);
+>>>> +
+>>> Can we use devm_ioremap instead? for the reg_base of smmu_pmu is
+>>> IMPLEMENTATION DEFINED. If the reg of smmu_pmu is inside smmu,
+>>> devm_ioremap_resource will failed and return -EBUSY, eg.:
+>>> 
+>>>   smmu reg ranges:        0x180000000 ~ 0x1801fffff
+>>>   its smmu_pmu reg ranges:    0x180001000 ~ 0x180001fff
+>>> 
+>> Just to let you know that I no longer work at Qualcomm and I won't be 
+>> able to provide updates to this patchset. I expect that others from my 
+>> former team at Qualcomm will pick up ownership.
 > 
-> I don't really know what to do, so that is why I'm discussing.
-
-me too. It is also interesting that I have met with the case with
-zynq/zynqmp gpio driver and not gpio-xilinx.c which can have a lot of
-instances.
-
+> Thanks for this infomation.
 > 
-> It's one of those gray areas.
+> hi Agustin and Timur,
 > 
-> From one point of view there is the purist stance that we should
-> only support what the mainline tree does, and be strict and
-> consistent so we don't accumulate to many nasty hacks.
-
-Also this expect that the first patch does everything right which is not
-truth all the time.
-
+> Is there any new status about this patchset?
 > 
-> On the other hand, it is completely possible that all users of this
-> particular driver actually must have this patch, and then I just
-> push them to use a deviant vendor tree for no good reason.
-> 
-> Would it be possible that I apply the patch, and somehow also
-> establish some understanding with all users of the Xilinx
-> platform that whatever legacy applications are out there
-> must start to migrate towards using the character device so
-> this reliance on the numberspace doesn't stick around forever?
 
-When someone contacts me for asking guidance for gpio I am telling them
-not to use legacy sysfs interface and use libgpiod. Last one was a week
-ago in connection to Ultra96 and libmraa.
+Hi,
 
-But even chardev is not supported there now.
-https://github.com/intel-iot-devkit/mraa/issues/713
+Apologies for the slow response.
+We are having some internal discussions about when/if to do this.
+I expect to have more clarity within a few weeks.
 
-> 
-> For example can we make a patch to some systems like
-> arch/arm/boot/dts/zynq-*.dts
-> adding proper GPIO line names to these device trees, such
-> as was made in e.g. commit f6b1674d570aa1
-> "arm64: dts: qcom: sbc: Name GPIO lines"
+For what is worth let me take the opportunity to outline the approach
+we would like to see for a V2 either developed by us or somebody else
+in the community:
 
-If you take a look at
-arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
-which is Ultra96 board gpio-line-names are filled there for the whole PS
-part. Definitely take a look and let know if you find out any issue there.
+1. Rework to comply with the IORT spec changes.
 
-zynq/zynqmp gpio controller contains PS pins (hard part) and PL pins
-coming to logic.
+2. Rework probing to extract extra information from the IORT table
+    about SMMU/device associations.
 
-I can't describe PL gpio pins because it can be whatever even I have
-done that for one fixed hw design.
+   With this information and some perf user space work I think it's 
+possible
+   to have a single dynamic PMU node and use a similar approach to what 
+is
+   used in the Coresight drivers to pass the device we want to monitor 
+and
+   for the driver to find the PMU/PMCG. E.g.:
 
-Interesting part on that sha1 you shared is how "NC" pin is described.
+   $ lspci
+   0001:00:00.0 PCI bridge: Airgo Networks, Inc. Device 0401
+   0002:00:00.0 PCI bridge: Airgo Networks, Inc. Device 0401
+   0002:01:00.0 Ethernet controller: Mellanox Technologies MT27500 Family 
+[ConnectX-3]
+   0003:00:00.0 PCI bridge: Airgo Networks, Inc. Device 0401
+   0003:01:00.0 Ethernet controller: Mellanox Technologies MT27500 Family 
+[ConnectX-3]
 
-gpio pin 35 I have on zcu100 as "" but it should be maybe TP_PAD which
-is really just a pad on real board. And the rest of "" gpio names are
-connected to PL.
+   # Monitor TLB misses on root complex 2 (no stream filter is applied)
+   perf stat -a -e smmu/tlb_miss, at 0002:00:00.0/ <workload>
 
-I am happy to take a look at existing platforms and use gpio-line-names
-there. For example arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
-I use in tca6416_u97 and u61 comments instead of this property.
-
-> 
-> After all that is what I strive for as maintainer, as the IETF
-> motto says:
-> "rough consensus and running code"
+   # Monitor TLB misses on a device on root complex 2 (derive the stream 
+number from the RID)
+   perf stat -a -e smmu/tlb_miss, at 0002:01:00.0/ <workload>
 
 Thanks,
-Michal
+Agust?n
+
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
