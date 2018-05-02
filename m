@@ -1,219 +1,39 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 2 May 2018 10:31:11 +0800
-Subject: [PATCH v2 15/17] power: reset: mt6323: add a driver for
- MT6323 power controller
-In-Reply-To: <20180501125628.44nyx25tqsrxkvsl@earth.universe>
-References: <cover.1524646231.git.sean.wang@mediatek.com>
- <51d4fbe0d6a22986ddd2df66c9db39aa1eaab74a.1524646231.git.sean.wang@mediatek.com>
- <20180501125628.44nyx25tqsrxkvsl@earth.universe>
-Message-ID: <1525228271.14792.5.camel@mtkswgap22>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Wed, 2 May 2018 11:41:23 +0800
+Subject: [PATCH 1/2] arm64: dts: mt7622: add High-Speed DMA device nodes
+Message-ID: <d208e8cf93f18b97ee9cf24cdd0220aa44188b8b.1525231985.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-05-01 at 14:56 +0200, Sebastian Reichel wrote:
-> Hi,
-> 
-> On Wed, Apr 25, 2018 at 05:32:41PM +0800, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > The power device is responsible for externally down or up the power
-> > of the remote MediaTek SoC through the tiny circuit BBPU inside PMIC RTC.
-> > 
-> > Though it's a part of RTC device, it would be better to be a standalone
-> > driver than to be a part of existent RTC driver so as to let us make
-> > concentration on works about power-controlling topic and to obtain
-> > improvements while the subsystem power/reset constantly growing.
-> 
-> I don't understand the above sentence. (I'm fine with adding the
-> driver)
+From: Sean Wang <sean.wang@mediatek.com>
 
-Which I was actually meaning is that taking the poweroff driver as the
-standalone one and placing it under driver/reset/power seems can simply
-get a help from its subsystem either for function extension or bugfix in
-the future. I thought that way is better than just an embedded one
-somewhere in rtc driver or other drivers.
+add High-Speed DMA (HSDMA) nodes
 
-> > Currently, the most basic functionality supported is to just power off
-> > the system by writing to a special bit field in BBPU register after the
-> > system has reached pm_poweroff.
-> > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >  drivers/power/reset/Kconfig           | 10 ++++
-> >  drivers/power/reset/Makefile          |  1 +
-> >  drivers/power/reset/mt6323-poweroff.c | 97 +++++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/mt6397/rtc.h        |  1 +
-> >  4 files changed, 109 insertions(+)
-> >  create mode 100644 drivers/power/reset/mt6323-poweroff.c
-> > 
-> > diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-> > index df58fc8..7b49d71 100644
-> > --- a/drivers/power/reset/Kconfig
-> > +++ b/drivers/power/reset/Kconfig
-> > @@ -128,6 +128,16 @@ config POWER_RESET_LTC2952
-> >  	  This driver supports an external powerdown trigger and board power
-> >  	  down via the LTC2952. Bindings are made in the device tree.
-> >  
-> > +config POWER_RESET_MT6323
-> > +	bool "MediaTek MT6323 power-off driver"
-> > +	depends on MFD_MT6397
-> > +	help
-> > +	  The power-off driver is responsible for externally shutdown down
-> > +	  the power of a remote MediaTek SoC MT6323 is connected to through
-> > +	  controlling a tiny circuit BBPU inside MT6323 RTC.
-> > +
-> > +	  Say Y if you have a board where MT6323 could be found.
-> > +
-> >  config POWER_RESET_QNAP
-> >  	bool "QNAP power-off driver"
-> >  	depends on OF_GPIO && PLAT_ORION
-> > diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-> > index 7778c74..8836172 100644
-> > --- a/drivers/power/reset/Makefile
-> > +++ b/drivers/power/reset/Makefile
-> > @@ -11,6 +11,7 @@ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
-> >  obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
-> >  obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
-> >  obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
-> > +obj-$(CONFIG_POWER_RESET_MT6323) += mt6323-poweroff.o
-> >  obj-$(CONFIG_POWER_RESET_OCELOT_RESET) += ocelot-reset.o
-> >  obj-$(CONFIG_POWER_RESET_PIIX4_POWEROFF) += piix4-poweroff.o
-> >  obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
-> > diff --git a/drivers/power/reset/mt6323-poweroff.c b/drivers/power/reset/mt6323-poweroff.c
-> > new file mode 100644
-> > index 0000000..c195766
-> > --- /dev/null
-> > +++ b/drivers/power/reset/mt6323-poweroff.c
-> > @@ -0,0 +1,97 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * Power off through MediaTek PMIC
-> > + *
-> > + * Copyright (C) 2018 MediaTek Inc.
-> > + *
-> > + * Author: Sean Wang <sean.wang@mediatek.com>
-> > + *
-> > + */
-> > +
-> > +#include <linux/err.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> 
-> Not needed
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Will be removed.
-
-> 
-> > +#include <linux/platform_device.h>
-> > +#include <linux/mfd/mt6397/core.h>
-> > +#include <linux/mfd/mt6397/rtc.h>
-> > +
-> > +struct mt6323_pwrc {
-> > +	struct device *dev;
-> > +	struct regmap *regmap;
-> > +	u32 base;
-> > +};
-> > +
-> > +static struct mt6323_pwrc *mt_pwrc;
-> > +
-> > +static void mt6323_do_pwroff(void)
-> > +{
-> > +	struct mt6323_pwrc *pwrc = mt_pwrc;
-> > +	unsigned int val;
-> > +	int ret;
-> > +
-> > +	regmap_write(pwrc->regmap, pwrc->base + RTC_BBPU, RTC_BBPU_KEY);
-> > +	regmap_write(pwrc->regmap, pwrc->base + RTC_WRTGR, 1);
-> > +
-> > +	ret = regmap_read_poll_timeout(pwrc->regmap,
-> > +				       pwrc->base + RTC_BBPU, val,
-> > +				       !(val & RTC_BBPU_CBUSY),
-> > +				       MTK_RTC_POLL_DELAY_US,
-> > +				       MTK_RTC_POLL_TIMEOUT);
-> > +	if (ret)
-> > +		dev_err(pwrc->dev, "failed to write BBPU: %d\n", ret);
-> > +
-> > +	/* Wait some time until system down, otherwise, notice with a warn */
-> > +	mdelay(1000);
-> > +
-> > +	WARN_ONCE(1, "Unable to power off system\n");
-> > +}
-> > +
-> > +static int mt6323_pwrc_probe(struct platform_device *pdev)
-> > +{
-> > +	struct mt6397_chip *mt6397_chip = dev_get_drvdata(pdev->dev.parent);
-> > +	struct mt6323_pwrc *pwrc;
-> > +	struct resource *res;
-> > +
-> > +	pwrc = devm_kzalloc(&pdev->dev, sizeof(*pwrc), GFP_KERNEL);
-> > +	if (!pwrc)
-> > +		return -ENOMEM;
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	pwrc->base = res->start;
-> > +	pwrc->regmap = mt6397_chip->regmap;
-> > +	pwrc->dev = &pdev->dev;
-> > +	mt_pwrc = pwrc;
-> > +
-> > +	pm_power_off = &mt6323_do_pwroff;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int mt6323_pwrc_remove(struct platform_device *pdev)
-> > +{
-> > +	if (pm_power_off == &mt6323_do_pwroff)
-> > +		pm_power_off = NULL;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id mt6323_pwrc_dt_match[] = {
-> > +	{ .compatible = "mediatek,mt6323-pwrc" },
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, mt6323_pwrc_dt_match);
-> 
-> Don't forget to remove the DT table when you respin the series for
-> the requested binding changes.
-> 
-
-Thanks. This table will be removed in the next version.
-
-
-> > +static struct platform_driver mt6323_pwrc_driver = {
-> > +	.probe		= mt6323_pwrc_probe,
-> > +	.remove		= mt6323_pwrc_remove,
-> > +	.driver		= {
-> > +		.name	= "mt6323-pwrc",
-> > +		.of_match_table = mt6323_pwrc_dt_match,
-> > +	},
-> > +};
-> > +
-> > +module_platform_driver(mt6323_pwrc_driver);
-> > +
-> > +MODULE_DESCRIPTION("Poweroff driver for MT6323 PMIC");
-> > +MODULE_AUTHOR("Sean Wang <sean.wang@mediatek.com>");
-> > +MODULE_LICENSE("GPL v2");
-> > diff --git a/include/linux/mfd/mt6397/rtc.h b/include/linux/mfd/mt6397/rtc.h
-> > index 480977c..ac932c9 100644
-> > --- a/include/linux/mfd/mt6397/rtc.h
-> > +++ b/include/linux/mfd/mt6397/rtc.h
-> > @@ -16,6 +16,7 @@
-> >  
-> >  #define RTC_BBPU		0x0000
-> >  #define RTC_BBPU_CBUSY		BIT(6)
-> > +#define RTC_BBPU_KEY            (0x43 << 8)
-> >  
-> >  #define RTC_WRTGR		0x003c
-> 
-> The driver looks fine otherwise.
-> 
-
-Thanks.
-
-> -- Sebastian
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+index e9d5130..6bbabb6 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+@@ -735,6 +735,16 @@
+ 		#reset-cells = <1>;
+ 	};
+ 
++	hsdma: dma-controller at 1b007000 {
++		compatible = "mediatek,mt7622-hsdma";
++		reg = <0 0x1b007000 0 0x1000>;
++		interrupts = <GIC_SPI 219 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&ethsys CLK_ETH_HSDMA_EN>;
++		clock-names = "hsdma";
++		power-domains = <&scpsys MT7622_POWER_DOMAIN_ETHSYS>;
++		#dma-cells = <1>;
++	};
++
+ 	eth: ethernet at 1b100000 {
+ 		compatible = "mediatek,mt7622-eth",
+ 			     "mediatek,mt2701-eth",
+-- 
+2.7.4
