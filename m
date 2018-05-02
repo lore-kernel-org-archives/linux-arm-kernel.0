@@ -1,33 +1,36 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 2 May 2018 16:25:06 +0200
-Subject: [PATCH v1 0/2] Add MDMA Support on STM32MP157C
-In-Reply-To: <1524215707-14642-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1524215707-14642-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <0bcb0bea-cdc1-483e-4396-517d33e9e69f@st.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 2 May 2018 07:25:44 -0700
+Subject: [PATCH] ARM: dts: BCM5301X: Relicense most DTS files to the GPL
+ 2.0+ / MIT
+In-Reply-To: <20180502141102.31769-1-zajec5@gmail.com>
+References: <20180502141102.31769-1-zajec5@gmail.com>
+Message-ID: <20180502142544.GB10928@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/20/2018 11:15 AM, Pierre-Yves MORDRET wrote:
-> This patch adds MDMA support on STM32MP157C with configs and device tree.
-> ---
->    Version history:
->       v1:
->          * Initial
-> ---
+On Wed, May 02, 2018 at 04:11:02PM +0200, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> Pierre-Yves MORDRET (2):
->    ARM: configs: stm32: Add MDMA support on STM32MP157C
->    ARM: dts: stm32: Add MDMA support on STM32MP157C
+> These files were created and ever touched by a group of three people
+> only: Dan, Hauke and me. They were licensed under GNU/GPL or ISC.
 > 
->   arch/arm/boot/dts/stm32mp157c.dtsi | 10 ++++++++++
->   arch/arm/mach-stm32/Kconfig        |  1 +
->   2 files changed, 11 insertions(+)
+> Introducing and discussing SPDX-License-Identifier resulted in a
+> conclusion that ISC is a not recommended license (see also a
+> license-rules.rst). Moveover an old e-mail from Alan Cox was pointed
+> which explained that dual licensing is a safer solution than depending
+> on a common compatibility belief.
 > 
+> This commit switches most of BCM5301X DTS files to dual licensing using:
+> 1) GPL 2.0+ to make sure they are compatible with Linux kernel
+> 2) MIT to allow sharing with more permissive projects
+> Both licenses belong to the preferred ones (see LICENSES/preferred/).
+> 
+> An attempt to relicense remaining files will be made separately and will
+> require approve from more/other developers.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Series applied on stm32-next.
-As said before I modified commit header for mach-stm32/Kconfig patch.
+Many thanks for doing this, it makes the license "confusion" a bit less
+now :)
 
-Regards
-Alex
+Reviewed-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
