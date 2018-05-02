@@ -1,106 +1,143 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 2 May 2018 19:49:57 +0100
-Subject: [RFC PATCH] driver core: make deferring probe forever optional
-In-Reply-To: <CAL_JsqJvMyrKS4LsRC6fDus24Yg8U+VcrbNNvxtOXmKbrc8RAA@mail.gmail.com>
-References: <20180501213114.20183-1-robh@kernel.org>
- <f808a652-2454-941c-2fd1-60776fb353f6@arm.com>
- <CAL_JsqJvMyrKS4LsRC6fDus24Yg8U+VcrbNNvxtOXmKbrc8RAA@mail.gmail.com>
-Message-ID: <74d495d8-04e2-fb7d-7d07-0905fbc8a6cf@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 2 May 2018 18:54:43 +0000
+Subject: [PATCH 0/4] soc: imx: add scu firmware api support
+In-Reply-To: <20180501055904.sdiesjlbw5fduztn@pengutronix.de>
+References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
+ <20180501055904.sdiesjlbw5fduztn@pengutronix.de>
+Message-ID: <AM0PR04MB4211F83720193386D05C3CFC80800@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/18 15:48, Rob Herring wrote:
-> On Wed, May 2, 2018 at 6:40 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->> On 01/05/18 22:31, Rob Herring wrote:
->>>
->>> Deferred probe will currently wait forever on dependent devices to probe,
->>> but sometimes a driver will never exist. It's also not always critical for
->>> a driver to exist. Platforms can rely on default configuration from the
->>> bootloader or reset defaults for things such as pinctrl and power domains.
->>> This is often the case with initial platform support until various drivers
->>> get enabled. There's at least 2 scenarios where deferred probe can render
->>> a platform broken. Both involve using a DT which has more devices and
->>> dependencies than the kernel supports. The 1st case is a driver may be
->>> disabled in the kernel config. The 2nd case is the kernel version may
->>> simply not have the dependent driver. This can happen if using a newer DT
->>> (provided by firmware perhaps) with a stable kernel version.
->>>
->>> Unfortunately, this change breaks with modules as we have no way of
->>> knowing when modules are done loading. One possibility is to make this
->>> opt in or out based on compatible strings rather than at a subsystem
->>> level.
->>> Ideally this information could be extracted automatically somehow. OTOH,
->>> maybe the lists are pretty small. There's only a handful of subsystems
->>> that can be optional, and then only so many drivers in those that can be
->>> modules (at least for pinctrl, many drivers are built-in only).
->>
->>
->> Ooh, this is exactly what I wanted for of_iommu_xlate(), and would be much
->> nicer than the current bodge using system_state that I ended up with. The
->> context there is very similar - if the device has a parent IOMMU then we
->> want to wait for that to probe first if possible, but with a deadline such
->> that if it doesn't show up then we can go ahead and make progress without it
->> (on the assumption that DMA ops can fall back to CMA). The modules problem
->> doesn't currently apply to IOMMU drivers either, although we do use a
->> special of_device_id table for detecting built-in drivers via
->> OF_IOMMU_DECLARE() to avoid deferring at all when we know it would be
->> pointless - a more generic solution for that could certainly be useful too.
+> -----Original Message-----
+> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+> Sent: Tuesday, May 1, 2018 1:59 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
+> <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> Subject: Re: [PATCH 0/4] soc: imx: add scu firmware api support
 > 
-> Ah, so you kept the IOMMU_OF_DECLARE() but it does nothing but define
-> a table. We already have the driver match table which should pretty
-> much be the same data, so it would be better if we could use that if
-> possible. If we used MODULE_DEVICE_TABLE somehow, we could avoid
-> modifying lots of drivers. Though many built-in only drivers omit
-> that. The other problem is it would become a large set of tables to
-> search thru because it is global. That would probably end up slower
-> than just deferring. So we need something like
-> <subsystem>_DEVICE_TABLE() to have per subsystem tables. Then this
-> function in this patch would need to be told which table to use.
-> However, this is all really just an optimization to avoid deferring at
-> all and could be addressed later. Is there any data on how much time
-> you save avoiding deferring? This has come up in the past and I don't
-> think it is much.
+> Hi,
+> 
+> On Sat, Apr 28, 2018 at 02:46:12AM +0800, Dong Aisheng wrote:
+> > Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
+> > (e.g. MX8QXP and MX8QM) contain a system controller which runs on a
+> > dedicated Cortex-M core to provide power, clock, Pad, and resource
+> > management. Communication between the host processor running an OS
+> and
+> > the system controller happens through a SCU protocol.
+> > This patchset adds the SCU APIs which is implemented based on MU and
+> > will be used by different system components.
+> >
+> > It mainly consists of below parts:
+> > 1) MU library calls
+> > 1) Implementation of the IPC functions based on MUs (client side).
+> > 2) SCU firmware services APIs implementation ased on RPC calls which
+> >    are mostly generated by SCU firmware
+> 
+> 
+> Hm... I fail to see the difference between remoteproc, virtio, rpmsg and
+> other existing frameworks in kernel with this functionality. Why do we need
+> vendor/soc specific framework once again?
+> 
 
-In the of_iommu case it's not actually an optimisation, but dodges a big 
-problem with the self-contained implementation - if we blindly defer on 
-a not-yet-present IOMMU until all built-in drivers have had a chance to 
-register themselves naturally, then by the time we could safely assume 
-the relevant IOMMU driver *isn't* built-in, all the clients (which may 
-include the boot device) can already be stuck on the deferred probe list 
-with nothing left to kick it and make progress again. It's quite 
-possible I could have done better, I just wasn't very familiar with the 
-driver core at the time, and repurposing the magic table instead of 
-entirely removing it was by far the easiest way forward.
+Hmm.. It seems like not a vendor specific framework...
+It mainly SCU firmware APIs generated by SCU firmware script for
+Linux OS components to use.
+And those APIs are implemented base on MU simple polling mode
+With better performance.
 
-With this patch we would have a guarantee that the deferred list gets at 
-least one kick after the deadline for waiting has passed, so in theory 
-we could then just use the regular driver matching mechanisms to see 
-whether a given IOMMU node can possibly probe or not. I'm not sure we 
-could get rid of the driver introspection aspect entirely, since it 
-might be the case that the IOMMU itself has dependencies and winds up on 
-the deferred list behind one or more of its clients, in which case we'd 
-still want them to keep waiting even after the deadline is nominally up.
+NXP internally has tried mailbox but got performance regression,
+So we're still not sure whether Mailbox is quit suitable for i.MX
+SCU Firmware. Needs more time to investigate.
 
-> I've also been thinking about if we could use MODULE_DEVICE_TABLE to
-> provide a list compatible strings from modules as a whitelist of
-> devices to keep deferring probe on. That would require building
-> modules to build the kernel which I don't think would work. I think my
-> conclusion is that the cases we care about may be short enough to just
-> manually maintain such a list.
+And I'm still not quite familiar with remoteproc, virtio, rpmsg.
+May need spend more time to investigate later.
+And it would be good if you can provide suggestions and sharing
+Informations about them.
+e.g. what's requirement of i.MX to switch to them? Benefit? Or 
+something else valuable?
 
-FWIW we did get rid of the equivalent table completely for the arm64 
-ACPI code, but that only has to support 2 types of IOMMU so just 
-evaluates the respective driver config symbols directly with 
-IS_BUILTIN(). Sadly that method really can't scale to DT with multiple 
-compatible strings per driver...
+Regards
+Dong Aisheng
 
-I guess there's also the possibility that a single driver may want 
-multiple behaviours, if e.g. if SoC variants A and B have some identical 
-peripherals but slightly different pinctrl/IOMMU/etc. hardware such that 
-A has workable default behaviour and can be treated as optional, whereas 
-B absolutely must be controlled by the kernel for the consumers to 
-function properly, and they *should* defer forever otherwise. I think 
-that would pretty much demand some sort of explicitly-curated 
-white/blacklist setup at the subsystem or driver level.
-
-Robin.
+> > Dong Aisheng (4):
+> >   soc: imx: add mu library functions support
+> >   dt-bindings: arm: fsl: add mu binding doc
+> >   dt-bindings: arm: fsl: add scu binding doc
+> >   soc: imx: add SC firmware IPC and APIs
+> >
+> >  .../devicetree/bindings/arm/freescale/fsl,mu.txt   |  33 +
+> >  .../devicetree/bindings/arm/freescale/fsl,scu.txt  |  40 ++
+> >  drivers/soc/imx/Kconfig                            |   7 +
+> >  drivers/soc/imx/Makefile                           |   2 +
+> >  drivers/soc/imx/imx_mu.c                           | 125 ++++
+> >  drivers/soc/imx/sc/Makefile                        |   8 +
+> >  drivers/soc/imx/sc/main/ipc.c                      | 270 ++++++++
+> >  drivers/soc/imx/sc/main/rpc.h                      | 123 ++++
+> >  drivers/soc/imx/sc/svc/irq/rpc.h                   |  41 ++
+> >  drivers/soc/imx/sc/svc/irq/rpc_clnt.c              |  58 ++
+> >  drivers/soc/imx/sc/svc/misc/rpc.h                  |  58 ++
+> >  drivers/soc/imx/sc/svc/misc/rpc_clnt.c             | 368 ++++++++++
+> >  drivers/soc/imx/sc/svc/pad/rpc.h                   |  55 ++
+> >  drivers/soc/imx/sc/svc/pad/rpc_clnt.c              | 412 +++++++++++
+> >  drivers/soc/imx/sc/svc/pm/rpc.h                    |  58 ++
+> >  drivers/soc/imx/sc/svc/pm/rpc_clnt.c               | 393 +++++++++++
+> >  drivers/soc/imx/sc/svc/rm/rpc.h                    |  70 ++
+> >  drivers/soc/imx/sc/svc/rm/rpc_clnt.c               | 612 +++++++++++++++++
+> >  drivers/soc/imx/sc/svc/timer/rpc.h                 |  52 ++
+> >  drivers/soc/imx/sc/svc/timer/rpc_clnt.c            | 295 ++++++++
+> >  include/soc/imx/mu.h                               |  21 +
+> >  include/soc/imx/sc/ipc.h                           |  46 ++
+> >  include/soc/imx/sc/scfw.h                          |  24 +
+> >  include/soc/imx/sc/sci.h                           |  35 +
+> >  include/soc/imx/sc/svc/irq/api.h                   | 139 ++++
+> >  include/soc/imx/sc/svc/misc/api.h                  | 395 +++++++++++
+> >  include/soc/imx/sc/svc/pad/api.h                   | 536 +++++++++++++++
+> >  include/soc/imx/sc/svc/pm/api.h                    | 559 +++++++++++++++
+> >  include/soc/imx/sc/svc/rm/api.h                    | 726 ++++++++++++++++++++
+> >  include/soc/imx/sc/svc/timer/api.h                 | 265 +++++++
+> >  include/soc/imx/sc/types.h                         | 764 +++++++++++++++++++++
+> >  31 files changed, 6590 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/arm/freescale/fsl,mu.txt
+> >  create mode 100644
+> > Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> >  create mode 100644 drivers/soc/imx/imx_mu.c  create mode 100644
+> > drivers/soc/imx/sc/Makefile  create mode 100644
+> > drivers/soc/imx/sc/main/ipc.c  create mode 100644
+> > drivers/soc/imx/sc/main/rpc.h  create mode 100644
+> > drivers/soc/imx/sc/svc/irq/rpc.h  create mode 100644
+> > drivers/soc/imx/sc/svc/irq/rpc_clnt.c
+> >  create mode 100644 drivers/soc/imx/sc/svc/misc/rpc.h  create mode
+> > 100644 drivers/soc/imx/sc/svc/misc/rpc_clnt.c
+> >  create mode 100644 drivers/soc/imx/sc/svc/pad/rpc.h  create mode
+> > 100644 drivers/soc/imx/sc/svc/pad/rpc_clnt.c
+> >  create mode 100644 drivers/soc/imx/sc/svc/pm/rpc.h  create mode
+> > 100644 drivers/soc/imx/sc/svc/pm/rpc_clnt.c
+> >  create mode 100644 drivers/soc/imx/sc/svc/rm/rpc.h  create mode
+> > 100644 drivers/soc/imx/sc/svc/rm/rpc_clnt.c
+> >  create mode 100644 drivers/soc/imx/sc/svc/timer/rpc.h
+> >  create mode 100644 drivers/soc/imx/sc/svc/timer/rpc_clnt.c
+> >  create mode 100644 include/soc/imx/mu.h  create mode 100644
+> > include/soc/imx/sc/ipc.h  create mode 100644 include/soc/imx/sc/scfw.h
+> > create mode 100644 include/soc/imx/sc/sci.h  create mode 100644
+> > include/soc/imx/sc/svc/irq/api.h  create mode 100644
+> > include/soc/imx/sc/svc/misc/api.h  create mode 100644
+> > include/soc/imx/sc/svc/pad/api.h  create mode 100644
+> > include/soc/imx/sc/svc/pm/api.h  create mode 100644
+> > include/soc/imx/sc/svc/rm/api.h  create mode 100644
+> > include/soc/imx/sc/svc/timer/api.h
+> >  create mode 100644 include/soc/imx/sc/types.h
+> >
+> > --
+> > 2.7.4
+> >
+> >
+> >
+> 
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
