@@ -1,38 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 May 2018 14:18:41 +0200
-Subject: [PATCH v2 2/2] pinctrl: uniphier: add LD11 MPEG2-TS I/O pin-mux
- settings
-In-Reply-To: <20180427014905.19520-2-suzuki.katsuhiro@socionext.com>
-References: <20180427014905.19520-1-suzuki.katsuhiro@socionext.com>
- <20180427014905.19520-2-suzuki.katsuhiro@socionext.com>
-Message-ID: <CACRpkdaoN1SBeadam6V6re64WyEvm7s6TOA+m38t3CDj16MU8Q@mail.gmail.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 2 May 2018 14:19:25 +0200
+Subject: [PATCH] ARM: dts: stm32: add reset binding on stm32mp157c
+In-Reply-To: <1524215347-10600-1-git-send-email-gabriel.fernandez@st.com>
+References: <1524215347-10600-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <a49de02e-5ea3-0ac7-9ae0-75add5806c6a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 3:49 AM, Katsuhiro Suzuki
-<suzuki.katsuhiro@socionext.com> wrote:
+Hi Gabriel,
 
-> The MPEG2-TS input/output core both accepts serial TS and parallel TS.
->
-> The serial TS interface uses following pins:
->   hscin0_s : HS0DOUT[0-3]
->   hscin1_s : HS0DOUT[4-7]
->   hscin2_s : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN0
->   hscout0_s: HS0DOUT[0-3]
->   hscout1_s: HS0DOUT[4-7]
->
-> And the parallel TS interface uses following pins:
->   hscin0_p : HS0BCLKIN, HS0SYNCIN, HS0VALIN, HS0DIN[0-7]
->   hscin1_p : HS1BCLKIN, HS1SYNCIN, HS1VALIN, HS1DIN[0-7]
->   hscout0_p: HS0BCLKOUT, HS0SYNCOUT, HS0VALOUT, HS0DOUT[0-7]
->
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
->
+On 04/20/2018 11:09 AM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> 
+> This patch adds reset binding file.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 > ---
->
-> Changes in v2:
+>   arch/arm/boot/dts/stm32mp157c.dtsi | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+> index bc3eddc..7e91fd6 100644
+> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+> @@ -5,6 +5,7 @@
+>    */
+>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+>   #include <dt-bindings/clock/stm32mp1-clks.h>
+> +#include <dt-bindings/reset/stm32mp1-resets.h>
+>   
+>   / {
+>   	#address-cells = <1>;
+> 
 
-This v2 version applied with Masahiro's ACK.
+Applied on stm32-next.
 
-Yours,
-Linus Walleij
+Thanks.
+Alex
