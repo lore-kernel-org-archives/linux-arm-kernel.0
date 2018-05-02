@@ -1,34 +1,39 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 2 May 2018 15:09:08 +0200
-Subject: [PATCH v8 09/12] ARM: sun9i: smp: Add is_a83t field
-In-Reply-To: <20180501123131.7738-10-mylene.josserand@bootlin.com>
-References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
- <20180501123131.7738-10-mylene.josserand@bootlin.com>
-Message-ID: <20180502130908.nuykfypradbmggs5@flea>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 2 May 2018 15:10:18 +0200
+Subject: [PATCH 00/10] ARM, arm64: dts: renesas: update register properties
+In-Reply-To: <20180426102951.8683-1-horms+renesas@verge.net.au>
+References: <20180426102951.8683-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUBtNrny+DPqamKSL6nmiyuF38BQdD0eqc7kzDhuMSQqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 02:31:28PM +0200, Myl?ne Josserand wrote:
-> To prepare the support of sun8i-a83t, add a field in the smp_data
-> structure to know if we are on sun9i-a80 or sun8i-a83t.
-> 
-> Add also a global variable to retrieve which architecture we are
-> having.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+Hi Simon,
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+On Thu, Apr 26, 2018 at 12:29 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> this series:
+>
+> 1. Drops unnecessary address properties from VIN port nodes
+>    on Renesas R-Car Gen2 SoC board DTSes. These are unnecessary
+>    as the nodes to not have bus addresses.
 
-Maxime
+I guess the example in Documentation/devicetree/bindings/media/rcar_vin.txt
+should be updated, too?
+
+> 2. And adds address properties to R-Car Sound port nodes on
+>    Renesas R-Car Gen2 SoC DTSes. These are necessary as the nodes
+>    have unit names.
+
+Documentation/devicetree/bindings/sound/renesas,rsnd.txt doesn't say
+anything about the presence of ports?
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/686825ce/attachment.sig>
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
