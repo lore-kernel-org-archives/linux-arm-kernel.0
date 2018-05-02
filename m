@@ -1,33 +1,72 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 1 May 2018 20:49:52 -0500
-Subject: [PATCH v9 03/27] clk: davinci: psc: allow for dev == NULL
-In-Reply-To: <8940259b-5811-ce9f-8262-17d39ca0a46f@ti.com>
+Date: Tue, 1 May 2018 20:52:18 -0500
+Subject: [PATCH v9 24/27] dt-bindings: timer: new bindings for TI DaVinci
+ timer
+In-Reply-To: <20180427140522.npmhjamhwxgp7y73@rob-hp-laptop>
 References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-4-david@lechnology.com>
- <8940259b-5811-ce9f-8262-17d39ca0a46f@ti.com>
-Message-ID: <94d4cfc5-0ea7-e642-c7e3-8d549bdef8ce@lechnology.com>
+ <20180427001745.4116-25-david@lechnology.com>
+ <20180427140522.npmhjamhwxgp7y73@rob-hp-laptop>
+Message-ID: <7cea07f1-e174-8496-a27a-01f0e3082054@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2018 09:02 AM, Sekhar Nori wrote:
-> On Friday 27 April 2018 05:47 AM, David Lechner wrote:
->> +static inline void *_devm_kzalloc(struct device *dev, size_t size, gfp_t flags)
->> +{
->> +	if (dev)
->> +		return devm_kzalloc(dev, size, flags);
+Sekhar,
+
+On 04/27/2018 09:05 AM, Rob Herring wrote:
+> On Thu, Apr 26, 2018 at 07:17:42PM -0500, David Lechner wrote:
+>> This adds new device tree bindings for the timer IP block of TI
+>> DaVinci-like SoCs.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>> ---
+>>
+>> v9 changes:
+>> - new patch in v9
+>>
+>>
+>>   .../bindings/timer/ti,davinci-timer.txt       | 24 +++++++++++++++++++
+>>   1 file changed, 24 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt b/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
+>> new file mode 100644
+>> index 000000000000..2091eca46981
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
+>> @@ -0,0 +1,24 @@
+>> +* Device tree bindings for Texas Instruments DaVinci timer
 >> +
->> +	return kzalloc(size, flags);
->> +}
+>> +This document provides bindings for the 64-bit timer in the DaVinci
+>> +architecture devices. The timer can be configured as a general-purpose 64-bit
+>> +timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
+>> +timers, each half can operate in conjunction (chain mode) or independently
+>> +(unchained mode) of each other.
+>> +
+>> +It is global timer is a free running up-counter and can generate interrupt
 > 
-> I have the same question on the utility of this. A memory allocation
-> error so early on is not going to result in a bootable system anyway.
-> So, I wonder if its better to just BUG() in such cases. That will
-> actually help faster debug than returning an error back. I know the push
-> back on using BUG(), but clock drivers are special, and I think thats
-> why its seems to be used quite a bit already.
+> Doesn't make sense, too many 'is'.
 > 
+> There's no interrupt property listed.
+> 
+>> +when the counter reaches preset counter values.
+>> +
+>> +Required properties:
+>> +
+>> +- compatible : should be "ti,davinci-timer".
+>> +- reg : specifies base physical address and count of the registers.
+>> +- clocks : the clock feeding the timer clock.
+>> +
+>> +Example:
+>> +
+>> +	clocksource: timer at 20000 {
+>> +		compatible = "ti,davinci-timer";
+>> +		reg = <0x20000 0x1000>;
+>> +		clocks = <&pll0_auxclk>;
+>> +	};
+>> -- 
+>> 2.17.0
+>>
 
-Same reply here as well. On DA850/DA830, you might not get a console,
-but you will "boot" even if one of the PSC devices fails though.
-
-WARN() is probably just as good as BUG() in this case too.
+What do you think about trying to reuse the keystone timer here instead of
+introducing our own binding? I assume it is basically the same since the
+watchdog timer is shared already between davinci and keystone.
