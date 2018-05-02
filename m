@@ -1,83 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 2 May 2018 23:11:14 +0200
-Subject: [PATCH RFC PoC 0/2] platform: different approach to early
- platform drivers
-In-Reply-To: <CAK8P3a0tMp2QURp-9WuHehqE0b6-BO1wJ38siTdxhxgwCb-ERw@mail.gmail.com>
-References: <20180426152920.21569-1-brgl@bgdev.pl>
- <20180426173151.GJ3094@brightrain.aerifal.cx>
- <6d1f9114-f1d1-961f-4f36-74adff059dc3@lechnology.com>
- <CAK8P3a0oCH7zyBs8nQd4p+xLrFwDQiJsaKKCF1m04nyXsZxk=g@mail.gmail.com>
- <CAMpxmJUR+31axmAe2TNq00aUg40bnC=5k=2cVX019Vncr7cRkw@mail.gmail.com>
- <CAK8P3a2xtTLx-VHVWok-b19=o1z5FbTNcaWq7Y_HSdaH6pWnZg@mail.gmail.com>
- <CAMRc=MdomjLCq-bJyktaToH00kNQAuTLgkSFRrY9Jmre8McT3A@mail.gmail.com>
- <CAK8P3a0tMp2QURp-9WuHehqE0b6-BO1wJ38siTdxhxgwCb-ERw@mail.gmail.com>
-Message-ID: <CAMuHMdU7b86fWAFaK6LQ0gHukJebc4fegUetHPCvu7ujdjSfRw@mail.gmail.com>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Wed,  2 May 2018 23:07:56 +0200
+Subject: [PATCH v14 4/8] ASoC: sun4i-codec: Add Mic1 Playback Switch,
+ Mic2 Playback Switch
+In-Reply-To: <20180502210800.1971-1-dannym@scratchpost.org>
+References: <20180502210800.1971-1-dannym@scratchpost.org>
+Message-ID: <20180502210800.1971-5-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 2:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Fri, Apr 27, 2018 at 1:53 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->> 2018-04-27 12:18 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->>> On Fri, Apr 27, 2018 at 10:57 AM, Bartosz Golaszewski
->>> <bgolaszewski@baylibre.com> wrote:
->>>> 2018-04-27 9:52 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->>>>> On Fri, Apr 27, 2018 at 4:28 AM, David Lechner <david@lechnology.com> wrote:
->>>> My patch tries to address exactly the use cases we're facing - for
->>>> example by providing means to probe devices twice (early and late) and
->>>> to check the state we're at in order for users to be able to just do
->>>> the critical initialization early on and then continue with regular
->>>> stuff later.
->>>
->>> Maybe the problem is reusing the name and some of the code from
->>> an existing functionality that we've been trying to get rid of.
->>>
->>
->> I'm not reusing the name - in fact I set the prefix to earlydev_
->> exactly in order to not confuse anyone. I'm also not reusing any code
->> in the second series.
->
-> Ok.
->
->>> If what you want to do is completely different from the existing
->>> early_platform implementation, how about starting by moving that
->>> out of drivers/base/platform.c into something under arch/sh/
->>> and renaming it to something with an sh_ prefix.
->>>
->>
->> Yes, this is a good idea, but what about the sh-specific drivers that
->> rely on it? Is including headers from arch/ in driver code still an
->> accepted practice?
->
-> I think it's fine here, since we're just move it out of the way and
-> there are only very few drivers using it:
->
-> drivers/clocksource/sh_cmt.c:early_platform_init("earlytimer",
-> &sh_cmt_device_driver);
-> drivers/clocksource/sh_mtu2.c:early_platform_init("earlytimer",
-> &sh_mtu2_device_driver);
-> drivers/clocksource/sh_tmu.c:early_platform_init("earlytimer",
-> &sh_tmu_device_driver);
-> drivers/clocksource/timer-ti-dm.c:early_platform_init("earlytimer",
-> &omap_dm_timer_driver);
-> drivers/tty/serial/sh-sci.c:early_platform_init_buffer("earlyprintk",
-> &sci_driver,
->
-> For timer-ti-dm, it seems like a leftover from old times that can
-> be removed. The other four are shared between arch/sh and
-> arch/arm/mach-shmobile and already have some #ifdef
-> to handle those two cases.
+Add Mic1 Playback Switch and Mic2 Playback Switch for Allwinner A10 and
+Allwinner A20.
 
-Sh-sci is also used on arm64, for R-Car Gen3 SoCs.
-While the latter has CMT and TMU hardware blocks, so far we haven't enabled
-support for it yet (just using the ARM arch timer is too convenient? ;-)
+Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+---
+ sound/soc/sunxi/sun4i-codec.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index b62af407967f..0add2c44115c 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -68,6 +68,10 @@
+ #define SUN4I_CODEC_DAC_ACTL_LDACLMIXS			(15)
+ #define SUN4I_CODEC_DAC_ACTL_RDACRMIXS			(14)
+ #define SUN4I_CODEC_DAC_ACTL_LDACRMIXS			(13)
++#define SUN4I_CODEC_DAC_ACTL_MIC1LS			(12)
++#define SUN4I_CODEC_DAC_ACTL_MIC1RS			(11)
++#define SUN4I_CODEC_DAC_ACTL_MIC2LS			(10)
++#define SUN4I_CODEC_DAC_ACTL_MIC2RS			(9)
+ #define SUN4I_CODEC_DAC_ACTL_DACPAS			(8)
+ #define SUN4I_CODEC_DAC_ACTL_MIXPAS			(7)
+ #define SUN4I_CODEC_DAC_ACTL_PA_MUTE			(6)
+@@ -725,6 +729,12 @@ static const struct snd_kcontrol_new sun4i_codec_mixer_controls[] = {
+ 	SOC_DAPM_SINGLE("Right Mixer Left DAC Playback Switch",
+ 			SUN4I_CODEC_DAC_ACTL,
+ 			SUN4I_CODEC_DAC_ACTL_LDACRMIXS, 1, 0),
++	SOC_DAPM_DOUBLE("Mic1 Playback Switch", SUN4I_CODEC_DAC_ACTL,
++			SUN4I_CODEC_DAC_ACTL_MIC1LS,
++			SUN4I_CODEC_DAC_ACTL_MIC1RS, 1, 0),
++	SOC_DAPM_DOUBLE("Mic2 Playback Switch", SUN4I_CODEC_DAC_ACTL,
++			SUN4I_CODEC_DAC_ACTL_MIC2LS,
++			SUN4I_CODEC_DAC_ACTL_MIC2RS, 1, 0),
+ };
+ 
+ static const struct snd_kcontrol_new sun4i_codec_pa_mixer_controls[] = {
+@@ -807,10 +817,14 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+ 	{ "Right Mixer", NULL, "Mixer Enable" },
+ 	{ "Right Mixer", "Right Mixer Left DAC Playback Switch", "Left DAC" },
+ 	{ "Right Mixer", "Right Mixer Right DAC Playback Switch", "Right DAC" },
++	{ "Right Mixer", "Mic1 Playback Switch", "MIC1 Pre-Amplifier" },
++	{ "Right Mixer", "Mic2 Playback Switch", "MIC2 Pre-Amplifier" },
+ 
+ 	/* Left Mixer Routes */
+ 	{ "Left Mixer", NULL, "Mixer Enable" },
+ 	{ "Left Mixer", "Left Mixer Left DAC Playback Switch", "Left DAC" },
++	{ "Left Mixer", "Mic1 Playback Switch", "MIC1 Pre-Amplifier" },
++	{ "Left Mixer", "Mic2 Playback Switch", "MIC2 Pre-Amplifier" },
+ 
+ 	/* Power Amplifier Routes */
+ 	{ "Power Amplifier", "Mixer Playback Switch", "Left Mixer" },
