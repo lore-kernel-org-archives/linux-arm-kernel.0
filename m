@@ -1,174 +1,120 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  2 May 2018 15:47:19 +0200
-Subject: [PATCH 2/2 v5] drm/pl111: Enable device-specific assigned memory
-In-Reply-To: <20180502134719.8388-1-linus.walleij@linaro.org>
-References: <20180502134719.8388-1-linus.walleij@linaro.org>
-Message-ID: <20180502134719.8388-2-linus.walleij@linaro.org>
+From: Gilles.Buloz@kontron.com (Gilles Buloz)
+Date: Wed, 2 May 2018 13:48:27 +0000
+Subject: LS1043A : "synchronous abort" at boot due to PCI config read
+In-Reply-To: <20180502132501.GE11698@bhelgaas-glaptop.roam.corp.google.com>
+References: <5AD0E995.3090802@kontron.com>
+ <CAKv+Gu_v4V8DUa6f4WxvjZHoJbbqT0mKpOwYVmaLaE20CB3U_g@mail.gmail.com>
+ <5AE317AB.4020404@kontron.com>
+ <20180427165627.GA8199@bhelgaas-glaptop.roam.corp.google.com>
+ <5AE6D7E2.9030506@kontron.com> <5AE71BF4.2010200@kontron.com>
+ <20180430170447.GA95643@bhelgaas-glaptop.roam.corp.google.com>
+ <5AE75809.30701@kontron.com> <5AE9B5BB.2080003@kontron.com>
+ <20180502132501.GE11698@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <5AE9C1AB.8020403@kontron.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Versatile Express has 8 MB of dedicated video RAM (VRAM)
-on the motherboard, which is what we should be using for the
-PL111 if available. On this platform, the memory backplane
-is constructed so that only this memory will work properly
-with the CLCD on the motherboard, using any other memory
-area just gives random snow on the display.
+Le 02/05/2018 15:26, Bjorn Helgaas a ?crit :
+> On Wed, May 02, 2018 at 12:57:31PM +0000, Gilles Buloz wrote:
+>> Hi Bjorn,
+>> See attached patch (tested ok this morning)
+> This looks good.  Minor comments below.
+>
+> I can fix minor things myself, but I do need a signed-off-by from you
+> before applying (see
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/submitting-patches.rst)
+>
+> Please add a changelog, too, and include the patch inline (as opposed
+> to as an attachment) if possible.
+>
+>> --- include/linux/pci.h.orig	2018-03-26 16:51:18.050000000 +0000
+>> +++ include/linux/pci.h	2018-04-30 18:29:14.140000000 +0000
+>> @@ -193,6 +193,7 @@
+>>   enum pci_bus_flags {
+>>   	PCI_BUS_FLAGS_NO_MSI   = (__force pci_bus_flags_t) 1,
+>>   	PCI_BUS_FLAGS_NO_MMRBC = (__force pci_bus_flags_t) 2,
+>> +	PCI_BUS_FLAGS_NO_EXTCFG = (__force pci_bus_flags_t) 4,
+> Best if you can rebase this to v4.17-rc1.
+>
+>>   };
+>>   
+>>   /* These values come from the PCI Express Spec */
+>> --- drivers/pci/probe.c.orig	2018-01-22 09:29:52.000000000 +0000
+>> +++ drivers/pci/probe.c	2018-05-02 13:44:35.530000000 +0000
+>> @@ -664,6 +664,23 @@
+>>   	}
+>>   }
+>>   
+>> +static bool pci_bridge_child_bus_ext_cfg_accessible(struct pci_dev *bridge)
+>> +{
+>> +	int pos;
+>> +	u32 status;
+>> +
+>> +	if (!pci_is_pcie(bridge) || /* PCI/PCI bridge */
+>> +	    (pci_pcie_type(bridge) == PCI_EXP_TYPE_PCIE_BRIDGE) || /* PCIe/PCI bridge in forward mode */
+>> +	    (pci_pcie_type(bridge) == PCI_EXP_TYPE_PCI_BRIDGE)) {  /* PCIe/PCI bridge in reverse mode */
+>> +		pos = pci_find_capability(bridge, PCI_CAP_ID_PCIX);
+>> +		if (pos)
+>> +			pci_read_config_dword(bridge, pos + PCI_X_STATUS, &status);
+>> +		return pos && (status & (PCI_X_STATUS_266MHZ | PCI_X_STATUS_533MHZ));
+>> +	}
+> Please arrange this so everything fits in 80 columns.
+>
+> If you can split it into several simpler "if" statements rather
+> than one with a complicated expression, that would also be good.
+>
+>> +
+>> +	return true;
+>> +}
+>> +
+>>   static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>>   					   struct pci_dev *bridge, int busnr)
+>>   {
+>> @@ -725,6 +742,19 @@
+>>   	/* Create legacy_io and legacy_mem files for this bus */
+>>   	pci_create_legacy_files(child);
+>>   
+>> +	/*
+>> +	 * if bus_flags inherited from parent bus do not already report lack of extended config
+>> +	 * space support, check if supported by child bus by checking its parent bridge
+>> +	 */
+> Wrap to fit in 80 columns.
+>
+>> +	if (bridge && !(child->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG)) {
+> The double negative makes this a little bit hard to read.  Maybe it
+> could be improved by reversing the sense of something?
+>
+>> +		if (!pci_bridge_child_bus_ext_cfg_accessible(bridge)) {
+>> +			child->bus_flags |= PCI_BUS_FLAGS_NO_EXTCFG;
+>> +			dev_info(&child->dev, "extended config space not accessible due to parent bridge\n");
+> In v4.17-rc1, there's a pci_info() that should work here (instead of
+> dev_info()).
+>
+>> +		}
+>> +	} else {
+>> +		dev_info(&child->dev, "extended config space not accessible due to parent bus\n");
+>> +	}
+>> +
+>>   	return child;
+>>   }
+>>   
+>> @@ -1084,6 +1114,9 @@
+>>   	u32 status;
+>>   	u16 class;
+>>   
+>> +	if (dev->bus->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG)
+>> +		return PCI_CFG_SPACE_SIZE;
+>> +
+>>   	class = dev->class >> 8;
+>>   	if (class == PCI_CLASS_BRIDGE_HOST)
+>>   		return pci_cfg_space_size_ext(dev);
+> .
+>
+OK I'm going to learn about signing (sorry this is my first "official" patch).
+I'll download kernel v4.17-rc1 and write the patch for it; however I hope I'll be able to test it on my platform without the 
+freescale addons I have on 4.1.35, because I don't want to send an untested patch.
+For "if (bridge && !(child->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG))", I don't understand what you mean with "double negative", as I 
+only have one "!"
 
-The CA9 Versatile Express also has a PL111 instance on its
-core tile that can address all memory, and this does not
-have the restriction.
-
-The memory is assigned to the device using the memory-region
-device tree property and a "shared-dma-pool" reserved
-memory pool like this:
-
-reserved-memory {
-        #address-cells = <1>;
-        #size-cells = <1>;
-        ranges;
-
-        vram: vram at 48000000 {
-                compatible = "shared-dma-pool";
-                reg = <0x48000000 0x00800000>;
-                no-map;
-        };
-};
-
-clcd at 1f000 {
-        compatible = "arm,pl111", "arm,primecell";
-	(...)
-        memory-region = <&vram>;
-}?;
-
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Mali DP Maintainers <malidp@foss.arm.com>
-Reviewed-by: Eric Anholt <eric@anholt.net>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v4->v5:
-- Collect Robin's Tested-by
-ChangeLog v4->v5:
-- Make the GEM sg import function static.
-ChangeLog v3->v4:
-- Collect Eric's review-tag.
-ChangeLog v2->v3:
-- Fix error path so we uref the memory properly.
-- Augment the GEM buffer import to return an error pointer
-  if we try to import a buffer when using device-assigned
-  memory: we can only scan out the special memory and the
-  GEM buffers are not copied but referenced by pointer.
-ChangeLog v1->v2:
-- Make sure to also call of_reserved_mem_device_release() at
-  remove() and errorpath.
----
- drivers/gpu/drm/pl111/pl111_drm.h |  1 +
- drivers/gpu/drm/pl111/pl111_drv.c | 34 +++++++++++++++++++++++++++++--
- 2 files changed, 33 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-index 8639b2d4ddf7..ce4501d0ab48 100644
---- a/drivers/gpu/drm/pl111/pl111_drm.h
-+++ b/drivers/gpu/drm/pl111/pl111_drm.h
-@@ -79,6 +79,7 @@ struct pl111_drm_dev_private {
- 	const struct pl111_variant_data *variant;
- 	void (*variant_display_enable) (struct drm_device *drm, u32 format);
- 	void (*variant_display_disable) (struct drm_device *drm);
-+	bool use_device_memory;
- };
- 
- int pl111_display_init(struct drm_device *dev);
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 4621259d5387..454ff0804642 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -60,6 +60,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_graph.h>
-+#include <linux/of_reserved_mem.h>
- 
- #include <drm/drmP.h>
- #include <drm/drm_atomic_helper.h>
-@@ -207,6 +208,24 @@ static int pl111_modeset_init(struct drm_device *dev)
- 	return ret;
- }
- 
-+static struct drm_gem_object *
-+pl111_gem_import_sg_table(struct drm_device *dev,
-+			  struct dma_buf_attachment *attach,
-+			  struct sg_table *sgt)
-+{
-+	struct pl111_drm_dev_private *priv = dev->dev_private;
-+
-+	/*
-+	 * When using device-specific reserved memory we can't import
-+	 * DMA buffers: those are passed by reference in any global
-+	 * memory and we can only handle a specific range of memory.
-+	 */
-+	if (priv->use_device_memory)
-+		return ERR_PTR(-EINVAL);
-+
-+	return drm_gem_cma_prime_import_sg_table(dev, attach, sgt);
-+}
-+
- DEFINE_DRM_GEM_CMA_FOPS(drm_fops);
- 
- static struct drm_driver pl111_drm_driver = {
-@@ -227,7 +246,7 @@ static struct drm_driver pl111_drm_driver = {
- 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
- 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
- 	.gem_prime_import = drm_gem_prime_import,
--	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
-+	.gem_prime_import_sg_table = pl111_gem_import_sg_table,
- 	.gem_prime_export = drm_gem_prime_export,
- 	.gem_prime_get_sg_table	= drm_gem_cma_prime_get_sg_table,
- 
-@@ -257,6 +276,12 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	drm->dev_private = priv;
- 	priv->variant = variant;
- 
-+	ret = of_reserved_mem_device_init(dev);
-+	if (!ret) {
-+		dev_info(dev, "using device-specific reserved memory\n");
-+		priv->use_device_memory = true;
-+	}
-+
- 	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
- 				 &priv->memory_bw)) {
- 		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
-@@ -275,7 +300,8 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	priv->regs = devm_ioremap_resource(dev, &amba_dev->res);
- 	if (IS_ERR(priv->regs)) {
- 		dev_err(dev, "%s failed mmio\n", __func__);
--		return PTR_ERR(priv->regs);
-+		ret = PTR_ERR(priv->regs);
-+		goto dev_unref;
- 	}
- 
- 	/* This may override some variant settings */
-@@ -305,11 +331,14 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 
- dev_unref:
- 	drm_dev_unref(drm);
-+	of_reserved_mem_device_release(dev);
-+
- 	return ret;
- }
- 
- static int pl111_amba_remove(struct amba_device *amba_dev)
- {
-+	struct device *dev = &amba_dev->dev;
- 	struct drm_device *drm = amba_get_drvdata(amba_dev);
- 	struct pl111_drm_dev_private *priv = drm->dev_private;
- 
-@@ -319,6 +348,7 @@ static int pl111_amba_remove(struct amba_device *amba_dev)
- 		drm_panel_bridge_remove(priv->bridge);
- 	drm_mode_config_cleanup(drm);
- 	drm_dev_unref(drm);
-+	of_reserved_mem_device_release(dev);
- 
- 	return 0;
- }
--- 
-2.17.0
+Do you think it's worth keeping the two dev_info() ? The code would be smaller without; however this may help to have it for debug. 
+Maybe use _dbg instead of _info ?
