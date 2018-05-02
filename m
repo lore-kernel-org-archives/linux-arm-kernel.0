@@ -1,68 +1,96 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 2 May 2018 11:20:38 +0100
-Subject: [PATCH] firmware/psci: add support for SYSTEM_RESET2
-In-Reply-To: <ef2f0c7c-eb2d-157d-e215-ced1ce984aa5@gmail.com>
-References: <1525186288-536-1-git-send-email-sudeep.holla@arm.com>
- <ef2f0c7c-eb2d-157d-e215-ced1ce984aa5@gmail.com>
-Message-ID: <95af7f71-c68e-5312-16ce-08dcd6f0bec6@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 2 May 2018 12:27:26 +0200
+Subject: [PATCH V4 2/8] soc: mediatek: pwrap: add caps flag for pwrap
+In-Reply-To: <20180502092112.3991-3-argus.lin@mediatek.com>
+References: <20180502092112.3991-1-argus.lin@mediatek.com>
+ <20180502092112.3991-3-argus.lin@mediatek.com>
+Message-ID: <41027d71-a0b5-b78d-e9bf-aec4beb05a59@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 01/05/18 18:59, Florian Fainelli wrote:
-> On 05/01/2018 07:51 AM, Sudeep Holla wrote:
->> PSCI v1.1 introduced SYSTEM_RESET2 to allow both architectural resets
->> where the semantics are described by the PSCI specification itself as
->> well as vendor-specific resets. Currently only system warm reset
->> semantics is defined as part of architectural resets by the specification.
->>
->> This patch implements support for SYSTEM_RESET2 by making using of
->> reboot_mode passed by the reboot infrastructure in the kernel.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  drivers/firmware/psci.c   | 21 +++++++++++++++++++++
->>  include/uapi/linux/psci.h |  2 ++
->>  2 files changed, 23 insertions(+)
->>
->> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
->> index c80ec1d03274..216b1950bbd5 100644
->> --- a/drivers/firmware/psci.c
->> +++ b/drivers/firmware/psci.c
->> @@ -88,6 +88,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
->>  				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
->>
->>  static u32 psci_cpu_suspend_feature;
->> +bool psci_system_reset2_supported;
+On 05/02/2018 11:21 AM, argus.lin at mediatek.com wrote:
+> From: Argus Lin <argus.lin@mediatek.com>
 > 
-> Should this be static? It does not appear to be used in another
-> translation unit.
+> We use caps to describe pwrap's capability, used
+> to replace has_bridge flag for single meaning.
 > 
-
-Indeed will fix it.
-
->>
->>  static inline bool psci_has_ext_power_state(void)
->>  {
->> @@ -253,6 +254,15 @@ static int get_set_conduit_method(struct device_node *np)
->>
->>  static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
->>  {
->> +	if ((reboot_mode == REBOOT_WARM || reboot_mode == REBOOT_SOFT) &&
->> +	    psci_system_reset2_supported)
->> +		/*
->> +		 * reset_type[31] = 0 (architectural)
->> +		 * reset_type[30:0] = 0 (SYSTEM_WARM_RESET)
->> +		 * cookie = 0 (ignored by the implementation
+> Signed-off-by: Argus Lin <argus.lin@mediatek.com>
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> Missing closing parenthesis
->
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index e9e054a15b7d..3a25ff6e6907 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -76,6 +76,12 @@
+>  #define PWRAP_SLV_CAP_SECURITY	BIT(2)
+>  #define HAS_CAP(_c, _x)	(((_c) & (_x)) == (_x))
+>  
+> +/* Group of bits used for shown pwrap capability */
+> +#define PWRAP_CAP_BRIDGE	BIT(0)
+> +#define PWRAP_CAP_RESET		BIT(1)
+> +#define PWRAP_CAP_DCM		BIT(2)
+> +#define PWRAP_CAP_INT1_EN	BIT(3)
+> +
 
-Yes I saw this soon after I sent out, already fixed locally.
+You are missing the logic to handle the caps.
+With out this logic, this patch is useless.
 
--- 
 Regards,
-Sudeep
+Matthias
+
+>  /* defines for slave device wrapper registers */
+>  enum dew_regs {
+>  	PWRAP_DEW_BASE,
+> @@ -684,6 +690,8 @@ struct pmic_wrapper_type {
+>  	u32 spi_w;
+>  	u32 wdt_src;
+>  	unsigned int has_bridge:1;
+> +	/* Flags indicating the capability for the target pwrap */
+> +	u8 caps;
+>  	int (*init_reg_clock)(struct pmic_wrapper *wrp);
+>  	int (*init_soc_specific)(struct pmic_wrapper *wrp);
+>  };
+> @@ -1394,6 +1402,7 @@ static const struct pmic_wrapper_type pwrap_mt2701 = {
+>  	.spi_w = PWRAP_MAN_CMD_SPI_WRITE_NEW,
+>  	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
+>  	.has_bridge = 0,
+> +	.caps = PWRAP_CAP_RESET | PWRAP_CAP_DCM,
+>  	.init_reg_clock = pwrap_mt2701_init_reg_clock,
+>  	.init_soc_specific = pwrap_mt2701_init_soc_specific,
+>  };
+> @@ -1406,6 +1415,7 @@ static const struct pmic_wrapper_type pwrap_mt7622 = {
+>  	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
+>  	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
+>  	.has_bridge = 0,
+> +	.caps = PWRAP_CAP_RESET | PWRAP_CAP_DCM,
+>  	.init_reg_clock = pwrap_common_init_reg_clock,
+>  	.init_soc_specific = pwrap_mt7622_init_soc_specific,
+>  };
+> @@ -1418,6 +1428,7 @@ static const struct pmic_wrapper_type pwrap_mt8135 = {
+>  	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
+>  	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
+>  	.has_bridge = 1,
+> +	.caps = PWRAP_CAP_BRIDGE | PWRAP_CAP_RESET | PWRAP_CAP_DCM,
+>  	.init_reg_clock = pwrap_common_init_reg_clock,
+>  	.init_soc_specific = pwrap_mt8135_init_soc_specific,
+>  };
+> -- 
+> 2.12.5
+> 
+> ************* Email Confidentiality Notice ********************
+> The information contained in this e-mail message (including any 
+> attachments) may be confidential, proprietary, privileged, or otherwise
+> exempt from disclosure under applicable laws. It is intended to be 
+> conveyed only to the designated recipient(s). Any use, dissemination, 
+> distribution, printing, retaining or copying of this e-mail (including its 
+> attachments) by unintended recipient(s) is strictly prohibited and may 
+> be unlawful. If you are not an intended recipient of this e-mail, or believe 
+> that you have received this e-mail in error, please notify the sender 
+> immediately (by replying to this e-mail), delete any and all copies of 
+> this e-mail (including any attachments) from your system, and do not
+> disclose the content of this e-mail to any other person. Thank you!
+> 
