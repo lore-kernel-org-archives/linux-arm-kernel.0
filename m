@@ -1,43 +1,111 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 2 May 2018 12:05:20 +0100
-Subject: [PATCH 1/2] arm64/mm: define ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
-In-Reply-To: <15c56137-e7c4-dbfa-ce5d-f5feeea79e98@linux.vnet.ibm.com>
-References: <1525247672-2165-1-git-send-email-opensource.ganesh@gmail.com>
- <15c56137-e7c4-dbfa-ce5d-f5feeea79e98@linux.vnet.ibm.com>
-Message-ID: <20180502110441.xuvjs7gu5xir6y72@lakrids.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 2 May 2018 12:08:55 +0100
+Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <CAJWu+orJPfY4OMbNa5BqgteyYL+-r2vj+5O_ohbHe5_F-7TWTg@mail.gmail.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <CAEi0qNk7pVtfcrFU4gM35sajPb09xjR8d6cJkgoSr-H0Tgo+QA@mail.gmail.com>
+ <cc4347d0-995d-6921-a796-374a214cdce9@arm.com>
+ <CAJWu+orJPfY4OMbNa5BqgteyYL+-r2vj+5O_ohbHe5_F-7TWTg@mail.gmail.com>
+Message-ID: <8f7de708-8281-4030-e727-8263f110b21c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 11:00:55AM +0200, Laurent Dufour wrote:
-> On 02/05/2018 09:54, Ganesh Mahendran wrote:
-> > Set ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT for arm64. This
-> > enables Speculative Page Fault handler.
-> > 
-> > Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
-> > ---
-> > This patch is on top of Laurent's v10 spf
-> > ---
-> >  arch/arm64/Kconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index eb2cf49..cd583a9 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -144,6 +144,7 @@ config ARM64
-> >  	select SPARSE_IRQ
-> >  	select SYSCTL_EXCEPTION_TRACE
-> >  	select THREAD_INFO_IN_TASK
-> > +	select ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT if SMP
+On 01/05/18 21:51, Joel Fernandes wrote:
+> On Mon, Apr 30, 2018 at 2:46 AM Julien Thierry <julien.thierry@arm.com>
+> wrote:
+> [...]
+>>> On Wed, Jan 17, 2018 at 3:54 AM, Julien Thierry <julien.thierry@arm.com>
+> wrote:
+>>>> Hi,
+>>>>
+>>>> This series is a continuation of the work started by Daniel [1]. The
+> goal
+>>>> is to use GICv3 interrupt priorities to simulate an NMI.
+>>>>
+>>>> To achieve this, set two priorities, one for standard interrupts and
+>>>> another, higher priority, for NMIs. Whenever we want to disable
+> interrupts,
+>>>> we mask the standard priority instead so NMIs can still be raised. Some
+>>>> corner cases though still require to actually mask all interrupts
+>>>> effectively disabling the NMI.
+>>>>
+>>>> Of course, using priority masking instead of PSR.I comes at some cost.
+> On
+>>>> hackbench, the drop of performance seems to be >1% on average for this
+>>>> version. I can only attribute that to recent changes in the kernel as
+>>>
+>>> Do you have more specific performance data on the performance overhead
+>>> with this series?
+>>>
 > 
-> There is no need to depend on SMP here as the upper
-> CONFIG_SPECULATIVE_PAGE_FAULT is depending on SMP.
+>> Not at the moment. I was planning on doing a v3 anyway considering this
+>> series is getting a bit old and the GICv3 driver has had some
+> modifications.
+> 
+> Great! Looking forward to it, will try to find some time to review this set
+> as well.
+> 
+>> Once I get to it I can try to have more detailed performance data on a
+>> recent kernel. I've really only measured the performance on hackbench
+>> and on kernel build from defconfig (and for the kernel build the
+>> performance difference was completely hidden by the noise).
+> 
+>>>> hackbench seems slightly slower compared to my other benchmarks while
+> the
+>>>> runs with the use of GICv3 priorities have stayed in the same time
+> frames.
+>>>> KVM Guests do not seem to be affected preformance-wise by the host
+> using
+>>>> PMR to mask interrupts or not.
+>>>>
+>>>> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+>>>> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as
+> NMI
+>>>> for now. I don't think there is any reason LPIs should be allowed to
+> be set
+>>>> as NMI as they do not have an active state.
+>>>> When an NMI is active on a CPU, no other NMI can be triggered on the
+> CPU.
+>>>>
+>>>>
+>>>> Requirements to use this:
+>>>> - Have GICv3
+>>>> - SCR_EL3.FIQ is set to 1 when linux runs
+>>>
+>>> Ah I see it mentioned here. Again, can you clarify if this is
+>>> something that can be misconfigured? Is it something that the
+>>> bootloader sets?
+>>>
+> 
+>> Yes, this is something that the bootloader sets and we have seen a few
+>> cases where it is set to 0, so it can be "misconfigured".
+> 
+>> It is not impossible to handle this case, but this bit affects the view
+>> the GICv3 CPU interface has on interrupt priority values. However it
+>> requires to add some conditions in both the interrupt handling and
+>> masking/unmasking code, so ideally we would avoid adding things to this.
+> 
+>> But the idea is that Linux only deals with group 1 interrupts, and group
+>> 1 interrupts are only signaled as FIQs when the execution state is
+>> secure or at EL3, which should never happen in Linux's case. So ideally
+>> we'd like firmwares to set up this bit properly rather than to have to
+>> deal with both cases when only one of them makes sense for Linux.
+> 
+>  From what I see, on all our platforms, FIQs are delivered to the secure
+> monitor only. Which is the reason for this patchset in the first place. I
+> can't imagine a usecase that is not designed like this (and have not come
+> across this), so its probably Ok to just assume SCR_EL3.FIQ is to 1.
+> 
+> In the future, if SCR_EL3.FIQ is set 0, then the NMI should use the FIQ
+> mechanism delivered to the non-secure OS.
+> 
+> Does what I say make sense or was I just shooting arrows in the dark? :-P
 
-Additionally, since commit:
+It would mean teaching Group-0 interrupts to the arm64 kernel. Not an
+impossible task, but that'd be catering for a minority of broken
+systems. In my book, that's at the absolute bottom of the priority range
+(pun intended...).
 
-  4b3dc9679cf77933 ("arm64: force CONFIG_SMP=y and remove redundant #ifdefs")
-
-... arm64 is always SMP.
-
-Thanks,
-Mark.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
