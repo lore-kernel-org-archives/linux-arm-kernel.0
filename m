@@ -1,81 +1,69 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 2 May 2018 15:34:18 +0200
-Subject: [PATCH v4 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <20180426185233.GU4813@piout.net>
-References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
- <20180426164623.tlv6kz5yopk6voxx@breakpoint.cc>
- <20180426185233.GU4813@piout.net>
-Message-ID: <20180502133418.xa26c5ta2ytxxjcn@linutronix.de>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 2 May 2018 15:41:12 +0200
+Subject: [PATCH] gpio: zynq: Setup chip->base based on alias ID
+In-Reply-To: <CACRpkdYgw+HaC5bUCZKiD7j+2ZLYbCTG+DdPdAEkRDq0xF5b3w@mail.gmail.com>
+References: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
+ <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
+ <f9dd4f64-4026-f495-5810-32affb5b0944@xilinx.com>
+ <CACRpkdaxwRc0zoDKogVGisXTPJ0EwLbOQjHzz1pSEjvWCsSCTQ@mail.gmail.com>
+ <cc8d864a-e8e6-d30d-ae54-91819e5d0b8d@xilinx.com>
+ <CACRpkdYgw+HaC5bUCZKiD7j+2ZLYbCTG+DdPdAEkRDq0xF5b3w@mail.gmail.com>
+Message-ID: <60652f48-2a98-414b-5cff-25890a6da37f@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-26 20:52:33 [+0200], Alexandre Belloni wrote:
+On 2.5.2018 15:01, Linus Walleij wrote:
+> On Wed, May 2, 2018 at 12:15 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> On 2.5.2018 12:10, Linus Walleij wrote:
+>>> On Thu, Apr 26, 2018 at 3:35 PM, Michal Simek <michal.simek@xilinx.com> wrote:
 > 
-> I don't remember you posted anything for the TCB. Wasn't it focused on
-> getting rid of the PIT irq?
+>>>> Yes, it is about legacy application which I have seen recently and there
+>>>> is no source code for application calls it because board vendor doesn't
+>>>> provide it.
+>>>>
+>>>> You are right that -1 was used from the beginning in mainline but
+>>>> unfortunately this driver was in vendor tree for a while and it uses 0
+>>>> there.
+>>>>
+>>>> In upstreaming this was changed to -1 but customers have a lot of code
+>>>> which developed against vendor tree and they want to use
+>>>> latest&greatest. And without this they are not able to run that
+>>>> applications.
+>>>>
+>>>> I found that this logic is already in 5 drivers in mainline that's why I
+>>>> send this patch to be +1.
+>>>
+>>> I see.
+>>>
+>>> Sadly comaptibility with out-of-tree driver code is none of our
+>>> (community) business.
+>>>
+>>> We do pay a lot of effort not to break the ABI to userspace, but
+>>> it needs to be an ABI coming from the mainline kernel, not from
+>>> a vendor tree.
+>>>
+>>> So to the mainline kernel this is no regression.
+>>
+>> I understand your statement. On the other hand it is feature which was
+>> permitted in past for some drivers and this is +1.
+> 
+> But was it permitted because of breaking out of tree code?
 
-the PIT irq which was shared with the UART one some devices, yes this
-was part of it. The other essential piece was using a higher frequency
-for the device:
-  https://git.kernel.org/pub/scm/linux/kernel/git/rt/linux-rt-devel.git/tree/patches/clocksource-tclib-allow-higher-clockrates.patch?h=linux-4.14.y-rt-patches
+You know how soc vendors are working. We need to develop code out of
+mainline for certain time because we can't share details before.
 
-> As said below, this is solving multiple issues, including the one for
-> SoCs that don't have the PIT.
-will the PIT be removed? Where it needs the PIT?
+When we get permission to upstream code a lot of application code is
+done already with certain expectation.
 
-> Ok, if I understand correctly tc_clkevt2_set_oneshot is called from
-> atomic context so it shouldn't call tc_clkevt2_shutdown.
-> 
-> Back in 2016, tglx said:
-> "There was an earlier discussion about the clk stuff. Actually the lock
-> protecting disable/enable should be made raw, but there was some crap going on
-> in some of the clk callbacks which made that impossible. We realy should
-> revisit this."
-> 
-> Anyway, I'll try to avoid disabling the clock just to reenable it
-> afterwards.
-> 
-> (Actually, I've just checked before sending and I've found your patch,
-> I'll do something similar)
-thanks.
+Soren has sent this driver with using -1 for autodetection even at that
+time Xilinx gpio driver had 0 there.
 
-> > >  - the current solution is wasting some TCB channels
-> > > 
-> > > The plan is to get this driver upstream, then convert the TCB PWM driver to be
-> > > able to get rid of the tcb_clksrc driver along with atmel_tclib.
-> > 
-> > The config options are now less than optimal (for me at least). On
-> > oldconfig it asks you for PIT and I say selected no because I wanted the
-> > new one. So I end up with nothing.
-> > Not sure you want do something about it?
-> > 
-> 
-> I don't think you ending up with nothing but probably you removed the
-> PIT and kept ATMEL_TCLIB which is the combination that is really
-> difficult to protect from. I don't think it is worth the added Kconfig
-> complexity.
+This patch is not breaking any current functionality and there is no any
+gpio alias in zynq/zynqmp too. And from my point of view the usage of
+gpio alias is similar to others aliases present in DTS file.
 
-TCLIB was still enabled yes. It is 'oldconfig'.
+If you don't want this patch I understand that and it will become just
+another soc vendor patch out of mainline.
 
-> > Is the resolution more or the same compared what we have in -RT? On an
-> > idle system this clocks goes up to 180us/ 190us while the old clock
-> > started at 160us and moved to around 180us after one hackbench
-> > invocation. This could be nothing, it could be a lower frequency of the
-> > clockevents device.
-> > 
-> 
-> The driver shouldn't change anything on that side.
-> 
-> > If you intend to stick with this driver then I would replace the current
-> > hack in -RT with this series.
-> > 
-> 
-> That is one of the goal, yes.
-> 
-> The remaining one would be "clocksource: TCLIB: Allow higher clock rates
-> for clock events"
-
-I see. So I would need to keep that patch in queue after it was
-dismissed from duty?
-
-Sebastian
+Thanks,
+Michal
