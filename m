@@ -1,47 +1,42 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 2 May 2018 15:16:16 +0200
-Subject: [RFC PATCH] driver core: make deferring probe forever optional
-In-Reply-To: <20180501213114.20183-1-robh@kernel.org>
-References: <20180501213114.20183-1-robh@kernel.org>
-Message-ID: <e7755330-bb6f-ad3a-fb82-7fc85a4cfac3@suse.de>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 2 May 2018 15:18:06 +0200
+Subject: [PATCH v8 12/12] ARM: shmobile: Convert file to use cntvoff
+In-Reply-To: <20180502063639.qa7bzqxzrejd4kh2@verge.net.au>
+References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
+ <20180501123131.7738-13-mylene.josserand@bootlin.com>
+ <20180502063639.qa7bzqxzrejd4kh2@verge.net.au>
+Message-ID: <20180502131806.5aybrfzll7wdoybv@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2018 11:31 PM, Rob Herring wrote:
-> Deferred probe will currently wait forever on dependent devices to probe,
-> but sometimes a driver will never exist. It's also not always critical for
-> a driver to exist. Platforms can rely on default configuration from the
-> bootloader or reset defaults for things such as pinctrl and power domains.
-> This is often the case with initial platform support until various drivers
-> get enabled. There's at least 2 scenarios where deferred probe can render
-> a platform broken. Both involve using a DT which has more devices and
-> dependencies than the kernel supports. The 1st case is a driver may be
-> disabled in the kernel config. The 2nd case is the kernel version may
-> simply not have the dependent driver. This can happen if using a newer DT
-> (provided by firmware perhaps) with a stable kernel version.
->
-> Unfortunately, this change breaks with modules as we have no way of
-> knowing when modules are done loading. One possibility is to make this
-> opt in or out based on compatible strings rather than at a subsystem level.
-> Ideally this information could be extracted automatically somehow. OTOH,
-> maybe the lists are pretty small. There's only a handful of subsystems
-> that can be optional, and then only so many drivers in those that can be
-> modules (at least for pinctrl, many drivers are built-in only).
->
-> Cc: Alexander Graf <agraf@suse.de>
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
-> This patch came out of a discussion on the ARM boot-architecture
-> list[1] about DT forwards and backwards compatibility issues. There are
-> issues with newer DTs breaking on older, stable kernels. Some of these
-> are difficult to solve, but cases of optional devices not having
-> kernel support should be solvable.
+Hi Simon,
 
-I think this is a reasonable approach. Maybe this should be a CONFIG 
-option that disallows pinctrl drivers (and power domain later) to be =m? 
-Then by default we could force those drivers to be compiled in, but if 
-you really wanted to do kernel modules for pinctrl/pd you'd consciously 
-potentially lose forward compatibility.
+On Wed, May 02, 2018 at 08:36:39AM +0200, Simon Horman wrote:
+> On Tue, May 01, 2018 at 02:31:31PM +0200, Myl?ne Josserand wrote:
+> > Now that a common function is available for CNTVOFF's
+> > initialization, let's convert shmobile-apmu code to use
+> > this function.
+> > 
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
+For the sake of bisectability (and to ease the merge), is it ok if we
+take it through the sunxi (and then arm-soc) tree?
 
-Alex
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/767edd70/attachment.sig>
