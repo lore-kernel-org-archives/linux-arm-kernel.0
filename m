@@ -1,472 +1,403 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Wed, 2 May 2018 11:17:44 +0200
-Subject: [PATCH 10/17] irqchip/irq-mvebu-sei: add new driver for Marvell
- SEI
-In-Reply-To: <20180421135537.24716-11-miquel.raynal@bootlin.com>
-References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
- <20180421135537.24716-11-miquel.raynal@bootlin.com>
-Message-ID: <20180502111744.5391afff@windsurf.home>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 2 May 2018 11:20:18 +0200
+Subject: [PATCH v5 2/6] mfd: stm32-timers: add support for dmas
+In-Reply-To: <1523972313-28765-3-git-send-email-fabrice.gasnier@st.com>
+References: <1523972313-28765-1-git-send-email-fabrice.gasnier@st.com>
+ <1523972313-28765-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <04b630f0-46c2-b63a-3b1f-f3e28d199d91@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 04/17/2018 03:38 PM, Fabrice Gasnier wrote:
+> STM32 Timers can support up to 7 DMA requests:
+> - 4 channels, update, compare and trigger.
+> Optionally request part, or all DMAs from stm32-timers MFD core.
+> 
+> Also add routine to implement burst reads using DMA from timer registers.
+> This is exported. So, it can be used by child drivers, PWM capture
+> for instance (but not limited to).
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> ---
+> Changes in v5:
+> - fix warning on dma_mapping_error() that doesn't return an error code.
+> - move stm32_timers_dma struct to header file as discussed with Lee.
+>   This allows to remove alloc for this struct in stm32_timers_dma_probe.
 
-On Sat, 21 Apr 2018 15:55:30 +0200, Miquel Raynal wrote:
+Hi Lee,
 
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 5ed465ab1c76..6b5b75cb4694 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -73,6 +73,7 @@ obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
->  obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
->  obj-$(CONFIG_MSCC_OCELOT_IRQ)		+= irq-mscc-ocelot.o
->  obj-$(CONFIG_MVEBU_GICP)		+= irq-mvebu-gicp.o
-> +obj-$(CONFIG_MVEBU_SEI)			+= irq-mvebu-sei.o
->  obj-$(CONFIG_MVEBU_ICU)			+= irq-mvebu-icu.o
->  obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
->  obj-$(CONFIG_MVEBU_PIC)			+= irq-mvebu-pic.o
+Gentle reminder to review changes I've made in v5, following our
+discussions.
 
-Alphabetic ordering would put SEI after PIC I guess :)
+Thanks in advance,
+Best Regards,
+Fabrice
 
-> diff --git a/drivers/irqchip/irq-mvebu-sei.c b/drivers/irqchip/irq-mvebu-sei.c
-> new file mode 100644
-> index 000000000000..5c12c74e3f09
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-mvebu-sei.c
-> @@ -0,0 +1,449 @@
-> +// SPDX-License-Identifier: GPL-2.0 OR X11
-
-License for code is GPL-2.0 only. We use GPL-2.0 OR X11 for Device
-Trees.
-
-> +#define pr_fmt(fmt) "mvebu-sei: " fmt
+> 
+> Changes in v4:
+> - Lee's comments: Add kerneldoc header, better format comments.
+> 
+> Changes in v3:
+> - Basically Lee's comments:
+> - rather create a struct stm32_timers_dma, and place a reference to it
+>   in existing ddata (instead of adding priv struct).
+> - rather use a struct device in exported routine prototype, and use
+>   standard helpers instead of ddata. Get rid of to_stm32_timers_priv().
+> - simplify error handling in probe (remove a goto)
+> - comment on devm_of_platform_*populate() usage.
+> 
+> Changes in v2:
+> - Abstract DMA handling from child driver: move it to MFD core
+> - Add comments on optional dma support
+> ---
+>  drivers/mfd/stm32-timers.c       | 201 ++++++++++++++++++++++++++++++++++++++-
+>  include/linux/mfd/stm32-timers.h |  46 +++++++++
+>  2 files changed, 245 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+> index 1d347e5..efcd4b9 100644
+> --- a/drivers/mfd/stm32-timers.c
+> +++ b/drivers/mfd/stm32-timers.c
+> @@ -4,16 +4,156 @@
+>   * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
+>   */
+>  
+> +#include <linux/bitfield.h>
+>  #include <linux/mfd/stm32-timers.h>
+>  #include <linux/module.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/reset.h>
+>  
+> +#define STM32_TIMERS_MAX_REGISTERS	0x3fc
 > +
-> +#include <linux/irq.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irqchip/chained_irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/msi.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/irqchip.h>
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +#define GICP_SET_SEI_OFFSET	0x30
-> +#define GICP_CLR_SEI_OFFSET	GICP_SET_SEI_OFFSET
-
-Why do you have this concept of set/clr if there is only one register ?
-I assume that if there is only a "set" register, it means that SEI
-interrupts can only be edge triggered, contrary to NSR interrupts,
-which have separate set/clr to support level-triggered interrupts.
-
-Having only a "set" offset means that we can rely on the existing
-"struct msi_msg" to convey both the MSI doorbell address and payload,
-and we don't need the mvebu_gicp_get_doorbells() hack.
-
-> +/* Cause register */
-> +#define GICP_SECR(idx)		(0x0  + (idx * 0x4))
-> +/* Mask register */
-> +#define GICP_SEMR(idx)		(0x20 + (idx * 0x4))
-
-Minor nit: order register definitions by order of increasing offset,
-i.e the GICP_SET_SEI_OFFSET should be defined here.
-
-> +#define SEI_IRQ_NB_PER_REG	32
-> +#define SEI_IRQ_REG_NB		2
-
-s/NB/COUNT/
-
-> +#define SEI_IRQ_NB		(SEI_IRQ_NB_PER_REG * SEI_IRQ_REG_NB)
-
-Ditto.
-
-> +#define SEI_IRQ_REG_IDX(irq_id)	(irq_id / SEI_IRQ_NB_PER_REG)
-> +#define SEI_IRQ_REG_BIT(irq_id)	(irq_id % SEI_IRQ_NB_PER_REG)
-> +
-> +struct mvebu_sei_interrupt_range {
-> +	u32 first;
-> +	u32 number;
+> +/* DIER register DMA enable bits */
+> +static const u32 stm32_timers_dier_dmaen[STM32_TIMERS_MAX_DMAS] = {
+> +	TIM_DIER_CC1DE,
+> +	TIM_DIER_CC2DE,
+> +	TIM_DIER_CC3DE,
+> +	TIM_DIER_CC4DE,
+> +	TIM_DIER_UIE,
+> +	TIM_DIER_TDE,
+> +	TIM_DIER_COMDE
 > +};
 > +
-> +struct mvebu_sei {
-> +	struct device *dev;
-> +	void __iomem *base;
-> +	struct resource *res;
-> +	struct irq_domain *ap_domain;
-> +	struct irq_domain *cp_domain;
-> +	struct mvebu_sei_interrupt_range ap_interrupts;
-> +	struct mvebu_sei_interrupt_range cp_interrupts;
-> +	/* Lock on MSI allocations/releases */
-> +	spinlock_t cp_msi_lock;
-> +	DECLARE_BITMAP(cp_msi_bitmap, SEI_IRQ_NB);
-> +};
-> +
-> +static int mvebu_sei_domain_to_sei_irq(struct mvebu_sei *sei,
-> +				       struct irq_domain *domain,
-> +				       irq_hw_number_t hwirq)
+> +static void stm32_timers_dma_done(void *p)
 > +{
-> +	if (domain == sei->ap_domain)
-> +		return sei->ap_interrupts.first + hwirq;
-> +	else
-> +		return sei->cp_interrupts.first + hwirq;
-
-I am not entirely clear whether we need subnodes or not in this
-binding, but I guess we do because we have one subset of the interrupts
-that are wired interrupts, and another part that are MSI triggered.
-
-Perhaps this is one aspect on which Marc Zyngier can comment ?
-
-> +static void mvebu_sei_reset(struct mvebu_sei *sei)
-> +{
-> +	u32 reg_idx;
+> +	struct stm32_timers_dma *dma = p;
+> +	struct dma_tx_state state;
+> +	enum dma_status status;
 > +
-> +	for (reg_idx = 0; reg_idx < SEI_IRQ_REG_NB; reg_idx++) {
-> +		/* Clear all cause bits */
-> +		writel(0xFFFFFFFF, sei->base + GICP_SECR(reg_idx));
-> +		/* Enable all interrupts */
-> +		writel(0, sei->base + GICP_SEMR(reg_idx));
-
-Enabling interrupts by default ? This looks weird. They should only be
-enabled... when enabled.
-
-> +int mvebu_sei_get_doorbells(struct device_node *dn, phys_addr_t *set,
-> +			    phys_addr_t *clr)
-> +{
-> +	struct platform_device *pdev;
-> +	struct mvebu_sei *sei;
+> +	status = dmaengine_tx_status(dma->chan, dma->chan->cookie, &state);
+> +	if (status == DMA_COMPLETE)
+> +		complete(&dma->completion);
+> +}
 > +
-> +	pdev = of_find_device_by_node(dn->parent);
-> +	if (!pdev)
+> +/**
+> + * stm32_timers_dma_burst_read - Read from timers registers using DMA.
+> + *
+> + * Read from STM32 timers registers using DMA on a single event.
+> + * @dev: reference to stm32_timers MFD device
+> + * @buf: DMA'able destination buffer
+> + * @id: stm32_timers_dmas event identifier (ch[1..4], up, trig or com)
+> + * @reg: registers start offset for DMA to read from (like CCRx for capture)
+> + * @num_reg: number of registers to read upon each DMA request, starting @reg.
+> + * @bursts: number of bursts to read (e.g. like two for pwm period capture)
+> + * @tmo_ms: timeout (milliseconds)
+> + */
+> +int stm32_timers_dma_burst_read(struct device *dev, u32 *buf,
+> +				enum stm32_timers_dmas id, u32 reg,
+> +				unsigned int num_reg, unsigned int bursts,
+> +				unsigned long tmo_ms)
+> +{
+> +	struct stm32_timers *ddata = dev_get_drvdata(dev);
+> +	unsigned long timeout = msecs_to_jiffies(tmo_ms);
+> +	struct regmap *regmap = ddata->regmap;
+> +	struct stm32_timers_dma *dma = &ddata->dma;
+> +	size_t len = num_reg * bursts * sizeof(u32);
+> +	struct dma_async_tx_descriptor *desc;
+> +	struct dma_slave_config config;
+> +	dma_cookie_t cookie;
+> +	dma_addr_t dma_buf;
+> +	u32 dbl, dba;
+> +	long err;
+> +	int ret;
+> +
+> +	/* Sanity check */
+> +	if (id < STM32_TIMERS_DMA_CH1 || id >= STM32_TIMERS_MAX_DMAS)
+> +		return -EINVAL;
+> +
+> +	if (!num_reg || !bursts || reg > STM32_TIMERS_MAX_REGISTERS ||
+> +	    (reg + num_reg * sizeof(u32)) > STM32_TIMERS_MAX_REGISTERS)
+> +		return -EINVAL;
+> +
+> +	if (!dma->chans[id])
 > +		return -ENODEV;
+> +	mutex_lock(&dma->lock);
 > +
-> +	sei = platform_get_drvdata(pdev);
-> +	if (!sei)
-> +		return -ENODEV;
+> +	/* Select DMA channel in use */
+> +	dma->chan = dma->chans[id];
+> +	dma_buf = dma_map_single(dev, buf, len, DMA_FROM_DEVICE);
+> +	if (dma_mapping_error(dev, dma_buf)) {
+> +		ret = -ENOMEM;
+> +		goto unlock;
+> +	}
 > +
-> +	*set = (phys_addr_t)(sei->res->start + GICP_SET_SEI_OFFSET);
-> +	*clr = (phys_addr_t)(sei->res->start + GICP_CLR_SEI_OFFSET);
+> +	/* Prepare DMA read from timer registers, using DMA burst mode */
+> +	memset(&config, 0, sizeof(config));
+> +	config.src_addr = (dma_addr_t)dma->phys_base + TIM_DMAR;
+> +	config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +	ret = dmaengine_slave_config(dma->chan, &config);
+> +	if (ret)
+> +		goto unmap;
+> +
+> +	desc = dmaengine_prep_slave_single(dma->chan, dma_buf, len,
+> +					   DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
+> +	if (!desc) {
+> +		ret = -EBUSY;
+> +		goto unmap;
+> +	}
+> +
+> +	desc->callback = stm32_timers_dma_done;
+> +	desc->callback_param = dma;
+> +	cookie = dmaengine_submit(desc);
+> +	ret = dma_submit_error(cookie);
+> +	if (ret)
+> +		goto dma_term;
+> +
+> +	reinit_completion(&dma->completion);
+> +	dma_async_issue_pending(dma->chan);
+> +
+> +	/* Setup and enable timer DMA burst mode */
+> +	dbl = FIELD_PREP(TIM_DCR_DBL, bursts - 1);
+> +	dba = FIELD_PREP(TIM_DCR_DBA, reg >> 2);
+> +	ret = regmap_write(regmap, TIM_DCR, dbl | dba);
+> +	if (ret)
+> +		goto dma_term;
+> +
+> +	/* Clear pending flags before enabling DMA request */
+> +	ret = regmap_write(regmap, TIM_SR, 0);
+> +	if (ret)
+> +		goto dcr_clr;
+> +
+> +	ret = regmap_update_bits(regmap, TIM_DIER, stm32_timers_dier_dmaen[id],
+> +				 stm32_timers_dier_dmaen[id]);
+> +	if (ret)
+> +		goto dcr_clr;
+> +
+> +	err = wait_for_completion_interruptible_timeout(&dma->completion,
+> +							timeout);
+> +	if (err == 0)
+> +		ret = -ETIMEDOUT;
+> +	else if (err < 0)
+> +		ret = err;
+> +
+> +	regmap_update_bits(regmap, TIM_DIER, stm32_timers_dier_dmaen[id], 0);
+> +	regmap_write(regmap, TIM_SR, 0);
+> +dcr_clr:
+> +	regmap_write(regmap, TIM_DCR, 0);
+> +dma_term:
+> +	dmaengine_terminate_all(dma->chan);
+> +unmap:
+> +	dma_unmap_single(dev, dma_buf, len, DMA_FROM_DEVICE);
+> +unlock:
+> +	dma->chan = NULL;
+> +	mutex_unlock(&dma->lock);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(stm32_timers_dma_burst_read);
+> +
+>  static const struct regmap_config stm32_timers_regmap_cfg = {
+>  	.reg_bits = 32,
+>  	.val_bits = 32,
+>  	.reg_stride = sizeof(u32),
+> -	.max_register = 0x3fc,
+> +	.max_register = STM32_TIMERS_MAX_REGISTERS,
+>  };
+>  
+>  static void stm32_timers_get_arr_size(struct stm32_timers *ddata)
+> @@ -27,12 +167,45 @@ static void stm32_timers_get_arr_size(struct stm32_timers *ddata)
+>  	regmap_write(ddata->regmap, TIM_ARR, 0x0);
+>  }
+>  
+> +static void stm32_timers_dma_probe(struct device *dev,
+> +				   struct stm32_timers *ddata)
+> +{
+> +	int i;
+> +	char name[4];
+> +
+> +	init_completion(&ddata->dma.completion);
+> +	mutex_init(&ddata->dma.lock);
+> +
+> +	/* Optional DMA support: get valid DMA channel(s) or NULL */
+> +	for (i = STM32_TIMERS_DMA_CH1; i <= STM32_TIMERS_DMA_CH4; i++) {
+> +		snprintf(name, ARRAY_SIZE(name), "ch%1d", i + 1);
+> +		ddata->dma.chans[i] = dma_request_slave_channel(dev, name);
+> +	}
+> +	ddata->dma.chans[STM32_TIMERS_DMA_UP] =
+> +		dma_request_slave_channel(dev, "up");
+> +	ddata->dma.chans[STM32_TIMERS_DMA_TRIG] =
+> +		dma_request_slave_channel(dev, "trig");
+> +	ddata->dma.chans[STM32_TIMERS_DMA_COM] =
+> +		dma_request_slave_channel(dev, "com");
+> +}
+> +
+> +static void stm32_timers_dma_remove(struct device *dev,
+> +				    struct stm32_timers *ddata)
+> +{
+> +	int i;
+> +
+> +	for (i = STM32_TIMERS_DMA_CH1; i < STM32_TIMERS_MAX_DMAS; i++)
+> +		if (ddata->dma.chans[i])
+> +			dma_release_channel(ddata->dma.chans[i]);
+> +}
+> +
+>  static int stm32_timers_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	struct stm32_timers *ddata;
+>  	struct resource *res;
+>  	void __iomem *mmio;
+> +	int ret;
+>  
+>  	ddata = devm_kzalloc(dev, sizeof(*ddata), GFP_KERNEL);
+>  	if (!ddata)
+> @@ -43,6 +216,9 @@ static int stm32_timers_probe(struct platform_device *pdev)
+>  	if (IS_ERR(mmio))
+>  		return PTR_ERR(mmio);
+>  
+> +	/* Timer physical addr for DMA */
+> +	ddata->dma.phys_base = res->start;
+> +
+>  	ddata->regmap = devm_regmap_init_mmio_clk(dev, "int", mmio,
+>  						  &stm32_timers_regmap_cfg);
+>  	if (IS_ERR(ddata->regmap))
+> @@ -54,9 +230,29 @@ static int stm32_timers_probe(struct platform_device *pdev)
+>  
+>  	stm32_timers_get_arr_size(ddata);
+>  
+> +	stm32_timers_dma_probe(dev, ddata);
+> +
+>  	platform_set_drvdata(pdev, ddata);
+>  
+> -	return devm_of_platform_populate(&pdev->dev);
+> +	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> +	if (ret)
+> +		stm32_timers_dma_remove(dev, ddata);
+> +
+> +	return ret;
+> +}
+> +
+> +static int stm32_timers_remove(struct platform_device *pdev)
+> +{
+> +	struct stm32_timers *ddata = platform_get_drvdata(pdev);
+> +
+> +	/*
+> +	 * Don't use devm_ here: enfore of_platform_depopulate() happens before
+> +	 * DMA are released, to avoid race on DMA.
+> +	 */
+> +	of_platform_depopulate(&pdev->dev);
+> +	stm32_timers_dma_remove(&pdev->dev, ddata);
 > +
 > +	return 0;
-> +}
-
-As I said above, I believe this hack is not needed, because SEIs are
-edge-triggered, and we have a single SET_SEI_OFFSET MSI doorbell
-address to convey, which makes "struct msi_msg" as it is today
-sufficient.
-
-> +static void mvebu_sei_mask_irq(struct irq_data *d)
-> +{
-> +	struct mvebu_sei *sei = irq_data_get_irq_chip_data(d);
-> +	u32 reg_idx = SEI_IRQ_REG_IDX(d->hwirq);
-
-This doesn't look right. The d->hwirq is relative to the beginning of
-the domain, while you should use sei_irq here. For example, the SEI
-n?32 (first interrupt in the second register) will have d->hwirq = 11,
-because it is the 11th SEI interrupt for the CP. So here, you will
-conclude that reg_idx = 0, while it should be reg_idx = 1.
-
-> +	u32 sei_irq = mvebu_sei_domain_to_sei_irq(sei, d->domain, d->hwirq);
-> +	u32 irq_mask = BIT(SEI_IRQ_REG_BIT(sei_irq));
-> +	u32 reg;
-> +
-> +	/* 1 disables the interrupt */
-> +	reg =  readl(sei->base + GICP_SEMR(reg_idx));
-> +	writel(reg | irq_mask, sei->base + GICP_SEMR(reg_idx));
-
-Personal taste here, but I prefer:
-
-	reg =  readl(sei->base + GICP_SEMR(reg_idx));
-	reg |= BIT(SEI_IRQ_REG_BIT(sei_irq));
-	writel(reg, sei->base + GICP_SEMR(reg_idx));
-
-> +static void mvebu_sei_unmask_irq(struct irq_data *d)
-> +{
-> +	struct mvebu_sei *sei = irq_data_get_irq_chip_data(d);
-> +	u32 reg_idx = SEI_IRQ_REG_IDX(d->hwirq);
-
-Same mistake as above I believe.
-
-> +	u32 sei_irq = mvebu_sei_domain_to_sei_irq(sei, d->domain, d->hwirq);
-> +	u32 irq_mask = BIT(SEI_IRQ_REG_BIT(sei_irq));
-> +	u32 reg;
-> +
-> +	/* 0 enables the interrupt */
-> +	reg = readl(sei->base + GICP_SEMR(reg_idx));
-> +	writel(reg & ~irq_mask, sei->base + GICP_SEMR(reg_idx));
-
-And same nitpick comment :-)
-
-> +static int mvebu_sei_irq_domain_alloc(struct irq_domain *domain,
-> +				      unsigned int virq, unsigned int nr_irqs,
-> +				      void *args)
-
-I think the coding style says that arguments should be aligned, no ?
-
-> +{
-> +	struct mvebu_sei *sei = domain->host_data;
-> +	struct irq_fwspec *fwspec = args;
-> +	struct irq_chip *irq_chip;
-> +	int sei_hwirq, hwirq;
-> +	int ret;
-> +
-> +	/* Software only supports single allocations for now */
-> +	if (nr_irqs != 1)
-> +		return -ENOTSUPP;
-> +
-> +	if (domain == sei->ap_domain) {
-> +		irq_chip = &mvebu_sei_ap_wired_irq_chip;
-> +		hwirq = fwspec->param[0];
-> +	} else {
-> +		irq_chip = &mvebu_sei_cp_msi_irq_chip;
-> +		spin_lock(&sei->cp_msi_lock);
-> +		hwirq = bitmap_find_free_region(sei->cp_msi_bitmap, SEI_IRQ_NB,
-> +						0);
-> +		spin_unlock(&sei->cp_msi_lock);
-> +		if (hwirq < 0)
-> +			return -ENOSPC;
-> +	}
-> +
-> +	sei_hwirq = mvebu_sei_domain_to_sei_irq(sei, domain, hwirq);
-> +
-> +	fwspec->fwnode = domain->parent->fwnode;
-> +	fwspec->param_count = 3;
-> +	fwspec->param[0] = GIC_SPI;
-> +	fwspec->param[1] = sei_hwirq;
-> +	fwspec->param[2] = IRQ_TYPE_EDGE_RISING;
-
-Maybe it's me being confused, but I thought all SEI interrupts were
-muxed together to a single SPI for the parent GIC. But here, you
-allocate different SPIs at the GIC level. Intuitively, this doesn't
-look good. Haven't you copy/pasted too much from the gicp driver, where
-we have a 1:1 mapping between interrupts coming into the GICP and
-interrupts signaled by the GICP to the GIC, while here we have a N:1
-mapping, with N interrupts coming into the GICP_SEI, and only one
-interrupt leaving the GICP_SEI to the GIC ?
-
-> +static const struct irq_domain_ops mvebu_sei_ap_domain_ops = {
-> +	.xlate = irq_domain_xlate_onecell,
-> +	.alloc = mvebu_sei_irq_domain_alloc,
-> +	.free = mvebu_sei_irq_domain_free,
+>  }
+>  
+>  static const struct of_device_id stm32_timers_of_match[] = {
+> @@ -67,6 +263,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
+>  
+>  static struct platform_driver stm32_timers_driver = {
+>  	.probe = stm32_timers_probe,
+> +	.remove = stm32_timers_remove,
+>  	.driver	= {
+>  		.name = "stm32-timers",
+>  		.of_match_table = stm32_timers_of_match,
+> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
+> index 2aadab6..9596d5c 100644
+> --- a/include/linux/mfd/stm32-timers.h
+> +++ b/include/linux/mfd/stm32-timers.h
+> @@ -8,6 +8,8 @@
+>  #define _LINUX_STM32_GPTIMER_H_
+>  
+>  #include <linux/clk.h>
+> +#include <linux/dmaengine.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/regmap.h>
+>  
+>  #define TIM_CR1		0x00	/* Control Register 1      */
+> @@ -27,6 +29,8 @@
+>  #define TIM_CCR3	0x3C	/* Capt/Comp Register 3    */
+>  #define TIM_CCR4	0x40	/* Capt/Comp Register 4    */
+>  #define TIM_BDTR	0x44	/* Break and Dead-Time Reg */
+> +#define TIM_DCR		0x48	/* DMA control register    */
+> +#define TIM_DMAR	0x4C	/* DMA register for transfer */
+>  
+>  #define TIM_CR1_CEN	BIT(0)	/* Counter Enable	   */
+>  #define TIM_CR1_DIR	BIT(4)  /* Counter Direction	   */
+> @@ -36,6 +40,13 @@
+>  #define TIM_SMCR_SMS	(BIT(0) | BIT(1) | BIT(2)) /* Slave mode selection */
+>  #define TIM_SMCR_TS	(BIT(4) | BIT(5) | BIT(6)) /* Trigger selection */
+>  #define TIM_DIER_UIE	BIT(0)	/* Update interrupt	   */
+> +#define TIM_DIER_UDE	BIT(8)  /* Update DMA request Enable */
+> +#define TIM_DIER_CC1DE	BIT(9)  /* CC1 DMA request Enable  */
+> +#define TIM_DIER_CC2DE	BIT(10) /* CC2 DMA request Enable  */
+> +#define TIM_DIER_CC3DE	BIT(11) /* CC3 DMA request Enable  */
+> +#define TIM_DIER_CC4DE	BIT(12) /* CC4 DMA request Enable  */
+> +#define TIM_DIER_COMDE	BIT(13) /* COM DMA request Enable  */
+> +#define TIM_DIER_TDE	BIT(14) /* Trigger DMA request Enable */
+>  #define TIM_SR_UIF	BIT(0)	/* Update interrupt flag   */
+>  #define TIM_EGR_UG	BIT(0)	/* Update Generation       */
+>  #define TIM_CCMR_PE	BIT(3)	/* Channel Preload Enable  */
+> @@ -56,6 +67,8 @@
+>  #define TIM_BDTR_BK2F	(BIT(20) | BIT(21) | BIT(22) | BIT(23))
+>  #define TIM_BDTR_BK2E	BIT(24) /* Break 2 input enable	   */
+>  #define TIM_BDTR_BK2P	BIT(25) /* Break 2 input polarity  */
+> +#define TIM_DCR_DBA	GENMASK(4, 0)	/* DMA base addr */
+> +#define TIM_DCR_DBL	GENMASK(12, 8)	/* DMA burst len */
+>  
+>  #define MAX_TIM_PSC		0xFFFF
+>  #define TIM_CR2_MMS_SHIFT	4
+> @@ -65,9 +78,42 @@
+>  #define TIM_BDTR_BKF_SHIFT	16
+>  #define TIM_BDTR_BK2F_SHIFT	20
+>  
+> +enum stm32_timers_dmas {
+> +	STM32_TIMERS_DMA_CH1,
+> +	STM32_TIMERS_DMA_CH2,
+> +	STM32_TIMERS_DMA_CH3,
+> +	STM32_TIMERS_DMA_CH4,
+> +	STM32_TIMERS_DMA_UP,
+> +	STM32_TIMERS_DMA_TRIG,
+> +	STM32_TIMERS_DMA_COM,
+> +	STM32_TIMERS_MAX_DMAS,
 > +};
 > +
-> +static const struct irq_domain_ops mvebu_sei_cp_domain_ops = {
-> +	.xlate = irq_domain_xlate_twocell,
-> +	.alloc = mvebu_sei_irq_domain_alloc,
-> +	.free = mvebu_sei_irq_domain_free,
+> +/**
+> + * struct stm32_timers_dma - STM32 timer DMA handling.
+> + * @completion:		end of DMA transfer completion
+> + * @phys_base:		control registers physical base address
+> + * @lock:		protect DMA access
+> + * @chan:		DMA channel in use
+> + * @chans:		DMA channels available for this timer instance
+> + */
+> +struct stm32_timers_dma {
+> +	struct completion completion;
+> +	phys_addr_t phys_base;
+> +	struct mutex lock;
+> +	struct dma_chan *chan;
+> +	struct dma_chan *chans[STM32_TIMERS_MAX_DMAS];
 > +};
-
-Why do you need two cells for the interrupts coming from the CP and
-only one cell for the interrupts coming from the AP ?
-
-For thermal in the AP, you do:
-
-+					interrupt-parent = <&sei_wired_controller>;
-+					interrupts = <18>;
-
-i.e, you don't specify an interrupt type. For thermal in the CP, you do:
-
-+				interrupts-extended =
-+					<&CP110_LABEL(icu_sei) 116 IRQ_TYPE_LEVEL_HIGH>;
-
-here you specify an interrupt type. I'm not sure why you have this
-difference. Even more so because I think a SEI level interrupt is not
-possible, since you only have a "SET" register and no "CLR" register.
-
-Some guidance from Marc here might be useful perhaps.
-
-
-> +static int mvebu_sei_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *node = pdev->dev.of_node, *parent, *child;
-> +	struct irq_domain *parent_domain, *plat_domain;
-> +	struct mvebu_sei *sei;
-> +	const __be32 *property;
-> +	u32 top_level_spi, size;
-> +	int ret;
 > +
-> +	sei = devm_kzalloc(&pdev->dev, sizeof(*sei), GFP_KERNEL);
-> +	if (!sei)
-> +		return -ENOMEM;
+>  struct stm32_timers {
+>  	struct clk *clk;
+>  	struct regmap *regmap;
+>  	u32 max_arr;
+> +	struct stm32_timers_dma dma; /* Only to be used by the parent */
+>  };
 > +
-> +	sei->dev = &pdev->dev;
-> +
-> +	spin_lock_init(&sei->cp_msi_lock);
-> +
-> +	sei->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!sei->res) {
-> +		dev_err(sei->dev, "Failed to retrieve SEI resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	sei->base = devm_ioremap(sei->dev, sei->res->start,
-> +				 resource_size(sei->res));
-> +	if (!sei->base) {
-> +		dev_err(sei->dev, "Failed to remap SEI resource\n");
-> +		return -ENODEV;
-> +	}
-
-Use devm_ioremap_resource() here, and remove the error handling of
-platform_get_resource(), because it's already taken care of by
-devm_ioremap_resource().
-
-> +	/*
-> +	 * Reserve the single (top-level) parent SPI IRQ from which all the
-> +	 * interrupts handled by this driver will be signaled.
-> +	 */
-> +	top_level_spi = irq_of_parse_and_map(node, 0);
-> +	if (top_level_spi <= 0) {
-> +		dev_err(sei->dev, "Failed to retrieve top-level SPI IRQ\n");
-> +		return -ENODEV;
-> +	}
-
-Rather than top_level_spi, something like parent_irq would make more
-sense to me.
-
-> +	irq_set_chained_handler(top_level_spi, mvebu_sei_handle_cascade_irq);
-> +	irq_set_handler_data(top_level_spi, sei);
-> +
-> +	/*
-> +	 * SEIs in the range [ 0; 20] are wired and come from the AP.
-> +	 * SEIs in the range [21; 63] are CP SEI and are triggered through MSIs.
-> +	 *
-> +	 * Each SEI 'domain' is represented as a subnode.
-> +	 */
-> +
-> +	/* Get a reference to the parent domain to create a hierarchy */
-> +	parent = of_irq_find_parent(node);
-> +	if (!parent) {
-> +		dev_err(sei->dev, "Failed to find parent IRQ node\n");
-> +		ret = -ENODEV;
-> +		goto dispose_irq;
-> +	}
-> +
-> +	parent_domain = irq_find_host(parent);
-> +	if (!parent_domain) {
-> +		dev_err(sei->dev, "Failed to find parent IRQ domain\n");
-> +		ret = -ENODEV;
-> +		goto dispose_irq;
-> +	}
-> +
-> +	/* Create the 'wired' hierarchy */
-> +	child = of_find_node_by_name(node, "sei-wired-controller");
-> +	if (!child) {
-> +		dev_err(sei->dev, "Missing 'sei-wired-controller' subnode\n");
-> +		ret = -ENODEV;
-> +		goto dispose_irq;
-> +	}
-
-Don't forget to of_node_put(child) once you're done using this DT node
-reference.
-
-> +
-> +	property = of_get_property(child, "reg", &size);
-> +	if (!property || size != (2 * sizeof(u32))) {
-> +		dev_err(sei->dev, "Missing subnode 'reg' property\n");
-> +		ret = -ENODEV;
-> +		goto dispose_irq;
-> +	}
-
-As Rob said, I don't think the "reg" property is appropriate for this
-usage.
-
-> +	sei->ap_interrupts.first = be32_to_cpu(property[0]);
-> +	sei->ap_interrupts.number = be32_to_cpu(property[1]);
-> +	sei->ap_domain = irq_domain_create_hierarchy(parent_domain, 0,
-> +						     sei->ap_interrupts.number,
-> +						     of_node_to_fwnode(child),
-> +						     &mvebu_sei_ap_domain_ops,
-> +						     sei);
-> +	if (!sei->ap_domain) {
-> +		dev_err(sei->dev, "Failed to create AP IRQ domain\n");
-> +		ret = -ENOMEM;
-> +		goto dispose_irq;
-> +	}
-> +
-> +	/* Create the 'MSI' hierarchy */
-> +	child = of_find_node_by_name(node, "sei-msi-controller");
-> +	if (!child) {
-> +		dev_err(sei->dev, "Missing 'sei-msi-controller' subnode\n");
-> +		ret = -ENODEV;
-> +		goto remove_ap_domain;
-> +	}
-
-Ditto: missing of_node_put(child) somewhere below to balance
-of_find_node_by_name().
-
-> +	property = of_get_property(child, "reg", &size);
-> +	if (!property || size != (2 * sizeof(u32))) {
-> +		dev_err(sei->dev, "Missing subnode 'reg' property\n");
-> +		ret = -ENODEV;
-> +		goto remove_ap_domain;
-> +	}
-> +
-> +	sei->cp_interrupts.first = be32_to_cpu(property[0]);
-> +	sei->cp_interrupts.number = be32_to_cpu(property[1]);
-> +	sei->cp_domain = irq_domain_create_hierarchy(parent_domain, 0,
-> +						     sei->cp_interrupts.number,
-> +						     of_node_to_fwnode(child),
-> +						     &mvebu_sei_cp_domain_ops,
-> +						     sei);
-> +	if (!sei->cp_domain) {
-> +		pr_err("Failed to create CPs IRQ domain\n");
-> +		ret = -ENOMEM;
-> +		goto remove_ap_domain;
-> +	}
-> +
-> +	plat_domain = platform_msi_create_irq_domain(of_node_to_fwnode(child),
-> +						     &mvebu_sei_msi_domain_info,
-> +						     sei->cp_domain);
-> +	if (!plat_domain) {
-> +		pr_err("Failed to create CPs MSI domain\n");
-> +		ret = -ENOMEM;
-> +		goto remove_cp_domain;
-> +	}
-
-
-
-> +
-> +	platform_set_drvdata(pdev, sei);
-> +
-> +	mvebu_sei_reset(sei);
-
-Please do the reset *before* registering the IRQ domains, it's more
-logical to have the HW ready and then expose it to Linux rather than
-the opposite.
-
-It would be nice to have the review from Marc on this driver,
-especially on whether the SEI is properly modeled in terms of IRQ
-domains;
-
-> diff --git a/drivers/irqchip/irq-mvebu-sei.h b/drivers/irqchip/irq-mvebu-sei.h
-> new file mode 100644
-> index 000000000000..f0c12a441923
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-mvebu-sei.h
-> @@ -0,0 +1,12 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +#ifndef __MVEBU_SEI_H__
-> +#define __MVEBU_SEI_H__
-> +
-> +#include <linux/types.h>
-> +
-> +struct device_node;
-> +
-> +int mvebu_sei_get_doorbells(struct device_node *dn, phys_addr_t *set,
-> +			    phys_addr_t *clr);
-> +
-> +#endif /* __MVEBU_SEI_H__ */
-
-This header file can be removed if you drop mvebu_sei_get_doorbells(),
-as suggested above.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> +int stm32_timers_dma_burst_read(struct device *dev, u32 *buf,
+> +				enum stm32_timers_dmas id, u32 reg,
+> +				unsigned int num_reg, unsigned int bursts,
+> +				unsigned long tmo_ms);
+>  #endif
+> 
