@@ -1,59 +1,68 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 2 May 2018 20:10:46 +0200
-Subject: [PATCH v4 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <20180502133418.xa26c5ta2ytxxjcn@linutronix.de>
-References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
- <20180426164623.tlv6kz5yopk6voxx@breakpoint.cc>
- <20180426185233.GU4813@piout.net>
- <20180502133418.xa26c5ta2ytxxjcn@linutronix.de>
-Message-ID: <20180502181046.GG19273@piout.net>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Wed,  2 May 2018 20:32:03 +0200
+Subject: [PATCH] arm: omap1: ams-delta: fix deferred_fiq handler
+Message-ID: <20180502183203.16034-1-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2018 15:34:18+0200, Sebastian Andrzej Siewior wrote:
-> On 2018-04-26 20:52:33 [+0200], Alexandre Belloni wrote:
-> > 
-> > I don't remember you posted anything for the TCB. Wasn't it focused on
-> > getting rid of the PIT irq?
-> 
-> the PIT irq which was shared with the UART one some devices, yes this
-> was part of it. The other essential piece was using a higher frequency
-> for the device:
->   https://git.kernel.org/pub/scm/linux/kernel/git/rt/linux-rt-devel.git/tree/patches/clocksource-tclib-allow-higher-clockrates.patch?h=linux-4.14.y-rt-patches
-> 
-> > As said below, this is solving multiple issues, including the one for
-> > SoCs that don't have the PIT.
-> will the PIT be removed? Where it needs the PIT?
-> 
+The deferred_fiq handler used to limit hardware operations to IRQ
+unmask only, relying on gpio-omap assigned handler performing the ACKs.
+Since commit 80ac93c27441 ("gpio: omap: Fix lost edge interrupts") this
+is no longer the case as handle_edge_irq() has been replaced with
+handle_simmple_irq() which doesn't touch the hardware.
 
-The last patch is unselecting the PIT driver so by default it is not
-enabled. The PIT driver will stay just in case someone has to use it
-e.g. when they are using all the TCB channels for something else.
-However, recent Atmel SoC have a TCB without any output so it can ony be
-used as a timer. Some other SoCs don't have a PIT at all.
+Add single ACK operation per each active IRQ pin to the handler. While
+being at it, move unmask operation out of irq_counter loop so it is
+also called only once for each active IRQ pin.
 
-> > I don't think you ending up with nothing but probably you removed the
-> > PIT and kept ATMEL_TCLIB which is the combination that is really
-> > difficult to protect from. I don't think it is worth the added Kconfig
-> > complexity.
-> 
-> TCLIB was still enabled yes. It is 'oldconfig'.
-> 
+Created and tested against linux-4.17-rc2.
 
-Hum, ok, I'll try to provide a cleaner path.
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+---
+ arch/arm/mach-omap1/ams-delta-fiq.c | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
 
-> > The remaining one would be "clocksource: TCLIB: Allow higher clock rates
-> > for clock events"
-> 
-> I see. So I would need to keep that patch in queue after it was
-> dismissed from duty?
-
-Boris suggested a DT binding to allow changing the rate but it didn't
-reach consensus at the time. this is something that will ne to be
-revived at some point and I would very much like having that upstream
-too.
-
+diff --git a/arch/arm/mach-omap1/ams-delta-fiq.c b/arch/arm/mach-omap1/ams-delta-fiq.c
+index 793a24a53c52..d7ca9e2b40d2 100644
+--- a/arch/arm/mach-omap1/ams-delta-fiq.c
++++ b/arch/arm/mach-omap1/ams-delta-fiq.c
+@@ -58,22 +58,24 @@ static irqreturn_t deferred_fiq(int irq, void *dev_id)
+ 		irq_num = gpio_to_irq(gpio);
+ 		fiq_count = fiq_buffer[FIQ_CNT_INT_00 + gpio];
+ 
+-		while (irq_counter[gpio] < fiq_count) {
+-			if (gpio != AMS_DELTA_GPIO_PIN_KEYBRD_CLK) {
+-				struct irq_data *d = irq_get_irq_data(irq_num);
+-
+-				/*
+-				 * It looks like handle_edge_irq() that
+-				 * OMAP GPIO edge interrupts default to,
+-				 * expects interrupt already unmasked.
+-				 */
+-				if (irq_chip && irq_chip->irq_unmask)
++		if (irq_counter[gpio] < fiq_count &&
++				gpio != AMS_DELTA_GPIO_PIN_KEYBRD_CLK) {
++			struct irq_data *d = irq_get_irq_data(irq_num);
++
++			/*
++			 * handle_simple_irq() that OMAP GPIO edge
++			 * interrupts default to since commit 80ac93c27441
++			 * requires interrupt already acked and unmasked.
++			 */
++			if (irq_chip) {
++				if (irq_chip->irq_ack)
++					irq_chip->irq_ack(d);
++				if (irq_chip->irq_unmask)
+ 					irq_chip->irq_unmask(d);
+ 			}
+-			generic_handle_irq(irq_num);
+-
+-			irq_counter[gpio]++;
+ 		}
++		for (; irq_counter[gpio] < fiq_count; irq_counter[gpio]++)
++			generic_handle_irq(irq_num);
+ 	}
+ 	return IRQ_HANDLED;
+ }
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.16.1
