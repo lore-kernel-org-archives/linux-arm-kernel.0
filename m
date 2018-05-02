@@ -1,38 +1,44 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 2 May 2018 23:32:10 +0200
-Subject: Motorola Droid 4 progress, power consumption
-In-Reply-To: <20180502194229.GM98604@atomide.com>
-References: <20180501183148.GA26996@amd> <20180502144158.GJ98604@atomide.com>
- <20180502191049.ximiyccwfkjqcj7m@devuan>
- <20180502194229.GM98604@atomide.com>
-Message-ID: <20180502213210.GA10306@amd>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed,  2 May 2018 23:31:40 +0200
+Subject: [PATCH] arm64: defconfig: Increase CMA size for VC4
+Message-ID: <1525296700-3588-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The VC4 needs more memory than the default setting (16 MB):
 
-> > I also have some hacks to allow configuration of the full
-> > voltage. Charging to 4.35V is pretty agressive, and I believe baterry
-> > will be damaged less if we only charge to 4.1V.
-> 
-> That should be based on the PMIC register values that Android
-> uses. Worth rechecking for sure, I thought it is higher than
-> normal too for the charge voltage.
+  vc4-drm soc:gpu: swiotlb: coherent allocation failed, size=16777216
+  [drm:vc4_bo_create [vc4]] *ERROR* Failed to allocate from CMA:
+  vc4_v3d 3fc00000.v3d: Failed to allocate memory for tile binning: -12.
+    You may need to enable CMA or give it more memory.
+  vc4-drm soc:gpu: failed to bind 3fc00000.v3d (ops vc4_v3d_ops [vc4]): -12
+  vc4-drm soc:gpu: master bind failed: -12
+  vc4-drm: probe of soc:gpu failed with error -12
 
-Actually that part is ok. Android probably charges it to 4.35V, and
-battery is designed to handle that... For a year, or two. But I don't need
-full capacity at the moment, and perhaps battery will last three years
-if it is only charged to 4.1V.
+So increase the value to 32 MB and fix this issue.
 
-Best regards,
-									Pavel
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+
+Hi,
+i known it's a little bit late for 4.18 or should i rebase for 4.17?
+
+Regards
+
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 7ca583e..0e1f6d7 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -172,6 +172,7 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_DMA_CMA=y
++CONFIG_CMA_SIZE_MBYTES=32
+ CONFIG_MTD=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_M25P80=y
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/b7d72c94/attachment.sig>
+2.7.4
