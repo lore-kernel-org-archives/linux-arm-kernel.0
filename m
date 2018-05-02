@@ -1,74 +1,82 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Wed, 2 May 2018 07:39:42 +0200
-Subject: [PATCH 3/6] PCI: Introduce devm_of_pci_get_host_bridge_resources
-In-Reply-To: <5e218659-b512-b622-25e0-5bb5a8f4b87d@codeaurora.org>
-References: <cover.1524582822.git.jan.kiszka@siemens.com>
- <e387d04ea235c9a4879a897bb730adc383a96635.1524582822.git.jan.kiszka@siemens.com>
- <20180427222427.GB73638@bhelgaas-glaptop.roam.corp.google.com>
- <869a8ad9-dd2f-8462-c0c4-2d8a62d74185@siemens.com>
- <20180430184007.GC95643@bhelgaas-glaptop.roam.corp.google.com>
- <5e218659-b512-b622-25e0-5bb5a8f4b87d@codeaurora.org>
-Message-ID: <5dd1e93a-b85b-a3eb-08de-6989c6a782c2@siemens.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 2 May 2018 14:10:39 +0800
+Subject: [PATCH] coresight: Remove %px for printing pcsr value
+In-Reply-To: <CAGXu5jJjCJuDNOJPMHmu94naQvKke47LVv-Y=t9vji88FtkRDw@mail.gmail.com>
+References: <1525237251-32496-1-git-send-email-leo.yan@linaro.org>
+ <CAGXu5jJjCJuDNOJPMHmu94naQvKke47LVv-Y=t9vji88FtkRDw@mail.gmail.com>
+Message-ID: <20180502061039.GB332@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-30 20:43, Sinan Kaya wrote:
-> On 4/30/2018 2:40 PM, Bjorn Helgaas wrote:
->> On Sat, Apr 28, 2018 at 09:28:47AM +0200, Jan Kiszka wrote:
->>> On 2018-04-28 00:24, Bjorn Helgaas wrote:
->>>> On Tue, Apr 24, 2018 at 05:13:39PM +0200, Jan Kiszka wrote:
->>>>> From: Jan Kiszka <jan.kiszka@siemens.com>
->>>>>
->>>>> of_pci_get_host_bridge_resources allocates the resource structures it
->>>>> fills dynamically, but none of its callers care to release them so far.
->>>>> Rather than requiring everyone to do this explicitly, introduce a
->>>>> managed version of that service. This differs API-wise only in taking a
->>>>> reference to the associated device, rather than to the device tree node.
->>>>>
->>>>> As of_pci_get_host_bridge_resources is an exported interface, we cannot
->>>>> simply drop it at this point. After converting all in-tree users to the
->>>>> new API, we could phase out the unmanaged one over some grace period.
->>>>
->>>> It looks like it might be possible to split this into three or four
->>>> patches:
->>>>
->>>>   1) Factor __of_pci_get_host_bridge_resources() out of
->>>>      of_pci_get_host_bridge_resources()
->>>>
->>>>   2) Add struct device * argument
->>>>
->>>>   3) Convert pr_info() to dev_info()
->>>>
->>>>   4) Add devm_of_pci_get_host_bridge_resources()
->>>
->>> Will do. I'm even considering
->>>
->>> 5) mark of_pci_get_host_bridge_resources() __deprecated, due to the leak
->>>    and no remaining in-tree user - what do you think?
->>
->> Sounds good.
->>
->> It'd be nice if we had some guideline about deprecation -- whether we
->> actually need to mark things __deprecated, and then how long to wait
->> before actually removing them, but I don't see anything in
->> Documentation/.
+On Tue, May 01, 2018 at 10:29:46PM -0700, Kees Cook wrote:
+> On Tue, May 1, 2018 at 10:00 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> > The driver prints pcsr twice: the first time it uses specifier %px to
+> > print hexadecimal pcsr value and the second time uses specifier %pS for
+> > output kernel symbols.
+> >
+> > As suggested by Kees, using %pS should be sufficient and %px isn't
+> > necessary; the reason is if the pcsr is a kernel space address, we can
+> > easily get to know the code line from %pS format, on the other hand, if
+> > the pcsr value doesn't fall into kernel space range (e.g. if the CPU is
+> > stuck in firmware), %pS also gives out pcsr hexadecimal value.
+> >
+> > So this commit removes useless %px and update section "Output format"
+> > in the document for alignment between the code and document.
+> >
+> > Suggested-by: Kees Cook <keescook@chromium.org>
+> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > 
-> I'm under the impression that we don't quite care about out-of-tree drivers.
-> I have seen many times out-of-tree drivers to be broken due to API changes,
-> renames or even parameter meaning change. 
+> Thanks!
 > 
-> If the plan is to remove the API, just remove the API today.
+> Reviewed-by: Kees Cook <keescook@chromium.org>
 
-I've already sent a __deprecated patch on Monday [1], in v2 of this
-series [2]. Please vote against that there, and I will replace it with a
-complete removal of that API.
+Thanks for reviewing, Kees.
 
-Thanks,
-Jan
-
-[1] https://lkml.org/lkml/2018/4/30/22
-[2] https://lkml.org/lkml/2018/4/30/24
-
--- 
-Siemens AG, Corporate Technology, CT RDA IOT SES-DE
-Corporate Competence Center Embedded Linux
+> -Kees
+> 
+> > ---
+> >  Documentation/trace/coresight-cpu-debug.txt       | 4 ++--
+> >  drivers/hwtracing/coresight/coresight-cpu-debug.c | 2 +-
+> >  2 files changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
+> > index 2b9b51c..89ab09e 100644
+> > --- a/Documentation/trace/coresight-cpu-debug.txt
+> > +++ b/Documentation/trace/coresight-cpu-debug.txt
+> > @@ -177,11 +177,11 @@ Here is an example of the debugging output format:
+> >  ARM external debug module:
+> >  coresight-cpu-debug 850000.debug: CPU[0]:
+> >  coresight-cpu-debug 850000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
+> > -coresight-cpu-debug 850000.debug:  EDPCSR:  [<ffff00000808e9bc>] handle_IPI+0x174/0x1d8
+> > +coresight-cpu-debug 850000.debug:  EDPCSR:  handle_IPI+0x174/0x1d8
+> >  coresight-cpu-debug 850000.debug:  EDCIDSR: 00000000
+> >  coresight-cpu-debug 850000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+> >  coresight-cpu-debug 852000.debug: CPU[1]:
+> >  coresight-cpu-debug 852000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
+> > -coresight-cpu-debug 852000.debug:  EDPCSR:  [<ffff0000087fab34>] debug_notifier_call+0x23c/0x358
+> > +coresight-cpu-debug 852000.debug:  EDPCSR:  debug_notifier_call+0x23c/0x358
+> >  coresight-cpu-debug 852000.debug:  EDCIDSR: 00000000
+> >  coresight-cpu-debug 852000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+> > diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> > index 9cdb3fb..78a054e 100644
+> > --- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> > +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> > @@ -315,7 +315,7 @@ static void debug_dump_regs(struct debug_drvdata *drvdata)
+> >         }
+> >
+> >         pc = debug_adjust_pc(drvdata);
+> > -       dev_emerg(dev, " EDPCSR:  [<%px>] %pS\n", (void *)pc, (void *)pc);
+> > +       dev_emerg(dev, " EDPCSR:  %pS\n", (void *)pc);
+> >
+> >         if (drvdata->edcidsr_present)
+> >                 dev_emerg(dev, " EDCIDSR: %08x\n", drvdata->edcidsr);
+> > --
+> > 2.7.4
+> >
+> 
+> 
+> 
+> -- 
+> Kees Cook
+> Pixel Security
