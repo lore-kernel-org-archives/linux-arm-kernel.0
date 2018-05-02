@@ -1,72 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 2 May 2018 21:10:49 +0200
-Subject: Motorola Droid 4 progress, power consumption
-In-Reply-To: <20180502144158.GJ98604@atomide.com>
-References: <20180501183148.GA26996@amd> <20180502144158.GJ98604@atomide.com>
-Message-ID: <20180502191049.ximiyccwfkjqcj7m@devuan>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 2 May 2018 21:16:32 +0200
+Subject: [PATCH] tty/serial: atmel: use port->name as name in request_irq()
+In-Reply-To: <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
+References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
+ <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
+ <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
+Message-ID: <20180502191632.tgda4g5v3rhncx7c@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 2018-04-27 12:31:52 [+0200], Richard Genoud wrote:
+> Hi Sebastian,
+Hi,
 
-> > Anyway, >5.5hours of standby with screen off, GSM on is already
-> > usable.
-> 
-> Just to rub that in, you do mean GSM usable for voice calls and
-> SMS with your unicsy_demo with mainline kernel plus the pending
-> LCD related patches, right? :)
+> > If this is unknown and a bisect is requested, please let me know.
+> Indeed, this will be appreciated.
+> I'm quite curious to find the commit that led to this.
 
-Plus some other patches, yes.
+commit 761ed4a94582ab291aa24dcbea4e01e8936488c8
+Author: Rob Herring <robh@kernel.org>
+Date:   Mon Aug 22 17:39:10 2016 -0500
 
-> > This is the core of code I'm using.
-> > 
-> > https://github.com/pavelmachek/unicsy_demo
-> > 
-> > Battery graphs are attached. I'm not sure if the battery was really
-> > close to empty at that point -- voltage curve should have different
-> > shape if that was the case. 
-> 
-> Cool. BTW, the value for POWER_SUPPLY_POWER_AVG should be quite
-> accurate for the whole device power consumption.
+    tty: serial_core: convert uart_close to use tty_port_close
+    
+    tty_port_close handles much of the common parts of tty close. Convert
+    uart_close to use it and move the serial_core specific parts into
+    tty_port.shutdown function. This will be needed to use tty_port functions
+    directly from in kernel clients.
+    
+    This change causes ops->stop_rx() to be called after uart_wait_until_sent()
+    is called which I think should be fine. Otherwise, the sequence of the
+    close should be the same.
+    
+    Cc: Peter Hurley <peter@hurleysoftware.com>
+    Signed-off-by: Rob Herring <robh@kernel.org>
+    Acked-by: Alan Cox <alan@linux.intel.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-Aha, I was looking in the wrong directory. Yes, these look useful.
+The thread starts at
+  https://www.spinics.net/lists/linux-serial/msg30070.html
+  http://lkml.kernel.org/r/20180426150625.q5tqcb7fzchvkb5d at linutronix.de
 
-> It comes from the shunt resistor measured by the PMIC. Sorry I don't
-> remember how often it needs to be polled but I'm guessing polling it
-> once a minute or so should be plenty.
+> Richard
 
-Ok. I normally do once in 30 seconds.
-
-> Hmm oh and the POWER_SUPPLY_CHARGE_COUNTER value should be monitored
-> by your libbattery and it's low value and high value should be saved
-> to a file. Low should be saved when we get the battery low interrupt
-> and battery state changes to POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL.
-> High value should be saved on POWER_SUPPLY_CAPACITY_LEVEL_FULL.
-> 
-> Then when you know the high value and low value, you can calculate
-> the remaining capacity based on the current value and
-> POWER_SUPPLY_POWER_AVG.
-
-Ok, more stuff on TODO list. I actually use python hacks, and not
-libbattery now.
-
-Is this one correct?
-
-voltage_min_design:3100000
-
-I believe you mentioned flash stops working at 3.3V. What is important
-from my point of view is to shut the system down when the battery is
-low. I believe that still needs to be implemented.
-
-Is it appropriate to shutdown at POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL?
-But then libbattery will race with shutdown to save the thresholds...
-
-I also have some hacks to allow configuration of the full
-voltage. Charging to 4.35V is pretty agressive, and I believe baterry
-will be damaged less if we only charge to 4.1V.
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Sebastian
