@@ -1,65 +1,40 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 2 May 2018 18:42:50 +0000
-Subject: [PATCH 4/6] pinctrl: fsl: add scu based pinctrl support
-In-Reply-To: <CACRpkdbiPQ8h_0cD5nkG21wQSq5FrcdNXK1AvE-AP7kWy3yUqw@mail.gmail.com>
-References: <1524855713-15527-1-git-send-email-aisheng.dong@nxp.com>
- <1524855713-15527-5-git-send-email-aisheng.dong@nxp.com>
- <CACRpkdY5zSNYvXD3icbO+4R7Mc7TDhHCoUU0gikE6A+=ZFA=Kg@mail.gmail.com>
- <CACRpkdbiPQ8h_0cD5nkG21wQSq5FrcdNXK1AvE-AP7kWy3yUqw@mail.gmail.com>
-Message-ID: <AM0PR04MB42114CBFD59FF6AA843DDD7580800@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: javierm@redhat.com (Javier Martinez Canillas)
+Date: Wed, 2 May 2018 20:36:43 +0200
+Subject: [PATCH v2] Input: atmel_mxt_ts - add missing compatible strings
+ to OF device table
+In-Reply-To: <20180501205713.GA130399@dtor-ws>
+References: <20180410095340.24074-1-javierm@redhat.com>
+ <20180501184853.GB52077@dtor-ws>
+ <CAL_JsqJ-UTGrPm2tiS1yVFweWB_LH2JSBpOpMtogTYFi7pCsGA@mail.gmail.com>
+ <20180501205713.GA130399@dtor-ws>
+Message-ID: <79d51c87-65c8-8cb6-039c-933b114e86cb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Dmitry,
 
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Wednesday, May 2, 2018 8:29 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: open list:GPIO SUBSYSTEM <linux-gpio@vger.kernel.org>; Linux ARM
-> <linux-arm-kernel@lists.infradead.org>; Shawn Guo
-> <shawnguo@kernel.org>; Stefan Agner <stefan@agner.ch>; Dong Aisheng
-> <dongas86@gmail.com>; dl-linux-imx <linux-imx@nxp.com>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>;
-> Fabio Estevam <festevam@gmail.com>
-> Subject: Re: [PATCH 4/6] pinctrl: fsl: add scu based pinctrl support
+On 05/01/2018 10:57 PM, Dmitry Torokhov wrote:
+> From: Javier Martinez Canillas <javierm@redhat.com>
 > 
-> On Wed, May 2, 2018 at 2:27 PM, Linus Walleij <linus.walleij@linaro.org>
-> wrote:
-> > On Fri, Apr 27, 2018 at 9:01 PM, Dong Aisheng <aisheng.dong@nxp.com>
-> wrote:
-> >
-> >> Some i.MX SoCs (e.g. MX8QXP and MX8QM) contain a system controller
-> >> that is responsible for controlling the pad setting of the IPs that
-> >> are present. Communication between the host processor running an OS
-> >> and the system controller happens through a SCU protocol.
-> >> This patch adds SCU protocol based pinctrl drivers.
-> >>
-> >> Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> Cc: Shawn Guo <shawnguo@kernel.org>
-> >> Cc: Fabio Estevam <festevam@gmail.com>
-> >> Cc: Stefan Agner <stefan@agner.ch>
-> >> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-> >> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> >
-> > Patch applied.
+> Commit af503716ac14 ("i2c: core: report OF style module alias for devices
+> registered via OF") fixed how the I2C core reports the module alias when
+> devices are registered via OF.
 > 
-> Bah on second thought holding this back since I see thyere are some
-> discussions about the bindings in the next patch.
+> But the atmel_mxt_ts driver only has an "atmel,maxtouch" compatible in its
+> OF device ID table, so if a Device Tree is using a different one, autoload
+> won't be working for the module (the matching works because the I2C device
+> ID table is used as a fallback).
 > 
-
-Yes :-)
-
-> Anyway, it's nice if the other maintainers would like to get involved.
+> So add compatible strings for each of the entries in the I2C device table.
 > 
-> Dong: you only need to resend patches 4.5.6 next time.
+> Fixes: af503716ac14 ("i2c: core: report OF style module alias for devices registered via OF")
+> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+> Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> [dtor: document which compatibles are deprecated and should not be used]
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Got it.
+Thanks for taking care of this. Yes, I should had added as deprecated indeed.
 
-Thanks a lot.
-
-Regards
-Dong Aisheng
-> 
-> Yours,
-> Linus Walleij
+Best regards,
+Javier
