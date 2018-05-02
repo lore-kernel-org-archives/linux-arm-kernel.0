@@ -1,69 +1,62 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 2 May 2018 17:24:56 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 analog & timer drivers
-Message-ID: <1525274696-11968-1-git-send-email-fabrice.gasnier@st.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 2 May 2018 17:29:04 +0200
+Subject: [PATCH 3/6] arm64: untag user addresses in copy_from_user and
+ others
+In-Reply-To: <20180426154725.74a33tnevvbtqx63@armageddon.cambridge.arm.com>
+References: <cover.1524077494.git.andreyknvl@google.com>
+ <949c343a4b02b41b80f324c2b7cd56b75e6a04f3.1524077494.git.andreyknvl@google.com>
+ <20180426154725.74a33tnevvbtqx63@armageddon.cambridge.arm.com>
+Message-ID: <CAAeHK+xWV2RNuoOrgkLrQ973eV2r8xFOcrzHWVrQZz7XA2WGYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables drivers for STM32 timer, low power timer and analog hardware
-that can be used on STM32MP1 SoC:
-- Timer & LP Timer MFD core, PWM, trigger & encoder drivers
-- IIO ADC/DAC/DFSDM
-- vrefbuf regu driver (voltage reference buffer).
+On Thu, Apr 26, 2018 at 5:47 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Apr 18, 2018 at 08:53:12PM +0200, Andrey Konovalov wrote:
+>> @@ -238,12 +239,15 @@ static inline void uaccess_enable_not_uao(void)
+>>  /*
+>>   * Sanitise a uaccess pointer such that it becomes NULL if above the
+>>   * current addr_limit.
+>> + * Also untag user pointers that have the top byte tag set.
+>>   */
+>>  #define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
+>>  static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+>>  {
+>>       void __user *safe_ptr;
+>>
+>> +     ptr = untagged_addr(ptr);
+>> +
+>>       asm volatile(
+>>       "       bics    xzr, %1, %2\n"
+>>       "       csel    %0, %1, xzr, eq\n"
+>
+> First of all, passing a tagged user pointer throughout the kernel is
+> safe with uaccess routines but not suitable for find_vma() etc.
+>
+> With this change, we may have an inconsistent behaviour on the tag
+> masking, depending on whether the entry code uses __uaccess_mask_ptr()
+> or not. We could preserve the tag with something like:
+>
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index e66b0fca99c2..ed15bfcbd797 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -244,10 +244,11 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+>         void __user *safe_ptr;
+>
+>         asm volatile(
+> -       "       bics    xzr, %1, %2\n"
+> +       "       bics    xzr, %3, %2\n"
+>         "       csel    %0, %1, xzr, eq\n"
+>         : "=&r" (safe_ptr)
+> -       : "r" (ptr), "r" (current_thread_info()->addr_limit)
+> +       : "r" (ptr), "r" (current_thread_info()->addr_limit),
+> +         "r" (untagged_addr(ptr))
+>         : "cc");
+>
+>         csdb();
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e6b3c96..40f5dd8 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -535,6 +535,7 @@ CONFIG_MFD_TPS65217=y
- CONFIG_MFD_TPS65218=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_MFD_TPS65910=y
-+CONFIG_MFD_STM32_LPTIMER=y
- CONFIG_REGULATOR_ACT8945A=y
- CONFIG_REGULATOR_AB8500=y
- CONFIG_REGULATOR_ACT8865=y
-@@ -567,6 +568,7 @@ CONFIG_REGULATOR_QCOM_SMD_RPM=y
- CONFIG_REGULATOR_RN5T618=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
-+CONFIG_REGULATOR_STM32_VREFBUF=y
- CONFIG_REGULATOR_TI_ABB=y
- CONFIG_REGULATOR_TPS51632=y
- CONFIG_REGULATOR_TPS62360=y
-@@ -935,13 +937,19 @@ CONFIG_AT91_SAMA5D2_ADC=m
- CONFIG_BERLIN2_ADC=m
- CONFIG_CPCAP_ADC=m
- CONFIG_EXYNOS_ADC=m
-+CONFIG_STM32_ADC_CORE=y
-+CONFIG_STM32_ADC=y
-+CONFIG_STM32_DFSDM_ADC=y
- CONFIG_VF610_ADC=m
- CONFIG_XILINX_XADC=y
-+CONFIG_STM32_LPTIMER_CNT=y
-+CONFIG_STM32_DAC=y
- CONFIG_MPU3050_I2C=y
- CONFIG_CM36651=m
- CONFIG_AK8975=y
- CONFIG_RASPBERRYPI_POWER=y
- CONFIG_IIO_HRTIMER_TRIGGER=y
-+CONFIG_IIO_STM32_LPTIMER_TRIGGER=y
- CONFIG_PWM=y
- CONFIG_PWM_ATMEL=m
- CONFIG_PWM_ATMEL_HLCDC_PWM=m
-@@ -951,6 +959,8 @@ CONFIG_PWM_RCAR=m
- CONFIG_PWM_RENESAS_TPU=y
- CONFIG_PWM_ROCKCHIP=m
- CONFIG_PWM_SAMSUNG=m
-+CONFIG_PWM_STM32=y
-+CONFIG_PWM_STM32_LP=y
- CONFIG_PWM_SUN4I=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
--- 
-1.9.1
+Just to make sure I understood this assembly snippet correctly, this
+change will result in checking untagged address against addr_limit,
+and returning the original tagged address if the check passes. Sure,
+sounds good, I'll do that.
