@@ -1,59 +1,32 @@
 From: christophe.roullier@st.com (Christophe Roullier)
-Date: Wed, 2 May 2018 16:18:40 +0200
-Subject: [PATCH V2 5/8] ARM: dts: stm32: Add ethernet dwmac on stm32mp1
+Date: Wed, 2 May 2018 16:18:41 +0200
+Subject: [PATCH V2 6/8] net: stmmac: add dwmac-4.20a compatible
 In-Reply-To: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
 References: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
-Message-ID: <1525270723-18241-6-git-send-email-christophe.roullier@st.com>
+Message-ID: <1525270723-18241-7-git-send-email-christophe.roullier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ethernet support (Synopsys MAC IP 4.20a) on stm32mp1 SOC.
-Enable feature supported by the stmmac driver, such as TSO.
+Manage dwmac-4.20a version from synopsys
 
 Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
 ---
- arch/arm/boot/dts/stm32mp157c.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index 86421ba..79def3b 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -179,5 +179,35 @@
- 			clocks = <&rcc USART1_K>;
- 			status = "disabled";
- 		};
-+
-+		stmmac_axi_config_0: stmmac-axi-config {
-+			snps,wr_osr_lmt = <0x7>;
-+			snps,rd_osr_lmt = <0x7>;
-+			snps,blen = <0 0 0 0 16 8 4>;
-+		};
-+
-+		ethernet0: ethernet at 5800a000 {
-+			compatible = "st,stm32mp1-dwmac", "snps,dwmac-4.20a";
-+			reg = <0x5800a000 0x2000>;
-+			reg-names = "stmmaceth";
-+			interrupts-extended = <&intc GIC_SPI 61 IRQ_TYPE_NONE>;
-+			interrupt-names = "macirq";
-+			clock-names = "stmmaceth",
-+				      "mac-clk-tx",
-+				      "mac-clk-rx",
-+				      "ethstp",
-+				      "syscfg-clk";
-+			clocks = <&rcc ETHMAC>,
-+				 <&rcc ETHTX>,
-+				 <&rcc ETHRX>,
-+				 <&rcc ETHSTP>,
-+				 <&rcc SYSCFG>;
-+			st,syscon = <&syscfg 0x4>;
-+			snps,mixed-burst;
-+			snps,pbl = <2>;
-+			snps,axi-config = <&stmmac_axi_config_0>;
-+			snps,tso;
-+			status = "disabled";
-+		};
- 	};
- };
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index ebd3e5f..6d141f3 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -472,7 +472,8 @@ struct plat_stmmacenet_data *
+ 	}
+ 
+ 	if (of_device_is_compatible(np, "snps,dwmac-4.00") ||
+-	    of_device_is_compatible(np, "snps,dwmac-4.10a")) {
++	    of_device_is_compatible(np, "snps,dwmac-4.10a") ||
++	    of_device_is_compatible(np, "snps,dwmac-4.20a")) {
+ 		plat->has_gmac4 = 1;
+ 		plat->has_gmac = 0;
+ 		plat->pmt = 1;
 -- 
 1.9.1
