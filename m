@@ -1,175 +1,86 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 02 May 2018 17:52:13 +0200
-Subject: [PATCH V4 3/3] cpufreq: add suspend/resume support in Armada 37xx
- DVFS driver
-In-Reply-To: <d6be605205f6af01968a99582b05026aec2eca42.1524737432.git.viresh.kumar@linaro.org>
- (Viresh Kumar's message of "Thu, 26 Apr 2018 15:42:17 +0530")
-References: <e98965068836e673ea826e8a03fd01e168fce3ed.1524561482.git.viresh.kumar@linaro.org>
- <cover.1524737432.git.viresh.kumar@linaro.org>
- <d6be605205f6af01968a99582b05026aec2eca42.1524737432.git.viresh.kumar@linaro.org>
-Message-ID: <87r2mu8382.fsf@bootlin.com>
+Date: Wed, 02 May 2018 17:55:35 +0200
+Subject: [PATCH v2 0/4] Update 32-bit Marvell EBU NAND DT nodes with new
+ bindings
+In-Reply-To: <20180425144802.15998-1-miquel.raynal@bootlin.com> (Miquel
+ Raynal's message of "Wed, 25 Apr 2018 16:47:58 +0200")
+References: <20180425144802.15998-1-miquel.raynal@bootlin.com>
+Message-ID: <87muxi832g.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi Miquel,
  
- On jeu., avril 26 2018, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+ On mer., avril 25 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-> From: Miquel Raynal <miquel.raynal@bootlin.com>
+> Hello,
 >
-> Add suspend/resume hooks in Armada 37xx DVFS driver to handle S2RAM
-> operations. As there is currently no 'driver' structure, create one
-> to store both the regmap and the register values during suspend
-> operation.
+> As part of a previous work, the bindings for the Marvell NAND controller
+> have changed and various DT got updated accordingly. I asked Gregory not
+> to take the DT patches updating the NAND nodes of the 32-bit Marvell EBU
+> platforms from the last series because of the need to update one
+> property after a review from Rob Herring.
+>
+> My apologies to this very late new version of the patches, they are now
+> ready to be merged.
+>
+> Thank you,
+> Miqu?l
+>
+> Changes since v1
+> ================
+> * s/marvell,rb/nand-rb/ DT property.
+> * Reworded a bit the commit messages.
+>
+>
+> Miquel Raynal (4):
+>   ARM: dts: armada-370-xp: update NAND node with new bindings
+>   ARM: dts: armada-375: update NAND node with new bindings
+>   ARM: dts: armada-38x: update NAND node with new bindings
+>   ARM: dts: armada-39x: update NAND node with new bindings
 
-I tested this patch on a Armada 3720 based board (EspressoBin), and it
-worked well. I even made some power consumption measurement and after
-the resume, the power consumption had the same value that before the
-suspend, for low CPU frequency and high CPU frequency.
 
-Tested-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+The four patches are now applied on mvebu/dt
 
 Thanks,
 
 Gregory
 
 
-
 >
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
-> V3->V4:
-> - Fix the "unused put_clk label" build error that happened between V2
->   and V3.
+>  arch/arm/boot/dts/armada-370-db.dts                |  57 ++++----
+>  arch/arm/boot/dts/armada-370-dlink-dns327l.dts     | 120 ++++++++--------
+>  arch/arm/boot/dts/armada-370-mirabox.dts           |  51 ++++---
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts     |  90 ++++++------
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts     |  90 ++++++------
+>  arch/arm/boot/dts/armada-370-rd.dts                |  52 ++++---
+>  arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |  64 +++++----
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |   6 +-
+>  arch/arm/boot/dts/armada-375-db.dts                |  48 ++++---
+>  arch/arm/boot/dts/armada-375.dtsi                  |   6 +-
+>  arch/arm/boot/dts/armada-385-db-ap.dts             |  69 ++++-----
+>  arch/arm/boot/dts/armada-385-linksys-caiman.dts    | 127 +++++++++--------
+>  arch/arm/boot/dts/armada-385-linksys-cobra.dts     | 127 +++++++++--------
+>  arch/arm/boot/dts/armada-385-linksys-rango.dts     | 119 ++++++++--------
+>  arch/arm/boot/dts/armada-385-linksys-shelby.dts    | 127 +++++++++--------
+>  arch/arm/boot/dts/armada-385-linksys.dtsi          |  16 ++-
+>  arch/arm/boot/dts/armada-388-db.dts                |  55 +++++---
+>  arch/arm/boot/dts/armada-38x.dtsi                  |   6 +-
+>  arch/arm/boot/dts/armada-390-db.dts                |  66 +++++----
+>  arch/arm/boot/dts/armada-395-gp.dts                |  74 +++++-----
+>  arch/arm/boot/dts/armada-398-db.dts                |  60 ++++----
+>  arch/arm/boot/dts/armada-39x.dtsi                  |   6 +-
+>  arch/arm/boot/dts/armada-xp-db-dxbc2.dts           |   2 +-
+>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      |   2 +-
+>  arch/arm/boot/dts/armada-xp-db.dts                 |   2 +-
+>  arch/arm/boot/dts/armada-xp-gp.dts                 |   2 +-
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    |   2 +-
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts      | 156 +++++++++++----------
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     |  90 ++++++------
+>  29 files changed, 920 insertions(+), 772 deletions(-)
 >
->  drivers/cpufreq/armada-37xx-cpufreq.c | 67 +++++++++++++++++++++++++++++++++--
->  1 file changed, 65 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
-> index 1d5db6f6ace9..739da90ff3f6 100644
-> --- a/drivers/cpufreq/armada-37xx-cpufreq.c
-> +++ b/drivers/cpufreq/armada-37xx-cpufreq.c
-> @@ -23,6 +23,8 @@
->  #include <linux/regmap.h>
->  #include <linux/slab.h>
->  
-> +#include "cpufreq-dt.h"
-> +
->  /* Power management in North Bridge register set */
->  #define ARMADA_37XX_NB_L0L1	0x18
->  #define ARMADA_37XX_NB_L2L3	0x1C
-> @@ -56,6 +58,16 @@
->   */
->  #define LOAD_LEVEL_NR	4
->  
-> +struct armada37xx_cpufreq_state {
-> +	struct regmap *regmap;
-> +	u32 nb_l0l1;
-> +	u32 nb_l2l3;
-> +	u32 nb_dyn_mod;
-> +	u32 nb_cpu_load;
-> +};
-> +
-> +static struct armada37xx_cpufreq_state *armada37xx_cpufreq_state;
-> +
->  struct armada_37xx_dvfs {
->  	u32 cpu_freq_max;
->  	u8 divider[LOAD_LEVEL_NR];
-> @@ -136,7 +148,7 @@ static void __init armada37xx_cpufreq_dvfs_setup(struct regmap *base,
->  	clk_set_parent(clk, parent);
->  }
->  
-> -static void __init armada37xx_cpufreq_disable_dvfs(struct regmap *base)
-> +static void armada37xx_cpufreq_disable_dvfs(struct regmap *base)
->  {
->  	unsigned int reg = ARMADA_37XX_NB_DYN_MOD,
->  		mask = ARMADA_37XX_NB_DFS_EN;
-> @@ -162,8 +174,44 @@ static void __init armada37xx_cpufreq_enable_dvfs(struct regmap *base)
->  	regmap_update_bits(base, reg, mask, mask);
->  }
->  
-> +static int armada37xx_cpufreq_suspend(struct cpufreq_policy *policy)
-> +{
-> +	struct armada37xx_cpufreq_state *state = armada37xx_cpufreq_state;
-> +
-> +	regmap_read(state->regmap, ARMADA_37XX_NB_L0L1, &state->nb_l0l1);
-> +	regmap_read(state->regmap, ARMADA_37XX_NB_L2L3, &state->nb_l2l3);
-> +	regmap_read(state->regmap, ARMADA_37XX_NB_CPU_LOAD,
-> +		    &state->nb_cpu_load);
-> +	regmap_read(state->regmap, ARMADA_37XX_NB_DYN_MOD, &state->nb_dyn_mod);
-> +
-> +	return 0;
-> +}
-> +
-> +static int armada37xx_cpufreq_resume(struct cpufreq_policy *policy)
-> +{
-> +	struct armada37xx_cpufreq_state *state = armada37xx_cpufreq_state;
-> +
-> +	/* Ensure DVFS is disabled otherwise the following registers are RO */
-> +	armada37xx_cpufreq_disable_dvfs(state->regmap);
-> +
-> +	regmap_write(state->regmap, ARMADA_37XX_NB_L0L1, state->nb_l0l1);
-> +	regmap_write(state->regmap, ARMADA_37XX_NB_L2L3, state->nb_l2l3);
-> +	regmap_write(state->regmap, ARMADA_37XX_NB_CPU_LOAD,
-> +		     state->nb_cpu_load);
-> +
-> +	/*
-> +	 * NB_DYN_MOD register is the one that actually enable back DVFS if it
-> +	 * was enabled before the suspend operation. This must be done last
-> +	 * otherwise other registers are not writable.
-> +	 */
-> +	regmap_write(state->regmap, ARMADA_37XX_NB_DYN_MOD, state->nb_dyn_mod);
-> +
-> +	return 0;
-> +}
-> +
->  static int __init armada37xx_cpufreq_driver_init(void)
->  {
-> +	struct cpufreq_dt_platform_data pdata;
->  	struct armada_37xx_dvfs *dvfs;
->  	struct platform_device *pdev;
->  	unsigned long freq;
-> @@ -213,6 +261,15 @@ static int __init armada37xx_cpufreq_driver_init(void)
->  		return -EINVAL;
->  	}
->  
-> +	armada37xx_cpufreq_state = kmalloc(sizeof(*armada37xx_cpufreq_state),
-> +					   GFP_KERNEL);
-> +	if (!armada37xx_cpufreq_state) {
-> +		clk_put(clk);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	armada37xx_cpufreq_state->regmap = nb_pm_base;
-> +
->  	armada37xx_cpufreq_dvfs_setup(nb_pm_base, clk, dvfs->divider);
->  	clk_put(clk);
->  
-> @@ -228,7 +285,11 @@ static int __init armada37xx_cpufreq_driver_init(void)
->  	/* Now that everything is setup, enable the DVFS at hardware level */
->  	armada37xx_cpufreq_enable_dvfs(nb_pm_base);
->  
-> -	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-> +	pdata.suspend = armada37xx_cpufreq_suspend;
-> +	pdata.resume = armada37xx_cpufreq_resume;
-> +
-> +	pdev = platform_device_register_data(NULL, "cpufreq-dt", -1, &pdata,
-> +					     sizeof(pdata));
->  	ret = PTR_ERR_OR_ZERO(pdev);
->  	if (ret)
->  		goto disable_dvfs;
-> @@ -244,6 +305,8 @@ static int __init armada37xx_cpufreq_driver_init(void)
->  		dev_pm_opp_remove(cpu_dev, freq);
->  	}
->  
-> +	kfree(armada37xx_cpufreq_state);
-> +
->  	return ret;
->  }
->  /* late_initcall, to guarantee the driver is loaded after A37xx clock driver */
 > -- 
-> 2.15.0.194.g9af6a3dea062
+> 2.14.1
 >
 
 -- 
