@@ -1,25 +1,62 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 2 May 2018 09:48:25 +0200
-Subject: [PATCH] ARM: dts: at91: sama5d4ek: use canonical compatible for
- touchscreen
-In-Reply-To: <20180501224833.GA151132@dtor-ws>
-References: <20180501224833.GA151132@dtor-ws>
-Message-ID: <20180502074825.GB18640@piout.net>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 2 May 2018 09:51:38 +0200
+Subject: [PATCH] ARM: dts: stm32: Fix DTC warnings for stm32mp157
+Message-ID: <1525247498-12834-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2018 15:48:33-0700, Dmitry Torokhov wrote:
-> The canonical compatible string is "atmel,maxtouch", let's use it. Also,
-> change the node name to be "touchscreen" rather than driver name.
-> 
-> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> ---
->  arch/arm/boot/dts/at91-sama5d4ek.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-Applied, thanks.
+Fix DTC warnings for stm32mp157:
 
+Warning (unit_address_vs_reg): /soc/pin-controller: node has a reg or ranges property, but no unit name
+Warning (unit_address_vs_reg): /soc/pin-controller/uart4 at 0: node has a unit name, but no reg property
+Warning (unit_address_vs_reg): /soc/pin-controller-z: node has a reg or ranges property, but no unit name
+Warning (unit_address_vs_reg): /memory: node has a reg or ranges property, but no unit name
+
+Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+
+diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+index 6f044100..8534371 100644
+--- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+@@ -7,7 +7,7 @@
+ 
+ / {
+ 	soc {
+-		pinctrl: pin-controller {
++		pinctrl: pin-controller at 50002000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			compatible = "st,stm32mp157-pinctrl";
+@@ -146,7 +146,7 @@
+ 				gpio-ranges = <&pinctrl 0 160 8>;
+ 			};
+ 
+-			uart4_pins_a: uart4 at 0 {
++			uart4_pins_a: uart4-0 {
+ 				pins1 {
+ 					pinmux = <STM32_PINMUX('G', 11, AF6)>; /* UART4_TX */
+ 					bias-disable;
+@@ -160,7 +160,7 @@
+ 			};
+ 		};
+ 
+-		pinctrl_z: pin-controller-z {
++		pinctrl_z: pin-controller-z at 54004000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			compatible = "st,stm32mp157-z-pinctrl";
+diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+index 9f90337a..86ede40 100644
+--- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
++++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+@@ -16,7 +16,7 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+-	memory {
++	memory at c0000000 {
+ 		reg = <0xC0000000 0x40000000>;
+ 	};
+ 
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.7.4
