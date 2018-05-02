@@ -1,222 +1,576 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed,  2 May 2018 13:33:26 -0700
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <20180502203326.9491-1-labbott@redhat.com>
-References: <20180502203326.9491-1-labbott@redhat.com>
-Message-ID: <20180502203326.9491-3-labbott@redhat.com>
+From: riproute@gmail.com (Rip Route)
+Date: Wed, 2 May 2018 14:52:50 -0600
+Subject: [PATCH] ARM: dts: BCM5301X: Relicense most DTS files to the GPL
+ 2.0+ / MIT
+In-Reply-To: <20180502141102.31769-1-zajec5@gmail.com>
+References: <20180502141102.31769-1-zajec5@gmail.com>
+Message-ID: <CALZrXOnAGc4G1AuHqFCr1D5tro+uuGDYa7geYg1CeRnCFJ4vNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/02/2018 04:11 PM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>
+> These files were created and ever touched by a group of three people
+> only: Dan, Hauke and me. They were licensed under GNU/GPL or ISC.
+>
+> Introducing and discussing SPDX-License-Identifier resulted in a
+> conclusion that ISC is a not recommended license (see also a
+> license-rules.rst). Moveover an old e-mail from Alan Cox was pointed
+> which explained that dual licensing is a safer solution than depending
+> on a common compatibility belief.
+>
+> This commit switches most of BCM5301X DTS files to dual licensing using:
+> 1) GPL 2.0+ to make sure they are compatible with Linux kernel
+> 2) MIT to allow sharing with more permissive projects Both licenses
+> belong to the preferred ones (see LICENSES/preferred/).
+>
+> An attempt to relicense remaining files will be made separately and
+> will require approve from more/other developers.
+>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Implementation of stackleak based heavily on the x86 version
+Acked-by: Dan Haab <dan.haab@luxul.com>
+re-sent without footer and using text/plain
 
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
-Now written in C instead of a bunch of assembly.
----
- arch/arm64/Kconfig                    |  1 +
- arch/arm64/include/asm/processor.h    |  6 ++++
- arch/arm64/kernel/Makefile            |  3 ++
- arch/arm64/kernel/entry.S             |  6 ++++
- arch/arm64/kernel/erase.c             | 55 +++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/process.c           | 16 ++++++++++
- drivers/firmware/efi/libstub/Makefile |  3 +-
- scripts/Makefile.gcc-plugins          |  5 +++-
- 8 files changed, 93 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/kernel/erase.c
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index eb2cf4938f6d..b0221db95dc9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -92,6 +92,7 @@ config ARM64
- 	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
- 	select HAVE_ARCH_SECCOMP_FILTER
-+	select HAVE_ARCH_STACKLEAK
- 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 767598932549..d31ab80ff647 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -124,6 +124,12 @@ struct thread_struct {
- 	unsigned long		fault_address;	/* fault info */
- 	unsigned long		fault_code;	/* ESR_EL1 value */
- 	struct debug_info	debug;		/* debugging */
-+#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-+	unsigned long           lowest_stack;
-+#ifdef CONFIG_STACKLEAK_METRICS
-+	unsigned long		prev_lowest_stack;
-+#endif
-+#endif
- };
- 
- static inline void arch_thread_struct_whitelist(unsigned long *offset,
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index bf825f38d206..0ceea613c65b 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -55,6 +55,9 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
- 
-+arm64-obj-$(CONFIG_GCC_PLUGIN_STACKLEAK) += erase.o
-+KASAN_SANITIZE_erase.o	:= n
-+
- obj-y					+= $(arm64-obj-y) vdso/ probes/
- obj-m					+= $(arm64-obj-m)
- head-y					:= head.o
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index ec2ee720e33e..3144f1ebdc18 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -401,6 +401,11 @@ tsk	.req	x28		// current thread_info
- 
- 	.text
- 
-+	.macro	ERASE_KSTACK
-+#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-+	bl	erase_kstack
-+#endif
-+	.endm
- /*
-  * Exception vectors.
-  */
-@@ -906,6 +911,7 @@ ret_to_user:
- 	cbnz	x2, work_pending
- finish_ret_to_user:
- 	enable_step_tsk x1, x2
-+	ERASE_KSTACK
- 	kernel_exit 0
- ENDPROC(ret_to_user)
- 
-diff --git a/arch/arm64/kernel/erase.c b/arch/arm64/kernel/erase.c
-new file mode 100644
-index 000000000000..b8b5648d893b
---- /dev/null
-+++ b/arch/arm64/kernel/erase.c
-@@ -0,0 +1,55 @@
-+#include <linux/bug.h>
-+#include <linux/sched.h>
-+#include <asm/current.h>
-+#include <asm/linkage.h>
-+#include <asm/processor.h>
-+
-+asmlinkage void erase_kstack(void)
-+{
-+	unsigned long p = current->thread.lowest_stack;
-+	unsigned long boundary = p & ~(THREAD_SIZE - 1);
-+	unsigned long poison = 0;
-+	const unsigned long check_depth = STACKLEAK_POISON_CHECK_DEPTH /
-+							sizeof(unsigned long);
-+
-+	/*
-+	 * Let's search for the poison value in the stack.
-+	 * Start from the lowest_stack and go to the bottom.
-+	 */
-+	while (p > boundary && poison <= check_depth) {
-+		if (*(unsigned long *)p == STACKLEAK_POISON)
-+			poison++;
-+		else
-+			poison = 0;
-+
-+		p -= sizeof(unsigned long);
-+	}
-+
-+	/*
-+	 * One long int@the bottom of the thread stack is reserved and
-+	 * should not be poisoned (see CONFIG_SCHED_STACK_END_CHECK).
-+	 */
-+	if (p == boundary)
-+		p += sizeof(unsigned long);
-+
-+#ifdef CONFIG_STACKLEAK_METRICS
-+	current->thread.prev_lowest_stack = p;
-+#endif
-+
-+	/*
-+	 * So let's write the poison value to the kernel stack.
-+	 * Start from the address in p and move up till the new boundary.
-+	 */
-+	boundary = current_stack_pointer;
-+
-+	BUG_ON(boundary - p >= THREAD_SIZE);
-+
-+	while (p < boundary) {
-+		*(unsigned long *)p = STACKLEAK_POISON;
-+		p += sizeof(unsigned long);
-+	}
-+
-+	/* Reset the lowest_stack value for the next syscall */
-+	current->thread.lowest_stack = current_stack_pointer;
-+}
-+
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index f08a2ed9db0d..156fa0a0da19 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -364,6 +364,9 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 	p->thread.cpu_context.pc = (unsigned long)ret_from_fork;
- 	p->thread.cpu_context.sp = (unsigned long)childregs;
- 
-+#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-+	p->thread.lowest_stack = (unsigned long)task_stack_page(p);
-+#endif
- 	ptrace_hw_copy_thread(p);
- 
- 	return 0;
-@@ -493,3 +496,16 @@ void arch_setup_new_exec(void)
- {
- 	current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
- }
-+
-+#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-+void __used check_alloca(unsigned long size)
-+{
-+	unsigned long sp, stack_left;
-+
-+	sp = current_stack_pointer;
-+
-+	stack_left = sp & (THREAD_SIZE - 1);
-+	BUG_ON(stack_left < 256 || size >= stack_left - 256);
-+}
-+EXPORT_SYMBOL(check_alloca);
-+#endif
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index a34e9290a699..25dd2a14560d 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
- KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
- 				   -D__NO_FORTIFY \
- 				   $(call cc-option,-ffreestanding) \
--				   $(call cc-option,-fno-stack-protector)
-+				   $(call cc-option,-fno-stack-protector) \
-+				   $(DISABLE_STACKLEAK_PLUGIN)
- 
- GCOV_PROFILE			:= n
- KASAN_SANITIZE			:= n
-diff --git a/scripts/Makefile.gcc-plugins b/scripts/Makefile.gcc-plugins
-index 8d6070fc538f..6cc0e35d3324 100644
---- a/scripts/Makefile.gcc-plugins
-+++ b/scripts/Makefile.gcc-plugins
-@@ -37,11 +37,14 @@ ifdef CONFIG_GCC_PLUGINS
- 
-   gcc-plugin-$(CONFIG_GCC_PLUGIN_STACKLEAK)	+= stackleak_plugin.so
-   gcc-plugin-cflags-$(CONFIG_GCC_PLUGIN_STACKLEAK)	+= -DSTACKLEAK_PLUGIN -fplugin-arg-stackleak_plugin-track-min-size=$(CONFIG_STACKLEAK_TRACK_MIN_SIZE)
-+  ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-+    DISABLE_STACKLEAK_PLUGIN		+= -fplugin-arg-stackleak_plugin-disable
-+  endif
- 
-   GCC_PLUGINS_CFLAGS := $(strip $(addprefix -fplugin=$(objtree)/scripts/gcc-plugins/, $(gcc-plugin-y)) $(gcc-plugin-cflags-y))
- 
-   export PLUGINCC GCC_PLUGINS_CFLAGS GCC_PLUGIN GCC_PLUGIN_SUBDIR
--  export SANCOV_PLUGIN DISABLE_LATENT_ENTROPY_PLUGIN
-+  export SANCOV_PLUGIN DISABLE_LATENT_ENTROPY_PLUGIN DISABLE_STACKLEAK_PLUGIN
- 
-   ifneq ($(PLUGINCC),)
-     # SANCOV_PLUGIN can be only in CFLAGS_KCOV because avoid duplication.
--- 
-2.14.3
+> ---
+>  arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts        | 13 +------------
+>  arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts        | 13 +------------
+>  arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts    |  3 +--
+>  arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts       |  3 +--
+>  arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       |  3 +--
+>  arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts     | 13 +------------
+>  arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      |  3 +--
+>  arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        | 13 +------------
+>  arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 13 +------------
+>  arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts      |  3 +--
+>  arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts      |  3 +--
+>  arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts |  3 +--
+>  arch/arm/boot/dts/bcm4709-linksys-ea9200.dts       |  3 +--
+>  arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 13 +------------
+>  arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  |  3 +--
+>  arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 13 +------------
+>  arch/arm/boot/dts/bcm47094-linksys-panamera.dts    |  3 +--
+>  arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts      |  3 +--
+>  arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts      |  3 +--
+>  arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      |  3 +--
+>  arch/arm/boot/dts/bcm47094-netgear-r8500.dts       |  3 +--
+>  arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi      |  3 +--
+>  arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi      |  3 +--
+>  arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi      |  3 +--
+>  arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi           |  3 +--
+>  25 files changed, 25 insertions(+), 120 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
+> b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
+> index 4175174e589a..ff2e551b9058 100644
+> --- a/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
+> +++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
+> @@ -1,20 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Asus RT-AC56U
+>   *
+>   * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Permission to use, copy, modify, and/or distribute this software
+> for any
+> - * purpose with or without fee is hereby granted, provided that the
+> above
+> - * copyright notice and this permission notice appear in all copies.
+> - *
+> - * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+> WARRANTIES WITH
+> - * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+> MERCHANTABILITY
+> - * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+> SPECIAL, DIRECT,
+> - * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+> RESULTING FROM
+> - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+> NEGLIGENCE
+> - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
+> USE OR
+> - * PERFORMANCE OF THIS SOFTWARE.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+> b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+> index 8fa033fea959..3bcc03788f38 100644
+> --- a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+> +++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+> @@ -1,20 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Asus RT-AC68U
+>   *
+>   * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Permission to use, copy, modify, and/or distribute this software
+> for any
+> - * purpose with or without fee is hereby granted, provided that the
+> above
+> - * copyright notice and this permission notice appear in all copies.
+> - *
+> - * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+> WARRANTIES WITH
+> - * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+> MERCHANTABILITY
+> - * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+> SPECIAL, DIRECT,
+> - * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+> RESULTING FROM
+> - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+> NEGLIGENCE
+> - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
+> USE OR
+> - * PERFORMANCE OF THIS SOFTWARE.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts
+> b/arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts
+> index 126ab5867772..6c8f0ad82332 100644
+> --- a/arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts
+> +++ b/arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> index f591b0f256d8..ebda45fe9ea4 100644
+> --- a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> +++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright 2016 Luxul Inc.
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> index 5efb6f31164d..9dd0e22c906a 100644
+> --- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> +++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> @@ -1,10 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Luxul XWC-1000
+>   *
+>   * Copyright 2014 Luxul Inc.
+> - *
+> - * Licensed under the GNU/GPL. See COPYING for details.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+> b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+> index bb66cebe0bd8..2642494c97a1 100644
+> --- a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+> +++ b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+> @@ -1,20 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Netgear R6300 V2
+>   *
+>   * Copyright (C) 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Permission to use, copy, modify, and/or distribute this software
+> for any
+> - * purpose with or without fee is hereby granted, provided that the
+> above
+> - * copyright notice and this permission notice appear in all copies.
+> - *
+> - * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+> WARRANTIES WITH
+> - * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+> MERCHANTABILITY
+> - * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+> SPECIAL, DIRECT,
+> - * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+> RESULTING FROM
+> - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+> NEGLIGENCE
+> - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
+> USE OR
+> - * PERFORMANCE OF THIS SOFTWARE.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> index 83a4c60bb431..e7b09b7b7d25 100644
+> --- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> +++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> @@ -1,10 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X arm platform code.
+>   * DTS for SmartRG SR400ac
+>   *
+>   * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Licensed under the GNU/GPL. See COPYING for details.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+> b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+> index 0800a964f2fe..16314fcc6e56 100644
+> --- a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+> +++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+> @@ -1,20 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Asus RT-N18U
+>   *
+>   * Copyright (C) 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Permission to use, copy, modify, and/or distribute this software
+> for any
+> - * purpose with or without fee is hereby granted, provided that the
+> above
+> - * copyright notice and this permission notice appear in all copies.
+> - *
+> - * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+> WARRANTIES WITH
+> - * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+> MERCHANTABILITY
+> - * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+> SPECIAL, DIRECT,
+> - * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+> RESULTING FROM
+> - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+> NEGLIGENCE
+> - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
+> USE OR
+> - * PERFORMANCE OF THIS SOFTWARE.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> index c2af33eb47de..328aa90240ce 100644
+> --- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> +++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> @@ -1,20 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Buffalo WZR-600DHP2
+>   *
+>   * Copyright (C) 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Permission to use, copy, modify, and/or distribute this software
+> for any
+> - * purpose with or without fee is hereby granted, provided that the
+> above
+> - * copyright notice and this permission notice appear in all copies.
+> - *
+> - * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+> WARRANTIES WITH
+> - * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+> MERCHANTABILITY
+> - * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+> SPECIAL, DIRECT,
+> - * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+> RESULTING FROM
+> - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+> NEGLIGENCE
+> - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
+> USE OR
+> - * PERFORMANCE OF THIS SOFTWARE.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
+> b/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
+> index 9b5759849983..5eeac7302329 100644
+> --- a/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
+> +++ b/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright 2017 Luxul Inc.
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts
+> b/arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts
+> index ba1c19b1b3eb..da4d9ec62fc6 100644
+> --- a/arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts
+> +++ b/arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright 2017 Luxul Inc.
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+> b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+> index 3ed8de42cb48..c94c732188fb 100644
+> --- a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+> +++ b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4709-linksys-ea9200.dts
+> b/arch/arm/boot/dts/bcm4709-linksys-ea9200.dts
+> index 3d1d9c2c4efc..db744a5e122d 100644
+> --- a/arch/arm/boot/dts/bcm4709-linksys-ea9200.dts
+> +++ b/arch/arm/boot/dts/bcm4709-linksys-ea9200.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> index f43ab4721456..9e267d38df4c 100644
+> --- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> +++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> @@ -1,20 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Netgear R7000
+>   *
+>   * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Permission to use, copy, modify, and/or distribute this software
+> for any
+> - * purpose with or without fee is hereby granted, provided that the
+> above
+> - * copyright notice and this permission notice appear in all copies.
+> - *
+> - * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+> WARRANTIES WITH
+> - * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+> MERCHANTABILITY
+> - * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+> SPECIAL, DIRECT,
+> - * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+> RESULTING FROM
+> - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+> NEGLIGENCE
+> - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
+> USE OR
+> - * PERFORMANCE OF THIS SOFTWARE.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> index ec4a50e440f6..f5bf6586ae07 100644
+> --- a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> +++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> index 7cc7d344fe5b..494dbd39658c 100644
+> --- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> +++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> @@ -1,20 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for D-Link DIR-885L
+>   *
+>   * Copyright (C) 2016 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Permission to use, copy, modify, and/or distribute this software
+> for any
+> - * purpose with or without fee is hereby granted, provided that the
+> above
+> - * copyright notice and this permission notice appear in all copies.
+> - *
+> - * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+> WARRANTIES WITH
+> - * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+> MERCHANTABILITY
+> - * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+> SPECIAL, DIRECT,
+> - * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+> RESULTING FROM
+> - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+> NEGLIGENCE
+> - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
+> USE OR
+> - * PERFORMANCE OF THIS SOFTWARE.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+> b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+> index b6750f70dffb..f47afe36d857 100644
+> --- a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+> +++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts
+> b/arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts
+> index ecd22a246746..a5cef51cfe4f 100644
+> --- a/arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts
+> +++ b/arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright (C) 2017 Luxul Inc.
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
+> b/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
+> index 15ffb1abc440..7496aabf8f77 100644
+> --- a/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
+> +++ b/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright (C) 2017 Luxul Inc.
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> index bc1d1e10d4ac..53aaa5212610 100644
+> --- a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> +++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright 2016 Luxul Inc.
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> index 859929973158..0e718edc065a 100644
+> --- a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> +++ b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi
+> b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi
+> index 24b099c00f13..c349e8f0afc5 100644
+> --- a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi
+> +++ b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi
+> @@ -1,9 +1,8 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom Northstar NAND.
+>   *
+>   * Copyright (C) 2016 Rafa? Mi?ecki <rafal.milecki@gmail.com>
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  #include "bcm5301x-nand-cs0.dtsi"
+> diff --git a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi
+> b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi
+> index b4e875df9528..18e25e302b13 100644
+> --- a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi
+> +++ b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi
+> @@ -1,7 +1,6 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Copyright 2016 Luxul Inc.
+> - *
+> - * Licensed under the ISC license.
+>   */
+>
+>  #include "bcm5301x-nand-cs0.dtsi"
+> diff --git a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi
+> b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi
+> index 9a9630ded306..c8e56d30bd6f 100644
+> --- a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi
+> +++ b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi
+> @@ -1,3 +1,4 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X Nand chip defaults.
+>   *
+> @@ -5,8 +6,6 @@
+>   * and uses 8 bit ECC.
+>   *
+>   * Copyright (C) 2015 Hauke Mehrtens <hauke@hauke-m.de>
+> - *
+> - * Licensed under the GNU/GPL. See COPYING for details.
+>   */
+>
+>  #include "bcm5301x-nand-cs0.dtsi"
+> diff --git a/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
+> b/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
+> index 168495106b82..e5a2d62daf92 100644
+> --- a/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
+> +++ b/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
+> @@ -1,9 +1,8 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom Northstar NAND.
+>   *
+>   * Copyright (C) 2015 Hauke Mehrtens <hauke@hauke-m.de>
+> - *
+> - * Licensed under the GNU/GPL. See COPYING for details.
+>   */
+>
+>  / {
+>
