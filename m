@@ -1,54 +1,171 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  2 May 2018 12:18:14 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.17
-Message-ID: <cover.1525256178.git.horms+renesas@verge.net.au>
+Date: Wed,  2 May 2018 12:18:22 +0200
+Subject: [PATCH 1/3] ARM: dts: r8a7790: Convert to new LVDS DT bindings
+In-Reply-To: <cover.1525256178.git.horms+renesas@verge.net.au>
+References: <cover.1525256178.git.horms+renesas@verge.net.au>
+Message-ID: <15a1ff30d8f9bd83273d8712973b88663ad16265.1525256178.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Please consider these Renesas ARM based SoC fixes for v4.17.
+The internal LVDS encoder now has DT bindings separate from the DU. Port
+the device tree over to the new model.
 
+Fixes: c6a27fa41fab ("drm: rcar-du: Convert LVDS encoder code to bridge driver")
+Fixes: 4bdb7aa7dcd0 ("ARM: dts: r8a7790: add soc node")
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 22 ++++++++++---
+ arch/arm/boot/dts/r8a7790.dtsi      | 65 ++++++++++++++++++++++++++++++++-----
+ 2 files changed, 74 insertions(+), 13 deletions(-)
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.17
-
-for you to fetch changes up to edb0c3affe5214a21d71ffb82ca92ed068e828df:
-
-  ARM: dts: r8a7793: Convert to new LVDS DT bindings (2018-04-23 12:31:42 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Fixes for v4.17
-
-Fix LVDS output on Gen2 boards
-
-Laurent Pincart says "This patch series fixes LVDS output support on the
-Lager, Koelsh, Porter and Gose boards that broke in v4.17-rc1 due to the
-combination of the R-Car DU LVDS driver rework and the DT move of all
-on-SoC peripherals to a /soc node.
-
-We could handle the problem in the R-Car DU LVDS DT backward compatibility
-code, but that fix would only be used for v4.17 as in v4.18 the Gen2 DT
-will move to the new LVDS DT bindings. I thus propose merging these three
-patches in v4.17 already to fix the problem as this is the simplest
-solution."
-
-----------------------------------------------------------------
-Laurent Pinchart (3):
-      ARM: dts: r8a7790: Convert to new LVDS DT bindings
-      ARM: dts: r8a7791: Convert to new LVDS DT bindings
-      ARM: dts: r8a7793: Convert to new LVDS DT bindings
-
- arch/arm/boot/dts/r8a7790-lager.dts   | 22 +++++++++---
- arch/arm/boot/dts/r8a7790.dtsi        | 65 ++++++++++++++++++++++++++++++-----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 12 +++++--
- arch/arm/boot/dts/r8a7791-porter.dts  | 16 +++++++--
- arch/arm/boot/dts/r8a7791.dtsi        | 36 +++++++++++++++----
- arch/arm/boot/dts/r8a7793-gose.dts    | 10 ++++--
- arch/arm/boot/dts/r8a7793.dtsi        | 37 ++++++++++++++++----
- 7 files changed, 164 insertions(+), 34 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 063fdb65dc60..f07f9018c3e7 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -379,7 +379,7 @@
+ 				port at 0 {
+ 					reg = <0>;
+ 					adv7511_in: endpoint {
+-						remote-endpoint = <&du_out_lvds0>;
++						remote-endpoint = <&lvds0_out>;
+ 					};
+ 				};
+ 
+@@ -467,10 +467,8 @@
+ 	status = "okay";
+ 
+ 	clocks = <&cpg CPG_MOD 724>, <&cpg CPG_MOD 723>, <&cpg CPG_MOD 722>,
+-		 <&cpg CPG_MOD 726>, <&cpg CPG_MOD 725>,
+ 		 <&x13_clk>, <&x2_clk>;
+-	clock-names = "du.0", "du.1", "du.2", "lvds.0", "lvds.1",
+-		      "dclkin.0", "dclkin.1";
++	clock-names = "du.0", "du.1", "du.2", "dclkin.0", "dclkin.1";
+ 
+ 	ports {
+ 		port at 0 {
+@@ -478,12 +476,26 @@
+ 				remote-endpoint = <&adv7123_in>;
+ 			};
+ 		};
++	};
++};
++
++&lvds0 {
++	status = "okay";
++
++	ports {
+ 		port at 1 {
+ 			endpoint {
+ 				remote-endpoint = <&adv7511_in>;
+ 			};
+ 		};
+-		port at 2 {
++	};
++};
++
++&lvds1 {
++	status = "okay";
++
++	ports {
++		port at 1 {
+ 			lvds_connector: endpoint {
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index e4367cecad18..05a0fc23ac88 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1627,18 +1627,13 @@
+ 
+ 		du: display at feb00000 {
+ 			compatible = "renesas,du-r8a7790";
+-			reg = <0 0xfeb00000 0 0x70000>,
+-			      <0 0xfeb90000 0 0x1c>,
+-			      <0 0xfeb94000 0 0x1c>;
+-			reg-names = "du", "lvds.0", "lvds.1";
++			reg = <0 0xfeb00000 0 0x70000>;
+ 			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 269 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 724>, <&cpg CPG_MOD 723>,
+-				 <&cpg CPG_MOD 722>, <&cpg CPG_MOD 726>,
+-				 <&cpg CPG_MOD 725>;
+-			clock-names = "du.0", "du.1", "du.2", "lvds.0",
+-				      "lvds.1";
++				 <&cpg CPG_MOD 722>;
++			clock-names = "du.0", "du.1", "du.2";
+ 			status = "disabled";
+ 
+ 			ports {
+@@ -1653,11 +1648,65 @@
+ 				port at 1 {
+ 					reg = <1>;
+ 					du_out_lvds0: endpoint {
++						remote-endpoint = <&lvds0_in>;
+ 					};
+ 				};
+ 				port at 2 {
+ 					reg = <2>;
+ 					du_out_lvds1: endpoint {
++						remote-endpoint = <&lvds1_in>;
++					};
++				};
++			};
++		};
++
++		lvds0: lvds at feb90000 {
++			compatible = "renesas,r8a7790-lvds";
++			reg = <0 0xfeb90000 0 0x1c>;
++			clocks = <&cpg CPG_MOD 726>;
++			power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
++			resets = <&cpg 726>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					lvds0_in: endpoint {
++						remote-endpoint = <&du_out_lvds0>;
++					};
++				};
++				port at 1 {
++					reg = <1>;
++					lvds0_out: endpoint {
++					};
++				};
++			};
++		};
++
++		lvds1: lvds at feb94000 {
++			compatible = "renesas,r8a7790-lvds";
++			reg = <0 0xfeb94000 0 0x1c>;
++			clocks = <&cpg CPG_MOD 725>;
++			power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
++			resets = <&cpg 725>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					lvds1_in: endpoint {
++						remote-endpoint = <&du_out_lvds1>;
++					};
++				};
++				port at 1 {
++					reg = <1>;
++					lvds1_out: endpoint {
+ 					};
+ 				};
+ 			};
+-- 
+2.11.0
