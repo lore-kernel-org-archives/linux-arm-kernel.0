@@ -1,99 +1,81 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Wed, 2 May 2018 15:28:37 +0200
-Subject: [PATCH v8 07/12] ARM: sunxi: Add initialization of CNTVOFF
-In-Reply-To: <20180502130842.pecjwahxrvx5addq@flea>
-References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
- <20180501123131.7738-8-mylene.josserand@bootlin.com>
- <20180502130842.pecjwahxrvx5addq@flea>
-Message-ID: <20180502152837.379c376a@dell-desktop.home>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 2 May 2018 15:34:18 +0200
+Subject: [PATCH v4 0/6] clocksource: rework Atmel TCB timer driver
+In-Reply-To: <20180426185233.GU4813@piout.net>
+References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
+ <20180426164623.tlv6kz5yopk6voxx@breakpoint.cc>
+ <20180426185233.GU4813@piout.net>
+Message-ID: <20180502133418.xa26c5ta2ytxxjcn@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Wed, 2 May 2018 15:08:42 +0200
-Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-
-> On Tue, May 01, 2018 at 02:31:26PM +0200, Myl?ne Josserand wrote:
-> > Add the initialization of CNTVOFF for sun8i-a83t.
-> > 
-> > For boot CPU, create a new machine that handles this
-> > function's call in an "init_early" callback. We need to initialize
-> > CNTVOFF before the arch timer's initialization otherwise, it will
-> > not be taken into account and fails to boot correctly.
-> > Because of that, this function can't be called in SMP's early_initcall
-> > function which is called after timer's init.
-> > 
-> > For secondary CPUs, add this function into secondary_startup
-> > assembly entry.
-> > 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > ---
-> >  arch/arm/mach-sunxi/headsmp.S |  1 +
-> >  arch/arm/mach-sunxi/sunxi.c   | 20 +++++++++++++++++++-
-> >  2 files changed, 20 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> > index 37dc772701f3..32d76be98541 100644
-> > --- a/arch/arm/mach-sunxi/headsmp.S
-> > +++ b/arch/arm/mach-sunxi/headsmp.S
-> > @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
-> >  
-> >  ENTRY(sunxi_mc_smp_secondary_startup)
-> >  	bl	sunxi_mc_smp_cluster_cache_enable
-> > +	bl	secure_cntvoff_init
-> >  	b	secondary_startup
-> >  ENDPROC(sunxi_mc_smp_secondary_startup)
-> >  
-> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> > index 5e9602ce1573..2770a31a9278 100644
-> > --- a/arch/arm/mach-sunxi/sunxi.c
-> > +++ b/arch/arm/mach-sunxi/sunxi.c
-> > @@ -16,6 +16,7 @@
-> >  #include <linux/platform_device.h>
-> >  
-> >  #include <asm/mach/arch.h>
-> > +#include <asm/secure_cntvoff.h>
-> >  
-> >  static const char * const sunxi_board_dt_compat[] = {
-> >  	"allwinner,sun4i-a10",
-> > @@ -62,7 +63,6 @@ MACHINE_END
-> >  static const char * const sun8i_board_dt_compat[] = {
-> >  	"allwinner,sun8i-a23",
-> >  	"allwinner,sun8i-a33",
-> > -	"allwinner,sun8i-a83t",
-> >  	"allwinner,sun8i-h2-plus",
-> >  	"allwinner,sun8i-h3",
-> >  	"allwinner,sun8i-r40",
-> > @@ -75,6 +75,24 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
-> >  	.dt_compat	= sun8i_board_dt_compat,
-> >  MACHINE_END
-> >  
-> > +void __init sun8i_a83t_cntvoff_init(void)
-> > +{
-> > +#ifdef CONFIG_SMP
-> > +	secure_cntvoff_init();
-> > +#endif
-> > +}
-> > +
-> > +static const char * const sun8i_a83t_cntvoff_board_dt_compat[] = {
-> > +	"allwinner,sun8i-a83t",
-> > +	NULL,
-> > +};
-> > +
-> > +DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i-a83t board")  
+On 2018-04-26 20:52:33 [+0200], Alexandre Belloni wrote:
 > 
-> I put my Acked-by on the condition that you would fix this. And you
-> still didn't.
+> I don't remember you posted anything for the TCB. Wasn't it focused on
+> getting rid of the PIT irq?
 
-Grrr, stupid me.
-I modified the names of functions but I forgot the machine. Sorry
-about that.
+the PIT irq which was shared with the UART one some devices, yes this
+was part of it. The other essential piece was using a higher frequency
+for the device:
+  https://git.kernel.org/pub/scm/linux/kernel/git/rt/linux-rt-devel.git/tree/patches/clocksource-tclib-allow-higher-clockrates.patch?h=linux-4.14.y-rt-patches
 
-Best regards,
+> As said below, this is solving multiple issues, including the one for
+> SoCs that don't have the PIT.
+will the PIT be removed? Where it needs the PIT?
 
--- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+> Ok, if I understand correctly tc_clkevt2_set_oneshot is called from
+> atomic context so it shouldn't call tc_clkevt2_shutdown.
+> 
+> Back in 2016, tglx said:
+> "There was an earlier discussion about the clk stuff. Actually the lock
+> protecting disable/enable should be made raw, but there was some crap going on
+> in some of the clk callbacks which made that impossible. We realy should
+> revisit this."
+> 
+> Anyway, I'll try to avoid disabling the clock just to reenable it
+> afterwards.
+> 
+> (Actually, I've just checked before sending and I've found your patch,
+> I'll do something similar)
+thanks.
+
+> > >  - the current solution is wasting some TCB channels
+> > > 
+> > > The plan is to get this driver upstream, then convert the TCB PWM driver to be
+> > > able to get rid of the tcb_clksrc driver along with atmel_tclib.
+> > 
+> > The config options are now less than optimal (for me at least). On
+> > oldconfig it asks you for PIT and I say selected no because I wanted the
+> > new one. So I end up with nothing.
+> > Not sure you want do something about it?
+> > 
+> 
+> I don't think you ending up with nothing but probably you removed the
+> PIT and kept ATMEL_TCLIB which is the combination that is really
+> difficult to protect from. I don't think it is worth the added Kconfig
+> complexity.
+
+TCLIB was still enabled yes. It is 'oldconfig'.
+
+> > Is the resolution more or the same compared what we have in -RT? On an
+> > idle system this clocks goes up to 180us/ 190us while the old clock
+> > started at 160us and moved to around 180us after one hackbench
+> > invocation. This could be nothing, it could be a lower frequency of the
+> > clockevents device.
+> > 
+> 
+> The driver shouldn't change anything on that side.
+> 
+> > If you intend to stick with this driver then I would replace the current
+> > hack in -RT with this series.
+> > 
+> 
+> That is one of the goal, yes.
+> 
+> The remaining one would be "clocksource: TCLIB: Allow higher clock rates
+> for clock events"
+
+I see. So I would need to keep that patch in queue after it was
+dismissed from duty?
+
+Sebastian
