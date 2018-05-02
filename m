@@ -1,266 +1,201 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 May 2018 12:04:01 +0200
-Subject: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
-In-Reply-To: <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
-References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
- <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20180502100401.qmik5goglbuiqcaa@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 2 May 2018 11:09:18 +0100
+Subject: [PATCH 2/2] PCI: mediatek: Using chained IRQ to setup IRQ handle
+In-Reply-To: <1525254064.22948.11.camel@mhfsdcap03>
+References: <1524201910-22836-1-git-send-email-honghui.zhang@mediatek.com>
+ <1524201910-22836-3-git-send-email-honghui.zhang@mediatek.com>
+ <a2f7e70a-fdef-d925-8838-be3051c2e96d@arm.com>
+ <1525254064.22948.11.camel@mhfsdcap03>
+Message-ID: <e04ea8b1-731f-e72b-8944-5c067e1a04da@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 28, 2018 at 02:46:16AM +0800, Dong Aisheng wrote:
-> +/* Initialization of the MU code. */
-> +int __init imx8_scu_init(void)
-> +{
-> +	struct device_node *np, *mu_np;
-> +	struct resource mu_res;
-> +	sc_err_t sci_err;
-> +	int ret;
-> +
-> +	if (!of_machine_is_compatible("fsl,imx8qxp"))
-> +		return 0;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "nxp,imx8qxp-scu");
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	mu_np = of_parse_phandle(np, "fsl,mu", 0);
-> +	if (WARN_ON(!mu_np))
-> +		return -EINVAL;
-> +
-> +	ret = of_address_to_resource(mu_np, 0, &mu_res);
-> +	if (WARN_ON(ret))
-> +		return -EINVAL;
-> +
-> +	/* we use mu physical address as IPC communication channel ID */
-> +	sci_err = sc_ipc_open(&scu_ipc_handle, (sc_ipc_id_t)(mu_res.start));
-> +	if (sci_err != SC_ERR_NONE) {
-> +		pr_err("Cannot open MU channel to SCU\n");
-> +		return sci_err;
-> +	};
+On 02/05/18 10:41, Honghui Zhang wrote:
+> On Mon, 2018-04-30 at 12:03 +0100, Marc Zyngier wrote:
+>> Hi Zhang,
+>>
+>> On 20/04/18 06:25, honghui.zhang at mediatek.com wrote:
+>>> From: Honghui Zhang <honghui.zhang@mediatek.com>
+>>>
+>>> Using irq_chip solution to setup IRQs for the consistent with IRQ framework.
+>>>
+>>> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+>>> ---
+>>>  drivers/pci/host/pcie-mediatek.c | 192 +++++++++++++++++++++------------------
+>>>  1 file changed, 105 insertions(+), 87 deletions(-)
+>>>
+>>> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+>>> index c3dc549..1d9c6f1 100644
+>>> --- a/drivers/pci/host/pcie-mediatek.c
+>>> +++ b/drivers/pci/host/pcie-mediatek.c
+>>> @@ -11,8 +11,10 @@
+>>>  #include <linux/delay.h>
+>>>  #include <linux/iopoll.h>
+>>>  #include <linux/irq.h>
+>>> +#include <linux/irqchip/chained_irq.h>
+>>>  #include <linux/irqdomain.h>
+>>>  #include <linux/kernel.h>
+>>> +#include <linux/msi.h>
+>>>  #include <linux/of_address.h>
+>>>  #include <linux/of_pci.h>
+>>>  #include <linux/of_platform.h>
+>>> @@ -130,14 +132,12 @@ struct mtk_pcie_port;
+>>>  /**
+>>>   * struct mtk_pcie_soc - differentiate between host generations
+>>>   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+>>> - * @has_msi: whether this host supports MSI interrupts or not
+>>>   * @ops: pointer to configuration access functions
+>>>   * @startup: pointer to controller setting functions
+>>>   * @setup_irq: pointer to initialize IRQ functions
+>>>   */
+>>>  struct mtk_pcie_soc {
+>>>  	bool need_fix_class_id;
+>>> -	bool has_msi;
+>>>  	struct pci_ops *ops;
+>>>  	int (*startup)(struct mtk_pcie_port *port);
+>>>  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+>>> @@ -161,7 +161,9 @@ struct mtk_pcie_soc {
+>>>   * @lane: lane count
+>>>   * @slot: port slot
+>>>   * @irq_domain: legacy INTx IRQ domain
+>>> + * @inner_domain: inner IRQ domain
+>>>   * @msi_domain: MSI IRQ domain
+>>> + * @lock: protect the msi_irq_in_use bitmap
+>>>   * @msi_irq_in_use: bit map for assigned MSI IRQ
+>>>   */
+>>>  struct mtk_pcie_port {
+>>> @@ -179,7 +181,9 @@ struct mtk_pcie_port {
+>>>  	u32 lane;
+>>>  	u32 slot;
+>>>  	struct irq_domain *irq_domain;
+>>> +	struct irq_domain *inner_domain;
+>>>  	struct irq_domain *msi_domain;
+>>> +	struct mutex lock;
+>>>  	DECLARE_BITMAP(msi_irq_in_use, MTK_MSI_IRQS_NUM);
+>>>  };
+>>>  
+>>> @@ -446,103 +450,122 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+>>>  	return 0;
+>>>  }
+>>>  
+>>> -static int mtk_pcie_msi_alloc(struct mtk_pcie_port *port)
+>>> +static void mtk_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+>>>  {
+>>> -	int msi;
+>>> +	struct mtk_pcie_port *port = irq_data_get_irq_chip_data(data);
+>>> +	phys_addr_t addr;
+>>>  
+>>> -	msi = find_first_zero_bit(port->msi_irq_in_use, MTK_MSI_IRQS_NUM);
+>>> -	if (msi < MTK_MSI_IRQS_NUM)
+>>> -		set_bit(msi, port->msi_irq_in_use);
+>>> -	else
+>>> -		return -ENOSPC;
+>>> +	/* MT2712/MT7622 only support 32-bit MSI addresses */
+>>> +	addr = virt_to_phys(port->base + PCIE_MSI_VECTOR);
+>>> +	msg->address_hi = 0;
+>>> +	msg->address_lo = lower_32_bits(addr);
+>>>  
+>>> -	return msi;
+>>> +	msg->data = data->hwirq;
+>>> +
+>>> +	dev_dbg(port->pcie->dev, "msi#%d address_hi %#x address_lo %#x\n",
+>>> +		(int)data->hwirq, msg->address_hi, msg->address_lo);
+>>>  }
+>>>  
+>>> -static void mtk_pcie_msi_free(struct mtk_pcie_port *port, unsigned long hwirq)
+>>> +static int mtk_msi_set_affinity(struct irq_data *irq_data,
+>>> +				   const struct cpumask *mask, bool force)
+>>>  {
+>>> -	clear_bit(hwirq, port->msi_irq_in_use);
+>>> +	return -EINVAL;
+>>>  }
+>>>  
+>>> -static int mtk_pcie_msi_setup_irq(struct msi_controller *chip,
+>>> -				  struct pci_dev *pdev, struct msi_desc *desc)
+>>> -{
+>>> -	struct mtk_pcie_port *port;
+>>> -	struct msi_msg msg;
+>>> -	unsigned int irq;
+>>> -	int hwirq;
+>>> -	phys_addr_t msg_addr;
+>>> +static struct irq_chip mtk_msi_bottom_irq_chip = {
+>>> +	.name			= "MTK MSI",
+>>> +	.irq_compose_msi_msg	= mtk_compose_msi_msg,
+>>> +	.irq_set_affinity	= mtk_msi_set_affinity,
+>>> +	.irq_mask		= pci_msi_mask_irq,
+>>> +	.irq_unmask	= pci_msi_unmask_irq,
+>>> +};
+>>>  
+>>> -	port = mtk_pcie_find_port(pdev->bus, pdev->devfn);
+>>> -	if (!port)
+>>> -		return -EINVAL;
+>>> +static int mtk_pcie_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>>> +				     unsigned int nr_irqs, void *args)
+>>> +{
+>>> +	struct mtk_pcie_port *port = domain->host_data;
+>>> +	unsigned long bit;
+>>>  
+>>> -	hwirq = mtk_pcie_msi_alloc(port);
+>>> -	if (hwirq < 0)
+>>> -		return hwirq;
+>>> +	WARN_ON(nr_irqs != 1);
+>>> +	mutex_lock(&port->lock);
+>>>  
+>>> -	irq = irq_create_mapping(port->msi_domain, hwirq);
+>>> -	if (!irq) {
+>>> -		mtk_pcie_msi_free(port, hwirq);
+>>> -		return -EINVAL;
+>>> +	bit = find_first_zero_bit(port->msi_irq_in_use, MTK_MSI_IRQS_NUM);
+>>> +	if (bit >= MTK_MSI_IRQS_NUM) {
+>>> +		mutex_unlock(&port->lock);
+>>> +		return -ENOSPC;
+>>>  	}
+>>>  
+>>> -	chip->dev = &pdev->dev;
+>>> -
+>>> -	irq_set_msi_desc(irq, desc);
+>>> +	__set_bit(bit, port->msi_irq_in_use);
+>>>  
+>>> -	/* MT2712/MT7622 only support 32-bit MSI addresses */
+>>> -	msg_addr = virt_to_phys(port->base + PCIE_MSI_VECTOR);
+>>> -	msg.address_hi = 0;
+>>> -	msg.address_lo = lower_32_bits(msg_addr);
+>>> -	msg.data = hwirq;
+>>> +	mutex_unlock(&port->lock);
+>>>  
+>>> -	pci_write_msi_msg(irq, &msg);
+>>> +	irq_domain_set_info(domain, virq, bit, &mtk_msi_bottom_irq_chip,
+>>> +			    domain->host_data, handle_simple_irq,
+>>
+>> Why don't you handle the interrupt as an edge interrupt
+>> (handle_edge_irq)? That's what it really is, and the fact that you use
+>> "handle_simple_irq" makes me think that wou're papering over some other
+>> issue (see below).
+> 
+> Hi, Marc,
+> 
+> Thanks very much for your comments.
+> 
+> I guess the MSI irq is more like a level IRQ instead of edge IRQ.
+> When a MSI IRQ arrived, the corresponding bit of MSI status register
+> will be asserted and stay asserted until it's been cleared by software.
 
-Introducing private error codes always has the risk of just forwarding
-them as errno codes as done here.
+There is some confusion here. The MSI itself is always edge-triggered.
+That's by definition, and you cannot change it. The interrupt that is
+used to signal that MSIs are pending (the multiplexing interrupt) can
+itself be level triggered (and goes low once all the MSIs have been
+acknowledged).
 
-> +
-> +	of_node_put(mu_np);
-> +
-> +	pr_info("NXP i.MX SCU Initialized (scu_ipc %u)\n", scu_ipc_handle);
-> +
-> +	return 0;
-> +}
-> +early_initcall(imx8_scu_init);
+> I will try to using handle_level_irq and add some callbacks of irq_ack
+> in the next version.
 
-This code shows that the separate 'scu' device node shouldn't exist. It is
-only used as a stepping stone to find the 'mu' node. Instead of
-providing a proper driver for the 'mu' node the scu code registers it
-with its physical address.
-I don't think it makes sense to separate mu and scu code in this way.
+The interrupt above seem to be the MSI itself, and not the multiplexing
+interrupt. It should be handled as an edge.
 
-> +#define RPC_VER(MSG)            ((MSG)->version)
-> +#define RPC_SIZE(MSG)           ((MSG)->size)
-> +#define RPC_SVC(MSG)            ((MSG)->svc)
-> +#define RPC_FUNC(MSG)           ((MSG)->func)
-> +#define RPC_R8(MSG)             ((MSG)->func)
-> +#define RPC_I32(MSG, IDX)       ((MSG)->DATA.i32[(IDX) / 4])
-> +#define RPC_I16(MSG, IDX)       ((MSG)->DATA.i16[(IDX) / 2])
-> +#define RPC_I8(MSG, IDX)        ((MSG)->DATA.i8[(IDX)])
-> +#define RPC_U32(MSG, IDX)       ((MSG)->DATA.u32[(IDX) / 4])
-> +#define RPC_U16(MSG, IDX)       ((MSG)->DATA.u16[(IDX) / 2])
-> +#define RPC_U8(MSG, IDX)        ((MSG)->DATA.u8[(IDX)])
+If that doesn't work, we need to understand why.
 
-These macros only make the code less readable, please drop them. Plain
-m->version is easier to read and forces the reader through less
-indirections. IMO m->DATA.u32[0] = foo; m->DATA.u8[4] = bar is still
-better readable than doing the division by size in macros.
+Thanks,
 
-> +typedef enum sc_rpc_async_state_e {
-> +	SC_RPC_ASYNC_STATE_RD_START = 0,
-> +	SC_RPC_ASYNC_STATE_RD_ACTIVE = 1,
-> +	SC_RPC_ASYNC_STATE_RD_DONE = 2,
-> +	SC_RPC_ASYNC_STATE_WR_START = 3,
-> +	SC_RPC_ASYNC_STATE_WR_ACTIVE = 4,
-> +	SC_RPC_ASYNC_STATE_WR_DONE = 5,
-> +} sc_rpc_async_state_t;
-> +
-> +typedef struct sc_rpc_async_msg_s {
-> +	sc_rpc_async_state_t state;
-> +	uint8_t wordIdx;
-> +	sc_rpc_msg_t msg;
-> +	uint32_t timeStamp;
-> +} sc_rpc_async_msg_t;
-
-We normally do not typedef struct types. Any good reasons to do so here?
-
-> +
-> +/* Functions */
-> +
-> +/*
-> + * This is an internal function to send an RPC message over an IPC
-> + * channel. It is called by client-side SCFW API function shims.
-> + *
-> + * @param[in]     ipc         IPC handle
-> + * @param[in,out] msg         handle to a message
-> + * @param[in]     no_resp     response flag
-> + *
-> + * If no_resp is false then this function waits for a response
-> + * and returns the result in msg.
-> + */
-> +void sc_call_rpc(sc_ipc_t ipc, sc_rpc_msg_t *msg, bool no_resp);
-> +
-> +/*
-> + * This is an internal function to dispath an RPC call that has
-> + * arrived via IPC over an MU. It is called by server-side SCFW.
-> + *
-> + * @param[in]     mu          MU message arrived on
-> + * @param[in,out] msg         handle to a message
-> + *
-> + * The function result is returned in msg.
-> + */
-> +void sc_rpc_dispatch(sc_rsrc_t mu, sc_rpc_msg_t *msg);
-
-Declared but never defined.
-
-> +
-> +/*
-> + * This function translates an RPC message and forwards on to the
-> + * normal RPC API.  It is used only by hypervisors.
-> + *
-> + * @param[in]     ipc         IPC handle
-> + * @param[in,out] msg         handle to a message
-> + *
-> + * This function decodes a message, calls macros to translate the
-> + * resources, pins, addresses, partitions, memory regions, etc. and
-> + * then forwards on to the hypervisors SCFW API.Return results are
-> + * translated back abd placed back into the message to be returned
-> + * to the original API.
-> + */
-> +void sc_rpc_xlate(sc_ipc_t ipc, sc_rpc_msg_t *msg);
-
-ditto.
-
-> +
-> +#endif /* _SC_RPC_H */
-> diff --git a/drivers/soc/imx/sc/svc/irq/rpc.h b/drivers/soc/imx/sc/svc/irq/rpc.h
-> new file mode 100644
-> index 0000000..0de8718
-> --- /dev/null
-> +++ b/drivers/soc/imx/sc/svc/irq/rpc.h
-> @@ -0,0 +1,41 @@
-> +/* SPDX-License-Identifier: GPL-2.0+ */
-> +/*
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + * Copyright 2017~2018 NXP
-> + *
-> + * Header file for the IRQ RPC implementation.
-> + */
-> +
-> +#ifndef _SC_IRQ_RPC_H
-> +#define _SC_IRQ_RPC_H
-> +
-> +/* Types */
-> +
-> +/*!
-> + * This type is used to indicate RPC IRQ function calls.
-> + */
-> +typedef enum irq_func_e {
-> +	IRQ_FUNC_UNKNOWN = 0,	/* Unknown function */
-> +	IRQ_FUNC_ENABLE = 1,	/* Index for irq_enable() RPC call */
-> +	IRQ_FUNC_STATUS = 2,	/* Index for irq_status() RPC call */
-> +} irq_func_t;
-> +
-> +/* Functions */
-> +
-> +/*!
-> + * This function dispatches an incoming IRQ RPC request.
-> + *
-> + * @param[in]     caller_pt   caller partition
-> + * @param[in]     msg         pointer to RPC message
-> + */
-> +void irq_dispatch(sc_rm_pt_t caller_pt, sc_rpc_msg_t *msg);
-
-ditto.
-
-> +
-> +/*!
-> + * This function translates and dispatches an IRQ RPC request.
-> + *
-> + * @param[in]     ipc         IPC handle
-> + * @param[in]     msg         pointer to RPC message
-> + */
-> +void irq_xlate(sc_ipc_t ipc, sc_rpc_msg_t *msg);
-
-ditto.
-
-> +++ b/include/soc/imx/sc/svc/timer/api.h
-> @@ -0,0 +1,265 @@
-> +/* SPDX-License-Identifier: GPL-2.0+ */
-> +/*
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + * Copyright 2017~2018 NXP
-> + *
-> + * Header file containing the public API for the System Controller (SC)
-> + * Timer function.
-> + *
-> + * TIMER_SVC (SVC) Timer Service
-> + *
-> + * Module for the Timer service. This includes support for the watchdog, RTC,
-> + * and system counter. Note every resource partition has a watchdog it can
-> + * use.
-> + */
-> +
-> +#ifndef _SC_TIMER_API_H
-> +#define _SC_TIMER_API_H
-> +
-> +/* Includes */
-> +
-> +#include <soc/imx/sc/types.h>
-> +#include <soc/imx/sc/svc/rm/api.h>
-> +
-> +/* Defines */
-> +
-> +/*
-> + * @name Defines for type widths
-> + */
-> +#define SC_TIMER_ACTION_W   3	/* Width of sc_timer_wdog_action_t */
-> +
-> +/*
-> + * @name Defines for sc_timer_wdog_action_t
-> + */
-> +#define SC_TIMER_WDOG_ACTION_PARTITION      0	/* Reset partition */
-> +#define SC_TIMER_WDOG_ACTION_WARM           1	/* Warm reset system */
-> +#define SC_TIMER_WDOG_ACTION_COLD           2	/* Cold reset system */
-> +#define SC_TIMER_WDOG_ACTION_BOARD          3	/* Reset board */
-> +#define SC_TIMER_WDOG_ACTION_IRQ            4	/* Only generate IRQs */
-> +
-> +/* Types */
-> +
-> +/*
-> + * This type is used to configure the watchdog action.
-> + */
-> +typedef uint8_t sc_timer_wdog_action_t;
-
-Mixing an unnecessary typedef and defines doesn't look good. This should
-be
-
-typedef enum {
-	SC_TIMER_WDOG_ACTION_PARTITION,
-} sc_timer_wdog_action_t;
-
-The same pattern is used elsewhere in this patch.
-
-> +
-> +/*
-> + * This type is used to declare a watchdog time value in milliseconds.
-> + */
-> +typedef uint32_t sc_timer_wdog_time_t;
-
-Why an extra type for this?
-
-Sascha
-
+	M.
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Jazz is not dead. It just smells funny...
