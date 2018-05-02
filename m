@@ -1,83 +1,93 @@
 From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Wed,  2 May 2018 23:07:55 +0200
-Subject: [PATCH v14 3/8] ASoC: sun4i-codec: Merge
- sun4i_codec_left_mixer_controls and sun4i_codec_right_mixer_controls into
- sun4i_codec_mixer_controls
+Date: Wed,  2 May 2018 23:08:00 +0200
+Subject: [PATCH v14 8/8] ASoC: sun4i-codec: Add Left Capture Select,
+ Right Capture Select
 In-Reply-To: <20180502210800.1971-1-dannym@scratchpost.org>
 References: <20180502210800.1971-1-dannym@scratchpost.org>
-Message-ID: <20180502210800.1971-4-dannym@scratchpost.org>
+Message-ID: <20180502210800.1971-9-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since it's now possible to have a DAPM mixer control with multiple channels,
-use it to cut down the total number of controls.
-
-Keep "Left Mixer Left DAC Playback Switch" and "Right Mixer Right DAC Playback
-Switch" name & layout the same as before for compatibility.
+Add Left Capture Select and Right Capture Select for Allwinner A10 and
+Allwinner A20.
 
 Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 ---
- sound/soc/sunxi/sun4i-codec.c | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+ sound/soc/sunxi/sun4i-codec.c | 50 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 4af286f44a67..b62af407967f 100644
+index 45dcb80a1da9..1a4ba3bae5da 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -715,15 +715,15 @@ static const struct snd_kcontrol_new sun7i_codec_extra_controls[] = {
- 		       sun7i_codec_micin_preamp_gain_scale),
+@@ -706,6 +706,25 @@ static DECLARE_TLV_DB_RANGE(sun7i_codec_micin_preamp_gain_scale,
+ 			    0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
+ 			    1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0));
+ 
++static const char * const sun4i_codec_capture_source[] = {
++	"Line",
++	"FM",
++	"Mic1",
++	"Mic2",
++	"Mic1,Mic2",
++	"Mic1+Mic2",
++	"Output Mixer",
++	"Line,Mic1",
++};
++
++static SOC_ENUM_SINGLE_DECL(sun4i_codec_enum_capture_source,
++			    SUN4I_CODEC_ADC_ACTL,
++			    SUN4I_CODEC_ADC_ACTL_ADCIS,
++			    sun4i_codec_capture_source);
++
++static const struct snd_kcontrol_new sun4i_codec_capture_source_controls =
++	SOC_DAPM_ENUM("Capture Source", sun4i_codec_enum_capture_source);
++
+ static const char * const sun4i_codec_difflinein_source[] = {
+ 	"Stereo",
+ 	"Differential",
+@@ -841,6 +860,10 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
+ 			    &sun4i_codec_pa_mute),
+ 
+ 	/* MUX */
++	SND_SOC_DAPM_MUX("Left Capture Select", SND_SOC_NOPM, 0, 0,
++			 &sun4i_codec_capture_source_controls),
++	SND_SOC_DAPM_MUX("Right Capture Select", SND_SOC_NOPM, 0, 0,
++			 &sun4i_codec_capture_source_controls),
+ 	SND_SOC_DAPM_MUX("Differential Line Source", SND_SOC_NOPM,
+ 			 0, 0,
+ 			 &sun4i_codec_difflinein_source_controls),
+@@ -908,6 +931,33 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+ 	/* LNRDF Routes */
+ 	{ "Differential Line Source", "Differential", "Line Left" },
+ 	{ "Differential Line Source", "Differential", "Line Right" },
++
++	/* Right ADC Input Routes */
++	{ "Right Capture Select", "Line", "Line Right" },
++	{ "Right Capture Select", "Line", "Differential Line Capture Switch" },
++	{ "Right Capture Select", "FM", "FM Right" },
++	{ "Right Capture Select", "Mic1", "MIC1 Pre-Amplifier" },
++	{ "Right Capture Select", "Mic2", "MIC2 Pre-Amplifier" },
++	{ "Right Capture Select", "Mic1,Mic2", "MIC2 Pre-Amplifier" },
++	{ "Right Capture Select", "Mic1+Mic2", "MIC2 Pre-Amplifier" },
++	{ "Right Capture Select", "Mic1+Mic2", "MIC1 Pre-Amplifier" },
++	{ "Right Capture Select", "Output Mixer", "Right Mixer" },
++	{ "Right Capture Select", "Line,Mic1", "MIC1 Pre-Amplifier" },
++	{ "Right ADC", NULL, "Right Capture Select" },
++
++	/* Left ADC Input Routes */
++	{ "Left Capture Select", "Line", "Line Left" },
++	{ "Left Capture Select", "Line", "Differential Line Capture Switch" },
++	{ "Left Capture Select", "FM", "FM Left" },
++	{ "Left Capture Select", "Mic1", "MIC1 Pre-Amplifier" },
++	{ "Left Capture Select", "Mic2", "MIC2 Pre-Amplifier" },
++	{ "Left Capture Select", "Mic1,Mic2", "MIC1 Pre-Amplifier" },
++	{ "Left Capture Select", "Mic1+Mic2", "MIC1 Pre-Amplifier" },
++	{ "Left Capture Select", "Mic1+Mic2", "MIC2 Pre-Amplifier" },
++	{ "Left Capture Select", "Output Mixer", "Left Mixer" },
++	{ "Left Capture Select", "Line,Mic1", "Line Left" },
++	{ "Left Capture Select", "Line,Mic1", "Differential Line Capture Switch" },
++	{ "Left ADC", NULL, "Left Capture Select" },
  };
  
--static const struct snd_kcontrol_new sun4i_codec_left_mixer_controls[] = {
--	SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
--			SUN4I_CODEC_DAC_ACTL_LDACLMIXS, 1, 0),
--};
--
--static const struct snd_kcontrol_new sun4i_codec_right_mixer_controls[] = {
--	SOC_DAPM_SINGLE("Right DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
--			SUN4I_CODEC_DAC_ACTL_RDACRMIXS, 1, 0),
--	SOC_DAPM_SINGLE("Left DAC Playback Switch", SUN4I_CODEC_DAC_ACTL,
-+static const struct snd_kcontrol_new sun4i_codec_mixer_controls[] = {
-+	SOC_DAPM_SINGLE("Left Mixer Left DAC Playback Switch",
-+			SUN4I_CODEC_DAC_ACTL, SUN4I_CODEC_DAC_ACTL_LDACLMIXS,
-+			1, 0),
-+	SOC_DAPM_SINGLE("Right Mixer Right DAC Playback Switch",
-+			SUN4I_CODEC_DAC_ACTL, SUN4I_CODEC_DAC_ACTL_RDACRMIXS,
-+			1, 0),
-+	SOC_DAPM_SINGLE("Right Mixer Left DAC Playback Switch",
-+			SUN4I_CODEC_DAC_ACTL,
- 			SUN4I_CODEC_DAC_ACTL_LDACRMIXS, 1, 0),
- };
- 
-@@ -759,11 +759,11 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
- 
- 	/* Mixers */
- 	SND_SOC_DAPM_MIXER("Left Mixer", SND_SOC_NOPM, 0, 0,
--			   sun4i_codec_left_mixer_controls,
--			   ARRAY_SIZE(sun4i_codec_left_mixer_controls)),
-+			   sun4i_codec_mixer_controls,
-+			   ARRAY_SIZE(sun4i_codec_mixer_controls)),
- 	SND_SOC_DAPM_MIXER("Right Mixer", SND_SOC_NOPM, 0, 0,
--			   sun4i_codec_right_mixer_controls,
--			   ARRAY_SIZE(sun4i_codec_right_mixer_controls)),
-+			   sun4i_codec_mixer_controls,
-+			   ARRAY_SIZE(sun4i_codec_mixer_controls)),
- 
- 	/* Global Mixer Enable */
- 	SND_SOC_DAPM_SUPPLY("Mixer Enable", SUN4I_CODEC_DAC_ACTL,
-@@ -805,12 +805,12 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 
- 	/* Right Mixer Routes */
- 	{ "Right Mixer", NULL, "Mixer Enable" },
--	{ "Right Mixer", "Left DAC Playback Switch", "Left DAC" },
--	{ "Right Mixer", "Right DAC Playback Switch", "Right DAC" },
-+	{ "Right Mixer", "Right Mixer Left DAC Playback Switch", "Left DAC" },
-+	{ "Right Mixer", "Right Mixer Right DAC Playback Switch", "Right DAC" },
- 
- 	/* Left Mixer Routes */
- 	{ "Left Mixer", NULL, "Mixer Enable" },
--	{ "Left Mixer", "Left DAC Playback Switch", "Left DAC" },
-+	{ "Left Mixer", "Left Mixer Left DAC Playback Switch", "Left DAC" },
- 
- 	/* Power Amplifier Routes */
- 	{ "Power Amplifier", "Mixer Playback Switch", "Left Mixer" },
+ struct sun4i_codec_quirks {
