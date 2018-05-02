@@ -1,114 +1,99 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 2 May 2018 08:26:09 -0500
-Subject: LS1043A : "synchronous abort" at boot due to PCI config read
-In-Reply-To: <5AE9B5BB.2080003@kontron.com>
-References: <5AD0E995.3090802@kontron.com>
- <CAKv+Gu_v4V8DUa6f4WxvjZHoJbbqT0mKpOwYVmaLaE20CB3U_g@mail.gmail.com>
- <5AE317AB.4020404@kontron.com>
- <20180427165627.GA8199@bhelgaas-glaptop.roam.corp.google.com>
- <5AE6D7E2.9030506@kontron.com> <5AE71BF4.2010200@kontron.com>
- <20180430170447.GA95643@bhelgaas-glaptop.roam.corp.google.com>
- <5AE75809.30701@kontron.com> <5AE9B5BB.2080003@kontron.com>
-Message-ID: <20180502132501.GE11698@bhelgaas-glaptop.roam.corp.google.com>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Wed, 2 May 2018 15:28:37 +0200
+Subject: [PATCH v8 07/12] ARM: sunxi: Add initialization of CNTVOFF
+In-Reply-To: <20180502130842.pecjwahxrvx5addq@flea>
+References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
+ <20180501123131.7738-8-mylene.josserand@bootlin.com>
+ <20180502130842.pecjwahxrvx5addq@flea>
+Message-ID: <20180502152837.379c376a@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 12:57:31PM +0000, Gilles Buloz wrote:
-> Hi Bjorn,
-> See attached patch (tested ok this morning)
+Hi Maxime,
 
-This looks good.  Minor comments below.
+On Wed, 2 May 2018 15:08:42 +0200
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
-I can fix minor things myself, but I do need a signed-off-by from you
-before applying (see
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/submitting-patches.rst)
+> On Tue, May 01, 2018 at 02:31:26PM +0200, Myl?ne Josserand wrote:
+> > Add the initialization of CNTVOFF for sun8i-a83t.
+> > 
+> > For boot CPU, create a new machine that handles this
+> > function's call in an "init_early" callback. We need to initialize
+> > CNTVOFF before the arch timer's initialization otherwise, it will
+> > not be taken into account and fails to boot correctly.
+> > Because of that, this function can't be called in SMP's early_initcall
+> > function which is called after timer's init.
+> > 
+> > For secondary CPUs, add this function into secondary_startup
+> > assembly entry.
+> > 
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  arch/arm/mach-sunxi/headsmp.S |  1 +
+> >  arch/arm/mach-sunxi/sunxi.c   | 20 +++++++++++++++++++-
+> >  2 files changed, 20 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+> > index 37dc772701f3..32d76be98541 100644
+> > --- a/arch/arm/mach-sunxi/headsmp.S
+> > +++ b/arch/arm/mach-sunxi/headsmp.S
+> > @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+> >  
+> >  ENTRY(sunxi_mc_smp_secondary_startup)
+> >  	bl	sunxi_mc_smp_cluster_cache_enable
+> > +	bl	secure_cntvoff_init
+> >  	b	secondary_startup
+> >  ENDPROC(sunxi_mc_smp_secondary_startup)
+> >  
+> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> > index 5e9602ce1573..2770a31a9278 100644
+> > --- a/arch/arm/mach-sunxi/sunxi.c
+> > +++ b/arch/arm/mach-sunxi/sunxi.c
+> > @@ -16,6 +16,7 @@
+> >  #include <linux/platform_device.h>
+> >  
+> >  #include <asm/mach/arch.h>
+> > +#include <asm/secure_cntvoff.h>
+> >  
+> >  static const char * const sunxi_board_dt_compat[] = {
+> >  	"allwinner,sun4i-a10",
+> > @@ -62,7 +63,6 @@ MACHINE_END
+> >  static const char * const sun8i_board_dt_compat[] = {
+> >  	"allwinner,sun8i-a23",
+> >  	"allwinner,sun8i-a33",
+> > -	"allwinner,sun8i-a83t",
+> >  	"allwinner,sun8i-h2-plus",
+> >  	"allwinner,sun8i-h3",
+> >  	"allwinner,sun8i-r40",
+> > @@ -75,6 +75,24 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+> >  	.dt_compat	= sun8i_board_dt_compat,
+> >  MACHINE_END
+> >  
+> > +void __init sun8i_a83t_cntvoff_init(void)
+> > +{
+> > +#ifdef CONFIG_SMP
+> > +	secure_cntvoff_init();
+> > +#endif
+> > +}
+> > +
+> > +static const char * const sun8i_a83t_cntvoff_board_dt_compat[] = {
+> > +	"allwinner,sun8i-a83t",
+> > +	NULL,
+> > +};
+> > +
+> > +DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i-a83t board")  
+> 
+> I put my Acked-by on the condition that you would fix this. And you
+> still didn't.
 
-Please add a changelog, too, and include the patch inline (as opposed
-to as an attachment) if possible.
+Grrr, stupid me.
+I modified the names of functions but I forgot the machine. Sorry
+about that.
 
-> --- include/linux/pci.h.orig	2018-03-26 16:51:18.050000000 +0000
-> +++ include/linux/pci.h	2018-04-30 18:29:14.140000000 +0000
-> @@ -193,6 +193,7 @@
->  enum pci_bus_flags {
->  	PCI_BUS_FLAGS_NO_MSI   = (__force pci_bus_flags_t) 1,
->  	PCI_BUS_FLAGS_NO_MMRBC = (__force pci_bus_flags_t) 2,
-> +	PCI_BUS_FLAGS_NO_EXTCFG = (__force pci_bus_flags_t) 4,
+Best regards,
 
-Best if you can rebase this to v4.17-rc1.
-
->  };
->  
->  /* These values come from the PCI Express Spec */
-> --- drivers/pci/probe.c.orig	2018-01-22 09:29:52.000000000 +0000
-> +++ drivers/pci/probe.c	2018-05-02 13:44:35.530000000 +0000
-> @@ -664,6 +664,23 @@
->  	}
->  }
->  
-> +static bool pci_bridge_child_bus_ext_cfg_accessible(struct pci_dev *bridge)
-> +{
-> +	int pos;
-> +	u32 status;
-> +
-> +	if (!pci_is_pcie(bridge) || /* PCI/PCI bridge */
-> +	    (pci_pcie_type(bridge) == PCI_EXP_TYPE_PCIE_BRIDGE) || /* PCIe/PCI bridge in forward mode */
-> +	    (pci_pcie_type(bridge) == PCI_EXP_TYPE_PCI_BRIDGE)) {  /* PCIe/PCI bridge in reverse mode */
-> +		pos = pci_find_capability(bridge, PCI_CAP_ID_PCIX);
-> +		if (pos)
-> +			pci_read_config_dword(bridge, pos + PCI_X_STATUS, &status);
-> +		return pos && (status & (PCI_X_STATUS_266MHZ | PCI_X_STATUS_533MHZ));
-> +	}
-
-Please arrange this so everything fits in 80 columns.
-
-If you can split it into several simpler "if" statements rather
-than one with a complicated expression, that would also be good.
-
-> +
-> +	return true;
-> +}
-> +
->  static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->  					   struct pci_dev *bridge, int busnr)
->  {
-> @@ -725,6 +742,19 @@
->  	/* Create legacy_io and legacy_mem files for this bus */
->  	pci_create_legacy_files(child);
->  
-> +	/*
-> +	 * if bus_flags inherited from parent bus do not already report lack of extended config
-> +	 * space support, check if supported by child bus by checking its parent bridge
-> +	 */
-
-Wrap to fit in 80 columns.
-
-> +	if (bridge && !(child->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG)) {
-
-The double negative makes this a little bit hard to read.  Maybe it
-could be improved by reversing the sense of something?
-
-> +		if (!pci_bridge_child_bus_ext_cfg_accessible(bridge)) {
-> +			child->bus_flags |= PCI_BUS_FLAGS_NO_EXTCFG;
-> +			dev_info(&child->dev, "extended config space not accessible due to parent bridge\n");
-
-In v4.17-rc1, there's a pci_info() that should work here (instead of
-dev_info()).
-
-> +		}
-> +	} else {
-> +		dev_info(&child->dev, "extended config space not accessible due to parent bus\n");
-> +	}
-> +
->  	return child;
->  }
->  
-> @@ -1084,6 +1114,9 @@
->  	u32 status;
->  	u16 class;
->  
-> +	if (dev->bus->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG)
-> +		return PCI_CFG_SPACE_SIZE;
-> +
->  	class = dev->class >> 8;
->  	if (class == PCI_CLASS_BRIDGE_HOST)
->  		return pci_cfg_space_size_ext(dev);
+-- 
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
