@@ -1,96 +1,46 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 2 May 2018 19:22:08 +0800
-Subject: [xlnx:xlnx_rebase_v4.14 74/914] drivers//fpga/zynqmp-fpga.c:79:2:
- error: implicit declaration of function '__flush_cache_user_range'; did you
- mean '__flush_dcache_range'?
-Message-ID: <201805021904.2hnvpvEV%fengguang.wu@intel.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 2 May 2018 13:31:59 +0200
+Subject: [PATCH] ARM: dts: stm32: Add vrefbuf support to stm32mp157c
+In-Reply-To: <1524037665-26178-1-git-send-email-fabrice.gasnier@st.com>
+References: <1524037665-26178-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <664e594b-067d-9abb-ecd3-8240cce91449@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
-head:   d69837315ea565c33c5e85aca78ba6ab380cea8b
-commit: d91b9e49c2c2663091e2d71a136ad2db919a91b3 [74/914] fpga manager: Adding FPGA Manager support for Xilinx zynqmp
-config: xtensa-allyesconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d91b9e49c2c2663091e2d71a136ad2db919a91b3
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+Hi Fabrice,
 
-All errors (new ones prefixed by >>):
+On 04/18/2018 09:47 AM, Fabrice Gasnier wrote:
+> stm32mp157c has vrefbuf regulator that can provide analog reference
+> voltage from 1500mV to 2500mV.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>   arch/arm/boot/dts/stm32mp157c.dtsi | 9 +++++++++
+>   1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+> index bc3eddc..7df3c99 100644
+> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+> @@ -167,6 +167,15 @@
+>   			#reset-cells = <1>;
+>   		};
+>   
+> +		vrefbuf: vrefbuf at 50025000 {
+> +			compatible = "st,stm32-vrefbuf";
+> +			reg = <0x50025000 0x8>;
+> +			regulator-min-microvolt = <1500000>;
+> +			regulator-max-microvolt = <2500000>;
+> +			clocks = <&rcc VREF>;
+> +			status = "disabled";
+> +		};
+> +
+>   		usart1: serial at 5c000000 {
+>   			compatible = "st,stm32h7-uart";
+>   			reg = <0x5c000000 0x400>;
+> 
 
-   drivers//fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_ops_write':
->> drivers//fpga/zynqmp-fpga.c:79:2: error: implicit declaration of function '__flush_cache_user_range'; did you mean '__flush_dcache_range'? [-Werror=implicit-function-declaration]
-     __flush_cache_user_range((unsigned long)kbuf,
-     ^~~~~~~~~~~~~~~~~~~~~~~~
-     __flush_dcache_range
-   cc1: some warnings being treated as errors
+Applied on stm32-next.
 
-vim +79 drivers//fpga/zynqmp-fpga.c
-
-    45	
-    46	static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
-    47						const char *buf, size_t size)
-    48	{
-    49		struct zynqmp_fpga_priv *priv;
-    50		char *kbuf;
-    51		size_t dma_size;
-    52		dma_addr_t dma_addr;
-    53		u32 transfer_length;
-    54		int ret;
-    55		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-    56	
-    57		if (!eemi_ops || !eemi_ops->fpga_load)
-    58			return -ENXIO;
-    59	
-    60		priv = mgr->priv;
-    61	
-    62		if (mgr->flags & IXR_FPGA_ENCRYPTION_EN)
-    63			dma_size = size + ENCRYPTED_KEY_LEN + ENCRYPTED_IV_LEN;
-    64		else
-    65			dma_size = size;
-    66	
-    67		kbuf = dma_alloc_coherent(priv->dev, dma_size, &dma_addr, GFP_KERNEL);
-    68		if (!kbuf)
-    69			return -ENOMEM;
-    70	
-    71		memcpy(kbuf, buf, size);
-    72	
-    73		if (mgr->flags & IXR_FPGA_ENCRYPTION_EN) {
-    74			memcpy(kbuf + size, mgr->key, ENCRYPTED_KEY_LEN);
-    75			memcpy(kbuf + size + ENCRYPTED_KEY_LEN, mgr->iv,
-    76							ENCRYPTED_IV_LEN);
-    77		}
-    78	
-  > 79		__flush_cache_user_range((unsigned long)kbuf,
-    80					 (unsigned long)kbuf + dma_size);
-    81	
-    82		/**
-    83		 * Translate size from bytes to number of 32bit words that
-    84		 * the DMA should write to the PCAP interface
-    85		 */
-    86		if (size & 3)
-    87			transfer_length = (size >> 2) + 1;
-    88		else
-    89			transfer_length = size >> 2;
-    90	
-    91		ret = eemi_ops->fpga_load(dma_addr, transfer_length, mgr->flags);
-    92	
-    93		dma_free_coherent(priv->dev, dma_size, kbuf, dma_addr);
-    94	
-    95		return ret;
-    96	}
-    97	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 51634 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/b9e854ed/attachment-0001.gz>
+Thanks.
+Alex
