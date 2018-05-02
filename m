@@ -1,48 +1,38 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 2 May 2018 20:38:06 +0530
-Subject: [PATCH v9 03/27] clk: davinci: psc: allow for dev == NULL
-In-Reply-To: <94d4cfc5-0ea7-e642-c7e3-8d549bdef8ce@lechnology.com>
-References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-4-david@lechnology.com>
- <8940259b-5811-ce9f-8262-17d39ca0a46f@ti.com>
- <94d4cfc5-0ea7-e642-c7e3-8d549bdef8ce@lechnology.com>
-Message-ID: <3cec9c1f-48fd-1c16-b642-eb93e41446fc@ti.com>
+From: christophe.roullier@st.com (Christophe ROULLIER)
+Date: Wed, 2 May 2018 15:16:56 +0000
+Subject: [PATCH V2 6/8] net: stmmac: add dwmac-4.20a compatible
+In-Reply-To: <cb027f0e-7209-0035-84a9-b5d7a4ec9595@synopsys.com>
+References: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
+ <1525270723-18241-7-git-send-email-christophe.roullier@st.com>
+ <cb027f0e-7209-0035-84a9-b5d7a4ec9595@synopsys.com>
+Message-ID: <50090e5db8db4753b9519d8c1c770ebd@SFHDAG5NODE3.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 May 2018 07:19 AM, David Lechner wrote:
-> On 05/01/2018 09:02 AM, Sekhar Nori wrote:
->> On Friday 27 April 2018 05:47 AM, David Lechner wrote:
->>> +static inline void *_devm_kzalloc(struct device *dev, size_t size,
->>> gfp_t flags)
->>> +{
->>> +??? if (dev)
->>> +??????? return devm_kzalloc(dev, size, flags);
->>> +
->>> +??? return kzalloc(size, flags);
->>> +}
->>
->> I have the same question on the utility of this. A memory allocation
->> error so early on is not going to result in a bootable system anyway.
->> So, I wonder if its better to just BUG() in such cases. That will
->> actually help faster debug than returning an error back. I know the push
->> back on using BUG(), but clock drivers are special, and I think thats
->> why its seems to be used quite a bit already.
->>
-> 
-> Same reply here as well. On DA850/DA830, you might not get a console,
-> but you will "boot" even if one of the PSC devices fails though.
+Hi Jose,
 
-Was not thinking of failure to boot due to clocks being disabled, but
-the fact that you are not able to allocate a small amount of memory so
-early in boot process. The chances of successful boot after memory
-allocation failures like that are close to zero.
+>Just being curious: Can you tell me which HW features do you have on your NIC?
+Nothing specific to SNPS 4.20a, it is just to be align with our SNPS IP in our NIC ;-)
 
-> WARN() is probably just as good as BUG() in this case too.
+BR
 
-Okay, but with WARN() you would continue to proceed to try to boot which
-is not going to be much fruitful (and might actually muddle the first
-failure). But up to you on this.
+Christophe.
 
-Thanks,
-Sekhar
+-----Original Message-----
+From: Jose Abreu [mailto:Jose.Abreu at synopsys.com] 
+Sent: mercredi 2 mai 2018 16:41
+To: Christophe ROULLIER <christophe.roullier@st.com>; mark.rutland at arm.com; mcoquelin.stm32 at gmail.com; Alexandre TORGUE <alexandre.torgue@st.com>; Peppe CAVALLARO <peppe.cavallaro@st.com>
+Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org; andrew at lunn.ch
+Subject: Re: [PATCH V2 6/8] net: stmmac: add dwmac-4.20a compatible
+
+Hi Christophe,
+
+On 02-05-2018 15:18, Christophe Roullier wrote:
+> Manage dwmac-4.20a version from synopsys
+>
+>
+
+Just being curious: Can you tell me which HW features do you have on your NIC?
+
+Thanks and Best Regards,
+Jose Miguel Abreu
