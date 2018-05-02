@@ -1,111 +1,25 @@
-From: opensource.ganesh@gmail.com (Ganesh Mahendran)
-Date: Wed,  2 May 2018 15:54:32 +0800
-Subject: [PATCH 2/2] arm64/mm: add speculative page fault
-In-Reply-To: <1525247672-2165-1-git-send-email-opensource.ganesh@gmail.com>
-References: <1525247672-2165-1-git-send-email-opensource.ganesh@gmail.com>
-Message-ID: <1525247672-2165-2-git-send-email-opensource.ganesh@gmail.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Wed, 2 May 2018 10:02:17 +0200
+Subject: [PATCH 07/17] irqchip/irq-mvebu-icu: make irq_domain local
+In-Reply-To: <20180421135537.24716-8-miquel.raynal@bootlin.com>
+References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
+ <20180421135537.24716-8-miquel.raynal@bootlin.com>
+Message-ID: <20180502100217.432badb7@windsurf.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the speculative page fault on the arm64
-architecture.
+Hello,
 
-I completed spf porting in 4.9. From the test result,
-we can see app launching time improved by about 10% in average.
-For the apps which have more than 50 threads, 15% or even more
-improvement can be got.
+On Sat, 21 Apr 2018 15:55:27 +0200, Miquel Raynal wrote:
+> Make the current MSI irq_domain local to ease the split between ICU
+> platform device code and NSR platform device code.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
----
-This patch is on top of Laurent's v10 spf
----
- arch/arm64/mm/fault.c | 38 +++++++++++++++++++++++++++++++++++---
- 1 file changed, 35 insertions(+), 3 deletions(-)
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 4165485..e7992a3 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -322,11 +322,13 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
- 
- static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
- 			   unsigned int mm_flags, unsigned long vm_flags,
--			   struct task_struct *tsk)
-+			   struct task_struct *tsk, struct vm_area_struct *vma)
- {
--	struct vm_area_struct *vma;
- 	int fault;
- 
-+	if (!vma || !can_reuse_spf_vma(vma, addr))
-+		vma = find_vma(mm, addr);
-+
- 	vma = find_vma(mm, addr);
- 	fault = VM_FAULT_BADMAP;
- 	if (unlikely(!vma))
-@@ -371,6 +373,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 	int fault, major = 0;
- 	unsigned long vm_flags = VM_READ | VM_WRITE;
- 	unsigned int mm_flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
-+	struct vm_area_struct *vma;
- 
- 	if (notify_page_fault(regs, esr))
- 		return 0;
-@@ -409,6 +412,25 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 
- 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
- 
-+	if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT)) {
-+		fault = handle_speculative_fault(mm, addr, mm_flags, &vma);
-+		/*
-+		 * Page fault is done if VM_FAULT_RETRY is not returned.
-+		 * But if the memory protection keys are active, we don't know
-+		 * if the fault is due to key mistmatch or due to a
-+		 * classic protection check.
-+		 * To differentiate that, we will need the VMA we no
-+		 * more have, so let's retry with the mmap_sem held.
-+		 */
-+		if (fault != VM_FAULT_RETRY &&
-+			 fault != VM_FAULT_SIGSEGV) {
-+			perf_sw_event(PERF_COUNT_SW_SPF, 1, regs, addr);
-+			goto done;
-+		}
-+	} else {
-+		vma = NULL;
-+	}
-+
- 	/*
- 	 * As per x86, we may deadlock here. However, since the kernel only
- 	 * validly references user space from well defined areas of the code,
-@@ -431,7 +453,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- #endif
- 	}
- 
--	fault = __do_page_fault(mm, addr, mm_flags, vm_flags, tsk);
-+	fault = __do_page_fault(mm, addr, mm_flags, vm_flags, tsk, vma);
- 	major |= fault & VM_FAULT_MAJOR;
- 
- 	if (fault & VM_FAULT_RETRY) {
-@@ -454,11 +476,21 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		if (mm_flags & FAULT_FLAG_ALLOW_RETRY) {
- 			mm_flags &= ~FAULT_FLAG_ALLOW_RETRY;
- 			mm_flags |= FAULT_FLAG_TRIED;
-+
-+			/*
-+			 * Do not try to reuse this vma and fetch it
-+			 * again since we will release the mmap_sem.
-+			 */
-+			if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT))
-+				vma = NULL;
-+
- 			goto retry;
- 		}
- 	}
- 	up_read(&mm->mmap_sem);
- 
-+done:
-+
- 	/*
- 	 * Handle the "normal" (no error) case first.
- 	 */
+Thomas
 -- 
-1.9.1
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
