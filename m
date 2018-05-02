@@ -1,30 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 May 2018 14:22:22 +0200
-Subject: [PATCH 1/6] pinctrl: imx: fix unsigned check if nfuncs with less
- than or equal zero
-In-Reply-To: <1524855713-15527-2-git-send-email-aisheng.dong@nxp.com>
-References: <1524855713-15527-1-git-send-email-aisheng.dong@nxp.com>
- <1524855713-15527-2-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CACRpkdbSxGE57vCHkViKTx920LgDb+MJLuxXUXN1pBtdBFCMrA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 May 2018 13:23:14 +0100
+Subject: [PATCH 1/2] arm64/mm: define ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
+In-Reply-To: <1525247602-1565-1-git-send-email-opensource.ganesh@gmail.com>
+References: <1525247602-1565-1-git-send-email-opensource.ganesh@gmail.com>
+Message-ID: <20180502122314.GB30246@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 9:01 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+On Wed, May 02, 2018 at 03:53:21PM +0800, Ganesh Mahendran wrote:
+> Set ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT for arm64. This
+> enables Speculative Page Fault handler.
 
-> The unsigned integer nfuncs is being error checked with a value less
-> or equal to zero; this is always false if of_get_child_count returns a
-> -ve for an error condition since nfuncs is not signed. Fix this by
-> making variables nfuncs and i signed integers.
->
-> Detected with Coccinelle:
-> drivers/pinctrl/freescale/pinctrl-imx.c:620:6-12: WARNING: Unsigned
-> expression compared with zero: nfuncs <= 0
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Reported-by: Colin Ian King <colin.king@canonical.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Are there are tests for this? I'm really nervous about enabling it...
 
-Patch applied.
+Will
 
-Yours,
-Linus Walleij
+> 
+> Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
+> ---
+> This patch is on top of Laurent's v10 spf
+> ---
+>  arch/arm64/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index eb2cf49..cd583a9 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -144,6 +144,7 @@ config ARM64
+>  	select SPARSE_IRQ
+>  	select SYSCTL_EXCEPTION_TRACE
+>  	select THREAD_INFO_IN_TASK
+> +	select ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT if SMP
+>  	help
+>  	  ARM 64-bit (AArch64) Linux support.
+>  
+> -- 
+> 1.9.1
+> 
