@@ -1,36 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 2 May 2018 07:41:43 -0500
-Subject: [PATCH 1/2] dt-bindings: add MediaTek XS-PHY binding
-In-Reply-To: <1525244660.25162.12.camel@mhfsdcap03>
-References: <1524642329-12255-1-git-send-email-chunfeng.yun@mediatek.com>
- <1524642329-12255-2-git-send-email-chunfeng.yun@mediatek.com>
- <20180501142459.GA10534@rob-hp-laptop> <1525244660.25162.12.camel@mhfsdcap03>
-Message-ID: <CAL_Jsq+_Bq_Cm7RT0aTstLcRvdpx62U-7CXUA5hJnO-UqW6E4w@mail.gmail.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Wed, 2 May 2018 05:46:17 -0700
+Subject: centralize SWIOTLB config symbol and misc other cleanups V3
+In-Reply-To: <20180425051539.1989-1-hch@lst.de>
+References: <20180425051539.1989-1-hch@lst.de>
+Message-ID: <20180502124617.GA22001@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2018 at 2:04 AM, Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
-> Hi Rob,
-> On Tue, 2018-05-01 at 09:24 -0500, Rob Herring wrote:
->> On Wed, Apr 25, 2018 at 03:45:28PM +0800, Chunfeng Yun wrote:
->> > Add a DT binding documentation of XS-PHY for MediaTek SoCs
->> > with USB3.1 GEN2 controller
+Any more comments?  Especially from the x86, mips and powerpc arch
+maintainers?  I'd like to merge this in a few days as various other
+patches depend on it.
 
-[...]
-
->> > +   reg = <0 0x11c43000 0 0x0200>;
->> > +   mediatek,src-ref-clk-mhz = <26>;
->> > +   mediatek,src-coef = <17>;
->> > +   #address-cells = <2>;
->> > +   #size-cells = <2>;
->>
->> Really need 64-bit sizes?
-> Just an example, 32-bit is also ok, but it's better to use the same
-> value as the root node
-
-Why is it better?
-
-It is unnecessary bloat and it is better to limit the range of child
-nodes using ranges.
-
-Rob
+On Wed, Apr 25, 2018 at 07:15:26AM +0200, Christoph Hellwig wrote:
+> Hi all,
+> 
+> this seris aims for a single defintion of the Kconfig symbol.  To get
+> there various cleanups, mostly about config symbols are included as well.
+> 
+> Changes since V2:
+>  - swiotlb doesn't need the dma_length field by itself, so don't select it
+>  - don't offer a user visible SWIOTLB choice
+> 
+> Chages since V1:
+>  - fixed a incorrect Reviewed-by that should be a Signed-off-by.
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+---end quoted text---
