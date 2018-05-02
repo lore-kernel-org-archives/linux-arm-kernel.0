@@ -1,19 +1,19 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 2 May 2018 11:36:37 +0200
-Subject: [PATCH 2/2] arm64: dts: renesas: condor: add CAN-FD support
-In-Reply-To: <76764cb2-c392-7892-bbd3-95734fbc07cc@cogentembedded.com>
-References: <c184f961-2f98-532f-ed02-6f3751256d9c@cogentembedded.com>
- <76764cb2-c392-7892-bbd3-95734fbc07cc@cogentembedded.com>
-Message-ID: <20180502093636.5ygpycfrlcqkielp@verge.net.au>
+Date: Wed, 2 May 2018 11:38:21 +0200
+Subject: [PATCH v5 14/26] ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
+In-Reply-To: <1518457475-4480-15-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1518457475-4480-15-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180502093821.m276vxqixob47e4p@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 10:14:26PM +0300, Sergei Shtylyov wrote:
-> Define the Condor board dependent part of the CAN-FD device node.
+On Mon, Feb 12, 2018 at 05:44:23PM +0000, Fabrizio Castro wrote:
+> R-Car Gen2 and RZ/G1 platforms come with a watchdog IP, therefore enable
+> its driver by default.
 > 
-> Based on the original (and large) patch by Vladimir Barinov.
-> 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
 Thanks, applied.
