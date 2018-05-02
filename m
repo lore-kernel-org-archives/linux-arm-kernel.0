@@ -1,35 +1,266 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 2 May 2018 15:33:15 +0530
-Subject: [PATCH 0/2] Revert explicit support for Renesas R-Car Gen 3
- r8a779[56] SoCs
-In-Reply-To: <20180502095806.30341-1-horms+renesas@verge.net.au>
-References: <20180502095806.30341-1-horms+renesas@verge.net.au>
-Message-ID: <20180502100315.aydjezp4flmnwu2j@vireshk-i7>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 May 2018 12:04:01 +0200
+Subject: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+In-Reply-To: <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
+References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
+ <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20180502100401.qmik5goglbuiqcaa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-05-18, 11:58, Simon Horman wrote:
-> Revert commits that added explicit support for Renesas R-Car Gen 3
-> r8a779[56] SoCs to the generic cpufreq driver.
-> 
-> This is no longer needed since the flowing commit and to the best of my
+On Sat, Apr 28, 2018 at 02:46:16AM +0800, Dong Aisheng wrote:
+> +/* Initialization of the MU code. */
+> +int __init imx8_scu_init(void)
+> +{
+> +	struct device_node *np, *mu_np;
+> +	struct resource mu_res;
+> +	sc_err_t sci_err;
+> +	int ret;
+> +
+> +	if (!of_machine_is_compatible("fsl,imx8qxp"))
+> +		return 0;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "nxp,imx8qxp-scu");
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	mu_np = of_parse_phandle(np, "fsl,mu", 0);
+> +	if (WARN_ON(!mu_np))
+> +		return -EINVAL;
+> +
+> +	ret = of_address_to_resource(mu_np, 0, &mu_res);
+> +	if (WARN_ON(ret))
+> +		return -EINVAL;
+> +
+> +	/* we use mu physical address as IPC communication channel ID */
+> +	sci_err = sc_ipc_open(&scu_ipc_handle, (sc_ipc_id_t)(mu_res.start));
+> +	if (sci_err != SC_ERR_NONE) {
+> +		pr_err("Cannot open MU channel to SCU\n");
+> +		return sci_err;
+> +	};
 
-s/flowing/following ?
+Introducing private error codes always has the risk of just forwarding
+them as errno codes as done here.
 
-Same thing in the patches as well.
+> +
+> +	of_node_put(mu_np);
+> +
+> +	pr_info("NXP i.MX SCU Initialized (scu_ipc %u)\n", scu_ipc_handle);
+> +
+> +	return 0;
+> +}
+> +early_initcall(imx8_scu_init);
 
-> knowledge is not relied on by any upstream DTS: edeec420de24 ("cpufreq:
-> dt-platdev: Automatically create cpufreq device with OPP v2")
-> 
-> Simon Horman (2):
->   Revert "cpufreq: dt: Add r8a7796 support to to use generic cpufreq
->     driver"
->   Revert "cpufreq: rcar: Add support for R8A7795 SoC"
-> 
->  drivers/cpufreq/cpufreq-dt-platdev.c | 2 --
->  1 file changed, 2 deletions(-)
+This code shows that the separate 'scu' device node shouldn't exist. It is
+only used as a stepping stone to find the 'mu' node. Instead of
+providing a proper driver for the 'mu' node the scu code registers it
+with its physical address.
+I don't think it makes sense to separate mu and scu code in this way.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> +#define RPC_VER(MSG)            ((MSG)->version)
+> +#define RPC_SIZE(MSG)           ((MSG)->size)
+> +#define RPC_SVC(MSG)            ((MSG)->svc)
+> +#define RPC_FUNC(MSG)           ((MSG)->func)
+> +#define RPC_R8(MSG)             ((MSG)->func)
+> +#define RPC_I32(MSG, IDX)       ((MSG)->DATA.i32[(IDX) / 4])
+> +#define RPC_I16(MSG, IDX)       ((MSG)->DATA.i16[(IDX) / 2])
+> +#define RPC_I8(MSG, IDX)        ((MSG)->DATA.i8[(IDX)])
+> +#define RPC_U32(MSG, IDX)       ((MSG)->DATA.u32[(IDX) / 4])
+> +#define RPC_U16(MSG, IDX)       ((MSG)->DATA.u16[(IDX) / 2])
+> +#define RPC_U8(MSG, IDX)        ((MSG)->DATA.u8[(IDX)])
+
+These macros only make the code less readable, please drop them. Plain
+m->version is easier to read and forces the reader through less
+indirections. IMO m->DATA.u32[0] = foo; m->DATA.u8[4] = bar is still
+better readable than doing the division by size in macros.
+
+> +typedef enum sc_rpc_async_state_e {
+> +	SC_RPC_ASYNC_STATE_RD_START = 0,
+> +	SC_RPC_ASYNC_STATE_RD_ACTIVE = 1,
+> +	SC_RPC_ASYNC_STATE_RD_DONE = 2,
+> +	SC_RPC_ASYNC_STATE_WR_START = 3,
+> +	SC_RPC_ASYNC_STATE_WR_ACTIVE = 4,
+> +	SC_RPC_ASYNC_STATE_WR_DONE = 5,
+> +} sc_rpc_async_state_t;
+> +
+> +typedef struct sc_rpc_async_msg_s {
+> +	sc_rpc_async_state_t state;
+> +	uint8_t wordIdx;
+> +	sc_rpc_msg_t msg;
+> +	uint32_t timeStamp;
+> +} sc_rpc_async_msg_t;
+
+We normally do not typedef struct types. Any good reasons to do so here?
+
+> +
+> +/* Functions */
+> +
+> +/*
+> + * This is an internal function to send an RPC message over an IPC
+> + * channel. It is called by client-side SCFW API function shims.
+> + *
+> + * @param[in]     ipc         IPC handle
+> + * @param[in,out] msg         handle to a message
+> + * @param[in]     no_resp     response flag
+> + *
+> + * If no_resp is false then this function waits for a response
+> + * and returns the result in msg.
+> + */
+> +void sc_call_rpc(sc_ipc_t ipc, sc_rpc_msg_t *msg, bool no_resp);
+> +
+> +/*
+> + * This is an internal function to dispath an RPC call that has
+> + * arrived via IPC over an MU. It is called by server-side SCFW.
+> + *
+> + * @param[in]     mu          MU message arrived on
+> + * @param[in,out] msg         handle to a message
+> + *
+> + * The function result is returned in msg.
+> + */
+> +void sc_rpc_dispatch(sc_rsrc_t mu, sc_rpc_msg_t *msg);
+
+Declared but never defined.
+
+> +
+> +/*
+> + * This function translates an RPC message and forwards on to the
+> + * normal RPC API.  It is used only by hypervisors.
+> + *
+> + * @param[in]     ipc         IPC handle
+> + * @param[in,out] msg         handle to a message
+> + *
+> + * This function decodes a message, calls macros to translate the
+> + * resources, pins, addresses, partitions, memory regions, etc. and
+> + * then forwards on to the hypervisors SCFW API.Return results are
+> + * translated back abd placed back into the message to be returned
+> + * to the original API.
+> + */
+> +void sc_rpc_xlate(sc_ipc_t ipc, sc_rpc_msg_t *msg);
+
+ditto.
+
+> +
+> +#endif /* _SC_RPC_H */
+> diff --git a/drivers/soc/imx/sc/svc/irq/rpc.h b/drivers/soc/imx/sc/svc/irq/rpc.h
+> new file mode 100644
+> index 0000000..0de8718
+> --- /dev/null
+> +++ b/drivers/soc/imx/sc/svc/irq/rpc.h
+> @@ -0,0 +1,41 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017~2018 NXP
+> + *
+> + * Header file for the IRQ RPC implementation.
+> + */
+> +
+> +#ifndef _SC_IRQ_RPC_H
+> +#define _SC_IRQ_RPC_H
+> +
+> +/* Types */
+> +
+> +/*!
+> + * This type is used to indicate RPC IRQ function calls.
+> + */
+> +typedef enum irq_func_e {
+> +	IRQ_FUNC_UNKNOWN = 0,	/* Unknown function */
+> +	IRQ_FUNC_ENABLE = 1,	/* Index for irq_enable() RPC call */
+> +	IRQ_FUNC_STATUS = 2,	/* Index for irq_status() RPC call */
+> +} irq_func_t;
+> +
+> +/* Functions */
+> +
+> +/*!
+> + * This function dispatches an incoming IRQ RPC request.
+> + *
+> + * @param[in]     caller_pt   caller partition
+> + * @param[in]     msg         pointer to RPC message
+> + */
+> +void irq_dispatch(sc_rm_pt_t caller_pt, sc_rpc_msg_t *msg);
+
+ditto.
+
+> +
+> +/*!
+> + * This function translates and dispatches an IRQ RPC request.
+> + *
+> + * @param[in]     ipc         IPC handle
+> + * @param[in]     msg         pointer to RPC message
+> + */
+> +void irq_xlate(sc_ipc_t ipc, sc_rpc_msg_t *msg);
+
+ditto.
+
+> +++ b/include/soc/imx/sc/svc/timer/api.h
+> @@ -0,0 +1,265 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017~2018 NXP
+> + *
+> + * Header file containing the public API for the System Controller (SC)
+> + * Timer function.
+> + *
+> + * TIMER_SVC (SVC) Timer Service
+> + *
+> + * Module for the Timer service. This includes support for the watchdog, RTC,
+> + * and system counter. Note every resource partition has a watchdog it can
+> + * use.
+> + */
+> +
+> +#ifndef _SC_TIMER_API_H
+> +#define _SC_TIMER_API_H
+> +
+> +/* Includes */
+> +
+> +#include <soc/imx/sc/types.h>
+> +#include <soc/imx/sc/svc/rm/api.h>
+> +
+> +/* Defines */
+> +
+> +/*
+> + * @name Defines for type widths
+> + */
+> +#define SC_TIMER_ACTION_W   3	/* Width of sc_timer_wdog_action_t */
+> +
+> +/*
+> + * @name Defines for sc_timer_wdog_action_t
+> + */
+> +#define SC_TIMER_WDOG_ACTION_PARTITION      0	/* Reset partition */
+> +#define SC_TIMER_WDOG_ACTION_WARM           1	/* Warm reset system */
+> +#define SC_TIMER_WDOG_ACTION_COLD           2	/* Cold reset system */
+> +#define SC_TIMER_WDOG_ACTION_BOARD          3	/* Reset board */
+> +#define SC_TIMER_WDOG_ACTION_IRQ            4	/* Only generate IRQs */
+> +
+> +/* Types */
+> +
+> +/*
+> + * This type is used to configure the watchdog action.
+> + */
+> +typedef uint8_t sc_timer_wdog_action_t;
+
+Mixing an unnecessary typedef and defines doesn't look good. This should
+be
+
+typedef enum {
+	SC_TIMER_WDOG_ACTION_PARTITION,
+} sc_timer_wdog_action_t;
+
+The same pattern is used elsewhere in this patch.
+
+> +
+> +/*
+> + * This type is used to declare a watchdog time value in milliseconds.
+> + */
+> +typedef uint32_t sc_timer_wdog_time_t;
+
+Why an extra type for this?
+
+Sascha
 
 -- 
-viresh
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
