@@ -1,62 +1,31 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 2 May 2018 09:51:38 +0200
-Subject: [PATCH] ARM: dts: stm32: Fix DTC warnings for stm32mp157
-Message-ID: <1525247498-12834-1-git-send-email-alexandre.torgue@st.com>
+From: opensource.ganesh@gmail.com (Ganesh Mahendran)
+Date: Wed,  2 May 2018 15:53:21 +0800
+Subject: [PATCH 1/2] arm64/mm: define ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
+Message-ID: <1525247602-1565-1-git-send-email-opensource.ganesh@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix DTC warnings for stm32mp157:
+Set ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT for arm64. This
+enables Speculative Page Fault handler.
 
-Warning (unit_address_vs_reg): /soc/pin-controller: node has a reg or ranges property, but no unit name
-Warning (unit_address_vs_reg): /soc/pin-controller/uart4 at 0: node has a unit name, but no reg property
-Warning (unit_address_vs_reg): /soc/pin-controller-z: node has a reg or ranges property, but no unit name
-Warning (unit_address_vs_reg): /memory: node has a reg or ranges property, but no unit name
+Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
+---
+This patch is on top of Laurent's v10 spf
+---
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-
-diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-index 6f044100..8534371 100644
---- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-@@ -7,7 +7,7 @@
- 
- / {
- 	soc {
--		pinctrl: pin-controller {
-+		pinctrl: pin-controller at 50002000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "st,stm32mp157-pinctrl";
-@@ -146,7 +146,7 @@
- 				gpio-ranges = <&pinctrl 0 160 8>;
- 			};
- 
--			uart4_pins_a: uart4 at 0 {
-+			uart4_pins_a: uart4-0 {
- 				pins1 {
- 					pinmux = <STM32_PINMUX('G', 11, AF6)>; /* UART4_TX */
- 					bias-disable;
-@@ -160,7 +160,7 @@
- 			};
- 		};
- 
--		pinctrl_z: pin-controller-z {
-+		pinctrl_z: pin-controller-z at 54004000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "st,stm32mp157-z-pinctrl";
-diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-index 9f90337a..86ede40 100644
---- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
-+++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-@@ -16,7 +16,7 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	memory {
-+	memory at c0000000 {
- 		reg = <0xC0000000 0x40000000>;
- 	};
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index eb2cf49..cd583a9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -144,6 +144,7 @@ config ARM64
+ 	select SPARSE_IRQ
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select THREAD_INFO_IN_TASK
++	select ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT if SMP
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
  
 -- 
-2.7.4
+1.9.1
