@@ -1,94 +1,104 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 2 May 2018 11:35:04 +0100
-Subject: [PATCH] arm64: export memblock_reserve()d regions via /proc/iomem
-In-Reply-To: <20180425132250.9397-1-james.morse@arm.com>
-References: <20180425132250.9397-1-james.morse@arm.com>
-Message-ID: <2708a0b0-72c7-b518-cced-a87b8a94ab79@arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 2 May 2018 12:45:38 +0200
+Subject: [PATCH 01/12] mtd: nand: davinci: store the core chipselect
+ number in platform data
+In-Reply-To: <447b4f2f-27c8-f552-d058-3b2eba71a765@ti.com>
+References: <20180430082453.8091-1-brgl@bgdev.pl>
+ <20180430082453.8091-2-brgl@bgdev.pl>
+ <3dccc5af-2df1-8374-e4e8-0a8b9ea1ae99@ti.com>
+ <8b7e4588-5a35-6c18-fe60-148d6ccf778c@ti.com>
+ <447b4f2f-27c8-f552-d058-3b2eba71a765@ti.com>
+Message-ID: <CAMRc=Md4_QvyMP_vwwD8qpONr3SmWoxn+BJDd1OBHdR6rCLoWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+2018-05-01 12:29 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+> On Tuesday 01 May 2018 03:23 PM, Sekhar Nori wrote:
+>> On Tuesday 01 May 2018 02:55 PM, Sekhar Nori wrote:
+>>> On Monday 30 April 2018 01:54 PM, Bartosz Golaszewski wrote:
+>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>
+>>>> We have the 'ti,davinci-chipselect' property in the device tree, but
+>>>> when using platform data the driver silently uses the id field of
+>>>> struct platform_device as the chipselect. This is confusing and we
+>>>> almost broke the nand support again recently after converting the
+>>>> platform to common clock framework (which changed the device id in the
+>>>> clock lookup - the problem is gone now that we no longer acquire the
+>>>> clock in the nand driver.
+>>>>
+>>>> This patch adds a new filed - core_chipsel - to the platform_data.
+>>>
+>>> s/filed/field
+>>>
+>>>> Subsequent patches will convert the platforms to using this new field.
+>>>
+>>> Can you add a comment for this new field too, like how we have for most
+>>> other fields?
+>>>
+>>> Curious on what 'core' in core_chipsel means. Something to do with
+>>> chip-select offset we have on DA850?
+>>
+>> Looks like you may have just picked the terminology from DaVinci NAND
+>> driver (introduced back in 2009). But in this context, it means the
+>> 0-indexed chip-select number that of the asynchronous memory interface
+>> to which the NAND device is connected.
+>>
+>> So, may be a comment here will suffice.
+>
+> This is what I committed:
+>
 
-On 25/04/18 14:22, James Morse wrote:
-> There has been some confusion around what is necessary to prevent kexec
-> overwriting important memory regions. memblock: reserve, or nomap?
-> Only memblock nomap regions are reported via /proc/iomem, kexec's
-> user-space doesn't know about memblock_reserve()d regions.
-> 
-> Until commit f56ab9a5b73ca ("efi/arm: Don't mark ACPI reclaim memory
-> as MEMBLOCK_NOMAP") the ACPI tables were nomap, now they are reserved
-> and thus possible for kexec to overwrite with the new kernel or initrd.
-> But this was always broken, as the UEFI memory map is also reserved
-> and not marked as nomap.
-> 
-> It turns out that while kexec-tools will pick up reserved sections in
-> iomem that look like:
-> | 80000000-dfffffff : System RAM
-> |   81000000-8158ffff : reserved
-> 
-> The reserved section is ignored by its 'locate_hole()' code. To fix
-> this, we need to describe memblock_reserved() and nomap regions as
-> 'reserved' at the top level:
-> | 80000000-80ffffff : System RAM
-> | 81000000-8158ffff : reserved
-> | 81590000-dfffffff : System RAM
-> 
-> To complicate matters, our existing named sections are described as
-> being part of 'System RAM', but they are also memblock_reserve()d.
-> We need to keep this in-case something is depending on it. To do this
-> involves walking memblock multiple times:
-> 
-> First add the 'System RAM' sections that are memory and not-reserved.
-> These may be smaller than a page if part of the page is reserved. In
-> this case we want to describe the page as reserved, so we round these
-> regions down to the smallest page-size region, which may be empty.
-> (We round-up the memblock_reserved() regions to fill in the gaps).
-> 
-> The boundaries for kernel_data are changed because paging_init() punches
-> holes in the _sdata -> _edata region, and this code can't add a named
-> region that crosses memblock_reserve()d<->normal-memory regions. The
-> new helpers will catch any more overlapping regions that occur.
-> 
-> Lastly, we add the memblock_reserved() regions using
-> reserve_region_with_split(), which will fill in the gaps between the
-> existing named regions. (e.g. the regions occupied by the __init code).
-> This call uses the slab allocator, so has to run from an initcall.
+I don't see it in your tree yet.
 
-Re-reading Akashi's description of how kdump generates the ELF headers for
-/proc/vmcore, this change might break kdump, as now the memblock_reserved()
-regions may be missing from /proc/vmcore. (I'll test that).
+> --8<--
+> commit 533d93703fa717fdf74c4fb711c868c4fdc8b475 (HEAD -> refs/heads/v4.18/nand-cs-simplification)
+> Author:     Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> AuthorDate: Mon Apr 30 10:24:42 2018 +0200
+> Commit:     Sekhar Nori <nsekhar@ti.com>
+> CommitDate: Tue May 1 15:57:47 2018 +0530
+>
+>     mtd: nand: davinci: store the core chipselect number in platform data
+>
+>     We have the 'ti,davinci-chipselect' property in the device tree, but
+>     when using platform data the driver silently uses the id field of
+>     struct platform_device as the chipselect. This is confusing and we
+>     almost broke the nand support again recently after converting the
+>     platform to common clock framework (which changed the device id in the
+>     clock lookup - the problem is gone now that we no longer acquire the
+>     clock in the nand driver.
+>
+>     This patch adds a new field - core_chipsel - to the platform_data.
+>     Subsequent patches will convert the platforms to using this new field.
+>
+>     Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>     Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>
+> diff --git a/include/linux/platform_data/mtd-davinci.h b/include/linux/platform_data/mtd-davinci.h
+> index f1a2cf655bdb..1bbfa27cccb4 100644
+> --- a/include/linux/platform_data/mtd-davinci.h
+> +++ b/include/linux/platform_data/mtd-davinci.h
+> @@ -56,6 +56,16 @@ struct davinci_nand_pdata {          /* platform_data */
+>         uint32_t                mask_ale;
+>         uint32_t                mask_cle;
+>
+> +       /*
+> +        * 0-indexed chip-select number of the asynchronous
+> +        * interface to which the NAND device has been connected.
+> +        *
+> +        * So, if you have NAND connected to CS3 of DA850, you
+> +        * will pass '1' here. Since the asynchronous interface
+> +        * on DA850 starts from CS2.
+> +        */
 
-Unless there is a 'name' for a region that kexec-tools interprets as "don't
-overwrite this, but do include it in the ELF header", then we're stuck. We can't
-fix kexec without breaking kdump, we have to change user-space.
+Maybe we should add that on all other DaVinci SoCs the async interface
+starts from CS0?
 
-Of the two, missing data from kdump vmcore would be preferable to failed-to-boot
-kexec. If we have to change user-space, I'd like to make use of the kernels
-ability to generate the ELF header itself, (e.g. kexec_file_load()).
-
-
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 30ad2f085d1f..e82c0d5c70f8 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -202,45 +202,135 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
-
->  static void __init request_standard_resources(void)
->  {
-
-[...]
-
-> +	/*
-> +	 * We can't allocate memory while walking free memory, count the number
-> +	 * of struct resource's we will need. Round start/end to the smallest
-> +	 * page-size region as we round the reserved regions up.
-> +	 */
-> +	for_each_free_mem_range(i, NUMA_NO_NODE, 0, &start, &end, NULL) {
-
-Nit: That 0 should be MEMBLOCK_NONE
-
-
+> +       uint32_t                core_chipsel;
+> +
+>         /* for packages using two chipselects */
+>         uint32_t                mask_chipsel;
+>
+>
 
 Thanks,
-
-James
+Bart
