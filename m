@@ -1,30 +1,32 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 2 May 2018 05:46:17 -0700
-Subject: centralize SWIOTLB config symbol and misc other cleanups V3
-In-Reply-To: <20180425051539.1989-1-hch@lst.de>
-References: <20180425051539.1989-1-hch@lst.de>
-Message-ID: <20180502124617.GA22001@infradead.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 2 May 2018 14:54:58 +0200
+Subject: [PATCH 1/3] mmc: sunxi: add support for the MMC controller on H6
+In-Reply-To: <20180426140728.43155-2-icenowy@aosc.io>
+References: <20180426140728.43155-1-icenowy@aosc.io>
+ <20180426140728.43155-2-icenowy@aosc.io>
+Message-ID: <CAPDyKFr1CRS7W5gYntbo_KhkvoCB00xzfF4jyUOmtkG1z2g2xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any more comments?  Especially from the x86, mips and powerpc arch
-maintainers?  I'd like to merge this in a few days as various other
-patches depend on it.
+On 26 April 2018 at 16:07, Icenowy Zheng <icenowy@aosc.io> wrote:
+> The new Allwinner H6 SoC have 3 MMC controllers. The first and second
+> ones are similar to the ones on A64, but the third one adds EMCE
+> (Embedded Crypto Engine) support which does hardware transparent crypto
+> on the eMMC.
+>
+> As we still do not have support for EMCE, and the support of it is
+> disabled by defualt, we just duplicate the A64 mmc configurations and
+> change the compatible string.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  2 ++
 
-On Wed, Apr 25, 2018 at 07:15:26AM +0200, Christoph Hellwig wrote:
-> Hi all,
-> 
-> this seris aims for a single defintion of the Kconfig symbol.  To get
-> there various cleanups, mostly about config symbols are included as well.
-> 
-> Changes since V2:
->  - swiotlb doesn't need the dma_length field by itself, so don't select it
->  - don't offer a user visible SWIOTLB choice
-> 
-> Chages since V1:
->  - fixed a incorrect Reviewed-by that should be a Signed-off-by.
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
----end quoted text---
+DT doc changes in separate patches please!
+
+>  drivers/mmc/host/sunxi-mmc.c                        | 16 ++++++++++++++++
+>  2 files changed, 18 insertions(+)
+>
+
+Kind regards
+Uffe
