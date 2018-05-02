@@ -1,88 +1,112 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 2 May 2018 13:48:43 +0200
-Subject: [PATCH 15/21] drm: sun4i: add support for HVCC regulator for DWC
- HDMI glue
-In-Reply-To: <20180430114058.5061-16-jagan@amarulasolutions.com>
-References: <20180430114058.5061-1-jagan@amarulasolutions.com>
- <20180430114058.5061-16-jagan@amarulasolutions.com>
-Message-ID: <20180502114843.ou4qczp5eaigrdfo@flea>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Wed, 2 May 2018 12:49:16 +0100
+Subject: [PATCH v8 13/13] arm64: topology: divorce MC scheduling domain
+ from core_siblings
+In-Reply-To: <62677b95-faf5-4908-abc9-428ef39ea912@arm.com>
+References: <20180425233121.13270-1-jeremy.linton@arm.com>
+ <20180425233121.13270-14-jeremy.linton@arm.com>
+ <62677b95-faf5-4908-abc9-428ef39ea912@arm.com>
+Message-ID: <20180502114916.GW4589@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 05:10:52PM +0530, Jagan Teki wrote:
-> From: Icenowy Zheng <icenowy@aosc.io>
+On Tue, May 01, 2018 at 03:33:33PM +0100, Sudeep Holla wrote:
 > 
-> Allwinner SoCs with DWC HDMI controller have a "HVCC" power pin for the
-> HDMI part, and on some boards it's connected to a dedicated regulator
-> rather than the main 3.3v.
 > 
-> Add support for optional HVCC regulator. For boards that doesn't use a
-> dedicated regulator to power it, the default dummy regulator is used.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 14 ++++++++++++++
->  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h |  2 ++
->  2 files changed, 16 insertions(+)
+> On 26/04/18 00:31, Jeremy Linton wrote:
+> > Now that we have an accurate view of the physical topology
+> > we need to represent it correctly to the scheduler. Generally MC
+> > should equal the LLC in the system, but there are a number of
+> > special cases that need to be dealt with.
+> > 
+> > In the case of NUMA in socket, we need to assure that the sched
+> > domain we build for the MC layer isn't larger than the DIE above it.
+> > Similarly for LLC's that might exist in cross socket interconnect or
+> > directory hardware we need to assure that MC is shrunk to the socket
+> > or NUMA node.
+> > 
+> > This patch builds a sibling mask for the LLC, and then picks the
+> > smallest of LLC, socket siblings, or NUMA node siblings, which
+> > gives us the behavior described above. This is ever so slightly
+> > different than the similar alternative where we look for a cache
+> > layer less than or equal to the socket/NUMA siblings.
+> > 
+> > The logic to pick the MC layer affects all arm64 machines, but
+> > only changes the behavior for DT/MPIDR systems if the NUMA domain
+> > is smaller than the core siblings (generally set to the cluster).
+> > Potentially this fixes a possible bug in DT systems, but really
+> > it only affects ACPI systems where the core siblings is correctly
+> > set to the socket siblings. Thus all currently available ACPI
+> > systems should have MC equal to LLC, including the NUMA in socket
+> > machines where the LLC is partitioned between the NUMA nodes.
+> > 
+> > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> > ---
+> >  arch/arm64/include/asm/topology.h |  2 ++
+> >  arch/arm64/kernel/topology.c      | 32 +++++++++++++++++++++++++++++++-
+> >  2 files changed, 33 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+> > index 6b10459e6905..df48212f767b 100644
+> > --- a/arch/arm64/include/asm/topology.h
+> > +++ b/arch/arm64/include/asm/topology.h
+> > @@ -8,8 +8,10 @@ struct cpu_topology {
+> >  	int thread_id;
+> >  	int core_id;
+> >  	int package_id;
+> > +	int llc_id;
+> >  	cpumask_t thread_sibling;
+> >  	cpumask_t core_sibling;
+> > +	cpumask_t llc_siblings;
+> >  };
+> >  
+> >  extern struct cpu_topology cpu_topology[NR_CPUS];
+> > diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> > index bd1aae438a31..20b4341dc527 100644
+> > --- a/arch/arm64/kernel/topology.c
+> > +++ b/arch/arm64/kernel/topology.c
+> > @@ -13,6 +13,7 @@
+> >  
+> >  #include <linux/acpi.h>
+> >  #include <linux/arch_topology.h>
+> > +#include <linux/cacheinfo.h>
+> >  #include <linux/cpu.h>
+> >  #include <linux/cpumask.h>
+> >  #include <linux/init.h>
+> > @@ -214,7 +215,19 @@ EXPORT_SYMBOL_GPL(cpu_topology);
+> >  
+> >  const struct cpumask *cpu_coregroup_mask(int cpu)
+> >  {
+> > -	return &cpu_topology[cpu].core_sibling;
+> > +	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
+> > +
+> > +	/* Find the smaller of NUMA, core or LLC siblings */
+> > +	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
+> > +		/* not numa in package, lets use the package siblings */
+> > +		core_mask = &cpu_topology[cpu].core_sibling;
+> > +	}
+> > +	if (cpu_topology[cpu].llc_id != -1) {
+> > +		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
+> > +			core_mask = &cpu_topology[cpu].llc_siblings;
+> > +	}
+> > +
+> > +	return core_mask;
+> >  }
+> >  
+> >  static void update_siblings_masks(unsigned int cpuid)
+> > @@ -226,6 +239,9 @@ static void update_siblings_masks(unsigned int cpuid)
+> >  	for_each_possible_cpu(cpu) {
+> >  		cpu_topo = &cpu_topology[cpu];
+> >  
+> > +		if (cpuid_topo->llc_id == cpu_topo->llc_id)
+> > +			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
+> > +
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-> index 9f40a44b456b..7c33faff7ad4 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-> @@ -73,6 +73,12 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
->  	if (encoder->possible_crtcs == 0)
->  		return -EPROBE_DEFER;
->  
-> +	hdmi->vcc_hdmi = devm_regulator_get(dev, "hvcc");
-> +	if (IS_ERR(hdmi->vcc_hdmi)) {
-> +		dev_err(dev, "Could not get HDMI power supply\n");
-> +		return PTR_ERR(hdmi->vcc_hdmi);
-> +	}
-> +
+> Would this not result in cpuid_topo->llc_siblings = cpu_possible_mask
+> on DT systems where llc_id is not set/defaults to -1 and still pass the
+> condition. Does it make sense to add additional -1 check ?
 
-You're not making it optional here, unlike what your commit log
-says. Not that I'm fine with both, but we need to be consistent :)
-
->  	hdmi->rst_ctrl = devm_reset_control_get(dev, "ctrl");
->  	if (IS_ERR(hdmi->rst_ctrl)) {
->  		dev_err(dev, "Could not get ctrl reset control\n");
-> @@ -91,6 +97,12 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
->  		return ret;
->  	}
->  
-> +	ret = regulator_enable(hdmi->vcc_hdmi);
-> +	if (ret) {
-> +		dev_err(dev, "Cannot enable HDMI power supply\n");
-> +		goto err_disable_vcc;
-> +	}
-> +
->  	ret = clk_prepare_enable(hdmi->clk_tmds);
->  	if (ret) {
->  		dev_err(dev, "Could not enable tmds clock\n");
-> @@ -143,6 +155,8 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
->  	clk_disable_unprepare(hdmi->clk_tmds);
->  err_assert_ctrl_reset:
->  	reset_control_assert(hdmi->rst_ctrl);
-> +err_disable_vcc:
-> +	regulator_disable(hdmi->vcc_hdmi);
-
-
-The err_disable_vcc label will disable the regulator, but if there's
-an error in regulator_enable, it will disable it while it wasn't
-enabled in the first place, which is not really something we want to
-do.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/866ed06f/attachment.sig>
+I don't think mask will be used by the current code if llc_id == -1 as
+the user does the check. Is it better to have the mask empty than
+default to cpu_possible_mask? If we require all users to implement a
+check it shouldn't matter.
