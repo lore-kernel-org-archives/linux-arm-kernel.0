@@ -1,23 +1,27 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 02 May 2018 08:38:53 -0700
-Subject: [PATCH v3 5/5] pinctrl: sunxi: Use of_clk_get_parent_count()
- instead of open coding
-In-Reply-To: <1524063005-1716-6-git-send-email-geert+renesas@glider.be>
-References: <1524063005-1716-1-git-send-email-geert+renesas@glider.be>
- <1524063005-1716-6-git-send-email-geert+renesas@glider.be>
-Message-ID: <152527553396.138124.11939404292726432804@swboyd.mtv.corp.google.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 02 May 2018 11:06:17 -0400 (EDT)
+Subject: [PATCH net-next v2 00/15] ARM: sun8i: r40: Add Ethernet support
+In-Reply-To: <CAGb2v67HFb6eLBS4_9s_wJ5uWFeQdUtwn_NMJnm59UUDFBDJUA@mail.gmail.com>
+References: <20180501161227.2110-1-wens@csie.org>
+ <CAGb2v67HFb6eLBS4_9s_wJ5uWFeQdUtwn_NMJnm59UUDFBDJUA@mail.gmail.com>
+Message-ID: <20180502.110617.304411895589508709.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Geert Uytterhoeven (2018-04-18 07:50:05)
-> A new open coder has crept in since 470b73a38470e8ba ("pinctrl: sunxi:
-> Use of_clk_get_parent_count() instead of open coding"), replace it.
-> 
-> of_clk_get_parent_count() was moved to <linux/of_clk.h>, so include that
-> instead of <linux/clk-provider.h>.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Wed, 2 May 2018 00:33:45 +0800
 
-Applied to clk-next
+> I should've mentioned that patches 3 ~ 10, and only these, should go
+> through net-next. sunxi will handle the remaining clk, device tree, and
+> soc driver patches.
+
+Ok, I just noticed this.
+
+Why don't you just post those patches separately as a series on their
+own then, in order to avoid confusion?
+
+Then you can adjust the patch series header posting to explain the
+non-net-next changes, where they got merged, and what they provide
+in order to faciliate the net-next changes.
+
+Thanks.
