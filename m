@@ -1,36 +1,36 @@
-From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
-Date: Wed, 2 May 2018 11:00:55 +0200
-Subject: [PATCH 1/2] arm64/mm: define ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
-In-Reply-To: <1525247672-2165-1-git-send-email-opensource.ganesh@gmail.com>
-References: <1525247672-2165-1-git-send-email-opensource.ganesh@gmail.com>
-Message-ID: <15c56137-e7c4-dbfa-ce5d-f5feeea79e98@linux.vnet.ibm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 2 May 2018 17:01:11 +0800
+Subject: [PATCH] ARM: dts: imx6ull: add UART5 RTS input select register
+In-Reply-To: <1524136779-13246-1-git-send-email-stefan.wahren@i2se.com>
+References: <1524136779-13246-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20180502090110.GI3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2018 09:54, Ganesh Mahendran wrote:
-> Set ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT for arm64. This
-> enables Speculative Page Fault handler.
+On Thu, Apr 19, 2018 at 01:19:39PM +0200, Stefan Wahren wrote:
+> The iMX6ULL UART5_RTS_B_DATA_SELECT_INPUT DAISY Register has some different
+> bit definitions to that same register in the i.MX6UL.
 > 
-> Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
-> ---
-> This patch is on top of Laurent's v10 spf
-> ---
->  arch/arm64/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+> The bits for the i.MX6UL:
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index eb2cf49..cd583a9 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -144,6 +144,7 @@ config ARM64
->  	select SPARSE_IRQ
->  	select SYSCTL_EXCEPTION_TRACE
->  	select THREAD_INFO_IN_TASK
-> +	select ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT if SMP
+> 000 CSI_DATA03_ALT8 ? Selecting Pad: CSI_DATA03 for Mode: ALT8
+> 001 GPIO1_IO08_ALT8 ? Selecting Pad: GPIO1_IO08 for Mode: ALT8
+> 010 GPIO1_IO09_ALT8 ? Selecting Pad: GPIO1_IO09 for Mode: ALT8
+> 011 ENET1_RX_EN_ALT1 ? Selecting Pad: ENET1_RX_EN for Mode: ALT1
+> 100 ENET1_TX_DATA0_ALT1 ? Selecting Pad: ENET1_TX_DATA0 for Mode: ALT1
+> 101 CSI_DATA02_ALT8 ? Selecting Pad: CSI_DATA02 for Mode: ALT8
+> 
+> But for the i.MX6ULL:
+> 
+> 000 CSI_DATA03_ALT8 ? Selecting Pad: CSI_DATA03 for Mode: ALT8
+> 001 GPIO1_IO08_ALT8 ? Selecting Pad: GPIO1_IO08 for Mode: ALT8
+> 010 GPIO1_IO09_ALT8 ? Selecting Pad: GPIO1_IO09 for Mode: ALT8
+> 011 UART1_CTS_B_ALT9 ? Selecting Pad: UART1_CTS_B for Mode: ALT9
+> 100 UART1_RTS_B_ALT9 ? Selecting Pad: UART1_RTS_B for Mode: ALT9
+> 101 ENET1_RX_EN_ALT1 ? Selecting Pad: ENET1_RX_EN for Mode: ALT1
+> 110 ENET1_TX_DATA0_ALT1 ? Selecting Pad: ENET1_TX_DATA0 for Mode: ALT1
+> 111 CSI_DATA02_ALT8 ? Selecting Pad: CSI_DATA02 for Mode: ALT8
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-There is no need to depend on SMP here as the upper
-CONFIG_SPECULATIVE_PAGE_FAULT is depending on SMP.
-
->  	help
->  	  ARM 64-bit (AArch64) Linux support.
-> 
+Applied, thanks.
