@@ -1,72 +1,87 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 1 May 2018 20:52:18 -0500
-Subject: [PATCH v9 24/27] dt-bindings: timer: new bindings for TI DaVinci
- timer
-In-Reply-To: <20180427140522.npmhjamhwxgp7y73@rob-hp-laptop>
-References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-25-david@lechnology.com>
- <20180427140522.npmhjamhwxgp7y73@rob-hp-laptop>
-Message-ID: <7cea07f1-e174-8496-a27a-01f0e3082054@lechnology.com>
+Date: Tue, 1 May 2018 21:02:00 -0500
+Subject: [PATCH v2] ARM: davinci: fix GPIO lookup for I2C
+In-Reply-To: <20180501153135.32746-1-nsekhar@ti.com>
+References: <20180501153135.32746-1-nsekhar@ti.com>
+Message-ID: <076da698-1902-5a35-032e-2778df0bce71@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar,
+On 05/01/2018 10:31 AM, Sekhar Nori wrote:
+> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
+> I2C can correctly lookup the recovery gpios.
+> 
+> Note that it is the gpio-davinci driver that sets the gpiochip label to
+> davinci_gpio.0.
+> 
+> Also, the I2C device uses an id of 1 on DM644x and DM355.
+> 
+> While at it, convert to using GPIO_TO_PIN() for referring to GPIO pin
+> numbers, like it is done in rest of the board support files.
+> 
+> Fixes: e53537653791 ("i2c/ARM: davinci: Deep refactoring of I2C recovery")
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+> v2: use GPIO_TO_PIN() to fix comment by David Lechner.
+> 
+>   arch/arm/mach-davinci/board-dm355-evm.c  |  9 ++++++---
+>   arch/arm/mach-davinci/board-dm644x-evm.c | 10 +++++++---
+>   2 files changed, 13 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+> index 762d29683a3a..23ab9e8bc04c 100644
+> --- a/arch/arm/mach-davinci/board-dm355-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+> @@ -110,12 +110,15 @@ static struct platform_device davinci_nand_device = {
+>   	},
+>   };
+>   
+> +#define DM355_I2C_SDA_PIN	GPIO_TO_PIN(0, 15)
+> +#define DM355_I2C_SCL_PIN	GPIO_TO_PIN(0, 14)
+> +
+>   static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
+> -	.dev_id = "i2c_davinci",
+> +	.dev_id = "i2c_davinci.1",
+>   	.table = {
+> -		GPIO_LOOKUP("davinci_gpio", 15, "sda",
+> +		GPIO_LOOKUP("davinci_gpio.0", DM355_I2C_SDA_PIN, "sda",
+>   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+> -		GPIO_LOOKUP("davinci_gpio", 14, "scl",
+> +		GPIO_LOOKUP("davinci_gpio.0", DM355_I2C_SCL_PIN, "scl",
+>   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+>   	},
+>   };
+> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> index 95b55aae1366..509e64ab1994 100644
+> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> @@ -17,6 +17,7 @@
+>   #include <linux/i2c.h>
+>   #include <linux/platform_data/pcf857x.h>
+>   #include <linux/platform_data/at24.h>
+> +#include <linux/platform_data/gpio-davinci.h>
+>   #include <linux/mtd/mtd.h>
+>   #include <linux/mtd/rawnand.h>
+>   #include <linux/mtd/partitions.h>
+> @@ -596,12 +597,15 @@ static struct i2c_board_info __initdata i2c_info[] =  {
+>   	},
+>   };
+>   
+> +#define DM644X_I2C_SDA_PIN	GPIO_TO_PIN(2, 12)
+> +#define DM644X_I2C_SCL_PIN	GPIO_TO_PIN(2, 11)
+> +
+>   static struct gpiod_lookup_table i2c_recovery_gpiod_table = {
+> -	.dev_id = "i2c_davinci",
+> +	.dev_id = "i2c_davinci.1",
+>   	.table = {
+> -		GPIO_LOOKUP("davinci_gpio", 44, "sda",
+> +		GPIO_LOOKUP("davinci_gpio.0", DM644X_I2C_SDA_PIN, "sda",
+>   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+> -		GPIO_LOOKUP("davinci_gpio", 43, "scl",
+> +		GPIO_LOOKUP("davinci_gpio.0", DM644X_I2C_SCL_PIN, "scl",
+>   			    GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+>   	},
+>   };
+> 
 
-On 04/27/2018 09:05 AM, Rob Herring wrote:
-> On Thu, Apr 26, 2018 at 07:17:42PM -0500, David Lechner wrote:
->> This adds new device tree bindings for the timer IP block of TI
->> DaVinci-like SoCs.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>
->> v9 changes:
->> - new patch in v9
->>
->>
->>   .../bindings/timer/ti,davinci-timer.txt       | 24 +++++++++++++++++++
->>   1 file changed, 24 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
->>
->> diff --git a/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt b/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
->> new file mode 100644
->> index 000000000000..2091eca46981
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
->> @@ -0,0 +1,24 @@
->> +* Device tree bindings for Texas Instruments DaVinci timer
->> +
->> +This document provides bindings for the 64-bit timer in the DaVinci
->> +architecture devices. The timer can be configured as a general-purpose 64-bit
->> +timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
->> +timers, each half can operate in conjunction (chain mode) or independently
->> +(unchained mode) of each other.
->> +
->> +It is global timer is a free running up-counter and can generate interrupt
-> 
-> Doesn't make sense, too many 'is'.
-> 
-> There's no interrupt property listed.
-> 
->> +when the counter reaches preset counter values.
->> +
->> +Required properties:
->> +
->> +- compatible : should be "ti,davinci-timer".
->> +- reg : specifies base physical address and count of the registers.
->> +- clocks : the clock feeding the timer clock.
->> +
->> +Example:
->> +
->> +	clocksource: timer at 20000 {
->> +		compatible = "ti,davinci-timer";
->> +		reg = <0x20000 0x1000>;
->> +		clocks = <&pll0_auxclk>;
->> +	};
->> -- 
->> 2.17.0
->>
-
-What do you think about trying to reuse the keystone timer here instead of
-introducing our own binding? I assume it is basically the same since the
-watchdog timer is shared already between davinci and keystone.
+Reviewed-by: David Lechner <david@lechnology.com>
