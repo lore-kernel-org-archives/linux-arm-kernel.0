@@ -1,40 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 May 2018 13:23:14 +0100
-Subject: [PATCH 1/2] arm64/mm: define ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
-In-Reply-To: <1525247602-1565-1-git-send-email-opensource.ganesh@gmail.com>
-References: <1525247602-1565-1-git-send-email-opensource.ganesh@gmail.com>
-Message-ID: <20180502122314.GB30246@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 May 2018 14:23:11 +0200
+Subject: [PATCH 2/6] pinctrl: pinctrl-imx: improve the code comments of
+ PIN_FUNC_ID
+In-Reply-To: <1524855713-15527-3-git-send-email-aisheng.dong@nxp.com>
+References: <1524855713-15527-1-git-send-email-aisheng.dong@nxp.com>
+ <1524855713-15527-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkdbHU49+3Dq6CQaYZc+JYQ+4OPgT4iwJ4=ucV=oQWNEgeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 03:53:21PM +0800, Ganesh Mahendran wrote:
-> Set ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT for arm64. This
-> enables Speculative Page Fault handler.
+On Fri, Apr 27, 2018 at 9:01 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 
-Are there are tests for this? I'm really nervous about enabling it...
+> The current code comments of PIN_FUNC_ID actually is not true for
+> SHARE_MUX_CONF_REG case which should be a 4 u32 PIN_FUNC_ID.
+> Fix the comments and re-org it a bit for better extendibility
+> as we may add a different size for SCU based PIN_FUNC_ID later.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Fabio Estevam <festevam@gmail.com>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Will
+Patch applied.
 
-> 
-> Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
-> ---
-> This patch is on top of Laurent's v10 spf
-> ---
->  arch/arm64/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index eb2cf49..cd583a9 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -144,6 +144,7 @@ config ARM64
->  	select SPARSE_IRQ
->  	select SYSCTL_EXCEPTION_TRACE
->  	select THREAD_INFO_IN_TASK
-> +	select ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT if SMP
->  	help
->  	  ARM 64-bit (AArch64) Linux support.
->  
-> -- 
-> 1.9.1
-> 
+Yours,
+Linus Walleij
