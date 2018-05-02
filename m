@@ -1,20 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 May 2018 14:23:11 +0200
-Subject: [PATCH 2/6] pinctrl: pinctrl-imx: improve the code comments of
- PIN_FUNC_ID
-In-Reply-To: <1524855713-15527-3-git-send-email-aisheng.dong@nxp.com>
+Date: Wed, 2 May 2018 14:24:13 +0200
+Subject: [PATCH 3/6] pinctrl: imx: use seq_puts() instead of seq_printf()
+In-Reply-To: <1524855713-15527-4-git-send-email-aisheng.dong@nxp.com>
 References: <1524855713-15527-1-git-send-email-aisheng.dong@nxp.com>
- <1524855713-15527-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CACRpkdbHU49+3Dq6CQaYZc+JYQ+4OPgT4iwJ4=ucV=oQWNEgeA@mail.gmail.com>
+ <1524855713-15527-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkdZ-GkW5KR=7CdT2RTb1VRpr1bpmf_HNZKu0m5f0DVaWaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Apr 27, 2018 at 9:01 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 
-> The current code comments of PIN_FUNC_ID actually is not true for
-> SHARE_MUX_CONF_REG case which should be a 4 u32 PIN_FUNC_ID.
-> Fix the comments and re-org it a bit for better extendibility
-> as we may add a different size for SCU based PIN_FUNC_ID later.
+> For a constant format without additional arguments, use seq_puts()
+> instead of seq_printf(). Also, it fixes the following checkpatch
+> warning.
+>
+> WARNING: Prefer seq_puts to seq_printf
+> +               seq_printf(s, "N/A");
+>
+> WARNING: Prefer seq_puts to seq_printf
+> +       seq_printf(s, "\n");
 >
 > Cc: Linus Walleij <linus.walleij@linaro.org>
 > Cc: Shawn Guo <shawnguo@kernel.org>
