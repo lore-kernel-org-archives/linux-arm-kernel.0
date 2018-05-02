@@ -1,44 +1,61 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed,  2 May 2018 23:31:40 +0200
-Subject: [PATCH] arm64: defconfig: Increase CMA size for VC4
-Message-ID: <1525296700-3588-1-git-send-email-stefan.wahren@i2se.com>
+From: jhogan@kernel.org (James Hogan)
+Date: Wed, 2 May 2018 23:09:34 +0100
+Subject: [PATCH 08/13] arch: define the ARCH_DMA_ADDR_T_64BIT config
+ symbol in lib/Kconfig
+In-Reply-To: <20180425051539.1989-9-hch@lst.de>
+References: <20180425051539.1989-1-hch@lst.de>
+ <20180425051539.1989-9-hch@lst.de>
+Message-ID: <20180502220933.GB20766@jamesdev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VC4 needs more memory than the default setting (16 MB):
+On Wed, Apr 25, 2018 at 07:15:34AM +0200, Christoph Hellwig wrote:
+> Define this symbol if the architecture either uses 64-bit pointers or the
+> PHYS_ADDR_T_64BIT is set.  This covers 95% of the old arch magic.  We only
+> need an additional select for Xen on ARM (why anyway?), and we now always
+> set ARCH_DMA_ADDR_T_64BIT on mips boards with 64-bit physical addressing
+> instead of only doing it when highmem is set.
 
-  vc4-drm soc:gpu: swiotlb: coherent allocation failed, size=16777216
-  [drm:vc4_bo_create [vc4]] *ERROR* Failed to allocate from CMA:
-  vc4_v3d 3fc00000.v3d: Failed to allocate memory for tile binning: -12.
-    You may need to enable CMA or give it more memory.
-  vc4-drm soc:gpu: failed to bind 3fc00000.v3d (ops vc4_v3d_ops [vc4]): -12
-  vc4-drm soc:gpu: master bind failed: -12
-  vc4-drm: probe of soc:gpu failed with error -12
+I think this should be fine. It only affects alchemy and Netlogic, and
+Netlogic supports highmem already.
 
-So increase the value to 32 MB and fix this issue.
+So for MIPS:
+Acked-by: James Hogan <jhogan@kernel.org>
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
+Cheers
+James
 
-Hi,
-i known it's a little bit late for 4.18 or should i rebase for 4.17?
+> diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+> index 985388078872..e10cc5c7be69 100644
+> --- a/arch/mips/Kconfig
+> +++ b/arch/mips/Kconfig
+> @@ -1101,9 +1101,6 @@ config GPIO_TXX9
+>  config FW_CFE
+>  	bool
+>  
+> -config ARCH_DMA_ADDR_T_64BIT
+> -	def_bool (HIGHMEM && PHYS_ADDR_T_64BIT) || 64BIT
+> -
+>  config ARCH_SUPPORTS_UPROBES
+>  	bool
 
-Regards
-
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 7ca583e..0e1f6d7 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -172,6 +172,7 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
-+CONFIG_CMA_SIZE_MBYTES=32
- CONFIG_MTD=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
--- 
-2.7.4
+> diff --git a/lib/Kconfig b/lib/Kconfig
+> index ce9fa962d59b..1f12faf03819 100644
+> --- a/lib/Kconfig
+> +++ b/lib/Kconfig
+> @@ -435,6 +435,9 @@ config NEED_SG_DMA_LENGTH
+>  config NEED_DMA_MAP_STATE
+>  	bool
+>  
+> +config ARCH_DMA_ADDR_T_64BIT
+> +	def_bool 64BIT || PHYS_ADDR_T_64BIT
+> +
+>  config IOMMU_HELPER
+>  	bool
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/a9d04421/attachment-0001.sig>
