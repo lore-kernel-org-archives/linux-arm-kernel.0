@@ -1,105 +1,105 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 2 May 2018 17:40:54 +0000
-Subject: [PATCH 11/12] dt-bindings: clock: add imx8qxp clock binding doc
-In-Reply-To: <20180501153727.GA21845@rob-hp-laptop>
-References: <1524855403-15301-1-git-send-email-aisheng.dong@nxp.com>
- <1524855403-15301-12-git-send-email-aisheng.dong@nxp.com>
- <20180501153727.GA21845@rob-hp-laptop>
-Message-ID: <AM0PR04MB42112867033DD6A0D36D364B80800@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 2 May 2018 12:45:26 -0500
+Subject: [PATCH 07/11] irqchip: stm32: add stm32mp1 support with hierarchy
+ domain
+In-Reply-To: <6fdb652b-e7f9-7035-3eda-39f763ed7ea3@st.com>
+References: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
+ <1524759514-12392-8-git-send-email-ludovic.Barre@st.com>
+ <20180501145611.GA6842@rob-hp-laptop>
+ <6fdb652b-e7f9-7035-3eda-39f763ed7ea3@st.com>
+Message-ID: <CAL_JsqLvbGdPC9ifPZ5+tVxznHbsDuWGRg4R47st8Y9BtnNYUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Tuesday, May 1, 2018 11:37 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: linux-clk at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org; Fabio
-> Estevam <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
-> kernel at pengutronix.de; Mark Rutland <mark.rutland@arm.com>;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH 11/12] dt-bindings: clock: add imx8qxp clock binding doc
-> 
-> On Sat, Apr 28, 2018 at 02:56:42AM +0800, Dong Aisheng wrote:
-> > Add imx8qxp clock binding doc.
-> >
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Stephen Boyd <sboyd@kernel.org>
-> > Cc: Michael Turquette <mturquette@baylibre.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  .../devicetree/bindings/clock/imx8qxp-clk.txt      |  39 +++
-> >  include/dt-bindings/clock/imx8qxp-clock.h          | 362
-> +++++++++++++++++++++
-> >  2 files changed, 401 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
-> >  create mode 100644 include/dt-bindings/clock/imx8qxp-clock.h
-> >
-> > diff --git a/Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
-> > b/Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
-> > new file mode 100644
-> > index 0000000..5e365d7
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/imx8qxp-clk.txt
-> > @@ -0,0 +1,39 @@
-> > +NXP i.MX8QXP Clocks Based on SCFW
-> > +--------------------------------------------------------------------
-> > +
-> > +Some i.MX SoCs contain a system controller that is responsible for
-> > +providing clock control service for the IPs. Communication between
-> > +the host processor running an OS and the system controller happens
-> > +through a SCU protocol [1].
-> > +
-> > +[1] Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> > +
-> > +Required properties:
-> > +
-> > +- compatible:	Should be "fsl,imx8qxp-clock".
-> > +- #clock-cells:	Should be <1>.
-> 
-> There's no reason for this node. Just make the parent (SCU) a clock provider.
-> 
+On Wed, May 2, 2018 at 11:03 AM, Ludovic BARRE <ludovic.barre@st.com> wrote:
+> Hi Rob
+>
+>
+>
+> On 05/01/2018 04:56 PM, Rob Herring wrote:
+>>
+>> On Thu, Apr 26, 2018 at 06:18:30PM +0200, Ludovic Barre wrote:
+>>>
+>>> From: Ludovic Barre <ludovic.barre@st.com>
+>>>
+>>> Exti controller has been differently integrated on stm32mp1 SoC.
+>>> A parent irq has only one external interrupt. A hierachy domain could
+>>> be used. Handlers are call by parent, each parent interrupt could be
+>>> masked and unmasked according to the needs.
+>>>
+>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>>> ---
+>>>   .../interrupt-controller/st,stm32-exti.txt         |   3 +
+>>>   drivers/irqchip/irq-stm32-exti.c                   | 322
+>>> +++++++++++++++++++++
+>>>   2 files changed, 325 insertions(+)
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+>>> b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+>>> index edf03f0..136bd61 100644
+>>> ---
+>>> a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+>>> +++
+>>> b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+>>> @@ -5,11 +5,14 @@ Required properties:
+>>>   - compatible: Should be:
+>>>       "st,stm32-exti"
+>>>       "st,stm32h7-exti"
+>>> +    "st,stm32mp1-exti"
+>>>   - reg: Specifies base physical address and size of the registers
+>>>   - interrupt-controller: Indentifies the node as an interrupt controller
+>>>   - #interrupt-cells: Specifies the number of cells to encode an
+>>> interrupt
+>>>     specifier, shall be 2
+>>>   - interrupts: interrupts references to primary interrupt controller
+>>> +  (only needed for exti controller with multiple exti under
+>>> +  same parent interrupt: st,stm32-exti and st,stm32h7-exti")
+>>>     Example:
+>>>   diff --git a/drivers/irqchip/irq-stm32-exti.c
+>>> b/drivers/irqchip/irq-stm32-exti.c
+>>> index b38c655..ebf7146 100644
+>>> --- a/drivers/irqchip/irq-stm32-exti.c
+>>> +++ b/drivers/irqchip/irq-stm32-exti.c
+>>
+>>
+>> [...]
+>>
+>>> +static const struct stm32_desc_irq stm32mp1_desc_irq[] = {
+>>> +       { .exti = 1, .irq_parent = 7 },
+>>> +       { .exti = 2, .irq_parent = 8 },
+>>> +       { .exti = 3, .irq_parent = 9 },
+>>> +       { .exti = 4, .irq_parent = 10 },
+>>> +       { .exti = 5, .irq_parent = 23 },
+>>> +       { .exti = 6, .irq_parent = 64 },
+>>> +       { .exti = 7, .irq_parent = 65 },
+>>> +       { .exti = 8, .irq_parent = 66 },
+>>> +       { .exti = 9, .irq_parent = 67 },
+>>> +       { .exti = 10, .irq_parent = 40 },
+>>> +       { .exti = 11, .irq_parent = 42 },
+>>> +       { .exti = 12, .irq_parent = 76 },
+>>> +       { .exti = 13, .irq_parent = 77 },
+>>> +       { .exti = 14, .irq_parent = 121 },
+>>> +       { .exti = 15, .irq_parent = 127 },
+>>> +       { .exti = 16, .irq_parent = 1 },
+>>> +       { .exti = 65, .irq_parent = 144 },
+>>> +       { .exti = 68, .irq_parent = 143 },
+>>> +       { .exti = 73, .irq_parent = 129 },
+>>> +};
+>>
+>>
+>> You can use an interrupt-map property rather than put this into the
+>> driver.
+>
+>
+> interrupt-map seemed interesting and promising like used in pci host.
+> At first sight this property can't be used into node with
+> "interrupt-controller" property (see in drivers/of/irq.c function:
+> of_irq_parse_raw) because "of_irq_parse_raw" checks if node got
+> it first, and after lookup the interrupt-map.
+>
+> Rob, Thomas, Jason, Marc what do you prefers or the right ways...?
 
-It can be done, but do I need to also remove other nodes like pinctrl, power domain
-in the same sub-nodes Of SCU?
+I believe the correct thing to do is simply drop "interrupt-controller".
 
-BTW i saw arm,scpi.txt also keep the clk node under scpi node.
-Documentation/devicetree/bindings/arm/arm,scpi.txt
-
-Seems like SCU like ARM SCPI is more like a protocol node while still needs
-different drivers to provide services.
-
-Regards
-Dong Aisheng
-
-> > +
-> > +The clock consumer should specify the desired clock by having the
-> > +clock ID in its "clocks" phandle cell.
-> > +See include/dt-bindings/clock/imx8qxp-clock.h
-> > +for the full list of i.MX8QXP clock IDs.
-> > +
-> > +Examples:
-> > +
-> > +#include <dt-bindings/clock/imx8qxp-clock.h>
-> > +
-> > +clk: clk {
-> > +	compatible = "fsl,imx8qxp-clk";
-> > +	#clock-cells = <1>;
-> > +};
-> > +
-> > +i2c0: i2c at 5a800000 {
-> > +	compatible = "fsl,imx8qxp-lpi2c", "fsl,imx7ulp-lpi2c";
-> > +	reg = <0x0 0x5a800000 0x0 0x4000>;
-> > +	interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH>;
-> > +	interrupt-parent = <&gic>;
-> > +	clocks = <&clk IMX8QXP_I2C0_CLK>,
-> > +		 <&clk IMX8QXP_I2C0_IPG_CLK>;
-> > +	clock-names = "per", "ipg";
-> > +	...
-> > +};
+Rob
