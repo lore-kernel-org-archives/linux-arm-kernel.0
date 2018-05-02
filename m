@@ -1,54 +1,48 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 May 2018 15:01:24 +0200
-Subject: [PATCH] gpio: zynq: Setup chip->base based on alias ID
-In-Reply-To: <cc8d864a-e8e6-d30d-ae54-91819e5d0b8d@xilinx.com>
-References: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
- <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
- <f9dd4f64-4026-f495-5810-32affb5b0944@xilinx.com>
- <CACRpkdaxwRc0zoDKogVGisXTPJ0EwLbOQjHzz1pSEjvWCsSCTQ@mail.gmail.com>
- <cc8d864a-e8e6-d30d-ae54-91819e5d0b8d@xilinx.com>
-Message-ID: <CACRpkdYgw+HaC5bUCZKiD7j+2ZLYbCTG+DdPdAEkRDq0xF5b3w@mail.gmail.com>
+Date: Wed, 2 May 2018 15:03:04 +0200
+Subject: [PATCH 4/6] pinctrl: fsl: add scu based pinctrl support
+In-Reply-To: <20180502123638.qgolj3h6ycbx6aas@pengutronix.de>
+References: <1524855713-15527-1-git-send-email-aisheng.dong@nxp.com>
+ <1524855713-15527-5-git-send-email-aisheng.dong@nxp.com>
+ <CACRpkdY5zSNYvXD3icbO+4R7Mc7TDhHCoUU0gikE6A+=ZFA=Kg@mail.gmail.com>
+ <CACRpkdbiPQ8h_0cD5nkG21wQSq5FrcdNXK1AvE-AP7kWy3yUqw@mail.gmail.com>
+ <20180502123638.qgolj3h6ycbx6aas@pengutronix.de>
+Message-ID: <CACRpkdbgi6f2famHA_QUb0zZY7rF3QqbDzcfS_X=czcRJGMMyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2018 at 12:15 PM, Michal Simek <michal.simek@xilinx.com> wrote:
-> On 2.5.2018 12:10, Linus Walleij wrote:
->> On Thu, Apr 26, 2018 at 3:35 PM, Michal Simek <michal.simek@xilinx.com> wrote:
-
->>> Yes, it is about legacy application which I have seen recently and there
->>> is no source code for application calls it because board vendor doesn't
->>> provide it.
->>>
->>> You are right that -1 was used from the beginning in mainline but
->>> unfortunately this driver was in vendor tree for a while and it uses 0
->>> there.
->>>
->>> In upstreaming this was changed to -1 but customers have a lot of code
->>> which developed against vendor tree and they want to use
->>> latest&greatest. And without this they are not able to run that
->>> applications.
->>>
->>> I found that this logic is already in 5 drivers in mainline that's why I
->>> send this patch to be +1.
->>
->> I see.
->>
->> Sadly comaptibility with out-of-tree driver code is none of our
->> (community) business.
->>
->> We do pay a lot of effort not to break the ABI to userspace, but
->> it needs to be an ABI coming from the mainline kernel, not from
->> a vendor tree.
->>
->> So to the mainline kernel this is no regression.
+On Wed, May 2, 2018 at 2:36 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Linus,
 >
-> I understand your statement. On the other hand it is feature which was
-> permitted in past for some drivers and this is +1.
+> On Wed, May 02, 2018 at 02:29:04PM +0200, Linus Walleij wrote:
+>> On Wed, May 2, 2018 at 2:27 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> > On Fri, Apr 27, 2018 at 9:01 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+>> >
+>> >> Some i.MX SoCs (e.g. MX8QXP and MX8QM) contain a system controller
+>> >> that is responsible for controlling the pad setting of the IPs that
+>> >> are present. Communication between the host processor running an OS
+>> >> and the system controller happens through a SCU protocol.
+>> >> This patch adds SCU protocol based pinctrl drivers.
+>> >>
+>> >> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> >> Cc: Shawn Guo <shawnguo@kernel.org>
+>> >> Cc: Fabio Estevam <festevam@gmail.com>
+>> >> Cc: Stefan Agner <stefan@agner.ch>
+>> >> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+>> >> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>> >
+>> > Patch applied.
+>>
+>> Bah on second thought holding this back since I see thyere are
+>> some discussions about the bindings in the next patch.
+>
+> Also note that this patch depends on the SCU base support posted elsewhere
+> as Dong mentioned in his introductory mail.
 
-But was it permitted because of breaking out of tree code?
+Aha is that a compile-time dependence?
 
-I know people have done questionable things in the past, but
-two wrongs does not make one right.
+I guess it would be better if it is one big series if it is supposed
+to be merged in one big series.
 
 Yours,
 Linus Walleij
