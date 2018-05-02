@@ -1,113 +1,83 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  2 May 2018 12:18:24 +0200
-Subject: [PATCH 3/3] ARM: dts: r8a7793: Convert to new LVDS DT bindings
-In-Reply-To: <cover.1525256178.git.horms+renesas@verge.net.au>
-References: <cover.1525256178.git.horms+renesas@verge.net.au>
-Message-ID: <edb0c3affe5214a21d71ffb82ca92ed068e828df.1525256178.git.horms+renesas@verge.net.au>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 02 May 2018 18:19:51 +0800
+Subject: [PATCH net-next v2 15/15] arm64: dts: allwinner: a64: add SRAM
+ controller device tree node
+In-Reply-To: <CAGb2v67pvL58Pes1ZFDZtPu_nL2+m6dgf_XOOymG9nVAkXVpEw@mail.gmail.com>
+References: <20180501161227.2110-1-wens@csie.org>
+ <20180501161227.2110-16-wens@csie.org> <20180502095118.rqnfwy576xh6ercm@flea>
+ <CAGb2v67pvL58Pes1ZFDZtPu_nL2+m6dgf_XOOymG9nVAkXVpEw@mail.gmail.com>
+Message-ID: <29E5670C-9D17-4EC1-AAAC-0CF33DD0534C@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The internal LVDS encoder now has DT bindings separate from the DU. Port
-the device tree over to the new model.
 
-Fixes: c6a27fa41fab ("drm: rcar-du: Convert LVDS encoder code to bridge driver")
-Fixes: bff8f8c2feb7 ("ARM: dts: r8a7793: add soc node")
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7793-gose.dts | 10 +++++++---
- arch/arm/boot/dts/r8a7793.dtsi     | 37 +++++++++++++++++++++++++++++++------
- 2 files changed, 38 insertions(+), 9 deletions(-)
+? 2018?5?2? GMT+08:00 ??5:53:21, Chen-Yu Tsai <wens@csie.org> ??:
+>On Wed, May 2, 2018 at 5:51 PM, Maxime Ripard
+><maxime.ripard@bootlin.com> wrote:
+>> Hi,
+>>
+>> On Wed, May 02, 2018 at 12:12:27AM +0800, Chen-Yu Tsai wrote:
+>>> From: Icenowy Zheng <icenowy@aosc.io>
+>>>
+>>> Allwinner A64 has a SRAM controller, and in the device tree
+>currently
+>>> we have a syscon node to enable EMAC driver to access the EMAC clock
+>>> register. As SRAM controller driver can now export regmap for this
+>>> register, replace the syscon node to the SRAM controller device
+>node,
+>>> and let EMAC driver to acquire its EMAC clock regmap.
+>>>
+>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> ---
+>>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 23
+>+++++++++++++++----
+>>>  1 file changed, 19 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>>> index 1b2ef28c42bd..1c37659d9d41 100644
+>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>>> @@ -168,10 +168,25 @@
+>>>               #size-cells = <1>;
+>>>               ranges;
+>>>
+>>> -             syscon: syscon at 1c00000 {
+>>> -                     compatible =
+>"allwinner,sun50i-a64-system-controller",
+>>> -                             "syscon";
+>>> +             sram_controller: sram-controller at 1c00000 {
+>>> +                     compatible =
+>"allwinner,sun50i-a64-sram-controller";
+>>
+>> I don't think there's anything preventing us from keeping the
+>> -system-controller compatible. It's what was in the DT before, and
+>> it's how it's called in the datasheet.
+>
+>I actually meant to ask you about this. The -system-controller
+>compatible
+>matches the datasheet better. Maybe we should just switch to that one?
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 9ed6961f2d9a..96e117d8b2cc 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -447,10 +447,9 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- 
--	clocks = <&cpg CPG_MOD 724>, <&cpg CPG_MOD 723>, <&cpg CPG_MOD 726>,
-+	clocks = <&cpg CPG_MOD 724>, <&cpg CPG_MOD 723>,
- 		 <&x13_clk>, <&x2_clk>;
--	clock-names = "du.0", "du.1", "lvds.0",
--		      "dclkin.0", "dclkin.1";
-+	clock-names = "du.0", "du.1", "dclkin.0", "dclkin.1";
- 
- 	ports {
- 		port at 0 {
-@@ -458,6 +457,11 @@
- 				remote-endpoint = <&adv7511_in>;
- 			};
- 		};
-+	};
-+};
-+
-+&lvds0 {
-+	ports {
- 		port at 1 {
- 			lvds_connector: endpoint {
- 			};
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index f9c5a557107d..4f526030dc7c 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -1292,15 +1292,12 @@
- 
- 		du: display at feb00000 {
- 			compatible = "renesas,du-r8a7793";
--			reg = <0 0xfeb00000 0 0x40000>,
--			      <0 0xfeb90000 0 0x1c>;
--			reg-names = "du", "lvds.0";
-+			reg = <0 0xfeb00000 0 0x40000>;
- 			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 724>,
--				 <&cpg CPG_MOD 723>,
--				 <&cpg CPG_MOD 726>;
--			clock-names = "du.0", "du.1", "lvds.0";
-+				 <&cpg CPG_MOD 723>;
-+			clock-names = "du.0", "du.1";
- 			status = "disabled";
- 
- 			ports {
-@@ -1315,6 +1312,34 @@
- 				port at 1 {
- 					reg = <1>;
- 					du_out_lvds0: endpoint {
-+						remote-endpoint = <&lvds0_in>;
-+					};
-+				};
-+			};
-+		};
-+
-+		lvds0: lvds at feb90000 {
-+			compatible = "renesas,r8a7793-lvds";
-+			reg = <0 0xfeb90000 0 0x1c>;
-+			clocks = <&cpg CPG_MOD 726>;
-+			power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
-+			resets = <&cpg 726>;
-+
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					lvds0_in: endpoint {
-+						remote-endpoint = <&du_out_lvds0>;
-+					};
-+				};
-+				port at 1 {
-+					reg = <1>;
-+					lvds0_out: endpoint {
- 					};
- 				};
- 			};
--- 
-2.11.0
+No, if we do the switch the system-controller compatible,
+the device will be probed on the same memory region with
+a syscon on old DTs.
+
+>
+>ChenYu
+>
+>> Otherwise, the whole serie looks good to me:
+>> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+>>
+>> Maxime
+>>
+>> --
+>> Maxime Ripard, Bootlin (formerly Free Electrons)
+>> Embedded Linux and Kernel engineering
+>> https://bootlin.com
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
