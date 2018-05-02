@@ -1,116 +1,70 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 2 May 2018 18:41:34 +0200
-Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
- HMI
-In-Reply-To: <42feccc9-1d09-9ff2-3ccc-1dea63bacfb6@micronovasrl.com>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
- <20180322180508.my64gobhh5rc2x2m@flea>
- <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
- <20180424084137.7xfwji2gcibxavvt@flea>
- <03a02abb-e95c-b4ec-748f-907c0af67969@micronovasrl.com>
- <20180425184016.xktppxw7egddr7li@flea>
- <42feccc9-1d09-9ff2-3ccc-1dea63bacfb6@micronovasrl.com>
-Message-ID: <839d2560-0250-9b3a-8019-4e83d9e931e2@micronovasrl.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 2 May 2018 10:56:50 -0600
+Subject: [PATCH] coresight: Remove %px for printing pcsr value
+In-Reply-To: <1525237251-32496-1-git-send-email-leo.yan@linaro.org>
+References: <1525237251-32496-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <CANLsYkyR3=oZkHfot7CtFNu3WBXSQCz8qNc63a2djsTGM7jUWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 1 May 2018 at 23:00, Leo Yan <leo.yan@linaro.org> wrote:
+> The driver prints pcsr twice: the first time it uses specifier %px to
+> print hexadecimal pcsr value and the second time uses specifier %pS for
+> output kernel symbols.
+>
+> As suggested by Kees, using %pS should be sufficient and %px isn't
+> necessary; the reason is if the pcsr is a kernel space address, we can
+> easily get to know the code line from %pS format, on the other hand, if
+> the pcsr value doesn't fall into kernel space range (e.g. if the CPU is
+> stuck in firmware), %pS also gives out pcsr hexadecimal value.
+>
+> So this commit removes useless %px and update section "Output format"
+> in the document for alignment between the code and document.
+>
+> Suggested-by: Kees Cook <keescook@chromium.org>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
->> You don't have to handcode the fragments anymore with the new syntax,
->> and U-Boot makes it really trivial to use if you use the FIT image
->> format to have multiple overlays bundled in the same image. You can
->> choose to apply them dynamically, for example based on an EEPROM or
->> some other metric to see which combination you have.
-> 
-> Ah, this is interesting. I'm going to experiment with that.
-> 
+Applied - thanks,
+Mathieu
 
-I'm struggling against this, I don't really know how to proceed,
-except keeping monolithic dts files including other dtsi files.
 
-About dt-overlays I've tried to look around lot of time,
-but the only thing I've found is this:
-https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git/tree/arch/arm/boot/dts?h=topic/renesas-overlays
-
-where they use .dtso tagging them as "/plugin/;"
-and compile all .dtso found in dts folder.
-Then they obtain .dtbo files that should be the dt-overlays we have 
-spoken about right?
-
-What I can't understand is if there's a real standard at this time to 
-follow, because on renesas-driver they use their way to handle all .dtso 
-files, but on mainline there seems to be nothing about that.
-
-So at the moment I'm trying to compile dts tagged as /plugin/;
-but dtc gives me a lot of warnings.
-
-dts:
-"
-/dts-v1/;
-/plugin/;
-
-#include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/interrupt-controller/irq.h>
-
-&i2c2 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c2_pins_a>;
-	status = "okay";
-
-	ft5x {
-		compatible = "edt,edt-ft5306";
-		reg = <0x38>;
-		interrupt-parent = <&pio>;
-		interrupts = <7 2 IRQ_TYPE_EDGE_FALLING>; /* PH2 */
-		reset-gpios = <&pio 7 3 GPIO_ACTIVE_LOW>; /* PH3 */
-		touchscreen-size-x = <480>;
-		touchscreen-size-y = <272>;
-	};
-};
-"
-
-Build output issuing make ARCH=arm CROSS_COMPILE=arm-linux- aaa.dtb (I 
-use aaa.dts as source):
-"
-arch/arm/boot/dts/aaa.dtb: Warning (reg_format): 
-/fragment at 0/__overlay__/ft5x:reg: property has invalid length (4 bytes) 
-(#address-cells == 2, #size-cells == 1)
-arch/arm/boot/dts/aaa.dtb: Warning (pci_device_bus_num): Failed 
-prerequisite 'reg_format'
-arch/arm/boot/dts/aaa.dtb: Warning (simple_bus_reg): Failed prerequisite 
-'reg_format'
-arch/arm/boot/dts/aaa.dtb: Warning (avoid_default_addr_size): 
-/fragment at 0/__overlay__/ft5x: Relying on default #address-cells value
-arch/arm/boot/dts/aaa.dtb: Warning (avoid_default_addr_size): 
-/fragment at 0/__overlay__/ft5x: Relying on default #size-cells value
-"
-
-Then in uboot I'm trying to do as follows:
-# fdt addr 0x43000000 (where dtb is)
-# fdt resize 8192
-# fdt apply 0x430c0000 (where dtbo is)
-But it gives me "libfdt fdt_check_header(): FDT_ERR_BADMAGIC"
-(I was expecting some error)
-
-Is there anywhere a guide for this?
-Is this what you've meant before?
-Using FIT for my use is not the best, so I would like to have many 
-overlays in /boot folder and use different boot.scr depending on hardware.
-
-Can you point me to somewhere or something?
-I don't really know where to beat my head!
-
-Thanks in advance.
-
--- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+> ---
+>  Documentation/trace/coresight-cpu-debug.txt       | 4 ++--
+>  drivers/hwtracing/coresight/coresight-cpu-debug.c | 2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
+> index 2b9b51c..89ab09e 100644
+> --- a/Documentation/trace/coresight-cpu-debug.txt
+> +++ b/Documentation/trace/coresight-cpu-debug.txt
+> @@ -177,11 +177,11 @@ Here is an example of the debugging output format:
+>  ARM external debug module:
+>  coresight-cpu-debug 850000.debug: CPU[0]:
+>  coresight-cpu-debug 850000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
+> -coresight-cpu-debug 850000.debug:  EDPCSR:  [<ffff00000808e9bc>] handle_IPI+0x174/0x1d8
+> +coresight-cpu-debug 850000.debug:  EDPCSR:  handle_IPI+0x174/0x1d8
+>  coresight-cpu-debug 850000.debug:  EDCIDSR: 00000000
+>  coresight-cpu-debug 850000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+>  coresight-cpu-debug 852000.debug: CPU[1]:
+>  coresight-cpu-debug 852000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
+> -coresight-cpu-debug 852000.debug:  EDPCSR:  [<ffff0000087fab34>] debug_notifier_call+0x23c/0x358
+> +coresight-cpu-debug 852000.debug:  EDPCSR:  debug_notifier_call+0x23c/0x358
+>  coresight-cpu-debug 852000.debug:  EDCIDSR: 00000000
+>  coresight-cpu-debug 852000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+> diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> index 9cdb3fb..78a054e 100644
+> --- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> @@ -315,7 +315,7 @@ static void debug_dump_regs(struct debug_drvdata *drvdata)
+>         }
+>
+>         pc = debug_adjust_pc(drvdata);
+> -       dev_emerg(dev, " EDPCSR:  [<%px>] %pS\n", (void *)pc, (void *)pc);
+> +       dev_emerg(dev, " EDPCSR:  %pS\n", (void *)pc);
+>
+>         if (drvdata->edcidsr_present)
+>                 dev_emerg(dev, " EDCIDSR: %08x\n", drvdata->edcidsr);
+> --
+> 2.7.4
+>
