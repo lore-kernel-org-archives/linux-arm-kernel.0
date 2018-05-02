@@ -1,70 +1,27 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 2 May 2018 10:56:50 -0600
-Subject: [PATCH] coresight: Remove %px for printing pcsr value
-In-Reply-To: <1525237251-32496-1-git-send-email-leo.yan@linaro.org>
-References: <1525237251-32496-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <CANLsYkyR3=oZkHfot7CtFNu3WBXSQCz8qNc63a2djsTGM7jUWA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 2 May 2018 19:07:34 +0200
+Subject: [RFC 10/10] ARM: exynos: Remove support for Exynos5440
+In-Reply-To: <20180424203239.21885-11-krzk@kernel.org>
+References: <20180424203239.21885-1-krzk@kernel.org>
+ <20180424203239.21885-11-krzk@kernel.org>
+Message-ID: <20180502170734.dghbjq4evn2pzha2@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 May 2018 at 23:00, Leo Yan <leo.yan@linaro.org> wrote:
-> The driver prints pcsr twice: the first time it uses specifier %px to
-> print hexadecimal pcsr value and the second time uses specifier %pS for
-> output kernel symbols.
->
-> As suggested by Kees, using %pS should be sufficient and %px isn't
-> necessary; the reason is if the pcsr is a kernel space address, we can
-> easily get to know the code line from %pS format, on the other hand, if
-> the pcsr value doesn't fall into kernel space range (e.g. if the CPU is
-> stuck in firmware), %pS also gives out pcsr hexadecimal value.
->
-> So this commit removes useless %px and update section "Output format"
-> in the document for alignment between the code and document.
->
-> Suggested-by: Kees Cook <keescook@chromium.org>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-
-Applied - thanks,
-Mathieu
-
-
+On Tue, Apr 24, 2018 at 10:32:39PM +0200, Krzysztof Kozlowski wrote:
+> The Exynos5440 is not actively developed, there are no development
+> boards available and probably there are no real products with it.
+> Remove wide-tree support for Exynos5440.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
->  Documentation/trace/coresight-cpu-debug.txt       | 4 ++--
->  drivers/hwtracing/coresight/coresight-cpu-debug.c | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
-> index 2b9b51c..89ab09e 100644
-> --- a/Documentation/trace/coresight-cpu-debug.txt
-> +++ b/Documentation/trace/coresight-cpu-debug.txt
-> @@ -177,11 +177,11 @@ Here is an example of the debugging output format:
->  ARM external debug module:
->  coresight-cpu-debug 850000.debug: CPU[0]:
->  coresight-cpu-debug 850000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
-> -coresight-cpu-debug 850000.debug:  EDPCSR:  [<ffff00000808e9bc>] handle_IPI+0x174/0x1d8
-> +coresight-cpu-debug 850000.debug:  EDPCSR:  handle_IPI+0x174/0x1d8
->  coresight-cpu-debug 850000.debug:  EDCIDSR: 00000000
->  coresight-cpu-debug 850000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
->  coresight-cpu-debug 852000.debug: CPU[1]:
->  coresight-cpu-debug 852000.debug:  EDPRSR:  00000001 (Power:On DLK:Unlock)
-> -coresight-cpu-debug 852000.debug:  EDPCSR:  [<ffff0000087fab34>] debug_notifier_call+0x23c/0x358
-> +coresight-cpu-debug 852000.debug:  EDPCSR:  debug_notifier_call+0x23c/0x358
->  coresight-cpu-debug 852000.debug:  EDCIDSR: 00000000
->  coresight-cpu-debug 852000.debug:  EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
-> diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> index 9cdb3fb..78a054e 100644
-> --- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> @@ -315,7 +315,7 @@ static void debug_dump_regs(struct debug_drvdata *drvdata)
->         }
->
->         pc = debug_adjust_pc(drvdata);
-> -       dev_emerg(dev, " EDPCSR:  [<%px>] %pS\n", (void *)pc, (void *)pc);
-> +       dev_emerg(dev, " EDPCSR:  %pS\n", (void *)pc);
->
->         if (drvdata->edcidsr_present)
->                 dev_emerg(dev, " EDCIDSR: %08x\n", drvdata->edcidsr);
-> --
-> 2.7.4
->
+>  arch/arm/mach-exynos/Kconfig  | 12 ------------
+>  arch/arm/mach-exynos/common.h |  8 --------
+>  arch/arm/mach-exynos/exynos.c | 15 ++-------------
+>  3 files changed, 2 insertions(+), 33 deletions(-)
+> 
+
+Applied.
+
+Best regards,
+Krzysztof
