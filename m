@@ -1,54 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 2 May 2018 14:52:43 +0100
-Subject: [PATCH v2 21/27] coresight: Convert driver messages to dev_dbg
-In-Reply-To: <20180501225503.a55fb963795afb40163f3763@arm.com>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-22-git-send-email-suzuki.poulose@arm.com>
- <20180501225503.a55fb963795afb40163f3763@arm.com>
-Message-ID: <adf2465b-dd2c-dc0f-51ca-da7f1a8836ba@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 May 2018 15:56:05 +0200
+Subject: [PATCH] gpio: zynq: Setup chip->base based on alias ID
+In-Reply-To: <60652f48-2a98-414b-5cff-25890a6da37f@xilinx.com>
+References: <6ee982f8eb6e07f9ecbb0cc5093152f4a16b9c31.1523454899.git.michal.simek@xilinx.com>
+ <CACRpkdbOa+AvhQT1RCWA_zQuTpp4qfNjZBFDOKLdaFqMGAe+cw@mail.gmail.com>
+ <f9dd4f64-4026-f495-5810-32affb5b0944@xilinx.com>
+ <CACRpkdaxwRc0zoDKogVGisXTPJ0EwLbOQjHzz1pSEjvWCsSCTQ@mail.gmail.com>
+ <cc8d864a-e8e6-d30d-ae54-91819e5d0b8d@xilinx.com>
+ <CACRpkdYgw+HaC5bUCZKiD7j+2ZLYbCTG+DdPdAEkRDq0xF5b3w@mail.gmail.com>
+ <60652f48-2a98-414b-5cff-25890a6da37f@xilinx.com>
+Message-ID: <CACRpkdaNJzW+LO97oxavzYJwfkj0xu7wxTNRaGiaKm98ON5JMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/18 04:55, Kim Phillips wrote:
-> On Tue, 1 May 2018 10:10:51 +0100
-> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> 
->> Convert component enable/disable messages from dev_info to dev_dbg.
->> This is required to prevent LOCKDEP splats when operating in perf
->> mode where we could be called with locks held to enable a coresight
-> 
-> Can we see the splats?  Doesn't lockdep turn itself off if it starts
-> triggering too many splats?
+On Wed, May 2, 2018 at 3:41 PM, Michal Simek <michal.simek@xilinx.com> wrote:
 
-Without some very careful and robust reasoning for why the condition 
-being reported by lockdep could not actually occur in practice, 
-"avoiding the splats" is far, far less important than "avoiding the 
-potential deadlock that they are reporting".
+> If you don't want this patch I understand that and it will become just
+> another soc vendor patch out of mainline.
 
->> path. If someone wants to really see the messages, they can always
->> enable it at runtime via dynamic_debug.
-> 
-> Won't the splats still occur when the messages are enabled with
-> dynamic_debug?
-> 
-> So in effect this patch only tries to mitigate the splats, all the
-> while making things harder for regular users that now have to recompile
-> their kernels, in exchange for a very small convenience for kernel
-> developers that happen to see a splat or two with DEBUG_LOCKDEP set?
+I don't really know what to do, so that is why I'm discussing.
 
-FWIW, if "regular users" means people running distro kernels, then 
-chances are that they probably have DYNAMIC_DEBUG set already (100% of 
-my local sample of 2 - Ubuntu x86_64 and Arch aarch64 - certainly do). 
-Either way, though, this particular log spam really does only look 
-vaguely useful to people debugging the coresight stack itself, so anyone 
-going out of their way to turn it on has surely already gone beyond 
-regular use (even if they're just reproducing an issue with additional 
-logging at the request of kernel developers, rather than debugging it 
-themselves).
+It's one of those gray areas.
 
-Reducing the scope for possible deadlock from the general case to just 
-debugging scenarios is certainly not a bad thing, but as you say I think 
-we need a closer look at the underlying issue to know whether even 
-dev_dbg() is wise.
+>From one point of view there is the purist stance that we should
+only support what the mainline tree does, and be strict and
+consistent so we don't accumulate to many nasty hacks.
 
-Robin.
+On the other hand, it is completely possible that all users of this
+particular driver actually must have this patch, and then I just
+push them to use a deviant vendor tree for no good reason.
+
+Would it be possible that I apply the patch, and somehow also
+establish some understanding with all users of the Xilinx
+platform that whatever legacy applications are out there
+must start to migrate towards using the character device so
+this reliance on the numberspace doesn't stick around forever?
+
+For example can we make a patch to some systems like
+arch/arm/boot/dts/zynq-*.dts
+adding proper GPIO line names to these device trees, such
+as was made in e.g. commit f6b1674d570aa1
+"arm64: dts: qcom: sbc: Name GPIO lines"
+
+After all that is what I strive for as maintainer, as the IETF
+motto says:
+"rough consensus and running code"
+
+Yours,
+Linus Walleij
