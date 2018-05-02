@@ -1,62 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 May 2018 17:05:07 +0200
-Subject: [PATCH 4/6] pinctrl: fsl: add scu based pinctrl support
-In-Reply-To: <CACRpkdbgi6f2famHA_QUb0zZY7rF3QqbDzcfS_X=czcRJGMMyg@mail.gmail.com>
-References: <1524855713-15527-1-git-send-email-aisheng.dong@nxp.com>
- <1524855713-15527-5-git-send-email-aisheng.dong@nxp.com>
- <CACRpkdY5zSNYvXD3icbO+4R7Mc7TDhHCoUU0gikE6A+=ZFA=Kg@mail.gmail.com>
- <CACRpkdbiPQ8h_0cD5nkG21wQSq5FrcdNXK1AvE-AP7kWy3yUqw@mail.gmail.com>
- <20180502123638.qgolj3h6ycbx6aas@pengutronix.de>
- <CACRpkdbgi6f2famHA_QUb0zZY7rF3QqbDzcfS_X=czcRJGMMyg@mail.gmail.com>
-Message-ID: <20180502150507.pdqcrhsx3fkh3yof@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 2 May 2018 20:38:06 +0530
+Subject: [PATCH v9 03/27] clk: davinci: psc: allow for dev == NULL
+In-Reply-To: <94d4cfc5-0ea7-e642-c7e3-8d549bdef8ce@lechnology.com>
+References: <20180427001745.4116-1-david@lechnology.com>
+ <20180427001745.4116-4-david@lechnology.com>
+ <8940259b-5811-ce9f-8262-17d39ca0a46f@ti.com>
+ <94d4cfc5-0ea7-e642-c7e3-8d549bdef8ce@lechnology.com>
+Message-ID: <3cec9c1f-48fd-1c16-b642-eb93e41446fc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 03:03:04PM +0200, Linus Walleij wrote:
-> On Wed, May 2, 2018 at 2:36 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > Hi Linus,
-> >
-> > On Wed, May 02, 2018 at 02:29:04PM +0200, Linus Walleij wrote:
-> >> On Wed, May 2, 2018 at 2:27 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >> > On Fri, Apr 27, 2018 at 9:01 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
-> >> >
-> >> >> Some i.MX SoCs (e.g. MX8QXP and MX8QM) contain a system controller
-> >> >> that is responsible for controlling the pad setting of the IPs that
-> >> >> are present. Communication between the host processor running an OS
-> >> >> and the system controller happens through a SCU protocol.
-> >> >> This patch adds SCU protocol based pinctrl drivers.
-> >> >>
-> >> >> Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> >> Cc: Shawn Guo <shawnguo@kernel.org>
-> >> >> Cc: Fabio Estevam <festevam@gmail.com>
-> >> >> Cc: Stefan Agner <stefan@agner.ch>
-> >> >> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-> >> >> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> >> >
-> >> > Patch applied.
-> >>
-> >> Bah on second thought holding this back since I see thyere are
-> >> some discussions about the bindings in the next patch.
-> >
-> > Also note that this patch depends on the SCU base support posted elsewhere
-> > as Dong mentioned in his introductory mail.
+On Wednesday 02 May 2018 07:19 AM, David Lechner wrote:
+> On 05/01/2018 09:02 AM, Sekhar Nori wrote:
+>> On Friday 27 April 2018 05:47 AM, David Lechner wrote:
+>>> +static inline void *_devm_kzalloc(struct device *dev, size_t size,
+>>> gfp_t flags)
+>>> +{
+>>> +??? if (dev)
+>>> +??????? return devm_kzalloc(dev, size, flags);
+>>> +
+>>> +??? return kzalloc(size, flags);
+>>> +}
+>>
+>> I have the same question on the utility of this. A memory allocation
+>> error so early on is not going to result in a bootable system anyway.
+>> So, I wonder if its better to just BUG() in such cases. That will
+>> actually help faster debug than returning an error back. I know the push
+>> back on using BUG(), but clock drivers are special, and I think thats
+>> why its seems to be used quite a bit already.
+>>
 > 
-> Aha is that a compile-time dependence?
+> Same reply here as well. On DA850/DA830, you might not get a console,
+> but you will "boot" even if one of the PSC devices fails though.
 
-Yes.
+Was not thinking of failure to boot due to clocks being disabled, but
+the fact that you are not able to allocate a small amount of memory so
+early in boot process. The chances of successful boot after memory
+allocation failures like that are close to zero.
 
-> 
-> I guess it would be better if it is one big series if it is supposed
-> to be merged in one big series.
+> WARN() is probably just as good as BUG() in this case too.
 
-The SCU is a coprocessor that provides pinctrl, clk, power domain and
-other misc stuff, so posting this as multiple series should be the way
-to go.
+Okay, but with WARN() you would continue to proceed to try to boot which
+is not going to be much fruitful (and might actually muddle the first
+failure). But up to you on this.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Sekhar
