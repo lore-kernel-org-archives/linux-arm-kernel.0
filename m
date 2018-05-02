@@ -1,87 +1,51 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 2 May 2018 12:01:53 +0100
-Subject: [linux-sunxi] [PATCH 3/3] arm64: allwinner: h6: enable MMC0/2 on
- Pine H64
-In-Reply-To: <20180502093601.fvkacdv62aqxshbr@flea>
-References: <20180426140728.43155-1-icenowy@aosc.io>
- <20180426140728.43155-4-icenowy@aosc.io>
- <03cc2e8c-4a35-3fb4-b408-fd8d4ba3e407@arm.com>
- <83EDF187-5EB2-4FEB-99BC-9D5B728D3A45@aosc.io>
- <45956397-a593-e51e-8637-655178c5901c@arm.com>
- <20180502093601.fvkacdv62aqxshbr@flea>
-Message-ID: <aa2d6072-87a5-cd52-d3a5-17df889e6bc9@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 2 May 2018 12:02:13 +0100
+Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <CAJWu+oqH0-nwBNSXiuuf1gPK62rstSYBaus89dmanoCw1QYv7A@mail.gmail.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <e0b5ae90-f21e-f5db-a4af-52900a2e8c07@arm.com>
+ <CAEi0qNkt75cqF=03HrQ81+pDdWVOpzGiHrk8_cTNTJo9os9D8Q@mail.gmail.com>
+ <07a0b8c1-3d87-0cae-61df-dbff782be301@arm.com>
+ <20180430105559.ys6kcfoy76o3qpoj@holly.lan>
+ <CAJWu+oqH0-nwBNSXiuuf1gPK62rstSYBaus89dmanoCw1QYv7A@mail.gmail.com>
+Message-ID: <20180502110213.okx5gxu7vys34nxt@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/05/18 10:36, Maxime Ripard wrote:
-> On Mon, Apr 30, 2018 at 10:47:35AM +0100, Andre Przywara wrote:
->>>> I am just asking because I want to avoid running into the same problem
->>>> as with the A64 before: that future DTs become incompatible with older
->>>> kernels, because we change the power supply to point to the AXP
->>>> regulators, which this kernel does not support yet.
->>>
->>> The answer is just not to keep this compatibility, as it's not
->>> supported option to update DT without updating kernel.
->>
->> Well, I recognise that statement.. ;-) and I understand that it's far
->> easier to handle it this way. But:
->> - Which .dtb are we going to write into the SPI flash? An older one,
->> which covers all kernels, but lacks features? Or a newer one, which
->> limits the bootable kernels to recent versions?
->> - Which DT are we going to give to EFI applications?
->> - Which DT are the BSDs suspected to take? They don't ship their own DTs
->> (which is good!).
->>
->> So I understand that "shipping the DT with the kernel" is the old
->> (embedded!) way of doing things, but I really believe we should stop
->> relying on this and try to come up with backwards compatible DTs, which
->> live in the firmware and get updated there. Because this is what the
->> distros seem to expect from ARM64 boards these days.
+On Tue, May 01, 2018 at 06:18:44PM +0000, Joel Fernandes wrote:
+> > > From my understanding, Linux's hardlockup detector already uses the ARM
+> PMU
+> > > interrupt to check whether some task is stuck. I haven't looked at the
+> > > details of the implementation yet, but in theory having the PMU
+> interrupt as
+> > > NMI should make the hard lockup detector use the NMI.
+> > >
+> > > When I do the v3, I'll have a look at this to check whether the
+> hardlockup
+> > > detector works fine when using NMI.
 > 
-> You're not talking about backward compatibility, you're talking about
-> forward compatibility. All the changes in this patch and the one
-> predicted by Icenowy are backward compatible.
-
-Argh, yes, I meant forward compatibility, sorry!
-Shouldn't write those emails while actually doing something completely
-different ;-)
-
->>>> It looks like there are more users of those power rails, so we could
->>>> keep those supplies connected to these fixed regulators here, even with
->>>> AXP-805 support in the kernel.
->>>
->>> It's not a good choice.
->>>
->>>>
->>>> Or we keep this back until we get proper AXP support in the kernel? I
->>>> guess it's quite close to the existing PMICs, so it might be more a
->>>> copy&paste exercise to support the AXP-805?
->>>
->>> It's not a reason to keep it back.
->>
->> So I compared the manuals of the AXP806 and the AXP805, the register
->> interface looks identical to me. I only have a (somewhat) Chinese
->> version of the AXP806 manual, so couldn't really find the difference
->> between the two. Do you know more about it? Is it just maybe the
->> packaging and the electrical properties (like max current supported)?
->>
->> If the I2C register interface is really the same, we could just add the
->> DT nodes for the regulator and be done.
+> > That's what I saw on arch/arm (with some of the much older FIQ work).
 > 
-> And that argument is only valid if you 100% trust the fact that both
-> datasheet are complete and accurate.
+> > Once you have PMU and the appropriate config to *admit* to supporting
+> > hard lockup then it will "just work" and be setup automatically during
+> > kernel boot.
 > 
-> And experience show that you can't.
+> > Actually the problem then becomes that if you want to use the PMU
+> > for anything else then you may end up having to disable the hard
+> > lockup detector.
+> 
+> This problem is not anything pseudo-NMI specific though right?
+> Contention/constraints on PMU resources should be a problem even on
+> platforms with real NMI.
 
-Well, but I wonder how paranoid we are going to be? And in this case we
-have confirmation from Wink that they are the same.
-So I think we can go with just a DT addition, given that we test it and
-confirm that it works for our use case. Should we discover something odd
-or undocumented later, I'd consider this a bug fix, which we then (and
-only then!) could fix by adding the compatible string to the driver. Any
-DT would be fine already, because we list both compatible strings in there.
+Quite so. Nothing specific to pseudo-NMI; merely part of life's rich tapestry.
 
-Cheers,
-Andre.
+Moreover it is a potential surprise for anyone coming from x86 since I think
+the performance monitors make it easier to run hard lockup alongside
+some simple perf activity.
+
+Either way, if you are impacted, its easy to disable the hard lockup
+using procfs.
+
+
+Daniel.
