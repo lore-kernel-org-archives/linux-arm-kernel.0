@@ -1,96 +1,96 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 2 May 2018 15:05:23 +0200
-Subject: [PATCH] iio: adc: stm32-dfsdm: Add support for stm32mp1
-Message-ID: <1525266323-4922-1-git-send-email-fabrice.gasnier@st.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 2 May 2018 15:08:42 +0200
+Subject: [PATCH v8 07/12] ARM: sunxi: Add initialization of CNTVOFF
+In-Reply-To: <20180501123131.7738-8-mylene.josserand@bootlin.com>
+References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
+ <20180501123131.7738-8-mylene.josserand@bootlin.com>
+Message-ID: <20180502130842.pecjwahxrvx5addq@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DFSDM (Digital Filter For Sigma Delta Modulators)
-to STM32MP1. This variant is close to STM32H7 DFSDM, it implements
-6 filter instances. Registers map is also increased.
+On Tue, May 01, 2018 at 02:31:26PM +0200, Myl?ne Josserand wrote:
+> Add the initialization of CNTVOFF for sun8i-a83t.
+> 
+> For boot CPU, create a new machine that handles this
+> function's call in an "init_early" callback. We need to initialize
+> CNTVOFF before the arch timer's initialization otherwise, it will
+> not be taken into account and fails to boot correctly.
+> Because of that, this function can't be called in SMP's early_initcall
+> function which is called after timer's init.
+> 
+> For secondary CPUs, add this function into secondary_startup
+> assembly entry.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  arch/arm/mach-sunxi/headsmp.S |  1 +
+>  arch/arm/mach-sunxi/sunxi.c   | 20 +++++++++++++++++++-
+>  2 files changed, 20 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+> index 37dc772701f3..32d76be98541 100644
+> --- a/arch/arm/mach-sunxi/headsmp.S
+> +++ b/arch/arm/mach-sunxi/headsmp.S
+> @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+>  
+>  ENTRY(sunxi_mc_smp_secondary_startup)
+>  	bl	sunxi_mc_smp_cluster_cache_enable
+> +	bl	secure_cntvoff_init
+>  	b	secondary_startup
+>  ENDPROC(sunxi_mc_smp_secondary_startup)
+>  
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 5e9602ce1573..2770a31a9278 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/platform_device.h>
+>  
+>  #include <asm/mach/arch.h>
+> +#include <asm/secure_cntvoff.h>
+>  
+>  static const char * const sunxi_board_dt_compat[] = {
+>  	"allwinner,sun4i-a10",
+> @@ -62,7 +63,6 @@ MACHINE_END
+>  static const char * const sun8i_board_dt_compat[] = {
+>  	"allwinner,sun8i-a23",
+>  	"allwinner,sun8i-a33",
+> -	"allwinner,sun8i-a83t",
+>  	"allwinner,sun8i-h2-plus",
+>  	"allwinner,sun8i-h3",
+>  	"allwinner,sun8i-r40",
+> @@ -75,6 +75,24 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+>  	.dt_compat	= sun8i_board_dt_compat,
+>  MACHINE_END
+>  
+> +void __init sun8i_a83t_cntvoff_init(void)
+> +{
+> +#ifdef CONFIG_SMP
+> +	secure_cntvoff_init();
+> +#endif
+> +}
+> +
+> +static const char * const sun8i_a83t_cntvoff_board_dt_compat[] = {
+> +	"allwinner,sun8i-a83t",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i-a83t board")
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- .../bindings/iio/adc/st,stm32-dfsdm-adc.txt         |  7 +++++--
- drivers/iio/adc/stm32-dfsdm-core.c                  | 21 +++++++++++++++++++++
- 2 files changed, 26 insertions(+), 2 deletions(-)
+I put my Acked-by on the condition that you would fix this. And you
+still didn't.
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-index ed7520d..75ba25d 100644
---- a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-@@ -8,14 +8,16 @@ It is mainly targeted for:
- - PDM microphones (audio digital microphone)
- 
- It features up to 8 serial digital interfaces (SPI or Manchester) and
--up to 4 filters on stm32h7.
-+up to 4 filters on stm32h7 or 6 filters on stm32mp1.
- 
- Each child node match with a filter instance.
- 
- Contents of a STM32 DFSDM root node:
- ------------------------------------
- Required properties:
--- compatible: Should be "st,stm32h7-dfsdm".
-+- compatible: Should be one of:
-+  "st,stm32h7-dfsdm"
-+  "st,stm32mp1-dfsdm"
- - reg: Offset and length of the DFSDM block register set.
- - clocks: IP and serial interfaces clocking. Should be set according
- 		to rcc clock ID and "clock-names".
-@@ -45,6 +47,7 @@ Required properties:
- 	"st,stm32-dfsdm-adc" for sigma delta ADCs
- 	"st,stm32-dfsdm-dmic" for audio digital microphone.
- - reg: Specifies the DFSDM filter instance used.
-+	Valid values are from 0 to 3 on stm32h7, 0 to 5 on stm32mp1.
- - interrupts: IRQ lines connected to each DFSDM filter instance.
- - st,adc-channels:	List of single-ended channels muxed for this ADC.
- 			valid values:
-diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
-index e50efdc..d924e6c 100644
---- a/drivers/iio/adc/stm32-dfsdm-core.c
-+++ b/drivers/iio/adc/stm32-dfsdm-core.c
-@@ -25,6 +25,8 @@ struct stm32_dfsdm_dev_data {
- 
- #define STM32H7_DFSDM_NUM_FILTERS	4
- #define STM32H7_DFSDM_NUM_CHANNELS	8
-+#define STM32MP1_DFSDM_NUM_FILTERS	6
-+#define STM32MP1_DFSDM_NUM_CHANNELS	8
- 
- static bool stm32_dfsdm_volatile_reg(struct device *dev, unsigned int reg)
- {
-@@ -61,6 +63,21 @@ static bool stm32_dfsdm_volatile_reg(struct device *dev, unsigned int reg)
- 	.regmap_cfg = &stm32h7_dfsdm_regmap_cfg,
- };
- 
-+static const struct regmap_config stm32mp1_dfsdm_regmap_cfg = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = sizeof(u32),
-+	.max_register = 0x7fc,
-+	.volatile_reg = stm32_dfsdm_volatile_reg,
-+	.fast_io = true,
-+};
-+
-+static const struct stm32_dfsdm_dev_data stm32mp1_dfsdm_data = {
-+	.num_filters = STM32MP1_DFSDM_NUM_FILTERS,
-+	.num_channels = STM32MP1_DFSDM_NUM_CHANNELS,
-+	.regmap_cfg = &stm32mp1_dfsdm_regmap_cfg,
-+};
-+
- struct dfsdm_priv {
- 	struct platform_device *pdev; /* platform device */
- 
-@@ -243,6 +260,10 @@ static int stm32_dfsdm_parse_of(struct platform_device *pdev,
- 		.compatible = "st,stm32h7-dfsdm",
- 		.data = &stm32h7_dfsdm_data,
- 	},
-+	{
-+		.compatible = "st,stm32mp1-dfsdm",
-+		.data = &stm32mp1_dfsdm_data,
-+	},
- 	{}
- };
- MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/d7eb50f0/attachment.sig>
