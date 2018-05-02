@@ -1,51 +1,43 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 2 May 2018 12:02:13 +0100
-Subject: [PATCH v2 0/6] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <CAJWu+oqH0-nwBNSXiuuf1gPK62rstSYBaus89dmanoCw1QYv7A@mail.gmail.com>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <e0b5ae90-f21e-f5db-a4af-52900a2e8c07@arm.com>
- <CAEi0qNkt75cqF=03HrQ81+pDdWVOpzGiHrk8_cTNTJo9os9D8Q@mail.gmail.com>
- <07a0b8c1-3d87-0cae-61df-dbff782be301@arm.com>
- <20180430105559.ys6kcfoy76o3qpoj@holly.lan>
- <CAJWu+oqH0-nwBNSXiuuf1gPK62rstSYBaus89dmanoCw1QYv7A@mail.gmail.com>
-Message-ID: <20180502110213.okx5gxu7vys34nxt@holly.lan>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 2 May 2018 12:05:20 +0100
+Subject: [PATCH 1/2] arm64/mm: define ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
+In-Reply-To: <15c56137-e7c4-dbfa-ce5d-f5feeea79e98@linux.vnet.ibm.com>
+References: <1525247672-2165-1-git-send-email-opensource.ganesh@gmail.com>
+ <15c56137-e7c4-dbfa-ce5d-f5feeea79e98@linux.vnet.ibm.com>
+Message-ID: <20180502110441.xuvjs7gu5xir6y72@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 06:18:44PM +0000, Joel Fernandes wrote:
-> > > From my understanding, Linux's hardlockup detector already uses the ARM
-> PMU
-> > > interrupt to check whether some task is stuck. I haven't looked at the
-> > > details of the implementation yet, but in theory having the PMU
-> interrupt as
-> > > NMI should make the hard lockup detector use the NMI.
-> > >
-> > > When I do the v3, I'll have a look at this to check whether the
-> hardlockup
-> > > detector works fine when using NMI.
+On Wed, May 02, 2018 at 11:00:55AM +0200, Laurent Dufour wrote:
+> On 02/05/2018 09:54, Ganesh Mahendran wrote:
+> > Set ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT for arm64. This
+> > enables Speculative Page Fault handler.
+> > 
+> > Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
+> > ---
+> > This patch is on top of Laurent's v10 spf
+> > ---
+> >  arch/arm64/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index eb2cf49..cd583a9 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -144,6 +144,7 @@ config ARM64
+> >  	select SPARSE_IRQ
+> >  	select SYSCTL_EXCEPTION_TRACE
+> >  	select THREAD_INFO_IN_TASK
+> > +	select ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT if SMP
 > 
-> > That's what I saw on arch/arm (with some of the much older FIQ work).
-> 
-> > Once you have PMU and the appropriate config to *admit* to supporting
-> > hard lockup then it will "just work" and be setup automatically during
-> > kernel boot.
-> 
-> > Actually the problem then becomes that if you want to use the PMU
-> > for anything else then you may end up having to disable the hard
-> > lockup detector.
-> 
-> This problem is not anything pseudo-NMI specific though right?
-> Contention/constraints on PMU resources should be a problem even on
-> platforms with real NMI.
+> There is no need to depend on SMP here as the upper
+> CONFIG_SPECULATIVE_PAGE_FAULT is depending on SMP.
 
-Quite so. Nothing specific to pseudo-NMI; merely part of life's rich tapestry.
+Additionally, since commit:
 
-Moreover it is a potential surprise for anyone coming from x86 since I think
-the performance monitors make it easier to run hard lockup alongside
-some simple perf activity.
+  4b3dc9679cf77933 ("arm64: force CONFIG_SMP=y and remove redundant #ifdefs")
 
-Either way, if you are impacted, its easy to disable the hard lockup
-using procfs.
+... arm64 is always SMP.
 
-
-Daniel.
+Thanks,
+Mark.
