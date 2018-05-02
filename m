@@ -1,38 +1,24 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 2 May 2018 15:14:31 +0200
-Subject: [PATCH v8 10/12] ARM: sun8i: smp: Add support for A83T
-In-Reply-To: <20180501123131.7738-11-mylene.josserand@bootlin.com>
-References: <20180501123131.7738-1-mylene.josserand@bootlin.com>
- <20180501123131.7738-11-mylene.josserand@bootlin.com>
-Message-ID: <20180502131431.j7jaz74ko5ueotwn@flea>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 2 May 2018 21:15:26 +0800
+Subject: [PATCH V3 1/2] clk: imx6sx: add missing lvds2 clock to the clock
+ tree
+In-Reply-To: <1524209891-14146-1-git-send-email-Anson.Huang@nxp.com>
+References: <1524209891-14146-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180502131524.GJ3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 02:31:29PM +0200, Myl?ne Josserand wrote:
-> Add the support for A83T.
+On Fri, Apr 20, 2018 at 03:38:10PM +0800, Anson Huang wrote:
+> i.MX6SX has lvds2 (analog clock2), an I/O clock like lvds1.
+> And this lvds2, along with lvds1, can be used to provide
+> external clock source to the internal pll, such as pll4_audio
+> and pll5_video.
 > 
-> A83T SoC has an additional register than A80 to handle CPU configurations:
-> R_CPUS_CFG. Information about the register comes from Allwinner's BSP
-> driver.
-> An important difference is the Power Off Gating register for clusters
-> which is BIT(4) in case of SUN9I-A80 and BIT(0) in case of SUN8I-A83T.
-> There is also a bit swap between sun8i-a83t and sun9i-a80 that must be
-> handled.
+> This patch mainly adds the lvds2 to the clock tree and fix its
+> relationship with pll accordingly.
 > 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Signed-off-by: Shengjiu Wang <shengjiu.wang@nxp.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/8c1ae706/attachment-0001.sig>
+Acked-by: Shawn Guo <shawnguo@kernel.org>
