@@ -1,73 +1,33 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 1 May 2018 20:46:09 -0500
-Subject: [PATCH v9 02/27] clk: davinci: da850-pll: change PLL0 to
- CLK_OF_DECLARE
-In-Reply-To: <fe791ecf-ebd0-4e9e-722e-bfa07acc4ea2@ti.com>
+Date: Tue, 1 May 2018 20:49:52 -0500
+Subject: [PATCH v9 03/27] clk: davinci: psc: allow for dev == NULL
+In-Reply-To: <8940259b-5811-ce9f-8262-17d39ca0a46f@ti.com>
 References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-3-david@lechnology.com>
- <fe791ecf-ebd0-4e9e-722e-bfa07acc4ea2@ti.com>
-Message-ID: <f92d3a7c-3a1f-d267-6424-af1f38badd76@lechnology.com>
+ <20180427001745.4116-4-david@lechnology.com>
+ <8940259b-5811-ce9f-8262-17d39ca0a46f@ti.com>
+Message-ID: <94d4cfc5-0ea7-e642-c7e3-8d549bdef8ce@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2018 08:46 AM, Sekhar Nori wrote:
+On 05/01/2018 09:02 AM, Sekhar Nori wrote:
 > On Friday 27 April 2018 05:47 AM, David Lechner wrote:
->> PLL0 on davinci/da850-type device needs to be registered early in boot
->> because it is needed for clocksource/clockevent. Change the driver
->> to use CLK_OF_DECLARE for this special case.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>
->> v9 changes:
->> - new patch in v9
->>
->>
->>   drivers/clk/davinci/pll-da850.c | 26 ++++++++++++++++++++++----
->>   drivers/clk/davinci/pll.c       |  4 +++-
->>   drivers/clk/davinci/pll.h       |  2 +-
->>   3 files changed, 26 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/clk/davinci/pll-da850.c b/drivers/clk/davinci/pll-da850.c
->> index 00a6ece7b524..743527de1da2 100644
->> --- a/drivers/clk/davinci/pll-da850.c
->> +++ b/drivers/clk/davinci/pll-da850.c
->> @@ -12,6 +12,8 @@
->>   #include <linux/init.h>
->>   #include <linux/kernel.h>
->>   #include <linux/mfd/da8xx-cfgchip.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/of_address.h>
->>   #include <linux/of.h>
->>   #include <linux/types.h>
->>   
->> @@ -135,11 +137,27 @@ static const struct davinci_pll_sysclk_info *da850_pll0_sysclk_info[] = {
->>   	NULL
->>   };
->>   
->> -int of_da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
->> +void of_da850_pll0_init(struct device_node *node)
->>   {
->> -	return of_davinci_pll_init(dev, dev->of_node, &da850_pll0_info,
->> -				   &da850_pll0_obsclk_info,
->> -				   da850_pll0_sysclk_info, 7, base, cfgchip);
->> +	void __iomem *base;
->> +	struct regmap *cfgchip;
+>> +static inline void *_devm_kzalloc(struct device *dev, size_t size, gfp_t flags)
+>> +{
+>> +	if (dev)
+>> +		return devm_kzalloc(dev, size, flags);
 >> +
->> +	base = of_iomap(node, 0);
->> +	if (!base) {
->> +		pr_err("%s: ioremap failed\n", __func__);
->> +		return;
->> +	}
->> +
->> +	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
->> +	if (IS_ERR(cfgchip)) {
->> +		pr_warn("%s: failed to get cfgchip (%ld)\n", __func__,
->> +			PTR_ERR(cfgchip));
->> +		cfgchip = NULL;
->> +	}
+>> +	return kzalloc(size, flags);
+>> +}
 > 
-> Is this error handling for cfgchip needed here considering
-> davinci_pll_clk_register() already checks and warns.
+> I have the same question on the utility of this. A memory allocation
+> error so early on is not going to result in a bootable system anyway.
+> So, I wonder if its better to just BUG() in such cases. That will
+> actually help faster debug than returning an error back. I know the push
+> back on using BUG(), but clock drivers are special, and I think thats
+> why its seems to be used quite a bit already.
+> 
 
-Ah, good point. I'll clean this up.
+Same reply here as well. On DA850/DA830, you might not get a console,
+but you will "boot" even if one of the PSC devices fails though.
+
+WARN() is probably just as good as BUG() in this case too.
