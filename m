@@ -1,38 +1,69 @@
-From: christophe.roullier@st.com (Christophe ROULLIER)
-Date: Wed, 2 May 2018 15:16:56 +0000
-Subject: [PATCH V2 6/8] net: stmmac: add dwmac-4.20a compatible
-In-Reply-To: <cb027f0e-7209-0035-84a9-b5d7a4ec9595@synopsys.com>
-References: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
- <1525270723-18241-7-git-send-email-christophe.roullier@st.com>
- <cb027f0e-7209-0035-84a9-b5d7a4ec9595@synopsys.com>
-Message-ID: <50090e5db8db4753b9519d8c1c770ebd@SFHDAG5NODE3.st.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 2 May 2018 17:24:56 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 analog & timer drivers
+Message-ID: <1525274696-11968-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jose,
+This enables drivers for STM32 timer, low power timer and analog hardware
+that can be used on STM32MP1 SoC:
+- Timer & LP Timer MFD core, PWM, trigger & encoder drivers
+- IIO ADC/DAC/DFSDM
+- vrefbuf regu driver (voltage reference buffer).
 
->Just being curious: Can you tell me which HW features do you have on your NIC?
-Nothing specific to SNPS 4.20a, it is just to be align with our SNPS IP in our NIC ;-)
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-BR
-
-Christophe.
-
------Original Message-----
-From: Jose Abreu [mailto:Jose.Abreu at synopsys.com] 
-Sent: mercredi 2 mai 2018 16:41
-To: Christophe ROULLIER <christophe.roullier@st.com>; mark.rutland at arm.com; mcoquelin.stm32 at gmail.com; Alexandre TORGUE <alexandre.torgue@st.com>; Peppe CAVALLARO <peppe.cavallaro@st.com>
-Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org; andrew at lunn.ch
-Subject: Re: [PATCH V2 6/8] net: stmmac: add dwmac-4.20a compatible
-
-Hi Christophe,
-
-On 02-05-2018 15:18, Christophe Roullier wrote:
-> Manage dwmac-4.20a version from synopsys
->
->
-
-Just being curious: Can you tell me which HW features do you have on your NIC?
-
-Thanks and Best Regards,
-Jose Miguel Abreu
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index e6b3c96..40f5dd8 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -535,6 +535,7 @@ CONFIG_MFD_TPS65217=y
+ CONFIG_MFD_TPS65218=y
+ CONFIG_MFD_TPS6586X=y
+ CONFIG_MFD_TPS65910=y
++CONFIG_MFD_STM32_LPTIMER=y
+ CONFIG_REGULATOR_ACT8945A=y
+ CONFIG_REGULATOR_AB8500=y
+ CONFIG_REGULATOR_ACT8865=y
+@@ -567,6 +568,7 @@ CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_REGULATOR_RN5T618=y
+ CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_REGULATOR_S5M8767=y
++CONFIG_REGULATOR_STM32_VREFBUF=y
+ CONFIG_REGULATOR_TI_ABB=y
+ CONFIG_REGULATOR_TPS51632=y
+ CONFIG_REGULATOR_TPS62360=y
+@@ -935,13 +937,19 @@ CONFIG_AT91_SAMA5D2_ADC=m
+ CONFIG_BERLIN2_ADC=m
+ CONFIG_CPCAP_ADC=m
+ CONFIG_EXYNOS_ADC=m
++CONFIG_STM32_ADC_CORE=y
++CONFIG_STM32_ADC=y
++CONFIG_STM32_DFSDM_ADC=y
+ CONFIG_VF610_ADC=m
+ CONFIG_XILINX_XADC=y
++CONFIG_STM32_LPTIMER_CNT=y
++CONFIG_STM32_DAC=y
+ CONFIG_MPU3050_I2C=y
+ CONFIG_CM36651=m
+ CONFIG_AK8975=y
+ CONFIG_RASPBERRYPI_POWER=y
+ CONFIG_IIO_HRTIMER_TRIGGER=y
++CONFIG_IIO_STM32_LPTIMER_TRIGGER=y
+ CONFIG_PWM=y
+ CONFIG_PWM_ATMEL=m
+ CONFIG_PWM_ATMEL_HLCDC_PWM=m
+@@ -951,6 +959,8 @@ CONFIG_PWM_RCAR=m
+ CONFIG_PWM_RENESAS_TPU=y
+ CONFIG_PWM_ROCKCHIP=m
+ CONFIG_PWM_SAMSUNG=m
++CONFIG_PWM_STM32=y
++CONFIG_PWM_STM32_LP=y
+ CONFIG_PWM_SUN4I=y
+ CONFIG_PWM_TEGRA=y
+ CONFIG_PWM_VT8500=y
+-- 
+1.9.1
