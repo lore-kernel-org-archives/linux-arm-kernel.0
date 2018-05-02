@@ -1,62 +1,86 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed,  2 May 2018 13:53:14 +0200
-Subject: [PATCH] arm64: zynqmp: Add support for Avnet Ultra96 rev1 board
-Message-ID: <80d21c84d427cb6b4122efd3dea7f1c4ab4cf2be.1525261987.git.michal.simek@xilinx.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 2 May 2018 13:54:37 +0200
+Subject: [PATCH net-next v2 15/15] arm64: dts: allwinner: a64: add SRAM
+ controller device tree node
+In-Reply-To: <29E5670C-9D17-4EC1-AAAC-0CF33DD0534C@aosc.io>
+References: <20180501161227.2110-1-wens@csie.org>
+ <20180501161227.2110-16-wens@csie.org>
+ <20180502095118.rqnfwy576xh6ercm@flea>
+ <CAGb2v67pvL58Pes1ZFDZtPu_nL2+m6dgf_XOOymG9nVAkXVpEw@mail.gmail.com>
+ <29E5670C-9D17-4EC1-AAAC-0CF33DD0534C@aosc.io>
+Message-ID: <20180502115437.zlu2rafrguufutvp@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avnet Ultra96 rev1 board is commercialized Xilinx zcu100 revC/D
-internal board. The patch is reusing zcu100 revC files but changing
-model description and compatible strings which are used for example by
-libmraa.
+On Wed, May 02, 2018 at 06:19:51PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> ? 2018?5?2? GMT+08:00 ??5:53:21, Chen-Yu Tsai <wens@csie.org> ??:
+> >On Wed, May 2, 2018 at 5:51 PM, Maxime Ripard
+> ><maxime.ripard@bootlin.com> wrote:
+> >> Hi,
+> >>
+> >> On Wed, May 02, 2018 at 12:12:27AM +0800, Chen-Yu Tsai wrote:
+> >>> From: Icenowy Zheng <icenowy@aosc.io>
+> >>>
+> >>> Allwinner A64 has a SRAM controller, and in the device tree
+> >currently
+> >>> we have a syscon node to enable EMAC driver to access the EMAC clock
+> >>> register. As SRAM controller driver can now export regmap for this
+> >>> register, replace the syscon node to the SRAM controller device
+> >node,
+> >>> and let EMAC driver to acquire its EMAC clock regmap.
+> >>>
+> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >>> ---
+> >>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 23
+> >+++++++++++++++----
+> >>>  1 file changed, 19 insertions(+), 4 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >>> index 1b2ef28c42bd..1c37659d9d41 100644
+> >>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >>> @@ -168,10 +168,25 @@
+> >>>               #size-cells = <1>;
+> >>>               ranges;
+> >>>
+> >>> -             syscon: syscon at 1c00000 {
+> >>> -                     compatible =
+> >"allwinner,sun50i-a64-system-controller",
+> >>> -                             "syscon";
+> >>> +             sram_controller: sram-controller at 1c00000 {
+> >>> +                     compatible =
+> >"allwinner,sun50i-a64-sram-controller";
+> >>
+> >> I don't think there's anything preventing us from keeping the
+> >> -system-controller compatible. It's what was in the DT before, and
+> >> it's how it's called in the datasheet.
+> >
+> >I actually meant to ask you about this. The -system-controller
+> >compatible matches the datasheet better. Maybe we should just
+> >switch to that one?
+> 
+> No, if we do the switch the system-controller compatible,
+> the device will be probed on the same memory region with
+> a syscon on old DTs.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+The device hasn't magically changed either. Maybe we just need to add
+a check to make sure we don't have the syscon compatible in the SRAM
+driver probe so that the double driver issue doesn't happen?
 
-I choose this option because there are houndreds of zcu100 boards
-created and this will enable support both versions.
+Maxime
 
-Record avnet prefix was sent by separate patch.
----
- arch/arm64/boot/dts/xilinx/Makefile           |  1 +
- .../boot/dts/xilinx/avnet-ultra96-rev1.dts    | 19 +++++++++++++++++++
- 2 files changed, 20 insertions(+)
- create mode 100644 arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
-
-diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
-index d452f80e7601..60f5443f3ef4 100644
---- a/arch/arm64/boot/dts/xilinx/Makefile
-+++ b/arch/arm64/boot/dts/xilinx/Makefile
-@@ -1,4 +1,5 @@
- # SPDX-License-Identifier: GPL-2.0
-+dtb-$(CONFIG_ARCH_ZYNQMP) += avnet-ultra96-rev1.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1232-revA.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1254-revA.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1275-revA.dtb
-diff --git a/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts b/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
-new file mode 100644
-index 000000000000..88aa06fa78a8
---- /dev/null
-+++ b/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
-@@ -0,0 +1,19 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * dts file for Avnet Ultra96 rev1
-+ *
-+ * (C) Copyright 2018, Xilinx, Inc.
-+ *
-+ * Michal Simek <michal.simek@xilinx.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "zynqmp-zcu100-revC.dts"
-+
-+/ {
-+	model = "Avnet Ultra96 Rev1";
-+	compatible = "avnet,ultra96-rev1", "avnet,ultra96",
-+		     "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100",
-+		     "xlnx,zynqmp";
-+};
 -- 
-2.17.0
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180502/229e3e2b/attachment.sig>
