@@ -1,22 +1,62 @@
-From: Jose.Abreu@synopsys.com (Jose Abreu)
-Date: Wed, 2 May 2018 15:41:09 +0100
-Subject: [PATCH V2 6/8] net: stmmac: add dwmac-4.20a compatible
-In-Reply-To: <1525270723-18241-7-git-send-email-christophe.roullier@st.com>
-References: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
- <1525270723-18241-7-git-send-email-christophe.roullier@st.com>
-Message-ID: <cb027f0e-7209-0035-84a9-b5d7a4ec9595@synopsys.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 2 May 2018 07:41:58 -0700
+Subject: Motorola Droid 4 progress, power consumption
+In-Reply-To: <20180501183148.GA26996@amd>
+References: <20180501183148.GA26996@amd>
+Message-ID: <20180502144158.GJ98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christophe,
+* Pavel Machek <pavel@ucw.cz> [180501 18:33]:
+> Hi!
+> 
+> 4.17-rc1 is quite usable on droid 4; basically everything
+> works. OHCI is running all the time, which means we burn a lot of
+> power needlessly.
 
-On 02-05-2018 15:18, Christophe Roullier wrote:
-> Manage dwmac-4.20a version from synopsys
->
->
+To work around that we can use n_gsm and and then suspend USB
+device. That will need the modem wake gpio working that I'll
+be sending patches for at some point.
 
-Just being curious: Can you tell me which HW features do you have
-on your NIC?
+And we should make cdc_wdm, qcaux and ohci support runtime PM
+for autosuspend at some point. For *hci, we can make it work
+along what Roger did in his earlier series here except by using
+Linux generic wakeirq support:
 
-Thanks and Best Regards,
-Jose Miguel Abreu
+https://lkml.org/lkml/2013/7/10/355
+
+> Anyway, >5.5hours of standby with screen off, GSM on is already
+> usable.
+
+Just to rub that in, you do mean GSM usable for voice calls and
+SMS with your unicsy_demo with mainline kernel plus the pending
+LCD related patches, right? :)
+
+> This is the core of code I'm using.
+> 
+> https://github.com/pavelmachek/unicsy_demo
+> 
+> Battery graphs are attached. I'm not sure if the battery was really
+> close to empty at that point -- voltage curve should have different
+> shape if that was the case. 
+
+Cool. BTW, the value for POWER_SUPPLY_POWER_AVG should be quite
+accurate for the whole device power consumption.
+
+It comes from the shunt resistor measured by the PMIC. Sorry I don't
+remember how often it needs to be polled but I'm guessing polling it
+once a minute or so should be plenty.
+
+Hmm oh and the POWER_SUPPLY_CHARGE_COUNTER value should be monitored
+by your libbattery and it's low value and high value should be saved
+to a file. Low should be saved when we get the battery low interrupt
+and battery state changes to POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL.
+High value should be saved on POWER_SUPPLY_CAPACITY_LEVEL_FULL.
+
+Then when you know the high value and low value, you can calculate
+the remaining capacity based on the current value and
+POWER_SUPPLY_POWER_AVG.
+
+Regards,
+
+Tony
