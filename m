@@ -1,62 +1,83 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 3 May 2018 10:31:06 +0200
-Subject: [PATCH 00/11] PM / Domains: Fixup error paths with
- dev_pm_domain_attach()
-In-Reply-To: <CAPDyKFrUmNyMQ9Aqgwg-Ncf08fYgAqaY_MckvxqsrUq7mr-LQg@mail.gmail.com>
-References: <1524732790-2234-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFrUmNyMQ9Aqgwg-Ncf08fYgAqaY_MckvxqsrUq7mr-LQg@mail.gmail.com>
-Message-ID: <CAJZ5v0gze0Purjaq0U3gqcCBfjW3pHBUMY8LdaYuY9ZfP2xTVQ@mail.gmail.com>
+From: satendra.t@samsung.com (Satendra Singh Thakur)
+Date: Thu,  3 May 2018 14:06:00 +0530
+Subject: [PATCH 01/13] drm/kms/mode/atmel-hlcdc: using helper func
+ drm_display_mode_to_videomode for calculating timing parameters
+In-Reply-To: <cover.1525087679.git.satendra.t@samsung.com>
+References: <cover.1525087679.git.satendra.t@samsung.com>
+ <CGME20180503083608epcas5p4c9cda0f0b42af8232691baa7cbde96c9@epcas5p4.samsung.com>
+Message-ID: <b9ad5cb3c236c149b14df031d0a50226ee1fbff7.1525087679.git.satendra.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2018 at 2:31 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 26 April 2018 at 10:52, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> While I was on working adding support for multiple PM domains to genpd, I
->> stumbled over several problems in the error path related to
->> dev_pm_domain_attach(). Hence, I decided to fix these problems first, which is
->> what this series intends to address.
->>
->> There first patch is material for stable, as it fixes a real bug in genpd,
->> while the rest may be considered as improvement of the error paths when devices
->> fails to be attached to their PM domains.
->>
->> I am seeking acks from subsystem maintainers and suggest with funnel the hole
->> series through Rafael's linux-pm tree, unless there are objections to that of
->> course.
->>
->> Ulf Hansson (11):
->>   PM / Domains: Fix error path during attach in genpd
->>   PM / Domains: Drop comment in genpd about legacy Samsung DT binding
->>   PM / Domains: Drop redundant code in genpd while attaching devices
->>   PM / Domains: Check for existing PM domain in dev_pm_domain_attach()
->>   PM / Domains: Allow a better error handling of dev_pm_domain_attach()
->>   amba: Respect all error codes from dev_pm_domain_attach()
->>   driver core: Respect all error codes from dev_pm_domain_attach()
->>   i2c: Respect all error codes from dev_pm_domain_attach()
->>   mmc: sdio: Respect all error codes from dev_pm_domain_attach()
->>   soundwire: Respect all error codes from dev_pm_domain_attach()
->>   spi: Respect all error codes from dev_pm_domain_attach()
->>
->>  drivers/acpi/device_pm.c     |  9 +++------
->>  drivers/amba/bus.c           |  4 ++--
->>  drivers/base/platform.c      | 17 ++++++++---------
->>  drivers/base/power/common.c  | 10 +++++++---
->>  drivers/base/power/domain.c  | 45 +++++++++++++++-----------------------------
->>  drivers/i2c/i2c-core-base.c  |  2 +-
->>  drivers/mmc/core/sdio_bus.c  |  2 +-
->>  drivers/soundwire/bus_type.c | 15 +++++++--------
->>  drivers/spi/spi.c            | 11 ++++++-----
->>  include/linux/acpi.h         |  2 +-
->>  include/linux/pm_domain.h    |  2 +-
->>  11 files changed, 52 insertions(+), 67 deletions(-)
->
-> Rafael,
->
-> I understand if you are busy so this is not a ping. :-)
->
-> However, perhaps I can simplify by sending you a PR with these!?
+To avoid duplicate logic for the same:
+There is a function in drm-core to calculate display timing parameters:
+horizontal front porch, back porch, sync length,
+vertical front porch, back porch, sync length and
+clock in Hz.
+However, some drivers are still calculating these parameters themselves.
+Therefore, there is a duplication of the code.
+This patch series replaces this redundant code with the function
+drm_display_mode_to_videomode.
+This removes nearly 100 redundant lines from the related drivers.
 
-Yes, please.
+Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
+Cc: Madhur Verma <madhur.verma@samsung.com>
+Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 28 +++++++++++++---------------
+ 1 file changed, 13 insertions(+), 15 deletions(-)
 
-I'm going to have a look at the patches anyway, but I'm not expecting
-to see anything objectionable in them honestly. :-)
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+index c1ea5c3..3dfeef0 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+@@ -26,6 +26,7 @@
+ #include <linux/pm_runtime.h>
+ 
+ #include "atmel_hlcdc_dc.h"
++#include <video/videomode.h>
+ 
+ #define ATMEL_HLCDC_LAYER_IRQS_OFFSET		8
+ 
+@@ -393,27 +394,24 @@ enum drm_mode_status
+ atmel_hlcdc_dc_mode_valid(struct atmel_hlcdc_dc *dc,
+ 			  const struct drm_display_mode *mode)
+ {
+-	int vfront_porch = mode->vsync_start - mode->vdisplay;
+-	int vback_porch = mode->vtotal - mode->vsync_end;
+-	int vsync_len = mode->vsync_end - mode->vsync_start;
+-	int hfront_porch = mode->hsync_start - mode->hdisplay;
+-	int hback_porch = mode->htotal - mode->hsync_end;
+-	int hsync_len = mode->hsync_end - mode->hsync_start;
+-
+-	if (hsync_len > dc->desc->max_spw + 1 || hsync_len < 1)
++	struct videomode vm;
++
++	drm_display_mode_to_videomode(mode, &vm);
++
++	if (vm.hsync_len > dc->desc->max_spw + 1 || vm.hsync_len < 1)
+ 		return MODE_HSYNC;
+ 
+-	if (vsync_len > dc->desc->max_spw + 1 || vsync_len < 1)
++	if (vm.vsync_len > dc->desc->max_spw + 1 || vm.vsync_len < 1)
+ 		return MODE_VSYNC;
+ 
+-	if (hfront_porch > dc->desc->max_hpw + 1 || hfront_porch < 1 ||
+-	    hback_porch > dc->desc->max_hpw + 1 || hback_porch < 1 ||
+-	    mode->hdisplay < 1)
++	if (vm.hfront_porch > dc->desc->max_hpw + 1 || vm.hfront_porch < 1 ||
++	    vm.hback_porch > dc->desc->max_hpw + 1 || vm.hback_porch < 1 ||
++	    vm.hactive < 1)
+ 		return MODE_H_ILLEGAL;
+ 
+-	if (vfront_porch > dc->desc->max_vpw + 1 || vfront_porch < 1 ||
+-	    vback_porch > dc->desc->max_vpw || vback_porch < 0 ||
+-	    mode->vdisplay < 1)
++	if (vm.vfront_porch > dc->desc->max_vpw + 1 || vm.vfront_porch < 1 ||
++	    vm.vback_porch > dc->desc->max_vpw || vm.vback_porch < 0 ||
++	    vm.vactive < 1)
+ 		return MODE_V_ILLEGAL;
+ 
+ 	return MODE_OK;
+-- 
+2.7.4
