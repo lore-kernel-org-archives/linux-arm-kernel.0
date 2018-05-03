@@ -1,132 +1,205 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Thu, 3 May 2018 12:20:52 +0100
-Subject: [PATCH v8 13/13] arm64: topology: divorce MC scheduling domain
- from core_siblings
-In-Reply-To: <f3ec56a3-6352-5098-2e78-60f76a8b15b7@arm.com>
-References: <20180425233121.13270-1-jeremy.linton@arm.com>
- <20180425233121.13270-14-jeremy.linton@arm.com>
- <62677b95-faf5-4908-abc9-428ef39ea912@arm.com>
- <20180502114916.GW4589@e105550-lin.cambridge.arm.com>
- <f3ec56a3-6352-5098-2e78-60f76a8b15b7@arm.com>
-Message-ID: <20180503112052.GA28409@work-enc>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 3 May 2018 13:37:56 +0200
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <20180503071917.xm2xvgagvzkworay@salmiak>
+References: <20180502203326.9491-1-labbott@redhat.com>
+ <20180502203326.9491-3-labbott@redhat.com>
+ <20180503071917.xm2xvgagvzkworay@salmiak>
+Message-ID: <CAKv+Gu80crWiNEM6aFea=aUpDjv8N4ySSh3yB3noTen0gfpz-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 05:32:54PM -0500, Jeremy Linton wrote:
-> Hi,
-> 
-> On 05/02/2018 06:49 AM, Morten Rasmussen wrote:
-> >On Tue, May 01, 2018 at 03:33:33PM +0100, Sudeep Holla wrote:
-> >>
-> >>
-> >>On 26/04/18 00:31, Jeremy Linton wrote:
-> >>>Now that we have an accurate view of the physical topology
-> >>>we need to represent it correctly to the scheduler. Generally MC
-> >>>should equal the LLC in the system, but there are a number of
-> >>>special cases that need to be dealt with.
-> >>>
-> >>>In the case of NUMA in socket, we need to assure that the sched
-> >>>domain we build for the MC layer isn't larger than the DIE above it.
-> >>>Similarly for LLC's that might exist in cross socket interconnect or
-> >>>directory hardware we need to assure that MC is shrunk to the socket
-> >>>or NUMA node.
-> >>>
-> >>>This patch builds a sibling mask for the LLC, and then picks the
-> >>>smallest of LLC, socket siblings, or NUMA node siblings, which
-> >>>gives us the behavior described above. This is ever so slightly
-> >>>different than the similar alternative where we look for a cache
-> >>>layer less than or equal to the socket/NUMA siblings.
-> >>>
-> >>>The logic to pick the MC layer affects all arm64 machines, but
-> >>>only changes the behavior for DT/MPIDR systems if the NUMA domain
-> >>>is smaller than the core siblings (generally set to the cluster).
-> >>>Potentially this fixes a possible bug in DT systems, but really
-> >>>it only affects ACPI systems where the core siblings is correctly
-> >>>set to the socket siblings. Thus all currently available ACPI
-> >>>systems should have MC equal to LLC, including the NUMA in socket
-> >>>machines where the LLC is partitioned between the NUMA nodes.
-> >>>
-> >>>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> >>>---
-> >>>  arch/arm64/include/asm/topology.h |  2 ++
-> >>>  arch/arm64/kernel/topology.c      | 32 +++++++++++++++++++++++++++++++-
-> >>>  2 files changed, 33 insertions(+), 1 deletion(-)
-> >>>
-> >>>diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-> >>>index 6b10459e6905..df48212f767b 100644
-> >>>--- a/arch/arm64/include/asm/topology.h
-> >>>+++ b/arch/arm64/include/asm/topology.h
-> >>>@@ -8,8 +8,10 @@ struct cpu_topology {
-> >>>  	int thread_id;
-> >>>  	int core_id;
-> >>>  	int package_id;
-> >>>+	int llc_id;
-> >>>  	cpumask_t thread_sibling;
-> >>>  	cpumask_t core_sibling;
-> >>>+	cpumask_t llc_siblings;
-> >>>  };
-> >>>  extern struct cpu_topology cpu_topology[NR_CPUS];
-> >>>diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> >>>index bd1aae438a31..20b4341dc527 100644
-> >>>--- a/arch/arm64/kernel/topology.c
-> >>>+++ b/arch/arm64/kernel/topology.c
-> >>>@@ -13,6 +13,7 @@
-> >>>  #include <linux/acpi.h>
-> >>>  #include <linux/arch_topology.h>
-> >>>+#include <linux/cacheinfo.h>
-> >>>  #include <linux/cpu.h>
-> >>>  #include <linux/cpumask.h>
-> >>>  #include <linux/init.h>
-> >>>@@ -214,7 +215,19 @@ EXPORT_SYMBOL_GPL(cpu_topology);
-> >>>  const struct cpumask *cpu_coregroup_mask(int cpu)
-> >>>  {
-> >>>-	return &cpu_topology[cpu].core_sibling;
-> >>>+	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
-> >>>+
-> >>>+	/* Find the smaller of NUMA, core or LLC siblings */
-> >>>+	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
-> >>>+		/* not numa in package, lets use the package siblings */
-> >>>+		core_mask = &cpu_topology[cpu].core_sibling;
-> >>>+	}
-> >>>+	if (cpu_topology[cpu].llc_id != -1) {
-> >>>+		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
-> >>>+			core_mask = &cpu_topology[cpu].llc_siblings;
-> >>>+	}
-> >>>+
-> >>>+	return core_mask;
-> >>>  }
-> >>>  static void update_siblings_masks(unsigned int cpuid)
-> >>>@@ -226,6 +239,9 @@ static void update_siblings_masks(unsigned int cpuid)
-> >>>  	for_each_possible_cpu(cpu) {
-> >>>  		cpu_topo = &cpu_topology[cpu];
-> >>>+		if (cpuid_topo->llc_id == cpu_topo->llc_id)
-> >>>+			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
-> >>>+
-> >>
-> >>Would this not result in cpuid_topo->llc_siblings = cpu_possible_mask
-> >>on DT systems where llc_id is not set/defaults to -1 and still pass the
-> >>condition. Does it make sense to add additional -1 check ?
-> >
-> >I don't think mask will be used by the current code if llc_id == -1 as
-> >the user does the check. Is it better to have the mask empty than
-> >default to cpu_possible_mask? If we require all users to implement a
-> >check it shouldn't matter.
-> >
-> 
-> Right.
-> 
-> There is also the other way of thinking about it, which is if you remove the
-> if llc_id == -1 check in cpu_coregroup_mask() does it make more sense to
-> have llc_siblings default equal all the cores, or just the one being
-> requested?
+On 3 May 2018 at 09:19, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Laura,
+>
+> On Wed, May 02, 2018 at 01:33:26PM -0700, Laura Abbott wrote:
+>>
+>> Implementation of stackleak based heavily on the x86 version
+>>
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>> Now written in C instead of a bunch of assembly.
+>
+> This looks neat!
+>
+> I have a few minor comments below.
+>
+>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+>> index bf825f38d206..0ceea613c65b 100644
+>> --- a/arch/arm64/kernel/Makefile
+>> +++ b/arch/arm64/kernel/Makefile
+>> @@ -55,6 +55,9 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+>>  arm64-obj-$(CONFIG_CRASH_DUMP)               += crash_dump.o
+>>  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)        += sdei.o
+>>
+>> +arm64-obj-$(CONFIG_GCC_PLUGIN_STACKLEAK) += erase.o
+>> +KASAN_SANITIZE_erase.o       := n
+>
+> I suspect we want to avoid the full set of instrumentation suspects here, e.g.
+> GKOV, KASAN, UBSAN, and KCOV.
+>
+>> +
+>>  obj-y                                        += $(arm64-obj-y) vdso/ probes/
+>>  obj-m                                        += $(arm64-obj-m)
+>>  head-y                                       := head.o
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index ec2ee720e33e..3144f1ebdc18 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -401,6 +401,11 @@ tsk      .req    x28             // current thread_info
+>>
+>>       .text
+>>
+>> +     .macro  ERASE_KSTACK
+>> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+>> +     bl      erase_kstack
+>> +#endif
+>> +     .endm
+>
+> Nit: The rest of our asm macros are lower-case -- can we stick to that here?
+>
+>>  /*
+>>   * Exception vectors.
+>>   */
+>> @@ -906,6 +911,7 @@ ret_to_user:
+>>       cbnz    x2, work_pending
+>>  finish_ret_to_user:
+>>       enable_step_tsk x1, x2
+>> +     ERASE_KSTACK
+>>       kernel_exit 0
+>>  ENDPROC(ret_to_user)
+>
+> I believe we also need this in ret_fast_syscall.
+>
+> [...]
+>
+>> +asmlinkage void erase_kstack(void)
+>> +{
+>> +     unsigned long p = current->thread.lowest_stack;
+>> +     unsigned long boundary = p & ~(THREAD_SIZE - 1);
+>> +     unsigned long poison = 0;
+>> +     const unsigned long check_depth = STACKLEAK_POISON_CHECK_DEPTH /
+>> +                                                     sizeof(unsigned long);
+>> +
+>> +     /*
+>> +      * Let's search for the poison value in the stack.
+>> +      * Start from the lowest_stack and go to the bottom.
+>> +      */
+>> +     while (p > boundary && poison <= check_depth) {
+>> +             if (*(unsigned long *)p == STACKLEAK_POISON)
+>> +                     poison++;
+>> +             else
+>> +                     poison = 0;
+>> +
+>> +             p -= sizeof(unsigned long);
+>> +     }
+>> +
+>> +     /*
+>> +      * One long int at the bottom of the thread stack is reserved and
+>> +      * should not be poisoned (see CONFIG_SCHED_STACK_END_CHECK).
+>> +      */
+>> +     if (p == boundary)
+>> +             p += sizeof(unsigned long);
+>
+> I wonder if end_of_stack() should be taught about CONFIG_SCHED_STACK_END_CHECK,
+> given that's supposed to return the last *usable* long on the stack, and we
+> don't account for this elsewhere.
+>
+> If we did, then IIUC we could do:
+>
+>         unsigned long boundary = (unsigned long)end_of_stack(current);
+>
+> ... at the start of the function, and not have to worry about this explicitly.
+>
+>> +
+>> +#ifdef CONFIG_STACKLEAK_METRICS
+>> +     current->thread.prev_lowest_stack = p;
+>> +#endif
+>> +
+>> +     /*
+>> +      * So let's write the poison value to the kernel stack.
+>> +      * Start from the address in p and move up till the new boundary.
+>> +      */
+>> +     boundary = current_stack_pointer;
+>
+> I worry a little that the compiler can move the SP during a function's
+> lifetime, but maybe that's only the case when there are VLAs, or something like
+> that?
+>
 
-Since we define cpu_coregroup_mask() to be the smallest of LLC, package,
-and NUMA node, letting it default to just one cpu would change/break the
-topology on non-PPTT systems. Wouldn't it?
+I think the AAPCS permits the compiler to allocate the stack space for
+outgoing variables (i.e., args 9 and beyond or other argument types
+that require passing via the stack) at a smaller scope than the entire
+function, although GCC does appear to allocate it at the beginning
+(based on some quick experiments)
 
-If we want to drop the check llc_siblings should be default to either
-core_siblings or cpumask_of_node(). But I don't really see the point as
-any user of llc_siblings that really care about where the LLC is
-would have to check if llc_sibling is just assigned a default value or
-it is indeed representing the LLC. I'm fine with just expecting the user
-to check llc_id to see if the llc_sibling mask is valid or not.
+
+>> +
+>> +     BUG_ON(boundary - p >= THREAD_SIZE);
+>> +
+>> +     while (p < boundary) {
+>> +             *(unsigned long *)p = STACKLEAK_POISON;
+>> +             p += sizeof(unsigned long);
+>> +     }
+>> +
+>> +     /* Reset the lowest_stack value for the next syscall */
+>> +     current->thread.lowest_stack = current_stack_pointer;
+>> +}
+>
+> Once this function returns, its data is left on the stack. Is that not a problem?
+>
+> No strong feelings either way, but it might be worth mentioning in the commit
+> message.
+>
+>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>> index f08a2ed9db0d..156fa0a0da19 100644
+>> --- a/arch/arm64/kernel/process.c
+>> +++ b/arch/arm64/kernel/process.c
+>> @@ -364,6 +364,9 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+>>       p->thread.cpu_context.pc = (unsigned long)ret_from_fork;
+>>       p->thread.cpu_context.sp = (unsigned long)childregs;
+>>
+>> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+>> +     p->thread.lowest_stack = (unsigned long)task_stack_page(p);
+>
+> Nit: end_of_stack(p) would be slightly better semantically, even though
+> currently equivalent to task_stack_page(p).
+>
+> [...]
+>
+>> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+>> +void __used check_alloca(unsigned long size)
+>> +{
+>> +     unsigned long sp, stack_left;
+>> +
+>> +     sp = current_stack_pointer;
+>> +
+>> +     stack_left = sp & (THREAD_SIZE - 1);
+>> +     BUG_ON(stack_left < 256 || size >= stack_left - 256);
+>> +}
+>
+> Is this arbitrary, or is there something special about 256?
+>
+> Even if this is arbitrary, can we give it some mnemonic?
+>
+>> +EXPORT_SYMBOL(check_alloca);
+>> +#endif
+>> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+>> index a34e9290a699..25dd2a14560d 100644
+>> --- a/drivers/firmware/efi/libstub/Makefile
+>> +++ b/drivers/firmware/efi/libstub/Makefile
+>> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)        += -I$(srctree)/scripts/dtc/libfdt
+>>  KBUILD_CFLAGS                        := $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+>>                                  -D__NO_FORTIFY \
+>>                                  $(call cc-option,-ffreestanding) \
+>> -                                $(call cc-option,-fno-stack-protector)
+>> +                                $(call cc-option,-fno-stack-protector) \
+>> +                                $(DISABLE_STACKLEAK_PLUGIN)
+>>
+>>  GCOV_PROFILE                 := n
+>>  KASAN_SANITIZE                       := n
+>
+> I believe we'll also need to do this for the KVM hyp code in arch/arm64/kvm/hyp/.
+>
+> Thanks,
+> Mark.
