@@ -1,78 +1,69 @@
-From: chunkeey@gmail.com (Christian Lamparter)
-Date: Thu, 03 May 2018 19:43:37 +0200
-Subject: [PATCH v2] pinctrl: msm: fix gpio-hog related boot issues
-In-Reply-To: <CACRpkdaEYFerKQa4QRCFEg2TOrdbnF6SfVZ9chLpmCxSUNcZBw@mail.gmail.com>
-References: <20180402121005.10080-1-chunkeey@gmail.com>
- <3524410.JrO1DEFpQ1@debian64>
- <CACRpkdaEYFerKQa4QRCFEg2TOrdbnF6SfVZ9chLpmCxSUNcZBw@mail.gmail.com>
-Message-ID: <2265923.XhyVMjVhWR@debian64>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 3 May 2018 20:05:53 +0200
+Subject: [linux-sunxi] [PATCH 3/3] arm64: allwinner: h6: enable MMC0/2 on
+ Pine H64
+In-Reply-To: <aa2d6072-87a5-cd52-d3a5-17df889e6bc9@arm.com>
+References: <20180426140728.43155-1-icenowy@aosc.io>
+ <20180426140728.43155-4-icenowy@aosc.io>
+ <03cc2e8c-4a35-3fb4-b408-fd8d4ba3e407@arm.com>
+ <83EDF187-5EB2-4FEB-99BC-9D5B728D3A45@aosc.io>
+ <45956397-a593-e51e-8637-655178c5901c@arm.com>
+ <20180502093601.fvkacdv62aqxshbr@flea>
+ <aa2d6072-87a5-cd52-d3a5-17df889e6bc9@arm.com>
+Message-ID: <20180503180553.qjjgnw5jnvtdn46n@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mittwoch, 2. Mai 2018 14:14:39 CEST Linus Walleij wrote:
-> On Thu, Apr 26, 2018 at 11:47 PM, Christian Lamparter
-> <chunkeey@gmail.com> wrote:
-> > On Thu, Apr 26, 2018 11:12:21 CEST Linus Walleij wrote:
+On Wed, May 02, 2018 at 12:01:53PM +0100, Andre Przywara wrote:
+> >>>> It looks like there are more users of those power rails, so we could
+> >>>> keep those supplies connected to these fixed regulators here, even with
+> >>>> AXP-805 support in the kernel.
+> >>>
+> >>> It's not a good choice.
+> >>>
+> >>>>
+> >>>> Or we keep this back until we get proper AXP support in the kernel? I
+> >>>> guess it's quite close to the existing PMICs, so it might be more a
+> >>>> copy&paste exercise to support the AXP-805?
+> >>>
+> >>> It's not a reason to keep it back.
+> >>
+> >> So I compared the manuals of the AXP806 and the AXP805, the register
+> >> interface looks identical to me. I only have a (somewhat) Chinese
+> >> version of the AXP806 manual, so couldn't really find the difference
+> >> between the two. Do you know more about it? Is it just maybe the
+> >> packaging and the electrical properties (like max current supported)?
+> >>
+> >> If the I2C register interface is really the same, we could just add the
+> >> DT nodes for the regulator and be done.
+> > 
+> > And that argument is only valid if you 100% trust the fact that both
+> > datasheet are complete and accurate.
+> > 
+> > And experience show that you can't.
 > 
-> >> I think I replied in some other mail that I think we need to
-> >> be backwards compatible and it's not too hard to do
-> >> both. (Correct me if I'm wrong.)
-> >
-> > I think so too, I looked around and found that the nvidia pinctrl was
-> > doing something similar with of_find_property():
-> > <https://elixir.bootlin.com/linux/v4.17-rc2/source/drivers/pinctrl/tegra/pinctrl-tegra.c#L652>
-> > |       has_prop = of_find_property(np, "gpio-ranges", NULL);
-> >
-> > However this looks kinda funny, since "has_prob" is declared as a bool
-> > and of_find_property() returns a pointer to a "struct property"....
-> > Tell you what: If nobody beats me to it, I'll sent a patch for this after
-> > the pinctrl-msm's gpio-hog has been dealt with. :)
-> 
-> Yeah the nVidia driver is one of the oldest and also at the time
-> DT was kind of new. I haven't heard from Stephen for a while
-> but I bet he will pop up, else check with Laxman, he's got
-> a good grip on nVidia pinctrl+GPIO as well.
-All in good time. 
+> Well, but I wonder how paranoid we are going to be? And in this case we
+> have confirmation from Wink that they are the same.
 
-But first @Bjorn and @Andy or @David can you please look and
-review v4 "pinctrl: msm: fix gpio-hog related boot issues"
-<https://patchwork.kernel.org/patch/10339129/>
+Paranoid enough so that we don't blindly trust that the reviewer had a
+coffee, no interruptions or moment of distraction, or that the
+datasheet is correct.
 
-Thanks.
+But not so paranoid that having the driver running on a kernel is
+enough.
 
-> > The MR24 craze is mostly over by now. You can still find a few. However
-> > some listings are now selling them with OpenWrt/LEDE for ~$40.
-> >
-> > And obviously, this cycle will continue on, but now with the old wave1
-> > 802.11ac gear that gets replaced. In fact this business has spawned
-> > companies that are actively working on supporting "old" enterprise gear
-> > via their own OpenWrt/LEDE derivatives.
-> 
-> Haha that is just awesome :D
-> I hope they salvage a lot of them.
-Yes, I'm aware of that some of them where put to good use in the
-Personal Telco Projec (501(c)(3) non-profit organization in Portland, Oregon):
-<https://personaltelco.net/wiki/PersonalTelco>
-And they have been somewhat vocal about it too:
-<https://groups.google.com/forum/#!msg/ptp-general/RZ-VjKFonVo/cQgnGn2wAgAJ>
-"The MR24 is a dual-band 802.11n 3x3 MIMO access point with a single 
-ethernet port.  They are "last-gen" devices, and are starting to show up 
-on ebay at reasonable prices as Meraki's deep-pocket cloud-management 
-enterprise users are beginning to "upgrade" to 802.11ac gear.  Note that 
-802.11n in this case means a fully-open-source driver (ath9k).  802.11ac 
-drivers involve firmware blobs across the board.  You don't get 
-super-wide 5GHz channels, but you get freedom. "
+> So I think we can go with just a DT addition, given that we test it
+> and confirm that it works for our use case. Should we discover
+> something odd or undocumented later, I'd consider this a bug fix,
+> which we then (and only then!) could fix by adding the compatible
+> string to the driver. Any DT would be fine already, because we list
+> both compatible strings in there.
 
-;)
+In this particular case, yeah, it seems reasonable.
 
-By the way, it gets even weirder. In the past (and to this day) Meraki has
-given away their current crop of enterprise APs via their
-"Free AP for IT Professionals" <https://meraki.cisco.com/tc/freeap> program.
-Of course, the main idea probably was to get them all "hooked/sold" on their
-cloud-management firmware. Because of course that "Free AP" is intended to be
-only good for the lifespan of included the 3-year license. However, 
-"IT Professionals" do have their own mind and that's why there is some
-continued interest in making alternative firmwares for these devices.
+Maxime
 
-Best Regards,
-Christian
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
