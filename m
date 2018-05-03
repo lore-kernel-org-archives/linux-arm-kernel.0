@@ -1,25 +1,20 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Thu, 3 May 2018 10:14:06 +0300
-Subject: [PATCH v2 03/10] PCI: Factor out
+Date: Thu, 3 May 2018 10:15:12 +0300
+Subject: [PATCH v2 05/10] PCI: Replace pr_*() with dev_*() in
  __of_pci_get_host_bridge_resources()
-In-Reply-To: <35efe707d03c886f1ac1e0c9634810c9da59c88a.1525067324.git.jan.kiszka@siemens.com>
+In-Reply-To: <63f2e316090ea3284b4be62e446b3b28f998ac55.1525067324.git.jan.kiszka@siemens.com>
 References: <cover.1525067324.git.jan.kiszka@siemens.com>
- <35efe707d03c886f1ac1e0c9634810c9da59c88a.1525067324.git.jan.kiszka@siemens.com>
-Message-ID: <63e44c62-df98-0e73-5981-fdf2094e2fb2@mentor.com>
+ <63f2e316090ea3284b4be62e446b3b28f998ac55.1525067324.git.jan.kiszka@siemens.com>
+Message-ID: <57fa1919-80ea-df19-49a7-9d2d3e100d2e@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/30/2018 08:48 AM, Jan Kiszka wrote:
 > From: Jan Kiszka <jan.kiszka@siemens.com>
 > 
-> This will be needed for sharing the core logic between current
-> of_pci_get_host_bridge_resources() and upcoming
-> devm_of_pci_get_host_bridge_resources().
-> 
-> Already rename the dev parameter to dev_node in order to free the
-> namespace for a real device parameter.
-> 
-> No functional changes.
+> Now that we have a device reference, make use of it for printing. And as
+> long as dev can still be NULL, we will still get some reasonable output
+> nevertheless.
 > 
 > Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 
