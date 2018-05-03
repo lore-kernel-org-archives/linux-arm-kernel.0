@@ -1,79 +1,49 @@
-From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
-Date: Thu,  3 May 2018 14:13:42 +0200
-Subject: [PATCH] ARM: debug: enable UART1 for socfpga Cyclone5
-Message-ID: <20180503121342.14178-1-peron.clem@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 3 May 2018 13:21:33 +0100
+Subject: [PATCH 03/13] drm/kms/mode/exynos-dsi: using helper func
+ drm_display_mode_to_videomode for calculating timing parameters
+In-Reply-To: <e21d94cdd60e8c83140c5a917c255baf88f0e90a.1525087679.git.satendra.t@samsung.com>
+References: <cover.1525087679.git.satendra.t@samsung.com>
+ <CGME20180503083956epcas5p1eb97f7bd534e58e7154f5f11733e7aa0@epcas5p1.samsung.com>
+ <e21d94cdd60e8c83140c5a917c255baf88f0e90a.1525087679.git.satendra.t@samsung.com>
+Message-ID: <00b4a624-d2b6-dc6a-71c0-9c7642480a44@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cyclone5 and Arria10 doesn't have the same memory map for UART1.
+On 03/05/18 09:39, Satendra Singh Thakur wrote:
+> To avoid duplicate logic for the same
+> 
+> Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
+> Cc: Madhur Verma <madhur.verma@samsung.com>
+> Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
+> ---
+>   drivers/gpu/drm/exynos/exynos_drm_dsi.c | 9 +--------
+>   1 file changed, 1 insertion(+), 8 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> index 7904ffa..9397e5c 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> @@ -1493,14 +1493,7 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
+>   	struct videomode *vm = &dsi->vm;
+>   	struct drm_display_mode *m = adjusted_mode;
 
-Split the SOCFPGA_UART1 into 2 options to allow debugging on UART1 for Cylone5.
+FWIW you could just pass &dsi->vm and adjusted_mode directly to the 
+helper and get rid of these locals too.
 
-Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
----
- arch/arm/Kconfig.debug | 23 ++++++++++++++++-------
- 1 file changed, 16 insertions(+), 7 deletions(-)
+Robin.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 199ebc1c4538..5b1f1ec1d3fe 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1067,14 +1067,21 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on SOCFPGA(Cyclone 5 and Arria 5) based platforms.
- 
--	config DEBUG_SOCFPGA_UART1
-+	config DEBUG_SOCFPGA_ARRIA10_UART1
- 		depends on ARCH_SOCFPGA
--		bool "Use SOCFPGA UART1 for low-level debug"
-+		bool "Use SOCFPGA Arria10 UART1 for low-level debug"
- 		select DEBUG_UART_8250
- 		help
- 		  Say Y here if you want kernel low-level debugging support
- 		  on SOCFPGA(Arria 10) based platforms.
- 
-+	config DEBUG_SOCFPGA_CYCLONE5_UART1
-+		depends on ARCH_SOCFPGA
-+		bool "Use SOCFPGA Cyclone 5 UART1 for low-level debug"
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on SOCFPGA(Cyclone 5 and Arria 5) based platforms.
- 
- 	config DEBUG_SUN9I_UART0
- 		bool "Kernel low-level debugging messages via sun9i UART0"
-@@ -1632,7 +1639,8 @@ config DEBUG_UART_PHYS
- 	default 0xfe800000 if ARCH_IOP32X
- 	default 0xff690000 if DEBUG_RK32_UART2
- 	default 0xffc02000 if DEBUG_SOCFPGA_UART0
--	default 0xffc02100 if DEBUG_SOCFPGA_UART1
-+	default 0xffc02100 if DEBUG_SOCFPGA_ARRIA10_UART1
-+	default 0xffc03000 if DEBUG_SOCFPGA_CYCLONE5_UART1
- 	default 0xffd82340 if ARCH_IOP13XX
- 	default 0xffe40000 if DEBUG_RCAR_GEN1_SCIF0
- 	default 0xffe42000 if DEBUG_RCAR_GEN1_SCIF2
-@@ -1738,7 +1746,8 @@ config DEBUG_UART_VIRT
- 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
- 	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
- 	default 0xfec02000 if DEBUG_SOCFPGA_UART0
--	default 0xfec02100 if DEBUG_SOCFPGA_UART1
-+	default 0xfec02100 if DEBUG_SOCFPGA_ARRIA10_UART1
-+	default 0xfec03000 if DEBUG_SOCFPGA_CYCLONE5_UART1
- 	default 0xfec12000 if (DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE) && ARCH_MVEBU
- 	default 0xfec12100 if DEBUG_MVEBU_UART1_ALTERNATE
- 	default 0xfec10000 if DEBUG_SIRFATLAS7_UART0
-@@ -1787,9 +1796,9 @@ config DEBUG_UART_8250_WORD
- 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	depends on DEBUG_UART_8250_SHIFT >= 2
- 	default y if DEBUG_PICOXCELL_UART || \
--		DEBUG_SOCFPGA_UART0 || DEBUG_SOCFPGA_UART1 || \
--		DEBUG_KEYSTONE_UART0 || DEBUG_KEYSTONE_UART1 || \
--		DEBUG_ALPINE_UART0 || \
-+		DEBUG_SOCFPGA_UART0 || DEBUG_SOCFPGA_ARRIA10_UART1 || \
-+		DEBUG_SOCFPGA_CYCLONE5_UART1 || DEBUG_KEYSTONE_UART0 || \
-+		DEBUG_KEYSTONE_UART1 || DEBUG_ALPINE_UART0 || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
- 		DEBUG_DAVINCI_DA8XX_UART2 || \
- 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2
--- 
-2.17.0
+>   
+> -	vm->hactive = m->hdisplay;
+> -	vm->vactive = m->vdisplay;
+> -	vm->vfront_porch = m->vsync_start - m->vdisplay;
+> -	vm->vback_porch = m->vtotal - m->vsync_end;
+> -	vm->vsync_len = m->vsync_end - m->vsync_start;
+> -	vm->hfront_porch = m->hsync_start - m->hdisplay;
+> -	vm->hback_porch = m->htotal - m->hsync_end;
+> -	vm->hsync_len = m->hsync_end - m->hsync_start;
+> +	drm_display_mode_to_videomode(m, vm);
+>   }
+>   
+>   static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
+> 
