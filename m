@@ -1,73 +1,49 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 3 May 2018 11:06:48 +0200
-Subject: [PATCH 1/3] drm/sti: do not remove the drm_bridge that was never
- added
-In-Reply-To: <20180502074025.12421-2-peda@axentia.se>
-References: <20180502074025.12421-1-peda@axentia.se>
- <20180502074025.12421-2-peda@axentia.se>
-Message-ID: <20180503090648.GG12521@phenom.ffwll.local>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 3 May 2018 12:09:09 +0300
+Subject: [PATCH v6 05/17] media: rkisp1: add Rockchip ISP1 subdev driver
+In-Reply-To: <20180308094807.9443-6-jacob-chen@iotwrt.com>
+References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
+ <20180308094807.9443-6-jacob-chen@iotwrt.com>
+Message-ID: <20180503090909.o3dyhukzs2y7em5z@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 09:40:23AM +0200, Peter Rosin wrote:
-> The more natural approach would perhaps be to add an drm_bridge_add,
-> but there are several other bridges that never call drm_bridge_add.
-> Just removing the drm_bridge_remove is the easier fix.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+Hi Jacob,
 
-This mess is much bigger. There's 2 pairs of bridge functions:
+On Thu, Mar 08, 2018 at 05:47:55PM +0800, Jacob Chen wrote:
+> +static int rkisp1_isp_sd_s_power(struct v4l2_subdev *sd, int on)
+> +{
+> +	struct rkisp1_device *isp_dev = sd_to_isp_dev(sd);
+> +	int ret;
+> +
+> +	v4l2_dbg(1, rkisp1_debug, &isp_dev->v4l2_dev, "s_power: %d\n", on);
+> +
+> +	if (on) {
+> +		ret = pm_runtime_get_sync(isp_dev->dev);
+> +		if (ret < 0)
+> +			return ret;
+> +
+> +		rkisp1_config_clk(isp_dev);
+> +	} else {
+> +		ret = pm_runtime_put(isp_dev->dev);
 
-- drm_bridge_attach/detach. Those are meant to be called by the overall
-  drm driver to connect/disconnect a drm_bridge.
+I commented this line out to make more than one STREAMON work. Otherwise, the 
+second STREAMON hangs. I guess the bug is not this driver. Probably something 
+in drivers/soc/rockchip/pm_domains.c. Just noting that in case you or someone 
+on Cc would like to investigate it further.
 
-- drm_bridge_add/remove. These are supposed to be called by the bridge
-  driver itself to register/unregister itself. Maybe we should rename
-  them, since the same issue happens with drm_panel, with the same
-  confusion.
+I tested v4.16-rc4 on the Tinkerboard.
 
-I thought someone was working on a cleanup series to fix this mess, but I
-didn't find anything.
--Daniel
+baruch
 
-> ---
->  drivers/gpu/drm/sti/sti_hda.c  | 1 -
->  drivers/gpu/drm/sti/sti_hdmi.c | 1 -
->  2 files changed, 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sti/sti_hda.c b/drivers/gpu/drm/sti/sti_hda.c
-> index 67bbdb49fffc..199db13f565c 100644
-> --- a/drivers/gpu/drm/sti/sti_hda.c
-> +++ b/drivers/gpu/drm/sti/sti_hda.c
-> @@ -721,7 +721,6 @@ static int sti_hda_bind(struct device *dev, struct device *master, void *data)
->  	return 0;
->  
->  err_sysfs:
-> -	drm_bridge_remove(bridge);
->  	return -EINVAL;
->  }
->  
-> diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
-> index 58f431102512..932724784942 100644
-> --- a/drivers/gpu/drm/sti/sti_hdmi.c
-> +++ b/drivers/gpu/drm/sti/sti_hdmi.c
-> @@ -1315,7 +1315,6 @@ static int sti_hdmi_bind(struct device *dev, struct device *master, void *data)
->  	return 0;
->  
->  err_sysfs:
-> -	drm_bridge_remove(bridge);
->  	hdmi->drm_connector = NULL;
->  	return -EINVAL;
->  }
-> -- 
-> 2.11.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> +		if (ret < 0)
+> +			return ret;
+> +	}
+> +
+> +	return 0;
+> +}
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
