@@ -1,42 +1,21 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Wed, 2 May 2018 17:13:00 -0700
-Subject: [PATCH v2 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <CAD=FV=UDUKg58xe+3C5QUbFwFkO8d3c_tzxmfPDzdv1KXZ3W9g@mail.gmail.com>
-References: <cover.1523673467.git.collinsd@codeaurora.org>
- <39b676d2ba7dac2436196cc5a090c6f151498dc8.1523673467.git.collinsd@codeaurora.org>
- <CAD=FV=UDUKg58xe+3C5QUbFwFkO8d3c_tzxmfPDzdv1KXZ3W9g@mail.gmail.com>
-Message-ID: <db8970ea-05f4-e7c0-52fa-070c7a6b8d2e@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 3 May 2018 09:05:12 +0800
+Subject: [PATCH 1/5] ARM: dts: imx6qdl: Remove #address/#size-cells from
+ mipi_dsi
+In-Reply-To: <1524491174-16878-1-git-send-email-festevam@gmail.com>
+References: <1524491174-16878-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180503010510.GM3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2018 09:37 AM, Doug Anderson wrote:
-> On Fri, Apr 13, 2018 at 7:50 PM, David Collins <collinsd@codeaurora.org> wrote:
->> +- vdd_l26-supply
->> +- vdd_lvs1_lvs2-supply
->> +- vdd_lvs1_lvs2-supply
->> +       Usage:      optional (PM8998 only)
->> +       Value type: <phandle>
->> +       Definition: phandle of the parent supply regulator of one or more of the
->> +                   regulators for this PMIC.
+On Mon, Apr 23, 2018 at 10:46:10AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> One small additional nit here is that "vdd_lvs1_lvs2-supply" is listed twice.
+> Remove unnecessary #address-cells/#size-cells to fix the following
+> DTC warnings:
+> 
+> arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (avoid_unnecessary_addr_size): /soc/aips-bus at 2100000/mipi at 21e0000: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-I'll remove the duplicate.
-
-
-> Also on the schematics (and in the PM8998 datasheet) I have this is
-> "VIN_LVS_1_2".  It seems like you should be consistent here and call
-> this "vin-lvs-1-2-supply".
-
-I was trying to keep the naming consistent within device tree binding
-documentation for LVS vs LDO and SMPS (e.g. 'vdd' vs 'vin' prefix).  I
-suppose that I can change this to match the hardware documentation pin
-name.  I can also change '_' to '-' in the supply names if that is preferred.
-
-Take care,
-David
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Applied all, thanks.
