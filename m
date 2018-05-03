@@ -1,24 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 May 2018 10:08:20 -0700
-Subject: [PATCH] arm: omap1: ams-delta: fix deferred_fiq handler
-In-Reply-To: <20180502183203.16034-1-jmkrzyszt@gmail.com>
-References: <20180502183203.16034-1-jmkrzyszt@gmail.com>
-Message-ID: <20180503170820.GW98604@atomide.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 3 May 2018 19:14:10 +0200
+Subject: [PATCH v9 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <1520301070-48769-1-git-send-email-yong.deng@magewell.com>
+References: <1520301070-48769-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <20180503171410.q52ak27u47gycy6o@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jmkrzyszt@gmail.com> [180502 11:34]:
-> The deferred_fiq handler used to limit hardware operations to IRQ
-> unmask only, relying on gpio-omap assigned handler performing the ACKs.
-> Since commit 80ac93c27441 ("gpio: omap: Fix lost edge interrupts") this
-> is no longer the case as handle_edge_irq() has been replaced with
-> handle_simmple_irq() which doesn't touch the hardware.
+Hi Yong,
+
+On Tue, Mar 06, 2018 at 09:51:10AM +0800, Yong Deng wrote:
+> This patchset add initial support for Allwinner V3s CSI.
 > 
-> Add single ACK operation per each active IRQ pin to the handler. While
-> being at it, move unmask operation out of irq_counter loop so it is
-> also called only once for each active IRQ pin.
+> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> interface and CSI1 is used for parallel interface. This is not
+> documented in datasheet but by test and guess.
+> 
+> This patchset implement a v4l2 framework driver and add a binding 
+> documentation for it. 
+> 
+> Currently, the driver only support the parallel interface. And has been
+> tested with a BT1120 signal which generating from FPGA. The following
+> fetures are not support with this patchset:
+>   - ISP 
+>   - MIPI-CSI2
+>   - Master clock for camera sensor
+>   - Power regulator for the front end IC
 
-Good to hear the fiq handler is confirmed working, applying
-into omap-for-v4.17/fixes thanks.
+Do you plan on sending another version some time soon? It would be
+awesome to have this in 4.18.
 
-Tony
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
