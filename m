@@ -1,112 +1,25 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 3 May 2018 11:53:50 +0800
-Subject: [PATCH V4 7/8] soc: mediatek: pwrap: add mt6351 for mt6797 SoCs
-In-Reply-To: <20180502092112.3991-8-argus.lin@mediatek.com>
-References: <20180502092112.3991-1-argus.lin@mediatek.com>
- <20180502092112.3991-8-argus.lin@mediatek.com>
-Message-ID: <1525319630.14792.91.camel@mtkswgap22>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 3 May 2018 05:56:43 +0200
+Subject: [PATCH 11/13] mips,unicore32: swiotlb doesn't need sg->dma_length
+In-Reply-To: <20180502222017.GC20766@jamesdev>
+References: <20180425051539.1989-1-hch@lst.de>
+ <20180425051539.1989-12-hch@lst.de> <20180502222017.GC20766@jamesdev>
+Message-ID: <20180503035643.GA9781@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Argus
-
-On Wed, 2018-05-02 at 17:21 +0800, argus.lin at mediatek.com wrote:
-> From: Argus Lin <argus.lin@mediatek.com>
+On Wed, May 02, 2018 at 11:20:18PM +0100, James Hogan wrote:
+> On Wed, Apr 25, 2018 at 07:15:37AM +0200, Christoph Hellwig wrote:
+> > Only mips and unicore32 select CONFIG_NEED_SG_DMA_LENGTH when building
+> > swiotlb.  swiotlb itself never merges segements and doesn't accesses the
+> > dma_length field directly, so drop the dependency.
 > 
-> mt6351 is a new power management IC and it is
-> used for mt6797 SoCs. We need to add mt6351_regs for
-> pmic register mapping and pmic_mt6351 for
-> register accessing by regmap.
-> 
+> Is that at odds with Documentation/DMA-API-HOWTO.txt, which seems to
+> suggest arch ports should enable it for IOMMUs?
 
-suggest line wrapping closely at 75 columns
-
-> Signed-off-by: Argus Lin <argus.lin@mediatek.com>
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index 285bfa76249f..26076900eee0 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -152,6 +152,21 @@ static const u32 mt6397_regs[] = {
->  	[PWRAP_DEW_CIPHER_SWRST] =	0xbc24,
->  };
->  
-> +static const u32 mt6351_regs[] = {
-> +	[PWRAP_DEW_DIO_EN] =		0x02F2,
-> +	[PWRAP_DEW_READ_TEST] =		0x02F4,
-> +	[PWRAP_DEW_WRITE_TEST] =	0x02F6,
-> +	[PWRAP_DEW_CRC_EN] =		0x02FA,
-> +	[PWRAP_DEW_CRC_VAL] =		0x02FC,
-> +	[PWRAP_DEW_CIPHER_KEY_SEL] =	0x0300,
-> +	[PWRAP_DEW_CIPHER_IV_SEL] =	0x0302,
-> +	[PWRAP_DEW_CIPHER_EN] =		0x0304,
-> +	[PWRAP_DEW_CIPHER_RDY] =	0x0306,
-> +	[PWRAP_DEW_CIPHER_MODE] =	0x0308,
-> +	[PWRAP_DEW_CIPHER_SWRST] =	0x030A,
-> +	[PWRAP_DEW_RDDMY_NO] =		0x030C,
-> +};
-> +
-
-trim the unused registers if any
-
->  enum pwrap_regs {
->  	PWRAP_MUX_SEL,
->  	PWRAP_WRAP_EN,
-> @@ -684,6 +699,7 @@ static int mt8135_regs[] = {
->  
->  enum pmic_type {
->  	PMIC_MT6323,
-> +	PMIC_MT6351,
->  	PMIC_MT6380,
->  	PMIC_MT6397,
->  };
-> @@ -1150,6 +1166,7 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
->  			    0x1);
->  		break;
->  	case PMIC_MT6323:
-> +	case PMIC_MT6351:
->  		pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_EN],
->  			    0x1);
->  		break;
-> @@ -1435,6 +1452,15 @@ static const struct pwrap_slv_type pmic_mt6397 = {
->  	.pwrap_write = pwrap_write16,
->  };
->  
-> +static const struct pwrap_slv_type pmic_mt6351 = {
-> +	.dew_regs = mt6351_regs,
-> +	.type = PMIC_MT6351,
-> +	.regmap = &pwrap_regmap_config16,
-> +	.caps = 0,
-
-the caps should be
-
-PWRAP_SLV_CAP_SPI | PWRAP_SLV_CAP_DUALIO |
-                 PWRAP_SLV_CAP_SECURITY,
- 
-otherwise, the registers you defined here cannot be accessed by its
-function.
-
-
-> +	.pwrap_read = pwrap_read16,
-> +	.pwrap_write = pwrap_write16,
-> +};
-> +
->  static const struct of_device_id of_slave_match_tbl[] = {
->  	{
->  		.compatible = "mediatek,mt6323",
-> @@ -1449,6 +1475,9 @@ static const struct of_device_id of_slave_match_tbl[] = {
->  		.compatible = "mediatek,mt6397",
->  		.data = &pmic_mt6397,
->  	}, {
-> +		.compatible = "mediatek,mt6351",
-> +		.data = &pmic_mt6351,
-> +	}, {
-
-need to be sorted din alphabetical order
-
->  		/* sentinel */
->  	}
->  };
+swiotlb isn't really an iommu..  That being said iommus don't have to
+merge segments either if they don't want to, and we have various
+implementations that don't.  The whole dma api documentation needs
+a major overhaul, including merging the various files and dropping a lot
+of dead wood.  It has been on my todo list for a while, with an inner
+hope that someone else would do it before me.
