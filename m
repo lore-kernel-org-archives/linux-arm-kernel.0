@@ -1,205 +1,111 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 3 May 2018 13:37:56 +0200
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <20180503071917.xm2xvgagvzkworay@salmiak>
-References: <20180502203326.9491-1-labbott@redhat.com>
- <20180502203326.9491-3-labbott@redhat.com>
- <20180503071917.xm2xvgagvzkworay@salmiak>
-Message-ID: <CAKv+Gu80crWiNEM6aFea=aUpDjv8N4ySSh3yB3noTen0gfpz-w@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 3 May 2018 13:52:27 +0200
+Subject: [PATCH] tty: implement a rx led trigger
+In-Reply-To: <20180503101047.GF32180@amd>
+References: <20180503100448.1350-1-u.kleine-koenig@pengutronix.de>
+ <20180503101047.GF32180@amd>
+Message-ID: <20180503115227.gogvknx5sbuyrcey@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 May 2018 at 09:19, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Laura,
->
-> On Wed, May 02, 2018 at 01:33:26PM -0700, Laura Abbott wrote:
->>
->> Implementation of stackleak based heavily on the x86 version
->>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> Now written in C instead of a bunch of assembly.
->
-> This looks neat!
->
-> I have a few minor comments below.
->
->> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
->> index bf825f38d206..0ceea613c65b 100644
->> --- a/arch/arm64/kernel/Makefile
->> +++ b/arch/arm64/kernel/Makefile
->> @@ -55,6 +55,9 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
->>  arm64-obj-$(CONFIG_CRASH_DUMP)               += crash_dump.o
->>  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)        += sdei.o
->>
->> +arm64-obj-$(CONFIG_GCC_PLUGIN_STACKLEAK) += erase.o
->> +KASAN_SANITIZE_erase.o       := n
->
-> I suspect we want to avoid the full set of instrumentation suspects here, e.g.
-> GKOV, KASAN, UBSAN, and KCOV.
->
->> +
->>  obj-y                                        += $(arm64-obj-y) vdso/ probes/
->>  obj-m                                        += $(arm64-obj-m)
->>  head-y                                       := head.o
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index ec2ee720e33e..3144f1ebdc18 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -401,6 +401,11 @@ tsk      .req    x28             // current thread_info
->>
->>       .text
->>
->> +     .macro  ERASE_KSTACK
->> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
->> +     bl      erase_kstack
->> +#endif
->> +     .endm
->
-> Nit: The rest of our asm macros are lower-case -- can we stick to that here?
->
->>  /*
->>   * Exception vectors.
->>   */
->> @@ -906,6 +911,7 @@ ret_to_user:
->>       cbnz    x2, work_pending
->>  finish_ret_to_user:
->>       enable_step_tsk x1, x2
->> +     ERASE_KSTACK
->>       kernel_exit 0
->>  ENDPROC(ret_to_user)
->
-> I believe we also need this in ret_fast_syscall.
->
-> [...]
->
->> +asmlinkage void erase_kstack(void)
->> +{
->> +     unsigned long p = current->thread.lowest_stack;
->> +     unsigned long boundary = p & ~(THREAD_SIZE - 1);
->> +     unsigned long poison = 0;
->> +     const unsigned long check_depth = STACKLEAK_POISON_CHECK_DEPTH /
->> +                                                     sizeof(unsigned long);
->> +
->> +     /*
->> +      * Let's search for the poison value in the stack.
->> +      * Start from the lowest_stack and go to the bottom.
->> +      */
->> +     while (p > boundary && poison <= check_depth) {
->> +             if (*(unsigned long *)p == STACKLEAK_POISON)
->> +                     poison++;
->> +             else
->> +                     poison = 0;
->> +
->> +             p -= sizeof(unsigned long);
->> +     }
->> +
->> +     /*
->> +      * One long int at the bottom of the thread stack is reserved and
->> +      * should not be poisoned (see CONFIG_SCHED_STACK_END_CHECK).
->> +      */
->> +     if (p == boundary)
->> +             p += sizeof(unsigned long);
->
-> I wonder if end_of_stack() should be taught about CONFIG_SCHED_STACK_END_CHECK,
-> given that's supposed to return the last *usable* long on the stack, and we
-> don't account for this elsewhere.
->
-> If we did, then IIUC we could do:
->
->         unsigned long boundary = (unsigned long)end_of_stack(current);
->
-> ... at the start of the function, and not have to worry about this explicitly.
->
->> +
->> +#ifdef CONFIG_STACKLEAK_METRICS
->> +     current->thread.prev_lowest_stack = p;
->> +#endif
->> +
->> +     /*
->> +      * So let's write the poison value to the kernel stack.
->> +      * Start from the address in p and move up till the new boundary.
->> +      */
->> +     boundary = current_stack_pointer;
->
-> I worry a little that the compiler can move the SP during a function's
-> lifetime, but maybe that's only the case when there are VLAs, or something like
-> that?
->
+On Thu, May 03, 2018 at 12:10:47PM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > The trigger fires when data is pushed to the ldisc. This is a bit later
+> > than the actual receiving of data but has the nice benefit that it
+> > doesn't need adaption for each driver and isn't in the hot path.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+> Well, why not, but there certainly should be config option? Because I
+> really don't see many people wanting to use this trigger.
 
-I think the AAPCS permits the compiler to allocate the stack space for
-outgoing variables (i.e., args 9 and beyond or other argument types
-that require passing via the stack) at a smaller scope than the entire
-function, although GCC does appear to allocate it at the beginning
-(based on some quick experiments)
+Yeah, can be done. I'll implement this for v2.
 
+> > diff --git a/drivers/tty/tty_buffer.c b/drivers/tty/tty_buffer.c
+> > index c996b6859c5e..4d364b77b1a7 100644
+> > --- a/drivers/tty/tty_buffer.c
+> > +++ b/drivers/tty/tty_buffer.c
+> > @@ -17,6 +17,7 @@
+> >  #include <linux/delay.h>
+> >  #include <linux/module.h>
+> >  #include <linux/ratelimit.h>
+> > +#include <linux/leds.h>
+> >  
+> >  
+> >  #define MIN_TTYB_SIZE	256
+> > @@ -499,6 +500,7 @@ static void flush_to_ldisc(struct work_struct *work)
+> >  		struct tty_buffer *head = buf->head;
+> >  		struct tty_buffer *next;
+> >  		int count;
+> > +		unsigned long delay = 50 /* ms */;
+> >  
+> >  		/* Ldisc or user is trying to gain exclusive access */
+> >  		if (atomic_read(&buf->priority))
+> > @@ -521,6 +523,8 @@ static void flush_to_ldisc(struct work_struct *work)
+> >  			continue;
+> >  		}
+> >  
+> > +		led_trigger_blink_oneshot(port->led_trigger_rx, &delay, &delay, 0);
+> > +
+> >  		count = receive_buf(port, head, count);
+> >  		if (!count)
+> >  			break;
+> > diff --git a/drivers/tty/tty_port.c b/drivers/tty/tty_port.c
+> > index 25d736880013..51b78a585417 100644
+> > --- a/drivers/tty/tty_port.c
+> > +++ b/drivers/tty/tty_port.c
+> > @@ -16,6 +16,7 @@
+> >  #include <linux/wait.h>
+> >  #include <linux/bitops.h>
+> >  #include <linux/delay.h>
+> > +#include <linux/leds.h>
+> >  #include <linux/module.h>
+> >  #include <linux/serdev.h>
+> >  
+> > @@ -157,6 +158,18 @@ struct device *tty_port_register_device_attr_serdev(struct tty_port *port,
+> >  
+> >  	tty_port_link_device(port, driver, index);
+> >  
+> > +	port->led_trigger_rx_name = kasprintf(GFP_KERNEL, "%s%d-rx",
+> > +					      driver->name, index);
+> > +	if (!port->led_trigger_rx_name) {
+> > +		pr_err("Failed to allocate trigger name for %s%d\n",
+> > +		       driver->name, index);
+> > +		goto skip_trigger;
+> > +	}
+> > +
+> > +	led_trigger_register_simple(port->led_trigger_rx_name,
+> > +				    &port->led_trigger_rx);
+> > +
+> > +skip_trigger:
+> >  	dev = serdev_tty_port_register(port, device, driver, index);
+> >  	if (PTR_ERR(dev) != -ENODEV) {
+> >  		/* Skip creating cdev if we registered a serdev device */
+> > @@ -206,6 +219,9 @@ void tty_port_unregister_device(struct tty_port *port,
+> >  	if (ret == 0)
+> >  		return;
+> >  
+> > +	led_trigger_unregister_simple(port->led_trigger_rx);
+> 
+> Is it ok to unregister if it was not registered in the first place?
 
->> +
->> +     BUG_ON(boundary - p >= THREAD_SIZE);
->> +
->> +     while (p < boundary) {
->> +             *(unsigned long *)p = STACKLEAK_POISON;
->> +             p += sizeof(unsigned long);
->> +     }
->> +
->> +     /* Reset the lowest_stack value for the next syscall */
->> +     current->thread.lowest_stack = current_stack_pointer;
->> +}
->
-> Once this function returns, its data is left on the stack. Is that not a problem?
->
-> No strong feelings either way, but it might be worth mentioning in the commit
-> message.
->
->> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> index f08a2ed9db0d..156fa0a0da19 100644
->> --- a/arch/arm64/kernel/process.c
->> +++ b/arch/arm64/kernel/process.c
->> @@ -364,6 +364,9 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
->>       p->thread.cpu_context.pc = (unsigned long)ret_from_fork;
->>       p->thread.cpu_context.sp = (unsigned long)childregs;
->>
->> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
->> +     p->thread.lowest_stack = (unsigned long)task_stack_page(p);
->
-> Nit: end_of_stack(p) would be slightly better semantically, even though
-> currently equivalent to task_stack_page(p).
->
-> [...]
->
->> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
->> +void __used check_alloca(unsigned long size)
->> +{
->> +     unsigned long sp, stack_left;
->> +
->> +     sp = current_stack_pointer;
->> +
->> +     stack_left = sp & (THREAD_SIZE - 1);
->> +     BUG_ON(stack_left < 256 || size >= stack_left - 256);
->> +}
->
-> Is this arbitrary, or is there something special about 256?
->
-> Even if this is arbitrary, can we give it some mnemonic?
->
->> +EXPORT_SYMBOL(check_alloca);
->> +#endif
->> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
->> index a34e9290a699..25dd2a14560d 100644
->> --- a/drivers/firmware/efi/libstub/Makefile
->> +++ b/drivers/firmware/efi/libstub/Makefile
->> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)        += -I$(srctree)/scripts/dtc/libfdt
->>  KBUILD_CFLAGS                        := $(cflags-y) -DDISABLE_BRANCH_PROFILING \
->>                                  -D__NO_FORTIFY \
->>                                  $(call cc-option,-ffreestanding) \
->> -                                $(call cc-option,-fno-stack-protector)
->> +                                $(call cc-option,-fno-stack-protector) \
->> +                                $(DISABLE_STACKLEAK_PLUGIN)
->>
->>  GCOV_PROFILE                 := n
->>  KASAN_SANITIZE                       := n
->
-> I believe we'll also need to do this for the KVM hyp code in arch/arm64/kvm/hyp/.
->
-> Thanks,
-> Mark.
+led_trigger_unregister_simple() looks as follows:
+
+	if (trig)
+		led_trigger_unregister(trig);
+	kfree(trig);
+
+So yes, it does the right thing when it wasn't registered. Assuming it
+is NULL then, which doesn't seem to be guaranteed. Probably I'd need
+
+	port->led_trigger_rx = NULL
+	
+if kasprintf failed.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
