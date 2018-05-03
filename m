@@ -1,31 +1,44 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 3 May 2018 14:46:24 +0200
-Subject: [PATCH] iommu: rockchip: fix building without CONFIG_OF
-In-Reply-To: <20180404102401.3634085-1-arnd@arndb.de>
-References: <20180404102401.3634085-1-arnd@arndb.de>
-Message-ID: <20180503124623.wjnv6smvhpblpr76@8bytes.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu,  3 May 2018 14:30:51 +0200
+Subject: [PATCH v3 3/3] arm64: dts: renesas: ulcb: Add PMIC DDR Backup Power
+ config
+In-Reply-To: <1525350651-12471-1-git-send-email-geert+renesas@glider.be>
+References: <1525350651-12471-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1525350651-12471-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2018 at 12:23:53PM +0200, Arnd Bergmann wrote:
-> We get a build error when compiling the iommu driver without CONFIG_OF:
-> 
-> drivers/iommu/rockchip-iommu.c: In function 'rk_iommu_of_xlate':
-> drivers/iommu/rockchip-iommu.c:1101:2: error: implicit declaration of function 'of_dev_put'; did you mean 'of_node_put'? [-Werror=implicit-function-declaration]
-> 
-> This replaces the of_dev_put() with the equivalent platform_device_put(),
-> and adds an error check for of_find_device_by_node() returning NULL,
-> which seems to be appropriate here given that we pass the device into
-> platform_get_drvdata() next, and that of_find_device_by_node() might
-> theoretically return a NULL pointer.
-> 
-> Fixes: 5fd577c3eac3 ("iommu/rockchip: Use OF_IOMMU to attach devices automatically")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> This warning appears to only have been introduced in linux-next after
-> the merge window opened.
-> ---
->  drivers/iommu/rockchip-iommu.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+On the R-Car Starter Kit Premier/Pro, all of the DDR0, DDR1, DDR0C, and
+DDR1C power rails need to be kept powered when backup mode is enabled.
+Reflect this in the "rohm,ddr-backup-power" property for the BD9571MWV
+PMIC node.
 
-Changed patch according to Robins comments and applied it, thanks.
+The accessory power switch (SW8) is a momentary switch, hense specify
+"rohm,rstbmode-pulse".
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v3:
+  - Use a hex value for the bit mask,
+
+v2:
+  - New.
+---
+ arch/arm64/boot/dts/renesas/ulcb.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+index bb21ae335e8b8489..432a4e9752f2b923 100644
+--- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
++++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+@@ -256,6 +256,8 @@
+ 		#interrupt-cells = <2>;
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++		rohm,ddr-backup-power = <0xf>;
++		rohm,rstbmode-pulse;
+ 
+ 		regulators {
+ 			dvfs: dvfs {
+-- 
+2.7.4
