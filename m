@@ -1,43 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 3 May 2018 21:25:10 +0200
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 May 2018 12:28:38 -0700
 Subject: Droid 4: very confusing config around OHCI_OMAP3_HCD
-Message-ID: <20180503192510.GB32572@amd>
+In-Reply-To: <20180503192510.GB32572@amd>
+References: <20180503192510.GB32572@amd>
+Message-ID: <20180503192838.GY98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+* Pavel Machek <pavel@ucw.cz> [180503 19:27]:
+> Hi!
+> 
+> For power management experiments, I tried
+> 
+> CONFIG_USB_OHCI_HCD=y
+> CONFIG_USB_OHCI_HCD_OMAP3=m
+> CONFIG_USB_OHCI_HCD_PLATFORM=y
+> 
+> and could not find resulting .ko.
+> 
+> Help text says:
+> 
+> CONFIG_USB_OHCI_HCD_OMAP3:
+> 
+> This option is deprecated now and the driver was removed, use
+> USB_OHCI_HCD_PLATFORM instead.
+> 
+> Enables support for the on-chip OHCI controller on
+> OMAP3 and later chips.
+> 
+> Which may partly explain it. But if the option no longer does
+> anything, why keep it? Certainly second part is confusing if option is
+> NOP...
 
-For power management experiments, I tried
+Yeah it's ohci-platform now, I think we decided to keep the old one
+around to avoid breaking people's .config files for booting rather
+than silently fail.
 
-CONFIG_USB_OHCI_HCD=y
-CONFIG_USB_OHCI_HCD_OMAP3=m
-CONFIG_USB_OHCI_HCD_PLATFORM=y
+Regards,
 
-and could not find resulting .ko.
-
-Help text says:
-
-CONFIG_USB_OHCI_HCD_OMAP3:
-
-This option is deprecated now and the driver was removed, use
-USB_OHCI_HCD_PLATFORM instead.
-
-Enables support for the on-chip OHCI controller on
-OMAP3 and later chips.
-
-Which may partly explain it. But if the option no longer does
-anything, why keep it? Certainly second part is confusing if option is
-NOP...
-
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180503/4585a41e/attachment.sig>
+Tony
