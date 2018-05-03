@@ -1,92 +1,39 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 3 May 2018 16:05:09 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 analog & timer
- drivers
-In-Reply-To: <1525274696-11968-1-git-send-email-fabrice.gasnier@st.com>
-References: <1525274696-11968-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <cc934eb9-f9e4-3c52-7f38-413a1b63fce2@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 3 May 2018 16:06:48 +0200
+Subject: [PATCH] drm/pl111: Fix module probe bug
+In-Reply-To: <20180503134312.GN12521@phenom.ffwll.local>
+References: <20180503134053.24945-1-linus.walleij@linaro.org>
+ <20180503134312.GN12521@phenom.ffwll.local>
+Message-ID: <CACRpkdaYQKXcf_LYUEuUgjpPuJYzaNoLv52vKCF=urKf6C_x4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrice,
+On Thu, May 3, 2018 at 3:43 PM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Thu, May 03, 2018 at 03:40:53PM +0200, Linus Walleij wrote:
+>> Commit a30933c27602 ("drm/pl111: Support the Versatile Express")
+>> Added a second module using the builtin_platform_driver() call,
+>> which works fine as long as you do not try to build the PL111
+>> driver as a module, because a module can only have one initcall
+>> and cause the following build bug:
+>>
+>> (...) multiple definition of `init_module' (...)
+>>
+>> Reported-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+>> Cc: Pawel Moll <pawel.moll@arm.com>
+>> Cc: Eric Anholt <eric@anholt.net>
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> Fixes: a30933c27602 ("drm/pl111: Support the Versatile Express")
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> lgtm. Please also reenable the pl111 driver in the drm-rerere branch, you
+> can simple revert 17c11b73c2ea6a21eaad5c1f5d358054c9e2c2f6.
+>
+> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 
-On 05/02/2018 05:24 PM, Fabrice Gasnier wrote:
-> This enables drivers for STM32 timer, low power timer and analog hardware
-> that can be used on STM32MP1 SoC:
-> - Timer & LP Timer MFD core, PWM, trigger & encoder drivers
-> - IIO ADC/DAC/DFSDM
-> - vrefbuf regu driver (voltage reference buffer).
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->   arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
->   1 file changed, 10 insertions(+)
-> 
+Thanks Daniel, hope I can count that Review tag for v2 as well.
 
-Applied on stm32-next.
+Will apply and push later tonight unless I have done more mistakes.
 
-Arnd,
-Do you agree if I take multi_v7_defconfig related patches in my stm32 
-pull requests ?
-
-
-Thanks.
-Alex
-
-
-
-
-
-
-
-
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index e6b3c96..40f5dd8 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -535,6 +535,7 @@ CONFIG_MFD_TPS65217=y
->   CONFIG_MFD_TPS65218=y
->   CONFIG_MFD_TPS6586X=y
->   CONFIG_MFD_TPS65910=y
-> +CONFIG_MFD_STM32_LPTIMER=y
->   CONFIG_REGULATOR_ACT8945A=y
->   CONFIG_REGULATOR_AB8500=y
->   CONFIG_REGULATOR_ACT8865=y
-> @@ -567,6 +568,7 @@ CONFIG_REGULATOR_QCOM_SMD_RPM=y
->   CONFIG_REGULATOR_RN5T618=y
->   CONFIG_REGULATOR_S2MPS11=y
->   CONFIG_REGULATOR_S5M8767=y
-> +CONFIG_REGULATOR_STM32_VREFBUF=y
->   CONFIG_REGULATOR_TI_ABB=y
->   CONFIG_REGULATOR_TPS51632=y
->   CONFIG_REGULATOR_TPS62360=y
-> @@ -935,13 +937,19 @@ CONFIG_AT91_SAMA5D2_ADC=m
->   CONFIG_BERLIN2_ADC=m
->   CONFIG_CPCAP_ADC=m
->   CONFIG_EXYNOS_ADC=m
-> +CONFIG_STM32_ADC_CORE=y
-> +CONFIG_STM32_ADC=y
-> +CONFIG_STM32_DFSDM_ADC=y
->   CONFIG_VF610_ADC=m
->   CONFIG_XILINX_XADC=y
-> +CONFIG_STM32_LPTIMER_CNT=y
-> +CONFIG_STM32_DAC=y
->   CONFIG_MPU3050_I2C=y
->   CONFIG_CM36651=m
->   CONFIG_AK8975=y
->   CONFIG_RASPBERRYPI_POWER=y
->   CONFIG_IIO_HRTIMER_TRIGGER=y
-> +CONFIG_IIO_STM32_LPTIMER_TRIGGER=y
->   CONFIG_PWM=y
->   CONFIG_PWM_ATMEL=m
->   CONFIG_PWM_ATMEL_HLCDC_PWM=m
-> @@ -951,6 +959,8 @@ CONFIG_PWM_RCAR=m
->   CONFIG_PWM_RENESAS_TPU=y
->   CONFIG_PWM_ROCKCHIP=m
->   CONFIG_PWM_SAMSUNG=m
-> +CONFIG_PWM_STM32=y
-> +CONFIG_PWM_STM32_LP=y
->   CONFIG_PWM_SUN4I=y
->   CONFIG_PWM_TEGRA=y
->   CONFIG_PWM_VT8500=y
-> 
+Yours,
+Linus Walleij
