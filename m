@@ -1,40 +1,50 @@
-From: jhogan@kernel.org (James Hogan)
-Date: Thu, 3 May 2018 07:47:32 +0100
-Subject: [PATCH 11/13] mips, unicore32: swiotlb doesn't need sg->dma_length
-In-Reply-To: <20180503035643.GA9781@lst.de>
-References: <20180425051539.1989-1-hch@lst.de>
- <20180425051539.1989-12-hch@lst.de>
- <20180502222017.GC20766@jamesdev> <20180503035643.GA9781@lst.de>
-Message-ID: <20180503064731.GA3971@jamesdev>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu,  3 May 2018 14:55:53 +0800
+Subject: [RESEND PATCH] pinctrl: rockchip: Disable interrupt when changing
+ it's capability
+Message-ID: <20180503065553.7762-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2018 at 05:56:43AM +0200, Christoph Hellwig wrote:
-> On Wed, May 02, 2018 at 11:20:18PM +0100, James Hogan wrote:
-> > On Wed, Apr 25, 2018 at 07:15:37AM +0200, Christoph Hellwig wrote:
-> > > Only mips and unicore32 select CONFIG_NEED_SG_DMA_LENGTH when building
-> > > swiotlb.  swiotlb itself never merges segements and doesn't accesses the
-> > > dma_length field directly, so drop the dependency.
-> > 
-> > Is that at odds with Documentation/DMA-API-HOWTO.txt, which seems to
-> > suggest arch ports should enable it for IOMMUs?
-> 
-> swiotlb isn't really an iommu..  That being said iommus don't have to
-> merge segments either if they don't want to, and we have various
-> implementations that don't.  The whole dma api documentation needs
-> a major overhaul, including merging the various files and dropping a lot
-> of dead wood.  It has been on my todo list for a while, with an inner
-> hope that someone else would do it before me.
+We saw spurious irq when changing irq's trigger type, for example
+setting gpio-keys's wakeup irq trigger type.
 
-Okay, for MIPS:
-Acked-by: James Hogan <jhogan@kernel.org>
+And according to the TRM:
+"Programming the GPIO registers for interrupt capability, edge-sensitive
+or level-sensitive interrupts, and interrupt polarity should be
+completed prior to enabling the interrupts on Port A in order to prevent
+spurious glitches on the interrupt lines to the interrupt controller."
 
-Cheers
-James
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180503/32306b78/attachment.sig>
+Reported-by: Brian Norris <briannorris@google.com>
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+
+ drivers/pinctrl/pinctrl-rockchip.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index 3924779f55785..7ff45ec8330d1 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -2727,9 +2727,19 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
+ 		return -EINVAL;
+ 	}
+ 
++	/**
++	 * According to the TRM, we should keep irq disabled during programming
++	 * interrupt capability to prevent spurious glitches on the interrupt
++	 * lines to the interrupt controller.
++	 */
++	data = readl(bank->reg_base + GPIO_INTEN);
++	writel_relaxed(data & ~mask, gc->reg_base + GPIO_INTEN);
++
+ 	writel_relaxed(level, gc->reg_base + GPIO_INTTYPE_LEVEL);
+ 	writel_relaxed(polarity, gc->reg_base + GPIO_INT_POLARITY);
+ 
++	writel_relaxed(data, gc->reg_base + GPIO_INTEN);
++
+ 	irq_gc_unlock(gc);
+ 	raw_spin_unlock_irqrestore(&bank->slock, flags);
+ 	clk_disable(bank->clk);
+-- 
+2.11.0
