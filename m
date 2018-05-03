@@ -1,61 +1,80 @@
-From: faiz_abbas@ti.com (Faiz Abbas)
-Date: Thu, 3 May 2018 12:58:45 +0530
-Subject: [PATCH v2] ARM: dts: k2g-evm: Add DCAN dt nodes
-Message-ID: <20180503072845.5576-1-faiz_abbas@ti.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 3 May 2018 10:18:24 +0300
+Subject: [PATCH v2 07/10] PCI: Convert of_pci_get_host_bridge_resources()
+ users to devm variant
+In-Reply-To: <ed3e6df4feca5febefa14716d62aaddd5b4a39d1.1525067324.git.jan.kiszka@siemens.com>
+References: <cover.1525067324.git.jan.kiszka@siemens.com>
+ <ed3e6df4feca5febefa14716d62aaddd5b4a39d1.1525067324.git.jan.kiszka@siemens.com>
+Message-ID: <dbfa80fb-5fe8-3ccd-6886-4604ef9e058b@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 66AK2G evm has support for dcan.
-Add nodes and pinmuxes for dcan0 and dcan1.
+Hi Jan,
 
-Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
----
-Changes since v1: 
-Description updated.
+On 04/30/2018 08:48 AM, Jan Kiszka wrote:
+> From: Jan Kiszka <jan.kiszka@siemens.com>
+> 
+> Straightforward for all of them, no more leaks afterwards.
+> 
+> CC: Jingoo Han <jingoohan1@gmail.com>
+> CC: Joao Pinto <Joao.Pinto@synopsys.com>
+> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> Acked-by: Jingoo Han <jingoo1han@gmail.com>
 
- arch/arm/boot/dts/keystone-k2g-evm.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+[snip]
 
-diff --git a/arch/arm/boot/dts/keystone-k2g-evm.dts b/arch/arm/boot/dts/keystone-k2g-evm.dts
-index 6a4657799b99..154fdd7a7022 100644
---- a/arch/arm/boot/dts/keystone-k2g-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2g-evm.dts
-@@ -114,6 +114,20 @@
- 			K2G_CORE_IOPAD(0x11f0) (BUFFER_CLASS_B | PIN_PULLDOWN | MUX_MODE0)      /* uart2_txd.uart2_txd */
- 		>;
- 	};
-+
-+	dcan0_pins: pinmux_dcan0_pins {
-+		pinctrl-single,pins = <
-+			K2G_CORE_IOPAD(0x11fc) (BUFFER_CLASS_B | PULL_DISABLE  | MUX_MODE0)	/* dcan0tx.dcan0tx */
-+			K2G_CORE_IOPAD(0x1200) (BUFFER_CLASS_B | PIN_PULLDOWN  | MUX_MODE0)	/* dcan0rx.dcan0rx */
-+		>;
-+	};
-+
-+	dcan1_pins: pinmux_dcan1_pins {
-+		pinctrl-single,pins = <
-+			K2G_CORE_IOPAD(0x1224) (BUFFER_CLASS_B | PULL_DISABLE  | MUX_MODE1)	/* qspicsn2.dcan1tx */
-+			K2G_CORE_IOPAD(0x1228) (BUFFER_CLASS_B | PIN_PULLDOWN  | MUX_MODE1)	/* qspicsn3.dcan1rx */
-+		>;
-+	};
- };
- 
- &uart0 {
-@@ -268,3 +282,15 @@
- 	pinctrl-0 = <&uart2_pins>;
- 	status = "okay";
- };
-+
-+&dcan0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dcan0_pins>;
-+	status = "okay";
-+};
-+
-+&dcan1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dcan1_pins>;
-+	status = "okay";
-+};
--- 
-2.17.0
+> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+> index 6ab28f29ac6a..6eb36c924983 100644
+> --- a/drivers/pci/host/pcie-rcar.c
+> +++ b/drivers/pci/host/pcie-rcar.c
+> @@ -1067,12 +1067,11 @@ static int rcar_pcie_parse_request_of_pci_ranges(struct rcar_pcie *pci)
+>  {
+>  	int err;
+>  	struct device *dev = pci->dev;
+> -	struct device_node *np = dev->of_node;
+>  	resource_size_t iobase;
+>  	struct resource_entry *win, *tmp;
+>  
+> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
+> -					       &iobase);
+> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
+> +						    &pci->resources, &iobase);
+>  	if (err)
+>  		return err;
+>  
+
+this one snippet is obsoleted by https://patchwork.ozlabs.org/patch/904326/
+
+If 08/10 remains a deprecation, then it is sufficient to exclude the R-Car change,
+otherwise I hope maintainers can deal with the proper ordering.
+
+For PCI OF change:
+
+> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+> index f16b343d3b85..5a88d46a41b7 100644
+> --- a/drivers/pci/of.c
+> +++ b/drivers/pci/of.c
+> @@ -645,12 +645,12 @@ int pci_parse_request_of_pci_ranges(struct device *dev,
+>  				    struct resource **bus_range)
+>  {
+>  	int err, res_valid = 0;
+> -	struct device_node *np = dev->of_node;
+>  	resource_size_t iobase;
+>  	struct resource_entry *win, *tmp;
+>  
+>  	INIT_LIST_HEAD(resources);
+> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, resources, &iobase);
+> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, resources,
+> +						    &iobase);
+>  	if (err)
+>  		return err;
+>  
+> 
+
+Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+Tested-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+
+--
+With best wishes,
+Vladimir
