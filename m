@@ -1,36 +1,43 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 3 May 2018 17:12:32 +0200
-Subject: [PATCH v1 0/3] Append additional I2C instances and activate I2C1.
-In-Reply-To: <1524215110-13967-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1524215110-13967-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <6f1259a8-f036-d3bd-a17e-d1ceb77092f2@st.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Thu, 3 May 2018 16:12:55 +0100
+Subject: [PATCH v8 13/13] arm64: topology: divorce MC scheduling domain
+ from core_siblings
+In-Reply-To: <20180425233121.13270-14-jeremy.linton@arm.com>
+References: <20180425233121.13270-1-jeremy.linton@arm.com>
+ <20180425233121.13270-14-jeremy.linton@arm.com>
+Message-ID: <20180503151255.GB28409@work-enc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/20/2018 11:05 AM, Pierre-Yves MORDRET wrote:
-> This patch intends to appends 3 additional I2C instances (2, 3 and 4).
-> In the same time I2C1 is setup for both STM32F746 and STM32F769 Discovery
-> boards.
-> ---
->    Version history:
->       v1:
->          * Initial
-> ---
+On Wed, Apr 25, 2018 at 06:31:21PM -0500, Jeremy Linton wrote:
+> Now that we have an accurate view of the physical topology
+> we need to represent it correctly to the scheduler. Generally MC
+> should equal the LLC in the system, but there are a number of
+> special cases that need to be dealt with.
 > 
-> Pierre-Yves MORDRET (3):
->    ARM: dts: stm32: Append additional I2Cs for STM32F746 SoC
->    ARM: dts: stm32: Add I2C1 support for STM32F769-DISCO Board
->    ARM: dts: stm32: Add I2C1 support for STM32F746-DISCO Board
+> In the case of NUMA in socket, we need to assure that the sched
+> domain we build for the MC layer isn't larger than the DIE above it.
+> Similarly for LLC's that might exist in cross socket interconnect or
+> directory hardware we need to assure that MC is shrunk to the socket
+> or NUMA node.
 > 
->   arch/arm/boot/dts/stm32f746-disco.dts |  8 ++++++++
->   arch/arm/boot/dts/stm32f746.dtsi      | 36 +++++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/stm32f769-disco.dts |  8 ++++++++
->   3 files changed, 52 insertions(+)
+> This patch builds a sibling mask for the LLC, and then picks the
+> smallest of LLC, socket siblings, or NUMA node siblings, which
+> gives us the behavior described above. This is ever so slightly
+> different than the similar alternative where we look for a cache
+> layer less than or equal to the socket/NUMA siblings.
 > 
+> The logic to pick the MC layer affects all arm64 machines, but
+> only changes the behavior for DT/MPIDR systems if the NUMA domain
+> is smaller than the core siblings (generally set to the cluster).
+> Potentially this fixes a possible bug in DT systems, but really
+> it only affects ACPI systems where the core siblings is correctly
+> set to the socket siblings. Thus all currently available ACPI
+> systems should have MC equal to LLC, including the NUMA in socket
+> machines where the LLC is partitioned between the NUMA nodes.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 
-Series applied on stm32-next.
+This patch looks good to me.
 
-Regards
-Alex
+Acked-by: Morten Rasmussen <morten.rasmussen@arm.com>
