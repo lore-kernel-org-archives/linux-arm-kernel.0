@@ -1,477 +1,381 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu,  3 May 2018 11:35:49 +0200
-Subject: [PATCH v7 4/6] misc gnss serdev: Add w2sg0004 power control driver
-In-Reply-To: <cover.1525340143.git.hns@goldelico.com>
-References: <cover.1525340143.git.hns@goldelico.com>
-Message-ID: <5dc006ea2fde674ba89969fd8aa542d26a157fd9.1525340143.git.hns@goldelico.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 3 May 2018 11:41:44 +0200
+Subject: [PATCH 1/2 v5] drm/pl111: Support the Versatile Express
+In-Reply-To: <20180502134719.8388-1-linus.walleij@linaro.org>
+References: <20180502134719.8388-1-linus.walleij@linaro.org>
+Message-ID: <20180503094144.GK12521@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for Wi2Wi W2SG0004 GPS module connected to some SoC UART.
+On Wed, May 02, 2018 at 03:47:18PM +0200, Linus Walleij wrote:
+> The Versatile Express uses a special configuration controller
+> deeply embedded in the system motherboard FPGA to multiplex the
+> two to three (!) display controller instances out to the single
+> SiI9022 bridge.
+> 
+> Set up an extra file with the logic to probe to the FPGA mux
+> register on the system controller bus, then parse the device
+> tree to see if there is a CLCD or HDLCD instance on the core
+> tile (also known as the daughterboard) by looking in the
+> root of the device tree for compatible nodes.
+> 
+> - If there is a HDLCD on the core tile, and there is a driver
+>   for it, we exit probe and deactivate the motherboard CLCD.
+>   We do not touch the DVI mux in this case, to make sure we
+>   don't break HDLCD.
+> 
+> - If there is a CLCD on both the motherboard and the core tile
+>   (only the CA9 has this) the core tile CLCD takes precedence
+>   and get muxed to the DVI connector.
+> 
+> - Only if there is no working graphics on the core tile, the
+>   motherboard CLCD is probed and muxed to the DVI connector.
+> 
+> Core tile graphics should always take precedence as it can
+> address all memory and is also faster, however the motherboard
+> CLCD is good to have around for diagnostics and testing.
+> 
+> It is possible to test the motherboard CLCD by setting the
+> status = "disabled" property on the core tile CLCD or
+> HDLCD.
+> 
+> Scale down the Versatile Express to 16BPP so we can support a
+> 1024x768 display despite the bus bandwidth restrictions on this
+> platform. (The motherboard CLCD supports slightly lower
+> resolution.)
+> 
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Acked-by: Eric Anholt <eric@anholt.net>
+> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v4->v5:
+> - Collect Robin's Tested-by
+> - Switch to builtin_platform_driver() for the muxfpga as this
+>   file is always built as "-y" for the arch and we need to
+>   avoid module collisions with the main PL111 driver.
+> ChangeLog v3->v4:
+> - Add a missing platform_device_put()
+> - Simplify code with for_each_available_child_of_node()
+> - Collect Eric's ACK.
+> ChangeLog v2->v3:
+> - Rewrite CLCD detection and mux priority logic, look in
+>   the device tree root for core tile graphics.
+> ChangeLog v1->v2:
+> - No changes just reposting rebased on mainline changes.
+> ---
+>  drivers/gpu/drm/pl111/Makefile          |   1 +
+>  drivers/gpu/drm/pl111/pl111_versatile.c |  49 +++++++++-
+>  drivers/gpu/drm/pl111/pl111_vexpress.c  | 125 ++++++++++++++++++++++++
+>  drivers/gpu/drm/pl111/pl111_vexpress.h  |  22 +++++
+>  4 files changed, 196 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.c
+>  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.h
+> 
+> diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
+> index 9c5e8dba8ac6..19a8189dc54f 100644
+> --- a/drivers/gpu/drm/pl111/Makefile
+> +++ b/drivers/gpu/drm/pl111/Makefile
+> @@ -3,6 +3,7 @@ pl111_drm-y +=	pl111_display.o \
+>  		pl111_versatile.o \
+>  		pl111_drv.o
+>  
+> +pl111_drm-$(CONFIG_ARCH_VEXPRESS) += pl111_vexpress.o
+>  pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
+>  
+>  obj-$(CONFIG_DRM_PL111) += pl111_drm.o
+> diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
+> index 9302f516045e..78ddf8534fd2 100644
+> --- a/drivers/gpu/drm/pl111/pl111_versatile.c
+> +++ b/drivers/gpu/drm/pl111/pl111_versatile.c
+> @@ -1,12 +1,14 @@
+>  #include <linux/amba/clcd-regs.h>
+>  #include <linux/device.h>
+>  #include <linux/of.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/regmap.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/bitops.h>
+>  #include <linux/module.h>
+>  #include <drm/drmP.h>
+>  #include "pl111_versatile.h"
+> +#include "pl111_vexpress.h"
+>  #include "pl111_drm.h"
+>  
+>  static struct regmap *versatile_syscon_map;
+> @@ -22,6 +24,7 @@ enum versatile_clcd {
+>  	REALVIEW_CLCD_PB11MP,
+>  	REALVIEW_CLCD_PBA8,
+>  	REALVIEW_CLCD_PBX,
+> +	VEXPRESS_CLCD_V2M,
+>  };
+>  
+>  static const struct of_device_id versatile_clcd_of_match[] = {
+> @@ -53,6 +56,10 @@ static const struct of_device_id versatile_clcd_of_match[] = {
+>  		.compatible = "arm,realview-pbx-syscon",
+>  		.data = (void *)REALVIEW_CLCD_PBX,
+>  	},
+> +	{
+> +		.compatible = "arm,vexpress-muxfpga",
+> +		.data = (void *)VEXPRESS_CLCD_V2M,
+> +	},
+>  	{},
+>  };
+>  
+> @@ -286,12 +293,26 @@ static const struct pl111_variant_data pl111_realview = {
+>  	.fb_bpp = 16,
+>  };
+>  
+> +/*
+> + * Versatile Express PL111 variant, again we just push the maximum
+> + * BPP to 16 to be able to get 1024x768 without saturating the memory
+> + * bus. The clockdivider also seems broken on the Versatile Express.
+> + */
+> +static const struct pl111_variant_data pl111_vexpress = {
+> +	.name = "PL111 Versatile Express",
+> +	.formats = pl111_realview_pixel_formats,
+> +	.nformats = ARRAY_SIZE(pl111_realview_pixel_formats),
+> +	.fb_bpp = 16,
+> +	.broken_clockdivider = true,
+> +};
+> +
+>  int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
+>  {
+>  	const struct of_device_id *clcd_id;
+>  	enum versatile_clcd versatile_clcd_type;
+>  	struct device_node *np;
+>  	struct regmap *map;
+> +	int ret;
+>  
+>  	np = of_find_matching_node_and_match(NULL, versatile_clcd_of_match,
+>  					     &clcd_id);
+> @@ -301,7 +322,26 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
+>  	}
+>  	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
+>  
+> -	map = syscon_node_to_regmap(np);
+> +	/* Versatile Express special handling */
+> +	if (versatile_clcd_type == VEXPRESS_CLCD_V2M) {
+> +		struct platform_device *pdev;
+> +
+> +		/* Call into deep Vexpress configuration API */
+> +		pdev = of_find_device_by_node(np);
+> +		if (!pdev) {
+> +			dev_err(dev, "can't find the sysreg device, deferring\n");
+> +			return -EPROBE_DEFER;
+> +		}
+> +		map = dev_get_drvdata(&pdev->dev);
+> +		if (!map) {
+> +			dev_err(dev, "sysreg has not yet probed\n");
+> +			platform_device_put(pdev);
+> +			return -EPROBE_DEFER;
+> +		}
+> +	} else {
+> +		map = syscon_node_to_regmap(np);
+> +	}
+> +
+>  	if (IS_ERR(map)) {
+>  		dev_err(dev, "no Versatile syscon regmap\n");
+>  		return PTR_ERR(map);
+> @@ -340,6 +380,13 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
+>  		priv->variant_display_disable = pl111_realview_clcd_disable;
+>  		dev_info(dev, "set up callbacks for RealView PL111\n");
+>  		break;
+> +	case VEXPRESS_CLCD_V2M:
+> +		priv->variant = &pl111_vexpress;
+> +		dev_info(dev, "initializing Versatile Express PL111\n");
+> +		ret = pl111_vexpress_clcd_init(dev, priv, map);
+> +		if (ret)
+> +			return ret;
+> +		break;
+>  	default:
+>  		dev_info(dev, "unknown Versatile system controller\n");
+>  		break;
+> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.c b/drivers/gpu/drm/pl111/pl111_vexpress.c
+> new file mode 100644
+> index 000000000000..c9fee625faf1
+> --- /dev/null
+> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.c
+> @@ -0,0 +1,125 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Versatile Express PL111 handling
+> + * Copyright (C) 2018 Linus Walleij
+> + *
+> + * This module binds to the "arm,vexpress-muxfpga" device on the
+> + * Versatile Express configuration bus and sets up which CLCD instance
+> + * gets muxed out on the DVI bridge.
+> + */
+> +#include <linux/device.h>
+> +#include <linux/module.h>
+> +#include <linux/regmap.h>
+> +#include <linux/vexpress.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include "pl111_drm.h"
+> +#include "pl111_vexpress.h"
+> +
+> +#define VEXPRESS_FPGAMUX_MOTHERBOARD		0x00
+> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_1	0x01
+> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_2	0x02
+> +
+> +int pl111_vexpress_clcd_init(struct device *dev,
+> +			     struct pl111_drm_dev_private *priv,
+> +			     struct regmap *map)
+> +{
+> +	struct device_node *root;
+> +	struct device_node *child;
+> +	struct device_node *ct_clcd = NULL;
+> +	bool has_coretile_clcd = false;
+> +	bool has_coretile_hdlcd = false;
+> +	bool mux_motherboard = true;
+> +	u32 val;
+> +	int ret;
+> +
+> +	/*
+> +	 * Check if we have a CLCD or HDLCD on the core tile by checking if a
+> +	 * CLCD or HDLCD is available in the root of the device tree.
+> +	 */
+> +	root = of_find_node_by_path("/");
+> +	if (!root)
+> +		return -EINVAL;
+> +
+> +	for_each_available_child_of_node(root, child) {
+> +		if (of_device_is_compatible(child, "arm,pl111")) {
+> +			has_coretile_clcd = true;
+> +			ct_clcd = child;
+> +			break;
+> +		}
+> +		if (of_device_is_compatible(child, "arm,hdlcd")) {
+> +			has_coretile_hdlcd = true;
+> +			break;
+> +		}
+> +	}
+> +
+> +	/*
+> +	 * If there is a coretile HDLCD and it has a driver,
+> +	 * do not mux the CLCD on the motherboard to the DVI.
+> +	 */
+> +	if (has_coretile_hdlcd && IS_ENABLED(CONFIG_DRM_HDLCD))
+> +		mux_motherboard = false;
+> +
+> +	/*
+> +	 * On the Vexpress CA9 we let the CLCD on the coretile
+> +	 * take precedence, so also in this case do not mux the
+> +	 * motherboard to the DVI.
+> +	 */
+> +	if (has_coretile_clcd)
+> +		mux_motherboard = false;
+> +
+> +	if (mux_motherboard) {
+> +		dev_info(dev, "DVI muxed to motherboard CLCD\n");
+> +		val = VEXPRESS_FPGAMUX_MOTHERBOARD;
+> +	} else if (ct_clcd == dev->of_node) {
+> +		dev_info(dev,
+> +			 "DVI muxed to daughterboard 1 (core tile) CLCD\n");
+> +		val = VEXPRESS_FPGAMUX_DAUGHTERBOARD_1;
+> +	} else {
+> +		dev_info(dev, "core tile graphics present\n");
+> +		dev_info(dev, "this device will be deactivated\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	ret = regmap_write(map, 0, val);
+> +	if (ret) {
+> +		dev_err(dev, "error setting DVI muxmode\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * This sets up the regmap pointer that will then be retrieved by
+> + * the detection code in pl111_versatile.c and passed in to the
+> + * pl111_vexpress_clcd_init() function above.
+> + */
+> +static int vexpress_muxfpga_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct regmap *map;
+> +
+> +	map = devm_regmap_init_vexpress_config(&pdev->dev);
+> +	if (IS_ERR(map))
+> +		return PTR_ERR(map);
+> +	dev_set_drvdata(dev, map);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id vexpress_muxfpga_match[] = {
+> +	{ .compatible = "arm,vexpress-muxfpga", }
+> +};
+> +
+> +static struct platform_driver vexpress_muxfpga_driver = {
+> +	.driver = {
+> +		.name = "vexpress-muxfpga",
+> +		.of_match_table = of_match_ptr(vexpress_muxfpga_match),
+> +	},
+> +	.probe = vexpress_muxfpga_probe,
+> +};
+> +
+> +builtin_platform_driver(vexpress_muxfpga_driver);
 
-This chip is an older version of modern SirfStar modules and is
-lacking a WAKEUP output.
+  LD [M]  drivers/gpu/drm/pl111/pl111_drm.o
+drivers/gpu/drm/pl111/pl111_vexpress.o: In function `vexpress_muxfpga_driver_init':
+/home/daniel/linux/aarch64/drivers/gpu/drm/pl111/pl111_vexpress.c:125: multiple definition of `init_module'
+drivers/gpu/drm/pl111/pl111_drv.o:/home/daniel/linux/aarch64/drivers/gpu/drm/pl111/pl111_drv.c:427: first defined here
+make[4]: *** [scripts/Makefile.build:570: drivers/gpu/drm/pl111/pl111_drm.o] Error 1
+make[3]: *** [scripts/Makefile.build:583: drivers/gpu/drm/pl111] Error 2
+make[3]: *** Waiting for unfinished jobs....
 
-Hence we need a different strategy to determine the real power state.
+Using the default drm-misc configs.
 
-This driver uses serdev API hooks to monitor the UART traffic before
-forwarding to the gnss framework. Especially, it detects the situation
-where the module is turned on (sends data) but should be off. This can
-happen if it was already turned on during (re)boot or power-on-reset.
+Please fix asap, and please compile-test before pushing using these
+default configs so others aren't blocked. I've disabled the pl111 driver
+in there for now, please also re-enable.
 
-Additionally, "rfkill block/unblock gps" is supported to control power
-of an external LNA.
+Thanks, Daniel
+> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.h b/drivers/gpu/drm/pl111/pl111_vexpress.h
+> new file mode 100644
+> index 000000000000..49876417f7b6
+> --- /dev/null
+> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.h
+> @@ -0,0 +1,22 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +
+> +struct device;
+> +struct pl111_drm_dev_private;
+> +struct regmap;
+> +
+> +#ifdef CONFIG_ARCH_VEXPRESS
+> +
+> +int pl111_vexpress_clcd_init(struct device *dev,
+> +			     struct pl111_drm_dev_private *priv,
+> +			     struct regmap *map);
+> +
+> +#else
+> +
+> +static int inline pl111_vexpress_clcd_init(struct device *dev,
+> +					   struct pl111_drm_dev_private *priv,
+> +					   struct regmap *map)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +#endif
+> -- 
+> 2.17.0
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-The driver concept is based on code developed by Neil Brown <neilb@suse.de>
-but strongly simplified and heavily adapted to use the new serdev API
-introduced in v4.11 and the upcoming GNSS framework.
-
-Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
----
- drivers/gnss/w2sg0004.c | 435 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 435 insertions(+)
- create mode 100644 drivers/gnss/w2sg0004.c
-
-diff --git a/drivers/gnss/w2sg0004.c b/drivers/gnss/w2sg0004.c
-new file mode 100644
-index 000000000000..7e844ab7b31a
---- /dev/null
-+++ b/drivers/gnss/w2sg0004.c
-@@ -0,0 +1,435 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Driver for power controlling the w2sg0004 GPS receiver.
-+ *
-+ * Copyright (C) 2013 Neil Brown <neilb@suse.de>
-+ * Copyright (C) 2015-2018 H. Nikolaus Schaller <hns@goldelico.com>,
-+ *						Golden Delicious Computers
-+ *
-+ * This receiver has an ON/OFF pin which must be toggled to
-+ * turn the device 'on' or 'off'.  A high->low->high toggle
-+ * will switch the device on if it is off, and off if it is on.
-+ *
-+ * Contrary to newer Sirf based modules is not possible to directly
-+ * detect the power state of the w2sg0004.
-+ *
-+ * However, when it is on it will send characters on a UART line
-+ * regularly.
-+ *
-+ * To detect that the power state is out of sync (e.g. if GPS
-+ * was enabled before a reboot), we monitor the serdev data stream
-+ * and compare with what the driver thinks about the state.
-+ *
-+ * In addition we register as a rfkill client so that we can
-+ * control the LNA power.
-+ *
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/gnss.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/rfkill.h>
-+#include <linux/serdev.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+#include <linux/workqueue.h>
-+
-+/*
-+ * There seems to be restrictions on how quickly we can toggle the
-+ * on/off line.  data sheets says "two rtc ticks", whatever that means.
-+ * If we do it too soon it doesn't work.
-+ * So we have a state machine which uses the common work queue to ensure
-+ * clean transitions.
-+ * When a change is requested we record that request and only act on it
-+ * once the previous change has completed.
-+ * A change involves a 10ms low pulse, and a 990ms raised level, so only
-+ * one change per second.
-+ */
-+
-+enum w2sg_state {
-+	W2SG_IDLE,	/* is not changing state */
-+	W2SG_PULSE,	/* activate on/off impulse */
-+	W2SG_NOPULSE	/* deactivate on/off impulse */
-+};
-+
-+struct w2sg_data {
-+	struct		gnss_device *gdev;
-+	struct		regulator *lna_regulator;
-+	struct		gpio_desc *on_off_gpio;	/* the on-off gpio */
-+	struct		rfkill *rf_kill;
-+	struct		serdev_device *uart;	/* uart connected to the chip */
-+	bool		lna_blocked;	/* rfkill block gps is active */
-+	bool		lna_is_off;	/* LNA is currently off */
-+	bool		is_on;		/* current power state (0/1) */
-+	unsigned long	last_toggle;
-+	unsigned long	backoff;	/* time to wait since last_toggle */
-+	enum		w2sg_state state;	/* state engine state */
-+	bool		requested;	/* requested power state (0/1) */
-+	bool		suspended;
-+	struct		delayed_work work;
-+	int		discard_count;
-+};
-+
-+static int w2sg_set_lna_power(struct w2sg_data *data)
-+{
-+	int ret = 0;
-+	bool off = data->suspended || !data->requested || data->lna_blocked;
-+
-+	if (off != data->lna_is_off) {
-+		data->lna_is_off = off;
-+		if (!IS_ERR_OR_NULL(data->lna_regulator)) {
-+			if (off)
-+				regulator_disable(data->lna_regulator);
-+			else
-+				ret = regulator_enable(data->lna_regulator);
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+static void w2sg_set_power(struct w2sg_data *data, bool val)
-+{
-+	if (val && !data->requested) {
-+		data->requested = true;
-+	} else if (!val && data->requested) {
-+		data->backoff = HZ;
-+		data->requested = false;
-+	} else
-+		return;
-+
-+	if (!data->suspended)
-+		schedule_delayed_work(&data->work, 0);
-+}
-+
-+/* called each time data is received by the UART (i.e. sent by the w2sg0004) */
-+static int w2sg_uart_receive_buf(struct serdev_device *serdev,
-+				const unsigned char *rxdata,
-+				size_t count)
-+{
-+	struct w2sg_data *data =
-+		(struct w2sg_data *) serdev_device_get_drvdata(serdev);
-+
-+	if (!data->requested && !data->is_on) {
-+		/*
-+		 * we have received characters while the w2sg
-+		 * should have been be turned off
-+		 */
-+		data->discard_count += count;
-+		if ((data->state == W2SG_IDLE) &&
-+		    time_after(jiffies,
-+		    data->last_toggle + data->backoff)) {
-+			/* Should be off by now, time to toggle again */
-+			dev_dbg(&serdev->dev, "w2sg00x4 has sent %d characters data although it should be off!\n",
-+				data->discard_count);
-+
-+			data->discard_count = 0;
-+
-+			data->is_on = true;
-+			data->backoff *= 2;
-+			if (!data->suspended)
-+				schedule_delayed_work(&data->work, 0);
-+		}
-+		return count;
-+	}
-+
-+	/*
-+	 * pass to user-space
-+	 */
-+
-+	if (data->requested)
-+		return gnss_insert_raw(data->gdev, rxdata, count);
-+
-+	data->discard_count += count;
-+
-+	return count;
-+}
-+
-+/* try to toggle the power state by sending a pulse to the on-off GPIO */
-+static void toggle_work(struct work_struct *work)
-+{
-+	struct w2sg_data *data = container_of(work, struct w2sg_data,
-+					      work.work);
-+
-+	w2sg_set_lna_power(data);	/* update LNA power state */
-+
-+	switch (data->state) {
-+	case W2SG_IDLE:
-+		if (data->requested == data->is_on)
-+			return;
-+
-+		gpiod_set_value_cansleep(data->on_off_gpio, 1);
-+		data->state = W2SG_PULSE;
-+
-+		schedule_delayed_work(&data->work,
-+				      msecs_to_jiffies(10));
-+		break;
-+
-+	case W2SG_PULSE:
-+		gpiod_set_value_cansleep(data->on_off_gpio, 0);
-+		data->last_toggle = jiffies;
-+		data->state = W2SG_NOPULSE;
-+		data->is_on = !data->is_on;
-+
-+		schedule_delayed_work(&data->work,
-+				      msecs_to_jiffies(10));
-+		break;
-+
-+	case W2SG_NOPULSE:
-+		data->state = W2SG_IDLE;
-+
-+		break;
-+
-+	}
-+}
-+
-+static int w2sg_rfkill_set_block(void *pdata, bool blocked)
-+{
-+	struct w2sg_data *data = pdata;
-+
-+	data->lna_blocked = blocked;
-+
-+	if (!data->suspended)
-+		schedule_delayed_work(&data->work, 0);
-+
-+	return 0;
-+}
-+
-+static struct rfkill_ops w2sg0004_rfkill_ops = {
-+	.set_block = w2sg_rfkill_set_block,
-+};
-+
-+static struct serdev_device_ops serdev_ops = {
-+	.receive_buf = w2sg_uart_receive_buf,
-+};
-+
-+static int w2sg_gps_open(struct gnss_device *gdev)
-+{ /* user-space has opened our interface */
-+	struct w2sg_data *data = gnss_get_drvdata(gdev);
-+
-+	w2sg_set_power(data, true);
-+
-+	return 0;
-+}
-+
-+static void w2sg_gps_close(struct gnss_device *gdev)
-+{ /* user-space has finally closed our interface */
-+	struct w2sg_data *data = gnss_get_drvdata(gdev);
-+
-+	w2sg_set_power(data, false);
-+}
-+
-+static int w2sg_gps_send(struct gnss_device *gdev,
-+		const unsigned char *buffer, size_t count)
-+{ /* raw data coming from user space */
-+	struct w2sg_data *data = gnss_get_drvdata(gdev);
-+
-+	/* simply pass down to UART */
-+	return serdev_device_write_buf(data->uart, buffer, count);
-+}
-+
-+static const struct gnss_operations w2sg_gnss_ops = {
-+	.open		= w2sg_gps_open,
-+	.close		= w2sg_gps_close,
-+	.write_raw	= w2sg_gps_send,
-+};
-+
-+static int w2sg_probe(struct serdev_device *serdev)
-+{
-+	struct w2sg_data *data;
-+	struct rfkill *rf_kill;
-+	struct gnss_device *gdev;
-+	int err;
-+
-+	data = devm_kzalloc(&serdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	data->on_off_gpio = devm_gpiod_get_index(&serdev->dev,
-+						   "enable", 0,
-+						   GPIOD_OUT_LOW);
-+	if (IS_ERR(data->on_off_gpio)) {
-+		/* defer until we have the gpio */
-+		if (PTR_ERR(data->on_off_gpio) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		dev_err(&serdev->dev, "could not get the enable-gpio");
-+		return PTR_ERR(data->on_off_gpio);
-+	}
-+
-+	gpiod_direction_output(data->on_off_gpio, false);
-+
-+	data->lna_regulator = devm_regulator_get_optional(&serdev->dev,
-+							"lna");
-+	if (IS_ERR(data->lna_regulator)) {
-+		/* defer until we can get the regulator */
-+		if (PTR_ERR(data->lna_regulator) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+
-+		data->lna_regulator = NULL;	/* ignore other errors */
-+	}
-+
-+	gdev = gnss_allocate_device(&serdev->dev);
-+	if (!gdev)
-+		return -ENOMEM;
-+
-+	gdev->ops = &w2sg_gnss_ops;
-+	gnss_set_drvdata(gdev, data);
-+
-+	data->gdev = gdev;
-+	data->uart = serdev;
-+
-+	data->lna_blocked = true;
-+	data->lna_is_off = true;
-+
-+	data->is_on = false;
-+	data->requested = false;
-+	data->state = W2SG_IDLE;
-+	data->last_toggle = jiffies;
-+	data->backoff = HZ;
-+
-+	INIT_DELAYED_WORK(&data->work, toggle_work);
-+
-+	serdev_device_set_drvdata(serdev, data);
-+	serdev_device_set_client_ops(data->uart, &serdev_ops);
-+
-+	err = serdev_device_open(data->uart);
-+	if (err < 0)
-+		goto err_put_gnss;
-+
-+	err = serdev_device_set_baudrate(data->uart, 9600);
-+	if (err < 0)
-+		goto err_close_serdev;
-+
-+	serdev_device_set_flow_control(data->uart, false);
-+
-+	err = gnss_register_device(gdev);
-+	if (err < 0)
-+		goto err_close_serdev;
-+
-+	rf_kill = rfkill_alloc("GPS", &serdev->dev, RFKILL_TYPE_GPS,
-+				&w2sg0004_rfkill_ops, data);
-+	if (!rf_kill) {
-+		err = -ENOMEM;
-+		goto err_deregister_gnss;
-+	}
-+
-+	err = rfkill_register(rf_kill);
-+	if (err) {
-+		dev_err(&serdev->dev, "Cannot register rfkill device\n");
-+		goto err_destroy_rfkill;
-+	}
-+
-+	data->rf_kill = rf_kill;
-+
-+	/* keep off until user space requests the device */
-+	w2sg_set_power(data, false);
-+
-+	return 0;
-+
-+err_destroy_rfkill:
-+	rfkill_destroy(data->rf_kill);
-+
-+err_deregister_gnss:
-+	gnss_deregister_device(data->gdev);
-+
-+err_close_serdev:
-+	serdev_device_close(data->uart);
-+
-+err_put_gnss:
-+	gnss_put_device(data->gdev);
-+
-+	return err;
-+}
-+
-+static void w2sg_remove(struct serdev_device *serdev)
-+{
-+	struct w2sg_data *data = serdev_device_get_drvdata(serdev);
-+
-+	rfkill_destroy(data->rf_kill);
-+
-+	gnss_deregister_device(data->gdev);
-+
-+	cancel_delayed_work_sync(&data->work);
-+
-+	serdev_device_close(data->uart);
-+
-+	gnss_put_device(data->gdev);
-+}
-+
-+static int __maybe_unused w2sg_suspend(struct device *dev)
-+{
-+	struct w2sg_data *data = dev_get_drvdata(dev);
-+
-+	data->suspended = true;
-+
-+	cancel_delayed_work_sync(&data->work);
-+
-+	w2sg_set_lna_power(data);	/* shuts down if needed */
-+
-+	if (data->state == W2SG_PULSE) {
-+		msleep(10);
-+		gpiod_set_value_cansleep(data->on_off_gpio, 0);
-+		data->last_toggle = jiffies;
-+		data->is_on = !data->is_on;
-+		data->state = W2SG_NOPULSE;
-+	}
-+
-+	if (data->state == W2SG_NOPULSE) {
-+		msleep(10);
-+		data->state = W2SG_IDLE;
-+	}
-+
-+	if (data->is_on) {
-+		gpiod_set_value_cansleep(data->on_off_gpio, 1);
-+		msleep(10);
-+		gpiod_set_value_cansleep(data->on_off_gpio, 0);
-+		data->is_on = false;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused w2sg_resume(struct device *dev)
-+{
-+	struct w2sg_data *data = dev_get_drvdata(dev);
-+
-+	data->suspended = false;
-+
-+	schedule_delayed_work(&data->work, 0);	/* enables LNA if needed */
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id w2sg0004_of_match[] = {
-+	{ .compatible = "wi2wi,w2sg0004" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, w2sg0004_of_match);
-+
-+SIMPLE_DEV_PM_OPS(w2sg_pm_ops, w2sg_suspend, w2sg_resume);
-+
-+static struct serdev_device_driver w2sg_driver = {
-+	.probe		= w2sg_probe,
-+	.remove		= w2sg_remove,
-+	.driver = {
-+		.name	= "w2sg0004",
-+		.owner	= THIS_MODULE,
-+		.pm	= &w2sg_pm_ops,
-+		.of_match_table = of_match_ptr(w2sg0004_of_match)
-+	},
-+};
-+
-+module_serdev_device_driver(w2sg_driver);
-+
-+MODULE_AUTHOR("NeilBrown <neilb@suse.de>");
-+MODULE_AUTHOR("H. Nikolaus Schaller <hns@goldelico.com>");
-+MODULE_DESCRIPTION("w2sg0004 GPS power management driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-2.12.2
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
