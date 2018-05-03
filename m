@@ -1,35 +1,70 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu,  3 May 2018 16:15:44 +0200
-Subject: [PATCH v2 6/6] arm64: update Documentation/arm64/tagged-pointers.txt
-In-Reply-To: <cover.1525356769.git.andreyknvl@google.com>
-References: <cover.1525356769.git.andreyknvl@google.com>
-Message-ID: <1a708210a8056aa356407e72973e00970523e7e2.1525356769.git.andreyknvl@google.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 May 2018 07:22:40 -0700
+Subject: Motorola Droid 4 progress, power consumption
+In-Reply-To: <20180503090611.GA14451@amd>
+References: <20180501183148.GA26996@amd> <20180502144158.GJ98604@atomide.com>
+ <20180503090611.GA14451@amd>
+Message-ID: <20180503142240.GQ98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a note that work on passing tagged user pointers to the kernel via
-syscalls has started, but might not be complete yet.
+* Pavel Machek <pavel@ucw.cz> [180503 09:08]:
+> I'd like current_avg more, but if I cat it manually, it changes on
+> order of seconds, and quite significantly... which suggest shorter
+> polling interval would be needed.
+> 
+> user at devuan:/sys/class/power_supply/battery$ date; cat current_now
+> current_avg
+> Thu May  3 09:33:05 CEST 2018
+> -71000
+> -218408
+> user at devuan:/sys/class/power_supply/battery$ date; cat current_now
+> current_avg
+> Thu May  3 09:33:06 CEST 2018
+> -61000
+> -200238
+> user at devuan:/sys/class/power_supply/battery$ date; cat current_now
+> current_avg
+> Thu May  3 09:33:06 CEST 2018
+> -51000
+> -209879
+> user at devuan:/sys/class/power_supply/battery$ date; cat current_now
+> current_avg
+> Thu May  3 09:33:07 CEST 2018
+> -56000
+> -72308
+> user at devuan:/sys/class/power_supply/battery$ date; cat current_now
+> current_avg
+> Thu May  3 09:33:08 CEST 2018
+> -37000
+> -211362
 
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
----
- Documentation/arm64/tagged-pointers.txt | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+I recall it just being calculated based on the time between
+the reads. Hard to say what it does, -ENODOCS.. Maybe the mc13783
+PMIC docs have something similar.
 
-diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
-index a25a99e82bb1..361481283f00 100644
---- a/Documentation/arm64/tagged-pointers.txt
-+++ b/Documentation/arm64/tagged-pointers.txt
-@@ -35,8 +35,9 @@ Using non-zero address tags in any of these locations may result in an
- error code being returned, a (fatal) signal being raised, or other modes
- of failure.
- 
--For these reasons, passing non-zero address tags to the kernel via
--system calls is forbidden, and using a non-zero address tag for sp is
-+Some initial work for supporting non-zero address tags passed to the
-+kernel via system calls has been done, but the kernel doesn't provide
-+any guarantees at this point. Using a non-zero address tag for sp is
- strongly discouraged.
- 
- Programs maintaining a frame pointer and frame records that use non-zero
--- 
-2.17.0.441.gb46fe60e1d-goog
+> > Hmm oh and the POWER_SUPPLY_CHARGE_COUNTER value should be monitored
+> > by your libbattery and it's low value and high value should be saved
+> > to a file. Low should be saved when we get the battery low interrupt
+> > and battery state changes to POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL.
+> > High value should be saved on POWER_SUPPLY_CAPACITY_LEVEL_FULL.
+> > 
+> > Then when you know the high value and low value, you can calculate
+> > the remaining capacity based on the current value and
+> > POWER_SUPPLY_POWER_AVG.
+> 
+> I'll look into that... but probably will do experiments with python,
+> first.
+
+Sure. The reason why I think we should not do it in the kernel in
+addition to the earlier reasoning is that we don't have a place
+to store the min and max values across reboot. I think there's
+some flash on the battery over 1w bus, but it probably just
+contains battery serial number or something and is not intended
+for writing much to it. I guess the min and max values should be
+really keyd based on this battery id in case the battery gets
+changed.
+
+Regards,
+
+Tony
