@@ -1,40 +1,31 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 3 May 2018 14:44:10 +0200
-Subject: [PATCH] tty/serial: atmel: use port->name as name in request_irq()
-In-Reply-To: <4f3f6e7c-2806-1749-1523-72d5c8eb8229@sorico.fr>
-References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
- <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
- <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
- <20180502191632.tgda4g5v3rhncx7c@linutronix.de>
- <4f3f6e7c-2806-1749-1523-72d5c8eb8229@sorico.fr>
-Message-ID: <20180503124410.n6ze2ngwv6ekjhdr@linutronix.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 3 May 2018 14:46:24 +0200
+Subject: [PATCH] iommu: rockchip: fix building without CONFIG_OF
+In-Reply-To: <20180404102401.3634085-1-arnd@arndb.de>
+References: <20180404102401.3634085-1-arnd@arndb.de>
+Message-ID: <20180503124623.wjnv6smvhpblpr76@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-03 14:36:03 [+0200], Richard Genoud wrote:
-> Could resend your patch with Fixes: in the commit message ?
+On Wed, Apr 04, 2018 at 12:23:53PM +0200, Arnd Bergmann wrote:
+> We get a build error when compiling the iommu driver without CONFIG_OF:
+> 
+> drivers/iommu/rockchip-iommu.c: In function 'rk_iommu_of_xlate':
+> drivers/iommu/rockchip-iommu.c:1101:2: error: implicit declaration of function 'of_dev_put'; did you mean 'of_node_put'? [-Werror=implicit-function-declaration]
+> 
+> This replaces the of_dev_put() with the equivalent platform_device_put(),
+> and adds an error check for of_find_device_by_node() returning NULL,
+> which seems to be appropriate here given that we pass the device into
+> platform_get_drvdata() next, and that of_find_device_by_node() might
+> theoretically return a NULL pointer.
+> 
+> Fixes: 5fd577c3eac3 ("iommu/rockchip: Use OF_IOMMU to attach devices automatically")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> This warning appears to only have been introduced in linux-next after
+> the merge window opened.
+> ---
+>  drivers/iommu/rockchip-iommu.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
-will do shortly.
-
-> BTW, I didn't manage to reproduce the behavior you describe, could you
-> give me your .config and describe a little more how you manage to
-> trigger this bug ?
-.config sent offlist.
-Did you not reproduce this even with the second/debug patch I've sent?
-
-> (do you use the console on serial debug ? which board ? )
-up to date debian sid booting with systemd. After boot completed I do
-"cat /proc/interrupts" and check for the "gone" string.
-This is
-[    0.000000] OF: fdt:Machine model: SAMA5D3 Xplained
-[    0.000000] Kernel command line: earlyprintk=ttyS0,115200 console=ttyS0,115200 root=/dev/mmcblk0p2 rootwait
-[    0.520000] AT91: Detected SoC family: sama5d3
-[    0.520000] AT91: Detected SoC: sama5d36, revision 2
-
-at91-sama5d3_xplained.dtb
-
-Is this enough?
-
-> Thanks !
-
-Sebastian
+Changed patch according to Robins comments and applied it, thanks.
