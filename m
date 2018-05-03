@@ -1,48 +1,54 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 3 May 2018 08:06:15 -0700
-Subject: [PATCH] ARM: dts: cygnus: fix irq type for arm global timer
-In-Reply-To: <20180503094445.324-1-peron.clem@gmail.com>
-References: <20180503094445.324-1-peron.clem@gmail.com>
-Message-ID: <a5149af0-788a-e368-4f98-e228100360de@gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 3 May 2018 17:12:28 +0200
+Subject: [PATCH] tty/serial: atmel: use port->name as name in request_irq()
+In-Reply-To: <921729c6-7c3f-11cd-8634-044a5c52f810@sorico.fr>
+References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
+ <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
+ <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
+ <20180502191632.tgda4g5v3rhncx7c@linutronix.de>
+ <4f3f6e7c-2806-1749-1523-72d5c8eb8229@sorico.fr>
+ <20180503124410.n6ze2ngwv6ekjhdr@linutronix.de>
+ <921729c6-7c3f-11cd-8634-044a5c52f810@sorico.fr>
+Message-ID: <e13476e8-fd19-78c4-bfc2-774136ccda19@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Clement,
-
-Adding Ray, Scott, Eric and bcm-kernel-feedback-list
-
-On 05/03/2018 02:44 AM, Cl?ment P?ron wrote:
-> As per ARM documentation
-> PPI(0) ID27 - global timer interrupt is rising-edge sensitive.
+On 03/05/2018 15:34, Richard Genoud wrote:
+> On 03/05/2018 14:44, Sebastian Andrzej Siewior wrote:
+>> On 2018-05-03 14:36:03 [+0200], Richard Genoud wrote:
+>>> Could resend your patch with Fixes: in the commit message ?
+>>
+>> will do shortly.
+>>
+>>> BTW, I didn't manage to reproduce the behavior you describe, could you
+>>> give me your .config and describe a little more how you manage to
+>>> trigger this bug ?
+>> .config sent offlist.
+>> Did you not reproduce this even with the second/debug patch I've sent?
+> Nope. (I tried on a sam9g35 with buildroot/busybox)
 > 
-> set IRQ triggering type to IRQ_TYPE_EDGE_RISING for ARM Global timers.
+> I have a sama5d3 with a debian as a home server, I'll give it a try.
 
-This looks right and consistent with what was done on other iProc
-processors (BCM5301x, NSP etc.). Would you mind providing an appropriate
-Fixes: tag such that this can get backported to stable trees as well?
-
-Thanks!
+Ok, I reproduced the use-after-free on a SAMA5D2 and on a SAMA5D3, both
+with debian (sid / stretch).
+After the patch, no mode funny things in /proc/interrupts.
 
 > 
-> Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
-> ---
->  arch/arm/boot/dts/bcm-cygnus.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>>> (do you use the console on serial debug ? which board ? )
+>> up to date debian sid booting with systemd. After boot completed I do
+>> "cat /proc/interrupts" and check for the "gone" string.
+>> This is
+>> [    0.000000] OF: fdt:Machine model: SAMA5D3 Xplained
+>> [    0.000000] Kernel command line: earlyprintk=ttyS0,115200 console=ttyS0,115200 root=/dev/mmcblk0p2 rootwait
+>> [    0.520000] AT91: Detected SoC family: sama5d3
+>> [    0.520000] AT91: Detected SoC: sama5d36, revision 2
+>>
+>> at91-sama5d3_xplained.dtb
+>>
+>> Is this enough?
 > 
-> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-> index 699fdf94d139..9fe4f5a6379e 100644
-> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-> @@ -69,7 +69,7 @@
->  		timer at 20200 {
->  			compatible = "arm,cortex-a9-global-timer";
->  			reg = <0x20200 0x100>;
-> -			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupts = <GIC_PPI 11 IRQ_TYPE_EDGE_RISING>;
->  			clocks = <&periph_clk>;
->  		};
->  
+> Great,
 > 
-
--- 
-Florian
+> Thanks !
+> 
