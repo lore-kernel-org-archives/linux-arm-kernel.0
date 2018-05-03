@@ -1,381 +1,219 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 3 May 2018 11:41:44 +0200
-Subject: [PATCH 1/2 v5] drm/pl111: Support the Versatile Express
-In-Reply-To: <20180502134719.8388-1-linus.walleij@linaro.org>
-References: <20180502134719.8388-1-linus.walleij@linaro.org>
-Message-ID: <20180503094144.GK12521@phenom.ffwll.local>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Thu, 3 May 2018 17:41:54 +0800
+Subject: [PATCH 2/2] PCI: mediatek: Using chained IRQ to setup IRQ handle
+In-Reply-To: <e04ea8b1-731f-e72b-8944-5c067e1a04da@arm.com>
+References: <1524201910-22836-1-git-send-email-honghui.zhang@mediatek.com>
+ <1524201910-22836-3-git-send-email-honghui.zhang@mediatek.com>
+ <a2f7e70a-fdef-d925-8838-be3051c2e96d@arm.com>
+ <1525254064.22948.11.camel@mhfsdcap03>
+ <e04ea8b1-731f-e72b-8944-5c067e1a04da@arm.com>
+Message-ID: <1525340514.22948.25.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 03:47:18PM +0200, Linus Walleij wrote:
-> The Versatile Express uses a special configuration controller
-> deeply embedded in the system motherboard FPGA to multiplex the
-> two to three (!) display controller instances out to the single
-> SiI9022 bridge.
+On Wed, 2018-05-02 at 11:09 +0100, Marc Zyngier wrote:
+> On 02/05/18 10:41, Honghui Zhang wrote:
+> > On Mon, 2018-04-30 at 12:03 +0100, Marc Zyngier wrote:
+> >> Hi Zhang,
+> >>
+> >> On 20/04/18 06:25, honghui.zhang at mediatek.com wrote:
+> >>> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> >>>
+> >>> Using irq_chip solution to setup IRQs for the consistent with IRQ framework.
+> >>>
+> >>> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> >>> ---
+> >>>  drivers/pci/host/pcie-mediatek.c | 192 +++++++++++++++++++++------------------
+> >>>  1 file changed, 105 insertions(+), 87 deletions(-)
+> >>>
+> >>> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+> >>> index c3dc549..1d9c6f1 100644
+> >>> --- a/drivers/pci/host/pcie-mediatek.c
+> >>> +++ b/drivers/pci/host/pcie-mediatek.c
+> >>> @@ -11,8 +11,10 @@
+> >>>  #include <linux/delay.h>
+> >>>  #include <linux/iopoll.h>
+> >>>  #include <linux/irq.h>
+> >>> +#include <linux/irqchip/chained_irq.h>
+> >>>  #include <linux/irqdomain.h>
+> >>>  #include <linux/kernel.h>
+> >>> +#include <linux/msi.h>
+> >>>  #include <linux/of_address.h>
+> >>>  #include <linux/of_pci.h>
+> >>>  #include <linux/of_platform.h>
+> >>> @@ -130,14 +132,12 @@ struct mtk_pcie_port;
+> >>>  /**
+> >>>   * struct mtk_pcie_soc - differentiate between host generations
+> >>>   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+> >>> - * @has_msi: whether this host supports MSI interrupts or not
+> >>>   * @ops: pointer to configuration access functions
+> >>>   * @startup: pointer to controller setting functions
+> >>>   * @setup_irq: pointer to initialize IRQ functions
+> >>>   */
+> >>>  struct mtk_pcie_soc {
+> >>>  	bool need_fix_class_id;
+> >>> -	bool has_msi;
+> >>>  	struct pci_ops *ops;
+> >>>  	int (*startup)(struct mtk_pcie_port *port);
+> >>>  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+> >>> @@ -161,7 +161,9 @@ struct mtk_pcie_soc {
+> >>>   * @lane: lane count
+> >>>   * @slot: port slot
+> >>>   * @irq_domain: legacy INTx IRQ domain
+> >>> + * @inner_domain: inner IRQ domain
+> >>>   * @msi_domain: MSI IRQ domain
+> >>> + * @lock: protect the msi_irq_in_use bitmap
+> >>>   * @msi_irq_in_use: bit map for assigned MSI IRQ
+> >>>   */
+> >>>  struct mtk_pcie_port {
+> >>> @@ -179,7 +181,9 @@ struct mtk_pcie_port {
+> >>>  	u32 lane;
+> >>>  	u32 slot;
+> >>>  	struct irq_domain *irq_domain;
+> >>> +	struct irq_domain *inner_domain;
+> >>>  	struct irq_domain *msi_domain;
+> >>> +	struct mutex lock;
+> >>>  	DECLARE_BITMAP(msi_irq_in_use, MTK_MSI_IRQS_NUM);
+> >>>  };
+> >>>  
+> >>> @@ -446,103 +450,122 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+> >>>  	return 0;
+> >>>  }
+> >>>  
+> >>> -static int mtk_pcie_msi_alloc(struct mtk_pcie_port *port)
+> >>> +static void mtk_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+> >>>  {
+> >>> -	int msi;
+> >>> +	struct mtk_pcie_port *port = irq_data_get_irq_chip_data(data);
+> >>> +	phys_addr_t addr;
+> >>>  
+> >>> -	msi = find_first_zero_bit(port->msi_irq_in_use, MTK_MSI_IRQS_NUM);
+> >>> -	if (msi < MTK_MSI_IRQS_NUM)
+> >>> -		set_bit(msi, port->msi_irq_in_use);
+> >>> -	else
+> >>> -		return -ENOSPC;
+> >>> +	/* MT2712/MT7622 only support 32-bit MSI addresses */
+> >>> +	addr = virt_to_phys(port->base + PCIE_MSI_VECTOR);
+> >>> +	msg->address_hi = 0;
+> >>> +	msg->address_lo = lower_32_bits(addr);
+> >>>  
+> >>> -	return msi;
+> >>> +	msg->data = data->hwirq;
+> >>> +
+> >>> +	dev_dbg(port->pcie->dev, "msi#%d address_hi %#x address_lo %#x\n",
+> >>> +		(int)data->hwirq, msg->address_hi, msg->address_lo);
+> >>>  }
+> >>>  
+> >>> -static void mtk_pcie_msi_free(struct mtk_pcie_port *port, unsigned long hwirq)
+> >>> +static int mtk_msi_set_affinity(struct irq_data *irq_data,
+> >>> +				   const struct cpumask *mask, bool force)
+> >>>  {
+> >>> -	clear_bit(hwirq, port->msi_irq_in_use);
+> >>> +	return -EINVAL;
+> >>>  }
+> >>>  
+> >>> -static int mtk_pcie_msi_setup_irq(struct msi_controller *chip,
+> >>> -				  struct pci_dev *pdev, struct msi_desc *desc)
+> >>> -{
+> >>> -	struct mtk_pcie_port *port;
+> >>> -	struct msi_msg msg;
+> >>> -	unsigned int irq;
+> >>> -	int hwirq;
+> >>> -	phys_addr_t msg_addr;
+> >>> +static struct irq_chip mtk_msi_bottom_irq_chip = {
+> >>> +	.name			= "MTK MSI",
+> >>> +	.irq_compose_msi_msg	= mtk_compose_msi_msg,
+> >>> +	.irq_set_affinity	= mtk_msi_set_affinity,
+> >>> +	.irq_mask		= pci_msi_mask_irq,
+> >>> +	.irq_unmask	= pci_msi_unmask_irq,
+> >>> +};
+> >>>  
+> >>> -	port = mtk_pcie_find_port(pdev->bus, pdev->devfn);
+> >>> -	if (!port)
+> >>> -		return -EINVAL;
+> >>> +static int mtk_pcie_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> >>> +				     unsigned int nr_irqs, void *args)
+> >>> +{
+> >>> +	struct mtk_pcie_port *port = domain->host_data;
+> >>> +	unsigned long bit;
+> >>>  
+> >>> -	hwirq = mtk_pcie_msi_alloc(port);
+> >>> -	if (hwirq < 0)
+> >>> -		return hwirq;
+> >>> +	WARN_ON(nr_irqs != 1);
+> >>> +	mutex_lock(&port->lock);
+> >>>  
+> >>> -	irq = irq_create_mapping(port->msi_domain, hwirq);
+> >>> -	if (!irq) {
+> >>> -		mtk_pcie_msi_free(port, hwirq);
+> >>> -		return -EINVAL;
+> >>> +	bit = find_first_zero_bit(port->msi_irq_in_use, MTK_MSI_IRQS_NUM);
+> >>> +	if (bit >= MTK_MSI_IRQS_NUM) {
+> >>> +		mutex_unlock(&port->lock);
+> >>> +		return -ENOSPC;
+> >>>  	}
+> >>>  
+> >>> -	chip->dev = &pdev->dev;
+> >>> -
+> >>> -	irq_set_msi_desc(irq, desc);
+> >>> +	__set_bit(bit, port->msi_irq_in_use);
+> >>>  
+> >>> -	/* MT2712/MT7622 only support 32-bit MSI addresses */
+> >>> -	msg_addr = virt_to_phys(port->base + PCIE_MSI_VECTOR);
+> >>> -	msg.address_hi = 0;
+> >>> -	msg.address_lo = lower_32_bits(msg_addr);
+> >>> -	msg.data = hwirq;
+> >>> +	mutex_unlock(&port->lock);
+> >>>  
+> >>> -	pci_write_msi_msg(irq, &msg);
+> >>> +	irq_domain_set_info(domain, virq, bit, &mtk_msi_bottom_irq_chip,
+> >>> +			    domain->host_data, handle_simple_irq,
+> >>
+> >> Why don't you handle the interrupt as an edge interrupt
+> >> (handle_edge_irq)? That's what it really is, and the fact that you use
+> >> "handle_simple_irq" makes me think that wou're papering over some other
+> >> issue (see below).
+> > 
+> > Hi, Marc,
+> > 
+> > Thanks very much for your comments.
+> > 
+> > I guess the MSI irq is more like a level IRQ instead of edge IRQ.
+> > When a MSI IRQ arrived, the corresponding bit of MSI status register
+> > will be asserted and stay asserted until it's been cleared by software.
 > 
-> Set up an extra file with the logic to probe to the FPGA mux
-> register on the system controller bus, then parse the device
-> tree to see if there is a CLCD or HDLCD instance on the core
-> tile (also known as the daughterboard) by looking in the
-> root of the device tree for compatible nodes.
-> 
-> - If there is a HDLCD on the core tile, and there is a driver
->   for it, we exit probe and deactivate the motherboard CLCD.
->   We do not touch the DVI mux in this case, to make sure we
->   don't break HDLCD.
-> 
-> - If there is a CLCD on both the motherboard and the core tile
->   (only the CA9 has this) the core tile CLCD takes precedence
->   and get muxed to the DVI connector.
-> 
-> - Only if there is no working graphics on the core tile, the
->   motherboard CLCD is probed and muxed to the DVI connector.
-> 
-> Core tile graphics should always take precedence as it can
-> address all memory and is also faster, however the motherboard
-> CLCD is good to have around for diagnostics and testing.
-> 
-> It is possible to test the motherboard CLCD by setting the
-> status = "disabled" property on the core tile CLCD or
-> HDLCD.
-> 
-> Scale down the Versatile Express to 16BPP so we can support a
-> 1024x768 display despite the bus bandwidth restrictions on this
-> platform. (The motherboard CLCD supports slightly lower
-> resolution.)
-> 
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Acked-by: Eric Anholt <eric@anholt.net>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v4->v5:
-> - Collect Robin's Tested-by
-> - Switch to builtin_platform_driver() for the muxfpga as this
->   file is always built as "-y" for the arch and we need to
->   avoid module collisions with the main PL111 driver.
-> ChangeLog v3->v4:
-> - Add a missing platform_device_put()
-> - Simplify code with for_each_available_child_of_node()
-> - Collect Eric's ACK.
-> ChangeLog v2->v3:
-> - Rewrite CLCD detection and mux priority logic, look in
->   the device tree root for core tile graphics.
-> ChangeLog v1->v2:
-> - No changes just reposting rebased on mainline changes.
-> ---
->  drivers/gpu/drm/pl111/Makefile          |   1 +
->  drivers/gpu/drm/pl111/pl111_versatile.c |  49 +++++++++-
->  drivers/gpu/drm/pl111/pl111_vexpress.c  | 125 ++++++++++++++++++++++++
->  drivers/gpu/drm/pl111/pl111_vexpress.h  |  22 +++++
->  4 files changed, 196 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.c
->  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.h
-> 
-> diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
-> index 9c5e8dba8ac6..19a8189dc54f 100644
-> --- a/drivers/gpu/drm/pl111/Makefile
-> +++ b/drivers/gpu/drm/pl111/Makefile
-> @@ -3,6 +3,7 @@ pl111_drm-y +=	pl111_display.o \
->  		pl111_versatile.o \
->  		pl111_drv.o
->  
-> +pl111_drm-$(CONFIG_ARCH_VEXPRESS) += pl111_vexpress.o
->  pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
->  
->  obj-$(CONFIG_DRM_PL111) += pl111_drm.o
-> diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
-> index 9302f516045e..78ddf8534fd2 100644
-> --- a/drivers/gpu/drm/pl111/pl111_versatile.c
-> +++ b/drivers/gpu/drm/pl111/pl111_versatile.c
-> @@ -1,12 +1,14 @@
->  #include <linux/amba/clcd-regs.h>
->  #include <linux/device.h>
->  #include <linux/of.h>
-> +#include <linux/of_platform.h>
->  #include <linux/regmap.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/bitops.h>
->  #include <linux/module.h>
->  #include <drm/drmP.h>
->  #include "pl111_versatile.h"
-> +#include "pl111_vexpress.h"
->  #include "pl111_drm.h"
->  
->  static struct regmap *versatile_syscon_map;
-> @@ -22,6 +24,7 @@ enum versatile_clcd {
->  	REALVIEW_CLCD_PB11MP,
->  	REALVIEW_CLCD_PBA8,
->  	REALVIEW_CLCD_PBX,
-> +	VEXPRESS_CLCD_V2M,
->  };
->  
->  static const struct of_device_id versatile_clcd_of_match[] = {
-> @@ -53,6 +56,10 @@ static const struct of_device_id versatile_clcd_of_match[] = {
->  		.compatible = "arm,realview-pbx-syscon",
->  		.data = (void *)REALVIEW_CLCD_PBX,
->  	},
-> +	{
-> +		.compatible = "arm,vexpress-muxfpga",
-> +		.data = (void *)VEXPRESS_CLCD_V2M,
-> +	},
->  	{},
->  };
->  
-> @@ -286,12 +293,26 @@ static const struct pl111_variant_data pl111_realview = {
->  	.fb_bpp = 16,
->  };
->  
-> +/*
-> + * Versatile Express PL111 variant, again we just push the maximum
-> + * BPP to 16 to be able to get 1024x768 without saturating the memory
-> + * bus. The clockdivider also seems broken on the Versatile Express.
-> + */
-> +static const struct pl111_variant_data pl111_vexpress = {
-> +	.name = "PL111 Versatile Express",
-> +	.formats = pl111_realview_pixel_formats,
-> +	.nformats = ARRAY_SIZE(pl111_realview_pixel_formats),
-> +	.fb_bpp = 16,
-> +	.broken_clockdivider = true,
-> +};
-> +
->  int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
->  {
->  	const struct of_device_id *clcd_id;
->  	enum versatile_clcd versatile_clcd_type;
->  	struct device_node *np;
->  	struct regmap *map;
-> +	int ret;
->  
->  	np = of_find_matching_node_and_match(NULL, versatile_clcd_of_match,
->  					     &clcd_id);
-> @@ -301,7 +322,26 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
->  	}
->  	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
->  
-> -	map = syscon_node_to_regmap(np);
-> +	/* Versatile Express special handling */
-> +	if (versatile_clcd_type == VEXPRESS_CLCD_V2M) {
-> +		struct platform_device *pdev;
-> +
-> +		/* Call into deep Vexpress configuration API */
-> +		pdev = of_find_device_by_node(np);
-> +		if (!pdev) {
-> +			dev_err(dev, "can't find the sysreg device, deferring\n");
-> +			return -EPROBE_DEFER;
-> +		}
-> +		map = dev_get_drvdata(&pdev->dev);
-> +		if (!map) {
-> +			dev_err(dev, "sysreg has not yet probed\n");
-> +			platform_device_put(pdev);
-> +			return -EPROBE_DEFER;
-> +		}
-> +	} else {
-> +		map = syscon_node_to_regmap(np);
-> +	}
-> +
->  	if (IS_ERR(map)) {
->  		dev_err(dev, "no Versatile syscon regmap\n");
->  		return PTR_ERR(map);
-> @@ -340,6 +380,13 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
->  		priv->variant_display_disable = pl111_realview_clcd_disable;
->  		dev_info(dev, "set up callbacks for RealView PL111\n");
->  		break;
-> +	case VEXPRESS_CLCD_V2M:
-> +		priv->variant = &pl111_vexpress;
-> +		dev_info(dev, "initializing Versatile Express PL111\n");
-> +		ret = pl111_vexpress_clcd_init(dev, priv, map);
-> +		if (ret)
-> +			return ret;
-> +		break;
->  	default:
->  		dev_info(dev, "unknown Versatile system controller\n");
->  		break;
-> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.c b/drivers/gpu/drm/pl111/pl111_vexpress.c
-> new file mode 100644
-> index 000000000000..c9fee625faf1
-> --- /dev/null
-> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.c
-> @@ -0,0 +1,125 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Versatile Express PL111 handling
-> + * Copyright (C) 2018 Linus Walleij
-> + *
-> + * This module binds to the "arm,vexpress-muxfpga" device on the
-> + * Versatile Express configuration bus and sets up which CLCD instance
-> + * gets muxed out on the DVI bridge.
-> + */
-> +#include <linux/device.h>
-> +#include <linux/module.h>
-> +#include <linux/regmap.h>
-> +#include <linux/vexpress.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +#include "pl111_drm.h"
-> +#include "pl111_vexpress.h"
-> +
-> +#define VEXPRESS_FPGAMUX_MOTHERBOARD		0x00
-> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_1	0x01
-> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_2	0x02
-> +
-> +int pl111_vexpress_clcd_init(struct device *dev,
-> +			     struct pl111_drm_dev_private *priv,
-> +			     struct regmap *map)
-> +{
-> +	struct device_node *root;
-> +	struct device_node *child;
-> +	struct device_node *ct_clcd = NULL;
-> +	bool has_coretile_clcd = false;
-> +	bool has_coretile_hdlcd = false;
-> +	bool mux_motherboard = true;
-> +	u32 val;
-> +	int ret;
-> +
-> +	/*
-> +	 * Check if we have a CLCD or HDLCD on the core tile by checking if a
-> +	 * CLCD or HDLCD is available in the root of the device tree.
-> +	 */
-> +	root = of_find_node_by_path("/");
-> +	if (!root)
-> +		return -EINVAL;
-> +
-> +	for_each_available_child_of_node(root, child) {
-> +		if (of_device_is_compatible(child, "arm,pl111")) {
-> +			has_coretile_clcd = true;
-> +			ct_clcd = child;
-> +			break;
-> +		}
-> +		if (of_device_is_compatible(child, "arm,hdlcd")) {
-> +			has_coretile_hdlcd = true;
-> +			break;
-> +		}
-> +	}
-> +
-> +	/*
-> +	 * If there is a coretile HDLCD and it has a driver,
-> +	 * do not mux the CLCD on the motherboard to the DVI.
-> +	 */
-> +	if (has_coretile_hdlcd && IS_ENABLED(CONFIG_DRM_HDLCD))
-> +		mux_motherboard = false;
-> +
-> +	/*
-> +	 * On the Vexpress CA9 we let the CLCD on the coretile
-> +	 * take precedence, so also in this case do not mux the
-> +	 * motherboard to the DVI.
-> +	 */
-> +	if (has_coretile_clcd)
-> +		mux_motherboard = false;
-> +
-> +	if (mux_motherboard) {
-> +		dev_info(dev, "DVI muxed to motherboard CLCD\n");
-> +		val = VEXPRESS_FPGAMUX_MOTHERBOARD;
-> +	} else if (ct_clcd == dev->of_node) {
-> +		dev_info(dev,
-> +			 "DVI muxed to daughterboard 1 (core tile) CLCD\n");
-> +		val = VEXPRESS_FPGAMUX_DAUGHTERBOARD_1;
-> +	} else {
-> +		dev_info(dev, "core tile graphics present\n");
-> +		dev_info(dev, "this device will be deactivated\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	ret = regmap_write(map, 0, val);
-> +	if (ret) {
-> +		dev_err(dev, "error setting DVI muxmode\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * This sets up the regmap pointer that will then be retrieved by
-> + * the detection code in pl111_versatile.c and passed in to the
-> + * pl111_vexpress_clcd_init() function above.
-> + */
-> +static int vexpress_muxfpga_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct regmap *map;
-> +
-> +	map = devm_regmap_init_vexpress_config(&pdev->dev);
-> +	if (IS_ERR(map))
-> +		return PTR_ERR(map);
-> +	dev_set_drvdata(dev, map);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id vexpress_muxfpga_match[] = {
-> +	{ .compatible = "arm,vexpress-muxfpga", }
-> +};
-> +
-> +static struct platform_driver vexpress_muxfpga_driver = {
-> +	.driver = {
-> +		.name = "vexpress-muxfpga",
-> +		.of_match_table = of_match_ptr(vexpress_muxfpga_match),
-> +	},
-> +	.probe = vexpress_muxfpga_probe,
-> +};
-> +
-> +builtin_platform_driver(vexpress_muxfpga_driver);
+> There is some confusion here. The MSI itself is always edge-triggered.
+> That's by definition, and you cannot change it. The interrupt that is
+> used to signal that MSIs are pending (the multiplexing interrupt) can
+> itself be level triggered (and goes low once all the MSIs have been
+> acknowledged).
 
-  LD [M]  drivers/gpu/drm/pl111/pl111_drm.o
-drivers/gpu/drm/pl111/pl111_vexpress.o: In function `vexpress_muxfpga_driver_init':
-/home/daniel/linux/aarch64/drivers/gpu/drm/pl111/pl111_vexpress.c:125: multiple definition of `init_module'
-drivers/gpu/drm/pl111/pl111_drv.o:/home/daniel/linux/aarch64/drivers/gpu/drm/pl111/pl111_drv.c:427: first defined here
-make[4]: *** [scripts/Makefile.build:570: drivers/gpu/drm/pl111/pl111_drm.o] Error 1
-make[3]: *** [scripts/Makefile.build:583: drivers/gpu/drm/pl111] Error 2
-make[3]: *** Waiting for unfinished jobs....
+Hi, Marc, thanks for your comments.
 
-Using the default drm-misc configs.
+Yes, PCIe SPEC have defined that the MSI must be edge trigged. But I'm
+not sure whether the HW design needed to following some edge irq
+standard. In our design, when there's MSI irq trigged(which may is edge
+trigged in hw implemented), the corresponding msi irq status bits will
+be asserted until it's been cleared by software. It's more like that the
+HW IP have translate the edge irq to level status. Do you think using
+handle_level_irq or handle_simple_irq(which most of the pci host driver
+now doing) is acceptable in this case?
 
-Please fix asap, and please compile-test before pushing using these
-default configs so others aren't blocked. I've disabled the pl111 driver
-in there for now, please also re-enable.
+BTW, I'm still struggling in trying the handle_edge_irq solution. Seems
+that I could not get the msi index in irq_ack callback from
+irq_data->hwirq, the hwirq was set by pci_msi_domain_calc_hwirq() which
+I'm still try to figure out the proper routine in my driver.
 
-Thanks, Daniel
-> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.h b/drivers/gpu/drm/pl111/pl111_vexpress.h
-> new file mode 100644
-> index 000000000000..49876417f7b6
-> --- /dev/null
-> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.h
-> @@ -0,0 +1,22 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +
-> +struct device;
-> +struct pl111_drm_dev_private;
-> +struct regmap;
-> +
-> +#ifdef CONFIG_ARCH_VEXPRESS
-> +
-> +int pl111_vexpress_clcd_init(struct device *dev,
-> +			     struct pl111_drm_dev_private *priv,
-> +			     struct regmap *map);
-> +
-> +#else
-> +
-> +static int inline pl111_vexpress_clcd_init(struct device *dev,
-> +					   struct pl111_drm_dev_private *priv,
-> +					   struct regmap *map)
-> +{
-> +	return -ENODEV;
-> +}
-> +
-> +#endif
-> -- 
-> 2.17.0
+thanks.
 > 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+> > I will try to using handle_level_irq and add some callbacks of irq_ack
+> > in the next version.
+> 
+> The interrupt above seem to be the MSI itself, and not the multiplexing
+> interrupt. It should be handled as an edge.
+> 
+> If that doesn't work, we need to understand why.
+> 
+> Thanks,
+> 
+> 	M.
