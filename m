@@ -1,77 +1,55 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 3 May 2018 20:31:37 +0200 (CEST)
-Subject: [PATCH] spi: bcm2835aux: ensure interrupts are enabled for
- shared handler
-In-Reply-To: <20180503180945.3502-1-robh@kernel.org>
-References: <20180503180945.3502-1-robh@kernel.org>
-Message-ID: <205406626.92407.1525372297575@email.1und1.de>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri,  4 May 2018 02:38:40 +0800
+Subject: [PATCH 0/7] Allwinner H6 R_{PIO,INTC,I2C} support
+Message-ID: <20180503183847.11046-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset adds support for Allwinner H6's R_{PIO,INTC,I2C}
+peripherals. They are in the "CPUS" power domain, powered by VDD-CPUS
+rather than VDD-SYS.
 
-[added Martin, Noralf and Phil]
+R_PIO controls the PL/PM GPIO banks, R_INTC controls NMI, and R_I2C
+controls the I2C at PL0/1.
 
+A PCF8563 RTC is attached on R_I2C on Pine H64, which is added to the
+device tree. An AXP805 (a variation of AXP806 with different default
+value customization) is attached on the bus too, however as its driver
+currently lacks self-work mode support, it will be activated in another
+patchset.
 
-> Rob Herring <robh@kernel.org> hat am 3. Mai 2018 um 20:09 geschrieben:
-> 
-> 
-> The BCM2835 AUX SPI has a shared interrupt line (with AUX UART).
-> Downstream fixes this with an AUX irqchip to demux the IRQ sources and a
-> DT change which breaks compatibility with older kernels. The AUX irqchip
-> was already rejected for upstream[1] and the DT change would break
-> working systems if the DTB is updated to a newer one. The latter issue
-> was brought to my attention by Alex Graf.
-> 
-> The root cause however is a bug in the shared handler. Shared handlers
-> must check that interrupts are actually enabled before servicing the
-> interrupt. Add a check that the TXEMPTY or IDLE interrupts are enabled.
-> 
-> [1] https://patchwork.kernel.org/patch/9781221/
-> 
-> Cc: Alexander Graf <agraf@suse.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Scott Branden <sbranden@broadcom.com>
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Cc: linux-spi at vger.kernel.org
-> Cc: linux-rpi-kernel at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
-> Compile tested only. I'll add something to the related github issue on 
-> this and hopefully someone can test and confirm.
-> 
-> I'm assuming the 8250 driver can handle shared irqs correctly.
-> 
-> Rob
-> 
->  drivers/spi/spi-bcm2835aux.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
-> index 1431cb98fe40..3094d818cf06 100644
-> --- a/drivers/spi/spi-bcm2835aux.c
-> +++ b/drivers/spi/spi-bcm2835aux.c
-> @@ -184,6 +184,11 @@ static irqreturn_t bcm2835aux_spi_interrupt(int irq, void *dev_id)
->  	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
->  	irqreturn_t ret = IRQ_NONE;
->  
-> +	/* IRQ may be shared, so return if our interrupts are disabled */
-> +	if (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_CNTL1) &
-> +	      (BCM2835_AUX_SPI_CNTL1_TXEMPTY | BCM2835_AUX_SPI_CNTL1_IDLE)))
-> +		return ret;
-> +
->  	/* check if we have data to read */
->  	while (bs->rx_len &&
->  	       (!(bcm2835aux_rd(bs, BCM2835_AUX_SPI_STAT) &
-> -- 
-> 2.17.0
+In order to support R_{PIO,I2C}, a PRCM CCU driver is introduced. As the
+PRCM clock part is totally different with older SoCs (from A31 to H5),
+the driver for H6 is a new one, not reusing the old code.
 
-does anyone have a setup to test this patch (i assume it requires a compute module)?
+Icenowy Zheng (7):
+  clk: sunxi-ng: add support for H6 PRCM CCU
+  arm64: allwinner: h6: add PRCM CCU device node
+  pinctrl: sunxi: add support for H6 R_PIO pin controller
+  arm64: allwinner: h6: add node for R_PIO pin controller
+  arm64: allwinner: h6: add R_INTC interrupt controller
+  arm64: allwinner: h6: add R_I2C controller
+  arm64: allwinner: h6: add PCF8563 RTC on Pine H64 board
 
-@Rob: Thank you very much for this patch
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |   3 +-
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      |  10 +
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       |  52 ++++++
+ drivers/clk/sunxi-ng/Kconfig                       |   5 +
+ drivers/clk/sunxi-ng/Makefile                      |   1 +
+ drivers/clk/sunxi-ng/ccu-sun50i-h6-r.c             | 207 +++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun50i-h6-r.h             |  19 ++
+ drivers/pinctrl/sunxi/Kconfig                      |   4 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun50i-h6-r.c        | 128 +++++++++++++
+ include/dt-bindings/clock/sun50i-h6-r-ccu.h        |  24 +++
+ include/dt-bindings/reset/sun50i-h6-r-ccu.h        |  17 ++
+ 13 files changed, 471 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6-r.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6-r.h
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h6-r.c
+ create mode 100644 include/dt-bindings/clock/sun50i-h6-r-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun50i-h6-r-ccu.h
+
+-- 
+2.15.1
