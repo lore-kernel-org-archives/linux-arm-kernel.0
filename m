@@ -1,125 +1,102 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  3 May 2018 18:03:29 +0100
-Subject: [PATCH 3/4] firmware/psci: use common SMCCC_CONDUIT_*
+Date: Thu,  3 May 2018 18:03:30 +0100
+Subject: [PATCH 4/4] firmware: arm_sdei: use common SMCCC_CONDUIT_*
 In-Reply-To: <20180503170330.5591-1-mark.rutland@arm.com>
 References: <20180503170330.5591-1-mark.rutland@arm.com>
-Message-ID: <20180503170330.5591-4-mark.rutland@arm.com>
+Message-ID: <20180503170330.5591-5-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have common SMCCC_CONDUIT_* definitions, migrate the PSCI
-code over to them, and kill off the old PSCI_CONDUIT_* definitions.
+Now that we have common definitions for SMCCC conduits, move the SDEI
+code over to them, and remove the SDEI-specific definitions.
+
+There should be no functional change as a result of this patch.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: James Morse <james.morse@arm.com>
 ---
- drivers/firmware/psci.c | 25 +++++++++----------------
- include/linux/psci.h    |  9 ++-------
- 2 files changed, 11 insertions(+), 23 deletions(-)
+ arch/arm64/kernel/sdei.c    |  3 ++-
+ drivers/firmware/arm_sdei.c | 12 ++++++------
+ include/linux/arm_sdei.h    |  6 ------
+ 3 files changed, 8 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 310882185ca4..05792699e6b5 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -60,7 +60,7 @@ bool psci_tos_resident_on(int cpu)
- }
- 
- struct psci_operations psci_ops = {
--	.conduit = PSCI_CONDUIT_NONE,
-+	.conduit = SMCCC_CONDUIT_NONE,
- 	.smccc_version = SMCCC_VERSION_1_0,
- };
- 
-@@ -69,14 +69,7 @@ enum arm_smccc_conduit arm_smccc_get_conduit(void)
- 	if (psci_ops.smccc_version < SMCCC_VERSION_1_1)
- 		return SMCCC_CONDUIT_NONE;
- 
--	switch (psci_ops.conduit) {
--	case PSCI_CONDUIT_SMC:
--		return SMCCC_CONDUIT_SMC;
--	case PSCI_CONDUIT_HVC:
--		return SMCCC_CONDUIT_HVC;
--	default:
--		return SMCCC_CONDUIT_NONE;
--	}
-+	return psci_ops.conduit;
- }
- 
- typedef unsigned long (psci_fn)(unsigned long, unsigned long,
-@@ -228,13 +221,13 @@ static unsigned long psci_migrate_info_up_cpu(void)
- 			      0, 0, 0);
- }
- 
--static void set_conduit(enum psci_conduit conduit)
-+static void set_conduit(enum arm_smccc_conduit conduit)
- {
- 	switch (conduit) {
--	case PSCI_CONDUIT_HVC:
-+	case SMCCC_CONDUIT_HVC:
- 		invoke_psci_fn = __invoke_psci_fn_hvc;
- 		break;
--	case PSCI_CONDUIT_SMC:
-+	case SMCCC_CONDUIT_SMC:
- 		invoke_psci_fn = __invoke_psci_fn_smc;
- 		break;
- 	default:
-@@ -256,9 +249,9 @@ static int get_set_conduit_method(struct device_node *np)
- 	}
- 
- 	if (!strcmp("hvc", method)) {
--		set_conduit(PSCI_CONDUIT_HVC);
-+		set_conduit(SMCCC_CONDUIT_HVC);
- 	} else if (!strcmp("smc", method)) {
--		set_conduit(PSCI_CONDUIT_SMC);
-+		set_conduit(SMCCC_CONDUIT_SMC);
- 	} else {
- 		pr_warn("invalid \"method\" property: %s\n", method);
- 		return -EINVAL;
-@@ -714,9 +707,9 @@ int __init psci_acpi_init(void)
- 	pr_info("probing for conduit method from ACPI.\n");
- 
- 	if (acpi_psci_use_hvc())
--		set_conduit(PSCI_CONDUIT_HVC);
-+		set_conduit(SMCCC_CONDUIT_HVC);
- 	else
--		set_conduit(PSCI_CONDUIT_SMC);
-+		set_conduit(SMCCC_CONDUIT_SMC);
- 
- 	return psci_probe();
- }
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 8b1b3b5935ab..affcd2128df8 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -14,6 +14,7 @@
- #ifndef __LINUX_PSCI_H
- #define __LINUX_PSCI_H
+diff --git a/arch/arm64/kernel/sdei.c b/arch/arm64/kernel/sdei.c
+index 6b8d90d5ceae..a3be67ae8a88 100644
+--- a/arch/arm64/kernel/sdei.c
++++ b/arch/arm64/kernel/sdei.c
+@@ -2,6 +2,7 @@
+ // Copyright (C) 2017 Arm Ltd.
+ #define pr_fmt(fmt) "sdei: " fmt
  
 +#include <linux/arm-smccc.h>
- #include <linux/init.h>
- #include <linux/types.h>
+ #include <linux/arm_sdei.h>
+ #include <linux/hardirq.h>
+ #include <linux/irqflags.h>
+@@ -125,7 +126,7 @@ unsigned long sdei_arch_get_entry_point(int conduit)
+ 			return 0;
+ 	}
  
-@@ -25,12 +26,6 @@ bool psci_tos_resident_on(int cpu);
- int psci_cpu_init_idle(unsigned int cpu);
- int psci_cpu_suspend_enter(unsigned long index);
+-	sdei_exit_mode = (conduit == CONDUIT_HVC) ? SDEI_EXIT_HVC : SDEI_EXIT_SMC;
++	sdei_exit_mode = (conduit == SMCCC_CONDUIT_HVC) ? SDEI_EXIT_HVC : SDEI_EXIT_SMC;
  
--enum psci_conduit {
--	PSCI_CONDUIT_NONE,
--	PSCI_CONDUIT_SMC,
--	PSCI_CONDUIT_HVC,
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	if (arm64_kernel_unmapped_at_el0()) {
+diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+index 1ea71640fdc2..1357dbd7c7fc 100644
+--- a/drivers/firmware/arm_sdei.c
++++ b/drivers/firmware/arm_sdei.c
+@@ -896,29 +896,29 @@ static int sdei_get_conduit(struct platform_device *pdev)
+ 	if (np) {
+ 		if (of_property_read_string(np, "method", &method)) {
+ 			pr_warn("missing \"method\" property\n");
+-			return CONDUIT_INVALID;
++			return SMCCC_CONDUIT_NONE;
+ 		}
+ 
+ 		if (!strcmp("hvc", method)) {
+ 			sdei_firmware_call = &sdei_smccc_hvc;
+-			return CONDUIT_HVC;
++			return SMCCC_CONDUIT_HVC;
+ 		} else if (!strcmp("smc", method)) {
+ 			sdei_firmware_call = &sdei_smccc_smc;
+-			return CONDUIT_SMC;
++			return SMCCC_CONDUIT_SMC;
+ 		}
+ 
+ 		pr_warn("invalid \"method\" property: %s\n", method);
+ 	} else if (IS_ENABLED(CONFIG_ACPI) && !acpi_disabled) {
+ 		if (acpi_psci_use_hvc()) {
+ 			sdei_firmware_call = &sdei_smccc_hvc;
+-			return CONDUIT_HVC;
++			return SMCCC_CONDUIT_HVC;
+ 		} else {
+ 			sdei_firmware_call = &sdei_smccc_smc;
+-			return CONDUIT_SMC;
++			return SMCCC_CONDUIT_SMC;
+ 		}
+ 	}
+ 
+-	return CONDUIT_INVALID;
++	return SMCCC_CONDUIT_NONE;
+ }
+ 
+ static int sdei_probe(struct platform_device *pdev)
+diff --git a/include/linux/arm_sdei.h b/include/linux/arm_sdei.h
+index 942afbd544b7..21e337d99fa6 100644
+--- a/include/linux/arm_sdei.h
++++ b/include/linux/arm_sdei.h
+@@ -5,12 +5,6 @@
+ 
+ #include <uapi/linux/arm_sdei.h>
+ 
+-enum sdei_conduit_types {
+-	CONDUIT_INVALID = 0,
+-	CONDUIT_SMC,
+-	CONDUIT_HVC,
 -};
 -
- enum smccc_version {
- 	SMCCC_VERSION_1_0,
- 	SMCCC_VERSION_1_1,
-@@ -45,7 +40,7 @@ struct psci_operations {
- 	int (*affinity_info)(unsigned long target_affinity,
- 			unsigned long lowest_affinity_level);
- 	int (*migrate_info_type)(void);
--	enum psci_conduit conduit;
-+	enum arm_smccc_conduit conduit;
- 	enum smccc_version smccc_version;
- };
+ #include <asm/sdei.h>
  
+ /* Arch code should override this to set the entry point from firmware... */
 -- 
 2.11.0
