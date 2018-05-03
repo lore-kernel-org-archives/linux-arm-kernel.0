@@ -1,42 +1,64 @@
-From: satendra.t@samsung.com (Satendra Singh Thakur)
-Date: Thu,  3 May 2018 14:09:38 +0530
-Subject: [PATCH 03/13] drm/kms/mode/exynos-dsi: using helper func
- drm_display_mode_to_videomode for calculating timing parameters
-In-Reply-To: <cover.1525087679.git.satendra.t@samsung.com>
-References: <cover.1525087679.git.satendra.t@samsung.com>
- <CGME20180503083956epcas5p1eb97f7bd534e58e7154f5f11733e7aa0@epcas5p1.samsung.com>
-Message-ID: <e21d94cdd60e8c83140c5a917c255baf88f0e90a.1525087679.git.satendra.t@samsung.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 3 May 2018 10:41:43 +0200
+Subject: [PATCH v8 11/13] arm64: topology: enable ACPI/PPTT based CPU
+ topology
+In-Reply-To: <5078f4ac-74e7-aad3-1e0d-4de5da31d3c4@arm.com>
+References: <20180425233121.13270-1-jeremy.linton@arm.com>
+ <20180425233121.13270-12-jeremy.linton@arm.com>
+ <ab8357f0-61d5-2996-46ca-5bc5d3e097cf@arm.com>
+ <CAJZ5v0jwtSkw1x+MQVYo60YDeW0+jxLy2d4spQOu+i=pY7fjyQ@mail.gmail.com>
+ <5078f4ac-74e7-aad3-1e0d-4de5da31d3c4@arm.com>
+Message-ID: <CAJZ5v0iiWd0eET0iuj4RZuaQ4T12W-H775SEd0CFG5hK9+q9WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid duplicate logic for the same
+On Thu, May 3, 2018 at 12:35 AM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> Hi,
+>
+>
+> On 05/02/2018 03:24 AM, Rafael J. Wysocki wrote:
+>>
+>> On Tue, May 1, 2018 at 4:46 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>>
+>>>
+>>> On 26/04/18 00:31, Jeremy Linton wrote:
+>>>>
+>>>> Propagate the topology information from the PPTT tree to the
+>>>> cpu_topology array. We can get the thread id and core_id by assuming
+>>>> certain levels of the PPTT tree correspond to those concepts.
+>>>> The package_id is flagged in the tree and can be found by calling
+>>>> find_acpi_cpu_topology_package() which terminates
+>>>> its search when it finds an ACPI node flagged as the physical
+>>>> package. If the tree doesn't contain enough levels to represent
+>>>> all of the requested levels then the root node will be returned
+>>>> for all subsequent levels.
+>>>>
+>>>
+>>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>
+>>> [..]
+>>>
+>>>> @@ -304,6 +345,8 @@ void __init init_cpu_topology(void)
+>>>>         * Discard anything that was parsed if we hit an error so we
+>>>>         * don't use partial information.
+>>>>         */
+>>>> -     if (of_have_populated_dt() && parse_dt_topology())
+>>>> +     if ((!acpi_disabled) && parse_acpi_topology())
+>>>
+>>>
+>>> [nit] not sure if extra () is need above,
+>>
+>>
+>> No, it isn't.
+>>
+>>> but I am fine either way.
+>>
+>>
+>> The redundant parens need to go away, really.
+>>
+>
+> Yah, I missed this one, is there a linter everyone is using that finds
+> these?
 
-Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
-Cc: Madhur Verma <madhur.verma@samsung.com>
-Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
----
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index 7904ffa..9397e5c 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1493,14 +1493,7 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
- 	struct videomode *vm = &dsi->vm;
- 	struct drm_display_mode *m = adjusted_mode;
- 
--	vm->hactive = m->hdisplay;
--	vm->vactive = m->vdisplay;
--	vm->vfront_porch = m->vsync_start - m->vdisplay;
--	vm->vback_porch = m->vtotal - m->vsync_end;
--	vm->vsync_len = m->vsync_end - m->vsync_start;
--	vm->hfront_porch = m->hsync_start - m->hdisplay;
--	vm->hback_porch = m->htotal - m->hsync_end;
--	vm->hsync_len = m->hsync_end - m->hsync_start;
-+	drm_display_mode_to_videomode(m, vm);
- }
- 
- static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
--- 
-2.7.4
+I'm not actually sure.  At least I can't recall any right away.
