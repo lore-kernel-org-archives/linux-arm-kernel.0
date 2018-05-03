@@ -1,166 +1,185 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 May 2018 13:06:11 +0200
-Subject: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
-In-Reply-To: <AM0PR04MB421166CCB06610FF8AF25C2980800@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
- <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
- <20180502100401.qmik5goglbuiqcaa@pengutronix.de>
- <AM0PR04MB421166CCB06610FF8AF25C2980800@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <20180503110611.wxwsjfszjdnovm2f@pengutronix.de>
+From: satendra.t@samsung.com (Satendra Singh Thakur)
+Date: Thu,  3 May 2018 16:39:46 +0530
+Subject: [PATCH 12/13] drm/kms/mode/mtk_dpi_dsi: using helper func
+ drm_display_mode_to_videomode for calculating timing parameters
+In-Reply-To: <cover.1525087679.git.satendra.t@samsung.com>
+References: <cover.1525087679.git.satendra.t@samsung.com>
+ <CGME20180503111008epcas5p26088af1ff767ac0bf06cae934f1da339@epcas5p2.samsung.com>
+Message-ID: <986995915d004bf99936eaf380da6113a974b639.1525087679.git.satendra.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 06:40:03PM +0000, A.s. Dong wrote:
-> > -----Original Message-----
-> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > Sent: Wednesday, May 2, 2018 6:04 PM
-> > To: A.s. Dong <aisheng.dong@nxp.com>
-> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
-> > <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> > <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> > Subject: Re: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
-> > 
-> > On Sat, Apr 28, 2018 at 02:46:16AM +0800, Dong Aisheng wrote:
-> > > +/* Initialization of the MU code. */
-> > > +int __init imx8_scu_init(void)
-> > > +{
-> > > +	struct device_node *np, *mu_np;
-> > > +	struct resource mu_res;
-> > > +	sc_err_t sci_err;
-> > > +	int ret;
-> > > +
-> > > +	if (!of_machine_is_compatible("fsl,imx8qxp"))
-> > > +		return 0;
-> > > +
-> > > +	np = of_find_compatible_node(NULL, NULL, "nxp,imx8qxp-scu");
-> > > +	if (!np)
-> > > +		return -ENODEV;
-> > > +
-> > > +	mu_np = of_parse_phandle(np, "fsl,mu", 0);
-> > > +	if (WARN_ON(!mu_np))
-> > > +		return -EINVAL;
-> > > +
-> > > +	ret = of_address_to_resource(mu_np, 0, &mu_res);
-> > > +	if (WARN_ON(ret))
-> > > +		return -EINVAL;
-> > > +
-> > > +	/* we use mu physical address as IPC communication channel ID */
-> > > +	sci_err = sc_ipc_open(&scu_ipc_handle, (sc_ipc_id_t)(mu_res.start));
-> > > +	if (sci_err != SC_ERR_NONE) {
-> > > +		pr_err("Cannot open MU channel to SCU\n");
-> > > +		return sci_err;
-> > > +	};
-> > 
-> > Introducing private error codes always has the risk of just forwarding them as
-> > errno codes as done here.
-> > 
-> 
-> Yes, you're right.
-> We probably could do the same as scpi_to_linux_errno in
-> drivers/firmware/arm_scpi.c.
-> However, may can't fix the issue permanently.
-> 
-> > > +
-> > > +	of_node_put(mu_np);
-> > > +
-> > > +	pr_info("NXP i.MX SCU Initialized (scu_ipc %u)\n", scu_ipc_handle);
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +early_initcall(imx8_scu_init);
-> > 
-> > This code shows that the separate 'scu' device node shouldn't exist. It is only
-> > used as a stepping stone to find the 'mu' node. Instead of providing a proper
-> > driver for the 'mu' node the scu code registers it with its physical address.
-> > I don't think it makes sense to separate mu and scu code in this way.
-> > 
-> 
-> I agree that may not look quite well. 
-> It mainly because we want to use the MU physical address as a MU ID. 
-> (can't use virtual address as sc_ipc_id_t is u32 defined by SCU firmware.
-> 
-> If you have any better suggestion please let me know.
+-Duplicate logic for the timing params is avoided
+-Arithmatic operator *,/ are replaced by logical >>, << operators
+-The flags DRM_MODE_FLAG_* are replaced with DISPLAY_FLAGS_* flags
 
-What I'm suggesting is a single node:
+Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
+Cc: Madhur Verma <madhur.verma@samsung.com>
+Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
+---
+ drivers/gpu/drm/mediatek/mtk_dpi.c | 60 +++++++++++++++++++-------------------
+ drivers/gpu/drm/mediatek/mtk_dsi.c | 14 ++-------
+ 2 files changed, 32 insertions(+), 42 deletions(-)
 
-	scu at 5d1b0000 {
-		compatible = "fsl,imx8qxp-scu";
-		reg = <0x0 0x5d1b0000 0x0 0x10000>;
-	};
-
-Attach your code to this one, without any further separation between mu and scu code.
-
-We discussed this internally and came to the conclusion that the SCU is
-not a generic user of a MU. The MU is designed to work together with a piece
-of SRAM to form a mailbox system. Instead of working as designed the SCU
-morses the messages through the doorbell (what the MU really is). For
-anything that uses the MU in the way it is designed I would suggest
-using the mailbox interface from drivers/mailbox/ along with the
-binding from Documentation/devicetree/bindings/mailbox/mailbox.txt.
-
-In the way I suggest there is no need for any MU ID.
-
-> 
-> > > +#define RPC_VER(MSG)            ((MSG)->version)
-> > > +#define RPC_SIZE(MSG)           ((MSG)->size)
-> > > +#define RPC_SVC(MSG)            ((MSG)->svc)
-> > > +#define RPC_FUNC(MSG)           ((MSG)->func)
-> > > +#define RPC_R8(MSG)             ((MSG)->func)
-> > > +#define RPC_I32(MSG, IDX)       ((MSG)->DATA.i32[(IDX) / 4])
-> > > +#define RPC_I16(MSG, IDX)       ((MSG)->DATA.i16[(IDX) / 2])
-> > > +#define RPC_I8(MSG, IDX)        ((MSG)->DATA.i8[(IDX)])
-> > > +#define RPC_U32(MSG, IDX)       ((MSG)->DATA.u32[(IDX) / 4])
-> > > +#define RPC_U16(MSG, IDX)       ((MSG)->DATA.u16[(IDX) / 2])
-> > > +#define RPC_U8(MSG, IDX)        ((MSG)->DATA.u8[(IDX)])
-> > 
-> > These macros only make the code less readable, please drop them. Plain
-> > m->version is easier to read and forces the reader through less
-> > indirections. IMO m->DATA.u32[0] = foo; m->DATA.u8[4] = bar is still better
-> > readable than doing the division by size in macros.
-> > 
-> 
-> I somehow agree with you.
-> See below...
-> 
-> > > +typedef enum sc_rpc_async_state_e {
-> > > +	SC_RPC_ASYNC_STATE_RD_START = 0,
-> > > +	SC_RPC_ASYNC_STATE_RD_ACTIVE = 1,
-> > > +	SC_RPC_ASYNC_STATE_RD_DONE = 2,
-> > > +	SC_RPC_ASYNC_STATE_WR_START = 3,
-> > > +	SC_RPC_ASYNC_STATE_WR_ACTIVE = 4,
-> > > +	SC_RPC_ASYNC_STATE_WR_DONE = 5,
-> > > +} sc_rpc_async_state_t;
-> > > +
-> > > +typedef struct sc_rpc_async_msg_s {
-> > > +	sc_rpc_async_state_t state;
-> > > +	uint8_t wordIdx;
-> > > +	sc_rpc_msg_t msg;
-> > > +	uint32_t timeStamp;
-> > > +} sc_rpc_async_msg_t;
-> > 
-> > We normally do not typedef struct types. Any good reasons to do so here?
-> > 
-> 
-> Yes, I did not some checkpatch warnings about this.
-> 
-> For this patch, I only implemented IPC function calls based on MU which is in
-> drivers/soc/imx/sc/main/ipc.c. All other files actually are generated by SCU firmware
-> script automatically for Linux OS. They're tightly couple with SCU firmware side
-> implementation. In order to gain better maintainability (easy upgrade and sync with
-> SCU firmware), we're trying to not change those APIs too much unless we have strong
-> reasons. Does it make sense to you?
-
-Hm, I'm not suggesting to change the API, only the header files. In
-another mail you say that the SCU firmware is stable, so there shouldn't
-be any strong need to sync the header files from your internal
-repositories, right?
-Besides, you could also update your internal repositories with the
-suggestions I make ;)
-
-Sascha
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+index e80a603..76dd3b9 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+@@ -22,6 +22,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/types.h>
+ #include <linux/clk.h>
++#include <video/videomode.h>
+ 
+ #include "mtk_dpi_regs.h"
+ #include "mtk_drm_ddp_comp.h"
+@@ -429,34 +430,35 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
+ 	struct mtk_dpi_sync_param vsync_leven = { 0 };
+ 	struct mtk_dpi_sync_param vsync_rodd = { 0 };
+ 	struct mtk_dpi_sync_param vsync_reven = { 0 };
+-	unsigned long pix_rate;
++	struct videomode vm;
+ 	unsigned long pll_rate;
+ 	unsigned int factor;
+ 
+ 	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
+-	pix_rate = 1000UL * mode->clock;
++
+ 	if (mode->clock <= 27000)
+-		factor = 16 * 3;
++		factor = 3 << 4;
+ 	else if (mode->clock <= 84000)
+-		factor = 8 * 3;
++		factor = 3 << 3;
+ 	else if (mode->clock <= 167000)
+-		factor = 4 * 3;
++		factor = 3 << 2;
+ 	else
+-		factor = 2 * 3;
+-	pll_rate = pix_rate * factor;
++		factor = 3 << 1;
++	drm_display_mode_to_videomode(mode, &vm);
++	pll_rate = vm.pixelclock * factor;
+ 
+ 	dev_dbg(dpi->dev, "Want PLL %lu Hz, pixel clock %lu Hz\n",
+-		pll_rate, pix_rate);
++		pll_rate, vm.pixelclock);
+ 
+ 	clk_set_rate(dpi->tvd_clk, pll_rate);
+ 	pll_rate = clk_get_rate(dpi->tvd_clk);
+ 
+-	pix_rate = pll_rate / factor;
+-	clk_set_rate(dpi->pixel_clk, pix_rate);
+-	pix_rate = clk_get_rate(dpi->pixel_clk);
++	vm.pixelclock = pll_rate / factor;
++	clk_set_rate(dpi->pixel_clk, vm.pixelclock);
++	vm.pixelclock = clk_get_rate(dpi->pixel_clk);
+ 
+ 	dev_dbg(dpi->dev, "Got  PLL %lu Hz, pixel clock %lu Hz\n",
+-		pll_rate, pix_rate);
++		pll_rate, vm.pixelclock);
+ 
+ 	limit.c_bottom = 0x0010;
+ 	limit.c_top = 0x0FE0;
+@@ -465,33 +467,31 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
+ 
+ 	dpi_pol.ck_pol = MTK_DPI_POLARITY_FALLING;
+ 	dpi_pol.de_pol = MTK_DPI_POLARITY_RISING;
+-	dpi_pol.hsync_pol = mode->flags & DRM_MODE_FLAG_PHSYNC ?
++	dpi_pol.hsync_pol = vm.flags & DISPLAY_FLAGS_HSYNC_HIGH ?
+ 			    MTK_DPI_POLARITY_FALLING : MTK_DPI_POLARITY_RISING;
+-	dpi_pol.vsync_pol = mode->flags & DRM_MODE_FLAG_PVSYNC ?
++	dpi_pol.vsync_pol = vm.flags & DISPLAY_FLAGS_VSYNC_HIGH ?
+ 			    MTK_DPI_POLARITY_FALLING : MTK_DPI_POLARITY_RISING;
+-
+-	hsync.sync_width = mode->hsync_end - mode->hsync_start;
+-	hsync.back_porch = mode->htotal - mode->hsync_end;
+-	hsync.front_porch = mode->hsync_start - mode->hdisplay;
++	hsync.sync_width = vm.hsync_len;
++	hsync.back_porch = vm.hback_porch;
++	hsync.front_porch = vm.hfront_porch;
+ 	hsync.shift_half_line = false;
+-
+-	vsync_lodd.sync_width = mode->vsync_end - mode->vsync_start;
+-	vsync_lodd.back_porch = mode->vtotal - mode->vsync_end;
+-	vsync_lodd.front_porch = mode->vsync_start - mode->vdisplay;
++	vsync_lodd.sync_width = vm.vsync_len;
++	vsync_lodd.back_porch = vm.vback_porch;
++	vsync_lodd.front_porch = vm.vfront_porch;
+ 	vsync_lodd.shift_half_line = false;
+ 
+-	if (mode->flags & DRM_MODE_FLAG_INTERLACE &&
++	if (vm.flags & DISPLAY_FLAGS_INTERLACED &&
+ 	    mode->flags & DRM_MODE_FLAG_3D_MASK) {
+ 		vsync_leven = vsync_lodd;
+ 		vsync_rodd = vsync_lodd;
+ 		vsync_reven = vsync_lodd;
+ 		vsync_leven.shift_half_line = true;
+ 		vsync_reven.shift_half_line = true;
+-	} else if (mode->flags & DRM_MODE_FLAG_INTERLACE &&
++	} else if (vm.flags & DISPLAY_FLAGS_INTERLACED &&
+ 		   !(mode->flags & DRM_MODE_FLAG_3D_MASK)) {
+ 		vsync_leven = vsync_lodd;
+ 		vsync_leven.shift_half_line = true;
+-	} else if (!(mode->flags & DRM_MODE_FLAG_INTERLACE) &&
++	} else if (!(vm.flags & DISPLAY_FLAGS_INTERLACED) &&
+ 		   mode->flags & DRM_MODE_FLAG_3D_MASK) {
+ 		vsync_rodd = vsync_lodd;
+ 	}
+@@ -505,12 +505,12 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
+ 	mtk_dpi_config_vsync_reven(dpi, &vsync_reven);
+ 
+ 	mtk_dpi_config_3d(dpi, !!(mode->flags & DRM_MODE_FLAG_3D_MASK));
+-	mtk_dpi_config_interface(dpi, !!(mode->flags &
+-					 DRM_MODE_FLAG_INTERLACE));
+-	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
+-		mtk_dpi_config_fb_size(dpi, mode->hdisplay, mode->vdisplay / 2);
++	mtk_dpi_config_interface(dpi, !!(vm.flags &
++					 DISPLAY_FLAGS_INTERLACED));
++	if (vm.flags & DISPLAY_FLAGS_INTERLACED)
++		mtk_dpi_config_fb_size(dpi, vm.hactive, vm.vactive >> 1);
+ 	else
+-		mtk_dpi_config_fb_size(dpi, mode->hdisplay, mode->vdisplay);
++		mtk_dpi_config_fb_size(dpi, vm.hactive, vm.vactive);
+ 
+ 	mtk_dpi_config_channel_limit(dpi, &limit);
+ 	mtk_dpi_config_bit_num(dpi, dpi->bit_num);
+diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+index 7e5e24c..aa0943e 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dsi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+@@ -551,13 +551,12 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+ 	}
+ 
+ 	/**
+-	 * vm.pixelclock is in kHz, pixel_clock unit is Hz, so multiply by 1000
+ 	 * htotal_time = htotal * byte_per_pixel / num_lanes
+ 	 * overhead_time = lpx + hs_prepare + hs_zero + hs_trail + hs_exit
+ 	 * mipi_ratio = (htotal_time + overhead_time) / htotal_time
+ 	 * data_rate = pixel_clock * bit_per_pixel * mipi_ratio / num_lanes;
+ 	 */
+-	pixel_clock = dsi->vm.pixelclock * 1000;
++	pixel_clock = dsi->vm.pixelclock;
+ 	htotal = dsi->vm.hactive + dsi->vm.hback_porch + dsi->vm.hfront_porch +
+ 			dsi->vm.hsync_len;
+ 	htotal_bits = htotal * bit_per_pixel;
+@@ -725,16 +724,7 @@ static void mtk_dsi_encoder_mode_set(struct drm_encoder *encoder,
+ {
+ 	struct mtk_dsi *dsi = encoder_to_dsi(encoder);
+ 
+-	dsi->vm.pixelclock = adjusted->clock;
+-	dsi->vm.hactive = adjusted->hdisplay;
+-	dsi->vm.hback_porch = adjusted->htotal - adjusted->hsync_end;
+-	dsi->vm.hfront_porch = adjusted->hsync_start - adjusted->hdisplay;
+-	dsi->vm.hsync_len = adjusted->hsync_end - adjusted->hsync_start;
+-
+-	dsi->vm.vactive = adjusted->vdisplay;
+-	dsi->vm.vback_porch = adjusted->vtotal - adjusted->vsync_end;
+-	dsi->vm.vfront_porch = adjusted->vsync_start - adjusted->vdisplay;
+-	dsi->vm.vsync_len = adjusted->vsync_end - adjusted->vsync_start;
++	drm_display_mode_to_videomode(adjusted, &dsi->vm);
+ }
+ 
+ static void mtk_dsi_encoder_disable(struct drm_encoder *encoder)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.7.4
