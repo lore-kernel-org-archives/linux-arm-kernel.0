@@ -1,37 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 3 May 2018 18:48:20 +0530
-Subject: [PATCH v9 09/27] ARM: davinci: dm644x: add new clock init using
- common clock framework
-In-Reply-To: <20180427001745.4116-10-david@lechnology.com>
-References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-10-david@lechnology.com>
-Message-ID: <cfce1685-296a-a669-bb7d-bf14d43004ed@ti.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 3 May 2018 15:06:28 +0200
+Subject: [PATCH 0/2] ARM: dts: stm32: add qspi support for stm32mp157c
+In-Reply-To: <1525072281-17472-1-git-send-email-ludovic.Barre@st.com>
+References: <1525072281-17472-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <e6ab9571-c227-9246-3b34-f28420f0dbd5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 April 2018 05:47 AM, David Lechner wrote:
->  void __init dm644x_init_time(void)
->  {
-> +#ifdef CONFIG_COMMON_CLK
-> +	void __iomem *pll1, *psc;
-> +	struct clk *clk;
-> +
-> +	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM644X_REF_FREQ);
-> +
-> +	pll1 = ioremap(DAVINCI_PLL1_BASE, SZ_1K);
-> +	dm355_pll1_init(NULL, pll1, NULL);
+Hi Ludovic,
 
-This should be dm644x_*()
+On 04/30/2018 09:11 AM, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+> 
+> This patch series adds qspi support for stm32mp157c SoC
+> and its eval board.
+> 
+> Ludovic Barre (2):
+>    ARM: dts: stm32: add qspi support for stm32mp157c
+>    ARM: dts: stm32: add flash nor support on stm32mp157c eval board
+> 
+>   arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 45 +++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/stm32mp157c-ev1.dts     | 25 +++++++++++++++++
+>   arch/arm/boot/dts/stm32mp157c.dtsi        | 11 ++++++++
+>   3 files changed, 81 insertions(+)
+> 
 
-> +
-> +	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
-> +	dm355_psc_init(NULL, psc);
+Series applied on stm32-next.
 
-This one should be dm644x_*()
-
-With those fixes, I was able to bootup on DM644x EVM and a visual
-inspection of clock debug dump shows it remains same before and after
-the conversion.
-
-Thanks,
-Sekhar
+Regards
+Alex
