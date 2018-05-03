@@ -1,88 +1,73 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 3 May 2018 11:06:11 +0200
-Subject: Motorola Droid 4 progress, power consumption
-In-Reply-To: <20180502144158.GJ98604@atomide.com>
-References: <20180501183148.GA26996@amd> <20180502144158.GJ98604@atomide.com>
-Message-ID: <20180503090611.GA14451@amd>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 3 May 2018 11:06:48 +0200
+Subject: [PATCH 1/3] drm/sti: do not remove the drm_bridge that was never
+ added
+In-Reply-To: <20180502074025.12421-2-peda@axentia.se>
+References: <20180502074025.12421-1-peda@axentia.se>
+ <20180502074025.12421-2-peda@axentia.se>
+Message-ID: <20180503090648.GG12521@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > Anyway, >5.5hours of standby with screen off, GSM on is already
-> > usable.
+On Wed, May 02, 2018 at 09:40:23AM +0200, Peter Rosin wrote:
+> The more natural approach would perhaps be to add an drm_bridge_add,
+> but there are several other bridges that never call drm_bridge_add.
+> Just removing the drm_bridge_remove is the easier fix.
 > 
-> Just to rub that in, you do mean GSM usable for voice calls and
-> SMS with your unicsy_demo with mainline kernel plus the pending
-> LCD related patches, right? :)
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+
+This mess is much bigger. There's 2 pairs of bridge functions:
+
+- drm_bridge_attach/detach. Those are meant to be called by the overall
+  drm driver to connect/disconnect a drm_bridge.
+
+- drm_bridge_add/remove. These are supposed to be called by the bridge
+  driver itself to register/unregister itself. Maybe we should rename
+  them, since the same issue happens with drm_panel, with the same
+  confusion.
+
+I thought someone was working on a cleanup series to fix this mess, but I
+didn't find anything.
+-Daniel
+
+> ---
+>  drivers/gpu/drm/sti/sti_hda.c  | 1 -
+>  drivers/gpu/drm/sti/sti_hdmi.c | 1 -
+>  2 files changed, 2 deletions(-)
 > 
-> > This is the core of code I'm using.
-> > 
-> > https://github.com/pavelmachek/unicsy_demo
-> > 
-> > Battery graphs are attached. I'm not sure if the battery was really
-> > close to empty at that point -- voltage curve should have different
-> > shape if that was the case. 
+> diff --git a/drivers/gpu/drm/sti/sti_hda.c b/drivers/gpu/drm/sti/sti_hda.c
+> index 67bbdb49fffc..199db13f565c 100644
+> --- a/drivers/gpu/drm/sti/sti_hda.c
+> +++ b/drivers/gpu/drm/sti/sti_hda.c
+> @@ -721,7 +721,6 @@ static int sti_hda_bind(struct device *dev, struct device *master, void *data)
+>  	return 0;
+>  
+>  err_sysfs:
+> -	drm_bridge_remove(bridge);
+>  	return -EINVAL;
+>  }
+>  
+> diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
+> index 58f431102512..932724784942 100644
+> --- a/drivers/gpu/drm/sti/sti_hdmi.c
+> +++ b/drivers/gpu/drm/sti/sti_hdmi.c
+> @@ -1315,7 +1315,6 @@ static int sti_hdmi_bind(struct device *dev, struct device *master, void *data)
+>  	return 0;
+>  
+>  err_sysfs:
+> -	drm_bridge_remove(bridge);
+>  	hdmi->drm_connector = NULL;
+>  	return -EINVAL;
+>  }
+> -- 
+> 2.11.0
 > 
-> Cool. BTW, the value for POWER_SUPPLY_POWER_AVG should be quite
-> accurate for the whole device power consumption.
-> 
-> It comes from the shunt resistor measured by the PMIC. Sorry I don't
-> remember how often it needs to be polled but I'm guessing polling it
-> once a minute or so should be plenty.
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-I'd like current_avg more, but if I cat it manually, it changes on
-order of seconds, and quite significantly... which suggest shorter
-polling interval would be needed.
-
-user at devuan:/sys/class/power_supply/battery$ date; cat current_now
-current_avg
-Thu May  3 09:33:05 CEST 2018
--71000
--218408
-user at devuan:/sys/class/power_supply/battery$ date; cat current_now
-current_avg
-Thu May  3 09:33:06 CEST 2018
--61000
--200238
-user at devuan:/sys/class/power_supply/battery$ date; cat current_now
-current_avg
-Thu May  3 09:33:06 CEST 2018
--51000
--209879
-user at devuan:/sys/class/power_supply/battery$ date; cat current_now
-current_avg
-Thu May  3 09:33:07 CEST 2018
--56000
--72308
-user at devuan:/sys/class/power_supply/battery$ date; cat current_now
-current_avg
-Thu May  3 09:33:08 CEST 2018
--37000
--211362
-
-> Hmm oh and the POWER_SUPPLY_CHARGE_COUNTER value should be monitored
-> by your libbattery and it's low value and high value should be saved
-> to a file. Low should be saved when we get the battery low interrupt
-> and battery state changes to POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL.
-> High value should be saved on POWER_SUPPLY_CAPACITY_LEVEL_FULL.
-> 
-> Then when you know the high value and low value, you can calculate
-> the remaining capacity based on the current value and
-> POWER_SUPPLY_POWER_AVG.
-
-I'll look into that... but probably will do experiments with python,
-first.
-
-Best regards,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180503/5bccc8c0/attachment.sig>
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
