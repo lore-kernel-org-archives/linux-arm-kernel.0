@@ -1,32 +1,37 @@
 From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu,  3 May 2018 11:35:46 +0200
-Subject: [PATCH v7 1/6] dt-bindings: define vendor prefix for Wi2Wi, Inc.
+Date: Thu,  3 May 2018 11:35:51 +0200
+Subject: [PATCH v7 6/6] gnss: add w2sg0004 to Kconfig
 In-Reply-To: <cover.1525340143.git.hns@goldelico.com>
 References: <cover.1525340143.git.hns@goldelico.com>
-Message-ID: <7c03df30ceec8b171ab88787c1ef9556c96b30f6.1525340143.git.hns@goldelico.com>
+Message-ID: <7035d90fb71c4bc9d2e7c1090b77bdd6bdfd9871.1525340143.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce vendor prefix for Wi2Wi, Inc. for W2SG0004 GPS module
-and W2CBW003 Bluetooth/WiFi combo (CSR/Marvell).
+Allow to configure for w2sg0004 driver.
 
 Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gnss/Kconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index ddd81c82082d..9b3af098b99d 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -396,6 +396,7 @@ wi2wi	Wi2Wi
- wd	Western Digital Corp.
- wetek	WeTek Electronics, limited.
- wexler	Wexler
-+wi2wi	Wi2Wi, Inc.
- winbond Winbond Electronics corp.
- winstar	Winstar Display Corp.
- wlf	Wolfson Microelectronics
+diff --git a/drivers/gnss/Kconfig b/drivers/gnss/Kconfig
+index 6abc88514512..ccc128bd0a3f 100644
+--- a/drivers/gnss/Kconfig
++++ b/drivers/gnss/Kconfig
+@@ -40,4 +40,14 @@ config GNSS_UBX_SERIAL
+ 
+ 	  If unsure, say N.
+ 
++config GNSS_W2SG0004
++	tristate "W2SG00x4 power on/off driver"
++	depends on GPIOLIB && SERIAL_DEV_BUS
++	help
++	  Enable on/off control of W2SG00x4 GPS module connected
++	  to some SoC UART to allow powering up/down if the /dev/gnss
++	  is opened/closed.
++
++	  It also provides a "rfkill gps" name to control the LNA power.
++
+ endif # GNSS
 -- 
 2.12.2
