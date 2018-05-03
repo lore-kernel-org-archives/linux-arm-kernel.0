@@ -1,37 +1,45 @@
 From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu,  3 May 2018 11:35:51 +0200
-Subject: [PATCH v7 6/6] gnss: add w2sg0004 to Kconfig
+Date: Thu,  3 May 2018 11:35:48 +0200
+Subject: [PATCH v7 3/6] DTS: gta04: add uart2 child node for w2sg0004 GPS
+ receiver
 In-Reply-To: <cover.1525340143.git.hns@goldelico.com>
 References: <cover.1525340143.git.hns@goldelico.com>
-Message-ID: <7035d90fb71c4bc9d2e7c1090b77bdd6bdfd9871.1525340143.git.hns@goldelico.com>
+Message-ID: <9ebb28aed589aca8e9b5bc5c910f1d2f0d62669d.1525340143.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow to configure for w2sg0004 driver.
+GTA04 has a W2SG0004 module connected to UART2 of the OMAP3
+processor. A GPIO can pulse the on/off toggle switch.
+
+Note that there is no WAKEUP output from the W2SG0004,
+hence we can't use the generic SirfStar binding.
+
+The VSIM regulator is used to power on/off the LNA of an
+external active GPS antenna so that a driver can turn the
+LNA off if GPS is not needed to save battery energy.
 
 Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
 ---
- drivers/gnss/Kconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/omap3-gta04.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/gnss/Kconfig b/drivers/gnss/Kconfig
-index 6abc88514512..ccc128bd0a3f 100644
---- a/drivers/gnss/Kconfig
-+++ b/drivers/gnss/Kconfig
-@@ -40,4 +40,14 @@ config GNSS_UBX_SERIAL
- 
- 	  If unsure, say N.
- 
-+config GNSS_W2SG0004
-+	tristate "W2SG00x4 power on/off driver"
-+	depends on GPIOLIB && SERIAL_DEV_BUS
-+	help
-+	  Enable on/off control of W2SG00x4 GPS module connected
-+	  to some SoC UART to allow powering up/down if the /dev/gnss
-+	  is opened/closed.
+diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+index 4170be70460e..1c9e1ccf2346 100644
+--- a/arch/arm/boot/dts/omap3-gta04.dtsi
++++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+@@ -478,6 +478,13 @@
+ &uart2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart2_pins>;
 +
-+	  It also provides a "rfkill gps" name to control the LNA power.
-+
- endif # GNSS
++	gps: gps {
++		compatible = "wi2wi,w2sg0004";
++		lna-supply = <&vsim>;   /* LNA regulator */
++		/* GPIO_145: trigger for on/off-impulse for w2sg0004 */
++		enable-gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;
++	};
+ };
+ 
+ &uart3 {
 -- 
 2.12.2
