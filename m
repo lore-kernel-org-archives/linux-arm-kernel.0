@@ -1,43 +1,40 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Thu, 3 May 2018 16:12:55 +0100
-Subject: [PATCH v8 13/13] arm64: topology: divorce MC scheduling domain
- from core_siblings
-In-Reply-To: <20180425233121.13270-14-jeremy.linton@arm.com>
-References: <20180425233121.13270-1-jeremy.linton@arm.com>
- <20180425233121.13270-14-jeremy.linton@arm.com>
-Message-ID: <20180503151255.GB28409@work-enc>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 3 May 2018 08:13:33 -0700
+Subject: [PATCH] ARM: dts: cygnus: add ethernet0 alias
+In-Reply-To: <20180503095618.2312-1-peron.clem@gmail.com>
+References: <20180503095618.2312-1-peron.clem@gmail.com>
+Message-ID: <74263153-2f69-71e1-513b-e034a505588b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 06:31:21PM -0500, Jeremy Linton wrote:
-> Now that we have an accurate view of the physical topology
-> we need to represent it correctly to the scheduler. Generally MC
-> should equal the LLC in the system, but there are a number of
-> special cases that need to be dealt with.
-> 
-> In the case of NUMA in socket, we need to assure that the sched
-> domain we build for the MC layer isn't larger than the DIE above it.
-> Similarly for LLC's that might exist in cross socket interconnect or
-> directory hardware we need to assure that MC is shrunk to the socket
-> or NUMA node.
-> 
-> This patch builds a sibling mask for the LLC, and then picks the
-> smallest of LLC, socket siblings, or NUMA node siblings, which
-> gives us the behavior described above. This is ever so slightly
-> different than the similar alternative where we look for a cache
-> layer less than or equal to the socket/NUMA siblings.
-> 
-> The logic to pick the MC layer affects all arm64 machines, but
-> only changes the behavior for DT/MPIDR systems if the NUMA domain
-> is smaller than the core siblings (generally set to the cluster).
-> Potentially this fixes a possible bug in DT systems, but really
-> it only affects ACPI systems where the core siblings is correctly
-> set to the socket siblings. Thus all currently available ACPI
-> systems should have MC equal to LLC, including the NUMA in socket
-> machines where the LLC is partitioned between the NUMA nodes.
-> 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
++Ray, Scott, Eric, list
 
-This patch looks good to me.
+On 05/03/2018 02:56 AM, Cl?ment P?ron wrote:
+> In order to avoid Linux generating a random mac address on every boot,
+> add an ethernet0 alias that will allow u-boot to patch the dtb with
+> the MAC address.
+> 
+> Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
+> ---
+>  arch/arm/boot/dts/bcm-cygnus.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> index 9fe4f5a6379e..1a05b8f48b54 100644
+> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
+> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> @@ -41,6 +41,10 @@
+>  	model = "Broadcom Cygnus SoC";
+>  	interrupt-parent = <&gic>;
+>  
+> +	aliases {
+> +		ethernet0 = &eth0;
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> 
 
-Acked-by: Morten Rasmussen <morten.rasmussen@arm.com>
+-- 
+Florian
