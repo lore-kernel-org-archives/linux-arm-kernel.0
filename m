@@ -1,61 +1,32 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 3 May 2018 15:11:47 +0530
-Subject: [PATCH 00/12] mtd: nand: davinci: stop using pdev->id as
- chipselect
-In-Reply-To: <20180430184751.574550cc@bbrezillon>
-References: <20180430082453.8091-1-brgl@bgdev.pl>
- <20180430120930.4768a7cb@bbrezillon>
- <CAMRc=Mf2TKsuiudxPdEFStrstHH65jHb6JFJ0Ort9GvWDSo9bQ@mail.gmail.com>
- <20180430184751.574550cc@bbrezillon>
-Message-ID: <86e80ed7-e0be-8f2c-888e-66406551395f@ti.com>
+From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
+Date: Thu,  3 May 2018 11:44:45 +0200
+Subject: [PATCH] ARM: dts: cygnus: fix irq type for arm global timer
+Message-ID: <20180503094445.324-1-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+As per ARM documentation
+PPI(0) ID27 - global timer interrupt is rising-edge sensitive.
 
-On Monday 30 April 2018 10:17 PM, Boris Brezillon wrote:
-> On Mon, 30 Apr 2018 18:45:06 +0200
-> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> 
->> 2018-04-30 12:09 GMT+02:00 Boris Brezillon <boris.brezillon@bootlin.com>:
->>> Hi Bartosz,
->>>
->>> On Mon, 30 Apr 2018 10:24:41 +0200
->>> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->>>
->>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>
->>>> We have the 'ti,davinci-chipselect' property in the device tree, but
->>>> when using platform data the driver silently uses the id field of
->>>> struct platform_device as the chipselect. This is confusing and we
->>>> almost broke the nand support again recently after converting the
->>>> platform to common clock framework (which changed the device id in the
->>>> clock lookup - the problem is gone now that we no longer acquire the
->>>> clock in the nand driver.
->>>>
->>>> This series adds a new field to davinci-nand platform data, then makes
->>>> all board use it and finally modifies the two drivers that make use of
->>>> it.
->>>>
->>>> Bartosz Golaszewski (12):
->>>>   mtd: nand: davinci: store the core chipselect number in platform data
->>>
->>> Raw NAND related patches (that is, everything that is not onenand or
->>> SPI NAND) should use the "mtd: rawnand: " prefix now. Other than that,
->>> I'm fine with the patch series, just let me know how you want to have it
->>> merged (through the MTD tree or the davinci tree).
->>>
->>> Thanks,
->>>
->>> Boris
->>
->> I think Sekhar could pick all those patches up for 4.18.
-> 
-> Okay, then I'd need an immutable branch containing these changes.
+set IRQ triggering type to IRQ_TYPE_EDGE_RISING for ARM Global timers.
 
-You can use branch v4.18/nand-cs-simplification of
-git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git
-(commit 7c4db57cdb00)
+Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
+---
+ arch/arm/boot/dts/bcm-cygnus.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Sekhar
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index 699fdf94d139..9fe4f5a6379e 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -69,7 +69,7 @@
+ 		timer at 20200 {
+ 			compatible = "arm,cortex-a9-global-timer";
+ 			reg = <0x20200 0x100>;
+-			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_PPI 11 IRQ_TYPE_EDGE_RISING>;
+ 			clocks = <&periph_clk>;
+ 		};
+ 
+-- 
+2.17.0
