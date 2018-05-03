@@ -1,34 +1,28 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 3 May 2018 17:38:58 +0200
-Subject: [PATCH v1 0/2] Add I2C support for STM32H743
-In-Reply-To: <1524215122-14046-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1524215122-14046-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <73ba5cf4-3ea5-497f-b5c1-808aadff1515@st.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 3 May 2018 10:44:08 -0500
+Subject: [PATCH v9 07/27] ARM: davinci: dm355: add new clock init using
+ common clock framework
+In-Reply-To: <d9633747-0c50-2934-d3b2-ba745f021077@ti.com>
+References: <20180427001745.4116-1-david@lechnology.com>
+ <20180427001745.4116-8-david@lechnology.com>
+ <d9633747-0c50-2934-d3b2-ba745f021077@ti.com>
+Message-ID: <18b7b217-7ccb-d2dd-8f2c-ba3ba0e5d893@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/20/2018 11:05 AM, Pierre-Yves MORDRET wrote:
-> Add I2C support on STM32H743 SoC.
-> Activate I2C1 on STM32H743I Evaluation Board.
-> ---
->    Version history:
->       v1:
->          * Initial
-> ---
+On 05/03/2018 10:34 AM, Sekhar Nori wrote:
+> On Friday 27 April 2018 05:47 AM, David Lechner wrote:
+>> This adds the new board-specific clock init in mach-davinci/dm355.c
+>> using the new common clock framework drivers.
+>>
+>> The #ifdefs are needed to prevent compile errors until the entire
+>> ARCH_DAVINCI is converted.
+>>
+>> Also clean up the #includes since we are adding some here.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
 > 
-> Pierre-Yves MORDRET (2):
->    ARM: dts: stm32: Add I2C support for STM32H743 SoC
->    ARM: dts: stm32: Add I2C1 support for STM32H743I-EVAL Board
-> 
->   arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 10 +++++++
->   arch/arm/boot/dts/stm32h743.dtsi         | 48 ++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/stm32h743i-eval.dts    |  8 ++++++
->   3 files changed, 66 insertions(+)
-> 
+> I am having trouble booting DM355 EVM with the series applied.
+> Still to debug what is going wrong.
 
-Series applied on stm32-next.
-
-Regards
-Alex
+Can you dump the PLL registers using /sys/kernel/debug/clk/... ?
