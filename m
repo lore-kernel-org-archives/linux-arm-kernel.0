@@ -1,111 +1,99 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 May 2018 13:52:27 +0200
-Subject: [PATCH] tty: implement a rx led trigger
-In-Reply-To: <20180503101047.GF32180@amd>
-References: <20180503100448.1350-1-u.kleine-koenig@pengutronix.de>
- <20180503101047.GF32180@amd>
-Message-ID: <20180503115227.gogvknx5sbuyrcey@pengutronix.de>
+From: ilialin@codeaurora.org (Ilia Lin)
+Date: Thu,  3 May 2018 14:52:21 +0300
+Subject: [PATCH v5 00/14] CPU scaling support for msm8996
+Message-ID: <1525348355-25471-1-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2018 at 12:10:47PM +0200, Pavel Machek wrote:
-> Hi!
-> 
-> > The trigger fires when data is pushed to the ldisc. This is a bit later
-> > than the actual receiving of data but has the nice benefit that it
-> > doesn't need adaption for each driver and isn't in the hot path.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Well, why not, but there certainly should be config option? Because I
-> really don't see many people wanting to use this trigger.
+[v5]
+ * Rebased
+ * Adressed comments from Bjorn
+ * Adressed comments from Viresh
+ * Adressed comments from Sricharan
+ * Adressed comments from Nicolas
+ * Adressed comments from Rob
+ * Adressed comments from Mark
 
-Yeah, can be done. I'll implement this for v2.
+[v4]
+ * Adressed comments from Stephen
+ * Added CPU regulator support
+ * Added qcom-cpufreq-kryo driver
 
-> > diff --git a/drivers/tty/tty_buffer.c b/drivers/tty/tty_buffer.c
-> > index c996b6859c5e..4d364b77b1a7 100644
-> > --- a/drivers/tty/tty_buffer.c
-> > +++ b/drivers/tty/tty_buffer.c
-> > @@ -17,6 +17,7 @@
-> >  #include <linux/delay.h>
-> >  #include <linux/module.h>
-> >  #include <linux/ratelimit.h>
-> > +#include <linux/leds.h>
-> >  
-> >  
-> >  #define MIN_TTYB_SIZE	256
-> > @@ -499,6 +500,7 @@ static void flush_to_ldisc(struct work_struct *work)
-> >  		struct tty_buffer *head = buf->head;
-> >  		struct tty_buffer *next;
-> >  		int count;
-> > +		unsigned long delay = 50 /* ms */;
-> >  
-> >  		/* Ldisc or user is trying to gain exclusive access */
-> >  		if (atomic_read(&buf->priority))
-> > @@ -521,6 +523,8 @@ static void flush_to_ldisc(struct work_struct *work)
-> >  			continue;
-> >  		}
-> >  
-> > +		led_trigger_blink_oneshot(port->led_trigger_rx, &delay, &delay, 0);
-> > +
-> >  		count = receive_buf(port, head, count);
-> >  		if (!count)
-> >  			break;
-> > diff --git a/drivers/tty/tty_port.c b/drivers/tty/tty_port.c
-> > index 25d736880013..51b78a585417 100644
-> > --- a/drivers/tty/tty_port.c
-> > +++ b/drivers/tty/tty_port.c
-> > @@ -16,6 +16,7 @@
-> >  #include <linux/wait.h>
-> >  #include <linux/bitops.h>
-> >  #include <linux/delay.h>
-> > +#include <linux/leds.h>
-> >  #include <linux/module.h>
-> >  #include <linux/serdev.h>
-> >  
-> > @@ -157,6 +158,18 @@ struct device *tty_port_register_device_attr_serdev(struct tty_port *port,
-> >  
-> >  	tty_port_link_device(port, driver, index);
-> >  
-> > +	port->led_trigger_rx_name = kasprintf(GFP_KERNEL, "%s%d-rx",
-> > +					      driver->name, index);
-> > +	if (!port->led_trigger_rx_name) {
-> > +		pr_err("Failed to allocate trigger name for %s%d\n",
-> > +		       driver->name, index);
-> > +		goto skip_trigger;
-> > +	}
-> > +
-> > +	led_trigger_register_simple(port->led_trigger_rx_name,
-> > +				    &port->led_trigger_rx);
-> > +
-> > +skip_trigger:
-> >  	dev = serdev_tty_port_register(port, device, driver, index);
-> >  	if (PTR_ERR(dev) != -ENODEV) {
-> >  		/* Skip creating cdev if we registered a serdev device */
-> > @@ -206,6 +219,9 @@ void tty_port_unregister_device(struct tty_port *port,
-> >  	if (ret == 0)
-> >  		return;
-> >  
-> > +	led_trigger_unregister_simple(port->led_trigger_rx);
-> 
-> Is it ok to unregister if it was not registered in the first place?
+[v3]
+ * Rebased on top of the latest PLL driver changes
+ * Addressed comment from Rob Herring for bindings
 
-led_trigger_unregister_simple() looks as follows:
+[v2]
+ * Addressed comments from Rob Herring for bindings
+ * Addressed comments from Mark Rutland for memory barrier
+ * Addressed comments from Julien Thierry for clock reenabling condition
+ * Tuned the HW configuration for clock frequencies below 600MHz
 
-	if (trig)
-		led_trigger_unregister(trig);
-	kfree(trig);
+Clocks:
+This series adds support for the CPU clocks on msm8996 devices.
+The driver uses the existing PLL drivers and is required to control
+the CPU frequency scaling on the MSM8996.
 
-So yes, it does the right thing when it wasn't registered. Assuming it
-is NULL then, which doesn't seem to be guaranteed. Probably I'd need
+Regulators:
+Added SAW regulator support to the SPMI regulator driver. The SAW regulators
+will be controlled through special CPU registers instead of direct
+SPMI accesses.
 
-	port->led_trigger_rx = NULL
-	
-if kasprintf failed.
+Cpufreq:
+The qcom-cpufreq-kryo driver is aimed to support different SOC versions.
+The driver reads eFuse information and chooses the required OPP subset
+by passing the OPP supported-hw parameter.
 
-Best regards
-Uwe
+A previous post of RFC can be found here:
+https://patchwork.kernel.org/patch/10316261/
+
+Ilia Lin (11):
+  soc: qcom: Separate kryo l2 accessors from PMU driver
+  clk: qcom: Add CPU clock driver for msm8996
+  clk: qcom: Add DT bindings for CPU clock driver for msm8996
+  clk: qcom: Add ACD path to CPU clock driver for msm8996
+  dt: qcom: Add opp and thermal to the msm8996
+  regulator: qcom_spmi: Add support for SAW
+  dt-bindings: qcom_spmi: Add support for SAW documentation
+  dt: qcom: Add SAW regulator for 8x96 CPUs
+  cpufreq: Add Kryo CPU scaling driver
+  dt-bindings: cpufreq: Document operating-points-v2-kryo-cpu
+  dt: qcom: Add qcom-cpufreq-kryo driver configuration
+
+Rajendra Nayak (3):
+  clk: qcom: Make clk_alpha_pll_configure available to modules
+  clk: qcom: cpu-8996: Add support to switch to alternate PLL
+  clk: qcom: cpu-8996: Add support to switch below 600Mhz
+
+ .../devicetree/bindings/clock/qcom,kryocc.txt      |  17 +
+ .../devicetree/bindings/opp/kryo-cpufreq.txt       | 693 +++++++++++++++++++++
+ .../bindings/regulator/qcom,spmi-regulator.txt     |  45 ++
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dts        |   2 +-
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 650 ++++++++++++++++++-
+ drivers/clk/clk-fixed-factor.c                     |   2 +-
+ drivers/clk/qcom/Kconfig                           |   9 +
+ drivers/clk/qcom/Makefile                          |   1 +
+ drivers/clk/qcom/clk-alpha-pll.c                   |   1 +
+ drivers/clk/qcom/clk-alpha-pll.h                   |   6 +
+ drivers/clk/qcom/clk-cpu-8996.c                    | 519 +++++++++++++++
+ drivers/cpufreq/Kconfig.arm                        |  11 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/cpufreq-dt-platdev.c               |   3 +
+ drivers/cpufreq/qcom-cpufreq-kryo.c                | 153 +++++
+ drivers/perf/Kconfig                               |   1 +
+ drivers/perf/qcom_l2_pmu.c                         |  90 +--
+ drivers/regulator/qcom_spmi-regulator.c            | 133 +++-
+ drivers/soc/qcom/Kconfig                           |   3 +
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/kryo-l2-accessors.c               |  65 ++
+ include/soc/qcom/kryo-l2-accessors.h               |  21 +
+ 22 files changed, 2347 insertions(+), 80 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,kryocc.txt
+ create mode 100644 Documentation/devicetree/bindings/opp/kryo-cpufreq.txt
+ create mode 100644 drivers/clk/qcom/clk-cpu-8996.c
+ create mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
+ create mode 100644 drivers/soc/qcom/kryo-l2-accessors.c
+ create mode 100644 include/soc/qcom/kryo-l2-accessors.h
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.1
