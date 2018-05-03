@@ -1,50 +1,91 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu,  3 May 2018 14:55:53 +0800
-Subject: [RESEND PATCH] pinctrl: rockchip: Disable interrupt when changing
- it's capability
-Message-ID: <20180503065553.7762-1-jeffy.chen@rock-chips.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 3 May 2018 09:12:31 +0200
+Subject: [PATCH v3] soc: mediatek: add a fixed wait for SRAM stable
+In-Reply-To: <90f83c1bd359bb39cdae334e489037d6fb8ac69b.1525233544.git.sean.wang@mediatek.com>
+References: <90f83c1bd359bb39cdae334e489037d6fb8ac69b.1525233544.git.sean.wang@mediatek.com>
+Message-ID: <2377953d-f5a2-7b59-8d07-034b6827c45f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We saw spurious irq when changing irq's trigger type, for example
-setting gpio-keys's wakeup irq trigger type.
 
-And according to the TRM:
-"Programming the GPIO registers for interrupt capability, edge-sensitive
-or level-sensitive interrupts, and interrupt polarity should be
-completed prior to enabling the interrupts on Port A in order to prevent
-spurious glitches on the interrupt lines to the interrupt controller."
 
-Reported-by: Brian Norris <briannorris@google.com>
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+On 05/02/2018 06:03 AM, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> MT7622_POWER_DOMAIN_WB doesn't send an ACK when its managed SRAM becomes
+> stable, which is not like the behavior the other power domains should
+> have. Therefore, it's necessary for such a power domain to have a fixed
+> and well-predefined duration to wait until its managed SRAM can be allowed
+> to access by all functions running on the top.
+> 
+> v1 -> v2:
+>  - use MTK_SCPD_FWAIT_SRAM flag as an indication requiring force waiting.
+> 
+> v2 -> v3:
+>  - change the order for condition judgment with we check an existence of
+>    the MTK_SCPD_FWAIT_SRAM first to get rid of any oversight on negative
+>    condition.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Weiyi Lu <weiyi.lu@mediatek.com>
+> ---
 
- drivers/pinctrl/pinctrl-rockchip.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Now pused to v4.17-next/soc
 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 3924779f55785..7ff45ec8330d1 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -2727,9 +2727,19 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
- 		return -EINVAL;
- 	}
- 
-+	/**
-+	 * According to the TRM, we should keep irq disabled during programming
-+	 * interrupt capability to prevent spurious glitches on the interrupt
-+	 * lines to the interrupt controller.
-+	 */
-+	data = readl(bank->reg_base + GPIO_INTEN);
-+	writel_relaxed(data & ~mask, gc->reg_base + GPIO_INTEN);
-+
- 	writel_relaxed(level, gc->reg_base + GPIO_INTTYPE_LEVEL);
- 	writel_relaxed(polarity, gc->reg_base + GPIO_INT_POLARITY);
- 
-+	writel_relaxed(data, gc->reg_base + GPIO_INTEN);
-+
- 	irq_gc_unlock(gc);
- 	raw_spin_unlock_irqrestore(&bank->slock, flags);
- 	clk_disable(bank->clk);
--- 
-2.11.0
+Thanks a lot!
+Matthias
+
+>  drivers/soc/mediatek/mtk-scpsys.c | 23 +++++++++++++++++------
+>  1 file changed, 17 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> index b1b45e4..2080c8f 100644
+> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> @@ -32,6 +32,7 @@
+>  #define MTK_POLL_TIMEOUT    (jiffies_to_usecs(HZ))
+>  
+>  #define MTK_SCPD_ACTIVE_WAKEUP		BIT(0)
+> +#define MTK_SCPD_FWAIT_SRAM		BIT(1)
+>  #define MTK_SCPD_CAPS(_scpd, _x)	((_scpd)->data->caps & (_x))
+>  
+>  #define SPM_VDE_PWR_CON			0x0210
+> @@ -237,11 +238,21 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+>  	val &= ~scpd->data->sram_pdn_bits;
+>  	writel(val, ctl_addr);
+>  
+> -	/* wait until SRAM_PDN_ACK all 0 */
+> -	ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
+> -				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
+> -	if (ret < 0)
+> -		goto err_pwr_ack;
+> +	/* Either wait until SRAM_PDN_ACK all 0 or have a force wait */
+> +	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_FWAIT_SRAM)) {
+> +		/*
+> +		 * Currently, MTK_SCPD_FWAIT_SRAM is necessary only for
+> +		 * MT7622_POWER_DOMAIN_WB and thus just a trivial setup is
+> +		 * applied here.
+> +		 */
+> +		usleep_range(12000, 12100);
+> +
+> +	} else {
+> +		ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
+> +					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
+> +		if (ret < 0)
+> +			goto err_pwr_ack;
+> +	};
+>  
+>  	if (scpd->data->bus_prot_mask) {
+>  		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
+> @@ -785,7 +796,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
+>  		.sram_pdn_ack_bits = 0,
+>  		.clk_id = {CLK_NONE},
+>  		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
+> -		.caps = MTK_SCPD_ACTIVE_WAKEUP,
+> +		.caps = MTK_SCPD_ACTIVE_WAKEUP | MTK_SCPD_FWAIT_SRAM,
+>  	},
+>  };
+>  
+> 
