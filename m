@@ -1,185 +1,132 @@
-From: satendra.t@samsung.com (Satendra Singh Thakur)
-Date: Thu,  3 May 2018 16:39:46 +0530
-Subject: [PATCH 12/13] drm/kms/mode/mtk_dpi_dsi: using helper func
- drm_display_mode_to_videomode for calculating timing parameters
-In-Reply-To: <cover.1525087679.git.satendra.t@samsung.com>
-References: <cover.1525087679.git.satendra.t@samsung.com>
- <CGME20180503111008epcas5p26088af1ff767ac0bf06cae934f1da339@epcas5p2.samsung.com>
-Message-ID: <986995915d004bf99936eaf380da6113a974b639.1525087679.git.satendra.t@samsung.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Thu, 3 May 2018 12:20:52 +0100
+Subject: [PATCH v8 13/13] arm64: topology: divorce MC scheduling domain
+ from core_siblings
+In-Reply-To: <f3ec56a3-6352-5098-2e78-60f76a8b15b7@arm.com>
+References: <20180425233121.13270-1-jeremy.linton@arm.com>
+ <20180425233121.13270-14-jeremy.linton@arm.com>
+ <62677b95-faf5-4908-abc9-428ef39ea912@arm.com>
+ <20180502114916.GW4589@e105550-lin.cambridge.arm.com>
+ <f3ec56a3-6352-5098-2e78-60f76a8b15b7@arm.com>
+Message-ID: <20180503112052.GA28409@work-enc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
--Duplicate logic for the timing params is avoided
--Arithmatic operator *,/ are replaced by logical >>, << operators
--The flags DRM_MODE_FLAG_* are replaced with DISPLAY_FLAGS_* flags
+On Wed, May 02, 2018 at 05:32:54PM -0500, Jeremy Linton wrote:
+> Hi,
+> 
+> On 05/02/2018 06:49 AM, Morten Rasmussen wrote:
+> >On Tue, May 01, 2018 at 03:33:33PM +0100, Sudeep Holla wrote:
+> >>
+> >>
+> >>On 26/04/18 00:31, Jeremy Linton wrote:
+> >>>Now that we have an accurate view of the physical topology
+> >>>we need to represent it correctly to the scheduler. Generally MC
+> >>>should equal the LLC in the system, but there are a number of
+> >>>special cases that need to be dealt with.
+> >>>
+> >>>In the case of NUMA in socket, we need to assure that the sched
+> >>>domain we build for the MC layer isn't larger than the DIE above it.
+> >>>Similarly for LLC's that might exist in cross socket interconnect or
+> >>>directory hardware we need to assure that MC is shrunk to the socket
+> >>>or NUMA node.
+> >>>
+> >>>This patch builds a sibling mask for the LLC, and then picks the
+> >>>smallest of LLC, socket siblings, or NUMA node siblings, which
+> >>>gives us the behavior described above. This is ever so slightly
+> >>>different than the similar alternative where we look for a cache
+> >>>layer less than or equal to the socket/NUMA siblings.
+> >>>
+> >>>The logic to pick the MC layer affects all arm64 machines, but
+> >>>only changes the behavior for DT/MPIDR systems if the NUMA domain
+> >>>is smaller than the core siblings (generally set to the cluster).
+> >>>Potentially this fixes a possible bug in DT systems, but really
+> >>>it only affects ACPI systems where the core siblings is correctly
+> >>>set to the socket siblings. Thus all currently available ACPI
+> >>>systems should have MC equal to LLC, including the NUMA in socket
+> >>>machines where the LLC is partitioned between the NUMA nodes.
+> >>>
+> >>>Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> >>>---
+> >>>  arch/arm64/include/asm/topology.h |  2 ++
+> >>>  arch/arm64/kernel/topology.c      | 32 +++++++++++++++++++++++++++++++-
+> >>>  2 files changed, 33 insertions(+), 1 deletion(-)
+> >>>
+> >>>diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+> >>>index 6b10459e6905..df48212f767b 100644
+> >>>--- a/arch/arm64/include/asm/topology.h
+> >>>+++ b/arch/arm64/include/asm/topology.h
+> >>>@@ -8,8 +8,10 @@ struct cpu_topology {
+> >>>  	int thread_id;
+> >>>  	int core_id;
+> >>>  	int package_id;
+> >>>+	int llc_id;
+> >>>  	cpumask_t thread_sibling;
+> >>>  	cpumask_t core_sibling;
+> >>>+	cpumask_t llc_siblings;
+> >>>  };
+> >>>  extern struct cpu_topology cpu_topology[NR_CPUS];
+> >>>diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> >>>index bd1aae438a31..20b4341dc527 100644
+> >>>--- a/arch/arm64/kernel/topology.c
+> >>>+++ b/arch/arm64/kernel/topology.c
+> >>>@@ -13,6 +13,7 @@
+> >>>  #include <linux/acpi.h>
+> >>>  #include <linux/arch_topology.h>
+> >>>+#include <linux/cacheinfo.h>
+> >>>  #include <linux/cpu.h>
+> >>>  #include <linux/cpumask.h>
+> >>>  #include <linux/init.h>
+> >>>@@ -214,7 +215,19 @@ EXPORT_SYMBOL_GPL(cpu_topology);
+> >>>  const struct cpumask *cpu_coregroup_mask(int cpu)
+> >>>  {
+> >>>-	return &cpu_topology[cpu].core_sibling;
+> >>>+	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
+> >>>+
+> >>>+	/* Find the smaller of NUMA, core or LLC siblings */
+> >>>+	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
+> >>>+		/* not numa in package, lets use the package siblings */
+> >>>+		core_mask = &cpu_topology[cpu].core_sibling;
+> >>>+	}
+> >>>+	if (cpu_topology[cpu].llc_id != -1) {
+> >>>+		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
+> >>>+			core_mask = &cpu_topology[cpu].llc_siblings;
+> >>>+	}
+> >>>+
+> >>>+	return core_mask;
+> >>>  }
+> >>>  static void update_siblings_masks(unsigned int cpuid)
+> >>>@@ -226,6 +239,9 @@ static void update_siblings_masks(unsigned int cpuid)
+> >>>  	for_each_possible_cpu(cpu) {
+> >>>  		cpu_topo = &cpu_topology[cpu];
+> >>>+		if (cpuid_topo->llc_id == cpu_topo->llc_id)
+> >>>+			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
+> >>>+
+> >>
+> >>Would this not result in cpuid_topo->llc_siblings = cpu_possible_mask
+> >>on DT systems where llc_id is not set/defaults to -1 and still pass the
+> >>condition. Does it make sense to add additional -1 check ?
+> >
+> >I don't think mask will be used by the current code if llc_id == -1 as
+> >the user does the check. Is it better to have the mask empty than
+> >default to cpu_possible_mask? If we require all users to implement a
+> >check it shouldn't matter.
+> >
+> 
+> Right.
+> 
+> There is also the other way of thinking about it, which is if you remove the
+> if llc_id == -1 check in cpu_coregroup_mask() does it make more sense to
+> have llc_siblings default equal all the cores, or just the one being
+> requested?
 
-Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
-Cc: Madhur Verma <madhur.verma@samsung.com>
-Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
----
- drivers/gpu/drm/mediatek/mtk_dpi.c | 60 +++++++++++++++++++-------------------
- drivers/gpu/drm/mediatek/mtk_dsi.c | 14 ++-------
- 2 files changed, 32 insertions(+), 42 deletions(-)
+Since we define cpu_coregroup_mask() to be the smallest of LLC, package,
+and NUMA node, letting it default to just one cpu would change/break the
+topology on non-PPTT systems. Wouldn't it?
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index e80a603..76dd3b9 100644
---- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -22,6 +22,7 @@
- #include <linux/interrupt.h>
- #include <linux/types.h>
- #include <linux/clk.h>
-+#include <video/videomode.h>
- 
- #include "mtk_dpi_regs.h"
- #include "mtk_drm_ddp_comp.h"
-@@ -429,34 +430,35 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
- 	struct mtk_dpi_sync_param vsync_leven = { 0 };
- 	struct mtk_dpi_sync_param vsync_rodd = { 0 };
- 	struct mtk_dpi_sync_param vsync_reven = { 0 };
--	unsigned long pix_rate;
-+	struct videomode vm;
- 	unsigned long pll_rate;
- 	unsigned int factor;
- 
- 	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
--	pix_rate = 1000UL * mode->clock;
-+
- 	if (mode->clock <= 27000)
--		factor = 16 * 3;
-+		factor = 3 << 4;
- 	else if (mode->clock <= 84000)
--		factor = 8 * 3;
-+		factor = 3 << 3;
- 	else if (mode->clock <= 167000)
--		factor = 4 * 3;
-+		factor = 3 << 2;
- 	else
--		factor = 2 * 3;
--	pll_rate = pix_rate * factor;
-+		factor = 3 << 1;
-+	drm_display_mode_to_videomode(mode, &vm);
-+	pll_rate = vm.pixelclock * factor;
- 
- 	dev_dbg(dpi->dev, "Want PLL %lu Hz, pixel clock %lu Hz\n",
--		pll_rate, pix_rate);
-+		pll_rate, vm.pixelclock);
- 
- 	clk_set_rate(dpi->tvd_clk, pll_rate);
- 	pll_rate = clk_get_rate(dpi->tvd_clk);
- 
--	pix_rate = pll_rate / factor;
--	clk_set_rate(dpi->pixel_clk, pix_rate);
--	pix_rate = clk_get_rate(dpi->pixel_clk);
-+	vm.pixelclock = pll_rate / factor;
-+	clk_set_rate(dpi->pixel_clk, vm.pixelclock);
-+	vm.pixelclock = clk_get_rate(dpi->pixel_clk);
- 
- 	dev_dbg(dpi->dev, "Got  PLL %lu Hz, pixel clock %lu Hz\n",
--		pll_rate, pix_rate);
-+		pll_rate, vm.pixelclock);
- 
- 	limit.c_bottom = 0x0010;
- 	limit.c_top = 0x0FE0;
-@@ -465,33 +467,31 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
- 
- 	dpi_pol.ck_pol = MTK_DPI_POLARITY_FALLING;
- 	dpi_pol.de_pol = MTK_DPI_POLARITY_RISING;
--	dpi_pol.hsync_pol = mode->flags & DRM_MODE_FLAG_PHSYNC ?
-+	dpi_pol.hsync_pol = vm.flags & DISPLAY_FLAGS_HSYNC_HIGH ?
- 			    MTK_DPI_POLARITY_FALLING : MTK_DPI_POLARITY_RISING;
--	dpi_pol.vsync_pol = mode->flags & DRM_MODE_FLAG_PVSYNC ?
-+	dpi_pol.vsync_pol = vm.flags & DISPLAY_FLAGS_VSYNC_HIGH ?
- 			    MTK_DPI_POLARITY_FALLING : MTK_DPI_POLARITY_RISING;
--
--	hsync.sync_width = mode->hsync_end - mode->hsync_start;
--	hsync.back_porch = mode->htotal - mode->hsync_end;
--	hsync.front_porch = mode->hsync_start - mode->hdisplay;
-+	hsync.sync_width = vm.hsync_len;
-+	hsync.back_porch = vm.hback_porch;
-+	hsync.front_porch = vm.hfront_porch;
- 	hsync.shift_half_line = false;
--
--	vsync_lodd.sync_width = mode->vsync_end - mode->vsync_start;
--	vsync_lodd.back_porch = mode->vtotal - mode->vsync_end;
--	vsync_lodd.front_porch = mode->vsync_start - mode->vdisplay;
-+	vsync_lodd.sync_width = vm.vsync_len;
-+	vsync_lodd.back_porch = vm.vback_porch;
-+	vsync_lodd.front_porch = vm.vfront_porch;
- 	vsync_lodd.shift_half_line = false;
- 
--	if (mode->flags & DRM_MODE_FLAG_INTERLACE &&
-+	if (vm.flags & DISPLAY_FLAGS_INTERLACED &&
- 	    mode->flags & DRM_MODE_FLAG_3D_MASK) {
- 		vsync_leven = vsync_lodd;
- 		vsync_rodd = vsync_lodd;
- 		vsync_reven = vsync_lodd;
- 		vsync_leven.shift_half_line = true;
- 		vsync_reven.shift_half_line = true;
--	} else if (mode->flags & DRM_MODE_FLAG_INTERLACE &&
-+	} else if (vm.flags & DISPLAY_FLAGS_INTERLACED &&
- 		   !(mode->flags & DRM_MODE_FLAG_3D_MASK)) {
- 		vsync_leven = vsync_lodd;
- 		vsync_leven.shift_half_line = true;
--	} else if (!(mode->flags & DRM_MODE_FLAG_INTERLACE) &&
-+	} else if (!(vm.flags & DISPLAY_FLAGS_INTERLACED) &&
- 		   mode->flags & DRM_MODE_FLAG_3D_MASK) {
- 		vsync_rodd = vsync_lodd;
- 	}
-@@ -505,12 +505,12 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
- 	mtk_dpi_config_vsync_reven(dpi, &vsync_reven);
- 
- 	mtk_dpi_config_3d(dpi, !!(mode->flags & DRM_MODE_FLAG_3D_MASK));
--	mtk_dpi_config_interface(dpi, !!(mode->flags &
--					 DRM_MODE_FLAG_INTERLACE));
--	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
--		mtk_dpi_config_fb_size(dpi, mode->hdisplay, mode->vdisplay / 2);
-+	mtk_dpi_config_interface(dpi, !!(vm.flags &
-+					 DISPLAY_FLAGS_INTERLACED));
-+	if (vm.flags & DISPLAY_FLAGS_INTERLACED)
-+		mtk_dpi_config_fb_size(dpi, vm.hactive, vm.vactive >> 1);
- 	else
--		mtk_dpi_config_fb_size(dpi, mode->hdisplay, mode->vdisplay);
-+		mtk_dpi_config_fb_size(dpi, vm.hactive, vm.vactive);
- 
- 	mtk_dpi_config_channel_limit(dpi, &limit);
- 	mtk_dpi_config_bit_num(dpi, dpi->bit_num);
-diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index 7e5e24c..aa0943e 100644
---- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -551,13 +551,12 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
- 	}
- 
- 	/**
--	 * vm.pixelclock is in kHz, pixel_clock unit is Hz, so multiply by 1000
- 	 * htotal_time = htotal * byte_per_pixel / num_lanes
- 	 * overhead_time = lpx + hs_prepare + hs_zero + hs_trail + hs_exit
- 	 * mipi_ratio = (htotal_time + overhead_time) / htotal_time
- 	 * data_rate = pixel_clock * bit_per_pixel * mipi_ratio / num_lanes;
- 	 */
--	pixel_clock = dsi->vm.pixelclock * 1000;
-+	pixel_clock = dsi->vm.pixelclock;
- 	htotal = dsi->vm.hactive + dsi->vm.hback_porch + dsi->vm.hfront_porch +
- 			dsi->vm.hsync_len;
- 	htotal_bits = htotal * bit_per_pixel;
-@@ -725,16 +724,7 @@ static void mtk_dsi_encoder_mode_set(struct drm_encoder *encoder,
- {
- 	struct mtk_dsi *dsi = encoder_to_dsi(encoder);
- 
--	dsi->vm.pixelclock = adjusted->clock;
--	dsi->vm.hactive = adjusted->hdisplay;
--	dsi->vm.hback_porch = adjusted->htotal - adjusted->hsync_end;
--	dsi->vm.hfront_porch = adjusted->hsync_start - adjusted->hdisplay;
--	dsi->vm.hsync_len = adjusted->hsync_end - adjusted->hsync_start;
--
--	dsi->vm.vactive = adjusted->vdisplay;
--	dsi->vm.vback_porch = adjusted->vtotal - adjusted->vsync_end;
--	dsi->vm.vfront_porch = adjusted->vsync_start - adjusted->vdisplay;
--	dsi->vm.vsync_len = adjusted->vsync_end - adjusted->vsync_start;
-+	drm_display_mode_to_videomode(adjusted, &dsi->vm);
- }
- 
- static void mtk_dsi_encoder_disable(struct drm_encoder *encoder)
--- 
-2.7.4
+If we want to drop the check llc_siblings should be default to either
+core_siblings or cpumask_of_node(). But I don't really see the point as
+any user of llc_siblings that really care about where the LLC is
+would have to check if llc_sibling is just assigned a default value or
+it is indeed representing the LLC. I'm fine with just expecting the user
+to check llc_id to see if the llc_sibling mask is valid or not.
