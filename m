@@ -1,123 +1,158 @@
-From: Gilles.Buloz@kontron.com (Gilles Buloz)
-Date: Thu, 3 May 2018 12:40:27 +0000
-Subject: LS1043A : "synchronous abort" at boot due to PCI config read
-In-Reply-To: <20180502172341.GA123831@bhelgaas-glaptop.roam.corp.google.com>
-References: <CAKv+Gu_v4V8DUa6f4WxvjZHoJbbqT0mKpOwYVmaLaE20CB3U_g@mail.gmail.com>
- <5AE317AB.4020404@kontron.com>
- <20180427165627.GA8199@bhelgaas-glaptop.roam.corp.google.com>
- <5AE6D7E2.9030506@kontron.com> <5AE71BF4.2010200@kontron.com>
- <20180430170447.GA95643@bhelgaas-glaptop.roam.corp.google.com>
- <5AE75809.30701@kontron.com> <5AE9B5BB.2080003@kontron.com>
- <20180502132501.GE11698@bhelgaas-glaptop.roam.corp.google.com>
- <5AE9C1AB.8020403@kontron.com>
- <20180502172341.GA123831@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <5AEB033A.4060407@kontron.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 3 May 2018 14:40:30 +0200
+Subject: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+In-Reply-To: <AM0PR04MB42117041F226AD5E8501EC1080870@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1524854776-14863-1-git-send-email-aisheng.dong@nxp.com>
+ <1524854776-14863-5-git-send-email-aisheng.dong@nxp.com>
+ <20180502100401.qmik5goglbuiqcaa@pengutronix.de>
+ <AM0PR04MB421166CCB06610FF8AF25C2980800@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180503110611.wxwsjfszjdnovm2f@pengutronix.de>
+ <AM0PR04MB42117041F226AD5E8501EC1080870@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180503124030.jkc7oox2vyjblk2y@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject:    [PATCH] For exception at PCI probe due to bridge reporting UR
+On Thu, May 03, 2018 at 12:29:40PM +0000, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Thursday, May 3, 2018 7:06 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
+> > <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> > <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> > Subject: Re: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+> > 
+> > On Wed, May 02, 2018 at 06:40:03PM +0000, A.s. Dong wrote:
+> > > > -----Original Message-----
+> > > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > > > Sent: Wednesday, May 2, 2018 6:04 PM
+> > > > To: A.s. Dong <aisheng.dong@nxp.com>
+> > > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
+> > > > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio
+> > > > Estevam <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> > > > Subject: Re: [PATCH 4/4] soc: imx: add SC firmware IPC and APIs
+> > > >
+> > > > On Sat, Apr 28, 2018 at 02:46:16AM +0800, Dong Aisheng wrote:
+> > > > > +/* Initialization of the MU code. */ int __init
+> > > > > +imx8_scu_init(void) {
+> > > > > +	struct device_node *np, *mu_np;
+> > > > > +	struct resource mu_res;
+> > > > > +	sc_err_t sci_err;
+> > > > > +	int ret;
+> > > > > +
+> > > > > +	if (!of_machine_is_compatible("fsl,imx8qxp"))
+> > > > > +		return 0;
+> > > > > +
+> > > > > +	np = of_find_compatible_node(NULL, NULL, "nxp,imx8qxp-scu");
+> > > > > +	if (!np)
+> > > > > +		return -ENODEV;
+> > > > > +
+> > > > > +	mu_np = of_parse_phandle(np, "fsl,mu", 0);
+> > > > > +	if (WARN_ON(!mu_np))
+> > > > > +		return -EINVAL;
+> > > > > +
+> > > > > +	ret = of_address_to_resource(mu_np, 0, &mu_res);
+> > > > > +	if (WARN_ON(ret))
+> > > > > +		return -EINVAL;
+> > > > > +
+> > > > > +	/* we use mu physical address as IPC communication channel ID */
+> > > > > +	sci_err = sc_ipc_open(&scu_ipc_handle, (sc_ipc_id_t)(mu_res.start));
+> > > > > +	if (sci_err != SC_ERR_NONE) {
+> > > > > +		pr_err("Cannot open MU channel to SCU\n");
+> > > > > +		return sci_err;
+> > > > > +	};
+> > > >
+> > > > Introducing private error codes always has the risk of just
+> > > > forwarding them as errno codes as done here.
+> > > >
+> > >
+> > > Yes, you're right.
+> > > We probably could do the same as scpi_to_linux_errno in
+> > > drivers/firmware/arm_scpi.c.
+> > > However, may can't fix the issue permanently.
+> > >
+> > > > > +
+> > > > > +	of_node_put(mu_np);
+> > > > > +
+> > > > > +	pr_info("NXP i.MX SCU Initialized (scu_ipc %u)\n",
+> > > > > +scu_ipc_handle);
+> > > > > +
+> > > > > +	return 0;
+> > > > > +}
+> > > > > +early_initcall(imx8_scu_init);
+> > > >
+> > > > This code shows that the separate 'scu' device node shouldn't exist.
+> > > > It is only used as a stepping stone to find the 'mu' node. Instead
+> > > > of providing a proper driver for the 'mu' node the scu code registers it
+> > with its physical address.
+> > > > I don't think it makes sense to separate mu and scu code in this way.
+> > > >
+> > >
+> > > I agree that may not look quite well.
+> > > It mainly because we want to use the MU physical address as a MU ID.
+> > > (can't use virtual address as sc_ipc_id_t is u32 defined by SCU firmware.
+> > >
+> > > If you have any better suggestion please let me know.
+> > 
+> > What I'm suggesting is a single node:
+> > 
+> > 	scu at 5d1b0000 {
+> > 		compatible = "fsl,imx8qxp-scu";
+> > 		reg = <0x0 0x5d1b0000 0x0 0x10000>;
+> > 	};
+> > 
+> > Attach your code to this one, without any further separation between mu
+> > and scu code.
+> > 
+> 
+> A bit confused. You're suggesting a single node here without mu or mailbox node
+> phandle in it? Then how SCU use MU?
 
-Even if a device supports extended config access, no such access must be
-done to this device If there's a bridge not supporting that in the path
-to this device. Doing such access with UR reporting enabled on the root
-bridge leads to an exception.
+ioremap the address and mu_receive_msg()/mu_send_msg() on it, just like
+you do already.
 
-This is the case on a LS1043A CPU (NXP QorIQ Layerscape) platform with
-the following bus topology :
-  LS1043 PCIe root
-    -> PEX8112 PCIe-to-PCI bridge (not supporting ext cfg on PCI side)
-      -> PMC slot connector (for legacy PMC modules)
-With a PMC module topology as follows :
-  PMC connector
-    -> PCI-to-PCIe bridge
-      -> PCIe switch (4 ports)
-        -> 4 PCIe devices (one on each port)
-In this case all devices behind the PEX8112 are supporting extended config
-access but this is prohibited by the PEX8112. Without this patch, an
-exception (synchronous abort) occurs in pci_cfg_space_size_ext().
+> 
+> > We discussed this internally and came to the conclusion that the SCU is not a
+> > generic user of a MU. The MU is designed to work together with a piece of
+> > SRAM to form a mailbox system. Instead of working as designed the SCU
+> > morses the messages through the doorbell (what the MU really is). For
+> > anything that uses the MU in the way it is designed I would suggest using the
+> > mailbox interface from drivers/mailbox/ along with the binding from
+> > Documentation/devicetree/bindings/mailbox/mailbox.txt.
+> > 
+> > In the way I suggest there is no need for any MU ID.
+> > 
+> 
+> So you're suggesting switch to use mailbox instead of private MU library
+> function calls?
+> Something like:
+>         scu {
+>                 compatible = "nxp,imx8qxp-scu", "simple-bus";
+>                 mboxes = <&mailbox 0>;         
+>         }
+> Then IPC is implemented based on mailbox?
+> 
+> As I replied Oleksij Rempel in another mail in this thread, we've tried mailbox
+> but got performance regression issue and need more time to investigate
+> whether it's really quite suitable for i.MX SCU firmware as SCU handling
+> message quite fast in micro seconds. (Mailbox polling method has much
+> more latency than current MU sample polling we used)
+> and we want to avoid the SCU firmware API changes.
 
-This patch checks the parent bridge of each allocated child bus to know if
-extended config access is supported on the child bus, and sets a flag in
-child->bus_flags if not supported. This  flag is inherited by all children
-buses of this child bus and then is checked to avoid this unsupported
-accesses to every device on these buses.
+I am not suggesting to do mailboxing (using shared memory) for the SCU.
+I am also not suggesting any API update for the SCU communication.
+I am just mentioning that doing mailboxing is the way the MU was
+originally designed for. Looking at the reference manual I see many MUs
+on the i.MX8. I guess most of them are for communication between the
+different cores on the system. For these it's probably worth writing
+some generic MU driver. The way the MU is used for communication with
+the SCU though is so special that it's not worth writing a generic
+driver, so just integrate the MU access functions in the SCU code.
 
-Thanks
+Sascha
 
-=====================
-Gilles BULOZ
-Senior software engineer
-Kontron France
-=====================
-
-
-Signed-off-by: Gilles Buloz <gilles.buloz@kontron.com>
-
---- linux-4.17-rc1/include/linux/pci.h.orig	2018-04-16 01:24:20.000000000 +0000
-+++ linux-4.17-rc1/include/linux/pci.h	2018-05-03 09:53:03.270000000 +0000
-@@ -217,6 +217,7 @@ enum pci_bus_flags {
-  	PCI_BUS_FLAGS_NO_MSI	= (__force pci_bus_flags_t) 1,
-  	PCI_BUS_FLAGS_NO_MMRBC	= (__force pci_bus_flags_t) 2,
-  	PCI_BUS_FLAGS_NO_AERSID	= (__force pci_bus_flags_t) 4,
-+	PCI_BUS_FLAGS_NO_EXTCFG	= (__force pci_bus_flags_t) 8,
-  };
-  
-  /* Values from Link Status register, PCIe r3.1, sec 7.8.8 */
---- linux-4.17-rc1/drivers/pci/probe.c.orig	2018-05-03 09:45:21.110000000 +0000
-+++ linux-4.17-rc1/drivers/pci/probe.c	2018-05-03 09:46:50.550000000 +0000
-@@ -882,6 +882,24 @@ free:
-  	return err;
-  }
-  
-+static bool pci_bridge_child_bus_ext_cfg_accessible(struct pci_dev *bridge)
-+{
-+	int pos;
-+	u32 status;
-+
-+	if (pci_is_pcie(bridge) &&
-+	    (pci_pcie_type(bridge) != PCI_EXP_TYPE_PCIE_BRIDGE) &&
-+	    (pci_pcie_type(bridge) != PCI_EXP_TYPE_PCI_BRIDGE))
-+		return true;
-+
-+	/* PCI/PCI, or PCIe/PCI (forward), or PCI/PCIe (reverse) bridge */
-+	pos = pci_find_capability(bridge, PCI_CAP_ID_PCIX);
-+	if (pos)
-+		pci_read_config_dword(bridge, pos + PCI_X_STATUS, &status);
-+
-+	return pos && (status & (PCI_X_STATUS_266MHZ | PCI_X_STATUS_533MHZ));
-+}
-+
-  static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
-  					   struct pci_dev *bridge, int busnr)
-  {
-@@ -930,6 +948,20 @@ static struct pci_bus *pci_alloc_child_b
-  	}
-  	bridge->subordinate = child;
-  
-+	/*
-+	 * if bus_flags inherited from parent bus do not already report lack of
-+	 * extended config space support, check if supported by child bus by
-+	 * checking its parent bridge
-+	 */
-+	if (child->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG) {
-+		pci_info(child, "extended config space not accessible due to parent bus\n");
-+	} else {
-+		if (!pci_bridge_child_bus_ext_cfg_accessible(bridge)) {
-+			child->bus_flags |= PCI_BUS_FLAGS_NO_EXTCFG;
-+			pci_info(child, "extended config space not accessible due to parent bridge\n");
-+		}
-+	}
-+
-  add_dev:
-  	pci_set_bus_msi_domain(child);
-  	ret = device_register(&child->dev);
-@@ -1393,6 +1425,9 @@ int pci_cfg_space_size(struct pci_dev *d
-  	u32 status;
-  	u16 class;
-  
-+	if (dev->bus->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG)
-+		return PCI_CFG_SPACE_SIZE;
-+
-  	class = dev->class >> 8;
-  	if (class == PCI_CLASS_BRIDGE_HOST)
-  		return pci_cfg_space_size_ext(dev);
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
