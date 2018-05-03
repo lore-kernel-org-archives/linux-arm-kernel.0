@@ -1,38 +1,50 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 03 May 2018 14:20:42 -0700
-Subject: [PATCH] arm64: defconfig: Increase CMA size for VC4
-In-Reply-To: <1525296700-3588-1-git-send-email-stefan.wahren@i2se.com>
-References: <1525296700-3588-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87bmdwo2qd.fsf@anholt.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 3 May 2018 17:06:33 -0500
+Subject: [PATCH] spi: bcm2835aux: ensure interrupts are enabled for shared
+ handler
+In-Reply-To: <87efiso2yz.fsf@anholt.net>
+References: <20180503180945.3502-1-robh@kernel.org> <87efiso2yz.fsf@anholt.net>
+Message-ID: <CAL_Jsq+pf0y7+mV8o3t=Uvgo9ZbmVNB9PyS2E3BktR8BZ_ecQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
-
-> The VC4 needs more memory than the default setting (16 MB):
+On Thu, May 3, 2018 at 4:15 PM, Eric Anholt <eric@anholt.net> wrote:
+> Rob Herring <robh@kernel.org> writes:
 >
->   vc4-drm soc:gpu: swiotlb: coherent allocation failed, size=16777216
->   [drm:vc4_bo_create [vc4]] *ERROR* Failed to allocate from CMA:
->   vc4_v3d 3fc00000.v3d: Failed to allocate memory for tile binning: -12.
->     You may need to enable CMA or give it more memory.
->   vc4-drm soc:gpu: failed to bind 3fc00000.v3d (ops vc4_v3d_ops [vc4]): -12
->   vc4-drm soc:gpu: master bind failed: -12
->   vc4-drm: probe of soc:gpu failed with error -12
+>> The BCM2835 AUX SPI has a shared interrupt line (with AUX UART).
+>> Downstream fixes this with an AUX irqchip to demux the IRQ sources and a
+>> DT change which breaks compatibility with older kernels. The AUX irqchip
+>> was already rejected for upstream[1] and the DT change would break
+>> working systems if the DTB is updated to a newer one. The latter issue
+>> was brought to my attention by Alex Graf.
+>>
+>> The root cause however is a bug in the shared handler. Shared handlers
+>> must check that interrupts are actually enabled before servicing the
+>> interrupt. Add a check that the TXEMPTY or IDLE interrupts are enabled.
 >
-> So increase the value to 32 MB and fix this issue.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> It looks to me like we'd only return IRQ_HANDLED if we did work that
+> needed doing.  Is this check effectively doing some interlock to make
+> sure that we've already started bcm2835aux_spi_transfer_one_irq() and
+> aren't just racing against transaction setup?
 
-If there was a way to check how big the CMA pool is, then we could
-probably have V3D disable itself when the pool was too small.  It's not
-like V3D rendering is going to actually *work* with just a 32mb pool to
-play in.
+What if you are in polled mode for the SPI and the 8250 irq (or other
+SPI instance) causes the SPI irq handler to run?
 
-That said, I'd also be fine with this patch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180503/04dd6dce/attachment.sig>
+The way I look at it is, this change in the irq handler was also said
+to fix the problem[1]:
+
+    u32 irq_flags = readl(bcm2835_aux_irq_reg);
+
+    if(!(irq_flags & (1<<master->bus_num)))
+    {
+        return IRQ_NONE;
+    }
+
+Is checking whether the interrupt is pending in the aux reg any
+different than checking for interrupt being enabled in the device? I
+could have checked the status bits too, but as you say that is handled
+farther down.
+
+Rob
+
+[1] https://github.com/raspberrypi/linux/issues/1573
