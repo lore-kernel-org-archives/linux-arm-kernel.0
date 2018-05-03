@@ -1,34 +1,44 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu,  3 May 2018 23:18:23 +0800
-Subject: [PATCH 2/2] perf cs-etm: Remove redundant space
-In-Reply-To: <1525360703-26159-1-git-send-email-leo.yan@linaro.org>
-References: <1525360703-26159-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1525360703-26159-2-git-send-email-leo.yan@linaro.org>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Thu, 3 May 2018 18:24:32 +0300
+Subject: [PATCH 4/6] mm, arm64: untag user addresses in mm/gup.c
+In-Reply-To: <CAAeHK+zh0LSpq2VFJeHrV7AETnL1b9R+yex3iPMg5SetbEyxwg@mail.gmail.com>
+References: <cover.1524077494.git.andreyknvl@google.com>
+ <0db34d04fa16be162336106e3b4a94f3dacc0af4.1524077494.git.andreyknvl@google.com>
+ <20180426174714.4jtb72q56w3xonsa@armageddon.cambridge.arm.com>
+ <CAAeHK+zY8p9E4FZa7mbdgR=wR0u-RDS552dn=h9fKRC-ArYLdw@mail.gmail.com>
+ <20180502153645.fui4ju3scsze3zkq@black.fi.intel.com>
+ <CAAeHK+yTbmZfkeNbqbo+J90zsjsM99rwnYBGfQBxphHMMfgD7A@mail.gmail.com>
+ <CAAeHK+zh0LSpq2VFJeHrV7AETnL1b9R+yex3iPMg5SetbEyxwg@mail.gmail.com>
+Message-ID: <20180503152432.q742zvdbv6xtvo34@kshutemo-mobl1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There have two spaces ahead function name cs_etm__set_pid_tid_cpu(), so
-remove one space and correct indentation.
+On Thu, May 03, 2018 at 04:09:56PM +0200, Andrey Konovalov wrote:
+> On Wed, May 2, 2018 at 7:25 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> > On Wed, May 2, 2018 at 5:36 PM, Kirill A. Shutemov
+> > <kirill.shutemov@linux.intel.com> wrote:
+> >> On Wed, May 02, 2018 at 02:38:42PM +0000, Andrey Konovalov wrote:
+> >>> > Does having a tagged address here makes any difference? I couldn't hit a
+> >>> > failure with my simple tests (LD_PRELOAD a library that randomly adds
+> >>> > tags to pointers returned by malloc).
+> >>>
+> >>> I think you're right, follow_page_mask is only called from
+> >>> __get_user_pages, which already untagged the address. I'll remove
+> >>> untagging here.
+> >>
+> >> It also called from follow_page(). Have you covered all its callers?
+> >
+> > Oh, missed that, will take a look.
+> 
+> I wasn't able to find anything that calls follow_page with pointers
+> passed from userspace except for the memory subsystem syscalls, and we
+> deliberately don't add untagging in those.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- tools/perf/util/cs-etm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I guess I missed this part, but could you elaborate on this? Why?
+Not yet or not ever?
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 417302c..3137fbe 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -612,8 +612,8 @@ cs_etm__get_trace(struct cs_etm_buffer *buff, struct cs_etm_queue *etmq)
- 	return buff->len;
- }
- 
--static void  cs_etm__set_pid_tid_cpu(struct cs_etm_auxtrace *etm,
--				     struct auxtrace_queue *queue)
-+static void cs_etm__set_pid_tid_cpu(struct cs_etm_auxtrace *etm,
-+				    struct auxtrace_queue *queue)
- {
- 	struct cs_etm_queue *etmq = queue->priv;
- 
+Also I wounder if we can find (with sparse?) all places where we cast out
+__user. This would give a nice list of places where to pay attention.
+
 -- 
-2.7.4
+ Kirill A. Shutemov
