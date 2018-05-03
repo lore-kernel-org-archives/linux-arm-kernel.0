@@ -1,98 +1,78 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 3 May 2018 11:42:56 -0600
-Subject: [PATCH v2 05/27] dts: bindings: Document device tree binding for
- CATU
-In-Reply-To: <20180501131057.GA15706@rob-hp-laptop>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-6-git-send-email-suzuki.poulose@arm.com>
- <20180501131057.GA15706@rob-hp-laptop>
-Message-ID: <CANLsYkwzD0gpAo9be5ii4=+tn8GOL6psHcRA24=EMq=MRAzBoQ@mail.gmail.com>
+From: chunkeey@gmail.com (Christian Lamparter)
+Date: Thu, 03 May 2018 19:43:37 +0200
+Subject: [PATCH v2] pinctrl: msm: fix gpio-hog related boot issues
+In-Reply-To: <CACRpkdaEYFerKQa4QRCFEg2TOrdbnF6SfVZ9chLpmCxSUNcZBw@mail.gmail.com>
+References: <20180402121005.10080-1-chunkeey@gmail.com>
+ <3524410.JrO1DEFpQ1@debian64>
+ <CACRpkdaEYFerKQa4QRCFEg2TOrdbnF6SfVZ9chLpmCxSUNcZBw@mail.gmail.com>
+Message-ID: <2265923.XhyVMjVhWR@debian64>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 May 2018 at 07:10, Rob Herring <robh@kernel.org> wrote:
-> On Tue, May 01, 2018 at 10:10:35AM +0100, Suzuki K Poulose wrote:
->> Document CATU device-tree bindings. CATU augments the TMC-ETR
->> by providing an improved Scatter Gather mechanism for streaming
->> trace data to non-contiguous system RAM pages.
->>
->> Cc: devicetree at vger.kernel.org
->> Cc: frowand.list at gmail.com
->> Cc: Rob Herring <robh@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Mathieu Poirier <mathieu.poirier@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>  .../devicetree/bindings/arm/coresight.txt          | 52 ++++++++++++++++++++++
->>  1 file changed, 52 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
->> index 15ac8e8..cdd84d0 100644
->> --- a/Documentation/devicetree/bindings/arm/coresight.txt
->> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
->> @@ -39,6 +39,8 @@ its hardware characteristcs.
->>
->>               - System Trace Macrocell:
->>                       "arm,coresight-stm", "arm,primecell"; [1]
->> +             - Coresight Address Translation Unit (CATU)
->> +                     "arm, coresight-catu", "arm,primecell";
->
-> spurious space               ^
->
->>
->>       * reg: physical base address and length of the register
->>         set(s) of the component.
->> @@ -86,6 +88,9 @@ its hardware characteristcs.
->>       * arm,buffer-size: size of contiguous buffer space for TMC ETR
->>        (embedded trace router)
->>
->> +* Optional property for CATU :
->> +     * interrupts : Exactly one SPI may be listed for reporting the address
->> +       error
->
-> Somewhere you need to define the ports for the CATU.
->
->>
->>  Example:
->>
->> @@ -118,6 +123,35 @@ Example:
->>               };
->>       };
->>
->> +     etr at 20070000 {
->> +             compatible = "arm,coresight-tmc", "arm,primecell";
->> +             reg = <0 0x20070000 0 0x1000>;
->> +
->> +             clocks = <&oscclk6a>;
->> +             clock-names = "apb_pclk";
->> +             ports {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +
->> +                     /* input port */
->> +                     port at 0 {
->> +                             reg =  <0>;
->> +                             etr_in_port: endpoint {
->> +                                     slave-mode;
->> +                                     remote-endpoint = <&replicator2_out_port0>;
->> +                             };
->> +                     };
->> +
->> +                     /* CATU link represented by output port */
->> +                     port at 1 {
->> +                             reg = <0>;
->
-> While common in the Coresight bindings, having unit-address and reg not
-> match is an error. Mathieu and I discussed this a bit as dtc now warns
-> on these.
->
-> Either reg should be 1 here, or 'ports' needs to be split into input and
-> output ports. My preference would be the former, but Mathieu objected to
-> this not reflecting the the h/w numbering.
+On Mittwoch, 2. Mai 2018 14:14:39 CEST Linus Walleij wrote:
+> On Thu, Apr 26, 2018 at 11:47 PM, Christian Lamparter
+> <chunkeey@gmail.com> wrote:
+> > On Thu, Apr 26, 2018 11:12:21 CEST Linus Walleij wrote:
+> 
+> >> I think I replied in some other mail that I think we need to
+> >> be backwards compatible and it's not too hard to do
+> >> both. (Correct me if I'm wrong.)
+> >
+> > I think so too, I looked around and found that the nvidia pinctrl was
+> > doing something similar with of_find_property():
+> > <https://elixir.bootlin.com/linux/v4.17-rc2/source/drivers/pinctrl/tegra/pinctrl-tegra.c#L652>
+> > |       has_prop = of_find_property(np, "gpio-ranges", NULL);
+> >
+> > However this looks kinda funny, since "has_prob" is declared as a bool
+> > and of_find_property() returns a pointer to a "struct property"....
+> > Tell you what: If nobody beats me to it, I'll sent a patch for this after
+> > the pinctrl-msm's gpio-hog has been dealt with. :)
+> 
+> Yeah the nVidia driver is one of the oldest and also at the time
+> DT was kind of new. I haven't heard from Stephen for a while
+> but I bet he will pop up, else check with Laxman, he's got
+> a good grip on nVidia pinctrl+GPIO as well.
+All in good time. 
 
-Suzuki, as we discuss this is related to your work on revamping CS
-bindings for ACPI.  Until that gets done and to move forward with this
-set I suggest you abide to Rob's request.
+But first @Bjorn and @Andy or @David can you please look and
+review v4 "pinctrl: msm: fix gpio-hog related boot issues"
+<https://patchwork.kernel.org/patch/10339129/>
 
->
-> Rob
+Thanks.
+
+> > The MR24 craze is mostly over by now. You can still find a few. However
+> > some listings are now selling them with OpenWrt/LEDE for ~$40.
+> >
+> > And obviously, this cycle will continue on, but now with the old wave1
+> > 802.11ac gear that gets replaced. In fact this business has spawned
+> > companies that are actively working on supporting "old" enterprise gear
+> > via their own OpenWrt/LEDE derivatives.
+> 
+> Haha that is just awesome :D
+> I hope they salvage a lot of them.
+Yes, I'm aware of that some of them where put to good use in the
+Personal Telco Projec (501(c)(3) non-profit organization in Portland, Oregon):
+<https://personaltelco.net/wiki/PersonalTelco>
+And they have been somewhat vocal about it too:
+<https://groups.google.com/forum/#!msg/ptp-general/RZ-VjKFonVo/cQgnGn2wAgAJ>
+"The MR24 is a dual-band 802.11n 3x3 MIMO access point with a single 
+ethernet port.  They are "last-gen" devices, and are starting to show up 
+on ebay at reasonable prices as Meraki's deep-pocket cloud-management 
+enterprise users are beginning to "upgrade" to 802.11ac gear.  Note that 
+802.11n in this case means a fully-open-source driver (ath9k).  802.11ac 
+drivers involve firmware blobs across the board.  You don't get 
+super-wide 5GHz channels, but you get freedom. "
+
+;)
+
+By the way, it gets even weirder. In the past (and to this day) Meraki has
+given away their current crop of enterprise APs via their
+"Free AP for IT Professionals" <https://meraki.cisco.com/tc/freeap> program.
+Of course, the main idea probably was to get them all "hooked/sold" on their
+cloud-management firmware. Because of course that "Free AP" is intended to be
+only good for the lifespan of included the 3-year license. However, 
+"IT Professionals" do have their own mind and that's why there is some
+continued interest in making alternative firmwares for these devices.
+
+Best Regards,
+Christian
