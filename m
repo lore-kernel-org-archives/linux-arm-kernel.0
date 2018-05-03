@@ -1,132 +1,54 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 3 May 2018 10:38:19 -0400
-Subject: [PATCH v2] drm/pl111: Fix module probe bug
-In-Reply-To: <20180503140431.5798-1-linus.walleij@linaro.org>
-References: <20180503140431.5798-1-linus.walleij@linaro.org>
-Message-ID: <20180503143819.GB73214@art_vandelay>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 3 May 2018 15:39:18 +0100
+Subject: [PATCH v2 11/17] kvm: arm64: Configure VTCR per VM
+In-Reply-To: <1522156531-28348-12-git-send-email-suzuki.poulose@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-12-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1175bc06-14b1-63e4-7b99-55c22db1c451@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2018 at 04:04:31PM +0200, Linus Walleij wrote:
-> Commit a30933c27602 ("drm/pl111: Support the Versatile Express")
-> Added a second module using the builtin_platform_driver() call,
-> which works fine as long as you do not try to build the PL111
-> driver as a module, because a module can only have one initcall
-> and cause the following build bug:
-> 
-> (...) multiple definition of `init_module' (...)
-> 
-> Reported-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Fixes: a30933c27602 ("drm/pl111: Support the Versatile Express")
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - In my stress I missed that if there are several CLCD instances
->   on the board the platform_driver_register() call will return
->   -EBUSY so we need to ignore that explicitly, all we want is to
->   register the driver at least once.
-> ---
->  drivers/gpu/drm/pl111/pl111_versatile.c |  7 +++++++
->  drivers/gpu/drm/pl111/pl111_vexpress.c  | 12 ++++++++++--
->  drivers/gpu/drm/pl111/pl111_vexpress.h  |  7 +++++++
->  3 files changed, 24 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
-> index 78ddf8534fd2..ad769e3e9fd3 100644
-> --- a/drivers/gpu/drm/pl111/pl111_versatile.c
-> +++ b/drivers/gpu/drm/pl111/pl111_versatile.c
-> @@ -326,6 +326,13 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
->  	if (versatile_clcd_type == VEXPRESS_CLCD_V2M) {
->  		struct platform_device *pdev;
+Hi Suzuki,
+
+On 27/03/18 14:15, Suzuki K Poulose wrote:
+> We set VTCR_EL2 very early during the stage2 init and don't
+> touch it ever. This is fine as we had a fixed IPA size. This
+> patch changes the behavior to set the VTCR for a given VM,
+> depending on its stage2 table. The common configuration for
+> VTCR is still performed during the early init as we have to
+> retain the hardware access flag update bits (VTCR_EL2_HA)
+> per CPU (as they are only set for the CPUs which are capabile).
+> The bits defining the number of levels in the page table (SL0)
+> and and the size of the Input address to the translation (T0SZ)
+> are programmed for each VM upon entry to the guest.
+
+
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 596f8e4..9f3c8b8 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -392,10 +392,12 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
 >  
-> +		/* Registers a driver for the muxfpga */
-> +		ret = vexpress_muxfpga_init();
-> +		if (ret) {
-> +			dev_err(dev, "unable to intialize muxfpga driver\n");
-> +			return ret;
-> +		}
-> +
->  		/* Call into deep Vexpress configuration API */
->  		pdev = of_find_device_by_node(np);
->  		if (!pdev) {
-> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.c b/drivers/gpu/drm/pl111/pl111_vexpress.c
-> index c9fee625faf1..c30f63cd66a8 100644
-> --- a/drivers/gpu/drm/pl111/pl111_vexpress.c
-> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.c
-> @@ -106,7 +106,6 @@ static int vexpress_muxfpga_probe(struct platform_device *pdev)
->  	if (IS_ERR(map))
->  		return PTR_ERR(map);
->  	dev_set_drvdata(dev, map);
-> -
+>  static inline void __cpu_init_stage2(void)
+>  {
+> -	u32 parange = kvm_call_hyp(__init_stage2_translation);
+> +	u32 ps;
+>  
+> -	WARN_ONCE(parange < 40,
+> -		  "PARange is %d bits, unsupported configuration!", parange);
+> +	kvm_call_hyp(__init_stage2_translation);
+> +	ps = id_aa64mmfr0_parange_to_phys_shift(read_sysreg(id_aa64mmfr0_el1));
 
-nit: unrelated whitespace change
+Doesn't id_aa64mmfr0_parange_to_phys_shift() expect you do to the mask and shift
+for it? This will always hit the default case.
 
->  	return 0;
+
+> +	WARN_ONCE(ps < 40,
+> +		  "PARange is %d bits, unsupported configuration!", ps);
 >  }
->  
-> @@ -122,4 +121,13 @@ static struct platform_driver vexpress_muxfpga_driver = {
->  	.probe = vexpress_muxfpga_probe,
->  };
->  
-> -builtin_platform_driver(vexpress_muxfpga_driver);
-> +int vexpress_muxfpga_init(void)
-> +{
-> +	int ret;
-> +
-> +	ret = platform_driver_register(&vexpress_muxfpga_driver);
-> +	/* -EBUSY just means this driver is already registered */
-> +	if (ret && ret != -EBUSY)
-> +		return ret;
-> +	return 0;
-
-fwiw, i think it'd be cleaner to do:
-
-        /* -EBUSY just means this driver is already registered */
-        if (ret == -EBUSY)
-                ret = 0;
-        return ret;
-
-or if you're one of those people who doesn't mind inline conditionals:
-
-        /* -EBUSY just means this driver is already registered */
-        return ret == -EBUSY ? 0 : ret;
 
 
-Anyways, just verbalizing my personal code style. With the whitespace fix,
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+Thanks,
 
-> +}
-> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.h b/drivers/gpu/drm/pl111/pl111_vexpress.h
-> index 49876417f7b6..40fbe42369dc 100644
-> --- a/drivers/gpu/drm/pl111/pl111_vexpress.h
-> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.h
-> @@ -10,6 +10,8 @@ int pl111_vexpress_clcd_init(struct device *dev,
->  			     struct pl111_drm_dev_private *priv,
->  			     struct regmap *map);
->  
-> +int vexpress_muxfpga_init(void);
-> +
->  #else
->  
->  static int inline pl111_vexpress_clcd_init(struct device *dev,
-> @@ -19,4 +21,9 @@ static int inline pl111_vexpress_clcd_init(struct device *dev,
->  	return -ENODEV;
->  }
->  
-> +static inline int vexpress_muxfpga_init(void)
-> +{
-> +	return 0;
-> +}
-> +
->  #endif
-> -- 
-> 2.17.0
-> 
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+James
