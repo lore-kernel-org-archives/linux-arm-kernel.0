@@ -1,193 +1,55 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 3 May 2018 17:31:27 -0500
-Subject: [PATCH] PCI: Check whether bridges allow access to extended config
- space
-In-Reply-To: <5AEB033A.4060407@kontron.com>
-References: <20180427165627.GA8199@bhelgaas-glaptop.roam.corp.google.com>
- <5AE6D7E2.9030506@kontron.com> <5AE71BF4.2010200@kontron.com>
- <20180430170447.GA95643@bhelgaas-glaptop.roam.corp.google.com>
- <5AE75809.30701@kontron.com> <5AE9B5BB.2080003@kontron.com>
- <20180502132501.GE11698@bhelgaas-glaptop.roam.corp.google.com>
- <5AE9C1AB.8020403@kontron.com>
- <20180502172341.GA123831@bhelgaas-glaptop.roam.corp.google.com>
- <5AEB033A.4060407@kontron.com>
-Message-ID: <20180503223127.GB15790@bhelgaas-glaptop.roam.corp.google.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 03 May 2018 15:36:12 -0700
+Subject: [PATCH] spi: bcm2835aux: ensure interrupts are enabled for shared
+ handler
+In-Reply-To: <CAL_Jsq+pf0y7+mV8o3t=Uvgo9ZbmVNB9PyS2E3BktR8BZ_ecQQ@mail.gmail.com>
+References: <20180503180945.3502-1-robh@kernel.org> <87efiso2yz.fsf@anholt.net>
+ <CAL_Jsq+pf0y7+mV8o3t=Uvgo9ZbmVNB9PyS2E3BktR8BZ_ecQQ@mail.gmail.com>
+Message-ID: <87a7tg9xk3.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc LKML]
+Rob Herring <robh@kernel.org> writes:
 
-On Thu, May 03, 2018 at 12:40:27PM +0000, Gilles Buloz wrote:
-> Subject:    [PATCH] For exception at PCI probe due to bridge reporting UR
-> 
-> Even if a device supports extended config access, no such access must be
-> done to this device If there's a bridge not supporting that in the path
-> to this device. Doing such access with UR reporting enabled on the root
-> bridge leads to an exception.
-> 
-> This is the case on a LS1043A CPU (NXP QorIQ Layerscape) platform with
-> the following bus topology :
->   LS1043 PCIe root
->     -> PEX8112 PCIe-to-PCI bridge (not supporting ext cfg on PCI side)
->       -> PMC slot connector (for legacy PMC modules)
-> With a PMC module topology as follows :
->   PMC connector
->     -> PCI-to-PCIe bridge
->       -> PCIe switch (4 ports)
->         -> 4 PCIe devices (one on each port)
-> In this case all devices behind the PEX8112 are supporting extended config
-> access but this is prohibited by the PEX8112. Without this patch, an
-> exception (synchronous abort) occurs in pci_cfg_space_size_ext().
-> 
-> This patch checks the parent bridge of each allocated child bus to know if
-> extended config access is supported on the child bus, and sets a flag in
-> child->bus_flags if not supported. This  flag is inherited by all children
-> buses of this child bus and then is checked to avoid this unsupported
-> accesses to every device on these buses.
+> On Thu, May 3, 2018 at 4:15 PM, Eric Anholt <eric@anholt.net> wrote:
+>> Rob Herring <robh@kernel.org> writes:
+>>
+>>> The BCM2835 AUX SPI has a shared interrupt line (with AUX UART).
+>>> Downstream fixes this with an AUX irqchip to demux the IRQ sources and a
+>>> DT change which breaks compatibility with older kernels. The AUX irqchip
+>>> was already rejected for upstream[1] and the DT change would break
+>>> working systems if the DTB is updated to a newer one. The latter issue
+>>> was brought to my attention by Alex Graf.
+>>>
+>>> The root cause however is a bug in the shared handler. Shared handlers
+>>> must check that interrupts are actually enabled before servicing the
+>>> interrupt. Add a check that the TXEMPTY or IDLE interrupts are enabled.
+>>
+>> It looks to me like we'd only return IRQ_HANDLED if we did work that
+>> needed doing.  Is this check effectively doing some interlock to make
+>> sure that we've already started bcm2835aux_spi_transfer_one_irq() and
+>> aren't just racing against transaction setup?
+>
+> What if you are in polled mode for the SPI and the 8250 irq (or other
+> SPI instance) causes the SPI irq handler to run?
+>
+> Is checking whether the interrupt is pending in the aux reg any
+> different than checking for interrupt being enabled in the device? I
+> could have checked the status bits too, but as you say that is handled
+> farther down.
 
-Hi Gilles,
+It seems clearly different to me, in that one is about allowing the
+interrupt line to go high and the other is about whether the interrupt
+line is actually high right now.
 
-Thanks for the patch!  I reworked it a little bit to simplify the code
-in pci_alloc_child_bus().  Can you test it and make sure I didn't
-break anything?
+However, the polled mode note explains to me what was going wrong, so:
 
+Reviewed-by: Eric Anholt <eric@anholt.net>
 
-commit cbaaa85b558a8f974e301fa0364d568efaf491ce
-Author: Gilles Buloz <Gilles.Buloz@kontron.com>
-Date:   Thu May 3 15:21:44 2018 -0500
-
-    PCI: Check whether bridges allow access to extended config space
-    
-    Even if a device supports extended config space, i.e., it is a PCI-X Mode 2
-    or a PCI Express device, the extended space may not be accessible if
-    there's a conventional PCI bus in the path to it.
-    
-    We currently figure that out in pci_cfg_space_size() by reading the first
-    dword of extended config space.  On most platforms that returns ~0 data if
-    the space is inaccessible, but it may set error bits in PCI status
-    registers, and on some platforms it causes exceptions that we currently
-    don't recover from.
-    
-    For example, a PCIe-to-conventional PCI bridge treats config transactions
-    with a non-zero Extended Register Address as an Unsupported Request on PCIe
-    and a received Master-Abort on the destination bus (see PCI Express to
-    PCI/PCI-X Bridge spec, r1.0, sec 4.1.3).
-    
-    A sample case is a LS1043A CPU (NXP QorIQ Layerscape) platform with the
-    following bus topology:
-    
-      LS1043 PCIe Root Port
-        -> PEX8112 PCIe-to-PCI bridge (doesn't support ext cfg on PCI side)
-          -> PMC slot connector (for legacy PMC modules)
-    
-    With a PMC module topology as follows:
-    
-      PMC connector
-        -> PCI-to-PCIe bridge
-          -> PCIe switch (4 ports)
-            -> 4 PCIe devices (one on each port)
-    
-    The PCIe devices on the PMC module support extended config space, but we
-    can't reach it because the PEX8112 can't generate accesses to the extended
-    space on its secondary bus.  Attempts to access it cause Unsupported
-    Request errors, which result in synchronous aborts on this platform.
-    
-    To avoid these errors, check whether bridges are capable of generating
-    extended config space addresses on their secondary interfaces.  If they
-    can't, we restrict devices below the bridge to only the 256-byte
-    PCI-compatible config space.
-    
-    Signed-off-by: Gilles Buloz <gilles.buloz@kontron.com>
-    [bhelgaas: changelog, rework patch so bus_flags testing is all in
-    pci_bridge_child_ext_cfg_accessible()]
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index ac91b6fd0bcd..7b1b7b2e01e4 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -882,6 +882,45 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
- 	return err;
- }
- 
-+static bool pci_bridge_child_ext_cfg_accessible(struct pci_dev *bridge)
-+{
-+	int pos;
-+	u32 status;
-+
-+	/*
-+	 * If extended config space isn't accessible on a bridge's primary
-+	 * bus, we certainly can't access it on the secondary bus.
-+	 */
-+	if (bridge->bus->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG)
-+		return false;
-+
-+	/*
-+	 * PCIe Root Ports and switch ports are PCIe on both sides, so if
-+	 * extended config space is accessible on the primary, it's also
-+	 * accessible on the secondary.
-+	 */
-+	if (pci_is_pcie(bridge) &&
-+	    (pci_pcie_type(bridge) == PCI_EXP_TYPE_ROOT_PORT ||
-+	     pci_pcie_type(bridge) == PCI_EXP_TYPE_UPSTREAM ||
-+	     pci_pcie_type(bridge) == PCI_EXP_TYPE_DOWNSTREAM))
-+		return true;
-+
-+	/*
-+	 * For the other bridge types:
-+	 *   - PCI-to-PCI bridges
-+	 *   - PCIe-to-PCI/PCI-X forward bridges
-+	 *   - PCI/PCI-X-to-PCIe reverse bridges
-+	 * extended config space on the secondary side is only accessible
-+	 * if the bridge supports PCI-X Mode 2.
-+	 */
-+	pos = pci_find_capability(bridge, PCI_CAP_ID_PCIX);
-+	if (!pos)
-+		return false;
-+
-+	pci_read_config_dword(bridge, pos + PCI_X_STATUS, &status);
-+	return status & (PCI_X_STATUS_266MHZ | PCI_X_STATUS_533MHZ);
-+}
-+
- static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 					   struct pci_dev *bridge, int busnr)
- {
-@@ -923,6 +962,16 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 	pci_set_bus_of_node(child);
- 	pci_set_bus_speed(child);
- 
-+	/*
-+	 * Check whether extended config space is accessible on the child
-+	 * bus.  Note that we currently assume it is always accessible on
-+	 * the root bus.
-+	 */
-+	if (!pci_bridge_child_ext_cfg_accessible(bridge)) {
-+		child->bus_flags |= PCI_BUS_FLAGS_NO_EXTCFG;
-+		pci_info(child, "extended config space not accessible on secondary bus\n");
-+	}
-+
- 	/* Set up default resource pointers and names */
- 	for (i = 0; i < PCI_BRIDGE_RESOURCE_NUM; i++) {
- 		child->resource[i] = &bridge->resource[PCI_BRIDGE_RESOURCES+i];
-@@ -1393,6 +1442,9 @@ int pci_cfg_space_size(struct pci_dev *dev)
- 	u32 status;
- 	u16 class;
- 
-+	if (dev->bus->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG)
-+		return PCI_CFG_SPACE_SIZE;
-+
- 	class = dev->class >> 8;
- 	if (class == PCI_CLASS_BRIDGE_HOST)
- 		return pci_cfg_space_size_ext(dev);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 230615620a4a..f7aa6d9f8999 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -217,6 +217,7 @@ enum pci_bus_flags {
- 	PCI_BUS_FLAGS_NO_MSI	= (__force pci_bus_flags_t) 1,
- 	PCI_BUS_FLAGS_NO_MMRBC	= (__force pci_bus_flags_t) 2,
- 	PCI_BUS_FLAGS_NO_AERSID	= (__force pci_bus_flags_t) 4,
-+	PCI_BUS_FLAGS_NO_EXTCFG	= (__force pci_bus_flags_t) 8,
- };
- 
- /* Values from Link Status register, PCIe r3.1, sec 7.8.8 */
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180503/f9180838/attachment.sig>
