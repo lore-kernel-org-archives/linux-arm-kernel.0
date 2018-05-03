@@ -1,79 +1,191 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 3 May 2018 21:38:38 +0200
-Subject: Droid 4: very confusing config around OHCI_OMAP3_HCD
-In-Reply-To: <20180503192838.GY98604@atomide.com>
-References: <20180503192510.GB32572@amd> <20180503192838.GY98604@atomide.com>
-Message-ID: <20180503193837.GC32572@amd>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 3 May 2018 13:50:13 -0600
+Subject: [PATCH v2 07/27] coresight: tmc: Hide trace buffer handling for
+ file read
+In-Reply-To: <1525165857-11096-8-git-send-email-suzuki.poulose@arm.com>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+ <1525165857-11096-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180503195013.GC11425@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2018-05-03 12:28:38, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [180503 19:27]:
-> > Hi!
-> > 
-> > For power management experiments, I tried
-> > 
-> > CONFIG_USB_OHCI_HCD=y
-> > CONFIG_USB_OHCI_HCD_OMAP3=m
-> > CONFIG_USB_OHCI_HCD_PLATFORM=y
-> > 
-> > and could not find resulting .ko.
-> > 
-> > Help text says:
-> > 
-> > CONFIG_USB_OHCI_HCD_OMAP3:
-> > 
-> > This option is deprecated now and the driver was removed, use
-> > USB_OHCI_HCD_PLATFORM instead.
-> > 
-> > Enables support for the on-chip OHCI controller on
-> > OMAP3 and later chips.
-> > 
-> > Which may partly explain it. But if the option no longer does
-> > anything, why keep it? Certainly second part is confusing if option is
-> > NOP...
+On Tue, May 01, 2018 at 10:10:37AM +0100, Suzuki K Poulose wrote:
+> At the moment we adjust the buffer pointers for reading the trace
+> data via misc device in the common code for ETF/ETB and ETR. Since
+> we are going to change how we manage the buffer for ETR, let us
+> move the buffer manipulation to the respective driver files, hiding
+> it from the common code. We do so by adding type specific helpers
+> for finding the length of data and the pointer to the buffer,
+> for a given length at a file position.
 > 
-> Yeah it's ohci-platform now, I think we decided to keep the old one
-> around to avoid breaking people's .config files for booting rather
-> than silently fail.
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c | 18 +++++++++++
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c | 34 ++++++++++++++++++++
+>  drivers/hwtracing/coresight/coresight-tmc.c     | 41 ++++++++++++++-----------
+>  drivers/hwtracing/coresight/coresight-tmc.h     |  4 +++
+>  4 files changed, 79 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index e2513b7..2113e93 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -120,6 +120,24 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+>  	CS_LOCK(drvdata->base);
+>  }
+>  
+> +/*
+> + * Return the available trace data in the buffer from @pos, with
+> + * a maximum limit of @len, updating the @bufpp on where to
+> + * find it.
+> + */
+> +ssize_t tmc_etb_get_sysfs_trace(struct tmc_drvdata *drvdata,
+> +				  loff_t pos, size_t len, char **bufpp)
+> +{
+> +	ssize_t actual = len;
+> +
+> +	/* Adjust the len to available size @pos */
+> +	if (pos + actual > drvdata->len)
+> +		actual = drvdata->len - pos;
+> +	if (actual > 0)
+> +		*bufpp = drvdata->buf + pos;
+> +	return actual;
+> +}
+> +
+>  static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev)
+>  {
+>  	int ret = 0;
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index bff46f2..53a17a8 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -92,6 +92,40 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+>  	CS_LOCK(drvdata->base);
+>  }
+>  
+> +/*
+> + * Return the available trace data in the buffer @pos, with a maximum
+> + * limit of @len, also updating the @bufpp on where to find it.
+> + */
+> +ssize_t tmc_etr_get_sysfs_trace(struct tmc_drvdata *drvdata,
+> +			    loff_t pos, size_t len, char **bufpp)
+> +{
+> +	ssize_t actual = len;
+> +	char *bufp = drvdata->buf + pos;
+> +	char *bufend = (char *)(drvdata->vaddr + drvdata->size);
+> +
+> +	/* Adjust the len to available size @pos */
+> +	if (pos + actual > drvdata->len)
+> +		actual = drvdata->len - pos;
+> +
+> +	if (actual <= 0)
+> +		return actual;
+> +
+> +	/*
+> +	 * Since we use a circular buffer, with trace data starting
+> +	 * @drvdata->buf, possibly anywhere in the buffer @drvdata->vaddr,
+> +	 * wrap the current @pos to within the buffer.
+> +	 */
+> +	if (bufp >= bufend)
+> +		bufp -= drvdata->size;
+> +	/*
+> +	 * For simplicity, avoid copying over a wrapped around buffer.
+> +	 */
+> +	if ((bufp + actual) > bufend)
+> +		actual = bufend - bufp;
+> +	*bufpp = bufp;
+> +	return actual;
+> +}
+> +
+>  static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+>  {
+>  	const u32 *barrier;
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+> index 0ea04f5..7a4e84f 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
+> @@ -131,35 +131,40 @@ static int tmc_open(struct inode *inode, struct file *file)
+>  	return 0;
+>  }
+>  
+> +static inline ssize_t tmc_get_sysfs_trace(struct tmc_drvdata *drvdata,
+> +					loff_t pos, size_t len, char **bufpp)
+> +{
+> +	switch (drvdata->config_type) {
+> +	case TMC_CONFIG_TYPE_ETB:
+> +	case TMC_CONFIG_TYPE_ETF:
+> +		return tmc_etb_get_sysfs_trace(drvdata, pos, len, bufpp);
+> +	case TMC_CONFIG_TYPE_ETR:
+> +		return tmc_etr_get_sysfs_trace(drvdata, pos, len, bufpp);
+> +	}
+> +
+> +	return  -EINVAL;
 
-Ok, what about this? (Should I do the same for the other drivers?)
-Or at least put (DEPRECATED) as other drivers do?
+Extra space betwen return and -EINVAL.
 
-Situation is quite confusing if you already have PLATFORM=y. OMAP=m
-can be selected, but nothing happens.
-
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 5d958da..67c151a 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -455,7 +455,7 @@ config USB_OHCI_HCD_AT91
-           Atmel chips.
- 
- config USB_OHCI_HCD_OMAP3
--	tristate "OHCI support for OMAP3 and later chips"
-+	tristate "dummy option for backwards compatibility"
- 	depends on (ARCH_OMAP3 || ARCH_OMAP4 || SOC_OMAP5)
- 	select USB_OHCI_HCD_PLATFORM
- 	default y
-@@ -463,9 +463,6 @@ config USB_OHCI_HCD_OMAP3
- 	  This option is deprecated now and the driver was removed, use
- 	  USB_OHCI_HCD_PLATFORM instead.
- 
--	  Enables support for the on-chip OHCI controller on
--	  OMAP3 and later chips.
--
- config USB_OHCI_HCD_DAVINCI
- 	tristate "OHCI support for TI DaVinci DA8xx"
- 	depends on ARCH_DAVINCI_DA8XX
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180503/9205ad12/attachment.sig>
+> +}
+> +
+>  static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
+>  			loff_t *ppos)
+>  {
+> +	char *bufp;
+> +	ssize_t actual;
+>  	struct tmc_drvdata *drvdata = container_of(file->private_data,
+>  						   struct tmc_drvdata, miscdev);
+> -	char *bufp = drvdata->buf + *ppos;
+> +	actual = tmc_get_sysfs_trace(drvdata, *ppos, len, &bufp);
+> +	if (actual <= 0)
+> +		return 0;
+>  
+> -	if (*ppos + len > drvdata->len)
+> -		len = drvdata->len - *ppos;
+> -
+> -	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+> -		if (bufp == (char *)(drvdata->vaddr + drvdata->size))
+> -			bufp = drvdata->vaddr;
+> -		else if (bufp > (char *)(drvdata->vaddr + drvdata->size))
+> -			bufp -= drvdata->size;
+> -		if ((bufp + len) > (char *)(drvdata->vaddr + drvdata->size))
+> -			len = (char *)(drvdata->vaddr + drvdata->size) - bufp;
+> -	}
+> -
+> -	if (copy_to_user(data, bufp, len)) {
+> +	if (copy_to_user(data, bufp, actual)) {
+>  		dev_dbg(drvdata->dev, "%s: copy_to_user failed\n", __func__);
+>  		return -EFAULT;
+>  	}
+>  
+> -	*ppos += len;
+> +	*ppos += actual;
+> +	dev_dbg(drvdata->dev, "%zu bytes copied\n", actual);
+>  
+> -	dev_dbg(drvdata->dev, "%s: %zu bytes copied, %d bytes left\n",
+> -		__func__, len, (int)(drvdata->len - *ppos));
+> -	return len;
+> +	return actual;
+>  }
+>  
+>  static int tmc_release(struct inode *inode, struct file *file)
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+> index cdff853..9cbc4d5 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.h
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
+> @@ -184,10 +184,14 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata);
+>  extern const struct coresight_ops tmc_etb_cs_ops;
+>  extern const struct coresight_ops tmc_etf_cs_ops;
+>  
+> +ssize_t tmc_etb_get_sysfs_trace(struct tmc_drvdata *drvdata,
+> +				loff_t pos, size_t len, char **bufpp);
+>  /* ETR functions */
+>  int tmc_read_prepare_etr(struct tmc_drvdata *drvdata);
+>  int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata);
+>  extern const struct coresight_ops tmc_etr_cs_ops;
+> +ssize_t tmc_etr_get_sysfs_trace(struct tmc_drvdata *drvdata,
+> +				loff_t pos, size_t len, char **bufpp);
+>  
+>  
+>  #define TMC_REG_PAIR(name, lo_off, hi_off)				\
+> -- 
+> 2.7.4
+> 
