@@ -1,64 +1,195 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 03 May 2018 14:40:42 -0400 (EDT)
-Subject: [PATCH net-next v2 00/15] ARM: sun8i: r40: Add Ethernet support
-In-Reply-To: <20180503131257.rlqxetafejikmnji@flea>
-References: <CAGb2v67HFb6eLBS4_9s_wJ5uWFeQdUtwn_NMJnm59UUDFBDJUA@mail.gmail.com>
- <20180502.110617.304411895589508709.davem@davemloft.net>
- <20180503131257.rlqxetafejikmnji@flea>
-Message-ID: <20180503.144042.266645949281979304.davem@davemloft.net>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri,  4 May 2018 02:38:43 +0800
+Subject: [PATCH 3/7] pinctrl: sunxi: add support for H6 R_PIO pin controller
+In-Reply-To: <20180503183847.11046-1-icenowy@aosc.io>
+References: <20180503183847.11046-1-icenowy@aosc.io>
+Message-ID: <20180503183847.11046-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-Date: Thu, 3 May 2018 15:12:57 +0200
+Allwinner H6 SoC has a R_PIO pin controller like other Allwinner SoCs,
+which controls the PL and PM pin banks.
 
-> Hi Dave,
-> 
-> On Wed, May 02, 2018 at 11:06:17AM -0400, David Miller wrote:
->> From: Chen-Yu Tsai <wens@csie.org>
->> Date: Wed, 2 May 2018 00:33:45 +0800
->> 
->> > I should've mentioned that patches 3 ~ 10, and only these, should go
->> > through net-next. sunxi will handle the remaining clk, device tree, and
->> > soc driver patches.
->> 
->> Ok, I just noticed this.
->> 
->> Why don't you just post those patches separately as a series on their
->> own then, in order to avoid confusion?
->> 
->> Then you can adjust the patch series header posting to explain the
->> non-net-next changes, where they got merged, and what they provide
->> in order to faciliate the net-next changes.
-> 
-> I now that we usually have some feedback from non-net maintainers that
-> they actually prefer seeing the full picture (and I also tend to
-> prefer that as well) and having all the patches relevant to enable a
-> particular feature, even if it means getting multiple maintainers
-> involved.
-> 
-> Just to make sure we understood you fully, do you want Chen-Yu to
-> resend his serie following your comments, or was that just a general
-> remark for next time?
+Add support for it.
 
-Yeah, good questions.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+ drivers/pinctrl/sunxi/Kconfig                      |   4 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun50i-h6-r.c        | 128 +++++++++++++++++++++
+ 4 files changed, 134 insertions(+)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h6-r.c
 
-I think it can be argued either way.  For review having the complete
-context is important.
-
-But from a maintainer's standpoint, when there is any ambiguity
-whatsoever about what patches go into this tree or that, it is really
-frowned upon and is quite error prone.
-
-Also, that header posting is _SO_ important.  It explains the series.
-But for these 'partial apply' situations the header posting refers
-to patches not in the series.
-
-This looks terrible in the logs, when, as I do, the header posting
-text is added to a marge commit for the series.  People will read it
-and say "where are all of these other changes mentioned in the text?
-was this series misapplied?"
-
-That's why, maybe after the review is successful, I want the actual
-patch series standalone with appropriately updated header posting
-text.
+diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+index 64bc5c2a76da..258a4648ab81 100644
+--- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+@@ -28,6 +28,7 @@ Required properties:
+   "allwinner,sun50i-a64-r-pinctrl"
+   "allwinner,sun50i-h5-pinctrl"
+   "allwinner,sun50i-h6-pinctrl"
++  "allwinner,sun50i-h6-r-pinctrl"
+   "nextthing,gr8-pinctrl"
+ 
+ - reg: Should contain the register physical address and length for the
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index 5de1f63b07bb..95282cda6cee 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -81,4 +81,8 @@ config PINCTRL_SUN50I_H6
+ 	def_bool ARM64 && ARCH_SUNXI
+ 	select PINCTRL_SUNXI
+ 
++config PINCTRL_SUN50I_H6_R
++	def_bool ARM64 && ARCH_SUNXI
++	select PINCTRL_SUNXI
++
+ endif
+diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+index 3c4aec6611e9..adb8443aa55c 100644
+--- a/drivers/pinctrl/sunxi/Makefile
++++ b/drivers/pinctrl/sunxi/Makefile
+@@ -19,5 +19,6 @@ obj-$(CONFIG_PINCTRL_SUN8I_H3_R)	+= pinctrl-sun8i-h3-r.o
+ obj-$(CONFIG_PINCTRL_SUN8I_V3S)		+= pinctrl-sun8i-v3s.o
+ obj-$(CONFIG_PINCTRL_SUN50I_H5)		+= pinctrl-sun50i-h5.o
+ obj-$(CONFIG_PINCTRL_SUN50I_H6)		+= pinctrl-sun50i-h6.o
++obj-$(CONFIG_PINCTRL_SUN50I_H6_R)	+= pinctrl-sun50i-h6-r.o
+ obj-$(CONFIG_PINCTRL_SUN9I_A80)		+= pinctrl-sun9i-a80.o
+ obj-$(CONFIG_PINCTRL_SUN9I_A80_R)	+= pinctrl-sun9i-a80-r.o
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-h6-r.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-h6-r.c
+new file mode 100644
+index 000000000000..4557e18d5989
+--- /dev/null
++++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-h6-r.c
+@@ -0,0 +1,128 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Allwinner H6 R_PIO pin controller driver
++ *
++ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * Based on pinctrl-sun6i-a31-r.c, which is:
++ *   Copyright (C) 2014 Boris Brezillon
++ *   Boris Brezillon <boris.brezillon@free-electrons.com>
++ *   Copyright (C) 2014 Maxime Ripard
++ *   Maxime Ripard <maxime.ripard@free-electrons.com>
++ */
++
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/reset.h>
++
++#include "pinctrl-sunxi.h"
++
++static const struct sunxi_desc_pin sun50i_h6_r_pins[] = {
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_i2c"),		/* SCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),	/* PL_EINT0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x3, "s_i2c"),		/* SDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),	/* PL_EINT1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_uart"),	/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),	/* PL_EINT2 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_uart"),	/* RX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),	/* PL_EINT3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* MS */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),	/* PL_EINT4 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* CK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),	/* PL_EINT5 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* DO */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),	/* PL_EINT6 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* DI */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),	/* PL_EINT7 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_pwm"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),	/* PL_EINT8 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_cir_rx"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),	/* PL_EINT9 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 10),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "s_w1"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)),	/* PL_EINT10 */
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 0)),	/* PM_EINT0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 1)),	/* PM_EINT1 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 2),	/* PM_EINT2 */
++		  SUNXI_FUNCTION(0x3, "1wire")),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 3)),	/* PM_EINT3 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(M, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),	/* PM_EINT4 */
++};
++
++static const struct sunxi_pinctrl_desc sun50i_h6_r_pinctrl_data = {
++	.pins = sun50i_h6_r_pins,
++	.npins = ARRAY_SIZE(sun50i_h6_r_pins),
++	.pin_base = PL_BASE,
++	.irq_banks = 2,
++};
++
++static int sun50i_h6_r_pinctrl_probe(struct platform_device *pdev)
++{
++	return sunxi_pinctrl_init(pdev,
++				  &sun50i_h6_r_pinctrl_data);
++}
++
++static const struct of_device_id sun50i_h6_r_pinctrl_match[] = {
++	{ .compatible = "allwinner,sun50i-h6-r-pinctrl", },
++	{}
++};
++
++static struct platform_driver sun50i_h6_r_pinctrl_driver = {
++	.probe	= sun50i_h6_r_pinctrl_probe,
++	.driver	= {
++		.name		= "sun50i-h6-r-pinctrl",
++		.of_match_table	= sun50i_h6_r_pinctrl_match,
++	},
++};
++builtin_platform_driver(sun50i_h6_r_pinctrl_driver);
+-- 
+2.15.1
