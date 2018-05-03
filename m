@@ -1,64 +1,140 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 3 May 2018 12:41:09 +0200
-Subject: [PATCH 1/2 v5] drm/pl111: Support the Versatile Express
-In-Reply-To: <CACRpkdZK8ahaWT1Y4jQ_W6pkUZeGSFP4BT8DgtvBAKb=vX1cfA@mail.gmail.com>
-References: <20180502134719.8388-1-linus.walleij@linaro.org>
- <20180503094144.GK12521@phenom.ffwll.local>
- <CACRpkdZK8ahaWT1Y4jQ_W6pkUZeGSFP4BT8DgtvBAKb=vX1cfA@mail.gmail.com>
-Message-ID: <CAKMK7uHN-HsdJJxOiR9U8Aw0b=LaaePM+YqA8+LzSOnFx=fccQ@mail.gmail.com>
+From: satendra.t@samsung.com (Satendra Singh Thakur)
+Date: Thu,  3 May 2018 16:28:06 +0530
+Subject: [PATCH 09/13] drm/kms/mode/sun4i-tv: using helper func
+ drm_display_mode_from_videomode for calculating timing parameters
+In-Reply-To: <cover.1525087679.git.satendra.t@samsung.com>
+References: <cover.1525087679.git.satendra.t@samsung.com>
+ <CGME20180503105821epcas5p21a35d9eb29f83201d337a195d218fdd3@epcas5p2.samsung.com>
+Message-ID: <6919c8943505fe0c1f700e223a77194f85e64a58.1525087679.git.satendra.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 3, 2018 at 11:58 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, May 3, 2018 at 11:41 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
->>Me:
-> (...)
->>> ChangeLog v4->v5:
->>> - Collect Robin's Tested-by
->>> - Switch to builtin_platform_driver() for the muxfpga as this
->>>   file is always built as "-y" for the arch and we need to
->>>   avoid module collisions with the main PL111 driver.
->>> +builtin_platform_driver(vexpress_muxfpga_driver);
->>
->>   LD [M]  drivers/gpu/drm/pl111/pl111_drm.o
->> drivers/gpu/drm/pl111/pl111_vexpress.o: In function `vexpress_muxfpga_driver_init':
->> /home/daniel/linux/aarch64/drivers/gpu/drm/pl111/pl111_vexpress.c:125: multiple definition of `init_module'
->> drivers/gpu/drm/pl111/pl111_drv.o:/home/daniel/linux/aarch64/drivers/gpu/drm/pl111/pl111_drv.c:427: first defined here
->> make[4]: *** [scripts/Makefile.build:570: drivers/gpu/drm/pl111/pl111_drm.o] Error 1
->> make[3]: *** [scripts/Makefile.build:583: drivers/gpu/drm/pl111] Error 2
->> make[3]: *** Waiting for unfinished jobs....
->>
->> Using the default drm-misc configs.
->>
->> Please fix asap, and please compile-test before pushing using these
->> default configs so others aren't blocked. I've disabled the pl111 driver
->> in there for now, please also re-enable.
->
-> That's typical. As you see in the ChangeLog I really tried to address
-> exactly this. I got that build error from the zeroday build with v4,
-> changed it to a builtin driver and pushed, then it did not give me
-> the problem again.
->
-> I guess the zeroday build robot isn't using the same configs...
->
-> Hm, I will take suggestions on how to actually solve it, I guess
-> this is due to the initcall infrastructure only allowing one initcall
-> per module?
->
-> In that case I guess I should either:
-> - Break out the vexpress file into its own module
-> - Call the vexpress init hooks from the initcalls in the
->   main module
->
-> I guess I will go for the latter even if it litters the driver with
-> more cross-calls.
+To avoid duplicate logic for horizonal/vertical sync_start/end
+helper func drm_display_mode_from_videomode is used
 
-Yeah, that's what we generally do. Including #ifdef mess and all that,
-since separate kmod tends to be even worse (you need piles of
-EXPORT_SYMBOL all over). It's a bit silly that the module/initcall
-stuff can't allow multiple entries ...
--Daniel
+Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
+Cc: Madhur Verma <madhur.verma@samsung.com>
+Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_tv.c | 67 +++++++++++++++-------------------------
+ 1 file changed, 25 insertions(+), 42 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index b070d52..7ffa930 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -21,6 +21,7 @@
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_of.h>
+ #include <drm/drm_panel.h>
++#include <video/videomode.h>
+ 
+ #include "sun4i_crtc.h"
+ #include "sun4i_drv.h"
+@@ -147,16 +148,7 @@ struct tv_mode {
+ 	u16		front_porch;
+ 	u16		line_number;
+ 	u16		vblank_level;
+-
+-	u32		hdisplay;
+-	u16		hfront_porch;
+-	u16		hsync_len;
+-	u16		hback_porch;
+-
+-	u32		vdisplay;
+-	u16		vfront_porch;
+-	u16		vsync_len;
+-	u16		vback_porch;
++	struct videomode vm;
+ 
+ 	bool		yc_en;
+ 	bool		dac3_en;
+@@ -223,16 +215,16 @@ static const struct tv_mode tv_modes[] = {
+ 		.back_porch	= 118,
+ 		.front_porch	= 32,
+ 		.line_number	= 525,
+-
+-		.hdisplay	= 720,
+-		.hfront_porch	= 18,
+-		.hsync_len	= 2,
+-		.hback_porch	= 118,
+-
+-		.vdisplay	= 480,
+-		.vfront_porch	= 26,
+-		.vsync_len	= 2,
+-		.vback_porch	= 17,
++		.vm = {
++			.hactive	= 720,
++			.hfront_porch	= 18,
++			.hsync_len	= 2,
++			.hback_porch	= 118,
++			.vactive	= 480,
++			.vfront_porch	= 26,
++			.vsync_len	= 2,
++			.vback_porch	= 17,
++		},
+ 
+ 		.vblank_level	= 240,
+ 
+@@ -249,16 +241,16 @@ static const struct tv_mode tv_modes[] = {
+ 		.back_porch	= 138,
+ 		.front_porch	= 24,
+ 		.line_number	= 625,
+-
+-		.hdisplay	= 720,
+-		.hfront_porch	= 3,
+-		.hsync_len	= 2,
+-		.hback_porch	= 139,
+-
+-		.vdisplay	= 576,
+-		.vfront_porch	= 28,
+-		.vsync_len	= 2,
+-		.vback_porch	= 19,
++		.vm = {
++			.hactive	= 720,
++			.hfront_porch	= 3,
++			.hsync_len	= 2,
++			.hback_porch	= 139,
++			.vactive	= 576,
++			.vfront_porch	= 28,
++			.vsync_len	= 2,
++			.vback_porch	= 19,
++		},
+ 
+ 		.vblank_level	= 252,
+ 
+@@ -311,9 +303,9 @@ static const struct tv_mode *sun4i_tv_find_tv_by_mode(const struct drm_display_m
+ 
+ 		DRM_DEBUG_DRIVER("Comparing mode %s vs %s (X: %d vs %d)",
+ 				 mode->name, tv_mode->name,
+-				 mode->vdisplay, tv_mode->vdisplay);
++				 mode->vdisplay, tv_mode->vm.vactive);
+ 
+-		if (mode->vdisplay == tv_mode->vdisplay)
++		if (mode->vdisplay == tv_mode->vm.vactive)
+ 			return tv_mode;
+ 	}
+ 
+@@ -325,19 +317,10 @@ static void sun4i_tv_mode_to_drm_mode(const struct tv_mode *tv_mode,
+ {
+ 	DRM_DEBUG_DRIVER("Creating mode %s\n", mode->name);
+ 
++	drm_display_mode_from_videomode(&tv_mode->vm, mode);
+ 	mode->type = DRM_MODE_TYPE_DRIVER;
+ 	mode->clock = 13500;
+ 	mode->flags = DRM_MODE_FLAG_INTERLACE;
+-
+-	mode->hdisplay = tv_mode->hdisplay;
+-	mode->hsync_start = mode->hdisplay + tv_mode->hfront_porch;
+-	mode->hsync_end = mode->hsync_start + tv_mode->hsync_len;
+-	mode->htotal = mode->hsync_end  + tv_mode->hback_porch;
+-
+-	mode->vdisplay = tv_mode->vdisplay;
+-	mode->vsync_start = mode->vdisplay + tv_mode->vfront_porch;
+-	mode->vsync_end = mode->vsync_start + tv_mode->vsync_len;
+-	mode->vtotal = mode->vsync_end  + tv_mode->vback_porch;
+ }
+ 
+ static void sun4i_tv_disable(struct drm_encoder *encoder)
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+2.7.4
