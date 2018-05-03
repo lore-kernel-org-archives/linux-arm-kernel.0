@@ -1,52 +1,50 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 3 May 2018 08:01:27 -0700
-Subject: [PATCH v2 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <db8970ea-05f4-e7c0-52fa-070c7a6b8d2e@codeaurora.org>
-References: <cover.1523673467.git.collinsd@codeaurora.org>
- <39b676d2ba7dac2436196cc5a090c6f151498dc8.1523673467.git.collinsd@codeaurora.org>
- <CAD=FV=UDUKg58xe+3C5QUbFwFkO8d3c_tzxmfPDzdv1KXZ3W9g@mail.gmail.com>
- <db8970ea-05f4-e7c0-52fa-070c7a6b8d2e@codeaurora.org>
-Message-ID: <CAD=FV=UC4CqOut0GoJ-heqdZ9NTHzzgBpVWy3XAMFax26HoZmg@mail.gmail.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Thu, 3 May 2018 17:05:34 +0200
+Subject: [PATCH 06/17] irqchip/irq-mvebu-icu: switch to regmap
+In-Reply-To: <20180430155352.1b24d1d8@windsurf>
+References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
+ <20180421135537.24716-7-miquel.raynal@bootlin.com>
+ <20180430155352.1b24d1d8@windsurf>
+Message-ID: <20180503170534.6b42510e@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thomas, Gregory,
 
-On Wed, May 2, 2018 at 5:13 PM, David Collins <collinsd@codeaurora.org> wrote:
-> On 05/02/2018 09:37 AM, Doug Anderson wrote:
->> On Fri, Apr 13, 2018 at 7:50 PM, David Collins <collinsd@codeaurora.org> wrote:
->>> +- vdd_l26-supply
->>> +- vdd_lvs1_lvs2-supply
->>> +- vdd_lvs1_lvs2-supply
->>> +       Usage:      optional (PM8998 only)
->>> +       Value type: <phandle>
->>> +       Definition: phandle of the parent supply regulator of one or more of the
->>> +                   regulators for this PMIC.
->>
->> One small additional nit here is that "vdd_lvs1_lvs2-supply" is listed twice.
->
-> I'll remove the duplicate.
->
->
->> Also on the schematics (and in the PM8998 datasheet) I have this is
->> "VIN_LVS_1_2".  It seems like you should be consistent here and call
->> this "vin-lvs-1-2-supply".
->
-> I was trying to keep the naming consistent within device tree binding
-> documentation for LVS vs LDO and SMPS (e.g. 'vdd' vs 'vin' prefix).  I
-> suppose that I can change this to match the hardware documentation pin
-> name.  I can also change '_' to '-' in the supply names if that is preferred.
+On Mon, 30 Apr 2018 15:53:52 +0200, Thomas Petazzoni
+<thomas.petazzoni@bootlin.com> wrote:
 
-I'd rather it match the docs.  I personally have no idea for why the
-writer of the docs used "vdd" vs. "vin", but even if they had no good
-reason matching the docs makes this searchable.
+> Hello,
+> 
+> On Sat, 21 Apr 2018 15:55:26 +0200, Miquel Raynal wrote:
+> > The ICU DT nodes have now the 'syscon' compatible, we can switch to  
+> 
+> have now -> now have
+> 
+> > regmap before splitting the code to support multiple platform devices to
+> > be probed (one for the ICU, one per interrupt group).
+> > 
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>  
+> 
+> As I explained in the review of PATCH 03/17, I think we could simply
+> create the regmap in the ->probe() of the parent device, instead of
+> using the "syscon" property, which is mainly useful when there is no
+> parent device.
 
-As far as the "_" to "-", Rob asked for that earlier in this thread
-and you says "I will change this on the next patch set."  In general
-the desire to convert "_" to "-" makes this less searchable (since the
-docs use "_"), but that's the way device tree guys want it so so c'est
-la vie.  Luckily it's easily to mentally change the "-"s back to "_"s
-when searching...
+This is a much better idea than adding the 'syscon' compatible. I will
+work on it.
 
--Doug
+> 
+> The rest of the conversion to regmap looks good otherwise.
+> 
+> Best regards,
+> 
+> Thomas
+
+Thanks,
+Miqu?l
+
+-- 
+Miquel Raynal, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
