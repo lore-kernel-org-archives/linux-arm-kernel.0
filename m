@@ -1,382 +1,125 @@
-From: satendra.t@samsung.com (Satendra Singh Thakur)
-Date: Thu,  3 May 2018 14:39:21 +0530
-Subject: [PATCH 07/13] drm/kms/mode/meson-encoder: using helper function
- drm_display_mode_to_videomode for calculating timing parameters
-In-Reply-To: <cover.1525087679.git.satendra.t@samsung.com>
-References: <cover.1525087679.git.satendra.t@samsung.com>
- <CGME20180503090930epcas5p23ef09c1e72c344bf8d879a344d0998cf@epcas5p2.samsung.com>
-Message-ID: <905f0ccf6c9abc97b6d77855b14d3bf8af892372.1525087679.git.satendra.t@samsung.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Thu, 3 May 2018 09:22:17 +0000
+Subject: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
+In-Reply-To: <93b3738c386c528193b158da0f85fd27@codeaurora.org>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <1501876754-1064-3-git-send-email-nleeder@codeaurora.org>
+ <883d32ce-6581-ecf6-5088-ecb238322ebe@huawei.com>
+ <e55ab4404143ea0b3cc4795a93e37480@codeaurora.org>
+ <14f90cc6-f2c1-5a63-67c6-a5c8ddb4799e@gmail.com>
+ <c1f9230b-8ff0-5b2e-def9-cbf6b2e2e99c@huawei.com>
+ <93b3738c386c528193b158da0f85fd27@codeaurora.org>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8386AE941@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
--Duplicate logic for the timing params is avoided
--Arithmatic operator *,/ are replaced by logical >>, << operators
--The flags DRM_MODE_FLAG_* are replaced with DISPLAY_FLAGS_* flags
--Combined similar if statements
 
-Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
-Cc: Madhur Verma <madhur.verma@samsung.com>
-Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
----
- drivers/gpu/drm/meson/meson_venc.c | 149 ++++++++++++++++---------------------
- 1 file changed, 65 insertions(+), 84 deletions(-)
 
-diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
-index 6e27013..dddf914 100644
---- a/drivers/gpu/drm/meson/meson_venc.c
-+++ b/drivers/gpu/drm/meson/meson_venc.c
-@@ -25,7 +25,7 @@
- #include "meson_vpp.h"
- #include "meson_vclk.h"
- #include "meson_registers.h"
--
-+#include <video/videomode.h>
- /**
-  * DOC: Video Encoder
-  *
-@@ -1125,9 +1125,6 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 	bool hdmi_repeat = false;
- 	unsigned int venc_hdmi_latency = 2;
- 	unsigned long total_pixels_venc = 0;
--	unsigned long active_pixels_venc = 0;
--	unsigned long front_porch_venc = 0;
--	unsigned long hsync_pixels_venc = 0;
- 	unsigned long de_h_begin = 0;
- 	unsigned long de_h_end = 0;
- 	unsigned long de_v_begin_even = 0;
-@@ -1143,9 +1140,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 	unsigned long vs_eline_odd = 0;
- 	unsigned long vso_begin_evn = 0;
- 	unsigned long vso_begin_odd = 0;
--	unsigned int eof_lines;
--	unsigned int sof_lines;
--	unsigned int vsync_lines;
-+	struct videomode vm = {};
- 
- 	if (meson_venc_hdmi_supported_vic(vic))
- 		vmode = meson_venc_hdmi_get_vic_vmode(vic);
-@@ -1156,9 +1151,9 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 			DRM_MODE_FMT "\n", __func__, DRM_MODE_ARG(mode));
- 		return;
- 	}
--
-+	drm_display_mode_to_videomode(mode, &vm);
- 	/* Use VENCI for 480i and 576i and double HDMI pixels */
--	if (mode->flags & DRM_MODE_FLAG_DBLCLK) {
-+	if (vm.flags & DISPLAY_FLAGS_DOUBLECLK) {
- 		hdmi_repeat = true;
- 		use_enci = true;
- 		venc_hdmi_latency = 1;
-@@ -1167,40 +1162,25 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 	/* Repeat VENC pixels for 480/576i/p, 720p50/60 and 1080p50/60 */
- 	if (meson_venc_hdmi_venc_repeat(vic))
- 		venc_repeat = true;
--
--	eof_lines = mode->vsync_start - mode->vdisplay;
--	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
--		eof_lines /= 2;
--	sof_lines = mode->vtotal - mode->vsync_end;
--	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
--		sof_lines /= 2;
--	vsync_lines = mode->vsync_end - mode->vsync_start;
--	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
--		vsync_lines /= 2;
-+	if (vm.flags & DISPLAY_FLAGS_INTERLACED) {
-+		vm.vfront_porch >>= 1;
-+		vm.vback_porch >>= 1;
-+		vm.vsync_len >>= 1;
-+	}
- 
- 	total_pixels_venc = mode->htotal;
--	if (hdmi_repeat)
--		total_pixels_venc /= 2;
--	if (venc_repeat)
--		total_pixels_venc *= 2;
--
--	active_pixels_venc = mode->hdisplay;
--	if (hdmi_repeat)
--		active_pixels_venc /= 2;
--	if (venc_repeat)
--		active_pixels_venc *= 2;
--
--	front_porch_venc = (mode->hsync_start - mode->hdisplay);
--	if (hdmi_repeat)
--		front_porch_venc /= 2;
--	if (venc_repeat)
--		front_porch_venc *= 2;
--
--	hsync_pixels_venc = (mode->hsync_end - mode->hsync_start);
--	if (hdmi_repeat)
--		hsync_pixels_venc /= 2;
--	if (venc_repeat)
--		hsync_pixels_venc *= 2;
-+	if (hdmi_repeat) {
-+		total_pixels_venc >>= 1;
-+		vm.hactive >>= 1;
-+		vm.hfront_porch >>= 1;
-+		vm.hsync_len >>= 1;
-+	}
-+	if (venc_repeat) {
-+		total_pixels_venc <<= 1;
-+		vm.hactive <<= 1;
-+		vm.hfront_porch <<= 1;
-+		vm.hsync_len <<= 1;
-+	}
- 
- 	/* Disable VDACs */
- 	writel_bits_relaxed(0xff, 0xff,
-@@ -1302,7 +1282,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 					_REG(ENCI_VFIFO2VD_PIXEL_START))
- 					+ venc_hdmi_latency,
- 				    total_pixels_venc);
--		de_h_end  = modulo(de_h_begin + active_pixels_venc,
-+		de_h_end  = modulo(de_h_begin + vm.hactive,
- 				   total_pixels_venc);
- 
- 		writel_relaxed(de_h_begin,
-@@ -1312,10 +1292,10 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 
- 		de_v_begin_even = readl_relaxed(priv->io_base +
- 					_REG(ENCI_VFIFO2VD_LINE_TOP_START));
--		de_v_end_even  = de_v_begin_even + mode->vdisplay;
-+		de_v_end_even  = de_v_begin_even + vm.vactive;
- 		de_v_begin_odd = readl_relaxed(priv->io_base +
- 					_REG(ENCI_VFIFO2VD_LINE_BOT_START));
--		de_v_end_odd = de_v_begin_odd + mode->vdisplay;
-+		de_v_end_odd = de_v_begin_odd + vm.vactive;
- 
- 		writel_relaxed(de_v_begin_even,
- 				priv->io_base + _REG(ENCI_DE_V_BEGIN_EVEN));
-@@ -1327,16 +1307,16 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 				priv->io_base + _REG(ENCI_DE_V_END_ODD));
- 
- 		/* Program Hsync timing */
--		hs_begin = de_h_end + front_porch_venc;
--		if (de_h_end + front_porch_venc >= total_pixels_venc) {
-+		hs_begin = de_h_end + vm.hfront_porch;
-+		if (de_h_end + vm.hfront_porch >= total_pixels_venc) {
- 			hs_begin -= total_pixels_venc;
- 			vs_adjust  = 1;
- 		} else {
--			hs_begin = de_h_end + front_porch_venc;
-+			hs_begin = de_h_end + vm.hfront_porch;
- 			vs_adjust  = 0;
- 		}
- 
--		hs_end = modulo(hs_begin + hsync_pixels_venc,
-+		hs_end = modulo(hs_begin + vm.hsync_len,
- 				total_pixels_venc);
- 		writel_relaxed(hs_begin,
- 				priv->io_base + _REG(ENCI_DVI_HSO_BEGIN));
-@@ -1344,12 +1324,13 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 				priv->io_base + _REG(ENCI_DVI_HSO_END));
- 
- 		/* Program Vsync timing for even field */
--		if (((de_v_end_odd - 1) + eof_lines + vs_adjust) >= lines_f1) {
-+		if (((de_v_end_odd - 1) + vm.vfront_porch + vs_adjust)
-+							>= lines_f1) {
- 			vs_bline_evn = (de_v_end_odd - 1)
--					+ eof_lines
-+					+ vm.vfront_porch
- 					+ vs_adjust
- 					- lines_f1;
--			vs_eline_evn = vs_bline_evn + vsync_lines;
-+			vs_eline_evn = vs_bline_evn + vm.vsync_len;
- 
- 			writel_relaxed(vs_bline_evn,
- 				priv->io_base + _REG(ENCI_DVI_VSO_BLINE_EVN));
-@@ -1363,7 +1344,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 				priv->io_base + _REG(ENCI_DVI_VSO_END_EVN));
- 		} else {
- 			vs_bline_odd = (de_v_end_odd - 1)
--					+ eof_lines
-+					+ vm.vfront_porch
- 					+ vs_adjust;
- 
- 			writel_relaxed(vs_bline_odd,
-@@ -1372,9 +1353,9 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 			writel_relaxed(hs_begin,
- 				priv->io_base + _REG(ENCI_DVI_VSO_BEGIN_ODD));
- 
--			if ((vs_bline_odd + vsync_lines) >= lines_f1) {
-+			if ((vs_bline_odd + vm.vsync_len) >= lines_f1) {
- 				vs_eline_evn = vs_bline_odd
--						+ vsync_lines
-+						+ vm.vsync_len
- 						- lines_f1;
- 
- 				writel_relaxed(vs_eline_evn, priv->io_base
-@@ -1384,7 +1365,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 						+ _REG(ENCI_DVI_VSO_END_EVN));
- 			} else {
- 				vs_eline_odd = vs_bline_odd
--						+ vsync_lines;
-+						+ vm.vsync_len;
- 
- 				writel_relaxed(vs_eline_odd, priv->io_base
- 						+ _REG(ENCI_DVI_VSO_ELINE_ODD));
-@@ -1395,11 +1376,11 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 		}
- 
- 		/* Program Vsync timing for odd field */
--		if (((de_v_end_even - 1) + (eof_lines + 1)) >= lines_f0) {
-+		if (((de_v_end_even - 1) + (vm.vfront_porch + 1)) >= lines_f0) {
- 			vs_bline_odd = (de_v_end_even - 1)
--					+ (eof_lines + 1)
-+					+ (vm.vfront_porch + 1)
- 					- lines_f0;
--			vs_eline_odd = vs_bline_odd + vsync_lines;
-+			vs_eline_odd = vs_bline_odd + vm.vsync_len;
- 
- 			writel_relaxed(vs_bline_odd,
- 				priv->io_base + _REG(ENCI_DVI_VSO_BLINE_ODD));
-@@ -1417,7 +1398,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 				priv->io_base + _REG(ENCI_DVI_VSO_END_ODD));
- 		} else {
- 			vs_bline_evn = (de_v_end_even - 1)
--					+ (eof_lines + 1);
-+					+ (vm.vfront_porch + 1);
- 
- 			writel_relaxed(vs_bline_evn,
- 				priv->io_base + _REG(ENCI_DVI_VSO_BLINE_EVN));
-@@ -1429,9 +1410,9 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 			writel_relaxed(vso_begin_evn, priv->io_base
- 					+ _REG(ENCI_DVI_VSO_BEGIN_EVN));
- 
--			if (vs_bline_evn + vsync_lines >= lines_f0) {
-+			if (vs_bline_evn + vm.vsync_len >= lines_f0) {
- 				vs_eline_odd = vs_bline_evn
--						+ vsync_lines
-+						+ vm.vsync_len
- 						- lines_f0;
- 
- 				writel_relaxed(vs_eline_odd, priv->io_base
-@@ -1440,7 +1421,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 				writel_relaxed(vso_begin_evn, priv->io_base
- 						+ _REG(ENCI_DVI_VSO_END_ODD));
- 			} else {
--				vs_eline_evn = vs_bline_evn + vsync_lines;
-+				vs_eline_evn = vs_bline_evn + vm.vsync_len;
- 
- 				writel_relaxed(vs_eline_evn, priv->io_base
- 						+ _REG(ENCI_DVI_VSO_ELINE_EVN));
-@@ -1548,7 +1529,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 					_REG(ENCP_VIDEO_HAVON_BEGIN))
- 					+ venc_hdmi_latency,
- 				    total_pixels_venc);
--		de_h_end = modulo(de_h_begin + active_pixels_venc,
-+		de_h_end = modulo(de_h_begin + vm.hactive,
- 				  total_pixels_venc);
- 
- 		writel_relaxed(de_h_begin,
-@@ -1559,11 +1540,11 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 		/* Program DE timing for even field */
- 		de_v_begin_even = readl_relaxed(priv->io_base
- 						+ _REG(ENCP_VIDEO_VAVON_BLINE));
--		if (mode->flags & DRM_MODE_FLAG_INTERLACE)
-+		if (vm.flags & DISPLAY_FLAGS_INTERLACED)
- 			de_v_end_even = de_v_begin_even +
--					(mode->vdisplay / 2);
-+					(vm.vactive >> 1);
- 		else
--			de_v_end_even = de_v_begin_even + mode->vdisplay;
-+			de_v_end_even = de_v_begin_even + vm.vactive;
- 
- 		writel_relaxed(de_v_begin_even,
- 				priv->io_base + _REG(ENCP_DE_V_BEGIN_EVEN));
-@@ -1571,14 +1552,14 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 				priv->io_base + _REG(ENCP_DE_V_END_EVEN));
- 
- 		/* Program DE timing for odd field if needed */
--		if (mode->flags & DRM_MODE_FLAG_INTERLACE) {
-+		if (vm.flags & DISPLAY_FLAGS_INTERLACED) {
- 			unsigned int ofld_voav_ofst =
- 				readl_relaxed(priv->io_base +
- 					_REG(ENCP_VIDEO_OFLD_VOAV_OFST));
- 			de_v_begin_odd = to_signed((ofld_voav_ofst & 0xf0) >> 4)
- 						+ de_v_begin_even
- 						+ ((mode->vtotal - 1) / 2);
--			de_v_end_odd = de_v_begin_odd + (mode->vdisplay / 2);
-+			de_v_end_odd = de_v_begin_odd + (vm.vactive >> 1);
- 
- 			writel_relaxed(de_v_begin_odd,
- 				priv->io_base + _REG(ENCP_DE_V_BEGIN_ODD));
-@@ -1587,18 +1568,18 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 		}
- 
- 		/* Program Hsync timing */
--		if ((de_h_end + front_porch_venc) >= total_pixels_venc) {
-+		if ((de_h_end + vm.hfront_porch) >= total_pixels_venc) {
- 			hs_begin = de_h_end
--				   + front_porch_venc
-+				   + vm.hfront_porch
- 				   - total_pixels_venc;
- 			vs_adjust  = 1;
- 		} else {
- 			hs_begin = de_h_end
--				   + front_porch_venc;
-+				   + vm.hfront_porch;
- 			vs_adjust  = 0;
- 		}
- 
--		hs_end = modulo(hs_begin + hsync_pixels_venc,
-+		hs_end = modulo(hs_begin + vm.hsync_len,
- 				total_pixels_venc);
- 
- 		writel_relaxed(hs_begin,
-@@ -1608,19 +1589,19 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 
- 		/* Program Vsync timing for even field */
- 		if (de_v_begin_even >=
--				(sof_lines + vsync_lines + (1 - vs_adjust)))
-+			(vm.vback_porch + vm.vsync_len + (1 - vs_adjust)))
- 			vs_bline_evn = de_v_begin_even
--					- sof_lines
--					- vsync_lines
-+					- vm.vback_porch
-+					- vm.vsync_len
- 					- (1 - vs_adjust);
- 		else
- 			vs_bline_evn = mode->vtotal
- 					+ de_v_begin_even
--					- sof_lines
--					- vsync_lines
-+					- vm.vback_porch
-+					- vm.vsync_len
- 					- (1 - vs_adjust);
- 
--		vs_eline_evn = modulo(vs_bline_evn + vsync_lines,
-+		vs_eline_evn = modulo(vs_bline_evn + vm.vsync_len,
- 					mode->vtotal);
- 
- 		writel_relaxed(vs_bline_evn,
-@@ -1635,12 +1616,12 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 				priv->io_base + _REG(ENCP_DVI_VSO_END_EVN));
- 
- 		/* Program Vsync timing for odd field if needed */
--		if (mode->flags & DRM_MODE_FLAG_INTERLACE) {
-+		if (vm.flags & DISPLAY_FLAGS_INTERLACED) {
- 			vs_bline_odd = (de_v_begin_odd - 1)
--					- sof_lines
--					- vsync_lines;
-+					- vm.vback_porch
-+					- vm.vsync_len;
- 			vs_eline_odd = (de_v_begin_odd - 1)
--					- vsync_lines;
-+					- vm.vsync_len;
- 			vso_begin_odd  = modulo(hs_begin
- 						+ (total_pixels_venc >> 1),
- 						total_pixels_venc);
-@@ -1660,8 +1641,8 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
- 	}
- 
- 	writel_relaxed((use_enci ? 1 : 2) |
--		       (mode->flags & DRM_MODE_FLAG_PHSYNC ? 1 << 2 : 0) |
--		       (mode->flags & DRM_MODE_FLAG_PVSYNC ? 1 << 3 : 0) |
-+		       (vm.flags & DISPLAY_FLAGS_HSYNC_HIGH ? 1 << 2 : 0) |
-+		       (vm.flags & DISPLAY_FLAGS_VSYNC_HIGH ? 1 << 3 : 0) |
- 		       4 << 5 |
- 		       (venc_repeat ? 1 << 8 : 0) |
- 		       (hdmi_repeat ? 1 << 12 : 0),
--- 
-2.7.4
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Agustin Vega-Frias
+> Sent: Wednesday, May 02, 2018 3:20 PM
+> To: xieyisheng (A) <xieyisheng1@huawei.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>; Mark Langsdorf
+> <mlangsdo@redhat.com>; Neil Leeder <neil.m.leeder@gmail.com>; Jon
+> Masters <jcm@redhat.com>; Timur Tabi <timur@codeaurora.org>; Will
+> Deacon <will.deacon@arm.com>; linux-kernel at vger.kernel.org; Mark Brown
+> <broonie@kernel.org>; Mark Salter <msalter@redhat.com>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
+> 
+> On 2018-04-02 02:37, Yisheng Xie wrote:
+> > Hi Neil,
+> >
+> > On 2018/4/1 13:44, Neil Leeder wrote:
+> >> Hi Yisheng Xie,
+> >>
+> >> On 3/29/2018 03:03 AM, Yisheng Xie wrote:
+> >>>
+> >>> Hi Neil,
+> >>>
+> >>> On 2017/8/5 3:59, Neil Leeder wrote:
+> >>>> +    mem_resource_0 = platform_get_resource(pdev,
+> IORESOURCE_MEM,
+> >>>> 0);
+> >>>> +    mem_map_0 = devm_ioremap_resource(&pdev->dev,
+> mem_resource_0);
+> >>>> +
+> >>> Can we use devm_ioremap instead? for the reg_base of smmu_pmu is
+> >>> IMPLEMENTATION DEFINED. If the reg of smmu_pmu is inside smmu,
+> >>> devm_ioremap_resource will failed and return -EBUSY, eg.:
+> >>>
+> >>>   smmu reg ranges:        0x180000000 ~ 0x1801fffff
+> >>>   its smmu_pmu reg ranges:    0x180001000 ~ 0x180001fff
+> >>>
+> >> Just to let you know that I no longer work at Qualcomm and I won't be
+> >> able to provide updates to this patchset. I expect that others from my
+> >> former team at Qualcomm will pick up ownership.
+> >
+> > Thanks for this infomation.
+> >
+> > hi Agustin and Timur,
+> >
+> > Is there any new status about this patchset?
+> >
+> 
+> Hi,
+> 
+> Apologies for the slow response.
+> We are having some internal discussions about when/if to do this.
+> I expect to have more clarity within a few weeks.
+> 
+> For what is worth let me take the opportunity to outline the approach
+> we would like to see for a V2 either developed by us or somebody else
+> in the community:
+> 
+> 1. Rework to comply with the IORT spec changes.
+> 
+> 2. Rework probing to extract extra information from the IORT table
+>     about SMMU/device associations.
+
+Thanks for coming back on this. It would be good to address cases where
+the PMCG base address is at a IMP DEF address offset within the associated
+SMMUv3 page address space. As things stands with pmu v1 currently, the
+SMMUv3 driver probe will fail. Please find the discussion here[1].
+
+Thanks,
+Shameer
+[1] https://lkml.org/lkml/2018/1/31/235
+
+>    With this information and some perf user space work I think it's
+> possible
+>    to have a single dynamic PMU node and use a similar approach to what
+> is
+>    used in the Coresight drivers to pass the device we want to monitor
+> and
+>    for the driver to find the PMU/PMCG. E.g.:
+> 
+>    $ lspci
+>    0001:00:00.0 PCI bridge: Airgo Networks, Inc. Device 0401
+>    0002:00:00.0 PCI bridge: Airgo Networks, Inc. Device 0401
+>    0002:01:00.0 Ethernet controller: Mellanox Technologies MT27500 Family
+> [ConnectX-3]
+>    0003:00:00.0 PCI bridge: Airgo Networks, Inc. Device 0401
+>    0003:01:00.0 Ethernet controller: Mellanox Technologies MT27500 Family
+> [ConnectX-3]
+> 
+>    # Monitor TLB misses on root complex 2 (no stream filter is applied)
+>    perf stat -a -e smmu/tlb_miss, at 0002:00:00.0/ <workload>
+> 
+>    # Monitor TLB misses on a device on root complex 2 (derive the stream
+> number from the RID)
+>    perf stat -a -e smmu/tlb_miss, at 0002:01:00.0/ <workload>
+> Thanks,
+> Agust?n
+> 
+> --
+> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm
+> Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a
+> Linux Foundation Collaborative Project.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
