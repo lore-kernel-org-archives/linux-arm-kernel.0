@@ -1,60 +1,41 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri,  4 May 2018 02:38:46 +0800
-Subject: [PATCH 6/7] arm64: allwinner: h6: add R_I2C controller
+Date: Fri,  4 May 2018 02:38:47 +0800
+Subject: [PATCH 7/7] arm64: allwinner: h6: add PCF8563 RTC on Pine H64 board
 In-Reply-To: <20180503183847.11046-1-icenowy@aosc.io>
 References: <20180503183847.11046-1-icenowy@aosc.io>
-Message-ID: <20180503183847.11046-7-icenowy@aosc.io>
+Message-ID: <20180503183847.11046-8-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H6 SoC has a R_I2C controller wired to the PL0/PL1 pins, which
-are used in the reference design to connect AXP805 PMIC.
+Pine H64 board has a PCF8563 dedicated RTC connected to its R_I2C bus.
 
-Add support for it.
+Enable the R_I2C bus and add the RTC to the device tree.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-index b0b342c8c189..37c2e11fca2e 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-@@ -5,7 +5,9 @@
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/sun50i-h6-ccu.h>
-+#include <dt-bindings/clock/sun50i-h6-r-ccu.h>
- #include <dt-bindings/reset/sun50i-h6-ccu.h>
-+#include <dt-bindings/reset/sun50i-h6-r-ccu.h>
- 
- / {
- 	interrupt-parent = <&gic>;
-@@ -204,6 +206,24 @@
- 			#gpio-cells = <3>;
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
-+
-+			r_i2c_pins: r-i2c {
-+				pins = "PL0", "PL1";
-+				function = "s_i2c";
-+			};
-+		};
-+
-+		r_i2c: i2c at 7081400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x07081400 0x400>;
-+			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&r_ccu CLK_R_APB2_I2C>;
-+			resets = <&r_ccu RST_R_APB2_I2C>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&r_i2c_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+index d36de5eb81f3..b6f2d6b2ecae 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+@@ -22,6 +22,16 @@
  	};
  };
+ 
++&r_i2c {
++	status = "okay";
++
++	pcf8563: rtc at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
++		#clock-cells = <0>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_ph_pins>;
 -- 
 2.15.1
