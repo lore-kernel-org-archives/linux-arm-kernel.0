@@ -1,25 +1,90 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Thu, 3 May 2018 16:15:13 +0100
-Subject: [PATCH v8 11/13] arm64: topology: enable ACPI/PPTT based CPU
- topology
-In-Reply-To: <20180425233121.13270-12-jeremy.linton@arm.com>
-References: <20180425233121.13270-1-jeremy.linton@arm.com>
- <20180425233121.13270-12-jeremy.linton@arm.com>
-Message-ID: <20180503151513.GD28409@work-enc>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu,  3 May 2018 23:18:22 +0800
+Subject: [PATCH 1/2] perf cs-etm: Support unknown_thread in cs_etm_auxtrace
+Message-ID: <1525360703-26159-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 06:31:19PM -0500, Jeremy Linton wrote:
-> Propagate the topology information from the PPTT tree to the
-> cpu_topology array. We can get the thread id and core_id by assuming
-> certain levels of the PPTT tree correspond to those concepts.
-> The package_id is flagged in the tree and can be found by calling
-> find_acpi_cpu_topology_package() which terminates
-> its search when it finds an ACPI node flagged as the physical
-> package. If the tree doesn't contain enough levels to represent
-> all of the requested levels then the root node will be returned
-> for all subsequent levels.
-> 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+CoreSight doesn't allocate thread structure for unknown_thread in etm
+auxtrace, so unknown_thread is NULL pointer.  If the perf data doesn't
+contain valid tid and then cs_etm__mem_access() uses unknown_thread
+instead as thread handler, this results in segmentation fault when
+thread__find_addr_map() accesses thread handler.
 
-Acked-by: Morten Rasmussen <morten.rasmussen@arm.com>
+This commit creates new thread data which is used by unknown_thread, so
+CoreSight tracing can roll back to use unknown_thread if perf data
+doesn't include valid thread info.  This commit also releases thread
+data for initialization failure case and for normal auxtrace free flow.
+
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ tools/perf/util/cs-etm.c | 25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
+
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 6533b1a..417302c 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -239,6 +239,7 @@ static void cs_etm__free(struct perf_session *session)
+ 	for (i = 0; i < aux->num_cpu; i++)
+ 		zfree(&aux->metadata[i]);
+ 
++	thread__zput(aux->unknown_thread);
+ 	zfree(&aux->metadata);
+ 	zfree(&aux);
+ }
+@@ -266,6 +267,7 @@ static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
+ 	if (!thread) {
+ 		if (cpumode != PERF_RECORD_MISC_KERNEL)
+ 			return -EINVAL;
++
+ 		thread = etmq->etm->unknown_thread;
+ 	}
+ 
+@@ -1355,6 +1357,23 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
+ 	etm->auxtrace.free = cs_etm__free;
+ 	session->auxtrace = &etm->auxtrace;
+ 
++	etm->unknown_thread = thread__new(999999999, 999999999);
++	if (!etm->unknown_thread)
++		goto err_free_queues;
++
++	/*
++	 * Initialize list node so that at thread__zput() we can avoid
++	 * segmentation fault at list_del_init().
++	 */
++	INIT_LIST_HEAD(&etm->unknown_thread->node);
++
++	err = thread__set_comm(etm->unknown_thread, "unknown", 0);
++	if (err)
++		goto err_delete_thread;
++
++	if (thread__init_map_groups(etm->unknown_thread, etm->machine))
++		goto err_delete_thread;
++
+ 	if (dump_trace) {
+ 		cs_etm__print_auxtrace_info(auxtrace_info->priv, num_cpu);
+ 		return 0;
+@@ -1369,16 +1388,18 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
+ 
+ 	err = cs_etm__synth_events(etm, session);
+ 	if (err)
+-		goto err_free_queues;
++		goto err_delete_thread;
+ 
+ 	err = auxtrace_queues__process_index(&etm->queues, session);
+ 	if (err)
+-		goto err_free_queues;
++		goto err_delete_thread;
+ 
+ 	etm->data_queued = etm->queues.populated;
+ 
+ 	return 0;
+ 
++err_delete_thread:
++	thread__zput(etm->unknown_thread);
+ err_free_queues:
+ 	auxtrace_queues__free(&etm->queues);
+ 	session->auxtrace = NULL;
+-- 
+2.7.4
