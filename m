@@ -1,91 +1,37 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 3 May 2018 09:12:31 +0200
-Subject: [PATCH v3] soc: mediatek: add a fixed wait for SRAM stable
-In-Reply-To: <90f83c1bd359bb39cdae334e489037d6fb8ac69b.1525233544.git.sean.wang@mediatek.com>
-References: <90f83c1bd359bb39cdae334e489037d6fb8ac69b.1525233544.git.sean.wang@mediatek.com>
-Message-ID: <2377953d-f5a2-7b59-8d07-034b6827c45f@gmail.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 3 May 2018 10:12:54 +0300
+Subject: [PATCH v2 00/10] PCI: leak fixes, removable generic PCI host,
+ assorted stuff
+In-Reply-To: <cover.1525067324.git.jan.kiszka@siemens.com>
+References: <cover.1525067324.git.jan.kiszka@siemens.com>
+Message-ID: <e15c1cf5-0844-e5f1-d7af-e196207be6d4@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jan,
 
+On 04/30/2018 08:48 AM, Jan Kiszka wrote:
+> Changes in v2:
+>  - patch 1: commit message reworking as suggested by Lorenzo
+>  - patch 3-6: split-up as suggested by Bjorn
+>  - patch 8: new
+>  - patch 10: select PCI_DOMAINS from PCI_HOST_GENERIC, rather than
+>    allowing manual choice, as suggested by Lorenzo
+> 
+> This primarily enables to unbind the generic PCI host controller without
+> leaving lots of memory leaks behind. A previous proposal patch 5 was
+> rejected because of those issues [1].
+> 
+> The fixes have been validated in the Jailhouse setup, where we add and
+> remove a virtual PCI host controller on hypervisor activation/
+> deactivation, with the help of kmemleak.
 
-On 05/02/2018 06:03 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> MT7622_POWER_DOMAIN_WB doesn't send an ACK when its managed SRAM becomes
-> stable, which is not like the behavior the other power domains should
-> have. Therefore, it's necessary for such a power domain to have a fixed
-> and well-predefined duration to wait until its managed SRAM can be allowed
-> to access by all functions running on the top.
-> 
-> v1 -> v2:
->  - use MTK_SCPD_FWAIT_SRAM flag as an indication requiring force waiting.
-> 
-> v2 -> v3:
->  - change the order for condition judgment with we check an existence of
->    the MTK_SCPD_FWAIT_SRAM first to get rid of any oversight on negative
->    condition.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Weiyi Lu <weiyi.lu@mediatek.com>
-> ---
+by chance I was looking into a memleak in of_pci_get_host_bridge_resources(),
+so I can give you a number of review tags.
 
-Now pused to v4.17-next/soc
+FWIW the state of unfixably broken https://patchwork.kernel.org/patch/9662893/
+should be changed to obsoleted/deprecated/rejected.
 
-Thanks a lot!
-Matthias
-
->  drivers/soc/mediatek/mtk-scpsys.c | 23 +++++++++++++++++------
->  1 file changed, 17 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index b1b45e4..2080c8f 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -32,6 +32,7 @@
->  #define MTK_POLL_TIMEOUT    (jiffies_to_usecs(HZ))
->  
->  #define MTK_SCPD_ACTIVE_WAKEUP		BIT(0)
-> +#define MTK_SCPD_FWAIT_SRAM		BIT(1)
->  #define MTK_SCPD_CAPS(_scpd, _x)	((_scpd)->data->caps & (_x))
->  
->  #define SPM_VDE_PWR_CON			0x0210
-> @@ -237,11 +238,21 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
->  	val &= ~scpd->data->sram_pdn_bits;
->  	writel(val, ctl_addr);
->  
-> -	/* wait until SRAM_PDN_ACK all 0 */
-> -	ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
-> -				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
-> -	if (ret < 0)
-> -		goto err_pwr_ack;
-> +	/* Either wait until SRAM_PDN_ACK all 0 or have a force wait */
-> +	if (MTK_SCPD_CAPS(scpd, MTK_SCPD_FWAIT_SRAM)) {
-> +		/*
-> +		 * Currently, MTK_SCPD_FWAIT_SRAM is necessary only for
-> +		 * MT7622_POWER_DOMAIN_WB and thus just a trivial setup is
-> +		 * applied here.
-> +		 */
-> +		usleep_range(12000, 12100);
-> +
-> +	} else {
-> +		ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
-> +					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
-> +		if (ret < 0)
-> +			goto err_pwr_ack;
-> +	};
->  
->  	if (scpd->data->bus_prot_mask) {
->  		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
-> @@ -785,7 +796,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
->  		.sram_pdn_ack_bits = 0,
->  		.clk_id = {CLK_NONE},
->  		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
-> -		.caps = MTK_SCPD_ACTIVE_WAKEUP,
-> +		.caps = MTK_SCPD_ACTIVE_WAKEUP | MTK_SCPD_FWAIT_SRAM,
->  	},
->  };
->  
-> 
+--
+With best wishes,
+Vladimir
