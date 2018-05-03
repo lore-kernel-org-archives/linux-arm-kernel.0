@@ -1,44 +1,33 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Thu, 3 May 2018 18:24:32 +0300
-Subject: [PATCH 4/6] mm, arm64: untag user addresses in mm/gup.c
-In-Reply-To: <CAAeHK+zh0LSpq2VFJeHrV7AETnL1b9R+yex3iPMg5SetbEyxwg@mail.gmail.com>
-References: <cover.1524077494.git.andreyknvl@google.com>
- <0db34d04fa16be162336106e3b4a94f3dacc0af4.1524077494.git.andreyknvl@google.com>
- <20180426174714.4jtb72q56w3xonsa@armageddon.cambridge.arm.com>
- <CAAeHK+zY8p9E4FZa7mbdgR=wR0u-RDS552dn=h9fKRC-ArYLdw@mail.gmail.com>
- <20180502153645.fui4ju3scsze3zkq@black.fi.intel.com>
- <CAAeHK+yTbmZfkeNbqbo+J90zsjsM99rwnYBGfQBxphHMMfgD7A@mail.gmail.com>
- <CAAeHK+zh0LSpq2VFJeHrV7AETnL1b9R+yex3iPMg5SetbEyxwg@mail.gmail.com>
-Message-ID: <20180503152432.q742zvdbv6xtvo34@kshutemo-mobl1>
+From: peron.clem@gmail.com (=?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?=)
+Date: Thu,  3 May 2018 17:32:07 +0200
+Subject: [PATCH v2] ARM: dts: cygnus: fix irq type for arm global timer
+Message-ID: <20180503153207.7668-1-peron.clem@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2018 at 04:09:56PM +0200, Andrey Konovalov wrote:
-> On Wed, May 2, 2018 at 7:25 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> > On Wed, May 2, 2018 at 5:36 PM, Kirill A. Shutemov
-> > <kirill.shutemov@linux.intel.com> wrote:
-> >> On Wed, May 02, 2018 at 02:38:42PM +0000, Andrey Konovalov wrote:
-> >>> > Does having a tagged address here makes any difference? I couldn't hit a
-> >>> > failure with my simple tests (LD_PRELOAD a library that randomly adds
-> >>> > tags to pointers returned by malloc).
-> >>>
-> >>> I think you're right, follow_page_mask is only called from
-> >>> __get_user_pages, which already untagged the address. I'll remove
-> >>> untagging here.
-> >>
-> >> It also called from follow_page(). Have you covered all its callers?
-> >
-> > Oh, missed that, will take a look.
-> 
-> I wasn't able to find anything that calls follow_page with pointers
-> passed from userspace except for the memory subsystem syscalls, and we
-> deliberately don't add untagging in those.
+As per ARM documentation
+PPI(0) ID27 - global timer interrupt is rising-edge sensitive.
 
-I guess I missed this part, but could you elaborate on this? Why?
-Not yet or not ever?
+set IRQ triggering type to IRQ_TYPE_EDGE_RISING for ARM Global timers.
 
-Also I wounder if we can find (with sparse?) all places where we cast out
-__user. This would give a nice list of places where to pay attention.
+Fixes: c9ad7bc5fe3 ("ARM: dts: Enable Broadcom Cygnus SoC")
+Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
+---
+ arch/arm/boot/dts/bcm-cygnus.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index 699fdf94d139..9fe4f5a6379e 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -69,7 +69,7 @@
+ 		timer at 20200 {
+ 			compatible = "arm,cortex-a9-global-timer";
+ 			reg = <0x20200 0x100>;
+-			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_PPI 11 IRQ_TYPE_EDGE_RISING>;
+ 			clocks = <&periph_clk>;
+ 		};
+ 
 -- 
- Kirill A. Shutemov
+2.17.0
