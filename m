@@ -1,61 +1,41 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 3 May 2018 09:45:36 -0700
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <fc4f2832-4e8f-3e70-6ab0-9f077790eca0@linux.com>
-References: <20180502203326.9491-1-labbott@redhat.com>
- <20180502203326.9491-3-labbott@redhat.com>
- <CAGXu5jK1_--omGSqz03sfB8twQVzy9ZQR9Xzi-uxseekp+r1jQ@mail.gmail.com>
- <4b7e94c1-79c9-0380-25c6-762762ed595f@redhat.com>
- <fc4f2832-4e8f-3e70-6ab0-9f077790eca0@linux.com>
-Message-ID: <CAGXu5jJ7ER58PvF4V=-BiNpmhxU2=_C8tkcNSPR5ANp2B7Seeg@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Thu, 3 May 2018 18:51:14 +0200
+Subject: [PATCH 4/6] mm, arm64: untag user addresses in mm/gup.c
+In-Reply-To: <20180503152432.q742zvdbv6xtvo34@kshutemo-mobl1>
+References: <cover.1524077494.git.andreyknvl@google.com>
+ <0db34d04fa16be162336106e3b4a94f3dacc0af4.1524077494.git.andreyknvl@google.com>
+ <20180426174714.4jtb72q56w3xonsa@armageddon.cambridge.arm.com>
+ <CAAeHK+zY8p9E4FZa7mbdgR=wR0u-RDS552dn=h9fKRC-ArYLdw@mail.gmail.com>
+ <20180502153645.fui4ju3scsze3zkq@black.fi.intel.com>
+ <CAAeHK+yTbmZfkeNbqbo+J90zsjsM99rwnYBGfQBxphHMMfgD7A@mail.gmail.com>
+ <CAAeHK+zh0LSpq2VFJeHrV7AETnL1b9R+yex3iPMg5SetbEyxwg@mail.gmail.com>
+ <20180503152432.q742zvdbv6xtvo34@kshutemo-mobl1>
+Message-ID: <CAAeHK+xzcjVm+E+nHLNcZ1jDOMM3ha2fH+Y0G26RU7aO81BSdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 3, 2018 at 9:05 AM, Alexander Popov <alex.popov@linux.com> wrote:
-> Hello Laura and Kees,
->
-> On 03.05.2018 02:07, Laura Abbott wrote:
->> On 05/02/2018 02:31 PM, Kees Cook wrote:
->>> On Wed, May 2, 2018 at 1:33 PM, Laura Abbott <labbott@redhat.com> wrote:
->>>>
->>>> Implementation of stackleak based heavily on the x86 version
->>>
->>> Awesome! Notes below for both you and Alexander, since I think we can
->>> create a common code base instead of having near-duplicates in the
->>> arch/ trees...
->
-> Yes, sure.
->
-> I will extract the common part and send v12 for x86. Then Laura will be able to
-> add arm64 support in a separate patch series. Is it fine?
+On Thu, May 3, 2018 at 5:24 PM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
+> On Thu, May 03, 2018 at 04:09:56PM +0200, Andrey Konovalov wrote:
+>> On Wed, May 2, 2018 at 7:25 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
 
-Sure, though if you could fold the plugin fix from her, that would be
-ideal. I'll likely carry both patch sets together once the arm64 one
-stabilizes.
-
->> This was based on the earlier version of x86. I'll confess to
->> not seeing how the current x86 version ended up with get_stack_info
->> but I suspect it's either related to ORC unwinding or it's best
->> practice.
+>> I wasn't able to find anything that calls follow_page with pointers
+>> passed from userspace except for the memory subsystem syscalls, and we
+>> deliberately don't add untagging in those.
 >
-> I've changed that in v4. Quote from the changelog:
->   - Fixed the surplus and erroneous code for calculating stack_left in
->      check_alloca() on x86_64. That code repeats the work which is already
->      done in get_stack_info() and it misses the fact that different
->      exception stacks on x86_64 have different size.
+> I guess I missed this part, but could you elaborate on this? Why?
+> Not yet or not ever?
+
+Check out the discussion here:
+https://www.spinics.net/lists/arm-kernel/msg640936.html
+
 >
-> http://www.openwall.com/lists/kernel-hardening/2017/10/04/68
->
-> We can see that in arch/x86/kernel/dumpstack_64.c.
->
-> Is it fine if check_alloca() would be arch-specific?
+> Also I wounder if we can find (with sparse?) all places where we cast out
+> __user. This would give a nice list of places where to pay attention.
 
-I'm fine if check_alloca() remains arch-specific.
-
-Thanks!
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+The way I tested this is I added BUG_ON(top byte tag is set) to
+find_vma and find_extend_vma and ran a modified version of syzkaller
+that embeds tags into pointers overnight. The only crashes that I saw
+were coming from memory subsystem syscalls. I then temporarily added
+untagging to suppress those crashes
+(https://gist.github.com/xairy/3aa1f57798fa62522c8ac53fad9b74ca), and
+didn't see any crashes after that.
