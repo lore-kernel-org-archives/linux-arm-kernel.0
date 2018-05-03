@@ -1,54 +1,37 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 3 May 2018 15:12:57 +0200
-Subject: [PATCH net-next v2 00/15] ARM: sun8i: r40: Add Ethernet support
-In-Reply-To: <20180502.110617.304411895589508709.davem@davemloft.net>
-References: <20180501161227.2110-1-wens@csie.org>
- <CAGb2v67HFb6eLBS4_9s_wJ5uWFeQdUtwn_NMJnm59UUDFBDJUA@mail.gmail.com>
- <20180502.110617.304411895589508709.davem@davemloft.net>
-Message-ID: <20180503131257.rlqxetafejikmnji@flea>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 3 May 2018 18:48:20 +0530
+Subject: [PATCH v9 09/27] ARM: davinci: dm644x: add new clock init using
+ common clock framework
+In-Reply-To: <20180427001745.4116-10-david@lechnology.com>
+References: <20180427001745.4116-1-david@lechnology.com>
+ <20180427001745.4116-10-david@lechnology.com>
+Message-ID: <cfce1685-296a-a669-bb7d-bf14d43004ed@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Friday 27 April 2018 05:47 AM, David Lechner wrote:
+>  void __init dm644x_init_time(void)
+>  {
+> +#ifdef CONFIG_COMMON_CLK
+> +	void __iomem *pll1, *psc;
+> +	struct clk *clk;
+> +
+> +	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM644X_REF_FREQ);
+> +
+> +	pll1 = ioremap(DAVINCI_PLL1_BASE, SZ_1K);
+> +	dm355_pll1_init(NULL, pll1, NULL);
 
-On Wed, May 02, 2018 at 11:06:17AM -0400, David Miller wrote:
-> From: Chen-Yu Tsai <wens@csie.org>
-> Date: Wed, 2 May 2018 00:33:45 +0800
-> 
-> > I should've mentioned that patches 3 ~ 10, and only these, should go
-> > through net-next. sunxi will handle the remaining clk, device tree, and
-> > soc driver patches.
-> 
-> Ok, I just noticed this.
-> 
-> Why don't you just post those patches separately as a series on their
-> own then, in order to avoid confusion?
-> 
-> Then you can adjust the patch series header posting to explain the
-> non-net-next changes, where they got merged, and what they provide
-> in order to faciliate the net-next changes.
+This should be dm644x_*()
 
-I now that we usually have some feedback from non-net maintainers that
-they actually prefer seeing the full picture (and I also tend to
-prefer that as well) and having all the patches relevant to enable a
-particular feature, even if it means getting multiple maintainers
-involved.
+> +
+> +	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
+> +	dm355_psc_init(NULL, psc);
 
-Just to make sure we understood you fully, do you want Chen-Yu to
-resend his serie following your comments, or was that just a general
-remark for next time?
+This one should be dm644x_*()
 
-Thanks!
-Maxime
+With those fixes, I was able to bootup on DM644x EVM and a visual
+inspection of clock debug dump shows it remains same before and after
+the conversion.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180503/ca25c556/attachment.sig>
+Thanks,
+Sekhar
