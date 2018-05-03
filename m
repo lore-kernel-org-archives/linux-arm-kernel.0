@@ -1,35 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 3 May 2018 13:33:10 +0100
-Subject: [PATCH] tty: implement a rx led trigger
-In-Reply-To: <20180503100448.1350-1-u.kleine-koenig@pengutronix.de>
-References: <20180503100448.1350-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <0c1bb915-bd92-4433-61ec-78fdba453396@arm.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 3 May 2018 14:36:03 +0200
+Subject: [PATCH] tty/serial: atmel: use port->name as name in request_irq()
+In-Reply-To: <20180502191632.tgda4g5v3rhncx7c@linutronix.de>
+References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
+ <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
+ <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
+ <20180502191632.tgda4g5v3rhncx7c@linutronix.de>
+Message-ID: <4f3f6e7c-2806-1749-1523-72d5c8eb8229@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/18 11:04, Uwe Kleine-K?nig wrote:
-[...]
-> @@ -157,6 +158,18 @@ struct device *tty_port_register_device_attr_serdev(struct tty_port *port,
->   
->   	tty_port_link_device(port, driver, index);
->   
-> +	port->led_trigger_rx_name = kasprintf(GFP_KERNEL, "%s%d-rx",
-> +					      driver->name, index);
-> +	if (!port->led_trigger_rx_name) {
-> +		pr_err("Failed to allocate trigger name for %s%d\n",
-> +		       driver->name, index);
-> +		goto skip_trigger;
+On 02/05/2018 21:16, Sebastian Andrzej Siewior wrote:
+> On 2018-04-27 12:31:52 [+0200], Richard Genoud wrote:
+>> Hi Sebastian,
+> Hi,
+> 
+>>> If this is unknown and a bisect is requested, please let me know.
+>> Indeed, this will be appreciated.
+>> I'm quite curious to find the commit that led to this.
+> 
+> commit 761ed4a94582ab291aa24dcbea4e01e8936488c8
+> Author: Rob Herring <robh@kernel.org>
+> Date:   Mon Aug 22 17:39:10 2016 -0500
+> 
+>     tty: serial_core: convert uart_close to use tty_port_close
+>     
+>     tty_port_close handles much of the common parts of tty close. Convert
+>     uart_close to use it and move the serial_core specific parts into
+>     tty_port.shutdown function. This will be needed to use tty_port functions
+>     directly from in kernel clients.
+>     
+>     This change causes ops->stop_rx() to be called after uart_wait_until_sent()
+>     is called which I think should be fine. Otherwise, the sequence of the
+>     close should be the same.
+>     
+>     Cc: Peter Hurley <peter@hurleysoftware.com>
+>     Signed-off-by: Rob Herring <robh@kernel.org>
+>     Acked-by: Alan Cox <alan@linux.intel.com>
+>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> 
+> The thread starts at
+>   https://www.spinics.net/lists/linux-serial/msg30070.html
+>   http://lkml.kernel.org/r/20180426150625.q5tqcb7fzchvkb5d at linutronix.de
 
-Hmm, isn't that a rather awkward way to spell "else"? ;)
+Thanks for this hunting session !
+Could resend your patch with Fixes: in the commit message ?
 
-Robin.
+BTW, I didn't manage to reproduce the behavior you describe, could you
+give me your .config and describe a little more how you manage to
+trigger this bug ?
+(do you use the console on serial debug ? which board ? )
 
-> +	}
-> +
-> +	led_trigger_register_simple(port->led_trigger_rx_name,
-> +				    &port->led_trigger_rx);
-> +
-> +skip_trigger:
->   	dev = serdev_tty_port_register(port, device, driver, index);
->   	if (PTR_ERR(dev) != -ENODEV) {
->   		/* Skip creating cdev if we registered a serdev device */
+
+Thanks !
