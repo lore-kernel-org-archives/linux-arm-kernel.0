@@ -1,79 +1,42 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 2 May 2018 16:37:58 -0700
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <4b7e94c1-79c9-0380-25c6-762762ed595f@redhat.com>
-References: <20180502203326.9491-1-labbott@redhat.com>
- <20180502203326.9491-3-labbott@redhat.com>
- <CAGXu5jK1_--omGSqz03sfB8twQVzy9ZQR9Xzi-uxseekp+r1jQ@mail.gmail.com>
- <4b7e94c1-79c9-0380-25c6-762762ed595f@redhat.com>
-Message-ID: <CAGXu5j+LP8Yq8R=FUUA1TX2gD5G5xaYNVkt56aezZ_GLpxn69g@mail.gmail.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Wed, 2 May 2018 17:13:00 -0700
+Subject: [PATCH v2 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <CAD=FV=UDUKg58xe+3C5QUbFwFkO8d3c_tzxmfPDzdv1KXZ3W9g@mail.gmail.com>
+References: <cover.1523673467.git.collinsd@codeaurora.org>
+ <39b676d2ba7dac2436196cc5a090c6f151498dc8.1523673467.git.collinsd@codeaurora.org>
+ <CAD=FV=UDUKg58xe+3C5QUbFwFkO8d3c_tzxmfPDzdv1KXZ3W9g@mail.gmail.com>
+Message-ID: <db8970ea-05f4-e7c0-52fa-070c7a6b8d2e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2018 at 4:07 PM, Laura Abbott <labbott@redhat.com> wrote:
-> On 05/02/2018 02:31 PM, Kees Cook wrote:
->> struct stackleak {
->> #ifdef CONFIG_GCC_PLUGIN_STACKLEAK
->>         unsigned long           lowest;
->> #ifdef CONFIG_STACKLEAK_METRICS
->>         unsigned long           prev_lowest;
->> #endif
->> #endif
->> };
->>
->
-> Is this well defined across all compilers if the plugin is off?
-> This seems to compile with gcc at least but 0 sized structs
-> make me a little uneasy.
+On 05/02/2018 09:37 AM, Doug Anderson wrote:
+> On Fri, Apr 13, 2018 at 7:50 PM, David Collins <collinsd@codeaurora.org> wrote:
+>> +- vdd_l26-supply
+>> +- vdd_lvs1_lvs2-supply
+>> +- vdd_lvs1_lvs2-supply
+>> +       Usage:      optional (PM8998 only)
+>> +       Value type: <phandle>
+>> +       Definition: phandle of the parent supply regulator of one or more of the
+>> +                   regulators for this PMIC.
+> 
+> One small additional nit here is that "vdd_lvs1_lvs2-supply" is listed twice.
 
-Yup! Or at least, there have been no problems with this and the
-seccomp struct, which is empty when !CONFIG_SECCOMP.
+I'll remove the duplicate.
 
->> This is the only difference between x86 and arm64 in this code. What
->> do you think about implementing on_thread_stack() to match x86:
->>
->>          if (on_thread_stack())
->>                  boundary = current_stack_pointer;
->>          else
->>                  boundary = current_top_of_stack();
->>
->> then we could make this common code too instead of having two copies in
->> arch/?
->>
->
-> The issue isn't on_thread_stack, it's current_top_of_stack which isn't
-> defined on arm64. I agree it would be good if the code would be common
-> but I'm not sure how much we want to start trying to force APIs.
 
-Ah, gotcha. Well, I'd rather we had an #ifdef here that two copies of
-the code. ;)
+> Also on the schematics (and in the PM8998 datasheet) I have this is
+> "VIN_LVS_1_2".  It seems like you should be consistent here and call
+> this "vin-lvs-1-2-supply".
 
->>> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
->>> +void __used check_alloca(unsigned long size)
->>> +{
->>> +       unsigned long sp, stack_left;
->>> +
->>> +       sp = current_stack_pointer;
->>> +
->>> +       stack_left = sp & (THREAD_SIZE - 1);
->>> +       BUG_ON(stack_left < 256 || size >= stack_left - 256);
->>> +}
->>> +EXPORT_SYMBOL(check_alloca);
->>
->>
->> This is pretty different from x86. Is this just an artifact of ORC, or
->> something else?
->>
->
-> This was based on the earlier version of x86. I'll confess to
-> not seeing how the current x86 version ended up with get_stack_info
-> but I suspect it's either related to ORC unwinding or it's best
-> practice.
+I was trying to keep the naming consistent within device tree binding
+documentation for LVS vs LDO and SMPS (e.g. 'vdd' vs 'vin' prefix).  I
+suppose that I can change this to match the hardware documentation pin
+name.  I can also change '_' to '-' in the supply names if that is preferred.
 
-Alexander, what was the history here?
-
--Kees
+Take care,
+David
 
 -- 
-Kees Cook
-Pixel Security
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
