@@ -1,98 +1,304 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 3 May 2018 12:10:47 +0200
-Subject: [PATCH] tty: implement a rx led trigger
-In-Reply-To: <20180503100448.1350-1-u.kleine-koenig@pengutronix.de>
-References: <20180503100448.1350-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20180503101047.GF32180@amd>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Thu, 3 May 2018 11:36:39 +0100
+Subject: [PATCH] drm/kms/mode: added a new helper for calculating
+ videomode from crtc's display mode
+In-Reply-To: <1525327118-26078-1-git-send-email-satendra.t@samsung.com>
+References: <CGME20180503055902epcas5p2eea7b9f58dc630e60fb28c8fc2ffad7b@epcas5p2.samsung.com>
+ <1525327118-26078-1-git-send-email-satendra.t@samsung.com>
+Message-ID: <20180503103639.GH1027@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> The trigger fires when data is pushed to the ldisc. This is a bit later
-> than the actual receiving of data but has the nice benefit that it
-> doesn't need adaption for each driver and isn't in the hot path.
+On Thu, May 03, 2018 at 11:28:37AM +0530, Satendra Singh Thakur wrote:
+> 1.
+> -Added a new helper drm_display_mode_crtc_to_videomode
+> -This helper calculates mode parameters like
+>   horizontal front_porch, back_porch, sync length
+>   vertical front_porch, back_porch, sync length
+>   using crtc_* fields of struct drm_display_mode
+> -It uses following fields of crtc mode
+>  horizontal sync start/end, active and total length
+>  vertical sync start/end, active and total length
+> 2.
+> -Most of the driver use user-supplied mode for calculating videomode
+> -However, few drivers use HW (crtc) mode for calculating videomode
+> -This helper will be useful for such drivers
+> 3.
+> -Currently following drivers will be using this new helper
+> -arm hdlcd
+> -atmel hlcdc
+> -exynos 5433 decon
+> -exynos7 decon
+> -exynos fimd
+> 4.
+> -This patch removes related duplicate code from above mentioned drivers
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
+> Cc: Madhur Verma <madhur.verma@samsung.com>
+> Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
+> ---
+>  drivers/gpu/drm/arm/hdlcd_crtc.c               |  8 +-------
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c |  7 +------
+>  drivers/gpu/drm/drm_modes.c                    | 20 ++++++++++++++++++++
+>  drivers/gpu/drm/exynos/exynos5433_drm_decon.c  | 22 ++++++++++------------
+>  drivers/gpu/drm/exynos/exynos7_drm_decon.c     | 23 ++++++++++-------------
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.c       | 22 +++++++++-------------
+>  include/drm/drm_modes.h                        |  2 ++
+>  7 files changed, 53 insertions(+), 51 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> index cf5cbd6..d20e471 100644
+> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
+> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> @@ -130,13 +130,7 @@ static void hdlcd_crtc_mode_set_nofb(struct drm_crtc *crtc)
+>  	struct videomode vm;
+>  	unsigned int polarities, err;
+>  
+> -	vm.vfront_porch = m->crtc_vsync_start - m->crtc_vdisplay;
+> -	vm.vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
+> -	vm.vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
+> -	vm.hfront_porch = m->crtc_hsync_start - m->crtc_hdisplay;
+> -	vm.hback_porch = m->crtc_htotal - m->crtc_hsync_end;
+> -	vm.hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
+> -
+> +	drm_display_mode_crtc_to_videomode(m, &vm);
+>  	polarities = HDLCD_POLARITY_DATAEN | HDLCD_POLARITY_DATA;
+>  
+>  	if (m->flags & DRM_MODE_FLAG_PHSYNC)
 
-Well, why not, but there certainly should be config option? Because I
-really don't see many people wanting to use this trigger.
+For the HDLCD part:
 
-> diff --git a/drivers/tty/tty_buffer.c b/drivers/tty/tty_buffer.c
-> index c996b6859c5e..4d364b77b1a7 100644
-> --- a/drivers/tty/tty_buffer.c
-> +++ b/drivers/tty/tty_buffer.c
-> @@ -17,6 +17,7 @@
->  #include <linux/delay.h>
->  #include <linux/module.h>
->  #include <linux/ratelimit.h>
-> +#include <linux/leds.h>
+Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+
+If you're not sending the final version through drm-misc then let me
+know and I can pick up the HDLCD part separately.
+
+Best regards,
+Liviu
+
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> index d732810..bafcef6 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> @@ -81,12 +81,7 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
+>  	unsigned int cfg;
+>  	int div;
 >  
+> -	vm.vfront_porch = adj->crtc_vsync_start - adj->crtc_vdisplay;
+> -	vm.vback_porch = adj->crtc_vtotal - adj->crtc_vsync_end;
+> -	vm.vsync_len = adj->crtc_vsync_end - adj->crtc_vsync_start;
+> -	vm.hfront_porch = adj->crtc_hsync_start - adj->crtc_hdisplay;
+> -	vm.hback_porch = adj->crtc_htotal - adj->crtc_hsync_end;
+> -	vm.hsync_len = adj->crtc_hsync_end - adj->crtc_hsync_start;
+> +	drm_display_mode_crtc_to_videomode(adj, &vm);
 >  
->  #define MIN_TTYB_SIZE	256
-> @@ -499,6 +500,7 @@ static void flush_to_ldisc(struct work_struct *work)
->  		struct tty_buffer *head = buf->head;
->  		struct tty_buffer *next;
->  		int count;
-> +		unsigned long delay = 50 /* ms */;
->  
->  		/* Ldisc or user is trying to gain exclusive access */
->  		if (atomic_read(&buf->priority))
-> @@ -521,6 +523,8 @@ static void flush_to_ldisc(struct work_struct *work)
->  			continue;
->  		}
->  
-> +		led_trigger_blink_oneshot(port->led_trigger_rx, &delay, &delay, 0);
+>  	regmap_write(regmap, ATMEL_HLCDC_CFG(1),
+>  		     (vm.hsync_len - 1) | ((vm.vsync_len - 1) << 16));
+> diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+> index e82b61e..a406749 100644
+> --- a/drivers/gpu/drm/drm_modes.c
+> +++ b/drivers/gpu/drm/drm_modes.c
+> @@ -654,6 +654,26 @@ void drm_display_mode_to_videomode(const struct drm_display_mode *dmode,
+>  		vm->flags |= DISPLAY_FLAGS_DOUBLECLK;
+>  }
+>  EXPORT_SYMBOL_GPL(drm_display_mode_to_videomode);
+> +/**
+> + * drm_display_mode_crtc_to_videomode - fill in @vm using crtc fields of at dmode,
+> + * @dmode: drm_display_mode structure to use as source
+> + * @vm: videomode structure to use as destination
+> + *
+> + * Fills out @vm using the crtc display mode specified in @dmode.
+> + */
+> +void drm_display_mode_crtc_to_videomode(const struct drm_display_mode *dmode,
+> +				   struct videomode *vm)
+> +{
+> +	vm->hfront_porch = dmode->crtc_hsync_start - dmode->crtc_hdisplay;
+> +	vm->hsync_len = dmode->crtc_hsync_end - dmode->crtc_hsync_start;
+> +	vm->hback_porch = dmode->crtc_htotal - dmode->crtc_hsync_end;
 > +
->  		count = receive_buf(port, head, count);
->  		if (!count)
->  			break;
-> diff --git a/drivers/tty/tty_port.c b/drivers/tty/tty_port.c
-> index 25d736880013..51b78a585417 100644
-> --- a/drivers/tty/tty_port.c
-> +++ b/drivers/tty/tty_port.c
-> @@ -16,6 +16,7 @@
->  #include <linux/wait.h>
->  #include <linux/bitops.h>
->  #include <linux/delay.h>
-> +#include <linux/leds.h>
->  #include <linux/module.h>
->  #include <linux/serdev.h>
->  
-> @@ -157,6 +158,18 @@ struct device *tty_port_register_device_attr_serdev(struct tty_port *port,
->  
->  	tty_port_link_device(port, driver, index);
->  
-> +	port->led_trigger_rx_name = kasprintf(GFP_KERNEL, "%s%d-rx",
-> +					      driver->name, index);
-> +	if (!port->led_trigger_rx_name) {
-> +		pr_err("Failed to allocate trigger name for %s%d\n",
-> +		       driver->name, index);
-> +		goto skip_trigger;
-> +	}
+> +	vm->vfront_porch = dmode->crtc_vsync_start - dmode->crtc_vdisplay;
+> +	vm->vsync_len = dmode->crtc_vsync_end - dmode->crtc_vsync_start;
+> +	vm->vback_porch = dmode->crtc_vtotal - dmode->crtc_vsync_end;
 > +
-> +	led_trigger_register_simple(port->led_trigger_rx_name,
-> +				    &port->led_trigger_rx);
-> +
-> +skip_trigger:
->  	dev = serdev_tty_port_register(port, device, driver, index);
->  	if (PTR_ERR(dev) != -ENODEV) {
->  		/* Skip creating cdev if we registered a serdev device */
-> @@ -206,6 +219,9 @@ void tty_port_unregister_device(struct tty_port *port,
->  	if (ret == 0)
+> +}
+> +EXPORT_SYMBOL_GPL(drm_display_mode_crtc_to_videomode);
+>  
+>  /**
+>   * drm_bus_flags_from_videomode - extract information about pixelclk and
+> diff --git a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
+> index 1c330f2..1ba73a8 100644
+> --- a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
+> +++ b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/of_gpio.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+> +#include <video/videomode.h>
+>  
+>  #include "exynos_drm_drv.h"
+>  #include "exynos_drm_crtc.h"
+> @@ -225,26 +226,23 @@ static void decon_commit(struct exynos_drm_crtc *crtc)
+>  	writel(val, ctx->addr + DECON_VIDTCON2);
+>  
+>  	if (!crtc->i80_mode) {
+> -		int vbp = m->crtc_vtotal - m->crtc_vsync_end;
+> -		int vfp = m->crtc_vsync_start - m->crtc_vdisplay;
+> +		struct videomode vm;
+>  
+> +		drm_display_mode_crtc_to_videomode(m, &vm);
+>  		if (interlaced)
+> -			vbp = vbp / 2 - 1;
+> -		val = VIDTCON00_VBPD_F(vbp - 1) | VIDTCON00_VFPD_F(vfp - 1);
+> +			vm.vback_porch = (vm.vback_porch >> 1) - 1;
+> +		val = VIDTCON00_VBPD_F(vm.vback_porch - 1) |
+> +			VIDTCON00_VFPD_F(vm.vfront_porch - 1);
+>  		writel(val, ctx->addr + DECON_VIDTCON00);
+>  
+> -		val = VIDTCON01_VSPW_F(
+> -				m->crtc_vsync_end - m->crtc_vsync_start - 1);
+> +		val = VIDTCON01_VSPW_F(vm.vsync_len - 1);
+>  		writel(val, ctx->addr + DECON_VIDTCON01);
+>  
+> -		val = VIDTCON10_HBPD_F(
+> -				m->crtc_htotal - m->crtc_hsync_end - 1) |
+> -			VIDTCON10_HFPD_F(
+> -				m->crtc_hsync_start - m->crtc_hdisplay - 1);
+> +		val = VIDTCON10_HBPD_F(vm.hback_porch - 1) |
+> +			VIDTCON10_HFPD_F(vm.hfront_porch - 1);
+>  		writel(val, ctx->addr + DECON_VIDTCON10);
+>  
+> -		val = VIDTCON11_HSPW_F(
+> -				m->crtc_hsync_end - m->crtc_hsync_start - 1);
+> +		val = VIDTCON11_HSPW_F(vm.hsync_len - 1);
+>  		writel(val, ctx->addr + DECON_VIDTCON11);
+>  	}
+>  
+> diff --git a/drivers/gpu/drm/exynos/exynos7_drm_decon.c b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
+> index 3931d5e..148daae 100644
+> --- a/drivers/gpu/drm/exynos/exynos7_drm_decon.c
+> +++ b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
+> @@ -25,6 +25,7 @@
+>  
+>  #include <video/of_display_timing.h>
+>  #include <video/of_videomode.h>
+> +#include <video/videomode.h>
+>  
+>  #include "exynos_drm_crtc.h"
+>  #include "exynos_drm_plane.h"
+> @@ -168,28 +169,24 @@ static void decon_commit(struct exynos_drm_crtc *crtc)
 >  		return;
 >  
-> +	led_trigger_unregister_simple(port->led_trigger_rx);
-
-Is it ok to unregister if it was not registered in the first place?
+>  	if (!ctx->i80_if) {
+> -		int vsync_len, vbpd, vfpd, hsync_len, hbpd, hfpd;
+> +		struct videomode vm;
+> +
+> +		drm_display_mode_crtc_to_videomode(mode, &vm);
+>  	      /* setup vertical timing values. */
+> -		vsync_len = mode->crtc_vsync_end - mode->crtc_vsync_start;
+> -		vbpd = mode->crtc_vtotal - mode->crtc_vsync_end;
+> -		vfpd = mode->crtc_vsync_start - mode->crtc_vdisplay;
+>  
+> -		val = VIDTCON0_VBPD(vbpd - 1) | VIDTCON0_VFPD(vfpd - 1);
+> +		val = VIDTCON0_VBPD(vm.vback_porch - 1) |
+> +			VIDTCON0_VFPD(vm.vfront_porch - 1);
+>  		writel(val, ctx->regs + VIDTCON0);
+>  
+> -		val = VIDTCON1_VSPW(vsync_len - 1);
+> +		val = VIDTCON1_VSPW(vm.vsync_len - 1);
+>  		writel(val, ctx->regs + VIDTCON1);
+>  
+>  		/* setup horizontal timing values.  */
+> -		hsync_len = mode->crtc_hsync_end - mode->crtc_hsync_start;
+> -		hbpd = mode->crtc_htotal - mode->crtc_hsync_end;
+> -		hfpd = mode->crtc_hsync_start - mode->crtc_hdisplay;
+> -
+> -		/* setup horizontal timing values.  */
+> -		val = VIDTCON2_HBPD(hbpd - 1) | VIDTCON2_HFPD(hfpd - 1);
+> +		val = VIDTCON2_HBPD(vm.hback_porch - 1) |
+> +			VIDTCON2_HFPD(vm.hfront_porch - 1);
+>  		writel(val, ctx->regs + VIDTCON2);
+>  
+> -		val = VIDTCON3_HSPW(hsync_len - 1);
+> +		val = VIDTCON3_HSPW(vm.hsync_len - 1);
+>  		writel(val, ctx->regs + VIDTCON3);
+>  	}
+>  
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> index d42ae2b..b3ab89d 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> @@ -25,6 +25,7 @@
+>  
+>  #include <video/of_display_timing.h>
+>  #include <video/of_videomode.h>
+> +#include <video/videomode.h>
+>  #include <video/samsung_fimd.h>
+>  #include <drm/exynos_drm.h>
+>  
+> @@ -463,7 +464,7 @@ static void fimd_commit(struct exynos_drm_crtc *crtc)
+>  			return;
+>  		}
+>  	} else {
+> -		int vsync_len, vbpd, vfpd, hsync_len, hbpd, hfpd;
+> +		struct videomode vm;
+>  		u32 vidcon1;
+>  
+>  		/* setup polarity values */
+> @@ -474,24 +475,19 @@ static void fimd_commit(struct exynos_drm_crtc *crtc)
+>  			vidcon1 |= VIDCON1_INV_HSYNC;
+>  		writel(vidcon1, ctx->regs + driver_data->timing_base + VIDCON1);
+>  
+> +		drm_display_mode_crtc_to_videomode(mode, &vm);
+>  		/* setup vertical timing values. */
+> -		vsync_len = mode->crtc_vsync_end - mode->crtc_vsync_start;
+> -		vbpd = mode->crtc_vtotal - mode->crtc_vsync_end;
+> -		vfpd = mode->crtc_vsync_start - mode->crtc_vdisplay;
+>  
+> -		val = VIDTCON0_VBPD(vbpd - 1) |
+> -			VIDTCON0_VFPD(vfpd - 1) |
+> -			VIDTCON0_VSPW(vsync_len - 1);
+> +		val = VIDTCON0_VBPD(vm.vback_porch - 1) |
+> +			VIDTCON0_VFPD(vm.vfront_porch - 1) |
+> +			VIDTCON0_VSPW(vm.vsync_len - 1);
+>  		writel(val, ctx->regs + driver_data->timing_base + VIDTCON0);
+>  
+>  		/* setup horizontal timing values.  */
+> -		hsync_len = mode->crtc_hsync_end - mode->crtc_hsync_start;
+> -		hbpd = mode->crtc_htotal - mode->crtc_hsync_end;
+> -		hfpd = mode->crtc_hsync_start - mode->crtc_hdisplay;
+>  
+> -		val = VIDTCON1_HBPD(hbpd - 1) |
+> -			VIDTCON1_HFPD(hfpd - 1) |
+> -			VIDTCON1_HSPW(hsync_len - 1);
+> +		val = VIDTCON1_HBPD(vm.hback_porch - 1) |
+> +			VIDTCON1_HFPD(vm.hfront_porch - 1) |
+> +			VIDTCON1_HSPW(vm.hsync_len - 1);
+>  		writel(val, ctx->regs + driver_data->timing_base + VIDTCON1);
+>  	}
+>  
+> diff --git a/include/drm/drm_modes.h b/include/drm/drm_modes.h
+> index 0d310be..9ac764b 100644
+> --- a/include/drm/drm_modes.h
+> +++ b/include/drm/drm_modes.h
+> @@ -473,6 +473,8 @@ void drm_display_mode_from_videomode(const struct videomode *vm,
+>  				     struct drm_display_mode *dmode);
+>  void drm_display_mode_to_videomode(const struct drm_display_mode *dmode,
+>  				   struct videomode *vm);
+> +void drm_display_mode_crtc_to_videomode(const struct drm_display_mode *dmode,
+> +				   struct videomode *vm);
+>  void drm_bus_flags_from_videomode(const struct videomode *vm, u32 *bus_flags);
+>  int of_get_drm_display_mode(struct device_node *np,
+>  			    struct drm_display_mode *dmode, u32 *bus_flags,
+> -- 
+> 2.7.4
+> 
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180503/613fb74c/attachment.sig>
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
