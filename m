@@ -1,44 +1,75 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 4 May 2018 15:15:08 -0700
-Subject: [PATCH] [stable] arm64: Add work around for Arm Cortex-A55
- Erratum 1024718
-In-Reply-To: <1525170364-21032-1-git-send-email-suzuki.poulose@arm.com>
-References: <1525170364-21032-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180504221508.GD20328@kroah.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 4 May 2018 17:56:33 -0500
+Subject: [PATCH v2 10/27] dts: bindings: Restrict coresight tmc-etr
+ scatter-gather mode
+In-Reply-To: <CANLsYkwozU7QC5EeEy46KrEd4X7J9S69SiNg8-GhSSuMkhQrBw@mail.gmail.com>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+ <1525165857-11096-11-git-send-email-suzuki.poulose@arm.com>
+ <20180501131300.GA31425@rob-hp-laptop>
+ <CANLsYkwozU7QC5EeEy46KrEd4X7J9S69SiNg8-GhSSuMkhQrBw@mail.gmail.com>
+Message-ID: <CAL_JsqJDTx2UWN7VdsvDctyXw_rco6Q8NmoWQ5EBx6uhwJu=0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 11:26:04AM +0100, Suzuki K Poulose wrote:
-> commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
-> 
-> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
-> from an erratum 1024718, which causes incorrect updates when DBM/AP
-> bits in a page table entry is modified without a break-before-make
-> sequence. The work around is to disable the hardware DBM feature
-> on the affected cores. The hardware Access Flag management features
-> is not affected.
-> 
-> The hardware DBM feature is a non-conflicting capability, i.e, the
-> kernel could handle cores using the feature and those without having
-> the features running at the same time. So this work around is detected
-> at early boot time, rather than delaying it until the CPUs are brought
-> up into the kernel with MMU turned on. This also avoids other complexities
-> with late CPUs turning online, with or without the hardware DBM features.
-> 
-> Note: The upstream commit is on top of a reworked capability
-> infrastructure for arm64 heterogeneous systems, which allows
-> handling this later in the boot process. This backport
-> is based on the original version of the patch [0]. Folded the 3
-> patches into this single commit, removing the unncessary bits.
-> 
-> [0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
-> 
-> Cc: stable at vger.kernel.org # v4.3 to v4.16
+On Thu, May 3, 2018 at 3:32 PM, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
+> On 1 May 2018 at 07:13, Rob Herring <robh@kernel.org> wrote:
+>> On Tue, May 01, 2018 at 10:10:40AM +0100, Suzuki K Poulose wrote:
+>>> We are about to add the support for ETR builtin scatter-gather mode
+>>> for dealing with large amount of trace buffers. However, on some of
+>>> the platforms, using the ETR SG mode can lock up the system due to
+>>> the way the ETR is connected to the memory subsystem.
+>>>
+>>> In SG mode, the ETR performs READ from the scatter-gather table to
+>>> fetch the next page and regular WRITE of trace data. If the READ
+>>> operation doesn't complete(due to the memory subsystem issues,
+>>> which we have seen on a couple of platforms) the trace WRITE
+>>> cannot proceed leading to issues. So, we by default do not
+>>> use the SG mode, unless it is known to be safe on the platform.
+>>> We define a DT property for the TMC node to specify whether we
+>>> have a proper SG mode.
+>>>
+>>> Cc: Mathieu Poirier <matheiu.poirier@linaro.org>
+>>> Cc: Mike Leach <mike.leach@linaro.org>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: John Horley <john.horley@arm.com>
+>>> Cc: Robert Walker <robert.walker@arm.com>
+>>> Cc: devicetree at vger.kernel.org
+>>> Cc: frowand.list at gmail.com
+>>> Cc: Rob Herring <robh@kernel.org>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/coresight.txt | 3 +++
+>>>  drivers/hwtracing/coresight/coresight-tmc.c         | 8 +++++++-
+>>>  2 files changed, 10 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+>>> index cdd84d0..7c0c8f0 100644
+>>> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+>>> @@ -88,6 +88,9 @@ its hardware characteristcs.
+>>>       * arm,buffer-size: size of contiguous buffer space for TMC ETR
+>>>        (embedded trace router)
+>>>
+>>> +     * scatter-gather: boolean. Indicates that the TMC-ETR can safely
+>>> +       use the SG mode on this system.
+>>> +
+>>
+>> Needs a vendor prefix.
+>>
+>
+> Thinking further on this, do we need to make it device specific as
+> well - something like "arm,etr-scatter-gather"?  That way we don't
+> have to redefine "scatter-gather" for other ARM devices if they happen
+> to need the same property but for different reasons.
 
-This only would apply to the 4.16.y tree.  Can you provide working
-backports to 4.14.y, 4.9.y, and 4.4.y so I can queue them up there as
-well?
+No. If we had a bunch of cases, then we'd probably want to have just
+'scatter-gather'.
 
-thanks,
+BTW, if SG had already been supported, then I'd say this is a quirk
+and we should invert this property. Otherwise, you'd be disabling once
+enabled SG and require working platforms to update their dtb. Of
+course, I shouldn't really let the state of an OS driver influence the
+DT binding.
 
-greg k-h
+Rob
