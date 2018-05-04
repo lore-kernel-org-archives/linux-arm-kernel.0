@@ -1,154 +1,160 @@
-From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Fri, 4 May 2018 19:34:40 +0800
-Subject: [PATCH v8 00/13] Support PPTT for ARM64
-In-Reply-To: <20180425233121.13270-1-jeremy.linton@arm.com>
-References: <20180425233121.13270-1-jeremy.linton@arm.com>
-Message-ID: <35ce144b-4386-7bd8-f401-8643400fb7a1@huawei.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Fri, 4 May 2018 13:38:13 +0200
+Subject: [PATCH v2 1/4] KVM: arm/arm64: Share common code in
+ user_mem_abort()
+In-Reply-To: <20180501102659.13188-2-punit.agrawal@arm.com>
+References: <20180501102659.13188-1-punit.agrawal@arm.com>
+ <20180501102659.13188-2-punit.agrawal@arm.com>
+Message-ID: <20180504113813.GD10191@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+On Tue, May 01, 2018 at 11:26:56AM +0100, Punit Agrawal wrote:
+> The code for operations such as marking the pfn as dirty, and
+> dcache/icache maintenance during stage 2 fault handling is duplicated
+> between normal pages and PMD hugepages.
+> 
+> Instead of creating another copy of the operations when we introduce
+> PUD hugepages, let's share them across the different pagesizes.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/mmu.c | 66 +++++++++++++++++++++++++++-------------------
+>  1 file changed, 39 insertions(+), 27 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 7f6a944db23d..686fc6a4b866 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -1396,6 +1396,21 @@ static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
+>  	__invalidate_icache_guest_page(pfn, size);
+>  }
+>  
+> +static bool stage2_should_exec(struct kvm *kvm, phys_addr_t addr,
+> +			       bool exec_fault, unsigned long fault_status)
+> +{
+> +	/*
+> +	 * If we took an execution fault we will have made the
+> +	 * icache/dcache coherent and should now let the s2 mapping be
+> +	 * executable.
+> +	 *
+> +	 * Write faults (!exec_fault && FSC_PERM) are orthogonal to
+> +	 * execute permissions, and we preserve whatever we have.
+> +	 */
+> +	return exec_fault ||
+> +		(fault_status == FSC_PERM && stage2_is_exec(kvm, addr));
+> +}
+> +
+>  static void kvm_send_hwpoison_signal(unsigned long address,
+>  				     struct vm_area_struct *vma)
+>  {
+> @@ -1428,7 +1443,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	kvm_pfn_t pfn;
+>  	pgprot_t mem_type = PAGE_S2;
+>  	bool logging_active = memslot_is_logging(memslot);
+> -	unsigned long flags = 0;
+> +	unsigned long vma_pagesize, flags = 0;
+>  
+>  	write_fault = kvm_is_write_fault(vcpu);
+>  	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
+> @@ -1448,7 +1463,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  		return -EFAULT;
+>  	}
+>  
+> -	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
+> +	vma_pagesize = vma_kernel_pagesize(vma);
+> +	if (vma_pagesize == PMD_SIZE && !logging_active) {
+>  		hugetlb = true;
+>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>  	} else {
+> @@ -1517,28 +1533,34 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>  		goto out_unlock;
+>  
+> -	if (!hugetlb && !force_pte)
+> +	if (!hugetlb && !force_pte) {
+>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+> +		/*
+> +		 * Only PMD_SIZE transparent hugepages(THP) are
+> +		 * currently supported. This code will need to be
+> +		 * updated to support other THP sizes.
+> +		 */
+> +		if (hugetlb)
+> +			vma_pagesize = PMD_SIZE;
 
-Tested on D05 board. 'lscpu' prints the following info:
-localhost:~ # lscpu
-Architecture:          aarch64
-Byte Order:            Little Endian
-CPU(s):                64
-On-line CPU(s) list:   0-63
-Thread(s) per core:    1
-Core(s) per socket:    32
-Socket(s):             2
-NUMA node(s):          4
-L1d cache:             32K
-L1i cache:             48K
-L2 cache:              1024K
-L3 cache:              16384K
-NUMA node0 CPU(s):     0-15
-NUMA node1 CPU(s):     16-31
-NUMA node2 CPU(s):     32-47
-NUMA node3 CPU(s):     48-63
+nit: this is a bit of a trap waiting to happen, as the suggested
+semantics of hugetlb is now hugetlbfs and not THP.
 
-'sched_domain' is as follows
-localhost:~ # cat /proc/schedstat
-version 15
-timestamp 4294936236
-cpu0 0 0 0 0 0 0 2471285600 2634828800 4813
-domain0 00000000,0000ffff 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-domain1 00000000,ffffffff 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-domain2 ffffffff,ffffffff 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+It may be slightly nicer to do do:
 
+		if (transparent_hugepage_adjust(&pfn, &fault_ipa))
+			vma_pagesize = PMD_SIZE;
 
-On 2018/4/26 7:31, Jeremy Linton wrote:
-> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
-> used to describe the processor and cache topology. Ideally it is
-> used to extend/override information provided by the hardware, but
-> right now ARM64 is entirely dependent on firmware provided tables.
+> +	}
+> +
+> +	if (writable)
+> +		kvm_set_pfn_dirty(pfn);
+> +
+> +	if (fault_status != FSC_PERM)
+> +		clean_dcache_guest_page(pfn, vma_pagesize);
+> +
+> +	if (exec_fault)
+> +		invalidate_icache_guest_page(pfn, vma_pagesize);
+>  
+>  	if (hugetlb) {
+>  		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
+>  		new_pmd = pmd_mkhuge(new_pmd);
+> -		if (writable) {
+> +		if (writable)
+>  			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
+> -			kvm_set_pfn_dirty(pfn);
+> -		}
+>  
+> -		if (fault_status != FSC_PERM)
+> -			clean_dcache_guest_page(pfn, PMD_SIZE);
+> -
+> -		if (exec_fault) {
+> +		if (stage2_should_exec(kvm, fault_ipa, exec_fault, fault_status))
+>  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+> -			invalidate_icache_guest_page(pfn, PMD_SIZE);
+> -		} else if (fault_status == FSC_PERM) {
+> -			/* Preserve execute if XN was already cleared */
+> -			if (stage2_is_exec(kvm, fault_ipa))
+> -				new_pmd = kvm_s2pmd_mkexec(new_pmd);
+> -		}
+>  
+>  		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+>  	} else {
+> @@ -1546,21 +1568,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  
+>  		if (writable) {
+>  			new_pte = kvm_s2pte_mkwrite(new_pte);
+> -			kvm_set_pfn_dirty(pfn);
+>  			mark_page_dirty(kvm, gfn);
+>  		}
+>  
+> -		if (fault_status != FSC_PERM)
+> -			clean_dcache_guest_page(pfn, PAGE_SIZE);
+> -
+> -		if (exec_fault) {
+> +		if (stage2_should_exec(kvm, fault_ipa, exec_fault, fault_status))
+>  			new_pte = kvm_s2pte_mkexec(new_pte);
+> -			invalidate_icache_guest_page(pfn, PAGE_SIZE);
+> -		} else if (fault_status == FSC_PERM) {
+> -			/* Preserve execute if XN was already cleared */
+> -			if (stage2_is_exec(kvm, fault_ipa))
+> -				new_pte = kvm_s2pte_mkexec(new_pte);
+> -		}
+>  
+>  		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
+>  	}
+> -- 
+> 2.17.0
 > 
-> This patch parses the table for the cache topology and CPU topology.
-> When we enable ACPI/PPTT for arm64 we map the package_id to the
-> PPTT node flagged as the physical package by the firmware.
-> This results in topologies that match what the remainder of the
-> system expects. Finally, we update the scheduler MC domain so that
-> it generally reflects the LLC unless the LLC is too large for the
-> NUMA domain (or package).
-> 
-> For example on juno:
-> [root at mammon-juno-rh topology]# lstopo-no-graphics
->   Package L#0
->     L2 L#0 (1024KB)
->       L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
->       L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
->       L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
->       L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
->     L2 L#1 (2048KB)
->       L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
->       L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
->   HostBridge L#0
->     PCIBridge
->       PCIBridge
->         PCIBridge
->           PCI 1095:3132
->             Block(Disk) L#0 "sda"
->         PCIBridge
->           PCI 1002:68f9
->             GPU L#1 "renderD128"
->             GPU L#2 "card0"
->             GPU L#3 "controlD64"
->         PCIBridge
->           PCI 11ab:4380
->             Net L#4 "enp8s0"
-> 
-> Git tree at:
-> http://linux-arm.org/git?p=linux-jlinton.git
-> branch: pptt_v8
-> 
-> v7->v8:
-> Modify the logic used to select the MC domain (the change
->   shouldn't modify the sched domains on any existing machines
->   compared to v7, only how they are built)
-> Reduce the severity of some parsing messages.
-> Fix s390 link problem.
-> Further checks to deal with broken PPTT tables.
-> Various style tweaks, SPDX license addition, etc.
-> 
-> v6->v7:
-> Add additional patch to use the last cache level within the NUMA
->   or socket as the MC domain. This assures the MC domain is
->   equal or smaller than the DIE.
->   
-> Various formatting/etc review comments.
-> 
-> Rebase to 4.16rc2
-> 
-> v5->v6:
-> Add additional patches which re-factor how the initial DT code sets
->   up the cacheinfo structure so that its not as dependent on the
->   of_node stored in that tree. Once that is done we rename it
->   for use with the ACPI code.
-> 
-> Additionally there were a fair number of minor name/location/etc
->   tweaks scattered about made in response to review comments.
-> 
-> v4->v5:
-> Update the cache type from NOCACHE to UNIFIED when all the cache
->   attributes we update are valid. This fixes a problem where caches
->   which are entirely created by the PPTT don't show up in lstopo.
-> 
-> Give the PPTT its own firmware_node in the cache structure instead of
->   sharing it with the of_node.
-> 
-> Move some pieces around between patches.
-> 
-> (see previous cover letters for futher changes)
-> 
-> Jeremy Linton (13):
->   drivers: base: cacheinfo: move cache_setup_of_node()
->   drivers: base: cacheinfo: setup DT cache properties early
->   cacheinfo: rename of_node to fw_token
->   arm64/acpi: Create arch specific cpu to acpi id helper
->   ACPI/PPTT: Add Processor Properties Topology Table parsing
->   ACPI: Enable PPTT support on ARM64
->   drivers: base cacheinfo: Add support for ACPI based firmware tables
->   arm64: Add support for ACPI based firmware tables
->   ACPI/PPTT: Add topology parsing code
->   arm64: topology: rename cluster_id
->   arm64: topology: enable ACPI/PPTT based CPU topology
->   ACPI: Add PPTT to injectable table list
->   arm64: topology: divorce MC scheduling domain from core_siblings
-> 
->  arch/arm64/Kconfig                |   1 +
->  arch/arm64/include/asm/acpi.h     |   4 +
->  arch/arm64/include/asm/topology.h |   6 +-
->  arch/arm64/kernel/cacheinfo.c     |  15 +-
->  arch/arm64/kernel/topology.c      | 103 +++++-
->  arch/riscv/kernel/cacheinfo.c     |   1 -
->  drivers/acpi/Kconfig              |   3 +
->  drivers/acpi/Makefile             |   1 +
->  drivers/acpi/pptt.c               | 678 ++++++++++++++++++++++++++++++++++++++
->  drivers/acpi/tables.c             |   2 +-
->  drivers/base/cacheinfo.c          | 157 ++++-----
->  include/linux/acpi.h              |   4 +
->  include/linux/cacheinfo.h         |  18 +-
->  13 files changed, 886 insertions(+), 107 deletions(-)
->  create mode 100644 drivers/acpi/pptt.c
-> 
+
+Otherwise looks good.
+
+Thanks,
+-Christoffer
