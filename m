@@ -1,38 +1,177 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Fri, 4 May 2018 13:03:44 +0200
-Subject: Potential deadlock in vgic
-Message-ID: <20180504110343.GA10968@hc>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 4 May 2018 12:09:08 +0100
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
+References: <20180502203326.9491-1-labbott@redhat.com>
+ <20180502203326.9491-3-labbott@redhat.com>
+ <20180503071917.xm2xvgagvzkworay@salmiak>
+ <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
+Message-ID: <20180504110907.c2dw33kjmyybso6t@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, May 03, 2018 at 08:33:38PM +0300, Alexander Popov wrote:
+> Hello Mark and Laura,
+> 
+> Let me join the discussion. Mark, thanks for your feedback!
+> 
+> On 03.05.2018 10:19, Mark Rutland wrote:
+> > Hi Laura,
+> > 
+> > On Wed, May 02, 2018 at 01:33:26PM -0700, Laura Abbott wrote:
+> >>
+> >> Implementation of stackleak based heavily on the x86 version
+> >>
+> >> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> >> ---
+> >> Now written in C instead of a bunch of assembly.
+> > 
+> > This looks neat!
+> > 
+> > I have a few minor comments below.
+> > 
+> >> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> >> index bf825f38d206..0ceea613c65b 100644
+> >> --- a/arch/arm64/kernel/Makefile
+> >> +++ b/arch/arm64/kernel/Makefile
+> >> @@ -55,6 +55,9 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+> >>  arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+> >>  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+> >>  
+> >> +arm64-obj-$(CONFIG_GCC_PLUGIN_STACKLEAK) += erase.o
+> >> +KASAN_SANITIZE_erase.o	:= n
+> > 
+> > I suspect we want to avoid the full set of instrumentation suspects here, e.g.
+> > GKOV, KASAN, UBSAN, and KCOV.
+> 
+> I've disabled KASAN instrumentation for that file on x86 because erase_kstack()
+> intentionally writes to the stack and causes KASAN false positive reports.
+> 
+> But I didn't see any conflicts with other types of instrumentation that you
+> mentioned.
 
-enabling lockdep I see the following reported in the host when I start a kvm guest:
+The rationale is that any of these can result in implicit calls to C
+functions at arbitrary points during erase_kstack(). That could
+interfere with the search for poison, and/or leave data on the stack
+which is not erased.
 
-[12399.954245]        CPU0                    CPU1
-[12399.958762]        ----                    ----
-[12399.963279]   lock(&(&dist->lpi_list_lock)->rlock);
-[12399.968146]                                local_irq_disable();
-[12399.974052]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
-[12399.981696]                                lock(&(&dist->lpi_list_lock)->rlock);
-[12399.989081]   <Interrupt>
-[12399.991688]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
-[12399.996989]
-                *** DEADLOCK ***
+They won't result in hard failures, as KASAN would, but we should
+probably avoid them regardless.
 
-[12400.002897] 2 locks held by qemu-system-aar/5597:
-[12400.007587]  #0: 0000000042beb9dc (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
-[12400.015411]  #1: 00000000c45d644a (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}, at: kvm_vgic_sync_hwstate+0x8c/0x328
+[...]
 
+> >> +asmlinkage void erase_kstack(void)
+> >> +{
+> >> +	unsigned long p = current->thread.lowest_stack;
+> >> +	unsigned long boundary = p & ~(THREAD_SIZE - 1);
+> >> +	unsigned long poison = 0;
+> >> +	const unsigned long check_depth = STACKLEAK_POISON_CHECK_DEPTH /
+> >> +							sizeof(unsigned long);
+> >> +
+> >> +	/*
+> >> +	 * Let's search for the poison value in the stack.
+> >> +	 * Start from the lowest_stack and go to the bottom.
+> >> +	 */
+> >> +	while (p > boundary && poison <= check_depth) {
+> >> +		if (*(unsigned long *)p == STACKLEAK_POISON)
+> >> +			poison++;
+> >> +		else
+> >> +			poison = 0;
+> >> +
+> >> +		p -= sizeof(unsigned long);
+> >> +	}
+> >> +
+> >> +	/*
+> >> +	 * One long int at the bottom of the thread stack is reserved and
+> >> +	 * should not be poisoned (see CONFIG_SCHED_STACK_END_CHECK).
+> >> +	 */
+> >> +	if (p == boundary)
+> >> +		p += sizeof(unsigned long);
+> > 
+> > I wonder if end_of_stack() should be taught about CONFIG_SCHED_STACK_END_CHECK,
+> > given that's supposed to return the last *usable* long on the stack, and we
+> > don't account for this elsewhere.
+> 
+> I would be afraid to change the meaning of end_of_stack()... Currently it
+> considers that magic long as usable (include/linux/sched/task_stack.h):
+> 
+> #define task_stack_end_corrupted(task) \
+> 		(*(end_of_stack(task)) != STACK_END_MAGIC)
+> 
+> 
+> > If we did, then IIUC we could do:
+> > 
+> > 	unsigned long boundary = (unsigned long)end_of_stack(current);
+> > 
+> > ... at the start of the function, and not have to worry about this explicitly.
+> 
+> I should mention that erase_kstack() can be called from x86 trampoline stack.
+> That's why the boundary is calculated from the lowest_stack.
 
-There is nothing unusual in my config or qemu parameters, I can upload these
-if needed. I see this on ThunderX and ThunderX2 and also with older kernels
-(4.13+ distribution kernel).
+Ok. Under what circumstances does that happen?
 
-I tried making the lpi_list_lock irq safe but that just leads to different
-warnings. The locking here seems to be quite sophisticated and I'm not familiar
-with it.
+It seems a little scary that curent::thread::lowest_stack might not be
+on current's task stack. Is that reset when transitioning to/from the
+trampoile stack?
 
-Full dmesg: https://paste.ubuntu.com/p/BZ5QTg62Ym/
+[...]
 
---Jan
+> >> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+> >> +void __used check_alloca(unsigned long size)
+> >> +{
+> >> +	unsigned long sp, stack_left;
+> >> +
+> >> +	sp = current_stack_pointer;
+> >> +
+> >> +	stack_left = sp & (THREAD_SIZE - 1);
+> >> +	BUG_ON(stack_left < 256 || size >= stack_left - 256);
+> >> +}
+> > 
+> > Is this arbitrary, or is there something special about 256?
+> > 
+> > Even if this is arbitrary, can we give it some mnemonic?
+> 
+> It's just a reasonable number. We can introduce a macro for it.
+
+I'm just not sure I see the point in the offset, given things like
+VMAP_STACK exist. BUG_ON() handling will likely require *more* than 256
+bytes of stack, so it seems superfluous, as we'd be relying on stack
+overflow detection at that point.
+
+I can see that we should take the CONFIG_SCHED_STACK_END_CHECK offset
+into account, though.
+
+> >> +EXPORT_SYMBOL(check_alloca);
+> >> +#endif
+> >> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+> >> index a34e9290a699..25dd2a14560d 100644
+> >> --- a/drivers/firmware/efi/libstub/Makefile
+> >> +++ b/drivers/firmware/efi/libstub/Makefile
+> >> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+> >>  KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+> >>  				   -D__NO_FORTIFY \
+> >>  				   $(call cc-option,-ffreestanding) \
+> >> -				   $(call cc-option,-fno-stack-protector)
+> >> +				   $(call cc-option,-fno-stack-protector) \
+> >> +				   $(DISABLE_STACKLEAK_PLUGIN)
+> >>  
+> >>  GCOV_PROFILE			:= n
+> >>  KASAN_SANITIZE			:= n
+> > 
+> > I believe we'll also need to do this for the KVM hyp code in arch/arm64/kvm/hyp/.
+> 
+> Could you please give more details on that? Why STACKLEAK breaks it?
+
+In the hyp/EL2 exception level, we only map the hyp text, and not the
+rest of the kernel. So erase_kstack and check_alloca won't be mapped,
+and attempt to branch to them will fault.
+
+Even if it were mapped, things like BUG_ON(), get_current(), etc do not
+work at hyp.
+
+Additionally, the hyp code is mapped as a different virtual address from
+the rest of the kernel, so if any of the STACKLEAK code happens to use
+an absolute address, this will not work correctly.
+
+Thanks,
+Mark.
