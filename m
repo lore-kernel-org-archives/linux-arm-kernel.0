@@ -1,22 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 4 May 2018 12:34:29 -0300
-Subject: [PATCH 3/4] ARM: dts: imx27: use lable to override osc26m clock
- setting
-In-Reply-To: <1525395446-1953-4-git-send-email-shawnguo@kernel.org>
-References: <1525395446-1953-1-git-send-email-shawnguo@kernel.org>
- <1525395446-1953-4-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAOMZO5D1Dc9hh-o81fvy8PKNx_m8gdR9yW2w5Xumse1VFHFLTQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  4 May 2018 17:38:25 +0200
+Subject: [GIT PULL] ARM: tegra: Device tree fixes for v4.17
+Message-ID: <20180504153825.1074-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi ARM SoC maintainers,
 
-On Thu, May 3, 2018 at 9:57 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> Instead of copying the whole node hierarchy, let's define a label for
-> clock osc26m in soc dtsi and use it for overriding clock-frequency.
->
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-In the Subject: s/lable/label
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-Other than that the series looks good.
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-fixes
+
+for you to fetch changes up to 9bf4e370048d2bbae5262d0c6280e0142804a272:
+
+  ARM: dts: tegra20: Revert "Fix ULPI regression on Tegra20" (2018-05-04 17:32:29 +0200)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+ARM: tegra: Device tree fixes for v4.17
+
+This contains a single revert for a patch that was merged in v4.17-rc1
+and that turns out to cause a regression on some boards. Further, the
+original issue that the patch was supposed to fix seems to have
+disappeared.
+
+----------------------------------------------------------------
+Dmitry Osipenko (1):
+      ARM: dts: tegra20: Revert "Fix ULPI regression on Tegra20"
+
+ arch/arm/boot/dts/tegra20.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
