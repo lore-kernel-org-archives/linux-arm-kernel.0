@@ -1,33 +1,36 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 4 May 2018 20:24:22 +0200
-Subject: [PATCH 1/6] locking/atomic, asm-generic: instrument ordering
- variants
-In-Reply-To: <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
-References: <20180504173937.25300-1-mark.rutland@arm.com>
- <20180504173937.25300-2-mark.rutland@arm.com>
- <20180504180105.GS12217@hirez.programming.kicks-ass.net>
- <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
-Message-ID: <20180504182422.GT12217@hirez.programming.kicks-ass.net>
+From: neelx@redhat.com (Daniel Vacek)
+Date: Fri, 4 May 2018 20:33:56 +0200
+Subject: [PATCH v8 0/6] optimize memblock_next_valid_pfn and
+ early_pfn_valid on arm and arm64
+In-Reply-To: <23b14717-0f4a-10f2-5118-7cb8445fbdab@oracle.com>
+References: <1523431317-30612-1-git-send-email-hejianet@gmail.com>
+ <05b0fcf2-7670-101e-d4ab-1f656ff6b02f@gmail.com>
+ <CACjP9X8bHmrxmd7ZPcfQq6Eq0Mzwmt0saOR3Ph53gp2n-dcKBQ@mail.gmail.com>
+ <23b14717-0f4a-10f2-5118-7cb8445fbdab@oracle.com>
+Message-ID: <CACjP9X950MTY9qZ7OkzEaph3U1BL8Vo9sT4jBZ8HTuhHez9JAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 07:09:09PM +0100, Mark Rutland wrote:
-> On Fri, May 04, 2018 at 08:01:05PM +0200, Peter Zijlstra wrote:
-> > On Fri, May 04, 2018 at 06:39:32PM +0100, Mark Rutland wrote:
+On Fri, May 4, 2018 at 6:53 PM, Pavel Tatashin
+<pasha.tatashin@oracle.com> wrote:
+>> I'm wondering, ain't simple enabling of config
+>> DEFERRED_STRUCT_PAGE_INIT provide even better speed-up? If that is the
+>> case then it seems like this series is not needed at all, right?
+>> I am not sure why is this config optional. It looks like it could be
+>> enabled by default or even unconditionally considering that with
+>> commit c9e97a1997fb ("mm: initialize pages on demand during boot") the
+>> deferred code is statically disabled after all the pages are
+>> initialized.
+>
+> Hi Daniel,
+>
+> Currently, deferred struct pages are initialized in parallel only on NUMA machines. I would like to make a change to use all the available CPUs even on a single socket systems, but that is not there yet. So, I believe Jia's performance improvements are still relevant.
 
-> > >  include/asm-generic/atomic-instrumented.h | 1195 ++++++++++++++++++++++++-----
-> > >  1 file changed, 1008 insertions(+), 187 deletions(-)
-> > 
-> > Is there really no way to either generate or further macro compress this?
-> 
-> I can definitely macro compress this somewhat, but the bulk of the
-> repetition will be the ifdeffery, which can't be macro'd away IIUC.
+Ahaa, I thought it also works on UP or single node systems. I didn't
+study the code closely. Sorry about the noise. And thank you, Pavel.
+You're right.
 
-Right, much like what we already have in linux/atomic.h I suspect,
-having to duplicating that isn't brilliant either.
+--nX
 
-> Generating this with a script is possible -- do we do anything like that
-> elsewhere?
-
-There's include/generated/ in your build directory. But nothing on this
-scale I think.
+> Thank you,
+> Pavel
