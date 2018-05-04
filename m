@@ -1,51 +1,124 @@
 From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Fri,  4 May 2018 13:15:58 +0900
-Subject: [BUGFIX PATCH v3 3/4] arm: kprobes: Prohibit kprobes on do_undefinstr
+Date: Fri,  4 May 2018 13:16:27 +0900
+Subject: [BUGFIX PATCH v3 4/4] arm: kprobes: Prohibit kprobes on get_user
+ functions
 In-Reply-To: <152540727123.29650.13679359124038587629.stgit@devbox>
 References: <152540727123.29650.13679359124038587629.stgit@devbox>
-Message-ID: <152540735813.29650.10807161581632067171.stgit@devbox>
+Message-ID: <152540738682.29650.10638462666953783065.stgit@devbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prohibit kprobes on do_undefinstr because kprobes on
-arm is implemented by undefined instruction. This means
-if we probe do_undefinstr(), it can cause infinit
-recursive exception.
+Since do_undefinstr() uses get_user to get the undefined
+instruction, it can be called before kprobes processes
+recursive check. This can cause an infinit recursive
+exception.
+Prohibit probing on get_user functions.
 
 Fixes: 24ba613c9d6c ("ARM kprobes: core code")
 Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
 Cc: stable at vger.kernel.org
 ---
- arch/arm/kernel/traps.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ Changes in v2:
+  - Fix to add _ASM_NOKPROBE() definition for
+    !CONFIG_KPROBES.
+---
+ arch/arm/include/asm/assembler.h |   10 ++++++++++
+ arch/arm/lib/getuser.S           |   10 ++++++++++
+ 2 files changed, 20 insertions(+)
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 5e3633c24e63..2fe87109ae46 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -19,6 +19,7 @@
- #include <linux/uaccess.h>
- #include <linux/hardirq.h>
- #include <linux/kdebug.h>
-+#include <linux/kprobes.h>
- #include <linux/module.h>
- #include <linux/kexec.h>
- #include <linux/bug.h>
-@@ -417,7 +418,8 @@ void unregister_undef_hook(struct undef_hook *hook)
- 	raw_spin_unlock_irqrestore(&undef_lock, flags);
- }
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index bc8d4bbd82e2..9342904cccca 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -536,4 +536,14 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ #endif
+ 	.endm
  
--static int call_undef_hook(struct pt_regs *regs, unsigned int instr)
-+static nokprobe_inline
-+int call_undef_hook(struct pt_regs *regs, unsigned int instr)
- {
- 	struct undef_hook *hook;
- 	unsigned long flags;
-@@ -490,6 +492,7 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
++#ifdef CONFIG_KPROBES
++#define _ASM_NOKPROBE(entry)				\
++	.pushsection "_kprobe_blacklist", "aw" ;	\
++	.balign 4 ;					\
++	.long entry;					\
++	.popsection
++#else
++#define _ASM_NOKPROBE(entry)
++#endif
++
+ #endif /* __ASM_ASSEMBLER_H__ */
+diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
+index df73914e81c8..746e7801dcdf 100644
+--- a/arch/arm/lib/getuser.S
++++ b/arch/arm/lib/getuser.S
+@@ -38,6 +38,7 @@ ENTRY(__get_user_1)
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__get_user_1)
++_ASM_NOKPROBE(__get_user_1)
  
- 	arm_notify_die("Oops - undefined instruction", regs, &info, 0, 6);
- }
-+NOKPROBE_SYMBOL(do_undefinstr)
+ ENTRY(__get_user_2)
+ 	check_uaccess r0, 2, r1, r2, __get_user_bad
+@@ -58,6 +59,7 @@ rb	.req	r0
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__get_user_2)
++_ASM_NOKPROBE(__get_user_2)
  
- /*
-  * Handle FIQ similarly to NMI on x86 systems.
+ ENTRY(__get_user_4)
+ 	check_uaccess r0, 4, r1, r2, __get_user_bad
+@@ -65,6 +67,7 @@ ENTRY(__get_user_4)
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__get_user_4)
++_ASM_NOKPROBE(__get_user_4)
+ 
+ ENTRY(__get_user_8)
+ 	check_uaccess r0, 8, r1, r2, __get_user_bad8
+@@ -78,6 +81,7 @@ ENTRY(__get_user_8)
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__get_user_8)
++_ASM_NOKPROBE(__get_user_8)
+ 
+ #ifdef __ARMEB__
+ ENTRY(__get_user_32t_8)
+@@ -91,6 +95,7 @@ ENTRY(__get_user_32t_8)
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__get_user_32t_8)
++_ASM_NOKPROBE(__get_user_32t_8)
+ 
+ ENTRY(__get_user_64t_1)
+ 	check_uaccess r0, 1, r1, r2, __get_user_bad8
+@@ -98,6 +103,7 @@ ENTRY(__get_user_64t_1)
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__get_user_64t_1)
++_ASM_NOKPROBE(__get_user_64t_1)
+ 
+ ENTRY(__get_user_64t_2)
+ 	check_uaccess r0, 2, r1, r2, __get_user_bad8
+@@ -114,6 +120,7 @@ rb	.req	r0
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__get_user_64t_2)
++_ASM_NOKPROBE(__get_user_64t_2)
+ 
+ ENTRY(__get_user_64t_4)
+ 	check_uaccess r0, 4, r1, r2, __get_user_bad8
+@@ -121,6 +128,7 @@ ENTRY(__get_user_64t_4)
+ 	mov	r0, #0
+ 	ret	lr
+ ENDPROC(__get_user_64t_4)
++_ASM_NOKPROBE(__get_user_64t_4)
+ #endif
+ 
+ __get_user_bad8:
+@@ -131,6 +139,8 @@ __get_user_bad:
+ 	ret	lr
+ ENDPROC(__get_user_bad)
+ ENDPROC(__get_user_bad8)
++_ASM_NOKPROBE(__get_user_bad)
++_ASM_NOKPROBE(__get_user_bad8)
+ 
+ .pushsection __ex_table, "a"
+ 	.long	1b, __get_user_bad
