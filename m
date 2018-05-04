@@ -1,39 +1,60 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri,  4 May 2018 21:05:37 +0200
-Subject: [PATCH v9 04/12] ARM: dts: sun8i: Add R_CPUCFG device node for the
- A83T dtsi
+Date: Fri,  4 May 2018 21:05:34 +0200
+Subject: [PATCH v9 01/12] ARM: Allow this header to be included by assembly
+ files
 In-Reply-To: <20180504190545.5114-1-mylene.josserand@bootlin.com>
 References: <20180504190545.5114-1-mylene.josserand@bootlin.com>
-Message-ID: <20180504190545.5114-5-mylene.josserand@bootlin.com>
+Message-ID: <20180504190545.5114-2-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The R_CPUCFG is a collection of registers needed for SMP bringup
-on clusters and cluster's reset.
-For the moment, documentation about this register is found in
-Allwinner's code only.
+From: Doug Berger <opendmb@gmail.com>
 
+The constants defined in this file are equally useful in assembly and C
+source files. The arm64 architecture version of this file allows
+inclusion in both assembly and C source files, so this this commit adds
+that capability to the arm architecture version so that the constants
+don't need to be defined in multiple places.
+
+Signed-off-by: Doug Berger <opendmb@gmail.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/include/asm/cputype.h | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index a50ccb475de8..53ace066b7dc 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -938,6 +938,11 @@
- 			#reset-cells = <1>;
- 		};
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index cb546425da8a..e7632f536633 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -2,9 +2,6 @@
+ #ifndef __ASM_ARM_CPUTYPE_H
+ #define __ASM_ARM_CPUTYPE_H
  
-+		r_cpucfg at 1f01c00 {
-+			compatible = "allwinner,sun8i-a83t-r-cpucfg";
-+			reg = <0x1f01c00 0x400>;
-+		};
+-#include <linux/stringify.h>
+-#include <linux/kernel.h>
+-
+ #define CPUID_ID	0
+ #define CPUID_CACHETYPE	1
+ #define CPUID_TCM	2
+@@ -98,6 +95,11 @@
+ /* Qualcomm implemented cores */
+ #define ARM_CPU_PART_SCORPION		0x510002d0
+ 
++#ifndef __ASSEMBLY__
 +
- 		r_pio: pinctrl at 1f02c00 {
- 			compatible = "allwinner,sun8i-a83t-r-pinctrl";
- 			reg = <0x01f02c00 0x400>;
++#include <linux/stringify.h>
++#include <linux/kernel.h>
++
+ extern unsigned int processor_id;
+ 
+ #ifdef CONFIG_CPU_CP15
+@@ -326,4 +328,6 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u32 features,
+ #define cpuid_feature_extract(reg, field) \
+ 	cpuid_feature_extract_field(read_cpuid_ext(reg), field)
+ 
++#endif /* __ASSEMBLY__ */
++
+ #endif
 -- 
 2.11.0
