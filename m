@@ -1,92 +1,87 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri,  4 May 2018 15:52:12 +0200
-Subject: [PATCH v2 26/26] drm/bridge: establish a link between the bridge
- supplier and consumer
-In-Reply-To: <20180504135212.26977-1-peda@axentia.se>
-References: <20180504135212.26977-1-peda@axentia.se>
-Message-ID: <20180504135212.26977-27-peda@axentia.se>
+From: antoine.tenart@bootlin.com (Antoine Tenart)
+Date: Fri,  4 May 2018 15:56:37 +0200
+Subject: [PATCH net-next v2 07/13] phy: cp110-comphy: 2.5G SGMII mode
+In-Reply-To: <20180504135643.23466-1-antoine.tenart@bootlin.com>
+References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
+Message-ID: <20180504135643.23466-8-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the bridge supplier is unbound, this will bring the bridge consumer
-down along with the bridge. Thus, there will no longer linger any
-dangling pointers from the bridge consumer (the drm_device) to some
-non-existent bridge supplier.
+This patch allow the CP110 comphy to configure some lanes in the
+2.5G SGMII mode. This mode is quite close to SGMII and uses nearly the
+same code path.
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
+Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
 ---
- drivers/gpu/drm/drm_bridge.c | 18 ++++++++++++++++++
- include/drm/drm_bridge.h     |  2 ++
- 2 files changed, 20 insertions(+)
+ drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
-index 78d186b6831b..0259f0a3ff27 100644
---- a/drivers/gpu/drm/drm_bridge.c
-+++ b/drivers/gpu/drm/drm_bridge.c
-@@ -26,6 +26,7 @@
- #include <linux/mutex.h>
+diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+index a0d522154cdf..4ef429250d7b 100644
+--- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
++++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+@@ -135,19 +135,25 @@ struct mvebu_comhy_conf {
+ static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
+ 	/* lane 0 */
+ 	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII, 0x1),
++	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_2500SGMII, 0x1),
+ 	/* lane 1 */
+ 	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_SGMII, 0x1),
++	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_2500SGMII, 0x1),
+ 	/* lane 2 */
+ 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_SGMII, 0x1),
++	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_2500SGMII, 0x1),
+ 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_10GKR, 0x1),
+ 	/* lane 3 */
+ 	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_SGMII, 0x2),
++	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_2500SGMII, 0x2),
+ 	/* lane 4 */
+ 	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_SGMII, 0x2),
++	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_2500SGMII, 0x2),
+ 	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_10GKR, 0x2),
+ 	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_SGMII, 0x1),
+ 	/* lane 5 */
+ 	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_SGMII, 0x1),
++	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_2500SGMII, 0x1),
+ };
  
- #include <drm/drm_bridge.h>
-+#include <drm/drm_device.h>
- #include <drm/drm_encoder.h>
- 
- #include "drm_crtc_internal.h"
-@@ -127,12 +128,25 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
- 	if (bridge->dev)
- 		return -EBUSY;
- 
-+	if (encoder->dev->dev != bridge->odev) {
-+		bridge->link = device_link_add(encoder->dev->dev,
-+					       bridge->odev, 0);
-+		if (!bridge->link) {
-+			dev_err(bridge->odev, "failed to link bridge to %s\n",
-+				dev_name(encoder->dev->dev));
-+			return -EINVAL;
-+		}
-+	}
-+
- 	bridge->dev = encoder->dev;
- 	bridge->encoder = encoder;
- 
- 	if (bridge->funcs->attach) {
- 		ret = bridge->funcs->attach(bridge);
- 		if (ret < 0) {
-+			if (bridge->link)
-+				device_link_del(bridge->link);
-+			bridge->link = NULL;
- 			bridge->dev = NULL;
- 			bridge->encoder = NULL;
- 			return ret;
-@@ -159,6 +173,10 @@ void drm_bridge_detach(struct drm_bridge *bridge)
- 	if (bridge->funcs->detach)
- 		bridge->funcs->detach(bridge);
- 
-+	if (bridge->link)
-+		device_link_del(bridge->link);
-+	bridge->link = NULL;
-+
- 	bridge->dev = NULL;
+ struct mvebu_comphy_priv {
+@@ -206,6 +212,10 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
+ 	if (mode == PHY_MODE_10GKR)
+ 		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0xe) |
+ 		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0xe);
++	else if (mode == PHY_MODE_2500SGMII)
++		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x8) |
++		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x8) |
++		       MVEBU_COMPHY_SERDES_CFG0_HALF_BUS;
+ 	else if (mode == PHY_MODE_SGMII)
+ 		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x6) |
+ 		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x6) |
+@@ -296,13 +306,13 @@ static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane,
+ 	return 0;
  }
  
-diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-index b656e505d11e..804189c63a4c 100644
---- a/include/drm/drm_bridge.h
-+++ b/include/drm/drm_bridge.h
-@@ -261,6 +261,7 @@ struct drm_bridge_timings {
-  * @list: to keep track of all added bridges
-  * @timings: the timing specification for the bridge, if any (may
-  * be NULL)
-+ * @link: drm consumer <-> bridge supplier
-  * @funcs: control functions
-  * @driver_private: pointer to the bridge driver's internal context
-  */
-@@ -271,6 +272,7 @@ struct drm_bridge {
- 	struct drm_bridge *next;
- 	struct list_head list;
- 	const struct drm_bridge_timings *timings;
-+	struct device_link *link;
+-static int mvebu_comphy_set_mode_sgmii(struct phy *phy)
++static int mvebu_comphy_set_mode_sgmii(struct phy *phy, enum phy_mode mode)
+ {
+ 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
+ 	struct mvebu_comphy_priv *priv = lane->priv;
+ 	u32 val;
  
- 	const struct drm_bridge_funcs *funcs;
- 	void *driver_private;
+-	mvebu_comphy_ethernet_init_reset(lane, PHY_MODE_SGMII);
++	mvebu_comphy_ethernet_init_reset(lane, mode);
+ 
+ 	val = readl(priv->base + MVEBU_COMPHY_RX_CTRL1(lane->id));
+ 	val &= ~MVEBU_COMPHY_RX_CTRL1_CLK8T_EN;
+@@ -487,7 +497,8 @@ static int mvebu_comphy_power_on(struct phy *phy)
+ 
+ 	switch (lane->mode) {
+ 	case PHY_MODE_SGMII:
+-		ret = mvebu_comphy_set_mode_sgmii(phy);
++	case PHY_MODE_2500SGMII:
++		ret = mvebu_comphy_set_mode_sgmii(phy, lane->mode);
+ 		break;
+ 	case PHY_MODE_10GKR:
+ 		ret = mvebu_comphy_set_mode_10gkr(phy);
 -- 
-2.11.0
+2.17.0
