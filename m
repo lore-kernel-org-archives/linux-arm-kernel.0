@@ -1,111 +1,82 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 4 May 2018 15:51:20 +0100
-Subject: Potential deadlock in vgic
-In-Reply-To: <20180504130854.GA14663@hc>
-References: <20180504110343.GA10968@hc>
- <20180504124742.GG10191@C02W217FHV2R.local> <20180504130854.GA14663@hc>
-Message-ID: <1f343d54-03a2-10b4-1413-c0fa4a84bb7e@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 4 May 2018 17:03:08 +0200
+Subject: [PATCH net-next v2 00/15] ARM: sun8i: r40: Add Ethernet support
+In-Reply-To: <20180503.144042.266645949281979304.davem@davemloft.net>
+References: <CAGb2v67HFb6eLBS4_9s_wJ5uWFeQdUtwn_NMJnm59UUDFBDJUA@mail.gmail.com>
+ <20180502.110617.304411895589508709.davem@davemloft.net>
+ <20180503131257.rlqxetafejikmnji@flea>
+ <20180503.144042.266645949281979304.davem@davemloft.net>
+Message-ID: <20180504150307.sdtnksk2uslrl3o5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, May 03, 2018 at 02:40:42PM -0400, David Miller wrote:
+> From: Maxime Ripard <maxime.ripard@bootlin.com>
+> Date: Thu, 3 May 2018 15:12:57 +0200
+> 
+> > Hi Dave,
+> > 
+> > On Wed, May 02, 2018 at 11:06:17AM -0400, David Miller wrote:
+> >> From: Chen-Yu Tsai <wens@csie.org>
+> >> Date: Wed, 2 May 2018 00:33:45 +0800
+> >> 
+> >> > I should've mentioned that patches 3 ~ 10, and only these, should go
+> >> > through net-next. sunxi will handle the remaining clk, device tree, and
+> >> > soc driver patches.
+> >> 
+> >> Ok, I just noticed this.
+> >> 
+> >> Why don't you just post those patches separately as a series on their
+> >> own then, in order to avoid confusion?
+> >> 
+> >> Then you can adjust the patch series header posting to explain the
+> >> non-net-next changes, where they got merged, and what they provide
+> >> in order to faciliate the net-next changes.
+> > 
+> > I now that we usually have some feedback from non-net maintainers that
+> > they actually prefer seeing the full picture (and I also tend to
+> > prefer that as well) and having all the patches relevant to enable a
+> > particular feature, even if it means getting multiple maintainers
+> > involved.
+> > 
+> > Just to make sure we understood you fully, do you want Chen-Yu to
+> > resend his serie following your comments, or was that just a general
+> > remark for next time?
+> 
+> Yeah, good questions.
+> 
+> I think it can be argued either way.  For review having the complete
+> context is important.
+> 
+> But from a maintainer's standpoint, when there is any ambiguity
+> whatsoever about what patches go into this tree or that, it is really
+> frowned upon and is quite error prone.
+> 
+> Also, that header posting is _SO_ important.  It explains the series.
+> But for these 'partial apply' situations the header posting refers
+> to patches not in the series.
+> 
+> This looks terrible in the logs, when, as I do, the header posting
+> text is added to a marge commit for the series.  People will read it
+> and say "where are all of these other changes mentioned in the text?
+> was this series misapplied?"
+> 
+> That's why, maybe after the review is successful, I want the actual
+> patch series standalone with appropriately updated header posting
+> text.
 
-On 04/05/18 14:08, Jan Glauber wrote:
-> On Fri, May 04, 2018 at 02:47:42PM +0200, Christoffer Dall wrote:
->> Hi Jan,
->>
->> On Fri, May 04, 2018 at 01:03:44PM +0200, Jan Glauber wrote:
->>> Hi all,
->>>
->>> enabling lockdep I see the following reported in the host when I start a kvm guest:
->>>
->>> [12399.954245]        CPU0                    CPU1
->>> [12399.958762]        ----                    ----
->>> [12399.963279]   lock(&(&dist->lpi_list_lock)->rlock);
->>> [12399.968146]                                local_irq_disable();
->>> [12399.974052]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
->>> [12399.981696]                                lock(&(&dist->lpi_list_lock)->rlock);
->>> [12399.989081]   <Interrupt>
->>> [12399.991688]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
->>> [12399.996989]
->>>                 *** DEADLOCK ***
->>>
->>> [12400.002897] 2 locks held by qemu-system-aar/5597:
->>> [12400.007587]  #0: 0000000042beb9dc (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
->>> [12400.015411]  #1: 00000000c45d644a (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}, at: kvm_vgic_sync_hwstate+0x8c/0x328
->>>
->>>
->>> There is nothing unusual in my config or qemu parameters, I can upload these
->>> if needed. I see this on ThunderX and ThunderX2 and also with older kernels
->>> (4.13+ distribution kernel).
->>>
->>> I tried making the lpi_list_lock irq safe but that just leads to different
->>> warnings. The locking here seems to be quite sophisticated and I'm not familiar
->>> with it.
->>
->> That's unfortunate.  The problem here is that we end up violating our
->> locking order, which stipulates that ap_list_lock must be taken before
->> the lpi_list_lock.
->>
->> Give that we can take the ap_list_lock from interrupt context (timers
->> firing), the only solution I can easily think of is to change
->> lpi_list_lock takers to disable interrupts as well.
->>
->> Which warnings did you encounter with that approach?
-> 
-> Hi Christoffer,
-> 
-> making lpi_list_lock irq safe I get:
-> 
-> [  394.239174] ========================================================
-> [  394.245515] WARNING: possible irq lock inversion dependency detected
-> [  394.251857] 4.17.0-rc3-jang+ #72 Not tainted
-> [  394.256114] --------------------------------------------------------
-> [  394.262454] qemu-system-aar/5596 just changed the state of lock:
-> [  394.268448] 00000000da3f09ef (&(&irq->irq_lock)->rlock#3){+...}, at: update_affinity+0x3c/0xa8
-> [  394.277066] but this lock was taken by another, HARDIRQ-safe lock in the past:
-> [  394.284274]  (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}
-> [  394.284278] 
->                
->                and interrupts could create inverse lock ordering between them.
-> 
-> [  394.300777] 
->                other info that might help us debug this:
-> [  394.307292]  Possible interrupt unsafe locking scenario:
-> 
-> [  394.314066]        CPU0                    CPU1
-> [  394.318584]        ----                    ----
-> [  394.323101]   lock(&(&irq->irq_lock)->rlock#3);
-> [  394.327622]                                local_irq_disable();
-> [  394.333528]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
-> [  394.341172]                                lock(&(&irq->irq_lock)->rlock#3);
-> [  394.348210]   <Interrupt>
-> [  394.350817]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
-> [  394.356118] 
+Ok, thanks for the explanation, that makes sense :)
 
-That's weird, as that shouldn't happen anymore. IIRC we switched *both*
-ap_list_lock and irq_lock over to be IRQ safe, so the first lock on CPU0
-would disable IRQs, making the interrupt afterwards impossible.
-Did we actually forget some irq_lock's to convert over and lockdep is
-picking those up?
+Maxime
 
-So if this is the case, we should be fine by making the missing ones
-irqsave as well, then adding _irqsave to the lpi_list_lock, which has
-just a few users and guards only short critical sections contained
-within a function.
-
-Cheers,
-Andre.
-
->                 *** DEADLOCK ***
-> 
-> [  394.362025] 4 locks held by qemu-system-aar/5596:
-> [  394.366716]  #0: 00000000719c7423 (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
-> [  394.374545]  #1: 0000000060090841 (&kvm->srcu){....}, at: kvm_handle_guest_abort+0x11c/0xb70
-> [  394.382984]  #2: 0000000064647766 (&its->cmd_lock){+.+.}, at: vgic_mmio_write_its_cwriter+0x44/0xa8
-> [  394.392022]  #3: 0000000075f90a8a (&its->its_lock){+.+.}, at: vgic_its_process_commands.part.11+0xac/0x780
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/fe9e3279/attachment.sig>
