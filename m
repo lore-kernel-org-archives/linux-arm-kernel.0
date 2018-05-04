@@ -1,43 +1,71 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 4 May 2018 13:31:52 -0300
-Subject: [PATCH] ARM: dts: imx7s: Pass the 'fsl,sec-era' property
-In-Reply-To: <20180504071926.GT3443@dragon>
-References: <1524601519-23502-1-git-send-email-festevam@gmail.com>
- <20180504071926.GT3443@dragon>
-Message-ID: <CAOMZO5AVjFCad4PC20X5PqMuKGJQ2cOSBnqbGw+ngYCODL2vmQ@mail.gmail.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Fri, 4 May 2018 18:31:42 +0200
+Subject: Potential deadlock in vgic
+In-Reply-To: <20180504151740.12165-1-andre.przywara@arm.com>
+References: <20180504130854.GA14663@hc>
+ <20180504151740.12165-1-andre.przywara@arm.com>
+Message-ID: <20180504163142.GC14663@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Fri, May 04, 2018 at 04:17:40PM +0100, Andre Przywara wrote:
+> Hi Jan,
+> 
+> can you please test this patch with your setup, to see if it still
+> screams? That converts two forgotten irq_lock's over to be irqsafe,
+> plus lets lpi_list_lock join them (which you already did, IIUC).
+> That should appease lockdep, hopefully.
 
-On Fri, May 4, 2018 at 4:19 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+Hit send too soon, on halting the guest I get:
 
-> The property is documented as optional in the bindings.  Missing the
-> property shouldn't cause any fatal error, I guess.
+[ 1025.694857] =============================
+[ 1025.694862] WARNING: suspicious RCU usage
+[ 1025.694868] 4.17.0-rc3-jang+ #73 Not tainted
+[ 1025.694873] -----------------------------
+[ 1025.694880] ./include/linux/kvm_host.h:575 suspicious rcu_dereference_check() usage!
+[ 1025.694884] 
+               other info that might help us debug this:
 
-The CAAM drivers uses the era information in many places:
+[ 1025.694890] 
+               rcu_scheduler_active = 2, debug_locks = 1
+[ 1025.694896] 18 locks held by qemu-system-aar/5540:
+[ 1025.694901]  #0: 000000005e03488a (&kvm->lock){+.+.}, at: vgic_its_set_attr+0x230/0x388
+[ 1025.694937]  #1: 000000004b1a3bb5 (&its->its_lock){+.+.}, at: vgic_its_set_attr+0x23c/0x388
+[ 1025.694965]  #2: 000000003ca8213c (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.694993]  #3: 00000000adb6ae51 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695021]  #4: 0000000000563df7 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695048]  #5: 00000000da16277a (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695076]  #6: 00000000bf36d9aa (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695103]  #7: 00000000607eaa4f (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695130]  #8: 0000000046dadf65 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695157]  #9: 00000000197747b2 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695184]  #10: 00000000e4f1282c (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695211]  #11: 000000007471b896 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695239]  #12: 000000005be54486 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695266]  #13: 000000000f1fa184 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695293]  #14: 0000000093fdb28b (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695396]  #15: 0000000097cc103c (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695426]  #16: 00000000d24dd32e (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695453]  #17: 000000002606c3a7 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
+[ 1025.695482] 
+               stack backtrace:
+[ 1025.695489] CPU: 29 PID: 5540 Comm: qemu-system-aar Not tainted 4.17.0-rc3-jang+ #73
+[ 1025.695494] Hardware name: To be filled by O.E.M. Saber/To be filled by O.E.M., BIOS 0ACKL018 03/30/2018
+[ 1025.695499] Call trace:
+[ 1025.695505]  dump_backtrace+0x0/0x160
+[ 1025.695510]  show_stack+0x24/0x30
+[ 1025.695517]  dump_stack+0x9c/0xd4
+[ 1025.695524]  lockdep_rcu_suspicious+0xcc/0x118
+[ 1025.695537]  gfn_to_memslot+0x174/0x190
+[ 1025.695546]  kvm_read_guest+0x50/0xb0
+[ 1025.695553]  vgic_its_check_id.isra.0+0x114/0x148
+[ 1025.695560]  vgic_its_save_tables_v0+0x1a0/0x320
+[ 1025.695567]  vgic_its_set_attr+0x330/0x388
+[ 1025.695573]  kvm_device_ioctl_attr+0x9c/0xd8
+[ 1025.695579]  kvm_device_ioctl+0x8c/0xf8
+[ 1025.695587]  do_vfs_ioctl+0xc4/0x938
+[ 1025.695594]  ksys_ioctl+0x8c/0x98
+[ 1025.695601]  sys_ioctl+0x34/0x48
+[ 1025.695609]  el0_svc_naked+0x44/0x48
 
-drivers/crypto/caam/caamalg.c:  if (ctrlpriv->era >= 6) {
-drivers/crypto/caam/caamalg.c:  if (ctrlpriv->era < 3)
-drivers/crypto/caam/caamalg.c:  if (priv->era >= 6 && uses_dkp)
-drivers/crypto/caam/caamalg_desc.c:     if (era < 6) {
-drivers/crypto/caam/caamalg_desc.c:     /* Class 2 operation */
-drivers/crypto/caam/caamalg_desc.c:     if (era < 6) {
-drivers/crypto/caam/caamalg_desc.c:     /* Class 2 operation */
-drivers/crypto/caam/caamalg_desc.c:     if (era < 6) {
-
-If the era information is not provided the value of -524 (-ENOTSUPP)
-will be used, so all the above logic will not operate correctly.
-
-I have sent a patch that allows the era information to be retrieved
-via CAAM registers:
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/crypto/caam/ctrl.c?h=next-20180424&id=654f2b937b389295581bcb4aa26011a63db7bc8f
-
-but this will only land in 4.18.
-
-In order to avoid i.MX7 to report the incorrect era information in
-4.17 I suggest that this patch should be applied for 4.17-rc.
-
-Also, the other i.mx SoCs pass the fsl,sec-era in their dts.
-
-Thanks
+--Jan
