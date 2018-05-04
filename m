@@ -1,63 +1,52 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 4 May 2018 09:40:16 +0200
-Subject: [PATCH 3/4] dt-bindings: rtc: update stm32-rtc documentation for
- st,syscfg property
-In-Reply-To: <20180503205351.GE10960@piout.net>
-References: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
- <1524144103-21432-4-git-send-email-amelie.delaunay@st.com>
- <20180427025803.mn32y5xle2p6knn6@rob-hp-laptop>
- <20180503205351.GE10960@piout.net>
-Message-ID: <a2cbe252-c957-103d-aae1-4a8fce9116fa@st.com>
+Date: Fri, 4 May 2018 09:42:03 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 analog & timer
+ drivers
+In-Reply-To: <CAK8P3a0maxno4S-dXoT1O5zp3NgHP2LWuGhtVoqFMMEv-tm07Q@mail.gmail.com>
+References: <1525274696-11968-1-git-send-email-fabrice.gasnier@st.com>
+ <cc934eb9-f9e4-3c52-7f38-413a1b63fce2@st.com>
+ <CAK8P3a0maxno4S-dXoT1O5zp3NgHP2LWuGhtVoqFMMEv-tm07Q@mail.gmail.com>
+Message-ID: <84f8b1bf-d6df-ca0e-cb3f-e5b7f7ded14b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
 
-On 05/03/2018 10:53 PM, Alexandre Belloni wrote:
-> Amelie,
-> 
-> On 26/04/2018 21:58:03-0500, Rob Herring wrote:
->> On Thu, Apr 19, 2018 at 03:21:42PM +0200, Amelie Delaunay wrote:
->>> RTC driver should not be aware of the PWR registers offset and bits
->>> position. Furthermore, we can imagine that Disable Backup Protection (DBP)
->>> relative register and bit mask could change depending on the SoC. So this
->>> patch moves st,syscfg property from single pwrcfg phandle to pwrcfg
->>> phandle/offset/mask triplet.
+
+On 05/04/2018 12:12 AM, Arnd Bergmann wrote:
+> On Thu, May 3, 2018 at 10:05 AM, Alexandre Torgue
+> <alexandre.torgue@st.com> wrote:
+>> Hi Fabrice,
+>>
+>> On 05/02/2018 05:24 PM, Fabrice Gasnier wrote:
 >>>
->>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+>>> This enables drivers for STM32 timer, low power timer and analog hardware
+>>> that can be used on STM32MP1 SoC:
+>>> - Timer & LP Timer MFD core, PWM, trigger & encoder drivers
+>>> - IIO ADC/DAC/DFSDM
+>>> - vrefbuf regu driver (voltage reference buffer).
+>>>
+>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 >>> ---
->>>   Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt | 10 ++++++----
->>>   1 file changed, 6 insertions(+), 4 deletions(-)
+>>>    arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
+>>>    1 file changed, 10 insertions(+)
 >>>
->>> diff --git a/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
->>> index a66692a..00f8b5d 100644
->>> --- a/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
->>> +++ b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
->>> @@ -14,8 +14,10 @@ Required properties:
->>>       It is required only on stm32h7.
->>>   - interrupt-parent: phandle for the interrupt controller.
->>>   - interrupts: rtc alarm interrupt.
->>> -- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
->>> -  (RTC registers) write protection.
->>> +- st,syscfg: phandle/offset/mask triplet. The phandle to pwrcfg used to
->>> +  access control register at offset, and change the dbp (Disable Backup
->>> +  Protection) bit represented by the mask, mandatory to disable/enable backup
->>> +  domain (RTC registers) write protection.
 >>
->> It's fine to add this, but you are breaking compatibility in the driver
->> with existing DTBs by requiring these new fields.
+>> Applied on stm32-next.
 >>
+>> Arnd,
+>> Do you agree if I take multi_v7_defconfig related patches in my stm32 pull
+>> requests ?
 > 
-> I'm fine with that change but I would like confirmation that this has
-> been well thought. Maybe Maxime or Alexandre could give their ack.
-> 
+> Yes, just make sure that all drivers that can reasonably be loadable
+> modules are configured that way rather than as built-in, so a defconfig
+> build doesn't become too big.
 
-It's a good thing to remove PWR registers information from RTC driver. 
-My only concern was the compatibility with old DT but we can accept it. 
-Indeed, Kernel will continue to boot fine, only RTC will not probe if we 
-use old DT.
-
-Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Ok. You're right, this drivers could be configured as module. We just 
+need to verify impact before send it.
 
 Regards
 alex
+
+> 
+>         Arnd
+> 
