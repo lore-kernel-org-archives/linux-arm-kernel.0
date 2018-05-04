@@ -1,102 +1,142 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 4 May 2018 14:41:36 +0100
-Subject: Potential deadlock in vgic
-In-Reply-To: <20180504130854.GA14663@hc>
-References: <20180504110343.GA10968@hc>
- <20180504124742.GG10191@C02W217FHV2R.local> <20180504130854.GA14663@hc>
-Message-ID: <da1fefae-fec4-aa3a-4fb6-fae9f85f4f61@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 4 May 2018 15:46:51 +0200
+Subject: [GIT PULL] STM32 DT changes for v4.18 #1
+Message-ID: <28c73dd0-fa87-83c1-5a93-217124e0f484@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/18 14:08, Jan Glauber wrote:
-> On Fri, May 04, 2018 at 02:47:42PM +0200, Christoffer Dall wrote:
->> Hi Jan,
->>
->> On Fri, May 04, 2018 at 01:03:44PM +0200, Jan Glauber wrote:
->>> Hi all,
->>>
->>> enabling lockdep I see the following reported in the host when I start a kvm guest:
->>>
->>> [12399.954245]        CPU0                    CPU1
->>> [12399.958762]        ----                    ----
->>> [12399.963279]   lock(&(&dist->lpi_list_lock)->rlock);
->>> [12399.968146]                                local_irq_disable();
->>> [12399.974052]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
->>> [12399.981696]                                lock(&(&dist->lpi_list_lock)->rlock);
->>> [12399.989081]   <Interrupt>
->>> [12399.991688]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
->>> [12399.996989]
->>>                 *** DEADLOCK ***
->>>
->>> [12400.002897] 2 locks held by qemu-system-aar/5597:
->>> [12400.007587]  #0: 0000000042beb9dc (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
->>> [12400.015411]  #1: 00000000c45d644a (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}, at: kvm_vgic_sync_hwstate+0x8c/0x328
->>>
->>>
->>> There is nothing unusual in my config or qemu parameters, I can upload these
->>> if needed. I see this on ThunderX and ThunderX2 and also with older kernels
->>> (4.13+ distribution kernel).
->>>
->>> I tried making the lpi_list_lock irq safe but that just leads to different
->>> warnings. The locking here seems to be quite sophisticated and I'm not familiar
->>> with it.
->>
->> That's unfortunate.  The problem here is that we end up violating our
->> locking order, which stipulates that ap_list_lock must be taken before
->> the lpi_list_lock.
->>
->> Give that we can take the ap_list_lock from interrupt context (timers
->> firing), the only solution I can easily think of is to change
->> lpi_list_lock takers to disable interrupts as well.
->>
->> Which warnings did you encounter with that approach?
-> 
-> Hi Christoffer,
-> 
-> making lpi_list_lock irq safe I get:
-> 
-> [  394.239174] ========================================================
-> [  394.245515] WARNING: possible irq lock inversion dependency detected
-> [  394.251857] 4.17.0-rc3-jang+ #72 Not tainted
-> [  394.256114] --------------------------------------------------------
-> [  394.262454] qemu-system-aar/5596 just changed the state of lock:
-> [  394.268448] 00000000da3f09ef (&(&irq->irq_lock)->rlock#3){+...}, at: update_affinity+0x3c/0xa8
-> [  394.277066] but this lock was taken by another, HARDIRQ-safe lock in the past:
-> [  394.284274]  (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}
-> [  394.284278] 
->                
->                and interrupts could create inverse lock ordering between them.
-> 
-> [  394.300777] 
->                other info that might help us debug this:
-> [  394.307292]  Possible interrupt unsafe locking scenario:
-> 
-> [  394.314066]        CPU0                    CPU1
-> [  394.318584]        ----                    ----
-> [  394.323101]   lock(&(&irq->irq_lock)->rlock#3);
-> [  394.327622]                                local_irq_disable();
-> [  394.333528]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
-> [  394.341172]                                lock(&(&irq->irq_lock)->rlock#3);
-> [  394.348210]   <Interrupt>
-> [  394.350817]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
-> [  394.356118] 
->                 *** DEADLOCK ***
-> 
-> [  394.362025] 4 locks held by qemu-system-aar/5596:
-> [  394.366716]  #0: 00000000719c7423 (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
-> [  394.374545]  #1: 0000000060090841 (&kvm->srcu){....}, at: kvm_handle_guest_abort+0x11c/0xb70
-> [  394.382984]  #2: 0000000064647766 (&its->cmd_lock){+.+.}, at: vgic_mmio_write_its_cwriter+0x44/0xa8
-> [  394.392022]  #3: 0000000075f90a8a (&its->its_lock){+.+.}, at: vgic_its_process_commands.part.11+0xac/0x780
+Hi Arnd, Olof and Kevin,
 
-Right, that's conceptually the same problem (the ap_list_lock being
-always taken with interrupt disabled creates a point where all the
-subsequent locks must also be with interrupts disabled.
+Please consider this first round of STM32 DT updates for v4.18. As you 
+will see, main part of patches concerns support for STM32MP157 platform.
+I didn't squash DT patches (as I like the way there are split) but let 
+me know if for next time you prefer I do it.
 
-Another possibility would be to ensure that we always take the ap_list
-lock before taking the lpi_list_lock, disabling interrupts in the process.
+Regards
+Alex
 
-I need to convince myself that this is correct though...
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+
+   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+tags/stm32-dt-for-v4.18-1
+
+for you to fetch changes up to 0a84a00094eea4080288f5c62aff8a90e510a252:
+
+   ARM: dts: stm32: update pwm-cells for LPTimer on stm32h743 
+(2018-05-04 09:45:54 +0200)
+
+----------------------------------------------------------------
+STM32 DT updates for v4.18, round 1
+
+Highlights:
+-----------
+-MCU platforms updates:
+  -Update pwm-cells for stm32h743
+  -Add I2C support on stm32f7xx-disco boards and
+   on stm32h743i-eval board
+  -Add new stm32f469 dtsi file
+  -Add display support on stm32f469-disco (LTDC/DSI)
+   + pannel orisetech (otm8009a)
+
+-MPU STM32MP157 platform updates:
+  -Fix DTC (W=12) warnings
+  -Fix IRQ type definition for usart
+  -Add QSPI & NOR flash support on EV1 board
+  -Add CEC support
+  -Add USB host
+  -Add USBPHYC support and enable it on EV1 board
+  -Add LTDC and DSI support
+  -Add I2C support and enable it on ED1 and EV1 boards
+  -Add CRC support
+  -Add RNG support
+  -Add CRYP support
+  -Add DAC support
+  -Add LPTIMER support
+  -Add VREFBUFF support
+  -Add timers supports and enable timer trigger 6 on ED1 board
+  -Add MDMA, DMA and DMAMUX support and enable it
+  -Enable clock driver
+
+----------------------------------------------------------------
+Alexandre Torgue (2):
+       ARM: dts: stm32: Fix DTC warnings for stm32mp157
+       ARM: dts: stm32: Fix IRQ_TYPE_NONE warnings on stm32mp157c
+
+Amelie Delaunay (4):
+       ARM: dts: stm32: add USBPHYC support to stm32mp157c
+       ARM: dts: stm32: add supplies to usbphyc ports on stm32mp157c-ed1
+       ARM: dts: stm32: enable USBPHYC on stm32mp157c-ev1
+       ARM: dts: stm32: add USB Host (USBH) support to stm32mp157c
+
+Fabrice Gasnier (8):
+       ARM: dts: stm32: add timers support to stm32mp157c
+       ARM: dts: stm32: add PWM pins used on stm32mp157c-ev1 board
+       ARM: dts: stm32: add PWM and triggers on stm32mp157c-ev1 board
+       ARM: dts: stm32: enable timer trigger 6 on stm32mp157c-ed1
+       ARM: dts: stm32: Add vrefbuf support to stm32mp157c
+       ARM: dts: stm32: Add LPtimer support to stm32mp157c
+       ARM: dts: stm32: Add DAC support to stm32mp157c
+       ARM: dts: stm32: update pwm-cells for LPTimer on stm32h743
+
+Gabriel Fernandez (2):
+       ARM: dts: stm32: Enable stm32mp1 clock driver on stm32mp157c
+       ARM: dts: stm32: add reset binding on stm32mp157c
+
+Lionel Debieve (4):
+       ARM: dts: stm32: Add RNG support on stm32mp157c
+       ARM: dts: stm32: Enable RNG for stm32mp157c-ed1
+       ARM: dts: stm32: Add CRYP support on stm32mp157c
+       ARM: dts: stm32: Add CRC support on stm32mp157c
+
+Ludovic Barre (2):
+       ARM: dts: stm32: add qspi support for stm32mp157c
+       ARM: dts: stm32: add flash nor support on stm32mp157c eval board
+
+Philippe CORNU (1):
+       ARM: dts: stm32: Add display support on stm32f469-disco
+
+Philippe Cornu (2):
+       ARM: dts: stm32: Use gpio bindings in stm32f469-disco
+       ARM: dts: stm32: Add new stm32f469 dtsi file with mipi dsi
+
+Pierre-Yves MORDRET (12):
+       ARM: dts: stm32: Add DMAv2 support on STM32MP157C
+       ARM: dts: stm32: Add DMAMUX support on STM32MP157C
+       ARM: dts: stm32: Add MDMA support on STM32MP157C
+       ARM: dts: stm32: Add STM32F7 I2C support for STM32MP157C SoC
+       ARM: dts: stm32: Add I2Cs pins used on STM32MP157C
+       ARM: dts: stm32: Add I2C4 support for STM32MP157C-ED1
+       ARM: dts: stm32: Add I2C2/5 support for STM32MP157C-EV1
+       ARM: dts: stm32: Append additional I2Cs for STM32F746 SoC
+       ARM: dts: stm32: Add I2C1 support for stm32f769-disco Board
+       ARM: dts: stm32: Add I2C1 support for stm32f746-disco Board
+       ARM: dts: stm32: Add I2C support for STM32H743 SoC
+       ARM: dts: stm32: Add I2C1 support for stm32h743i-eval Board
+
+yannick fertre (5):
+       ARM: dts: stm32: add ltdc support on stm32mp157c
+       ARM: dts: stm32: add dsi support on stm32mp157c
+       ARM: dts: stm32: add cec support on stm32mp157c
+       ARM: dts: stm32: add cec pins to stm32mp157c
+       ARM: dts: stm32: add cec support on stm32mp157c-ev1
+
+  arch/arm/boot/dts/stm32f469-disco.dts     |  53 ++-
+  arch/arm/boot/dts/stm32f469.dtsi          |  19 +
+  arch/arm/boot/dts/stm32f746-disco.dts     |   8 +
+  arch/arm/boot/dts/stm32f746.dtsi          |  36 ++
+  arch/arm/boot/dts/stm32f769-disco.dts     |   8 +
+  arch/arm/boot/dts/stm32h743-pinctrl.dtsi  |  10 +
+  arch/arm/boot/dts/stm32h743.dtsi          |  53 +++
+  arch/arm/boot/dts/stm32h743i-eval.dts     |   8 +
+  arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 151 ++++++-
+  arch/arm/boot/dts/stm32mp157c-ed1.dts     |  57 ++-
+  arch/arm/boot/dts/stm32mp157c-ev1.dts     |  87 ++++
+  arch/arm/boot/dts/stm32mp157c.dtsi        | 720 
+++++++++++++++++++++++++++++--
+  12 files changed, 1152 insertions(+), 58 deletions(-)
+  create mode 100644 arch/arm/boot/dts/stm32f469.dtsi
