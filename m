@@ -1,146 +1,217 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 4 May 2018 17:44:06 +0200
-Subject: [PATCH v2 09/10] ARM: dts: sun7i-a20: Add Video Engine and
- reserved memory nodes
-In-Reply-To: <dd6b502c66aad1fe34eb0b16a1e44a4ebfd172f1.camel@bootlin.com>
-References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
- <20180419154536.17846-5-paul.kocialkowski@bootlin.com>
- <20180420073908.nkcbsdxibnzkqski@flea>
- <82057e2f734137a3902d9313c228b01ceb345ee7.camel@bootlin.com>
- <20180504084008.h6p4brari3xrbv6l@flea>
- <e8cd340605ab4db8ebf2888a4fce645e8bc481d0.camel@bootlin.com>
- <20180504091555.idgtzey53lozj2uh@flea>
- <fc064c3f1534a6082dc2b4e18454e054b53e5aee.camel@bootlin.com>
- <20180504134033.wngpe5scyisreonn@flea>
- <dd6b502c66aad1fe34eb0b16a1e44a4ebfd172f1.camel@bootlin.com>
-Message-ID: <20180504154406.djxq6wqil3dwutvw@flea>
+From: Gilles.Buloz@kontron.com (Gilles Buloz)
+Date: Fri, 4 May 2018 15:45:07 +0000
+Subject: [PATCH] PCI: Check whether bridges allow access to extended
+ config space
+In-Reply-To: <20180503223127.GB15790@bhelgaas-glaptop.roam.corp.google.com>
+References: <20180427165627.GA8199@bhelgaas-glaptop.roam.corp.google.com>
+ <5AE6D7E2.9030506@kontron.com> <5AE71BF4.2010200@kontron.com>
+ <20180430170447.GA95643@bhelgaas-glaptop.roam.corp.google.com>
+ <5AE75809.30701@kontron.com> <5AE9B5BB.2080003@kontron.com>
+ <20180502132501.GE11698@bhelgaas-glaptop.roam.corp.google.com>
+ <5AE9C1AB.8020403@kontron.com>
+ <20180502172341.GA123831@bhelgaas-glaptop.roam.corp.google.com>
+ <5AEB033A.4060407@kontron.com>
+ <20180503223127.GB15790@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <5AEC8002.5000309@kontron.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 03:57:48PM +0200, Paul Kocialkowski wrote:
-> On Fri, 2018-05-04 at 15:40 +0200, Maxime Ripard wrote:
-> > On Fri, May 04, 2018 at 02:04:38PM +0200, Paul Kocialkowski wrote:
-> > > On Fri, 2018-05-04 at 11:15 +0200, Maxime Ripard wrote:
-> > > > On Fri, May 04, 2018 at 10:47:44AM +0200, Paul Kocialkowski wrote:
-> > > > > > > > > +			reg = <0x01c0e000 0x1000>;
-> > > > > > > > > +			memory-region = <&ve_memory>;
-> > > > > > > > 
-> > > > > > > > Since you made the CMA region the default one, you don't
-> > > > > > > > need
-> > > > > > > > to
-> > > > > > > > tie
-> > > > > > > > it to that device in particular (and you can drop it being
-> > > > > > > > mandatory
-> > > > > > > > from your binding as well).
-> > > > > > > 
-> > > > > > > What if another driver (or the system) claims memory from
-> > > > > > > that
-> > > > > > > zone
-> > > > > > > and
-> > > > > > > that the reserved memory ends up not being available for the
-> > > > > > > VPU
-> > > > > > > anymore?
-> > > > > > > 
-> > > > > > > Acccording to the reserved-memory documentation, the
-> > > > > > > reusable
-> > > > > > > property
-> > > > > > > (that we need for dmabuf) puts a limitation that the device
-> > > > > > > driver
-> > > > > > > owning the region must be able to reclaim it back.
-> > > > > > > 
-> > > > > > > How does that work out if the CMA region is not tied to a
-> > > > > > > driver
-> > > > > > > in
-> > > > > > > particular?
-> > > > > > 
-> > > > > > I'm not sure to get what you're saying. You have the property
-> > > > > > linux,cma-default in your reserved region, so the behaviour
-> > > > > > you
-> > > > > > described is what you explicitly asked for.
-> > > > > 
-> > > > > My point is that I don't see how the driver can claim back (part
-> > > > > of)
-> > > > > the
-> > > > > reserved area if the area is not explicitly attached to it.
-> > > > > 
-> > > > > Or is that mechanism made in a way that all drivers wishing to
-> > > > > use
-> > > > > the
-> > > > > reserved memory area can claim it back from the system, but
-> > > > > there is
-> > > > > no
-> > > > > priority (other than first-come first-served) for which drivers
-> > > > > claims
-> > > > > it back in case two want to use the same reserved region (in a
-> > > > > scenario
-> > > > > where there isn't enough memory to allow both drivers)?
-> > > > 
-> > > > This is indeed what happens. Reusable is to let the system use the
-> > > > reserved memory for things like caches that can easily be dropped
-> > > > when
-> > > > a driver wants to use the memory in that reserved area. Once that
-> > > > memory has been allocated, there's no claiming back, unless that
-> > > > memory segment was freed of course.
-> > > 
-> > > Thanks for the clarification. So in our case, perhaps the best fit
-> > > would
-> > > be to make that area the default CMA pool so that we can be ensured
-> > > that
-> > > the whole 96 MiB is available for the VPU and that no other consumer
-> > > of
-> > > CMA will use it?
-> > 
-> > The best fit for what use case ? We already discussed this, and I
-> > don't see any point in having two separate CMA regions. If you have a
-> > reasonably sized region that will accomodate for both the VPU and
-> > display engine, why would we want to split them?
-> 
-> The use case I have in mind is boilerplate use of the VPU with the
-> display engine, say with DMAbuf.
-> 
-> It wasn't exactly clear in my memory whether we had decided that the CMA
-> pool we use for the VPU should also be used for other CMA consumers (I
-> realize that this is what we've been doing all along by having
-> linux,cma-default; though).
-> 
-> The fact that the memory region will accomodate for both the display
-> engine and the VPU is not straightforward IMO and I think this has to be
-> an explicit choice that we take. I was under the impression that we
-> chose the 96 MiB because that's what the Allwinner reference code does.
-> Does the reference code also use this pool for display?
+Le 04/05/2018 00:31, Bjorn Helgaas a ?crit :
+> [+cc LKML]
+>
+> On Thu, May 03, 2018 at 12:40:27PM +0000, Gilles Buloz wrote:
+>> Subject:    [PATCH] For exception at PCI probe due to bridge reporting UR
+>>
+>> Even if a device supports extended config access, no such access must be
+>> done to this device If there's a bridge not supporting that in the path
+>> to this device. Doing such access with UR reporting enabled on the root
+>> bridge leads to an exception.
+>>
+>> This is the case on a LS1043A CPU (NXP QorIQ Layerscape) platform with
+>> the following bus topology :
+>>    LS1043 PCIe root
+>>      -> PEX8112 PCIe-to-PCI bridge (not supporting ext cfg on PCI side)
+>>        -> PMC slot connector (for legacy PMC modules)
+>> With a PMC module topology as follows :
+>>    PMC connector
+>>      -> PCI-to-PCIe bridge
+>>        -> PCIe switch (4 ports)
+>>          -> 4 PCIe devices (one on each port)
+>> In this case all devices behind the PEX8112 are supporting extended config
+>> access but this is prohibited by the PEX8112. Without this patch, an
+>> exception (synchronous abort) occurs in pci_cfg_space_size_ext().
+>>
+>> This patch checks the parent bridge of each allocated child bus to know if
+>> extended config access is supported on the child bus, and sets a flag in
+>> child->bus_flags if not supported. This  flag is inherited by all children
+>> buses of this child bus and then is checked to avoid this unsupported
+>> accesses to every device on these buses.
+> Hi Gilles,
+>
+> Thanks for the patch!  I reworked it a little bit to simplify the code
+> in pci_alloc_child_bus().  Can you test it and make sure I didn't
+> break anything?
+>
+Hi Bjorn,
 
-Yes
+Your rework works as expected. Tested on LS1043A platform with kernel 4.17-rc1, and with some backport on kernel 4.1.35
 
-> I liked the idea of having 96 MiB fully reserved to the VPU because it
-> allows us to provide a limit on the use case, such as "this guarantees N
-> buffers for resolution foo in format bar". If the display engine also
-> uses it, then the limit also depends on how many GEM buffers are
-> allocated (unless I'm missing something).
+Suggestion : maybe change the pci_info() string to have :
+     pci_bus 0000:xx: extended config space not accessible
+instead of
+     pci_bus 0000:xx: extended config space not accessible on secondary bus
+as xx is already the number of the secondary bus
 
-This also guarantees that you take away a fifth of the RAM on some
-boards. If we had yet another CMA pool of 64MB as is the multi_v7
-defconfig, that's a third of your RAM that's gone, possibly for no
-particular reason.
+Info : with kernel 4.17-rc1, it turns out I need pcie_aspm=off to have the PMC devices behind the
+PCI-to-PCIe bridge of the PMC safely detected/configured. But this is not caused by the patch.
+Without pcie_aspm=off I saw this at one boot :
+    "pci 0000:02:0e.0: ASPM: Could not configure common clock" for this bridge, but devices
+    correctly detected/configured
+but at most boots I get :
+    no ASPM message but "pci 0000:04:02.0: bridge configuration invalid ([bus ff-ff]), reconfiguring "
+    instead, and some devices are missing. Also lspci show "rev ff" for some devices.
+I don't see this problem on 4.1.35 with the same backported patch.
 
-If we make the math, let's say that we are running a system with 4
-planes used in 1080p, with 4 Bpp, in double buffering (which is
-already an unlikely setup). Let's add on top of that that we're
-decoding a 1080p video with 8 buffers pre-allocated with 2Bpp (in
-YUV422). Which really seems extreme now :)
-
-And we're at 80MB. My guess is that your memory bus is going to be
-dead before you need to use all that memory.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/dafc7cb2/attachment.sig>
+Gilles
+> commit cbaaa85b558a8f974e301fa0364d568efaf491ce
+> Author: Gilles Buloz <Gilles.Buloz@kontron.com>
+> Date:   Thu May 3 15:21:44 2018 -0500
+>
+>      PCI: Check whether bridges allow access to extended config space
+>      
+>      Even if a device supports extended config space, i.e., it is a PCI-X Mode 2
+>      or a PCI Express device, the extended space may not be accessible if
+>      there's a conventional PCI bus in the path to it.
+>      
+>      We currently figure that out in pci_cfg_space_size() by reading the first
+>      dword of extended config space.  On most platforms that returns ~0 data if
+>      the space is inaccessible, but it may set error bits in PCI status
+>      registers, and on some platforms it causes exceptions that we currently
+>      don't recover from.
+>      
+>      For example, a PCIe-to-conventional PCI bridge treats config transactions
+>      with a non-zero Extended Register Address as an Unsupported Request on PCIe
+>      and a received Master-Abort on the destination bus (see PCI Express to
+>      PCI/PCI-X Bridge spec, r1.0, sec 4.1.3).
+>      
+>      A sample case is a LS1043A CPU (NXP QorIQ Layerscape) platform with the
+>      following bus topology:
+>      
+>        LS1043 PCIe Root Port
+>          -> PEX8112 PCIe-to-PCI bridge (doesn't support ext cfg on PCI side)
+>            -> PMC slot connector (for legacy PMC modules)
+>      
+>      With a PMC module topology as follows:
+>      
+>        PMC connector
+>          -> PCI-to-PCIe bridge
+>            -> PCIe switch (4 ports)
+>              -> 4 PCIe devices (one on each port)
+>      
+>      The PCIe devices on the PMC module support extended config space, but we
+>      can't reach it because the PEX8112 can't generate accesses to the extended
+>      space on its secondary bus.  Attempts to access it cause Unsupported
+>      Request errors, which result in synchronous aborts on this platform.
+>      
+>      To avoid these errors, check whether bridges are capable of generating
+>      extended config space addresses on their secondary interfaces.  If they
+>      can't, we restrict devices below the bridge to only the 256-byte
+>      PCI-compatible config space.
+>      
+>      Signed-off-by: Gilles Buloz <gilles.buloz@kontron.com>
+>      [bhelgaas: changelog, rework patch so bus_flags testing is all in
+>      pci_bridge_child_ext_cfg_accessible()]
+>      Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index ac91b6fd0bcd..7b1b7b2e01e4 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -882,6 +882,45 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
+>   	return err;
+>   }
+>   
+> +static bool pci_bridge_child_ext_cfg_accessible(struct pci_dev *bridge)
+> +{
+> +	int pos;
+> +	u32 status;
+> +
+> +	/*
+> +	 * If extended config space isn't accessible on a bridge's primary
+> +	 * bus, we certainly can't access it on the secondary bus.
+> +	 */
+> +	if (bridge->bus->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG)
+> +		return false;
+> +
+> +	/*
+> +	 * PCIe Root Ports and switch ports are PCIe on both sides, so if
+> +	 * extended config space is accessible on the primary, it's also
+> +	 * accessible on the secondary.
+> +	 */
+> +	if (pci_is_pcie(bridge) &&
+> +	    (pci_pcie_type(bridge) == PCI_EXP_TYPE_ROOT_PORT ||
+> +	     pci_pcie_type(bridge) == PCI_EXP_TYPE_UPSTREAM ||
+> +	     pci_pcie_type(bridge) == PCI_EXP_TYPE_DOWNSTREAM))
+> +		return true;
+> +
+> +	/*
+> +	 * For the other bridge types:
+> +	 *   - PCI-to-PCI bridges
+> +	 *   - PCIe-to-PCI/PCI-X forward bridges
+> +	 *   - PCI/PCI-X-to-PCIe reverse bridges
+> +	 * extended config space on the secondary side is only accessible
+> +	 * if the bridge supports PCI-X Mode 2.
+> +	 */
+> +	pos = pci_find_capability(bridge, PCI_CAP_ID_PCIX);
+> +	if (!pos)
+> +		return false;
+> +
+> +	pci_read_config_dword(bridge, pos + PCI_X_STATUS, &status);
+> +	return status & (PCI_X_STATUS_266MHZ | PCI_X_STATUS_533MHZ);
+> +}
+> +
+>   static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>   					   struct pci_dev *bridge, int busnr)
+>   {
+> @@ -923,6 +962,16 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>   	pci_set_bus_of_node(child);
+>   	pci_set_bus_speed(child);
+>   
+> +	/*
+> +	 * Check whether extended config space is accessible on the child
+> +	 * bus.  Note that we currently assume it is always accessible on
+> +	 * the root bus.
+> +	 */
+> +	if (!pci_bridge_child_ext_cfg_accessible(bridge)) {
+> +		child->bus_flags |= PCI_BUS_FLAGS_NO_EXTCFG;
+> +		pci_info(child, "extended config space not accessible on secondary bus\n");
+> +	}
+> +
+>   	/* Set up default resource pointers and names */
+>   	for (i = 0; i < PCI_BRIDGE_RESOURCE_NUM; i++) {
+>   		child->resource[i] = &bridge->resource[PCI_BRIDGE_RESOURCES+i];
+> @@ -1393,6 +1442,9 @@ int pci_cfg_space_size(struct pci_dev *dev)
+>   	u32 status;
+>   	u16 class;
+>   
+> +	if (dev->bus->bus_flags & PCI_BUS_FLAGS_NO_EXTCFG)
+> +		return PCI_CFG_SPACE_SIZE;
+> +
+>   	class = dev->class >> 8;
+>   	if (class == PCI_CLASS_BRIDGE_HOST)
+>   		return pci_cfg_space_size_ext(dev);
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 230615620a4a..f7aa6d9f8999 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -217,6 +217,7 @@ enum pci_bus_flags {
+>   	PCI_BUS_FLAGS_NO_MSI	= (__force pci_bus_flags_t) 1,
+>   	PCI_BUS_FLAGS_NO_MMRBC	= (__force pci_bus_flags_t) 2,
+>   	PCI_BUS_FLAGS_NO_AERSID	= (__force pci_bus_flags_t) 4,
+> +	PCI_BUS_FLAGS_NO_EXTCFG	= (__force pci_bus_flags_t) 8,
+>   };
+>   
+>   /* Values from Link Status register, PCIe r3.1, sec 7.8.8 */
+>
+> .
+>
