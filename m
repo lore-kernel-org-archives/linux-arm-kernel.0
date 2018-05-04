@@ -1,118 +1,183 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 4 May 2018 11:41:23 +0530
-Subject: [PATCH v5 13/14] dt-bindings: cpufreq: Document
- operating-points-v2-kryo-cpu
-In-Reply-To: <1525348355-25471-14-git-send-email-ilialin@codeaurora.org>
-References: <1525348355-25471-1-git-send-email-ilialin@codeaurora.org>
- <1525348355-25471-14-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180504061123.lf2ffpami23d3q72@vireshk-i7>
+From: opensource.ganesh@gmail.com (Ganesh Mahendran)
+Date: Fri, 4 May 2018 14:25:19 +0800
+Subject: [PATCH 2/2] arm64/mm: add speculative page fault
+In-Reply-To: <9e7ab02c-a9af-71ed-afda-108e3b26b2ef@linux.vnet.ibm.com>
+References: <1525247672-2165-1-git-send-email-opensource.ganesh@gmail.com>
+ <1525247672-2165-2-git-send-email-opensource.ganesh@gmail.com>
+ <9e7ab02c-a9af-71ed-afda-108e3b26b2ef@linux.vnet.ibm.com>
+Message-ID: <CADAEsF-9+EBjn9nMj1qc7R9RbOTZTMc0GhZ9XbgHJB6zXQzsGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03-05-18, 14:52, Ilia Lin wrote:
-> In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
-> that have KRYO processors, the CPU ferequencies subset and voltage value
-> of each OPP varies based on the silicon variant in use.
-> Qualcomm Technologies, Inc. Process Voltage Scaling Tables
-> defines the voltage and frequency value based on the msm-id in SMEM
-> and speedbin blown in the efuse combination.
-> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
-> to provide the OPP framework with required information.
-> This is used to determine the voltage and frequency value for each OPP of
-> operating-points-v2 table when it is parsed by the OPP framework.
-> 
-> This change adds documentation.
-> 
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> ---
->  .../devicetree/bindings/opp/kryo-cpufreq.txt       | 693 +++++++++++++++++++++
->  1 file changed, 693 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/opp/kryo-cpufreq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/opp/kryo-cpufreq.txt b/Documentation/devicetree/bindings/opp/kryo-cpufreq.txt
-> new file mode 100644
-> index 0000000..20cef9d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/opp/kryo-cpufreq.txt
-> @@ -0,0 +1,693 @@
-> +Qualcomm Technologies, Inc. KRYO CPUFreq and OPP bindings
-> +===================================
-> +
-> +In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
-> +that have KRYO processors, the CPU ferequencies subset and voltage value
-> +of each OPP varies based on the silicon variant in use.
-> +Qualcomm Technologies, Inc. Process Voltage Scaling Tables
-> +defines the voltage and frequency value based on the msm-id in SMEM
-> +and speedbin blown in the efuse combination.
-> +The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
-> +to provide the OPP framework with required information (existing HW bitmap).
-> +This is used to determine the voltage and frequency value for each OPP of
-> +operating-points-v2 table when it is parsed by the OPP framework.
-> +
-> +Required properties:
-> +--------------------
-> +In 'cpus' nodes:
-> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
-> +
-> +In 'operating-points-v2' table:
-> +- compatible: Should be
-> +	- 'operating-points-v2-kryo-cpu' for apq8096 and msm8996.
-> +- nvmem-cells: A phandle pointing to a nvmem-cells node representing the
-> +		efuse registers that has information about the
-> +		speedbin that is used to select the right frequency/voltage
-> +		value pair.
-> +		Please refer the for nvmem-cells
-> +		bindings Documentation/devicetree/bindings/nvmem/nvmem.txt
-> +		and also examples below.
-> +
-> +In every OPP node:
-> +- opp-supported-hw: A single 32 bit bitmap value, representing compatible HW.
-> +		    Bitmap:
-> +			0:	MSM8996 V3, speedbin 0
-> +			1:	MSM8996 V3, speedbin 1
-> +			2:	MSM8996 V3, speedbin 2
-> +			3:	unused
-> +			4:	MSM8996 SG, speedbin 0
-> +			5:	MSM8996 SG, speedbin 1
-> +			6:	MSM8996 SG, speedbin 2
-> +			7-31:	unused
-> +
-> +Example 1:
-> +---------
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		CPU0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "qcom,kryo";
-> +			reg = <0x0 0x0>;
-> +			enable-method = "psci";
-> +			clocks = <&kryocc 0>;
-> +			cpu-supply = <&pm8994_s11_saw>;
-> +			operating-points-v2 = <&cluster0_opp>;
-> +			/* cooling options */
-> +			cooling-min-level = <0>;
-> +			cooling-max-level = <15>;
+2018-05-02 17:07 GMT+08:00 Laurent Dufour <ldufour@linux.vnet.ibm.com>:
+> On 02/05/2018 09:54, Ganesh Mahendran wrote:
+>> This patch enables the speculative page fault on the arm64
+>> architecture.
+>>
+>> I completed spf porting in 4.9. From the test result,
+>> we can see app launching time improved by about 10% in average.
+>> For the apps which have more than 50 threads, 15% or even more
+>> improvement can be got.
+>
+> Thanks Ganesh,
+>
+> That's a great improvement, could you please provide details about the apps and
+> the hardware you used ?
 
-cooling min/max aren't required anymore, as I told you in the previous
-version :)
+We run spf on Qcom SDM845(kernel 4.9). Below is app(popular in China)
+list we tested:
+------
+com.tencent.mobileqq
+com.tencent.qqmusic
+com.tencent.mtt
+com.UCMobile
+com.qiyi.video
+com.baidu.searchbox
+com.baidu.BaiduMap
+tv.danmaku.bili
+com.sdu.didi.psnger
+com.ss.android.ugc.aweme
+air.tv.douyu.android
+me.ele
+com.autonavi.minimap
+com.duowan.kiwi
+com.v.study
+com.qqgame.hlddz
+com.ss.android.article.lite
+com.jingdong.app.mall
+com.tencent.tmgp.pubgmhd
+com.kugou.android
+com.kuaikan.comic
+com.hunantv.imgo.activity
+com.mt.mtxx.mtxx
+com.sankuai.meituan
+com.sankuai.meituan.takeoutnew
+com.tencent.karaoke
+com.taobao.taobao
+com.tencent.qqlive
+com.tmall.wireless
+com.tencent.tmgp.sgame
+com.netease.cloudmusic
+com.sina.weibo
+com.tencent.mm
+com.immomo.momo
+com.xiaomi.hm.health
+com.youku.phone
+com.eg.android.AlipayGphone
+com.meituan.qcs.c.android
+------
 
-> +	cluster0_opp: opp_table0 {
-> +		compatible = "operating-points-v2-kryo-cpu";
-> +		nvmem-cells = <&speedbin_efuse>;
-> +		opp-shared;
-> +
-> +		opp-307200000 {
-> +			opp-hz = /bits/ 64 <  307200000 >;
+We will do more test of the V10 spf.
 
-You fixed spacing around frequency values in the dts but not here.
+>
+>>
+>> Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
+>> ---
+>> This patch is on top of Laurent's v10 spf
+>> ---
+>>  arch/arm64/mm/fault.c | 38 +++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 35 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index 4165485..e7992a3 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -322,11 +322,13 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
+>>
+>>  static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
+>>                          unsigned int mm_flags, unsigned long vm_flags,
+>> -                        struct task_struct *tsk)
+>> +                        struct task_struct *tsk, struct vm_area_struct *vma)
+>>  {
+>> -     struct vm_area_struct *vma;
+>>       int fault;
+>>
+>> +     if (!vma || !can_reuse_spf_vma(vma, addr))
+>> +             vma = find_vma(mm, addr);
+>> +
+>>       vma = find_vma(mm, addr);
+>>       fault = VM_FAULT_BADMAP;
+>>       if (unlikely(!vma))
+>> @@ -371,6 +373,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+>>       int fault, major = 0;
+>>       unsigned long vm_flags = VM_READ | VM_WRITE;
+>>       unsigned int mm_flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
+>> +     struct vm_area_struct *vma;
+>>
+>>       if (notify_page_fault(regs, esr))
+>>               return 0;
+>> @@ -409,6 +412,25 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+>>
+>>       perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
+>>
+>> +     if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT)) {
+>
+> As suggested by Punit in his v10's review, the test on
+> CONFIG_SPECULATIVE_PAGE_FAULT is not needed as handle_speculative_fault() is
+> defined to return VM_FAULT_RETRY is the config is not set.
 
-> +			opp-microvolt = <905000 905000 1140000>;
-> +			opp-supported-hw = <0x77>;
-> +			clock-latency-ns = <200000>;
-> +		};
+Thanks, will fix.
 
--- 
-viresh
+>
+>> +             fault = handle_speculative_fault(mm, addr, mm_flags, &vma);
+>> +             /*
+>> +              * Page fault is done if VM_FAULT_RETRY is not returned.
+>> +              * But if the memory protection keys are active, we don't know
+>> +              * if the fault is due to key mistmatch or due to a
+>> +              * classic protection check.
+>> +              * To differentiate that, we will need the VMA we no
+>> +              * more have, so let's retry with the mmap_sem held.
+>> +              */
+>
+> The check of VM_FAULT_SIGSEGV was needed on ppc64 because of the memory
+> protection key support, but as far as I know, this is not the case on arm64.
+> Isn't it ?
+
+Yes, wil fix.
+
+>
+>> +             if (fault != VM_FAULT_RETRY &&
+>> +                      fault != VM_FAULT_SIGSEGV) {
+>> +                     perf_sw_event(PERF_COUNT_SW_SPF, 1, regs, addr);
+>> +                     goto done;
+>> +             }
+>> +     } else {
+>> +             vma = NULL;
+>> +     }
+>> +
+>>       /*
+>>        * As per x86, we may deadlock here. However, since the kernel only
+>>        * validly references user space from well defined areas of the code,
+>> @@ -431,7 +453,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+>>  #endif
+>>       }
+>>
+>> -     fault = __do_page_fault(mm, addr, mm_flags, vm_flags, tsk);
+>> +     fault = __do_page_fault(mm, addr, mm_flags, vm_flags, tsk, vma);
+>>       major |= fault & VM_FAULT_MAJOR;
+>>
+>>       if (fault & VM_FAULT_RETRY) {
+>> @@ -454,11 +476,21 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+>>               if (mm_flags & FAULT_FLAG_ALLOW_RETRY) {
+>>                       mm_flags &= ~FAULT_FLAG_ALLOW_RETRY;
+>>                       mm_flags |= FAULT_FLAG_TRIED;
+>> +
+>> +                     /*
+>> +                      * Do not try to reuse this vma and fetch it
+>> +                      * again since we will release the mmap_sem.
+>> +                      */
+>> +                     if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT))
+>> +                             vma = NULL;
+>> +
+>>                       goto retry;
+>>               }
+>>       }
+>>       up_read(&mm->mmap_sem);
+>>
+>> +done:
+>> +
+>>       /*
+>>        * Handle the "normal" (no error) case first.
+>>        */
+>>
+>
