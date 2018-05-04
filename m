@@ -1,92 +1,54 @@
 From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Fri,  4 May 2018 15:56:41 +0200
-Subject: [PATCH net-next v2 11/13] arm64: dts: marvell: mcbin: enable the
- fourth network interface
+Date: Fri,  4 May 2018 15:56:34 +0200
+Subject: [PATCH net-next v2 04/13] net: mvpp2: align the ethtool ops definition
 In-Reply-To: <20180504135643.23466-1-antoine.tenart@bootlin.com>
 References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
-Message-ID: <20180504135643.23466-12-antoine.tenart@bootlin.com>
+Message-ID: <20180504135643.23466-5-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the fourth network interface on the Marvell
-Macchiatobin. It is configured in the 2500Base-X PHY mode. The SFP cage
-is also described.
+Cosmetic patch to align the ethtool functions to ops definitions. This
+patch does not change in any way the driver's behaviour.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
 ---
- .../boot/dts/marvell/armada-8040-mcbin.dts    | 32 +++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ drivers/net/ethernet/marvell/mvpp2.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-index eaa67de8c2bb..a66958ff4de6 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-@@ -27,6 +27,7 @@
- 		ethernet0 = &cp0_eth0;
- 		ethernet1 = &cp1_eth0;
- 		ethernet2 = &cp1_eth1;
-+		ethernet3 = &cp1_eth2;
- 	};
- 
- 	/* Regulator labels correspond with schematics */
-@@ -88,6 +89,18 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&cp1_sfpp1_pins &cp0_sfpp1_pins>;
- 	};
-+
-+	sfp_eth3: sfp-eth3 {
-+		/* CON3,4 - CPS lane 5 */
-+		compatible = "sff,sfp";
-+		i2c-bus = <&sfp_1g_i2c>;
-+		los-gpio = <&cp0_gpio2 22 GPIO_ACTIVE_HIGH>;
-+		mod-def0-gpio = <&cp0_gpio2 21 GPIO_ACTIVE_LOW>;
-+		tx-disable-gpio = <&cp1_gpio1 24 GPIO_ACTIVE_HIGH>;
-+		tx-fault-gpio = <&cp0_gpio2 19 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&cp0_sfp_1g_pins &cp1_sfp_1g_pins>;
-+	};
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index 6f410235987c..77dd91e3d962 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -7859,18 +7859,18 @@ static const struct net_device_ops mvpp2_netdev_ops = {
  };
  
- &uart0 {
-@@ -195,6 +208,10 @@
- 		marvell,pins = "mpp47";
- 		marvell,function = "gpio";
- 	};
-+	cp0_sfp_1g_pins: sfp-1g-pins {
-+		marvell,pins = "mpp51", "mpp53", "mpp54";
-+		marvell,function = "gpio";
-+	};
- 	cp0_pcie_pins: pcie-pins {
- 		marvell,pins = "mpp52";
- 		marvell,function = "gpio";
-@@ -287,6 +304,17 @@
- 	phys = <&cp1_comphy0 1>;
+ static const struct ethtool_ops mvpp2_eth_tool_ops = {
+-	.nway_reset	= phy_ethtool_nway_reset,
+-	.get_link	= ethtool_op_get_link,
+-	.set_coalesce	= mvpp2_ethtool_set_coalesce,
+-	.get_coalesce	= mvpp2_ethtool_get_coalesce,
+-	.get_drvinfo	= mvpp2_ethtool_get_drvinfo,
+-	.get_ringparam	= mvpp2_ethtool_get_ringparam,
+-	.set_ringparam	= mvpp2_ethtool_set_ringparam,
+-	.get_strings	= mvpp2_ethtool_get_strings,
+-	.get_ethtool_stats = mvpp2_ethtool_get_stats,
+-	.get_sset_count	= mvpp2_ethtool_get_sset_count,
+-	.get_link_ksettings = phy_ethtool_get_link_ksettings,
+-	.set_link_ksettings = phy_ethtool_set_link_ksettings,
++	.nway_reset		= phy_ethtool_nway_reset,
++	.get_link		= ethtool_op_get_link,
++	.set_coalesce		= mvpp2_ethtool_set_coalesce,
++	.get_coalesce		= mvpp2_ethtool_get_coalesce,
++	.get_drvinfo		= mvpp2_ethtool_get_drvinfo,
++	.get_ringparam		= mvpp2_ethtool_get_ringparam,
++	.set_ringparam		= mvpp2_ethtool_set_ringparam,
++	.get_strings		= mvpp2_ethtool_get_strings,
++	.get_ethtool_stats	= mvpp2_ethtool_get_stats,
++	.get_sset_count		= mvpp2_ethtool_get_sset_count,
++	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
++	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
  };
  
-+&cp1_eth2 {
-+	/* CPS Lane 5 */
-+	status = "okay";
-+	/* Network PHY */
-+	phy-mode = "2500base-x";
-+	managed = "in-band-status";
-+	/* Generic PHY, providing serdes lanes */
-+	phys = <&cp1_comphy5 2>;
-+	sfp = <&sfp_eth3>;
-+};
-+
- &cp1_pinctrl {
- 	cp1_sfpp1_pins: sfpp1-pins {
- 		marvell,pins = "mpp8", "mpp10", "mpp11";
-@@ -300,6 +328,10 @@
- 		marvell,pins = "mpp6", "mpp7";
- 		marvell,function = "uart0";
- 	};
-+	cp1_sfp_1g_pins: sfp-1g-pins {
-+		marvell,pins = "mpp24";
-+		marvell,function = "gpio";
-+	};
- 	cp1_sfpp0_pins: sfpp0-pins {
- 		marvell,pins = "mpp26", "mpp27", "mpp28", "mpp29";
- 		marvell,function = "gpio";
+ /* Used for PPv2.1, or PPv2.2 with the old Device Tree binding that
 -- 
 2.17.0
