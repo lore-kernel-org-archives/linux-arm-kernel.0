@@ -1,158 +1,436 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 4 May 2018 10:33:49 -0700
-Subject: [PATCH v7 01/24] soc: qcom dt-bindings: Add APR bus bindings
-In-Reply-To: <20180501120820.11016-2-srinivas.kandagatla@linaro.org>
-References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
- <20180501120820.11016-2-srinivas.kandagatla@linaro.org>
-Message-ID: <20180504173348.GS18510@minitux>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 4 May 2018 11:35:07 -0600
+Subject: [PATCH v2 13/27] coresight: Add generic TMC sg table framework
+In-Reply-To: <1525165857-11096-14-git-send-email-suzuki.poulose@arm.com>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+ <1525165857-11096-14-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180504173507.GA5981@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 01 May 05:07 PDT 2018, Srinivas Kandagatla wrote:
-
-> This patch add dt bindings for Qualcomm APR (Asynchronous Packet Router)
-> bus driver. This bus is used for communicating with DSP which provides
-> audio and various other services to cpu.
+On Tue, May 01, 2018 at 10:10:43AM +0100, Suzuki K Poulose wrote:
+> This patch introduces a generic sg table data structure and
+> associated operations. An SG table can be used to map a set
+> of Data pages where the trace data could be stored by the TMC
+> ETR. The information about the data pages could be stored in
+> different formats, depending on the type of the underlying
+> SG mechanism (e.g, TMC ETR SG vs Coresight CATU). The generic
+> structure provides book keeping of the pages used for the data
+> as well as the table contents. The table should be filled by
+> the user of the infrastructure.
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
+> A table can be created by specifying the number of data pages
+> as well as the number of table pages required to hold the
+> pointers, where the latter could be different for different
+> types of tables. The pages are mapped in the appropriate dma
+> data direction mode (i.e, DMA_TO_DEVICE for table pages
+> and DMA_FROM_DEVICE for data pages).  The framework can optionally
+> accept a set of allocated data pages (e.g, perf ring buffer) and
+> map them accordingly. The table and data pages are vmap'ed to allow
+> easier access by the drivers. The framework also provides helpers to
+> sync the data written to the pages with appropriate directions.
+> 
+> This will be later used by the TMC ETR SG unit and CATU.
+> 
+> Cc: Mathieu Poirier <matheiu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  .../devicetree/bindings/soc/qcom/qcom,apr.txt      | 84 ++++++++++++++++++++++
->  include/dt-bindings/soc/qcom,apr.h                 | 28 ++++++++
->  2 files changed, 112 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
->  create mode 100644 include/dt-bindings/soc/qcom,apr.h
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c | 284 ++++++++++++++++++++++++
+>  drivers/hwtracing/coresight/coresight-tmc.h     |  50 +++++
+>  2 files changed, 334 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
-> new file mode 100644
-> index 000000000000..bcc612cc7423
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
-> @@ -0,0 +1,84 @@
-> +Qualcomm APR (Asynchronous Packet Router) binding
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index 7af72d7..57a8fe1 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -17,10 +17,294 @@
+>  
+>  #include <linux/coresight.h>
+>  #include <linux/dma-mapping.h>
+> +#include <linux/slab.h>
+>  #include "coresight-catu.h"
+>  #include "coresight-priv.h"
+>  #include "coresight-tmc.h"
+>  
+> +/*
+> + * tmc_pages_get_offset:  Go through all the pages in the tmc_pages
+> + * and map the device address @addr to an offset within the virtual
+> + * contiguous buffer.
+> + */
+> +static long
+> +tmc_pages_get_offset(struct tmc_pages *tmc_pages, dma_addr_t addr)
+> +{
+> +	int i;
+> +	dma_addr_t page_start;
 > +
-> +This binding describes the Qualcomm APR. APR is a IPC protocol for
-> +communication between Application processor and QDSP. APR is mainly
-> +used for audio/voice services on the QDSP.
+> +	for (i = 0; i < tmc_pages->nr_pages; i++) {
+> +		page_start = tmc_pages->daddrs[i];
+> +		if (addr >= page_start && addr < (page_start + PAGE_SIZE))
+> +			return i * PAGE_SIZE + (addr - page_start);
+> +	}
 > +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: must be "qcom,apr-v<VERSION-NUMBER>", example "qcom,apr-v2"
+> +	return -EINVAL;
+> +}
 > +
-> +- reg
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: Destination processor ID.
-> +	Possible values are :
-> +			1 - APR simulator
-> +			2 - PC
-> +			3 - MODEM
-> +			4 - ADSP
-> +			5 - APPS
-> +			6 - MODEM2
-> +			7 - APPS2
+> +/*
+> + * tmc_pages_free : Unmap and free the pages used by tmc_pages.
+> + */
+> +static void tmc_pages_free(struct tmc_pages *tmc_pages,
+> +			   struct device *dev, enum dma_data_direction dir)
+> +{
+> +	int i;
 > +
-> += APR SERVICES
-> +Each subnode of the APR node represents service tied to this apr. The name
-> +of the nodes are not important. The properties of these nodes are defined
-> +by the individual bindings for the specific service
-> +- All APR services MUST contain the following property:
+> +	for (i = 0; i < tmc_pages->nr_pages; i++) {
+> +		if (tmc_pages->daddrs && tmc_pages->daddrs[i])
+> +			dma_unmap_page(dev, tmc_pages->daddrs[i],
+> +					 PAGE_SIZE, dir);
+> +		if (tmc_pages->pages && tmc_pages->pages[i])
+> +			__free_page(tmc_pages->pages[i]);
+
+I think it's worth adding a comment saying that because of the page count, pages
+given to the infracstructure (rather than allocated) won't be free'ed by
+__free_page().
+
+> +	}
 > +
-> +- reg
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: APR Service ID
-> +	Possible values are :
-> +			3 - DSP Core Service
-> +			4 - Audio Front End Service.
-> +			5 - Voice Stream Manager Service.
-> +			6 - Voice processing manager.
-> +			7 - Audio Stream Manager Service.
-> +			8 - Audio Device Manager Service.
-> +			9 - Multimode voice manager.
-> +			10 - Core voice stream.
-> +			11 - Core voice processor.
-> +			12 - Ultrasound stream manager.
-> +			13 - Listen stream manager.
+> +	kfree(tmc_pages->pages);
+> +	kfree(tmc_pages->daddrs);
+> +	tmc_pages->pages = NULL;
+> +	tmc_pages->daddrs = NULL;
+> +	tmc_pages->nr_pages = 0;
+> +}
 > +
-> += EXAMPLE
-> +The following example represents a QDSP based sound card on a MSM8996 device
-> +which uses apr as communication between Apps and QDSP.
+> +/*
+> + * tmc_pages_alloc : Allocate and map pages for a given @tmc_pages.
+> + * If @pages is not NULL, the list of page virtual addresses are
+> + * used as the data pages. The pages are then dma_map'ed for @dev
+> + * with dma_direction @dir.
+> + *
+> + * Returns 0 upon success, else the error number.
+> + */
+> +static int tmc_pages_alloc(struct tmc_pages *tmc_pages,
+> +			   struct device *dev, int node,
+> +			   enum dma_data_direction dir, void **pages)
+> +{
+> +	int i, nr_pages;
+> +	dma_addr_t paddr;
+> +	struct page *page;
 > +
-> +	apr at 4 {
-> +		compatible = "qcom,apr-v2";
-> +		reg = <APR_DOMAIN_ADSP>;
+> +	nr_pages = tmc_pages->nr_pages;
+> +	tmc_pages->daddrs = kcalloc(nr_pages, sizeof(*tmc_pages->daddrs),
+> +					 GFP_KERNEL);
+> +	if (!tmc_pages->daddrs)
+> +		return -ENOMEM;
+> +	tmc_pages->pages = kcalloc(nr_pages, sizeof(*tmc_pages->pages),
+> +					 GFP_KERNEL);
+> +	if (!tmc_pages->pages) {
+> +		kfree(tmc_pages->daddrs);
+> +		tmc_pages->daddrs = NULL;
+> +		return -ENOMEM;
+> +	}
 > +
-> +		q6core at 3 {
-> +			compatible = "qcom,q6core";
-> +			reg = <APR_SVC_ADSP_CORE>;
-> +		};
+> +	for (i = 0; i < nr_pages; i++) {
+> +		if (pages && pages[i]) {
+> +			page = virt_to_page(pages[i]);
+> +			get_page(page);
+> +		} else {
+> +			page = alloc_pages_node(node,
+> +						GFP_KERNEL | __GFP_ZERO, 0);
+> +		}
+> +		paddr = dma_map_page(dev, page, 0, PAGE_SIZE, dir);
+> +		if (dma_mapping_error(dev, paddr))
+> +			goto err;
+> +		tmc_pages->daddrs[i] = paddr;
+> +		tmc_pages->pages[i] = page;
+> +	}
+> +	return 0;
+> +err:
+> +	tmc_pages_free(tmc_pages, dev, dir);
+> +	return -ENOMEM;
+> +}
 > +
-> +		q6afe at 4 {
-> +			compatible = "qcom,q6afe";
-> +			reg = <APR_SVC_AFE>;
+> +static inline dma_addr_t tmc_sg_table_base_paddr(struct tmc_sg_table *sg_table)
+> +{
+> +	if (WARN_ON(!sg_table->data_pages.pages[0]))
+> +		return 0;
+> +	return sg_table->table_daddr;
+> +}
 > +
-> +			dais {
-> +				#sound-dai-cells = <1>;
-> +				hdmi at 1 {
-> +					reg = <1>;
-> +				};
-> +			};
-> +		};
+> +static inline void *tmc_sg_table_base_vaddr(struct tmc_sg_table *sg_table)
+> +{
+> +	if (WARN_ON(!sg_table->data_pages.pages[0]))
+> +		return NULL;
+> +	return sg_table->table_vaddr;
+> +}
 > +
-> +		q6asm at 7 {
-> +			compatible = "qcom,q6asm";
-> +			reg = <APR_SVC_ASM>;
-> +			...
-> +		};
+> +static inline void *
+> +tmc_sg_table_data_vaddr(struct tmc_sg_table *sg_table)
+> +{
+> +	if (WARN_ON(!sg_table->data_pages.nr_pages))
+> +		return 0;
+> +	return sg_table->data_vaddr;
+> +}
 > +
-> +		q6adm at 8 {
-> +			compatible = "qcom,q6adm";
-> +			reg = <APR_SVC_ADM>;
-> +			...
-> +		};
-> +	};
-> diff --git a/include/dt-bindings/soc/qcom,apr.h b/include/dt-bindings/soc/qcom,apr.h
-> new file mode 100644
-> index 000000000000..006362400c0f
-> --- /dev/null
-> +++ b/include/dt-bindings/soc/qcom,apr.h
-> @@ -0,0 +1,28 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +#ifndef __DT_BINDINGS_QCOM_APR_H
-> +#define __DT_BINDINGS_QCOM_APR_H
+> +static inline long
+> +tmc_sg_get_data_page_offset(struct tmc_sg_table *sg_table, dma_addr_t addr)
+> +{
+> +	return tmc_pages_get_offset(&sg_table->data_pages, addr);
+> +}
 > +
-> +/* Domain IDs */
-> +#define APR_DOMAIN_SIM		0x1
-> +#define APR_DOMAIN_PC		0x2
-> +#define APR_DOMAIN_MODEM	0x3
-> +#define APR_DOMAIN_ADSP		0x4
-> +#define APR_DOMAIN_APPS		0x5
-> +#define APR_DOMAIN_MAX		0x6
+> +static inline void tmc_free_table_pages(struct tmc_sg_table *sg_table)
+> +{
+> +	if (sg_table->table_vaddr)
+> +		vunmap(sg_table->table_vaddr);
+> +	tmc_pages_free(&sg_table->table_pages, sg_table->dev, DMA_TO_DEVICE);
+> +}
 > +
-> +/* ADSP service IDs */
-> +#define APR_SVC_ADSP_CORE	0x3
-> +#define APR_SVC_AFE		0x4
-> +#define APR_SVC_VSM		0x5
-> +#define APR_SVC_VPM		0x6
-> +#define APR_SVC_ASM		0x7
-> +#define APR_SVC_ADM		0x8
-> +#define APR_SVC_ADSP_MVM	0x09
-> +#define APR_SVC_ADSP_CVS	0x0A
-> +#define APR_SVC_ADSP_CVP	0x0B
-> +#define APR_SVC_USM		0x0C
-> +#define APR_SVC_LSM		0x0D
-> +#define APR_SVC_VIDC		0x16
-> +#define APR_SVC_MAX		0x17
+> +static void tmc_free_data_pages(struct tmc_sg_table *sg_table)
+> +{
+> +	if (sg_table->data_vaddr)
+> +		vunmap(sg_table->data_vaddr);
+> +	tmc_pages_free(&sg_table->data_pages, sg_table->dev, DMA_FROM_DEVICE);
+> +}
 > +
-> +#endif /* __DT_BINDINGS_QCOM_APR_H */
+> +void tmc_free_sg_table(struct tmc_sg_table *sg_table)
+> +{
+> +	tmc_free_table_pages(sg_table);
+> +	tmc_free_data_pages(sg_table);
+> +}
+> +
+> +/*
+> + * Alloc pages for the table. Since this will be used by the device,
+> + * allocate the pages closer to the device (i.e, dev_to_node(dev)
+> + * rather than the CPU node).
+> + */
+> +static int tmc_alloc_table_pages(struct tmc_sg_table *sg_table)
+> +{
+> +	int rc;
+> +	struct tmc_pages *table_pages = &sg_table->table_pages;
+> +
+> +	rc = tmc_pages_alloc(table_pages, sg_table->dev,
+> +			     dev_to_node(sg_table->dev),
+> +			     DMA_TO_DEVICE, NULL);
+> +	if (rc)
+> +		return rc;
+> +	sg_table->table_vaddr = vmap(table_pages->pages,
+> +				     table_pages->nr_pages,
+> +				     VM_MAP,
+> +				     PAGE_KERNEL);
+> +	if (!sg_table->table_vaddr)
+> +		rc = -ENOMEM;
+> +	else
+> +		sg_table->table_daddr = table_pages->daddrs[0];
+> +	return rc;
+> +}
+> +
+> +static int tmc_alloc_data_pages(struct tmc_sg_table *sg_table, void **pages)
+> +{
+> +	int rc;
+> +
+> +	/* Allocate data pages on the node requested by the caller */
+> +	rc = tmc_pages_alloc(&sg_table->data_pages,
+> +			     sg_table->dev, sg_table->node,
+> +			     DMA_FROM_DEVICE, pages);
+> +	if (!rc) {
+> +		sg_table->data_vaddr = vmap(sg_table->data_pages.pages,
+> +					   sg_table->data_pages.nr_pages,
+> +					   VM_MAP,
+> +					   PAGE_KERNEL);
+
+Indentation.
+
+> +		if (!sg_table->data_vaddr)
+> +			rc = -ENOMEM;
+> +	}
+> +	return rc;
+> +}
+> +
+> +/*
+> + * tmc_alloc_sg_table: Allocate and setup dma pages for the TMC SG table
+> + * and data buffers. TMC writes to the data buffers and reads from the SG
+> + * Table pages.
+> + *
+> + * @dev		- Device to which page should be DMA mapped.
+> + * @node	- Numa node for mem allocations
+> + * @nr_tpages	- Number of pages for the table entries.
+> + * @nr_dpages	- Number of pages for Data buffer.
+> + * @pages	- Optional list of virtual address of pages.
+> + */
+> +struct tmc_sg_table *tmc_alloc_sg_table(struct device *dev,
+> +					int node,
+> +					int nr_tpages,
+> +					int nr_dpages,
+> +					void **pages)
+> +{
+> +	long rc;
+> +	struct tmc_sg_table *sg_table;
+> +
+> +	sg_table = kzalloc(sizeof(*sg_table), GFP_KERNEL);
+> +	if (!sg_table)
+> +		return ERR_PTR(-ENOMEM);
+> +	sg_table->data_pages.nr_pages = nr_dpages;
+> +	sg_table->table_pages.nr_pages = nr_tpages;
+> +	sg_table->node = node;
+> +	sg_table->dev = dev;
+> +
+> +	rc  = tmc_alloc_data_pages(sg_table, pages);
+> +	if (!rc)
+> +		rc = tmc_alloc_table_pages(sg_table);
+> +	if (rc) {
+> +		tmc_free_sg_table(sg_table);
+> +		kfree(sg_table);
+> +		return ERR_PTR(rc);
+> +	}
+> +
+> +	return sg_table;
+> +}
+> +
+> +/*
+> + * tmc_sg_table_sync_data_range: Sync the data buffer written
+> + * by the device from @offset upto a @size bytes.
+> + */
+> +void tmc_sg_table_sync_data_range(struct tmc_sg_table *table,
+> +				  u64 offset, u64 size)
+> +{
+> +	int i, index, start;
+> +	int npages = DIV_ROUND_UP(size, PAGE_SIZE);
+> +	struct device *dev = table->dev;
+> +	struct tmc_pages *data = &table->data_pages;
+> +
+> +	start = offset >> PAGE_SHIFT;
+> +	for (i = start; i < (start + npages); i++) {
+> +		index = i % data->nr_pages;
+> +		dma_sync_single_for_cpu(dev, data->daddrs[index],
+> +					PAGE_SIZE, DMA_FROM_DEVICE);
+> +	}
+> +}
+> +
+> +/* tmc_sg_sync_table: Sync the page table */
+> +void tmc_sg_table_sync_table(struct tmc_sg_table *sg_table)
+> +{
+> +	int i;
+> +	struct device *dev = sg_table->dev;
+> +	struct tmc_pages *table_pages = &sg_table->table_pages;
+> +
+> +	for (i = 0; i < table_pages->nr_pages; i++)
+> +		dma_sync_single_for_device(dev, table_pages->daddrs[i],
+> +					   PAGE_SIZE, DMA_TO_DEVICE);
+> +}
+> +
+> +/*
+> + * tmc_sg_table_get_data: Get the buffer pointer for data @offset
+> + * in the SG buffer. The @bufpp is updated to point to the buffer.
+> + * Returns :
+> + *	the length of linear data available at @offset.
+> + *	or
+> + *	<= 0 if no data is available.
+> + */
+> +ssize_t tmc_sg_table_get_data(struct tmc_sg_table *sg_table,
+> +				u64 offset, size_t len, char **bufpp)
+
+Indentation
+
+> +{
+> +	size_t size;
+> +	int pg_idx = offset >> PAGE_SHIFT;
+> +	int pg_offset = offset & (PAGE_SIZE - 1);
+> +	struct tmc_pages *data_pages = &sg_table->data_pages;
+> +
+> +	size = tmc_sg_table_buf_size(sg_table);
+> +	if (offset >= size)
+> +		return -EINVAL;
+
+        /* Make sure we don't go beyond the page array */
+
+> +	len = (len < (size - offset)) ? len : size - offset;
+
+        /* Respect page boundaries */
+
+> +	len = (len < (PAGE_SIZE - pg_offset)) ? len : (PAGE_SIZE - pg_offset);
+> +	if (len > 0)
+> +		*bufpp = page_address(data_pages->pages[pg_idx]) + pg_offset;
+> +	return len;
+> +}
+> +
+>  static inline void tmc_etr_enable_catu(struct tmc_drvdata *drvdata)
+>  {
+>  	struct coresight_device *catu = tmc_etr_get_catu_device(drvdata);
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+> index 9cbc4d5..74d8f24 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.h
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
+> @@ -19,6 +19,7 @@
+>  #define _CORESIGHT_TMC_H
+>  
+>  #include <linux/miscdevice.h>
+> +#include <linux/dma-mapping.h>
+
+Alphabetial order.
+
+>  #include "coresight-catu.h"
+>  
+>  #define TMC_RSZ			0x004
+> @@ -172,6 +173,38 @@ struct tmc_drvdata {
+>  	u32			etr_caps;
+>  };
+>  
+> +/**
+> + * struct tmc_pages - Collection of pages used for SG.
+> + * @nr_pages:		Number of pages in the list.
+> + * @daddrs:		Array of DMA'able page address.
+> + * @pages:		Array pages for the buffer.
+> + */
+> +struct tmc_pages {
+> +	int nr_pages;
+> +	dma_addr_t	*daddrs;
+> +	struct page	**pages;
+> +};
+> +
+> +/*
+> + * struct tmc_sg_table - Generic SG table for TMC
+> + * @dev:		Device for DMA allocations
+> + * @table_vaddr:	Contiguous Virtual address for PageTable
+> + * @data_vaddr:		Contiguous Virtual address for Data Buffer
+> + * @table_daddr:	DMA address of the PageTable base
+> + * @node:		Node for Page allocations
+> + * @table_pages:	List of pages & dma address for Table
+> + * @data_pages:		List of pages & dma address for Data
+> + */
+> +struct tmc_sg_table {
+> +	struct device *dev;
+> +	void *table_vaddr;
+> +	void *data_vaddr;
+> +	dma_addr_t table_daddr;
+> +	int node;
+> +	struct tmc_pages table_pages;
+> +	struct tmc_pages data_pages;
+> +};
+> +
+>  /* Generic functions */
+>  void tmc_wait_for_tmcready(struct tmc_drvdata *drvdata);
+>  void tmc_flush_and_stop(struct tmc_drvdata *drvdata);
+> @@ -253,4 +286,21 @@ tmc_etr_get_catu_device(struct tmc_drvdata *drvdata)
+>  	return NULL;
+>  }
+>  
+> +struct tmc_sg_table *tmc_alloc_sg_table(struct device *dev,
+> +					int node,
+> +					int nr_tpages,
+> +					int nr_dpages,
+> +					void **pages);
+> +void tmc_free_sg_table(struct tmc_sg_table *sg_table);
+> +void tmc_sg_table_sync_table(struct tmc_sg_table *sg_table);
+> +void tmc_sg_table_sync_data_range(struct tmc_sg_table *table,
+> +				  u64 offset, u64 size);
+> +ssize_t tmc_sg_table_get_data(struct tmc_sg_table *sg_table,
+> +			      u64 offset, size_t len, char **bufpp);
+> +static inline unsigned long
+> +tmc_sg_table_buf_size(struct tmc_sg_table *sg_table)
+> +{
+> +	return sg_table->data_pages.nr_pages << PAGE_SHIFT;
+> +}
+> +
+>  #endif
 > -- 
-> 2.16.2
+> 2.7.4
 > 
