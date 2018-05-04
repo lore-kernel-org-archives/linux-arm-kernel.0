@@ -1,52 +1,47 @@
-From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Fri,  4 May 2018 09:21:37 -0500
-Subject: [PATCHv4 7/7] defconfig: enable fpga and service layer
-In-Reply-To: <1525443697-31009-1-git-send-email-richard.gong@linux.intel.com>
-References: <1525443697-31009-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1525443697-31009-8-git-send-email-richard.gong@linux.intel.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 4 May 2018 22:19:20 +0800
+Subject: [PATCH 5/5] hisi: Consolidate the Kconfigs for the CLOCK_STUB
+ and the MAILBOX
+In-Reply-To: <1522811675-12741-6-git-send-email-leo.yan@linaro.org>
+References: <1522811675-12741-1-git-send-email-leo.yan@linaro.org>
+ <1522811675-12741-6-git-send-email-leo.yan@linaro.org>
+Message-ID: <20180504141920.GA17313@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Gong <richard.gong@intel.com>
+On Wed, Apr 04, 2018 at 11:14:35AM +0800, Leo Yan wrote:
+> From: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> The current defconfig is inconsistent as it selects the mailbox and
+> the clock for the hi6220 and the hi3660 without having their Kconfigs
+> making sure the dependencies are correct. It ends up when selecting
+> different versions for the kernel (for example when git bisecting)
+> those options disappear and they don't get back, leading to unexpected
+> behaviors. In our case, the cpufreq driver does no longer work because
+> the clock fails to initialize due to the clock stub and the mailbox
+> missing.
+> 
+> In order to have the dependencies correctly set when defaulting, let's
+> do the same as commit 3a49afb84ca074e ("clk: enable hi655x common clk
+> automatically") where we select automatically the driver when the
+> parent driver is selected. With sensible defaults in place, we can leave
+> other choices for EXPERT.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Enable fpga framework, Stratix 10 SoC FPGA manager and Stratix10
-Service Layer
+Hi Jassi,
 
-Signed-off-by: Richard Gong <richard.gong@intel.com>
-Signed-off-by: Alan Tull <atull@kernel.org>
----
-v2: this patch is added in patch set version 2
-v3: no change
-v4: s/CONFIG_INTEL_SERVICE/CONFIG_STRATIX10_SERVICE/
-    Add CONFIG_OF_FPGA_REGION=y
-    s/Intel/Stratix10/ in subject line
----
- arch/arm64/configs/defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+Could you review and ack for this patch?
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index ecf6137..5f7a9b7 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -180,6 +180,7 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_NBD=m
- CONFIG_VIRTIO_BLK=y
- CONFIG_BLK_DEV_NVME=m
-+CONFIG_STRATIX10_SERVICE=y
- CONFIG_SRAM=y
- CONFIG_EEPROM_AT25=m
- # CONFIG_SCSI_PROC_FS is not set
-@@ -595,6 +596,11 @@ CONFIG_PHY_TEGRA_XUSB=y
- CONFIG_QCOM_L2_PMU=y
- CONFIG_QCOM_L3_PMU=y
- CONFIG_MESON_EFUSE=m
-+CONFIG_FPGA=y
-+CONFIG_FPGA_MGR_STRATIX10_SOC=y
-+CONFIG_FPGA_REGION=y
-+CONFIG_FPGA_BRIDGE=y
-+CONFIG_OF_FPGA_REGION=y
- CONFIG_QCOM_QFPROM=y
- CONFIG_UNIPHIER_EFUSE=y
- CONFIG_TEE=y
--- 
-2.7.4
+Hi Wei,
+
+Stephen has acked this patch and if we can get ack from Jassi, could
+you pick up this patch?
+
+I missed my Signed-off-by tag, this might break the chain.
+So when you pick up this patch, please add my Signed-off-by tag:
+
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+
+Thanks,
+Leo Yan
