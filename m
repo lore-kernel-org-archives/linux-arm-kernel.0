@@ -1,29 +1,112 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri,  4 May 2018 12:34:46 +0200
-Subject: [PATCH REPOST] mfd: syscon: atmel-smc: include string.h
-Message-ID: <20180504103446.20104-1-bigeasy@linutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  4 May 2018 11:41:17 +0100
+Subject: [PATCH] drivers/perf: arm-ccn: stop spamming dmesg in event_init
+Message-ID: <20180504104117.8086-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The string.h header file is needed for the memset() definition. The RT
-build fails because it is not pulled in via other header files.
+The ARM CCN PMU driver uses dev_warn() to complain about parameters in
+the user-provided perf_event_attr. This means that under normal
+operation (e.g. a single invocation of the perf tool), dmesg may be
+spammed with multiple messages.
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Tools may issue multiple syscalls to probe for feature support, and
+multiple applications (from multiple users) can attempt to open events
+simultaneously, so this is not very helpful, even if a user happens to
+have access to dmesg. Worse, this can push important information out of
+the dmesg ring buffer, and can significantly slow down syscall fuzzers,
+vastly increasing the time it takes to find critical bugs.
+
+Demote the dev_warn() instances to dev_dbg(), as is the case for all
+other PMU drivers under drivers/perf/. Users who wish to debug PMU event
+initialisation can enable dynamic debug to receive these messages.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/mfd/atmel-smc.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/perf/arm-ccn.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
---- a/drivers/mfd/atmel-smc.c
-+++ b/drivers/mfd/atmel-smc.c
-@@ -12,6 +12,7 @@
-  */
+diff --git a/drivers/perf/arm-ccn.c b/drivers/perf/arm-ccn.c
+index 65b7e4042ece..07771e28f572 100644
+--- a/drivers/perf/arm-ccn.c
++++ b/drivers/perf/arm-ccn.c
+@@ -736,7 +736,7 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 	ccn = pmu_to_arm_ccn(event->pmu);
  
- #include <linux/mfd/syscon/atmel-smc.h>
-+#include <linux/string.h>
+ 	if (hw->sample_period) {
+-		dev_warn(ccn->dev, "Sampling not supported!\n");
++		dev_dbg(ccn->dev, "Sampling not supported!\n");
+ 		return -EOPNOTSUPP;
+ 	}
  
- /**
-  * atmel_smc_cs_conf_init - initialize a SMC CS conf
+@@ -744,12 +744,12 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 			event->attr.exclude_kernel || event->attr.exclude_hv ||
+ 			event->attr.exclude_idle || event->attr.exclude_host ||
+ 			event->attr.exclude_guest) {
+-		dev_warn(ccn->dev, "Can't exclude execution levels!\n");
++		dev_dbg(ccn->dev, "Can't exclude execution levels!\n");
+ 		return -EINVAL;
+ 	}
+ 
+ 	if (event->cpu < 0) {
+-		dev_warn(ccn->dev, "Can't provide per-task data!\n");
++		dev_dbg(ccn->dev, "Can't provide per-task data!\n");
+ 		return -EOPNOTSUPP;
+ 	}
+ 	/*
+@@ -771,13 +771,13 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 	switch (type) {
+ 	case CCN_TYPE_MN:
+ 		if (node_xp != ccn->mn_id) {
+-			dev_warn(ccn->dev, "Invalid MN ID %d!\n", node_xp);
++			dev_dbg(ccn->dev, "Invalid MN ID %d!\n", node_xp);
+ 			return -EINVAL;
+ 		}
+ 		break;
+ 	case CCN_TYPE_XP:
+ 		if (node_xp >= ccn->num_xps) {
+-			dev_warn(ccn->dev, "Invalid XP ID %d!\n", node_xp);
++			dev_dbg(ccn->dev, "Invalid XP ID %d!\n", node_xp);
+ 			return -EINVAL;
+ 		}
+ 		break;
+@@ -785,11 +785,11 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 		break;
+ 	default:
+ 		if (node_xp >= ccn->num_nodes) {
+-			dev_warn(ccn->dev, "Invalid node ID %d!\n", node_xp);
++			dev_dbg(ccn->dev, "Invalid node ID %d!\n", node_xp);
+ 			return -EINVAL;
+ 		}
+ 		if (!arm_ccn_pmu_type_eq(type, ccn->node[node_xp].type)) {
+-			dev_warn(ccn->dev, "Invalid type 0x%x for node %d!\n",
++			dev_dbg(ccn->dev, "Invalid type 0x%x for node %d!\n",
+ 					type, node_xp);
+ 			return -EINVAL;
+ 		}
+@@ -808,19 +808,19 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 		if (event_id != e->event)
+ 			continue;
+ 		if (e->num_ports && port >= e->num_ports) {
+-			dev_warn(ccn->dev, "Invalid port %d for node/XP %d!\n",
++			dev_dbg(ccn->dev, "Invalid port %d for node/XP %d!\n",
+ 					port, node_xp);
+ 			return -EINVAL;
+ 		}
+ 		if (e->num_vcs && vc >= e->num_vcs) {
+-			dev_warn(ccn->dev, "Invalid vc %d for node/XP %d!\n",
++			dev_dbg(ccn->dev, "Invalid vc %d for node/XP %d!\n",
+ 					vc, node_xp);
+ 			return -EINVAL;
+ 		}
+ 		valid = 1;
+ 	}
+ 	if (!valid) {
+-		dev_warn(ccn->dev, "Invalid event 0x%x for node/XP %d!\n",
++		dev_dbg(ccn->dev, "Invalid event 0x%x for node/XP %d!\n",
+ 				event_id, node_xp);
+ 		return -EINVAL;
+ 	}
+-- 
+2.11.0
