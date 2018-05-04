@@ -1,15 +1,15 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 4 May 2018 11:30:40 +0200
-Subject: [GIT PULL] Ux500 updates for v4.18
-Message-ID: <CACRpkdbG9DSRT0iT+YmuUx7vXsUyJo2w8XGxr=-rCxcMnZ2yUQ@mail.gmail.com>
+Date: Fri, 4 May 2018 11:33:07 +0200
+Subject: [GIT PULL] Ux500 DTS changes for v4.18
+Message-ID: <CACRpkdYR_eUXMGArMwCChKBdTSUCt4pd0+ofGCQ0sLmN8kCCMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi there ARM SoC folks,
 
-here are some Ux500 updates for v4.18. We drop
-the experimental silicon in U8540 and U9540 and
-tidy up Kconfig a bit.
+here is two DTS update patches for Ux500 for v4.18.
+We fix up the debounces and delete the unused U8540
+and U9540 device trees.
 
 Please pull it in!
 
@@ -23,23 +23,30 @@ The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 are available in the Git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-machine-arm-soc
+tags/ux500-dts-arm-soc
 
-for you to fetch changes up to 52b12be584ba554a40ad61d4d07bfbc100ffa1ac:
+for you to fetch changes up to f6601ae15fffbb3ade2cdbace9a2c9a25aba85ea:
 
-  ARM: ux500: Cut down Kconfig options (2018-05-04 11:02:52 +0200)
-
-----------------------------------------------------------------
-These changes for ux500:
-- Drops U8540 and U9540
-- Cuts down the Kconfig options due to accumulated simplifications
+  ARM: ux500: Drop the U8540 device trees (2018-05-04 11:15:43 +0200)
 
 ----------------------------------------------------------------
-Linus Walleij (2):
-      ARM: ux500: Drop U8540/9540 support
-      ARM: ux500: Cut down Kconfig options
+This:
+- Corrects the debounce interval on some nodes
+- Drops the U8540/U9540 device trees
 
- arch/arm/mach-ux500/Kconfig       | 53 ++++++++-------------------------------
- arch/arm/mach-ux500/cpu-db8500.c  | 16 ++----------
- arch/arm/mach-ux500/db8500-regs.h |  4 ---
- 3 files changed, 13 insertions(+), 60 deletions(-)
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: dts: Ux500: Fix "debounce-interval" property misspelling
+
+Linus Walleij (1):
+      ARM: ux500: Drop the U8540 device trees
+
+ arch/arm/boot/dts/Makefile                 |   4 +-
+ arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi | 196 -----------------------------
+ arch/arm/boot/dts/ste-ccu8540.dts          |  94 --------------
+ arch/arm/boot/dts/ste-ccu9540.dts          |  79 ------------
+ arch/arm/boot/dts/ste-snowball.dts         |  10 +-
+ 5 files changed, 6 insertions(+), 377 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi
+ delete mode 100644 arch/arm/boot/dts/ste-ccu8540.dts
+ delete mode 100644 arch/arm/boot/dts/ste-ccu9540.dts
