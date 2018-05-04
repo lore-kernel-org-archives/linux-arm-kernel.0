@@ -1,78 +1,78 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  4 May 2018 18:39:35 +0100
-Subject: [PATCH 4/6] arm64: fix assembly constraints for cmpxchg
+Date: Fri,  4 May 2018 18:39:34 +0100
+Subject: [PATCH 3/6] arm64: use <linux/atomic.h> for cmpxchg
 In-Reply-To: <20180504173937.25300-1-mark.rutland@arm.com>
 References: <20180504173937.25300-1-mark.rutland@arm.com>
-Message-ID: <20180504173937.25300-5-mark.rutland@arm.com>
+Message-ID: <20180504173937.25300-4-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our LL/SC cmpxchg assembly uses "Lr" as the constraint for old, which
-allows either an integer constant suitable for a 64-bit logical
-oepration, or a register.
+Currently a number of arm64-specific files include <asm/cmpxchg.h> for
+the definition of the cmpxchg helpers. This works fine today, but won't
+when we switch over to instrumented atomics, and as noted in
+Documentation/core-api/atomic_ops.rst:
 
-However, this assembly is also used for 32-bit cases (where we
-explicitly add a 'w' prefix to the output format), where the set of
-valid immediates differ, and we should use a 'Kr' constraint.
+  If someone wants to use xchg(), cmpxchg() and their variants,
+  linux/atomic.h should be included rather than asm/cmpxchg.h, unless
+  the code is in arch/* and can take care of itself.
 
-In some cases, this can result in build failures, when GCC selects an
-immediate which is valid for a 64-bit logical operation, but we try to
-assemble a 32-bit logical operation:
-
-[mark at lakrids:~/src/linux]% uselinaro 17.05 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- net/sunrpc/auth_gss/svcauth_gss.o
-  CHK     include/config/kernel.release
-  CHK     include/generated/uapi/linux/version.h
-  CHK     include/generated/utsrelease.h
-  CHK     include/generated/bounds.h
-  CHK     include/generated/timeconst.h
-  CHK     include/generated/asm-offsets.h
-  CALL    scripts/checksyscalls.sh
-  CHK     scripts/mod/devicetable-offsets.h
-  CC      net/sunrpc/auth_gss/svcauth_gss.o
-/tmp/ccj04KVh.s: Assembler messages:
-/tmp/ccj04KVh.s:325: Error: immediate out of range at operand 3 -- `eor w2,w1,4294967295'
-scripts/Makefile.build:324: recipe for target 'net/sunrpc/auth_gss/svcauth_gss.o' failed
-make[1]: *** [net/sunrpc/auth_gss/svcauth_gss.o] Error 1
-Makefile:1704: recipe for target 'net/sunrpc/auth_gss/svcauth_gss.o' failed
-make: *** [net/sunrpc/auth_gss/svcauth_gss.o] Error 2
-
-Note that today we largely avoid the specific failure above because GCC
-happens to already have the value in a register, and in most cases uses
-that rather than generating the immediate. The following code added to
-an arbitrary file will cause the same failure:
-
-unsigned int test_cmpxchg(unsigned int *l)
-{
-       return cmpxchg(l, -1, 0);
-}
-
-While it would seem that we could conditionally use the 'K' constraint,
-this seems to be handled erroneously by GCC (at least versions 6.3 and
-7.1), with the same immediates being used, despite not being permitted
-for 32-bit logical operations.
-
-Thus we must avoid the use of an immediate in order to prevent failures
-as above.
+... so let's switch to <linux/atomic.h> for these definitions.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic_ll_sc.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/pgtable.h     | 2 +-
+ arch/arm64/include/asm/sync_bitops.h | 2 +-
+ arch/arm64/mm/fault.c                | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index f5a2d09afb38..3175f4982682 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -267,7 +267,7 @@ __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
- 	"2:"								\
- 	: [tmp] "=&r" (tmp), [oldval] "=&r" (oldval),			\
- 	  [v] "+Q" (*(unsigned long *)ptr)				\
--	: [old] "Lr" (old), [new] "r" (new)				\
-+	: [old] "r" (old), [new] "r" (new)				\
- 	: cl);								\
- 									\
- 	return oldval;							\
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 7c4c8f318ba9..c797c0fbbce2 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -39,8 +39,8 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
+-#include <asm/cmpxchg.h>
+ #include <asm/fixmap.h>
++#include <linux/atomic.h>
+ #include <linux/mmdebug.h>
+ #include <linux/mm_types.h>
+ #include <linux/sched.h>
+diff --git a/arch/arm64/include/asm/sync_bitops.h b/arch/arm64/include/asm/sync_bitops.h
+index eee31a9f72a5..24ed8f445b8b 100644
+--- a/arch/arm64/include/asm/sync_bitops.h
++++ b/arch/arm64/include/asm/sync_bitops.h
+@@ -3,7 +3,7 @@
+ #define __ASM_SYNC_BITOPS_H__
+ 
+ #include <asm/bitops.h>
+-#include <asm/cmpxchg.h>
++#include <linux/atomic.h>
+ 
+ /* sync_bitops functions are equivalent to the SMP implementation of the
+  * original functions, independently from CONFIG_SMP being defined.
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 4165485e8b6e..bfbc695e2ea2 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -18,6 +18,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/atomic.h>
+ #include <linux/extable.h>
+ #include <linux/signal.h>
+ #include <linux/mm.h>
+@@ -34,7 +35,6 @@
+ #include <linux/hugetlb.h>
+ 
+ #include <asm/bug.h>
+-#include <asm/cmpxchg.h>
+ #include <asm/cpufeature.h>
+ #include <asm/exception.h>
+ #include <asm/debug-monitors.h>
 -- 
 2.11.0
