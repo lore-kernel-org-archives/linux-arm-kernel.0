@@ -1,44 +1,47 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 4 May 2018 16:15:35 +0800
-Subject: [RFC PATCH] ARM: dts: imx: replace underscore with hyphen in
- aliases name
-In-Reply-To: <20180504074025.GA11186@g751.home>
-References: <1525399128-11587-1-git-send-email-shawnguo@kernel.org>
- <20180504074025.GA11186@g751.home>
-Message-ID: <20180504081534.GA3443@dragon>
+From: satendra.t@samsung.com (Satendra Singh Thakur)
+Date: Fri,  4 May 2018 13:45:26 +0530
+Subject: [PATCH v1 03/13] drm/kms/mode/exynos-dsi: using helper func
+ drm_display_mode_to_videomode for calculating timing parameters
+In-Reply-To: <00b4a624-d2b6-dc6a-71c0-9c7642480a44@arm.com>
+References: <00b4a624-d2b6-dc6a-71c0-9c7642480a44@arm.com>
+ <CGME20180504081613epcas5p405d342fe333975048175c4a360067f52@epcas5p4.samsung.com>
+Message-ID: <1525421726-2817-1-git-send-email-satendra.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 09:40:25AM +0200, Gary Bisson wrote:
-> Hi Shawn,
-> 
-> On Fri, May 04, 2018 at 09:58:48AM +0800, Shawn Guo wrote:
-> > It replaces underscore with hyphen in aliases name to fix DTC
-> > alias_paths warning below, which is seen with various i.MX board dts
-> > files when W=1 switch is on.
-> > 
-> >  Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-> > 
-> > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> > Cc: Gary Bisson <gary.bisson@boundarydevices.com>
-> > Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> > ---
-> > Hi Lothar, Gary,
-> > 
-> > Per my search on kernel code, this change will not break anything on
-> > kernel support.  But I'm not really sure about the case of bootloaders
-> > running on the boards.  That's why I'm sending it as RFC.
-> > 
-> > We really want i.MX to be the first-class citizen in the community.
-> > After a few cycles efforts on cleaning up DTC warnings, this alias_paths
-> > warning is the last one we see with i.MX dts files.  We really want to
-> > get rid of it and make i.MX dts be DTC warning free.
-> > 
-> > So please comment whether we can merge this patch.
-> 
-> Yes that is fine.
-> Reviewed-by: Gary Bisson <gary.bisson@boundarydevices.com>
+To avoid duplicate logic for the same
 
-Thanks, Gary.
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
+Acked-by: Madhur Verma <madhur.verma@samsung.com>
+Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-Shawn
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index 7904ffa..7fe84fd 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1490,17 +1490,8 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
+ 				struct drm_display_mode *adjusted_mode)
+ {
+ 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+-	struct videomode *vm = &dsi->vm;
+-	struct drm_display_mode *m = adjusted_mode;
+-
+-	vm->hactive = m->hdisplay;
+-	vm->vactive = m->vdisplay;
+-	vm->vfront_porch = m->vsync_start - m->vdisplay;
+-	vm->vback_porch = m->vtotal - m->vsync_end;
+-	vm->vsync_len = m->vsync_end - m->vsync_start;
+-	vm->hfront_porch = m->hsync_start - m->hdisplay;
+-	vm->hback_porch = m->htotal - m->hsync_end;
+-	vm->hsync_len = m->hsync_end - m->hsync_start;
++
++	drm_display_mode_to_videomode(adjusted_mode, &dsi->vm);
+ }
+ 
+ static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
+-- 
+2.7.4
