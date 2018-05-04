@@ -1,69 +1,50 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 4 May 2018 16:23:13 +0800
-Subject: [PATCH] ARM: dts: imx6sx-sabreauto: add debug LED support
-In-Reply-To: <1524812288-799-1-git-send-email-Anson.Huang@nxp.com>
-References: <1524812288-799-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180504082312.GB3443@dragon>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 4 May 2018 13:53:18 +0530
+Subject: [PATCH] ARM: dts: da850-lcdk: increase the size of the u-boot
+ nand partition
+In-Reply-To: <20180504080835.28632-1-brgl@bgdev.pl>
+References: <20180504080835.28632-1-brgl@bgdev.pl>
+Message-ID: <a998535f-8963-9e95-0652-b6ac16a13afa@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 02:58:08PM +0800, Anson Huang wrote:
-> There is a debug LED(D11) connected to GPIO1_IO24, add
-> support for it.
+Hi Bartosz,
+
+On Friday 04 May 2018 01:38 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Current mainline u-boot builds images that are bigger than the 0x80000
+> bytes u-boot partition allocated from the NAND memory. Using the free
+> space partition results in an unbootable system. Increase the partition
+> size to 0xa0000 bytes.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
-> this patch is based on patch series (ARM: dts: imx6sx-sabreauto: add wdog external reset support).
-
-In this case, you can include these two patches into the series, if you
-need to resend the series.
-
-Shawn
-
->  arch/arm/boot/dts/imx6sx-sabreauto.dts | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
+>  arch/arm/boot/dts/da850-lcdk.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> index eb1452c..6b94f24 100644
-> --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> @@ -18,6 +18,18 @@
->  		reg = <0x80000000 0x80000000>;
->  	};
->  
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_led>;
-> +
-> +		user {
-> +			label = "debug";
-> +			gpios = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +
->  	regulators {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
-> @@ -119,6 +131,12 @@
->  &iomuxc {
->  	imx6x-sabreauto {
->  
-> +		pinctrl_led: ledgrp {
-> +			fsl,pins = <
-> +				MX6SX_PAD_CSI_PIXCLK__GPIO1_IO_24 0x17059
-> +			>;
-> +		};
-> +
+> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+> index 7de302f890d7..fc8667445892 100644
+> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> @@ -336,11 +336,11 @@
+>  				partition at 20000 {
+>  					/* The LCDK defaults to booting from this partition */
+>  					label = "u-boot";
+> -					reg = <0x020000 0x080000>;
+> +					reg = <0x020000 0x0a0000>;
+>  				};
+>  				partition at a0000 {
+>  					label = "free space";
+> -					reg = <0x0a0000 0>;
+> +					reg = <0x0c0000 0>;
 
-Try to sort the pinctrl node alphabetically.
+Unfortunately, we cannot do this because it introduces incompatibility
+(data loss) for users who may have some data stored in "free space".
 
-Shawn
+I should have insisted on a lot of padding for the u-boot partition or
+asked not to add partitions to DT at all. For now the only solution is
+to use command line partitions. They take precedence over DT partitions.
 
->  		pinctrl_enet1_1: enet1grp-1 {
->  			fsl,pins = <
->  				MX6SX_PAD_ENET1_MDIO__ENET1_MDIO        0xa0b1
-> -- 
-> 2.7.4
-> 
+Thanks,
+Sekhar
