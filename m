@@ -1,52 +1,169 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 4 May 2018 09:42:03 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 analog & timer
- drivers
-In-Reply-To: <CAK8P3a0maxno4S-dXoT1O5zp3NgHP2LWuGhtVoqFMMEv-tm07Q@mail.gmail.com>
-References: <1525274696-11968-1-git-send-email-fabrice.gasnier@st.com>
- <cc934eb9-f9e4-3c52-7f38-413a1b63fce2@st.com>
- <CAK8P3a0maxno4S-dXoT1O5zp3NgHP2LWuGhtVoqFMMEv-tm07Q@mail.gmail.com>
-Message-ID: <84f8b1bf-d6df-ca0e-cb3f-e5b7f7ded14b@st.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 4 May 2018 15:46:38 +0800
+Subject: [PATCH V5 1/6] ARM: dts: imx6sx-sabreauto: add PMIC support
+In-Reply-To: <1524725898-27974-1-git-send-email-Anson.Huang@nxp.com>
+References: <1524725898-27974-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180504074637.GW3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/04/2018 12:12 AM, Arnd Bergmann wrote:
-> On Thu, May 3, 2018 at 10:05 AM, Alexandre Torgue
-> <alexandre.torgue@st.com> wrote:
->> Hi Fabrice,
->>
->> On 05/02/2018 05:24 PM, Fabrice Gasnier wrote:
->>>
->>> This enables drivers for STM32 timer, low power timer and analog hardware
->>> that can be used on STM32MP1 SoC:
->>> - Timer & LP Timer MFD core, PWM, trigger & encoder drivers
->>> - IIO ADC/DAC/DFSDM
->>> - vrefbuf regu driver (voltage reference buffer).
->>>
->>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>> ---
->>>    arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
->>>    1 file changed, 10 insertions(+)
->>>
->>
->> Applied on stm32-next.
->>
->> Arnd,
->> Do you agree if I take multi_v7_defconfig related patches in my stm32 pull
->> requests ?
+On Thu, Apr 26, 2018 at 02:58:13PM +0800, Anson Huang wrote:
+> Add pfuze100 support on i.MX6SX Sabre Auto board.
 > 
-> Yes, just make sure that all drivers that can reasonably be loadable
-> modules are configured that way rather than as built-in, so a defconfig
-> build doesn't become too big.
-
-Ok. You're right, this drivers could be configured as module. We just 
-need to verify impact before send it.
-
-Regards
-alex
-
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+> no changes since V4.
+>  arch/arm/boot/dts/imx6sx-sabreauto.dts | 117 +++++++++++++++++++++++++++++++++
+>  1 file changed, 117 insertions(+)
 > 
->         Arnd
+> diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> index 57d1ea0..2caca934 100644
+> --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> @@ -74,6 +74,14 @@
+>  
+>  &iomuxc {
+>  	imx6x-sabreauto {
+> +
+
+Drop this newline.
+
+> +		pinctrl_i2c2_1: i2c2grp-1 {
+
+The suffix "1" doesn't make any sense now.
+
+	pinctrl_i2c2: i2c2grp {
+
+> +			fsl,pins = <
+> +				MX6SX_PAD_GPIO1_IO03__I2C2_SDA          0x4001b8b1
+> +				MX6SX_PAD_GPIO1_IO02__I2C2_SCL          0x4001b8b1
+> +			>;
+> +		};
+> +
+>  		pinctrl_uart1: uart1grp {
+>  			fsl,pins = <
+>  				MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
+> @@ -148,3 +156,112 @@
+>  		};
+>  	};
+>  };
+> +
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2_1>;
+> +	status = "okay";
+> +
+> +	pmic: pfuze100 at 08 {
+
+Use generic name for node, and specific name for label.  Also, drop the
+leading zeros in unit-address.
+
+	pfuze100: pmic at 8 {
+
+Shawn
+
+> +		compatible = "fsl,pfuze100";
+> +		reg = <0x08>;
+> +
+> +		regulators {
+> +			sw1a_reg: sw1ab {
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-ramp-delay = <6250>;
+> +			};
+> +
+> +			sw1c_reg: sw1c {
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-ramp-delay = <6250>;
+> +			};
+> +
+> +			sw2_reg: sw2 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw3a_reg: sw3a {
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw3b_reg: sw3b {
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw4_reg: sw4 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			swbst_reg: swbst {
+> +				regulator-min-microvolt = <5000000>;
+> +				regulator-max-microvolt = <5150000>;
+> +			};
+> +
+> +			snvs_reg: vsnvs {
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vref_reg: vrefddr {
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen1_reg: vgen1 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen2_reg: vgen2 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +			};
+> +
+> +			vgen3_reg: vgen3 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen4_reg: vgen4 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen5_reg: vgen5 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen6_reg: vgen6 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 2.7.4
 > 
