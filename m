@@ -1,176 +1,55 @@
-From: opensource.ganesh@gmail.com (Ganesh Mahendran)
-Date: Fri, 4 May 2018 14:31:07 +0800
-Subject: [PATCH 2/2] arm64/mm: add speculative page fault
-In-Reply-To: <871seunmj9.fsf@e105922-lin.cambridge.arm.com>
-References: <1525247672-2165-1-git-send-email-opensource.ganesh@gmail.com>
- <1525247672-2165-2-git-send-email-opensource.ganesh@gmail.com>
- <871seunmj9.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <CADAEsF-qdU3Te279sDFEMs0wL1o-N2R3agTuHCh3qZxFDkpwyg@mail.gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 4 May 2018 08:35:02 +0200
+Subject: [PATCH] tty/serial: atmel: use port->name as name in request_irq()
+In-Reply-To: <921729c6-7c3f-11cd-8634-044a5c52f810@sorico.fr>
+References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
+ <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
+ <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
+ <20180502191632.tgda4g5v3rhncx7c@linutronix.de>
+ <4f3f6e7c-2806-1749-1523-72d5c8eb8229@sorico.fr>
+ <20180503124410.n6ze2ngwv6ekjhdr@linutronix.de>
+ <921729c6-7c3f-11cd-8634-044a5c52f810@sorico.fr>
+Message-ID: <80203f75-f38e-6214-e9b6-8512c5941647@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-05-02 22:46 GMT+08:00 Punit Agrawal <punit.agrawal@arm.com>:
-> Hi Ganesh,
->
-> I was looking at evaluating speculative page fault handling on arm64 and
-> noticed your patch.
->
-> Some comments below -
-
-Thanks for your review.
-
->
-> Ganesh Mahendran <opensource.ganesh@gmail.com> writes:
->
->> This patch enables the speculative page fault on the arm64
->> architecture.
+On 03/05/2018 15:34, Richard Genoud wrote:
+> On 03/05/2018 14:44, Sebastian Andrzej Siewior wrote:
+>> On 2018-05-03 14:36:03 [+0200], Richard Genoud wrote:
+>>> Could resend your patch with Fixes: in the commit message ?
 >>
->> I completed spf porting in 4.9. From the test result,
->> we can see app launching time improved by about 10% in average.
->> For the apps which have more than 50 threads, 15% or even more
->> improvement can be got.
+>> will do shortly.
+
+Actually, this fix can only be applied on stable kernels 4.14+, because
+uart_port->name was introduced in 4.12 by commit f7048b15900f ("tty:
+serial_core: Add name field to uart_port struct")
+
+
 >>
->> Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
->> ---
->> This patch is on top of Laurent's v10 spf
->> ---
->>  arch/arm64/mm/fault.c | 38 +++++++++++++++++++++++++++++++++++---
->>  1 file changed, 35 insertions(+), 3 deletions(-)
+>>> BTW, I didn't manage to reproduce the behavior you describe, could you
+>>> give me your .config and describe a little more how you manage to
+>>> trigger this bug ?
+>> .config sent offlist.
+>> Did you not reproduce this even with the second/debug patch I've sent?
+> Nope. (I tried on a sam9g35 with buildroot/busybox)
+> 
+> I have a sama5d3 with a debian as a home server, I'll give it a try.
+> 
 >>
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index 4165485..e7992a3 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -322,11 +322,13 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
+>>> (do you use the console on serial debug ? which board ? )
+>> up to date debian sid booting with systemd. After boot completed I do
+>> "cat /proc/interrupts" and check for the "gone" string.
+>> This is
+>> [    0.000000] OF: fdt:Machine model: SAMA5D3 Xplained
+>> [    0.000000] Kernel command line: earlyprintk=ttyS0,115200 console=ttyS0,115200 root=/dev/mmcblk0p2 rootwait
+>> [    0.520000] AT91: Detected SoC family: sama5d3
+>> [    0.520000] AT91: Detected SoC: sama5d36, revision 2
 >>
->>  static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
->>                          unsigned int mm_flags, unsigned long vm_flags,
->> -                        struct task_struct *tsk)
->> +                        struct task_struct *tsk, struct vm_area_struct *vma)
->>  {
->> -     struct vm_area_struct *vma;
->>       int fault;
+>> at91-sama5d3_xplained.dtb
 >>
->> +     if (!vma || !can_reuse_spf_vma(vma, addr))
->> +             vma = find_vma(mm, addr);
->> +
->
-> It would be better to move this hunk to do_page_fault().
->
-> It'll help localise the fact that handle_speculative_fault() is a
-> stateful call which needs a corresponding can_reuse_spf_vma() to
-> properly update the vma reference counting.
-
-Yes, your suggestion is better.
-
->
->
->>       vma = find_vma(mm, addr);
->
-> Remember to drop this call in the next version. As it stands the call
-> the find_vma() needlessly gets duplicated.
-
-Will fix
-
->
->>       fault = VM_FAULT_BADMAP;
->>       if (unlikely(!vma))
->> @@ -371,6 +373,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
->>       int fault, major = 0;
->>       unsigned long vm_flags = VM_READ | VM_WRITE;
->>       unsigned int mm_flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
->> +     struct vm_area_struct *vma;
->>
->>       if (notify_page_fault(regs, esr))
->>               return 0;
->> @@ -409,6 +412,25 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
->>
->>       perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
->>
->> +     if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT)) {
->
-> You don't need the IS_ENABLED() check. The alternate implementation of
-> handle_speculative_fault() when CONFIG_SPECULATIVE_PAGE_FAULT is not
-> enabled takes care of this.
-
-Will fix
-
->
->> +             fault = handle_speculative_fault(mm, addr, mm_flags, &vma);
->> +             /*
->> +              * Page fault is done if VM_FAULT_RETRY is not returned.
->> +              * But if the memory protection keys are active, we don't know
->> +              * if the fault is due to key mistmatch or due to a
->> +              * classic protection check.
->> +              * To differentiate that, we will need the VMA we no
->> +              * more have, so let's retry with the mmap_sem held.
->> +              */
->
-> As there is no support for memory protection keys on arm64 most of this
-> comment can be dropped.
-
-will fix
-
->
->> +             if (fault != VM_FAULT_RETRY &&
->> +                      fault != VM_FAULT_SIGSEGV) {
->
-> Not sure if you need the VM_FAULT_SIGSEGV here.
->
->> +                     perf_sw_event(PERF_COUNT_SW_SPF, 1, regs, addr);
->> +                     goto done;
->> +             }
->> +     } else {
->> +             vma = NULL;
->> +     }
->> +
->
-> If vma is initiliased to NULL during declaration, the else part can be
-> dropped.
-
-will fix
-
->
->>       /*
->>        * As per x86, we may deadlock here. However, since the kernel only
->>        * validly references user space from well defined areas of the code,
->> @@ -431,7 +453,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
->>  #endif
->>       }
->>
->> -     fault = __do_page_fault(mm, addr, mm_flags, vm_flags, tsk);
->> +     fault = __do_page_fault(mm, addr, mm_flags, vm_flags, tsk, vma);
->>       major |= fault & VM_FAULT_MAJOR;
->>
->>       if (fault & VM_FAULT_RETRY) {
->> @@ -454,11 +476,21 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
->>               if (mm_flags & FAULT_FLAG_ALLOW_RETRY) {
->>                       mm_flags &= ~FAULT_FLAG_ALLOW_RETRY;
->>                       mm_flags |= FAULT_FLAG_TRIED;
->> +
->> +                     /*
->> +                      * Do not try to reuse this vma and fetch it
->> +                      * again since we will release the mmap_sem.
->> +                      */
->> +                     if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT))
->> +                             vma = NULL;
->
-> Please drop the IS_ENABLED() check.
-
-will fix
-
->
-> Thanks,
-> Punit
->
->> +
->>                       goto retry;
->>               }
->>       }
->>       up_read(&mm->mmap_sem);
->>
->> +done:
->> +
->>       /*
->>        * Handle the "normal" (no error) case first.
->>        */
+>> Is this enough?
+> 
+> Great,
+> 
+> Thanks !
+> 
