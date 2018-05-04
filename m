@@ -1,51 +1,83 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Fri, 4 May 2018 18:47:08 +0300
-Subject: [PATCH v2 0/6] Driver for at91 usart in spi mode
-Message-ID: <20180504154714.5109-1-radu.pirea@microchip.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri,  4 May 2018 17:05:22 +0100
+Subject: [PATCH v5 01/14] thread_info: Add update_thread_flag() helpers
+In-Reply-To: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
+References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1525449935-31424-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+There are a number of bits of code sprinkled around the kernel to
+set a thread flag if a certain condition is true, and clear it
+otherwise.
 
-This is the second version of driver. I added a mfd driver which by
-default probes atmel_serial driver and if in dt is specified to probe
-the spi driver, then the spi-at91-usart driver will be probed. The
-compatible for atmel_serial is now the compatible for at91-usart mfd
-driver and compatilbe for atmel_serial driver was changed in order to
-keep the bindings for serial as they are.
+To help make those call sites terser and less cumbersome, this
+patch adds a new family of thread flag manipulators
 
-Changes in v1:
-- added spi-at91-usart driver
+	update*_thread_flag([...,] flag, cond)
 
-Changes in v2:
-- added at91-usart mfd driver
-- modified spi-at91-usart driver to work as mfd driver child
-- modified atmel_serial driver to work as mfd driver child
+which do the equivalent of:
 
-Radu Pirea (6):
-  MAINTAINERS: add at91 usart mfd driver
-  mfd: at91-usart: added mfd driver for usart
-  MAINTAINERS: add at91 usart spi driver
-  dt-bindings: add binding for at91-usart in spi mode
-  spi: at91-usart: add driver for at91-usart as spi
-  tty/serial: atmel: changed the driver to work under at91-usart mfd
+	if (cond)
+		set*_thread_flag([...,] flag);
+	else
+		clear*_thread_flag([...,] flag);
 
- .../bindings/spi/microchip,at91-usart-spi.txt |  28 +
- MAINTAINERS                                   |  14 +
- drivers/mfd/Kconfig                           |  10 +
- drivers/mfd/Makefile                          |   1 +
- drivers/mfd/at91-usart.c                      |  81 +++
- drivers/spi/Kconfig                           |   9 +
- drivers/spi/Makefile                          |   1 +
- drivers/spi/spi-at91-usart.c                  | 545 ++++++++++++++++++
- drivers/tty/serial/Kconfig                    |   1 +
- drivers/tty/serial/atmel_serial.c             |  29 +-
- include/dt-bindings/mfd/at91-usart.h          |  17 +
- 11 files changed, 722 insertions(+), 14 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
- create mode 100644 drivers/mfd/at91-usart.c
- create mode 100644 drivers/spi/spi-at91-usart.c
- create mode 100644 include/dt-bindings/mfd/at91-usart.h
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Oleg Nesterov <oleg@redhat.com>
+---
+ include/linux/sched.h       |  6 ++++++
+ include/linux/thread_info.h | 11 +++++++++++
+ 2 files changed, 17 insertions(+)
 
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index b3d697f..c2c3051 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1578,6 +1578,12 @@ static inline void clear_tsk_thread_flag(struct task_struct *tsk, int flag)
+ 	clear_ti_thread_flag(task_thread_info(tsk), flag);
+ }
+ 
++static inline void update_tsk_thread_flag(struct task_struct *tsk, int flag,
++					  bool value)
++{
++	update_ti_thread_flag(task_thread_info(tsk), flag, value);
++}
++
+ static inline int test_and_set_tsk_thread_flag(struct task_struct *tsk, int flag)
+ {
+ 	return test_and_set_ti_thread_flag(task_thread_info(tsk), flag);
+diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
+index cf2862b..8d8821b 100644
+--- a/include/linux/thread_info.h
++++ b/include/linux/thread_info.h
+@@ -60,6 +60,15 @@ static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
+ 	clear_bit(flag, (unsigned long *)&ti->flags);
+ }
+ 
++static inline void update_ti_thread_flag(struct thread_info *ti, int flag,
++					 bool value)
++{
++	if (value)
++		set_ti_thread_flag(ti, flag);
++	else
++		clear_ti_thread_flag(ti, flag);
++}
++
+ static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
+ {
+ 	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
+@@ -79,6 +88,8 @@ static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
+ 	set_ti_thread_flag(current_thread_info(), flag)
+ #define clear_thread_flag(flag) \
+ 	clear_ti_thread_flag(current_thread_info(), flag)
++#define update_thread_flag(flag, value) \
++	update_ti_thread_flag(current_thread_info(), flag, value)
+ #define test_and_set_thread_flag(flag) \
+ 	test_and_set_ti_thread_flag(current_thread_info(), flag)
+ #define test_and_clear_thread_flag(flag) \
 -- 
-2.17.0
+2.1.4
