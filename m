@@ -1,129 +1,234 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 4 May 2018 10:18:10 +0200
-Subject: [PATCH 4/4] ARM: dts: imx: drop 'clocks' container for board
- level clocks
-In-Reply-To: <1525395446-1953-5-git-send-email-shawnguo@kernel.org>
-References: <1525395446-1953-1-git-send-email-shawnguo@kernel.org>
- <1525395446-1953-5-git-send-email-shawnguo@kernel.org>
-Message-ID: <20180504101810.065b01f6@karo-electronics.de>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Fri, 04 May 2018 10:21:43 +0200
+Subject: [PATCH v2 05/10] media: v4l: Add definitions for MPEG2 frame
+ format and header metadata
+In-Reply-To: <20180424090150.rtbejfjaddd6wysk@paasikivi.fi.intel.com>
+References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+ <20180419154536.17846-1-paul.kocialkowski@bootlin.com>
+ <20180424090150.rtbejfjaddd6wysk@paasikivi.fi.intel.com>
+Message-ID: <d728db1b56907c0f86aa661d71e16038329da2e1.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri,  4 May 2018 08:57:26 +0800 Shawn Guo wrote:
-> For soc level of clocks which are input to Clock Control Module, clock
-> driver expects them to be under 'clocks' container node.  But for board
-> level clocks, this container is not really necessary.  Let's drop it and
-> use an unique name for fixed rate clock, so that 'reg' property can be
-> saved as well.
+On Tue, 2018-04-24 at 12:01 +0300, Sakari Ailus wrote:
+> Hi Paul,
 > 
-For imx28-tx28.dts and imx53-tx53.dtsi:
-Acked-By: Lothar Wa?mann <LW@KARO-electronics.de>
-
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> ---
->  arch/arm/boot/dts/imx28-tx28.dts             | 13 ++++---------
->  arch/arm/boot/dts/imx53-tx53.dtsi            | 11 +++++------
->  arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 15 ++++++---------
->  arch/arm/boot/dts/imx6q-bx50v3.dtsi          | 11 ++++-------
->  4 files changed, 19 insertions(+), 31 deletions(-)
+> On Thu, Apr 19, 2018 at 05:45:31PM +0200, Paul Kocialkowski wrote:
+> > Stateless video decoding engines require both the MPEG slices and
+> > associated metadata from the video stream in order to decode frames.
+> > 
+> > This introduces definitions for a new pixel format, describing
+> > buffers
+> > with MPEG2 slice data, as well as a control structure for passing
+> > the
+> > frame header (metadata) to drivers.
 > 
-> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-> index 687186358c18..e4f19f9be6d0 100644
-> --- a/arch/arm/boot/dts/imx28-tx28.dts
-> +++ b/arch/arm/boot/dts/imx28-tx28.dts
-> @@ -140,15 +140,10 @@
->  		regulator-boot-on;
->  	};
->  
-> -	clocks {
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -		mclk: clock at 0 {
-> -			compatible = "fixed-clock";
-> -			reg = <0>;
-> -			#clock-cells = <0>;
-> -			clock-frequency = <26000000>;
-> -		};
-> +	mclk: clock-mclk {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <26000000>;
->  	};
->  
->  	sound {
-> diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
-> index 77f2ce9f1e41..5dd3dd3a2fd0 100644
-> --- a/arch/arm/boot/dts/imx53-tx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53-tx53.dtsi
-> @@ -67,13 +67,12 @@
->  		ckih1 {
->  			clock-frequency = <0>;
->  		};
-> +	};
->  
-> -		mclk: clock at 0 {
-> -			compatible = "fixed-clock";
-> -			reg = <0>;
-> -			#clock-cells = <0>;
-> -			clock-frequency = <26000000>;
-> -		};
-> +	mclk: clock-mclk {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <26000000>;
->  	};
->  
->  	gpio-keys {
-> diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-> index ea184d108491..3dee3af1a4c1 100644
-> --- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-> +++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-> @@ -72,15 +72,12 @@
->  		stdout-path = "serial0:115200n8";
->  	};
->  
-> -	clocks {
-> -		/* Fixed crystal dedicated to mcp251x */
-> -		clk16m: clk at 1 {
-> -			compatible = "fixed-clock";
-> -			reg = <1>;
-> -			#clock-cells = <0>;
-> -			clock-frequency = <16000000>;
-> -			clock-output-names = "clk16m";
-> -		};
-> +	/* Fixed crystal dedicated to mcp251x */
-> +	clk16m: clock-16m {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <16000000>;
-> +		clock-output-names = "clk16m";
->  	};
->  
->  	gpio-keys {
-> diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
-> index d0e7dab4d72b..d3cba09be0cb 100644
-> --- a/arch/arm/boot/dts/imx6q-bx50v3.dtsi
-> +++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
-> @@ -43,13 +43,10 @@
->  #include "imx6q-ba16.dtsi"
->  
->  / {
-> -	clocks {
-> -		mclk: clock at 0 {
-> -			compatible = "fixed-clock";
-> -			reg = <0>;
-> -			#clock-cells = <0>;
-> -			clock-frequency = <22000000>;
-> -		};
-> +	mclk: clock-mclk {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <22000000>;
->  	};
->  
->  	gpio-poweroff {
+> What's the typical relationship between MPEG2 slice data and the
+> header?
+> 
+> Are the two always used together, do they originate from the same
+> source, for instance? I have to admit I'm not very familiar with
+> MPEG...
 
+Yes, the header is closely related to the slice data, as it expresses
+the metadata required for properly decoding the slice data. Both are
+extracted from the MPEG bitstream and there is dedicated metadata for
+each new set of slices that is decoded to a single frame.
 
-Lothar Wa?mann
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
+> > ---
+> >  drivers/media/v4l2-core/v4l2-ctrls.c | 10 ++++++++++
+> >  drivers/media/v4l2-core/v4l2-ioctl.c |  1 +
+> >  include/uapi/linux/v4l2-controls.h   | 26
+> > ++++++++++++++++++++++++++
+> >  include/uapi/linux/videodev2.h       |  3 +++
+> >  4 files changed, 40 insertions(+)
+> > 
+> > diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c
+> > b/drivers/media/v4l2-core/v4l2-ctrls.c
+> > index ba05a8b9a095..fcdc12b9a9e0 100644
+> > --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> > +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> > @@ -761,6 +761,7 @@ const char *v4l2_ctrl_get_name(u32 id)
+> >  	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		
+> > return "Vertical MV Search Range";
+> >  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		
+> > return "Repeat Sequence Header";
+> >  	case V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME:		re
+> > turn "Force Key Frame";
+> > +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:		re
+> > turn "MPEG2 Frame Header";
+> >  
+> >  	/* VPX controls */
+> >  	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		
+> > return "VPX Number of Partitions";
+> > @@ -1152,6 +1153,9 @@ void v4l2_ctrl_fill(u32 id, const char **name,
+> > enum v4l2_ctrl_type *type,
+> >  	case V4L2_CID_RDS_TX_ALT_FREQS:
+> >  		*type = V4L2_CTRL_TYPE_U32;
+> >  		break;
+> > +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:
+> > +		*type = V4L2_CTRL_TYPE_MPEG2_FRAME_HDR;
+> > +		break;
+> >  	default:
+> >  		*type = V4L2_CTRL_TYPE_INTEGER;
+> >  		break;
+> > @@ -1472,6 +1476,9 @@ static int std_validate(const struct v4l2_ctrl
+> > *ctrl, u32 idx,
+> >  			return -ERANGE;
+> >  		return 0;
+> >  
+> > +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
+> > +		return 0;
+> > +
+> >  	default:
+> >  		return -EINVAL;
+> >  	}
+> > @@ -2046,6 +2053,9 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct
+> > v4l2_ctrl_handler *hdl,
+> >  	case V4L2_CTRL_TYPE_U32:
+> >  		elem_size = sizeof(u32);
+> >  		break;
+> > +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
+> > +		elem_size = sizeof(struct
+> > v4l2_ctrl_mpeg2_frame_hdr);
+> > +		break;
+> >  	default:
+> >  		if (type < V4L2_CTRL_COMPOUND_TYPES)
+> >  			elem_size = sizeof(s32);
+> > diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c
+> > b/drivers/media/v4l2-core/v4l2-ioctl.c
+> > index 468c3c65362d..8070203da5d2 100644
+> > --- a/drivers/media/v4l2-core/v4l2-ioctl.c
+> > +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+> > @@ -1273,6 +1273,7 @@ static void v4l_fill_fmtdesc(struct
+> > v4l2_fmtdesc *fmt)
+> >  		case V4L2_PIX_FMT_VC1_ANNEX_L:	descr = "VC-1 
+> > (SMPTE 412M Annex L)"; break;
+> >  		case V4L2_PIX_FMT_VP8:		descr =
+> > "VP8"; break;
+> >  		case V4L2_PIX_FMT_VP9:		descr =
+> > "VP9"; break;
+> > +		case V4L2_PIX_FMT_MPEG2_FRAME:	descr =
+> > "MPEG2 Frame"; break;
+> >  		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA
+> > YUV"; break;
+> >  		case V4L2_PIX_FMT_WNVA:		descr =
+> > "WNVA"; break;
+> >  		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA
+> > SN9C10X"; break;
+> > diff --git a/include/uapi/linux/v4l2-controls.h
+> > b/include/uapi/linux/v4l2-controls.h
+> > index cbbb750d87d1..8431b2a540c7 100644
+> > --- a/include/uapi/linux/v4l2-controls.h
+> > +++ b/include/uapi/linux/v4l2-controls.h
+> > @@ -557,6 +557,8 @@ enum v4l2_mpeg_video_mpeg4_profile {
+> >  };
+> >  #define V4L2_CID_MPEG_VIDEO_MPEG4_QPEL		(V4L2_CID_MPE
+> > G_BASE+407)
+> >  
+> > +#define
+> > V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR     (V4L2_CID_MPEG_BASE+450)
+> > +
+> >  /*  Control IDs for VP8 streams
+> >   *  Although VP8 is not part of MPEG we add these controls to the
+> > MPEG class
+> >   *  as that class is already handling other video compression
+> > standards
+> > @@ -985,4 +987,28 @@ enum v4l2_detect_md_mode {
+> >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_C
+> > LASS_BASE + 3)
+> >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DET
+> > ECT_CLASS_BASE + 4)
+> >  
+> > +struct v4l2_ctrl_mpeg2_frame_hdr {
+> > +	__u32 slice_len;
+> > +	__u32 slice_pos;
+> > +	enum { MPEG1, MPEG2 } type;
+> > +
+> > +	__u16 width;
+> > +	__u16 height;
+> > +
+> > +	enum { PCT_I = 1, PCT_P, PCT_B, PCT_D }
+> > picture_coding_type;
+> > +	__u8 f_code[2][2];
+> > +
+> > +	__u8 intra_dc_precision;
+> > +	__u8 picture_structure;
+> > +	__u8 top_field_first;
+> > +	__u8 frame_pred_frame_dct;
+> > +	__u8 concealment_motion_vectors;
+> > +	__u8 q_scale_type;
+> > +	__u8 intra_vlc_format;
+> > +	__u8 alternate_scan;
+> > +
+> > +	__u8 backward_ref_index;
+> > +	__u8 forward_ref_index;
+> > +};
+> 
+> Besides the comments that have been given, please add
+> __attribute__((packed)) to the struct definition.
+
+Noted.
+
+> > +
+> >  #endif
+> > diff --git a/include/uapi/linux/videodev2.h
+> > b/include/uapi/linux/videodev2.h
+> > index 31b5728b56e9..4b8336f7bcf0 100644
+> > --- a/include/uapi/linux/videodev2.h
+> > +++ b/include/uapi/linux/videodev2.h
+> > @@ -635,6 +635,7 @@ struct v4l2_pix_format {
+> >  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /*
+> > SMPTE 421M Annex L compliant stream */
+> >  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /*
+> > VP8 */
+> >  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /*
+> > VP9 */
+> > +#define V4L2_PIX_FMT_MPEG2_FRAME v4l2_fourcc('M', 'G', '2', 'F') /*
+> > MPEG2 frame */
+> 
+> This format needs documentation.
+
+Noted too. Thanks for the review!
+
+> >  
+> >  /*  Vendor-specific formats   */
+> >  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /*
+> > cpia1 YUV */
+> > @@ -1586,6 +1587,7 @@ struct v4l2_ext_control {
+> >  		__u8 __user *p_u8;
+> >  		__u16 __user *p_u16;
+> >  		__u32 __user *p_u32;
+> > +		struct v4l2_ctrl_mpeg2_frame_hdr __user
+> > *p_mpeg2_frame_hdr;
+> >  		void __user *ptr;
+> >  	};
+> >  } __attribute__ ((packed));
+> > @@ -1631,6 +1633,7 @@ enum v4l2_ctrl_type {
+> >  	V4L2_CTRL_TYPE_U8	     = 0x0100,
+> >  	V4L2_CTRL_TYPE_U16	     = 0x0101,
+> >  	V4L2_CTRL_TYPE_U32	     = 0x0102,
+> > +	V4L2_CTRL_TYPE_MPEG2_FRAME_HDR = 0x0109,
+> >  };
+> >  
+> >  /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
+> > -- 
+> > 2.16.3
+> > 
+> 
+> 
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/618ed7c4/attachment-0001.sig>
