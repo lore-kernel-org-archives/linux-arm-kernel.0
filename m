@@ -1,54 +1,57 @@
 From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Fri,  4 May 2018 15:56:34 +0200
-Subject: [PATCH net-next v2 04/13] net: mvpp2: align the ethtool ops definition
+Date: Fri,  4 May 2018 15:56:43 +0200
+Subject: [PATCH net-next v2 13/13] arm64: dts: marvell: 8040-db: describe the
+ 10G SFP cages
 In-Reply-To: <20180504135643.23466-1-antoine.tenart@bootlin.com>
 References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
-Message-ID: <20180504135643.23466-5-antoine.tenart@bootlin.com>
+Message-ID: <20180504135643.23466-14-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cosmetic patch to align the ethtool functions to ops definitions. This
-patch does not change in any way the driver's behaviour.
+This patch adds the SFP cages description for the 10G interfaces in the
+Marvell Armada 8080 DB board.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 6f410235987c..77dd91e3d962 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -7859,18 +7859,18 @@ static const struct net_device_ops mvpp2_netdev_ops = {
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+index 5689fb23bbab..0a9aeac71614 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+@@ -70,6 +70,14 @@
+ 		compatible = "usb-nop-xceiv";
+ 		vcc-supply = <&cp1_reg_usb3_0_vbus>;
+ 	};
++
++	sfp_eth0: sfp-eth0 {
++		compatible = "sff,sfp";
++	};
++
++	sfp_eth1: sfp-eth1 {
++		compatible = "sff,sfp";
++	};
  };
  
- static const struct ethtool_ops mvpp2_eth_tool_ops = {
--	.nway_reset	= phy_ethtool_nway_reset,
--	.get_link	= ethtool_op_get_link,
--	.set_coalesce	= mvpp2_ethtool_set_coalesce,
--	.get_coalesce	= mvpp2_ethtool_get_coalesce,
--	.get_drvinfo	= mvpp2_ethtool_get_drvinfo,
--	.get_ringparam	= mvpp2_ethtool_get_ringparam,
--	.set_ringparam	= mvpp2_ethtool_set_ringparam,
--	.get_strings	= mvpp2_ethtool_get_strings,
--	.get_ethtool_stats = mvpp2_ethtool_get_stats,
--	.get_sset_count	= mvpp2_ethtool_get_sset_count,
--	.get_link_ksettings = phy_ethtool_get_link_ksettings,
--	.set_link_ksettings = phy_ethtool_set_link_ksettings,
-+	.nway_reset		= phy_ethtool_nway_reset,
-+	.get_link		= ethtool_op_get_link,
-+	.set_coalesce		= mvpp2_ethtool_set_coalesce,
-+	.get_coalesce		= mvpp2_ethtool_get_coalesce,
-+	.get_drvinfo		= mvpp2_ethtool_get_drvinfo,
-+	.get_ringparam		= mvpp2_ethtool_get_ringparam,
-+	.set_ringparam		= mvpp2_ethtool_set_ringparam,
-+	.get_strings		= mvpp2_ethtool_get_strings,
-+	.get_ethtool_stats	= mvpp2_ethtool_get_stats,
-+	.get_sset_count		= mvpp2_ethtool_get_sset_count,
-+	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
-+	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
+ &i2c0 {
+@@ -177,6 +185,8 @@
+ &cp0_eth0 {
+ 	status = "okay";
+ 	phy-mode = "10gbase-kr";
++	managed = "in-band-status";
++	sfp = <&sfp_eth0>;
  };
  
- /* Used for PPv2.1, or PPv2.2 with the old Device Tree binding that
+ &cp0_eth2 {
+@@ -303,6 +313,8 @@
+ &cp1_eth0 {
+ 	status = "okay";
+ 	phy-mode = "10gbase-kr";
++	managed = "in-band-status";
++	sfp = <&sfp_eth1>;
+ };
+ 
+ &cp1_eth1 {
 -- 
 2.17.0
