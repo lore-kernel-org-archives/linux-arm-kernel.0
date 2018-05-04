@@ -1,135 +1,116 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  4 May 2018 17:05:26 +0100
-Subject: [PATCH v5 05/14] arm64: fpsimd: Generalise context saving for
- non-task contexts
-In-Reply-To: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
-References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525449935-31424-6-git-send-email-Dave.Martin@arm.com>
+From: riproute@gmail.com (Dan Haab)
+Date: Fri,  4 May 2018 10:08:43 -0600
+Subject: [PATCH 1/2] ARM: dts: BCM5301X: Add DT for Luxul XWR-3150 V1
+Message-ID: <1525450124-21665-1-git-send-email-dan.haab@luxul.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for allowing non-task (i.e., KVM vcpu) FPSIMD
-contexts to be handled by the fpsimd common code, this patch adapts
-task_fpsimd_save() to save back the currently loaded context,
-removing the explicit dependency on current.
+Luxul XWR-3150 is a wireless router similar to the XWR-3100 except:
+1) It has more RAM
+2) Its NAND controller in running in BCH8 mode
+3) LAN ports LEDs are hardware controlled
 
-The relevant storage to write back to in memory is now found by
-examining the fpsimd_last_state percpu struct.
-
-fpsimd_save() does nothing unless TIF_FOREIGN_FPSTATE is clear, and
-fpsimd_last_state is updated under local_bh_disable() or
-local_irq_disable() everywhere that TIF_FOREIGN_FPSTATE is cleared:
-thus, fpsimd_save() will write back to the correct storage for the
-loaded context.
-
-No functional change.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
+Signed-off-by: Dan Haab <dan.haab@luxul.com>
 ---
+ arch/arm/boot/dts/Makefile                       |  1 +
+ arch/arm/boot/dts/bcm47094-luxul-xwr-3150-v1.dts | 77 ++++++++++++++++++++++++
+ 2 files changed, 78 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm47094-luxul-xwr-3150-v1.dts
 
-New patch since RFC v4:
-
- (Split from KVM: arm64: Optimise FPSIMD handling to reduce guest/host
- thrashing, with no functional change.)
-
-Changes since RFC v4:
-
- * task_fpsimd_save() renamed to fpsimd_save(), since it doesn't only
-   apply to task contexts any more.
----
- arch/arm64/kernel/fpsimd.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 0c4e7e0..5fc0595 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -270,13 +270,15 @@ static void task_fpsimd_load(void)
- }
- 
- /*
-- * Ensure current's FPSIMD/SVE storage in thread_struct is up to date
-- * with respect to the CPU registers.
-+ * Ensure FPSIMD/SVE storage in memory for the loaded context is up to
-+ * date with respect to the CPU registers.
-  *
-  * Softirqs (and preemption) must be disabled.
-  */
--static void task_fpsimd_save(void)
-+static void fpsimd_save(void)
- {
-+	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7e24249..a00b279 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -104,6 +104,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm47094-luxul-abr-4500.dtb \
+ 	bcm47094-luxul-xbr-4500.dtb \
+ 	bcm47094-luxul-xwr-3100.dtb \
++	bcm47094-luxul-xwr-3150-v1.dtb \
+ 	bcm47094-netgear-r8500.dtb \
+ 	bcm94708.dtb \
+ 	bcm94709.dtb \
+diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3150-v1.dts b/arch/arm/boot/dts/bcm47094-luxul-xwr-3150-v1.dts
+new file mode 100644
+index 0000000..bdad726
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3150-v1.dts
+@@ -0,0 +1,77 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++/*
++ * Copyright 2018 Luxul Inc.
++ */
 +
- 	WARN_ON(!in_softirq() && !irqs_disabled());
- 
- 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
-@@ -291,10 +293,9 @@ static void task_fpsimd_save(void)
- 				return;
- 			}
- 
--			sve_save_state(sve_pffr(current),
--				       &current->thread.uw.fpsimd_state.fpsr);
-+			sve_save_state(sve_pffr(current), &st->fpsr);
- 		} else
--			fpsimd_save_state(&current->thread.uw.fpsimd_state);
-+			fpsimd_save_state(st);
- 	}
- }
- 
-@@ -598,7 +599,7 @@ int sve_set_vector_length(struct task_struct *task,
- 	if (task == current) {
- 		local_bh_disable();
- 
--		task_fpsimd_save();
-+		fpsimd_save();
- 		set_thread_flag(TIF_FOREIGN_FPSTATE);
- 	}
- 
-@@ -837,7 +838,7 @@ asmlinkage void do_sve_acc(unsigned int esr, struct pt_regs *regs)
- 
- 	local_bh_disable();
- 
--	task_fpsimd_save();
-+	fpsimd_save();
- 	fpsimd_to_sve(current);
- 
- 	/* Force ret_to_user to reload the registers: */
-@@ -898,7 +899,7 @@ void fpsimd_thread_switch(struct task_struct *next)
- 	 * 'current'.
- 	 */
- 	if (current->mm)
--		task_fpsimd_save();
-+		fpsimd_save();
- 
- 	if (next->mm)
- 		/*
-@@ -977,7 +978,7 @@ void fpsimd_preserve_current_state(void)
- 		return;
- 
- 	local_bh_disable();
--	task_fpsimd_save();
-+	fpsimd_save();
- 	local_bh_enable();
- }
- 
-@@ -1117,7 +1118,7 @@ void kernel_neon_begin(void)
- 
- 	/* Save unsaved task fpsimd state, if any: */
- 	if (current->mm) {
--		task_fpsimd_save();
-+		fpsimd_save();
- 		set_thread_flag(TIF_FOREIGN_FPSTATE);
- 	}
- 
-@@ -1242,7 +1243,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
- 	switch (cmd) {
- 	case CPU_PM_ENTER:
- 		if (current->mm)
--			task_fpsimd_save();
-+			fpsimd_save();
- 		fpsimd_flush_cpu_state();
- 		break;
- 	case CPU_PM_EXIT:
++/dts-v1/;
++
++#include "bcm47094.dtsi"
++#include "bcm5301x-nand-cs0-bch8.dtsi"
++
++/ {
++	compatible = "luxul,xwr-3150-v1", "brcm,bcm47094", "brcm,bcm4708";
++	model = "Luxul XWR-3150 V1";
++
++	chosen {
++		bootargs = "earlycon";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000
++		       0x88000000 0x18000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		power	{
++			label = "bcm53xx:green:power";
++			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-on";
++		};
++
++		usb3	{
++			label = "bcm53xx:green:usb3";
++			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
++			trigger-sources = <&ohci_port1>, <&ehci_port1>,
++					  <&xhci_port1>;
++			linux,default-trigger = "usbport";
++		};
++
++		status	{
++			label = "bcm53xx:green:status";
++			gpios = <&chipcommon 10 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "timer";
++		};
++
++		2ghz {
++			label = "bcm53xx:green:2ghz";
++			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
++		};
++
++		5ghz {
++			label = "bcm53xx:green:5ghz";
++			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&usb3 {
++	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
++};
++
++&spi_nor {
++	status = "okay";
++};
 -- 
-2.1.4
+1.9.1
