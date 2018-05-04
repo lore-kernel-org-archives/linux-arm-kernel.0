@@ -1,95 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 4 May 2018 18:54:14 +0100
-Subject: [PATCH 1/4] arm/arm64: smccc/psci: add arm_smccc_get_conduit()
-In-Reply-To: <20180503170330.5591-2-mark.rutland@arm.com>
-References: <20180503170330.5591-1-mark.rutland@arm.com>
- <20180503170330.5591-2-mark.rutland@arm.com>
-Message-ID: <d04f8eff-06e3-2080-e03e-cd35b7b2c382@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 4 May 2018 20:01:05 +0200
+Subject: [PATCH 1/6] locking/atomic, asm-generic: instrument ordering
+ variants
+In-Reply-To: <20180504173937.25300-2-mark.rutland@arm.com>
+References: <20180504173937.25300-1-mark.rutland@arm.com>
+ <20180504173937.25300-2-mark.rutland@arm.com>
+Message-ID: <20180504180105.GS12217@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 03/05/18 18:03, Mark Rutland wrote:
-> SMCCC callers are currently amassing a collection of enums for the SMCCC
-> conduit, and are having to dig into the PSCI driver's internals in order
-> to figure out what to do.
+On Fri, May 04, 2018 at 06:39:32PM +0100, Mark Rutland wrote:
+> Currently <asm-generic/atomic-instrumented.h> only instruments the fully
+> ordered variants of atomic functions, ignoring the {relaxed,acquire,release}
+> ordering variants.
 > 
-> Let's clean this up, with common SMCCC_CONDUIT_* definitions, and an
-> arm_smccc_get_conduit() helper that abstracts the PSCI driver's internal
-> state.
+> This patch reworks the header to instrument all ordering variants of the atomic
+> functions, so that architectures implementing these are instrumented
+> appropriately.
 > 
-> We can kill off the PSCI_CONDUIT_* definitions once we've migrated users
-> over to the nerw interface.
-
-new
-
+> To minimise repetition, a macro is used to generate each variant from a common
+> template. The {full,relaxed,acquire,release} order variants respectively are
+> then built using this template, where the architecture provides an
+> implementation.
+> 
+> To stick to an 80 column limit while keeping the templates legible, the return
+> type and function name of each template are split over two lines. For
+> consistency, this is done even when not strictly necessary.
+> 
 > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> Cc: Boqun Feng <boqun.feng@gmail.com>
+> Cc: Dmitry Vyukov <dvyukov@google.com>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Cc: Peter Zijlstra <peterz@infradead.org>
 > Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
 > ---
->   drivers/firmware/psci.c   | 15 +++++++++++++++
->   include/linux/arm-smccc.h | 16 ++++++++++++++++
->   2 files changed, 31 insertions(+)
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index c80ec1d03274..310882185ca4 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -64,6 +64,21 @@ struct psci_operations psci_ops = {
->   	.smccc_version = SMCCC_VERSION_1_0,
->   };
->   
-> +enum arm_smccc_conduit arm_smccc_get_conduit(void)
-> +{
-> +	if (psci_ops.smccc_version < SMCCC_VERSION_1_1)
-> +		return SMCCC_CONDUIT_NONE;
-> +
-> +	switch (psci_ops.conduit) {
-> +	case PSCI_CONDUIT_SMC:
-> +		return SMCCC_CONDUIT_SMC;
-> +	case PSCI_CONDUIT_HVC:
-> +		return SMCCC_CONDUIT_HVC;
-> +	default:
-> +		return SMCCC_CONDUIT_NONE;
-> +	}
-> +}
-> +
->   typedef unsigned long (psci_fn)(unsigned long, unsigned long,
->   				unsigned long, unsigned long);
->   static psci_fn *invoke_psci_fn;
-> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-> index a031897fca76..193e9d8a1ac2 100644
-> --- a/include/linux/arm-smccc.h
-> +++ b/include/linux/arm-smccc.h
-> @@ -84,6 +84,22 @@
->   
->   #include <linux/linkage.h>
->   #include <linux/types.h>
-> +
-> +enum arm_smccc_conduit {
-> +	SMCCC_CONDUIT_NONE,
-> +	SMCCC_CONDUIT_SMC,
-> +	SMCCC_CONDUIT_HVC,
-> +};
-> +
-> +/**
-> + * arm_smccc_get_conduit()
-> + *
-> + * Returns the conduit to be used for SMCCCv1.1 or later.
-> + *
-> + * When SMCCCv1.1 is not present, returns SMCCC_CONDUIT_NONE.
-> + */
-> +enum arm_smccc_conduit arm_smccc_get_conduit(void);
+>  include/asm-generic/atomic-instrumented.h | 1195 ++++++++++++++++++++++++-----
+>  1 file changed, 1008 insertions(+), 187 deletions(-)
 
-Given that implicit condition, can we save some confusion by naming this 
-arm_smccc_1_1_conduit(), in line with the actual SMCCCv1.1 calls?
+Is there really no way to either generate or further macro compress this?
 
-Robin.
+This is stupid repetitive, we just got rid of all that endless copy
+paste crap in atomic implementations and now we're going back to that.
 
-> +
->   /**
->    * struct arm_smccc_res - Result from SMC/HVC call
->    * @a0-a3 result values from registers 0 to 3
-> 
+Adding or changing atomic bits becomes horrifically painful because of this.
