@@ -1,78 +1,48 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  4 May 2018 18:39:34 +0100
-Subject: [PATCH 3/6] arm64: use <linux/atomic.h> for cmpxchg
-In-Reply-To: <20180504173937.25300-1-mark.rutland@arm.com>
-References: <20180504173937.25300-1-mark.rutland@arm.com>
-Message-ID: <20180504173937.25300-4-mark.rutland@arm.com>
+Date: Fri,  4 May 2018 18:39:31 +0100
+Subject: [PATCH 0/6] arm64: add instrumented atomics
+Message-ID: <20180504173937.25300-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently a number of arm64-specific files include <asm/cmpxchg.h> for
-the definition of the cmpxchg helpers. This works fine today, but won't
-when we switch over to instrumented atomics, and as noted in
-Documentation/core-api/atomic_ops.rst:
+This series (based on v4.17-rc3) allows arm64's atomics to be
+instrumented, which should make it easier to catch bugs where atomics
+are used on erroneous memory locations.
 
-  If someone wants to use xchg(), cmpxchg() and their variants,
-  linux/atomic.h should be included rather than asm/cmpxchg.h, unless
-  the code is in arch/* and can take care of itself.
+The bulk of the diffstat is teaching the generic instrumentation about
+the acquire/release/relaxed variants of each atomic, along with some
+optional atomics which x86 doesn't implement directly.
 
-... so let's switch to <linux/atomic.h> for these definitions.
+To build an arm64 defonfig one additional patch [1] is required, which
+fixes an include in the SUNRPC code. I've pushed the series, along with
+that patch, to my arm64/atomic-instrumentation branch [2].
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/pgtable.h     | 2 +-
- arch/arm64/include/asm/sync_bitops.h | 2 +-
- arch/arm64/mm/fault.c                | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+This has seen basic testing on a Juno R1 machine so far.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 7c4c8f318ba9..c797c0fbbce2 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -39,8 +39,8 @@
- 
- #ifndef __ASSEMBLY__
- 
--#include <asm/cmpxchg.h>
- #include <asm/fixmap.h>
-+#include <linux/atomic.h>
- #include <linux/mmdebug.h>
- #include <linux/mm_types.h>
- #include <linux/sched.h>
-diff --git a/arch/arm64/include/asm/sync_bitops.h b/arch/arm64/include/asm/sync_bitops.h
-index eee31a9f72a5..24ed8f445b8b 100644
---- a/arch/arm64/include/asm/sync_bitops.h
-+++ b/arch/arm64/include/asm/sync_bitops.h
-@@ -3,7 +3,7 @@
- #define __ASM_SYNC_BITOPS_H__
- 
- #include <asm/bitops.h>
--#include <asm/cmpxchg.h>
-+#include <linux/atomic.h>
- 
- /* sync_bitops functions are equivalent to the SMP implementation of the
-  * original functions, independently from CONFIG_SMP being defined.
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 4165485e8b6e..bfbc695e2ea2 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -18,6 +18,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/atomic.h>
- #include <linux/extable.h>
- #include <linux/signal.h>
- #include <linux/mm.h>
-@@ -34,7 +35,6 @@
- #include <linux/hugetlb.h>
- 
- #include <asm/bug.h>
--#include <asm/cmpxchg.h>
- #include <asm/cpufeature.h>
- #include <asm/exception.h>
- #include <asm/debug-monitors.h>
+Thanks,
+Mark.
+
+[1] https://lkml.kernel.org/r/1489574142-20856-1-git-send-email-mark.rutland at arm.com
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/atomic-instrumentation
+
+Mark Rutland (6):
+  locking/atomic, asm-generic: instrument ordering variants
+  locking/atomic, asm-generic: instrument atomic*andnot*()
+  arm64: use <linux/atomic.h> for cmpxchg
+  arm64: fix assembly constraints for cmpxchg
+  arm64: use instrumented atomics
+  arm64: instrument smp_{load_acquire,store_release}
+
+ arch/arm64/include/asm/atomic.h           |  299 +++----
+ arch/arm64/include/asm/atomic_ll_sc.h     |   30 +-
+ arch/arm64/include/asm/atomic_lse.h       |   43 +-
+ arch/arm64/include/asm/barrier.h          |   22 +-
+ arch/arm64/include/asm/cmpxchg.h          |   25 +-
+ arch/arm64/include/asm/pgtable.h          |    2 +-
+ arch/arm64/include/asm/sync_bitops.h      |    3 +-
+ arch/arm64/mm/fault.c                     |    2 +-
+ include/asm-generic/atomic-instrumented.h | 1305 +++++++++++++++++++++++++----
+ 9 files changed, 1339 insertions(+), 392 deletions(-)
+
 -- 
 2.11.0
