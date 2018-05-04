@@ -1,50 +1,54 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 4 May 2018 14:46:55 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Add STM32F7 I2C & STM32 USBPHYC
- support
-Message-ID: <1525438015-15834-1-git-send-email-alexandre.torgue@st.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Fri, 4 May 2018 14:47:42 +0200
+Subject: Potential deadlock in vgic
+In-Reply-To: <20180504110343.GA10968@hc>
+References: <20180504110343.GA10968@hc>
+Message-ID: <20180504124742.GG10191@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds STM32F7 I2C support to multi_v7_defconfig and
-enable the STM32 USB PHY Controller (USBPHYC) driver, implemented on
-STM32MP1 SoC.
+Hi Jan,
 
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+On Fri, May 04, 2018 at 01:03:44PM +0200, Jan Glauber wrote:
+> Hi all,
+> 
+> enabling lockdep I see the following reported in the host when I start a kvm guest:
+> 
+> [12399.954245]        CPU0                    CPU1
+> [12399.958762]        ----                    ----
+> [12399.963279]   lock(&(&dist->lpi_list_lock)->rlock);
+> [12399.968146]                                local_irq_disable();
+> [12399.974052]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
+> [12399.981696]                                lock(&(&dist->lpi_list_lock)->rlock);
+> [12399.989081]   <Interrupt>
+> [12399.991688]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
+> [12399.996989]
+>                 *** DEADLOCK ***
+> 
+> [12400.002897] 2 locks held by qemu-system-aar/5597:
+> [12400.007587]  #0: 0000000042beb9dc (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
+> [12400.015411]  #1: 00000000c45d644a (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}, at: kvm_vgic_sync_hwstate+0x8c/0x328
+> 
+> 
+> There is nothing unusual in my config or qemu parameters, I can upload these
+> if needed. I see this on ThunderX and ThunderX2 and also with older kernels
+> (4.13+ distribution kernel).
+> 
+> I tried making the lpi_list_lock irq safe but that just leads to different
+> warnings. The locking here seems to be quite sophisticated and I'm not familiar
+> with it.
 
----
+That's unfortunate.  The problem here is that we end up violating our
+locking order, which stipulates that ap_list_lock must be taken before
+the lpi_list_lock.
 
-Hi Arnd, Kevin and Olof,
+Give that we can take the ap_list_lock from interrupt context (timers
+firing), the only solution I can easily think of is to change
+lpi_list_lock takers to disable interrupts as well.
 
-I just have this patch for STM32 configs update, so please consider it as my
-STM32 defconfig pull request for v4.18.
+Which warnings did you encounter with that approach?
 
-Thanks
+(I'll try to reproduce on my end).
 
-Alex
-
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e6b3c96..9d0856e 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -385,6 +385,7 @@ CONFIG_I2C_S3C2410=y
- CONFIG_I2C_SH_MOBILE=y
- CONFIG_I2C_SIRF=y
- CONFIG_I2C_ST=y
-+CONFIG_I2C_STM32F7=y
- CONFIG_I2C_SUN6I_P2WI=y
- CONFIG_I2C_TEGRA=y
- CONFIG_I2C_UNIPHIER=y
-@@ -972,6 +973,7 @@ CONFIG_PHY_QCOM_APQ8064_SATA=m
- CONFIG_PHY_MIPHY28LP=y
- CONFIG_PHY_RCAR_GEN2=m
- CONFIG_PHY_STIH407_USB=y
-+CONFIG_PHY_STM32_USBPHYC=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_PHY_SUN9I_USB=y
- CONFIG_PHY_SAMSUNG_USB2=m
--- 
-2.7.4
+Thanks,
+-Christoffer
