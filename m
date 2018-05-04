@@ -1,36 +1,35 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu,  3 May 2018 17:51:02 -0700
-Subject: [PATCH] ARM: dts: BCM5301X: Relicense most DTS files to the GPL
- 2.0+ / MIT
-In-Reply-To: <20180502141102.31769-1-zajec5@gmail.com>
-References: <20180502141102.31769-1-zajec5@gmail.com>
-Message-ID: <20180504005102.20717-1-f.fainelli@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri,  4 May 2018 08:57:22 +0800
+Subject: [PATCH 0/4] Fix avoid_unnecessary_addr_size DTC warning with 'clocks'
+ node
+Message-ID: <1525395446-1953-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  2 May 2018 16:11:02 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
-> 
-> These files were created and ever touched by a group of three people
-> only: Dan, Hauke and me. They were licensed under GNU/GPL or ISC.
-> 
-> Introducing and discussing SPDX-License-Identifier resulted in a
-> conclusion that ISC is a not recommended license (see also a
-> license-rules.rst). Moveover an old e-mail from Alan Cox was pointed
-> which explained that dual licensing is a safer solution than depending
-> on a common compatibility belief.
-> 
-> This commit switches most of BCM5301X DTS files to dual licensing using:
-> 1) GPL 2.0+ to make sure they are compatible with Linux kernel
-> 2) MIT to allow sharing with more permissive projects
-> Both licenses belong to the preferred ones (see LICENSES/preferred/).
-> 
-> An attempt to relicense remaining files will be made separately and will
-> require approve from more/other developers.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> ---
+The series is to clean up avoid_unnecessary_addr_size DTC warning seen
+with 'clocks' container node in i.MX dts files.
 
-Applied to devicetree/next, thanks!
---
-Florian
+Shawn Guo (4):
+  ARM: dts: imx: drop unnecessary #address-cells/#size-cells
+  ARM: dts: imx1: move clk32 clock into soc dtsi
+  ARM: dts: imx27: use lable to override osc26m clock setting
+  ARM: dts: imx: drop 'clocks' container for board level clocks
+
+ arch/arm/boot/dts/imx1-ads.dts               | 11 -----------
+ arch/arm/boot/dts/imx1.dtsi                  |  8 ++++++++
+ arch/arm/boot/dts/imx25.dtsi                 |  3 ---
+ arch/arm/boot/dts/imx27-apf27.dts            | 13 +++----------
+ arch/arm/boot/dts/imx27.dtsi                 |  5 +----
+ arch/arm/boot/dts/imx28-tx28.dts             | 13 ++++---------
+ arch/arm/boot/dts/imx50.dtsi                 |  3 ---
+ arch/arm/boot/dts/imx51.dtsi                 |  3 ---
+ arch/arm/boot/dts/imx53-tx53.dtsi            | 11 +++++------
+ arch/arm/boot/dts/imx53.dtsi                 |  3 ---
+ arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 15 ++++++---------
+ arch/arm/boot/dts/imx6q-bx50v3.dtsi          | 11 ++++-------
+ arch/arm/boot/dts/imx6qdl.dtsi               |  3 ---
+ arch/arm/boot/dts/imx6sl.dtsi                |  3 ---
+ 14 files changed, 31 insertions(+), 74 deletions(-)
+
+-- 
+1.9.1
