@@ -1,134 +1,98 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  4 May 2018 17:05:25 +0100
-Subject: [PATCH v5 04/14] KVM: arm64: Convert lazy FPSIMD context switch trap
- to C
-In-Reply-To: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
-References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525449935-31424-5-git-send-email-Dave.Martin@arm.com>
+Date: Fri,  4 May 2018 17:05:21 +0100
+Subject: [PATCH v5 00/14] KVM: arm64: Optimise FPSIMD context switching
+Message-ID: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make the lazy FPSIMD context switch trap code easier to hack on,
-this patch converts it to C.
+Note: Most of these patches are Arm-specific.  People not Cc'd on the
+whole series can find it in the linux-arm-kernel archive [3].
 
-This is not amazingly efficient, but the trap should typically only
-be taken once per host context switch.
+This series aims to improve the way FPSIMD context is handled by KVM,
+building on the previous RFC v4 [1].
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Patches 1-2 are picked from a separate RFC series [2] since they
+introduce a helper I wanted to use here.
 
----
 
-Changes since RFCv4:
+The main changes since RFC v4 are:
 
- * Move __hyp_switch_fpsimd() to a more sensible place to avoid forward
-   declarations in future patches.
+ * Rebased to -rc3.
 
----
- arch/arm64/kvm/hyp/entry.S  | 57 +++++++++++++++++----------------------------
- arch/arm64/kvm/hyp/switch.c | 24 +++++++++++++++++++
- 2 files changed, 46 insertions(+), 35 deletions(-)
+ * Patches 1-2 pulled into series from [2], and other patches modified
+   to use it.
 
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index e41a161..40f349b 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -172,40 +172,27 @@ ENTRY(__fpsimd_guest_restore)
- 	// x1: vcpu
- 	// x2-x29,lr: vcpu regs
- 	// vcpu x0-x1 on the stack
--	stp	x2, x3, [sp, #-16]!
--	stp	x4, lr, [sp, #-16]!
--
--alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
--	mrs	x2, cptr_el2
--	bic	x2, x2, #CPTR_EL2_TFP
--	msr	cptr_el2, x2
--alternative_else
--	mrs	x2, cpacr_el1
--	orr	x2, x2, #CPACR_EL1_FPEN
--	msr	cpacr_el1, x2
--alternative_endif
--	isb
--
--	mov	x3, x1
--
--	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
--	kern_hyp_va x0
--	add	x0, x0, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
--	bl	__fpsimd_save_state
--
--	add	x2, x3, #VCPU_CONTEXT
--	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
--	bl	__fpsimd_restore_state
--
--	// Skip restoring fpexc32 for AArch64 guests
--	mrs	x1, hcr_el2
--	tbnz	x1, #HCR_RW_SHIFT, 1f
--	ldr	x4, [x3, #VCPU_FPEXC32_EL2]
--	msr	fpexc32_el2, x4
--1:
--	ldp	x4, lr, [sp], #16
--	ldp	x2, x3, [sp], #16
--	ldp	x0, x1, [sp], #16
--
-+	stp	x2, x3, [sp, #-144]!
-+	stp	x4, x5, [sp, #16]
-+	stp	x6, x7, [sp, #32]
-+	stp	x8, x9, [sp, #48]
-+	stp	x10, x11, [sp, #64]
-+	stp	x12, x13, [sp, #80]
-+	stp	x14, x15, [sp, #96]
-+	stp	x16, x17, [sp, #112]
-+	stp	x18, lr, [sp, #128]
-+
-+	bl	__hyp_switch_fpsimd
-+
-+	ldp	x4, x5, [sp, #16]
-+	ldp	x6, x7, [sp, #32]
-+	ldp	x8, x9, [sp, #48]
-+	ldp	x10, x11, [sp, #64]
-+	ldp	x12, x13, [sp, #80]
-+	ldp	x14, x15, [sp, #96]
-+	ldp	x16, x17, [sp, #112]
-+	ldp	x18, lr, [sp, #128]
-+	ldp	x0, x1, [sp, #144]
-+	ldp	x2, x3, [sp], #160
- 	eret
- ENDPROC(__fpsimd_guest_restore)
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index d964523..c0796c4 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -318,6 +318,30 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
- }
- 
-+void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
-+				    struct kvm_vcpu *vcpu)
-+{
-+	kvm_cpu_context_t *host_ctxt;
-+
-+	if (has_vhe())
-+		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
-+			     cpacr_el1);
-+	else
-+		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
-+			     cptr_el2);
-+
-+	isb();
-+
-+	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
-+	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
-+
-+	/* Skip restoring fpexc32 for AArch64 guests */
-+	if (!(read_sysreg(hcr_el2) & HCR_RW))
-+		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
-+			     fpexc32_el2);
-+}
-+
- /*
-  * Return true when we were able to fixup the guest exit and should return to
-  * the guest, false when we should restore the host state and return to the
+ * Redundant additions by patch 3 that were reverted by other patches
+   are now gone.
+
+ * New patches 12-14 move the call to __hyp_switch_fpsimd() out of asm
+   completely, moving it to the fixup_guest_exit() path instead.  This
+   should significantly cleaner, but does add a bit of overhead to
+   FPSIMD trapping.
+
+   This is presented as an independent change in case people want to
+   benchmark with/without.
+
+
+Other minor changes as noted.
+
+
+Some testing done on Juno and the Arm fast model (arm64), including
+combinations of (non-)SVE and (non-)VHE configurations.
+
+Cheers
+---Dave
+
+[1] [RFC PATCH 0/8] KVM: arm64: Optimise FPSIMD context switching
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/572781.html
+
+[2] [RFC PATCH 0/6] Simplify setting thread flags to a particular value
+https://lkml.org/lkml/2018/4/19/225
+
+[3] linux-arm-kernel archive
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/thread.html
+
+
+Christoffer Dall (1):
+  KVM: arm/arm64: Introduce kvm_arch_vcpu_run_pid_change
+
+Dave Martin (13):
+  thread_info: Add update_thread_flag() helpers
+  arm64: Use update{,_tsk}_thread_flag()
+  KVM: arm64: Convert lazy FPSIMD context switch trap to C
+  arm64: fpsimd: Generalise context saving for non-task contexts
+  KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing
+  arm64/sve: Move read_zcr_features() out of cpufeature.h
+  arm64/sve: Switch sve_pffr() argument from task to thread
+  arm64/sve: Move sve_pffr() to fpsimd.h and make inline
+  KVM: arm64: Save host SVE context as appropriate
+  KVM: arm64: Remove eager host SVE state saving
+  KVM: arm64: Remove redundant *exit_code changes in fpsimd_guest_exit()
+  KVM: arm64: Fold redundant exit code checks out of fixup_guest_exit()
+  KVM: arm64: Invoke FPSIMD context switch trap from C
+
+ arch/arm/include/asm/kvm_host.h     |   9 ++-
+ arch/arm64/Kconfig                  |   7 +++
+ arch/arm64/include/asm/cpufeature.h |  29 ---------
+ arch/arm64/include/asm/fpsimd.h     |  20 ++++++
+ arch/arm64/include/asm/kvm_host.h   |  22 ++++---
+ arch/arm64/include/asm/processor.h  |   2 +
+ arch/arm64/kernel/fpsimd.c          | 120 +++++++++++++++++------------------
+ arch/arm64/kernel/ptrace.c          |   1 +
+ arch/arm64/kvm/Kconfig              |   1 +
+ arch/arm64/kvm/Makefile             |   2 +-
+ arch/arm64/kvm/fpsimd.c             | 105 +++++++++++++++++++++++++++++++
+ arch/arm64/kvm/hyp/entry.S          |  43 -------------
+ arch/arm64/kvm/hyp/hyp-entry.S      |  19 ------
+ arch/arm64/kvm/hyp/switch.c         | 121 +++++++++++++++++++++++++-----------
+ include/linux/kvm_host.h            |   9 +++
+ include/linux/sched.h               |   6 ++
+ include/linux/thread_info.h         |  11 ++++
+ virt/kvm/Kconfig                    |   3 +
+ virt/kvm/arm/arm.c                  |  25 +++++++-
+ virt/kvm/kvm_main.c                 |   7 ++-
+ 20 files changed, 360 insertions(+), 202 deletions(-)
+ create mode 100644 arch/arm64/kvm/fpsimd.c
+
 -- 
 2.1.4
