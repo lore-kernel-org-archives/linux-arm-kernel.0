@@ -1,69 +1,80 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 4 May 2018 15:23:08 -0500
-Subject: [PATCH v2] tty/serial: atmel: use port->name as name in
- request_irq()
-In-Reply-To: <d62a945c-f81e-d7e5-8431-a7948a0b833c@sorico.fr>
-References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
- <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
- <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
- <20180502191632.tgda4g5v3rhncx7c@linutronix.de>
- <4f3f6e7c-2806-1749-1523-72d5c8eb8229@sorico.fr>
- <20180503124410.n6ze2ngwv6ekjhdr@linutronix.de>
- <921729c6-7c3f-11cd-8634-044a5c52f810@sorico.fr>
- <80203f75-f38e-6214-e9b6-8512c5941647@sorico.fr>
- <20180504081447.enontsm6jod4xa6g@linutronix.de>
- <d62a945c-f81e-d7e5-8431-a7948a0b833c@sorico.fr>
-Message-ID: <CAL_JsqJ+84OFyN07XWsb0hSHxtxL_V6gSfO+iMSOU1bceztr3Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 May 2018 13:38:19 -0700
+Subject: Motorola Droid 4 progress, power consumption
+In-Reply-To: <20180504202044.GC22519@amd>
+References: <20180501183148.GA26996@amd> <20180502144158.GJ98604@atomide.com>
+ <20180503090611.GA14451@amd> <20180503142240.GQ98604@atomide.com>
+ <20180504202044.GC22519@amd>
+Message-ID: <20180504203819.GF98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 4, 2018 at 5:28 AM, Richard Genoud <richard.genoud@gmail.com> wrote:
-> On 04/05/2018 10:14, Sebastian Andrzej Siewior wrote:
->> I was puzzled while looking at /proc/interrupts and random things showed
->> up between reboots. This occurred more often but I realised it later. The
->> "correct" output should be:
->> |38:      11861  atmel-aic5   2 Level     ttyS0
->>
->> but I saw sometimes
->> |38:       6426  atmel-aic5   2 Level     tty1
->>
->> and accounted it wrongly as correct. This is use after free and the
->> former example randomly got the "old" pointer which pointed to the same
->> content. With SLAB_FREELIST_RANDOM and HARDENED I even got
->> |38:       7067  atmel-aic5   2 Level     E=Started User Manager for UID 0
->>
->> or other nonsense.
->> As it turns out the tty, pointer that is accessed in atmel_startup(), is
->> freed() before atmel_shutdown(). It seems to happen quite often that the
->> tty for ttyS0 is allocated and freed while ->shutdown is not invoked. I
->> don't do anything special - just a systemd boot :)
->>
->> Use port->name as the IRQ name for request_irq(). This exists as long as
->> the driver is loaded so no use-after-free here.
->> For backports before v4.12 I suggest to use `"atmel_serial"' instead
->> `port->name' (that member was introduced in f7048b15900f ("tty: serial_core:
->> Add name field to uart_port struct").
->>
->> Cc: stable at vger.kernel.org
-> I think it's safer to use:
-> Cc: stable at vger.kernel.org # 4.14
-> Because the stable team may miss your comment, and even if they don't, I
-> think it's not their role to adapt the patch to 4.9.x (and test it !)
-> IMHO, the best way is to add # 4.14 and when it's applied on 4.14.x,
-> send a tested backport for 4.9.x
->
-> Besides that, you can add my:
-> Acked-by: Richard Genoud <richard.genoud@gmail.com>
->
-> Rob, do you agree with this fix ?
+* Pavel Machek <pavel@ucw.cz> [180504 20:22]:
+> Hi!
+> 
+> > > user at devuan:/sys/class/power_supply/battery$ date; cat current_now
+> > > current_avg
+> > > Thu May  3 09:33:07 CEST 2018
+> > > -56000
+> > > -72308
+> > > user at devuan:/sys/class/power_supply/battery$ date; cat current_now
+> > > current_avg
+> > > Thu May  3 09:33:08 CEST 2018
+> > > -37000
+> > > -211362
+> > 
+> > I recall it just being calculated based on the time between
+> > the reads. Hard to say what it does, -ENODOCS.. Maybe the mc13783
+> > PMIC docs have something similar.
+> 
+> Hmm. current_avg is world readable; if it does changes to the
+> hardware, that's somehow bad.
 
-Yes, one less dependency on tty struct in serial drivers is a good
-thing. However, I find port->name to be a somewhat pointless addition.
-Most platform drivers (which most serial drivers are) use the device
-name for registering their IRQ. And now serial drivers may not even
-have a tty with serdev. Using the device name would also solve your
-backporting issue. But either way:
+No it just calls cpcap_battery_cc_get_avg_current() that calculates
+the average from last time it got sampled based on number of samples
+collected between the two reads. Seems to match what I see on my
+power supply here.
 
-Acked-by: Rob Herring <robh@kernel.org>
+> But I guess I can sample charge_counter every minute or so and get
+> what I need?
 
-Rob
+Not sure what the max time range is for the PMIC, but yeah I'd
+assume once a minute is duoable. Maybe compare it to the chart
+you already have?
+
+> > > > Hmm oh and the POWER_SUPPLY_CHARGE_COUNTER value should be monitored
+> > > > by your libbattery and it's low value and high value should be saved
+> > > > to a file. Low should be saved when we get the battery low interrupt
+> > > > and battery state changes to POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL.
+> > > > High value should be saved on POWER_SUPPLY_CAPACITY_LEVEL_FULL.
+> > > > 
+> > > > Then when you know the high value and low value, you can calculate
+> > > > the remaining capacity based on the current value and
+> > > > POWER_SUPPLY_POWER_AVG.
+> > > 
+> > > I'll look into that... but probably will do experiments with python,
+> > > first.
+> > 
+> > Sure. The reason why I think we should not do it in the kernel in
+> > addition to the earlier reasoning is that we don't have a place
+> > to store the min and max values across reboot. I think there's
+> > some flash on the battery over 1w bus, but it probably just
+> > contains battery serial number or something and is not intended
+> > for writing much to it. I guess the min and max values should be
+> > really keyd based on this battery id in case the battery gets
+> > changed.
+> 
+> I agree this should not be done in kernel as it requires persistent
+> storage.
+> 
+> Battery is not user-replacable (and this will recalibrate itself on
+> charge/discharge cycle) so.. I don't think keying is strictly
+> neccessary for D4.
+
+Yeah right, that can be added later on if needed if you just
+plan accordingly. It's replaceable with a T5 after you peel off the
+sticker from the corners :)
+
+Regards,
+
+Tony
