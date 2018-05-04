@@ -1,95 +1,102 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 4 May 2018 15:40:33 +0200
-Subject: [PATCH v2 09/10] ARM: dts: sun7i-a20: Add Video Engine and
- reserved memory nodes
-In-Reply-To: <fc064c3f1534a6082dc2b4e18454e054b53e5aee.camel@bootlin.com>
-References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
- <20180419154536.17846-5-paul.kocialkowski@bootlin.com>
- <20180420073908.nkcbsdxibnzkqski@flea>
- <82057e2f734137a3902d9313c228b01ceb345ee7.camel@bootlin.com>
- <20180504084008.h6p4brari3xrbv6l@flea>
- <e8cd340605ab4db8ebf2888a4fce645e8bc481d0.camel@bootlin.com>
- <20180504091555.idgtzey53lozj2uh@flea>
- <fc064c3f1534a6082dc2b4e18454e054b53e5aee.camel@bootlin.com>
-Message-ID: <20180504134033.wngpe5scyisreonn@flea>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 4 May 2018 14:41:36 +0100
+Subject: Potential deadlock in vgic
+In-Reply-To: <20180504130854.GA14663@hc>
+References: <20180504110343.GA10968@hc>
+ <20180504124742.GG10191@C02W217FHV2R.local> <20180504130854.GA14663@hc>
+Message-ID: <da1fefae-fec4-aa3a-4fb6-fae9f85f4f61@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 02:04:38PM +0200, Paul Kocialkowski wrote:
-> On Fri, 2018-05-04 at 11:15 +0200, Maxime Ripard wrote:
-> > On Fri, May 04, 2018 at 10:47:44AM +0200, Paul Kocialkowski wrote:
-> > > > > > > +			reg = <0x01c0e000 0x1000>;
-> > > > > > > +			memory-region = <&ve_memory>;
-> > > > > > 
-> > > > > > Since you made the CMA region the default one, you don't need
-> > > > > > to
-> > > > > > tie
-> > > > > > it to that device in particular (and you can drop it being
-> > > > > > mandatory
-> > > > > > from your binding as well).
-> > > > > 
-> > > > > What if another driver (or the system) claims memory from that
-> > > > > zone
-> > > > > and
-> > > > > that the reserved memory ends up not being available for the VPU
-> > > > > anymore?
-> > > > > 
-> > > > > Acccording to the reserved-memory documentation, the reusable
-> > > > > property
-> > > > > (that we need for dmabuf) puts a limitation that the device
-> > > > > driver
-> > > > > owning the region must be able to reclaim it back.
-> > > > > 
-> > > > > How does that work out if the CMA region is not tied to a driver
-> > > > > in
-> > > > > particular?
-> > > > 
-> > > > I'm not sure to get what you're saying. You have the property
-> > > > linux,cma-default in your reserved region, so the behaviour you
-> > > > described is what you explicitly asked for.
-> > > 
-> > > My point is that I don't see how the driver can claim back (part of)
-> > > the
-> > > reserved area if the area is not explicitly attached to it.
-> > > 
-> > > Or is that mechanism made in a way that all drivers wishing to use
-> > > the
-> > > reserved memory area can claim it back from the system, but there is
-> > > no
-> > > priority (other than first-come first-served) for which drivers
-> > > claims
-> > > it back in case two want to use the same reserved region (in a
-> > > scenario
-> > > where there isn't enough memory to allow both drivers)?
-> > 
-> > This is indeed what happens. Reusable is to let the system use the
-> > reserved memory for things like caches that can easily be dropped when
-> > a driver wants to use the memory in that reserved area. Once that
-> > memory has been allocated, there's no claiming back, unless that
-> > memory segment was freed of course.
+On 04/05/18 14:08, Jan Glauber wrote:
+> On Fri, May 04, 2018 at 02:47:42PM +0200, Christoffer Dall wrote:
+>> Hi Jan,
+>>
+>> On Fri, May 04, 2018 at 01:03:44PM +0200, Jan Glauber wrote:
+>>> Hi all,
+>>>
+>>> enabling lockdep I see the following reported in the host when I start a kvm guest:
+>>>
+>>> [12399.954245]        CPU0                    CPU1
+>>> [12399.958762]        ----                    ----
+>>> [12399.963279]   lock(&(&dist->lpi_list_lock)->rlock);
+>>> [12399.968146]                                local_irq_disable();
+>>> [12399.974052]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
+>>> [12399.981696]                                lock(&(&dist->lpi_list_lock)->rlock);
+>>> [12399.989081]   <Interrupt>
+>>> [12399.991688]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
+>>> [12399.996989]
+>>>                 *** DEADLOCK ***
+>>>
+>>> [12400.002897] 2 locks held by qemu-system-aar/5597:
+>>> [12400.007587]  #0: 0000000042beb9dc (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
+>>> [12400.015411]  #1: 00000000c45d644a (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}, at: kvm_vgic_sync_hwstate+0x8c/0x328
+>>>
+>>>
+>>> There is nothing unusual in my config or qemu parameters, I can upload these
+>>> if needed. I see this on ThunderX and ThunderX2 and also with older kernels
+>>> (4.13+ distribution kernel).
+>>>
+>>> I tried making the lpi_list_lock irq safe but that just leads to different
+>>> warnings. The locking here seems to be quite sophisticated and I'm not familiar
+>>> with it.
+>>
+>> That's unfortunate.  The problem here is that we end up violating our
+>> locking order, which stipulates that ap_list_lock must be taken before
+>> the lpi_list_lock.
+>>
+>> Give that we can take the ap_list_lock from interrupt context (timers
+>> firing), the only solution I can easily think of is to change
+>> lpi_list_lock takers to disable interrupts as well.
+>>
+>> Which warnings did you encounter with that approach?
 > 
-> Thanks for the clarification. So in our case, perhaps the best fit would
-> be to make that area the default CMA pool so that we can be ensured that
-> the whole 96 MiB is available for the VPU and that no other consumer of
-> CMA will use it?
+> Hi Christoffer,
+> 
+> making lpi_list_lock irq safe I get:
+> 
+> [  394.239174] ========================================================
+> [  394.245515] WARNING: possible irq lock inversion dependency detected
+> [  394.251857] 4.17.0-rc3-jang+ #72 Not tainted
+> [  394.256114] --------------------------------------------------------
+> [  394.262454] qemu-system-aar/5596 just changed the state of lock:
+> [  394.268448] 00000000da3f09ef (&(&irq->irq_lock)->rlock#3){+...}, at: update_affinity+0x3c/0xa8
+> [  394.277066] but this lock was taken by another, HARDIRQ-safe lock in the past:
+> [  394.284274]  (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}
+> [  394.284278] 
+>                
+>                and interrupts could create inverse lock ordering between them.
+> 
+> [  394.300777] 
+>                other info that might help us debug this:
+> [  394.307292]  Possible interrupt unsafe locking scenario:
+> 
+> [  394.314066]        CPU0                    CPU1
+> [  394.318584]        ----                    ----
+> [  394.323101]   lock(&(&irq->irq_lock)->rlock#3);
+> [  394.327622]                                local_irq_disable();
+> [  394.333528]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
+> [  394.341172]                                lock(&(&irq->irq_lock)->rlock#3);
+> [  394.348210]   <Interrupt>
+> [  394.350817]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
+> [  394.356118] 
+>                 *** DEADLOCK ***
+> 
+> [  394.362025] 4 locks held by qemu-system-aar/5596:
+> [  394.366716]  #0: 00000000719c7423 (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
+> [  394.374545]  #1: 0000000060090841 (&kvm->srcu){....}, at: kvm_handle_guest_abort+0x11c/0xb70
+> [  394.382984]  #2: 0000000064647766 (&its->cmd_lock){+.+.}, at: vgic_mmio_write_its_cwriter+0x44/0xa8
+> [  394.392022]  #3: 0000000075f90a8a (&its->its_lock){+.+.}, at: vgic_its_process_commands.part.11+0xac/0x780
 
-The best fit for what use case ? We already discussed this, and I
-don't see any point in having two separate CMA regions. If you have a
-reasonably sized region that will accomodate for both the VPU and
-display engine, why would we want to split them?
+Right, that's conceptually the same problem (the ap_list_lock being
+always taken with interrupt disabled creates a point where all the
+subsequent locks must also be with interrupts disabled.
 
-Or did you have any experience of running out of buffers?
+Another possibility would be to ensure that we always take the ap_list
+lock before taking the lpi_list_lock, disabling interrupts in the process.
 
-Maxime
+I need to convince myself that this is correct though...
 
+	M.
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/d2d87aa3/attachment.sig>
+Jazz is not dead. It just smells funny...
