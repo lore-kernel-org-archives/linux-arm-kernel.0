@@ -1,52 +1,72 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 4 May 2018 15:48:22 +0800
-Subject: [PATCH V5 2/6] ARM: dts: imx6sx-sabreauto: add max7322 IO
- expander support
-In-Reply-To: <1524725898-27974-2-git-send-email-Anson.Huang@nxp.com>
+Date: Fri, 4 May 2018 15:50:28 +0800
+Subject: [PATCH V5 3/6] ARM: dts: imx6sx-sabreauto: add IO expander
+ max7310 support
+In-Reply-To: <1524725898-27974-3-git-send-email-Anson.Huang@nxp.com>
 References: <1524725898-27974-1-git-send-email-Anson.Huang@nxp.com>
- <1524725898-27974-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180504074821.GX3443@dragon>
+ <1524725898-27974-3-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180504075027.GY3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 02:58:14PM +0800, Anson Huang wrote:
-> Add MAX7322 IO expander support.
+On Thu, Apr 26, 2018 at 02:58:15PM +0800, Anson Huang wrote:
+> i.MX6SX Sabre Auto board has two max7310 IO expander
+> on I2C3 bus, add support for them.
 > 
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > ---
 > no changes since V4.
->  arch/arm/boot/dts/imx6sx-sabreauto.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  arch/arm/boot/dts/imx6sx-sabreauto.dts | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
 > 
 > diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> index 2caca934..d59084f 100644
+> index d59084f..812f40b 100644
 > --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
 > +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> @@ -163,6 +163,13 @@
->  	pinctrl-0 = <&pinctrl_i2c2_1>;
->  	status = "okay";
+> @@ -82,6 +82,13 @@
+>  			>;
+>  		};
 >  
-> +	max7322: gpio at 68 {
-> +		compatible = "maxim,max7322";
-> +		reg = <0x68>;
+> +		pinctrl_i2c3_2: i2c3grp-2 {
+
+Drop suffix number '2'.
+
+Shawn
+
+> +			fsl,pins = <
+> +				MX6SX_PAD_KEY_ROW4__I2C3_SDA            0x4001b8b1
+> +				MX6SX_PAD_KEY_COL4__I2C3_SCL            0x4001b8b1
+> +			>;
+> +		};
+> +
+>  		pinctrl_uart1: uart1grp {
+>  			fsl,pins = <
+>  				MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
+> @@ -272,3 +279,24 @@
+>  		};
+>  	};
+>  };
+> +
+> +&i2c3 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c3_2>;
+> +	status = "okay";
+> +
+> +	max7310_a: gpio at 30 {
+> +		compatible = "maxim,max7310";
+> +		reg = <0x30>;
 > +		gpio-controller;
 > +		#gpio-cells = <2>;
 > +	};
 > +
-
-For child nodes having unit-address ('reg' property), sort them in order
-of unit-address.
-
-Shawn
-
->  	pmic: pfuze100 at 08 {
->  		compatible = "fsl,pfuze100";
->  		reg = <0x08>;
+> +	max7310_b: gpio at 32 {
+> +		compatible = "maxim,max7310";
+> +		reg = <0x32>;
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+> +};
 > -- 
 > 2.7.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
