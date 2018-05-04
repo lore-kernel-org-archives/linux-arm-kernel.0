@@ -1,124 +1,121 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri,  4 May 2018 08:57:23 +0800
-Subject: [PATCH 1/4] ARM: dts: imx: drop unnecessary #address-cells/#size-cells
+Date: Fri,  4 May 2018 08:57:26 +0800
+Subject: [PATCH 4/4] ARM: dts: imx: drop 'clocks' container for board level
+ clocks
 In-Reply-To: <1525395446-1953-1-git-send-email-shawnguo@kernel.org>
 References: <1525395446-1953-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1525395446-1953-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <1525395446-1953-5-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It drops unnecessary #address-cells/#size-cells from <soc>.dtsi 'clocks'
-node to fix DTC warning avoid_unnecessary_addr_size seen with W=1
-switch.
+For soc level of clocks which are input to Clock Control Module, clock
+driver expects them to be under 'clocks' container node.  But for board
+level clocks, this container is not really necessary.  Let's drop it and
+use an unique name for fixed rate clock, so that 'reg' property can be
+saved as well.
 
 Signed-off-by: Shawn Guo <shawnguo@kernel.org>
 ---
- arch/arm/boot/dts/imx25.dtsi   | 3 ---
- arch/arm/boot/dts/imx27.dtsi   | 3 ---
- arch/arm/boot/dts/imx50.dtsi   | 3 ---
- arch/arm/boot/dts/imx51.dtsi   | 3 ---
- arch/arm/boot/dts/imx53.dtsi   | 3 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 3 ---
- arch/arm/boot/dts/imx6sl.dtsi  | 3 ---
- 7 files changed, 21 deletions(-)
+ arch/arm/boot/dts/imx28-tx28.dts             | 13 ++++---------
+ arch/arm/boot/dts/imx53-tx53.dtsi            | 11 +++++------
+ arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 15 ++++++---------
+ arch/arm/boot/dts/imx6q-bx50v3.dtsi          | 11 ++++-------
+ 4 files changed, 19 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index cf70df20b19c..67606dd334bf 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -70,9 +70,6 @@
+diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+index 687186358c18..e4f19f9be6d0 100644
+--- a/arch/arm/boot/dts/imx28-tx28.dts
++++ b/arch/arm/boot/dts/imx28-tx28.dts
+@@ -140,15 +140,10 @@
+ 		regulator-boot-on;
  	};
  
- 	clocks {
+-	clocks {
 -		#address-cells = <1>;
 -		#size-cells = <0>;
--
- 		osc {
- 			compatible = "fsl,imx-osc", "fixed-clock";
- 			#clock-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 6585b00c3917..389c9288b4ed 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -57,9 +57,6 @@
+-		mclk: clock at 0 {
+-			compatible = "fixed-clock";
+-			reg = <0>;
+-			#clock-cells = <0>;
+-			clock-frequency = <26000000>;
+-		};
++	mclk: clock-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <26000000>;
  	};
  
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
- 		osc26m {
- 			compatible = "fsl,imx-osc26m", "fixed-clock";
- 			#clock-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
-index 7954e79d0a16..a9b712db9f6c 100644
---- a/arch/arm/boot/dts/imx50.dtsi
-+++ b/arch/arm/boot/dts/imx50.dtsi
-@@ -60,9 +60,6 @@
+ 	sound {
+diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+index 77f2ce9f1e41..5dd3dd3a2fd0 100644
+--- a/arch/arm/boot/dts/imx53-tx53.dtsi
++++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+@@ -67,13 +67,12 @@
+ 		ckih1 {
+ 			clock-frequency = <0>;
+ 		};
++	};
+ 
+-		mclk: clock at 0 {
+-			compatible = "fixed-clock";
+-			reg = <0>;
+-			#clock-cells = <0>;
+-			clock-frequency = <26000000>;
+-		};
++	mclk: clock-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <26000000>;
  	};
  
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
- 		ckil {
- 			compatible = "fsl,imx-ckil", "fixed-clock";
- 			#clock-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 5d390a64e976..b5db83cd7439 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -56,9 +56,6 @@
+ 	gpio-keys {
+diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+index ea184d108491..3dee3af1a4c1 100644
+--- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
++++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+@@ -72,15 +72,12 @@
+ 		stdout-path = "serial0:115200n8";
  	};
  
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
- 		ckil {
- 			compatible = "fsl,imx-ckil", "fixed-clock";
- 			#clock-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 7d647d043f52..d0db80150db7 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -88,9 +88,6 @@
+-	clocks {
+-		/* Fixed crystal dedicated to mcp251x */
+-		clk16m: clk at 1 {
+-			compatible = "fixed-clock";
+-			reg = <1>;
+-			#clock-cells = <0>;
+-			clock-frequency = <16000000>;
+-			clock-output-names = "clk16m";
+-		};
++	/* Fixed crystal dedicated to mcp251x */
++	clk16m: clock-16m {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <16000000>;
++		clock-output-names = "clk16m";
  	};
  
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
- 		ckil {
- 			compatible = "fsl,imx-ckil", "fixed-clock";
- 			#clock-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 5332fe78cc8a..69648e205dca 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -58,9 +58,6 @@
+ 	gpio-keys {
+diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+index d0e7dab4d72b..d3cba09be0cb 100644
+--- a/arch/arm/boot/dts/imx6q-bx50v3.dtsi
++++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+@@ -43,13 +43,10 @@
+ #include "imx6q-ba16.dtsi"
+ 
+ / {
+-	clocks {
+-		mclk: clock at 0 {
+-			compatible = "fixed-clock";
+-			reg = <0>;
+-			#clock-cells = <0>;
+-			clock-frequency = <22000000>;
+-		};
++	mclk: clock-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <22000000>;
  	};
  
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
- 		ckil {
- 			compatible = "fsl,imx-ckil", "fixed-clock";
- 			#clock-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index ab6a7e2e7e8f..2002db2feb00 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -86,9 +86,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
- 		ckil {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
+ 	gpio-poweroff {
 -- 
 1.9.1
