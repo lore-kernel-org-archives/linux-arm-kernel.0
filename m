@@ -1,121 +1,54 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri,  4 May 2018 08:57:26 +0800
-Subject: [PATCH 4/4] ARM: dts: imx: drop 'clocks' container for board level
- clocks
-In-Reply-To: <1525395446-1953-1-git-send-email-shawnguo@kernel.org>
-References: <1525395446-1953-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1525395446-1953-5-git-send-email-shawnguo@kernel.org>
+From: yong.deng@magewell.com (Yong)
+Date: Fri, 4 May 2018 09:19:40 +0800
+Subject: [PATCH v9 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <20180503171410.q52ak27u47gycy6o@flea>
+References: <1520301070-48769-1-git-send-email-yong.deng@magewell.com>
+ <20180503171410.q52ak27u47gycy6o@flea>
+Message-ID: <20180504091940.88dbbe8eed8da931ab4bfbea@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For soc level of clocks which are input to Clock Control Module, clock
-driver expects them to be under 'clocks' container node.  But for board
-level clocks, this container is not really necessary.  Let's drop it and
-use an unique name for fixed rate clock, so that 'reg' property can be
-saved as well.
+Hi Maxime,
 
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
----
- arch/arm/boot/dts/imx28-tx28.dts             | 13 ++++---------
- arch/arm/boot/dts/imx53-tx53.dtsi            | 11 +++++------
- arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 15 ++++++---------
- arch/arm/boot/dts/imx6q-bx50v3.dtsi          | 11 ++++-------
- 4 files changed, 19 insertions(+), 31 deletions(-)
+On Thu, 3 May 2018 19:14:10 +0200
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
-diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-index 687186358c18..e4f19f9be6d0 100644
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -140,15 +140,10 @@
- 		regulator-boot-on;
- 	};
- 
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		mclk: clock at 0 {
--			compatible = "fixed-clock";
--			reg = <0>;
--			#clock-cells = <0>;
--			clock-frequency = <26000000>;
--		};
-+	mclk: clock-mclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
- 	};
- 
- 	sound {
-diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
-index 77f2ce9f1e41..5dd3dd3a2fd0 100644
---- a/arch/arm/boot/dts/imx53-tx53.dtsi
-+++ b/arch/arm/boot/dts/imx53-tx53.dtsi
-@@ -67,13 +67,12 @@
- 		ckih1 {
- 			clock-frequency = <0>;
- 		};
-+	};
- 
--		mclk: clock at 0 {
--			compatible = "fixed-clock";
--			reg = <0>;
--			#clock-cells = <0>;
--			clock-frequency = <26000000>;
--		};
-+	mclk: clock-mclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
- 	};
- 
- 	gpio-keys {
-diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-index ea184d108491..3dee3af1a4c1 100644
---- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-+++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-@@ -72,15 +72,12 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	clocks {
--		/* Fixed crystal dedicated to mcp251x */
--		clk16m: clk at 1 {
--			compatible = "fixed-clock";
--			reg = <1>;
--			#clock-cells = <0>;
--			clock-frequency = <16000000>;
--			clock-output-names = "clk16m";
--		};
-+	/* Fixed crystal dedicated to mcp251x */
-+	clk16m: clock-16m {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <16000000>;
-+		clock-output-names = "clk16m";
- 	};
- 
- 	gpio-keys {
-diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
-index d0e7dab4d72b..d3cba09be0cb 100644
---- a/arch/arm/boot/dts/imx6q-bx50v3.dtsi
-+++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
-@@ -43,13 +43,10 @@
- #include "imx6q-ba16.dtsi"
- 
- / {
--	clocks {
--		mclk: clock at 0 {
--			compatible = "fixed-clock";
--			reg = <0>;
--			#clock-cells = <0>;
--			clock-frequency = <22000000>;
--		};
-+	mclk: clock-mclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <22000000>;
- 	};
- 
- 	gpio-poweroff {
--- 
-1.9.1
+> Hi Yong,
+> 
+> On Tue, Mar 06, 2018 at 09:51:10AM +0800, Yong Deng wrote:
+> > This patchset add initial support for Allwinner V3s CSI.
+> > 
+> > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> > interface and CSI1 is used for parallel interface. This is not
+> > documented in datasheet but by test and guess.
+> > 
+> > This patchset implement a v4l2 framework driver and add a binding 
+> > documentation for it. 
+> > 
+> > Currently, the driver only support the parallel interface. And has been
+> > tested with a BT1120 signal which generating from FPGA. The following
+> > fetures are not support with this patchset:
+> >   - ISP 
+> >   - MIPI-CSI2
+> >   - Master clock for camera sensor
+> >   - Power regulator for the front end IC
+> 
+> Do you plan on sending another version some time soon? It would be
+> awesome to have this in 4.18.
+
+I was waiting for Sakari Ailus's feedback. But ...
+I will send a new version soon. But not all suggestion from Sakari Ailus
+would be accepted.
+
+> 
+> Thanks!
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
+
+
+Thanks,
+Yong
