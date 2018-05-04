@@ -1,96 +1,56 @@
-From: riproute@gmail.com (Dan Haab)
-Date: Fri,  4 May 2018 10:08:44 -0600
-Subject: [PATCH 2/2] ARM: dts: BCM5301X: Add DT for Luxul XAP-1610
-In-Reply-To: <1525450124-21665-1-git-send-email-dan.haab@luxul.com>
-References: <1525450124-21665-1-git-send-email-dan.haab@luxul.com>
-Message-ID: <1525450124-21665-2-git-send-email-dan.haab@luxul.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri,  4 May 2018 08:49:56 -0700
+Subject: [GIT PULL] one bug fix and few other fixes for v4.17-rc cycle
+Message-ID: <pull-1525448974-362873@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's an access point based on BCM47094 SoC with two BCM4366E wireless
-chipsets.
+From: "Tony Lindgren" <tony@atomide.com>
 
-Signed-off-by: Dan Haab <dan.haab@luxul.com>
----
- arch/arm/boot/dts/Makefile                    |  1 +
- arch/arm/boot/dts/bcm47094-luxul-xap-1610.dts | 57 +++++++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm47094-luxul-xap-1610.dts
+The following changes since commit fb289e3ab10c16834741bb02be740fa9d025fde0:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a00b279..d041508 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -102,6 +102,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm47094-dlink-dir-885l.dtb \
- 	bcm47094-linksys-panamera.dtb \
- 	bcm47094-luxul-abr-4500.dtb \
-+	bcm47094-luxul-xap-1610.dtb \
- 	bcm47094-luxul-xbr-4500.dtb \
- 	bcm47094-luxul-xwr-3100.dtb \
- 	bcm47094-luxul-xwr-3150-v1.dtb \
-diff --git a/arch/arm/boot/dts/bcm47094-luxul-xap-1610.dts b/arch/arm/boot/dts/bcm47094-luxul-xap-1610.dts
-new file mode 100644
-index 0000000..7fd8547
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm47094-luxul-xap-1610.dts
-@@ -0,0 +1,57 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
-+/*
-+ * Copyright 2018 Luxul Inc.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm47094.dtsi"
-+
-+/ {
-+	compatible = "luxul,xap-1610-v1", "brcm,bcm47094", "brcm,bcm4708";
-+	model = "Luxul XAP-1610 V1";
-+
-+	chosen {
-+		bootargs = "earlycon";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		status	{
-+			label = "bcm53xx:green:status";
-+			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "timer";
-+		};
-+
-+		2ghz {
-+			label = "bcm53xx:blue:2ghz";
-+			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		5ghz {
-+			label = "bcm53xx:blue:5ghz";
-+			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&spi_nor {
-+	status = "okay";
-+};
--- 
-1.9.1
+  Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes (2018-04-19 15:48:46 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.17/fixes-rc3
+
+for you to fetch changes up to 647efef69de483f1dd7944ede31b4cae16acb124:
+
+  ARM: dts: correct missing "compatible" entry for ti81xx SoCs (2018-05-03 10:07:47 -0700)
+
+----------------------------------------------------------------
+Fixes for omap variants for v4.17-rc cycle
+
+This series of patches contains one BUG fix for trace if
+CONFIG_DEBUG_PREEMPT is enabled and a regression fix for omap1
+FIQ handling on ams-delta. Then there's a dts fix for missing SoC
+compatible on ti81xx board dts files that did matter until we added
+the clkctrl clocks and without that some clocks are now not found.
+
+Then there are three minor logicpd-som-lv specific dts fixes that
+fix misconfigured pins for WLAN, audio and USB.
+
+----------------------------------------------------------------
+Adam Ford (3):
+      ARM: dts: logicpd-som-lv: Fix WL127x Startup Issues
+      ARM: dts: logicpd-som-lv: Fix Audio Mute
+      ARM: dts: logicpd-som-lv: Fix pinmux controller references
+
+Graeme Smecher (1):
+      ARM: dts: correct missing "compatible" entry for ti81xx SoCs
+
+Janusz Krzysztofik (1):
+      ARM: OMAP1: ams-delta: fix deferred_fiq handler
+
+Tero Kristo (1):
+      ARM: OMAP2+: powerdomain: use raw_smp_processor_id() for trace
+
+ arch/arm/boot/dts/dm8148-evm.dts       |  2 +-
+ arch/arm/boot/dts/dm8148-t410.dts      |  2 +-
+ arch/arm/boot/dts/dm8168-evm.dts       |  2 +-
+ arch/arm/boot/dts/dra62x-j5eco-evm.dts |  2 +-
+ arch/arm/boot/dts/logicpd-som-lv.dtsi  | 15 +++++++++------
+ arch/arm/mach-omap1/ams-delta-fiq.c    | 28 +++++++++++++++-------------
+ arch/arm/mach-omap2/powerdomain.c      |  4 ++--
+ 7 files changed, 30 insertions(+), 25 deletions(-)
