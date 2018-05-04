@@ -1,137 +1,127 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 4 May 2018 10:32:20 +0200
-Subject: [PATCH 09/17] irqchip/irq-mvebu-icu: support ICU subnodes
-In-Reply-To: <20180502101300.49cc3623@windsurf.home>
-References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
- <20180421135537.24716-10-miquel.raynal@bootlin.com>
- <20180502101300.49cc3623@windsurf.home>
-Message-ID: <20180504103220.3504e73b@xps13>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 4 May 2018 10:39:28 +0200
+Subject: [PATCH V4 5/8] soc: mediatek: pwrap: add pwrap for mt6797 SoCs
+In-Reply-To: <1525403052.14792.131.camel@mtkswgap22>
+References: <20180502092112.3991-1-argus.lin@mediatek.com>
+ <20180502092112.3991-6-argus.lin@mediatek.com>
+ <1525320067.14792.95.camel@mtkswgap22> <1525328436.6214.10.camel@mtkswgap22>
+ <1525403052.14792.131.camel@mtkswgap22>
+Message-ID: <69e4766f-8c7a-7729-93f8-4f87d2ceff8b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Wed, 2 May 2018 10:13:00 +0200, Thomas Petazzoni
-<thomas.petazzoni@bootlin.com> wrote:
-
-> Hello Miqu?l,
-> 
-> On Sat, 21 Apr 2018 15:55:29 +0200, Miquel Raynal wrote:
-> > Introduce new bindings for the ICU.  
-> 
-> Perhaps this should explain *why* we need new bindings.
-
-Sure, I changed the whole message by:
-
-    The ICU can handle several type of interrupt, each of them being
-    handled differently on AP side. On CP side, the ICU should be able
-    to make the distinction between each interrupt group by pointing to
-    the right parent.
-    
-    This is done through the introduction of new bindings, presenting
-    the ICU node as the parent of multiple ICU sub-nodes, each of them
-    being an interrupt type with a different interrupt parent. ICU
-    interrupt 'clients' now directly point to the right sub-node,
-    avoiding the need for the extra ICU_GRP_* parameter.
-    
-    ICU subnodes are probed automatically with
-    devm_platform_populate(). If the node as no child, the probe
-    function for NSRs will still be called 'manually' in order to
-    preserve backward compatibility with DT using the old binding.
-    
-> 
-> > Each DT subnode of the ICU represents a type of interrupt that should
-> > be handled separately. Add the possibility for the ICU to have subnodes
-> > and probe each of them automatically with devm_platform_populate(). If
-> > the node as no child, the probe function for NSRs will still be called
-> > 'manually'.  
-> 
->  ... in order to preserve backward compatibility with Device Trees
->  using the old binding.
-
-Added, see above.
-
-> 
-> > +static struct mvebu_icu *mvebu_dev_get_drvdata(struct platform_device *pdev)  
-> 
-> The function should be prefixed by mvebu_icu_, not just mvebu_.
-
-Changed.
-
-> 
-> > +{
-> > +	struct mvebu_icu *icu;
-> > +
-> > +	icu = dev_get_drvdata(&pdev->dev);
-> > +	if (icu) {
-> > +		/* Legacy bindings: get the device data */  
-> 
-> I find this comment weird, because it doesn't document what the test
-> just below is doing.
-
-Refactored a bit the comments in this section.
-
-> 
-> > +		if (!icu->legacy_bindings)
-> > +			return ERR_PTR(-EINVAL);
-> > +	} else {
-> > +		/* New bindings: get the parent device (ICU) data */
-> > +		icu = dev_get_drvdata(pdev->dev.parent);
-> > +		if (!icu)
-> > +			return ERR_PTR(-ENODEV);
-> > +		if (icu->legacy_bindings)
-> > +			return ERR_PTR(-EINVAL);
-> > +	}  
-> 
-> 
-> > @@ -144,7 +170,10 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> >  		goto free_irqd;
-> >  	}
-> >  
-> > -	icu_irqd->icu_group = fwspec->param[0];
-> > +	if (icu->legacy_bindings)
-> > +		icu_irqd->icu_group = fwspec->param[0];
-> > +	else
-> > +		icu_irqd->icu_group = ICU_GRP_NSR;  
-> 
-> In practice here fwspec->param[0] is always going to be equal to
-> ICU_GRP_NSR, but OK, the test makes sense as in a future commit, the
-> "else" case will be changed to support SEIs.
-> 
-> > +static const struct of_device_id mvebu_icu_nsr_of_match[] = {
-> > +	{ .compatible = "marvell,cp110-icu-nsr", },
-> > +	{},
-> > +};
-> > +
-> > +static struct platform_driver mvebu_icu_nsr_driver = {
-> > +	.probe  = mvebu_icu_nsr_probe,
-> > +	.driver = {
-> > +		.name = "mvebu-icu-nsr",
-> > +		.of_match_table = mvebu_icu_nsr_of_match,
-> > +	},
-> > +};
-> > +builtin_platform_driver(mvebu_icu_nsr_driver);  
-> 
-> I'm not sure why you call this icu_nsr here, and change it later to
-> icu_subset. Wouldn't it make sense to call it right away with the final
-> name ? Note that this is not a very strong request to change this
-> aspect, I'm fine with how it's done today, it's just that I would have
-> done it differently.
-
-I thought calling it icu_subset right now would not be very clear as
-there are not "ICU subset" other than NSR interrupts, but I changed it,
-this is not a big deal.
-
-> 
-> Other than that, looks good to me.
-> 
-> Thomas
-
-Thanks for the review,
-Miqu?l
 
 
--- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+On 05/04/2018 05:04 AM, Sean Wang wrote:
+> On Thu, 2018-05-03 at 14:20 +0800, Argus Lin wrote:
+>> On Thu, 2018-05-03 at 12:01 +0800, Sean Wang wrote:
+>>>  };
+> 
+> [...]
+> 
+>>>> @@ -1503,11 +1581,13 @@ static int pwrap_probe(struct platform_device *pdev)
+>>>>  	if (IS_ERR(wrp->base))
+>>>>  		return PTR_ERR(wrp->base);
+>>>>  
+>>>> -	wrp->rstc = devm_reset_control_get(wrp->dev, "pwrap");
+>>>> -	if (IS_ERR(wrp->rstc)) {
+>>>> -		ret = PTR_ERR(wrp->rstc);
+>>>> -		dev_dbg(wrp->dev, "cannot get pwrap reset: %d\n", ret);
+>>>> -		return ret;
+>>>> +	if (HAS_CAP(wrp->master->caps, PWRAP_CAP_RESET)) {
+>>>> +		wrp->rstc = devm_reset_control_get(wrp->dev, "pwrap");
+>>>
+>>> there should be a reset bit present for pwrap on infrasys.
+>>>
+>>> the specific condition can be dropped when the reset cell is exported from infrasys and then the device has a reference to it.
+>> hmm, I think it need to keep here.
+>> because after pwrap initialized, it can't be reset alone.
+>> It needs to reset PMIC simultaneously, too.
+> 
+> Reset a pair, either a master or its slave, all had been a part of
+> pwrap_init.
+> 
+> The reset controller provided here is just to reset pwrap device.
+> And for its slave reset, it should be done by pwrap_reset_spislave. 
+> 
+> So for MT6397, it should be able to fall into the same procedure.
+> 
+>>>
+>>>> +		if (IS_ERR(wrp->rstc)) {
+>>>> +			ret = PTR_ERR(wrp->rstc);
+>>>> +			dev_dbg(wrp->dev, "cannot get pwrap reset: %d\n", ret);
+>>>> +			return ret;
+>>>> +		}
+>>>>  	}
+>>>>  
+>>>>  	if (HAS_CAP(wrp->master->caps, PWRAP_CAP_BRIDGE)) {
+>>>> @@ -1549,9 +1629,17 @@ static int pwrap_probe(struct platform_device *pdev)
+>>>>  	if (ret)
+>>>>  		goto err_out1;
+>>>>  
+>>>> -	/* Enable internal dynamic clock */
+>>>> -	pwrap_writel(wrp, 1, PWRAP_DCM_EN);
+>>>> -	pwrap_writel(wrp, 0, PWRAP_DCM_DBC_PRD);
+>>>> +	/*
+>>>> +	 * add dcm capability check
+>>>> +	 */
+>>>> +	if (HAS_CAP(wrp->master->caps, PWRAP_CAP_DCM)) {
+>>>
+>>> the specific condition can be dropped since so far all devices the driver can support are owning PWRAP_CAP_DCM
+>> We did not support DCM for future chips.
+>> MT6797 is the last one.
+>> This why I want to add judgement here.
+> 
+> The series is only for MT6797 pwrap, so it's fine with only adding these
+> things the SoC actually relies on. 
+> 
+> PWRAP_CAP_DCM should not be added until a new SoC without dcm is really
+> introduced.
+> 
+
+I agree (and I think I said this already in a previous review).
+
+Regards,
+Matthias
+
+>>>
+>>>> +		if (wrp->master->type == PWRAP_MT6797)
+>>>> +			pwrap_writel(wrp, 3, PWRAP_DCM_EN);
+>>>
+>>> the setup for MT6797 can be moved into .init_soc_specific callback ?
+>>
+>> I think put it here is more generally.
+>>>
+>>>> +		else
+>>>> +			pwrap_writel(wrp, 1, PWRAP_DCM_EN);
+>>>> +
+>>>> +		pwrap_writel(wrp, 0, PWRAP_DCM_DBC_PRD);
+>>>> +	}
+>>>>  
+>>>>  	/*
+>>>>  	 * The PMIC could already be initialized by the bootloader.
+>>>> @@ -1580,6 +1668,12 @@ static int pwrap_probe(struct platform_device *pdev)
+>>>>  	pwrap_writel(wrp, wrp->master->wdt_src, PWRAP_WDT_SRC_EN);
+>>>>  	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
+>>>>  	pwrap_writel(wrp, wrp->master->int_en_all, PWRAP_INT_EN);
+>>>> +	/*
+>>>> +	 * We add INT1 interrupt to handle starvation and request exception
+>>>> +	 * If we support it, we should enable them here.
+>>>> +	 */
+>>>> +	if (HAS_CAP(wrp->master->caps, PWRAP_CAP_INT1_EN))
+>>>> +		pwrap_writel(wrp, wrp->master->int1_en_all, PWRAP_INT1_EN);
+>>>>  
+>>>
+>>> if there is no explicitly enabling on INT1, then ISR handling for INT1 is also unnecessary
+>>
+>> It's ok for me.
+>>>
+>>>>  	irq = platform_get_irq(pdev, 0);
+>>>>  	ret = devm_request_irq(wrp->dev, irq, pwrap_interrupt,
+>>>
+>>>
+>>>
+>>
+>>
+> 
+> 
