@@ -1,21 +1,36 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Fri, 4 May 2018 08:46:53 -0700
-Subject: [PATCH v2] ARM: dts: k2g-evm: Add DCAN dt nodes
-In-Reply-To: <20180503072845.5576-1-faiz_abbas@ti.com>
-References: <20180503072845.5576-1-faiz_abbas@ti.com>
-Message-ID: <244aed8e-b287-a5b1-72c4-0a954d5ac3a1@oracle.com>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Fri, 4 May 2018 18:47:11 +0300
+Subject: [PATCH v2 3/6] MAINTAINERS: add at91 usart spi driver
+In-Reply-To: <20180504154714.5109-1-radu.pirea@microchip.com>
+References: <20180504154714.5109-1-radu.pirea@microchip.com>
+Message-ID: <20180504154714.5109-4-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/3/18 12:28 AM, Faiz Abbas wrote:
-> The 66AK2G evm has support for dcan.
-> Add nodes and pinmuxes for dcan0 and dcan1.
-> 
-> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
-> ---
-> Changes since v1:
-> Description updated.
-Will pick this up.
+Added entry for at91 usart mfd driver.
 
-Regards,
-Santosh
+Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
+---
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ca06c6f58299..9243b9007966 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9199,6 +9199,13 @@ S:	Supported
+ F:	drivers/mfd/at91-usart.c
+ F:	include/dt-bindings/mfd/at91-usart.h
+ 
++MICROCHIP AT91 USART SPI DRIVER
++M:	Radu Pirea <radu.pirea@microchip.com>
++L:	linux-spi at vger.kernel.org
++S:	Supported
++F:	drivers/spi/spi-at91-usart.c
++F:	Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
++
+ MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
+ M:	Woojung Huh <Woojung.Huh@microchip.com>
+ M:	Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
+-- 
+2.17.0
