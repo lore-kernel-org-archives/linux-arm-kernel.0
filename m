@@ -1,36 +1,66 @@
-From: bgoswami@codeaurora.org (Banajit Goswami)
-Date: Thu, 3 May 2018 18:35:10 -0700
-Subject: [PATCH v7 07/24] ASoC: qdsp6: q6common: Add qdsp6 helper functions
-In-Reply-To: <20180501120820.11016-8-srinivas.kandagatla@linaro.org>
-References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
- <20180501120820.11016-8-srinivas.kandagatla@linaro.org>
-Message-ID: <28f86f87-b28e-bec8-1a74-a218afeac0cc@codeaurora.org>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Fri, 4 May 2018 09:44:37 +0800
+Subject: [PATCH] ARM64: dts: meson-axg: enable AP6255 wifi module
+In-Reply-To: <CAOi56cXKmv_Us1wDcMOYbdjFzZcLVu_t210Yrv891wKi22hV8A@mail.gmail.com>
+References: <20180423145729.14368-1-yixun.lan@amlogic.com>
+ <7h7eos1n68.fsf@baylibre.com>
+ <30de15b8-4cc4-7f97-d134-7af75cb6ace1@amlogic.com>
+ <CAOi56cXKmv_Us1wDcMOYbdjFzZcLVu_t210Yrv891wKi22hV8A@mail.gmail.com>
+Message-ID: <2cbd74df-ab25-f6f3-df0e-f58a083eb834@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+HI Kevin
 
-On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
-> This patch adds some common helper functions like translating dsp error
-> to linux error codes and channel mappings etc.
->
-> These functions are used in all the following qdsp6 drivers.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
-> ---
->   sound/soc/qcom/Kconfig              | 13 ++++++++
->   sound/soc/qcom/Makefile             |  3 ++
->   sound/soc/qcom/qdsp6/Makefile       |  1 +
->   sound/soc/qcom/qdsp6/q6dsp-common.c | 66 +++++++++++++++++++++++++++++++++++++
->   sound/soc/qcom/qdsp6/q6dsp-common.h | 24 ++++++++++++++
->   sound/soc/qcom/qdsp6/q6dsp-errno.h  | 51 ++++++++++++++++++++++++++++
->   6 files changed, 158 insertions(+)
->   create mode 100644 sound/soc/qcom/qdsp6/Makefile
->   create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.c
->   create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.h
->   create mode 100644 sound/soc/qcom/qdsp6/q6dsp-errno.h
-Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
+On 04/30/18 23:35, Kevin Hilman wrote:
+> On Fri, Apr 27, 2018 at 6:56 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+>> On 04/28/18 03:09, Kevin Hilman wrote:
+>>> Yixun Lan <yixun.lan@amlogic.com> writes:
+>>>
+>>>> The Meson-AXG S400 board is shipped with AP6255 wifi module,
+>>>> which is actually using the brcmfmac 43455 driver.
+>>>>
+>>>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>>>> ---
+>>>>  .../arm64/boot/dts/amlogic/meson-axg-s400.dts | 44 ++++++++++++++++++-
+>>>>  1 file changed, 43 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>>>> index f67d4e47e641..b3e1bdca32bb 100644
+>>>> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>>>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>>>> @@ -51,7 +51,16 @@
+>>>>
+>>>>      sdio_pwrseq: sdio-pwrseq {
+>>>>              compatible = "mmc-pwrseq-simple";
+>>>> -            reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
+>>>> +            reset-gpios = <&gpio GPIOX_7 GPIO_ACTIVE_LOW>;
+>>>
+>>> You didn't mention this GPIO change in the changelog.  Is it
+>>> intentional?
+>>
+>> Yes, the 'sdio_pwrseq' is used by wifi driver till now
+>> previous the reset-gpio is wrongly configured (copy & paste error),
+>> according to the schematics, it's GPIOX_7 which need to be fixed here.
+>>
+>> to be clean, in s400 board
+>>  GPIOX_6 is WIFI_WAKE_HOST pin
+>>  GPIOX_7 is WIFI_PWREN pin
+>>
+>> do you want me to put a note into the commit message? and resend this patch?
+> 
+> OK, thanks for the explanation.
+> 
+> I'd prefer the GPIO pin fix as a separate, standalone patch.
+> 
+> Thanks,
+> 
+> Kevin
+> 
+> .
+> 
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+As we already talked offline, this error was introduced exactly in the
+v4.18 cycle, so I will send a fix which can be squashed into the old commit
+
+Yixun
