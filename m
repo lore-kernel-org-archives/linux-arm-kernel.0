@@ -1,66 +1,87 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 04 May 2018 09:58:41 +0200
-Subject: [PATCH v2 06/10] media: v4l: Add definition for Allwinner's
- MB32-tiled NV12 format
-In-Reply-To: <198e991c-1052-5bfb-f397-0e7d388b3c00@xs4all.nl>
+Date: Fri, 04 May 2018 10:03:05 +0200
+Subject: [PATCH v2 02/10] media-request: Add a request complete
+ operation to allow m2m scheduling
+In-Reply-To: <20180419154124.17512-3-paul.kocialkowski@bootlin.com>
 References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
- <20180419154536.17846-2-paul.kocialkowski@bootlin.com>
- <198e991c-1052-5bfb-f397-0e7d388b3c00@xs4all.nl>
-Message-ID: <18af23e5efe2cdef5ed4b51c6dbf1ddeef8ffd5f.camel@bootlin.com>
+ <20180419154124.17512-3-paul.kocialkowski@bootlin.com>
+Message-ID: <ddab13eb3dbc179d4a366248b5f510f147b02556.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, 2018-04-20 at 15:59 +0200, Hans Verkuil wrote:
-> On 04/19/18 17:45, Paul Kocialkowski wrote:
-> > This introduces support for Allwinner's MB32-tiled NV12 format,
-> > where
-> > each plane is divided into macroblocks of 32x32 pixels. Hence, the
-> > size
-> > of each plane has to be aligned to 32 bytes. The pixels inside each
-> > macroblock are coded as they would be if the macroblock was a single
-> > plane, line after line.
-> > 
-> > The MB32-tiled NV12 format is used by the video engine on Allwinner
-> > platforms: it is the default format for decoded frames (and the only
-> > one
-> > available in the oldest supported platforms).
-> > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > ---
-> >  include/uapi/linux/videodev2.h | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/include/uapi/linux/videodev2.h
-> > b/include/uapi/linux/videodev2.h
-> > index 4b8336f7bcf0..43993a116e2b 100644
-> > --- a/include/uapi/linux/videodev2.h
-> > +++ b/include/uapi/linux/videodev2.h
-> > @@ -669,6 +669,7 @@ struct v4l2_pix_format {
-> >  #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /*
-> > Depth data 16-bit */
-> >  #define V4L2_PIX_FMT_MT21C    v4l2_fourcc('M', 'T', '2', '1') /*
-> > Mediatek compressed block mode  */
-> >  #define V4L2_PIX_FMT_INZI     v4l2_fourcc('I', 'N', 'Z', 'I') /*
-> > Intel Planar Greyscale 10-bit and Depth 16-bit */
-> > +#define V4L2_PIX_FMT_MB32_NV12 v4l2_fourcc('M', 'N', '1', '2') /*
-> > Allwinner NV12 in 32x32 macroblocks */
-> >  
-> >  /* 10bit raw bayer packed, 32 bytes for every 25 pixels, last LSB 6
-> > bits unused */
-> >  #define V4L2_PIX_FMT_IPU3_SBGGR10	v4l2_fourcc('i', 'p', '3',
-> > 'b') /* IPU3 packed 10-bit BGGR bayer */
-> > 
+On Thu, 2018-04-19 at 17:41 +0200, Paul Kocialkowski wrote:
+> When using the request API in the context of a m2m driver, the
+> operations that come with a m2m run scheduling call in their
+> (m2m-specific) ioctl handler are delayed until the request is queued
+> (for instance, this includes queuing buffers and streamon).
 > 
-> Add an entry for this to v4l_fill_fmtdesc() in v4l2-ioctl.c.
+> Thus, the m2m run scheduling calls are not called in due time since
+> the
+> request AP's internal plumbing will (rightfully) use the relevant core
+> functions directly instead of the ioctl handler.
 > 
-> It also needs to be documented in the spec.
+> This ends up in a situation where nothing happens if there is no
+> run-scheduling ioctl called after queuing the request.
+> 
+> In order to circumvent the issue, a new media operation is introduced,
+> called at the time of handling the media request queue ioctl. It gives
+> m2m drivers a chance to schedule a m2m device run at that time.
+> 
+> The existing req_queue operation cannot be used for this purpose,
+> since
+> it is called with the request queue mutex held, that is eventually
+> needed
+> in the device_run call to apply relevant controls.
 
-Noted, I will look in that direction for the future versions.
+This patch will be dropped since it's no longer useful with the latest
+version of the request API.
 
-Cheers,
-
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+>  drivers/media/media-request.c | 3 +++
+>  include/media/media-device.h  | 2 ++
+>  2 files changed, 5 insertions(+)
+> 
+> diff --git a/drivers/media/media-request.c b/drivers/media/media-
+> request.c
+> index 415f7e31019d..28ac5ccfe6a2 100644
+> --- a/drivers/media/media-request.c
+> +++ b/drivers/media/media-request.c
+> @@ -157,6 +157,9 @@ static long media_request_ioctl_queue(struct
+> media_request *req)
+>  		media_request_get(req);
+>  	}
+>  
+> +	if (mdev->ops->req_complete)
+> +		mdev->ops->req_complete(req);
+> +
+>  	return ret;
+>  }
+>  
+> diff --git a/include/media/media-device.h b/include/media/media-
+> device.h
+> index 07e323c57202..c7dcf2079cc9 100644
+> --- a/include/media/media-device.h
+> +++ b/include/media/media-device.h
+> @@ -55,6 +55,7 @@ struct media_entity_notify {
+>   * @req_alloc: Allocate a request
+>   * @req_free: Free a request
+>   * @req_queue: Queue a request
+> + * @req_complete: Complete a request
+>   */
+>  struct media_device_ops {
+>  	int (*link_notify)(struct media_link *link, u32 flags,
+> @@ -62,6 +63,7 @@ struct media_device_ops {
+>  	struct media_request *(*req_alloc)(struct media_device
+> *mdev);
+>  	void (*req_free)(struct media_request *req);
+>  	int (*req_queue)(struct media_request *req);
+> +	void (*req_complete)(struct media_request *req);
+>  };
+>  
+>  /**
 -- 
 Paul Kocialkowski, Bootlin (formerly Free Electrons)
 Embedded Linux and kernel engineering
@@ -71,4 +92,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/89c68886/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/d4d89b15/attachment.sig>
