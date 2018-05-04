@@ -1,44 +1,92 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 4 May 2018 09:26:02 -0500
-Subject: [PATCH v9 07/27] ARM: davinci: dm355: add new clock init using
- common clock framework
-In-Reply-To: <093052da-08b8-fe68-d319-254ae1da4d0d@ti.com>
-References: <20180427001745.4116-1-david@lechnology.com>
- <20180427001745.4116-8-david@lechnology.com>
- <d9633747-0c50-2934-d3b2-ba745f021077@ti.com>
- <18b7b217-7ccb-d2dd-8f2c-ba3ba0e5d893@lechnology.com>
- <093052da-08b8-fe68-d319-254ae1da4d0d@ti.com>
-Message-ID: <8e248f88-4a21-0862-28f4-fb03f90493ae@lechnology.com>
+From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
+Date: Fri,  4 May 2018 09:21:31 -0500
+Subject: [PATCHv4 1/7] dt-bindings,
+ firmware: add Intel Stratix10 service layer binding
+In-Reply-To: <1525443697-31009-1-git-send-email-richard.gong@linux.intel.com>
+References: <1525443697-31009-1-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1525443697-31009-2-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2018 05:01 AM, Sekhar Nori wrote:
-> On Thursday 03 May 2018 09:14 PM, David Lechner wrote:
->> On 05/03/2018 10:34 AM, Sekhar Nori wrote:
->>> On Friday 27 April 2018 05:47 AM, David Lechner wrote:
->>>> This adds the new board-specific clock init in mach-davinci/dm355.c
->>>> using the new common clock framework drivers.
->>>>
->>>> The #ifdefs are needed to prevent compile errors until the entire
->>>> ARCH_DAVINCI is converted.
->>>>
->>>> Also clean up the #includes since we are adding some here.
->>>>
->>>> Signed-off-by: David Lechner <david@lechnology.com>
->>>
->>> I am having trouble booting DM355 EVM with the series applied.
->>> Still to debug what is going wrong.
->>
->> Can you dump the PLL registers using /sys/kernel/debug/clk/... ?
-> 
-> I was able to get to ramdisk shell if I set clk_ignore_unused. Here is
-> the dump:
-> 
+From: Richard Gong <richard.gong@intel.com>
 
-...
+Add a device tree binding for the Intel Stratix10 service layer driver
 
-> I didn't have time today to analyze these myself. Hope it helps.
-> 
+Signed-off-by: Richard Gong <richard.gong@intel.com>
+Signed-off-by: Alan Tull <atull@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+v2: Change to put service layer driver node under the firmware node
+    Change compatible to "intel, stratix10-svc"
+v3: No change
+v4: Add Rob's Reviewed-by
+---
+ .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
 
-I just sent out a patch to fix this: "clk: davinci: pll-dm355: fix
-SYSCLKn parent names".
+diff --git a/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+new file mode 100644
+index 0000000..1fa6606
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+@@ -0,0 +1,57 @@
++Intel Service Layer Driver for Stratix10 SoC
++============================================
++Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
++processor system (HPS) and Secure Device Manager (SDM). When the FPGA is
++configured from HPS, there needs to be a way for HPS to notify SDM the
++location and size of the configuration data. Then SDM will get the
++configuration data from that location and perform the FPGA configuration.
++
++To meet the whole system security needs and support virtual machine requesting
++communication with SDM, only the secure world of software (EL3, Exception
++Layer 3) can interface with SDM. All software entities running on other
++exception layers must channel through the EL3 software whenever it needs
++service from SDM.
++
++Intel Stratix10 service layer driver, running at privileged exception level
++(EL1, Exception Layer 1), interfaces with the service providers and provides
++the services for FPGA configuration, QSPI, Crypto and warm reset. Service layer
++driver also manages secure monitor call (SMC) to communicate with secure monitor
++code running in EL3.
++
++Required properties:
++-------------------
++The svc node has the following mandatory properties, must be located under
++the firmware node.
++
++- compatible: "intel,stratix10-svc"
++- method: smc or hvc
++        smc - Secure Monitor Call
++        hvc - Hypervisor Call
++- memory-region:
++	phandle to the reserved memory node. See
++	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
++	for details
++
++Example:
++-------
++
++	reserved-memory {
++                #address-cells = <2>;
++                #size-cells = <2>;
++                ranges;
++
++                service_reserved: svcbuffer at 0 {
++                        compatible = "shared-dma-pool";
++                        reg = <0x0 0x0 0x0 0x1000000>;
++                        alignment = <0x1000>;
++                        no-map;
++                };
++        };
++
++	firmware {
++		svc {
++			compatible = "intel,stratix10-svc";
++			method = "smc";
++			memory-region = <&service_reserved>;
++		};
++	};
+-- 
+2.7.4
