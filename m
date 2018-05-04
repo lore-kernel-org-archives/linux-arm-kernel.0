@@ -1,39 +1,47 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 4 May 2018 19:02:29 +0100
-Subject: [PATCH 1/4] arm/arm64: smccc/psci: add arm_smccc_get_conduit()
-In-Reply-To: <d04f8eff-06e3-2080-e03e-cd35b7b2c382@arm.com>
-References: <20180503170330.5591-1-mark.rutland@arm.com>
- <20180503170330.5591-2-mark.rutland@arm.com>
- <d04f8eff-06e3-2080-e03e-cd35b7b2c382@arm.com>
-Message-ID: <20180504180227.h6qt5u76eomxsw4s@lakrids.cambridge.arm.com>
+Date: Fri, 4 May 2018 19:09:09 +0100
+Subject: [PATCH 1/6] locking/atomic, asm-generic: instrument ordering
+ variants
+In-Reply-To: <20180504180105.GS12217@hirez.programming.kicks-ass.net>
+References: <20180504173937.25300-1-mark.rutland@arm.com>
+ <20180504173937.25300-2-mark.rutland@arm.com>
+ <20180504180105.GS12217@hirez.programming.kicks-ass.net>
+Message-ID: <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 06:54:14PM +0100, Robin Murphy wrote:
-> On 03/05/18 18:03, Mark Rutland wrote:
+On Fri, May 04, 2018 at 08:01:05PM +0200, Peter Zijlstra wrote:
+> On Fri, May 04, 2018 at 06:39:32PM +0100, Mark Rutland wrote:
+> > Currently <asm-generic/atomic-instrumented.h> only instruments the fully
+> > ordered variants of atomic functions, ignoring the {relaxed,acquire,release}
+> > ordering variants.
+> > 
+> > This patch reworks the header to instrument all ordering variants of the atomic
+> > functions, so that architectures implementing these are instrumented
+> > appropriately.
+> > 
+> > To minimise repetition, a macro is used to generate each variant from a common
+> > template. The {full,relaxed,acquire,release} order variants respectively are
+> > then built using this template, where the architecture provides an
+> > implementation.
 
-> > We can kill off the PSCI_CONDUIT_* definitions once we've migrated users
-> > over to the nerw interface.
+> >  include/asm-generic/atomic-instrumented.h | 1195 ++++++++++++++++++++++++-----
+> >  1 file changed, 1008 insertions(+), 187 deletions(-)
 > 
-> new
+> Is there really no way to either generate or further macro compress this?
 
-Whoops; fixed locally.
+I can definitely macro compress this somewhat, but the bulk of the
+repetition will be the ifdeffery, which can't be macro'd away IIUC.
 
-[...]
+Generating this with a script is possible -- do we do anything like that
+elsewhere?
 
-> > +/**
-> > + * arm_smccc_get_conduit()
-> > + *
-> > + * Returns the conduit to be used for SMCCCv1.1 or later.
-> > + *
-> > + * When SMCCCv1.1 is not present, returns SMCCC_CONDUIT_NONE.
-> > + */
-> > +enum arm_smccc_conduit arm_smccc_get_conduit(void);
+> This is stupid repetitive, we just got rid of all that endless copy
+> paste crap in atomic implementations and now we're going back to that.
 > 
-> Given that implicit condition, can we save some confusion by naming this
-> arm_smccc_1_1_conduit(), in line with the actual SMCCCv1.1 calls?
+> Adding or changing atomic bits becomes horrifically painful because of this.
 
-Sure; done.
+Sure thing; mangling it to its current state was a pain enough.
 
 Thanks,
 Mark.
