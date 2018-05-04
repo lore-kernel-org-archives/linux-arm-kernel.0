@@ -1,74 +1,102 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri,  4 May 2018 09:17:33 -0700
-Subject: [GIT PULL 3/3] omap sdhci dts changes for v4.18 merge window
-In-Reply-To: <pull-1525450571-674978@atomide.com>
-References: <pull-1525450571-674978@atomide.com>
-Message-ID: <pull-1525450571-674978@atomide.com-3>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  4 May 2018 17:15:59 +0100
+Subject: [PATCH 4/4] arm64: vgic-v2: Fix proxying of cpuif access
+In-Reply-To: <20180504161559.22852-1-marc.zyngier@arm.com>
+References: <20180504161559.22852-1-marc.zyngier@arm.com>
+Message-ID: <20180504161559.22852-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+From: James Morse <james.morse@arm.com>
 
-The following changes since commit 3f4028780287ff5a7308f40e10bbba9a42b993aa:
+Proxying the cpuif accesses at EL2 makes use of vcpu_data_guest_to_host
+and co, which check the endianness, which call into vcpu_read_sys_reg...
+which isn't mapped at EL2 (it was inlined before, and got moved OoL
+with the VHE optimizations).
 
-  mmc: sdhci-omap: Get IODelay values for 3.3v DDR mode (2018-05-03 09:37:13 +0200)
+The result is of course a nice panic. Let's add some specialized
+cruft to keep the broken platforms that require this hack alive.
 
-are available in the Git repository at:
+But, this code used vcpu_data_guest_to_host(), which expected us to
+write the value to host memory, instead we have trapped the guest's
+read or write to an mmio-device, and are about to replay it using the
+host's readl()/writel() which also perform swabbing based on the host
+endianness. This goes wrong when both host and guest are big-endian,
+as readl()/writel() will undo the guest's swabbing, causing the
+big-endian value to be written to device-memory.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/dt-sdhci-signed
+What needs doing?
+A big-endian guest will have pre-swabbed data before storing, undo this.
+If its necessary for the host, writel() will re-swab it.
 
-for you to fetch changes up to 24a6f1f65ea567d017c598faf1374ee443f73851:
+For a read a big-endian guest expects to swab the data after the load.
+The hosts's readl() will correct for host endianness, giving us the
+device-memory's value in the register. For a big-endian guest, swab it
+as if we'd only done the load.
 
-  Documentation: ARM: Add new MMC requirements for DRA7/K2G (2018-05-03 10:32:20 -0700)
+For a little-endian guest, nothing needs doing as readl()/writel() leave
+the correct device-memory value in registers.
 
-----------------------------------------------------------------
-Device tree changes for omap variants for SDHCI
+Tested on Juno with that rarest of things: a big-endian 64K host.
+Based on a patch from Marc Zyngier.
 
-This series adds the devicetree configuration needed for pinctrl on
-dra7 variants to use the SDHCI SDIO driver instead of mmc-omap-hs
-driver. To use SDHCI, both the pins and the iodelay needs to be
-configured.
+Reported-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Fixes: bf8feb39642b ("arm64: KVM: vgic-v2: Add GICV access from HYP")
+Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
 
-This series is based on the related SDHCI drivers changes on a branch
-set up by Ulf.
-
-----------------------------------------------------------------
-Hari Nagalla (2):
-      ARM: dts: dra72-evm-common: Add wilink8 wlan support
-      ARM: dts: dra7-evm: Add wilink8 wlan support
-
-Kishon Vijay Abraham I (10):
-      ARM: dts: dra72-evm-common: Remove mmc specific pinmux
-      ARM: dts: dra71-evm: Add "vqmmc-supply" property for mmc2
-      ARM: dts: dra7-mmc-iodelay: Add a new pinctrl group for clk line without pullup
-      ARM: dts: am57xx-idk: Use pinctrl group from dra7-mmc-iodelay.dtsi to select pulldown
-      ARM: dts: dra71-evm: Use pinctrl group from dra7-mmc-iodelay.dtsi to select pulldown
-      ARM: dts: am57xx-beagle-x15/am57xx-idk: Fix pinctrl-names
-      ARM: dts: dra7-evm: Model EVM_3V6 regulator
-      ARM: dts: dra7: Use sdhci-omap programming model
-      ARM: dts: dra7: Add high speed modes capability to MMC1/MMC2 dt node
-      Documentation: ARM: Add new MMC requirements for DRA7/K2G
-
-Sekhar Nori (1):
-      ARM: dts: am574x-idk: Add pinmux configuration for MMC
-
-Vishal Mahaveer (1):
-      ARM: dts: dra76-evm: Add wilink8 wlan support
-
- Documentation/arm/OMAP/README                   |  4 ++
- arch/arm/boot/dts/am571x-idk.dts                |  5 +-
- arch/arm/boot/dts/am572x-idk.dts                |  5 +-
- arch/arm/boot/dts/am574x-idk.dts                | 20 +++++++
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |  4 +-
- arch/arm/boot/dts/am57xx-beagle-x15.dts         |  3 +-
- arch/arm/boot/dts/am57xx-idk-common.dtsi        | 14 +----
- arch/arm/boot/dts/dra7-evm-common.dtsi          | 15 ++++++
- arch/arm/boot/dts/dra7-evm.dts                  | 68 +++++++++++++++++++++++
- arch/arm/boot/dts/dra7-mmc-iodelay.dtsi         | 19 +++++++
- arch/arm/boot/dts/dra7.dtsi                     | 32 ++++++-----
- arch/arm/boot/dts/dra71-evm.dts                 | 17 ++----
- arch/arm/boot/dts/dra72-evm-common.dtsi         | 71 +++++++++++++++----------
- arch/arm/boot/dts/dra72x-mmc-iodelay.dtsi       | 11 ++++
- arch/arm/boot/dts/dra76-evm.dts                 | 34 +++++++++++-
- 15 files changed, 243 insertions(+), 79 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra7-mmc-iodelay.dtsi
+diff --git a/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c b/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
+index 86801b6055d6..39be799d0417 100644
+--- a/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
++++ b/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
+@@ -18,11 +18,20 @@
+ #include <linux/compiler.h>
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/kvm_host.h>
++#include <linux/swab.h>
+ 
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ 
++static bool __hyp_text __is_be(struct kvm_vcpu *vcpu)
++{
++	if (vcpu_mode_is_32bit(vcpu))
++		return !!(read_sysreg_el2(spsr) & COMPAT_PSR_E_BIT);
++
++	return !!(read_sysreg(SCTLR_EL1) & SCTLR_ELx_EE);
++}
++
+ /*
+  * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
+  *				     guest.
+@@ -64,14 +73,19 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 	addr += fault_ipa - vgic->vgic_cpu_base;
+ 
+ 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
+-		u32 data = vcpu_data_guest_to_host(vcpu,
+-						   vcpu_get_reg(vcpu, rd),
+-						   sizeof(u32));
++		u32 data = vcpu_get_reg(vcpu, rd);
++		if (__is_be(vcpu)) {
++			/* guest pre-swabbed data, undo this for writel() */
++			data = swab32(data);
++		}
+ 		writel_relaxed(data, addr);
+ 	} else {
+ 		u32 data = readl_relaxed(addr);
+-		vcpu_set_reg(vcpu, rd, vcpu_data_host_to_guest(vcpu, data,
+-							       sizeof(u32)));
++		if (__is_be(vcpu)) {
++			/* guest expects swabbed data */
++			data = swab32(data);
++		}
++		vcpu_set_reg(vcpu, rd, data);
+ 	}
+ 
+ 	return 1;
+-- 
+2.14.2
