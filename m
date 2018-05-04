@@ -1,71 +1,60 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Fri, 4 May 2018 18:31:42 +0200
-Subject: Potential deadlock in vgic
-In-Reply-To: <20180504151740.12165-1-andre.przywara@arm.com>
-References: <20180504130854.GA14663@hc>
- <20180504151740.12165-1-andre.przywara@arm.com>
-Message-ID: <20180504163142.GC14663@hc>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 4 May 2018 17:44:01 +0100
+Subject: [PATCH v2 07/10] PCI: Convert of_pci_get_host_bridge_resources()
+ users to devm variant
+In-Reply-To: <dbfa80fb-5fe8-3ccd-6886-4604ef9e058b@mentor.com>
+References: <cover.1525067324.git.jan.kiszka@siemens.com>
+ <ed3e6df4feca5febefa14716d62aaddd5b4a39d1.1525067324.git.jan.kiszka@siemens.com>
+ <dbfa80fb-5fe8-3ccd-6886-4604ef9e058b@mentor.com>
+Message-ID: <20180504164401.GA17043@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 04:17:40PM +0100, Andre Przywara wrote:
+On Thu, May 03, 2018 at 10:18:24AM +0300, Vladimir Zapolskiy wrote:
 > Hi Jan,
 > 
-> can you please test this patch with your setup, to see if it still
-> screams? That converts two forgotten irq_lock's over to be irqsafe,
-> plus lets lpi_list_lock join them (which you already did, IIUC).
-> That should appease lockdep, hopefully.
+> On 04/30/2018 08:48 AM, Jan Kiszka wrote:
+> > From: Jan Kiszka <jan.kiszka@siemens.com>
+> > 
+> > Straightforward for all of them, no more leaks afterwards.
+> > 
+> > CC: Jingoo Han <jingoohan1@gmail.com>
+> > CC: Joao Pinto <Joao.Pinto@synopsys.com>
+> > CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> > Acked-by: Jingoo Han <jingoo1han@gmail.com>
+> 
+> [snip]
+> 
+> > diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+> > index 6ab28f29ac6a..6eb36c924983 100644
+> > --- a/drivers/pci/host/pcie-rcar.c
+> > +++ b/drivers/pci/host/pcie-rcar.c
+> > @@ -1067,12 +1067,11 @@ static int rcar_pcie_parse_request_of_pci_ranges(struct rcar_pcie *pci)
+> >  {
+> >  	int err;
+> >  	struct device *dev = pci->dev;
+> > -	struct device_node *np = dev->of_node;
+> >  	resource_size_t iobase;
+> >  	struct resource_entry *win, *tmp;
+> >  
+> > -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
+> > -					       &iobase);
+> > +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
+> > +						    &pci->resources, &iobase);
+> >  	if (err)
+> >  		return err;
+> >  
+> 
+> this one snippet is obsoleted by https://patchwork.ozlabs.org/patch/904326/
+> 
+> If 08/10 remains a deprecation, then it is sufficient to exclude the R-Car change,
+> otherwise I hope maintainers can deal with the proper ordering.
 
-Hit send too soon, on halting the guest I get:
+Isn't applying your patch:
 
-[ 1025.694857] =============================
-[ 1025.694862] WARNING: suspicious RCU usage
-[ 1025.694868] 4.17.0-rc3-jang+ #73 Not tainted
-[ 1025.694873] -----------------------------
-[ 1025.694880] ./include/linux/kvm_host.h:575 suspicious rcu_dereference_check() usage!
-[ 1025.694884] 
-               other info that might help us debug this:
+https://patchwork.ozlabs.org/patch/904326/
 
-[ 1025.694890] 
-               rcu_scheduler_active = 2, debug_locks = 1
-[ 1025.694896] 18 locks held by qemu-system-aar/5540:
-[ 1025.694901]  #0: 000000005e03488a (&kvm->lock){+.+.}, at: vgic_its_set_attr+0x230/0x388
-[ 1025.694937]  #1: 000000004b1a3bb5 (&its->its_lock){+.+.}, at: vgic_its_set_attr+0x23c/0x388
-[ 1025.694965]  #2: 000000003ca8213c (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.694993]  #3: 00000000adb6ae51 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695021]  #4: 0000000000563df7 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695048]  #5: 00000000da16277a (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695076]  #6: 00000000bf36d9aa (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695103]  #7: 00000000607eaa4f (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695130]  #8: 0000000046dadf65 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695157]  #9: 00000000197747b2 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695184]  #10: 00000000e4f1282c (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695211]  #11: 000000007471b896 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695239]  #12: 000000005be54486 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695266]  #13: 000000000f1fa184 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695293]  #14: 0000000093fdb28b (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695396]  #15: 0000000097cc103c (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695426]  #16: 00000000d24dd32e (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695453]  #17: 000000002606c3a7 (&vcpu->mutex){+.+.}, at: lock_all_vcpus+0x64/0xc0
-[ 1025.695482] 
-               stack backtrace:
-[ 1025.695489] CPU: 29 PID: 5540 Comm: qemu-system-aar Not tainted 4.17.0-rc3-jang+ #73
-[ 1025.695494] Hardware name: To be filled by O.E.M. Saber/To be filled by O.E.M., BIOS 0ACKL018 03/30/2018
-[ 1025.695499] Call trace:
-[ 1025.695505]  dump_backtrace+0x0/0x160
-[ 1025.695510]  show_stack+0x24/0x30
-[ 1025.695517]  dump_stack+0x9c/0xd4
-[ 1025.695524]  lockdep_rcu_suspicious+0xcc/0x118
-[ 1025.695537]  gfn_to_memslot+0x174/0x190
-[ 1025.695546]  kvm_read_guest+0x50/0xb0
-[ 1025.695553]  vgic_its_check_id.isra.0+0x114/0x148
-[ 1025.695560]  vgic_its_save_tables_v0+0x1a0/0x320
-[ 1025.695567]  vgic_its_set_attr+0x330/0x388
-[ 1025.695573]  kvm_device_ioctl_attr+0x9c/0xd8
-[ 1025.695579]  kvm_device_ioctl+0x8c/0xf8
-[ 1025.695587]  do_vfs_ioctl+0xc4/0x938
-[ 1025.695594]  ksys_ioctl+0x8c/0x98
-[ 1025.695601]  sys_ioctl+0x34/0x48
-[ 1025.695609]  el0_svc_naked+0x44/0x48
+and dropping the rcar hunk from this patch enough ?
 
---Jan
+Lorenzo
