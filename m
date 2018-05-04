@@ -1,9 +1,9 @@
 From: radu.pirea@microchip.com (Radu Pirea)
-Date: Fri, 4 May 2018 18:47:11 +0300
-Subject: [PATCH v2 3/6] MAINTAINERS: add at91 usart spi driver
+Date: Fri, 4 May 2018 18:47:09 +0300
+Subject: [PATCH v2 1/6] MAINTAINERS: add at91 usart mfd driver
 In-Reply-To: <20180504154714.5109-1-radu.pirea@microchip.com>
 References: <20180504154714.5109-1-radu.pirea@microchip.com>
-Message-ID: <20180504154714.5109-4-radu.pirea@microchip.com>
+Message-ID: <20180504154714.5109-2-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,19 +15,19 @@ Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
  1 file changed, 7 insertions(+)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index ca06c6f58299..9243b9007966 100644
+index 8e2a2fddbd19..ca06c6f58299 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -9199,6 +9199,13 @@ S:	Supported
- F:	drivers/mfd/at91-usart.c
- F:	include/dt-bindings/mfd/at91-usart.h
+@@ -9192,6 +9192,13 @@ S:	Supported
+ F:	drivers/mtd/nand/raw/atmel/*
+ F:	Documentation/devicetree/bindings/mtd/atmel-nand.txt
  
-+MICROCHIP AT91 USART SPI DRIVER
++MICROCHIP AT91 USART MFD DRIVER
 +M:	Radu Pirea <radu.pirea@microchip.com>
-+L:	linux-spi at vger.kernel.org
++L:	linux-kernel at vger.kernel.org
 +S:	Supported
-+F:	drivers/spi/spi-at91-usart.c
-+F:	Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
++F:	drivers/mfd/at91-usart.c
++F:	include/dt-bindings/mfd/at91-usart.h
 +
  MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
  M:	Woojung Huh <Woojung.Huh@microchip.com>
