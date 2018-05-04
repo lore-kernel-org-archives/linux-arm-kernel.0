@@ -1,133 +1,51 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 04 May 2018 15:57:48 +0200
-Subject: [PATCH v2 09/10] ARM: dts: sun7i-a20: Add Video Engine and
- reserved memory nodes
-In-Reply-To: <20180504134033.wngpe5scyisreonn@flea>
-References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
- <20180419154536.17846-5-paul.kocialkowski@bootlin.com>
- <20180420073908.nkcbsdxibnzkqski@flea>
- <82057e2f734137a3902d9313c228b01ceb345ee7.camel@bootlin.com>
- <20180504084008.h6p4brari3xrbv6l@flea>
- <e8cd340605ab4db8ebf2888a4fce645e8bc481d0.camel@bootlin.com>
- <20180504091555.idgtzey53lozj2uh@flea>
- <fc064c3f1534a6082dc2b4e18454e054b53e5aee.camel@bootlin.com>
- <20180504134033.wngpe5scyisreonn@flea>
-Message-ID: <dd6b502c66aad1fe34eb0b16a1e44a4ebfd172f1.camel@bootlin.com>
+From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
+Date: Fri,  4 May 2018 09:21:34 -0500
+Subject: [PATCHv4 4/7] dt-bindings: fpga: add Stratix10 SoC FPGA manager
+ binding
+In-Reply-To: <1525443697-31009-1-git-send-email-richard.gong@linux.intel.com>
+References: <1525443697-31009-1-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1525443697-31009-5-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-05-04 at 15:40 +0200, Maxime Ripard wrote:
-> On Fri, May 04, 2018 at 02:04:38PM +0200, Paul Kocialkowski wrote:
-> > On Fri, 2018-05-04 at 11:15 +0200, Maxime Ripard wrote:
-> > > On Fri, May 04, 2018 at 10:47:44AM +0200, Paul Kocialkowski wrote:
-> > > > > > > > +			reg = <0x01c0e000 0x1000>;
-> > > > > > > > +			memory-region = <&ve_memory>;
-> > > > > > > 
-> > > > > > > Since you made the CMA region the default one, you don't
-> > > > > > > need
-> > > > > > > to
-> > > > > > > tie
-> > > > > > > it to that device in particular (and you can drop it being
-> > > > > > > mandatory
-> > > > > > > from your binding as well).
-> > > > > > 
-> > > > > > What if another driver (or the system) claims memory from
-> > > > > > that
-> > > > > > zone
-> > > > > > and
-> > > > > > that the reserved memory ends up not being available for the
-> > > > > > VPU
-> > > > > > anymore?
-> > > > > > 
-> > > > > > Acccording to the reserved-memory documentation, the
-> > > > > > reusable
-> > > > > > property
-> > > > > > (that we need for dmabuf) puts a limitation that the device
-> > > > > > driver
-> > > > > > owning the region must be able to reclaim it back.
-> > > > > > 
-> > > > > > How does that work out if the CMA region is not tied to a
-> > > > > > driver
-> > > > > > in
-> > > > > > particular?
-> > > > > 
-> > > > > I'm not sure to get what you're saying. You have the property
-> > > > > linux,cma-default in your reserved region, so the behaviour
-> > > > > you
-> > > > > described is what you explicitly asked for.
-> > > > 
-> > > > My point is that I don't see how the driver can claim back (part
-> > > > of)
-> > > > the
-> > > > reserved area if the area is not explicitly attached to it.
-> > > > 
-> > > > Or is that mechanism made in a way that all drivers wishing to
-> > > > use
-> > > > the
-> > > > reserved memory area can claim it back from the system, but
-> > > > there is
-> > > > no
-> > > > priority (other than first-come first-served) for which drivers
-> > > > claims
-> > > > it back in case two want to use the same reserved region (in a
-> > > > scenario
-> > > > where there isn't enough memory to allow both drivers)?
-> > > 
-> > > This is indeed what happens. Reusable is to let the system use the
-> > > reserved memory for things like caches that can easily be dropped
-> > > when
-> > > a driver wants to use the memory in that reserved area. Once that
-> > > memory has been allocated, there's no claiming back, unless that
-> > > memory segment was freed of course.
-> > 
-> > Thanks for the clarification. So in our case, perhaps the best fit
-> > would
-> > be to make that area the default CMA pool so that we can be ensured
-> > that
-> > the whole 96 MiB is available for the VPU and that no other consumer
-> > of
-> > CMA will use it?
-> 
-> The best fit for what use case ? We already discussed this, and I
-> don't see any point in having two separate CMA regions. If you have a
-> reasonably sized region that will accomodate for both the VPU and
-> display engine, why would we want to split them?
+From: Alan Tull <atull@kernel.org>
 
-The use case I have in mind is boilerplate use of the VPU with the
-display engine, say with DMAbuf.
+Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
 
-It wasn't exactly clear in my memory whether we had decided that the CMA
-pool we use for the VPU should also be used for other CMA consumers (I
-realize that this is what we've been doing all along by having
-linux,cma-default; though).
+Signed-off-by: Alan Tull <atull@kernel.org>
+Signed-off-by: Richard Gong <richard.gong@intel.com>
+---
+v2: this patch is added in patch set version 2
+v3: change to put fpga_mgr node under firmware/svc node
+v4: s/fpga-mgr at 0/fpga-mgr/ to remove unit_address
+    Add Richard's signed-off-by
+---
+ .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt      | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
 
-The fact that the memory region will accomodate for both the display
-engine and the VPU is not straightforward IMO and I think this has to be
-an explicit choice that we take. I was under the impression that we
-chose the 96 MiB because that's what the Allwinner reference code does.
-Does the reference code also use this pool for display?
-
-I liked the idea of having 96 MiB fully reserved to the VPU because it
-allows us to provide a limit on the use case, such as "this guarantees N
-buffers for resolution foo in format bar". If the display engine also
-uses it, then the limit also depends on how many GEM buffers are
-allocated (unless I'm missing something).
-
-> Or did you have any experience of running out of buffers?
-
-Not yet, I haven't. I have no objection with making the reserved region
-the default CMA pool and have other consumers use it too.
-
-Cheers,
-
+diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+new file mode 100644
+index 0000000..6e03f79
+--- /dev/null
++++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
+@@ -0,0 +1,17 @@
++Intel Stratix10 SoC FPGA Manager
++
++Required properties:
++The fpga_mgr node has the following mandatory property, must be located under
++firmware/svc node.
++
++- compatible : should contain "intel,stratix10-soc-fpga-mgr"
++
++Example:
++
++	firmware {
++		svc {
++			fpga_mgr: fpga-mgr {
++				compatible = "intel,stratix10-soc-fpga-mgr";
++			};
++		};
++	};
 -- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/84c48205/attachment.sig>
+2.7.4
