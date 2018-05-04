@@ -1,60 +1,75 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 4 May 2018 12:25:47 +0100
-Subject: [PATCH v1 03/13] drm/kms/mode/exynos-dsi: using helper func
- drm_display_mode_to_videomode for calculating timing parameters
-In-Reply-To: <1525421726-2817-1-git-send-email-satendra.t@samsung.com>
-References: <00b4a624-d2b6-dc6a-71c0-9c7642480a44@arm.com>
- <CGME20180504081613epcas5p405d342fe333975048175c4a360067f52@epcas5p4.samsung.com>
- <1525421726-2817-1-git-send-email-satendra.t@samsung.com>
-Message-ID: <920ac8d1-8d2d-1332-256d-21472f69fca5@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri,  4 May 2018 13:29:39 +0200
+Subject: [PATCH REPOST] ARM: smp: Move clear_tasks_mm_cpumask() call to
+ __cpu_die()
+Message-ID: <20180504112939.25493-1-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/18 09:15, Satendra Singh Thakur wrote:
-> To avoid duplicate logic for the same
-> 
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Please read section 13 of Documentation/process/submitting-patches.rst 
-for what this tag means; specifically, it is definitely not "this guy 
-read my patch".
+Suspending a CPU on a RT kernel results in the following backtrace:
 
-FWIW, in my case the patches I give trivial coding style comments on 
-tend to be the ones I'm specifically *not* in a position to review in a 
-technical capacity - the reason I'm looking at them in the first place 
-is out of interest to learn more about how the relevant subsystems work.
+| Disabling non-boot CPUs ...
+| BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+| in_atomic(): 1, irqs_disabled(): 128, pid: 18, name: migration/1
+| INFO: lockdep is turned off.
+| irq event stamp: 122
+| hardirqs last  enabled at (121): [<c06ac0ac>] _raw_spin_unlock_irqrestore+0x88/0x90
+| hardirqs last disabled at (122): [<c06abed0>] _raw_spin_lock_irq+0x28/0x5c
+|  CPU: 1 PID: 18 Comm: migration/1 Tainted: G        W       4.1.4-rt3-01046-g96ac8da #204
+| Hardware name: Generic DRA74X (Flattened Device Tree)
+| [<c0019134>] (unwind_backtrace) from [<c0014774>] (show_stack+0x20/0x24)
+| [<c0014774>] (show_stack) from [<c06a70f4>] (dump_stack+0x88/0xdc)
+| [<c06a70f4>] (dump_stack) from [<c006cab8>] (___might_sleep+0x198/0x2a8)
+| [<c006cab8>] (___might_sleep) from [<c06ac4dc>] (rt_spin_lock+0x30/0x70)
+| [<c06ac4dc>] (rt_spin_lock) from [<c013f790>] (find_lock_task_mm+0x9c/0x174)
+| [<c013f790>] (find_lock_task_mm) from [<c00409ac>] (clear_tasks_mm_cpumask+0xb4/0x1ac)
+| [<c00409ac>] (clear_tasks_mm_cpumask) from [<c00166a4>] (__cpu_disable+0x98/0xbc)
+| [<c00166a4>] (__cpu_disable) from [<c06a2e8c>] (take_cpu_down+0x1c/0x50)
+| [<c06a2e8c>] (take_cpu_down) from [<c00f2600>] (multi_cpu_stop+0x11c/0x158)
+| [<c00f2600>] (multi_cpu_stop) from [<c00f2a9c>] (cpu_stopper_thread+0xc4/0x184)
+| [<c00f2a9c>] (cpu_stopper_thread) from [<c0069058>] (smpboot_thread_fn+0x18c/0x324)
+| [<c0069058>] (smpboot_thread_fn) from [<c00649c4>] (kthread+0xe8/0x104)
+| [<c00649c4>] (kthread) from [<c0010058>] (ret_from_fork+0x14/0x3c)
+| CPU1: shutdown
 
-Robin.
+The root cause of above backtrace is task_lock() which takes a sleeping
+lock on -RT.
 
-> Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
-> Acked-by: Madhur Verma <madhur.verma@samsung.com>
-> Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
-> ---
->   drivers/gpu/drm/exynos/exynos_drm_dsi.c | 13 ++-----------
->   1 file changed, 2 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> index 7904ffa..7fe84fd 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> @@ -1490,17 +1490,8 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
->   				struct drm_display_mode *adjusted_mode)
->   {
->   	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
-> -	struct videomode *vm = &dsi->vm;
-> -	struct drm_display_mode *m = adjusted_mode;
-> -
-> -	vm->hactive = m->hdisplay;
-> -	vm->vactive = m->vdisplay;
-> -	vm->vfront_porch = m->vsync_start - m->vdisplay;
-> -	vm->vback_porch = m->vtotal - m->vsync_end;
-> -	vm->vsync_len = m->vsync_end - m->vsync_start;
-> -	vm->hfront_porch = m->hsync_start - m->hdisplay;
-> -	vm->hback_porch = m->htotal - m->hsync_end;
-> -	vm->hsync_len = m->hsync_end - m->hsync_start;
-> +
-> +	drm_display_mode_to_videomode(adjusted_mode, &dsi->vm);
->   }
->   
->   static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
-> 
+To fix the issue, move clear_tasks_mm_cpumask() call from __cpu_disable()
+to __cpu_die() which is called on the thread which is asking for a target
+CPU to be shutdown. In addition, this change restores CPU hotplug
+functionality on ARM CPU1 can be unplugged/plugged many times.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Link: http://lkml.kernel.org/r/1441995683-30817-1-git-send-email-grygorii.strashko at ti.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+[bigeasy: slighty edited the commit message]
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/kernel/smp.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -236,8 +236,6 @@ int __cpu_disable(void)
+ 	flush_cache_louis();
+ 	local_flush_tlb_all();
+ 
+-	clear_tasks_mm_cpumask(cpu);
+-
+ 	return 0;
+ }
+ 
+@@ -255,6 +253,7 @@ void __cpu_die(unsigned int cpu)
+ 	}
+ 	pr_debug("CPU%u: shutdown\n", cpu);
+ 
++	clear_tasks_mm_cpumask(cpu);
+ 	/*
+ 	 * platform_cpu_kill() is generally expected to do the powering off
+ 	 * and/or cutting of clocks to the dying CPU.  Optionally, this may
