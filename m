@@ -1,57 +1,55 @@
-From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Fri,  4 May 2018 09:21:35 -0500
-Subject: [PATCHv4 5/7] arm64: dts: stratix10: add fpga manager and region
-In-Reply-To: <1525443697-31009-1-git-send-email-richard.gong@linux.intel.com>
-References: <1525443697-31009-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1525443697-31009-6-git-send-email-richard.gong@linux.intel.com>
+From: david@lechnology.com (David Lechner)
+Date: Fri,  4 May 2018 09:24:26 -0500
+Subject: [PATCH] clk: davinci: pll-dm355: fix SYSCLKn parent names
+Message-ID: <20180504142426.4764-1-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alan Tull <atull@kernel.org>
+This fixes the parent clock names of the SYSCLKn clocks for the DM355
+SoC in the TI DaVinici PLL clock driver.
 
-Add the Stratix10 FPGA manager and a FPGA region to the
-device tree.
+It appears that this name just didn't get updated to the correct name
+like the other SoCs during the driver's development.
 
-Signed-off-by: Alan Tull <atull@kernel.org>
-Signed-off-by: Richard Gong <richard.gong@intel.com>
+Reported-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: David Lechner <david@lechnology.com>
 ---
-v2: this patch is added in patch set version 2
-v3: change to put fpga_mgr node under firmware/svc node
-v4: s/fpga-mgr at 0/fpga-mgr/ to remove unit_address
-    Add Richard's signed-off-by
----
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-index 985b9e5..9e32607 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -106,6 +106,14 @@
- 		interrupt-parent = <&intc>;
- 		ranges = <0 0 0 0xffffffff>;
+Sekhar, can you please test to make sure this works?
+
+
+ drivers/clk/davinci/pll-dm355.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clk/davinci/pll-dm355.c b/drivers/clk/davinci/pll-dm355.c
+index a0cff4212ac3..13dc6b8ea97a 100644
+--- a/drivers/clk/davinci/pll-dm355.c
++++ b/drivers/clk/davinci/pll-dm355.c
+@@ -22,10 +22,10 @@ static const struct davinci_pll_clk_info dm355_pll1_info = {
+ 		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
+ };
  
-+		base_fpga_region {
-+			#address-cells = <0x1>;
-+			#size-cells = <0x1>;
-+
-+			compatible = "fpga-region";
-+			fpga-mgr = <&fpga_mgr>;
-+		};
-+
- 		clkmgr: clock-controller at ffd10000 {
- 			compatible = "intel,stratix10-clkmgr";
- 			reg = <0xffd10000 0x1000>;
-@@ -473,6 +481,10 @@
- 				compatible = "intel,stratix10-svc";
- 				method = "smc";
- 				memory-region = <&service_reserved>;
-+
-+				fpga_mgr: fpga-mgr {
-+					compatible = "intel,stratix10-soc-fpga-mgr";
-+				};
- 			};
- 		};
- 	};
+-SYSCLK(1, pll1_sysclk1, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+-SYSCLK(2, pll1_sysclk2, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+-SYSCLK(3, pll1_sysclk3, pll1, 5, SYSCLK_ALWAYS_ENABLED);
+-SYSCLK(4, pll1_sysclk4, pll1, 5, SYSCLK_ALWAYS_ENABLED);
++SYSCLK(1, pll1_sysclk1, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
++SYSCLK(2, pll1_sysclk2, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
++SYSCLK(3, pll1_sysclk3, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
++SYSCLK(4, pll1_sysclk4, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
+ 
+ int dm355_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
+ {
+@@ -62,8 +62,8 @@ static const struct davinci_pll_clk_info dm355_pll2_info = {
+ 		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
+ };
+ 
+-SYSCLK(1, pll2_sysclk1, pll2, 5, SYSCLK_FIXED_DIV);
+-SYSCLK(2, pll2_sysclk2, pll2, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
++SYSCLK(1, pll2_sysclk1, pll2_pllen, 5, SYSCLK_FIXED_DIV);
++SYSCLK(2, pll2_sysclk2, pll2_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+ 
+ int dm355_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
+ {
 -- 
-2.7.4
+2.17.0
