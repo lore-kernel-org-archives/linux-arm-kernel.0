@@ -1,56 +1,177 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 4 May 2018 09:52:38 +0200
-Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add CAN-FD support
-In-Reply-To: <f07c00b3-228c-e0d2-f7fe-38b8e9f25a4d@cogentembedded.com>
-References: <c184f961-2f98-532f-ed02-6f3751256d9c@cogentembedded.com>
- <f07c00b3-228c-e0d2-f7fe-38b8e9f25a4d@cogentembedded.com>
-Message-ID: <CAMuHMdWFLC=kyHKVuq4KByO=KFf2eHvXu0_g2HqGoZT7gKkNDA@mail.gmail.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Fri, 04 May 2018 09:56:20 +0200
+Subject: [PATCH v2 08/10] dt-bindings: media: Document bindings for the
+ Sunxi-Cedrus VPU driver
+In-Reply-To: <20180427030436.3ptrb2ldhtnssipj@rob-hp-laptop>
+References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+ <20180419154536.17846-4-paul.kocialkowski@bootlin.com>
+ <1524153860.3416.9.camel@pengutronix.de>
+ <CAAFQd5DT_xjUbZzFOoKk7_duiSZ8Awb1J=0dPEhVTBk0P3gppA@mail.gmail.com>
+ <5fa80b1e88ad2a215f51ea3a2b9b62274fa9b1ec.camel@bootlin.com>
+ <20180427030436.3ptrb2ldhtnssipj@rob-hp-laptop>
+Message-ID: <ce85c790b639bf9101b8c33526bdf149070bcc03.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi,
 
-On Fri, Apr 27, 2018 at 9:12 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Define the generic R8A77980 part of the CAN-FD device node.
->
-> Based on the original (and large) patch by Vladimir Barinov.
->
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Thu, 2018-04-26 at 22:04 -0500, Rob Herring wrote:
+> On Fri, Apr 20, 2018 at 09:22:20AM +0200, Paul Kocialkowski wrote:
+> > Hi and thanks for the review,
+> > 
+> > On Fri, 2018-04-20 at 01:31 +0000, Tomasz Figa wrote:
+> > > Hi Paul, Philipp,
+> > > 
+> > > On Fri, Apr 20, 2018 at 1:04 AM Philipp Zabel <p.zabel@pengutronix
+> > > .de>
+> > > wrote:
+> > > 
+> > > > Hi Paul,
+> > > > On Thu, 2018-04-19 at 17:45 +0200, Paul Kocialkowski wrote:
+> > > > > This adds a device-tree binding document that specifies the
+> > > > > properties
+> > > > > used by the Sunxi-Cedurs VPU driver, as well as examples.
+> > > > > 
+> > > > > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.co
+> > > > > m>
+> > > > > ---
+> > > > >  .../devicetree/bindings/media/sunxi-cedrus.txt     | 50
+> > > 
+> > > ++++++++++++++++++++++
+> > > > >  1 file changed, 50 insertions(+)
+> > > > >  create mode 100644
+> > > 
+> > > Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> > > > > 
+> > > > > diff --git a/Documentation/devicetree/bindings/media/sunxi-
+> > > > > cedrus.txt
+> > > 
+> > > b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> > > > > new file mode 100644
+> > > > > index 000000000000..71ad3f9c3352
+> > > > > --- /dev/null
+> > > > > +++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> > > > > @@ -0,0 +1,50 @@
+> > > > > +Device-tree bindings for the VPU found in Allwinner SoCs,
+> > > > > referred to
+> > > 
+> > > as the
+> > > > > +Video Engine (VE) in Allwinner literature.
+> > > > > +
+> > > > > +The VPU can only access the first 256 MiB of DRAM, that are
+> > > > > DMA-
+> > > > > mapped
+> > > 
+> > > starting
+> > > > > +from the DRAM base. This requires specific memory allocation
+> > > > > and
+> > > 
+> > > handling.
+> > > 
+> > > And no IOMMU? Brings back memories.
+> > 
+> > Exactly, no IOMMU so we don't have much choice but cope with that
+> > hardware limitation...
+> > 
+> > > > > +
+> > > > > +Required properties:
+> > > > > +- compatible         : "allwinner,sun4i-a10-video-engine";
+> > > > > +- memory-region         : DMA pool for buffers allocation;
+> > > > > +- clocks             : list of clock specifiers,
+> > > > > corresponding to
+> > > 
+> > > entries in
+> > > > > +                          the clock-names property;
+> > > > > +- clock-names                : should contain "ahb", "mod"
+> > > > > and
+> > > > > "ram"
+> > > 
+> > > entries;
+> > > > > +- assigned-clocks       : list of clocks assigned to the VE;
+> > > > > +- assigned-clocks-rates : list of clock rates for the clocks
+> > > > > assigned
+> > > 
+> > > to the VE;
+> > > > > +- resets             : phandle for reset;
+> > > > > +- interrupts         : should contain VE interrupt number;
+> > > > > +- reg                        : should contain register base
+> > > > > and
+> > > > > length
+> > > 
+> > > of VE.
+> > > > > +
+> > > > > +Example:
+> > > > > +
+> > > > > +reserved-memory {
+> > > > > +     #address-cells = <1>;
+> > > > > +     #size-cells = <1>;
+> > > > > +     ranges;
+> > > > > +
+> > > > > +     /* Address must be kept in the lower 256 MiBs of DRAM
+> > > > > for
+> > > > > VE. */
+> > > > > +     ve_memory: cma at 4a000000 {
+> > > > > +             compatible = "shared-dma-pool";
+> > > > > +             reg = <0x4a000000 0x6000000>;
+> > > > > +             no-map;
+> > > > > +             linux,cma-default;
+> > > > > +     };
+> > > > > +};
+> > > > > +
+> > > > > +video-engine at 1c0e000 {
+> > > > 
+> > > > This is not really required by any specification, and not as
+> > > > common
+> > > > as
+> > > > gpu at ..., but could this reasonably be called "vpu at 1c0e000" to
+> > > > follow
+> > > > somewhat-common practice?
+> > > 
+> > > AFAIR the name is supposed to be somewhat readable for someone
+> > > that
+> > > doesn't know the hardware. To me, "video-engine" sounds more
+> > > obvious
+> > > than "vpu", but we actually use "codec" already, in case of MFC
+> > > and
+> > > JPEG codec on Exynos. If encode/decode is the only functionality
+> > > of
+> > > this block, I'd personally go with "codec". If it can do other
+> > > things,
+> > > e.g. scaling/rotation without encode/decode, I'd probably call it
+> > > "video-processor".
+> > 
+> > I agree that the term VPU is more commonly associated with video
+> > decoding, while video engine could mean a number of things.
+> > 
+> > The reason I went with "video-engine" here (while still presenting
+> > the
+> > driver as a VPU driver) is that Video Engine is the term used in
+> > Allwinner's litterature. Other nodes in Allwinner device-trees
+> > generally
+> > stick to these terms (for instance, we have "display-engine" nodes).
+> > This also makes it easier to find the matching parts in the
+> > documentation.
+> 
+> 'video-codec' is what is defined in the DT spec.
 
-Thanks for your patch!
+Is that an actively-enforced guideline or a suggestion? I'd like to keep
+video-engine just to stick with the technical documentation wording and
+my personal taste is also to prefer vpu over video-codec (in terms of
+clarity/straightforwardness) as a second choice.
 
-> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-=
-> @@ -170,6 +177,30 @@
->                         status = "disabled";
->                 };
->
-> +               canfd: can at e66c0000 {
-> +                       compatible = "renesas,r8a77980-canfd",
-> +                                    "renesas,rcar-gen3-canfd";
-> +                       reg = <0 0xe66c0000 0 0x8000>;
-> +                       interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&cpg CPG_MOD 914>,
-> +                                <&cpg CPG_CORE R8A77980_CLK_CANFD>,
-> +                                <&can_clk>;
-> +                       clock-names = "fck", "canfd", "can_clk";
-> +                       assigned-clocks = <&cpg CPG_CORE R8A77980_CLK_CANFD>;
-> +                       assigned-clock-rates = <40000000>;
-> +                       power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+Still, if the choice isn't up to me, we can go with video-codec (or
+vpu).
 
-You forgot the resets property.
-
-Gr{oetje,eeting}s,
-
-                        Geert
+Cheers,
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/5bbb8dfd/attachment.sig>
