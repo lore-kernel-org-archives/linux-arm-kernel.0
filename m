@@ -1,436 +1,78 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 4 May 2018 11:35:07 -0600
-Subject: [PATCH v2 13/27] coresight: Add generic TMC sg table framework
-In-Reply-To: <1525165857-11096-14-git-send-email-suzuki.poulose@arm.com>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-14-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180504173507.GA5981@xps15>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  4 May 2018 18:39:35 +0100
+Subject: [PATCH 4/6] arm64: fix assembly constraints for cmpxchg
+In-Reply-To: <20180504173937.25300-1-mark.rutland@arm.com>
+References: <20180504173937.25300-1-mark.rutland@arm.com>
+Message-ID: <20180504173937.25300-5-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 10:10:43AM +0100, Suzuki K Poulose wrote:
-> This patch introduces a generic sg table data structure and
-> associated operations. An SG table can be used to map a set
-> of Data pages where the trace data could be stored by the TMC
-> ETR. The information about the data pages could be stored in
-> different formats, depending on the type of the underlying
-> SG mechanism (e.g, TMC ETR SG vs Coresight CATU). The generic
-> structure provides book keeping of the pages used for the data
-> as well as the table contents. The table should be filled by
-> the user of the infrastructure.
-> 
-> A table can be created by specifying the number of data pages
-> as well as the number of table pages required to hold the
-> pointers, where the latter could be different for different
-> types of tables. The pages are mapped in the appropriate dma
-> data direction mode (i.e, DMA_TO_DEVICE for table pages
-> and DMA_FROM_DEVICE for data pages).  The framework can optionally
-> accept a set of allocated data pages (e.g, perf ring buffer) and
-> map them accordingly. The table and data pages are vmap'ed to allow
-> easier access by the drivers. The framework also provides helpers to
-> sync the data written to the pages with appropriate directions.
-> 
-> This will be later used by the TMC ETR SG unit and CATU.
-> 
-> Cc: Mathieu Poirier <matheiu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etr.c | 284 ++++++++++++++++++++++++
->  drivers/hwtracing/coresight/coresight-tmc.h     |  50 +++++
->  2 files changed, 334 insertions(+)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 7af72d7..57a8fe1 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -17,10 +17,294 @@
->  
->  #include <linux/coresight.h>
->  #include <linux/dma-mapping.h>
-> +#include <linux/slab.h>
->  #include "coresight-catu.h"
->  #include "coresight-priv.h"
->  #include "coresight-tmc.h"
->  
-> +/*
-> + * tmc_pages_get_offset:  Go through all the pages in the tmc_pages
-> + * and map the device address @addr to an offset within the virtual
-> + * contiguous buffer.
-> + */
-> +static long
-> +tmc_pages_get_offset(struct tmc_pages *tmc_pages, dma_addr_t addr)
-> +{
-> +	int i;
-> +	dma_addr_t page_start;
-> +
-> +	for (i = 0; i < tmc_pages->nr_pages; i++) {
-> +		page_start = tmc_pages->daddrs[i];
-> +		if (addr >= page_start && addr < (page_start + PAGE_SIZE))
-> +			return i * PAGE_SIZE + (addr - page_start);
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +/*
-> + * tmc_pages_free : Unmap and free the pages used by tmc_pages.
-> + */
-> +static void tmc_pages_free(struct tmc_pages *tmc_pages,
-> +			   struct device *dev, enum dma_data_direction dir)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < tmc_pages->nr_pages; i++) {
-> +		if (tmc_pages->daddrs && tmc_pages->daddrs[i])
-> +			dma_unmap_page(dev, tmc_pages->daddrs[i],
-> +					 PAGE_SIZE, dir);
-> +		if (tmc_pages->pages && tmc_pages->pages[i])
-> +			__free_page(tmc_pages->pages[i]);
+Our LL/SC cmpxchg assembly uses "Lr" as the constraint for old, which
+allows either an integer constant suitable for a 64-bit logical
+oepration, or a register.
 
-I think it's worth adding a comment saying that because of the page count, pages
-given to the infracstructure (rather than allocated) won't be free'ed by
-__free_page().
+However, this assembly is also used for 32-bit cases (where we
+explicitly add a 'w' prefix to the output format), where the set of
+valid immediates differ, and we should use a 'Kr' constraint.
 
-> +	}
-> +
-> +	kfree(tmc_pages->pages);
-> +	kfree(tmc_pages->daddrs);
-> +	tmc_pages->pages = NULL;
-> +	tmc_pages->daddrs = NULL;
-> +	tmc_pages->nr_pages = 0;
-> +}
-> +
-> +/*
-> + * tmc_pages_alloc : Allocate and map pages for a given @tmc_pages.
-> + * If @pages is not NULL, the list of page virtual addresses are
-> + * used as the data pages. The pages are then dma_map'ed for @dev
-> + * with dma_direction @dir.
-> + *
-> + * Returns 0 upon success, else the error number.
-> + */
-> +static int tmc_pages_alloc(struct tmc_pages *tmc_pages,
-> +			   struct device *dev, int node,
-> +			   enum dma_data_direction dir, void **pages)
-> +{
-> +	int i, nr_pages;
-> +	dma_addr_t paddr;
-> +	struct page *page;
-> +
-> +	nr_pages = tmc_pages->nr_pages;
-> +	tmc_pages->daddrs = kcalloc(nr_pages, sizeof(*tmc_pages->daddrs),
-> +					 GFP_KERNEL);
-> +	if (!tmc_pages->daddrs)
-> +		return -ENOMEM;
-> +	tmc_pages->pages = kcalloc(nr_pages, sizeof(*tmc_pages->pages),
-> +					 GFP_KERNEL);
-> +	if (!tmc_pages->pages) {
-> +		kfree(tmc_pages->daddrs);
-> +		tmc_pages->daddrs = NULL;
-> +		return -ENOMEM;
-> +	}
-> +
-> +	for (i = 0; i < nr_pages; i++) {
-> +		if (pages && pages[i]) {
-> +			page = virt_to_page(pages[i]);
-> +			get_page(page);
-> +		} else {
-> +			page = alloc_pages_node(node,
-> +						GFP_KERNEL | __GFP_ZERO, 0);
-> +		}
-> +		paddr = dma_map_page(dev, page, 0, PAGE_SIZE, dir);
-> +		if (dma_mapping_error(dev, paddr))
-> +			goto err;
-> +		tmc_pages->daddrs[i] = paddr;
-> +		tmc_pages->pages[i] = page;
-> +	}
-> +	return 0;
-> +err:
-> +	tmc_pages_free(tmc_pages, dev, dir);
-> +	return -ENOMEM;
-> +}
-> +
-> +static inline dma_addr_t tmc_sg_table_base_paddr(struct tmc_sg_table *sg_table)
-> +{
-> +	if (WARN_ON(!sg_table->data_pages.pages[0]))
-> +		return 0;
-> +	return sg_table->table_daddr;
-> +}
-> +
-> +static inline void *tmc_sg_table_base_vaddr(struct tmc_sg_table *sg_table)
-> +{
-> +	if (WARN_ON(!sg_table->data_pages.pages[0]))
-> +		return NULL;
-> +	return sg_table->table_vaddr;
-> +}
-> +
-> +static inline void *
-> +tmc_sg_table_data_vaddr(struct tmc_sg_table *sg_table)
-> +{
-> +	if (WARN_ON(!sg_table->data_pages.nr_pages))
-> +		return 0;
-> +	return sg_table->data_vaddr;
-> +}
-> +
-> +static inline long
-> +tmc_sg_get_data_page_offset(struct tmc_sg_table *sg_table, dma_addr_t addr)
-> +{
-> +	return tmc_pages_get_offset(&sg_table->data_pages, addr);
-> +}
-> +
-> +static inline void tmc_free_table_pages(struct tmc_sg_table *sg_table)
-> +{
-> +	if (sg_table->table_vaddr)
-> +		vunmap(sg_table->table_vaddr);
-> +	tmc_pages_free(&sg_table->table_pages, sg_table->dev, DMA_TO_DEVICE);
-> +}
-> +
-> +static void tmc_free_data_pages(struct tmc_sg_table *sg_table)
-> +{
-> +	if (sg_table->data_vaddr)
-> +		vunmap(sg_table->data_vaddr);
-> +	tmc_pages_free(&sg_table->data_pages, sg_table->dev, DMA_FROM_DEVICE);
-> +}
-> +
-> +void tmc_free_sg_table(struct tmc_sg_table *sg_table)
-> +{
-> +	tmc_free_table_pages(sg_table);
-> +	tmc_free_data_pages(sg_table);
-> +}
-> +
-> +/*
-> + * Alloc pages for the table. Since this will be used by the device,
-> + * allocate the pages closer to the device (i.e, dev_to_node(dev)
-> + * rather than the CPU node).
-> + */
-> +static int tmc_alloc_table_pages(struct tmc_sg_table *sg_table)
-> +{
-> +	int rc;
-> +	struct tmc_pages *table_pages = &sg_table->table_pages;
-> +
-> +	rc = tmc_pages_alloc(table_pages, sg_table->dev,
-> +			     dev_to_node(sg_table->dev),
-> +			     DMA_TO_DEVICE, NULL);
-> +	if (rc)
-> +		return rc;
-> +	sg_table->table_vaddr = vmap(table_pages->pages,
-> +				     table_pages->nr_pages,
-> +				     VM_MAP,
-> +				     PAGE_KERNEL);
-> +	if (!sg_table->table_vaddr)
-> +		rc = -ENOMEM;
-> +	else
-> +		sg_table->table_daddr = table_pages->daddrs[0];
-> +	return rc;
-> +}
-> +
-> +static int tmc_alloc_data_pages(struct tmc_sg_table *sg_table, void **pages)
-> +{
-> +	int rc;
-> +
-> +	/* Allocate data pages on the node requested by the caller */
-> +	rc = tmc_pages_alloc(&sg_table->data_pages,
-> +			     sg_table->dev, sg_table->node,
-> +			     DMA_FROM_DEVICE, pages);
-> +	if (!rc) {
-> +		sg_table->data_vaddr = vmap(sg_table->data_pages.pages,
-> +					   sg_table->data_pages.nr_pages,
-> +					   VM_MAP,
-> +					   PAGE_KERNEL);
+In some cases, this can result in build failures, when GCC selects an
+immediate which is valid for a 64-bit logical operation, but we try to
+assemble a 32-bit logical operation:
 
-Indentation.
+[mark at lakrids:~/src/linux]% uselinaro 17.05 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- net/sunrpc/auth_gss/svcauth_gss.o
+  CHK     include/config/kernel.release
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+  CHK     include/generated/bounds.h
+  CHK     include/generated/timeconst.h
+  CHK     include/generated/asm-offsets.h
+  CALL    scripts/checksyscalls.sh
+  CHK     scripts/mod/devicetable-offsets.h
+  CC      net/sunrpc/auth_gss/svcauth_gss.o
+/tmp/ccj04KVh.s: Assembler messages:
+/tmp/ccj04KVh.s:325: Error: immediate out of range at operand 3 -- `eor w2,w1,4294967295'
+scripts/Makefile.build:324: recipe for target 'net/sunrpc/auth_gss/svcauth_gss.o' failed
+make[1]: *** [net/sunrpc/auth_gss/svcauth_gss.o] Error 1
+Makefile:1704: recipe for target 'net/sunrpc/auth_gss/svcauth_gss.o' failed
+make: *** [net/sunrpc/auth_gss/svcauth_gss.o] Error 2
 
-> +		if (!sg_table->data_vaddr)
-> +			rc = -ENOMEM;
-> +	}
-> +	return rc;
-> +}
-> +
-> +/*
-> + * tmc_alloc_sg_table: Allocate and setup dma pages for the TMC SG table
-> + * and data buffers. TMC writes to the data buffers and reads from the SG
-> + * Table pages.
-> + *
-> + * @dev		- Device to which page should be DMA mapped.
-> + * @node	- Numa node for mem allocations
-> + * @nr_tpages	- Number of pages for the table entries.
-> + * @nr_dpages	- Number of pages for Data buffer.
-> + * @pages	- Optional list of virtual address of pages.
-> + */
-> +struct tmc_sg_table *tmc_alloc_sg_table(struct device *dev,
-> +					int node,
-> +					int nr_tpages,
-> +					int nr_dpages,
-> +					void **pages)
-> +{
-> +	long rc;
-> +	struct tmc_sg_table *sg_table;
-> +
-> +	sg_table = kzalloc(sizeof(*sg_table), GFP_KERNEL);
-> +	if (!sg_table)
-> +		return ERR_PTR(-ENOMEM);
-> +	sg_table->data_pages.nr_pages = nr_dpages;
-> +	sg_table->table_pages.nr_pages = nr_tpages;
-> +	sg_table->node = node;
-> +	sg_table->dev = dev;
-> +
-> +	rc  = tmc_alloc_data_pages(sg_table, pages);
-> +	if (!rc)
-> +		rc = tmc_alloc_table_pages(sg_table);
-> +	if (rc) {
-> +		tmc_free_sg_table(sg_table);
-> +		kfree(sg_table);
-> +		return ERR_PTR(rc);
-> +	}
-> +
-> +	return sg_table;
-> +}
-> +
-> +/*
-> + * tmc_sg_table_sync_data_range: Sync the data buffer written
-> + * by the device from @offset upto a @size bytes.
-> + */
-> +void tmc_sg_table_sync_data_range(struct tmc_sg_table *table,
-> +				  u64 offset, u64 size)
-> +{
-> +	int i, index, start;
-> +	int npages = DIV_ROUND_UP(size, PAGE_SIZE);
-> +	struct device *dev = table->dev;
-> +	struct tmc_pages *data = &table->data_pages;
-> +
-> +	start = offset >> PAGE_SHIFT;
-> +	for (i = start; i < (start + npages); i++) {
-> +		index = i % data->nr_pages;
-> +		dma_sync_single_for_cpu(dev, data->daddrs[index],
-> +					PAGE_SIZE, DMA_FROM_DEVICE);
-> +	}
-> +}
-> +
-> +/* tmc_sg_sync_table: Sync the page table */
-> +void tmc_sg_table_sync_table(struct tmc_sg_table *sg_table)
-> +{
-> +	int i;
-> +	struct device *dev = sg_table->dev;
-> +	struct tmc_pages *table_pages = &sg_table->table_pages;
-> +
-> +	for (i = 0; i < table_pages->nr_pages; i++)
-> +		dma_sync_single_for_device(dev, table_pages->daddrs[i],
-> +					   PAGE_SIZE, DMA_TO_DEVICE);
-> +}
-> +
-> +/*
-> + * tmc_sg_table_get_data: Get the buffer pointer for data @offset
-> + * in the SG buffer. The @bufpp is updated to point to the buffer.
-> + * Returns :
-> + *	the length of linear data available at @offset.
-> + *	or
-> + *	<= 0 if no data is available.
-> + */
-> +ssize_t tmc_sg_table_get_data(struct tmc_sg_table *sg_table,
-> +				u64 offset, size_t len, char **bufpp)
+Note that today we largely avoid the specific failure above because GCC
+happens to already have the value in a register, and in most cases uses
+that rather than generating the immediate. The following code added to
+an arbitrary file will cause the same failure:
 
-Indentation
+unsigned int test_cmpxchg(unsigned int *l)
+{
+       return cmpxchg(l, -1, 0);
+}
 
-> +{
-> +	size_t size;
-> +	int pg_idx = offset >> PAGE_SHIFT;
-> +	int pg_offset = offset & (PAGE_SIZE - 1);
-> +	struct tmc_pages *data_pages = &sg_table->data_pages;
-> +
-> +	size = tmc_sg_table_buf_size(sg_table);
-> +	if (offset >= size)
-> +		return -EINVAL;
+While it would seem that we could conditionally use the 'K' constraint,
+this seems to be handled erroneously by GCC (at least versions 6.3 and
+7.1), with the same immediates being used, despite not being permitted
+for 32-bit logical operations.
 
-        /* Make sure we don't go beyond the page array */
+Thus we must avoid the use of an immediate in order to prevent failures
+as above.
 
-> +	len = (len < (size - offset)) ? len : size - offset;
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/atomic_ll_sc.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-        /* Respect page boundaries */
-
-> +	len = (len < (PAGE_SIZE - pg_offset)) ? len : (PAGE_SIZE - pg_offset);
-> +	if (len > 0)
-> +		*bufpp = page_address(data_pages->pages[pg_idx]) + pg_offset;
-> +	return len;
-> +}
-> +
->  static inline void tmc_etr_enable_catu(struct tmc_drvdata *drvdata)
->  {
->  	struct coresight_device *catu = tmc_etr_get_catu_device(drvdata);
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-> index 9cbc4d5..74d8f24 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.h
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-> @@ -19,6 +19,7 @@
->  #define _CORESIGHT_TMC_H
->  
->  #include <linux/miscdevice.h>
-> +#include <linux/dma-mapping.h>
-
-Alphabetial order.
-
->  #include "coresight-catu.h"
->  
->  #define TMC_RSZ			0x004
-> @@ -172,6 +173,38 @@ struct tmc_drvdata {
->  	u32			etr_caps;
->  };
->  
-> +/**
-> + * struct tmc_pages - Collection of pages used for SG.
-> + * @nr_pages:		Number of pages in the list.
-> + * @daddrs:		Array of DMA'able page address.
-> + * @pages:		Array pages for the buffer.
-> + */
-> +struct tmc_pages {
-> +	int nr_pages;
-> +	dma_addr_t	*daddrs;
-> +	struct page	**pages;
-> +};
-> +
-> +/*
-> + * struct tmc_sg_table - Generic SG table for TMC
-> + * @dev:		Device for DMA allocations
-> + * @table_vaddr:	Contiguous Virtual address for PageTable
-> + * @data_vaddr:		Contiguous Virtual address for Data Buffer
-> + * @table_daddr:	DMA address of the PageTable base
-> + * @node:		Node for Page allocations
-> + * @table_pages:	List of pages & dma address for Table
-> + * @data_pages:		List of pages & dma address for Data
-> + */
-> +struct tmc_sg_table {
-> +	struct device *dev;
-> +	void *table_vaddr;
-> +	void *data_vaddr;
-> +	dma_addr_t table_daddr;
-> +	int node;
-> +	struct tmc_pages table_pages;
-> +	struct tmc_pages data_pages;
-> +};
-> +
->  /* Generic functions */
->  void tmc_wait_for_tmcready(struct tmc_drvdata *drvdata);
->  void tmc_flush_and_stop(struct tmc_drvdata *drvdata);
-> @@ -253,4 +286,21 @@ tmc_etr_get_catu_device(struct tmc_drvdata *drvdata)
->  	return NULL;
->  }
->  
-> +struct tmc_sg_table *tmc_alloc_sg_table(struct device *dev,
-> +					int node,
-> +					int nr_tpages,
-> +					int nr_dpages,
-> +					void **pages);
-> +void tmc_free_sg_table(struct tmc_sg_table *sg_table);
-> +void tmc_sg_table_sync_table(struct tmc_sg_table *sg_table);
-> +void tmc_sg_table_sync_data_range(struct tmc_sg_table *table,
-> +				  u64 offset, u64 size);
-> +ssize_t tmc_sg_table_get_data(struct tmc_sg_table *sg_table,
-> +			      u64 offset, size_t len, char **bufpp);
-> +static inline unsigned long
-> +tmc_sg_table_buf_size(struct tmc_sg_table *sg_table)
-> +{
-> +	return sg_table->data_pages.nr_pages << PAGE_SHIFT;
-> +}
-> +
->  #endif
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
+index f5a2d09afb38..3175f4982682 100644
+--- a/arch/arm64/include/asm/atomic_ll_sc.h
++++ b/arch/arm64/include/asm/atomic_ll_sc.h
+@@ -267,7 +267,7 @@ __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
+ 	"2:"								\
+ 	: [tmp] "=&r" (tmp), [oldval] "=&r" (oldval),			\
+ 	  [v] "+Q" (*(unsigned long *)ptr)				\
+-	: [old] "Lr" (old), [new] "r" (new)				\
++	: [old] "r" (old), [new] "r" (new)				\
+ 	: cl);								\
+ 									\
+ 	return oldval;							\
+-- 
+2.11.0
