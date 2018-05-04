@@ -1,94 +1,106 @@
-From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Fri,  4 May 2018 09:21:30 -0500
-Subject: [PATCHv4 0/7] Add Intel Stratix10 FPGA manager and service layer
-Message-ID: <1525443697-31009-1-git-send-email-richard.gong@linux.intel.com>
+From: antoine.tenart@bootlin.com (Antoine Tenart)
+Date: Fri,  4 May 2018 15:56:40 +0200
+Subject: [PATCH net-next v2 10/13] arm64: dts: marvell: mcbin: add 10G SFP
+ support
+In-Reply-To: <20180504135643.23466-1-antoine.tenart@bootlin.com>
+References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
+Message-ID: <20180504135643.23466-11-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Gong <richard.gong@intel.com>
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-This is the 4th submission of Intel stratix10 service layer patches. Intel
-Stratix10 FPGA manager, which is 1st Stratix10 service layer client, is
-included in this submission.
+This patch adds the SFP cage description in the Marvell Armada 8040
+mcbin, for both 10G interfaces.
 
-Stratix10 service layer patches have been reviewed internally by Alan Tull
-and other colleagues at Intel.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+[Antoine: small reworks, commit message]
+Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+---
+ .../boot/dts/marvell/armada-8040-mcbin.dts    | 38 +++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-Some features of the Intel Stratix10 SoC require a level of privilege
-higher than the kernel is granted. Such secure features include
-FPGA programming. In terms of the ARMv8 architecture, the kernel runs
-at Exception Level 1 (EL1), access to the features requires
-Exception Level 3 (EL3).
-
-The Intel Stratix10 service layer provides an in kernel API for drivers to
-request access to the secure features. The requests are queued and
-processed one by one. ARM?s SMCCC is used to pass the execution of the
-requests on to a secure monitor (EL3).
-
-Later the Intel Stratix10 service layer driver will be extended to provide
-services for QSPI, Crypto and warm reset.
-
-v2: add patches for FPGA manager, FPGA manager binding, dts and defconfig
-    remove intel-service subdirectory and intel-service.h, move intel-smc.h
-    and intel-service.c to driver/misc subdirectory
-    remove global variables
-    change service layer driver be 'default n'
-    correct SPDX markers
-    add timeout for do..while() loop
-    add kernel-doc for the functions and structs, correct multiline comments
-    replace kfifo_in/kfifo_out with kfifo_in_spinlocked/kfifo_out_spinlocked
-    rename struct intel_svc_data (at client header) to intel_svc_client_msg
-    rename struct intel_svc_private_mem to intel_svc_data
-    other corrections/changes from Intel internal code reviews
-v3: change all exported functions with "intel_svc_" as the prefix
-    increase timeout values for claiming back submitted buffer(s)
-    rename struct intel_command_reconfig_payload to
-    struct intel_svc_command_reconfig_payload
-    add pr_err() to provide the error return value
-    change to put fpga_mgr node under firmware/svc node
-    change to FPGA manager to align the update of service client APIs, and the
-    update of fpga_mgr device node
-    Other corrections/changes
-v4: s/intel/stratix10/ on some variables, structs, functions, and file names
-    intel-service.c -> stratix10-svc.c
-    intel-smc.h -> stratix10-smc.h
-    intel-service-client.h -> stratix10-svc-client.h
-    remove non-kernel-doc formatting
-    s/fpga-mgr at 0/fpga-mgr/ to remove unit_address at fpga_mgr node
-    add Rob's Reviewed-by
-    add Richard's signed-off-by
-
-Alan Tull (3):
-  dt-bindings: fpga: add Stratix10 SoC FPGA manager binding
-  arm64: dts: stratix10: add fpga manager and region
-  fpga: add intel stratix10 soc fpga manager driver
-
-Richard Gong (4):
-  dt-bindings, firmware: add Intel Stratix10 service layer binding
-  arm64: dts: stratix10: add stratix10 service driver binding to base
-    dtsi
-  driver, misc: add Intel Stratix10 service layer driver
-  defconfig: enable fpga and service layer
-
- .../bindings/firmware/intel,stratix10-svc.txt      |  57 ++
- .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt |  17 +
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  |  33 +
- arch/arm64/configs/defconfig                       |   6 +
- drivers/fpga/Kconfig                               |   6 +
- drivers/fpga/Makefile                              |   1 +
- drivers/fpga/stratix10-soc.c                       | 534 ++++++++++++
- drivers/misc/Kconfig                               |  12 +
- drivers/misc/Makefile                              |   1 +
- drivers/misc/stratix10-smc.h                       | 203 +++++
- drivers/misc/stratix10-svc.c                       | 945 +++++++++++++++++++++
- include/linux/stratix10-svc-client.h               | 190 +++++
- 12 files changed, 2005 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
- create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
- create mode 100644 drivers/fpga/stratix10-soc.c
- create mode 100644 drivers/misc/stratix10-smc.h
- create mode 100644 drivers/misc/stratix10-svc.c
- create mode 100644 include/linux/stratix10-svc-client.h
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index 81de03ef860d..eaa67de8c2bb 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -64,6 +64,30 @@
+ 		compatible = "usb-nop-xceiv";
+ 		vcc-supply = <&v_5v0_usb3_hst_vbus>;
+ 	};
++
++	sfp_eth0: sfp-eth0 {
++		/* CON15,16 - CPM lane 4 */
++		compatible = "sff,sfp";
++		i2c-bus = <&sfpp0_i2c>;
++		los-gpio = <&cp1_gpio1 28 GPIO_ACTIVE_HIGH>;
++		mod-def0-gpio = <&cp1_gpio1 27 GPIO_ACTIVE_LOW>;
++		tx-disable-gpio = <&cp1_gpio1 29 GPIO_ACTIVE_HIGH>;
++		tx-fault-gpio  = <&cp1_gpio1 26 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cp1_sfpp0_pins>;
++	};
++
++	sfp_eth1: sfp-eth1 {
++		/* CON17,18 - CPS lane 4 */
++		compatible = "sff,sfp";
++		i2c-bus = <&sfpp1_i2c>;
++		los-gpio = <&cp1_gpio1 8 GPIO_ACTIVE_HIGH>;
++		mod-def0-gpio = <&cp1_gpio1 11 GPIO_ACTIVE_LOW>;
++		tx-disable-gpio = <&cp1_gpio1 10 GPIO_ACTIVE_HIGH>;
++		tx-fault-gpio = <&cp0_gpio2 30 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cp1_sfpp1_pins &cp0_sfpp1_pins>;
++	};
+ };
+ 
+ &uart0 {
+@@ -180,6 +204,10 @@
+ 			       "mpp60", "mpp61";
+ 		marvell,function = "sdio";
+ 	};
++	cp0_sfpp1_pins: sfpp1-pins {
++		marvell,pins = "mpp62";
++		marvell,function = "gpio";
++	};
+ };
+ 
+ &cp0_xmdio {
+@@ -188,11 +216,13 @@
+ 	phy0: ethernet-phy at 0 {
+ 		compatible = "ethernet-phy-ieee802.3-c45";
+ 		reg = <0>;
++		sfp = <&sfp_eth0>;
+ 	};
+ 
+ 	phy8: ethernet-phy at 8 {
+ 		compatible = "ethernet-phy-ieee802.3-c45";
+ 		reg = <8>;
++		sfp = <&sfp_eth1>;
+ 	};
+ };
+ 
+@@ -258,6 +288,10 @@
+ };
+ 
+ &cp1_pinctrl {
++	cp1_sfpp1_pins: sfpp1-pins {
++		marvell,pins = "mpp8", "mpp10", "mpp11";
++		marvell,function = "gpio";
++	};
+ 	cp1_spi1_pins: spi1-pins {
+ 		marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15", "mpp16";
+ 		marvell,function = "spi1";
+@@ -266,6 +300,10 @@
+ 		marvell,pins = "mpp6", "mpp7";
+ 		marvell,function = "uart0";
+ 	};
++	cp1_sfpp0_pins: sfpp0-pins {
++		marvell,pins = "mpp26", "mpp27", "mpp28", "mpp29";
++		marvell,function = "gpio";
++	};
+ };
+ 
+ /* J27 UART header */
 -- 
-2.7.4
+2.17.0
