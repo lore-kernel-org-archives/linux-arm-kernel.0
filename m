@@ -1,76 +1,167 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  4 May 2018 17:05:34 +0100
-Subject: [PATCH v5 13/14] KVM: arm64: Fold redundant exit code checks out of
- fixup_guest_exit()
+Date: Fri,  4 May 2018 17:05:31 +0100
+Subject: [PATCH v5 10/14] KVM: arm64: Save host SVE context as appropriate
 In-Reply-To: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
 References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525449935-31424-14-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1525449935-31424-11-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The entire tail of fixup_guest_exit() is contained in if statements
-of the form if (x && *exit_code == ARM_EXCEPTION_TRAP).  As a result,
-we can check just once and bail out of the function early, allowing
-the remaining if conditions to be simplified.
+This patch adds SVE context saving to the hyp FPSIMD context switch
+path.  This means that it is no longer necessary to save the host
+SVE state in advance of entering the guest, when in use.
 
-The only awkward case is where *exit_code is changed to
-ARM_EXCEPTION_EL1_SERROR in the case of an illegal GICv2 CPU
-interface access: in that case, the GICv3 trap handling code is
-skipped using a goto.  This avoids pointlessly evaluating the
-static branch check for the GICv3 case, even though we can't have
-vgic_v2_cpuif_trap and vgic_v3_cpuif_trap true simultaneously
-unless we have a GICv3 and GICv2 on the host: that sounds stupid,
-but I haven't satisfied myself that it can't happen.
+In order to avoid adding pointless complexity to the code, VHE is
+assumed if SVE is in use.  VHE is an architectural prerequisite for
+SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
+kernels that support both SVE and KVM.
 
-No functional change.
+Historically, software models exist that can expose the
+architecturally invalid configuration of SVE without VHE, so if
+this situation is detected this patch warns and refuses to create a
+VM.  Doing this check at VM creation time avoids race issues
+between KVM and SVE initialisation.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig          |  7 +++++++
+ arch/arm64/kvm/fpsimd.c     |  1 -
+ arch/arm64/kvm/hyp/switch.c | 21 +++++++++++++++++++--
+ virt/kvm/arm/arm.c          | 18 ++++++++++++++++++
+ 4 files changed, 44 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index eb2cf49..b0d3820 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1130,6 +1130,7 @@ endmenu
+ config ARM64_SVE
+ 	bool "ARM Scalable Vector Extension support"
+ 	default y
++	depends on !KVM || ARM64_VHE
+ 	help
+ 	  The Scalable Vector Extension (SVE) is an extension to the AArch64
+ 	  execution state which complements and extends the SIMD functionality
+@@ -1155,6 +1156,12 @@ config ARM64_SVE
+ 	  booting the kernel.  If unsure and you are not observing these
+ 	  symptoms, you should assume that it is safe to say Y.
+ 
++	  CPUs that support SVE are architecturally required to support the
++	  Virtualization Host Extensions (VHE), so the kernel makes no
++	  provision for supporting SVE alongside KVM without VHE enabled.
++	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
++	  KVM in the same kernel image.
++
+ config ARM64_MODULE_PLTS
+ 	bool
+ 	select HAVE_MOD_ARCH_SPECIFIC
+diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+index bbc6889..91ad01f 100644
+--- a/arch/arm64/kvm/fpsimd.c
++++ b/arch/arm64/kvm/fpsimd.c
+@@ -59,7 +59,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+  */
+ void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
+ {
+-	BUG_ON(system_supports_sve());
+ 	BUG_ON(!current->mm);
+ 
+ 	vcpu->arch.fp_enabled = false;
 diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 39e9166..be09c52 100644
+index 10f55d3..8009126 100644
 --- a/arch/arm64/kvm/hyp/switch.c
 +++ b/arch/arm64/kvm/hyp/switch.c
-@@ -385,11 +385,13 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 	 * same PC once the SError has been injected, and replay the
- 	 * trapping instruction.
- 	 */
--	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
-+	if (*exit_code != ARM_EXCEPTION_TRAP)
-+		goto exit;
+@@ -21,12 +21,14 @@
+ 
+ #include <kvm/arm_psci.h>
+ 
++#include <asm/cpufeature.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/fpsimd.h>
+ #include <asm/debug-monitors.h>
++#include <asm/processor.h>
+ #include <asm/thread_info.h>
+ 
+ static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
+@@ -328,6 +330,8 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+ 				    struct kvm_vcpu *vcpu)
+ {
++	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
 +
-+	if (!__populate_fault_info(vcpu))
- 		return true;
+ 	if (has_vhe())
+ 		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+ 			     cpacr_el1);
+@@ -337,8 +341,21 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
  
--	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
--	    *exit_code == ARM_EXCEPTION_TRAP) {
-+	if (static_branch_unlikely(&vgic_v2_cpuif_trap)) {
- 		bool valid;
+ 	isb();
  
- 		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
-@@ -414,12 +416,12 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 				if (!__skip_instr(vcpu))
- 					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
- 				*exit_code = ARM_EXCEPTION_EL1_SERROR;
-+				goto exit;
- 			}
- 		}
+-	if (vcpu->arch.host_fpsimd_state) {
+-		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
++	if (host_fpsimd) {
++		/*
++		 * In the SVE case, VHE is assumed: it is enforced by
++		 * Kconfig and kvm_arch_init_vm().
++		 */
++		if (system_supports_sve() && vcpu->arch.host_sve_in_use) {
++			struct thread_struct *thread = container_of(
++				host_fpsimd,
++				struct thread_struct, uw.fpsimd_state);
++
++			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
++		} else {
++			__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
++		}
++
+ 		vcpu->arch.host_fpsimd_state = NULL;
  	}
  
- 	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
--	    *exit_code == ARM_EXCEPTION_TRAP &&
- 	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
- 	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
- 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
-@@ -428,6 +430,7 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 			return true;
- 	}
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 6cf499b..a7be7bf 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -16,6 +16,7 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
  
-+exit:
- 	/* Return to the host kernel and handle the exit */
- 	return false;
- }
++#include <linux/bug.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+@@ -41,6 +42,7 @@
+ #include <asm/mman.h>
+ #include <asm/tlbflush.h>
+ #include <asm/cacheflush.h>
++#include <asm/cpufeature.h>
+ #include <asm/virt.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_asm.h>
+@@ -120,6 +122,22 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+ 	if (type)
+ 		return -EINVAL;
+ 
++	/*
++	 * VHE is a prerequisite for SVE in the Arm architecture, and
++	 * Kconfig ensures that if system_supports_sve() here then
++	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
++	 * detected and enabled, the CPU is architecturally
++	 * noncompliant.
++	 *
++	 * Just in case this mismatch is seen, detect it, warn and give
++	 * up.  Supporting this forbidden configuration in Hyp would be
++	 * pointless.
++	 */
++	if (system_supports_sve() && !has_vhe()) {
++		kvm_pr_unimpl("Cannot create VMs on SVE system without VHE.  Broken cpu?");
++		return -ENXIO;
++	}
++
+ 	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
+ 	if (!kvm->arch.last_vcpu_ran)
+ 		return -ENOMEM;
 -- 
 2.1.4
