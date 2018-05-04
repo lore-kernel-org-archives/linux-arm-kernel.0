@@ -1,41 +1,63 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Fri, 4 May 2018 09:40:25 +0200
-Subject: [RFC PATCH] ARM: dts: imx: replace underscore with hyphen in
- aliases name
-In-Reply-To: <1525399128-11587-1-git-send-email-shawnguo@kernel.org>
-References: <1525399128-11587-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20180504074025.GA11186@g751.home>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 4 May 2018 09:40:16 +0200
+Subject: [PATCH 3/4] dt-bindings: rtc: update stm32-rtc documentation for
+ st,syscfg property
+In-Reply-To: <20180503205351.GE10960@piout.net>
+References: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
+ <1524144103-21432-4-git-send-email-amelie.delaunay@st.com>
+ <20180427025803.mn32y5xle2p6knn6@rob-hp-laptop>
+ <20180503205351.GE10960@piout.net>
+Message-ID: <a2cbe252-c957-103d-aae1-4a8fce9116fa@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Alexandre,
 
-On Fri, May 04, 2018 at 09:58:48AM +0800, Shawn Guo wrote:
-> It replaces underscore with hyphen in aliases name to fix DTC
-> alias_paths warning below, which is seen with various i.MX board dts
-> files when W=1 switch is on.
+On 05/03/2018 10:53 PM, Alexandre Belloni wrote:
+> Amelie,
 > 
->  Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+> On 26/04/2018 21:58:03-0500, Rob Herring wrote:
+>> On Thu, Apr 19, 2018 at 03:21:42PM +0200, Amelie Delaunay wrote:
+>>> RTC driver should not be aware of the PWR registers offset and bits
+>>> position. Furthermore, we can imagine that Disable Backup Protection (DBP)
+>>> relative register and bit mask could change depending on the SoC. So this
+>>> patch moves st,syscfg property from single pwrcfg phandle to pwrcfg
+>>> phandle/offset/mask triplet.
+>>>
+>>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt | 10 ++++++----
+>>>   1 file changed, 6 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
+>>> index a66692a..00f8b5d 100644
+>>> --- a/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
+>>> +++ b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
+>>> @@ -14,8 +14,10 @@ Required properties:
+>>>       It is required only on stm32h7.
+>>>   - interrupt-parent: phandle for the interrupt controller.
+>>>   - interrupts: rtc alarm interrupt.
+>>> -- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
+>>> -  (RTC registers) write protection.
+>>> +- st,syscfg: phandle/offset/mask triplet. The phandle to pwrcfg used to
+>>> +  access control register at offset, and change the dbp (Disable Backup
+>>> +  Protection) bit represented by the mask, mandatory to disable/enable backup
+>>> +  domain (RTC registers) write protection.
+>>
+>> It's fine to add this, but you are breaking compatibility in the driver
+>> with existing DTBs by requiring these new fields.
+>>
 > 
-> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> Cc: Gary Bisson <gary.bisson@boundarydevices.com>
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> ---
-> Hi Lothar, Gary,
+> I'm fine with that change but I would like confirmation that this has
+> been well thought. Maybe Maxime or Alexandre could give their ack.
 > 
-> Per my search on kernel code, this change will not break anything on
-> kernel support.  But I'm not really sure about the case of bootloaders
-> running on the boards.  That's why I'm sending it as RFC.
-> 
-> We really want i.MX to be the first-class citizen in the community.
-> After a few cycles efforts on cleaning up DTC warnings, this alias_paths
-> warning is the last one we see with i.MX dts files.  We really want to
-> get rid of it and make i.MX dts be DTC warning free.
-> 
-> So please comment whether we can merge this patch.
 
-Yes that is fine.
-Reviewed-by: Gary Bisson <gary.bisson@boundarydevices.com>
+It's a good thing to remove PWR registers information from RTC driver. 
+My only concern was the compatibility with old DT but we can accept it. 
+Indeed, Kernel will continue to boot fine, only RTC will not probe if we 
+use old DT.
 
-Thanks,
-Gary
+Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+
+Regards
+alex
