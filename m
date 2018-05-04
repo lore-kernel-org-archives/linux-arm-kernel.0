@@ -1,74 +1,112 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 4 May 2018 16:27:34 +0800
-Subject: [PATCH] ARM: dts: imx6sx-sabreauto: add egalax touch screen
- support
-In-Reply-To: <1524813650-19241-1-git-send-email-Anson.Huang@nxp.com>
-References: <1524813650-19241-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180504082733.GC3443@dragon>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Fri, 4 May 2018 11:30:31 +0300
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <5b654bb4-64cc-dc64-afd7-135971b54c98@redhat.com>
+References: <20180502203326.9491-1-labbott@redhat.com>
+ <20180502203326.9491-3-labbott@redhat.com>
+ <20180503071917.xm2xvgagvzkworay@salmiak>
+ <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
+ <5b654bb4-64cc-dc64-afd7-135971b54c98@redhat.com>
+Message-ID: <b2f4f5c4-ab19-b7c9-a564-02d54d17fd49@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 03:20:50PM +0800, Anson Huang wrote:
-> From: Haibo Chen <haibo.chen@nxp.com>
+On 03.05.2018 22:09, Laura Abbott wrote:
+> On 05/03/2018 10:33 AM, Alexander Popov wrote:
+>> On 03.05.2018 10:19, Mark Rutland wrote:
+>>> On Wed, May 02, 2018 at 01:33:26PM -0700, Laura Abbott wrote:
+>>>> +	/* Reset the lowest_stack value for the next syscall */
+>>>> +	current->thread.lowest_stack = current_stack_pointer;
+>>
+>> Laura, that might be wrong and introduce huge performance impact.
+>>
+>> I think, lowest_stack should be reset similarly to the original version.
+>>
 > 
-> Add egalax touch screen support on i2c2 bus.
+> Sorry, I'm not understanding here. What's the performance impact and
+> what do you mean by original version?
+
+I meant the code for x86:
+	/* Reset the lowest_stack value for the next syscall */
+	current->thread.lowest_stack = current_top_of_stack() - 256;
+
+...Now when I'm writing about the performance impact, I see that I was wrong
+about "huge". Excuse me.
+
+Let me describe the implications of this code change.
+
+So we are at the end of a syscall. We've just erased the used part of the kernel
+stack. The current stack pointer is near to the top of stack. On x86_64 I see
+that the stack pointer is stack top minus 56 bytes (just before switching onto
+the trampoline stack).
+
+I took the idea of resetting lowest_stack to stack top minus 256 from the
+original PaX Team's code. It should give the speedup when lowest_stack is not
+updated during a syscall (a lot of functions are not instrumented) and we start
+to search for the poison value from that reasonable point.
+
+If we speak about the common erase_kstack() code, this code change can break
+x86, because this function can be called from the trampoline stack (separate
+from the thread stack).
+
+>>>> +}
+>>>
+>>> Once this function returns, its data is left on the stack. Is that not a problem?
+>>>
+>>> No strong feelings either way, but it might be worth mentioning in the commit
+>>> message.
+>>
+>> I managed to bypass that with "register" specifier. Although it doesn't give an
+>> absolute guarantee.
+>>
 > 
-> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
-> this patch is based on patch (ARM: dts: imx6sx-sabreauto: add debug LED support) I sent out for review.
->  arch/arm/boot/dts/imx6sx-sabreauto.dts | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+> I guess I was assuming gcc would be smart enough not to spill stuff
+> on the stack. I also intentionally removed the register keyword
+> since it wasn't clear gcc does much with it on a modern system? I
+> could be completely off base here though so please correct me if
+> I'm wrong. It probably is worth documenting what we are assuming about
+> the compiler here.
+
+I think having register storage class specifier here is a bit better than
+nothing. And yes, I'll add a comment. Right now don't see a better solution.
+
+>>>> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+>>>> index a34e9290a699..25dd2a14560d 100644
+>>>> --- a/drivers/firmware/efi/libstub/Makefile
+>>>> +++ b/drivers/firmware/efi/libstub/Makefile
+>>>> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+>>>>   KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+>>>>   				   -D__NO_FORTIFY \
+>>>>   				   $(call cc-option,-ffreestanding) \
+>>>> -				   $(call cc-option,-fno-stack-protector)
+>>>> +				   $(call cc-option,-fno-stack-protector) \
+>>>> +				   $(DISABLE_STACKLEAK_PLUGIN)
+>>>>   
+>>>>   GCOV_PROFILE			:= n
+>>>>   KASAN_SANITIZE			:= n
+>>>
+>>> I believe we'll also need to do this for the KVM hyp code in arch/arm64/kvm/hyp/.
+>>
+>> Could you please give more details on that? Why STACKLEAK breaks it?
+>>
 > 
-> diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> index 6b94f24..2f6e474 100644
-> --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> @@ -131,6 +131,12 @@
->  &iomuxc {
->  	imx6x-sabreauto {
->  
-> +		pinctrl_egalax_int: egalax_intgrp {
+> For reference, I originally added this for the efistub because
+> it would not compile.
 
-General recommendation: use hyphen instead of underscore in the node
-node.
+I guess it was a linkage error, right?
 
-> +			fsl,pins = <
-> +				MX6SX_PAD_SD4_RESET_B__GPIO6_IO_22      0x80000000
-> +			>;
-> +		};
-> +
->  		pinctrl_led: ledgrp {
->  			fsl,pins = <
->  				MX6SX_PAD_CSI_PIXCLK__GPIO1_IO_24 0x17059
-> @@ -274,6 +280,16 @@
->  	pinctrl-0 = <&pinctrl_i2c2_1>;
->  	status = "okay";
->  
-> +	egalax_ts at 04 {
+> I did compile this against my Fedora tree which has KVM enabled.
 
-Use generic node name - touchscreen, as recommended by Devicetree
-Specification, and drop leading zeros in unit-address.
+Looked through this big article about ARM, KVM and HYP mode:
+https://lwn.net/Articles/557132/
 
-Shawn
+So we have some limited amount of kernel code which runs in HYP mode. Is it only
+in arch/arm64/kvm/hyp/ directory?
 
-> +		compatible = "eeti,egalax_ts";
-> +		reg = <0x04>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_egalax_int>;
-> +		interrupt-parent = <&gpio6>;
-> +		interrupts = <22 IRQ_TYPE_EDGE_FALLING>;
-> +		wakeup-gpios = <&gpio6 22 GPIO_ACTIVE_HIGH>;
-> +	};
-> +
->  	max7322: gpio at 68 {
->  		compatible = "maxim,max7322";
->  		reg = <0x68>;
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Mark, could you give a clue what trouble will we have if we call track_stack()
+or check_alloca() from that code?
+
+Thanks in advance!
+
+--
+Alexander
