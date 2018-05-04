@@ -1,27 +1,82 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Fri, 4 May 2018 12:53:40 -0400
-Subject: [PATCH v8 0/6] optimize memblock_next_valid_pfn and
- early_pfn_valid on arm and arm64
-In-Reply-To: <CACjP9X8bHmrxmd7ZPcfQq6Eq0Mzwmt0saOR3Ph53gp2n-dcKBQ@mail.gmail.com>
-References: <1523431317-30612-1-git-send-email-hejianet@gmail.com>
- <05b0fcf2-7670-101e-d4ab-1f656ff6b02f@gmail.com>
- <CACjP9X8bHmrxmd7ZPcfQq6Eq0Mzwmt0saOR3Ph53gp2n-dcKBQ@mail.gmail.com>
-Message-ID: <23b14717-0f4a-10f2-5118-7cb8445fbdab@oracle.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 4 May 2018 10:03:16 -0700
+Subject: [PATCH net-next v2 01/13] net: phy: sfp: make the i2c-bus
+ property really optional
+In-Reply-To: <20180504135643.23466-2-antoine.tenart@bootlin.com>
+References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
+ <20180504135643.23466-2-antoine.tenart@bootlin.com>
+Message-ID: <fd91699d-c290-8821-b4a6-0789071cfba1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'm wondering, ain't simple enabling of config
-> DEFERRED_STRUCT_PAGE_INIT provide even better speed-up? If that is the
-> case then it seems like this series is not needed at all, right?
-> I am not sure why is this config optional. It looks like it could be
-> enabled by default or even unconditionally considering that with
-> commit c9e97a1997fb ("mm: initialize pages on demand during boot") the
-> deferred code is statically disabled after all the pages are
-> initialized.
+On 05/04/2018 06:56 AM, Antoine Tenart wrote:
+> The SFF,SFP documentation is clear about making all the DT properties,
+> with the exception of the compatible, optional. In practice this is not
+> the case and without an i2c-bus property provided the SFP code will
+> throw NULL pointer exceptions.
+> 
+> This patch is an attempt to fix this.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+> ---
+>  drivers/net/phy/sfp.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/drivers/net/phy/sfp.c b/drivers/net/phy/sfp.c
+> index 4ab6e9a50bbe..4686c443fc22 100644
+> --- a/drivers/net/phy/sfp.c
+> +++ b/drivers/net/phy/sfp.c
+> @@ -298,11 +298,17 @@ static void sfp_set_state(struct sfp *sfp, unsigned int state)
+>  
+>  static int sfp_read(struct sfp *sfp, bool a2, u8 addr, void *buf, size_t len)
+>  {
+> +	if (!sfp->read)
+> +		return -EOPNOTSUPP;
 
-Hi Daniel,
+-ENODEV would be closer to the intended meaning IMHO, those this could
+be argue that this is yet another color to paint the bikeshed with.
 
-Currently, deferred struct pages are initialized in parallel only on NUMA machines. I would like to make a change to use all the available CPUs even on a single socket systems, but that is not there yet. So, I believe Jia's performance improvements are still relevant.
+> +
+>  	return sfp->read(sfp, a2, addr, buf, len);
+>  }
+>  
+>  static int sfp_write(struct sfp *sfp, bool a2, u8 addr, void *buf, size_t len)
+>  {
+> +	if (!sfp->write)
+> +		return -EOPNOTSUPP;
+> +
+>  	return sfp->write(sfp, a2, addr, buf, len);
+>  }
+>  
+> @@ -533,6 +539,8 @@ static int sfp_sm_mod_hpower(struct sfp *sfp)
+>  		return 0;
+>  
+>  	err = sfp_read(sfp, true, SFP_EXT_STATUS, &val, sizeof(val));
+> +	if (err == -EOPNOTSUPP)
+> +		goto err;
+>  	if (err != sizeof(val)) {
+>  		dev_err(sfp->dev, "Failed to read EEPROM: %d\n", err);
+>  		err = -EAGAIN;
+> @@ -542,6 +550,8 @@ static int sfp_sm_mod_hpower(struct sfp *sfp)
+>  	val |= BIT(0);
+>  
+>  	err = sfp_write(sfp, true, SFP_EXT_STATUS, &val, sizeof(val));
+> +	if (err == -EOPNOTSUPP)
+> +		goto err;
+>  	if (err != sizeof(val)) {
+>  		dev_err(sfp->dev, "Failed to write EEPROM: %d\n", err);
+>  		err = -EAGAIN;
+> @@ -565,6 +575,8 @@ static int sfp_sm_mod_probe(struct sfp *sfp)
+>  	int ret;
+>  
+>  	ret = sfp_read(sfp, false, 0, &id, sizeof(id));
+> +	if (ret == -EOPNOTSUPP)
+> +		return ret;
 
-Thank you,
-Pavel
+Can you find a way such that only sfp_sm_mod_probe() needs to check
+whether the sfp read/write operations returned failure and then we just
+make sure the SFP state machine does not make any more progress? Having
+to check the sfp_read()/sfp_write() operations all over the place sounds
+error prone and won't scale in the future.
+-- 
+Florian
