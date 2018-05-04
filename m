@@ -1,66 +1,45 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 4 May 2018 17:29:38 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6sx-sabreauto: drop 'regulators'
- container node
-In-Reply-To: <1525426030-17221-1-git-send-email-shawnguo@kernel.org>
-References: <1525426030-17221-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20180504092937.GF3443@dragon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 4 May 2018 11:30:40 +0200
+Subject: [GIT PULL] Ux500 updates for v4.18
+Message-ID: <CACRpkdbG9DSRT0iT+YmuUx7vXsUyJo2w8XGxr=-rCxcMnZ2yUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+Hi there ARM SoC folks,
 
-I will push these two patches to imx/dt branch soon.  Please base your
-imx6sx-sabreauto dts patches on them.
+here are some Ux500 updates for v4.18. We drop
+the experimental silicon in U8540 and U9540 and
+tidy up Kconfig a bit.
 
-Shawn
+Please pull it in!
 
-On Fri, May 04, 2018 at 05:27:09PM +0800, Shawn Guo wrote:
-> Let's drop the 'regulators' container node by giving VCC_SD3 an unique
-> name and removing 'reg' property, so that the fixed regulator can be
-> under root node directly.
-> 
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> ---
->  arch/arm/boot/dts/imx6sx-sabreauto.dts | 25 +++++++++----------------
->  1 file changed, 9 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> index 57d1ea0a3f8e..e5c1d6daa5e0 100644
-> --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> @@ -18,22 +18,15 @@
->  		reg = <0x80000000 0x80000000>;
->  	};
->  
-> -	regulators {
-> -		compatible = "simple-bus";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -
-> -		vcc_sd3: regulator at 0 {
-> -			compatible = "regulator-fixed";
-> -			reg = <0>;
-> -			pinctrl-names = "default";
-> -			pinctrl-0 = <&pinctrl_vcc_sd3>;
-> -			regulator-name = "VCC_SD3";
-> -			regulator-min-microvolt = <3000000>;
-> -			regulator-max-microvolt = <3000000>;
-> -			gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
-> -			enable-active-high;
-> -		};
-> +	vcc_sd3: regulator-vcc-sd3 {
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_vcc_sd3>;
-> +		regulator-name = "VCC_SD3";
-> +		regulator-min-microvolt = <3000000>;
-> +		regulator-max-microvolt = <3000000>;
-> +		gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
->  	};
->  };
->  
-> -- 
-> 1.9.1
-> 
+Yours,
+Linus Walleij
+
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-machine-arm-soc
+
+for you to fetch changes up to 52b12be584ba554a40ad61d4d07bfbc100ffa1ac:
+
+  ARM: ux500: Cut down Kconfig options (2018-05-04 11:02:52 +0200)
+
+----------------------------------------------------------------
+These changes for ux500:
+- Drops U8540 and U9540
+- Cuts down the Kconfig options due to accumulated simplifications
+
+----------------------------------------------------------------
+Linus Walleij (2):
+      ARM: ux500: Drop U8540/9540 support
+      ARM: ux500: Cut down Kconfig options
+
+ arch/arm/mach-ux500/Kconfig       | 53 ++++++++-------------------------------
+ arch/arm/mach-ux500/cpu-db8500.c  | 16 ++----------
+ arch/arm/mach-ux500/db8500-regs.h |  4 ---
+ 3 files changed, 13 insertions(+), 60 deletions(-)
