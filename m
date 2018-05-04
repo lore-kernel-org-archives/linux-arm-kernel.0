@@ -1,47 +1,129 @@
-From: satendra.t@samsung.com (Satendra Singh Thakur)
-Date: Fri,  4 May 2018 13:45:26 +0530
-Subject: [PATCH v1 03/13] drm/kms/mode/exynos-dsi: using helper func
- drm_display_mode_to_videomode for calculating timing parameters
-In-Reply-To: <00b4a624-d2b6-dc6a-71c0-9c7642480a44@arm.com>
-References: <00b4a624-d2b6-dc6a-71c0-9c7642480a44@arm.com>
- <CGME20180504081613epcas5p405d342fe333975048175c4a360067f52@epcas5p4.samsung.com>
-Message-ID: <1525421726-2817-1-git-send-email-satendra.t@samsung.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 4 May 2018 10:18:10 +0200
+Subject: [PATCH 4/4] ARM: dts: imx: drop 'clocks' container for board
+ level clocks
+In-Reply-To: <1525395446-1953-5-git-send-email-shawnguo@kernel.org>
+References: <1525395446-1953-1-git-send-email-shawnguo@kernel.org>
+ <1525395446-1953-5-git-send-email-shawnguo@kernel.org>
+Message-ID: <20180504101810.065b01f6@karo-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid duplicate logic for the same
+Hi,
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
-Acked-by: Madhur Verma <madhur.verma@samsung.com>
-Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
----
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
+On Fri,  4 May 2018 08:57:26 +0800 Shawn Guo wrote:
+> For soc level of clocks which are input to Clock Control Module, clock
+> driver expects them to be under 'clocks' container node.  But for board
+> level clocks, this container is not really necessary.  Let's drop it and
+> use an unique name for fixed rate clock, so that 'reg' property can be
+> saved as well.
+> 
+For imx28-tx28.dts and imx53-tx53.dtsi:
+Acked-By: Lothar Wa?mann <LW@KARO-electronics.de>
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index 7904ffa..7fe84fd 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1490,17 +1490,8 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
- 				struct drm_display_mode *adjusted_mode)
- {
- 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
--	struct videomode *vm = &dsi->vm;
--	struct drm_display_mode *m = adjusted_mode;
--
--	vm->hactive = m->hdisplay;
--	vm->vactive = m->vdisplay;
--	vm->vfront_porch = m->vsync_start - m->vdisplay;
--	vm->vback_porch = m->vtotal - m->vsync_end;
--	vm->vsync_len = m->vsync_end - m->vsync_start;
--	vm->hfront_porch = m->hsync_start - m->hdisplay;
--	vm->hback_porch = m->htotal - m->hsync_end;
--	vm->hsync_len = m->hsync_end - m->hsync_start;
-+
-+	drm_display_mode_to_videomode(adjusted_mode, &dsi->vm);
- }
- 
- static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
--- 
-2.7.4
+> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> ---
+>  arch/arm/boot/dts/imx28-tx28.dts             | 13 ++++---------
+>  arch/arm/boot/dts/imx53-tx53.dtsi            | 11 +++++------
+>  arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 15 ++++++---------
+>  arch/arm/boot/dts/imx6q-bx50v3.dtsi          | 11 ++++-------
+>  4 files changed, 19 insertions(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+> index 687186358c18..e4f19f9be6d0 100644
+> --- a/arch/arm/boot/dts/imx28-tx28.dts
+> +++ b/arch/arm/boot/dts/imx28-tx28.dts
+> @@ -140,15 +140,10 @@
+>  		regulator-boot-on;
+>  	};
+>  
+> -	clocks {
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -		mclk: clock at 0 {
+> -			compatible = "fixed-clock";
+> -			reg = <0>;
+> -			#clock-cells = <0>;
+> -			clock-frequency = <26000000>;
+> -		};
+> +	mclk: clock-mclk {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <26000000>;
+>  	};
+>  
+>  	sound {
+> diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+> index 77f2ce9f1e41..5dd3dd3a2fd0 100644
+> --- a/arch/arm/boot/dts/imx53-tx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+> @@ -67,13 +67,12 @@
+>  		ckih1 {
+>  			clock-frequency = <0>;
+>  		};
+> +	};
+>  
+> -		mclk: clock at 0 {
+> -			compatible = "fixed-clock";
+> -			reg = <0>;
+> -			#clock-cells = <0>;
+> -			clock-frequency = <26000000>;
+> -		};
+> +	mclk: clock-mclk {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <26000000>;
+>  	};
+>  
+>  	gpio-keys {
+> diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+> index ea184d108491..3dee3af1a4c1 100644
+> --- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+> +++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+> @@ -72,15 +72,12 @@
+>  		stdout-path = "serial0:115200n8";
+>  	};
+>  
+> -	clocks {
+> -		/* Fixed crystal dedicated to mcp251x */
+> -		clk16m: clk at 1 {
+> -			compatible = "fixed-clock";
+> -			reg = <1>;
+> -			#clock-cells = <0>;
+> -			clock-frequency = <16000000>;
+> -			clock-output-names = "clk16m";
+> -		};
+> +	/* Fixed crystal dedicated to mcp251x */
+> +	clk16m: clock-16m {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <16000000>;
+> +		clock-output-names = "clk16m";
+>  	};
+>  
+>  	gpio-keys {
+> diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+> index d0e7dab4d72b..d3cba09be0cb 100644
+> --- a/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+> +++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+> @@ -43,13 +43,10 @@
+>  #include "imx6q-ba16.dtsi"
+>  
+>  / {
+> -	clocks {
+> -		mclk: clock at 0 {
+> -			compatible = "fixed-clock";
+> -			reg = <0>;
+> -			#clock-cells = <0>;
+> -			clock-frequency = <22000000>;
+> -		};
+> +	mclk: clock-mclk {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <22000000>;
+>  	};
+>  
+>  	gpio-poweroff {
+
+
+Lothar Wa?mann
