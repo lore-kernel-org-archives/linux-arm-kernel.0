@@ -1,230 +1,144 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 04 May 2018 10:22:51 +0200
-Subject: [PATCH v2 05/10] media: v4l: Add definitions for MPEG2 frame
- format and header metadata
-In-Reply-To: <4e6c4cb7-01b2-3278-4f12-c0ce8cd82ecc@xs4all.nl>
-References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
- <20180419154536.17846-1-paul.kocialkowski@bootlin.com>
- <4e6c4cb7-01b2-3278-4f12-c0ce8cd82ecc@xs4all.nl>
-Message-ID: <5534cc4b748d7b3b1ce621ea43ce44aabea09d56.camel@bootlin.com>
+From: satendra.t@samsung.com (Satendra Singh Thakur)
+Date: Fri,  4 May 2018 13:53:25 +0530
+Subject: [PATCH v1 09/13] drm/kms/mode/sun4i-tv: using helper func
+ drm_display_mode_from_videomode for calculating timing parameters
+In-Reply-To: <20180503110216.63bg3kw7cwppqbzx@flea>
+References: <20180503110216.63bg3kw7cwppqbzx@flea>
+ <CGME20180504082405epcas5p212d6a9fbb2a0baac4166cb5b68616055@epcas5p2.samsung.com>
+Message-ID: <1525422205-2915-1-git-send-email-satendra.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+To avoid duplicate logic for horizonal/vertical sync_start/end
+helper func drm_display_mode_from_videomode is used
 
-On Fri, 2018-04-20 at 15:57 +0200, Hans Verkuil wrote:
-> On 04/19/18 17:45, Paul Kocialkowski wrote:
-> > Stateless video decoding engines require both the MPEG slices and
-> > associated metadata from the video stream in order to decode frames.
-> > 
-> > This introduces definitions for a new pixel format, describing
-> > buffers
-> > with MPEG2 slice data, as well as a control structure for passing
-> > the
-> > frame header (metadata) to drivers.
-> > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
-> > ---
-> >  drivers/media/v4l2-core/v4l2-ctrls.c | 10 ++++++++++
-> >  drivers/media/v4l2-core/v4l2-ioctl.c |  1 +
-> >  include/uapi/linux/v4l2-controls.h   | 26
-> > ++++++++++++++++++++++++++
-> >  include/uapi/linux/videodev2.h       |  3 +++
-> >  4 files changed, 40 insertions(+)
-> > 
-> > diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c
-> > b/drivers/media/v4l2-core/v4l2-ctrls.c
-> > index ba05a8b9a095..fcdc12b9a9e0 100644
-> > --- a/drivers/media/v4l2-core/v4l2-ctrls.c
-> > +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-> > @@ -761,6 +761,7 @@ const char *v4l2_ctrl_get_name(u32 id)
-> >  	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		
-> > return "Vertical MV Search Range";
-> >  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		
-> > return "Repeat Sequence Header";
-> >  	case V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME:		re
-> > turn "Force Key Frame";
-> > +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:		re
-> > turn "MPEG2 Frame Header";
-> >  
-> >  	/* VPX controls */
-> >  	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		
-> > return "VPX Number of Partitions";
-> > @@ -1152,6 +1153,9 @@ void v4l2_ctrl_fill(u32 id, const char **name,
-> > enum v4l2_ctrl_type *type,
-> >  	case V4L2_CID_RDS_TX_ALT_FREQS:
-> >  		*type = V4L2_CTRL_TYPE_U32;
-> >  		break;
-> > +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:
-> > +		*type = V4L2_CTRL_TYPE_MPEG2_FRAME_HDR;
-> > +		break;
-> >  	default:
-> >  		*type = V4L2_CTRL_TYPE_INTEGER;
-> >  		break;
-> > @@ -1472,6 +1476,9 @@ static int std_validate(const struct v4l2_ctrl
-> > *ctrl, u32 idx,
-> >  			return -ERANGE;
-> >  		return 0;
-> >  
-> > +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
-> > +		return 0;
-> > +
-> >  	default:
-> >  		return -EINVAL;
-> >  	}
-> > @@ -2046,6 +2053,9 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct
-> > v4l2_ctrl_handler *hdl,
-> >  	case V4L2_CTRL_TYPE_U32:
-> >  		elem_size = sizeof(u32);
-> >  		break;
-> > +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
-> > +		elem_size = sizeof(struct
-> > v4l2_ctrl_mpeg2_frame_hdr);
-> > +		break;
-> >  	default:
-> >  		if (type < V4L2_CTRL_COMPOUND_TYPES)
-> >  			elem_size = sizeof(s32);
-> > diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c
-> > b/drivers/media/v4l2-core/v4l2-ioctl.c
-> > index 468c3c65362d..8070203da5d2 100644
-> > --- a/drivers/media/v4l2-core/v4l2-ioctl.c
-> > +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
-> > @@ -1273,6 +1273,7 @@ static void v4l_fill_fmtdesc(struct
-> > v4l2_fmtdesc *fmt)
-> >  		case V4L2_PIX_FMT_VC1_ANNEX_L:	descr = "VC-1 
-> > (SMPTE 412M Annex L)"; break;
-> >  		case V4L2_PIX_FMT_VP8:		descr =
-> > "VP8"; break;
-> >  		case V4L2_PIX_FMT_VP9:		descr =
-> > "VP9"; break;
-> > +		case V4L2_PIX_FMT_MPEG2_FRAME:	descr =
-> > "MPEG2 Frame"; break;
-> >  		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA
-> > YUV"; break;
-> >  		case V4L2_PIX_FMT_WNVA:		descr =
-> > "WNVA"; break;
-> >  		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA
-> > SN9C10X"; break;
-> > diff --git a/include/uapi/linux/v4l2-controls.h
-> > b/include/uapi/linux/v4l2-controls.h
-> > index cbbb750d87d1..8431b2a540c7 100644
-> > --- a/include/uapi/linux/v4l2-controls.h
-> > +++ b/include/uapi/linux/v4l2-controls.h
-> > @@ -557,6 +557,8 @@ enum v4l2_mpeg_video_mpeg4_profile {
-> >  };
-> >  #define V4L2_CID_MPEG_VIDEO_MPEG4_QPEL		(V4L2_CID_MPE
-> > G_BASE+407)
-> >  
-> > +#define
-> > V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR     (V4L2_CID_MPEG_BASE+450)
-> > +
-> >  /*  Control IDs for VP8 streams
-> >   *  Although VP8 is not part of MPEG we add these controls to the
-> > MPEG class
-> >   *  as that class is already handling other video compression
-> > standards
-> > @@ -985,4 +987,28 @@ enum v4l2_detect_md_mode {
-> >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_C
-> > LASS_BASE + 3)
-> >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DET
-> > ECT_CLASS_BASE + 4)
-> >  
-> > +struct v4l2_ctrl_mpeg2_frame_hdr {
-> > +	__u32 slice_len;
-> > +	__u32 slice_pos;
-> > +	enum { MPEG1, MPEG2 } type;
-> > +
-> > +	__u16 width;
-> > +	__u16 height;
-> > +
-> > +	enum { PCT_I = 1, PCT_P, PCT_B, PCT_D }
-> > picture_coding_type;
-> 
-> As someone else already mentioned (I believe): avoid enums. Use __u16
-> instead.
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
+Acked-by: Madhur Verma <madhur.verma@samsung.com>
+Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
+---
 
-Indeed. I have taken a note of that.
+ v1: Added acked-by fields
 
-> > +	__u8 f_code[2][2];
-> > +
-> > +	__u8 intra_dc_precision;
-> > +	__u8 picture_structure;
-> > +	__u8 top_field_first;
-> > +	__u8 frame_pred_frame_dct;
-> > +	__u8 concealment_motion_vectors;
-> > +	__u8 q_scale_type;
-> > +	__u8 intra_vlc_format;
-> > +	__u8 alternate_scan;
-> > +
-> > +	__u8 backward_ref_index;
-> > +	__u8 forward_ref_index;
-> > +};
-> 
-> Please test that the layout and size of this structure is identical
-> for 32 and 64 bit
-> architectures, both on Intel and ARM.
-> 
-> It looks good, but it doesn't hurt to check.
+ drivers/gpu/drm/sun4i/sun4i_tv.c | 67 +++++++++++++++-------------------------
+ 1 file changed, 25 insertions(+), 42 deletions(-)
 
-Right, I'll keep that in mind and make sure this is the case.
-
-Cheers and thanks for the review!
-
-Paul
-
-> Regards,
-> 
-> 	Hans
-> 
-> > +
-> >  #endif
-> > diff --git a/include/uapi/linux/videodev2.h
-> > b/include/uapi/linux/videodev2.h
-> > index 31b5728b56e9..4b8336f7bcf0 100644
-> > --- a/include/uapi/linux/videodev2.h
-> > +++ b/include/uapi/linux/videodev2.h
-> > @@ -635,6 +635,7 @@ struct v4l2_pix_format {
-> >  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /*
-> > SMPTE 421M Annex L compliant stream */
-> >  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /*
-> > VP8 */
-> >  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /*
-> > VP9 */
-> > +#define V4L2_PIX_FMT_MPEG2_FRAME v4l2_fourcc('M', 'G', '2', 'F') /*
-> > MPEG2 frame */
-> >  
-> >  /*  Vendor-specific formats   */
-> >  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /*
-> > cpia1 YUV */
-> > @@ -1586,6 +1587,7 @@ struct v4l2_ext_control {
-> >  		__u8 __user *p_u8;
-> >  		__u16 __user *p_u16;
-> >  		__u32 __user *p_u32;
-> > +		struct v4l2_ctrl_mpeg2_frame_hdr __user
-> > *p_mpeg2_frame_hdr;
-> >  		void __user *ptr;
-> >  	};
-> >  } __attribute__ ((packed));
-> > @@ -1631,6 +1633,7 @@ enum v4l2_ctrl_type {
-> >  	V4L2_CTRL_TYPE_U8	     = 0x0100,
-> >  	V4L2_CTRL_TYPE_U16	     = 0x0101,
-> >  	V4L2_CTRL_TYPE_U32	     = 0x0102,
-> > +	V4L2_CTRL_TYPE_MPEG2_FRAME_HDR = 0x0109,
-> >  };
-> >  
-> >  /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
-> > 
-> 
-> 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index b070d52..7ffa930 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -21,6 +21,7 @@
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_of.h>
+ #include <drm/drm_panel.h>
++#include <video/videomode.h>
+ 
+ #include "sun4i_crtc.h"
+ #include "sun4i_drv.h"
+@@ -147,16 +148,7 @@ struct tv_mode {
+ 	u16		front_porch;
+ 	u16		line_number;
+ 	u16		vblank_level;
+-
+-	u32		hdisplay;
+-	u16		hfront_porch;
+-	u16		hsync_len;
+-	u16		hback_porch;
+-
+-	u32		vdisplay;
+-	u16		vfront_porch;
+-	u16		vsync_len;
+-	u16		vback_porch;
++	struct videomode vm;
+ 
+ 	bool		yc_en;
+ 	bool		dac3_en;
+@@ -223,16 +215,16 @@ static const struct tv_mode tv_modes[] = {
+ 		.back_porch	= 118,
+ 		.front_porch	= 32,
+ 		.line_number	= 525,
+-
+-		.hdisplay	= 720,
+-		.hfront_porch	= 18,
+-		.hsync_len	= 2,
+-		.hback_porch	= 118,
+-
+-		.vdisplay	= 480,
+-		.vfront_porch	= 26,
+-		.vsync_len	= 2,
+-		.vback_porch	= 17,
++		.vm = {
++			.hactive	= 720,
++			.hfront_porch	= 18,
++			.hsync_len	= 2,
++			.hback_porch	= 118,
++			.vactive	= 480,
++			.vfront_porch	= 26,
++			.vsync_len	= 2,
++			.vback_porch	= 17,
++		},
+ 
+ 		.vblank_level	= 240,
+ 
+@@ -249,16 +241,16 @@ static const struct tv_mode tv_modes[] = {
+ 		.back_porch	= 138,
+ 		.front_porch	= 24,
+ 		.line_number	= 625,
+-
+-		.hdisplay	= 720,
+-		.hfront_porch	= 3,
+-		.hsync_len	= 2,
+-		.hback_porch	= 139,
+-
+-		.vdisplay	= 576,
+-		.vfront_porch	= 28,
+-		.vsync_len	= 2,
+-		.vback_porch	= 19,
++		.vm = {
++			.hactive	= 720,
++			.hfront_porch	= 3,
++			.hsync_len	= 2,
++			.hback_porch	= 139,
++			.vactive	= 576,
++			.vfront_porch	= 28,
++			.vsync_len	= 2,
++			.vback_porch	= 19,
++		},
+ 
+ 		.vblank_level	= 252,
+ 
+@@ -311,9 +303,9 @@ static const struct tv_mode *sun4i_tv_find_tv_by_mode(const struct drm_display_m
+ 
+ 		DRM_DEBUG_DRIVER("Comparing mode %s vs %s (X: %d vs %d)",
+ 				 mode->name, tv_mode->name,
+-				 mode->vdisplay, tv_mode->vdisplay);
++				 mode->vdisplay, tv_mode->vm.vactive);
+ 
+-		if (mode->vdisplay == tv_mode->vdisplay)
++		if (mode->vdisplay == tv_mode->vm.vactive)
+ 			return tv_mode;
+ 	}
+ 
+@@ -325,19 +317,10 @@ static void sun4i_tv_mode_to_drm_mode(const struct tv_mode *tv_mode,
+ {
+ 	DRM_DEBUG_DRIVER("Creating mode %s\n", mode->name);
+ 
++	drm_display_mode_from_videomode(&tv_mode->vm, mode);
+ 	mode->type = DRM_MODE_TYPE_DRIVER;
+ 	mode->clock = 13500;
+ 	mode->flags = DRM_MODE_FLAG_INTERLACE;
+-
+-	mode->hdisplay = tv_mode->hdisplay;
+-	mode->hsync_start = mode->hdisplay + tv_mode->hfront_porch;
+-	mode->hsync_end = mode->hsync_start + tv_mode->hsync_len;
+-	mode->htotal = mode->hsync_end  + tv_mode->hback_porch;
+-
+-	mode->vdisplay = tv_mode->vdisplay;
+-	mode->vsync_start = mode->vdisplay + tv_mode->vfront_porch;
+-	mode->vsync_end = mode->vsync_start + tv_mode->vsync_len;
+-	mode->vtotal = mode->vsync_end  + tv_mode->vback_porch;
+ }
+ 
+ static void sun4i_tv_disable(struct drm_encoder *encoder)
 -- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/629ee026/attachment.sig>
+2.7.4
