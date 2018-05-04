@@ -1,88 +1,49 @@
-From: satendra.t@samsung.com (Satendra Singh Thakur)
-Date: Fri,  4 May 2018 14:32:03 +0530
-Subject: [PATCH v1] drm/kms/mode: added a new helper for calculating
- videomode from crtc's display mode
-In-Reply-To: <1525419600-1774-1-git-send-email-satendra.t@samsung.com>
-References: <1525419600-1774-1-git-send-email-satendra.t@samsung.com>
- <CGME20180504090214epcas5p4e9c362da6cc7b65effcc042fc4f82d2a@epcas5p4.samsung.com>
-Message-ID: <1525424523-3367-1-git-send-email-satendra.t@samsung.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Fri, 4 May 2018 14:34:05 +0530
+Subject: [PATCH v2] pinctrl: msm: fix gpio-hog related boot issues
+In-Reply-To: <2265923.XhyVMjVhWR@debian64>
+References: <20180402121005.10080-1-chunkeey@gmail.com>
+ <3524410.JrO1DEFpQ1@debian64>
+ <CACRpkdaEYFerKQa4QRCFEg2TOrdbnF6SfVZ9chLpmCxSUNcZBw@mail.gmail.com>
+ <2265923.XhyVMjVhWR@debian64>
+Message-ID: <044eab94-fd5f-884f-8e60-047c40344aad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2018 at 11:36:39 +0100, Liviu Dudau wrote:
-> On Thu, May 03, 2018 at 11:28:37AM +0530, Satendra Singh Thakur wrote:
-> > 1.
-> > -Added a new helper drm_display_mode_crtc_to_videomode
-> > -This helper calculates mode parameters like
-> >   horizontal front_porch, back_porch, sync length
-> >   vertical front_porch, back_porch, sync length
-> >   using crtc_* fields of struct drm_display_mode
-> > -It uses following fields of crtc mode
-> >  horizontal sync start/end, active and total length
-> >  vertical sync start/end, active and total length
-> > 2.
-> > -Most of the driver use user-supplied mode for calculating videomode
-> > -However, few drivers use HW (crtc) mode for calculating videomode
-> > -This helper will be useful for such drivers
-> > 3.
-> > -Currently following drivers will be using this new helper
-> > -arm hdlcd
-> > -atmel hlcdc
-> > -exynos 5433 decon
-> > -exynos7 decon
-> > -exynos fimd
-> > 4.
-> > -This patch removes related duplicate code from above mentioned drivers
-> > 
-> > Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
-> > Cc: Madhur Verma <madhur.verma@samsung.com>
-> > Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
-> > ---
-> >  drivers/gpu/drm/arm/hdlcd_crtc.c               |  8 +-------
-> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c |  7 +------
-> >  drivers/gpu/drm/drm_modes.c                    | 20 ++++++++++++++++++++
-> >  drivers/gpu/drm/exynos/exynos5433_drm_decon.c  | 22 ++++++++++------------
-> >  drivers/gpu/drm/exynos/exynos7_drm_decon.c     | 23 ++++++++++-------------
-> >  drivers/gpu/drm/exynos/exynos_drm_fimd.c       | 22 +++++++++-------------
-> >  include/drm/drm_modes.h                        |  2 ++
-> >  7 files changed, 53 insertions(+), 51 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > index cf5cbd6..d20e471 100644
-> > --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > @@ -130,13 +130,7 @@ static void hdlcd_crtc_mode_set_nofb(struct drm_crtc *crtc)
-> >  	struct videomode vm;
-> >  	unsigned int polarities, err;
-> >  
-> > -	vm.vfront_porch = m->crtc_vsync_start - m->crtc_vdisplay;
-> > -	vm.vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
-> > -	vm.vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
-> > -	vm.hfront_porch = m->crtc_hsync_start - m->crtc_hdisplay;
-> > -	vm.hback_porch = m->crtc_htotal - m->crtc_hsync_end;
-> > -	vm.hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
-> > -
-> > +	drm_display_mode_crtc_to_videomode(m, &vm);
-> >  	polarities = HDLCD_POLARITY_DATAEN | HDLCD_POLARITY_DATA;
-> >  
-> >  	if (m->flags & DRM_MODE_FLAG_PHSYNC)
->
-> For the HDLCD part:
-> 
-> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
-> 
-> If you're not sending the final version through drm-misc then let me
-> know and I can pick up the HDLCD part separately.
->
-> Best regards,
-> Liviu
->
->
 
-Hi Mr Liviu,
-Thanks for accepting the patch.
-I don't know how to send patch through drm-misc.
-You may please go ahead and pick HDLCD part separately.
 
-Thanks
--Satendra
+On Thursday 03 May 2018 11:13 PM, Christian Lamparter wrote:
+> On Mittwoch, 2. Mai 2018 14:14:39 CEST Linus Walleij wrote:
+>> On Thu, Apr 26, 2018 at 11:47 PM, Christian Lamparter
+>> <chunkeey@gmail.com> wrote:
+>>> On Thu, Apr 26, 2018 11:12:21 CEST Linus Walleij wrote:
+>>>> I think I replied in some other mail that I think we need to
+>>>> be backwards compatible and it's not too hard to do
+>>>> both. (Correct me if I'm wrong.)
+>>> I think so too, I looked around and found that the nvidia pinctrl was
+>>> doing something similar with of_find_property():
+>>> <https://elixir.bootlin.com/linux/v4.17-rc2/source/drivers/pinctrl/tegra/pinctrl-tegra.c#L652>
+>>> |       has_prop = of_find_property(np, "gpio-ranges", NULL);
+>>>
+>>> However this looks kinda funny, since "has_prob" is declared as a bool
+>>> and of_find_property() returns a pointer to a "struct property"....
+>>> Tell you what: If nobody beats me to it, I'll sent a patch for this after
+>>> the pinctrl-msm's gpio-hog has been dealt with. :)
+>> Yeah the nVidia driver is one of the oldest and also at the time
+>> DT was kind of new. I haven't heard from Stephen for a while
+>> but I bet he will pop up, else check with Laxman, he's got
+>> a good grip on nVidia pinctrl+GPIO as well.
+> All in good time.
+>
+> But first @Bjorn and @Andy or @David can you please look and
+> review v4 "pinctrl: msm: fix gpio-hog related boot issues"
+> <https://patchwork.kernel.org/patch/10339129/>
+
+Agree with the patch as by adding gpio-ranges, we add the gpio range 
+part of gpiochip_add(), called by 
+of_gpiochip_add()->of_gpiochip_add_pin_range(). and so does not need to 
+explicitly call of the gpiochip_add_pin_range().
+
+Please add ack in above patch.
+
+Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
