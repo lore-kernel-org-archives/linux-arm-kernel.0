@@ -1,93 +1,185 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri,  4 May 2018 21:05:45 +0200
-Subject: [PATCH v9 12/12] ARM: shmobile: Convert file to use cntvoff
-In-Reply-To: <20180504190545.5114-1-mylene.josserand@bootlin.com>
-References: <20180504190545.5114-1-mylene.josserand@bootlin.com>
-Message-ID: <20180504190545.5114-13-mylene.josserand@bootlin.com>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Fri, 4 May 2018 22:20:17 +0300
+Subject: [PATCH v5 12/14] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <20180504065709.62kacfext6bbprlo@vireshk-i7>
+References: <1525348355-25471-1-git-send-email-ilialin@codeaurora.org>
+ <1525348355-25471-13-git-send-email-ilialin@codeaurora.org>
+ <20180504060827.7bddb53ln2ogwcvv@vireshk-i7>
+ <002a01d3e373$6b6ee410$424cac30$@codeaurora.org>
+ <20180504065709.62kacfext6bbprlo@vireshk-i7>
+Message-ID: <007601d3e3dc$f7454a60$e5cfdf20$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that a common function is available for CNTVOFF's
-initialization, let's convert shmobile-apmu code to use
-this function.
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/common.h          |  1 -
- arch/arm/mach-shmobile/headsmp-apmu.S    | 22 +---------------------
- arch/arm/mach-shmobile/setup-rcar-gen2.c |  3 ++-
- 3 files changed, 3 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-index 43c1ac696274..2109f123bdfb 100644
---- a/arch/arm/mach-shmobile/common.h
-+++ b/arch/arm/mach-shmobile/common.h
-@@ -2,7 +2,6 @@
- #ifndef __ARCH_MACH_COMMON_H
- #define __ARCH_MACH_COMMON_H
- 
--extern void shmobile_init_cntvoff(void);
- extern void shmobile_init_delay(void);
- extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
-diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
-index 5672b5849401..d49ab194766a 100644
---- a/arch/arm/mach-shmobile/headsmp-apmu.S
-+++ b/arch/arm/mach-shmobile/headsmp-apmu.S
-@@ -11,29 +11,9 @@
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- 
--ENTRY(shmobile_init_cntvoff)
--	/*
--	 * CNTVOFF has to be initialized either from non-secure Hypervisor
--	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
--	 * then it should be handled by the secure code
--	 */
--	cps	#MON_MODE
--	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
--	orr	r0, r1, #1
--	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
--	instr_sync
--	mov	r0, #0
--	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
--	instr_sync
--	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
--	instr_sync
--	cps	#SVC_MODE
--	ret	lr
--ENDPROC(shmobile_init_cntvoff)
--
- #ifdef CONFIG_SMP
- ENTRY(shmobile_boot_apmu)
--	bl	shmobile_init_cntvoff
-+	bl	secure_cntvoff_init
- 	b	secondary_startup
- ENDPROC(shmobile_boot_apmu)
- #endif
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 5561dbed7a33..4a881026d740 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -26,6 +26,7 @@
- #include <linux/of_fdt.h>
- #include <linux/of_platform.h>
- #include <asm/mach/arch.h>
-+#include <asm/secure_cntvoff.h>
- #include "common.h"
- #include "rcar-gen2.h"
- 
-@@ -70,7 +71,7 @@ void __init rcar_gen2_timer_init(void)
- 	void __iomem *base;
- 	u32 freq;
- 
--	shmobile_init_cntvoff();
-+	secure_cntvoff_init();
- 
- 	if (of_machine_is_compatible("renesas,r8a7745") ||
- 	    of_machine_is_compatible("renesas,r8a7792") ||
--- 
-2.11.0
+> -----Original Message-----
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Sent: Friday, May 4, 2018 09:57
+> To: ilialin at codeaurora.org
+> Cc: mturquette at baylibre.com; sboyd at kernel.org; robh at kernel.org;
+> mark.rutland at arm.com; rjw at rjwysocki.net; lgirdwood at gmail.com;
+> broonie at kernel.org; andy.gross at linaro.org; david.brown at linaro.org;
+> catalin.marinas at arm.com; will.deacon at arm.com; linux-clk at vger.kernel.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> pm at vger.kernel.org; linux-arm-msm at vger.kernel.org; linux-
+> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> rnayak at codeaurora.org; amit.kucheria at linaro.org;
+> nicolas.dechesne at linaro.org; celster at codeaurora.org;
+> tfinkel at codeaurora.org
+> Subject: Re: [PATCH v5 12/14] cpufreq: Add Kryo CPU scaling driver
+> 
+> On 04-05-18, 09:44, ilialin at codeaurora.org wrote:
+> >
+> >
+> > > -----Original Message-----
+> > > From: Viresh Kumar <viresh.kumar@linaro.org>
+> > > Sent: Friday, May 4, 2018 09:08
+> > > To: Ilia Lin <ilialin@codeaurora.org>
+> > > Cc: mturquette at baylibre.com; sboyd at kernel.org; robh at kernel.org;
+> > > mark.rutland at arm.com; rjw at rjwysocki.net; lgirdwood at gmail.com;
+> > > broonie at kernel.org; andy.gross at linaro.org; david.brown at linaro.org;
+> > > catalin.marinas at arm.com; will.deacon at arm.com;
+> > > linux-clk at vger.kernel.org; devicetree at vger.kernel.org;
+> > > linux-kernel at vger.kernel.org; linux- pm at vger.kernel.org;
+> > > linux-arm-msm at vger.kernel.org; linux- soc at vger.kernel.org;
+> > > linux-arm-kernel at lists.infradead.org;
+> > > rnayak at codeaurora.org; amit.kucheria at linaro.org;
+> > > nicolas.dechesne at linaro.org; celster at codeaurora.org;
+> > > tfinkel at codeaurora.org
+> > > Subject: Re: [PATCH v5 12/14] cpufreq: Add Kryo CPU scaling driver
+> > >
+> > > On 03-05-18, 14:52, Ilia Lin wrote:
+> > > > In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO
+> > > > processors, the CPU ferequencies subset and voltage value of each
+> > > > OPP varies based on the silicon variant in use. Qualcomm Process
+> > > > Voltage Scaling Tables defines the voltage and frequency value
+> > > > based on the msm-id in SMEM and speedbin blown in the efuse
+> combination.
+> > > > The qcom-cpufreq-kryo driver reads the msm-id and efuse value from
+> > > > the SoC to provide the OPP framework with required information.
+> > > > This is used to determine the voltage and frequency value for each
+> > > > OPP of
+> > > > operating-points-v2 table when it is parsed by the OPP framework.
+> > > >
+> > > > Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+> > > > ---
+> > > >  drivers/cpufreq/Kconfig.arm          |  11 +++
+> > > >  drivers/cpufreq/Makefile             |   1 +
+> > > >  drivers/cpufreq/cpufreq-dt-platdev.c |   3 +
+> > > >  drivers/cpufreq/qcom-cpufreq-kryo.c  | 153
+> > > > +++++++++++++++++++++++++++++++++++
+> > > >  4 files changed, 168 insertions(+)  create mode 100644
+> > > > drivers/cpufreq/qcom-cpufreq-kryo.c
+> > > >
+> > > > diff --git a/drivers/cpufreq/Kconfig.arm
+> > > > b/drivers/cpufreq/Kconfig.arm index de55c7d..f9da18c 100644
+> > > > --- a/drivers/cpufreq/Kconfig.arm
+> > > > +++ b/drivers/cpufreq/Kconfig.arm
+> > > > @@ -124,6 +124,17 @@ config ARM_OMAP2PLUS_CPUFREQ
+> > > >  	depends on ARCH_OMAP2PLUS
+> > > >  	default ARCH_OMAP2PLUS
+> > > >
+> > > > +config ARM_QCOM_CPUFREQ_KRYO
+> > > > +	tristate "Qualcomm Technologies, Inc. Kryo based CPUFreq"
+> > >
+> > > I don't see any reply to Sricharan's query on this being tristate.
+> >
+> > Why shouldn't we leave possibility to compile the cpufreq-dt built-in,
+> > and the qcom-cpufreq-kryo module?
+> 
+> I was not saying this is incorrect, all I am saying is that you never
+replied to a
+> comment from one of the reviewers.
+> 
+> And I don't see a reason why this should be a tristate really.
+> cpufreq-dt is already capable of being a module, all your driver does is
+that it
+> creates the cpufreq-dt platform device after setting the OPP hw
+properties..
+> 
+> Over that, have you ever tried inserting, then removing and inserting the
+> driver module again? I feel it will fail.
+> 
+> The reason is that you never provided an exit routine which can get rid of
+the
+> platform device created in the first place.
+
+Convinced. I'll change it to bool.
+
+> 
+> > > > +	depends on QCOM_QFPROM
+> > > > +	depends on QCOM_SMEM
+> > > > +	select PM_OPP
+> > > > +	help
+> > > > +	  This adds the CPUFreq driver for
+> > > > +	  Qualcomm Technologies, Inc. Kryo SoC based boards.
+> > > > +
+> > > > +	  If in doubt, say N.
+> > > > +
+> > > >  config ARM_S3C_CPUFREQ
+> > > >  	bool
+> > > >  	help
+> > > > diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> > > > index 8d24ade..fb4a2ec 100644
+> > > > --- a/drivers/cpufreq/Makefile
+> > > > +++ b/drivers/cpufreq/Makefile
+> > > > @@ -65,6 +65,7 @@ obj-$(CONFIG_MACH_MVEBU_V7)		+=
+> > > mvebu-cpufreq.o
+> > > >  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+> > > >  obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+> > > >  obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
+> > > > +obj-$(CONFIG_ARM_QCOM_CPUFREQ_KRYO)	+= qcom-cpufreq-
+> > > kryo.o
+> > > >  obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
+> > > >  obj-$(CONFIG_ARM_S3C2412_CPUFREQ)	+= s3c2412-cpufreq.o
+> > > >  obj-$(CONFIG_ARM_S3C2416_CPUFREQ)	+= s3c2416-cpufreq.o
+> > > > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c
+> > > > b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > > > index 3b585e4..77d6ab8 100644
+> > > > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> > > > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > > > @@ -118,6 +118,9 @@
+> > > >
+> > > >  	{ .compatible = "nvidia,tegra124", },
+> > > >
+> > > > +	{ .compatible = "qcom,apq8096", },
+> > > > +	{ .compatible = "qcom,msm8996", },
+> > > > +
+> > > >  	{ .compatible = "st,stih407", },
+> > > >  	{ .compatible = "st,stih410", },
+> > > >
+> > > > diff --git a/drivers/cpufreq/qcom-cpufreq-kryo.c
+> > > > b/drivers/cpufreq/qcom-cpufreq-kryo.c
+> > > > new file mode 100644
+> > > > index 0000000..32371cc
+> > > > --- /dev/null
+> > > > +++ b/drivers/cpufreq/qcom-cpufreq-kryo.c
+> > > > @@ -0,0 +1,153 @@
+> > > > +// SPDX-License-Identifier: GPL-2.0
+> > > > +/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+> > >
+> > > Incorrect multi line comment.
+> >
+> > This was done as per Bjorn's instruction.
+> 
+> You haven't followed him correctly.
+> 
+> What he asked for is:
+> 
+> // SPDX...
+> /*
+>  * XXXX
+>  */
+> 
+> What you have done is:
+> 
+> // SPDX...
+> /* XXXX
+>  */
+
+OK. Got you. Will fix.
+
+> 
+> --
+> viresh
