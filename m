@@ -1,76 +1,58 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 4 May 2018 10:14:47 +0200
-Subject: [PATCH v2] tty/serial: atmel: use port->name as name in request_irq()
-In-Reply-To: <80203f75-f38e-6214-e9b6-8512c5941647@sorico.fr>
-References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
- <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
- <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
- <20180502191632.tgda4g5v3rhncx7c@linutronix.de>
- <4f3f6e7c-2806-1749-1523-72d5c8eb8229@sorico.fr>
- <20180503124410.n6ze2ngwv6ekjhdr@linutronix.de>
- <921729c6-7c3f-11cd-8634-044a5c52f810@sorico.fr>
- <80203f75-f38e-6214-e9b6-8512c5941647@sorico.fr>
-Message-ID: <20180504081447.enontsm6jod4xa6g@linutronix.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 4 May 2018 16:15:08 +0800
+Subject: [RFC PATCH] ARM: dts: imx: replace underscore with hyphen in
+ aliases name
+In-Reply-To: <20180504085248.532c8a47@karo-electronics.de>
+References: <1525399128-11587-1-git-send-email-shawnguo@kernel.org>
+ <20180504085248.532c8a47@karo-electronics.de>
+Message-ID: <20180504081506.GZ3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was puzzled while looking at /proc/interrupts and random things showed
-up between reboots. This occurred more often but I realised it later. The
-"correct" output should be:
-|38:      11861  atmel-aic5   2 Level     ttyS0
+On Fri, May 04, 2018 at 08:52:48AM +0200, Lothar Wa?mann wrote:
+> Hi,
+> 
+> On Fri,  4 May 2018 09:58:48 +0800 Shawn Guo wrote:
+> > It replaces underscore with hyphen in aliases name to fix DTC
+> > alias_paths warning below, which is seen with various i.MX board dts
+> > files when W=1 switch is on.
+> > 
+> >  Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+> > 
+> > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> > Cc: Gary Bisson <gary.bisson@boundarydevices.com>
+> > Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> > ---
+> > Hi Lothar, Gary,
+> > 
+> > Per my search on kernel code, this change will not break anything on
+> > kernel support.  But I'm not really sure about the case of bootloaders
+> > running on the boards.  That's why I'm sending it as RFC.
+> > 
+> > We really want i.MX to be the first-class citizen in the community.
+> > After a few cycles efforts on cleaning up DTC warnings, this alias_paths
+> > warning is the last one we see with i.MX dts files.  We really want to
+> > get rid of it and make i.MX dts be DTC warning free.
+> > 
+> > So please comment whether we can merge this patch.
+> > 
+> This breaks our U-Boot which searches for the alias names with '_'.
+> But I think it's not worth keeping the old names alive, since the
+> problem can easily be fixed by adding the old alias name to the FDT
+> on affected boards from within U-Boot, if necessary.
+> 
+> Alternatively we could add a:
+> 	reg_can_xcvr = "reg-can-xcvr";
+> [...]
+> so that the respective aliases can be resolved using both names for a
+> while.
 
-but I saw sometimes
-|38:       6426  atmel-aic5   2 Level     tty1
+Appreciate it.
 
-and accounted it wrongly as correct. This is use after free and the
-former example randomly got the "old" pointer which pointed to the same
-content. With SLAB_FREELIST_RANDOM and HARDENED I even got
-|38:       7067  atmel-aic5   2 Level     E=Started User Manager for UID 0
+> 
+> So:
+> Acked-By: Lothar Wa?mann <LW@KARO-electronics.de>
 
-or other nonsense.
-As it turns out the tty, pointer that is accessed in atmel_startup(), is
-freed() before atmel_shutdown(). It seems to happen quite often that the
-tty for ttyS0 is allocated and freed while ->shutdown is not invoked. I
-don't do anything special - just a systemd boot :)
+Thanks, Lothar.
 
-Use port->name as the IRQ name for request_irq(). This exists as long as
-the driver is loaded so no use-after-free here.
-For backports before v4.12 I suggest to use `"atmel_serial"' instead
-`port->name' (that member was introduced in f7048b15900f ("tty: serial_core:
-Add name field to uart_port struct").
-
-Cc: stable at vger.kernel.org
-Fixes: 761ed4a94582 ("tty: serial_core: convert uart_close to use tty_port_close")
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
-v1?v2: - Bisected and added a Fixes tag
-       - added a note for backporters to v4.9 ? v4.12 (pointed out by
-	 Richard Genoud)
-
- drivers/tty/serial/atmel_serial.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index e287fe8f10fc..d3189816740e 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1757,7 +1757,6 @@ static int atmel_startup(struct uart_port *port)
- {
- 	struct platform_device *pdev = to_platform_device(port->dev);
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
--	struct tty_struct *tty = port->state->port.tty;
- 	int retval;
- 
- 	/*
-@@ -1772,8 +1771,7 @@ static int atmel_startup(struct uart_port *port)
- 	 * Allocate the IRQ
- 	 */
- 	retval = request_irq(port->irq, atmel_interrupt,
--			IRQF_SHARED | IRQF_COND_SUSPEND,
--			tty ? tty->name : "atmel_serial", port);
-+			     IRQF_SHARED | IRQF_COND_SUSPEND, port->name, port);
- 	if (retval) {
- 		dev_err(port->dev, "atmel_startup - Can't get irq\n");
- 		return retval;
--- 
-2.17.0
+Shawn
