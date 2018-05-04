@@ -1,122 +1,44 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Sat, 5 May 2018 00:05:00 +0200
-Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
- HMI
-In-Reply-To: <644bcd2f-3479-3f3c-3aef-9db3d565c133@orpaltech.com>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
- <20180322180508.my64gobhh5rc2x2m@flea>
- <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
- <20180424084137.7xfwji2gcibxavvt@flea>
- <03a02abb-e95c-b4ec-748f-907c0af67969@micronovasrl.com>
- <20180425184016.xktppxw7egddr7li@flea>
- <42feccc9-1d09-9ff2-3ccc-1dea63bacfb6@micronovasrl.com>
- <839d2560-0250-9b3a-8019-4e83d9e931e2@micronovasrl.com>
- <20180504080652.dniwaqqhbeuknp7y@flea>
- <afc78821-2d08-3f4f-d008-5b2d216e96c0@micronovasrl.com>
- <644bcd2f-3479-3f3c-3aef-9db3d565c133@orpaltech.com>
-Message-ID: <f8a35f86-80e5-c183-10ad-63e7425e75c6@micronovasrl.com>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 4 May 2018 15:15:08 -0700
+Subject: [PATCH] [stable] arm64: Add work around for Arm Cortex-A55
+ Erratum 1024718
+In-Reply-To: <1525170364-21032-1-git-send-email-suzuki.poulose@arm.com>
+References: <1525170364-21032-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180504221508.GD20328@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergey,
-
-Il 04/05/2018 23:59, Sergey Suloev ha scritto:
-> Hi, Giulio,
+On Tue, May 01, 2018 at 11:26:04AM +0100, Suzuki K Poulose wrote:
+> commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
 > 
-> On 05/05/2018 12:52 AM, Giulio Benetti wrote:
->> Hi Maxime!
->>
->> Il 04/05/2018 10:06, Maxime Ripard ha scritto:
->>> Hi,
->>>
->>> On Wed, May 02, 2018 at 06:41:34PM +0200, Giulio Benetti wrote:
->>>>>> You don't have to handcode the fragments anymore with the new syntax,
->>>>>> and U-Boot makes it really trivial to use if you use the FIT image
->>>>>> format to have multiple overlays bundled in the same image. You can
->>>>>> choose to apply them dynamically, for example based on an EEPROM or
->>>>>> some other metric to see which combination you have.
->>>>>
->>>>> Ah, this is interesting. I'm going to experiment with that.
->>>>>
->>>>
->>>> I'm struggling against this, I don't really know how to proceed,
->>>> except keeping monolithic dts files including other dtsi files.
->>>>
->>>> About dt-overlays I've tried to look around lot of time,
->>>> but the only thing I've found is this:
->>>> https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git/tree/arch/arm/boot/dts?h=topic/renesas-overlays 
->>>>
->>>>
->>>> where they use .dtso tagging them as "/plugin/;"
->>>> and compile all .dtso found in dts folder.
->>>> Then they obtain .dtbo files that should be the dt-overlays we have 
->>>> spoken
->>>> about right?
->>>
->>> Yes. You don't have to do that though, you can just rely on dtc to
->>> compile them, outside of the linux build system.
->>>
->>>> What I can't understand is if there's a real standard at this time to
->>>> follow, because on renesas-driver they use their way to handle all 
->>>> .dtso
->>>> files, but on mainline there seems to be nothing about that.
->>>
->>> I'm not sure what you mean here. It's just fragments of device tree,
->>> that have to be compiled using dtc, that's it. You can use the Linux
->>> build system infrastructure to do that, or you can build your own
->>> simpler one. That's really up to you. See for example
->>> https://github.com/NextThingCo/CHIP-dt-overlays/blob/master/Makefile
->>>
->>> (even though the overlays themselves use the legacy syntax and
->>> shouldn't really be used an examples)
->>
->> Everything works now!
->> Thank you very much!
->> I've setted up a Repo on Github to give an example on how make it work 
->> with no pain:
->> https://github.com/micronovasrl/linova-dtoverlays
->>
->> At the moment it's a mess all around, but it's working and give an 
->> idea on how to make it work. Though I'm going to clean it up well as a 
->> base for linova dtoverlays.
->>
->> Ah, btw, can you confirm me that base dts file must be compiled 
->> outside kernel with:
->> dtc -@ ....
->> Otherwise as in-tree dts with make dtbs "-@" argument is not passed.
->> Right?
->>
->> Thank you a lot for your help and time again!
->>
->> Best regards!
->>
-> I'd highly recommend you to look at Armbian overlay support: it is easy 
-> and elegant.
+> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
+> from an erratum 1024718, which causes incorrect updates when DBM/AP
+> bits in a page table entry is modified without a break-before-make
+> sequence. The work around is to disable the hardware DBM feature
+> on the affected cores. The hardware Access Flag management features
+> is not affected.
 > 
-> https://github.com/armbian/build/blob/master/patch/kernel/sunxi-next/add-overlay-compilation-support.patch 
+> The hardware DBM feature is a non-conflicting capability, i.e, the
+> kernel could handle cores using the feature and those without having
+> the features running at the same time. So this work around is detected
+> at early boot time, rather than delaying it until the CPUs are brought
+> up into the kernel with MMU turned on. This also avoids other complexities
+> with late CPUs turning online, with or without the hardware DBM features.
 > 
+> Note: The upstream commit is on top of a reworked capability
+> infrastructure for arm64 heterogeneous systems, which allows
+> handling this later in the boot process. This backport
+> is based on the original version of the patch [0]. Folded the 3
+> patches into this single commit, removing the unncessary bits.
 > 
-> https://github.com/armbian/build/blob/master/patch/kernel/sunxi-next/add-sunxi-overlays.patch 
+> [0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
+> 
+> Cc: stable at vger.kernel.org # v4.3 to v4.16
 
-Thanks for pointing me that,
-but as we've discussed before, at the moment overlays are not going to 
-be included in Mainline Kernel(Maxime correct if I'm wrong).
-Try to think maintaining thousands and thousands of overlays,
-it would be a nightmare(IMHO).
-Maybe it will change, I don't know.
+This only would apply to the 4.16.y tree.  Can you provide working
+backports to 4.14.y, 4.9.y, and 4.4.y so I can queue them up there as
+well?
 
-Thanks anyway.
-Best regards
+thanks,
 
--- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+greg k-h
