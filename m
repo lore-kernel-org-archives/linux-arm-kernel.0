@@ -1,73 +1,63 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  4 May 2018 17:05:29 +0100
-Subject: [PATCH v5 08/14] arm64/sve: Switch sve_pffr() argument from task to
- thread
+Date: Fri,  4 May 2018 17:05:33 +0100
+Subject: [PATCH v5 12/14] KVM: arm64: Remove redundant *exit_code changes in
+ fpsimd_guest_exit()
 In-Reply-To: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
 References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525449935-31424-9-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1525449935-31424-13-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sve_pffr(), which is used to derive the base address used for
-low-level SVE save/restore routines, currently takes the relevant
-task_struct as an argument.
+In fixup_guest_exit(), there are a couple of cases where after
+checking what the exit code was, we assign it explicitly with the
+value it already had.
 
-The only accessed fields are actually part of thread_struct, so
-this patch changes the argument type accordingly.  This is done in
-preparation for moving this function to a header, where we do not
-want to have to include <linux/sched.h> due to the consequent
-circular #include problems.
+Assuming this is not indicative of a bug, these assignments are not
+needed.
+
+This patch removes the redundant assignments simplifies some if-
+nesting that becomes trivial as a result.
 
 No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/hyp/switch.c | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e7f99f2..d811679 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -44,6 +44,7 @@
- #include <asm/fpsimd.h>
- #include <asm/cpufeature.h>
- #include <asm/cputype.h>
-+#include <asm/processor.h>
- #include <asm/simd.h>
- #include <asm/sigcontext.h>
- #include <asm/sysreg.h>
-@@ -167,10 +168,9 @@ static size_t sve_ffr_offset(int vl)
- 	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
- }
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 8009126..39e9166 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -401,12 +401,8 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+ 		if (valid) {
+ 			int ret = __vgic_v2_perform_cpuif_access(vcpu);
  
--static void *sve_pffr(struct task_struct *task)
-+static void *sve_pffr(struct thread_struct *thread)
- {
--	return (char *)task->thread.sve_state +
--		sve_ffr_offset(task->thread.sve_vl);
-+	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
- }
+-			if (ret == 1) {
+-				if (__skip_instr(vcpu))
+-					return true;
+-				else
+-					*exit_code = ARM_EXCEPTION_TRAP;
+-			}
++			if (ret ==  1 && __skip_instr(vcpu))
++				return true;
  
- static void change_cpacr(u64 val, u64 mask)
-@@ -253,7 +253,7 @@ static void task_fpsimd_load(void)
- 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 			if (ret == -1) {
+ 				/* Promote an illegal access to an
+@@ -428,12 +424,8 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+ 	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
+ 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
  
- 	if (system_supports_sve() && test_thread_flag(TIF_SVE))
--		sve_load_state(sve_pffr(current),
-+		sve_load_state(sve_pffr(&current->thread),
- 			       &current->thread.uw.fpsimd_state.fpsr,
- 			       sve_vq_from_vl(current->thread.sve_vl) - 1);
- 	else
-@@ -294,7 +294,7 @@ void fpsimd_save(void)
- 				return;
- 			}
- 
--			sve_save_state(sve_pffr(current), &st->fpsr);
-+			sve_save_state(sve_pffr(&current->thread), &st->fpsr);
- 		} else
- 			fpsimd_save_state(st);
+-		if (ret == 1) {
+-			if (__skip_instr(vcpu))
+-				return true;
+-			else
+-				*exit_code = ARM_EXCEPTION_TRAP;
+-		}
++		if (ret == 1 && __skip_instr(vcpu))
++			return true;
  	}
+ 
+ 	/* Return to the host kernel and handle the exit */
 -- 
 2.1.4
