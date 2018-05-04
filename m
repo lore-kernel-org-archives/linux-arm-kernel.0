@@ -1,173 +1,93 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 4 May 2018 11:06:56 +0100
-Subject: [PATCH v2 2/6] arm64: alternative: Apply alternatives early in
- boot process
-In-Reply-To: <1516190084-18978-3-git-send-email-julien.thierry@arm.com>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <1516190084-18978-3-git-send-email-julien.thierry@arm.com>
-Message-ID: <c935a9e6-94a0-03cb-eb64-7e2eef8f8d86@arm.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 4 May 2018 12:28:56 +0200
+Subject: [PATCH v2] tty/serial: atmel: use port->name as name in
+ request_irq()
+In-Reply-To: <20180504081447.enontsm6jod4xa6g@linutronix.de>
+References: <20180426150625.q5tqcb7fzchvkb5d@linutronix.de>
+ <20180426151222.6vw67lwqmu6ffgnw@linutronix.de>
+ <0dbf4a4c-71d4-6456-67b9-d4d202acffb7@sorico.fr>
+ <20180502191632.tgda4g5v3rhncx7c@linutronix.de>
+ <4f3f6e7c-2806-1749-1523-72d5c8eb8229@sorico.fr>
+ <20180503124410.n6ze2ngwv6ekjhdr@linutronix.de>
+ <921729c6-7c3f-11cd-8634-044a5c52f810@sorico.fr>
+ <80203f75-f38e-6214-e9b6-8512c5941647@sorico.fr>
+ <20180504081447.enontsm6jod4xa6g@linutronix.de>
+Message-ID: <d62a945c-f81e-d7e5-8431-a7948a0b833c@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/05/2018 10:14, Sebastian Andrzej Siewior wrote:
+> I was puzzled while looking at /proc/interrupts and random things showed
+> up between reboots. This occurred more often but I realised it later. The
+> "correct" output should be:
+> |38:      11861  atmel-aic5   2 Level     ttyS0
+> 
+> but I saw sometimes
+> |38:       6426  atmel-aic5   2 Level     tty1
+> 
+> and accounted it wrongly as correct. This is use after free and the
+> former example randomly got the "old" pointer which pointed to the same
+> content. With SLAB_FREELIST_RANDOM and HARDENED I even got
+> |38:       7067  atmel-aic5   2 Level     E=Started User Manager for UID 0
+> 
+> or other nonsense.
+> As it turns out the tty, pointer that is accessed in atmel_startup(), is
+> freed() before atmel_shutdown(). It seems to happen quite often that the
+> tty for ttyS0 is allocated and freed while ->shutdown is not invoked. I
+> don't do anything special - just a systemd boot :)
+> 
+> Use port->name as the IRQ name for request_irq(). This exists as long as
+> the driver is loaded so no use-after-free here.
+> For backports before v4.12 I suggest to use `"atmel_serial"' instead
+> `port->name' (that member was introduced in f7048b15900f ("tty: serial_core:
+> Add name field to uart_port struct").
+> 
+> Cc: stable at vger.kernel.org
+I think it's safer to use:
+Cc: stable at vger.kernel.org # 4.14
+Because the stable team may miss your comment, and even if they don't, I
+think it's not their role to adapt the patch to 4.9.x (and test it !)
+IMHO, the best way is to add # 4.14 and when it's applied on 4.14.x,
+send a tested backport for 4.9.x
 
-In order to prepare the v3 of this patchset, I'd like people's opinion 
-on what this patch does. More below.
+Besides that, you can add my:
+Acked-by: Richard Genoud <richard.genoud@gmail.com>
 
-On 17/01/18 11:54, Julien Thierry wrote:
-> From: Daniel Thompson <daniel.thompson@linaro.org>
-> 
-> Currently alternatives are applied very late in the boot process (and
-> a long time after we enable scheduling). Some alternative sequences,
-> such as those that alter the way CPU context is stored, must be applied
-> much earlier in the boot sequence.
-> 
-> Introduce apply_alternatives_early() to allow some alternatives to be
-> applied immediately after we detect the CPU features of the boot CPU.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+Rob, do you agree with this fix ?
+
+
+> Fixes: 761ed4a94582 ("tty: serial_core: convert uart_close to use tty_port_close")
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 > ---
->   arch/arm64/include/asm/alternative.h |  1 +
->   arch/arm64/kernel/alternative.c      | 39 +++++++++++++++++++++++++++++++++---
->   arch/arm64/kernel/smp.c              |  6 ++++++
->   3 files changed, 43 insertions(+), 3 deletions(-)
+> v1?v2: - Bisected and added a Fixes tag
+>        - added a note for backporters to v4.9 ? v4.12 (pointed out by
+> 	 Richard Genoud)
 > 
-> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-> index 4a85c69..1fc1cdb 100644
-> --- a/arch/arm64/include/asm/alternative.h
-> +++ b/arch/arm64/include/asm/alternative.h
-> @@ -20,6 +20,7 @@ struct alt_instr {
->   	u8  alt_len;		/* size of new instruction(s), <= orig_len */
->   };
+>  drivers/tty/serial/atmel_serial.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 > 
-> +void __init apply_alternatives_early(void);
->   void __init apply_alternatives_all(void);
->   void apply_alternatives(void *start, size_t length);
-> 
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index 6dd0a3a3..78051d4 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -28,6 +28,18 @@
->   #include <asm/sections.h>
->   #include <linux/stop_machine.h>
-> 
-> +/*
-> + * early-apply features are detected using only the boot CPU and checked on
-> + * secondary CPUs startup, even then,
-> + * These early-apply features should only include features where we must
-> + * patch the kernel very early in the boot process.
-> + *
-> + * Note that the cpufeature logic *must* be made aware of early-apply
-> + * features to ensure they are reported as enabled without waiting
-> + * for other CPUs to boot.
-> + */
-> +#define EARLY_APPLY_FEATURE_MASK BIT(ARM64_HAS_SYSREG_GIC_CPUIF)
-> +
-
-Following the change in the cpufeature infrastructure, 
-ARM64_HAS_SYSREG_GIC_CPUIF will have the scope 
-ARM64_CPUCAP_SCOPE_BOOT_CPU in order to be checked early in the boot 
-process.
-
-Now, regarding the early application of alternative, I am wondering 
-whether we can apply all the alternatives associated with SCOPE_BOOT 
-features that *do not* have a cpu_enable callback.
-
-Otherwise we can keep the macro to list individually each feature that 
-is patchable at boot time as the current patch does (or put this info in 
-a flag within the arm64_cpu_capabilities structure).
-
-Any thoughts or preferences on this?
-
-Thanks,
-
->   #define __ALT_PTR(a,f)		((void *)&(a)->f + (a)->f)
->   #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
->   #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
-> @@ -105,7 +117,8 @@ static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnp
->   	return insn;
->   }
-> 
-> -static void __apply_alternatives(void *alt_region, bool use_linear_alias)
-> +static void __apply_alternatives(void *alt_region,  bool use_linear_alias,
-> +				 unsigned long feature_mask)
->   {
->   	struct alt_instr *alt;
->   	struct alt_region *region = alt_region;
-> @@ -115,6 +128,9 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
->   		u32 insn;
->   		int i, nr_inst;
-> 
-> +		if ((BIT(alt->cpufeature) & feature_mask) == 0)
-> +			continue;
-> +
->   		if (!cpus_have_cap(alt->cpufeature))
->   			continue;
-> 
-> @@ -138,6 +154,21 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
->   }
-> 
->   /*
-> + * This is called very early in the boot process (directly after we run
-> + * a feature detect on the boot CPU). No need to worry about other CPUs
-> + * here.
-> + */
-> +void apply_alternatives_early(void)
-> +{
-> +	struct alt_region region = {
-> +		.begin	= (struct alt_instr *)__alt_instructions,
-> +		.end	= (struct alt_instr *)__alt_instructions_end,
-> +	};
-> +
-> +	__apply_alternatives(&region, true, EARLY_APPLY_FEATURE_MASK);
-> +}
-> +
-> +/*
->    * We might be patching the stop_machine state machine, so implement a
->    * really simple polling protocol here.
->    */
-> @@ -156,7 +187,9 @@ static int __apply_alternatives_multi_stop(void *unused)
->   		isb();
->   	} else {
->   		BUG_ON(patched);
-> -		__apply_alternatives(&region, true);
-> +
-> +		__apply_alternatives(&region, true, ~EARLY_APPLY_FEATURE_MASK);
-> +
->   		/* Barriers provided by the cache flushing */
->   		WRITE_ONCE(patched, 1);
->   	}
-> @@ -177,5 +210,5 @@ void apply_alternatives(void *start, size_t length)
->   		.end	= start + length,
->   	};
-> 
-> -	__apply_alternatives(&region, false);
-> +	__apply_alternatives(&region, false, -1);
->   }
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 551eb07..37361b5 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -453,6 +453,12 @@ void __init smp_prepare_boot_cpu(void)
->   	 * cpuinfo_store_boot_cpu() above.
->   	 */
->   	update_cpu_errata_workarounds();
-> +	/*
-> +	 * We now know enough about the boot CPU to apply the
-> +	 * alternatives that cannot wait until interrupt handling
-> +	 * and/or scheduling is enabled.
-> +	 */
-> +	apply_alternatives_early();
->   }
-> 
->   static u64 __init of_get_cpu_mpidr(struct device_node *dn)
-> --
-> 1.9.1
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index e287fe8f10fc..d3189816740e 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -1757,7 +1757,6 @@ static int atmel_startup(struct uart_port *port)
+>  {
+>  	struct platform_device *pdev = to_platform_device(port->dev);
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> -	struct tty_struct *tty = port->state->port.tty;
+>  	int retval;
+>  
+>  	/*
+> @@ -1772,8 +1771,7 @@ static int atmel_startup(struct uart_port *port)
+>  	 * Allocate the IRQ
+>  	 */
+>  	retval = request_irq(port->irq, atmel_interrupt,
+> -			IRQF_SHARED | IRQF_COND_SUSPEND,
+> -			tty ? tty->name : "atmel_serial", port);
+> +			     IRQF_SHARED | IRQF_COND_SUSPEND, port->name, port);
+>  	if (retval) {
+>  		dev_err(port->dev, "atmel_startup - Can't get irq\n");
+>  		return retval;
 > 
 
--- 
-Julien Thierry
+Thanks !
