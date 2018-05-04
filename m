@@ -1,124 +1,119 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Fri,  4 May 2018 13:16:27 +0900
-Subject: [BUGFIX PATCH v3 4/4] arm: kprobes: Prohibit kprobes on get_user
- functions
-In-Reply-To: <152540727123.29650.13679359124038587629.stgit@devbox>
-References: <152540727123.29650.13679359124038587629.stgit@devbox>
-Message-ID: <152540738682.29650.10638462666953783065.stgit@devbox>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Fri, 4 May 2018 13:47:32 +0800
+Subject: [PATCH v7 1/2] PCI: mediatek: Set up vendor ID and class type for
+ MT7622
+In-Reply-To: <1525412853-24367-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1525412853-24367-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1525412853-24367-2-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since do_undefinstr() uses get_user to get the undefined
-instruction, it can be called before kprobes processes
-recursive check. This can cause an infinit recursive
-exception.
-Prohibit probing on get_user functions.
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Fixes: 24ba613c9d6c ("ARM kprobes: core code")
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-Cc: stable at vger.kernel.org
----
- Changes in v2:
-  - Fix to add _ASM_NOKPROBE() definition for
-    !CONFIG_KPROBES.
----
- arch/arm/include/asm/assembler.h |   10 ++++++++++
- arch/arm/lib/getuser.S           |   10 ++++++++++
- 2 files changed, 20 insertions(+)
+MT7622's hardware default value of vendor ID and class type is not correct,
+fix that by setup the correct values before linkup with Endpoint.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index bc8d4bbd82e2..9342904cccca 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -536,4 +536,14 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- #endif
- 	.endm
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ drivers/pci/host/pcie-mediatek.c | 30 +++++++++++++++++++++++++++---
+ include/linux/pci_ids.h          |  2 ++
+ 2 files changed, 29 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+index a8b20c5..c3dc549 100644
+--- a/drivers/pci/host/pcie-mediatek.c
++++ b/drivers/pci/host/pcie-mediatek.c
+@@ -66,6 +66,10 @@
  
-+#ifdef CONFIG_KPROBES
-+#define _ASM_NOKPROBE(entry)				\
-+	.pushsection "_kprobe_blacklist", "aw" ;	\
-+	.balign 4 ;					\
-+	.long entry;					\
-+	.popsection
-+#else
-+#define _ASM_NOKPROBE(entry)
-+#endif
+ /* PCIe V2 per-port registers */
+ #define PCIE_MSI_VECTOR		0x0c0
 +
- #endif /* __ASM_ASSEMBLER_H__ */
-diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
-index df73914e81c8..746e7801dcdf 100644
---- a/arch/arm/lib/getuser.S
-+++ b/arch/arm/lib/getuser.S
-@@ -38,6 +38,7 @@ ENTRY(__get_user_1)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_1)
-+_ASM_NOKPROBE(__get_user_1)
++#define PCIE_CONF_VEND_ID	0x100
++#define PCIE_CONF_CLASS_ID	0x106
++
+ #define PCIE_INT_MASK		0x420
+ #define INTX_MASK		GENMASK(19, 16)
+ #define INTX_SHIFT		16
+@@ -125,12 +129,14 @@ struct mtk_pcie_port;
  
- ENTRY(__get_user_2)
- 	check_uaccess r0, 2, r1, r2, __get_user_bad
-@@ -58,6 +59,7 @@ rb	.req	r0
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_2)
-+_ASM_NOKPROBE(__get_user_2)
+ /**
+  * struct mtk_pcie_soc - differentiate between host generations
++ * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+  * @has_msi: whether this host supports MSI interrupts or not
+  * @ops: pointer to configuration access functions
+  * @startup: pointer to controller setting functions
+  * @setup_irq: pointer to initialize IRQ functions
+  */
+ struct mtk_pcie_soc {
++	bool need_fix_class_id;
+ 	bool has_msi;
+ 	struct pci_ops *ops;
+ 	int (*startup)(struct mtk_pcie_port *port);
+@@ -375,6 +381,7 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+ {
+ 	struct mtk_pcie *pcie = port->pcie;
+ 	struct resource *mem = &pcie->mem;
++	const struct mtk_pcie_soc *soc = port->pcie->soc;
+ 	u32 val;
+ 	size_t size;
+ 	int err;
+@@ -403,6 +410,15 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+ 	       PCIE_MAC_SRSTB | PCIE_CRSTB;
+ 	writel(val, port->base + PCIE_RST_CTRL);
  
- ENTRY(__get_user_4)
- 	check_uaccess r0, 4, r1, r2, __get_user_bad
-@@ -65,6 +67,7 @@ ENTRY(__get_user_4)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_4)
-+_ASM_NOKPROBE(__get_user_4)
++	/* Set up vendor ID and class code */
++	if (soc->need_fix_class_id) {
++		val = PCI_VENDOR_ID_MEDIATEK;
++		writew(val, port->base + PCIE_CONF_VEND_ID);
++
++		val = PCI_CLASS_BRIDGE_HOST;
++		writew(val, port->base + PCIE_CONF_CLASS_ID);
++	}
++
+ 	/* 100ms timeout value should be enough for Gen1/2 training */
+ 	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
+ 				 !!(val & PCIE_PORT_LINKUP_V2), 20,
+@@ -1142,7 +1158,15 @@ static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+ 	.startup = mtk_pcie_startup_port,
+ };
  
- ENTRY(__get_user_8)
- 	check_uaccess r0, 8, r1, r2, __get_user_bad8
-@@ -78,6 +81,7 @@ ENTRY(__get_user_8)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_8)
-+_ASM_NOKPROBE(__get_user_8)
+-static const struct mtk_pcie_soc mtk_pcie_soc_v2 = {
++static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
++	.has_msi = true,
++	.ops = &mtk_pcie_ops_v2,
++	.startup = mtk_pcie_startup_port_v2,
++	.setup_irq = mtk_pcie_setup_irq,
++};
++
++static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
++	.need_fix_class_id = true,
+ 	.has_msi = true,
+ 	.ops = &mtk_pcie_ops_v2,
+ 	.startup = mtk_pcie_startup_port_v2,
+@@ -1152,8 +1176,8 @@ static const struct mtk_pcie_soc mtk_pcie_soc_v2 = {
+ static const struct of_device_id mtk_pcie_ids[] = {
+ 	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
+ 	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
+-	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_v2 },
+-	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_v2 },
++	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_mt2712 },
++	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_mt7622 },
+ 	{},
+ };
  
- #ifdef __ARMEB__
- ENTRY(__get_user_32t_8)
-@@ -91,6 +95,7 @@ ENTRY(__get_user_32t_8)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_32t_8)
-+_ASM_NOKPROBE(__get_user_32t_8)
+diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+index a6b3066..9d4fca5 100644
+--- a/include/linux/pci_ids.h
++++ b/include/linux/pci_ids.h
+@@ -2115,6 +2115,8 @@
  
- ENTRY(__get_user_64t_1)
- 	check_uaccess r0, 1, r1, r2, __get_user_bad8
-@@ -98,6 +103,7 @@ ENTRY(__get_user_64t_1)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_64t_1)
-+_ASM_NOKPROBE(__get_user_64t_1)
+ #define PCI_VENDOR_ID_MYRICOM		0x14c1
  
- ENTRY(__get_user_64t_2)
- 	check_uaccess r0, 2, r1, r2, __get_user_bad8
-@@ -114,6 +120,7 @@ rb	.req	r0
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_64t_2)
-+_ASM_NOKPROBE(__get_user_64t_2)
- 
- ENTRY(__get_user_64t_4)
- 	check_uaccess r0, 4, r1, r2, __get_user_bad8
-@@ -121,6 +128,7 @@ ENTRY(__get_user_64t_4)
- 	mov	r0, #0
- 	ret	lr
- ENDPROC(__get_user_64t_4)
-+_ASM_NOKPROBE(__get_user_64t_4)
- #endif
- 
- __get_user_bad8:
-@@ -131,6 +139,8 @@ __get_user_bad:
- 	ret	lr
- ENDPROC(__get_user_bad)
- ENDPROC(__get_user_bad8)
-+_ASM_NOKPROBE(__get_user_bad)
-+_ASM_NOKPROBE(__get_user_bad8)
- 
- .pushsection __ex_table, "a"
- 	.long	1b, __get_user_bad
++#define PCI_VENDOR_ID_MEDIATEK		0x14c3
++
+ #define PCI_VENDOR_ID_TITAN		0x14D2
+ #define PCI_DEVICE_ID_TITAN_010L	0x8001
+ #define PCI_DEVICE_ID_TITAN_100L	0x8010
+-- 
+2.6.4
