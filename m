@@ -1,112 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  4 May 2018 11:41:17 +0100
-Subject: [PATCH] drivers/perf: arm-ccn: stop spamming dmesg in event_init
-Message-ID: <20180504104117.8086-1-mark.rutland@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri,  4 May 2018 12:55:59 +0200
+Subject: [PATCH] arm: kprobe: replace patch_lock to raw lock
+In-Reply-To: <20180504105600.20613-1-bigeasy@linutronix.de>
+References: <20180504105600.20613-1-bigeasy@linutronix.de>
+Message-ID: <20180504105600.20613-2-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM CCN PMU driver uses dev_warn() to complain about parameters in
-the user-provided perf_event_attr. This means that under normal
-operation (e.g. a single invocation of the perf tool), dmesg may be
-spammed with multiple messages.
+From: Yang Shi <yang.shi@linaro.org>
 
-Tools may issue multiple syscalls to probe for feature support, and
-multiple applications (from multiple users) can attempt to open events
-simultaneously, so this is not very helpful, even if a user happens to
-have access to dmesg. Worse, this can push important information out of
-the dmesg ring buffer, and can significantly slow down syscall fuzzers,
-vastly increasing the time it takes to find critical bugs.
+When running kprobe on -rt kernel, the below bug is caught:
 
-Demote the dev_warn() instances to dev_dbg(), as is the case for all
-other PMU drivers under drivers/perf/. Users who wish to debug PMU event
-initialisation can enable dynamic debug to receive these messages.
+BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:931
+in_atomic(): 1, irqs_disabled(): 128, pid: 14, name: migration/0
+INFO: lockdep is turned off.
+irq event stamp: 238
+hardirqs last enabled at (237): [<80b5aecc>] _raw_spin_unlock_irqrestore+0x88/0x90
+hardirqs last disabled at (238): [<80b56d88>] __schedule+0xec/0x94c
+softirqs last enabled at (0): [<80225584>] copy_process.part.5+0x30c/0x1994
+softirqs last disabled at (0): [< (null)>] (null)
+Preemption disabled at:[<802f2b98>] cpu_stopper_thread+0xc0/0x140
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+CPU: 0 PID: 14 Comm: migration/0 Tainted: G O 4.8.3-rt2 #1
+Hardware name: Freescale LS1021A
+[<80212e7c>] (unwind_backtrace) from [<8020cd2c>] (show_stack+0x20/0x24)
+[<8020cd2c>] (show_stack) from [<80689e14>] (dump_stack+0xa0/0xcc)
+[<80689e14>] (dump_stack) from [<8025a43c>] (___might_sleep+0x1b8/0x2a4)
+[<8025a43c>] (___might_sleep) from [<80b5b324>] (rt_spin_lock+0x34/0x74)
+[<80b5b324>] (rt_spin_lock) from [<80b5c31c>] (__patch_text_real+0x70/0xe8)
+[<80b5c31c>] (__patch_text_real) from [<80b5c3ac>] (patch_text_stop_machine+0x18/0x20)
+[<80b5c3ac>] (patch_text_stop_machine) from [<802f2920>] (multi_cpu_stop+0xfc/0x134)
+[<802f2920>] (multi_cpu_stop) from [<802f2ba0>] (cpu_stopper_thread+0xc8/0x140)
+[<802f2ba0>] (cpu_stopper_thread) from [<802563a4>] (smpboot_thread_fn+0x1a4/0x354)
+[<802563a4>] (smpboot_thread_fn) from [<80251d38>] (kthread+0x104/0x11c)
+[<80251d38>] (kthread) from [<80207f70>] (ret_from_fork+0x14/0x24)
+
+Since patch_text_stop_machine() is called in stop_machine() which disables IRQ,
+sleepable lock should be not used in this atomic context, so replace patch_lock
+to raw lock.
+
+Cc: Russell King <linux@armlinux.org.uk> 
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/perf/arm-ccn.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/kernel/patch.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/perf/arm-ccn.c b/drivers/perf/arm-ccn.c
-index 65b7e4042ece..07771e28f572 100644
---- a/drivers/perf/arm-ccn.c
-+++ b/drivers/perf/arm-ccn.c
-@@ -736,7 +736,7 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 	ccn = pmu_to_arm_ccn(event->pmu);
+--- a/arch/arm/kernel/patch.c
++++ b/arch/arm/kernel/patch.c
+@@ -16,7 +16,7 @@ struct patch {
+ 	unsigned int insn;
+ };
  
- 	if (hw->sample_period) {
--		dev_warn(ccn->dev, "Sampling not supported!\n");
-+		dev_dbg(ccn->dev, "Sampling not supported!\n");
- 		return -EOPNOTSUPP;
- 	}
+-static DEFINE_SPINLOCK(patch_lock);
++static DEFINE_RAW_SPINLOCK(patch_lock);
  
-@@ -744,12 +744,12 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 			event->attr.exclude_kernel || event->attr.exclude_hv ||
- 			event->attr.exclude_idle || event->attr.exclude_host ||
- 			event->attr.exclude_guest) {
--		dev_warn(ccn->dev, "Can't exclude execution levels!\n");
-+		dev_dbg(ccn->dev, "Can't exclude execution levels!\n");
- 		return -EINVAL;
- 	}
+ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+ 	__acquires(&patch_lock)
+@@ -33,7 +33,7 @@ static void __kprobes *patch_map(void *a
+ 		return addr;
  
- 	if (event->cpu < 0) {
--		dev_warn(ccn->dev, "Can't provide per-task data!\n");
-+		dev_dbg(ccn->dev, "Can't provide per-task data!\n");
- 		return -EOPNOTSUPP;
- 	}
- 	/*
-@@ -771,13 +771,13 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 	switch (type) {
- 	case CCN_TYPE_MN:
- 		if (node_xp != ccn->mn_id) {
--			dev_warn(ccn->dev, "Invalid MN ID %d!\n", node_xp);
-+			dev_dbg(ccn->dev, "Invalid MN ID %d!\n", node_xp);
- 			return -EINVAL;
- 		}
- 		break;
- 	case CCN_TYPE_XP:
- 		if (node_xp >= ccn->num_xps) {
--			dev_warn(ccn->dev, "Invalid XP ID %d!\n", node_xp);
-+			dev_dbg(ccn->dev, "Invalid XP ID %d!\n", node_xp);
- 			return -EINVAL;
- 		}
- 		break;
-@@ -785,11 +785,11 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 		break;
- 	default:
- 		if (node_xp >= ccn->num_nodes) {
--			dev_warn(ccn->dev, "Invalid node ID %d!\n", node_xp);
-+			dev_dbg(ccn->dev, "Invalid node ID %d!\n", node_xp);
- 			return -EINVAL;
- 		}
- 		if (!arm_ccn_pmu_type_eq(type, ccn->node[node_xp].type)) {
--			dev_warn(ccn->dev, "Invalid type 0x%x for node %d!\n",
-+			dev_dbg(ccn->dev, "Invalid type 0x%x for node %d!\n",
- 					type, node_xp);
- 			return -EINVAL;
- 		}
-@@ -808,19 +808,19 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 		if (event_id != e->event)
- 			continue;
- 		if (e->num_ports && port >= e->num_ports) {
--			dev_warn(ccn->dev, "Invalid port %d for node/XP %d!\n",
-+			dev_dbg(ccn->dev, "Invalid port %d for node/XP %d!\n",
- 					port, node_xp);
- 			return -EINVAL;
- 		}
- 		if (e->num_vcs && vc >= e->num_vcs) {
--			dev_warn(ccn->dev, "Invalid vc %d for node/XP %d!\n",
-+			dev_dbg(ccn->dev, "Invalid vc %d for node/XP %d!\n",
- 					vc, node_xp);
- 			return -EINVAL;
- 		}
- 		valid = 1;
- 	}
- 	if (!valid) {
--		dev_warn(ccn->dev, "Invalid event 0x%x for node/XP %d!\n",
-+		dev_dbg(ccn->dev, "Invalid event 0x%x for node/XP %d!\n",
- 				event_id, node_xp);
- 		return -EINVAL;
- 	}
--- 
-2.11.0
+ 	if (flags)
+-		spin_lock_irqsave(&patch_lock, *flags);
++		raw_spin_lock_irqsave(&patch_lock, *flags);
+ 	else
+ 		__acquire(&patch_lock);
+ 
+@@ -48,7 +48,7 @@ static void __kprobes patch_unmap(int fi
+ 	clear_fixmap(fixmap);
+ 
+ 	if (flags)
+-		spin_unlock_irqrestore(&patch_lock, *flags);
++		raw_spin_unlock_irqrestore(&patch_lock, *flags);
+ 	else
+ 		__release(&patch_lock);
+ }
