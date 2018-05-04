@@ -1,144 +1,137 @@
-From: satendra.t@samsung.com (Satendra Singh Thakur)
-Date: Fri,  4 May 2018 13:53:25 +0530
-Subject: [PATCH v1 09/13] drm/kms/mode/sun4i-tv: using helper func
- drm_display_mode_from_videomode for calculating timing parameters
-In-Reply-To: <20180503110216.63bg3kw7cwppqbzx@flea>
-References: <20180503110216.63bg3kw7cwppqbzx@flea>
- <CGME20180504082405epcas5p212d6a9fbb2a0baac4166cb5b68616055@epcas5p2.samsung.com>
-Message-ID: <1525422205-2915-1-git-send-email-satendra.t@samsung.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Fri, 4 May 2018 10:32:20 +0200
+Subject: [PATCH 09/17] irqchip/irq-mvebu-icu: support ICU subnodes
+In-Reply-To: <20180502101300.49cc3623@windsurf.home>
+References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
+ <20180421135537.24716-10-miquel.raynal@bootlin.com>
+ <20180502101300.49cc3623@windsurf.home>
+Message-ID: <20180504103220.3504e73b@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid duplicate logic for horizonal/vertical sync_start/end
-helper func drm_display_mode_from_videomode is used
+Hi Thomas,
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
-Acked-by: Madhur Verma <madhur.verma@samsung.com>
-Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
----
+On Wed, 2 May 2018 10:13:00 +0200, Thomas Petazzoni
+<thomas.petazzoni@bootlin.com> wrote:
 
- v1: Added acked-by fields
+> Hello Miqu?l,
+> 
+> On Sat, 21 Apr 2018 15:55:29 +0200, Miquel Raynal wrote:
+> > Introduce new bindings for the ICU.  
+> 
+> Perhaps this should explain *why* we need new bindings.
 
- drivers/gpu/drm/sun4i/sun4i_tv.c | 67 +++++++++++++++-------------------------
- 1 file changed, 25 insertions(+), 42 deletions(-)
+Sure, I changed the whole message by:
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index b070d52..7ffa930 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -21,6 +21,7 @@
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_of.h>
- #include <drm/drm_panel.h>
-+#include <video/videomode.h>
- 
- #include "sun4i_crtc.h"
- #include "sun4i_drv.h"
-@@ -147,16 +148,7 @@ struct tv_mode {
- 	u16		front_porch;
- 	u16		line_number;
- 	u16		vblank_level;
--
--	u32		hdisplay;
--	u16		hfront_porch;
--	u16		hsync_len;
--	u16		hback_porch;
--
--	u32		vdisplay;
--	u16		vfront_porch;
--	u16		vsync_len;
--	u16		vback_porch;
-+	struct videomode vm;
- 
- 	bool		yc_en;
- 	bool		dac3_en;
-@@ -223,16 +215,16 @@ static const struct tv_mode tv_modes[] = {
- 		.back_porch	= 118,
- 		.front_porch	= 32,
- 		.line_number	= 525,
--
--		.hdisplay	= 720,
--		.hfront_porch	= 18,
--		.hsync_len	= 2,
--		.hback_porch	= 118,
--
--		.vdisplay	= 480,
--		.vfront_porch	= 26,
--		.vsync_len	= 2,
--		.vback_porch	= 17,
-+		.vm = {
-+			.hactive	= 720,
-+			.hfront_porch	= 18,
-+			.hsync_len	= 2,
-+			.hback_porch	= 118,
-+			.vactive	= 480,
-+			.vfront_porch	= 26,
-+			.vsync_len	= 2,
-+			.vback_porch	= 17,
-+		},
- 
- 		.vblank_level	= 240,
- 
-@@ -249,16 +241,16 @@ static const struct tv_mode tv_modes[] = {
- 		.back_porch	= 138,
- 		.front_porch	= 24,
- 		.line_number	= 625,
--
--		.hdisplay	= 720,
--		.hfront_porch	= 3,
--		.hsync_len	= 2,
--		.hback_porch	= 139,
--
--		.vdisplay	= 576,
--		.vfront_porch	= 28,
--		.vsync_len	= 2,
--		.vback_porch	= 19,
-+		.vm = {
-+			.hactive	= 720,
-+			.hfront_porch	= 3,
-+			.hsync_len	= 2,
-+			.hback_porch	= 139,
-+			.vactive	= 576,
-+			.vfront_porch	= 28,
-+			.vsync_len	= 2,
-+			.vback_porch	= 19,
-+		},
- 
- 		.vblank_level	= 252,
- 
-@@ -311,9 +303,9 @@ static const struct tv_mode *sun4i_tv_find_tv_by_mode(const struct drm_display_m
- 
- 		DRM_DEBUG_DRIVER("Comparing mode %s vs %s (X: %d vs %d)",
- 				 mode->name, tv_mode->name,
--				 mode->vdisplay, tv_mode->vdisplay);
-+				 mode->vdisplay, tv_mode->vm.vactive);
- 
--		if (mode->vdisplay == tv_mode->vdisplay)
-+		if (mode->vdisplay == tv_mode->vm.vactive)
- 			return tv_mode;
- 	}
- 
-@@ -325,19 +317,10 @@ static void sun4i_tv_mode_to_drm_mode(const struct tv_mode *tv_mode,
- {
- 	DRM_DEBUG_DRIVER("Creating mode %s\n", mode->name);
- 
-+	drm_display_mode_from_videomode(&tv_mode->vm, mode);
- 	mode->type = DRM_MODE_TYPE_DRIVER;
- 	mode->clock = 13500;
- 	mode->flags = DRM_MODE_FLAG_INTERLACE;
--
--	mode->hdisplay = tv_mode->hdisplay;
--	mode->hsync_start = mode->hdisplay + tv_mode->hfront_porch;
--	mode->hsync_end = mode->hsync_start + tv_mode->hsync_len;
--	mode->htotal = mode->hsync_end  + tv_mode->hback_porch;
--
--	mode->vdisplay = tv_mode->vdisplay;
--	mode->vsync_start = mode->vdisplay + tv_mode->vfront_porch;
--	mode->vsync_end = mode->vsync_start + tv_mode->vsync_len;
--	mode->vtotal = mode->vsync_end  + tv_mode->vback_porch;
- }
- 
- static void sun4i_tv_disable(struct drm_encoder *encoder)
+    The ICU can handle several type of interrupt, each of them being
+    handled differently on AP side. On CP side, the ICU should be able
+    to make the distinction between each interrupt group by pointing to
+    the right parent.
+    
+    This is done through the introduction of new bindings, presenting
+    the ICU node as the parent of multiple ICU sub-nodes, each of them
+    being an interrupt type with a different interrupt parent. ICU
+    interrupt 'clients' now directly point to the right sub-node,
+    avoiding the need for the extra ICU_GRP_* parameter.
+    
+    ICU subnodes are probed automatically with
+    devm_platform_populate(). If the node as no child, the probe
+    function for NSRs will still be called 'manually' in order to
+    preserve backward compatibility with DT using the old binding.
+    
+> 
+> > Each DT subnode of the ICU represents a type of interrupt that should
+> > be handled separately. Add the possibility for the ICU to have subnodes
+> > and probe each of them automatically with devm_platform_populate(). If
+> > the node as no child, the probe function for NSRs will still be called
+> > 'manually'.  
+> 
+>  ... in order to preserve backward compatibility with Device Trees
+>  using the old binding.
+
+Added, see above.
+
+> 
+> > +static struct mvebu_icu *mvebu_dev_get_drvdata(struct platform_device *pdev)  
+> 
+> The function should be prefixed by mvebu_icu_, not just mvebu_.
+
+Changed.
+
+> 
+> > +{
+> > +	struct mvebu_icu *icu;
+> > +
+> > +	icu = dev_get_drvdata(&pdev->dev);
+> > +	if (icu) {
+> > +		/* Legacy bindings: get the device data */  
+> 
+> I find this comment weird, because it doesn't document what the test
+> just below is doing.
+
+Refactored a bit the comments in this section.
+
+> 
+> > +		if (!icu->legacy_bindings)
+> > +			return ERR_PTR(-EINVAL);
+> > +	} else {
+> > +		/* New bindings: get the parent device (ICU) data */
+> > +		icu = dev_get_drvdata(pdev->dev.parent);
+> > +		if (!icu)
+> > +			return ERR_PTR(-ENODEV);
+> > +		if (icu->legacy_bindings)
+> > +			return ERR_PTR(-EINVAL);
+> > +	}  
+> 
+> 
+> > @@ -144,7 +170,10 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> >  		goto free_irqd;
+> >  	}
+> >  
+> > -	icu_irqd->icu_group = fwspec->param[0];
+> > +	if (icu->legacy_bindings)
+> > +		icu_irqd->icu_group = fwspec->param[0];
+> > +	else
+> > +		icu_irqd->icu_group = ICU_GRP_NSR;  
+> 
+> In practice here fwspec->param[0] is always going to be equal to
+> ICU_GRP_NSR, but OK, the test makes sense as in a future commit, the
+> "else" case will be changed to support SEIs.
+> 
+> > +static const struct of_device_id mvebu_icu_nsr_of_match[] = {
+> > +	{ .compatible = "marvell,cp110-icu-nsr", },
+> > +	{},
+> > +};
+> > +
+> > +static struct platform_driver mvebu_icu_nsr_driver = {
+> > +	.probe  = mvebu_icu_nsr_probe,
+> > +	.driver = {
+> > +		.name = "mvebu-icu-nsr",
+> > +		.of_match_table = mvebu_icu_nsr_of_match,
+> > +	},
+> > +};
+> > +builtin_platform_driver(mvebu_icu_nsr_driver);  
+> 
+> I'm not sure why you call this icu_nsr here, and change it later to
+> icu_subset. Wouldn't it make sense to call it right away with the final
+> name ? Note that this is not a very strong request to change this
+> aspect, I'm fine with how it's done today, it's just that I would have
+> done it differently.
+
+I thought calling it icu_subset right now would not be very clear as
+there are not "ICU subset" other than NSR interrupts, but I changed it,
+this is not a big deal.
+
+> 
+> Other than that, looks good to me.
+> 
+> Thomas
+
+Thanks for the review,
+Miqu?l
+
+
 -- 
-2.7.4
+Miquel Raynal, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
