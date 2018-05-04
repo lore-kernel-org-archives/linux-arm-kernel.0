@@ -1,112 +1,230 @@
-From: alex.popov@linux.com (Alexander Popov)
-Date: Fri, 4 May 2018 11:30:31 +0300
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <5b654bb4-64cc-dc64-afd7-135971b54c98@redhat.com>
-References: <20180502203326.9491-1-labbott@redhat.com>
- <20180502203326.9491-3-labbott@redhat.com>
- <20180503071917.xm2xvgagvzkworay@salmiak>
- <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
- <5b654bb4-64cc-dc64-afd7-135971b54c98@redhat.com>
-Message-ID: <b2f4f5c4-ab19-b7c9-a564-02d54d17fd49@linux.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Fri, 04 May 2018 10:22:51 +0200
+Subject: [PATCH v2 05/10] media: v4l: Add definitions for MPEG2 frame
+ format and header metadata
+In-Reply-To: <4e6c4cb7-01b2-3278-4f12-c0ce8cd82ecc@xs4all.nl>
+References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+ <20180419154536.17846-1-paul.kocialkowski@bootlin.com>
+ <4e6c4cb7-01b2-3278-4f12-c0ce8cd82ecc@xs4all.nl>
+Message-ID: <5534cc4b748d7b3b1ce621ea43ce44aabea09d56.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.05.2018 22:09, Laura Abbott wrote:
-> On 05/03/2018 10:33 AM, Alexander Popov wrote:
->> On 03.05.2018 10:19, Mark Rutland wrote:
->>> On Wed, May 02, 2018 at 01:33:26PM -0700, Laura Abbott wrote:
->>>> +	/* Reset the lowest_stack value for the next syscall */
->>>> +	current->thread.lowest_stack = current_stack_pointer;
->>
->> Laura, that might be wrong and introduce huge performance impact.
->>
->> I think, lowest_stack should be reset similarly to the original version.
->>
+Hi,
+
+On Fri, 2018-04-20 at 15:57 +0200, Hans Verkuil wrote:
+> On 04/19/18 17:45, Paul Kocialkowski wrote:
+> > Stateless video decoding engines require both the MPEG slices and
+> > associated metadata from the video stream in order to decode frames.
+> > 
+> > This introduces definitions for a new pixel format, describing
+> > buffers
+> > with MPEG2 slice data, as well as a control structure for passing
+> > the
+> > frame header (metadata) to drivers.
+> > 
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
+> > ---
+> >  drivers/media/v4l2-core/v4l2-ctrls.c | 10 ++++++++++
+> >  drivers/media/v4l2-core/v4l2-ioctl.c |  1 +
+> >  include/uapi/linux/v4l2-controls.h   | 26
+> > ++++++++++++++++++++++++++
+> >  include/uapi/linux/videodev2.h       |  3 +++
+> >  4 files changed, 40 insertions(+)
+> > 
+> > diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c
+> > b/drivers/media/v4l2-core/v4l2-ctrls.c
+> > index ba05a8b9a095..fcdc12b9a9e0 100644
+> > --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> > +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> > @@ -761,6 +761,7 @@ const char *v4l2_ctrl_get_name(u32 id)
+> >  	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		
+> > return "Vertical MV Search Range";
+> >  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		
+> > return "Repeat Sequence Header";
+> >  	case V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME:		re
+> > turn "Force Key Frame";
+> > +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:		re
+> > turn "MPEG2 Frame Header";
+> >  
+> >  	/* VPX controls */
+> >  	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		
+> > return "VPX Number of Partitions";
+> > @@ -1152,6 +1153,9 @@ void v4l2_ctrl_fill(u32 id, const char **name,
+> > enum v4l2_ctrl_type *type,
+> >  	case V4L2_CID_RDS_TX_ALT_FREQS:
+> >  		*type = V4L2_CTRL_TYPE_U32;
+> >  		break;
+> > +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:
+> > +		*type = V4L2_CTRL_TYPE_MPEG2_FRAME_HDR;
+> > +		break;
+> >  	default:
+> >  		*type = V4L2_CTRL_TYPE_INTEGER;
+> >  		break;
+> > @@ -1472,6 +1476,9 @@ static int std_validate(const struct v4l2_ctrl
+> > *ctrl, u32 idx,
+> >  			return -ERANGE;
+> >  		return 0;
+> >  
+> > +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
+> > +		return 0;
+> > +
+> >  	default:
+> >  		return -EINVAL;
+> >  	}
+> > @@ -2046,6 +2053,9 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct
+> > v4l2_ctrl_handler *hdl,
+> >  	case V4L2_CTRL_TYPE_U32:
+> >  		elem_size = sizeof(u32);
+> >  		break;
+> > +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
+> > +		elem_size = sizeof(struct
+> > v4l2_ctrl_mpeg2_frame_hdr);
+> > +		break;
+> >  	default:
+> >  		if (type < V4L2_CTRL_COMPOUND_TYPES)
+> >  			elem_size = sizeof(s32);
+> > diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c
+> > b/drivers/media/v4l2-core/v4l2-ioctl.c
+> > index 468c3c65362d..8070203da5d2 100644
+> > --- a/drivers/media/v4l2-core/v4l2-ioctl.c
+> > +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+> > @@ -1273,6 +1273,7 @@ static void v4l_fill_fmtdesc(struct
+> > v4l2_fmtdesc *fmt)
+> >  		case V4L2_PIX_FMT_VC1_ANNEX_L:	descr = "VC-1 
+> > (SMPTE 412M Annex L)"; break;
+> >  		case V4L2_PIX_FMT_VP8:		descr =
+> > "VP8"; break;
+> >  		case V4L2_PIX_FMT_VP9:		descr =
+> > "VP9"; break;
+> > +		case V4L2_PIX_FMT_MPEG2_FRAME:	descr =
+> > "MPEG2 Frame"; break;
+> >  		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA
+> > YUV"; break;
+> >  		case V4L2_PIX_FMT_WNVA:		descr =
+> > "WNVA"; break;
+> >  		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA
+> > SN9C10X"; break;
+> > diff --git a/include/uapi/linux/v4l2-controls.h
+> > b/include/uapi/linux/v4l2-controls.h
+> > index cbbb750d87d1..8431b2a540c7 100644
+> > --- a/include/uapi/linux/v4l2-controls.h
+> > +++ b/include/uapi/linux/v4l2-controls.h
+> > @@ -557,6 +557,8 @@ enum v4l2_mpeg_video_mpeg4_profile {
+> >  };
+> >  #define V4L2_CID_MPEG_VIDEO_MPEG4_QPEL		(V4L2_CID_MPE
+> > G_BASE+407)
+> >  
+> > +#define
+> > V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR     (V4L2_CID_MPEG_BASE+450)
+> > +
+> >  /*  Control IDs for VP8 streams
+> >   *  Although VP8 is not part of MPEG we add these controls to the
+> > MPEG class
+> >   *  as that class is already handling other video compression
+> > standards
+> > @@ -985,4 +987,28 @@ enum v4l2_detect_md_mode {
+> >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_C
+> > LASS_BASE + 3)
+> >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DET
+> > ECT_CLASS_BASE + 4)
+> >  
+> > +struct v4l2_ctrl_mpeg2_frame_hdr {
+> > +	__u32 slice_len;
+> > +	__u32 slice_pos;
+> > +	enum { MPEG1, MPEG2 } type;
+> > +
+> > +	__u16 width;
+> > +	__u16 height;
+> > +
+> > +	enum { PCT_I = 1, PCT_P, PCT_B, PCT_D }
+> > picture_coding_type;
 > 
-> Sorry, I'm not understanding here. What's the performance impact and
-> what do you mean by original version?
+> As someone else already mentioned (I believe): avoid enums. Use __u16
+> instead.
 
-I meant the code for x86:
-	/* Reset the lowest_stack value for the next syscall */
-	current->thread.lowest_stack = current_top_of_stack() - 256;
+Indeed. I have taken a note of that.
 
-...Now when I'm writing about the performance impact, I see that I was wrong
-about "huge". Excuse me.
-
-Let me describe the implications of this code change.
-
-So we are at the end of a syscall. We've just erased the used part of the kernel
-stack. The current stack pointer is near to the top of stack. On x86_64 I see
-that the stack pointer is stack top minus 56 bytes (just before switching onto
-the trampoline stack).
-
-I took the idea of resetting lowest_stack to stack top minus 256 from the
-original PaX Team's code. It should give the speedup when lowest_stack is not
-updated during a syscall (a lot of functions are not instrumented) and we start
-to search for the poison value from that reasonable point.
-
-If we speak about the common erase_kstack() code, this code change can break
-x86, because this function can be called from the trampoline stack (separate
-from the thread stack).
-
->>>> +}
->>>
->>> Once this function returns, its data is left on the stack. Is that not a problem?
->>>
->>> No strong feelings either way, but it might be worth mentioning in the commit
->>> message.
->>
->> I managed to bypass that with "register" specifier. Although it doesn't give an
->> absolute guarantee.
->>
+> > +	__u8 f_code[2][2];
+> > +
+> > +	__u8 intra_dc_precision;
+> > +	__u8 picture_structure;
+> > +	__u8 top_field_first;
+> > +	__u8 frame_pred_frame_dct;
+> > +	__u8 concealment_motion_vectors;
+> > +	__u8 q_scale_type;
+> > +	__u8 intra_vlc_format;
+> > +	__u8 alternate_scan;
+> > +
+> > +	__u8 backward_ref_index;
+> > +	__u8 forward_ref_index;
+> > +};
 > 
-> I guess I was assuming gcc would be smart enough not to spill stuff
-> on the stack. I also intentionally removed the register keyword
-> since it wasn't clear gcc does much with it on a modern system? I
-> could be completely off base here though so please correct me if
-> I'm wrong. It probably is worth documenting what we are assuming about
-> the compiler here.
-
-I think having register storage class specifier here is a bit better than
-nothing. And yes, I'll add a comment. Right now don't see a better solution.
-
->>>> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
->>>> index a34e9290a699..25dd2a14560d 100644
->>>> --- a/drivers/firmware/efi/libstub/Makefile
->>>> +++ b/drivers/firmware/efi/libstub/Makefile
->>>> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
->>>>   KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
->>>>   				   -D__NO_FORTIFY \
->>>>   				   $(call cc-option,-ffreestanding) \
->>>> -				   $(call cc-option,-fno-stack-protector)
->>>> +				   $(call cc-option,-fno-stack-protector) \
->>>> +				   $(DISABLE_STACKLEAK_PLUGIN)
->>>>   
->>>>   GCOV_PROFILE			:= n
->>>>   KASAN_SANITIZE			:= n
->>>
->>> I believe we'll also need to do this for the KVM hyp code in arch/arm64/kvm/hyp/.
->>
->> Could you please give more details on that? Why STACKLEAK breaks it?
->>
+> Please test that the layout and size of this structure is identical
+> for 32 and 64 bit
+> architectures, both on Intel and ARM.
 > 
-> For reference, I originally added this for the efistub because
-> it would not compile.
+> It looks good, but it doesn't hurt to check.
 
-I guess it was a linkage error, right?
+Right, I'll keep that in mind and make sure this is the case.
 
-> I did compile this against my Fedora tree which has KVM enabled.
+Cheers and thanks for the review!
 
-Looked through this big article about ARM, KVM and HYP mode:
-https://lwn.net/Articles/557132/
+Paul
 
-So we have some limited amount of kernel code which runs in HYP mode. Is it only
-in arch/arm64/kvm/hyp/ directory?
-
-Mark, could you give a clue what trouble will we have if we call track_stack()
-or check_alloca() from that code?
-
-Thanks in advance!
-
---
-Alexander
+> Regards,
+> 
+> 	Hans
+> 
+> > +
+> >  #endif
+> > diff --git a/include/uapi/linux/videodev2.h
+> > b/include/uapi/linux/videodev2.h
+> > index 31b5728b56e9..4b8336f7bcf0 100644
+> > --- a/include/uapi/linux/videodev2.h
+> > +++ b/include/uapi/linux/videodev2.h
+> > @@ -635,6 +635,7 @@ struct v4l2_pix_format {
+> >  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /*
+> > SMPTE 421M Annex L compliant stream */
+> >  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /*
+> > VP8 */
+> >  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /*
+> > VP9 */
+> > +#define V4L2_PIX_FMT_MPEG2_FRAME v4l2_fourcc('M', 'G', '2', 'F') /*
+> > MPEG2 frame */
+> >  
+> >  /*  Vendor-specific formats   */
+> >  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /*
+> > cpia1 YUV */
+> > @@ -1586,6 +1587,7 @@ struct v4l2_ext_control {
+> >  		__u8 __user *p_u8;
+> >  		__u16 __user *p_u16;
+> >  		__u32 __user *p_u32;
+> > +		struct v4l2_ctrl_mpeg2_frame_hdr __user
+> > *p_mpeg2_frame_hdr;
+> >  		void __user *ptr;
+> >  	};
+> >  } __attribute__ ((packed));
+> > @@ -1631,6 +1633,7 @@ enum v4l2_ctrl_type {
+> >  	V4L2_CTRL_TYPE_U8	     = 0x0100,
+> >  	V4L2_CTRL_TYPE_U16	     = 0x0101,
+> >  	V4L2_CTRL_TYPE_U32	     = 0x0102,
+> > +	V4L2_CTRL_TYPE_MPEG2_FRAME_HDR = 0x0109,
+> >  };
+> >  
+> >  /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
+> > 
+> 
+> 
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/629ee026/attachment.sig>
