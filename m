@@ -1,67 +1,111 @@
-From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Fri,  4 May 2018 15:56:32 +0200
-Subject: [PATCH net-next v2 02/13] net: phy: sfp: handle non-wired SFP
- connectors
-In-Reply-To: <20180504135643.23466-1-antoine.tenart@bootlin.com>
-References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
-Message-ID: <20180504135643.23466-3-antoine.tenart@bootlin.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 4 May 2018 15:51:20 +0100
+Subject: Potential deadlock in vgic
+In-Reply-To: <20180504130854.GA14663@hc>
+References: <20180504110343.GA10968@hc>
+ <20180504124742.GG10191@C02W217FHV2R.local> <20180504130854.GA14663@hc>
+Message-ID: <1f343d54-03a2-10b4-1413-c0fa4a84bb7e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SFP connectors can be solder on a board without having any of their pins
-(LOS, i2c...) wired. In such cases the SFP link state cannot be guessed,
-and the overall link status reporting is left to other layers.
+Hi,
 
-In order to achieve this, a new SFP_DEV status is added, named UNKNOWN.
-This mode is set when it is not possible for the SFP code to get the
-link status and as a result the link status is reported to be always UP
-from the SFP point of view.
+On 04/05/18 14:08, Jan Glauber wrote:
+> On Fri, May 04, 2018 at 02:47:42PM +0200, Christoffer Dall wrote:
+>> Hi Jan,
+>>
+>> On Fri, May 04, 2018 at 01:03:44PM +0200, Jan Glauber wrote:
+>>> Hi all,
+>>>
+>>> enabling lockdep I see the following reported in the host when I start a kvm guest:
+>>>
+>>> [12399.954245]        CPU0                    CPU1
+>>> [12399.958762]        ----                    ----
+>>> [12399.963279]   lock(&(&dist->lpi_list_lock)->rlock);
+>>> [12399.968146]                                local_irq_disable();
+>>> [12399.974052]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
+>>> [12399.981696]                                lock(&(&dist->lpi_list_lock)->rlock);
+>>> [12399.989081]   <Interrupt>
+>>> [12399.991688]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
+>>> [12399.996989]
+>>>                 *** DEADLOCK ***
+>>>
+>>> [12400.002897] 2 locks held by qemu-system-aar/5597:
+>>> [12400.007587]  #0: 0000000042beb9dc (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
+>>> [12400.015411]  #1: 00000000c45d644a (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}, at: kvm_vgic_sync_hwstate+0x8c/0x328
+>>>
+>>>
+>>> There is nothing unusual in my config or qemu parameters, I can upload these
+>>> if needed. I see this on ThunderX and ThunderX2 and also with older kernels
+>>> (4.13+ distribution kernel).
+>>>
+>>> I tried making the lpi_list_lock irq safe but that just leads to different
+>>> warnings. The locking here seems to be quite sophisticated and I'm not familiar
+>>> with it.
+>>
+>> That's unfortunate.  The problem here is that we end up violating our
+>> locking order, which stipulates that ap_list_lock must be taken before
+>> the lpi_list_lock.
+>>
+>> Give that we can take the ap_list_lock from interrupt context (timers
+>> firing), the only solution I can easily think of is to change
+>> lpi_list_lock takers to disable interrupts as well.
+>>
+>> Which warnings did you encounter with that approach?
+> 
+> Hi Christoffer,
+> 
+> making lpi_list_lock irq safe I get:
+> 
+> [  394.239174] ========================================================
+> [  394.245515] WARNING: possible irq lock inversion dependency detected
+> [  394.251857] 4.17.0-rc3-jang+ #72 Not tainted
+> [  394.256114] --------------------------------------------------------
+> [  394.262454] qemu-system-aar/5596 just changed the state of lock:
+> [  394.268448] 00000000da3f09ef (&(&irq->irq_lock)->rlock#3){+...}, at: update_affinity+0x3c/0xa8
+> [  394.277066] but this lock was taken by another, HARDIRQ-safe lock in the past:
+> [  394.284274]  (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}
+> [  394.284278] 
+>                
+>                and interrupts could create inverse lock ordering between them.
+> 
+> [  394.300777] 
+>                other info that might help us debug this:
+> [  394.307292]  Possible interrupt unsafe locking scenario:
+> 
+> [  394.314066]        CPU0                    CPU1
+> [  394.318584]        ----                    ----
+> [  394.323101]   lock(&(&irq->irq_lock)->rlock#3);
+> [  394.327622]                                local_irq_disable();
+> [  394.333528]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
+> [  394.341172]                                lock(&(&irq->irq_lock)->rlock#3);
+> [  394.348210]   <Interrupt>
+> [  394.350817]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
+> [  394.356118] 
 
-Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
----
- drivers/net/phy/sfp.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+That's weird, as that shouldn't happen anymore. IIRC we switched *both*
+ap_list_lock and irq_lock over to be IRQ safe, so the first lock on CPU0
+would disable IRQs, making the interrupt afterwards impossible.
+Did we actually forget some irq_lock's to convert over and lockdep is
+picking those up?
 
-diff --git a/drivers/net/phy/sfp.c b/drivers/net/phy/sfp.c
-index 4686c443fc22..8e323a4b70da 100644
---- a/drivers/net/phy/sfp.c
-+++ b/drivers/net/phy/sfp.c
-@@ -48,6 +48,7 @@ enum {
- 
- 	SFP_DEV_DOWN = 0,
- 	SFP_DEV_UP,
-+	SFP_DEV_UNKNOWN,
- 
- 	SFP_S_DOWN = 0,
- 	SFP_S_INIT,
-@@ -737,6 +738,15 @@ static void sfp_sm_event(struct sfp *sfp, unsigned int event)
- 			sfp->sm_dev_state = SFP_DEV_DOWN;
- 		}
- 		break;
-+
-+	case SFP_DEV_UNKNOWN:
-+		/* We can't know the state of the SFP link. Report the
-+		 * link as being up as its status has to be guessed by
-+		 * other layers.
-+		 */
-+		if (event != SFP_E_DEV_UP)
-+			sfp_link_up(sfp->sfp_bus);
-+		break;
- 	}
- 
- 	/* Some events are global */
-@@ -1077,6 +1087,12 @@ static int sfp_probe(struct platform_device *pdev)
- 	if (poll)
- 		mod_delayed_work(system_wq, &sfp->poll, poll_jiffies);
- 
-+	/* We won't be able to know the state of the SFP link, report it as
-+	 * unknown.
-+	 */
-+	if (!sfp->gpio[GPIO_MODDEF0] && !sfp->gpio[GPIO_LOS])
-+		sfp->sm_dev_state = SFP_DEV_UNKNOWN;
-+
- 	return 0;
- }
- 
--- 
-2.17.0
+So if this is the case, we should be fine by making the missing ones
+irqsave as well, then adding _irqsave to the lpi_list_lock, which has
+just a few users and guards only short critical sections contained
+within a function.
+
+Cheers,
+Andre.
+
+>                 *** DEADLOCK ***
+> 
+> [  394.362025] 4 locks held by qemu-system-aar/5596:
+> [  394.366716]  #0: 00000000719c7423 (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
+> [  394.374545]  #1: 0000000060090841 (&kvm->srcu){....}, at: kvm_handle_guest_abort+0x11c/0xb70
+> [  394.382984]  #2: 0000000064647766 (&its->cmd_lock){+.+.}, at: vgic_mmio_write_its_cwriter+0x44/0xa8
+> [  394.392022]  #3: 0000000075f90a8a (&its->its_lock){+.+.}, at: vgic_its_process_commands.part.11+0xac/0x780
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
