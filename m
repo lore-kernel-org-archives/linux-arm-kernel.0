@@ -1,156 +1,155 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 4 May 2018 08:52:48 +0200
-Subject: [RFC PATCH] ARM: dts: imx: replace underscore with hyphen in
- aliases name
-In-Reply-To: <1525399128-11587-1-git-send-email-shawnguo@kernel.org>
-References: <1525399128-11587-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20180504085248.532c8a47@karo-electronics.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 4 May 2018 12:27:09 +0530
+Subject: [PATCH v5 12/14] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <002a01d3e373$6b6ee410$424cac30$@codeaurora.org>
+References: <1525348355-25471-1-git-send-email-ilialin@codeaurora.org>
+ <1525348355-25471-13-git-send-email-ilialin@codeaurora.org>
+ <20180504060827.7bddb53ln2ogwcvv@vireshk-i7>
+ <002a01d3e373$6b6ee410$424cac30$@codeaurora.org>
+Message-ID: <20180504065709.62kacfext6bbprlo@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04-05-18, 09:44, ilialin at codeaurora.org wrote:
+> 
+> 
+> > -----Original Message-----
+> > From: Viresh Kumar <viresh.kumar@linaro.org>
+> > Sent: Friday, May 4, 2018 09:08
+> > To: Ilia Lin <ilialin@codeaurora.org>
+> > Cc: mturquette at baylibre.com; sboyd at kernel.org; robh at kernel.org;
+> > mark.rutland at arm.com; rjw at rjwysocki.net; lgirdwood at gmail.com;
+> > broonie at kernel.org; andy.gross at linaro.org; david.brown at linaro.org;
+> > catalin.marinas at arm.com; will.deacon at arm.com; linux-clk at vger.kernel.org;
+> > devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> > pm at vger.kernel.org; linux-arm-msm at vger.kernel.org; linux-
+> > soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > rnayak at codeaurora.org; amit.kucheria at linaro.org;
+> > nicolas.dechesne at linaro.org; celster at codeaurora.org;
+> > tfinkel at codeaurora.org
+> > Subject: Re: [PATCH v5 12/14] cpufreq: Add Kryo CPU scaling driver
+> > 
+> > On 03-05-18, 14:52, Ilia Lin wrote:
+> > > In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO
+> > > processors, the CPU ferequencies subset and voltage value of each OPP
+> > > varies based on the silicon variant in use. Qualcomm Process Voltage
+> > > Scaling Tables defines the voltage and frequency value based on the
+> > > msm-id in SMEM and speedbin blown in the efuse combination.
+> > > The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the
+> > > SoC to provide the OPP framework with required information.
+> > > This is used to determine the voltage and frequency value for each OPP
+> > > of
+> > > operating-points-v2 table when it is parsed by the OPP framework.
+> > >
+> > > Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+> > > ---
+> > >  drivers/cpufreq/Kconfig.arm          |  11 +++
+> > >  drivers/cpufreq/Makefile             |   1 +
+> > >  drivers/cpufreq/cpufreq-dt-platdev.c |   3 +
+> > >  drivers/cpufreq/qcom-cpufreq-kryo.c  | 153
+> > > +++++++++++++++++++++++++++++++++++
+> > >  4 files changed, 168 insertions(+)
+> > >  create mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
+> > >
+> > > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > > index de55c7d..f9da18c 100644
+> > > --- a/drivers/cpufreq/Kconfig.arm
+> > > +++ b/drivers/cpufreq/Kconfig.arm
+> > > @@ -124,6 +124,17 @@ config ARM_OMAP2PLUS_CPUFREQ
+> > >  	depends on ARCH_OMAP2PLUS
+> > >  	default ARCH_OMAP2PLUS
+> > >
+> > > +config ARM_QCOM_CPUFREQ_KRYO
+> > > +	tristate "Qualcomm Technologies, Inc. Kryo based CPUFreq"
+> > 
+> > I don't see any reply to Sricharan's query on this being tristate.
+> 
+> Why shouldn't we leave possibility to compile the cpufreq-dt built-in, and
+> the qcom-cpufreq-kryo module?
 
-On Fri,  4 May 2018 09:58:48 +0800 Shawn Guo wrote:
-> It replaces underscore with hyphen in aliases name to fix DTC
-> alias_paths warning below, which is seen with various i.MX board dts
-> files when W=1 switch is on.
-> 
->  Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
-> 
-> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> Cc: Gary Bisson <gary.bisson@boundarydevices.com>
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> ---
-> Hi Lothar, Gary,
-> 
-> Per my search on kernel code, this change will not break anything on
-> kernel support.  But I'm not really sure about the case of bootloaders
-> running on the boards.  That's why I'm sending it as RFC.
-> 
-> We really want i.MX to be the first-class citizen in the community.
-> After a few cycles efforts on cleaning up DTC warnings, this alias_paths
-> warning is the last one we see with i.MX dts files.  We really want to
-> get rid of it and make i.MX dts be DTC warning free.
-> 
-> So please comment whether we can merge this patch.
-> 
-This breaks our U-Boot which searches for the alias names with '_'.
-But I think it's not worth keeping the old names alive, since the
-problem can easily be fixed by adding the old alias name to the FDT
-on affected boards from within U-Boot, if necessary.
+I was not saying this is incorrect, all I am saying is that you never
+replied to a comment from one of the reviewers.
 
-Alternatively we could add a:
-	reg_can_xcvr = "reg-can-xcvr";
-[...]
-so that the respective aliases can be resolved using both names for a
-while.
+And I don't see a reason why this should be a tristate really.
+cpufreq-dt is already capable of being a module, all your driver does
+is that it creates the cpufreq-dt platform device after setting the
+OPP hw properties..
 
-So:
-Acked-By: Lothar Wa?mann <LW@KARO-electronics.de>
+Over that, have you ever tried inserting, then removing and inserting
+the driver module again? I feel it will fail.
 
-> Shawn
+The reason is that you never provided an exit routine which can get
+rid of the platform device created in the first place.
+
+> > > +	depends on QCOM_QFPROM
+> > > +	depends on QCOM_SMEM
+> > > +	select PM_OPP
+> > > +	help
+> > > +	  This adds the CPUFreq driver for
+> > > +	  Qualcomm Technologies, Inc. Kryo SoC based boards.
+> > > +
+> > > +	  If in doubt, say N.
+> > > +
+> > >  config ARM_S3C_CPUFREQ
+> > >  	bool
+> > >  	help
+> > > diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile index
+> > > 8d24ade..fb4a2ec 100644
+> > > --- a/drivers/cpufreq/Makefile
+> > > +++ b/drivers/cpufreq/Makefile
+> > > @@ -65,6 +65,7 @@ obj-$(CONFIG_MACH_MVEBU_V7)		+=
+> > mvebu-cpufreq.o
+> > >  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+> > >  obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+> > >  obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
+> > > +obj-$(CONFIG_ARM_QCOM_CPUFREQ_KRYO)	+= qcom-cpufreq-
+> > kryo.o
+> > >  obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
+> > >  obj-$(CONFIG_ARM_S3C2412_CPUFREQ)	+= s3c2412-cpufreq.o
+> > >  obj-$(CONFIG_ARM_S3C2416_CPUFREQ)	+= s3c2416-cpufreq.o
+> > > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c
+> > > b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > > index 3b585e4..77d6ab8 100644
+> > > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> > > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > > @@ -118,6 +118,9 @@
+> > >
+> > >  	{ .compatible = "nvidia,tegra124", },
+> > >
+> > > +	{ .compatible = "qcom,apq8096", },
+> > > +	{ .compatible = "qcom,msm8996", },
+> > > +
+> > >  	{ .compatible = "st,stih407", },
+> > >  	{ .compatible = "st,stih410", },
+> > >
+> > > diff --git a/drivers/cpufreq/qcom-cpufreq-kryo.c
+> > > b/drivers/cpufreq/qcom-cpufreq-kryo.c
+> > > new file mode 100644
+> > > index 0000000..32371cc
+> > > --- /dev/null
+> > > +++ b/drivers/cpufreq/qcom-cpufreq-kryo.c
+> > > @@ -0,0 +1,153 @@
+> > > +// SPDX-License-Identifier: GPL-2.0
+> > > +/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+> > 
+> > Incorrect multi line comment.
 > 
->  arch/arm/boot/dts/imx53-tx53.dtsi            | 2 +-
->  arch/arm/boot/dts/imx6qdl-tx6.dtsi           | 6 +++---
->  arch/arm/boot/dts/imx6sx-nitrogen6sx.dts     | 4 ++--
->  arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts | 2 +-
->  arch/arm/boot/dts/imx6ul-tx6ul.dtsi          | 6 +++---
->  arch/arm/boot/dts/imx7d-nitrogen7.dts        | 4 ++--
->  6 files changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
-> index 5dd3dd3a2fd0..54cf3e67069a 100644
-> --- a/arch/arm/boot/dts/imx53-tx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53-tx53.dtsi
-> @@ -58,7 +58,7 @@
->  		can0 = &can2; /* Make the can interface indices consistent with TX28/TX48 modules */
->  		can1 = &can1;
->  		ipu = &ipu;
-> -		reg_can_xcvr = &reg_can_xcvr;
-> +		reg-can-xcvr = &reg_can_xcvr;
->  		usbh1 = &usbh1;
->  		usbotg = &usbotg;
->  	};
-> diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> index f015e2d1cf35..a98fb2564c63 100644
-> --- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-> @@ -50,11 +50,11 @@
->  		can0 = &can2;
->  		can1 = &can1;
->  		ethernet0 = &fec;
-> -		lcdif_23bit_pins_a = &pinctrl_disp0_1;
-> -		lcdif_24bit_pins_a = &pinctrl_disp0_2;
-> +		lcdif-23bit-pins-a = &pinctrl_disp0_1;
-> +		lcdif-24bit-pins-a = &pinctrl_disp0_2;
->  		pwm0 = &pwm1;
->  		pwm1 = &pwm2;
-> -		reg_can_xcvr = &reg_can_xcvr;
-> +		reg-can-xcvr = &reg_can_xcvr;
->  		stk5led = &user_led;
->  		usbotg = &usbotg;
->  		sdhc0 = &usdhc1;
-> diff --git a/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts b/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
-> index b58f770c40d9..59e52f504922 100644
-> --- a/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
-> +++ b/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
-> @@ -48,8 +48,8 @@
->  	compatible = "boundary,imx6sx-nitrogen6sx", "fsl,imx6sx";
->  
->  	aliases {
-> -		fb_lcd = &lcdif1;
-> -		t_lcd = &t_lcd;
-> +		fb-lcd = &lcdif1;
-> +		t-lcd = &t_lcd;
->  	};
->  
->  	memory at 80000000 {
-> diff --git a/arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts b/arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts
-> index 2d80f7b50bc0..97686097a86e 100644
-> --- a/arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts
-> +++ b/arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts
-> @@ -48,7 +48,7 @@
->  	compatible = "karo,imx6ul-tx6ul", "fsl,imx6ul";
->  
->  	aliases {
-> -		lcdif_24bit_pins_a = &pinctrl_disp0_3;
-> +		lcdif-24bit-pins-a = &pinctrl_disp0_3;
->  		mmc0 = &usdhc1;
->  		/delete-property/ mmc1;
->  		serial2 = &uart3;
-> diff --git a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-> index f678d18ad44a..02b5ba42cd59 100644
-> --- a/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul-tx6ul.dtsi
-> @@ -53,10 +53,10 @@
->  		i2c2 = &i2c1;
->  		i2c3 = &i2c3;
->  		i2c4 = &i2c4;
-> -		lcdif_23bit_pins_a = &pinctrl_disp0_1;
-> -		lcdif_24bit_pins_a = &pinctrl_disp0_2;
-> +		lcdif-23bit-pins-a = &pinctrl_disp0_1;
-> +		lcdif-24bit-pins-a = &pinctrl_disp0_2;
->  		pwm0 = &pwm5;
-> -		reg_can_xcvr = &reg_can_xcvr;
-> +		reg-can-xcvr = &reg_can_xcvr;
->  		serial2 = &uart5;
->  		serial4 = &uart3;
->  		spi0 = &ecspi2;
-> diff --git a/arch/arm/boot/dts/imx7d-nitrogen7.dts b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-> index 52167298984d..b8e73b46cddb 100644
-> --- a/arch/arm/boot/dts/imx7d-nitrogen7.dts
-> +++ b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-> @@ -49,8 +49,8 @@
->  	compatible = "boundary,imx7d-nitrogen7", "fsl,imx7d";
->  
->  	aliases {
-> -		fb_lcd = &lcdif;
-> -		t_lcd = &t_lcd;
-> +		fb-lcd = &lcdif;
-> +		t-lcd = &t_lcd;
->  	};
->  
->  	memory at 80000000 {
+> This was done as per Bjorn's instruction.
 
+You haven't followed him correctly.
 
-Lothar Wa?mann
+What he asked for is:
+
+// SPDX...
+/*
+ * XXXX
+ */
+
+What you have done is:
+
+// SPDX...
+/* XXXX
+ */
+ 
+-- 
+viresh
