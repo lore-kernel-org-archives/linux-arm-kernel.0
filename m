@@ -1,117 +1,74 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 4 May 2018 15:06:00 -0500
-Subject: No subject
-Message-ID: <20180504200600.GA9529@bhelgaas-glaptop.roam.corp.google.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 4 May 2018 22:20:44 +0200
+Subject: Motorola Droid 4 progress, power consumption
+In-Reply-To: <20180503142240.GQ98604@atomide.com>
+References: <20180501183148.GA26996@amd> <20180502144158.GJ98604@atomide.com>
+ <20180503090611.GA14451@amd> <20180503142240.GQ98604@atomide.com>
+Message-ID: <20180504202044.GC22519@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bcc: 
-Subject: Re: [PATCH] PCI: Check whether bridges allow access to extended
- config space
-Reply-To: 
-In-Reply-To: <5AEC8002.5000309@kontron.com>
+Hi!
 
-[+cc Fred, Sinan]
-
-On Fri, May 04, 2018 at 03:45:07PM +0000, Gilles Buloz wrote:
-> Le 04/05/2018 00:31, Bjorn Helgaas a ?crit :
-> > [+cc LKML]
-> >
-> > On Thu, May 03, 2018 at 12:40:27PM +0000, Gilles Buloz wrote:
-> >> Subject:    [PATCH] For exception at PCI probe due to bridge reporting UR
-> >>
-> >> Even if a device supports extended config access, no such access must be
-> >> done to this device If there's a bridge not supporting that in the path
-> >> to this device. Doing such access with UR reporting enabled on the root
-> >> bridge leads to an exception.
-> >>
-> >> This is the case on a LS1043A CPU (NXP QorIQ Layerscape) platform with
-> >> the following bus topology :
-> >>    LS1043 PCIe root
-> >>      -> PEX8112 PCIe-to-PCI bridge (not supporting ext cfg on PCI side)
-> >>        -> PMC slot connector (for legacy PMC modules)
-> >> With a PMC module topology as follows :
-> >>    PMC connector
-> >>      -> PCI-to-PCIe bridge
-> >>        -> PCIe switch (4 ports)
-> >>          -> 4 PCIe devices (one on each port)
-> >> In this case all devices behind the PEX8112 are supporting extended config
-> >> access but this is prohibited by the PEX8112. Without this patch, an
-> >> exception (synchronous abort) occurs in pci_cfg_space_size_ext().
-> >>
-> >> This patch checks the parent bridge of each allocated child bus to know if
-> >> extended config access is supported on the child bus, and sets a flag in
-> >> child->bus_flags if not supported. This  flag is inherited by all children
-> >> buses of this child bus and then is checked to avoid this unsupported
-> >> accesses to every device on these buses.
-> > Hi Gilles,
-> >
-> > Thanks for the patch!  I reworked it a little bit to simplify the code
-> > in pci_alloc_child_bus().  Can you test it and make sure I didn't
-> > break anything?
-> >
-> Hi Bjorn,
+> > user at devuan:/sys/class/power_supply/battery$ date; cat current_now
+> > current_avg
+> > Thu May  3 09:33:07 CEST 2018
+> > -56000
+> > -72308
+> > user at devuan:/sys/class/power_supply/battery$ date; cat current_now
+> > current_avg
+> > Thu May  3 09:33:08 CEST 2018
+> > -37000
+> > -211362
 > 
-> Your rework works as expected. Tested on LS1043A platform with kernel 4.17-rc1, and with some backport on kernel 4.1.35
+> I recall it just being calculated based on the time between
+> the reads. Hard to say what it does, -ENODOCS.. Maybe the mc13783
+> PMIC docs have something similar.
+
+Hmm. current_avg is world readable; if it does changes to the
+hardware, that's somehow bad.
+
+But I guess I can sample charge_counter every minute or so and get
+what I need?
+
+> > > Hmm oh and the POWER_SUPPLY_CHARGE_COUNTER value should be monitored
+> > > by your libbattery and it's low value and high value should be saved
+> > > to a file. Low should be saved when we get the battery low interrupt
+> > > and battery state changes to POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL.
+> > > High value should be saved on POWER_SUPPLY_CAPACITY_LEVEL_FULL.
+> > > 
+> > > Then when you know the high value and low value, you can calculate
+> > > the remaining capacity based on the current value and
+> > > POWER_SUPPLY_POWER_AVG.
+> > 
+> > I'll look into that... but probably will do experiments with python,
+> > first.
 > 
-> Suggestion : maybe change the pci_info() string to have :
->      pci_bus 0000:xx: extended config space not accessible
-> instead of
->      pci_bus 0000:xx: extended config space not accessible on secondary bus
-> as xx is already the number of the secondary bus
+> Sure. The reason why I think we should not do it in the kernel in
+> addition to the earlier reasoning is that we don't have a place
+> to store the min and max values across reboot. I think there's
+> some flash on the battery over 1w bus, but it probably just
+> contains battery serial number or something and is not intended
+> for writing much to it. I guess the min and max values should be
+> really keyd based on this battery id in case the battery gets
+> changed.
 
-Oops, when I wrote that I was thinking it would be printed for the
-bridge device (not the bus).  I changed it as you suggest.
+I agree this should not be done in kernel as it requires persistent
+storage.
 
-Interesting, I didn't think about the fact that pci_info() would work
-on a struct pci_bus * as well as on a struct pci_dev *, since it's a
-macro and they both have a "dev" member.
+Battery is not user-replacable (and this will recalibrate itself on
+charge/discharge cycle) so.. I don't think keying is strictly
+neccessary for D4.
 
-> Info : with kernel 4.17-rc1, it turns out I need pcie_aspm=off to
-> have the PMC devices behind the PCI-to-PCIe bridge of the PMC safely
-> detected/configured. But this is not caused by the patch.
-
-> Without pcie_aspm=off I saw this at one boot :
->     "pci 0000:02:0e.0: ASPM: Could not configure common clock" for this bridge, but devices
->     correctly detected/configured
-> but at most boots I get :
->     no ASPM message but "pci 0000:04:02.0: bridge configuration invalid ([bus ff-ff]), reconfiguring "
->     instead, and some devices are missing. Also lspci show "rev ff" for some devices.
-> I don't see this problem on 4.1.35 with the same backported patch.
-
-This is interesting, especially since you have this unusual topology
-of a path to the device that is PCIe, then conventional PCI, then PCIe
-again.  We *should* be able to use ASPM on the PCIe links, but it's
-definitely not a well-tested scenario.
-
-Can you tell if something is actually broken?  Sinan's recent change,
-04875177dbe0 ("PCI/ASPM: Don't warn if already in common clock mode"),
-which appeared in v4.17-rc1, turns off the message in some cases.
-
-The "bridge configuration invalid" message just means the firmware
-didn't configure the bridge.  We *should* still set it up correctly,
-but please report a bug if we don't.
-
-lspci showing "ff" for some devices might be a symptom of the devices
-being powered off.  In that case config reads normally return ~0 data
-(though on your platform maybe it would cause exceptions).  I've seen
-this in other situations and wondered if it would be worth adding a
-hint to lspci so it could say "device may be powered off".
-
-Anyway, if you are seeing something broken (more than just the
-messages), please start a new thread about each one.  If you do, could
-you please:
-
-  - open a report at https://bugzilla.kernel.org/, in the Drivers/PCI
-    component (open a separate bug for each issue you see)
-
-  - use kernel version 4.17-rc1 and mark it as a regression if
-    appropriate
-
-  - attach (don't paste inline) the complete dmesg log and "lspci -vv"
-    output (as root) to the bug
-
-  - post a note to linux-pci at vger.kernel.org, cc Fred, Sinan, and me,
-    and include the link to the bugzilla
-
-Bjorn
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180504/1468df3d/attachment.sig>
