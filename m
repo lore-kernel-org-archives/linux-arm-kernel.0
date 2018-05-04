@@ -1,108 +1,47 @@
-From: opensource.ganesh@gmail.com (Ganesh Mahendran)
-Date: Fri,  4 May 2018 14:57:49 +0800
-Subject: [PATCH v2 2/2] arm64/mm: add speculative page fault
-In-Reply-To: <1525417069-27401-1-git-send-email-opensource.ganesh@gmail.com>
-References: <1525417069-27401-1-git-send-email-opensource.ganesh@gmail.com>
-Message-ID: <1525417069-27401-2-git-send-email-opensource.ganesh@gmail.com>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Fri, 4 May 2018 09:48:46 +0300
+Subject: [PATCH v4 08/14] dt: qcom: Add opp and thermal to the msm8996
+In-Reply-To: <CAKohpo=cw+2Leuwa6XjEYh4kVYK093A5eckUmPBDutgqeqpvog@mail.gmail.com>
+References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
+ <1522358807-10413-9-git-send-email-ilialin@codeaurora.org>
+ <20180402091617.GA3572@vireshk-i7>
+ <CAKohpo=cw+2Leuwa6XjEYh4kVYK093A5eckUmPBDutgqeqpvog@mail.gmail.com>
+Message-ID: <003001d3e373$f94db540$ebe91fc0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the speculative page fault on the arm64
-architecture.
+Kryo has single clock per cluster. I define here a shared OPP table per cluster.
 
-I completed spf porting in 4.9. From the test result,
-we can see app launching time improved by about 10% in average.
-For the apps which have more than 50 threads, 15% or even more
-improvement can be got.
-
-Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
----
-v2:
-  move find_vma() to do_page_fault()
-  remove IS_ENABLED()
-  remove fault != VM_FAULT_SIGSEGV check
-  initilize vma = NULL
----
- arch/arm64/mm/fault.c | 29 +++++++++++++++++++++++++----
- 1 file changed, 25 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 4165485..efd5956 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -320,14 +320,12 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
- #define VM_FAULT_BADMAP		0x010000
- #define VM_FAULT_BADACCESS	0x020000
- 
--static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
-+static int __do_page_fault(struct vm_area_struct *vma, unsigned long addr,
- 			   unsigned int mm_flags, unsigned long vm_flags,
- 			   struct task_struct *tsk)
- {
--	struct vm_area_struct *vma;
- 	int fault;
- 
--	vma = find_vma(mm, addr);
- 	fault = VM_FAULT_BADMAP;
- 	if (unlikely(!vma))
- 		goto out;
-@@ -371,6 +369,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 	int fault, major = 0;
- 	unsigned long vm_flags = VM_READ | VM_WRITE;
- 	unsigned int mm_flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
-+	struct vm_area_struct *vma = NULL;
- 
- 	if (notify_page_fault(regs, esr))
- 		return 0;
-@@ -410,6 +409,16 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
- 
- 	/*
-+	 * let's try a speculative page fault without grabbing the
-+	 * mmap_sem.
-+	 */
-+	fault = handle_speculative_fault(mm, addr, mm_flags, &vma);
-+	if (fault != VM_FAULT_RETRY) {
-+		perf_sw_event(PERF_COUNT_SW_SPF, 1, regs, addr);
-+		goto done;
-+	}
-+
-+	/*
- 	 * As per x86, we may deadlock here. However, since the kernel only
- 	 * validly references user space from well defined areas of the code,
- 	 * we can bug out early if this is from code which shouldn't.
-@@ -431,7 +440,10 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- #endif
- 	}
- 
--	fault = __do_page_fault(mm, addr, mm_flags, vm_flags, tsk);
-+	if (!vma || !can_reuse_spf_vma(vma, addr))
-+		vma = find_vma(mm, addr);
-+
-+	fault = __do_page_fault(vma, addr, mm_flags, vm_flags, tsk);
- 	major |= fault & VM_FAULT_MAJOR;
- 
- 	if (fault & VM_FAULT_RETRY) {
-@@ -454,11 +466,20 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		if (mm_flags & FAULT_FLAG_ALLOW_RETRY) {
- 			mm_flags &= ~FAULT_FLAG_ALLOW_RETRY;
- 			mm_flags |= FAULT_FLAG_TRIED;
-+
-+			/*
-+			 * Do not try to reuse this vma and fetch it
-+			 * again since we will release the mmap_sem.
-+			 */
-+			vma = NULL;
-+
- 			goto retry;
- 		}
- 	}
- 	up_read(&mm->mmap_sem);
- 
-+done:
-+
- 	/*
- 	 * Handle the "normal" (no error) case first.
- 	 */
--- 
-1.9.1
+> -----Original Message-----
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Sent: Friday, May 4, 2018 09:04
+> To: Ilia Lin <ilialin@codeaurora.org>
+> Cc: Michael Turquette <mturquette@baylibre.com>; Stephen Boyd
+> <sboyd@kernel.org>; Rob Herring <robh@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Rafael J. Wysocki <rjw@rjwysocki.net>; Liam
+> Girdwood <lgirdwood@gmail.com>; Mark Brown <broonie@kernel.org>;
+> Andy Gross <andy.gross@linaro.org>; David Brown
+> <david.brown@linaro.org>; Catalin Marinas <catalin.marinas@arm.com>; Will
+> Deacon <will.deacon@arm.com>; Linux Clock List <linux-
+> clk at vger.kernel.org>; devicetree at vger.kernel.org; Linux Kernel Mailing List
+> <linux-kernel@vger.kernel.org>; linux-pm at vger.kernel.org; linux-arm-
+> msm at vger.kernel.org; open list:ARM/QUALCOMM SUPPORT <linux-
+> soc at vger.kernel.org>; linux-arm-kernel at lists.infradead.org; Nayak,
+> Rajendra <rnayak@codeaurora.org>; Amit Kucheria
+> <amit.kucheria@linaro.org>; Nicolas Dechesne
+> <nicolas.dechesne@linaro.org>; celster at codeaurora.org;
+> tfinkel at codeaurora.org
+> Subject: Re: [PATCH v4 08/14] dt: qcom: Add opp and thermal to the
+> msm8996
+> 
+> On 2 April 2018 at 14:46, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> 
+> >> +     cluster0_opp: opp_table0 {
+> >> +             compatible = "operating-points-v2";
+> >> +             opp-shared;
+> >
+> > Is Kryo like krait where CPUs do DVFS independently ? If yes, then
+> > opp-shared thing should be dropped.
+> 
+> Have you ever replied to this question ? Sorry, but I am not able to find it in
+> my inbox :(
