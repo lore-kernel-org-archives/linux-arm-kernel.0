@@ -1,88 +1,62 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Fri, 4 May 2018 15:08:54 +0200
-Subject: Potential deadlock in vgic
-In-Reply-To: <20180504124742.GG10191@C02W217FHV2R.local>
-References: <20180504110343.GA10968@hc>
- <20180504124742.GG10191@C02W217FHV2R.local>
-Message-ID: <20180504130854.GA14663@hc>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 4 May 2018 14:16:28 +0100
+Subject: [PATCH v7 0/2] PCI: mediatek: Fixups for the IRQ handle routine
+ and MT7622's class code
+In-Reply-To: <1525412853-24367-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1525412853-24367-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20180504131628.GA8759@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 02:47:42PM +0200, Christoffer Dall wrote:
-> Hi Jan,
+On Fri, May 04, 2018 at 01:47:31PM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
 > 
-> On Fri, May 04, 2018 at 01:03:44PM +0200, Jan Glauber wrote:
-> > Hi all,
-> > 
-> > enabling lockdep I see the following reported in the host when I start a kvm guest:
-> > 
-> > [12399.954245]        CPU0                    CPU1
-> > [12399.958762]        ----                    ----
-> > [12399.963279]   lock(&(&dist->lpi_list_lock)->rlock);
-> > [12399.968146]                                local_irq_disable();
-> > [12399.974052]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
-> > [12399.981696]                                lock(&(&dist->lpi_list_lock)->rlock);
-> > [12399.989081]   <Interrupt>
-> > [12399.991688]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
-> > [12399.996989]
-> >                 *** DEADLOCK ***
-> > 
-> > [12400.002897] 2 locks held by qemu-system-aar/5597:
-> > [12400.007587]  #0: 0000000042beb9dc (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
-> > [12400.015411]  #1: 00000000c45d644a (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}, at: kvm_vgic_sync_hwstate+0x8c/0x328
-> > 
-> > 
-> > There is nothing unusual in my config or qemu parameters, I can upload these
-> > if needed. I see this on ThunderX and ThunderX2 and also with older kernels
-> > (4.13+ distribution kernel).
-> > 
-> > I tried making the lpi_list_lock irq safe but that just leads to different
-> > warnings. The locking here seems to be quite sophisticated and I'm not familiar
-> > with it.
+> Two fixups for mediatek's host bridge:
+> The first patch fixup class type and vendor ID for MT7622.
+> The second patch fixup the IRQ handle routine by using irq_chip solution
+> to avoid IRQ reentry which may exist for both MT2712 and MT7622.
 > 
-> That's unfortunate.  The problem here is that we end up violating our
-> locking order, which stipulates that ap_list_lock must be taken before
-> the lpi_list_lock.
+> Change since v6:
+>  - Remove the irq_mask, irq_unmask callback in lower layer irq_chip since we
+>    have set the MSI_FLAG_USE_DEF_CHIP_OPS flags.
+>  - Add irq_ack callback in irq_chip to handle edge IRQ.
+>  - Uing handle_edge_irq to handle the MSI IRQs.
 > 
-> Give that we can take the ap_list_lock from interrupt context (timers
-> firing), the only solution I can easily think of is to change
-> lpi_list_lock takers to disable interrupts as well.
+> Change since v5:
+>  - Make the comments consistend with the code modification in the first patch.
+>  - Using writew to performing a 16-bit write.
+>  - Using irq_chip solution to fix the IRQ issue.
 > 
-> Which warnings did you encounter with that approach?
+> The v5 patchset could be found in:
+>  https://patchwork.kernel.org/patch/10133303
+>  https://patchwork.kernel.org/patch/10133305
+> 
+> Change since v4:
+>  - Only setup vendor ID for MT7622, igorning the device ID since mediatek's
+>    host bridge driver does not cares about the device ID.
+> 
+> Change since v3:
+>  - Setup the class type and vendor ID at the beginning of startup instead
+>    of in a quirk.
+>  - Add mediatek's vendor ID, it could be found in:
+>    https://pcisig.com/membership/member-companies?combine=&page=4
+> 
+> Change since v2:
+>  - Move the initialize of the iterate before the loop to fix an
+>    INTx IRQ issue in the first patch
+> 
+> Change since v1:
+>  - Add the second patch.
+>  - Make the first patch's commit message more standard.
+> 
+> Honghui Zhang (2):
+>   PCI: mediatek: Set up vendor ID and class type for MT7622
+>   PCI: mediatek: Using chained IRQ to setup IRQ handle
+> 
+>  drivers/pci/host/pcie-mediatek.c | 234 +++++++++++++++++++++++----------------
+>  include/linux/pci_ids.h          |   2 +
+>  2 files changed, 143 insertions(+), 93 deletions(-)
 
-Hi Christoffer,
+Applied to pci/mediatek for v4.18, thanks.
 
-making lpi_list_lock irq safe I get:
-
-[  394.239174] ========================================================
-[  394.245515] WARNING: possible irq lock inversion dependency detected
-[  394.251857] 4.17.0-rc3-jang+ #72 Not tainted
-[  394.256114] --------------------------------------------------------
-[  394.262454] qemu-system-aar/5596 just changed the state of lock:
-[  394.268448] 00000000da3f09ef (&(&irq->irq_lock)->rlock#3){+...}, at: update_affinity+0x3c/0xa8
-[  394.277066] but this lock was taken by another, HARDIRQ-safe lock in the past:
-[  394.284274]  (&(&vgic_cpu->ap_list_lock)->rlock){-.-.}
-[  394.284278] 
-               
-               and interrupts could create inverse lock ordering between them.
-
-[  394.300777] 
-               other info that might help us debug this:
-[  394.307292]  Possible interrupt unsafe locking scenario:
-
-[  394.314066]        CPU0                    CPU1
-[  394.318584]        ----                    ----
-[  394.323101]   lock(&(&irq->irq_lock)->rlock#3);
-[  394.327622]                                local_irq_disable();
-[  394.333528]                                lock(&(&vgic_cpu->ap_list_lock)->rlock);
-[  394.341172]                                lock(&(&irq->irq_lock)->rlock#3);
-[  394.348210]   <Interrupt>
-[  394.350817]     lock(&(&vgic_cpu->ap_list_lock)->rlock);
-[  394.356118] 
-                *** DEADLOCK ***
-
-[  394.362025] 4 locks held by qemu-system-aar/5596:
-[  394.366716]  #0: 00000000719c7423 (&vcpu->mutex){+.+.}, at: kvm_vcpu_ioctl+0x7c/0xa68
-[  394.374545]  #1: 0000000060090841 (&kvm->srcu){....}, at: kvm_handle_guest_abort+0x11c/0xb70
-[  394.382984]  #2: 0000000064647766 (&its->cmd_lock){+.+.}, at: vgic_mmio_write_its_cwriter+0x44/0xa8
-[  394.392022]  #3: 0000000075f90a8a (&its->its_lock){+.+.}, at: vgic_its_process_commands.part.11+0xac/0x780
+Lorenzo
