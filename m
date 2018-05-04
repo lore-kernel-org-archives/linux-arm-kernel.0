@@ -1,171 +1,135 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  4 May 2018 17:05:28 +0100
-Subject: [PATCH v5 07/14] arm64/sve: Move read_zcr_features() out of
- cpufeature.h
+Date: Fri,  4 May 2018 17:05:26 +0100
+Subject: [PATCH v5 05/14] arm64: fpsimd: Generalise context saving for
+ non-task contexts
 In-Reply-To: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
 References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525449935-31424-8-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1525449935-31424-6-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having read_zcr_features() inline in cpufeature.h results in that
-header requiring #includes which make it hard to include
-<asm/fpsimd.h> elsewhere without triggering header inclusion
-cycles.
+In preparation for allowing non-task (i.e., KVM vcpu) FPSIMD
+contexts to be handled by the fpsimd common code, this patch adapts
+task_fpsimd_save() to save back the currently loaded context,
+removing the explicit dependency on current.
 
-This is not a hot-path function and arguably should not be in
-cpufeature.h in the first place, so this patch moves it to
-fpsimd.c, compiled conditionally if CONFIG_ARM64_SVE=y.
+The relevant storage to write back to in memory is now found by
+examining the fpsimd_last_state percpu struct.
 
-This allows some SVE-related #includes to be dropped from
-cpufeature.h, which will ease future maintenance.
-
-A couple of missing #includes of <asm/fpsimd.h> are exposed by this
-change under arch/arm64/.  This patch adds the missing #includes as
-necessary.
+fpsimd_save() does nothing unless TIF_FOREIGN_FPSTATE is clear, and
+fpsimd_last_state is updated under local_bh_disable() or
+local_irq_disable() everywhere that TIF_FOREIGN_FPSTATE is cleared:
+thus, fpsimd_save() will write back to the correct storage for the
+loaded context.
 
 No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/cpufeature.h | 29 -----------------------------
- arch/arm64/include/asm/fpsimd.h     |  2 ++
- arch/arm64/include/asm/processor.h  |  1 +
- arch/arm64/kernel/fpsimd.c          | 28 ++++++++++++++++++++++++++++
- arch/arm64/kernel/ptrace.c          |  1 +
- 5 files changed, 32 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 09b0f2a..0a6b713 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -11,9 +11,7 @@
- 
- #include <asm/cpucaps.h>
- #include <asm/cputype.h>
--#include <asm/fpsimd.h>
- #include <asm/hwcap.h>
--#include <asm/sigcontext.h>
- #include <asm/sysreg.h>
- 
- /*
-@@ -510,33 +508,6 @@ static inline bool system_supports_sve(void)
- 		cpus_have_const_cap(ARM64_SVE);
- }
- 
--/*
-- * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
-- * vector length.
-- *
-- * Use only if SVE is present.
-- * This function clobbers the SVE vector length.
-- */
--static inline u64 read_zcr_features(void)
--{
--	u64 zcr;
--	unsigned int vq_max;
--
--	/*
--	 * Set the maximum possible VL, and write zeroes to all other
--	 * bits to see if they stick.
--	 */
--	sve_kernel_enable(NULL);
--	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
--
--	zcr = read_sysreg_s(SYS_ZCR_EL1);
--	zcr &= ~(u64)ZCR_ELx_LEN_MASK; /* find sticky 1s outside LEN field */
--	vq_max = sve_vq_from_vl(sve_get_vl());
--	zcr |= vq_max - 1; /* set LEN field to maximum effective value */
--
--	return zcr;
--}
--
- #endif /* __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index aa60895..f4d80ae 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -68,6 +68,8 @@ extern unsigned int sve_get_vl(void);
- struct arm64_cpu_capabilities;
- extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
- 
-+extern u64 read_zcr_features(void);
-+
- extern int __ro_after_init sve_max_vl;
- 
- #ifdef CONFIG_ARM64_SVE
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 7675989..f902b6d 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -40,6 +40,7 @@
- 
- #include <asm/alternative.h>
- #include <asm/cpufeature.h>
-+#include <asm/fpsimd.h>
- #include <asm/hw_breakpoint.h>
- #include <asm/lse.h>
- #include <asm/pgtable-hwdef.h>
+---
+
+New patch since RFC v4:
+
+ (Split from KVM: arm64: Optimise FPSIMD handling to reduce guest/host
+ thrashing, with no functional change.)
+
+Changes since RFC v4:
+
+ * task_fpsimd_save() renamed to fpsimd_save(), since it doesn't only
+   apply to task contexts any more.
+---
+ arch/arm64/kernel/fpsimd.c | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
+
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e7349b5..e7f99f2 100644
+index 0c4e7e0..5fc0595 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -37,6 +37,7 @@
- #include <linux/sched/task_stack.h>
- #include <linux/signal.h>
- #include <linux/slab.h>
-+#include <linux/stddef.h>
- #include <linux/sysctl.h>
- 
- #include <asm/esr.h>
-@@ -764,6 +765,33 @@ void sve_kernel_enable(const struct arm64_cpu_capabilities *__always_unused p)
- 	isb();
+@@ -270,13 +270,15 @@ static void task_fpsimd_load(void)
  }
  
-+/*
-+ * Read the pseudo-ZCR used by cpufeatures to identify the supported SVE
-+ * vector length.
-+ *
-+ * Use only if SVE is present.
-+ * This function clobbers the SVE vector length.
-+ */
-+u64 read_zcr_features(void)
-+{
-+	u64 zcr;
-+	unsigned int vq_max;
-+
-+	/*
-+	 * Set the maximum possible VL, and write zeroes to all other
-+	 * bits to see if they stick.
-+	 */
-+	sve_kernel_enable(NULL);
-+	write_sysreg_s(ZCR_ELx_LEN_MASK, SYS_ZCR_EL1);
-+
-+	zcr = read_sysreg_s(SYS_ZCR_EL1);
-+	zcr &= ~(u64)ZCR_ELx_LEN_MASK; /* find sticky 1s outside LEN field */
-+	vq_max = sve_vq_from_vl(sve_get_vl());
-+	zcr |= vq_max - 1; /* set LEN field to maximum effective value */
-+
-+	return zcr;
-+}
-+
- void __init sve_setup(void)
+ /*
+- * Ensure current's FPSIMD/SVE storage in thread_struct is up to date
+- * with respect to the CPU registers.
++ * Ensure FPSIMD/SVE storage in memory for the loaded context is up to
++ * date with respect to the CPU registers.
+  *
+  * Softirqs (and preemption) must be disabled.
+  */
+-static void task_fpsimd_save(void)
++static void fpsimd_save(void)
  {
- 	u64 zcr;
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 7ff81fe..78889c4 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -44,6 +44,7 @@
- #include <asm/compat.h>
- #include <asm/cpufeature.h>
- #include <asm/debug-monitors.h>
-+#include <asm/fpsimd.h>
- #include <asm/pgtable.h>
- #include <asm/stacktrace.h>
- #include <asm/syscall.h>
++	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
++
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 
+ 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
+@@ -291,10 +293,9 @@ static void task_fpsimd_save(void)
+ 				return;
+ 			}
+ 
+-			sve_save_state(sve_pffr(current),
+-				       &current->thread.uw.fpsimd_state.fpsr);
++			sve_save_state(sve_pffr(current), &st->fpsr);
+ 		} else
+-			fpsimd_save_state(&current->thread.uw.fpsimd_state);
++			fpsimd_save_state(st);
+ 	}
+ }
+ 
+@@ -598,7 +599,7 @@ int sve_set_vector_length(struct task_struct *task,
+ 	if (task == current) {
+ 		local_bh_disable();
+ 
+-		task_fpsimd_save();
++		fpsimd_save();
+ 		set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 	}
+ 
+@@ -837,7 +838,7 @@ asmlinkage void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+ 
+ 	local_bh_disable();
+ 
+-	task_fpsimd_save();
++	fpsimd_save();
+ 	fpsimd_to_sve(current);
+ 
+ 	/* Force ret_to_user to reload the registers: */
+@@ -898,7 +899,7 @@ void fpsimd_thread_switch(struct task_struct *next)
+ 	 * 'current'.
+ 	 */
+ 	if (current->mm)
+-		task_fpsimd_save();
++		fpsimd_save();
+ 
+ 	if (next->mm)
+ 		/*
+@@ -977,7 +978,7 @@ void fpsimd_preserve_current_state(void)
+ 		return;
+ 
+ 	local_bh_disable();
+-	task_fpsimd_save();
++	fpsimd_save();
+ 	local_bh_enable();
+ }
+ 
+@@ -1117,7 +1118,7 @@ void kernel_neon_begin(void)
+ 
+ 	/* Save unsaved task fpsimd state, if any: */
+ 	if (current->mm) {
+-		task_fpsimd_save();
++		fpsimd_save();
+ 		set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 	}
+ 
+@@ -1242,7 +1243,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+ 	switch (cmd) {
+ 	case CPU_PM_ENTER:
+ 		if (current->mm)
+-			task_fpsimd_save();
++			fpsimd_save();
+ 		fpsimd_flush_cpu_state();
+ 		break;
+ 	case CPU_PM_EXIT:
 -- 
 2.1.4
