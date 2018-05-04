@@ -1,98 +1,203 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Sat, 5 May 2018 00:59:07 +0300
-Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
- HMI
-In-Reply-To: <afc78821-2d08-3f4f-d008-5b2d216e96c0@micronovasrl.com>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
- <20180322180508.my64gobhh5rc2x2m@flea>
- <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
- <20180424084137.7xfwji2gcibxavvt@flea>
- <03a02abb-e95c-b4ec-748f-907c0af67969@micronovasrl.com>
- <20180425184016.xktppxw7egddr7li@flea>
- <42feccc9-1d09-9ff2-3ccc-1dea63bacfb6@micronovasrl.com>
- <839d2560-0250-9b3a-8019-4e83d9e931e2@micronovasrl.com>
- <20180504080652.dniwaqqhbeuknp7y@flea>
- <afc78821-2d08-3f4f-d008-5b2d216e96c0@micronovasrl.com>
-Message-ID: <644bcd2f-3479-3f3c-3aef-9db3d565c133@orpaltech.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Fri,  4 May 2018 15:03:56 -0700
+Subject: [PATCH] arm64: dts: qcom: sdm845: Sort nodes in the soc by address
+Message-ID: <20180504220356.261711-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Giulio,
+This is pure-churn and should be a no-op.  I'm doing it in the hopes
+of reducing merge conflicts.  When things are sorted in a sane way
+(and by base address seems sane) then it's less likely that future
+patches will cause merge conflicts.
 
-On 05/05/2018 12:52 AM, Giulio Benetti wrote:
-> Hi Maxime!
->
-> Il 04/05/2018 10:06, Maxime Ripard ha scritto:
->> Hi,
->>
->> On Wed, May 02, 2018 at 06:41:34PM +0200, Giulio Benetti wrote:
->>>>> You don't have to handcode the fragments anymore with the new syntax,
->>>>> and U-Boot makes it really trivial to use if you use the FIT image
->>>>> format to have multiple overlays bundled in the same image. You can
->>>>> choose to apply them dynamically, for example based on an EEPROM or
->>>>> some other metric to see which combination you have.
->>>>
->>>> Ah, this is interesting. I'm going to experiment with that.
->>>>
->>>
->>> I'm struggling against this, I don't really know how to proceed,
->>> except keeping monolithic dts files including other dtsi files.
->>>
->>> About dt-overlays I've tried to look around lot of time,
->>> but the only thing I've found is this:
->>> https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git/tree/arch/arm/boot/dts?h=topic/renesas-overlays 
->>>
->>>
->>> where they use .dtso tagging them as "/plugin/;"
->>> and compile all .dtso found in dts folder.
->>> Then they obtain .dtbo files that should be the dt-overlays we have 
->>> spoken
->>> about right?
->>
->> Yes. You don't have to do that though, you can just rely on dtc to
->> compile them, outside of the linux build system.
->>
->>> What I can't understand is if there's a real standard at this time to
->>> follow, because on renesas-driver they use their way to handle all 
->>> .dtso
->>> files, but on mainline there seems to be nothing about that.
->>
->> I'm not sure what you mean here. It's just fragments of device tree,
->> that have to be compiled using dtc, that's it. You can use the Linux
->> build system infrastructure to do that, or you can build your own
->> simpler one. That's really up to you. See for example
->> https://github.com/NextThingCo/CHIP-dt-overlays/blob/master/Makefile
->>
->> (even though the overlays themselves use the legacy syntax and
->> shouldn't really be used an examples)
->
-> Everything works now!
-> Thank you very much!
-> I've setted up a Repo on Github to give an example on how make it work 
-> with no pain:
-> https://github.com/micronovasrl/linova-dtoverlays
->
-> At the moment it's a mess all around, but it's working and give an 
-> idea on how to make it work. Though I'm going to clean it up well as a 
-> base for linova dtoverlays.
->
-> Ah, btw, can you confirm me that base dts file must be compiled 
-> outside kernel with:
-> dtc -@ ....
-> Otherwise as in-tree dts with make dtbs "-@" argument is not passed.
-> Right?
->
-> Thank you a lot for your help and time again!
->
-> Best regards!
->
-I'd highly recommend you to look at Armbian overlay support: it is easy 
-and elegant.
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
 
-https://github.com/armbian/build/blob/master/patch/kernel/sunxi-next/add-overlay-compilation-support.patch
+ arch/arm64/boot/dts/qcom/sdm845.dtsi | 152 +++++++++++++--------------
+ 1 file changed, 76 insertions(+), 76 deletions(-)
 
-https://github.com/armbian/build/blob/master/patch/kernel/sunxi-next/add-sunxi-overlays.patch
-
-
-Sergey
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+index 486ace9a9e8b..101350743bd2 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -158,32 +158,50 @@
+ 		ranges = <0 0 0 0xffffffff>;
+ 		compatible = "simple-bus";
+ 
+-		intc: interrupt-controller at 17a00000 {
+-			compatible = "arm,gic-v3";
++		gcc: clock-controller at 100000 {
++			compatible = "qcom,gcc-sdm845";
++			reg = <0x100000 0x1f0000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			#power-domain-cells = <1>;
++		};
++
++		geniqup at ac0000 {
++			compatible = "qcom,geni-se-qup";
++			reg = <0xac0000 0x6000>;
++			clock-names = "m-ahb", "s-ahb";
++			clocks = <&gcc 105>,
++				 <&gcc 106>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
+-			#interrupt-cells = <3>;
+-			interrupt-controller;
+-			reg = <0x17a00000 0x10000>,     /* GICD */
+-			      <0x17a60000 0x100000>;    /* GICR * 8 */
+-			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
+ 
+-			gic-its at 17a40000 {
+-				compatible = "arm,gic-v3-its";
+-				msi-controller;
+-				#msi-cells = <1>;
+-				reg = <0x17a40000 0x20000>;
++			uart2: serial at a84000 {
++				compatible = "qcom,geni-debug-uart";
++				reg = <0xa84000 0x4000>;
++				clock-names = "se";
++				clocks = <&gcc 89>;
++				pinctrl-names = "default", "sleep";
++				pinctrl-0 = <&qup_uart2_default>;
++				pinctrl-1 = <&qup_uart2_sleep>;
++				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
+ 				status = "disabled";
+ 			};
+-		};
+ 
+-		gcc: clock-controller at 100000 {
+-			compatible = "qcom,gcc-sdm845";
+-			reg = <0x100000 0x1f0000>;
+-			#clock-cells = <1>;
+-			#reset-cells = <1>;
+-			#power-domain-cells = <1>;
++			i2c10: i2c at a88000 {
++				compatible = "qcom,geni-i2c";
++				reg = <0xa88000 0x4000>;
++				clock-names = "se";
++				clocks = <&gcc 91>;
++				pinctrl-names = "default", "sleep";
++				pinctrl-0 = <&qup_i2c10_default>;
++				pinctrl-1 = <&qup_i2c10_sleep>;
++				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		tlmm: pinctrl at 3400000 {
+@@ -224,6 +242,45 @@
+ 			};
+ 		};
+ 
++		spmi_bus: spmi at c440000 {
++			compatible = "qcom,spmi-pmic-arb";
++			reg = <0xc440000 0x1100>,
++			      <0xc600000 0x2000000>,
++			      <0xe600000 0x100000>,
++			      <0xe700000 0xa0000>,
++			      <0xc40a000 0x26000>;
++			reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
++			interrupt-names = "periph_irq";
++			interrupts = <GIC_SPI 481 IRQ_TYPE_LEVEL_HIGH>;
++			qcom,ee = <0>;
++			qcom,channel = <0>;
++			#address-cells = <2>;
++			#size-cells = <0>;
++			interrupt-controller;
++			#interrupt-cells = <4>;
++			cell-index = <0>;
++		};
++
++		intc: interrupt-controller at 17a00000 {
++			compatible = "arm,gic-v3";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			#interrupt-cells = <3>;
++			interrupt-controller;
++			reg = <0x17a00000 0x10000>,     /* GICD */
++			      <0x17a60000 0x100000>;    /* GICR * 8 */
++			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++
++			gic-its at 17a40000 {
++				compatible = "arm,gic-v3-its";
++				msi-controller;
++				#msi-cells = <1>;
++				reg = <0x17a40000 0x20000>;
++				status = "disabled";
++			};
++		};
++
+ 		timer at 17c90000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+@@ -281,62 +338,5 @@
+ 				status = "disabled";
+ 			};
+ 		};
+-
+-		spmi_bus: spmi at c440000 {
+-			compatible = "qcom,spmi-pmic-arb";
+-			reg = <0xc440000 0x1100>,
+-			      <0xc600000 0x2000000>,
+-			      <0xe600000 0x100000>,
+-			      <0xe700000 0xa0000>,
+-			      <0xc40a000 0x26000>;
+-			reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
+-			interrupt-names = "periph_irq";
+-			interrupts = <GIC_SPI 481 IRQ_TYPE_LEVEL_HIGH>;
+-			qcom,ee = <0>;
+-			qcom,channel = <0>;
+-			#address-cells = <2>;
+-			#size-cells = <0>;
+-			interrupt-controller;
+-			#interrupt-cells = <4>;
+-			cell-index = <0>;
+-		};
+-
+-		geniqup at ac0000 {
+-			compatible = "qcom,geni-se-qup";
+-			reg = <0xac0000 0x6000>;
+-			clock-names = "m-ahb", "s-ahb";
+-			clocks = <&gcc 105>,
+-				 <&gcc 106>;
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges;
+-			status = "disabled";
+-
+-			uart2: serial at a84000 {
+-				compatible = "qcom,geni-debug-uart";
+-				reg = <0xa84000 0x4000>;
+-				clock-names = "se";
+-				clocks = <&gcc 89>;
+-				pinctrl-names = "default", "sleep";
+-				pinctrl-0 = <&qup_uart2_default>;
+-				pinctrl-1 = <&qup_uart2_sleep>;
+-				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
+-				status = "disabled";
+-			};
+-
+-			i2c10: i2c at a88000 {
+-				compatible = "qcom,geni-i2c";
+-				reg = <0xa88000 0x4000>;
+-				clock-names = "se";
+-				clocks = <&gcc 91>;
+-				pinctrl-names = "default", "sleep";
+-				pinctrl-0 = <&qup_i2c10_default>;
+-				pinctrl-1 = <&qup_i2c10_sleep>;
+-				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-				status = "disabled";
+-			};
+-		};
+ 	};
+ };
+-- 
+2.17.0.441.gb46fe60e1d-goog
