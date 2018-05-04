@@ -1,54 +1,34 @@
 From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Fri,  4 May 2018 13:15:01 +0900
-Subject: [BUGFIX PATCH v3 1/4] arm: kprobes: Fix to use get_kprobe_ctlblk
- after irq-disabed
+Date: Fri,  4 May 2018 13:15:29 +0900
+Subject: [BUGFIX PATCH v3 2/4] arm: kprobes: Prohibit probing on
+ optimized_callback
 In-Reply-To: <152540727123.29650.13679359124038587629.stgit@devbox>
 References: <152540727123.29650.13679359124038587629.stgit@devbox>
-Message-ID: <152540730083.29650.15621737261480060241.stgit@devbox>
+Message-ID: <152540732952.29650.11645105922811248579.stgit@devbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since get_kprobe_ctlblk() uses smp_processor_id() to access
-per-cpu variable, it hits smp_processor_id sanity check as below.
-
-[    7.006928] BUG: using smp_processor_id() in preemptible [00000000] code: swapper/0/1
-[    7.007859] caller is debug_smp_processor_id+0x20/0x24
-[    7.008438] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.16.0-rc1-00192-g4eb17253e4b5 #1
-[    7.008890] Hardware name: Generic DT based system
-[    7.009917] [<c0313f0c>] (unwind_backtrace) from [<c030e6d8>] (show_stack+0x20/0x24)
-[    7.010473] [<c030e6d8>] (show_stack) from [<c0c64694>] (dump_stack+0x84/0x98)
-[    7.010990] [<c0c64694>] (dump_stack) from [<c071ca5c>] (check_preemption_disabled+0x138/0x13c)
-[    7.011592] [<c071ca5c>] (check_preemption_disabled) from [<c071ca80>] (debug_smp_processor_id+0x20/0x24)
-[    7.012214] [<c071ca80>] (debug_smp_processor_id) from [<c03335e0>] (optimized_callback+0x2c/0xe4)
-[    7.013077] [<c03335e0>] (optimized_callback) from [<bf0021b0>] (0xbf0021b0)
-
-To fix this issue, call get_kprobe_ctlblk() right after
-irq-disabled since that disables preemption.
+Prohibit probing on optimized_callback() because
+it is called from kprobes itself. If we put a kprobes
+on it, that will cause a recursive call loop.
+Mark it NOKPROBE_SYMBOL.
 
 Fixes: 0dc016dbd820 ("ARM: kprobes: enable OPTPROBES for ARM 32")
 Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
 Cc: stable at vger.kernel.org
 ---
- arch/arm/probes/kprobes/opt-arm.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/probes/kprobes/opt-arm.c |    1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
-index bcdecc25461b..ddc5a82eb10d 100644
+index ddc5a82eb10d..b2aa9b32bff2 100644
 --- a/arch/arm/probes/kprobes/opt-arm.c
 +++ b/arch/arm/probes/kprobes/opt-arm.c
-@@ -165,13 +165,14 @@ optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+@@ -192,6 +192,7 @@ optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+ 
+ 	local_irq_restore(flags);
+ }
++NOKPROBE_SYMBOL(optimized_callback)
+ 
+ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *orig)
  {
- 	unsigned long flags;
- 	struct kprobe *p = &op->kp;
--	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-+	struct kprobe_ctlblk *kcb;
- 
- 	/* Save skipped registers */
- 	regs->ARM_pc = (unsigned long)op->kp.addr;
- 	regs->ARM_ORIG_r0 = ~0UL;
- 
- 	local_irq_save(flags);
-+	kcb = get_kprobe_ctlblk();
- 
- 	if (kprobe_running()) {
- 		kprobes_inc_nmissed_count(&op->kp);
