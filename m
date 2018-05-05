@@ -1,78 +1,46 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Sat, 5 May 2018 10:56:03 +0100
-Subject: [PATCH v2 03/27] coresight: Add helper device type
-In-Reply-To: <20180503170040.GA11425@xps15>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-4-git-send-email-suzuki.poulose@arm.com>
- <20180503170040.GA11425@xps15>
-Message-ID: <86778b1b-cd08-629a-b56c-20549d9d7299@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sat, 5 May 2018 11:58:05 +0200
+Subject: [PATCH v3 01/12] ACPI / APEI: Move the estatus queue code up,
+ and under its own ifdef
+In-Reply-To: <20180427153510.5799-2-james.morse@arm.com>
+References: <20180427153510.5799-1-james.morse@arm.com>
+ <20180427153510.5799-2-james.morse@arm.com>
+Message-ID: <20180505095805.GB3708@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2018 06:00 PM, Mathieu Poirier wrote:
-
-...
-
->> +/*
->> + * coresight_release_device - Release this device and any of the helper
->> + * devices connected to it for trace operation.
->> + */
->> +static void coresight_release_device(struct coresight_device *csdev)
->> +{
->> +	int i;
->> +
->> +	for (i = 0; i < csdev->nr_outport; i++) {
->> +		struct coresight_device *child = csdev->conns[i].child_dev;
->> +
->> +		if (child && child->type == CORESIGHT_DEV_TYPE_HELPER)
->> +			pm_runtime_put(child->dev.parent);
->> +	}
+On Fri, Apr 27, 2018 at 04:34:59PM +0100, James Morse wrote:
+> To support asynchronous NMI-like notifications on arm64 we need to use
+> the estatus-queue. These patches refactor it to allow multiple APEI
+> notification types to use it.
 > 
-> There is a newline here in coresight_prepare_device().  Either add one (or not)
-> in both function but please be consistent.
+> First we move the estatus-queue code higher in the file so that any
+> notify_foo() handler can make use of it.
 > 
-
->> @@ -480,8 +517,7 @@ static int _coresight_build_path(struct coresight_device *csdev,
->>   
->>   	node->csdev = csdev;
->>   	list_add(&node->link, path);
->> -	pm_runtime_get_sync(csdev->dev.parent);
->> -
->> +	coresight_prepare_device(csdev);
+> This patch moves code around ... and makes the following trivial change:
+> Freshen the dated comment above ghes_estatus_llist. printk() is no
+> longer the issue, its the helpers like memory_failure_queue() that
+> still aren't nmi safe.
 > 
-> There was a newline between pm_runtime_get_sync() and the return statement in
-> the original code.
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
 > 
+> Notes for cover letter:
+> ghes.c has three things all called 'estatus'. One is a pool of memory
+> that has a static size, and is grown/shrunk when new NMI users are
+> allocated.
+> The second is the cache, this holds recent notifications so we can
+> suppress notifications we've already handled.
+> The last is the queue, which hold data from NMI notifications (in pool
+> memory) that can't be handled immediatly.
+> ---
+>  drivers/acpi/apei/ghes.c | 265 ++++++++++++++++++++++++-----------------------
+>  1 file changed, 137 insertions(+), 128 deletions(-)
 
+Reviewed-by: Borislav Petkov <bp@suse.de>
 
->> @@ -775,6 +811,10 @@ static struct device_type coresight_dev_type[] = {
->>   		.name = "source",
->>   		.groups = coresight_source_groups,
->>   	},
->> +	{
->> +		.name = "helper",
->> +	},
->> +
-> 
-> Extra newline.
-> 
+-- 
+Regards/Gruss,
+    Boris.
 
->>   };   
->> +/**
->> + * struct coresight_ops_helper - Operations for a helper device.
->> + *
->> + * All operations could pass in a device specific data, which could
->> + * help the helper device to determine what to do.
->> + *
->> + * @enable	: Turn the device ON.
->> + * @disable	: Turn the device OFF.
-> 
-> There is a discrepancy between the comment and the operations, i.e enabling a
-> device is not synonymous of turning it on.  Looking at patch 04/27 the ops is
-> called in tmc_etr_enable/disable_catu() so the comment propably needs to be
-> changed.
-
-Sure, will fix all of them.
-
-Cheers
-Suzuki
+Good mailing practices for 400: avoid top-posting and trim the reply.
