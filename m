@@ -1,58 +1,306 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 5 May 2018 12:15:46 +0200
-Subject: [PATCH] ARM: dts: BCM5301X: Relicense Asus RT-AC87U file to the
- GPL 2.0+ / MIT
-In-Reply-To: <20180504100324.31847-1-zajec5@gmail.com>
-References: <20180504100324.31847-1-zajec5@gmail.com>
-Message-ID: <945090c5-2b7c-b1c5-7402-660dd3270e2d@hauke-m.de>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Sat, 5 May 2018 18:26:49 +0800
+Subject: [RFC PATCH] locking/atomics/powerpc: Introduce optimized
+ cmpxchg_release() family of APIs for PowerPC
+In-Reply-To: <20180505100055.yc4upauxo5etq5ud@gmail.com>
+References: <20180504173937.25300-1-mark.rutland@arm.com>
+ <20180504173937.25300-2-mark.rutland@arm.com>
+ <20180504180105.GS12217@hirez.programming.kicks-ass.net>
+ <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
+ <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
+ <20180505084721.GA32344@noisy.programming.kicks-ass.net>
+ <20180505090403.p2ywuen42rnlwizq@gmail.com>
+ <20180505093829.xfylnedwd5nonhae@gmail.com>
+ <20180505100055.yc4upauxo5etq5ud@gmail.com>
+Message-ID: <20180505102649.t74xclzalkejeb6x@tardis>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2018 12:03 PM, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
-> 
-> This matches licensing used by other BCM5301X files and is preferred as:
-> 1) GPL 2.0+ makes is clearly compatible with Linux kernel
-> 2) MIT is also permissive but preferred over ISC
-> 
-> This file were created and ever touched by a group of three people only:
-> ?lvaro, Hauke and me.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+Hi Ingo,
 
-Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-
-> ---
-> ?lvaro, Hauke: I need approve for this change from each of you. If you
-> are OK with it, can you reply with an Acked-by, please?
-> ---
->  arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts | 13 +------------
->  1 file changed, 1 insertion(+), 12 deletions(-)
+On Sat, May 05, 2018 at 12:00:55PM +0200, Ingo Molnar wrote:
 > 
-> diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-> index df473cc41572..22271818f901 100644
-> --- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-> +++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-> @@ -1,20 +1,9 @@
-> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
->  /*
->   * Broadcom BCM470X / BCM5301X ARM platform code.
->   * DTS for Asus RT-AC87U
->   *
->   * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
-> - *
-> - * Permission to use, copy, modify, and/or distribute this software for any
-> - * purpose with or without fee is hereby granted, provided that the above
-> - * copyright notice and this permission notice appear in all copies.
-> - *
-> - * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-> - * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-> - * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-> - * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-> - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
-> - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-> - * PERFORMANCE OF THIS SOFTWARE.
->   */
+> * Ingo Molnar <mingo@kernel.org> wrote:
+> 
+> > > So there's no loss in arch flexibility.
+> > 
+> > BTW., PowerPC for example is already in such a situation, it does not define 
+> > atomic_cmpxchg_release(), only the other APIs:
+> > 
+> > #define atomic_cmpxchg(v, o, n) (cmpxchg(&((v)->counter), (o), (n)))
+> > #define atomic_cmpxchg_relaxed(v, o, n) \
+> > 	cmpxchg_relaxed(&((v)->counter), (o), (n))
+> > #define atomic_cmpxchg_acquire(v, o, n) \
+> > 	cmpxchg_acquire(&((v)->counter), (o), (n))
+> > 
+> > Was it really the intention on the PowerPC side that the generic code falls back 
+> > to cmpxchg(), i.e.:
+> > 
+> > #  define atomic_cmpxchg_release(...)           __atomic_op_release(atomic_cmpxchg, __VA_ARGS__)
+> > 
+> > Which after macro expansion becomes:
+> > 
+> > 	smp_mb__before_atomic();
+> > 	atomic_cmpxchg_relaxed(v, o, n);
+> > 
+> > smp_mb__before_atomic() on PowerPC falls back to the generic __smp_mb(), which 
+> > falls back to mb(), which on PowerPC is the 'sync' instruction.
+> > 
+> > Isn't this a inefficiency bug?
+> > 
+> > While I'm pretty clueless about PowerPC low level cmpxchg atomics, they appear to 
+> > have the following basic structure:
+> > 
+> > full cmpxchg():
+> > 
+> > 	PPC_ATOMIC_ENTRY_BARRIER # sync
+> > 	ldarx + stdcx
+> > 	PPC_ATOMIC_EXIT_BARRIER  # sync
+> > 
+> > cmpxchg_relaxed():
+> > 
+> > 	ldarx + stdcx
+> > 
+> > cmpxchg_acquire():
+> > 
+> > 	ldarx + stdcx
+> > 	PPC_ACQUIRE_BARRIER      # lwsync
+> > 
+> > The logical extension for cmpxchg_release() would be:
+> > 
+> > cmpxchg_release():
+> > 
+> > 	PPC_RELEASE_BARRIER      # lwsync
+> > 	ldarx + stdcx
+> > 
+> > But instead we silently get the generic fallback, which does:
+> > 
+> > 	smp_mb__before_atomic();
+> > 	atomic_cmpxchg_relaxed(v, o, n);
+> > 
+> > Which maps to:
+> > 
+> > 	sync
+> > 	ldarx + stdcx
+> > 
+> > Note that it uses a full barrier instead of lwsync (does that stand for 
+> > 'lightweight sync'?).
+> > 
+> > Even if it turns out we need the full barrier, with the overly finegrained 
+> > structure of the atomics this detail is totally undocumented and non-obvious.
+> 
+> The patch below fills in those bits and implements the optimized cmpxchg_release() 
+> family of APIs. The end effect should be that cmpxchg_release() will now use 
+> 'lwsync' instead of 'sync' on PowerPC, for the following APIs:
+> 
+>   cmpxchg_release()
+>   cmpxchg64_release()
+>   atomic_cmpxchg_release()
+>   atomic64_cmpxchg_release()
+> 
+> I based this choice of the release barrier on an existing bitops low level PowerPC 
+> method:
+> 
+>    DEFINE_BITOP(clear_bits_unlock, andc, PPC_RELEASE_BARRIER)
+> 
+> This clearly suggests that PPC_RELEASE_BARRIER is in active use and 'lwsync' is 
+> the 'release barrier' instruction, if I interpreted that right.
+> 
+
+Thanks for looking into this, but as I said in other email:
+
+	https://marc.info/?l=linux-kernel&m=152551511324210&w=2
+
+, we actually generate light weight barriers for cmpxchg_release()
+familiy.
+
+The reason of the asymmetry between cmpxchg_acquire() and
+cmpxchg_release() is that we want to save a barrier for
+cmpxchg_acquire() if the cmp fails, but doing the similar for
+cmpxchg_release() will introduce a scenario that puts a barrier in a
+ll/sc loop, which may be a bad idea.
+
+> But I know very little about PowerPC so this might be spectacularly wrong. It's 
+> totally untested as well. I also pretty sick today so my mental capabilities are 
+> significantly reduced ...
+> 
+
+Feel sorry about that, hope you well!
+
+Please let me know if you think I should provide more document work to
+make this more informative.
+
+Regards,
+Boqun
+
+> So not signed off and such.
+> 
+> Thanks,
+> 
+> 	Ingo
+> 
+> ---
+>  arch/powerpc/include/asm/atomic.h  |  4 ++
+>  arch/powerpc/include/asm/cmpxchg.h | 81 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 85 insertions(+)
+> 
+> diff --git a/arch/powerpc/include/asm/atomic.h b/arch/powerpc/include/asm/atomic.h
+> index 682b3e6a1e21..f7a6f29acb12 100644
+> --- a/arch/powerpc/include/asm/atomic.h
+> +++ b/arch/powerpc/include/asm/atomic.h
+> @@ -213,6 +213,8 @@ static __inline__ int atomic_dec_return_relaxed(atomic_t *v)
+>  	cmpxchg_relaxed(&((v)->counter), (o), (n))
+>  #define atomic_cmpxchg_acquire(v, o, n) \
+>  	cmpxchg_acquire(&((v)->counter), (o), (n))
+> +#define atomic_cmpxchg_release(v, o, n) \
+> +	cmpxchg_release(&((v)->counter), (o), (n))
 >  
->  /dts-v1/;
-> 
+>  #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
+>  #define atomic_xchg_relaxed(v, new) xchg_relaxed(&((v)->counter), (new))
+> @@ -519,6 +521,8 @@ static __inline__ long atomic64_dec_if_positive(atomic64_t *v)
+>  	cmpxchg_relaxed(&((v)->counter), (o), (n))
+>  #define atomic64_cmpxchg_acquire(v, o, n) \
+>  	cmpxchg_acquire(&((v)->counter), (o), (n))
+> +#define atomic64_cmpxchg_release(v, o, n) \
+> +	cmpxchg_release(&((v)->counter), (o), (n))
+>  
+>  #define atomic64_xchg(v, new) (xchg(&((v)->counter), new))
+>  #define atomic64_xchg_relaxed(v, new) xchg_relaxed(&((v)->counter), (new))
+> diff --git a/arch/powerpc/include/asm/cmpxchg.h b/arch/powerpc/include/asm/cmpxchg.h
+> index 9b001f1f6b32..6e46310b1833 100644
+> --- a/arch/powerpc/include/asm/cmpxchg.h
+> +++ b/arch/powerpc/include/asm/cmpxchg.h
+> @@ -213,10 +213,12 @@ __xchg_relaxed(void *ptr, unsigned long x, unsigned int size)
+>  CMPXCHG_GEN(u8, , PPC_ATOMIC_ENTRY_BARRIER, PPC_ATOMIC_EXIT_BARRIER, "memory");
+>  CMPXCHG_GEN(u8, _local, , , "memory");
+>  CMPXCHG_GEN(u8, _acquire, , PPC_ACQUIRE_BARRIER, "memory");
+> +CMPXCHG_GEN(u8, _release, PPC_RELEASE_BARRIER, , "memory");
+>  CMPXCHG_GEN(u8, _relaxed, , , "cc");
+>  CMPXCHG_GEN(u16, , PPC_ATOMIC_ENTRY_BARRIER, PPC_ATOMIC_EXIT_BARRIER, "memory");
+>  CMPXCHG_GEN(u16, _local, , , "memory");
+>  CMPXCHG_GEN(u16, _acquire, , PPC_ACQUIRE_BARRIER, "memory");
+> +CMPXCHG_GEN(u16, _release, PPC_RELEASE_BARRIER, , "memory");
+>  CMPXCHG_GEN(u16, _relaxed, , , "cc");
+>  
+>  static __always_inline unsigned long
+> @@ -314,6 +316,29 @@ __cmpxchg_u32_acquire(u32 *p, unsigned long old, unsigned long new)
+>  	return prev;
+>  }
+>  
+> +static __always_inline unsigned long
+> +__cmpxchg_u32_release(u32 *p, unsigned long old, unsigned long new)
+> +{
+> +	unsigned long prev;
+> +
+> +	__asm__ __volatile__ (
+> +	PPC_RELEASE_BARRIER
+> +"1:	lwarx	%0,0,%2		# __cmpxchg_u32_release\n"
+> +"	cmpw	0,%0,%3\n"
+> +"	bne-	2f\n"
+> +	PPC405_ERR77(0, %2)
+> +"	stwcx.	%4,0,%2\n"
+> +"	bne-	1b\n"
+> +	"\n"
+> +"2:"
+> +	: "=&r" (prev), "+m" (*p)
+> +	: "r" (p), "r" (old), "r" (new)
+> +	: "cc", "memory");
+> +
+> +	return prev;
+> +}
+> +
+> +
+>  #ifdef CONFIG_PPC64
+>  static __always_inline unsigned long
+>  __cmpxchg_u64(volatile unsigned long *p, unsigned long old, unsigned long new)
+> @@ -397,6 +422,27 @@ __cmpxchg_u64_acquire(u64 *p, unsigned long old, unsigned long new)
+>  
+>  	return prev;
+>  }
+> +
+> +static __always_inline unsigned long
+> +__cmpxchg_u64_release(u64 *p, unsigned long old, unsigned long new)
+> +{
+> +	unsigned long prev;
+> +
+> +	__asm__ __volatile__ (
+> +	PPC_RELEASE_BARRIER
+> +"1:	ldarx	%0,0,%2		# __cmpxchg_u64_release\n"
+> +"	cmpd	0,%0,%3\n"
+> +"	bne-	2f\n"
+> +"	stdcx.	%4,0,%2\n"
+> +"	bne-	1b\n"
+> +	"\n"
+> +"2:"
+> +	: "=&r" (prev), "+m" (*p)
+> +	: "r" (p), "r" (old), "r" (new)
+> +	: "cc", "memory");
+> +
+> +	return prev;
+> +}
+>  #endif
+>  
+>  static __always_inline unsigned long
+> @@ -478,6 +524,27 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
+>  	BUILD_BUG_ON_MSG(1, "Unsupported size for __cmpxchg_acquire");
+>  	return old;
+>  }
+> +
+> +static __always_inline unsigned long
+> +__cmpxchg_release(void *ptr, unsigned long old, unsigned long new,
+> +		  unsigned int size)
+> +{
+> +	switch (size) {
+> +	case 1:
+> +		return __cmpxchg_u8_release(ptr, old, new);
+> +	case 2:
+> +		return __cmpxchg_u16_release(ptr, old, new);
+> +	case 4:
+> +		return __cmpxchg_u32_release(ptr, old, new);
+> +#ifdef CONFIG_PPC64
+> +	case 8:
+> +		return __cmpxchg_u64_release(ptr, old, new);
+> +#endif
+> +	}
+> +	BUILD_BUG_ON_MSG(1, "Unsupported size for __cmpxchg_release");
+> +	return old;
+> +}
+> +
+>  #define cmpxchg(ptr, o, n)						 \
+>    ({									 \
+>       __typeof__(*(ptr)) _o_ = (o);					 \
+> @@ -512,6 +579,15 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
+>  			(unsigned long)_o_, (unsigned long)_n_,		\
+>  			sizeof(*(ptr)));				\
+>  })
+> +
+> +#define cmpxchg_release(ptr, o, n)					\
+> +({									\
+> +	__typeof__(*(ptr)) _o_ = (o);					\
+> +	__typeof__(*(ptr)) _n_ = (n);					\
+> +	(__typeof__(*(ptr))) __cmpxchg_release((ptr),			\
+> +			(unsigned long)_o_, (unsigned long)_n_,		\
+> +			sizeof(*(ptr)));				\
+> +})
+>  #ifdef CONFIG_PPC64
+>  #define cmpxchg64(ptr, o, n)						\
+>    ({									\
+> @@ -533,6 +609,11 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
+>  	BUILD_BUG_ON(sizeof(*(ptr)) != 8);				\
+>  	cmpxchg_acquire((ptr), (o), (n));				\
+>  })
+> +#define cmpxchg64_release(ptr, o, n)					\
+> +({									\
+> +	BUILD_BUG_ON(sizeof(*(ptr)) != 8);				\
+> +	cmpxchg_release((ptr), (o), (n));				\
+> +})
+>  #else
+>  #include <asm-generic/cmpxchg-local.h>
+>  #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180505/064f3b95/attachment-0001.sig>
