@@ -1,48 +1,90 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 5 May 2018 09:10:51 -0300
-Subject: [PATCH V6 4/7] ARM: dts: imx6sx-sabreauto: add fec support
-In-Reply-To: <1525508963-7986-4-git-send-email-Anson.Huang@nxp.com>
-References: <1525508963-7986-1-git-send-email-Anson.Huang@nxp.com>
- <1525508963-7986-4-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5B8xrnjyoPoj0J_+WM6TBbE1Gbq8HChdTCQ=UpKYyRBmQ@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sat, 5 May 2018 14:27:19 +0200
+Subject: [PATCH v3 07/12] ACPI / APEI: Make the nmi_fixmap_idx per-ghes
+ to allow multiple in_nmi() users
+In-Reply-To: <20180427153510.5799-8-james.morse@arm.com>
+References: <20180427153510.5799-1-james.morse@arm.com>
+ <20180427153510.5799-8-james.morse@arm.com>
+Message-ID: <20180505122719.GE3708@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 5, 2018 at 5:29 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> Add FEC support on i.MX6SX Sabre Auto board.
->
-> Signed-off-by: Fugang Duan <fugang.duan@nxp.com>
-
-Again, it is not clear who is the author here. Is it Fugang or yourself?
-
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+On Fri, Apr 27, 2018 at 04:35:05PM +0100, James Morse wrote:
+> Arm64 has multiple NMI-like notifications, but ghes.c only has one
+> in_nmi() path, risking deadlock if one NMI-like notification can
+> interrupt another.
+> 
+> To support this we need a fixmap entry and lock for each notification
+> type. But ghes_probe() attempts to process each struct ghes at probe
+> time, to ensure any error that was notified before ghes_probe() was
+> called has been done, and the buffer released (and maybe acknowledge
+> to firmware) so that future errors can be delivered.
+> 
+> This means NMI-like notifications need two fixmap entries and locks,
+> one for the ghes_probe() time call, and another for the actual NMI
+> that could interrupt ghes_probe().
+> 
+> Split this single path up by adding an NMI fixmap idx and lock into
+> the struct ghes. Any notification that can be called as an NMI can
+> use these to separate its resources from any other notification it
+> may interrupt.
+> 
+> The majority of notifications occur in IRQ context, so unless its
+> called in_nmi(), ghes_copy_tofrom_phys() will use the FIX_APEI_GHES_IRQ
+> fixmap entry and the ghes_fixmap_lock_irq lock. This allows
+> NMI-notifications to be processed by ghes_probe(), and then taken
+> as an NMI.
+> 
+> The double-underscore version of fix_to_virt() is used because the index
+> to be mapped can't be tested against the end of the enum at compile
+> time.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> 
 > ---
-> changes since V5:
->         use "gpios" instead of "enable-gpio".
->  arch/arm/boot/dts/imx6sx-sabreauto.dts | 80 ++++++++++++++++++++++++++++++++++
->  1 file changed, 80 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> index 4d41b4d..7dda741 100644
-> --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> @@ -18,6 +18,17 @@
->                 reg = <0x80000000 0x80000000>;
->         };
->
-> +       reg_fec: fec_io_supply {
-> +               compatible = "regulator-gpio";
-> +               regulator-name = "1.8V_1.5V_FEC";
-> +               regulator-min-microvolt = <1500000>;
-> +               regulator-max-microvolt = <1800000>;
-> +               states = <1500000 0x0 1800000 0x1>;
-> +               gpios = <&max7322 0 GPIO_ACTIVE_HIGH>;
-> +               vin-supply = <&sw2_reg>;
-> +               enable-active-high;
-> +       };
+> Changes since v1:
+>  * Fixed for ghes_proc() always calling every notification in process context.
+>    Now only NMI-like notifications need an additional fixmap-slot/lock.
 
-I still find this confusing.
+...
 
-There is no consumer for reg_fec in, so it seems you are relying on
-the fact that the kernel regulator core will disable reg_fec to put
-the regulator in the state you require.
+> @@ -986,6 +960,8 @@ int ghes_notify_sea(void)
+>  
+>  static void ghes_sea_add(struct ghes *ghes)
+>  {
+> +	ghes->nmi_fixmap_lock = &ghes_fixmap_lock_nmi;
+> +	ghes->nmi_fixmap_idx = FIX_APEI_GHES_NMI;
+>  	ghes_estatus_queue_grow_pool(ghes);
+>  
+>  	mutex_lock(&ghes_list_mutex);
+> @@ -1032,6 +1008,8 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+>  
+>  static void ghes_nmi_add(struct ghes *ghes)
+>  {
+> +	ghes->nmi_fixmap_lock = &ghes_fixmap_lock_nmi;
+
+Ewww, we're assigning the spinlock to a pointer which we'll take later?
+Yuck.
+
+Why?
+
+Do I see it correctly that one can have ACPI_HEST_NOTIFY_SEA and
+ACPI_HEST_NOTIFY_NMI coexist in parallel on a single system?
+
+If not, you can use a single spinlock.
+
+If yes, then I'd prefer to make it less ugly and do the notification
+type check ghes_probe() does:
+
+	switch (generic->notify.type)
+
+and take the respective spinlock in ghes_copy_tofrom_phys(). This way it
+is a bit better than using a spinlock ptr.
+
+Thx.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
