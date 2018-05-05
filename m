@@ -1,53 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 5 May 2018 22:52:42 +0200
-Subject: [PATCH net-next v2 03/13] net: phy: sfp: warn the user when no
- tx_disable pin is available
-In-Reply-To: <44545AF4-64E3-4772-B5BA-43CCF2321025@gmail.com>
-References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
- <20180504135643.23466-4-antoine.tenart@bootlin.com>
- <ed267042-1a61-7fcc-13ee-3cad2c05c658@gmail.com>
- <20180504171425.GA17233@lunn.ch>
- <44545AF4-64E3-4772-B5BA-43CCF2321025@gmail.com>
-Message-ID: <20180505205242.GA2876@lunn.ch>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 5 May 2018 23:39:51 +0200
+Subject: Handling lm3559 flash on Motorola Droid 4 and others
+Message-ID: <20180505213951.GA4530@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2018 at 01:38:31PM -0700, Florian Fainelli wrote:
-> On May 4, 2018 10:14:25 AM PDT, Andrew Lunn <andrew@lunn.ch> wrote:
-> >On Fri, May 04, 2018 at 10:07:53AM -0700, Florian Fainelli wrote:
-> >> On 05/04/2018 06:56 AM, Antoine Tenart wrote:
-> >> > In case no Tx disable pin is available the SFP modules will always
-> >be
-> >> > emitting. This could be an issue when using modules using laser as
-> >their
-> >> > light source as we would have no way to disable it when the fiber
-> >is
-> >> > removed. This patch adds a warning when registering an SFP cage
-> >which do
-> >> > not have its tx_disable pin wired or available.
-> >> 
-> >> Is this something that was done in a possibly earlier revision of a
-> >> given board design and which was finally fixed? Nothing wrong with
-> >the
-> >> patch, but this seems like a pretty serious board design mistake,
-> >that
-> >> needs to be addressed.
-> >
-> >Hi Florian
-> >
-> >Zii Devel B is like this. Only the "Signal Detect" pin is wired to a
-> >GPIO.
-> 
+Hi!
 
-> Good point, indeed. BTW what do you think about exposing the SFF's
-> EEPROM and diagnostics through the standard ethtool operations even
-> if we have to keep the description of the SFF as a fixed link in
-> Device Tree because of the unfortunate wiring?
+It seems lm3559 flash driver is available on github (
+https://github.com/ZenfoneArea/android_kernel_asus_zenfone5/tree/master/linux/modules/camera/drivers/media/i2c
+) but there'll be some fun getting it cleaned up and merged.
 
-I believe in Antoine case, all the control plane is broken. He cannot
-read the EEPROM, nor any of the modules pins via GPIOs.
+Did anyone start doing anything in that area? Is there possibly better
+source to start from?
 
-For Zii Devel B, the EEPROM is accessible, and so is the SD pin. What
-is missing is transmit disable. So i would expose it as an SFF module.
+Best regards,
 
-   Andrew
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180505/afcb1700/attachment.sig>
