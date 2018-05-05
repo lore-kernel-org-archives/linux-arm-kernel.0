@@ -1,65 +1,43 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 5 May 2018 12:15:22 +0200
-Subject: [PATCH] ARM: dts: BCM5301X: Relicense Buffalo files to the GPL
- 2.0+ / MIT
-In-Reply-To: <20180504095445.30918-1-zajec5@gmail.com>
-References: <20180504095445.30918-1-zajec5@gmail.com>
-Message-ID: <cca03502-1d2c-4de3-0ac9-11ba47e4f15b@hauke-m.de>
+Date: Sat, 5 May 2018 12:15:46 +0200
+Subject: [PATCH] ARM: dts: BCM5301X: Relicense Asus RT-AC87U file to the
+ GPL 2.0+ / MIT
+In-Reply-To: <20180504100324.31847-1-zajec5@gmail.com>
+References: <20180504100324.31847-1-zajec5@gmail.com>
+Message-ID: <945090c5-2b7c-b1c5-7402-660dd3270e2d@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2018 11:54 AM, Rafa? Mi?ecki wrote:
+On 05/04/2018 12:03 PM, Rafa? Mi?ecki wrote:
 > From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
 > This matches licensing used by other BCM5301X files and is preferred as:
 > 1) GPL 2.0+ makes is clearly compatible with Linux kernel
 > 2) MIT is also permissive but preferred over ISC
 > 
-> These files were created and ever touched by a group of four people
-> only: Felix, INAGAKI, Hauke and me.
+> This file were created and ever touched by a group of three people only:
+> ?lvaro, Hauke and me.
 > 
 > Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
 Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
 
 > ---
-> Felix, INAGAKI, Hauke: I need approve for this change from each of you.
-> If you are OK with it, can you reply with a line like:
-> 
-> Acked-by: <name> "<e-mail>"
-> 
-> please?
+> ?lvaro, Hauke: I need approve for this change from each of you. If you
+> are OK with it, can you reply with an Acked-by, please?
 > ---
->  arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts |  3 +--
->  arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts | 13 +------------
->  arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts |  3 +--
->  3 files changed, 3 insertions(+), 16 deletions(-)
+>  arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts | 13 +------------
+>  1 file changed, 1 insertion(+), 12 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-> index 8b64caabaad8..a587384f8e40 100644
-> --- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-> +++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-> @@ -1,10 +1,9 @@
-> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
->  /*
->   * Broadcom BCM470X / BCM5301X ARM platform code.
->   * DTS for Buffalo WZR-1750DHP
->   *
->   * Copyright (C) 2014 Rafa? Mi?ecki <zajec5@gmail.com>
-> - *
-> - * Licensed under the GNU/GPL. See COPYING for details.
->   */
->  
->  /dts-v1/;
-> diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-> index 87ea6ba664f5..8ea46eed26e2 100644
-> --- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-> +++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+> diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+> index df473cc41572..22271818f901 100644
+> --- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+> +++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
 > @@ -1,20 +1,9 @@
 > +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
 >  /*
 >   * Broadcom BCM470X / BCM5301X ARM platform code.
->   * DTS for Buffalo WZR-900DHP
+>   * DTS for Asus RT-AC87U
 >   *
 >   * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
 > - *
@@ -74,22 +52,6 @@ Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
 > - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
 > - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 > - * PERFORMANCE OF THIS SOFTWARE.
->   */
->  
->  /dts-v1/;
-> diff --git a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-> index 92058c73ee59..79a9633ec417 100644
-> --- a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-> +++ b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-> @@ -1,10 +1,9 @@
-> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
->  /*
->   * Broadcom BCM470X / BCM5301X ARM platform code.
->   * DTS for Buffalo WXR-1900DHP
->   *
->   * Copyright (C) 2015 Felix Fietkau <nbd@openwrt.org>
-> - *
-> - * Licensed under the GNU/GPL. See COPYING for details.
 >   */
 >  
 >  /dts-v1/;
