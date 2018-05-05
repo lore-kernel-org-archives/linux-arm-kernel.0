@@ -1,55 +1,56 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Sat,  5 May 2018 16:29:22 +0800
-Subject: [PATCH V6 6/7] ARM: dts: imx6sx-sabreauto: add debug LED support
+Date: Sat,  5 May 2018 16:29:23 +0800
+Subject: [PATCH V6 7/7] ARM: dts: imx6sx-sabreauto: add egalax touch screen
+ support
 In-Reply-To: <1525508963-7986-1-git-send-email-Anson.Huang@nxp.com>
 References: <1525508963-7986-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1525508963-7986-6-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1525508963-7986-7-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a debug LED(D11) connected to GPIO1_IO24,
-add support for it.
+Add egalax touch screen support on i2c2 bus.
 
+Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- arch/arm/boot/dts/imx6sx-sabreauto.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+changes since V5:
+	improve pinctrl node name and touchscreen node name.
+ arch/arm/boot/dts/imx6sx-sabreauto.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-index 13de77b..1dc5b58 100644
+index 1dc5b58..3fe41d3 100644
 --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
 +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-@@ -18,6 +18,18 @@
- 		reg = <0x80000000 0x80000000>;
- 	};
+@@ -122,6 +122,12 @@
+ };
  
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_led>;
-+
-+		user {
-+			label = "debug";
-+			gpios = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
- 	reg_fec: fec_io_supply {
- 		compatible = "regulator-gpio";
- 		regulator-name = "1.8V_1.5V_FEC";
-@@ -160,6 +172,12 @@
- 		>;
- 	};
- 
-+	pinctrl_led: ledgrp {
+ &iomuxc {
++	pinctrl_egalax_int: egalax-intgrp {
 +		fsl,pins = <
-+			MX6SX_PAD_CSI_PIXCLK__GPIO1_IO_24 0x17059
++			MX6SX_PAD_SD4_RESET_B__GPIO6_IO_22      0x80000000
 +		>;
 +	};
 +
- 	pinctrl_uart1: uart1grp {
+ 	pinctrl_enet1: enet1grp {
  		fsl,pins = <
- 			MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
+ 			MX6SX_PAD_ENET1_MDIO__ENET1_MDIO        0xa0b1
+@@ -264,6 +270,16 @@
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
+ 
++	egalax_touchscreen at 4 {
++		compatible = "eeti,egalax_ts";
++		reg = <0x04>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_egalax_int>;
++		interrupt-parent = <&gpio6>;
++		interrupts = <22 IRQ_TYPE_EDGE_FALLING>;
++		wakeup-gpios = <&gpio6 22 GPIO_ACTIVE_HIGH>;
++	};
++
+ 	pfuze100: pmic at 8 {
+ 		compatible = "fsl,pfuze100";
+ 		reg = <0x08>;
 -- 
 2.7.4
