@@ -1,82 +1,96 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Sat, 5 May 2018 12:12:09 +0200
-Subject: [PATCH v3 02/12] ACPI / APEI: Generalise the estatus queue's
- add/remove and notify code
-In-Reply-To: <20180427153510.5799-3-james.morse@arm.com>
-References: <20180427153510.5799-1-james.morse@arm.com>
- <20180427153510.5799-3-james.morse@arm.com>
-Message-ID: <20180505101209.GC3708@pd.tnic>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sat, 5 May 2018 12:15:22 +0200
+Subject: [PATCH] ARM: dts: BCM5301X: Relicense Buffalo files to the GPL
+ 2.0+ / MIT
+In-Reply-To: <20180504095445.30918-1-zajec5@gmail.com>
+References: <20180504095445.30918-1-zajec5@gmail.com>
+Message-ID: <cca03502-1d2c-4de3-0ac9-11ba47e4f15b@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 04:35:00PM +0100, James Morse wrote:
-> To support asynchronous NMI-like notifications on arm64 we need to use
-> the estatus-queue. These patches refactor it to allow multiple APEI
-> notification types to use it.
+On 05/04/2018 11:54 AM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> Refactor the estatus queue's pool grow/shrink code and notification
-> routine from NOTIFY_NMI's handlers. This will allow another notification
-> method to use the estatus queue without duplicating this code.
+> This matches licensing used by other BCM5301X files and is preferred as:
+> 1) GPL 2.0+ makes is clearly compatible with Linux kernel
+> 2) MIT is also permissive but preferred over ISC
+> 
+> These files were created and ever touched by a group of four people
+> only: Felix, INAGAKI, Hauke and me.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-These two are repeated from patch 1.
+Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
 
-> This patch adds rcu_read_lock()/rcu_read_unlock() around the list
-> list_for_each_entry_rcu() walker. These aren't strictly necessary as
-> the whole nmi_enter/nmi_exit() window is a spooky RCU read-side
-> critical section.
-> 
-> Keep the oops_begin() call for x86, arm64 doesn't have one of these,
-> and APEI is the only thing outside arch code calling this..
-
-Next patch removes it so I guess you don't have to talk about it here.
-
-> The existing ghes_estatus_pool_shrink() is folded into the new
-> ghes_estatus_queue_shrink_pool() as only the queue uses it.
-> 
-> _in_nmi_notify_one() is separate from the rcu-list walker for a later
-> caller that doesn't need to walk a list.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
-> 
 > ---
-> Changes since v1:
->  * Tidied up _in_nmi_notify_one().
+> Felix, INAGAKI, Hauke: I need approve for this change from each of you.
+> If you are OK with it, can you reply with a line like:
 > 
->  drivers/acpi/apei/ghes.c | 100 ++++++++++++++++++++++++++++++-----------------
->  1 file changed, 65 insertions(+), 35 deletions(-)
-
-...
-
-> +static int ghes_estatus_queue_notified(struct list_head *rcu_list)
-> +{
-> +	int ret = -ENOENT;
-> +	struct ghes *ghes;
-> +
-> +	rcu_read_lock();
-> +	list_for_each_entry_rcu(ghes, rcu_list, list) {
-> +		if (!_in_nmi_notify_one(ghes))
-> +			ret = 0;
-> +	}
-> +	rcu_read_unlock();
-> +
-> +	if (IS_ENABLED(CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG) && ret == 0)
-
-		... && !ret
-
-like the rest of the file.
-
-> +		irq_work_queue(&ghes_proc_irq_work);
-> +
-> +	return ret;
-> +}
-> +
->  static unsigned long ghes_esource_prealloc_size(
->  	const struct acpi_hest_generic *generic)
->  {
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+> Acked-by: <name> "<e-mail>"
+> 
+> please?
+> ---
+>  arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts |  3 +--
+>  arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts | 13 +------------
+>  arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts |  3 +--
+>  3 files changed, 3 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+> index 8b64caabaad8..a587384f8e40 100644
+> --- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+> +++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+> @@ -1,10 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Buffalo WZR-1750DHP
+>   *
+>   * Copyright (C) 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Licensed under the GNU/GPL. See COPYING for details.
+>   */
+>  
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+> index 87ea6ba664f5..8ea46eed26e2 100644
+> --- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+> +++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+> @@ -1,20 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Buffalo WZR-900DHP
+>   *
+>   * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+> - *
+> - * Permission to use, copy, modify, and/or distribute this software for any
+> - * purpose with or without fee is hereby granted, provided that the above
+> - * copyright notice and this permission notice appear in all copies.
+> - *
+> - * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+> - * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+> - * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+> - * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+> - * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+> - * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+> - * PERFORMANCE OF THIS SOFTWARE.
+>   */
+>  
+>  /dts-v1/;
+> diff --git a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
+> index 92058c73ee59..79a9633ec417 100644
+> --- a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
+> +++ b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
+> @@ -1,10 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>  /*
+>   * Broadcom BCM470X / BCM5301X ARM platform code.
+>   * DTS for Buffalo WXR-1900DHP
+>   *
+>   * Copyright (C) 2015 Felix Fietkau <nbd@openwrt.org>
+> - *
+> - * Licensed under the GNU/GPL. See COPYING for details.
+>   */
+>  
+>  /dts-v1/;
+> 
