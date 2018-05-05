@@ -1,121 +1,32 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Sat, 5 May 2018 10:47:22 +0200
-Subject: [PATCH] locking/atomics: Clean up the atomic.h maze of #defines
-In-Reply-To: <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
-References: <20180504173937.25300-1-mark.rutland@arm.com>
- <20180504173937.25300-2-mark.rutland@arm.com>
- <20180504180105.GS12217@hirez.programming.kicks-ass.net>
- <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
- <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
-Message-ID: <20180505084721.GA32344@noisy.programming.kicks-ass.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 5 May 2018 11:49:23 +0300
+Subject: [PATCH v9 01/12] ARM: Allow this header to be included by
+ assembly files
+In-Reply-To: <20180504190545.5114-2-mylene.josserand@bootlin.com>
+References: <20180504190545.5114-1-mylene.josserand@bootlin.com>
+ <20180504190545.5114-2-mylene.josserand@bootlin.com>
+Message-ID: <60ba513e-d865-d4c0-7956-7d6302020165@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2018 at 10:11:00AM +0200, Ingo Molnar wrote:
+Hello!
 
-> Before:
-> 
->  #ifndef atomic_fetch_dec_relaxed
-> 
->  #ifndef atomic_fetch_dec
->  #define atomic_fetch_dec(v)	        atomic_fetch_sub(1, (v))
->  #define atomic_fetch_dec_relaxed(v)	atomic_fetch_sub_relaxed(1, (v))
->  #define atomic_fetch_dec_acquire(v)	atomic_fetch_sub_acquire(1, (v))
->  #define atomic_fetch_dec_release(v)	atomic_fetch_sub_release(1, (v))
->  #else /* atomic_fetch_dec */
->  #define atomic_fetch_dec_relaxed	atomic_fetch_dec
->  #define atomic_fetch_dec_acquire	atomic_fetch_dec
->  #define atomic_fetch_dec_release	atomic_fetch_dec
->  #endif /* atomic_fetch_dec */
-> 
->  #else /* atomic_fetch_dec_relaxed */
-> 
->  #ifndef atomic_fetch_dec_acquire
->  #define atomic_fetch_dec_acquire(...)					\
-> 	__atomic_op_acquire(atomic_fetch_dec, __VA_ARGS__)
->  #endif
-> 
->  #ifndef atomic_fetch_dec_release
->  #define atomic_fetch_dec_release(...)					\
-> 	__atomic_op_release(atomic_fetch_dec, __VA_ARGS__)
->  #endif
-> 
->  #ifndef atomic_fetch_dec
->  #define atomic_fetch_dec(...)						\
-> 	__atomic_op_fence(atomic_fetch_dec, __VA_ARGS__)
->  #endif
->  #endif /* atomic_fetch_dec_relaxed */
-> 
-> After:
-> 
->  #ifndef atomic_fetch_dec_relaxed
->  # ifndef atomic_fetch_dec
->  #  define atomic_fetch_dec(v)			atomic_fetch_sub(1, (v))
->  #  define atomic_fetch_dec_relaxed(v)		atomic_fetch_sub_relaxed(1, (v))
->  #  define atomic_fetch_dec_acquire(v)		atomic_fetch_sub_acquire(1, (v))
->  #  define atomic_fetch_dec_release(v)		atomic_fetch_sub_release(1, (v))
->  # else
->  #  define atomic_fetch_dec_relaxed		atomic_fetch_dec
->  #  define atomic_fetch_dec_acquire		atomic_fetch_dec
->  #  define atomic_fetch_dec_release		atomic_fetch_dec
->  # endif
->  #else
->  # ifndef atomic_fetch_dec_acquire
->  #  define atomic_fetch_dec_acquire(...)	__atomic_op_acquire(atomic_fetch_dec, __VA_ARGS__)
->  # endif
->  # ifndef atomic_fetch_dec_release
->  #  define atomic_fetch_dec_release(...)	__atomic_op_release(atomic_fetch_dec, __VA_ARGS__)
->  # endif
->  # ifndef atomic_fetch_dec
->  #  define atomic_fetch_dec(...)		__atomic_op_fence(atomic_fetch_dec, __VA_ARGS__)
->  # endif
->  #endif
-> 
-> The new variant is readable at a glance, and the hierarchy of defines is very 
-> obvious as well.
+On 5/4/2018 10:05 PM, Myl?ne Josserand wrote:
 
-It wraps and looks hideous in my normal setup. And I do detest that indent
-after # thing.
-
-> And I think we could do even better - there's absolutely no reason why _every_ 
-> operation has to be made conditional on a finegrained level - they are overriden 
-> in API groups. In fact allowing individual override is arguably a fragility.
+> From: Doug Berger <opendmb@gmail.com>
 > 
-> So we could do the following simplification on top of that:
+> The constants defined in this file are equally useful in assembly and C
+> source files. The arm64 architecture version of this file allows
+> inclusion in both assembly and C source files, so this this commit adds
+
+    One "this" is enough. :-)
+
+> that capability to the arm architecture version so that the constants
+> don't need to be defined in multiple places.
 > 
->  #ifndef atomic_fetch_dec_relaxed
->  # ifndef atomic_fetch_dec
->  #  define atomic_fetch_dec(v)			atomic_fetch_sub(1, (v))
->  #  define atomic_fetch_dec_relaxed(v)		atomic_fetch_sub_relaxed(1, (v))
->  #  define atomic_fetch_dec_acquire(v)		atomic_fetch_sub_acquire(1, (v))
->  #  define atomic_fetch_dec_release(v)		atomic_fetch_sub_release(1, (v))
->  # else
->  #  define atomic_fetch_dec_relaxed		atomic_fetch_dec
->  #  define atomic_fetch_dec_acquire		atomic_fetch_dec
->  #  define atomic_fetch_dec_release		atomic_fetch_dec
->  # endif
->  #else
->  # ifndef atomic_fetch_dec
->  #  define atomic_fetch_dec(...)		__atomic_op_fence(atomic_fetch_dec, __VA_ARGS__)
->  #  define atomic_fetch_dec_acquire(...)	__atomic_op_acquire(atomic_fetch_dec, __VA_ARGS__)
->  #  define atomic_fetch_dec_release(...)	__atomic_op_release(atomic_fetch_dec, __VA_ARGS__)
->  # endif
->  #endif
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+[...]
 
-This would disallow an architecture to override just fetch_dec_release for
-instance.
-
-I don't think there currently is any architecture that does that, but the
-intent was to allow it to override anything and only provide defaults where it
-does not.
-
-None of this takes away the giant trainwreck that is the annotated atomic stuff
-though.
-
-And I seriously hate this one:
-
-  ba1c9f83f633 ("locking/atomic/x86: Un-macro-ify atomic ops implementation")
-
-and will likely undo that the moment I need to change anything there.
-
-So no, don't like.
+MBR, Sergei
