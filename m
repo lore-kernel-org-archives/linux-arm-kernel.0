@@ -1,40 +1,82 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 5 May 2018 15:17:11 +0800
-Subject: [PATCH 0/2] crypto: implement SM4 for arm64 using special
- instructions
-In-Reply-To: <20180425122046.12695-1-ard.biesheuvel@linaro.org>
-References: <20180425122046.12695-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180505071711.r5swugmom3t44kcd@gondor.apana.org.au>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Sat, 5 May 2018 10:42:16 +0300
+Subject: [PATCH v2 07/10] PCI: Convert of_pci_get_host_bridge_resources()
+ users to devm variant
+In-Reply-To: <20180504164401.GA17043@e107981-ln.cambridge.arm.com>
+References: <cover.1525067324.git.jan.kiszka@siemens.com>
+ <ed3e6df4feca5febefa14716d62aaddd5b4a39d1.1525067324.git.jan.kiszka@siemens.com>
+ <dbfa80fb-5fe8-3ccd-6886-4604ef9e058b@mentor.com>
+ <20180504164401.GA17043@e107981-ln.cambridge.arm.com>
+Message-ID: <0b7bf715-63dc-e2dc-a614-02d88bdc0254@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 02:20:44PM +0200, Ard Biesheuvel wrote:
-> Patch #1 makes some preparatory changes so the C routines can be used as
-> a fallback by other drivers.
-> 
-> Patch #2 implements the SM4 core cipher using the special instructions
-> introduced as an optional extension by revision 8.2 of the ARM architecture.
-> 
-> Note that this does not implement cipher+chaining mode combinations as we
-> do for AES. This can be added later if desiresd.
-> 
-> Ard Biesheuvel (2):
->   crypto: sm4 - export encrypt/decrypt routines to other drivers
->   crypto: arm64 - add support for SM4 encryption using special
->     instructions
-> 
->  arch/arm64/crypto/Kconfig       |  6 ++
->  arch/arm64/crypto/Makefile      |  3 +
->  arch/arm64/crypto/sm4-ce-core.S | 36 ++++++++++
->  arch/arm64/crypto/sm4-ce-glue.c | 73 ++++++++++++++++++++
->  crypto/sm4_generic.c            | 10 +--
->  include/crypto/sm4.h            |  3 +
->  6 files changed, 127 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm64/crypto/sm4-ce-core.S
->  create mode 100644 arch/arm64/crypto/sm4-ce-glue.c
+Hi Lorenzo,
 
-All applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+On 05/04/2018 07:44 PM, Lorenzo Pieralisi wrote:
+> On Thu, May 03, 2018 at 10:18:24AM +0300, Vladimir Zapolskiy wrote:
+>> Hi Jan,
+>>
+>> On 04/30/2018 08:48 AM, Jan Kiszka wrote:
+>>> From: Jan Kiszka <jan.kiszka@siemens.com>
+>>>
+>>> Straightforward for all of them, no more leaks afterwards.
+>>>
+>>> CC: Jingoo Han <jingoohan1@gmail.com>
+>>> CC: Joao Pinto <Joao.Pinto@synopsys.com>
+>>> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+>>> Acked-by: Jingoo Han <jingoo1han@gmail.com>
+>>
+>> [snip]
+>>
+>>> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+>>> index 6ab28f29ac6a..6eb36c924983 100644
+>>> --- a/drivers/pci/host/pcie-rcar.c
+>>> +++ b/drivers/pci/host/pcie-rcar.c
+>>> @@ -1067,12 +1067,11 @@ static int rcar_pcie_parse_request_of_pci_ranges(struct rcar_pcie *pci)
+>>>  {
+>>>  	int err;
+>>>  	struct device *dev = pci->dev;
+>>> -	struct device_node *np = dev->of_node;
+>>>  	resource_size_t iobase;
+>>>  	struct resource_entry *win, *tmp;
+>>>  
+>>> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
+>>> -					       &iobase);
+>>> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
+>>> +						    &pci->resources, &iobase);
+>>>  	if (err)
+>>>  		return err;
+>>>  
+>>
+>> this one snippet is obsoleted by https://patchwork.ozlabs.org/patch/904326/
+>>
+>> If 08/10 remains a deprecation, then it is sufficient to exclude the R-Car change,
+>> otherwise I hope maintainers can deal with the proper ordering.
+> 
+> Isn't applying your patch:
+> 
+> https://patchwork.ozlabs.org/patch/904326/
+> 
+> and dropping the rcar hunk from this patch enough ?
+> 
+
+absolutely, but it relies on any of two assumptions that
+* my unmodified change is applied first, then Jan's adjusted change is applied,
+* Jan's unmodified change is applied first, then my adjusted change is applied.
+
+Otherwise there will be a trivial merge conflict, or even worse, if R-Car hunk
+is removed as suggested, then of_pci_get_host_bridge_resources() is removed
+instead of deprecation, and then my unmodified change is applied on top, it will
+result in a window of commits, where R-Car PCIe driver won't be buildable, and
+git-bisect users can be disappointed.
+
+It makes little sense to include my change into Jan's series, thus I rely on
+maintainers' awareness and smooth resolution of the issue by maintainers.
+
+For what it's worth, I vote for of_pci_get_host_bridge_resources() removal.
+
+--
+With best wishes,
+Vladimir
