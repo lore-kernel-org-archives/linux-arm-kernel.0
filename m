@@ -1,161 +1,170 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Sat, 5 May 2018 11:03:30 +0100
-Subject: [PATCH v2 04/27] coresight: Introduce support for Coresight
- Addrss Translation Unit
-In-Reply-To: <CANLsYkwCYUD0OSEuVML=vKJysT=xi8M0ahpU2bz=nBykSgFgGQ@mail.gmail.com>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-5-git-send-email-suzuki.poulose@arm.com>
- <20180503173141.GB11425@xps15>
- <CANLsYkwCYUD0OSEuVML=vKJysT=xi8M0ahpU2bz=nBykSgFgGQ@mail.gmail.com>
-Message-ID: <4582be29-d46d-c3fd-d84f-6fd850252b39@arm.com>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Sat, 5 May 2018 18:16:09 +0800
+Subject: [PATCH] locking/atomics: Clean up the atomic.h maze of #defines
+In-Reply-To: <20180505093829.xfylnedwd5nonhae@gmail.com>
+References: <20180504173937.25300-1-mark.rutland@arm.com>
+ <20180504173937.25300-2-mark.rutland@arm.com>
+ <20180504180105.GS12217@hirez.programming.kicks-ass.net>
+ <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
+ <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
+ <20180505084721.GA32344@noisy.programming.kicks-ass.net>
+ <20180505090403.p2ywuen42rnlwizq@gmail.com>
+ <20180505093829.xfylnedwd5nonhae@gmail.com>
+Message-ID: <20180505101609.5wb56j4mspjkokmw@tardis>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2018 09:25 PM, Mathieu Poirier wrote:
-> On 3 May 2018 at 11:31, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->> On Tue, May 01, 2018 at 10:10:34AM +0100, Suzuki K Poulose wrote:
->>> Add the initial support for Coresight Address Translation Unit, which
->>> augments the TMC in Coresight SoC-600 by providing an improved Scatter
->>> Gather mechanism. CATU is always connected to a single TMC-ETR and
->>> converts the AXI address with a translated address (from a given SG
->>> table with specific format). The CATU should be programmed in pass
->>> through mode and enabled if the ETR doesn't translation by CATU.
->>>
->>> This patch provides mechanism to enable/disable the CATU always in the
->>> pass through mode.
->>>
->>> We reuse the existing ports mechanism to link the TMC-ETR to the
->>> connected CATU.
->>>
->>> i.e, TMC-ETR:output_port0 -> CATU:input_port0
->>>
->>> Reference manual for  CATU component is avilable in version r2p0 of :
->>> "Arm Coresight System-on-Chip SoC-600 Technical Reference Manual",
->>> under Section 4.9.
->>
->> Please remove the part about the TRM as it is bound to change.
-
-Ok, I will. Generally the TRM for a particular release (rXpY) doesn't
-change, unless there is a change in either X or Y or both.
-
->>>
->>> +config CORESIGHT_CATU
->>> +     bool "Coresight Address Translation Unit (CATU) driver"
->>> +     depends on CORESIGHT_LINK_AND_SINK_TMC
->>> +     help
->>> +        Enable support for the Coresight Address Translation Unit (CATU).
->>> +        CATU supports a scatter gather table of 4K pages, with forward/backward
->>> +        lookup. CATU helps TMC ETR to use large physically non-contiguous trace
->>> +        buffer by translating the addersses used by ETR to the corresponding
->>> +        physical adderss by looking up the table.
->>
->> There is a couple of typos in the last sentence.
+On Sat, May 05, 2018 at 11:38:29AM +0200, Ingo Molnar wrote:
 > 
-> There's also a typo in the patch title.
+> * Ingo Molnar <mingo@kernel.org> wrote:
+> 
+> > * Peter Zijlstra <peterz@infradead.org> wrote:
+> > 
+> > > > So we could do the following simplification on top of that:
+> > > > 
+> > > >  #ifndef atomic_fetch_dec_relaxed
+> > > >  # ifndef atomic_fetch_dec
+> > > >  #  define atomic_fetch_dec(v)		atomic_fetch_sub(1, (v))
+> > > >  #  define atomic_fetch_dec_relaxed(v)	atomic_fetch_sub_relaxed(1, (v))
+> > > >  #  define atomic_fetch_dec_acquire(v)	atomic_fetch_sub_acquire(1, (v))
+> > > >  #  define atomic_fetch_dec_release(v)	atomic_fetch_sub_release(1, (v))
+> > > >  # else
+> > > >  #  define atomic_fetch_dec_relaxed		atomic_fetch_dec
+> > > >  #  define atomic_fetch_dec_acquire		atomic_fetch_dec
+> > > >  #  define atomic_fetch_dec_release		atomic_fetch_dec
+> > > >  # endif
+> > > >  #else
+> > > >  # ifndef atomic_fetch_dec
+> > > >  #  define atomic_fetch_dec(...)		__atomic_op_fence(atomic_fetch_dec, __VA_ARGS__)
+> > > >  #  define atomic_fetch_dec_acquire(...)	__atomic_op_acquire(atomic_fetch_dec, __VA_ARGS__)
+> > > >  #  define atomic_fetch_dec_release(...)	__atomic_op_release(atomic_fetch_dec, __VA_ARGS__)
+> > > >  # endif
+> > > >  #endif
+> > > 
+> > > This would disallow an architecture to override just fetch_dec_release for
+> > > instance.
+> > 
+> > Couldn't such a crazy arch just define _all_ the 3 APIs in this group?
+> > That's really a small price and makes the place pay the complexity
+> > price that does the weirdness...
+> > 
+> > > I don't think there currently is any architecture that does that, but the
+> > > intent was to allow it to override anything and only provide defaults where it
+> > > does not.
+> > 
+> > I'd argue that if a new arch only defines one of these APIs that's probably a bug. 
+> > If they absolutely want to do it, they still can - by defining all 3 APIs.
+> > 
+> > So there's no loss in arch flexibility.
+> 
+> BTW., PowerPC for example is already in such a situation, it does not define 
+> atomic_cmpxchg_release(), only the other APIs:
+> 
+> #define atomic_cmpxchg(v, o, n) (cmpxchg(&((v)->counter), (o), (n)))
+> #define atomic_cmpxchg_relaxed(v, o, n) \
+> 	cmpxchg_relaxed(&((v)->counter), (o), (n))
+> #define atomic_cmpxchg_acquire(v, o, n) \
+> 	cmpxchg_acquire(&((v)->counter), (o), (n))
+> 
+> Was it really the intention on the PowerPC side that the generic code falls back 
+> to cmpxchg(), i.e.:
+> 
+> #  define atomic_cmpxchg_release(...)           __atomic_op_release(atomic_cmpxchg, __VA_ARGS__)
 > 
 
->>> diff --git a/drivers/hwtracing/coresight/coresight-catu.c b/drivers/hwtracing/coresight/coresight-catu.c
->>> new file mode 100644
->>> index 0000000..2cd69a6
->>> --- /dev/null
->>> +++ b/drivers/hwtracing/coresight/coresight-catu.c
->>> @@ -0,0 +1,195 @@
->>> +// SPDX-License-Identifier: GPL-2.0
->>> +
->>
->> Extra line
->>
->>> +/*
->>> + * Copyright (C) 2017 ARM Limited. All rights reserved.
->>
->> You sure you don't want to bump this to 2018?
->>
+So ppc has its own definition __atomic_op_release() in
+arch/powerpc/include/asm/atomic.h:
+
+	#define __atomic_op_release(op, args...)				\
+	({									\
+		__asm__ __volatile__(PPC_RELEASE_BARRIER "" : : : "memory");	\
+		op##_relaxed(args);						\
+	})
+
+, and PPC_RELEASE_BARRIER is lwsync, so we map to
+
+	lwsync();
+	atomic_cmpxchg_relaxed(v, o, n);
+
+And the reason, why we don't define atomic_cmpxchg_release() but define
+atomic_cmpxchg_acquire() is that, atomic_cmpxchg_*() could provide no
+ordering guarantee if the cmp fails, we did this for
+atomic_cmpxchg_acquire() but not for atomic_cmpxchg_release(), because
+doing so may introduce a memory barrier inside a ll/sc critical section,
+please see the comment before __cmpxchg_u32_acquire() in
+arch/powerpc/include/asm/cmpxchg.h:
+
+	/*
+	 * cmpxchg family don't have order guarantee if cmp part fails, therefore we
+	 * can avoid superfluous barriers if we use assembly code to implement
+	 * cmpxchg() and cmpxchg_acquire(), however we don't do the similar for
+	 * cmpxchg_release() because that will result in putting a barrier in the
+	 * middle of a ll/sc loop, which is probably a bad idea. For example, this
+	 * might cause the conditional store more likely to fail.
+	 */
+
+Regards,
+Boqun
 
 
->>> + *
->>> + * Coresight Address Translation Unit support
->>> + *
->>> + * Author: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> + */
->>> +
->>> +#include <linux/kernel.h>
->>> +#include <linux/device.h>
->>> +#include <linux/amba/bus.h>
->>> +#include <linux/io.h>
->>> +#include <linux/slab.h>
->>
->> List in alphabetical order is possible.
->>
-
->>> +static int catu_disable(struct coresight_device *csdev, void *__unused)
->>> +{
->>> +     int rc;
->>> +     struct catu_drvdata *catu_drvdata = csdev_to_catu_drvdata(csdev);
->>> +
->>> +     CS_UNLOCK(catu_drvdata->base);
->>> +     rc = catu_disable_hw(catu_drvdata);
->>> +     CS_LOCK(catu_drvdata->base);
->>> +
->>
->> I suppose you can remove the extra line as catu_enable() doesn't have one.
->>
->>> +     return rc;
->>> +}
-
->>> +     drvdata->base = base;
->>> +     catu_desc.pdata = pdata;
->>> +     catu_desc.dev = dev;
->>> +     catu_desc.groups = catu_groups;
->>> +     catu_desc.type = CORESIGHT_DEV_TYPE_HELPER;
->>> +     catu_desc.subtype.helper_subtype = CORESIGHT_DEV_SUBTYPE_HELPER_CATU;
->>> +     catu_desc.ops = &catu_ops;
->>> +     drvdata->csdev = coresight_register(&catu_desc);
->>> +     if (IS_ERR(drvdata->csdev))
->>> +             ret = PTR_ERR(drvdata->csdev);
->>> +     if (!ret)
->>> +             dev_info(drvdata->dev, "initialized\n");
->>
->> Please remove as it 1) doesn't convey HW related information and 2) the TMC
->> doesn't out put anything.
->>
-
->>> diff --git a/drivers/hwtracing/coresight/coresight-catu.h b/drivers/hwtracing/coresight/coresight-catu.h
->>> new file mode 100644
->>> index 0000000..cd58d6f
->>> --- /dev/null
->>> +++ b/drivers/hwtracing/coresight/coresight-catu.h
->>> @@ -0,0 +1,89 @@
->>> +/* SPDX-License-Identifier: GPL-2.0 */
->>> +
->>
->> Extra line
->>
->>> +/*
->>> + * Copyright (C) 2017 ARM Limited. All rights reserved.
->>> + *
->>> + * Author: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> + *
->>
->> Extra line. In coresight-catu.c there isn't one.
->>
-
->>> +#define CATU_STATUS_READY    8
->>> +#define CATU_STATUS_ADRERR   0
->>> +#define CATU_STATUS_AXIERR   4
->>> +
->>> +
->>
->> Extra line.
->>
->>> +#define CATU_IRQEN_ON                0x1
->>> +#define CATU_IRQEN_OFF               0x0
->>> +
->>> +
->>
->> Extra line.
->>
-
-Will address all the above.
-
-Cheers
-Suzuki
+> Which after macro expansion becomes:
+> 
+> 	smp_mb__before_atomic();
+> 	atomic_cmpxchg_relaxed(v, o, n);
+> 
+> smp_mb__before_atomic() on PowerPC falls back to the generic __smp_mb(), which 
+> falls back to mb(), which on PowerPC is the 'sync' instruction.
+> 
+> Isn't this a inefficiency bug?
+> 
+> While I'm pretty clueless about PowerPC low level cmpxchg atomics, they appear to 
+> have the following basic structure:
+> 
+> full cmpxchg():
+> 
+> 	PPC_ATOMIC_ENTRY_BARRIER # sync
+> 	ldarx + stdcx
+> 	PPC_ATOMIC_EXIT_BARRIER  # sync
+> 
+> cmpxchg_relaxed():
+> 
+> 	ldarx + stdcx
+> 
+> cmpxchg_acquire():
+> 
+> 	ldarx + stdcx
+> 	PPC_ACQUIRE_BARRIER      # lwsync
+> 
+> The logical extension for cmpxchg_release() would be:
+> 
+> cmpxchg_release():
+> 
+> 	PPC_RELEASE_BARRIER      # lwsync
+> 	ldarx + stdcx
+> 
+> But instead we silently get the generic fallback, which does:
+> 
+> 	smp_mb__before_atomic();
+> 	atomic_cmpxchg_relaxed(v, o, n);
+> 
+> Which maps to:
+> 
+> 	sync
+> 	ldarx + stdcx
+> 
+> Note that it uses a full barrier instead of lwsync (does that stand for 
+> 'lightweight sync'?).
+> 
+> Even if it turns out we need the full barrier, with the overly finegrained 
+> structure of the atomics this detail is totally undocumented and non-obvious.
+> 
+> Thanks,
+> 
+> 	Ingo
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180505/84554ee3/attachment.sig>
