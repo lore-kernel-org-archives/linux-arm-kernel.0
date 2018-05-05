@@ -1,268 +1,169 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Sat, 5 May 2018 22:03:40 +0800
-Subject: [PATCH] locking/atomics/powerpc: Move cmpxchg helpers to
- asm/cmpxchg.h and define the full set of cmpxchg APIs
-In-Reply-To: <20180505132751.gwzu2vbzibr2risd@gmail.com>
-References: <20180504180105.GS12217@hirez.programming.kicks-ass.net>
- <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
- <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
- <20180505084721.GA32344@noisy.programming.kicks-ass.net>
- <20180505090403.p2ywuen42rnlwizq@gmail.com>
- <20180505093829.xfylnedwd5nonhae@gmail.com>
- <20180505101609.5wb56j4mspjkokmw@tardis>
- <20180505103550.s7xsnto7tgppkmle@gmail.com>
- <20180505112817.ihrb726i37bwm4cj@tardis>
- <20180505132751.gwzu2vbzibr2risd@gmail.com>
-Message-ID: <20180505140340.uzfhoc42xvas4m72@tardis>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 5 May 2018 23:14:45 +0800
+Subject: [arm-platforms:irq/level-msi 11/13]
+ drivers/irqchip/irq-gic-v3-mbi.c:77:13: error: passing argument 1 of
+ 'mutex_lock_nested' from incompatible pointer type
+Message-ID: <201805052343.ErK1yBFD%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2018 at 03:27:51PM +0200, Ingo Molnar wrote:
-> 
-> * Boqun Feng <boqun.feng@gmail.com> wrote:
-> 
-> > > May I suggest the patch below? No change in functionality, but it documents the 
-> > > lack of the cmpxchg_release() APIs and maps them explicitly to the full cmpxchg() 
-> > > version. (Which the generic code does now in a rather roundabout way.)
-> > > 
-> > 
-> > Hmm.. cmpxchg_release() is actually lwsync() + cmpxchg_relaxed(), but
-> > you just make it sync() + cmpxchg_relaxed() + sync() with the fallback,
-> > and sync() is much heavier, so I don't think the fallback is correct.
-> 
-> Indeed!
-> 
-> The bit I missed previously is that PowerPC provides its own __atomic_op_release() 
-> method:
-> 
->    #define __atomic_op_release(op, args...)                                \
->    ({                                                                      \
->            __asm__ __volatile__(PPC_RELEASE_BARRIER "" : : : "memory");    \
->            op##_relaxed(args);                                             \
->    })
-> 
-> ... which maps to LWSYNC as you say, and my patch made that worse.
-> 
-> > I think maybe you can move powerpc's __atomic_op_{acqurie,release}()
-> > from atomic.h to cmpxchg.h (in arch/powerpc/include/asm), and
-> > 
-> > 	#define cmpxchg_release __atomic_op_release(cmpxchg, __VA_ARGS__);
-> > 	#define cmpxchg64_release __atomic_op_release(cmpxchg64, __VA_ARGS__);
-> > 
-> > I put a diff below to say what I mean (untested).
-> > 
-> > > Also, the change to arch/powerpc/include/asm/atomic.h has no functional effect 
-> > > right now either, but should anyone add a _relaxed() variant in the future, with 
-> > > this change atomic_cmpxchg_release() and atomic64_cmpxchg_release() will pick that 
-> > > up automatically.
-> > > 
-> > 
-> > You mean with your other modification in include/linux/atomic.h, right?
-> > Because with the unmodified include/linux/atomic.h, we already pick that
-> > autmatically. If so, I think that's fine.
-> > 
-> > Here is the diff for the modification for cmpxchg_release(), the idea is
-> > we generate them in asm/cmpxchg.h other than linux/atomic.h for ppc, so
-> > we keep the new linux/atomic.h working. Because if I understand
-> > correctly, the next linux/atomic.h only accepts that
-> > 
-> > 1)	architecture only defines fully ordered primitives
-> > 
-> > or
-> > 
-> > 2)	architecture only defines _relaxed primitives
-> > 
-> > or
-> > 
-> > 3)	architecture defines all four (fully, _relaxed, _acquire,
-> > 	_release) primitives
-> > 
-> > So powerpc needs to define all four primitives in its only
-> > asm/cmpxchg.h.
-> 
-> Correct, although the new logic is still RFC, PeterZ didn't like the first version 
-> I proposed and might NAK them.
-> 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/level-msi
+head:   899ce68260999a53b26b3ba17836a080882e0e08
+commit: 37b3cc58b06bf28420f0bff0b20fddf21b9c6b01 [11/13] irqchip/gic-v3: Add support for Message Based Interrupts as an MSI controller
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 37b3cc58b06bf28420f0bff0b20fddf21b9c6b01
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Understood. From my side, I don't have strong feelings for either way.
-But since powerpc gets affected with the new logic, so I'm glad I could
-help.
+All errors (new ones prefixed by >>):
 
-> Thanks for the patch - I have created the patch below from it and added your 
-> Signed-off-by.
-> 
+   drivers/irqchip/irq-gic-v3-mbi.c:26:8: error: unknown type name 'mutex_t'
+    static mutex_t   mbi_lock;
+           ^~~~~~~
+   In file included from include/linux/kernfs.h:13:0,
+                    from include/linux/sysfs.h:16,
+                    from include/linux/kobject.h:20,
+                    from include/linux/device.h:16,
+                    from include/linux/dma-mapping.h:7,
+                    from include/linux/dma-iommu.h:24,
+                    from drivers/irqchip/irq-gic-v3-mbi.c:9:
+   drivers/irqchip/irq-gic-v3-mbi.c: In function 'mbi_free_msi':
+>> drivers/irqchip/irq-gic-v3-mbi.c:77:13: error: passing argument 1 of 'mutex_lock_nested' from incompatible pointer type [-Werror=incompatible-pointer-types]
+     mutex_lock(&mbi_lock);
+                ^
+   include/linux/mutex.h:169:44: note: in definition of macro 'mutex_lock'
+    #define mutex_lock(lock) mutex_lock_nested(lock, 0)
+                                               ^~~~
+   include/linux/mutex.h:160:13: note: expected 'struct mutex *' but argument is of type 'int *'
+    extern void mutex_lock_nested(struct mutex *lock, unsigned int subclass);
+                ^~~~~~~~~~~~~~~~~
+   drivers/irqchip/irq-gic-v3-mbi.c:80:15: error: passing argument 1 of 'mutex_unlock' from incompatible pointer type [-Werror=incompatible-pointer-types]
+     mutex_unlock(&mbi_lock);
+                  ^
+   In file included from include/linux/kernfs.h:13:0,
+                    from include/linux/sysfs.h:16,
+                    from include/linux/kobject.h:20,
+                    from include/linux/device.h:16,
+                    from include/linux/dma-mapping.h:7,
+                    from include/linux/dma-iommu.h:24,
+                    from drivers/irqchip/irq-gic-v3-mbi.c:9:
+   include/linux/mutex.h:200:13: note: expected 'struct mutex *' but argument is of type 'int *'
+    extern void mutex_unlock(struct mutex *lock);
+                ^~~~~~~~~~~~
+   drivers/irqchip/irq-gic-v3-mbi.c: In function 'mbi_irq_domain_alloc':
+   drivers/irqchip/irq-gic-v3-mbi.c:89:13: error: passing argument 1 of 'mutex_lock_nested' from incompatible pointer type [-Werror=incompatible-pointer-types]
+     mutex_lock(&mbi_lock);
+                ^
+   include/linux/mutex.h:169:44: note: in definition of macro 'mutex_lock'
+    #define mutex_lock(lock) mutex_lock_nested(lock, 0)
+                                               ^~~~
+   include/linux/mutex.h:160:13: note: expected 'struct mutex *' but argument is of type 'int *'
+    extern void mutex_lock_nested(struct mutex *lock, unsigned int subclass);
+                ^~~~~~~~~~~~~~~~~
+   drivers/irqchip/irq-gic-v3-mbi.c:99:15: error: passing argument 1 of 'mutex_unlock' from incompatible pointer type [-Werror=incompatible-pointer-types]
+     mutex_unlock(&mbi_lock);
+                  ^
+   In file included from include/linux/kernfs.h:13:0,
+                    from include/linux/sysfs.h:16,
+                    from include/linux/kobject.h:20,
+                    from include/linux/device.h:16,
+                    from include/linux/dma-mapping.h:7,
+                    from include/linux/dma-iommu.h:24,
+                    from drivers/irqchip/irq-gic-v3-mbi.c:9:
+   include/linux/mutex.h:200:13: note: expected 'struct mutex *' but argument is of type 'int *'
+    extern void mutex_unlock(struct mutex *lock);
+                ^~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
-Thanks ;-)
+vim +/mutex_lock_nested +77 drivers/irqchip/irq-gic-v3-mbi.c
 
-> The only change I made beyond a trivial build fix is that I also added the release 
-> atomics variants explicitly:
-> 
-> +#define atomic_cmpxchg_release(v, o, n) \
-> +	cmpxchg_release(&((v)->counter), (o), (n))
-> +#define atomic64_cmpxchg_release(v, o, n) \
-> +	cmpxchg_release(&((v)->counter), (o), (n))
-> 
-> It has passed a PowerPC cross-build test here, but no runtime tests.
-> 
+     8	
+   > 9	#include <linux/dma-iommu.h>
+    10	#include <linux/irq.h>
+    11	#include <linux/irqdomain.h>
+    12	#include <linux/kernel.h>
+    13	#include <linux/msi.h>
+    14	#include <linux/of_address.h>
+    15	#include <linux/slab.h>
+    16	#include <linux/spinlock.h>
+    17	
+    18	#include <linux/irqchip/arm-gic-v3.h>
+    19	
+    20	struct mbi_range {
+    21		u32			spi_start;
+    22		u32			nr_spis;
+    23		unsigned long		*bm;
+    24	};
+    25	
+    26	static mutex_t			mbi_lock;
+    27	static phys_addr_t		mbi_phys_base;
+    28	static struct mbi_range		*mbi_ranges;
+    29	static unsigned int		mbi_range_nr;
+    30	
+    31	static struct irq_chip mbi_irq_chip = {
+    32		.name			= "MBI",
+    33		.irq_mask		= irq_chip_mask_parent,
+    34		.irq_unmask		= irq_chip_unmask_parent,
+    35		.irq_eoi		= irq_chip_eoi_parent,
+    36		.irq_set_type		= irq_chip_set_type_parent,
+    37		.irq_set_affinity	= irq_chip_set_affinity_parent,
+    38	};
+    39	
+    40	static int mbi_irq_gic_domain_alloc(struct irq_domain *domain,
+    41					       unsigned int virq,
+    42					       irq_hw_number_t hwirq)
+    43	{
+    44		struct irq_fwspec fwspec;
+    45		struct irq_data *d;
+    46		int err;
+    47	
+    48		/*
+    49		 * Using ACPI? There is no MBI support in the spec, you
+    50		 * shouldn't even be here.
+    51		 */
+    52		if (!is_of_node(domain->parent->fwnode))
+    53			return -EINVAL;
+    54	
+    55		/*
+    56		 * Let's default to edge. This is consistent with traditional
+    57		 * MSIs, and systems requiring level signaling will just
+    58		 * enforce the trigger on their own.
+    59		 */
+    60		fwspec.fwnode = domain->parent->fwnode;
+    61		fwspec.param_count = 3;
+    62		fwspec.param[0] = 0;
+    63		fwspec.param[1] = hwirq - 32;
+    64		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
+    65	
+    66		err = irq_domain_alloc_irqs_parent(domain, virq, 1, &fwspec);
+    67		if (err)
+    68			return err;
+    69	
+    70		d = irq_domain_get_irq_data(domain->parent, virq);
+    71		return d->chip->irq_set_type(d, IRQ_TYPE_EDGE_RISING);
+    72	}
+    73	
+    74	static void mbi_free_msi(struct mbi_range *mbi, unsigned int hwirq,
+    75				 int nr_irqs)
+    76	{
+  > 77		mutex_lock(&mbi_lock);
+    78		bitmap_release_region(mbi->bm, hwirq - mbi->spi_start,
+    79				      get_count_order(nr_irqs));
+    80		mutex_unlock(&mbi_lock);
+    81	}
+    82	
 
-Do you have the commit at any branch in tip tree? I could pull it and
-cross-build and check the assembly code of lib/atomic64_test.c, that way
-I could verify whether we mess something up.
-
-> Does this patch look good to you?
-> 
-
-Yep!
-
-Regards,
-Boqun
-
-> (Still subject to PeterZ's Ack/NAK.)
-> 
-> Thanks,
-> 
-> 	Ingo
-> 
-> ======================>
-> From: Boqun Feng <boqun.feng@gmail.com>
-> Date: Sat, 5 May 2018 19:28:17 +0800
-> Subject: [PATCH] locking/atomics/powerpc: Move cmpxchg helpers to asm/cmpxchg.h and define the full set of cmpxchg APIs
-> 
-> Move PowerPC's __op_{acqurie,release}() from atomic.h to
-> cmpxchg.h (in arch/powerpc/include/asm), plus use them to
-> define these two methods:
-> 
-> 	#define cmpxchg_release __op_release(cmpxchg, __VA_ARGS__);
-> 	#define cmpxchg64_release __op_release(cmpxchg64, __VA_ARGS__);
-> 
-> ... the idea is to generate all these methods in cmpxchg.h and to define the full
-> array of atomic primitives, including the cmpxchg_release() methods which were
-> defined by the generic code before.
-> 
-> Also define the atomic[64]_() variants explicitly.
-> 
-> This ensures that all these low level cmpxchg APIs are defined in
-> PowerPC headers, with no generic header fallbacks.
-> 
-> No change in functionality or code generation.
-> 
-> Signed-off-by: Boqun Feng <boqun.feng@gmail.com>
-> Cc: Linus Torvalds <torvalds@linux-foundation.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: aryabinin at virtuozzo.com
-> Cc: catalin.marinas at arm.com
-> Cc: dvyukov at google.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: will.deacon at arm.com
-> Link: http://lkml.kernel.org/r/20180505112817.ihrb726i37bwm4cj at tardis
-> Signed-off-by: Ingo Molnar <mingo@kernel.org>
-> ---
->  arch/powerpc/include/asm/atomic.h  | 22 ++++------------------
->  arch/powerpc/include/asm/cmpxchg.h | 24 ++++++++++++++++++++++++
->  2 files changed, 28 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/powerpc/include/asm/atomic.h b/arch/powerpc/include/asm/atomic.h
-> index 682b3e6a1e21..4e06955ec10f 100644
-> --- a/arch/powerpc/include/asm/atomic.h
-> +++ b/arch/powerpc/include/asm/atomic.h
-> @@ -13,24 +13,6 @@
->  
->  #define ATOMIC_INIT(i)		{ (i) }
->  
-> -/*
-> - * Since *_return_relaxed and {cmp}xchg_relaxed are implemented with
-> - * a "bne-" instruction at the end, so an isync is enough as a acquire barrier
-> - * on the platform without lwsync.
-> - */
-> -#define __atomic_op_acquire(op, args...)				\
-> -({									\
-> -	typeof(op##_relaxed(args)) __ret  = op##_relaxed(args);		\
-> -	__asm__ __volatile__(PPC_ACQUIRE_BARRIER "" : : : "memory");	\
-> -	__ret;								\
-> -})
-> -
-> -#define __atomic_op_release(op, args...)				\
-> -({									\
-> -	__asm__ __volatile__(PPC_RELEASE_BARRIER "" : : : "memory");	\
-> -	op##_relaxed(args);						\
-> -})
-> -
->  static __inline__ int atomic_read(const atomic_t *v)
->  {
->  	int t;
-> @@ -213,6 +195,8 @@ static __inline__ int atomic_dec_return_relaxed(atomic_t *v)
->  	cmpxchg_relaxed(&((v)->counter), (o), (n))
->  #define atomic_cmpxchg_acquire(v, o, n) \
->  	cmpxchg_acquire(&((v)->counter), (o), (n))
-> +#define atomic_cmpxchg_release(v, o, n) \
-> +	cmpxchg_release(&((v)->counter), (o), (n))
->  
->  #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
->  #define atomic_xchg_relaxed(v, new) xchg_relaxed(&((v)->counter), (new))
-> @@ -519,6 +503,8 @@ static __inline__ long atomic64_dec_if_positive(atomic64_t *v)
->  	cmpxchg_relaxed(&((v)->counter), (o), (n))
->  #define atomic64_cmpxchg_acquire(v, o, n) \
->  	cmpxchg_acquire(&((v)->counter), (o), (n))
-> +#define atomic64_cmpxchg_release(v, o, n) \
-> +	cmpxchg_release(&((v)->counter), (o), (n))
->  
->  #define atomic64_xchg(v, new) (xchg(&((v)->counter), new))
->  #define atomic64_xchg_relaxed(v, new) xchg_relaxed(&((v)->counter), (new))
-> diff --git a/arch/powerpc/include/asm/cmpxchg.h b/arch/powerpc/include/asm/cmpxchg.h
-> index 9b001f1f6b32..e27a612b957f 100644
-> --- a/arch/powerpc/include/asm/cmpxchg.h
-> +++ b/arch/powerpc/include/asm/cmpxchg.h
-> @@ -8,6 +8,24 @@
->  #include <asm/asm-compat.h>
->  #include <linux/bug.h>
->  
-> +/*
-> + * Since *_return_relaxed and {cmp}xchg_relaxed are implemented with
-> + * a "bne-" instruction at the end, so an isync is enough as a acquire barrier
-> + * on the platform without lwsync.
-> + */
-> +#define __atomic_op_acquire(op, args...)				\
-> +({									\
-> +	typeof(op##_relaxed(args)) __ret  = op##_relaxed(args);		\
-> +	__asm__ __volatile__(PPC_ACQUIRE_BARRIER "" : : : "memory");	\
-> +	__ret;								\
-> +})
-> +
-> +#define __atomic_op_release(op, args...)				\
-> +({									\
-> +	__asm__ __volatile__(PPC_RELEASE_BARRIER "" : : : "memory");	\
-> +	op##_relaxed(args);						\
-> +})
-> +
->  #ifdef __BIG_ENDIAN
->  #define BITOFF_CAL(size, off)	((sizeof(u32) - size - off) * BITS_PER_BYTE)
->  #else
-> @@ -512,6 +530,9 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
->  			(unsigned long)_o_, (unsigned long)_n_,		\
->  			sizeof(*(ptr)));				\
->  })
-> +
-> +#define cmpxchg_release(...) __atomic_op_release(cmpxchg, __VA_ARGS__)
-> +
->  #ifdef CONFIG_PPC64
->  #define cmpxchg64(ptr, o, n)						\
->    ({									\
-> @@ -533,6 +554,9 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
->  	BUILD_BUG_ON(sizeof(*(ptr)) != 8);				\
->  	cmpxchg_acquire((ptr), (o), (n));				\
->  })
-> +
-> +#define cmpxchg64_release(...) __atomic_op_release(cmpxchg64, __VA_ARGS__)
-> +
->  #else
->  #include <asm-generic/cmpxchg-local.h>
->  #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 65221 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180505/fec9a4cc/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180505/bb91a61a/attachment-0001.gz>
