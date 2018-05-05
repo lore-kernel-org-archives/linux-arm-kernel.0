@@ -1,32 +1,18 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Sat, 5 May 2018 10:21:16 +0800
-Subject: [RESEND PATCH 1/5] usb: mtu3: avoid TX data length truncated in
- SS/SSP mode
-Message-ID: <3b0c7ca576fee8220d63c9914483b70b0fbc8783.1525486663.git.chunfeng.yun@mediatek.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 04 May 2018 19:55:26 -0700
+Subject: [PATCH] clk: imx6ul: fix periph clk2 clock mux selection
+In-Reply-To: <20180418125254.4397-1-stefan@agner.ch>
+References: <20180418125254.4397-1-stefan@agner.ch>
+Message-ID: <152548892600.138124.3143140012763491118@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable of 'count' is declared as u8, this will cause an issue
-due to value truncated when works in SS or SSP mode and data length
-is greater than 255, so change it as u32.
+Quoting Stefan Agner (2018-04-18 05:52:54)
+> According to the data sheet the 3rd choice is the bypass clock
+> of pll2. This should not have any effect in practice as this
+> selection is not used currently.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/mtu3/mtu3_gadget_ep0.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/usb/mtu3/mtu3_gadget_ep0.c b/drivers/usb/mtu3/mtu3_gadget_ep0.c
-index ebdcf7a..d67b540 100644
---- a/drivers/usb/mtu3/mtu3_gadget_ep0.c
-+++ b/drivers/usb/mtu3/mtu3_gadget_ep0.c
-@@ -546,7 +546,7 @@ static void ep0_tx_state(struct mtu3 *mtu)
- 	struct usb_request *req;
- 	u32 csr;
- 	u8 *src;
--	u8 count;
-+	u32 count;
- 	u32 maxp;
- 
- 	dev_dbg(mtu->dev, "%s\n", __func__);
--- 
-1.9.1
+Applied to clk-next
