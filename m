@@ -1,130 +1,173 @@
-From: m.brock@vanmierlo.com (Maarten Brock)
-Date: Sat, 05 May 2018 15:10:35 +0200
-Subject: [RFC PATCH 0/3] serial: uartps: Add run time support for more IPs
- than hardcoded 2
-In-Reply-To: <cover.1524751696.git.michal.simek@xilinx.com>
-References: <cover.1524751696.git.michal.simek@xilinx.com>
-Message-ID: <1d3bc2082972bb1d4abc2c15db396257@vanmierlo.com>
+From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
+Date: Sat, 5 May 2018 10:26:37 -0300
+Subject: [PATCH 1/7] i2c: i2c-gpio: move header to platform_data
+In-Reply-To: <20180419200015.15095-2-wsa@the-dreams.de>
+References: <20180419200015.15095-1-wsa@the-dreams.de>
+ <20180419200015.15095-2-wsa@the-dreams.de>
+Message-ID: <20180505102637.76ab7c41@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-26 16:08, Michal Simek wrote:
-> Hi,
-> 
-> this series is trying to address discussion I had with Alan in past
-> https://patchwork.kernel.org/patch/9738445/.
-> 
-> It is moving uart_register_driver() to probe function like it is done 
-> in
-> pl011 driver.
-> And also introducing new function for alias compatibility checking to
-> resolve cases where some IPs have alias and some of them not.
-> This case is detected in pl011_probe_dt_alias() but not properly 
-> solved.
-> 
-> Also keep status of free ids/minor numbers in bitmap to know what's the
-> next unallocated number.
-> 
-> The same solution can be used in pl011, uart16550 and uartlite to 
-> really
-> get unified kernel.
-> 
-> Tested on these use cases:
-> Notes:
-> ff000000 is the first PS uart listed in dtsi
-> ff010000 is the second PS uart listed in dtsi
-> 
-> Standard zcu102 setting
-> 		serial0 = &uart0;
-> 		serial1 = &uart1;
-> [    0.196628] ff000000.serial: ttyPS0 at MMIO 0xff000000 (irq = 33,
-> base_baud = 6250000) is a xuartps
-> [    0.642542] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
-> base_baud = 6250000) is a xuartps
-> 
-> Swapped zcu102 setting
-> 		serial0 = &uart1;
-> 		serial1 = &uart0;
-> [    0.196472] ff000000.serial: ttyPS1 at MMIO 0xff000000 (irq = 33,
-> base_baud = 6250000) is a xuartps
-> [    0.196824] ff010000.serial: ttyPS0 at MMIO 0xff010000 (irq = 34,
-> base_baud = 6250000) is a xuartps
-> 
-> uart0 on alias higher then MAX uart ports
-> 		serial0 = &uart1;
-> 		serial200 = &uart0;
-> [    0.176793] ff000000.serial: ttyPS200 at MMIO 0xff000000 (irq = 33,
-> base_baud = 6250000) is a xuartps
-> [    0.177288] ff010000.serial: ttyPS0 at MMIO 0xff010000 (irq = 34,
-> base_baud = 6250000) is a xuartps
-> 
-> Both uarts on higher aliases
-> 		serial1 = &uart1;
-> 		serial2 = &uart0;
-> [    0.196470] ff000000.serial: ttyPS2 at MMIO 0xff000000 (irq = 33,
-> base_baud = 6250000) is a xuartps
-> [    0.196823] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
-> base_baud = 6250000) is a xuartps
-> 
-> uart0 not listed but it is probed first that's why should be ttyPS0 but
-> there is uart1 via alias
-> 		serial0 = &uart1;
-> [    0.176656] xuartps ff000000.serial: No serial alias passed. Using
-> the first free id
-> [    0.176671] xuartps ff000000.serial: Validate id 0
-> [    0.176680] xuartps ff000000.serial: The empty id is 0
-> [    0.176692] xuartps ff000000.serial: ID 0 already taken - skipped
-> [    0.176701] xuartps ff000000.serial: Validate id 1
-> [    0.176710] xuartps ff000000.serial: The empty id is 1
-> [    0.176719] xuartps ff000000.serial: Selected ID 1 allocation passed
-> [    0.176760] ff000000.serial: ttyPS1 at MMIO 0xff000000 (irq = 33,
-> base_baud = 6250000) is a xuartps
-> [    0.177104] ff010000.serial: ttyPS0 at MMIO 0xff010000 (irq = 34,
-> base_baud = 6250000) is a xuartps
-> 
-> uart0 not listed but it is probed first that's why should be ttyPS0
-> 		serial1 = &uart1;
-> [    0.176661] xuartps ff000000.serial: No serial alias passed. Using
-> the first free id
-> [    0.176676] xuartps ff000000.serial: Validate id 0
-> [    0.176686] xuartps ff000000.serial: The empty id is 0
-> [    0.176696] xuartps ff000000.serial: Selected ID 0 allocation passed
-> [    0.176737] ff000000.serial: ttyPS0 at MMIO 0xff000000 (irq = 33,
-> base_baud = 6250000) is a xuartps
-> [    0.177069] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
-> base_baud = 6250000) is a xuartps
-> 
-> uarts not listed in aliases list
-> [    0.176673] xuartps ff000000.serial: No serial alias passed. Using
-> the first free id
-> [    0.176687] xuartps ff000000.serial: Validate id 0
-> [    0.176697] xuartps ff000000.serial: The empty id is 0
-> [    0.176707] xuartps ff000000.serial: Selected ID 0 allocation passed
-> [    0.176746] ff000000.serial: ttyPS0 at MMIO 0xff000000 (irq = 33,
-> base_baud = 6250000) is a xuartps
-> [    0.177057] xuartps ff010000.serial: No serial alias passed. Using
-> the first free id
-> [    0.177070] xuartps ff010000.serial: Validate id 0
-> [    0.177079] xuartps ff010000.serial: The empty id is 0
-> [    0.177089] xuartps ff010000.serial: Selected ID 0 allocation failed
-> [    0.177098] xuartps ff010000.serial: Validate id 1
-> [    0.177107] xuartps ff010000.serial: The empty id is 1
-> [    0.177116] xuartps ff010000.serial: Selected ID 1 allocation passed
-> [    0.177149] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
-> base_baud = 6250000) is a xuartps
-> 
-> Thanks,
-> Michal
+Em Thu, 19 Apr 2018 22:00:07 +0200
+Wolfram Sang <wsa@the-dreams.de> escreveu:
 
-Hello Michal,
+> This header only contains platform_data. Move it to the proper directory.
+> 
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> ---
+>  MAINTAINERS                                      | 2 +-
+>  arch/arm/mach-ks8695/board-acs5k.c               | 2 +-
+>  arch/arm/mach-omap1/board-htcherald.c            | 2 +-
+>  arch/arm/mach-pxa/palmz72.c                      | 2 +-
+>  arch/arm/mach-pxa/viper.c                        | 2 +-
+>  arch/arm/mach-sa1100/simpad.c                    | 2 +-
+>  arch/mips/alchemy/board-gpr.c                    | 2 +-
+>  drivers/i2c/busses/i2c-gpio.c                    | 2 +-
 
-How will this interact with ns16550 based UARTs?
+>  drivers/media/platform/marvell-ccic/mmp-driver.c | 2 +-
+Acked-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
 
-Can we have both /dev/ttyS0 and /dev/ttyPS0?
-Currently we can't unless we create *no* serialN alias for the ns16550.
-And there is no other means to lock the /dev/ttySx name to a device 
-either.
+>  drivers/mfd/sm501.c                              | 2 +-
+>  include/linux/{ => platform_data}/i2c-gpio.h     | 0
+>  11 files changed, 10 insertions(+), 10 deletions(-)
+>  rename include/linux/{ => platform_data}/i2c-gpio.h (100%)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 0a1410d5a621..7aad64b62102 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -5872,7 +5872,7 @@ GENERIC GPIO I2C DRIVER
+>  M:	Haavard Skinnemoen <hskinnemoen@gmail.com>
+>  S:	Supported
+>  F:	drivers/i2c/busses/i2c-gpio.c
+> -F:	include/linux/i2c-gpio.h
+> +F:	include/linux/platform_data/i2c-gpio.h
+>  
+>  GENERIC GPIO I2C MULTIPLEXER DRIVER
+>  M:	Peter Korsgaard <peter.korsgaard@barco.com>
+> diff --git a/arch/arm/mach-ks8695/board-acs5k.c b/arch/arm/mach-ks8695/board-acs5k.c
+> index 937eb1d47e7b..ef835d82cdb9 100644
+> --- a/arch/arm/mach-ks8695/board-acs5k.c
+> +++ b/arch/arm/mach-ks8695/board-acs5k.c
+> @@ -19,7 +19,7 @@
+>  #include <linux/gpio/machine.h>
+>  #include <linux/i2c.h>
+>  #include <linux/i2c-algo-bit.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/platform_data/pca953x.h>
+>  
+>  #include <linux/mtd/mtd.h>
+> diff --git a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
+> index 67d46690a56e..da8f3fc3180f 100644
+> --- a/arch/arm/mach-omap1/board-htcherald.c
+> +++ b/arch/arm/mach-omap1/board-htcherald.c
+> @@ -31,7 +31,7 @@
+>  #include <linux/gpio.h>
+>  #include <linux/gpio_keys.h>
+>  #include <linux/i2c.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/htcpld.h>
+>  #include <linux/leds.h>
+>  #include <linux/spi/spi.h>
+> diff --git a/arch/arm/mach-pxa/palmz72.c b/arch/arm/mach-pxa/palmz72.c
+> index 5877e547cecd..c053c8ce1586 100644
+> --- a/arch/arm/mach-pxa/palmz72.c
+> +++ b/arch/arm/mach-pxa/palmz72.c
+> @@ -30,7 +30,7 @@
+>  #include <linux/wm97xx.h>
+>  #include <linux/power_supply.h>
+>  #include <linux/usb/gpio_vbus.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/gpio/machine.h>
+>  
+>  #include <asm/mach-types.h>
+> diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+> index 90d0f277de55..39e05b7008d8 100644
+> --- a/arch/arm/mach-pxa/viper.c
+> +++ b/arch/arm/mach-pxa/viper.c
+> @@ -35,7 +35,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/gpio.h>
+>  #include <linux/jiffies.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/gpio/machine.h>
+>  #include <linux/platform_data/i2c-pxa.h>
+>  #include <linux/serial_8250.h>
+> diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+> index ace010479eb6..49a61e6f3c5f 100644
+> --- a/arch/arm/mach-sa1100/simpad.c
+> +++ b/arch/arm/mach-sa1100/simpad.c
+> @@ -37,7 +37,7 @@
+>  #include <linux/input.h>
+>  #include <linux/gpio_keys.h>
+>  #include <linux/leds.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  
+>  #include "generic.h"
+>  
+> diff --git a/arch/mips/alchemy/board-gpr.c b/arch/mips/alchemy/board-gpr.c
+> index 4e79dbd54a33..fa75d75b5ba9 100644
+> --- a/arch/mips/alchemy/board-gpr.c
+> +++ b/arch/mips/alchemy/board-gpr.c
+> @@ -29,7 +29,7 @@
+>  #include <linux/leds.h>
+>  #include <linux/gpio.h>
+>  #include <linux/i2c.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/gpio/machine.h>
+>  #include <asm/bootinfo.h>
+>  #include <asm/idle.h>
+> diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
+> index 58abb3eced58..005e6e0330c2 100644
+> --- a/drivers/i2c/busses/i2c-gpio.c
+> +++ b/drivers/i2c/busses/i2c-gpio.c
+> @@ -11,7 +11,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/i2c.h>
+>  #include <linux/i2c-algo-bit.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/init.h>
+>  #include <linux/module.h>
+>  #include <linux/slab.h>
+> diff --git a/drivers/media/platform/marvell-ccic/mmp-driver.c b/drivers/media/platform/marvell-ccic/mmp-driver.c
+> index 816f4b6a7b8e..d9f0dd0d3525 100644
+> --- a/drivers/media/platform/marvell-ccic/mmp-driver.c
+> +++ b/drivers/media/platform/marvell-ccic/mmp-driver.c
+> @@ -12,7 +12,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/i2c.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/slab.h>
+> diff --git a/drivers/mfd/sm501.c b/drivers/mfd/sm501.c
+> index ad774161a22d..66af659b01b2 100644
+> --- a/drivers/mfd/sm501.c
+> +++ b/drivers/mfd/sm501.c
+> @@ -19,7 +19,7 @@
+>  #include <linux/device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pci.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/gpio/machine.h>
+>  #include <linux/slab.h>
+>  
+> diff --git a/include/linux/i2c-gpio.h b/include/linux/platform_data/i2c-gpio.h
+> similarity index 100%
+> rename from include/linux/i2c-gpio.h
+> rename to include/linux/platform_data/i2c-gpio.h
 
-Or will the xuartps driver eventually use /dev/ttySx as well?
 
-Maarten
+
+Thanks,
+Mauro
