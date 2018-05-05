@@ -1,32 +1,24 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 5 May 2018 11:49:23 +0300
-Subject: [PATCH v9 01/12] ARM: Allow this header to be included by
- assembly files
-In-Reply-To: <20180504190545.5114-2-mylene.josserand@bootlin.com>
-References: <20180504190545.5114-1-mylene.josserand@bootlin.com>
- <20180504190545.5114-2-mylene.josserand@bootlin.com>
-Message-ID: <60ba513e-d865-d4c0-7956-7d6302020165@cogentembedded.com>
+From: musashino.open@gmail.com (INAGAKI Hiroshi)
+Date: Sat, 5 May 2018 17:53:31 +0900
+Subject: [PATCH] ARM: dts: BCM5301X: Relicense Buffalo files to the GPL
+ 2.0+ / MIT
+In-Reply-To: <20180504095445.30918-1-zajec5@gmail.com>
+References: <20180504095445.30918-1-zajec5@gmail.com>
+Message-ID: <15d68a4b-62d7-34b4-270e-ff42a71dc2dc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Acked-by: INAGAKI Hiroshi <musashino.open@gmail.com>
 
-On 5/4/2018 10:05 PM, Myl?ne Josserand wrote:
 
-> From: Doug Berger <opendmb@gmail.com>
-> 
-> The constants defined in this file are equally useful in assembly and C
-> source files. The arm64 architecture version of this file allows
-> inclusion in both assembly and C source files, so this this commit adds
-
-    One "this" is enough. :-)
-
-> that capability to the arm architecture version so that the constants
-> don't need to be defined in multiple places.
-> 
-> Signed-off-by: Doug Berger <opendmb@gmail.com>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-[...]
-
-MBR, Sergei
+On 2018/05/04 18:54, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>
+> This matches licensing used by other BCM5301X files and is preferred as:
+> 1) GPL 2.0+ makes is clearly compatible with Linux kernel
+> 2) MIT is also permissive but preferred over ISC
+>
+> These files were created and ever touched by a group of four people
+> only: Felix, INAGAKI, Hauke and me.
+>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
