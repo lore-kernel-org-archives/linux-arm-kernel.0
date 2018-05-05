@@ -1,40 +1,32 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Sat, 5 May 2018 10:21:17 +0800
-Subject: [RESEND PATCH 2/5] usb: mtu3: remove repeated setting of gadget state
-In-Reply-To: <3b0c7ca576fee8220d63c9914483b70b0fbc8783.1525486663.git.chunfeng.yun@mediatek.com>
-References: <3b0c7ca576fee8220d63c9914483b70b0fbc8783.1525486663.git.chunfeng.yun@mediatek.com>
-Message-ID: <e570f74b9ef18b0de5fc2bf660c547028a22743e.1525486663.git.chunfeng.yun@mediatek.com>
+Date: Sat, 5 May 2018 10:21:16 +0800
+Subject: [RESEND PATCH 1/5] usb: mtu3: avoid TX data length truncated in
+ SS/SSP mode
+Message-ID: <3b0c7ca576fee8220d63c9914483b70b0fbc8783.1525486663.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usb_add_gadget_udc() will set the gadget state as
-USB_STATE_NOTATTACHED, so we needn't set it again.
+The variable of 'count' is declared as u8, this will cause an issue
+due to value truncated when works in SS or SSP mode and data length
+is greater than 255, so change it as u32.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3_gadget.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/usb/mtu3/mtu3_gadget_ep0.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/mtu3/mtu3_gadget.c b/drivers/usb/mtu3/mtu3_gadget.c
-index f05f10f..de0de01 100644
---- a/drivers/usb/mtu3/mtu3_gadget.c
-+++ b/drivers/usb/mtu3/mtu3_gadget.c
-@@ -660,14 +660,10 @@ int mtu3_gadget_setup(struct mtu3 *mtu)
- 	mtu3_gadget_init_eps(mtu);
+diff --git a/drivers/usb/mtu3/mtu3_gadget_ep0.c b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+index ebdcf7a..d67b540 100644
+--- a/drivers/usb/mtu3/mtu3_gadget_ep0.c
++++ b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+@@ -546,7 +546,7 @@ static void ep0_tx_state(struct mtu3 *mtu)
+ 	struct usb_request *req;
+ 	u32 csr;
+ 	u8 *src;
+-	u8 count;
++	u32 count;
+ 	u32 maxp;
  
- 	ret = usb_add_gadget_udc(mtu->dev, &mtu->g);
--	if (ret) {
-+	if (ret)
- 		dev_err(mtu->dev, "failed to register udc\n");
--		return ret;
--	}
- 
--	usb_gadget_set_state(&mtu->g, USB_STATE_NOTATTACHED);
--
--	return 0;
-+	return ret;
- }
- 
- void mtu3_gadget_cleanup(struct mtu3 *mtu)
+ 	dev_dbg(mtu->dev, "%s\n", __func__);
 -- 
 1.9.1
