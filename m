@@ -1,35 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 5 May 2018 10:25:13 +0900
-Subject: [RFC PATCH] driver core: make deferring probe forever optional
-In-Reply-To: <74d495d8-04e2-fb7d-7d07-0905fbc8a6cf@arm.com>
-References: <20180501213114.20183-1-robh@kernel.org>
- <f808a652-2454-941c-2fd1-60776fb353f6@arm.com>
- <CAL_JsqJvMyrKS4LsRC6fDus24Yg8U+VcrbNNvxtOXmKbrc8RAA@mail.gmail.com>
- <74d495d8-04e2-fb7d-7d07-0905fbc8a6cf@arm.com>
-Message-ID: <20180505012513.GJ13402@sirena.org.uk>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Sat, 5 May 2018 09:47:41 +0800
+Subject: [PATCH v2] phy: phy-mtk-tphy: use SPDX license tag
+Message-ID: <e650d3f5f586e6282a5bbbc4007e4920d4a9147f.1525484369.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 07:49:57PM +0100, Robin Murphy wrote:
+Use SPDX-License-Identifier tag instead of the GPL license text
 
-> I guess there's also the possibility that a single driver may want multiple
-> behaviours, if e.g. if SoC variants A and B have some identical peripherals
-> but slightly different pinctrl/IOMMU/etc. hardware such that A has workable
-> default behaviour and can be treated as optional, whereas B absolutely must
-> be controlled by the kernel for the consumers to function properly, and they
-> *should* defer forever otherwise. I think that would pretty much demand some
-> sort of explicitly-curated white/blacklist setup at the subsystem or driver
-> level.
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+v2: change subject line to fix checkpatch warning:
+    "A patch subject line should describe the change not
+    the tool that found it"
+---
+ drivers/phy/mediatek/Makefile       |  1 +
+ drivers/phy/mediatek/phy-mtk-tphy.c | 10 +---------
+ 2 files changed, 2 insertions(+), 9 deletions(-)
 
-Different board variants, and possibly even different bootloaders might
-also be an issue here - a vendor bootloader might do pinmuxing that an
-upstream bootloader doesn't for example.  In some cases the pinmuxing
-even depends on the boot method with things only getting configured if
-the bootloader wanted to use them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180505/a0a54ead/attachment.sig>
+diff --git a/drivers/phy/mediatek/Makefile b/drivers/phy/mediatek/Makefile
+index 763a92e..1bdab14 100644
+--- a/drivers/phy/mediatek/Makefile
++++ b/drivers/phy/mediatek/Makefile
+@@ -1,3 +1,4 @@
++# SPDX-License-Identifier: GPL-2.0
+ #
+ # Makefile for the phy drivers.
+ #
+diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
+index 38c281b..b962339 100644
+--- a/drivers/phy/mediatek/phy-mtk-tphy.c
++++ b/drivers/phy/mediatek/phy-mtk-tphy.c
+@@ -1,16 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2015 MediaTek Inc.
+  * Author: Chunfeng Yun <chunfeng.yun@mediatek.com>
+  *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+  */
+ 
+ #include <dt-bindings/phy/phy.h>
+-- 
+1.9.1
