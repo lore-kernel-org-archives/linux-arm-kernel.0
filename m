@@ -1,62 +1,56 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Sat, 5 May 2018 08:51:43 +0200
-Subject: [PATCH v14 3/8] ASoC: sun4i-codec: Merge
- sun4i_codec_left_mixer_controls and sun4i_codec_right_mixer_controls into
- sun4i_codec_mixer_controls
-In-Reply-To: <20180503144618.oojhvmey44dtg5fa@flea>
-References: <20180502210800.1971-1-dannym@scratchpost.org>
- <20180502210800.1971-4-dannym@scratchpost.org>
- <20180503144618.oojhvmey44dtg5fa@flea>
-Message-ID: <20180505085056.6c6011ca@scratchpost.org>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Sat, 5 May 2018 09:01:47 +0200
+Subject: [PATCH v6 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20180504134956.36dc72a253d03e94a517a867@linux-foundation.org>
+References: <20180305102524.5905-1-o.rempel@pengutronix.de>
+ <20180305102524.5905-4-o.rempel@pengutronix.de>
+ <20180504185052.bjhfkvpgrblc7tfc@pengutronix.de>
+ <20180504134956.36dc72a253d03e94a517a867@linux-foundation.org>
+Message-ID: <20180505070147.epsrglnypm72jr5u@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Moving Rafael from Cc to To.
 
-On Thu, 3 May 2018 16:46:19 +0200
-Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+Hi Rafael,
 
-> Doesn't that mean that the controls will be shared between the right
-> and left mixers now, which wasn't the case before?
+can you please help here?
+I need your ACK or NACK for this patch.
 
-Yes.  However Chen-Yu said that except for debugfs that cannot be
-observed by user space anyway.
+On Fri, May 04, 2018 at 01:49:56PM -0700, Andrew Morton wrote:
+> On Fri, 4 May 2018 20:50:52 +0200 Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+> 
+> > Hallo Andrew,
+> > I need your ACK or NACK for this patch.
+> > 
+> > This function is used to configure external PMIC to interpret
+> > signal which will be triggered by pm_power_off as power off.
+> > Since same signal can be used for stand by, I linked PMIC configuration
+> > with pm_power_off_prepare to avoid possible conflicts.
+> > 
+> > ...
+> >
+> > > --- a/kernel/reboot.c
+> > > +++ b/kernel/reboot.c
+> > > @@ -49,6 +49,7 @@ int reboot_force;
+> > >   */
+> > >  
+> > >  void (*pm_power_off_prepare)(void);
+> > > +EXPORT_SYMBOL(pm_power_off_prepare);
+> > >  
+> 
+> OK by me, but it's more of a Rafael thing.
+> 
 
-It's nice to have the NEW controls have multiple channels, which is what
-this does.
-
->And also, wouldn't
-> the controls be called "Left Mixer Left Mixer Left DAC Playback
-> Switch" (for the first one) now?
-
-No.  I checked using "amixer" - the names look fine,
-"Left Mixer Left DAC Playback Switch".
-
-With the patch series, amixer says:
-
-numid=10,iface=MIXER,name='FM Playback Switch'
-numid=6,iface=MIXER,name='FM Playback Volume'
-numid=5,iface=MIXER,name='Line Boost Volume'
-numid=9,iface=MIXER,name='Line Playback Switch'
-numid=4,iface=MIXER,name='Line Playback Volume'
-numid=1,iface=MIXER,name='Mic1 Boost Volume'
-numid=11,iface=MIXER,name='Mic1 Playback Switch'
-numid=2,iface=MIXER,name='Mic2 Boost Volume'
-numid=12,iface=MIXER,name='Mic2 Playback Switch'
-numid=7,iface=MIXER,name='Mic Playback Volume'
-numid=18,iface=MIXER,name='Capture Source'
-numid=19,iface=MIXER,name='Differential Line Source'
-numid=8,iface=MIXER,name='Left Mixer Left DAC Playback Switch'
-numid=15,iface=MIXER,name='Power Amplifier DAC Playback Switch'
-numid=16,iface=MIXER,name='Power Amplifier Mixer Playback Switch'
-numid=17,iface=MIXER,name='Power Amplifier Mute Switch'
-numid=3,iface=MIXER,name='Power Amplifier Volume'
-numid=14,iface=MIXER,name='Right Mixer Left DAC Playback Switch'
-numid=13,iface=MIXER,name='Right Mixer Right DAC Playback Switch'
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180505/33d470da/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180505/28f953ea/attachment-0001.sig>
