@@ -1,52 +1,38 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Sat, 5 May 2018 09:47:41 +0800
-Subject: [PATCH v2] phy: phy-mtk-tphy: use SPDX license tag
-Message-ID: <e650d3f5f586e6282a5bbbc4007e4920d4a9147f.1525484369.git.chunfeng.yun@mediatek.com>
+Date: Sat, 5 May 2018 10:15:04 +0800
+Subject: [PATCH v2 0/2] Add MediaTek XS-PHY driver
+Message-ID: <1525486506-19301-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use SPDX-License-Identifier tag instead of the GPL license text
+>From a0814ad7725587a06d273997e0fdf5161f916fd8 Mon Sep 17 00:00:00 2001
+From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Date: Sat, 5 May 2018 09:56:59 +0800
+Subject: [PATCH v2 0/2] Add MediaTek XS-PHY driver
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
-v2: change subject line to fix checkpatch warning:
-    "A patch subject line should describe the change not
-    the tool that found it"
----
- drivers/phy/mediatek/Makefile       |  1 +
- drivers/phy/mediatek/phy-mtk-tphy.c | 10 +---------
- 2 files changed, 2 insertions(+), 9 deletions(-)
+This patch series support the SuperSpeedPlus XS-PHY transceiver for
+USB3.1 GEN2 controller on MediaTek chips. The driver supports multiple
+USB2.0, USB3.1 GEN2 ports.
 
-diff --git a/drivers/phy/mediatek/Makefile b/drivers/phy/mediatek/Makefile
-index 763a92e..1bdab14 100644
---- a/drivers/phy/mediatek/Makefile
-+++ b/drivers/phy/mediatek/Makefile
-@@ -1,3 +1,4 @@
-+# SPDX-License-Identifier: GPL-2.0
- #
- # Makefile for the phy drivers.
- #
-diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
-index 38c281b..b962339 100644
---- a/drivers/phy/mediatek/phy-mtk-tphy.c
-+++ b/drivers/phy/mediatek/phy-mtk-tphy.c
-@@ -1,16 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015 MediaTek Inc.
-  * Author: Chunfeng Yun <chunfeng.yun@mediatek.com>
-  *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-  */
- 
- #include <dt-bindings/phy/phy.h>
+v2: changes in binding (suggested by Rob)
+    1. list all valid SoCs for compatible
+    2. move required child nodes after parent optional ones
+    3. remove status property in example
+    4. move banks layout example before dts one
+    5. remove phy binding example
+    6. add #address-cells, #size-cells, ranges properties for parent node
+
+Chunfeng Yun (2):
+  dt-bindings: add MediaTek XS-PHY binding
+  phy: mediatek: add XS-PHY driver
+
+ .../devicetree/bindings/phy/phy-mtk-xsphy.txt      | 110 ++++
+ drivers/phy/mediatek/Kconfig                       |   9 +
+ drivers/phy/mediatek/Makefile                      |   1 +
+ drivers/phy/mediatek/phy-mtk-xsphy.c               | 600 +++++++++++++++++++++
+ 4 files changed, 720 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
+ create mode 100644 drivers/phy/mediatek/phy-mtk-xsphy.c
+
 -- 
 1.9.1
