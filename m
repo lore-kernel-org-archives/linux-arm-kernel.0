@@ -1,89 +1,121 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Sat, 5 May 2018 08:37:07 +0000
-Subject: [PATCH 1/2] ARM: dts: imx6sx-sabreauto: drop 'regulators'
- container node
-In-Reply-To: <20180504092937.GF3443@dragon>
-References: <1525426030-17221-1-git-send-email-shawnguo@kernel.org>
- <20180504092937.GF3443@dragon>
-Message-ID: <AM3PR04MB1315A172B4A1DFAA58991B8BF5850@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Sat, 5 May 2018 10:47:22 +0200
+Subject: [PATCH] locking/atomics: Clean up the atomic.h maze of #defines
+In-Reply-To: <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
+References: <20180504173937.25300-1-mark.rutland@arm.com>
+ <20180504173937.25300-2-mark.rutland@arm.com>
+ <20180504180105.GS12217@hirez.programming.kicks-ass.net>
+ <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
+ <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
+Message-ID: <20180505084721.GA32344@noisy.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, May 05, 2018 at 10:11:00AM +0200, Ingo Molnar wrote:
 
-
-Anson Huang
-Best Regards!
-
-
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Friday, May 4, 2018 5:30 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Anson Huang <anson.huang@nxp.com>; Fabio Estevam
-> <fabio.estevam@nxp.com>; kernel at pengutronix.de; dl-linux-imx
-> <linux-imx@nxp.com>
-> Subject: Re: [PATCH 1/2] ARM: dts: imx6sx-sabreauto: drop 'regulators'
-> container node
+> Before:
 > 
-> Hi Anson,
+>  #ifndef atomic_fetch_dec_relaxed
 > 
-> I will push these two patches to imx/dt branch soon.  Please base your
-> imx6sx-sabreauto dts patches on them.
- 
-Thanks for reminder, I already rebase it and send V6 patch series.
+>  #ifndef atomic_fetch_dec
+>  #define atomic_fetch_dec(v)	        atomic_fetch_sub(1, (v))
+>  #define atomic_fetch_dec_relaxed(v)	atomic_fetch_sub_relaxed(1, (v))
+>  #define atomic_fetch_dec_acquire(v)	atomic_fetch_sub_acquire(1, (v))
+>  #define atomic_fetch_dec_release(v)	atomic_fetch_sub_release(1, (v))
+>  #else /* atomic_fetch_dec */
+>  #define atomic_fetch_dec_relaxed	atomic_fetch_dec
+>  #define atomic_fetch_dec_acquire	atomic_fetch_dec
+>  #define atomic_fetch_dec_release	atomic_fetch_dec
+>  #endif /* atomic_fetch_dec */
+> 
+>  #else /* atomic_fetch_dec_relaxed */
+> 
+>  #ifndef atomic_fetch_dec_acquire
+>  #define atomic_fetch_dec_acquire(...)					\
+> 	__atomic_op_acquire(atomic_fetch_dec, __VA_ARGS__)
+>  #endif
+> 
+>  #ifndef atomic_fetch_dec_release
+>  #define atomic_fetch_dec_release(...)					\
+> 	__atomic_op_release(atomic_fetch_dec, __VA_ARGS__)
+>  #endif
+> 
+>  #ifndef atomic_fetch_dec
+>  #define atomic_fetch_dec(...)						\
+> 	__atomic_op_fence(atomic_fetch_dec, __VA_ARGS__)
+>  #endif
+>  #endif /* atomic_fetch_dec_relaxed */
+> 
+> After:
+> 
+>  #ifndef atomic_fetch_dec_relaxed
+>  # ifndef atomic_fetch_dec
+>  #  define atomic_fetch_dec(v)			atomic_fetch_sub(1, (v))
+>  #  define atomic_fetch_dec_relaxed(v)		atomic_fetch_sub_relaxed(1, (v))
+>  #  define atomic_fetch_dec_acquire(v)		atomic_fetch_sub_acquire(1, (v))
+>  #  define atomic_fetch_dec_release(v)		atomic_fetch_sub_release(1, (v))
+>  # else
+>  #  define atomic_fetch_dec_relaxed		atomic_fetch_dec
+>  #  define atomic_fetch_dec_acquire		atomic_fetch_dec
+>  #  define atomic_fetch_dec_release		atomic_fetch_dec
+>  # endif
+>  #else
+>  # ifndef atomic_fetch_dec_acquire
+>  #  define atomic_fetch_dec_acquire(...)	__atomic_op_acquire(atomic_fetch_dec, __VA_ARGS__)
+>  # endif
+>  # ifndef atomic_fetch_dec_release
+>  #  define atomic_fetch_dec_release(...)	__atomic_op_release(atomic_fetch_dec, __VA_ARGS__)
+>  # endif
+>  # ifndef atomic_fetch_dec
+>  #  define atomic_fetch_dec(...)		__atomic_op_fence(atomic_fetch_dec, __VA_ARGS__)
+>  # endif
+>  #endif
+> 
+> The new variant is readable at a glance, and the hierarchy of defines is very 
+> obvious as well.
 
-Anson.
+It wraps and looks hideous in my normal setup. And I do detest that indent
+after # thing.
 
+> And I think we could do even better - there's absolutely no reason why _every_ 
+> operation has to be made conditional on a finegrained level - they are overriden 
+> in API groups. In fact allowing individual override is arguably a fragility.
 > 
-> Shawn
+> So we could do the following simplification on top of that:
 > 
-> On Fri, May 04, 2018 at 05:27:09PM +0800, Shawn Guo wrote:
-> > Let's drop the 'regulators' container node by giving VCC_SD3 an unique
-> > name and removing 'reg' property, so that the fixed regulator can be
-> > under root node directly.
-> >
-> > Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> > ---
-> >  arch/arm/boot/dts/imx6sx-sabreauto.dts | 25 +++++++++----------------
-> >  1 file changed, 9 insertions(+), 16 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> > b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> > index 57d1ea0a3f8e..e5c1d6daa5e0 100644
-> > --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> > +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> > @@ -18,22 +18,15 @@
-> >  		reg = <0x80000000 0x80000000>;
-> >  	};
-> >
-> > -	regulators {
-> > -		compatible = "simple-bus";
-> > -		#address-cells = <1>;
-> > -		#size-cells = <0>;
-> > -
-> > -		vcc_sd3: regulator at 0 {
-> > -			compatible = "regulator-fixed";
-> > -			reg = <0>;
-> > -			pinctrl-names = "default";
-> > -			pinctrl-0 = <&pinctrl_vcc_sd3>;
-> > -			regulator-name = "VCC_SD3";
-> > -			regulator-min-microvolt = <3000000>;
-> > -			regulator-max-microvolt = <3000000>;
-> > -			gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
-> > -			enable-active-high;
-> > -		};
-> > +	vcc_sd3: regulator-vcc-sd3 {
-> > +		compatible = "regulator-fixed";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_vcc_sd3>;
-> > +		regulator-name = "VCC_SD3";
-> > +		regulator-min-microvolt = <3000000>;
-> > +		regulator-max-microvolt = <3000000>;
-> > +		gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
-> > +		enable-active-high;
-> >  	};
-> >  };
-> >
-> > --
-> > 1.9.1
-> >
+>  #ifndef atomic_fetch_dec_relaxed
+>  # ifndef atomic_fetch_dec
+>  #  define atomic_fetch_dec(v)			atomic_fetch_sub(1, (v))
+>  #  define atomic_fetch_dec_relaxed(v)		atomic_fetch_sub_relaxed(1, (v))
+>  #  define atomic_fetch_dec_acquire(v)		atomic_fetch_sub_acquire(1, (v))
+>  #  define atomic_fetch_dec_release(v)		atomic_fetch_sub_release(1, (v))
+>  # else
+>  #  define atomic_fetch_dec_relaxed		atomic_fetch_dec
+>  #  define atomic_fetch_dec_acquire		atomic_fetch_dec
+>  #  define atomic_fetch_dec_release		atomic_fetch_dec
+>  # endif
+>  #else
+>  # ifndef atomic_fetch_dec
+>  #  define atomic_fetch_dec(...)		__atomic_op_fence(atomic_fetch_dec, __VA_ARGS__)
+>  #  define atomic_fetch_dec_acquire(...)	__atomic_op_acquire(atomic_fetch_dec, __VA_ARGS__)
+>  #  define atomic_fetch_dec_release(...)	__atomic_op_release(atomic_fetch_dec, __VA_ARGS__)
+>  # endif
+>  #endif
+
+This would disallow an architecture to override just fetch_dec_release for
+instance.
+
+I don't think there currently is any architecture that does that, but the
+intent was to allow it to override anything and only provide defaults where it
+does not.
+
+None of this takes away the giant trainwreck that is the annotated atomic stuff
+though.
+
+And I seriously hate this one:
+
+  ba1c9f83f633 ("locking/atomic/x86: Un-macro-ify atomic ops implementation")
+
+and will likely undo that the moment I need to change anything there.
+
+So no, don't like.
