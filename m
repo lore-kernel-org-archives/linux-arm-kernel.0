@@ -1,40 +1,78 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Sat, 5 May 2018 10:49:53 +0100
-Subject: [PATCH] [stable] arm64: Add work around for Arm Cortex-A55
- Erratum 1024718
-In-Reply-To: <20180504221508.GD20328@kroah.com>
-References: <1525170364-21032-1-git-send-email-suzuki.poulose@arm.com>
- <20180504221508.GD20328@kroah.com>
-Message-ID: <39eef51c-3b6b-3c32-c6ee-15bae1d4b13b@arm.com>
+Date: Sat, 5 May 2018 10:56:03 +0100
+Subject: [PATCH v2 03/27] coresight: Add helper device type
+In-Reply-To: <20180503170040.GA11425@xps15>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+ <1525165857-11096-4-git-send-email-suzuki.poulose@arm.com>
+ <20180503170040.GA11425@xps15>
+Message-ID: <86778b1b-cd08-629a-b56c-20549d9d7299@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-On 05/04/2018 11:15 PM, Greg KH wrote:
-> On Tue, May 01, 2018 at 11:26:04AM +0100, Suzuki K Poulose wrote:
->> commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
->>
+On 05/03/2018 06:00 PM, Mathieu Poirier wrote:
 
 ...
 
->>
->> Note: The upstream commit is on top of a reworked capability
->> infrastructure for arm64 heterogeneous systems, which allows
->> handling this later in the boot process. This backport
->> is based on the original version of the patch [0]. Folded the 3
->> patches into this single commit, removing the unncessary bits.
->>
->> [0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
->>
->> Cc: stable at vger.kernel.org # v4.3 to v4.16
+>> +/*
+>> + * coresight_release_device - Release this device and any of the helper
+>> + * devices connected to it for trace operation.
+>> + */
+>> +static void coresight_release_device(struct coresight_device *csdev)
+>> +{
+>> +	int i;
+>> +
+>> +	for (i = 0; i < csdev->nr_outport; i++) {
+>> +		struct coresight_device *child = csdev->conns[i].child_dev;
+>> +
+>> +		if (child && child->type == CORESIGHT_DEV_TYPE_HELPER)
+>> +			pm_runtime_put(child->dev.parent);
+>> +	}
 > 
-> This only would apply to the 4.16.y tree.  Can you provide working
-> backports to 4.14.y, 4.9.y, and 4.4.y so I can queue them up there as
-> well?
+> There is a newline here in coresight_prepare_device().  Either add one (or not)
+> in both function but please be consistent.
+> 
+
+>> @@ -480,8 +517,7 @@ static int _coresight_build_path(struct coresight_device *csdev,
+>>   
+>>   	node->csdev = csdev;
+>>   	list_add(&node->link, path);
+>> -	pm_runtime_get_sync(csdev->dev.parent);
+>> -
+>> +	coresight_prepare_device(csdev);
+> 
+> There was a newline between pm_runtime_get_sync() and the return statement in
+> the original code.
+> 
 
 
-Sure, I will send them soon.
+>> @@ -775,6 +811,10 @@ static struct device_type coresight_dev_type[] = {
+>>   		.name = "source",
+>>   		.groups = coresight_source_groups,
+>>   	},
+>> +	{
+>> +		.name = "helper",
+>> +	},
+>> +
+> 
+> Extra newline.
+> 
+
+>>   };   
+>> +/**
+>> + * struct coresight_ops_helper - Operations for a helper device.
+>> + *
+>> + * All operations could pass in a device specific data, which could
+>> + * help the helper device to determine what to do.
+>> + *
+>> + * @enable	: Turn the device ON.
+>> + * @disable	: Turn the device OFF.
+> 
+> There is a discrepancy between the comment and the operations, i.e enabling a
+> device is not synonymous of turning it on.  Looking at patch 04/27 the ops is
+> called in tmc_etr_enable/disable_catu() so the comment propably needs to be
+> changed.
+
+Sure, will fix all of them.
 
 Cheers
 Suzuki
