@@ -1,65 +1,72 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 6 May 2018 20:43:30 +0530
-Subject: [PATCH] clk: davinci: pll-dm355: fix SYSCLKn parent names
-In-Reply-To: <20180504142426.4764-1-david@lechnology.com>
-References: <20180504142426.4764-1-david@lechnology.com>
-Message-ID: <ebe8d8aa-ea7d-62ad-106e-abb0db95edce@ti.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun,  6 May 2018 18:10:25 +0200
+Subject: [PATCH 3/3] ARM: dts: s3c64xx: Remove skeleton.dtsi and fix DTC
+ warnings for /memory
+In-Reply-To: <20180506161025.26937-1-krzk@kernel.org>
+References: <20180506161025.26937-1-krzk@kernel.org>
+Message-ID: <20180506161025.26937-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Remove the usage of skeleton.dtsi to fix the DTC warnings:
 
-On Friday 04 May 2018 07:54 PM, David Lechner wrote:
-> This fixes the parent clock names of the SYSCLKn clocks for the DM355
-> SoC in the TI DaVinici PLL clock driver.
-> 
-> It appears that this name just didn't get updated to the correct name
-> like the other SoCs during the driver's development.
-> 
-> Reported-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
-> 
-> Sekhar, can you please test to make sure this works?
-> 
-> 
->  drivers/clk/davinci/pll-dm355.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/clk/davinci/pll-dm355.c b/drivers/clk/davinci/pll-dm355.c
-> index a0cff4212ac3..13dc6b8ea97a 100644
-> --- a/drivers/clk/davinci/pll-dm355.c
-> +++ b/drivers/clk/davinci/pll-dm355.c
-> @@ -22,10 +22,10 @@ static const struct davinci_pll_clk_info dm355_pll1_info = {
->  		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
->  };
->  
-> -SYSCLK(1, pll1_sysclk1, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> -SYSCLK(2, pll1_sysclk2, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> -SYSCLK(3, pll1_sysclk3, pll1, 5, SYSCLK_ALWAYS_ENABLED);
-> -SYSCLK(4, pll1_sysclk4, pll1, 5, SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(1, pll1_sysclk1, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(2, pll1_sysclk2, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(3, pll1_sysclk3, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(4, pll1_sysclk4, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
->  
->  int dm355_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
->  {
-> @@ -62,8 +62,8 @@ static const struct davinci_pll_clk_info dm355_pll2_info = {
->  		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
->  };
->  
-> -SYSCLK(1, pll2_sysclk1, pll2, 5, SYSCLK_FIXED_DIV);
-> -SYSCLK(2, pll2_sysclk2, pll2, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(1, pll2_sysclk1, pll2_pllen, 5, SYSCLK_FIXED_DIV);
+    arch/arm/boot/dts/s3c6410-mini6410.dtb: Warning (unit_address_vs_reg):
+        /memory: node has a reg or ranges property, but no unit name
+    arch/arm/boot/dts/s3c6410-smdk6410.dtb: Warning (unit_address_vs_reg):
+        /memory: node has a reg or ranges property, but no unit name
 
-We also need SYSCLK_ALWAYS_ENABLED for PLL2 sysclk1. With that change, I
-was able to boot DM355 EVM and the clock tree looks good too.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm/boot/dts/s3c6410-mini6410.dts | 3 ++-
+ arch/arm/boot/dts/s3c6410-smdk6410.dts | 3 ++-
+ arch/arm/boot/dts/s3c64xx.dtsi         | 4 +++-
+ 3 files changed, 7 insertions(+), 3 deletions(-)
 
-> +SYSCLK(2, pll2_sysclk2, pll2_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
->  
->  int dm355_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
->  {
-
-Regards,
-Sekhar
+diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
+index f68601bd9c91..0e159c884f97 100644
+--- a/arch/arm/boot/dts/s3c6410-mini6410.dts
++++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
+@@ -19,7 +19,8 @@
+ 	model = "FriendlyARM Mini6410 board based on S3C6410";
+ 	compatible = "friendlyarm,mini6410", "samsung,s3c6410";
+ 
+-	memory {
++	memory at 50000000 {
++		device_type = "memory";
+ 		reg = <0x50000000 0x10000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/s3c6410-smdk6410.dts b/arch/arm/boot/dts/s3c6410-smdk6410.dts
+index b6b5afcd7602..a9a5689dc462 100644
+--- a/arch/arm/boot/dts/s3c6410-smdk6410.dts
++++ b/arch/arm/boot/dts/s3c6410-smdk6410.dts
+@@ -19,7 +19,8 @@
+ 	model = "SAMSUNG SMDK6410 board based on S3C6410";
+ 	compatible = "samsung,mini6410", "samsung,s3c6410";
+ 
+-	memory {
++	memory at 50000000 {
++		device_type = "memory";
+ 		reg = <0x50000000 0x8000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/s3c64xx.dtsi b/arch/arm/boot/dts/s3c64xx.dtsi
+index e2be3fbdd3f3..2e611df37911 100644
+--- a/arch/arm/boot/dts/s3c64xx.dtsi
++++ b/arch/arm/boot/dts/s3c64xx.dtsi
+@@ -13,10 +13,12 @@
+  * nodes can be added to this file.
+  */
+ 
+-#include "skeleton.dtsi"
+ #include <dt-bindings/clock/samsung,s3c64xx-clock.h>
+ 
+ / {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
+ 	aliases {
+ 		i2c0 = &i2c0;
+ 		pinctrl0 = &pinctrl0;
+-- 
+2.14.1
