@@ -1,53 +1,33 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Sun, 6 May 2018 14:11:29 +0200
-Subject: [PATCH] locking/atomics/powerpc: Move cmpxchg helpers to
- asm/cmpxchg.h and define the full set of cmpxchg APIs
-In-Reply-To: <20180505140340.uzfhoc42xvas4m72@tardis>
-References: <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
- <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
- <20180505084721.GA32344@noisy.programming.kicks-ass.net>
- <20180505090403.p2ywuen42rnlwizq@gmail.com>
- <20180505093829.xfylnedwd5nonhae@gmail.com>
- <20180505101609.5wb56j4mspjkokmw@tardis>
- <20180505103550.s7xsnto7tgppkmle@gmail.com>
- <20180505112817.ihrb726i37bwm4cj@tardis>
- <20180505132751.gwzu2vbzibr2risd@gmail.com>
- <20180505140340.uzfhoc42xvas4m72@tardis>
-Message-ID: <20180506121129.baacc4fxgr72rzex@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun,  6 May 2018 15:43:45 +0200
+Subject: [PATCH 0/7] Gemini DTS updates
+Message-ID: <20180506134352.2637-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is a resend of some patches and some new fixups for
+the Gemini device trees. Will send a v4.18 pull request for
+this stuff in a few days.
 
-* Boqun Feng <boqun.feng@gmail.com> wrote:
+Geert Uytterhoeven (1):
+  ARM: dts: gemini: Fix "debounce-interval" property misspelling
 
-> > The only change I made beyond a trivial build fix is that I also added the release 
-> > atomics variants explicitly:
-> > 
-> > +#define atomic_cmpxchg_release(v, o, n) \
-> > +	cmpxchg_release(&((v)->counter), (o), (n))
-> > +#define atomic64_cmpxchg_release(v, o, n) \
-> > +	cmpxchg_release(&((v)->counter), (o), (n))
-> > 
-> > It has passed a PowerPC cross-build test here, but no runtime tests.
-> > 
-> 
-> Do you have the commit at any branch in tip tree? I could pull it and
-> cross-build and check the assembly code of lib/atomic64_test.c, that way
-> I could verify whether we mess something up.
-> 
-> > Does this patch look good to you?
-> > 
-> 
-> Yep!
+Linus Walleij (6):
+  ARM: dtd: Set DNS-313 LEDs to use better triggers
+  ARM: dts: Set DNS-685 LEDs to use better triggers
+  ARM: dts: Fix the DNS-313 flash compatible
+  ARM: dts: Fix bootargs for Gemini D-Link devices
+  ARM: dts: Add second ATA to NAS4220B
+  ARM: dts: Fix DTC warnings
 
-Great - I have pushed the commits out into the locking tree, they can be found in:
+ arch/arm/boot/dts/gemini-dlink-dir-685.dts | 16 +++++++++-------
+ arch/arm/boot/dts/gemini-dlink-dns-313.dts | 19 +++++++++++--------
+ arch/arm/boot/dts/gemini-nas4220b.dts      | 20 +++++++++++---------
+ arch/arm/boot/dts/gemini-rut1xx.dts        | 12 +++++-------
+ arch/arm/boot/dts/gemini-sq201.dts         | 12 +++++-------
+ arch/arm/boot/dts/gemini-wbd111.dts        | 17 ++++++++---------
+ arch/arm/boot/dts/gemini-wbd222.dts        | 16 +++++++---------
+ 7 files changed, 56 insertions(+), 56 deletions(-)
 
-  git fetch git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git locking/core
-
-The PowerPC preparatory commit from you is:
-
-  0476a632cb3a: locking/atomics/powerpc: Move cmpxchg helpers to asm/cmpxchg.h and define the full set of cmpxchg APIs
-
-Thanks,
-
-	Ingo
+-- 
+2.17.0
