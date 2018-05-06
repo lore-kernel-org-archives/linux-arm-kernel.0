@@ -1,192 +1,73 @@
-From: andrea.parri@amarulasolutions.com (Andrea Parri)
-Date: Sun, 6 May 2018 16:15:52 +0200
-Subject: [PATCH] locking/atomics: Combine the atomic_andnot() and
- atomic64_andnot() API definitions
-In-Reply-To: <20180505085445.cmdnqh6xpnpfoqzb@gmail.com>
-References: <20180504173937.25300-1-mark.rutland@arm.com>
- <20180504173937.25300-2-mark.rutland@arm.com>
- <20180504180105.GS12217@hirez.programming.kicks-ass.net>
- <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
- <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
- <20180505083635.622xmcvb42dw5xxh@gmail.com>
- <20180505085445.cmdnqh6xpnpfoqzb@gmail.com>
-Message-ID: <20180506141552.GA28937@andrea>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun,  6 May 2018 16:55:24 +0200
+Subject: [PATCH fixes-for-current] arm64: dts: exynos: Fix interrupt type for
+ I2S1 device on Exynos5433
+Message-ID: <20180506145524.14570-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ingo,
+From: Marek Szyprowski <m.szyprowski@samsung.com>
 
-> From f5efafa83af8c46b9e81b010b46caeeadb450179 Mon Sep 17 00:00:00 2001
-> From: Ingo Molnar <mingo@kernel.org>
-> Date: Sat, 5 May 2018 10:46:41 +0200
-> Subject: [PATCH] locking/atomics: Combine the atomic_andnot() and atomic64_andnot() API definitions
-> 
-> The atomic_andnot() and atomic64_andnot() are defined in 4 separate groups
-> spred out in the atomic.h header:
-> 
->  #ifdef atomic_andnot
->  ...
->  #endif /* atomic_andnot */
->  ...
->  #ifndef atomic_andnot
->  ...
->  #endif
->  ...
->  #ifdef atomic64_andnot
->  ...
->  #endif /* atomic64_andnot */
->  ...
->  #ifndef atomic64_andnot
->  ...
->  #endif
-> 
-> Combine them into unify them into two groups:
+All interrupts from SoC internal modules are level triggered, so fix
+incorrect trigger type for I2S1 device on Exynos5433 SoCs.
 
-Nit: "Combine them into unify them into"
+This fixes following kernel warning:
 
-  Andrea
+WARNING: CPU: 2 PID: 1 at drivers/irqchip/irq-gic.c:1016 gic_irq_domain_translate+0xb0/0xb8
+Modules linked in:
+CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.16.0-rc7-next-20180329 #646
+Hardware name: Samsung TM2 board (DT)
+pstate: 20000005 (nzCv daif -PAN -UAO)
+pc : gic_irq_domain_translate+0xb0/0xb8
+lr : irq_create_fwspec_mapping+0x64/0x328
+sp : ffff0000098b38d0
+...
+Call trace:
+ gic_irq_domain_translate+0xb0/0xb8
+ irq_create_of_mapping+0x78/0xa0
+ of_irq_get+0x6c/0xa0
+ of_irq_to_resource+0x38/0x108
+ of_irq_to_resource_table+0x50/0x78
+ of_device_alloc+0x118/0x1b8
+ of_platform_device_create_pdata+0x54/0xe0
+ of_platform_bus_create+0x118/0x340
+ of_platform_bus_create+0x17c/0x340
+ of_platform_populate+0x74/0xd8
+ of_platform_default_populate_init+0xb0/0xcc
+ do_one_initcall+0x50/0x158
+ kernel_init_freeable+0x184/0x22c
+ kernel_init+0x10/0x108
+ ret_from_fork+0x10/0x18
+---[ end trace 6decb2b3078d73f0 ]---
+
+Fixes: d8d579c316e8 ("ARM: dts: exynos: Add I2S1 device node to exynos5433")
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+
+Hi Arnd and Olof,
+
+That's one fix for current release cycle (issue introduced in merge window).
+
+Best regards,
+Krzysztof
 
 
-> 
->  #ifdef atomic_andnot
->  #else
->  #endif
-> 
->  ...
-> 
->  #ifdef atomic64_andnot
->  #else
->  #endif
-> 
-> So that one API group is defined in a single place within the header.
-> 
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Linus Torvalds <torvalds@linux-foundation.org>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Ingo Molnar <mingo@kernel.org>
-> ---
->  include/linux/atomic.h | 72 +++++++++++++++++++++++++-------------------------
->  1 file changed, 36 insertions(+), 36 deletions(-)
-> 
-> diff --git a/include/linux/atomic.h b/include/linux/atomic.h
-> index 352ecc72d7f5..1176cf7c6f03 100644
-> --- a/include/linux/atomic.h
-> +++ b/include/linux/atomic.h
-> @@ -205,22 +205,6 @@
->  # endif
->  #endif
->  
-> -#ifdef atomic_andnot
-> -
-> -#ifndef atomic_fetch_andnot_relaxed
-> -# define atomic_fetch_andnot_relaxed		atomic_fetch_andnot
-> -# define atomic_fetch_andnot_acquire		atomic_fetch_andnot
-> -# define atomic_fetch_andnot_release		atomic_fetch_andnot
-> -#else
-> -# ifndef atomic_fetch_andnot
-> -#  define atomic_fetch_andnot(...)		__atomic_op_fence(atomic_fetch_andnot, __VA_ARGS__)
-> -#  define atomic_fetch_andnot_acquire(...)	__atomic_op_acquire(atomic_fetch_andnot, __VA_ARGS__)
-> -#  define atomic_fetch_andnot_release(...)	__atomic_op_release(atomic_fetch_andnot, __VA_ARGS__)
-> -# endif
-> -#endif
-> -
-> -#endif /* atomic_andnot */
-> -
->  #ifndef atomic_fetch_xor_relaxed
->  # define atomic_fetch_xor_relaxed		atomic_fetch_xor
->  # define atomic_fetch_xor_acquire		atomic_fetch_xor
-> @@ -338,7 +322,22 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
->  # define atomic_inc_not_zero(v)			atomic_add_unless((v), 1, 0)
->  #endif
->  
-> -#ifndef atomic_andnot
-> +#ifdef atomic_andnot
-> +
-> +#ifndef atomic_fetch_andnot_relaxed
-> +# define atomic_fetch_andnot_relaxed		atomic_fetch_andnot
-> +# define atomic_fetch_andnot_acquire		atomic_fetch_andnot
-> +# define atomic_fetch_andnot_release		atomic_fetch_andnot
-> +#else
-> +# ifndef atomic_fetch_andnot
-> +#  define atomic_fetch_andnot(...)		__atomic_op_fence(atomic_fetch_andnot, __VA_ARGS__)
-> +#  define atomic_fetch_andnot_acquire(...)	__atomic_op_acquire(atomic_fetch_andnot, __VA_ARGS__)
-> +#  define atomic_fetch_andnot_release(...)	__atomic_op_release(atomic_fetch_andnot, __VA_ARGS__)
-> +# endif
-> +#endif
-> +
-> +#else /* !atomic_andnot: */
-> +
->  static inline void atomic_andnot(int i, atomic_t *v)
->  {
->  	atomic_and(~i, v);
-> @@ -363,7 +362,8 @@ static inline int atomic_fetch_andnot_release(int i, atomic_t *v)
->  {
->  	return atomic_fetch_and_release(~i, v);
->  }
-> -#endif
-> +
-> +#endif /* !atomic_andnot */
->  
->  /**
->   * atomic_inc_not_zero_hint - increment if not null
-> @@ -600,22 +600,6 @@ static inline int atomic_dec_if_positive(atomic_t *v)
->  # endif
->  #endif
->  
-> -#ifdef atomic64_andnot
-> -
-> -#ifndef atomic64_fetch_andnot_relaxed
-> -# define atomic64_fetch_andnot_relaxed		atomic64_fetch_andnot
-> -# define atomic64_fetch_andnot_acquire		atomic64_fetch_andnot
-> -# define atomic64_fetch_andnot_release		atomic64_fetch_andnot
-> -#else
-> -# ifndef atomic64_fetch_andnot
-> -#  define atomic64_fetch_andnot(...)		__atomic_op_fence(atomic64_fetch_andnot, __VA_ARGS__)
-> -#  define atomic64_fetch_andnot_acquire(...)	__atomic_op_acquire(atomic64_fetch_andnot, __VA_ARGS__)
-> -#  define atomic64_fetch_andnot_release(...)	__atomic_op_release(atomic64_fetch_andnot, __VA_ARGS__)
-> -# endif
-> -#endif
-> -
-> -#endif /* atomic64_andnot */
-> -
->  #ifndef atomic64_fetch_xor_relaxed
->  # define atomic64_fetch_xor_relaxed		atomic64_fetch_xor
->  # define atomic64_fetch_xor_acquire		atomic64_fetch_xor
-> @@ -672,7 +656,22 @@ static inline int atomic_dec_if_positive(atomic_t *v)
->  # define atomic64_try_cmpxchg_release		atomic64_try_cmpxchg
->  #endif
->  
-> -#ifndef atomic64_andnot
-> +#ifdef atomic64_andnot
-> +
-> +#ifndef atomic64_fetch_andnot_relaxed
-> +# define atomic64_fetch_andnot_relaxed		atomic64_fetch_andnot
-> +# define atomic64_fetch_andnot_acquire		atomic64_fetch_andnot
-> +# define atomic64_fetch_andnot_release		atomic64_fetch_andnot
-> +#else
-> +# ifndef atomic64_fetch_andnot
-> +#  define atomic64_fetch_andnot(...)		__atomic_op_fence(atomic64_fetch_andnot, __VA_ARGS__)
-> +#  define atomic64_fetch_andnot_acquire(...)	__atomic_op_acquire(atomic64_fetch_andnot, __VA_ARGS__)
-> +#  define atomic64_fetch_andnot_release(...)	__atomic_op_release(atomic64_fetch_andnot, __VA_ARGS__)
-> +# endif
-> +#endif
-> +
-> +#else /* !atomic64_andnot: */
-> +
->  static inline void atomic64_andnot(long long i, atomic64_t *v)
->  {
->  	atomic64_and(~i, v);
-> @@ -697,7 +696,8 @@ static inline long long atomic64_fetch_andnot_release(long long i, atomic64_t *v
->  {
->  	return atomic64_fetch_and_release(~i, v);
->  }
-> -#endif
-> +
-> +#endif /* !atomic64_andnot */
->  
->  #define atomic64_cond_read_relaxed(v, c)	smp_cond_load_relaxed(&(v)->counter, (c))
->  #define atomic64_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index c0231d077fa6..1ad8677f6a0a 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -1317,7 +1317,7 @@
+ 			reg = <0x14d60000 0x100>;
+ 			dmas = <&pdma0 31 &pdma0 30>;
+ 			dma-names = "tx", "rx";
+-			interrupts = <GIC_SPI 435 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 435 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cmu_peric CLK_PCLK_I2S1>,
+ 				 <&cmu_peric CLK_PCLK_I2S1>,
+ 				 <&cmu_peric CLK_SCLK_I2S1>;
+-- 
+2.14.1
