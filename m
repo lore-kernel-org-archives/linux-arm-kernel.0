@@ -1,49 +1,149 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Sun, 6 May 2018 06:10:11 +0000
-Subject: [PATCH V6 7/7] ARM: dts: imx6sx-sabreauto: add egalax touch
- screen support
-In-Reply-To: <CAOMZO5A7bf1qcHrWjM1mr31Nkz+oDJ=fQo3rjksp1YY-HhPM9A@mail.gmail.com>
-References: <1525508963-7986-1-git-send-email-Anson.Huang@nxp.com>
- <1525508963-7986-7-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5A7bf1qcHrWjM1mr31Nkz+oDJ=fQo3rjksp1YY-HhPM9A@mail.gmail.com>
-Message-ID: <AM3PR04MB1315E5B2A6C1DDCC6C279715F5840@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Sun,  6 May 2018 14:28:07 +0800
+Subject: [PATCH V7 1/7] ARM: dts: imx6sx-sabreauto: add PMIC support
+Message-ID: <1525588093-29994-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio
+Add pfuze100 support on i.MX6SX Sabre Auto board.
 
-Anson Huang
-Best Regards!
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+changes since V6:
+	remove unnecessary sign-off.
+ arch/arm/boot/dts/imx6sx-sabreauto.dts | 116 +++++++++++++++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
 
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Saturday, May 5, 2018 11:18 PM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
-> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Haibo Chen <haibo.chen@freescale.com>; Andy Duan
-> <fugang.duan@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>; Robin Gong
-> <yibin.gong@nxp.com>; dl-linux-imx <linux-imx@nxp.com>; moderated
-> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
-> <linux-arm-kernel@lists.infradead.org>; open list:OPEN FIRMWARE AND
-> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-kernel
-> <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH V6 7/7] ARM: dts: imx6sx-sabreauto: add egalax touch
-> screen support
-> 
-> On Sat, May 5, 2018 at 5:29 AM, Anson Huang <Anson.Huang@nxp.com>
-> wrote:
-> 
-> >  &iomuxc {
-> > +       pinctrl_egalax_int: egalax-intgrp {
-> > +               fsl,pins = <
-> > +                       MX6SX_PAD_SD4_RESET_B__GPIO6_IO_22
-> 0x80000000
-> 
-> Please avoid using 0x80000000 and use the real IOMUX value instead.
+diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+index 87ffe2c..1d8cf0f 100644
+--- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+@@ -66,6 +66,13 @@
+ };
  
-Will use the expected pad settings in next version. Thanks.
-
-Anson.
+ &iomuxc {
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX6SX_PAD_GPIO1_IO03__I2C2_SDA          0x4001b8b1
++			MX6SX_PAD_GPIO1_IO02__I2C2_SCL          0x4001b8b1
++		>;
++	};
++
+ 	pinctrl_uart1: uart1grp {
+ 		fsl,pins = <
+ 			MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
+@@ -139,3 +146,112 @@
+ 		>;
+ 	};
+ };
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	pfuze100: pmic at 8 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++				regulator-always-on;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
+-- 
+2.7.4
