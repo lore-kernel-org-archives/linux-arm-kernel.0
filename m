@@ -1,55 +1,155 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Sun,  6 May 2018 14:28:13 +0800
-Subject: [PATCH V7 7/7] ARM: dts: imx6sx-sabreauto: add egalax touch screen
- support
-In-Reply-To: <1525588093-29994-1-git-send-email-Anson.Huang@nxp.com>
-References: <1525588093-29994-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1525588093-29994-7-git-send-email-Anson.Huang@nxp.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 6 May 2018 09:31:18 +0200
+Subject: Handling lm3559 flash on Motorola Droid 4 and others
+In-Reply-To: <20180505213951.GA4530@amd>
+References: <20180505213951.GA4530@amd>
+Message-ID: <20180506073118.GA6811@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add egalax touch screen support on i2c2 bus.
+Hi!
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-changes since V6:
-	remove unnecessary sign-off, improve node name and add PAD setting value.
- arch/arm/boot/dts/imx6sx-sabreauto.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+> It seems lm3559 flash driver is available on github (
+> https://github.com/ZenfoneArea/android_kernel_asus_zenfone5/tree/master/linux/modules/camera/drivers/media/i2c
+> ) but there'll be some fun getting it cleaned up and merged.
+> 
+> Did anyone start doing anything in that area? Is there possibly better
+> source to start from?
 
-diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-index 8e6bd9d..bfbcf70 100644
---- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-@@ -111,6 +111,12 @@
+It turned out to be easier than expected. Of course, using flash w/o
+v4l will not be easy, but that's generic problem.
+
+									Pavel
+
+diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-droid4-xt894.dts
+index bdf73cb..45305e8 100644
+--- a/arch/arm/boot/dts/omap4-droid4-xt894.dts
++++ b/arch/arm/boot/dts/omap4-droid4-xt894.dts
+@@ -271,6 +271,34 @@
+ 	};
  };
  
- &iomuxc {
-+	pinctrl_egalax_int: egalax-intgrp {
-+		fsl,pins = <
-+			MX6SX_PAD_SD4_RESET_B__GPIO6_IO_22      0x10b0
-+		>;
++&i2c3 {
++      rearcam: camera at 36 {
++            compatible = "micron,ov8820";
++	    reg = <0x36>;
++	    clocks = <&auxclk1_ck>;
++	    clock-names = "xvclk";
++	    clock-frequency = <24000000>;
++	    power-gpios = <&gpio2 16 GPIO_ACTIVE_HIGH>, // gpio48
++	    		  <&gpio3 19 GPIO_ACTIVE_HIGH>, // gpio83
++			  <&gpio5 23 GPIO_ACTIVE_HIGH>; // gpio151
++      };
++      frontcam: camera at 48 {
++       		compatible = "ovti,mt9m114";
++		reg = <0x48>;
++		clocks = <&auxclk2_ck>;
++		clock-names = "extclk";
++		clock-frequency = <24000000>;
++		power-gpios = <&gpio6 11 GPIO_ACTIVE_HIGH>, // gpio171
++			      <&gpio2 5 GPIO_ACTIVE_HIGH>; // gpio37
++		};
++	flashlight: flash at 53 {
++ 	    compatible = "ti,lm3559";
++	    reg = <0x53>;
 +	};
++};
 +
- 	pinctrl_enet1: enet1grp {
- 		fsl,pins = <
- 			MX6SX_PAD_ENET1_MDIO__ENET1_MDIO        0xa0b1
-@@ -253,6 +259,16 @@
- 	pinctrl-0 = <&pinctrl_i2c2>;
- 	status = "okay";
++
++
+ &keypad {
+ 	keypad,num-rows = <8>;
+ 	keypad,num-columns = <8>;
+diff --git a/drivers/media/i2c/lm3560.c b/drivers/media/i2c/lm3560.c
+index b600e03a..a9b2ba2 100644
+--- a/drivers/media/i2c/lm3560.c
++++ b/drivers/media/i2c/lm3560.c
+@@ -17,6 +17,8 @@
+  * General Public License for more details.
+  */
  
-+	touchscreen at 4 {
-+		compatible = "eeti,egalax_ts";
-+		reg = <0x04>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_egalax_int>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <22 IRQ_TYPE_EDGE_FALLING>;
-+		wakeup-gpios = <&gpio6 22 GPIO_ACTIVE_HIGH>;
-+	};
++// Probably compatible with lm3559, too.
 +
- 	pfuze100: pmic at 8 {
- 		compatible = "fsl,pfuze100";
- 		reg = <0x08>;
+ #include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/i2c.h>
+@@ -395,6 +397,22 @@ static int lm3560_init_device(struct lm3560_flash *flash)
+ 		return rval;
+ 	/* reset faults */
+ 	rval = regmap_read(flash->regmap, REG_FLAG, &reg_val);
++
++	printk("lm3560: Device initialized\n");
++
++	flash->led_mode = V4L2_FLASH_LED_MODE_TORCH;
++	rval = lm3560_mode_ctrl(flash);
++	rval = lm3560_torch_brt_ctrl(flash, 0, LM3560_TORCH_BRT_MIN);
++	rval = lm3560_torch_brt_ctrl(flash, 1, LM3560_TORCH_BRT_MIN);		
++
++	mdelay(1000);
++
++	rval = lm3560_torch_brt_ctrl(flash, 0, 0);
++	rval = lm3560_torch_brt_ctrl(flash, 1, 0);		
++	
++	flash->led_mode = V4L2_FLASH_LED_MODE_NONE;
++	rval = lm3560_mode_ctrl(flash);
++	
+ 	return rval;
+ }
+ 
+@@ -405,6 +423,8 @@ static int lm3560_probe(struct i2c_client *client,
+ 	struct lm3560_platform_data *pdata = dev_get_platdata(&client->dev);
+ 	int rval;
+ 
++	printk("3560: probe\n");
++
+ 	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
+ 	if (flash == NULL)
+ 		return -ENOMEM;
+@@ -417,17 +437,19 @@ static int lm3560_probe(struct i2c_client *client,
+ 
+ 	/* if there is no platform data, use chip default value */
+ 	if (pdata == NULL) {
++		printk("3560: no pdata\n");
++		
+ 		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+ 		if (pdata == NULL)
+ 			return -ENODEV;
+-		pdata->peak = LM3560_PEAK_3600mA;
+-		pdata->max_flash_timeout = LM3560_FLASH_TOUT_MAX;
++		pdata->peak = LM3560_PEAK_1600mA;
++		pdata->max_flash_timeout = LM3560_FLASH_TOUT_MIN;
+ 		/* led 1 */
+-		pdata->max_flash_brt[LM3560_LED0] = LM3560_FLASH_BRT_MAX;
+-		pdata->max_torch_brt[LM3560_LED0] = LM3560_TORCH_BRT_MAX;
++		pdata->max_flash_brt[LM3560_LED0] = LM3560_FLASH_BRT_MIN;
++		pdata->max_torch_brt[LM3560_LED0] = LM3560_TORCH_BRT_MIN;
+ 		/* led 2 */
+-		pdata->max_flash_brt[LM3560_LED1] = LM3560_FLASH_BRT_MAX;
+-		pdata->max_torch_brt[LM3560_LED1] = LM3560_TORCH_BRT_MAX;
++		pdata->max_flash_brt[LM3560_LED1] = LM3560_FLASH_BRT_MIN;
++		pdata->max_torch_brt[LM3560_LED1] = LM3560_TORCH_BRT_MIN;
+ 	}
+ 	flash->pdata = pdata;
+ 	flash->dev = &client->dev;
+@@ -466,6 +488,8 @@ static int lm3560_remove(struct i2c_client *client)
+ 
+ static const struct i2c_device_id lm3560_id_table[] = {
+ 	{LM3560_NAME, 0},
++	{"lm3559", 0},
++	{"ti,lm3559", 0},
+ 	{}
+ };
+ 
+
+
+
 -- 
-2.7.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180506/96bdf4cf/attachment.sig>
