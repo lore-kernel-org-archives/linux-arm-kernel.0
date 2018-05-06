@@ -1,36 +1,53 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun,  6 May 2018 06:30:53 -0400
-Subject: [PATCH] PCI: pciehp: Add quirk for QDF2400 Command Completed erratum
-Message-ID: <1525602662-1873-1-git-send-email-okaya@codeaurora.org>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Sun, 6 May 2018 14:11:29 +0200
+Subject: [PATCH] locking/atomics/powerpc: Move cmpxchg helpers to
+ asm/cmpxchg.h and define the full set of cmpxchg APIs
+In-Reply-To: <20180505140340.uzfhoc42xvas4m72@tardis>
+References: <20180504180909.dnhfflibjwywnm4l@lakrids.cambridge.arm.com>
+ <20180505081100.nsyrqrpzq2vd27bk@gmail.com>
+ <20180505084721.GA32344@noisy.programming.kicks-ass.net>
+ <20180505090403.p2ywuen42rnlwizq@gmail.com>
+ <20180505093829.xfylnedwd5nonhae@gmail.com>
+ <20180505101609.5wb56j4mspjkokmw@tardis>
+ <20180505103550.s7xsnto7tgppkmle@gmail.com>
+ <20180505112817.ihrb726i37bwm4cj@tardis>
+ <20180505132751.gwzu2vbzibr2risd@gmail.com>
+ <20180505140340.uzfhoc42xvas4m72@tardis>
+Message-ID: <20180506121129.baacc4fxgr72rzex@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The QDF2400 controller does not set the Command Completed bit unless
-writes to the Slot Command register change "Control" bits.  Command
-Completed is never set for writes that only change software notification
-"Enable" bits.  This results in timeouts like this:
 
-pciehp 0000:00:00.0:pcie004: Timeout on hotplug command 0x1038
+* Boqun Feng <boqun.feng@gmail.com> wrote:
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/hotplug/pciehp_hpc.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+> > The only change I made beyond a trivial build fix is that I also added the release 
+> > atomics variants explicitly:
+> > 
+> > +#define atomic_cmpxchg_release(v, o, n) \
+> > +	cmpxchg_release(&((v)->counter), (o), (n))
+> > +#define atomic64_cmpxchg_release(v, o, n) \
+> > +	cmpxchg_release(&((v)->counter), (o), (n))
+> > 
+> > It has passed a PowerPC cross-build test here, but no runtime tests.
+> > 
+> 
+> Do you have the commit at any branch in tip tree? I could pull it and
+> cross-build and check the assembly code of lib/atomic64_test.c, that way
+> I could verify whether we mess something up.
+> 
+> > Does this patch look good to you?
+> > 
+> 
+> Yep!
 
-diff --git a/drivers/pci/hotplug/pciehp_hpc.c b/drivers/pci/hotplug/pciehp_hpc.c
-index e70eba5..974a8f1 100644
---- a/drivers/pci/hotplug/pciehp_hpc.c
-+++ b/drivers/pci/hotplug/pciehp_hpc.c
-@@ -914,3 +914,9 @@ static void quirk_cmd_compl(struct pci_dev *pdev)
- }
- DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, PCI_ANY_ID,
- 			      PCI_CLASS_BRIDGE_PCI, 8, quirk_cmd_compl);
-+
-+DECLARE_PCI_FIXUP_CLASS_EARLY(0x17cb, 0x400,
-+			      PCI_CLASS_BRIDGE_PCI, 8, quirk_cmd_compl);
-+
-+DECLARE_PCI_FIXUP_CLASS_EARLY(0x17cb, 0x401,
-+			      PCI_CLASS_BRIDGE_PCI, 8, quirk_cmd_compl);
--- 
-2.7.4
+Great - I have pushed the commits out into the locking tree, they can be found in:
+
+  git fetch git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git locking/core
+
+The PowerPC preparatory commit from you is:
+
+  0476a632cb3a: locking/atomics/powerpc: Move cmpxchg helpers to asm/cmpxchg.h and define the full set of cmpxchg APIs
+
+Thanks,
+
+	Ingo
