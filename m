@@ -1,48 +1,62 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Sun, 6 May 2018 19:59:14 +0200
-Subject: [PATCH v4 5/9] iio: adc: at91-sama5d2_adc: add support for
- position and pressure channels
-In-Reply-To: <20180506182953.6adad5b5@archlinux>
-References: <1525084335-11276-1-git-send-email-eugen.hristev@microchip.com>
- <1525084335-11276-6-git-send-email-eugen.hristev@microchip.com>
- <20180506182953.6adad5b5@archlinux>
-Message-ID: <20180506175914.GL10960@piout.net>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 6 May 2018 20:23:25 +0200
+Subject: [PATCH] arm: Convert arm boot_lock to raw
+In-Reply-To: <20180504105600.20613-1-bigeasy@linutronix.de>
+References: <20180504105600.20613-1-bigeasy@linutronix.de>
+Message-ID: <20180506182325.w7yvrpp3hcii54pj@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06/05/2018 18:29:53+0100, Jonathan Cameron wrote:
-> On Mon, 30 Apr 2018 13:32:11 +0300
-> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+On Fri, May 04, 2018 at 12:55:58PM +0200, Sebastian Andrzej Siewior wrote:
+> From: Frank Rowand <frank.rowand@am.sony.com>
 > 
-> > This implements the support for position and pressure for the included
-> > touchscreen support in the SAMA5D2 SOC ADC block.
-> > Two position channels are added and one for pressure.
-> > They can be read in raw format, or through a buffer.
-> > A normal use case is for a consumer driver to register a callback buffer
-> > for these channels.
-> > When the touchscreen channels are in the active scan mask,
-> > the driver will start the touchscreen sampling and push the data to the
-> > buffer.
-> > 
-> > Some parts of this patch are based on initial original work by
-> > Mohamed Jamsheeth Hajanajubudeen and Bandaru Venkateswara Swamy
-> > 
-> > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> Looks good to me now.
+> The arm boot_lock is used by the secondary processor startup code.  The locking
+> task is the idle thread, which has idle->sched_class == &idle_sched_class.
+> idle_sched_class->enqueue_task == NULL, so if the idle task blocks on the
+> lock, the attempt to wake it when the lock becomes available will fail:
 > 
-> I'm assuming that once Dmitry and others are happy, I'll take the
-> series through the IIO tree. Will reply to the cover letter if the
-> rest of the patches look good to me to let everyone know that without
-> having to catch this comment down in here!
+> try_to_wake_up()
+>    ...
+>       activate_task()
+>          enqueue_task()
+>             p->sched_class->enqueue_task(rq, p, flags)
 > 
+> Fix by converting boot_lock to a raw spin lock.
+> 
+> Cc: "Andreas F?rber" <afaerber@suse.de>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Barry Song <baohua@kernel.org>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: David Brown <david.brown@linaro.org>
+> Cc: Viresh Kumar <vireshk@kernel.org>
+> Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-soc at vger.kernel.org
+> Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
+> Link: http://lkml.kernel.org/r/4E77B952.3010606 at am.sony.com
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> [bigeasy: added new boot_lock user]
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  arch/arm/mach-actions/platsmp.c   |    6 +++---
+>  arch/arm/mach-exynos/platsmp.c    |   12 ++++++------
 
-I'm planning to take both DT patches through the at91 tree once you take
-the DT bindings patches.
+I assume this is needed for -rt patches?
 
+For Exynos:
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Tested on Exynos5422 (Odroid HC1) with Linaro PM-QA:
+Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Best regards,
+Krzysztof
