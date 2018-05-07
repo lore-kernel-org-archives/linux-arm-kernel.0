@@ -1,26 +1,22 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  7 May 2018 11:20:50 -0700
-Subject: [PATCH] ARM: dts: BCM5301X: Relicense Buffalo files to the GPL
- 2.0+ / MIT
-In-Reply-To: <20180504095445.30918-1-zajec5@gmail.com>
-References: <20180504095445.30918-1-zajec5@gmail.com>
-Message-ID: <20180507182050.26870-1-f.fainelli@gmail.com>
+Date: Mon,  7 May 2018 11:21:19 -0700
+Subject: [PATCH v2] ARM: dts: cygnus: fix irq type for arm global timer
+In-Reply-To: <20180503153207.7668-1-peron.clem@gmail.com>
+References: <20180503153207.7668-1-peron.clem@gmail.com>
+Message-ID: <20180507182119.27016-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  4 May 2018 11:54:45 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Thu,  3 May 2018 17:32:07 +0200, Cl?ment P?ron <peron.clem@gmail.com> wrote:
+> As per ARM documentation
+> PPI(0) ID27 - global timer interrupt is rising-edge sensitive.
 > 
-> This matches licensing used by other BCM5301X files and is preferred as:
-> 1) GPL 2.0+ makes is clearly compatible with Linux kernel
-> 2) MIT is also permissive but preferred over ISC
+> set IRQ triggering type to IRQ_TYPE_EDGE_RISING for ARM Global timers.
 > 
-> These files were created and ever touched by a group of four people
-> only: Felix, INAGAKI, Hauke and me.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> Fixes: c9ad7bc5fe3 ("ARM: dts: Enable Broadcom Cygnus SoC")
+> Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
 > ---
 
-Applied to devicetree/next, thanks!
+Applied to devicetree/fixes, thanks!
 --
 Florian
