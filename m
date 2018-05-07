@@ -1,110 +1,320 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Mon, 7 May 2018 15:15:12 -0700
-Subject: [RESEND PATCH] pinctrl: rockchip: Disable interrupt when
- changing it's capability
-In-Reply-To: <20180503065553.7762-1-jeffy.chen@rock-chips.com>
-References: <20180503065553.7762-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180507221511.GA6448@rodete-desktop-imager.corp.google.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 7 May 2018 16:28:39 -0600
+Subject: [PATCH v2 21/27] coresight: Convert driver messages to dev_dbg
+In-Reply-To: <1525165857-11096-22-git-send-email-suzuki.poulose@arm.com>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+ <1525165857-11096-22-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180507222839.GB22194@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Doug
+On Tue, May 01, 2018 at 10:10:51AM +0100, Suzuki K Poulose wrote:
+> Convert component enable/disable messages from dev_info to dev_dbg.
+> This is required to prevent LOCKDEP splats when operating in perf
+> mode where we could be called with locks held to enable a coresight
+> path. If someone wants to really see the messages, they can always
+> enable it at runtime via dynamic_debug.
 
-Hi Jeffy,
+I'm also in favor of moving to dev_dbg() - the messages they produce are useless
+unless serious debugging of the CS framework is happening.  But as Robin Murphy
+pointed out it would be great to fix the problem for real rather than masking
+it.
 
-On Thu, May 03, 2018 at 02:55:53PM +0800, Jeffy Chen wrote:
-> We saw spurious irq when changing irq's trigger type, for example
-> setting gpio-keys's wakeup irq trigger type.
+I understand this kind of work would be outside the scope of this set.  As such
+I'd take this patch but the log message would need to be modified to avoid
+talking about LOCKDEP splats, only to make sure nobody thinks the problem has
+been fixed.
+
+That being said I work extensively with the CS framework every day (with option
+CONFIG_LOCKED_SUPPORT=y) and haven't seen any splats.  Perhaps you have a
+recipe to reproduce the problem?
+
 > 
-> And according to the TRM:
-> "Programming the GPIO registers for interrupt capability, edge-sensitive
-> or level-sensitive interrupts, and interrupt polarity should be
-> completed prior to enabling the interrupts on Port A in order to prevent
-> spurious glitches on the interrupt lines to the interrupt controller."
-> 
-> Reported-by: Brian Norris <briannorris@google.com>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
+>  drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 4 ++--
+>  drivers/hwtracing/coresight/coresight-etb10.c              | 6 +++---
+>  drivers/hwtracing/coresight/coresight-etm3x.c              | 4 ++--
+>  drivers/hwtracing/coresight/coresight-etm4x.c              | 4 ++--
+>  drivers/hwtracing/coresight/coresight-funnel.c             | 4 ++--
+>  drivers/hwtracing/coresight/coresight-replicator.c         | 4 ++--
+>  drivers/hwtracing/coresight/coresight-stm.c                | 4 ++--
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c            | 8 ++++----
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c            | 4 ++--
+>  drivers/hwtracing/coresight/coresight-tmc.c                | 4 ++--
+>  drivers/hwtracing/coresight/coresight-tpiu.c               | 4 ++--
+>  11 files changed, 25 insertions(+), 25 deletions(-)
 > 
->  drivers/pinctrl/pinctrl-rockchip.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-> index 3924779f55785..7ff45ec8330d1 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -2727,9 +2727,19 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
->  		return -EINVAL;
+> diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+> index 043da86..c41d95c 100644
+> --- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+> +++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+> @@ -64,7 +64,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
+>  
+>  	CS_LOCK(drvdata->base);
+>  
+> -	dev_info(drvdata->dev, "REPLICATOR enabled\n");
+> +	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
+>  	return 0;
+>  }
+>  
+> @@ -83,7 +83,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
+>  
+>  	CS_LOCK(drvdata->base);
+>  
+> -	dev_info(drvdata->dev, "REPLICATOR disabled\n");
+> +	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
+>  }
+>  
+>  static const struct coresight_ops_link replicator_link_ops = {
+> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+> index 74232e6..d9c2f87 100644
+> --- a/drivers/hwtracing/coresight/coresight-etb10.c
+> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
+> @@ -163,7 +163,7 @@ static int etb_enable(struct coresight_device *csdev, u32 mode)
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+>  out:
+> -	dev_info(drvdata->dev, "ETB enabled\n");
+> +	dev_dbg(drvdata->dev, "ETB enabled\n");
+>  	return 0;
+>  }
+>  
+> @@ -269,7 +269,7 @@ static void etb_disable(struct coresight_device *csdev)
+>  
+>  	local_set(&drvdata->mode, CS_MODE_DISABLED);
+>  
+> -	dev_info(drvdata->dev, "ETB disabled\n");
+> +	dev_dbg(drvdata->dev, "ETB disabled\n");
+>  }
+>  
+>  static void *etb_alloc_buffer(struct coresight_device *csdev, int cpu,
+> @@ -512,7 +512,7 @@ static void etb_dump(struct etb_drvdata *drvdata)
+>  	}
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+> -	dev_info(drvdata->dev, "ETB dumped\n");
+> +	dev_dbg(drvdata->dev, "ETB dumped\n");
+>  }
+>  
+>  static int etb_open(struct inode *inode, struct file *file)
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+> index 39f42fd..9d4a663 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+> @@ -510,7 +510,7 @@ static int etm_enable_sysfs(struct coresight_device *csdev)
+>  	drvdata->sticky_enable = true;
+>  	spin_unlock(&drvdata->spinlock);
+>  
+> -	dev_info(drvdata->dev, "ETM tracing enabled\n");
+> +	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
+>  	return 0;
+>  
+>  err:
+> @@ -613,7 +613,7 @@ static void etm_disable_sysfs(struct coresight_device *csdev)
+>  	spin_unlock(&drvdata->spinlock);
+>  	cpus_read_unlock();
+>  
+> -	dev_info(drvdata->dev, "ETM tracing disabled\n");
+> +	dev_dbg(drvdata->dev, "ETM tracing disabled\n");
+>  }
+>  
+>  static void etm_disable(struct coresight_device *csdev,
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+> index e84d80b..c9c73c2 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+> @@ -274,7 +274,7 @@ static int etm4_enable_sysfs(struct coresight_device *csdev)
+>  	drvdata->sticky_enable = true;
+>  	spin_unlock(&drvdata->spinlock);
+>  
+> -	dev_info(drvdata->dev, "ETM tracing enabled\n");
+> +	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
+>  	return 0;
+>  
+>  err:
+> @@ -387,7 +387,7 @@ static void etm4_disable_sysfs(struct coresight_device *csdev)
+>  	spin_unlock(&drvdata->spinlock);
+>  	cpus_read_unlock();
+>  
+> -	dev_info(drvdata->dev, "ETM tracing disabled\n");
+> +	dev_dbg(drvdata->dev, "ETM tracing disabled\n");
+>  }
+>  
+>  static void etm4_disable(struct coresight_device *csdev,
+> diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+> index 9f8ac0be..18b5361 100644
+> --- a/drivers/hwtracing/coresight/coresight-funnel.c
+> +++ b/drivers/hwtracing/coresight/coresight-funnel.c
+> @@ -72,7 +72,7 @@ static int funnel_enable(struct coresight_device *csdev, int inport,
+>  
+>  	funnel_enable_hw(drvdata, inport);
+>  
+> -	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
+> +	dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
+>  	return 0;
+>  }
+>  
+> @@ -96,7 +96,7 @@ static void funnel_disable(struct coresight_device *csdev, int inport,
+>  
+>  	funnel_disable_hw(drvdata, inport);
+>  
+> -	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
+> +	dev_dbg(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
+>  }
+>  
+>  static const struct coresight_ops_link funnel_link_ops = {
+> diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+> index 3756e71..4f77812 100644
+> --- a/drivers/hwtracing/coresight/coresight-replicator.c
+> +++ b/drivers/hwtracing/coresight/coresight-replicator.c
+> @@ -42,7 +42,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
+>  {
+>  	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  
+> -	dev_info(drvdata->dev, "REPLICATOR enabled\n");
+> +	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
+>  	return 0;
+>  }
+>  
+> @@ -51,7 +51,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
+>  {
+>  	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  
+> -	dev_info(drvdata->dev, "REPLICATOR disabled\n");
+> +	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
+>  }
+>  
+>  static const struct coresight_ops_link replicator_link_ops = {
+> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+> index 15e7ef38..4c88d99 100644
+> --- a/drivers/hwtracing/coresight/coresight-stm.c
+> +++ b/drivers/hwtracing/coresight/coresight-stm.c
+> @@ -218,7 +218,7 @@ static int stm_enable(struct coresight_device *csdev,
+>  	stm_enable_hw(drvdata);
+>  	spin_unlock(&drvdata->spinlock);
+>  
+> -	dev_info(drvdata->dev, "STM tracing enabled\n");
+> +	dev_dbg(drvdata->dev, "STM tracing enabled\n");
+>  	return 0;
+>  }
+>  
+> @@ -281,7 +281,7 @@ static void stm_disable(struct coresight_device *csdev,
+>  		pm_runtime_put(drvdata->dev);
+>  
+>  		local_set(&drvdata->mode, CS_MODE_DISABLED);
+> -		dev_info(drvdata->dev, "STM tracing disabled\n");
+> +		dev_dbg(drvdata->dev, "STM tracing disabled\n");
+>  	}
+>  }
+>  
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index 1dd44fd..0a32734 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -244,7 +244,7 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
+>  	if (ret)
+>  		return ret;
+>  
+> -	dev_info(drvdata->dev, "TMC-ETB/ETF enabled\n");
+> +	dev_dbg(drvdata->dev, "TMC-ETB/ETF enabled\n");
+>  	return 0;
+>  }
+>  
+> @@ -267,7 +267,7 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
+>  
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+> -	dev_info(drvdata->dev, "TMC-ETB/ETF disabled\n");
+> +	dev_dbg(drvdata->dev, "TMC-ETB/ETF disabled\n");
+>  }
+>  
+>  static int tmc_enable_etf_link(struct coresight_device *csdev,
+> @@ -286,7 +286,7 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
+>  	drvdata->mode = CS_MODE_SYSFS;
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+> -	dev_info(drvdata->dev, "TMC-ETF enabled\n");
+> +	dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
+>  	return 0;
+>  }
+>  
+> @@ -306,7 +306,7 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
+>  	drvdata->mode = CS_MODE_DISABLED;
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+> -	dev_info(drvdata->dev, "TMC-ETF disabled\n");
+> +	dev_dbg(drvdata->dev, "TMC-ETF disabled\n");
+>  }
+>  
+>  static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int cpu,
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index 41dde0a..1ef0f62 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -1350,7 +1350,7 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
+>  		tmc_etr_free_sysfs_buf(free_buf);
+>  
+>  	if (!ret)
+> -		dev_info(drvdata->dev, "TMC-ETR enabled\n");
+> +		dev_dbg(drvdata->dev, "TMC-ETR enabled\n");
+>  
+>  	return ret;
+>  }
+> @@ -1393,7 +1393,7 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
+>  
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+> -	dev_info(drvdata->dev, "TMC-ETR disabled\n");
+> +	dev_dbg(drvdata->dev, "TMC-ETR disabled\n");
+>  }
+>  
+>  static const struct coresight_ops_sink tmc_etr_sink_ops = {
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+> index 4d41b4b..7adcde3 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
+> @@ -92,7 +92,7 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
 >  	}
 >  
-> +	/**
-
-The typical multiline comment style is to use only 1 asterisk -- 2
-asterisks usually denote something more formal, like kerneldoc.
-
-> +	 * According to the TRM, we should keep irq disabled during programming
-> +	 * interrupt capability to prevent spurious glitches on the interrupt
-> +	 * lines to the interrupt controller.
-> +	 */
-
-It's also worth noting that this case may come up in
-rockchip_irq_demux() for EDGE_BOTH triggers:
-
-		/*
-		 * Triggering IRQ on both rising and falling edge
-		 * needs manual intervention.
-		 */
-		if (bank->toggle_edge_mode & BIT(irq)) {
-...
-				polarity = readl_relaxed(bank->reg_base +
-							 GPIO_INT_POLARITY);
-				if (data & BIT(irq))
-					polarity &= ~BIT(irq);
-				else
-					polarity |= BIT(irq);
-				writel(polarity,
-				       bank->reg_base + GPIO_INT_POLARITY);
-
-AIUI, this case is not actually a problem, because this polarity
-reconfiguration happens before we call generic_handle_irq(), so the
-extra spurious interrupt is handled and cleared after this point. But it
-seems like this should be noted somewhere in either the commit message,
-the code comments, or both.
-
-On the other hand...this also implies there may be a race condition
-there, where we might lose an interrupt if there is an edge between the
-re-configuration of the polarity in rockchip_irq_demux() and the
-clearing/handling of the interrupt (handle_edge_irq() ->
-chip->irq_ack()). If we have an edge between there, then we might ack
-it, but leave the polarity such that we aren't ready for the next
-(inverted) edge.
-
-I'm not 100% sure about the above, so it might be good to verify it. But
-I also expect this means there's really no way to 100% reliably
-implement both-edge trigger types on hardware like this that doesn't
-directly implement it. So I'm not sure what we'd do with that knowledge.
-
-> +	data = readl(bank->reg_base + GPIO_INTEN);
-> +	writel_relaxed(data & ~mask, gc->reg_base + GPIO_INTEN);
-
-Not sure if this is a needless optimization: but couldn't you only
-disable the interrupt (and make the level and polarity changes) only if
-the level or polarity are actually changing? For example, it's possible
-to end up here when changing from EDGE_BOTH to EDGE_RISING, but we might
-not actually program a new value.
-
-Brian
-
-> +
->  	writel_relaxed(level, gc->reg_base + GPIO_INTTYPE_LEVEL);
->  	writel_relaxed(polarity, gc->reg_base + GPIO_INT_POLARITY);
+>  	if (!ret)
+> -		dev_info(drvdata->dev, "TMC read start\n");
+> +		dev_dbg(drvdata->dev, "TMC read start\n");
 >  
-> +	writel_relaxed(data, gc->reg_base + GPIO_INTEN);
-> +
->  	irq_gc_unlock(gc);
->  	raw_spin_unlock_irqrestore(&bank->slock, flags);
->  	clk_disable(bank->clk);
+>  	return ret;
+>  }
+> @@ -114,7 +114,7 @@ static int tmc_read_unprepare(struct tmc_drvdata *drvdata)
+>  	}
+>  
+>  	if (!ret)
+> -		dev_info(drvdata->dev, "TMC read end\n");
+> +		dev_dbg(drvdata->dev, "TMC read end\n");
+>  
+>  	return ret;
+>  }
+> diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+> index 805f7c2..c7f0827 100644
+> --- a/drivers/hwtracing/coresight/coresight-tpiu.c
+> +++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+> @@ -80,7 +80,7 @@ static int tpiu_enable(struct coresight_device *csdev, u32 mode)
+>  
+>  	tpiu_enable_hw(drvdata);
+>  
+> -	dev_info(drvdata->dev, "TPIU enabled\n");
+> +	dev_dbg(drvdata->dev, "TPIU enabled\n");
+>  	return 0;
+>  }
+>  
+> @@ -106,7 +106,7 @@ static void tpiu_disable(struct coresight_device *csdev)
+>  
+>  	tpiu_disable_hw(drvdata);
+>  
+> -	dev_info(drvdata->dev, "TPIU disabled\n");
+> +	dev_dbg(drvdata->dev, "TPIU disabled\n");
+>  }
+>  
+>  static const struct coresight_ops_sink tpiu_sink_ops = {
 > -- 
-> 2.11.0
-> 
+> 2.7.4
 > 
