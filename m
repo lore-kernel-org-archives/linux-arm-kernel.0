@@ -1,40 +1,22 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  7 May 2018 14:37:57 +0200
-Subject: [PATCH] ARM: dts: r8a7740: Add CEU1
-Message-ID: <20180507123757.4708-1-horms+renesas@verge.net.au>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Mon, 7 May 2018 15:43:49 +0300
+Subject: [PATCH] PCI: pciehp: Add quirk for QDF2400 Command Completed
+ erratum
+In-Reply-To: <1525602662-1873-1-git-send-email-okaya@codeaurora.org>
+References: <1525602662-1873-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180507124349.GC2879@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe CEU1 peripheral for Renesas R-Mobile A1 R8A7740 Soc.
+On Sun, May 06, 2018 at 06:30:53AM -0400, Sinan Kaya wrote:
+> The QDF2400 controller does not set the Command Completed bit unless
+> writes to the Slot Command register change "Control" bits.  Command
+> Completed is never set for writes that only change software notification
+> "Enable" bits.  This results in timeouts like this:
+> 
+> pciehp 0000:00:00.0:pcie004: Timeout on hotplug command 0x1038
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7740.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
- Depends and based on:
- "[PATCH v2 2/2] ARM: dts: r8a7740: Add CEU0"
-
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 508d93440ee8..af4c071c9178 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -77,6 +77,16 @@
- 		status = "disabled";
- 	};
- 
-+	ceu1: ceu at fe914000 {
-+		reg = <0xfe910000 0x3000>;
-+		compatible = "renesas,r8a7740-ceu";
-+		interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp1_clks R8A7740_CLK_CEU21>;
-+		clock-names = "ceu21";
-+		power-domains = <&pd_a4r>;
-+		status = "disabled";
-+	};
-+
- 	cmt1: timer at e6138000 {
- 		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
- 		reg = <0xe6138000 0x170>;
--- 
-2.11.0
+Reviewed-by: Mika Westerberg <mika.westerberg@linux.intel.com>
