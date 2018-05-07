@@ -1,159 +1,318 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 7 May 2018 14:55:31 -0500
-Subject: [RFC PATCH] driver core: make deferring probe forever optional
-In-Reply-To: <20180507183106.GF2259@tuxbook-pro>
-References: <20180501213114.20183-1-robh@kernel.org>
- <20180507183106.GF2259@tuxbook-pro>
-Message-ID: <CAL_Jsq+PRUR5rCeV820XZuQmQH3gD-X=6a5fNuF-9qVbq5dqFg@mail.gmail.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Mon, 07 May 2018 22:15:46 +0200
+Subject: [PATCH v3 3/3] ARM: dts: sun7i: Add support for the Ainol AW1
+ tablet
+In-Reply-To: <20180507071931.tebv45yxrojxxkeb@flea>
+References: <20180506214901.23429-1-contact@paulk.fr>
+ <20180506214901.23429-3-contact@paulk.fr>
+ <20180507071931.tebv45yxrojxxkeb@flea>
+Message-ID: <d8de7d2237a74388ac8c8152eded3477e7fd56a4.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 7, 2018 at 1:31 PM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Tue 01 May 14:31 PDT 2018, Rob Herring wrote:
->
->> Deferred probe will currently wait forever on dependent devices to probe,
->> but sometimes a driver will never exist. It's also not always critical for
->> a driver to exist. Platforms can rely on default configuration from the
->> bootloader or reset defaults for things such as pinctrl and power domains.
->
-> But how do you know if this is the case?
+Hi,
 
-Because the platform worked before adding the dependency in the dts.
+Le lundi 07 mai 2018 ? 09:19 +0200, Maxime Ripard a ?crit :
+> Hi,
+> 
+> On Sun, May 06, 2018 at 11:49:01PM +0200, Paul Kocialkowski wrote:
+> > This adds support for the Ainol AW1, an A20-based 7" tablet from Ainol.
+> > 
+> > The following board-specific features are supported:
+> > * LCD panel
+> > * Backlight
+> > * USB OTG
+> > * Buttons
+> > * Touchscreen (doesn't work without non-free firmware)
+> > * Accelerometer
+> > * Battery
+> > 
+> > The following are untested:
+> > * Audio output
+> > * Audio speakers
+> > * USB via SPCI connector
+> > 
+> > The following are not supported:
+> > * Wi-Fi
+> > * Bluetooth
+> > * NAND
+> > * Audio via SPCI connector
+> > * Audio via Bluetooth I2S
+> > 
+> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > ---
+> >  arch/arm/boot/dts/Makefile                |   1 +
+> >  arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts | 275 ++++++++++++++++++++++
+> >  2 files changed, 276 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 7e2424957809..4a80971f2bc9 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -946,6 +946,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+> >  	sun6i-a31s-sinovoip-bpi-m2.dtb \
+> >  	sun6i-a31s-yones-toptech-bs1078-v2.dtb
+> >  dtb-$(CONFIG_MACH_SUN7I) += \
+> > +	sun7i-a20-ainol-aw1.dtb \
+> >  	sun7i-a20-bananapi.dtb \
+> >  	sun7i-a20-bananapi-m1-plus.dtb \
+> >  	sun7i-a20-bananapro.dtb \
+> > diff --git a/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts b/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
+> > new file mode 100644
+> > index 000000000000..9a1d54a9f9a0
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
+> > @@ -0,0 +1,275 @@
+> > +/*
+> > + * Copyright (C) 2018 Paul Kocialkowski <contact@paulk.fr>
+> > + *
+> > + * SPDX-License-Identifier: GPL-2.0+
+> 
+> This should be your first line.
 
->> This is often the case with initial platform support until various drivers
->> get enabled.
->
-> Can you please name platform that has enough support for Alexander to
-> care about backwards and forwards compatibility but lacks a pinctrl
-> driver.
+Alright then. For reference, I based this off sun8i-h3-libretech-all-h3-
+cc.dts, that has the copyright first.
 
-Alex will have to answer that. I do agree pinctrl drivers shouldn't be
-that hard because it is all just translating a bunch of pin data into
-one-time (mostly) register writes, so it shouldn't take that long to
-implement support. OTOH, maybe a pinctrl driver is low priority
-because nothing needs it yet. Either a given board works with the
-defaults and only some new board needs to change things or you don't
-need pinctrl until low power modes are implemented. However, power
-domains have the same problem and it can take years for those to get
-proper support.
+> Also, we usually license our DT under
+> a dual license (GPL and MIT) so that other projects (like FreeBSD) can
+> use them as well, instead of duplicating them. It would be great if
+> you'd consider it.
 
-Alex proposed declaring dts files stable and then enforcing
-compatibility after that point. If anyone believes that will work,
-then please send a patch marking all the platforms in the kernel tree
-that are stable.
+Ah, I didn't think of BSD-licensed systems like FreeBSD off-hand.
 
->> There's at least 2 scenarios where deferred probe can render
->> a platform broken. Both involve using a DT which has more devices and
->> dependencies than the kernel supports. The 1st case is a driver may be
->> disabled in the kernel config.
->
-> I agree that there is a chance that you _might_ get some parts of the
-> system working by relying on the boot loader configuration, but
-> misconfiguration issues applies to any other fundamental providers, such
-> as clocks, regulators, power domains and gpios as well.
+Since they are apparently working on ARM support, it's probably worth
+publishing this under a non-copyleft license.
 
-If it is only a chance, then perhaps we shouldn't allow things
-upstream without proper drivers for all these things. That will only
-give users the wrong impression.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "sun7i-a20.dtsi"
+> > +#include "sunxi-common-regulators.dtsi"
+> > +
+> > +#include <dt-bindings/gpio/gpio.h>
+> > +#include <dt-bindings/input/input.h>
+> > +#include <dt-bindings/interrupt-controller/irq.h>
+> > +#include <dt-bindings/pwm/pwm.h>
+> > +
+> > +/ {
+> > +	model = "Ainol AW1";
+> > +	compatible = "ainol,ainol-aw1", "allwinner,sun7i-a20";
+> > +
+> > +	aliases {
+> > +		serial0 = &uart0;
+> > +	};
+> > +
+> > +	chosen {
+> > +		stdout-path = "serial0:115200n8";
+> > +	};
+> > +
+> > +	backlight: backlight {
+> > +		compatible = "pwm-backlight";
+> > +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
+> > +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+> 
+> The increase in perceived brightness should be linear. Usually, for
+> PWMs backed backlight, an exponential list is a much better
+> approximation.
 
->> The 2nd case is the kernel version may
->> simply not have the dependent driver. This can happen if using a newer DT
->> (provided by firmware perhaps) with a stable kernel version.
->>
->
-> As above, this is in no way limited to pinctrl drivers.
+Thanks for the hint, it never occurred to me that pwm duty cycle was not
+linear with brightness, but that makes sense. I'll give that a try (on
+255 values instead of 10 to keep some level of precision in low
+brightness). The way to go here is probably use a base-255 logarithm
+such as: duty cycle = range * log(i+1)/log(255) with i the linear
+brightness value (0 to 255) and range the amplitude of our values (that
+gets divided by the maximum brightness, so it's really up to hardware
+precision at this point). I'll go with a range of 255 as well.
 
-Yes, I wasn't trying to imply that with this patch. I was just
-starting with 1 example. IOMMUs (which essentially is already doing
-what this patch does) and power domains are the main other 2. Clocks
-is an obvious one too, but from the discussion I referenced that
-problem is a bit different as platforms change from dummy fixed-clocks
-to a real clock controller driver. That will need a different
-solution.
+> > +		default-brightness-level = <5>;
+> > +		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
+> > +	};
+> > +
+> > +	panel: panel {
+> > +		compatible = "innolux,at070tn90";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		power-supply = <&panel_power>;
+> > +		backlight = <&backlight>;
+> > +
+> > +		port at 0 {
+> > +			reg = <0>;
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			panel_input: endpoint at 0 {
+> > +				reg = <0>;
+> > +				remote-endpoint = <&tcon0_out_panel>;
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > +	panel_power: panel_power {
+> > +		compatible = "regulator-fixed";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&panel_power_pin>;
+> > +		regulator-name = "panel-power";
+> > +		regulator-min-microvolt = <10400000>;
+> > +		regulator-max-microvolt = <10400000>;
+> > +		gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
+> > +		enable-active-high;
+> > +		regulator-boot-on;
+> > +	};
+> > +};
+> > +
+> > +&codec {
+> > +	allwinner,pa-gpios = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
+> > +	status = "okay";
+> > +};
+> > +
+> > +&cpu0 {
+> > +	cpu-supply = <&reg_dcdc2>;
+> > +};
+> > +
+> > +&de {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&ehci0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&ehci1 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&i2c0 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&i2c0_pins_a>;
+> > +	status = "okay";
+> > +
+> > +	axp209: pmic at 34 {
+> > +		reg = <0x34>;
+> > +		interrupt-parent = <&nmi_intc>;
+> > +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> > +	};
+> > +};
+> > +
+> > +&i2c1 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&i2c1_pins_a>;
+> > +	status = "okay";
+> > +
+> > +	lis3dh: accelerometer at 18 {
+> > +		compatible = "st,lis3dh-accel";
+> > +		reg = <0x18>;
+> > +		vdd-supply = <&reg_vcc3v3>;
+> > +		vddio-supply = <&reg_vcc3v3>;
+> > +		st,drdy-int-pin = <1>;
+> > +	};
+> > +};
+> > +
+> > +&i2c2 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&i2c2_pins_a>;
+> > +	status = "okay";
+> > +	clock-frequency = <400000>;
+> > +
+> > +	gsl1680: touchscreen at 40 {
+> > +		compatible = "silead,gsl1680";
+> > +		reg = <0x40>;
+> > +		interrupt-parent = <&pio>;
+> > +		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>; /* EINT21 (PH21) */
+> > +		power-gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>; /* PH20 */
+> > +		firmware-name = "gsl1680-ainol-aw1.fw";
+> > +		touchscreen-size-x = <480>;
+> > +		touchscreen-size-y = <800>;
+> > +		touchscreen-swapped-x-y;
+> > +		touchscreen-inverted-y;
+> > +		silead,max-fingers = <5>;
+> > +	};
+> > +};
+> > +
+> > +&lradc {
+> > +	vref-supply = <&reg_ldo2>;
+> > +	status = "okay";
+> > +
+> > +	button at 571 {
+> > +		label = "Volume Up";
+> > +		linux,code = <KEY_VOLUMEUP>;
+> > +		channel = <0>;
+> > +		voltage = <571428>;
+> > +	};
+> > +
+> > +	button at 761 {
+> > +		label = "Volume Down";
+> > +		linux,code = <KEY_VOLUMEDOWN>;
+> > +		channel = <0>;
+> > +		voltage = <761904>;
+> > +	};
+> > +
+> > +	button at 952 {
+> > +		label = "Home";
+> > +		linux,code = <KEY_HOME>;
+> > +		channel = <0>;
+> > +		voltage = <952380>;
+> > +	};
+> > +};
+> > +
+> > +&mmc0 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&mmc0_pins_a>;
+> > +	vmmc-supply = <&reg_vcc3v3>;
+> 
+> You have the regulators described in your DT, you'd better use them
+> instead of the one coming from sunxi-common-regulators.dtsi.
 
->> Unfortunately, this change breaks with modules as we have no way of
->> knowing when modules are done loading. One possibility is to make this
->> opt in or out based on compatible strings rather than at a subsystem level.
->> Ideally this information could be extracted automatically somehow. OTOH,
->> maybe the lists are pretty small. There's only a handful of subsystems
->> that can be optional, and then only so many drivers in those that can be
->> modules (at least for pinctrl, many drivers are built-in only).
->>
->
-> On the Qualcomm platform most drivers are tristate and on most platforms
-> there are size restrictions in the proprietary boot loader preventing us
-> from boot the kernel after switching all these frameworks from tristate
-> to bool (which feels like a more appropriate solution than your hack).
+Well, according to the reference A20 design, the mmc pins and the card
+are powered by the 3.3V power rail, that comes from a regular step-down
+regulator sourcing from IPSOUT, so I don't see what regulator I should
+better use. Do you have a suggestion?
 
-BTW, QCom platforms are almost the only ones with pinctrl drivers as
-modules. They are also happen to be PIA to configure correctly for a
-board.
+> > +	bus-width = <4>;
+> > +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+> > +	cd-inverted;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&ohci0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&ohci1 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&otg_sram {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&pio {
+> > +	panel_power_pin: panel_power_pin at 0 {
+> > +		pins = "PH8";
+> > +		function = "gpio_out";
+> > +	};
+> > +};
+> 
+> You don't need that pinctrl node.
 
-However, I would like a solution that works with modules. It would be
-nice to know when userspace finished processing all the coldplug
-uevents. That would be sufficient to support modules. I researched
-that a bit and it doesn't seem the kernel can tell when that has
-happened.
+I'll get rid of it then. You mentioned that regulator-simple uses the
+old GPIO API, so I assumed it meant that a pinctrl node is still needed.
+For reference, it uses of_get_named_gpio (not the devm-managed fashion).
 
->
->> Cc: Alexander Graf <agraf@suse.de>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> ---
->> This patch came out of a discussion on the ARM boot-architecture
->> list[1] about DT forwards and backwards compatibility issues. There are
->> issues with newer DTs breaking on older, stable kernels. Some of these
->> are difficult to solve, but cases of optional devices not having
->> kernel support should be solvable.
->>
->
-> There are two cases here:
-> 1) DT contains compatibles that isn't supported by the kernel. In this
-> case the associated device will remain in the probe deferral list and
-> user space won't know about the device.
->
-> 2) DT contains compatibles known to the kernel but has new optional
-> properties that makes things functional or works around hardware bugs.
->
->> I tested this on a RPi3 B with the pinctrl driver forced off. With this
->> change, the MMC/SD and UART drivers can function without the pinctrl
->> driver.
->>
->
-> Cool, so what about graphics, audio, networking, usb and all the other
-> things that people actually expect when they _use_ a distro?
+Cheers,
 
-I often care about none of those things. When I do, I'd rather boot to
-a working console with those broken than have to debug why the kernel
-panicked.
+Paul
 
->> [1] https://lists.linaro.org/pipermail/boot-architecture/2018-April/000466.html
->>
->>  drivers/base/dd.c            | 16 ++++++++++++++++
->>  drivers/pinctrl/devicetree.c |  2 +-
->>  include/linux/device.h       |  2 ++
->>  3 files changed, 19 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
->> index c9f54089429b..5848808b9d7a 100644
->> --- a/drivers/base/dd.c
->> +++ b/drivers/base/dd.c
->> @@ -226,6 +226,15 @@ void device_unblock_probing(void)
->>       driver_deferred_probe_trigger();
->>  }
->>
->> +
->> +int driver_deferred_probe_optional(void)
->> +{
->> +     if (initcalls_done)
->> +             return -ENODEV;
->
-> You forgot the humongous printout here that tells the users that we do
-> not want any bug reports related hardware not working as expected after
-> this point.
+-- 
+Developer of free digital technology and hardware support.
 
-I assume you were joking, but I would happily add a WARN here. Spewing
-new warnings while still booting is a better UX than just panicking.
-Ideally, it would be once per missing dependency.
-
-Rob
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180507/0e18e2ce/attachment.sig>
