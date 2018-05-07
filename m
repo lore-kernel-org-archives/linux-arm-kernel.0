@@ -1,51 +1,158 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  7 May 2018 15:19:51 +0200
-Subject: [PATCH v3 0/2] ARM: dts: renesas: Correct mask for GIC PPI interrupts
-Message-ID: <1525699193-5589-1-git-send-email-geert+renesas@glider.be>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Mon,  7 May 2018 21:31:14 +0800
+Subject: [PATCH v2] locking/atomics/powerpc: Move cmpxchg helpers to
+ asm/cmpxchg.h and define the full set of cmpxchg APIs
+In-Reply-To: <tip-0476a632cb3aa88c03cefc294050a9a86760e88d@git.kernel.org>
+References: <tip-0476a632cb3aa88c03cefc294050a9a86760e88d@git.kernel.org>
+Message-ID: <20180507133114.10106-1-boqun.feng@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-        Hi Simon, Magnus,
+Move PowerPC's __op_{acqurie,release}() from atomic.h to
+cmpxchg.h (in arch/powerpc/include/asm), plus use them to
+define these two methods:
 
-R-Car H2 and R-Mobile APE6 contain four Cortex-A15 and four Cortex-A7
-cores, hence the second interrupt specifier cell for Private Peripheral
-Interrupts should use "GIC_CPU_MASK_SIMPLE(8)", to make sure interrupts
-can be delivered to all 8 processor cores.
+	#define cmpxchg_release __op_release(cmpxchg, __VA_ARGS__);
+	#define cmpxchg64_release __op_release(cmpxchg64, __VA_ARGS__);
 
-This brings the predecessors of R-Car Gen3 in line with what we're doing
-on other big.LITTLE SoCs, like R-Car H3 and M3-W.
+... the idea is to generate all these methods in cmpxchg.h and to define the full
+array of atomic primitives, including the cmpxchg_release() methods which were
+defined by the generic code before.
 
-Changes compared to v2:
-  - Change one-line summary prefix to match current arm-soc practices,
-  - Fast-forward by 3 years,
-  - Rebase.
+Also define the atomic[64]_() variants explicitly.
 
-Changes compared to v1:
-  - Drop RFC status after receiving confirmation from Liviu Dudau.
+This ensures that all these low level cmpxchg APIs are defined in
+PowerPC headers, with no generic header fallbacks.
 
-Thanks for applying!
+Also remove the duplicate definitions of atomic_xchg() and
+atomic64_xchg() in asm/atomic.h: they could be generated via the generic
+atomic.h header using _relaxed() primitives. This helps ppc adopt the
+upcoming change of generic atomic.h header.
 
-P.S. Feel free to take a ride on your unicorn, to test on a legendary
-     system that boots all 8 cores.
+No change in functionality or code generation.
 
-Geert Uytterhoeven (2):
-  ARM: dts: r8a7790: Correct mask for GIC PPI interrupts
-  ARM: dts: r8a73a4: Correct mask for GIC PPI interrupts
+Signed-off-by: Boqun Feng <boqun.feng@gmail.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: aryabinin at virtuozzo.com
+Cc: catalin.marinas at arm.com
+Cc: dvyukov at google.com
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: will.deacon at arm.com
+---
+v1 --> v2:
+	remove duplicate definitions for atomic*_xchg() for future
+	change
 
- arch/arm/boot/dts/r8a73a4.dtsi | 10 +++++-----
- arch/arm/boot/dts/r8a7790.dtsi | 10 +++++-----
- 2 files changed, 10 insertions(+), 10 deletions(-)
+Ingo,
+	I also remove the link and your SoB because I think your bot
+	could add them automatically.
 
+ arch/powerpc/include/asm/atomic.h  | 24 ++++--------------------
+ arch/powerpc/include/asm/cmpxchg.h | 24 ++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 20 deletions(-)
+
+diff --git a/arch/powerpc/include/asm/atomic.h b/arch/powerpc/include/asm/atomic.h
+index 682b3e6a1e21..583837a41bcc 100644
+--- a/arch/powerpc/include/asm/atomic.h
++++ b/arch/powerpc/include/asm/atomic.h
+@@ -13,24 +13,6 @@
+ 
+ #define ATOMIC_INIT(i)		{ (i) }
+ 
+-/*
+- * Since *_return_relaxed and {cmp}xchg_relaxed are implemented with
+- * a "bne-" instruction at the end, so an isync is enough as a acquire barrier
+- * on the platform without lwsync.
+- */
+-#define __atomic_op_acquire(op, args...)				\
+-({									\
+-	typeof(op##_relaxed(args)) __ret  = op##_relaxed(args);		\
+-	__asm__ __volatile__(PPC_ACQUIRE_BARRIER "" : : : "memory");	\
+-	__ret;								\
+-})
+-
+-#define __atomic_op_release(op, args...)				\
+-({									\
+-	__asm__ __volatile__(PPC_RELEASE_BARRIER "" : : : "memory");	\
+-	op##_relaxed(args);						\
+-})
+-
+ static __inline__ int atomic_read(const atomic_t *v)
+ {
+ 	int t;
+@@ -213,8 +195,9 @@ static __inline__ int atomic_dec_return_relaxed(atomic_t *v)
+ 	cmpxchg_relaxed(&((v)->counter), (o), (n))
+ #define atomic_cmpxchg_acquire(v, o, n) \
+ 	cmpxchg_acquire(&((v)->counter), (o), (n))
++#define atomic_cmpxchg_release(v, o, n) \
++	cmpxchg_release(&((v)->counter), (o), (n))
+ 
+-#define atomic_xchg(v, new) (xchg(&((v)->counter), new))
+ #define atomic_xchg_relaxed(v, new) xchg_relaxed(&((v)->counter), (new))
+ 
+ /**
+@@ -519,8 +502,9 @@ static __inline__ long atomic64_dec_if_positive(atomic64_t *v)
+ 	cmpxchg_relaxed(&((v)->counter), (o), (n))
+ #define atomic64_cmpxchg_acquire(v, o, n) \
+ 	cmpxchg_acquire(&((v)->counter), (o), (n))
++#define atomic64_cmpxchg_release(v, o, n) \
++	cmpxchg_release(&((v)->counter), (o), (n))
+ 
+-#define atomic64_xchg(v, new) (xchg(&((v)->counter), new))
+ #define atomic64_xchg_relaxed(v, new) xchg_relaxed(&((v)->counter), (new))
+ 
+ /**
+diff --git a/arch/powerpc/include/asm/cmpxchg.h b/arch/powerpc/include/asm/cmpxchg.h
+index 9b001f1f6b32..e27a612b957f 100644
+--- a/arch/powerpc/include/asm/cmpxchg.h
++++ b/arch/powerpc/include/asm/cmpxchg.h
+@@ -8,6 +8,24 @@
+ #include <asm/asm-compat.h>
+ #include <linux/bug.h>
+ 
++/*
++ * Since *_return_relaxed and {cmp}xchg_relaxed are implemented with
++ * a "bne-" instruction at the end, so an isync is enough as a acquire barrier
++ * on the platform without lwsync.
++ */
++#define __atomic_op_acquire(op, args...)				\
++({									\
++	typeof(op##_relaxed(args)) __ret  = op##_relaxed(args);		\
++	__asm__ __volatile__(PPC_ACQUIRE_BARRIER "" : : : "memory");	\
++	__ret;								\
++})
++
++#define __atomic_op_release(op, args...)				\
++({									\
++	__asm__ __volatile__(PPC_RELEASE_BARRIER "" : : : "memory");	\
++	op##_relaxed(args);						\
++})
++
+ #ifdef __BIG_ENDIAN
+ #define BITOFF_CAL(size, off)	((sizeof(u32) - size - off) * BITS_PER_BYTE)
+ #else
+@@ -512,6 +530,9 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
+ 			(unsigned long)_o_, (unsigned long)_n_,		\
+ 			sizeof(*(ptr)));				\
+ })
++
++#define cmpxchg_release(...) __atomic_op_release(cmpxchg, __VA_ARGS__)
++
+ #ifdef CONFIG_PPC64
+ #define cmpxchg64(ptr, o, n)						\
+   ({									\
+@@ -533,6 +554,9 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
+ 	BUILD_BUG_ON(sizeof(*(ptr)) != 8);				\
+ 	cmpxchg_acquire((ptr), (o), (n));				\
+ })
++
++#define cmpxchg64_release(...) __atomic_op_release(cmpxchg64, __VA_ARGS__)
++
+ #else
+ #include <asm-generic/cmpxchg-local.h>
+ #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
 -- 
-2.7.4
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+2.16.2
