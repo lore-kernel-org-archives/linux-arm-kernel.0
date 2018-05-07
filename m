@@ -1,44 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  7 May 2018 09:02:44 -0300
-Subject: [PATCH] arm64: dts: fsl-ls1012a: Fix DTC aliases warnings
-Message-ID: <1525694564-15203-1-git-send-email-festevam@gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon,  7 May 2018 20:29:39 +0800
+Subject: [PATCH v4 0/3] SY8106A regulator support and enable it on Orange Pi PC
+Message-ID: <20180507122942.25758-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+This patchset adds dt-bindings and driver for Silergy SY8106A, and then
+utilize it on the Orange Pi PC board, which uses SY8016A as its CPUX
+(main ARM CPU cluster in an Allwinner SoC) power supply.
 
-Use '-' instead of '_' to fix the following DTC warnings with W=1:
+The driver's functionality is restricted now, mainly {en,dis}able function
+is not yet implemented, as it cannot be debugged on Orange Pi PC
+(disable it will kill Linux).
 
-arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
+Ondrej Jirman (3):
+  dt-bindings: add binding for the SY8106A voltage regulator
+  regulator: add support for SY8106A regulator
+  ARM: dts: sun8i: h3: Add SY8106A regulator to Orange Pi PC
 
-Cc: Harninder Rai <harninder.rai@nxp.com>
-Cc: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-Cc: Li Yang <leoyang.li@nxp.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ .../bindings/regulator/sy8106a-regulator.txt  |  23 +++
+ MAINTAINERS                                   |   6 +
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts    |  28 +++
+ drivers/regulator/Kconfig                     |   7 +
+ drivers/regulator/Makefile                    |   2 +-
+ drivers/regulator/sy8106a-regulator.c         | 168 ++++++++++++++++++
+ 6 files changed, 233 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/regulator/sy8106a-regulator.txt
+ create mode 100644 drivers/regulator/sy8106a-regulator.c
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index bb788ed..205f0f4 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -53,11 +53,11 @@
- 
- 	aliases {
- 		crypto = &crypto;
--		rtic_a = &rtic_a;
--		rtic_b = &rtic_b;
--		rtic_c = &rtic_c;
--		rtic_d = &rtic_d;
--		sec_mon = &sec_mon;
-+		rtic-a = &rtic_a;
-+		rtic-b = &rtic_b;
-+		rtic-c = &rtic_c;
-+		rtic-d = &rtic_d;
-+		sec-mon = &sec_mon;
- 	};
- 
- 	cpus {
 -- 
-2.7.4
+2.17.0
