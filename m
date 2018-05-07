@@ -1,37 +1,36 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 7 May 2018 11:35:37 -0500
-Subject: [PATCH V2 8/8] dt-bindings: stm32: add compatible for syscon
-In-Reply-To: <1525270723-18241-9-git-send-email-christophe.roullier@st.com>
+Date: Mon, 7 May 2018 11:36:19 -0500
+Subject: [PATCH V2 4/8] ARM: dts: stm32: Add syscfg on stm32mp1
+In-Reply-To: <1525270723-18241-5-git-send-email-christophe.roullier@st.com>
 References: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
- <1525270723-18241-9-git-send-email-christophe.roullier@st.com>
-Message-ID: <20180507163537.GA15212@rob-hp-laptop>
+ <1525270723-18241-5-git-send-email-christophe.roullier@st.com>
+Message-ID: <20180507163619.GB15212@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 04:18:43PM +0200, Christophe Roullier wrote:
-> This patch describes syscon DT bindings.
+On Wed, May 02, 2018 at 04:18:39PM +0200, Christophe Roullier wrote:
+> System configuration controller is mainly used to manage
+> the compensation cell and other IOs and system related
+> settings.
 > 
 > Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
 > ---
->  Documentation/devicetree/bindings/arm/stm32.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/boot/dts/stm32mp157c.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
-> index 6808ed9..06e3834 100644
-> --- a/Documentation/devicetree/bindings/arm/stm32.txt
-> +++ b/Documentation/devicetree/bindings/arm/stm32.txt
-> @@ -8,3 +8,7 @@ using one of the following compatible strings:
->    st,stm32f746
->    st,stm32h743
->    st,stm32mp157
-> +
-> +Required nodes:
-> +- syscon: the soc bus node must have a system controller node pointing to the
-> +  global control registers, with the compatible string "syscon";
+> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+> index bc3eddc..86421ba 100644
+> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+> @@ -167,6 +167,11 @@
+>  			#reset-cells = <1>;
+>  		};
+>  
+> +		syscfg: system-config at 50020000 {
+> +			compatible = "syscon";
+> +			reg = <0x50020000 0x400>;
+> +		};
 
-You misunderstood my prior comment. 'syscon' alone is not valid. You 
-need SoC specific compatible string for it and 'stm32' is not SoC 
-specific. IOW, the compatible property for a syscon should imply every 
-single register field in the block.
+NAK as explained in the documentation patch.
 
 Rob
