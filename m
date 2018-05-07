@@ -1,22 +1,22 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 7 May 2018 11:08:35 -0300
-Subject: [PATCH 4/4] ARM: dts: i.MX6: imx6dl-mamoj: Add usb host and
- device support
-In-Reply-To: <20180425173932.7213-4-jagan@amarulasolutions.com>
-References: <20180425173932.7213-1-jagan@amarulasolutions.com>
- <20180425173932.7213-4-jagan@amarulasolutions.com>
-Message-ID: <CAOMZO5B5jwXiByfCm1aGY9+DHq7QOpq1hrbnD-DLMsqtpFWsrw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 7 May 2018 09:18:46 -0500
+Subject: [PATCH v3 10/14] dt-bindings: media: Document bindings for the
+ Sunxi-Cedrus VPU driver
+In-Reply-To: <20180507124500.20434-11-paul.kocialkowski@bootlin.com>
+References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+ <20180507124500.20434-11-paul.kocialkowski@bootlin.com>
+Message-ID: <20180507141846.GA1413@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 25, 2018 at 2:39 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> From: Michael Trimarchi <michael@amarulasolutions.com>
->
-> Add USB host and device support for BTicino i.MX6DL Mamoj board.
->
-> Signed-off-by: Simone CIANNI <simone.cianni@bticino.it>
-> Signed-off-by: Raffaele RECALCATI <raffaele.recalcati@bticino.it>
-> Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+On Mon, May 07, 2018 at 02:44:56PM +0200, Paul Kocialkowski wrote:
+> This adds a device-tree binding document that specifies the properties
+> used by the Sunxi-Cedurs VPU driver, as well as examples.
+> 
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+>  .../devicetree/bindings/media/sunxi-cedrus.txt     | 58 ++++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
