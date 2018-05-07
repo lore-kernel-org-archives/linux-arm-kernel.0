@@ -1,156 +1,53 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 7 May 2018 14:59:07 +0900
-Subject: [PATCH v9 04/11] arm64: kexec_file: allocate memory walking
- through memblock list
-In-Reply-To: <648656ef-1f1e-b0ac-581c-aba1e62f4eee@arm.com>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-5-takahiro.akashi@linaro.org>
- <648656ef-1f1e-b0ac-581c-aba1e62f4eee@arm.com>
-Message-ID: <20180507055906.GE11326@linaro.org>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Mon, 07 May 2018 06:13:27 +0000
+Subject: [PATCH v6 05/17] media: rkisp1: add Rockchip ISP1 subdev driver
+In-Reply-To: <20180503090909.o3dyhukzs2y7em5z@tarshish>
+References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
+ <20180308094807.9443-6-jacob-chen@iotwrt.com>
+ <20180503090909.o3dyhukzs2y7em5z@tarshish>
+Message-ID: <CAAFQd5CvBv4hkE=PSHBJTYa9Lj0SyggxpMBEAYD=if0=T0uzHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
+Hi Baruch,
 
-On Tue, May 01, 2018 at 06:46:09PM +0100, James Morse wrote:
-> Hi Akashi,
-> 
-> On 25/04/18 07:26, AKASHI Takahiro wrote:
-> > We need to prevent firmware-reserved memory regions, particularly EFI
-> > memory map as well as ACPI tables, from being corrupted by loading
-> > kernel/initrd (or other kexec buffers). We also want to support memory
-> > allocation in top-down manner in addition to default bottom-up.
-> > So let's have arm64 specific arch_kexec_walk_mem() which will search
-> > for available memory ranges in usable memblock list,
-> > i.e. !NOMAP & !reserved, 
-> 
-> > instead of system resource tree.
-> 
-> Didn't we try to fix the system-resource-tree in order to fix regular-kexec to
-> be safe in the EFI-memory-map/ACPI-tables case?
-> 
-> It would be good to avoid having two ways of doing this, and I would like to
-> avoid having extra arch code...
+On Thu, May 3, 2018 at 6:09 PM Baruch Siach <baruch@tkos.co.il> wrote:
 
-I know what you mean.
-/proc/iomem or system resource is, in my opinion, not the best place to
-describe memory usage of kernel but rather to describe *physical* hardware
-layout. As we are still discussing about "reserved" memory, I don't want
-to depend on it.
-Along with memblock list, we will have more accurate control over memory
-usage.
+> Hi Jacob,
 
-> 
-> > diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-> > new file mode 100644
-> > index 000000000000..f9ebf54ca247
-> > --- /dev/null
-> > +++ b/arch/arm64/kernel/machine_kexec_file.c
-> > @@ -0,0 +1,57 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * kexec_file for arm64
-> > + *
-> > + * Copyright (C) 2018 Linaro Limited
-> > + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > + *
-> 
-> > + * Most code is derived from arm64 port of kexec-tools
-> 
-> How does kexec-tools walk memblock?
-
-Will remove this comment from this patch.
-Obviously, this comment is for the rest of the code which will be
-added to succeeding patches (patch #5 and #7).
-
-
-> 
-> > + */
-> > +
-> > +#define pr_fmt(fmt) "kexec_file: " fmt
-> > +
-> > +#include <linux/ioport.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/kexec.h>
-> > +#include <linux/memblock.h>
-> > +
-> > +int arch_kexec_walk_mem(struct kexec_buf *kbuf,
-> > +				int (*func)(struct resource *, void *))
+> On Thu, Mar 08, 2018 at 05:47:55PM +0800, Jacob Chen wrote:
+> > +static int rkisp1_isp_sd_s_power(struct v4l2_subdev *sd, int on)
 > > +{
-> > +	phys_addr_t start, end;
-> > +	struct resource res;
-> > +	u64 i;
-> > +	int ret = 0;
+> > +     struct rkisp1_device *isp_dev = sd_to_isp_dev(sd);
+> > +     int ret;
 > > +
-> > +	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-> > +		return func(&crashk_res, kbuf);
+> > +     v4l2_dbg(1, rkisp1_debug, &isp_dev->v4l2_dev, "s_power: %d\n",
+on);
 > > +
-> > +	if (kbuf->top_down)
-> > +		for_each_mem_range_rev(i, &memblock.memory, &memblock.reserved,
-> > +				NUMA_NO_NODE, MEMBLOCK_NONE,
-> > +				&start, &end, NULL) {
-> 
-> for_each_free_mem_range_reverse() is a more readable version of this helper.
-
-OK. I used to use my own limited list of reserved memory instead of
-memblock.reserved here to exclude verbose ranges.
-
-
-> > +			if (!memblock_is_map_memory(start))
-> > +				continue;
-> 
-> Passing MEMBLOCK_NONE means this walk will never find MEMBLOCK_NOMAP memory.
-
-Sure, I confirmed it.
-
-> 
-> > +			res.start = start;
-> > +			res.end = end;
-> > +			ret = func(&res, kbuf);
-> > +			if (ret)
-> > +				break;
-> > +		}
-> > +	else
-> > +		for_each_mem_range(i, &memblock.memory, &memblock.reserved,
-> > +				NUMA_NO_NODE, MEMBLOCK_NONE,
-> > +				&start, &end, NULL) {
-> 
-> for_each_free_mem_range()?
-
-OK.
-
-> > +			if (!memblock_is_map_memory(start))
-> > +				continue;
+> > +     if (on) {
+> > +             ret = pm_runtime_get_sync(isp_dev->dev);
+> > +             if (ret < 0)
+> > +                     return ret;
 > > +
-> > +			res.start = start;
-> > +			res.end = end;
-> > +			ret = func(&res, kbuf);
-> > +			if (ret)
-> > +				break;
-> > +		}
-> > +
-> > +	return ret;
-> > +}
-> > 
-> 
-> With these changes, what we have is almost:
-> arch/powerpc/kernel/machine_kexec_file_64.c::arch_kexec_walk_mem() !
-> (the difference being powerpc doesn't yet support crash-kernels here)
-> 
-> If the argument is walking memblock gives a better answer than the stringy
-> walk_system_ram_res() thing, is there any mileage in moving this code into
-> kexec_file.c, and using it if !IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK)?
-> 
-> This would save arm64/powerpc having near-identical implementations.
-> 32bit arm keeps memblock if it has kexec, so it may be useful there too if
-> kexec_file_load() support is added.
+> > +             rkisp1_config_clk(isp_dev);
+> > +     } else {
+> > +             ret = pm_runtime_put(isp_dev->dev);
 
-Thanks. I've forgot ppc.
+> I commented this line out to make more than one STREAMON work. Otherwise,
+the
+> second STREAMON hangs. I guess the bug is not this driver. Probably
+something
+> in drivers/soc/rockchip/pm_domains.c. Just noting that in case you or
+someone
+> on Cc would like to investigate it further.
 
--Takahiro AKASHI
+> I tested v4.16-rc4 on the Tinkerboard.
 
+Looks like that version doesn't include the IOMMU PM and clock handling
+rework [1], which should fix a lot of runtime PM issues. FWIW, linux-next
+seems to already include it.
 
-> 
-> Thanks,
-> 
-> James
+[1] https://lkml.org/lkml/2018/3/23/44
+
+Best regards,
+Tomasz
