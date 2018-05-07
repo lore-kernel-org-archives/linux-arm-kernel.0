@@ -1,144 +1,115 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 7 May 2018 15:43:01 +0200
-Subject: [PATCH v2 26/26] drm/bridge: establish a link between the bridge
- supplier and consumer
-In-Reply-To: <4cdcd215-8caf-e045-a478-f438f128c9f2@samsung.com>
-References: <20180504135212.26977-1-peda@axentia.se>
- <CGME20180504135358epcas3p2bd9c2f5c9a8295152f2c96fdbb2ea8b1@epcas3p2.samsung.com>
- <20180504135212.26977-27-peda@axentia.se>
- <4cdcd215-8caf-e045-a478-f438f128c9f2@samsung.com>
-Message-ID: <9751c1c5-f2fa-f24e-64f3-71019f253332@axentia.se>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 7 May 2018 15:46:02 +0200
+Subject: [PATCH 00/13] drm/kms/mode: using helper func
+ drm_display_mode_to/from_videomode for calculating timing parameters
+In-Reply-To: <cover.1525087679.git.satendra.t@samsung.com>
+References: <CGME20180503082417epcas5p19ee919d68eb5ae18f183a41881869cc1@epcas5p1.samsung.com>
+ <cover.1525087679.git.satendra.t@samsung.com>
+Message-ID: <20180507134602.GH12521@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-07 14:59, Andrzej Hajda wrote:
-> On 04.05.2018 15:52, Peter Rosin wrote:
->> If the bridge supplier is unbound, this will bring the bridge consumer
->> down along with the bridge. Thus, there will no longer linger any
->> dangling pointers from the bridge consumer (the drm_device) to some
->> non-existent bridge supplier.
+On Thu, May 03, 2018 at 01:53:55PM +0530, Satendra Singh Thakur wrote:
+> 1.There is a function in drm-core to calculate display timing parameters:
+> horizontal front porch, back porch, sync length,
+> vertical front porch, back porch, sync length and
+> clock in Hz.
+> However, some drivers are still calculating these parameters themselves.
+> Therefore, there is a duplication of the code.
+> This patch series replaces this redundant code with the function
+> drm_display_mode_to_videomode.
+> This removes nearly 100 redundant lines from the related drivers.
+> 2.For some drivers (sun4i) the reverse helper
+> drm_display_mode_from_videomode is used.
+> 3.For some drivers it replaces arithmatic operators (*, /) with shifting
+> operators (>>, <<).
+> 4.For some drivers DRM_MODE_FLAG_* are replaced with DISPLAY_FLAGS_* flags.
+> 5.These changes apply to following crtc and encoder drivers:
+> atmel-hlcdc
+> bridge-tc358767
+> exynos-dsi
+> fsl-dcu
+> gma500-mdfld_dsi_dpi
+> hisilicon-kirin_dsi, ade
+> meson-encoder
+> pl111-display
+> sun4i-tv
+> ti lcdc
+> tegra dc
+> mediatek dpi dsi
+> bridge-adv7533
+
+The drm_mode_to_videomode helper is meant for interop between drm and v4l,
+which have different internal structures to represent modes.
+
+For drivers that only use drm I think the better option would be to add
+these fields to struct drm_display_mode as another set of crtc_* values
+(the computed values are stored in crtc_ prefixed members). And compute
+front/back porch in drm_mode_set_crtcinfo.
+
+Then we can use these new drm_display_mode->crtc_h|vfront|back_porch
+fields in all the drivers you're changing. This way you avoid having to
+change all the drm drivers to use v4l #defines.
+
+Thanks,
+Daniel
+
 > 
-> I understand rationales behind this patch, but it is another step into
-> making drm_dev one big driver with subcomponents, where drm will work
-> only if every subcomponent is working/loaded.
-
-The step is very small IMHO. Just a device-link, which is very easy to
-remove once whatever other solution is ready.
-
->                                               Do we need to go this way?
-
-If the drivers expect the parts to be there, and there is no other safety
-net in place if they are not, what is the (short-term) alternative?
-
-> In case of many platforms such approach results in display turned on
-> very late on boot for example due to late initialization of some
-> regulator exposed by some i2c device, which is used by hdmi bridge. And
-> this hdmi bridge is just to provide alternative(rarely used) display
-> path, the main display path would work anyway.
-
-This patch does not contribute to any late init and any such delay is not
-affected by this. At all.
-
-> So the main question to drm maintainers is about evolution of bridges,
-> if drm_bridges should become mandatory components of drm device or they
-> could be added/removed dynamically?
-
-That is a much bigger question than this patch/series. Conflating the
-two is not fair IMHO. You could run this very same argument for every
-driver that gets added, since any additional driver will just make it
-harder to make everything dynamic. Should we stop development right
-away?
-
-Besides, as long as the drm devices are in fact acting as big static
-drivers (built from smaller parts), this should be considered a bug-fix
-that will prevent dereference of stale pointers.
-
-Or will some other solution appear and magically make all bridges and
-drm drivers capable of dynamic reconfiguration in the next few weeks?
-Yeah, right...
-
-Cheers,
-Peter
-
-> Regards
-> Andrzej
+> Satendra Singh Thakur (13):
+>   drm/kms/mode/atmel-hlcdc: using helper func
+>     drm_display_mode_to_videomode for calculating timing parameters
+>   drm/kms/mode/bridge-tc358767: using helper func
+>     drm_display_mode_to_videomode for calculating timing parameters
+>   drm/kms/mode/exynos-dsi: using helper func
+>     drm_display_mode_to_videomode for calculating timing parameters
+>   drm/kms/mode/fsl-dcu: using helper func drm_display_mode_to_videomode 
+>        for calculating timing parameters
+>   drm/kms/mode/gma500-mdfld_dsi_dpi: using helper function
+>     drm_display_mode_to_videomode for calculating timing parameters
+>   drm/kms/mode/hisilicon-kirin-dsi-ade: using helper function    
+>     drm_display_mode_to_videomode for calculating timing parameters
+>   drm/kms/mode/meson-encoder: using helper function
+>     drm_display_mode_to_videomode for calculating timing parameters
+>   drm/kms/mode/pl111-display: using helper function
+>     drm_display_mode_to_videomode for calculating timing parameters
+>   drm/kms/mode/sun4i-tv: using helper func
+>     drm_display_mode_from_videomode for calculating timing
+>     parameters
+>   drm/kms/mode/ti-lcdc: using helper func drm_display_mode_to_videomode 
+>        for calculating timing parameters
+>   drm/kms/mode/tegra: using helper func drm_display_mode_to_videomode
+>     for calculating timing parameters
+>   drm/kms/mode/mtk_dpi_dsi: using helper func
+>     drm_display_mode_to_videomode for calculating timing parameters
+>   drm/kms/mode/bridge-adv7533: using helper func
+>     drm_display_mode_to_videomode for calculating timing parameters
 > 
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c    |  28 +++--
+>  drivers/gpu/drm/bridge/adv7511/adv7533.c        |  35 +++---
+>  drivers/gpu/drm/bridge/tc358767.c               |  42 +++----
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c         |   9 +-
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c      |  29 ++---
+>  drivers/gpu/drm/gma500/mdfld_dsi_dpi.c          |  28 ++---
+>  drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c    |  42 ++++---
+>  drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c |  52 +++------
+>  drivers/gpu/drm/mediatek/mtk_dpi.c              |  60 +++++-----
+>  drivers/gpu/drm/mediatek/mtk_dsi.c              |  14 +--
+>  drivers/gpu/drm/meson/meson_venc.c              | 149 +++++++++++-------------
+>  drivers/gpu/drm/pl111/pl111_display.c           |  40 +++----
+>  drivers/gpu/drm/sun4i/sun4i_tv.c                |  67 ++++-------
+>  drivers/gpu/drm/tegra/dc.c                      |  15 ++-
+>  drivers/gpu/drm/tilcdc/tilcdc_crtc.c            |  60 +++++-----
+>  15 files changed, 280 insertions(+), 390 deletions(-)
 > 
->>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>  drivers/gpu/drm/drm_bridge.c | 18 ++++++++++++++++++
->>  include/drm/drm_bridge.h     |  2 ++
->>  2 files changed, 20 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
->> index 78d186b6831b..0259f0a3ff27 100644
->> --- a/drivers/gpu/drm/drm_bridge.c
->> +++ b/drivers/gpu/drm/drm_bridge.c
->> @@ -26,6 +26,7 @@
->>  #include <linux/mutex.h>
->>  
->>  #include <drm/drm_bridge.h>
->> +#include <drm/drm_device.h>
->>  #include <drm/drm_encoder.h>
->>  
->>  #include "drm_crtc_internal.h"
->> @@ -127,12 +128,25 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
->>  	if (bridge->dev)
->>  		return -EBUSY;
->>  
->> +	if (encoder->dev->dev != bridge->odev) {
->> +		bridge->link = device_link_add(encoder->dev->dev,
->> +					       bridge->odev, 0);
->> +		if (!bridge->link) {
->> +			dev_err(bridge->odev, "failed to link bridge to %s\n",
->> +				dev_name(encoder->dev->dev));
->> +			return -EINVAL;
->> +		}
->> +	}
->> +
->>  	bridge->dev = encoder->dev;
->>  	bridge->encoder = encoder;
->>  
->>  	if (bridge->funcs->attach) {
->>  		ret = bridge->funcs->attach(bridge);
->>  		if (ret < 0) {
->> +			if (bridge->link)
->> +				device_link_del(bridge->link);
->> +			bridge->link = NULL;
->>  			bridge->dev = NULL;
->>  			bridge->encoder = NULL;
->>  			return ret;
->> @@ -159,6 +173,10 @@ void drm_bridge_detach(struct drm_bridge *bridge)
->>  	if (bridge->funcs->detach)
->>  		bridge->funcs->detach(bridge);
->>  
->> +	if (bridge->link)
->> +		device_link_del(bridge->link);
->> +	bridge->link = NULL;
->> +
->>  	bridge->dev = NULL;
->>  }
->>  
->> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
->> index b656e505d11e..804189c63a4c 100644
->> --- a/include/drm/drm_bridge.h
->> +++ b/include/drm/drm_bridge.h
->> @@ -261,6 +261,7 @@ struct drm_bridge_timings {
->>   * @list: to keep track of all added bridges
->>   * @timings: the timing specification for the bridge, if any (may
->>   * be NULL)
->> + * @link: drm consumer <-> bridge supplier
->>   * @funcs: control functions
->>   * @driver_private: pointer to the bridge driver's internal context
->>   */
->> @@ -271,6 +272,7 @@ struct drm_bridge {
->>  	struct drm_bridge *next;
->>  	struct list_head list;
->>  	const struct drm_bridge_timings *timings;
->> +	struct device_link *link;
->>  
->>  	const struct drm_bridge_funcs *funcs;
->>  	void *driver_private;
+> -- 
+> 2.7.4
 > 
-> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
