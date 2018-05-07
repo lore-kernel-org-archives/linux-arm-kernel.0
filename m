@@ -1,82 +1,61 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Mon, 7 May 2018 11:27:10 +0200
-Subject: [PATCH v2] tty: implement led triggers
-In-Reply-To: <20180507084127.ekpd3ze2itkzo7fd@pengutronix.de>
-References: <0c1bb915-bd92-4433-61ec-78fdba453396@arm.com>
- <20180503201952.16592-1-u.kleine-koenig@pengutronix.de>
- <20180507080252.GO2285@localhost>
- <20180507084127.ekpd3ze2itkzo7fd@pengutronix.de>
-Message-ID: <20180507092710.GQ2285@localhost>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 7 May 2018 11:33:32 +0200
+Subject: [PATCH v2 03/13] drm/kms/mode/exynos-dsi: using helper func
+ drm_display_mode_to_videomode for calculating timing parameters
+In-Reply-To: <1525663938-4172-1-git-send-email-satendra.t@samsung.com>
+References: <920ac8d1-8d2d-1332-256d-21472f69fca5@arm.com>
+ <CGME20180507033238epcas5p2601b5ccbba8fa02cdde4f1375e90abe9@epcas5p2.samsung.com>
+ <1525663938-4172-1-git-send-email-satendra.t@samsung.com>
+Message-ID: <000252e2-af94-f0af-d943-0c28aedc91f5@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2018 at 10:41:27AM +0200, Uwe Kleine-K?nig wrote:
-> Hello Johan,
-> 
-> thanks for your feedback.
-> 
-> On Mon, May 07, 2018 at 10:02:52AM +0200, Johan Hovold wrote:
-> > On Thu, May 03, 2018 at 10:19:52PM +0200, Uwe Kleine-K?nig wrote:
-> > > The rx trigger fires when data is pushed to the ldisc. This is a bit later
-> > > than the actual receiving of data but has the nice benefit that it
-> > > doesn't need adaption for each driver and isn't in the hot path.
-> > > 
-> > > Similarily the tx trigger fires when data taken from the ldisc.
-> > 
-> > You meant copied from user space, or written to the ldisc, here.
-> 
-> ack.
-> 
-> > Note that the rx-path is shared with serdev, but the write path is not.
-> > So with this series, serdev devices would only trigger the rx-led.
-> 
-> Where would be the right place to put the tx trigger to catch serdev,
-> too?
+Hi Satendra Singh Thakur,
 
-I haven't given this much thought, but do we really want this for serdev
-at all? I'm thinking whatever driver or subsystem is using serdev should
-have their own triggers (e.g. bluetooth or net).
+On 07.05.2018 05:32, Satendra Singh Thakur wrote:
+> To avoid duplicate logic for the same
+>
+> Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
+> Acked-by: Madhur Verma <madhur.verma@samsung.com>
+> Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
 
-So it might be better to move the rx-blinking to the default tty-port
-client receive_buf callback instead (i.e.
-tty_port_default_receive_buf()).
+Whole exynos_dsi_mode_set callback is redundant, so I have posted patch
+removing it [1], so this patch can be dropped.
 
-And then the resource allocations would need to go after the serdev
-registration in tty_port_register_device_attr_serdev().
+[1]: https://marc.info/?l=dri-devel&m=152568538400712
 
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > ---
-> > > Changes since v1, sent with Message-Id: 
-> > > 20180503100448.1350-1-u.kleine-koenig at pengutronix.de:
-> > > 
-> > >  - implement tx trigger;
-> > >  - introduce Kconfig symbol for conditional compilation;
-> > >  - set trigger to NULL if allocating the name failed to not free random
-> > >    pointers in case the port struct wasn't zeroed;
-> > >  - use if/else instead of goto
-> > 
-> > > @@ -499,6 +500,7 @@ static void flush_to_ldisc(struct work_struct *work)
-> > >  		struct tty_buffer *head = buf->head;
-> > >  		struct tty_buffer *next;
-> > >  		int count;
-> > > +		unsigned long delay = 50 /* ms */;
-> > 
-> > Comment after the semicolon?
-> 
-> Given that this comment is about the 50 and not the delay member, I
-> prefer it before the ;.
 
-Hmm. I personally find it hard to read and can only find about 30
-instances of this comment style (for assignments) in the kernel. And
-arguably the comment applies equally well to the delay variable in this
-case too.
+Regards
+Andrzej
 
-> > Besides the ugly ifdefs here, you're leaking the above LED resources in
-> > the error paths below (e.g. on probe deferrals).
-
-> ack, the ifdevs are ugly. I'm working on an idea to get rid of them.
-
-Sounds good.
-
-Thanks,
-Johan
+> ---
+>
+>  v2: Removed Mr Robin from reviewed-by field	
+>
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 13 ++-----------
+>  1 file changed, 2 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> index 7904ffa..7fe84fd 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> @@ -1490,17 +1490,8 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
+>  				struct drm_display_mode *adjusted_mode)
+>  {
+>  	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+> -	struct videomode *vm = &dsi->vm;
+> -	struct drm_display_mode *m = adjusted_mode;
+> -
+> -	vm->hactive = m->hdisplay;
+> -	vm->vactive = m->vdisplay;
+> -	vm->vfront_porch = m->vsync_start - m->vdisplay;
+> -	vm->vback_porch = m->vtotal - m->vsync_end;
+> -	vm->vsync_len = m->vsync_end - m->vsync_start;
+> -	vm->hfront_porch = m->hsync_start - m->hdisplay;
+> -	vm->hback_porch = m->htotal - m->hsync_end;
+> -	vm->hsync_len = m->hsync_end - m->hsync_start;
+> +
+> +	drm_display_mode_to_videomode(adjusted_mode, &dsi->vm);
+>  }
+>  
+>  static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
