@@ -1,118 +1,154 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 7 May 2018 14:22:09 +0900
-Subject: [PATCH v9 03/11] arm64: kexec_file: invoke the kernel without
- purgatory
-In-Reply-To: <9c830fe8-56d8-b43a-6265-43d31dffe61a@arm.com>
+Date: Mon, 7 May 2018 14:59:07 +0900
+Subject: [PATCH v9 04/11] arm64: kexec_file: allocate memory walking
+ through memblock list
+In-Reply-To: <648656ef-1f1e-b0ac-581c-aba1e62f4eee@arm.com>
 References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-4-takahiro.akashi@linaro.org>
- <9c830fe8-56d8-b43a-6265-43d31dffe61a@arm.com>
-Message-ID: <20180507052208.GD11326@linaro.org>
+ <20180425062629.29404-5-takahiro.akashi@linaro.org>
+ <648656ef-1f1e-b0ac-581c-aba1e62f4eee@arm.com>
+Message-ID: <20180507055906.GE11326@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 06:46:06PM +0100, James Morse wrote:
+James,
+
+On Tue, May 01, 2018 at 06:46:09PM +0100, James Morse wrote:
 > Hi Akashi,
 > 
 > On 25/04/18 07:26, AKASHI Takahiro wrote:
-> > On arm64, purugatory would do almosty nothing. So just invoke secondary
-> > kernel directy by jumping into its entry code.
+> > We need to prevent firmware-reserved memory regions, particularly EFI
+> > memory map as well as ACPI tables, from being corrupted by loading
+> > kernel/initrd (or other kexec buffers). We also want to support memory
+> > allocation in top-down manner in addition to default bottom-up.
+> > So let's have arm64 specific arch_kexec_walk_mem() which will search
+> > for available memory ranges in usable memblock list,
+> > i.e. !NOMAP & !reserved, 
 > 
-> (Nits: purgatory, almost, directly)
+> > instead of system resource tree.
+> 
+> Didn't we try to fix the system-resource-tree in order to fix regular-kexec to
+> be safe in the EFI-memory-map/ACPI-tables case?
+> 
+> It would be good to avoid having two ways of doing this, and I would like to
+> avoid having extra arch code...
 
-Oops, I think I ran spell before ...
-
-> 
-> > While, in this case, cpu_soft_restart() must be called with dtb address
-> > in the fifth argument, the behavior still stays compatible with kexec_load
-> > case as long as the argument is null.
-> 
-> 
-> > diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-> > index 8021b46c9743..391df91328ac 100644
-> > --- a/arch/arm64/kernel/cpu-reset.S
-> > +++ b/arch/arm64/kernel/cpu-reset.S
-> > @@ -24,9 +24,9 @@
-> >   *
-> >   * @el2_switch: Flag to indicate a swich to EL2 is needed.
-> 
-> (Nit: switch)
-
-ditto
-
-> >   * @entry: Location to jump to for soft reset.
-> > - * arg0: First argument passed to @entry.
-> > - * arg1: Second argument passed to @entry.
-> > - * arg2: Third argument passed to @entry.
-> > + * arg0: First argument passed to @entry. (relocation list)
-> > + * arg1: Second argument passed to @entry.(physcal kernel entry)
-> 
-> (Nit: physical)
-
-ditto
-> 
-> > + * arg2: Third argument passed to @entry. (physical dtb address)
-> >   *
-> >   * Put the CPU into the same state as it would be if it had been reset, and
-> >   * branch to what would be the reset vector. It must be executed with the
-> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> > index f76ea92dff91..f7dbba00be10 100644
-> > --- a/arch/arm64/kernel/machine_kexec.c
-> > +++ b/arch/arm64/kernel/machine_kexec.c
-> > @@ -205,10 +205,17 @@ void machine_kexec(struct kimage *kimage)
-> >  	 * uses physical addressing to relocate the new image to its final
-> >  	 * position and transfers control to the image entry point when the
-> >  	 * relocation is complete.
-> > +	 * In case of kexec_file_load syscall, we directly start the kernel,
-> > +	 * skipping purgatory.
-> 
-> We're not really skipping purgatory, purgatory doesn't exist! For regular kexec
-> the image/payload we run is up to kexec-tools. For kexec_file_load its a
-> kernel-image. Purgatory is a kexec-tools-ism.
-
-You are right, but in general, purgatory is expected to exist by
-generic kexec code and does exist on all architectures,  kexec_load()
-or kexec_file_load(), except arm64's kexec_file_load case.
-So it would be nice to have some explicit notes here.
+I know what you mean.
+/proc/iomem or system resource is, in my opinion, not the best place to
+describe memory usage of kernel but rather to describe *physical* hardware
+layout. As we are still discussing about "reserved" memory, I don't want
+to depend on it.
+Along with memblock list, we will have more accurate control over memory
+usage.
 
 > 
-> >  	cpu_soft_restart(kimage != kexec_crash_image,
-> > -		reboot_code_buffer_phys, kimage->head, kimage->start, 0);
-> > +		reboot_code_buffer_phys, kimage->head, kimage->start,
-> > +#ifdef CONFIG_KEXEC_FILE
-> > +				kimage->purgatory_info.purgatory_buf ?
-> > +						0 : kimage->arch.dtb_mem);
-> > +#else
-> > +				0);
-> > +#endif
+> > diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+> > new file mode 100644
+> > index 000000000000..f9ebf54ca247
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/machine_kexec_file.c
+> > @@ -0,0 +1,57 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * kexec_file for arm64
+> > + *
+> > + * Copyright (C) 2018 Linaro Limited
+> > + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > + *
 > 
-> Where does kimage->arch.dtb_mem come from? This patch won't build until patch 8
-> adds the config option, which is going to make bisecting any kexec side-effects
-> tricky.
-
-CONFIG_KEXEC_FILE is also used in patch #4, #5 and #6.
-I don't know how we can fix this as the implementation is divided
-into several patches.
-(So bisecting doesn't work anyway.)
-
-> purgatory_buf seems to only be set in kexec_purgatory_setup_kbuf(), called from
-> kexec_load_purgatory(), which we don't use. How does this get a value?
+> > + * Most code is derived from arm64 port of kexec-tools
 > 
-> Would it be better to always use kimage->arch.dtb_mem, and ensure that is 0 for
-> regular kexec (as we can't know where the dtb is)? (image_arg may then be a
-> better name).
+> How does kexec-tools walk memblock?
 
-The problem is arch.dtb_mem is currently defined only if CONFIG_KEXEC_FILE.
-So I would like to
-- merge this patch with patch#8
-- change the condition
-        #ifdef CONFIG_KEXEC_FILE
-       				kimage->file_mode ? kimage->arch.dtb_mem : 0);
-        #else
-        			0);
-        #endif
+Will remove this comment from this patch.
+Obviously, this comment is for the rest of the code which will be
+added to succeeding patches (patch #5 and #7).
 
-Thanks,
+
+> 
+> > + */
+> > +
+> > +#define pr_fmt(fmt) "kexec_file: " fmt
+> > +
+> > +#include <linux/ioport.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/kexec.h>
+> > +#include <linux/memblock.h>
+> > +
+> > +int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> > +				int (*func)(struct resource *, void *))
+> > +{
+> > +	phys_addr_t start, end;
+> > +	struct resource res;
+> > +	u64 i;
+> > +	int ret = 0;
+> > +
+> > +	if (kbuf->image->type == KEXEC_TYPE_CRASH)
+> > +		return func(&crashk_res, kbuf);
+> > +
+> > +	if (kbuf->top_down)
+> > +		for_each_mem_range_rev(i, &memblock.memory, &memblock.reserved,
+> > +				NUMA_NO_NODE, MEMBLOCK_NONE,
+> > +				&start, &end, NULL) {
+> 
+> for_each_free_mem_range_reverse() is a more readable version of this helper.
+
+OK. I used to use my own limited list of reserved memory instead of
+memblock.reserved here to exclude verbose ranges.
+
+
+> > +			if (!memblock_is_map_memory(start))
+> > +				continue;
+> 
+> Passing MEMBLOCK_NONE means this walk will never find MEMBLOCK_NOMAP memory.
+
+Sure, I confirmed it.
+
+> 
+> > +			res.start = start;
+> > +			res.end = end;
+> > +			ret = func(&res, kbuf);
+> > +			if (ret)
+> > +				break;
+> > +		}
+> > +	else
+> > +		for_each_mem_range(i, &memblock.memory, &memblock.reserved,
+> > +				NUMA_NO_NODE, MEMBLOCK_NONE,
+> > +				&start, &end, NULL) {
+> 
+> for_each_free_mem_range()?
+
+OK.
+
+> > +			if (!memblock_is_map_memory(start))
+> > +				continue;
+> > +
+> > +			res.start = start;
+> > +			res.end = end;
+> > +			ret = func(&res, kbuf);
+> > +			if (ret)
+> > +				break;
+> > +		}
+> > +
+> > +	return ret;
+> > +}
+> > 
+> 
+> With these changes, what we have is almost:
+> arch/powerpc/kernel/machine_kexec_file_64.c::arch_kexec_walk_mem() !
+> (the difference being powerpc doesn't yet support crash-kernels here)
+> 
+> If the argument is walking memblock gives a better answer than the stringy
+> walk_system_ram_res() thing, is there any mileage in moving this code into
+> kexec_file.c, and using it if !IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK)?
+> 
+> This would save arm64/powerpc having near-identical implementations.
+> 32bit arm keeps memblock if it has kexec, so it may be useful there too if
+> kexec_file_load() support is added.
+
+Thanks. I've forgot ppc.
+
 -Takahiro AKASHI
+
 
 > 
 > Thanks,
