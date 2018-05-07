@@ -1,59 +1,67 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 7 May 2018 20:51:14 +0530
-Subject: [PATCH v2 1/2] clk: davinci: pll-dm355: fix SYSCLKn parent names
-In-Reply-To: <20180507144307.32364-1-david@lechnology.com>
-References: <20180507144307.32364-1-david@lechnology.com>
-Message-ID: <5805f462-0cb5-3024-f5af-941db8a46895@ti.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon,  7 May 2018 23:18:14 +0800
+Subject: [PATCH 2/5] dt-bindings: usb: add binding for the DWC3 controller on
+ Allwinner SoC
+In-Reply-To: <20180507151817.55663-1-icenowy@aosc.io>
+References: <20180507151817.55663-1-icenowy@aosc.io>
+Message-ID: <20180507151817.55663-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 May 2018 08:13 PM, David Lechner wrote:
-> This fixes the parent clock names of the SYSCLKn clocks for the DM355
-> SoC in the TI DaVinici PLL clock driver.
-> 
-> It appears that this name just didn't get updated to the correct name
-> like the other SoCs during the driver's development.
-> 
-> Reported-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
-> 
-> v2 changes:
-> - add second patch to fix additional problems with DM355
-> 
->  drivers/clk/davinci/pll-dm355.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/clk/davinci/pll-dm355.c b/drivers/clk/davinci/pll-dm355.c
-> index 5345f8286c50..1f746d2fc894 100644
-> --- a/drivers/clk/davinci/pll-dm355.c
-> +++ b/drivers/clk/davinci/pll-dm355.c
-> @@ -22,10 +22,10 @@ static const struct davinci_pll_clk_info dm355_pll1_info = {
->  		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
->  };
->  
-> -SYSCLK(1, pll1_sysclk1, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> -SYSCLK(2, pll1_sysclk2, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> -SYSCLK(3, pll1_sysclk3, pll1, 5, SYSCLK_ALWAYS_ENABLED);
-> -SYSCLK(4, pll1_sysclk4, pll1, 5, SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(1, pll1_sysclk1, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(2, pll1_sysclk2, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(3, pll1_sysclk3, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(4, pll1_sysclk4, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
->  
->  int dm355_pll1_init(struct device *dev, void __iomem *base)
->  {
-> @@ -62,8 +62,8 @@ static const struct davinci_pll_clk_info dm355_pll2_info = {
->  		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
->  };
->  
-> -SYSCLK(1, pll2_sysclk1, pll2, 5, SYSCLK_FIXED_DIV);
-> -SYSCLK(2, pll2_sysclk2, pll2, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-> +SYSCLK(1, pll2_sysclk1, pll2_pllen, 5, SYSCLK_FIXED_DIV);
-> +SYSCLK(2, pll2_sysclk2, pll2_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+The Allwinner H6 SoC uses DWC3 controller for USB3.
 
-Good find with PLL2 SYSCLK2. Can you reverse the patch order so we are
-not fixing up a non-existent clock?
+Add its device tree binding document.
 
-Thanks,
-Sekhar
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ .../bindings/usb/allwinner,dwc3.txt           | 39 +++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/allwinner,dwc3.txt
+
+diff --git a/Documentation/devicetree/bindings/usb/allwinner,dwc3.txt b/Documentation/devicetree/bindings/usb/allwinner,dwc3.txt
+new file mode 100644
+index 000000000000..3f7714636785
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/allwinner,dwc3.txt
+@@ -0,0 +1,39 @@
++Allwinner SuperSpeed DWC3 USB SoC controller
++
++Required properties:
++- compatible:	should contain "allwinner,sun50i-h6-dwc3" for H6 SoC
++- clocks:	A list of phandle + clock-specifier pairs for the
++		clocks listed in clock-names
++- clock-names:	Should contain the following:
++  "bus"		The bus clock of the DWC3 part
++- resets:	A list of phandle + reset-specifier pairs for the
++		resets listed in reset-names
++- reset-names:	Should contain the following:
++  "bus"		The bus reset of the DWC3 part
++
++Required child node:
++A child node must exist to represent the core DWC3 IP block. The name of
++the node is not important. The content of the node is defined in dwc3.txt.
++
++Phy documentation is provided in the following places:
++Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
++
++Example device nodes:
++	usb3: usb at 5200000 {
++		compatible = "allwinner,sun50i-h6-dwc3";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		clocks = <&ccu CLK_BUS_XHCI>;
++		clock-names = "bus";
++		resets = <&ccu RST_BUS_XHCI>;
++		reset-names = "bus";
++
++		dwc3: dwc3 {
++			compatible = "snps,dwc3";
++			reg = <0x5200000 0x10000>;
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++			phys = <&usb3phy>;
++			phy-names = "usb3-phy";
++		};
++	};
+-- 
+2.17.0
