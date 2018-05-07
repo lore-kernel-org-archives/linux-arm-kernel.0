@@ -1,72 +1,21 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Mon, 7 May 2018 15:50:38 -0500
-Subject: [PATCHv2 3/3] arm64: dts: stratix10: add sdram ecc
-In-Reply-To: <20180507165943.GE733@pd.tnic>
-References: <1524854238-19394-1-git-send-email-thor.thayer@linux.intel.com>
- <1524854238-19394-4-git-send-email-thor.thayer@linux.intel.com>
- <20180507165943.GE733@pd.tnic>
-Message-ID: <CADhT+weyJFhMyPbVt0n2EVe7OpeHHLjhxjw7aY2_8GBZ-7h7Xg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 7 May 2018 15:51:51 -0500
+Subject: [PATCH] iio: adc: stm32-dfsdm: Add support for stm32mp1
+In-Reply-To: <1525266323-4922-1-git-send-email-fabrice.gasnier@st.com>
+References: <1525266323-4922-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180507205151.GA25321@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 7, 2018 at 11:59 AM, Borislav Petkov <bp@alien8.de> wrote:
-> On Fri, Apr 27, 2018 at 01:37:18PM -0500, thor.thayer at linux.intel.com wrote:
->> From: Thor Thayer <thor.thayer@linux.intel.com>
->>
->> Add the Stratix10 ECC Manager and SDRAM EDAC nodes to the
->> device tree.
->>
->> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
->> ---
->> v2  Remove unused SysMan syscon
->>     Remove unused SDRAM ECC register defines
->>     Remove unused address, size and range from device tree.
->> ---
->>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
->> index c89d0c307f8d..688391f3bf78 100644
->> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
->> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
->> @@ -387,5 +387,17 @@
->>                       resets = <&rst WATCHDOG3_RESET>;
->>                       status = "disabled";
->>               };
->> +
->> +             eccmgr {
->> +                     compatible = "altr,socfpga-s10-ecc-manager";
->> +                     interrupts = <0 15 4>, <0 95 4>;
->> +                     interrupt-controller;
->> +                     #interrupt-cells = <2>;
->> +
->> +                     sdramedac {
->> +                             compatible = "altr,sdram-edac-s10";
->> +                             interrupts = <16 4>, <48 4>;
->> +                     };
->> +             };
->>       };
->>  };
->> --
->> 2.7.4
->>
->> --
->
-> Hey Rob,
->
-> ACK here too?
->
-> Also, this one:
->
-> https://lkml.kernel.org/r/1525203036-21774-1-git-send-email-thor.thayer at linux.intel.com
->
-> ?
->
+On Wed, May 02, 2018 at 03:05:23PM +0200, Fabrice Gasnier wrote:
+> Add support for DFSDM (Digital Filter For Sigma Delta Modulators)
+> to STM32MP1. This variant is close to STM32H7 DFSDM, it implements
+> 6 filter instances. Registers map is also increased.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt         |  7 +++++--
+>  drivers/iio/adc/stm32-dfsdm-core.c                  | 21 +++++++++++++++++++++
+>  2 files changed, 26 insertions(+), 2 deletions(-)
 
-Just in case you need mine, since the edits here match what was in the
-in the bindings doc.
-
-Acked-by: Dinh Nguyen <dinguyen@kernel.org>
-
-Thanks,
-Dinh
+Reviewed-by: Rob Herring <robh@kernel.org>
