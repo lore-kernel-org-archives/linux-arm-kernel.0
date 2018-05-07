@@ -1,20 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 6 May 2018 22:51:55 -0300
-Subject: [PATCH] ARM: dts: imx7s: Pass the 'fsl,sec-era' property
-In-Reply-To: <20180507011710.GH3443@dragon>
-References: <1524601519-23502-1-git-send-email-festevam@gmail.com>
- <20180504071926.GT3443@dragon>
- <CAOMZO5AVjFCad4PC20X5PqMuKGJQ2cOSBnqbGw+ngYCODL2vmQ@mail.gmail.com>
- <20180507011710.GH3443@dragon>
-Message-ID: <CAOMZO5CqE_G4_d8VcHT4vjmbpVuNCPMc3EsZ3oDURDuPJLpiFA@mail.gmail.com>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Mon,  7 May 2018 14:25:55 +1200
+Subject: [PATCH] pinctrl: mvebu: use correct MPP sel value for dev pins
+Message-ID: <20180507022555.31645-1-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 6, 2018 at 10:17 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+The "dev" function is selected with the value 0x4 not 0x01.
 
-> I applied it for 4.17, but still questioning whether it's reasonable to
-> have the property documented as optional in bindings, if missing the
-> property results in a non-functional driver.
+Fixes: commit d7ae8f8dee7f ("pinctrl: mvebu: pinctrl driver for 98DX3236 SoC")
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+ drivers/pinctrl/mvebu/pinctrl-armada-xp.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-Thanks Shawn. Yes, after my CAAM patch gets applied it will be a
-proper optional property.
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+index 28b199796fae..5e828468e43d 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+@@ -437,34 +437,34 @@ static struct mvebu_mpp_mode mv98dx3236_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(0x4, "dev", "we0",         V_98DX3236_PLUS)),
+ 	MPP_MODE(21,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "ad0",         V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "ad0",         V_98DX3236_PLUS)),
+ 	MPP_MODE(22,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "ad1",         V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "ad1",         V_98DX3236_PLUS)),
+ 	MPP_MODE(23,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "ad2",         V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "ad2",         V_98DX3236_PLUS)),
+ 	MPP_MODE(24,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "ad3",         V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "ad3",         V_98DX3236_PLUS)),
+ 	MPP_MODE(25,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "ad4",         V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "ad4",         V_98DX3236_PLUS)),
+ 	MPP_MODE(26,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "ad5",         V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "ad5",         V_98DX3236_PLUS)),
+ 	MPP_MODE(27,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "ad6",         V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "ad6",         V_98DX3236_PLUS)),
+ 	MPP_MODE(28,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "ad7",         V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "ad7",         V_98DX3236_PLUS)),
+ 	MPP_MODE(29,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "a0",          V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "a0",          V_98DX3236_PLUS)),
+ 	MPP_MODE(30,
+ 		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
+-		 MPP_VAR_FUNCTION(0x1, "dev", "a1",          V_98DX3236_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "dev", "a1",          V_98DX3236_PLUS)),
+ 	MPP_MODE(31,
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "slv_smi", "mdc",     V_98DX3236_PLUS),
+-- 
+2.17.0
