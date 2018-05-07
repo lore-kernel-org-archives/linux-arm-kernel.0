@@ -1,119 +1,63 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 7 May 2018 11:31:06 -0700
-Subject: [RFC PATCH] driver core: make deferring probe forever optional
-In-Reply-To: <20180501213114.20183-1-robh@kernel.org>
-References: <20180501213114.20183-1-robh@kernel.org>
-Message-ID: <20180507183106.GF2259@tuxbook-pro>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 7 May 2018 13:32:41 -0500
+Subject: [PATCH v2 1/2] clk: davinci: pll-dm355: fix SYSCLKn parent names
+In-Reply-To: <5805f462-0cb5-3024-f5af-941db8a46895@ti.com>
+References: <20180507144307.32364-1-david@lechnology.com>
+ <5805f462-0cb5-3024-f5af-941db8a46895@ti.com>
+Message-ID: <f41e762d-273a-9e8a-579a-f43e90260020@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 01 May 14:31 PDT 2018, Rob Herring wrote:
 
-> Deferred probe will currently wait forever on dependent devices to probe,
-> but sometimes a driver will never exist. It's also not always critical for
-> a driver to exist. Platforms can rely on default configuration from the
-> bootloader or reset defaults for things such as pinctrl and power domains.
 
-But how do you know if this is the case?
-
-> This is often the case with initial platform support until various drivers
-> get enabled.
-
-Can you please name platform that has enough support for Alexander to
-care about backwards and forwards compatibility but lacks a pinctrl
-driver.
-
-> There's at least 2 scenarios where deferred probe can render
-> a platform broken. Both involve using a DT which has more devices and
-> dependencies than the kernel supports. The 1st case is a driver may be
-> disabled in the kernel config.
-
-I agree that there is a chance that you _might_ get some parts of the
-system working by relying on the boot loader configuration, but
-misconfiguration issues applies to any other fundamental providers, such
-as clocks, regulators, power domains and gpios as well.
-
-> The 2nd case is the kernel version may
-> simply not have the dependent driver. This can happen if using a newer DT
-> (provided by firmware perhaps) with a stable kernel version.
+On 5/7/18 10:21 AM, Sekhar Nori wrote:
+> On Monday 07 May 2018 08:13 PM, David Lechner wrote:
+>> This fixes the parent clock names of the SYSCLKn clocks for the DM355
+>> SoC in the TI DaVinici PLL clock driver.
+>>
+>> It appears that this name just didn't get updated to the correct name
+>> like the other SoCs during the driver's development.
+>>
+>> Reported-by: Sekhar Nori <nsekhar@ti.com>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>> ---
+>>
+>> v2 changes:
+>> - add second patch to fix additional problems with DM355
+>>
+>>   drivers/clk/davinci/pll-dm355.c | 12 ++++++------
+>>   1 file changed, 6 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/clk/davinci/pll-dm355.c b/drivers/clk/davinci/pll-dm355.c
+>> index 5345f8286c50..1f746d2fc894 100644
+>> --- a/drivers/clk/davinci/pll-dm355.c
+>> +++ b/drivers/clk/davinci/pll-dm355.c
+>> @@ -22,10 +22,10 @@ static const struct davinci_pll_clk_info dm355_pll1_info = {
+>>   		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
+>>   };
+>>   
+>> -SYSCLK(1, pll1_sysclk1, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+>> -SYSCLK(2, pll1_sysclk2, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+>> -SYSCLK(3, pll1_sysclk3, pll1, 5, SYSCLK_ALWAYS_ENABLED);
+>> -SYSCLK(4, pll1_sysclk4, pll1, 5, SYSCLK_ALWAYS_ENABLED);
+>> +SYSCLK(1, pll1_sysclk1, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+>> +SYSCLK(2, pll1_sysclk2, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+>> +SYSCLK(3, pll1_sysclk3, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
+>> +SYSCLK(4, pll1_sysclk4, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
+>>   
+>>   int dm355_pll1_init(struct device *dev, void __iomem *base)
+>>   {
+>> @@ -62,8 +62,8 @@ static const struct davinci_pll_clk_info dm355_pll2_info = {
+>>   		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
+>>   };
+>>   
+>> -SYSCLK(1, pll2_sysclk1, pll2, 5, SYSCLK_FIXED_DIV);
+>> -SYSCLK(2, pll2_sysclk2, pll2, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+>> +SYSCLK(1, pll2_sysclk1, pll2_pllen, 5, SYSCLK_FIXED_DIV);
+>> +SYSCLK(2, pll2_sysclk2, pll2_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+> 
+> Good find with PLL2 SYSCLK2. Can you reverse the patch order so we are
+> not fixing up a non-existent clock?
 > 
 
-As above, this is in no way limited to pinctrl drivers.
-
-> Unfortunately, this change breaks with modules as we have no way of
-> knowing when modules are done loading. One possibility is to make this
-> opt in or out based on compatible strings rather than at a subsystem level.
-> Ideally this information could be extracted automatically somehow. OTOH,
-> maybe the lists are pretty small. There's only a handful of subsystems
-> that can be optional, and then only so many drivers in those that can be
-> modules (at least for pinctrl, many drivers are built-in only).
-> 
-
-On the Qualcomm platform most drivers are tristate and on most platforms
-there are size restrictions in the proprietary boot loader preventing us
-from boot the kernel after switching all these frameworks from tristate
-to bool (which feels like a more appropriate solution than your hack).
-
-> Cc: Alexander Graf <agraf@suse.de>
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
-> This patch came out of a discussion on the ARM boot-architecture 
-> list[1] about DT forwards and backwards compatibility issues. There are 
-> issues with newer DTs breaking on older, stable kernels. Some of these 
-> are difficult to solve, but cases of optional devices not having 
-> kernel support should be solvable.
-> 
-
-There are two cases here:
-1) DT contains compatibles that isn't supported by the kernel. In this
-case the associated device will remain in the probe deferral list and
-user space won't know about the device.
-
-2) DT contains compatibles known to the kernel but has new optional
-properties that makes things functional or works around hardware bugs.
-
-> I tested this on a RPi3 B with the pinctrl driver forced off. With this 
-> change, the MMC/SD and UART drivers can function without the pinctrl 
-> driver.
-> 
-
-Cool, so what about graphics, audio, networking, usb and all the other
-things that people actually expect when they _use_ a distro?
-
-> Rob
-> 
-> [1] https://lists.linaro.org/pipermail/boot-architecture/2018-April/000466.html
-> 
->  drivers/base/dd.c            | 16 ++++++++++++++++
->  drivers/pinctrl/devicetree.c |  2 +-
->  include/linux/device.h       |  2 ++
->  3 files changed, 19 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index c9f54089429b..5848808b9d7a 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -226,6 +226,15 @@ void device_unblock_probing(void)
->  	driver_deferred_probe_trigger();
->  }
->  
-> +
-> +int driver_deferred_probe_optional(void)
-> +{
-> +	if (initcalls_done)
-> +		return -ENODEV;
-
-You forgot the humongous printout here that tells the users that we do
-not want any bug reports related hardware not working as expected after
-this point.
-
-> +
-> +	return -EPROBE_DEFER;
-> +}
-> +
-
-I do not agree with the partial benefits of this at the cost of not
-supporting kernel modules.
-
-Regards,
-Bjorn
+Sure. But it will take me a couple days to get back to it.
