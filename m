@@ -1,98 +1,106 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Mon, 07 May 2018 22:41:40 +0100
-Subject: [PATCH] PCI: pciehp: Add quirk for QDF2400 Command Completed
- erratum
-In-Reply-To: <20180507213531.GB133147@bhelgaas-glaptop.roam.corp.google.com>
-References: <1525602662-1873-1-git-send-email-okaya@codeaurora.org>
- <20180507213531.GB133147@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <15288037a0316d181d6fd12813f468ad@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 7 May 2018 16:56:19 -0500
+Subject: [PATCH] PCI: Check whether bridges allow access to extended
+ config space
+In-Reply-To: <20180504200600.GA9529@bhelgaas-glaptop.roam.corp.google.com>
+References: <20180504200600.GA9529@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180507215619.GA161390@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-07 22:35, Bjorn Helgaas wrote:
-> On Sun, May 06, 2018 at 06:30:53AM -0400, Sinan Kaya wrote:
->> The QDF2400 controller does not set the Command Completed bit unless
->> writes to the Slot Command register change "Control" bits.  Command
->> Completed is never set for writes that only change software 
->> notification
->> "Enable" bits.  This results in timeouts like this:
->> 
->> pciehp 0000:00:00.0:pcie004: Timeout on hotplug command 0x1038
->> 
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> 
-> Since there's no bisection benefit for keeping these separate, I folded
-> this into the original quirk and added Mika's reviewed-by.
-> 
-> I also added the following ID patch and used PCI_VENDOR_ID_QCOM:
+On Fri, May 04, 2018 at 03:06:00PM -0500, Bjorn Helgaas wrote:
+> On Fri, May 04, 2018 at 03:45:07PM +0000, Gilles Buloz wrote:
+> > Le 04/05/2018 00:31, Bjorn Helgaas a ?crit :
+> > > [+cc LKML]
+> > >
+> > > On Thu, May 03, 2018 at 12:40:27PM +0000, Gilles Buloz wrote:
+> > >> Subject:    [PATCH] For exception at PCI probe due to bridge reporting UR
+> > >>
+> > >> Even if a device supports extended config access, no such access must be
+> > >> done to this device If there's a bridge not supporting that in the path
+> > >> to this device. Doing such access with UR reporting enabled on the root
+> > >> bridge leads to an exception.
+> > >>
+> > >> This is the case on a LS1043A CPU (NXP QorIQ Layerscape) platform with
+> > >> the following bus topology :
+> > >>    LS1043 PCIe root
+> > >>      -> PEX8112 PCIe-to-PCI bridge (not supporting ext cfg on PCI side)
+> > >>        -> PMC slot connector (for legacy PMC modules)
+> > >> With a PMC module topology as follows :
+> > >>    PMC connector
+> > >>      -> PCI-to-PCIe bridge
+> > >>        -> PCIe switch (4 ports)
+> > >>          -> 4 PCIe devices (one on each port)
+> > >> In this case all devices behind the PEX8112 are supporting extended config
+> > >> access but this is prohibited by the PEX8112. Without this patch, an
+> > >> exception (synchronous abort) occurs in pci_cfg_space_size_ext().
+> > >>
+> > >> This patch checks the parent bridge of each allocated child bus to know if
+> > >> extended config access is supported on the child bus, and sets a flag in
+> > >> child->bus_flags if not supported. This  flag is inherited by all children
+> > >> buses of this child bus and then is checked to avoid this unsupported
+> > >> accesses to every device on these buses.
+> > > Hi Gilles,
+> > >
+> > > Thanks for the patch!  I reworked it a little bit to simplify the code
+> > > in pci_alloc_child_bus().  Can you test it and make sure I didn't
+> > > break anything?
+> > >
+> > Hi Bjorn,
+> > 
+> > Your rework works as expected. Tested on LS1043A platform with kernel
+> > 4.17-rc1, and with some backport on kernel 4.1.35
 
-Thanks for the clean up.
+Thanks for testing it!  I applied it to pci/enumeration for v4.18.
 
+I think the ASPM issue below is unrelated.  But I would like to figure out
+what's going on there, too, if you have any more information.
+
+> > Info : with kernel 4.17-rc1, it turns out I need pcie_aspm=off to
+> > have the PMC devices behind the PCI-to-PCIe bridge of the PMC safely
+> > detected/configured. But this is not caused by the patch.
 > 
-> commit 333c8c1216c1e7ead6af7b3d667b43eb425b5034
-> Author: Bjorn Helgaas <bhelgaas@google.com>
-> Date:   Mon May 7 15:52:55 2018 -0500
+> > Without pcie_aspm=off I saw this at one boot :
+> >     "pci 0000:02:0e.0: ASPM: Could not configure common clock" for this bridge, but devices
+> >     correctly detected/configured
+> > but at most boots I get :
+> >     no ASPM message but "pci 0000:04:02.0: bridge configuration invalid ([bus ff-ff]), reconfiguring "
+> >     instead, and some devices are missing. Also lspci show "rev ff" for some devices.
+> > I don't see this problem on 4.1.35 with the same backported patch.
 > 
->     PCI: Add Qualcomm vendor ID
+> This is interesting, especially since you have this unusual topology
+> of a path to the device that is PCIe, then conventional PCI, then PCIe
+> again.  We *should* be able to use ASPM on the PCIe links, but it's
+> definitely not a well-tested scenario.
 > 
->     Add the Qualcomm vendor ID to pci_ids.h and use it in quirks.
+> Can you tell if something is actually broken?  Sinan's recent change,
+> 04875177dbe0 ("PCI/ASPM: Don't warn if already in common clock mode"),
+> which appeared in v4.17-rc1, turns off the message in some cases.
 > 
->     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> The "bridge configuration invalid" message just means the firmware
+> didn't configure the bridge.  We *should* still set it up correctly,
+> but please report a bug if we don't.
 > 
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index 2990ad1e7c99..e7bf44515fd6 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-> @@ -4361,8 +4361,8 @@ static const struct pci_dev_acs_enabled {
->  	{ PCI_VENDOR_ID_INTEL, 0x15b7, pci_quirk_mf_endpoint_acs },
->  	{ PCI_VENDOR_ID_INTEL, 0x15b8, pci_quirk_mf_endpoint_acs },
->  	/* QCOM QDF2xxx root ports */
-> -	{ 0x17cb, 0x400, pci_quirk_qcom_rp_acs },
-> -	{ 0x17cb, 0x401, pci_quirk_qcom_rp_acs },
-> +	{ PCI_VENDOR_ID_QCOM, 0x0400, pci_quirk_qcom_rp_acs },
-> +	{ PCI_VENDOR_ID_QCOM, 0x0401, pci_quirk_qcom_rp_acs },
->  	/* Intel PCH root ports */
->  	{ PCI_VENDOR_ID_INTEL, PCI_ANY_ID, pci_quirk_intel_pch_acs },
->  	{ PCI_VENDOR_ID_INTEL, PCI_ANY_ID, pci_quirk_intel_spt_pch_acs },
-> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-> index cc608fc55334..883cb7bf78aa 100644
-> --- a/include/linux/pci_ids.h
-> +++ b/include/linux/pci_ids.h
-> @@ -2387,6 +2387,8 @@
+> lspci showing "ff" for some devices might be a symptom of the devices
+> being powered off.  In that case config reads normally return ~0 data
+> (though on your platform maybe it would cause exceptions).  I've seen
+> this in other situations and wondered if it would be worth adding a
+> hint to lspci so it could say "device may be powered off".
 > 
->  #define PCI_VENDOR_ID_LENOVO		0x17aa
+> Anyway, if you are seeing something broken (more than just the
+> messages), please start a new thread about each one.  If you do, could
+> you please:
 > 
-> +#define PCI_VENDOR_ID_QCOM		0x17cb
-> +
->  #define PCI_VENDOR_ID_CDNS		0x17cd
+>   - open a report at https://bugzilla.kernel.org/, in the Drivers/PCI
+>     component (open a separate bug for each issue you see)
 > 
->  #define PCI_VENDOR_ID_ARECA		0x17d3
+>   - use kernel version 4.17-rc1 and mark it as a regression if
+>     appropriate
 > 
->> ---
->>  drivers/pci/hotplug/pciehp_hpc.c | 6 ++++++
->>  1 file changed, 6 insertions(+)
->> 
->> diff --git a/drivers/pci/hotplug/pciehp_hpc.c 
->> b/drivers/pci/hotplug/pciehp_hpc.c
->> index e70eba5..974a8f1 100644
->> --- a/drivers/pci/hotplug/pciehp_hpc.c
->> +++ b/drivers/pci/hotplug/pciehp_hpc.c
->> @@ -914,3 +914,9 @@ static void quirk_cmd_compl(struct pci_dev *pdev)
->>  }
->>  DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, PCI_ANY_ID,
->>  			      PCI_CLASS_BRIDGE_PCI, 8, quirk_cmd_compl);
->> +
->> +DECLARE_PCI_FIXUP_CLASS_EARLY(0x17cb, 0x400,
->> +			      PCI_CLASS_BRIDGE_PCI, 8, quirk_cmd_compl);
->> +
->> +DECLARE_PCI_FIXUP_CLASS_EARLY(0x17cb, 0x401,
->> +			      PCI_CLASS_BRIDGE_PCI, 8, quirk_cmd_compl);
->> --
->> 2.7.4
->> 
->> 
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   - attach (don't paste inline) the complete dmesg log and "lspci -vv"
+>     output (as root) to the bug
+> 
+>   - post a note to linux-pci at vger.kernel.org, cc Fred, Sinan, and me,
+>     and include the link to the bugzilla
+> 
+> Bjorn
