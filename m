@@ -1,35 +1,33 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon,  7 May 2018 14:44:48 +0200
-Subject: [PATCH v3 02/14] drivers: soc: sunxi: Add dedicated compatibles for
- the A13, A20 and A33
+Date: Mon,  7 May 2018 14:44:50 +0200
+Subject: [PATCH v3 04/14] ARM: dts: sun7i-a20: Use dedicated SRAM controller
+ compatible
 In-Reply-To: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
 References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180507124500.20434-3-paul.kocialkowski@bootlin.com>
+Message-ID: <20180507124500.20434-5-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces platform-specific compatibles for the A13, A20 and A33
-SRAM driver. No particular adaptation for these platforms is required at
-this point, although this might become the case in the future.
+Use the newly-introduced SRAM controller compatible for the A20 instead
+of its A10 fashion.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/soc/sunxi/sunxi_sram.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
-index 74cb81f37bd6..43ebc3bd33f2 100644
---- a/drivers/soc/sunxi/sunxi_sram.c
-+++ b/drivers/soc/sunxi/sunxi_sram.c
-@@ -315,6 +315,9 @@ static int sunxi_sram_probe(struct platform_device *pdev)
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index e529e4ff2174..b179e05408e4 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -240,7 +240,7 @@
+ 		ranges;
  
- static const struct of_device_id sunxi_sram_dt_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-sram-controller" },
-+	{ .compatible = "allwinner,sun5i-a13-sram-controller" },
-+	{ .compatible = "allwinner,sun7i-a20-sram-controller" },
-+	{ .compatible = "allwinner,sun8i-a33-sram-controller" },
- 	{ .compatible = "allwinner,sun50i-a64-sram-controller" },
- 	{ },
- };
+ 		sram-controller at 1c00000 {
+-			compatible = "allwinner,sun4i-a10-sram-controller";
++			compatible = "allwinner,sun7i-a20-sram-controller";
+ 			reg = <0x01c00000 0x30>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
 -- 
 2.16.3
