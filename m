@@ -1,67 +1,32 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  7 May 2018 23:18:14 +0800
-Subject: [PATCH 2/5] dt-bindings: usb: add binding for the DWC3 controller on
- Allwinner SoC
+Date: Mon,  7 May 2018 23:18:15 +0800
+Subject: [PATCH 3/5] usb: dwc3: of-simple: Add compatible for Allwinner H6
+ platform
 In-Reply-To: <20180507151817.55663-1-icenowy@aosc.io>
 References: <20180507151817.55663-1-icenowy@aosc.io>
-Message-ID: <20180507151817.55663-3-icenowy@aosc.io>
+Message-ID: <20180507151817.55663-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner H6 SoC uses DWC3 controller for USB3.
-
-Add its device tree binding document.
+Add compatible string to use this generic glue layer to support
+Allwinner H6 platform's dwc3 controller.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- .../bindings/usb/allwinner,dwc3.txt           | 39 +++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/allwinner,dwc3.txt
+ drivers/usb/dwc3/dwc3-of-simple.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/allwinner,dwc3.txt b/Documentation/devicetree/bindings/usb/allwinner,dwc3.txt
-new file mode 100644
-index 000000000000..3f7714636785
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/allwinner,dwc3.txt
-@@ -0,0 +1,39 @@
-+Allwinner SuperSpeed DWC3 USB SoC controller
-+
-+Required properties:
-+- compatible:	should contain "allwinner,sun50i-h6-dwc3" for H6 SoC
-+- clocks:	A list of phandle + clock-specifier pairs for the
-+		clocks listed in clock-names
-+- clock-names:	Should contain the following:
-+  "bus"		The bus clock of the DWC3 part
-+- resets:	A list of phandle + reset-specifier pairs for the
-+		resets listed in reset-names
-+- reset-names:	Should contain the following:
-+  "bus"		The bus reset of the DWC3 part
-+
-+Required child node:
-+A child node must exist to represent the core DWC3 IP block. The name of
-+the node is not important. The content of the node is defined in dwc3.txt.
-+
-+Phy documentation is provided in the following places:
-+Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
-+
-+Example device nodes:
-+	usb3: usb at 5200000 {
-+		compatible = "allwinner,sun50i-h6-dwc3";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		clocks = <&ccu CLK_BUS_XHCI>;
-+		clock-names = "bus";
-+		resets = <&ccu RST_BUS_XHCI>;
-+		reset-names = "bus";
-+
-+		dwc3: dwc3 {
-+			compatible = "snps,dwc3";
-+			reg = <0x5200000 0x10000>;
-+			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+			phys = <&usb3phy>;
-+			phy-names = "usb3-phy";
-+		};
-+	};
+diff --git a/drivers/usb/dwc3/dwc3-of-simple.c b/drivers/usb/dwc3/dwc3-of-simple.c
+index cb2ee96fd3e8..a92a8e4c6b92 100644
+--- a/drivers/usb/dwc3/dwc3-of-simple.c
++++ b/drivers/usb/dwc3/dwc3-of-simple.c
+@@ -215,6 +215,7 @@ static const struct of_device_id of_dwc3_simple_match[] = {
+ 	{ .compatible = "sprd,sc9860-dwc3" },
+ 	{ .compatible = "amlogic,meson-axg-dwc3" },
+ 	{ .compatible = "amlogic,meson-gxl-dwc3" },
++	{ .compatible = "allwinner,sun50i-h6-dwc3" },
+ 	{ /* Sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, of_dwc3_simple_match);
 -- 
 2.17.0
