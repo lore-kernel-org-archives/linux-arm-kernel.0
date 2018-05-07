@@ -1,32 +1,32 @@
 From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Mon, 7 May 2018 01:39:45 +0000
-Subject: [PATCH -next] ASoC: fix return value check in
- mt6351_codec_driver_probe()
-Message-ID: <1525657185-73163-1-git-send-email-weiyongjun1@huawei.com>
+Date: Mon, 7 May 2018 01:40:24 +0000
+Subject: [PATCH -next] gpio: Fix return value check in owl_gpio_probe()
+Message-ID: <1525657224-88189-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of error, the function dev_get_regmap() returns NULL pointer not
+In case of error, the function of_iomap() returns NULL pointer not
 ERR_PTR(). The IS_ERR() test in the return value check should be
 replaced with NULL test.
 
+Fixes: d3654d38809c ("gpio: Add gpio driver for Actions OWL S900 SoC")
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- sound/soc/codecs/mt6351.c | 4 ++--
+ drivers/gpio/gpio-owl.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/codecs/mt6351.c b/sound/soc/codecs/mt6351.c
-index e739f07..f73dcd7 100644
---- a/sound/soc/codecs/mt6351.c
-+++ b/sound/soc/codecs/mt6351.c
-@@ -1472,8 +1472,8 @@ static int mt6351_codec_driver_probe(struct platform_device *pdev)
- 	priv->dev = &pdev->dev;
+diff --git a/drivers/gpio/gpio-owl.c b/drivers/gpio/gpio-owl.c
+index 3546362..f35e80f 100644
+--- a/drivers/gpio/gpio-owl.c
++++ b/drivers/gpio/gpio-owl.c
+@@ -128,8 +128,8 @@ static int owl_gpio_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
- 	priv->regmap = dev_get_regmap(pdev->dev.parent, NULL);
--	if (IS_ERR(priv->regmap))
--		return PTR_ERR(priv->regmap);
-+	if (!priv->regmap)
-+		return -ENODEV;
+ 	gpio->base = of_iomap(dev->of_node, 0);
+-	if (IS_ERR(gpio->base))
+-		return PTR_ERR(gpio->base);
++	if (!gpio->base)
++		return -ENOMEM;
  
- 	dev_dbg(priv->dev, "%s(), dev name %s\n",
- 		__func__, dev_name(&pdev->dev));
+ 	/*
+ 	 * Get the number of gpio's for this bank. If none specified,
