@@ -1,50 +1,18 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 7 May 2018 11:51:16 +0530
-Subject: [PATCH -next v2] gpio: owl: Fix return value check in
- owl_gpio_probe()
-In-Reply-To: <1525674356-39189-1-git-send-email-weiyongjun1@huawei.com>
-References: <1525657224-88189-1-git-send-email-weiyongjun1@huawei.com>
- <1525674356-39189-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <20180507062116.xddlxqywmqkpkavv@mani>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 7 May 2018 14:30:05 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-wandboard: Switch to SPDX identifier
+In-Reply-To: <1525189650-5826-1-git-send-email-festevam@gmail.com>
+References: <1525189650-5826-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180507063004.GA21989@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2018 at 06:25:56AM +0000, Wei Yongjun wrote:
-> In case of error, the function of_iomap() returns NULL pointer not
-> ERR_PTR(). The IS_ERR() test in the return value check should be
-> replaced with NULL test.
+On Tue, May 01, 2018 at 12:47:29PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Fixes: d3654d38809c ("gpio: Add gpio driver for Actions OWL S900 SoC")
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-
-Acked-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org> 
-
-Thanks,
-Mani
-
-> ---
-> v1 -> v2: return -ENXIO instead of -ENOMEM
-> ---
->  drivers/gpio/gpio-owl.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Adopt the SPDX license identifier headers to ease license compliance
+> management.
 > 
-> diff --git a/drivers/gpio/gpio-owl.c b/drivers/gpio/gpio-owl.c
-> index 3546362..f35e80f 100644
-> --- a/drivers/gpio/gpio-owl.c
-> +++ b/drivers/gpio/gpio-owl.c
-> @@ -128,8 +128,8 @@ static int owl_gpio_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	gpio->base = of_iomap(dev->of_node, 0);
-> -	if (IS_ERR(gpio->base))
-> -		return PTR_ERR(gpio->base);
-> +	if (!gpio->base)
-> +		return -ENXIO;
->  
->  	/*
->  	 * Get the number of gpio's for this bank. If none specified,
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+Applied, thanks.
