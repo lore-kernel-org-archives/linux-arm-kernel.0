@@ -1,40 +1,71 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 7 May 2018 09:25:05 -0500
-Subject: [PATCH] clk: davinci: psc-da830: fix USB0 48MHz PHY clock
- registration
-In-Reply-To: <20180507113457.4716-1-nsekhar@ti.com>
-References: <20180507113457.4716-1-nsekhar@ti.com>
-Message-ID: <a06ddbc4-e257-ddcd-55c6-3f3a745b91e3@lechnology.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Mon, 7 May 2018 16:28:08 +0200
+Subject: [PATCH RESEND] phy: stm32: fix usbphyc static checker and checkpatch
+ warnings
+Message-ID: <1525703288-26653-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2018 06:34 AM, Sekhar Nori wrote:
-> USB0 48MHz PHY clock registration fails on DA830 because the
-> da8xx-cfgchip clock driver cannot get a reference to USB0
-> LPSC clock.
-> 
-> The USB0 LPSC needs to be enabled during PHY clock enable. Setup
-> the clock lookup correctly to fix this.
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
->   drivers/clk/davinci/psc-da830.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/davinci/psc-da830.c b/drivers/clk/davinci/psc-da830.c
-> index f61abf5632ff..081b039fcb02 100644
-> --- a/drivers/clk/davinci/psc-da830.c
-> +++ b/drivers/clk/davinci/psc-da830.c
-> @@ -55,7 +55,8 @@ const struct davinci_psc_init_data da830_psc0_init_data = {
->   	.psc_init		= &da830_psc0_init,
->   };
->   
-> -LPSC_CLKDEV2(usb0_clkdev,	NULL,	"musb-da8xx",
-> +LPSC_CLKDEV3(usb0_clkdev,	"fck",	"da830-usb-phy-clks",
-> +				NULL,	"musb-da8xx",
->   				NULL,	"cppi41-dmaengine");
->   LPSC_CLKDEV1(usb1_clkdev,	NULL,	"ohci-da8xx");
->   /* REVISIT: gpio-davinci.c should be modified to drop con_id */
-> 
+This patch fixes the following issues:
+* warning reported by checkpatch:
+WARNING: line over 80 characters
+#87: FILE: drivers/phy/st/phy-stm32-usbphyc.c:87:
++static void stm32_usbphyc_get_pll_params(u32 clk_rate, struct pll_params *pll_params)
 
-Reviewed-by: David Lechner <david@lechnology.com>
+* bug reported by static checker (Dan Carpenter):
+drivers/phy/st/phy-stm32-usbphyc.c:371 stm32_usbphyc_probe()
+error: uninitialized symbol 'i'.
+
+* unused stm32_usbphyc structure member: bool pll_enabled.
+
+* unnecessary extra line in stm32_usbphyc_of_xlate
+
+Fixes: 94c358da3a05 "phy: stm32: add support for STM32 USB PHY Controller (USBPHYC)"
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+---
+ drivers/phy/st/phy-stm32-usbphyc.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/phy/st/phy-stm32-usbphyc.c b/drivers/phy/st/phy-stm32-usbphyc.c
+index bc4e78a..1255cd1 100644
+--- a/drivers/phy/st/phy-stm32-usbphyc.c
++++ b/drivers/phy/st/phy-stm32-usbphyc.c
+@@ -71,7 +71,6 @@ struct stm32_usbphyc {
+ 	struct stm32_usbphyc_phy **phys;
+ 	int nphys;
+ 	int switch_setup;
+-	bool pll_enabled;
+ };
+ 
+ static inline void stm32_usbphyc_set_bits(void __iomem *reg, u32 bits)
+@@ -84,7 +83,8 @@ static inline void stm32_usbphyc_clr_bits(void __iomem *reg, u32 bits)
+ 	writel_relaxed(readl_relaxed(reg) & ~bits, reg);
+ }
+ 
+-static void stm32_usbphyc_get_pll_params(u32 clk_rate, struct pll_params *pll_params)
++static void stm32_usbphyc_get_pll_params(u32 clk_rate,
++					 struct pll_params *pll_params)
+ {
+ 	unsigned long long fvco, ndiv, frac;
+ 
+@@ -271,7 +271,6 @@ static struct phy *stm32_usbphyc_of_xlate(struct device *dev,
+ 	struct stm32_usbphyc *usbphyc = dev_get_drvdata(dev);
+ 	struct stm32_usbphyc_phy *usbphyc_phy = NULL;
+ 	struct device_node *phynode = args->np;
+-
+ 	int port = 0;
+ 
+ 	for (port = 0; port < usbphyc->nphys; port++) {
+@@ -367,8 +366,8 @@ static int stm32_usbphyc_probe(struct platform_device *pdev)
+ 		if (IS_ERR(phy)) {
+ 			ret = PTR_ERR(phy);
+ 			if (ret != -EPROBE_DEFER)
+-				dev_err(dev,
+-					"failed to create phy%d: %d\n", i, ret);
++				dev_err(dev, "failed to create phy%d: %d\n",
++					port, ret);
+ 			goto put_child;
+ 		}
+ 
+-- 
+2.7.4
