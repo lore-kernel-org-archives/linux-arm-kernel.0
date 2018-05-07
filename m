@@ -1,56 +1,49 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon,  7 May 2018 14:44:47 +0200
-Subject: [PATCH v3 01/14] drivers: soc: sunxi: Add support for the C1 SRAM
- region
+Date: Mon,  7 May 2018 14:44:52 +0200
+Subject: [PATCH v3 06/14] ARM: sun7i-a20: Add support for the C1 SRAM region
+ with the SRAM controller
 In-Reply-To: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
 References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180507124500.20434-2-paul.kocialkowski@bootlin.com>
+Message-ID: <20180507124500.20434-7-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 
-This introduces support for the SRAM C1 section, that is controlled by
-the system controller. This SRAM area can be muxed either to the CPU
-or the Video Engine, that needs this area to store various tables (e.g.
-the Huffman VLD decoding tables).
-
-This only supports devices with the same layout as the A10 (which also
-includes the A13, A20, A33 and other SoCs).
+This adds support for the C1 SRAM region (to be used with the SRAM
+controller driver) for the A20 platform. The region is shared
+between the Video Engine and the CPU.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/soc/sunxi/sunxi_sram.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
-index 882be5ed7e84..74cb81f37bd6 100644
---- a/drivers/soc/sunxi/sunxi_sram.c
-+++ b/drivers/soc/sunxi/sunxi_sram.c
-@@ -63,6 +63,12 @@ static struct sunxi_sram_desc sun4i_a10_sram_a3_a4 = {
- 				  SUNXI_SRAM_MAP(1, 1, "emac")),
- };
- 
-+static struct sunxi_sram_desc sun4i_a10_sram_c1 = {
-+	.data	= SUNXI_SRAM_DATA("C1", 0x0, 0x0, 31,
-+				  SUNXI_SRAM_MAP(0, 0, "cpu"),
-+				  SUNXI_SRAM_MAP(0x7fffffff, 1, "ve")),
-+};
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index b179e05408e4..9bb6c35fb850 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -273,6 +273,20 @@
+ 					status = "disabled";
+ 				};
+ 			};
 +
- static struct sunxi_sram_desc sun4i_a10_sram_d = {
- 	.data	= SUNXI_SRAM_DATA("D", 0x4, 0x0, 1,
- 				  SUNXI_SRAM_MAP(0, 0, "cpu"),
-@@ -80,6 +86,10 @@ static const struct of_device_id sunxi_sram_dt_ids[] = {
- 		.compatible	= "allwinner,sun4i-a10-sram-a3-a4",
- 		.data		= &sun4i_a10_sram_a3_a4.data,
- 	},
-+	{
-+		.compatible	= "allwinner,sun4i-a10-sram-c1",
-+		.data		= &sun4i_a10_sram_c1.data,
-+	},
- 	{
- 		.compatible	= "allwinner,sun4i-a10-sram-d",
- 		.data		= &sun4i_a10_sram_d.data,
++			sram_c: sram at 1d00000 {
++				compatible = "mmio-sram";
++				reg = <0x01d00000 0xd00000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x01d00000 0xd00000>;
++
++				ve_sram: sram-section at 0 {
++					compatible = "allwinner,sun7i-a20-sram-c1",
++						     "allwinner,sun4i-a10-sram-c1";
++					reg = <0x000000 0x80000>;
++				};
++			};
+ 		};
+ 
+ 		nmi_intc: interrupt-controller at 1c00030 {
 -- 
 2.16.3
