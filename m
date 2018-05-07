@@ -1,38 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 May 2018 14:02:25 -0700
-Subject: [PATCH v2 2/2] ARM: dts: am335x: Replaced register offsets with
- defines
-In-Reply-To: <20180505085921.5513-3-cquast@baylibre.com>
-References: <20180505085921.5513-1-cquast@baylibre.com>
- <20180505085921.5513-3-cquast@baylibre.com>
-Message-ID: <20180507210225.GS98604@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 7 May 2018 16:05:30 -0500
+Subject: [PATCH 3/7] pinctrl: sunxi: add support for H6 R_PIO pin
+ controller
+In-Reply-To: <20180503183847.11046-4-icenowy@aosc.io>
+References: <20180503183847.11046-1-icenowy@aosc.io>
+ <20180503183847.11046-4-icenowy@aosc.io>
+Message-ID: <20180507210530.GA8285@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, May 04, 2018 at 02:38:43AM +0800, Icenowy Zheng wrote:
+> Allwinner H6 SoC has a R_PIO pin controller like other Allwinner SoCs,
+> which controls the PL and PM pin banks.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
 
-Thanks for updating these, adding Linus Walleij to Cc too.
+Acked-by: Rob Herring <robh@kernel.org>
 
-* Christina Quast <cquast@baylibre.com> [180505 09:02]:
-> The defines are taken from dt-bindings/pinctrl/am335x.h
+In the future, please split bindings to separate patches.
 
-If we're going to replace all of these, I'd go a step further
-where we make pinctrl-single use the newish #pinctrl-cells but
-set it to 2 instead of 1. Then set the pull flags as one value
-using the generic pinctrl defines and the second value being
-the selected mux mode.
-
-Then the offset really should be from the padconf mux area,
-not from the control module base. And then we would just have
-a new macro for these being:
-
-AM33XX_PINCTRL(AM335X_PIN_UART1_RXD, PIN_INPUT, MUX_MODE0)
-
-Where the PIN_INPUT ideally would be a Linux generic define.
-
-Otherwise we'd be churning these same files over and
-over.
-
-Regards,
-
-Tony
+>  drivers/pinctrl/sunxi/Kconfig                      |   4 +
+>  drivers/pinctrl/sunxi/Makefile                     |   1 +
+>  drivers/pinctrl/sunxi/pinctrl-sun50i-h6-r.c        | 128 +++++++++++++++++++++
+>  4 files changed, 134 insertions(+)
+>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h6-r.c
