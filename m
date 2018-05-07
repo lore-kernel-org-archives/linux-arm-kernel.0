@@ -1,58 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 7 May 2018 17:09:41 -0400
-Subject: [PATCH v2 0/6] ARM: clang support
-In-Reply-To: <d099cce32d109caefd2fc39196ce5bca@agner.ch>
-References: <20180325180959.28008-1-stefan@agner.ch>
- <d099cce32d109caefd2fc39196ce5bca@agner.ch>
-Message-ID: <CAK8P3a3-0q-YrA0gdT-wJD3fp3a4pXQOCx9mVwp8qFWS3n7dMg@mail.gmail.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Mon, 7 May 2018 16:10:01 -0500
+Subject: [PATCHv2 3/3] arm64: dts: stratix10: add sdram ecc
+In-Reply-To: <CADhT+weyJFhMyPbVt0n2EVe7OpeHHLjhxjw7aY2_8GBZ-7h7Xg@mail.gmail.com>
+References: <1524854238-19394-1-git-send-email-thor.thayer@linux.intel.com>
+ <1524854238-19394-4-git-send-email-thor.thayer@linux.intel.com>
+ <20180507165943.GE733@pd.tnic>
+ <CADhT+weyJFhMyPbVt0n2EVe7OpeHHLjhxjw7aY2_8GBZ-7h7Xg@mail.gmail.com>
+Message-ID: <CADhT+weL=8ODk1JVLwUXtFG3e4iKfzBMpZmo4Y0UwoK0=H=Zhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 7, 2018 at 4:24 PM, Stefan Agner <stefan@agner.ch> wrote:
-> On 25.03.2018 20:09, Stefan Agner wrote:
->> This patchset fixes some remaining issues when building the ARM
->> architecture using LLVM/clang.  The patchset requires the following
->> kbuild change:
->> https://lkml.org/lkml/2018/3/19/1756
+Hi Boris,
+
+On Mon, May 7, 2018 at 3:50 PM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
+> On Mon, May 7, 2018 at 11:59 AM, Borislav Petkov <bp@alien8.de> wrote:
+>> On Fri, Apr 27, 2018 at 01:37:18PM -0500, thor.thayer at linux.intel.com wrote:
+>>> From: Thor Thayer <thor.thayer@linux.intel.com>
+>>>
+>>> Add the Stratix10 ECC Manager and SDRAM EDAC nodes to the
+>>> device tree.
+>>>
+>>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+>>> ---
+>>> v2  Remove unused SysMan syscon
+>>>     Remove unused SDRAM ECC register defines
+>>>     Remove unused address, size and range from device tree.
+>>> ---
+>>>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 12 ++++++++++++
+>>>  1 file changed, 12 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>>> index c89d0c307f8d..688391f3bf78 100644
+>>> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>>> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>>> @@ -387,5 +387,17 @@
+>>>                       resets = <&rst WATCHDOG3_RESET>;
+>>>                       status = "disabled";
+>>>               };
+>>> +
+>>> +             eccmgr {
+>>> +                     compatible = "altr,socfpga-s10-ecc-manager";
+>>> +                     interrupts = <0 15 4>, <0 95 4>;
+>>> +                     interrupt-controller;
+>>> +                     #interrupt-cells = <2>;
+>>> +
+>>> +                     sdramedac {
+>>> +                             compatible = "altr,sdram-edac-s10";
+>>> +                             interrupts = <16 4>, <48 4>;
+>>> +                     };
+>>> +             };
+>>>       };
+>>>  };
+>>> --
+>>> 2.7.4
+>>>
+>>> --
 >>
->> With that patch and this patchset applied and I can successfully
->> build (and boot) the multi_v7_defconfig with 4.16-rc5 using clang
->> 5.0.1 and 6.0.0.
+>> Hey Rob,
+>>
+>> ACK here too?
+>>
+>> Also, this one:
+>>
+>> https://lkml.kernel.org/r/1525203036-21774-1-git-send-email-thor.thayer at linux.intel.com
+>>
+>> ?
+>>
 >
-> Russel, Arnd, any comment on this patch series? How can we get it
-> merged?
+> Just in case you need mine, since the edits here match what was in the
+> in the bindings doc.
 >
-> I was thinking patch 1 through armsoc since that is the way previous
-> patches have been merged.
-
-Please resend it to arm at kernel.org.
-
-Lorenzo, Robin, Will, Suzuki: could one of you look at the patch and
-provide an Ack
-and maybe send a patch to add a MAINTAINERS file entry for the the
-arm-cci driver to make it less ambiguous to who's responsible for it?
-
-I know very little about the code and don't want to be the main person having
-to decide if a patch can go in or not.
-
-> Note sure about patch 2,
-
-This should be up to Ard to pick up or comment on. I think I had
-previously suggested a similar patch to him, but don't remember
-what happened to that.
-
-> Russel can you comment on Thierry's email?
+> Acked-by: Dinh Nguyen <dinguyen@kernel.org>
 >
-> And patch 3 through 6 through Russel's tree?
 
-Sounds good to me. Please submit those through
-http://www.arm.linux.org.uk/developer/patches/ once they are
-ready. I think patches 4, 5 and 6 are good to go in, while patch
-3 has an unfinished discussion.
+Do you mind if I take this patch through arm-soc? I have a pull
+request to arm-soc that is pending.
 
-It might also be a good idea to pick up the CONFIG_FRAME_POINTER
-problem and disable that option for clang based builds now, using
-the new infrastructure we have for detecting compiler features at
-Kconfig time.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573133.html
 
-       Arnd
+In that pull request, there is a patch:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git/commit/?h=socfpga_for_next_v4.18_dts_v1&id=d93101abe41e9596555a0f7f6f775e543b71c441
+
+This patch has some major changes to the socfpga_stratix10.dtsi file
+that will conflict with this patch.
+
+If it's okay with you.
+
+Thanks,
+Dinh
