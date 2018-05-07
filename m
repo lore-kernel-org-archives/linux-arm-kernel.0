@@ -1,71 +1,55 @@
-From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Mon, 7 May 2018 16:28:08 +0200
-Subject: [PATCH RESEND] phy: stm32: fix usbphyc static checker and checkpatch
- warnings
-Message-ID: <1525703288-26653-1-git-send-email-amelie.delaunay@st.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon,  7 May 2018 09:43:06 -0500
+Subject: [PATCH v2 1/2] clk: davinci: pll-dm355: fix SYSCLKn parent names
+Message-ID: <20180507144307.32364-1-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following issues:
-* warning reported by checkpatch:
-WARNING: line over 80 characters
-#87: FILE: drivers/phy/st/phy-stm32-usbphyc.c:87:
-+static void stm32_usbphyc_get_pll_params(u32 clk_rate, struct pll_params *pll_params)
+This fixes the parent clock names of the SYSCLKn clocks for the DM355
+SoC in the TI DaVinici PLL clock driver.
 
-* bug reported by static checker (Dan Carpenter):
-drivers/phy/st/phy-stm32-usbphyc.c:371 stm32_usbphyc_probe()
-error: uninitialized symbol 'i'.
+It appears that this name just didn't get updated to the correct name
+like the other SoCs during the driver's development.
 
-* unused stm32_usbphyc structure member: bool pll_enabled.
-
-* unnecessary extra line in stm32_usbphyc_of_xlate
-
-Fixes: 94c358da3a05 "phy: stm32: add support for STM32 USB PHY Controller (USBPHYC)"
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+Reported-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: David Lechner <david@lechnology.com>
 ---
- drivers/phy/st/phy-stm32-usbphyc.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/phy/st/phy-stm32-usbphyc.c b/drivers/phy/st/phy-stm32-usbphyc.c
-index bc4e78a..1255cd1 100644
---- a/drivers/phy/st/phy-stm32-usbphyc.c
-+++ b/drivers/phy/st/phy-stm32-usbphyc.c
-@@ -71,7 +71,6 @@ struct stm32_usbphyc {
- 	struct stm32_usbphyc_phy **phys;
- 	int nphys;
- 	int switch_setup;
--	bool pll_enabled;
+v2 changes:
+- add second patch to fix additional problems with DM355
+
+ drivers/clk/davinci/pll-dm355.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clk/davinci/pll-dm355.c b/drivers/clk/davinci/pll-dm355.c
+index 5345f8286c50..1f746d2fc894 100644
+--- a/drivers/clk/davinci/pll-dm355.c
++++ b/drivers/clk/davinci/pll-dm355.c
+@@ -22,10 +22,10 @@ static const struct davinci_pll_clk_info dm355_pll1_info = {
+ 		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
  };
  
- static inline void stm32_usbphyc_set_bits(void __iomem *reg, u32 bits)
-@@ -84,7 +83,8 @@ static inline void stm32_usbphyc_clr_bits(void __iomem *reg, u32 bits)
- 	writel_relaxed(readl_relaxed(reg) & ~bits, reg);
- }
+-SYSCLK(1, pll1_sysclk1, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+-SYSCLK(2, pll1_sysclk2, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
+-SYSCLK(3, pll1_sysclk3, pll1, 5, SYSCLK_ALWAYS_ENABLED);
+-SYSCLK(4, pll1_sysclk4, pll1, 5, SYSCLK_ALWAYS_ENABLED);
++SYSCLK(1, pll1_sysclk1, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
++SYSCLK(2, pll1_sysclk2, pll1_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
++SYSCLK(3, pll1_sysclk3, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
++SYSCLK(4, pll1_sysclk4, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED);
  
--static void stm32_usbphyc_get_pll_params(u32 clk_rate, struct pll_params *pll_params)
-+static void stm32_usbphyc_get_pll_params(u32 clk_rate,
-+					 struct pll_params *pll_params)
+ int dm355_pll1_init(struct device *dev, void __iomem *base)
  {
- 	unsigned long long fvco, ndiv, frac;
+@@ -62,8 +62,8 @@ static const struct davinci_pll_clk_info dm355_pll2_info = {
+ 		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
+ };
  
-@@ -271,7 +271,6 @@ static struct phy *stm32_usbphyc_of_xlate(struct device *dev,
- 	struct stm32_usbphyc *usbphyc = dev_get_drvdata(dev);
- 	struct stm32_usbphyc_phy *usbphyc_phy = NULL;
- 	struct device_node *phynode = args->np;
--
- 	int port = 0;
+-SYSCLK(1, pll2_sysclk1, pll2, 5, SYSCLK_FIXED_DIV);
+-SYSCLK(2, pll2_sysclk2, pll2, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
++SYSCLK(1, pll2_sysclk1, pll2_pllen, 5, SYSCLK_FIXED_DIV);
++SYSCLK(2, pll2_sysclk2, pll2_pllen, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
  
- 	for (port = 0; port < usbphyc->nphys; port++) {
-@@ -367,8 +366,8 @@ static int stm32_usbphyc_probe(struct platform_device *pdev)
- 		if (IS_ERR(phy)) {
- 			ret = PTR_ERR(phy);
- 			if (ret != -EPROBE_DEFER)
--				dev_err(dev,
--					"failed to create phy%d: %d\n", i, ret);
-+				dev_err(dev, "failed to create phy%d: %d\n",
-+					port, ret);
- 			goto put_child;
- 		}
- 
+ int dm355_pll2_init(struct device *dev, void __iomem *base)
+ {
 -- 
-2.7.4
+2.17.0
