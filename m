@@ -1,75 +1,56 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon,  7 May 2018 14:45:00 +0200
-Subject: [PATCH v3 14/14] ARM: dts: sun8i-a33: Add Video Engine and reserved
- memory nodes
+Date: Mon,  7 May 2018 14:44:53 +0200
+Subject: [PATCH v3 07/14] ARM: sun8i-a33: Add SRAM controller node and C1 SRAM
+ region
 In-Reply-To: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
 References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180507124500.20434-15-paul.kocialkowski@bootlin.com>
+Message-ID: <20180507124500.20434-8-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds nodes for the Video Engine and the associated reserved memory
-for the A33. Up to 96 MiB of memory are dedicated to the CMA pool.
+From: Maxime Ripard <maxime.ripard@bootlin.com>
 
-The VPU can only map the first 256 MiB of DRAM, so the reserved memory
-pool has to be located in that area. Following Allwinner's decision in
-downstream software, the last 96 MiB of the first 256 MiB of RAM are
-reserved for this purpose.
+This adds a SRAM controller node for the A33, with support for the C1
+SRAM region that is shared between the Video Engine and the CPU.
 
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a33.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/sun8i-a33.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 97a976b3b1ef..5308a49601f6 100644
+index a21f2ed07a52..97a976b3b1ef 100644
 --- a/arch/arm/boot/dts/sun8i-a33.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -181,6 +181,21 @@
- 		reg = <0x40000000 0x80000000>;
+@@ -204,6 +204,28 @@
  	};
  
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
+ 	soc at 1c00000 {
++		sram-controller at 1c00000 {
++			compatible = "allwinner,sun8i-a33-sram-controller";
++			reg = <0x01c00000 0x30>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
 +
-+		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
-+		cma_pool: cma at 4a000000 {
-+			compatible = "shared-dma-pool";
-+			size = <0x6000000>;
-+			alloc-ranges = <0x4a000000 0x6000000>;
-+			reusable;
-+			linux,cma-default;
-+		};
-+	};
++			sram_c: sram at 1d00000 {
++				compatible = "mmio-sram";
++				reg = <0x01d00000 0xd00000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x01d00000 0xd00000>;
 +
- 	sound: sound {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "sun8i-a33-audio";
-@@ -262,6 +277,23 @@
- 			};
- 		};
- 
-+		vpu: video-codec at 01c0e000 {
-+			compatible = "allwinner,sun8i-a33-video-engine";
-+			reg = <0x01c0e000 0x1000>;
-+
-+			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
-+				 <&ccu CLK_DRAM_VE>;
-+			clock-names = "ahb", "mod", "ram";
-+
-+			assigned-clocks = <&ccu CLK_VE>;
-+			assigned-clock-rates = <320000000>;
-+
-+			resets = <&ccu RST_BUS_VE>;
-+
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+			allwinner,sram = <&ve_sram 1>;
++				ve_sram: sram-section at 0 {
++					compatible = "allwinner,sun8i-a33-sram-c1",
++						     "allwinner,sun4i-a10-sram-c1";
++					reg = <0x000000 0x80000>;
++				};
++			};
 +		};
 +
- 		crypto: crypto-engine at 1c15000 {
- 			compatible = "allwinner,sun4i-a10-crypto";
- 			reg = <0x01c15000 0x1000>;
+ 		tcon0: lcd-controller at 1c0c000 {
+ 			compatible = "allwinner,sun8i-a33-tcon";
+ 			reg = <0x01c0c000 0x1000>;
 -- 
 2.16.3
