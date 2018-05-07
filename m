@@ -1,227 +1,41 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon, 07 May 2018 15:52:59 +0200
-Subject: [PATCH v3 08/14] media: v4l: Add definitions for MPEG2 frame
- format and header metadata
-In-Reply-To: <1bd7af5a-c8d5-220c-8471-545eb1835882@xs4all.nl>
-References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
- <20180507124500.20434-9-paul.kocialkowski@bootlin.com>
- <1bd7af5a-c8d5-220c-8471-545eb1835882@xs4all.nl>
-Message-ID: <cdbf4fd2f97f333d92c30086c85407f2aa246834.camel@bootlin.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon,  7 May 2018 15:57:06 +0200
+Subject: [PATCH 7/8] ARM: dts: r8a7743: Add PMU device node
+In-Reply-To: <1525701427-12914-1-git-send-email-geert+renesas@glider.be>
+References: <1525701427-12914-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1525701427-12914-8-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Enable support for the ARM Performance Monitor Units in the Cortex-A15
+CPU cores on RZ/G1M by adding a device node for the PMU.
 
-On Mon, 2018-05-07 at 15:49 +0200, Hans Verkuil wrote:
-> On 07/05/18 14:44, Paul Kocialkowski wrote:
-> > From: Florent Revest <florent.revest@free-electrons.com>
-> > 
-> > Stateless video decoding engines require both the MPEG slices and
-> > associated metadata from the video stream in order to decode frames.
-> > 
-> > This introduces definitions for a new pixel format, describing
-> > buffers
-> > with MPEG2 slice data, as well as a control structure for passing
-> > the
-> > frame header (metadata) to drivers.
+New Linux output:
 
-Thanks for the review!
+    hw perfevents: enabled with armv7_cortex_a15 PMU driver, 7 counters available
 
-I should have made it clear that this patch has not seen any improvement
-between v2 and v3. Cleaning up and documenting the MPEG2 headers is
-still in the tasks list (presented in the cover letter), as well as the
-MB32 NV12 format.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7743.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> > Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > ---
-> >  drivers/media/v4l2-core/v4l2-ctrls.c | 10 ++++++++++
-> >  drivers/media/v4l2-core/v4l2-ioctl.c |  1 +
-> >  include/uapi/linux/v4l2-controls.h   | 26
-> > ++++++++++++++++++++++++++
-> >  include/uapi/linux/videodev2.h       |  3 +++
-> >  4 files changed, 40 insertions(+)
-> > 
-> > diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c
-> > b/drivers/media/v4l2-core/v4l2-ctrls.c
-> > index df58a23eb731..cdf860c8e3d8 100644
-> > --- a/drivers/media/v4l2-core/v4l2-ctrls.c
-> > +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-> > @@ -826,6 +826,7 @@ const char *v4l2_ctrl_get_name(u32 id)
-> >  	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		
-> > return "Vertical MV Search Range";
-> >  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		
-> > return "Repeat Sequence Header";
-> >  	case V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME:		re
-> > turn "Force Key Frame";
-> > +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:		re
-> > turn "MPEG2 Frame Header";
-> 
-> This compound control needs to be documented in the V4l2 spec.
-> 
-> >  
-> >  	/* VPX controls */
-> >  	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		
-> > return "VPX Number of Partitions";
-> > @@ -1271,6 +1272,9 @@ void v4l2_ctrl_fill(u32 id, const char **name,
-> > enum v4l2_ctrl_type *type,
-> >  	case V4L2_CID_RDS_TX_ALT_FREQS:
-> >  		*type = V4L2_CTRL_TYPE_U32;
-> >  		break;
-> > +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:
-> > +		*type = V4L2_CTRL_TYPE_MPEG2_FRAME_HDR;
-> > +		break;
-> >  	default:
-> >  		*type = V4L2_CTRL_TYPE_INTEGER;
-> >  		break;
-> > @@ -1591,6 +1595,9 @@ static int std_validate(const struct v4l2_ctrl
-> > *ctrl, u32 idx,
-> >  			return -ERANGE;
-> >  		return 0;
-> >  
-> > +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
-> > +		return 0;
-> > +
-> >  	default:
-> >  		return -EINVAL;
-> >  	}
-> > @@ -2165,6 +2172,9 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct
-> > v4l2_ctrl_handler *hdl,
-> >  	case V4L2_CTRL_TYPE_U32:
-> >  		elem_size = sizeof(u32);
-> >  		break;
-> > +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
-> > +		elem_size = sizeof(struct
-> > v4l2_ctrl_mpeg2_frame_hdr);
-> > +		break;
-> >  	default:
-> >  		if (type < V4L2_CTRL_COMPOUND_TYPES)
-> >  			elem_size = sizeof(s32);
-> > diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c
-> > b/drivers/media/v4l2-core/v4l2-ioctl.c
-> > index 561a1fe3160b..38d318c47c55 100644
-> > --- a/drivers/media/v4l2-core/v4l2-ioctl.c
-> > +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
-> > @@ -1274,6 +1274,7 @@ static void v4l_fill_fmtdesc(struct
-> > v4l2_fmtdesc *fmt)
-> >  		case V4L2_PIX_FMT_VP8:		descr =
-> > "VP8"; break;
-> >  		case V4L2_PIX_FMT_VP9:		descr =
-> > "VP9"; break;
-> >  		case V4L2_PIX_FMT_HEVC:		descr =
-> > "HEVC"; break; /* aka H.265 */
-> > +		case V4L2_PIX_FMT_MPEG2_FRAME:	descr =
-> > "MPEG2 Frame"; break;
-> 
-> Needs to be documented in the spec.
-> 
-> >  		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA
-> > YUV"; break;
-> >  		case V4L2_PIX_FMT_WNVA:		descr =
-> > "WNVA"; break;
-> >  		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA
-> > SN9C10X"; break;
-> > diff --git a/include/uapi/linux/v4l2-controls.h
-> > b/include/uapi/linux/v4l2-controls.h
-> > index 8d473c979b61..23da8bfa7e6f 100644
-> > --- a/include/uapi/linux/v4l2-controls.h
-> > +++ b/include/uapi/linux/v4l2-controls.h
-> > @@ -557,6 +557,8 @@ enum v4l2_mpeg_video_mpeg4_profile {
-> >  };
-> >  #define V4L2_CID_MPEG_VIDEO_MPEG4_QPEL		(V4L2_CID_MPE
-> > G_BASE+407)
-> >  
-> > +#define
-> > V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR     (V4L2_CID_MPEG_BASE+450)
-> > +
-> >  /*  Control IDs for VP8 streams
-> >   *  Although VP8 is not part of MPEG we add these controls to the
-> > MPEG class
-> >   *  as that class is already handling other video compression
-> > standards
-> > @@ -1076,4 +1078,28 @@ enum v4l2_detect_md_mode {
-> >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_C
-> > LASS_BASE + 3)
-> >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DET
-> > ECT_CLASS_BASE + 4)
-> >  
-> > +struct v4l2_ctrl_mpeg2_frame_hdr {
-> > +	__u32 slice_len;
-> > +	__u32 slice_pos;
-> > +	enum { MPEG1, MPEG2 } type;
-> 
-> Still an enum?
->
-> > +
-> > +	__u16 width;
-> > +	__u16 height;
-> > +
-> > +	enum { PCT_I = 1, PCT_P, PCT_B, PCT_D }
-> > picture_coding_type;
-> > +	__u8 f_code[2][2];
-> > +
-> > +	__u8 intra_dc_precision;
-> > +	__u8 picture_structure;
-> > +	__u8 top_field_first;
-> > +	__u8 frame_pred_frame_dct;
-> > +	__u8 concealment_motion_vectors;
-> > +	__u8 q_scale_type;
-> > +	__u8 intra_vlc_format;
-> > +	__u8 alternate_scan;
-> > +
-> > +	__u8 backward_ref_index;
-> > +	__u8 forward_ref_index;
-> > +};
-> > +
-> >  #endif
-> > diff --git a/include/uapi/linux/videodev2.h
-> > b/include/uapi/linux/videodev2.h
-> > index 1f6c4b52baae..d8f9b59d90d7 100644
-> > --- a/include/uapi/linux/videodev2.h
-> > +++ b/include/uapi/linux/videodev2.h
-> > @@ -636,6 +636,7 @@ struct v4l2_pix_format {
-> >  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /*
-> > VP8 */
-> >  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /*
-> > VP9 */
-> >  #define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /*
-> > HEVC aka H.265 */
-> > +#define V4L2_PIX_FMT_MPEG2_FRAME v4l2_fourcc('M', 'G', '2', 'F') /*
-> > MPEG2 frame */
-> >  
-> >  /*  Vendor-specific formats   */
-> >  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /*
-> > cpia1 YUV */
-> > @@ -1587,6 +1588,7 @@ struct v4l2_ext_control {
-> >  		__u8 __user *p_u8;
-> >  		__u16 __user *p_u16;
-> >  		__u32 __user *p_u32;
-> > +		struct v4l2_ctrl_mpeg2_frame_hdr __user
-> > *p_mpeg2_frame_hdr;
-> >  		void __user *ptr;
-> >  	};
-> >  } __attribute__ ((packed));
-> > @@ -1632,6 +1634,7 @@ enum v4l2_ctrl_type {
-> >  	V4L2_CTRL_TYPE_U8	     = 0x0100,
-> >  	V4L2_CTRL_TYPE_U16	     = 0x0101,
-> >  	V4L2_CTRL_TYPE_U32	     = 0x0102,
-> > +	V4L2_CTRL_TYPE_MPEG2_FRAME_HDR = 0x0109,
-> >  };
-> >  
-> >  /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
-> > 
-> 
-> Regards,
-> 
-> 	Hans
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index 69d8f7e0f0536fc0..142949d7066f3a65 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -125,6 +125,13 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a15-pmu";
++		interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
++				      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>, <&cpu1>;
++	};
++
+ 	/* External SCIF clock */
+ 	scif_clk: scif {
+ 		compatible = "fixed-clock";
 -- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 484 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180507/c9681c49/attachment.sig>
+2.7.4
