@@ -1,22 +1,35 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Mon, 7 May 2018 15:43:49 +0300
-Subject: [PATCH] PCI: pciehp: Add quirk for QDF2400 Command Completed
- erratum
-In-Reply-To: <1525602662-1873-1-git-send-email-okaya@codeaurora.org>
-References: <1525602662-1873-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180507124349.GC2879@lahna.fi.intel.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Mon,  7 May 2018 14:44:48 +0200
+Subject: [PATCH v3 02/14] drivers: soc: sunxi: Add dedicated compatibles for
+ the A13, A20 and A33
+In-Reply-To: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20180507124500.20434-3-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 06, 2018 at 06:30:53AM -0400, Sinan Kaya wrote:
-> The QDF2400 controller does not set the Command Completed bit unless
-> writes to the Slot Command register change "Control" bits.  Command
-> Completed is never set for writes that only change software notification
-> "Enable" bits.  This results in timeouts like this:
-> 
-> pciehp 0000:00:00.0:pcie004: Timeout on hotplug command 0x1038
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+This introduces platform-specific compatibles for the A13, A20 and A33
+SRAM driver. No particular adaptation for these platforms is required at
+this point, although this might become the case in the future.
 
-Reviewed-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ drivers/soc/sunxi/sunxi_sram.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
+index 74cb81f37bd6..43ebc3bd33f2 100644
+--- a/drivers/soc/sunxi/sunxi_sram.c
++++ b/drivers/soc/sunxi/sunxi_sram.c
+@@ -315,6 +315,9 @@ static int sunxi_sram_probe(struct platform_device *pdev)
+ 
+ static const struct of_device_id sunxi_sram_dt_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-sram-controller" },
++	{ .compatible = "allwinner,sun5i-a13-sram-controller" },
++	{ .compatible = "allwinner,sun7i-a20-sram-controller" },
++	{ .compatible = "allwinner,sun8i-a33-sram-controller" },
+ 	{ .compatible = "allwinner,sun50i-a64-sram-controller" },
+ 	{ },
+ };
+-- 
+2.16.3
