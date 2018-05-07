@@ -1,49 +1,37 @@
-From: satendra.t@samsung.com (Satendra Singh Thakur)
-Date: Mon,  7 May 2018 09:02:17 +0530
-Subject: [PATCH v2 03/13] drm/kms/mode/exynos-dsi: using helper func
- drm_display_mode_to_videomode for calculating timing parameters
-In-Reply-To: <920ac8d1-8d2d-1332-256d-21472f69fca5@arm.com>
-References: <920ac8d1-8d2d-1332-256d-21472f69fca5@arm.com>
- <CGME20180507033238epcas5p2601b5ccbba8fa02cdde4f1375e90abe9@epcas5p2.samsung.com>
-Message-ID: <1525663938-4172-1-git-send-email-satendra.t@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 7 May 2018 13:40:51 +0900
+Subject: [PATCH v9 02/11] kexec_file: make
+ kexec_image_post_load_cleanup_default() global
+In-Reply-To: <cbf66675-1671-32f9-1410-a76986becf85@arm.com>
+References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
+ <20180425062629.29404-3-takahiro.akashi@linaro.org>
+ <cbf66675-1671-32f9-1410-a76986becf85@arm.com>
+Message-ID: <20180507044050.GC11326@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid duplicate logic for the same
+On Tue, May 01, 2018 at 06:46:04PM +0100, James Morse wrote:
+> Hi Akashi,
+> 
+> On 25/04/18 07:26, AKASHI Takahiro wrote:
+> > Change this function from static to global so that arm64 can implement
+> > its own arch_kimage_file_post_load_cleanup() later using
+> > kexec_image_post_load_cleanup_default().
+> 
+> Do we need to call kexec_image_post_load_cleanup_default()? All it does is call
+> the image-type fops->cleanup(), which you don't implement in this series.
+> 
+> Is this just-in-case someone adds cleanup() later and is surprised only the
+> arch-level helper is called?
 
-Signed-off-by: Satendra Singh Thakur <satendra.t@samsung.com>
-Acked-by: Madhur Verma <madhur.verma@samsung.com>
-Cc: Hemanshu Srivastava <hemanshu.s@samsung.com>
----
+Yes, we want not to miss two possibilities:
+- some common clean-up code is added to kexec_image_post_load_cleanup_default()
+- some format(i.e. Image)-specific clean-up code is added to fops->cleanup()
 
- v2: Removed Mr Robin from reviewed-by field	
+-Takahiro AKASHI
 
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index 7904ffa..7fe84fd 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1490,17 +1490,8 @@ static void exynos_dsi_mode_set(struct drm_encoder *encoder,
- 				struct drm_display_mode *adjusted_mode)
- {
- 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
--	struct videomode *vm = &dsi->vm;
--	struct drm_display_mode *m = adjusted_mode;
--
--	vm->hactive = m->hdisplay;
--	vm->vactive = m->vdisplay;
--	vm->vfront_porch = m->vsync_start - m->vdisplay;
--	vm->vback_porch = m->vtotal - m->vsync_end;
--	vm->vsync_len = m->vsync_end - m->vsync_start;
--	vm->hfront_porch = m->hsync_start - m->hdisplay;
--	vm->hback_porch = m->htotal - m->hsync_end;
--	vm->hsync_len = m->hsync_end - m->hsync_start;
-+
-+	drm_display_mode_to_videomode(adjusted_mode, &dsi->vm);
- }
- 
- static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
--- 
-2.7.4
+> 
+> 
+> Thanks,
+> 
+> James
