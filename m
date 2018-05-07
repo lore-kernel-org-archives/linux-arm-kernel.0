@@ -1,56 +1,51 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  7 May 2018 15:19:53 +0200
-Subject: [PATCH v3 2/2] ARM: dts: r8a73a4: Correct mask for GIC PPI interrupts
-In-Reply-To: <1525699193-5589-1-git-send-email-geert+renesas@glider.be>
-References: <1525699193-5589-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1525699193-5589-3-git-send-email-geert+renesas@glider.be>
+Date: Mon,  7 May 2018 15:19:51 +0200
+Subject: [PATCH v3 0/2] ARM: dts: renesas: Correct mask for GIC PPI interrupts
+Message-ID: <1525699193-5589-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R-Mobile APE6 (r8a73a4) contains four Cortex-A15 and four Cortex-A7
+        Hi Simon, Magnus,
+
+R-Car H2 and R-Mobile APE6 contain four Cortex-A15 and four Cortex-A7
 cores, hence the second interrupt specifier cell for Private Peripheral
-Interrupts should use "GIC_CPU_MASK_SIMPLE(8)", so GIC interrupts are
-delivered to all 8 processor cores.
+Interrupts should use "GIC_CPU_MASK_SIMPLE(8)", to make sure interrupts
+can be delivered to all 8 processor cores.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v3:
+This brings the predecessors of R-Car Gen3 in line with what we're doing
+on other big.LITTLE SoCs, like R-Car H3 and M3-W.
+
+Changes compared to v2:
   - Change one-line summary prefix to match current arm-soc practices,
-  - Rebased,
+  - Fast-forward by 3 years,
+  - Rebase.
 
-v2:
+Changes compared to v1:
   - Drop RFC status after receiving confirmation from Liviu Dudau.
----
- arch/arm/boot/dts/r8a73a4.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 8e48090e4fdc1412..080d037f5733a8c3 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -57,10 +57,10 @@
- 
- 	timer {
- 		compatible = "arm,armv7-timer";
--		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
- 	dbsc1: memory-controller at e6790000 {
-@@ -464,7 +464,7 @@
- 			<0 0xf1002000 0 0x2000>,
- 			<0 0xf1004000 0 0x2000>,
- 			<0 0xf1006000 0 0x2000>;
--		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
- 		clocks = <&mstp4_clks R8A73A4_CLK_INTC_SYS>;
- 		clock-names = "clk";
- 		power-domains = <&pd_c4>;
+Thanks for applying!
+
+P.S. Feel free to take a ride on your unicorn, to test on a legendary
+     system that boots all 8 cores.
+
+Geert Uytterhoeven (2):
+  ARM: dts: r8a7790: Correct mask for GIC PPI interrupts
+  ARM: dts: r8a73a4: Correct mask for GIC PPI interrupts
+
+ arch/arm/boot/dts/r8a73a4.dtsi | 10 +++++-----
+ arch/arm/boot/dts/r8a7790.dtsi | 10 +++++-----
+ 2 files changed, 10 insertions(+), 10 deletions(-)
+
 -- 
 2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
