@@ -1,158 +1,43 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Mon,  7 May 2018 21:31:14 +0800
-Subject: [PATCH v2] locking/atomics/powerpc: Move cmpxchg helpers to
- asm/cmpxchg.h and define the full set of cmpxchg APIs
-In-Reply-To: <tip-0476a632cb3aa88c03cefc294050a9a86760e88d@git.kernel.org>
-References: <tip-0476a632cb3aa88c03cefc294050a9a86760e88d@git.kernel.org>
-Message-ID: <20180507133114.10106-1-boqun.feng@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 7 May 2018 08:37:44 -0500
+Subject: [RFC PATCH] driver core: make deferring probe forever optional
+In-Reply-To: <20180505012513.GJ13402@sirena.org.uk>
+References: <20180501213114.20183-1-robh@kernel.org>
+ <f808a652-2454-941c-2fd1-60776fb353f6@arm.com>
+ <CAL_JsqJvMyrKS4LsRC6fDus24Yg8U+VcrbNNvxtOXmKbrc8RAA@mail.gmail.com>
+ <74d495d8-04e2-fb7d-7d07-0905fbc8a6cf@arm.com>
+ <20180505012513.GJ13402@sirena.org.uk>
+Message-ID: <CAL_Jsq+WDrx6Jfoa5drutK-LaVE9xSfttFSGrsgNxPG60DmWJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move PowerPC's __op_{acqurie,release}() from atomic.h to
-cmpxchg.h (in arch/powerpc/include/asm), plus use them to
-define these two methods:
+On Fri, May 4, 2018 at 8:25 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, May 02, 2018 at 07:49:57PM +0100, Robin Murphy wrote:
+>
+>> I guess there's also the possibility that a single driver may want multiple
+>> behaviours, if e.g. if SoC variants A and B have some identical peripherals
+>> but slightly different pinctrl/IOMMU/etc. hardware such that A has workable
+>> default behaviour and can be treated as optional, whereas B absolutely must
+>> be controlled by the kernel for the consumers to function properly, and they
+>> *should* defer forever otherwise. I think that would pretty much demand some
+>> sort of explicitly-curated white/blacklist setup at the subsystem or driver
+>> level.
+>
+> Different board variants, and possibly even different bootloaders might
+> also be an issue here - a vendor bootloader might do pinmuxing that an
+> upstream bootloader doesn't for example.  In some cases the pinmuxing
+> even depends on the boot method with things only getting configured if
+> the bootloader wanted to use them.
 
-	#define cmpxchg_release __op_release(cmpxchg, __VA_ARGS__);
-	#define cmpxchg64_release __op_release(cmpxchg64, __VA_ARGS__);
+I think this is going to be too big of a hammer for pinctrl at least.
+My current thought is to define a pinctrl DT property to indicate pins
+are configured already which the OS can use to decide if pinctrl is
+optional or not. I'd prefer to keep it simple and be a per pin
+controller flag even though this is quite possibly a per client or pin
+group state (as you say, the bootloader may only configure what it
+uses). Making this per pin group could be a lot of nodes and difficult
+to really get right without testing. Making it per pin controller
+could make drivers fail in less predictable ways if their pins are not
+configured.
 
-... the idea is to generate all these methods in cmpxchg.h and to define the full
-array of atomic primitives, including the cmpxchg_release() methods which were
-defined by the generic code before.
-
-Also define the atomic[64]_() variants explicitly.
-
-This ensures that all these low level cmpxchg APIs are defined in
-PowerPC headers, with no generic header fallbacks.
-
-Also remove the duplicate definitions of atomic_xchg() and
-atomic64_xchg() in asm/atomic.h: they could be generated via the generic
-atomic.h header using _relaxed() primitives. This helps ppc adopt the
-upcoming change of generic atomic.h header.
-
-No change in functionality or code generation.
-
-Signed-off-by: Boqun Feng <boqun.feng@gmail.com>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: aryabinin at virtuozzo.com
-Cc: catalin.marinas at arm.com
-Cc: dvyukov at google.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: will.deacon at arm.com
----
-v1 --> v2:
-	remove duplicate definitions for atomic*_xchg() for future
-	change
-
-Ingo,
-	I also remove the link and your SoB because I think your bot
-	could add them automatically.
-
- arch/powerpc/include/asm/atomic.h  | 24 ++++--------------------
- arch/powerpc/include/asm/cmpxchg.h | 24 ++++++++++++++++++++++++
- 2 files changed, 28 insertions(+), 20 deletions(-)
-
-diff --git a/arch/powerpc/include/asm/atomic.h b/arch/powerpc/include/asm/atomic.h
-index 682b3e6a1e21..583837a41bcc 100644
---- a/arch/powerpc/include/asm/atomic.h
-+++ b/arch/powerpc/include/asm/atomic.h
-@@ -13,24 +13,6 @@
- 
- #define ATOMIC_INIT(i)		{ (i) }
- 
--/*
-- * Since *_return_relaxed and {cmp}xchg_relaxed are implemented with
-- * a "bne-" instruction at the end, so an isync is enough as a acquire barrier
-- * on the platform without lwsync.
-- */
--#define __atomic_op_acquire(op, args...)				\
--({									\
--	typeof(op##_relaxed(args)) __ret  = op##_relaxed(args);		\
--	__asm__ __volatile__(PPC_ACQUIRE_BARRIER "" : : : "memory");	\
--	__ret;								\
--})
--
--#define __atomic_op_release(op, args...)				\
--({									\
--	__asm__ __volatile__(PPC_RELEASE_BARRIER "" : : : "memory");	\
--	op##_relaxed(args);						\
--})
--
- static __inline__ int atomic_read(const atomic_t *v)
- {
- 	int t;
-@@ -213,8 +195,9 @@ static __inline__ int atomic_dec_return_relaxed(atomic_t *v)
- 	cmpxchg_relaxed(&((v)->counter), (o), (n))
- #define atomic_cmpxchg_acquire(v, o, n) \
- 	cmpxchg_acquire(&((v)->counter), (o), (n))
-+#define atomic_cmpxchg_release(v, o, n) \
-+	cmpxchg_release(&((v)->counter), (o), (n))
- 
--#define atomic_xchg(v, new) (xchg(&((v)->counter), new))
- #define atomic_xchg_relaxed(v, new) xchg_relaxed(&((v)->counter), (new))
- 
- /**
-@@ -519,8 +502,9 @@ static __inline__ long atomic64_dec_if_positive(atomic64_t *v)
- 	cmpxchg_relaxed(&((v)->counter), (o), (n))
- #define atomic64_cmpxchg_acquire(v, o, n) \
- 	cmpxchg_acquire(&((v)->counter), (o), (n))
-+#define atomic64_cmpxchg_release(v, o, n) \
-+	cmpxchg_release(&((v)->counter), (o), (n))
- 
--#define atomic64_xchg(v, new) (xchg(&((v)->counter), new))
- #define atomic64_xchg_relaxed(v, new) xchg_relaxed(&((v)->counter), (new))
- 
- /**
-diff --git a/arch/powerpc/include/asm/cmpxchg.h b/arch/powerpc/include/asm/cmpxchg.h
-index 9b001f1f6b32..e27a612b957f 100644
---- a/arch/powerpc/include/asm/cmpxchg.h
-+++ b/arch/powerpc/include/asm/cmpxchg.h
-@@ -8,6 +8,24 @@
- #include <asm/asm-compat.h>
- #include <linux/bug.h>
- 
-+/*
-+ * Since *_return_relaxed and {cmp}xchg_relaxed are implemented with
-+ * a "bne-" instruction at the end, so an isync is enough as a acquire barrier
-+ * on the platform without lwsync.
-+ */
-+#define __atomic_op_acquire(op, args...)				\
-+({									\
-+	typeof(op##_relaxed(args)) __ret  = op##_relaxed(args);		\
-+	__asm__ __volatile__(PPC_ACQUIRE_BARRIER "" : : : "memory");	\
-+	__ret;								\
-+})
-+
-+#define __atomic_op_release(op, args...)				\
-+({									\
-+	__asm__ __volatile__(PPC_RELEASE_BARRIER "" : : : "memory");	\
-+	op##_relaxed(args);						\
-+})
-+
- #ifdef __BIG_ENDIAN
- #define BITOFF_CAL(size, off)	((sizeof(u32) - size - off) * BITS_PER_BYTE)
- #else
-@@ -512,6 +530,9 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
- 			(unsigned long)_o_, (unsigned long)_n_,		\
- 			sizeof(*(ptr)));				\
- })
-+
-+#define cmpxchg_release(...) __atomic_op_release(cmpxchg, __VA_ARGS__)
-+
- #ifdef CONFIG_PPC64
- #define cmpxchg64(ptr, o, n)						\
-   ({									\
-@@ -533,6 +554,9 @@ __cmpxchg_acquire(void *ptr, unsigned long old, unsigned long new,
- 	BUILD_BUG_ON(sizeof(*(ptr)) != 8);				\
- 	cmpxchg_acquire((ptr), (o), (n));				\
- })
-+
-+#define cmpxchg64_release(...) __atomic_op_release(cmpxchg64, __VA_ARGS__)
-+
- #else
- #include <asm-generic/cmpxchg-local.h>
- #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
--- 
-2.16.2
+Rob
