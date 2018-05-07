@@ -1,28 +1,31 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 7 May 2018 09:33:07 +0200
-Subject: [PATCH] arm: Convert arm boot_lock to raw
-In-Reply-To: <20180506182325.w7yvrpp3hcii54pj@kozik-lap>
-References: <20180504105600.20613-1-bigeasy@linutronix.de>
- <20180506182325.w7yvrpp3hcii54pj@kozik-lap>
-Message-ID: <20180507073307.uuumknm4fx3wbq3u@linutronix.de>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Mon, 7 May 2018 15:42:15 +0800
+Subject: [PATCH] arm: oxnas: remove non-necessary flush_cache_all()
+Message-ID: <20180507154215.45a9348f@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-06 20:23:25 [+0200], Krzysztof Kozlowski wrote:
-> >  arch/arm/mach-actions/platsmp.c   |    6 +++---
-> >  arch/arm/mach-exynos/platsmp.c    |   12 ++++++------
-> 
-> I assume this is needed for -rt patches?
-correct.
+I believe the flush_cache_all() after scu_enable() is to "Ensure that
+the data accessed by CPU0 before the SCU was initialised is visible
+to the other CPUs." as commented in scu_enable(). So flush_cache_all()
+here is a duplication of the one in scu_enable(), remove it.
 
-> For Exynos:
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Tested on Exynos5422 (Odroid HC1) with Linaro PM-QA:
-> Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+---
+ arch/arm/mach-oxnas/platsmp.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-thank you.
-
-> Best regards,
-> Krzysztof
-
-Sebastian
+diff --git a/arch/arm/mach-oxnas/platsmp.c b/arch/arm/mach-oxnas/platsmp.c
+index 442cc8a2f7dc..1a8e1e9fc222 100644
+--- a/arch/arm/mach-oxnas/platsmp.c
++++ b/arch/arm/mach-oxnas/platsmp.c
+@@ -85,7 +85,6 @@ static void __init ox820_smp_prepare_cpus(unsigned int max_cpus)
+ 		goto unmap_scu;
+ 
+ 	scu_enable(scu_base);
+-	flush_cache_all();
+ 
+ unmap_scu:
+ 	iounmap(scu_base);
+-- 
+2.17.0
