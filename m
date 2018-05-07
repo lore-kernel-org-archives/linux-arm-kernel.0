@@ -1,32 +1,15 @@
-From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Mon, 7 May 2018 01:40:24 +0000
-Subject: [PATCH -next] gpio: Fix return value check in owl_gpio_probe()
-Message-ID: <1525657224-88189-1-git-send-email-weiyongjun1@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 7 May 2018 09:36:31 +0800
+Subject: [PATCH V7 1/7] ARM: dts: imx6sx-sabreauto: add PMIC support
+In-Reply-To: <1525588093-29994-1-git-send-email-Anson.Huang@nxp.com>
+References: <1525588093-29994-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180507013630.GI3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of error, the function of_iomap() returns NULL pointer not
-ERR_PTR(). The IS_ERR() test in the return value check should be
-replaced with NULL test.
+On Sun, May 06, 2018 at 02:28:07PM +0800, Anson Huang wrote:
+> Add pfuze100 support on i.MX6SX Sabre Auto board.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Fixes: d3654d38809c ("gpio: Add gpio driver for Actions OWL S900 SoC")
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/gpio/gpio-owl.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpio/gpio-owl.c b/drivers/gpio/gpio-owl.c
-index 3546362..f35e80f 100644
---- a/drivers/gpio/gpio-owl.c
-+++ b/drivers/gpio/gpio-owl.c
-@@ -128,8 +128,8 @@ static int owl_gpio_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	gpio->base = of_iomap(dev->of_node, 0);
--	if (IS_ERR(gpio->base))
--		return PTR_ERR(gpio->base);
-+	if (!gpio->base)
-+		return -ENOMEM;
- 
- 	/*
- 	 * Get the number of gpio's for this bank. If none specified,
+Applied all, thanks.
