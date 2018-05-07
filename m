@@ -1,114 +1,89 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Mon, 07 May 2018 20:50:23 +0200
-Subject: [PATCH v3 1/3] drm/panel: Add RGB666 variant of Innolux AT070TN90
-In-Reply-To: <20180507070855.dh47obvpmze577x5@flea>
-References: <20180506214901.23429-1-contact@paulk.fr>
- <20180507070855.dh47obvpmze577x5@flea>
-Message-ID: <8050492b544e5783d16eb74050313bfdddc0fc0d.camel@paulk.fr>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 7 May 2018 12:28:37 -0700
+Subject: [PATCH 3/3] iommu: armsmmu: set iommu ops for rpmsg bus
+In-Reply-To: <57fc5480-c57e-dfd3-e6af-5e5bba296430@arm.com>
+References: <20180302145531.20463-1-srinivas.kandagatla@linaro.org>
+ <20180302145531.20463-4-srinivas.kandagatla@linaro.org>
+ <57fc5480-c57e-dfd3-e6af-5e5bba296430@arm.com>
+Message-ID: <CAOCOHw4RDwmbCySN==-zT7cQ6abzLzKUhBHBSdv_EvWnU4g4Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Mar 2, 2018 at 8:59 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 02/03/18 14:55, srinivas.kandagatla at linaro.org wrote:
+>>
+>> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>>
+>> On Qualcomm SoCs, ADSP exposes many functions like audio and
+>> others. These services need iommu access to allocate any
+>> memory for the DSP. As these drivers are childeren of
+>> rpmsg bus, able to allocate memory from iommus is basic
+>> requirement. So set arm smmu iommu ops for this bus type.
+>
 
-Le lundi 07 mai 2018 ? 09:08 +0200, Maxime Ripard a ?crit :
-> Hi,
-> 
-> On Sun, May 06, 2018 at 11:48:59PM +0200, Paul Kocialkowski wrote:
-> > This adds timings for the RGB666 variant of the Innolux AT070TN90
-> > panel,
-> > as found on the Ainol AW1 tablet.
-> > 
-> > The panel also supports RGB888 output. When RGB666 mode is used
-> > instead,
-> > the two extra lanes per component are grounded.
-> > 
-> > In the future, it might become necessary to introduce a dedicated
-> > device-tree property to specify the bus format and maybe specify it
-> > in
-> > the mode description instead of panel description so that the
-> > appropriate mode can be selected for each bus format.
-> > 
-> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> 
-> A change log would be nice. Also, you mentionned in your first version
-> that the screen was an AT070TN92, and now you mention that it is an
-> AT070TN90, which one is it?
+Forgot to answer this and the dma_ops patch seems to be going in the
+right direction.
 
-Yes, I should probably have explained why I changed the model here.
-I checked on the device yesterday and found that the ribbon cable
-indicates AT070TN90. I am not sure why I was initially assuming that the
-panel was an AT070TN92. 
+>
+> Documentation/rpmsg.txt: "Every rpmsg device is a communication channel with
+> a remote processor (thus rpmsg devices are called channels)."
+>
+> I'd instinctively assume that a remote processor already has its own memory,
+> and that a communication channel doesn't somehow go directly through an
+> IOMMU, so that "basic requirement" seems like a pretty big assumption.
+>
 
-> Maxime
-> 
-> > ---
-> >  drivers/gpu/drm/panel/panel-simple.c | 26
-> > ++++++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/panel/panel-simple.c
-> > b/drivers/gpu/drm/panel/panel-simple.c
-> > index cbf1ab404ee7..351742df8ee1 100644
-> > --- a/drivers/gpu/drm/panel/panel-simple.c
-> > +++ b/drivers/gpu/drm/panel/panel-simple.c
-> > @@ -1086,6 +1086,29 @@ static const struct panel_desc
-> > innolux_at070tn92 = {
-> >  	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-> >  };
-> >  
-> > +static const struct drm_display_mode innolux_at070tn90_mode = {
-> > +	.clock = 40000,
-> > +	.hdisplay = 800,
-> > +	.hsync_start = 800 + 112,
-> > +	.hsync_end = 800 + 112 + 1,
-> > +	.htotal = 800 + 112 + 1 + 87,
-> > +	.vdisplay = 480,
-> > +	.vsync_start = 480 + 141,
-> > +	.vsync_end = 480 + 141 + 1,
-> > +	.vtotal = 480 + 141 + 1 + 38,
-> > +	.vrefresh = 60,
-> > +};
-> > +
-> > +static const struct panel_desc innolux_at070tn90 = {
-> > +	.modes = &innolux_at070tn90_mode,
-> > +	.num_modes = 1,
-> > +	.size = {
-> > +		.width = 154,
-> > +		.height = 86,
-> > +	},
-> > +	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-> > +};
-> > +
-> >  static const struct display_timing innolux_g101ice_l01_timing = {
-> >  	.pixelclock = { 60400000, 71100000, 74700000 },
-> >  	.hactive = { 1280, 1280, 1280 },
-> > @@ -2154,6 +2177,9 @@ static const struct of_device_id
-> > platform_of_match[] = {
-> >  	}, {
-> >  		.compatible = "innolux,at070tn92",
-> >  		.data = &innolux_at070tn92,
-> > +	}, {
-> > +		.compatible = "innolux,at070tn90",
-> > +		.data = &innolux_at070tn90,
-> 
-> This should be ordered alphabetically.
+As of today rpmsg exclusively uses system memory for implementing the
+communication fifos, but this memory is owned/handled by the rpmsg
+bus. The need here is for drivers on top of the rpmsg_bus,
+implementing some application-level protocol that requires indirection
+buffers; e.g. to achieve zero copy of audio or image buffers that the
+remote processor is expected to operate on. In this case the device
+sitting on top of the rpmsg bus will have to map the buffer to the
+appropriate context and can then send application specific control
+requests referencing this mapping.
 
-Thanks for the review!
+As different parts of the firmware might operate in different contexts
+it's not feasible to utilize the parent's (the rpmsg_bus) context for
+these indirection buffers.
 
-Cheers,
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   drivers/iommu/arm-smmu.c | 5 +++++
+>>   1 file changed, 5 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index e6920d32ac9e..9b63489af15c 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -53,6 +53,7 @@
+>>   #include <linux/spinlock.h>
+>>     #include <linux/amba/bus.h>
+>> +#include <linux/rpmsg.h>
+>>     #include "io-pgtable.h"
+>>   #include "arm-smmu-regs.h"
+>> @@ -2168,6 +2169,10 @@ static void arm_smmu_bus_init(void)
+>>                 bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+>>         }
+>>   #endif
+>> +#ifdef CONFIG_RPMSG
+>
+>
+> Ah, so this will at least build OK with RPMSG=m, but I doubt it does what
+> you want it to in that case.
+>
 
-Paul
+Things have been refactored but the core has remained tristate,
+causing extra head aches in various areas. I think it's very
+reasonable to review the rpmsg config options and make CONFIG_RPMSG
+bool.
 
--- 
-Developer of free digital technology and hardware support.
+So with the addition of making CONFIG_RPMSG bool the patch has my Acked-by.
 
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180507/9dfbd569/attachment.sig>
+That said I'm generally concerned about the first probed iommu
+implementation assigning itself as the sole iommu implementation for
+all busses, but I guess we haven't yet hit the point where there are
+different iommu implementations in a single SoC?
+
+Regards,
+Bjorn
