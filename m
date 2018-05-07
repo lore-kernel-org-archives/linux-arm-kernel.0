@@ -1,215 +1,94 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 7 May 2018 16:21:41 +0900
-Subject: [PATCH v9 06/11] arm64: kexec_file: allow for loading
- Image-format kernel
-In-Reply-To: <c604b578-6667-3532-eac9-55c428001025@arm.com>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-7-takahiro.akashi@linaro.org>
- <c604b578-6667-3532-eac9-55c428001025@arm.com>
-Message-ID: <20180507072139.GF11326@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 7 May 2018 09:30:13 +0200
+Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
+ HMI
+In-Reply-To: <afc78821-2d08-3f4f-d008-5b2d216e96c0@micronovasrl.com>
+References: <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180322180508.my64gobhh5rc2x2m@flea>
+ <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
+ <20180424084137.7xfwji2gcibxavvt@flea>
+ <03a02abb-e95c-b4ec-748f-907c0af67969@micronovasrl.com>
+ <20180425184016.xktppxw7egddr7li@flea>
+ <42feccc9-1d09-9ff2-3ccc-1dea63bacfb6@micronovasrl.com>
+ <839d2560-0250-9b3a-8019-4e83d9e931e2@micronovasrl.com>
+ <20180504080652.dniwaqqhbeuknp7y@flea>
+ <afc78821-2d08-3f4f-d008-5b2d216e96c0@micronovasrl.com>
+Message-ID: <20180507073013.dvtbmwi4ora6tdj2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
-
-On Tue, May 01, 2018 at 06:46:11PM +0100, James Morse wrote:
-> Hi Akashi,
+On Fri, May 04, 2018 at 11:52:59PM +0200, Giulio Benetti wrote:
+> Hi Maxime!
 > 
-> On 25/04/18 07:26, AKASHI Takahiro wrote:
-> > This patch provides kexec_file_ops for "Image"-format kernel. In this
-> > implementation, a binary is always loaded with a fixed offset identified
-> > in text_offset field of its header.
+> Il 04/05/2018 10:06, Maxime Ripard ha scritto:
+> > Hi,
+> > 
+> > On Wed, May 02, 2018 at 06:41:34PM +0200, Giulio Benetti wrote:
+> > > > > You don't have to handcode the fragments anymore with the new syntax,
+> > > > > and U-Boot makes it really trivial to use if you use the FIT image
+> > > > > format to have multiple overlays bundled in the same image. You can
+> > > > > choose to apply them dynamically, for example based on an EEPROM or
+> > > > > some other metric to see which combination you have.
+> > > > 
+> > > > Ah, this is interesting. I'm going to experiment with that.
+> > > > 
+> > > 
+> > > I'm struggling against this, I don't really know how to proceed,
+> > > except keeping monolithic dts files including other dtsi files.
+> > > 
+> > > About dt-overlays I've tried to look around lot of time,
+> > > but the only thing I've found is this:
+> > > https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git/tree/arch/arm/boot/dts?h=topic/renesas-overlays
+> > > 
+> > > where they use .dtso tagging them as "/plugin/;"
+> > > and compile all .dtso found in dts folder.
+> > > Then they obtain .dtbo files that should be the dt-overlays we have spoken
+> > > about right?
+> > 
+> > Yes. You don't have to do that though, you can just rely on dtc to
+> > compile them, outside of the linux build system.
+> > 
+> > > What I can't understand is if there's a real standard at this time to
+> > > follow, because on renesas-driver they use their way to handle all .dtso
+> > > files, but on mainline there seems to be nothing about that.
+> > 
+> > I'm not sure what you mean here. It's just fragments of device tree,
+> > that have to be compiled using dtc, that's it. You can use the Linux
+> > build system infrastructure to do that, or you can build your own
+> > simpler one. That's really up to you. See for example
+> > https://github.com/NextThingCo/CHIP-dt-overlays/blob/master/Makefile
+> > 
+> > (even though the overlays themselves use the legacy syntax and
+> > shouldn't really be used an examples)
 > 
+> Everything works now!
+> Thank you very much!
+> I've setted up a Repo on Github to give an example on how make it work with
+> no pain:
+> https://github.com/micronovasrl/linova-dtoverlays
 > 
-> > diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-> > index e4de1223715f..3cba4161818a 100644
-> > --- a/arch/arm64/include/asm/kexec.h
-> > +++ b/arch/arm64/include/asm/kexec.h
-> > @@ -102,6 +102,56 @@ struct kimage_arch {
-> >  	void *dtb_buf;
-> >  };
-> >  
-> > +/**
-> > + * struct arm64_image_header - arm64 kernel image header
-> > + *
-> > + * @pe_sig: Optional PE format 'MZ' signature
-> > + * @branch_code: Instruction to branch to stext
-> > + * @text_offset: Image load offset, little endian
-> > + * @image_size: Effective image size, little endian
-> > + * @flags:
-> > + *	Bit 0: Kernel endianness. 0=little endian, 1=big endian
+> At the moment it's a mess all around, but it's working and give an idea on
+> how to make it work. Though I'm going to clean it up well as a base for
+> linova dtoverlays.
 > 
-> Page size? What about 'phys_base'?, (whatever that is...)
-> Probably best to refer to Documentation/arm64/booting.txt here, its the
-> authoritative source of what these fields mean.
+> Ah, btw, can you confirm me that base dts file must be compiled outside
+> kernel with:
+> dtc -@ ....
+> Otherwise as in-tree dts with make dtbs "-@" argument is not passed.
+> Right?
 
-While we don't care other bit fields for now, I will add the reference
-to the Documentation file.
+You should use DTC_FLAGS='-@'
 
-> 
-> > + * @reserved: Reserved
-> > + * @magic: Magic number, "ARM\x64"
-> > + * @pe_header: Optional offset to a PE format header
-> > + **/
-> > +
-> > +struct arm64_image_header {
-> > +	u8 pe_sig[2];
-> > +	u8 pad[2];
-> > +	u32 branch_code;
-> > +	u64 text_offset;
-> > +	u64 image_size;
-> > +	u64 flags;
-> 
-> __le64 as appropriate here would let tools like sparse catch any missing endian
-> conversion bugs.
+Maxime
 
-OK.
-
-> 
-> > +	u64 reserved[3];
-> > +	u8 magic[4];
-> > +	u32 pe_header;
-> > +};
-> 
-> I'm surprised we don't have a definition for this already, I guess its always
-> done in asm. We have kernel/image.h that holds some of this stuff, if we are
-> going to validate the flags, is it worth adding the code there, (and moving it
-> to include/asm)?
-
-A comment at the beginning of this file says,
-    #ifndef LINKER_SCRIPT
-    #error This file should only be included in vmlinux.lds.S
-    #endif
-Let me think about.
-
-> 
-> > +static const u8 arm64_image_magic[4] = {'A', 'R', 'M', 0x64U};
-> 
-> Any chance this magic could be a pre-processor symbol shared with head.S?
-
-OK.
-
-> 
-> > +
-> > +/**
-> > + * arm64_header_check_magic - Helper to check the arm64 image header.
-> > + *
-> > + * Returns non-zero if header is OK.
-> > + */
-> > +
-> > +static inline int arm64_header_check_magic(const struct arm64_image_header *h)
-> > +{
-> > +	if (!h)
-> > +		return 0;
-> > +
-> > +	if (!h->text_offset)
-> > +		return 0;
-> > +
-> > +	return (h->magic[0] == arm64_image_magic[0]
-> > +		&& h->magic[1] == arm64_image_magic[1]
-> > +		&& h->magic[2] == arm64_image_magic[2]
-> > +		&& h->magic[3] == arm64_image_magic[3]);
-> 
-> memcmp()? Or just define it as a 32bit value?
-
-OK. As you know, I always tried to keep the code not diverted
-from kexec-tools for maintainability reason.
-
-> I guess you skip the MZ prefix as its not present for !EFI?
-
-CONFIG_KEXEC_IMAGE_VERIFY_SIG depends on the fact that the file
-format is PE (that is, EFI is enabled).
-
-
-> Could we check branch_code is non-zero, and text-offset points within image-size?
-
-We could do it, but I don't think this check is very useful.
-
-> 
-> We could check that this platform supports the page-size/endian config that this
-> Image was built with... We get a message from the EFI stub if the page-size
-> can't be supported, it would be nice to do the same here (as we can).
-
-There is no restriction on page-size or endianness for kexec.
-What will be the purpose of this check?
-
-> (no idea if kexec-tool checks this stuff, it probably can't get at the id
-> registers to know)
-> 
-> 
-> > diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-> > new file mode 100644
-> > index 000000000000..4dd524ad6611
-> > --- /dev/null
-> > +++ b/arch/arm64/kernel/kexec_image.c
-> > @@ -0,0 +1,79 @@
-> 
-> > +static void *image_load(struct kimage *image,
-> > +				char *kernel, unsigned long kernel_len,
-> > +				char *initrd, unsigned long initrd_len,
-> > +				char *cmdline, unsigned long cmdline_len)
-> > +{
-> > +	struct kexec_buf kbuf;
-> > +	struct arm64_image_header *h = (struct arm64_image_header *)kernel;
-> > +	unsigned long text_offset;
-> > +	int ret;
-> > +
-> > +	/* Load the kernel */
-> > +	kbuf.image = image;
-> > +	kbuf.buf_min = 0;
-> > +	kbuf.buf_max = ULONG_MAX;
-> > +	kbuf.top_down = false;
-> > +
-> > +	kbuf.buffer = kernel;
-> > +	kbuf.bufsz = kernel_len;
-> > +	kbuf.memsz = le64_to_cpu(h->image_size);
-> > +	text_offset = le64_to_cpu(h->text_offset);
-> > +	kbuf.buf_align = SZ_2M;
-> 
-> > +	/* Adjust kernel segment with TEXT_OFFSET */
-> > +	kbuf.memsz += text_offset;
-> > +
-> > +	ret = kexec_add_buffer(&kbuf);
-> > +	if (ret)
-> > +		goto out;
-> > +
-> > +	image->arch.kern_segment = image->nr_segments - 1;
-> 
-> You only seem to use kern_segment here, and in load_other_segments() called
-> below. Could it not be a local variable passed in? Instead of arch-specific data
-> we keep forever?
-
-No, kern_segment is also used in load_other_segments() in machine_kexec_file.c.
-To optimize memory hole allocation logic in locate_mem_hole_callback(),
-we need to know the exact range of kernel image (start and end).
-
-(Known drawback in this code is that Image only occupies one segment, but
-once vmlinux might be supported, it would occupy two segments for text and
-data.)
-
-> 
-> > +	image->segment[image->arch.kern_segment].mem += text_offset;
-> > +	image->segment[image->arch.kern_segment].memsz -= text_offset;
-> > +	image->start = image->segment[image->arch.kern_segment].mem;
-> > +
-> > +	pr_debug("Loaded kernel at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
-> > +				image->segment[image->arch.kern_segment].mem,
-> > +				kbuf.bufsz, kbuf.memsz);
-> > +
-> > +	/* Load additional data */
-> > +	ret = load_other_segments(image, initrd, initrd_len,
-> > +				cmdline, cmdline_len);
-> > +
-> > +out:
-> > +	return ERR_PTR(ret);
-> > +}
-> Looks good,
-
-Thank you for thorough review.
-
--Takahiro AKASHI
-
-
-> Thanks,
-> 
-> James
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180507/73b6662a/attachment.sig>
