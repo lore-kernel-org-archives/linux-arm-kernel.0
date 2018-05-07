@@ -1,149 +1,56 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon,  7 May 2018 14:44:46 +0200
-Subject: [PATCH v3 00/14] Sunxi-Cedrus driver for the Allwinner Video Engine,
- using media requests
-Message-ID: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+Date: Mon,  7 May 2018 14:44:47 +0200
+Subject: [PATCH v3 01/14] drivers: soc: sunxi: Add support for the C1 SRAM
+ region
+In-Reply-To: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20180507124500.20434-2-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This presents a third iteration of the updated Sunxi-Cedrus driver,
-that supports the Video Engine found in most Allwinner SoCs, starting
-with the A10. It was tested on the A13, A20 and A33.
+From: Maxime Ripard <maxime.ripard@bootlin.com>
 
-The initial version of this driver[0] was originally written and
-submitted by Florent Revest using a previous version of the request API
-that is necessary to provide coherency between controls and the buffers
-they apply to.
+This introduces support for the SRAM C1 section, that is controlled by
+the system controller. This SRAM area can be muxed either to the CPU
+or the Video Engine, that needs this area to store various tables (e.g.
+the Huffman VLD decoding tables).
 
-The driver was adapted to use the latest version of the media request
-API[1], as submitted by Hand Verkuil. Media request API support is a
-hard requirement for the Sunxi-Cedrus driver.
+This only supports devices with the same layout as the A10 (which also
+includes the A13, A20, A33 and other SoCs).
 
-The driver itself currently only supports MPEG2 and more codecs will be
-added to the driver eventually. The output frames provided by the
-Video Engine are in a multi-planar 32x32-tiled YUV format, with a plane
-for luminance (Y) and a plane for chrominance (UV). A specific format is
-introduced in the V4L2 API to describe it.
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ drivers/soc/sunxi/sunxi_sram.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-This implementation is based on the significant work that was conducted
-by various members of the linux-sunxi community for understanding and
-documenting the Video Engine's innards.
-
-Changes since v2:
-* updated to version 13 of the media request API;
-* integrated various changes from Maxime Ripard;
-* reworked memory reservation to use CMA, dynamic allocation and allow
-  DMABUF;
-* removed reserved memory binding since the CMA pool is the default one
-  (and allow ENODEV in the driver, for that use case);
-* added SRAM controller support for the SRAM region used by the VE;
-* updated the device-tree bindings the for SRAM region;
-* added per-platform bindings;
-* added A13 support;
-* renamed VE node name and label;
-* fixed Florent's authorship for the MPEG2 headers;
-* added a MAINTAINERS entry.
-
-Changes since v1:
-* use the latest version of the request API for Hans Verkuil;
-* added media controller support and dependency
-* renamed v4l2 format to the more explicit V4L2_PIX_FMT_MB32_NV12;
-* reworked bindings documentation;
-* moved driver to drivers/media/platforms/sunxi/cedrus to pair with
-  incoming CSI support ;
-* added a workqueue and lists to schedule buffer completion, since it
-  cannot be done in interrupt context;
-* split mpeg2 support into a setup and a trigger function to avoid race
-  condition;
-* split video-related ops to a dedicated sunxi_cedrus_video file;
-* cleaned up the included headers for each file;
-* used device PFN offset instead of subtracting PHYS_BASE;
-* used reset_control_reset instead of assert+deassert;
-* put the device in reset when removing driver;
-* changed dt bindings to use the last 96 Mib of the first 256 MiB of
-  DRAM;
-* made it clear in the mpeg frame header structure that forward and
-  backward indexes are used as reference frames for motion vectors;
-* lots of small cosmetic and consistency changes, including naming
-  harmonization and headers text rework.
-
-Remaining tasks:
-* cleaning up registers description and documenting the fields used;
-* removing the assigned-clocks property and setting the clock rate
-  in the driver directly;
-* checking the series with checkpatch and fixing warnings;
-* documenting the MB32 NV12 format and adding it to v4l_fill_fmtdesc;
-* reworking and documenting the MPEG2 header, then adding it to
-  v4l_fill_fmtdesc;
-* checking and fixing the error paths;
-* testing on more platforms.
-
-Cheers!
-
-[0]: https://patchwork.kernel.org/patch/9299073/
-[1]: https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=reqv13
-
-Florent Revest (1):
-  media: v4l: Add definitions for MPEG2 frame format and header metadata
-
-Maxime Ripard (4):
-  drivers: soc: sunxi: Add support for the C1 SRAM region
-  ARM: sun5i: Add support for the C1 SRAM region with the SRAM
-    controller
-  ARM: sun7i-a20: Add support for the C1 SRAM region with the SRAM
-    controller
-  ARM: sun8i-a33: Add SRAM controller node and C1 SRAM region
-
-Paul Kocialkowski (9):
-  drivers: soc: sunxi: Add dedicated compatibles for the A13, A20 and
-    A33
-  ARM: dts: sun5i: Use dedicated SRAM controller compatible
-  ARM: dts: sun7i-a20: Use dedicated SRAM controller compatible
-  media: v4l: Add definition for Allwinner's MB32-tiled NV12 format
-  dt-bindings: media: Document bindings for the Sunxi-Cedrus VPU driver
-  media: platform: Add Sunxi-Cedrus VPU decoder driver
-  ARM: dts: sun5i: Add Video Engine and reserved memory nodes
-  ARM: dts: sun7i-a20: Add Video Engine and reserved memory nodes
-  ARM: dts: sun8i-a33: Add Video Engine and reserved memory nodes
-
- .../devicetree/bindings/media/sunxi-cedrus.txt     |  58 +++
- MAINTAINERS                                        |   7 +
- arch/arm/boot/dts/sun5i.dtsi                       |  47 +-
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  47 +-
- arch/arm/boot/dts/sun8i-a33.dtsi                   |  54 +++
- drivers/media/platform/Kconfig                     |  15 +
- drivers/media/platform/Makefile                    |   1 +
- drivers/media/platform/sunxi/cedrus/Makefile       |   4 +
- drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c | 333 ++++++++++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_common.h    | 128 ++++++
- .../media/platform/sunxi/cedrus/sunxi_cedrus_dec.c | 188 ++++++++
- .../media/platform/sunxi/cedrus/sunxi_cedrus_dec.h |  35 ++
- .../media/platform/sunxi/cedrus/sunxi_cedrus_hw.c  | 240 ++++++++++
- .../media/platform/sunxi/cedrus/sunxi_cedrus_hw.h  |  37 ++
- .../platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c     | 160 +++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h     |  33 ++
- .../platform/sunxi/cedrus/sunxi_cedrus_regs.h      | 175 +++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_video.c     | 505 +++++++++++++++++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_video.h     |  31 ++
- drivers/media/v4l2-core/v4l2-ctrls.c               |  10 +
- drivers/media/v4l2-core/v4l2-ioctl.c               |   1 +
- drivers/soc/sunxi/sunxi_sram.c                     |  13 +
- include/uapi/linux/v4l2-controls.h                 |  26 ++
- include/uapi/linux/videodev2.h                     |   4 +
- 24 files changed, 2150 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
- create mode 100644 drivers/media/platform/sunxi/cedrus/Makefile
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_regs.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.h
-
+diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
+index 882be5ed7e84..74cb81f37bd6 100644
+--- a/drivers/soc/sunxi/sunxi_sram.c
++++ b/drivers/soc/sunxi/sunxi_sram.c
+@@ -63,6 +63,12 @@ static struct sunxi_sram_desc sun4i_a10_sram_a3_a4 = {
+ 				  SUNXI_SRAM_MAP(1, 1, "emac")),
+ };
+ 
++static struct sunxi_sram_desc sun4i_a10_sram_c1 = {
++	.data	= SUNXI_SRAM_DATA("C1", 0x0, 0x0, 31,
++				  SUNXI_SRAM_MAP(0, 0, "cpu"),
++				  SUNXI_SRAM_MAP(0x7fffffff, 1, "ve")),
++};
++
+ static struct sunxi_sram_desc sun4i_a10_sram_d = {
+ 	.data	= SUNXI_SRAM_DATA("D", 0x4, 0x0, 1,
+ 				  SUNXI_SRAM_MAP(0, 0, "cpu"),
+@@ -80,6 +86,10 @@ static const struct of_device_id sunxi_sram_dt_ids[] = {
+ 		.compatible	= "allwinner,sun4i-a10-sram-a3-a4",
+ 		.data		= &sun4i_a10_sram_a3_a4.data,
+ 	},
++	{
++		.compatible	= "allwinner,sun4i-a10-sram-c1",
++		.data		= &sun4i_a10_sram_c1.data,
++	},
+ 	{
+ 		.compatible	= "allwinner,sun4i-a10-sram-d",
+ 		.data		= &sun4i_a10_sram_d.data,
 -- 
 2.16.3
