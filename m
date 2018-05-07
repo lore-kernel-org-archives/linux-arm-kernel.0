@@ -1,26 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 7 May 2018 11:28:31 -0500
-Subject: [PATCH v2 1/3] dt-bindings: iio: stm32-adc: add support for
- STM32MP1
-In-Reply-To: <1525247091-18143-2-git-send-email-fabrice.gasnier@st.com>
-References: <1525247091-18143-1-git-send-email-fabrice.gasnier@st.com>
- <1525247091-18143-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180507162830.GA11497@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 May 2018 09:34:44 -0700
+Subject: [GIT PULL] one bug fix and few other fixes for v4.17-rc cycle
+In-Reply-To: <CAHCN7xLZ-qY95qy6ntucc782nm9bzF=pV-G9KbFdk=dxww5sXg@mail.gmail.com>
+References: <pull-1525448974-362873@atomide.com>
+ <20180505194326.GI98604@atomide.com>
+ <CAHCN7xJ8yAU=zjJuS6rPh61qNuRc7nr2e+i0z-YHCZQREcs0Yg@mail.gmail.com>
+ <20180507153133.GN98604@atomide.com>
+ <CAHCN7xLZ-qY95qy6ntucc782nm9bzF=pV-G9KbFdk=dxww5sXg@mail.gmail.com>
+Message-ID: <20180507163444.GQ98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 09:44:49AM +0200, Fabrice Gasnier wrote:
-> Document support for STM32MP1 ADC. It's quite similar to STM32H7 ADC.
-> Introduce "st,stm32mp1-adc" compatible to handle variants of this
-> hardware such as vregready flag, interrupts, clock rate.
+* Adam Ford <aford173@gmail.com> [180507 16:28]:
+> On Mon, May 7, 2018 at 10:31 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > OK reverted and pushed out omap-for-v4.17/fixes. Can you please
+> > test that branch and make sure things are OK now?
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
-> Changes in v2:
-> - Update dt-bindings following Rob's remark: STM32MP1 ADC has two
->   interrupt lines
-> ---
->  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+> I just pulled everything, built and tested.  We're good from my
+> perspective. Thank you for your patience and help.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+OK thanks!
+
+Tony
