@@ -1,115 +1,168 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 7 May 2018 15:46:02 +0200
-Subject: [PATCH 00/13] drm/kms/mode: using helper func
- drm_display_mode_to/from_videomode for calculating timing parameters
-In-Reply-To: <cover.1525087679.git.satendra.t@samsung.com>
-References: <CGME20180503082417epcas5p19ee919d68eb5ae18f183a41881869cc1@epcas5p1.samsung.com>
- <cover.1525087679.git.satendra.t@samsung.com>
-Message-ID: <20180507134602.GH12521@phenom.ffwll.local>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 7 May 2018 15:49:43 +0200
+Subject: [PATCH v3 08/14] media: v4l: Add definitions for MPEG2 frame
+ format and header metadata
+In-Reply-To: <20180507124500.20434-9-paul.kocialkowski@bootlin.com>
+References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+ <20180507124500.20434-9-paul.kocialkowski@bootlin.com>
+Message-ID: <1bd7af5a-c8d5-220c-8471-545eb1835882@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 03, 2018 at 01:53:55PM +0530, Satendra Singh Thakur wrote:
-> 1.There is a function in drm-core to calculate display timing parameters:
-> horizontal front porch, back porch, sync length,
-> vertical front porch, back porch, sync length and
-> clock in Hz.
-> However, some drivers are still calculating these parameters themselves.
-> Therefore, there is a duplication of the code.
-> This patch series replaces this redundant code with the function
-> drm_display_mode_to_videomode.
-> This removes nearly 100 redundant lines from the related drivers.
-> 2.For some drivers (sun4i) the reverse helper
-> drm_display_mode_from_videomode is used.
-> 3.For some drivers it replaces arithmatic operators (*, /) with shifting
-> operators (>>, <<).
-> 4.For some drivers DRM_MODE_FLAG_* are replaced with DISPLAY_FLAGS_* flags.
-> 5.These changes apply to following crtc and encoder drivers:
-> atmel-hlcdc
-> bridge-tc358767
-> exynos-dsi
-> fsl-dcu
-> gma500-mdfld_dsi_dpi
-> hisilicon-kirin_dsi, ade
-> meson-encoder
-> pl111-display
-> sun4i-tv
-> ti lcdc
-> tegra dc
-> mediatek dpi dsi
-> bridge-adv7533
-
-The drm_mode_to_videomode helper is meant for interop between drm and v4l,
-which have different internal structures to represent modes.
-
-For drivers that only use drm I think the better option would be to add
-these fields to struct drm_display_mode as another set of crtc_* values
-(the computed values are stored in crtc_ prefixed members). And compute
-front/back porch in drm_mode_set_crtcinfo.
-
-Then we can use these new drm_display_mode->crtc_h|vfront|back_porch
-fields in all the drivers you're changing. This way you avoid having to
-change all the drm drivers to use v4l #defines.
-
-Thanks,
-Daniel
-
+On 07/05/18 14:44, Paul Kocialkowski wrote:
+> From: Florent Revest <florent.revest@free-electrons.com>
 > 
-> Satendra Singh Thakur (13):
->   drm/kms/mode/atmel-hlcdc: using helper func
->     drm_display_mode_to_videomode for calculating timing parameters
->   drm/kms/mode/bridge-tc358767: using helper func
->     drm_display_mode_to_videomode for calculating timing parameters
->   drm/kms/mode/exynos-dsi: using helper func
->     drm_display_mode_to_videomode for calculating timing parameters
->   drm/kms/mode/fsl-dcu: using helper func drm_display_mode_to_videomode 
->        for calculating timing parameters
->   drm/kms/mode/gma500-mdfld_dsi_dpi: using helper function
->     drm_display_mode_to_videomode for calculating timing parameters
->   drm/kms/mode/hisilicon-kirin-dsi-ade: using helper function    
->     drm_display_mode_to_videomode for calculating timing parameters
->   drm/kms/mode/meson-encoder: using helper function
->     drm_display_mode_to_videomode for calculating timing parameters
->   drm/kms/mode/pl111-display: using helper function
->     drm_display_mode_to_videomode for calculating timing parameters
->   drm/kms/mode/sun4i-tv: using helper func
->     drm_display_mode_from_videomode for calculating timing
->     parameters
->   drm/kms/mode/ti-lcdc: using helper func drm_display_mode_to_videomode 
->        for calculating timing parameters
->   drm/kms/mode/tegra: using helper func drm_display_mode_to_videomode
->     for calculating timing parameters
->   drm/kms/mode/mtk_dpi_dsi: using helper func
->     drm_display_mode_to_videomode for calculating timing parameters
->   drm/kms/mode/bridge-adv7533: using helper func
->     drm_display_mode_to_videomode for calculating timing parameters
+> Stateless video decoding engines require both the MPEG slices and
+> associated metadata from the video stream in order to decode frames.
 > 
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c    |  28 +++--
->  drivers/gpu/drm/bridge/adv7511/adv7533.c        |  35 +++---
->  drivers/gpu/drm/bridge/tc358767.c               |  42 +++----
->  drivers/gpu/drm/exynos/exynos_drm_dsi.c         |   9 +-
->  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c      |  29 ++---
->  drivers/gpu/drm/gma500/mdfld_dsi_dpi.c          |  28 ++---
->  drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c    |  42 ++++---
->  drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c |  52 +++------
->  drivers/gpu/drm/mediatek/mtk_dpi.c              |  60 +++++-----
->  drivers/gpu/drm/mediatek/mtk_dsi.c              |  14 +--
->  drivers/gpu/drm/meson/meson_venc.c              | 149 +++++++++++-------------
->  drivers/gpu/drm/pl111/pl111_display.c           |  40 +++----
->  drivers/gpu/drm/sun4i/sun4i_tv.c                |  67 ++++-------
->  drivers/gpu/drm/tegra/dc.c                      |  15 ++-
->  drivers/gpu/drm/tilcdc/tilcdc_crtc.c            |  60 +++++-----
->  15 files changed, 280 insertions(+), 390 deletions(-)
+> This introduces definitions for a new pixel format, describing buffers
+> with MPEG2 slice data, as well as a control structure for passing the
+> frame header (metadata) to drivers.
 > 
-> -- 
-> 2.7.4
+> Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+>  drivers/media/v4l2-core/v4l2-ctrls.c | 10 ++++++++++
+>  drivers/media/v4l2-core/v4l2-ioctl.c |  1 +
+>  include/uapi/linux/v4l2-controls.h   | 26 ++++++++++++++++++++++++++
+>  include/uapi/linux/videodev2.h       |  3 +++
+>  4 files changed, 40 insertions(+)
 > 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+> index df58a23eb731..cdf860c8e3d8 100644
+> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> @@ -826,6 +826,7 @@ const char *v4l2_ctrl_get_name(u32 id)
+>  	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return "Vertical MV Search Range";
+>  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return "Repeat Sequence Header";
+>  	case V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME:		return "Force Key Frame";
+> +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:		return "MPEG2 Frame Header";
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+This compound control needs to be documented in the V4l2 spec.
+
+>  
+>  	/* VPX controls */
+>  	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		return "VPX Number of Partitions";
+> @@ -1271,6 +1272,9 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+>  	case V4L2_CID_RDS_TX_ALT_FREQS:
+>  		*type = V4L2_CTRL_TYPE_U32;
+>  		break;
+> +	case V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR:
+> +		*type = V4L2_CTRL_TYPE_MPEG2_FRAME_HDR;
+> +		break;
+>  	default:
+>  		*type = V4L2_CTRL_TYPE_INTEGER;
+>  		break;
+> @@ -1591,6 +1595,9 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
+>  			return -ERANGE;
+>  		return 0;
+>  
+> +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
+> +		return 0;
+> +
+>  	default:
+>  		return -EINVAL;
+>  	}
+> @@ -2165,6 +2172,9 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
+>  	case V4L2_CTRL_TYPE_U32:
+>  		elem_size = sizeof(u32);
+>  		break;
+> +	case V4L2_CTRL_TYPE_MPEG2_FRAME_HDR:
+> +		elem_size = sizeof(struct v4l2_ctrl_mpeg2_frame_hdr);
+> +		break;
+>  	default:
+>  		if (type < V4L2_CTRL_COMPOUND_TYPES)
+>  			elem_size = sizeof(s32);
+> diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+> index 561a1fe3160b..38d318c47c55 100644
+> --- a/drivers/media/v4l2-core/v4l2-ioctl.c
+> +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+> @@ -1274,6 +1274,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+>  		case V4L2_PIX_FMT_VP8:		descr = "VP8"; break;
+>  		case V4L2_PIX_FMT_VP9:		descr = "VP9"; break;
+>  		case V4L2_PIX_FMT_HEVC:		descr = "HEVC"; break; /* aka H.265 */
+> +		case V4L2_PIX_FMT_MPEG2_FRAME:	descr = "MPEG2 Frame"; break;
+
+Needs to be documented in the spec.
+
+>  		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA YUV"; break;
+>  		case V4L2_PIX_FMT_WNVA:		descr = "WNVA"; break;
+>  		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA SN9C10X"; break;
+> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> index 8d473c979b61..23da8bfa7e6f 100644
+> --- a/include/uapi/linux/v4l2-controls.h
+> +++ b/include/uapi/linux/v4l2-controls.h
+> @@ -557,6 +557,8 @@ enum v4l2_mpeg_video_mpeg4_profile {
+>  };
+>  #define V4L2_CID_MPEG_VIDEO_MPEG4_QPEL		(V4L2_CID_MPEG_BASE+407)
+>  
+> +#define V4L2_CID_MPEG_VIDEO_MPEG2_FRAME_HDR     (V4L2_CID_MPEG_BASE+450)
+> +
+>  /*  Control IDs for VP8 streams
+>   *  Although VP8 is not part of MPEG we add these controls to the MPEG class
+>   *  as that class is already handling other video compression standards
+> @@ -1076,4 +1078,28 @@ enum v4l2_detect_md_mode {
+>  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
+>  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
+>  
+> +struct v4l2_ctrl_mpeg2_frame_hdr {
+> +	__u32 slice_len;
+> +	__u32 slice_pos;
+> +	enum { MPEG1, MPEG2 } type;
+
+Still an enum?
+
+> +
+> +	__u16 width;
+> +	__u16 height;
+> +
+> +	enum { PCT_I = 1, PCT_P, PCT_B, PCT_D } picture_coding_type;
+> +	__u8 f_code[2][2];
+> +
+> +	__u8 intra_dc_precision;
+> +	__u8 picture_structure;
+> +	__u8 top_field_first;
+> +	__u8 frame_pred_frame_dct;
+> +	__u8 concealment_motion_vectors;
+> +	__u8 q_scale_type;
+> +	__u8 intra_vlc_format;
+> +	__u8 alternate_scan;
+> +
+> +	__u8 backward_ref_index;
+> +	__u8 forward_ref_index;
+> +};
+> +
+>  #endif
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index 1f6c4b52baae..d8f9b59d90d7 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -636,6 +636,7 @@ struct v4l2_pix_format {
+>  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
+>  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
+>  #define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC aka H.265 */
+> +#define V4L2_PIX_FMT_MPEG2_FRAME v4l2_fourcc('M', 'G', '2', 'F') /* MPEG2 frame */
+>  
+>  /*  Vendor-specific formats   */
+>  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
+> @@ -1587,6 +1588,7 @@ struct v4l2_ext_control {
+>  		__u8 __user *p_u8;
+>  		__u16 __user *p_u16;
+>  		__u32 __user *p_u32;
+> +		struct v4l2_ctrl_mpeg2_frame_hdr __user *p_mpeg2_frame_hdr;
+>  		void __user *ptr;
+>  	};
+>  } __attribute__ ((packed));
+> @@ -1632,6 +1634,7 @@ enum v4l2_ctrl_type {
+>  	V4L2_CTRL_TYPE_U8	     = 0x0100,
+>  	V4L2_CTRL_TYPE_U16	     = 0x0101,
+>  	V4L2_CTRL_TYPE_U32	     = 0x0102,
+> +	V4L2_CTRL_TYPE_MPEG2_FRAME_HDR = 0x0109,
+>  };
+>  
+>  /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
+> 
+
+Regards,
+
+	Hans
