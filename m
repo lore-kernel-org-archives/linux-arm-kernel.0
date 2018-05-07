@@ -1,39 +1,75 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon,  7 May 2018 14:44:55 +0200
-Subject: [PATCH v3 09/14] media: v4l: Add definition for Allwinner's
- MB32-tiled NV12 format
+Date: Mon,  7 May 2018 14:45:00 +0200
+Subject: [PATCH v3 14/14] ARM: dts: sun8i-a33: Add Video Engine and reserved
+ memory nodes
 In-Reply-To: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
 References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180507124500.20434-10-paul.kocialkowski@bootlin.com>
+Message-ID: <20180507124500.20434-15-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces support for Allwinner's MB32-tiled NV12 format, where
-each plane is divided into macroblocks of 32x32 pixels. Hence, the size
-of each plane has to be aligned to 32 bytes. The pixels inside each
-macroblock are coded as they would be if the macroblock was a single
-plane, line after line.
+This adds nodes for the Video Engine and the associated reserved memory
+for the A33. Up to 96 MiB of memory are dedicated to the CMA pool.
 
-The MB32-tiled NV12 format is used by the video engine on Allwinner
-platforms: it is the default format for decoded frames (and the only one
-available in the oldest supported platforms).
+The VPU can only map the first 256 MiB of DRAM, so the reserved memory
+pool has to be located in that area. Following Allwinner's decision in
+downstream software, the last 96 MiB of the first 256 MiB of RAM are
+reserved for this purpose.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- include/uapi/linux/videodev2.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sun8i-a33.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-index d8f9b59d90d7..242a6bfa1440 100644
---- a/include/uapi/linux/videodev2.h
-+++ b/include/uapi/linux/videodev2.h
-@@ -670,6 +670,7 @@ struct v4l2_pix_format {
- #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
- #define V4L2_PIX_FMT_MT21C    v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
- #define V4L2_PIX_FMT_INZI     v4l2_fourcc('I', 'N', 'Z', 'I') /* Intel Planar Greyscale 10-bit and Depth 16-bit */
-+#define V4L2_PIX_FMT_MB32_NV12 v4l2_fourcc('M', 'N', '1', '2') /* Allwinner NV12 in 32x32 macroblocks */
+diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+index 97a976b3b1ef..5308a49601f6 100644
+--- a/arch/arm/boot/dts/sun8i-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+@@ -181,6 +181,21 @@
+ 		reg = <0x40000000 0x80000000>;
+ 	};
  
- /* 10bit raw bayer packed, 32 bytes for every 25 pixels, last LSB 6 bits unused */
- #define V4L2_PIX_FMT_IPU3_SBGGR10	v4l2_fourcc('i', 'p', '3', 'b') /* IPU3 packed 10-bit BGGR bayer */
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
++		cma_pool: cma at 4a000000 {
++			compatible = "shared-dma-pool";
++			size = <0x6000000>;
++			alloc-ranges = <0x4a000000 0x6000000>;
++			reusable;
++			linux,cma-default;
++		};
++	};
++
+ 	sound: sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "sun8i-a33-audio";
+@@ -262,6 +277,23 @@
+ 			};
+ 		};
+ 
++		vpu: video-codec at 01c0e000 {
++			compatible = "allwinner,sun8i-a33-video-engine";
++			reg = <0x01c0e000 0x1000>;
++
++			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
++				 <&ccu CLK_DRAM_VE>;
++			clock-names = "ahb", "mod", "ram";
++
++			assigned-clocks = <&ccu CLK_VE>;
++			assigned-clock-rates = <320000000>;
++
++			resets = <&ccu RST_BUS_VE>;
++
++			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
++			allwinner,sram = <&ve_sram 1>;
++		};
++
+ 		crypto: crypto-engine at 1c15000 {
+ 			compatible = "allwinner,sun4i-a10-crypto";
+ 			reg = <0x01c15000 0x1000>;
 -- 
 2.16.3
