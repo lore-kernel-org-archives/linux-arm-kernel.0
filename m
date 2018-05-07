@@ -1,26 +1,20 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 7 May 2018 09:39:39 +0800
-Subject: [PATCH 3/4] ARM: dts: imx27: use lable to override osc26m clock
- setting
-In-Reply-To: <CAOMZO5D1Dc9hh-o81fvy8PKNx_m8gdR9yW2w5Xumse1VFHFLTQ@mail.gmail.com>
-References: <1525395446-1953-1-git-send-email-shawnguo@kernel.org>
- <1525395446-1953-4-git-send-email-shawnguo@kernel.org>
- <CAOMZO5D1Dc9hh-o81fvy8PKNx_m8gdR9yW2w5Xumse1VFHFLTQ@mail.gmail.com>
-Message-ID: <20180507013938.GJ3443@dragon>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 6 May 2018 22:51:55 -0300
+Subject: [PATCH] ARM: dts: imx7s: Pass the 'fsl,sec-era' property
+In-Reply-To: <20180507011710.GH3443@dragon>
+References: <1524601519-23502-1-git-send-email-festevam@gmail.com>
+ <20180504071926.GT3443@dragon>
+ <CAOMZO5AVjFCad4PC20X5PqMuKGJQ2cOSBnqbGw+ngYCODL2vmQ@mail.gmail.com>
+ <20180507011710.GH3443@dragon>
+Message-ID: <CAOMZO5CqE_G4_d8VcHT4vjmbpVuNCPMc3EsZ3oDURDuPJLpiFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 12:34:29PM -0300, Fabio Estevam wrote:
-> Hi Shawn,
-> 
-> On Thu, May 3, 2018 at 9:57 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > Instead of copying the whole node hierarchy, let's define a label for
-> > clock osc26m in soc dtsi and use it for overriding clock-frequency.
-> >
-> > Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> 
-> In the Subject: s/lable/label
+On Sun, May 6, 2018 at 10:17 PM, Shawn Guo <shawnguo@kernel.org> wrote:
 
-Fixed.  Thanks, Fabio.
+> I applied it for 4.17, but still questioning whether it's reasonable to
+> have the property documented as optional in bindings, if missing the
+> property results in a non-functional driver.
 
-Shawn
+Thanks Shawn. Yes, after my CAAM patch gets applied it will be a
+proper optional property.
