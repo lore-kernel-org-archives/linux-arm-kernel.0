@@ -1,24 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 May 2018 09:34:44 -0700
-Subject: [GIT PULL] one bug fix and few other fixes for v4.17-rc cycle
-In-Reply-To: <CAHCN7xLZ-qY95qy6ntucc782nm9bzF=pV-G9KbFdk=dxww5sXg@mail.gmail.com>
-References: <pull-1525448974-362873@atomide.com>
- <20180505194326.GI98604@atomide.com>
- <CAHCN7xJ8yAU=zjJuS6rPh61qNuRc7nr2e+i0z-YHCZQREcs0Yg@mail.gmail.com>
- <20180507153133.GN98604@atomide.com>
- <CAHCN7xLZ-qY95qy6ntucc782nm9bzF=pV-G9KbFdk=dxww5sXg@mail.gmail.com>
-Message-ID: <20180507163444.GQ98604@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 7 May 2018 11:35:37 -0500
+Subject: [PATCH V2 8/8] dt-bindings: stm32: add compatible for syscon
+In-Reply-To: <1525270723-18241-9-git-send-email-christophe.roullier@st.com>
+References: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
+ <1525270723-18241-9-git-send-email-christophe.roullier@st.com>
+Message-ID: <20180507163537.GA15212@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Adam Ford <aford173@gmail.com> [180507 16:28]:
-> On Mon, May 7, 2018 at 10:31 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > OK reverted and pushed out omap-for-v4.17/fixes. Can you please
-> > test that branch and make sure things are OK now?
+On Wed, May 02, 2018 at 04:18:43PM +0200, Christophe Roullier wrote:
+> This patch describes syscon DT bindings.
 > 
-> I just pulled everything, built and tested.  We're good from my
-> perspective. Thank you for your patience and help.
+> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
+> ---
+>  Documentation/devicetree/bindings/arm/stm32.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
+> index 6808ed9..06e3834 100644
+> --- a/Documentation/devicetree/bindings/arm/stm32.txt
+> +++ b/Documentation/devicetree/bindings/arm/stm32.txt
+> @@ -8,3 +8,7 @@ using one of the following compatible strings:
+>    st,stm32f746
+>    st,stm32h743
+>    st,stm32mp157
+> +
+> +Required nodes:
+> +- syscon: the soc bus node must have a system controller node pointing to the
+> +  global control registers, with the compatible string "syscon";
 
-OK thanks!
+You misunderstood my prior comment. 'syscon' alone is not valid. You 
+need SoC specific compatible string for it and 'stm32' is not SoC 
+specific. IOW, the compatible property for a syscon should imply every 
+single register field in the block.
 
-Tony
+Rob
