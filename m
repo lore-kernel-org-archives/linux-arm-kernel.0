@@ -1,282 +1,215 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 7 May 2018 09:19:31 +0200
-Subject: [PATCH v3 3/3] ARM: dts: sun7i: Add support for the Ainol AW1
- tablet
-In-Reply-To: <20180506214901.23429-3-contact@paulk.fr>
-References: <20180506214901.23429-1-contact@paulk.fr>
- <20180506214901.23429-3-contact@paulk.fr>
-Message-ID: <20180507071931.tebv45yxrojxxkeb@flea>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 7 May 2018 16:21:41 +0900
+Subject: [PATCH v9 06/11] arm64: kexec_file: allow for loading
+ Image-format kernel
+In-Reply-To: <c604b578-6667-3532-eac9-55c428001025@arm.com>
+References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
+ <20180425062629.29404-7-takahiro.akashi@linaro.org>
+ <c604b578-6667-3532-eac9-55c428001025@arm.com>
+Message-ID: <20180507072139.GF11326@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+James,
 
-On Sun, May 06, 2018 at 11:49:01PM +0200, Paul Kocialkowski wrote:
-> This adds support for the Ainol AW1, an A20-based 7" tablet from Ainol.
+On Tue, May 01, 2018 at 06:46:11PM +0100, James Morse wrote:
+> Hi Akashi,
 > 
-> The following board-specific features are supported:
-> * LCD panel
-> * Backlight
-> * USB OTG
-> * Buttons
-> * Touchscreen (doesn't work without non-free firmware)
-> * Accelerometer
-> * Battery
+> On 25/04/18 07:26, AKASHI Takahiro wrote:
+> > This patch provides kexec_file_ops for "Image"-format kernel. In this
+> > implementation, a binary is always loaded with a fixed offset identified
+> > in text_offset field of its header.
 > 
-> The following are untested:
-> * Audio output
-> * Audio speakers
-> * USB via SPCI connector
 > 
-> The following are not supported:
-> * Wi-Fi
-> * Bluetooth
-> * NAND
-> * Audio via SPCI connector
-> * Audio via Bluetooth I2S
+> > diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> > index e4de1223715f..3cba4161818a 100644
+> > --- a/arch/arm64/include/asm/kexec.h
+> > +++ b/arch/arm64/include/asm/kexec.h
+> > @@ -102,6 +102,56 @@ struct kimage_arch {
+> >  	void *dtb_buf;
+> >  };
+> >  
+> > +/**
+> > + * struct arm64_image_header - arm64 kernel image header
+> > + *
+> > + * @pe_sig: Optional PE format 'MZ' signature
+> > + * @branch_code: Instruction to branch to stext
+> > + * @text_offset: Image load offset, little endian
+> > + * @image_size: Effective image size, little endian
+> > + * @flags:
+> > + *	Bit 0: Kernel endianness. 0=little endian, 1=big endian
 > 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> ---
->  arch/arm/boot/dts/Makefile                |   1 +
->  arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts | 275 ++++++++++++++++++++++
->  2 files changed, 276 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
+> Page size? What about 'phys_base'?, (whatever that is...)
+> Probably best to refer to Documentation/arm64/booting.txt here, its the
+> authoritative source of what these fields mean.
+
+While we don't care other bit fields for now, I will add the reference
+to the Documentation file.
+
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 7e2424957809..4a80971f2bc9 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -946,6 +946,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
->  	sun6i-a31s-sinovoip-bpi-m2.dtb \
->  	sun6i-a31s-yones-toptech-bs1078-v2.dtb
->  dtb-$(CONFIG_MACH_SUN7I) += \
-> +	sun7i-a20-ainol-aw1.dtb \
->  	sun7i-a20-bananapi.dtb \
->  	sun7i-a20-bananapi-m1-plus.dtb \
->  	sun7i-a20-bananapro.dtb \
-> diff --git a/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts b/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
-> new file mode 100644
-> index 000000000000..9a1d54a9f9a0
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
-> @@ -0,0 +1,275 @@
-> +/*
-> + * Copyright (C) 2018 Paul Kocialkowski <contact@paulk.fr>
-> + *
-> + * SPDX-License-Identifier: GPL-2.0+
+> > + * @reserved: Reserved
+> > + * @magic: Magic number, "ARM\x64"
+> > + * @pe_header: Optional offset to a PE format header
+> > + **/
+> > +
+> > +struct arm64_image_header {
+> > +	u8 pe_sig[2];
+> > +	u8 pad[2];
+> > +	u32 branch_code;
+> > +	u64 text_offset;
+> > +	u64 image_size;
+> > +	u64 flags;
+> 
+> __le64 as appropriate here would let tools like sparse catch any missing endian
+> conversion bugs.
 
-This should be your first line. Also, we usually license our DT under
-a dual license (GPL and MIT) so that other projects (like FreeBSD) can
-use them as well, instead of duplicating them. It would be great if
-you'd consider it.
+OK.
 
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun7i-a20.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/pwm/pwm.h>
-> +
-> +/ {
-> +	model = "Ainol AW1";
-> +	compatible = "ainol,ainol-aw1", "allwinner,sun7i-a20";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	backlight: backlight {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-> +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+> 
+> > +	u64 reserved[3];
+> > +	u8 magic[4];
+> > +	u32 pe_header;
+> > +};
+> 
+> I'm surprised we don't have a definition for this already, I guess its always
+> done in asm. We have kernel/image.h that holds some of this stuff, if we are
+> going to validate the flags, is it worth adding the code there, (and moving it
+> to include/asm)?
 
-The increase in perceived brightness should be linear. Usually, for
-PWMs backed backlight, an exponential list is a much better
-approximation.
+A comment at the beginning of this file says,
+    #ifndef LINKER_SCRIPT
+    #error This file should only be included in vmlinux.lds.S
+    #endif
+Let me think about.
 
-> +		default-brightness-level = <5>;
-> +		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
-> +	};
-> +
-> +	panel: panel {
-> +		compatible = "innolux,at070tn90";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		power-supply = <&panel_power>;
-> +		backlight = <&backlight>;
-> +
-> +		port at 0 {
-> +			reg = <0>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			panel_input: endpoint at 0 {
-> +				reg = <0>;
-> +				remote-endpoint = <&tcon0_out_panel>;
-> +			};
-> +		};
-> +	};
-> +
-> +	panel_power: panel_power {
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&panel_power_pin>;
-> +		regulator-name = "panel-power";
-> +		regulator-min-microvolt = <10400000>;
-> +		regulator-max-microvolt = <10400000>;
-> +		gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
-> +		enable-active-high;
-> +		regulator-boot-on;
-> +	};
-> +};
-> +
-> +&codec {
-> +	allwinner,pa-gpios = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
-> +	status = "okay";
-> +};
-> +
-> +&cpu0 {
-> +	cpu-supply = <&reg_dcdc2>;
-> +};
-> +
-> +&de {
-> +	status = "okay";
-> +};
-> +
-> +&ehci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci1 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins_a>;
-> +	status = "okay";
-> +
-> +	axp209: pmic at 34 {
-> +		reg = <0x34>;
-> +		interrupt-parent = <&nmi_intc>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins_a>;
-> +	status = "okay";
-> +
-> +	lis3dh: accelerometer at 18 {
-> +		compatible = "st,lis3dh-accel";
-> +		reg = <0x18>;
-> +		vdd-supply = <&reg_vcc3v3>;
-> +		vddio-supply = <&reg_vcc3v3>;
-> +		st,drdy-int-pin = <1>;
-> +	};
-> +};
-> +
-> +&i2c2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c2_pins_a>;
-> +	status = "okay";
-> +	clock-frequency = <400000>;
-> +
-> +	gsl1680: touchscreen at 40 {
-> +		compatible = "silead,gsl1680";
-> +		reg = <0x40>;
-> +		interrupt-parent = <&pio>;
-> +		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>; /* EINT21 (PH21) */
-> +		power-gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>; /* PH20 */
-> +		firmware-name = "gsl1680-ainol-aw1.fw";
-> +		touchscreen-size-x = <480>;
-> +		touchscreen-size-y = <800>;
-> +		touchscreen-swapped-x-y;
-> +		touchscreen-inverted-y;
-> +		silead,max-fingers = <5>;
-> +	};
-> +};
-> +
-> +&lradc {
-> +	vref-supply = <&reg_ldo2>;
-> +	status = "okay";
-> +
-> +	button at 571 {
-> +		label = "Volume Up";
-> +		linux,code = <KEY_VOLUMEUP>;
-> +		channel = <0>;
-> +		voltage = <571428>;
-> +	};
-> +
-> +	button at 761 {
-> +		label = "Volume Down";
-> +		linux,code = <KEY_VOLUMEDOWN>;
-> +		channel = <0>;
-> +		voltage = <761904>;
-> +	};
-> +
-> +	button at 952 {
-> +		label = "Home";
-> +		linux,code = <KEY_HOME>;
-> +		channel = <0>;
-> +		voltage = <952380>;
-> +	};
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins_a>;
-> +	vmmc-supply = <&reg_vcc3v3>;
+> 
+> > +static const u8 arm64_image_magic[4] = {'A', 'R', 'M', 0x64U};
+> 
+> Any chance this magic could be a pre-processor symbol shared with head.S?
 
-You have the regulators described in your DT, you'd better use them
-instead of the one coming from sunxi-common-regulators.dtsi.
+OK.
 
-> +	bus-width = <4>;
-> +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-> +	cd-inverted;
-> +	status = "okay";
-> +};
-> +
-> +&ohci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci1 {
-> +	status = "okay";
-> +};
-> +
-> +&otg_sram {
-> +	status = "okay";
-> +};
-> +
-> +&pio {
-> +	panel_power_pin: panel_power_pin at 0 {
-> +		pins = "PH8";
-> +		function = "gpio_out";
-> +	};
-> +};
+> 
+> > +
+> > +/**
+> > + * arm64_header_check_magic - Helper to check the arm64 image header.
+> > + *
+> > + * Returns non-zero if header is OK.
+> > + */
+> > +
+> > +static inline int arm64_header_check_magic(const struct arm64_image_header *h)
+> > +{
+> > +	if (!h)
+> > +		return 0;
+> > +
+> > +	if (!h->text_offset)
+> > +		return 0;
+> > +
+> > +	return (h->magic[0] == arm64_image_magic[0]
+> > +		&& h->magic[1] == arm64_image_magic[1]
+> > +		&& h->magic[2] == arm64_image_magic[2]
+> > +		&& h->magic[3] == arm64_image_magic[3]);
+> 
+> memcmp()? Or just define it as a 32bit value?
 
-You don't need that pinctrl node.
+OK. As you know, I always tried to keep the code not diverted
+from kexec-tools for maintainability reason.
 
-Maxime
+> I guess you skip the MZ prefix as its not present for !EFI?
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180507/19ecef0e/attachment.sig>
+CONFIG_KEXEC_IMAGE_VERIFY_SIG depends on the fact that the file
+format is PE (that is, EFI is enabled).
+
+
+> Could we check branch_code is non-zero, and text-offset points within image-size?
+
+We could do it, but I don't think this check is very useful.
+
+> 
+> We could check that this platform supports the page-size/endian config that this
+> Image was built with... We get a message from the EFI stub if the page-size
+> can't be supported, it would be nice to do the same here (as we can).
+
+There is no restriction on page-size or endianness for kexec.
+What will be the purpose of this check?
+
+> (no idea if kexec-tool checks this stuff, it probably can't get at the id
+> registers to know)
+> 
+> 
+> > diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
+> > new file mode 100644
+> > index 000000000000..4dd524ad6611
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/kexec_image.c
+> > @@ -0,0 +1,79 @@
+> 
+> > +static void *image_load(struct kimage *image,
+> > +				char *kernel, unsigned long kernel_len,
+> > +				char *initrd, unsigned long initrd_len,
+> > +				char *cmdline, unsigned long cmdline_len)
+> > +{
+> > +	struct kexec_buf kbuf;
+> > +	struct arm64_image_header *h = (struct arm64_image_header *)kernel;
+> > +	unsigned long text_offset;
+> > +	int ret;
+> > +
+> > +	/* Load the kernel */
+> > +	kbuf.image = image;
+> > +	kbuf.buf_min = 0;
+> > +	kbuf.buf_max = ULONG_MAX;
+> > +	kbuf.top_down = false;
+> > +
+> > +	kbuf.buffer = kernel;
+> > +	kbuf.bufsz = kernel_len;
+> > +	kbuf.memsz = le64_to_cpu(h->image_size);
+> > +	text_offset = le64_to_cpu(h->text_offset);
+> > +	kbuf.buf_align = SZ_2M;
+> 
+> > +	/* Adjust kernel segment with TEXT_OFFSET */
+> > +	kbuf.memsz += text_offset;
+> > +
+> > +	ret = kexec_add_buffer(&kbuf);
+> > +	if (ret)
+> > +		goto out;
+> > +
+> > +	image->arch.kern_segment = image->nr_segments - 1;
+> 
+> You only seem to use kern_segment here, and in load_other_segments() called
+> below. Could it not be a local variable passed in? Instead of arch-specific data
+> we keep forever?
+
+No, kern_segment is also used in load_other_segments() in machine_kexec_file.c.
+To optimize memory hole allocation logic in locate_mem_hole_callback(),
+we need to know the exact range of kernel image (start and end).
+
+(Known drawback in this code is that Image only occupies one segment, but
+once vmlinux might be supported, it would occupy two segments for text and
+data.)
+
+> 
+> > +	image->segment[image->arch.kern_segment].mem += text_offset;
+> > +	image->segment[image->arch.kern_segment].memsz -= text_offset;
+> > +	image->start = image->segment[image->arch.kern_segment].mem;
+> > +
+> > +	pr_debug("Loaded kernel at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
+> > +				image->segment[image->arch.kern_segment].mem,
+> > +				kbuf.bufsz, kbuf.memsz);
+> > +
+> > +	/* Load additional data */
+> > +	ret = load_other_segments(image, initrd, initrd_len,
+> > +				cmdline, cmdline_len);
+> > +
+> > +out:
+> > +	return ERR_PTR(ret);
+> > +}
+> Looks good,
+
+Thank you for thorough review.
+
+-Takahiro AKASHI
+
+
+> Thanks,
+> 
+> James
