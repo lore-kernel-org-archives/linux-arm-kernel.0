@@ -1,22 +1,78 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 7 May 2018 09:18:46 -0500
-Subject: [PATCH v3 10/14] dt-bindings: media: Document bindings for the
- Sunxi-Cedrus VPU driver
-In-Reply-To: <20180507124500.20434-11-paul.kocialkowski@bootlin.com>
-References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
- <20180507124500.20434-11-paul.kocialkowski@bootlin.com>
-Message-ID: <20180507141846.GA1413@rob-hp-laptop>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 7 May 2018 16:24:43 +0200
+Subject: [PATCH 1/3] drm/sti: do not remove the drm_bridge that was never
+ added
+In-Reply-To: <d378241f-7420-bbaf-c447-18cdfd4f9dd3@axentia.se>
+References: <20180502074025.12421-1-peda@axentia.se>
+ <20180502074025.12421-2-peda@axentia.se>
+ <20180503090648.GG12521@phenom.ffwll.local>
+ <bd8d12f7-0c71-c96b-80fa-54de7de39511@axentia.se>
+ <20180507133929.GG12521@phenom.ffwll.local>
+ <d378241f-7420-bbaf-c447-18cdfd4f9dd3@axentia.se>
+Message-ID: <7f79c109-6b0f-000e-569b-1f702e0006d3@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2018 at 02:44:56PM +0200, Paul Kocialkowski wrote:
-> This adds a device-tree binding document that specifies the properties
-> used by the Sunxi-Cedurs VPU driver, as well as examples.
+On 2018-05-07 15:59, Peter Rosin wrote:
+> On 2018-05-07 15:39, Daniel Vetter wrote:
+>> On Thu, May 03, 2018 at 11:12:21PM +0200, Peter Rosin wrote:
+>>> On 2018-05-03 11:06, Daniel Vetter wrote:
+>>>> On Wed, May 02, 2018 at 09:40:23AM +0200, Peter Rosin wrote:
+>>>>> The more natural approach would perhaps be to add an drm_bridge_add,
+>>>>> but there are several other bridges that never call drm_bridge_add.
+>>>>> Just removing the drm_bridge_remove is the easier fix.
+>>>>>
+>>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>>>>
+>>>> This mess is much bigger. There's 2 pairs of bridge functions:
+>>>>
+>>>> - drm_bridge_attach/detach. Those are meant to be called by the overall
+>>>>   drm driver to connect/disconnect a drm_bridge.
+>>>>
+>>>> - drm_bridge_add/remove. These are supposed to be called by the bridge
+>>>>   driver itself to register/unregister itself. Maybe we should rename
+>>>>   them, since the same issue happens with drm_panel, with the same
+>>>>   confusion.
+>>>>
+>>>> I thought someone was working on a cleanup series to fix this mess, but I
+>>>> didn't find anything.
+>>>
+>>> Ok, I just spotted the imbalance and didn't really dig into what
+>>> actually happens in these error paths. Now that I have done so I
+>>> believe that the removed drm_bridge_remove calls causes NULL
+>>> dereferences if/when the error paths are triggered.
+>>>
+>>> So, I don't think this can wait for some bigger cleanup.
+>>>
+>>> drm_bridge_remove calls list_del_init calls __list_del_entry calls
+>>> __list_del with NULL in both prev and next since the list member
+>>> is never initialized. prev and next are dereferenced by __list_del
+>>> and you have *boom*
+>>>
+>>> I recommend adding the tag
+>>>
+>>> Fixes: 84601dbdea36 ("drm: sti: rework init sequence")
+>>>
+>>> so that stable picks this one up.
+>>
+>> I just wanted to correct your commit message text - the correct solution
+>> is definitely _not_ for sti here to call drm_bridge_add.
 > 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  .../devicetree/bindings/media/sunxi-cedrus.txt     | 58 ++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> Ah, I see what you mean. Do you want me to respin?
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Hold on, no I don't agree. sti_hda.c does create a bridge for it's own
+internal use. It does not drm_bridge_add it, because all that ever does
+is adding the bridge to the global lost of bridges. But since this is
+a bridge for internal use, there is little point in calling drm_bridge_add,
+the driver currently gains nothing by doing so.
+
+But, drm_bridge_add might be a good place to put common stuff for every
+bridge in the system, so it might be worthwhile to start requiring all
+bridges to be drm_bridge_add-ed. And IMHO, it would not be wrong to have
+the sti-hda driver call drm_bridge_add on the bridge it creates.
+
+Do you really think it is actively wrong to call drm_bridge_add for
+internal bridges such as this?
+
+Cheers,
+Peter
