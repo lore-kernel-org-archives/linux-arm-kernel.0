@@ -1,33 +1,47 @@
-From: hejianet@gmail.com (Jia He)
-Date: Mon, 7 May 2018 09:10:40 +0800
-Subject: [PATCH v8 0/6] optimize memblock_next_valid_pfn and
- early_pfn_valid on arm and arm64
-In-Reply-To: <23b14717-0f4a-10f2-5118-7cb8445fbdab@oracle.com>
-References: <1523431317-30612-1-git-send-email-hejianet@gmail.com>
- <05b0fcf2-7670-101e-d4ab-1f656ff6b02f@gmail.com>
- <CACjP9X8bHmrxmd7ZPcfQq6Eq0Mzwmt0saOR3Ph53gp2n-dcKBQ@mail.gmail.com>
- <23b14717-0f4a-10f2-5118-7cb8445fbdab@oracle.com>
-Message-ID: <448ad581-6635-e732-c49d-9240cdb385b5@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 7 May 2018 09:17:11 +0800
+Subject: [PATCH] ARM: dts: imx7s: Pass the 'fsl,sec-era' property
+In-Reply-To: <CAOMZO5AVjFCad4PC20X5PqMuKGJQ2cOSBnqbGw+ngYCODL2vmQ@mail.gmail.com>
+References: <1524601519-23502-1-git-send-email-festevam@gmail.com>
+ <20180504071926.GT3443@dragon>
+ <CAOMZO5AVjFCad4PC20X5PqMuKGJQ2cOSBnqbGw+ngYCODL2vmQ@mail.gmail.com>
+Message-ID: <20180507011710.GH3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 04, 2018 at 01:31:52PM -0300, Fabio Estevam wrote:
+> Hi Shawn,
+> 
+> On Fri, May 4, 2018 at 4:19 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> 
+> > The property is documented as optional in the bindings.  Missing the
+> > property shouldn't cause any fatal error, I guess.
+> 
+> The CAAM drivers uses the era information in many places:
+> 
+> drivers/crypto/caam/caamalg.c:  if (ctrlpriv->era >= 6) {
+> drivers/crypto/caam/caamalg.c:  if (ctrlpriv->era < 3)
+> drivers/crypto/caam/caamalg.c:  if (priv->era >= 6 && uses_dkp)
+> drivers/crypto/caam/caamalg_desc.c:     if (era < 6) {
+> drivers/crypto/caam/caamalg_desc.c:     /* Class 2 operation */
+> drivers/crypto/caam/caamalg_desc.c:     if (era < 6) {
+> drivers/crypto/caam/caamalg_desc.c:     /* Class 2 operation */
+> drivers/crypto/caam/caamalg_desc.c:     if (era < 6) {
+> 
+> If the era information is not provided the value of -524 (-ENOTSUPP)
+> will be used, so all the above logic will not operate correctly.
+> 
+> I have sent a patch that allows the era information to be retrieved
+> via CAAM registers:
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/crypto/caam/ctrl.c?h=next-20180424&id=654f2b937b389295581bcb4aa26011a63db7bc8f
+> 
+> but this will only land in 4.18.
+> 
+> In order to avoid i.MX7 to report the incorrect era information in
+> 4.17 I suggest that this patch should be applied for 4.17-rc.
 
+I applied it for 4.17, but still questioning whether it's reasonable to
+have the property documented as optional in bindings, if missing the
+property results in a non-functional driver.
 
-On 5/5/2018 12:53 AM, Pavel Tatashin Wrote:
->> I'm wondering, ain't simple enabling of config
->> DEFERRED_STRUCT_PAGE_INIT provide even better speed-up? If that is the
->> case then it seems like this series is not needed at all, right?
->> I am not sure why is this config optional. It looks like it could be
->> enabled by default or even unconditionally considering that with
->> commit c9e97a1997fb ("mm: initialize pages on demand during boot") the
->> deferred code is statically disabled after all the pages are
->> initialized.
-> Hi Daniel,
->
-> Currently, deferred struct pages are initialized in parallel only on NUMA machines. I would like to make a change to use all the available CPUs even on a single socket systems, but that is not there yet. So, I believe Jia's performance improvements are still relevant.
-Thanks for the information. I checked the config in my armv8a server,
-DEFERRED_STRUCT_PAGE_INIT has not been enabled yet.And my server is
-single socket.
-
-Cheers.
-Jia
+Shawn
