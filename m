@@ -1,40 +1,215 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue,  8 May 2018 11:43:29 +0100
-Subject: [PATCH 0/2] arm64: Report signal frame size to userspace via auxv
-Message-ID: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
+Date: Tue,  8 May 2018 11:43:30 +0100
+Subject: [PATCH 1/2] arm64: signal: Report signal frame size to userspace via
+ auxv
+In-Reply-To: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
+References: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1525776211-28169-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because SVE makes the arm64 signal frame size variable, userspace will
-ultimately need a way to detect the size.
+Stateful CPU architecture extensions may require the signal frame
+to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
+However, changing this #define is an ABI break.
 
-This series adds support for exposing this information via a new auxv
-entry AT_MINSIGSTKSZ.
+To allow userspace the option of determining the signal frame size
+in a more forwards-compatible way, this patch adds a new auxv entry
+tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
+size that the process can observe during its lifetime.
 
-These patches are taken from [1], with minor updates.  (They were RFC
-in that series, but there has been no significant discussion or
-objections raised in the meantime, and no change in the understanding
-of the problem being addressed here.  I'd like to get discussions for
-binding this to glibc started.)
+If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
+assume that the MINSIGSTKSZ #define is sufficient.  This allows for
+a consistent interface with older kernels that do not provide
+AT_MINSIGSTKSZ.
 
-Changes since [1]:
+The idea is that libc could expose this via sysconf() or some
+similar mechanism.
 
- * Cache the value computed to AT_MINSIGSTKSZ so that the effort of
-   computing it does not need to be repeated on every exec.
+There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
+about userspace's own stack overheads and should not pretend to
+know.
 
+For arm64:
 
-[1] [PATCH v5 00/30] ARM Scalable Vector Extension (SVE)
-lists.infradead.org/pipermail/linux-arm-kernel/2017-October/539993.html
+The primary motivation for this interface is the Scalable Vector
+Extension, which can require at least 4KB or so of extra space
+in the signal frame for the largest hardware implementations.
 
-Dave Martin (2):
-  arm64: signal: Report signal frame size to userspace via auxv
-  arm64/sve: signal: Include SVE when computing AT_MINSIGSTKSZ
+To determine the correct value, a "Christmas tree" mode (via the
+add_all argument) is added to setup_sigframe_layout(), to simulate
+addition of all possible records to the signal frame at maximum
+possible size.
 
- arch/arm64/include/asm/elf.h         |  5 +++
+If this procedure goes wrong somehow, resulting in a stupidly large
+frame layout and hence failure of sigframe_alloc() to allocate a
+record to the frame, then this is indicative of a kernel bug: the
+kernel's internal SIGFRAME_MAXSZ is supposed to sanity-check
+against generting frames that we consider _impossibly_ large.  In
+this case, SIGSTKSZ is returned as a "reasonable guess that is at
+least bigger than MINSIGSTKSZ" and we WARN().
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+
+---
+
+Changes since v5:
+
+ * Cache the value computed for AT_MINSIGSTKSZ.  This is invariant post-
+   boot, so recomputing it on every exec is pointless effort.
+---
+ arch/arm64/include/asm/elf.h         |  5 ++++
  arch/arm64/include/asm/processor.h   |  3 ++
  arch/arm64/include/uapi/asm/auxvec.h |  3 +-
- arch/arm64/kernel/signal.c           | 68 ++++++++++++++++++++++++++++++++----
- 4 files changed, 71 insertions(+), 8 deletions(-)
+ arch/arm64/kernel/signal.c           | 54 ++++++++++++++++++++++++++++++++----
+ 4 files changed, 59 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index fac1c4d..771c7a8 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -24,6 +24,10 @@
+ #include <asm/ptrace.h>
+ #include <asm/user.h>
+ 
++#ifndef __ASSEMBLY__
++#include <asm/processor.h> /* for get_minsigstksz(), used by ARCH_DLINFO */
++#endif
++
+ /*
+  * AArch64 static relocation types.
+  */
+@@ -148,6 +152,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+ do {									\
+ 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+ 		    (elf_addr_t)current->mm->context.vdso);		\
++	NEW_AUX_ENT(AT_MINSIGSTKSZ, get_minsigstksz());			\
+ } while (0)
+ 
+ #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 7675989..eee058f 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -244,6 +244,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
+ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
+ void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
+ 
++/* User signal frame size discovery: */
++int get_minsigstksz(void);
++
+ /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
+ #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+ #define SVE_GET_VL()	sve_get_current_vl()
+diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+index ec0a86d..a35797e 100644
+--- a/arch/arm64/include/uapi/asm/auxvec.h
++++ b/arch/arm64/include/uapi/asm/auxvec.h
+@@ -19,7 +19,8 @@
+ 
+ /* vDSO location */
+ #define AT_SYSINFO_EHDR	33
++#define AT_MINSIGSTKSZ	34	/* stack needed for signal delivery */
+ 
+-#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
++#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 154b7d3..a4f1edf 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -17,6 +17,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/atomic.h>
+ #include <linux/compat.h>
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
+@@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ 	return 0;
+ }
+ 
+-/* Determine the layout of optional records in the signal frame */
+-static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
++/*
++ * Determine the layout of optional records in the signal frame
++ *
++ * add_all: if true, lays out the biggest possible signal frame for
++ *	this task; otherwise, generates a layout for the current state
++ *	of the task.
++ */
++static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
++				 bool add_all)
+ {
+ 	int err;
+ 
+@@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 		return err;
+ 
+ 	/* fault information, if valid */
+-	if (current->thread.fault_code) {
++	if (add_all || current->thread.fault_code) {
+ 		err = sigframe_alloc(user, &user->esr_offset,
+ 				     sizeof(struct esr_context));
+ 		if (err)
+@@ -603,7 +611,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 	return sigframe_alloc_end(user);
+ }
+ 
+-
+ static int setup_sigframe(struct rt_sigframe_user_layout *user,
+ 			  struct pt_regs *regs, sigset_t *set)
+ {
+@@ -701,7 +708,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
+ 	int err;
+ 
+ 	init_user_layout(user);
+-	err = setup_sigframe_layout(user);
++	err = setup_sigframe_layout(user, false);
+ 	if (err)
+ 		return err;
+ 
+@@ -936,3 +943,40 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 		thread_flags = READ_ONCE(current_thread_info()->flags);
+ 	} while (thread_flags & _TIF_WORK_MASK);
+ }
++
++/*
++ * Determine the stack space required for guaranteed signal devliery.
++ * This function is used to populate AT_MINSIGSTKSZ at process startup.
++ */
++int get_minsigstksz(void)
++{
++	static __read_mostly atomic_t minsigstksz;
++
++	int ret;
++	struct rt_sigframe_user_layout user;
++
++	ret = atomic_read(&minsigstksz);
++	if (ret)
++		return ret;
++
++	init_user_layout(&user);
++	ret = setup_sigframe_layout(&user, true);
++
++	if (ret) {
++		WARN_ON(1);
++
++		ret = SIGSTKSZ;
++	} else {
++		ret = sigframe_size(&user) +
++			round_up(sizeof(struct frame_record), 16) +
++			16; /* max alignment padding */
++	}
++
++	/*
++	 * The computed value (ret) is invariant, so its value can be
++	 * safely stored irrespective of whether some other racing
++	 * task got there first:
++	 */
++	atomic_set(&minsigstksz, ret);
++	return ret;
++}
 -- 
 2.1.4
