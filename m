@@ -1,135 +1,129 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Tue, 8 May 2018 13:18:49 +0200
-Subject: [PATCH v1 6/7] Bluetooth: hci_mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <1525767775.18877.22.camel@mtkswgap22>
-References: <cover.1522736996.git.sean.wang@mediatek.com>
- <f0e0a0b7f1dc3845dc6eafb4ccd60284d1675f8d.1522736996.git.sean.wang@mediatek.com>
- <A7391E5D-2945-415B-8AB1-8DFBF2E65878@holtmann.org>
- <1525762084.14468.20.camel@mtkswgap22>
- <D474053D-6910-4B04-8B98-59B96FEB86BC@holtmann.org>
- <1525767775.18877.22.camel@mtkswgap22>
-Message-ID: <6033F916-F103-4F07-9912-695B5B49F30F@holtmann.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 8 May 2018 12:25:14 +0100
+Subject: [PATCH v5 10/14] KVM: arm64: Save host SVE context as appropriate
+In-Reply-To: <0c616c43-3bff-1c93-0463-fae1c53c0e51@arm.com>
+References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
+ <1525449935-31424-11-git-send-email-Dave.Martin@arm.com>
+ <0c616c43-3bff-1c93-0463-fae1c53c0e51@arm.com>
+Message-ID: <20180508112514.GE7753@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
-
->>>>> +
->>>>> +static int mtk_wmt_cmd_sync(struct hci_uart *hu, u8 opcode, u8 flag, u16 plen,
->>>>> +			    const void *param)
->>>>> +{
->>>>> +	struct mtk_bt_dev *btdev = hu->priv;
->>>>> +	struct hci_command_hdr *hhdr;
->>>>> +	struct hci_acl_hdr *ahdr;
->>>>> +	struct mtk_wmt_hdr *whdr;
->>>>> +	struct sk_buff *skb;
->>>>> +	int ret = 0;
->>>>> +
->>>>> +	init_completion(&btdev->wmt_cmd);
->>>>> +
->>>>> +	skb = bt_skb_alloc(plen + MTK_WMT_CMD_SIZE, GFP_KERNEL);
->>>>> +	if (!skb)
->>>>> +		return -ENOMEM;
->>>>> +
->>>>> +	/*
->>>>> +	 * WMT data is carried in either ACL or HCI format with op code as
->>>>> +	 * 0xfc6f and followed by a WMT header and its actual payload.
->>>>> +	 */
->>>> 
->>>> Please use net subsystem comment style.
->>>> 
->>>>> +	switch (opcode) {
->>>>> +	case MTK_WMT_PATCH_DWNLD:
->>>>> +		ahdr = skb_put(skb, HCI_ACL_HDR_SIZE);
->>>>> +		ahdr->handle = cpu_to_le16(0xfc6f);
->>>>> +		ahdr->dlen   = cpu_to_le16(plen + MTK_WMT_HDR_SIZE);
->>>>> +		break;
->>>>> +	default:
->>>>> +		hhdr = skb_put(skb, HCI_COMMAND_HDR_SIZE);
->>>>> +		hhdr->opcode = cpu_to_le16(0xfc6f);
->>>>> +		hhdr->plen = plen + MTK_WMT_HDR_SIZE;
->>>>> +		break;
->>>>> +	}
->>>>> +
->>>>> +	hci_skb_pkt_type(skb) = opcode == MTK_WMT_PATCH_DWNLD ?
->>>>> +				HCI_ACLDATA_PKT : HCI_COMMAND_PKT;
->>>> 
->>>> Why not move that into the switch statement above.
->>>> 
->>>>> +
->>>>> +	/* Start to build a WMT header and its actual payload. */
->>>>> +	whdr = skb_put(skb, MTK_WMT_HDR_SIZE);
->>>>> +	whdr->dir = 1;
->>>>> +	whdr->op = opcode;
->>>>> +	whdr->dlen = cpu_to_le16(plen + 1);
->>>>> +	whdr->flag = flag;
->>>>> +	skb_put_data(skb, param, plen);
->>>>> +
->>>>> +	mtk_enqueue(hu, skb);
->>>>> +	hci_uart_tx_wakeup(hu);
->>>>> +
->>>>> +	/*
->>>>> +	 * Waiting a WMT event response, while we must take care in case of
->>>>> +	 * failures for the wait.
->>>>> +	 */
->>>>> +	ret = wait_for_completion_interruptible_timeout(&btdev->wmt_cmd, HZ);
->>>>> +
->>>>> +	return ret > 0 ? 0 : ret < 0 ? ret : -ETIMEDOUT;
->>>>> +}
->>>> 
->>>> All in all I am not convinced that this is super clean. I get that we need something special for having this in the ACL data packets, but for the standard HCI command I prefer that __hci_cmd_sync is used. I addition, it seems that patch download is the only special case and that happens before at the setup stage. So we could make things special for that. I need to understand this a bit better. Can I get a btmon -w trace.log file from the whole init procedure.
->>>> 
->>> 
->>> While i was trying to rewrite the driver based on btuart.c. you posted
->>> on RFC, I used __hci_cmd_sync_ev to replace such kinds of SoC specific
->>> hci command sending which I've done previously with mtk_wmt_cmd_sync.
->>> 
->>> However, eventually, I got a cmd_timer timeout whose message printed
->>> on console as "Bluetooth: hci0: command 0xfc6f tx timeout".
->>> 
->>> The mtk soc specific cmd/event I posted below, I dumped directly in
->>> driver, always uses cmd as opcode 0xfc6f, and its event id as 0xe4.
->>> 
->>> It appears to the event id is not standard and thus it cannot cancel the
->>> cmd timer when the special hci event is being handled. This way can we
->>> can still use __hci_cmd_sync api ?
->>> 
->>> [    4.896200] hci tx: 00000000: 01 6f fc 05 01 07 01 00 04    
->>> [    4.904671] hci rx: 00000000: e4 05 02 07 01 00
->>> 00                             
->>> [    4.912859] Bluetooth: hci0 event 0xe4
->>> 
->>> 
->>> buildroot login: [    6.914509] Bluetooth: hci0: command 0xfc6f tx
->>> timeout
->>> [    6.919831] hci tx: 00000000: 01 6f fc 06 01 06 02 00 00
->>> 01                    .o........
->>> [    7.006631] hci rx: 00000000: e4 05 02 06 01 00
->>> 00                             .......
->>> [    7.014821] Bluetooth: hci0 event 0xe4
->> 
->> can you just start btmon before loading the module / driver? It makes it a lot easier since it will actually decode the basics for us. If there is a bug within __hci_cmd_sync_ev, then we are going to fix it.
->> 
+On Tue, May 08, 2018 at 11:38:05AM +0100, Marc Zyngier wrote:
+> On 04/05/18 17:05, Dave Martin wrote:
+> > This patch adds SVE context saving to the hyp FPSIMD context switch
+> > path.  This means that it is no longer necessary to save the host
+> > SVE state in advance of entering the guest, when in use.
+> > 
+> > In order to avoid adding pointless complexity to the code, VHE is
+> > assumed if SVE is in use.  VHE is an architectural prerequisite for
+> > SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
+> > kernels that support both SVE and KVM.
+> > 
+> > Historically, software models exist that can expose the
+> > architecturally invalid configuration of SVE without VHE, so if
+> > this situation is detected this patch warns and refuses to create a
+> > VM.  Doing this check at VM creation time avoids race issues
+> > between KVM and SVE initialisation.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+> > ---
+> >  arch/arm64/Kconfig          |  7 +++++++
+> >  arch/arm64/kvm/fpsimd.c     |  1 -
+> >  arch/arm64/kvm/hyp/switch.c | 21 +++++++++++++++++++--
+> >  virt/kvm/arm/arm.c          | 18 ++++++++++++++++++
+> >  4 files changed, 44 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index eb2cf49..b0d3820 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -1130,6 +1130,7 @@ endmenu
+> >  config ARM64_SVE
+> >  	bool "ARM Scalable Vector Extension support"
+> >  	default y
+> > +	depends on !KVM || ARM64_VHE
 > 
-> I'm happy to do with btmon. just the environment with buildroot the BT
-> running on seems there's a missing support for btmon. I can start to use
-> btmon once I change the environment to Debian.
+> In that case, should we consider making ARM64_VHE "default y" as well,
+> as KVM is "default y" too?
+
+Surely ARM64_VHE has always been default y?
+
+1f364c8c48a0 ("arm64: VHE: Add support for running Linux in EL2 mode")
+
+> Otherwise, I fear we end-up regressing existing configurations. Also,
+> you still have to check for the configuration at run time, so I'm not
+> immediately getting the point of this particular change.
+
+We check for the configuration, but the penalty is severe (i.e., can't
+create VMs) and it doesn't appear to make sense to put effort into
+working around that: the user has an easy fix in the form of setting
+ARM64_VHE=y.
+
+Is there some value to supporting this configuration that I'm missing?
+SVE and VHE are both default y.
+
+
+[...]
+
+> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > index 6cf499b..a7be7bf 100644
+> > --- a/virt/kvm/arm/arm.c
+> > +++ b/virt/kvm/arm/arm.c
+> > @@ -16,6 +16,7 @@
+> >   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+> >   */
+> >  
+> > +#include <linux/bug.h>
+> >  #include <linux/cpu_pm.h>
+> >  #include <linux/errno.h>
+> >  #include <linux/err.h>
+> > @@ -41,6 +42,7 @@
+> >  #include <asm/mman.h>
+> >  #include <asm/tlbflush.h>
+> >  #include <asm/cacheflush.h>
+> > +#include <asm/cpufeature.h>
+> >  #include <asm/virt.h>
+> >  #include <asm/kvm_arm.h>
+> >  #include <asm/kvm_asm.h>
+> > @@ -120,6 +122,22 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+> >  	if (type)
+> >  		return -EINVAL;
+> >  
+> > +	/*
+> > +	 * VHE is a prerequisite for SVE in the Arm architecture, and
+> > +	 * Kconfig ensures that if system_supports_sve() here then
+> > +	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
+> > +	 * detected and enabled, the CPU is architecturally
+> > +	 * noncompliant.
+> > +	 *
+> > +	 * Just in case this mismatch is seen, detect it, warn and give
+> > +	 * up.  Supporting this forbidden configuration in Hyp would be
+> > +	 * pointless.
+> > +	 */
+> > +	if (system_supports_sve() && !has_vhe()) {
+> > +		kvm_pr_unimpl("Cannot create VMs on SVE system without VHE.  Broken cpu?");
+> > +		return -ENXIO;
+> > +	}
 > 
->> So all the MTK vendor commands respond with a vendor event? Or are there some that do the standard command status/complete handling?
->> 
-> 
-> yes, mtk controller after mt7622 (included), its MTK vendors command
-> (opcode 0xfc6f) always respond with a vendor event id 0xe4. And they
-> don't do any standard status/complete handling.
+> You might as well fail the boot KVM initialization altogether, and not
+> wait for a VM to be created.
 
-then we need to figure out where the __hci_cmd_sync_ev causes a problem. Since normally that should just work for you.
+I was concerned that the SVE and KVM initialisation might happen in
+an unpredictable order.
 
-> BTW, mtk controller before mt7622, such as mt7623, its MTK vendor
-> command always go with completely specific format, not with hci format.
+KVM is initialised via module_init(), which I'm guessing is later than
+cpufeatures (?)  If so then yes, kvm_arch_init() would be a reasonable
+place to do this.
 
-What does that mean? Do you have an example?
+> But I'm more concerned with the fact that we're now have a configuration
+> that drops functionalities on the floor, one way or another.
 
-Regards
+Is this still a problem if that configuration is forbidden by Kconfig?
 
-Marcel
+Can you describe a scenario in which the problem config (KVM=y, VHE=n,
+SVE=y) would be wanted?
+
+Cheers
+---Dave
