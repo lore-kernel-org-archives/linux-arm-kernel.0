@@ -1,8 +1,8 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Tue, 08 May 2018 09:22:49 +0200
+Date: Tue, 08 May 2018 09:23:06 +0200
 Subject: Patch "irqchip/qcom: Fix check for spurious interrupts" has been
- added to the 4.14-stable tree
-Message-ID: <152576416995100@kroah.com>
+ added to the 4.16-stable tree
+Message-ID: <15257641864146@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,12 +11,12 @@ This is a note to let you know that I've just added the patch titled
 
     irqchip/qcom: Fix check for spurious interrupts
 
-to the 4.14-stable tree which can be found at:
+to the 4.16-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
      irqchip-qcom-fix-check-for-spurious-interrupts.patch
-and it can be found in the queue-4.14 subdirectory.
+and it can be found in the queue-4.16 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
@@ -75,4 +75,4 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 Patches currently in stable-queue which might be from agustinv at codeaurora.org are
 
-queue-4.14/irqchip-qcom-fix-check-for-spurious-interrupts.patch
+queue-4.16/irqchip-qcom-fix-check-for-spurious-interrupts.patch
