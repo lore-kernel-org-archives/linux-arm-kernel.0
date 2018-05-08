@@ -1,75 +1,71 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 8 May 2018 13:29:38 +0100
-Subject: [PATCH 1/2] arm64: signal: Report signal frame size to userspace
- via auxv
-In-Reply-To: <20180508122652.3zbgvpx7x2al5g5m@lakrids.cambridge.arm.com>
-References: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
- <1525776211-28169-2-git-send-email-Dave.Martin@arm.com>
- <20180508113043.elgvfz3dud2amcif@lakrids.cambridge.arm.com>
- <20180508114323.GG7753@e103592.cambridge.arm.com>
- <20180508122652.3zbgvpx7x2al5g5m@lakrids.cambridge.arm.com>
-Message-ID: <20180508122938.GH7753@e103592.cambridge.arm.com>
+Date: Tue, 8 May 2018 13:30:31 +0100
+Subject: [PATCH v5 13/14] KVM: arm64: Fold redundant exit code checks out
+ of fixup_guest_exit()
+In-Reply-To: <5b9460e5-207d-befd-446c-b9c7ec2bcc35@arm.com>
+References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
+ <1525449935-31424-14-git-send-email-Dave.Martin@arm.com>
+ <eddc101f-6f6c-a37b-ae48-e80a24f60815@arm.com>
+ <20180508113039.GF7753@e103592.cambridge.arm.com>
+ <5b9460e5-207d-befd-446c-b9c7ec2bcc35@arm.com>
+Message-ID: <20180508123031.GI7753@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 01:26:52PM +0100, Mark Rutland wrote:
-> On Tue, May 08, 2018 at 12:43:24PM +0100, Dave Martin wrote:
-> > On Tue, May 08, 2018 at 12:30:44PM +0100, Mark Rutland wrote:
-> > > On Tue, May 08, 2018 at 11:43:30AM +0100, Dave Martin wrote:
-> > > > +/*
-> > > > + * Determine the stack space required for guaranteed signal devliery.
-> > > > + * This function is used to populate AT_MINSIGSTKSZ at process startup.
-> > > > + */
-> > > > +int get_minsigstksz(void)
-> > > > +{
-> > > > +	static __read_mostly atomic_t minsigstksz;
-> > > > +
-> > > > +	int ret;
-> > > > +	struct rt_sigframe_user_layout user;
-> > > > +
-> > > > +	ret = atomic_read(&minsigstksz);
-> > > > +	if (ret)
-> > > > +		return ret;
-> > > > +
-> > > > +	init_user_layout(&user);
-> > > > +	ret = setup_sigframe_layout(&user, true);
-> > > > +
-> > > > +	if (ret) {
-> > > > +		WARN_ON(1);
-> > > > +
-> > > > +		ret = SIGSTKSZ;
-> > > > +	} else {
-> > > > +		ret = sigframe_size(&user) +
-> > > > +			round_up(sizeof(struct frame_record), 16) +
-> > > > +			16; /* max alignment padding */
-> > > > +	}
-> > > > +
-> > > > +	/*
-> > > > +	 * The computed value (ret) is invariant, so its value can be
-> > > > +	 * safely stored irrespective of whether some other racing
-> > > > +	 * task got there first:
-> > > > +	 */
-> > > > +	atomic_set(&minsigstksz, ret);
-> > > > +	return ret;
-> > > > +}
-> > > 
-> > > Can we set up minsigstksz at some initcall time? that way get_minstksz()
-> > > can return minsigstksz with no conditionality at all.
+On Tue, May 08, 2018 at 12:59:39PM +0100, Marc Zyngier wrote:
+> On 08/05/18 12:30, Dave Martin wrote:
+> > On Tue, May 08, 2018 at 11:59:25AM +0100, Marc Zyngier wrote:
+> >> On 04/05/18 17:05, Dave Martin wrote:
+
+[...]
+
+> >>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> >>> index 39e9166..be09c52 100644
+> >>> --- a/arch/arm64/kvm/hyp/switch.c
+> >>> +++ b/arch/arm64/kvm/hyp/switch.c
+> >>> @@ -385,11 +385,13 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+> >>>  	 * same PC once the SError has been injected, and replay the
+> >>>  	 * trapping instruction.
+> >>>  	 */
+> >>> -	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+> >>> +	if (*exit_code != ARM_EXCEPTION_TRAP)
+> >>> +		goto exit;
+> >>> +
+> >>> +	if (!__populate_fault_info(vcpu))
+> >>>  		return true;
+> >>>  
+> >>> -	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+> >>> -	    *exit_code == ARM_EXCEPTION_TRAP) {
+> >>> +	if (static_branch_unlikely(&vgic_v2_cpuif_trap)) {
+> >>>  		bool valid;
+> >>>  
+> >>>  		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
+> >>> @@ -414,12 +416,12 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+> >>>  				if (!__skip_instr(vcpu))
+> >>>  					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+> >>>  				*exit_code = ARM_EXCEPTION_EL1_SERROR;
+> >>> +				goto exit;
+> >>
+> >> This goto...
+> >>
+> >>>  			}
+> >>
+> >> ... should be placed here. If this was a data abort, it cannot be a
+> >> system register trap, and the below conditions cannot possibly apply.
 > > 
-> > I would have preferred to do that, but I wasn't sure where to put it.
+> > That sounds logically sensible, but to be clear, this would be a
+> > semantic change to this function, right?
 > > 
-> > Unless arch_initcall_sync() works for this, I don't know what to
-> > suggest.
+> > (i.e., it forces skipping of the GICv3 handling code in a case where
+> > it previously wasn't forced -- at least not within this function.  The
+> > arguments about whether vgic_v2_cpuif_trap and vgic_v3_cpuif_trap can
+> > ever be true simultaneously still apply.)
 > 
-> Perhaps have a setup_minsigstksz(), and call that at the end of
-> setup_cpu_features()?
+> I agree that this is a slight semantic change, but one that makes sense,
+> just like the one you've introduced in patch #12.
 
-That's probably reasonable.  The places the computed value can change
-are ... not well defined, if the dust hasn't settled by the time we get
-to the end of the cpufeatures setup then we almost certainly have more
-serious problems.
-
-I'll have a go and see what it looks like.
+Agreed, just wanted to make sure I hadn't missed something in my
+original refactoring.
 
 Cheers
 ---Dave
