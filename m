@@ -1,233 +1,210 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue,  8 May 2018 08:59:25 -0500
-Subject: [PATCH] arm: dts: atmel: graph_child_address warning fixes
-Message-ID: <20180508135930.5768-1-robh@kernel.org>
+Date: Tue,  8 May 2018 08:59:26 -0500
+Subject: [PATCH] arm: dts: imx: fix IPU OF graph endpoint node names
+In-Reply-To: <20180508135930.5768-1-robh@kernel.org>
+References: <20180508135930.5768-1-robh@kernel.org>
+Message-ID: <20180508135930.5768-2-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addresses for graph ports and endpoints are not necessary when
-there's only a single child. Fix the following warnings removing
-unnecessary addresses on OF graph nodes:
+OF graph endpoint nodes are supposed to be named 'endpoint' with an
+address if there is more than one. The i.MX IPU binding graph has used
+unique endpoint names instead which now generate dtc warnings:
 
-Warning (graph_child_address): /ahb/apb/hlcdc at f0030000/hlcdc-display-controller: graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
-Warning (graph_child_address): /ahb/apb/hlcdc at f0030000/hlcdc-display-controller/port at 0: graph node has single child node 'endpoint', #address-cells/#size-cells are not necessary
-Warning (graph_child_address): /ahb/apb/isi at f0034000/port: graph node has single child node 'endpoint', #address-cells/#size-cells are not necessary
-Warning (graph_child_address): /panel/port at 0: graph node has single child node 'endpoint at 0', #address-cells/#size-cells are not necessary
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 2/disp0-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 2/hdmi-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 2/mipi-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 2/lvds0-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 2/lvds1-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 3/disp1-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 3/hdmi-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 3/mipi-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 3/lvds0-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2400000/port at 3/lvds1-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2800000/port at 2/disp0-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2800000/port at 2/hdmi-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2800000/port at 2/mipi-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2800000/port at 2/lvds0-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2800000/port at 2/lvds1-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2800000/port at 3/hdmi-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2800000/port at 3/mipi-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2800000/port at 3/lvds0-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/ipu at 2800000/port at 3/lvds1-endpoint: graph endpont node name should be 'endpoint'
 
-Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts | 15 ++++-----------
- arch/arm/boot/dts/at91sam9g45.dtsi          |  2 --
- arch/arm/boot/dts/at91sam9n12.dtsi          |  8 +-------
- arch/arm/boot/dts/at91sam9n12ek.dts         | 14 ++++----------
- arch/arm/boot/dts/at91sam9x5_lcd.dtsi       |  7 +------
- arch/arm/boot/dts/at91sam9x5dm.dtsi         | 13 ++++---------
- arch/arm/boot/dts/sama5d3.dtsi              |  2 --
- arch/arm/boot/dts/sama5d3_lcd.dtsi          |  8 +-------
- arch/arm/boot/dts/sama5d4.dtsi              |  8 +-------
- 9 files changed, 16 insertions(+), 61 deletions(-)
+ arch/arm/boot/dts/imx6q.dtsi             | 27 ++++++++++++++-------
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi |  3 ---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi   |  3 ---
+ arch/arm/boot/dts/imx6qdl.dtsi           | 30 ++++++++++++++++--------
+ 4 files changed, 38 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts b/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
-index fe05aaa7ac87..72c3b077fb46 100644
---- a/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
-@@ -49,9 +49,8 @@
- 					pinctrl-names = "default";
- 					pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index ae7b3f107893..c2fda9d21a17 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -162,22 +162,27 @@
+ 				#size-cells = <0>;
+ 				reg = <2>;
  
--					port at 0 {
--						hlcdc_panel_output: endpoint at 0 {
--							reg = <0>;
-+					port {
-+						hlcdc_panel_output: endpoint {
- 							remote-endpoint = <&panel_input>;
- 						};
- 					};
-@@ -144,16 +143,10 @@
- 		/* Actually Ampire 800480R2 */
- 		compatible = "foxlink,fl500wvr00-a0t", "simple-panel";
- 		backlight = <&backlight>;
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		status = "okay";
+-				ipu2_di0_disp0: disp0-endpoint {
++				ipu2_di0_disp0: endpoint at 0 {
++					reg = <0>;
+ 				};
  
--		port at 0 {
+-				ipu2_di0_hdmi: hdmi-endpoint {
++				ipu2_di0_hdmi: endpoint at 1 {
++					reg = <1>;
+ 					remote-endpoint = <&hdmi_mux_2>;
+ 				};
+ 
+-				ipu2_di0_mipi: mipi-endpoint {
++				ipu2_di0_mipi: endpoint at 2 {
++					reg = <2>;
+ 					remote-endpoint = <&mipi_mux_2>;
+ 				};
+ 
+-				ipu2_di0_lvds0: lvds0-endpoint {
++				ipu2_di0_lvds0: endpoint at 3 {
++					reg = <3>;
+ 					remote-endpoint = <&lvds0_mux_2>;
+ 				};
+ 
+-				ipu2_di0_lvds1: lvds1-endpoint {
++				ipu2_di0_lvds1: endpoint at 4 {
++					reg = <4>;
+ 					remote-endpoint = <&lvds1_mux_2>;
+ 				};
+ 			};
+@@ -187,19 +192,23 @@
+ 				#size-cells = <0>;
+ 				reg = <3>;
+ 
+-				ipu2_di1_hdmi: hdmi-endpoint {
++				ipu2_di1_hdmi: endpoint at 1 {
++					reg = <1>;
+ 					remote-endpoint = <&hdmi_mux_3>;
+ 				};
+ 
+-				ipu2_di1_mipi: mipi-endpoint {
++				ipu2_di1_mipi: endpoint at 2 {
++					reg = <2>;
+ 					remote-endpoint = <&mipi_mux_3>;
+ 				};
+ 
+-				ipu2_di1_lvds0: lvds0-endpoint {
++				ipu2_di1_lvds0: endpoint at 3 {
++					reg = <3>;
+ 					remote-endpoint = <&lvds0_mux_3>;
+ 				};
+ 
+-				ipu2_di1_lvds1: lvds1-endpoint {
++				ipu2_di1_lvds1: endpoint at 4 {
++					reg = <4>;
+ 					remote-endpoint = <&lvds1_mux_3>;
+ 				};
+ 			};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index 18b65052553d..654cf2c9b073 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -379,9 +379,6 @@
+ 		powerdown-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>; /* NANDF_WP_B */
+ 
+ 		port {
 -			#address-cells = <1>;
 -			#size-cells = <0>;
 -
--			panel_input: endpoint at 0 {
--				reg = <0>;
-+		port {
-+			panel_input: endpoint {
- 				remote-endpoint = <&hlcdc_panel_output>;
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 1ee25a475be8..36729e3f2899 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -1114,8 +1114,6 @@
- 				clock-names = "isi_clk";
- 				status = "disabled";
- 				port {
--					#address-cells = <1>;
--					#size-cells = <0>;
- 				};
- 			};
+ 			ov5640_to_mipi_csi2: endpoint {
+ 				remote-endpoint = <&mipi_csi2_in>;
+ 				clock-lanes = <0>;
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index f019f9900369..c2de2250718c 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -294,9 +294,6 @@
+ 		reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
  
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 37cb81f457b5..a071fccb729b 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -475,13 +475,7 @@
- 
- 				hlcdc-display-controller {
- 					compatible = "atmel,hlcdc-display-controller";
--					#address-cells = <1>;
--					#size-cells = <0>;
--
--					port at 0 {
--						#address-cells = <1>;
--						#size-cells = <0>;
--						reg = <0>;
-+					port {
- 					};
- 				};
- 
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index c43095c5cb5c..eb0c1e11fa4d 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -134,9 +134,8 @@
- 					pinctrl-names = "default";
- 					pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
- 
--					port at 0 {
--						hlcdc_panel_output: endpoint at 0 {
--							reg = <0>;
-+					port {
-+						hlcdc_panel_output: endpoint {
- 							remote-endpoint = <&panel_input>;
- 						};
- 					};
-@@ -246,13 +245,8 @@
- 		#size-cells = <0>;
- 		status = "okay";
- 
--		port at 0 {
--			reg = <0>;
+ 		port {
 -			#address-cells = <1>;
 -			#size-cells = <0>;
 -
--			panel_input: endpoint at 0 {
--				reg = <0>;
-+		port {
-+			panel_input: endpoint {
- 				remote-endpoint = <&hlcdc_panel_output>;
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9x5_lcd.dtsi b/arch/arm/boot/dts/at91sam9x5_lcd.dtsi
-index 1629db9dd563..e243dff67a67 100644
---- a/arch/arm/boot/dts/at91sam9x5_lcd.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5_lcd.dtsi
-@@ -23,13 +23,8 @@
+ 			ov5640_to_mipi_csi2: endpoint {
+ 				remote-endpoint = <&mipi_csi2_in>;
+ 				clock-lanes = <0>;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index c003e62bf290..0ebcf057961e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1300,22 +1300,27 @@
+ 				#size-cells = <0>;
+ 				reg = <2>;
  
- 				hlcdc-display-controller {
- 					compatible = "atmel,hlcdc-display-controller";
--					#address-cells = <1>;
--					#size-cells = <0>;
- 
--					port at 0 {
--						#address-cells = <1>;
--						#size-cells = <0>;
--						reg = <0>;
-+					port {
- 					};
+-				ipu1_di0_disp0: disp0-endpoint {
++				ipu1_di0_disp0: endpoint at 0 {
++					reg = <0>;
  				};
  
-diff --git a/arch/arm/boot/dts/at91sam9x5dm.dtsi b/arch/arm/boot/dts/at91sam9x5dm.dtsi
-index 34c089fe0bc0..5aea8fd09ad6 100644
---- a/arch/arm/boot/dts/at91sam9x5dm.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5dm.dtsi
-@@ -29,9 +29,8 @@
- 					pinctrl-names = "default";
- 					pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
+-				ipu1_di0_hdmi: hdmi-endpoint {
++				ipu1_di0_hdmi: endpoint at 1 {
++					reg = <1>;
+ 					remote-endpoint = <&hdmi_mux_0>;
+ 				};
  
--					port at 0 {
--						hlcdc_panel_output: endpoint at 0 {
--							reg = <0>;
-+					port {
-+						hlcdc_panel_output: endpoint {
- 							remote-endpoint = <&panel_input>;
- 						};
- 					};
-@@ -80,12 +79,8 @@
- 		#size-cells = <0>;
- 		status = "disabled";
+-				ipu1_di0_mipi: mipi-endpoint {
++				ipu1_di0_mipi: endpoint at 2 {
++					reg = <2>;
+ 					remote-endpoint = <&mipi_mux_0>;
+ 				};
  
--		port at 0 {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			panel_input: endpoint at 0 {
--				reg = <0>;
-+		port {
-+			panel_input: endpoint {
- 				remote-endpoint = <&hlcdc_panel_output>;
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index eae5e1ee9cd8..2c51042e1f6b 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -239,8 +239,6 @@
- 				clock-names = "isi_clk";
- 				status = "disabled";
- 				port {
--					#address-cells = <1>;
--					#size-cells = <0>;
+-				ipu1_di0_lvds0: lvds0-endpoint {
++				ipu1_di0_lvds0: endpoint at 3 {
++					reg = <3>;
+ 					remote-endpoint = <&lvds0_mux_0>;
+ 				};
+ 
+-				ipu1_di0_lvds1: lvds1-endpoint {
++				ipu1_di0_lvds1: endpoint at 4 {
++					reg = <4>;
+ 					remote-endpoint = <&lvds1_mux_0>;
  				};
  			};
+@@ -1325,22 +1330,27 @@
+ 				#size-cells = <0>;
+ 				reg = <3>;
  
-diff --git a/arch/arm/boot/dts/sama5d3_lcd.dtsi b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-index be7cfefc6c31..2d042d7ec531 100644
---- a/arch/arm/boot/dts/sama5d3_lcd.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-@@ -23,13 +23,7 @@
- 
- 				hlcdc-display-controller {
- 					compatible = "atmel,hlcdc-display-controller";
--					#address-cells = <1>;
--					#size-cells = <0>;
--
--					port at 0 {
--						#address-cells = <1>;
--						#size-cells = <0>;
--						reg = <0>;
-+					port {
- 					};
+-				ipu1_di1_disp1: disp1-endpoint {
++				ipu1_di1_disp1: endpoint at 0 {
++					reg = <0>;
  				};
  
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 0cf9beddd556..90d7b64915ec 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -333,13 +333,7 @@
- 
- 				hlcdc-display-controller {
- 					compatible = "atmel,hlcdc-display-controller";
--					#address-cells = <1>;
--					#size-cells = <0>;
--
--					port at 0 {
--						#address-cells = <1>;
--						#size-cells = <0>;
--						reg = <0>;
-+					port {
- 					};
+-				ipu1_di1_hdmi: hdmi-endpoint {
++				ipu1_di1_hdmi: endpoint at 1 {
++					reg = <1>;
+ 					remote-endpoint = <&hdmi_mux_1>;
  				};
  
+-				ipu1_di1_mipi: mipi-endpoint {
++				ipu1_di1_mipi: endpoint at 2 {
++					reg = <2>;
+ 					remote-endpoint = <&mipi_mux_1>;
+ 				};
+ 
+-				ipu1_di1_lvds0: lvds0-endpoint {
++				ipu1_di1_lvds0: endpoint at 3 {
++					reg = <3>;
+ 					remote-endpoint = <&lvds0_mux_1>;
+ 				};
+ 
+-				ipu1_di1_lvds1: lvds1-endpoint {
++				ipu1_di1_lvds1: endpoint at 4 {
++					reg = <4>;
+ 					remote-endpoint = <&lvds1_mux_1>;
+ 				};
+ 			};
 -- 
 2.17.0
