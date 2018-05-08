@@ -1,60 +1,54 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 8 May 2018 06:51:52 -0700
-Subject: [PATCH] hwmon: (aspeed-pwm-tacho) Use 24MHz clock
-In-Reply-To: <1525772367-20627-1-git-send-email-mine260309@gmail.com>
-References: <1525772367-20627-1-git-send-email-mine260309@gmail.com>
-Message-ID: <8a801894-4293-d2e8-4673-3d9ff5c2a5bb@roeck-us.net>
+From: robh@kernel.org (Rob Herring)
+Date: Tue,  8 May 2018 08:59:30 -0500
+Subject: [PATCH] arm: dts: omap: fix OMAP3 CM-T3x OF graph video connectors
+In-Reply-To: <20180508135930.5768-1-robh@kernel.org>
+References: <20180508135930.5768-1-robh@kernel.org>
+Message-ID: <20180508135930.5768-6-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2018 02:39 AM, Lei YU wrote:
-> The clock source for aspeed pwm is set to 24MHz, so use the hard-coded
-> clock frequency instead of the one in device tree.
-> 
-> Otherwise, in case of the clock specified in device tree is not 24MHz,
-> the fan speed will be incorrect.
-> 
-> Signed-off-by: Lei YU <mine260309@gmail.com>
-> ---
->   drivers/hwmon/aspeed-pwm-tacho.c | 7 ++-----
->   1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/hwmon/aspeed-pwm-tacho.c b/drivers/hwmon/aspeed-pwm-tacho.c
-> index 693a3d5..e83b8df 100644
-> --- a/drivers/hwmon/aspeed-pwm-tacho.c
-> +++ b/drivers/hwmon/aspeed-pwm-tacho.c
-> @@ -922,7 +922,6 @@ static int aspeed_pwm_tacho_probe(struct platform_device *pdev)
->   	void __iomem *regs;
->   	struct resource *res;
->   	struct device *hwmon;
-> -	struct clk *clk;
->   	int ret;
->   
->   	np = dev->of_node;
-> @@ -956,12 +955,10 @@ static int aspeed_pwm_tacho_probe(struct platform_device *pdev)
->   	regmap_write(priv->regmap, ASPEED_PTCR_TACH_SOURCE, 0);
->   	regmap_write(priv->regmap, ASPEED_PTCR_TACH_SOURCE_EXT, 0);
->   
-> -	clk = devm_clk_get(dev, NULL);
-> -	if (IS_ERR(clk))
-> -		return -ENODEV;
-> -	priv->clk_freq = clk_get_rate(clk);
->   	aspeed_set_clock_enable(priv->regmap, true);
-> +	// The clock source is set to 24MHz
+The OMAP3 CM-T3x based boards define 2 /connector nodes for S-Video and
+DVI output. However, since they have the same node name, the S-Video
+connector overwritten. This leaves a dangling graph connection which
+gives the following warning:
 
-No mixed C/C++ comments in hwmon drivers.
+arch/arm/boot/dts/omap3-sbc-t3517.dtb: Warning (graph_endpoint): /ocp at 68000000/dss at 48050000/encoder at 48050c00/port/endpoint: graph connection to node '/connector/port/endpoint' is not bidirectional
 
->   	aspeed_set_clock_source(priv->regmap, 0);
-> +	priv->clk_freq = 24000000;
->   
+Fix this by renaming the nodes to s-video-connector and dvi-connector.
 
-Are you saying that clk_get_rate() is wrong ? Anyway, if the DT is bad, it should be fixed.
-I am not a friend of hacking drivers to fix up bad DTs, and much less so without explanation.
-Plus, how do we know that the next chip supported by the driver doesn't have a 32MHz clock ?
-Really, please fix the DT.
+Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi | 2 +-
+ arch/arm/boot/dts/omap3-sb-t35.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Guenter
-
->   	aspeed_create_type(priv);
->   
-> 
+diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+index 9dcb18d22cde..cdb632df152a 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
++++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+@@ -60,7 +60,7 @@
+ 		regulator-max-microvolt = <3300000>;
+ 	};
+ 
+-	tv0: connector {
++	tv0: svideo-connector {
+ 		compatible = "svideo-connector";
+ 		label = "tv";
+ 
+diff --git a/arch/arm/boot/dts/omap3-sb-t35.dtsi b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+index 22b4c8bdcc65..fb9842fa922c 100644
+--- a/arch/arm/boot/dts/omap3-sb-t35.dtsi
++++ b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+@@ -34,7 +34,7 @@
+ 		};
+ 	};
+ 
+-	dvi0: connector {
++	dvi0: dvi-connector {
+ 		compatible = "dvi-connector";
+ 		label = "dvi";
+ 
+-- 
+2.17.0
