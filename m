@@ -1,19 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue,  8 May 2018 08:59:27 -0500
-Subject: [PATCH] arm: dts: imx53: Fix LDB OF graph warning
+Date: Tue,  8 May 2018 08:59:28 -0500
+Subject: [PATCH] arm: dts: imx7: Fix error in coresight TPIU graph connection
 In-Reply-To: <20180508135930.5768-1-robh@kernel.org>
 References: <20180508135930.5768-1-robh@kernel.org>
-Message-ID: <20180508135930.5768-3-robh@kernel.org>
+Message-ID: <20180508135930.5768-4-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Single child nodes in OF graph don't need an address and now dtc will
-warn about this:
+OF graph endpoint connections must be bidirectional and dtc will now
+warn if they are not. i.MX7 based DTs have an error and generate
+warnings:
 
-Warning (graph_child_address): /soc/aips at 50000000/ldb at 53fa8008/lvds-channel at 0: graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
+Warning (graph_endpoint): /replicator/ports/port at 0/endpoint: graph connection to node '/soc/tpiu at 30087000/port/endpoint' is not bidirectional
+Warning (graph_endpoint): /soc/tpiu at 30087000/port/endpoint: graph connection to node '/replicator/ports/port at 1/endpoint' is not bidirectional
 
-Since the LDB should always have an output port, fix the warning by
-adding the output port, 2, to the DT.
+This appears to be a copy-n-paste error and the TPIU input should be
+connected to replicator port 0 instead of port 1.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
@@ -21,34 +23,21 @@ Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/imx53.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/imx7s.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 7d647d043f52..1cf2fc9d0a58 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -488,6 +488,10 @@
- 							remote-endpoint = <&ipu_di0_lvds0>;
- 						};
- 					};
-+
-+					port at 2 {
-+						reg = <2>;
-+					};
- 				};
- 
- 				lvds-channel at 1 {
-@@ -503,6 +507,10 @@
- 							remote-endpoint = <&ipu_di1_lvds1>;
- 						};
- 					};
-+
-+					port at 2 {
-+						reg = <2>;
-+					};
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 4d42335c0dee..5db530ec756e 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -321,7 +321,7 @@
+ 			port {
+ 				tpiu_in_port: endpoint {
+ 					slave-mode;
+-					remote-endpoint = <&replicator_out_port1>;
++					remote-endpoint = <&replicator_out_port0>;
  				};
  			};
- 
+ 		};
 -- 
 2.17.0
