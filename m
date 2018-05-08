@@ -1,106 +1,62 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 8 May 2018 13:44:24 +0100
-Subject: [PATCH] tty: pl011: Avoid spuriously stuck-off interrupts
-In-Reply-To: <20180508110119.GA16141@n2100.armlinux.org.uk>
-References: <1524823545-11309-1-git-send-email-Dave.Martin@arm.com>
- <1524823545-11309-2-git-send-email-Dave.Martin@arm.com>
- <20180508110119.GA16141@n2100.armlinux.org.uk>
-Message-ID: <20180508124423.GK7753@e103592.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 May 2018 13:45:53 +0100
+Subject: [PATCH net-next v2 03/13] net: phy: sfp: warn the user when no
+ tx_disable pin is available
+In-Reply-To: <20180505205242.GA2876@lunn.ch>
+References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
+ <20180504135643.23466-4-antoine.tenart@bootlin.com>
+ <ed267042-1a61-7fcc-13ee-3cad2c05c658@gmail.com>
+ <20180504171425.GA17233@lunn.ch>
+ <44545AF4-64E3-4772-B5BA-43CCF2321025@gmail.com>
+ <20180505205242.GA2876@lunn.ch>
+Message-ID: <20180508124553.GO16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 12:01:19PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 27, 2018 at 11:05:45AM +0100, Dave Martin wrote:
-> > Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-> > clears the RX and receive timeout interrupts on pl011 startup, to
-> > avoid a screaming-interrupt scenario that can occur when the
-> > firmware or bootloader leaves these interrupts asserted.
+On Sat, May 05, 2018 at 10:52:42PM +0200, Andrew Lunn wrote:
+> On Sat, May 05, 2018 at 01:38:31PM -0700, Florian Fainelli wrote:
+> > On May 4, 2018 10:14:25 AM PDT, Andrew Lunn <andrew@lunn.ch> wrote:
+> > >On Fri, May 04, 2018 at 10:07:53AM -0700, Florian Fainelli wrote:
+> > >> On 05/04/2018 06:56 AM, Antoine Tenart wrote:
+> > >> > In case no Tx disable pin is available the SFP modules will always
+> > >be
+> > >> > emitting. This could be an issue when using modules using laser as
+> > >their
+> > >> > light source as we would have no way to disable it when the fiber
+> > >is
+> > >> > removed. This patch adds a warning when registering an SFP cage
+> > >which do
+> > >> > not have its tx_disable pin wired or available.
+> > >> 
+> > >> Is this something that was done in a possibly earlier revision of a
+> > >> given board design and which was finally fixed? Nothing wrong with
+> > >the
+> > >> patch, but this seems like a pretty serious board design mistake,
+> > >that
+> > >> needs to be addressed.
+> > >
+> > >Hi Florian
+> > >
+> > >Zii Devel B is like this. Only the "Signal Detect" pin is wired to a
+> > >GPIO.
 > > 
-> > This has been noted as an issue when running Linux on qemu [1].
-> > 
-> > Unfortunately, the above fix seems to lead to potential
-> > misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
-> > on driver startup, if the RX FIFO is also already full to the
-> > trigger level.
-> > 
-> > Clearing the RX FIFO interrupt does not change the FIFO fill level.
-> > In this scenario, because the interrupt is now clear and because
-> > the FIFO is already full to the trigger level, no new assertion of
-> > the RX FIFO interrupt can occur unless the FIFO is drained back
-> > below the trigger level.  This never occurs because the pl011
-> > driver is waiting for an RX FIFO interrupt to tell it that there is
-> > something to read, and does not read the FIFO at all until that
-> > interrupt occurs.
-> > 
-> > Thus, simply clearing "spurious" interrupts on startup may be
-> > misguided, since there is no way to be sure that the interrupts are
-> > truly spurious, and things can go wrong if they are not.
-> > 
-> > This patch instead clears the interrupt condition by draining the
-> > RX FIFO during UART startup, after clearing any potentially
-> > spurious interrupt.  This should ensure that an interrupt will
-> > definitely be asserted if the RX FIFO subsequently becomes
-> > sufficiently full.
-> > 
-> > The drain is done at the point of enabling interrupts only.  This
-> > means that it will occur any time the UART is newly opened through
-> > the tty layer.  It will not apply to polled-mode use of the UART by
-> > kgdboc: since that scenario cannot use interrupts by design, this
-> > should not matter.  kgdboc will interact badly with "normal" use of
-> > the UART in any case: this patch makes no attempt to paper over
-> > such issues.
-> > 
-> > This patch does not attempt to address the case where the RX FIFO
-> > fills faster than it can be drained: that is a pathological
-> > hardware design problem that is beyond the scope of the driver to
-> > work around.
-> > 
-> > [1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
-> > before enabled the interruption
-> > https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
-> > 
-> > Reported-by: Wei Xu <xuwei5@hisilicon.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Peter Maydell <peter.maydell@linaro.org>
-> > Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Tested-by: Andrew Jones <drjones@redhat.com>
-> > Reviewed-by: Andrew Jones <drjones@redhat.com>
-> > ---
-> >  drivers/tty/serial/amba-pl011.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> > index 4b40a5b..a6ccb85 100644
-> > --- a/drivers/tty/serial/amba-pl011.c
-> > +++ b/drivers/tty/serial/amba-pl011.c
-> > @@ -1731,6 +1731,16 @@ static void pl011_enable_interrupts(struct uart_amba_port *uap)
-> >  
-> >  	/* Clear out any spuriously appearing RX interrupts */
-> >  	pl011_write(UART011_RTIS | UART011_RXIS, uap, REG_ICR);
-> > +
-> > +	/*
-> > +	 * RXIS is asserted only when the RX FIFO transitions from below
-> > +	 * to above the trigger threshold.  If the RX FIFO is already
-> > +	 * full to the threshold this can't happen and RXIS will now be
-> > +	 * stuck off.  Drain the RX FIFO explicitly to fix this:
-> > +	 */
-> > +	while (!(pl011_read(uap, REG_FR) & UART01x_FR_RXFE))
-> > +		pl011_read(uap, REG_DR);
 > 
-> You probably ought to limit this in case of a stuck receive not empty
-> case, maybe to (eg) twice the depth of the FIFO?
+> > Good point, indeed. BTW what do you think about exposing the SFF's
+> > EEPROM and diagnostics through the standard ethtool operations even
+> > if we have to keep the description of the SFF as a fixed link in
+> > Device Tree because of the unfortunate wiring?
+> 
+> I believe in Antoine case, all the control plane is broken. He cannot
+> read the EEPROM, nor any of the modules pins via GPIOs.
 
-My argument would have been that if the FIFO fills too fast to be
-drained, then you have more serious problems... but it would be better
-for this to show as character loss than a lockup.
+Correct.
 
-So, I guess draining twice the FIFO depth before giving up is a
-reasonable compromise.
+> For Zii Devel B, the EEPROM is accessible, and so is the SD pin. What
+> is missing is transmit disable. So i would expose it as an SFF module.
 
+Agreed.
 
-I'll hack that in and repost.
-
-Cheers
----Dave
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
