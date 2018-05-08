@@ -1,13 +1,13 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue,  8 May 2018 10:10:46 +0200
-Subject: [PATCH 4.16 48/52] irqchip/qcom: Fix check for spurious interrupts
-In-Reply-To: <20180508073928.058320984@linuxfoundation.org>
-References: <20180508073928.058320984@linuxfoundation.org>
-Message-ID: <20180508073934.885061518@linuxfoundation.org>
+Date: Tue,  8 May 2018 10:11:01 +0200
+Subject: [PATCH 4.14 42/43] irqchip/qcom: Fix check for spurious interrupts
+In-Reply-To: <20180508074003.984433784@linuxfoundation.org>
+References: <20180508074003.984433784@linuxfoundation.org>
+Message-ID: <20180508074010.706606097@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.16-stable review patch.  If anyone has any objections, please let me know.
+4.14-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
