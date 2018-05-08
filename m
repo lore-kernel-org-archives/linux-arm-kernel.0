@@ -1,141 +1,243 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 9 May 2018 03:33:13 +0800
-Subject: [arm-platforms:irq/level-msi 5/13] kernel/irq/msi.c:88:26: error:
- 'IRQCHIP_SUPPORTS_LEVEL_MSI' undeclared
-Message-ID: <201805090310.yEC3A0na%fengguang.wu@intel.com>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Tue, 8 May 2018 21:33:14 +0200
+Subject: [PATCH v3 1/3] leds: triggers: provide
+ led_trigger_register_format()
+In-Reply-To: <20180508100543.12559-2-u.kleine-koenig@pengutronix.de>
+References: <20180508100543.12559-1-u.kleine-koenig@pengutronix.de>
+ <20180508100543.12559-2-u.kleine-koenig@pengutronix.de>
+Message-ID: <ea34ce99-d446-03d2-b38d-d40a22480337@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/level-msi
-head:   0861f66578097d276094bf0c83e25c7ac0a28d2a
-commit: f91d97462a9a4b2034e09826c1b758ece59646f8 [5/13] genirq/msi: Allow level-triggered MSIs to be exposed by MSI providers
-config: x86_64-randconfig-u0-05090156 (attached as .config)
-compiler: gcc-5 (Debian 5.5.0-3) 5.4.1 20171010
-reproduce:
-        git checkout f91d97462a9a4b2034e09826c1b758ece59646f8
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+Hi Uwe,
 
-Note: the arm-platforms/irq/level-msi HEAD 0861f66578097d276094bf0c83e25c7ac0a28d2a builds fine.
-      It only hurts bisectibility.
+Thank you for the patch. It looks fine, but please split
+the drivers/net/can/led.c related changes into a separate one.
 
-All errors (new ones prefixed by >>):
+Best regards,
+Jacek Anaszewski
 
-   In file included from arch/x86/include/asm/bug.h:83:0,
-                    from include/linux/bug.h:5,
-                    from include/linux/debug_locks.h:7,
-                    from include/linux/lockdep.h:28,
-                    from include/linux/spinlock_types.h:18,
-                    from include/linux/mutex.h:16,
-                    from include/linux/kernfs.h:13,
-                    from include/linux/sysfs.h:16,
-                    from include/linux/kobject.h:20,
-                    from include/linux/device.h:16,
-                    from kernel/irq/msi.c:12:
-   kernel/irq/msi.c: In function 'msi_check_level':
->> kernel/irq/msi.c:88:26: error: 'IRQCHIP_SUPPORTS_LEVEL_MSI' undeclared (first use in this function)
-        (info->chip->flags & IRQCHIP_SUPPORTS_LEVEL_MSI)) &&
-                             ^
-   include/asm-generic/bug.h:112:25: note: in definition of macro 'WARN_ON'
-     int __ret_warn_on = !!(condition);    \
-                            ^
-   kernel/irq/msi.c:88:26: note: each undeclared identifier is reported only once for each function it appears in
-        (info->chip->flags & IRQCHIP_SUPPORTS_LEVEL_MSI)) &&
-                             ^
-   include/asm-generic/bug.h:112:25: note: in definition of macro 'WARN_ON'
-     int __ret_warn_on = !!(condition);    \
-                            ^
-
-vim +/IRQCHIP_SUPPORTS_LEVEL_MSI +88 kernel/irq/msi.c
-
-  > 12	#include <linux/device.h>
-    13	#include <linux/irq.h>
-    14	#include <linux/irqdomain.h>
-    15	#include <linux/msi.h>
-    16	#include <linux/slab.h>
-    17	
-    18	#include "internals.h"
-    19	
-    20	/**
-    21	 * alloc_msi_entry - Allocate an initialize msi_entry
-    22	 * @dev:	Pointer to the device for which this is allocated
-    23	 * @nvec:	The number of vectors used in this entry
-    24	 * @affinity:	Optional pointer to an affinity mask array size of @nvec
-    25	 *
-    26	 * If @affinity is not NULL then a an affinity array[@nvec] is allocated
-    27	 * and the affinity masks from @affinity are copied.
-    28	 */
-    29	struct msi_desc *
-    30	alloc_msi_entry(struct device *dev, int nvec, const struct cpumask *affinity)
-    31	{
-    32		struct msi_desc *desc;
-    33	
-    34		desc = kzalloc(sizeof(*desc), GFP_KERNEL);
-    35		if (!desc)
-    36			return NULL;
-    37	
-    38		INIT_LIST_HEAD(&desc->list);
-    39		desc->dev = dev;
-    40		desc->nvec_used = nvec;
-    41		if (affinity) {
-    42			desc->affinity = kmemdup(affinity,
-    43				nvec * sizeof(*desc->affinity), GFP_KERNEL);
-    44			if (!desc->affinity) {
-    45				kfree(desc);
-    46				return NULL;
-    47			}
-    48		}
-    49	
-    50		return desc;
-    51	}
-    52	
-    53	void free_msi_entry(struct msi_desc *entry)
-    54	{
-    55		kfree(entry->affinity);
-    56		kfree(entry);
-    57	}
-    58	
-    59	void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
-    60	{
-    61		*msg = entry->msg;
-    62	}
-    63	
-    64	void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg)
-    65	{
-    66		struct msi_desc *entry = irq_get_msi_desc(irq);
-    67	
-    68		__get_cached_msi_msg(entry, msg);
-    69	}
-    70	EXPORT_SYMBOL_GPL(get_cached_msi_msg);
-    71	
-    72	#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-    73	static inline void irq_chip_write_msi_msg(struct irq_data *data,
-    74						  struct msi_msg *msg)
-    75	{
-    76		data->chip->irq_write_msi_msg(data, msg);
-    77	}
-    78	
-    79	static void msi_check_level(struct irq_domain *domain, struct msi_msg *msg)
-    80	{
-    81		struct msi_domain_info *info = domain->host_data;
-    82	
-    83		/*
-    84		 * If the MSI provider has messed with the second message and
-    85		 * not advertized that it is level-capable, signal the breakage.
-    86		 */
-    87		WARN_ON(!((info->flags & MSI_FLAG_LEVEL_CAPABLE) &&
-  > 88			  (info->chip->flags & IRQCHIP_SUPPORTS_LEVEL_MSI)) &&
-    89			(msg[1].address_lo || msg[1].address_hi || msg[1].data));
-    90	}
-    91	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31831 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180509/5c017176/attachment-0001.gz>
+On 05/08/2018 12:05 PM, Uwe Kleine-K?nig wrote:
+> This allows one to simplify drivers that provide a trigger with a
+> non-constant name (e.g. one trigger per device with the trigger name
+> depending on the device's name).
+> 
+> Internally the memory the name member of struct led_trigger points to
+> now always allocated dynamically instead of just taken from the caller.
+> 
+> The function led_trigger_rename_static() must be changed accordingly and
+> was renamed to led_trigger_rename() for consistency, with the only user
+> adapted.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>   drivers/leds/led-triggers.c | 84 +++++++++++++++++++++++++++----------
+>   drivers/net/can/led.c       |  6 +--
+>   include/linux/leds.h        | 30 +++++++------
+>   3 files changed, 81 insertions(+), 39 deletions(-)
+> 
+> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
+> index 431123b048a2..5d8bb504b07b 100644
+> --- a/drivers/leds/led-triggers.c
+> +++ b/drivers/leds/led-triggers.c
+> @@ -175,18 +175,34 @@ void led_trigger_set_default(struct led_classdev *led_cdev)
+>   }
+>   EXPORT_SYMBOL_GPL(led_trigger_set_default);
+>   
+> -void led_trigger_rename_static(const char *name, struct led_trigger *trig)
+> +int led_trigger_rename(struct led_trigger *trig, const char *fmt, ...)
+>   {
+> -	/* new name must be on a temporary string to prevent races */
+> -	BUG_ON(name == trig->name);
+> +	const char *prevname;
+> +	const char *newname;
+> +	va_list args;
+> +
+> +	if (!trig)
+> +		return 0;
+> +
+> +	va_start(args, fmt);
+> +	newname = kvasprintf_const(GFP_KERNEL, fmt, args);
+> +	va_end(args);
+> +
+> +	if (!newname) {
+> +		pr_err("Failed to allocate new name for trigger %s\n", trig->name);
+> +		return -ENOMEM;
+> +	}
+>   
+>   	down_write(&triggers_list_lock);
+> -	/* this assumes that trig->name was originaly allocated to
+> -	 * non constant storage */
+> -	strcpy((char *)trig->name, name);
+> +	prevname = trig->name;
+> +	trig->name = newname;
+>   	up_write(&triggers_list_lock);
+> +
+> +	kfree_const(prevname);
+> +
+> +	return 0;
+>   }
+> -EXPORT_SYMBOL_GPL(led_trigger_rename_static);
+> +EXPORT_SYMBOL_GPL(led_trigger_rename);
+>   
+>   /* LED Trigger Interface */
+>   
+> @@ -333,34 +349,56 @@ void led_trigger_blink_oneshot(struct led_trigger *trig,
+>   }
+>   EXPORT_SYMBOL_GPL(led_trigger_blink_oneshot);
+>   
+> -void led_trigger_register_simple(const char *name, struct led_trigger **tp)
+> +int led_trigger_register_format(struct led_trigger **tp, const char *fmt, ...)
+>   {
+> +	va_list args;
+>   	struct led_trigger *trig;
+> -	int err;
+> +	int err = -ENOMEM;
+> +	const char *name;
+> +
+> +	va_start(args, fmt);
+> +	name = kvasprintf_const(GFP_KERNEL, fmt, args);
+> +	va_end(args);
+>   
+>   	trig = kzalloc(sizeof(struct led_trigger), GFP_KERNEL);
+>   
+> -	if (trig) {
+> -		trig->name = name;
+> -		err = led_trigger_register(trig);
+> -		if (err < 0) {
+> -			kfree(trig);
+> -			trig = NULL;
+> -			pr_warn("LED trigger %s failed to register (%d)\n",
+> -				name, err);
+> -		}
+> -	} else {
+> -		pr_warn("LED trigger %s failed to register (no memory)\n",
+> -			name);
+> -	}
+> +	if (!name || !trig)
+> +		goto err;
+> +
+> +	trig->name = name;
+> +
+> +	err = led_trigger_register(trig);
+> +	if (err < 0)
+> +		goto err;
+> +
+>   	*tp = trig;
+> +
+> +	return 0;
+> +
+> +err:
+> +	kfree(trig);
+> +	kfree_const(name);
+> +
+> +	*tp = NULL;
+> +
+> +	return err;
+> +}
+> +EXPORT_SYMBOL_GPL(led_trigger_register_format);
+> +
+> +void led_trigger_register_simple(const char *name, struct led_trigger **tp)
+> +{
+> +	int ret = led_trigger_register_format(tp, "%s", name);
+> +	if (ret < 0)
+> +		pr_warn("LED trigger %s failed to register (%d)\n", name, ret);
+>   }
+>   EXPORT_SYMBOL_GPL(led_trigger_register_simple);
+>   
+>   void led_trigger_unregister_simple(struct led_trigger *trig)
+>   {
+> -	if (trig)
+> +	if (trig) {
+>   		led_trigger_unregister(trig);
+> +		kfree_const(trig->name);
+> +	}
+>   	kfree(trig);
+>   }
+>   EXPORT_SYMBOL_GPL(led_trigger_unregister_simple);
+> diff --git a/drivers/net/can/led.c b/drivers/net/can/led.c
+> index c1b667675fa1..2d7d1b0d20f9 100644
+> --- a/drivers/net/can/led.c
+> +++ b/drivers/net/can/led.c
+> @@ -115,13 +115,13 @@ static int can_led_notifier(struct notifier_block *nb, unsigned long msg,
+>   
+>   	if (msg == NETDEV_CHANGENAME) {
+>   		snprintf(name, sizeof(name), "%s-tx", netdev->name);
+> -		led_trigger_rename_static(name, priv->tx_led_trig);
+> +		led_trigger_rename(priv->tx_led_trig, name);
+>   
+>   		snprintf(name, sizeof(name), "%s-rx", netdev->name);
+> -		led_trigger_rename_static(name, priv->rx_led_trig);
+> +		led_trigger_rename(priv->rx_led_trig, name);
+>   
+>   		snprintf(name, sizeof(name), "%s-rxtx", netdev->name);
+> -		led_trigger_rename_static(name, priv->rxtx_led_trig);
+> +		led_trigger_rename(priv->rxtx_led_trig, name);
+>   	}
+>   
+>   	return NOTIFY_DONE;
+> diff --git a/include/linux/leds.h b/include/linux/leds.h
+> index b7e82550e655..e706c28bb35b 100644
+> --- a/include/linux/leds.h
+> +++ b/include/linux/leds.h
+> @@ -275,6 +275,8 @@ extern void led_trigger_unregister(struct led_trigger *trigger);
+>   extern int devm_led_trigger_register(struct device *dev,
+>   				     struct led_trigger *trigger);
+>   
+> +extern int led_trigger_register_format(struct led_trigger **trigger,
+> +				       const char *fmt, ...);
+>   extern void led_trigger_register_simple(const char *name,
+>   				struct led_trigger **trigger);
+>   extern void led_trigger_unregister_simple(struct led_trigger *trigger);
+> @@ -298,28 +300,25 @@ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
+>   }
+>   
+>   /**
+> - * led_trigger_rename_static - rename a trigger
+> - * @name: the new trigger name
+> + * led_trigger_rename - rename a trigger
+>    * @trig: the LED trigger to rename
+> + * @fmt: format string for new name
+>    *
+> - * Change a LED trigger name by copying the string passed in
+> - * name into current trigger name, which MUST be large
+> - * enough for the new string.
+> - *
+> - * Note that name must NOT point to the same string used
+> - * during LED registration, as that could lead to races.
+> - *
+> - * This is meant to be used on triggers with statically
+> - * allocated name.
+> + * rebaptize the given trigger.
+>    */
+> -extern void led_trigger_rename_static(const char *name,
+> -				      struct led_trigger *trig);
+> +extern int led_trigger_rename(struct led_trigger *trig, const char *fmt, ...);
+>   
+>   #else
+>   
+>   /* Trigger has no members */
+>   struct led_trigger {};
+>   
+> +static inline int led_trigger_register_format(struct led_trigger **trigger,
+> +					      const char *fmt, ...)
+> +{
+> +	return 0;
+> +}
+> +
+>   /* Trigger inline empty functions */
+>   static inline void led_trigger_register_simple(const char *name,
+>   					struct led_trigger **trigger) {}
+> @@ -342,6 +341,11 @@ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
+>   	return NULL;
+>   }
+>   
+> +static inline int led_trigger_rename(struct led_trigger *trig, const char *fmt, ...)
+> +{
+> +	return 0;
+> +}
+> +
+>   #endif /* CONFIG_LEDS_TRIGGERS */
+>   
+>   /* Trigger specific functions */
+> 
