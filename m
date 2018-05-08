@@ -1,97 +1,96 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 8 May 2018 11:59:25 +0100
-Subject: [PATCH v5 13/14] KVM: arm64: Fold redundant exit code checks out
- of fixup_guest_exit()
-In-Reply-To: <1525449935-31424-14-git-send-email-Dave.Martin@arm.com>
-References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
- <1525449935-31424-14-git-send-email-Dave.Martin@arm.com>
-Message-ID: <eddc101f-6f6c-a37b-ae48-e80a24f60815@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 May 2018 12:01:19 +0100
+Subject: [PATCH] tty: pl011: Avoid spuriously stuck-off interrupts
+In-Reply-To: <1524823545-11309-2-git-send-email-Dave.Martin@arm.com>
+References: <1524823545-11309-1-git-send-email-Dave.Martin@arm.com>
+ <1524823545-11309-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180508110119.GA16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/18 17:05, Dave Martin wrote:
-> The entire tail of fixup_guest_exit() is contained in if statements
-> of the form if (x && *exit_code == ARM_EXCEPTION_TRAP).  As a result,
-> we can check just once and bail out of the function early, allowing
-> the remaining if conditions to be simplified.
+On Fri, Apr 27, 2018 at 11:05:45AM +0100, Dave Martin wrote:
+> Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+> clears the RX and receive timeout interrupts on pl011 startup, to
+> avoid a screaming-interrupt scenario that can occur when the
+> firmware or bootloader leaves these interrupts asserted.
 > 
-> The only awkward case is where *exit_code is changed to
-> ARM_EXCEPTION_EL1_SERROR in the case of an illegal GICv2 CPU
-> interface access: in that case, the GICv3 trap handling code is
-> skipped using a goto.  This avoids pointlessly evaluating the
-> static branch check for the GICv3 case, even though we can't have
-> vgic_v2_cpuif_trap and vgic_v3_cpuif_trap true simultaneously
-> unless we have a GICv3 and GICv2 on the host: that sounds stupid,
-> but I haven't satisfied myself that it can't happen.
-
-Indeed, this cannot happen, unless we decided to trap access to the
-memory-mapped interface of a GICv3 implementation. We don't do that.
-
-But I guess the goto also serves a visual clue that the two cases are
-mutually exclusives. Small nit below though:
-
+> This has been noted as an issue when running Linux on qemu [1].
 > 
-> No functional change.
+> Unfortunately, the above fix seems to lead to potential
+> misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
+> on driver startup, if the RX FIFO is also already full to the
+> trigger level.
 > 
+> Clearing the RX FIFO interrupt does not change the FIFO fill level.
+> In this scenario, because the interrupt is now clear and because
+> the FIFO is already full to the trigger level, no new assertion of
+> the RX FIFO interrupt can occur unless the FIFO is drained back
+> below the trigger level.  This never occurs because the pl011
+> driver is waiting for an RX FIFO interrupt to tell it that there is
+> something to read, and does not read the FIFO at all until that
+> interrupt occurs.
+> 
+> Thus, simply clearing "spurious" interrupts on startup may be
+> misguided, since there is no way to be sure that the interrupts are
+> truly spurious, and things can go wrong if they are not.
+> 
+> This patch instead clears the interrupt condition by draining the
+> RX FIFO during UART startup, after clearing any potentially
+> spurious interrupt.  This should ensure that an interrupt will
+> definitely be asserted if the RX FIFO subsequently becomes
+> sufficiently full.
+> 
+> The drain is done at the point of enabling interrupts only.  This
+> means that it will occur any time the UART is newly opened through
+> the tty layer.  It will not apply to polled-mode use of the UART by
+> kgdboc: since that scenario cannot use interrupts by design, this
+> should not matter.  kgdboc will interact badly with "normal" use of
+> the UART in any case: this patch makes no attempt to paper over
+> such issues.
+> 
+> This patch does not attempt to address the case where the RX FIFO
+> fills faster than it can be drained: that is a pathological
+> hardware design problem that is beyond the scope of the driver to
+> work around.
+> 
+> [1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
+> before enabled the interruption
+> https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
+> 
+> Reported-by: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Peter Maydell <peter.maydell@linaro.org>
+> Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
 > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Tested-by: Andrew Jones <drjones@redhat.com>
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
 > ---
->  arch/arm64/kvm/hyp/switch.c | 11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
+>  drivers/tty/serial/amba-pl011.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 39e9166..be09c52 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -385,11 +385,13 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->  	 * same PC once the SError has been injected, and replay the
->  	 * trapping instruction.
->  	 */
-> -	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
-> +	if (*exit_code != ARM_EXCEPTION_TRAP)
-> +		goto exit;
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 4b40a5b..a6ccb85 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -1731,6 +1731,16 @@ static void pl011_enable_interrupts(struct uart_amba_port *uap)
+>  
+>  	/* Clear out any spuriously appearing RX interrupts */
+>  	pl011_write(UART011_RTIS | UART011_RXIS, uap, REG_ICR);
 > +
-> +	if (!__populate_fault_info(vcpu))
->  		return true;
->  
-> -	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
-> -	    *exit_code == ARM_EXCEPTION_TRAP) {
-> +	if (static_branch_unlikely(&vgic_v2_cpuif_trap)) {
->  		bool valid;
->  
->  		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
-> @@ -414,12 +416,12 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->  				if (!__skip_instr(vcpu))
->  					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
->  				*exit_code = ARM_EXCEPTION_EL1_SERROR;
-> +				goto exit;
+> +	/*
+> +	 * RXIS is asserted only when the RX FIFO transitions from below
+> +	 * to above the trigger threshold.  If the RX FIFO is already
+> +	 * full to the threshold this can't happen and RXIS will now be
+> +	 * stuck off.  Drain the RX FIFO explicitly to fix this:
+> +	 */
+> +	while (!(pl011_read(uap, REG_FR) & UART01x_FR_RXFE))
+> +		pl011_read(uap, REG_DR);
 
-This goto...
+You probably ought to limit this in case of a stuck receive not empty
+case, maybe to (eg) twice the depth of the FIFO?
 
->  			}
-
-... should be placed here. If this was a data abort, it cannot be a
-system register trap, and the below conditions cannot possibly apply.
-
->  		}
->  	}
->  
->  	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
-> -	    *exit_code == ARM_EXCEPTION_TRAP &&
->  	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
->  	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
->  		int ret = __vgic_v3_perform_cpuif_access(vcpu);
-> @@ -428,6 +430,7 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->  			return true;
->  	}
->  
-> +exit:
->  	/* Return to the host kernel and handle the exit */
->  	return false;
->  }
-> 
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
