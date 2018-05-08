@@ -1,43 +1,137 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 8 May 2018 09:03:09 +0800
-Subject: [PATCH v2 1/2] dt-bindings: add MediaTek XS-PHY binding
-In-Reply-To: <20180507170435.GA14540@rob-hp-laptop>
-References: <1525486506-19301-1-git-send-email-chunfeng.yun@mediatek.com>
- <1525486506-19301-2-git-send-email-chunfeng.yun@mediatek.com>
- <20180507170435.GA14540@rob-hp-laptop>
-Message-ID: <1525741389.25162.37.camel@mhfsdcap03>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Tue, 08 May 2018 09:36:24 +0800
+Subject: [RESEND PATCH] pinctrl: rockchip: Disable interrupt when changing
+ it's capability
+In-Reply-To: <20180507221511.GA6448@rodete-desktop-imager.corp.google.com>
+References: <20180503065553.7762-1-jeffy.chen@rock-chips.com>
+ <20180507221511.GA6448@rodete-desktop-imager.corp.google.com>
+Message-ID: <5AF0FF18.1050905@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-05-07 at 12:04 -0500, Rob Herring wrote:
-> On Sat, May 05, 2018 at 10:15:05AM +0800, Chunfeng Yun wrote:
-> > Add a DT binding documentation of XS-PHY for MediaTek SoCs
-> > with USB3.1 GEN2 controller
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/phy/phy-mtk-xsphy.txt      |  110 ++++++++++++++++++++
-> >  1 file changed, 110 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
-> > new file mode 100644
-> > index 0000000..9a95fab
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
-> > @@ -0,0 +1,110 @@
-> > +MediaTek XS-PHY binding
-> > +--------------------------
-> > +
-> > +The XS-PHY controller supports physical layer functionality for USB3.1
-> > +GEN2 controller on MediaTek SoCs.
-> > +
-> > +Required properties (controller (parent) node):
-> > + - compatible	: should be "mediatek,<soc-model>-xsphy", "mediatek,xsphy",
-> > + 		  soc-model is the name of SoC, such as mt2712 etc;
-> > +		  when using "mediatek,xsphy" compatible string, you need SoC specific
-> > +		  ones in addition, one of:
-> > +		  - "mediatek,mt3611-xsphy"
-> 
-> What about mt2712 you mention above?
-Sorry, forgot to modify it
+Hi Brian,
+
+On 05/08/2018 06:15 AM, Brian Norris wrote:
+> + Doug
+>
+> Hi Jeffy,
+>
+> On Thu, May 03, 2018 at 02:55:53PM +0800, Jeffy Chen wrote:
+>> We saw spurious irq when changing irq's trigger type, for example
+>> setting gpio-keys's wakeup irq trigger type.
+>>
+>> And according to the TRM:
+>> "Programming the GPIO registers for interrupt capability, edge-sensitive
+>> or level-sensitive interrupts, and interrupt polarity should be
+>> completed prior to enabling the interrupts on Port A in order to prevent
+>> spurious glitches on the interrupt lines to the interrupt controller."
+>>
+>> Reported-by: Brian Norris <briannorris@google.com>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>> ---
+>>
+>>   drivers/pinctrl/pinctrl-rockchip.c | 10 ++++++++++
+>>   1 file changed, 10 insertions(+)
+>>
+>> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+>> index 3924779f55785..7ff45ec8330d1 100644
+>> --- a/drivers/pinctrl/pinctrl-rockchip.c
+>> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+>> @@ -2727,9 +2727,19 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
+>>   		return -EINVAL;
+>>   	}
+>>
+>> +	/**
+>
+> The typical multiline comment style is to use only 1 asterisk -- 2
+> asterisks usually denote something more formal, like kerneldoc.
+
+ok, will fix it.
+
+>
+>> +	 * According to the TRM, we should keep irq disabled during programming
+>> +	 * interrupt capability to prevent spurious glitches on the interrupt
+>> +	 * lines to the interrupt controller.
+>> +	 */
+>
+> It's also worth noting that this case may come up in
+> rockchip_irq_demux() for EDGE_BOTH triggers:
+>
+> 		/*
+> 		 * Triggering IRQ on both rising and falling edge
+> 		 * needs manual intervention.
+> 		 */
+> 		if (bank->toggle_edge_mode & BIT(irq)) {
+> ...
+> 				polarity = readl_relaxed(bank->reg_base +
+> 							 GPIO_INT_POLARITY);
+> 				if (data & BIT(irq))
+> 					polarity &= ~BIT(irq);
+> 				else
+> 					polarity |= BIT(irq);
+> 				writel(polarity,
+> 				       bank->reg_base + GPIO_INT_POLARITY);
+>
+> AIUI, this case is not actually a problem, because this polarity
+> reconfiguration happens before we call generic_handle_irq(), so the
+> extra spurious interrupt is handled and cleared after this point. But it
+> seems like this should be noted somewhere in either the commit message,
+> the code comments, or both.
+
+just from my testing, the spurious irq only happen when set EDGE_RISING 
+to a gpio which is already high level, or set EDGE_FALLING to a gpio 
+which is already low level.so the demux / EDGE_BOTH seem ok.
+
+but adding comments as your suggested is a good idea, will do that.
+
+>
+> On the other hand...this also implies there may be a race condition
+> there, where we might lose an interrupt if there is an edge between the
+> re-configuration of the polarity in rockchip_irq_demux() and the
+> clearing/handling of the interrupt (handle_edge_irq() ->
+> chip->irq_ack()). If we have an edge between there, then we might ack
+> it, but leave the polarity such that we aren't ready for the next
+> (inverted) edge.
+
+if let me guess, the unexpected irq we saw is the hardware trying to 
+avoid losing irq? for example, we set a EDGE_RISING, and the hardware 
+saw the gpio is already high, then though it might lost an irq, so fake 
+one for safe?
+
+i'll try to confirm it with IC guys.
+
+>
+> I'm not 100% sure about the above, so it might be good to verify it. But
+> I also expect this means there's really no way to 100% reliably
+> implement both-edge trigger types on hardware like this that doesn't
+> directly implement it. So I'm not sure what we'd do with that knowledge.
+>
+>> +	data = readl(bank->reg_base + GPIO_INTEN);
+>> +	writel_relaxed(data & ~mask, gc->reg_base + GPIO_INTEN);
+>
+> Not sure if this is a needless optimization: but couldn't you only
+> disable the interrupt (and make the level and polarity changes) only if
+> the level or polarity are actually changing? For example, it's possible
+> to end up here when changing from EDGE_BOTH to EDGE_RISING, but we might
+> not actually program a new value.
+
+right, i noticed that too, will add a patch for that in v2.
+>
+> Brian
+>
+>> +
+>>   	writel_relaxed(level, gc->reg_base + GPIO_INTTYPE_LEVEL);
+>>   	writel_relaxed(polarity, gc->reg_base + GPIO_INT_POLARITY);
+>>
+>> +	writel_relaxed(data, gc->reg_base + GPIO_INTEN);
+>> +
+>>   	irq_gc_unlock(gc);
+>>   	raw_spin_unlock_irqrestore(&bank->slock, flags);
+>>   	clk_disable(bank->clk);
+>> --
+>> 2.11.0
+>>
+>>
+>
+>
+>
