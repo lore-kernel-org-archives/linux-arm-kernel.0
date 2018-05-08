@@ -1,78 +1,39 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 8 May 2018 16:48:36 +0100
-Subject: [PATCH v2 10/27] dts: bindings: Restrict coresight tmc-etr
- scatter-gather mode
-In-Reply-To: <CAL_JsqJDTx2UWN7VdsvDctyXw_rco6Q8NmoWQ5EBx6uhwJu=0Q@mail.gmail.com>
+Date: Tue, 8 May 2018 16:49:56 +0100
+Subject: [PATCH v2 12/27] coresight: tmc-etr: Allow commandline option to
+ override SG use
+In-Reply-To: <20180503204035.GA15555@xps15>
 References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-11-git-send-email-suzuki.poulose@arm.com>
- <20180501131300.GA31425@rob-hp-laptop>
- <CANLsYkwozU7QC5EeEy46KrEd4X7J9S69SiNg8-GhSSuMkhQrBw@mail.gmail.com>
- <CAL_JsqJDTx2UWN7VdsvDctyXw_rco6Q8NmoWQ5EBx6uhwJu=0Q@mail.gmail.com>
-Message-ID: <514f69b1-2219-aa83-dfe8-09c26ed4f5b1@arm.com>
+ <1525165857-11096-13-git-send-email-suzuki.poulose@arm.com>
+ <20180503204035.GA15555@xps15>
+Message-ID: <3610e97f-87aa-3bfe-c89d-161a6bd09047@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/18 23:56, Rob Herring wrote:
-> On Thu, May 3, 2018 at 3:32 PM, Mathieu Poirier
-> <mathieu.poirier@linaro.org> wrote:
->> On 1 May 2018 at 07:13, Rob Herring <robh@kernel.org> wrote:
->>> On Tue, May 01, 2018 at 10:10:40AM +0100, Suzuki K Poulose wrote:
->>>> We are about to add the support for ETR builtin scatter-gather mode
->>>> for dealing with large amount of trace buffers. However, on some of
->>>> the platforms, using the ETR SG mode can lock up the system due to
->>>> the way the ETR is connected to the memory subsystem.
->>>>
->>>> In SG mode, the ETR performs READ from the scatter-gather table to
->>>> fetch the next page and regular WRITE of trace data. If the READ
->>>> operation doesn't complete(due to the memory subsystem issues,
->>>> which we have seen on a couple of platforms) the trace WRITE
->>>> cannot proceed leading to issues. So, we by default do not
->>>> use the SG mode, unless it is known to be safe on the platform.
->>>> We define a DT property for the TMC node to specify whether we
->>>> have a proper SG mode.
-
-
->>>> ---
->>>>   Documentation/devicetree/bindings/arm/coresight.txt | 3 +++
->>>>   drivers/hwtracing/coresight/coresight-tmc.c         | 8 +++++++-
->>>>   2 files changed, 10 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
->>>> index cdd84d0..7c0c8f0 100644
->>>> --- a/Documentation/devicetree/bindings/arm/coresight.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
->>>> @@ -88,6 +88,9 @@ its hardware characteristcs.
->>>>        * arm,buffer-size: size of contiguous buffer space for TMC ETR
->>>>         (embedded trace router)
->>>>
->>>> +     * scatter-gather: boolean. Indicates that the TMC-ETR can safely
->>>> +       use the SG mode on this system.
->>>> +
->>>
->>> Needs a vendor prefix.
->>>
+On 03/05/18 21:40, Mathieu Poirier wrote:
+> On Tue, May 01, 2018 at 10:10:42AM +0100, Suzuki K Poulose wrote:
+>> The Coresight TMC-ETR SG mode could be unsafe on a platform where
+>> the ETR is not properly connected to account for READ operations.
+>> We use a DT node property to indicate if the system is safe.
+>> This patch also provides a command line parameter to "force"
+>> the use of SG mode to override the firmware information.
 >>
->> Thinking further on this, do we need to make it device specific as
->> well - something like "arm,etr-scatter-gather"?  That way we don't
->> have to redefine "scatter-gather" for other ARM devices if they happen
->> to need the same property but for different reasons.
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Cc: Mike Leach <mike.leach@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> Hi
+>>
+>> This is more of a debug patch for people who may want to
+>> test their platform without too much of hacking. I am not
+>> too keen on pushing this patch in.
 > 
-> No. If we had a bunch of cases, then we'd probably want to have just
-> 'scatter-gather'.
+> I am not either nor do I personally need it to test this feature.  We can leave
+> it in for now (and subsequent version) if you need it but we agree that I won't
+> queue it to my tree when the time comes.
 
-Does it mean "arm,scatter-gather" ? If we ever wanted to add the device
-specific information, I would prefer to go with "arm,tmc-scatter-gather"
-and not "etr-scatter-gather". They both could mean different things.
+OK, I was expecting this view from most of us here. I will drop it from my series in
+the next version.
 
-> 
-> BTW, if SG had already been supported, then I'd say this is a quirk
-> and we should invert this property. Otherwise, you'd be disabling once
-> enabled SG and require working platforms to update their dtb. Of
-> course, I shouldn't really let the state of an OS driver influence the
-> DT binding.
-> 
-
-The SG support is added with this series. So, the OS has never made use
-of the feature.
-
+Cheers
 Suzuki
