@@ -1,258 +1,561 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 8 May 2018 10:54:42 +0100
-Subject: [PATCH 4/3] dma-debug: remove CONFIG_HAVE_DMA_API_DEBUG
-In-Reply-To: <20180427155342.GA9232@lst.de>
-References: <20180424140235.9125-1-hch@lst.de> <20180427155342.GA9232@lst.de>
-Message-ID: <cfc6ac1e-56b7-0211-afa3-86865a01667d@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 8 May 2018 10:58:04 +0100
+Subject: [PATCH v5 06/14] KVM: arm64: Optimise FPSIMD handling to reduce
+ guest/host thrashing
+In-Reply-To: <1525449935-31424-7-git-send-email-Dave.Martin@arm.com>
+References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
+ <1525449935-31424-7-git-send-email-Dave.Martin@arm.com>
+Message-ID: <e87c6940-1c79-ccd4-c6ad-2d87790b2e00@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/04/18 16:53, Christoph Hellwig wrote:
-> There is no arch specific code required for dma-debug, so there is no
-> need to opt into the support either.
+On 04/05/18 17:05, Dave Martin wrote:
+> This patch refactors KVM to align the host and guest FPSIMD
+> save/restore logic with each other for arm64.  This reduces the
+> number of redundant save/restore operations that must occur, and
+> reduces the common-case IRQ blackout time during guest exit storms
+> by saving the host state lazily and optimising away the need to
+> restore the host state before returning to the run loop.
+> 
+> Four hooks are defined in order to enable this:
+> 
+>  * kvm_arch_vcpu_run_map_fp():
+>    Called on PID change to map necessary bits of current to Hyp.
+> 
+>  * kvm_arch_vcpu_load_fp():
+>    Set up FP/SIMD for entering the KVM run loop (parse as
+>    "vcpu_load fp").
+> 
+>  * kvm_arch_vcpu_park_fp():
+>    Get FP/SIMD into a safe state for re-enabling interrupts after a
+>    guest exit back to the run loop.
+> 
+>    For arm64 specifically, this involves updating the host kernel's
+>    FPSIMD context tracking metadata so that kernel-mode NEON use
+>    will cause the vcpu's FPSIMD state to be saved back correctly
+>    into the vcpu struct.  This must be done before re-enabling
+>    interrupts because kernel-mode NEON may be used my softirqs.
 
-Makes sense, and a purely negative diffstat is always pleasing :)
+s/my/by/
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+I must admit being slightly confused by the word "park". I tend to read
+"park" as "stash away for later use", while it really is "update the
+kernel's view of who is actually in control of the FP registers".
 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+No, I don't have a better name for it... ;-) But maybe something along
+the lines of "hwsync_fp", in order to be consistent with the rest of the
+code that deals with shared resources?
+
+> 
+>  * kvm_arch_vcpu_put_fp():
+>    Save guest FP/SIMD state back to memory and dissociate from the
+>    CPU ("vcpu_put fp").
+> 
+> Also, the arm64 FPSIMD context switch code is updated to enable it
+> to save back FPSIMD state for a vcpu, not just current.  A few
+> helpers drive this:
+> 
+>  * fpsimd_bind_state_to_cpu(struct user_fpsimd_state *fp):
+>    mark this CPU as having context fp (which may belong to a vcpu)
+>    currently loaded in its registers.  This is the non-task
+>    equivalent of the static function fpsimd_bind_to_cpu() in
+>    fpsimd.c.
+> 
+>  * task_fpsimd_save():
+>    exported to allow KVM to save the guest's FPSIMD state back to
+>    memory on exit from the run loop.
+> 
+>  * fpsimd_flush_state():
+>    invalidate any context's FPSIMD state that is currently loaded.
+>    Used to disassociate the vcpu from the CPU regs on run loop exit.
+> 
+> These changes allow the run loop to enable interrupts (and thus
+> softirqs that may use kernel-mode NEON) without having to save the
+> guest's FPSIMD state eagerly.
+> 
+> Some new vcpu_arch fields are added to make all this work.  Because
+> host FPSIMD state can now be saved back directly into current's
+> thread_struct as appropriate, host_cpu_context is no longer used
+> for preserving the FPSIMD state.  However, it is still needed for
+> preserving other things such as the host's system registers.  To
+> avoid ABI churn, the redundant storage space in host_cpu_context is
+> not removed for now.
+> 
+> arch/arm is not addressed by this patch and continues to use its
+> current save/restore logic.  It could provide implementations of
+> the helpers later if desired.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
 > ---
->   .../io/dma-api-debug/arch-support.txt         | 31 -------------------
->   arch/Kconfig                                  |  3 --
->   arch/arm/Kconfig                              |  1 -
->   arch/arm64/Kconfig                            |  1 -
->   arch/c6x/Kconfig                              |  1 -
->   arch/ia64/Kconfig                             |  1 -
->   arch/microblaze/Kconfig                       |  1 -
->   arch/mips/Kconfig                             |  1 -
->   arch/powerpc/Kconfig                          |  1 -
->   arch/riscv/Kconfig                            |  1 -
->   arch/s390/Kconfig                             |  1 -
->   arch/sh/Kconfig                               |  1 -
->   arch/sparc/Kconfig                            |  1 -
->   arch/x86/Kconfig                              |  1 -
->   arch/xtensa/Kconfig                           |  1 -
->   lib/Kconfig.debug                             |  1 -
->   16 files changed, 48 deletions(-)
->   delete mode 100644 Documentation/features/io/dma-api-debug/arch-support.txt
 > 
-> diff --git a/Documentation/features/io/dma-api-debug/arch-support.txt b/Documentation/features/io/dma-api-debug/arch-support.txt
-> deleted file mode 100644
-> index e438ed675623..000000000000
-> --- a/Documentation/features/io/dma-api-debug/arch-support.txt
-> +++ /dev/null
-> @@ -1,31 +0,0 @@
-> -#
-> -# Feature name:          dma-api-debug
-> -#         Kconfig:       HAVE_DMA_API_DEBUG
-> -#         description:   arch supports DMA debug facilities
-> -#
-> -    -----------------------
-> -    |         arch |status|
-> -    -----------------------
-> -    |       alpha: | TODO |
-> -    |         arc: | TODO |
-> -    |         arm: |  ok  |
-> -    |       arm64: |  ok  |
-> -    |         c6x: |  ok  |
-> -    |       h8300: | TODO |
-> -    |     hexagon: | TODO |
-> -    |        ia64: |  ok  |
-> -    |        m68k: | TODO |
-> -    |  microblaze: |  ok  |
-> -    |        mips: |  ok  |
-> -    |       nios2: | TODO |
-> -    |    openrisc: | TODO |
-> -    |      parisc: | TODO |
-> -    |     powerpc: |  ok  |
-> -    |        s390: |  ok  |
-> -    |          sh: |  ok  |
-> -    |       sparc: |  ok  |
-> -    |          um: | TODO |
-> -    |   unicore32: | TODO |
-> -    |         x86: |  ok  |
-> -    |      xtensa: |  ok  |
-> -    -----------------------
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 8e0d665c8d53..f07a1a99e5db 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -278,9 +278,6 @@ config HAVE_CLK
->   	  The <linux/clk.h> calls support software clock gating and
->   	  thus are a key power management tool on many systems.
->   
-> -config HAVE_DMA_API_DEBUG
-> -	bool
+> Changes since RFC v4:
+> 
+>  * select HAVE_KVM_VCPU_RUN_PID_CHANGE alongside adding the arm64
+>    implementation of kvm_arch_vcpu_run_pid_change().
+> 
+>    (These are no longer done by KVM: arm/arm64: Introduce
+>    kvm_arch_vcpu_run_pid_change in this series.)
+> 
+>  * Some pure refactoring in arch/arm64/kernel/fpsimd.c has been
+>    split into the previous patch for clarity.
+> 
+>  * Migrate to use update_thread_flag().
+> ---
+>  arch/arm/include/asm/kvm_host.h   |   8 +++
+>  arch/arm64/include/asm/fpsimd.h   |   5 ++
+>  arch/arm64/include/asm/kvm_host.h |  18 +++++++
+>  arch/arm64/kernel/fpsimd.c        |  15 +++++-
+>  arch/arm64/kvm/Kconfig            |   1 +
+>  arch/arm64/kvm/Makefile           |   2 +-
+>  arch/arm64/kvm/fpsimd.c           | 106 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kvm/hyp/switch.c       |  50 +++++++++---------
+>  virt/kvm/arm/arm.c                |   4 ++
+>  9 files changed, 180 insertions(+), 29 deletions(-)
+>  create mode 100644 arch/arm64/kvm/fpsimd.c
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index c7c28c8..4cac8d1 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -303,6 +303,14 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+>  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>  			       struct kvm_device_attr *attr);
+>  
+> +/*
+> + * VFP/NEON switching is all done by the hyp switch code, so no need to
+> + * coordinate with host context handling for this state:
+> + */
+> +static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
+> +static inline void kvm_arch_vcpu_park_fp(struct kvm_vcpu *vcpu) {}
+> +static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
+> +
+>  /* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+>  static inline void kvm_fpsimd_flush_cpu_state(void) {}
+>  
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index aa7162a..aa60895 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -41,6 +41,8 @@ struct task_struct;
+>  extern void fpsimd_save_state(struct user_fpsimd_state *state);
+>  extern void fpsimd_load_state(struct user_fpsimd_state *state);
+>  
+> +extern void fpsimd_save(void);
+> +
+>  extern void fpsimd_thread_switch(struct task_struct *next);
+>  extern void fpsimd_flush_thread(void);
+>  
+> @@ -49,7 +51,10 @@ extern void fpsimd_preserve_current_state(void);
+>  extern void fpsimd_restore_current_state(void);
+>  extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
+>  
+> +extern void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *state);
+> +
+>  extern void fpsimd_flush_task_state(struct task_struct *target);
+> +extern void fpsimd_flush_cpu_state(void);
+>  extern void sve_flush_cpu_state(void);
+>  
+>  /* Maximum VL that SVE VL-agnostic software can transparently support */
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 469de8a..811097e 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -30,6 +30,7 @@
+>  #include <asm/kvm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
+> +#include <asm/thread_info.h>
+>  
+>  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+>  
+> @@ -238,6 +239,12 @@ struct kvm_vcpu_arch {
+>  
+>  	/* Pointer to host CPU context */
+>  	kvm_cpu_context_t *host_cpu_context;
+> +
+> +	struct thread_info *host_thread_info;	/* hyp VA */
+> +	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
+> +	bool host_sve_in_use;	/* backup for host TIF_SVE while in guest */
+> +	bool fp_enabled;
+
+Could we consider merging these two fields together with debug_flags?
+Overall, they share a common purpose (tracking the use of a resource
+shared between host and guest). Not necessarily something to do
+immediately though.
+
+> +
+>  	struct {
+>  		/* {Break,watch}point registers */
+>  		struct kvm_guest_debug_arch regs;
+> @@ -420,6 +427,17 @@ static inline void __cpu_init_stage2(void)
+>  		  "PARange is %d bits, unsupported configuration!", parange);
+>  }
+>  
+> +/* Guest/host FPSIMD coordination helpers */
+> +int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu);
+> +void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu);
+> +void kvm_arch_vcpu_park_fp(struct kvm_vcpu *vcpu);
+> +void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu);
+> +
+> +static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+> +{
+> +	return kvm_arch_vcpu_run_map_fp(vcpu);
+> +}
+> +
+>  /*
+>   * All host FP/SIMD state is restored on guest exit, so nothing needs
+>   * doing here except in the SVE case:
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 5fc0595..e7349b5 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -275,7 +275,7 @@ static void task_fpsimd_load(void)
+>   *
+>   * Softirqs (and preemption) must be disabled.
+>   */
+> -static void fpsimd_save(void)
+> +void fpsimd_save(void)
+>  {
+>  	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
+>  
+> @@ -1008,6 +1008,17 @@ static void fpsimd_bind_to_cpu(void)
+>  	current->thread.fpsimd_cpu = smp_processor_id();
+>  }
+>  
+> +void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
+> +{
+> +	struct fpsimd_last_state_struct *last =
+> +		this_cpu_ptr(&fpsimd_last_state);
+> +
+> +	WARN_ON(!in_softirq() && !irqs_disabled());
+> +
+> +	last->st = st;
+> +	last->sve_in_use = false;
+> +}
+> +
+>  /*
+>   * Load the userland FPSIMD state of 'current' from memory, but only if the
+>   * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
+> @@ -1060,7 +1071,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
+>  	t->thread.fpsimd_cpu = NR_CPUS;
+>  }
+>  
+> -static inline void fpsimd_flush_cpu_state(void)
+> +void fpsimd_flush_cpu_state(void)
+>  {
+>  	__this_cpu_write(fpsimd_last_state.st, NULL);
+>  }
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index a2e3a5a..47b23bf 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -39,6 +39,7 @@ config KVM
+>  	select HAVE_KVM_IRQ_ROUTING
+>  	select IRQ_BYPASS_MANAGER
+>  	select HAVE_KVM_IRQ_BYPASS
+> +	select HAVE_KVM_VCPU_RUN_PID_CHANGE
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  	  We don't support KVM with 16K page tables yet, due to the multiple
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index 93afff9..0f2a135 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -19,7 +19,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o va_layout.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
+> -kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o
+> +kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o fpsimd.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/aarch32.o
+>  
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
+> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+> new file mode 100644
+> index 0000000..bbc6889
+> --- /dev/null
+> +++ b/arch/arm64/kvm/fpsimd.c
+> @@ -0,0 +1,106 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * arch/arm64/kvm/fpsimd.c: Guest/host FPSIMD context coordination helpers
+> + *
+> + * Copyright 2018 Arm Limited
+> + * Author: Dave Martin <Dave.Martin@arm.com>
+> + */
+> +#include <linux/bottom_half.h>
+> +#include <linux/sched.h>
+> +#include <linux/thread_info.h>
+> +#include <linux/kvm_host.h>
+> +#include <asm/kvm_host.h>
+> +#include <asm/kvm_mmu.h>
+> +
+> +/*
+> + * Called on entry to KVM_RUN unless this vcpu previously ran at least
+> + * once and the most recent prior KVM_RUN for this vcpu was called from
+> + * the same task as current (highly likely).
+> + *
+> + * This is guaranteed to execute before kvm_arch_vcpu_load_fp(vcpu),
+> + * such that on entering hyp the relevant parts of current are already
+> + * mapped.
+> + */
+> +int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+> +{
+> +	int ret;
+> +
+> +	struct thread_info *ti = &current->thread_info;
+> +	struct user_fpsimd_state *fpsimd = &current->thread.uw.fpsimd_state;
+> +
+> +	/*
+> +	 * Make sure the host task thread flags and fpsimd state are
+> +	 * visible to hyp:
+> +	 */
+> +	ret = create_hyp_mappings(ti, ti + 1, PAGE_HYP);
+> +	if (ret)
+> +		goto error;
+> +
+> +	ret = create_hyp_mappings(fpsimd, fpsimd + 1, PAGE_HYP);
+> +	if (ret)
+> +		goto error;
+> +
+> +	vcpu->arch.host_thread_info = kern_hyp_va(ti);
+> +	vcpu->arch.host_fpsimd_state = kern_hyp_va(fpsimd);
+> +error:
+> +	return ret;
+> +}
+> +
+> +/*
+> + * Prepare vcpu for saving the host's FPSIMD state and loading the guest's.
+> + * The actual loading is done by the FPSIMD access trap taken to hyp.
+> + *
+> + * Here, we just set the correct metadata to indicate that the FPSIMD
+> + * state in the cpu regs (if any) belongs to current, and where to write
+> + * it back to if/when a FPSIMD access trap is taken.
+> + *
+> + * TIF_SVE is backed up here, since it may get clobbered with guest state.
+> + * This flag is restored by kvm_arch_vcpu_put_fp(vcpu).
+> + */
+> +void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
+> +{
+> +	BUG_ON(system_supports_sve());
+> +	BUG_ON(!current->mm);
+> +
+> +	vcpu->arch.fp_enabled = false;
+> +	vcpu->arch.host_fpsimd_state =
+> +		kern_hyp_va(&current->thread.uw.fpsimd_state);
+> +	vcpu->arch.host_sve_in_use = !!test_thread_flag(TIF_SVE);
+> +}
+> +
+> +/*
+> + * If the guest FPSIMD state was loaded, mark the CPU FPSIMD regs as
+> + * dirty for vcpu so that they will be written back if the kernel
+> + * clobbers them due to kernel-mode NEON before re-entry into the guest.
+> + */
+> +void kvm_arch_vcpu_park_fp(struct kvm_vcpu *vcpu)
+> +{
+> +	WARN_ON_ONCE(!irqs_disabled());
+> +
+> +	if (vcpu->arch.fp_enabled) {
+> +		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs);
+> +		clear_thread_flag(TIF_FOREIGN_FPSTATE);
+> +		clear_thread_flag(TIF_SVE);
+> +	}
+> +}
+> +
+> +/*
+> + * Write back the vcpu FPSIMD regs if they are dirty, and invalidate the
+> + * cpu FPSIMD regs so that they can't be spuriously reused if this vcpu
+> + * disappears and another task or vcpu appears that recycles the same
+> + * struct fpsimd_state.
+> + */
+> +void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+> +{
+> +	local_bh_disable();
+> +
+> +	if (vcpu->arch.fp_enabled) {
+> +		fpsimd_save();
+> +		fpsimd_flush_cpu_state();
+> +		set_thread_flag(TIF_FOREIGN_FPSTATE);
+> +	}
+> +
+> +	update_thread_flag(TIF_SVE, vcpu->arch.host_sve_in_use);
+> +
+> +	local_bh_enable();
+> +}
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index c0796c4..10f55d3 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -27,15 +27,16 @@
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/fpsimd.h>
+>  #include <asm/debug-monitors.h>
+> +#include <asm/thread_info.h>
+>  
+> -static bool __hyp_text __fpsimd_enabled_nvhe(void)
+> +static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
+>  {
+> -	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
+> -}
+> +	if (vcpu->arch.host_thread_info->flags & _TIF_FOREIGN_FPSTATE) {
+> +		vcpu->arch.host_fpsimd_state = NULL;
+> +		vcpu->arch.fp_enabled = false;
+> +	}
+>  
+> -static bool fpsimd_enabled_vhe(void)
+> -{
+> -	return !!(read_sysreg(cpacr_el1) & CPACR_EL1_FPEN);
+> +	return vcpu->arch.fp_enabled;
+>  }
+>  
+>  /* Save the 32-bit only FPSIMD system register state */
+> @@ -92,7 +93,10 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
+>  
+>  	val = read_sysreg(cpacr_el1);
+>  	val |= CPACR_EL1_TTA;
+> -	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+> +	val &= ~CPACR_EL1_ZEN;
+> +	if (!update_fp_enabled(vcpu))
+> +		val &= ~CPACR_EL1_FPEN;
+> +
+>  	write_sysreg(val, cpacr_el1);
+>  
+>  	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
+> @@ -105,7 +109,10 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+>  	__activate_traps_common(vcpu);
+>  
+>  	val = CPTR_EL2_DEFAULT;
+> -	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
+> +	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+> +	if (!update_fp_enabled(vcpu))
+> +		val |= CPTR_EL2_TFP;
+> +
+>  	write_sysreg(val, cptr_el2);
+>  }
+>  
+> @@ -321,8 +328,6 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+>  void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  				    struct kvm_vcpu *vcpu)
+>  {
+> -	kvm_cpu_context_t *host_ctxt;
 > -
->   config HAVE_HW_BREAKPOINT
->   	bool
->   	depends on PERF_EVENTS
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 676977bdfe33..c43f5bb55ac8 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -60,7 +60,6 @@ config ARM
->   	select HAVE_CONTEXT_TRACKING
->   	select HAVE_C_RECORDMCOUNT
->   	select HAVE_DEBUG_KMEMLEAK
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_DMA_CONTIGUOUS if MMU
->   	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
->   	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index db51b6445744..b25ed7834f6c 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -105,7 +105,6 @@ config ARM64
->   	select HAVE_CONTEXT_TRACKING
->   	select HAVE_DEBUG_BUGVERBOSE
->   	select HAVE_DEBUG_KMEMLEAK
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_DMA_CONTIGUOUS
->   	select HAVE_DYNAMIC_FTRACE
->   	select HAVE_EFFICIENT_UNALIGNED_ACCESS
-> diff --git a/arch/c6x/Kconfig b/arch/c6x/Kconfig
-> index c6b4dd1418b4..8c088b96e372 100644
-> --- a/arch/c6x/Kconfig
-> +++ b/arch/c6x/Kconfig
-> @@ -10,7 +10,6 @@ config C6X
->   	select GENERIC_ATOMIC64
->   	select GENERIC_IRQ_SHOW
->   	select HAVE_ARCH_TRACEHOOK
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_MEMBLOCK
->   	select SPARSE_IRQ
->   	select IRQ_DOMAIN
-> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-> index 9485b5490eca..2067289fad4a 100644
-> --- a/arch/ia64/Kconfig
-> +++ b/arch/ia64/Kconfig
-> @@ -29,7 +29,6 @@ config IA64
->   	select HAVE_FUNCTION_TRACER
->   	select TTY
->   	select HAVE_ARCH_TRACEHOOK
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_MEMBLOCK
->   	select HAVE_MEMBLOCK_NODE_MAP
->   	select HAVE_VIRT_CPU_ACCOUNTING
-> diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
-> index 3817a3e2146c..d14782100088 100644
-> --- a/arch/microblaze/Kconfig
-> +++ b/arch/microblaze/Kconfig
-> @@ -19,7 +19,6 @@ config MICROBLAZE
->   	select HAVE_ARCH_HASH
->   	select HAVE_ARCH_KGDB
->   	select HAVE_DEBUG_KMEMLEAK
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_DYNAMIC_FTRACE
->   	select HAVE_FTRACE_MCOUNT_RECORD
->   	select HAVE_FUNCTION_GRAPH_TRACER
-> diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-> index 0f619b8c0e9e..2dcdc13cd65d 100644
-> --- a/arch/mips/Kconfig
-> +++ b/arch/mips/Kconfig
-> @@ -42,7 +42,6 @@ config MIPS
->   	select HAVE_C_RECORDMCOUNT
->   	select HAVE_DEBUG_KMEMLEAK
->   	select HAVE_DEBUG_STACKOVERFLOW
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_DMA_CONTIGUOUS
->   	select HAVE_DYNAMIC_FTRACE
->   	select HAVE_EXIT_THREAD
-> diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-> index 1887f8f86a77..268fd46fc3c7 100644
-> --- a/arch/powerpc/Kconfig
-> +++ b/arch/powerpc/Kconfig
-> @@ -181,7 +181,6 @@ config PPC
->   	select HAVE_CONTEXT_TRACKING		if PPC64
->   	select HAVE_DEBUG_KMEMLEAK
->   	select HAVE_DEBUG_STACKOVERFLOW
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_DYNAMIC_FTRACE
->   	select HAVE_DYNAMIC_FTRACE_WITH_REGS	if MPROFILE_KERNEL
->   	select HAVE_EBPF_JIT			if PPC64
-> diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
-> index 17212ba54ee3..95e2da34aaad 100644
-> --- a/arch/riscv/Kconfig
-> +++ b/arch/riscv/Kconfig
-> @@ -23,7 +23,6 @@ config RISCV
->   	select GENERIC_ATOMIC64 if !64BIT || !RISCV_ISA_A
->   	select HAVE_MEMBLOCK
->   	select HAVE_MEMBLOCK_NODE_MAP
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_DMA_CONTIGUOUS
->   	select HAVE_GENERIC_DMA_COHERENT
->   	select IRQ_DOMAIN
-> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-> index b794a2ab6d15..6a64287ec1da 100644
-> --- a/arch/s390/Kconfig
-> +++ b/arch/s390/Kconfig
-> @@ -130,7 +130,6 @@ config S390
->   	select HAVE_CMPXCHG_LOCAL
->   	select HAVE_COPY_THREAD_TLS
->   	select HAVE_DEBUG_KMEMLEAK
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_DMA_CONTIGUOUS
->   	select DMA_DIRECT_OPS
->   	select HAVE_DYNAMIC_FTRACE
-> diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-> index 9417f70e008e..7d521926041e 100644
-> --- a/arch/sh/Kconfig
-> +++ b/arch/sh/Kconfig
-> @@ -13,7 +13,6 @@ config SUPERH
->   	select HAVE_OPROFILE
->   	select HAVE_GENERIC_DMA_COHERENT
->   	select HAVE_ARCH_TRACEHOOK
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_PERF_EVENTS
->   	select HAVE_DEBUG_BUGVERBOSE
->   	select ARCH_HAVE_CUSTOM_GPIO_H
-> diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-> index c1cfc17eb504..435dbc033afe 100644
-> --- a/arch/sparc/Kconfig
-> +++ b/arch/sparc/Kconfig
-> @@ -25,7 +25,6 @@ config SPARC
->   	select RTC_CLASS
->   	select RTC_DRV_M48T59
->   	select RTC_SYSTOHC
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_ARCH_JUMP_LABEL if SPARC64
->   	select GENERIC_IRQ_SHOW
->   	select ARCH_WANT_IPC_PARSE_VERSION
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index aad35c568681..3eeca48a146b 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -135,7 +135,6 @@ config X86
->   	select HAVE_C_RECORDMCOUNT
->   	select HAVE_DEBUG_KMEMLEAK
->   	select HAVE_DEBUG_STACKOVERFLOW
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_DMA_CONTIGUOUS
->   	select HAVE_DYNAMIC_FTRACE
->   	select HAVE_DYNAMIC_FTRACE_WITH_REGS
-> diff --git a/arch/xtensa/Kconfig b/arch/xtensa/Kconfig
-> index c921e8bccdc8..17df332269b2 100644
-> --- a/arch/xtensa/Kconfig
-> +++ b/arch/xtensa/Kconfig
-> @@ -19,7 +19,6 @@ config XTENSA
->   	select HAVE_ARCH_KASAN if MMU
->   	select HAVE_CC_STACKPROTECTOR
->   	select HAVE_DEBUG_KMEMLEAK
-> -	select HAVE_DMA_API_DEBUG
->   	select HAVE_DMA_CONTIGUOUS
->   	select HAVE_EXIT_THREAD
->   	select HAVE_FUNCTION_TRACER
-> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-> index 685ed2dd4384..d5175eb7b917 100644
-> --- a/lib/Kconfig.debug
-> +++ b/lib/Kconfig.debug
-> @@ -1634,7 +1634,6 @@ config PROVIDE_OHCI1394_DMA_INIT
->   
->   config DMA_API_DEBUG
->   	bool "Enable debugging of DMA-API usage"
-> -	depends on HAVE_DMA_API_DEBUG
->   	select NEED_DMA_MAP_STATE
->   	help
->   	  Enable this option to debug the use of the DMA API by device drivers.
+>  	if (has_vhe())
+>  		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+>  			     cpacr_el1);
+> @@ -332,14 +337,19 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  
+>  	isb();
+>  
+> -	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> -	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
+> +	if (vcpu->arch.host_fpsimd_state) {
+> +		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
+> +		vcpu->arch.host_fpsimd_state = NULL;
+> +	}
+> +
+>  	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
+>  
+>  	/* Skip restoring fpexc32 for AArch64 guests */
+>  	if (!(read_sysreg(hcr_el2) & HCR_RW))
+>  		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
+>  			     fpexc32_el2);
+> +
+> +	vcpu->arch.fp_enabled = true;
+>  }
+>  
+>  /*
+> @@ -418,7 +428,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm_cpu_context *host_ctxt;
+>  	struct kvm_cpu_context *guest_ctxt;
+> -	bool fp_enabled;
+>  	u64 exit_code;
+>  
+>  	host_ctxt = vcpu->arch.host_cpu_context;
+> @@ -440,19 +449,14 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  		/* And we're baaack! */
+>  	} while (fixup_guest_exit(vcpu, &exit_code));
+>  
+> -	fp_enabled = fpsimd_enabled_vhe();
+> -
+>  	sysreg_save_guest_state_vhe(guest_ctxt);
+>  
+>  	__deactivate_traps(vcpu);
+>  
+>  	sysreg_restore_host_state_vhe(host_ctxt);
+>  
+> -	if (fp_enabled) {
+> -		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+> -		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> +	if (vcpu->arch.fp_enabled)
+>  		__fpsimd_save_fpexc32(vcpu);
+> -	}
+>  
+>  	__debug_switch_to_host(vcpu);
+>  
+> @@ -464,7 +468,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm_cpu_context *host_ctxt;
+>  	struct kvm_cpu_context *guest_ctxt;
+> -	bool fp_enabled;
+>  	u64 exit_code;
+>  
+>  	vcpu = kern_hyp_va(vcpu);
+> @@ -496,8 +499,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  		/* And we're baaack! */
+>  	} while (fixup_guest_exit(vcpu, &exit_code));
+>  
+> -	fp_enabled = __fpsimd_enabled_nvhe();
+> -
+>  	__sysreg_save_state_nvhe(guest_ctxt);
+>  	__sysreg32_save_state(vcpu);
+>  	__timer_disable_traps(vcpu);
+> @@ -508,11 +509,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  
+>  	__sysreg_restore_state_nvhe(host_ctxt);
+>  
+> -	if (fp_enabled) {
+> -		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+> -		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> +	if (vcpu->arch.fp_enabled)
+>  		__fpsimd_save_fpexc32(vcpu);
+> -	}
+>  
+>  	/*
+>  	 * This must come after restoring the host sysregs, since a non-VHE
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index a4c1b76..6cf499b 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -363,10 +363,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  	kvm_vgic_load(vcpu);
+>  	kvm_timer_vcpu_load(vcpu);
+>  	kvm_vcpu_load_sysregs(vcpu);
+> +	kvm_arch_vcpu_load_fp(vcpu);
+>  }
+>  
+>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  {
+> +	kvm_arch_vcpu_put_fp(vcpu);
+>  	kvm_vcpu_put_sysregs(vcpu);
+>  	kvm_timer_vcpu_put(vcpu);
+>  	kvm_vgic_put(vcpu);
+> @@ -778,6 +780,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		if (static_branch_unlikely(&userspace_irqchip_in_use))
+>  			kvm_timer_sync_hwstate(vcpu);
+>  
+> +		kvm_arch_vcpu_park_fp(vcpu);
+> +
+>  		/*
+>  		 * We may have taken a host interrupt in HYP mode (ie
+>  		 * while executing the guest). This interrupt is still
 > 
+
+Other than the couple of minor nits above,
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
