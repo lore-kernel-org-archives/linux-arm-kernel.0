@@ -1,332 +1,189 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 8 May 2018 11:37:38 +0100
-Subject: [PATCH 7/7] ARM: dts: Fix DTC warnings
-In-Reply-To: <20180506134352.2637-8-linus.walleij@linaro.org>
-References: <20180506134352.2637-1-linus.walleij@linaro.org>
- <20180506134352.2637-8-linus.walleij@linaro.org>
-Message-ID: <f1aa27c4-8a59-fc32-fdf8-218d9d2d6e97@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 8 May 2018 11:38:05 +0100
+Subject: [PATCH v5 10/14] KVM: arm64: Save host SVE context as appropriate
+In-Reply-To: <1525449935-31424-11-git-send-email-Dave.Martin@arm.com>
+References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
+ <1525449935-31424-11-git-send-email-Dave.Martin@arm.com>
+Message-ID: <0c616c43-3bff-1c93-0463-fae1c53c0e51@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/18 14:43, Linus Walleij wrote:
-> The DTC was warning a lot about unit names etc, I think I fixed
-> them all. One warning remains:
+On 04/05/18 17:05, Dave Martin wrote:
+> This patch adds SVE context saving to the hyp FPSIMD context switch
+> path.  This means that it is no longer necessary to save the host
+> SVE state in advance of entering the guest, when in use.
 > 
-> arch/arm/boot/dts/gemini-rut1xx.dtb: Warning (unit_address_vs_reg):
->   /memory: node has a reg or ranges property, but no unit name
+> In order to avoid adding pointless complexity to the code, VHE is
+> assumed if SVE is in use.  VHE is an architectural prerequisite for
+> SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
+> kernels that support both SVE and KVM.
 > 
-> This comes up all the time even though memory is stated as
-> memory at 0 for all boards, I guess this is a bug in the DTC
-> syntax checker, like it cannot really differentiate between
-> @0 and no unit name at all for the memory node.
-
-That might be because it's pulling in skeleton.dtsi, since I think 
-"memory at 0" and "memory" are treated as distinct nodes, such that the 
-former from the board DTS no longer overrides the latter from skeleton 
-and you end up with both.
-
-Robin.
-
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Historically, software models exist that can expose the
+> architecturally invalid configuration of SVE without VHE, so if
+> this situation is detected this patch warns and refuses to create a
+> VM.  Doing this check at VM creation time avoids race issues
+> between KVM and SVE initialisation.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 > ---
->   arch/arm/boot/dts/gemini-dlink-dir-685.dts |  5 ++---
->   arch/arm/boot/dts/gemini-dlink-dns-313.dts |  5 ++---
->   arch/arm/boot/dts/gemini-nas4220b.dts      | 12 +++++-------
->   arch/arm/boot/dts/gemini-rut1xx.dts        | 10 ++++------
->   arch/arm/boot/dts/gemini-sq201.dts         | 10 ++++------
->   arch/arm/boot/dts/gemini-wbd111.dts        | 15 +++++++--------
->   arch/arm/boot/dts/gemini-wbd222.dts        | 14 ++++++--------
->   7 files changed, 30 insertions(+), 41 deletions(-)
+>  arch/arm64/Kconfig          |  7 +++++++
+>  arch/arm64/kvm/fpsimd.c     |  1 -
+>  arch/arm64/kvm/hyp/switch.c | 21 +++++++++++++++++++--
+>  virt/kvm/arm/arm.c          | 18 ++++++++++++++++++
+>  4 files changed, 44 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/gemini-dlink-dir-685.dts b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-> index 89ce0d1916e3..fb5c954ab95a 100644
-> --- a/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-> +++ b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-> @@ -13,7 +13,7 @@
->   	#address-cells = <1>;
->   	#size-cells = <1>;
->   
-> -	memory {
-> +	memory at 0 {
->   		/* 128 MB SDRAM in 2 x Hynix HY5DU121622DTP-D43 */
->   		device_type = "memory";
->   		reg = <0x00000000 0x8000000>;
-> @@ -26,8 +26,7 @@
->   
->   	gpio_keys {
->   		compatible = "gpio-keys";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index eb2cf49..b0d3820 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1130,6 +1130,7 @@ endmenu
+>  config ARM64_SVE
+>  	bool "ARM Scalable Vector Extension support"
+>  	default y
+> +	depends on !KVM || ARM64_VHE
+
+In that case, should we consider making ARM64_VHE "default y" as well,
+as KVM is "default y" too?
+
+Otherwise, I fear we end-up regressing existing configurations. Also,
+you still have to check for the configuration at run time, so I'm not
+immediately getting the point of this particular change.
+
+>  	help
+>  	  The Scalable Vector Extension (SVE) is an extension to the AArch64
+>  	  execution state which complements and extends the SIMD functionality
+> @@ -1155,6 +1156,12 @@ config ARM64_SVE
+>  	  booting the kernel.  If unsure and you are not observing these
+>  	  symptoms, you should assume that it is safe to say Y.
+>  
+> +	  CPUs that support SVE are architecturally required to support the
+> +	  Virtualization Host Extensions (VHE), so the kernel makes no
+> +	  provision for supporting SVE alongside KVM without VHE enabled.
+> +	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
+> +	  KVM in the same kernel image.
 > +
->   		button-esc {
->   			debounce-interval = <50>;
->   			wakeup-source;
-> diff --git a/arch/arm/boot/dts/gemini-dlink-dns-313.dts b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-> index da78a0aa389a..d1329322b968 100644
-> --- a/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-> +++ b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-> @@ -15,7 +15,7 @@
->   	#address-cells = <1>;
->   	#size-cells = <1>;
->   
-> -	memory {
-> +	memory at 0 {
->   		/* 64 MB SDRAM in a Nanya NT5DS32M16BS-6K package */
->   		device_type = "memory";
->   		reg = <0x00000000 0x4000000>;
-> @@ -32,8 +32,7 @@
->   
->   	gpio_keys {
->   		compatible = "gpio-keys";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
+>  config ARM64_MODULE_PLTS
+>  	bool
+>  	select HAVE_MOD_ARCH_SPECIFIC
+> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+> index bbc6889..91ad01f 100644
+> --- a/arch/arm64/kvm/fpsimd.c
+> +++ b/arch/arm64/kvm/fpsimd.c
+> @@ -59,7 +59,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+>   */
+>  void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
+>  {
+> -	BUG_ON(system_supports_sve());
+>  	BUG_ON(!current->mm);
+>  
+>  	vcpu->arch.fp_enabled = false;
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 10f55d3..8009126 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -21,12 +21,14 @@
+>  
+>  #include <kvm/arm_psci.h>
+>  
+> +#include <asm/cpufeature.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_hyp.h>
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/fpsimd.h>
+>  #include <asm/debug-monitors.h>
+> +#include <asm/processor.h>
+>  #include <asm/thread_info.h>
+>  
+>  static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
+> @@ -328,6 +330,8 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+>  void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  				    struct kvm_vcpu *vcpu)
+>  {
+> +	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
 > +
->   		button-esc {
->   			debounce-interval = <50>;
->   			wakeup-source;
-> diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts b/arch/arm/boot/dts/gemini-nas4220b.dts
-> index 9f78803b2456..963ea890c87f 100644
-> --- a/arch/arm/boot/dts/gemini-nas4220b.dts
-> +++ b/arch/arm/boot/dts/gemini-nas4220b.dts
-> @@ -14,7 +14,7 @@
->   	#address-cells = <1>;
->   	#size-cells = <1>;
->   
-> -	memory { /* 128 MB */
-> +	memory at 0 { /* 128 MB */
->   		device_type = "memory";
->   		reg = <0x00000000 0x8000000>;
->   	};
-> @@ -26,10 +26,8 @@
->   
->   	gpio_keys {
->   		compatible = "gpio-keys";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
->   
-> -		button at 29 {
-> +		button-setup {
->   			debounce-interval = <50>;
->   			wakeup-source;
->   			linux,code = <KEY_SETUP>;
-> @@ -37,7 +35,7 @@
->   			/* Conflict with TVC */
->   			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
->   		};
-> -		button at 31 {
-> +		button-restart {
->   			debounce-interval = <50>;
->   			wakeup-source;
->   			linux,code = <KEY_RESTART>;
-> @@ -49,13 +47,13 @@
->   
->   	leds {
->   		compatible = "gpio-leds";
-> -		led at 28 {
-> +		led-orange-hdd {
->   			label = "nas4220b:orange:hdd";
->   			/* Conflict with TVC */
->   			gpios = <&gpio1 28 GPIO_ACTIVE_HIGH>;
->   			default-state = "on";
->   		};
-> -		led at 30 {
-> +		led-green-os {
->   			label = "nas4220b:green:os";
->   			/* Conflict with TVC */
->   			gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>;
-> diff --git a/arch/arm/boot/dts/gemini-rut1xx.dts b/arch/arm/boot/dts/gemini-rut1xx.dts
-> index a2f14ee37599..eb4f0bf074da 100644
-> --- a/arch/arm/boot/dts/gemini-rut1xx.dts
-> +++ b/arch/arm/boot/dts/gemini-rut1xx.dts
-> @@ -14,7 +14,7 @@
->   	#address-cells = <1>;
->   	#size-cells = <1>;
->   
-> -	memory { /* 128 MB */
-> +	memory at 0 { /* 128 MB */
->   		device_type = "memory";
->   		reg = <0x00000000 0x8000000>;
->   	};
-> @@ -26,10 +26,8 @@
->   
->   	gpio_keys {
->   		compatible = "gpio-keys";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
->   
-> -		button at 28 {
-> +		button-setup {
->   			debounce-interval = <50>;
->   			wakeup-source;
->   			linux,code = <KEY_SETUP>;
-> @@ -41,14 +39,14 @@
->   
->   	leds {
->   		compatible = "gpio-leds";
-> -		led at 7 {
-> +		led-gsm {
->   			/* FIXME: add the LED color */
->   			label = "rut1xx::gsm";
->   			/* Conflict with ICE */
->   			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
->   			default-state = "on";
->   		};
-> -		led at 31 {
-> +		led-power {
->   			/* FIXME: add the LED color */
->   			label = "rut1xx::power";
->   			/* Conflict with NAND CE0 */
-> diff --git a/arch/arm/boot/dts/gemini-sq201.dts b/arch/arm/boot/dts/gemini-sq201.dts
-> index 229c0267617a..e5cf9d1a98cd 100644
-> --- a/arch/arm/boot/dts/gemini-sq201.dts
-> +++ b/arch/arm/boot/dts/gemini-sq201.dts
-> @@ -14,7 +14,7 @@
->   	#address-cells = <1>;
->   	#size-cells = <1>;
->   
-> -	memory { /* 128 MB */
-> +	memory at 0 { /* 128 MB */
->   		device_type = "memory";
->   		reg = <0x00000000 0x8000000>;
->   	};
-> @@ -26,10 +26,8 @@
->   
->   	gpio_keys {
->   		compatible = "gpio-keys";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
->   
-> -		button at 18 {
-> +		button-setup {
->   			debounce-interval = <50>;
->   			wakeup-source;
->   			linux,code = <KEY_SETUP>;
-> @@ -41,14 +39,14 @@
->   
->   	leds {
->   		compatible = "gpio-leds";
-> -		led at 20 {
-> +		led-green-info {
->   			label = "sq201:green:info";
->   			/* Conflict with parallel flash */
->   			gpios = <&gpio0 20 GPIO_ACTIVE_HIGH>;
->   			default-state = "on";
->   			linux,default-trigger = "heartbeat";
->   		};
-> -		led at 31 {
-> +		led-green-usb {
->   			label = "sq201:green:usb";
->   			/* Conflict with parallel and NAND flash */
->   			gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
-> diff --git a/arch/arm/boot/dts/gemini-wbd111.dts b/arch/arm/boot/dts/gemini-wbd111.dts
-> index b31a9189083f..29af86cd10f7 100644
-> --- a/arch/arm/boot/dts/gemini-wbd111.dts
-> +++ b/arch/arm/boot/dts/gemini-wbd111.dts
-> @@ -14,7 +14,8 @@
->   	#address-cells = <1>;
->   	#size-cells = <1>;
->   
-> -	memory { /* 128 MB */
-> +	memory at 0 {
-> +		/* 128 MB */
->   		device_type = "memory";
->   		reg = <0x00000000 0x8000000>;
->   	};
-> @@ -26,10 +27,8 @@
->   
->   	gpio_keys {
->   		compatible = "gpio-keys";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
->   
-> -		button at 5 {
-> +		button-setup {
->   			debounce-interval = <50>;
->   			wakeup-source;
->   			linux,code = <KEY_SETUP>;
-> @@ -42,25 +41,25 @@
->   	leds {
->   		compatible = "gpio-leds";
->   
-> -		led at 1 {
-> +		led-red-l3 {
->   			label = "wbd111:red:L3";
->   			/* Conflict with TVC and extended parallel flash */
->   			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
->   			default-state = "off";
->   		};
-> -		led at 2 {
-> +		led-green-l4 {
->   			label = "wbd111:green:L4";
->   			/* Conflict with TVC and extended parallel flash */
->   			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
->   			default-state = "off";
->   		};
-> -		led at 3 {
-> +		led-red-l4 {
->   			label = "wbd111:red:L4";
->   			/* Conflict with TVC and extended parallel flash */
->   			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
->   			default-state = "off";
->   		};
-> -		led at 5 {
-> +		led-greeb-l3 {
->   			label = "wbd111:green:L3";
->   			/* Conflict with TVC and extended parallel flash */
->   			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-> diff --git a/arch/arm/boot/dts/gemini-wbd222.dts b/arch/arm/boot/dts/gemini-wbd222.dts
-> index 0be867fbfc69..24e6ae3616f7 100644
-> --- a/arch/arm/boot/dts/gemini-wbd222.dts
-> +++ b/arch/arm/boot/dts/gemini-wbd222.dts
-> @@ -14,7 +14,7 @@
->   	#address-cells = <1>;
->   	#size-cells = <1>;
->   
-> -	memory { /* 128 MB */
-> +	memory at 0 { /* 128 MB */
->   		device_type = "memory";
->   		reg = <0x00000000 0x8000000>;
->   	};
-> @@ -26,10 +26,8 @@
->   
->   	gpio_keys {
->   		compatible = "gpio-keys";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
->   
-> -		button at 5 {
-> +		button-setup {
->   			debounce-interval = <50>;
->   			wakeup-source;
->   			linux,code = <KEY_SETUP>;
-> @@ -42,25 +40,25 @@
->   	leds {
->   		compatible = "gpio-leds";
->   
-> -		led at 1 {
-> +		led-red-l3 {
->   			label = "wbd111:red:L3";
->   			/* Conflict with TVC and extended parallel flash */
->   			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
->   			default-state = "off";
->   		};
-> -		led at 2 {
-> +		led-green-l4 {
->   			label = "wbd111:green:L4";
->   			/* Conflict with TVC and extended parallel flash */
->   			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
->   			default-state = "off";
->   		};
-> -		led at 3 {
-> +		led-red-l4 {
->   			label = "wbd111:red:L4";
->   			/* Conflict with TVC and extended parallel flash */
->   			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
->   			default-state = "off";
->   		};
-> -		led at 5 {
-> +		led-green-l3 {
->   			label = "wbd111:green:L3";
->   			/* Conflict with TVC and extended parallel flash */
->   			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
+>  	if (has_vhe())
+>  		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+>  			     cpacr_el1);
+> @@ -337,8 +341,21 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  
+>  	isb();
+>  
+> -	if (vcpu->arch.host_fpsimd_state) {
+> -		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
+> +	if (host_fpsimd) {
+> +		/*
+> +		 * In the SVE case, VHE is assumed: it is enforced by
+> +		 * Kconfig and kvm_arch_init_vm().
+> +		 */
+> +		if (system_supports_sve() && vcpu->arch.host_sve_in_use) {
+> +			struct thread_struct *thread = container_of(
+> +				host_fpsimd,
+> +				struct thread_struct, uw.fpsimd_state);
+> +
+> +			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
+> +		} else {
+> +			__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
+> +		}
+> +
+>  		vcpu->arch.host_fpsimd_state = NULL;
+>  	}
+>  
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 6cf499b..a7be7bf 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -16,6 +16,7 @@
+>   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+>   */
+>  
+> +#include <linux/bug.h>
+>  #include <linux/cpu_pm.h>
+>  #include <linux/errno.h>
+>  #include <linux/err.h>
+> @@ -41,6 +42,7 @@
+>  #include <asm/mman.h>
+>  #include <asm/tlbflush.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/cpufeature.h>
+>  #include <asm/virt.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_asm.h>
+> @@ -120,6 +122,22 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+>  	if (type)
+>  		return -EINVAL;
+>  
+> +	/*
+> +	 * VHE is a prerequisite for SVE in the Arm architecture, and
+> +	 * Kconfig ensures that if system_supports_sve() here then
+> +	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
+> +	 * detected and enabled, the CPU is architecturally
+> +	 * noncompliant.
+> +	 *
+> +	 * Just in case this mismatch is seen, detect it, warn and give
+> +	 * up.  Supporting this forbidden configuration in Hyp would be
+> +	 * pointless.
+> +	 */
+> +	if (system_supports_sve() && !has_vhe()) {
+> +		kvm_pr_unimpl("Cannot create VMs on SVE system without VHE.  Broken cpu?");
+> +		return -ENXIO;
+> +	}
+
+You might as well fail the boot KVM initialization altogether, and not
+wait for a VM to be created.
+
+But I'm more concerned with the fact that we're now have a configuration
+that drops functionalities on the floor, one way or another.
+
+> +
+>  	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
+>  	if (!kvm->arch.last_vcpu_ran)
+>  		return -ENOMEM;
 > 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
