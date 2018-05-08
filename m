@@ -1,109 +1,78 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 8 May 2018 16:40:18 +0100
-Subject: [PATCH v2 05/27] dts: bindings: Document device tree binding for
- CATU
-In-Reply-To: <CANLsYkwzD0gpAo9be5ii4=+tn8GOL6psHcRA24=EMq=MRAzBoQ@mail.gmail.com>
+Date: Tue, 8 May 2018 16:48:36 +0100
+Subject: [PATCH v2 10/27] dts: bindings: Restrict coresight tmc-etr
+ scatter-gather mode
+In-Reply-To: <CAL_JsqJDTx2UWN7VdsvDctyXw_rco6Q8NmoWQ5EBx6uhwJu=0Q@mail.gmail.com>
 References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-6-git-send-email-suzuki.poulose@arm.com>
- <20180501131057.GA15706@rob-hp-laptop>
- <CANLsYkwzD0gpAo9be5ii4=+tn8GOL6psHcRA24=EMq=MRAzBoQ@mail.gmail.com>
-Message-ID: <8725a726-0733-b0bc-fcf8-4e22399c0e22@arm.com>
+ <1525165857-11096-11-git-send-email-suzuki.poulose@arm.com>
+ <20180501131300.GA31425@rob-hp-laptop>
+ <CANLsYkwozU7QC5EeEy46KrEd4X7J9S69SiNg8-GhSSuMkhQrBw@mail.gmail.com>
+ <CAL_JsqJDTx2UWN7VdsvDctyXw_rco6Q8NmoWQ5EBx6uhwJu=0Q@mail.gmail.com>
+Message-ID: <514f69b1-2219-aa83-dfe8-09c26ed4f5b1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/05/18 23:56, Rob Herring wrote:
+> On Thu, May 3, 2018 at 3:32 PM, Mathieu Poirier
+> <mathieu.poirier@linaro.org> wrote:
+>> On 1 May 2018 at 07:13, Rob Herring <robh@kernel.org> wrote:
+>>> On Tue, May 01, 2018 at 10:10:40AM +0100, Suzuki K Poulose wrote:
+>>>> We are about to add the support for ETR builtin scatter-gather mode
+>>>> for dealing with large amount of trace buffers. However, on some of
+>>>> the platforms, using the ETR SG mode can lock up the system due to
+>>>> the way the ETR is connected to the memory subsystem.
+>>>>
+>>>> In SG mode, the ETR performs READ from the scatter-gather table to
+>>>> fetch the next page and regular WRITE of trace data. If the READ
+>>>> operation doesn't complete(due to the memory subsystem issues,
+>>>> which we have seen on a couple of platforms) the trace WRITE
+>>>> cannot proceed leading to issues. So, we by default do not
+>>>> use the SG mode, unless it is known to be safe on the platform.
+>>>> We define a DT property for the TMC node to specify whether we
+>>>> have a proper SG mode.
 
 
-Rob, Mathieu,
-
-On 03/05/18 18:42, Mathieu Poirier wrote:
-> On 1 May 2018 at 07:10, Rob Herring <robh@kernel.org> wrote:
->> On Tue, May 01, 2018 at 10:10:35AM +0100, Suzuki K Poulose wrote:
->>> Document CATU device-tree bindings. CATU augments the TMC-ETR
->>> by providing an improved Scatter Gather mechanism for streaming
->>> trace data to non-contiguous system RAM pages.
+>>>> ---
+>>>>   Documentation/devicetree/bindings/arm/coresight.txt | 3 +++
+>>>>   drivers/hwtracing/coresight/coresight-tmc.c         | 8 +++++++-
+>>>>   2 files changed, 10 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+>>>> index cdd84d0..7c0c8f0 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+>>>> @@ -88,6 +88,9 @@ its hardware characteristcs.
+>>>>        * arm,buffer-size: size of contiguous buffer space for TMC ETR
+>>>>         (embedded trace router)
+>>>>
+>>>> +     * scatter-gather: boolean. Indicates that the TMC-ETR can safely
+>>>> +       use the SG mode on this system.
+>>>> +
 >>>
->>> Cc: devicetree at vger.kernel.org
->>> Cc: frowand.list at gmail.com
->>> Cc: Rob Herring <robh@kernel.org>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Mathieu Poirier <mathieu.poirier@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> ---
->>>   .../devicetree/bindings/arm/coresight.txt          | 52 ++++++++++++++++++++++
->>>   1 file changed, 52 insertions(+)
+>>> Needs a vendor prefix.
 >>>
->>> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
->>> index 15ac8e8..cdd84d0 100644
->>> --- a/Documentation/devicetree/bindings/arm/coresight.txt
->>> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
->>> @@ -39,6 +39,8 @@ its hardware characteristcs.
->>>
->>>                - System Trace Macrocell:
->>>                        "arm,coresight-stm", "arm,primecell"; [1]
->>> +             - Coresight Address Translation Unit (CATU)
->>> +                     "arm, coresight-catu", "arm,primecell";
 >>
->> spurious space               ^
-
-Thanks for spotting, will fix it.
-
->>
->>>
->>>        * reg: physical base address and length of the register
->>>          set(s) of the component.
->>> @@ -86,6 +88,9 @@ its hardware characteristcs.
->>>        * arm,buffer-size: size of contiguous buffer space for TMC ETR
->>>         (embedded trace router)
->>>
->>> +* Optional property for CATU :
->>> +     * interrupts : Exactly one SPI may be listed for reporting the address
->>> +       error
->>
->> Somewhere you need to define the ports for the CATU.
-
-The ports are defined common to all the coresight components. Would you
-like it to be added just for the CATU ?
-
->>
->>>
->>>   Example:
->>>
->>> @@ -118,6 +123,35 @@ Example:
->>>                };
->>>        };
->>>
->>> +     etr at 20070000 {
->>> +             compatible = "arm,coresight-tmc", "arm,primecell";
->>> +             reg = <0 0x20070000 0 0x1000>;
->>> +
->>> +                     /* input port */
->>> +                     port at 0 {
->>> +                             reg =  <0>;
->>> +                             etr_in_port: endpoint {
->>> +                                     slave-mode;
->>> +                                     remote-endpoint = <&replicator2_out_port0>;
->>> +                             };
->>> +                     };
->>> +
->>> +                     /* CATU link represented by output port */
->>> +                     port at 1 {
->>> +                             reg = <0>;
->>
->> While common in the Coresight bindings, having unit-address and reg not
->> match is an error. Mathieu and I discussed this a bit as dtc now warns
->> on these.
->>
->> Either reg should be 1 here, or 'ports' needs to be split into input and
->> output ports. My preference would be the former, but Mathieu objected to
->> this not reflecting the the h/w numbering.
+>> Thinking further on this, do we need to make it device specific as
+>> well - something like "arm,etr-scatter-gather"?  That way we don't
+>> have to redefine "scatter-gather" for other ARM devices if they happen
+>> to need the same property but for different reasons.
 > 
-> Suzuki, as we discuss this is related to your work on revamping CS
-> bindings for ACPI.  Until that gets done and to move forward with this
-> set I suggest you abide to Rob's request.
+> No. If we had a bunch of cases, then we'd probably want to have just
+> 'scatter-gather'.
 
-Ok, I can change it to <1>, as we don't expect any other output port for an
-ETR.
+Does it mean "arm,scatter-gather" ? If we ever wanted to add the device
+specific information, I would prefer to go with "arm,tmc-scatter-gather"
+and not "etr-scatter-gather". They both could mean different things.
 
+> 
+> BTW, if SG had already been supported, then I'd say this is a quirk
+> and we should invert this property. Otherwise, you'd be disabling once
+> enabled SG and require working platforms to update their dtb. Of
+> course, I shouldn't really let the state of an OS driver influence the
+> DT binding.
+> 
 
-Thanks
+The SG support is added with this series. So, the OS has never made use
+of the feature.
+
 Suzuki
