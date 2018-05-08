@@ -1,99 +1,98 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 8 May 2018 11:34:47 -0600
-Subject: [PATCH v2 25/27] coresight: etr_buf: Add helper for padding an
- area of trace data
-In-Reply-To: <1525165857-11096-26-git-send-email-suzuki.poulose@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 8 May 2018 12:34:37 -0500
+Subject: [PATCH v2 10/27] dts: bindings: Restrict coresight tmc-etr
+ scatter-gather mode
+In-Reply-To: <514f69b1-2219-aa83-dfe8-09c26ed4f5b1@arm.com>
 References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-26-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180508173447.GB3389@xps15>
+ <1525165857-11096-11-git-send-email-suzuki.poulose@arm.com>
+ <20180501131300.GA31425@rob-hp-laptop>
+ <CANLsYkwozU7QC5EeEy46KrEd4X7J9S69SiNg8-GhSSuMkhQrBw@mail.gmail.com>
+ <CAL_JsqJDTx2UWN7VdsvDctyXw_rco6Q8NmoWQ5EBx6uhwJu=0Q@mail.gmail.com>
+ <514f69b1-2219-aa83-dfe8-09c26ed4f5b1@arm.com>
+Message-ID: <CAL_JsqLD9cw2gUSg9U9jmBTQNgPZ3Fp894y19w6+Kht4y2wbzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 01, 2018 at 10:10:55AM +0100, Suzuki K Poulose wrote:
-> This patch adds a helper to insert barrier packets for a given
-> size (aligned to packet size) at given offset in an etr_buf. This
-> will be used later for perf mode when we try to start in the
-> middle of an SG buffer.
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etr.c | 53 ++++++++++++++++++++++---
->  1 file changed, 47 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 7551272..8159e84 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -1083,18 +1083,59 @@ static ssize_t tmc_etr_buf_get_data(struct etr_buf *etr_buf,
->  	return etr_buf->ops->get_data(etr_buf, (u64)offset, len, bufpp);
->  }
->  
-> +/*
-> + * tmc_etr_buf_insert_barrier_packets : Insert barrier packets at @offset upto
-> + * @size of bytes in the given buffer. @size should be aligned to the barrier
-> + * packet size.
-> + *
-> + * Returns the new @offset after filling the barriers on success. Otherwise
-> + * returns error.
-> + */
->  static inline s64
-> -tmc_etr_buf_insert_barrier_packet(struct etr_buf *etr_buf, u64 offset)
-> +tmc_etr_buf_insert_barrier_packets(struct etr_buf *etr_buf,
-> +				   u64 offset, u64 size)
->  {
->  	ssize_t len;
->  	char *bufp;
->  
-> -	len = tmc_etr_buf_get_data(etr_buf, offset,
-> -				   CORESIGHT_BARRIER_PKT_SIZE, &bufp);
-> -	if (WARN_ON(len <= CORESIGHT_BARRIER_PKT_SIZE))
-> +	if (size < CORESIGHT_BARRIER_PKT_SIZE)
->  		return -EINVAL;
-> -	coresight_insert_barrier_packet(bufp);
-> -	return offset + CORESIGHT_BARRIER_PKT_SIZE;
-> +	/*
-> +	 * Normally the size should be aligned to the frame size
-> +	 * of the ETR. Even if it isn't, the decoder looks for a
-> +	 * barrier packet at a frame size aligned offset. So align
-> +	 * the buffer to frame size first and then fill barrier
-> +	 * packets.
-> +	 */
-> +	do {
-> +		len = tmc_etr_buf_get_data(etr_buf, offset, size, &bufp);
-> +		if (WARN_ON(len <= 0))
-> +			return -EINVAL;
-> +		/*
-> +		 * We are guaranteed that @bufp will point to a linear range
-> +		 * of @len bytes, where @len <= @size.
-> +		 */
-> +		size -= len;
-> +		offset += len;
-> +		while (len >= CORESIGHT_BARRIER_PKT_SIZE) {
-> +			coresight_insert_barrier_packet(bufp);
-> +			bufp += CORESIGHT_BARRIER_PKT_SIZE;
-> +			len -= CORESIGHT_BARRIER_PKT_SIZE;
-> +		}
-> +
-> +		/* If we reached the end of the buffer, wrap around */
-> +		if (offset == etr_buf->size)
-> +			offset -= etr_buf->size;
-> +	} while (size);
-> +
-> +	return offset;
-> +}
-> +
-> +static inline s64
-> +tmc_etr_buf_insert_barrier_packet(struct etr_buf *etr_buf, u64 offset)
-> +{
-> +	return tmc_etr_buf_insert_barrier_packets(etr_buf, offset,
-> +					  CORESIGHT_BARRIER_PKT_SIZE);
+On Tue, May 8, 2018 at 10:48 AM, Suzuki K Poulose
+<Suzuki.Poulose@arm.com> wrote:
+> On 04/05/18 23:56, Rob Herring wrote:
+>>
+>> On Thu, May 3, 2018 at 3:32 PM, Mathieu Poirier
+>> <mathieu.poirier@linaro.org> wrote:
+>>>
+>>> On 1 May 2018 at 07:13, Rob Herring <robh@kernel.org> wrote:
+>>>>
+>>>> On Tue, May 01, 2018 at 10:10:40AM +0100, Suzuki K Poulose wrote:
+>>>>>
+>>>>> We are about to add the support for ETR builtin scatter-gather mode
+>>>>> for dealing with large amount of trace buffers. However, on some of
+>>>>> the platforms, using the ETR SG mode can lock up the system due to
+>>>>> the way the ETR is connected to the memory subsystem.
+>>>>>
+>>>>> In SG mode, the ETR performs READ from the scatter-gather table to
+>>>>> fetch the next page and regular WRITE of trace data. If the READ
+>>>>> operation doesn't complete(due to the memory subsystem issues,
+>>>>> which we have seen on a couple of platforms) the trace WRITE
+>>>>> cannot proceed leading to issues. So, we by default do not
+>>>>> use the SG mode, unless it is known to be safe on the platform.
+>>>>> We define a DT property for the TMC node to specify whether we
+>>>>> have a proper SG mode.
+>
+>
+>
+>>>>> ---
+>>>>>   Documentation/devicetree/bindings/arm/coresight.txt | 3 +++
+>>>>>   drivers/hwtracing/coresight/coresight-tmc.c         | 8 +++++++-
+>>>>>   2 files changed, 10 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt
+>>>>> b/Documentation/devicetree/bindings/arm/coresight.txt
+>>>>> index cdd84d0..7c0c8f0 100644
+>>>>> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+>>>>> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+>>>>> @@ -88,6 +88,9 @@ its hardware characteristcs.
+>>>>>        * arm,buffer-size: size of contiguous buffer space for TMC ETR
+>>>>>         (embedded trace router)
+>>>>>
+>>>>> +     * scatter-gather: boolean. Indicates that the TMC-ETR can safely
+>>>>> +       use the SG mode on this system.
+>>>>> +
+>>>>
+>>>>
+>>>> Needs a vendor prefix.
+>>>>
+>>>
+>>> Thinking further on this, do we need to make it device specific as
+>>> well - something like "arm,etr-scatter-gather"?  That way we don't
+>>> have to redefine "scatter-gather" for other ARM devices if they happen
+>>> to need the same property but for different reasons.
+>>
+>>
+>> No. If we had a bunch of cases, then we'd probably want to have just
+>> 'scatter-gather'.
+>
+>
+> Does it mean "arm,scatter-gather" ?
 
-Indentation
+Yes. Use that.
 
->  }
->  
->  /*
-> -- 
-> 2.7.4
-> 
+> If we ever wanted to add the device
+> specific information, I would prefer to go with "arm,tmc-scatter-gather"
+> and not "etr-scatter-gather". They both could mean different things.
+>
+>>
+>> BTW, if SG had already been supported, then I'd say this is a quirk
+>> and we should invert this property. Otherwise, you'd be disabling once
+>> enabled SG and require working platforms to update their dtb. Of
+>> course, I shouldn't really let the state of an OS driver influence the
+>> DT binding.
+>>
+>
+> The SG support is added with this series. So, the OS has never made use
+> of the feature.
+
+Linux never did, but other OSs use DT, hence why I said "an OS
+driver", not "the OS driver". But in reality, I'd guess only Linux has
+Coresight support at all.
+
+Rob
