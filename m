@@ -1,69 +1,46 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue,  8 May 2018 08:59:29 -0500
-Subject: [PATCH] arm: dts: omap: fix OF graph in omap3-devkit8000
-In-Reply-To: <20180508135930.5768-1-robh@kernel.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 8 May 2018 11:06:44 -0300
+Subject: [PATCH] arm: dts: imx: fix IPU OF graph endpoint node names
+In-Reply-To: <20180508135930.5768-2-robh@kernel.org>
 References: <20180508135930.5768-1-robh@kernel.org>
-Message-ID: <20180508135930.5768-5-robh@kernel.org>
+ <20180508135930.5768-2-robh@kernel.org>
+Message-ID: <CAOMZO5A+7YW89E5PEo6841hk8GQUr2k7D+xWPGb1iqvpD096Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap3-devkit8000-common.dtsi defines a graph connection for DVI, but
-then omap3-devkit8000-lcd-common.dtsi overrides that with a graph
-connection for the LCD as the same output signals are used. This
-leaves an incomplete graph as the TFP410 output has only half a
-connection. The result is the following warning:
+Hi Rob,
 
-arch/arm/boot/dts/omap3-devkit8000-lcd70.dtb: Warning (graph_endpoint): /encoder0/ports/port at 0/endpoint: graph connection to node '/ocp at 68000000/dss at 48050000/port/endpoint' is not bidirectional
+On Tue, May 8, 2018 at 10:59 AM, Rob Herring <robh@kernel.org> wrote:
 
-Fix this by defining multiple endpoints which is the correct way to show
-a 1 to many connection.
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> index 18b65052553d..654cf2c9b073 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> @@ -379,9 +379,6 @@
+>                 powerdown-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>; /* NANDF_WP_B */
+>
+>                 port {
+> -                       #address-cells = <1>;
+> -                       #size-cells = <0>;
+> -
+>                         ov5640_to_mipi_csi2: endpoint {
+>                                 remote-endpoint = <&mipi_csi2_in>;
+>                                 clock-lanes = <0>;
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index f019f9900369..c2de2250718c 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -294,9 +294,6 @@
+>                 reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
+>
+>                 port {
+> -                       #address-cells = <1>;
+> -                       #size-cells = <0>;
+> -
+>                         ov5640_to_mipi_csi2: endpoint {
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- arch/arm/boot/dts/omap3-devkit8000-common.dtsi     | 9 ++++++++-
- arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi | 5 ++++-
- 2 files changed, 12 insertions(+), 2 deletions(-)
+These two changes seem unrelated and I have already fixed them at:
+https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=1b215c73d1586e6f2586e9a6d6dfaf49cc142b3a
 
-diff --git a/arch/arm/boot/dts/omap3-devkit8000-common.dtsi b/arch/arm/boot/dts/omap3-devkit8000-common.dtsi
-index 0c0bb1b01b0b..746a658e84b6 100644
---- a/arch/arm/boot/dts/omap3-devkit8000-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-devkit8000-common.dtsi
-@@ -349,10 +349,17 @@
- 	vdda_dac-supply = <&vdac>;
- 
- 	port {
--		dpi_dvi_out: endpoint {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dpi_dvi_out: endpoint at 0 {
-+			reg = <0>;
- 			remote-endpoint = <&tfp410_in>;
- 			data-lines = <24>;
- 		};
-+
-+		endpoint at 1 {
-+			reg = <1>;
-+		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi b/arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi
-index 2d64bcffaaa8..1093387259e2 100644
---- a/arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi
-@@ -30,7 +30,10 @@
- 
- &dss {
- 	port {
--		dpi_lcd_out: endpoint {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dpi_lcd_out: endpoint at 1 {
-+			reg = <1>;
- 			remote-endpoint = <&lcd_in>;
- 			data-lines = <24>;
- 		};
--- 
-2.17.0
+BTW, linux-next from today shows no W=1 DTC warnings on
+imx_v6_v7_defconfig, but maybe new ones are coming soon :-)
