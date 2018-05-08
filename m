@@ -1,65 +1,50 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue,  8 May 2018 10:09:49 -0500
-Subject: [PATCH] arm64: dts: juno: fix OF graph endpoint node names
-Message-ID: <20180508150952.24562-1-robh@kernel.org>
+Date: Tue,  8 May 2018 10:09:51 -0500
+Subject: [PATCH] arm64: dts: msm8916: fix Coresight ETF graph connections
+In-Reply-To: <20180508150952.24562-1-robh@kernel.org>
+References: <20180508150952.24562-1-robh@kernel.org>
+Message-ID: <20180508150952.24562-3-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OF graph endpoint node names should be 'endpoint'. Fix the following
-warnings found by dtc:
+The ETF input should be connected to the funnel output, and the ETF
+output should be connected to the replicator input. The labels are wrong
+and these got swapped:
 
-Warning (graph_endpoint): /hdlcd at 7ff50000/port/hdlcd1-endpoint: graph endpont node nameshould be 'endpoint'
-Warning (graph_endpoint): /hdlcd at 7ff60000/port/hdlcd0-endpoint: graph endpont node nameshould be 'endpoint'
-Warning (graph_endpoint): /i2c at 7ffa0000/hdmi-transmitter at 70/port/tda998x-0-endpoint: graph endpont node name should be 'endpoint'
-Warning (graph_endpoint): /i2c at 7ffa0000/hdmi-transmitter at 71/port/tda998x-1-endpoint: graph endpont node name should be 'endpoint'
+Warning (graph_endpoint): /soc/funnel at 821000/ports/port at 8/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 1/endpoint' is not bidirectional
+Warning (graph_endpoint): /soc/replicator at 824000/ports/port at 2/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 0/endpoint' is not bidirectional
 
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Fixes: 7c10da373698 ("arm64: dts: qcom: Add msm8916 CoreSight components")
+Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: David Brown <david.brown@linaro.org>
+Cc: linux-arm-msm at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/boot/dts/arm/juno-base.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index eb749c50a736..b2fedaab3fcc 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -677,7 +677,7 @@
- 		clock-names = "pxlclk";
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 66b318e1de80..aef814b2dc9e 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -1191,14 +1191,14 @@
  
- 		port {
--			hdlcd1_output: hdlcd1-endpoint {
-+			hdlcd1_output: endpoint {
- 				remote-endpoint = <&tda998x_1_input>;
- 			};
- 		};
-@@ -692,7 +692,7 @@
- 		clock-names = "pxlclk";
- 
- 		port {
--			hdlcd0_output: hdlcd0-endpoint {
-+			hdlcd0_output: endpoint {
- 				remote-endpoint = <&tda998x_0_input>;
- 			};
- 		};
-@@ -720,7 +720,7 @@
- 			compatible = "nxp,tda998x";
- 			reg = <0x70>;
- 			port {
--				tda998x_0_input: tda998x-0-endpoint {
-+				tda998x_0_input: endpoint {
- 					remote-endpoint = <&hdlcd0_output>;
+ 				port at 0 {
+ 					reg = <0>;
+-					etf_out: endpoint {
++					etf_in: endpoint {
+ 						slave-mode;
+ 						remote-endpoint = <&funnel0_out>;
+ 					};
  				};
- 			};
-@@ -730,7 +730,7 @@
- 			compatible = "nxp,tda998x";
- 			reg = <0x71>;
- 			port {
--				tda998x_1_input: tda998x-1-endpoint {
-+				tda998x_1_input: endpoint {
- 					remote-endpoint = <&hdlcd1_output>;
+ 				port at 1 {
+ 					reg = <0>;
+-					etf_in: endpoint {
++					etf_out: endpoint {
+ 						remote-endpoint = <&replicator_in>;
+ 					};
  				};
- 			};
 -- 
 2.17.0
