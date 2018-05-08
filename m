@@ -1,129 +1,53 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 8 May 2018 12:25:14 +0100
-Subject: [PATCH v5 10/14] KVM: arm64: Save host SVE context as appropriate
-In-Reply-To: <0c616c43-3bff-1c93-0463-fae1c53c0e51@arm.com>
-References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
- <1525449935-31424-11-git-send-email-Dave.Martin@arm.com>
- <0c616c43-3bff-1c93-0463-fae1c53c0e51@arm.com>
-Message-ID: <20180508112514.GE7753@e103592.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 May 2018 12:25:03 +0100
+Subject: [BUGFIX PATCH v3 0/4] arm: kprobes: Fix to prohibit probing on
+ unsafe functions
+In-Reply-To: <152540727123.29650.13679359124038587629.stgit@devbox>
+References: <152540727123.29650.13679359124038587629.stgit@devbox>
+Message-ID: <20180508112503.GD16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 11:38:05AM +0100, Marc Zyngier wrote:
-> On 04/05/18 17:05, Dave Martin wrote:
-> > This patch adds SVE context saving to the hyp FPSIMD context switch
-> > path.  This means that it is no longer necessary to save the host
-> > SVE state in advance of entering the guest, when in use.
-> > 
-> > In order to avoid adding pointless complexity to the code, VHE is
-> > assumed if SVE is in use.  VHE is an architectural prerequisite for
-> > SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
-> > kernels that support both SVE and KVM.
-> > 
-> > Historically, software models exist that can expose the
-> > architecturally invalid configuration of SVE without VHE, so if
-> > this situation is detected this patch warns and refuses to create a
-> > VM.  Doing this check at VM creation time avoids race issues
-> > between KVM and SVE initialisation.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> > ---
-> >  arch/arm64/Kconfig          |  7 +++++++
-> >  arch/arm64/kvm/fpsimd.c     |  1 -
-> >  arch/arm64/kvm/hyp/switch.c | 21 +++++++++++++++++++--
-> >  virt/kvm/arm/arm.c          | 18 ++++++++++++++++++
-> >  4 files changed, 44 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index eb2cf49..b0d3820 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -1130,6 +1130,7 @@ endmenu
-> >  config ARM64_SVE
-> >  	bool "ARM Scalable Vector Extension support"
-> >  	default y
-> > +	depends on !KVM || ARM64_VHE
+On Fri, May 04, 2018 at 01:14:31PM +0900, Masami Hiramatsu wrote:
+> Hi,
 > 
-> In that case, should we consider making ARM64_VHE "default y" as well,
-> as KVM is "default y" too?
-
-Surely ARM64_VHE has always been default y?
-
-1f364c8c48a0 ("arm64: VHE: Add support for running Linux in EL2 mode")
-
-> Otherwise, I fear we end-up regressing existing configurations. Also,
-> you still have to check for the configuration at run time, so I'm not
-> immediately getting the point of this particular change.
-
-We check for the configuration, but the penalty is severe (i.e., can't
-create VMs) and it doesn't appear to make sense to put effort into
-working around that: the user has an easy fix in the form of setting
-ARM64_VHE=y.
-
-Is there some value to supporting this configuration that I'm missing?
-SVE and VHE are both default y.
-
-
-[...]
-
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index 6cf499b..a7be7bf 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -16,6 +16,7 @@
-> >   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-> >   */
-> >  
-> > +#include <linux/bug.h>
-> >  #include <linux/cpu_pm.h>
-> >  #include <linux/errno.h>
-> >  #include <linux/err.h>
-> > @@ -41,6 +42,7 @@
-> >  #include <asm/mman.h>
-> >  #include <asm/tlbflush.h>
-> >  #include <asm/cacheflush.h>
-> > +#include <asm/cpufeature.h>
-> >  #include <asm/virt.h>
-> >  #include <asm/kvm_arm.h>
-> >  #include <asm/kvm_asm.h>
-> > @@ -120,6 +122,22 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
-> >  	if (type)
-> >  		return -EINVAL;
-> >  
-> > +	/*
-> > +	 * VHE is a prerequisite for SVE in the Arm architecture, and
-> > +	 * Kconfig ensures that if system_supports_sve() here then
-> > +	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
-> > +	 * detected and enabled, the CPU is architecturally
-> > +	 * noncompliant.
-> > +	 *
-> > +	 * Just in case this mismatch is seen, detect it, warn and give
-> > +	 * up.  Supporting this forbidden configuration in Hyp would be
-> > +	 * pointless.
-> > +	 */
-> > +	if (system_supports_sve() && !has_vhe()) {
-> > +		kvm_pr_unimpl("Cannot create VMs on SVE system without VHE.  Broken cpu?");
-> > +		return -ENXIO;
-> > +	}
+> This is the 3rd version of bugfix series for kprobes on arm.
+> This series fixes 4 different issues which I found.
 > 
-> You might as well fail the boot KVM initialization altogether, and not
-> wait for a VM to be created.
+>  - Fix to use smp_processor_id() after disabling preemption.
+>  - Prohibit probing on optimized_callback() for avoiding
+>    recursive probe.
+>  - Prohibit kprobes on do_undefinstr() by same reason.
+>  - Prohibit kprobes on get_user() by same reason.
+> 
+> >From v2, I included another 2 bugfixes (1/4 and 2/4)
+> which are not merged yet, and added "Cc: stable at vger.kernel.org",
+> since there are obvious bugs.
 
-I was concerned that the SVE and KVM initialisation might happen in
-an unpredictable order.
+Please submit them to the patch system, thanks.
 
-KVM is initialised via module_init(), which I'm guessing is later than
-cpufeatures (?)  If so then yes, kvm_arch_init() would be a reasonable
-place to do this.
+> 
+> Thanks,
+> 
+> ---
+> 
+> Masami Hiramatsu (4):
+>       arm: kprobes: Fix to use get_kprobe_ctlblk after irq-disabed
+>       arm: kprobes: Prohibit probing on optimized_callback
+>       arm: kprobes: Prohibit kprobes on do_undefinstr
+>       arm: kprobes: Prohibit kprobes on get_user functions
+> 
+> 
+>  arch/arm/include/asm/assembler.h  |   10 ++++++++++
+>  arch/arm/kernel/traps.c           |    5 ++++-
+>  arch/arm/lib/getuser.S            |   10 ++++++++++
+>  arch/arm/probes/kprobes/opt-arm.c |    4 +++-
+>  4 files changed, 27 insertions(+), 2 deletions(-)
+> 
+> --
+> Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
 
-> But I'm more concerned with the fact that we're now have a configuration
-> that drops functionalities on the floor, one way or another.
-
-Is this still a problem if that configuration is forbidden by Kconfig?
-
-Can you describe a scenario in which the problem config (KVM=y, VHE=n,
-SVE=y) would be wanted?
-
-Cheers
----Dave
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
