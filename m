@@ -1,96 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 May 2018 12:01:19 +0100
-Subject: [PATCH] tty: pl011: Avoid spuriously stuck-off interrupts
-In-Reply-To: <1524823545-11309-2-git-send-email-Dave.Martin@arm.com>
-References: <1524823545-11309-1-git-send-email-Dave.Martin@arm.com>
- <1524823545-11309-2-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180508110119.GA16141@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 8 May 2018 12:03:05 +0100
+Subject: [PATCH v5 14/14] KVM: arm64: Invoke FPSIMD context switch trap
+ from C
+In-Reply-To: <1525449935-31424-15-git-send-email-Dave.Martin@arm.com>
+References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
+ <1525449935-31424-15-git-send-email-Dave.Martin@arm.com>
+Message-ID: <5dc80121-63a2-3bf1-e24a-a8909fadea20@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2018 at 11:05:45AM +0100, Dave Martin wrote:
-> Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-> clears the RX and receive timeout interrupts on pl011 startup, to
-> avoid a screaming-interrupt scenario that can occur when the
-> firmware or bootloader leaves these interrupts asserted.
+On 04/05/18 17:05, Dave Martin wrote:
+> The conversion of the FPSIMD context switch trap code to C has added
+> some overhead to calling it, due to the need to save registers that
+> the procedure call standard defines as caller-saved.
 > 
-> This has been noted as an issue when running Linux on qemu [1].
+> So, perhaps it is no longer worth invoking this trap handler quite
+> so early.
 > 
-> Unfortunately, the above fix seems to lead to potential
-> misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
-> on driver startup, if the RX FIFO is also already full to the
-> trigger level.
+> Instead, we can invoke it from fixup_guest_exit(), with little
+> likelihood of increasing the overhead much further.
 > 
-> Clearing the RX FIFO interrupt does not change the FIFO fill level.
-> In this scenario, because the interrupt is now clear and because
-> the FIFO is already full to the trigger level, no new assertion of
-> the RX FIFO interrupt can occur unless the FIFO is drained back
-> below the trigger level.  This never occurs because the pl011
-> driver is waiting for an RX FIFO interrupt to tell it that there is
-> something to read, and does not read the FIFO at all until that
-> interrupt occurs.
+> As a convenience, this patch gives __hyp_switch_fpsimd() the same
+> return semantics fixup_guest_exit().  For now there is no
+> possibility of a spurious FPSIMD trap, so the function always
+> returns true, but this allows it to be tail-called with a single
+> return statement.
 > 
-> Thus, simply clearing "spurious" interrupts on startup may be
-> misguided, since there is no way to be sure that the interrupts are
-> truly spurious, and things can go wrong if they are not.
-> 
-> This patch instead clears the interrupt condition by draining the
-> RX FIFO during UART startup, after clearing any potentially
-> spurious interrupt.  This should ensure that an interrupt will
-> definitely be asserted if the RX FIFO subsequently becomes
-> sufficiently full.
-> 
-> The drain is done at the point of enabling interrupts only.  This
-> means that it will occur any time the UART is newly opened through
-> the tty layer.  It will not apply to polled-mode use of the UART by
-> kgdboc: since that scenario cannot use interrupts by design, this
-> should not matter.  kgdboc will interact badly with "normal" use of
-> the UART in any case: this patch makes no attempt to paper over
-> such issues.
-> 
-> This patch does not attempt to address the case where the RX FIFO
-> fills faster than it can be drained: that is a pathological
-> hardware design problem that is beyond the scope of the driver to
-> work around.
-> 
-> [1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
-> before enabled the interruption
-> https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
-> 
-> Reported-by: Wei Xu <xuwei5@hisilicon.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Peter Maydell <peter.maydell@linaro.org>
-> Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
 > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Tested-by: Andrew Jones <drjones@redhat.com>
-> Reviewed-by: Andrew Jones <drjones@redhat.com>
-> ---
->  drivers/tty/serial/amba-pl011.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 4b40a5b..a6ccb85 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -1731,6 +1731,16 @@ static void pl011_enable_interrupts(struct uart_amba_port *uap)
->  
->  	/* Clear out any spuriously appearing RX interrupts */
->  	pl011_write(UART011_RTIS | UART011_RXIS, uap, REG_ICR);
-> +
-> +	/*
-> +	 * RXIS is asserted only when the RX FIFO transitions from below
-> +	 * to above the trigger threshold.  If the RX FIFO is already
-> +	 * full to the threshold this can't happen and RXIS will now be
-> +	 * stuck off.  Drain the RX FIFO explicitly to fix this:
-> +	 */
-> +	while (!(pl011_read(uap, REG_FR) & UART01x_FR_RXFE))
-> +		pl011_read(uap, REG_DR);
 
-You probably ought to limit this in case of a stuck receive not empty
-case, maybe to (eg) twice the depth of the FIFO?
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Jazz is not dead. It just smells funny...
