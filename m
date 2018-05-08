@@ -1,35 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 8 May 2018 10:20:36 +0100
-Subject: [PATCH v5 05/14] arm64: fpsimd: Generalise context saving for
- non-task contexts
-In-Reply-To: <1525449935-31424-6-git-send-email-Dave.Martin@arm.com>
-References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
- <1525449935-31424-6-git-send-email-Dave.Martin@arm.com>
-Message-ID: <f4ef5d12-0543-b078-6caf-b579bad56fb6@arm.com>
+From: mine260309@gmail.com (Lei YU)
+Date: Tue,  8 May 2018 17:39:27 +0800
+Subject: [PATCH] hwmon: (aspeed-pwm-tacho) Use 24MHz clock
+Message-ID: <1525772367-20627-1-git-send-email-mine260309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/18 17:05, Dave Martin wrote:
-> In preparation for allowing non-task (i.e., KVM vcpu) FPSIMD
-> contexts to be handled by the fpsimd common code, this patch adapts
-> task_fpsimd_save() to save back the currently loaded context,
-> removing the explicit dependency on current.
-> 
-> The relevant storage to write back to in memory is now found by
-> examining the fpsimd_last_state percpu struct.
-> 
-> fpsimd_save() does nothing unless TIF_FOREIGN_FPSTATE is clear, and
-> fpsimd_last_state is updated under local_bh_disable() or
-> local_irq_disable() everywhere that TIF_FOREIGN_FPSTATE is cleared:
-> thus, fpsimd_save() will write back to the correct storage for the
-> loaded context.
-> 
-> No functional change.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+The clock source for aspeed pwm is set to 24MHz, so use the hard-coded
+clock frequency instead of the one in device tree.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Otherwise, in case of the clock specified in device tree is not 24MHz,
+the fan speed will be incorrect.
 
-	M.
+Signed-off-by: Lei YU <mine260309@gmail.com>
+---
+ drivers/hwmon/aspeed-pwm-tacho.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/hwmon/aspeed-pwm-tacho.c b/drivers/hwmon/aspeed-pwm-tacho.c
+index 693a3d5..e83b8df 100644
+--- a/drivers/hwmon/aspeed-pwm-tacho.c
++++ b/drivers/hwmon/aspeed-pwm-tacho.c
+@@ -922,7 +922,6 @@ static int aspeed_pwm_tacho_probe(struct platform_device *pdev)
+ 	void __iomem *regs;
+ 	struct resource *res;
+ 	struct device *hwmon;
+-	struct clk *clk;
+ 	int ret;
+ 
+ 	np = dev->of_node;
+@@ -956,12 +955,10 @@ static int aspeed_pwm_tacho_probe(struct platform_device *pdev)
+ 	regmap_write(priv->regmap, ASPEED_PTCR_TACH_SOURCE, 0);
+ 	regmap_write(priv->regmap, ASPEED_PTCR_TACH_SOURCE_EXT, 0);
+ 
+-	clk = devm_clk_get(dev, NULL);
+-	if (IS_ERR(clk))
+-		return -ENODEV;
+-	priv->clk_freq = clk_get_rate(clk);
+ 	aspeed_set_clock_enable(priv->regmap, true);
++	// The clock source is set to 24MHz
+ 	aspeed_set_clock_source(priv->regmap, 0);
++	priv->clk_freq = 24000000;
+ 
+ 	aspeed_create_type(priv);
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
