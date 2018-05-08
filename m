@@ -1,85 +1,56 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Tue, 8 May 2018 16:15:01 +0100
-Subject: [PATCH] arm64: dts: juno: fix OF graph endpoint node names
-In-Reply-To: <20180508150952.24562-1-robh@kernel.org>
-References: <20180508150952.24562-1-robh@kernel.org>
-Message-ID: <20180508151501.GN1027@e110455-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 8 May 2018 10:22:29 -0500
+Subject: [PATCH] arm: dts: imx: fix IPU OF graph endpoint node names
+In-Reply-To: <CAOMZO5A+7YW89E5PEo6841hk8GQUr2k7D+xWPGb1iqvpD096Rg@mail.gmail.com>
+References: <20180508135930.5768-1-robh@kernel.org>
+ <20180508135930.5768-2-robh@kernel.org>
+ <CAOMZO5A+7YW89E5PEo6841hk8GQUr2k7D+xWPGb1iqvpD096Rg@mail.gmail.com>
+Message-ID: <CAL_JsqKcz=i0ELosVvuhevMSxa2q8pE+2WcAk57sg8ns5X-mtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 10:09:49AM -0500, Rob Herring wrote:
-> OF graph endpoint node names should be 'endpoint'. Fix the following
-> warnings found by dtc:
-> 
-> Warning (graph_endpoint): /hdlcd at 7ff50000/port/hdlcd1-endpoint: graph endpont node nameshould be 'endpoint'
-> Warning (graph_endpoint): /hdlcd at 7ff60000/port/hdlcd0-endpoint: graph endpont node nameshould be 'endpoint'
-> Warning (graph_endpoint): /i2c at 7ffa0000/hdmi-transmitter at 70/port/tda998x-0-endpoint: graph endpont node name should be 'endpoint'
-> Warning (graph_endpoint): /i2c at 7ffa0000/hdmi-transmitter at 71/port/tda998x-1-endpoint: graph endpont node name should be 'endpoint'
-> 
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
+On Tue, May 8, 2018 at 9:06 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Rob,
+>
+> On Tue, May 8, 2018 at 10:59 AM, Rob Herring <robh@kernel.org> wrote:
+>
+>> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+>> index 18b65052553d..654cf2c9b073 100644
+>> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+>> @@ -379,9 +379,6 @@
+>>                 powerdown-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>; /* NANDF_WP_B */
+>>
+>>                 port {
+>> -                       #address-cells = <1>;
+>> -                       #size-cells = <0>;
+>> -
+>>                         ov5640_to_mipi_csi2: endpoint {
+>>                                 remote-endpoint = <&mipi_csi2_in>;
+>>                                 clock-lanes = <0>;
+>> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> index f019f9900369..c2de2250718c 100644
+>> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+>> @@ -294,9 +294,6 @@
+>>                 reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
+>>
+>>                 port {
+>> -                       #address-cells = <1>;
+>> -                       #size-cells = <0>;
+>> -
+>>                         ov5640_to_mipi_csi2: endpoint {
+>
+> These two changes seem unrelated and I have already fixed them at:
+> https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=1b215c73d1586e6f2586e9a6d6dfaf49cc142b3a
 
-Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+Right. Will drop them.
 
-Thanks for this!
-Liviu
+>
+> BTW, linux-next from today shows no W=1 DTC warnings on
+> imx_v6_v7_defconfig, but maybe new ones are coming soon :-)
 
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  arch/arm64/boot/dts/arm/juno-base.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> index eb749c50a736..b2fedaab3fcc 100644
-> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> @@ -677,7 +677,7 @@
->  		clock-names = "pxlclk";
->  
->  		port {
-> -			hdlcd1_output: hdlcd1-endpoint {
-> +			hdlcd1_output: endpoint {
->  				remote-endpoint = <&tda998x_1_input>;
->  			};
->  		};
-> @@ -692,7 +692,7 @@
->  		clock-names = "pxlclk";
->  
->  		port {
-> -			hdlcd0_output: hdlcd0-endpoint {
-> +			hdlcd0_output: endpoint {
->  				remote-endpoint = <&tda998x_0_input>;
->  			};
->  		};
-> @@ -720,7 +720,7 @@
->  			compatible = "nxp,tda998x";
->  			reg = <0x70>;
->  			port {
-> -				tda998x_0_input: tda998x-0-endpoint {
-> +				tda998x_0_input: endpoint {
->  					remote-endpoint = <&hdlcd0_output>;
->  				};
->  			};
-> @@ -730,7 +730,7 @@
->  			compatible = "nxp,tda998x";
->  			reg = <0x71>;
->  			port {
-> -				tda998x_1_input: tda998x-1-endpoint {
-> +				tda998x_1_input: endpoint {
->  					remote-endpoint = <&hdlcd1_output>;
->  				};
->  			};
-> -- 
-> 2.17.0
-> 
+I just sent out the dtc update patch shortly before this one. I'll
+probably add it to -next today.
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Rob
