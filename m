@@ -1,62 +1,144 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 May 2018 13:45:53 +0100
-Subject: [PATCH net-next v2 03/13] net: phy: sfp: warn the user when no
- tx_disable pin is available
-In-Reply-To: <20180505205242.GA2876@lunn.ch>
-References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
- <20180504135643.23466-4-antoine.tenart@bootlin.com>
- <ed267042-1a61-7fcc-13ee-3cad2c05c658@gmail.com>
- <20180504171425.GA17233@lunn.ch>
- <44545AF4-64E3-4772-B5BA-43CCF2321025@gmail.com>
- <20180505205242.GA2876@lunn.ch>
-Message-ID: <20180508124553.GO16141@n2100.armlinux.org.uk>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 8 May 2018 07:56:58 -0500
+Subject: [PATCH] Kirin-PCIe: Add kirin pcie msi feature.
+In-Reply-To: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
+References: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
+Message-ID: <20180508125658.GK161390@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2018 at 10:52:42PM +0200, Andrew Lunn wrote:
-> On Sat, May 05, 2018 at 01:38:31PM -0700, Florian Fainelli wrote:
-> > On May 4, 2018 10:14:25 AM PDT, Andrew Lunn <andrew@lunn.ch> wrote:
-> > >On Fri, May 04, 2018 at 10:07:53AM -0700, Florian Fainelli wrote:
-> > >> On 05/04/2018 06:56 AM, Antoine Tenart wrote:
-> > >> > In case no Tx disable pin is available the SFP modules will always
-> > >be
-> > >> > emitting. This could be an issue when using modules using laser as
-> > >their
-> > >> > light source as we would have no way to disable it when the fiber
-> > >is
-> > >> > removed. This patch adds a warning when registering an SFP cage
-> > >which do
-> > >> > not have its tx_disable pin wired or available.
-> > >> 
-> > >> Is this something that was done in a possibly earlier revision of a
-> > >> given board design and which was finally fixed? Nothing wrong with
-> > >the
-> > >> patch, but this seems like a pretty serious board design mistake,
-> > >that
-> > >> needs to be addressed.
-> > >
-> > >Hi Florian
-> > >
-> > >Zii Devel B is like this. Only the "Signal Detect" pin is wired to a
-> > >GPIO.
-> > 
+[+cc Stanimir, Jianguo, Shawn for qcom, histb comments below]
+
+On Tue, May 08, 2018 at 03:03:48PM +0800, Yao Chen wrote:
+> This patch adds kirin pcie msi feature.
+
+Thanks for the patch!  Please update your subject and changelog like this:
+
+  PCI: kirin: Add MSI support
+
+  Add support for MSI.
+
+You can figure out what style to use for the subject by running:
+
+  git log --oneline drivers/pci/dwc/pcie-kirin.c
+
+Then follow the existing style.
+
+> Signed-off-by: Yao Chen <chenyao11@huawei.com>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi |  2 ++
+>  drivers/pci/dwc/pcie-kirin.c              | 38 +++++++++++++++++++++++++++++++
+>  2 files changed, 40 insertions(+)
 > 
-> > Good point, indeed. BTW what do you think about exposing the SFF's
-> > EEPROM and diagnostics through the standard ethtool operations even
-> > if we have to keep the description of the SFF as a fixed link in
-> > Device Tree because of the unfortunate wiring?
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> index ec3eb8e..4ef684f 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> @@ -872,6 +872,8 @@
+>  				  0x0 0x02000000>;
+>  			num-lanes = <1>;
+>  			#interrupt-cells = <1>;
+> +			interrupts = <0 283 4>;
+> +			interrupts-names = "msi";
+>  			interrupt-map-mask = <0xf800 0 0 7>;
+>  			interrupt-map = <0x0 0 0 1
+>  					 &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
+> diff --git a/drivers/pci/dwc/pcie-kirin.c b/drivers/pci/dwc/pcie-kirin.c
+> index d2970a0..2319c9c 100644
+> --- a/drivers/pci/dwc/pcie-kirin.c
+> +++ b/drivers/pci/dwc/pcie-kirin.c
+> @@ -426,9 +426,28 @@ static int kirin_pcie_establish_link(struct pcie_port *pp)
+>  	return 0;
+>  }
+>  
+> +static irqreturn_t kirin_pcie_msi_irq_handler(int irq, void *arg)
+> +{
+> +	struct pcie_port *pp = arg;
+> +
+> +	return dw_handle_msi_irq(pp);
+> +}
+> +
+> +static void kirin_pcie_msi_init(struct pcie_port *pp)
+> +{
+> +	dw_pcie_msi_init(pp);
+> +}
+> +
+> +static void kirin_pcie_enable_interrupts(struct pcie_port *pp)
+> +{
+> +	if (IS_ENABLED(CONFIG_PCI_MSI))
+> +		kirin_pcie_msi_init(pp);
+> +}
+> +
+>  static int kirin_pcie_host_init(struct pcie_port *pp)
+>  {
+>  	kirin_pcie_establish_link(pp);
+> +	kirin_pcie_enable_interrupts(pp);
+>  
+>  	return 0;
+>  }
+> @@ -448,6 +467,25 @@ static int kirin_pcie_host_init(struct pcie_port *pp)
+>  static int __init kirin_add_pcie_port(struct dw_pcie *pci,
+>  				      struct platform_device *pdev)
+>  {
+> +	int ret;
+> +
+> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> +		pci->pp.msi_irq = platform_get_irq(pdev, 0);
+> +		if (!pci->pp.msi_irq) {
+> +			dev_err(&pdev->dev, "failed to get msi irq\n");
+
+s/msi irq/MSI IRQ/
+
+> +			return -ENODEV;
+> +		}
+> +		ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
+> +				       kirin_pcie_msi_irq_handler,
+> +				       IRQF_SHARED | IRQF_NO_THREAD,
+> +				       "kirin_pcie_msi", &pci->pp);
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "failed to request msi irq\n");
+
+s/msi irq/MSI IRQ/
+Also, please include the IRQ number (pci->pp.msi_irq) in the message.
+
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	pci->pp.root_bus_nr = -1;
+
+Setting root_bus_nr looks like an unrelated change that should be in a
+separate patch.
+
+But I'm not sure why you need to set root_bus_nr at all, since
+dw_pcie_host_init() always sets it.
+
+Some other callers of dw_pcie_host_init() do set it:
+
+  exynos_add_pcie_port()
+  imx6_add_pcie_port()
+  armada8k_add_pcie_port()
+  artpec6_add_pcie_port()
+  dw_plat_add_pcie_port()
+  histb_pcie_probe()
+  qcom_pcie_probe()
+  spear13xx_add_pcie_port()
+
+But I don't see *why* any of these need to set it.  If they don't need to
+set it, they shouldn't.
+
+And it would be nice if histb and qcom followed the structure and naming
+conventions of the other drivers, i.e., they should have
+histb_add_pcie_port() and qcom_add_pcie_port().
+
+>  	pci->pp.ops = &kirin_pcie_host_ops;
+>  
+>  	return dw_pcie_host_init(&pci->pp);
+> -- 
+> 1.9.1
 > 
-> I believe in Antoine case, all the control plane is broken. He cannot
-> read the EEPROM, nor any of the modules pins via GPIOs.
-
-Correct.
-
-> For Zii Devel B, the EEPROM is accessible, and so is the SD pin. What
-> is missing is transmit disable. So i would expose it as an SFF module.
-
-Agreed.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
