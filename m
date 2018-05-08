@@ -1,27 +1,40 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 8 May 2018 12:45:56 +0200
-Subject: [PATCH 3/3] dma-debug: unexport dma_debug_resize_entries and
- debug_dma_dump_mappings
-In-Reply-To: <bb5bb25f-24da-9729-a39b-3b88c65ef628@arm.com>
-References: <20180424140235.9125-1-hch@lst.de>
- <20180424140235.9125-4-hch@lst.de>
- <bb5bb25f-24da-9729-a39b-3b88c65ef628@arm.com>
-Message-ID: <20180508104556.GA26841@lst.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue,  8 May 2018 11:43:29 +0100
+Subject: [PATCH 0/2] arm64: Report signal frame size to userspace via auxv
+Message-ID: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 11:05:20AM +0100, Robin Murphy wrote:
-> On 24/04/18 15:02, Christoph Hellwig wrote:
->> Only used by the AMD GART driver, which must be built in.
->
-> FWIW debug_dma_dump_mappings() is also called by the Intel VT-d driver, but 
-> the same reasoning still applies.
+Because SVE makes the arm64 signal frame size variable, userspace will
+ultimately need a way to detect the size.
 
-I'll update the changelog.
+This series adds support for exposing this information via a new auxv
+entry AT_MINSIGSTKSZ.
 
-> This does rather beg the question of 
-> whether it's right to have bits of low-level dma-debug internals *only* 
-> called by a couple of IOMMU drivers, but that can wait for another day.
+These patches are taken from [1], with minor updates.  (They were RFC
+in that series, but there has been no significant discussion or
+objections raised in the meantime, and no change in the understanding
+of the problem being addressed here.  I'd like to get discussions for
+binding this to glibc started.)
 
-My gut feeling is that it is wrong, but I didn't have time to look into
-the details and history of how this happened.
+Changes since [1]:
+
+ * Cache the value computed to AT_MINSIGSTKSZ so that the effort of
+   computing it does not need to be repeated on every exec.
+
+
+[1] [PATCH v5 00/30] ARM Scalable Vector Extension (SVE)
+lists.infradead.org/pipermail/linux-arm-kernel/2017-October/539993.html
+
+Dave Martin (2):
+  arm64: signal: Report signal frame size to userspace via auxv
+  arm64/sve: signal: Include SVE when computing AT_MINSIGSTKSZ
+
+ arch/arm64/include/asm/elf.h         |  5 +++
+ arch/arm64/include/asm/processor.h   |  3 ++
+ arch/arm64/include/uapi/asm/auxvec.h |  3 +-
+ arch/arm64/kernel/signal.c           | 68 ++++++++++++++++++++++++++++++++----
+ 4 files changed, 71 insertions(+), 8 deletions(-)
+
+-- 
+2.1.4
