@@ -1,30 +1,30 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 8 May 2018 09:06:26 +0100
-Subject: [PATCH v9 06/12] ARM: smp: Add initialization of CNTVOFF
-In-Reply-To: <20180504190545.5114-7-mylene.josserand@bootlin.com>
+Date: Tue, 8 May 2018 09:07:59 +0100
+Subject: [PATCH v9 07/12] ARM: sunxi: Add initialization of CNTVOFF
+In-Reply-To: <20180504190545.5114-8-mylene.josserand@bootlin.com>
 References: <20180504190545.5114-1-mylene.josserand@bootlin.com>
- <20180504190545.5114-7-mylene.josserand@bootlin.com>
-Message-ID: <0a377a75-d99c-b00c-ec96-bf5a7daf721a@arm.com>
+ <20180504190545.5114-8-mylene.josserand@bootlin.com>
+Message-ID: <71a9026d-1327-4948-5729-8d10cb7415f9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/05/18 20:05, Myl?ne Josserand wrote:
-> The CNTVOFF register from arch timer is uninitialized.
-> It should be done by the bootloader but it is currently not the case,
-> even for boot CPU because this SoC is booting in secure mode.
-> It leads to an random offset value meaning that each CPU will have a
-> different time, which isn't working very well.
+> Add the initialization of CNTVOFF for sun8i-a83t.
 > 
-> Add assembly code used for boot CPU and secondary CPU cores to make
-> sure that the CNTVOFF register is initialized. Because this code can
-> be used by different platforms, add this assembly file in ARM's common
-> folder.
+> For boot CPU, create a new machine that handles this
+> function's call in an "init_early" callback. We need to initialize
+> CNTVOFF before the arch timer's initialization otherwise, it will
+> not be taken into account and fails to boot correctly.
+> Because of that, this function can't be called in SMP's early_initcall
+> function which is called after timer's init.
+> 
+> For secondary CPUs, add this function into secondary_startup
+> assembly entry.
 > 
 > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
 -- 
