@@ -1,83 +1,124 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Tue, 8 May 2018 10:20:53 +0800
-Subject: [PATCH 3/7] drm/mediatek: add dpi driver for mt2701 and mt7623
+Date: Tue, 8 May 2018 10:20:57 +0800
+Subject: [PATCH 7/7] drm/mediatek: config component output by device node port
 In-Reply-To: <20180508022057.29379-1-bibby.hsieh@mediatek.com>
 References: <20180508022057.29379-1-bibby.hsieh@mediatek.com>
-Message-ID: <20180508022057.29379-4-bibby.hsieh@mediatek.com>
+Message-ID: <20180508022057.29379-8-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: chunhui dai <chunhui.dai@mediatek.com>
+We can select output component by decive node port.
+Main path default output component is DSI.
+External path default output component is DPI.
 
-This patch adds dpi dirver suppot for both mt2701 and mt7623.
-And also support other (existing or future) chips that use
-the same binding and driver.
-
-Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dpi.c     | 24 ++++++++++++++++++++++--
- drivers/gpu/drm/mediatek/mtk_drm_drv.c |  1 +
- 2 files changed, 23 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c | 37 ++++++++++++++++++++++++++++++----
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h |  4 ++--
+ 2 files changed, 35 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index 2b8b34c72697..e1af1d0d213d 100644
---- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -640,8 +640,7 @@ static int mtk_dpi_bind(struct device *dev, struct device *master, void *data)
- 	}
- 	drm_encoder_helper_add(&dpi->encoder, &mtk_dpi_encoder_helper_funcs);
- 
--	/* Currently DPI0 is fixed to be driven by OVL1 */
--	dpi->encoder.possible_crtcs = BIT(1);
-+	dpi->encoder.possible_crtcs = BIT(0) | BIT(1);
- 	dpi->encoder.bridge->encoder = &dpi->encoder;
- 	ret = drm_bridge_attach(&dpi->encoder, dpi->encoder.bridge, NULL);
- 	if (ret) {
-@@ -690,12 +689,33 @@ static unsigned int mt8173_calculate_factor(int clock)
- 		return 2 * 3;
- }
- 
-+static unsigned int mt2701_calculate_factor(int clock)
-+{
-+	if (clock <= 64000)
-+		return 16;
-+	else if (clock <= 128000)
-+		return 8;
-+	else if (clock <= 256000)
-+		return 4;
-+	else
-+		return 2;
-+}
-+
- static const struct mtk_dpi_conf mt8173_conf = {
- 	.cal_factor = mt8173_calculate_factor,
- 	.reg_h_fre_con = 0xe0,
- };
- 
-+static const struct mtk_dpi_conf mt2701_conf = {
-+	.cal_factor = mt2701_calculate_factor,
-+	.reg_h_fre_con = 0xb0,
-+	.edge_sel_en = true,
-+};
-+
- static const struct of_device_id mtk_dpi_of_ids[] = {
-+	{ .compatible = "mediatek,mt2701-dpi",
-+	  .data = &mt2701_conf,
-+	},
- 	{ .compatible = "mediatek,mt8173-dpi",
- 	  .data = &mt8173_conf,
- 	},
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index a2ca90fc403c..f4fb86ab7b8d 100644
+index f4fb86ab7b8d..05333769d862 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -372,6 +372,7 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
- 	{ .compatible = "mediatek,mt8173-disp-ufoe",  .data = (void *)MTK_DISP_UFOE },
- 	{ .compatible = "mediatek,mt2701-dsi",	      .data = (void *)MTK_DSI },
- 	{ .compatible = "mediatek,mt8173-dsi",        .data = (void *)MTK_DSI },
-+	{ .compatible = "mediatek,mt2701-dpi",	      .data = (void *)MTK_DPI },
- 	{ .compatible = "mediatek,mt8173-dpi",        .data = (void *)MTK_DPI },
- 	{ .compatible = "mediatek,mt2701-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
- 	{ .compatible = "mediatek,mt8173-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+@@ -24,6 +24,8 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
++#include <linux/of_graph.h>
+ 
+ #include "mtk_drm_crtc.h"
+ #include "mtk_drm_ddp.h"
+@@ -133,7 +135,7 @@ static const struct drm_mode_config_funcs mtk_drm_mode_config_funcs = {
+ 	.atomic_commit = mtk_atomic_commit,
+ };
+ 
+-static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
++static enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_OVL0,
+ 	DDP_COMPONENT_RDMA0,
+ 	DDP_COMPONENT_COLOR0,
+@@ -141,12 +143,12 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_DSI0,
+ };
+ 
+-static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
++static enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
+ 	DDP_COMPONENT_RDMA1,
+ 	DDP_COMPONENT_DPI0,
+ };
+ 
+-static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
++static enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_OVL0,
+ 	DDP_COMPONENT_COLOR0,
+ 	DDP_COMPONENT_AAL,
+@@ -157,7 +159,7 @@ static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_PWM0,
+ };
+ 
+-static const enum mtk_ddp_comp_id mt8173_mtk_ddp_ext[] = {
++static enum mtk_ddp_comp_id mt8173_mtk_ddp_ext[] = {
+ 	DDP_COMPONENT_OVL1,
+ 	DDP_COMPONENT_COLOR1,
+ 	DDP_COMPONENT_GAMMA,
+@@ -411,6 +413,7 @@ static int mtk_drm_probe(struct platform_device *pdev)
+ 
+ 	/* Iterate over sibling DISP function blocks */
+ 	for_each_child_of_node(dev->of_node->parent, node) {
++		struct device_node *port, *ep, *remote;
+ 		const struct of_device_id *of_id;
+ 		enum mtk_ddp_comp_type comp_type;
+ 		int comp_id;
+@@ -470,6 +473,32 @@ static int mtk_drm_probe(struct platform_device *pdev)
+ 
+ 			private->ddp_comp[comp_id] = comp;
+ 		}
++
++		if (comp_type != MTK_DSI && comp_type != MTK_DPI) {
++			port = of_graph_get_port_by_id(node, 0);
++			if (!port)
++				continue;
++			ep = of_get_child_by_name(port, "endpoint");
++			of_node_put(port);
++			if (!ep)
++				continue;
++			remote = of_graph_get_remote_port_parent(ep);
++			of_node_put(ep);
++			if (!remote)
++				continue;
++			of_id = of_match_node(mtk_ddp_comp_dt_ids, remote);
++			if (!of_id)
++				continue;
++			comp_type = (enum mtk_ddp_comp_type)of_id->data;
++			for (i = 0; i < private->data->main_len - 1; i++)
++				if (private->data->main_path[i] == comp_id)
++					private->data->main_path[i + 1] =
++					mtk_ddp_comp_get_id(node, comp_type);
++			for (i = 0; i < private->data->ext_len - 1; i++)
++				if (private->data->ext_path[i] == comp_id)
++					private->data->ext_path[i + 1] =
++					mtk_ddp_comp_get_id(node, comp_type);
++		}
+ 	}
+ 
+ 	if (!private->mutex_node) {
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+index c3378c452c0a..2bcba8eb06f4 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+@@ -29,9 +29,9 @@ struct drm_property;
+ struct regmap;
+ 
+ struct mtk_mmsys_driver_data {
+-	const enum mtk_ddp_comp_id *main_path;
++	enum mtk_ddp_comp_id *main_path;
+ 	unsigned int main_len;
+-	const enum mtk_ddp_comp_id *ext_path;
++	enum mtk_ddp_comp_id *ext_path;
+ 	unsigned int ext_len;
+ 	bool shadow_register;
+ };
 -- 
 2.12.5
