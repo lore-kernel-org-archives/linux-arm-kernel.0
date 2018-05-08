@@ -1,35 +1,53 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 May 2018 12:51:31 +0200
-Subject: [PATCH v3 3/3] tty: implement led triggers
-In-Reply-To: <20180508100851.GY2285@localhost>
-References: <20180508100543.12559-1-u.kleine-koenig@pengutronix.de>
- <20180508100543.12559-4-u.kleine-koenig@pengutronix.de>
- <20180508100851.GY2285@localhost>
-Message-ID: <20180508105131.agz7u3q42gy7mrxy@pengutronix.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue,  8 May 2018 11:43:31 +0100
+Subject: [PATCH 2/2] arm64/sve: signal: Include SVE when computing
+ AT_MINSIGSTKSZ
+In-Reply-To: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
+References: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1525776211-28169-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 12:08:51PM +0200, Johan Hovold wrote:
-> On Tue, May 08, 2018 at 12:05:43PM +0200, Uwe Kleine-K?nig wrote:
-> > The rx trigger fires when data is pushed to the ldisc by the driver. This
-> > is a bit later than the actual receiving of data but has the nice benefit
-> > that it doesn't need adaption for each driver and isn't in the hot path.
-> > 
-> > Similarly the tx trigger fires when data was copied from userspace and is
-> > given to the ldisc.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx25-logitech-baby.dts | 192 ++++++++++++++++++++++
-> 
-> Looks like you included more than intended in this patch.
+The SVE context block in the signal frame needs to be considered
+too when computing the maximum possible signal frame size.
 
-Right, this doesn't belong here. Feel free to assume I didn't include it
-in the patch and comment the rest :-)
+Because the size of this block depends on the vector length, this
+patch computes the size based not on the thread's current vector
+length but instead on the maximum possible vector length: this
+determines the maximum size of SVE context block that can be
+observed in any signal frame for the lifetime of the process.
 
-Best regards
-Uwe
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Alex Benn?e <alex.bennee@linaro.org>
+---
+ arch/arm64/kernel/signal.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index a4f1edf..3427c70 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -599,8 +599,18 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
+ 	if (system_supports_sve()) {
+ 		unsigned int vq = 0;
+ 
+-		if (test_thread_flag(TIF_SVE))
+-			vq = sve_vq_from_vl(current->thread.sve_vl);
++		if (add_all || test_thread_flag(TIF_SVE)) {
++			int vl = sve_max_vl;
++
++			if (!add_all)
++				vl = current->thread.sve_vl;
++
++			/* Fail safe if something wasn't initialised */
++			if (WARN_ON(!sve_vl_valid(vl)))
++				vl = SVE_VL_MIN;
++
++			vq = sve_vq_from_vl(vl);
++		}
+ 
+ 		err = sigframe_alloc(user, &user->sve_offset,
+ 				     SVE_SIG_CONTEXT_SIZE(vq));
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.1.4
