@@ -1,50 +1,60 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue,  8 May 2018 10:09:51 -0500
-Subject: [PATCH] arm64: dts: msm8916: fix Coresight ETF graph connections
+Date: Tue,  8 May 2018 10:09:50 -0500
+Subject: [PATCH] arm64: dts: juno: fix missing Coresight STM graph connection
 In-Reply-To: <20180508150952.24562-1-robh@kernel.org>
 References: <20180508150952.24562-1-robh@kernel.org>
-Message-ID: <20180508150952.24562-3-robh@kernel.org>
+Message-ID: <20180508150952.24562-2-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ETF input should be connected to the funnel output, and the ETF
-output should be connected to the replicator input. The labels are wrong
-and these got swapped:
+OF graph endpoint connections must be bidirectional. Fix 2 missing
+connections to the STM output port:
 
-Warning (graph_endpoint): /soc/funnel at 821000/ports/port at 8/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 1/endpoint' is not bidirectional
-Warning (graph_endpoint): /soc/replicator at 824000/ports/port at 2/endpoint: graph connection to node '/soc/etf at 825000/ports/port at 0/endpoint' is not bidirectional
+arch/arm64/boot/dts/arm/juno-r1.dtb: Warning (graph_endpoint): /stm at 20100000/port/endpoint: graph connection to node '/funnel at 20130000/ports/port at 1/endpoint' is not bidirectional
+arch/arm64/boot/dts/arm/juno-r2.dtb: Warning (graph_endpoint): /stm at 20100000/port/endpoint: graph connection to node '/funnel at 20130000/ports/port at 1/endpoint' is not bidirectional
 
-Fixes: 7c10da373698 ("arm64: dts: qcom: Add msm8916 CoreSight components")
-Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+Fixes: cde6f9ab10c6 ("arm64: dts: juno: add missing CoreSight STM component")
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
-Cc: linux-arm-msm at vger.kernel.org
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Mike Leach <mike.leach@linaro.org>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/arm/juno-r1.dts | 4 ++++
+ arch/arm64/boot/dts/arm/juno-r2.dts | 4 ++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 66b318e1de80..aef814b2dc9e 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -1191,14 +1191,14 @@
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index aed6389468c4..c52c5c40dede 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -278,6 +278,10 @@
+ 	remote-endpoint = <&csys2_funnel_out_port>;
+ };
  
- 				port at 0 {
- 					reg = <0>;
--					etf_out: endpoint {
-+					etf_in: endpoint {
- 						slave-mode;
- 						remote-endpoint = <&funnel0_out>;
- 					};
- 				};
- 				port at 1 {
- 					reg = <0>;
--					etf_in: endpoint {
-+					etf_out: endpoint {
- 						remote-endpoint = <&replicator_in>;
- 					};
- 				};
++&csys1_funnel_in_port0 {
++	remote-endpoint = <&stm_out_port>;
++};
++
+ &stm_out_port {
+ 	remote-endpoint = <&csys1_funnel_in_port0>;
+ };
+diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
+index b39b6d6ec5aa..a90982ceda35 100644
+--- a/arch/arm64/boot/dts/arm/juno-r2.dts
++++ b/arch/arm64/boot/dts/arm/juno-r2.dts
+@@ -278,6 +278,10 @@
+ 	remote-endpoint = <&csys2_funnel_out_port>;
+ };
+ 
++&csys1_funnel_in_port0 {
++	remote-endpoint = <&stm_out_port>;
++};
++
+ &stm_out_port {
+ 	remote-endpoint = <&csys1_funnel_in_port0>;
+ };
 -- 
 2.17.0
