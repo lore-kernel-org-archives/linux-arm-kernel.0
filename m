@@ -1,150 +1,50 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 8 May 2018 13:40:15 +0100
-Subject: [PATCH v5 10/14] KVM: arm64: Save host SVE context as appropriate
-In-Reply-To: <ab34071f-1808-f33a-e9a0-3067afa815af@arm.com>
-References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
- <1525449935-31424-11-git-send-email-Dave.Martin@arm.com>
- <0c616c43-3bff-1c93-0463-fae1c53c0e51@arm.com>
- <20180508112514.GE7753@e103592.cambridge.arm.com>
- <ab34071f-1808-f33a-e9a0-3067afa815af@arm.com>
-Message-ID: <20180508124015.GJ7753@e103592.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 May 2018 13:40:33 +0100
+Subject: [PATCH v6 2/6] ARM: imx6: register pm_power_off handler if
+ "fsl,pmic-stby-poweroff" is set
+In-Reply-To: <20180305102524.5905-3-o.rempel@pengutronix.de>
+References: <20180305102524.5905-1-o.rempel@pengutronix.de>
+ <20180305102524.5905-3-o.rempel@pengutronix.de>
+Message-ID: <20180508124033.GL16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 12:57:56PM +0100, Marc Zyngier wrote:
-> On 08/05/18 12:25, Dave Martin wrote:
-> > On Tue, May 08, 2018 at 11:38:05AM +0100, Marc Zyngier wrote:
-> >> On 04/05/18 17:05, Dave Martin wrote:
-> >>> This patch adds SVE context saving to the hyp FPSIMD context switch
-> >>> path.  This means that it is no longer necessary to save the host
-> >>> SVE state in advance of entering the guest, when in use.
-> >>>
-> >>> In order to avoid adding pointless complexity to the code, VHE is
-> >>> assumed if SVE is in use.  VHE is an architectural prerequisite for
-> >>> SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
-> >>> kernels that support both SVE and KVM.
-> >>>
-> >>> Historically, software models exist that can expose the
-> >>> architecturally invalid configuration of SVE without VHE, so if
-> >>> this situation is detected this patch warns and refuses to create a
-> >>> VM.  Doing this check at VM creation time avoids race issues
-> >>> between KVM and SVE initialisation.
-> >>>
-> >>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> >>> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> >>> ---
-> >>>  arch/arm64/Kconfig          |  7 +++++++
-> >>>  arch/arm64/kvm/fpsimd.c     |  1 -
-> >>>  arch/arm64/kvm/hyp/switch.c | 21 +++++++++++++++++++--
-> >>>  virt/kvm/arm/arm.c          | 18 ++++++++++++++++++
-> >>>  4 files changed, 44 insertions(+), 3 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >>> index eb2cf49..b0d3820 100644
-> >>> --- a/arch/arm64/Kconfig
-> >>> +++ b/arch/arm64/Kconfig
-> >>> @@ -1130,6 +1130,7 @@ endmenu
-> >>>  config ARM64_SVE
-> >>>  	bool "ARM Scalable Vector Extension support"
-> >>>  	default y
-> >>> +	depends on !KVM || ARM64_VHE
-> >>
-> >> In that case, should we consider making ARM64_VHE "default y" as well,
-> >> as KVM is "default y" too?
-> > 
-> > Surely ARM64_VHE has always been default y?
-> > 
-> > 1f364c8c48a0 ("arm64: VHE: Add support for running Linux in EL2 mode")
+On Mon, Mar 05, 2018 at 11:25:19AM +0100, Oleksij Rempel wrote:
+> One of the Freescale recommended sequences for power off with external
+> PMIC is the following:
+> ...
+> 3.  SoC is programming PMIC for power off when standby is asserted.
+> 4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
 > 
-> Hmmm. I have no idea who this Zyngier guy from 2014 is. Oh well.
+> See:
+> http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
+> page 5083
 > 
-> >> Otherwise, I fear we end-up regressing existing configurations. Also,
-> >> you still have to check for the configuration at run time, so I'm not
-> >> immediately getting the point of this particular change.
-> > 
-> > We check for the configuration, but the penalty is severe (i.e., can't
-> > create VMs) and it doesn't appear to make sense to put effort into
-> > working around that: the user has an easy fix in the form of setting
-> > ARM64_VHE=y.
-> > 
-> > Is there some value to supporting this configuration that I'm missing?
-> > SVE and VHE are both default y.
+> This patch implements step 4. of this sequence.
 > 
-> I had the (obviously wrong) idea that VHE didn't default to y.
-
-Fair enough.
-
-[...]
-
-> >>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> >>> index 6cf499b..a7be7bf 100644
-> >>> --- a/virt/kvm/arm/arm.c
-> >>> +++ b/virt/kvm/arm/arm.c
-> >>> @@ -16,6 +16,7 @@
-> >>>   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-> >>>   */
-> >>>  
-> >>> +#include <linux/bug.h>
-> >>>  #include <linux/cpu_pm.h>
-> >>>  #include <linux/errno.h>
-> >>>  #include <linux/err.h>
-> >>> @@ -41,6 +42,7 @@
-> >>>  #include <asm/mman.h>
-> >>>  #include <asm/tlbflush.h>
-> >>>  #include <asm/cacheflush.h>
-> >>> +#include <asm/cpufeature.h>
-> >>>  #include <asm/virt.h>
-> >>>  #include <asm/kvm_arm.h>
-> >>>  #include <asm/kvm_asm.h>
-> >>> @@ -120,6 +122,22 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
-> >>>  	if (type)
-> >>>  		return -EINVAL;
-> >>>  
-> >>> +	/*
-> >>> +	 * VHE is a prerequisite for SVE in the Arm architecture, and
-> >>> +	 * Kconfig ensures that if system_supports_sve() here then
-> >>> +	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
-> >>> +	 * detected and enabled, the CPU is architecturally
-> >>> +	 * noncompliant.
-> >>> +	 *
-> >>> +	 * Just in case this mismatch is seen, detect it, warn and give
-> >>> +	 * up.  Supporting this forbidden configuration in Hyp would be
-> >>> +	 * pointless.
-> >>> +	 */
-> >>> +	if (system_supports_sve() && !has_vhe()) {
-> >>> +		kvm_pr_unimpl("Cannot create VMs on SVE system without VHE.  Broken cpu?");
-> >>> +		return -ENXIO;
-> >>> +	}
-> >>
-> >> You might as well fail the boot KVM initialization altogether, and not
-> >> wait for a VM to be created.
-> > 
-> > I was concerned that the SVE and KVM initialisation might happen in
-> > an unpredictable order.
-> > 
-> > KVM is initialised via module_init(), which I'm guessing is later than
-> > cpufeatures (?)  If so then yes, kvm_arch_init() would be a reasonable
-> > place to do this.
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 > 
-> CPU features are set in stone very early, right after we've booted all
-> the CPUs that can be discovered before running userspace. KVM itself
-> relies on that, so you should be able to move that check pretty early.
+> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+> index ecdf071653d4..24689260a2a5 100644
+> --- a/arch/arm/mach-imx/pm-imx6.c
+> +++ b/arch/arm/mach-imx/pm-imx6.c
+> @@ -604,6 +604,28 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
+>  				   IMX6Q_GPR1_GINT);
+>  }
+>  
+> +static void imx6_pm_stby_poweroff(void)
+> +{
+> +	imx6_set_lpm(STOP_POWER_OFF);
+> +	cpu_suspend(0, imx6q_suspend_finish);
 
-OK, I'll have a go.
+Do you actually need to save the processor state etc here - the request
+is after all to power down the system and not to suspend.  Would calling
+imx6q_suspend_finish() directly work (and hence simplify the code) ?
 
-> >> But I'm more concerned with the fact that we're now have a configuration
-> >> that drops functionalities on the floor, one way or another.
-> > 
-> > Is this still a problem if that configuration is forbidden by Kconfig?
-> > 
-> > Can you describe a scenario in which the problem config (KVM=y, VHE=n,
-> > SVE=y) would be wanted?
-> 
-> Not really. I guess it is just me being paranoid and not realising we
-> had VHE on by default already.
-
-OK, I'll leave it as-is for now, but give me a shout if you have further
-concerns.
-
-Cheers
----Dave
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
