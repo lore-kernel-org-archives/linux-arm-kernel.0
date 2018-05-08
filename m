@@ -1,233 +1,117 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  8 May 2018 12:05:41 +0200
-Subject: [PATCH v3 1/3] leds: triggers: provide led_trigger_register_format()
-In-Reply-To: <20180508100543.12559-1-u.kleine-koenig@pengutronix.de>
-References: <20180508100543.12559-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20180508100543.12559-2-u.kleine-koenig@pengutronix.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 8 May 2018 11:14:07 +0100
+Subject: [PATCH v5 06/14] KVM: arm64: Optimise FPSIMD handling to reduce
+ guest/host thrashing
+In-Reply-To: <e87c6940-1c79-ccd4-c6ad-2d87790b2e00@arm.com>
+References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
+ <1525449935-31424-7-git-send-email-Dave.Martin@arm.com>
+ <e87c6940-1c79-ccd4-c6ad-2d87790b2e00@arm.com>
+Message-ID: <20180508101404.GD7753@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows one to simplify drivers that provide a trigger with a
-non-constant name (e.g. one trigger per device with the trigger name
-depending on the device's name).
+On Tue, May 08, 2018 at 10:58:04AM +0100, Marc Zyngier wrote:
+> On 04/05/18 17:05, Dave Martin wrote:
+> > This patch refactors KVM to align the host and guest FPSIMD
+> > save/restore logic with each other for arm64.  This reduces the
+> > number of redundant save/restore operations that must occur, and
+> > reduces the common-case IRQ blackout time during guest exit storms
+> > by saving the host state lazily and optimising away the need to
+> > restore the host state before returning to the run loop.
+> > 
+> > Four hooks are defined in order to enable this:
+> > 
+> >  * kvm_arch_vcpu_run_map_fp():
+> >    Called on PID change to map necessary bits of current to Hyp.
+> > 
+> >  * kvm_arch_vcpu_load_fp():
+> >    Set up FP/SIMD for entering the KVM run loop (parse as
+> >    "vcpu_load fp").
+> > 
+> >  * kvm_arch_vcpu_park_fp():
+> >    Get FP/SIMD into a safe state for re-enabling interrupts after a
+> >    guest exit back to the run loop.
+> > 
+> >    For arm64 specifically, this involves updating the host kernel's
+> >    FPSIMD context tracking metadata so that kernel-mode NEON use
+> >    will cause the vcpu's FPSIMD state to be saved back correctly
+> >    into the vcpu struct.  This must be done before re-enabling
+> >    interrupts because kernel-mode NEON may be used my softirqs.
+> 
+> s/my/by/
+> 
+> I must admit being slightly confused by the word "park". I tend to read
+> "park" as "stash away for later use", while it really is "update the
+> kernel's view of who is actually in control of the FP registers".
 
-Internally the memory the name member of struct led_trigger points to
-now always allocated dynamically instead of just taken from the caller.
+I was thinking park as in parking disk heads, i.e., get things so we can
+kick FPSIMD without doing damage.
 
-The function led_trigger_rename_static() must be changed accordingly and
-was renamed to led_trigger_rename() for consistency, with the only user
-adapted.
+(Or indeed, applying the handbrake so your car doesn't roll away
+downhill while you're gone.)
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/leds/led-triggers.c | 84 +++++++++++++++++++++++++++----------
- drivers/net/can/led.c       |  6 +--
- include/linux/leds.h        | 30 +++++++------
- 3 files changed, 81 insertions(+), 39 deletions(-)
+But of a strained analogy though, I'll admit.
 
-diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
-index 431123b048a2..5d8bb504b07b 100644
---- a/drivers/leds/led-triggers.c
-+++ b/drivers/leds/led-triggers.c
-@@ -175,18 +175,34 @@ void led_trigger_set_default(struct led_classdev *led_cdev)
- }
- EXPORT_SYMBOL_GPL(led_trigger_set_default);
- 
--void led_trigger_rename_static(const char *name, struct led_trigger *trig)
-+int led_trigger_rename(struct led_trigger *trig, const char *fmt, ...)
- {
--	/* new name must be on a temporary string to prevent races */
--	BUG_ON(name == trig->name);
-+	const char *prevname;
-+	const char *newname;
-+	va_list args;
-+
-+	if (!trig)
-+		return 0;
-+
-+	va_start(args, fmt);
-+	newname = kvasprintf_const(GFP_KERNEL, fmt, args);
-+	va_end(args);
-+
-+	if (!newname) {
-+		pr_err("Failed to allocate new name for trigger %s\n", trig->name);
-+		return -ENOMEM;
-+	}
- 
- 	down_write(&triggers_list_lock);
--	/* this assumes that trig->name was originaly allocated to
--	 * non constant storage */
--	strcpy((char *)trig->name, name);
-+	prevname = trig->name;
-+	trig->name = newname;
- 	up_write(&triggers_list_lock);
-+
-+	kfree_const(prevname);
-+
-+	return 0;
- }
--EXPORT_SYMBOL_GPL(led_trigger_rename_static);
-+EXPORT_SYMBOL_GPL(led_trigger_rename);
- 
- /* LED Trigger Interface */
- 
-@@ -333,34 +349,56 @@ void led_trigger_blink_oneshot(struct led_trigger *trig,
- }
- EXPORT_SYMBOL_GPL(led_trigger_blink_oneshot);
- 
--void led_trigger_register_simple(const char *name, struct led_trigger **tp)
-+int led_trigger_register_format(struct led_trigger **tp, const char *fmt, ...)
- {
-+	va_list args;
- 	struct led_trigger *trig;
--	int err;
-+	int err = -ENOMEM;
-+	const char *name;
-+
-+	va_start(args, fmt);
-+	name = kvasprintf_const(GFP_KERNEL, fmt, args);
-+	va_end(args);
- 
- 	trig = kzalloc(sizeof(struct led_trigger), GFP_KERNEL);
- 
--	if (trig) {
--		trig->name = name;
--		err = led_trigger_register(trig);
--		if (err < 0) {
--			kfree(trig);
--			trig = NULL;
--			pr_warn("LED trigger %s failed to register (%d)\n",
--				name, err);
--		}
--	} else {
--		pr_warn("LED trigger %s failed to register (no memory)\n",
--			name);
--	}
-+	if (!name || !trig)
-+		goto err;
-+
-+	trig->name = name;
-+
-+	err = led_trigger_register(trig);
-+	if (err < 0)
-+		goto err;
-+
- 	*tp = trig;
-+
-+	return 0;
-+
-+err:
-+	kfree(trig);
-+	kfree_const(name);
-+
-+	*tp = NULL;
-+
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(led_trigger_register_format);
-+
-+void led_trigger_register_simple(const char *name, struct led_trigger **tp)
-+{
-+	int ret = led_trigger_register_format(tp, "%s", name);
-+	if (ret < 0)
-+		pr_warn("LED trigger %s failed to register (%d)\n", name, ret);
- }
- EXPORT_SYMBOL_GPL(led_trigger_register_simple);
- 
- void led_trigger_unregister_simple(struct led_trigger *trig)
- {
--	if (trig)
-+	if (trig) {
- 		led_trigger_unregister(trig);
-+		kfree_const(trig->name);
-+	}
- 	kfree(trig);
- }
- EXPORT_SYMBOL_GPL(led_trigger_unregister_simple);
-diff --git a/drivers/net/can/led.c b/drivers/net/can/led.c
-index c1b667675fa1..2d7d1b0d20f9 100644
---- a/drivers/net/can/led.c
-+++ b/drivers/net/can/led.c
-@@ -115,13 +115,13 @@ static int can_led_notifier(struct notifier_block *nb, unsigned long msg,
- 
- 	if (msg == NETDEV_CHANGENAME) {
- 		snprintf(name, sizeof(name), "%s-tx", netdev->name);
--		led_trigger_rename_static(name, priv->tx_led_trig);
-+		led_trigger_rename(priv->tx_led_trig, name);
- 
- 		snprintf(name, sizeof(name), "%s-rx", netdev->name);
--		led_trigger_rename_static(name, priv->rx_led_trig);
-+		led_trigger_rename(priv->rx_led_trig, name);
- 
- 		snprintf(name, sizeof(name), "%s-rxtx", netdev->name);
--		led_trigger_rename_static(name, priv->rxtx_led_trig);
-+		led_trigger_rename(priv->rxtx_led_trig, name);
- 	}
- 
- 	return NOTIFY_DONE;
-diff --git a/include/linux/leds.h b/include/linux/leds.h
-index b7e82550e655..e706c28bb35b 100644
---- a/include/linux/leds.h
-+++ b/include/linux/leds.h
-@@ -275,6 +275,8 @@ extern void led_trigger_unregister(struct led_trigger *trigger);
- extern int devm_led_trigger_register(struct device *dev,
- 				     struct led_trigger *trigger);
- 
-+extern int led_trigger_register_format(struct led_trigger **trigger,
-+				       const char *fmt, ...);
- extern void led_trigger_register_simple(const char *name,
- 				struct led_trigger **trigger);
- extern void led_trigger_unregister_simple(struct led_trigger *trigger);
-@@ -298,28 +300,25 @@ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
- }
- 
- /**
-- * led_trigger_rename_static - rename a trigger
-- * @name: the new trigger name
-+ * led_trigger_rename - rename a trigger
-  * @trig: the LED trigger to rename
-+ * @fmt: format string for new name
-  *
-- * Change a LED trigger name by copying the string passed in
-- * name into current trigger name, which MUST be large
-- * enough for the new string.
-- *
-- * Note that name must NOT point to the same string used
-- * during LED registration, as that could lead to races.
-- *
-- * This is meant to be used on triggers with statically
-- * allocated name.
-+ * rebaptize the given trigger.
-  */
--extern void led_trigger_rename_static(const char *name,
--				      struct led_trigger *trig);
-+extern int led_trigger_rename(struct led_trigger *trig, const char *fmt, ...);
- 
- #else
- 
- /* Trigger has no members */
- struct led_trigger {};
- 
-+static inline int led_trigger_register_format(struct led_trigger **trigger,
-+					      const char *fmt, ...)
-+{
-+	return 0;
-+}
-+
- /* Trigger inline empty functions */
- static inline void led_trigger_register_simple(const char *name,
- 					struct led_trigger **trigger) {}
-@@ -342,6 +341,11 @@ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
- 	return NULL;
- }
- 
-+static inline int led_trigger_rename(struct led_trigger *trig, const char *fmt, ...)
-+{
-+	return 0;
-+}
-+
- #endif /* CONFIG_LEDS_TRIGGERS */
- 
- /* Trigger specific functions */
--- 
-2.17.0
+> No, I don't have a better name for it... ;-) But maybe something along
+> the lines of "hwsync_fp", in order to be consistent with the rest of the
+> code that deals with shared resources?
+
+To me, "hw" carries too much of a suggestion that we would be flushing
+the registers back to memory.  In fact, we don't touch the hardware
+here, only kernel bookkeeping data.
+
+Trying to come up with an intuitive name for this may be futile; how
+about
+
+ * _sync_ (which is suitably vague), or
+ * _ctxsync_ (which will avoid fooling people into thinking they know
+	what it does without looking at the code)
+
+?
+
+[...]
+
+> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > index 469de8a..811097e 100644
+> > --- a/arch/arm64/include/asm/kvm_host.h
+> > +++ b/arch/arm64/include/asm/kvm_host.h
+> > @@ -30,6 +30,7 @@
+> >  #include <asm/kvm.h>
+> >  #include <asm/kvm_asm.h>
+> >  #include <asm/kvm_mmio.h>
+> > +#include <asm/thread_info.h>
+> >  
+> >  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+> >  
+> > @@ -238,6 +239,12 @@ struct kvm_vcpu_arch {
+> >  
+> >  	/* Pointer to host CPU context */
+> >  	kvm_cpu_context_t *host_cpu_context;
+> > +
+> > +	struct thread_info *host_thread_info;	/* hyp VA */
+> > +	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
+> > +	bool host_sve_in_use;	/* backup for host TIF_SVE while in guest */
+> > +	bool fp_enabled;
+> 
+> Could we consider merging these two fields together with debug_flags?
+> Overall, they share a common purpose (tracking the use of a resource
+> shared between host and guest). Not necessarily something to do
+> immediately though.
+
+I expect so.  I added these as bools partly for simplicity and partly
+because there was no general-purpose flags field already.
+
+We could make debug_flags into a general-purpose flags field, though.
+
+Once we've agreed about the park_fp renaming, I'll consider reworking
+this also -- but I'll punt it to a separate patch if it turns out to be
+non-trivial.
+
+[...]
+
+> Other than the couple of minor nits above,
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thanks
+---Dave
