@@ -1,113 +1,89 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 8 May 2018 14:48:04 +0800
-Subject: [PATCH v1 6/7] Bluetooth: hci_mediatek: Add protocol support
- for MediaTek serial devices
-In-Reply-To: <A7391E5D-2945-415B-8AB1-8DFBF2E65878@holtmann.org>
-References: <cover.1522736996.git.sean.wang@mediatek.com>
- <f0e0a0b7f1dc3845dc6eafb4ccd60284d1675f8d.1522736996.git.sean.wang@mediatek.com>
- <A7391E5D-2945-415B-8AB1-8DFBF2E65878@holtmann.org>
-Message-ID: <1525762084.14468.20.camel@mtkswgap22>
+From: chenyao11@huawei.com (Yao Chen)
+Date: Tue, 8 May 2018 15:03:48 +0800
+Subject: [PATCH] Kirin-PCIe: Add kirin pcie msi feature.
+Message-ID: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Marcel
+This patch adds kirin pcie msi feature.
 
-On Tue, 2018-04-03 at 12:27 +0200, Marcel Holtmann wrote:
-> Hi Sean,
-> 
+Signed-off-by: Yao Chen <chenyao11@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi |  2 ++
+ drivers/pci/dwc/pcie-kirin.c              | 38 +++++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
 
-[ ... ]
-
-> > +
-> > +static int mtk_wmt_cmd_sync(struct hci_uart *hu, u8 opcode, u8 flag, u16 plen,
-> > +			    const void *param)
-> > +{
-> > +	struct mtk_bt_dev *btdev = hu->priv;
-> > +	struct hci_command_hdr *hhdr;
-> > +	struct hci_acl_hdr *ahdr;
-> > +	struct mtk_wmt_hdr *whdr;
-> > +	struct sk_buff *skb;
-> > +	int ret = 0;
-> > +
-> > +	init_completion(&btdev->wmt_cmd);
-> > +
-> > +	skb = bt_skb_alloc(plen + MTK_WMT_CMD_SIZE, GFP_KERNEL);
-> > +	if (!skb)
-> > +		return -ENOMEM;
-> > +
-> > +	/*
-> > +	 * WMT data is carried in either ACL or HCI format with op code as
-> > +	 * 0xfc6f and followed by a WMT header and its actual payload.
-> > +	 */
-> 
-> Please use net subsystem comment style.
-> 
-> > +	switch (opcode) {
-> > +	case MTK_WMT_PATCH_DWNLD:
-> > +		ahdr = skb_put(skb, HCI_ACL_HDR_SIZE);
-> > +		ahdr->handle = cpu_to_le16(0xfc6f);
-> > +		ahdr->dlen   = cpu_to_le16(plen + MTK_WMT_HDR_SIZE);
-> > +		break;
-> > +	default:
-> > +		hhdr = skb_put(skb, HCI_COMMAND_HDR_SIZE);
-> > +		hhdr->opcode = cpu_to_le16(0xfc6f);
-> > +		hhdr->plen = plen + MTK_WMT_HDR_SIZE;
-> > +		break;
-> > +	}
-> > +
-> > +	hci_skb_pkt_type(skb) = opcode == MTK_WMT_PATCH_DWNLD ?
-> > +				HCI_ACLDATA_PKT : HCI_COMMAND_PKT;
-> 
-> Why not move that into the switch statement above.
-> 
-> > +
-> > +	/* Start to build a WMT header and its actual payload. */
-> > +	whdr = skb_put(skb, MTK_WMT_HDR_SIZE);
-> > +	whdr->dir = 1;
-> > +	whdr->op = opcode;
-> > +	whdr->dlen = cpu_to_le16(plen + 1);
-> > +	whdr->flag = flag;
-> > +	skb_put_data(skb, param, plen);
-> > +
-> > +	mtk_enqueue(hu, skb);
-> > +	hci_uart_tx_wakeup(hu);
-> > +
-> > +	/*
-> > +	 * Waiting a WMT event response, while we must take care in case of
-> > +	 * failures for the wait.
-> > +	 */
-> > +	ret = wait_for_completion_interruptible_timeout(&btdev->wmt_cmd, HZ);
-> > +
-> > +	return ret > 0 ? 0 : ret < 0 ? ret : -ETIMEDOUT;
-> > +}
-> 
-> All in all I am not convinced that this is super clean. I get that we need something special for having this in the ACL data packets, but for the standard HCI command I prefer that __hci_cmd_sync is used. I addition, it seems that patch download is the only special case and that happens before at the setup stage. So we could make things special for that. I need to understand this a bit better. Can I get a btmon -w trace.log file from the whole init procedure.
-> 
-
-While i was trying to rewrite the driver based on btuart.c. you posted
-on RFC, I used __hci_cmd_sync_ev to replace such kinds of SoC specific
-hci command sending which I've done previously with mtk_wmt_cmd_sync.
-
-However, eventually, I got a cmd_timer timeout whose message printed
-on console as "Bluetooth: hci0: command 0xfc6f tx timeout".
-
-The mtk soc specific cmd/event I posted below, I dumped directly in
-driver, always uses cmd as opcode 0xfc6f, and its event id as 0xe4.
-
-It appears to the event id is not standard and thus it cannot cancel the
-cmd timer when the special hci event is being handled. This way can we
-can still use __hci_cmd_sync api ?
-                         
-[    4.896200] hci tx: 00000000: 01 6f fc 05 01 07 01 00 04    
-[    4.904671] hci rx: 00000000: e4 05 02 07 01 00
-00                             
-[    4.912859] Bluetooth: hci0 event 0xe4
-
-
-buildroot login: [    6.914509] Bluetooth: hci0: command 0xfc6f tx
-timeout
-[    6.919831] hci tx: 00000000: 01 6f fc 06 01 06 02 00 00
-01                    .o........
-[    7.006631] hci rx: 00000000: e4 05 02 06 01 00
-00                             .......
-[    7.014821] Bluetooth: hci0 event 0xe4
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index ec3eb8e..4ef684f 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -872,6 +872,8 @@
+ 				  0x0 0x02000000>;
+ 			num-lanes = <1>;
+ 			#interrupt-cells = <1>;
++			interrupts = <0 283 4>;
++			interrupts-names = "msi";
+ 			interrupt-map-mask = <0xf800 0 0 7>;
+ 			interrupt-map = <0x0 0 0 1
+ 					 &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
+diff --git a/drivers/pci/dwc/pcie-kirin.c b/drivers/pci/dwc/pcie-kirin.c
+index d2970a0..2319c9c 100644
+--- a/drivers/pci/dwc/pcie-kirin.c
++++ b/drivers/pci/dwc/pcie-kirin.c
+@@ -426,9 +426,28 @@ static int kirin_pcie_establish_link(struct pcie_port *pp)
+ 	return 0;
+ }
+ 
++static irqreturn_t kirin_pcie_msi_irq_handler(int irq, void *arg)
++{
++	struct pcie_port *pp = arg;
++
++	return dw_handle_msi_irq(pp);
++}
++
++static void kirin_pcie_msi_init(struct pcie_port *pp)
++{
++	dw_pcie_msi_init(pp);
++}
++
++static void kirin_pcie_enable_interrupts(struct pcie_port *pp)
++{
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		kirin_pcie_msi_init(pp);
++}
++
+ static int kirin_pcie_host_init(struct pcie_port *pp)
+ {
+ 	kirin_pcie_establish_link(pp);
++	kirin_pcie_enable_interrupts(pp);
+ 
+ 	return 0;
+ }
+@@ -448,6 +467,25 @@ static int kirin_pcie_host_init(struct pcie_port *pp)
+ static int __init kirin_add_pcie_port(struct dw_pcie *pci,
+ 				      struct platform_device *pdev)
+ {
++	int ret;
++
++	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++		pci->pp.msi_irq = platform_get_irq(pdev, 0);
++		if (!pci->pp.msi_irq) {
++			dev_err(&pdev->dev, "failed to get msi irq\n");
++			return -ENODEV;
++		}
++		ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
++				       kirin_pcie_msi_irq_handler,
++				       IRQF_SHARED | IRQF_NO_THREAD,
++				       "kirin_pcie_msi", &pci->pp);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to request msi irq\n");
++			return ret;
++		}
++	}
++
++	pci->pp.root_bus_nr = -1;
+ 	pci->pp.ops = &kirin_pcie_host_ops;
+ 
+ 	return dw_pcie_host_init(&pci->pp);
+-- 
+1.9.1
