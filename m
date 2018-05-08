@@ -1,51 +1,46 @@
-From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
-Date: Tue, 8 May 2018 23:39:45 +0200
-Subject: [PATCH v6 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <20180505070147.epsrglnypm72jr5u@pengutronix.de>
-References: <20180305102524.5905-1-o.rempel@pengutronix.de>
- <20180305102524.5905-4-o.rempel@pengutronix.de>
- <20180504185052.bjhfkvpgrblc7tfc@pengutronix.de>
- <20180504134956.36dc72a253d03e94a517a867@linux-foundation.org>
- <20180505070147.epsrglnypm72jr5u@pengutronix.de>
-Message-ID: <c1f2e09d-f64b-afe6-59bf-c0742409e4d6@intel.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Tue,  8 May 2018 14:41:36 -0700
+Subject: [GIT PULL 1/2] ARM: SOC driver update v4.18
+Message-ID: <1525815697-6338-1-git-send-email-santosh.shilimkar@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/5/2018 9:01 AM, Oleksij Rempel wrote:
-> Moving Rafael from Cc to To.
->
-> Hi Rafael,
->
-> can you please help here?
-> I need your ACK or NACK for this patch.
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-Sorry for the delay, I'll have a closer look at it in the next couple of 
-days.
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-Thanks,
-Rafael
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/soc_drivers_for_4.18
 
-> On Fri, May 04, 2018 at 01:49:56PM -0700, Andrew Morton wrote:
->> On Fri, 4 May 2018 20:50:52 +0200 Oleksij Rempel <o.rempel@pengutronix.de> wrote:
->>
->>> Hallo Andrew,
->>> I need your ACK or NACK for this patch.
->>>
->>> This function is used to configure external PMIC to interpret
->>> signal which will be triggered by pm_power_off as power off.
->>> Since same signal can be used for stand by, I linked PMIC configuration
->>> with pm_power_off_prepare to avoid possible conflicts.
->>>
->>> ...
->>>
->>>> --- a/kernel/reboot.c
->>>> +++ b/kernel/reboot.c
->>>> @@ -49,6 +49,7 @@ int reboot_force;
->>>>    */
->>>>   
->>>>   void (*pm_power_off_prepare)(void);
->>>> +EXPORT_SYMBOL(pm_power_off_prepare);
->>>>   
->> OK by me, but it's more of a Rafael thing.
->>
+for you to fetch changes up to 1e0a601437a6111ecf384df010812c53cada6497:
+
+  firmware: ti_sci: Switch to SPDX Licensing (2018-05-04 23:10:23 -0700)
+
+----------------------------------------------------------------
+ARM: SOC driver update for 4.18
+
+ - AEMIF driver update to support board files and remove
+   need of mach-davinci aemif code
+ - Use percpu counters for qmss datapath stats
+ - License update for TI SCI
+
+----------------------------------------------------------------
+Bartosz Golaszewski (2):
+      memory: aemif: don't rely on kbuild for driver's name
+      memory: aemif: add support for board files
+
+Lokesh Vutla (1):
+      firmware: ti_sci: Switch to SPDX Licensing
+
+Vasyl Gomonovych (1):
+      soc: ti: knav_qmss: Use percpu instead atomic for stats counter
+
+ drivers/firmware/ti_sci.c              | 10 +-----
+ drivers/firmware/ti_sci.h              | 30 +----------------
+ drivers/memory/ti-aemif.c              | 60 ++++++++++++++++++++++------------
+ drivers/soc/ti/knav_qmss.h             | 14 ++++----
+ drivers/soc/ti/knav_qmss_queue.c       | 60 ++++++++++++++++++++++------------
+ include/linux/platform_data/ti-aemif.h | 25 ++++++++++++++
+ include/linux/soc/ti/ti_sci_protocol.h | 10 +-----
+ 7 files changed, 115 insertions(+), 94 deletions(-)
