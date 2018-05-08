@@ -1,31 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 8 May 2018 11:51:17 +0100
-Subject: [PATCH v5 12/14] KVM: arm64: Remove redundant *exit_code changes
- in fpsimd_guest_exit()
-In-Reply-To: <1525449935-31424-13-git-send-email-Dave.Martin@arm.com>
-References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
- <1525449935-31424-13-git-send-email-Dave.Martin@arm.com>
-Message-ID: <a1f8ba62-1f39-5649-a92b-88aad0358d22@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 8 May 2018 12:51:31 +0200
+Subject: [PATCH v3 3/3] tty: implement led triggers
+In-Reply-To: <20180508100851.GY2285@localhost>
+References: <20180508100543.12559-1-u.kleine-koenig@pengutronix.de>
+ <20180508100543.12559-4-u.kleine-koenig@pengutronix.de>
+ <20180508100851.GY2285@localhost>
+Message-ID: <20180508105131.agz7u3q42gy7mrxy@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/18 17:05, Dave Martin wrote:
-> In fixup_guest_exit(), there are a couple of cases where after
-> checking what the exit code was, we assign it explicitly with the
-> value it already had.
+On Tue, May 08, 2018 at 12:08:51PM +0200, Johan Hovold wrote:
+> On Tue, May 08, 2018 at 12:05:43PM +0200, Uwe Kleine-K?nig wrote:
+> > The rx trigger fires when data is pushed to the ldisc by the driver. This
+> > is a bit later than the actual receiving of data but has the nice benefit
+> > that it doesn't need adaption for each driver and isn't in the hot path.
+> > 
+> > Similarly the tx trigger fires when data was copied from userspace and is
+> > given to the ldisc.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx25-logitech-baby.dts | 192 ++++++++++++++++++++++
 > 
-> Assuming this is not indicative of a bug, these assignments are not
-> needed.
-> 
-> This patch removes the redundant assignments simplifies some if-
-> nesting that becomes trivial as a result.
-> 
-> No functional change.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Looks like you included more than intended in this patch.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Right, this doesn't belong here. Feel free to assume I didn't include it
+in the patch and comment the rest :-)
 
-	M.
+Best regards
+Uwe
+
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
