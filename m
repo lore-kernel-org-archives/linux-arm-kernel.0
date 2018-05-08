@@ -1,58 +1,34 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 8 May 2018 14:43:55 +0300
-Subject: [PATCH 0/8] Tegra Combined UART driver
-Message-ID: <20180508114403.14499-1-mperttunen@nvidia.com>
+Date: Tue, 8 May 2018 14:43:56 +0300
+Subject: [PATCH 1/8] dt-bindings: tegra186-hsp: Add shared interrupts
+In-Reply-To: <20180508114403.14499-1-mperttunen@nvidia.com>
+References: <20180508114403.14499-1-mperttunen@nvidia.com>
+Message-ID: <20180508114403.14499-2-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Non-doorbell interrupts are routed through "shared interrupts". These
+interrupts can be mapped to various internal interrupt lines. Add
+interrupt properties for shared interrupts to the tegra186-hsp device
+tree bindings.
 
-on Tegra194, the primary console UART is the "Tegra Combined UART",
-or TCU. This is a "virtual UART", where each consumer communicates
-with a central implementation over mailboxes. The central
-implementation then multiplexes the streams and arbitrates use of
-a hardware serial port. This driver implements the consumer portion
-to allow using the primary console.
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+ Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The series is split into the following parts:
-* patches 1 and 2 add the device tree bindings for mailbox and tcu
-  itself.
-* patch 3 adds a blocking transmission option to the mailbox
-  framework.
-* patches 4 and 5 add support for the "shared mailbox" primitive
-  to the Tegra HSP driver.
-* patch 6 adds the TCU driver itself
-* patches 7 and 8 do the necessary device tree changes.
-
-The series has been tested on the Tegra194 P2972 board.
-
-Thanks,
-Mikko
-
-Mikko Perttunen (8):
-  dt-bindings: tegra186-hsp: Add shared interrupts
-  dt-bindings: serial: Add bindings for nvidia,tegra194-tcu
-  mailbox: Add transmit done by blocking option
-  mailbox: tegra-hsp: Refactor in preparation of mailboxes
-  mailbox: tegra-hsp: Add support for shared mailboxes
-  serial: Add Tegra Combined UART driver
-  arm64: tegra: Add nodes for tcu on Tegra194
-  arm64: tegra: Mark tcu as primary serial port on Tegra194 P2888
-
- .../bindings/mailbox/nvidia,tegra186-hsp.txt       |   2 +
- .../bindings/serial/nvidia,tegra194-tcu.txt        |  35 +++
- arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi     |   2 +-
- arch/arm64/boot/dts/nvidia/tegra194.dtsi           |  34 ++-
- drivers/mailbox/mailbox.c                          |  30 +-
- drivers/mailbox/mailbox.h                          |   1 +
- drivers/mailbox/tegra-hsp.c                        | 320 +++++++++++++++++----
- drivers/tty/serial/Kconfig                         |   9 +
- drivers/tty/serial/Makefile                        |   1 +
- drivers/tty/serial/tegra-tcu.c                     | 302 +++++++++++++++++++
- include/uapi/linux/serial_core.h                   |   3 +
- 11 files changed, 671 insertions(+), 68 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
- create mode 100644 drivers/tty/serial/tegra-tcu.c
-
+diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+index b99d25fc2f26..9edcdf82d719 100644
+--- a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
++++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+@@ -21,6 +21,8 @@ Required properties:
+     Contains a list of names for the interrupts described by the interrupt
+     property. May contain the following entries, in any order:
+     - "doorbell"
++    - "sharedN", where 'N' is a number from zero up to the number of
++      external interrupts supported by the HSP instance minus one.
+     Users of this binding MUST look up entries in the interrupt property
+     by name, using this interrupt-names property to do so.
+ - interrupts
 -- 
 2.16.1
