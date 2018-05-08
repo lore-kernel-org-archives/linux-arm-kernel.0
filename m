@@ -1,98 +1,43 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 7 May 2018 16:43:12 -0700
-Subject: [PATCH v2 2/2] arm64: dts: qcom: msm8998: Add rpm and regulators
- for MTP
-In-Reply-To: <152573424824.138124.9876892052732688689@swboyd.mtv.corp.google.com>
-References: <20180428054248.22387-1-bjorn.andersson@linaro.org>
- <20180428054248.22387-2-bjorn.andersson@linaro.org>
- <152573424824.138124.9876892052732688689@swboyd.mtv.corp.google.com>
-Message-ID: <20180507234312.GD14924@minitux>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 8 May 2018 09:03:09 +0800
+Subject: [PATCH v2 1/2] dt-bindings: add MediaTek XS-PHY binding
+In-Reply-To: <20180507170435.GA14540@rob-hp-laptop>
+References: <1525486506-19301-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1525486506-19301-2-git-send-email-chunfeng.yun@mediatek.com>
+ <20180507170435.GA14540@rob-hp-laptop>
+Message-ID: <1525741389.25162.37.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 07 May 16:04 PDT 2018, Stephen Boyd wrote:
-
-> Quoting Bjorn Andersson (2018-04-27 22:42:48)
-> > diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
-> > index d6665e4f801f..ccbf6347aacb 100644
-> > --- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
-> > +++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
-> > @@ -220,6 +220,16 @@
-> >                 method = "smc";
-> >         };
-> >  
-> > +       rpm_glink: rpm-glink {
-> > +               compatible = "qcom,glink-rpm";
+On Mon, 2018-05-07 at 12:04 -0500, Rob Herring wrote:
+> On Sat, May 05, 2018 at 10:15:05AM +0800, Chunfeng Yun wrote:
+> > Add a DT binding documentation of XS-PHY for MediaTek SoCs
+> > with USB3.1 GEN2 controller
+> > 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/phy/phy-mtk-xsphy.txt      |  110 ++++++++++++++++++++
+> >  1 file changed, 110 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
+> > new file mode 100644
+> > index 0000000..9a95fab
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
+> > @@ -0,0 +1,110 @@
+> > +MediaTek XS-PHY binding
+> > +--------------------------
 > > +
-> > +               interrupts = <GIC_SPI 168 IRQ_TYPE_EDGE_RISING>;
+> > +The XS-PHY controller supports physical layer functionality for USB3.1
+> > +GEN2 controller on MediaTek SoCs.
 > > +
-> > +               qcom,rpm-msg-ram = <&rpm_msg_ram>;
-> > +
-> > +               mboxes = <&apcs_glb 0>;
+> > +Required properties (controller (parent) node):
+> > + - compatible	: should be "mediatek,<soc-model>-xsphy", "mediatek,xsphy",
+> > + 		  soc-model is the name of SoC, such as mt2712 etc;
+> > +		  when using "mediatek,xsphy" compatible string, you need SoC specific
+> > +		  ones in addition, one of:
+> > +		  - "mediatek,mt3611-xsphy"
 > 
-> Why so many newlines?
-> 
-
-No particular reason...
-
-> > +       };
-> > +
-> >         soc: soc {};
-> >  };
-> >  
-> > @@ -337,4 +347,77 @@
-> >                 #interrupt-cells = <4>;
-> >                 cell-index = <0>;
-> >         };
-> > +
-> > +       rpm_msg_ram: memory at 68000 {
-> 
-> unit address doesn't match reg property.
-> 
-
-Doh...
-
-> > +               compatible = "qcom,rpm-msg-ram";
-> > +               reg = <0x778000 0x7000>;
-> > +       };
-[..]
-> > +&rpm_glink {
-> > +       rpm_requests {
-> > +               compatible = "qcom,rpm-msm8998";
-> > +               qcom,glink-channels = "rpm_requests";
-> > +
-> > +               pm8998-regulators {
-> > +                       compatible = "qcom,rpm-pm8998-regulators";
-> > +
-> > +                       pm8998_s1: s1 {};
-[..]
-> > +                       pm8998_lvs2: lvs2 {};
-> 
-> What's the benefit to having the nodes here instead of in each board?
-> 
-
-That's how we've done it in the previous boards, but I had a discussion
-regarding this with Doug the other day and agree that it might make
-sense to just leave them out.
-
-In particular Doug wanted to use labels based on names in the schematics
-for his board...
-
-> > +               };
-> > +
-> > +               pmi8998-regulators {
-> > +                       compatible = "qcom,rpm-pmi8998-regulators";
-> > +
-> > +                       pmi8998_bob: bob {};
-> > +               };
-> 
-> These may be board specific? So each regulator container would need
-> status = "disabled" and then status = "okay" in the board file.
-> 
-
-Right, we haven't really seen the need for this before, but it seems to
-make more sense to move all regulators and their references to the board
-file.
-
-Regards,
-Bjorn
+> What about mt2712 you mention above?
+Sorry, forgot to modify it
