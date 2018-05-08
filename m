@@ -1,117 +1,443 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 8 May 2018 11:14:07 +0100
-Subject: [PATCH v5 06/14] KVM: arm64: Optimise FPSIMD handling to reduce
- guest/host thrashing
-In-Reply-To: <e87c6940-1c79-ccd4-c6ad-2d87790b2e00@arm.com>
-References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
- <1525449935-31424-7-git-send-email-Dave.Martin@arm.com>
- <e87c6940-1c79-ccd4-c6ad-2d87790b2e00@arm.com>
-Message-ID: <20180508101404.GD7753@e103592.cambridge.arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 8 May 2018 12:22:12 +0200
+Subject: [PATCH 1/3] dma-debug: move initialization to common code
+In-Reply-To: <20180424140235.9125-2-hch@lst.de>
+References: <20180424140235.9125-1-hch@lst.de>
+ <CGME20180424140315epcas1p260a93a22d2b78db49274ec5c07664efe@epcas1p2.samsung.com>
+ <20180424140235.9125-2-hch@lst.de>
+Message-ID: <d2ea505f-ef18-bed1-23b5-dad81032e775@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 10:58:04AM +0100, Marc Zyngier wrote:
-> On 04/05/18 17:05, Dave Martin wrote:
-> > This patch refactors KVM to align the host and guest FPSIMD
-> > save/restore logic with each other for arm64.  This reduces the
-> > number of redundant save/restore operations that must occur, and
-> > reduces the common-case IRQ blackout time during guest exit storms
-> > by saving the host state lazily and optimising away the need to
-> > restore the host state before returning to the run loop.
-> > 
-> > Four hooks are defined in order to enable this:
-> > 
-> >  * kvm_arch_vcpu_run_map_fp():
-> >    Called on PID change to map necessary bits of current to Hyp.
-> > 
-> >  * kvm_arch_vcpu_load_fp():
-> >    Set up FP/SIMD for entering the KVM run loop (parse as
-> >    "vcpu_load fp").
-> > 
-> >  * kvm_arch_vcpu_park_fp():
-> >    Get FP/SIMD into a safe state for re-enabling interrupts after a
-> >    guest exit back to the run loop.
-> > 
-> >    For arm64 specifically, this involves updating the host kernel's
-> >    FPSIMD context tracking metadata so that kernel-mode NEON use
-> >    will cause the vcpu's FPSIMD state to be saved back correctly
-> >    into the vcpu struct.  This must be done before re-enabling
-> >    interrupts because kernel-mode NEON may be used my softirqs.
-> 
-> s/my/by/
-> 
-> I must admit being slightly confused by the word "park". I tend to read
-> "park" as "stash away for later use", while it really is "update the
-> kernel's view of who is actually in control of the FP registers".
+Hi Christoph,
 
-I was thinking park as in parking disk heads, i.e., get things so we can
-kick FPSIMD without doing damage.
+On 2018-04-24 16:02, Christoph Hellwig wrote:
+> Most mainstream architectures are using 65536 entries, so lets stick to
+> that.  If someone is really desperate to override it that can still be
+> done through <asm/dma-mapping.h>, but I'd rather see a really good
+> rationale for that.
+>
+> dma_debug_init is now called as a core_initcall, which for many
+> architectures means much earlier, and provides dma-debug functionality
+> earlier in the boot process.  This should be safe as it only relies
+> on the memory allocator already being available.
+>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 
-(Or indeed, applying the handbrake so your car doesn't roll away
-downhill while you're gone.)
+Nice! Unification of this is definitely needed and solves the issues
+reported some time ago:
 
-But of a strained analogy though, I'll admit.
+https://patchwork.kernel.org/patch/9429637/ (arm)
+https://patchwork.kernel.org/patch/9431161/ (arm64, rejected)
 
-> No, I don't have a better name for it... ;-) But maybe something along
-> the lines of "hwsync_fp", in order to be consistent with the rest of the
-> code that deals with shared resources?
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-To me, "hw" carries too much of a suggestion that we would be flushing
-the registers back to memory.  In fact, we don't touch the hardware
-here, only kernel bookkeeping data.
+> ---
+>   arch/arm/mm/dma-mapping-nommu.c |  9 ---------
+>   arch/arm/mm/dma-mapping.c       |  9 ---------
+>   arch/arm64/mm/dma-mapping.c     | 10 ----------
+>   arch/c6x/kernel/dma.c           | 11 -----------
+>   arch/ia64/kernel/dma-mapping.c  | 10 ----------
+>   arch/microblaze/kernel/dma.c    | 11 -----------
+>   arch/mips/mm/dma-default.c      | 10 ----------
+>   arch/openrisc/kernel/dma.c      | 11 -----------
+>   arch/powerpc/kernel/dma.c       |  3 ---
+>   arch/s390/pci/pci_dma.c         |  9 ---------
+>   arch/sh/mm/consistent.c         |  9 ---------
+>   arch/sparc/kernel/Makefile      |  2 --
+>   arch/sparc/kernel/dma.c         | 13 -------------
+>   arch/x86/kernel/pci-dma.c       |  4 ----
+>   arch/xtensa/kernel/pci-dma.c    |  9 ---------
+>   include/linux/dma-debug.h       |  6 ------
+>   lib/dma-debug.c                 | 21 ++++++++++++++-------
+>   17 files changed, 14 insertions(+), 143 deletions(-)
+>   delete mode 100644 arch/sparc/kernel/dma.c
+>
+> diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
+> index 619f24a42d09..f448a0663b10 100644
+> --- a/arch/arm/mm/dma-mapping-nommu.c
+> +++ b/arch/arm/mm/dma-mapping-nommu.c
+> @@ -241,12 +241,3 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   void arch_teardown_dma_ops(struct device *dev)
+>   {
+>   }
+> -
+> -#define PREALLOC_DMA_DEBUG_ENTRIES	4096
+> -
+> -static int __init dma_debug_do_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -	return 0;
+> -}
+> -core_initcall(dma_debug_do_init);
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 8c398fedbbb6..c26bf83f44ca 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1165,15 +1165,6 @@ int arm_dma_supported(struct device *dev, u64 mask)
+>   	return __dma_supported(dev, mask, false);
+>   }
+>   
+> -#define PREALLOC_DMA_DEBUG_ENTRIES	4096
+> -
+> -static int __init dma_debug_do_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -	return 0;
+> -}
+> -core_initcall(dma_debug_do_init);
+> -
+>   #ifdef CONFIG_ARM_DMA_USE_IOMMU
+>   
+>   static int __dma_info_to_prot(enum dma_data_direction dir, unsigned long attrs)
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index a96ec0181818..db01f2709842 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -508,16 +508,6 @@ static int __init arm64_dma_init(void)
+>   }
+>   arch_initcall(arm64_dma_init);
+>   
+> -#define PREALLOC_DMA_DEBUG_ENTRIES	4096
+> -
+> -static int __init dma_debug_do_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -	return 0;
+> -}
+> -fs_initcall(dma_debug_do_init);
+> -
+> -
+>   #ifdef CONFIG_IOMMU_DMA
+>   #include <linux/dma-iommu.h>
+>   #include <linux/platform_device.h>
+> diff --git a/arch/c6x/kernel/dma.c b/arch/c6x/kernel/dma.c
+> index 9fff8be75f58..31e1a9ec3a9c 100644
+> --- a/arch/c6x/kernel/dma.c
+> +++ b/arch/c6x/kernel/dma.c
+> @@ -136,14 +136,3 @@ const struct dma_map_ops c6x_dma_ops = {
+>   	.sync_sg_for_cpu	= c6x_dma_sync_sg_for_cpu,
+>   };
+>   EXPORT_SYMBOL(c6x_dma_ops);
+> -
+> -/* Number of entries preallocated for DMA-API debugging */
+> -#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
+> -
+> -static int __init dma_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -
+> -	return 0;
+> -}
+> -fs_initcall(dma_init);
+> diff --git a/arch/ia64/kernel/dma-mapping.c b/arch/ia64/kernel/dma-mapping.c
+> index f2d57e66fd86..7a471d8d67d4 100644
+> --- a/arch/ia64/kernel/dma-mapping.c
+> +++ b/arch/ia64/kernel/dma-mapping.c
+> @@ -9,16 +9,6 @@ int iommu_detected __read_mostly;
+>   const struct dma_map_ops *dma_ops;
+>   EXPORT_SYMBOL(dma_ops);
+>   
+> -#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
+> -
+> -static int __init dma_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -
+> -	return 0;
+> -}
+> -fs_initcall(dma_init);
+> -
+>   const struct dma_map_ops *dma_get_ops(struct device *dev)
+>   {
+>   	return dma_ops;
+> diff --git a/arch/microblaze/kernel/dma.c b/arch/microblaze/kernel/dma.c
+> index c91e8cef98dd..3145e7dc8ab1 100644
+> --- a/arch/microblaze/kernel/dma.c
+> +++ b/arch/microblaze/kernel/dma.c
+> @@ -184,14 +184,3 @@ const struct dma_map_ops dma_nommu_ops = {
+>   	.sync_sg_for_device	= dma_nommu_sync_sg_for_device,
+>   };
+>   EXPORT_SYMBOL(dma_nommu_ops);
+> -
+> -/* Number of entries preallocated for DMA-API debugging */
+> -#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
+> -
+> -static int __init dma_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -
+> -	return 0;
+> -}
+> -fs_initcall(dma_init);
+> diff --git a/arch/mips/mm/dma-default.c b/arch/mips/mm/dma-default.c
+> index dcafa43613b6..f9fef0028ca2 100644
+> --- a/arch/mips/mm/dma-default.c
+> +++ b/arch/mips/mm/dma-default.c
+> @@ -402,13 +402,3 @@ static const struct dma_map_ops mips_default_dma_map_ops = {
+>   
+>   const struct dma_map_ops *mips_dma_map_ops = &mips_default_dma_map_ops;
+>   EXPORT_SYMBOL(mips_dma_map_ops);
+> -
+> -#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
+> -
+> -static int __init mips_dma_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -
+> -	return 0;
+> -}
+> -fs_initcall(mips_dma_init);
+> diff --git a/arch/openrisc/kernel/dma.c b/arch/openrisc/kernel/dma.c
+> index a945f00011b4..ec7fd45704d2 100644
+> --- a/arch/openrisc/kernel/dma.c
+> +++ b/arch/openrisc/kernel/dma.c
+> @@ -247,14 +247,3 @@ const struct dma_map_ops or1k_dma_map_ops = {
+>   	.sync_single_for_device = or1k_sync_single_for_device,
+>   };
+>   EXPORT_SYMBOL(or1k_dma_map_ops);
+> -
+> -/* Number of entries preallocated for DMA-API debugging */
+> -#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
+> -
+> -static int __init dma_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -
+> -	return 0;
+> -}
+> -fs_initcall(dma_init);
+> diff --git a/arch/powerpc/kernel/dma.c b/arch/powerpc/kernel/dma.c
+> index da20569de9d4..138157deeadf 100644
+> --- a/arch/powerpc/kernel/dma.c
+> +++ b/arch/powerpc/kernel/dma.c
+> @@ -309,8 +309,6 @@ int dma_set_coherent_mask(struct device *dev, u64 mask)
+>   }
+>   EXPORT_SYMBOL(dma_set_coherent_mask);
+>   
+> -#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
+> -
+>   int dma_set_mask(struct device *dev, u64 dma_mask)
+>   {
+>   	if (ppc_md.dma_set_mask)
+> @@ -361,7 +359,6 @@ EXPORT_SYMBOL_GPL(dma_get_required_mask);
+>   
+>   static int __init dma_init(void)
+>   {
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+>   #ifdef CONFIG_PCI
+>   	dma_debug_add_bus(&pci_bus_type);
+>   #endif
+> diff --git a/arch/s390/pci/pci_dma.c b/arch/s390/pci/pci_dma.c
+> index 2d15d84c20ed..5dee7a922589 100644
+> --- a/arch/s390/pci/pci_dma.c
+> +++ b/arch/s390/pci/pci_dma.c
+> @@ -668,15 +668,6 @@ void zpci_dma_exit(void)
+>   	kmem_cache_destroy(dma_region_table_cache);
+>   }
+>   
+> -#define PREALLOC_DMA_DEBUG_ENTRIES	(1 << 16)
+> -
+> -static int __init dma_debug_do_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -	return 0;
+> -}
+> -fs_initcall(dma_debug_do_init);
+> -
+>   const struct dma_map_ops s390_pci_dma_ops = {
+>   	.alloc		= s390_dma_alloc,
+>   	.free		= s390_dma_free,
+> diff --git a/arch/sh/mm/consistent.c b/arch/sh/mm/consistent.c
+> index 8ce98691d822..35ea3099a3b6 100644
+> --- a/arch/sh/mm/consistent.c
+> +++ b/arch/sh/mm/consistent.c
+> @@ -20,18 +20,9 @@
+>   #include <asm/cacheflush.h>
+>   #include <asm/addrspace.h>
+>   
+> -#define PREALLOC_DMA_DEBUG_ENTRIES	4096
+> -
+>   const struct dma_map_ops *dma_ops;
+>   EXPORT_SYMBOL(dma_ops);
+>   
+> -static int __init dma_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -	return 0;
+> -}
+> -fs_initcall(dma_init);
+> -
+>   void *dma_generic_alloc_coherent(struct device *dev, size_t size,
+>   				 dma_addr_t *dma_handle, gfp_t gfp,
+>   				 unsigned long attrs)
+> diff --git a/arch/sparc/kernel/Makefile b/arch/sparc/kernel/Makefile
+> index 76cb57750dda..84cfc5a428d6 100644
+> --- a/arch/sparc/kernel/Makefile
+> +++ b/arch/sparc/kernel/Makefile
+> @@ -74,8 +74,6 @@ obj-$(CONFIG_SPARC64)	+= pcr.o
+>   obj-$(CONFIG_SPARC64)	+= nmi.o
+>   obj-$(CONFIG_SPARC64_SMP) += cpumap.o
+>   
+> -obj-y                     += dma.o
+> -
+>   obj-$(CONFIG_PCIC_PCI)    += pcic.o
+>   obj-$(CONFIG_LEON_PCI)    += leon_pci.o
+>   obj-$(CONFIG_SPARC_GRPCI2)+= leon_pci_grpci2.o
+> diff --git a/arch/sparc/kernel/dma.c b/arch/sparc/kernel/dma.c
+> deleted file mode 100644
+> index f73e7597c971..000000000000
+> --- a/arch/sparc/kernel/dma.c
+> +++ /dev/null
+> @@ -1,13 +0,0 @@
+> -// SPDX-License-Identifier: GPL-2.0
+> -#include <linux/kernel.h>
+> -#include <linux/dma-mapping.h>
+> -#include <linux/dma-debug.h>
+> -
+> -#define PREALLOC_DMA_DEBUG_ENTRIES       (1 << 15)
+> -
+> -static int __init dma_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -	return 0;
+> -}
+> -fs_initcall(dma_init);
+> diff --git a/arch/x86/kernel/pci-dma.c b/arch/x86/kernel/pci-dma.c
+> index 77625b60a510..bcbaa2e8031e 100644
+> --- a/arch/x86/kernel/pci-dma.c
+> +++ b/arch/x86/kernel/pci-dma.c
+> @@ -55,9 +55,6 @@ struct device x86_dma_fallback_dev = {
+>   };
+>   EXPORT_SYMBOL(x86_dma_fallback_dev);
+>   
+> -/* Number of entries preallocated for DMA-API debugging */
+> -#define PREALLOC_DMA_DEBUG_ENTRIES       65536
+> -
+>   void __init pci_iommu_alloc(void)
+>   {
+>   	struct iommu_table_entry *p;
+> @@ -189,7 +186,6 @@ EXPORT_SYMBOL(arch_dma_supported);
+>   static int __init pci_iommu_init(void)
+>   {
+>   	struct iommu_table_entry *p;
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+>   
+>   #ifdef CONFIG_PCI
+>   	dma_debug_add_bus(&pci_bus_type);
+> diff --git a/arch/xtensa/kernel/pci-dma.c b/arch/xtensa/kernel/pci-dma.c
+> index 732631ce250f..392b4a80ebc2 100644
+> --- a/arch/xtensa/kernel/pci-dma.c
+> +++ b/arch/xtensa/kernel/pci-dma.c
+> @@ -261,12 +261,3 @@ const struct dma_map_ops xtensa_dma_map_ops = {
+>   	.mapping_error = xtensa_dma_mapping_error,
+>   };
+>   EXPORT_SYMBOL(xtensa_dma_map_ops);
+> -
+> -#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
+> -
+> -static int __init xtensa_dma_init(void)
+> -{
+> -	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> -	return 0;
+> -}
+> -fs_initcall(xtensa_dma_init);
+> diff --git a/include/linux/dma-debug.h b/include/linux/dma-debug.h
+> index c7d844f09c3a..a785f2507159 100644
+> --- a/include/linux/dma-debug.h
+> +++ b/include/linux/dma-debug.h
+> @@ -30,8 +30,6 @@ struct bus_type;
+>   
+>   extern void dma_debug_add_bus(struct bus_type *bus);
+>   
+> -extern void dma_debug_init(u32 num_entries);
+> -
+>   extern int dma_debug_resize_entries(u32 num_entries);
+>   
+>   extern void debug_dma_map_page(struct device *dev, struct page *page,
+> @@ -100,10 +98,6 @@ static inline void dma_debug_add_bus(struct bus_type *bus)
+>   {
+>   }
+>   
+> -static inline void dma_debug_init(u32 num_entries)
+> -{
+> -}
+> -
+>   static inline int dma_debug_resize_entries(u32 num_entries)
+>   {
+>   	return 0;
+> diff --git a/lib/dma-debug.c b/lib/dma-debug.c
+> index 7f5cdc1e6b29..712a897174e4 100644
+> --- a/lib/dma-debug.c
+> +++ b/lib/dma-debug.c
+> @@ -41,6 +41,11 @@
+>   #define HASH_FN_SHIFT   13
+>   #define HASH_FN_MASK    (HASH_SIZE - 1)
+>   
+> +/* allow architectures to override this if absolutely required */
+> +#ifndef PREALLOC_DMA_DEBUG_ENTRIES
+> +#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
+> +#endif
+> +
+>   enum {
+>   	dma_debug_single,
+>   	dma_debug_page,
+> @@ -1004,18 +1009,16 @@ void dma_debug_add_bus(struct bus_type *bus)
+>   	bus_register_notifier(bus, nb);
+>   }
+>   
+> -/*
+> - * Let the architectures decide how many entries should be preallocated.
+> - */
+> -void dma_debug_init(u32 num_entries)
+> +static int dma_debug_init(void)
+>   {
+> +	u32 num_entries;
+>   	int i;
+>   
+>   	/* Do not use dma_debug_initialized here, since we really want to be
+>   	 * called to set dma_debug_initialized
+>   	 */
+>   	if (global_disable)
+> -		return;
+> +		return 0;
+>   
+>   	for (i = 0; i < HASH_SIZE; ++i) {
+>   		INIT_LIST_HEAD(&dma_entry_hash[i].list);
+> @@ -1026,17 +1029,19 @@ void dma_debug_init(u32 num_entries)
+>   		pr_err("DMA-API: error creating debugfs entries - disabling\n");
+>   		global_disable = true;
+>   
+> -		return;
+> +		return 0;
+>   	}
+>   
+>   	if (req_entries)
+>   		num_entries = req_entries;
+> +	else
+> +		num_entries = PREALLOC_DMA_DEBUG_ENTRIES;
+>   
+>   	if (prealloc_memory(num_entries) != 0) {
+>   		pr_err("DMA-API: debugging out of memory error - disabled\n");
+>   		global_disable = true;
+>   
+> -		return;
+> +		return 0;
+>   	}
+>   
+>   	nr_total_entries = num_free_entries;
+> @@ -1044,7 +1049,9 @@ void dma_debug_init(u32 num_entries)
+>   	dma_debug_initialized = true;
+>   
+>   	pr_info("DMA-API: debugging enabled by kernel config\n");
+> +	return 0;
+>   }
+> +core_initcall(dma_debug_init);
+>   
+>   static __init int dma_debug_cmdline(char *str)
+>   {
 
-Trying to come up with an intuitive name for this may be futile; how
-about
-
- * _sync_ (which is suitably vague), or
- * _ctxsync_ (which will avoid fooling people into thinking they know
-	what it does without looking at the code)
-
-?
-
-[...]
-
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index 469de8a..811097e 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -30,6 +30,7 @@
-> >  #include <asm/kvm.h>
-> >  #include <asm/kvm_asm.h>
-> >  #include <asm/kvm_mmio.h>
-> > +#include <asm/thread_info.h>
-> >  
-> >  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
-> >  
-> > @@ -238,6 +239,12 @@ struct kvm_vcpu_arch {
-> >  
-> >  	/* Pointer to host CPU context */
-> >  	kvm_cpu_context_t *host_cpu_context;
-> > +
-> > +	struct thread_info *host_thread_info;	/* hyp VA */
-> > +	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
-> > +	bool host_sve_in_use;	/* backup for host TIF_SVE while in guest */
-> > +	bool fp_enabled;
-> 
-> Could we consider merging these two fields together with debug_flags?
-> Overall, they share a common purpose (tracking the use of a resource
-> shared between host and guest). Not necessarily something to do
-> immediately though.
-
-I expect so.  I added these as bools partly for simplicity and partly
-because there was no general-purpose flags field already.
-
-We could make debug_flags into a general-purpose flags field, though.
-
-Once we've agreed about the park_fp renaming, I'll consider reworking
-this also -- but I'll punt it to a separate patch if it turns out to be
-non-trivial.
-
-[...]
-
-> Other than the couple of minor nits above,
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Thanks
----Dave
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
