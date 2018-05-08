@@ -1,104 +1,60 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 8 May 2018 14:47:03 +0100
-Subject: [PATCH v2 05/17] arm64: Helper for parange to PASize
-In-Reply-To: <b44930d9-b25d-acd4-9676-6f779e2c590a@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-6-git-send-email-suzuki.poulose@arm.com>
- <b44930d9-b25d-acd4-9676-6f779e2c590a@arm.com>
-Message-ID: <89d5f41c-56e1-9195-ec08-05a708bf15f0@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 8 May 2018 06:51:52 -0700
+Subject: [PATCH] hwmon: (aspeed-pwm-tacho) Use 24MHz clock
+In-Reply-To: <1525772367-20627-1-git-send-email-mine260309@gmail.com>
+References: <1525772367-20627-1-git-send-email-mine260309@gmail.com>
+Message-ID: <8a801894-4293-d2e8-4673-3d9ff5c2a5bb@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/18 15:39, James Morse wrote:
-> Hi Suzuki,
+On 05/08/2018 02:39 AM, Lei YU wrote:
+> The clock source for aspeed pwm is set to 24MHz, so use the hard-coded
+> clock frequency instead of the one in device tree.
 > 
-> Nit: KVM in the subject line?
-
-Well, the helper is generic and its just that KVM makes use of it.
-
+> Otherwise, in case of the clock specified in device tree is not 24MHz,
+> the fan speed will be incorrect.
 > 
-> On 27/03/18 14:15, Suzuki K Poulose wrote:
->> Add a helper to convert ID_AA64MMFR0_EL1:PARange to they physical
->> size shift. Limit the size to the maximum supported by the kernel.
->> We are about to move the user of this code and this helps to
->> keep the changes cleaner.
+> Signed-off-by: Lei YU <mine260309@gmail.com>
+> ---
+>   drivers/hwmon/aspeed-pwm-tacho.c | 7 ++-----
+>   1 file changed, 2 insertions(+), 5 deletions(-)
 > 
->> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index fbf0aab..1f2a5dd 100644
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -311,6 +311,22 @@ static inline u64 read_zcr_features(void)
->>   	return zcr;
->>   }
->>   
->> +static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
->> +{
->> +	switch (parange) {
->> +	case 0: return 32;
->> +	case 1: return 36;
->> +	case 2: return 40;
->> +	case 3: return 42;
->> +	case 4: return 44;
->> +	/* Report 48 bit if the kernel doesn't support 52bit */
->> +	default:
->> +	case 5: return 48;
->> +#ifdef CONFIG_ARM64_PA_BITS_52
->> +	case 6: return 52;
->> +#endif
+> diff --git a/drivers/hwmon/aspeed-pwm-tacho.c b/drivers/hwmon/aspeed-pwm-tacho.c
+> index 693a3d5..e83b8df 100644
+> --- a/drivers/hwmon/aspeed-pwm-tacho.c
+> +++ b/drivers/hwmon/aspeed-pwm-tacho.c
+> @@ -922,7 +922,6 @@ static int aspeed_pwm_tacho_probe(struct platform_device *pdev)
+>   	void __iomem *regs;
+>   	struct resource *res;
+>   	struct device *hwmon;
+> -	struct clk *clk;
+>   	int ret;
+>   
+>   	np = dev->of_node;
+> @@ -956,12 +955,10 @@ static int aspeed_pwm_tacho_probe(struct platform_device *pdev)
+>   	regmap_write(priv->regmap, ASPEED_PTCR_TACH_SOURCE, 0);
+>   	regmap_write(priv->regmap, ASPEED_PTCR_TACH_SOURCE_EXT, 0);
+>   
+> -	clk = devm_clk_get(dev, NULL);
+> -	if (IS_ERR(clk))
+> -		return -ENODEV;
+> -	priv->clk_freq = clk_get_rate(clk);
+>   	aspeed_set_clock_enable(priv->regmap, true);
+> +	// The clock source is set to 24MHz
+
+No mixed C/C++ comments in hwmon drivers.
+
+>   	aspeed_set_clock_source(priv->regmap, 0);
+> +	priv->clk_freq = 24000000;
+>   
+
+Are you saying that clk_get_rate() is wrong ? Anyway, if the DT is bad, it should be fixed.
+I am not a friend of hacking drivers to fix up bad DTs, and much less so without explanation.
+Plus, how do we know that the next chip supported by the driver doesn't have a 32MHz clock ?
+Really, please fix the DT.
+
+Guenter
+
+>   	aspeed_create_type(priv);
+>   
 > 
-> Eeew. I thought 'default' had to appear at the end of the list, but evidently
-> not! If the last three bit value ever gets used this is going to look really weird.
-
-I could rearrange them a bit to :
-
-	case 4: ..
-#ifdef CONFIG_ARM64_PA_BITS_52
-	case 6: ...
-#endif
-	case 5:
-	/* Report 48 bit if the kernel doesn't support 52bit */
-	default: return 48;
-
-> 
-> Can't we have a helper that just does the mapping, then apply the clamping with
-> something like:
-> | parange = min(CONFIG_ARM64_PA_BITS, parange);
-
-Yes, I think that might be a bit cleaner.
-
-> 
-> 
-> Its odd that the helper has the id-register in the name, but expects you do the
-> shift and mask for it...
-> 
-> (and for this patch, KVM has already done the 52bit clamping with:
-> | 	if (parange > ID_AA64MMFR0_PARANGE_MAX)
-> |		parange = ID_AA64MMFR0_PARANGE_MAX;
-> )
-> 
-
-As mentioned in the other thread, I will change the name of the helper.
-
-> 
->> diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
->> index 603e1ee..b1129c8 100644
->> --- a/arch/arm64/kvm/hyp/s2-setup.c
->> +++ b/arch/arm64/kvm/hyp/s2-setup.c
->> @@ -19,11 +19,13 @@
->>   #include <asm/kvm_arm.h>
->>   #include <asm/kvm_asm.h>
->>   #include <asm/kvm_hyp.h>
->> +#include <asm/cpufeature.h>
->>   
->>   u32 __hyp_text __init_stage2_translation(void)
->>   {
-> 
-> Nit: Why change the variable you put this in, if its all removed again in patch 11?
-
-The parange holds the PARange initially, used to set the VTCR.IPS and is then
-overloaded with the converted "phys-shift". The change is a minor cleanup to
-make that clear, even though we remove it later as we don't deal with the
-phys-shifts anymore. I would prefer to keep it as it is.
-
-Cheers
-Suzuki
