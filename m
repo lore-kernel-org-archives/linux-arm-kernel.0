@@ -1,89 +1,31 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 8 May 2018 13:08:50 -0400
-Subject: [PATCH v6 01/15] thread_info: Add update_thread_flag() helpers
-In-Reply-To: <1525797900-5548-2-git-send-email-Dave.Martin@arm.com>
-References: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
- <1525797900-5548-2-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180508130850.64825594@gandalf.local.home>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 8 May 2018 10:11:07 -0700
+Subject: [PATCH v9 00/12] Sunxi: Add SMP support on A83T
+In-Reply-To: <20180508131914.6sy7cd6urnfg3tam@flea>
+References: <20180504190545.5114-1-mylene.josserand@bootlin.com>
+ <20180508131914.6sy7cd6urnfg3tam@flea>
+Message-ID: <7491f58f-d24d-8f7c-c195-87d13457fd80@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  8 May 2018 17:44:46 +0100
-Dave Martin <Dave.Martin@arm.com> wrote:
+On 05/08/2018 06:19 AM, Maxime Ripard wrote:
+> Hi,
+> 
+> On Fri, May 04, 2018 at 09:05:33PM +0200, Myl?ne Josserand wrote:
+>> Hello everyone,
+>>
+>> This is a V9 of my series that adds SMP support for Allwinner sun8i-a83t.
+>> Based on sunxi's tree, sunxi/for-next branch.
+>> Depends on a patch from Doug Berger that allows to include the "cpu-type"
+>> header on assembly files that I included in my series (patch 01).
+> 
+> I applied the patches, with the remarks done by Russell on v8 fixed,
+> and the function sun8i_a83t_cntvoff_init made static.
 
-> There are a number of bits of code sprinkled around the kernel to
-> set a thread flag if a certain condition is true, and clear it
-> otherwise.
-> 
-> To help make those call sites terser and less cumbersome, this
-> patch adds a new family of thread flag manipulators
-> 
-> 	update*_thread_flag([...,] flag, cond)
-> 
-> which do the equivalent of:
-> 
-> 	if (cond)
-> 		set*_thread_flag([...,] flag);
-> 	else
-> 		clear*_thread_flag([...,] flag);
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
+Did you push those patches to sunxi/linux.git yet? I would like to make
+sure I have the same copy of patch 1 since that is necessary for some of
+our Broadcom ARM SoCs for 4.18.
 
-Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-
--- Steve
-
-> Cc: Oleg Nesterov <oleg@redhat.com>
-> ---
->  include/linux/sched.h       |  6 ++++++
->  include/linux/thread_info.h | 11 +++++++++++
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/include/linux/sched.h b/include/linux/sched.h
-> index b3d697f..c2c3051 100644
-> --- a/include/linux/sched.h
-> +++ b/include/linux/sched.h
-> @@ -1578,6 +1578,12 @@ static inline void clear_tsk_thread_flag(struct task_struct *tsk, int flag)
->  	clear_ti_thread_flag(task_thread_info(tsk), flag);
->  }
->  
-> +static inline void update_tsk_thread_flag(struct task_struct *tsk, int flag,
-> +					  bool value)
-> +{
-> +	update_ti_thread_flag(task_thread_info(tsk), flag, value);
-> +}
-> +
->  static inline int test_and_set_tsk_thread_flag(struct task_struct *tsk, int flag)
->  {
->  	return test_and_set_ti_thread_flag(task_thread_info(tsk), flag);
-> diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-> index cf2862b..8d8821b 100644
-> --- a/include/linux/thread_info.h
-> +++ b/include/linux/thread_info.h
-> @@ -60,6 +60,15 @@ static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
->  	clear_bit(flag, (unsigned long *)&ti->flags);
->  }
->  
-> +static inline void update_ti_thread_flag(struct thread_info *ti, int flag,
-> +					 bool value)
-> +{
-> +	if (value)
-> +		set_ti_thread_flag(ti, flag);
-> +	else
-> +		clear_ti_thread_flag(ti, flag);
-> +}
-> +
->  static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
->  {
->  	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
-> @@ -79,6 +88,8 @@ static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
->  	set_ti_thread_flag(current_thread_info(), flag)
->  #define clear_thread_flag(flag) \
->  	clear_ti_thread_flag(current_thread_info(), flag)
-> +#define update_thread_flag(flag, value) \
-> +	update_ti_thread_flag(current_thread_info(), flag, value)
->  #define test_and_set_thread_flag(flag) \
->  	test_and_set_ti_thread_flag(current_thread_info(), flag)
->  #define test_and_clear_thread_flag(flag) \
+Thanks!
+-- 
+Florian
