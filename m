@@ -1,69 +1,106 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 8 May 2018 11:31:27 +0300
-Subject: [PATCH 4/5] arm64: allwinner: h6: add USB3 device nodes
-In-Reply-To: <20180507151817.55663-5-icenowy@aosc.io>
-References: <20180507151817.55663-1-icenowy@aosc.io>
- <20180507151817.55663-5-icenowy@aosc.io>
-Message-ID: <9a25a561-b643-a77b-3287-8082780fce60@cogentembedded.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Tue,  8 May 2018 17:45:09 +0900
+Subject: [PATCH] ASoC: uniphier: evea: use DAPM to change source of line-in
+Message-ID: <20180508084509.21616-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+This patch replaces mixer switch to DAPM one for changing audio source
+of line-in.
 
-On 5/7/2018 6:18 PM, Icenowy Zheng wrote:
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ sound/soc/uniphier/evea.c | 55 +++++++++++++++++++++++----------------
+ 1 file changed, 33 insertions(+), 22 deletions(-)
 
-> Allwinner H6 SoC features USB3 functionality, with a DWC3 controller and
-> a custom PHY.
-> 
-> Add device tree nodes for them.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->   arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 38 ++++++++++++++++++++
->   1 file changed, 38 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> index c72da8cd9ef5..9564c938717c 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> @@ -174,6 +174,44 @@
->   			status = "disabled";
->   		};
->   
-> +		usb3: usb at 5200000 {
-
-    I don't think <unit-address> is allowed for a node having no "reg" prop...
-
-> +			compatible = "allwinner,sun50i-h6-dwc3";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +			clocks = <&ccu CLK_BUS_XHCI>;
-> +			clock-names = "bus";
-> +			resets = <&ccu RST_BUS_XHCI>;
-> +			reset-names = "bus";
-> +			status = "disabled";
-> +
-> +			dwc3: dwc3 {
-
-    Contrariwise, need <unit-address> here...
-
-> +				compatible = "snps,dwc3";
-> +				reg = <0x5200000 0x10000>;
-> +				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-> +				/*
-> +				 * According to Wink from Allwinner, the
-> +				 * USB3 port on H6 is not capable of OTG;
-> +				 * the datasheet doesn't mention OTG at all
-> +				 * either, so the dr_mode is default to
-> +				 * "host" here.
-> +				 */
-> +				dr_mode = "host";
-> +				phys = <&usb3phy>;
-> +				phy-names = "usb3-phy";
-> +				status = "disabled";
-> +			};
-> +		};
-[...]
-
-MBR, Sergei
+diff --git a/sound/soc/uniphier/evea.c b/sound/soc/uniphier/evea.c
+index 73fd6730095c..f9c10165fbc1 100644
+--- a/sound/soc/uniphier/evea.c
++++ b/sound/soc/uniphier/evea.c
+@@ -54,8 +54,21 @@ struct evea_priv {
+ 	int switch_hp;
+ };
+ 
++static const char * const linsw1_sel1_text[] = {
++	"LIN1", "LIN2", "LIN3"
++};
++
++static SOC_ENUM_SINGLE_DECL(linsw1_sel1_enum,
++	ALINSW1, ALINSW1_SEL1_SHIFT,
++	linsw1_sel1_text);
++
++static const struct snd_kcontrol_new linesw1_mux[] = {
++	SOC_DAPM_ENUM("Line In 1 Source", linsw1_sel1_enum),
++};
++
+ static const struct snd_soc_dapm_widget evea_widgets[] = {
+-	SND_SOC_DAPM_ADC("ADC", "Capture", SND_SOC_NOPM, 0, 0),
++	SND_SOC_DAPM_ADC("ADC", NULL, SND_SOC_NOPM, 0, 0),
++	SND_SOC_DAPM_MUX("Line In 1 Mux", SND_SOC_NOPM, 0, 0, linesw1_mux),
+ 	SND_SOC_DAPM_INPUT("LIN1_LP"),
+ 	SND_SOC_DAPM_INPUT("LIN1_RP"),
+ 	SND_SOC_DAPM_INPUT("LIN2_LP"),
+@@ -63,7 +76,9 @@ static const struct snd_soc_dapm_widget evea_widgets[] = {
+ 	SND_SOC_DAPM_INPUT("LIN3_LP"),
+ 	SND_SOC_DAPM_INPUT("LIN3_RP"),
+ 
+-	SND_SOC_DAPM_DAC("DAC", "Playback", SND_SOC_NOPM, 0, 0),
++	SND_SOC_DAPM_DAC("DAC HP", NULL, SND_SOC_NOPM, 0, 0),
++	SND_SOC_DAPM_DAC("DAC LO1", NULL, SND_SOC_NOPM, 0, 0),
++	SND_SOC_DAPM_DAC("DAC LO2", NULL, SND_SOC_NOPM, 0, 0),
+ 	SND_SOC_DAPM_OUTPUT("HP1_L"),
+ 	SND_SOC_DAPM_OUTPUT("HP1_R"),
+ 	SND_SOC_DAPM_OUTPUT("LO2_L"),
+@@ -71,17 +86,22 @@ static const struct snd_soc_dapm_widget evea_widgets[] = {
+ };
+ 
+ static const struct snd_soc_dapm_route evea_routes[] = {
+-	{ "ADC", NULL, "LIN1_LP" },
+-	{ "ADC", NULL, "LIN1_RP" },
+-	{ "ADC", NULL, "LIN2_LP" },
+-	{ "ADC", NULL, "LIN2_RP" },
+-	{ "ADC", NULL, "LIN3_LP" },
+-	{ "ADC", NULL, "LIN3_RP" },
+-
+-	{ "HP1_L", NULL, "DAC" },
+-	{ "HP1_R", NULL, "DAC" },
+-	{ "LO2_L", NULL, "DAC" },
+-	{ "LO2_R", NULL, "DAC" },
++	{ "Line In 1", NULL, "ADC" },
++	{ "ADC", NULL, "Line In 1 Mux" },
++	{ "Line In 1 Mux", "LIN1", "LIN1_LP" },
++	{ "Line In 1 Mux", "LIN1", "LIN1_RP" },
++	{ "Line In 1 Mux", "LIN2", "LIN2_LP" },
++	{ "Line In 1 Mux", "LIN2", "LIN2_RP" },
++	{ "Line In 1 Mux", "LIN3", "LIN3_LP" },
++	{ "Line In 1 Mux", "LIN3", "LIN3_RP" },
++
++	{ "DAC HP", NULL, "Headphone 1" },
++	{ "DAC LO1", NULL, "Line Out 1" },
++	{ "DAC LO2", NULL, "Line Out 2" },
++	{ "HP1_L", NULL, "DAC HP" },
++	{ "HP1_R", NULL, "DAC HP" },
++	{ "LO2_L", NULL, "DAC LO2" },
++	{ "LO2_R", NULL, "DAC LO2" },
+ };
+ 
+ static void evea_set_power_state_on(struct evea_priv *evea)
+@@ -280,16 +300,7 @@ static int evea_set_switch_hp(struct snd_kcontrol *kcontrol,
+ 	return evea_update_switch_hp(evea);
+ }
+ 
+-static const char * const linsw1_sel1_text[] = {
+-	"LIN1", "LIN2", "LIN3"
+-};
+-
+-static SOC_ENUM_SINGLE_DECL(linsw1_sel1_enum,
+-	ALINSW1, ALINSW1_SEL1_SHIFT,
+-	linsw1_sel1_text);
+-
+ static const struct snd_kcontrol_new evea_controls[] = {
+-	SOC_ENUM("Line Capture Source", linsw1_sel1_enum),
+ 	SOC_SINGLE_BOOL_EXT("Line Capture Switch", 0,
+ 			    evea_get_switch_lin, evea_set_switch_lin),
+ 	SOC_SINGLE_BOOL_EXT("Line Playback Switch", 0,
+-- 
+2.17.0
