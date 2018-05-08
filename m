@@ -1,86 +1,141 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 8 May 2018 17:21:22 +0100
-Subject: [PATCH v2 19/27] coresight: catu: Plug in CATU as a backend for
- ETR buffer
-In-Reply-To: <20180507220249.GA22194@xps15>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-20-git-send-email-suzuki.poulose@arm.com>
- <20180507220249.GA22194@xps15>
-Message-ID: <6145aae1-8d0c-2720-5e3b-bcbd4d4ddb58@arm.com>
+From: swboyd@chromium.org (Stephen Boyd)
+Date: Tue, 08 May 2018 09:32:58 -0700
+Subject: [PATCH v2 1/2] arm64: dts: Add msm8998 SoC and MTP board support
+In-Reply-To: <20180507233511.GC14924@minitux>
+References: <20180428054248.22387-1-bjorn.andersson@linaro.org>
+ <152573399648.138124.10341359049104453178@swboyd.mtv.corp.google.com>
+ <20180507233511.GC14924@minitux>
+Message-ID: <152579717814.138124.2254267448028084692@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/18 23:02, Mathieu Poirier wrote:
-> On Tue, May 01, 2018 at 10:10:49AM +0100, Suzuki K Poulose wrote:
->> Now that we can use a CATU with a scatter gather table, add support
->> for the TMC ETR to make use of the connected CATU in translate mode.
->> This is done by adding CATU as new buffer mode. CATU's SLADDR must
->> always be 4K aligned. Thus the INADDR (base VA) is always 1M aligned
->> and we adjust the DBA for the ETR to align to the "offset" within
->> the 1MB page.
-
-
->> diff --git a/drivers/hwtracing/coresight/coresight-catu.h b/drivers/hwtracing/coresight/coresight-catu.h
->> index cd58d6f..b673a73 100644
->> --- a/drivers/hwtracing/coresight/coresight-catu.h
->> +++ b/drivers/hwtracing/coresight/coresight-catu.h
->> @@ -29,6 +29,32 @@
-
->>   
->> +extern const struct etr_buf_operations etr_catu_buf_ops;
->> +
-
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> index 25e7feb..41dde0a 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> @@ -941,6 +941,9 @@ static const struct etr_buf_operations etr_sg_buf_ops = {
->>   static const struct etr_buf_operations *etr_buf_ops[] = {
->>   	[ETR_MODE_FLAT] = &etr_flat_buf_ops,
->>   	[ETR_MODE_ETR_SG] = &etr_sg_buf_ops,
->> +#ifdef CONFIG_CORESIGHT_CATU
->> +	[ETR_MODE_CATU] = &etr_catu_buf_ops,
->> +#endif
-
-...
-
->>   static inline int tmc_etr_mode_alloc_buf(int mode,
->> @@ -953,6 +956,9 @@ static inline int tmc_etr_mode_alloc_buf(int mode,
->>   	switch (mode) {
->>   	case ETR_MODE_FLAT:
->>   	case ETR_MODE_ETR_SG:
->> +#ifdef CONFIG_CORESIGHT_CATU
->> +	case ETR_MODE_CATU:
->> +#endif
+Quoting Bjorn Andersson (2018-05-07 16:35:11)
+> On Mon 07 May 15:59 PDT 2018, Stephen Boyd wrote:
 > 
-> I really wish we could avoid doing something like this (and the above) but every
-> alternate solution I come up with is either uglier or on par with it...
-> Unless someone comes up with a bright idea we'll simply have to let it be.
+> > Quoting Bjorn Andersson (2018-04-27 22:42:47)
+> > > diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+> > > new file mode 100644
+> > > index 000000000000..d6665e4f801f
+> > > --- /dev/null
+> > > +++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+> > > @@ -0,0 +1,340 @@
+> > > +// SPDX-License-Identifier: GPL-2.0
+> > > +/* Copyright (c) 2016, The Linux Foundation. All rights reserved. */
+> > > +
+> > > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > > +#include <dt-bindings/clock/qcom,gcc-msm8998.h>
+> > > +
+> > > +/ {
+> > > +       model = "Qualcomm Technologies, Inc. MSM 8998";
 
-We could do a little trick in the coresight-catu.h :
+Drop the space between MSM and 8998?
 
-#ifdef CONFIG_CORESIGHT_CATU
-extern struct etr_buf_operations etr_catu_buf_ops;
-#else
-static struct etr_buf_opertaions etr_catu_buf_ops;
-#endif
+> > > +
+> > > +       interrupt-parent = <&intc>;
+> > > +
+> > > +       qcom,msm-id = <292 0x0>;
+> > 
+> > No update to dtbtool?
+> > 
+> 
+> This allows me to concatenate the dtb to the Image.gz and boot the
+> device. From my scripts I see that I tried to use dtbTool before
+> reverting to this...
 
-And then add the following check to get rid of the #ifdef above in tmc_etr_mode_alloc_buf().
-
-		if (etr_buf_ops[mode]->alloc)
-			rc = etr_buf_ops[mode]->alloc(drvdata, etr_buf, node, pages);
-
->>   		rc = etr_buf_ops[mode]->alloc(drvdata, etr_buf, node, pages);
+Oh, must be that the bootloader mandates the magic numbers exist in the
+blob and you can't concatenate a single dtb and have it ignore the magic
+numbers? Sounds perfect.
 
 > 
-> While looking for a solution I noticed that tmc_etr_get_catu_device()
-> could be moved to coresight-catu.h.  That way we wouldn't have to include
-> coresight-catu.h every time coresight-tmc.h is present in a file.
+> [..]
+> > > +               cpu-map {
+> > > +                       cluster0 {
+> > > +                               core0 {
+> > > +                                       cpu = <&CPU0>;
+> > > +                               };
+> > > +
+> > > +                               core1 {
+> > > +                                       cpu = <&CPU1>;
+> > > +                               };
+> > > +
+> > > +                               core2 {
+> > > +                                       cpu = <&CPU2>;
+> > > +                               };
+> > > +
+> > > +                               core3 {
+> > > +                                       cpu = <&CPU3>;
+> > > +                               };
+> > > +                       };
+> > > +
+> > > +                       cluster1 {
+> > > +                               core0 {
+> > > +                                       cpu = <&CPU4>;
+> > > +                               };
+> > > +
+> > > +                               core1 {
+> > > +                                       cpu = <&CPU5>;
+> > > +                               };
+> > > +
+> > > +                               core2 {
+> > > +                                       cpu = <&CPU6>;
+> > > +                               };
+> > > +
+> > > +                               core3 {
+> > > +                                       cpu = <&CPU7>;
+> > > +                               };
+> > > +                       };
+> > > +               };
+> > 
+> > I still wonder if this is accurate, but OK.
+> > 
+> 
+> Afaict it matches downstream, not sure if I'm missing something?
 
-Yes, we could do that. I don't remember if there was a specific reason behind it.
-May be it is a left over from the rebases and how the CATU link was evolved. I
-will clean it up.
+Right, it matches downstream, but I seem to recall that downstream was
+describing the power "clusters" for big and little, when this mapping
+usually follows the cache layout of the CPUs (i.e. if all CPUs share a
+cache then they're in the same cluster).
 
+> 
+> [..]
+> > > +       intc: interrupt-controller at 17a00000 {
+> > > +               compatible = "arm,gic-v3";
+> > > +               reg = <0x17a00000 0x10000>,       /* GICD */
+> > > +                     <0x17b00000 0x100000>;      /* GICR * 8 */
+> > > +               #interrupt-cells = <3>;
+> > > +               #address-cells = <1>;
+> > > +               #size-cells = <1>;
+> > > +               ranges;
+> > > +               interrupt-controller;
+> > > +               #redistributor-regions = <1>;
+> > > +               redistributor-stride = <0x0 0x20000>;
+> > 
+> > Is this needed? The redistributor stuff can be left out if there's only
+> > one right?
+> > 
+> 
+> #redistributor-regions is listed as optional if there's more than 1, the
+> stride is still needed.
+> 
+> Afaict the stride still needs to be specified, as it's different from
+> the default 64kb.
 
-Cheers
-Suzuki
+There's one region though. Marc rejected those properties in the sdm845
+dts file[1] and it looks exactly the same here. It would be nice if the
+ITS region was described (we know it's there and it's probably the same
+offset as on SDM845 no doubt).
+
+> 
+> > > +               interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> > > +       };
+> > > +
+> > > +       blsp2_uart1: serial at c1b0000 {
+> > 
+> > Clk name says uart2 though?
+> > 
+> 
+> That's because it's the wrong clock. Thanks!
+
+Hah!
+
+[1] https://lkml.kernel.org/r/96fac632-8fb8-0933-cc1f-627acb38a595 at arm.com
