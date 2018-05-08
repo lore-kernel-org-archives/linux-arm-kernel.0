@@ -1,89 +1,78 @@
-From: chenyao11@huawei.com (Yao Chen)
-Date: Tue, 8 May 2018 15:03:48 +0800
-Subject: [PATCH] Kirin-PCIe: Add kirin pcie msi feature.
-Message-ID: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Tue, 08 May 2018 09:22:49 +0200
+Subject: Patch "irqchip/qcom: Fix check for spurious interrupts" has been
+ added to the 4.14-stable tree
+Message-ID: <152576416995100@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds kirin pcie msi feature.
 
-Signed-off-by: Yao Chen <chenyao11@huawei.com>
+This is a note to let you know that I've just added the patch titled
+
+    irqchip/qcom: Fix check for spurious interrupts
+
+to the 4.14-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+
+The filename of the patch is:
+     irqchip-qcom-fix-check-for-spurious-interrupts.patch
+and it can be found in the queue-4.14 subdirectory.
+
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
+
+
+>From 1bc2463cee92ef0e2034c813d5e511adeb58b5fd Mon Sep 17 00:00:00 2001
+From: Agustin Vega-Frias <agustinv@codeaurora.org>
+Date: Tue, 1 May 2018 10:14:50 -0400
+Subject: irqchip/qcom: Fix check for spurious interrupts
+
+From: Agustin Vega-Frias <agustinv@codeaurora.org>
+
+commit 1bc2463cee92ef0e2034c813d5e511adeb58b5fd upstream.
+
+When the interrupts for a combiner span multiple registers it must be
+checked if any interrupts have been asserted on each register before
+checking for spurious interrupts.
+
+Checking each register seperately leads to false positive warnings.
+
+[ tglx: Massaged changelog ]
+
+Fixes: f20cc9b00c7b ("irqchip/qcom: Add IRQ combiner driver")
+Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: timur at codeaurora.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: stable at vger.kernel.org
+Link: https://lkml.kernel.org/r/1525184090-26143-1-git-send-email-agustinv at codeaurora.org
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
 ---
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi |  2 ++
- drivers/pci/dwc/pcie-kirin.c              | 38 +++++++++++++++++++++++++++++++
- 2 files changed, 40 insertions(+)
+ drivers/irqchip/qcom-irq-combiner.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index ec3eb8e..4ef684f 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -872,6 +872,8 @@
- 				  0x0 0x02000000>;
- 			num-lanes = <1>;
- 			#interrupt-cells = <1>;
-+			interrupts = <0 283 4>;
-+			interrupts-names = "msi";
- 			interrupt-map-mask = <0xf800 0 0 7>;
- 			interrupt-map = <0x0 0 0 1
- 					 &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
-diff --git a/drivers/pci/dwc/pcie-kirin.c b/drivers/pci/dwc/pcie-kirin.c
-index d2970a0..2319c9c 100644
---- a/drivers/pci/dwc/pcie-kirin.c
-+++ b/drivers/pci/dwc/pcie-kirin.c
-@@ -426,9 +426,28 @@ static int kirin_pcie_establish_link(struct pcie_port *pp)
- 	return 0;
- }
+--- a/drivers/irqchip/qcom-irq-combiner.c
++++ b/drivers/irqchip/qcom-irq-combiner.c
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -68,7 +68,7 @@ static void combiner_handle_irq(struct i
  
-+static irqreturn_t kirin_pcie_msi_irq_handler(int irq, void *arg)
-+{
-+	struct pcie_port *pp = arg;
-+
-+	return dw_handle_msi_irq(pp);
-+}
-+
-+static void kirin_pcie_msi_init(struct pcie_port *pp)
-+{
-+	dw_pcie_msi_init(pp);
-+}
-+
-+static void kirin_pcie_enable_interrupts(struct pcie_port *pp)
-+{
-+	if (IS_ENABLED(CONFIG_PCI_MSI))
-+		kirin_pcie_msi_init(pp);
-+}
-+
- static int kirin_pcie_host_init(struct pcie_port *pp)
- {
- 	kirin_pcie_establish_link(pp);
-+	kirin_pcie_enable_interrupts(pp);
- 
- 	return 0;
- }
-@@ -448,6 +467,25 @@ static int kirin_pcie_host_init(struct pcie_port *pp)
- static int __init kirin_add_pcie_port(struct dw_pcie *pci,
- 				      struct platform_device *pdev)
- {
-+	int ret;
-+
-+	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+		pci->pp.msi_irq = platform_get_irq(pdev, 0);
-+		if (!pci->pp.msi_irq) {
-+			dev_err(&pdev->dev, "failed to get msi irq\n");
-+			return -ENODEV;
-+		}
-+		ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
-+				       kirin_pcie_msi_irq_handler,
-+				       IRQF_SHARED | IRQF_NO_THREAD,
-+				       "kirin_pcie_msi", &pci->pp);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to request msi irq\n");
-+			return ret;
-+		}
-+	}
-+
-+	pci->pp.root_bus_nr = -1;
- 	pci->pp.ops = &kirin_pcie_host_ops;
- 
- 	return dw_pcie_host_init(&pci->pp);
--- 
-1.9.1
+ 		bit = readl_relaxed(combiner->regs[reg].addr);
+ 		status = bit & combiner->regs[reg].enabled;
+-		if (!status)
++		if (bit && !status)
+ 			pr_warn_ratelimited("Unexpected IRQ on CPU%d: (%08x %08lx %p)\n",
+ 					    smp_processor_id(), bit,
+ 					    combiner->regs[reg].enabled,
+
+
+Patches currently in stable-queue which might be from agustinv at codeaurora.org are
+
+queue-4.14/irqchip-qcom-fix-check-for-spurious-interrupts.patch
