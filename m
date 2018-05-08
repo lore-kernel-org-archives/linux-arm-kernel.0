@@ -1,365 +1,380 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 8 May 2018 14:44:00 +0300
-Subject: [PATCH 5/8] mailbox: tegra-hsp: Add support for shared mailboxes
+Date: Tue, 8 May 2018 14:44:01 +0300
+Subject: [PATCH 6/8] serial: Add Tegra Combined UART driver
 In-Reply-To: <20180508114403.14499-1-mperttunen@nvidia.com>
 References: <20180508114403.14499-1-mperttunen@nvidia.com>
-Message-ID: <20180508114403.14499-6-mperttunen@nvidia.com>
+Message-ID: <20180508114403.14499-7-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra HSP block supports 'shared mailboxes' that are simple 32-bit
-registers consisting of a FULL bit in MSB position and 31 bits of data.
-The hardware can be configured to trigger interrupts when a mailbox
-is empty or full. Add support for these shared mailboxes to the HSP
-driver.
+The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
+multiplexing multiple "virtual UARTs" into a single hardware serial
+port. The TCU is the primary serial port on Tegra194 devices.
 
-The initial use for the mailboxes is the Tegra Combined UART. For this
-purpose, we use interrupts to receive data, and spinning to wait for
-the transmit mailbox to be emptied to minimize unnecessary overhead.
+Add a TCU driver utilizing the mailbox framework, as the used mailboxes
+are part of Tegra HSP blocks that are already controlled by the Tegra
+HSP mailbox driver.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- drivers/mailbox/tegra-hsp.c | 216 +++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 193 insertions(+), 23 deletions(-)
+ drivers/tty/serial/Kconfig       |   9 ++
+ drivers/tty/serial/Makefile      |   1 +
+ drivers/tty/serial/tegra-tcu.c   | 302 +++++++++++++++++++++++++++++++++++++++
+ include/uapi/linux/serial_core.h |   3 +
+ 4 files changed, 315 insertions(+)
+ create mode 100644 drivers/tty/serial/tegra-tcu.c
 
-diff --git a/drivers/mailbox/tegra-hsp.c b/drivers/mailbox/tegra-hsp.c
-index 16eb970f2c9f..77bc8ed7ef15 100644
---- a/drivers/mailbox/tegra-hsp.c
-+++ b/drivers/mailbox/tegra-hsp.c
-@@ -21,6 +21,11 @@
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index eca55187539a..494db7afe230 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -322,6 +322,15 @@ config SERIAL_TEGRA
+ 	  are enabled). This driver uses the APB DMA to achieve higher baudrate
+ 	  and better performance.
  
- #include <dt-bindings/mailbox/tegra186-hsp.h>
- 
-+#include "mailbox.h"
++config SERIAL_TEGRA_TCU
++	tristate "NVIDIA Tegra Combined UART"
++	depends on ARCH_TEGRA && MAILBOX
++	select SERIAL_CORE
++	help
++	  Support for the mailbox-based TCU (Tegra Combined UART) serial port.
++	  TCU is a virtual serial port that allows multiplexing multiple data
++	  streams into a single hardware serial port.
 +
-+#define HSP_INT0_IE		0x100
-+#define HSP_INT_IR		0x304
+ config SERIAL_MAX3100
+ 	tristate "MAX3100 support"
+ 	depends on SPI
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index daac675612df..4ad82231ff8a 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -76,6 +76,7 @@ obj-$(CONFIG_SERIAL_LANTIQ)	+= lantiq.o
+ obj-$(CONFIG_SERIAL_XILINX_PS_UART) += xilinx_uartps.o
+ obj-$(CONFIG_SERIAL_SIRFSOC) += sirfsoc_uart.o
+ obj-$(CONFIG_SERIAL_TEGRA) += serial-tegra.o
++obj-$(CONFIG_SERIAL_TEGRA_TCU) += tegra-tcu.o
+ obj-$(CONFIG_SERIAL_AR933X)   += ar933x_uart.o
+ obj-$(CONFIG_SERIAL_EFM32_UART) += efm32-uart.o
+ obj-$(CONFIG_SERIAL_ARC)	+= arc_uart.o
+diff --git a/drivers/tty/serial/tegra-tcu.c b/drivers/tty/serial/tegra-tcu.c
+new file mode 100644
+index 000000000000..8b46fe3a4b0c
+--- /dev/null
++++ b/drivers/tty/serial/tegra-tcu.c
+@@ -0,0 +1,302 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
++ */
 +
- #define HSP_INT_DIMENSIONING	0x380
- #define HSP_nSM_SHIFT		0
- #define HSP_nSS_SHIFT		4
-@@ -34,6 +39,8 @@
- #define HSP_DB_RAW	0x8
- #define HSP_DB_PENDING	0xc
- 
-+#define HSP_SM_SHRD_MBOX	0x0
++#include <linux/console.h>
++#include <linux/mailbox_client.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/serial.h>
++#include <linux/serial_core.h>
++#include <linux/slab.h>
++#include <linux/tty.h>
++#include <linux/tty_flip.h>
 +
- #define HSP_DB_CCPLEX		1
- #define HSP_DB_BPMP		3
- #define HSP_DB_MAX		7
-@@ -68,6 +75,18 @@ struct tegra_hsp_db_map {
- 	unsigned int index;
- };
- 
-+struct tegra_hsp_mailbox {
-+	struct tegra_hsp_channel channel;
-+	unsigned int index;
-+	bool sending;
++static struct uart_driver tegra_tcu_uart_driver;
++static struct uart_port tegra_tcu_uart_port;
++
++struct tegra_tcu {
++	struct mbox_client tx_client, rx_client;
++	struct mbox_chan *tx, *rx;
 +};
 +
-+static inline struct tegra_hsp_mailbox *
-+channel_to_mailbox(struct tegra_hsp_channel *channel)
++static unsigned int tegra_tcu_uart_tx_empty(struct uart_port *port)
 +{
-+	return container_of(channel, struct tegra_hsp_mailbox, channel);
++	return TIOCSER_TEMT;
 +}
 +
- struct tegra_hsp_soc {
- 	const struct tegra_hsp_db_map *map;
- };
-@@ -77,6 +96,7 @@ struct tegra_hsp {
- 	struct mbox_controller mbox;
- 	void __iomem *regs;
- 	unsigned int doorbell_irq;
-+	unsigned int shared_irq;
- 	unsigned int num_sm;
- 	unsigned int num_as;
- 	unsigned int num_ss;
-@@ -85,6 +105,7 @@ struct tegra_hsp {
- 	spinlock_t lock;
- 
- 	struct list_head doorbells;
-+	struct tegra_hsp_mailbox *mailboxes;
- };
- 
- static inline struct tegra_hsp *
-@@ -189,6 +210,35 @@ static irqreturn_t tegra_hsp_doorbell_irq(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
-+static irqreturn_t tegra_hsp_shared_irq(int irq, void *data)
++static void tegra_tcu_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
 +{
-+	struct tegra_hsp_mailbox *mb;
-+	struct tegra_hsp *hsp = data;
-+	unsigned long bit, mask;
-+	u32 value;
++	(void)port;
++	(void)mctrl;
++}
 +
-+	mask = tegra_hsp_readl(hsp, HSP_INT_IR);
-+	/* Only interested in FULL interrupts */
-+	mask &= 0xff << 8;
++static unsigned int tegra_tcu_uart_get_mctrl(struct uart_port *port)
++{
++	return 0;
++}
 +
-+	for_each_set_bit(bit, &mask, 16) {
-+		unsigned int mb_i = bit % 8;
++static void tegra_tcu_uart_stop_tx(struct uart_port *port)
++{
++	(void)port;
++}
 +
-+		mb = &hsp->mailboxes[mb_i];
++static void tegra_tcu_write(const char *s, unsigned int count)
++{
++	struct tegra_tcu *tcu = tegra_tcu_uart_port.private_data;
++	unsigned int written = 0, i = 0;
++	bool insert_nl = false;
++	uint32_t value = 0;
 +
-+		if (!mb->sending) {
-+			value = tegra_hsp_channel_readl(&mb->channel,
-+							HSP_SM_SHRD_MBOX);
-+			value &= ~BIT(31);
-+			mbox_chan_received_data(mb->channel.chan, &value);
-+			tegra_hsp_channel_writel(&mb->channel, value,
-+						 HSP_SM_SHRD_MBOX);
++	while (i < count) {
++		if (insert_nl) {
++			value |= '\n' << (written++ * 8);
++			insert_nl = false;
++			i++;
++		} else if (s[i] == '\n') {
++			value |= '\r' << (written++ * 8);
++			insert_nl = true;
++		} else {
++			value |= s[i++] << (written++ * 8);
++		}
++
++		if (written == 3) {
++			value |= 3 << 24;
++			value |= BIT(26);
++			mbox_send_message(tcu->tx, &value);
++			value = 0;
++			written = 0;
 +		}
 +	}
 +
-+	return IRQ_HANDLED;
++	if (written) {
++		value |= written << 24;
++		value |= BIT(26);
++		mbox_send_message(tcu->tx, &value);
++	}
 +}
 +
- static struct tegra_hsp_channel *
- tegra_hsp_doorbell_create(struct tegra_hsp *hsp, const char *name,
- 			  unsigned int master, unsigned int index)
-@@ -277,15 +327,58 @@ static void tegra_hsp_doorbell_shutdown(struct tegra_hsp_doorbell *db)
- 	spin_unlock_irqrestore(&hsp->lock, flags);
- }
- 
-+static int tegra_hsp_mailbox_startup(struct tegra_hsp_mailbox *mb)
++static void tegra_tcu_uart_start_tx(struct uart_port *port)
 +{
-+	struct tegra_hsp *hsp = mb->channel.hsp;
-+	u32 value;
++	struct circ_buf *xmit = &port->state->xmit;
++	unsigned long count;
 +
-+	mb->channel.chan->txdone_method = TXDONE_BY_BLOCK;
++	for (;;) {
++		count = CIRC_CNT_TO_END(xmit->head, xmit->tail, UART_XMIT_SIZE);
++		if (!count)
++			break;
 +
-+	/* Route FULL interrupt to external IRQ 0 */
-+	value = tegra_hsp_readl(hsp, HSP_INT0_IE);
-+	value |= BIT(mb->index + 8);
-+	tegra_hsp_writel(hsp, value, HSP_INT0_IE);
++		tegra_tcu_write(&xmit->buf[xmit->tail], count);
++		xmit->tail = (xmit->tail + count) & (UART_XMIT_SIZE - 1);
++	}
++
++	uart_write_wakeup(port);
++}
++
++static void tegra_tcu_uart_stop_rx(struct uart_port *port)
++{
++	(void)port;
++}
++
++static void tegra_tcu_uart_break_ctl(struct uart_port *port, int ctl)
++{
++	(void)port;
++	(void)ctl;
++}
++
++static int tegra_tcu_uart_startup(struct uart_port *port)
++{
++	(void)port;
 +
 +	return 0;
 +}
 +
-+static int tegra_hsp_mailbox_shutdown(struct tegra_hsp_mailbox *mb)
++static void tegra_tcu_uart_shutdown(struct uart_port *port)
 +{
-+	struct tegra_hsp *hsp = mb->channel.hsp;
-+	u32 value;
-+
-+	value = tegra_hsp_readl(hsp, HSP_INT0_IE);
-+	value &= ~BIT(mb->index + 8);
-+	tegra_hsp_writel(hsp, value, HSP_INT0_IE);
-+
-+	return 0;
++	(void)port;
 +}
 +
- static int tegra_hsp_send_data(struct mbox_chan *chan, void *data)
- {
- 	struct tegra_hsp_channel *channel = chan->con_priv;
--	struct tegra_hsp_doorbell *db;
-+	struct tegra_hsp_mailbox *mailbox;
-+	uint32_t value;
- 
- 	switch (channel->type) {
- 	case TEGRA_HSP_MBOX_TYPE_DB:
--		db = channel_to_doorbell(channel);
--		tegra_hsp_channel_writel(&db->channel, 1, HSP_DB_TRIGGER);
-+		tegra_hsp_channel_writel(channel, 1, HSP_DB_TRIGGER);
-+		return 0;
-+	case TEGRA_HSP_MBOX_TYPE_SM:
-+		mailbox = channel_to_mailbox(channel);
-+		mailbox->sending = true;
-+
-+		value = *(uint32_t *)data;
-+		/* Mark mailbox full */
-+		value |= BIT(31);
-+
-+		tegra_hsp_channel_writel(channel, value, HSP_SM_SHRD_MBOX);
-+
-+		while (tegra_hsp_channel_readl(channel, HSP_SM_SHRD_MBOX)
-+		               & BIT(31))
-+			cpu_relax();
-+
-+		return 0;
- 	}
- 
- 	return -EINVAL;
-@@ -298,6 +391,8 @@ static int tegra_hsp_startup(struct mbox_chan *chan)
- 	switch (channel->type) {
- 	case TEGRA_HSP_MBOX_TYPE_DB:
- 		return tegra_hsp_doorbell_startup(channel_to_doorbell(channel));
-+	case TEGRA_HSP_MBOX_TYPE_SM:
-+		return tegra_hsp_mailbox_startup(channel_to_mailbox(channel));
- 	}
- 
- 	return -EINVAL;
-@@ -311,6 +406,9 @@ static void tegra_hsp_shutdown(struct mbox_chan *chan)
- 	case TEGRA_HSP_MBOX_TYPE_DB:
- 		tegra_hsp_doorbell_shutdown(channel_to_doorbell(channel));
- 		break;
-+	case TEGRA_HSP_MBOX_TYPE_SM:
-+		tegra_hsp_mailbox_shutdown(channel_to_mailbox(channel));
-+		break;
- 	}
- }
- 
-@@ -364,7 +462,16 @@ static struct mbox_chan *of_tegra_hsp_xlate(struct mbox_controller *mbox,
- 
- 	switch (type) {
- 	case TEGRA_HSP_MBOX_TYPE_DB:
--		return tegra_hsp_doorbell_xlate(hsp, param);
-+		if (hsp->doorbell_irq)
-+			return tegra_hsp_doorbell_xlate(hsp, param);
-+		else
-+			return ERR_PTR(-EINVAL);
-+
-+	case TEGRA_HSP_MBOX_TYPE_SM:
-+		if (hsp->shared_irq && param < hsp->num_sm)
-+			return hsp->mailboxes[param].channel.chan;
-+		else
-+			return ERR_PTR(-EINVAL);
- 
- 	default:
- 		return ERR_PTR(-EINVAL);
-@@ -403,6 +510,31 @@ static int tegra_hsp_add_doorbells(struct tegra_hsp *hsp)
- 	return 0;
- }
- 
-+static int tegra_hsp_add_mailboxes(struct tegra_hsp *hsp, struct device *dev)
++static void tegra_tcu_uart_set_termios(struct uart_port *port,
++				       struct ktermios *new,
++				       struct ktermios *old)
 +{
++	(void)port;
++	(void)new;
++	(void)old;
++}
++
++static const struct uart_ops tegra_tcu_uart_ops = {
++	.tx_empty = tegra_tcu_uart_tx_empty,
++	.set_mctrl = tegra_tcu_uart_set_mctrl,
++	.get_mctrl = tegra_tcu_uart_get_mctrl,
++	.stop_tx = tegra_tcu_uart_stop_tx,
++	.start_tx = tegra_tcu_uart_start_tx,
++	.stop_rx = tegra_tcu_uart_stop_rx,
++	.break_ctl = tegra_tcu_uart_break_ctl,
++	.startup = tegra_tcu_uart_startup,
++	.shutdown = tegra_tcu_uart_shutdown,
++	.set_termios = tegra_tcu_uart_set_termios,
++};
++
++static void tegra_tcu_console_write(struct console *cons, const char *s,
++				    unsigned int count)
++{
++	(void)cons;
++
++	tegra_tcu_write(s, count);
++}
++
++static int tegra_tcu_console_setup(struct console *cons, char *options)
++{
++	(void)options;
++
++	if (!tegra_tcu_uart_port.private_data)
++		return -ENODEV;
++
++	return uart_set_options(&tegra_tcu_uart_port, cons,
++				115200, 'n', 8, 'n');
++}
++
++static struct console tegra_tcu_console = {
++	.name = "ttyTCU",
++	.device = uart_console_device,
++	.flags = CON_PRINTBUFFER | CON_ANYTIME,
++	.index = -1,
++	.write = tegra_tcu_console_write,
++	.setup = tegra_tcu_console_setup,
++	.data = &tegra_tcu_uart_driver,
++};
++
++static struct uart_driver tegra_tcu_uart_driver = {
++	.owner = THIS_MODULE,
++	.driver_name = "tegra-tcu",
++	.dev_name = "ttyTCU",
++	.cons = &tegra_tcu_console,
++	.nr = 1,
++};
++
++static void tegra_tcu_receive(struct mbox_client *client, void *msg_p)
++{
++	struct tty_port *port = &tegra_tcu_uart_port.state->port;
++	uint32_t msg = *(uint32_t *)msg_p;
++	unsigned int num_bytes;
 +	int i;
 +
-+	hsp->mailboxes = devm_kcalloc(dev, hsp->num_sm, sizeof(*hsp->mailboxes),
-+				      GFP_KERNEL);
-+	if (!hsp->mailboxes)
++	num_bytes = (msg >> 24) & 0x3;
++	for (i = 0; i < num_bytes; i++)
++		tty_insert_flip_char(port, (msg >> (i*8)) & 0xff, TTY_NORMAL);
++
++	tty_flip_buffer_push(port);
++}
++
++static int tegra_tcu_probe(struct platform_device *pdev)
++{
++	struct uart_port *port = &tegra_tcu_uart_port;
++	struct tegra_tcu *tcu;
++	int err;
++
++	tcu = devm_kzalloc(&pdev->dev, sizeof(*tcu), GFP_KERNEL);
++	if (!tcu)
 +		return -ENOMEM;
 +
-+	for (i = 0; i < hsp->num_sm; i++) {
-+		struct tegra_hsp_mailbox *mb = &hsp->mailboxes[i];
++	tcu->tx_client.dev = &pdev->dev;
++	tcu->rx_client.dev = &pdev->dev;
++	tcu->rx_client.rx_callback = tegra_tcu_receive;
 +
-+		mb->index = i;
-+		mb->sending = false;
-+
-+		mb->channel.hsp = hsp;
-+		mb->channel.type = TEGRA_HSP_MBOX_TYPE_SM;
-+		mb->channel.regs = hsp->regs + SZ_64K + i * SZ_32K;
-+		mb->channel.chan = &hsp->mbox.chans[i];
-+		mb->channel.chan->con_priv = &mb->channel;
++	tcu->tx = mbox_request_channel_byname(&tcu->tx_client, "tx");
++	if (IS_ERR(tcu->tx)) {
++		err = PTR_ERR(tcu->tx);
++		dev_err(&pdev->dev, "failed to get tx mailbox: %d\n", err);
++		return err;
 +	}
++
++	tcu->rx = mbox_request_channel_byname(&tcu->rx_client, "rx");
++	if (IS_ERR(tcu->rx)) {
++		err = PTR_ERR(tcu->rx);
++		dev_err(&pdev->dev, "failed to get rx mailbox: %d\n", err);
++		goto free_tx;
++	}
++
++	err = uart_register_driver(&tegra_tcu_uart_driver);
++	if (err) {
++		dev_err(&pdev->dev, "failed to register UART driver: %d\n",
++			err);
++		goto free_rx;
++	}
++
++	spin_lock_init(&port->lock);
++	port->dev = &pdev->dev;
++	port->type = PORT_TEGRA_TCU;
++	port->ops = &tegra_tcu_uart_ops;
++	port->fifosize = 1;
++	port->iotype = UPIO_MEM;
++	port->flags = UPF_BOOT_AUTOCONF;
++	port->private_data = tcu;
++
++	err = uart_add_one_port(&tegra_tcu_uart_driver, port);
++	if (err) {
++		dev_err(&pdev->dev, "failed to add UART port: %d\n", err);
++		goto unregister_uart;
++	}
++
++	return 0;
++
++unregister_uart:
++	uart_unregister_driver(&tegra_tcu_uart_driver);
++free_rx:
++	mbox_free_channel(tcu->rx);
++free_tx:
++	mbox_free_channel(tcu->tx);
++
++	return err;
++}
++
++static int tegra_tcu_remove(struct platform_device *pdev)
++{
++	uart_remove_one_port(&tegra_tcu_uart_driver, &tegra_tcu_uart_port);
++	uart_unregister_driver(&tegra_tcu_uart_driver);
 +
 +	return 0;
 +}
 +
- static int tegra_hsp_probe(struct platform_device *pdev)
- {
- 	struct tegra_hsp *hsp;
-@@ -431,14 +563,19 @@ static int tegra_hsp_probe(struct platform_device *pdev)
- 	hsp->num_si = (value >> HSP_nSI_SHIFT) & HSP_nINT_MASK;
- 
- 	err = platform_get_irq_byname(pdev, "doorbell");
--	if (err < 0) {
--		dev_err(&pdev->dev, "failed to get doorbell IRQ: %d\n", err);
--		return err;
--	}
-+	if (err < 0)
-+		hsp->doorbell_irq = 0;
-+	else
-+		hsp->doorbell_irq = err;
- 
--	hsp->doorbell_irq = err;
-+	err = platform_get_irq_byname(pdev, "shared0");
-+	if (err < 0)
-+		hsp->shared_irq = 0;
-+	else
-+		hsp->shared_irq = err;
- 
- 	hsp->mbox.of_xlate = of_tegra_hsp_xlate;
-+	/* First nSM are reserved for mailboxes */
- 	hsp->mbox.num_chans = 32;
- 	hsp->mbox.dev = &pdev->dev;
- 	hsp->mbox.txdone_irq = false;
-@@ -451,10 +588,22 @@ static int tegra_hsp_probe(struct platform_device *pdev)
- 	if (!hsp->mbox.chans)
- 		return -ENOMEM;
- 
--	err = tegra_hsp_add_doorbells(hsp);
--	if (err < 0) {
--		dev_err(&pdev->dev, "failed to add doorbells: %d\n", err);
--		return err;
-+	if (hsp->doorbell_irq) {
-+		err = tegra_hsp_add_doorbells(hsp);
-+		if (err < 0) {
-+			dev_err(&pdev->dev, "failed to add doorbells: %d\n",
-+			        err);
-+			return err;
-+		}
-+	}
++static const struct of_device_id tegra_tcu_match[] = {
++	{ .compatible = "nvidia,tegra194-tcu" },
++	{ }
++};
 +
-+	if (hsp->shared_irq) {
-+		err = tegra_hsp_add_mailboxes(hsp, &pdev->dev);
-+		if (err < 0) {
-+			dev_err(&pdev->dev, "failed to add mailboxes: %d\n",
-+			        err);
-+			goto remove_doorbells;
-+		}
- 	}
- 
- 	platform_set_drvdata(pdev, hsp);
-@@ -462,20 +611,40 @@ static int tegra_hsp_probe(struct platform_device *pdev)
- 	err = mbox_controller_register(&hsp->mbox);
- 	if (err) {
- 		dev_err(&pdev->dev, "failed to register mailbox: %d\n", err);
--		tegra_hsp_remove_doorbells(hsp);
--		return err;
-+		goto remove_doorbells;
- 	}
- 
--	err = devm_request_irq(&pdev->dev, hsp->doorbell_irq,
--			       tegra_hsp_doorbell_irq, IRQF_NO_SUSPEND,
--			       dev_name(&pdev->dev), hsp);
--	if (err < 0) {
--		dev_err(&pdev->dev, "failed to request doorbell IRQ#%u: %d\n",
--			hsp->doorbell_irq, err);
--		return err;
-+	if (hsp->doorbell_irq) {
-+		err = devm_request_irq(&pdev->dev, hsp->doorbell_irq,
-+				       tegra_hsp_doorbell_irq, IRQF_NO_SUSPEND,
-+				       dev_name(&pdev->dev), hsp);
-+		if (err < 0) {
-+			dev_err(&pdev->dev,
-+			        "failed to request doorbell IRQ#%u: %d\n",
-+				hsp->doorbell_irq, err);
-+			return err;
-+		}
-+	}
++static struct platform_driver tegra_tcu_driver = {
++	.driver = {
++		.name = "tegra-tcu",
++		.of_match_table = tegra_tcu_match,
++	},
++	.probe = tegra_tcu_probe,
++	.remove = tegra_tcu_remove,
++};
 +
-+	if (hsp->shared_irq) {
-+		err = devm_request_irq(&pdev->dev, hsp->shared_irq,
-+				       tegra_hsp_shared_irq, 0,
-+				       dev_name(&pdev->dev), hsp);
-+		if (err < 0) {
-+			dev_err(&pdev->dev,
-+				"failed to request shared0 IRQ%u: %d\n",
-+				hsp->shared_irq, err);
-+			return err;
-+		}
- 	}
- 
- 	return 0;
++static int __init tegra_tcu_init(void)
++{
++	int err;
 +
-+remove_doorbells:
-+	if (hsp->doorbell_irq)
-+		tegra_hsp_remove_doorbells(hsp);
++	err = platform_driver_register(&tegra_tcu_driver);
++	if (err)
++		return err;
 +
-+	return err;
- }
++	register_console(&tegra_tcu_console);
++
++	return 0;
++}
++module_init(tegra_tcu_init);
++
++static void __exit tegra_tcu_exit(void)
++{
++	unregister_console(&tegra_tcu_console);
++	platform_driver_unregister(&tegra_tcu_driver);
++}
++module_exit(tegra_tcu_exit);
++
++MODULE_AUTHOR("Mikko Perttunen <mperttunen@nvidia.com>");
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("NVIDIA Tegra Combined UART driver");
+diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
+index dce5f9dae121..eaf3c303cba6 100644
+--- a/include/uapi/linux/serial_core.h
++++ b/include/uapi/linux/serial_core.h
+@@ -281,4 +281,7 @@
+ /* MediaTek BTIF */
+ #define PORT_MTK_BTIF	117
  
- static int tegra_hsp_remove(struct platform_device *pdev)
-@@ -483,7 +652,8 @@ static int tegra_hsp_remove(struct platform_device *pdev)
- 	struct tegra_hsp *hsp = platform_get_drvdata(pdev);
- 
- 	mbox_controller_unregister(&hsp->mbox);
--	tegra_hsp_remove_doorbells(hsp);
-+	if (hsp->doorbell_irq)
-+		tegra_hsp_remove_doorbells(hsp);
- 
- 	return 0;
- }
++/* NVIDIA Tegra Combined UART */
++#define PORT_TEGRA_TCU	118
++
+ #endif /* _UAPILINUX_SERIAL_CORE_H */
 -- 
 2.16.1
