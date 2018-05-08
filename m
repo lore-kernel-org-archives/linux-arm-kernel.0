@@ -1,73 +1,182 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue,  8 May 2018 17:44:54 +0100
-Subject: [PATCH v6 09/15] arm64/sve: Switch sve_pffr() argument from task to
- thread
+Date: Tue,  8 May 2018 17:44:56 +0100
+Subject: [PATCH v6 11/15] KVM: arm64: Save host SVE context as appropriate
 In-Reply-To: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
 References: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525797900-5548-10-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1525797900-5548-12-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sve_pffr(), which is used to derive the base address used for
-low-level SVE save/restore routines, currently takes the relevant
-task_struct as an argument.
+This patch adds SVE context saving to the hyp FPSIMD context switch
+path.  This means that it is no longer necessary to save the host
+SVE state in advance of entering the guest, when in use.
 
-The only accessed fields are actually part of thread_struct, so
-this patch changes the argument type accordingly.  This is done in
-preparation for moving this function to a header, where we do not
-want to have to include <linux/sched.h> due to the consequent
-circular #include problems.
+In order to avoid adding pointless complexity to the code, VHE is
+assumed if SVE is in use.  VHE is an architectural prerequisite for
+SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
+kernels that support both SVE and KVM.
 
-No functional change.
+Historically, software models exist that can expose the
+architecturally invalid configuration of SVE without VHE, so if
+this situation is detected this patch warns and refuses to create a
+VM.  Doing this check at VM creation time avoids race issues
+between KVM and SVE initialisation.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/kernel/fpsimd.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e7f99f2..d811679 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -44,6 +44,7 @@
- #include <asm/fpsimd.h>
- #include <asm/cpufeature.h>
- #include <asm/cputype.h>
-+#include <asm/processor.h>
- #include <asm/simd.h>
- #include <asm/sigcontext.h>
- #include <asm/sysreg.h>
-@@ -167,10 +168,9 @@ static size_t sve_ffr_offset(int vl)
- 	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
- }
+---
+
+Changes since v5:
+
+Requested by Marc Zyngier:
+
+ * Migrate to flag bits in vcpu_arch.flags instead of adding bools in
+   vcpu_arch.
+
+ * Move system_supports_sve() && !has_vhe() sanity check to
+   kvm_arch_init() instead of doing it each time a VM is created.
+   cpufeatures initialisation should be complete by the time any
+   before module_init() call runs.
+---
+ arch/arm64/Kconfig          |  7 +++++++
+ arch/arm64/kvm/fpsimd.c     |  1 -
+ arch/arm64/kvm/hyp/switch.c | 22 ++++++++++++++++++++--
+ virt/kvm/arm/arm.c          | 18 ++++++++++++++++++
+ 4 files changed, 45 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index eb2cf49..b0d3820 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1130,6 +1130,7 @@ endmenu
+ config ARM64_SVE
+ 	bool "ARM Scalable Vector Extension support"
+ 	default y
++	depends on !KVM || ARM64_VHE
+ 	help
+ 	  The Scalable Vector Extension (SVE) is an extension to the AArch64
+ 	  execution state which complements and extends the SIMD functionality
+@@ -1155,6 +1156,12 @@ config ARM64_SVE
+ 	  booting the kernel.  If unsure and you are not observing these
+ 	  symptoms, you should assume that it is safe to say Y.
  
--static void *sve_pffr(struct task_struct *task)
-+static void *sve_pffr(struct thread_struct *thread)
++	  CPUs that support SVE are architecturally required to support the
++	  Virtualization Host Extensions (VHE), so the kernel makes no
++	  provision for supporting SVE alongside KVM without VHE enabled.
++	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
++	  KVM in the same kernel image.
++
+ config ARM64_MODULE_PLTS
+ 	bool
+ 	select HAVE_MOD_ARCH_SPECIFIC
+diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+index 7059275..4c47b55 100644
+--- a/arch/arm64/kvm/fpsimd.c
++++ b/arch/arm64/kvm/fpsimd.c
+@@ -60,7 +60,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+  */
+ void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
  {
--	return (char *)task->thread.sve_state +
--		sve_ffr_offset(task->thread.sve_vl);
-+	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
- }
+-	BUG_ON(system_supports_sve());
+ 	BUG_ON(!current->mm);
  
- static void change_cpacr(u64 val, u64 mask)
-@@ -253,7 +253,7 @@ static void task_fpsimd_load(void)
- 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 75c3b65..6826f2d 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -21,12 +21,14 @@
  
- 	if (system_supports_sve() && test_thread_flag(TIF_SVE))
--		sve_load_state(sve_pffr(current),
-+		sve_load_state(sve_pffr(&current->thread),
- 			       &current->thread.uw.fpsimd_state.fpsr,
- 			       sve_vq_from_vl(current->thread.sve_vl) - 1);
- 	else
-@@ -294,7 +294,7 @@ void fpsimd_save(void)
- 				return;
- 			}
+ #include <kvm/arm_psci.h>
  
--			sve_save_state(sve_pffr(current), &st->fpsr);
-+			sve_save_state(sve_pffr(&current->thread), &st->fpsr);
- 		} else
- 			fpsimd_save_state(st);
++#include <asm/cpufeature.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/fpsimd.h>
+ #include <asm/debug-monitors.h>
++#include <asm/processor.h>
+ #include <asm/thread_info.h>
+ 
+ static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
+@@ -328,6 +330,8 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+ 				    struct kvm_vcpu *vcpu)
+ {
++	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
++
+ 	if (has_vhe())
+ 		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+ 			     cpacr_el1);
+@@ -337,8 +341,22 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+ 
+ 	isb();
+ 
+-	if (vcpu->arch.host_fpsimd_state) {
+-		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
++	if (host_fpsimd) {
++		/*
++		 * In the SVE case, VHE is assumed: it is enforced by
++		 * Kconfig and kvm_arch_init_vm().
++		 */
++		if (system_supports_sve() &&
++		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
++			struct thread_struct *thread = container_of(
++				host_fpsimd,
++				struct thread_struct, uw.fpsimd_state);
++
++			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
++		} else {
++			__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
++		}
++
+ 		vcpu->arch.host_fpsimd_state = NULL;
  	}
+ 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index bee226c..379e8a9 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -16,6 +16,7 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
+ 
++#include <linux/bug.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+@@ -41,6 +42,7 @@
+ #include <asm/mman.h>
+ #include <asm/tlbflush.h>
+ #include <asm/cacheflush.h>
++#include <asm/cpufeature.h>
+ #include <asm/virt.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_asm.h>
+@@ -1582,6 +1584,22 @@ int kvm_arch_init(void *opaque)
+ 		}
+ 	}
+ 
++	/*
++	 * VHE is a prerequisite for SVE in the Arm architecture, and
++	 * Kconfig ensures that if system_supports_sve() here then
++	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
++	 * detected and enabled, the CPU is architecturally
++	 * noncompliant.
++	 *
++	 * Just in case this mismatch is seen, detect it, warn and give
++	 * up.  Supporting this forbidden configuration in Hyp would be
++	 * pointless.
++	 */
++	if (system_supports_sve() && !has_vhe()) {
++		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
++		return -ENODEV;
++	}
++
+ 	err = init_common_resources();
+ 	if (err)
+ 		return err;
 -- 
 2.1.4
