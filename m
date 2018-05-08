@@ -1,116 +1,88 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Tue, 8 May 2018 09:27:48 +0200
-Subject: [PATCH v1 6/7] Bluetooth: hci_mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <1525762084.14468.20.camel@mtkswgap22>
-References: <cover.1522736996.git.sean.wang@mediatek.com>
- <f0e0a0b7f1dc3845dc6eafb4ccd60284d1675f8d.1522736996.git.sean.wang@mediatek.com>
- <A7391E5D-2945-415B-8AB1-8DFBF2E65878@holtmann.org>
- <1525762084.14468.20.camel@mtkswgap22>
-Message-ID: <D474053D-6910-4B04-8B98-59B96FEB86BC@holtmann.org>
+From: ping.bai@nxp.com (Jacky Bai)
+Date: Tue, 8 May 2018 07:32:33 +0000
+Subject: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
+In-Reply-To: <56a409cf76a3eaa713cb4f0bbe1e39b6@agner.ch>
+References: <20180418124908.3079-1-stefan@agner.ch>
+ <20180502073807.GE3443@dragon> <56a409cf76a3eaa713cb4f0bbe1e39b6@agner.ch>
+Message-ID: <HE1PR04MB311395765D3DC03D5960DBA3879A0@HE1PR04MB3113.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+> Subject: Re: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
+> 
+> Hi Jacky,
+> 
+> On 02.05.2018 09:38, Shawn Guo wrote:
+> > Hi Jacky,
+> >
+> > Do you see this problem on i.MX6 ULL?  What's your take on Stefan's fix?
+> 
+> Any comment to this?
+> 
+> It is 4.17.0-rc4 is out and i.MX 6ULL is still broken :-(
+> 
+Hi Stefan,
 
->>> +
->>> +static int mtk_wmt_cmd_sync(struct hci_uart *hu, u8 opcode, u8 flag, u16 plen,
->>> +			    const void *param)
->>> +{
->>> +	struct mtk_bt_dev *btdev = hu->priv;
->>> +	struct hci_command_hdr *hhdr;
->>> +	struct hci_acl_hdr *ahdr;
->>> +	struct mtk_wmt_hdr *whdr;
->>> +	struct sk_buff *skb;
->>> +	int ret = 0;
->>> +
->>> +	init_completion(&btdev->wmt_cmd);
->>> +
->>> +	skb = bt_skb_alloc(plen + MTK_WMT_CMD_SIZE, GFP_KERNEL);
->>> +	if (!skb)
->>> +		return -ENOMEM;
->>> +
->>> +	/*
->>> +	 * WMT data is carried in either ACL or HCI format with op code as
->>> +	 * 0xfc6f and followed by a WMT header and its actual payload.
->>> +	 */
->> 
->> Please use net subsystem comment style.
->> 
->>> +	switch (opcode) {
->>> +	case MTK_WMT_PATCH_DWNLD:
->>> +		ahdr = skb_put(skb, HCI_ACL_HDR_SIZE);
->>> +		ahdr->handle = cpu_to_le16(0xfc6f);
->>> +		ahdr->dlen   = cpu_to_le16(plen + MTK_WMT_HDR_SIZE);
->>> +		break;
->>> +	default:
->>> +		hhdr = skb_put(skb, HCI_COMMAND_HDR_SIZE);
->>> +		hhdr->opcode = cpu_to_le16(0xfc6f);
->>> +		hhdr->plen = plen + MTK_WMT_HDR_SIZE;
->>> +		break;
->>> +	}
->>> +
->>> +	hci_skb_pkt_type(skb) = opcode == MTK_WMT_PATCH_DWNLD ?
->>> +				HCI_ACLDATA_PKT : HCI_COMMAND_PKT;
->> 
->> Why not move that into the switch statement above.
->> 
->>> +
->>> +	/* Start to build a WMT header and its actual payload. */
->>> +	whdr = skb_put(skb, MTK_WMT_HDR_SIZE);
->>> +	whdr->dir = 1;
->>> +	whdr->op = opcode;
->>> +	whdr->dlen = cpu_to_le16(plen + 1);
->>> +	whdr->flag = flag;
->>> +	skb_put_data(skb, param, plen);
->>> +
->>> +	mtk_enqueue(hu, skb);
->>> +	hci_uart_tx_wakeup(hu);
->>> +
->>> +	/*
->>> +	 * Waiting a WMT event response, while we must take care in case of
->>> +	 * failures for the wait.
->>> +	 */
->>> +	ret = wait_for_completion_interruptible_timeout(&btdev->wmt_cmd, HZ);
->>> +
->>> +	return ret > 0 ? 0 : ret < 0 ? ret : -ETIMEDOUT;
->>> +}
->> 
->> All in all I am not convinced that this is super clean. I get that we need something special for having this in the ACL data packets, but for the standard HCI command I prefer that __hci_cmd_sync is used. I addition, it seems that patch download is the only special case and that happens before at the setup stage. So we could make things special for that. I need to understand this a bit better. Can I get a btmon -w trace.log file from the whole init procedure.
->> 
-> 
-> While i was trying to rewrite the driver based on btuart.c. you posted
-> on RFC, I used __hci_cmd_sync_ev to replace such kinds of SoC specific
-> hci command sending which I've done previously with mtk_wmt_cmd_sync.
-> 
-> However, eventually, I got a cmd_timer timeout whose message printed
-> on console as "Bluetooth: hci0: command 0xfc6f tx timeout".
-> 
-> The mtk soc specific cmd/event I posted below, I dumped directly in
-> driver, always uses cmd as opcode 0xfc6f, and its event id as 0xe4.
-> 
-> It appears to the event id is not standard and thus it cannot cancel the
-> cmd timer when the special hci event is being handled. This way can we
-> can still use __hci_cmd_sync api ?
-> 
-> [    4.896200] hci tx: 00000000: 01 6f fc 05 01 07 01 00 04    
-> [    4.904671] hci rx: 00000000: e4 05 02 07 01 00
-> 00                             
-> [    4.912859] Bluetooth: hci0 event 0xe4
-> 
-> 
-> buildroot login: [    6.914509] Bluetooth: hci0: command 0xfc6f tx
-> timeout
-> [    6.919831] hci tx: 00000000: 01 6f fc 06 01 06 02 00 00
-> 01                    .o........
-> [    7.006631] hci rx: 00000000: e4 05 02 06 01 00
-> 00                             .......
-> [    7.014821] Bluetooth: hci0 event 0xe4
+I have tried two 6ULL board, I don't meet such issue. System can boot up successfully with commit 6f9575e55632 included.
+Anyway, the change in this patch is ok for me. it is no harm to the BUS clock change flow.
 
-can you just start btmon before loading the module / driver? It makes it a lot easier since it will actually decode the basics for us. If there is a bug within __hci_cmd_sync_ev, then we are going to fix it.
-
-So all the MTK vendor commands respond with a vendor event? Or are there some that do the standard command status/complete handling?
-
-Regards
-
-Marcel
+Jacky
+> --
+> Stefan
+> 
+> >
+> > Shawn
+> >
+> > On Wed, Apr 18, 2018 at 02:49:08PM +0200, Stefan Agner wrote:
+> >> On i.MX6 ULL using PLL3 seems to cause a freeze when setting the
+> >> parent to IMX6UL_CLK_PLL3_USB_OTG. This only seems to appear since
+> >> commit 6f9575e55632 ("clk: imx: Add CLK_IS_CRITICAL flag for busy
+> >> divider and busy mux"), probably because the clock is now forced to
+> >> be on.
+> >>
+> >> Fixes: 6f9575e55632("clk: imx: Add CLK_IS_CRITICAL flag for busy
+> >> divider and busy mux")
+> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> >> ---
+> >> This addresses a regression ssen on v4.17-rc1 where the kernel boots
+> >> during clock initialization, see also:
+> >>
+> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpa
+> >>
+> tchwork.kernel.org%2Fpatch%2F10295927%2F&data=02%7C01%7Cping.bai%
+> 40nx
+> >>
+> p.com%7C023287ec65034c4db45f08d5b419effb%7C686ea1d3bc2b4c6fa92cd9
+> 9c5c
+> >>
+> 301635%7C0%7C0%7C636612945852594725&sdata=U0ZGid9ZBey0FXfId2dhZb
+> hVl8p
+> >> CcjTiexG3JHYwCA4%3D&reserved=0
+> >>
+> >>  drivers/clk/imx/clk-imx6ul.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/clk/imx/clk-imx6ul.c
+> >> b/drivers/clk/imx/clk-imx6ul.c index 114ecbb94ec5..12320118f8de
+> >> 100644
+> >> --- a/drivers/clk/imx/clk-imx6ul.c
+> >> +++ b/drivers/clk/imx/clk-imx6ul.c
+> >> @@ -464,7 +464,7 @@ static void __init imx6ul_clocks_init(struct
+> device_node *ccm_node)
+> >>  	clk_set_rate(clks[IMX6UL_CLK_AHB], 99000000);
+> >>
+> >>  	/* Change periph_pre clock to pll2_bus to adjust AXI rate to 264MHz
+> */
+> >> -	clk_set_parent(clks[IMX6UL_CLK_PERIPH_CLK2_SEL],
+> clks[IMX6UL_CLK_PLL3_USB_OTG]);
+> >> +	clk_set_parent(clks[IMX6UL_CLK_PERIPH_CLK2_SEL],
+> >> +clks[IMX6UL_CLK_OSC]);
+> >>  	clk_set_parent(clks[IMX6UL_CLK_PERIPH],
+> clks[IMX6UL_CLK_PERIPH_CLK2]);
+> >>  	clk_set_parent(clks[IMX6UL_CLK_PERIPH_PRE],
+> clks[IMX6UL_CLK_PLL2_BUS]);
+> >>  	clk_set_parent(clks[IMX6UL_CLK_PERIPH],
+> >> clks[IMX6UL_CLK_PERIPH_PRE]);
+> >> --
+> >> 2.17.0
+> >>
