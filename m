@@ -1,96 +1,51 @@
-From: dimitrysh@google.com (Dmitry Shmidt)
-Date: Tue, 8 May 2018 14:31:02 -0700
-Subject: [PATCH] Kirin-PCIe: Add kirin pcie msi feature.
-In-Reply-To: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
-References: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
-Message-ID: <CAH7ZN-zOwCqzzmKxkCeLt+z2FCpMrxnu5a8s8Os-fSsuS2R01w@mail.gmail.com>
+From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
+Date: Tue, 8 May 2018 23:39:45 +0200
+Subject: [PATCH v6 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20180505070147.epsrglnypm72jr5u@pengutronix.de>
+References: <20180305102524.5905-1-o.rempel@pengutronix.de>
+ <20180305102524.5905-4-o.rempel@pengutronix.de>
+ <20180504185052.bjhfkvpgrblc7tfc@pengutronix.de>
+ <20180504134956.36dc72a253d03e94a517a867@linux-foundation.org>
+ <20180505070147.epsrglnypm72jr5u@pengutronix.de>
+Message-ID: <c1f2e09d-f64b-afe6-59bf-c0742409e4d6@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2018 at 12:03 AM, Yao Chen <chenyao11@huawei.com> wrote:
-> This patch adds kirin pcie msi feature.
+On 5/5/2018 9:01 AM, Oleksij Rempel wrote:
+> Moving Rafael from Cc to To.
 >
-> Signed-off-by: Yao Chen <chenyao11@huawei.com>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi |  2 ++
->  drivers/pci/dwc/pcie-kirin.c              | 38 +++++++++++++++++++++++++++++++
->  2 files changed, 40 insertions(+)
+> Hi Rafael,
 >
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> index ec3eb8e..4ef684f 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> @@ -872,6 +872,8 @@
->                                   0x0 0x02000000>;
->                         num-lanes = <1>;
->                         #interrupt-cells = <1>;
-> +                       interrupts = <0 283 4>;
-> +                       interrupts-names = "msi";
+> can you please help here?
+> I need your ACK or NACK for this patch.
 
-Possible typo? Should be interrupt-names = "msi";
+Sorry for the delay, I'll have a closer look at it in the next couple of 
+days.
 
->                         interrupt-map-mask = <0xf800 0 0 7>;
->                         interrupt-map = <0x0 0 0 1
->                                          &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
-> diff --git a/drivers/pci/dwc/pcie-kirin.c b/drivers/pci/dwc/pcie-kirin.c
-> index d2970a0..2319c9c 100644
-> --- a/drivers/pci/dwc/pcie-kirin.c
-> +++ b/drivers/pci/dwc/pcie-kirin.c
-> @@ -426,9 +426,28 @@ static int kirin_pcie_establish_link(struct pcie_port *pp)
->         return 0;
->  }
->
-> +static irqreturn_t kirin_pcie_msi_irq_handler(int irq, void *arg)
-> +{
-> +       struct pcie_port *pp = arg;
-> +
-> +       return dw_handle_msi_irq(pp);
-> +}
-> +
-> +static void kirin_pcie_msi_init(struct pcie_port *pp)
-> +{
-> +       dw_pcie_msi_init(pp);
-> +}
-> +
-> +static void kirin_pcie_enable_interrupts(struct pcie_port *pp)
-> +{
-> +       if (IS_ENABLED(CONFIG_PCI_MSI))
-> +               kirin_pcie_msi_init(pp);
-> +}
-> +
->  static int kirin_pcie_host_init(struct pcie_port *pp)
->  {
->         kirin_pcie_establish_link(pp);
-> +       kirin_pcie_enable_interrupts(pp);
->
->         return 0;
->  }
-> @@ -448,6 +467,25 @@ static int kirin_pcie_host_init(struct pcie_port *pp)
->  static int __init kirin_add_pcie_port(struct dw_pcie *pci,
->                                       struct platform_device *pdev)
->  {
-> +       int ret;
-> +
-> +       if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +               pci->pp.msi_irq = platform_get_irq(pdev, 0);
-> +               if (!pci->pp.msi_irq) {
-> +                       dev_err(&pdev->dev, "failed to get msi irq\n");
-> +                       return -ENODEV;
-> +               }
-> +               ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
-> +                                      kirin_pcie_msi_irq_handler,
-> +                                      IRQF_SHARED | IRQF_NO_THREAD,
-> +                                      "kirin_pcie_msi", &pci->pp);
-> +               if (ret) {
-> +                       dev_err(&pdev->dev, "failed to request msi irq\n");
-> +                       return ret;
-> +               }
-> +       }
-> +
-> +       pci->pp.root_bus_nr = -1;
->         pci->pp.ops = &kirin_pcie_host_ops;
->
->         return dw_pcie_host_init(&pci->pp);
-> --
-> 1.9.1
->
+Thanks,
+Rafael
+
+
+> On Fri, May 04, 2018 at 01:49:56PM -0700, Andrew Morton wrote:
+>> On Fri, 4 May 2018 20:50:52 +0200 Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+>>
+>>> Hallo Andrew,
+>>> I need your ACK or NACK for this patch.
+>>>
+>>> This function is used to configure external PMIC to interpret
+>>> signal which will be triggered by pm_power_off as power off.
+>>> Since same signal can be used for stand by, I linked PMIC configuration
+>>> with pm_power_off_prepare to avoid possible conflicts.
+>>>
+>>> ...
+>>>
+>>>> --- a/kernel/reboot.c
+>>>> +++ b/kernel/reboot.c
+>>>> @@ -49,6 +49,7 @@ int reboot_force;
+>>>>    */
+>>>>   
+>>>>   void (*pm_power_off_prepare)(void);
+>>>> +EXPORT_SYMBOL(pm_power_off_prepare);
+>>>>   
+>> OK by me, but it's more of a Rafael thing.
+>>
