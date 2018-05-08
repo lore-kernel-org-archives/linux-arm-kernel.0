@@ -1,83 +1,89 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 8 May 2018 12:43:24 +0100
-Subject: [PATCH 1/2] arm64: signal: Report signal frame size to userspace
- via auxv
-In-Reply-To: <20180508113043.elgvfz3dud2amcif@lakrids.cambridge.arm.com>
-References: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
- <1525776211-28169-2-git-send-email-Dave.Martin@arm.com>
- <20180508113043.elgvfz3dud2amcif@lakrids.cambridge.arm.com>
-Message-ID: <20180508114323.GG7753@e103592.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 May 2018 12:45:17 +0100
+Subject: [PATCH REPOST] ARM: smp: Move clear_tasks_mm_cpumask() call to
+ __cpu_die()
+In-Reply-To: <20180504112939.25493-1-bigeasy@linutronix.de>
+References: <20180504112939.25493-1-bigeasy@linutronix.de>
+Message-ID: <20180508114516.GE16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 12:30:44PM +0100, Mark Rutland wrote:
-> On Tue, May 08, 2018 at 11:43:30AM +0100, Dave Martin wrote:
-> > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> > index fac1c4d..771c7a8 100644
-> > --- a/arch/arm64/include/asm/elf.h
-> > +++ b/arch/arm64/include/asm/elf.h
-> > @@ -24,6 +24,10 @@
-> >  #include <asm/ptrace.h>
-> >  #include <asm/user.h>
-> >  
-> > +#ifndef __ASSEMBLY__
-> > +#include <asm/processor.h> /* for get_minsigstksz(), used by ARCH_DLINFO */
-> > +#endif
+On Fri, May 04, 2018 at 01:29:39PM +0200, Sebastian Andrzej Siewior wrote:
+> From: Grygorii Strashko <grygorii.strashko@ti.com>
 > 
-> This can live under the existing ifndef __ASSEMBLY__ block, where
-> ARCH_DLINFO lives.
+> Suspending a CPU on a RT kernel results in the following backtrace:
+> 
+> | Disabling non-boot CPUs ...
+> | BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+> | in_atomic(): 1, irqs_disabled(): 128, pid: 18, name: migration/1
+> | INFO: lockdep is turned off.
+> | irq event stamp: 122
+> | hardirqs last  enabled at (121): [<c06ac0ac>] _raw_spin_unlock_irqrestore+0x88/0x90
+> | hardirqs last disabled at (122): [<c06abed0>] _raw_spin_lock_irq+0x28/0x5c
+> |  CPU: 1 PID: 18 Comm: migration/1 Tainted: G        W       4.1.4-rt3-01046-g96ac8da #204
+> | Hardware name: Generic DRA74X (Flattened Device Tree)
+> | [<c0019134>] (unwind_backtrace) from [<c0014774>] (show_stack+0x20/0x24)
+> | [<c0014774>] (show_stack) from [<c06a70f4>] (dump_stack+0x88/0xdc)
+> | [<c06a70f4>] (dump_stack) from [<c006cab8>] (___might_sleep+0x198/0x2a8)
+> | [<c006cab8>] (___might_sleep) from [<c06ac4dc>] (rt_spin_lock+0x30/0x70)
+> | [<c06ac4dc>] (rt_spin_lock) from [<c013f790>] (find_lock_task_mm+0x9c/0x174)
+> | [<c013f790>] (find_lock_task_mm) from [<c00409ac>] (clear_tasks_mm_cpumask+0xb4/0x1ac)
+> | [<c00409ac>] (clear_tasks_mm_cpumask) from [<c00166a4>] (__cpu_disable+0x98/0xbc)
+> | [<c00166a4>] (__cpu_disable) from [<c06a2e8c>] (take_cpu_down+0x1c/0x50)
+> | [<c06a2e8c>] (take_cpu_down) from [<c00f2600>] (multi_cpu_stop+0x11c/0x158)
+> | [<c00f2600>] (multi_cpu_stop) from [<c00f2a9c>] (cpu_stopper_thread+0xc4/0x184)
+> | [<c00f2a9c>] (cpu_stopper_thread) from [<c0069058>] (smpboot_thread_fn+0x18c/0x324)
+> | [<c0069058>] (smpboot_thread_fn) from [<c00649c4>] (kthread+0xe8/0x104)
+> | [<c00649c4>] (kthread) from [<c0010058>] (ret_from_fork+0x14/0x3c)
+> | CPU1: shutdown
+> 
+> The root cause of above backtrace is task_lock() which takes a sleeping
+> lock on -RT.
+> 
+> To fix the issue, move clear_tasks_mm_cpumask() call from __cpu_disable()
+> to __cpu_die() which is called on the thread which is asking for a target
+> CPU to be shutdown. In addition, this change restores CPU hotplug
+> functionality on ARM CPU1 can be unplugged/plugged many times.
 
-Can do.  I don't usually like mixing #includes with the code unless absolutely necessary, but this looks like a pretty trivial case, with just some #defines before the #ifndef __ASSEMBLY__ block.
+This looks fine to me - all the paths that use the mm_cpumask() check
+that the CPU is still marked online.
 
-So I guess this can be moved harmlessly.
+Please send to the patch system, thanks.
 
 > 
-> [...]
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Link: http://lkml.kernel.org/r/1441995683-30817-1-git-send-email-grygorii.strashko at ti.com
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> [bigeasy: slighty edited the commit message]
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  arch/arm/kernel/smp.c |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> > +/*
-> > + * Determine the stack space required for guaranteed signal devliery.
-> > + * This function is used to populate AT_MINSIGSTKSZ at process startup.
-> > + */
-> > +int get_minsigstksz(void)
-> > +{
-> > +	static __read_mostly atomic_t minsigstksz;
-> > +
-> > +	int ret;
-> > +	struct rt_sigframe_user_layout user;
-> > +
-> > +	ret = atomic_read(&minsigstksz);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	init_user_layout(&user);
-> > +	ret = setup_sigframe_layout(&user, true);
-> > +
-> > +	if (ret) {
-> > +		WARN_ON(1);
-> > +
-> > +		ret = SIGSTKSZ;
-> > +	} else {
-> > +		ret = sigframe_size(&user) +
-> > +			round_up(sizeof(struct frame_record), 16) +
-> > +			16; /* max alignment padding */
-> > +	}
-> > +
-> > +	/*
-> > +	 * The computed value (ret) is invariant, so its value can be
-> > +	 * safely stored irrespective of whether some other racing
-> > +	 * task got there first:
-> > +	 */
-> > +	atomic_set(&minsigstksz, ret);
-> > +	return ret;
-> > +}
-> 
-> Can we set up minsigstksz at some initcall time? that way get_minstksz()
-> can return minsigstksz with no conditionality at all.
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -236,8 +236,6 @@ int __cpu_disable(void)
+>  	flush_cache_louis();
+>  	local_flush_tlb_all();
+>  
+> -	clear_tasks_mm_cpumask(cpu);
+> -
+>  	return 0;
+>  }
+>  
+> @@ -255,6 +253,7 @@ void __cpu_die(unsigned int cpu)
+>  	}
+>  	pr_debug("CPU%u: shutdown\n", cpu);
+>  
+> +	clear_tasks_mm_cpumask(cpu);
+>  	/*
+>  	 * platform_cpu_kill() is generally expected to do the powering off
+>  	 * and/or cutting of clocks to the dying CPU.  Optionally, this may
 
-I would have preferred to do that, but I wasn't sure where to put it.
-
-Unless arch_initcall_sync() works for this, I don't know what to
-suggest.
-
-Cheers
----Dave
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
