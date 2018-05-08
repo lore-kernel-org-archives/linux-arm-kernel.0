@@ -1,30 +1,44 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue,  8 May 2018 14:41:37 -0700
-Subject: [GIT PULL 2/2] ARM: Keystone DTS update for v4.18
-In-Reply-To: <1525815697-6338-1-git-send-email-santosh.shilimkar@oracle.com>
-References: <1525815697-6338-1-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <1525815697-6338-2-git-send-email-santosh.shilimkar@oracle.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 8 May 2018 23:51:02 +0200
+Subject: Incoming sms problem on Motorola Droid 4
+Message-ID: <20180508215102.GA5253@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+Hi!
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+I have problems with incoming SMS. ofono tries to use +CNMI=1,2,2,1,0
 
-are available in the git repository at:
+> AT+CNMI=?
+< +CNMI: (0,1,2),(0,1,2,3),(0,2),(0,1,2),(0,1)
+< OK
+ofonod[3070]: drivers/atmodem/sms.c:build_cnmi_string()
+ofonod[3070]: drivers/atmodem/sms.c:construct_ack_pdu()
+> AT+CNMI=1,2,2,1,0
+< OK
+ofonod[3070]: src/network.c:__ofono_netreg_add_status_watch() 0x5bbbf0
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.18
+... unfortunately, with that configuration no messages are comming to
+ofono and the other phone sees them as "delievery failed".
 
-for you to fetch changes up to 84cfd2c4f3b159b308976ccd0501985524fd6ee1:
+I had some luck with unicsy_demo using AT+CNMI=1,2 with text mode (not
+PDU) messages. That works well enough for me.
 
-  ARM: dts: k2g-evm: Add DCAN dt nodes (2018-05-04 23:11:49 -0700)
+Unfortunately, if I force ofono to pass "AT+CNMI=1,2", it does not
+work well, either.
 
-----------------------------------------------------------------
-ARM: DTS: Add DCAN support for Keystone K2G
+Any ideas how to debug this / what to try?
 
-----------------------------------------------------------------
-Faiz Abbas (1):
-      ARM: dts: k2g-evm: Add DCAN dt nodes
+Thanks,
 
- arch/arm/boot/dts/keystone-k2g-evm.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180508/3f90d2c4/attachment.sig>
