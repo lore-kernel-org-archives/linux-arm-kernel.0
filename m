@@ -1,31 +1,48 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 08 May 2018 11:19:02 -0700
-Subject: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
-In-Reply-To: <4188ee25bd5179b57d09e4624dcfbfbb@agner.ch>
-References: <20180418124908.3079-1-stefan@agner.ch>
- <20180502073807.GE3443@dragon>
- <56a409cf76a3eaa713cb4f0bbe1e39b6@agner.ch>
- <HE1PR04MB311395765D3DC03D5960DBA3879A0@HE1PR04MB3113.eurprd04.prod.outlook.com>
- <4188ee25bd5179b57d09e4624dcfbfbb@agner.ch>
-Message-ID: <152580354289.138124.13657232356773397650@swboyd.mtv.corp.google.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 8 May 2018 20:40:05 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a77970: add SMP support
+In-Reply-To: <54dbd1d2-8279-5073-cffb-c647fba91e42@cogentembedded.com>
+References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
+ <54dbd1d2-8279-5073-cffb-c647fba91e42@cogentembedded.com>
+Message-ID: <CAMuHMdUqVVWz0jLb2Vmrkk3BQBsYVsCOW1zsaPUi8o6jr_mojQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stefan Agner (2018-05-08 06:20:03)
-> On 08.05.2018 09:32, Jacky Bai wrote:
-> > 
-> > I have tried two 6ULL board, I don't meet such issue. System can boot
-> > up successfully with commit 6f9575e55632 included.
-> > Anyway, the change in this patch is ok for me. it is no harm to the
-> > BUS clock change flow.
-> 
-> Hm, that is interesting, maybe it is because we use a different SKU? Or
-> maybe bootloader?
-> 
-> I tested here with a 800 MHz clocked variant on a Colibri iMX6ULL using
-> U-Boot 2016.11.
-> 
+Hi Sergei,
 
-I'll throw this into fixes today because it fixes something to be
-useful. It's still interesting to see what's different between the two
-setups though.
+On Tue, May 8, 2018 at 6:39 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add the device node for the second Cortex-A53 CPU core.
+>
+> Based on the original (and large) patch by Daisuke Matsushita
+> <daisuke.matsushita.ns@hitachi.com>.
+>
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+Dupe of https://patchwork.kernel.org/patch/10032875/
+>From series "[PATCH 0/2] arm64: dts: renesas: r8a77970: Add SMP Support"
+(https://www.spinics.net/lists/linux-renesas-soc/msg19681.html)
+
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+> @@ -41,6 +41,16 @@
+>                         enable-method = "psci";
+>                 };
+>
+> +               a53_1: cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53","arm,armv8";
+
+Missing space after the comma.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
