@@ -1,98 +1,226 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 May 2018 12:34:37 -0500
-Subject: [PATCH v2 10/27] dts: bindings: Restrict coresight tmc-etr
- scatter-gather mode
-In-Reply-To: <514f69b1-2219-aa83-dfe8-09c26ed4f5b1@arm.com>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-11-git-send-email-suzuki.poulose@arm.com>
- <20180501131300.GA31425@rob-hp-laptop>
- <CANLsYkwozU7QC5EeEy46KrEd4X7J9S69SiNg8-GhSSuMkhQrBw@mail.gmail.com>
- <CAL_JsqJDTx2UWN7VdsvDctyXw_rco6Q8NmoWQ5EBx6uhwJu=0Q@mail.gmail.com>
- <514f69b1-2219-aa83-dfe8-09c26ed4f5b1@arm.com>
-Message-ID: <CAL_JsqLD9cw2gUSg9U9jmBTQNgPZ3Fp894y19w6+Kht4y2wbzw@mail.gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue,  8 May 2018 23:04:49 +0530
+Subject: [PATCH] arm64: allwinner: a64: Add Amarula A64-Relic initial support
+Message-ID: <20180508173449.18009-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2018 at 10:48 AM, Suzuki K Poulose
-<Suzuki.Poulose@arm.com> wrote:
-> On 04/05/18 23:56, Rob Herring wrote:
->>
->> On Thu, May 3, 2018 at 3:32 PM, Mathieu Poirier
->> <mathieu.poirier@linaro.org> wrote:
->>>
->>> On 1 May 2018 at 07:13, Rob Herring <robh@kernel.org> wrote:
->>>>
->>>> On Tue, May 01, 2018 at 10:10:40AM +0100, Suzuki K Poulose wrote:
->>>>>
->>>>> We are about to add the support for ETR builtin scatter-gather mode
->>>>> for dealing with large amount of trace buffers. However, on some of
->>>>> the platforms, using the ETR SG mode can lock up the system due to
->>>>> the way the ETR is connected to the memory subsystem.
->>>>>
->>>>> In SG mode, the ETR performs READ from the scatter-gather table to
->>>>> fetch the next page and regular WRITE of trace data. If the READ
->>>>> operation doesn't complete(due to the memory subsystem issues,
->>>>> which we have seen on a couple of platforms) the trace WRITE
->>>>> cannot proceed leading to issues. So, we by default do not
->>>>> use the SG mode, unless it is known to be safe on the platform.
->>>>> We define a DT property for the TMC node to specify whether we
->>>>> have a proper SG mode.
->
->
->
->>>>> ---
->>>>>   Documentation/devicetree/bindings/arm/coresight.txt | 3 +++
->>>>>   drivers/hwtracing/coresight/coresight-tmc.c         | 8 +++++++-
->>>>>   2 files changed, 10 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt
->>>>> b/Documentation/devicetree/bindings/arm/coresight.txt
->>>>> index cdd84d0..7c0c8f0 100644
->>>>> --- a/Documentation/devicetree/bindings/arm/coresight.txt
->>>>> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
->>>>> @@ -88,6 +88,9 @@ its hardware characteristcs.
->>>>>        * arm,buffer-size: size of contiguous buffer space for TMC ETR
->>>>>         (embedded trace router)
->>>>>
->>>>> +     * scatter-gather: boolean. Indicates that the TMC-ETR can safely
->>>>> +       use the SG mode on this system.
->>>>> +
->>>>
->>>>
->>>> Needs a vendor prefix.
->>>>
->>>
->>> Thinking further on this, do we need to make it device specific as
->>> well - something like "arm,etr-scatter-gather"?  That way we don't
->>> have to redefine "scatter-gather" for other ARM devices if they happen
->>> to need the same property but for different reasons.
->>
->>
->> No. If we had a bunch of cases, then we'd probably want to have just
->> 'scatter-gather'.
->
->
-> Does it mean "arm,scatter-gather" ?
+Amarula A64-Relic is Allwinner A64 based IoT device, which support
+- Allwinner A64 Cortex-A53
+- Mali-400MP2 GPU
+- AXP803 PMIC
+- 1GB DDR3 RAM
+- 8GB eMMC
+- AP6330 Wifi/BLE
+- MIPI-DSI
+- CSI: OV5640 sensor
+- USB OTG
+- 12V DC power supply
 
-Yes. Use that.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../dts/allwinner/sun50i-a64-amarula-relic.dts     | 182 +++++++++++++++++++++
+ 2 files changed, 183 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
 
-> If we ever wanted to add the device
-> specific information, I would prefer to go with "arm,tmc-scatter-gather"
-> and not "etr-scatter-gather". They both could mean different things.
->
->>
->> BTW, if SG had already been supported, then I'd say this is a quirk
->> and we should invert this property. Otherwise, you'd be disabling once
->> enabled SG and require working platforms to update their dtb. Of
->> course, I shouldn't really let the state of an OS driver influence the
->> DT binding.
->>
->
-> The SG support is added with this series. So, the OS has never made use
-> of the feature.
-
-Linux never did, but other OSs use DT, hence why I said "an OS
-driver", not "the OS driver". But in reality, I'd guess only Linux has
-Coresight support at all.
-
-Rob
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index c31f90a49481..67ce8c500b2e 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-amarula-relic.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+new file mode 100644
+index 000000000000..0e907e0e23c0
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+@@ -0,0 +1,182 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2017 Amarula Solutions B.V.
++ * Author: Jagan Teki <jagan@amarulasolutions.com>
++ */
++
++/dts-v1/;
++
++#include "sun50i-a64.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Amarula A64-Relic";
++	compatible = "amarula,a64-relic", "allwinner,sun50i-a64";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins>;
++	vmmc-supply = <&reg_dcdc1>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-hw-reset;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&r_rsb {
++	status = "okay";
++
++	axp803: pmic at 3a3 {
++		compatible = "x-powers,axp803";
++		reg = <0x3a3>;
++		interrupt-parent = <&r_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		x-powers,drive-vbus-en; /* set N_VBUSEN as output pin */
++	};
++};
++
++#include "axp803.dtsi"
++
++&reg_aldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "avdd-csi";
++};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vcc-pl";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-3v3";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1040000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-cpux";
++};
++
++/* DCDC3 is polyphased with DCDC2 */
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dcdc6 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-hdmi-dsi-sensor";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-mipi";
++};
++
++&reg_dldo3 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "vcc-gen";
++};
++
++&reg_dldo4 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi-io";
++};
++
++&reg_drivevbus {
++	regulator-name = "usb0-vbus";
++	status = "okay";
++};
++
++&reg_eldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "cpvdd";
++};
++
++&reg_fldo1 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-1v2-hsic";
++};
++
++/*
++ * The A64 chip cannot work without this regulator off, although
++ * it seems to be only driving the AR100 core.
++ * Maybe we don't still know well about CPUs domain.
++ */
++&reg_fldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "peripheral";
++	status = "okay";
++};
++
++&usbphy {
++	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
++	usb0_vbus-supply = <&reg_drivevbus>;
++	status = "okay";
++};
+-- 
+2.14.3
