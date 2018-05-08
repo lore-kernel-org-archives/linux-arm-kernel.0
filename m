@@ -1,133 +1,58 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 8 May 2018 14:43:58 +0300
-Subject: [PATCH 3/8] mailbox: Add transmit done by blocking option
-In-Reply-To: <20180508114403.14499-1-mperttunen@nvidia.com>
-References: <20180508114403.14499-1-mperttunen@nvidia.com>
-Message-ID: <20180508114403.14499-4-mperttunen@nvidia.com>
+Date: Tue, 8 May 2018 14:43:55 +0300
+Subject: [PATCH 0/8] Tegra Combined UART driver
+Message-ID: <20180508114403.14499-1-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new TXDONE option, TXDONE_BY_BLOCK. With this option, the
-send_data function of the mailbox driver is expected to block until
-the message has been sent. The new option is used with the Tegra
-Combined UART driver to minimize unnecessary overhead when transmitting
-data.
+Hi all,
 
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
----
- drivers/mailbox/mailbox.c | 30 +++++++++++++++++++++---------
- drivers/mailbox/mailbox.h |  1 +
- 2 files changed, 22 insertions(+), 9 deletions(-)
+on Tegra194, the primary console UART is the "Tegra Combined UART",
+or TCU. This is a "virtual UART", where each consumer communicates
+with a central implementation over mailboxes. The central
+implementation then multiplexes the streams and arbitrates use of
+a hardware serial port. This driver implements the consumer portion
+to allow using the primary console.
 
-diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index 674b35f402f5..5c76b70e673c 100644
---- a/drivers/mailbox/mailbox.c
-+++ b/drivers/mailbox/mailbox.c
-@@ -53,6 +53,8 @@ static int add_to_rbuf(struct mbox_chan *chan, void *mssg)
- 	return idx;
- }
- 
-+static void tx_tick(struct mbox_chan *chan, int r, bool submit_next);
-+
- static void msg_submit(struct mbox_chan *chan)
- {
- 	unsigned count, idx;
-@@ -60,10 +62,13 @@ static void msg_submit(struct mbox_chan *chan)
- 	void *data;
- 	int err = -EBUSY;
- 
-+next:
- 	spin_lock_irqsave(&chan->lock, flags);
- 
--	if (!chan->msg_count || chan->active_req)
--		goto exit;
-+	if (!chan->msg_count || chan->active_req) {
-+		spin_unlock_irqrestore(&chan->lock, flags);
-+		return;
-+	}
- 
- 	count = chan->msg_count;
- 	idx = chan->msg_free;
-@@ -82,15 +87,21 @@ static void msg_submit(struct mbox_chan *chan)
- 		chan->active_req = data;
- 		chan->msg_count--;
- 	}
--exit:
-+
- 	spin_unlock_irqrestore(&chan->lock, flags);
- 
- 	if (!err && (chan->txdone_method & TXDONE_BY_POLL))
- 		/* kick start the timer immediately to avoid delays */
- 		hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
-+
-+	if (chan->txdone_method & TXDONE_BY_BLOCK) {
-+		tx_tick(chan, err, false);
-+		if (!err)
-+			goto next;
-+	}
- }
- 
--static void tx_tick(struct mbox_chan *chan, int r)
-+static void tx_tick(struct mbox_chan *chan, int r, bool submit_next)
- {
- 	unsigned long flags;
- 	void *mssg;
-@@ -101,7 +112,8 @@ static void tx_tick(struct mbox_chan *chan, int r)
- 	spin_unlock_irqrestore(&chan->lock, flags);
- 
- 	/* Submit next message */
--	msg_submit(chan);
-+	if (submit_next)
-+		msg_submit(chan);
- 
- 	if (!mssg)
- 		return;
-@@ -127,7 +139,7 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
- 		if (chan->active_req && chan->cl) {
- 			txdone = chan->mbox->ops->last_tx_done(chan);
- 			if (txdone)
--				tx_tick(chan, 0);
-+				tx_tick(chan, 0, true);
- 			else
- 				resched = true;
- 		}
-@@ -176,7 +188,7 @@ void mbox_chan_txdone(struct mbox_chan *chan, int r)
- 		return;
- 	}
- 
--	tx_tick(chan, r);
-+	tx_tick(chan, r, true);
- }
- EXPORT_SYMBOL_GPL(mbox_chan_txdone);
- 
-@@ -196,7 +208,7 @@ void mbox_client_txdone(struct mbox_chan *chan, int r)
- 		return;
- 	}
- 
--	tx_tick(chan, r);
-+	tx_tick(chan, r, true);
- }
- EXPORT_SYMBOL_GPL(mbox_client_txdone);
- 
-@@ -275,7 +287,7 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
- 		ret = wait_for_completion_timeout(&chan->tx_complete, wait);
- 		if (ret == 0) {
- 			t = -ETIME;
--			tx_tick(chan, t);
-+			tx_tick(chan, t, true);
- 		}
- 	}
- 
-diff --git a/drivers/mailbox/mailbox.h b/drivers/mailbox/mailbox.h
-index 456ba68513bb..ec68e2e28cd6 100644
---- a/drivers/mailbox/mailbox.h
-+++ b/drivers/mailbox/mailbox.h
-@@ -10,5 +10,6 @@
- #define TXDONE_BY_IRQ	BIT(0) /* controller has remote RTR irq */
- #define TXDONE_BY_POLL	BIT(1) /* controller can read status of last TX */
- #define TXDONE_BY_ACK	BIT(2) /* S/W ACK recevied by Client ticks the TX */
-+#define TXDONE_BY_BLOCK	BIT(3) /* mailbox driver send_data blocks until done */
- 
- #endif /* __MAILBOX_H */
+The series is split into the following parts:
+* patches 1 and 2 add the device tree bindings for mailbox and tcu
+  itself.
+* patch 3 adds a blocking transmission option to the mailbox
+  framework.
+* patches 4 and 5 add support for the "shared mailbox" primitive
+  to the Tegra HSP driver.
+* patch 6 adds the TCU driver itself
+* patches 7 and 8 do the necessary device tree changes.
+
+The series has been tested on the Tegra194 P2972 board.
+
+Thanks,
+Mikko
+
+Mikko Perttunen (8):
+  dt-bindings: tegra186-hsp: Add shared interrupts
+  dt-bindings: serial: Add bindings for nvidia,tegra194-tcu
+  mailbox: Add transmit done by blocking option
+  mailbox: tegra-hsp: Refactor in preparation of mailboxes
+  mailbox: tegra-hsp: Add support for shared mailboxes
+  serial: Add Tegra Combined UART driver
+  arm64: tegra: Add nodes for tcu on Tegra194
+  arm64: tegra: Mark tcu as primary serial port on Tegra194 P2888
+
+ .../bindings/mailbox/nvidia,tegra186-hsp.txt       |   2 +
+ .../bindings/serial/nvidia,tegra194-tcu.txt        |  35 +++
+ arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi     |   2 +-
+ arch/arm64/boot/dts/nvidia/tegra194.dtsi           |  34 ++-
+ drivers/mailbox/mailbox.c                          |  30 +-
+ drivers/mailbox/mailbox.h                          |   1 +
+ drivers/mailbox/tegra-hsp.c                        | 320 +++++++++++++++++----
+ drivers/tty/serial/Kconfig                         |   9 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/tegra-tcu.c                     | 302 +++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ 11 files changed, 671 insertions(+), 68 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+ create mode 100644 drivers/tty/serial/tegra-tcu.c
+
 -- 
 2.16.1
