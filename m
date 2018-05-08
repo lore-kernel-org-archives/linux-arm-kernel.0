@@ -1,44 +1,77 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 8 May 2018 23:51:02 +0200
-Subject: Incoming sms problem on Motorola Droid 4
-Message-ID: <20180508215102.GA5253@amd>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 8 May 2018 22:51:59 +0100
+Subject: [PATCH v2 23/27] coresight: tmc-etr: Handle driver mode specific
+ ETR buffers
+In-Reply-To: <20180508171800.GA3389@xps15>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+ <1525165857-11096-24-git-send-email-suzuki.poulose@arm.com>
+ <20180508171800.GA3389@xps15>
+Message-ID: <a16587f9-bb0f-e806-9c8d-ee4af0e8b805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 05/08/2018 06:18 PM, Mathieu Poirier wrote:
+> On Tue, May 01, 2018 at 10:10:53AM +0100, Suzuki K Poulose wrote:
+>> Since the ETR could be driven either by SYSFS or by perf, it
+>> becomes complicated how we deal with the buffers used for each
+>> of these modes. The ETR driver cannot simply free the current
+>> attached buffer without knowing the provider (i.e, sysfs vs perf).
+>>
+>> To solve this issue, we provide:
+>> 1) the driver-mode specific etr buffer to be retained in the drvdata
+>> 2) the etr_buf for a session should be passed on when enabling the
+>>     hardware, which will be stored in drvdata->etr_buf. This will be
+>>     replaced (not free'd) as soon as the hardware is disabled, after
+>>     necessary sync operation.
+>>
+>> The advantages of this are :
+>>
+>> 1) The common code path doesn't need to worry about how to dispose
+>>     an existing buffer, if it is about to start a new session with a
+>>     different buffer, possibly in a different mode.
+>> 2) The driver mode can control its buffers and can get access to the
+>>     saved session even when the hardware is operating in a different
+>>     mode. (e.g, we can still access a trace buffer from a sysfs mode
+>>     even if the etr is now used in perf mode, without disrupting the
+>>     current session.)
+>>
+>> Towards this, we introduce a sysfs specific data which will hold the
+>> etr_buf used for sysfs mode of operation, controlled solely by the
+>> sysfs mode handling code.
+> 
+> Thinking further on this... I toyed with the idea of doing the same thing when
+> working on the original driver and decided against it.  Do we really have a case
+> where users would want to use sysFS and perf alternatively?  To me this looks
+> overdesigned.
+> 
+> If we are going to go that way we need to enact the same behavior for ETB10 and
+> ETF...  And take it out of this set as it is already substantial enough.
 
-I have problems with incoming SMS. ofono tries to use +CNMI=1,2,2,1,0
+The difference between ETB10/ETF and ETR is the usage of the buffer. The 
+former uses an internal buffer and we always have to copy it out to an
+external buffer for consumption. Now this external buffer is actually 
+separate for each mode, i.e sysfs and perf. Also the data is copied
+out right after we disable the HW. This ensures that the interleaved
+mode doesn't corrupt each others data.
 
-> AT+CNMI=?
-< +CNMI: (0,1,2),(0,1,2,3),(0,2),(0,1,2),(0,1)
-< OK
-ofonod[3070]: drivers/atmodem/sms.c:build_cnmi_string()
-ofonod[3070]: drivers/atmodem/sms.c:construct_ack_pdu()
-> AT+CNMI=1,2,2,1,0
-< OK
-ofonod[3070]: src/network.c:__ofono_netreg_add_status_watch() 0x5bbbf0
+However, the ETR doesn't have an internal buffer and uses the System 
+RAM. That brings in the problem of one mode using the "buffer" as
+described by the drvdata. So, eventually either mode could write to
+the buffer allocated by the other mode before it is consumed by the
+end user (via syfs read or perf). That brings in the challenge of
+managing the buffer safely, switching back and forth the buffer
+(with the right size and pages) for each mode without any interferences.
+That also implies, one mode must be able to free the left-over buffer
+from the previous mode safely (which could be potentially linked to
+other data structures maintained by the mode). And that makes it more 
+complex. e.g, we must leave the sysfs trace data for collection and
+meanwhile the perf could grab the ETR for its usage. The perf mode
+might not know the mode of the existing buffer and thus wouldn't know
+how to free it properly.
 
-... unfortunately, with that configuration no messages are comming to
-ofono and the other phone sees them as "delievery failed".
+This is why we need buffers per mode which can be managed by
+each mode. i.e, both allocated, used and more importantly free'd
+appropriately.
 
-I had some luck with unicsy_demo using AT+CNMI=1,2 with text mode (not
-PDU) messages. That works well enough for me.
-
-Unfortunately, if I force ofono to pass "AT+CNMI=1,2", it does not
-work well, either.
-
-Any ideas how to debug this / what to try?
-
-Thanks,
-
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180508/3f90d2c4/attachment.sig>
+Cheers
+Suzuki
