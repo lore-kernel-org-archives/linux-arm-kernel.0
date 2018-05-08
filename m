@@ -1,73 +1,106 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 May 2018 13:42:00 +0100
-Subject: [PATCH v9 01/12] ARM: Allow this header to be included by
- assembly files
-In-Reply-To: <20180504190545.5114-2-mylene.josserand@bootlin.com>
-References: <20180504190545.5114-1-mylene.josserand@bootlin.com>
- <20180504190545.5114-2-mylene.josserand@bootlin.com>
-Message-ID: <20180508124200.GM16141@n2100.armlinux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 8 May 2018 13:44:24 +0100
+Subject: [PATCH] tty: pl011: Avoid spuriously stuck-off interrupts
+In-Reply-To: <20180508110119.GA16141@n2100.armlinux.org.uk>
+References: <1524823545-11309-1-git-send-email-Dave.Martin@arm.com>
+ <1524823545-11309-2-git-send-email-Dave.Martin@arm.com>
+ <20180508110119.GA16141@n2100.armlinux.org.uk>
+Message-ID: <20180508124423.GK7753@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 09:05:34PM +0200, Myl?ne Josserand wrote:
-> From: Doug Berger <opendmb@gmail.com>
+On Tue, May 08, 2018 at 12:01:19PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Apr 27, 2018 at 11:05:45AM +0100, Dave Martin wrote:
+> > Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+> > clears the RX and receive timeout interrupts on pl011 startup, to
+> > avoid a screaming-interrupt scenario that can occur when the
+> > firmware or bootloader leaves these interrupts asserted.
+> > 
+> > This has been noted as an issue when running Linux on qemu [1].
+> > 
+> > Unfortunately, the above fix seems to lead to potential
+> > misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
+> > on driver startup, if the RX FIFO is also already full to the
+> > trigger level.
+> > 
+> > Clearing the RX FIFO interrupt does not change the FIFO fill level.
+> > In this scenario, because the interrupt is now clear and because
+> > the FIFO is already full to the trigger level, no new assertion of
+> > the RX FIFO interrupt can occur unless the FIFO is drained back
+> > below the trigger level.  This never occurs because the pl011
+> > driver is waiting for an RX FIFO interrupt to tell it that there is
+> > something to read, and does not read the FIFO at all until that
+> > interrupt occurs.
+> > 
+> > Thus, simply clearing "spurious" interrupts on startup may be
+> > misguided, since there is no way to be sure that the interrupts are
+> > truly spurious, and things can go wrong if they are not.
+> > 
+> > This patch instead clears the interrupt condition by draining the
+> > RX FIFO during UART startup, after clearing any potentially
+> > spurious interrupt.  This should ensure that an interrupt will
+> > definitely be asserted if the RX FIFO subsequently becomes
+> > sufficiently full.
+> > 
+> > The drain is done at the point of enabling interrupts only.  This
+> > means that it will occur any time the UART is newly opened through
+> > the tty layer.  It will not apply to polled-mode use of the UART by
+> > kgdboc: since that scenario cannot use interrupts by design, this
+> > should not matter.  kgdboc will interact badly with "normal" use of
+> > the UART in any case: this patch makes no attempt to paper over
+> > such issues.
+> > 
+> > This patch does not attempt to address the case where the RX FIFO
+> > fills faster than it can be drained: that is a pathological
+> > hardware design problem that is beyond the scope of the driver to
+> > work around.
+> > 
+> > [1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
+> > before enabled the interruption
+> > https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
+> > 
+> > Reported-by: Wei Xu <xuwei5@hisilicon.com>
+> > Cc: Russell King <linux@armlinux.org.uk>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Peter Maydell <peter.maydell@linaro.org>
+> > Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Tested-by: Andrew Jones <drjones@redhat.com>
+> > Reviewed-by: Andrew Jones <drjones@redhat.com>
+> > ---
+> >  drivers/tty/serial/amba-pl011.c | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> > 
+> > diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> > index 4b40a5b..a6ccb85 100644
+> > --- a/drivers/tty/serial/amba-pl011.c
+> > +++ b/drivers/tty/serial/amba-pl011.c
+> > @@ -1731,6 +1731,16 @@ static void pl011_enable_interrupts(struct uart_amba_port *uap)
+> >  
+> >  	/* Clear out any spuriously appearing RX interrupts */
+> >  	pl011_write(UART011_RTIS | UART011_RXIS, uap, REG_ICR);
+> > +
+> > +	/*
+> > +	 * RXIS is asserted only when the RX FIFO transitions from below
+> > +	 * to above the trigger threshold.  If the RX FIFO is already
+> > +	 * full to the threshold this can't happen and RXIS will now be
+> > +	 * stuck off.  Drain the RX FIFO explicitly to fix this:
+> > +	 */
+> > +	while (!(pl011_read(uap, REG_FR) & UART01x_FR_RXFE))
+> > +		pl011_read(uap, REG_DR);
 > 
-> The constants defined in this file are equally useful in assembly and C
-> source files. The arm64 architecture version of this file allows
-> inclusion in both assembly and C source files, so this this commit adds
-> that capability to the arm architecture version so that the constants
-> don't need to be defined in multiple places.
-> 
-> Signed-off-by: Doug Berger <opendmb@gmail.com>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> You probably ought to limit this in case of a stuck receive not empty
+> case, maybe to (eg) twice the depth of the FIFO?
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+My argument would have been that if the FIFO fills too fast to be
+drained, then you have more serious problems... but it would be better
+for this to show as character loss than a lockup.
 
-Thanks.
+So, I guess draining twice the FIFO depth before giving up is a
+reasonable compromise.
 
-> ---
->  arch/arm/include/asm/cputype.h | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index cb546425da8a..e7632f536633 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -2,9 +2,6 @@
->  #ifndef __ASM_ARM_CPUTYPE_H
->  #define __ASM_ARM_CPUTYPE_H
->  
-> -#include <linux/stringify.h>
-> -#include <linux/kernel.h>
-> -
->  #define CPUID_ID	0
->  #define CPUID_CACHETYPE	1
->  #define CPUID_TCM	2
-> @@ -98,6 +95,11 @@
->  /* Qualcomm implemented cores */
->  #define ARM_CPU_PART_SCORPION		0x510002d0
->  
-> +#ifndef __ASSEMBLY__
-> +
-> +#include <linux/stringify.h>
-> +#include <linux/kernel.h>
-> +
->  extern unsigned int processor_id;
->  
->  #ifdef CONFIG_CPU_CP15
-> @@ -326,4 +328,6 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u32 features,
->  #define cpuid_feature_extract(reg, field) \
->  	cpuid_feature_extract_field(read_cpuid_ext(reg), field)
->  
-> +#endif /* __ASSEMBLY__ */
-> +
->  #endif
-> -- 
-> 2.11.0
-> 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+I'll hack that in and repost.
+
+Cheers
+---Dave
