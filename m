@@ -1,71 +1,57 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 8 May 2018 13:30:31 +0100
-Subject: [PATCH v5 13/14] KVM: arm64: Fold redundant exit code checks out
- of fixup_guest_exit()
-In-Reply-To: <5b9460e5-207d-befd-446c-b9c7ec2bcc35@arm.com>
-References: <1525449935-31424-1-git-send-email-Dave.Martin@arm.com>
- <1525449935-31424-14-git-send-email-Dave.Martin@arm.com>
- <eddc101f-6f6c-a37b-ae48-e80a24f60815@arm.com>
- <20180508113039.GF7753@e103592.cambridge.arm.com>
- <5b9460e5-207d-befd-446c-b9c7ec2bcc35@arm.com>
-Message-ID: <20180508123031.GI7753@e103592.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 May 2018 13:34:08 +0100
+Subject: [PATCH net-next v2 06/13] phy: add 2.5G SGMII mode to the
+ phy_mode enum
+In-Reply-To: <20180504135643.23466-7-antoine.tenart@bootlin.com>
+References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
+ <20180504135643.23466-7-antoine.tenart@bootlin.com>
+Message-ID: <20180508123408.GK16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 12:59:39PM +0100, Marc Zyngier wrote:
-> On 08/05/18 12:30, Dave Martin wrote:
-> > On Tue, May 08, 2018 at 11:59:25AM +0100, Marc Zyngier wrote:
-> >> On 04/05/18 17:05, Dave Martin wrote:
-
-[...]
-
-> >>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> >>> index 39e9166..be09c52 100644
-> >>> --- a/arch/arm64/kvm/hyp/switch.c
-> >>> +++ b/arch/arm64/kvm/hyp/switch.c
-> >>> @@ -385,11 +385,13 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
-> >>>  	 * same PC once the SError has been injected, and replay the
-> >>>  	 * trapping instruction.
-> >>>  	 */
-> >>> -	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
-> >>> +	if (*exit_code != ARM_EXCEPTION_TRAP)
-> >>> +		goto exit;
-> >>> +
-> >>> +	if (!__populate_fault_info(vcpu))
-> >>>  		return true;
-> >>>  
-> >>> -	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
-> >>> -	    *exit_code == ARM_EXCEPTION_TRAP) {
-> >>> +	if (static_branch_unlikely(&vgic_v2_cpuif_trap)) {
-> >>>  		bool valid;
-> >>>  
-> >>>  		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
-> >>> @@ -414,12 +416,12 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
-> >>>  				if (!__skip_instr(vcpu))
-> >>>  					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
-> >>>  				*exit_code = ARM_EXCEPTION_EL1_SERROR;
-> >>> +				goto exit;
-> >>
-> >> This goto...
-> >>
-> >>>  			}
-> >>
-> >> ... should be placed here. If this was a data abort, it cannot be a
-> >> system register trap, and the below conditions cannot possibly apply.
-> > 
-> > That sounds logically sensible, but to be clear, this would be a
-> > semantic change to this function, right?
-> > 
-> > (i.e., it forces skipping of the GICv3 handling code in a case where
-> > it previously wasn't forced -- at least not within this function.  The
-> > arguments about whether vgic_v2_cpuif_trap and vgic_v3_cpuif_trap can
-> > ever be true simultaneously still apply.)
+On Fri, May 04, 2018 at 03:56:36PM +0200, Antoine Tenart wrote:
+> This patch adds one more generic PHY mode to the phy_mode enum, to allow
+> configuring generic PHYs to the 2.5G SGMII mode by using the set_mode
+> callback.
 > 
-> I agree that this is a slight semantic change, but one that makes sense,
-> just like the one you've introduced in patch #12.
+> Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Agreed, just wanted to make sure I hadn't missed something in my
-original refactoring.
+Hi,
 
-Cheers
----Dave
+Would it be possible to get the 2.5G SGMII comphy support merged
+ahead of the rest of this series please - I don't think there's been
+any objections to it, and having it in mainline would then mean I can
+drop the Marvell Comphy code from my tree and transition to the bootlin
+Comphy code instead.
+
+Of course, the perfect solution would be to get the whole series merged,
+but I'm just thinking about the situation where we're still discussing
+points when the next merge window opens.
+
+Thanks.
+
+> ---
+>  include/linux/phy/phy.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+> index c9d14eeee7f5..9713aebdd348 100644
+> --- a/include/linux/phy/phy.h
+> +++ b/include/linux/phy/phy.h
+> @@ -36,6 +36,7 @@ enum phy_mode {
+>  	PHY_MODE_USB_DEVICE_SS,
+>  	PHY_MODE_USB_OTG,
+>  	PHY_MODE_SGMII,
+> +	PHY_MODE_2500SGMII,
+>  	PHY_MODE_10GKR,
+>  	PHY_MODE_UFS_HS_A,
+>  	PHY_MODE_UFS_HS_B,
+> -- 
+> 2.17.0
+> 
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
