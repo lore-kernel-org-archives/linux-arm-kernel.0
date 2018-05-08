@@ -1,46 +1,77 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 8 May 2018 11:06:44 -0300
-Subject: [PATCH] arm: dts: imx: fix IPU OF graph endpoint node names
-In-Reply-To: <20180508135930.5768-2-robh@kernel.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 08 May 2018 16:16:37 +0200
+Subject: [PATCH] arm: dts: imx53: Fix LDB OF graph warning
+In-Reply-To: <20180508135930.5768-3-robh@kernel.org>
 References: <20180508135930.5768-1-robh@kernel.org>
- <20180508135930.5768-2-robh@kernel.org>
-Message-ID: <CAOMZO5A+7YW89E5PEo6841hk8GQUr2k7D+xWPGb1iqvpD096Rg@mail.gmail.com>
+ <20180508135930.5768-3-robh@kernel.org>
+Message-ID: <1525788997.18091.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tue, 2018-05-08 at 08:59 -0500, Rob Herring wrote:
+> Single child nodes in OF graph don't need an address and now dtc will
+> warn about this:
+> 
+> Warning (graph_child_address): /soc/aips at 50000000/ldb at 53fa8008/lvds-channel at 0: graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
+> 
+> Since the LDB should always have an output port, fix the warning by
+> adding the output port, 2, to the DT.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  arch/arm/boot/dts/imx53.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index 7d647d043f52..1cf2fc9d0a58 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -488,6 +488,10 @@
+>  							remote-endpoint = <&ipu_di0_lvds0>;
+>  						};
+>  					};
+> +
+> +					port at 2 {
+> +						reg = <2>;
+> +					};
 
-On Tue, May 8, 2018 at 10:59 AM, Rob Herring <robh@kernel.org> wrote:
+Now that the reg property of port at 2 is added in the .dtsi, it could be
+removed from the one .dts files that use it:
 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-> index 18b65052553d..654cf2c9b073 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-> @@ -379,9 +379,6 @@
->                 powerdown-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>; /* NANDF_WP_B */
->
->                 port {
-> -                       #address-cells = <1>;
-> -                       #size-cells = <0>;
-> -
->                         ov5640_to_mipi_csi2: endpoint {
->                                 remote-endpoint = <&mipi_csi2_in>;
->                                 clock-lanes = <0>;
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> index f019f9900369..c2de2250718c 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -294,9 +294,6 @@
->                 reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
->
->                 port {
-> -                       #address-cells = <1>;
-> -                       #size-cells = <0>;
-> -
->                         ov5640_to_mipi_csi2: endpoint {
+----------8<----------
+--- a/arch/arm/boot/dts/imx53-ppd.dts
++++ b/arch/arm/boot/dts/imx53-ppd.dts
+@@ -559,8 +559,6 @@
+                status = "okay";
+ 
+                port@2 {
+-                       reg = <2>;
+-
+                        lvds0_out: endpoint {
+                                remote-endpoint = <&panel_in_lvds0>;
+                        };
+---------->8----------
 
-These two changes seem unrelated and I have already fixed them at:
-https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=1b215c73d1586e6f2586e9a6d6dfaf49cc142b3a
+>  				};
+>  
+>  				lvds-channel at 1 {
+> @@ -503,6 +507,10 @@
+>  							remote-endpoint = <&ipu_di1_lvds1>;
+>  						};
+>  					};
+> +
+> +					port at 2 {
+> +						reg = <2>;
+> +					};
+>  				};
+>  			};
+>  
 
-BTW, linux-next from today shows no W=1 DTC warnings on
-imx_v6_v7_defconfig, but maybe new ones are coming soon :-)
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
