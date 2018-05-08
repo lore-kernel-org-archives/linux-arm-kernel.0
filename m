@@ -1,48 +1,47 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 8 May 2018 11:05:20 +0100
-Subject: [PATCH 3/3] dma-debug: unexport dma_debug_resize_entries and
- debug_dma_dump_mappings
-In-Reply-To: <20180424140235.9125-4-hch@lst.de>
-References: <20180424140235.9125-1-hch@lst.de>
- <20180424140235.9125-4-hch@lst.de>
-Message-ID: <bb5bb25f-24da-9729-a39b-3b88c65ef628@arm.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  8 May 2018 12:05:40 +0200
+Subject: [PATCH v3 0/3] led_trigger_register_format and tty triggers
+Message-ID: <20180508100543.12559-1-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/18 15:02, Christoph Hellwig wrote:
-> Only used by the AMD GART driver, which must be built in.
+Hello,
 
-FWIW debug_dma_dump_mappings() is also called by the Intel VT-d driver, 
-but the same reasoning still applies. This does rather beg the question 
-of whether it's right to have bits of low-level dma-debug internals 
-*only* called by a couple of IOMMU drivers, but that can wait for 
-another day.
+while working on a patch that adds led triggers to drivers/tty (patch 3)
+I thought that being able to pass a format string (and the respective
+parameters) to led_trigger_register_simple instead of a constant string
+would be nice. This is implemented in the first patch. The second patch
+converts the can leds to this new function which demonstrates nicely the
+added benefit for users. Both patches are new in v3.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+The third patch finally implements the triggers for the tty framework.
+Compared to v2 I reduced the need for #ifdefs, make use of
+led_trigger_register_format() and excluded serdev devices from
+triggering as suggested by Johan Hovold.
 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->   lib/dma-debug.c | 2 --
->   1 file changed, 2 deletions(-)
-> 
-> diff --git a/lib/dma-debug.c b/lib/dma-debug.c
-> index 075253cb613b..6a1ebaa83623 100644
-> --- a/lib/dma-debug.c
-> +++ b/lib/dma-debug.c
-> @@ -444,7 +444,6 @@ void debug_dma_dump_mappings(struct device *dev)
->   		spin_unlock_irqrestore(&bucket->lock, flags);
->   	}
->   }
-> -EXPORT_SYMBOL(debug_dma_dump_mappings);
->   
->   /*
->    * For each mapping (initial cacheline in the case of
-> @@ -753,7 +752,6 @@ int dma_debug_resize_entries(u32 num_entries)
->   
->   	return ret;
->   }
-> -EXPORT_SYMBOL(dma_debug_resize_entries);
->   
->   /*
->    * DMA-API debugging init code
-> 
+Also code cleanup in the error case is done now and hopefully the kbuild
+test robot is happy now.
+
+Best regards
+Uwe
+
+Uwe Kleine-K?nig (3):
+  leds: triggers: provide led_trigger_register_format()
+  can: simplify LED trigger handling
+  tty: implement led triggers
+
+ arch/arm/boot/dts/imx25-logitech-baby.dts | 192 ++++++++++++++++++++++
+ drivers/leds/led-triggers.c               |  84 +++++++---
+ drivers/net/can/led.c                     |  30 +---
+ drivers/tty/Kconfig                       |   7 +
+ drivers/tty/tty_buffer.c                  |   2 +
+ drivers/tty/tty_io.c                      |   3 +
+ drivers/tty/tty_port.c                    |  32 +++-
+ include/linux/can/dev.h                   |   3 -
+ include/linux/leds.h                      |  30 ++--
+ include/linux/tty.h                       |  22 +++
+ 10 files changed, 341 insertions(+), 64 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx25-logitech-baby.dts
+
+-- 
+2.17.0
