@@ -1,29 +1,49 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 8 May 2018 08:41:45 +0200
-Subject: [PATCH v7 1/6] dt-bindings: define vendor prefix for Wi2Wi, Inc.
-In-Reply-To: <20180507205455.GA28316@rob-hp-laptop>
-References: <cover.1525340143.git.hns@goldelico.com>
- <7c03df30ceec8b171ab88787c1ef9556c96b30f6.1525340143.git.hns@goldelico.com>
- <20180507205455.GA28316@rob-hp-laptop>
-Message-ID: <61FC6AF2-C770-45FF-B2D3-932377FF0C91@goldelico.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 8 May 2018 08:45:01 +0200
+Subject: [PATCH v3 2/3] platform: move the early platform device support
+ to arch/sh
+In-Reply-To: <20180504132731.14574-3-brgl@bgdev.pl>
+References: <20180504132731.14574-1-brgl@bgdev.pl>
+ <20180504132731.14574-3-brgl@bgdev.pl>
+Message-ID: <CAMuHMdXbTkOHAGFBAz16zV1NKmejzy1SpO7LuqZUmsasVf0-jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Rob,
+Hi Bartosz,
 
-> Am 07.05.2018 um 22:54 schrieb Rob Herring <robh@kernel.org>:
-> 
-> On Thu, May 03, 2018 at 11:35:46AM +0200, H. Nikolaus Schaller wrote:
->> Introduce vendor prefix for Wi2Wi, Inc. for W2SG0004 GPS module
->> and W2CBW003 Bluetooth/WiFi combo (CSR/Marvell).
->> 
->> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->> Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->> 1 file changed, 1 insertion(+)
-> 
-> Applied this one so you don't have to keep sending it.
+On Fri, May 4, 2018 at 3:27 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>
+> SuperH is the only user of the current implementation of early platform
+> device support. We want to introduce a more robust approach to early
+> probing. As the first step - move all the current early platform code
+> to arch/sh.
+>
+> In order not to export internal drivers/base functions to arch code for
+> this temporary solution - copy the two needed routines for driver
+> matching from drivers/base/platform.c to arch/sh/drivers/platform_early.c.
+>
+> Also: call early_platform_cleanup() from subsys_initcall() so that it's
+> called after all early devices are probed.
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Thanks and BR,
-Nikolaus
+>  drivers/clocksource/sh_cmt.c           |   7 +
+>  drivers/clocksource/sh_mtu2.c          |   7 +
+>  drivers/clocksource/sh_tmu.c           |   8 +
+>  drivers/tty/serial/sh-sci.c            |   7 +-
+>  include/linux/platform_device.h        |  64 +----
+
+The parts used on contemporary ARM/ARM64 Renesas SoCs look fine to me, so
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
