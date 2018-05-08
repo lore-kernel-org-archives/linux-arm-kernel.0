@@ -1,243 +1,279 @@
-From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
-Date: Tue, 8 May 2018 21:33:14 +0200
-Subject: [PATCH v3 1/3] leds: triggers: provide
- led_trigger_register_format()
-In-Reply-To: <20180508100543.12559-2-u.kleine-koenig@pengutronix.de>
-References: <20180508100543.12559-1-u.kleine-koenig@pengutronix.de>
- <20180508100543.12559-2-u.kleine-koenig@pengutronix.de>
-Message-ID: <ea34ce99-d446-03d2-b38d-d40a22480337@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 8 May 2018 13:42:41 -0600
+Subject: [PATCH v2 26/27] coresight: perf: Remove reset_buffer call back
+ for sinks
+In-Reply-To: <1525165857-11096-27-git-send-email-suzuki.poulose@arm.com>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+ <1525165857-11096-27-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180508194241.GC3389@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-Thank you for the patch. It looks fine, but please split
-the drivers/net/can/led.c related changes into a separate one.
-
-Best regards,
-Jacek Anaszewski
-
-On 05/08/2018 12:05 PM, Uwe Kleine-K?nig wrote:
-> This allows one to simplify drivers that provide a trigger with a
-> non-constant name (e.g. one trigger per device with the trigger name
-> depending on the device's name).
+On Tue, May 01, 2018 at 10:10:56AM +0100, Suzuki K Poulose wrote:
+> Right now we issue an update_buffer() and reset_buffer() call backs
+> in succession when we stop tracing an event. The update_buffer is
+> supposed to check the status of the buffer and make sure the ring buffer
+> is updated with the trace data. And we store information about the
+> size of the data collected only to be consumed by the reset_buffer
+> callback which always follows the update_buffer. This was originally
+> designed for handling future IPs which could trigger a buffer overflow
+> interrupt. This patch gets rid of the reset_buffer callback altogether
+> and performs the actions in update_buffer, making it return the size
+> collected. We can always add the support for handling the overflow
+> interrupt case later.
 > 
-> Internally the memory the name member of struct led_trigger points to
-> now always allocated dynamically instead of just taken from the caller.
+> This removes some not-so pretty hack (storing the new head in the
+> size field for snapshot mode) and cleans it up a little bit.
+
+IPs with an overflow interrupts will be arriving shortly, so it is not like the
+future is uncertain - they are coming.  Right now the logic is there - I don't
+see a real need to consolidate things only to split it again in the near future.
+
+I agree the part about overloading buf->data_size with the head of the ring
+buffer when operating in snapshot mode isn't pretty (though well documented).
+If anything that can be improve, i.e add a buf->head and things will be clear.
+Once again this could be part of another patchset.
+
 > 
-> The function led_trigger_rename_static() must be changed accordingly and
-> was renamed to led_trigger_rename() for consistency, with the only user
-> adapted.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->   drivers/leds/led-triggers.c | 84 +++++++++++++++++++++++++++----------
->   drivers/net/can/led.c       |  6 +--
->   include/linux/leds.h        | 30 +++++++------
->   3 files changed, 81 insertions(+), 39 deletions(-)
+>  drivers/hwtracing/coresight/coresight-etb10.c    | 56 +++++------------------
+>  drivers/hwtracing/coresight/coresight-etm-perf.c |  9 +---
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c  | 58 +++++-------------------
+>  include/linux/coresight.h                        |  5 +-
+>  4 files changed, 26 insertions(+), 102 deletions(-)
 > 
-> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
-> index 431123b048a2..5d8bb504b07b 100644
-> --- a/drivers/leds/led-triggers.c
-> +++ b/drivers/leds/led-triggers.c
-> @@ -175,18 +175,34 @@ void led_trigger_set_default(struct led_classdev *led_cdev)
->   }
->   EXPORT_SYMBOL_GPL(led_trigger_set_default);
->   
-> -void led_trigger_rename_static(const char *name, struct led_trigger *trig)
-> +int led_trigger_rename(struct led_trigger *trig, const char *fmt, ...)
->   {
-> -	/* new name must be on a temporary string to prevent races */
-> -	BUG_ON(name == trig->name);
-> +	const char *prevname;
-> +	const char *newname;
-> +	va_list args;
-> +
-> +	if (!trig)
-> +		return 0;
-> +
-> +	va_start(args, fmt);
-> +	newname = kvasprintf_const(GFP_KERNEL, fmt, args);
-> +	va_end(args);
-> +
-> +	if (!newname) {
-> +		pr_err("Failed to allocate new name for trigger %s\n", trig->name);
-> +		return -ENOMEM;
-> +	}
->   
->   	down_write(&triggers_list_lock);
-> -	/* this assumes that trig->name was originaly allocated to
-> -	 * non constant storage */
-> -	strcpy((char *)trig->name, name);
-> +	prevname = trig->name;
-> +	trig->name = newname;
->   	up_write(&triggers_list_lock);
-> +
-> +	kfree_const(prevname);
-> +
-> +	return 0;
->   }
-> -EXPORT_SYMBOL_GPL(led_trigger_rename_static);
-> +EXPORT_SYMBOL_GPL(led_trigger_rename);
->   
->   /* LED Trigger Interface */
->   
-> @@ -333,34 +349,56 @@ void led_trigger_blink_oneshot(struct led_trigger *trig,
->   }
->   EXPORT_SYMBOL_GPL(led_trigger_blink_oneshot);
->   
-> -void led_trigger_register_simple(const char *name, struct led_trigger **tp)
-> +int led_trigger_register_format(struct led_trigger **tp, const char *fmt, ...)
->   {
-> +	va_list args;
->   	struct led_trigger *trig;
-> -	int err;
-> +	int err = -ENOMEM;
-> +	const char *name;
-> +
-> +	va_start(args, fmt);
-> +	name = kvasprintf_const(GFP_KERNEL, fmt, args);
-> +	va_end(args);
->   
->   	trig = kzalloc(sizeof(struct led_trigger), GFP_KERNEL);
->   
-> -	if (trig) {
-> -		trig->name = name;
-> -		err = led_trigger_register(trig);
-> -		if (err < 0) {
-> -			kfree(trig);
-> -			trig = NULL;
-> -			pr_warn("LED trigger %s failed to register (%d)\n",
-> -				name, err);
-> -		}
-> -	} else {
-> -		pr_warn("LED trigger %s failed to register (no memory)\n",
-> -			name);
+> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+> index d9c2f87..b13712a 100644
+> --- a/drivers/hwtracing/coresight/coresight-etb10.c
+> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
+> @@ -322,37 +322,7 @@ static int etb_set_buffer(struct coresight_device *csdev,
+>  	return ret;
+>  }
+>  
+> -static unsigned long etb_reset_buffer(struct coresight_device *csdev,
+> -				      struct perf_output_handle *handle,
+> -				      void *sink_config)
+> -{
+> -	unsigned long size = 0;
+> -	struct cs_buffers *buf = sink_config;
+> -
+> -	if (buf) {
+> -		/*
+> -		 * In snapshot mode ->data_size holds the new address of the
+> -		 * ring buffer's head.  The size itself is the whole address
+> -		 * range since we want the latest information.
+> -		 */
+> -		if (buf->snapshot)
+> -			handle->head = local_xchg(&buf->data_size,
+> -						  buf->nr_pages << PAGE_SHIFT);
+> -
+> -		/*
+> -		 * Tell the tracer PMU how much we got in this run and if
+> -		 * something went wrong along the way.  Nobody else can use
+> -		 * this cs_buffers instance until we are done.  As such
+> -		 * resetting parameters here and squaring off with the ring
+> -		 * buffer API in the tracer PMU is fine.
+> -		 */
+> -		size = local_xchg(&buf->data_size, 0);
 > -	}
-> +	if (!name || !trig)
-> +		goto err;
-> +
-> +	trig->name = name;
-> +
-> +	err = led_trigger_register(trig);
-> +	if (err < 0)
-> +		goto err;
-> +
->   	*tp = trig;
-> +
-> +	return 0;
-> +
-> +err:
-> +	kfree(trig);
-> +	kfree_const(name);
-> +
-> +	*tp = NULL;
-> +
-> +	return err;
-> +}
-> +EXPORT_SYMBOL_GPL(led_trigger_register_format);
-> +
-> +void led_trigger_register_simple(const char *name, struct led_trigger **tp)
-> +{
-> +	int ret = led_trigger_register_format(tp, "%s", name);
-> +	if (ret < 0)
-> +		pr_warn("LED trigger %s failed to register (%d)\n", name, ret);
->   }
->   EXPORT_SYMBOL_GPL(led_trigger_register_simple);
->   
->   void led_trigger_unregister_simple(struct led_trigger *trig)
->   {
-> -	if (trig)
-> +	if (trig) {
->   		led_trigger_unregister(trig);
-> +		kfree_const(trig->name);
+> -
+> -	return size;
+> -}
+> -
+> -static void etb_update_buffer(struct coresight_device *csdev,
+> +static unsigned long etb_update_buffer(struct coresight_device *csdev,
+>  			      struct perf_output_handle *handle,
+>  			      void *sink_config)
+>  {
+> @@ -361,13 +331,13 @@ static void etb_update_buffer(struct coresight_device *csdev,
+>  	u8 *buf_ptr;
+>  	const u32 *barrier;
+>  	u32 read_ptr, write_ptr, capacity;
+> -	u32 status, read_data, to_read;
+> -	unsigned long offset;
+> +	u32 status, read_data;
+> +	unsigned long offset, to_read;
+>  	struct cs_buffers *buf = sink_config;
+>  	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  
+>  	if (!buf)
+> -		return;
+> +		return 0;
+>  
+>  	capacity = drvdata->buffer_depth * ETB_FRAME_SIZE_WORDS;
+>  
+> @@ -472,18 +442,17 @@ static void etb_update_buffer(struct coresight_device *csdev,
+>  	writel_relaxed(0x0, drvdata->base + ETB_RAM_WRITE_POINTER);
+>  
+>  	/*
+> -	 * In snapshot mode all we have to do is communicate to
+> -	 * perf_aux_output_end() the address of the current head.  In full
+> -	 * trace mode the same function expects a size to move rb->aux_head
+> -	 * forward.
+> +	 * In snapshot mode we have to update the handle->head to point
+> +	 * to the new location.
+>  	 */
+> -	if (buf->snapshot)
+> -		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
+> -	else
+> -		local_add(to_read, &buf->data_size);
+> -
+> +	if (buf->snapshot) {
+> +		handle->head = (cur * PAGE_SIZE) + offset;
+> +		to_read = buf->nr_pages << PAGE_SHIFT;
 > +	}
->   	kfree(trig);
->   }
->   EXPORT_SYMBOL_GPL(led_trigger_unregister_simple);
-> diff --git a/drivers/net/can/led.c b/drivers/net/can/led.c
-> index c1b667675fa1..2d7d1b0d20f9 100644
-> --- a/drivers/net/can/led.c
-> +++ b/drivers/net/can/led.c
-> @@ -115,13 +115,13 @@ static int can_led_notifier(struct notifier_block *nb, unsigned long msg,
->   
->   	if (msg == NETDEV_CHANGENAME) {
->   		snprintf(name, sizeof(name), "%s-tx", netdev->name);
-> -		led_trigger_rename_static(name, priv->tx_led_trig);
-> +		led_trigger_rename(priv->tx_led_trig, name);
->   
->   		snprintf(name, sizeof(name), "%s-rx", netdev->name);
-> -		led_trigger_rename_static(name, priv->rx_led_trig);
-> +		led_trigger_rename(priv->rx_led_trig, name);
->   
->   		snprintf(name, sizeof(name), "%s-rxtx", netdev->name);
-> -		led_trigger_rename_static(name, priv->rxtx_led_trig);
-> +		led_trigger_rename(priv->rxtx_led_trig, name);
->   	}
->   
->   	return NOTIFY_DONE;
-> diff --git a/include/linux/leds.h b/include/linux/leds.h
-> index b7e82550e655..e706c28bb35b 100644
-> --- a/include/linux/leds.h
-> +++ b/include/linux/leds.h
-> @@ -275,6 +275,8 @@ extern void led_trigger_unregister(struct led_trigger *trigger);
->   extern int devm_led_trigger_register(struct device *dev,
->   				     struct led_trigger *trigger);
->   
-> +extern int led_trigger_register_format(struct led_trigger **trigger,
-> +				       const char *fmt, ...);
->   extern void led_trigger_register_simple(const char *name,
->   				struct led_trigger **trigger);
->   extern void led_trigger_unregister_simple(struct led_trigger *trigger);
-> @@ -298,28 +300,25 @@ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
->   }
->   
->   /**
-> - * led_trigger_rename_static - rename a trigger
-> - * @name: the new trigger name
-> + * led_trigger_rename - rename a trigger
->    * @trig: the LED trigger to rename
-> + * @fmt: format string for new name
->    *
-> - * Change a LED trigger name by copying the string passed in
-> - * name into current trigger name, which MUST be large
-> - * enough for the new string.
-> - *
-> - * Note that name must NOT point to the same string used
-> - * during LED registration, as that could lead to races.
-> - *
-> - * This is meant to be used on triggers with statically
-> - * allocated name.
-> + * rebaptize the given trigger.
->    */
-> -extern void led_trigger_rename_static(const char *name,
-> -				      struct led_trigger *trig);
-> +extern int led_trigger_rename(struct led_trigger *trig, const char *fmt, ...);
->   
->   #else
->   
->   /* Trigger has no members */
->   struct led_trigger {};
->   
-> +static inline int led_trigger_register_format(struct led_trigger **trigger,
-> +					      const char *fmt, ...)
-> +{
-> +	return 0;
-> +}
+>  	etb_enable_hw(drvdata);
+>  	CS_LOCK(drvdata->base);
 > +
->   /* Trigger inline empty functions */
->   static inline void led_trigger_register_simple(const char *name,
->   					struct led_trigger **trigger) {}
-> @@ -342,6 +341,11 @@ static inline void *led_get_trigger_data(struct led_classdev *led_cdev)
->   	return NULL;
->   }
->   
-> +static inline int led_trigger_rename(struct led_trigger *trig, const char *fmt, ...)
-> +{
-> +	return 0;
-> +}
+> +	return to_read;
+>  }
+>  
+>  static const struct coresight_ops_sink etb_sink_ops = {
+> @@ -492,7 +461,6 @@ static const struct coresight_ops_sink etb_sink_ops = {
+>  	.alloc_buffer	= etb_alloc_buffer,
+>  	.free_buffer	= etb_free_buffer,
+>  	.set_buffer	= etb_set_buffer,
+> -	.reset_buffer	= etb_reset_buffer,
+>  	.update_buffer	= etb_update_buffer,
+>  };
+>  
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index 4e5ed65..5096def 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -342,15 +342,8 @@ static void etm_event_stop(struct perf_event *event, int mode)
+>  		if (!sink_ops(sink)->update_buffer)
+>  			return;
+>  
+> -		sink_ops(sink)->update_buffer(sink, handle,
+> +		size = sink_ops(sink)->update_buffer(sink, handle,
+>  					      event_data->snk_config);
+> -
+> -		if (!sink_ops(sink)->reset_buffer)
+> -			return;
+> -
+> -		size = sink_ops(sink)->reset_buffer(sink, handle,
+> -						    event_data->snk_config);
+> -
+>  		perf_aux_output_end(handle, size);
+>  	}
+>  
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index 0a32734..75ef5c4 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -360,36 +360,7 @@ static int tmc_set_etf_buffer(struct coresight_device *csdev,
+>  	return ret;
+>  }
+>  
+> -static unsigned long tmc_reset_etf_buffer(struct coresight_device *csdev,
+> -					  struct perf_output_handle *handle,
+> -					  void *sink_config)
+> -{
+> -	long size = 0;
+> -	struct cs_buffers *buf = sink_config;
+> -
+> -	if (buf) {
+> -		/*
+> -		 * In snapshot mode ->data_size holds the new address of the
+> -		 * ring buffer's head.  The size itself is the whole address
+> -		 * range since we want the latest information.
+> -		 */
+> -		if (buf->snapshot)
+> -			handle->head = local_xchg(&buf->data_size,
+> -						  buf->nr_pages << PAGE_SHIFT);
+> -		/*
+> -		 * Tell the tracer PMU how much we got in this run and if
+> -		 * something went wrong along the way.  Nobody else can use
+> -		 * this cs_buffers instance until we are done.  As such
+> -		 * resetting parameters here and squaring off with the ring
+> -		 * buffer API in the tracer PMU is fine.
+> -		 */
+> -		size = local_xchg(&buf->data_size, 0);
+> -	}
+> -
+> -	return size;
+> -}
+> -
+> -static void tmc_update_etf_buffer(struct coresight_device *csdev,
+> +static unsigned long tmc_update_etf_buffer(struct coresight_device *csdev,
+>  				  struct perf_output_handle *handle,
+>  				  void *sink_config)
+>  {
+> @@ -398,17 +369,17 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+>  	const u32 *barrier;
+>  	u32 *buf_ptr;
+>  	u64 read_ptr, write_ptr;
+> -	u32 status, to_read;
+> -	unsigned long offset;
+> +	u32 status;
+> +	unsigned long offset, to_read;
+>  	struct cs_buffers *buf = sink_config;
+>  	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  
+>  	if (!buf)
+> -		return;
+> +		return 0;
+>  
+>  	/* This shouldn't happen */
+>  	if (WARN_ON_ONCE(drvdata->mode != CS_MODE_PERF))
+> -		return;
+> +		return 0;
+>  
+>  	CS_UNLOCK(drvdata->base);
+>  
+> @@ -497,18 +468,14 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+>  		}
+>  	}
+>  
+> -	/*
+> -	 * In snapshot mode all we have to do is communicate to
+> -	 * perf_aux_output_end() the address of the current head.  In full
+> -	 * trace mode the same function expects a size to move rb->aux_head
+> -	 * forward.
+> -	 */
+> -	if (buf->snapshot)
+> -		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
+> -	else
+> -		local_add(to_read, &buf->data_size);
+> -
+> +	/* In snapshot mode we have to update the head */
+> +	if (buf->snapshot) {
+> +		handle->head = (cur * PAGE_SIZE) + offset;
+> +		to_read = buf->nr_pages << PAGE_SHIFT;
+> +	}
+>  	CS_LOCK(drvdata->base);
 > +
->   #endif /* CONFIG_LEDS_TRIGGERS */
->   
->   /* Trigger specific functions */
+> +	return to_read;
+>  }
+>  
+>  static const struct coresight_ops_sink tmc_etf_sink_ops = {
+> @@ -517,7 +484,6 @@ static const struct coresight_ops_sink tmc_etf_sink_ops = {
+>  	.alloc_buffer	= tmc_alloc_etf_buffer,
+>  	.free_buffer	= tmc_free_etf_buffer,
+>  	.set_buffer	= tmc_set_etf_buffer,
+> -	.reset_buffer	= tmc_reset_etf_buffer,
+>  	.update_buffer	= tmc_update_etf_buffer,
+>  };
+>  
+> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+> index c0e1568..41b3729 100644
+> --- a/include/linux/coresight.h
+> +++ b/include/linux/coresight.h
+> @@ -212,10 +212,7 @@ struct coresight_ops_sink {
+>  	int (*set_buffer)(struct coresight_device *csdev,
+>  			  struct perf_output_handle *handle,
+>  			  void *sink_config);
+> -	unsigned long (*reset_buffer)(struct coresight_device *csdev,
+> -				      struct perf_output_handle *handle,
+> -				      void *sink_config);
+> -	void (*update_buffer)(struct coresight_device *csdev,
+> +	unsigned long (*update_buffer)(struct coresight_device *csdev,
+>  			      struct perf_output_handle *handle,
+>  			      void *sink_config);
+>  };
+> -- 
+> 2.7.4
 > 
