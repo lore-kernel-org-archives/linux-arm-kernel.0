@@ -1,53 +1,121 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue,  8 May 2018 11:43:31 +0100
-Subject: [PATCH 2/2] arm64/sve: signal: Include SVE when computing
- AT_MINSIGSTKSZ
-In-Reply-To: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
-References: <1525776211-28169-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525776211-28169-3-git-send-email-Dave.Martin@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 May 2018 11:57:32 +0100
+Subject: [PATCH v7 05/11] ARM: smp: Add initialization of CNTVOFF
+In-Reply-To: <20180420211022.11759-6-mylene.josserand@bootlin.com>
+References: <20180420211022.11759-1-mylene.josserand@bootlin.com>
+ <20180420211022.11759-6-mylene.josserand@bootlin.com>
+Message-ID: <20180508105732.GZ16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SVE context block in the signal frame needs to be considered
-too when computing the maximum possible signal frame size.
+On Fri, Apr 20, 2018 at 11:10:16PM +0200, Myl?ne Josserand wrote:
+> The CNTVOFF register from arch timer is uninitialized.
+> It should be done by the bootloader but it is currently not the case,
+> even for boot CPU because this SoC is booting in secure mode.
+> It leads to an random offset value meaning that each CPU will have a
+> different time, which isn't working very well.
+> 
+> Add assembly code used for boot CPU and secondary CPU cores to make
+> sure that the CNTVOFF register is initialized. Because this code can
+> be used by different platforms, add this assembly file in ARM's common
+> folder.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  arch/arm/common/Makefile              |  1 +
+>  arch/arm/common/secure_cntvoff.S      | 31 +++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/secure_cntvoff.h |  8 ++++++++
+>  3 files changed, 40 insertions(+)
+>  create mode 100644 arch/arm/common/secure_cntvoff.S
+>  create mode 100644 arch/arm/include/asm/secure_cntvoff.h
+> 
+> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> index 70b4a14ed993..1e9f7af8f70f 100644
+> --- a/arch/arm/common/Makefile
+> +++ b/arch/arm/common/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
+>  obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+>  obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+>  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+> +obj-$(CONFIG_SMP)		+= secure_cntvoff.o
+>  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+>  obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
+>  CFLAGS_REMOVE_mcpm_entry.o	= -pg
+> diff --git a/arch/arm/common/secure_cntvoff.S b/arch/arm/common/secure_cntvoff.S
+> new file mode 100644
+> index 000000000000..68a4a8344319
+> --- /dev/null
+> +++ b/arch/arm/common/secure_cntvoff.S
+> @@ -0,0 +1,31 @@
+> +/* SPDX-License-Identifier: GPL-2.0
 
-Because the size of this block depends on the vector length, this
-patch computes the size based not on the thread's current vector
-length but instead on the maximum possible vector length: this
-determines the maximum size of SVE context block that can be
-observed in any signal frame for the lifetime of the process.
+For assembly files, the SPDX specifier is of this format:
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Alex Benn?e <alex.bennee@linaro.org>
----
- arch/arm64/kernel/signal.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+/* SPDX-License-Identifier: <SPDX License Expression> */
 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index a4f1edf..3427c70 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -599,8 +599,18 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
- 	if (system_supports_sve()) {
- 		unsigned int vq = 0;
- 
--		if (test_thread_flag(TIF_SVE))
--			vq = sve_vq_from_vl(current->thread.sve_vl);
-+		if (add_all || test_thread_flag(TIF_SVE)) {
-+			int vl = sve_max_vl;
-+
-+			if (!add_all)
-+				vl = current->thread.sve_vl;
-+
-+			/* Fail safe if something wasn't initialised */
-+			if (WARN_ON(!sve_vl_valid(vl)))
-+				vl = SVE_VL_MIN;
-+
-+			vq = sve_vq_from_vl(vl);
-+		}
- 
- 		err = sigframe_alloc(user, &user->sve_offset,
- 				     SVE_SIG_CONTEXT_SIZE(vq));
+Please see Documentation/process/license-rules.rst for more
+information, and fix your specifier to conform to the requirements.
+Thanks.
+
+> + *
+> + * Copyright (C) 2014 Renesas Electronics Corporation
+> + *
+> + * Initialization of CNTVOFF register from secure mode
+> + *
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> +
+> +ENTRY(secure_cntvoff_init)
+> +	.arch	armv7-a
+> +	/*
+> +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
+> +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
+> +	 * then it should be handled by the secure code
+
+This should also state that this code must not be executed if
+virtualisation extensions are not present (which should be obvious)
+as the mcrr instruction becomes unpredictable in that case.
+
+> +	 */
+> +	cps	#MON_MODE
+> +	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
+> +	orr	r0, r1, #1
+> +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
+> +	isb
+> +	mov	r0, #0
+> +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
+> +	isb
+> +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
+> +	isb
+> +	cps	#SVC_MODE
+> +	ret	lr
+> +ENDPROC(secure_cntvoff_init)
+> diff --git a/arch/arm/include/asm/secure_cntvoff.h b/arch/arm/include/asm/secure_cntvoff.h
+> new file mode 100644
+> index 000000000000..1f93aee1f630
+> --- /dev/null
+> +++ b/arch/arm/include/asm/secure_cntvoff.h
+> @@ -0,0 +1,8 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+
+This one conforms.
+
+> +
+> +#ifndef __ASMARM_ARCH_CNTVOFF_H
+> +#define __ASMARM_ARCH_CNTVOFF_H
+> +
+> +extern void secure_cntvoff_init(void);
+> +
+> +#endif
+> -- 
+> 2.11.0
+> 
+
 -- 
-2.1.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
