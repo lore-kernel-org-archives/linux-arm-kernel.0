@@ -1,45 +1,87 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 8 May 2018 19:39:40 +0300
-Subject: [PATCH] arm64: dts: renesas: r8a77970: add SMP support
-In-Reply-To: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
-References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
-Message-ID: <54dbd1d2-8279-5073-cffb-c647fba91e42@cogentembedded.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue,  8 May 2018 17:44:45 +0100
+Subject: [PATCH v6 00/15] KVM: arm64: Optimise FPSIMD context switching
+Message-ID: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device node for the second Cortex-A53 CPU core.
+Note: Most of these patches are Arm-specific.  People not Cc'd on the
+whole series can find it in the linux-arm-kernel archive [3].
 
-Based on the original (and large) patch by Daisuke Matsushita
-<daisuke.matsushita.ns@hitachi.com>.
+This series aims to improve the way FPSIMD context is handled by KVM.
+Only minor changes have been made since the previous v5 [1].
+The changes are summarised in the individual patches.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Patch 6 is new, and does some simple refactoring to enable new bits to
+be added to an existing vcpu_arch flags field.
 
----
-This patch is against the 'renesas-devel-20180508-v4.17-rc4' tag of Simon
-Horman's 'renesas.git' repo.
+Patches 1, 2, 6, 7 and 14 are still missing Reviewed-bys/Acked-bys, so
+reviewer attention on these patches would be much appreciated.
 
- arch/arm64/boot/dts/renesas/r8a77970.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -41,6 +41,16 @@
- 			enable-method = "psci";
- 		};
- 
-+		a53_1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <1>;
-+			clocks = <&cpg CPG_CORE R8A77970_CLK_Z2>;
-+			power-domains = <&sysc R8A77970_PD_CA53_CPU1>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
-+		};
-+
- 		L2_CA53: cache-controller {
- 			compatible = "cache";
- 			power-domains = <&sysc R8A77970_PD_CA53_SCU>;
+Some testing done on Juno and the Arm fast model (arm64), including
+(on earlier versions of the patches) combinations of (non-)SVE and
+(non-)VHE configurations.
+
+Cheers
+---Dave
+
+[1] [PATCH v5 00/14] KVM: arm64: Optimise FPSIMD context switching
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/575805.html
+
+[2] [RFC PATCH 0/6] Simplify setting thread flags to a particular value
+https://lkml.org/lkml/2018/4/19/225
+
+[3] linux-arm-kernel archive
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/thread.html
+
+
+Christoffer Dall (1):
+  KVM: arm/arm64: Introduce kvm_arch_vcpu_run_pid_change
+
+Dave Martin (14):
+  thread_info: Add update_thread_flag() helpers
+  arm64: Use update{,_tsk}_thread_flag()
+  KVM: arm64: Convert lazy FPSIMD context switch trap to C
+  arm64: fpsimd: Generalise context saving for non-task contexts
+  KVM: arm64: Repurpose vcpu_arch.debug_flags for general-purpose flags
+  KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing
+  arm64/sve: Move read_zcr_features() out of cpufeature.h
+  arm64/sve: Switch sve_pffr() argument from task to thread
+  arm64/sve: Move sve_pffr() to fpsimd.h and make inline
+  KVM: arm64: Save host SVE context as appropriate
+  KVM: arm64: Remove eager host SVE state saving
+  KVM: arm64: Remove redundant *exit_code changes in fpsimd_guest_exit()
+  KVM: arm64: Fold redundant exit code checks out of fixup_guest_exit()
+  KVM: arm64: Invoke FPSIMD context switch trap from C
+
+ arch/arm/include/asm/kvm_host.h     |   9 ++-
+ arch/arm64/Kconfig                  |   7 ++
+ arch/arm64/include/asm/cpufeature.h |  29 ---------
+ arch/arm64/include/asm/fpsimd.h     |  20 ++++++
+ arch/arm64/include/asm/kvm_asm.h    |   3 +
+ arch/arm64/include/asm/kvm_host.h   |  24 ++++---
+ arch/arm64/include/asm/processor.h  |   2 +
+ arch/arm64/kernel/fpsimd.c          | 120 ++++++++++++++++++-----------------
+ arch/arm64/kernel/ptrace.c          |   1 +
+ arch/arm64/kvm/Kconfig              |   1 +
+ arch/arm64/kvm/Makefile             |   2 +-
+ arch/arm64/kvm/debug.c              |   8 +--
+ arch/arm64/kvm/fpsimd.c             | 110 ++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/hyp/debug-sr.c       |   6 +-
+ arch/arm64/kvm/hyp/entry.S          |  43 -------------
+ arch/arm64/kvm/hyp/hyp-entry.S      |  19 ------
+ arch/arm64/kvm/hyp/switch.c         | 123 +++++++++++++++++++++++++-----------
+ arch/arm64/kvm/hyp/sysreg-sr.c      |   4 +-
+ arch/arm64/kvm/sys_regs.c           |   8 +--
+ include/linux/kvm_host.h            |   9 +++
+ include/linux/sched.h               |   6 ++
+ include/linux/thread_info.h         |  11 ++++
+ virt/kvm/Kconfig                    |   3 +
+ virt/kvm/arm/arm.c                  |  25 +++++++-
+ virt/kvm/kvm_main.c                 |   7 +-
+ 25 files changed, 383 insertions(+), 217 deletions(-)
+ create mode 100644 arch/arm64/kvm/fpsimd.c
+
+-- 
+2.1.4
