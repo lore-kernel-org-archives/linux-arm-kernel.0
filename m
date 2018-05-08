@@ -1,89 +1,133 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 May 2018 12:45:17 +0100
-Subject: [PATCH REPOST] ARM: smp: Move clear_tasks_mm_cpumask() call to
- __cpu_die()
-In-Reply-To: <20180504112939.25493-1-bigeasy@linutronix.de>
-References: <20180504112939.25493-1-bigeasy@linutronix.de>
-Message-ID: <20180508114516.GE16141@n2100.armlinux.org.uk>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Tue, 8 May 2018 14:43:58 +0300
+Subject: [PATCH 3/8] mailbox: Add transmit done by blocking option
+In-Reply-To: <20180508114403.14499-1-mperttunen@nvidia.com>
+References: <20180508114403.14499-1-mperttunen@nvidia.com>
+Message-ID: <20180508114403.14499-4-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 01:29:39PM +0200, Sebastian Andrzej Siewior wrote:
-> From: Grygorii Strashko <grygorii.strashko@ti.com>
-> 
-> Suspending a CPU on a RT kernel results in the following backtrace:
-> 
-> | Disabling non-boot CPUs ...
-> | BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-> | in_atomic(): 1, irqs_disabled(): 128, pid: 18, name: migration/1
-> | INFO: lockdep is turned off.
-> | irq event stamp: 122
-> | hardirqs last  enabled at (121): [<c06ac0ac>] _raw_spin_unlock_irqrestore+0x88/0x90
-> | hardirqs last disabled at (122): [<c06abed0>] _raw_spin_lock_irq+0x28/0x5c
-> |  CPU: 1 PID: 18 Comm: migration/1 Tainted: G        W       4.1.4-rt3-01046-g96ac8da #204
-> | Hardware name: Generic DRA74X (Flattened Device Tree)
-> | [<c0019134>] (unwind_backtrace) from [<c0014774>] (show_stack+0x20/0x24)
-> | [<c0014774>] (show_stack) from [<c06a70f4>] (dump_stack+0x88/0xdc)
-> | [<c06a70f4>] (dump_stack) from [<c006cab8>] (___might_sleep+0x198/0x2a8)
-> | [<c006cab8>] (___might_sleep) from [<c06ac4dc>] (rt_spin_lock+0x30/0x70)
-> | [<c06ac4dc>] (rt_spin_lock) from [<c013f790>] (find_lock_task_mm+0x9c/0x174)
-> | [<c013f790>] (find_lock_task_mm) from [<c00409ac>] (clear_tasks_mm_cpumask+0xb4/0x1ac)
-> | [<c00409ac>] (clear_tasks_mm_cpumask) from [<c00166a4>] (__cpu_disable+0x98/0xbc)
-> | [<c00166a4>] (__cpu_disable) from [<c06a2e8c>] (take_cpu_down+0x1c/0x50)
-> | [<c06a2e8c>] (take_cpu_down) from [<c00f2600>] (multi_cpu_stop+0x11c/0x158)
-> | [<c00f2600>] (multi_cpu_stop) from [<c00f2a9c>] (cpu_stopper_thread+0xc4/0x184)
-> | [<c00f2a9c>] (cpu_stopper_thread) from [<c0069058>] (smpboot_thread_fn+0x18c/0x324)
-> | [<c0069058>] (smpboot_thread_fn) from [<c00649c4>] (kthread+0xe8/0x104)
-> | [<c00649c4>] (kthread) from [<c0010058>] (ret_from_fork+0x14/0x3c)
-> | CPU1: shutdown
-> 
-> The root cause of above backtrace is task_lock() which takes a sleeping
-> lock on -RT.
-> 
-> To fix the issue, move clear_tasks_mm_cpumask() call from __cpu_disable()
-> to __cpu_die() which is called on the thread which is asking for a target
-> CPU to be shutdown. In addition, this change restores CPU hotplug
-> functionality on ARM CPU1 can be unplugged/plugged many times.
+Add a new TXDONE option, TXDONE_BY_BLOCK. With this option, the
+send_data function of the mailbox driver is expected to block until
+the message has been sent. The new option is used with the Tegra
+Combined UART driver to minimize unnecessary overhead when transmitting
+data.
 
-This looks fine to me - all the paths that use the mm_cpumask() check
-that the CPU is still marked online.
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+ drivers/mailbox/mailbox.c | 30 +++++++++++++++++++++---------
+ drivers/mailbox/mailbox.h |  1 +
+ 2 files changed, 22 insertions(+), 9 deletions(-)
 
-Please send to the patch system, thanks.
-
-> 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Link: http://lkml.kernel.org/r/1441995683-30817-1-git-send-email-grygorii.strashko at ti.com
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> [bigeasy: slighty edited the commit message]
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
->  arch/arm/kernel/smp.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -236,8 +236,6 @@ int __cpu_disable(void)
->  	flush_cache_louis();
->  	local_flush_tlb_all();
->  
-> -	clear_tasks_mm_cpumask(cpu);
-> -
->  	return 0;
->  }
->  
-> @@ -255,6 +253,7 @@ void __cpu_die(unsigned int cpu)
->  	}
->  	pr_debug("CPU%u: shutdown\n", cpu);
->  
-> +	clear_tasks_mm_cpumask(cpu);
->  	/*
->  	 * platform_cpu_kill() is generally expected to do the powering off
->  	 * and/or cutting of clocks to the dying CPU.  Optionally, this may
-
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index 674b35f402f5..5c76b70e673c 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -53,6 +53,8 @@ static int add_to_rbuf(struct mbox_chan *chan, void *mssg)
+ 	return idx;
+ }
+ 
++static void tx_tick(struct mbox_chan *chan, int r, bool submit_next);
++
+ static void msg_submit(struct mbox_chan *chan)
+ {
+ 	unsigned count, idx;
+@@ -60,10 +62,13 @@ static void msg_submit(struct mbox_chan *chan)
+ 	void *data;
+ 	int err = -EBUSY;
+ 
++next:
+ 	spin_lock_irqsave(&chan->lock, flags);
+ 
+-	if (!chan->msg_count || chan->active_req)
+-		goto exit;
++	if (!chan->msg_count || chan->active_req) {
++		spin_unlock_irqrestore(&chan->lock, flags);
++		return;
++	}
+ 
+ 	count = chan->msg_count;
+ 	idx = chan->msg_free;
+@@ -82,15 +87,21 @@ static void msg_submit(struct mbox_chan *chan)
+ 		chan->active_req = data;
+ 		chan->msg_count--;
+ 	}
+-exit:
++
+ 	spin_unlock_irqrestore(&chan->lock, flags);
+ 
+ 	if (!err && (chan->txdone_method & TXDONE_BY_POLL))
+ 		/* kick start the timer immediately to avoid delays */
+ 		hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
++
++	if (chan->txdone_method & TXDONE_BY_BLOCK) {
++		tx_tick(chan, err, false);
++		if (!err)
++			goto next;
++	}
+ }
+ 
+-static void tx_tick(struct mbox_chan *chan, int r)
++static void tx_tick(struct mbox_chan *chan, int r, bool submit_next)
+ {
+ 	unsigned long flags;
+ 	void *mssg;
+@@ -101,7 +112,8 @@ static void tx_tick(struct mbox_chan *chan, int r)
+ 	spin_unlock_irqrestore(&chan->lock, flags);
+ 
+ 	/* Submit next message */
+-	msg_submit(chan);
++	if (submit_next)
++		msg_submit(chan);
+ 
+ 	if (!mssg)
+ 		return;
+@@ -127,7 +139,7 @@ static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
+ 		if (chan->active_req && chan->cl) {
+ 			txdone = chan->mbox->ops->last_tx_done(chan);
+ 			if (txdone)
+-				tx_tick(chan, 0);
++				tx_tick(chan, 0, true);
+ 			else
+ 				resched = true;
+ 		}
+@@ -176,7 +188,7 @@ void mbox_chan_txdone(struct mbox_chan *chan, int r)
+ 		return;
+ 	}
+ 
+-	tx_tick(chan, r);
++	tx_tick(chan, r, true);
+ }
+ EXPORT_SYMBOL_GPL(mbox_chan_txdone);
+ 
+@@ -196,7 +208,7 @@ void mbox_client_txdone(struct mbox_chan *chan, int r)
+ 		return;
+ 	}
+ 
+-	tx_tick(chan, r);
++	tx_tick(chan, r, true);
+ }
+ EXPORT_SYMBOL_GPL(mbox_client_txdone);
+ 
+@@ -275,7 +287,7 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
+ 		ret = wait_for_completion_timeout(&chan->tx_complete, wait);
+ 		if (ret == 0) {
+ 			t = -ETIME;
+-			tx_tick(chan, t);
++			tx_tick(chan, t, true);
+ 		}
+ 	}
+ 
+diff --git a/drivers/mailbox/mailbox.h b/drivers/mailbox/mailbox.h
+index 456ba68513bb..ec68e2e28cd6 100644
+--- a/drivers/mailbox/mailbox.h
++++ b/drivers/mailbox/mailbox.h
+@@ -10,5 +10,6 @@
+ #define TXDONE_BY_IRQ	BIT(0) /* controller has remote RTR irq */
+ #define TXDONE_BY_POLL	BIT(1) /* controller can read status of last TX */
+ #define TXDONE_BY_ACK	BIT(2) /* S/W ACK recevied by Client ticks the TX */
++#define TXDONE_BY_BLOCK	BIT(3) /* mailbox driver send_data blocks until done */
+ 
+ #endif /* __MAILBOX_H */
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.16.1
