@@ -1,101 +1,73 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 9 May 2018 11:00:07 +0100
-Subject: [PATCH v6 07/15] KVM: arm64: Optimise FPSIMD handling to reduce
- guest/host thrashing
-In-Reply-To: <5010b106-4aa3-fb19-bbac-55cf261f9d30@arm.com>
-References: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
- <1525797900-5548-8-git-send-email-Dave.Martin@arm.com>
- <cd45aff8-66dd-b6bc-ada0-189b45e09d17@arm.com>
- <20180509091701.GM7753@e103592.cambridge.arm.com>
- <5010b106-4aa3-fb19-bbac-55cf261f9d30@arm.com>
-Message-ID: <20180509100007.GO7753@e103592.cambridge.arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 9 May 2018 11:03:35 +0100
+Subject: [PATCH v7 23/24] ASoC: qcom: apq8096: Add db820c machine driver
+In-Reply-To: <c52fc35d-95a6-6675-6c6e-32a0d5f486d4@codeaurora.org>
+References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
+ <20180501120820.11016-24-srinivas.kandagatla@linaro.org>
+ <c52fc35d-95a6-6675-6c6e-32a0d5f486d4@codeaurora.org>
+Message-ID: <0db86f6a-76cb-22a5-eed9-98b2134dcb8b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 10:46:11AM +0100, Marc Zyngier wrote:
-> On 09/05/18 10:17, Dave Martin wrote:
-> > On Wed, May 09, 2018 at 09:24:36AM +0100, Marc Zyngier wrote:
-> >> On 08/05/18 17:44, Dave Martin wrote:
-> >>> This patch refactors KVM to align the host and guest FPSIMD
-> >>> save/restore logic with each other for arm64.  This reduces the
-> > 
-> > [...]
-> > 
-> >>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> >>> index 9699c13..6429eb6 100644
-> >>> --- a/arch/arm64/include/asm/kvm_asm.h
-> >>> +++ b/arch/arm64/include/asm/kvm_asm.h
-> >>> @@ -33,6 +33,8 @@
-> >>>  /* vcpu_arch flags field values: */
-> >>>  #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
-> >>>  #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
-> >>
-> >> At some point, we could remove KVM_ARM64_DEBUG_DIRTY_SHIFT as it is not
-> >> used anymore (since 1ea66d27e7b0). Do not respin on this account though.
-> > 
-> > I wondered about this...  I presume this was used from assembly once
-> > upon a time.
-> > 
-> > Since I need to repost for something else anyway, shall I delete that
-> > and move the defines to kvm_host.h?  There's no longer an obvious reason
-> > for them to be in a different header.
+Thanks for the review Banajit.
+
+On 09/05/18 10:15, Banajit Goswami wrote:
 > 
-> Yes, please.
-
-OK, will do.
-
-> >>> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-
-[...]
-
-> >>> +void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
-> >>> +{
-> >>> +	BUG_ON(system_supports_sve());
-> >>> +	BUG_ON(!current->mm);
-> >>> +
-> >>> +	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
-> >>> +	if (test_thread_flag(TIF_SVE))
-> >>> +		vcpu->arch.flags |= KVM_ARM64_HOST_SVE_IN_USE;
-> >>> +
-> >>> +	vcpu->arch.host_fpsimd_state =
-> >>> +		kern_hyp_va(&current->thread.uw.fpsimd_state);
-> >>
-> >> ... what is the purpose of this assignment? I don't think it is harmful
-> >> in any way, but I'm just wondering if I'm missing in the actual flow.
-> > 
-> > The pointer will be NULLed by __hyp_switch_fpsimd() when loading the
-> > guest state in, to indicate that there is no longer any host state to
-> > save.  Perhaps it would have been clearer to have a separate flag to
-> > represent this change of state.
-> > 
-> > As things stand I think you're right: the assignments are redundant.  
-> > We certainly need the pointer to reflect the current task, which is
-> > the motivation for doing it here -- but in fact we need to do it
-> > more often, at every vcpu_load().
-> > 
-> > I think the most appropriate thing is to delete the assignment from
-> > _map_fp().
-> > 
-> > The alternative would be to add a flag for the "no host state to save"
-> > case, and fpsimd_host_state only in the pid_change hook.
+> On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
+>> This patch adds support to DB820c machine driver.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   sound/soc/qcom/Kconfig   |   9 ++
+>>   sound/soc/qcom/Makefile  |   2 +
+>>   sound/soc/qcom/apq8096.c | 238 
+>> +++++++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 249 insertions(+)
+>> +    link = card->dai_link;
+>> +
+>> +    for_each_child_of_node(node, np) {
+>> +        cpu = of_get_child_by_name(np, "cpu");
+>> +        platform = of_get_child_by_name(np, "platform");
+>> +        codec = of_get_child_by_name(np, "codec");
+>> +
+>> +        if (!cpu) {
+>> +            dev_err(dev, "Can't find cpu DT node\n");
+> clean up missing to kfree(card->dai_link)?
+Yep, I will fix error path in next version.
 > 
-> I think I'd prefer the latter. It makes the whole pointer stuff a lot
-> easier to understand (the linkages are basically static), and using
-> flags is consistent with the way the rest of the kernel works. I'm not
-> sure whether we need to add a new flag or simply rely on the existing
-> thread flag, but that for you to decide.
+>> +            return -EINVAL;
+>> +        }
+>> +
+>> +                return ret;
+>> +            }
+>> +            link->no_pcm = 1;
+>> +            link->ignore_suspend = 1;
+> ignore_suspend will also need to be set for FE DAIs?
+> 
+Okay!
+>> +            link->ignore_pmdown_time = 1;
+>> +            link->be_hw_params_fixup = apq8096_be_hw_params_fixup;
+>> +        } else {
+>> +            link->platform_of_node = link->cpu_of_node;
+>> +            link->codec_dai_name = "snd-soc-dummy-dai";
+>> +            link->codec_name = "snd-soc-dummy";
+>> +            link->dynamic = 1;
+>> +        }
 
-OK, agreed.  It should definitely help clarity.
+>> +
 
-[...]
+>> +
+>> +static void apq8096_unbind(struct device *dev)
+>> +{
+>> +    struct snd_soc_card *card = dev_get_drvdata(dev);
+>> +
+>> +    component_unbind_all(dev, card);
+>> +    snd_soc_unregister_card(card);
+> Should sound card not be unregistered first, before calling 
+> component_unbind_all()?
+Yep, I will give that a go.
 
-> > Happy to keep your Reviewed-by with the discussed changes?
-> Yes, no problem. I'll eyeball the changes and let you know if I spot
-> anything.
+thanks,
+srini
 
-OK, thanks.
-
-I'll note the changes under the tearoff.
-
-Cheers
----Dave
+> 
