@@ -1,24 +1,26 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 9 May 2018 09:15:01 +0100
-Subject: [PATCH v7 14/24] ASoC: qdsp6: q6asm: Add q6asm driver
-In-Reply-To: <3e7601d4-0304-3aa1-66cc-617b99727567@codeaurora.org>
-References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
- <20180501120820.11016-15-srinivas.kandagatla@linaro.org>
- <3e7601d4-0304-3aa1-66cc-617b99727567@codeaurora.org>
-Message-ID: <e6e8fdd0-b6a3-07fa-46d8-d75d6de4c173@linaro.org>
+From: chenyao11@huawei.com (Yao Chen)
+Date: Wed, 9 May 2018 16:20:10 +0800
+Subject: [PATCH v2 0/2] Add MSI support
+Message-ID: <1525854012-24228-1-git-send-email-chenyao11@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Changes between V2 and V1
+=========================
+1. seperate DT binding patch.
+2. fix issues according to review comments
+   (1)from Bjorn Helgaas: Update the style of subject and changelog.
+   (2)from Bjorn Helgaas: Add msi irq number in the message.
+   (3)from Bjorn Helgaas: Delete unnecessary code 'pci->pp.root_bus_nr = -1'.
+   (4)from Dmitry Shmidt: Fix typing error. Replace 'interrupts-names' of 'interrupt-names'.
 
+Yao Chen (2):
+  PCI: kirin: Add MSI support
+  arm64: dts: hi3660: Add pcie msi interrupt attribute
 
-On 09/05/18 09:10, Banajit Goswami wrote:
->>
-> MAX_SESSIONS should be 8?
-> 
-Yep, will update it in v8.
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi |  2 ++
+ drivers/pci/dwc/pcie-kirin.c              | 39 +++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
 
-thanks,
-srini
-> Otherwise LGTM.
-> Once addressed about, add acked-by-
-> Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
+-- 
+1.9.1
