@@ -1,43 +1,42 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 9 May 2018 16:39:20 +0200
-Subject: [PATCH] mtd: nxp-spifi: decrement flash_np refcnt on error paths
-In-Reply-To: <04eca940-cf53-d365-9899-336eb213e089@ispras.ru>
-References: <1525812456-25877-1-git-send-email-khoroshilov@ispras.ru>
- <20180509114250.120eb299@bbrezillon>
- <04eca940-cf53-d365-9899-336eb213e089@ispras.ru>
-Message-ID: <20180509163920.67a5f203@bbrezillon>
+From: khoroshilov@ispras.ru (Alexey Khoroshilov)
+Date: Wed,  9 May 2018 17:56:46 +0300
+Subject: [PATCH v2] mtd: nxp-spifi: release flash_np in nxp_spifi_probe()
+In-Reply-To: <20180509163920.67a5f203@bbrezillon>
+Message-ID: <1525877806-21148-1-git-send-email-khoroshilov@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 May 2018 17:35:41 +0300
-Alexey Khoroshilov <khoroshilov@ispras.ru> wrote:
+nxp_spifi_probe() increments refcnt of SPI flash device node by
+of_get_next_available_child() and leaves it undecremented on both
+successful and error paths.
 
-> On 09.05.2018 12:42, Boris Brezillon wrote:
-> > On Tue,  8 May 2018 23:47:36 +0300
-> > Alexey Khoroshilov <khoroshilov@ispras.ru> wrote:
-> >   
-> >> nxp_spifi_probe() increments refcnt of SPI flash device node by
-> >> of_get_next_available_child() and then it passes the node
-> >> to mtd device in nxp_spifi_setup_flash().
-> >> But if a failure happens before mtd_device_register() succeed,
-> >> the refcnt is left undecremented.  
-> > 
-> > Why not doing that in the error path of the probe function? Also, you
-> > probably want to call of_node_put() in the ->remove() function.
-> >   
-> 
-> 
-> You are right.
-> 
-> I believed that after successful mtd_device_register()
-> the node is managed by mtd device. I missed that it calls of_node_get()
-> in add_mtd_device() by itself.
-> 
-> I will prepare v2.
-> But I guess there is no need to have of_node_put() in ->remove(), since
-> probe() finishes its own usage of flash_np, while mtd_device incremented
-> refcnt by itself and will decrement it in ->remove() in
-> mtd_device_unregister(&spifi->nor.mtd). So, I would propose
-> of_node_put() on both successful and error path.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-Sounds good.
+Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+---
+ drivers/mtd/spi-nor/nxp-spifi.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mtd/spi-nor/nxp-spifi.c b/drivers/mtd/spi-nor/nxp-spifi.c
+index 15374216d4d9..7b047951d0a2 100644
+--- a/drivers/mtd/spi-nor/nxp-spifi.c
++++ b/drivers/mtd/spi-nor/nxp-spifi.c
+@@ -438,11 +438,15 @@ static int nxp_spifi_probe(struct platform_device *pdev)
+ 	ret = nxp_spifi_setup_flash(spifi, flash_np);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "unable to setup flash chip\n");
+-		goto dis_clks;
++		goto put_np;
+ 	}
+ 
++	of_node_put(flash_np);
++
+ 	return 0;
+ 
++put_np:
++	of_node_put(flash_np);
+ dis_clks:
+ 	clk_disable_unprepare(spifi->clk_spifi);
+ dis_clk_reg:
+-- 
+2.7.4
