@@ -1,49 +1,198 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 09 May 2018 16:12:59 +0200
-Subject: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
-In-Reply-To: <HE1PR04MB3113135433766196E708685887990@HE1PR04MB3113.eurprd04.prod.outlook.com>
-References: <20180418124908.3079-1-stefan@agner.ch>
- <20180502073807.GE3443@dragon> <56a409cf76a3eaa713cb4f0bbe1e39b6@agner.ch>
- <HE1PR04MB311395765D3DC03D5960DBA3879A0@HE1PR04MB3113.eurprd04.prod.outlook.com>
- <4188ee25bd5179b57d09e4624dcfbfbb@agner.ch>
- <152580354289.138124.13657232356773397650@swboyd.mtv.corp.google.com>
- <HE1PR04MB3113135433766196E708685887990@HE1PR04MB3113.eurprd04.prod.outlook.com>
-Message-ID: <ae5b239a57bd7e3f3e62cc23a1c3788e@agner.ch>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 9 May 2018 15:27:52 +0100
+Subject: [PATCH v2 2/6] arm64: alternative: Apply alternatives early in
+ boot process
+In-Reply-To: <c935a9e6-94a0-03cb-eb64-7e2eef8f8d86@arm.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <1516190084-18978-3-git-send-email-julien.thierry@arm.com>
+ <c935a9e6-94a0-03cb-eb64-7e2eef8f8d86@arm.com>
+Message-ID: <20180509142752.redewrpymwvuzgbv@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.05.2018 03:26, Jacky Bai wrote:
->> Subject: Re: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
->>
->> Quoting Stefan Agner (2018-05-08 06:20:03)
->> > On 08.05.2018 09:32, Jacky Bai wrote:
->> > >
->> > > I have tried two 6ULL board, I don't meet such issue. System can
->> > > boot up successfully with commit 6f9575e55632 included.
->> > > Anyway, the change in this patch is ok for me. it is no harm to the
->> > > BUS clock change flow.
->> >
->> > Hm, that is interesting, maybe it is because we use a different SKU?
->> > Or maybe bootloader?
->> >
->> > I tested here with a 800 MHz clocked variant on a Colibri iMX6ULL
->> > using U-Boot 2016.11.
->> >
->>
->> I'll throw this into fixes today because it fixes something to be useful. It's still
->> interesting to see what's different between the two setups though.
+On Fri, May 04, 2018 at 11:06:56AM +0100, Julien Thierry wrote:
+> Hi,
 > 
-> Thanks. 
+> In order to prepare the v3 of this patchset, I'd like people's opinion on
+> what this patch does. More below.
 > 
-> I will find some 800MHz parts and have a try with different bootloader later.
-> Will let you know, when I have some results.
+> On 17/01/18 11:54, Julien Thierry wrote:
+> > From: Daniel Thompson <daniel.thompson@linaro.org>
+> > 
+> > Currently alternatives are applied very late in the boot process (and
+> > a long time after we enable scheduling). Some alternative sequences,
+> > such as those that alter the way CPU context is stored, must be applied
+> > much earlier in the boot sequence.
+> > 
+> > Introduce apply_alternatives_early() to allow some alternatives to be
+> > applied immediately after we detect the CPU features of the boot CPU.
+> > 
+> > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >   arch/arm64/include/asm/alternative.h |  1 +
+> >   arch/arm64/kernel/alternative.c      | 39 +++++++++++++++++++++++++++++++++---
+> >   arch/arm64/kernel/smp.c              |  6 ++++++
+> >   3 files changed, 43 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+> > index 4a85c69..1fc1cdb 100644
+> > --- a/arch/arm64/include/asm/alternative.h
+> > +++ b/arch/arm64/include/asm/alternative.h
+> > @@ -20,6 +20,7 @@ struct alt_instr {
+> >   	u8  alt_len;		/* size of new instruction(s), <= orig_len */
+> >   };
+> > 
+> > +void __init apply_alternatives_early(void);
+> >   void __init apply_alternatives_all(void);
+> >   void apply_alternatives(void *start, size_t length);
+> > 
+> > diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+> > index 6dd0a3a3..78051d4 100644
+> > --- a/arch/arm64/kernel/alternative.c
+> > +++ b/arch/arm64/kernel/alternative.c
+> > @@ -28,6 +28,18 @@
+> >   #include <asm/sections.h>
+> >   #include <linux/stop_machine.h>
+> > 
+> > +/*
+> > + * early-apply features are detected using only the boot CPU and checked on
+> > + * secondary CPUs startup, even then,
+> > + * These early-apply features should only include features where we must
+> > + * patch the kernel very early in the boot process.
+> > + *
+> > + * Note that the cpufeature logic *must* be made aware of early-apply
+> > + * features to ensure they are reported as enabled without waiting
+> > + * for other CPUs to boot.
+> > + */
+> > +#define EARLY_APPLY_FEATURE_MASK BIT(ARM64_HAS_SYSREG_GIC_CPUIF)
+> > +
 > 
+> Following the change in the cpufeature infrastructure,
+> ARM64_HAS_SYSREG_GIC_CPUIF will have the scope ARM64_CPUCAP_SCOPE_BOOT_CPU
+> in order to be checked early in the boot process.
+> 
+> Now, regarding the early application of alternative, I am wondering whether
+> we can apply all the alternatives associated with SCOPE_BOOT features that
+> *do not* have a cpu_enable callback.
+> 
+> Otherwise we can keep the macro to list individually each feature that is
+> patchable at boot time as the current patch does (or put this info in a flag
+> within the arm64_cpu_capabilities structure).
+> 
+> Any thoughts or preferences on this?
 
-FWIW, I tried two SKUs here:
-MCIMX6Z2DVM05AA (528Mhz)
-MCIMX6Z2CVM08AA (800MHz)
+If I understand ARM64_CPUCAP_SCOPE_BOOT_CPU correctly it certainly seems
+safe to apply the alternatives early (it means that a CPU that 
+contradicts a CSCOPE_BOOT_CPU won't be allowed to join the system,
+right?).
 
-Both run at 396MHz in U-Boot, and both freeze and the same location.
+It also makes the system to apply errata fixes more powerful: maybe a
+future errata must be applied before we commence threading.
 
---
-Stefan
+This I have a preference for striping this out and relying on
+SCOPE_BOOT_CPU instead. It's a weak preference though since I haven't
+studied exactly what errate fixes this will bring into the scope of
+early boot.
+
+I don't think you'll regret changing it. This patch has always been
+a *total* PITA to rebase so aligning it better with upstream will make
+it easier to nurse the patch set until the if-and-when point it hits
+the upstream.
+
+
+Daniel.
+
+
+
+
+> Thanks,
+> 
+> >   #define __ALT_PTR(a,f)		((void *)&(a)->f + (a)->f)
+> >   #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
+> >   #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
+> > @@ -105,7 +117,8 @@ static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnp
+> >   	return insn;
+> >   }
+> > 
+> > -static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+> > +static void __apply_alternatives(void *alt_region,  bool use_linear_alias,
+> > +				 unsigned long feature_mask)
+> >   {
+> >   	struct alt_instr *alt;
+> >   	struct alt_region *region = alt_region;
+> > @@ -115,6 +128,9 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+> >   		u32 insn;
+> >   		int i, nr_inst;
+> > 
+> > +		if ((BIT(alt->cpufeature) & feature_mask) == 0)
+> > +			continue;
+> > +
+> >   		if (!cpus_have_cap(alt->cpufeature))
+> >   			continue;
+> > 
+> > @@ -138,6 +154,21 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+> >   }
+> > 
+> >   /*
+> > + * This is called very early in the boot process (directly after we run
+> > + * a feature detect on the boot CPU). No need to worry about other CPUs
+> > + * here.
+> > + */
+> > +void apply_alternatives_early(void)
+> > +{
+> > +	struct alt_region region = {
+> > +		.begin	= (struct alt_instr *)__alt_instructions,
+> > +		.end	= (struct alt_instr *)__alt_instructions_end,
+> > +	};
+> > +
+> > +	__apply_alternatives(&region, true, EARLY_APPLY_FEATURE_MASK);
+> > +}
+> > +
+> > +/*
+> >    * We might be patching the stop_machine state machine, so implement a
+> >    * really simple polling protocol here.
+> >    */
+> > @@ -156,7 +187,9 @@ static int __apply_alternatives_multi_stop(void *unused)
+> >   		isb();
+> >   	} else {
+> >   		BUG_ON(patched);
+> > -		__apply_alternatives(&region, true);
+> > +
+> > +		__apply_alternatives(&region, true, ~EARLY_APPLY_FEATURE_MASK);
+> > +
+> >   		/* Barriers provided by the cache flushing */
+> >   		WRITE_ONCE(patched, 1);
+> >   	}
+> > @@ -177,5 +210,5 @@ void apply_alternatives(void *start, size_t length)
+> >   		.end	= start + length,
+> >   	};
+> > 
+> > -	__apply_alternatives(&region, false);
+> > +	__apply_alternatives(&region, false, -1);
+> >   }
+> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> > index 551eb07..37361b5 100644
+> > --- a/arch/arm64/kernel/smp.c
+> > +++ b/arch/arm64/kernel/smp.c
+> > @@ -453,6 +453,12 @@ void __init smp_prepare_boot_cpu(void)
+> >   	 * cpuinfo_store_boot_cpu() above.
+> >   	 */
+> >   	update_cpu_errata_workarounds();
+> > +	/*
+> > +	 * We now know enough about the boot CPU to apply the
+> > +	 * alternatives that cannot wait until interrupt handling
+> > +	 * and/or scheduling is enabled.
+> > +	 */
+> > +	apply_alternatives_early();
+> >   }
+> > 
+> >   static u64 __init of_get_cpu_mpidr(struct device_node *dn)
+> > --
+> > 1.9.1
+> > 
+> 
+> -- 
+> Julien Thierry
