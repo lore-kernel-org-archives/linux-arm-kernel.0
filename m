@@ -1,32 +1,40 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed,  9 May 2018 16:32:25 +0200
-Subject: [PATCH] arm64: defconfig: enable rockchip efuse
-Message-ID: <20180509143225.32596-1-heiko@sntech.de>
+From: khoroshilov@ispras.ru (Alexey Khoroshilov)
+Date: Wed, 9 May 2018 17:35:41 +0300
+Subject: [PATCH] mtd: nxp-spifi: decrement flash_np refcnt on error paths
+In-Reply-To: <20180509114250.120eb299@bbrezillon>
+References: <1525812456-25877-1-git-send-email-khoroshilov@ispras.ru>
+ <20180509114250.120eb299@bbrezillon>
+Message-ID: <04eca940-cf53-d365-9899-336eb213e089@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The efuses on Rockchip socs often contain informations
-about specifics of the chip its running on (leakage currents etc)
-which components might want to read to adjust settings accordingly.
+On 09.05.2018 12:42, Boris Brezillon wrote:
+> On Tue,  8 May 2018 23:47:36 +0300
+> Alexey Khoroshilov <khoroshilov@ispras.ru> wrote:
+> 
+>> nxp_spifi_probe() increments refcnt of SPI flash device node by
+>> of_get_next_available_child() and then it passes the node
+>> to mtd device in nxp_spifi_setup_flash().
+>> But if a failure happens before mtd_device_register() succeed,
+>> the refcnt is left undecremented.
+> 
+> Why not doing that in the error path of the probe function? Also, you
+> probably want to call of_node_put() in the ->remove() function.
+> 
 
-So enable the efuse early for that.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+You are right.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 34037d24fbf4..74abf140e332 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -612,6 +612,7 @@ CONFIG_QCOM_L2_PMU=y
- CONFIG_QCOM_L3_PMU=y
- CONFIG_MESON_EFUSE=m
- CONFIG_QCOM_QFPROM=y
-+CONFIG_ROCKCHIP_EFUSE=y
- CONFIG_UNIPHIER_EFUSE=y
- CONFIG_TEE=y
- CONFIG_OPTEE=y
--- 
-2.16.2
+I believed that after successful mtd_device_register()
+the node is managed by mtd device. I missed that it calls of_node_get()
+in add_mtd_device() by itself.
+
+I will prepare v2.
+But I guess there is no need to have of_node_put() in ->remove(), since
+probe() finishes its own usage of flash_np, while mtd_device incremented
+refcnt by itself and will decrement it in ->remove() in
+mtd_device_unregister(&spifi->nor.mtd). So, I would propose
+of_node_put() on both successful and error path.
+
+Thank you,
+Alexey
