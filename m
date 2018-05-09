@@ -1,97 +1,131 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 9 May 2018 09:51:50 -0600
-Subject: [PATCH v2 1/2] perf cs-etm: Support unknown_thread in
- cs_etm_auxtrace
-In-Reply-To: <1525839312-20544-1-git-send-email-leo.yan@linaro.org>
-References: <1525839312-20544-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20180509155150.GC25559@xps15>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 9 May 2018 17:53:26 +0200
+Subject: [PATCH v2 01/26] drm/bridge: allow optionally specifying an owner
+ .odev device
+In-Reply-To: <4e92fdea-0609-0fff-0e3f-d9f78f596eb7@samsung.com>
+References: <20180504135212.26977-1-peda@axentia.se>
+ <CGME20180504135245epcas4p1d0463b6b3c73d1dd2550c6ed5a4e3986@epcas4p1.samsung.com>
+ <20180504135212.26977-2-peda@axentia.se>
+ <4e92fdea-0609-0fff-0e3f-d9f78f596eb7@samsung.com>
+Message-ID: <4be4448e-763c-4832-f194-6b79afe87d08@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 12:15:11PM +0800, Leo Yan wrote:
-> CoreSight doesn't allocate thread structure for unknown_thread in etm
-> auxtrace, so unknown_thread is NULL pointer.  If the perf data doesn't
-> contain valid tid and then cs_etm__mem_access() uses unknown_thread
-> instead as thread handler, this results in segmentation fault when
-> thread__find_addr_map() accesses thread handler.
+On 2018-05-09 17:08, Andrzej Hajda wrote:
+> On 04.05.2018 15:51, Peter Rosin wrote:
+>> Bridge drivers can now (temporarily, in a transition phase) select if
+>> they want to provide a full owner device or keep just providing an
+>> of_node.
+>>
+>> By providing a full owner device, the bridge drivers no longer need
+>> to provide an of_node since that node is available via the owner
+>> device.
+>>
+>> When all bridge drivers provide an owner device, that will become
+>> mandatory and the .of_node member will be removed.
+>>
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> ---
+>>  drivers/gpu/drm/drm_bridge.c             | 3 ++-
+>>  drivers/gpu/drm/rockchip/rockchip_lvds.c | 4 +++-
 > 
-> This commit creates new thread data which is used by unknown_thread, so
-> CoreSight tracing can roll back to use unknown_thread if perf data
-> doesn't include valid thread info.  This commit also releases thread
-> data for initialization failure case and for normal auxtrace free flow.
+> What is the reason to put rockchip here? Shouldn't be in separate patch?
 
-Hi Leo,
+Because the rockchip driver peeks into the bridge struct and all the
+changes in this patch relate to making the new .odev member optional in
+the transition phase, when the bridge can have either a new-style odev
+or an old style of_node.
 
-Arnaldo maintains the perf tools and he receives dozens of patches every day.
-If his name is not the first one to appear on the "To:" list, it is unlikely
-that his email filters will catch your patches.
+I guess this rockchip change could be patch 2, but it has to come first
+after this patch and it makes no sense on its own. Hence, one patch.
 
-Mathieu
+This rockchip_lvds interaction is also present in patch 24/26
+drm/bridge: remove the .of_node member
+
+I can split them if you want, but I personally don't see the point.
+
+>>  include/drm/drm_bridge.h                 | 2 ++
+>>  3 files changed, 7 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
+>> index 1638bfe9627c..3872f5379998 100644
+>> --- a/drivers/gpu/drm/drm_bridge.c
+>> +++ b/drivers/gpu/drm/drm_bridge.c
+>> @@ -365,7 +365,8 @@ struct drm_bridge *of_drm_find_bridge(struct device_node *np)
+>>  	mutex_lock(&bridge_lock);
+>>  
+>>  	list_for_each_entry(bridge, &bridge_list, list) {
+>> -		if (bridge->of_node == np) {
+>> +		if ((bridge->odev && bridge->odev->of_node == np) ||
+>> +		    bridge->of_node == np) {
+>>  			mutex_unlock(&bridge_lock);
+>>  			return bridge;
+>>  		}
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+>> index 4bd94b167d2c..557e0079c98d 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+>> @@ -377,8 +377,10 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
+>>  	}
+>>  	if (lvds->panel)
+>>  		remote = lvds->panel->dev->of_node;
+>> -	else
+>> +	else if (lvds->bridge->of_node)
+>>  		remote = lvds->bridge->of_node;
+>> +	else
+>> +		remote = lvds->bridge->odev->of_node;
+> 
+> I guess odev should be NULL here, or have I missed something.
+
+s/should/could/ ???
+
+Assuming that was what you meant and answering accordingly...
+
+No, .odev cannot be NULL in that else branch. drm_of_find_panel_or_bridge
+either found a panel or a bridge (or it failed). If it found a bridge
+(which is the relevant branch for this question) that bridge would have
+to have either an of_node (in the transition phase) or a valid .odev.
+Otherwise the bridge could not have been found by
+drm_of_find_panel_or_bridge.
+
+*time passes*
+
+Ahh, yes, .odev is always NULL here so you probably did mean "should".
+But after patches 2-23 when bridges start populating .odev *instead*
+of .of_node, .odev will not remain NULL. But as I said above, while
+.odev is NULL, .of_node will never be NULL and vice versa (or
+drm_of_find_panel_or_bridge could not have found the bridge) so there
+is no risk of a NULL dereference.
+
+Cheers,
+Peter
 
 > 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  tools/perf/util/cs-etm.c | 24 ++++++++++++++++++++++--
->  1 file changed, 22 insertions(+), 2 deletions(-)
+> Regards
+> Andrzej
 > 
-> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-> index 6533b1a..69f21de 100644
-> --- a/tools/perf/util/cs-etm.c
-> +++ b/tools/perf/util/cs-etm.c
-> @@ -239,6 +239,7 @@ static void cs_etm__free(struct perf_session *session)
->  	for (i = 0; i < aux->num_cpu; i++)
->  		zfree(&aux->metadata[i]);
->  
-> +	thread__zput(aux->unknown_thread);
->  	zfree(&aux->metadata);
->  	zfree(&aux);
->  }
-> @@ -1355,6 +1356,23 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
->  	etm->auxtrace.free = cs_etm__free;
->  	session->auxtrace = &etm->auxtrace;
->  
-> +	etm->unknown_thread = thread__new(999999999, 999999999);
-> +	if (!etm->unknown_thread)
-> +		goto err_free_queues;
-> +
-> +	/*
-> +	 * Initialize list node so that at thread__zput() we can avoid
-> +	 * segmentation fault at list_del_init().
-> +	 */
-> +	INIT_LIST_HEAD(&etm->unknown_thread->node);
-> +
-> +	err = thread__set_comm(etm->unknown_thread, "unknown", 0);
-> +	if (err)
-> +		goto err_delete_thread;
-> +
-> +	if (thread__init_map_groups(etm->unknown_thread, etm->machine))
-> +		goto err_delete_thread;
-> +
->  	if (dump_trace) {
->  		cs_etm__print_auxtrace_info(auxtrace_info->priv, num_cpu);
->  		return 0;
-> @@ -1369,16 +1387,18 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
->  
->  	err = cs_etm__synth_events(etm, session);
->  	if (err)
-> -		goto err_free_queues;
-> +		goto err_delete_thread;
->  
->  	err = auxtrace_queues__process_index(&etm->queues, session);
->  	if (err)
-> -		goto err_free_queues;
-> +		goto err_delete_thread;
->  
->  	etm->data_queued = etm->queues.populated;
->  
->  	return 0;
->  
-> +err_delete_thread:
-> +	thread__zput(etm->unknown_thread);
->  err_free_queues:
->  	auxtrace_queues__free(&etm->queues);
->  	session->auxtrace = NULL;
-> -- 
-> 2.7.4
+>>  	if (of_property_read_string(dev->of_node, "rockchip,output", &name))
+>>  		/* default set it as output rgb */
+>>  		lvds->output = DISPLAY_OUTPUT_RGB;
+>> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+>> index 3270fec46979..7c17977c3537 100644
+>> --- a/include/drm/drm_bridge.h
+>> +++ b/include/drm/drm_bridge.h
+>> @@ -254,6 +254,7 @@ struct drm_bridge_timings {
+>>  
+>>  /**
+>>   * struct drm_bridge - central DRM bridge control structure
+>> + * @odev: device that owns the bridge
+>>   * @dev: DRM device this bridge belongs to
+>>   * @encoder: encoder to which this bridge is connected
+>>   * @next: the next bridge in the encoder chain
+>> @@ -265,6 +266,7 @@ struct drm_bridge_timings {
+>>   * @driver_private: pointer to the bridge driver's internal context
+>>   */
+>>  struct drm_bridge {
+>> +	struct device *odev;
+>>  	struct drm_device *dev;
+>>  	struct drm_encoder *encoder;
+>>  	struct drm_bridge *next;
+> 
 > 
