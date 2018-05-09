@@ -1,33 +1,32 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed,  9 May 2018 18:07:12 +0100
-Subject: [PATCH 6/8] firmware: arm_scmi: remove unnecessary bitmap_zero
-In-Reply-To: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
-References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1525885634-22348-7-git-send-email-sudeep.holla@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  9 May 2018 19:54:09 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add resets property CAN-FD node
+Message-ID: <20180509175409.10507-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kcalloc zeros the memory and it's totally unnecessary to zero the bitmap
-again using bitmap_zero. This patch just drops the unnecessary use of
-the bitmap_zero in the context.
+Add resets property to CAN-FD node to describe it in the reset topology of
+on-SoC devices.  This allows to reset the CAN-FD device using the Reset
+Controller API.
 
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/firmware/arm_scmi/driver.c | 2 --
- 1 file changed, 2 deletions(-)
+Based on renesas-devel-20180508-v4.17-rc4
+---
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-index 33d2b78af3ff..4087d6c50ecd 100644
---- a/drivers/firmware/arm_scmi/driver.c
-+++ b/drivers/firmware/arm_scmi/driver.c
-@@ -636,8 +636,6 @@ static int scmi_xfer_info_init(struct scmi_info *sinfo)
- 	if (!info->xfer_alloc_table)
- 		return -ENOMEM;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+index 3a127643d1dc..32db26f2c8b5 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+@@ -190,6 +190,7 @@
+ 			assigned-clocks = <&cpg CPG_CORE R8A77980_CLK_CANFD>;
+ 			assigned-clock-rates = <40000000>;
+ 			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 914>;
+ 			status = "disabled";
  
--	bitmap_zero(info->xfer_alloc_table, desc->max_msg);
--
- 	/* Pre-initialize the buffer pointer to pre-allocated buffers */
- 	for (i = 0, xfer = info->xfer_block; i < desc->max_msg; i++, xfer++) {
- 		xfer->rx.buf = devm_kcalloc(dev, sizeof(u8), desc->max_msg_size,
+ 			channel0 {
 -- 
-2.7.4
+2.11.0
