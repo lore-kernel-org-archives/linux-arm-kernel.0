@@ -1,187 +1,99 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed,  9 May 2018 12:25:49 -0500
-Subject: [PATCH v10 10/27] ARM: davinci: dm646x: add new clock init using
- common clock framework
+Date: Wed,  9 May 2018 12:25:41 -0500
+Subject: [PATCH v10 02/27] clk: davinci: da850-pll: change PLL0 to
+ CLK_OF_DECLARE
 In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
 References: <20180509172606.29387-1-david@lechnology.com>
-Message-ID: <20180509172606.29387-11-david@lechnology.com>
+Message-ID: <20180509172606.29387-3-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the new board-specific clock init in mach-davinci/dm646x.c
-using the new common clock framework drivers.
-
-The #ifdefs are needed to prevent compile errors until the entire
-ARCH_DAVINCI is converted.
-
-Also clean up the #includes since we are adding some here.
+PLL0 on davinci/da850-type device needs to be registered early in boot
+because it is needed for clocksource/clockevent. Change the driver
+to use CLK_OF_DECLARE for this special case.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v10 changes:
-- none
+- removed duplicate warning message
 
 v9 changes:
-- register PLL1 and PSC in dm646x_init_time() instead of as platform device so
-  that we get the correct timer0 clock for davinci_timer_init()
-- Fixed size of PLL memory block
+- new patch in v9
 
-v8 changes:
-- register clkdev lookup for ref_clk and aux_clkin
+ drivers/clk/davinci/pll-da850.c | 21 +++++++++++++++++----
+ drivers/clk/davinci/pll.c       |  4 +++-
+ drivers/clk/davinci/pll.h       |  2 +-
+ 3 files changed, 21 insertions(+), 6 deletions(-)
 
-v7 changes:
-- add clock platform device declarations
-- register platform devices instead of registering clocks directly
-- add davinci prefix to commit description
-
-v6 changes:
-- add blank lines between function calls
-
-
- arch/arm/mach-davinci/board-dm646x-evm.c |  2 +
- arch/arm/mach-davinci/davinci.h          |  1 +
- arch/arm/mach-davinci/dm646x.c           | 63 +++++++++++++++++++++---
- 3 files changed, 58 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 764be73735a2..37c9e0ee4dcc 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -773,6 +773,8 @@ static __init void evm_init(void)
- 	int ret;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 
-+	dm646x_register_clocks();
-+
- 	ret = dm646x_gpio_register();
- 	if (ret)
- 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
-diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
-index 16aca5853ab2..fa99197d36f9 100644
---- a/arch/arm/mach-davinci/davinci.h
-+++ b/arch/arm/mach-davinci/davinci.h
-@@ -116,6 +116,7 @@ int dm644x_gpio_register(void);
- /* DM646x function declarations */
- void dm646x_init(void);
- void dm646x_init_time(unsigned long ref_clk_rate, unsigned long aux_clkin_rate);
-+void dm646x_register_clocks(void);
- void dm646x_init_mcasp0(struct snd_platform_data *pdata);
- void dm646x_init_mcasp1(struct snd_platform_data *pdata);
- int dm646x_init_edma(struct edma_rsv_info *rsv);
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index e1d6e92f434a..f5693bafc81f 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -8,29 +8,35 @@
-  * is licensed "as is" without any warranty of any kind, whether express
-  * or implied.
-  */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clk/davinci.h>
-+#include <linux/clkdev.h>
- #include <linux/dma-mapping.h>
- #include <linux/dmaengine.h>
+diff --git a/drivers/clk/davinci/pll-da850.c b/drivers/clk/davinci/pll-da850.c
+index 00a6ece7b524..fde4642a993f 100644
+--- a/drivers/clk/davinci/pll-da850.c
++++ b/drivers/clk/davinci/pll-da850.c
+@@ -12,6 +12,8 @@
  #include <linux/init.h>
--#include <linux/clk.h>
--#include <linux/serial_8250.h>
--#include <linux/platform_device.h>
- #include <linux/platform_data/edma.h>
- #include <linux/platform_data/gpio-davinci.h>
-+#include <linux/platform_device.h>
-+#include <linux/serial_8250.h>
+ #include <linux/kernel.h>
+ #include <linux/mfd/da8xx-cfgchip.h>
++#include <linux/mfd/syscon.h>
++#include <linux/of_address.h>
+ #include <linux/of.h>
+ #include <linux/types.h>
  
- #include <asm/mach/map.h>
- 
-+#include <mach/common.h>
- #include <mach/cputype.h>
- #include <mach/irqs.h>
--#include "psc.h"
- #include <mach/mux.h>
--#include <mach/time.h>
- #include <mach/serial.h>
--#include <mach/common.h>
-+#include <mach/time.h>
- 
-+#include "asp.h"
- #include "davinci.h"
--#include "clock.h"
- #include "mux.h"
--#include "asp.h"
-+
-+#ifndef CONFIG_COMMON_CLK
-+#include "clock.h"
-+#include "psc.h"
-+#endif
- 
- #define DAVINCI_VPIF_BASE       (0x01C12000)
- 
-@@ -46,6 +52,7 @@
- #define DM646X_EMAC_CNTRL_RAM_OFFSET	0x2000
- #define DM646X_EMAC_CNTRL_RAM_SIZE	0x2000
- 
-+#ifndef CONFIG_COMMON_CLK
- static struct pll_data pll1_data = {
- 	.num       = 1,
- 	.phys_base = DAVINCI_PLL1_BASE,
-@@ -356,6 +363,7 @@ static struct clk_lookup dm646x_clks[] = {
- 	CLK(NULL, "vpif1", &vpif1_clk),
- 	CLK(NULL, NULL, NULL),
+@@ -135,11 +137,22 @@ static const struct davinci_pll_sysclk_info *da850_pll0_sysclk_info[] = {
+ 	NULL
  };
-+#endif
  
- static struct emac_platform_data dm646x_emac_pdata = {
- 	.ctrl_reg_offset	= DM646X_EMAC_CNTRL_OFFSET,
-@@ -953,10 +961,49 @@ void __init dm646x_init(void)
- void __init dm646x_init_time(unsigned long ref_clk_rate,
- 			     unsigned long aux_clkin_rate)
+-int of_da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
++void of_da850_pll0_init(struct device_node *node)
  {
-+#ifdef CONFIG_COMMON_CLK
-+	void __iomem *pll1, *psc;
-+	struct clk *clk;
+-	return of_davinci_pll_init(dev, dev->of_node, &da850_pll0_info,
+-				   &da850_pll0_obsclk_info,
+-				   da850_pll0_sysclk_info, 7, base, cfgchip);
++	void __iomem *base;
++	struct regmap *cfgchip;
 +
-+	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, ref_clk_rate);
-+	clk_register_fixed_rate(NULL, "aux_clkin", NULL, 0, aux_clkin_rate);
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: ioremap failed\n", __func__);
++		return;
++	}
 +
-+	pll1 = ioremap(DAVINCI_PLL1_BASE, SZ_1K);
-+	dm646x_pll1_init(NULL, pll1, NULL);
++	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
 +
-+	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
-+	dm646x_psc_init(NULL, psc);
-+
-+	clk = clk_get(NULL, "timer0");
-+
-+	davinci_timer_init(clk);
-+#else
- 	ref_clk.rate = ref_clk_rate;
- 	aux_clkin.rate = aux_clkin_rate;
- 	davinci_clk_init(dm646x_clks);
- 	davinci_timer_init(&timer0_clk);
-+#endif
-+}
-+
-+static struct resource dm646x_pll2_resources[] = {
-+	{
-+		.start	= DAVINCI_PLL2_BASE,
-+		.end	= DAVINCI_PLL2_BASE + SZ_1K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device dm646x_pll2_device = {
-+	.name		= "dm646x-pll2",
-+	.id		= -1,
-+	.resource	= dm646x_pll2_resources,
-+	.num_resources	= ARRAY_SIZE(dm646x_pll2_resources),
-+};
-+
-+void __init dm646x_register_clocks(void)
-+{
-+	/* PLL1 and PSC are registered in dm646x_init_time() */
-+	platform_device_register(&dm646x_pll2_device);
++	of_davinci_pll_init(NULL, node, &da850_pll0_info,
++			    &da850_pll0_obsclk_info,
++			    da850_pll0_sysclk_info, 7, base, cfgchip);
  }
  
- static int __init dm646x_init_devices(void)
+ static const struct davinci_pll_clk_info da850_pll1_info = {
+diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
+index f362f10d8459..dcfa780f828a 100644
+--- a/drivers/clk/davinci/pll.c
++++ b/drivers/clk/davinci/pll.c
+@@ -770,8 +770,10 @@ static struct davinci_pll_platform_data *davinci_pll_get_pdata(struct device *de
+ 	return pdata;
+ }
+ 
++/* needed in early boot for clocksource/clockevent */
++CLK_OF_DECLARE(da850_pll0, "ti,da850-pll0", of_da850_pll0_init);
++
+ static const struct of_device_id davinci_pll_of_match[] = {
+-	{ .compatible = "ti,da850-pll0", .data = of_da850_pll0_init },
+ 	{ .compatible = "ti,da850-pll1", .data = of_da850_pll1_init },
+ 	{ }
+ };
+diff --git a/drivers/clk/davinci/pll.h b/drivers/clk/davinci/pll.h
+index 562652fc0759..b2e5c4496645 100644
+--- a/drivers/clk/davinci/pll.h
++++ b/drivers/clk/davinci/pll.h
+@@ -123,7 +123,7 @@ int of_davinci_pll_init(struct device *dev, struct device_node *node,
+ /* Platform-specific callbacks */
+ 
+ int da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+-int of_da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
++void of_da850_pll0_init(struct device_node *node);
+ int of_da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+ 
+ int dm355_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
 -- 
 2.17.0
