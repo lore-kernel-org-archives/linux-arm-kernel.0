@@ -1,186 +1,278 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  9 May 2018 12:17:52 +0200
-Subject: [PATCH V2 05/11] PM / Domains: Allow a better error handling of
- dev_pm_domain_attach()
-Message-ID: <1525861072-29150-1-git-send-email-ulf.hansson@linaro.org>
+From: hl@rock-chips.com (Lin Huang)
+Date: Wed,  9 May 2018 18:22:41 +0800
+Subject: [PATCH v2 1/4] drm/rockchip: add transfer function for cdn-dp
+Message-ID: <1525861364-26323-1-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The callers of dev_pm_domain_attach() currently checks the returned error
-code for -EPROBE_DEFER and needs to ignore other error codes. This is an
-unnecessary limitation, which also leads to a rather strange behaviour in
-the error path.
+From: Chris Zhong <zyw@rock-chips.com>
 
-Address this limitation, by changing the return codes from
-acpi_dev_pm_attach() and genpd_dev_pm_attach(). More precisely, let them
-return 0, when no PM domain is needed for the device and then return 1, in
-case the device was successfully attached to its PM domain. In this way,
-dev_pm_domain_attach(), gets a better understanding of what happens in the
-attach attempts and also allowing its caller to better act on real errors
-codes.
+We may support training outside firmware, so we need support
+dpcd read/write to get the message or do some setting with
+display.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Signed-off-by: Lin Huang <hl@rock-chips.com>
 ---
 
-Changes in v2:
-	- Return 0 from the inline variant of dev_pm_domain_attach(), to make
-	sure probing still works when CONFIG_PM is unset.
+Changes in v2: 
+- update patch following Enric suggest
 
----
- drivers/acpi/device_pm.c    |  6 +++---
- drivers/base/power/common.c |  7 ++++---
- drivers/base/power/domain.c | 19 ++++++++++---------
- include/linux/acpi.h        |  2 +-
- include/linux/pm_domain.h   |  4 ++--
- 5 files changed, 20 insertions(+), 18 deletions(-)
+ drivers/gpu/drm/rockchip/cdn-dp-core.c | 55 ++++++++++++++++++++++++----
+ drivers/gpu/drm/rockchip/cdn-dp-core.h |  1 +
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c  | 67 ++++++++++++++++++++++++++++++----
+ drivers/gpu/drm/rockchip/cdn-dp-reg.h  | 14 ++++++-
+ 4 files changed, 120 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-index d006300..a7c2673 100644
---- a/drivers/acpi/device_pm.c
-+++ b/drivers/acpi/device_pm.c
-@@ -1257,7 +1257,7 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
- 	struct acpi_device *adev = ACPI_COMPANION(dev);
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+index c6fbdcd..cce64c1 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
++++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+@@ -176,8 +176,8 @@ static int cdn_dp_get_sink_count(struct cdn_dp_device *dp, u8 *sink_count)
+ 	u8 value;
  
- 	if (!adev)
--		return -ENODEV;
-+		return 0;
- 
- 	/*
- 	 * Only attach the power domain to the first device if the
-@@ -1265,7 +1265,7 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
- 	 * management twice.
- 	 */
- 	if (!acpi_device_is_first_physical_node(adev, dev))
--		return -EBUSY;
-+		return 0;
- 
- 	acpi_add_pm_notifier(adev, dev, acpi_pm_notify_work_func);
- 	dev_pm_domain_set(dev, &acpi_general_pm_domain);
-@@ -1275,7 +1275,7 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
- 	}
- 
- 	dev->pm_domain->detach = acpi_dev_pm_detach;
--	return 0;
-+	return 1;
- }
- EXPORT_SYMBOL_GPL(acpi_dev_pm_attach);
- #endif /* CONFIG_PM */
-diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
-index f3cf61f..5e4b481 100644
---- a/drivers/base/power/common.c
-+++ b/drivers/base/power/common.c
-@@ -98,7 +98,8 @@ EXPORT_SYMBOL_GPL(dev_pm_put_subsys_data);
-  * Callers must ensure proper synchronization of this function with power
-  * management callbacks.
-  *
-- * Returns 0 on successfully attached PM domain or negative error code.
-+ * Returns 0 on successfully attached PM domain and when it found that the
-+ * device don't need a PM domain, else a negative error code.
-  */
- int dev_pm_domain_attach(struct device *dev, bool power_on)
- {
-@@ -108,10 +109,10 @@ int dev_pm_domain_attach(struct device *dev, bool power_on)
- 		return -EEXIST;
- 
- 	ret = acpi_dev_pm_attach(dev, power_on);
+ 	*sink_count = 0;
+-	ret = cdn_dp_dpcd_read(dp, DP_SINK_COUNT, &value, 1);
 -	if (ret)
-+	if (!ret)
- 		ret = genpd_dev_pm_attach(dev);
++	ret = drm_dp_dpcd_read(&dp->aux, DP_SINK_COUNT, &value, 1);
++	if (ret < 0)
+ 		return ret;
  
--	return ret;
-+	return ret < 0 ? ret : 0;
+ 	*sink_count = DP_GET_SINK_COUNT(value);
+@@ -374,9 +374,9 @@ static int cdn_dp_get_sink_capability(struct cdn_dp_device *dp)
+ 	if (!cdn_dp_check_sink_connection(dp))
+ 		return -ENODEV;
+ 
+-	ret = cdn_dp_dpcd_read(dp, DP_DPCD_REV, dp->dpcd,
+-			       DP_RECEIVER_CAP_SIZE);
+-	if (ret) {
++	ret = drm_dp_dpcd_read(&dp->aux, DP_DPCD_REV, dp->dpcd,
++			       sizeof(dp->dpcd));
++	if (ret < 0) {
+ 		DRM_DEV_ERROR(dp->dev, "Failed to get caps %d\n", ret);
+ 		return ret;
+ 	}
+@@ -582,8 +582,8 @@ static bool cdn_dp_check_link_status(struct cdn_dp_device *dp)
+ 	if (!port || !dp->link.rate || !dp->link.num_lanes)
+ 		return false;
+ 
+-	if (cdn_dp_dpcd_read(dp, DP_LANE0_1_STATUS, link_status,
+-			     DP_LINK_STATUS_SIZE)) {
++	if (drm_dp_dpcd_read_link_status(&dp->aux, link_status) !=
++	    DP_LINK_STATUS_SIZE) {
+ 		DRM_ERROR("Failed to get link status\n");
+ 		return false;
+ 	}
+@@ -1012,6 +1012,40 @@ static int cdn_dp_pd_event(struct notifier_block *nb,
+ 	return NOTIFY_DONE;
  }
- EXPORT_SYMBOL_GPL(dev_pm_domain_attach);
  
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index b816adb..455ecea 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2180,10 +2180,11 @@ static void genpd_dev_pm_sync(struct device *dev)
-  * Parse device's OF node to find a PM domain specifier. If such is found,
-  * attaches the device to retrieved pm_domain ops.
-  *
-- * Returns 0 on successfully attached PM domain or negative error code. Note
-- * that if a power-domain exists for the device, but it cannot be found or
-- * turned on, then return -EPROBE_DEFER to ensure that the device is not
-- * probed and to re-try again later.
-+ * Returns 1 on successfully attached PM domain, 0 when the device don't need a
-+ * PM domain or a negative error code in case of failures. Note that if a
-+ * power-domain exists for the device, but it cannot be found or turned on,
-+ * then return -EPROBE_DEFER to ensure that the device is not probed and to
-+ * re-try again later.
-  */
- int genpd_dev_pm_attach(struct device *dev)
++static ssize_t cdn_dp_aux_transfer(struct drm_dp_aux *aux,
++				   struct drm_dp_aux_msg *msg)
++{
++	struct cdn_dp_device *dp = container_of(aux, struct cdn_dp_device, aux);
++	int ret;
++	u8 status;
++
++	switch (msg->request & ~DP_AUX_I2C_MOT) {
++	case DP_AUX_NATIVE_WRITE:
++	case DP_AUX_I2C_WRITE:
++	case DP_AUX_I2C_WRITE_STATUS_UPDATE:
++		ret = cdn_dp_dpcd_write(dp, msg->address, msg->buffer,
++					msg->size);
++		break;
++	case DP_AUX_NATIVE_READ:
++	case DP_AUX_I2C_READ:
++		ret = cdn_dp_dpcd_read(dp, msg->address, msg->buffer,
++				       msg->size);
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	status = cdn_dp_get_aux_status(dp);
++	if (status == AUX_STATUS_ACK)
++		msg->reply = DP_AUX_NATIVE_REPLY_ACK;
++	else if (status == AUX_STATUS_NACK)
++		msg->reply = DP_AUX_NATIVE_REPLY_NACK;
++	else if (status == AUX_STATUS_DEFER)
++		msg->reply = DP_AUX_NATIVE_REPLY_DEFER;
++
++	return ret;
++}
++
+ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
  {
-@@ -2192,12 +2193,12 @@ int genpd_dev_pm_attach(struct device *dev)
+ 	struct cdn_dp_device *dp = dev_get_drvdata(dev);
+@@ -1030,6 +1064,13 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
+ 	dp->active = false;
+ 	dp->active_port = -1;
+ 	dp->fw_loaded = false;
++	dp->aux.name = "DP-AUX";
++	dp->aux.transfer = cdn_dp_aux_transfer;
++	dp->aux.dev = dev;
++
++	ret = drm_dp_aux_register(&dp->aux);
++	if (ret)
++		return ret;
+ 
+ 	INIT_WORK(&dp->event_work, cdn_dp_pd_event_work);
+ 
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.h b/drivers/gpu/drm/rockchip/cdn-dp-core.h
+index f57e296..46159b2 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-core.h
++++ b/drivers/gpu/drm/rockchip/cdn-dp-core.h
+@@ -78,6 +78,7 @@ struct cdn_dp_device {
+ 	struct platform_device *audio_pdev;
+ 	struct work_struct event_work;
+ 	struct edid *edid;
++	struct drm_dp_aux aux;
+ 
+ 	struct mutex lock;
+ 	bool connected;
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.c b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
+index eb3042c..afdfda0 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-reg.c
++++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
+@@ -221,7 +221,11 @@ static int cdn_dp_reg_write_bit(struct cdn_dp_device *dp, u16 addr,
+ 				   sizeof(field), field);
+ }
+ 
+-int cdn_dp_dpcd_read(struct cdn_dp_device *dp, u32 addr, u8 *data, u16 len)
++/*
++ * Returns the number of bytes transferred on success, or a negative error
++ * code on failure. -ETIMEDOUT is returned if mailbox message not send success;
++ */
++ssize_t cdn_dp_dpcd_read(struct cdn_dp_device *dp, u32 addr, u8 *data, u16 len)
+ {
+ 	u8 msg[5], reg[5];
+ 	int ret;
+@@ -247,24 +251,40 @@ int cdn_dp_dpcd_read(struct cdn_dp_device *dp, u32 addr, u8 *data, u16 len)
+ 		goto err_dpcd_read;
+ 
+ 	ret = cdn_dp_mailbox_read_receive(dp, data, len);
++	if (!ret)
++		return len;
+ 
+ err_dpcd_read:
++	DRM_DEV_ERROR(dp->dev, "dpcd read failed: %d\n", ret);
+ 	return ret;
+ }
+ 
+-int cdn_dp_dpcd_write(struct cdn_dp_device *dp, u32 addr, u8 value)
++#define CDN_AUX_HEADER_SIZE	5
++#define CDN_AUX_MSG_SIZE	20
++/*
++ * Returns the number of bytes transferred on success, or a negative error
++ * code on failure. -ETIMEDOUT is returned if mailbox message not send success;
++ * -EINVAL is return if get the wrong data size after message send.
++ */
++ssize_t cdn_dp_dpcd_write(struct cdn_dp_device *dp, u32 addr, u8 *data, u16 len)
+ {
+-	u8 msg[6], reg[5];
++	u8 msg[CDN_AUX_MSG_SIZE + CDN_AUX_HEADER_SIZE];
++	u8 reg[CDN_AUX_HEADER_SIZE];
  	int ret;
  
- 	if (!dev->of_node)
--		return -ENODEV;
-+		return 0;
- 
- 	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
- 					"#power-domain-cells", 0, &pd_args);
- 	if (ret < 0)
--		return ret;
-+		return 0;
- 
- 	mutex_lock(&gpd_list_lock);
- 	pd = genpd_get_from_provider(&pd_args);
-@@ -2218,7 +2219,7 @@ int genpd_dev_pm_attach(struct device *dev)
- 		if (ret != -EPROBE_DEFER)
- 			dev_err(dev, "failed to add to PM domain %s: %d",
- 				pd->name, ret);
--		goto out;
-+		return ret;
- 	}
- 
- 	dev->pm_domain->detach = genpd_dev_pm_detach;
-@@ -2230,8 +2231,8 @@ int genpd_dev_pm_attach(struct device *dev)
- 
- 	if (ret)
- 		genpd_remove_device(pd, dev);
--out:
--	return ret ? -EPROBE_DEFER : 0;
+-	msg[0] = 0;
+-	msg[1] = 1;
++	if (WARN_ON(len > CDN_AUX_MSG_SIZE) || WARN_ON(len <= 0))
++		return -EINVAL;
 +
-+	return ret ? -EPROBE_DEFER : 1;
- }
- EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
++	msg[0] = (len >> 8) & 0xff;
++	msg[1] = len & 0xff;
+ 	msg[2] = (addr >> 16) & 0xff;
+ 	msg[3] = (addr >> 8) & 0xff;
+ 	msg[4] = addr & 0xff;
+-	msg[5] = value;
++
++	memcpy(msg + CDN_AUX_HEADER_SIZE, data, len);
++
+ 	ret = cdn_dp_mailbox_send(dp, MB_MODULE_ID_DP_TX, DPTX_WRITE_DPCD,
+-				  sizeof(msg), msg);
++				  CDN_AUX_HEADER_SIZE + len, msg);
+ 	if (ret)
+ 		goto err_dpcd_write;
  
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 15bfb15..c01675b 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -899,7 +899,7 @@ static inline int acpi_subsys_runtime_suspend(struct device *dev) { return 0; }
- static inline int acpi_subsys_runtime_resume(struct device *dev) { return 0; }
- static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
+@@ -277,8 +297,12 @@ int cdn_dp_dpcd_write(struct cdn_dp_device *dp, u32 addr, u8 value)
+ 	if (ret)
+ 		goto err_dpcd_write;
+ 
+-	if (addr != (reg[2] << 16 | reg[3] << 8 | reg[4]))
++	if ((len != (reg[0] << 8 | reg[1])) ||
++	    (addr != (reg[2] << 16 | reg[3] << 8 | reg[4]))) {
+ 		ret = -EINVAL;
++	} else {
++		return len;
++	}
+ 
+ err_dpcd_write:
+ 	if (ret)
+@@ -286,6 +310,33 @@ int cdn_dp_dpcd_write(struct cdn_dp_device *dp, u32 addr, u8 value)
+ 	return ret;
+ }
+ 
++int cdn_dp_get_aux_status(struct cdn_dp_device *dp)
++{
++	u8 status;
++	int ret;
++
++	ret = cdn_dp_mailbox_send(dp, MB_MODULE_ID_DP_TX,
++				  DPTX_GET_LAST_AUX_STAUS, 0, NULL);
++	if (ret)
++		goto err_get_hpd;
++
++	ret = cdn_dp_mailbox_validate_receive(dp, MB_MODULE_ID_DP_TX,
++					      DPTX_GET_LAST_AUX_STAUS,
++					      sizeof(status));
++	if (ret)
++		goto err_get_hpd;
++
++	ret = cdn_dp_mailbox_read_receive(dp, &status, sizeof(status));
++	if (ret)
++		goto err_get_hpd;
++
++	return status;
++
++err_get_hpd:
++	DRM_DEV_ERROR(dp->dev, "get aux status failed: %d\n", ret);
++	return ret;
++}
++
+ int cdn_dp_load_firmware(struct cdn_dp_device *dp, const u32 *i_mem,
+ 			 u32 i_size, const u32 *d_mem, u32 d_size)
  {
--	return -ENODEV;
-+	return 0;
- }
- #endif
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.h b/drivers/gpu/drm/rockchip/cdn-dp-reg.h
+index c4bbb4a83..6580b11 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-reg.h
++++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.h
+@@ -328,6 +328,13 @@
+ #define GENERAL_BUS_SETTINGS            0x03
+ #define GENERAL_TEST_ACCESS             0x04
  
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 04dbef9..ab18548 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -280,7 +280,7 @@ static inline int of_genpd_parse_idle_states(struct device_node *dn,
- 
- static inline int genpd_dev_pm_attach(struct device *dev)
- {
--	return -ENODEV;
-+	return 0;
- }
- 
- static inline
-@@ -297,7 +297,7 @@ extern void dev_pm_domain_set(struct device *dev, struct dev_pm_domain *pd);
- #else
- static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
- {
--	return -ENODEV;
-+	return 0;
- }
- static inline void dev_pm_domain_detach(struct device *dev, bool power_off) {}
- static inline void dev_pm_domain_set(struct device *dev,
++/* AUX status*/
++#define AUX_STATUS_ACK			0
++#define AUX_STATUS_NACK			1
++#define AUX_STATUS_DEFER			2
++#define AUX_STATUS_SINK_ERROR		3
++#define AUX_STATUS_BUS_ERROR		4
++
+ #define DPTX_SET_POWER_MNG			0x00
+ #define DPTX_SET_HOST_CAPABILITIES		0x01
+ #define DPTX_GET_EDID				0x02
+@@ -469,8 +476,11 @@ int cdn_dp_set_host_cap(struct cdn_dp_device *dp, u8 lanes, bool flip);
+ int cdn_dp_event_config(struct cdn_dp_device *dp);
+ u32 cdn_dp_get_event(struct cdn_dp_device *dp);
+ int cdn_dp_get_hpd_status(struct cdn_dp_device *dp);
+-int cdn_dp_dpcd_write(struct cdn_dp_device *dp, u32 addr, u8 value);
+-int cdn_dp_dpcd_read(struct cdn_dp_device *dp, u32 addr, u8 *data, u16 len);
++ssize_t cdn_dp_dpcd_write(struct cdn_dp_device *dp, u32 addr,
++			  u8 *data, u16 len);
++ssize_t cdn_dp_dpcd_read(struct cdn_dp_device *dp, u32 addr,
++			 u8 *data, u16 len);
++int cdn_dp_get_aux_status(struct cdn_dp_device *dp);
+ int cdn_dp_get_edid_block(void *dp, u8 *edid,
+ 			  unsigned int block, size_t length);
+ int cdn_dp_train_link(struct cdn_dp_device *dp);
 -- 
 2.7.4
