@@ -1,43 +1,83 @@
-From: bgoswami@codeaurora.org (Banajit Goswami)
-Date: Wed, 9 May 2018 02:42:34 -0700
-Subject: [PATCH v7 20/24] ASoC: qdsp6: q6afe: Add q6afe dai driver
-In-Reply-To: <20180501120820.11016-21-srinivas.kandagatla@linaro.org>
-References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
- <20180501120820.11016-21-srinivas.kandagatla@linaro.org>
-Message-ID: <22a39a17-36ef-3e94-e91b-11d303559ae4@codeaurora.org>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 9 May 2018 11:42:50 +0200
+Subject: [PATCH] mtd: nxp-spifi: decrement flash_np refcnt on error paths
+In-Reply-To: <1525812456-25877-1-git-send-email-khoroshilov@ispras.ru>
+References: <1525812456-25877-1-git-send-email-khoroshilov@ispras.ru>
+Message-ID: <20180509114250.120eb299@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
-> This patch adds support to q6afe backend dais driver.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
+On Tue,  8 May 2018 23:47:36 +0300
+Alexey Khoroshilov <khoroshilov@ispras.ru> wrote:
+
+> nxp_spifi_probe() increments refcnt of SPI flash device node by
+> of_get_next_available_child() and then it passes the node
+> to mtd device in nxp_spifi_setup_flash().
+> But if a failure happens before mtd_device_register() succeed,
+> the refcnt is left undecremented.
+
+Why not doing that in the error path of the probe function? Also, you
+probably want to call of_node_put() in the ->remove() function.
+
+> 
+> Found by Linux Driver Verification project (linuxtesting.org).
+> 
+> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
 > ---
->   sound/soc/qcom/Kconfig           |   4 +
->   sound/soc/qcom/qdsp6/Makefile    |   1 +
->   sound/soc/qcom/qdsp6/q6afe-dai.c | 752 +++++++++++++++++++++++++++++++++++++++
->   3 files changed, 757 insertions(+)
->   create mode 100644 sound/soc/qcom/qdsp6/q6afe-dai.c
->
-> diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-> index 43f9ed85efa8..d3523a30d942 100644
-> --- a/sound/soc/qcom/Kconfig
-<snip>
-> +};
+>  drivers/mtd/spi-nor/nxp-spifi.c | 16 +++++++++++-----
+>  1 file changed, 11 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/nxp-spifi.c b/drivers/mtd/spi-nor/nxp-spifi.c
+> index 15374216d4d9..8919e31f2ab8 100644
+> --- a/drivers/mtd/spi-nor/nxp-spifi.c
+> +++ b/drivers/mtd/spi-nor/nxp-spifi.c
+> @@ -294,7 +294,8 @@ static int nxp_spifi_setup_flash(struct nxp_spifi *spifi,
+>  			break;
+>  		default:
+>  			dev_err(spifi->dev, "unsupported rx-bus-width\n");
+> -			return -EINVAL;
+> +			ret = -EINVAL;
+> +			goto err_node_put;
+>  		}
+>  	}
+>  
+> @@ -328,7 +329,8 @@ static int nxp_spifi_setup_flash(struct nxp_spifi *spifi,
+>  		break;
+>  	default:
+>  		dev_err(spifi->dev, "only mode 0 and 3 supported\n");
+> -		return -EINVAL;
+> +		ret = -EINVAL;
+> +		goto err_node_put;
+>  	}
+>  
+>  	writel(ctrl, spifi->io_base + SPIFI_CTRL);
+> @@ -356,22 +358,26 @@ static int nxp_spifi_setup_flash(struct nxp_spifi *spifi,
+>  	ret = spi_nor_scan(&spifi->nor, NULL, &hwcaps);
+>  	if (ret) {
+>  		dev_err(spifi->dev, "device scan failed\n");
+> -		return ret;
+> +		goto err_node_put;
+>  	}
+>  
+>  	ret = nxp_spifi_setup_memory_cmd(spifi);
+>  	if (ret) {
+>  		dev_err(spifi->dev, "memory command setup failed\n");
+> -		return ret;
+> +		goto err_node_put;
+>  	}
+>  
+>  	ret = mtd_device_register(&spifi->nor.mtd, NULL, 0);
+>  	if (ret) {
+>  		dev_err(spifi->dev, "mtd device parse failed\n");
+> -		return ret;
+> +		goto err_node_put;
+>  	}
+>  
+>  	return 0;
 > +
-> +static int msm_dai_q6_dai_probe(struct snd_soc_dai *dai)
-> +{
-> +	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
-> +	struct snd_soc_dapm_context *dapm;
-> +	struct q6afe_port *port;
-> +
-> +	dapm = snd_soc_component_get_dapm(dai->component);
-dapm unused here?
-
-LGTM otherwise.
-Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> +err_node_put:
+> +	of_node_put(np);
+> +	return ret;
+>  }
+>  
+>  static int nxp_spifi_probe(struct platform_device *pdev)
