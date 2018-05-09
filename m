@@ -1,76 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 9 May 2018 17:47:31 +0100
-Subject: [PATCH v7 06/16] arm64/sve: Refactor user SVE trap maintenance
- for external use
-In-Reply-To: <20180509164125.GQ7753@e103592.cambridge.arm.com>
-References: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
- <1525882385-29181-7-git-send-email-Dave.Martin@arm.com>
- <dad74a47-26f4-d38f-a9c4-e60fc9d1a07a@arm.com>
- <20180509164125.GQ7753@e103592.cambridge.arm.com>
-Message-ID: <d61937a5-d8f1-92fb-6d0c-483cd9d2244a@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed,  9 May 2018 17:48:02 +0100
+Subject: [PATCH] ARM: dts: vexpress: Replace '_' with '-' in node names
+Message-ID: <1525884482-19855-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/18 17:41, Dave Martin wrote:
-> On Wed, May 09, 2018 at 05:36:30PM +0100, Marc Zyngier wrote:
->> On 09/05/18 17:12, Dave Martin wrote:
->>> In preparation for optimising the way KVM manages switching the
->>> guest and host FPSIMD state, it is necessary to provide a means for
->>> code outside arch/arm64/kernel/fpsimd.c to restore the user trap
->>> configuration for SVE correctly for the current task.
->>>
->>> Rather than requiring external code to duplicate the maintenance
->>> explicitly, this patch wraps moves the trap maintenenace to
->>> fpsimd_bind_to_cpu(), since it is logically part of the work of
->>> associating the current task with the cpu.
->>>
->>> Because fpsimd_bind_to_cpu() is rather a cryptic name to publish
->>> alongside fpsimd_bind_state_to_cpu(), the former function is
->>> renamed to fpsimd_bind_task_to_cpu() to make its purpose more
->>> explicit.
->>>
->>> This patch makes appropriate changes to ensure that
->>> fpsimd_bind_task_to_cpu() is always called alongside
->>> task_fpsimd_load(), so that the trap maintenance continues to be
->>> done in every situation where it was done prior to this patch.
->>>
->>> As a side-effect, the metadata updates done by
->>> fpsimd_bind_task_to_cpu() now change from conditional to
->>> unconditional in the "already bound" case of sigreturn.  This is
->>> harmless, and a couple of extra stores on this slow path will not
->>> impact performance.  I consider this a reasonable price to pay for
->>> a slightly cleaner interface.
->>>
->>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->>> ---
->>>  arch/arm64/kernel/fpsimd.c | 28 ++++++++++++++--------------
->>>  1 file changed, 14 insertions(+), 14 deletions(-)
->>>
->>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> 
-> [...]
-> 
->>> @@ -1006,6 +996,16 @@ static void fpsimd_bind_to_cpu(void)
->>>  	last->st = &current->thread.uw.fpsimd_state;
->>>  	last->sve_in_use = test_thread_flag(TIF_SVE);
->>>  	current->thread.fpsimd_cpu = smp_processor_id();
->>> +
->>> +	if (system_supports_sve()) {
->>
->> Is it worth moving the last->sve_in_use assignment here? If the system
->> doesn't have SVE, the assignment is always 0, and we probably don't need
->> to do it at all. It could avoid the double call to test_thread_flag.
-> 
-> Could do now that you point it out ... but patch 13 gets rid of it
-> entirely anyway.  This is (was) part of the (now legacy) mechanism for
-> working round KVM's inability to lazily save the host SVE state.
-> 
-> If I respin I could tweak it here, but it would be purely cosmetic from
-> the whole-series point of view.
-Nah, don't even bother.
+The latest DTC throws warnings for character '_' in the node names.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Warning (node_name_chars_strict): /sysreg at 10000/sys_led: Character '_' not recommended in node name
+Warning (node_name_chars_strict): /sysreg at 10000/sys_mci: Character '_' not recommended in node name
+Warning (node_name_chars_strict): /sysreg at 10000/sys_flash: Character '_' not recommended in node name
 
-	M.
+The general recommendation is to use character '-' for all the node names.
+This patch fixes the warnings following the recommendation.
+
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index 7b8ff5b3b912..58e73131ecef 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -77,19 +77,19 @@
+ 					compatible = "arm,vexpress-sysreg";
+ 					reg = <0x010000 0x1000>;
+ 
+-					v2m_led_gpios: sys_led {
++					v2m_led_gpios: sys-led {
+ 						compatible = "arm,vexpress-sysreg,sys_led";
+ 						gpio-controller;
+ 						#gpio-cells = <2>;
+ 					};
+ 
+-					v2m_mmc_gpios: sys_mci {
++					v2m_mmc_gpios: sys-mci {
+ 						compatible = "arm,vexpress-sysreg,sys_mci";
+ 						gpio-controller;
+ 						#gpio-cells = <2>;
+ 					};
+ 
+-					v2m_flash_gpios: sys_flash {
++					v2m_flash_gpios: sys-flash {
+ 						compatible = "arm,vexpress-sysreg,sys_flash";
+ 						gpio-controller;
+ 						#gpio-cells = <2>;
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
