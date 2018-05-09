@@ -1,62 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 May 2018 10:02:13 +0100
-Subject: [PATCH v6 2/6] ARM: imx6: register pm_power_off handler if
- "fsl,pmic-stby-poweroff" is set
-In-Reply-To: <20180509050628.csbusplowpvmmiwa@pengutronix.de>
-References: <20180305102524.5905-1-o.rempel@pengutronix.de>
- <20180305102524.5905-3-o.rempel@pengutronix.de>
- <20180508124033.GL16141@n2100.armlinux.org.uk>
- <20180509050628.csbusplowpvmmiwa@pengutronix.de>
-Message-ID: <20180509090213.GQ16141@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 9 May 2018 10:05:43 +0100
+Subject: [PATCH v6 14/15] KVM: arm64: Fold redundant exit code checks out
+ of fixup_guest_exit()
+In-Reply-To: <1525797900-5548-15-git-send-email-Dave.Martin@arm.com>
+References: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
+ <1525797900-5548-15-git-send-email-Dave.Martin@arm.com>
+Message-ID: <b418f004-6c1c-fc97-5600-7ccbb07e9f08@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 07:06:28AM +0200, Oleksij Rempel wrote:
-> On Tue, May 08, 2018 at 01:40:33PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Mar 05, 2018 at 11:25:19AM +0100, Oleksij Rempel wrote:
-> > > One of the Freescale recommended sequences for power off with external
-> > > PMIC is the following:
-> > > ...
-> > > 3.  SoC is programming PMIC for power off when standby is asserted.
-> > > 4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
-> > > 
-> > > See:
-> > > http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
-> > > page 5083
-> > > 
-> > > This patch implements step 4. of this sequence.
-> > > 
-> > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > > ---
-> > >  arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
-> > >  1 file changed, 25 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-> > > index ecdf071653d4..24689260a2a5 100644
-> > > --- a/arch/arm/mach-imx/pm-imx6.c
-> > > +++ b/arch/arm/mach-imx/pm-imx6.c
-> > > @@ -604,6 +604,28 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
-> > >  				   IMX6Q_GPR1_GINT);
-> > >  }
-> > >  
-> > > +static void imx6_pm_stby_poweroff(void)
-> > > +{
-> > > +	imx6_set_lpm(STOP_POWER_OFF);
-> > > +	cpu_suspend(0, imx6q_suspend_finish);
-> > 
-> > Do you actually need to save the processor state etc here - the request
-> > is after all to power down the system and not to suspend.  Would calling
-> > imx6q_suspend_finish() directly work (and hence simplify the code) ?
+On 08/05/18 17:44, Dave Martin wrote:
+> The entire tail of fixup_guest_exit() is contained in if statements
+> of the form if (x && *exit_code == ARM_EXCEPTION_TRAP).  As a result,
+> we can check just once and bail out of the function early, allowing
+> the remaining if conditions to be simplified.
 > 
-> yes you right. This will work as well.
-> I'll send changed version after Rafaels feedback for kernel/reboot.c
-> part.
-> Russell, can I expect your Signed-off-by for changed patch?
+> The only awkward case is where *exit_code is changed to
+> ARM_EXCEPTION_EL1_SERROR in the case of an illegal GICv2 CPU
+> interface access: in that case, the GICv3 trap handling code is
+> skipped using a goto.  This avoids pointlessly evaluating the
+> static branch check for the GICv3 case, even though we can't have
+> vgic_v2_cpuif_trap and vgic_v3_cpuif_trap true simultaneously
+> unless we have a GICv3 and GICv2 on the host: that sounds stupid,
+> but I haven't satisfied myself that it can't happen.
+> 
+> No functional change.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-No, please read Documentation/process/submitting-patches.rst section 12.
-s-o-b does not apply in this case.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Jazz is not dead. It just smells funny...
