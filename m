@@ -1,73 +1,58 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 9 May 2018 11:03:35 +0100
-Subject: [PATCH v7 23/24] ASoC: qcom: apq8096: Add db820c machine driver
-In-Reply-To: <c52fc35d-95a6-6675-6c6e-32a0d5f486d4@codeaurora.org>
+From: bgoswami@codeaurora.org (Banajit Goswami)
+Date: Wed, 9 May 2018 03:16:54 -0700
+Subject: [PATCH v7 16/24] ASoC: qdsp6: q6asm: Add support to audio stream
+ apis
+In-Reply-To: <20180501120820.11016-17-srinivas.kandagatla@linaro.org>
 References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
- <20180501120820.11016-24-srinivas.kandagatla@linaro.org>
- <c52fc35d-95a6-6675-6c6e-32a0d5f486d4@codeaurora.org>
-Message-ID: <0db86f6a-76cb-22a5-eed9-98b2134dcb8b@linaro.org>
+ <20180501120820.11016-17-srinivas.kandagatla@linaro.org>
+Message-ID: <3296bc93-8790-3780-064c-d87422c644a9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review Banajit.
+On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
+> This patch adds support to open, write and media format commands
+> in the q6asm module.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
+> ---
+>   sound/soc/qcom/qdsp6/q6asm.c | 839 ++++++++++++++++++++++++++++++++++++++++++-
+>   sound/soc/qcom/qdsp6/q6asm.h |  49 +++
+>   2 files changed, 887 insertions(+), 1 deletion(-)
+>
+> diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
+> index 5a573e927a5e..a3073de235e1 100644
+> --- a/sound/soc/qcom/qdsp6/q6asm.c
+> +++ b/sound/soc/qcom/qdsp6/q6asm.c
+> @@ -10,6 +10,8 @@
+<snip>
+>   EXPORT_SYMBOL_GPL(q6asm_audio_client_alloc);
+>   
+> +static int q6asm_ac_send_cmd_sync(struct audio_client *ac, struct apr_pkt *pkt)
+> +{
+> +	struct apr_hdr *hdr = &pkt->hdr;
+> +	int rc;
+> +
+> +	mutex_lock(&ac->lock);
+> +	ac->result.opcode = 0;
+> +	ac->result.status = 0;
+> +
+> +	rc = apr_send_pkt(ac->adev, pkt);
+> +	if (rc < 0)
+> +		goto err;
+> +
+> +	rc = wait_event_timeout(ac->cmd_wait,
+> +				(ac->result.opcode == hdr->opcode), 5 * HZ);
+> +	if (!rc) {
+> +		dev_err(ac->dev, "CMD timeout\n");
+> +		rc =  -ETIMEDOUT;
+> +		goto err;
+> +	}
+else set rc to 0 to avoid returning >0 value.
 
-On 09/05/18 10:15, Banajit Goswami wrote:
-> 
-> On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
->> This patch adds support to DB820c machine driver.
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   sound/soc/qcom/Kconfig   |   9 ++
->>   sound/soc/qcom/Makefile  |   2 +
->>   sound/soc/qcom/apq8096.c | 238 
->> +++++++++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 249 insertions(+)
->> +    link = card->dai_link;
->> +
->> +    for_each_child_of_node(node, np) {
->> +        cpu = of_get_child_by_name(np, "cpu");
->> +        platform = of_get_child_by_name(np, "platform");
->> +        codec = of_get_child_by_name(np, "codec");
->> +
->> +        if (!cpu) {
->> +            dev_err(dev, "Can't find cpu DT node\n");
-> clean up missing to kfree(card->dai_link)?
-Yep, I will fix error path in next version.
-> 
->> +            return -EINVAL;
->> +        }
->> +
->> +                return ret;
->> +            }
->> +            link->no_pcm = 1;
->> +            link->ignore_suspend = 1;
-> ignore_suspend will also need to be set for FE DAIs?
-> 
-Okay!
->> +            link->ignore_pmdown_time = 1;
->> +            link->be_hw_params_fixup = apq8096_be_hw_params_fixup;
->> +        } else {
->> +            link->platform_of_node = link->cpu_of_node;
->> +            link->codec_dai_name = "snd-soc-dummy-dai";
->> +            link->codec_name = "snd-soc-dummy";
->> +            link->dynamic = 1;
->> +        }
+LGTM otherwise.
+Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
 
->> +
-
->> +
->> +static void apq8096_unbind(struct device *dev)
->> +{
->> +    struct snd_soc_card *card = dev_get_drvdata(dev);
->> +
->> +    component_unbind_all(dev, card);
->> +    snd_soc_unregister_card(card);
-> Should sound card not be unregistered first, before calling 
-> component_unbind_all()?
-Yep, I will give that a go.
-
-thanks,
-srini
-
-> 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
