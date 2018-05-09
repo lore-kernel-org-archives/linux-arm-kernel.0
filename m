@@ -1,101 +1,140 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 9 May 2018 11:12:59 -0600
-Subject: [PATCH v2 23/27] coresight: tmc-etr: Handle driver mode specific
- ETR buffers
-In-Reply-To: <a16587f9-bb0f-e806-9c8d-ee4af0e8b805@arm.com>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-24-git-send-email-suzuki.poulose@arm.com>
- <20180508171800.GA3389@xps15> <a16587f9-bb0f-e806-9c8d-ee4af0e8b805@arm.com>
-Message-ID: <CANLsYkxT90EtuJas08auzsZCEYgxTt93TZRpQqhA-bX3oE1=ug@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 May 2018 19:46:24 +0200
+Subject: [PATCH v2] arm64: dts: r8a77965: Add SDHI device nodes
+In-Reply-To: <CAMuHMdWq0w2V-Oskvci6bznTMPRXALVkCtefkFgvSm3Obw-e-Q@mail.gmail.com>
+References: <1525869504-3361-1-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdWq0w2V-Oskvci6bznTMPRXALVkCtefkFgvSm3Obw-e-Q@mail.gmail.com>
+Message-ID: <20180509174621.e22jqofunz4bwmdy@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2018 at 15:51, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> On 05/08/2018 06:18 PM, Mathieu Poirier wrote:
->>
->> On Tue, May 01, 2018 at 10:10:53AM +0100, Suzuki K Poulose wrote:
->>>
->>> Since the ETR could be driven either by SYSFS or by perf, it
->>> becomes complicated how we deal with the buffers used for each
->>> of these modes. The ETR driver cannot simply free the current
->>> attached buffer without knowing the provider (i.e, sysfs vs perf).
->>>
->>> To solve this issue, we provide:
->>> 1) the driver-mode specific etr buffer to be retained in the drvdata
->>> 2) the etr_buf for a session should be passed on when enabling the
->>>     hardware, which will be stored in drvdata->etr_buf. This will be
->>>     replaced (not free'd) as soon as the hardware is disabled, after
->>>     necessary sync operation.
->>>
->>> The advantages of this are :
->>>
->>> 1) The common code path doesn't need to worry about how to dispose
->>>     an existing buffer, if it is about to start a new session with a
->>>     different buffer, possibly in a different mode.
->>> 2) The driver mode can control its buffers and can get access to the
->>>     saved session even when the hardware is operating in a different
->>>     mode. (e.g, we can still access a trace buffer from a sysfs mode
->>>     even if the etr is now used in perf mode, without disrupting the
->>>     current session.)
->>>
->>> Towards this, we introduce a sysfs specific data which will hold the
->>> etr_buf used for sysfs mode of operation, controlled solely by the
->>> sysfs mode handling code.
->>
->>
->> Thinking further on this... I toyed with the idea of doing the same thing
->> when
->> working on the original driver and decided against it.  Do we really have
->> a case
->> where users would want to use sysFS and perf alternatively?  To me this
->> looks
->> overdesigned.
->>
->> If we are going to go that way we need to enact the same behavior for
->> ETB10 and
->> ETF...  And take it out of this set as it is already substantial enough.
->
->
-> The difference between ETB10/ETF and ETR is the usage of the buffer. The
-> former uses an internal buffer and we always have to copy it out to an
-> external buffer for consumption. Now this external buffer is actually
-> separate for each mode, i.e sysfs and perf. Also the data is copied
-> out right after we disable the HW. This ensures that the interleaved
-> mode doesn't corrupt each others data.
+On Wed, May 09, 2018 at 03:39:45PM +0200, Geert Uytterhoeven wrote:
+> Hi Kaneko-san,
+> 
+> On Wed, May 9, 2018 at 2:38 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >
+> > Add SDHI nodes to the DT of the r8a77965 SoC.
+> >
+> > Based on several similar patches of the R8A7796 device tree
+> > by Simon Horman <horms+renesas@verge.net.au>.
+> >
+> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> > ---
+> >
+> > This patch is based on the devel branch of Simon Horman's renesas tree.
+> >
+> > v2 [Yoshihiro Kaneko]
+> > * As suggested by Simon Horman
+> > Rebased on top of the devel branch of the renesas tree.
+> 
+> Thanks for the update!
+> 
+> >  arch/arm64/boot/dts/renesas/r8a77965.dtsi | 36 +++++++++++++++++++++++++++----
+> >  1 file changed, 32 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> > index ba0edda..510815e 100644
+> > --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> > +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> > @@ -978,23 +978,51 @@
+> >                 };
+> >
+> >                 sdhi0: sd at ee100000 {
+> > +                       compatible = "renesas,sdhi-r8a77965",
+> > +                                    "renesas,rcar-gen3-sdhi";
+> >                         reg = <0 0xee100000 0 0x2000>;
+> > -                       /* placeholder */
+> > +                       interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+> > +                       clocks = <&cpg CPG_MOD 314>;
+> > +                       max-frequency = <200000000>;
+> > +                       power-domains = <&sysc 32>;
+> 
+> In the mean time, <dt-bindings/power/r8a77965-sysc.h> has landed
+> upstream, so please use R8A77965_PD_ALWAYS_ON.
+> 
+> With the above fixed:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Hi Suzuki,
+Thanks, I have applied the patch with that fix.
+The result is as follows:
 
-When I wrote my original comment I was under the impression that
-ETB10/ETF's drvdata->buf was used for both sysFS and perf, but after
-going back to the code find it isn't the case.  As such a user can
-call sysFS and perf session alternately without destroying the results
-acquired from the previous trace scenario.  This is also what your
-patch is providing, enacting the same (desired) behaviour we currently
-have.
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Subject: [PATCH] arm64: dts: r8a77965: Add SDHI device nodes
 
-I'm good with this one.
+Add SDHI nodes to the DT of the r8a77965 SoC.
 
-Mathieu
+Based on several similar patches of the R8A7796 device tree
+by Simon Horman <horms+renesas@verge.net.au>.
 
->
-> However, the ETR doesn't have an internal buffer and uses the System RAM.
-> That brings in the problem of one mode using the "buffer" as
-> described by the drvdata. So, eventually either mode could write to
-> the buffer allocated by the other mode before it is consumed by the
-> end user (via syfs read or perf). That brings in the challenge of
-> managing the buffer safely, switching back and forth the buffer
-> (with the right size and pages) for each mode without any interferences.
-> That also implies, one mode must be able to free the left-over buffer
-> from the previous mode safely (which could be potentially linked to
-> other data structures maintained by the mode). And that makes it more
-> complex. e.g, we must leave the sysfs trace data for collection and
-> meanwhile the perf could grab the ETR for its usage. The perf mode
-> might not know the mode of the existing buffer and thus wouldn't know
-> how to free it properly.
->
-> This is why we need buffers per mode which can be managed by
-> each mode. i.e, both allocated, used and more importantly free'd
-> appropriately.
->
-> Cheers
-> Suzuki
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 36 +++++++++++++++++++++++++++----
+ 1 file changed, 32 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index ba0edda431a5..f51c1b2cbae4 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -978,23 +978,51 @@
+ 		};
+ 
+ 		sdhi0: sd at ee100000 {
++			compatible = "renesas,sdhi-r8a77965",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee100000 0 0x2000>;
+-			/* placeholder */
++			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 314>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 314>;
++			status = "disabled";
+ 		};
+ 
+ 		sdhi1: sd at ee120000 {
++			compatible = "renesas,sdhi-r8a77965",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee120000 0 0x2000>;
+-			/* placeholder */
++			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 313>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 313>;
++			status = "disabled";
+ 		};
+ 
+ 		sdhi2: sd at ee140000 {
++			compatible = "renesas,sdhi-r8a77965",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee140000 0 0x2000>;
+-			/* placeholder */
++			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 312>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 312>;
++			status = "disabled";
+ 		};
+ 
+ 		sdhi3: sd at ee160000 {
++			compatible = "renesas,sdhi-r8a77965",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee160000 0 0x2000>;
+-			/* placeholder */
++			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 311>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 311>;
++			status = "disabled";
+ 		};
+ 
+ 		gic: interrupt-controller at f1010000 {
+-- 
+2.11.0
