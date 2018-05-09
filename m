@@ -1,33 +1,40 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 9 May 2018 16:15:18 -0500
-Subject: [PATCH 2/3] arm64: dts: juno: replace '_' with '-' in node names
-In-Reply-To: <1525884291-18851-2-git-send-email-sudeep.holla@arm.com>
-References: <1525884291-18851-1-git-send-email-sudeep.holla@arm.com>
- <1525884291-18851-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAL_JsqKXXEyzFo9LSspjfN4ge6-skUvN_O3tkh+3oHkqEaMv0w@mail.gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Wed,  9 May 2018 14:34:39 -0700
+Subject: [PATCH] arm64: dts: sdm845: Add command DB node
+Message-ID: <20180509213439.165623-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2018 at 11:44 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> The latest DTC throws warnings for character '_' in the node names.
->
-> Warning (node_name_chars_strict): /thermal-zones/big_cluster: Character '_' not recommended in node name
-> Warning (node_name_chars_strict): /thermal-zones/little_cluster: Character '_' not recommended in node name
-> Warning (node_name_chars_strict): /smb at 8000000/motherboard/gpio_keys: Character '_' not recommended in node name
-> Warning (node_name_chars_strict): /pmu_a57: Character '_' not recommended in node name
-> Warning (node_name_chars_strict): /pmu_a53: Character '_' not recommended in node name
->
-> The general recommendation is to use character '-' for all the node names.
-> This patch fixes the warnings following the recommendation.
->
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm64/boot/dts/arm/juno-base.dtsi        | 4 ++--
->  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 2 +-
->  arch/arm64/boot/dts/arm/juno-r1.dts           | 4 ++--
->  arch/arm64/boot/dts/arm/juno-r2.dts           | 4 ++--
->  arch/arm64/boot/dts/arm/juno.dts              | 4 ++--
->  5 files changed, 9 insertions(+), 9 deletions(-)
+Add command DB node based on the bindings example.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+
+ arch/arm64/boot/dts/qcom/sdm845.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+index 486ace9a9e8b..7b5f2b3982a3 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -21,6 +21,18 @@
+ 		reg = <0 0x80000000 0 0>;
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		reserved-memory at 85fe0000 {
++			compatible = "qcom,cmd-db";
++			reg = <0x0 0x85fe0000 0x0 0x20000>;
++			no-map;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <2>;
+ 		#size-cells = <0>;
+-- 
+2.17.0.441.gb46fe60e1d-goog
