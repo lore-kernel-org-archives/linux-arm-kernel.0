@@ -1,30 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 May 2018 21:23:52 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a77980: add resets property
- CAN-FD node
-In-Reply-To: <2889c7ff-1748-e435-c03c-cb36cf930b1d@cogentembedded.com>
-References: <20180509175409.10507-1-horms+renesas@verge.net.au>
- <CAMuHMdXWHXtO1-0FucCsPTE22U_k+vdqCrDHgBFrM4+yEgXYcQ@mail.gmail.com>
- <20180509191435.vm2zfuuixbyd3drm@verge.net.au>
- <2889c7ff-1748-e435-c03c-cb36cf930b1d@cogentembedded.com>
-Message-ID: <20180509192351.ubealepswr4i6pik@verge.net.au>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed,  9 May 2018 12:26:59 -0700
+Subject: [PATCH] ARM: dts: BCM5301X: Relicense Asus RT-AC87U file to the
+ GPL 2.0+ / MIT
+In-Reply-To: <20180504100324.31847-1-zajec5@gmail.com>
+References: <20180504100324.31847-1-zajec5@gmail.com>
+Message-ID: <20180509192659.32382-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 10:18:47PM +0300, Sergei Shtylyov wrote:
-> On 5/9/2018 10:14 PM, Simon Horman wrote:
+On Fri,  4 May 2018 12:03:24 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> > > > Add resets property to CAN-FD node to describe it in the reset topology of
-> > > > on-SoC devices.  This allows to reset the CAN-FD device using the Reset
-> > > > Controller API.
-> > > > 
-> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > 
-> > > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > 
-> > Thanks, applied.
+> This matches licensing used by other BCM5301X files and is preferred as:
+> 1) GPL 2.0+ makes is clearly compatible with Linux kernel
+> 2) MIT is also permissive but preferred over ISC
 > 
->    You're too quick (and I'm on holiday today). Need "to| before "CAN-FD" in
-> the subject. ;-)
+> This file were created and ever touched by a group of three people only:
+> ?lvaro, Hauke and me.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> ---
 
-Thanks, fixed.
+Applied to devicetree/next, thanks!
+--
+Florian
