@@ -1,58 +1,186 @@
-From: bgoswami@codeaurora.org (Banajit Goswami)
-Date: Wed, 9 May 2018 03:16:54 -0700
-Subject: [PATCH v7 16/24] ASoC: qdsp6: q6asm: Add support to audio stream
- apis
-In-Reply-To: <20180501120820.11016-17-srinivas.kandagatla@linaro.org>
-References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
- <20180501120820.11016-17-srinivas.kandagatla@linaro.org>
-Message-ID: <3296bc93-8790-3780-064c-d87422c644a9@codeaurora.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed,  9 May 2018 12:17:52 +0200
+Subject: [PATCH V2 05/11] PM / Domains: Allow a better error handling of
+ dev_pm_domain_attach()
+Message-ID: <1525861072-29150-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
-> This patch adds support to open, write and media format commands
-> in the q6asm module.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
-> ---
->   sound/soc/qcom/qdsp6/q6asm.c | 839 ++++++++++++++++++++++++++++++++++++++++++-
->   sound/soc/qcom/qdsp6/q6asm.h |  49 +++
->   2 files changed, 887 insertions(+), 1 deletion(-)
->
-> diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
-> index 5a573e927a5e..a3073de235e1 100644
-> --- a/sound/soc/qcom/qdsp6/q6asm.c
-> +++ b/sound/soc/qcom/qdsp6/q6asm.c
-> @@ -10,6 +10,8 @@
-<snip>
->   EXPORT_SYMBOL_GPL(q6asm_audio_client_alloc);
->   
-> +static int q6asm_ac_send_cmd_sync(struct audio_client *ac, struct apr_pkt *pkt)
-> +{
-> +	struct apr_hdr *hdr = &pkt->hdr;
-> +	int rc;
-> +
-> +	mutex_lock(&ac->lock);
-> +	ac->result.opcode = 0;
-> +	ac->result.status = 0;
-> +
-> +	rc = apr_send_pkt(ac->adev, pkt);
-> +	if (rc < 0)
-> +		goto err;
-> +
-> +	rc = wait_event_timeout(ac->cmd_wait,
-> +				(ac->result.opcode == hdr->opcode), 5 * HZ);
-> +	if (!rc) {
-> +		dev_err(ac->dev, "CMD timeout\n");
-> +		rc =  -ETIMEDOUT;
-> +		goto err;
-> +	}
-else set rc to 0 to avoid returning >0 value.
+The callers of dev_pm_domain_attach() currently checks the returned error
+code for -EPROBE_DEFER and needs to ignore other error codes. This is an
+unnecessary limitation, which also leads to a rather strange behaviour in
+the error path.
 
-LGTM otherwise.
-Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
+Address this limitation, by changing the return codes from
+acpi_dev_pm_attach() and genpd_dev_pm_attach(). More precisely, let them
+return 0, when no PM domain is needed for the device and then return 1, in
+case the device was successfully attached to its PM domain. In this way,
+dev_pm_domain_attach(), gets a better understanding of what happens in the
+attach attempts and also allowing its caller to better act on real errors
+codes.
 
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+
+Changes in v2:
+	- Return 0 from the inline variant of dev_pm_domain_attach(), to make
+	sure probing still works when CONFIG_PM is unset.
+
+---
+ drivers/acpi/device_pm.c    |  6 +++---
+ drivers/base/power/common.c |  7 ++++---
+ drivers/base/power/domain.c | 19 ++++++++++---------
+ include/linux/acpi.h        |  2 +-
+ include/linux/pm_domain.h   |  4 ++--
+ 5 files changed, 20 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
+index d006300..a7c2673 100644
+--- a/drivers/acpi/device_pm.c
++++ b/drivers/acpi/device_pm.c
+@@ -1257,7 +1257,7 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
+ 	struct acpi_device *adev = ACPI_COMPANION(dev);
+ 
+ 	if (!adev)
+-		return -ENODEV;
++		return 0;
+ 
+ 	/*
+ 	 * Only attach the power domain to the first device if the
+@@ -1265,7 +1265,7 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
+ 	 * management twice.
+ 	 */
+ 	if (!acpi_device_is_first_physical_node(adev, dev))
+-		return -EBUSY;
++		return 0;
+ 
+ 	acpi_add_pm_notifier(adev, dev, acpi_pm_notify_work_func);
+ 	dev_pm_domain_set(dev, &acpi_general_pm_domain);
+@@ -1275,7 +1275,7 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
+ 	}
+ 
+ 	dev->pm_domain->detach = acpi_dev_pm_detach;
+-	return 0;
++	return 1;
+ }
+ EXPORT_SYMBOL_GPL(acpi_dev_pm_attach);
+ #endif /* CONFIG_PM */
+diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+index f3cf61f..5e4b481 100644
+--- a/drivers/base/power/common.c
++++ b/drivers/base/power/common.c
+@@ -98,7 +98,8 @@ EXPORT_SYMBOL_GPL(dev_pm_put_subsys_data);
+  * Callers must ensure proper synchronization of this function with power
+  * management callbacks.
+  *
+- * Returns 0 on successfully attached PM domain or negative error code.
++ * Returns 0 on successfully attached PM domain and when it found that the
++ * device don't need a PM domain, else a negative error code.
+  */
+ int dev_pm_domain_attach(struct device *dev, bool power_on)
+ {
+@@ -108,10 +109,10 @@ int dev_pm_domain_attach(struct device *dev, bool power_on)
+ 		return -EEXIST;
+ 
+ 	ret = acpi_dev_pm_attach(dev, power_on);
+-	if (ret)
++	if (!ret)
+ 		ret = genpd_dev_pm_attach(dev);
+ 
+-	return ret;
++	return ret < 0 ? ret : 0;
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_domain_attach);
+ 
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index b816adb..455ecea 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -2180,10 +2180,11 @@ static void genpd_dev_pm_sync(struct device *dev)
+  * Parse device's OF node to find a PM domain specifier. If such is found,
+  * attaches the device to retrieved pm_domain ops.
+  *
+- * Returns 0 on successfully attached PM domain or negative error code. Note
+- * that if a power-domain exists for the device, but it cannot be found or
+- * turned on, then return -EPROBE_DEFER to ensure that the device is not
+- * probed and to re-try again later.
++ * Returns 1 on successfully attached PM domain, 0 when the device don't need a
++ * PM domain or a negative error code in case of failures. Note that if a
++ * power-domain exists for the device, but it cannot be found or turned on,
++ * then return -EPROBE_DEFER to ensure that the device is not probed and to
++ * re-try again later.
+  */
+ int genpd_dev_pm_attach(struct device *dev)
+ {
+@@ -2192,12 +2193,12 @@ int genpd_dev_pm_attach(struct device *dev)
+ 	int ret;
+ 
+ 	if (!dev->of_node)
+-		return -ENODEV;
++		return 0;
+ 
+ 	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
+ 					"#power-domain-cells", 0, &pd_args);
+ 	if (ret < 0)
+-		return ret;
++		return 0;
+ 
+ 	mutex_lock(&gpd_list_lock);
+ 	pd = genpd_get_from_provider(&pd_args);
+@@ -2218,7 +2219,7 @@ int genpd_dev_pm_attach(struct device *dev)
+ 		if (ret != -EPROBE_DEFER)
+ 			dev_err(dev, "failed to add to PM domain %s: %d",
+ 				pd->name, ret);
+-		goto out;
++		return ret;
+ 	}
+ 
+ 	dev->pm_domain->detach = genpd_dev_pm_detach;
+@@ -2230,8 +2231,8 @@ int genpd_dev_pm_attach(struct device *dev)
+ 
+ 	if (ret)
+ 		genpd_remove_device(pd, dev);
+-out:
+-	return ret ? -EPROBE_DEFER : 0;
++
++	return ret ? -EPROBE_DEFER : 1;
+ }
+ EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+ 
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 15bfb15..c01675b 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -899,7 +899,7 @@ static inline int acpi_subsys_runtime_suspend(struct device *dev) { return 0; }
+ static inline int acpi_subsys_runtime_resume(struct device *dev) { return 0; }
+ static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
+ {
+-	return -ENODEV;
++	return 0;
+ }
+ #endif
+ 
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 04dbef9..ab18548 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -280,7 +280,7 @@ static inline int of_genpd_parse_idle_states(struct device_node *dn,
+ 
+ static inline int genpd_dev_pm_attach(struct device *dev)
+ {
+-	return -ENODEV;
++	return 0;
+ }
+ 
+ static inline
+@@ -297,7 +297,7 @@ extern void dev_pm_domain_set(struct device *dev, struct dev_pm_domain *pd);
+ #else
+ static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
+ {
+-	return -ENODEV;
++	return 0;
+ }
+ static inline void dev_pm_domain_detach(struct device *dev, bool power_off) {}
+ static inline void dev_pm_domain_set(struct device *dev,
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
