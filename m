@@ -1,36 +1,49 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Wed, 9 May 2018 22:08:27 +0000
-Subject: [PATCH 2/2] pinctrl: nand: meson-gxl: fix missing data pins
-In-Reply-To: <20180509220827.22286-1-yixun.lan@amlogic.com>
-References: <20180509220827.22286-1-yixun.lan@amlogic.com>
-Message-ID: <20180509220827.22286-3-yixun.lan@amlogic.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 09 May 2018 16:12:59 +0200
+Subject: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
+In-Reply-To: <HE1PR04MB3113135433766196E708685887990@HE1PR04MB3113.eurprd04.prod.outlook.com>
+References: <20180418124908.3079-1-stefan@agner.ch>
+ <20180502073807.GE3443@dragon> <56a409cf76a3eaa713cb4f0bbe1e39b6@agner.ch>
+ <HE1PR04MB311395765D3DC03D5960DBA3879A0@HE1PR04MB3113.eurprd04.prod.outlook.com>
+ <4188ee25bd5179b57d09e4624dcfbfbb@agner.ch>
+ <152580354289.138124.13657232356773397650@swboyd.mtv.corp.google.com>
+ <HE1PR04MB3113135433766196E708685887990@HE1PR04MB3113.eurprd04.prod.outlook.com>
+Message-ID: <ae5b239a57bd7e3f3e62cc23a1c3788e@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The data pin 0-7 of the NAND controller are actually missing from
-the nand pinctrl group, so we fix it here.
+On 09.05.2018 03:26, Jacky Bai wrote:
+>> Subject: Re: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
+>>
+>> Quoting Stefan Agner (2018-05-08 06:20:03)
+>> > On 08.05.2018 09:32, Jacky Bai wrote:
+>> > >
+>> > > I have tried two 6ULL board, I don't meet such issue. System can
+>> > > boot up successfully with commit 6f9575e55632 included.
+>> > > Anyway, the change in this patch is ok for me. it is no harm to the
+>> > > BUS clock change flow.
+>> >
+>> > Hm, that is interesting, maybe it is because we use a different SKU?
+>> > Or maybe bootloader?
+>> >
+>> > I tested here with a 800 MHz clocked variant on a Colibri iMX6ULL
+>> > using U-Boot 2016.11.
+>> >
+>>
+>> I'll throw this into fixes today because it fixes something to be useful. It's still
+>> interesting to see what's different between the two setups though.
+> 
+> Thanks. 
+> 
+> I will find some 800MHz parts and have a try with different bootloader later.
+> Will let you know, when I have some results.
+> 
 
-Fixes: 0f15f500ff2c ("pinctrl: meson: Add GXL pinctrl definitions")
-Reported-by: Liang Yang <liang.yang@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxl.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+FWIW, I tried two SKUs here:
+MCIMX6Z2DVM05AA (528Mhz)
+MCIMX6Z2CVM08AA (800MHz)
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-index b3786cde963d..7dae1d7bf6b0 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-@@ -617,8 +617,8 @@ static const char * const sdio_groups[] = {
- };
- 
- static const char * const nand_groups[] = {
--	"nand_ce0", "nand_ce1", "nand_rb0", "nand_ale", "nand_cle",
--	"nand_wen_clk", "nand_ren_wr", "nand_dqs",
-+	"emmc_nand_d07", "nand_ce0", "nand_ce1", "nand_rb0", "nand_ale",
-+	"nand_cle", "nand_wen_clk", "nand_ren_wr", "nand_dqs",
- };
- 
- static const char * const uart_a_groups[] = {
--- 
-2.17.0
+Both run at 396MHz in U-Boot, and both freeze and the same location.
+
+--
+Stefan
