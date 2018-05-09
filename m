@@ -1,202 +1,213 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed,  9 May 2018 12:25:42 -0500
-Subject: [PATCH v10 03/27] clk: davinci: psc: allow for dev == NULL
+Date: Wed,  9 May 2018 12:25:48 -0500
+Subject: [PATCH v10 09/27] ARM: davinci: dm644x: add new clock init using
+ common clock framework
 In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
 References: <20180509172606.29387-1-david@lechnology.com>
-Message-ID: <20180509172606.29387-4-david@lechnology.com>
+Message-ID: <20180509172606.29387-10-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some davinci SoCs, we need to register the PSC clocks during early
-boot because they are needed for clocksource/clockevent. These changes
-allow for dev == NULL because in this case, we won't have a platform
-device for the clocks.
+This adds the new board-specific clock init in mach-davinci/dm644x.c
+using the new common clock framework drivers.
 
-Some function declarations are moved to a public header files so that they can
-be called from mach init code.
+The #ifdefs are needed to prevent compile errors until the entire
+ARCH_DAVINCI is converted.
+
+Also clean up the #includes since we are adding some here.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v10 changes:
-- dropped helper functions that conditionally called devm_ versions of functions
+- fix copy/paste error s/dm355/dm644x/
 
 v9 changes:
-- new patch in v9
+- register PLL1 and PSC in dm644x_init_time() instead of as platform device so
+  that we get the correct timer0 clock for davinci_timer_init()
+- Fixed size of PLL memory block
+
+v8 changes:
+- none
+
+v7 changes:
+- add clock platform device declarations
+- register platform devices instead of registering clocks directly
+- add davinci prefix to commit description
+
+v6 changes:
+- add blank lines between function calls
 
 
- drivers/clk/davinci/psc-dm355.c  |  2 +-
- drivers/clk/davinci/psc-dm365.c  |  2 +-
- drivers/clk/davinci/psc-dm644x.c |  2 +-
- drivers/clk/davinci/psc-dm646x.c |  2 +-
- drivers/clk/davinci/psc.c        | 27 ++++++++++++++++++++-------
- include/linux/clk/davinci.h      |  5 +++++
- 6 files changed, 29 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/clk/davinci/psc-dm355.c b/drivers/clk/davinci/psc-dm355.c
-index 6995ecea2677..001288dfdfb1 100644
---- a/drivers/clk/davinci/psc-dm355.c
-+++ b/drivers/clk/davinci/psc-dm355.c
-@@ -68,7 +68,7 @@ static const struct davinci_lpsc_clk_info dm355_psc_info[] = {
- 	{ }
- };
+ arch/arm/mach-davinci/board-dm644x-evm.c  |  2 +
+ arch/arm/mach-davinci/board-neuros-osd2.c |  2 +
+ arch/arm/mach-davinci/board-sffsdr.c      |  2 +
+ arch/arm/mach-davinci/davinci.h           |  1 +
+ arch/arm/mach-davinci/dm644x.c            | 64 +++++++++++++++++++----
+ 5 files changed, 62 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 48436f74fd71..738e443ab15f 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -773,6 +773,8 @@ static __init void davinci_evm_init(void)
+ 	struct clk *aemif_clk;
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
  
--static int dm355_psc_init(struct device *dev, void __iomem *base)
-+int dm355_psc_init(struct device *dev, void __iomem *base)
++	dm644x_register_clocks();
++
+ 	dm644x_init_devices();
+ 
+ 	ret = dm644x_gpio_register();
+diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+index 25ad9b0612be..353f9e5a1454 100644
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@ -175,6 +175,8 @@ static __init void davinci_ntosd2_init(void)
+ 	struct clk *aemif_clk;
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+ 
++	dm644x_register_clocks();
++
+ 	dm644x_init_devices();
+ 
+ 	ret = dm644x_gpio_register();
+diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+index e7c1728b0833..792bb84d5011 100644
+--- a/arch/arm/mach-davinci/board-sffsdr.c
++++ b/arch/arm/mach-davinci/board-sffsdr.c
+@@ -134,6 +134,8 @@ static __init void davinci_sffsdr_init(void)
  {
- 	return davinci_psc_register_clocks(dev, dm355_psc_info, 42, base);
- }
-diff --git a/drivers/clk/davinci/psc-dm365.c b/drivers/clk/davinci/psc-dm365.c
-index 3ad915f37376..5b5b55b0b59a 100644
---- a/drivers/clk/davinci/psc-dm365.c
-+++ b/drivers/clk/davinci/psc-dm365.c
-@@ -73,7 +73,7 @@ static const struct davinci_lpsc_clk_info dm365_psc_info[] = {
- 	{ }
- };
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
  
--static int dm365_psc_init(struct device *dev, void __iomem *base)
-+int dm365_psc_init(struct device *dev, void __iomem *base)
- {
- 	return davinci_psc_register_clocks(dev, dm365_psc_info, 52, base);
- }
-diff --git a/drivers/clk/davinci/psc-dm644x.c b/drivers/clk/davinci/psc-dm644x.c
-index c22367baa46f..74668931be48 100644
---- a/drivers/clk/davinci/psc-dm644x.c
-+++ b/drivers/clk/davinci/psc-dm644x.c
-@@ -63,7 +63,7 @@ static const struct davinci_lpsc_clk_info dm644x_psc_info[] = {
- 	{ }
- };
++	dm644x_register_clocks();
++
+ 	dm644x_init_devices();
  
--static int dm644x_psc_init(struct device *dev, void __iomem *base)
-+int dm644x_psc_init(struct device *dev, void __iomem *base)
- {
- 	return davinci_psc_register_clocks(dev, dm644x_psc_info, 41, base);
- }
-diff --git a/drivers/clk/davinci/psc-dm646x.c b/drivers/clk/davinci/psc-dm646x.c
-index 468ef86ea40b..22473affa7cf 100644
---- a/drivers/clk/davinci/psc-dm646x.c
-+++ b/drivers/clk/davinci/psc-dm646x.c
-@@ -58,7 +58,7 @@ static const struct davinci_lpsc_clk_info dm646x_psc_info[] = {
- 	{ }
- };
- 
--static int dm646x_psc_init(struct device *dev, void __iomem *base)
-+int dm646x_psc_init(struct device *dev, void __iomem *base)
- {
- 	return davinci_psc_register_clocks(dev, dm646x_psc_info, 46, base);
- }
-diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
-index ce170e600f09..421f9f7906f4 100644
---- a/drivers/clk/davinci/psc.c
-+++ b/drivers/clk/davinci/psc.c
-@@ -15,6 +15,7 @@
- 
- #include <linux/clk-provider.h>
- #include <linux/clk.h>
+ 	platform_add_devices(davinci_sffsdr_devices,
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+index a799b5266d4b..16aca5853ab2 100644
+--- a/arch/arm/mach-davinci/davinci.h
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -108,6 +108,7 @@ int dm365_gpio_register(void);
+ void dm644x_init(void);
+ void dm644x_init_devices(void);
+ void dm644x_init_time(void);
++void dm644x_register_clocks(void);
+ void dm644x_init_asp(void);
+ int dm644x_init_video(struct vpfe_config *, struct vpbe_config *);
+ int dm644x_gpio_register(void);
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 708df0ed8554..c3cd27c6cd70 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -8,28 +8,34 @@
+  * is licensed "as is" without any warranty of any kind, whether express
+  * or implied.
+  */
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/serial_8250.h>
++
++#include <linux/clk-provider.h>
 +#include <linux/clk/davinci.h>
- #include <linux/clkdev.h>
- #include <linux/err.h>
- #include <linux/of_address.h>
-@@ -63,7 +64,7 @@ struct davinci_psc_data {
++#include <linux/clkdev.h>
+ #include <linux/dmaengine.h>
+-#include <linux/platform_device.h>
++#include <linux/init.h>
+ #include <linux/platform_data/edma.h>
+ #include <linux/platform_data/gpio-davinci.h>
++#include <linux/platform_device.h>
++#include <linux/serial_8250.h>
  
- /**
-  * struct davinci_lpsc_clk - LPSC clock structure
-- * @dev: the device that provides this LPSC
-+ * @dev: the device that provides this LPSC or NULL
-  * @hw: clk_hw for the LPSC
-  * @pm_domain: power domain for the LPSC
-  * @genpd_clk: clock reference owned by @pm_domain
-@@ -221,6 +222,7 @@ static void davinci_psc_genpd_detach_dev(struct generic_pm_domain *pm_domain,
+ #include <asm/mach/map.h>
  
- /**
-  * davinci_lpsc_clk_register - register LPSC clock
-+ * @dev: the clocks's device or NULL
-  * @name: name of this clock
-  * @parent_name: name of clock's parent
-  * @regmap: PSC MMIO region
-@@ -238,7 +240,7 @@ davinci_lpsc_clk_register(struct device *dev, const char *name,
- 	int ret;
- 	bool is_on;
++#include <mach/common.h>
+ #include <mach/cputype.h>
+ #include <mach/irqs.h>
+-#include "psc.h"
+ #include <mach/mux.h>
+-#include <mach/time.h>
+ #include <mach/serial.h>
+-#include <mach/common.h>
++#include <mach/time.h>
  
--	lpsc = devm_kzalloc(dev, sizeof(*lpsc), GFP_KERNEL);
-+	lpsc = kzalloc(sizeof(*lpsc), GFP_KERNEL);
- 	if (!lpsc)
- 		return ERR_PTR(-ENOMEM);
- 
-@@ -261,10 +263,14 @@ davinci_lpsc_clk_register(struct device *dev, const char *name,
- 	lpsc->pd = pd;
- 	lpsc->flags = flags;
- 
--	ret = devm_clk_hw_register(dev, &lpsc->hw);
-+	ret = clk_hw_register(dev, &lpsc->hw);
- 	if (ret < 0)
- 		return ERR_PTR(ret);
- 
-+	/* for now, genpd is only registered when using device-tree */
-+	if (!dev || !dev->of_node)
-+		return lpsc;
++#include "asp.h"
+ #include "davinci.h"
+-#include "clock.h"
+ #include "mux.h"
+-#include "asp.h"
 +
- 	/* genpd attach needs a way to look up this clock */
- 	ret = clk_hw_register_clkdev(&lpsc->hw, name, best_dev_name(dev));
++#ifndef CONFIG_COMMON_CLK
++#include "clock.h"
++#include "psc.h"
++#endif
  
-@@ -378,11 +384,11 @@ __davinci_psc_register_clocks(struct device *dev,
- 	struct regmap *regmap;
- 	int i, ret;
+ /*
+  * Device specific clocks
+@@ -43,6 +49,7 @@
+ #define DM644X_EMAC_CNTRL_RAM_OFFSET	0x2000
+ #define DM644X_EMAC_CNTRL_RAM_SIZE	0x2000
  
--	psc = devm_kzalloc(dev, sizeof(*psc), GFP_KERNEL);
-+	psc = kzalloc(sizeof(*psc), GFP_KERNEL);
- 	if (!psc)
- 		return ERR_PTR(-ENOMEM);
++#ifndef CONFIG_COMMON_CLK
+ static struct pll_data pll1_data = {
+ 	.num       = 1,
+ 	.phys_base = DAVINCI_PLL1_BASE,
+@@ -326,6 +333,7 @@ static struct clk_lookup dm644x_clks[] = {
+ 	CLK("davinci-wdt", NULL, &timer2_clk),
+ 	CLK(NULL, NULL, NULL),
+ };
++#endif
  
--	clks = devm_kmalloc_array(dev, num_clks, sizeof(*clks), GFP_KERNEL);
-+	clks = kmalloc_array(num_clks, sizeof(*clks), GFP_KERNEL);
- 	if (!clks)
- 		return ERR_PTR(-ENOMEM);
+ static struct emac_platform_data dm644x_emac_pdata = {
+ 	.ctrl_reg_offset	= DM644X_EMAC_CNTRL_OFFSET,
+@@ -934,8 +942,46 @@ void __init dm644x_init(void)
  
-@@ -396,14 +402,14 @@ __davinci_psc_register_clocks(struct device *dev,
- 	for (i = 0; i < num_clks; i++)
- 		clks[i] = ERR_PTR(-ENOENT);
- 
--	pm_domains = devm_kcalloc(dev, num_clks, sizeof(*pm_domains), GFP_KERNEL);
-+	pm_domains = kcalloc(num_clks, sizeof(*pm_domains), GFP_KERNEL);
- 	if (!pm_domains)
- 		return ERR_PTR(-ENOMEM);
- 
- 	psc->pm_data.domains = pm_domains;
- 	psc->pm_data.num_domains = num_clks;
- 
--	regmap = devm_regmap_init_mmio(dev, base, &davinci_psc_regmap_config);
-+	regmap = regmap_init_mmio(dev, base, &davinci_psc_regmap_config);
- 	if (IS_ERR(regmap))
- 		return ERR_CAST(regmap);
- 
-@@ -423,6 +429,13 @@ __davinci_psc_register_clocks(struct device *dev,
- 		pm_domains[info->md] = &lpsc->pm_domain;
- 	}
- 
-+	/*
-+	 * for now, a reset controller is only registered when there is a device
-+	 * to associate it with.
-+	 */
-+	if (!dev)
-+		return psc;
+ void __init dm644x_init_time(void)
+ {
++#ifdef CONFIG_COMMON_CLK
++	void __iomem *pll1, *psc;
++	struct clk *clk;
 +
- 	psc->rcdev.ops = &davinci_psc_reset_ops;
- 	psc->rcdev.owner = THIS_MODULE;
- 	psc->rcdev.dev = dev;
-diff --git a/include/linux/clk/davinci.h b/include/linux/clk/davinci.h
-index ebdd9df1c0ef..62764c5cc86e 100644
---- a/include/linux/clk/davinci.h
-+++ b/include/linux/clk/davinci.h
-@@ -21,4 +21,9 @@ int dm365_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgch
- int dm644x_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
- int dm646x_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
- 
-+int dm355_psc_init(struct device *dev, void __iomem *base);
-+int dm365_psc_init(struct device *dev, void __iomem *base);
-+int dm644x_psc_init(struct device *dev, void __iomem *base);
-+int dm646x_psc_init(struct device *dev, void __iomem *base);
++	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM644X_REF_FREQ);
 +
- #endif /* __LINUX_CLK_DAVINCI_PLL_H___ */
++	pll1 = ioremap(DAVINCI_PLL1_BASE, SZ_1K);
++	dm644x_pll1_init(NULL, pll1, NULL);
++
++	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
++	dm644x_psc_init(NULL, psc);
++
++	clk = clk_get(NULL, "timer0");
++
++	davinci_timer_init(clk);
++#else
+ 	davinci_clk_init(dm644x_clks);
+ 	davinci_timer_init(&timer0_clk);
++#endif
++}
++
++static struct resource dm644x_pll2_resources[] = {
++	{
++		.start	= DAVINCI_PLL2_BASE,
++		.end	= DAVINCI_PLL2_BASE + SZ_1K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device dm644x_pll2_device = {
++	.name		= "dm644x-pll2",
++	.id		= -1,
++	.resource	= dm644x_pll2_resources,
++	.num_resources	= ARRAY_SIZE(dm644x_pll2_resources),
++};
++
++void __init dm644x_register_clocks(void)
++{
++	/* PLL1 and PSC are registered in dm644x_init_time() */
++	platform_device_register(&dm644x_pll2_device);
+ }
+ 
+ int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
 -- 
 2.17.0
