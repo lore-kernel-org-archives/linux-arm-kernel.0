@@ -1,99 +1,114 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed,  9 May 2018 12:25:41 -0500
-Subject: [PATCH v10 02/27] clk: davinci: da850-pll: change PLL0 to
- CLK_OF_DECLARE
+Date: Wed,  9 May 2018 12:25:51 -0500
+Subject: [PATCH v10 12/27] ARM: davinci: da8xx: add new sata_refclk init using
+ common clock framework
 In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
 References: <20180509172606.29387-1-david@lechnology.com>
-Message-ID: <20180509172606.29387-3-david@lechnology.com>
+Message-ID: <20180509172606.29387-13-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PLL0 on davinci/da850-type device needs to be registered early in boot
-because it is needed for clocksource/clockevent. Change the driver
-to use CLK_OF_DECLARE for this special case.
+This adds the new SATA REFCLK clock init in mach-davinci/devices-da8xx.c
+using the new common clock framework drivers.
+
+The #ifdefs are needed to prevent compile errors until the entire
+ARCH_DAVINCI is converted.
+
+Also, the #includes are sorted since we are adding some here.
 
 Signed-off-by: David Lechner <david@lechnology.com>
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 ---
 
 v10 changes:
-- removed duplicate warning message
+- none
 
 v9 changes:
-- new patch in v9
+- none
 
- drivers/clk/davinci/pll-da850.c | 21 +++++++++++++++++----
- drivers/clk/davinci/pll.c       |  4 +++-
- drivers/clk/davinci/pll.h       |  2 +-
- 3 files changed, 21 insertions(+), 6 deletions(-)
+v8 changes:
+- none
 
-diff --git a/drivers/clk/davinci/pll-da850.c b/drivers/clk/davinci/pll-da850.c
-index 00a6ece7b524..fde4642a993f 100644
---- a/drivers/clk/davinci/pll-da850.c
-+++ b/drivers/clk/davinci/pll-da850.c
-@@ -12,6 +12,8 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/mfd/da8xx-cfgchip.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_address.h>
- #include <linux/of.h>
- #include <linux/types.h>
+v7 changes:
+- none
+
+v6 changes:
+- none
+
+
+ arch/arm/mach-davinci/devices-da8xx.c | 36 ++++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 78390c64e6ca..73de449bbc68 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -10,25 +10,30 @@
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  */
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/dma-contiguous.h>
+-#include <linux/serial_8250.h>
+ #include <linux/ahci_platform.h>
++#include <linux/clk-provider.h>
+ #include <linux/clk.h>
+-#include <linux/reboot.h>
++#include <linux/clkdev.h>
++#include <linux/dma-contiguous.h>
+ #include <linux/dmaengine.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++#include <linux/serial_8250.h>
  
-@@ -135,11 +137,22 @@ static const struct davinci_pll_sysclk_info *da850_pll0_sysclk_info[] = {
- 	NULL
- };
+-#include <mach/cputype.h>
+ #include <mach/common.h>
+-#include <mach/time.h>
++#include <mach/cputype.h>
+ #include <mach/da8xx.h>
+-#include <mach/clock.h>
++#include <mach/time.h>
++
++#include "asp.h"
+ #include "cpuidle.h"
+ #include "sram.h"
  
--int of_da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
-+void of_da850_pll0_init(struct device_node *node)
- {
--	return of_davinci_pll_init(dev, dev->of_node, &da850_pll0_info,
--				   &da850_pll0_obsclk_info,
--				   da850_pll0_sysclk_info, 7, base, cfgchip);
-+	void __iomem *base;
-+	struct regmap *cfgchip;
-+
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s: ioremap failed\n", __func__);
-+		return;
-+	}
-+
-+	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
-+
-+	of_davinci_pll_init(NULL, node, &da850_pll0_info,
-+			    &da850_pll0_obsclk_info,
-+			    da850_pll0_sysclk_info, 7, base, cfgchip);
++#ifndef CONFIG_COMMON_CLK
++#include <mach/clock.h>
+ #include "clock.h"
+-#include "asp.h"
++#endif
+ 
+ #define DA8XX_TPCC_BASE			0x01c00000
+ #define DA8XX_TPTC0_BASE		0x01c08000
+@@ -1040,6 +1045,7 @@ int __init da8xx_register_spi_bus(int instance, unsigned num_chipselect)
  }
  
- static const struct davinci_pll_clk_info da850_pll1_info = {
-diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
-index f362f10d8459..dcfa780f828a 100644
---- a/drivers/clk/davinci/pll.c
-+++ b/drivers/clk/davinci/pll.c
-@@ -770,8 +770,10 @@ static struct davinci_pll_platform_data *davinci_pll_get_pdata(struct device *de
- 	return pdata;
+ #ifdef CONFIG_ARCH_DAVINCI_DA850
++#ifndef CONFIG_COMMON_CLK
+ static struct clk sata_refclk = {
+ 	.name		= "sata_refclk",
+ 	.set_rate	= davinci_simple_set_rate,
+@@ -1061,6 +1067,18 @@ int __init da850_register_sata_refclk(int rate)
+ 
+ 	return 0;
  }
- 
-+/* needed in early boot for clocksource/clockevent */
-+CLK_OF_DECLARE(da850_pll0, "ti,da850-pll0", of_da850_pll0_init);
++#else
++int __init da850_register_sata_refclk(int rate)
++{
++	struct clk *clk;
 +
- static const struct of_device_id davinci_pll_of_match[] = {
--	{ .compatible = "ti,da850-pll0", .data = of_da850_pll0_init },
- 	{ .compatible = "ti,da850-pll1", .data = of_da850_pll1_init },
- 	{ }
- };
-diff --git a/drivers/clk/davinci/pll.h b/drivers/clk/davinci/pll.h
-index 562652fc0759..b2e5c4496645 100644
---- a/drivers/clk/davinci/pll.h
-+++ b/drivers/clk/davinci/pll.h
-@@ -123,7 +123,7 @@ int of_davinci_pll_init(struct device *dev, struct device_node *node,
- /* Platform-specific callbacks */
++	clk = clk_register_fixed_rate(NULL, "sata_refclk", NULL, 0, rate);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	return clk_register_clkdev(clk, "refclk", "ahci_da850");
++}
++#endif
  
- int da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
--int of_da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
-+void of_da850_pll0_init(struct device_node *node);
- int of_da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
- 
- int dm355_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+ static struct resource da850_sata_resources[] = {
+ 	{
 -- 
 2.17.0
