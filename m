@@ -1,32 +1,79 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  9 May 2018 13:56:35 +0100
-Subject: [PATCH v8 24/24] MAINTAINERS: Add myself as co-maintainer of qcom
- audio
-In-Reply-To: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
-References: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180509125635.5653-25-srinivas.kandagatla@linaro.org>
+From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
+Date: Wed,  9 May 2018 10:18:53 -0300
+Subject: [PATCH v2 10/11] arch/*: Kconfig: fix documentation for NMI watchdog
+In-Reply-To: <cover.1525870886.git.mchehab+samsung@kernel.org>
+References: <cover.1525870886.git.mchehab+samsung@kernel.org>
+Message-ID: <30b7698983a917b736088821420ac0c3bd9f9a0f.1525870886.git.mchehab+samsung@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as co-maintainer of qcom audio drivers
+Changeset 9919cba7ff71 ("watchdog: Update documentation") updated
+the documentation, removing the old nmi_watchdog.txt and adding
+a file with a new content.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Reviewed-by: Banajit Goswami <bgoswami@codeaurora.org>
+Update Kconfig files accordingly.
+
+Fixes: 9919cba7ff71 ("watchdog: Update documentation")
+
+Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
 ---
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/Kconfig    | 2 +-
+ arch/parisc/Kconfig | 2 +-
+ arch/sh/Kconfig     | 2 +-
+ arch/sparc/Kconfig  | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 20032feaa9e7..3df5f6226827 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -11522,6 +11522,7 @@ F:	drivers/crypto/qat/
- QCOM AUDIO (ASoC) DRIVERS
- M:	Patrick Lai <plai@codeaurora.org>
- M:	Banajit Goswami <bgoswami@codeaurora.org>
-+M:	Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
- L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
- S:	Supported
- F:	sound/soc/qcom/
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a7f8e7f4b88f..7b4fa8356978 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1305,7 +1305,7 @@ config SMP
+ 	  will run faster if you say N here.
+ 
+ 	  See also <file:Documentation/x86/i386/IO-APIC.txt>,
+-	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
++	  <file:Documentation/lockup-watchdogs.txt> and the SMP-HOWTO available at
+ 	  <http://tldp.org/HOWTO/SMP-HOWTO.html>.
+ 
+ 	  If you don't know what to do here, say N.
+diff --git a/arch/parisc/Kconfig b/arch/parisc/Kconfig
+index fc5a574c3482..b6823215cc9a 100644
+--- a/arch/parisc/Kconfig
++++ b/arch/parisc/Kconfig
+@@ -279,7 +279,7 @@ config SMP
+ 	  machines, but will use only one CPU of a multiprocessor machine.
+ 	  On a uniprocessor machine, the kernel will run faster if you say N.
+ 
+-	  See also <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO
++	  See also <file:Documentation/lockup-watchdogs.txt> and the SMP-HOWTO
+ 	  available at <http://www.tldp.org/docs.html#howto>.
+ 
+ 	  If you don't know what to do here, say N.
+diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
+index 97fe29316476..bf628dd7c195 100644
+--- a/arch/sh/Kconfig
++++ b/arch/sh/Kconfig
+@@ -689,7 +689,7 @@ config SMP
+ 	  People using multiprocessor machines who say Y here should also say
+ 	  Y to "Enhanced Real Time Clock Support", below.
+ 
+-	  See also <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO
++	  See also <file:Documentation/lockup-watchdogs.txt> and the SMP-HOWTO
+ 	  available at <http://www.tldp.org/docs.html#howto>.
+ 
+ 	  If you don't know what to do here, say N.
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index 8767e45f1b2b..66171c2e428b 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -189,7 +189,7 @@ config SMP
+ 	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
+ 	  Management" code will be disabled if you say Y here.
+ 
+-	  See also <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO
++	  See also <file:Documentation/lockup-watchdogs.txt> and the SMP-HOWTO
+ 	  available at <http://www.tldp.org/docs.html#howto>.
+ 
+ 	  If you don't know what to do here, say N.
 -- 
-2.16.2
+2.17.0
