@@ -1,100 +1,50 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 10 May 2018 00:21:24 +0200
-Subject: [PATCH v2 01/26] drm/bridge: allow optionally specifying an owner
- .odev device
-In-Reply-To: <4be4448e-763c-4832-f194-6b79afe87d08@axentia.se>
-References: <20180504135212.26977-1-peda@axentia.se>
- <CGME20180504135245epcas4p1d0463b6b3c73d1dd2550c6ed5a4e3986@epcas4p1.samsung.com>
- <20180504135212.26977-2-peda@axentia.se>
- <4e92fdea-0609-0fff-0e3f-d9f78f596eb7@samsung.com>
- <4be4448e-763c-4832-f194-6b79afe87d08@axentia.se>
-Message-ID: <5abcab35-8a78-a02a-9f22-321da55d9858@axentia.se>
+From: nicoleotsuka@gmail.com (Nicolin Chen)
+Date: Wed,  9 May 2018 15:58:23 -0700
+Subject: [RFC][PATCH] arm64: update iomem_resource.end
+Message-ID: <1525906703-28481-1-git-send-email-nicoleotsuka@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-09 17:53, Peter Rosin wrote:
-> On 2018-05-09 17:08, Andrzej Hajda wrote:
->> On 04.05.2018 15:51, Peter Rosin wrote:
->>> Bridge drivers can now (temporarily, in a transition phase) select if
->>> they want to provide a full owner device or keep just providing an
->>> of_node.
->>>
->>> By providing a full owner device, the bridge drivers no longer need
->>> to provide an of_node since that node is available via the owner
->>> device.
->>>
->>> When all bridge drivers provide an owner device, that will become
->>> mandatory and the .of_node member will be removed.
->>>
->>> Signed-off-by: Peter Rosin <peda@axentia.se>
->>> ---
->>>  drivers/gpu/drm/drm_bridge.c             | 3 ++-
->>>  drivers/gpu/drm/rockchip/rockchip_lvds.c | 4 +++-
->>
->> What is the reason to put rockchip here? Shouldn't be in separate patch?
-> 
-> Because the rockchip driver peeks into the bridge struct and all the
-> changes in this patch relate to making the new .odev member optional in
-> the transition phase, when the bridge can have either a new-style odev
-> or an old style of_node.
-> 
-> I guess this rockchip change could be patch 2, but it has to come first
-> after this patch and it makes no sense on its own. Hence, one patch.
-> 
-> This rockchip_lvds interaction is also present in patch 24/26
-> drm/bridge: remove the .of_node member
-> 
-> I can split them if you want, but I personally don't see the point.
+The iomem_resource.end is -1 by default and should be updated in
+arch-level code.
 
-I had a second look, and maybe the series should start with a patch like
-this instead, so that the rockchip_lvds.c hunks can be removed from
-patch 1/26 and 24/26. That would perhaps be slightly cleaner?
+ARM64 so far hasn't updated it while core kernel code (mm/hmm.c)
+started to use iomem_resource.end for boundary check. So it'd be
+better to assign iomem_resource.end using a valid value, the end
+of physical address space for example because iomem_resource.end
+in theory should reflect that.
 
-On the other hand, it's orthogonal and this series can be left as is
-(with the benefit of me not having to do another iteration and you all
-not having another bunch of messages to sift through). The below
-patch could easily be (adjusted and) applied later instead. Or not,
-since the right fix is to do this with the newfangled static image
-format mechanism from Jacopo Mondi, and it might be easier to just do
-it right.
+However, VA_BITS might be smaller than PA_BITS in ARM64. So using
+the end of physical address space doesn't make a lot of sense in
+this case, or could be even harmful since virtual address cannot
+reach that memory region. Furthermore, the linear region size of
+ARM64 only has the half of Virtual Memory size -- "VA_BITS - 1".
 
-State your preference.
+So this patch updates the iomem_resource.end by using the end of
+physical address space or the end of linear mapping region when
+(VA_BITS - 1) is smaller than PA_BITS.
 
-Cheers,
-Peter
-
->From dee27b36a36acd271459d1489336b56132097425 Mon Sep 17 00:00:00 2001
-From: Peter Rosin <peda@axentia.se>
-Date: Wed, 9 May 2018 23:58:24 +0200
-Subject: [PATCH] drm/rockchip: lvds: do not dig into the DT of remote bridges
-
-The driver is trying to find the needed "data-mapping" for
-interacting with the following bridge in the graphics chain.
-But, doing so is bad since it is done w/o regard of the
-compatible of the remote bridge, so the value of "data-mapping"
-might not mean what this driver assumes. It is also pointless
-since no bridge has any documented "data-mapping" DT property
-and no dts file show any undocumented use.
-
-Just remove the inappropriate code.
-
-Signed-off-by: Peter Rosin <peda@axentia.se>
+Signed-off-by: Nicolin Chen <nicoleotsuka@gmail.com>
 ---
- drivers/gpu/drm/rockchip/rockchip_lvds.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/mm/init.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-index 4bd94b167d2c..fa3f4bf9712f 100644
---- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-@@ -377,8 +377,6 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
- 	}
- 	if (lvds->panel)
- 		remote = lvds->panel->dev->of_node;
--	else
--		remote = lvds->bridge->of_node;
- 	if (of_property_read_string(dev->of_node, "rockchip,output", &name))
- 		/* default set it as output rgb */
- 		lvds->output = DISPLAY_OUTPUT_RGB;
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index f48b194..22015af 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -377,6 +377,12 @@ void __init arm64_memblock_init(void)
+ 	BUILD_BUG_ON(linear_region_size != BIT(VA_BITS - 1));
+ 
+ 	/*
++	 * Update iomem_resource.end based on size of physical address space,
++	 * or linear region size when (VA_BITS - 1) is smaller than PA_BITS.
++	 */
++	iomem_resource.end = BIT(min(PHYS_MASK_SHIFT, VA_BITS - 1)) - 1;
++
++	/*
+ 	 * Select a suitable value for the base of physical memory.
+ 	 */
+ 	memstart_addr = round_down(memblock_start_of_DRAM(),
 -- 
-2.11.0
+2.1.4
