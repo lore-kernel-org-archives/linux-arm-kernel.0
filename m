@@ -1,171 +1,171 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  9 May 2018 13:56:11 +0100
-Subject: [PATCH v8 00/24] ASoC: qcom: Add support to QDSP based Audio
-Message-ID: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
+Date: Wed,  9 May 2018 13:56:15 +0100
+Subject: [PATCH v8 04/24] ASoC: qdsp6: dt-bindings: Add q6afe dt bindings
+In-Reply-To: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
+References: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180509125635.5653-5-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thankyou everyone for providing feedback and testing v7 patchset.
-This patchset aims to provide a basic version of QCOM DSP based
-audio support which is available in downstream andriod kernels.
-This patchset support audio playback on HDMI-RX, MI2S, SLIMBus and
-will add support to other features as we move on.
+This patch add DT bindings for AFE (Audio Frontend) DSP module.
 
-QDSP has both static and dynamic modules. static modules like AFE
-(Audio FrontEnd), ADM (Audio Device Manager), ASM(Audio Stream Manager)
-and CORE to provide this audio services.
-All these services use APR (Asynchronous Packet Router) protocol
-via smd/glink transport to communicate with Application processor.
-More details on each module is availble in there respective patch.
-
-This patchset is tested on DB820c, with HDMI audio playback, MI2S on
-DB410c on top of mainline, Also tested SLIMBus analog audio using
-wcd9355 with an additional patches. Patches are also tested on
-SDM845 by Rohit.
-
-Here is my test branch incase someone want to try these patches
-https://git.linaro.org/people/srinivas.kandagatla/linux.git/log/?h=v4.17-qdsp6
-
-Here is block diagram to give a quick overview of the components
-
-
-  +---------+          +---------+         +---------+   
-  |  q6asm  |          |q6routing|         | q6afe   | 
-  |   dais  | <------> |  mixers | <-----> |  dais   |  
-  +---------+          +---------+         +---------+   
-      ^                     ^                   ^
-      |                     |                   |
-      |  +------------------+----------------+  |       
-      |  |                  |                |  |       
-      v  v                  v                v  v       
-  +---------+          +---------+         +---------+ 
-  |   q6ASM |          |  q6ADM  |         |   q6AFE |  
-  +---------+          +---------+         +---------+  
-      ^                     ^                   ^          ^
-      |                     |                   | CPU Side |
-------+---------------------+-------------------+--------
-      |                     |                   |
-      |                     |APR(smd/glink)     | 
-      |                     |                   |
-      |  +------------------+----------------+  |
-      |  |                  |                |  |
-+-----+--+-----------------------------------+--+-------
-      |  |                  |                |  | QDSP Side |
-      v  v                  v                v  v           v
- +---------+          +---------+         +---------+
- |   ASM   | <------> |   ADM   | <-----> |   AFE   |
- +---------+          +---------+         +---------+
-                                               ^
-                                               | 
-                           +-------------------+
-                           |
----------------------------+--------------------------
-                           |            Audio I/O |
-                           v                      v
-    +--------------------------------------------------+
-    |                Audio devices                     |
-    | CODEC | HDMI-TX | PCM  | SLIMBUS | I2S |MI2S |...|
-    |                                                  |
-    +--------------------------------------------------+
-
-
-Changes since v6 (https://lkml.org/lkml/2018/5/1/176)
-- Added Banajit's and Bjorn's reviewed by tags to patches.
-- Few minor typos spotted by Banajit.
-- Made read/write allocations to be atomic as spotted by Rohit.
-- fixed error path in db820c machine driver.
-- rebased patchset on top of
-https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/?h=for-next
-
-Srinivas Kandagatla (24):
-  soc: qcom dt-bindings: Add APR bus bindings
-  soc: qcom: Add APR bus driver
-  ASoC: qdsp6: dt-bindings: Add q6core dt bindings
-  ASoC: qdsp6: dt-bindings: Add q6afe dt bindings
-  ASoC: qdsp6: dt-bindings: Add q6adm dt bindings
-  ASoC: qdsp6: dt-bindings: Add q6asm dt bindings
-  ASoC: qdsp6: q6common: Add qdsp6 helper functions
-  ASoC: qdsp6: q6core: Add q6core driver
-  ASoC: qdsp6: q6afe: Add q6afe driver
-  ASoC: qdsp6: qdafe: Add SLIMBus port Support
-  ASoC: qdsp6: q6afe: Add support to MI2S ports
-  ASoC: qdsp6: q6afe: Add support to MI2S sysclks
-  ASoC: qdsp6: q6adm: Add q6adm driver
-  ASoC: qdsp6: q6asm: Add q6asm driver
-  ASoC: qdsp6: q6asm: Add support to memory map and unmap
-  ASoC: qdsp6: q6asm: Add support to audio stream apis
-  ASoC: qdsp6: q6routing: Add q6routing driver
-  ASoC: qdsp6: q6routing: Add support to all SLIMBus Mixers
-  ASoC: qdsp6: q6routing: Add support to MI2S Mixers
-  ASoC: qdsp6: q6afe: Add q6afe dai driver
-  ASoC: qdsp6: q6asm: Add q6asm dai driver
-  ASoC: qdsp6: dt-bindings: Add apq8096 machine bindings
-  ASoC: qcom: apq8096: Add db820c machine driver
-  MAINTAINERS: Add myself as co-maintainer of qcom audio
-
- .../devicetree/bindings/soc/qcom/qcom,apr.txt      |   84 ++
- .../devicetree/bindings/sound/qcom,apq8096.txt     |  109 ++
- .../devicetree/bindings/sound/qcom,q6adm.txt       |   33 +
- .../devicetree/bindings/sound/qcom,q6afe.txt       |  104 ++
- .../devicetree/bindings/sound/qcom,q6asm.txt       |   33 +
- .../devicetree/bindings/sound/qcom,q6core.txt      |   21 +
- MAINTAINERS                                        |    1 +
- drivers/soc/qcom/Kconfig                           |    9 +
- drivers/soc/qcom/Makefile                          |    1 +
- drivers/soc/qcom/apr.c                             |  378 ++++++
- include/dt-bindings/soc/qcom,apr.h                 |   28 +
- include/dt-bindings/sound/qcom,q6afe.h             |   31 +
- include/dt-bindings/sound/qcom,q6asm.h             |   22 +
- include/linux/mod_devicetable.h                    |   11 +
- include/linux/soc/qcom/apr.h                       |  128 ++
- sound/soc/qcom/Kconfig                             |   50 +
- sound/soc/qcom/Makefile                            |    5 +
- sound/soc/qcom/apq8096.c                           |  255 ++++
- sound/soc/qcom/qdsp6/Makefile                      |    8 +
- sound/soc/qcom/qdsp6/q6adm.c                       |  633 +++++++++
- sound/soc/qcom/qdsp6/q6adm.h                       |   25 +
- sound/soc/qcom/qdsp6/q6afe-dai.c                   |  748 +++++++++++
- sound/soc/qcom/qdsp6/q6afe.c                       | 1046 +++++++++++++++
- sound/soc/qcom/qdsp6/q6afe.h                       |  193 +++
- sound/soc/qcom/qdsp6/q6asm-dai.c                   |  624 +++++++++
- sound/soc/qcom/qdsp6/q6asm.c                       | 1398 ++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6asm.h                       |   69 +
- sound/soc/qcom/qdsp6/q6core.c                      |  380 ++++++
- sound/soc/qcom/qdsp6/q6core.h                      |   15 +
- sound/soc/qcom/qdsp6/q6dsp-common.c                |   66 +
- sound/soc/qcom/qdsp6/q6dsp-common.h                |   24 +
- sound/soc/qcom/qdsp6/q6dsp-errno.h                 |   51 +
- sound/soc/qcom/qdsp6/q6routing.c                   |  982 ++++++++++++++
- sound/soc/qcom/qdsp6/q6routing.h                   |    9 +
- 34 files changed, 7574 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,apq8096.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6adm.txt
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Banajit Goswami <bgoswami@codeaurora.org>
+---
+ .../devicetree/bindings/sound/qcom,q6afe.txt       | 104 +++++++++++++++++++++
+ include/dt-bindings/sound/qcom,q6afe.h             |  31 ++++++
+ 2 files changed, 135 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6afe.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6asm.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6core.txt
- create mode 100644 drivers/soc/qcom/apr.c
- create mode 100644 include/dt-bindings/soc/qcom,apr.h
  create mode 100644 include/dt-bindings/sound/qcom,q6afe.h
- create mode 100644 include/dt-bindings/sound/qcom,q6asm.h
- create mode 100644 include/linux/soc/qcom/apr.h
- create mode 100644 sound/soc/qcom/apq8096.c
- create mode 100644 sound/soc/qcom/qdsp6/Makefile
- create mode 100644 sound/soc/qcom/qdsp6/q6adm.c
- create mode 100644 sound/soc/qcom/qdsp6/q6adm.h
- create mode 100644 sound/soc/qcom/qdsp6/q6afe-dai.c
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.c
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.h
- create mode 100644 sound/soc/qcom/qdsp6/q6asm-dai.c
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.c
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.h
- create mode 100644 sound/soc/qcom/qdsp6/q6core.c
- create mode 100644 sound/soc/qcom/qdsp6/q6core.h
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.c
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.h
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-errno.h
- create mode 100644 sound/soc/qcom/qdsp6/q6routing.c
- create mode 100644 sound/soc/qcom/qdsp6/q6routing.h
 
+diff --git a/Documentation/devicetree/bindings/sound/qcom,q6afe.txt b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
+new file mode 100644
+index 000000000000..14335a08b963
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
+@@ -0,0 +1,104 @@
++Qualcomm Audio Front End (Q6AFE) binding
++
++AFE is one of the APR audio service on Q6DSP
++Please refer to qcom,apr.txt for details of the common apr service bindings
++used by all apr services. Must contain the following properties.
++
++- compatible:
++	Usage: required
++	Value type: <stringlist>
++	Definition: must be "qcom,q6afe-v<MAJOR-NUMBER>.<MINOR-NUMBER>"
++		  Or "qcom,q6afe" where the version number can be queried
++		  from DSP.
++		  example "qcom,q6afe"
++
++= AFE DAIs (Digial Audio Interface)
++"dais" subnode of the AFE node. It represents afe dais, each afe dai is a
++subnode of "dais" representing board specific dai setup.
++"dais" node should have following properties followed by dai children.
++
++- #sound-dai-cells
++	Usage: required
++	Value type: <u32>
++	Definition: Must be 1
++
++- #address-cells
++	Usage: required
++	Value type: <u32>
++	Definition: Must be 1
++
++- #size-cells
++	Usage: required
++	Value type: <u32>
++	Definition: Must be 0
++
++== AFE DAI is subnode of "dais" and represent a dai, it includes board specific
++configuration of each dai. Must contain the following properties.
++
++- reg
++	Usage: required
++	Value type: <u32>
++	Definition: Must be dai id
++
++- qcom,sd-lines
++	Usage: required for mi2s interface
++	Value type: <prop-encoded-array>
++	Definition: Must be list of serial data lines used by this dai.
++	should be one or more of the 1-4 sd lines.
++
++= EXAMPLE
++
++q6afe at 4 {
++	compatible = "qcom,q6afe";
++	reg = <APR_SVC_AFE>;
++
++	dais {
++		#sound-dai-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		hdmi at 1 {
++			reg = <1>;
++		};
++
++		prim-mi2s-rx at 16 {
++			reg = <16>;
++			qcom,sd-lines = <1 3>;
++		};
++
++		prim-mi2s-tx at 17 {
++			reg = <17>;
++			qcom,sd-lines = <2>;
++		};
++
++		sec-mi2s-rx at 18 {
++			reg = <18>;
++			qcom,sd-lines = <1 4>;
++		};
++
++		sec-mi2s-tx at 19 {
++			reg = <19>;
++			qcom,sd-lines = <2>;
++		};
++
++		tert-mi2s-rx at 20 {
++			reg = <20>;
++			qcom,sd-lines = <2 4>;
++		};
++
++		tert-mi2s-tx at 21 {
++			reg = <21>;
++			qcom,sd-lines = <1>;
++		};
++
++		quat-mi2s-rx at 22 {
++			reg = <22>;
++			qcom,sd-lines = <1>;
++		};
++
++		quat-mi2s-tx at 23 {
++			reg = <23>;
++			qcom,sd-lines = <2>;
++		};
++	};
++};
+diff --git a/include/dt-bindings/sound/qcom,q6afe.h b/include/dt-bindings/sound/qcom,q6afe.h
+new file mode 100644
+index 000000000000..e162045f5dc9
+--- /dev/null
++++ b/include/dt-bindings/sound/qcom,q6afe.h
+@@ -0,0 +1,31 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef __DT_BINDINGS_Q6_AFE_H__
++#define __DT_BINDINGS_Q6_AFE_H__
++
++/* Audio Front End (AFE) virtual ports IDs */
++#define HDMI_RX		1
++#define SLIMBUS_0_RX    2
++#define SLIMBUS_0_TX    3
++#define SLIMBUS_1_RX    4
++#define SLIMBUS_1_TX    5
++#define SLIMBUS_2_RX    6
++#define SLIMBUS_2_TX    7
++#define SLIMBUS_3_RX    8
++#define SLIMBUS_3_TX    9
++#define SLIMBUS_4_RX    10
++#define SLIMBUS_4_TX    11
++#define SLIMBUS_5_RX    12
++#define SLIMBUS_5_TX    13
++#define SLIMBUS_6_RX    14
++#define SLIMBUS_6_TX    15
++#define PRIMARY_MI2S_RX		16
++#define PRIMARY_MI2S_TX		17
++#define SECONDARY_MI2S_RX	18
++#define SECONDARY_MI2S_TX	19
++#define TERTIARY_MI2S_RX	20
++#define TERTIARY_MI2S_TX	21
++#define QUATERNARY_MI2S_RX	22
++#define QUATERNARY_MI2S_TX	23
++
++#endif /* __DT_BINDINGS_Q6_AFE_H__ */
++
 -- 
 2.16.2
