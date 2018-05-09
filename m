@@ -1,52 +1,135 @@
-From: npcomplete13@gmail.com (Vivek Unune)
-Date: Wed, 9 May 2018 08:08:06 -0400
-Subject: [PATCH v2] ARM: dts: BCM5301X: Make usb3 phy use mdio phy driver
-In-Reply-To: <68519de5-9a47-9cb5-064c-dc4703aaa508@gmail.com>
-References: <20180315135647.48456-1-npcomplete13@gmail.com>
- <20180409223153.41893-1-npcomplete13@gmail.com>
- <68519de5-9a47-9cb5-064c-dc4703aaa508@gmail.com>
-Message-ID: <20180509120806.7a37jpcqcby7ryku@osboxes>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 9 May 2018 14:09:40 +0200
+Subject: [RFC PATCH 0/3] serial: uartps: Add run time support for more IPs
+ than hardcoded 2
+In-Reply-To: <1d3bc2082972bb1d4abc2c15db396257@vanmierlo.com>
+References: <cover.1524751696.git.michal.simek@xilinx.com>
+ <1d3bc2082972bb1d4abc2c15db396257@vanmierlo.com>
+Message-ID: <b1915bcd-00c4-ce88-b50f-73815ff36755@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 03:31:17PM -0700, Florian Fainelli wrote:
-> On 04/09/2018 03:31 PM, Vivek Unune wrote:
-> > Currently, usb3 phy in bcm5301x.dtsi uses platform driver which
-> > requires register range "ccb-mii" <0x18003000 0x1000>. This range
-> > overlaps with mdio cmd and param registers (<0x18003000 0x8>).
-> > Essentially, the platform driver partly acts like a mdio bus
-> > driver, hence to use of this register range.
-> > 
-> > In some Northstar devices like Linksys EA9500, secondary switch
-> > is connected via external mdio. The only way to access and
-> > configure the external switch is via mdio bus. When we enable the
-> > mdio bus in it's current state, the mdio bus and any child buses
-> > fail to register because of the register range overlap.
-> > 
-> > On Northstar, the usb3 phy is connected at address 0x10 on the
-> > internal mdio bus. This change moves the usb3_phy node and makes
-> > it a child node of internal mdio bus.
-> > 
-> > Thanks to Rafa? Mi?ecki's commit af850e14a7ae
-> > ("phy: bcm-ns-usb3: add MDIO driver using proper bus layer") the
-> > same usb3 platform driver can now act as usb3 phy mdio driver.
-> > 
-> > Tested on Linksys Panamera (EA9500)
-> > 
-> > Signed-off-by: Vivek Unune <npcomplete13@gmail.com>
-> > ---
-> > v2: Disabled usb3_phy by default, then enabled in dts where
-> >     necessary
+Hi,
+
+On 5.5.2018 15:10, Maarten Brock wrote:
+> On 2018-04-26 16:08, Michal Simek wrote:
+>> Hi,
+>>
+>> this series is trying to address discussion I had with Alan in past
+>> https://patchwork.kernel.org/patch/9738445/.
+>>
+>> It is moving uart_register_driver() to probe function like it is done in
+>> pl011 driver.
+>> And also introducing new function for alias compatibility checking to
+>> resolve cases where some IPs have alias and some of them not.
+>> This case is detected in pl011_probe_dt_alias() but not properly solved.
+>>
+>> Also keep status of free ids/minor numbers in bitmap to know what's the
+>> next unallocated number.
+>>
+>> The same solution can be used in pl011, uart16550 and uartlite to really
+>> get unified kernel.
+>>
+>> Tested on these use cases:
+>> Notes:
+>> ff000000 is the first PS uart listed in dtsi
+>> ff010000 is the second PS uart listed in dtsi
+>>
+>> Standard zcu102 setting
+>> ??????? serial0 = &uart0;
+>> ??????? serial1 = &uart1;
+>> [??? 0.196628] ff000000.serial: ttyPS0 at MMIO 0xff000000 (irq = 33,
+>> base_baud = 6250000) is a xuartps
+>> [??? 0.642542] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
+>> base_baud = 6250000) is a xuartps
+>>
+>> Swapped zcu102 setting
+>> ??????? serial0 = &uart1;
+>> ??????? serial1 = &uart0;
+>> [??? 0.196472] ff000000.serial: ttyPS1 at MMIO 0xff000000 (irq = 33,
+>> base_baud = 6250000) is a xuartps
+>> [??? 0.196824] ff010000.serial: ttyPS0 at MMIO 0xff010000 (irq = 34,
+>> base_baud = 6250000) is a xuartps
+>>
+>> uart0 on alias higher then MAX uart ports
+>> ??????? serial0 = &uart1;
+>> ??????? serial200 = &uart0;
+>> [??? 0.176793] ff000000.serial: ttyPS200 at MMIO 0xff000000 (irq = 33,
+>> base_baud = 6250000) is a xuartps
+>> [??? 0.177288] ff010000.serial: ttyPS0 at MMIO 0xff010000 (irq = 34,
+>> base_baud = 6250000) is a xuartps
+>>
+>> Both uarts on higher aliases
+>> ??????? serial1 = &uart1;
+>> ??????? serial2 = &uart0;
+>> [??? 0.196470] ff000000.serial: ttyPS2 at MMIO 0xff000000 (irq = 33,
+>> base_baud = 6250000) is a xuartps
+>> [??? 0.196823] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
+>> base_baud = 6250000) is a xuartps
+>>
+>> uart0 not listed but it is probed first that's why should be ttyPS0 but
+>> there is uart1 via alias
+>> ??????? serial0 = &uart1;
+>> [??? 0.176656] xuartps ff000000.serial: No serial alias passed. Using
+>> the first free id
+>> [??? 0.176671] xuartps ff000000.serial: Validate id 0
+>> [??? 0.176680] xuartps ff000000.serial: The empty id is 0
+>> [??? 0.176692] xuartps ff000000.serial: ID 0 already taken - skipped
+>> [??? 0.176701] xuartps ff000000.serial: Validate id 1
+>> [??? 0.176710] xuartps ff000000.serial: The empty id is 1
+>> [??? 0.176719] xuartps ff000000.serial: Selected ID 1 allocation passed
+>> [??? 0.176760] ff000000.serial: ttyPS1 at MMIO 0xff000000 (irq = 33,
+>> base_baud = 6250000) is a xuartps
+>> [??? 0.177104] ff010000.serial: ttyPS0 at MMIO 0xff010000 (irq = 34,
+>> base_baud = 6250000) is a xuartps
+>>
+>> uart0 not listed but it is probed first that's why should be ttyPS0
+>> ??????? serial1 = &uart1;
+>> [??? 0.176661] xuartps ff000000.serial: No serial alias passed. Using
+>> the first free id
+>> [??? 0.176676] xuartps ff000000.serial: Validate id 0
+>> [??? 0.176686] xuartps ff000000.serial: The empty id is 0
+>> [??? 0.176696] xuartps ff000000.serial: Selected ID 0 allocation passed
+>> [??? 0.176737] ff000000.serial: ttyPS0 at MMIO 0xff000000 (irq = 33,
+>> base_baud = 6250000) is a xuartps
+>> [??? 0.177069] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
+>> base_baud = 6250000) is a xuartps
+>>
+>> uarts not listed in aliases list
+>> [??? 0.176673] xuartps ff000000.serial: No serial alias passed. Using
+>> the first free id
+>> [??? 0.176687] xuartps ff000000.serial: Validate id 0
+>> [??? 0.176697] xuartps ff000000.serial: The empty id is 0
+>> [??? 0.176707] xuartps ff000000.serial: Selected ID 0 allocation passed
+>> [??? 0.176746] ff000000.serial: ttyPS0 at MMIO 0xff000000 (irq = 33,
+>> base_baud = 6250000) is a xuartps
+>> [??? 0.177057] xuartps ff010000.serial: No serial alias passed. Using
+>> the first free id
+>> [??? 0.177070] xuartps ff010000.serial: Validate id 0
+>> [??? 0.177079] xuartps ff010000.serial: The empty id is 0
+>> [??? 0.177089] xuartps ff010000.serial: Selected ID 0 allocation failed
+>> [??? 0.177098] xuartps ff010000.serial: Validate id 1
+>> [??? 0.177107] xuartps ff010000.serial: The empty id is 1
+>> [??? 0.177116] xuartps ff010000.serial: Selected ID 1 allocation passed
+>> [??? 0.177149] ff010000.serial: ttyPS1 at MMIO 0xff010000 (irq = 34,
+>> base_baud = 6250000) is a xuartps
+>>
+>> Thanks,
+>> Michal
 > 
-> Rafal, Hauke, this looks good to me, can you review? Thanks
-> -- 
-> Florian
+> Hello Michal,
+> 
+> How will this interact with ns16550 based UARTs?
+> 
+> Can we have both /dev/ttyS0 and /dev/ttyPS0?
+> Currently we can't unless we create *no* serialN alias for the ns16550.
+> And there is no other means to lock the /dev/ttySx name to a device either.
+> 
+> Or will the xuartps driver eventually use /dev/ttySx as well?
 
-Rafa?, Hauke,
-
-I'm sure you are super busy :) Just want to bring this to your
-attention. 
+I am not changing any current behavior in this case. uartps is using
+ttyPS. ns16550 is using ttyS and on xilinx devices we are using also
+ttyUL for uartlite. Other drivers are using different names.
 
 Thanks,
-
-Vivek
+Michal
