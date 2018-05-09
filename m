@@ -1,67 +1,96 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 9 May 2018 12:17:25 +0100
-Subject: [PATCH 2/4] pid: Export find_task_by_vpid for use in external
- modules
-In-Reply-To: <87d0y5toed.fsf@xmission.com>
-References: <20180508140640.0e312dba025df75cbf205cdb@arm.com>
- <87d0y5toed.fsf@xmission.com>
-Message-ID: <9f67480f-ac5b-6c53-3463-06a9319ddfad@arm.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Wed, 09 May 2018 13:31:23 +0200
+Subject: [PATCH v4 1/3] drm/panel: Add RGB666 variant of Innolux AT070TN90
+In-Reply-To: <20180509071226.ivh4s3wtczg2u7zw@flea>
+References: <20180507220413.21990-1-contact@paulk.fr>
+ <20180509071226.ivh4s3wtczg2u7zw@flea>
+Message-ID: <c8ab5f472881063b90abe9461933baf6ee325dcd.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi,
 
-On 09/05/18 05:59, Eric W. Biederman wrote:
-> Kim Phillips <kim.phillips@arm.com> writes:
+On Wed, 2018-05-09 at 09:12 +0200, Maxime Ripard wrote:
+> On Tue, May 08, 2018 at 12:04:11AM +0200, Paul Kocialkowski wrote:
+> > This adds timings for the RGB666 variant of the Innolux AT070TN90 panel,
+> > as found on the Ainol AW1 tablet.
+> > 
+> > The panel also supports RGB888 output. When RGB666 mode is used instead,
+> > the two extra lanes per component are grounded.
+> > 
+> > In the future, it might become necessary to introduce a dedicated
+> > device-tree property to specify the bus format to use instead of the
+> > default one for the panel. This will allow supporting different bus
+> > formats for the same panel modes.
+> > 
+> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > ---
+> >  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> > index cbf1ab404ee7..32e30d5a8f08 100644
+> > --- a/drivers/gpu/drm/panel/panel-simple.c
+> > +++ b/drivers/gpu/drm/panel/panel-simple.c
+> > @@ -1063,6 +1063,29 @@ static const struct panel_desc innolux_at043tn24 = {
+> >  	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_POSEDGE,
+> >  };
+> >  
+> > +static const struct drm_display_mode innolux_at070tn90_mode = {
+> > +	.clock = 40000,
+> > +	.hdisplay = 800,
+> > +	.hsync_start = 800 + 112,
+> > +	.hsync_end = 800 + 112 + 1,
+> > +	.htotal = 800 + 112 + 1 + 87,
+> > +	.vdisplay = 480,
+> > +	.vsync_start = 480 + 141,
+> > +	.vsync_end = 480 + 141 + 1,
+> > +	.vtotal = 480 + 141 + 1 + 38,
+> > +	.vrefresh = 60,
+> > +};
+> > +
+> > +static const struct panel_desc innolux_at070tn90 = {
+> > +	.modes = &innolux_at070tn90_mode,
+> > +	.num_modes = 1,
+> > +	.size = {
+> > +		.width = 154,
+> > +		.height = 86,
+> > +	},
+> > +	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+> > +};
+> > +
 > 
->> This patch is in the context of allowing the Coresight h/w
->> trace driver suite to be loaded as modules.  Coresight uses
->> find_task_by_vpid when running in direct capture mode (via sysfs)
->> when getting/setting the context ID comparator to trigger on
->> (/sys/bus/coresight/devices/<x>.etm/ctxid_pid).
+> I'm not really convinced this is the right approach. You said it
+> yourself, the panel is using a 24-bits interface, and you just happen
+> to have a tablet that routed it using a 18-bits interface instead.
 > 
-> Aside from my objection about how bad an interface a pid in sysfs is.
-> The implementation of coresight_vpid_to_pid is horrible.
-> 
-> The code should be just:
-> 
-> static inline pid_t coresight_vpid_to_pid(pid_t vpid)
-> {
-> 	rcu_read_lock();
->          pid = pid_nr(find_vpid(vpid));
-> 	rcu_read_unlock();
-> 
-> 	return pid;
-> }
-> Which takes find_task_by_vpid out of the picture.
-> 
-> But reading further I am seeing code writing a pid to hardware.  That is
-> broken.  That is a layering violation of the first order.  Giving
-> implementation details like that to hardware.
+> That doesn't belong in the driver, especially associated to the
+> compatible, but where the routing is described: in the device
+> tree. And given that the panel interface is a 24 bits panel, if we
+> were to have a default, we should have this one, and not the one
+> fitting your use case.
 
-Note that the value here is nothing more than a token - the CoreSight 
-hardware doesn't actually *do* anything with it other than match it 
-against the same value which we also stash in the CPU in much the same 
-fashion - see CONFIG_PID_IN_CONTEXTIDR for, if you'll pardon the pun, 
-context.
+I fully agree, this is why I suggested introducing a dedicated dt
+property for selecting the bus format (in the commit message). I still
+proposed this patch as a temporary solution, but I'm definitely willing
+to craft a proper solution as well.
 
-TL;DR: the CPU has a special register whose only purpose is to allow the 
-OS help external debug tools identify the currently executing process, 
-by writing some arbitrary identifier in there. The trace hardware can 
-spit that identifier out into the trace stream whenever it changes, such 
-that the user can see context switches easily. Newer trace hardware can 
-also use it to actively filter what the capture at source, such that 
-only the portions of interest are traced at all. We could in theory make 
-up any old value, but as I understand it the PID is/was the most 
-user-friendly and easily correlatable thing to hand, and it's now 
-probably too well-established to reasonably change.
+Here is an initial proposition:
+1. Making bus_format an array in struct panel_desc and listing all the
+relevant bus formats that the panel can support there;
+2. Introducing an optional "bus-format" dt property that indicates which
+bus format to use, and using the first index of the bus formats array if
+the property is not present;
+3. Checking that the bus format requested from dt is supported by the
+panel.
 
-Robin.
+What do you think?
 
-> Any chance while you are working on this you can modify this code so
-> that it does something sensible and defensible instead of every line of
-> code I read be wrong in at least one detail?
-> 
-> Thank you,
-> Eric
-> 
+Paul
+
+-- 
+Developer of free digital technology and hardware support.
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
