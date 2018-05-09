@@ -1,29 +1,32 @@
-From: bgoswami@codeaurora.org (Banajit Goswami)
-Date: Wed, 9 May 2018 01:39:55 -0700
-Subject: [PATCH v7 18/24] ASoC: qdsp6: q6routing: Add support to all
- SLIMBus Mixers
-In-Reply-To: <20180501120820.11016-19-srinivas.kandagatla@linaro.org>
-References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
- <20180501120820.11016-19-srinivas.kandagatla@linaro.org>
-Message-ID: <b40ae86f-de73-3432-131b-4efc4cee656a@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 9 May 2018 09:44:20 +0100
+Subject: [PATCH v6 09/15] arm64/sve: Switch sve_pffr() argument from task
+ to thread
+In-Reply-To: <1525797900-5548-10-git-send-email-Dave.Martin@arm.com>
+References: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
+ <1525797900-5548-10-git-send-email-Dave.Martin@arm.com>
+Message-ID: <05e693a7-0eba-ab33-5b89-e1b7e4e0cb5e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/05/18 17:44, Dave Martin wrote:
+> sve_pffr(), which is used to derive the base address used for
+> low-level SVE save/restore routines, currently takes the relevant
+> task_struct as an argument.
+> 
+> The only accessed fields are actually part of thread_struct, so
+> this patch changes the argument type accordingly.  This is done in
+> preparation for moving this function to a header, where we do not
+> want to have to include <linux/sched.h> due to the consequent
+> circular #include problems.
+> 
+> No functional change.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
-> This patch adds support to SLIMBus related mixers to control mux between
-> ASM stream and AFE port.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
-> ---
->   sound/soc/qcom/qdsp6/q6routing.c | 261 +++++++++++++++++++++++++++++++++++++++
->   1 file changed, 261 insertions(+)
->
->
-Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
-
+	M.
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jazz is not dead. It just smells funny...
