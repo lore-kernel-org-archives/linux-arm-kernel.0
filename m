@@ -1,198 +1,283 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 9 May 2018 09:50:26 +0100
-Subject: [PATCH v6 11/15] KVM: arm64: Save host SVE context as appropriate
-In-Reply-To: <1525797900-5548-12-git-send-email-Dave.Martin@arm.com>
-References: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
- <1525797900-5548-12-git-send-email-Dave.Martin@arm.com>
-Message-ID: <606acf08-5af7-8045-221d-73737e730c3c@arm.com>
+From: bgoswami@codeaurora.org (Banajit Goswami)
+Date: Wed, 9 May 2018 01:56:27 -0700
+Subject: [PATCH v7 17/24] ASoC: qdsp6: q6routing: Add q6routing driver
+In-Reply-To: <20180501120820.11016-18-srinivas.kandagatla@linaro.org>
+References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
+ <20180501120820.11016-18-srinivas.kandagatla@linaro.org>
+Message-ID: <bf93d6d6-ba10-21b9-4bbe-224bb39f56f2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/18 17:44, Dave Martin wrote:
-> This patch adds SVE context saving to the hyp FPSIMD context switch
-> path.  This means that it is no longer necessary to save the host
-> SVE state in advance of entering the guest, when in use.
-> 
-> In order to avoid adding pointless complexity to the code, VHE is
-> assumed if SVE is in use.  VHE is an architectural prerequisite for
-> SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
-> kernels that support both SVE and KVM.
-> 
-> Historically, software models exist that can expose the
-> architecturally invalid configuration of SVE without VHE, so if
-> this situation is detected this patch warns and refuses to create a
-> VM.  Doing this check at VM creation time avoids race issues
-> between KVM and SVE initialisation.
 
-I don't think the commit log now reflects the code, since we bail out at
-init time and disable KVM altogether.
-
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> 
+On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
+> This patch adds support to q6 routing driver which configures route
+> between ASM and AFE module using ADM apis.
+>
+> This driver uses dapm widgets to setup the matrix between AFE ports and
+> ASM streams.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 > ---
-> 
-> Changes since v5:
-> 
-> Requested by Marc Zyngier:
-> 
->  * Migrate to flag bits in vcpu_arch.flags instead of adding bools in
->    vcpu_arch.
-> 
->  * Move system_supports_sve() && !has_vhe() sanity check to
->    kvm_arch_init() instead of doing it each time a VM is created.
->    cpufeatures initialisation should be complete by the time any
->    before module_init() call runs.
-> ---
->  arch/arm64/Kconfig          |  7 +++++++
->  arch/arm64/kvm/fpsimd.c     |  1 -
->  arch/arm64/kvm/hyp/switch.c | 22 ++++++++++++++++++++--
->  virt/kvm/arm/arm.c          | 18 ++++++++++++++++++
->  4 files changed, 45 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index eb2cf49..b0d3820 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1130,6 +1130,7 @@ endmenu
->  config ARM64_SVE
->  	bool "ARM Scalable Vector Extension support"
->  	default y
-> +	depends on !KVM || ARM64_VHE
->  	help
->  	  The Scalable Vector Extension (SVE) is an extension to the AArch64
->  	  execution state which complements and extends the SIMD functionality
-> @@ -1155,6 +1156,12 @@ config ARM64_SVE
->  	  booting the kernel.  If unsure and you are not observing these
->  	  symptoms, you should assume that it is safe to say Y.
->  
-> +	  CPUs that support SVE are architecturally required to support the
-> +	  Virtualization Host Extensions (VHE), so the kernel makes no
-> +	  provision for supporting SVE alongside KVM without VHE enabled.
-> +	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
-> +	  KVM in the same kernel image.
+>   sound/soc/qcom/Kconfig           |   4 +
+>   sound/soc/qcom/qdsp6/Makefile    |   1 +
+>   sound/soc/qcom/qdsp6/q6routing.c | 393 +++++++++++++++++++++++++++++++++++++++
+>   sound/soc/qcom/qdsp6/q6routing.h |   9 +
+>   4 files changed, 407 insertions(+)
+>   create mode 100644 sound/soc/qcom/qdsp6/q6routing.c
+>   create mode 100644 sound/soc/qcom/qdsp6/q6routing.h
+>
+> diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
+> index 941774abd94f..43f9ed85efa8 100644
+> --- a/sound/soc/qcom/Kconfig
+> +++ b/sound/soc/qcom/Kconfig
+> @@ -53,6 +53,9 @@ config SND_SOC_QDSP6_AFE
+>   config SND_SOC_QDSP6_ADM
+>   	tristate
+>   
+> +config SND_SOC_QDSP6_ROUTING
+> +	tristate
 > +
->  config ARM64_MODULE_PLTS
->  	bool
->  	select HAVE_MOD_ARCH_SPECIFIC
-> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-> index 7059275..4c47b55 100644
-> --- a/arch/arm64/kvm/fpsimd.c
-> +++ b/arch/arm64/kvm/fpsimd.c
-> @@ -60,7 +60,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
->   */
->  void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
->  {
-> -	BUG_ON(system_supports_sve());
->  	BUG_ON(!current->mm);
->  
->  	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 75c3b65..6826f2d 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -21,12 +21,14 @@
->  
->  #include <kvm/arm_psci.h>
->  
-> +#include <asm/cpufeature.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_hyp.h>
->  #include <asm/kvm_mmu.h>
->  #include <asm/fpsimd.h>
->  #include <asm/debug-monitors.h>
-> +#include <asm/processor.h>
->  #include <asm/thread_info.h>
->  
->  static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
-> @@ -328,6 +330,8 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->  void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
->  				    struct kvm_vcpu *vcpu)
->  {
-> +	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
+>   config SND_SOC_QDSP6_ASM
+>   	tristate
+>   
+> @@ -63,6 +66,7 @@ config SND_SOC_QDSP6
+>   	select SND_SOC_QDSP6_CORE
+>   	select SND_SOC_QDSP6_AFE
+>   	select SND_SOC_QDSP6_ADM
+> +	select SND_SOC_QDSP6_ROUTING
+>   	select SND_SOC_QDSP6_ASM
+>   	help
+>   	 To add support for MSM QDSP6 Soc Audio.
+> diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
+> index 01d9dcf3375c..0e8e2febb7ec 100644
+> --- a/sound/soc/qcom/qdsp6/Makefile
+> +++ b/sound/soc/qcom/qdsp6/Makefile
+> @@ -2,4 +2,5 @@ obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
+>   obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
+>   obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
+>   obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
+> +obj-$(CONFIG_SND_SOC_QDSP6_ROUTING) += q6routing.o
+>   obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
+> diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
+> new file mode 100644
+> index 000000000000..72863672f11f
+> --- /dev/null
+> +++ b/sound/soc/qcom/qdsp6/q6routing.c
+> @@ -0,0 +1,393 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
+> +// Copyright (c) 2018, Linaro Limited
 > +
->  	if (has_vhe())
->  		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
->  			     cpacr_el1);
-> @@ -337,8 +341,22 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
->  
->  	isb();
->  
-> -	if (vcpu->arch.host_fpsimd_state) {
-> -		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
-> +	if (host_fpsimd) {
-> +		/*
-> +		 * In the SVE case, VHE is assumed: it is enforced by
-> +		 * Kconfig and kvm_arch_init_vm().
-
-Nit: this is now kvm_arch_init().
-
-> +		 */
-> +		if (system_supports_sve() &&
-> +		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
-> +			struct thread_struct *thread = container_of(
-> +				host_fpsimd,
-> +				struct thread_struct, uw.fpsimd_state);
+> +#include <linux/init.h>
+> +#include <linux/err.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/bitops.h>
+> +#include <linux/component.h>
+> +#include <linux/mutex.h>
+> +#include <linux/of_device.h>
+> +#include <linux/slab.h>
+> +#include <sound/core.h>
+> +#include <sound/soc.h>
+> +#include <sound/soc-dapm.h>
+> +#include <sound/pcm.h>
+> +#include <sound/control.h>
+> +#include <sound/asound.h>
+> +#include <sound/pcm_params.h>
+> +#include "q6afe.h"
+> +#include "q6asm.h"
+> +#include "q6adm.h"
+> +#include "q6routing.h"
 > +
-> +			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
-> +		} else {
-> +			__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
-> +		}
+> +#define DRV_NAME "q6routing-component"
 > +
->  		vcpu->arch.host_fpsimd_state = NULL;
->  	}
->  
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index bee226c..379e8a9 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -16,6 +16,7 @@
->   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
->   */
->  
-> +#include <linux/bug.h>
->  #include <linux/cpu_pm.h>
->  #include <linux/errno.h>
->  #include <linux/err.h>
-> @@ -41,6 +42,7 @@
->  #include <asm/mman.h>
->  #include <asm/tlbflush.h>
->  #include <asm/cacheflush.h>
-> +#include <asm/cpufeature.h>
->  #include <asm/virt.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_asm.h>
-> @@ -1582,6 +1584,22 @@ int kvm_arch_init(void *opaque)
->  		}
->  	}
->  
-> +	/*
-> +	 * VHE is a prerequisite for SVE in the Arm architecture, and
-> +	 * Kconfig ensures that if system_supports_sve() here then
-> +	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
-> +	 * detected and enabled, the CPU is architecturally
-> +	 * noncompliant.
-> +	 *
-> +	 * Just in case this mismatch is seen, detect it, warn and give
-> +	 * up.  Supporting this forbidden configuration in Hyp would be
-> +	 * pointless.
-> +	 */
-> +	if (system_supports_sve() && !has_vhe()) {
-> +		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
-> +		return -ENODEV;
+> +struct session_data {
+> +	int state;
+> +	int port_id;
+> +	int path_type;
+> +	int app_type;
+> +	int acdb_id;
+> +	int sample_rate;
+> +	int bits_per_sample;
+> +	int channels;
+> +	int perf_mode;
+> +	int numcopps;
+> +	int fedai_id;
+> +	unsigned long copp_map;
+> +};
+> +
+> +struct msm_routing_data {
+> +	struct session_data sessions[MAX_SESSIONS];
+> +	struct session_data port_data[AFE_MAX_PORTS];
+> +	struct device *dev;
+> +	struct mutex lock;
+> +};
+> +
+> +static struct msm_routing_data *routing_data;
+> +
+> +/**
+> + * q6routing_stream_open() - Register a new stream for route setup
+> + *
+> + * @fedai_id: Frontend dai id.
+> + * @perf_mode: Performance mode.
+> + * @stream_id: ASM stream id to map.
+> + * @stream_type: Direction of stream
+> + *
+> + * Return: Will be an negative on error or a zero on success.
+> + */
+> +int q6routing_stream_open(int fedai_id, int perf_mode,
+> +			   int stream_id, int stream_type)
+> +{
+> +	int j, topology, num_copps = 0;
+> +	struct route_payload payload;
+> +	int copp_idx;
+> +	struct session_data *session, *pdata;
+> +
+> +	if (!routing_data) {
+> +		pr_err("Routing driver not yet ready\n");
+> +		return -EINVAL;
 > +	}
 > +
->  	err = init_common_resources();
->  	if (err)
->  		return err;
-> 
+> +	session = &routing_data->sessions[stream_id - 1];
+> +	pdata = &routing_data->port_data[session->port_id];
+> +
+> +	mutex_lock(&routing_data->lock);
+> +	session->fedai_id = fedai_id;
+> +
+> +	session->path_type = pdata->path_type;
+> +	session->sample_rate = pdata->sample_rate;
+> +	session->channels = pdata->channels;
+> +	session->bits_per_sample = pdata->bits_per_sample;
+> +
+> +	payload.num_copps = 0; /* only RX needs to use payload */
+> +	topology = NULL_COPP_TOPOLOGY;
+> +	copp_idx = q6adm_open(routing_data->dev, session->port_id,
+> +			      session->path_type, session->sample_rate,
+> +			      session->channels, topology, perf_mode,
+> +			      session->bits_per_sample, 0, 0);
+> +
+> +	if (copp_idx < 0) {
+> +		mutex_unlock(&routing_data->lock);
+> +		return -EINVAL;
+> +	}
+> +
+> +	set_bit(copp_idx, &session->copp_map);
+> +
+> +	for_each_set_bit(j, &session->copp_map, MAX_COPPS_PER_PORT) {
+> +		payload.port_id[num_copps] = session->port_id;
+> +		payload.copp_idx[num_copps] = j;
+> +		num_copps++;
+> +	}
+> +
+> +	if (num_copps) {
+> +		payload.num_copps = num_copps;
+> +		payload.session_id = stream_id;
+> +		q6adm_matrix_map(routing_data->dev, session->path_type,
+> +				 payload, perf_mode);
+> +	}
+> +	mutex_unlock(&routing_data->lock);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(q6routing_stream_open);
+> +
+> +static struct session_data *get_session_from_id(struct msm_routing_data *data,
+> +						int fedai_id)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < MAX_SESSIONS; i++) {
+> +		if (fedai_id == data->sessions[i].fedai_id)
+> +			return &data->sessions[i];
+> +	}
+> +
+> +	return NULL;
+> +}
+> +/**
+> + * q6routing_stream_close() - Deregister a stream
+> + *
+> + * @fedai_id: Frontend dai id.
+> + * @stream_type: Direction of stream
+> + *
+> + * Return: Will be an negative on error or a zero on success.
+> + */
+> +void q6routing_stream_close(int fedai_id, int stream_type)
+> +{
+> +	struct session_data *session;
+> +	int idx;
+> +
+> +	session = get_session_from_id(routing_data, fedai_id);
+> +	if (!session)
+> +		return;
+> +
+> +	for_each_set_bit(idx, &session->copp_map, MAX_COPPS_PER_PORT)
+> +		q6adm_close(routing_data->dev, session->port_id,
+> +			    session->perf_mode, idx);
+> +
+> +	session->fedai_id = -1;
+> +	session->copp_map = 0;
+> +}
+> +EXPORT_SYMBOL_GPL(q6routing_stream_close);
+> +
+> +static int msm_routing_get_audio_mixer(struct snd_kcontrol *kcontrol,
+> +				       struct snd_ctl_elem_value *ucontrol)
+> +{
+> +	struct snd_soc_dapm_context *dapm =
+> +	    snd_soc_dapm_kcontrol_dapm(kcontrol);
+> +	struct soc_mixer_control *mc =
+> +	    (struct soc_mixer_control *)kcontrol->private_value;
+> +	int session_id = mc->shift;
+> +	struct snd_soc_component *c = snd_soc_dapm_to_component(dapm);
+> +	struct msm_routing_data *priv = dev_get_drvdata(c->dev);
+> +	struct session_data *session = &priv->sessions[session_id];
+> +
+> +	if (session->port_id == mc->reg)
+> +		ucontrol->value.integer.value[0] = 1;
+> +	else
+> +		ucontrol->value.integer.value[0] = 0;
+> +
+> +	return 0;
+> +}
+> +
+> +static int msm_routing_put_audio_mixer(struct snd_kcontrol *kcontrol,
+> +				       struct snd_ctl_elem_value *ucontrol)
+> +{
+> +	struct snd_soc_dapm_context *dapm =
+> +				    snd_soc_dapm_kcontrol_dapm(kcontrol);
+> +	struct snd_soc_component *c = snd_soc_dapm_to_component(dapm);
+> +	struct msm_routing_data *data = dev_get_drvdata(c->dev);
+> +	struct soc_mixer_control *mc =
+> +		    (struct soc_mixer_control *)kcontrol->private_value;
+> +	struct snd_soc_dapm_update *update = NULL;
+> +	int be_id = mc->reg;
+> +	int session_id = mc->shift;
+> +	struct session_data *session = &data->sessions[session_id];
+> +
+> +	if (ucontrol->value.integer.value[0]) {
+> +		session->port_id = be_id;
+> +		snd_soc_dapm_mixer_update_power(dapm, kcontrol, 1, update);
+> +	} else {
+> +		session->port_id = -1;
+> +		snd_soc_dapm_mixer_update_power(dapm, kcontrol, 0, update);
+> +	}
+> +
+> +	return 1;
+> +}
+> +
+> +static const struct snd_kcontrol_new hdmi_mixer_controls[] = {
+> +	SOC_SINGLE_EXT("MultiMedia1", HDMI_RX,
+> +		       MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0,
+At some point in future, when FE DAI IDs become more than "31", 
+SOC_DOUBLE_EXT would need to be used with "reg" marked with SND_SOC_NOPM 
+and FE DAI and BE DAI IDs passed in shift_left and shift_right. This is 
+to avoid having any "shift" operation issue in DAPM code, when reg is 
+not marked with SND_SOC_NOPM, and shift value is more than 31.
+However, for now, its OK.
 
-Otherwise:
+Acked-by: Banajit Goswami <bgoswami@codeaurora.org
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
