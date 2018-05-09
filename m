@@ -1,31 +1,97 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Wed, 9 May 2018 15:47:19 +0000
-Subject: [PATCH 3/3] x86/mm: disable ioremap free page handling on x86-PAE
-In-Reply-To: <20180430175925.2657-4-toshi.kani@hpe.com>
-References: <20180430175925.2657-1-toshi.kani@hpe.com>
- <20180430175925.2657-4-toshi.kani@hpe.com>
-Message-ID: <1525880775.2693.558.camel@hpe.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 9 May 2018 09:51:50 -0600
+Subject: [PATCH v2 1/2] perf cs-etm: Support unknown_thread in
+ cs_etm_auxtrace
+In-Reply-To: <1525839312-20544-1-git-send-email-leo.yan@linaro.org>
+References: <1525839312-20544-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <20180509155150.GC25559@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-04-30 at 11:59 -0600, Toshi Kani wrote:
-> ioremap() supports pmd mappings on x86-PAE.  However, kernel's pmd
-> tables are not shared among processes on x86-PAE.  Therefore, any
-> update to sync'd pmd entries need re-syncing.  Freeing a pte page
-> also leads to a vmalloc fault and hits the BUG_ON in vmalloc_sync_one().
+On Wed, May 09, 2018 at 12:15:11PM +0800, Leo Yan wrote:
+> CoreSight doesn't allocate thread structure for unknown_thread in etm
+> auxtrace, so unknown_thread is NULL pointer.  If the perf data doesn't
+> contain valid tid and then cs_etm__mem_access() uses unknown_thread
+> instead as thread handler, this results in segmentation fault when
+> thread__find_addr_map() accesses thread handler.
 > 
-> Disable free page handling on x86-PAE.  pud_free_pmd_page() and
-> pmd_free_pte_page() simply return 0 if a given pud/pmd entry is present.
-> This assures that ioremap() does not update sync'd pmd entries at the
-> cost of falling back to pte mappings.
+> This commit creates new thread data which is used by unknown_thread, so
+> CoreSight tracing can roll back to use unknown_thread if perf data
+> doesn't include valid thread info.  This commit also releases thread
+> data for initialization failure case and for normal auxtrace free flow.
+
+Hi Leo,
+
+Arnaldo maintains the perf tools and he receives dozens of patches every day.
+If his name is not the first one to appear on the "To:" list, it is unlikely
+that his email filters will catch your patches.
+
+Mathieu
+
 > 
-> Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
-> Reported-by: Joerg Roedel <joro@8bytes.org>
-
-Hi Joerg,
-
-Does it solve your problem?  Let me know if you have any issue with the
-series. 
-
-Thanks,
--Toshi
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  tools/perf/util/cs-etm.c | 24 ++++++++++++++++++++++--
+>  1 file changed, 22 insertions(+), 2 deletions(-)
+> 
+> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+> index 6533b1a..69f21de 100644
+> --- a/tools/perf/util/cs-etm.c
+> +++ b/tools/perf/util/cs-etm.c
+> @@ -239,6 +239,7 @@ static void cs_etm__free(struct perf_session *session)
+>  	for (i = 0; i < aux->num_cpu; i++)
+>  		zfree(&aux->metadata[i]);
+>  
+> +	thread__zput(aux->unknown_thread);
+>  	zfree(&aux->metadata);
+>  	zfree(&aux);
+>  }
+> @@ -1355,6 +1356,23 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
+>  	etm->auxtrace.free = cs_etm__free;
+>  	session->auxtrace = &etm->auxtrace;
+>  
+> +	etm->unknown_thread = thread__new(999999999, 999999999);
+> +	if (!etm->unknown_thread)
+> +		goto err_free_queues;
+> +
+> +	/*
+> +	 * Initialize list node so that at thread__zput() we can avoid
+> +	 * segmentation fault at list_del_init().
+> +	 */
+> +	INIT_LIST_HEAD(&etm->unknown_thread->node);
+> +
+> +	err = thread__set_comm(etm->unknown_thread, "unknown", 0);
+> +	if (err)
+> +		goto err_delete_thread;
+> +
+> +	if (thread__init_map_groups(etm->unknown_thread, etm->machine))
+> +		goto err_delete_thread;
+> +
+>  	if (dump_trace) {
+>  		cs_etm__print_auxtrace_info(auxtrace_info->priv, num_cpu);
+>  		return 0;
+> @@ -1369,16 +1387,18 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
+>  
+>  	err = cs_etm__synth_events(etm, session);
+>  	if (err)
+> -		goto err_free_queues;
+> +		goto err_delete_thread;
+>  
+>  	err = auxtrace_queues__process_index(&etm->queues, session);
+>  	if (err)
+> -		goto err_free_queues;
+> +		goto err_delete_thread;
+>  
+>  	etm->data_queued = etm->queues.populated;
+>  
+>  	return 0;
+>  
+> +err_delete_thread:
+> +	thread__zput(etm->unknown_thread);
+>  err_free_queues:
+>  	auxtrace_queues__free(&etm->queues);
+>  	session->auxtrace = NULL;
+> -- 
+> 2.7.4
+> 
