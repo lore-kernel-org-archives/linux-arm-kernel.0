@@ -1,86 +1,58 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Tue, 8 May 2018 18:40:50 -0500
-Subject: [PATCH] drivers/perf: arm-ccn: stop spamming dmesg in event_init
-In-Reply-To: <20180504104117.8086-1-mark.rutland@arm.com>
-References: <20180504104117.8086-1-mark.rutland@arm.com>
-Message-ID: <20180508184050.75c60b82ba538d0ecdeb2d78@arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 9 May 2018 08:56:41 +0800
+Subject: [PATCH 1/2] perf cs-etm: Support unknown_thread in cs_etm_auxtrace
+In-Reply-To: <CANLsYky4QatoCv_4k1r8eb4Rjugx9g2YZLG1dtHKJy9AsHtCSg@mail.gmail.com>
+References: <1525360703-26159-1-git-send-email-leo.yan@linaro.org>
+ <CANLsYky4QatoCv_4k1r8eb4Rjugx9g2YZLG1dtHKJy9AsHtCSg@mail.gmail.com>
+Message-ID: <20180509005640.GB23540@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  4 May 2018 11:41:17 +0100
-Mark Rutland <mark.rutland@arm.com> wrote:
+On Tue, May 08, 2018 at 11:01:30AM -0600, Mathieu Poirier wrote:
+> On 3 May 2018 at 09:18, Leo Yan <leo.yan@linaro.org> wrote:
+> > CoreSight doesn't allocate thread structure for unknown_thread in etm
+> > auxtrace, so unknown_thread is NULL pointer.  If the perf data doesn't
+> > contain valid tid and then cs_etm__mem_access() uses unknown_thread
+> > instead as thread handler, this results in segmentation fault when
+> > thread__find_addr_map() accesses thread handler.
+> >
+> > This commit creates new thread data which is used by unknown_thread, so
+> > CoreSight tracing can roll back to use unknown_thread if perf data
+> > doesn't include valid thread info.  This commit also releases thread
+> > data for initialization failure case and for normal auxtrace free flow.
+> >
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  tools/perf/util/cs-etm.c | 25 +++++++++++++++++++++++--
+> >  1 file changed, 23 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+> > index 6533b1a..417302c 100644
+> > --- a/tools/perf/util/cs-etm.c
+> > +++ b/tools/perf/util/cs-etm.c
+> > @@ -239,6 +239,7 @@ static void cs_etm__free(struct perf_session *session)
+> >         for (i = 0; i < aux->num_cpu; i++)
+> >                 zfree(&aux->metadata[i]);
+> >
+> > +       thread__zput(aux->unknown_thread);
+> >         zfree(&aux->metadata);
+> >         zfree(&aux);
+> >  }
+> > @@ -266,6 +267,7 @@ static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
+> >         if (!thread) {
+> >                 if (cpumode != PERF_RECORD_MISC_KERNEL)
+> >                         return -EINVAL;
+> > +
+> 
+> Extra line, please remove.
+> 
+> With this change:
+> 
+> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-[adding Pawel, arm-ccn driver author]
+Thanks for reviewing, Mathieu.  Will spin new patches and send out.
 
-> The ARM CCN PMU driver uses dev_warn() to complain about parameters in
-> the user-provided perf_event_attr. This means that under normal
-> operation (e.g. a single invocation of the perf tool), dmesg may be
-> spammed with multiple messages.
-
-Nothing new there:  perf does that all the time: E.g., a single, basic
-x86 invocation causes all this:
-
-[77360.630571] perf: interrupt took too long (2549 > 2500), lowering kernel.perf_event_max_sample_rate to 78250
-[77360.630800] perf: interrupt took too long (3492 > 3186), lowering kernel.perf_event_max_sample_rate to 57250
-[77360.631045] perf: interrupt took too long (4379 > 4365), lowering kernel.perf_event_max_sample_rate to 45500
-[77360.631437] perf: interrupt took too long (5845 > 5473), lowering kernel.perf_event_max_sample_rate to 34000
-[77360.631967] perf: interrupt took too long (7736 > 7306), lowering kernel.perf_event_max_sample_rate to 25750
-[77360.632520] perf: interrupt took too long (9921 > 9670), lowering kernel.perf_event_max_sample_rate to 20000
-[77360.633344] perf: interrupt took too long (12778 > 12401), lowering kernel.perf_event_max_sample_rate to 15500
-[77360.634294] perf: interrupt took too long (16030 > 15972), lowering kernel.perf_event_max_sample_rate to 12250
-[77360.635587] perf: interrupt took too long (20105 > 20037), lowering kernel.perf_event_max_sample_rate to 9750
-[77360.637301] perf: interrupt took too long (25319 > 25131), lowering kernel.perf_event_max_sample_rate to 7750
-
-> Tools may issue multiple syscalls to probe for feature support, and
-
-Why isn't it helpful?  A user can see the tool is trying different
-options, and as they are tried, to see which ones are they can do
-something about.  Arm-ccn has plenty of h/w specific errors, and users
-need to know things like node specific details.
-
-> multiple applications (from multiple users) can attempt to open events
-> simultaneously, so this is not very helpful, 
-
-Does running perf on the same PMU h/w against other users even work?
-Is it even practical, if they get it to?  In any case, for Arm-ccn,
-since it's system-wide PMU h/w, this use-case is completely unrealistic.
-
-> even if a user happens to have access to dmesg.
-
-Again, unrealistic:  If they have access to run arm-ccn, kptrs are
-unrestricted, so they have way more access than to just dmesg.
-
-> Worse, this can push important information out of
-> the dmesg ring buffer,
-
-Like what, specifically?  People about to run perf do so on a stable
-system, for measurement of performance accuracy reasons.   Anyway,
-there are logging daemons to help with that, and arm-ccn doesn't emit
-*that* many messages such as to even come close to filling the buffer.
-
-> and can significantly slow down syscall fuzzers,
-> vastly increasing the time it takes to find critical bugs.
-
-Facilitating first user experience  - esp. for Arm perf - trumps fuzzer
-runner convenience any day, in my book.  Fuzzer runners can patch their
-kernels prior to running the fuzzers.
-
-> Demote the dev_warn() instances to dev_dbg(), as is the case for all
-> other PMU drivers under drivers/perf/. Users who wish to debug PMU event
-> initialisation can enable dynamic debug to receive these messages.
-
-After having already debugged things to the point where they find the
-problem is the driver's event_init() function?  Then they find they
-have to recompile their kernels yet again, with DYNAMIC_DEBUG set?
-
-No, please, this is a definite usability regression for Arm-ccn users.
-
-In fact, are you sure it shouldn't be the other way around?:
-{kernel,PMU driver} developers that wish to run fuzzers should disable
-warnings using /proc/sys/kernel/printk, or boot with a different
-loglevel on the boot command line.  I think our users would appreciate
-that more than this patch.
+[...]
 
 Thanks,
-
-Kim
+Leo Yan
