@@ -1,30 +1,36 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Wed, 9 May 2018 22:08:25 +0000
-Subject: [PATCH 0/2] pinctrl: nand: meson: fix missing data pins
-Message-ID: <20180509220827.22286-1-yixun.lan@amlogic.com>
+Date: Wed, 9 May 2018 22:08:26 +0000
+Subject: [PATCH 1/2] pinctrl: nand: meson-gxbb: fix missing data pins
+In-Reply-To: <20180509220827.22286-1-yixun.lan@amlogic.com>
+References: <20180509220827.22286-1-yixun.lan@amlogic.com>
+Message-ID: <20180509220827.22286-2-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
-   We found the data pins of NAND controller are actually mising from
-the nand pinctrl group in the GXBB, GXL SoC driver, these two patches
-will fix these issue.
-   I have prepared the two patches separated with different Fix tag,
-but I can squash them into one patch if you prefer, since the meson nand
-driver has never been pushed into mainline (so probably the Fix tag is
-useless).
-   Btw, the patches are formated on top your 'for-next' branch,
-and I'm fine with this merged as for-next.
+The data pin 0-7 of the NAND controller are actually missing from
+the nand pinctrl group, so we fix it here.
 
-   Thanks
-
-Yixun Lan (2):
-  pinctrl: nand: meson-gxbb: fix missing data pins
-  pinctrl: nand: meson-gxl: fix missing data pins
-
+Fixes: cd1e3b01c7d3 ("pinctrl: amlogic: gxbb: add nand pins")
+Reported-by: Liang Yang <liang.yang@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
  drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 4 ++--
- drivers/pinctrl/meson/pinctrl-meson-gxl.c  | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+index 9079020259c5..2c97a2e07a5f 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
++++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
+@@ -627,8 +627,8 @@ static const char * const sdio_groups[] = {
+ };
+ 
+ static const char * const nand_groups[] = {
+-	"nand_ce0", "nand_ce1", "nand_rb0", "nand_ale", "nand_cle",
+-	"nand_wen_clk", "nand_ren_wr", "nand_dqs",
++	"emmc_nand_d07", "nand_ce0", "nand_ce1", "nand_rb0", "nand_ale",
++	"nand_cle", "nand_wen_clk", "nand_ren_wr", "nand_dqs",
+ };
+ 
+ static const char * const uart_a_groups[] = {
 -- 
 2.17.0
