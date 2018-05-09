@@ -1,29 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 9 May 2018 09:56:52 +0100
-Subject: [PATCH v6 12/15] KVM: arm64: Remove eager host SVE state saving
-In-Reply-To: <1525797900-5548-13-git-send-email-Dave.Martin@arm.com>
-References: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
- <1525797900-5548-13-git-send-email-Dave.Martin@arm.com>
-Message-ID: <34f4b9d4-9699-eb42-d451-39077e8f8dcd@arm.com>
+From: bgoswami@codeaurora.org (Banajit Goswami)
+Date: Wed, 9 May 2018 02:01:34 -0700
+Subject: [PATCH v7 22/24] ASoC: qdsp6: dt-bindings: Add apq8096 machine
+ bindings
+In-Reply-To: <20180501120820.11016-23-srinivas.kandagatla@linaro.org>
+References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
+ <20180501120820.11016-23-srinivas.kandagatla@linaro.org>
+Message-ID: <a33018c1-1ee8-da44-ae93-459abe12b049@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/18 17:44, Dave Martin wrote:
-> Now that the host SVE context can be saved on demand from Hyp,
-> there is no longer any need to save this state in advance before
-> entering the guest.
-> 
-> This patch removes the relevant call to
-> kvm_fpsimd_flush_cpu_state().
-> 
-> Since the problem that function was intended to solve now no longer
-> exists, the function and its dependencies are also deleted.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
+> Add devicetree bindings documentation file for Qualcomm apq8096 sound card.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+>   .../devicetree/bindings/sound/qcom,apq8096.txt     | 109 +++++++++++++++++++++
+>   1 file changed, 109 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/sound/qcom,apq8096.txt
+>
+Reviewed-by: Banajit Goswami <bgoswami@codeaurora.org>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
