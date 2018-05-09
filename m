@@ -1,42 +1,32 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 9 May 2018 14:28:19 +0200
-Subject: [PATCH 7/7] ARM: dts: sun7i: Add dts file for the A20-linova1-7
- HMI
-In-Reply-To: <20180507073013.dvtbmwi4ora6tdj2@flea>
-References: <1521662593-25468-7-git-send-email-giulio.benetti@micronovasrl.com>
- <20180322180508.my64gobhh5rc2x2m@flea>
- <8ef3b259-03b4-6987-286e-36ff627a8b76@micronovasrl.com>
- <20180424084137.7xfwji2gcibxavvt@flea>
- <03a02abb-e95c-b4ec-748f-907c0af67969@micronovasrl.com>
- <20180425184016.xktppxw7egddr7li@flea>
- <42feccc9-1d09-9ff2-3ccc-1dea63bacfb6@micronovasrl.com>
- <839d2560-0250-9b3a-8019-4e83d9e931e2@micronovasrl.com>
- <20180504080652.dniwaqqhbeuknp7y@flea>
- <afc78821-2d08-3f4f-d008-5b2d216e96c0@micronovasrl.com>
- <20180507073013.dvtbmwi4ora6tdj2@flea>
-Message-ID: <102bc56e-f746-6d2c-d3a5-f9d0449781ff@micronovasrl.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 9 May 2018 19:29:16 +0800
+Subject: [PATCH] usb: gadget: composite: fill bcdUSB as 0x0320 for SuperSpeed
+ or higher speeds
+Message-ID: <69cc710fa8b7d18c494c9f482fd2b8e6fb7c0c94.1525865206.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The USB3CV version 2.1.80 (March 26, 2018) requires all devices
+( gen1, gen2, single lane, dual lane) to return the value of 0x0320
+in the bcdUSB field
 
-Il 07/05/2018 09:30, Maxime Ripard ha scritto:
->> Otherwise as in-tree dts with make dtbs "-@" argument is not passed.
->> Right?
-> 
-> You should use DTC_FLAGS='-@'
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/gadget/composite.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thank you, I'm going to use that.
-
-
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index 63a7cb8..f242c2b 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -1601,7 +1601,7 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
+ 				cdev->gadget->ep0->maxpacket;
+ 			if (gadget_is_superspeed(gadget)) {
+ 				if (gadget->speed >= USB_SPEED_SUPER) {
+-					cdev->desc.bcdUSB = cpu_to_le16(0x0310);
++					cdev->desc.bcdUSB = cpu_to_le16(0x0320);
+ 					cdev->desc.bMaxPacketSize0 = 9;
+ 				} else {
+ 					cdev->desc.bcdUSB = cpu_to_le16(0x0210);
 -- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+1.9.1
