@@ -1,38 +1,188 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed,  9 May 2018 18:07:11 +0100
-Subject: [PATCH 5/8] firmware: arm_scmi: drop unused `con_priv` structure
- member
-In-Reply-To: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
-References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1525885634-22348-6-git-send-email-sudeep.holla@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed,  9 May 2018 12:25:44 -0500
+Subject: [PATCH v10 05/27] ARM: davinci: da830: add new clock init using
+ common clock framework
+In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
+References: <20180509172606.29387-1-david@lechnology.com>
+Message-ID: <20180509172606.29387-6-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initially con_priv was supposedly used for transport specific data when
-the SCMI driver had an abstraction to communicate with different mailbox
-controllers. But after some discussions, the idea was dropped but this
-variable slipped through the cracks.
+This adds the new board-specific clock init in mach-davinci/da830.c
+using the new common clock framework drivers.
 
-This patch gets rid of this unused variable.
+The #ifdefs are needed to prevent compile errors until the entire
+ARCH_DAVINCI is converted.
 
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Also clean up the #includes since we are adding some here.
+
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: David Lechner <david@lechnology.com>
 ---
- drivers/firmware/arm_scmi/common.h | 2 --
- 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
-index 41b03e46cca8..937a930ce87d 100644
---- a/drivers/firmware/arm_scmi/common.h
-+++ b/drivers/firmware/arm_scmi/common.h
-@@ -86,9 +86,7 @@ struct scmi_msg {
-  *	buffer for the rx path as we use for the tx path.
-  * @done: completion event
+v10 changes:
+- none
+
+v9 changes:
+- register PLL in da830_init_time() instead of as platform device so that we
+  get the correct timer0 clock for davinci_timer_init()
+
+v8 changes:
+- none
+
+v7 changes:
+- add clock platform device declarations
+- register platform devices instead of registering clocks directly
+- clkdev lookup is moved to drivers/clk
+- add davinci prefix to commit description
+
+v6 changes:
+- add blank lines between function calls
+- include da8xx_register_cfgchip()
+
+
+ arch/arm/mach-davinci/board-da830-evm.c    |  2 +
+ arch/arm/mach-davinci/da830.c              | 70 ++++++++++++++++++++--
+ arch/arm/mach-davinci/include/mach/da8xx.h |  1 +
+ 3 files changed, 67 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 14a6fc061744..74df37821abe 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -557,6 +557,8 @@ static __init void da830_evm_init(void)
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+ 	int ret;
+ 
++	da830_register_clocks();
++
+ 	ret = da830_register_gpio();
+ 	if (ret)
+ 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 0b17e5a22e5e..8a79e245db1f 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -8,23 +8,27 @@
+  * is licensed "as is" without any warranty of any kind, whether express
+  * or implied.
   */
--
- struct scmi_xfer {
--	void *con_priv;
- 	struct scmi_msg_hdr hdr;
- 	struct scmi_msg tx;
- 	struct scmi_msg rx;
++#include <linux/clk-provider.h>
++#include <linux/clk/davinci.h>
+ #include <linux/gpio.h>
+ #include <linux/init.h>
+-#include <linux/clk.h>
+ #include <linux/platform_data/gpio-davinci.h>
+ 
+ #include <asm/mach/map.h>
+ 
+-#include "psc.h"
+-#include <mach/irqs.h>
+-#include <mach/cputype.h>
+ #include <mach/common.h>
+-#include <mach/time.h>
++#include <mach/cputype.h>
+ #include <mach/da8xx.h>
++#include <mach/irqs.h>
++#include <mach/time.h>
+ 
+-#include "clock.h"
+ #include "mux.h"
+ 
++#ifndef CONFIG_COMMON_CLK
++#include "clock.h"
++#include "psc.h"
++#endif
++
+ /* Offsets of the 8 compare registers on the da830 */
+ #define DA830_CMP12_0		0x60
+ #define DA830_CMP12_1		0x64
+@@ -37,6 +41,7 @@
+ 
+ #define DA830_REF_FREQ		24000000
+ 
++#ifndef CONFIG_COMMON_CLK
+ static struct pll_data pll0_data = {
+ 	.num		= 1,
+ 	.phys_base	= DA8XX_PLL0_BASE,
+@@ -432,6 +437,7 @@ static struct clk_lookup da830_clks[] = {
+ 	CLK(NULL,		"rmii",		&rmii_clk),
+ 	CLK(NULL,		NULL,		NULL),
+ };
++#endif
+ 
+ /*
+  * Device specific mux setup
+@@ -1223,6 +1229,58 @@ void __init da830_init(void)
+ 
+ void __init da830_init_time(void)
+ {
++#ifdef CONFIG_COMMON_CLK
++	void __iomem *pll;
++	struct clk *clk;
++
++	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DA830_REF_FREQ);
++
++	pll = ioremap(DA8XX_PLL0_BASE, SZ_4K);
++
++	da830_pll_init(NULL, pll, NULL);
++
++	clk = clk_get(NULL, "timer0");
++
++	davinci_timer_init(clk);
++#else
+ 	davinci_clk_init(da830_clks);
+ 	davinci_timer_init(&timerp64_0_clk);
++#endif
++}
++
++static struct resource da830_psc0_resources[] = {
++	{
++		.start	= DA8XX_PSC0_BASE,
++		.end	= DA8XX_PSC0_BASE + SZ_4K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device da830_psc0_device = {
++	.name		= "da830-psc0",
++	.id		= -1,
++	.resource	= da830_psc0_resources,
++	.num_resources	= ARRAY_SIZE(da830_psc0_resources),
++};
++
++static struct resource da830_psc1_resources[] = {
++	{
++		.start	= DA8XX_PSC1_BASE,
++		.end	= DA8XX_PSC1_BASE + SZ_4K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device da830_psc1_device = {
++	.name		= "da830-psc1",
++	.id		= -1,
++	.resource	= da830_psc1_resources,
++	.num_resources	= ARRAY_SIZE(da830_psc1_resources),
++};
++
++void __init da830_register_clocks(void)
++{
++	/* PLL is registered in da830_init_time() */
++	platform_device_register(&da830_psc0_device);
++	platform_device_register(&da830_psc1_device);
+ }
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index 9fd6d0125762..64861ac6a9d4 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -89,6 +89,7 @@ extern unsigned int da850_max_speed;
+ 
+ void da830_init(void);
+ void da830_init_time(void);
++void da830_register_clocks(void);
+ 
+ void da850_init(void);
+ void da850_init_time(void);
 -- 
-2.7.4
+2.17.0
