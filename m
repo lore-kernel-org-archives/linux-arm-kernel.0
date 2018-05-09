@@ -1,86 +1,38 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Wed, 09 May 2018 10:21:34 +0800
-Subject: [RESEND PATCH] pinctrl: rockchip: Disable interrupt when changing
- it's capability
-In-Reply-To: <CAD=FV=W_v+aoNT09k-2exVABTFzOp0heY-XWcLi95uPisZhiGQ@mail.gmail.com>
-References: <20180503065553.7762-1-jeffy.chen@rock-chips.com>
- <20180507221511.GA6448@rodete-desktop-imager.corp.google.com>
- <5AF0FF18.1050905@rock-chips.com>
- <20180508015623.GA61455@rodete-desktop-imager.corp.google.com>
- <CAD=FV=W_v+aoNT09k-2exVABTFzOp0heY-XWcLi95uPisZhiGQ@mail.gmail.com>
-Message-ID: <5AF25B2E.8080901@rock-chips.com>
+From: bgoswami@codeaurora.org (Banajit Goswami)
+Date: Tue, 8 May 2018 19:40:48 -0700
+Subject: [PATCH v7 09/24] ASoC: qdsp6: q6afe: Add q6afe driver
+In-Reply-To: <20180501120820.11016-10-srinivas.kandagatla@linaro.org>
+References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
+ <20180501120820.11016-10-srinivas.kandagatla@linaro.org>
+Message-ID: <d7aed12f-78d4-8528-bfab-3fc87a94e557@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
 
-On 05/09/2018 03:46 AM, Doug Anderson wrote:
-> One note is that in the case Brian points at (where we need to
-> simulate EDGE_BOTH by swapping edges) we purposely ignored the TRM and
-> we needed to do that to avoid losing interrupts.  For details, see
-> commit 53b1bfc76df2 ("pinctrl: rockchip: Avoid losing interrupts when
-> supporting both edges").  We did this because:
+On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
+> This patch adds support to Q6AFE (Audio Front End) module on Q6DSP.
 >
-> 1. We believed that the IP block in Rockchip SoCs has nearly the same
-> logic as "gpio-dwapb.c" and that's what "gpio-dwapb.c" did.
+> AFE module sits right at the other end of cpu where the codec/audio
+> devices are connected.
 >
-
-hmm, but i saw the gpio-dwapb.c actually toggle trigger after handle 
-irq, which might avoid the race Brian mentioned:
-+               generic_handle_irq(gpio_irq);
-+               irq_status &= ~BIT(hwirq);
-+
-+               if ((irq_get_trigger_type(gpio_irq) & IRQ_TYPE_SENSE_MASK)
-+                       == IRQ_TYPE_EDGE_BOTH)
-+                       dwapb_toggle_trigger(gpio, hwirq);
-
-
-and i also saw ./qcom/pinctrl-msm.c do the 
-toggle(msm_gpio_update_dual_edge_pos) at the end of 
-msm_gpio_irq_set_type and msm_gpio_irq_ack, that seems can avoid the 
-polarity races too.
-
-> 2. We were actually losing real interrupts and this was the only way
-> we could figure out how to fix it.
+> AFE provides abstraced interfaces to both hardware and virtual devices.
+> Each AFE tx/rx port can be configured to connect to one of the hardware
+> devices like codec, hdmi, slimbus, i2s and so on. AFE services include
+> starting, stopping, and if needed, any configurations of the ports.
 >
-> When I tested that back in the day I was fairly convinced that we
-> weren't losing any interrupts in the EDGE_BOTH case after my fix, but
-> I certainly could have messed up.
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
+> ---
+>   sound/soc/qcom/Kconfig        |   4 +
+>   sound/soc/qcom/qdsp6/Makefile |   1 +
+>   sound/soc/qcom/qdsp6/q6afe.c  | 536 ++++++++++++++++++++++++++++++++++++++++++
+>   sound/soc/qcom/qdsp6/q6afe.h  |  35 +++
+>   4 files changed, 576 insertions(+)
+>   create mode 100644 sound/soc/qcom/qdsp6/q6afe.c
+>   create mode 100644 sound/soc/qcom/qdsp6/q6afe.h
 >
->
-> For the EDGE_BOTH case it was important not to lose an interrupt
-> because, as you guys are talking about, we could end up configured the
-> wrong way.  I think in your case where you're just picking one
-> polarity losing an interrupt shouldn't matter since it's undefined
-> exactly if an edge happens while you're in the middle of executing
-> rockchip_irq_set_type().  Is that right?
+Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
 
-right, so we now have 2 cases: rockchip_irq_demux/ rockchip_irq_set_type
-
-if i'm right about the spurious irq(only happen when set rising for a 
-high gpio, or set falling for a low gpio), then:
-
-1/ rockchip_irq_demux
-it's important to not losing irqs in this case, maybe we can
-
-a) ack irq
-b) update polarity for edge both irq
-
-we don't need to disable irq in b), since we would not hit the spurious 
-irq cases here(always check gpio level to toggle it)
-
-
-2/ rockchip_irq_set_type
-it's important to not having spurious irqs
-
-so we can disable irq during changing polarity only in these case:
-((rising && gpio is heigh) || (falling && gpio is low))
-
-i'm still confirming the spurious irq with IC guys.
-
->
->
-> -Doug
->
->
->
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
