@@ -1,161 +1,167 @@
-From: chenyao11@huawei.com (Yao Chen)
-Date: Wed, 9 May 2018 14:28:52 +0800
-Subject: [PATCH] Kirin-PCIe: Add kirin pcie msi feature.
-In-Reply-To: <20180508125658.GK161390@bhelgaas-glaptop.roam.corp.google.com>
-References: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
- <20180508125658.GK161390@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <a9f05f3d-9c5c-472b-73be-f37c41bd71be@huawei.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Wed, 09 May 2018 14:41:28 +0800
+Subject: [RESEND PATCH] pinctrl: rockchip: Disable interrupt when changing
+ it's capability
+In-Reply-To: <CAD=FV=WZ+2MNbe341M7OQD11+RxaJuzdM6zMnXYB4dka74K1hQ@mail.gmail.com>
+References: <20180503065553.7762-1-jeffy.chen@rock-chips.com>
+ <20180507221511.GA6448@rodete-desktop-imager.corp.google.com>
+ <5AF0FF18.1050905@rock-chips.com>
+ <20180508015623.GA61455@rodete-desktop-imager.corp.google.com>
+ <CAD=FV=W_v+aoNT09k-2exVABTFzOp0heY-XWcLi95uPisZhiGQ@mail.gmail.com>
+ <5AF25B2E.8080901@rock-chips.com>
+ <CAD=FV=WZ+2MNbe341M7OQD11+RxaJuzdM6zMnXYB4dka74K1hQ@mail.gmail.com>
+Message-ID: <5AF29818.2010705@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Doug,
+
+Thanks for your reply :)
+
+On 05/09/2018 01:18 PM, Doug Anderson wrote:
+>> >
+>> >
+>> >right, so we now have 2 cases: rockchip_irq_demux/ rockchip_irq_set_type
+>> >
+>> >if i'm right about the spurious irq(only happen when set rising for a high
+>> >gpio, or set falling for a low gpio), then:
+>> >
+>> >1/ rockchip_irq_demux
+>> >it's important to not losing irqs in this case, maybe we can
+>> >
+>> >a) ack irq
+>> >b) update polarity for edge both irq
+>> >
+>> >we don't need to disable irq in b), since we would not hit the spurious irq
+>> >cases here(always check gpio level to toggle it)
+> Unless you have some sort of proof that rockchip_irq_demux(), I would
+> take it as an example of something that works.  I remember stress
+> testing the heck out of it.  Do you have some evidence that it's not
+> working?  I think Brian was simply speculating that there might be a
+> race here, but I don't think anyone has shown it have they?  Looking
+> back at my notes, the thing I really made sure to stress was that we
+> never got into a situation where we were losing an edge (AKA we were
+> never configured to look for a falling edge when the line was already
+> low).  I'm not sure I confirmed that we never got an extra interrupt.
+>
+> I'm at home right now and I can't add prints and poke at things, but
+> as I understand it for edge interrupts the usual flow to make sure
+> interrupts aren't ever lost is:
+>
+> 1. See that the interrupt went off
+> 2. Ack it (clear it)
+> 3. Call the interrupt handler
+>
+> ...presumably in this case rockchip_irq_demux() is called after step
+> #2 (but I don't know if it's called before or after step #3).  If the
+> line is toggling like crazy while the 3 steps are going on, it's OK if
+> the interrupt handler is called more than once.  In general this could
+> be considered expected.  That's why you Ack before handling--any extra
+> edges that come in any time after the interrupt handler starts (even
+> after the very first instruction) need to cause the interrupt handler
+> to get called again.
+>
+> This is different than Brian's understanding since he seemed to think
+> the Ack was happening later.  If you're in front of something where
+> you can add printouts, maybe you can tell us.  I tried to look through
+> the code and it was too twisted for me to be sure.
+
+i think the current edge both irq flow for rk3399 would be:
+gic_handle_irq //irq-gic-v3.c
+   handle_domain_irq
+     rockchip_irq_demux //pinctrl-rockchip.c
+       toggle polarity
+       generic_handle_irq
+         handle_edge_irq //kernel/irq
+           irq_ack
+           handle_irq_event
+             action->handler
+
+so i think the race might actually exist (maybe we can add some delay 
+after toggle polarity to confirm)
 
 
-On 2018/5/8 20:56, Bjorn Helgaas wrote:
-> [+cc Stanimir, Jianguo, Shawn for qcom, histb comments below]
-> 
-> On Tue, May 08, 2018 at 03:03:48PM +0800, Yao Chen wrote:
->> This patch adds kirin pcie msi feature.
-> 
-> Thanks for the patch!  Please update your subject and changelog like this:
-> 
->   PCI: kirin: Add MSI support
-> 
->   Add support for MSI.
-> 
-> You can figure out what style to use for the subject by running:
-> 
->   git log --oneline drivers/pci/dwc/pcie-kirin.c
-> 
-> Then follow the existing style.
-> 
+BTW, checking other drivers, there're quite a few using this kind of 
+toggle edge for edge both, and they go different ways:
 
-Ok, I will update the style of subject and changelog.
+1/ toggle it in ack():
+mediatek/pinctrl-mtk-common.c
+gpio-ingenic.c
+gpio-ep93xx.c
 
->> Signed-off-by: Yao Chen <chenyao11@huawei.com>
->> ---
->>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi |  2 ++
->>  drivers/pci/dwc/pcie-kirin.c              | 38 +++++++++++++++++++++++++++++++
->>  2 files changed, 40 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->> index ec3eb8e..4ef684f 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->> @@ -872,6 +872,8 @@
->>  				  0x0 0x02000000>;
->>  			num-lanes = <1>;
->>  			#interrupt-cells = <1>;
->> +			interrupts = <0 283 4>;
->> +			interrupts-names = "msi";
->>  			interrupt-map-mask = <0xf800 0 0 7>;
->>  			interrupt-map = <0x0 0 0 1
->>  					 &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
->> diff --git a/drivers/pci/dwc/pcie-kirin.c b/drivers/pci/dwc/pcie-kirin.c
->> index d2970a0..2319c9c 100644
->> --- a/drivers/pci/dwc/pcie-kirin.c
->> +++ b/drivers/pci/dwc/pcie-kirin.c
->> @@ -426,9 +426,28 @@ static int kirin_pcie_establish_link(struct pcie_port *pp)
->>  	return 0;
->>  }
->>  
->> +static irqreturn_t kirin_pcie_msi_irq_handler(int irq, void *arg)
->> +{
->> +	struct pcie_port *pp = arg;
->> +
->> +	return dw_handle_msi_irq(pp);
->> +}
->> +
->> +static void kirin_pcie_msi_init(struct pcie_port *pp)
->> +{
->> +	dw_pcie_msi_init(pp);
->> +}
->> +
->> +static void kirin_pcie_enable_interrupts(struct pcie_port *pp)
->> +{
->> +	if (IS_ENABLED(CONFIG_PCI_MSI))
->> +		kirin_pcie_msi_init(pp);
->> +}
->> +
->>  static int kirin_pcie_host_init(struct pcie_port *pp)
->>  {
->>  	kirin_pcie_establish_link(pp);
->> +	kirin_pcie_enable_interrupts(pp);
->>  
->>  	return 0;
->>  }
->> @@ -448,6 +467,25 @@ static int kirin_pcie_host_init(struct pcie_port *pp)
->>  static int __init kirin_add_pcie_port(struct dw_pcie *pci,
->>  				      struct platform_device *pdev)
->>  {
->> +	int ret;
->> +
->> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
->> +		pci->pp.msi_irq = platform_get_irq(pdev, 0);
->> +		if (!pci->pp.msi_irq) {
->> +			dev_err(&pdev->dev, "failed to get msi irq\n");
-> 
-> s/msi irq/MSI IRQ/
-> 
->> +			return -ENODEV;
->> +		}
->> +		ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
->> +				       kirin_pcie_msi_irq_handler,
->> +				       IRQF_SHARED | IRQF_NO_THREAD,
->> +				       "kirin_pcie_msi", &pci->pp);
->> +		if (ret) {
->> +			dev_err(&pdev->dev, "failed to request msi irq\n");
-> 
-> s/msi irq/MSI IRQ/
-> Also, please include the IRQ number (pci->pp.msi_irq) in the message.
-> 
-Ok, I will add msi_irq message.
+2/ toggle it before handle_irq:
+pinctrl-rockchip.c
+pinctrl-armada-37xx.c
+gpio-ath79.c
+gpio-mxs.c
+gpio-omap.c
+gpio-mvebu.c
 
->> +			return ret;
->> +		}
->> +	}
->> +
->> +	pci->pp.root_bus_nr = -1;
-> 
-> Setting root_bus_nr looks like an unrelated change that should be in a
-> separate patch.
-> 
-> But I'm not sure why you need to set root_bus_nr at all, since
-> dw_pcie_host_init() always sets it.
-> 
-> Some other callers of dw_pcie_host_init() do set it:
-> 
->   exynos_add_pcie_port()
->   imx6_add_pcie_port()
->   armada8k_add_pcie_port()
->   artpec6_add_pcie_port()
->   dw_plat_add_pcie_port()
->   histb_pcie_probe()
->   qcom_pcie_probe()
->   spear13xx_add_pcie_port()
-> 
-> But I don't see *why* any of these need to set it.  If they don't need to
-> set it, they shouldn't.
-> 
-> And it would be nice if histb and qcom followed the structure and naming
-> conventions of the other drivers, i.e., they should have
-> histb_add_pcie_port() and qcom_add_pcie_port().
-> 
+3/ toggle it after handle_irq:
+gpio-dwapb.c
+gpio-pmic-eic-sprd.c
 
-You're right, "pci->pp.root_bus_nr = -1;" is truly unnecessary. I will delete it.
 
->>  	pci->pp.ops = &kirin_pcie_host_ops;
->>  
->>  	return dw_pcie_host_init(&pci->pp);
->> -- 
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> .
-> 
-Thanks,
-Yao
+would it make sense to support this kind of emulate edge both irq in 
+some core codes?
+
+>
+>
+>> >2/ rockchip_irq_set_type
+>> >it's important to not having spurious irqs
+>> >
+>> >so we can disable irq during changing polarity only in these case:
+>> >((rising && gpio is heigh) || (falling && gpio is low))
+>> >
+>> >i'm still confirming the spurious irq with IC guys.
+> Hmmm, thinking about all this more, I'm curious how callers expect
+> this to work.  Certainly things are undefined if you have the
+> following situation:
+>
+> Start: rising edge trigger, line is actually high
+> Request: change to falling edge trigger
+> Line falls during the request
+>
+> In that case it's OK to throw the interrupt away because it can be
+> argued that the line could have fallen before the request actually
+> took place.  ...but it seems like there could be situations where the
+> user wouldn't expect interrupts to be thrown away by a call to
+> irq_set_type().  In other words:
+>
+> Start: rising edge trigger, line is actually high
+> Request: change to falling edge trigger
+> Line falls, rises, and falls during the request
+>
+> ...in that case you'd expect that some sort of interrupt would have
+> gone off and not be thrown away.  No matter what instant in time the
+> request actually took place it should have caught an edge, right?
+>
+>
+> Said another way: As a client of irq_set_type() I'd expect it to not
+> throw away interrupts, but I'd expect that the change in type would be
+> atomic.  That is: if the interrupt came in before the type change in
+> type applied then it should trigger with the old rules.  If the
+> interrupt came in after the type change then it should trigger with
+> the new rules.
+>
+>
+> I would be tempted to confirm your testing and just clear the spurious
+> interrupts that you're aware of.  AKA: if there's no interrupt pending
+> and you change the type to "IRQ_TYPE_EDGE_RISING" or
+> "IRQ_TYPE_EDGE_FALLING" then you should clear the interrupt.  It's
+> still racy, but I guess it's the best you can do unless IC guys come
+> up with something better.
+>
+
+hmmm, right, clear the spurious irq seems to be a better way, will try 
+to do it in the next version.
+>
+>
+> Anyway, it's past my bedtime.  Hopefully some of the above made sense.
+> I'm sure you'll tell me if it didn't or if I said something
+> stupid/wrong.:-P
+>
+> -Doug
+>
+>
+>
