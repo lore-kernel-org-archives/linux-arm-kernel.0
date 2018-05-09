@@ -1,120 +1,77 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 9 May 2018 18:08:33 +0100
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 May 2018 17:17:28 +0100
 Subject: [PATCH v7 02/16] arm64: Use update{,_tsk}_thread_flag()
-In-Reply-To: <f444acee-b558-7dbb-97bd-bbf716b20ebd@arm.com>
+In-Reply-To: <1525882385-29181-3-git-send-email-Dave.Martin@arm.com>
 References: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
  <1525882385-29181-3-git-send-email-Dave.Martin@arm.com>
- <20180509161728.GC26671@arm.com>
- <20180509162753.GP7753@e103592.cambridge.arm.com>
- <f444acee-b558-7dbb-97bd-bbf716b20ebd@arm.com>
-Message-ID: <20180509170833.GS7753@e103592.cambridge.arm.com>
+Message-ID: <20180509161728.GC26671@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 05:55:51PM +0100, Marc Zyngier wrote:
-> On 09/05/18 17:27, Dave Martin wrote:
-> > On Wed, May 09, 2018 at 05:17:28PM +0100, Will Deacon wrote:
-> >> Hi Dave,
-> >>
-> >> On Wed, May 09, 2018 at 05:12:51PM +0100, Dave Martin wrote:
-> >>> This patch uses the new update_thread_flag() helpers to simplify a
-> >>> couple of if () set; else clear; constructs.
-> >>>
-> >>> No functional change.
-> >>>
-> >>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> >>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >>> Cc: Will Deacon <will.deacon@arm.com>
-> >>> ---
-> >>>  arch/arm64/kernel/fpsimd.c | 19 +++++++------------
-> >>>  1 file changed, 7 insertions(+), 12 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> >>> index 87a3536..0c4e7e0 100644
-> >>> --- a/arch/arm64/kernel/fpsimd.c
-> >>> +++ b/arch/arm64/kernel/fpsimd.c
-> > 
-> > [...]
-> > 
-> >>> @@ -902,7 +900,7 @@ void fpsimd_thread_switch(struct task_struct *next)
-> >>>  	if (current->mm)
-> >>>  		task_fpsimd_save();
-> >>>  
-> >>> -	if (next->mm) {
-> >>> +	if (next->mm)
-> >>>  		/*
-> >>>  		 * If we are switching to a task whose most recent userland
-> >>>  		 * FPSIMD state is already in the registers of *this* cpu,
-> >>> @@ -910,13 +908,10 @@ void fpsimd_thread_switch(struct task_struct *next)
-> >>>  		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
-> >>>  		 * upon the next return to userland.
-> >>>  		 */
-> >>> -		if (__this_cpu_read(fpsimd_last_state.st) ==
-> >>> -			&next->thread.uw.fpsimd_state
-> >>> -		    && next->thread.fpsimd_cpu == smp_processor_id())
-> >>> -			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
-> >>> -		else
-> >>> -			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
-> >>> -	}
-> >>> +		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
-> >>> +			__this_cpu_read(fpsimd_last_state.st) !=
-> >>> +				&next->thread.uw.fpsimd_state ||
-> >>> +			next->thread.fpsimd_cpu != smp_processor_id());
-> >>
-> >> Given the multi-line comment and this multi-line call, I'd be inclined to
-> >> leave the curlies in place and then use a local bool for the complex
-> >> condition.
-> > 
-> > Hey, curlies cost money, you know.
-> > 
-> >> With that:
-> >>
-> >> Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > Are you content to see this merged without the change?  It doesn't seem
-> > worth a respin of the whole series just for this.  I agree the code
-> > would be clearer, but this patch doesn't actually make it worse IMHO.
-> > 
-> > If I respin for some reason though, I can address this and add your Ack.
+Hi Dave,
+
+On Wed, May 09, 2018 at 05:12:51PM +0100, Dave Martin wrote:
+> This patch uses the new update_thread_flag() helpers to simplify a
+> couple of if () set; else clear; constructs.
 > 
-> I'm happy to perform the change myself when applying the series if there
-> is no additional comment that would lead to a respin.
+> No functional change.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/fpsimd.c | 19 +++++++------------
+>  1 file changed, 7 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 87a3536..0c4e7e0 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -618,10 +618,8 @@ int sve_set_vector_length(struct task_struct *task,
+>  	task->thread.sve_vl = vl;
+>  
+>  out:
+> -	if (flags & PR_SVE_VL_INHERIT)
+> -		set_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
+> -	else
+> -		clear_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
+> +	update_tsk_thread_flag(task, TIF_SVE_VL_INHERIT,
+> +			       flags & PR_SVE_VL_INHERIT);
+>  
+>  	return 0;
+>  }
+> @@ -902,7 +900,7 @@ void fpsimd_thread_switch(struct task_struct *next)
+>  	if (current->mm)
+>  		task_fpsimd_save();
+>  
+> -	if (next->mm) {
+> +	if (next->mm)
+>  		/*
+>  		 * If we are switching to a task whose most recent userland
+>  		 * FPSIMD state is already in the registers of *this* cpu,
+> @@ -910,13 +908,10 @@ void fpsimd_thread_switch(struct task_struct *next)
+>  		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
+>  		 * upon the next return to userland.
+>  		 */
+> -		if (__this_cpu_read(fpsimd_last_state.st) ==
+> -			&next->thread.uw.fpsimd_state
+> -		    && next->thread.fpsimd_cpu == smp_processor_id())
+> -			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+> -		else
+> -			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+> -	}
+> +		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
+> +			__this_cpu_read(fpsimd_last_state.st) !=
+> +				&next->thread.uw.fpsimd_state ||
+> +			next->thread.fpsimd_cpu != smp_processor_id());
 
-OK, feel free to apply the following if it looks good for you.
+Given the multi-line comment and this multi-line call, I'd be inclined to
+leave the curlies in place and then use a local bool for the complex
+condition.
 
-Cheers
----Dave
+With that:
 
---8<--
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 32898a8..b0d29b7 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -906,7 +906,7 @@ void fpsimd_thread_switch(struct task_struct *next)
- 	if (current->mm)
- 		fpsimd_save();
- 
--	if (next->mm)
-+	if (next->mm) {
- 		/*
- 		 * If we are switching to a task whose most recent userland
- 		 * FPSIMD state is already in the registers of *this* cpu,
-@@ -914,10 +914,13 @@ void fpsimd_thread_switch(struct task_struct *next)
- 		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
- 		 * upon the next return to userland.
- 		 */
-+		bool wrong_task = __this_cpu_read(fpsimd_last_state.st) !=
-+					&next->thread.uw.fpsimd_state;
-+		bool wrong_cpu = next->thread.fpsimd_cpu != smp_processor_id();
-+
- 		update_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE,
--			__this_cpu_read(fpsimd_last_state.st) !=
--				&next->thread.uw.fpsimd_state ||
--			next->thread.fpsimd_cpu != smp_processor_id());
-+				       wrong_task || wrong_cpu);
-+	}
- }
- 
- void fpsimd_flush_thread(void)
+Will
