@@ -1,167 +1,121 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 8 May 2018 22:18:18 -0700
-Subject: [RESEND PATCH] pinctrl: rockchip: Disable interrupt when changing
- it's capability
-In-Reply-To: <5AF25B2E.8080901@rock-chips.com>
-References: <20180503065553.7762-1-jeffy.chen@rock-chips.com>
- <20180507221511.GA6448@rodete-desktop-imager.corp.google.com>
- <5AF0FF18.1050905@rock-chips.com>
- <20180508015623.GA61455@rodete-desktop-imager.corp.google.com>
- <CAD=FV=W_v+aoNT09k-2exVABTFzOp0heY-XWcLi95uPisZhiGQ@mail.gmail.com>
- <5AF25B2E.8080901@rock-chips.com>
-Message-ID: <CAD=FV=WZ+2MNbe341M7OQD11+RxaJuzdM6zMnXYB4dka74K1hQ@mail.gmail.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Tue, 8 May 2018 23:01:12 -0700
+Subject: [PATCH 3/4] coresight: allow to build as modules
+In-Reply-To: <20180508153756.09f6fa8066bc23a0d11ec670@arm.com>
+References: <20180508140650.c070e6aa0eb1a6690e6d9607@arm.com>
+ <f299d0be-f1a6-46ca-3d8a-13d7d89a007d@infradead.org>
+ <20180508153756.09f6fa8066bc23a0d11ec670@arm.com>
+Message-ID: <3826d737-c180-7b9e-8013-be54f6d7302d@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/08/2018 01:37 PM, Kim Phillips wrote:
+> On Tue, 8 May 2018 12:31:08 -0700
+> Randy Dunlap <rdunlap@infradead.org> wrote:
+> 
+>> Hi,
+> 
+> Hi,
 
-On Tue, May 8, 2018 at 7:21 PM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
-> Hi Doug,
->
-> On 05/09/2018 03:46 AM, Doug Anderson wrote:
+>>> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+>>> index 3ffc9feb2d64..8c49c7b82d84 100644
+>>> --- a/drivers/hwtracing/coresight/coresight-etm-perf.h
+>>> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+>>> @@ -54,7 +54,7 @@ struct etm_filters {
+>>>  };
+>>>  
+>>>  
+>>> -#ifdef CONFIG_CORESIGHT
+>>> +#if IS_ENABLED(CONFIG_CORESIGHT)
 >>
->> One note is that in the case Brian points at (where we need to
->> simulate EDGE_BOTH by swapping edges) we purposely ignored the TRM and
->> we needed to do that to avoid losing interrupts.  For details, see
->> commit 53b1bfc76df2 ("pinctrl: rockchip: Avoid losing interrupts when
->> supporting both edges").  We did this because:
+>> Have you found (observed) that this change (above) is necessary (and others
+>> like it below)?  I thought that they would be equivalent.
 >>
->> 1. We believed that the IP block in Rockchip SoCs has nearly the same
->> logic as "gpio-dwapb.c" and that's what "gpio-dwapb.c" did.
->>
->
-> hmm, but i saw the gpio-dwapb.c actually toggle trigger after handle irq,
-> which might avoid the race Brian mentioned:
-> +               generic_handle_irq(gpio_irq);
-> +               irq_status &= ~BIT(hwirq);
-> +
-> +               if ((irq_get_trigger_type(gpio_irq) & IRQ_TYPE_SENSE_MASK)
-> +                       == IRQ_TYPE_EDGE_BOTH)
-> +                       dwapb_toggle_trigger(gpio, hwirq);
-
-The code you point at in dwapb_toggle_trigger() specifically is an
-example of toggling the polarity _without_ disabling the interrupt in
-between.  We took this as "working" code and as proof that it was OK
-to change polarity without disabling the interrupt in-between.
-
-
-> and i also saw ./qcom/pinctrl-msm.c do the
-> toggle(msm_gpio_update_dual_edge_pos) at the end of msm_gpio_irq_set_type
-> and msm_gpio_irq_ack, that seems can avoid the polarity races too.
->
->> 2. We were actually losing real interrupts and this was the only way
->> we could figure out how to fix it.
->>
->> When I tested that back in the day I was fairly convinced that we
->> weren't losing any interrupts in the EDGE_BOTH case after my fix, but
->> I certainly could have messed up.
+>> From include/linux/kconfig.h:
+>> /*
+>>  * IS_ENABLED(CONFIG_FOO) evaluates to 1 if CONFIG_FOO is set to 'y' or 'm',
+>>  * 0 otherwise.
+>>  */
+>> #define IS_ENABLED(option) __or(IS_BUILTIN(option), IS_MODULE(option))
 >>
 >>
->> For the EDGE_BOTH case it was important not to lose an interrupt
->> because, as you guys are talking about, we could end up configured the
->> wrong way.  I think in your case where you're just picking one
->> polarity losing an interrupt shouldn't matter since it's undefined
->> exactly if an edge happens while you're in the middle of executing
->> rockchip_irq_set_type().  Is that right?
->
->
-> right, so we now have 2 cases: rockchip_irq_demux/ rockchip_irq_set_type
->
-> if i'm right about the spurious irq(only happen when set rising for a high
-> gpio, or set falling for a low gpio), then:
->
-> 1/ rockchip_irq_demux
-> it's important to not losing irqs in this case, maybe we can
->
-> a) ack irq
-> b) update polarity for edge both irq
->
-> we don't need to disable irq in b), since we would not hit the spurious irq
-> cases here(always check gpio level to toggle it)
+>>
+>>> diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+>>> index f1d0e21d8cab..335bca44b42d 100644
+>>> --- a/drivers/hwtracing/coresight/coresight-priv.h
+>>> +++ b/drivers/hwtracing/coresight/coresight-priv.h
+>>
+>>> @@ -143,7 +149,7 @@ struct list_head *coresight_build_path(struct coresight_device *csdev,
+>>>  				       struct coresight_device *sink);
+>>>  void coresight_release_path(struct list_head *path);
+>>>  
+>>> -#ifdef CONFIG_CORESIGHT_SOURCE_ETM3X
+>>> +#if IS_ENABLED(CONFIG_CORESIGHT_SOURCE_ETM3X)
+>>
+>> ditto.
+>>
+>>>  extern int etm_readl_cp14(u32 off, unsigned int *val);
+>>>  extern int etm_writel_cp14(u32 off, u32 val);
+>>>  #else
+>>
+>>> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+>>> index d950dad5056a..5863eb1a7335 100644
+>>> --- a/include/linux/coresight.h
+>>> +++ b/include/linux/coresight.h
+>>> @@ -243,7 +243,7 @@ struct coresight_ops {
+>>>  	const struct coresight_ops_source *source_ops;
+>>>  };
+>>>  
+>>> -#ifdef CONFIG_CORESIGHT
+>>> +#if IS_ENABLED(CONFIG_CORESIGHT)
+>>
+>> ditto.
+> 
+> If I revert all three IS_ENABLED back to plain #ifdefs, and rebuild with
+> CONFIG_CORESIGHT*=m, I get:
+> 
 
-Unless you have some sort of proof that rockchip_irq_demux(), I would
-take it as an example of something that works.  I remember stress
-testing the heck out of it.  Do you have some evidence that it's not
-working?  I think Brian was simply speculating that there might be a
-race here, but I don't think anyone has shown it have they?  Looking
-back at my notes, the thing I really made sure to stress was that we
-never got into a situation where we were losing an edge (AKA we were
-never configured to look for a falling edge when the line was already
-low).  I'm not sure I confirmed that we never got an extra interrupt.
+[build errors deleted]
 
-I'm at home right now and I can't add prints and poke at things, but
-as I understand it for edge interrupts the usual flow to make sure
-interrupts aren't ever lost is:
+> 
+> Building CORESIGHT=y builds ok, so, building it as a module causes the
+> latter stubs to be compiled:
+> 
+> #ifdef CONFIG_CORESIGHT
+> extern struct coresight_device *
+> coresight_register(struct coresight_desc *desc);
+> extern void coresight_unregister(struct coresight_device *csdev);
+> extern int coresight_enable(struct coresight_device *csdev);
+> extern void coresight_disable(struct coresight_device *csdev);
+> extern int coresight_timeout(void __iomem *addr, u32 offset,
+>                              int position, int value);
+> #else
+> static inline struct coresight_device *
+> coresight_register(struct coresight_desc *desc) { return NULL; }
+> static inline void coresight_unregister(struct coresight_device *csdev) {}
+> static inline int
+> coresight_enable(struct coresight_device *csdev) { return -ENOSYS; }
+> static inline void coresight_disable(struct coresight_device *csdev) {}
+> static inline int coresight_timeout(void __iomem *addr, u32 offset,
+>                                      int position, int value) { return 1; }
+> #endif
+> 
+> Adding kconfig.h to coresight.h's #include list doesn't help.  So we
+> need the IS_ENABLED for its __or(..., IS_MODULE()) case.
 
-1. See that the interrupt went off
-2. Ack it (clear it)
-3. Call the interrupt handler
+<linux/kconfig.h> is automatically #included by the top-level Makefile,
+so adding it again would not help any. ;)
 
-...presumably in this case rockchip_irq_demux() is called after step
-#2 (but I don't know if it's called before or after step #3).  If the
-line is toggling like crazy while the 3 steps are going on, it's OK if
-the interrupt handler is called more than once.  In general this could
-be considered expected.  That's why you Ack before handling--any extra
-edges that come in any time after the interrupt handler starts (even
-after the very first instruction) need to cause the interrupt handler
-to get called again.
+> That being said, I don't know of any outside kernel-build dependencies
+> coresight.h might have.
 
-This is different than Brian's understanding since he seemed to think
-the Ack was happening later.  If you're in front of something where
-you can add printouts, maybe you can tell us.  I tried to look through
-the code and it was too twisted for me to be sure.
+OK, using
+#if IS_ENABLED(CONFIG_CORESIGHT)
+is fine.  This is just the current/modern way of saying:
+#if defined(CONFIG_CORESIGHT) || defined(CONFIG_CORESIGHT_MODULE)
 
+There are several hundred instances of that latter form in the kernel tree.
 
-> 2/ rockchip_irq_set_type
-> it's important to not having spurious irqs
->
-> so we can disable irq during changing polarity only in these case:
-> ((rising && gpio is heigh) || (falling && gpio is low))
->
-> i'm still confirming the spurious irq with IC guys.
-
-Hmmm, thinking about all this more, I'm curious how callers expect
-this to work.  Certainly things are undefined if you have the
-following situation:
-
-Start: rising edge trigger, line is actually high
-Request: change to falling edge trigger
-Line falls during the request
-
-In that case it's OK to throw the interrupt away because it can be
-argued that the line could have fallen before the request actually
-took place.  ...but it seems like there could be situations where the
-user wouldn't expect interrupts to be thrown away by a call to
-irq_set_type().  In other words:
-
-Start: rising edge trigger, line is actually high
-Request: change to falling edge trigger
-Line falls, rises, and falls during the request
-
-...in that case you'd expect that some sort of interrupt would have
-gone off and not be thrown away.  No matter what instant in time the
-request actually took place it should have caught an edge, right?
-
-
-Said another way: As a client of irq_set_type() I'd expect it to not
-throw away interrupts, but I'd expect that the change in type would be
-atomic.  That is: if the interrupt came in before the type change in
-type applied then it should trigger with the old rules.  If the
-interrupt came in after the type change then it should trigger with
-the new rules.
-
-
-I would be tempted to confirm your testing and just clear the spurious
-interrupts that you're aware of.  AKA: if there's no interrupt pending
-and you change the type to "IRQ_TYPE_EDGE_RISING" or
-"IRQ_TYPE_EDGE_FALLING" then you should clear the interrupt.  It's
-still racy, but I guess it's the best you can do unless IC guys come
-up with something better.
-
-
-
-Anyway, it's past my bedtime.  Hopefully some of the above made sense.
-I'm sure you'll tell me if it didn't or if I said something
-stupid/wrong.  :-P
-
--Doug
+thanks,
+-- 
+~Randy
