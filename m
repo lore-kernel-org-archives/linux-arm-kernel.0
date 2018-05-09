@@ -1,17 +1,20 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed,  9 May 2018 12:25:54 -0500
-Subject: [PATCH v10 15/27] ARM: davinci: switch to common clock framework
+Date: Wed,  9 May 2018 12:25:47 -0500
+Subject: [PATCH v10 08/27] ARM: davinci: dm365: add new clock init using
+ common clock framework
 In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
 References: <20180509172606.29387-1-david@lechnology.com>
-Message-ID: <20180509172606.29387-16-david@lechnology.com>
+Message-ID: <20180509172606.29387-9-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches ARCH_DAVINCI to use the common clock framework. The legacy
-clock code in arch/arm/mach-davinci/ is no longer used. New drivers in
-drivers/clk/davinci/ are used instead.
+This adds the new board-specific clock init in mach-davinci/dm365.c
+using the new common clock framework drivers.
 
-A few macros had to be moved to prevent compilation errors.
+The #ifdefs are needed to prevent compile errors until the entire
+ARCH_DAVINCI is converted.
+
+Also clean up the #includes since we are adding some here.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
@@ -20,105 +23,156 @@ v10 changes:
 - none
 
 v9 changes:
-- none
+- register PLL1 and PSC in dm365_init_time() instead of as platform device so
+  that we get the correct timer0 clock for davinci_timer_init()
+- Fixed size of PLL memory block
 
 v8 changes:
 - none
 
 v7 changes:
-- s/compile/compilation and space instead of tab
-- add PM_GENERIC_DOMAINS dependencies
+- add clock platform device declarations
+- register platform devices instead of registering clocks directly
+- add davinci prefix to commit description
 
 v6 changes:
-- clean up indent on Common objects section
+- add blank lines between function calls
 
 
- arch/arm/Kconfig                | 5 ++++-
- arch/arm/mach-davinci/Makefile  | 4 ++--
- arch/arm/mach-davinci/clock.h   | 4 ----
- arch/arm/mach-davinci/davinci.h | 4 ++++
- arch/arm/mach-davinci/psc.h     | 2 --
- 5 files changed, 10 insertions(+), 9 deletions(-)
+ arch/arm/mach-davinci/board-dm365-evm.c |  2 +
+ arch/arm/mach-davinci/davinci.h         |  1 +
+ arch/arm/mach-davinci/dm365.c           | 56 +++++++++++++++++++------
+ 3 files changed, 47 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a7f8e7f4b88f..a57ad13810c8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -609,13 +609,16 @@ config ARCH_S3C24XX
- config ARCH_DAVINCI
- 	bool "TI DaVinci"
- 	select ARCH_HAS_HOLES_MEMORYMODEL
--	select CLKDEV_LOOKUP
-+	select COMMON_CLK
- 	select CPU_ARM926T
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_IRQ_CHIP
- 	select GPIOLIB
- 	select HAVE_IDE
-+	select PM_GENERIC_DOMAINS if PM
-+	select PM_GENERIC_DOMAINS_OF if PM && OF
-+	select RESET_CONTROLLER
- 	select USE_OF
- 	select ZONE_DMA
- 	help
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 4e8178050027..8725d8bea567 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -5,8 +5,8 @@
- #
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 435f7ec7d9af..307e88d99dd3 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -742,6 +742,8 @@ static __init void dm365_evm_init(void)
+ {
+ 	int ret;
  
- # Common objects
--obj-y 			:= time.o clock.o serial.o psc.o \
--			   usb.o common.o sram.o aemif.o
-+obj-y 					:= time.o serial.o usb.o \
-+					   common.o sram.o aemif.o
- 
- obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
- 
-diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
-index d7894d5aaa25..2d058568e004 100644
---- a/arch/arm/mach-davinci/clock.h
-+++ b/arch/arm/mach-davinci/clock.h
-@@ -12,10 +12,6 @@
- #ifndef __ARCH_ARM_DAVINCI_CLOCK_H
- #define __ARCH_ARM_DAVINCI_CLOCK_H
- 
--#define DAVINCI_PLL1_BASE 0x01c40800
--#define DAVINCI_PLL2_BASE 0x01c40c00
--#define MAX_PLL 2
--
- /* PLL/Reset register offsets */
- #define PLLCTL          0x100
- #define PLLCTL_PLLEN    BIT(0)
++	dm365_register_clocks();
++
+ 	ret = dm365_gpio_register();
+ 	if (ret)
+ 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
 diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
-index fa99197d36f9..db4c95ef4d5c 100644
+index c2c634b6578e..a799b5266d4b 100644
 --- a/arch/arm/mach-davinci/davinci.h
 +++ b/arch/arm/mach-davinci/davinci.h
-@@ -35,6 +35,10 @@
- #include <media/davinci/vpbe.h>
- #include <media/davinci/vpbe_osd.h>
- 
-+#define DAVINCI_PLL1_BASE		0x01c40800
-+#define DAVINCI_PLL2_BASE		0x01c40c00
-+#define DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01c41000
+@@ -94,6 +94,7 @@ int dm355_gpio_register(void);
+ /* DM365 function declarations */
+ void dm365_init(void);
+ void dm365_init_time(void);
++void dm365_register_clocks(void);
+ void dm365_init_asp(void);
+ void dm365_init_vc(void);
+ void dm365_init_ks(struct davinci_ks_platform_data *pdata);
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 871372a59da8..76de426a0e41 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -12,32 +12,38 @@
+  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/serial_8250.h>
+-#include <linux/platform_device.h>
 +
- #define DAVINCI_SYSTEM_MODULE_BASE	0x01c40000
- #define SYSMOD_VDAC_CONFIG		0x2c
- #define SYSMOD_VIDCLKCTL		0x38
-diff --git a/arch/arm/mach-davinci/psc.h b/arch/arm/mach-davinci/psc.h
-index 8af9f09fc10c..b58707cf7033 100644
---- a/arch/arm/mach-davinci/psc.h
-+++ b/arch/arm/mach-davinci/psc.h
-@@ -27,8 +27,6 @@
- #ifndef __ASM_ARCH_PSC_H
- #define __ASM_ARCH_PSC_H
++#include <linux/clk-provider.h>
++#include <linux/clk/davinci.h>
++#include <linux/clkdev.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+-#include <linux/spi/spi.h>
++#include <linux/init.h>
+ #include <linux/platform_data/edma.h>
+ #include <linux/platform_data/gpio-davinci.h>
+ #include <linux/platform_data/keyscan-davinci.h>
+ #include <linux/platform_data/spi-davinci.h>
++#include <linux/platform_device.h>
++#include <linux/serial_8250.h>
++#include <linux/spi/spi.h>
  
--#define	DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01C41000
+ #include <asm/mach/map.h>
+ 
++#include <mach/common.h>
+ #include <mach/cputype.h>
+-#include "psc.h"
+-#include <mach/mux.h>
+ #include <mach/irqs.h>
+-#include <mach/time.h>
++#include <mach/mux.h>
+ #include <mach/serial.h>
+-#include <mach/common.h>
++#include <mach/time.h>
+ 
++#include "asp.h"
+ #include "davinci.h"
+-#include "clock.h"
+ #include "mux.h"
+-#include "asp.h"
++
++#ifndef CONFIG_COMMON_CLK
++#include "clock.h"
++#include "psc.h"
++#endif
+ 
+ #define DM365_REF_FREQ		24000000	/* 24 MHz on the DM365 EVM */
+ #define DM365_RTC_BASE			0x01c69000
+@@ -54,6 +60,7 @@
+ #define DM365_EMAC_CNTRL_RAM_OFFSET	0x1000
+ #define DM365_EMAC_CNTRL_RAM_SIZE	0x2000
+ 
++#ifndef CONFIG_COMMON_CLK
+ static struct pll_data pll1_data = {
+ 	.num		= 1,
+ 	.phys_base	= DAVINCI_PLL1_BASE,
+@@ -485,7 +492,7 @@ static struct clk_lookup dm365_clks[] = {
+ 	CLK(NULL, "mjcp", &mjcp_clk),
+ 	CLK(NULL, NULL, NULL),
+ };
 -
- /* Power and Sleep Controller (PSC) Domains */
- #define DAVINCI_GPSC_ARMDOMAIN		0
- #define DAVINCI_GPSC_DSPDOMAIN		1
++#endif
+ /*----------------------------------------------------------------------*/
+ 
+ #define INTMUX		0x18
+@@ -1171,8 +1178,33 @@ void __init dm365_init(void)
+ 
+ void __init dm365_init_time(void)
+ {
++#ifdef CONFIG_COMMON_CLK
++	void __iomem *pll1, *pll2, *psc;
++	struct clk *clk;
++
++	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM365_REF_FREQ);
++
++	pll1 = ioremap(DAVINCI_PLL1_BASE, SZ_1K);
++	dm365_pll1_init(NULL, pll1, NULL);
++
++	pll2 = ioremap(DAVINCI_PLL2_BASE, SZ_1K);
++	dm365_pll2_init(NULL, pll2, NULL);
++
++	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
++	dm365_psc_init(NULL, psc);
++
++	clk = clk_get(NULL, "timer0");
++
++	davinci_timer_init(clk);
++#else
+ 	davinci_clk_init(dm365_clks);
+ 	davinci_timer_init(&timer0_clk);
++#endif
++}
++
++void __init dm365_register_clocks(void)
++{
++	/* all clocks are currently registered in dm365_init_time() */
+ }
+ 
+ static struct resource dm365_vpss_resources[] = {
 -- 
 2.17.0
