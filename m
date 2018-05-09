@@ -1,50 +1,60 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Wed,  9 May 2018 15:58:23 -0700
-Subject: [RFC][PATCH] arm64: update iomem_resource.end
-Message-ID: <1525906703-28481-1-git-send-email-nicoleotsuka@gmail.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Thu, 10 May 2018 02:10:58 +0300
+Subject: [PATCH] Kirin-PCIe: Add kirin pcie msi feature.
+In-Reply-To: <20180509045151.GA24899@dragon>
+References: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
+ <20180508125658.GK161390@bhelgaas-glaptop.roam.corp.google.com>
+ <20180509045151.GA24899@dragon>
+Message-ID: <058ea1c5-6be1-43ec-0bfe-08231717b7e1@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iomem_resource.end is -1 by default and should be updated in
-arch-level code.
+Hi,
 
-ARM64 so far hasn't updated it while core kernel code (mm/hmm.c)
-started to use iomem_resource.end for boundary check. So it'd be
-better to assign iomem_resource.end using a valid value, the end
-of physical address space for example because iomem_resource.end
-in theory should reflect that.
+On  9.05.2018 07:51, Shawn Guo wrote:
+> Hi Bjorn,
+> 
+> On Tue, May 08, 2018 at 07:56:58AM -0500, Bjorn Helgaas wrote:
+> ...
+>>> +			return ret;
+>>> +		}
+>>> +	}
+>>> +
+>>> +	pci->pp.root_bus_nr = -1;
+>>
+>> Setting root_bus_nr looks like an unrelated change that should be in a
+>> separate patch.
+>>
+>> But I'm not sure why you need to set root_bus_nr at all, since
+>> dw_pcie_host_init() always sets it.
+>>
+>> Some other callers of dw_pcie_host_init() do set it:
+>>
+>>    exynos_add_pcie_port()
+>>    imx6_add_pcie_port()
+>>    armada8k_add_pcie_port()
+>>    artpec6_add_pcie_port()
+>>    dw_plat_add_pcie_port()
+>>    histb_pcie_probe()
+>>    qcom_pcie_probe()
+>>    spear13xx_add_pcie_port()
+>>
+>> But I don't see *why* any of these need to set it.  If they don't need to
+>> set it, they shouldn't.
+> 
+> Mostly it's a blind copy of unnecessary code.  I tested histb driver
+> by dropping the line, and did not see anything broken.  I will cook up
+> a series to remove the code from all above drivers, and copy
+> corresponding driver owner to comment.
+> 
+>> And it would be nice if histb and qcom followed the structure and naming
+>> conventions of the other drivers, i.e., they should have
+>> histb_add_pcie_port() and qcom_add_pcie_port().
+> 
+> I can create a patch for histb driver, but will leave qcom one to
+> Stanimir to decide.
 
-However, VA_BITS might be smaller than PA_BITS in ARM64. So using
-the end of physical address space doesn't make a lot of sense in
-this case, or could be even harmful since virtual address cannot
-reach that memory region. Furthermore, the linear region size of
-ARM64 only has the half of Virtual Memory size -- "VA_BITS - 1".
+Thanks, will see what can be done.
 
-So this patch updates the iomem_resource.end by using the end of
-physical address space or the end of linear mapping region when
-(VA_BITS - 1) is smaller than PA_BITS.
-
-Signed-off-by: Nicolin Chen <nicoleotsuka@gmail.com>
----
- arch/arm64/mm/init.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index f48b194..22015af 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -377,6 +377,12 @@ void __init arm64_memblock_init(void)
- 	BUILD_BUG_ON(linear_region_size != BIT(VA_BITS - 1));
- 
- 	/*
-+	 * Update iomem_resource.end based on size of physical address space,
-+	 * or linear region size when (VA_BITS - 1) is smaller than PA_BITS.
-+	 */
-+	iomem_resource.end = BIT(min(PHYS_MASK_SHIFT, VA_BITS - 1)) - 1;
-+
-+	/*
- 	 * Select a suitable value for the base of physical memory.
- 	 */
- 	memstart_addr = round_down(memblock_start_of_DRAM(),
--- 
-2.1.4
+regards,
+Stan
