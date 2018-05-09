@@ -1,65 +1,39 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Tue, 08 May 2018 20:23:19 -0500
-Subject: [PATCH 2/4] pid: Export find_task_by_vpid for use in external
- modules
-In-Reply-To: <20180508140640.0e312dba025df75cbf205cdb@arm.com> (Kim Phillips's
- message of "Tue, 8 May 2018 14:06:40 -0500")
-References: <20180508140640.0e312dba025df75cbf205cdb@arm.com>
-Message-ID: <87k1sdvczc.fsf@xmission.com>
+From: ping.bai@nxp.com (Jacky Bai)
+Date: Wed, 9 May 2018 01:26:38 +0000
+Subject: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
+In-Reply-To: <152580354289.138124.13657232356773397650@swboyd.mtv.corp.google.com>
+References: <20180418124908.3079-1-stefan@agner.ch>
+ <20180502073807.GE3443@dragon> <56a409cf76a3eaa713cb4f0bbe1e39b6@agner.ch>
+ <HE1PR04MB311395765D3DC03D5960DBA3879A0@HE1PR04MB3113.eurprd04.prod.outlook.com>
+ <4188ee25bd5179b57d09e4624dcfbfbb@agner.ch>
+ <152580354289.138124.13657232356773397650@swboyd.mtv.corp.google.com>
+Message-ID: <HE1PR04MB3113135433766196E708685887990@HE1PR04MB3113.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kim Phillips <kim.phillips@arm.com> writes:
+> Subject: Re: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
+> 
+> Quoting Stefan Agner (2018-05-08 06:20:03)
+> > On 08.05.2018 09:32, Jacky Bai wrote:
+> > >
+> > > I have tried two 6ULL board, I don't meet such issue. System can
+> > > boot up successfully with commit 6f9575e55632 included.
+> > > Anyway, the change in this patch is ok for me. it is no harm to the
+> > > BUS clock change flow.
+> >
+> > Hm, that is interesting, maybe it is because we use a different SKU?
+> > Or maybe bootloader?
+> >
+> > I tested here with a 800 MHz clocked variant on a Colibri iMX6ULL
+> > using U-Boot 2016.11.
+> >
+> 
+> I'll throw this into fixes today because it fixes something to be useful. It's still
+> interesting to see what's different between the two setups though.
 
-> This patch is in the context of allowing the Coresight h/w
-> trace driver suite to be loaded as modules.  Coresight uses
-> find_task_by_vpid when running in direct capture mode (via sysfs)
-> when getting/setting the context ID comparator to trigger on
-> (/sys/bus/coresight/devices/<x>.etm/ctxid_pid).
+Thanks. 
 
-Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+I will find some 800MHz parts and have a try with different bootloader later.
+Will let you know, when I have some results.
 
-There is no way to implement a sysfs file that takes a pid correctly.
-Don't do it.
-
-Pids are tied to pid namespaces and sysfs deliberately does not do
-anything remotely resembly a pid namespace.
-
-Eric
-
-
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Oleg Nesterov <oleg@redhat.com>
-> Cc: Gargi Sharma <gs051095@gmail.com>
-> Cc: Rik van Riel <riel@redhat.com>
-> Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Cc: Kefeng Wang <wangkefeng.wang@huawei.com>
-> Cc: Kirill Tkhai <ktkhai@virtuozzo.com>
-> Cc: Mike Rapoport <rppt@linux.vnet.ibm.com>
-> Cc: David Howells <dhowells@redhat.com>
-> Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
-> ---
-> Current CoreSight callsite:
->
-> https://lxr.missinglinkelectronics.com/linux/include/linux/coresight.h#L285
->
-> A quick look didn't find anything, but if Coresight needs to do
-> something differently, please comment.
->
->  kernel/pid.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/kernel/pid.c b/kernel/pid.c
-> index 157fe4b19971..92b1b623f3e0 100644
-> --- a/kernel/pid.c
-> +++ b/kernel/pid.c
-> @@ -342,6 +342,7 @@ struct task_struct *find_task_by_vpid(pid_t vnr)
->  {
->  	return find_task_by_pid_ns(vnr, task_active_pid_ns(current));
->  }
-> +EXPORT_SYMBOL_GPL(find_task_by_vpid);
->  
->  struct task_struct *find_get_task_by_vpid(pid_t nr)
->  {
+Jacky
