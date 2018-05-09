@@ -1,48 +1,90 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 9 May 2018 17:03:10 +0200
-Subject: [PATCH v2] mtd: nxp-spifi: release flash_np in nxp_spifi_probe()
-In-Reply-To: <1525877806-21148-1-git-send-email-khoroshilov@ispras.ru>
-References: <20180509163920.67a5f203@bbrezillon>
- <1525877806-21148-1-git-send-email-khoroshilov@ispras.ru>
-Message-ID: <20180509170310.65d19c49@bbrezillon>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 9 May 2018 17:08:24 +0200
+Subject: [PATCH v2 01/26] drm/bridge: allow optionally specifying an
+ owner .odev device
+In-Reply-To: <20180504135212.26977-2-peda@axentia.se>
+References: <20180504135212.26977-1-peda@axentia.se>
+ <CGME20180504135245epcas4p1d0463b6b3c73d1dd2550c6ed5a4e3986@epcas4p1.samsung.com>
+ <20180504135212.26977-2-peda@axentia.se>
+Message-ID: <4e92fdea-0609-0fff-0e3f-d9f78f596eb7@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  9 May 2018 17:56:46 +0300
-Alexey Khoroshilov <khoroshilov@ispras.ru> wrote:
-
-> nxp_spifi_probe() increments refcnt of SPI flash device node by
-> of_get_next_available_child() and leaves it undecremented on both
-> successful and error paths.
-> 
-> Found by Linux Driver Verification project (linuxtesting.org).
-> 
-> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+On 04.05.2018 15:51, Peter Rosin wrote:
+> Bridge drivers can now (temporarily, in a transition phase) select if
+> they want to provide a full owner device or keep just providing an
+> of_node.
+>
+> By providing a full owner device, the bridge drivers no longer need
+> to provide an of_node since that node is available via the owner
+> device.
+>
+> When all bridge drivers provide an owner device, that will become
+> mandatory and the .of_node member will be removed.
+>
+> Signed-off-by: Peter Rosin <peda@axentia.se>
 > ---
->  drivers/mtd/spi-nor/nxp-spifi.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/nxp-spifi.c b/drivers/mtd/spi-nor/nxp-spifi.c
-> index 15374216d4d9..7b047951d0a2 100644
-> --- a/drivers/mtd/spi-nor/nxp-spifi.c
-> +++ b/drivers/mtd/spi-nor/nxp-spifi.c
-> @@ -438,11 +438,15 @@ static int nxp_spifi_probe(struct platform_device *pdev)
->  	ret = nxp_spifi_setup_flash(spifi, flash_np);
+>  drivers/gpu/drm/drm_bridge.c             | 3 ++-
+>  drivers/gpu/drm/rockchip/rockchip_lvds.c | 4 +++-
 
-Just put the of_node_put() here and that's the only change you'll need.
+What is the reason to put rockchip here? Shouldn't be in separate patch?
 
->  	if (ret) {
->  		dev_err(&pdev->dev, "unable to setup flash chip\n");
-> -		goto dis_clks;
-> +		goto put_np;
+>  include/drm/drm_bridge.h                 | 2 ++
+>  3 files changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
+> index 1638bfe9627c..3872f5379998 100644
+> --- a/drivers/gpu/drm/drm_bridge.c
+> +++ b/drivers/gpu/drm/drm_bridge.c
+> @@ -365,7 +365,8 @@ struct drm_bridge *of_drm_find_bridge(struct device_node *np)
+>  	mutex_lock(&bridge_lock);
+>  
+>  	list_for_each_entry(bridge, &bridge_list, list) {
+> -		if (bridge->of_node == np) {
+> +		if ((bridge->odev && bridge->odev->of_node == np) ||
+> +		    bridge->of_node == np) {
+>  			mutex_unlock(&bridge_lock);
+>  			return bridge;
+>  		}
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+> index 4bd94b167d2c..557e0079c98d 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+> @@ -377,8 +377,10 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
 >  	}
+>  	if (lvds->panel)
+>  		remote = lvds->panel->dev->of_node;
+> -	else
+> +	else if (lvds->bridge->of_node)
+>  		remote = lvds->bridge->of_node;
+> +	else
+> +		remote = lvds->bridge->odev->of_node;
+
+I guess odev should be NULL here, or have I missed something.
+
+Regards
+Andrzej
+
+>  	if (of_property_read_string(dev->of_node, "rockchip,output", &name))
+>  		/* default set it as output rgb */
+>  		lvds->output = DISPLAY_OUTPUT_RGB;
+> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+> index 3270fec46979..7c17977c3537 100644
+> --- a/include/drm/drm_bridge.h
+> +++ b/include/drm/drm_bridge.h
+> @@ -254,6 +254,7 @@ struct drm_bridge_timings {
 >  
-> +	of_node_put(flash_np);
-> +
->  	return 0;
->  
-> +put_np:
-> +	of_node_put(flash_np);
->  dis_clks:
->  	clk_disable_unprepare(spifi->clk_spifi);
->  dis_clk_reg:
+>  /**
+>   * struct drm_bridge - central DRM bridge control structure
+> + * @odev: device that owns the bridge
+>   * @dev: DRM device this bridge belongs to
+>   * @encoder: encoder to which this bridge is connected
+>   * @next: the next bridge in the encoder chain
+> @@ -265,6 +266,7 @@ struct drm_bridge_timings {
+>   * @driver_private: pointer to the bridge driver's internal context
+>   */
+>  struct drm_bridge {
+> +	struct device *odev;
+>  	struct drm_device *dev;
+>  	struct drm_encoder *encoder;
+>  	struct drm_bridge *next;
