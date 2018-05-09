@@ -1,99 +1,101 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed,  9 May 2018 12:26:04 -0500
-Subject: [PATCH v10 25/27] ARM: davinci: add device tree support to timer
-In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
-References: <20180509172606.29387-1-david@lechnology.com>
-Message-ID: <20180509172606.29387-26-david@lechnology.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 9 May 2018 11:12:59 -0600
+Subject: [PATCH v2 23/27] coresight: tmc-etr: Handle driver mode specific
+ ETR buffers
+In-Reply-To: <a16587f9-bb0f-e806-9c8d-ee4af0e8b805@arm.com>
+References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
+ <1525165857-11096-24-git-send-email-suzuki.poulose@arm.com>
+ <20180508171800.GA3389@xps15> <a16587f9-bb0f-e806-9c8d-ee4af0e8b805@arm.com>
+Message-ID: <CANLsYkxT90EtuJas08auzsZCEYgxTt93TZRpQqhA-bX3oE1=ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree support to the davinci timer so that when clocks
-are moved to device tree, the timer will still work.
+On 8 May 2018 at 15:51, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> On 05/08/2018 06:18 PM, Mathieu Poirier wrote:
+>>
+>> On Tue, May 01, 2018 at 10:10:53AM +0100, Suzuki K Poulose wrote:
+>>>
+>>> Since the ETR could be driven either by SYSFS or by perf, it
+>>> becomes complicated how we deal with the buffers used for each
+>>> of these modes. The ETR driver cannot simply free the current
+>>> attached buffer without knowing the provider (i.e, sysfs vs perf).
+>>>
+>>> To solve this issue, we provide:
+>>> 1) the driver-mode specific etr buffer to be retained in the drvdata
+>>> 2) the etr_buf for a session should be passed on when enabling the
+>>>     hardware, which will be stored in drvdata->etr_buf. This will be
+>>>     replaced (not free'd) as soon as the hardware is disabled, after
+>>>     necessary sync operation.
+>>>
+>>> The advantages of this are :
+>>>
+>>> 1) The common code path doesn't need to worry about how to dispose
+>>>     an existing buffer, if it is about to start a new session with a
+>>>     different buffer, possibly in a different mode.
+>>> 2) The driver mode can control its buffers and can get access to the
+>>>     saved session even when the hardware is operating in a different
+>>>     mode. (e.g, we can still access a trace buffer from a sysfs mode
+>>>     even if the etr is now used in perf mode, without disrupting the
+>>>     current session.)
+>>>
+>>> Towards this, we introduce a sysfs specific data which will hold the
+>>> etr_buf used for sysfs mode of operation, controlled solely by the
+>>> sysfs mode handling code.
+>>
+>>
+>> Thinking further on this... I toyed with the idea of doing the same thing
+>> when
+>> working on the original driver and decided against it.  Do we really have
+>> a case
+>> where users would want to use sysFS and perf alternatively?  To me this
+>> looks
+>> overdesigned.
+>>
+>> If we are going to go that way we need to enact the same behavior for
+>> ETB10 and
+>> ETF...  And take it out of this set as it is already substantial enough.
+>
+>
+> The difference between ETB10/ETF and ETR is the usage of the buffer. The
+> former uses an internal buffer and we always have to copy it out to an
+> external buffer for consumption. Now this external buffer is actually
+> separate for each mode, i.e sysfs and perf. Also the data is copied
+> out right after we disable the HW. This ensures that the interleaved
+> mode doesn't corrupt each others data.
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
+Hi Suzuki,
 
-v10 changes:
-- change compatible to "ti,da830-timer"
-- remove comment clocks as platform devices
+When I wrote my original comment I was under the impression that
+ETB10/ETF's drvdata->buf was used for both sysFS and perf, but after
+going back to the code find it isn't the case.  As such a user can
+call sysFS and perf session alternately without destroying the results
+acquired from the previous trace scenario.  This is also what your
+patch is providing, enacting the same (desired) behaviour we currently
+have.
 
-v9 changes:
-- none (there were supposed to be changed, but apparently they got squashed
-  into the next commit - will fix on the next round)
+I'm good with this one.
 
-v8 changes:
-- none
+Mathieu
 
-v7 changes:
-- rebased
-- add davinci prefix to commit message
-
-v6 changes:
-- rebased
-
-
- arch/arm/mach-davinci/Kconfig |  1 +
- arch/arm/mach-davinci/time.c  | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
-
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index ba9912b4dfab..da8a039d65f9 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -59,6 +59,7 @@ config MACH_DA8XX_DT
- 	default y
- 	depends on ARCH_DAVINCI_DA850
- 	select PINCTRL
-+	select TIMER_OF
- 	help
- 	  Say y here to include support for TI DaVinci DA850 based using
- 	  Flattened Device Tree. More information at Documentation/devicetree
-diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-index 7ea3db0ff062..184e72922cc1 100644
---- a/arch/arm/mach-davinci/time.c
-+++ b/arch/arm/mach-davinci/time.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/sched_clock.h>
- 
-@@ -397,3 +398,34 @@ void __init davinci_timer_init(struct clk *timer_clk)
- 	for (i=0; i< ARRAY_SIZE(timers); i++)
- 		timer32_config(&timers[i]);
- }
-+
-+static int __init of_davinci_timer_init(struct device_node *np)
-+{
-+	struct clk *clk;
-+
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk)) {
-+		struct of_phandle_args clkspec;
-+
-+		/*
-+		 * Fall back to using ref_clk if the actual clock is not
-+		 * available. There will be problems later if the real clock
-+		 * source is disabled.
-+		 */
-+
-+		pr_warn("%s: falling back to ref_clk\n", __func__);
-+
-+		clkspec.np = of_find_node_by_name(NULL, "ref_clk");
-+		if (IS_ERR(clkspec.np)) {
-+			pr_err("%s: No clock available for timer!\n", __func__);
-+			return PTR_ERR(clkspec.np);
-+		}
-+		clk = of_clk_get_from_provider(&clkspec);
-+		of_node_put(clkspec.np);
-+	}
-+
-+	davinci_timer_init(clk);
-+
-+	return 0;
-+}
-+TIMER_OF_DECLARE(davinci_timer, "ti,da830-timer", of_davinci_timer_init);
--- 
-2.17.0
+>
+> However, the ETR doesn't have an internal buffer and uses the System RAM.
+> That brings in the problem of one mode using the "buffer" as
+> described by the drvdata. So, eventually either mode could write to
+> the buffer allocated by the other mode before it is consumed by the
+> end user (via syfs read or perf). That brings in the challenge of
+> managing the buffer safely, switching back and forth the buffer
+> (with the right size and pages) for each mode without any interferences.
+> That also implies, one mode must be able to free the left-over buffer
+> from the previous mode safely (which could be potentially linked to
+> other data structures maintained by the mode). And that makes it more
+> complex. e.g, we must leave the sysfs trace data for collection and
+> meanwhile the perf could grab the ETR for its usage. The perf mode
+> might not know the mode of the existing buffer and thus wouldn't know
+> how to free it properly.
+>
+> This is why we need buffers per mode which can be managed by
+> each mode. i.e, both allocated, used and more importantly free'd
+> appropriately.
+>
+> Cheers
+> Suzuki
