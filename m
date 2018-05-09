@@ -1,41 +1,63 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 May 2018 21:08:05 +0200
-Subject: [PATCH v2 0/2] arm64: dts: renesas: r8a77970: Add SMP Support
-In-Reply-To: <1525879403-12207-1-git-send-email-geert+renesas@glider.be>
-References: <1525879403-12207-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180509190804.l6luktwhrfeasspc@verge.net.au>
+Date: Wed, 9 May 2018 21:12:39 +0200
+Subject: [PATCH 0/8] ARM: dts: renesas: Add PMU device nodes
+In-Reply-To: <1525701427-12914-1-git-send-email-geert+renesas@glider.be>
+References: <1525701427-12914-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180509191238.rmcmq6ls3bmosxjb@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 05:23:21PM +0200, Geert Uytterhoeven wrote:
->         Hi Simon, Magnus,
+On Mon, May 07, 2018 at 03:56:59PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> This patch series enables SMP support on the R-Car V3M SoC, by adding
-> the second Cortex-A53 CPU core.  It also adds the performance monitor
-> unit, and links it to both CPU cores.
+> This patch series enables support for the ARM Performance Monitor Units
+> in Cortex-A7, Cortex-A9, and Cortex-A15 CPU cores on Renesas RZ/A1,
+> R-Car Gen2, and RZ/G1 SoCs.  This allows for better performance analysis
+> using the "perf" tool.
 > 
-> Changes compared to v1:
->   - Adjust GIC_CPU_MASK_SIMPLE(),
->   - Use symbolic core clock and power domain indices,
->   - Move the pmu node from the soc subnode to the root node, as it
->     doesn't have registers.
+> Sample output of "perf stat echo" on r8a7791/koelsch:
 > 
-> Note that the PSCI implementation on Eagle may be a preliminary version
-> with some familiar quirks:
->   - SMP bringup works, and both CPUs can be used,
->   - Offlining CPU0 crashes the system,
->   - CPU1 can be offlined, but trying to bring it online again crashes
->     the system, too.
+>   - Before:
 > 
-> I'm confident these will be fixed in future firmware versions, just like
-> on H3/Salvator-X.  Note that
-> git at github.com:renesas-rcar/arm-trusted-firmware.git does not have
-> support for R-Car V3M, V3H, and D3.
+>      Performance counter stats for 'echo':
 > 
-> Thanks!
+> 	      2,636300      task-clock (msec)         #    0,265 CPUs utilized
+> 		     8      context-switches          #    0,003 M/sec
+> 		     0      cpu-migrations            #    0,000 K/sec
+> 		    43      page-faults               #    0,016 M/sec
+>        <not supported>      cycles
+>        <not supported>      stalled-cycles-frontend
+>        <not supported>      stalled-cycles-backend
+>        <not supported>      instructions
+>        <not supported>      branches
+>        <not supported>      branch-misses
 > 
-> Geert Uytterhoeven (2):
->   arm64: dts: renesas: r8a77970: Add secondary CA53 CPU core
->   arm64: dts: renesas: r8a77970: Add Cortex-A53 PMU node
+> 	   0,009960300 seconds time elapsed
+> 
+>   - After:
+> 
+>      Performance counter stats for 'echo':
+> 
+> 	      2,455400      task-clock (msec)         #    0,273 CPUs utilized
+> 		     3      context-switches          #    0,001 M/sec
+> 		     0      cpu-migrations            #    0,000 K/sec
+> 		    45      page-faults               #    0,018 M/sec
+> 	     3.556.784      cycles                    #    1,449 GHz
+>        <not supported>      stalled-cycles-frontend
+>        <not supported>      stalled-cycles-backend
+> 	     1.350.480      instructions              #    0,38  insns per cycle
+> 	       335.542      branches                  #  136,655 M/sec
+> 		18.075      branch-misses             #    5,39% of all branches
+> 
+> 	   0,008987900 seconds time elapsed
+> 
+> Still missing:
+>   - R-Mobile APE6 (no PMU interrupt documented),
+>   - R-Car M1A and H1 (the PMU interrupt seems to be routed to the legacy
+>     SH INTC only?),
+>   - RZ/G1C (SMP support not yet upstream).
+> 
+> This has been tested on r8a7791/koelsch, and boot-tested on
+> r7s72100/genmai, r8a7790/lager, r8a7792/blanche, and r8a7794/silk.
 
 Thanks, applied.
