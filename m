@@ -1,106 +1,65 @@
-From: chenyao11@huawei.com (Yao Chen)
-Date: Wed, 9 May 2018 11:41:14 +0800
-Subject: [PATCH] Kirin-PCIe: Add kirin pcie msi feature.
-In-Reply-To: <CAH7ZN-zOwCqzzmKxkCeLt+z2FCpMrxnu5a8s8Os-fSsuS2R01w@mail.gmail.com>
-References: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
- <CAH7ZN-zOwCqzzmKxkCeLt+z2FCpMrxnu5a8s8Os-fSsuS2R01w@mail.gmail.com>
-Message-ID: <ce1ad9b2-e883-75be-aa4a-b7cdfc0b3f48@huawei.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 8 May 2018 20:43:43 -0700
+Subject: [PATCH] hwmon: (aspeed-pwm-tacho) Use 24MHz clock
+In-Reply-To: <CAARXrtmO=wsPK6bfO0E7fvAkqEJUV1kQSYK1gWXkUhmKytq42A@mail.gmail.com>
+References: <1525772367-20627-1-git-send-email-mine260309@gmail.com>
+ <8a801894-4293-d2e8-4673-3d9ff5c2a5bb@roeck-us.net>
+ <CAARXrtmO=wsPK6bfO0E7fvAkqEJUV1kQSYK1gWXkUhmKytq42A@mail.gmail.com>
+Message-ID: <c5770e4a-9445-d4ef-cc1f-a7a84599c4a1@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2018/5/9 5:31, Dmitry Shmidt wrote:
-> On Tue, May 8, 2018 at 12:03 AM, Yao Chen <chenyao11@huawei.com> wrote:
->> This patch adds kirin pcie msi feature.
+On 05/08/2018 08:18 PM, Lei YU wrote:
+> On Tue, May 8, 2018 at 9:51 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> No mixed C/C++ comments in hwmon drivers.
 >>
->> Signed-off-by: Yao Chen <chenyao11@huawei.com>
->> ---
->>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi |  2 ++
->>  drivers/pci/dwc/pcie-kirin.c              | 38 +++++++++++++++++++++++++++++++
->>  2 files changed, 40 insertions(+)
+>>>          aspeed_set_clock_source(priv->regmap, 0);
+>>> +       priv->clk_freq = 24000000;
+>>>
 >>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->> index ec3eb8e..4ef684f 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
->> @@ -872,6 +872,8 @@
->>                                   0x0 0x02000000>;
->>                         num-lanes = <1>;
->>                         #interrupt-cells = <1>;
->> +                       interrupts = <0 283 4>;
->> +                       interrupts-names = "msi";
+>>
+>> Are you saying that clk_get_rate() is wrong ? Anyway, if the DT is bad, it
+>> should be fixed.
+> Nope, clk_get_rate() is OK.
+> The reason I make this change is because the PWM supports two types of clock
+> source, the 24MHz or the clock from memory controller.
+> If the DT uses 24MHz clock, this code is OK.
+> But if the DT configs this pwm to use mclk (memory controller clk), this piece
+> of code becomes wrong, because the code
+> `aspeed_set_clock_source(priv->regmap, 0)` configs the device to use the 24MHz
+> clock.
+> So no matter what DT configs the clk, this driver *always* uses 24MHz clock.
 > 
-> Possible typo? Should be interrupt-names = "msi";
-
-Yes, you're right. It should be interrupt-names = "msi". I will fix it. Thanks.
-
+> That's why I want to make this change.
 > 
->>                         interrupt-map-mask = <0xf800 0 0 7>;
->>                         interrupt-map = <0x0 0 0 1
->>                                          &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
->> diff --git a/drivers/pci/dwc/pcie-kirin.c b/drivers/pci/dwc/pcie-kirin.c
->> index d2970a0..2319c9c 100644
->> --- a/drivers/pci/dwc/pcie-kirin.c
->> +++ b/drivers/pci/dwc/pcie-kirin.c
->> @@ -426,9 +426,28 @@ static int kirin_pcie_establish_link(struct pcie_port *pp)
->>         return 0;
->>  }
->>
->> +static irqreturn_t kirin_pcie_msi_irq_handler(int irq, void *arg)
->> +{
->> +       struct pcie_port *pp = arg;
->> +
->> +       return dw_handle_msi_irq(pp);
->> +}
->> +
->> +static void kirin_pcie_msi_init(struct pcie_port *pp)
->> +{
->> +       dw_pcie_msi_init(pp);
->> +}
->> +
->> +static void kirin_pcie_enable_interrupts(struct pcie_port *pp)
->> +{
->> +       if (IS_ENABLED(CONFIG_PCI_MSI))
->> +               kirin_pcie_msi_init(pp);
->> +}
->> +
->>  static int kirin_pcie_host_init(struct pcie_port *pp)
->>  {
->>         kirin_pcie_establish_link(pp);
->> +       kirin_pcie_enable_interrupts(pp);
->>
->>         return 0;
->>  }
->> @@ -448,6 +467,25 @@ static int kirin_pcie_host_init(struct pcie_port *pp)
->>  static int __init kirin_add_pcie_port(struct dw_pcie *pci,
->>                                       struct platform_device *pdev)
->>  {
->> +       int ret;
->> +
->> +       if (IS_ENABLED(CONFIG_PCI_MSI)) {
->> +               pci->pp.msi_irq = platform_get_irq(pdev, 0);
->> +               if (!pci->pp.msi_irq) {
->> +                       dev_err(&pdev->dev, "failed to get msi irq\n");
->> +                       return -ENODEV;
->> +               }
->> +               ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
->> +                                      kirin_pcie_msi_irq_handler,
->> +                                      IRQF_SHARED | IRQF_NO_THREAD,
->> +                                      "kirin_pcie_msi", &pci->pp);
->> +               if (ret) {
->> +                       dev_err(&pdev->dev, "failed to request msi irq\n");
->> +                       return ret;
->> +               }
->> +       }
->> +
->> +       pci->pp.root_bus_nr = -1;
->>         pci->pp.ops = &kirin_pcie_host_ops;
->>
->>         return dw_pcie_host_init(&pci->pp);
->> --
->> 1.9.1
->>
+>> I am not a friend of hacking drivers to fix up bad DTs, and much less so
+>> without explanation.
+>> Plus, how do we know that the next chip supported by the driver doesn't have
+>> a 32MHz clock ?
+> This driver currently supports ast2400 and ast2500, and they both use 24MHz
+> clock.
+> In case future device uses a different clock, we can update this code, right?
 > 
-> .
+
+I am not going to accept this change, period. This is not one, it is five steps
+backward. If "aspeed_set_clock_source(priv->regmap, 0)" changes the clock speed,
+or the clock source, read it later, and attach to the correct clock. If that
+doesn't work, fix the problem in the clock subsystem. Hacking the driver is just
+plain wrong.
+
+Also, if the idea in DT is to provide a different clock to the watchdog on purpose,
+maybe the call to "aspeed_set_clock_source(priv->regmap, 0)" is wrong.
+
+Guenter
+
+>> Really, please fix the DT.
+> Sure, I will send patch to config the clock to use fixed 24MHz clock as well.
+> 
+>>
+>> Guenter
+>>
+>>>          aspeed_create_type(priv);
+>>>
+>>
+>>
 > 
