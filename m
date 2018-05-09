@@ -1,14 +1,14 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed,  9 May 2018 12:25:47 -0500
-Subject: [PATCH v10 08/27] ARM: davinci: dm365: add new clock init using
+Date: Wed,  9 May 2018 12:25:49 -0500
+Subject: [PATCH v10 10/27] ARM: davinci: dm646x: add new clock init using
  common clock framework
 In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
 References: <20180509172606.29387-1-david@lechnology.com>
-Message-ID: <20180509172606.29387-9-david@lechnology.com>
+Message-ID: <20180509172606.29387-11-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the new board-specific clock init in mach-davinci/dm365.c
+This adds the new board-specific clock init in mach-davinci/dm646x.c
 using the new common clock framework drivers.
 
 The #ifdefs are needed to prevent compile errors until the entire
@@ -23,12 +23,12 @@ v10 changes:
 - none
 
 v9 changes:
-- register PLL1 and PSC in dm365_init_time() instead of as platform device so
+- register PLL1 and PSC in dm646x_init_time() instead of as platform device so
   that we get the correct timer0 clock for davinci_timer_init()
 - Fixed size of PLL memory block
 
 v8 changes:
-- none
+- register clkdev lookup for ref_clk and aux_clkin
 
 v7 changes:
 - add clock platform device declarations
@@ -39,73 +39,67 @@ v6 changes:
 - add blank lines between function calls
 
 
- arch/arm/mach-davinci/board-dm365-evm.c |  2 +
- arch/arm/mach-davinci/davinci.h         |  1 +
- arch/arm/mach-davinci/dm365.c           | 56 +++++++++++++++++++------
- 3 files changed, 47 insertions(+), 12 deletions(-)
+ arch/arm/mach-davinci/board-dm646x-evm.c |  2 +
+ arch/arm/mach-davinci/davinci.h          |  1 +
+ arch/arm/mach-davinci/dm646x.c           | 63 +++++++++++++++++++++---
+ 3 files changed, 58 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 435f7ec7d9af..307e88d99dd3 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -742,6 +742,8 @@ static __init void dm365_evm_init(void)
- {
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 764be73735a2..37c9e0ee4dcc 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -773,6 +773,8 @@ static __init void evm_init(void)
  	int ret;
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
  
-+	dm365_register_clocks();
++	dm646x_register_clocks();
 +
- 	ret = dm365_gpio_register();
+ 	ret = dm646x_gpio_register();
  	if (ret)
  		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
 diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
-index c2c634b6578e..a799b5266d4b 100644
+index 16aca5853ab2..fa99197d36f9 100644
 --- a/arch/arm/mach-davinci/davinci.h
 +++ b/arch/arm/mach-davinci/davinci.h
-@@ -94,6 +94,7 @@ int dm355_gpio_register(void);
- /* DM365 function declarations */
- void dm365_init(void);
- void dm365_init_time(void);
-+void dm365_register_clocks(void);
- void dm365_init_asp(void);
- void dm365_init_vc(void);
- void dm365_init_ks(struct davinci_ks_platform_data *pdata);
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 871372a59da8..76de426a0e41 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -12,32 +12,38 @@
-  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
+@@ -116,6 +116,7 @@ int dm644x_gpio_register(void);
+ /* DM646x function declarations */
+ void dm646x_init(void);
+ void dm646x_init_time(unsigned long ref_clk_rate, unsigned long aux_clkin_rate);
++void dm646x_register_clocks(void);
+ void dm646x_init_mcasp0(struct snd_platform_data *pdata);
+ void dm646x_init_mcasp1(struct snd_platform_data *pdata);
+ int dm646x_init_edma(struct edma_rsv_info *rsv);
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index e1d6e92f434a..f5693bafc81f 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -8,29 +8,35 @@
+  * is licensed "as is" without any warranty of any kind, whether express
+  * or implied.
   */
--#include <linux/init.h>
--#include <linux/clk.h>
--#include <linux/serial_8250.h>
--#include <linux/platform_device.h>
 +
 +#include <linux/clk-provider.h>
 +#include <linux/clk/davinci.h>
 +#include <linux/clkdev.h>
  #include <linux/dma-mapping.h>
  #include <linux/dmaengine.h>
--#include <linux/spi/spi.h>
-+#include <linux/init.h>
+ #include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/serial_8250.h>
+-#include <linux/platform_device.h>
  #include <linux/platform_data/edma.h>
  #include <linux/platform_data/gpio-davinci.h>
- #include <linux/platform_data/keyscan-davinci.h>
- #include <linux/platform_data/spi-davinci.h>
 +#include <linux/platform_device.h>
 +#include <linux/serial_8250.h>
-+#include <linux/spi/spi.h>
  
  #include <asm/mach/map.h>
  
 +#include <mach/common.h>
  #include <mach/cputype.h>
--#include "psc.h"
--#include <mach/mux.h>
  #include <mach/irqs.h>
+-#include "psc.h"
+ #include <mach/mux.h>
 -#include <mach/time.h>
-+#include <mach/mux.h>
  #include <mach/serial.h>
 -#include <mach/common.h>
 +#include <mach/time.h>
@@ -121,58 +115,73 @@ index 871372a59da8..76de426a0e41 100644
 +#include "psc.h"
 +#endif
  
- #define DM365_REF_FREQ		24000000	/* 24 MHz on the DM365 EVM */
- #define DM365_RTC_BASE			0x01c69000
-@@ -54,6 +60,7 @@
- #define DM365_EMAC_CNTRL_RAM_OFFSET	0x1000
- #define DM365_EMAC_CNTRL_RAM_SIZE	0x2000
+ #define DAVINCI_VPIF_BASE       (0x01C12000)
+ 
+@@ -46,6 +52,7 @@
+ #define DM646X_EMAC_CNTRL_RAM_OFFSET	0x2000
+ #define DM646X_EMAC_CNTRL_RAM_SIZE	0x2000
  
 +#ifndef CONFIG_COMMON_CLK
  static struct pll_data pll1_data = {
- 	.num		= 1,
- 	.phys_base	= DAVINCI_PLL1_BASE,
-@@ -485,7 +492,7 @@ static struct clk_lookup dm365_clks[] = {
- 	CLK(NULL, "mjcp", &mjcp_clk),
+ 	.num       = 1,
+ 	.phys_base = DAVINCI_PLL1_BASE,
+@@ -356,6 +363,7 @@ static struct clk_lookup dm646x_clks[] = {
+ 	CLK(NULL, "vpif1", &vpif1_clk),
  	CLK(NULL, NULL, NULL),
  };
--
 +#endif
- /*----------------------------------------------------------------------*/
  
- #define INTMUX		0x18
-@@ -1171,8 +1178,33 @@ void __init dm365_init(void)
- 
- void __init dm365_init_time(void)
+ static struct emac_platform_data dm646x_emac_pdata = {
+ 	.ctrl_reg_offset	= DM646X_EMAC_CNTRL_OFFSET,
+@@ -953,10 +961,49 @@ void __init dm646x_init(void)
+ void __init dm646x_init_time(unsigned long ref_clk_rate,
+ 			     unsigned long aux_clkin_rate)
  {
 +#ifdef CONFIG_COMMON_CLK
-+	void __iomem *pll1, *pll2, *psc;
++	void __iomem *pll1, *psc;
 +	struct clk *clk;
 +
-+	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM365_REF_FREQ);
++	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, ref_clk_rate);
++	clk_register_fixed_rate(NULL, "aux_clkin", NULL, 0, aux_clkin_rate);
 +
 +	pll1 = ioremap(DAVINCI_PLL1_BASE, SZ_1K);
-+	dm365_pll1_init(NULL, pll1, NULL);
-+
-+	pll2 = ioremap(DAVINCI_PLL2_BASE, SZ_1K);
-+	dm365_pll2_init(NULL, pll2, NULL);
++	dm646x_pll1_init(NULL, pll1, NULL);
 +
 +	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
-+	dm365_psc_init(NULL, psc);
++	dm646x_psc_init(NULL, psc);
 +
 +	clk = clk_get(NULL, "timer0");
 +
 +	davinci_timer_init(clk);
 +#else
- 	davinci_clk_init(dm365_clks);
+ 	ref_clk.rate = ref_clk_rate;
+ 	aux_clkin.rate = aux_clkin_rate;
+ 	davinci_clk_init(dm646x_clks);
  	davinci_timer_init(&timer0_clk);
 +#endif
 +}
 +
-+void __init dm365_register_clocks(void)
++static struct resource dm646x_pll2_resources[] = {
++	{
++		.start	= DAVINCI_PLL2_BASE,
++		.end	= DAVINCI_PLL2_BASE + SZ_1K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device dm646x_pll2_device = {
++	.name		= "dm646x-pll2",
++	.id		= -1,
++	.resource	= dm646x_pll2_resources,
++	.num_resources	= ARRAY_SIZE(dm646x_pll2_resources),
++};
++
++void __init dm646x_register_clocks(void)
 +{
-+	/* all clocks are currently registered in dm365_init_time() */
++	/* PLL1 and PSC are registered in dm646x_init_time() */
++	platform_device_register(&dm646x_pll2_device);
  }
  
- static struct resource dm365_vpss_resources[] = {
+ static int __init dm646x_init_devices(void)
 -- 
 2.17.0
