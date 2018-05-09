@@ -1,20 +1,28 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed,  9 May 2018 12:18:03 -0700
-Subject: [PATCH 2/2] ARM: dts: BCM5301X: Add DT for Luxul XAP-1610
-In-Reply-To: <1525450124-21665-2-git-send-email-dan.haab@luxul.com>
-References: <1525450124-21665-1-git-send-email-dan.haab@luxul.com>
- <1525450124-21665-2-git-send-email-dan.haab@luxul.com>
-Message-ID: <20180509191803.32006-1-f.fainelli@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 9 May 2018 22:18:47 +0300
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add resets property CAN-FD
+ node
+In-Reply-To: <20180509191435.vm2zfuuixbyd3drm@verge.net.au>
+References: <20180509175409.10507-1-horms+renesas@verge.net.au>
+ <CAMuHMdXWHXtO1-0FucCsPTE22U_k+vdqCrDHgBFrM4+yEgXYcQ@mail.gmail.com>
+ <20180509191435.vm2zfuuixbyd3drm@verge.net.au>
+Message-ID: <2889c7ff-1748-e435-c03c-cb36cf930b1d@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  4 May 2018 10:08:44 -0600, Dan Haab <riproute@gmail.com> wrote:
-> It's an access point based on BCM47094 SoC with two BCM4366E wireless
-> chipsets.
-> 
-> Signed-off-by: Dan Haab <dan.haab@luxul.com>
-> ---
+On 5/9/2018 10:14 PM, Simon Horman wrote:
 
-Applied to devicetree/next, thanks!
---
-Florian
+>>> Add resets property to CAN-FD node to describe it in the reset topology of
+>>> on-SoC devices.  This allows to reset the CAN-FD device using the Reset
+>>> Controller API.
+>>>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> Thanks, applied.
+
+    You're too quick (and I'm on holiday today). Need "to| before "CAN-FD" in 
+the subject. ;-)
+
+MBR, Sergei
