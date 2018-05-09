@@ -1,105 +1,247 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 9 May 2018 11:44:55 +0200
-Subject: [RFC PATCH] driver core: make deferring probe forever optional
-In-Reply-To: <20180507183106.GF2259@tuxbook-pro>
-References: <20180501213114.20183-1-robh@kernel.org>
- <20180507183106.GF2259@tuxbook-pro>
-Message-ID: <91dad272-e07d-2ab6-2afa-538294e9cefa@suse.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 9 May 2018 10:46:11 +0100
+Subject: [PATCH v6 07/15] KVM: arm64: Optimise FPSIMD handling to reduce
+ guest/host thrashing
+In-Reply-To: <20180509091701.GM7753@e103592.cambridge.arm.com>
+References: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
+ <1525797900-5548-8-git-send-email-Dave.Martin@arm.com>
+ <cd45aff8-66dd-b6bc-ada0-189b45e09d17@arm.com>
+ <20180509091701.GM7753@e103592.cambridge.arm.com>
+Message-ID: <5010b106-4aa3-fb19-bbac-55cf261f9d30@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2018 08:31 PM, Bjorn Andersson wrote:
-> On Tue 01 May 14:31 PDT 2018, Rob Herring wrote:
->
->> Deferred probe will currently wait forever on dependent devices to probe,
->> but sometimes a driver will never exist. It's also not always critical for
->> a driver to exist. Platforms can rely on default configuration from the
->> bootloader or reset defaults for things such as pinctrl and power domains.
-> But how do you know if this is the case?
->
->> This is often the case with initial platform support until various drivers
->> get enabled.
-> Can you please name platform that has enough support for Alexander to
-> care about backwards and forwards compatibility but lacks a pinctrl
-> driver.
-
-ZynqMP is one example that immediately comes to my mind. I'm sure there 
-are others too.
-
-In general it's very frustrating to debug what goes wrong when you can't 
-even get serial to output anything at all just because there are now 
-pinctrl bindings that your kernel may not know about yet. I've run into 
-that too many times.
-
->
->> There's at least 2 scenarios where deferred probe can render
->> a platform broken. Both involve using a DT which has more devices and
->> dependencies than the kernel supports. The 1st case is a driver may be
->> disabled in the kernel config.
-> I agree that there is a chance that you _might_ get some parts of the
-> system working by relying on the boot loader configuration, but
-> misconfiguration issues applies to any other fundamental providers, such
-> as clocks, regulators, power domains and gpios as well.
->
->> The 2nd case is the kernel version may
->> simply not have the dependent driver. This can happen if using a newer DT
->> (provided by firmware perhaps) with a stable kernel version.
+On 09/05/18 10:17, Dave Martin wrote:
+> On Wed, May 09, 2018 at 09:24:36AM +0100, Marc Zyngier wrote:
+>> On 08/05/18 17:44, Dave Martin wrote:
+>>> This patch refactors KVM to align the host and guest FPSIMD
+>>> save/restore logic with each other for arm64.  This reduces the
+> 
+> [...]
+> 
+>>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>>> index 9699c13..6429eb6 100644
+>>> --- a/arch/arm64/include/asm/kvm_asm.h
+>>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>>> @@ -33,6 +33,8 @@
+>>>  /* vcpu_arch flags field values: */
+>>>  #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
+>>>  #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
 >>
-> As above, this is in no way limited to pinctrl drivers.
->
->> Unfortunately, this change breaks with modules as we have no way of
->> knowing when modules are done loading. One possibility is to make this
->> opt in or out based on compatible strings rather than at a subsystem level.
->> Ideally this information could be extracted automatically somehow. OTOH,
->> maybe the lists are pretty small. There's only a handful of subsystems
->> that can be optional, and then only so many drivers in those that can be
->> modules (at least for pinctrl, many drivers are built-in only).
+>> At some point, we could remove KVM_ARM64_DEBUG_DIRTY_SHIFT as it is not
+>> used anymore (since 1ea66d27e7b0). Do not respin on this account though.
+> 
+> I wondered about this...  I presume this was used from assembly once
+> upon a time.
+> 
+> Since I need to repost for something else anyway, shall I delete that
+> and move the defines to kvm_host.h?  There's no longer an obvious reason
+> for them to be in a different header.
+
+Yes, please.
+
+> [...]
+> 
+>>> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+>>> new file mode 100644
+>>> index 0000000..7059275
+>>> --- /dev/null
+>>> +++ b/arch/arm64/kvm/fpsimd.c
+>>> @@ -0,0 +1,111 @@
+>>> +// SPDX-License-Identifier: GPL-2.0
+>>> +/*
+>>> + * arch/arm64/kvm/fpsimd.c: Guest/host FPSIMD context coordination helpers
+>>> + *
+>>> + * Copyright 2018 Arm Limited
+>>> + * Author: Dave Martin <Dave.Martin@arm.com>
+>>> + */
+>>> +#include <linux/bottom_half.h>
+>>> +#include <linux/sched.h>
+>>> +#include <linux/thread_info.h>
+>>> +#include <linux/kvm_host.h>
+>>> +#include <asm/kvm_asm.h>
+>>> +#include <asm/kvm_host.h>
+>>> +#include <asm/kvm_mmu.h>
+>>> +
+>>> +/*
+>>> + * Called on entry to KVM_RUN unless this vcpu previously ran at least
+>>> + * once and the most recent prior KVM_RUN for this vcpu was called from
+>>> + * the same task as current (highly likely).
+>>> + *
+>>> + * This is guaranteed to execute before kvm_arch_vcpu_load_fp(vcpu),
+>>> + * such that on entering hyp the relevant parts of current are already
+>>> + * mapped.
+>>> + */
+>>> +int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +	int ret;
+>>> +
+>>> +	struct thread_info *ti = &current->thread_info;
+>>> +	struct user_fpsimd_state *fpsimd = &current->thread.uw.fpsimd_state;
+>>> +
+>>> +	/*
+>>> +	 * Make sure the host task thread flags and fpsimd state are
+>>> +	 * visible to hyp:
+>>> +	 */
+>>> +	ret = create_hyp_mappings(ti, ti + 1, PAGE_HYP);
+>>> +	if (ret)
+>>> +		goto error;
+>>> +
+>>> +	ret = create_hyp_mappings(fpsimd, fpsimd + 1, PAGE_HYP);
+>>> +	if (ret)
+>>> +		goto error;
+>>> +
+>>> +	vcpu->arch.host_thread_info = kern_hyp_va(ti);
+>>> +	vcpu->arch.host_fpsimd_state = kern_hyp_va(fpsimd);
 >>
-> On the Qualcomm platform most drivers are tristate and on most platforms
-> there are size restrictions in the proprietary boot loader preventing us
-> from boot the kernel after switching all these frameworks from tristate
-> to bool (which feels like a more appropriate solution than your hack).
-
-I don't see how setting them to bool contradicts with the hack? The goal 
-of this patch is to allow systems to load drivers on firmware provided 
-pinctrl setups if there is no matching pinctrl driver in the kernel.
-
->
->> Cc: Alexander Graf <agraf@suse.de>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> ---
->> This patch came out of a discussion on the ARM boot-architecture
->> list[1] about DT forwards and backwards compatibility issues. There are
->> issues with newer DTs breaking on older, stable kernels. Some of these
->> are difficult to solve, but cases of optional devices not having
->> kernel support should be solvable.
+>> Since we assign host_fpsimd_state here, and that "map" is guaranteed to
+>> execute before "load"...
 >>
-> There are two cases here:
-> 1) DT contains compatibles that isn't supported by the kernel. In this
-> case the associated device will remain in the probe deferral list and
-> user space won't know about the device.
->
-> 2) DT contains compatibles known to the kernel but has new optional
-> properties that makes things functional or works around hardware bugs.
-
-The key point is not to regress. Imagine you have firmware 1.0 which 
-works with OS 1.0. Firmware provides the device tree.
-
-When you update to firmware to 1.1 you want to make sure OS 1.0 still 
-works. The bug you're referring to that existed before of course still 
-exists. But we're not worse off.
-
->
->> I tested this on a RPi3 B with the pinctrl driver forced off. With this
->> change, the MMC/SD and UART drivers can function without the pinctrl
->> driver.
+>>> +error:
+>>> +	return ret;
+>>> +}
+>>> +
+>>> +/*
+>>> + * Prepare vcpu for saving the host's FPSIMD state and loading the guest's.
+>>> + * The actual loading is done by the FPSIMD access trap taken to hyp.
+>>> + *
+>>> + * Here, we just set the correct metadata to indicate that the FPSIMD
+>>> + * state in the cpu regs (if any) belongs to current, and where to write
+>>> + * it back to if/when a FPSIMD access trap is taken.
+>>> + *
+>>> + * TIF_SVE is backed up here, since it may get clobbered with guest state.
+>>> + * This flag is restored by kvm_arch_vcpu_put_fp(vcpu).
+>>> + */
+>>> +void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +	BUG_ON(system_supports_sve());
+>>> +	BUG_ON(!current->mm);
+>>> +
+>>> +	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
+>>> +	if (test_thread_flag(TIF_SVE))
+>>> +		vcpu->arch.flags |= KVM_ARM64_HOST_SVE_IN_USE;
+>>> +
+>>> +	vcpu->arch.host_fpsimd_state =
+>>> +		kern_hyp_va(&current->thread.uw.fpsimd_state);
 >>
-> Cool, so what about graphics, audio, networking, usb and all the other
-> things that people actually expect when they _use_ a distro?
+>> ... what is the purpose of this assignment? I don't think it is harmful
+>> in any way, but I'm just wondering if I'm missing in the actual flow.
+> 
+> The pointer will be NULLed by __hyp_switch_fpsimd() when loading the
+> guest state in, to indicate that there is no longer any host state to
+> save.  Perhaps it would have been clearer to have a separate flag to
+> represent this change of state.
+> 
+> As things stand I think you're right: the assignments are redundant.  
+> We certainly need the pointer to reflect the current task, which is
+> the motivation for doing it here -- but in fact we need to do it
+> more often, at every vcpu_load().
+> 
+> I think the most appropriate thing is to delete the assignment from
+> _map_fp().
+> 
+> The alternative would be to add a flag for the "no host state to save"
+> case, and fpsimd_host_state only in the pid_change hook.
 
-Again, it's about regressions. If audio didn't work before, a firmware 
-update may not get you working audio with OS 1.0. But it may enable OS 
-1.1 to provide audio.
+I think I'd prefer the latter. It makes the whole pointer stuff a lot
+easier to understand (the linkages are basically static), and using
+flags is consistent with the way the rest of the kernel works. I'm not
+sure whether we need to add a new flag or simply rely on the existing
+thread flag, but that for you to decide.
 
+> 
+> [...]
+> 
+>>> +/*
+>>> + * Write back the vcpu FPSIMD regs if they are dirty, and invalidate the
+>>> + * cpu FPSIMD regs so that they can't be spuriously reused if this vcpu
+>>> + * disappears and another task or vcpu appears that recycles the same
+>>> + * struct fpsimd_state.
+>>> + */
+>>> +void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +	local_bh_disable();
+>>> +
+>>> +	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
+>>> +		fpsimd_save();
+>>> +		fpsimd_flush_cpu_state();
+>>> +		set_thread_flag(TIF_FOREIGN_FPSTATE);
+>>> +	}
+>>> +
+>>> +	update_thread_flag(TIF_SVE,
+>>> +			   vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE);
+>>
+>> Does this indicate anything about the validity of the SVE registers? Or
+>> is it for the sole purpose of userspace not having to trap to re-enable SVE?
+> 
+> This is the host task's "SVE registers exist" flag.  It's essential to
+> restore this correctly before re-enabling preemption, because it
+> controls where the regs are saved/restored from:
+> current->thread.fpsimd_state, or the dynamically allocated buffer
+> current->thread.sve_state (TIF_SVE set indicates the latter).
+> 
+> TIF_FOREIGN_FPSTATE is orthogonal to this, and indicates whether the
+> regs are actually loaded in the hardware.  Obviously they aren't if
+> we had loaded the guest's regs meanwhile.
 
-Alex
+OK, that makes sense now.
+
+> [...]
+> 
+>>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>>> index c0796c4..75c3b65 100644
+>>> --- a/arch/arm64/kvm/hyp/switch.c
+>>> +++ b/arch/arm64/kvm/hyp/switch.c
+>>> @@ -27,15 +27,16 @@
+>>>  #include <asm/kvm_mmu.h>
+>>>  #include <asm/fpsimd.h>
+>>>  #include <asm/debug-monitors.h>
+>>> +#include <asm/thread_info.h>
+>>>  
+>>> -static bool __hyp_text __fpsimd_enabled_nvhe(void)
+>>> +static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
+>>>  {
+>>> -	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
+>>> -}
+>>> +	if (vcpu->arch.host_thread_info->flags & _TIF_FOREIGN_FPSTATE) {
+>>> +		vcpu->arch.host_fpsimd_state = NULL;
+>>> +		vcpu->arch.flags &= ~KVM_ARM64_FP_ENABLED;
+>>> +	}
+>>
+>> I must confess I don't get this bit. If we started off with an invalid
+>> host state (which is how I interpret TIF_FOREIGN_FPSTATE), why didn't we
+>> simply zero the pointer at load time? The thread flag cannot change in
+>> the meantime, right? Or did I get that wrong?
+> 
+> The host kernel can take interrupts in the run loop while outside the
+> guest, causing this flag to get set.  So we really do need to re-check
+> on each entry to the guest.
+> 
+> I can add a one-line comment documenting the purpose of this function,
+> which should help understanding here, something like:
+> 
+> /* Check whether the FP regs were dirtied while in the host-side run loop */
+
+Yup, looks good.
+
+> [...]
+> 
+>> It otherwise looks good, and I don't think the above nits are
+>> problematic on their own.
+>>
+>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Thanks.
+> 
+> I will probably address the nits since I need to fix another build break
+> issue with CONFIG_KVM=n.  That will be a pretty trivial respin.
+> 
+> Happy to keep your Reviewed-by with the discussed changes?
+Yes, no problem. I'll eyeball the changes and let you know if I spot
+anything.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
