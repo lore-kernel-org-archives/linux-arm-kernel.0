@@ -1,33 +1,105 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 9 May 2018 10:43:32 +0100
-Subject: [PATCH v7 20/24] ASoC: qdsp6: q6afe: Add q6afe dai driver
-In-Reply-To: <22a39a17-36ef-3e94-e91b-11d303559ae4@codeaurora.org>
-References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
- <20180501120820.11016-21-srinivas.kandagatla@linaro.org>
- <22a39a17-36ef-3e94-e91b-11d303559ae4@codeaurora.org>
-Message-ID: <28faf045-a053-0918-70d3-1ef6fcdb13b8@linaro.org>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 9 May 2018 11:44:55 +0200
+Subject: [RFC PATCH] driver core: make deferring probe forever optional
+In-Reply-To: <20180507183106.GF2259@tuxbook-pro>
+References: <20180501213114.20183-1-robh@kernel.org>
+ <20180507183106.GF2259@tuxbook-pro>
+Message-ID: <91dad272-e07d-2ab6-2afa-538294e9cefa@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/07/2018 08:31 PM, Bjorn Andersson wrote:
+> On Tue 01 May 14:31 PDT 2018, Rob Herring wrote:
+>
+>> Deferred probe will currently wait forever on dependent devices to probe,
+>> but sometimes a driver will never exist. It's also not always critical for
+>> a driver to exist. Platforms can rely on default configuration from the
+>> bootloader or reset defaults for things such as pinctrl and power domains.
+> But how do you know if this is the case?
+>
+>> This is often the case with initial platform support until various drivers
+>> get enabled.
+> Can you please name platform that has enough support for Alexander to
+> care about backwards and forwards compatibility but lacks a pinctrl
+> driver.
+
+ZynqMP is one example that immediately comes to my mind. I'm sure there 
+are others too.
+
+In general it's very frustrating to debug what goes wrong when you can't 
+even get serial to output anything at all just because there are now 
+pinctrl bindings that your kernel may not know about yet. I've run into 
+that too many times.
+
+>
+>> There's at least 2 scenarios where deferred probe can render
+>> a platform broken. Both involve using a DT which has more devices and
+>> dependencies than the kernel supports. The 1st case is a driver may be
+>> disabled in the kernel config.
+> I agree that there is a chance that you _might_ get some parts of the
+> system working by relying on the boot loader configuration, but
+> misconfiguration issues applies to any other fundamental providers, such
+> as clocks, regulators, power domains and gpios as well.
+>
+>> The 2nd case is the kernel version may
+>> simply not have the dependent driver. This can happen if using a newer DT
+>> (provided by firmware perhaps) with a stable kernel version.
+>>
+> As above, this is in no way limited to pinctrl drivers.
+>
+>> Unfortunately, this change breaks with modules as we have no way of
+>> knowing when modules are done loading. One possibility is to make this
+>> opt in or out based on compatible strings rather than at a subsystem level.
+>> Ideally this information could be extracted automatically somehow. OTOH,
+>> maybe the lists are pretty small. There's only a handful of subsystems
+>> that can be optional, and then only so many drivers in those that can be
+>> modules (at least for pinctrl, many drivers are built-in only).
+>>
+> On the Qualcomm platform most drivers are tristate and on most platforms
+> there are size restrictions in the proprietary boot loader preventing us
+> from boot the kernel after switching all these frameworks from tristate
+> to bool (which feels like a more appropriate solution than your hack).
+
+I don't see how setting them to bool contradicts with the hack? The goal 
+of this patch is to allow systems to load drivers on firmware provided 
+pinctrl setups if there is no matching pinctrl driver in the kernel.
+
+>
+>> Cc: Alexander Graf <agraf@suse.de>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> ---
+>> This patch came out of a discussion on the ARM boot-architecture
+>> list[1] about DT forwards and backwards compatibility issues. There are
+>> issues with newer DTs breaking on older, stable kernels. Some of these
+>> are difficult to solve, but cases of optional devices not having
+>> kernel support should be solvable.
+>>
+> There are two cases here:
+> 1) DT contains compatibles that isn't supported by the kernel. In this
+> case the associated device will remain in the probe deferral list and
+> user space won't know about the device.
+>
+> 2) DT contains compatibles known to the kernel but has new optional
+> properties that makes things functional or works around hardware bugs.
+
+The key point is not to regress. Imagine you have firmware 1.0 which 
+works with OS 1.0. Firmware provides the device tree.
+
+When you update to firmware to 1.1 you want to make sure OS 1.0 still 
+works. The bug you're referring to that existed before of course still 
+exists. But we're not worse off.
+
+>
+>> I tested this on a RPi3 B with the pinctrl driver forced off. With this
+>> change, the MMC/SD and UART drivers can function without the pinctrl
+>> driver.
+>>
+> Cool, so what about graphics, audio, networking, usb and all the other
+> things that people actually expect when they _use_ a distro?
+
+Again, it's about regressions. If audio didn't work before, a firmware 
+update may not get you working audio with OS 1.0. But it may enable OS 
+1.1 to provide audio.
 
 
-On 09/05/18 10:42, Banajit Goswami wrote:
->> +
->> +static int msm_dai_q6_dai_probe(struct snd_soc_dai *dai)
->> +{
->> +    struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
->> +    struct snd_soc_dapm_context *dapm;
->> +    struct q6afe_port *port;
->> +
->> +    dapm = snd_soc_component_get_dapm(dai->component);
-> dapm unused here?
-> 
-I already removed this in v8.
-
-thanks,
-srini
-
-> LGTM otherwise.
-> Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
-> 
-> -- 
+Alex
