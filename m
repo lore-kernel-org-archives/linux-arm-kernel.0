@@ -1,95 +1,66 @@
-From: marcin@ziemianowicz.com (Marcin Ziemianowicz)
-Date: Wed, 9 May 2018 00:32:05 -0400
-Subject: [PATCH V4] clk: at91: PLL recalc_rate() now using cached MUL and
- DIV values
-In-Reply-To: <20180430075847.29706679@bbrezillon>
-References: <20180429190111.14247-1-marcin@ziemianowicz.com>
- <20180430075847.29706679@bbrezillon>
-Message-ID: <20180509043205.GA57916@hak8or>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 9 May 2018 12:51:53 +0800
+Subject: [PATCH] Kirin-PCIe: Add kirin pcie msi feature.
+In-Reply-To: <20180508125658.GK161390@bhelgaas-glaptop.roam.corp.google.com>
+References: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
+ <20180508125658.GK161390@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180509045151.GA24899@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 07:58:47AM +0200, Boris Brezillon wrote:
-> On Sun, 29 Apr 2018 15:01:11 -0400
-> Marcin Ziemianowicz <marcin@ziemianowicz.com> wrote:
-> 
-> > When a USB device is connected to the USB host port on the SAM9N12 then
-> > you get "-62" error which seems to indicate USB replies from the device
-> > are timing out. Based on a logic sniffer, I saw the USB bus was running
-> > at half speed.
-> > 
-> > The PLL code uses cached MUL and DIV values which get set in set_rate()
-> > and applied in prepare(), but the recalc_rate() function instead
-> > queries the hardware instead of using these cached values. Therefore,
-> > if recalc_rate() is called between a set_rate() and prepare(), the
-> > wrong frequency is calculated and later the USB clock divider for the
-> > SAM9N12 SOC will be configured for an incorrect clock.
-> > 
-> > In my case, the PLL hardware was set to 96 Mhz before the OHCI
-> > driver loads, and therefore the usb clock divider was being set
-> > to /2 even though the OHCI driver set the PLL to 48 Mhz.
-> > 
-> > As an alternative explanation, I noticed this was fixed in the past by
-> > 87e2ed338f1b ("clk: at91: fix recalc_rate implementation of PLL
-> > driver") but the bug was later re-introduced by 1bdf02326b71 ("clk:
-> > at91: make use of syscon/regmap internally").
-> > 
-> > Fixes: 1bdf02326b71 ("clk: at91: make use of syscon/regmap internally)
-> > Cc: <stable@vger.kernel.org>
-> > Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
-> 
-> Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
+Hi Bjorn,
 
-Apologies for being a bother, but since it's been a bit over a week,
-should I do something with this now that it has been ACK'd? I was thinking
-I would see it somewhere on the git group repo but am not seeing it there
-yet. Googling says that there is a "review cycle" for some maintainers, but
-I am not clear on if I need to initiate it manually or anything of the sort.
+On Tue, May 08, 2018 at 07:56:58AM -0500, Bjorn Helgaas wrote:
+...
+> > +			return ret;
+> > +		}
+> > +	}
+> > +
+> > +	pci->pp.root_bus_nr = -1;
+> 
+> Setting root_bus_nr looks like an unrelated change that should be in a
+> separate patch.
+> 
+> But I'm not sure why you need to set root_bus_nr at all, since
+> dw_pcie_host_init() always sets it.
+> 
+> Some other callers of dw_pcie_host_init() do set it:
+> 
+>   exynos_add_pcie_port()
+>   imx6_add_pcie_port()
+>   armada8k_add_pcie_port()
+>   artpec6_add_pcie_port()
+>   dw_plat_add_pcie_port()
+>   histb_pcie_probe()
+>   qcom_pcie_probe()
+>   spear13xx_add_pcie_port()
+> 
+> But I don't see *why* any of these need to set it.  If they don't need to
+> set it, they shouldn't.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/ 
+Mostly it's a blind copy of unnecessary code.  I tested histb driver
+by dropping the line, and did not see anything broken.  I will cook up
+a series to remove the code from all above drivers, and copy
+corresponding driver owner to comment.
+
+> And it would be nice if histb and qcom followed the structure and naming
+> conventions of the other drivers, i.e., they should have
+> histb_add_pcie_port() and qcom_add_pcie_port().
+
+I can create a patch for histb driver, but will leave qcom one to
+Stanimir to decide.
+
+Shawn
 
 > 
-> > ---
-> > Thank you for bearing with me about this Boris.
-> > 
-> > Changes since V3:
-> >   Fix for double returns found by kbluild test robot
-> >   > Comments by Boris Brezillon about email formatting issues  
-> > Changes since V2:
-> >   Removed all logging/debug messages I added
-> >   > Comment by Boris Brezillon about my fix being wrong addressed  
-> > Changes since V1:
-> >   Added patch set cover letter
-> >   Shortened lines which were over >80 characters long
-> >   > Comment by Greg Kroah-Hartman about "from" field in email addressed
-> >   > Comment by Alan Stern about redundant debug lines addressed  
-> > 
-> >  drivers/clk/at91/clk-pll.c | 13 +------------
-> >  1 file changed, 1 insertion(+), 12 deletions(-)
-> > 
-> > diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-> > index 7d3223fc..72b6091e 100644
-> > --- a/drivers/clk/at91/clk-pll.c
-> > +++ b/drivers/clk/at91/clk-pll.c
-> > @@ -132,19 +132,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
-> >  					 unsigned long parent_rate)
-> >  {
-> >  	struct clk_pll *pll = to_clk_pll(hw);
-> > -	unsigned int pllr;
-> > -	u16 mul;
-> > -	u8 div;
-> > -
-> > -	regmap_read(pll->regmap, PLL_REG(pll->id), &pllr);
-> > -
-> > -	div = PLL_DIV(pllr);
-> > -	mul = PLL_MUL(pllr, pll->layout);
-> > -
-> > -	if (!div || !mul)
-> > -		return 0;
+> >  	pci->pp.ops = &kirin_pcie_host_ops;
 > >  
-> > -	return (parent_rate / div) * (mul + 1);
-> > +	return (parent_rate / pll->div) * (pll->mul + 1);
-> >  }
-> >  
-> >  static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
-> 
+> >  	return dw_pcie_host_init(&pci->pp);
+> > -- 
+> > 1.9.1
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
