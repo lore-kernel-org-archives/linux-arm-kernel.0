@@ -1,60 +1,64 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Thu, 10 May 2018 02:10:58 +0300
-Subject: [PATCH] Kirin-PCIe: Add kirin pcie msi feature.
-In-Reply-To: <20180509045151.GA24899@dragon>
-References: <1525763028-107417-1-git-send-email-chenyao11@huawei.com>
- <20180508125658.GK161390@bhelgaas-glaptop.roam.corp.google.com>
- <20180509045151.GA24899@dragon>
-Message-ID: <058ea1c5-6be1-43ec-0bfe-08231717b7e1@mm-sol.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Wed, 9 May 2018 18:41:54 -0500
+Subject: [PATCH] drivers/perf: arm-ccn: stop spamming dmesg in event_init
+In-Reply-To: <1525882003.4199.55.camel@arm.com>
+References: <20180504104117.8086-1-mark.rutland@arm.com>
+ <20180508184050.75c60b82ba538d0ecdeb2d78@arm.com>
+ <1525882003.4199.55.camel@arm.com>
+Message-ID: <20180509184154.9994df2874e7a08025b56dea@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 9 May 2018 17:06:43 +0100
+Pawel Moll <pawel.moll@arm.com> wrote:
 
-On  9.05.2018 07:51, Shawn Guo wrote:
-> Hi Bjorn,
+> On Wed, 2018-05-09 at 00:40 +0100, Kim Phillips wrote:
+> > On Fri,  4 May 2018 11:41:17 +0100 Mark Rutland <mark.rutland@arm.com> wrote:
+> > 
+> > [adding Pawel, arm-ccn driver author]
 > 
-> On Tue, May 08, 2018 at 07:56:58AM -0500, Bjorn Helgaas wrote:
-> ...
->>> +			return ret;
->>> +		}
->>> +	}
->>> +
->>> +	pci->pp.root_bus_nr = -1;
->>
->> Setting root_bus_nr looks like an unrelated change that should be in a
->> separate patch.
->>
->> But I'm not sure why you need to set root_bus_nr at all, since
->> dw_pcie_host_init() always sets it.
->>
->> Some other callers of dw_pcie_host_init() do set it:
->>
->>    exynos_add_pcie_port()
->>    imx6_add_pcie_port()
->>    armada8k_add_pcie_port()
->>    artpec6_add_pcie_port()
->>    dw_plat_add_pcie_port()
->>    histb_pcie_probe()
->>    qcom_pcie_probe()
->>    spear13xx_add_pcie_port()
->>
->> But I don't see *why* any of these need to set it.  If they don't need to
->> set it, they shouldn't.
-> 
-> Mostly it's a blind copy of unnecessary code.  I tested histb driver
-> by dropping the line, and did not see anything broken.  I will cook up
-> a series to remove the code from all above drivers, and copy
-> corresponding driver owner to comment.
-> 
->> And it would be nice if histb and qcom followed the structure and naming
->> conventions of the other drivers, i.e., they should have
->> histb_add_pcie_port() and qcom_add_pcie_port().
-> 
-> I can create a patch for histb driver, but will leave qcom one to
-> Stanimir to decide.
+> We had this discussion way too many times for my liking. As I said
+> before - *I* will be fine with the debug messages in the CCN driver.
+> Now, if there ever turns out to be other user of this thing and gets
 
-Thanks, will see what can be done.
+Sure, this isn't just about Pawel using the driver he wrote - we know
+you know how to use it because you wrote it.  No, it's about all the
+other potential users out there, esp. first time users, as I once was.
 
-regards,
-Stan
+> into problems with event configuration, I'd hope that he/she can count
+> on support from the knowledgable people here... (just checked and both
+
+I abhor having to suggest our users email this list in order to find out
+how to use the PMU drivers.  First time users are going to tend to
+steer completely away if they don't have the patience to debug a silent
+PMU, rather than email this mailing list - sorry, but that's just
+adding a huge usage barrier - for what - fuzzer runner's convenience?
+
+> RHEL 7.5 and Ubuntu 16.04.3 kernels on AArch64 come with
+> CONFIG_DYNAMIC_DEBUG=y, so it's a matter of explaining what has to be
+> enabled where; sadly this information did not find its way into the
+> commit description)
+
+I can't think of a more difficult to find, more far-away, alien
+place for end users to find help with perf, sorry.
+
+> > > The ARM CCN PMU driver uses dev_warn() to complain about parameters
+> > in
+> > > the user-provided perf_event_attr. This means that under normal
+> > > operation (e.g. a single invocation of the perf tool), dmesg may be
+> > > spammed with multiple messages.
+> 
+> Surely Mark, in his role as maintainer of drivers/perf/ (and a few
+> other locations), meant to use much more technical and emotion-free
+> subject, along the lines of "reduce a number of dmesg warnings at event
+> init".
+
+'reduce a number' is the wrong word:  warnings are completely
+eliminated. Debug-level messages occur at exactly the same
+frequency/amount.
+
+But I still object to the rationale overall - it seems this is about
+running fuzzers?  I even offered an alternative for fuzzer runners: is
+modifying the loglevel prior to fuzzing somehow unacceptable?
+
+Kim
