@@ -1,37 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 9 May 2018 09:28:50 +0100
-Subject: [PATCH v6 08/15] arm64/sve: Move read_zcr_features() out of
- cpufeature.h
-In-Reply-To: <1525797900-5548-9-git-send-email-Dave.Martin@arm.com>
-References: <1525797900-5548-1-git-send-email-Dave.Martin@arm.com>
- <1525797900-5548-9-git-send-email-Dave.Martin@arm.com>
-Message-ID: <2d335ebd-a17e-cf0f-5d59-398f721ce43e@arm.com>
+From: bgoswami@codeaurora.org (Banajit Goswami)
+Date: Wed, 9 May 2018 01:34:06 -0700
+Subject: [PATCH v7 19/24] ASoC: qdsp6: q6routing: Add support to MI2S
+ Mixers
+In-Reply-To: <20180501120820.11016-20-srinivas.kandagatla@linaro.org>
+References: <20180501120820.11016-1-srinivas.kandagatla@linaro.org>
+ <20180501120820.11016-20-srinivas.kandagatla@linaro.org>
+Message-ID: <a54f3aba-5a8a-5a69-2cbd-98244f4f7ed1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/18 17:44, Dave Martin wrote:
-> Having read_zcr_features() inline in cpufeature.h results in that
-> header requiring #includes which make it hard to include
-> <asm/fpsimd.h> elsewhere without triggering header inclusion
-> cycles.
-> 
-> This is not a hot-path function and arguably should not be in
-> cpufeature.h in the first place, so this patch moves it to
-> fpsimd.c, compiled conditionally if CONFIG_ARM64_SVE=y.
-> 
-> This allows some SVE-related #includes to be dropped from
-> cpufeature.h, which will ease future maintenance.
-> 
-> A couple of missing #includes of <asm/fpsimd.h> are exposed by this
-> change under arch/arm64/.  This patch adds the missing #includes as
-> necessary.
-> 
-> No functional change.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-	M.
+On 5/1/2018 5:08 AM, Srinivas Kandagatla wrote:
+> This patch add support to MI2S mixers required to select path between
+> ASM stream and AFE ports.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
+> ---
+>   sound/soc/qcom/qdsp6/q6routing.c | 329 +++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 329 insertions(+)
+>
+>
+Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
+
 -- 
-Jazz is not dead. It just smells funny...
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
