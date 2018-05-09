@@ -1,35 +1,34 @@
-From: khoroshilov@ispras.ru (Alexey Khoroshilov)
-Date: Wed,  9 May 2018 18:11:20 +0300
-Subject: [PATCH v3] mtd: nxp-spifi: release flash_np in nxp_spifi_probe()
-In-Reply-To: <20180509170310.65d19c49@bbrezillon>
-Message-ID: <1525878680-22005-1-git-send-email-khoroshilov@ispras.ru>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Wed, 9 May 2018 17:18:14 +0200
+Subject: [PATCH 2/2] ARM: dts: stm32: update rtc st,
+ syscfg property on stm32f746
+In-Reply-To: <1525879094-19562-1-git-send-email-amelie.delaunay@st.com>
+References: <1525879094-19562-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1525879094-19562-3-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nxp_spifi_probe() increments refcnt of SPI flash device node by
-of_get_next_available_child() and leaves it undecremented on both
-successful and error paths.
+To fit with latest rtc driver updates, rtc st,syscfg property must contain
+the control register offset of pwrcfg and the mask corresponding to the
+DBP (Disable Backup Protection) bit.
 
-Found by Linux Driver Verification project (linuxtesting.org).
-
-Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
-v3: Move of_node_put() before return value check as Boris Brezillon suggested.
+ arch/arm/boot/dts/stm32f746.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/mtd/spi-nor/nxp-spifi.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/mtd/spi-nor/nxp-spifi.c b/drivers/mtd/spi-nor/nxp-spifi.c
-index 15374216d4d9..0c9094ec5966 100644
---- a/drivers/mtd/spi-nor/nxp-spifi.c
-+++ b/drivers/mtd/spi-nor/nxp-spifi.c
-@@ -436,6 +436,7 @@ static int nxp_spifi_probe(struct platform_device *pdev)
- 	}
+diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+index 1479e3e..f48d06a 100644
+--- a/arch/arm/boot/dts/stm32f746.dtsi
++++ b/arch/arm/boot/dts/stm32f746.dtsi
+@@ -297,7 +297,7 @@
+ 			interrupt-parent = <&exti>;
+ 			interrupts = <17 1>;
+ 			interrupt-names = "alarm";
+-			st,syscfg = <&pwrcfg>;
++			st,syscfg = <&pwrcfg 0x00 0x100>;
+ 			status = "disabled";
+ 		};
  
- 	ret = nxp_spifi_setup_flash(spifi, flash_np);
-+	of_node_put(flash_np);
- 	if (ret) {
- 		dev_err(&pdev->dev, "unable to setup flash chip\n");
- 		goto dis_clks;
 -- 
 2.7.4
