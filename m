@@ -1,230 +1,150 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  9 May 2018 13:56:18 +0100
-Subject: [PATCH v8 07/24] ASoC: qdsp6: q6common: Add qdsp6 helper functions
+Date: Wed,  9 May 2018 13:56:12 +0100
+Subject: [PATCH v8 01/24] soc: qcom dt-bindings: Add APR bus bindings
 In-Reply-To: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
 References: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180509125635.5653-8-srinivas.kandagatla@linaro.org>
+Message-ID: <20180509125635.5653-2-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds some common helper functions like translating dsp error
-to linux error codes and channel mappings etc.
-
-These functions are used in all the following qdsp6 drivers.
+This patch add dt bindings for Qualcomm APR (Asynchronous Packet Router)
+bus driver. This bus is used for communicating with DSP which provides
+audio and various other services to cpu.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Reviewed-by: Banajit Goswami <bgoswami@codeaurora.org>
 ---
- sound/soc/qcom/Kconfig              | 13 ++++++++
- sound/soc/qcom/Makefile             |  3 ++
- sound/soc/qcom/qdsp6/Makefile       |  1 +
- sound/soc/qcom/qdsp6/q6dsp-common.c | 66 +++++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6dsp-common.h | 24 ++++++++++++++
- sound/soc/qcom/qdsp6/q6dsp-errno.h  | 51 ++++++++++++++++++++++++++++
- 6 files changed, 158 insertions(+)
- create mode 100644 sound/soc/qcom/qdsp6/Makefile
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.c
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.h
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-errno.h
+ .../devicetree/bindings/soc/qcom/qcom,apr.txt      | 84 ++++++++++++++++++++++
+ include/dt-bindings/soc/qcom,apr.h                 | 28 ++++++++
+ 2 files changed, 112 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+ create mode 100644 include/dt-bindings/soc/qcom,apr.h
 
-diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 3cc252e55468..b44a9fcd7ed3 100644
---- a/sound/soc/qcom/Kconfig
-+++ b/sound/soc/qcom/Kconfig
-@@ -40,3 +40,16 @@ config SND_SOC_APQ8016_SBC
-           Support for Qualcomm Technologies LPASS audio block in
-           APQ8016 SOC-based systems.
-           Say Y if you want to use audio devices on MI2S.
-+
-+config SND_SOC_QDSP6_COMMON
-+	tristate
-+
-+config SND_SOC_QDSP6
-+	tristate "SoC ALSA audio driver for QDSP6"
-+	depends on QCOM_APR && HAS_DMA
-+	select SND_SOC_QDSP6_COMMON
-+	help
-+	 To add support for MSM QDSP6 Soc Audio.
-+	 This will enable sound soc platform specific
-+	 audio drivers. This includes q6asm, q6adm,
-+	 q6afe interfaces to DSP using apr.
-diff --git a/sound/soc/qcom/Makefile b/sound/soc/qcom/Makefile
-index d5280355c24f..0276717917c0 100644
---- a/sound/soc/qcom/Makefile
-+++ b/sound/soc/qcom/Makefile
-@@ -16,3 +16,6 @@ snd-soc-apq8016-sbc-objs := apq8016_sbc.o
- 
- obj-$(CONFIG_SND_SOC_STORM) += snd-soc-storm.o
- obj-$(CONFIG_SND_SOC_APQ8016_SBC) += snd-soc-apq8016-sbc.o
-+
-+#DSP lib
-+obj-$(CONFIG_SND_SOC_QDSP6) += qdsp6/
-diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
+diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
 new file mode 100644
-index 000000000000..accebdb49306
+index 000000000000..bcc612cc7423
 --- /dev/null
-+++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
-diff --git a/sound/soc/qcom/qdsp6/q6dsp-common.c b/sound/soc/qcom/qdsp6/q6dsp-common.c
++++ b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+@@ -0,0 +1,84 @@
++Qualcomm APR (Asynchronous Packet Router) binding
++
++This binding describes the Qualcomm APR. APR is a IPC protocol for
++communication between Application processor and QDSP. APR is mainly
++used for audio/voice services on the QDSP.
++
++- compatible:
++	Usage: required
++	Value type: <stringlist>
++	Definition: must be "qcom,apr-v<VERSION-NUMBER>", example "qcom,apr-v2"
++
++- reg
++	Usage: required
++	Value type: <u32>
++	Definition: Destination processor ID.
++	Possible values are :
++			1 - APR simulator
++			2 - PC
++			3 - MODEM
++			4 - ADSP
++			5 - APPS
++			6 - MODEM2
++			7 - APPS2
++
++= APR SERVICES
++Each subnode of the APR node represents service tied to this apr. The name
++of the nodes are not important. The properties of these nodes are defined
++by the individual bindings for the specific service
++- All APR services MUST contain the following property:
++
++- reg
++	Usage: required
++	Value type: <u32>
++	Definition: APR Service ID
++	Possible values are :
++			3 - DSP Core Service
++			4 - Audio Front End Service.
++			5 - Voice Stream Manager Service.
++			6 - Voice processing manager.
++			7 - Audio Stream Manager Service.
++			8 - Audio Device Manager Service.
++			9 - Multimode voice manager.
++			10 - Core voice stream.
++			11 - Core voice processor.
++			12 - Ultrasound stream manager.
++			13 - Listen stream manager.
++
++= EXAMPLE
++The following example represents a QDSP based sound card on a MSM8996 device
++which uses apr as communication between Apps and QDSP.
++
++	apr at 4 {
++		compatible = "qcom,apr-v2";
++		reg = <APR_DOMAIN_ADSP>;
++
++		q6core at 3 {
++			compatible = "qcom,q6core";
++			reg = <APR_SVC_ADSP_CORE>;
++		};
++
++		q6afe at 4 {
++			compatible = "qcom,q6afe";
++			reg = <APR_SVC_AFE>;
++
++			dais {
++				#sound-dai-cells = <1>;
++				hdmi at 1 {
++					reg = <1>;
++				};
++			};
++		};
++
++		q6asm at 7 {
++			compatible = "qcom,q6asm";
++			reg = <APR_SVC_ASM>;
++			...
++		};
++
++		q6adm at 8 {
++			compatible = "qcom,q6adm";
++			reg = <APR_SVC_ADM>;
++			...
++		};
++	};
+diff --git a/include/dt-bindings/soc/qcom,apr.h b/include/dt-bindings/soc/qcom,apr.h
 new file mode 100644
-index 000000000000..d393003492c7
+index 000000000000..006362400c0f
 --- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6dsp-common.c
-@@ -0,0 +1,66 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
-+// Copyright (c) 2018, Linaro Limited
-+
-+#include "q6dsp-common.h"
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/string.h>
-+#include <linux/errno.h>
-+
-+int q6dsp_map_channels(u8 ch_map[PCM_MAX_NUM_CHANNEL], int ch)
-+{
-+	memset(ch_map, 0, PCM_MAX_NUM_CHANNEL);
-+
-+	switch (ch) {
-+	case 1:
-+		ch_map[0] = PCM_CHANNEL_FC;
-+		break;
-+	case 2:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		break;
-+	case 3:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_FC;
-+		break;
-+	case 4:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_LS;
-+		ch_map[3] = PCM_CHANNEL_RS;
-+		break;
-+	case 5:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_FC;
-+		ch_map[3] = PCM_CHANNEL_LS;
-+		ch_map[4] = PCM_CHANNEL_RS;
-+		break;
-+	case 6:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_LFE;
-+		ch_map[3] = PCM_CHANNEL_FC;
-+		ch_map[4] = PCM_CHANNEL_LS;
-+		ch_map[5] = PCM_CHANNEL_RS;
-+		break;
-+	case 8:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_LFE;
-+		ch_map[3] = PCM_CHANNEL_FC;
-+		ch_map[4] = PCM_CHANNEL_LS;
-+		ch_map[5] = PCM_CHANNEL_RS;
-+		ch_map[6] = PCM_CHANNEL_LB;
-+		ch_map[7] = PCM_CHANNEL_RB;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(q6dsp_map_channels);
-+MODULE_LICENSE("GPL v2");
-diff --git a/sound/soc/qcom/qdsp6/q6dsp-common.h b/sound/soc/qcom/qdsp6/q6dsp-common.h
-new file mode 100644
-index 000000000000..01094d108b8a
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6dsp-common.h
-@@ -0,0 +1,24 @@
++++ b/include/dt-bindings/soc/qcom,apr.h
+@@ -0,0 +1,28 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef __DT_BINDINGS_QCOM_APR_H
++#define __DT_BINDINGS_QCOM_APR_H
 +
-+#ifndef __Q6DSP_COMMON_H__
-+#define __Q6DSP_COMMON_H__
++/* Domain IDs */
++#define APR_DOMAIN_SIM		0x1
++#define APR_DOMAIN_PC		0x2
++#define APR_DOMAIN_MODEM	0x3
++#define APR_DOMAIN_ADSP		0x4
++#define APR_DOMAIN_APPS		0x5
++#define APR_DOMAIN_MAX		0x6
 +
-+#include <linux/kernel.h>
++/* ADSP service IDs */
++#define APR_SVC_ADSP_CORE	0x3
++#define APR_SVC_AFE		0x4
++#define APR_SVC_VSM		0x5
++#define APR_SVC_VPM		0x6
++#define APR_SVC_ASM		0x7
++#define APR_SVC_ADM		0x8
++#define APR_SVC_ADSP_MVM	0x09
++#define APR_SVC_ADSP_CVS	0x0A
++#define APR_SVC_ADSP_CVP	0x0B
++#define APR_SVC_USM		0x0C
++#define APR_SVC_LSM		0x0D
++#define APR_SVC_VIDC		0x16
++#define APR_SVC_MAX		0x17
 +
-+#define PCM_MAX_NUM_CHANNEL  8
-+#define PCM_CHANNEL_NULL 0
-+
-+#define PCM_CHANNEL_FL    1	/* Front left channel. */
-+#define PCM_CHANNEL_FR    2	/* Front right channel. */
-+#define PCM_CHANNEL_FC    3	/* Front center channel. */
-+#define PCM_CHANNEL_LS   4	/* Left surround channel. */
-+#define PCM_CHANNEL_RS   5	/* Right surround channel. */
-+#define PCM_CHANNEL_LFE  6	/* Low frequency effect channel. */
-+#define PCM_CHANNEL_CS   7	/* Center surround channel; Rear center ch */
-+#define PCM_CHANNEL_LB   8	/* Left back channel; Rear left channel. */
-+#define PCM_CHANNEL_RB   9	/* Right back channel; Rear right channel. */
-+#define PCM_CHANNELS   10	/* Top surround channel. */
-+
-+int q6dsp_map_channels(u8 ch_map[PCM_MAX_NUM_CHANNEL], int ch);
-+
-+#endif /* __Q6DSP_COMMON_H__ */
-diff --git a/sound/soc/qcom/qdsp6/q6dsp-errno.h b/sound/soc/qcom/qdsp6/q6dsp-errno.h
-new file mode 100644
-index 000000000000..1ec00ff8c1d2
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6dsp-errno.h
-@@ -0,0 +1,51 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+
-+#ifndef __Q6DSP_ERR_NO_H__
-+#define __Q6DSP_ERR_NO_H__
-+#include <linux/kernel.h>
-+
-+/* Success. The operation completed with no errors. */
-+#define ADSP_EOK          0x00000000
-+/* General failure. */
-+#define ADSP_EFAILED      0x00000001
-+/* Bad operation parameter. */
-+#define ADSP_EBADPARAM    0x00000002
-+/* Unsupported routine or operation. */
-+#define ADSP_EUNSUPPORTED 0x00000003
-+/* Unsupported version. */
-+#define ADSP_EVERSION     0x00000004
-+/* Unexpected problem encountered. */
-+#define ADSP_EUNEXPECTED  0x00000005
-+/* Unhandled problem occurred. */
-+#define ADSP_EPANIC       0x00000006
-+/* Unable to allocate resource. */
-+#define ADSP_ENORESOURCE  0x00000007
-+/* Invalid handle. */
-+#define ADSP_EHANDLE      0x00000008
-+/* Operation is already processed. */
-+#define ADSP_EALREADY     0x00000009
-+/* Operation is not ready to be processed. */
-+#define ADSP_ENOTREADY    0x0000000A
-+/* Operation is pending completion. */
-+#define ADSP_EPENDING     0x0000000B
-+/* Operation could not be accepted or processed. */
-+#define ADSP_EBUSY        0x0000000C
-+/* Operation aborted due to an error. */
-+#define ADSP_EABORTED     0x0000000D
-+/* Operation preempted by a higher priority. */
-+#define ADSP_EPREEMPTED   0x0000000E
-+/* Operation requests intervention to complete. */
-+#define ADSP_ECONTINUE    0x0000000F
-+/* Operation requests immediate intervention to complete. */
-+#define ADSP_EIMMEDIATE   0x00000010
-+/* Operation is not implemented. */
-+#define ADSP_ENOTIMPL     0x00000011
-+/* Operation needs more data or resources. */
-+#define ADSP_ENEEDMORE    0x00000012
-+/* Operation does not have memory. */
-+#define ADSP_ENOMEMORY    0x00000014
-+/* Item does not exist. */
-+#define ADSP_ENOTEXIST    0x00000015
-+/* Max count for adsp error code sent to HLOS*/
-+
-+#endif /*__Q6DSP_ERR_NO_H__ */
++#endif /* __DT_BINDINGS_QCOM_APR_H */
 -- 
 2.16.2
