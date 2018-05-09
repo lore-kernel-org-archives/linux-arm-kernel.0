@@ -1,39 +1,48 @@
-From: ping.bai@nxp.com (Jacky Bai)
-Date: Wed, 9 May 2018 01:26:38 +0000
-Subject: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
-In-Reply-To: <152580354289.138124.13657232356773397650@swboyd.mtv.corp.google.com>
-References: <20180418124908.3079-1-stefan@agner.ch>
- <20180502073807.GE3443@dragon> <56a409cf76a3eaa713cb4f0bbe1e39b6@agner.ch>
- <HE1PR04MB311395765D3DC03D5960DBA3879A0@HE1PR04MB3113.eurprd04.prod.outlook.com>
- <4188ee25bd5179b57d09e4624dcfbfbb@agner.ch>
- <152580354289.138124.13657232356773397650@swboyd.mtv.corp.google.com>
-Message-ID: <HE1PR04MB3113135433766196E708685887990@HE1PR04MB3113.eurprd04.prod.outlook.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Wed, 9 May 2018 09:58:38 +0800
+Subject: [PATCH] arm64: dts: sprd: fix typo in 'remote-endpoint'
+In-Reply-To: <20180508150952.24562-4-robh@kernel.org>
+References: <20180508150952.24562-1-robh@kernel.org>
+ <20180508150952.24562-4-robh@kernel.org>
+Message-ID: <CAAfSe-tgKJvzCN6eHCuUR94ECSE8ypAR1eRjhV-VJNztebK9Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH] clk: imx6ull: use OSC clock during AXI rate change
-> 
-> Quoting Stefan Agner (2018-05-08 06:20:03)
-> > On 08.05.2018 09:32, Jacky Bai wrote:
-> > >
-> > > I have tried two 6ULL board, I don't meet such issue. System can
-> > > boot up successfully with commit 6f9575e55632 included.
-> > > Anyway, the change in this patch is ok for me. it is no harm to the
-> > > BUS clock change flow.
-> >
-> > Hm, that is interesting, maybe it is because we use a different SKU?
-> > Or maybe bootloader?
-> >
-> > I tested here with a 800 MHz clocked variant on a Colibri iMX6ULL
-> > using U-Boot 2016.11.
-> >
-> 
-> I'll throw this into fixes today because it fixes something to be useful. It's still
-> interesting to see what's different between the two setups though.
+Hi Rob,
 
-Thanks. 
+On 8 May 2018 at 23:09, Rob Herring <robh@kernel.org> wrote:
+> dtc now warns on incomplete OF graph endpoint connections:
+>
+> arch/arm64/boot/dts/sprd/sp9860g-1h10.dtb: Warning (graph_endpoint): /soc/stm at 10006000/port/endpoint: graph connection to node '/soc/funnel at 10001000/ports/port at 2/endpoint' is not bidirectional
+>
+> The cause is a typo in 'remote-endpoint'.
 
-I will find some 800MHz parts and have a try with different bootloader later.
-Will let you know, when I have some results.
+Thanks for fixing this and,
 
-Jacky
+Acked-by: Chunyan Zhang <zhang.lyra@gmail.com>
+
+>
+> Cc: Orson Zhai <orsonzhai@gmail.com>
+> Cc: Baolin Wang <baolin.wang@linaro.org>
+> Cc: Chunyan Zhang <zhang.lyra@gmail.com>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  arch/arm64/boot/dts/sprd/sc9860.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> index 5dbfb796d9f9..dcd03ffcda03 100644
+> --- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> @@ -326,7 +326,7 @@
+>                                         reg = <4>;
+>                                         soc_funnel_in_port1: endpoint {
+>                                                 slave-mode;
+> -                                               remote-endpioint =
+> +                                               remote-endpoint =
+>                                                         <&stm_out_port>;
+>                                         };
+>                                 };
+> --
+> 2.17.0
+>
