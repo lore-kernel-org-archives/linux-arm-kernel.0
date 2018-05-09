@@ -1,143 +1,112 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 May 2018 17:13:05 +0100
-Subject: [PATCH v7 16/16] KVM: arm64: Invoke FPSIMD context switch trap from C
+Date: Wed,  9 May 2018 17:12:55 +0100
+Subject: [PATCH v7 06/16] arm64/sve: Refactor user SVE trap maintenance for
+ external use
 In-Reply-To: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
 References: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525882385-29181-17-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1525882385-29181-7-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conversion of the FPSIMD context switch trap code to C has added
-some overhead to calling it, due to the need to save registers that
-the procedure call standard defines as caller-saved.
+In preparation for optimising the way KVM manages switching the
+guest and host FPSIMD state, it is necessary to provide a means for
+code outside arch/arm64/kernel/fpsimd.c to restore the user trap
+configuration for SVE correctly for the current task.
 
-So, perhaps it is no longer worth invoking this trap handler quite
-so early.
+Rather than requiring external code to duplicate the maintenance
+explicitly, this patch wraps moves the trap maintenenace to
+fpsimd_bind_to_cpu(), since it is logically part of the work of
+associating the current task with the cpu.
 
-Instead, we can invoke it from fixup_guest_exit(), with little
-likelihood of increasing the overhead much further.
+Because fpsimd_bind_to_cpu() is rather a cryptic name to publish
+alongside fpsimd_bind_state_to_cpu(), the former function is
+renamed to fpsimd_bind_task_to_cpu() to make its purpose more
+explicit.
 
-As a convenience, this patch gives __hyp_switch_fpsimd() the same
-return semantics fixup_guest_exit().  For now there is no
-possibility of a spurious FPSIMD trap, so the function always
-returns true, but this allows it to be tail-called with a single
-return statement.
+This patch makes appropriate changes to ensure that
+fpsimd_bind_task_to_cpu() is always called alongside
+task_fpsimd_load(), so that the trap maintenance continues to be
+done in every situation where it was done prior to this patch.
+
+As a side-effect, the metadata updates done by
+fpsimd_bind_task_to_cpu() now change from conditional to
+unconditional in the "already bound" case of sigreturn.  This is
+harmless, and a couple of extra stores on this slow path will not
+impact performance.  I consider this a reasonable price to pay for
+a slightly cleaner interface.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/entry.S     | 30 ------------------------------
- arch/arm64/kvm/hyp/hyp-entry.S | 19 -------------------
- arch/arm64/kvm/hyp/switch.c    | 15 +++++++++++++--
- 3 files changed, 13 insertions(+), 51 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index 40f349b..fad1e16 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -166,33 +166,3 @@ abort_guest_exit_end:
- 	orr	x0, x0, x5
- 1:	ret
- ENDPROC(__guest_exit)
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 5fc0595..60404eb 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -257,16 +257,6 @@ static void task_fpsimd_load(void)
+ 			       sve_vq_from_vl(current->thread.sve_vl) - 1);
+ 	else
+ 		fpsimd_load_state(&current->thread.uw.fpsimd_state);
 -
--ENTRY(__fpsimd_guest_restore)
--	// x0: esr
--	// x1: vcpu
--	// x2-x29,lr: vcpu regs
--	// vcpu x0-x1 on the stack
--	stp	x2, x3, [sp, #-144]!
--	stp	x4, x5, [sp, #16]
--	stp	x6, x7, [sp, #32]
--	stp	x8, x9, [sp, #48]
--	stp	x10, x11, [sp, #64]
--	stp	x12, x13, [sp, #80]
--	stp	x14, x15, [sp, #96]
--	stp	x16, x17, [sp, #112]
--	stp	x18, lr, [sp, #128]
+-	if (system_supports_sve()) {
+-		/* Toggle SVE trapping for userspace if needed */
+-		if (test_thread_flag(TIF_SVE))
+-			sve_user_enable();
+-		else
+-			sve_user_disable();
 -
--	bl	__hyp_switch_fpsimd
--
--	ldp	x4, x5, [sp, #16]
--	ldp	x6, x7, [sp, #32]
--	ldp	x8, x9, [sp, #48]
--	ldp	x10, x11, [sp, #64]
--	ldp	x12, x13, [sp, #80]
--	ldp	x14, x15, [sp, #96]
--	ldp	x16, x17, [sp, #112]
--	ldp	x18, lr, [sp, #128]
--	ldp	x0, x1, [sp, #144]
--	ldp	x2, x3, [sp], #160
--	eret
--ENDPROC(__fpsimd_guest_restore)
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index bffece2..753b9d2 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -113,25 +113,6 @@ el1_hvc_guest:
- 
- el1_trap:
- 	get_vcpu_ptr	x1, x0
--
--	mrs		x0, esr_el2
--	lsr		x0, x0, #ESR_ELx_EC_SHIFT
--	/*
--	 * x0: ESR_EC
--	 * x1: vcpu pointer
--	 */
--
--	/*
--	 * We trap the first access to the FP/SIMD to save the host context
--	 * and restore the guest context lazily.
--	 * If FP/SIMD is not implemented, handle the trap and inject an
--	 * undefined instruction exception to the guest.
--	 */
--alternative_if_not ARM64_HAS_NO_FPSIMD
--	cmp	x0, #ESR_ELx_EC_FP_ASIMD
--	b.eq	__fpsimd_guest_restore
--alternative_else_nop_endif
--
- 	mov	x0, #ARM_EXCEPTION_TRAP
- 	b	__guest_exit
- 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 4fbee95..2d45bd7 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -328,8 +328,7 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
- }
- 
--void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
--				    struct kvm_vcpu *vcpu)
-+static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
- {
- 	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
- 
-@@ -369,6 +368,8 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
- 			     fpexc32_el2);
- 
- 	vcpu->arch.flags |= KVM_ARM64_FP_ENABLED;
-+
-+	return true;
+-		/* Serialised by exception return to user */
+-	}
  }
  
  /*
-@@ -390,6 +391,16 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 	if (*exit_code != ARM_EXCEPTION_TRAP)
- 		goto exit;
- 
-+	/*
-+	 * We trap the first access to the FP/SIMD to save the host context
-+	 * and restore the guest context lazily.
-+	 * If FP/SIMD is not implemented, handle the trap and inject an
-+	 * undefined instruction exception to the guest.
-+	 */
-+	if (system_supports_fpsimd() &&
-+	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
-+		return __hyp_switch_fpsimd(vcpu);
+@@ -998,7 +988,7 @@ void fpsimd_signal_preserve_current_state(void)
+  * Associate current's FPSIMD context with this cpu
+  * Preemption must be disabled when calling this function.
+  */
+-static void fpsimd_bind_to_cpu(void)
++static void fpsimd_bind_task_to_cpu(void)
+ {
+ 	struct fpsimd_last_state_struct *last =
+ 		this_cpu_ptr(&fpsimd_last_state);
+@@ -1006,6 +996,16 @@ static void fpsimd_bind_to_cpu(void)
+ 	last->st = &current->thread.uw.fpsimd_state;
+ 	last->sve_in_use = test_thread_flag(TIF_SVE);
+ 	current->thread.fpsimd_cpu = smp_processor_id();
 +
- 	if (!__populate_fault_info(vcpu))
- 		return true;
++	if (system_supports_sve()) {
++		/* Toggle SVE trapping for userspace if needed */
++		if (test_thread_flag(TIF_SVE))
++			sve_user_enable();
++		else
++			sve_user_disable();
++
++		/* Serialised by exception return to user */
++	}
+ }
  
+ /*
+@@ -1022,7 +1022,7 @@ void fpsimd_restore_current_state(void)
+ 
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+ 		task_fpsimd_load();
+-		fpsimd_bind_to_cpu();
++		fpsimd_bind_task_to_cpu();
+ 	}
+ 
+ 	local_bh_enable();
+@@ -1045,9 +1045,9 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
+ 		fpsimd_to_sve(current);
+ 
+ 	task_fpsimd_load();
++	fpsimd_bind_task_to_cpu();
+ 
+-	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE))
+-		fpsimd_bind_to_cpu();
++	clear_thread_flag(TIF_FOREIGN_FPSTATE);
+ 
+ 	local_bh_enable();
+ }
 -- 
 2.1.4
