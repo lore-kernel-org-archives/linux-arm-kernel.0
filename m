@@ -1,58 +1,59 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 9 May 2018 08:56:41 +0800
-Subject: [PATCH 1/2] perf cs-etm: Support unknown_thread in cs_etm_auxtrace
-In-Reply-To: <CANLsYky4QatoCv_4k1r8eb4Rjugx9g2YZLG1dtHKJy9AsHtCSg@mail.gmail.com>
-References: <1525360703-26159-1-git-send-email-leo.yan@linaro.org>
- <CANLsYky4QatoCv_4k1r8eb4Rjugx9g2YZLG1dtHKJy9AsHtCSg@mail.gmail.com>
-Message-ID: <20180509005640.GB23540@leoy-ThinkPad-X240s>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 May 2018 18:03:24 -0700
+Subject: Incoming sms problem on Motorola Droid 4
+In-Reply-To: <20180508215102.GA5253@amd>
+References: <20180508215102.GA5253@amd>
+Message-ID: <20180509010324.GA98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 11:01:30AM -0600, Mathieu Poirier wrote:
-> On 3 May 2018 at 09:18, Leo Yan <leo.yan@linaro.org> wrote:
-> > CoreSight doesn't allocate thread structure for unknown_thread in etm
-> > auxtrace, so unknown_thread is NULL pointer.  If the perf data doesn't
-> > contain valid tid and then cs_etm__mem_access() uses unknown_thread
-> > instead as thread handler, this results in segmentation fault when
-> > thread__find_addr_map() accesses thread handler.
-> >
-> > This commit creates new thread data which is used by unknown_thread, so
-> > CoreSight tracing can roll back to use unknown_thread if perf data
-> > doesn't include valid thread info.  This commit also releases thread
-> > data for initialization failure case and for normal auxtrace free flow.
-> >
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> >  tools/perf/util/cs-etm.c | 25 +++++++++++++++++++++++--
-> >  1 file changed, 23 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-> > index 6533b1a..417302c 100644
-> > --- a/tools/perf/util/cs-etm.c
-> > +++ b/tools/perf/util/cs-etm.c
-> > @@ -239,6 +239,7 @@ static void cs_etm__free(struct perf_session *session)
-> >         for (i = 0; i < aux->num_cpu; i++)
-> >                 zfree(&aux->metadata[i]);
-> >
-> > +       thread__zput(aux->unknown_thread);
-> >         zfree(&aux->metadata);
-> >         zfree(&aux);
-> >  }
-> > @@ -266,6 +267,7 @@ static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
-> >         if (!thread) {
-> >                 if (cpumode != PERF_RECORD_MISC_KERNEL)
-> >                         return -EINVAL;
-> > +
+* Pavel Machek <pavel@ucw.cz> [180508 21:53]:
+> Hi!
 > 
-> Extra line, please remove.
+> I have problems with incoming SMS. ofono tries to use +CNMI=1,2,2,1,0
 > 
-> With this change:
+> > AT+CNMI=?
+> < +CNMI: (0,1,2),(0,1,2,3),(0,2),(0,1,2),(0,1)
+> < OK
+> ofonod[3070]: drivers/atmodem/sms.c:build_cnmi_string()
+> ofonod[3070]: drivers/atmodem/sms.c:construct_ack_pdu()
+> > AT+CNMI=1,2,2,1,0
+> < OK
+> ofonod[3070]: src/network.c:__ofono_netreg_add_status_watch() 0x5bbbf0
 > 
-> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ... unfortunately, with that configuration no messages are comming to
+> ofono and the other phone sees them as "delievery failed".
+> 
+> I had some luck with unicsy_demo using AT+CNMI=1,2 with text mode (not
+> PDU) messages. That works well enough for me.
+> 
+> Unfortunately, if I force ofono to pass "AT+CNMI=1,2", it does not
+> work well, either.
+> 
+> Any ideas how to debug this / what to try?
 
-Thanks for reviewing, Mathieu.  Will spin new patches and send out.
+Well you can try to see what Android is doing for SMS with:
 
-[...]
+# echo 0x7fffffff > /sys/module/ts27010mux/parameters/debug_level
+# dmesg | grep ts27010 | grep AT
 
-Thanks,
-Leo Yan
+To send SMS, looks like Android RIL first does:
+
+2 AT+CMGS=327 where 327 seems to be the size of the whatever
+encoded message. Then the next packet to dlci 2 contains the
+encoded message that is of size 327.
+
+When receiving, mdm6600 sends these on dlci 1:
+~+WAKEUP
+~+WAKEUP
+~+WAKEUP
+
+Then mdm6600 sends this on dlci 9:
+~+CMT=372
+
+And that's probably the incoming SMS size. But I don't see
+anything for what actually reads the incoming SMS.
+
+Regards,
+
+Tony
