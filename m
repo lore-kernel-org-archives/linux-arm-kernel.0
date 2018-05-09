@@ -1,77 +1,114 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 May 2018 17:13:04 +0100
-Subject: [PATCH v7 15/16] KVM: arm64: Fold redundant exit code checks out of
- fixup_guest_exit()
-In-Reply-To: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
-References: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525882385-29181-16-git-send-email-Dave.Martin@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed,  9 May 2018 18:07:09 +0100
+Subject: [PATCH 3/8] firmware: arm_scmi: rename get_transition_latency and
+ add_opps_to_device
+In-Reply-To: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
+References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1525885634-22348-4-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The entire tail of fixup_guest_exit() is contained in if statements
-of the form if (x && *exit_code == ARM_EXCEPTION_TRAP).  As a result,
-we can check just once and bail out of the function early, allowing
-the remaining if conditions to be simplified.
+Most of the scmi code follows the suggestion from Greg KH on a totally
+different thread[0] to have the subsystem name first, followed by the
+noun and finally the verb with couple of these exceptions.
 
-The only awkward case is where *exit_code is changed to
-ARM_EXCEPTION_EL1_SERROR in the case of an illegal GICv2 CPU
-interface access: in that case, the GICv3 trap handling code is
-skipped using a goto.  This avoids pointlessly evaluating the
-static branch check for the GICv3 case, even though we can't have
-vgic_v2_cpuif_trap and vgic_v3_cpuif_trap true simultaneously
-unless we have a GICv3 and GICv2 on the host: that sounds stupid,
-but I haven't satisfied myself that it can't happen.
+This patch fixes them so that all the functions names are aligned to
+on practice.
 
-No functional change.
+[0] https://www.spinics.net/lists/arm-kernel/msg583673.html
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ drivers/cpufreq/scmi-cpufreq.c   |  4 ++--
+ drivers/firmware/arm_scmi/perf.c | 10 +++++-----
+ include/linux/scmi_protocol.h    | 10 +++++-----
+ 3 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 18d0faa..4fbee95 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -387,11 +387,13 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 	 * same PC once the SError has been injected, and replay the
- 	 * trapping instruction.
- 	 */
--	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
-+	if (*exit_code != ARM_EXCEPTION_TRAP)
-+		goto exit;
-+
-+	if (!__populate_fault_info(vcpu))
- 		return true;
- 
--	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
--	    *exit_code == ARM_EXCEPTION_TRAP) {
-+	if (static_branch_unlikely(&vgic_v2_cpuif_trap)) {
- 		bool valid;
- 
- 		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
-@@ -417,11 +419,12 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
- 				*exit_code = ARM_EXCEPTION_EL1_SERROR;
- 			}
-+
-+			goto exit;
- 		}
+diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+index b4dbc77459b6..50b1551ba894 100644
+--- a/drivers/cpufreq/scmi-cpufreq.c
++++ b/drivers/cpufreq/scmi-cpufreq.c
+@@ -117,7 +117,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+ 		return -ENODEV;
  	}
  
- 	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
--	    *exit_code == ARM_EXCEPTION_TRAP &&
- 	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
- 	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
- 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
-@@ -430,6 +433,7 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
- 			return true;
- 	}
+-	ret = handle->perf_ops->add_opps_to_device(handle, cpu_dev);
++	ret = handle->perf_ops->device_opps_add(handle, cpu_dev);
+ 	if (ret) {
+ 		dev_warn(cpu_dev, "failed to add opps to the device\n");
+ 		return ret;
+@@ -164,7 +164,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+ 	/* SCMI allows DVFS request for any domain from any CPU */
+ 	policy->dvfs_possible_from_any_cpu = true;
  
-+exit:
- 	/* Return to the host kernel and handle the exit */
- 	return false;
+-	latency = handle->perf_ops->get_transition_latency(handle, cpu_dev);
++	latency = handle->perf_ops->transition_latency_get(handle, cpu_dev);
+ 	if (!latency)
+ 		latency = CPUFREQ_ETERNAL;
+ 
+diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
+index 987c64d19801..611ab08e6174 100644
+--- a/drivers/firmware/arm_scmi/perf.c
++++ b/drivers/firmware/arm_scmi/perf.c
+@@ -349,8 +349,8 @@ static int scmi_dev_domain_id(struct device *dev)
+ 	return clkspec.args[0];
  }
+ 
+-static int scmi_dvfs_add_opps_to_device(const struct scmi_handle *handle,
+-					struct device *dev)
++static int scmi_dvfs_device_opps_add(const struct scmi_handle *handle,
++				     struct device *dev)
+ {
+ 	int idx, ret, domain;
+ 	unsigned long freq;
+@@ -383,7 +383,7 @@ static int scmi_dvfs_add_opps_to_device(const struct scmi_handle *handle,
+ 	return 0;
+ }
+ 
+-static int scmi_dvfs_get_transition_latency(const struct scmi_handle *handle,
++static int scmi_dvfs_transition_latency_get(const struct scmi_handle *handle,
+ 					    struct device *dev)
+ {
+ 	struct perf_dom_info *dom;
+@@ -432,8 +432,8 @@ static struct scmi_perf_ops perf_ops = {
+ 	.level_set = scmi_perf_level_set,
+ 	.level_get = scmi_perf_level_get,
+ 	.device_domain_id = scmi_dev_domain_id,
+-	.get_transition_latency = scmi_dvfs_get_transition_latency,
+-	.add_opps_to_device = scmi_dvfs_add_opps_to_device,
++	.transition_latency_get = scmi_dvfs_transition_latency_get,
++	.device_opps_add = scmi_dvfs_device_opps_add,
+ 	.freq_set = scmi_dvfs_freq_set,
+ 	.freq_get = scmi_dvfs_freq_get,
+ };
+diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
+index a171c1e293e8..f4c9fc0fc755 100644
+--- a/include/linux/scmi_protocol.h
++++ b/include/linux/scmi_protocol.h
+@@ -85,8 +85,8 @@ struct scmi_clk_ops {
+  * @level_set: sets the performance level of a domain
+  * @level_get: gets the performance level of a domain
+  * @device_domain_id: gets the scmi domain id for a given device
+- * @get_transition_latency: gets the DVFS transition latency for a given device
+- * @add_opps_to_device: adds all the OPPs for a given device
++ * @transition_latency_get: gets the DVFS transition latency for a given device
++ * @device_opps_add: adds all the OPPs for a given device
+  * @freq_set: sets the frequency for a given device using sustained frequency
+  *	to sustained performance level mapping
+  * @freq_get: gets the frequency for a given device using sustained frequency
+@@ -102,10 +102,10 @@ struct scmi_perf_ops {
+ 	int (*level_get)(const struct scmi_handle *handle, u32 domain,
+ 			 u32 *level, bool poll);
+ 	int (*device_domain_id)(struct device *dev);
+-	int (*get_transition_latency)(const struct scmi_handle *handle,
++	int (*transition_latency_get)(const struct scmi_handle *handle,
+ 				      struct device *dev);
+-	int (*add_opps_to_device)(const struct scmi_handle *handle,
+-				  struct device *dev);
++	int (*device_opps_add)(const struct scmi_handle *handle,
++			       struct device *dev);
+ 	int (*freq_set)(const struct scmi_handle *handle, u32 domain,
+ 			unsigned long rate, bool poll);
+ 	int (*freq_get)(const struct scmi_handle *handle, u32 domain,
 -- 
-2.1.4
+2.7.4
