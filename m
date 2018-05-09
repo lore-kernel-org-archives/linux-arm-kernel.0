@@ -1,96 +1,133 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 May 2018 17:12:52 +0100
-Subject: [PATCH v7 03/16] KVM: arm/arm64: Introduce
- kvm_arch_vcpu_run_pid_change
+Date: Wed,  9 May 2018 17:13:02 +0100
+Subject: [PATCH v7 13/16] KVM: arm64: Remove eager host SVE state saving
 In-Reply-To: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
 References: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1525882385-29181-4-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1525882385-29181-14-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Now that the host SVE context can be saved on demand from Hyp,
+there is no longer any need to save this state in advance before
+entering the guest.
 
-KVM/ARM differs from other architectures in having to maintain an
-additional virtual address space from that of the host and the
-guest, because we split the execution of KVM across both EL1 and
-EL2.
+This patch removes the relevant call to
+kvm_fpsimd_flush_cpu_state().
 
-This results in a need to explicitly map data structures into EL2
-(hyp) which are accessed from the hyp code.  As we are about to be
-more clever with our FPSIMD handling on arm64, which stores data in
-the task struct and uses thread_info flags, we will have to map
-parts of the currently executing task struct into the EL2 virtual
-address space.
+Since the problem that function was intended to solve now no longer
+exists, the function and its dependencies are also deleted.
 
-However, we don't want to do this on every KVM_RUN, because it is a
-fairly expensive operation to walk the page tables, and the common
-execution mode is to map a single thread to a VCPU.  By introducing
-a hook that architectures can select with
-HAVE_KVM_VCPU_RUN_PID_CHANGE, we do not introduce overhead for
-other architectures, but have a simple way to only map the data we
-need when required for arm64.
-
-This patch introduces the framework only, and wires it up in the
-arm/arm64 KVM common code.
-
-No functional change.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/kvm_host.h | 9 +++++++++
- virt/kvm/Kconfig         | 3 +++
- virt/kvm/kvm_main.c      | 7 ++++++-
- 3 files changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_host.h   |  3 ---
+ arch/arm64/include/asm/kvm_host.h | 10 ----------
+ arch/arm64/kernel/fpsimd.c        | 21 ---------------------
+ virt/kvm/arm/arm.c                |  3 ---
+ 4 files changed, 37 deletions(-)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 6930c63..4268ace 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -1276,4 +1276,13 @@ static inline long kvm_arch_vcpu_async_ioctl(struct file *filp,
- void kvm_arch_mmu_notifier_invalidate_range(struct kvm *kvm,
- 		unsigned long start, unsigned long end);
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 4cac8d1..39f051f 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -311,9 +311,6 @@ static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_vcpu_park_fp(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
  
-+#ifdef CONFIG_HAVE_KVM_VCPU_RUN_PID_CHANGE
-+int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu);
-+#else
-+static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_HAVE_KVM_VCPU_RUN_PID_CHANGE */
-+
+-/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+-static inline void kvm_fpsimd_flush_cpu_state(void) {}
+-
+ static inline void kvm_arm_vhe_guest_enter(void) {}
+ static inline void kvm_arm_vhe_guest_exit(void) {}
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index b3fe730..2629093 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -444,16 +444,6 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+ }
  #endif
-diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
-index cca7e06..72143cf 100644
---- a/virt/kvm/Kconfig
-+++ b/virt/kvm/Kconfig
-@@ -54,3 +54,6 @@ config HAVE_KVM_IRQ_BYPASS
  
- config HAVE_KVM_VCPU_ASYNC_IOCTL
-        bool
-+
-+config HAVE_KVM_VCPU_RUN_PID_CHANGE
-+       bool
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index c7b2e92..c32e240 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -2550,8 +2550,13 @@ static long kvm_vcpu_ioctl(struct file *filp,
- 		oldpid = rcu_access_pointer(vcpu->pid);
- 		if (unlikely(oldpid != current->pids[PIDTYPE_PID].pid)) {
- 			/* The thread running this VCPU changed. */
--			struct pid *newpid = get_task_pid(current, PIDTYPE_PID);
-+			struct pid *newpid;
+-/*
+- * All host FP/SIMD state is restored on guest exit, so nothing needs
+- * doing here except in the SVE case:
+-*/
+-static inline void kvm_fpsimd_flush_cpu_state(void)
+-{
+-	if (system_supports_sve())
+-		sve_flush_cpu_state();
+-}
+-
+ static inline void kvm_arm_vhe_guest_enter(void)
+ {
+ 	local_daif_mask();
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 13fa681..32898a8 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -120,7 +120,6 @@
+  */
+ struct fpsimd_last_state_struct {
+ 	struct user_fpsimd_state *st;
+-	bool sve_in_use;
+ };
  
-+			r = kvm_arch_vcpu_run_pid_change(vcpu);
-+			if (r)
-+				break;
-+
-+			newpid = get_task_pid(current, PIDTYPE_PID);
- 			rcu_assign_pointer(vcpu->pid, newpid);
- 			if (oldpid)
- 				synchronize_rcu();
+ static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
+@@ -1010,7 +1009,6 @@ void fpsimd_bind_task_to_cpu(void)
+ 		this_cpu_ptr(&fpsimd_last_state);
+ 
+ 	last->st = &current->thread.uw.fpsimd_state;
+-	last->sve_in_use = test_thread_flag(TIF_SVE);
+ 	current->thread.fpsimd_cpu = smp_processor_id();
+ 
+ 	if (system_supports_sve()) {
+@@ -1032,7 +1030,6 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 
+ 	last->st = st;
+-	last->sve_in_use = false;
+ }
+ 
+ /*
+@@ -1092,24 +1089,6 @@ void fpsimd_flush_cpu_state(void)
+ 	__this_cpu_write(fpsimd_last_state.st, NULL);
+ }
+ 
+-/*
+- * Invalidate any task SVE state currently held in this CPU's regs.
+- *
+- * This is used to prevent the kernel from trying to reuse SVE register data
+- * that is detroyed by KVM guest enter/exit.  This function should go away when
+- * KVM SVE support is implemented.  Don't use it for anything else.
+- */
+-#ifdef CONFIG_ARM64_SVE
+-void sve_flush_cpu_state(void)
+-{
+-	struct fpsimd_last_state_struct const *last =
+-		this_cpu_ptr(&fpsimd_last_state);
+-
+-	if (last->st && last->sve_in_use)
+-		fpsimd_flush_cpu_state();
+-}
+-#endif /* CONFIG_ARM64_SVE */
+-
+ #ifdef CONFIG_KERNEL_MODE_NEON
+ 
+ DEFINE_PER_CPU(bool, kernel_neon_busy);
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 379e8a9..9cef525 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -682,9 +682,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		preempt_disable();
+ 
+-		/* Flush FP/SIMD state that can't survive guest entry/exit */
+-		kvm_fpsimd_flush_cpu_state();
+-
+ 		kvm_pmu_flush_hwstate(vcpu);
+ 
+ 		local_irq_disable();
 -- 
 2.1.4
