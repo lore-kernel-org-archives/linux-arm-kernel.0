@@ -1,74 +1,89 @@
-From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
-Date: Thu, 10 May 2018 13:09:11 +0000
-Subject: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-In-Reply-To: <78df845d-0788-3cbd-e435-5a3a8221fdc8@redhat.com>
-References: <8898674D84E3B24BA3A2D289B872026A69EECF90@G01JPEXMBKW03>
- <ce2c6191-1f74-4cec-9009-0a770d32673a@arm.com>
- <8898674D84E3B24BA3A2D289B872026A69EF9AF9@G01JPEXMBKW03>
- <78df845d-0788-3cbd-e435-5a3a8221fdc8@redhat.com>
-Message-ID: <8898674D84E3B24BA3A2D289B872026A69F09954@G01JPEXMBKW03>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Thu, 10 May 2018 14:24:20 +0100
+Subject: [PATCH] ARM: keystone: fix platform_domain_notifier array overrun
+Message-ID: <E1fGlYS-0001CN-Sd@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, Marc
+platform_domain_notifier contains a variable sized array, which the
+pm_clk_notify() notifier treats as a NULL terminated array:
 
-> -----Original Message-----
-> From: linux-arm-kernel
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> Mark Langsdorf
-> Sent: Wednesday, May 09, 2018 11:32 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-> 
+     for (con_id = clknb->con_ids; *con_id; con_id++)
+             pm_clk_add(dev, *con_id);
+
+Omitting the initialiser for con_ids means that the array is zero
+sized, and there is no NULL terminator.  This leads to pm_clk_notify()
+overrunning into what ever structure follows, which may not be NULL.
+This leads to an oops:
+
+Unable to handle kernel NULL pointer dereference at virtual address 0000008c
+pgd = c0003000
+[0000008c] *pgd=80000800004003c, *pmd=00000000c
+Internal error: Oops: 206 [#1] PREEMPT SMP ARM
+Modules linked in:c
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.16.0+ #9
+Hardware name: Keystone
+PC is at strlen+0x0/0x34
+LR is at kstrdup+0x18/0x54
+pc : [<c0623340>]    lr : [<c0111d6c>]    psr: 20000013
+sp : eec73dc0  ip : eed780c0  fp : 00000001
+r10: 00000000  r9 : 00000000  r8 : eed71e10
+r7 : 0000008c  r6 : 0000008c  r5 : 014000c0  r4 : c03a6ff4
+r3 : c09445d0  r2 : 00000000  r1 : 014000c0  r0 : 0000008c
+Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 30c5387d  Table: 00003000  DAC: fffffffd
+Process swapper/0 (pid: 1, stack limit = 0xeec72210)
+Stack: (0xeec73dc0 to 0xeec74000)
+...
+[<c0623340>] (strlen) from [<c0111d6c>] (kstrdup+0x18/0x54)
+[<c0111d6c>] (kstrdup) from [<c03a6ff4>] (__pm_clk_add+0x58/0x120)
+[<c03a6ff4>] (__pm_clk_add) from [<c03a731c>] (pm_clk_notify+0x64/0xa8)
+[<c03a731c>] (pm_clk_notify) from [<c004614c>] (notifier_call_chain+0x44/0x84)
+[<c004614c>] (notifier_call_chain) from [<c0046320>] (__blocking_notifier_call_chain+0x48/0x60)
+[<c0046320>] (__blocking_notifier_call_chain) from [<c0046350>] (blocking_notifier_call_chain+0x18/0x20)
+[<c0046350>] (blocking_notifier_call_chain) from [<c0390234>] (device_add+0x36c/0x534)
+[<c0390234>] (device_add) from [<c047fc00>] (of_platform_device_create_pdata+0x70/0xa4)
+[<c047fc00>] (of_platform_device_create_pdata) from [<c047fea0>] (of_platform_bus_create+0xf0/0x1ec)
+[<c047fea0>] (of_platform_bus_create) from [<c047fff8>] (of_platform_populate+0x5c/0xac)
+[<c047fff8>] (of_platform_populate) from [<c08b1f04>] (of_platform_default_populate_init+0x8c/0xa8)
+[<c08b1f04>] (of_platform_default_populate_init) from [<c000a78c>] (do_one_initcall+0x3c/0x164)
+[<c000a78c>] (do_one_initcall) from [<c087bd9c>] (kernel_init_freeable+0x10c/0x1d0)
+[<c087bd9c>] (kernel_init_freeable) from [<c0628db0>] (kernel_init+0x8/0xf0)
+[<c0628db0>] (kernel_init) from [<c00090d8>] (ret_from_fork+0x14/0x3c)
+Exception stack(0xeec73fb0 to 0xeec73ff8)
+3fa0:                                     00000000 00000000 00000000 00000000
+3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+3fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+Code: e3520000 1afffff7 e12fff1e c0801730 (e5d02000)
+---[ end trace cafa8f148e262e80 ]---
+
+Fix this by adding the necessary initialiser.
+
+Fixes: fc20ffe1213b ("ARM: keystone: add PM domain support for clock management")
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+This looks to be a latent bug that's been present since the above
+commit - whether it's a problem depends on the data structure that
+the linker places after platform_domain_notifier - if the first word
+of the following structure is NULL, then the bug will be hidden.  If
+it's a pointer to a string, or something that reasonably looks like a
+string, the bug will be hidden.  If it's a value that points at an
+invalid memory address, then an oops similar to the above will result.
+
+ arch/arm/mach-keystone/pm_domain.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
+index fe57e2692629..abca83d22ff3 100644
+--- a/arch/arm/mach-keystone/pm_domain.c
++++ b/arch/arm/mach-keystone/pm_domain.c
+@@ -29,6 +29,7 @@ static struct dev_pm_domain keystone_pm_domain = {
  
-> Marc's suggestion of implementing a glue layer, and then changing the
-> glue layer interface to pass the allocation requirements up to this
-> driver is the best solution that can be supported for server products.
-
-Thanks for your comments.
-?
-I'm considering implementing a glue layer. But the management of 
-whole LPI resource is implemented by core ITS driver (irq-gic-v3-its.c),
-So I think core ITS driver also need to be modified.
-?
-Below is my idea for core ITS driver. 
-Would you give me comments?
-?
-Add an interface that can specify the number of LPIs allocation requirements on Core ITS driver.
-My idea is extend its_msi_prepare function by adding two argument.
-
-SYNOPSIS
-its_msi_prepare(struct irq_domain *domain, struct device *dev,int nvec,
- msi_alloc_info_t *info,int request_nr_lpis, int request_lpis_align)
-?
-Argument "request_nr_lpis" means request LPIs total number for device. 
-Argument "request_lpis_align" means request of LPIs alignment. 0 means do not specify alignment.
-
-For PCI, PCI glue layer specifies, request_nr_lpis = 32, request_lpis_align = 32.
-For our device, the glue layer specifies, request_nr_lpis = 1, request_lpis_align = 0.
-(We have lots of device but each device only need a single LPI on our original bus. )
-?
-
-For expanding two arguments, core ITS driver maybe need to discard chunk mechanism 
-and use bitmap to manage LPI resource directly.
-?
-Example:
- (1) Non PCI glue layer requires ?request_nr_lpis? = 1, ?request_lpis_align? = 0.
-?
-    Bitmap will become  ...0000000000000000001
-?
- (2) PCI glue layer requires ?request_nr_lpis? = 32, ?request_lpis_align? = 32.
-?
-    Bitmap will become  ...000FFFFFFFF00000001
-?
-?
- (3) Non PCI glue layer requires ?request_nr_lpis? = 1, ?request_lpis_align? = 0.
-?
-    Bitmap will become  ...000FFFFFFFF00000003
-?
-I think it may be easy to implement by using bitmap_find_next_zero_area, because it has ?align_mask? argument.
-
-Regards,
-Lei Zhang
---
-Lei Zhang  e-mail: zhang.lei at jp.fujitsu.com FUJITSU LIMITED
+ static struct pm_clk_notifier_block platform_domain_notifier = {
+ 	.pm_domain = &keystone_pm_domain,
++	.con_ids = { NULL },
+ };
+ 
+ static const struct of_device_id of_keystone_table[] = {
+-- 
+2.7.4
