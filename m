@@ -1,49 +1,79 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 10 May 2018 19:43:03 +0300
-Subject: [PATCH] arm64: dts: renesas: r8a77970: add SMP support
-In-Reply-To: <20180509190517.ho5og3grbuzf4wz4@verge.net.au>
-References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
- <54dbd1d2-8279-5073-cffb-c647fba91e42@cogentembedded.com>
- <CAMuHMdUqVVWz0jLb2Vmrkk3BQBsYVsCOW1zsaPUi8o6jr_mojQ@mail.gmail.com>
- <db136ee6-4ce6-756e-743d-3342b2e65f2b@cogentembedded.com>
- <20180509190517.ho5og3grbuzf4wz4@verge.net.au>
-Message-ID: <110ba99c-1a8d-98a1-3ca0-5fc99e79572b@cogentembedded.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 May 2018 17:44:30 +0100
+Subject: [PATCH v7 08/16] KVM: arm64: Optimise FPSIMD handling to reduce
+ guest/host thrashing
+In-Reply-To: <1525882385-29181-9-git-send-email-Dave.Martin@arm.com>
+References: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
+ <1525882385-29181-9-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180510164430.ura3th2fxwwot6be@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
-
-On 05/09/2018 10:05 PM, Simon Horman wrote:
-
->>>> Add the device node for the second Cortex-A53 CPU core.
->>>>
->>>> Based on the original (and large) patch by Daisuke Matsushita
->>>> <daisuke.matsushita.ns@hitachi.com>.
->>>>
->>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>
->>> Dupe of https://patchwork.kernel.org/patch/10032875/
->>
->>    Sorry!
->>    Not an exact dupe, though -- mine has clock/power #define's used,
->> yours -- only bare #s. :-)
->>
->>> From series "[PATCH 0/2] arm64: dts: renesas: r8a77970: Add SMP Support"
->>> (https://www.spinics.net/lists/linux-renesas-soc/msg19681.html)
->>
->>    Hmm... what's the fate of this series?
+On Wed, May 09, 2018 at 05:12:57PM +0100, Dave P Martin wrote:
+> This patch refactors KVM to align the host and guest FPSIMD
+> save/restore logic with each other for arm64.  This reduces the
+> number of redundant save/restore operations that must occur, and
+> reduces the common-case IRQ blackout time during guest exit storms
+> by saving the host state lazily and optimising away the need to
+> restore the host state before returning to the run loop.
 > 
-> There is now a v2 of Geert's series which incorporates your enhancements.
+> Four hooks are defined in order to enable this:
+> 
+>  * kvm_arch_vcpu_run_map_fp():
+>    Called on PID change to map necessary bits of current to Hyp.
+> 
+>  * kvm_arch_vcpu_load_fp():
+>    Set up FP/SIMD for entering the KVM run loop (parse as
+>    "vcpu_load fp").
+> 
+>  * kvm_arch_vcpu_ctxsync_fp():
+>    Get FP/SIMD into a safe state for re-enabling interrupts after a
+>    guest exit back to the run loop.
+> 
+>    For arm64 specifically, this involves updating the host kernel's
+>    FPSIMD context tracking metadata so that kernel-mode NEON use
+>    will cause the vcpu's FPSIMD state to be saved back correctly
+>    into the vcpu struct.  This must be done before re-enabling
+>    interrupts because kernel-mode NEON may be used by softirqs.
+> 
+>  * kvm_arch_vcpu_put_fp():
+>    Save guest FP/SIMD state back to memory and dissociate from the
+>    CPU ("vcpu_put fp").
+> 
+> Also, the arm64 FPSIMD context switch code is updated to enable it
+> to save back FPSIMD state for a vcpu, not just current.  A few
+> helpers drive this:
+> 
+>  * fpsimd_bind_state_to_cpu(struct user_fpsimd_state *fp):
+>    mark this CPU as having context fp (which may belong to a vcpu)
+>    currently loaded in its registers.  This is the non-task
+>    equivalent of the static function fpsimd_bind_to_cpu() in
+>    fpsimd.c.
+> 
+>  * task_fpsimd_save():
+>    exported to allow KVM to save the guest's FPSIMD state back to
+>    memory on exit from the run loop.
+> 
+>  * fpsimd_flush_state():
+>    invalidate any context's FPSIMD state that is currently loaded.
+>    Used to disassociate the vcpu from the CPU regs on run loop exit.
+> 
+> These changes allow the run loop to enable interrupts (and thus
+> softirqs that may use kernel-mode NEON) without having to save the
+> guest's FPSIMD state eagerly.
+> 
+> Some new vcpu_arch fields are added to make all this work.  Because
+> host FPSIMD state can now be saved back directly into current's
+> thread_struct as appropriate, host_cpu_context is no longer used
+> for preserving the FPSIMD state.  However, it is still needed for
+> preserving other things such as the host's system registers.  To
+> avoid ABI churn, the redundant storage space in host_cpu_context is
+> not removed for now.
+> 
+> arch/arm is not addressed by this patch and continues to use its
+> current save/restore logic.  It could provide implementations of
+> the helpers later if desired.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-   I suggested to respin it. :-)
-
-> I will apply that.
-
-   Thank you.
-   For the record, I had better luck than Geert testing SMP on Eagle: only CPU0
-couldn't be offlined (and I was unable to find a workaround), others could be on/
-offlined w/o issues. As for suspend/resume -- it did work but I could only test
-s2idle (/sys/power/mem_sleep had no other variants)...
-
-MBR, Sergei
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
