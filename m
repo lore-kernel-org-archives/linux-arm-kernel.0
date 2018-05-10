@@ -1,101 +1,43 @@
-From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Thu, 10 May 2018 15:46:44 -0500
-Subject: [PATCH] arm64: dts: stratix10: Add QSPI support for Stratix10
-Message-ID: <1525985204-11525-1-git-send-email-thor.thayer@linux.intel.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Thu, 10 May 2018 23:20:00 +0200
+Subject: [PATCH] ARM: dts: BCM5301X: Switch D-Link DIR-885L to the new
+ partitions syntax
+Message-ID: <20180510212000.11110-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <thor.thayer@linux.intel.com>
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Add qspi_clock
-   The qspi_clk frequency is updated by U-Boot before starting Linux.
-Add QSPI interface node.
-Add QSPI flash memory child node.
-   Setup the QSPI memory in 2 partitions.
+This new syntax is slightly better designed & uses "compatible" string.
+For details see Documentation/devicetree/bindings/mtd/partition.txt .
 
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 22 +++++++++++++++
- .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 31 ++++++++++++++++++++++
- 2 files changed, 53 insertions(+)
+ arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-index e6b059378dc0..ed47dfce3ba6 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -119,6 +119,12 @@
- 				#clock-cells = <0>;
- 				compatible = "fixed-clock";
- 			};
-+
-+			qspi_clk: qspi_clk {
-+				#clock-cells = <0>;
-+				compatible = "fixed-clock";
-+				clock-frequency = <200000000>;
-+			};
- 		};
+diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+index 494dbd39658c..d173bcd93b91 100644
+--- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
++++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+@@ -26,9 +26,15 @@
  
- 		gmac0: ethernet at ff800000 {
-@@ -466,5 +472,21 @@
- 				interrupts = <16 4>, <48 4>;
+ 	nand: nand at 18028000 {
+ 		nandcs at 0 {
+-			partition at 0 {
+-				label = "firmware";
+-				reg = <0x00000000 0x08000000>;
++			partitions {
++				compatible = "fixed-partitions";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				partition at 0 {
++					label = "firmware";
++					reg = <0x00000000 0x08000000>;
++				};
  			};
  		};
-+
-+		qspi: spi at ff8d2000 {
-+			compatible = "cdns,qspi-nor";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0xff8d2000 0x100>,
-+			      <0xff900000 0x100000>;
-+			interrupts = <0 3 4>;
-+			cdns,fifo-depth = <128>;
-+			cdns,fifo-width = <4>;
-+			cdns,trigger-address = <0x00000000>;
-+			clocks = <&qspi_clk>;
-+			bus-num = <1>;
-+
-+			status = "disabled";
-+		};
  	};
- };
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-index f9b1ef12db48..60251462067a 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-@@ -147,3 +147,34 @@
- 		reg = <0x68>;
- 	};
- };
-+
-+&qspi {
-+	flash0: n25q00 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "n25q00aa";
-+		reg = <0>;
-+		spi-max-frequency = <50000000>;
-+
-+		m25p,fast-read;
-+		cdns,page-size = <256>;
-+		cdns,block-size = <16>;
-+		cdns,read-delay = <1>;
-+		cdns,tshsl-ns = <50>;
-+		cdns,tsd2d-ns = <50>;
-+		cdns,tchsh-ns = <4>;
-+		cdns,tslch-ns = <4>;
-+
-+		partition at qspi-boot {
-+			label = "Boot and fpga data";
-+			/* 64MB for boot and FPGA data */
-+			reg = <0x0 0x4000000>;
-+		};
-+
-+		partition at qspi-rootfs {
-+			label = "Root Filesystem - JFFS2";
-+			/* 64MB for Linux jffs2 */
-+			reg = <0x4000000 0x4000000>;
-+		};
-+	};
-+};
 -- 
-2.7.4
+2.13.6
