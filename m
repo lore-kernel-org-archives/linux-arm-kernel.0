@@ -1,66 +1,49 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Thu, 10 May 2018 17:23:40 +0100
-Subject: [PATCH v3 1/8] arm/arm64: KVM: Formalise end of direct linear map
+Date: Thu, 10 May 2018 17:23:43 +0100
+Subject: [PATCH v3 4/8] arm64: mm: Replace fixed map BUILD_BUG_ON's with
+ BUG_ON's
 In-Reply-To: <20180510162347.3858-1-steve.capper@arm.com>
 References: <20180510162347.3858-1-steve.capper@arm.com>
-Message-ID: <20180510162347.3858-2-steve.capper@arm.com>
+Message-ID: <20180510162347.3858-5-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We assume that the direct linear map ends at ~0 in the KVM HYP map
-intersection checking code. This assumption will become invalid later on
-for arm64 when the address space of the kernel is re-arranged.
+In order to prepare for a variable VA_BITS we need to account for a
+variable size VMEMMAP which in turn means the position of the fixed map
+is variable at compile time.
 
-This patch introduces a new constant PAGE_OFFSET_END for both arm and
-arm64 and defines it to be ~0UL
+Thus, we need to replace the BUILD_BUG_ON's that check the fixed map
+position with BUG_ON's.
 
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 ---
- arch/arm/include/asm/memory.h   | 1 +
- arch/arm64/include/asm/memory.h | 1 +
- virt/kvm/arm/mmu.c              | 4 ++--
- 3 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm64/mm/mmu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index ed8fd0d19a3e..45c211fd50da 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -24,6 +24,7 @@
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 12ce780fcef4..197f4110ae2c 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -811,7 +811,7 @@ void __init early_fixmap_init(void)
+ 	 * The boot-ioremap range spans multiple pmds, for which
+ 	 * we are not prepared:
+ 	 */
+-	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
++	BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+ 		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
  
- /* PAGE_OFFSET - the virtual address of the start of the kernel image */
- #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
-+#define PAGE_OFFSET_END		(~0UL)
+ 	if ((pmdp != fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)))
+@@ -879,9 +879,9 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
+ 	 * On 4k pages, we'll use section mappings for the FDT so we only
+ 	 * have to be in the same PUD.
+ 	 */
+-	BUILD_BUG_ON(dt_virt_base % SZ_2M);
++	BUG_ON(dt_virt_base % SZ_2M);
  
- #ifdef CONFIG_MMU
+-	BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> SWAPPER_TABLE_SHIFT !=
++	BUG_ON(__fix_to_virt(FIX_FDT_END) >> SWAPPER_TABLE_SHIFT !=
+ 		     __fix_to_virt(FIX_BTMAP_BEGIN) >> SWAPPER_TABLE_SHIFT);
  
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 49d99214f43c..c5617cbbf1ff 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -61,6 +61,7 @@
- 	(UL(1) << VA_BITS) + 1)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) - \
- 	(UL(1) << (VA_BITS - 1)) + 1)
-+#define PAGE_OFFSET_END		(~0UL)
- #define KIMAGE_VADDR		(MODULES_END)
- #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
- #define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 7f6a944db23d..22af347d65f1 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1927,10 +1927,10 @@ int kvm_mmu_init(void)
- 	kvm_debug("IDMAP page: %lx\n", hyp_idmap_start);
- 	kvm_debug("HYP VA range: %lx:%lx\n",
- 		  kern_hyp_va(PAGE_OFFSET),
--		  kern_hyp_va((unsigned long)high_memory - 1));
-+		  kern_hyp_va(PAGE_OFFSET_END));
- 
- 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
--	    hyp_idmap_start <  kern_hyp_va((unsigned long)high_memory - 1) &&
-+	    hyp_idmap_start <  kern_hyp_va(PAGE_OFFSET_END) &&
- 	    hyp_idmap_start != (unsigned long)__hyp_idmap_text_start) {
- 		/*
- 		 * The idmap page is intersecting with the VA space,
+ 	offset = dt_phys % SWAPPER_BLOCK_SIZE;
 -- 
 2.11.0
