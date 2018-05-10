@@ -1,59 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 May 2018 12:13:47 +0100
-Subject: [PATCHv2] ARM64: KVM: use lm_alias() for kvm_ksym_ref()
-Message-ID: <20180510111347.32253-1-mark.rutland@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 10 May 2018 13:14:34 +0200
+Subject: [PATCH v2] tty: implement led triggers
+In-Reply-To: <20180507092710.GQ2285@localhost>
+References: <0c1bb915-bd92-4433-61ec-78fdba453396@arm.com>
+ <20180503201952.16592-1-u.kleine-koenig@pengutronix.de>
+ <20180507080252.GO2285@localhost>
+ <20180507084127.ekpd3ze2itkzo7fd@pengutronix.de>
+ <20180507092710.GQ2285@localhost>
+Message-ID: <20180510111434.GC6977@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For historical reasons, we open-code lm_alias() in kvm_ksym_ref().
+Hi!
 
-Let's use lm_alias() to avoid duplication and make things clearer.
+> > > > @@ -499,6 +500,7 @@ static void flush_to_ldisc(struct work_struct *work)
+> > > >  		struct tty_buffer *head = buf->head;
+> > > >  		struct tty_buffer *next;
+> > > >  		int count;
+> > > > +		unsigned long delay = 50 /* ms */;
+> > > 
+> > > Comment after the semicolon?
+> > 
+> > Given that this comment is about the 50 and not the delay member, I
+> > prefer it before the ;.
+> 
+> Hmm. I personally find it hard to read and can only find about 30
+> instances of this comment style (for assignments) in the kernel. And
+> arguably the comment applies equally well to the delay variable in this
+> case too.
 
-As we have to pull this from <linux/mm.h> (which is not safe for
-inclusion in assembly), we may as well move the kvm_ksym_ref()
-definition into the existing !__ASSEMBLY__ block.
+It is not too traditional, but I believe it makes sense....
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
----
- arch/arm64/include/asm/kvm_asm.h | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+(and yes, I wish we had kernel in Rust, so we could have real units
+attached to our variables...)
 
-Since v1 [1]:
-* Rebase to v4.17-rc4
-* Fix typo in commit message
-
-Mark.
-
-[1] https://lkml.kernel.org/r/20180406151909.57197-1-mark.rutland at arm.com
-
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index f6648a3e4152..a9ceeec5a76f 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -33,16 +33,19 @@
- #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
- #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
- 
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/mm.h>
-+
- /* Translate a kernel address of @sym into its equivalent linear mapping */
- #define kvm_ksym_ref(sym)						\
- 	({								\
- 		void *val = &sym;					\
- 		if (!is_kernel_in_hyp_mode())				\
--			val = phys_to_virt((u64)&sym - kimage_voffset);	\
-+			val = lm_alias(&sym);				\
- 		val;							\
- 	 })
- 
--#ifndef __ASSEMBLY__
- struct kvm;
- struct kvm_vcpu;
- 
+									Pavel
 -- 
-2.11.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180510/fe3e817a/attachment.sig>
