@@ -1,64 +1,84 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Thu, 10 May 2018 15:29:21 -0700
-Subject: [RFC][PATCH] arm64: update iomem_resource.end
-In-Reply-To: <cfb81f55-f917-431f-0afd-c97e7641a2f8@arm.com>
-References: <1525906703-28481-1-git-send-email-nicoleotsuka@gmail.com>
- <cfb81f55-f917-431f-0afd-c97e7641a2f8@arm.com>
-Message-ID: <20180510222920.GA20553@Asurada-Nvidia>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 10 May 2018 17:51:32 -0500
+Subject: [PATCH v2 00/10] PCI: leak fixes, removable generic PCI host,
+ assorted stuff
+In-Reply-To: <cover.1525067324.git.jan.kiszka@siemens.com>
+References: <cover.1525067324.git.jan.kiszka@siemens.com>
+Message-ID: <20180510225132.GD190385@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the comments, Robin.
-
-On Thu, May 10, 2018 at 06:45:59PM +0100, Robin Murphy wrote:
-> On 09/05/18 23:58, Nicolin Chen wrote:
-> >The iomem_resource.end is -1 by default and should be updated in
-> >arch-level code.
-> >
-> >ARM64 so far hasn't updated it while core kernel code (mm/hmm.c)
-> >started to use iomem_resource.end for boundary check. So it'd be
-> >better to assign iomem_resource.end using a valid value, the end
-> >of physical address space for example because iomem_resource.end
-> >in theory should reflect that.
-> >
-> >However, VA_BITS might be smaller than PA_BITS in ARM64. So using
-> >the end of physical address space doesn't make a lot of sense in
-> >this case, or could be even harmful since virtual address cannot
-> >reach that memory region.
+On Mon, Apr 30, 2018 at 07:48:34AM +0200, Jan Kiszka wrote:
+> Changes in v2:
+>  - patch 1: commit message reworking as suggested by Lorenzo
+>  - patch 3-6: split-up as suggested by Bjorn
+>  - patch 8: new
+>  - patch 10: select PCI_DOMAINS from PCI_HOST_GENERIC, rather than
+>    allowing manual choice, as suggested by Lorenzo
 > 
-> Why? There's plenty of stuff in the physical address space that will
-> only ever be accessed via ioremap/memremap. There's no reason you
-> shouldn't be able to run a VA_BITS < 48 kernel on a Cavium ThunderX
+> This primarily enables to unbind the generic PCI host controller without
+> leaving lots of memory leaks behind. A previous proposal patch 5 was
+> rejected because of those issues [1].
+> 
+> The fixes have been validated in the Jailhouse setup, where we add and
+> remove a virtual PCI host controller on hypervisor activation/
+> deactivation, with the help of kmemleak.
+> 
+> Besides that, there is tiny PCI API cleanup at the beginning and
+> support for manually enabled PCI domains at the end that enables the
+> Jailhouse scenario.
+> 
+> Jan
+> 
+> [1] http://lkml.iu.edu/hypermail/linux/kernel/1606.3/00072.html
+> 
+> 
+> CC: Jingoo Han <jingoohan1@gmail.com>
+> CC: Joao Pinto <Joao.Pinto@synopsys.com>
+> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> 
+> Jan Kiszka (10):
+>   PCI: Make pci_get_new_domain_nr() static
+>   PCI: Fix memory leak of devm_pci_alloc_host_bridge()
+>   PCI: Factor out __of_pci_get_host_bridge_resources()
+>   PCI: Add dev parameter to __of_pci_get_host_bridge_resources()
+>   PCI: Replace pr_*() with dev_*() in
+>     __of_pci_get_host_bridge_resources()
+>   PCI: Introduce devm_of_pci_get_host_bridge_resources()
+>   PCI: Convert of_pci_get_host_bridge_resources() users to devm variant
+>   PCI: Deprecate of_pci_get_host_bridge_resources()
+>   PCI: Add support for unbinding the generic PCI host controller
+>   PCI: Enable PCI_DOMAINS along with generic PCI host controller
 
-I'm running VA_BITS_39 and PA_BITS_48 on Tegra 210. There had
-not been any problem of it, however with hmm.....
+Applied to pci/resource for v4.18, thanks!
 
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/mm/hmm.c#n1144
+I added the reviewed-by tags from Vladimir (thank you!) and replaced the
+"Deprecate" patch by the v3 "Remove" patch.
 
-This hmm_devmem_add() requests a region with PFNs being outside
-of the linear region in ARM64 case which takes MAX_PHYSMEM_BITS
-(48 bits) over iomem_resource.end without this patch. Then when
-dealing with page structures in vmemmap region from a given PFN
-directly (CONFIG_SPARSEMEM_VMEMMAP=y), and the given PFN is the
-last one based on physical region (48 bits), the address of its
-page structure will go beyond vmemmap region. Does this sound a
-problem?
-
-> where *all* the I/O is in the top half of the PA space. We already
-> constrain RAM in this very function to those regions which fit into
-> the linear map, and if you're accessing anything other than RAM
-> through the linear map you're probably doing something wrong.
-
-If I understand this part correctly, since ARM64 has applied the
-memory limit already, does it mean that probably we should fix
-something in the region_intersects() or add an extra check in the
-hmm_devmem_add(), instead of limiting the iomem_resource? 
- 
-> Furthermore, the physical region covered by the linear map doesn't
-> necessarily start at physical address 0 anyway - see PHYS_OFFSET.
-
-Hmm...okay...but there still should be a protection somewhere if
-it happens to access a page structure via pfn_to_page() while the
-PFN is not covered by the vmemmap linear mapping, right?
-
-Thanks!
+>  drivers/pci/dwc/pcie-designware-host.c |   2 +-
+>  drivers/pci/host/Kconfig               |   1 +
+>  drivers/pci/host/pci-aardvark.c        |   5 +-
+>  drivers/pci/host/pci-ftpci100.c        |   4 +-
+>  drivers/pci/host/pci-host-common.c     |  13 ++++
+>  drivers/pci/host/pci-host-generic.c    |   1 +
+>  drivers/pci/host/pci-v3-semi.c         |   3 +-
+>  drivers/pci/host/pci-versatile.c       |   3 +-
+>  drivers/pci/host/pci-xgene.c           |   3 +-
+>  drivers/pci/host/pcie-altera.c         |   5 +-
+>  drivers/pci/host/pcie-iproc-platform.c |   4 +-
+>  drivers/pci/host/pcie-rcar.c           |   5 +-
+>  drivers/pci/host/pcie-rockchip.c       |   4 +-
+>  drivers/pci/host/pcie-xilinx-nwl.c     |   4 +-
+>  drivers/pci/host/pcie-xilinx.c         |   4 +-
+>  drivers/pci/of.c                       | 105 +++++++++++++++++++++------------
+>  drivers/pci/pci.c                      |   6 +-
+>  drivers/pci/probe.c                    |   4 +-
+>  include/linux/of_pci.h                 |  42 ++++++++++++-
+>  include/linux/pci-ecam.h               |   1 +
+>  include/linux/pci.h                    |   3 -
+>  21 files changed, 149 insertions(+), 73 deletions(-)
+> 
+> -- 
+> 2.13.6
+> 
