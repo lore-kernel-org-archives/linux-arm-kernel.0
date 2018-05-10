@@ -1,100 +1,92 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 10 May 2018 21:12:30 +0300
-Subject: [PATCH 2/2] arm64: dts: renesas: initial V3HSK board device tree
-In-Reply-To: <3923fc5f-103c-94c9-57ba-cb29e8c55d05@cogentembedded.com>
-References: <3923fc5f-103c-94c9-57ba-cb29e8c55d05@cogentembedded.com>
-Message-ID: <50de037c-7560-c261-f96a-f86065674c9b@cogentembedded.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 10 May 2018 21:16:28 +0200
+Subject: [PATCH 1/2] i2c: exynos5: remove some dead code
+In-Reply-To: <b3915e40-895f-2a72-27a2-dcffe504456d@samsung.com>
+References: <CGME20180509194548epcas2p25579e969e21707afe2435b1f568ff005@epcas2p2.samsung.com>
+ <20180509194532.28929-1-peda@axentia.se>
+ <b3915e40-895f-2a72-27a2-dcffe504456d@samsung.com>
+Message-ID: <fa946b32-99b2-c59b-e4d0-7188fdc7bfc0@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial device  tree for  the V3H Starter Kit board.
-The board has 1 debug serial port (SCIF0); include support for it,
-so that the serial console can work.
+On 2018-05-10 10:36, Andrzej Hajda wrote:
+> On 09.05.2018 21:45, Peter Rosin wrote:
+>> The else branch cannot be taken as i will always equal num.
+>> Get rid of the whole construct.
+>>
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> ---
+>>  drivers/i2c/busses/i2c-exynos5.c | 12 +-----------
+>>  1 file changed, 1 insertion(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+>> index 12ec8484e653..a2cbc779c33a 100644
+>> --- a/drivers/i2c/busses/i2c-exynos5.c
+>> +++ b/drivers/i2c/busses/i2c-exynos5.c
+>> @@ -727,17 +727,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
+>>  			goto out;
+>>  	}
+>>  
+>> -	if (i == num) {
+>> -		ret = num;
+>> -	} else {
+>> -		/* Only one message, cannot access the device */
+>> -		if (i == 1)
+>> -			ret = -EREMOTEIO;
+>> -		else
+>> -			ret = i;
+>> -
+>> -		dev_warn(i2c->dev, "xfer message failed\n");
+>> -	}
+>> +	ret = num;
+>>  
+>>   out:
+>>  	clk_disable(i2c->clk);
+> 
+> You can go further and remove "out:" label, use break instead, and at
+> the end use "return (i == num) ? num : ret;" or sth similar.
+> 
+> With this change you can add:
+> 
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-Based on the original (and large) patch by Vladimir Barinov.
+But then the patch wouldn't be so obviously safe. If I would write
+a function equivalent to the original function, I think I'd write
+something like:
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+static int exynos5_i2c_xfer(struct i2c_adapter *adap,
+			    struct i2c_msg *msgs, int num)
+{
+	struct exynos5_i2c *i2c = adap->algo_data;
+	int i, ret;
 
----
- arch/arm64/boot/dts/renesas/Makefile           |    2 
- arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts |   60 +++++++++++++++++++++++++
- 2 files changed, 61 insertions(+), 1 deletion(-)
+	if (i2c->suspended) {
+		dev_err(i2c->dev, "HS-I2C is not initialized.\n");
+		return -EIO;
+	}
 
-Index: renesas/arch/arm64/boot/dts/renesas/Makefile
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/Makefile
-+++ renesas/arch/arm64/boot/dts/renesas/Makefile
-@@ -9,6 +9,6 @@ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-m3
- dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-xs.dtb
- dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-salvator-x.dtb r8a77965-salvator-xs.dtb
- dtb-$(CONFIG_ARCH_R8A77970) += r8a77970-eagle.dtb r8a77970-v3msk.dtb
--dtb-$(CONFIG_ARCH_R8A77980) += r8a77980-condor.dtb
-+dtb-$(CONFIG_ARCH_R8A77980) += r8a77980-condor.dtb r8a77980-v3hsk.dtb
- dtb-$(CONFIG_ARCH_R8A77990) += r8a77990-ebisu.dtb
- dtb-$(CONFIG_ARCH_R8A77995) += r8a77995-draak.dtb
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-===================================================================
---- /dev/null
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-@@ -0,0 +1,60 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the V3H Starter Kit board
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ * Copyright (C) 2018 Cogent Embedded, Inc.
-+ */
-+
-+/dts-v1/;
-+#include "r8a77980.dtsi"
-+
-+/ {
-+	model = "Renesas V3H Starter Kit board";
-+	compatible = "renesas,v3hsk", "renesas,r8a77980";
-+
-+	aliases {
-+		serial0 = &scif0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 48000000 {
-+		device_type = "memory";
-+		/* first 128MB is reserved for secure area. */
-+		reg = <0 0x48000000 0 0x78000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <16666666>;
-+};
-+
-+&extalr_clk {
-+	clock-frequency = <32768>;
-+};
-+
-+&pfc {
-+	scif0_pins: scif0 {
-+		groups = "scif0_data";
-+		function = "scif0";
-+	};
-+
-+	scif_clk_pins: scif_clk {
-+		groups = "scif_clk_b";
-+		function = "scif_clk";
-+	};
-+};
-+
-+&scif0 {
-+	pinctrl-0 = <&scif0_pins>, <&scif_clk_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&scif_clk {
-+	clock-frequency = <14745600>;
-+};
+	ret = clk_enable(i2c->clk);
+	if (ret)
+		return ret;
+
+	for (i = 0; !ret && i < num; i++)
+		ret = exynos5_i2c_xfer_msg(i2c, msgs + i, i == num - 1);
+
+	clk_disable(i2c->clk);
+
+	return ret ?: num;
+}
+
+And I think that is safe because I don't see any possibility for
+exynos_i2c_xfer_msg to return anything but zero success or negative
+errors. Since I can only compile-test, so I do not feel all that
+good about going further than I did.
+
+But if you or anyone can test the above function, feel free to make
+a patch out of it. I don't care enough to make a bunch of iterations
+on these trivialities. I just spotted dead code and dumb initializers
+while looking for other things. So, take it or leave it. I.e. it was
+just a couple of drive-by patches.
+
+Cheers,
+Peter
