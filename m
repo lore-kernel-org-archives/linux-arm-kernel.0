@@ -1,39 +1,89 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 10 May 2018 10:44:05 +0200
-Subject: [PATCH 2/2] i2c: exynos5: remove pointless initializers
-In-Reply-To: <20180509194532.28929-2-peda@axentia.se>
-References: <20180509194532.28929-1-peda@axentia.se>
- <CGME20180509194552epcas3p4777026e41c7b34663eb11345e4f3d82d@epcas3p4.samsung.com>
- <20180509194532.28929-2-peda@axentia.se>
-Message-ID: <b69f6656-3831-86ea-5f13-fc805d86b288@samsung.com>
+From: udknight@gmail.com (Wang YanQing)
+Date: Thu, 10 May 2018 16:48:31 +0800
+Subject: [PATCH] bpf, arm32: Correct check_imm24
+In-Reply-To: <20180510075656.GS16141@n2100.armlinux.org.uk>
+References: <20180510032013.GB26016@udknight>
+ <20180510075656.GS16141@n2100.armlinux.org.uk>
+Message-ID: <20180510084831.GA31194@udknight>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.05.2018 21:45, Peter Rosin wrote:
-> The variables are always assigned before use anyway.
->
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  drivers/i2c/busses/i2c-exynos5.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
-> index a2cbc779c33a..185fba37e830 100644
-> --- a/drivers/i2c/busses/i2c-exynos5.c
-> +++ b/drivers/i2c/busses/i2c-exynos5.c
-> @@ -707,7 +707,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
->  			struct i2c_msg *msgs, int num)
->  {
->  	struct exynos5_i2c *i2c = adap->algo_data;
-> -	int i = 0, ret = 0, stop = 0;
-> +	int i, ret, stop;
+On Thu, May 10, 2018 at 08:56:57AM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 10, 2018 at 11:20:13AM +0800, Wang YanQing wrote:
+> > imm24 is signed, so the right range is:
+> > [-(2<<(24 - 1)), (2<<(24 - 1)) - 1]
+> 
+> 2 << (24 - 1) is the same as 1 << 24.
+> 
+> > -#define check_imm(bits, imm) do {				\
+> > -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+> > -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+> > -		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+> > -			i, imm, imm);				\
+> > +#define check_imm_range(min, max, imm) do {			\
+> > +	if (imm < min || imm > max) {				\
+> > +		pr_info("[%2d] imm=%d is out of range\n",	\
+> > +			i, imm);				\
+> >  		return -EINVAL;					\
+> >  	}							\
+> >  } while (0)
+> > -#define check_imm24(imm) check_imm(24, imm)
+> > +#define check_imm24(imm) check_imm_range(-16777216, 16777215, imm)
+> 
+> How is this any different?
+> 
+> If imm is 16777216, then "imm > max" in your version is true.
+> In the original version, "imm > 0" is true, so we then test for
+> "16777216 >> 24" being non-zero.  That's also true, so the test
+> condition fires.
+> 
+> If imm is 16777215, then "imm > max" is false in your version.
+> In the original version, the conditions also evaluate to false.
+> 
+> For the -16777217 case, "imm < min" in your version is true.
+> In the original version, "imm < 0" is true, so we then test for
+> "~(-16777217) >> 24" being non-zero.  This is the same as
+> "16777216 >> 24" being non-zero, which is true so the condition
+> fires.
+> 
+> With -16777216, the same thing happens, both end up evaluating
+> to false.
+> 
+> So, the two cases end up producing identical results, and there
+> is no actual effect from this change.
+> 
+> However, your commit message is correct - there is a bug here.
+> That's obvious when you mask the "imm" value with 0x00ffffff,
+> and realise that an imm value of -16777216 ends up having the
+> same value in the instruction as an imm value of 0.  So, the
+> range of "imm" is _half_ that.
+> 
+>  #define check_imm(bits, imm) do {				\
+> -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+> -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+> +	if ((((imm) > 0) && ((imm) >> (bits - 1))) ||		\
+> +	    (((imm) < 0) && (~(imm) >> (bits - 1)))) {		\
+>  		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+>  			i, imm, imm);				\
+> 
+> would fix it.  Alternatively:
+> 
+>  #define check_imm(bits, imm) do {				\
+> -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+> -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+> +	if ((imm) >= (1 << ((bits) - 1)) ||			\
+> +	    (imm) < -(1 << ((bits) - 1))) {			\
+>  		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+>  			i, imm, imm);				\
+> 
+> would also fix it.
 
-I hope gcc is smart enough to not complain in case of ret.
-I think you can merge both patches into one.
+Hi!
 
-Regards
-Andrzej
+Sorry for confusion, I make a mistake here, the real fix I want to
+submit is [8388607, -8388608], this range has the same effect as your
+suggestion.
 
->  
->  	if (i2c->suspended) {
->  		dev_err(i2c->dev, "HS-I2C is not initialized.\n");
+Will you fix it? or I resend another version?
+
+Thanks.
