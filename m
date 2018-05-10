@@ -1,82 +1,108 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 May 2018 08:56:57 +0100
-Subject: [PATCH] bpf, arm32: Correct check_imm24
-In-Reply-To: <20180510032013.GB26016@udknight>
-References: <20180510032013.GB26016@udknight>
-Message-ID: <20180510075656.GS16141@n2100.armlinux.org.uk>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 10 May 2018 10:10:27 +0200
+Subject: [PATCH v2 26/26] drm/bridge: establish a link between the
+ bridge supplier and consumer
+In-Reply-To: <20180504135212.26977-27-peda@axentia.se>
+References: <20180504135212.26977-1-peda@axentia.se>
+ <CGME20180504135432epcas3p368bb7541ca52bc8bc301dec794851214@epcas3p3.samsung.com>
+ <20180504135212.26977-27-peda@axentia.se>
+Message-ID: <a723ad4a-8caa-4ff5-d39d-52db98a56d7b@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 11:20:13AM +0800, Wang YanQing wrote:
-> imm24 is signed, so the right range is:
-> [-(2<<(24 - 1)), (2<<(24 - 1)) - 1]
+On 04.05.2018 15:52, Peter Rosin wrote:
+> If the bridge supplier is unbound, this will bring the bridge consumer
+> down along with the bridge. Thus, there will no longer linger any
+> dangling pointers from the bridge consumer (the drm_device) to some
+> non-existent bridge supplier.
+>
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> ---
+>  drivers/gpu/drm/drm_bridge.c | 18 ++++++++++++++++++
+>  include/drm/drm_bridge.h     |  2 ++
+>  2 files changed, 20 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
+> index 78d186b6831b..0259f0a3ff27 100644
+> --- a/drivers/gpu/drm/drm_bridge.c
+> +++ b/drivers/gpu/drm/drm_bridge.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/mutex.h>
+>  
+>  #include <drm/drm_bridge.h>
+> +#include <drm/drm_device.h>
+>  #include <drm/drm_encoder.h>
+>  
+>  #include "drm_crtc_internal.h"
+> @@ -127,12 +128,25 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
+>  	if (bridge->dev)
+>  		return -EBUSY;
+>  
+> +	if (encoder->dev->dev != bridge->odev) {
 
-2 << (24 - 1) is the same as 1 << 24.
+I wonder why device_link_add does not handle this case (self dependency)
+silently as noop, as it seems to be a correct behavior.
 
-> -#define check_imm(bits, imm) do {				\
-> -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-> -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-> -		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
-> -			i, imm, imm);				\
-> +#define check_imm_range(min, max, imm) do {			\
-> +	if (imm < min || imm > max) {				\
-> +		pr_info("[%2d] imm=%d is out of range\n",	\
-> +			i, imm);				\
->  		return -EINVAL;					\
->  	}							\
->  } while (0)
-> -#define check_imm24(imm) check_imm(24, imm)
-> +#define check_imm24(imm) check_imm_range(-16777216, 16777215, imm)
+> +		bridge->link = device_link_add(encoder->dev->dev,
+> +					       bridge->odev, 0);
+> +		if (!bridge->link) {
+> +			dev_err(bridge->odev, "failed to link bridge to %s\n",
+> +				dev_name(encoder->dev->dev));
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+>  	bridge->dev = encoder->dev;
+>  	bridge->encoder = encoder;
+>  
+>  	if (bridge->funcs->attach) {
+>  		ret = bridge->funcs->attach(bridge);
+>  		if (ret < 0) {
+> +			if (bridge->link)
+> +				device_link_del(bridge->link);
+> +			bridge->link = NULL;
+>  			bridge->dev = NULL;
+>  			bridge->encoder = NULL;
+>  			return ret;
+> @@ -159,6 +173,10 @@ void drm_bridge_detach(struct drm_bridge *bridge)
+>  	if (bridge->funcs->detach)
+>  		bridge->funcs->detach(bridge);
+>  
+> +	if (bridge->link)
+> +		device_link_del(bridge->link);
+> +	bridge->link = NULL;
+> +
+>  	bridge->dev = NULL;
+>  }
+>  
+> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+> index b656e505d11e..804189c63a4c 100644
+> --- a/include/drm/drm_bridge.h
+> +++ b/include/drm/drm_bridge.h
+> @@ -261,6 +261,7 @@ struct drm_bridge_timings {
+>   * @list: to keep track of all added bridges
+>   * @timings: the timing specification for the bridge, if any (may
+>   * be NULL)
+> + * @link: drm consumer <-> bridge supplier
 
-How is this any different?
+Nitpick: "<->" suggests symmetry, maybe "device link from drm consumer
+to the bridge" would be better.
 
-If imm is 16777216, then "imm > max" in your version is true.
-In the original version, "imm > 0" is true, so we then test for
-"16777216 >> 24" being non-zero.  That's also true, so the test
-condition fires.
+Anyway:
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-If imm is 16777215, then "imm > max" is false in your version.
-In the original version, the conditions also evaluate to false.
+?--
+Regards
+Andrzej
 
-For the -16777217 case, "imm < min" in your version is true.
-In the original version, "imm < 0" is true, so we then test for
-"~(-16777217) >> 24" being non-zero.  This is the same as
-"16777216 >> 24" being non-zero, which is true so the condition
-fires.
-
-With -16777216, the same thing happens, both end up evaluating
-to false.
-
-So, the two cases end up producing identical results, and there
-is no actual effect from this change.
-
-However, your commit message is correct - there is a bug here.
-That's obvious when you mask the "imm" value with 0x00ffffff,
-and realise that an imm value of -16777216 ends up having the
-same value in the instruction as an imm value of 0.  So, the
-range of "imm" is _half_ that.
-
- #define check_imm(bits, imm) do {				\
--	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
--	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-+	if ((((imm) > 0) && ((imm) >> (bits - 1))) ||		\
-+	    (((imm) < 0) && (~(imm) >> (bits - 1)))) {		\
- 		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
- 			i, imm, imm);				\
-
-would fix it.  Alternatively:
-
- #define check_imm(bits, imm) do {				\
--	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
--	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-+	if ((imm) >= (1 << ((bits) - 1)) ||			\
-+	    (imm) < -(1 << ((bits) - 1))) {			\
- 		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
- 			i, imm, imm);				\
-
-would also fix it.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync@8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+>   * @funcs: control functions
+>   * @driver_private: pointer to the bridge driver's internal context
+>   */
+> @@ -271,6 +272,7 @@ struct drm_bridge {
+>  	struct drm_bridge *next;
+>  	struct list_head list;
+>  	const struct drm_bridge_timings *timings;
+> +	struct device_link *link;
+>  
+>  	const struct drm_bridge_funcs *funcs;
+>  	void *driver_private;
