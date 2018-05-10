@@ -1,84 +1,103 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 10 May 2018 17:51:32 -0500
-Subject: [PATCH v2 00/10] PCI: leak fixes, removable generic PCI host,
- assorted stuff
-In-Reply-To: <cover.1525067324.git.jan.kiszka@siemens.com>
-References: <cover.1525067324.git.jan.kiszka@siemens.com>
-Message-ID: <20180510225132.GD190385@bhelgaas-glaptop.roam.corp.google.com>
+From: hoeun.ryu@lge.com (=?ks_c_5601-1987?B?t/nIo8C6?=)
+Date: Fri, 11 May 2018 08:20:49 +0900
+Subject: [PATCH] armpmu: broadcast overflow irq on multi-core system
+ having one muxed SPI for PMU.
+In-Reply-To: <20180510102114.obmctt3nn7xakggi@lakrids.cambridge.arm.com>
+References: <1525941385-12766-1-git-send-email-hoeun.ryu@lge.com.com>
+ <20180510102114.obmctt3nn7xakggi@lakrids.cambridge.arm.com>
+Message-ID: <010c01d3e8b5$8839a480$98aced80$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 07:48:34AM +0200, Jan Kiszka wrote:
-> Changes in v2:
->  - patch 1: commit message reworking as suggested by Lorenzo
->  - patch 3-6: split-up as suggested by Bjorn
->  - patch 8: new
->  - patch 10: select PCI_DOMAINS from PCI_HOST_GENERIC, rather than
->    allowing manual choice, as suggested by Lorenzo
-> 
-> This primarily enables to unbind the generic PCI host controller without
-> leaving lots of memory leaks behind. A previous proposal patch 5 was
-> rejected because of those issues [1].
-> 
-> The fixes have been validated in the Jailhouse setup, where we add and
-> remove a virtual PCI host controller on hypervisor activation/
-> deactivation, with the help of kmemleak.
-> 
-> Besides that, there is tiny PCI API cleanup at the beginning and
-> support for manually enabled PCI domains at the end that enables the
-> Jailhouse scenario.
-> 
-> Jan
-> 
-> [1] http://lkml.iu.edu/hypermail/linux/kernel/1606.3/00072.html
-> 
-> 
-> CC: Jingoo Han <jingoohan1@gmail.com>
-> CC: Joao Pinto <Joao.Pinto@synopsys.com>
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> 
-> Jan Kiszka (10):
->   PCI: Make pci_get_new_domain_nr() static
->   PCI: Fix memory leak of devm_pci_alloc_host_bridge()
->   PCI: Factor out __of_pci_get_host_bridge_resources()
->   PCI: Add dev parameter to __of_pci_get_host_bridge_resources()
->   PCI: Replace pr_*() with dev_*() in
->     __of_pci_get_host_bridge_resources()
->   PCI: Introduce devm_of_pci_get_host_bridge_resources()
->   PCI: Convert of_pci_get_host_bridge_resources() users to devm variant
->   PCI: Deprecate of_pci_get_host_bridge_resources()
->   PCI: Add support for unbinding the generic PCI host controller
->   PCI: Enable PCI_DOMAINS along with generic PCI host controller
+Thank you for the reply.
 
-Applied to pci/resource for v4.18, thanks!
-
-I added the reviewed-by tags from Vladimir (thank you!) and replaced the
-"Deprecate" patch by the v3 "Remove" patch.
-
->  drivers/pci/dwc/pcie-designware-host.c |   2 +-
->  drivers/pci/host/Kconfig               |   1 +
->  drivers/pci/host/pci-aardvark.c        |   5 +-
->  drivers/pci/host/pci-ftpci100.c        |   4 +-
->  drivers/pci/host/pci-host-common.c     |  13 ++++
->  drivers/pci/host/pci-host-generic.c    |   1 +
->  drivers/pci/host/pci-v3-semi.c         |   3 +-
->  drivers/pci/host/pci-versatile.c       |   3 +-
->  drivers/pci/host/pci-xgene.c           |   3 +-
->  drivers/pci/host/pcie-altera.c         |   5 +-
->  drivers/pci/host/pcie-iproc-platform.c |   4 +-
->  drivers/pci/host/pcie-rcar.c           |   5 +-
->  drivers/pci/host/pcie-rockchip.c       |   4 +-
->  drivers/pci/host/pcie-xilinx-nwl.c     |   4 +-
->  drivers/pci/host/pcie-xilinx.c         |   4 +-
->  drivers/pci/of.c                       | 105 +++++++++++++++++++++------------
->  drivers/pci/pci.c                      |   6 +-
->  drivers/pci/probe.c                    |   4 +-
->  include/linux/of_pci.h                 |  42 ++++++++++++-
->  include/linux/pci-ecam.h               |   1 +
->  include/linux/pci.h                    |   3 -
->  21 files changed, 149 insertions(+), 73 deletions(-)
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Thursday, May 10, 2018 7:21 PM
+> To: Hoeun Ryu <hoeun.ryu@lge.com.com>
+> Cc: Will Deacon <will.deacon@arm.com>; Hoeun Ryu <hoeun.ryu@lge.com>;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH] armpmu: broadcast overflow irq on multi-core system
+> having one muxed SPI for PMU.
 > 
-> -- 
-> 2.13.6
+> Hi,
+> On Thu, May 10, 2018 at 05:36:17PM +0900, Hoeun Ryu wrote:
+> > From: Hoeun Ryu <hoeun.ryu@lge.com>
+> >
+> >  On some SoCs like i.MX6DL/QL have only one muxed SPI for multi-core
+> system.
+> > On the systems, a CPU can be interrupted by overflow irq but it is
+> > possible that the overflow actually occurs on another CPU.
 > 
+> Muxing the PMU IRQs is a really broken system design, and there's no good
+> way of supporting it.
+
+Yes. I agree with that. I scratched my head when I found the system has one
+muxed SPI.
+
+> 
+> What we should do for such systems is:
+> 
+> * Add a flag to the DT to describe that the IRQs are muxed, as this
+>   cannot be probed.
+> 
+> * Add hrtimer code to periodically update the counters, to avoid
+>   overflow (e.g. as we do in the l2x0 PMU).
+> 
+> * Reject sampling for such systems, as this cannot be done reliably or
+>   efficiently.
+> 
+> NAK to broadcasting the IRQ -- there are a number of issues with the
+> general approach.
+> 
+
+The second solution would be good if sampling is necessary even like those
+systems.
+
+Actually I'm working on FIQ available ARM32 system and trying to enable the
+hard lockup detector by routing the PMU IRQ to FIQ.
+Because of that, I really need the interrupt event if it is a muxed SPI,
+beside I also need to make an dedicated IPI FIQ to broadcast the IRQ in
+this approach.
+What would you do if you were in the same situation ?
+
+> We should update the PMU probing code to warn when we have fewer IRQs than
+> CPUs, and fail gracefully to the above.
+> 
+> [...]
+> 
+> >  static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)  {
+> 
+> > +			/* smp_call_function cannot be called with irq
+> disabled */
+> > +			local_irq_enable();
+> > +			preempt_disable();
+> > +			smp_call_function_many(&mask, __armpmu_handle_irq,
+dev,
+> 0);
+> > +			preempt_enable();
+> > +			local_irq_disable();
+> 
+> For many reasons, this sequence is not safe.
+> 
+> It is not safe to enable IRQs in irq handlers. Please never do this.
+
+I was not sure it was safe to enable IRQs in irq handlers.
+Thank you for pointing that.
+
+> 
+> Thus it's also never safe to call smp_call_function*() in IRQ handlers.
+
+Yes. I found out that it is due to csd lock.
+
+> 
+> Futher, If you ever encounter a case where you need to avoid preemption
+> across enabling IRQs, preemption must be disabled *before* enabling IRQs.
+
+Ah, OK.
+Enabling IRQs can cause scheduling tasks in the end of exception or other
+scheduling points, right ?
+
+> 
+> Thanks,
+> Mark.
