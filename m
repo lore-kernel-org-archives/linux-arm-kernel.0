@@ -1,103 +1,146 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 10 May 2018 15:04:40 +0100
-Subject: [RFC 12/13] kvmtool: arm64: Switch memory layout
+Date: Thu, 10 May 2018 15:04:32 +0100
+Subject: [RFC 04/13] Fold kvm__init_ram call in kvm__arch_init
 In-Reply-To: <20180510140441.24573-1-julien.grall@arm.com>
 References: <20180510140441.24573-1-julien.grall@arm.com>
-Message-ID: <20180510140441.24573-13-julien.grall@arm.com>
+Message-ID: <20180510140441.24573-5-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+The slipt between kvm__init_ram and kvm__arch_init for setting up the
+RAM can be quite subttle. By moving the former call in the later, it
+will be possible to make the RAM initialization easier on Arm with multi
+RAM banks support.
 
-If the guest wants to use a larger physical address space place
-the RAM at upper half of the address space. Otherwise, it uses the
-default layout.
+Note that it is necessary to move the call to kvm__arch_init after the
+initialization of the list kvm->mem_banks because kvm__init_ram is
+relying on it.
 
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Julien Grall <julien.grall@arm.com>
 ---
- arm/aarch32/include/kvm/kvm-arch.h |  1 +
- arm/aarch64/include/kvm/kvm-arch.h | 13 ++++++++++---
- arm/include/arm-common/kvm-arch.h  |  8 ++++++--
- arm/kvm.c                          |  2 +-
- 4 files changed, 18 insertions(+), 6 deletions(-)
+ arm/kvm.c         | 4 +++-
+ include/kvm/kvm.h | 1 -
+ kvm.c             | 4 +---
+ mips/kvm.c        | 4 +++-
+ powerpc/kvm.c     | 4 +++-
+ x86/kvm.c         | 4 +++-
+ 6 files changed, 13 insertions(+), 8 deletions(-)
 
-diff --git a/arm/aarch32/include/kvm/kvm-arch.h b/arm/aarch32/include/kvm/kvm-arch.h
-index 2ee0cb1..f0f0943 100644
---- a/arm/aarch32/include/kvm/kvm-arch.h
-+++ b/arm/aarch32/include/kvm/kvm-arch.h
-@@ -4,6 +4,7 @@
- #define ARM_KERN_OFFSET(...)	0x8000
- 
- #define ARM_MAX_PHYS_SHIFT(...)	32
-+#define ARM_MEMORY_AREA(...)	ARM32_MEMORY_AREA
- 
- #include "arm-common/kvm-arch.h"
- 
-diff --git a/arm/aarch64/include/kvm/kvm-arch.h b/arm/aarch64/include/kvm/kvm-arch.h
-index 53ac20f..9c9009b 100644
---- a/arm/aarch64/include/kvm/kvm-arch.h
-+++ b/arm/aarch64/include/kvm/kvm-arch.h
-@@ -1,12 +1,19 @@
- #ifndef KVM__KVM_ARCH_H
- #define KVM__KVM_ARCH_H
- 
-+#include "arm-common/kvm-arch.h"
-+
-+#define ARM64_MEMORY_AREA(phys_shift)	(1UL << (phys_shift - 1))
-+
-+#define ARM_MEMORY_AREA(cfg)	((cfg)->arch.aarch32_guest ?			\
-+				 ARM32_MEMORY_AREA		:		\
-+				 ARM64_MEMORY_AREA((cfg)->arch.phys_shift))
-+
- #define ARM_KERN_OFFSET(kvm)	((kvm)->cfg.arch.aarch32_guest	?	\
- 				0x8000				:	\
- 				0x80000)
- 
--#define ARM_MAX_PHYS_SHIFT(cfg)	((cfg)->arch.aarch32_guest ? 32 : 40)
--
--#include "arm-common/kvm-arch.h"
-+#define ARM_MAX_PHYS_SHIFT(cfg)	((cfg)->arch.aarch32_guest ? 32 :	\
-+				 (cfg)->arch.phys_shift)
- 
- #endif /* KVM__KVM_ARCH_H */
-diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
-index 884dda8..4be9589 100644
---- a/arm/include/arm-common/kvm-arch.h
-+++ b/arm/include/arm-common/kvm-arch.h
-@@ -10,7 +10,11 @@
- #define ARM_IOPORT_AREA		_AC(0x0000000000000000, UL)
- #define ARM_MMIO_AREA		_AC(0x0000000000010000, UL)
- #define ARM_AXI_AREA		_AC(0x0000000040000000, UL)
--#define ARM_MEMORY_AREA		_AC(0x0000000080000000, UL)
-+
-+#define ARM32_MEMORY_AREA	_AC(0x0000000080000000, UL)
-+#define ARM32_MAX_MEMORY	((1ULL << 32) - ARM32_MEMORY_AREA)
-+
-+#define ARM_IOMEM_AREA_END	ARM32_MEMORY_AREA
- 
- #define ARM_GIC_DIST_BASE	(ARM_AXI_AREA - ARM_GIC_DIST_SIZE)
- #define ARM_GIC_CPUI_BASE	(ARM_GIC_DIST_BASE - ARM_GIC_CPUI_SIZE)
-@@ -21,7 +25,7 @@
- #define ARM_IOPORT_SIZE		(ARM_MMIO_AREA - ARM_IOPORT_AREA)
- #define ARM_VIRTIO_MMIO_SIZE	(ARM_AXI_AREA - (ARM_MMIO_AREA + ARM_GIC_SIZE))
- #define ARM_PCI_CFG_SIZE	(1ULL << 24)
--#define ARM_PCI_MMIO_SIZE	(ARM_MEMORY_AREA - \
-+#define ARM_PCI_MMIO_SIZE	(ARM_IOMEM_AREA_END - \
- 				(ARM_AXI_AREA + ARM_PCI_CFG_SIZE))
- 
- #define KVM_IOPORT_AREA		ARM_IOPORT_AREA
 diff --git a/arm/kvm.c b/arm/kvm.c
-index 8a7c611..5a2bd28 100644
+index 7424887..619390a 100644
 --- a/arm/kvm.c
 +++ b/arm/kvm.c
-@@ -127,7 +127,7 @@ static void kvm__arch_sanitize_cfg(struct kvm_config *cfg)
- 		 */
- 		if (cfg->nr_ram > 1)
- 			die("sanitize: Base address should be specified for all the banks\n");
--		bank0->base = ARM_MEMORY_AREA;
-+		bank0->base = ARM_MEMORY_AREA(cfg);
- 		/*
- 		 * Keep compatibility with old KVM command line behavior where
- 		 * the memory is capped.
+@@ -24,7 +24,7 @@ bool kvm__arch_cpu_supports_vm(void)
+ 	return true;
+ }
+ 
+-void kvm__init_ram(struct kvm *kvm)
++static void kvm__init_ram(struct kvm *kvm)
+ {
+ 	int err;
+ 	u64 phys_start, phys_size;
+@@ -97,6 +97,8 @@ void kvm__arch_init(struct kvm *kvm)
+ 	/* Create the virtual GIC. */
+ 	if (gic__create(kvm, kvm->cfg.arch.irqchip))
+ 		die("Failed to create virtual GIC");
++
++	kvm__init_ram(kvm);
+ }
+ 
+ #define FDT_ALIGN	SZ_2M
+diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
+index 95bab40..6ac5c66 100644
+--- a/include/kvm/kvm.h
++++ b/include/kvm/kvm.h
+@@ -79,7 +79,6 @@ int kvm__init(struct kvm *kvm);
+ struct kvm *kvm__new(void);
+ int kvm__recommended_cpus(struct kvm *kvm);
+ int kvm__max_cpus(struct kvm *kvm);
+-void kvm__init_ram(struct kvm *kvm);
+ int kvm__exit(struct kvm *kvm);
+ bool kvm__load_firmware(struct kvm *kvm, const char *firmware_filename);
+ bool kvm__load_kernel(struct kvm *kvm, const char *kernel_filename,
+diff --git a/kvm.c b/kvm.c
+index 98b3cb8..e13d8f2 100644
+--- a/kvm.c
++++ b/kvm.c
+@@ -317,10 +317,8 @@ int kvm__init(struct kvm *kvm)
+ 		goto err_vm_fd;
+ 	}
+ 
+-	kvm__arch_init(kvm);
+-
+ 	INIT_LIST_HEAD(&kvm->mem_banks);
+-	kvm__init_ram(kvm);
++	kvm__arch_init(kvm);
+ 
+ 	if (!kvm->cfg.firmware_filename) {
+ 		if (!kvm__load_kernel(kvm, kvm->cfg.kernel_filename,
+diff --git a/mips/kvm.c b/mips/kvm.c
+index cdb0007..61bf104 100644
+--- a/mips/kvm.c
++++ b/mips/kvm.c
+@@ -17,7 +17,7 @@ void kvm__arch_read_term(struct kvm *kvm)
+ 	virtio_console__inject_interrupt(kvm);
+ }
+ 
+-void kvm__init_ram(struct kvm *kvm)
++static void kvm__init_ram(struct kvm *kvm)
+ {
+ 	u64	phys_start, phys_size;
+ 	void	*host_mem;
+@@ -75,6 +75,8 @@ void kvm__arch_init(struct kvm *kvm)
+ 	ret = ioctl(kvm->vm_fd, KVM_CREATE_IRQCHIP);
+ 	if (ret < 0)
+ 		die_perror("KVM_CREATE_IRQCHIP ioctl");
++
++	kvm__init_ram(kvm);
+ }
+ 
+ void kvm__irq_line(struct kvm *kvm, int irq, int level)
+diff --git a/powerpc/kvm.c b/powerpc/kvm.c
+index 0f2dab3..2c8dbb7 100644
+--- a/powerpc/kvm.c
++++ b/powerpc/kvm.c
+@@ -60,7 +60,7 @@ bool kvm__arch_cpu_supports_vm(void)
+ 	return true;
+ }
+ 
+-void kvm__init_ram(struct kvm *kvm)
++static void kvm__init_ram(struct kvm *kvm)
+ {
+ 	u64	phys_start, phys_size;
+ 	void	*host_mem;
+@@ -139,6 +139,8 @@ void kvm__arch_init(struct kvm *kvm)
+ 			 SPAPR_PCI_MEM_WIN_SIZE,
+ 			 SPAPR_PCI_IO_WIN_ADDR,
+ 			 SPAPR_PCI_IO_WIN_SIZE);
++
++	kvm__init_ram(kvm);
+ }
+ 
+ void kvm__arch_delete_ram(struct kvm *kvm)
+diff --git a/x86/kvm.c b/x86/kvm.c
+index 453922f..03b0277 100644
+--- a/x86/kvm.c
++++ b/x86/kvm.c
+@@ -86,7 +86,7 @@ bool kvm__arch_cpu_supports_vm(void)
+  * a gap between 0xe0000000 and 0x100000000 in the guest virtual mem space.
+  */
+ 
+-void kvm__init_ram(struct kvm *kvm)
++static void kvm__init_ram(struct kvm *kvm)
+ {
+ 	u64	phys_start, phys_size;
+ 	void	*host_mem;
+@@ -167,6 +167,8 @@ void kvm__arch_init(struct kvm *kvm)
+ 	ret = ioctl(kvm->vm_fd, KVM_CREATE_IRQCHIP);
+ 	if (ret < 0)
+ 		die_perror("KVM_CREATE_IRQCHIP ioctl");
++
++	kvm__init_ram(kvm);
+ }
+ 
+ void kvm__arch_delete_ram(struct kvm *kvm)
 -- 
 2.11.0
