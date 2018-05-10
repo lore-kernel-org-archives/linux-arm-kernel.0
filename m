@@ -1,125 +1,214 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 11 May 2018 00:01:05 +0200
-Subject: [PATCH v3 6/8] arm64: module-plts: Extend veneer to address
- 52-bit VAs
-In-Reply-To: <20180510162347.3858-7-steve.capper@arm.com>
-References: <20180510162347.3858-1-steve.capper@arm.com>
- <20180510162347.3858-7-steve.capper@arm.com>
-Message-ID: <CAKv+Gu_unCnhqE_Ort0zOjBj_ZmWja5unGON6KBuRxJzdhc5jA@mail.gmail.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 10 May 2018 15:16:27 -0700
+Subject: [RESEND PATCH] pinctrl: rockchip: Disable interrupt when
+ changing it's capability
+In-Reply-To: <CAD=FV=WZ+2MNbe341M7OQD11+RxaJuzdM6zMnXYB4dka74K1hQ@mail.gmail.com>
+References: <20180503065553.7762-1-jeffy.chen@rock-chips.com>
+ <20180507221511.GA6448@rodete-desktop-imager.corp.google.com>
+ <5AF0FF18.1050905@rock-chips.com>
+ <20180508015623.GA61455@rodete-desktop-imager.corp.google.com>
+ <CAD=FV=W_v+aoNT09k-2exVABTFzOp0heY-XWcLi95uPisZhiGQ@mail.gmail.com>
+ <5AF25B2E.8080901@rock-chips.com>
+ <CAD=FV=WZ+2MNbe341M7OQD11+RxaJuzdM6zMnXYB4dka74K1hQ@mail.gmail.com>
+Message-ID: <20180510221626.GA258670@rodete-desktop-imager.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 May 2018 at 18:23, Steve Capper <steve.capper@arm.com> wrote:
-> From: Ard Bieusheuval <ard.biesheuvel@linaro.org>
->
-> In preparation for 52-bit VA support in the Linux kernel, we extend the
-> plts veneer to support 52-bit addresses via an extra movk instruction.
->
-> [Steve: code from Ard off-list, changed the #ifdef logic to inequality]
-> Signed-off-by: Steve Capper <steve.capper@arm.com>
->
-> ---
->
-> New in V3 of the series.
->
-> I'm not sure if this is strictly necessary as the VAs of the module
-> space will fit within 48-bits of addressing even when a 52-bit VA space
-> is enabled.
++ irqchip maintainers
 
-What about the kernel text itself? Is that also guaranteed to have
-bits [51:48] of its VAs equal 0xf, even under randomization?
+[ irqchip is weird -- it's all over drivers/{pinctrl,gpio,irqchip}/ :D ]
 
-If so, I agree we don't need the patch.
+Hi Doug,
 
-> However, this may act to future-proof the 52-bit VA support
-> should any future adjustments be made to the VA space.
-> ---
->  arch/arm64/include/asm/module.h | 13 ++++++++++++-
->  arch/arm64/kernel/module-plts.c | 12 ++++++++++++
->  2 files changed, 24 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-> index 97d0ef12e2ff..30b8ca95d19a 100644
-> --- a/arch/arm64/include/asm/module.h
-> +++ b/arch/arm64/include/asm/module.h
-> @@ -59,6 +59,9 @@ struct plt_entry {
->         __le32  mov0;   /* movn x16, #0x....                    */
->         __le32  mov1;   /* movk x16, #0x...., lsl #16           */
->         __le32  mov2;   /* movk x16, #0x...., lsl #32           */
-> +#if CONFIG_ARM64_VA_BITS > 48
-> +       __le32  mov3;   /* movk x16, #0x...., lsl #48           */
-> +#endif
->         __le32  br;     /* br   x16                             */
->  };
->
-> @@ -71,7 +74,8 @@ static inline struct plt_entry get_plt_entry(u64 val)
->          * +--------+------------+--------+-----------+-------------+---------+
->          *
->          * Rd     := 0x10 (x16)
-> -        * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
-> +        * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32),
-> +        *           0b11 (lsl #48)
->          * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
->          * sf     := 1 (64-bit variant)
->          */
-> @@ -79,6 +83,9 @@ static inline struct plt_entry get_plt_entry(u64 val)
->                 cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
->                 cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
->                 cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
-> +#if CONFIG_ARM64_VA_BITS > 48
-> +               cpu_to_le32(0xf2e00010 | ((( val >> 48) & 0xffff)) << 5),
-> +#endif
->                 cpu_to_le32(0xd61f0200)
->         };
->  }
-> @@ -86,6 +93,10 @@ static inline struct plt_entry get_plt_entry(u64 val)
->  static inline bool plt_entries_equal(const struct plt_entry *a,
->                                      const struct plt_entry *b)
->  {
-> +#if CONFIG_ARM64_VA_BITS > 48
-> +       if (a->mov3 != b->mov3)
-> +               return false;
-> +#endif
->         return a->mov0 == b->mov0 &&
->                a->mov1 == b->mov1 &&
->                a->mov2 == b->mov2;
-> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-> index f0690c2ca3e0..4d5617e09943 100644
-> --- a/arch/arm64/kernel/module-plts.c
-> +++ b/arch/arm64/kernel/module-plts.c
-> @@ -50,6 +50,9 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
->         struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
->         int i = pltsec->plt_num_entries++;
->         u32 mov0, mov1, mov2, br;
-> +#if CONFIG_ARM64_VA_BITS > 48
-> +       u32 mov3;
-> +#endif
->         int rd;
->
->         if (WARN_ON(pltsec->plt_num_entries > pltsec->plt_max_entries))
-> @@ -69,6 +72,12 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
->         mov2 = aarch64_insn_gen_movewide(rd, (u16)(val >> 32), 32,
->                                          AARCH64_INSN_VARIANT_64BIT,
->                                          AARCH64_INSN_MOVEWIDE_KEEP);
-> +#if CONFIG_ARM64_VA_BITS > 48
-> +       mov3 = aarch64_insn_gen_movewide(rd, (u16)(val >> 48), 48,
-> +                                        AARCH64_INSN_VARIANT_64BIT,
-> +                                        AARCH64_INSN_MOVEWIDE_KEEP);
-> +#endif
-> +
->         br = aarch64_insn_gen_branch_imm((u64)&plt[i].br, (u64)loc + 4,
->                                          AARCH64_INSN_BRANCH_NOLINK);
->
-> @@ -76,6 +85,9 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
->                         cpu_to_le32(mov0),
->                         cpu_to_le32(mov1),
->                         cpu_to_le32(mov2),
-> +#if CONFIG_ARM64_VA_BITS > 48
-> +                       cpu_to_le32(mov3),
-> +#endif
->                         cpu_to_le32(br)
->                 };
->
-> --
-> 2.11.0
->
+On Tue, May 08, 2018 at 10:18:18PM -0700, Doug Anderson wrote:
+> On Tue, May 8, 2018 at 7:21 PM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
+> > On 05/09/2018 03:46 AM, Doug Anderson wrote:
+> >> One note is that in the case Brian points at (where we need to
+> >> simulate EDGE_BOTH by swapping edges) we purposely ignored the TRM and
+> >> we needed to do that to avoid losing interrupts.  For details, see
+> >> commit 53b1bfc76df2 ("pinctrl: rockchip: Avoid losing interrupts when
+> >> supporting both edges").  We did this because:
+> >>
+> >> 1. We believed that the IP block in Rockchip SoCs has nearly the same
+> >> logic as "gpio-dwapb.c" and that's what "gpio-dwapb.c" did.
+> >>
+> >
+> > hmm, but i saw the gpio-dwapb.c actually toggle trigger after handle irq,
+> > which might avoid the race Brian mentioned:
+> > +               generic_handle_irq(gpio_irq);
+> > +               irq_status &= ~BIT(hwirq);
+> > +
+> > +               if ((irq_get_trigger_type(gpio_irq) & IRQ_TYPE_SENSE_MASK)
+> > +                       == IRQ_TYPE_EDGE_BOTH)
+> > +                       dwapb_toggle_trigger(gpio, hwirq);
+> 
+> The code you point at in dwapb_toggle_trigger() specifically is an
+> example of toggling the polarity _without_ disabling the interrupt in
+> between.  We took this as "working" code and as proof that it was OK
+> to change polarity without disabling the interrupt in-between.
+
+There's a crucial ordering difference though: gpio-dwapb performs its
+polarity adjustments *after* calling generic_handle_irq(), which among
+other things calls ->irq_ack(). This means that it's re-ensuring that
+the polarity is correct *after* the point at which it last ack'ed the
+interrupt. So there's no chance of it clearing a second interrupt
+without appropriately reconfiguring the polarity.
+
+> > and i also saw ./qcom/pinctrl-msm.c do the
+> > toggle(msm_gpio_update_dual_edge_pos) at the end of msm_gpio_irq_set_type
+> > and msm_gpio_irq_ack, that seems can avoid the polarity races too.
+> >
+> >> 2. We were actually losing real interrupts and this was the only way
+> >> we could figure out how to fix it.
+> >>
+> >> When I tested that back in the day I was fairly convinced that we
+> >> weren't losing any interrupts in the EDGE_BOTH case after my fix, but
+> >> I certainly could have messed up.
+> >>
+> >>
+> >> For the EDGE_BOTH case it was important not to lose an interrupt
+> >> because, as you guys are talking about, we could end up configured the
+> >> wrong way.  I think in your case where you're just picking one
+> >> polarity losing an interrupt shouldn't matter since it's undefined
+> >> exactly if an edge happens while you're in the middle of executing
+> >> rockchip_irq_set_type().  Is that right?
+> >
+> >
+> > right, so we now have 2 cases: rockchip_irq_demux/ rockchip_irq_set_type
+> >
+> > if i'm right about the spurious irq(only happen when set rising for a high
+> > gpio, or set falling for a low gpio), then:
+> >
+> > 1/ rockchip_irq_demux
+> > it's important to not losing irqs in this case, maybe we can
+> >
+> > a) ack irq
+> > b) update polarity for edge both irq
+> >
+> > we don't need to disable irq in b), since we would not hit the spurious irq
+> > cases here(always check gpio level to toggle it)
+> 
+> Unless you have some sort of proof that rockchip_irq_demux(), I would
+> take it as an example of something that works.  I remember stress
+> testing the heck out of it.  Do you have some evidence that it's not
+> working?  I think Brian was simply speculating that there might be a
+> race here, but I don't think anyone has shown it have they?  Looking
+> back at my notes, the thing I really made sure to stress was that we
+> never got into a situation where we were losing an edge (AKA we were
+> never configured to look for a falling edge when the line was already
+> low).  I'm not sure I confirmed that we never got an extra interrupt.
+
+I'll agree wholeheartedly that I'm only at the speculation stage right
+now :) I can try to poke at it sometime if I get some cycles. I'd
+definitely want to get better test results to prove this before changing
+this part.
+
+This is really just a side tangent anyway, because apparently the
+existing code is working well enough for rockchip_irq_demux(), and for
+$subject, we're really only working on improving set_type().
+
+> I'm at home right now and I can't add prints and poke at things, but
+> as I understand it for edge interrupts the usual flow to make sure
+> interrupts aren't ever lost is:
+> 
+> 1. See that the interrupt went off
+> 2. Ack it (clear it)
+> 3. Call the interrupt handler
+> 
+> ...presumably in this case rockchip_irq_demux() is called after step
+> #2 (but I don't know if it's called before or after step #3).  If the
+
+One thing to note here is that we're talking about a 2-level (chained)
+interrupt system. We've got the GIC, which does all of 1, 2, 3 at its
+level, and as part of #3 for the GIC, it runs the 2nd-level handler --
+rockchip_irq_demux() -- which has to perform all of 1, 2, 3 at its level.
+
+1 -> this is looping over GPIO_INT_STATUS in rockchip_irq_demux()
+2 -> this happens when writing to GPIO_PORTS_EOI, which only is called
+     by ->irq_ack() (irq_gc_ack_set_bit()) ... which happens from:
+       rockchip_irq_demux()
+         -> generic_handle_irq()
+	   -> handle_edge_irq()
+             -> desc->irq_data.chip->irq_ack() = irq_gc_ack_set_bit()
+3 -> same callpath as 2, except it's
+     -> handle_edge_irq()
+       -> handle_irq_event()
+
+Those all happen in the correct order.
+
+But the problem is that you left out the part about "change polarity for
+emulating EDGE_BOTH"; in your example (gpio-dwapb.c), polarity
+adjustment happens *after* 2; in Rockchip's driver, we have it before.
+I'm pretty sure dwapb is correct, and we are not.
+
+> line is toggling like crazy while the 3 steps are going on, it's OK if
+> the interrupt handler is called more than once.  In general this could
+> be considered expected.  That's why you Ack before handling--any extra
+> edges that come in any time after the interrupt handler starts (even
+> after the very first instruction) need to cause the interrupt handler
+> to get called again.
+> 
+> This is different than Brian's understanding since he seemed to think
+> the Ack was happening later.  If you're in front of something where
+> you can add printouts, maybe you can tell us.  I tried to look through
+> the code and it was too twisted for me to be sure.
+
+I'm not sure your understanding of my understanding is accurate :)
+Hopefully the above clarifies what I'm thinking?
+
+> > 2/ rockchip_irq_set_type
+> > it's important to not having spurious irqs
+> >
+> > so we can disable irq during changing polarity only in these case:
+> > ((rising && gpio is heigh) || (falling && gpio is low))
+> >
+> > i'm still confirming the spurious irq with IC guys.
+> 
+> Hmmm, thinking about all this more, I'm curious how callers expect
+> this to work.  Certainly things are undefined if you have the
+> following situation:
+> 
+> Start: rising edge trigger, line is actually high
+> Request: change to falling edge trigger
+> Line falls during the request
+> 
+> In that case it's OK to throw the interrupt away because it can be
+> argued that the line could have fallen before the request actually
+> took place.  ...but it seems like there could be situations where the
+> user wouldn't expect interrupts to be thrown away by a call to
+> irq_set_type().  In other words:
+> 
+> Start: rising edge trigger, line is actually high
+> Request: change to falling edge trigger
+> Line falls, rises, and falls during the request
+> 
+> ...in that case you'd expect that some sort of interrupt would have
+> gone off and not be thrown away.  No matter what instant in time the
+> request actually took place it should have caught an edge, right?
+> 
+> 
+> Said another way: As a client of irq_set_type() I'd expect it to not
+> throw away interrupts, but I'd expect that the change in type would be
+> atomic.  That is: if the interrupt came in before the type change in
+> type applied then it should trigger with the old rules.  If the
+> interrupt came in after the type change then it should trigger with
+> the new rules.
+
+I'm not sure it's totally possible to differentiate these, but that
+seems about right I think.
+
+> I would be tempted to confirm your testing and just clear the spurious
+> interrupts that you're aware of.  AKA: if there's no interrupt pending
+> and you change the type to "IRQ_TYPE_EDGE_RISING" or
+> "IRQ_TYPE_EDGE_FALLING" then you should clear the interrupt.  It's
+> still racy, but I guess it's the best you can do unless IC guys come
+> up with something better.
+
+Thanks! Yeah, clearing (rather than temporarily disabling) seems to make
+more sense.
+
+> Anyway, it's past my bedtime.  Hopefully some of the above made sense.
+> I'm sure you'll tell me if it didn't or if I said something
+> stupid/wrong.  :-P
+
+Brian
