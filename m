@@ -1,64 +1,73 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 10 May 2018 15:04:46 +0100
-Subject: [PATCH v6 02/11] firmware: xilinx: Add Zynqmp firmware driver
-In-Reply-To: <1523389127-14243-3-git-send-email-jollys@xilinx.com>
-References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
- <1523389127-14243-3-git-send-email-jollys@xilinx.com>
-Message-ID: <9cbfb3cd-daa3-f145-c6f2-f15f61d1bea0@arm.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 10 May 2018 15:04:28 +0100
+Subject: [RFC 00/13] arm: Allow the user specifying where the RAM is place in
+ the memory
+Message-ID: <20180510140441.24573-1-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
+At the moment, a user is only able to specify the amount of RAM used by the
+guest. Where the RAM will live is left to the software and hardcoded.
 
-On 10/04/18 20:38, Jolly Shah wrote:
-> From: Rajan Vaja <rajanv@xilinx.com>
-> 
-> This patch is adding communication layer with firmware.
-> Firmware driver provides an interface to firmware APIs.
-> Interface APIs can be used by any driver to communicate to
-> PMUFW(Platform Management Unit). All requests go through ATF.
-> 
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> ---
+It could be useful for testing purpose to move the RAM in different place.
+This series adds the possibility for the user to specify multiple RAM region.
 
-[...]
+The option -m/--mem is extended to specify the address using the following
+format: <size>@<addr>. The option needs to be repeated as many times as the
+number of RAM region in the guest layout.
 
-> +
-> +/**
-> + * get_set_conduit_method() - Choose SMC or HVC based communication
-> + * @np:		Pointer to the device_node structure
-> + *
-> + * Use SMC or HVC-based functions to communicate with EL2/EL3.
-> + *
-> + * Return: Returns 0 on success or error code
-> + */
-> +static int get_set_conduit_method(struct device_node *np)
-> +{
-> +	const char *method;
-> +
-> +	if (of_property_read_string(np, "method", &method)) {
-> +		pr_warn("%s missing \"method\" property\n", __func__);
-> +		return -ENXIO;
-> +	}
-> +
-> +	if (!strcmp("hvc", method)) {
-> +		do_fw_call = do_fw_call_hvc;
-> +	} else if (!strcmp("smc", method)) {
-> +		do_fw_call = do_fw_call_smc;
-> +	} else {
-> +		pr_warn("%s Invalid \"method\" property: %s\n",
-> +			__func__, method);
-> +		return -EINVAL;
-> +	}
-> +
+For instance, if you want 512MB at 3GB and 512MB 4GB it would look like:
+    -m 512 at 0xc0000000 -m 512 at 0x100000000
 
-Mark R did some cleanup around SMCCC conduits[1]. It makes sense to base
-this on top that. But if you manage to push this for v4.18, then you may
-need to wait for that to be merged and clean it up after v4.18
+Note that the memory layout is not yet fully configurable by the user, so the
+MMIO region is still living below 2GB. This means RAM cannot live in the
+region 0-2GB. This could be changed in the future.
+
+This new version also integrates work from Suzuki to allow the user specifying
+the IPA size for the guest. This was previously sent separately on kvmarm [1].
+
+Cheers,
+
+[1] https://lkml.org/lkml/2018/3/27/437
+
+Julien Grall (7):
+  kvm__arch_init: Don't pass hugetlbfs_path and ram_size in parameter
+  virtio/scsi: Allow to use multiple banks
+  Fold kvm__init_ram call in kvm__arch_init
+  kvm__arch_sanitize_cfg
+  arm: Move anything related to RAM initialization in kvm__init_ram
+  Allow the user to specify where the RAM is placed in the memory
+  arm: Add support for multi memory regions
+
+Suzuki K Poulose (6):
+  arm: Allow use of hugepage with 16K pagesize host
+  virtio: Handle aborts using invalid PFN
+  kvmtool: Allow backends to run checks on the KVM device fd
+  kvmtool: arm64: Add support for guest physical address size
+  kvmtool: arm64: Switch memory layout
+  kvmtool: arm/arm64: Add support for creating VM with PA size
+
+ arm/aarch32/include/kvm/kvm-arch.h        |   3 +-
+ arm/aarch64/include/kvm/kvm-arch.h        |  15 ++-
+ arm/aarch64/include/kvm/kvm-config-arch.h |   5 +-
+ arm/fdt.c                                 |  17 ++-
+ arm/include/arm-common/kvm-arch.h         |  32 ++++--
+ arm/include/arm-common/kvm-config-arch.h  |   1 +
+ arm/kvm.c                                 | 183 +++++++++++++++++++++++++-----
+ builtin-run.c                             |  87 ++++++++++++--
+ include/kvm/kvm-config.h                  |  16 ++-
+ include/kvm/kvm.h                         |  28 ++++-
+ kvm.c                                     |  10 +-
+ mips/kvm.c                                |  47 +++++---
+ powerpc/kvm.c                             |  33 +++---
+ virtio/mmio.c                             |  14 ++-
+ virtio/pci.c                              |  10 +-
+ virtio/scsi.c                             |  21 ++--
+ x86/bios.c                                |   8 +-
+ x86/kvm.c                                 |  54 +++++----
+ 18 files changed, 443 insertions(+), 141 deletions(-)
 
 -- 
-Regards,
-Sudeep
-
-[1] https://www.spinics.net/lists/arm-kernel/msg650305.html
+2.11.0
