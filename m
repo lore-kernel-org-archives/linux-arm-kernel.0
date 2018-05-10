@@ -1,202 +1,114 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Thu, 10 May 2018 17:23:42 +0100
-Subject: [PATCH v3 3/8] arm64: kasan: Switch to using KASAN_SHADOW_OFFSET
+Date: Thu, 10 May 2018 17:23:45 +0100
+Subject: [PATCH v3 6/8] arm64: module-plts: Extend veneer to address 52-bit VAs
 In-Reply-To: <20180510162347.3858-1-steve.capper@arm.com>
 References: <20180510162347.3858-1-steve.capper@arm.com>
-Message-ID: <20180510162347.3858-4-steve.capper@arm.com>
+Message-ID: <20180510162347.3858-7-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KASAN_SHADOW_OFFSET is a constant that is supplied to gcc as a command
-line argument and affects the codegen of the inline address sanetiser.
+From: Ard Bieusheuval <ard.biesheuvel@linaro.org>
 
-Essentially, for an example memory access:
-    *ptr1 = val;
-The compiler will insert logic similar to the below:
-    shadowValue = *(ptr1 >> KASAN_SHADOW_SCALE_SHIFT + KASAN_SHADOW_OFFSET)
-    if (somethingWrong(shadowValue))
-        flagAnError();
+In preparation for 52-bit VA support in the Linux kernel, we extend the
+plts veneer to support 52-bit addresses via an extra movk instruction.
 
-This code sequence is inserted into many places, thus
-KASAN_SHADOW_OFFSET is essentially baked into many places in the kernel
-text.
-
-If we want to run a single kernel binary with multiple address spaces,
-then we need to do this with KASAN_SHADOW_OFFSET fixed.
-
-Thankfully, due to the way the KASAN_SHADOW_OFFSET is used to provide
-shadow addresses we know that the end of the shadow region is constant
-w.r.t. VA space size:
-    KASAN_SHADOW_END = ~0 >> KASAN_SHADOW_SCALE_SHIFT + KASAN_SHADOW_OFFSET
-
-This means that if we increase the size of the VA space, the start of
-the KASAN region expands into lower addresses whilst the end of the
-KASAN region is fixed.
-
-Currently the arm64 code computes KASAN_SHADOW_OFFSET at build time via
-build scripts with the VA size used as a parameter. (There are build
-time checks in the C code too to ensure that expected values are being
-derived). It is sufficient, and indeed is a simplification, to remove
-the build scripts (and build time checks) entirely and instead provide
-KASAN_SHADOW_OFFSET values.
-
-This patch removes the logic to compute the KASAN_SHADOW_OFFSET in the
-arm64 Makefile, and instead we adopt the approach used by x86 to supply
-offset values in kConfig. To help debug/develop future VA space changes,
-the Makefile logic has been preserved in a script file in the arm64
-Documentation folder.
-
+[Steve: code from Ard off-list, changed the #ifdef logic to inequality]
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 
 ---
 
-Changed in V3, rebase to include KASAN_SHADOW_SCALE_SHIFT, wording
-tidied up.
----
- Documentation/arm64/kasan-offsets.sh | 20 ++++++++++++++++++++
- arch/arm64/Kconfig                   | 10 ++++++++++
- arch/arm64/Makefile                  |  9 ---------
- arch/arm64/include/asm/kasan.h       | 11 ++++-------
- arch/arm64/include/asm/memory.h      |  7 +++++--
- arch/arm64/mm/kasan_init.c           |  2 --
- 6 files changed, 39 insertions(+), 20 deletions(-)
- create mode 100644 Documentation/arm64/kasan-offsets.sh
+New in V3 of the series.
 
-diff --git a/Documentation/arm64/kasan-offsets.sh b/Documentation/arm64/kasan-offsets.sh
-new file mode 100644
-index 000000000000..329353f8489d
---- /dev/null
-+++ b/Documentation/arm64/kasan-offsets.sh
-@@ -0,0 +1,20 @@
-+#!/bin/sh
-+
-+# Print out the KASAN_SHADOW_OFFSETS required to place the KASAN SHADOW
-+# start address at the mid-point of the kernel VA space
-+
-+KASAN_SHADOW_SCALE_SHIFT=3
-+
-+print_kasan_offset () {
-+	printf "%02d\t" $1
-+	printf "0x%08x00000000\n" $(( (0xffffffff & (-1 << ($1 - 1 - 32))) \
-+			+ (1 << ($1 - 32 - KASAN_SHADOW_SCALE_SHIFT)) \
-+			- (1 << (64 - 32 - KASAN_SHADOW_SCALE_SHIFT)) ))
-+}
-+
-+echo KASAN_SHADOW_SCALE_SHIFT = $KASAN_SHADOW_SCALE_SHIFT
-+printf "VABITS\tKASAN_SHADOW_OFFSET\n"
-+print_kasan_offset 48
-+print_kasan_offset 42
-+print_kasan_offset 39
-+print_kasan_offset 36
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index eb2cf4938f6d..4d2bc91d4017 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -279,6 +279,16 @@ config ARCH_PROC_KCORE_TEXT
- config MULTI_IRQ_HANDLER
- 	def_bool y
+I'm not sure if this is strictly necessary as the VAs of the module
+space will fit within 48-bits of addressing even when a 52-bit VA space
+is enabled. However, this may act to future-proof the 52-bit VA support
+should any future adjustments be made to the VA space.
+---
+ arch/arm64/include/asm/module.h | 13 ++++++++++++-
+ arch/arm64/kernel/module-plts.c | 12 ++++++++++++
+ 2 files changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index 97d0ef12e2ff..30b8ca95d19a 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -59,6 +59,9 @@ struct plt_entry {
+ 	__le32	mov0;	/* movn	x16, #0x....			*/
+ 	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
+ 	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
++#if CONFIG_ARM64_VA_BITS > 48
++	__le32  mov3;   /* movk x16, #0x...., lsl #48		*/
++#endif
+ 	__le32	br;	/* br	x16				*/
+ };
  
-+config KASAN_SHADOW_OFFSET
-+	hex
-+	depends on KASAN
-+	default 0xdfffa00000000000 if ARM64_VA_BITS_48
-+	default 0xdfffd00000000000 if ARM64_VA_BITS_47
-+	default 0xdffffe8000000000 if ARM64_VA_BITS_42
-+	default 0xdfffffd000000000 if ARM64_VA_BITS_39
-+	default 0xdffffffa00000000 if ARM64_VA_BITS_36
-+	default 0xffffffffffffffff
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 2785f34aa790..08ccbfaec3c5 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -96,15 +96,6 @@ else
- TEXT_OFFSET := 0x00080000
- endif
- 
--# KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
--#				 - (1 << (64 - KASAN_SHADOW_SCALE_SHIFT))
--# in 32-bit arithmetic
--KASAN_SHADOW_SCALE_SHIFT := 3
--KASAN_SHADOW_OFFSET := $(shell printf "0x%08x00000000\n" $$(( \
--	(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 1 - 32))) \
--	+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) \
--	- (1 << (64 - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) )) )
--
- export	TEXT_OFFSET GZFLAGS
- 
- core-y		+= arch/arm64/kernel/ arch/arm64/mm/
-diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-index 8758bb008436..ea397897ae4a 100644
---- a/arch/arm64/include/asm/kasan.h
-+++ b/arch/arm64/include/asm/kasan.h
-@@ -14,11 +14,8 @@
-  * KASAN_SHADOW_START: beginning of the kernel virtual addresses.
-  * KASAN_SHADOW_END: KASAN_SHADOW_START + 1/N of kernel virtual addresses,
-  * where N = (1 << KASAN_SHADOW_SCALE_SHIFT).
-- */
--#define KASAN_SHADOW_START      (VA_START)
--#define KASAN_SHADOW_END        (KASAN_SHADOW_START + KASAN_SHADOW_SIZE)
--
--/*
-+ *
-+ * KASAN_SHADOW_OFFSET:
-  * This value is used to map an address to the corresponding shadow
-  * address by the following formula:
-  *     shadow_addr = (address >> KASAN_SHADOW_SCALE_SHIFT) + KASAN_SHADOW_OFFSET
-@@ -29,8 +26,8 @@
-  *      KASAN_SHADOW_OFFSET = KASAN_SHADOW_END -
-  *				(1ULL << (64 - KASAN_SHADOW_SCALE_SHIFT))
-  */
--#define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << \
--					(64 - KASAN_SHADOW_SCALE_SHIFT)))
-+#define _KASAN_SHADOW_START(va)	(KASAN_SHADOW_END - (1UL << ((va) - KASAN_SHADOW_SCALE_SHIFT)))
-+#define KASAN_SHADOW_START      _KASAN_SHADOW_START(VA_BITS)
- 
- void kasan_init(void);
- void kasan_copy_shadow(pgd_t *pgdir);
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index f0478617db32..aa26958e5034 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -64,7 +64,7 @@
- #define PAGE_OFFSET_END		(VA_START)
- #define KIMAGE_VADDR		(MODULES_END)
- #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
--#define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
-+#define MODULES_VADDR		(KASAN_SHADOW_END)
- #define MODULES_VSIZE		(SZ_128M)
- #define VMEMMAP_START		(-VMEMMAP_SIZE)
- #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
-@@ -83,9 +83,12 @@
- #define KASAN_SHADOW_SCALE_SHIFT 3
- #define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
- #define KASAN_THREAD_SHIFT	1
-+#define KASAN_SHADOW_OFFSET	_AC(CONFIG_KASAN_SHADOW_OFFSET, UL)
-+#define KASAN_SHADOW_END	((UL(1) << (64 - KASAN_SHADOW_SCALE_SHIFT)) \
-+					+ KASAN_SHADOW_OFFSET)
- #else
--#define KASAN_SHADOW_SIZE	(0)
- #define KASAN_THREAD_SHIFT	0
-+#define KASAN_SHADOW_END	(VA_START)
- #endif
- 
- #define MIN_THREAD_SHIFT	(14 + KASAN_THREAD_SHIFT)
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index 7571e3e6e0f0..221ddead81ac 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -135,8 +135,6 @@ static void __init kasan_pgd_populate(unsigned long addr, unsigned long end,
- /* The early shadow maps everything to a single page of zeroes */
- asmlinkage void __init kasan_early_init(void)
+@@ -71,7 +74,8 @@ static inline struct plt_entry get_plt_entry(u64 val)
+ 	 * +--------+------------+--------+-----------+-------------+---------+
+ 	 *
+ 	 * Rd     := 0x10 (x16)
+-	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
++	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32),
++	 *           0b11 (lsl #48)
+ 	 * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
+ 	 * sf     := 1 (64-bit variant)
+ 	 */
+@@ -79,6 +83,9 @@ static inline struct plt_entry get_plt_entry(u64 val)
+ 		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
+ 		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
+ 		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
++#if CONFIG_ARM64_VA_BITS > 48
++		cpu_to_le32(0xf2e00010 | ((( val >> 48) & 0xffff)) << 5),
++#endif
+ 		cpu_to_le32(0xd61f0200)
+ 	};
+ }
+@@ -86,6 +93,10 @@ static inline struct plt_entry get_plt_entry(u64 val)
+ static inline bool plt_entries_equal(const struct plt_entry *a,
+ 				     const struct plt_entry *b)
  {
--	BUILD_BUG_ON(KASAN_SHADOW_OFFSET !=
--		KASAN_SHADOW_END - (1UL << (64 - KASAN_SHADOW_SCALE_SHIFT)));
- 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
- 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
- 	kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, NUMA_NO_NODE,
++#if CONFIG_ARM64_VA_BITS > 48
++	if (a->mov3 != b->mov3)
++		return false;
++#endif
+ 	return a->mov0 == b->mov0 &&
+ 	       a->mov1 == b->mov1 &&
+ 	       a->mov2 == b->mov2;
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+index f0690c2ca3e0..4d5617e09943 100644
+--- a/arch/arm64/kernel/module-plts.c
++++ b/arch/arm64/kernel/module-plts.c
+@@ -50,6 +50,9 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
+ 	struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
+ 	int i = pltsec->plt_num_entries++;
+ 	u32 mov0, mov1, mov2, br;
++#if CONFIG_ARM64_VA_BITS > 48
++	u32 mov3;
++#endif
+ 	int rd;
+ 
+ 	if (WARN_ON(pltsec->plt_num_entries > pltsec->plt_max_entries))
+@@ -69,6 +72,12 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
+ 	mov2 = aarch64_insn_gen_movewide(rd, (u16)(val >> 32), 32,
+ 					 AARCH64_INSN_VARIANT_64BIT,
+ 					 AARCH64_INSN_MOVEWIDE_KEEP);
++#if CONFIG_ARM64_VA_BITS > 48
++	mov3 = aarch64_insn_gen_movewide(rd, (u16)(val >> 48), 48,
++					 AARCH64_INSN_VARIANT_64BIT,
++					 AARCH64_INSN_MOVEWIDE_KEEP);
++#endif
++
+ 	br = aarch64_insn_gen_branch_imm((u64)&plt[i].br, (u64)loc + 4,
+ 					 AARCH64_INSN_BRANCH_NOLINK);
+ 
+@@ -76,6 +85,9 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
+ 			cpu_to_le32(mov0),
+ 			cpu_to_le32(mov1),
+ 			cpu_to_le32(mov2),
++#if CONFIG_ARM64_VA_BITS > 48
++			cpu_to_le32(mov3),
++#endif
+ 			cpu_to_le32(br)
+ 		};
+ 
 -- 
 2.11.0
