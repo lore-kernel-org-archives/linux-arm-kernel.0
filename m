@@ -1,89 +1,120 @@
-From: udknight@gmail.com (Wang YanQing)
-Date: Thu, 10 May 2018 16:48:31 +0800
-Subject: [PATCH] bpf, arm32: Correct check_imm24
-In-Reply-To: <20180510075656.GS16141@n2100.armlinux.org.uk>
-References: <20180510032013.GB26016@udknight>
- <20180510075656.GS16141@n2100.armlinux.org.uk>
-Message-ID: <20180510084831.GA31194@udknight>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Thu, 10 May 2018 12:03:27 +0300
+Subject: [PATCH] arm64: msm8916: fix gic_irq_domain_translate warnings
+In-Reply-To: <20180418163415.21646-1-srinivas.kandagatla@linaro.org>
+References: <20180418163415.21646-1-srinivas.kandagatla@linaro.org>
+Message-ID: <CAHLCerOZ3_A7PvD6i53WXLJXVPmUWcNakvA2gcwFYMT9f1iR0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 08:56:57AM +0100, Russell King - ARM Linux wrote:
-> On Thu, May 10, 2018 at 11:20:13AM +0800, Wang YanQing wrote:
-> > imm24 is signed, so the right range is:
-> > [-(2<<(24 - 1)), (2<<(24 - 1)) - 1]
-> 
-> 2 << (24 - 1) is the same as 1 << 24.
-> 
-> > -#define check_imm(bits, imm) do {				\
-> > -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-> > -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-> > -		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
-> > -			i, imm, imm);				\
-> > +#define check_imm_range(min, max, imm) do {			\
-> > +	if (imm < min || imm > max) {				\
-> > +		pr_info("[%2d] imm=%d is out of range\n",	\
-> > +			i, imm);				\
-> >  		return -EINVAL;					\
-> >  	}							\
-> >  } while (0)
-> > -#define check_imm24(imm) check_imm(24, imm)
-> > +#define check_imm24(imm) check_imm_range(-16777216, 16777215, imm)
-> 
-> How is this any different?
-> 
-> If imm is 16777216, then "imm > max" in your version is true.
-> In the original version, "imm > 0" is true, so we then test for
-> "16777216 >> 24" being non-zero.  That's also true, so the test
-> condition fires.
-> 
-> If imm is 16777215, then "imm > max" is false in your version.
-> In the original version, the conditions also evaluate to false.
-> 
-> For the -16777217 case, "imm < min" in your version is true.
-> In the original version, "imm < 0" is true, so we then test for
-> "~(-16777217) >> 24" being non-zero.  This is the same as
-> "16777216 >> 24" being non-zero, which is true so the condition
-> fires.
-> 
-> With -16777216, the same thing happens, both end up evaluating
-> to false.
-> 
-> So, the two cases end up producing identical results, and there
-> is no actual effect from this change.
-> 
-> However, your commit message is correct - there is a bug here.
-> That's obvious when you mask the "imm" value with 0x00ffffff,
-> and realise that an imm value of -16777216 ends up having the
-> same value in the instruction as an imm value of 0.  So, the
-> range of "imm" is _half_ that.
-> 
->  #define check_imm(bits, imm) do {				\
-> -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-> -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-> +	if ((((imm) > 0) && ((imm) >> (bits - 1))) ||		\
-> +	    (((imm) < 0) && (~(imm) >> (bits - 1)))) {		\
->  		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
->  			i, imm, imm);				\
-> 
-> would fix it.  Alternatively:
-> 
->  #define check_imm(bits, imm) do {				\
-> -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-> -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-> +	if ((imm) >= (1 << ((bits) - 1)) ||			\
-> +	    (imm) < -(1 << ((bits) - 1))) {			\
->  		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
->  			i, imm, imm);				\
-> 
-> would also fix it.
+On Wed, Apr 18, 2018 at 7:34 PM,  <srinivas.kandagatla@linaro.org> wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+> Remove the usage of IRQ_TYPE_NONE to fix loud warnings from
+> patch (83a86fbb5b56b "irqchip/gic: Loudly complain about
+> the use of IRQ_TYPE_NONE").
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Hi!
+Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
 
-Sorry for confusion, I make a mistake here, the real fix I want to
-submit is [8388607, -8388608], this range has the same effect as your
-suggestion.
+(boot report here:
+https://storage.kernelci.org/qcom-lt/integration-linux-qcomlt/v4.17-rc4-247-gbe94bee41bf6/arm64/defconfig/lab-bjorn/boot-apq8016-sbc.txt)
 
-Will you fix it? or I resend another version?
-
-Thanks.
+> ---
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> index cfbd72186762..5d66a575c7e1 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> @@ -180,7 +180,7 @@
+>
+>         pmu {
+>                 compatible = "arm,cortex-a53-pmu";
+> -               interrupts = <GIC_PPI 7 GIC_CPU_MASK_SIMPLE(4)>;
+> +               interrupts = <GIC_PPI 7 (GIC_CPU_MASK_SIMPLE(4)| IRQ_TYPE_LEVEL_HIGH)>;
+>         };
+>
+>         thermal-zones {
+> @@ -513,7 +513,7 @@
+>                 blsp_i2c2: i2c at 78b6000 {
+>                         compatible = "qcom,i2c-qup-v2.2.1";
+>                         reg = <0x078b6000 0x500>;
+> -                       interrupts = <GIC_SPI 96 0>;
+> +                       interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+>                         clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+>                                  <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
+>                         clock-names = "iface", "core";
+> @@ -528,7 +528,7 @@
+>                 blsp_i2c4: i2c at 78b8000 {
+>                         compatible = "qcom,i2c-qup-v2.2.1";
+>                         reg = <0x078b8000 0x500>;
+> -                       interrupts = <GIC_SPI 98 0>;
+> +                       interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+>                         clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+>                                  <&gcc GCC_BLSP1_QUP4_I2C_APPS_CLK>;
+>                         clock-names = "iface", "core";
+> @@ -543,7 +543,7 @@
+>                 blsp_i2c6: i2c at 78ba000 {
+>                         compatible = "qcom,i2c-qup-v2.2.1";
+>                         reg = <0x078ba000 0x500>;
+> -                       interrupts = <GIC_SPI 100 0>;
+> +                       interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+>                         clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+>                                  <&gcc GCC_BLSP1_QUP6_I2C_APPS_CLK>;
+>                         clock-names = "iface", "core";
+> @@ -575,7 +575,7 @@
+>                                         "mi2s-bit-clk3";
+>                         #sound-dai-cells = <1>;
+>
+> -                       interrupts = <0 160 0>;
+> +                       interrupts = <0 160 IRQ_TYPE_LEVEL_HIGH>;
+>                         interrupt-names = "lpass-irq-lpaif";
+>                         reg = <0x07708000 0x10000>;
+>                         reg-names = "lpass-lpaif";
+> @@ -595,7 +595,7 @@
+>                         reg = <0x07824900 0x11c>, <0x07824000 0x800>;
+>                         reg-names = "hc_mem", "core_mem";
+>
+> -                       interrupts = <0 123 0>, <0 138 0>;
+> +                       interrupts = <0 123 IRQ_TYPE_LEVEL_HIGH>, <0 138 IRQ_TYPE_LEVEL_HIGH>;
+>                         interrupt-names = "hc_irq", "pwr_irq";
+>                         clocks = <&gcc GCC_SDCC1_APPS_CLK>,
+>                                  <&gcc GCC_SDCC1_AHB_CLK>,
+> @@ -612,7 +612,7 @@
+>                         reg = <0x07864900 0x11c>, <0x07864000 0x800>;
+>                         reg-names = "hc_mem", "core_mem";
+>
+> -                       interrupts = <0 125 0>, <0 221 0>;
+> +                       interrupts = <0 125 IRQ_TYPE_LEVEL_HIGH>, <0 221 IRQ_TYPE_LEVEL_HIGH>;
+>                         interrupt-names = "hc_irq", "pwr_irq";
+>                         clocks = <&gcc GCC_SDCC2_APPS_CLK>,
+>                                  <&gcc GCC_SDCC2_AHB_CLK>,
+> @@ -819,7 +819,7 @@
+>                         iommu-ctx at 2000 {
+>                                 compatible = "qcom,msm-iommu-v1-ns";
+>                                 reg = <0x2000 0x1000>;
+> -                               interrupts = <GIC_SPI 242 0>;
+> +                               interrupts = <GIC_SPI 242 IRQ_TYPE_LEVEL_HIGH>;
+>                         };
+>                 };
+>
+> @@ -864,7 +864,7 @@
+>                                       "bus_clk",
+>                                       "vsync_clk";
+>
+> -                       interrupts = <0 72 0>;
+> +                       interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
+>
+>                         interrupt-controller;
+>                         #interrupt-cells = <1>;
+> --
+> 2.16.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
