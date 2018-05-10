@@ -1,127 +1,49 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 10 May 2018 18:42:17 +0200
-Subject: [PATCH] kvm: Change return type to vm_fault_t
-In-Reply-To: <20180418191958.GA25806@jordon-HP-15-Notebook-PC>
-References: <20180418191958.GA25806@jordon-HP-15-Notebook-PC>
-Message-ID: <4fb6e990-080b-0612-3fcd-f2082185f8ff@redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 10 May 2018 19:43:03 +0300
+Subject: [PATCH] arm64: dts: renesas: r8a77970: add SMP support
+In-Reply-To: <20180509190517.ho5og3grbuzf4wz4@verge.net.au>
+References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
+ <54dbd1d2-8279-5073-cffb-c647fba91e42@cogentembedded.com>
+ <CAMuHMdUqVVWz0jLb2Vmrkk3BQBsYVsCOW1zsaPUi8o6jr_mojQ@mail.gmail.com>
+ <db136ee6-4ce6-756e-743d-3342b2e65f2b@cogentembedded.com>
+ <20180509190517.ho5og3grbuzf4wz4@verge.net.au>
+Message-ID: <110ba99c-1a8d-98a1-3ca0-5fc99e79572b@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/2018 21:19, Souptick Joarder wrote:
-> Use new return type vm_fault_t for fault handler. For
-> now, this is just documenting that the function returns
-> a VM_FAULT value rather than an errno. Once all instances
-> are converted, vm_fault_t will become a distinct type.
-> 
-> commit 1c8f422059ae ("mm: change return type to vm_fault_t")
-> 
-> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> Reviewed-by: Matthew Wilcox <mawilcox@microsoft.com>
-> ---
->  arch/mips/kvm/mips.c       | 2 +-
->  arch/powerpc/kvm/powerpc.c | 2 +-
->  arch/s390/kvm/kvm-s390.c   | 2 +-
->  arch/x86/kvm/x86.c         | 2 +-
->  include/linux/kvm_host.h   | 2 +-
->  virt/kvm/arm/arm.c         | 2 +-
->  virt/kvm/kvm_main.c        | 2 +-
->  7 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/mips/kvm/mips.c b/arch/mips/kvm/mips.c
-> index 2549fdd..03e0e0f 100644
-> --- a/arch/mips/kvm/mips.c
-> +++ b/arch/mips/kvm/mips.c
-> @@ -1076,7 +1076,7 @@ int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
->  	return -ENOIOCTLCMD;
->  }
-> 
-> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
-> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
->  {
->  	return VM_FAULT_SIGBUS;
->  }
-> diff --git a/arch/powerpc/kvm/powerpc.c b/arch/powerpc/kvm/powerpc.c
-> index 403e642..3099dee 100644
-> --- a/arch/powerpc/kvm/powerpc.c
-> +++ b/arch/powerpc/kvm/powerpc.c
-> @@ -1825,7 +1825,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  	return r;
->  }
-> 
-> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
-> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
->  {
->  	return VM_FAULT_SIGBUS;
->  }
-> diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
-> index ba4c709..24af487 100644
-> --- a/arch/s390/kvm/kvm-s390.c
-> +++ b/arch/s390/kvm/kvm-s390.c
-> @@ -3941,7 +3941,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  	return r;
->  }
-> 
-> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
-> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
->  {
->  #ifdef CONFIG_KVM_S390_UCONTROL
->  	if ((vmf->pgoff == KVM_S390_SIE_PAGE_OFFSET)
-> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-> index c8a0b54..95d8102 100644
-> --- a/arch/x86/kvm/x86.c
-> +++ b/arch/x86/kvm/x86.c
-> @@ -3827,7 +3827,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  	return r;
->  }
-> 
-> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
-> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
->  {
->  	return VM_FAULT_SIGBUS;
->  }
-> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-> index ac0062b..8eeb062 100644
-> --- a/include/linux/kvm_host.h
-> +++ b/include/linux/kvm_host.h
-> @@ -736,7 +736,7 @@ long kvm_arch_dev_ioctl(struct file *filp,
->  			unsigned int ioctl, unsigned long arg);
->  long kvm_arch_vcpu_ioctl(struct file *filp,
->  			 unsigned int ioctl, unsigned long arg);
-> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf);
-> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf);
-> 
->  int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext);
-> 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 86941f6..6c8cc31 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -163,7 +163,7 @@ int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
->  	return 0;
->  }
-> 
-> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
-> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
->  {
->  	return VM_FAULT_SIGBUS;
->  }
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index 4501e65..45eb54b 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -2341,7 +2341,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
->  }
->  EXPORT_SYMBOL_GPL(kvm_vcpu_on_spin);
-> 
-> -static int kvm_vcpu_fault(struct vm_fault *vmf)
-> +static vm_fault_t kvm_vcpu_fault(struct vm_fault *vmf)
->  {
->  	struct kvm_vcpu *vcpu = vmf->vma->vm_file->private_data;
->  	struct page *page;
-> --
-> 1.9.1
-> 
+Hello!
 
-Applied, thanks.
+On 05/09/2018 10:05 PM, Simon Horman wrote:
 
-Paolo
+>>>> Add the device node for the second Cortex-A53 CPU core.
+>>>>
+>>>> Based on the original (and large) patch by Daisuke Matsushita
+>>>> <daisuke.matsushita.ns@hitachi.com>.
+>>>>
+>>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>
+>>> Dupe of https://patchwork.kernel.org/patch/10032875/
+>>
+>>    Sorry!
+>>    Not an exact dupe, though -- mine has clock/power #define's used,
+>> yours -- only bare #s. :-)
+>>
+>>> From series "[PATCH 0/2] arm64: dts: renesas: r8a77970: Add SMP Support"
+>>> (https://www.spinics.net/lists/linux-renesas-soc/msg19681.html)
+>>
+>>    Hmm... what's the fate of this series?
+> 
+> There is now a v2 of Geert's series which incorporates your enhancements.
+
+   I suggested to respin it. :-)
+
+> I will apply that.
+
+   Thank you.
+   For the record, I had better luck than Geert testing SMP on Eagle: only CPU0
+couldn't be offlined (and I was unable to find a workaround), others could be on/
+offlined w/o issues. As for suspend/resume -- it did work but I could only test
+s2idle (/sys/power/mem_sleep had no other variants)...
+
+MBR, Sergei
