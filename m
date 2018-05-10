@@ -1,120 +1,104 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 10 May 2018 10:29:48 +0200
-Subject: [PATCH 3/8] firmware: arm_scmi: rename get_transition_latency and
- add_opps_to_device
-In-Reply-To: <1525885634-22348-4-git-send-email-sudeep.holla@arm.com>
-References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
- <1525885634-22348-4-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAJZ5v0ixZPB8aZs0xc9-3JMrWfRC7+7mzYWNaCj1o_q6VSqEJA@mail.gmail.com>
+From: hoeun.ryu@lge.com.com (Hoeun Ryu)
+Date: Thu, 10 May 2018 17:36:17 +0900
+Subject: [PATCH] armpmu: broadcast overflow irq on multi-core system having
+ one muxed SPI for PMU.
+Message-ID: <1525941385-12766-1-git-send-email-hoeun.ryu@lge.com.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2018 at 7:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Most of the scmi code follows the suggestion from Greg KH on a totally
-> different thread[0] to have the subsystem name first, followed by the
-> noun and finally the verb with couple of these exceptions.
->
-> This patch fixes them so that all the functions names are aligned to
-> on practice.
->
-> [0] https://www.spinics.net/lists/arm-kernel/msg583673.html
->
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+From: Hoeun Ryu <hoeun.ryu@lge.com>
 
-ACK for the cpufreq driver changes and I'm assuming this to go in via the arch.
+ On some SoCs like i.MX6DL/QL have only one muxed SPI for multi-core system.
+On the systems, a CPU can be interrupted by overflow irq but it is possible that
+the overflow actually occurs on another CPU.
+ This patch broadcasts the irq using smp_call_function() so that other CPUs can
+check and handle their overflows by themselves when a overflow doesn't actually
+occur on the interrupted CPU.
 
-> ---
->  drivers/cpufreq/scmi-cpufreq.c   |  4 ++--
->  drivers/firmware/arm_scmi/perf.c | 10 +++++-----
->  include/linux/scmi_protocol.h    | 10 +++++-----
->  3 files changed, 12 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
-> index b4dbc77459b6..50b1551ba894 100644
-> --- a/drivers/cpufreq/scmi-cpufreq.c
-> +++ b/drivers/cpufreq/scmi-cpufreq.c
-> @@ -117,7 +117,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
->                 return -ENODEV;
->         }
->
-> -       ret = handle->perf_ops->add_opps_to_device(handle, cpu_dev);
-> +       ret = handle->perf_ops->device_opps_add(handle, cpu_dev);
->         if (ret) {
->                 dev_warn(cpu_dev, "failed to add opps to the device\n");
->                 return ret;
-> @@ -164,7 +164,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
->         /* SCMI allows DVFS request for any domain from any CPU */
->         policy->dvfs_possible_from_any_cpu = true;
->
-> -       latency = handle->perf_ops->get_transition_latency(handle, cpu_dev);
-> +       latency = handle->perf_ops->transition_latency_get(handle, cpu_dev);
->         if (!latency)
->                 latency = CPUFREQ_ETERNAL;
->
-> diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
-> index 987c64d19801..611ab08e6174 100644
-> --- a/drivers/firmware/arm_scmi/perf.c
-> +++ b/drivers/firmware/arm_scmi/perf.c
-> @@ -349,8 +349,8 @@ static int scmi_dev_domain_id(struct device *dev)
->         return clkspec.args[0];
->  }
->
-> -static int scmi_dvfs_add_opps_to_device(const struct scmi_handle *handle,
-> -                                       struct device *dev)
-> +static int scmi_dvfs_device_opps_add(const struct scmi_handle *handle,
-> +                                    struct device *dev)
->  {
->         int idx, ret, domain;
->         unsigned long freq;
-> @@ -383,7 +383,7 @@ static int scmi_dvfs_add_opps_to_device(const struct scmi_handle *handle,
->         return 0;
->  }
->
-> -static int scmi_dvfs_get_transition_latency(const struct scmi_handle *handle,
-> +static int scmi_dvfs_transition_latency_get(const struct scmi_handle *handle,
->                                             struct device *dev)
->  {
->         struct perf_dom_info *dom;
-> @@ -432,8 +432,8 @@ static struct scmi_perf_ops perf_ops = {
->         .level_set = scmi_perf_level_set,
->         .level_get = scmi_perf_level_get,
->         .device_domain_id = scmi_dev_domain_id,
-> -       .get_transition_latency = scmi_dvfs_get_transition_latency,
-> -       .add_opps_to_device = scmi_dvfs_add_opps_to_device,
-> +       .transition_latency_get = scmi_dvfs_transition_latency_get,
-> +       .device_opps_add = scmi_dvfs_device_opps_add,
->         .freq_set = scmi_dvfs_freq_set,
->         .freq_get = scmi_dvfs_freq_get,
->  };
-> diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-> index a171c1e293e8..f4c9fc0fc755 100644
-> --- a/include/linux/scmi_protocol.h
-> +++ b/include/linux/scmi_protocol.h
-> @@ -85,8 +85,8 @@ struct scmi_clk_ops {
->   * @level_set: sets the performance level of a domain
->   * @level_get: gets the performance level of a domain
->   * @device_domain_id: gets the scmi domain id for a given device
-> - * @get_transition_latency: gets the DVFS transition latency for a given device
-> - * @add_opps_to_device: adds all the OPPs for a given device
-> + * @transition_latency_get: gets the DVFS transition latency for a given device
-> + * @device_opps_add: adds all the OPPs for a given device
->   * @freq_set: sets the frequency for a given device using sustained frequency
->   *     to sustained performance level mapping
->   * @freq_get: gets the frequency for a given device using sustained frequency
-> @@ -102,10 +102,10 @@ struct scmi_perf_ops {
->         int (*level_get)(const struct scmi_handle *handle, u32 domain,
->                          u32 *level, bool poll);
->         int (*device_domain_id)(struct device *dev);
-> -       int (*get_transition_latency)(const struct scmi_handle *handle,
-> +       int (*transition_latency_get)(const struct scmi_handle *handle,
->                                       struct device *dev);
-> -       int (*add_opps_to_device)(const struct scmi_handle *handle,
-> -                                 struct device *dev);
-> +       int (*device_opps_add)(const struct scmi_handle *handle,
-> +                              struct device *dev);
->         int (*freq_set)(const struct scmi_handle *handle, u32 domain,
->                         unsigned long rate, bool poll);
->         int (*freq_get)(const struct scmi_handle *handle, u32 domain,
-> --
-> 2.7.4
->
+ Local irq is enabled and preemption is disabled temporarily to call
+smp_call_function_many() in armpmu_dispatch_irq() as the smp_call_function_many()
+doesn't allow to be called with irq-disabled.
+
+ The callback for smp_call_function_many() is __armpmu_handle_irq() and the
+function calls armpmu->handle_irq() with an invalid irq_num because
+smp_call_func_t has only one parameter and armpmu pointer is handed over by the
+pointer. It can be a problem if irq_num parameter is used by handlers but no
+handler uses the irq parameter for now. We could have another approach removing
+irq_num argument itself in handle_irq() function.
+
+Signed-off-by: Hoeun Ryu <hoeun.ryu@lge.com>
+---
+ drivers/perf/arm_pmu.c | 51 +++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 48 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 1a0d340..3d65e44 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -322,6 +322,29 @@ validate_group(struct perf_event *event)
+ 	return 0;
+ }
+ 
++static void __armpmu_handle_irq(void *dev)
++{
++	struct arm_pmu *armpmu;
++	u64 start_clock, finish_clock;
++	irqreturn_t ret;
++
++	armpmu = *(void **)dev;
++	start_clock = sched_clock();
++	/*
++	 * irq_num should not be used by the handler, we don't have irq_num for
++	 * the first place. There is no handler using the irq_num argument for now.
++	 * smp_call_func_t has one function argument and irq number cannot be handed
++	 * over to this callback because we need dev pointer here.
++	 * If you need valid irq_num, you need to declare a wrapper struct having
++	 * irq_num and dev pointer.
++	 */
++	ret = armpmu->handle_irq(-1, armpmu);
++	if (ret == IRQ_HANDLED) {
++		finish_clock = sched_clock();
++		perf_sample_event_took(finish_clock - start_clock);
++	}
++}
++
+ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ {
+ 	struct arm_pmu *armpmu;
+@@ -340,9 +363,31 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ 
+ 	start_clock = sched_clock();
+ 	ret = armpmu->handle_irq(irq, armpmu);
+-	finish_clock = sched_clock();
+-
+-	perf_sample_event_took(finish_clock - start_clock);
++	/*
++	 * The handler just returns with IRQ_NONE when it checks the overflow
++	 * and the overflow doesn't occur on the CPU.
++	 *
++	 * Some SoCs like i.MX6 have one muxed SPI on multi-core system.
++	 * On the systems , the irq should be broadcasted to other CPUs so that the
++	 * CPUs can check their own PMU overflow.
++	 */
++	if (ret == IRQ_HANDLED) {
++		finish_clock = sched_clock();
++		perf_sample_event_took(finish_clock - start_clock);
++	} else if (ret == IRQ_NONE) {
++		struct cpumask mask;
++
++		cpumask_copy(&mask, cpu_online_mask);
++		cpumask_clear_cpu(raw_smp_processor_id(), &mask);
++		if (!cpumask_empty(&mask)) {
++			/* smp_call_function cannot be called with irq disabled */
++			local_irq_enable();
++			preempt_disable();
++			smp_call_function_many(&mask, __armpmu_handle_irq, dev, 0);
++			preempt_enable();
++			local_irq_disable();
++		}
++	}
+ 	return ret;
+ }
+ 
+-- 
+2.1.4
