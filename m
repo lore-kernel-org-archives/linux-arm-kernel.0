@@ -1,60 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 May 2018 09:00:26 -0700
-Subject: [GIT PULL] one bug fix and other omap fixes for v4.17-rc cycle
-Message-ID: <pull-1525967831-865303@atomide.com>
+From: colin.king@canonical.com (Colin King)
+Date: Thu, 10 May 2018 17:02:39 +0100
+Subject: [PATCH] ARM: kprobes: fix spelling mistake: "undefeined" ->
+ "undefined"
+Message-ID: <20180510160239.21091-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+From: Colin Ian King <colin.king@canonical.com>
 
-The following changes since commit fb289e3ab10c16834741bb02be740fa9d025fde0:
+Trivial fix to spelling mistake
 
-  Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes (2018-04-19 15:48:46 -0700)
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ arch/arm/probes/kprobes/test-thumb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v17/fixes-rc4
-
-for you to fetch changes up to 41bd6adf3c5d3990d7a67639aff53d54483744fa:
-
-  Revert "ARM: dts: logicpd-som-lv: Fix pinmux controller references" (2018-05-07 08:28:17 -0700)
-
-----------------------------------------------------------------
-Fixes for omap variants for v4.17
-
-This series of patches contains one BUG fix for trace if
-CONFIG_DEBUG_PREEMPT is enabled and a regression fix for omap1 FIQ
-handling on ams-delta. Then there's a dts fix for missing SoC
-compatible on ti81xx board dts files that did matter until we added
-the clkctrl clocks and without that some clocks are now not found.
-
-Then there are two logicpd-som-lv specific dts fixes that fix
-misconfigured pins for WLAN and audio. Turns out we had to revert
-the third one because it caused another regression for USB.
-
-----------------------------------------------------------------
-Adam Ford (3):
-      ARM: dts: logicpd-som-lv: Fix WL127x Startup Issues
-      ARM: dts: logicpd-som-lv: Fix Audio Mute
-      ARM: dts: logicpd-som-lv: Fix pinmux controller references
-
-Graeme Smecher (1):
-      ARM: dts: correct missing "compatible" entry for ti81xx SoCs
-
-Janusz Krzysztofik (1):
-      ARM: OMAP1: ams-delta: fix deferred_fiq handler
-
-Tero Kristo (1):
-      ARM: OMAP2+: powerdomain: use raw_smp_processor_id() for trace
-
-Tony Lindgren (1):
-      Revert "ARM: dts: logicpd-som-lv: Fix pinmux controller references"
-
- arch/arm/boot/dts/dm8148-evm.dts       |  2 +-
- arch/arm/boot/dts/dm8148-t410.dts      |  2 +-
- arch/arm/boot/dts/dm8168-evm.dts       |  2 +-
- arch/arm/boot/dts/dra62x-j5eco-evm.dts |  2 +-
- arch/arm/boot/dts/logicpd-som-lv.dtsi  | 11 +++++++++--
- arch/arm/mach-omap1/ams-delta-fiq.c    | 28 +++++++++++++++-------------
- arch/arm/mach-omap2/powerdomain.c      |  4 ++--
- 7 files changed, 30 insertions(+), 21 deletions(-)
+diff --git a/arch/arm/probes/kprobes/test-thumb.c b/arch/arm/probes/kprobes/test-thumb.c
+index b683b4517458..6841909757cd 100644
+--- a/arch/arm/probes/kprobes/test-thumb.c
++++ b/arch/arm/probes/kprobes/test-thumb.c
+@@ -787,7 +787,7 @@ CONDITION_INSTRUCTIONS(22,
+ 
+ 	TEST_UNSUPPORTED(__inst_thumb32(0xf7f08000) " @ smc #0")
+ 
+-	TEST_UNSUPPORTED(__inst_thumb32(0xf7f0a000) " @ undefeined")
++	TEST_UNSUPPORTED(__inst_thumb32(0xf7f0a000) " @ undefined")
+ 
+ 	TEST_BF(  "b.w	2f")
+ 	TEST_BB(  "b.w	2b")
+-- 
+2.17.0
