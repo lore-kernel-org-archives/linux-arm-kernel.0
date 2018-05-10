@@ -1,180 +1,49 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 10 May 2018 18:16:36 +0900
-Subject: [reset-control] How to initialize hardware state with the shared
- reset line?
-Message-ID: <CAK7LNATZgJ4MxOFLUCNARWv3Zz=gpL-jGReDnBnArquiaXRWoQ@mail.gmail.com>
+From: djw@t-chip.com.cn (djw at t-chip.com.cn)
+Date: Thu, 10 May 2018 17:16:35 +0800
+Subject: [PATCH v1 0/5] Add sdmmc UHS support to ROC-RK3328-CC board.
+Message-ID: <1525943800-14095-1-git-send-email-djw@t-chip.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+From: Levin Du <djw@t-chip.com.cn>
 
+Hi all, this is an attemp to add sdmmc UHS support to the
+ROC-RK3328-CC board.
 
-The previous thread was:
-"usb: dwc3: support clocks and resets for DWC3 core"
-https://patchwork.kernel.org/patch/10349623/
+This patch series adds a new compatible `rockchip,gpio-syscon` to
+the gpio-syscon driver for general Rockchip SoC usage..
 
+A new gpio controller named `gpio_syscon10` is defined in
+rk3328.dtsi so that all rk3328 boards has access to it.
 
-I changed the subject because
-I think this is rather reset-control topic than USB.
+The ROC-RK3328-CC board use the new gpio <&gpio_syscon10 1> in
+gpio-regulator to control the signal voltage of the sdmmc.
+It is essential for UHS support which requires 1.8V signal voltage.
 
+Many thanks to Heiko's great advice!
 
-I am searching for a good way to initialize hardware devices
-in the following situation:
+Changes in v1:
+- Refactured for general gpio-syscon usage for Rockchip SoCs.
+- Add doc rockchip,gpio-syscon.txt .
+- Split into small patches.
+- Add gpio-syscon10 to rk3328 for general use.
+- Sort dts properties in sdmmc node.
 
- - two or more hardware devices share the same reset line
+Heiko Stuebner (1):
+  gpio: syscon: allow fetching syscon from parent node
 
- - those devices are not reset before booting the kernel
-   (i.e. flip flops in RTL are random state at driver probe)
+Levin Du (4):
+  gpio: syscon: Add gpio-syscon for rockchip
+  arm64: dts: rockchip: Add gpio-syscon10 to rk3328
+  arm64: dts: rockchip: Add io-domain to roc-rk3328-cc
+  arm64: dts: rockchip: Add sdmmc UHS support for roc-rk3328-cc
 
- - the hardware IP is used by various SoCs,
-   and this issue only appears only on some.
-
-
-
-Specifically, the DWC3 USB IP case is in my mind,
-but this should apply to any hardware in general.
-
-
-
-
-Issue in detail
----------------
-
-The DWC3 USB IP is very popular and used by various SoCs
-as you see in drivers/usb/dwc3/.
-
-SoCs are using the same RTL as provided by Synopsys.
-(SoC vendors could tweak the RTL if they like,
-but it would rarely happen because it would just be troublesome)
-
-So, let's assume we use the same IP with the same RTL version.
-It is *compatible* in terms of device tree.
-In this case, we should avoid differentiating the driver code per-SoC.
-
-In fact, we ended up with
-commit ff0a632 ("usb: dwc3: of-simple: add support for shared and
-pulsed reset lines")
-commit e8284db ("usb: dwc3: of-simple: add support for the Amlogic
-Meson GXL and AXG SoCs")
-
-
-This means, the difference that comes from the reset _provider_
-must be implemented in the reset _consumer_.
-This is unfortunate.
-
-So, I wonder if we can support it in sub-system level somehow
-instead of messing up the reset consumer driver.
-
- - The reset topology is SoC-dependent.
-   A reset line is dedicated for single hardware for some SoCs,
-   and shared by multiple hardware for others.
-
- - The reset policy (pulse reset, level reset, or both of them)
-   are SoC-dependent (reset controller dependent).
-
-
-
-RTL generally contains state machines.
-The initial state of flip flops are undefined on power-on
-hence the initial state of state machines are also undefined.
-
-So, digital circuits needs explicit reset in general.
-
-In some cases, the reset is performed before booting the kernel.
-
- - power-on reset
-   (FFs are put into defined state on power-on automatically)
-
- - a reset controller assert reset lines by default
-   (FFs are fixed to defined state.  If a reset consumer
-   driver deasserts the reset line, HW starts from the define state)
-
- - Firmware may reset the hardware before booting the kernel
-
-
-If nothing above is done, and the reset line is shared by multiple devices,
-we do not have a good way to put the hardware into the sane state.
-
-
-Reset consumers choose the required reset type:
-
-- Shared reset:
-    reset_control_assert / reset_control_deassert work like
-clock_disable / clock_enable.
-    The consumer must be tolerant to the situation where the HW may
-not reset-asserted.
-
-- Exclusive reset:
-    It is guaranteed reset_control_assert() really asserts the reset line,
-    but only one reset consumer grabs the reset line at the same time.
-
-
-As above, the state machines in digital circuits must start from a
-defined state.
-So, we want exclusive reset to reset the FFs.
-However, this is too much requirement
-since it is a reset line is often shared.
-
-
-How to save such an Amlogic case?
-
-
-Hogging solve the problem?
---------------------------
-
-
-I was thinking of a solution.
-
-I may be missing something, but
-one solution might be reset hogging on the
-reset provider side.  This allows us to describe
-the initial state of reset lines in the reset controller.
-
-The idea for "reset-hog" is similar to:
- - "gpio-hog" defined in
-   Documentation/devicetree/bindings/gpio/gpio.txt
- - "assigned-clocks" defined in
-   Documetation/devicetree/bindings/clock/clock-bindings.txt
-
-
-
-For example,
-
-   reset-controller {
-            ....
-
-            line_a {
-                  reset-hog;
-                  resets = <1>;
-                  reset-assert;
-            };
-   }
-
-
-When the reset controller is registered,
-the reset ID '1' is asserted.
-
-
-So, all reset consumers that share the reset line '1'
-will start from the asserted state
-(i.e. defined state machine state).
-
-
->From the discussion with Martin Blumenstingl
-(https://lkml.org/lkml/2018/4/28/115),
-the problem for Amlogic is that
-the reset line is "de-asserted" by default.
-If so, the 'reset-hog' would fix the problem,
-and DWC3 driver would be able to use
-shared, level reset, I think.
-
-
-I think something may be missing from my mind,
-but I hope this will prompt the discussion,
-and we will find a better idea.
-
-Thanks.
+ .../bindings/gpio/rockchip,gpio-syscon.txt         | 41 ++++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts     | 30 ++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  6 ++++
+ drivers/gpio/gpio-syscon.c                         | 32 +++++++++++++++++
+ 4 files changed, 109 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
 
 -- 
-Best Regards
-Masahiro Yamada
+2.7.4
