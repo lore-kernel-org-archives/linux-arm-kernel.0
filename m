@@ -1,67 +1,72 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 10 May 2018 18:45:59 +0100
-Subject: [RFC][PATCH] arm64: update iomem_resource.end
-In-Reply-To: <1525906703-28481-1-git-send-email-nicoleotsuka@gmail.com>
-References: <1525906703-28481-1-git-send-email-nicoleotsuka@gmail.com>
-Message-ID: <cfb81f55-f917-431f-0afd-c97e7641a2f8@arm.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Thu, 10 May 2018 10:55:39 -0700
+Subject: [PATCH] ARM: keystone: fix platform_domain_notifier array overrun
+In-Reply-To: <E1fGlYS-0001CN-Sd@rmk-PC.armlinux.org.uk>
+References: <E1fGlYS-0001CN-Sd@rmk-PC.armlinux.org.uk>
+Message-ID: <e78da70c-4be4-9bfe-5d78-67e0ec95e0e1@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/18 23:58, Nicolin Chen wrote:
-> The iomem_resource.end is -1 by default and should be updated in
-> arch-level code.
+On 5/10/2018 6:24 AM, Russell King wrote:
+> platform_domain_notifier contains a variable sized array, which the
+> pm_clk_notify() notifier treats as a NULL terminated array:
 > 
-> ARM64 so far hasn't updated it while core kernel code (mm/hmm.c)
-> started to use iomem_resource.end for boundary check. So it'd be
-> better to assign iomem_resource.end using a valid value, the end
-> of physical address space for example because iomem_resource.end
-> in theory should reflect that.
+>       for (con_id = clknb->con_ids; *con_id; con_id++)
+>               pm_clk_add(dev, *con_id);
 > 
-> However, VA_BITS might be smaller than PA_BITS in ARM64. So using
-> the end of physical address space doesn't make a lot of sense in
-> this case, or could be even harmful since virtual address cannot
-> reach that memory region.
-
-Why? There's plenty of stuff in the physical address space that will 
-only ever be accessed via ioremap/memremap. There's no reason you 
-shouldn't be able to run a VA_BITS < 48 kernel on a Cavium ThunderX 
-where *all* the I/O is in the top half of the PA space. We already 
-constrain RAM in this very function to those regions which fit into the 
-linear map, and if you're accessing anything other than RAM through the 
-linear map you're probably doing something wrong.
-
-Furthermore, the physical region covered by the linear map doesn't 
-necessarily start@physical address 0 anyway - see PHYS_OFFSET.
-
-Robin.
-
-> Furthermore, the linear region size of
-> ARM64 only has the half of Virtual Memory size -- "VA_BITS - 1".
+> Omitting the initialiser for con_ids means that the array is zero
+> sized, and there is no NULL terminator.  This leads to pm_clk_notify()
+> overrunning into what ever structure follows, which may not be NULL.
+> This leads to an oops:
 > 
-> So this patch updates the iomem_resource.end by using the end of
-> physical address space or the end of linear mapping region when
-> (VA_BITS - 1) is smaller than PA_BITS.
+> Unable to handle kernel NULL pointer dereference at virtual address 0000008c
+> pgd = c0003000
+> [0000008c] *pgd=80000800004003c, *pmd=00000000c
+> Internal error: Oops: 206 [#1] PREEMPT SMP ARM
+> Modules linked in:c
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.16.0+ #9
+> Hardware name: Keystone
+> PC is at strlen+0x0/0x34
+> LR is at kstrdup+0x18/0x54
+> pc : [<c0623340>]    lr : [<c0111d6c>]    psr: 20000013
+> sp : eec73dc0  ip : eed780c0  fp : 00000001
+> r10: 00000000  r9 : 00000000  r8 : eed71e10
+> r7 : 0000008c  r6 : 0000008c  r5 : 014000c0  r4 : c03a6ff4
+> r3 : c09445d0  r2 : 00000000  r1 : 014000c0  r0 : 0000008c
+> Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> Control: 30c5387d  Table: 00003000  DAC: fffffffd
+> Process swapper/0 (pid: 1, stack limit = 0xeec72210)
+> Stack: (0xeec73dc0 to 0xeec74000)
+> ...
+> [<c0623340>] (strlen) from [<c0111d6c>] (kstrdup+0x18/0x54)
+> [<c0111d6c>] (kstrdup) from [<c03a6ff4>] (__pm_clk_add+0x58/0x120)
+> [<c03a6ff4>] (__pm_clk_add) from [<c03a731c>] (pm_clk_notify+0x64/0xa8)
+> [<c03a731c>] (pm_clk_notify) from [<c004614c>] (notifier_call_chain+0x44/0x84)
+> [<c004614c>] (notifier_call_chain) from [<c0046320>] (__blocking_notifier_call_chain+0x48/0x60)
+> [<c0046320>] (__blocking_notifier_call_chain) from [<c0046350>] (blocking_notifier_call_chain+0x18/0x20)
+> [<c0046350>] (blocking_notifier_call_chain) from [<c0390234>] (device_add+0x36c/0x534)
+> [<c0390234>] (device_add) from [<c047fc00>] (of_platform_device_create_pdata+0x70/0xa4)
+> [<c047fc00>] (of_platform_device_create_pdata) from [<c047fea0>] (of_platform_bus_create+0xf0/0x1ec)
+> [<c047fea0>] (of_platform_bus_create) from [<c047fff8>] (of_platform_populate+0x5c/0xac)
+> [<c047fff8>] (of_platform_populate) from [<c08b1f04>] (of_platform_default_populate_init+0x8c/0xa8)
+> [<c08b1f04>] (of_platform_default_populate_init) from [<c000a78c>] (do_one_initcall+0x3c/0x164)
+> [<c000a78c>] (do_one_initcall) from [<c087bd9c>] (kernel_init_freeable+0x10c/0x1d0)
+> [<c087bd9c>] (kernel_init_freeable) from [<c0628db0>] (kernel_init+0x8/0xf0)
+> [<c0628db0>] (kernel_init) from [<c00090d8>] (ret_from_fork+0x14/0x3c)
+> Exception stack(0xeec73fb0 to 0xeec73ff8)
+> 3fa0:                                     00000000 00000000 00000000 00000000
+> 3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> 3fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+> Code: e3520000 1afffff7 e12fff1e c0801730 (e5d02000)
+> ---[ end trace cafa8f148e262e80 ]---
 > 
-> Signed-off-by: Nicolin Chen <nicoleotsuka@gmail.com>
+> Fix this by adding the necessary initialiser.
+> 
+> Fixes: fc20ffe1213b ("ARM: keystone: add PM domain support for clock management")
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > ---
->   arch/arm64/mm/init.c | 6 ++++++
->   1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index f48b194..22015af 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -377,6 +377,12 @@ void __init arm64_memblock_init(void)
->   	BUILD_BUG_ON(linear_region_size != BIT(VA_BITS - 1));
->   
->   	/*
-> +	 * Update iomem_resource.end based on size of physical address space,
-> +	 * or linear region size when (VA_BITS - 1) is smaller than PA_BITS.
-> +	 */
-> +	iomem_resource.end = BIT(min(PHYS_MASK_SHIFT, VA_BITS - 1)) - 1;
-> +
-> +	/*
->   	 * Select a suitable value for the base of physical memory.
->   	 */
->   	memstart_addr = round_down(memblock_start_of_DRAM(),
-> 
+Looks good. Thanks Russell !!
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+
+Arnd, olof,
+Could you please pick this up for the fixes branch ?
