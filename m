@@ -1,71 +1,50 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 10 May 2018 13:47:09 +0800
-Subject: [PATCH v2 4/7] usb: mtu3: fix operation failure when test TEST_J/K
+Date: Thu, 10 May 2018 13:47:11 +0800
+Subject: [PATCH v2 6/7] usb: mtu3: re-enable controller to accept LPM request
+ after LPM resume
 In-Reply-To: <6b82c11302a81368bd6936424d081ede3340b431.1525930818.git.chunfeng.yun@mediatek.com>
 References: <6b82c11302a81368bd6936424d081ede3340b431.1525930818.git.chunfeng.yun@mediatek.com>
-Message-ID: <572648c3e38d9d7947ecc397eb964178e140e40d.1525930818.git.chunfeng.yun@mediatek.com>
+Message-ID: <5ebd9e0bfbf3dcb7312b931849d2bd639c170673.1525930818.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an error dialog popped up in PC when test TEST_J/K
-by EHSETT tool, due to not waiting for the completion of
-control transfer. Here fix it by entering test mode after
-Status Stage finish.
+After the controller receives a LPM request, it will reject the LPM
+request, and need software to re-enable it after LPM resume if the
+controller doesn't remote wakeup from L1 automatically
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
 v2:
-    1. reset test_mode as default value when controller is reset
-    2. use readl_poll_timeout_atomic()
+    add this patch
 ---
- drivers/usb/mtu3/mtu3_gadget.c     |  1 +
- drivers/usb/mtu3/mtu3_gadget_ep0.c | 10 ++++++++++
- 2 files changed, 11 insertions(+)
+ drivers/usb/mtu3/mtu3_core.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/mtu3/mtu3_gadget.c b/drivers/usb/mtu3/mtu3_gadget.c
-index de0de01..5c60a8c 100644
---- a/drivers/usb/mtu3/mtu3_gadget.c
-+++ b/drivers/usb/mtu3/mtu3_gadget.c
-@@ -719,4 +719,5 @@ void mtu3_gadget_reset(struct mtu3 *mtu)
- 	mtu->u1_enable = 0;
- 	mtu->u2_enable = 0;
- 	mtu->delayed_status = false;
-+	mtu->test_mode = false;
+diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
+index b1b99a8..65ff53a 100644
+--- a/drivers/usb/mtu3/mtu3_core.c
++++ b/drivers/usb/mtu3/mtu3_core.c
+@@ -176,7 +176,7 @@ static void mtu3_intr_enable(struct mtu3 *mtu)
+ 	mtu3_writel(mbase, U3D_LV1IESR, value);
+ 
+ 	/* Enable U2 common USB interrupts */
+-	value = SUSPEND_INTR | RESUME_INTR | RESET_INTR;
++	value = SUSPEND_INTR | RESUME_INTR | RESET_INTR | LPM_RESUME_INTR;
+ 	mtu3_writel(mbase, U3D_COMMON_USB_INTR_ENABLE, value);
+ 
+ 	if (mtu->is_u3_ip) {
+@@ -692,6 +692,12 @@ static irqreturn_t mtu3_u2_common_isr(struct mtu3 *mtu)
+ 	if (u2comm & RESET_INTR)
+ 		mtu3_gadget_reset(mtu);
+ 
++	if (u2comm & LPM_RESUME_INTR) {
++		if (!(mtu3_readl(mbase, U3D_POWER_MANAGEMENT) & LPM_HRWE))
++			mtu3_setbits(mbase, U3D_USB20_MISC_CONTROL,
++				     LPM_U3_ACK_EN);
++	}
++
+ 	return IRQ_HANDLED;
  }
-diff --git a/drivers/usb/mtu3/mtu3_gadget_ep0.c b/drivers/usb/mtu3/mtu3_gadget_ep0.c
-index d67b540..d3fc51b 100644
---- a/drivers/usb/mtu3/mtu3_gadget_ep0.c
-+++ b/drivers/usb/mtu3/mtu3_gadget_ep0.c
-@@ -7,6 +7,7 @@
-  * Author:  Chunfeng.Yun <chunfeng.yun@mediatek.com>
-  */
  
-+#include <linux/iopoll.h>
- #include <linux/usb/composite.h>
- 
- #include "mtu3.h"
-@@ -263,6 +264,7 @@ static int handle_test_mode(struct mtu3 *mtu, struct usb_ctrlrequest *setup)
- {
- 	void __iomem *mbase = mtu->mac_base;
- 	int handled = 1;
-+	u32 value;
- 
- 	switch (le16_to_cpu(setup->wIndex) >> 8) {
- 	case TEST_J:
-@@ -292,6 +294,14 @@ static int handle_test_mode(struct mtu3 *mtu, struct usb_ctrlrequest *setup)
- 	if (mtu->test_mode_nr == TEST_PACKET_MODE)
- 		ep0_load_test_packet(mtu);
- 
-+	/* send status before entering test mode. */
-+	value = mtu3_readl(mbase, U3D_EP0CSR) & EP0_W1C_BITS;
-+	mtu3_writel(mbase, U3D_EP0CSR, value | EP0_SETUPPKTRDY | EP0_DATAEND);
-+
-+	/* wait for ACK status sent by host, ignore timeout error */
-+	readl_poll_timeout_atomic(mbase + U3D_EP0CSR, value,
-+			!(value & EP0_DATAEND), 100, 5000);
-+
- 	mtu3_writel(mbase, U3D_USB2_TEST_MODE, mtu->test_mode_nr);
- 
- 	mtu->ep0_state = MU3D_EP0_STATE_SETUP;
 -- 
 1.9.1
