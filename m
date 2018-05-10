@@ -1,96 +1,84 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 10 May 2018 22:16:19 +0800
-Subject: [xlnx:xlnx_rebase_v4.14 74/918] drivers/fpga/zynqmp-fpga.c:79:2:
- error: implicit declaration of function '__flush_cache_user_range'; did you
- mean 'flush_cache_range'?
-Message-ID: <201805102217.ZXoAg0xr%fengguang.wu@intel.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 10 May 2018 15:16:37 +0100
+Subject: [PATCH] ARM: dts: vexpress: Replace '_' with '-' in node names
+In-Reply-To: <CAL_Jsq+csM-Z8+bMTdD7gWhWRQLAkD0EMNUS0boWkes345cCrw@mail.gmail.com>
+References: <1525884482-19855-1-git-send-email-sudeep.holla@arm.com>
+ <CAL_Jsq+VNuvbxgFTFVouJF-_yMS90u0fd8jaXnYtKwogOP5rww@mail.gmail.com>
+ <f28fb5d6-1070-8cbb-e815-4baf7128b19e@arm.com>
+ <CAL_Jsq+csM-Z8+bMTdD7gWhWRQLAkD0EMNUS0boWkes345cCrw@mail.gmail.com>
+Message-ID: <f4f3e96b-2699-61e6-400e-134b9af9d72b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
-head:   944a760cdb1098e23096c923aef70488fdbd501b
-commit: d91b9e49c2c2663091e2d71a136ad2db919a91b3 [74/918] fpga manager: Adding FPGA Manager support for Xilinx zynqmp
-config: parisc-allmodconfig (attached as .config)
-compiler: hppa-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d91b9e49c2c2663091e2d71a136ad2db919a91b3
-        # save the attached .config to linux build tree
-        make.cross ARCH=parisc 
 
-All errors (new ones prefixed by >>):
 
-   drivers/fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_ops_write':
->> drivers/fpga/zynqmp-fpga.c:79:2: error: implicit declaration of function '__flush_cache_user_range'; did you mean 'flush_cache_range'? [-Werror=implicit-function-declaration]
-     __flush_cache_user_range((unsigned long)kbuf,
-     ^~~~~~~~~~~~~~~~~~~~~~~~
-     flush_cache_range
-   cc1: some warnings being treated as errors
+On 10/05/18 15:05, Rob Herring wrote:
+> On Thu, May 10, 2018 at 5:51 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On 09/05/18 22:14, Rob Herring wrote:
+>>> On Wed, May 9, 2018 at 11:48 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>> The latest DTC throws warnings for character '_' in the node names.
+>>>>
+>>>> Warning (node_name_chars_strict): /sysreg at 10000/sys_led: Character '_' not recommended in node name
+>>>> Warning (node_name_chars_strict): /sysreg at 10000/sys_mci: Character '_' not recommended in node name
+>>>> Warning (node_name_chars_strict): /sysreg at 10000/sys_flash: Character '_' not recommended in node name
+>>>>
+>>>> The general recommendation is to use character '-' for all the node names.
+>>>> This patch fixes the warnings following the recommendation.
+>>>>
+>>>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 6 +++---
+>>>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+>>>> index 7b8ff5b3b912..58e73131ecef 100644
+>>>> --- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+>>>> +++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+>>>> @@ -77,19 +77,19 @@
+>>>>                                         compatible = "arm,vexpress-sysreg";
+>>>>                                         reg = <0x010000 0x1000>;
+>>>>
+>>>> -                                       v2m_led_gpios: sys_led {
+>>>> +                                       v2m_led_gpios: sys-led {
+>>>
+>>> Except this is a gpio-controller so it should have 'gpio' for its node
+>>> name. (I have a dtc check written for that, but there are too many
+>>> false positives.)
+>>>
+>>
+>> True, sorry I didn't look at it in detail.
+>>
+>>> But then you have 3 of them and no addressing, so you need to add reg
+>>> property (with the register's offset and size) and unit-address.
+>>>
+>>
+>> Indeed. I had a look at the history but couldn't gather much. All I
+>> could get is that this is one of those weird mix of all functionality on
+>> ARM Ltd platforms which fits no subsystem. Me and Lorenzo has similar
+>> issue on TC2 platform. Pawel seem to have plumed this system control
+>> registers block into MFD and GPIO long back.
+>>
+>>> I'm surprised Linus W accepted these a GPIO when they are not really
+>>> general purpose, but then lots of things slip in.
+>>>
+>>
+>> I assume all these happened in early days of DT.
+>>
+>> I will drop this for now. I will take a look if these nodes can be made
+>> better to align with standard gpio controller nodes.
+> 
+> Why not just make the changes I suggested? It shouldn't break
+> anything. You can add reg property even though the kernel doesn't use
+> it.
+> 
 
-vim +79 drivers/fpga/zynqmp-fpga.c
+Ah OK. That makes sense. IIRC it used to have some @<offset> value
+previously which has some correlation to HW block. I will dig that out.
+Sorry I missed that you were suggesting to add reg property.
 
-    45	
-    46	static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
-    47						const char *buf, size_t size)
-    48	{
-    49		struct zynqmp_fpga_priv *priv;
-    50		char *kbuf;
-    51		size_t dma_size;
-    52		dma_addr_t dma_addr;
-    53		u32 transfer_length;
-    54		int ret;
-    55		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-    56	
-    57		if (!eemi_ops || !eemi_ops->fpga_load)
-    58			return -ENXIO;
-    59	
-    60		priv = mgr->priv;
-    61	
-    62		if (mgr->flags & IXR_FPGA_ENCRYPTION_EN)
-    63			dma_size = size + ENCRYPTED_KEY_LEN + ENCRYPTED_IV_LEN;
-    64		else
-    65			dma_size = size;
-    66	
-    67		kbuf = dma_alloc_coherent(priv->dev, dma_size, &dma_addr, GFP_KERNEL);
-    68		if (!kbuf)
-    69			return -ENOMEM;
-    70	
-    71		memcpy(kbuf, buf, size);
-    72	
-    73		if (mgr->flags & IXR_FPGA_ENCRYPTION_EN) {
-    74			memcpy(kbuf + size, mgr->key, ENCRYPTED_KEY_LEN);
-    75			memcpy(kbuf + size + ENCRYPTED_KEY_LEN, mgr->iv,
-    76							ENCRYPTED_IV_LEN);
-    77		}
-    78	
-  > 79		__flush_cache_user_range((unsigned long)kbuf,
-    80					 (unsigned long)kbuf + dma_size);
-    81	
-    82		/**
-    83		 * Translate size from bytes to number of 32bit words that
-    84		 * the DMA should write to the PCAP interface
-    85		 */
-    86		if (size & 3)
-    87			transfer_length = (size >> 2) + 1;
-    88		else
-    89			transfer_length = size >> 2;
-    90	
-    91		ret = eemi_ops->fpga_load(dma_addr, transfer_length, mgr->flags);
-    92	
-    93		dma_free_coherent(priv->dev, dma_size, kbuf, dma_addr);
-    94	
-    95		return ret;
-    96	}
-    97	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 51306 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180510/b0870d2f/attachment-0001.gz>
+-- 
+Regards,
+Sudeep
