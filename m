@@ -1,79 +1,113 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 10 May 2018 22:08:50 +0800
-Subject: [xlnx:xlnx_rebase_v4.14 730/918] drivers/crypto/zynqmp-sha.c:133:3:
- error: implicit declaration of function '__flush_cache_user_range'; did you
- mean 'flush_cache_range'?
-Message-ID: <201805102246.C70Wyr08%fengguang.wu@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 May 2018 15:12:02 +0100
+Subject: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+In-Reply-To: <8898674D84E3B24BA3A2D289B872026A69F09954@G01JPEXMBKW03>
+References: <8898674D84E3B24BA3A2D289B872026A69EECF90@G01JPEXMBKW03>
+ <ce2c6191-1f74-4cec-9009-0a770d32673a@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A69EF9AF9@G01JPEXMBKW03>
+ <78df845d-0788-3cbd-e435-5a3a8221fdc8@redhat.com>
+ <8898674D84E3B24BA3A2D289B872026A69F09954@G01JPEXMBKW03>
+Message-ID: <907eb976-7a26-2800-bf1a-563aca482235@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
-head:   944a760cdb1098e23096c923aef70488fdbd501b
-commit: 5cccc03f86f27a3e9e76ba7a863eaf2f8506e9e2 [730/918] crypto: zynqmp: Use new firmware ops
-config: sh-allmodconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 5cccc03f86f27a3e9e76ba7a863eaf2f8506e9e2
-        # save the attached .config to linux build tree
-        make.cross ARCH=sh 
+Hi Lei,
 
-All errors (new ones prefixed by >>):
+On 10/05/18 14:09, Zhang, Lei wrote:
+> Hi Mark, Marc
+> 
+>> -----Original Message-----
+>> From: linux-arm-kernel
+>> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
+>> Mark Langsdorf
+>> Sent: Wednesday, May 09, 2018 11:32 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+>>
+>  
+>> Marc's suggestion of implementing a glue layer, and then changing the
+>> glue layer interface to pass the allocation requirements up to this
+>> driver is the best solution that can be supported for server products.
+> 
+> Thanks for your comments.
+> ?
+> I'm considering implementing a glue layer. But the management of 
+> whole LPI resource is implemented by core ITS driver (irq-gic-v3-its.c),
+> So I think core ITS driver also need to be modified.
+> ?
+> Below is my idea for core ITS driver. 
+> Would you give me comments?
+> ?
+> Add an interface that can specify the number of LPIs allocation requirements on Core ITS driver.
+> My idea is extend its_msi_prepare function by adding two argument.
+> 
+> SYNOPSIS
+> its_msi_prepare(struct irq_domain *domain, struct device *dev,int nvec,
+>  msi_alloc_info_t *info,int request_nr_lpis, int request_lpis_align)
+> ?
+> Argument "request_nr_lpis" means request LPIs total number for device. 
 
-   drivers/crypto/zynqmp-sha.c: In function 'zynqmp_sha_update':
->> drivers/crypto/zynqmp-sha.c:133:3: error: implicit declaration of function '__flush_cache_user_range'; did you mean 'flush_cache_range'? [-Werror=implicit-function-declaration]
-      __flush_cache_user_range((unsigned long)kbuf,
-      ^~~~~~~~~~~~~~~~~~~~~~~~
-      flush_cache_range
-   cc1: some warnings being treated as errors
+I do not believe this is required. nvec already describes the number of
+LPIs that are expected by the device. Why should we add a new parameter
+that looks to be the exact same thing?
 
-vim +133 drivers/crypto/zynqmp-sha.c
+> Argument "request_lpis_align" means request of LPIs alignment. 0 means do not specify alignment.
 
-3abec383 Nava kishore Manne 2017-09-19  111  
-3abec383 Nava kishore Manne 2017-09-19  112  static int zynqmp_sha_update(struct ahash_request *req)
-3abec383 Nava kishore Manne 2017-09-19  113  {
-3abec383 Nava kishore Manne 2017-09-19  114  	struct zynqmp_sha_ctx *tctx = crypto_tfm_ctx(req->base.tfm);
-3abec383 Nava kishore Manne 2017-09-19  115  	struct zynqmp_sha_dev *dd = tctx->dd;
-5cccc03f Rajan Vaja         2018-03-01  116  	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-3abec383 Nava kishore Manne 2017-09-19  117  	char *kbuf;
-3abec383 Nava kishore Manne 2017-09-19  118  	size_t dma_size = req->nbytes;
-3abec383 Nava kishore Manne 2017-09-19  119  	dma_addr_t dma_addr;
-3abec383 Nava kishore Manne 2017-09-19  120  	int ret;
-3abec383 Nava kishore Manne 2017-09-19  121  
-3abec383 Nava kishore Manne 2017-09-19  122  	if (!req->nbytes)
-3abec383 Nava kishore Manne 2017-09-19  123  		return 0;
-3abec383 Nava kishore Manne 2017-09-19  124  
-5cccc03f Rajan Vaja         2018-03-01  125  	if (!eemi_ops || !eemi_ops->sha_hash)
-5cccc03f Rajan Vaja         2018-03-01  126  		return -ENOTSUPP;
-5cccc03f Rajan Vaja         2018-03-01  127  
-3abec383 Nava kishore Manne 2017-09-19  128  	kbuf = dma_alloc_coherent(dd->dev, dma_size, &dma_addr, GFP_KERNEL);
-3abec383 Nava kishore Manne 2017-09-19  129  	if (!kbuf)
-3abec383 Nava kishore Manne 2017-09-19  130  		return -ENOMEM;
-3abec383 Nava kishore Manne 2017-09-19  131  
-3abec383 Nava kishore Manne 2017-09-19  132  	scatterwalk_map_and_copy(kbuf, req->src, 0, req->nbytes, 0);
-3abec383 Nava kishore Manne 2017-09-19 @133  	 __flush_cache_user_range((unsigned long)kbuf,
-3abec383 Nava kishore Manne 2017-09-19  134  				  (unsigned long)kbuf + dma_size);
-5cccc03f Rajan Vaja         2018-03-01  135  	ret = eemi_ops->sha_hash(dma_addr, req->nbytes, ZYNQMP_SHA3_UPDATE);
-3abec383 Nava kishore Manne 2017-09-19  136  	dma_free_coherent(dd->dev, dma_size, kbuf, dma_addr);
-3abec383 Nava kishore Manne 2017-09-19  137  
-3abec383 Nava kishore Manne 2017-09-19  138  	return ret;
-3abec383 Nava kishore Manne 2017-09-19  139  }
-3abec383 Nava kishore Manne 2017-09-19  140  
+Another problem is that this approach isn't really practical.
+msi_prepare is part of a generic structure, and changing it will impact
+all the others users of that structure. I'd rather you don't change its
+prototype for something that is implementation specific.
 
-:::::: The code at line 133 was first introduced by commit
-:::::: 3abec3839538ef5fe79c2873360d84cc92b4df25 crypto: zynqmp-sha: Adopted SHA3 support for ZynqMP Soc
+Instead, we have the msi_alloc_info_t structure, which is explicitly
+designed to collate information pertaining to the allocation
+requirements in an implementation agnostic way.
 
-:::::: TO: Nava kishore Manne <nava.manne@xilinx.com>
-:::::: CC: Michal Simek <michal.simek@xilinx.com>
+At the moment, the ITS code only uses the first entry of the scratchpad
+area to store the DeviceID (and subsequently a pointer to the
+corresponding its_device).
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 46832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180510/97981c60/attachment-0001.gz>
+You could use the second entry to encode the alignment requirement.
+
+> For PCI, PCI glue layer specifies, request_nr_lpis = 32, request_lpis_align = 32.
+> For our device, the glue layer specifies, request_nr_lpis = 1, request_lpis_align = 0.
+> (We have lots of device but each device only need a single LPI on our original bus. )
+> ?
+> 
+> For expanding two arguments, core ITS driver maybe need to discard chunk mechanism 
+> and use bitmap to manage LPI resource directly.
+> ?
+> Example:
+>  (1) Non PCI glue layer requires ?request_nr_lpis? = 1, ?request_lpis_align? = 0.
+> ?
+>     Bitmap will become  ...0000000000000000001
+> ?
+>  (2) PCI glue layer requires ?request_nr_lpis? = 32, ?request_lpis_align? = 32.
+> ?
+>     Bitmap will become  ...000FFFFFFFF00000001
+> ?
+> ?
+>  (3) Non PCI glue layer requires ?request_nr_lpis? = 1, ?request_lpis_align? = 0.
+> ?
+>     Bitmap will become  ...000FFFFFFFF00000003
+> ?> I think it may be easy to implement by using
+> bitmap_find_next_zero_area, because it has ?align_mask? argument.
+
+The problem is that you now increase the footprint of the bitmap by a
+factor of 32:
+
+- For a system with 16bit INTIDs, you go from 256 bytes to 8kB. That's
+bad, but OK, fine.
+
+- For a system with 32bit INTIDs, you go from 16MB (which was already
+horrible) to 512MB. That's unacceptable.
+
+At that point, using a simple bitmap doesn't work anymore, and we're
+better off switching to a free list of some sort that would keep the
+memory overhead to a minimum (and actually radically reduce the
+footprint even in the smallest configurations).
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
