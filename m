@@ -1,9 +1,7 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  9 May 2018 23:08:09 -0300
-Subject: [PATCH 3/3] ARM: dts: imx6q-gk802: Do not hardcode input codes
-In-Reply-To: <1525918089-26242-1-git-send-email-festevam@gmail.com>
-References: <1525918089-26242-1-git-send-email-festevam@gmail.com>
-Message-ID: <1525918089-26242-3-git-send-email-festevam@gmail.com>
+Date: Wed,  9 May 2018 23:08:07 -0300
+Subject: [PATCH 1/3] ARM: dts: imx53-ard: Do not hardcode input codes
+Message-ID: <1525918089-26242-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,29 +12,60 @@ better readability.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6q-gk802.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx53-ard.dts | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-gk802.dts b/arch/arm/boot/dts/imx6q-gk802.dts
-index 0be3756..84d3540 100644
---- a/arch/arm/boot/dts/imx6q-gk802.dts
-+++ b/arch/arm/boot/dts/imx6q-gk802.dts
-@@ -8,6 +8,7 @@
+diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
+index 80fc007..117bd00 100644
+--- a/arch/arm/boot/dts/imx53-ard.dts
++++ b/arch/arm/boot/dts/imx53-ard.dts
+@@ -11,6 +11,7 @@
+  */
  
  /dts-v1/;
- #include <dt-bindings/gpio/gpio.h>
 +#include <dt-bindings/input/input.h>
- #include "imx6q.dtsi"
+ #include "imx53.dtsi"
  
  / {
-@@ -43,7 +44,7 @@
- 		recovery-button {
- 			label = "recovery";
- 			gpios = <&gpio3 16 1>;
--			linux,code = <0x198>; /* KEY_RESTART */
-+			linux,code = <KEY_RESTART>;
+@@ -68,34 +69,34 @@
+ 		home {
+ 			label = "Home";
+ 			gpios = <&gpio5 10 0>;
+-			linux,code = <102>; /* KEY_HOME */
++			linux,code = <KEY_HOME>;
  			wakeup-source;
  		};
+ 
+ 		back {
+ 			label = "Back";
+ 			gpios = <&gpio5 11 0>;
+-			linux,code = <158>; /* KEY_BACK */
++			linux,code = <KEY_BACK>;
+ 			wakeup-source;
+ 		};
+ 
+ 		program {
+ 			label = "Program";
+ 			gpios = <&gpio5 12 0>;
+-			linux,code = <362>; /* KEY_PROGRAM */
++			linux,code = <KEY_PROGRAM >;
+ 			wakeup-source;
+ 		};
+ 
+ 		volume-up {
+ 			label = "Volume Up";
+ 			gpios = <&gpio5 13 0>;
+-			linux,code = <115>; /* KEY_VOLUMEUP */
++			linux,code = <KEY_VOLUMEUP>;
+ 		};
+ 
+ 		volume-down {
+ 			label = "Volume Down";
+ 			gpios = <&gpio4 0 0>;
+-			linux,code = <114>; /* KEY_VOLUMEDOWN */
++			linux,code = <KEY_VOLUMEDOWN>;
+ 		};
  	};
+ };
 -- 
 2.7.4
