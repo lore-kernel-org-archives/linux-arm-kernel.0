@@ -1,80 +1,79 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 10 May 2018 15:09:12 +0100
-Subject: [PATCH v6 03/11] firmware: xilinx: Add zynqmp IOCTL API for
- device control
-In-Reply-To: <1523389127-14243-4-git-send-email-jollys@xilinx.com>
-References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
- <1523389127-14243-4-git-send-email-jollys@xilinx.com>
-Message-ID: <c351b9a3-5f26-7202-7171-0dcc7adef7c0@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 10 May 2018 22:08:50 +0800
+Subject: [xlnx:xlnx_rebase_v4.14 730/918] drivers/crypto/zynqmp-sha.c:133:3:
+ error: implicit declaration of function '__flush_cache_user_range'; did you
+ mean 'flush_cache_range'?
+Message-ID: <201805102246.C70Wyr08%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
+head:   944a760cdb1098e23096c923aef70488fdbd501b
+commit: 5cccc03f86f27a3e9e76ba7a863eaf2f8506e9e2 [730/918] crypto: zynqmp: Use new firmware ops
+config: sh-allmodconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 5cccc03f86f27a3e9e76ba7a863eaf2f8506e9e2
+        # save the attached .config to linux build tree
+        make.cross ARCH=sh 
 
+All errors (new ones prefixed by >>):
 
-On 10/04/18 20:38, Jolly Shah wrote:
-> From: Rajan Vaja <rajanv@xilinx.com>
-> 
-> Add ZynqMP firmware IOCTL API to control and configure
-> devices like PLLs, SD, Gem, etc.
-> 
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> ---
->  drivers/firmware/xilinx/zynqmp.c     | 20 ++++++++++++++++++++
->  include/linux/firmware/xlnx-zynqmp.h |  2 ++
->  2 files changed, 22 insertions(+)
-> 
-> diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-> index 490561a..44b43fa 100644
-> --- a/drivers/firmware/xilinx/zynqmp.c
-> +++ b/drivers/firmware/xilinx/zynqmp.c
-> @@ -239,8 +239,28 @@ static int get_set_conduit_method(struct device_node *np)
->  	return 0;
->  }
->  
-> +/**
-> + * zynqmp_pm_ioctl() - PM IOCTL API for device control and configs
-> + * @node_id:	Node ID of the device
-> + * @ioctl_id:	ID of the requested IOCTL
-> + * @arg1:	Argument 1 to requested IOCTL call
-> + * @arg2:	Argument 2 to requested IOCTL call
-> + * @out:	Returned output value
-> + *
-> + * This function calls IOCTL to firmware for device control and configuration.
-> + *
-> + * Return: Returns status, either success or error+reason
-> + */
-> +static int zynqmp_pm_ioctl(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2,
-> +			   u32 *out)
-> +{
-> +	return zynqmp_pm_invoke_fn(PM_IOCTL, node_id, ioctl_id,
-> +				   arg1, arg2, out);
-> +}
-> +
->  static const struct zynqmp_eemi_ops eemi_ops = {
->  	.get_api_version = zynqmp_pm_get_api_version,
-> +	.ioctl = zynqmp_pm_ioctl,
->  };
->  
->  /**
-> diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-> index cb63bed..2eec6e7 100644
-> --- a/include/linux/firmware/xlnx-zynqmp.h
-> +++ b/include/linux/firmware/xlnx-zynqmp.h
-> @@ -34,6 +34,7 @@
->  
->  enum pm_api_id {
->  	PM_GET_API_VERSION = 1,
-> +	PM_IOCTL = 34,
+   drivers/crypto/zynqmp-sha.c: In function 'zynqmp_sha_update':
+>> drivers/crypto/zynqmp-sha.c:133:3: error: implicit declaration of function '__flush_cache_user_range'; did you mean 'flush_cache_range'? [-Werror=implicit-function-declaration]
+      __flush_cache_user_range((unsigned long)kbuf,
+      ^~~~~~~~~~~~~~~~~~~~~~~~
+      flush_cache_range
+   cc1: some warnings being treated as errors
 
-I am not for this API. IIUC there are more fined grained well defined
-APIs(if I am not wrong from enum 2 upto 33). This is open ended API
-which allows user to do whatever setting it needs. And that defeats the
-purpose of other APIs.
+vim +133 drivers/crypto/zynqmp-sha.c
 
-I will look through the series for the usage of this to understand this
-better, but I am guessing how it can be (ab)used.
+3abec383 Nava kishore Manne 2017-09-19  111  
+3abec383 Nava kishore Manne 2017-09-19  112  static int zynqmp_sha_update(struct ahash_request *req)
+3abec383 Nava kishore Manne 2017-09-19  113  {
+3abec383 Nava kishore Manne 2017-09-19  114  	struct zynqmp_sha_ctx *tctx = crypto_tfm_ctx(req->base.tfm);
+3abec383 Nava kishore Manne 2017-09-19  115  	struct zynqmp_sha_dev *dd = tctx->dd;
+5cccc03f Rajan Vaja         2018-03-01  116  	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+3abec383 Nava kishore Manne 2017-09-19  117  	char *kbuf;
+3abec383 Nava kishore Manne 2017-09-19  118  	size_t dma_size = req->nbytes;
+3abec383 Nava kishore Manne 2017-09-19  119  	dma_addr_t dma_addr;
+3abec383 Nava kishore Manne 2017-09-19  120  	int ret;
+3abec383 Nava kishore Manne 2017-09-19  121  
+3abec383 Nava kishore Manne 2017-09-19  122  	if (!req->nbytes)
+3abec383 Nava kishore Manne 2017-09-19  123  		return 0;
+3abec383 Nava kishore Manne 2017-09-19  124  
+5cccc03f Rajan Vaja         2018-03-01  125  	if (!eemi_ops || !eemi_ops->sha_hash)
+5cccc03f Rajan Vaja         2018-03-01  126  		return -ENOTSUPP;
+5cccc03f Rajan Vaja         2018-03-01  127  
+3abec383 Nava kishore Manne 2017-09-19  128  	kbuf = dma_alloc_coherent(dd->dev, dma_size, &dma_addr, GFP_KERNEL);
+3abec383 Nava kishore Manne 2017-09-19  129  	if (!kbuf)
+3abec383 Nava kishore Manne 2017-09-19  130  		return -ENOMEM;
+3abec383 Nava kishore Manne 2017-09-19  131  
+3abec383 Nava kishore Manne 2017-09-19  132  	scatterwalk_map_and_copy(kbuf, req->src, 0, req->nbytes, 0);
+3abec383 Nava kishore Manne 2017-09-19 @133  	 __flush_cache_user_range((unsigned long)kbuf,
+3abec383 Nava kishore Manne 2017-09-19  134  				  (unsigned long)kbuf + dma_size);
+5cccc03f Rajan Vaja         2018-03-01  135  	ret = eemi_ops->sha_hash(dma_addr, req->nbytes, ZYNQMP_SHA3_UPDATE);
+3abec383 Nava kishore Manne 2017-09-19  136  	dma_free_coherent(dd->dev, dma_size, kbuf, dma_addr);
+3abec383 Nava kishore Manne 2017-09-19  137  
+3abec383 Nava kishore Manne 2017-09-19  138  	return ret;
+3abec383 Nava kishore Manne 2017-09-19  139  }
+3abec383 Nava kishore Manne 2017-09-19  140  
 
--- 
-Regards,
-Sudeep
+:::::: The code at line 133 was first introduced by commit
+:::::: 3abec3839538ef5fe79c2873360d84cc92b4df25 crypto: zynqmp-sha: Adopted SHA3 support for ZynqMP Soc
+
+:::::: TO: Nava kishore Manne <nava.manne@xilinx.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 46832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180510/97981c60/attachment-0001.gz>
