@@ -1,114 +1,101 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Thu, 10 May 2018 17:23:45 +0100
-Subject: [PATCH v3 6/8] arm64: module-plts: Extend veneer to address 52-bit VAs
+Date: Thu, 10 May 2018 17:23:47 +0100
+Subject: [PATCH v3 8/8] arm64: mm: Add 48/52-bit kernel VA support
 In-Reply-To: <20180510162347.3858-1-steve.capper@arm.com>
 References: <20180510162347.3858-1-steve.capper@arm.com>
-Message-ID: <20180510162347.3858-7-steve.capper@arm.com>
+Message-ID: <20180510162347.3858-9-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Bieusheuval <ard.biesheuvel@linaro.org>
+Add the option to use 52-bit VA support upon availability at boot. We
+use the same KASAN_SHADOW_OFFSET for both 48 and 52 bit VA spaces as in
+both cases the start and end of the KASAN shadow region are PGD aligned.
 
-In preparation for 52-bit VA support in the Linux kernel, we extend the
-plts veneer to support 52-bit addresses via an extra movk instruction.
+>From ID_AA64MMFR2, we check the LVA field on very early boot and set the
+VA size, PGDIR_SHIFT and TCR.T[01]SZ values which then influence how the
+rest of the memory system behaves.
 
-[Steve: code from Ard off-list, changed the #ifdef logic to inequality]
+Note that userspace addresses will still be capped out at 48-bit. More
+patches are needed to deal with scenarios where the user provides
+MMAP_FIXED hint and a high address to mmap.
+
 Signed-off-by: Steve Capper <steve.capper@arm.com>
-
 ---
+ arch/arm64/Kconfig   | 10 +++++++++-
+ arch/arm64/mm/proc.S | 13 +++++++++++++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
 
-New in V3 of the series.
-
-I'm not sure if this is strictly necessary as the VAs of the module
-space will fit within 48-bits of addressing even when a 52-bit VA space
-is enabled. However, this may act to future-proof the 52-bit VA support
-should any future adjustments be made to the VA space.
----
- arch/arm64/include/asm/module.h | 13 ++++++++++++-
- arch/arm64/kernel/module-plts.c | 12 ++++++++++++
- 2 files changed, 24 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-index 97d0ef12e2ff..30b8ca95d19a 100644
---- a/arch/arm64/include/asm/module.h
-+++ b/arch/arm64/include/asm/module.h
-@@ -59,6 +59,9 @@ struct plt_entry {
- 	__le32	mov0;	/* movn	x16, #0x....			*/
- 	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
- 	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
-+#if CONFIG_ARM64_VA_BITS > 48
-+	__le32  mov3;   /* movk x16, #0x...., lsl #48		*/
-+#endif
- 	__le32	br;	/* br	x16				*/
- };
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index f68eeab08904..6fe0c2976f0d 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -266,6 +266,7 @@ config PGTABLE_LEVELS
+ 	default 2 if ARM64_16K_PAGES && ARM64_VA_BITS_36
+ 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
+ 	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
++	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_52
+ 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
+ 	default 3 if ARM64_16K_PAGES && ARM64_VA_BITS_47
+ 	default 4 if !ARM64_64K_PAGES && ARM64_VA_BITS_48
+@@ -282,6 +283,7 @@ config MULTI_IRQ_HANDLER
+ config KASAN_SHADOW_OFFSET
+ 	hex
+ 	depends on KASAN
++	default 0xdfffa00000000000 if ARM64_VA_BITS_52
+ 	default 0xdfffa00000000000 if ARM64_VA_BITS_48
+ 	default 0xdfffd00000000000 if ARM64_VA_BITS_47
+ 	default 0xdffffe8000000000 if ARM64_VA_BITS_42
+@@ -670,6 +672,10 @@ config ARM64_VA_BITS_47
+ config ARM64_VA_BITS_48
+ 	bool "48-bit"
  
-@@ -71,7 +74,8 @@ static inline struct plt_entry get_plt_entry(u64 val)
- 	 * +--------+------------+--------+-----------+-------------+---------+
- 	 *
- 	 * Rd     := 0x10 (x16)
--	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
-+	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32),
-+	 *           0b11 (lsl #48)
- 	 * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
- 	 * sf     := 1 (64-bit variant)
- 	 */
-@@ -79,6 +83,9 @@ static inline struct plt_entry get_plt_entry(u64 val)
- 		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
- 		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
- 		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
-+#if CONFIG_ARM64_VA_BITS > 48
-+		cpu_to_le32(0xf2e00010 | ((( val >> 48) & 0xffff)) << 5),
-+#endif
- 		cpu_to_le32(0xd61f0200)
- 	};
- }
-@@ -86,6 +93,10 @@ static inline struct plt_entry get_plt_entry(u64 val)
- static inline bool plt_entries_equal(const struct plt_entry *a,
- 				     const struct plt_entry *b)
- {
-+#if CONFIG_ARM64_VA_BITS > 48
-+	if (a->mov3 != b->mov3)
-+		return false;
-+#endif
- 	return a->mov0 == b->mov0 &&
- 	       a->mov1 == b->mov1 &&
- 	       a->mov2 == b->mov2;
-diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-index f0690c2ca3e0..4d5617e09943 100644
---- a/arch/arm64/kernel/module-plts.c
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -50,6 +50,9 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
- 	struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
- 	int i = pltsec->plt_num_entries++;
- 	u32 mov0, mov1, mov2, br;
-+#if CONFIG_ARM64_VA_BITS > 48
-+	u32 mov3;
-+#endif
- 	int rd;
++config ARM64_VA_BITS_52
++	bool "52-bit (ARMv8.2) (48 if not in hardware)"
++	depends on ARM64_64K_PAGES
++
+ endchoice
  
- 	if (WARN_ON(pltsec->plt_num_entries > pltsec->plt_max_entries))
-@@ -69,6 +72,12 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
- 	mov2 = aarch64_insn_gen_movewide(rd, (u16)(val >> 32), 32,
- 					 AARCH64_INSN_VARIANT_64BIT,
- 					 AARCH64_INSN_MOVEWIDE_KEEP);
-+#if CONFIG_ARM64_VA_BITS > 48
-+	mov3 = aarch64_insn_gen_movewide(rd, (u16)(val >> 48), 48,
-+					 AARCH64_INSN_VARIANT_64BIT,
-+					 AARCH64_INSN_MOVEWIDE_KEEP);
+ config ARM64_VA_BITS
+@@ -679,10 +685,12 @@ config ARM64_VA_BITS
+ 	default 42 if ARM64_VA_BITS_42
+ 	default 47 if ARM64_VA_BITS_47
+ 	default 48 if ARM64_VA_BITS_48
++	default 52 if ARM64_VA_BITS_52
+ 
+ config ARM64_VA_BITS_MIN
+ 	int
+-	default ARM64_VA_BITS
++	default ARM64_VA_BITS if !ARM64_VA_BITS_52
++	default 48 if ARM64_VA_BITS_52
+ 
+ choice
+ 	prompt "Physical address space size"
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 5f8d9e452190..031604502776 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -472,9 +472,22 @@ ENTRY(__cpu_setup)
+ ENDPROC(__cpu_setup)
+ 
+ ENTRY(__setup_va_constants)
++#ifdef CONFIG_ARM64_VA_BITS_52
++	mrs_s	x5, SYS_ID_AA64MMFR2_EL1
++	and	x5, x5, #0xf << ID_AA64MMFR2_LVA_SHIFT
++	cmp	x5, #1 << ID_AA64MMFR2_LVA_SHIFT
++	b.ne	1f
++	mov	x0, #VA_BITS
++	mov	x1, TCR_T0SZ(VA_BITS)
++	mov	x2, #1 << (VA_BITS - PGDIR_SHIFT)
++	b	2f
 +#endif
 +
- 	br = aarch64_insn_gen_branch_imm((u64)&plt[i].br, (u64)loc + 4,
- 					 AARCH64_INSN_BRANCH_NOLINK);
- 
-@@ -76,6 +85,9 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
- 			cpu_to_le32(mov0),
- 			cpu_to_le32(mov1),
- 			cpu_to_le32(mov2),
-+#if CONFIG_ARM64_VA_BITS > 48
-+			cpu_to_le32(mov3),
-+#endif
- 			cpu_to_le32(br)
- 		};
- 
++1:
+ 	mov	x0, #VA_BITS_MIN
+ 	mov	x1, TCR_T0SZ(VA_BITS_MIN)
+ 	mov	x2, #1 << (VA_BITS_MIN - PGDIR_SHIFT)
++2:
+ 	str_l	x0, vabits_actual, x5
+ 	str_l	x1, idmap_t0sz, x5
+ 	str_l	x2, ptrs_per_pgd, x5
 -- 
 2.11.0
