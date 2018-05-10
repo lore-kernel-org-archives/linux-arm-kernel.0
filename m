@@ -1,42 +1,136 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 10 May 2018 14:10:27 +0800
-Subject: Add MediaTek XS-PHY driver
-Message-ID: <1525932629-10603-1-git-send-email-chunfeng.yun@mediatek.com>
+Date: Thu, 10 May 2018 14:10:28 +0800
+Subject: [PATCH v3 1/2] dt-bindings: add MediaTek XS-PHY binding
+In-Reply-To: <1525932629-10603-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1525932629-10603-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1525932629-10603-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 2ca1243f228633ca9dd96d3e4068af9e2936cd51 Mon Sep 17 00:00:00 2001
-From: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Date: Thu, 10 May 2018 13:55:52 +0800
-Subject: [PATCH v3 0/2]  Add MediaTek XS-PHY driver
+Add a DT binding documentation of XS-PHY for MediaTek SoCs
+with USB3.1 GEN2 controller
 
-This patch series support the SuperSpeedPlus XS-PHY transceiver for
-USB3.1 GEN2 controller on MediaTek chips. The driver supports multiple
-USB2.0, USB3.1 GEN2 ports.
-
-v3: changes in binding (suggested by Rob)
-    1. use the correct name of SoC as soc-model's example
-
-v2: changes in binding (suggested by Rob)
-    1. list all valid SoCs for compatible
-    2. move required child nodes after parent optional ones
-    3. remove status property in example
-    4. move banks layout example before dts one
-    5. remove phy binding example
-    6. add #address-cells, #size-cells, ranges properties for parent node
-
-
-Chunfeng Yun (2):
-  dt-bindings: add MediaTek XS-PHY binding
-  phy: mediatek: add XS-PHY driver
-
- .../devicetree/bindings/phy/phy-mtk-xsphy.txt      | 110 ++++
- drivers/phy/mediatek/Kconfig                       |   9 +
- drivers/phy/mediatek/Makefile                      |   1 +
- drivers/phy/mediatek/phy-mtk-xsphy.c               | 600 +++++++++++++++++++++
- 4 files changed, 720 insertions(+)
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ .../devicetree/bindings/phy/phy-mtk-xsphy.txt      |  110 ++++++++++++++++++++
+ 1 file changed, 110 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
- create mode 100644 drivers/phy/mediatek/phy-mtk-xsphy.c
 
---
-1.9.1
+diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
+new file mode 100644
+index 0000000..7f2b16f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
+@@ -0,0 +1,110 @@
++MediaTek XS-PHY binding
++--------------------------
++
++The XS-PHY controller supports physical layer functionality for USB3.1
++GEN2 controller on MediaTek SoCs.
++
++Required properties (controller (parent) node):
++ - compatible	: should be "mediatek,<soc-model>-xsphy", "mediatek,xsphy",
++ 		  soc-model is the name of SoC, such as mt3611 etc;
++		  when using "mediatek,xsphy" compatible string, you need SoC specific
++		  ones in addition, one of:
++		  - "mediatek,mt3611-xsphy"
++
++ - #address-cells, #size-cells : should use the same values as the root node
++ - ranges: must be present
++
++Optional properties (controller (parent) node):
++ - reg		: offset and length of register shared by multiple U3 ports,
++		  exclude port's private register, if only U2 ports provided,
++		  shouldn't use the property.
++ - mediatek,src-ref-clk-mhz	: u32, frequency of reference clock for slew rate
++		  calibrate
++ - mediatek,src-coef	: u32, coefficient for slew rate calibrate, depends on
++		  SoC process
++
++Required nodes	: a sub-node is required for each port the controller
++		  provides. Address range information including the usual
++		  'reg' property is used inside these nodes to describe
++		  the controller's topology.
++
++Required properties (port (child) node):
++- reg		: address and length of the register set for the port.
++- clocks	: a list of phandle + clock-specifier pairs, one for each
++		  entry in clock-names
++- clock-names	: must contain
++		  "ref": 48M reference clock for HighSpeed analog phy; and 26M
++			reference clock for SuperSpeedPlus analog phy, sometimes is
++			24M, 25M or 27M, depended on platform.
++- #phy-cells	: should be 1
++		  cell after port phandle is phy type from:
++			- PHY_TYPE_USB2
++			- PHY_TYPE_USB3
++
++The following optional properties are only for debug or HQA test
++Optional properties (PHY_TYPE_USB2 port (child) node):
++- mediatek,eye-src	: u32, the value of slew rate calibrate
++- mediatek,eye-vrt	: u32, the selection of VRT reference voltage
++- mediatek,eye-term	: u32, the selection of HS_TX TERM reference voltage
++- mediatek,efuse-intr	: u32, the selection of Internal Resistor
++
++Optional properties (PHY_TYPE_USB3 port (child) node):
++- mediatek,efuse-intr	: u32, the selection of Internal Resistor
++- mediatek,efuse-tx-imp	: u32, the selection of TX Impedance
++- mediatek,efuse-rx-imp	: u32, the selection of RX Impedance
++
++Banks layout of xsphy
++-------------------------------------------------------------
++port        offset    bank
++u2 port0    0x0000    MISC
++            0x0100    FMREG
++            0x0300    U2PHY_COM
++u2 port1    0x1000    MISC
++            0x1100    FMREG
++            0x1300    U2PHY_COM
++u2 port2    0x2000    MISC
++            ...
++u31 common  0x3000    DIG_GLB
++            0x3100    PHYA_GLB
++u31 port0   0x3400    DIG_LN_TOP
++            0x3500    DIG_LN_TX0
++            0x3600    DIG_LN_RX0
++            0x3700    DIG_LN_DAIF
++            0x3800    PHYA_LN
++u31 port1   0x3a00    DIG_LN_TOP
++            0x3b00    DIG_LN_TX0
++            0x3c00    DIG_LN_RX0
++            0x3d00    DIG_LN_DAIF
++            0x3e00    PHYA_LN
++            ...
++
++DIG_GLB & PHYA_GLB are shared by U31 ports.
++
++Example:
++
++u3phy: usb-phy at 11c40000 {
++	compatible = "mediatek,mt3611-xsphy", "mediatek,xsphy";
++	reg = <0 0x11c43000 0 0x0200>;
++	mediatek,src-ref-clk-mhz = <26>;
++	mediatek,src-coef = <17>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++	ranges;
++
++	u2port0: usb-phy at 11c40000 {
++		reg = <0 0x11c40000 0 0x0400>;
++		clocks = <&clk48m>;
++		clock-names = "ref";
++		mediatek,eye-src = <4>;
++		#phy-cells = <1>;
++	};
++
++	u3port0: usb-phy at 11c43000 {
++		reg = <0 0x11c43400 0 0x0500>;
++		clocks = <&clk26m>;
++		clock-names = "ref";
++		mediatek,efuse-intr = <28>;
++		#phy-cells = <1>;
++	};
++};
++
+-- 
+1.7.9.5
