@@ -1,34 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 9 May 2018 21:23:31 -0700
-Subject: [GIT PULL] ARM: uniphier: fixes for v4.17
-In-Reply-To: <CAK7LNARwR+9RhGTSJDxZY+NpLAzJNYgTV=v5GOR=nuT5SWqQFA@mail.gmail.com>
-References: <CAK7LNASuFh4wcSJ7HTW-+ZQCjZWt0QtjrOQQogoqzbM2W9n+nA@mail.gmail.com>
- <CAK7LNARwR+9RhGTSJDxZY+NpLAzJNYgTV=v5GOR=nuT5SWqQFA@mail.gmail.com>
-Message-ID: <CAOesGMh_yD4DaDkDbqeKWD-S4=B_YRtsxYT0aaMKHVyyctEL9g@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 10 May 2018 13:47:06 +0800
+Subject: [PATCH v2 1/7] usb: mtu3: avoid TX data length truncated in SS/SSP
+ mode
+Message-ID: <6b82c11302a81368bd6936424d081ede3340b431.1525930818.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2018 at 9:18 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi Arnd, Olof,
->
->
-> 2018-04-29 0:47 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->> Hi Arnd, Olof,
->>
->> Please pull some fixes of ARM UniPhier DT.
->
->
-> I am guessing why this has not been pulled yet.
-> Right, I was late - you had already sent the fixes pull request to Linus.
->
-> Do you have a chance to send another fixes PR for 4.17?
+The variable of 'count' is declared as u8, this will cause an issue
+due to value truncated when works in SS or SSP mode and data length
+is greater than 255, so change it as u32.
 
-Hi,
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/mtu3/mtu3_gadget_ep0.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Yes, I'm about to do a pass of merges and this will be part of that.
-Arnd is on leave and I haven't spun up merging yet, I should get to it
-tonight or tomorrow at the latest.
-
-
--Olof
+diff --git a/drivers/usb/mtu3/mtu3_gadget_ep0.c b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+index ebdcf7a..d67b540 100644
+--- a/drivers/usb/mtu3/mtu3_gadget_ep0.c
++++ b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+@@ -546,7 +546,7 @@ static void ep0_tx_state(struct mtu3 *mtu)
+ 	struct usb_request *req;
+ 	u32 csr;
+ 	u8 *src;
+-	u8 count;
++	u32 count;
+ 	u32 maxp;
+ 
+ 	dev_dbg(mtu->dev, "%s\n", __func__);
+-- 
+1.9.1
