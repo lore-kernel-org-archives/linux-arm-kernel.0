@@ -1,109 +1,78 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Wed, 9 May 2018 19:02:47 -0500
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 9 May 2018 17:22:42 -0700
 Subject: [PATCH] drivers/perf: arm-ccn: stop spamming dmesg in event_init
-In-Reply-To: <20180509161120.ilnukvismwfb452g@lakrids.cambridge.arm.com>
+In-Reply-To: <20180509184154.9994df2874e7a08025b56dea@arm.com>
 References: <20180504104117.8086-1-mark.rutland@arm.com>
  <20180508184050.75c60b82ba538d0ecdeb2d78@arm.com>
  <1525882003.4199.55.camel@arm.com>
- <20180509161120.ilnukvismwfb452g@lakrids.cambridge.arm.com>
-Message-ID: <20180509190247.b1cc37d59f3070b3b868988c@arm.com>
+ <20180509184154.9994df2874e7a08025b56dea@arm.com>
+Message-ID: <cee9c043-3d64-56b9-4f23-e8c8370387dd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 May 2018 17:12:42 +0100
-Mark Rutland <mark.rutland@arm.com> wrote:
-
-> On Wed, May 09, 2018 at 05:06:43PM +0100, Pawel Moll wrote:
-> > On Wed, 2018-05-09 at 00:40 +0100, Kim Phillips wrote:
-> > > On Fri,  4 May 2018 11:41:17 +0100 Mark Rutland <mark.rutland@arm.com> wrote:
-> > > 
-> > > [adding Pawel, arm-ccn driver author]
-> > 
-> > We had this discussion way too many times for my liking. As I said
-> > before - *I* will be fine with the debug messages in the CCN driver.
+On 05/09/2018 04:41 PM, Kim Phillips wrote:
+> On Wed, 9 May 2018 17:06:43 +0100
+> Pawel Moll <pawel.moll@arm.com> wrote:
 > 
-> > > > The ARM CCN PMU driver uses dev_warn() to complain about parameters
-> > > in
-> > > > the user-provided perf_event_attr. This means that under normal
-> > > > operation (e.g. a single invocation of the perf tool), dmesg may be
-> > > > spammed with multiple messages.
-> > 
-> > Surely Mark, in his role as maintainer of drivers/perf/ (and a few
-> > other locations), meant to use much more technical and emotion-free
-> > subject, along the lines of "reduce a number of dmesg warnings at event
-> > init".
+>> On Wed, 2018-05-09 at 00:40 +0100, Kim Phillips wrote:
+>>> On Fri,  4 May 2018 11:41:17 +0100 Mark Rutland <mark.rutland@arm.com> wrote:
+>>>
+>>> [adding Pawel, arm-ccn driver author]
+>>
+>> We had this discussion way too many times for my liking. As I said
+>> before - *I* will be fine with the debug messages in the CCN driver.
+>> Now, if there ever turns out to be other user of this thing and gets
 > 
-> True. I'll reword the above to:
+> Sure, this isn't just about Pawel using the driver he wrote - we know
+> you know how to use it because you wrote it.  No, it's about all the
+> other potential users out there, esp. first time users, as I once was.
 > 
->   The ARM CCN PMU driver uses dev_warn() to complain about parameters in
->   the user-provided perf_event_attr. This means that under normal
->   operation (e.g. a single invocation of the perf tool), a number of
->   messages warnings may be logged to dmesg.
+>> into problems with event configuration, I'd hope that he/she can count
+>> on support from the knowledgable people here... (just checked and both
+> 
+> I abhor having to suggest our users email this list in order to find out
+> how to use the PMU drivers.  First time users are going to tend to
+> steer completely away if they don't have the patience to debug a silent
+> PMU, rather than email this mailing list - sorry, but that's just
+> adding a huge usage barrier - for what - fuzzer runner's convenience?
+> 
+>> RHEL 7.5 and Ubuntu 16.04.3 kernels on AArch64 come with
+>> CONFIG_DYNAMIC_DEBUG=y, so it's a matter of explaining what has to be
+>> enabled where; sadly this information did not find its way into the
+>> commit description)
+> 
+> I can't think of a more difficult to find, more far-away, alien
+> place for end users to find help with perf, sorry.
+> 
+>>>> The ARM CCN PMU driver uses dev_warn() to complain about parameters
+>>> in
+>>>> the user-provided perf_event_attr. This means that under normal
+>>>> operation (e.g. a single invocation of the perf tool), dmesg may be
+>>>> spammed with multiple messages.
+>>
+>> Surely Mark, in his role as maintainer of drivers/perf/ (and a few
+>> other locations), meant to use much more technical and emotion-free
+>> subject, along the lines of "reduce a number of dmesg warnings at event
+>> init".
+> 
+> 'reduce a number' is the wrong word:  warnings are completely
+> eliminated. Debug-level messages occur at exactly the same
+> frequency/amount.
+> 
+> But I still object to the rationale overall - it seems this is about
+> running fuzzers?  I even offered an alternative for fuzzer runners: is
+> modifying the loglevel prior to fuzzing somehow unacceptable?
 
-So from:
+I don't have any dog in this, but maybe if providing information to the
+users is so essential to having a pleasant user experience, then
+rethinking the whole way these messages are funneled is necessary
+because the kernel log + dmesg is by no means appropriate. Take a look
+at what the networking maintainers recently did with netlink extended
+ack. You used to just get an "unsupported" error, and now you know
+exactly what is wrong when extack is available. It seems to me like
+something like this is what you might want here since you want to have
+perf be as user friendly as possible.
 
-"...dmesg may be spammed with multiple messages."
-
-to:
-
-"...a number of messages warnings may be logged to dmesg."
-
-Not sure what's *that* different between the two, but is the assumption
-that "normal operation" - i.e., a single *valid* perf invocation -
-still emits messages?  In which case, could the misunderstanding here
-possibly be the following?:
-
-Assuming I know what node is valid, I can still get messages:
-
-$ dmesg -w &
-$ sudo ./perf stat -e ccn/hnf_cache_miss,node=8/ find /usr > /dev/null
-[626610.173759] arm-ccn e8000000.ccn: Can't exclude execution levels!
-[626610.173790] arm-ccn e8000000.ccn: Can't exclude execution levels!
-
- Performance counter stats for 'system wide':
-
-         1,096,602      ccn/hnf_cache_miss,node=8/                                   
-
-       3.708314082 seconds time elapsed
-
-But the driver is still technically correct in that it WARNs (not
-invisibly DEBUGs) it's users about the EL problem.  In order to not
-exclude the default execution levels, we postpend 'hku' to the event,
-so now the EL messages are gone:
-
-$ sudo ./perf stat -e ccn/hnf_cache_miss,node=8/hku find /usr > /dev/null
-
- Performance counter stats for 'system wide':
-
-         1,086,521      ccn/hnf_cache_miss,node=8/hku                                   
-
-       3.699726648 seconds time elapsed
-
-What's important to keep the user warned about with arm-ccn is these
-types of messages:
-
-$ sudo ./perf stat -e ccn/hnf_cache_miss,node=1/hku find /usr > /dev/null
-[626675.574828] arm-ccn e8000000.ccn: Invalid type 0x4 for node 1!
-[626675.574841] arm-ccn e8000000.ccn: Invalid type 0x4 for node 1!
-
- Performance counter stats for 'system wide':
-
-   <not supported>      ccn/hnf_cache_miss,node=1/                                   
-
-       3.686169559 seconds time elapsed
-
-See?  Now the user is pointed directly at the problem.
-
-I've even enhanced the tool to help identify to the user the event with
-an unsupported sampling error (commit 114bc191c370 "perf evsel: Say
-which PMU Hardware event doesn't support sampling/overflow-interrupts").
-
-BTW, the dmesg output above was only two lines per effective message:
-That should be totally acceptable - it's only one line more than one
-line per message.  Are you seeing much more than that?  If so, can we
-see an example of an invocation that's completely unacceptable,
-dmesg-volume-wise?
-
-Thanks,
-
-Kim
+My 2 cents.
+-- 
+Florian
