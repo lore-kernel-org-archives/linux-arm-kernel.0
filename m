@@ -1,78 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 9 May 2018 22:10:41 -0300
-Subject: [PATCH] ARM: DTS: imx53: Add support for imx53 HSC/DDC boards
- from K+P
-In-Reply-To: <20180509153428.1440-1-lukma@denx.de>
-References: <20180509153428.1440-1-lukma@denx.de>
-Message-ID: <CAOMZO5AexXNEGVoXa9K_GAm+aFLNRQOXOhF_SdKAjV1qmuD2nA@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 10 May 2018 08:03:06 +0800
+Subject: [PATCH] usb: gadget: composite: fill bcdUSB as 0x0320 for
+ SuperSpeed or higher speeds
+In-Reply-To: <8736z1kqrq.fsf@linux.intel.com>
+References: <69cc710fa8b7d18c494c9f482fd2b8e6fb7c0c94.1525865206.git.chunfeng.yun@mediatek.com>
+ <8736z1kqrq.fsf@linux.intel.com>
+Message-ID: <1525910586.25162.40.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
+Hi,
 
-On Wed, May 9, 2018 at 12:34 PM, Lukasz Majewski <lukma@denx.de> wrote:
+On Wed, 2018-05-09 at 14:33 +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> Chunfeng Yun <chunfeng.yun@mediatek.com> writes:
+> > The USB3CV version 2.1.80 (March 26, 2018) requires all devices
+> > ( gen1, gen2, single lane, dual lane) to return the value of 0x0320
+> > in the bcdUSB field
+> 
+> this sounds really odd. What happens when I get a USB 3.1 compliant
+> device off-the-shelf and run it through USB3CV? will it fail now?
+It will fail, the last version require it 0x0310
+> 
+> Care to share a screenshot or the raw html of the test result?
+A screenshot is attached
+> 
 
-> +&iomuxc {
-> +       imx53-kp-ddc {
-
-No need for keeping this imx53-kp-ddc.
-
-> diff --git a/arch/arm/boot/dts/imx53-kp-hsc.dts b/arch/arm/boot/dts/imx53-kp-hsc.dts
-> new file mode 100644
-> index 000000000000..fff358395c9d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-kp-hsc.dts
-> @@ -0,0 +1,53 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> +/*
-> + * Copyright 2018
-> + * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx53-kp.dtsi"
-> +
-> +/ {
-> +       model = "K+P imx53 HSC";
-> +       compatible = "kiebackpeter,imx53-hsc", "fsl,imx53";
-> +
-
-No need for this blank line.
-
-> +};
-> +
-> +&fec {
-> +       status = "okay";
-
-We usually put the status in the last line.
-
-> +       gpio_buttons {
-> +               compatible = "gpio-keys";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_gpiobuttons>;
-> +
-> +               button at 1 {
-
-You pass @1 without a reg property. This triggers a warning when
-building with W=1.
-
-You could remove the @1.
-
-Please make sure this patch does not introduce any W=1 dtc warning.
-
-> +&iomuxc {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_kp_common>;
-> +
-> +       imx53-kp-common {
-
-No need for this  imx53-kp-common
-
-> +&uart4 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart4>;
-> +
-
-No need for this blank line.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: dev_desc_test_fail.png
+Type: image/png
+Size: 16866 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180510/64cc8879/attachment-0001.png>
