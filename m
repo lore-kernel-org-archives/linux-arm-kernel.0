@@ -1,85 +1,64 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 10 May 2018 09:04:31 -0500
-Subject: [PATCH v2 1/2] PCI: kirin: Add MSI support
-In-Reply-To: <1525854012-24228-2-git-send-email-chenyao11@huawei.com>
-References: <1525854012-24228-1-git-send-email-chenyao11@huawei.com>
- <1525854012-24228-2-git-send-email-chenyao11@huawei.com>
-Message-ID: <20180510140431.GJ173327@bhelgaas-glaptop.roam.corp.google.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 10 May 2018 15:04:46 +0100
+Subject: [PATCH v6 02/11] firmware: xilinx: Add Zynqmp firmware driver
+In-Reply-To: <1523389127-14243-3-git-send-email-jollys@xilinx.com>
+References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
+ <1523389127-14243-3-git-send-email-jollys@xilinx.com>
+Message-ID: <9cbfb3cd-daa3-f145-c6f2-f15f61d1bea0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Tejun, Wolfram]
 
-On Wed, May 09, 2018 at 04:20:11PM +0800, Yao Chen wrote:
-> Add support for MSI.
-> ...
 
-> @@ -448,6 +467,26 @@ static int kirin_pcie_host_init(struct pcie_port *pp)
->  static int __init kirin_add_pcie_port(struct dw_pcie *pci,
->  				      struct platform_device *pdev)
->  {
-> +	int ret;
+On 10/04/18 20:38, Jolly Shah wrote:
+> From: Rajan Vaja <rajanv@xilinx.com>
+> 
+> This patch is adding communication layer with firmware.
+> Firmware driver provides an interface to firmware APIs.
+> Interface APIs can be used by any driver to communicate to
+> PMUFW(Platform Management Unit). All requests go through ATF.
+> 
+> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> ---
+
+[...]
+
 > +
-> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +		pci->pp.msi_irq = platform_get_irq(pdev, 0);
-> +		if (!pci->pp.msi_irq) {
-
-I think this test is incorrect.  platform_get_irq() returns a negative
-errno value when it fails.  Most calls test "irq < 0" to check for failure.
-
-There's a lot of duplicated code like this, so maybe we should consider
-putting that check into devm_request_irq(), similar to what
-devm_ioremap_resource() does, so the driver code could look like this:
-
-  pci->pp.msi_irq = platform_get_irq(pdev, 0);
-  ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq, ...);
-  if (ret) {
-    dev_err(&pdev->dev, "failed to request MSI IRQ\n");
-    return ret;
-  }
-
-The basic devm_ioremap_resource() motivation is here: 72f8c0bfa0de ("lib:
-devres: add convenience function to remap a resource") and the same
-considerations seem to apply here.
-
-But that's more than you need to do for *this* series.  So for now, I would
-simply fix the test to check for "irq < 0" and update the messages as I
-mention below.
-
-> +			dev_err(&pdev->dev, "failed to get msi irq[%d]\n",
-> +				pci->pp.msi_irq);
-> +			return -ENODEV;
-> +		}
-> +		ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
-> +				       kirin_pcie_msi_irq_handler,
-> +				       IRQF_SHARED | IRQF_NO_THREAD,
-> +				       "kirin_pcie_msi", &pci->pp);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "failed to request msi irq[%d]\n",
-
-s/msi irq/MSI IRQ/ in both dev_err() messages above.  This is because the
-message is English text (not code), and the convention is that non-words
-like these initialisms written in all caps.
-
-I would style the first one as "failed to get MSI IRQ (%d)" because the %d
-there is a return code, probably -ENXIO.
-
-The second one should be "failed to request MSI IRQ %d" because here the %d
-is the actual IRQ.
-
-> +				pci->pp.msi_irq);
-> +			return ret;
-> +		}
+> +/**
+> + * get_set_conduit_method() - Choose SMC or HVC based communication
+> + * @np:		Pointer to the device_node structure
+> + *
+> + * Use SMC or HVC-based functions to communicate with EL2/EL3.
+> + *
+> + * Return: Returns 0 on success or error code
+> + */
+> +static int get_set_conduit_method(struct device_node *np)
+> +{
+> +	const char *method;
+> +
+> +	if (of_property_read_string(np, "method", &method)) {
+> +		pr_warn("%s missing \"method\" property\n", __func__);
+> +		return -ENXIO;
 > +	}
 > +
->  	pci->pp.ops = &kirin_pcie_host_ops;
->  
->  	return dw_pcie_host_init(&pci->pp);
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +	if (!strcmp("hvc", method)) {
+> +		do_fw_call = do_fw_call_hvc;
+> +	} else if (!strcmp("smc", method)) {
+> +		do_fw_call = do_fw_call_smc;
+> +	} else {
+> +		pr_warn("%s Invalid \"method\" property: %s\n",
+> +			__func__, method);
+> +		return -EINVAL;
+> +	}
+> +
+
+Mark R did some cleanup around SMCCC conduits[1]. It makes sense to base
+this on top that. But if you manage to push this for v4.18, then you may
+need to wait for that to be merged and clean it up after v4.18
+
+-- 
+Regards,
+Sudeep
+
+[1] https://www.spinics.net/lists/arm-kernel/msg650305.html
