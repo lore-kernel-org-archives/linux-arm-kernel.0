@@ -1,42 +1,127 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 May 2018 17:41:48 +0100
-Subject: [PATCH v7 06/16] arm64/sve: Refactor user SVE trap maintenance
- for external use
-In-Reply-To: <1525882385-29181-7-git-send-email-Dave.Martin@arm.com>
-References: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
- <1525882385-29181-7-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180510164148.ihcst6o5eau4vlme@armageddon.cambridge.arm.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 10 May 2018 18:42:17 +0200
+Subject: [PATCH] kvm: Change return type to vm_fault_t
+In-Reply-To: <20180418191958.GA25806@jordon-HP-15-Notebook-PC>
+References: <20180418191958.GA25806@jordon-HP-15-Notebook-PC>
+Message-ID: <4fb6e990-080b-0612-3fcd-f2082185f8ff@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 05:12:55PM +0100, Dave P Martin wrote:
-> In preparation for optimising the way KVM manages switching the
-> guest and host FPSIMD state, it is necessary to provide a means for
-> code outside arch/arm64/kernel/fpsimd.c to restore the user trap
-> configuration for SVE correctly for the current task.
+On 18/04/2018 21:19, Souptick Joarder wrote:
+> Use new return type vm_fault_t for fault handler. For
+> now, this is just documenting that the function returns
+> a VM_FAULT value rather than an errno. Once all instances
+> are converted, vm_fault_t will become a distinct type.
 > 
-> Rather than requiring external code to duplicate the maintenance
-> explicitly, this patch wraps moves the trap maintenenace to
-> fpsimd_bind_to_cpu(), since it is logically part of the work of
-> associating the current task with the cpu.
+> commit 1c8f422059ae ("mm: change return type to vm_fault_t")
 > 
-> Because fpsimd_bind_to_cpu() is rather a cryptic name to publish
-> alongside fpsimd_bind_state_to_cpu(), the former function is
-> renamed to fpsimd_bind_task_to_cpu() to make its purpose more
-> explicit.
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> Reviewed-by: Matthew Wilcox <mawilcox@microsoft.com>
+> ---
+>  arch/mips/kvm/mips.c       | 2 +-
+>  arch/powerpc/kvm/powerpc.c | 2 +-
+>  arch/s390/kvm/kvm-s390.c   | 2 +-
+>  arch/x86/kvm/x86.c         | 2 +-
+>  include/linux/kvm_host.h   | 2 +-
+>  virt/kvm/arm/arm.c         | 2 +-
+>  virt/kvm/kvm_main.c        | 2 +-
+>  7 files changed, 7 insertions(+), 7 deletions(-)
 > 
-> This patch makes appropriate changes to ensure that
-> fpsimd_bind_task_to_cpu() is always called alongside
-> task_fpsimd_load(), so that the trap maintenance continues to be
-> done in every situation where it was done prior to this patch.
+> diff --git a/arch/mips/kvm/mips.c b/arch/mips/kvm/mips.c
+> index 2549fdd..03e0e0f 100644
+> --- a/arch/mips/kvm/mips.c
+> +++ b/arch/mips/kvm/mips.c
+> @@ -1076,7 +1076,7 @@ int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+>  	return -ENOIOCTLCMD;
+>  }
 > 
-> As a side-effect, the metadata updates done by
-> fpsimd_bind_task_to_cpu() now change from conditional to
-> unconditional in the "already bound" case of sigreturn.  This is
-> harmless, and a couple of extra stores on this slow path will not
-> impact performance.  I consider this a reasonable price to pay for
-> a slightly cleaner interface.
+> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+>  {
+>  	return VM_FAULT_SIGBUS;
+>  }
+> diff --git a/arch/powerpc/kvm/powerpc.c b/arch/powerpc/kvm/powerpc.c
+> index 403e642..3099dee 100644
+> --- a/arch/powerpc/kvm/powerpc.c
+> +++ b/arch/powerpc/kvm/powerpc.c
+> @@ -1825,7 +1825,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	return r;
+>  }
 > 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+>  {
+>  	return VM_FAULT_SIGBUS;
+>  }
+> diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+> index ba4c709..24af487 100644
+> --- a/arch/s390/kvm/kvm-s390.c
+> +++ b/arch/s390/kvm/kvm-s390.c
+> @@ -3941,7 +3941,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	return r;
+>  }
+> 
+> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+>  {
+>  #ifdef CONFIG_KVM_S390_UCONTROL
+>  	if ((vmf->pgoff == KVM_S390_SIE_PAGE_OFFSET)
+> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+> index c8a0b54..95d8102 100644
+> --- a/arch/x86/kvm/x86.c
+> +++ b/arch/x86/kvm/x86.c
+> @@ -3827,7 +3827,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	return r;
+>  }
+> 
+> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+>  {
+>  	return VM_FAULT_SIGBUS;
+>  }
+> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> index ac0062b..8eeb062 100644
+> --- a/include/linux/kvm_host.h
+> +++ b/include/linux/kvm_host.h
+> @@ -736,7 +736,7 @@ long kvm_arch_dev_ioctl(struct file *filp,
+>  			unsigned int ioctl, unsigned long arg);
+>  long kvm_arch_vcpu_ioctl(struct file *filp,
+>  			 unsigned int ioctl, unsigned long arg);
+> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf);
+> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf);
+> 
+>  int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext);
+> 
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 86941f6..6c8cc31 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -163,7 +163,7 @@ int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
+>  	return 0;
+>  }
+> 
+> -int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+> +vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+>  {
+>  	return VM_FAULT_SIGBUS;
+>  }
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index 4501e65..45eb54b 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -2341,7 +2341,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
+>  }
+>  EXPORT_SYMBOL_GPL(kvm_vcpu_on_spin);
+> 
+> -static int kvm_vcpu_fault(struct vm_fault *vmf)
+> +static vm_fault_t kvm_vcpu_fault(struct vm_fault *vmf)
+>  {
+>  	struct kvm_vcpu *vcpu = vmf->vma->vm_file->private_data;
+>  	struct page *page;
+> --
+> 1.9.1
+> 
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Applied, thanks.
+
+Paolo
