@@ -1,50 +1,70 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 10 May 2018 15:04:38 +0100
-Subject: [RFC 10/13] kvmtool: Allow backends to run checks on the KVM device fd
+Date: Thu, 10 May 2018 15:04:37 +0100
+Subject: [RFC 09/13] virtio: Handle aborts using invalid PFN
 In-Reply-To: <20180510140441.24573-1-julien.grall@arm.com>
 References: <20180510140441.24573-1-julien.grall@arm.com>
-Message-ID: <20180510140441.24573-11-julien.grall@arm.com>
+Message-ID: <20180510140441.24573-10-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Allow architectures to perform initialisation based on the
-KVM device fd ioctls, even before the VM is created.
+When the host fails to complete the shake hand due to various
+reasons. e.g, for PCI and MMIO, if 0 is written as the PFN,
+it implies the host has given up and simply don't take any
+action.
 
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- include/kvm/kvm.h | 4 ++++
- kvm.c             | 2 ++
- 2 files changed, 6 insertions(+)
+ virtio/mmio.c | 14 ++++++++------
+ virtio/pci.c  | 10 ++++++----
+ 2 files changed, 14 insertions(+), 10 deletions(-)
 
-diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
-index 4e21446..bc916ea 100644
---- a/include/kvm/kvm.h
-+++ b/include/kvm/kvm.h
-@@ -107,6 +107,10 @@ int kvm__get_sock_by_instance(const char *name);
- int kvm__enumerate_instances(int (*callback)(const char *name, int pid));
- void kvm__remove_socket(const char *name);
- 
-+#ifndef kvm__arch_init_hyp
-+static inline void kvm__arch_init_hyp(struct kvm *kvm) {}
-+#endif
-+
- void kvm__arch_set_cmdline(char *cmdline, bool video);
- void kvm__arch_init(struct kvm *kvm);
- void kvm__arch_delete_ram(struct kvm *kvm);
-diff --git a/kvm.c b/kvm.c
-index 9c2cb2f..f40975b 100644
---- a/kvm.c
-+++ b/kvm.c
-@@ -308,6 +308,8 @@ int kvm__init(struct kvm *kvm)
- 		goto err_sys_fd;
- 	}
- 
-+	kvm__arch_init_hyp(kvm);
-+
- 	kvm->vm_fd = ioctl(kvm->sys_fd, KVM_CREATE_VM, KVM_VM_TYPE);
- 	if (kvm->vm_fd < 0) {
- 		pr_err("KVM_CREATE_VM ioctl");
+diff --git a/virtio/mmio.c b/virtio/mmio.c
+index 8c0f1cc..b118b8a 100644
+--- a/virtio/mmio.c
++++ b/virtio/mmio.c
+@@ -188,12 +188,14 @@ static void virtio_mmio_config_out(struct kvm_cpu *vcpu,
+ 		break;
+ 	case VIRTIO_MMIO_QUEUE_PFN:
+ 		val = ioport__read32(data);
+-		virtio_mmio_init_ioeventfd(vmmio->kvm, vdev, vmmio->hdr.queue_sel);
+-		vdev->ops->init_vq(vmmio->kvm, vmmio->dev,
+-				   vmmio->hdr.queue_sel,
+-				   vmmio->hdr.guest_page_size,
+-				   vmmio->hdr.queue_align,
+-				   val);
++		if (val) {
++			virtio_mmio_init_ioeventfd(vmmio->kvm, vdev, vmmio->hdr.queue_sel);
++			vdev->ops->init_vq(vmmio->kvm, vmmio->dev,
++					   vmmio->hdr.queue_sel,
++					   vmmio->hdr.guest_page_size,
++					   vmmio->hdr.queue_align,
++					   val);
++		}
+ 		break;
+ 	case VIRTIO_MMIO_QUEUE_NOTIFY:
+ 		val = ioport__read32(data);
+diff --git a/virtio/pci.c b/virtio/pci.c
+index 5a5fc6e..403063f 100644
+--- a/virtio/pci.c
++++ b/virtio/pci.c
+@@ -269,10 +269,12 @@ static bool virtio_pci__io_out(struct ioport *ioport, struct kvm_cpu *vcpu, u16
+ 		break;
+ 	case VIRTIO_PCI_QUEUE_PFN:
+ 		val = ioport__read32(data);
+-		virtio_pci__init_ioeventfd(kvm, vdev, vpci->queue_selector);
+-		vdev->ops->init_vq(kvm, vpci->dev, vpci->queue_selector,
+-				   1 << VIRTIO_PCI_QUEUE_ADDR_SHIFT,
+-				   VIRTIO_PCI_VRING_ALIGN, val);
++		if (val) {
++			virtio_pci__init_ioeventfd(kvm, vdev, vpci->queue_selector);
++			vdev->ops->init_vq(kvm, vpci->dev, vpci->queue_selector,
++					   1 << VIRTIO_PCI_QUEUE_ADDR_SHIFT,
++					   VIRTIO_PCI_VRING_ALIGN, val);
++		}
+ 		break;
+ 	case VIRTIO_PCI_QUEUE_SEL:
+ 		vpci->queue_selector = ioport__read16(data);
 -- 
 2.11.0
