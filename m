@@ -1,87 +1,94 @@
-From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Thu, 10 May 2018 17:28:41 +0800
-Subject: [PATCH v1 5/5] arm64: dts: rockchip: Add sdmmc UHS support for
- roc-rk3328-cc
-In-Reply-To: <1525943800-14095-1-git-send-email-djw@t-chip.com.cn>
-References: <1525943800-14095-1-git-send-email-djw@t-chip.com.cn>
-Message-ID: <1525944521-17114-1-git-send-email-djw@t-chip.com.cn>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Thu, 10 May 2018 10:44:53 +0100
+Subject: [PATCH 1/3] arm64: dts: juno: Fix "debounce-interval" property
+ misspelling
+In-Reply-To: <1525884291-18851-1-git-send-email-sudeep.holla@arm.com>
+References: <1525884291-18851-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180510094453.GP1027@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Levin Du <djw@t-chip.com.cn>
+On Wed, May 09, 2018 at 05:44:49PM +0100, Sudeep Holla wrote:
+> "debounce_interval" was never supported in the bindings. It should be
+> "debounce-interval". Moreover, latest DTC complains the following:
+> 
+> Warning (property_name_chars_strict): debounce_interval: Character '_' not recommended in property name
+> 
+> This patch fixes the above warning by using the correct property as
+> per the bindings.
+> 
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
 
-In roc-rk3328-cc board, the signal voltage of sdmmc is supplied by
-the vcc_sdio regulator, which is a mux between 1.8V and 3.3V,
-controlled by a special output only gpio pin labeled
-"gpiomut_pmuio_iout", corresponding bit 1 of the syscon GRF_SOC_CON10.
+Acked-by: Liviu Dudau <liviu.dudau@arm.com>
 
-This special pin can now be reference as <&gpio_syscon10 1>, thanks
-to the gpio-syscon driver, which makes writing regulator-gpio possible.
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> index 69804c5f1197..4b38195a8bea 100644
+> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> @@ -58,42 +58,42 @@
+>  				compatible = "gpio-keys";
+>  
+>  				power-button {
+> -					debounce_interval = <50>;
+> +					debounce-interval = <50>;
+>  					wakeup-source;
+>  					linux,code = <116>;
+>  					label = "POWER";
+>  					gpios = <&iofpga_gpio0 0 0x4>;
+>  				};
+>  				home-button {
+> -					debounce_interval = <50>;
+> +					debounce-interval = <50>;
+>  					wakeup-source;
+>  					linux,code = <102>;
+>  					label = "HOME";
+>  					gpios = <&iofpga_gpio0 1 0x4>;
+>  				};
+>  				rlock-button {
+> -					debounce_interval = <50>;
+> +					debounce-interval = <50>;
+>  					wakeup-source;
+>  					linux,code = <152>;
+>  					label = "RLOCK";
+>  					gpios = <&iofpga_gpio0 2 0x4>;
+>  				};
+>  				vol-up-button {
+> -					debounce_interval = <50>;
+> +					debounce-interval = <50>;
+>  					wakeup-source;
+>  					linux,code = <115>;
+>  					label = "VOL+";
+>  					gpios = <&iofpga_gpio0 3 0x4>;
+>  				};
+>  				vol-down-button {
+> -					debounce_interval = <50>;
+> +					debounce-interval = <50>;
+>  					wakeup-source;
+>  					linux,code = <114>;
+>  					label = "VOL-";
+>  					gpios = <&iofpga_gpio0 4 0x4>;
+>  				};
+>  				nmi-button {
+> -					debounce_interval = <50>;
+> +					debounce-interval = <50>;
+>  					wakeup-source;
+>  					linux,code = <99>;
+>  					label = "NMI";
+> -- 
+> 2.7.4
+> 
 
-If the signal voltage changes, the io domain needs to change
-correspondingly.
-
-To use this feature, the following options are required in kernel config:
- - CONFIG_GPIO_SYSCON=y
- - CONFIG_POWER_AVS=y
- - CONFIG_ROCKCHIP_IODOMAIN=y
-
-Signed-off-by: Levin Du <djw@t-chip.com.cn>
-
----
-
-Changes in v1:
-- Split into small patches
-- Sort dts properties in sdmmc node
-
- arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-index b983abd..3f33e42 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-@@ -41,6 +41,19 @@
- 		vin-supply = <&vcc_io>;
- 	};
- 
-+	vcc_sdio: sdmmcio-regulator {
-+		compatible = "regulator-gpio";
-+		gpios = <&gpio_syscon10 1 GPIO_ACTIVE_HIGH>;
-+		states = <1800000 0x1
-+			  3300000 0x0>;
-+		regulator-name = "vcc_sdio";
-+		regulator-type = "voltage";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
-+	};
-+
- 	vcc_host1_5v: vcc_otg_5v: vcc-host1-5v-regulator {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
-@@ -213,7 +226,7 @@
- 
- 	vccio1-supply = <&vcc_io>;
- 	vccio2-supply = <&vcc18_emmc>;
--	vccio3-supply = <&vcc_io>;
-+	vccio3-supply = <&vcc_sdio>;
- 	vccio4-supply = <&vcc_18>;
- 	vccio5-supply = <&vcc_io>;
- 	vccio6-supply = <&vcc_io>;
-@@ -242,7 +255,12 @@
- 	max-frequency = <150000000>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_dectn &sdmmc0_bus4>;
-+	sd-uhs-sdr12;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	vmmc-supply = <&vcc_sd>;
-+	vqmmc-supply = <&vcc_sdio>;
- 	status = "okay";
- };
- 
 -- 
-2.7.4
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
