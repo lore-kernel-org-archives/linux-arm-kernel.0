@@ -1,69 +1,53 @@
 From: udknight@gmail.com (Wang YanQing)
-Date: Thu, 10 May 2018 11:14:19 +0800
-Subject: [PATCH] bpf, arm32: Fix inconsistent naming about
- emit_a32_lsr_r64|emit_a32_lsr_i64
-Message-ID: <20180510031419.GA26016@udknight>
+Date: Thu, 10 May 2018 11:20:13 +0800
+Subject: [PATCH] bpf, arm32: Correct check_imm24
+Message-ID: <20180510032013.GB26016@udknight>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reasonable names for emit_a32_lsr_r64|emit_a32_lsr_i64 are
-emit_a32_rsh_r64|emit_a32_rsh_i64.
+imm24 is signed, so the right range is:
+[-(2<<(24 - 1)), (2<<(24 - 1)) - 1]
 
-This patch also correct a wrong comment.
+Note:this patch also fix a typo.
 
 Signed-off-by: Wang YanQing <udknight@gmail.com>
 ---
- arch/arm/net/bpf_jit_32.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/net/bpf_jit_32.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 82689b9..c0b4124 100644
+index c0b4124..19c6d77 100644
 --- a/arch/arm/net/bpf_jit_32.c
 +++ b/arch/arm/net/bpf_jit_32.c
-@@ -708,7 +708,7 @@ static inline void emit_a32_arsh_r64(const u8 dst[], const u8 src[], bool dstk,
- }
+@@ -84,7 +84,7 @@
+  *
+  * 1. First argument is passed using the arm 32bit registers and rest of the
+  * arguments are passed on stack scratch space.
+- * 2. First callee-saved arugument is mapped to arm 32 bit registers and rest
++ * 2. First callee-saved argument is mapped to arm 32 bit registers and rest
+  * arguments are mapped to scratch space on stack.
+  * 3. We need two 64 bit temp registers to do complex operations on eBPF
+  * registers.
+@@ -1198,15 +1198,14 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 	u8 rd, rt, rm, rn;
+ 	s32 jmp_offset;
  
- /* dst = dst >> src */
--static inline void emit_a32_lsr_r64(const u8 dst[], const u8 src[], bool dstk,
-+static inline void emit_a32_rsh_r64(const u8 dst[], const u8 src[], bool dstk,
- 				     bool sstk, struct jit_ctx *ctx) {
- 	const u8 *tmp = bpf2a32[TMP_REG_1];
- 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
-@@ -724,7 +724,7 @@ static inline void emit_a32_lsr_r64(const u8 dst[], const u8 src[], bool dstk,
- 		emit(ARM_LDR_I(rm, ARM_SP, STACK_VAR(dst_hi)), ctx);
- 	}
+-#define check_imm(bits, imm) do {				\
+-	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+-	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+-		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+-			i, imm, imm);				\
++#define check_imm_range(min, max, imm) do {			\
++	if (imm < min || imm > max) {				\
++		pr_info("[%2d] imm=%d is out of range\n",	\
++			i, imm);				\
+ 		return -EINVAL;					\
+ 	}							\
+ } while (0)
+-#define check_imm24(imm) check_imm(24, imm)
++#define check_imm24(imm) check_imm_range(-16777216, 16777215, imm)
  
--	/* Do LSH operation */
-+	/* Do RSH operation */
- 	emit(ARM_RSB_I(ARM_IP, rt, 32), ctx);
- 	emit(ARM_SUBS_I(tmp2[0], rt, 32), ctx);
- 	emit(ARM_MOV_SR(ARM_LR, rd, SRTYPE_LSR, rt), ctx);
-@@ -774,7 +774,7 @@ static inline void emit_a32_lsh_i64(const u8 dst[], bool dstk,
- }
- 
- /* dst = dst >> val */
--static inline void emit_a32_lsr_i64(const u8 dst[], bool dstk,
-+static inline void emit_a32_rsh_i64(const u8 dst[], bool dstk,
- 				    const u32 val, struct jit_ctx *ctx) {
- 	const u8 *tmp = bpf2a32[TMP_REG_1];
- 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
-@@ -1330,7 +1330,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 	case BPF_ALU64 | BPF_RSH | BPF_K:
- 		if (unlikely(imm > 63))
- 			return -EINVAL;
--		emit_a32_lsr_i64(dst, dstk, imm, ctx);
-+		emit_a32_rsh_i64(dst, dstk, imm, ctx);
- 		break;
- 	/* dst = dst << src */
- 	case BPF_ALU64 | BPF_LSH | BPF_X:
-@@ -1338,7 +1338,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 		break;
- 	/* dst = dst >> src */
- 	case BPF_ALU64 | BPF_RSH | BPF_X:
--		emit_a32_lsr_r64(dst, src, dstk, sstk, ctx);
-+		emit_a32_rsh_r64(dst, src, dstk, sstk, ctx);
- 		break;
- 	/* dst = dst >> src (signed) */
- 	case BPF_ALU64 | BPF_ARSH | BPF_X:
+ 	switch (code) {
+ 	/* ALU operations */
 -- 
 1.8.5.6.2.g3d8a54e.dirty
