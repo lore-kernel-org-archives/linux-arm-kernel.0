@@ -1,71 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  9 May 2018 23:08:07 -0300
-Subject: [PATCH 1/3] ARM: dts: imx53-ard: Do not hardcode input codes
-Message-ID: <1525918089-26242-1-git-send-email-festevam@gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 10 May 2018 10:16:46 +0800
+Subject: [RESEND PATCH 1/5] usb: mtu3: avoid TX data length truncated in
+ SS/SSP mode
+In-Reply-To: <3b0c7ca576fee8220d63c9914483b70b0fbc8783.1525486663.git.chunfeng.yun@mediatek.com>
+References: <3b0c7ca576fee8220d63c9914483b70b0fbc8783.1525486663.git.chunfeng.yun@mediatek.com>
+Message-ID: <1525918606.32173.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi, Greg
 
-Instead of hardcoding the input codes we can use the symbol name for
-better readability.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx53-ard.dts | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
-index 80fc007..117bd00 100644
---- a/arch/arm/boot/dts/imx53-ard.dts
-+++ b/arch/arm/boot/dts/imx53-ard.dts
-@@ -11,6 +11,7 @@
-  */
+   Could you please pick up the series of patches, thanks a lot
  
- /dts-v1/;
-+#include <dt-bindings/input/input.h>
- #include "imx53.dtsi"
- 
- / {
-@@ -68,34 +69,34 @@
- 		home {
- 			label = "Home";
- 			gpios = <&gpio5 10 0>;
--			linux,code = <102>; /* KEY_HOME */
-+			linux,code = <KEY_HOME>;
- 			wakeup-source;
- 		};
- 
- 		back {
- 			label = "Back";
- 			gpios = <&gpio5 11 0>;
--			linux,code = <158>; /* KEY_BACK */
-+			linux,code = <KEY_BACK>;
- 			wakeup-source;
- 		};
- 
- 		program {
- 			label = "Program";
- 			gpios = <&gpio5 12 0>;
--			linux,code = <362>; /* KEY_PROGRAM */
-+			linux,code = <KEY_PROGRAM >;
- 			wakeup-source;
- 		};
- 
- 		volume-up {
- 			label = "Volume Up";
- 			gpios = <&gpio5 13 0>;
--			linux,code = <115>; /* KEY_VOLUMEUP */
-+			linux,code = <KEY_VOLUMEUP>;
- 		};
- 
- 		volume-down {
- 			label = "Volume Down";
- 			gpios = <&gpio4 0 0>;
--			linux,code = <114>; /* KEY_VOLUMEDOWN */
-+			linux,code = <KEY_VOLUMEDOWN>;
- 		};
- 	};
- };
--- 
-2.7.4
+On Sat, 2018-05-05 at 10:21 +0800, Chunfeng Yun wrote:
+> The variable of 'count' is declared as u8, this will cause an issue
+> due to value truncated when works in SS or SSP mode and data length
+> is greater than 255, so change it as u32.
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/usb/mtu3/mtu3_gadget_ep0.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/mtu3/mtu3_gadget_ep0.c b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+> index ebdcf7a..d67b540 100644
+> --- a/drivers/usb/mtu3/mtu3_gadget_ep0.c
+> +++ b/drivers/usb/mtu3/mtu3_gadget_ep0.c
+> @@ -546,7 +546,7 @@ static void ep0_tx_state(struct mtu3 *mtu)
+>  	struct usb_request *req;
+>  	u32 csr;
+>  	u8 *src;
+> -	u8 count;
+> +	u32 count;
+>  	u32 maxp;
+>  
+>  	dev_dbg(mtu->dev, "%s\n", __func__);
