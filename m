@@ -1,36 +1,27 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 10 May 2018 08:03:06 +0800
-Subject: [PATCH] usb: gadget: composite: fill bcdUSB as 0x0320 for
- SuperSpeed or higher speeds
-In-Reply-To: <8736z1kqrq.fsf@linux.intel.com>
-References: <69cc710fa8b7d18c494c9f482fd2b8e6fb7c0c94.1525865206.git.chunfeng.yun@mediatek.com>
- <8736z1kqrq.fsf@linux.intel.com>
-Message-ID: <1525910586.25162.40.camel@mhfsdcap03>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 9 May 2018 22:45:39 -0300
+Subject: [PATCH] ARM: DTS: imx53: Add support for imx53 HSC/DDC boards
+ from K+P
+In-Reply-To: <20180509153428.1440-1-lukma@denx.de>
+References: <20180509153428.1440-1-lukma@denx.de>
+Message-ID: <CAOMZO5BGfoLZDesBN=hQ5cr7Rkm1p6xyggwTvWNq6QKJZVyzeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 9, 2018 at 12:34 PM, Lukasz Majewski <lukma@denx.de> wrote:
 
-On Wed, 2018-05-09 at 14:33 +0300, Felipe Balbi wrote:
-> Hi,
-> 
-> Chunfeng Yun <chunfeng.yun@mediatek.com> writes:
-> > The USB3CV version 2.1.80 (March 26, 2018) requires all devices
-> > ( gen1, gen2, single lane, dual lane) to return the value of 0x0320
-> > in the bcdUSB field
-> 
-> this sounds really odd. What happens when I get a USB 3.1 compliant
-> device off-the-shelf and run it through USB3CV? will it fail now?
-It will fail, the last version require it 0x0310
-> 
-> Care to share a screenshot or the raw html of the test result?
-A screenshot is attached
-> 
+> +               button at 1 {
+> +                       label = "Kaltstart";
+> +                       linux,code = <64>; /* KEY_F6 */
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: dev_desc_test_fail.png
-Type: image/png
-Size: 16866 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180510/64cc8879/attachment-0001.png>
+If you include <dt-bindings/input/input.h> then you can simply do:
+
+ linux,code = <KEY_F6 >;
+
+> +                       gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
+> +               };
+> +               button at 2 {
+> +                       label = "PowerFailInterrupt";
+> +                       linux,code = <65>; /* KEY_F7 */
+
+Same here.
