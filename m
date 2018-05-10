@@ -1,35 +1,96 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 10 May 2018 10:57:40 +0800
-Subject: [PATCH] soc: mediatek: remove unneeded semicolon
-Message-ID: <a4b9c30335194d90072baf9373e41a21b349bc54.1525920846.git.sean.wang@mediatek.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 10 May 2018 11:07:59 +0800
+Subject: [xlnx:xlnx_rebase_v4.14 74/917] drivers//fpga/zynqmp-fpga.c:79:2:
+ error: implicit declaration of function '__flush_cache_user_range'; did you
+ mean 'flush_cache_user_range'?
+Message-ID: <201805101154.U8B3hgZO%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
+head:   a24ae3acb778c948234fa8f227bacd818034055d
+commit: d91b9e49c2c2663091e2d71a136ad2db919a91b3 [74/917] fpga manager: Adding FPGA Manager support for Xilinx zynqmp
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout d91b9e49c2c2663091e2d71a136ad2db919a91b3
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Fix up drivers/soc/mediatek/mtk-scpsys.c:255:2-3: Unneeded semicolon
-accidently being added in commit f9e2f65dd561 ("soc: mediatek: add a
-fixed wait for SRAM stable").
+All errors (new ones prefixed by >>):
 
-Fixes: f9e2f65dd561 ("soc: mediatek: add a fixed wait for SRAM stable")
-Reported-by: kbuild test robot <lkp@intel.com>
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+   drivers//fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_ops_write':
+>> drivers//fpga/zynqmp-fpga.c:79:2: error: implicit declaration of function '__flush_cache_user_range'; did you mean 'flush_cache_user_range'? [-Werror=implicit-function-declaration]
+     __flush_cache_user_range((unsigned long)kbuf,
+     ^~~~~~~~~~~~~~~~~~~~~~~~
+     flush_cache_user_range
+   cc1: some warnings being treated as errors
+
+vim +79 drivers//fpga/zynqmp-fpga.c
+
+    45	
+    46	static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
+    47						const char *buf, size_t size)
+    48	{
+    49		struct zynqmp_fpga_priv *priv;
+    50		char *kbuf;
+    51		size_t dma_size;
+    52		dma_addr_t dma_addr;
+    53		u32 transfer_length;
+    54		int ret;
+    55		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+    56	
+    57		if (!eemi_ops || !eemi_ops->fpga_load)
+    58			return -ENXIO;
+    59	
+    60		priv = mgr->priv;
+    61	
+    62		if (mgr->flags & IXR_FPGA_ENCRYPTION_EN)
+    63			dma_size = size + ENCRYPTED_KEY_LEN + ENCRYPTED_IV_LEN;
+    64		else
+    65			dma_size = size;
+    66	
+    67		kbuf = dma_alloc_coherent(priv->dev, dma_size, &dma_addr, GFP_KERNEL);
+    68		if (!kbuf)
+    69			return -ENOMEM;
+    70	
+    71		memcpy(kbuf, buf, size);
+    72	
+    73		if (mgr->flags & IXR_FPGA_ENCRYPTION_EN) {
+    74			memcpy(kbuf + size, mgr->key, ENCRYPTED_KEY_LEN);
+    75			memcpy(kbuf + size + ENCRYPTED_KEY_LEN, mgr->iv,
+    76							ENCRYPTED_IV_LEN);
+    77		}
+    78	
+  > 79		__flush_cache_user_range((unsigned long)kbuf,
+    80					 (unsigned long)kbuf + dma_size);
+    81	
+    82		/**
+    83		 * Translate size from bytes to number of 32bit words that
+    84		 * the DMA should write to the PCAP interface
+    85		 */
+    86		if (size & 3)
+    87			transfer_length = (size >> 2) + 1;
+    88		else
+    89			transfer_length = size >> 2;
+    90	
+    91		ret = eemi_ops->fpga_load(dma_addr, transfer_length, mgr->flags);
+    92	
+    93		dma_free_coherent(priv->dev, dma_size, kbuf, dma_addr);
+    94	
+    95		return ret;
+    96	}
+    97	
+
 ---
- drivers/soc/mediatek/mtk-scpsys.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 2080c8f..128e3dd 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -252,7 +252,7 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
- 					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
- 		if (ret < 0)
- 			goto err_pwr_ack;
--	};
-+	}
- 
- 	if (scpd->data->bus_prot_mask) {
- 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 64038 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180510/f2a9f042/attachment-0001.gz>
