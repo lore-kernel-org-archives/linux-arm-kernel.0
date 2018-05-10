@@ -1,33 +1,53 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 10 May 2018 10:53:06 +0100
-Subject: [PATCH 3/8] firmware: arm_scmi: rename get_transition_latency
- and add_opps_to_device
-In-Reply-To: <CAJZ5v0ixZPB8aZs0xc9-3JMrWfRC7+7mzYWNaCj1o_q6VSqEJA@mail.gmail.com>
-References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
- <1525885634-22348-4-git-send-email-sudeep.holla@arm.com>
- <CAJZ5v0ixZPB8aZs0xc9-3JMrWfRC7+7mzYWNaCj1o_q6VSqEJA@mail.gmail.com>
-Message-ID: <20180510095306.GA24594@e107155-lin>
+Date: Thu, 10 May 2018 11:07:09 +0100
+Subject: [PATCH 3/3] arm64: dts: juno/rtsm: re-structure motherboard
+ includes
+In-Reply-To: <20180510094901.GR1027@e110455-lin.cambridge.arm.com>
+References: <1525884291-18851-1-git-send-email-sudeep.holla@arm.com>
+ <1525884291-18851-3-git-send-email-sudeep.holla@arm.com>
+ <20180510094901.GR1027@e110455-lin.cambridge.arm.com>
+Message-ID: <fd05b1da-83aa-2177-8e99-23dcb7199856@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 10:29:48AM +0200, Rafael J. Wysocki wrote:
-> On Wed, May 9, 2018 at 7:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> > Most of the scmi code follows the suggestion from Greg KH on a totally
-> > different thread[0] to have the subsystem name first, followed by the
-> > noun and finally the verb with couple of these exceptions.
-> >
-> > This patch fixes them so that all the functions names are aligned to
-> > on practice.
-> >
-> > [0] https://www.spinics.net/lists/arm-kernel/msg583673.html
-> >
-> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+
+
+On 10/05/18 10:49, Liviu Dudau wrote:
+> On Wed, May 09, 2018 at 05:44:51PM +0100, Sudeep Holla wrote:
+>> It is a bit unorthodox to just include a file in the middle of a another
+>> DTS file, it breaks the pattern from other device trees and also makes
+>> it really hard to reference things across the files with phandles.
+>>
+>> Restructure the include for the Juno/RTSM motherboards to happen at the
+>> top of the file, reference the target nodes directly, and indent the
+>> motherboard .dtsi files to reflect their actual depth in the hierarchy.
+>>
+>> This is a purely syntactic change that result in the same DTB files from
+>> the DTS/DTSI files. This is based on similar patch from Linus Walleij
+>> for ARM Vexpress platforms.
 > 
-> ACK for the cpufreq driver changes and I'm assuming this to go in via the arch.
+> A bit of bikeshedding here: the reason I've used the DT /include/
+> here was that on decompilation of the DTB the nodes would have been in
+> the natural order and easier to look for issues. Those were the early
+> days and I can accept that the general practice has changed and we're
+> using now the C preprocessor more. I don't have any strong feelings on
+> how the DT looks nowadays, so:
 >
 
-Thanks, yes I plan to send it via ARM-SoC.
+I can understand. After this patch applied, I did hit an issue with
+timer registration. I just posted a patch [1]
 
---
+>>
+>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> 
+> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+> 
+
+Thanks for all the acks.
+
+-- 
 Regards,
 Sudeep
+
+[1]
+https://lkml.kernel.org/r/1525881728-4858-1-git-send-email-sudeep.holla at arm.com
