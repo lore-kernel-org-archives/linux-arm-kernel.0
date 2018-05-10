@@ -1,72 +1,35 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 10 May 2018 15:31:18 +0100
-Subject: [PATCH v6 09/11] firmware: xilinx: Add debugfs for clock control
- APIs
-In-Reply-To: <1523389127-14243-10-git-send-email-jollys@xilinx.com>
-References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
- <1523389127-14243-10-git-send-email-jollys@xilinx.com>
-Message-ID: <5bcc47f7-3352-f0e6-29c5-78d5be96c1d1@arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 10 May 2018 16:37:26 +0200
+Subject: [PATCH] ARM: dts: socfpga: Fix NAND controller clock supply
+Message-ID: <20180510143726.8047-1-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Denali NAND x-clock should be supplied by nand_x_clk, not by
+nand_clk. Fix this, otherwise the Denali driver gets incorrect
+clock frequency information and incorrectly configures the NAND
+timing.
 
+Signed-off-by: Marek Vasut <marex@denx.de>
+Fixes: d837a80d19 ("ARM: dts: socfpga: add nand controller nodes")
+Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Cc: Dinh Nguyen <dinguyen@kernel.org>
+---
+ arch/arm/boot/dts/socfpga.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On 10/04/18 20:38, Jolly Shah wrote:
-> From: Rajan Vaja <rajanv@xilinx.com>
-> 
-> Add debugfs file to control clocks using firmware APIs
-> through debugfs interface.
-> 
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> ---
->  drivers/firmware/xilinx/zynqmp-debug.c | 48 ++++++++++++++++++++++++++++++++++
->  1 file changed, 48 insertions(+)
-> 
-> diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
-> index 1cb69f7..837fcd1 100644
-> --- a/drivers/firmware/xilinx/zynqmp-debug.c
-> +++ b/drivers/firmware/xilinx/zynqmp-debug.c
-> @@ -34,6 +34,15 @@ static struct pm_api_info pm_api_list[] = {
->  	PM_API(PM_GET_API_VERSION),
->  	PM_API(PM_IOCTL),
->  	PM_API(PM_QUERY_DATA),
-> +	PM_API(PM_CLOCK_ENABLE),
-> +	PM_API(PM_CLOCK_DISABLE),
-> +	PM_API(PM_CLOCK_GETSTATE),
-> +	PM_API(PM_CLOCK_SETDIVIDER),
-> +	PM_API(PM_CLOCK_GETDIVIDER),
-> +	PM_API(PM_CLOCK_SETRATE),
-> +	PM_API(PM_CLOCK_GETRATE),
-> +	PM_API(PM_CLOCK_SETPARENT),
-> +	PM_API(PM_CLOCK_GETPARENT),
->  };
->  
->  /**
-> @@ -87,6 +96,7 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
->  	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
->  	u32 pm_api_version;
->  	int ret;
-> +	u64 rate;
->  
->  	if (!eemi_ops)
->  		return -ENXIO;
-> @@ -132,6 +142,44 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
->  				pm_api_ret[2], pm_api_ret[3]);
->  		break;
->  	}
-> +	case PM_CLOCK_ENABLE:
-> +		ret = eemi_ops->clock_enable(pm_api_arg[0]);
-> +		break;
-
-As I mentioned in earlier patch, I don't see the need for this debugfs
-interface. Clock lay has read-only interface in debugfs already. Also if
-you want to debug clocks, you can do so using the driver which uses
-these clocks. Do you really want to manage clocks in user-space ?
-The whole idea of EEMI kind of interface is to abstract and hide the
-fine details even from non-trusted rich OS like Linux kernel, but by
-providing this you are doing exactly opposite.
-
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index d697f5062624..e719c20a0e65 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -750,7 +750,7 @@
+ 			reg-names = "nand_data", "denali_reg";
+ 			interrupts = <0x0 0x90 0x4>;
+ 			dma-mask = <0xffffffff>;
+-			clocks = <&nand_clk>;
++			clocks = <&nand_x_clk>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
-Regards,
-Sudeep
+2.16.2
