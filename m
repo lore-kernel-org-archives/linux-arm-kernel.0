@@ -1,108 +1,120 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 10 May 2018 10:10:27 +0200
-Subject: [PATCH v2 26/26] drm/bridge: establish a link between the
- bridge supplier and consumer
-In-Reply-To: <20180504135212.26977-27-peda@axentia.se>
-References: <20180504135212.26977-1-peda@axentia.se>
- <CGME20180504135432epcas3p368bb7541ca52bc8bc301dec794851214@epcas3p3.samsung.com>
- <20180504135212.26977-27-peda@axentia.se>
-Message-ID: <a723ad4a-8caa-4ff5-d39d-52db98a56d7b@samsung.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 10 May 2018 10:29:48 +0200
+Subject: [PATCH 3/8] firmware: arm_scmi: rename get_transition_latency and
+ add_opps_to_device
+In-Reply-To: <1525885634-22348-4-git-send-email-sudeep.holla@arm.com>
+References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
+ <1525885634-22348-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAJZ5v0ixZPB8aZs0xc9-3JMrWfRC7+7mzYWNaCj1o_q6VSqEJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.05.2018 15:52, Peter Rosin wrote:
-> If the bridge supplier is unbound, this will bring the bridge consumer
-> down along with the bridge. Thus, there will no longer linger any
-> dangling pointers from the bridge consumer (the drm_device) to some
-> non-existent bridge supplier.
+On Wed, May 9, 2018 at 7:07 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Most of the scmi code follows the suggestion from Greg KH on a totally
+> different thread[0] to have the subsystem name first, followed by the
+> noun and finally the verb with couple of these exceptions.
 >
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+> This patch fixes them so that all the functions names are aligned to
+> on practice.
+>
+> [0] https://www.spinics.net/lists/arm-kernel/msg583673.html
+>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+
+ACK for the cpufreq driver changes and I'm assuming this to go in via the arch.
+
 > ---
->  drivers/gpu/drm/drm_bridge.c | 18 ++++++++++++++++++
->  include/drm/drm_bridge.h     |  2 ++
->  2 files changed, 20 insertions(+)
+>  drivers/cpufreq/scmi-cpufreq.c   |  4 ++--
+>  drivers/firmware/arm_scmi/perf.c | 10 +++++-----
+>  include/linux/scmi_protocol.h    | 10 +++++-----
+>  3 files changed, 12 insertions(+), 12 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
-> index 78d186b6831b..0259f0a3ff27 100644
-> --- a/drivers/gpu/drm/drm_bridge.c
-> +++ b/drivers/gpu/drm/drm_bridge.c
-> @@ -26,6 +26,7 @@
->  #include <linux/mutex.h>
->  
->  #include <drm/drm_bridge.h>
-> +#include <drm/drm_device.h>
->  #include <drm/drm_encoder.h>
->  
->  #include "drm_crtc_internal.h"
-> @@ -127,12 +128,25 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
->  	if (bridge->dev)
->  		return -EBUSY;
->  
-> +	if (encoder->dev->dev != bridge->odev) {
-
-I wonder why device_link_add does not handle this case (self dependency)
-silently as noop, as it seems to be a correct behavior.
-
-> +		bridge->link = device_link_add(encoder->dev->dev,
-> +					       bridge->odev, 0);
-> +		if (!bridge->link) {
-> +			dev_err(bridge->odev, "failed to link bridge to %s\n",
-> +				dev_name(encoder->dev->dev));
-> +			return -EINVAL;
-> +		}
-> +	}
-> +
->  	bridge->dev = encoder->dev;
->  	bridge->encoder = encoder;
->  
->  	if (bridge->funcs->attach) {
->  		ret = bridge->funcs->attach(bridge);
->  		if (ret < 0) {
-> +			if (bridge->link)
-> +				device_link_del(bridge->link);
-> +			bridge->link = NULL;
->  			bridge->dev = NULL;
->  			bridge->encoder = NULL;
->  			return ret;
-> @@ -159,6 +173,10 @@ void drm_bridge_detach(struct drm_bridge *bridge)
->  	if (bridge->funcs->detach)
->  		bridge->funcs->detach(bridge);
->  
-> +	if (bridge->link)
-> +		device_link_del(bridge->link);
-> +	bridge->link = NULL;
-> +
->  	bridge->dev = NULL;
+> diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+> index b4dbc77459b6..50b1551ba894 100644
+> --- a/drivers/cpufreq/scmi-cpufreq.c
+> +++ b/drivers/cpufreq/scmi-cpufreq.c
+> @@ -117,7 +117,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+>                 return -ENODEV;
+>         }
+>
+> -       ret = handle->perf_ops->add_opps_to_device(handle, cpu_dev);
+> +       ret = handle->perf_ops->device_opps_add(handle, cpu_dev);
+>         if (ret) {
+>                 dev_warn(cpu_dev, "failed to add opps to the device\n");
+>                 return ret;
+> @@ -164,7 +164,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+>         /* SCMI allows DVFS request for any domain from any CPU */
+>         policy->dvfs_possible_from_any_cpu = true;
+>
+> -       latency = handle->perf_ops->get_transition_latency(handle, cpu_dev);
+> +       latency = handle->perf_ops->transition_latency_get(handle, cpu_dev);
+>         if (!latency)
+>                 latency = CPUFREQ_ETERNAL;
+>
+> diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
+> index 987c64d19801..611ab08e6174 100644
+> --- a/drivers/firmware/arm_scmi/perf.c
+> +++ b/drivers/firmware/arm_scmi/perf.c
+> @@ -349,8 +349,8 @@ static int scmi_dev_domain_id(struct device *dev)
+>         return clkspec.args[0];
 >  }
->  
-> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-> index b656e505d11e..804189c63a4c 100644
-> --- a/include/drm/drm_bridge.h
-> +++ b/include/drm/drm_bridge.h
-> @@ -261,6 +261,7 @@ struct drm_bridge_timings {
->   * @list: to keep track of all added bridges
->   * @timings: the timing specification for the bridge, if any (may
->   * be NULL)
-> + * @link: drm consumer <-> bridge supplier
-
-Nitpick: "<->" suggests symmetry, maybe "device link from drm consumer
-to the bridge" would be better.
-
-Anyway:
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-
-?--
-Regards
-Andrzej
-
->   * @funcs: control functions
->   * @driver_private: pointer to the bridge driver's internal context
->   */
-> @@ -271,6 +272,7 @@ struct drm_bridge {
->  	struct drm_bridge *next;
->  	struct list_head list;
->  	const struct drm_bridge_timings *timings;
-> +	struct device_link *link;
->  
->  	const struct drm_bridge_funcs *funcs;
->  	void *driver_private;
+>
+> -static int scmi_dvfs_add_opps_to_device(const struct scmi_handle *handle,
+> -                                       struct device *dev)
+> +static int scmi_dvfs_device_opps_add(const struct scmi_handle *handle,
+> +                                    struct device *dev)
+>  {
+>         int idx, ret, domain;
+>         unsigned long freq;
+> @@ -383,7 +383,7 @@ static int scmi_dvfs_add_opps_to_device(const struct scmi_handle *handle,
+>         return 0;
+>  }
+>
+> -static int scmi_dvfs_get_transition_latency(const struct scmi_handle *handle,
+> +static int scmi_dvfs_transition_latency_get(const struct scmi_handle *handle,
+>                                             struct device *dev)
+>  {
+>         struct perf_dom_info *dom;
+> @@ -432,8 +432,8 @@ static struct scmi_perf_ops perf_ops = {
+>         .level_set = scmi_perf_level_set,
+>         .level_get = scmi_perf_level_get,
+>         .device_domain_id = scmi_dev_domain_id,
+> -       .get_transition_latency = scmi_dvfs_get_transition_latency,
+> -       .add_opps_to_device = scmi_dvfs_add_opps_to_device,
+> +       .transition_latency_get = scmi_dvfs_transition_latency_get,
+> +       .device_opps_add = scmi_dvfs_device_opps_add,
+>         .freq_set = scmi_dvfs_freq_set,
+>         .freq_get = scmi_dvfs_freq_get,
+>  };
+> diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
+> index a171c1e293e8..f4c9fc0fc755 100644
+> --- a/include/linux/scmi_protocol.h
+> +++ b/include/linux/scmi_protocol.h
+> @@ -85,8 +85,8 @@ struct scmi_clk_ops {
+>   * @level_set: sets the performance level of a domain
+>   * @level_get: gets the performance level of a domain
+>   * @device_domain_id: gets the scmi domain id for a given device
+> - * @get_transition_latency: gets the DVFS transition latency for a given device
+> - * @add_opps_to_device: adds all the OPPs for a given device
+> + * @transition_latency_get: gets the DVFS transition latency for a given device
+> + * @device_opps_add: adds all the OPPs for a given device
+>   * @freq_set: sets the frequency for a given device using sustained frequency
+>   *     to sustained performance level mapping
+>   * @freq_get: gets the frequency for a given device using sustained frequency
+> @@ -102,10 +102,10 @@ struct scmi_perf_ops {
+>         int (*level_get)(const struct scmi_handle *handle, u32 domain,
+>                          u32 *level, bool poll);
+>         int (*device_domain_id)(struct device *dev);
+> -       int (*get_transition_latency)(const struct scmi_handle *handle,
+> +       int (*transition_latency_get)(const struct scmi_handle *handle,
+>                                       struct device *dev);
+> -       int (*add_opps_to_device)(const struct scmi_handle *handle,
+> -                                 struct device *dev);
+> +       int (*device_opps_add)(const struct scmi_handle *handle,
+> +                              struct device *dev);
+>         int (*freq_set)(const struct scmi_handle *handle, u32 domain,
+>                         unsigned long rate, bool poll);
+>         int (*freq_get)(const struct scmi_handle *handle, u32 domain,
+> --
+> 2.7.4
+>
