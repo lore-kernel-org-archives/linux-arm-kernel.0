@@ -1,73 +1,80 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 10 May 2018 09:05:02 -0500
-Subject: [PATCH] ARM: dts: vexpress: Replace '_' with '-' in node names
-In-Reply-To: <f28fb5d6-1070-8cbb-e815-4baf7128b19e@arm.com>
-References: <1525884482-19855-1-git-send-email-sudeep.holla@arm.com>
- <CAL_Jsq+VNuvbxgFTFVouJF-_yMS90u0fd8jaXnYtKwogOP5rww@mail.gmail.com>
- <f28fb5d6-1070-8cbb-e815-4baf7128b19e@arm.com>
-Message-ID: <CAL_Jsq+csM-Z8+bMTdD7gWhWRQLAkD0EMNUS0boWkes345cCrw@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 10 May 2018 15:09:12 +0100
+Subject: [PATCH v6 03/11] firmware: xilinx: Add zynqmp IOCTL API for
+ device control
+In-Reply-To: <1523389127-14243-4-git-send-email-jollys@xilinx.com>
+References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
+ <1523389127-14243-4-git-send-email-jollys@xilinx.com>
+Message-ID: <c351b9a3-5f26-7202-7171-0dcc7adef7c0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 5:51 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 09/05/18 22:14, Rob Herring wrote:
->> On Wed, May 9, 2018 at 11:48 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> The latest DTC throws warnings for character '_' in the node names.
->>>
->>> Warning (node_name_chars_strict): /sysreg at 10000/sys_led: Character '_' not recommended in node name
->>> Warning (node_name_chars_strict): /sysreg at 10000/sys_mci: Character '_' not recommended in node name
->>> Warning (node_name_chars_strict): /sysreg at 10000/sys_flash: Character '_' not recommended in node name
->>>
->>> The general recommendation is to use character '-' for all the node names.
->>> This patch fixes the warnings following the recommendation.
->>>
->>> Cc: Liviu Dudau <liviu.dudau@arm.com>
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 6 +++---
->>>  1 file changed, 3 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
->>> index 7b8ff5b3b912..58e73131ecef 100644
->>> --- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
->>> +++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
->>> @@ -77,19 +77,19 @@
->>>                                         compatible = "arm,vexpress-sysreg";
->>>                                         reg = <0x010000 0x1000>;
->>>
->>> -                                       v2m_led_gpios: sys_led {
->>> +                                       v2m_led_gpios: sys-led {
->>
->> Except this is a gpio-controller so it should have 'gpio' for its node
->> name. (I have a dtc check written for that, but there are too many
->> false positives.)
->>
->
-> True, sorry I didn't look at it in detail.
->
->> But then you have 3 of them and no addressing, so you need to add reg
->> property (with the register's offset and size) and unit-address.
->>
->
-> Indeed. I had a look at the history but couldn't gather much. All I
-> could get is that this is one of those weird mix of all functionality on
-> ARM Ltd platforms which fits no subsystem. Me and Lorenzo has similar
-> issue on TC2 platform. Pawel seem to have plumed this system control
-> registers block into MFD and GPIO long back.
->
->> I'm surprised Linus W accepted these a GPIO when they are not really
->> general purpose, but then lots of things slip in.
->>
->
-> I assume all these happened in early days of DT.
->
-> I will drop this for now. I will take a look if these nodes can be made
-> better to align with standard gpio controller nodes.
 
-Why not just make the changes I suggested? It shouldn't break
-anything. You can add reg property even though the kernel doesn't use
-it.
 
-Rob
+On 10/04/18 20:38, Jolly Shah wrote:
+> From: Rajan Vaja <rajanv@xilinx.com>
+> 
+> Add ZynqMP firmware IOCTL API to control and configure
+> devices like PLLs, SD, Gem, etc.
+> 
+> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> ---
+>  drivers/firmware/xilinx/zynqmp.c     | 20 ++++++++++++++++++++
+>  include/linux/firmware/xlnx-zynqmp.h |  2 ++
+>  2 files changed, 22 insertions(+)
+> 
+> diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+> index 490561a..44b43fa 100644
+> --- a/drivers/firmware/xilinx/zynqmp.c
+> +++ b/drivers/firmware/xilinx/zynqmp.c
+> @@ -239,8 +239,28 @@ static int get_set_conduit_method(struct device_node *np)
+>  	return 0;
+>  }
+>  
+> +/**
+> + * zynqmp_pm_ioctl() - PM IOCTL API for device control and configs
+> + * @node_id:	Node ID of the device
+> + * @ioctl_id:	ID of the requested IOCTL
+> + * @arg1:	Argument 1 to requested IOCTL call
+> + * @arg2:	Argument 2 to requested IOCTL call
+> + * @out:	Returned output value
+> + *
+> + * This function calls IOCTL to firmware for device control and configuration.
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_pm_ioctl(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2,
+> +			   u32 *out)
+> +{
+> +	return zynqmp_pm_invoke_fn(PM_IOCTL, node_id, ioctl_id,
+> +				   arg1, arg2, out);
+> +}
+> +
+>  static const struct zynqmp_eemi_ops eemi_ops = {
+>  	.get_api_version = zynqmp_pm_get_api_version,
+> +	.ioctl = zynqmp_pm_ioctl,
+>  };
+>  
+>  /**
+> diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
+> index cb63bed..2eec6e7 100644
+> --- a/include/linux/firmware/xlnx-zynqmp.h
+> +++ b/include/linux/firmware/xlnx-zynqmp.h
+> @@ -34,6 +34,7 @@
+>  
+>  enum pm_api_id {
+>  	PM_GET_API_VERSION = 1,
+> +	PM_IOCTL = 34,
+
+I am not for this API. IIUC there are more fined grained well defined
+APIs(if I am not wrong from enum 2 upto 33). This is open ended API
+which allows user to do whatever setting it needs. And that defeats the
+purpose of other APIs.
+
+I will look through the series for the usage of this to understand this
+better, but I am guessing how it can be (ab)used.
+
+-- 
+Regards,
+Sudeep
