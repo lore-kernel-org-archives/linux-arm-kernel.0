@@ -1,146 +1,104 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 10 May 2018 15:04:32 +0100
-Subject: [RFC 04/13] Fold kvm__init_ram call in kvm__arch_init
+Date: Thu, 10 May 2018 15:04:34 +0100
+Subject: [RFC 06/13] arm: Move anything related to RAM initialization in
+ kvm__init_ram
 In-Reply-To: <20180510140441.24573-1-julien.grall@arm.com>
 References: <20180510140441.24573-1-julien.grall@arm.com>
-Message-ID: <20180510140441.24573-5-julien.grall@arm.com>
+Message-ID: <20180510140441.24573-7-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The slipt between kvm__init_ram and kvm__arch_init for setting up the
-RAM can be quite subttle. By moving the former call in the later, it
-will be possible to make the RAM initialization easier on Arm with multi
-RAM banks support.
-
-Note that it is necessary to move the call to kvm__arch_init after the
-initialization of the list kvm->mem_banks because kvm__init_ram is
-relying on it.
-
-Signed-off-by: Julien Grall <julien.grall@arm.com>
 ---
- arm/kvm.c         | 4 +++-
- include/kvm/kvm.h | 1 -
- kvm.c             | 4 +---
- mips/kvm.c        | 4 +++-
- powerpc/kvm.c     | 4 +++-
- x86/kvm.c         | 4 +++-
- 6 files changed, 13 insertions(+), 8 deletions(-)
+ arm/kvm.c | 68 +++++++++++++++++++++++++++++++--------------------------------
+ 1 file changed, 33 insertions(+), 35 deletions(-)
 
 diff --git a/arm/kvm.c b/arm/kvm.c
-index 7424887..619390a 100644
+index 71aad9d..daa7425 100644
 --- a/arm/kvm.c
 +++ b/arm/kvm.c
-@@ -24,7 +24,7 @@ bool kvm__arch_cpu_supports_vm(void)
- 	return true;
- }
- 
--void kvm__init_ram(struct kvm *kvm)
-+static void kvm__init_ram(struct kvm *kvm)
- {
+@@ -29,6 +29,39 @@ static void kvm__init_ram(struct kvm *kvm)
  	int err;
  	u64 phys_start, phys_size;
-@@ -97,6 +97,8 @@ void kvm__arch_init(struct kvm *kvm)
+ 	void *host_mem;
++	unsigned long alignment;
++	/* Convenience aliases */
++	const char *hugetlbfs_path = kvm->cfg.hugetlbfs_path;
++
++	/*
++	 * Allocate guest memory. We must align our buffer to 64K to
++	 * correlate with the maximum guest page size for virtio-mmio.
++	 * If using THP, then our minimal alignment becomes 2M.
++	 * 2M trumps 64K, so let's go with that.
++	 * If we are running with 16K page size, align the memory to
++	 * 32M, so that we can make use of the THP.
++	 */
++	if (sysconf(_SC_PAGESIZE) == SZ_16K)
++		alignment = SZ_32M;
++	else
++		alignment = SZ_2M;
++	kvm->ram_size = kvm->cfg.ram_size;
++	kvm->arch.ram_alloc_size = kvm->ram_size + alignment;
++	kvm->arch.ram_alloc_start = mmap_anon_or_hugetlbfs(kvm, hugetlbfs_path,
++						kvm->arch.ram_alloc_size);
++
++	if (kvm->arch.ram_alloc_start == MAP_FAILED)
++		die("Failed to map %lld bytes for guest memory (%d)",
++		    kvm->arch.ram_alloc_size, errno);
++
++	kvm->ram_start = (void *)ALIGN((unsigned long)kvm->arch.ram_alloc_start,
++					SZ_2M);
++
++	madvise(kvm->arch.ram_alloc_start, kvm->arch.ram_alloc_size,
++		MADV_MERGEABLE);
++
++	madvise(kvm->arch.ram_alloc_start, kvm->arch.ram_alloc_size,
++		MADV_HUGEPAGE);
+ 
+ 	phys_start	= ARM_MEMORY_AREA;
+ 	phys_size	= kvm->ram_size;
+@@ -68,43 +101,8 @@ static void kvm__arch_sanitize_cfg(struct kvm_config *cfg)
+ 
+ void kvm__arch_init(struct kvm *kvm)
+ {
+-	unsigned long alignment;
+-
+-	/* Convenience aliases */
+-	const char *hugetlbfs_path = kvm->cfg.hugetlbfs_path;
+-
+ 	kvm__arch_sanitize_cfg(&kvm->cfg);
+ 
+-	/*
+-	 * Allocate guest memory. We must align our buffer to 64K to
+-	 * correlate with the maximum guest page size for virtio-mmio.
+-	 * If using THP, then our minimal alignment becomes 2M.
+-	 * 2M trumps 64K, so let's go with that.
+-	 * If we are running with 16K page size, align the memory to
+-	 * 32M, so that we can make use of the THP.
+-	 */
+-	if (sysconf(_SC_PAGESIZE) == SZ_16K)
+-		alignment = SZ_32M;
+-	else
+-		alignment = SZ_2M;
+-	kvm->ram_size = kvm->cfg.ram_size;
+-	kvm->arch.ram_alloc_size = kvm->ram_size + alignment;
+-	kvm->arch.ram_alloc_start = mmap_anon_or_hugetlbfs(kvm, hugetlbfs_path,
+-						kvm->arch.ram_alloc_size);
+-
+-	if (kvm->arch.ram_alloc_start == MAP_FAILED)
+-		die("Failed to map %lld bytes for guest memory (%d)",
+-		    kvm->arch.ram_alloc_size, errno);
+-
+-	kvm->ram_start = (void *)ALIGN((unsigned long)kvm->arch.ram_alloc_start,
+-					alignment);
+-
+-	madvise(kvm->arch.ram_alloc_start, kvm->arch.ram_alloc_size,
+-		MADV_MERGEABLE);
+-
+-	madvise(kvm->arch.ram_alloc_start, kvm->arch.ram_alloc_size,
+-		MADV_HUGEPAGE);
+-
  	/* Create the virtual GIC. */
  	if (gic__create(kvm, kvm->cfg.arch.irqchip))
  		die("Failed to create virtual GIC");
-+
-+	kvm__init_ram(kvm);
- }
- 
- #define FDT_ALIGN	SZ_2M
-diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
-index 95bab40..6ac5c66 100644
---- a/include/kvm/kvm.h
-+++ b/include/kvm/kvm.h
-@@ -79,7 +79,6 @@ int kvm__init(struct kvm *kvm);
- struct kvm *kvm__new(void);
- int kvm__recommended_cpus(struct kvm *kvm);
- int kvm__max_cpus(struct kvm *kvm);
--void kvm__init_ram(struct kvm *kvm);
- int kvm__exit(struct kvm *kvm);
- bool kvm__load_firmware(struct kvm *kvm, const char *firmware_filename);
- bool kvm__load_kernel(struct kvm *kvm, const char *kernel_filename,
-diff --git a/kvm.c b/kvm.c
-index 98b3cb8..e13d8f2 100644
---- a/kvm.c
-+++ b/kvm.c
-@@ -317,10 +317,8 @@ int kvm__init(struct kvm *kvm)
- 		goto err_vm_fd;
- 	}
- 
--	kvm__arch_init(kvm);
--
- 	INIT_LIST_HEAD(&kvm->mem_banks);
--	kvm__init_ram(kvm);
-+	kvm__arch_init(kvm);
- 
- 	if (!kvm->cfg.firmware_filename) {
- 		if (!kvm__load_kernel(kvm, kvm->cfg.kernel_filename,
-diff --git a/mips/kvm.c b/mips/kvm.c
-index cdb0007..61bf104 100644
---- a/mips/kvm.c
-+++ b/mips/kvm.c
-@@ -17,7 +17,7 @@ void kvm__arch_read_term(struct kvm *kvm)
- 	virtio_console__inject_interrupt(kvm);
- }
- 
--void kvm__init_ram(struct kvm *kvm)
-+static void kvm__init_ram(struct kvm *kvm)
- {
- 	u64	phys_start, phys_size;
- 	void	*host_mem;
-@@ -75,6 +75,8 @@ void kvm__arch_init(struct kvm *kvm)
- 	ret = ioctl(kvm->vm_fd, KVM_CREATE_IRQCHIP);
- 	if (ret < 0)
- 		die_perror("KVM_CREATE_IRQCHIP ioctl");
-+
-+	kvm__init_ram(kvm);
- }
- 
- void kvm__irq_line(struct kvm *kvm, int irq, int level)
-diff --git a/powerpc/kvm.c b/powerpc/kvm.c
-index 0f2dab3..2c8dbb7 100644
---- a/powerpc/kvm.c
-+++ b/powerpc/kvm.c
-@@ -60,7 +60,7 @@ bool kvm__arch_cpu_supports_vm(void)
- 	return true;
- }
- 
--void kvm__init_ram(struct kvm *kvm)
-+static void kvm__init_ram(struct kvm *kvm)
- {
- 	u64	phys_start, phys_size;
- 	void	*host_mem;
-@@ -139,6 +139,8 @@ void kvm__arch_init(struct kvm *kvm)
- 			 SPAPR_PCI_MEM_WIN_SIZE,
- 			 SPAPR_PCI_IO_WIN_ADDR,
- 			 SPAPR_PCI_IO_WIN_SIZE);
-+
-+	kvm__init_ram(kvm);
- }
- 
- void kvm__arch_delete_ram(struct kvm *kvm)
-diff --git a/x86/kvm.c b/x86/kvm.c
-index 453922f..03b0277 100644
---- a/x86/kvm.c
-+++ b/x86/kvm.c
-@@ -86,7 +86,7 @@ bool kvm__arch_cpu_supports_vm(void)
-  * a gap between 0xe0000000 and 0x100000000 in the guest virtual mem space.
-  */
- 
--void kvm__init_ram(struct kvm *kvm)
-+static void kvm__init_ram(struct kvm *kvm)
- {
- 	u64	phys_start, phys_size;
- 	void	*host_mem;
-@@ -167,6 +167,8 @@ void kvm__arch_init(struct kvm *kvm)
- 	ret = ioctl(kvm->vm_fd, KVM_CREATE_IRQCHIP);
- 	if (ret < 0)
- 		die_perror("KVM_CREATE_IRQCHIP ioctl");
-+
-+	kvm__init_ram(kvm);
- }
- 
- void kvm__arch_delete_ram(struct kvm *kvm)
 -- 
 2.11.0
