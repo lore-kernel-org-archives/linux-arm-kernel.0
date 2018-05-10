@@ -1,123 +1,49 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 10 May 2018 18:08:23 +0100
-Subject: [PATCH v2] tty: pl011: Avoid spuriously stuck-off interrupts
-Message-ID: <1525972103-26691-1-git-send-email-Dave.Martin@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 11 May 2018 01:10:47 +0800
+Subject: [xlnx:xlnx_rebase_v4.14 308/918] drivers/usb/dwc3/host.c:24:6:
+ error: redefinition of 'dwc3_host_wakeup_capable'
+Message-ID: <201805110145.xk87j5vQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-clears the RX and receive timeout interrupts on pl011 startup, to
-avoid a screaming-interrupt scenario that can occur when the
-firmware or bootloader leaves these interrupts asserted.
+tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
+head:   944a760cdb1098e23096c923aef70488fdbd501b
+commit: c46d066e5633e178b138742850c37ed262a9af6d [308/918] dwc3: Add support for clock disabling during suspend
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout c46d066e5633e178b138742850c37ed262a9af6d
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
-This has been noted as an issue when running Linux on qemu [1].
+All errors (new ones prefixed by >>):
 
-Unfortunately, the above fix seems to lead to potential
-misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
-on driver startup, if the RX FIFO is also already full to the
-trigger level.
+>> drivers/usb/dwc3/host.c:24:6: error: redefinition of 'dwc3_host_wakeup_capable'
+    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
+         ^~~~~~~~~~~~~~~~~~~~~~~~
+   In file included from drivers/usb/dwc3/host.c:20:0:
+   include/linux/usb/xhci_pdriver.h:25:6: note: previous definition of 'dwc3_host_wakeup_capable' was here
+    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
+         ^~~~~~~~~~~~~~~~~~~~~~~~
 
-Clearing the RX FIFO interrupt does not change the FIFO fill level.
-In this scenario, because the interrupt is now clear and because
-the FIFO is already full to the trigger level, no new assertion of
-the RX FIFO interrupt can occur unless the FIFO is drained back
-below the trigger level.  This never occurs because the pl011
-driver is waiting for an RX FIFO interrupt to tell it that there is
-something to read, and does not read the FIFO at all until that
-interrupt occurs.
+vim +/dwc3_host_wakeup_capable +24 drivers/usb/dwc3/host.c
 
-Thus, simply clearing "spurious" interrupts on startup may be
-misguided, since there is no way to be sure that the interrupts are
-truly spurious, and things can go wrong if they are not.
-
-This patch instead clears the interrupt condition by draining the
-RX FIFO during UART startup, after clearing any potentially
-spurious interrupt.  This should ensure that an interrupt will
-definitely be asserted if the RX FIFO subsequently becomes
-sufficiently full.
-
-The drain is done at the point of enabling interrupts only.  This
-means that it will occur any time the UART is newly opened through
-the tty layer.  It will not apply to polled-mode use of the UART by
-kgdboc: since that scenario cannot use interrupts by design, this
-should not matter.  kgdboc will interact badly with "normal" use of
-the UART in any case: this patch makes no attempt to paper over
-such issues.
-
-This patch does not attempt to address the case where the RX FIFO
-fills faster than it can be drained: that is a pathological
-hardware design problem that is beyond the scope of the driver to
-work around.  As a failsafe, the number of poll iterations for
-draining the FIFO is limited to twice the FIFO size.  This will
-ensure that the kernel at least boots even if it is impossible to
-drain the FIFO for some reason.
-
-[1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
-before enabled the interruption
-https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
-
-Reported-by: Wei Xu <xuwei5@hisilicon.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Peter Maydell <peter.maydell@linaro.org>
-Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+    23	
+  > 24	void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
+    25	{
+    26		dwc3_simple_wakeup_capable(dev, wakeup);
+    27	}
+    28	
 
 ---
-
-Changes since v1 [1]
-
- * Deleted Andrew Jones' Reviewed/Tested-bys due to the following
-   change.
-
-   If you can please retest that the updated patch fixes your
-   issue that would be appreciated.
-
-Suggested by Russell King:
-
- * Only drain 2 * FIFO size, to avoid going into an infinite spin
-   if something does wrong.  If the FIFO still couldn't be drained
-   sufficiently then pl011 RX won't work properly, but the kernel
-   will at least boot.
-
-
-[1] [PATCH] tty: pl011: Avoid spuriously stuck-off interrupts
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/574362.html
-
----
- drivers/tty/serial/amba-pl011.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 4b40a5b..ebd33c0 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1727,10 +1727,26 @@ static int pl011_allocate_irq(struct uart_amba_port *uap)
-  */
- static void pl011_enable_interrupts(struct uart_amba_port *uap)
- {
-+	unsigned int i;
-+
- 	spin_lock_irq(&uap->port.lock);
- 
- 	/* Clear out any spuriously appearing RX interrupts */
- 	pl011_write(UART011_RTIS | UART011_RXIS, uap, REG_ICR);
-+
-+	/*
-+	 * RXIS is asserted only when the RX FIFO transitions from below
-+	 * to above the trigger threshold.  If the RX FIFO is already
-+	 * full to the threshold this can't happen and RXIS will now be
-+	 * stuck off.  Drain the RX FIFO explicitly to fix this:
-+	 */
-+	for (i = 0; i < uap->fifosize * 2; ++i) {
-+		if (pl011_read(uap, REG_FR) & UART01x_FR_RXFE)
-+			break;
-+
-+		pl011_read(uap, REG_DR);
-+	}
-+
- 	uap->im = UART011_RTIM;
- 	if (!pl011_dma_rx_running(uap))
- 		uap->im |= UART011_RXIM;
--- 
-2.1.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 49013 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180511/4a0c175f/attachment-0001.gz>
