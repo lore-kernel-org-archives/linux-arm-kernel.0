@@ -1,69 +1,59 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 10 May 2018 11:51:14 +0100
-Subject: [PATCH] ARM: dts: vexpress: Replace '_' with '-' in node names
-In-Reply-To: <CAL_Jsq+VNuvbxgFTFVouJF-_yMS90u0fd8jaXnYtKwogOP5rww@mail.gmail.com>
-References: <1525884482-19855-1-git-send-email-sudeep.holla@arm.com>
- <CAL_Jsq+VNuvbxgFTFVouJF-_yMS90u0fd8jaXnYtKwogOP5rww@mail.gmail.com>
-Message-ID: <f28fb5d6-1070-8cbb-e815-4baf7128b19e@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 May 2018 12:13:47 +0100
+Subject: [PATCHv2] ARM64: KVM: use lm_alias() for kvm_ksym_ref()
+Message-ID: <20180510111347.32253-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+For historical reasons, we open-code lm_alias() in kvm_ksym_ref().
 
+Let's use lm_alias() to avoid duplication and make things clearer.
 
-On 09/05/18 22:14, Rob Herring wrote:
-> On Wed, May 9, 2018 at 11:48 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> The latest DTC throws warnings for character '_' in the node names.
->>
->> Warning (node_name_chars_strict): /sysreg at 10000/sys_led: Character '_' not recommended in node name
->> Warning (node_name_chars_strict): /sysreg at 10000/sys_mci: Character '_' not recommended in node name
->> Warning (node_name_chars_strict): /sysreg at 10000/sys_flash: Character '_' not recommended in node name
->>
->> The general recommendation is to use character '-' for all the node names.
->> This patch fixes the warnings following the recommendation.
->>
->> Cc: Liviu Dudau <liviu.dudau@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
->> index 7b8ff5b3b912..58e73131ecef 100644
->> --- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
->> +++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
->> @@ -77,19 +77,19 @@
->>                                         compatible = "arm,vexpress-sysreg";
->>                                         reg = <0x010000 0x1000>;
->>
->> -                                       v2m_led_gpios: sys_led {
->> +                                       v2m_led_gpios: sys-led {
-> 
-> Except this is a gpio-controller so it should have 'gpio' for its node
-> name. (I have a dtc check written for that, but there are too many
-> false positives.)
-> 
+As we have to pull this from <linux/mm.h> (which is not safe for
+inclusion in assembly), we may as well move the kvm_ksym_ref()
+definition into the existing !__ASSEMBLY__ block.
 
-True, sorry I didn't look at it in detail.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
+---
+ arch/arm64/include/asm/kvm_asm.h | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-> But then you have 3 of them and no addressing, so you need to add reg
-> property (with the register's offset and size) and unit-address.
-> 
+Since v1 [1]:
+* Rebase to v4.17-rc4
+* Fix typo in commit message
 
-Indeed. I had a look at the history but couldn't gather much. All I
-could get is that this is one of those weird mix of all functionality on
-ARM Ltd platforms which fits no subsystem. Me and Lorenzo has similar
-issue on TC2 platform. Pawel seem to have plumed this system control
-registers block into MFD and GPIO long back.
+Mark.
 
-> I'm surprised Linus W accepted these a GPIO when they are not really
-> general purpose, but then lots of things slip in.
-> 
+[1] https://lkml.kernel.org/r/20180406151909.57197-1-mark.rutland at arm.com
 
-I assume all these happened in early days of DT.
-
-I will drop this for now. I will take a look if these nodes can be made
-better to align with standard gpio controller nodes.
-
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index f6648a3e4152..a9ceeec5a76f 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -33,16 +33,19 @@
+ #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
+ #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+ 
++#ifndef __ASSEMBLY__
++
++#include <linux/mm.h>
++
+ /* Translate a kernel address of @sym into its equivalent linear mapping */
+ #define kvm_ksym_ref(sym)						\
+ 	({								\
+ 		void *val = &sym;					\
+ 		if (!is_kernel_in_hyp_mode())				\
+-			val = phys_to_virt((u64)&sym - kimage_voffset);	\
++			val = lm_alias(&sym);				\
+ 		val;							\
+ 	 })
+ 
+-#ifndef __ASSEMBLY__
+ struct kvm;
+ struct kvm_vcpu;
+ 
 -- 
-Regards,
-Sudeep
+2.11.0
