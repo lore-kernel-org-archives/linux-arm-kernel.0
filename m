@@ -1,9 +1,9 @@
 From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Thu, 10 May 2018 17:16:39 +0800
+Date: Thu, 10 May 2018 17:27:59 +0800
 Subject: [PATCH v1 4/5] arm64: dts: rockchip: Add io-domain to roc-rk3328-cc
 In-Reply-To: <1525943800-14095-1-git-send-email-djw@t-chip.com.cn>
 References: <1525943800-14095-1-git-send-email-djw@t-chip.com.cn>
-Message-ID: <1525943800-14095-5-git-send-email-djw@t-chip.com.cn>
+Message-ID: <1525944479-16616-1-git-send-email-djw@t-chip.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
