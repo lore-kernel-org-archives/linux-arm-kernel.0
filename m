@@ -1,59 +1,82 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 10 May 2018 15:12:18 +0100
-Subject: [PATCH v6 04/11] firmware: xilinx: Add query data API
-In-Reply-To: <1523389127-14243-5-git-send-email-jollys@xilinx.com>
-References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
- <1523389127-14243-5-git-send-email-jollys@xilinx.com>
-Message-ID: <85f8f8c5-a177-dad8-e095-a9dd1c513e8d@arm.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 10 May 2018 15:14:41 +0100
+Subject: [RFC 00/13] arm: Allow the user specifying where the RAM is place
+ in the memory
+In-Reply-To: <20180510140441.24573-1-julien.grall@arm.com>
+References: <20180510140441.24573-1-julien.grall@arm.com>
+Message-ID: <dc6210e2-300f-0279-863e-9b8dc286fe9f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I forgot to mention in the title that the series is for kvmtools. Sorry 
+for the confusion.
 
+Cheers,
 
-On 10/04/18 20:38, Jolly Shah wrote:
-> From: Rajan Vaja <rajanv@xilinx.com>
+On 10/05/18 15:04, Julien Grall wrote:
+> Hi all,
 > 
-> Add ZynqMP firmware query data API to query platform
-> specific information(clocks, pins) from firmware.
+> At the moment, a user is only able to specify the amount of RAM used by the
+> guest. Where the RAM will live is left to the software and hardcoded.
 > 
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> ---
->  drivers/firmware/xilinx/zynqmp.c     | 14 ++++++++++++++
->  include/linux/firmware/xlnx-zynqmp.h | 20 ++++++++++++++++++++
->  2 files changed, 34 insertions(+)
+> It could be useful for testing purpose to move the RAM in different place.
+> This series adds the possibility for the user to specify multiple RAM region.
 > 
-> diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-> index 44b43fa..ef09c44 100644
-> --- a/drivers/firmware/xilinx/zynqmp.c
-> +++ b/drivers/firmware/xilinx/zynqmp.c
-> @@ -258,9 +258,23 @@ static int zynqmp_pm_ioctl(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2,
->  				   arg1, arg2, out);
->  }
->  
-> +/**
-> + * zynqmp_pm_query_data() - Get query data from firmware
-> + * @qdata:	Variable to the zynqmp_pm_query_data structure
-> + * @out:	Returned output value
-> + *
-> + * Return: Returns status, either success or error+reason
-> + */
-> +static int zynqmp_pm_query_data(struct zynqmp_pm_query_data qdata, u32 *out)
-> +{
-> +	return zynqmp_pm_invoke_fn(PM_QUERY_DATA, qdata.qid, qdata.arg1,
-> +				   qdata.arg2, qdata.arg3, out);
-> +}
-> +
->  static const struct zynqmp_eemi_ops eemi_ops = {
->  	.get_api_version = zynqmp_pm_get_api_version,
->  	.ioctl = zynqmp_pm_ioctl,
-> +	.query_data = zynqmp_pm_query_data,
-
-Can you give more insight into this ? How will be this used ?
-How this aligns with data we get from DT ? I am just trying to
-understand how is this information split between this API and DT for
-example.
+> The option -m/--mem is extended to specify the address using the following
+> format: <size>@<addr>. The option needs to be repeated as many times as the
+> number of RAM region in the guest layout.
+> 
+> For instance, if you want 512MB at 3GB and 512MB 4GB it would look like:
+>      -m 512 at 0xc0000000 -m 512 at 0x100000000
+> 
+> Note that the memory layout is not yet fully configurable by the user, so the
+> MMIO region is still living below 2GB. This means RAM cannot live in the
+> region 0-2GB. This could be changed in the future.
+> 
+> This new version also integrates work from Suzuki to allow the user specifying
+> the IPA size for the guest. This was previously sent separately on kvmarm [1].
+> 
+> Cheers,
+> 
+> [1] https://lkml.org/lkml/2018/3/27/437
+> 
+> Julien Grall (7):
+>    kvm__arch_init: Don't pass hugetlbfs_path and ram_size in parameter
+>    virtio/scsi: Allow to use multiple banks
+>    Fold kvm__init_ram call in kvm__arch_init
+>    kvm__arch_sanitize_cfg
+>    arm: Move anything related to RAM initialization in kvm__init_ram
+>    Allow the user to specify where the RAM is placed in the memory
+>    arm: Add support for multi memory regions
+> 
+> Suzuki K Poulose (6):
+>    arm: Allow use of hugepage with 16K pagesize host
+>    virtio: Handle aborts using invalid PFN
+>    kvmtool: Allow backends to run checks on the KVM device fd
+>    kvmtool: arm64: Add support for guest physical address size
+>    kvmtool: arm64: Switch memory layout
+>    kvmtool: arm/arm64: Add support for creating VM with PA size
+> 
+>   arm/aarch32/include/kvm/kvm-arch.h        |   3 +-
+>   arm/aarch64/include/kvm/kvm-arch.h        |  15 ++-
+>   arm/aarch64/include/kvm/kvm-config-arch.h |   5 +-
+>   arm/fdt.c                                 |  17 ++-
+>   arm/include/arm-common/kvm-arch.h         |  32 ++++--
+>   arm/include/arm-common/kvm-config-arch.h  |   1 +
+>   arm/kvm.c                                 | 183 +++++++++++++++++++++++++-----
+>   builtin-run.c                             |  87 ++++++++++++--
+>   include/kvm/kvm-config.h                  |  16 ++-
+>   include/kvm/kvm.h                         |  28 ++++-
+>   kvm.c                                     |  10 +-
+>   mips/kvm.c                                |  47 +++++---
+>   powerpc/kvm.c                             |  33 +++---
+>   virtio/mmio.c                             |  14 ++-
+>   virtio/pci.c                              |  10 +-
+>   virtio/scsi.c                             |  21 ++--
+>   x86/bios.c                                |   8 +-
+>   x86/kvm.c                                 |  54 +++++----
+>   18 files changed, 443 insertions(+), 141 deletions(-)
+> 
 
 -- 
-Regards,
-Sudeep
+Julien Grall
