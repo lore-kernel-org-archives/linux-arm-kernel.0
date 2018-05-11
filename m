@@ -1,114 +1,52 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 11 May 2018 07:31:45 -0500
-Subject: [PATCH] arm64: dts: stratix10: Add QSPI support for Stratix10
-In-Reply-To: <1525985204-11525-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1525985204-11525-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <CAL_JsqKN0TxFoGjoeXuOb1tJ4GhhC1yHRud3g6-DvZOH_Ago5Q@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Fri, 11 May 2018 14:36:22 +0200
+Subject: [PATCH 4/6] mm, arm64: untag user addresses in mm/gup.c
+In-Reply-To: <20180508151137.zguepljs3pa7xv5g@armageddon.cambridge.arm.com>
+References: <cover.1524077494.git.andreyknvl@google.com>
+ <0db34d04fa16be162336106e3b4a94f3dacc0af4.1524077494.git.andreyknvl@google.com>
+ <20180426174714.4jtb72q56w3xonsa@armageddon.cambridge.arm.com>
+ <CAAeHK+zY8p9E4FZa7mbdgR=wR0u-RDS552dn=h9fKRC-ArYLdw@mail.gmail.com>
+ <20180502153645.fui4ju3scsze3zkq@black.fi.intel.com>
+ <CAAeHK+yTbmZfkeNbqbo+J90zsjsM99rwnYBGfQBxphHMMfgD7A@mail.gmail.com>
+ <20180508151137.zguepljs3pa7xv5g@armageddon.cambridge.arm.com>
+Message-ID: <CAAeHK+yR9=SYEBg-Pvi+x3qSqQSG1u+79pk5vQvOcsp+o=zkxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 3:46 PM,  <thor.thayer@linux.intel.com> wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+On Tue, May 8, 2018 at 5:11 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, May 02, 2018 at 07:25:17PM +0200, Andrey Konovalov wrote:
+>> On Wed, May 2, 2018 at 5:36 PM, Kirill A. Shutemov
+>> <kirill.shutemov@linux.intel.com> wrote:
+>> > On Wed, May 02, 2018 at 02:38:42PM +0000, Andrey Konovalov wrote:
+>> >> > Does having a tagged address here makes any difference? I couldn't hit a
+>> >> > failure with my simple tests (LD_PRELOAD a library that randomly adds
+>> >> > tags to pointers returned by malloc).
+>> >>
+>> >> I think you're right, follow_page_mask is only called from
+>> >> __get_user_pages, which already untagged the address. I'll remove
+>> >> untagging here.
+>> >
+>> > It also called from follow_page(). Have you covered all its callers?
+>>
+>> Oh, missed that, will take a look.
+>>
+>> Thinking about that, would it make sense to add untagging to find_vma
+>> (and others) instead of trying to cover all find_vma callers?
 >
-> Add qspi_clock
->    The qspi_clk frequency is updated by U-Boot before starting Linux.
-> Add QSPI interface node.
-> Add QSPI flash memory child node.
->    Setup the QSPI memory in 2 partitions.
->
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
->  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 22 +++++++++++++++
->  .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 31 ++++++++++++++++++++++
->  2 files changed, 53 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> index e6b059378dc0..ed47dfce3ba6 100644
-> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> @@ -119,6 +119,12 @@
->                                 #clock-cells = <0>;
->                                 compatible = "fixed-clock";
->                         };
-> +
-> +                       qspi_clk: qspi_clk {
+> I don't think adding the untagging to find_vma() is sufficient. In many
+> cases the caller does a subsequent check like 'start < vma->vm_start'
+> (see sys_msync() as an example, there are a few others as well).
 
-s/_/-/
+OK.
 
-> +                               #clock-cells = <0>;
-> +                               compatible = "fixed-clock";
-> +                               clock-frequency = <200000000>;
-> +                       };
->                 };
->
->                 gmac0: ethernet at ff800000 {
-> @@ -466,5 +472,21 @@
->                                 interrupts = <16 4>, <48 4>;
->                         };
->                 };
-> +
-> +               qspi: spi at ff8d2000 {
-> +                       compatible = "cdns,qspi-nor";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       reg = <0xff8d2000 0x100>,
-> +                             <0xff900000 0x100000>;
-> +                       interrupts = <0 3 4>;
-> +                       cdns,fifo-depth = <128>;
-> +                       cdns,fifo-width = <4>;
-> +                       cdns,trigger-address = <0x00000000>;
-> +                       clocks = <&qspi_clk>;
-> +                       bus-num = <1>;
-> +
-> +                       status = "disabled";
-> +               };
->         };
->  };
-> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> index f9b1ef12db48..60251462067a 100644
-> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> @@ -147,3 +147,34 @@
->                 reg = <0x68>;
->         };
->  };
-> +
-> +&qspi {
-> +       flash0: n25q00 at 0 {
+> What I
+> did in my tests was a WARN_ON_ONCE() in find_vma() if the address is
+> tagged.
 
-flash at 0
+So this is similar to what I did.
 
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "n25q00aa";
-> +               reg = <0>;
-> +               spi-max-frequency = <50000000>;
-> +
-> +               m25p,fast-read;
-> +               cdns,page-size = <256>;
-> +               cdns,block-size = <16>;
-> +               cdns,read-delay = <1>;
-> +               cdns,tshsl-ns = <50>;
-> +               cdns,tsd2d-ns = <50>;
-> +               cdns,tchsh-ns = <4>;
-> +               cdns,tslch-ns = <4>;
-> +
-> +               partition at qspi-boot {
-
-use a 'partitions' node to contain all the partitions.
-
-> +                       label = "Boot and fpga data";
-> +                       /* 64MB for boot and FPGA data */
-> +                       reg = <0x0 0x4000000>;
-> +               };
-> +
-> +               partition at qspi-rootfs {
-> +                       label = "Root Filesystem - JFFS2";
-> +                       /* 64MB for Linux jffs2 */
-> +                       reg = <0x4000000 0x4000000>;
-> +               };
-> +       };
-> +};
-> --
-> 2.7.4
->
+Do you think trying to find "all places where we cast out __user" with
+static analysis as Kirill suggested is something I should pursue? Or
+is this patchset is good as is as the first approximation, since we
+can fix more things where untagging is needed as we discover them one
+by one?
