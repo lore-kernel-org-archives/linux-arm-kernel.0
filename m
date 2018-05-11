@@ -1,39 +1,31 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Fri, 11 May 2018 11:30:45 +0800
-Subject: [PATCH v1 00/13] add power domain support for Rockchip Socs
-Message-ID: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
+Date: Fri, 11 May 2018 11:30:49 +0800
+Subject: [PATCH v1 04/13] soc: rockchip: power-domain: Fix wrong value when
+ power up pd
+In-Reply-To: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
+References: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1526009458-28579-5-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add power domain support for RK3036/RK3128/RK3228/PX30 Soc.
-fix up the wrong value when set power domain up.
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+---
+ drivers/soc/rockchip/pm_domains.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Elaine Zhang (13):
-  dt-bindings: power: add RK3036 SoCs header for power-domain
-  dt-bindings: add binding for rk3036 power domains
-  Soc: rockchip: power-domain: add power domain support for rk3036
-  soc: rockchip: power-domain: Fix wrong value when power up pd
-  dt-bindings: power: add RK3128 SoCs header for power-domain
-  dt-bindings: add binding for rk3128 power domains
-  soc: rockchip: power-domain: add power domain support for rk3128
-  dt-bindings: power: add RK3228 SoCs header for power-domain
-  dt-bindings: add binding for rk3228 power domains
-  soc: rockchip: power-domain: add power domain support for rk3228
-  dt-bindings: power: add PX30 SoCs header for power-domain
-  dt-bindings: add binding for px30 power domains
-  soc: rockchip: power-domain: add power domain support for px30
-
- .../bindings/soc/rockchip/power_domain.txt         |  12 +++
- drivers/soc/rockchip/pm_domains.c                  | 116 ++++++++++++++++++++-
- include/dt-bindings/power/px30-power.h             |  32 ++++++
- include/dt-bindings/power/rk3036-power.h           |  27 +++++
- include/dt-bindings/power/rk3128-power.h           |  28 +++++
- include/dt-bindings/power/rk3228-power.h           |  26 +++++
- 6 files changed, 240 insertions(+), 1 deletion(-)
- create mode 100644 include/dt-bindings/power/px30-power.h
- create mode 100644 include/dt-bindings/power/rk3036-power.h
- create mode 100644 include/dt-bindings/power/rk3128-power.h
- create mode 100644 include/dt-bindings/power/rk3228-power.h
-
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index ebd7c41898c0..01d4ba26a054 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -264,7 +264,7 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
+ 		return;
+ 	else if (pd->info->pwr_w_mask)
+ 		regmap_write(pmu->regmap, pmu->info->pwr_offset,
+-			     on ? pd->info->pwr_mask :
++			     on ? pd->info->pwr_w_mask :
+ 			     (pd->info->pwr_mask | pd->info->pwr_w_mask));
+ 	else
+ 		regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
 -- 
 1.9.1
