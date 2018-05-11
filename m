@@ -1,111 +1,92 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 11 May 2018 15:29:11 -0400
-Subject: [linux-next PATCH 3/4] ARM: dts: keystone-k2g-ice: Enable netcp
- network driver
-In-Reply-To: <1526066952-5230-1-git-send-email-m-karicheri2@ti.com>
-References: <1526066952-5230-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1526066952-5230-4-git-send-email-m-karicheri2@ti.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Fri, 11 May 2018 20:06:27 +0100
+Subject: [PATCH v2 26/40] iommu/arm-smmu-v3: Enable broadcast TLB maintenance
+In-Reply-To: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+Message-ID: <20180511190641.23008-27-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dt bindings to enable netcp network driver on K2G
-ICE boards. This consists of enabling bindings for NSS qmss, pktdma,
-2u ethss, mdio, pinmux and netcp devices as well as DP83867 phy.
+The SMMUv3 can handle invalidation targeted at TLB entries with shared
+ASIDs. If the implementation supports broadcast TLB maintenance, enable it
+and keep track of it in a feature bit. The SMMU will then be affected by
+inner-shareable TLB invalidations from other agents.
 
-EVM hardware spec recommends to add 0.25 nsec delay in the tx direction
-and 2.25 nsec delay in the rx direction for internal delay in the clock
-path to be on the safer side.
+A major side-effect of this change is that stage-2 translation contexts
+are now affected by all invalidations by VMID. VMIDs are all shared and
+the only ways to prevent over-invalidation, since the stage-2 page tables
+are not shared between CPU and SMMU, are to either disable BTM or allocate
+different VMIDs. This patch does not address the problem.
 
-The board straps RX_DV/RX_CTRL pin of on board DP83867 phy in mode 1.
-The phy data manual disallows this. Add ti,dp83867-rxctrl-strap-quirk
-in the phy node to allow software to enable the workaround suggested for
-this incorrect strap setting. This ensures proper operation of this PHY.
-
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- arch/arm/boot/dts/keystone-k2g-ice.dts | 59 ++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/keystone-k2g-ice.dts b/arch/arm/boot/dts/keystone-k2g-ice.dts
-index d820ed2..2a2d38c 100644
---- a/arch/arm/boot/dts/keystone-k2g-ice.dts
-+++ b/arch/arm/boot/dts/keystone-k2g-ice.dts
-@@ -7,6 +7,7 @@
- /dts-v1/;
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 280a5d9be839..073cba33ae6c 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -64,6 +64,7 @@
+ #define IDR0_ASID16			(1 << 12)
+ #define IDR0_ATS			(1 << 10)
+ #define IDR0_HYP			(1 << 9)
++#define IDR0_BTM			(1 << 5)
+ #define IDR0_COHACC			(1 << 4)
+ #define IDR0_TTF			GENMASK(3, 2)
+ #define IDR0_TTF_AARCH64		2
+@@ -523,6 +524,7 @@ struct arm_smmu_device {
+ #define ARM_SMMU_FEAT_STALL_FORCE	(1 << 13)
+ #define ARM_SMMU_FEAT_VAX		(1 << 14)
+ #define ARM_SMMU_FEAT_E2H		(1 << 15)
++#define ARM_SMMU_FEAT_BTM		(1 << 16)
+ 	u32				features;
  
- #include "keystone-k2g.dtsi"
-+#include <dt-bindings/net/ti-dp83867.h>
+ #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+@@ -2459,11 +2461,14 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+ 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR1);
  
- / {
- 	compatible = "ti,k2g-ice", "ti,k2g", "ti,keystone";
-@@ -281,6 +282,30 @@
- 			K2G_CORE_IOPAD(0x11bc) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE3)	/* spi2_scsn1.gpio0_102 */
- 		>;
- 	};
-+
-+	emac_pins: pinmux_emac_pins {
-+		pinctrl-single,pins = <
-+			K2G_CORE_IOPAD(0x113C) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_RXD1.RGMII_RXD1 */
-+			K2G_CORE_IOPAD(0x1138) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_RXD2.RGMII_RXD2 */
-+			K2G_CORE_IOPAD(0x1134) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_RXD3.RGMII_RXD3 */
-+			K2G_CORE_IOPAD(0x1140) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_RXD0.RGMII_RXD0 */
-+			K2G_CORE_IOPAD(0x1178) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_TXD0.RGMII_TXD0 */
-+			K2G_CORE_IOPAD(0x1174) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_TXD1.RGMII_TXD1 */
-+			K2G_CORE_IOPAD(0x1170) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_TXD2.RGMII_TXD2 */
-+			K2G_CORE_IOPAD(0x116C) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_TXD3.RGMII_TXD3 */
-+			K2G_CORE_IOPAD(0x1154) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_TXCLK.RGMII_TXC */
-+			K2G_CORE_IOPAD(0x117C) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_TXEN.RGMII_TXCTL */
-+			K2G_CORE_IOPAD(0x1120) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_RXCLK.RGMII_RXC */
-+			K2G_CORE_IOPAD(0x1144) (BUFFER_CLASS_D | PULL_DISABLE | MUX_MODE1)	/* MII_RXDV.RGMII_RXCTL */
-+		>;
-+	};
-+
-+	mdio_pins: pinmux_mdio_pins {
-+		pinctrl-single,pins = <
-+			K2G_CORE_IOPAD(0x118C) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* MDIO_CLK.MDIO_CLK */
-+			K2G_CORE_IOPAD(0x1188) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* MDIO_DATA.MDIO_DATA */
-+		>;
-+	};
- };
+ 	/* CR2 (random crap) */
+-	reg = CR2_PTM | CR2_RECINVSID;
++	reg = CR2_RECINVSID;
  
- &uart0 {
-@@ -386,3 +411,37 @@
- 		vcc-supply = <&vdd_3v3>;
- 	};
- };
+ 	if (smmu->features & ARM_SMMU_FEAT_E2H)
+ 		reg |= CR2_E2H;
+ 
++	if (!(smmu->features & ARM_SMMU_FEAT_BTM))
++		reg |= CR2_PTM;
 +
-+&qmss {
-+	status = "okay";
-+};
+ 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR2);
+ 
+ 	/* Stream table */
+@@ -2564,6 +2569,7 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+ {
+ 	u32 reg;
+ 	bool coherent = smmu->features & ARM_SMMU_FEAT_COHERENCY;
++	bool vhe = cpus_have_cap(ARM64_HAS_VIRT_HOST_EXTN);
+ 
+ 	/* IDR0 */
+ 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR0);
+@@ -2613,10 +2619,19 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+ 
+ 	if (reg & IDR0_HYP) {
+ 		smmu->features |= ARM_SMMU_FEAT_HYP;
+-		if (cpus_have_cap(ARM64_HAS_VIRT_HOST_EXTN))
++		if (vhe)
+ 			smmu->features |= ARM_SMMU_FEAT_E2H;
+ 	}
+ 
++	/*
++	 * If the CPU is using VHE, but the SMMU doesn't support it, the SMMU
++	 * will create TLB entries for NH-EL1 world and will miss the
++	 * broadcasted TLB invalidations that target EL2-E2H world. Don't enable
++	 * BTM in that case.
++	 */
++	if (reg & IDR0_BTM && (!vhe || reg & IDR0_HYP))
++		smmu->features |= ARM_SMMU_FEAT_BTM;
 +
-+&knav_dmas {
-+	status = "okay";
-+};
-+
-+&netcp {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_pins>;
-+	status = "okay";
-+};
-+
-+&mdio {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mdio_pins>;
-+	status = "okay";
-+	ethphy0: ethernet-phy at 0 {
-+		reg = <0>;
-+		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_25_NS>;
-+		ti,tx-internal-delay = <DP83867_RGMIIDCTL_250_PS>;
-+		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
-+		ti,min-output-impedance;
-+		ti,dp83867-rxctrl-strap-quirk;
-+	};
-+};
-+
-+&gbe0 {
-+	phy-handle = <&ethphy0>;
-+	phy-mode = "rgmii-id";
-+	status = "okay";
-+};
+ 	/*
+ 	 * The coherency feature as set by FW is used in preference to the ID
+ 	 * register, but warn on mismatch.
 -- 
-1.9.1
+2.17.0
