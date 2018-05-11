@@ -1,122 +1,107 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 11 May 2018 20:06:39 +0100
-Subject: [PATCH v2 38/40] PCI: Make "PRG Response PASID Required" handling
- common
+Date: Fri, 11 May 2018 20:06:41 +0100
+Subject: [PATCH v2 40/40] iommu/arm-smmu-v3: Add support for PCI PASID
 In-Reply-To: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
 References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
-Message-ID: <20180511190641.23008-39-jean-philippe.brucker@arm.com>
+Message-ID: <20180511190641.23008-41-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PASID ECN to the PCIe spec added a bit in the PRI status register that
-allows a Function to declare whether a PRG Response should contain the
-PASID prefix or not.
+Enable PASID for PCI devices that support it. Unlike PRI, we can't enable
+PASID lazily in iommu_sva_device_init(), because it has to be enabled
+before ATS, and because we have to allocate substream tables early.
 
-Move the helper that accesses it from amd_iommu into the PCI subsystem,
-renaming it to be consistent with the current PCI Express specification
-(PRPR - PRG Response PASID Required).
-
-Cc: bhelgaas at google.com
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/amd_iommu.c     | 19 +------------------
- drivers/pci/ats.c             | 17 +++++++++++++++++
- include/linux/pci-ats.h       |  8 ++++++++
- include/uapi/linux/pci_regs.h |  1 +
- 4 files changed, 27 insertions(+), 18 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 54 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-index 8fb8c737fffe..ac0d97fa514f 100644
---- a/drivers/iommu/amd_iommu.c
-+++ b/drivers/iommu/amd_iommu.c
-@@ -2043,23 +2043,6 @@ static int pdev_iommuv2_enable(struct pci_dev *pdev)
- 	return ret;
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 0edbb8d19579..ac6e69f25893 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -2542,6 +2542,52 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
+ 	return sid < limit;
  }
  
--/* FIXME: Move this to PCI code */
--#define PCI_PRI_TLP_OFF		(1 << 15)
--
--static bool pci_pri_tlp_required(struct pci_dev *pdev)
--{
--	u16 status;
--	int pos;
--
--	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
--	if (!pos)
--		return false;
--
--	pci_read_config_word(pdev, pos + PCI_PRI_STATUS, &status);
--
--	return (status & PCI_PRI_TLP_OFF) ? true : false;
--}
--
- /*
-  * If a device is not yet associated with a domain, this function
-  * assigns it visible for the hardware
-@@ -2088,7 +2071,7 @@ static int attach_device(struct device *dev,
++static int arm_smmu_enable_pasid(struct arm_smmu_master_data *master)
++{
++	int ret;
++	int features;
++	u8 pasid_bits;
++	int num_pasids;
++	struct pci_dev *pdev;
++
++	if (!dev_is_pci(master->dev))
++		return -ENOSYS;
++
++	pdev = to_pci_dev(master->dev);
++
++	features = pci_pasid_features(pdev);
++	if (features < 0)
++		return -ENOSYS;
++
++	num_pasids = pci_max_pasids(pdev);
++	if (num_pasids <= 0)
++		return -ENOSYS;
++
++	pasid_bits = min_t(u8, ilog2(num_pasids), master->smmu->ssid_bits);
++
++	dev_dbg(&pdev->dev, "device supports %#x PASID bits [%s%s]\n", pasid_bits,
++		(features & PCI_PASID_CAP_EXEC) ? "x" : "",
++		(features & PCI_PASID_CAP_PRIV) ? "p" : "");
++
++	ret = pci_enable_pasid(pdev, features);
++	return ret ? ret : pasid_bits;
++}
++
++static void arm_smmu_disable_pasid(struct arm_smmu_master_data *master)
++{
++	struct pci_dev *pdev;
++
++	if (!dev_is_pci(master->dev))
++		return;
++
++	pdev = to_pci_dev(master->dev);
++
++	if (!pdev->pasid_enabled)
++		return;
++
++	pci_disable_pasid(pdev);
++}
++
+ static int arm_smmu_enable_ats(struct arm_smmu_master_data *master)
+ {
+ 	size_t stu;
+@@ -2712,6 +2758,11 @@ static int arm_smmu_add_device(struct device *dev)
+ 		master->ste.can_stall = true;
+ 	}
  
- 			dev_data->ats.enabled = true;
- 			dev_data->ats.qdep    = pci_ats_queue_depth(pdev);
--			dev_data->pri_tlp     = pci_pri_tlp_required(pdev);
-+			dev_data->pri_tlp     = pci_prg_resp_requires_prefix(pdev);
- 		}
- 	} else if (amd_iommu_iotlb_sup &&
- 		   pci_enable_ats(pdev, PAGE_SHIFT) == 0) {
-diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
-index 89305b569d3d..dc743e2fae7d 100644
---- a/drivers/pci/ats.c
-+++ b/drivers/pci/ats.c
-@@ -388,3 +388,20 @@ int pci_max_pasids(struct pci_dev *pdev)
++	/* PASID must be enabled before ATS */
++	ret = arm_smmu_enable_pasid(master);
++	if (ret > 0)
++		master->ssid_bits = ret;
++
+ 	arm_smmu_enable_ats(master);
+ 
+ 	ret = iommu_device_link(&smmu->iommu, dev);
+@@ -2740,6 +2791,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 
+ err_disable_ats:
+ 	arm_smmu_disable_ats(master);
++	arm_smmu_disable_pasid(master);
+ 
+ err_free_master:
+ 	kfree(master);
+@@ -2769,7 +2821,9 @@ static void arm_smmu_remove_device(struct device *dev)
+ 	arm_smmu_remove_master(smmu, master);
+ 	iommu_device_unlink(&smmu->iommu, dev);
+ 	arm_smmu_disable_pri(master);
++	/* PASID must be disabled after ATS */
+ 	arm_smmu_disable_ats(master);
++	arm_smmu_disable_pasid(master);
+ 	kfree(master);
+ 	iommu_fwspec_free(dev);
  }
- EXPORT_SYMBOL_GPL(pci_max_pasids);
- #endif /* CONFIG_PCI_PASID */
-+
-+#if defined(CONFIG_PCI_PASID) && defined(CONFIG_PCI_PRI)
-+bool pci_prg_resp_requires_prefix(struct pci_dev *pdev)
-+{
-+	u16 status;
-+	int pos;
-+
-+	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
-+	if (!pos)
-+		return false;
-+
-+	pci_read_config_word(pdev, pos + PCI_PRI_STATUS, &status);
-+
-+	return !!(status & PCI_PRI_STATUS_PRPR);
-+}
-+EXPORT_SYMBOL_GPL(pci_prg_resp_requires_prefix);
-+#endif /* CONFIG_PCI_PASID && CONFIG_PCI_PRI */
-diff --git a/include/linux/pci-ats.h b/include/linux/pci-ats.h
-index 7c4b8e27268c..1825ca2c9bf4 100644
---- a/include/linux/pci-ats.h
-+++ b/include/linux/pci-ats.h
-@@ -68,5 +68,13 @@ static inline int pci_max_pasids(struct pci_dev *pdev)
- 
- #endif /* CONFIG_PCI_PASID */
- 
-+#if defined(CONFIG_PCI_PASID) && defined(CONFIG_PCI_PRI)
-+bool pci_prg_resp_requires_prefix(struct pci_dev *pdev);
-+#else
-+static inline bool pci_prg_resp_requires_prefix(struct pci_dev *pdev)
-+{
-+	return false;
-+}
-+#endif /* CONFIG_PCI_PASID && CONFIG_PCI_PRI */
- 
- #endif /* LINUX_PCI_ATS_H*/
-diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
-index 103ba797a8f3..f9a11a13131c 100644
---- a/include/uapi/linux/pci_regs.h
-+++ b/include/uapi/linux/pci_regs.h
-@@ -871,6 +871,7 @@
- #define  PCI_PRI_STATUS_RF	0x001	/* Response Failure */
- #define  PCI_PRI_STATUS_UPRGI	0x002	/* Unexpected PRG index */
- #define  PCI_PRI_STATUS_STOPPED	0x100	/* PRI Stopped */
-+#define  PCI_PRI_STATUS_PRPR	0x8000	/* PRG Response requires PASID prefix */
- #define PCI_PRI_MAX_REQ		0x08	/* PRI max reqs supported */
- #define PCI_PRI_ALLOC_REQ	0x0c	/* PRI max reqs allowed */
- #define PCI_EXT_CAP_PRI_SIZEOF	16
 -- 
 2.17.0
