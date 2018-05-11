@@ -1,34 +1,51 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 11 May 2018 18:20:22 +0200
-Subject: [PATCH 06/12] of: add a new flag for OF device nodes
+Date: Fri, 11 May 2018 18:20:25 +0200
+Subject: [PATCH 09/12] platform/early: add an init section for early driver
+ data
 In-Reply-To: <20180511162028.20616-1-brgl@bgdev.pl>
 References: <20180511162028.20616-1-brgl@bgdev.pl>
-Message-ID: <20180511162028.20616-7-brgl@bgdev.pl>
+Message-ID: <20180511162028.20616-10-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This flag indicates that a device node has been populated early and
-that it needs different handling when called from
-of_platform_populate().
+Provide a separate section in which pointers to early platform driver
+structs will be stored.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- include/linux/of.h | 1 +
- 1 file changed, 1 insertion(+)
+ include/asm-generic/vmlinux.lds.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 4d25e4f952d9..49ba6427c6b2 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -143,6 +143,7 @@ extern raw_spinlock_t devtree_lock;
- #define OF_DETACHED	2 /* node has been detached from the device tree */
- #define OF_POPULATED	3 /* device already created for the node */
- #define OF_POPULATED_BUS	4 /* of_platform_populate recursed to children of this node */
-+#define OF_POPULATED_EARLY	5 /* device is already allocated */
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index af240573e482..6b5205f30ef2 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -214,6 +214,16 @@
+ #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
+ #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
  
- #define OF_BAD_ADDR	((u64)-1)
- 
++#ifdef CONFIG_EARLY_PLATFORM
++#define EARLY_PLATFORM_DRIVERS_TABLE()					\
++	. = ALIGN(8);							\
++	VMLINUX_SYMBOL(__early_platform_drivers_table) = .;		\
++	KEEP(*(__early_platform_drivers_table))				\
++	VMLINUX_SYMBOL(__early_platform_drivers_table_end) = .;
++#else
++#define EARLY_PLATFORM_DRIVERS_TABLE()
++#endif
++
+ #ifdef CONFIG_ACPI
+ #define ACPI_PROBE_TABLE(name)						\
+ 	. = ALIGN(8);							\
+@@ -593,6 +603,7 @@
+ 	RESERVEDMEM_OF_TABLES()						\
+ 	TIMER_OF_TABLES()						\
+ 	IOMMU_OF_TABLES()						\
++	EARLY_PLATFORM_DRIVERS_TABLE()					\
+ 	CPU_METHOD_OF_TABLES()						\
+ 	CPUIDLE_METHOD_OF_TABLES()					\
+ 	KERNEL_DTB()							\
 -- 
 2.17.0
