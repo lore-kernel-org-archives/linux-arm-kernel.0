@@ -1,59 +1,65 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 11 May 2018 12:19:54 +0200
-Subject: [PATCH v2 1/3] usb: gadget: udc: atmel: GPIO inversion is handled by
- gpiod
+Date: Fri, 11 May 2018 12:19:55 +0200
+Subject: [PATCH v2 2/3] usb: gadget: udc: atmel: Remove obsolete include
 In-Reply-To: <20180511101956.11782-1-romain.izard.pro@gmail.com>
 References: <20180511101956.11782-1-romain.izard.pro@gmail.com>
-Message-ID: <20180511101956.11782-2-romain.izard.pro@gmail.com>
+Message-ID: <20180511101956.11782-3-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When converting to GPIO descriptors, gpiod_get_value automatically
-handles the line inversion flags from the device tree.
+The include defines the private platform_data structure used with AVR
+platforms. It has no user since 7c55984e191f. Remove it.
 
-Do not invert the line twice.
-
-Fixes: 3df034081021 ("usb: gadget: udc: atmel: convert to use GPIO descriptors")
 Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- drivers/usb/gadget/udc/atmel_usba_udc.c | 3 +--
- drivers/usb/gadget/udc/atmel_usba_udc.h | 1 -
- 2 files changed, 1 insertion(+), 3 deletions(-)
+ drivers/usb/gadget/udc/atmel_usba_udc.c |  1 -
+ include/linux/usb/atmel_usba_udc.h      | 24 ------------------------
+ 2 files changed, 25 deletions(-)
+ delete mode 100644 include/linux/usb/atmel_usba_udc.h
 
 diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 27c16399c7e8..0fe3d0feb8f7 100644
+index 0fe3d0feb8f7..b9623e228609 100644
 --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
 +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -417,7 +417,7 @@ static inline void usba_int_enb_set(struct usba_udc *udc, u32 val)
- static int vbus_is_present(struct usba_udc *udc)
- {
- 	if (udc->vbus_pin)
--		return gpiod_get_value(udc->vbus_pin) ^ udc->vbus_pin_inverted;
-+		return gpiod_get_value(udc->vbus_pin);
- 
- 	/* No Vbus detection: Assume always present */
- 	return 1;
-@@ -2076,7 +2076,6 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 
- 	udc->vbus_pin = devm_gpiod_get_optional(&pdev->dev, "atmel,vbus",
- 						GPIOD_IN);
--	udc->vbus_pin_inverted = gpiod_is_active_low(udc->vbus_pin);
- 
- 	if (fifo_mode == 0) {
- 		pp = NULL;
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
-index 969ce8f3c3e2..d7eb7cf4fd5c 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.h
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
-@@ -326,7 +326,6 @@ struct usba_udc {
- 	const struct usba_udc_errata *errata;
- 	int irq;
- 	struct gpio_desc *vbus_pin;
--	int vbus_pin_inverted;
- 	int num_ep;
- 	int configured_ep;
- 	struct usba_fifo_cfg *fifo_cfg;
+@@ -20,7 +20,6 @@
+ #include <linux/ctype.h>
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
+-#include <linux/usb/atmel_usba_udc.h>
+ #include <linux/delay.h>
+ #include <linux/of.h>
+ #include <linux/irq.h>
+diff --git a/include/linux/usb/atmel_usba_udc.h b/include/linux/usb/atmel_usba_udc.h
+deleted file mode 100644
+index 9bb00df3b53f..000000000000
+--- a/include/linux/usb/atmel_usba_udc.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/* SPDX-License-Identifier: GPL-2.0 */
+-/*
+- * Platform data definitions for Atmel USBA gadget driver.
+- */
+-#ifndef __LINUX_USB_USBA_H
+-#define __LINUX_USB_USBA_H
+-
+-struct usba_ep_data {
+-	char	*name;
+-	int	index;
+-	int	fifo_size;
+-	int	nr_banks;
+-	int	can_dma;
+-	int	can_isoc;
+-};
+-
+-struct usba_platform_data {
+-	int			vbus_pin;
+-	int			vbus_pin_inverted;
+-	int			num_ep;
+-	struct usba_ep_data	ep[0];
+-};
+-
+-#endif /* __LINUX_USB_USBA_H */
 -- 
 2.14.1
