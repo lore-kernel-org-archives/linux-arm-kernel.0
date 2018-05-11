@@ -1,52 +1,68 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Fri, 11 May 2018 10:43:05 -0400
-Subject: [PATCH v2 3/4] Documentation: bindings: add phy_config for
- Rockchip USB Type-C PHY
-In-Reply-To: <1525861364-26323-3-git-send-email-hl@rock-chips.com>
-References: <1525861364-26323-1-git-send-email-hl@rock-chips.com>
- <1525861364-26323-3-git-send-email-hl@rock-chips.com>
-Message-ID: <20180511144305.GP33053@art_vandelay>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 May 2018 15:38:14 +0100
+Subject: [PATCH 2/3] perf/arm-cci: Remove pointless PMU disabling
+In-Reply-To: <0278134025d69817f28ee50a704fb63715a397d8.1526048005.git.robin.murphy@arm.com>
+References: <cover.1526048005.git.robin.murphy@arm.com>
+ <0278134025d69817f28ee50a704fb63715a397d8.1526048005.git.robin.murphy@arm.com>
+Message-ID: <20180511143814.i4iorhlhyxslgkzn@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 06:22:43PM +0800, Lin Huang wrote:
-> If want to do training outside DP Firmware, need phy voltage swing
-> and pre_emphasis value.
+On Fri, May 11, 2018 at 03:29:13PM +0100, Robin Murphy wrote:
+> The CCI PMU driver bears some legacy remnants of the arm_pmu framework
+> from when it was split in c6f85cb4305b ("bus: cci: move away from
+> arm_pmu framework"). In particular this perf_pmu_{dis,en}able() dance
+> around pmu->add which was fixed for arm_pmu in a9e469d1c89b
+> ("drivers/perf: arm_pmu: remove pointless PMU disabling").
 > 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> For the exact same reasons (i.e. perf core already does this around the
+> call anyway), give cci_pmu_add() the exact same change, which also
+> prevents having to export those core functions to build it as a module.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Adding Rob Herring so he has a hope of seeing this.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
 
 > ---
-> Changes in v2:
-> - rebase
+>  drivers/perf/arm-cci.c | 13 +++----------
+>  1 file changed, 3 insertions(+), 10 deletions(-)
 > 
->  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> index 960da7f..eda26dd 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> @@ -17,7 +17,9 @@ Required properties:
->  
->  Optional properties:
->   - extcon : extcon specifier for the Power Delivery
+> diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
+> index 53c774b20563..7029d8fe8f44 100644
+> --- a/drivers/perf/arm-cci.c
+> +++ b/drivers/perf/arm-cci.c
+> @@ -1184,16 +1184,11 @@ static int cci_pmu_add(struct perf_event *event, int flags)
+>  	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
+>  	struct hw_perf_event *hwc = &event->hw;
+>  	int idx;
+> -	int err = 0;
 > -
-> + - rockchip,phy_config : That's phy voltage swing and pre_emphasis
-> +			 setting, if want to do dp training outside
-> +			 dp firmware, need to add these value.
-
-What are the units?
-
-Sean
-
->  Required nodes : a sub-node is required for each port the phy provides.
->  		 The sub-node name is used to identify dp or usb3 port,
->  		 and shall be the following entries:
+> -	perf_pmu_disable(event->pmu);
+>  
+>  	/* If we don't have a space for the counter then finish early. */
+>  	idx = pmu_get_event_idx(hw_events, event);
+> -	if (idx < 0) {
+> -		err = idx;
+> -		goto out;
+> -	}
+> +	if (idx < 0)
+> +		return idx;
+>  
+>  	event->hw.idx = idx;
+>  	hw_events->events[idx] = event;
+> @@ -1205,9 +1200,7 @@ static int cci_pmu_add(struct perf_event *event, int flags)
+>  	/* Propagate our changes to the userspace mapping. */
+>  	perf_event_update_userpage(event);
+>  
+> -out:
+> -	perf_pmu_enable(event->pmu);
+> -	return err;
+> +	return 0;
+>  }
+>  
+>  static void cci_pmu_del(struct perf_event *event, int flags)
 > -- 
-> 2.7.4
+> 2.17.0.dirty
 > 
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
