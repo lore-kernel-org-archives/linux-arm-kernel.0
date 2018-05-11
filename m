@@ -1,89 +1,194 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Fri, 11 May 2018 11:35:05 +0800
-Subject: [PATCH v1 13/13] soc: rockchip: power-domain: add power domain
- support for px30
-In-Reply-To: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
-References: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1526009705-6583-1-git-send-email-zhangqing@rock-chips.com>
+From: yinbo.zhu@nxp.com (Yinbo Zhu)
+Date: Fri, 11 May 2018 11:35:22 +0800
+Subject: [PATCH 1/9] armv8: pm: add rcpm module support
+Message-ID: <20180511033530.7931-1-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is modified to support PX30 SoC.
+From: Yuantian Tang <andy.tang@nxp.com>
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+The Run Control and Power Management (RCPM) module communicates
+with embedded cores, coherency modules, and other device platform
+module to provide run control and power management functionality
+
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
 ---
- drivers/soc/rockchip/pm_domains.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/soc/fsl/Makefile |    1 +
+ drivers/soc/fsl/rcpm.c   |  153 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 154 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/soc/fsl/rcpm.c
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 90dcd5e21ae6..d0c5615132e3 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -18,6 +18,7 @@
- #include <linux/clk.h>
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
-+#include <dt-bindings/power/px30-power.h>
- #include <dt-bindings/power/rk3036-power.h>
- #include <dt-bindings/power/rk3128-power.h>
- #include <dt-bindings/power/rk3228-power.h>
-@@ -114,6 +115,9 @@ struct rockchip_pmu {
- 	.active_wakeup = wakeup,			\
- }
- 
-+#define DOMAIN_PX30(pwr, status, req, wakeup)		\
-+	DOMAIN_M(pwr, status, req, (req) + 16, req, wakeup)
+diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+index 629dab8..68fcd71 100644
+--- a/drivers/soc/fsl/Makefile
++++ b/drivers/soc/fsl/Makefile
+@@ -5,6 +5,7 @@
+ obj-$(CONFIG_FSL_DPAA)                 += qbman/
+ obj-$(CONFIG_QUICC_ENGINE)		+= qe/
+ obj-$(CONFIG_CPM)			+= qe/
++obj-$(CONFIG_SUSPEND)            	+= rcpm.o
+ obj-$(CONFIG_FSL_GUTS)			+= guts.o
+ obj-$(CONFIG_FSL_LS2_CONSOLE)		+= ls2-console/
+ obj-$(CONFIG_LS_SOC_DRIVERS)		+= layerscape/
+diff --git a/drivers/soc/fsl/rcpm.c b/drivers/soc/fsl/rcpm.c
+new file mode 100644
+index 0000000..ff0477b
+--- /dev/null
++++ b/drivers/soc/fsl/rcpm.c
+@@ -0,0 +1,153 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright 2016 NXP
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#define pr_fmt(fmt) "RCPM: %s: " fmt, __func__
 +
- #define DOMAIN_RK3288(pwr, status, req, wakeup)		\
- 	DOMAIN(pwr, status, req, req, (req) + 16, wakeup)
- 
-@@ -712,6 +716,17 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 	return error;
- }
- 
-+static const struct rockchip_domain_info px30_pm_domains[] = {
-+	[PX30_PD_USB]		= DOMAIN_PX30(5, 5, 10, false),
-+	[PX30_PD_SDCARD]	= DOMAIN_PX30(8, 8, 9, false),
-+	[PX30_PD_GMAC]		= DOMAIN_PX30(10, 10, 6, false),
-+	[PX30_PD_MMC_NAND]	= DOMAIN_PX30(11, 11, 5, false),
-+	[PX30_PD_VPU]		= DOMAIN_PX30(12, 12, 14, false),
-+	[PX30_PD_VO]		= DOMAIN_PX30(13, 13, 7, false),
-+	[PX30_PD_VI]		= DOMAIN_PX30(14, 14, 8, false),
-+	[PX30_PD_GPU]		= DOMAIN_PX30(15, 15, 2, false),
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <linux/suspend.h>
++
++/* RCPM register offset */
++#define RCPM_IPPDEXPCR0			0x140
++
++#define RCPM_WAKEUP_CELL_SIZE	2
++
++struct rcpm_config {
++	int ipp_num;
++	int ippdexpcr_offset;
++	u32 ippdexpcr[2];
++	void *rcpm_reg_base;
 +};
 +
- static const struct rockchip_domain_info rk3036_pm_domains[] = {
- 	[RK3036_PD_MSCH]	= DOMAIN_RK3036(14, 23, 30, true),
- 	[RK3036_PD_CORE]	= DOMAIN_RK3036(13, 17, 24, false),
-@@ -811,6 +826,17 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 	[RK3399_PD_SDIOAUDIO]	= DOMAIN_RK3399(31, 31, 29, true),
- };
- 
-+static const struct rockchip_pmu_info px30_pmu = {
-+	.pwr_offset = 0x18,
-+	.status_offset = 0x20,
-+	.req_offset = 0x64,
-+	.idle_offset = 0x6c,
-+	.ack_offset = 0x6c,
++static struct rcpm_config *rcpm;
 +
-+	.num_domains = ARRAY_SIZE(px30_pm_domains),
-+	.domain_info = px30_pm_domains,
++static inline void rcpm_reg_write(u32 offset, u32 value)
++{
++	iowrite32be(value, rcpm->rcpm_reg_base + offset);
++}
++
++static inline u32 rcpm_reg_read(u32 offset)
++{
++	return ioread32be(rcpm->rcpm_reg_base + offset);
++}
++
++static void rcpm_wakeup_fixup(struct device *dev, void *data)
++{
++	struct device_node *node = dev ? dev->of_node : NULL;
++	u32 value[RCPM_WAKEUP_CELL_SIZE];
++	int ret, i;
++
++	if (!dev || !node || !device_may_wakeup(dev))
++		return;
++
++	/*
++	 * Get the values in the "rcpm-wakeup" property.
++	 * Three values are:
++	 * The first is a pointer to the RCPM node.
++	 * The second is the value of the ippdexpcr0 register.
++	 * The third is the value of the ippdexpcr1 register.
++	 */
++	ret = of_property_read_u32_array(node, "fsl,rcpm-wakeup",
++					 value, RCPM_WAKEUP_CELL_SIZE);
++	if (ret)
++		return;
++
++	pr_debug("wakeup source: the device %s\n", node->full_name);
++
++	for (i = 0; i < rcpm->ipp_num; i++)
++		rcpm->ippdexpcr[i] |= value[i + 1];
++}
++
++static int rcpm_suspend_prepare(void)
++{
++	int i;
++
++	WARN_ON(!rcpm);
++
++	for (i = 0; i < rcpm->ipp_num; i++)
++		rcpm->ippdexpcr[i] = 0;
++
++	dpm_for_each_dev(NULL, rcpm_wakeup_fixup);
++
++	for (i = 0; i < rcpm->ipp_num; i++) {
++		rcpm_reg_write(rcpm->ippdexpcr_offset + 4 * i,
++			       rcpm->ippdexpcr[i]);
++		pr_debug("ippdexpcr%d = 0x%x\n", i, rcpm->ippdexpcr[i]);
++	}
++
++	return 0;
++}
++
++static int rcpm_suspend_notifier_call(struct notifier_block *bl,
++				      unsigned long state,
++				      void *unused)
++{
++	switch (state) {
++	case PM_SUSPEND_PREPARE:
++		rcpm_suspend_prepare();
++		break;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct rcpm_config rcpm_default_config = {
++	.ipp_num = 1,
++	.ippdexpcr_offset = RCPM_IPPDEXPCR0,
 +};
 +
- static const struct rockchip_pmu_info rk3036_pmu = {
- 	.req_offset = 0x148,
- 	.idle_offset = 0x14c,
-@@ -915,6 +941,10 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 
- static const struct of_device_id rockchip_pm_domain_dt_match[] = {
- 	{
-+		.compatible = "rockchip,px30-power-controller",
-+		.data = (void *)&px30_pmu,
-+	},
++static const struct of_device_id rcpm_matches[] = {
 +	{
- 		.compatible = "rockchip,rk3036-power-controller",
- 		.data = (void *)&rk3036_pmu,
- 	},
++		.compatible = "fsl,qoriq-rcpm-2.1",
++		.data = &rcpm_default_config,
++	},
++	{}
++};
++
++static struct notifier_block rcpm_suspend_notifier = {
++	.notifier_call = rcpm_suspend_notifier_call,
++};
++
++static int __init layerscape_rcpm_init(void)
++{
++	const struct of_device_id *match;
++	struct device_node *np;
++
++	np = of_find_matching_node_and_match(NULL, rcpm_matches, &match);
++	if (!np) {
++		pr_err("Can't find the RCPM node.\n");
++		return -EINVAL;
++	}
++
++	if (match->data)
++		rcpm = (struct rcpm_config *)match->data;
++	else
++		return -EINVAL;
++
++	rcpm->rcpm_reg_base = of_iomap(np, 0);
++	of_node_put(np);
++	if (!rcpm->rcpm_reg_base)
++		return -ENOMEM;
++
++	register_pm_notifier(&rcpm_suspend_notifier);
++
++	pr_info("The RCPM driver initialized.\n");
++
++	return 0;
++}
++
++subsys_initcall(layerscape_rcpm_init);
 -- 
-1.9.1
+1.7.1
