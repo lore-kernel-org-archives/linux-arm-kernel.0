@@ -1,44 +1,28 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 11 May 2018 15:29:12 +0100
-Subject: [PATCH 1/3] perf/arm-cc*: Fix MODULE_LICENSE() tags
-In-Reply-To: <cover.1526048005.git.robin.murphy@arm.com>
-References: <cover.1526048005.git.robin.murphy@arm.com>
-Message-ID: <d62c107dcd95ff209cfa87d0165d8987aa5453a9.1526048005.git.robin.murphy@arm.com>
+Date: Fri, 11 May 2018 15:29:11 +0100
+Subject: [PATCH 0/3] perf: make Arm CCI driver modular
+Message-ID: <cover.1526048005.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CCI/CCN drivers are licensed under GPLv2, but the MODULE_LICENSE()
-tags are using the bare "GPL" string implying GPLv2 or later. Fix them
-to match their actual file license.
+Now that it has been surgically removed from the MCPM port-control code,
+we can let the CCI PMU driver be modular. Probing the PMU in the first
+place still depends on the bus driver stub being built-in, but it's a
+small price to pay compared to the major upheaval of completely reworking
+the DT-handling code across the two drivers.
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-Acked-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/perf/arm-cci.c | 2 +-
- drivers/perf/arm-ccn.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Robin.
 
-diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
-index 383b2d3dcbc6..53c774b20563 100644
---- a/drivers/perf/arm-cci.c
-+++ b/drivers/perf/arm-cci.c
-@@ -1718,5 +1718,5 @@ static struct platform_driver cci_pmu_driver = {
- };
- 
- builtin_platform_driver(cci_pmu_driver);
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("ARM CCI PMU support");
-diff --git a/drivers/perf/arm-ccn.c b/drivers/perf/arm-ccn.c
-index 65b7e4042ece..917b47e776df 100644
---- a/drivers/perf/arm-ccn.c
-+++ b/drivers/perf/arm-ccn.c
-@@ -1594,4 +1594,4 @@ module_init(arm_ccn_init);
- module_exit(arm_ccn_exit);
- 
- MODULE_AUTHOR("Pawel Moll <pawel.moll@arm.com>");
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
+
+Robin Murphy (3):
+  perf/arm-cc*: Fix MODULE_LICENSE() tags
+  perf/arm-cci: Remove pointless PMU disabling
+  perf/arm-cci: Allow building as a module
+
+ drivers/perf/Kconfig   | 31 +++++++++++++++++--------------
+ drivers/perf/arm-cci.c | 32 ++++++++++++++++++++------------
+ drivers/perf/arm-ccn.c |  2 +-
+ 3 files changed, 38 insertions(+), 27 deletions(-)
+
 -- 
 2.17.0.dirty
