@@ -1,39 +1,70 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 May 2018 19:40:37 +0530
-Subject: [PATCH 2/2] clk: davinci: psc-dm365: fix few clocks
-In-Reply-To: <20180511141037.25250-1-nsekhar@ti.com>
-References: <20180511141037.25250-1-nsekhar@ti.com>
-Message-ID: <20180511141037.25250-3-nsekhar@ti.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 11 May 2018 15:19:20 +0100
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.18
+Message-ID: <5AF5A668.8010903@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix parent of emac and voice codec PSC clocks. This now matches
-existing implementation in arch/arm/mach-davinci/dm365.c
+Hi Arnd, Hi Olof,
 
-Also, there is only one power domain on DM365. Fix the power
-domain of voice codec and vpss dac modules.
+Please help to pull the following changes.
+Thanks!
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Best Regards,
+Wei
+
 ---
- drivers/clk/davinci/psc-dm365.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/davinci/psc-dm365.c b/drivers/clk/davinci/psc-dm365.c
-index 5b5b55b0b59a..beeda10fd2f0 100644
---- a/drivers/clk/davinci/psc-dm365.c
-+++ b/drivers/clk/davinci/psc-dm365.c
-@@ -65,9 +65,9 @@ static const struct davinci_lpsc_clk_info dm365_psc_info[] = {
- 	LPSC(31, 0, arm,         pll2_sysclk2, NULL,               LPSC_ALWAYS_ENABLED),
- 	LPSC(38, 0, spi3,        pll1_sysclk4, spi3_clkdev,        0),
- 	LPSC(39, 0, spi4,        pll1_auxclk,  spi4_clkdev,        0),
--	LPSC(40, 0, emac,        pll2_sysclk4, emac_clkdev,        0),
--	LPSC(44, 1, voice_codec, pll1_sysclk3, voice_codec_clkdev, 0),
--	LPSC(46, 1, vpss_dac,    pll1_sysclk3, vpss_dac_clkdev,    0),
-+	LPSC(40, 0, emac,        pll1_sysclk4, emac_clkdev,        0),
-+	LPSC(44, 0, voice_codec, pll2_sysclk4, voice_codec_clkdev, 0),
-+	LPSC(46, 0, vpss_dac,    pll1_sysclk3, vpss_dac_clkdev,    0),
- 	LPSC(47, 0, vpss_master, pll1_sysclk5, vpss_master_clkdev, 0),
- 	LPSC(50, 0, mjcp,        pll1_sysclk3, NULL,               0),
- 	{ }
--- 
-2.16.2
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the Git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.18
+
+for you to fetch changes up to 84f7ed0f22e8eb42e81b69cd7772c3600c9f4959:
+
+  arm64: dts: hi3798cv200: enable emmc support for poplar board (2018-05-11 11:23:10 +0100)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon SoC DT updates for 4.18
+
+- Add mailbox, stub clock, CPU frequency scaling, thermal cooling
+  management and pcie msi interruption support for hi3660
+- Add LPC support for hip06 and hip07
+- Add PCIe, usb and emmc support for hi3798cv200
+
+----------------------------------------------------------------
+John Garry (2):
+      arm64: dts: hisi: Enable Hisi LPC node for hip06
+      arm64: dts: hisi: Enable Hisi LPC node for hip07
+
+Kaihua Zhong (2):
+      dts: arm64: hi3660: Add mailbox node
+      dts: arm64: hi3660: Add stub clock node
+
+Leo Yan (1):
+      dts: arm64: hi3660: Add CPU frequency scaling support
+
+Shawn Guo (3):
+      arm64: dts: hi3798cv200: enable PCIe support for poplar board
+      arm64: dts: hi3798cv200: enable usb2 support for poplar board
+      arm64: dts: hi3798cv200: enable emmc support for poplar board
+
+Tao Wang (1):
+      dts: arm64: hi3660: Add thermal cooling management
+
+Yao Chen (1):
+      arm64: dts: hi3660: Add pcie msi interrupt attribute
+
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 147 +++++++++++++++
+ .../boot/dts/hisilicon/hi3798cv200-poplar.dts      |  38 ++++
+ arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 205 ++++++++++++++++++++-
+ arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |   8 +
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi           |  21 +++
+ arch/arm64/boot/dts/hisilicon/hip07-d05.dts        |   4 +
+ arch/arm64/boot/dts/hisilicon/hip07.dtsi           |  14 ++
+ arch/arm64/boot/dts/hisilicon/poplar-pinctrl.dtsi  |  98 ++++++++++
+ 8 files changed, 532 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/poplar-pinctrl.dtsi
