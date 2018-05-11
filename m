@@ -1,65 +1,54 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 11 May 2018 12:19:55 +0200
-Subject: [PATCH v2 2/3] usb: gadget: udc: atmel: Remove obsolete include
-In-Reply-To: <20180511101956.11782-1-romain.izard.pro@gmail.com>
-References: <20180511101956.11782-1-romain.izard.pro@gmail.com>
-Message-ID: <20180511101956.11782-3-romain.izard.pro@gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 11 May 2018 12:20:33 +0200
+Subject: [PATCH v3 02/14] drivers: soc: sunxi: Add dedicated compatibles
+ for the A13, A20 and A33
+In-Reply-To: <CAGb2v67An8RSCKEDSgW_jY7m8iw22K4rRHb02q67decmCBcjhg@mail.gmail.com>
+References: <20180507124500.20434-1-paul.kocialkowski@bootlin.com>
+ <20180507124500.20434-3-paul.kocialkowski@bootlin.com>
+ <CAGb2v67An8RSCKEDSgW_jY7m8iw22K4rRHb02q67decmCBcjhg@mail.gmail.com>
+Message-ID: <20180511102033.i6jtzljbvkg47wz3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The include defines the private platform_data structure used with AVR
-platforms. It has no user since 7c55984e191f. Remove it.
+On Thu, May 10, 2018 at 10:05:33PM -0700, Chen-Yu Tsai wrote:
+> On Mon, May 7, 2018 at 5:44 AM, Paul Kocialkowski
+> <paul.kocialkowski@bootlin.com> wrote:
+> > This introduces platform-specific compatibles for the A13, A20 and A33
+> > SRAM driver. No particular adaptation for these platforms is required at
+> > this point, although this might become the case in the future.
+> >
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > ---
+> >  drivers/soc/sunxi/sunxi_sram.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> > diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
+> > index 74cb81f37bd6..43ebc3bd33f2 100644
+> > --- a/drivers/soc/sunxi/sunxi_sram.c
+> > +++ b/drivers/soc/sunxi/sunxi_sram.c
+> > @@ -315,6 +315,9 @@ static int sunxi_sram_probe(struct platform_device *pdev)
+> >
+> >  static const struct of_device_id sunxi_sram_dt_match[] = {
+> >         { .compatible = "allwinner,sun4i-a10-sram-controller" },
+> > +       { .compatible = "allwinner,sun5i-a13-sram-controller" },
+> > +       { .compatible = "allwinner,sun7i-a20-sram-controller" },
+> > +       { .compatible = "allwinner,sun8i-a33-sram-controller" },
+> 
+> We should probably name these "system-controller". Maxime?
 
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
- drivers/usb/gadget/udc/atmel_usba_udc.c |  1 -
- include/linux/usb/atmel_usba_udc.h      | 24 ------------------------
- 2 files changed, 25 deletions(-)
- delete mode 100644 include/linux/usb/atmel_usba_udc.h
+This would make sense yes, but we don't really need to add the A20 one
+to the driver, it's exactly the same than the A10.
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 0fe3d0feb8f7..b9623e228609 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -20,7 +20,6 @@
- #include <linux/ctype.h>
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
--#include <linux/usb/atmel_usba_udc.h>
- #include <linux/delay.h>
- #include <linux/of.h>
- #include <linux/irq.h>
-diff --git a/include/linux/usb/atmel_usba_udc.h b/include/linux/usb/atmel_usba_udc.h
-deleted file mode 100644
-index 9bb00df3b53f..000000000000
---- a/include/linux/usb/atmel_usba_udc.h
-+++ /dev/null
-@@ -1,24 +0,0 @@
--/* SPDX-License-Identifier: GPL-2.0 */
--/*
-- * Platform data definitions for Atmel USBA gadget driver.
-- */
--#ifndef __LINUX_USB_USBA_H
--#define __LINUX_USB_USBA_H
--
--struct usba_ep_data {
--	char	*name;
--	int	index;
--	int	fifo_size;
--	int	nr_banks;
--	int	can_dma;
--	int	can_isoc;
--};
--
--struct usba_platform_data {
--	int			vbus_pin;
--	int			vbus_pin_inverted;
--	int			num_ep;
--	struct usba_ep_data	ep[0];
--};
--
--#endif /* __LINUX_USB_USBA_H */
+Maxime
+
 -- 
-2.14.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180511/829346ef/attachment.sig>
