@@ -1,38 +1,40 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Fri, 11 May 2018 11:00:08 +0100
-Subject: [PATCH v3 1/8] arm/arm64: KVM: Formalise end of direct linear map
-In-Reply-To: <20180511094618.vlfg6h43ebkbk5x6@capper-debian.cambridge.arm.com>
-References: <20180510162347.3858-1-steve.capper@arm.com>
- <20180510162347.3858-2-steve.capper@arm.com>
- <9272dd72-7bc9-daf9-2386-ceca04384c1c@arm.com>
- <20180511094618.vlfg6h43ebkbk5x6@capper-debian.cambridge.arm.com>
-Message-ID: <20180511100008.ggqsp2g5crn2rtsf@capper-debian.cambridge.arm.com>
+From: jacopo+renesas@jmondi.org (Jacopo Mondi)
+Date: Fri, 11 May 2018 12:00:01 +0200
+Subject: [PATCH 2/3] arm64: dts: renesas: r8a77995: Add VIN4
+In-Reply-To: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
+References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1526032802-14376-3-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 10:46:28AM +0100, Steve Capper wrote:
-> On Thu, May 10, 2018 at 06:11:35PM +0100, Marc Zyngier wrote:
-> > [+Christoffer]
-> >
-> > Hi Steve,
-> 
-> Hi Marc,
-> 
-> >
-> > On 10/05/18 17:23, Steve Capper wrote:
+Describe VIN4 interface for R-Car D3 R8A77995 SoC.
 
-[...]
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+---
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-> >
-> > I'd appreciate if you could keep me cc'd on this series.
-> 
-> Apologies, I'll be much more careful with git send-email.
-> 
-> Cheers,
-> --
-> Steve
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
->
-
-I will also be more careful with my email client, please ignore this
-disclaimer.
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index 82aed7e..bdf7017 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -783,6 +783,17 @@
+ 				};
+ 			};
+ 		};
++
++		vin4: video at e6ef4000 {
++			compatible = "renesas,vin-r8a77995";
++			reg = <0 0xe6ef4000 0 0x1000>;
++			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 807>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 807>;
++			renesas,id = <4>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	timer {
+-- 
+2.7.4
