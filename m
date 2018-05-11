@@ -1,186 +1,318 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 11 May 2018 14:51:15 +0100
-Subject: [PATCH] [stable 4.9] arm64: Add work around for Arm Cortex-A55
- Erratum 1024718
-Message-ID: <1526046675-23790-1-git-send-email-suzuki.poulose@arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 11 May 2018 14:51:58 +0100
+Subject: [PATCH 1/2] arm64: defconfig: sync it with savedefconfig
+In-Reply-To: <1526007049-27884-1-git-send-email-shawn.guo@linaro.org>
+References: <1526007049-27884-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <5AF59FFE.4050206@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
+Hi Shawn,
 
-Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
-from an erratum 1024718, which causes incorrect updates when DBM/AP
-bits in a page table entry is modified without a break-before-make
-sequence. The work around is to disable the hardware DBM feature
-on the affected cores. The hardware Access Flag management features
-is not affected.
+On 2018/5/11 3:50, Shawn Guo wrote:
+> Sync the defconfig with savedefconfig with the following commands:
+> 
+>  make defconfig
+>  make savedefconfig
+>  cp defconfig arch/arm64/configs/defconfig
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-The hardware DBM feature is a non-conflicting capability, i.e, the
-kernel could handle cores using the feature and those without having
-the features running at the same time. So this work around is detected
-at early boot time, rather than delaying it until the CPUs are brought
-up into the kernel with MMU turned on. This also avoids other complexities
-with late CPUs turning online, with or without the hardware DBM features.
+Series applied into the hisilicon defconfig tree.
+Thanks!
 
-Cc: stable at vger.kernel.org # v4.9
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
-Note: The upstream commit is on top of a reworked capability
-infrastructure for arm64 heterogeneous systems, which allows
-delaying the CPU model checks. This backport is based on the
-original version of the patch [0], which checks the affected
-CPU models during the early boot.
+BR,
+Wei
 
-[0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
----
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 14 ++++++++++++
- arch/arm64/include/asm/assembler.h     | 40 ++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/cputype.h       |  5 +++++
- arch/arm64/mm/proc.S                   |  5 +++++
- 5 files changed, 65 insertions(+)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index d11af52..ac9489f 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -54,6 +54,7 @@ stable kernels.
- | ARM            | Cortex-A57      | #852523         | N/A                         |
- | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220        |
- | ARM            | Cortex-A72      | #853709         | N/A                         |
-+| ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
- | ARM            | MMU-500         | #841119,#826419 | N/A                         |
- |                |                 |                 |                             |
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 90e58bb..d0df361 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -427,6 +427,20 @@ config ARM64_ERRATUM_843419
- 
- 	  If unsure, say Y.
- 
-+config ARM64_ERRATUM_1024718
-+	bool "Cortex-A55: 1024718: Update of DBM/AP bits without break before make might result in incorrect update"
-+	default y
-+	help
-+	  This option adds work around for Arm Cortex-A55 Erratum 1024718.
-+
-+	  Affected Cortex-A55 cores (r0p0, r0p1, r1p0) could cause incorrect
-+	  update of the hardware dirty bit when the DBM/AP bits are updated
-+	  without a break-before-make. The work around is to disable the usage
-+	  of hardware DBM locally on the affected cores. CPUs not affected by
-+	  erratum will continue to use the feature.
-+
-+	  If unsure, say Y.
-+
- config CAVIUM_ERRATUM_22375
- 	bool "Cavium erratum 22375, 24313"
- 	default y
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index e60375c..bfcfec3 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -25,6 +25,7 @@
- 
- #include <asm/asm-offsets.h>
- #include <asm/cpufeature.h>
-+#include <asm/cputype.h>
- #include <asm/page.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptrace.h>
-@@ -435,4 +436,43 @@ alternative_endif
- 	and	\phys, \pte, #(((1 << (48 - PAGE_SHIFT)) - 1) << PAGE_SHIFT)
- 	.endm
- 
-+/*
-+ * Check the MIDR_EL1 of the current CPU for a given model and a range of
-+ * variant/revision. See asm/cputype.h for the macros used below.
-+ *
-+ *	model:		MIDR_CPU_MODEL of CPU
-+ *	rv_min:		Minimum of MIDR_CPU_VAR_REV()
-+ *	rv_max:		Maximum of MIDR_CPU_VAR_REV()
-+ *	res:		Result register.
-+ *	tmp1, tmp2, tmp3: Temporary registers
-+ *
-+ * Corrupts: res, tmp1, tmp2, tmp3
-+ * Returns:  0, if the CPU id doesn't match. Non-zero otherwise
-+ */
-+	.macro	cpu_midr_match model, rv_min, rv_max, res, tmp1, tmp2, tmp3
-+	mrs		\res, midr_el1
-+	mov_q		\tmp1, (MIDR_REVISION_MASK | MIDR_VARIANT_MASK)
-+	mov_q		\tmp2, MIDR_CPU_MODEL_MASK
-+	and		\tmp3, \res, \tmp2	// Extract model
-+	and		\tmp1, \res, \tmp1	// rev & variant
-+	mov_q		\tmp2, \model
-+	cmp		\tmp3, \tmp2
-+	cset		\res, eq
-+	cbz		\res, .Ldone\@		// Model matches ?
-+
-+	.if (\rv_min != 0)			// Skip min check if rv_min == 0
-+	mov_q		\tmp3, \rv_min
-+	cmp		\tmp1, \tmp3
-+	cset		\res, ge
-+	.endif					// \rv_min != 0
-+	/* Skip rv_max check if rv_min == rv_max && rv_min != 0 */
-+	.if ((\rv_min != \rv_max) || \rv_min == 0)
-+	mov_q		\tmp2, \rv_max
-+	cmp		\tmp1, \tmp2
-+	cset		\tmp2, le
-+	and		\res, \res, \tmp2
-+	.endif
-+.Ldone\@:
-+	.endm
-+
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 9ee3038..39d1db6 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -56,6 +56,9 @@
- 	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
- 	((partnum)		<< MIDR_PARTNUM_SHIFT))
- 
-+#define MIDR_CPU_VAR_REV(var, rev) \
-+	(((var) << MIDR_VARIANT_SHIFT) | (rev))
-+
- #define MIDR_CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
- 			     MIDR_ARCHITECTURE_MASK)
- 
-@@ -74,6 +77,7 @@
- 
- #define ARM_CPU_PART_AEM_V8		0xD0F
- #define ARM_CPU_PART_FOUNDATION		0xD00
-+#define ARM_CPU_PART_CORTEX_A55		0xD05
- #define ARM_CPU_PART_CORTEX_A57		0xD07
- #define ARM_CPU_PART_CORTEX_A72		0xD08
- #define ARM_CPU_PART_CORTEX_A53		0xD03
-@@ -89,6 +93,7 @@
- #define BRCM_CPU_PART_VULCAN		0x516
- 
- #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
-+#define MIDR_CORTEX_A55 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A55)
- #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
- #define MIDR_CORTEX_A72 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A72)
- #define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 619da1c..66cce21 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -425,6 +425,11 @@ ENTRY(__cpu_setup)
- 	cbz	x9, 2f
- 	cmp	x9, #2
- 	b.lt	1f
-+#ifdef CONFIG_ARM64_ERRATUM_1024718
-+	/* Disable hardware DBM on Cortex-A55 r0p0, r0p1 & r1p0 */
-+	cpu_midr_match MIDR_CORTEX_A55, MIDR_CPU_VAR_REV(0, 0), MIDR_CPU_VAR_REV(1, 0), x1, x2, x3, x4
-+	cbnz	x1, 1f
-+#endif
- 	orr	x10, x10, #TCR_HD		// hardware Dirty flag update
- 1:	orr	x10, x10, #TCR_HA		// hardware Access flag update
- 2:
--- 
-2.7.4
+> ---
+>  arch/arm64/configs/defconfig | 80 +++++++++++++++++---------------------------
+>  1 file changed, 30 insertions(+), 50 deletions(-)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index ecf613761e78..af0992f2fee7 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -47,6 +47,7 @@ CONFIG_ARCH_MVEBU=y
+>  CONFIG_ARCH_QCOM=y
+>  CONFIG_ARCH_ROCKCHIP=y
+>  CONFIG_ARCH_SEATTLE=y
+> +CONFIG_ARCH_SYNQUACER=y
+>  CONFIG_ARCH_RENESAS=y
+>  CONFIG_ARCH_R8A7795=y
+>  CONFIG_ARCH_R8A7796=y
+> @@ -57,7 +58,6 @@ CONFIG_ARCH_R8A77995=y
+>  CONFIG_ARCH_STRATIX10=y
+>  CONFIG_ARCH_TEGRA=y
+>  CONFIG_ARCH_SPRD=y
+> -CONFIG_ARCH_SYNQUACER=y
+>  CONFIG_ARCH_THUNDER=y
+>  CONFIG_ARCH_THUNDER2=y
+>  CONFIG_ARCH_UNIPHIER=y
+> @@ -73,16 +73,16 @@ CONFIG_HOTPLUG_PCI_ACPI=y
+>  CONFIG_PCI_LAYERSCAPE=y
+>  CONFIG_PCI_HISI=y
+>  CONFIG_PCIE_QCOM=y
+> -CONFIG_PCIE_KIRIN=y
+>  CONFIG_PCIE_ARMADA_8K=y
+> +CONFIG_PCIE_KIRIN=y
+>  CONFIG_PCI_AARDVARK=y
+>  CONFIG_PCI_TEGRA=y
+>  CONFIG_PCIE_RCAR=y
+> -CONFIG_PCIE_ROCKCHIP=m
+>  CONFIG_PCI_HOST_GENERIC=y
+>  CONFIG_PCI_XGENE=y
+>  CONFIG_PCI_HOST_THUNDER_PEM=y
+>  CONFIG_PCI_HOST_THUNDER_ECAM=y
+> +CONFIG_PCIE_ROCKCHIP=m
+>  CONFIG_ARM64_VA_BITS_48=y
+>  CONFIG_SCHED_MC=y
+>  CONFIG_NUMA=y
+> @@ -101,8 +101,6 @@ CONFIG_HIBERNATION=y
+>  CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+>  CONFIG_ARM_CPUIDLE=y
+>  CONFIG_CPU_FREQ=y
+> -CONFIG_CPU_FREQ_GOV_ATTR_SET=y
+> -CONFIG_CPU_FREQ_GOV_COMMON=y
+>  CONFIG_CPU_FREQ_STAT=y
+>  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+>  CONFIG_CPU_FREQ_GOV_USERSPACE=y
+> @@ -110,11 +108,11 @@ CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+>  CONFIG_CPU_FREQ_GOV_CONSERVATIVE=m
+>  CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+>  CONFIG_CPUFREQ_DT=y
+> +CONFIG_ACPI_CPPC_CPUFREQ=m
+>  CONFIG_ARM_ARMADA_37XX_CPUFREQ=y
+>  CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
+>  CONFIG_ARM_SCPI_CPUFREQ=y
+>  CONFIG_ARM_TEGRA186_CPUFREQ=y
+> -CONFIG_ACPI_CPPC_CPUFREQ=m
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> @@ -223,11 +221,6 @@ CONFIG_SMSC911X=y
+>  CONFIG_SNI_AVE=y
+>  CONFIG_SNI_NETSEC=y
+>  CONFIG_STMMAC_ETH=m
+> -CONFIG_DWMAC_IPQ806X=m
+> -CONFIG_DWMAC_MESON=m
+> -CONFIG_DWMAC_ROCKCHIP=m
+> -CONFIG_DWMAC_SUNXI=m
+> -CONFIG_DWMAC_SUN8I=m
+>  CONFIG_MDIO_BUS_MUX_MMIOREG=y
+>  CONFIG_AT803X_PHY=m
+>  CONFIG_MARVELL_PHY=m
+> @@ -251,8 +244,8 @@ CONFIG_WL18XX=m
+>  CONFIG_WLCORE_SDIO=m
+>  CONFIG_INPUT_EVDEV=y
+>  CONFIG_KEYBOARD_ADC=m
+> -CONFIG_KEYBOARD_CROS_EC=y
+>  CONFIG_KEYBOARD_GPIO=y
+> +CONFIG_KEYBOARD_CROS_EC=y
+>  CONFIG_INPUT_MISC=y
+>  CONFIG_INPUT_PM8941_PWRKEY=y
+>  CONFIG_INPUT_HISI_POWERKEY=y
+> @@ -276,15 +269,12 @@ CONFIG_SERIAL_SAMSUNG=y
+>  CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+>  CONFIG_SERIAL_TEGRA=y
+>  CONFIG_SERIAL_SH_SCI=y
+> -CONFIG_SERIAL_SH_SCI_NR_UARTS=11
+> -CONFIG_SERIAL_SH_SCI_CONSOLE=y
+>  CONFIG_SERIAL_MSM=y
+>  CONFIG_SERIAL_MSM_CONSOLE=y
+>  CONFIG_SERIAL_XILINX_PS_UART=y
+>  CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+>  CONFIG_SERIAL_MVEBU_UART=y
+>  CONFIG_SERIAL_DEV_BUS=y
+> -CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
+>  CONFIG_VIRTIO_CONSOLE=y
+>  CONFIG_I2C_CHARDEV=y
+>  CONFIG_I2C_MUX=y
+> @@ -303,20 +293,20 @@ CONFIG_I2C_UNIPHIER_F=y
+>  CONFIG_I2C_RCAR=y
+>  CONFIG_I2C_CROS_EC_TUNNEL=y
+>  CONFIG_SPI=y
+> -CONFIG_SPI_MESON_SPICC=m
+> -CONFIG_SPI_MESON_SPIFC=m
+>  CONFIG_SPI_BCM2835=m
+>  CONFIG_SPI_BCM2835AUX=m
+> +CONFIG_SPI_MESON_SPICC=m
+> +CONFIG_SPI_MESON_SPIFC=m
+>  CONFIG_SPI_ORION=y
+>  CONFIG_SPI_PL022=y
+> -CONFIG_SPI_QUP=y
+>  CONFIG_SPI_ROCKCHIP=y
+> +CONFIG_SPI_QUP=y
+>  CONFIG_SPI_S3C64XX=y
+>  CONFIG_SPI_SPIDEV=m
+>  CONFIG_SPMI=y
+> -CONFIG_PINCTRL_IPQ8074=y
+>  CONFIG_PINCTRL_SINGLE=y
+>  CONFIG_PINCTRL_MAX77620=y
+> +CONFIG_PINCTRL_IPQ8074=y
+>  CONFIG_PINCTRL_MSM8916=y
+>  CONFIG_PINCTRL_MSM8994=y
+>  CONFIG_PINCTRL_MSM8996=y
+> @@ -343,12 +333,12 @@ CONFIG_SENSORS_INA2XX=m
+>  CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+>  CONFIG_CPU_THERMAL=y
+>  CONFIG_THERMAL_EMULATION=y
+> +CONFIG_ROCKCHIP_THERMAL=m
+> +CONFIG_RCAR_GEN3_THERMAL=y
+>  CONFIG_BRCMSTB_THERMAL=m
+>  CONFIG_EXYNOS_THERMAL=y
+> -CONFIG_RCAR_GEN3_THERMAL=y
+> -CONFIG_QCOM_TSENS=y
+> -CONFIG_ROCKCHIP_THERMAL=m
+>  CONFIG_TEGRA_BPMP_THERMAL=m
+> +CONFIG_QCOM_TSENS=y
+>  CONFIG_UNIPHIER_THERMAL=y
+>  CONFIG_WATCHDOG=y
+>  CONFIG_S3C2410_WATCHDOG=y
+> @@ -368,9 +358,9 @@ CONFIG_MFD_MAX77620=y
+>  CONFIG_MFD_SPMI_PMIC=y
+>  CONFIG_MFD_RK808=y
+>  CONFIG_MFD_SEC_CORE=y
+> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>  CONFIG_REGULATOR_AXP20X=y
+>  CONFIG_REGULATOR_FAN53555=y
+> -CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>  CONFIG_REGULATOR_GPIO=y
+>  CONFIG_REGULATOR_HI6421V530=y
+>  CONFIG_REGULATOR_HI655X=y
+> @@ -380,16 +370,15 @@ CONFIG_REGULATOR_QCOM_SMD_RPM=y
+>  CONFIG_REGULATOR_QCOM_SPMI=y
+>  CONFIG_REGULATOR_RK808=y
+>  CONFIG_REGULATOR_S2MPS11=y
+> +CONFIG_RC_CORE=m
+> +CONFIG_RC_DECODERS=y
+> +CONFIG_RC_DEVICES=y
+> +CONFIG_IR_MESON=m
+>  CONFIG_MEDIA_SUPPORT=m
+>  CONFIG_MEDIA_CAMERA_SUPPORT=y
+>  CONFIG_MEDIA_ANALOG_TV_SUPPORT=y
+>  CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
+>  CONFIG_MEDIA_CONTROLLER=y
+> -CONFIG_MEDIA_RC_SUPPORT=y
+> -CONFIG_RC_CORE=m
+> -CONFIG_RC_DEVICES=y
+> -CONFIG_RC_DECODERS=y
+> -CONFIG_IR_MESON=m
+>  CONFIG_VIDEO_V4L2_SUBDEV_API=y
+>  # CONFIG_DVB_NET is not set
+>  CONFIG_V4L_MEM2MEM_DRIVERS=y
+> @@ -414,8 +403,7 @@ CONFIG_ROCKCHIP_DW_HDMI=y
+>  CONFIG_ROCKCHIP_DW_MIPI_DSI=y
+>  CONFIG_ROCKCHIP_INNO_HDMI=y
+>  CONFIG_DRM_RCAR_DU=m
+> -CONFIG_DRM_RCAR_LVDS=y
+> -CONFIG_DRM_RCAR_VSP=y
+> +CONFIG_DRM_RCAR_LVDS=m
+>  CONFIG_DRM_TEGRA=m
+>  CONFIG_DRM_PANEL_SIMPLE=m
+>  CONFIG_DRM_I2C_ADV7511=m
+> @@ -428,7 +416,6 @@ CONFIG_FB_ARMCLCD=y
+>  CONFIG_BACKLIGHT_GENERIC=m
+>  CONFIG_BACKLIGHT_PWM=m
+>  CONFIG_BACKLIGHT_LP855X=m
+> -CONFIG_FRAMEBUFFER_CONSOLE=y
+>  CONFIG_LOGO=y
+>  # CONFIG_LOGO_LINUX_MONO is not set
+>  # CONFIG_LOGO_LINUX_VGA16 is not set
+> @@ -473,12 +460,12 @@ CONFIG_MMC_BLOCK_MINORS=32
+>  CONFIG_MMC_ARMMMCI=y
+>  CONFIG_MMC_SDHCI=y
+>  CONFIG_MMC_SDHCI_ACPI=y
+> -CONFIG_MMC_SDHCI_F_SDH30=y
+>  CONFIG_MMC_SDHCI_PLTFM=y
+>  CONFIG_MMC_SDHCI_OF_ARASAN=y
+>  CONFIG_MMC_SDHCI_OF_ESDHC=y
+>  CONFIG_MMC_SDHCI_CADENCE=y
+>  CONFIG_MMC_SDHCI_TEGRA=y
+> +CONFIG_MMC_SDHCI_F_SDH30=y
+>  CONFIG_MMC_MESON_GX=y
+>  CONFIG_MMC_SDHCI_MSM=y
+>  CONFIG_MMC_SPI=y
+> @@ -495,11 +482,11 @@ CONFIG_LEDS_CLASS=y
+>  CONFIG_LEDS_GPIO=y
+>  CONFIG_LEDS_PWM=y
+>  CONFIG_LEDS_SYSCON=y
+> +CONFIG_LEDS_TRIGGER_DISK=y
+>  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_LEDS_TRIGGER_CPU=y
+>  CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+>  CONFIG_LEDS_TRIGGER_PANIC=y
+> -CONFIG_LEDS_TRIGGER_DISK=y
+>  CONFIG_EDAC=y
+>  CONFIG_EDAC_GHES=y
+>  CONFIG_RTC_CLASS=y
+> @@ -569,7 +556,6 @@ CONFIG_ARCH_TEGRA_186_SOC=y
+>  CONFIG_ARCH_TEGRA_194_SOC=y
+>  CONFIG_EXTCON_USB_GPIO=y
+>  CONFIG_MEMORY=y
+> -CONFIG_TEGRA_MC=y
+>  CONFIG_IIO=y
+>  CONFIG_EXYNOS_ADC=y
+>  CONFIG_ROCKCHIP_SARADC=m
+> @@ -581,22 +567,22 @@ CONFIG_PWM_RCAR=m
+>  CONFIG_PWM_ROCKCHIP=y
+>  CONFIG_PWM_SAMSUNG=y
+>  CONFIG_PWM_TEGRA=m
+> -CONFIG_PHY_RCAR_GEN3_USB2=y
+> -CONFIG_PHY_RCAR_GEN3_USB3=m
+> -CONFIG_PHY_HI6220_USB=y
+> -CONFIG_PHY_QCOM_USB_HS=y
+> +CONFIG_PHY_XGENE=y
+>  CONFIG_PHY_SUN4I_USB=y
+> +CONFIG_PHY_HI6220_USB=y
+>  CONFIG_PHY_MVEBU_CP110_COMPHY=y
+> -CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+> +CONFIG_PHY_QCOM_USB_HS=y
+> +CONFIG_PHY_RCAR_GEN3_USB2=y
+> +CONFIG_PHY_RCAR_GEN3_USB3=m
+>  CONFIG_PHY_ROCKCHIP_EMMC=y
+> +CONFIG_PHY_ROCKCHIP_INNO_USB2=y
+>  CONFIG_PHY_ROCKCHIP_PCIE=m
+> -CONFIG_PHY_XGENE=y
+>  CONFIG_PHY_TEGRA_XUSB=y
+>  CONFIG_QCOM_L2_PMU=y
+>  CONFIG_QCOM_L3_PMU=y
+> -CONFIG_MESON_EFUSE=m
+>  CONFIG_QCOM_QFPROM=y
+>  CONFIG_UNIPHIER_EFUSE=y
+> +CONFIG_MESON_EFUSE=m
+>  CONFIG_TEE=y
+>  CONFIG_OPTEE=y
+>  CONFIG_ARM_SCPI_PROTOCOL=y
+> @@ -640,7 +626,6 @@ CONFIG_DEBUG_INFO=y
+>  CONFIG_DEBUG_FS=y
+>  CONFIG_MAGIC_SYSRQ=y
+>  CONFIG_DEBUG_KERNEL=y
+> -CONFIG_LOCKUP_DETECTOR=y
+>  # CONFIG_SCHED_DEBUG is not set
+>  # CONFIG_DEBUG_PREEMPT is not set
+>  # CONFIG_FTRACE is not set
+> @@ -649,20 +634,15 @@ CONFIG_SECURITY=y
+>  CONFIG_CRYPTO_ECHAINIV=y
+>  CONFIG_CRYPTO_ANSI_CPRNG=y
+>  CONFIG_ARM64_CRYPTO=y
+> -CONFIG_CRYPTO_SHA256_ARM64=m
+> -CONFIG_CRYPTO_SHA512_ARM64=m
+>  CONFIG_CRYPTO_SHA1_ARM64_CE=y
+>  CONFIG_CRYPTO_SHA2_ARM64_CE=y
+> +CONFIG_CRYPTO_SHA512_ARM64_CE=m
+> +CONFIG_CRYPTO_SHA3_ARM64=m
+> +CONFIG_CRYPTO_SM3_ARM64_CE=m
+>  CONFIG_CRYPTO_GHASH_ARM64_CE=y
+>  CONFIG_CRYPTO_CRCT10DIF_ARM64_CE=m
+>  CONFIG_CRYPTO_CRC32_ARM64_CE=m
+> -CONFIG_CRYPTO_AES_ARM64=m
+> -CONFIG_CRYPTO_AES_ARM64_CE=m
+>  CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
+>  CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
+> -CONFIG_CRYPTO_AES_ARM64_NEON_BLK=m
+>  CONFIG_CRYPTO_CHACHA20_NEON=m
+>  CONFIG_CRYPTO_AES_ARM64_BS=m
+> -CONFIG_CRYPTO_SHA512_ARM64_CE=m
+> -CONFIG_CRYPTO_SHA3_ARM64=m
+> -CONFIG_CRYPTO_SM3_ARM64_CE=m
+> 
