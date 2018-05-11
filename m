@@ -1,48 +1,38 @@
-From: pku.leo@gmail.com (Yang Li)
-Date: Thu, 10 May 2018 23:03:18 -0500
-Subject: [GIT PULL] arm64: updates for 4.17
-In-Reply-To: <20180404143239.GA18238@arm.com>
-References: <20180404143239.GA18238@arm.com>
-Message-ID: <CADRPPNQhoXSGr4hpHaomcyamW51wT_F4fRTqZi4qtAD-jBHjxA@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 11 May 2018 07:28:51 +0300
+Subject: [GIT PULL] omap-gpmc updates for v4.18
+Message-ID: <75040f4e-9499-55a4-fad6-f27cab0bb224@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2018 at 9:32 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Linus,
->
-> Please pull these arm64 updates for 4.17. Note that I've pulled in a
-> stable branch from Eric Biederman here to fulfil some siginfo dependencies,
-> so the diffstat strays slightly out of arm64 due to his changes.
-{snip}
->
-> Catalin Marinas (1):
->       arm64: Revert L1_CACHE_SHIFT back to 6 (64-byte cache line size)
->
+Hi Olof/Arnd,
 
-{snip}
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
->
-> Will Deacon (20):
->       arm64: signal: Make force_signal_inject more robust
->       arm64: signal: Force SIGKILL for unknown signals in force_signal_inject
->       arm64: Introduce arm64_force_sig_info and hook up in arm64_notify_die
->       arm64: signal: Don't print anything directly in force_signal_inject
->       arm64: Pass user fault info to arm64_notify_die instead of printing it
->       arm64: mm: Rework unhandled user pagefaults to call arm64_force_sig_info
->       arm64: signal: Call arm64_notify_segfault when failing to deliver signal
->       arm64: Move show_unhandled_signals_ratelimited into traps.c
->       arm64: Use arm64_force_sig_info instead of force_sig_info
->       arm64: lse: Pass -fomit-frame-pointer to out-of-line ll/sc atomics
->       arm64: kaslr: Set TCR_EL1.NFD1 when CONFIG_RANDOMIZE_BASE=y
->       Merge tag 'acpi/iort-for-v4.17' of git://git.kernel.org/.../lpieralisi/linux into aarch64/for-next/core
->       Merge branch 'siginfo-next' of git://git.kernel.org/.../ebiederm/user-namespace into aarch64/for-next/core
->       arm64: cpufeature: Avoid warnings due to unused symbols
->       Revert "arm64: Revert L1_CACHE_SHIFT back to 6 (64-byte cache line size)"
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-Hi Will,
+are available in the git repository at:
 
-I'm wondering if we are changing the L1_CACHE_SHIFT to 6 in 4.17?
-This is causing big performance differences for us now.
+  https://github.com/rogerq/linux.git tags/gpmc-omap-for-v4.18
 
-Regards,
-Leo
+for you to fetch changes up to d507178f2ebb7bde5b3f64557f1c8f80e7b82541:
+
+  memory: omap-gpmc: Avoid redundant NULL check (2018-04-24 10:30:52 +0300)
+
+----------------------------------------------------------------
+OMAP-GPMC: driver updates for v4.18
+* get rid of a redundant NULL check in gpmc_probe_dt_children()
+
+----------------------------------------------------------------
+Roger Quadros (1):
+      memory: omap-gpmc: Avoid redundant NULL check
+
+ drivers/memory/omap-gpmc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+-- 
+cheers,
+-roger
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
