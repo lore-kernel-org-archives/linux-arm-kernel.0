@@ -1,78 +1,75 @@
-From: chenyao11@huawei.com (Yao Chen)
-Date: Fri, 11 May 2018 17:15:48 +0800
-Subject: [PATCH v3 1/2] PCI: kirin: Add MSI support
-In-Reply-To: <1526030149-23985-1-git-send-email-chenyao11@huawei.com>
-References: <1526030149-23985-1-git-send-email-chenyao11@huawei.com>
-Message-ID: <1526030149-23985-2-git-send-email-chenyao11@huawei.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 11 May 2018 10:19:50 +0100
+Subject: [PATCH v2 2/6] arm64: alternative: Apply alternatives early in
+ boot process
+In-Reply-To: <d170336d-8af0-893a-acb2-51900c28ade5@arm.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <1516190084-18978-3-git-send-email-julien.thierry@arm.com>
+ <c935a9e6-94a0-03cb-eb64-7e2eef8f8d86@arm.com>
+ <7a3afa42-821a-3d4a-3af8-00ba18653a4a@arm.com>
+ <d170336d-8af0-893a-acb2-51900c28ade5@arm.com>
+Message-ID: <8a8b80f8-d393-cb2e-fa7d-8d8800c4eae7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for MSI.
+On 11/05/18 09:12, Julien Thierry wrote:
+> 
+> 
+> On 09/05/18 22:52, Suzuki K Poulose wrote:
+>> On 05/04/2018 11:06 AM, Julien Thierry wrote:
+>>> Hi,
+>>>
+>>> In order to prepare the v3 of this patchset, I'd like people's opinion on what this patch does. More below.
+>>>
+>>> On 17/01/18 11:54, Julien Thierry wrote:
+>>>> From: Daniel Thompson <daniel.thompson@linaro.org>
+>>>>
+>>>> Currently alternatives are applied very late in the boot process (and
+>>>> a long time after we enable scheduling). Some alternative sequences,
+>>>> such as those that alter the way CPU context is stored, must be applied
+>>>> much earlier in the boot sequence.
+>>
+>>>> +/*
+>>>> + * early-apply features are detected using only the boot CPU and checked on
+>>>> + * secondary CPUs startup, even then,
+>>>> + * These early-apply features should only include features where we must
+>>>> + * patch the kernel very early in the boot process.
+>>>> + *
+>>>> + * Note that the cpufeature logic *must* be made aware of early-apply
+>>>> + * features to ensure they are reported as enabled without waiting
+>>>> + * for other CPUs to boot.
+>>>> + */
+>>>> +#define EARLY_APPLY_FEATURE_MASK BIT(ARM64_HAS_SYSREG_GIC_CPUIF)
+>>>> +
+>>>
+>>> Following the change in the cpufeature infrastructure, ARM64_HAS_SYSREG_GIC_CPUIF will have the scope ARM64_CPUCAP_SCOPE_BOOT_CPU in order to be checked early in the boot process.
+>>
+>> Thats correct.
+>>
+>>>
+>>> Now, regarding the early application of alternative, I am wondering whether we can apply all the alternatives associated with SCOPE_BOOT features that *do not* have a cpu_enable callback.
+>>>
+>>
+>> I don't understand why would you skip the ones that have a "cpu_enable" callback. Could you explain this a bit ? Ideally you should be able to
+>> apply the alternatives for features with the SCOPE_BOOT, provided the
+>> cpu_enable() callback is written properly.
+>>
+> 
+> In my mind the "cpu_enable" callback is the setup a cpu should perform before using the feature (i.e. the code getting patched in by the alternative). So I was worried about the code getting patched by the boot cpu and then have the secondary cpus ending up executing patched code before the cpu_enable for the corresponding feature gets called.
+> Or is there a requirement for secondary cpu startup code to be free of alternative code?
 
-Signed-off-by: Yao Chen <chenyao11@huawei.com>
----
- drivers/pci/dwc/pcie-kirin.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+There are no imposed restrictions. It is upto the capability to decide
+what can be done in cpu_enable() and what can be patched. So, if you
+make sure the patched code can be safely executed by secondary it is
+fine. May be you could even patch in some code in the early boot up, to
+do what you do in "cpu_enable()" for the secondary to safely execute
+the patched code.
 
-diff --git a/drivers/pci/dwc/pcie-kirin.c b/drivers/pci/dwc/pcie-kirin.c
-index d2970a0..8daab1f 100644
---- a/drivers/pci/dwc/pcie-kirin.c
-+++ b/drivers/pci/dwc/pcie-kirin.c
-@@ -426,9 +426,28 @@ static int kirin_pcie_establish_link(struct pcie_port *pp)
- 	return 0;
- }
- 
-+static irqreturn_t kirin_pcie_msi_irq_handler(int irq, void *arg)
-+{
-+	struct pcie_port *pp = arg;
-+
-+	return dw_handle_msi_irq(pp);
-+}
-+
-+static void kirin_pcie_msi_init(struct pcie_port *pp)
-+{
-+	dw_pcie_msi_init(pp);
-+}
-+
-+static void kirin_pcie_enable_interrupts(struct pcie_port *pp)
-+{
-+	if (IS_ENABLED(CONFIG_PCI_MSI))
-+		kirin_pcie_msi_init(pp);
-+}
-+
- static int kirin_pcie_host_init(struct pcie_port *pp)
- {
- 	kirin_pcie_establish_link(pp);
-+	kirin_pcie_enable_interrupts(pp);
- 
- 	return 0;
- }
-@@ -448,6 +467,26 @@ static int kirin_pcie_host_init(struct pcie_port *pp)
- static int __init kirin_add_pcie_port(struct dw_pcie *pci,
- 				      struct platform_device *pdev)
- {
-+	int ret;
-+
-+	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+		pci->pp.msi_irq = platform_get_irq(pdev, 0);
-+		if (pci->pp.msi_irq < 0) {
-+			dev_err(&pdev->dev, "failed to get MSI IRQ (%d)\n",
-+				pci->pp.msi_irq);
-+			return -ENODEV;
-+		}
-+		ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
-+				       kirin_pcie_msi_irq_handler,
-+				       IRQF_SHARED | IRQF_NO_THREAD,
-+				       "kirin_pcie_msi", &pci->pp);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to request MSI IRQ %d\n",
-+				pci->pp.msi_irq);
-+			return ret;
-+		}
-+	}
-+
- 	pci->pp.ops = &kirin_pcie_host_ops;
- 
- 	return dw_pcie_host_init(&pci->pp);
--- 
-1.9.1
+Anyway, if the secondary CPUs don't have the feature you are going to
+panic the system. So I don't think there is a big difference in the
+outcome if there is a mismatch, except for a clean message about the
+conflict.
+
+
+Cheers
+Suzuki
