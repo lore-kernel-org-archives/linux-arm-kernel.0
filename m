@@ -1,116 +1,45 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Fri, 11 May 2018 12:00:02 +0200
-Subject: [PATCH 3/3] arm64: dts: renesas: draak: Describe HDMI input
-In-Reply-To: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1526032802-14376-4-git-send-email-jacopo+renesas@jmondi.org>
+Date: Fri, 11 May 2018 11:59:59 +0200
+Subject: [PATCH 0/3] arm64: dts: Draak: Enable HDMI input and VIN4
+Message-ID: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe HDMI input connected to VIN4 interface for R-Car D3 Draak
-development board.
+Hello,
+   this series enables HDMI input and VIN4 on R-Car D3 Draak board.
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
----
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 68 ++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+The Draak board has an HDMI input connected to an HDMI decoder that feeds
+the VIN capture interface through its parallel video interface.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-index d03f194..e0ce462 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-@@ -59,6 +59,17 @@
- 		};
- 	};
- 
-+	hdmi-in {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&adv7612_in>;
-+			};
-+		};
-+	};
-+
- 	memory at 48000000 {
- 		device_type = "memory";
- 		/* first 128MB is reserved for secure area. */
-@@ -142,6 +153,11 @@
- 		groups = "usb0";
- 		function = "usb0";
- 	};
-+
-+	vin4_pins: vin4 {
-+		groups = "vin4_data24", "vin4_sync", "vin4_clk", "vin4_clkenb";
-+		function = "vin4";
-+	};
- };
- 
- &i2c0 {
-@@ -154,6 +170,35 @@
- 		reg = <0x50>;
- 		pagesize = <8>;
- 	};
-+
-+	hdmi-decoder at 4c {
-+		compatible = "adi,adv7612";
-+		reg = <0x4c>;
-+		default-input = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7612_in: endpoint {
-+					remote-endpoint = <&hdmi_con_in>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				adv7612_out: endpoint {
-+					pclk-sample = <0>;
-+					hsync-active = <0>;
-+					vsync-active = <0>;
-+
-+					remote-endpoint = <&vin4_in>;
-+				};
-+			};
-+		};
-+	};
- };
- 
- &i2c1 {
-@@ -246,3 +291,26 @@
- 	timeout-sec = <60>;
- 	status = "okay";
- };
-+
-+&vin4 {
-+	pinctrl-0 = <&vin4_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			reg = <0>;
-+
-+			vin4_in: endpoint {
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+
-+				remote-endpoint = <&adv7612_out>;
-+			};
-+		};
-+	};
-+};
--- 
+The series requires the just sent:
+[PATCH 0/5] rcar-vin: Add support for digital input on Gen3
+
+and enables image capture operations on D3 Draak board.
+
+The series has been developed on top of media-master tree but applies cleanly
+on top of latest renesas-driver.
+
+Geert: would you like a topic branch for this series to be included in
+renesas-drivers?
+
+Patches for testing are available at:
+git://jmondi.org/linux d3/media-master/driver
+git://jmondi.org/linux d3/media-master/dts
+git://jmondi.org/linux d3/media-master/test
+git://jmondi.org/vin-tests d3
+
+Thanks
+    j
+
+Jacopo Mondi (3):
+  dt-bindings: media: rcar-vin: Add R8A77995 support
+  arm64: dts: renesas: r8a77995: Add VIN4
+  arm64: dts: renesas: draak: Describe HDMI input
+
+ .../devicetree/bindings/media/rcar_vin.txt         |  1 +
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts     | 68 ++++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi          | 11 ++++
+ 3 files changed, 80 insertions(+)
+
+--
 2.7.4
