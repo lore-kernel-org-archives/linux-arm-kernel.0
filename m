@@ -1,60 +1,44 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 11 May 2018 15:29:13 +0100
-Subject: [PATCH 2/3] perf/arm-cci: Remove pointless PMU disabling
+Date: Fri, 11 May 2018 15:29:12 +0100
+Subject: [PATCH 1/3] perf/arm-cc*: Fix MODULE_LICENSE() tags
 In-Reply-To: <cover.1526048005.git.robin.murphy@arm.com>
 References: <cover.1526048005.git.robin.murphy@arm.com>
-Message-ID: <0278134025d69817f28ee50a704fb63715a397d8.1526048005.git.robin.murphy@arm.com>
+Message-ID: <d62c107dcd95ff209cfa87d0165d8987aa5453a9.1526048005.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CCI PMU driver bears some legacy remnants of the arm_pmu framework
-from when it was split in c6f85cb4305b ("bus: cci: move away from
-arm_pmu framework"). In particular this perf_pmu_{dis,en}able() dance
-around pmu->add which was fixed for arm_pmu in a9e469d1c89b
-("drivers/perf: arm_pmu: remove pointless PMU disabling").
+The CCI/CCN drivers are licensed under GPLv2, but the MODULE_LICENSE()
+tags are using the bare "GPL" string implying GPLv2 or later. Fix them
+to match their actual file license.
 
-For the exact same reasons (i.e. perf core already does this around the
-call anyway), give cci_pmu_add() the exact same change, which also
-prevents having to export those core functions to build it as a module.
-
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+Acked-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/perf/arm-cci.c | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+ drivers/perf/arm-cci.c | 2 +-
+ drivers/perf/arm-ccn.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
-index 53c774b20563..7029d8fe8f44 100644
+index 383b2d3dcbc6..53c774b20563 100644
 --- a/drivers/perf/arm-cci.c
 +++ b/drivers/perf/arm-cci.c
-@@ -1184,16 +1184,11 @@ static int cci_pmu_add(struct perf_event *event, int flags)
- 	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
- 	struct hw_perf_event *hwc = &event->hw;
- 	int idx;
--	int err = 0;
--
--	perf_pmu_disable(event->pmu);
+@@ -1718,5 +1718,5 @@ static struct platform_driver cci_pmu_driver = {
+ };
  
- 	/* If we don't have a space for the counter then finish early. */
- 	idx = pmu_get_event_idx(hw_events, event);
--	if (idx < 0) {
--		err = idx;
--		goto out;
--	}
-+	if (idx < 0)
-+		return idx;
+ builtin_platform_driver(cci_pmu_driver);
+-MODULE_LICENSE("GPL");
++MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("ARM CCI PMU support");
+diff --git a/drivers/perf/arm-ccn.c b/drivers/perf/arm-ccn.c
+index 65b7e4042ece..917b47e776df 100644
+--- a/drivers/perf/arm-ccn.c
++++ b/drivers/perf/arm-ccn.c
+@@ -1594,4 +1594,4 @@ module_init(arm_ccn_init);
+ module_exit(arm_ccn_exit);
  
- 	event->hw.idx = idx;
- 	hw_events->events[idx] = event;
-@@ -1205,9 +1200,7 @@ static int cci_pmu_add(struct perf_event *event, int flags)
- 	/* Propagate our changes to the userspace mapping. */
- 	perf_event_update_userpage(event);
- 
--out:
--	perf_pmu_enable(event->pmu);
--	return err;
-+	return 0;
- }
- 
- static void cci_pmu_del(struct perf_event *event, int flags)
+ MODULE_AUTHOR("Pawel Moll <pawel.moll@arm.com>");
+-MODULE_LICENSE("GPL");
++MODULE_LICENSE("GPL v2");
 -- 
 2.17.0.dirty
