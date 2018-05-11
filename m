@@ -1,40 +1,124 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Sat, 12 May 2018 07:29:53 +0800
-Subject: [PATCH RESEND v2 1/2] perf cs-etm: Support unknown_thread in
- cs_etm_auxtrace
-In-Reply-To: <20180511134800.GO13491@kernel.org>
-References: <1525924920-4381-1-git-send-email-leo.yan@linaro.org>
- <20180511134800.GO13491@kernel.org>
-Message-ID: <20180511232953.GA28378@leoy-ThinkPad-X240s>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 11 May 2018 18:57:56 -0500
+Subject: [PATCH v9 01/12] drivers: base: cacheinfo: move cache_setup_of_node()
+In-Reply-To: <20180511235807.30834-1-jeremy.linton@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+Message-ID: <20180511235807.30834-2-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 10:48:00AM -0300, Arnaldo Carvalho de Melo wrote:
-> Em Thu, May 10, 2018 at 12:01:59PM +0800, Leo Yan escreveu:
-> > CoreSight doesn't allocate thread structure for unknown_thread in etm
-> > auxtrace, so unknown_thread is NULL pointer.  If the perf data doesn't
-> > contain valid tid and then cs_etm__mem_access() uses unknown_thread
-> > instead as thread handler, this results in segmentation fault when
-> > thread__find_addr_map() accesses thread handler.
-> > 
-> > This commit creates new thread data which is used by unknown_thread, so
-> > CoreSight tracing can roll back to use unknown_thread if perf data
-> > doesn't include valid thread info.  This commit also releases thread
-> > data for initialization failure case and for normal auxtrace free flow.
-> > 
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> 
-> Thanks, applied to perf/urgent.
-> 
-> And please use a more descriptive, eye catching summary, something like:
-> 
->   perf cs-etm: Fix segfault when accessing NULL unknown_thread variable
-> 
-> :-)
+In preparation for the next patch, and to aid in
+review of that patch, lets move cache_setup_of_node
+further down in the module without any changes.
 
-Thanks for suggestion.  Indeed, this patch is a fix rather than
-a new feature, subject should reflect it.
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Vijaya Kumar K <vkilari@codeaurora.org>
+Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+Tested-by: Tomasz Nowicki <Tomasz.Nowicki@cavium.com>
+Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/base/cacheinfo.c | 80 ++++++++++++++++++++++++------------------------
+ 1 file changed, 40 insertions(+), 40 deletions(-)
 
-Thanks,
-Leo Yan
+diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+index edf726267282..09ccef7ddc99 100644
+--- a/drivers/base/cacheinfo.c
++++ b/drivers/base/cacheinfo.c
+@@ -32,46 +32,6 @@ struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu)
+ }
+ 
+ #ifdef CONFIG_OF
+-static int cache_setup_of_node(unsigned int cpu)
+-{
+-	struct device_node *np;
+-	struct cacheinfo *this_leaf;
+-	struct device *cpu_dev = get_cpu_device(cpu);
+-	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+-	unsigned int index = 0;
+-
+-	/* skip if of_node is already populated */
+-	if (this_cpu_ci->info_list->of_node)
+-		return 0;
+-
+-	if (!cpu_dev) {
+-		pr_err("No cpu device for CPU %d\n", cpu);
+-		return -ENODEV;
+-	}
+-	np = cpu_dev->of_node;
+-	if (!np) {
+-		pr_err("Failed to find cpu%d device node\n", cpu);
+-		return -ENOENT;
+-	}
+-
+-	while (index < cache_leaves(cpu)) {
+-		this_leaf = this_cpu_ci->info_list + index;
+-		if (this_leaf->level != 1)
+-			np = of_find_next_cache_node(np);
+-		else
+-			np = of_node_get(np);/* cpu node itself */
+-		if (!np)
+-			break;
+-		this_leaf->of_node = np;
+-		index++;
+-	}
+-
+-	if (index != cache_leaves(cpu)) /* not all OF nodes populated */
+-		return -ENOENT;
+-
+-	return 0;
+-}
+-
+ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+ 					   struct cacheinfo *sib_leaf)
+ {
+@@ -202,6 +162,46 @@ static void cache_of_override_properties(unsigned int cpu)
+ 		cache_associativity(this_leaf);
+ 	}
+ }
++
++static int cache_setup_of_node(unsigned int cpu)
++{
++	struct device_node *np;
++	struct cacheinfo *this_leaf;
++	struct device *cpu_dev = get_cpu_device(cpu);
++	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
++	unsigned int index = 0;
++
++	/* skip if of_node is already populated */
++	if (this_cpu_ci->info_list->of_node)
++		return 0;
++
++	if (!cpu_dev) {
++		pr_err("No cpu device for CPU %d\n", cpu);
++		return -ENODEV;
++	}
++	np = cpu_dev->of_node;
++	if (!np) {
++		pr_err("Failed to find cpu%d device node\n", cpu);
++		return -ENOENT;
++	}
++
++	while (index < cache_leaves(cpu)) {
++		this_leaf = this_cpu_ci->info_list + index;
++		if (this_leaf->level != 1)
++			np = of_find_next_cache_node(np);
++		else
++			np = of_node_get(np);/* cpu node itself */
++		if (!np)
++			break;
++		this_leaf->of_node = np;
++		index++;
++	}
++
++	if (index != cache_leaves(cpu)) /* not all OF nodes populated */
++		return -ENOENT;
++
++	return 0;
++}
+ #else
+ static void cache_of_override_properties(unsigned int cpu) { }
+ static inline int cache_setup_of_node(unsigned int cpu) { return 0; }
+-- 
+2.13.6
