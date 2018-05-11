@@ -1,182 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 11 May 2018 04:19:30 +0100 (BST)
-Subject: Applied "soc: qcom dt-bindings: Add APR bus bindings" to the asoc tree
-In-Reply-To: <20180426094606.4775-2-srinivas.kandagatla@linaro.org>
-Message-ID: <20180511031930.419CC44007A@finisterre.ee.mobilebroadband>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Fri, 11 May 2018 11:30:46 +0800
+Subject: [PATCH v1 01/13] dt-bindings: power: add RK3036 SoCs header for
+ power-domain
+In-Reply-To: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
+References: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1526009458-28579-2-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+According to a description from TRM, add all the power domains.
 
-   soc: qcom dt-bindings: Add APR bus bindings
-
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 8675e8d3d1b413dc0e6165d2ce09de4335f7f57a Mon Sep 17 00:00:00 2001
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Wed, 9 May 2018 13:56:12 +0100
-Subject: [PATCH] soc: qcom dt-bindings: Add APR bus bindings
-
-This patch add dt bindings for Qualcomm APR (Asynchronous Packet Router)
-bus driver. This bus is used for communicating with DSP which provides
-audio and various other services to cpu.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-Reviewed-by: Banajit Goswami <bgoswami@codeaurora.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
- .../devicetree/bindings/soc/qcom/qcom,apr.txt | 84 +++++++++++++++++++
- include/dt-bindings/soc/qcom,apr.h            | 28 +++++++
- 2 files changed, 112 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
- create mode 100644 include/dt-bindings/soc/qcom,apr.h
+ include/dt-bindings/power/rk3036-power.h | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 include/dt-bindings/power/rk3036-power.h
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+diff --git a/include/dt-bindings/power/rk3036-power.h b/include/dt-bindings/power/rk3036-power.h
 new file mode 100644
-index 000000000000..bcc612cc7423
+index 000000000000..59e09f1c5af7
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
-@@ -0,0 +1,84 @@
-+Qualcomm APR (Asynchronous Packet Router) binding
++++ b/include/dt-bindings/power/rk3036-power.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (c) 2017 Rockchip Electronics Co. Ltd.
++ * Author: Caesar Wang <wxt@rock-chips.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+This binding describes the Qualcomm APR. APR is a IPC protocol for
-+communication between Application processor and QDSP. APR is mainly
-+used for audio/voice services on the QDSP.
++#ifndef __DT_BINDINGS_POWER_RK3036_POWER_H__
++#define __DT_BINDINGS_POWER_RK3036_POWER_H__
 +
-+- compatible:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: must be "qcom,apr-v<VERSION-NUMBER>", example "qcom,apr-v2"
++#define RK3036_PD_MSCH		0
++#define RK3036_PD_CORE		1
++#define RK3036_PD_PERI		2
++#define RK3036_PD_VIO		3
++#define RK3036_PD_VPU		4
++#define RK3036_PD_GPU		5
++#define RK3036_PD_SYS		6
 +
-+- reg
-+	Usage: required
-+	Value type: <u32>
-+	Definition: Destination processor ID.
-+	Possible values are :
-+			1 - APR simulator
-+			2 - PC
-+			3 - MODEM
-+			4 - ADSP
-+			5 - APPS
-+			6 - MODEM2
-+			7 - APPS2
-+
-+= APR SERVICES
-+Each subnode of the APR node represents service tied to this apr. The name
-+of the nodes are not important. The properties of these nodes are defined
-+by the individual bindings for the specific service
-+- All APR services MUST contain the following property:
-+
-+- reg
-+	Usage: required
-+	Value type: <u32>
-+	Definition: APR Service ID
-+	Possible values are :
-+			3 - DSP Core Service
-+			4 - Audio Front End Service.
-+			5 - Voice Stream Manager Service.
-+			6 - Voice processing manager.
-+			7 - Audio Stream Manager Service.
-+			8 - Audio Device Manager Service.
-+			9 - Multimode voice manager.
-+			10 - Core voice stream.
-+			11 - Core voice processor.
-+			12 - Ultrasound stream manager.
-+			13 - Listen stream manager.
-+
-+= EXAMPLE
-+The following example represents a QDSP based sound card on a MSM8996 device
-+which uses apr as communication between Apps and QDSP.
-+
-+	apr at 4 {
-+		compatible = "qcom,apr-v2";
-+		reg = <APR_DOMAIN_ADSP>;
-+
-+		q6core at 3 {
-+			compatible = "qcom,q6core";
-+			reg = <APR_SVC_ADSP_CORE>;
-+		};
-+
-+		q6afe at 4 {
-+			compatible = "qcom,q6afe";
-+			reg = <APR_SVC_AFE>;
-+
-+			dais {
-+				#sound-dai-cells = <1>;
-+				hdmi at 1 {
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+		q6asm at 7 {
-+			compatible = "qcom,q6asm";
-+			reg = <APR_SVC_ASM>;
-+			...
-+		};
-+
-+		q6adm at 8 {
-+			compatible = "qcom,q6adm";
-+			reg = <APR_SVC_ADM>;
-+			...
-+		};
-+	};
-diff --git a/include/dt-bindings/soc/qcom,apr.h b/include/dt-bindings/soc/qcom,apr.h
-new file mode 100644
-index 000000000000..006362400c0f
---- /dev/null
-+++ b/include/dt-bindings/soc/qcom,apr.h
-@@ -0,0 +1,28 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __DT_BINDINGS_QCOM_APR_H
-+#define __DT_BINDINGS_QCOM_APR_H
-+
-+/* Domain IDs */
-+#define APR_DOMAIN_SIM		0x1
-+#define APR_DOMAIN_PC		0x2
-+#define APR_DOMAIN_MODEM	0x3
-+#define APR_DOMAIN_ADSP		0x4
-+#define APR_DOMAIN_APPS		0x5
-+#define APR_DOMAIN_MAX		0x6
-+
-+/* ADSP service IDs */
-+#define APR_SVC_ADSP_CORE	0x3
-+#define APR_SVC_AFE		0x4
-+#define APR_SVC_VSM		0x5
-+#define APR_SVC_VPM		0x6
-+#define APR_SVC_ASM		0x7
-+#define APR_SVC_ADM		0x8
-+#define APR_SVC_ADSP_MVM	0x09
-+#define APR_SVC_ADSP_CVS	0x0A
-+#define APR_SVC_ADSP_CVP	0x0B
-+#define APR_SVC_USM		0x0C
-+#define APR_SVC_LSM		0x0D
-+#define APR_SVC_VIDC		0x16
-+#define APR_SVC_MAX		0x17
-+
-+#endif /* __DT_BINDINGS_QCOM_APR_H */
++#endif
 -- 
-2.17.0
+1.9.1
