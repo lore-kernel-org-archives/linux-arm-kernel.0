@@ -1,84 +1,32 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 11 May 2018 15:04:09 +0200
-Subject: Delivery Status Notification (Failure)
-In-Reply-To: <20180511123915.GC16141@n2100.armlinux.org.uk>
-References: <CAOuPNLjqJVsPOVPCnswtFyXudAJ88_F0QVUq-Z6qWE=UpH0mBA@mail.gmail.com>
- <CAOuPNLjqJVsPOVPCnswtFyXudAJ88_F0QVUq-Z6qWE=UpH0mBA@mail.gmail.com>
- <5af57fea.1c69fb81.885f0.2377.GMRIR@mx.google.com>
- <CAOuPNLgbT59h=Jm5YiOCbrqFkDokJ8xutQ_OkpsFYzKazKhTHg@mail.gmail.com>
- <20180511123915.GC16141@n2100.armlinux.org.uk>
-Message-ID: <f6f7b18644136323f4485d6123b330d0dde207a4.camel@pengutronix.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 11 May 2018 14:12:04 +0100
+Subject: [PATCH] drivers/perf: arm-ccn: stop spamming dmesg in event_init
+In-Reply-To: <20180509161120.ilnukvismwfb452g@lakrids.cambridge.arm.com>
+References: <20180504104117.8086-1-mark.rutland@arm.com>
+ <20180508184050.75c60b82ba538d0ecdeb2d78@arm.com>
+ <1525882003.4199.55.camel@arm.com>
+ <20180509161120.ilnukvismwfb452g@lakrids.cambridge.arm.com>
+Message-ID: <1526044324.3315.88.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 11.05.2018, 13:39 +0100 schrieb Russell King - ARM Linux:
-> On Fri, May 11, 2018 at 05:07:37PM +0530, Pintu Kumar wrote:
-> > Hi,
-> > 
-> > I need one help.
-> > I am using i.MX7 Sabre board with kernel version 4.1.15
-> > 
-> > Let's say I am interested in GPIO number: 21
-> > I wanted to set CPU affinity for particular GPIO->IRQ number, so I
-> > tried the below steps:
-> > root at 10:~# echo 21 > /sys/class/gpio/export
-> > root at 10:~# echo "rising" > /sys/class/gpio/gpio21/edge
-> > root at 10:~# cat /proc/interrupts | grep 21
-> >   47: 0 0 gpio-mxc 21 Edge gpiolib
-> > root at 10:~# cat /sys/class/gpio/gpio21/direction
-> > in
-> > root at 10:~# cat /proc/irq/47/smp_affinity
-> > 3
-> > root at 10:~# echo 2 > /proc/irq/47/smp_affinity
-> > -bash: echo: write error: Input/output error
-> > 
-> > But I get input/output error.
-> > When I debug further, found that irq_can_set_affinity is returning 0:
-> > [    0.000000] genirq: irq_can_set_affinity (0): balance: 1,
-> > irq_data.chip: a81b7e48, irq_set_affinity:   (null)
-> > [    0.000000] write_irq_affinity: FAIL
-> > 
-> > I also tried first setting /proc/irq/default_smp_affinity to 2 (from 3).
-> > This change is working, but the smp_affinity setting for the new IRQ
-> > is not working.
-> > 
-> > When I try to set smp_affinity for mmc0, then it works.
-> > # cat /proc/interrupts | grep mmc
-> > 295:         55          0     GPCV2  22 Edge      mmc0
-> > 296:          0          0     GPCV2  23 Edge      mmc1
-> > 297:         52          0     GPCV2  24 Edge      mmc2
-> > 
-> > root at 10:~# echo 2 > /proc/irq/295/smp_affinity
-> > root at 10:~#
-> > 
-> > 
-> > So, I wanted to know what are the conditions for which setting
-> > smp_affinity for an IRQ will work ?
-> > 
-> > Is there any way by which I can set CPU affinity to a GPIO -> IRQ ?
-> > Whether, irq_set_affinity_hint() will work in this case ?
-> 
-> IRQ affinity is only supported where interrupts are _directly_ wired to
-> the GIC.  It's the GIC which does the interrupt steering to the CPU
-> cores.
-> 
-> Interrupts on downstream interrupt controllers (such as GPCV2) have no
-> ability to be directed independently to other CPUs - the only possible
-> way to change the mapping is to move _all_ interrupts on that controller,
-> and any downstream chained interrupts at GIC level.
-> 
-> Hence why Interrupt 295 has no irq_set_affinity function: there is no way
-> for the interrupt controller itself to change the affinity of the input
-> interrupt.
+Apologies about delay - I was away yesterday. And advance apologies
+about - most likely - not participating in discussions in the next 4
+weeks, but I'll be on holiday in rather remote areas.
 
-The GPCv2 though is a secondary IRQ controller which has a 1:1 mapping
-of its input IRQs to the upstream GIC IRQ lines. Affinity can thus be
-handled by forwarding the request to the GIC by
-irq_chip_set_affinity_parent().
+On Wed, 2018-05-09 at 17:12 +0100, Mark Rutland wrote:
+> True. I'll reword the above to:
+> 
+>   The ARM CCN PMU driver uses dev_warn() to complain about parameters
+> in
+>   the user-provided perf_event_attr. This means that under normal
+>   operation (e.g. a single invocation of the perf tool), a number of
+>   messages warnings may be logged to dmesg.
+> 
+> ... with that, can I take your ack?
 
-As this is handled correctly in the upstream kernel since the first
-commit introducing support for the GPCv2, it seems the issue is only
-present in some downstream kernel.
+I'm by no means enthusiastic nor happy about this change, so I'd rather
+say "you won't get my NAK" (although even this wouldn't matter much, I
+believe...)
 
-Regards,
-Lucas
+Pawe?
