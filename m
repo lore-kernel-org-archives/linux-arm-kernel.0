@@ -1,75 +1,57 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 11 May 2018 10:19:50 +0100
-Subject: [PATCH v2 2/6] arm64: alternative: Apply alternatives early in
- boot process
-In-Reply-To: <d170336d-8af0-893a-acb2-51900c28ade5@arm.com>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <1516190084-18978-3-git-send-email-julien.thierry@arm.com>
- <c935a9e6-94a0-03cb-eb64-7e2eef8f8d86@arm.com>
- <7a3afa42-821a-3d4a-3af8-00ba18653a4a@arm.com>
- <d170336d-8af0-893a-acb2-51900c28ade5@arm.com>
-Message-ID: <8a8b80f8-d393-cb2e-fa7d-8d8800c4eae7@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 11 May 2018 10:24:48 +0100
+Subject: [PATCH 0/2] Allwinner A64 timer workaround
+In-Reply-To: <20180511022751.9096-1-samuel@sholland.org>
+References: <20180511022751.9096-1-samuel@sholland.org>
+Message-ID: <9d12075e-745d-b7d7-9847-f1493fc8647e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/18 09:12, Julien Thierry wrote:
+Hi,
+
+On 11/05/18 03:27, Samuel Holland wrote:
+> Hello,
+> 
+> Several people (including me) have experienced extremely large system
+> clock jumps on their A64-based devices, apparently due to the
+> architectural timer going backward, which is interpreted by Linux as
+> the timer wrapping around after 2^56 cycles.
+
+So I experienced this before, though I didn't see actual clock jumps,
+only that subsequent reads of CNTVCT_EL0, both directly via mrs and
+indirectly via CLOCK_MONOTONIC, from userland (triggered by a directed
+test) *sometimes* went backwards, with a number of '1's in the lower bits.
+But that didn't happen on every boot, and I was suspecting that some
+timer setup was missing on the hardware/firmware side. And later on I
+failed to reproduce it anymore.
+So do you see it on every boot, with recent U-Boot/ATF?
+
+Cheers,
+Andre.
+
+> Investigation led to discovery of some obvious problems with this SoC's
+> architectural timer, and this patch series introduces what I believe is
+> the simplest workaround. More details are in the commit message for
+> patch 1. Patch 2 simply enables the workaround in the device tree.
+> 
+> Thanks,
+> Samuel
+> 
+> Samuel Holland (2):
+>   arm64: arch_timer: Workaround for Allwinner A64 timer instability
+>   arm64: dts: allwinner: a64: Enable A64 timer workaround
+> 
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  1 +
+>  drivers/clocksource/Kconfig                   | 11 ++++++++
+>  drivers/clocksource/arm_arch_timer.c          | 39 +++++++++++++++++++++++++++
+>  3 files changed, 51 insertions(+)
+> 
+> --
+> 2.16.1
 > 
 > 
-> On 09/05/18 22:52, Suzuki K Poulose wrote:
->> On 05/04/2018 11:06 AM, Julien Thierry wrote:
->>> Hi,
->>>
->>> In order to prepare the v3 of this patchset, I'd like people's opinion on what this patch does. More below.
->>>
->>> On 17/01/18 11:54, Julien Thierry wrote:
->>>> From: Daniel Thompson <daniel.thompson@linaro.org>
->>>>
->>>> Currently alternatives are applied very late in the boot process (and
->>>> a long time after we enable scheduling). Some alternative sequences,
->>>> such as those that alter the way CPU context is stored, must be applied
->>>> much earlier in the boot sequence.
->>
->>>> +/*
->>>> + * early-apply features are detected using only the boot CPU and checked on
->>>> + * secondary CPUs startup, even then,
->>>> + * These early-apply features should only include features where we must
->>>> + * patch the kernel very early in the boot process.
->>>> + *
->>>> + * Note that the cpufeature logic *must* be made aware of early-apply
->>>> + * features to ensure they are reported as enabled without waiting
->>>> + * for other CPUs to boot.
->>>> + */
->>>> +#define EARLY_APPLY_FEATURE_MASK BIT(ARM64_HAS_SYSREG_GIC_CPUIF)
->>>> +
->>>
->>> Following the change in the cpufeature infrastructure, ARM64_HAS_SYSREG_GIC_CPUIF will have the scope ARM64_CPUCAP_SCOPE_BOOT_CPU in order to be checked early in the boot process.
->>
->> Thats correct.
->>
->>>
->>> Now, regarding the early application of alternative, I am wondering whether we can apply all the alternatives associated with SCOPE_BOOT features that *do not* have a cpu_enable callback.
->>>
->>
->> I don't understand why would you skip the ones that have a "cpu_enable" callback. Could you explain this a bit ? Ideally you should be able to
->> apply the alternatives for features with the SCOPE_BOOT, provided the
->> cpu_enable() callback is written properly.
->>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> In my mind the "cpu_enable" callback is the setup a cpu should perform before using the feature (i.e. the code getting patched in by the alternative). So I was worried about the code getting patched by the boot cpu and then have the secondary cpus ending up executing patched code before the cpu_enable for the corresponding feature gets called.
-> Or is there a requirement for secondary cpu startup code to be free of alternative code?
-
-There are no imposed restrictions. It is upto the capability to decide
-what can be done in cpu_enable() and what can be patched. So, if you
-make sure the patched code can be safely executed by secondary it is
-fine. May be you could even patch in some code in the early boot up, to
-do what you do in "cpu_enable()" for the secondary to safely execute
-the patched code.
-
-Anyway, if the secondary CPUs don't have the feature you are going to
-panic the system. So I don't think there is a big difference in the
-outcome if there is a mismatch, except for a clean message about the
-conflict.
-
-
-Cheers
-Suzuki
