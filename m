@@ -1,179 +1,85 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 11 May 2018 18:56:00 +0200
-Subject: [PATCH 2/2] arm64: dts: mt7622: add audio related device nodes
-In-Reply-To: <1525233238.14792.14.camel@mtkswgap22>
-References: <d208e8cf93f18b97ee9cf24cdd0220aa44188b8b.1525231985.git.sean.wang@mediatek.com>
- <e48bc87f54d7f2e06664ee358822aa9a9e34256b.1525231985.git.sean.wang@mediatek.com>
- <1525233238.14792.14.camel@mtkswgap22>
-Message-ID: <626c6741-00cd-c125-07f9-cfbbdbe36db4@gmail.com>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Fri, 11 May 2018 17:00:28 +0000
+Subject: [PATCH 3/9] soc: fsl: set rcpm bit for FTM
+In-Reply-To: <20180511033530.7931-3-yinbo.zhu@nxp.com>
+References: <20180511033530.7931-1-yinbo.zhu@nxp.com>
+ <20180511033530.7931-3-yinbo.zhu@nxp.com>
+Message-ID: <AM4PR0401MB16995DFED0376ACE0DD5E7A78F9F0@AM4PR0401MB1699.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 05/02/2018 05:53 AM, Sean Wang wrote:
-> Hi, Matthias
+> -----Original Message-----
+> From: Yinbo Zhu [mailto:yinbo.zhu at nxp.com]
+> Sent: Thursday, May 10, 2018 10:35 PM
+> To: Yinbo Zhu <yinbo.zhu@nxp.com>; Rob Herring <robh+dt@kernel.org>;
+> Mark Rutland <mark.rutland@arm.com>; Catalin Marinas )
+> <catalin.marinas@arm.com>; Will Deacon ) <will.deacon@arm.com>;
+> Lorenzo Pieralisi ) <lorenzo.pieralisi@arm.com>; Leo Li <leoyang.li@nxp.com>
+> Cc: Xiaobo Xie <xiaobo.xie@nxp.com>; Ran Wang <ran.wang_1@nxp.com>;
+> Daniel Lezcano <daniel.lezcano@linaro.org>; Thomas Gleixner
+> <tglx@linutronix.de>; Shawn Guo <shawnguo@kernel.org>; Madalin-cristian
+> Bucur <madalin.bucur@nxp.com>; Z.q. Hou <zhiqiang.hou@nxp.com>; Jerry
+> Huang <jerry.huang@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>;
+> Qiang Zhao <qiang.zhao@nxp.com>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Jiaheng Fan <jiaheng.fan@nxp.com>; Po Liu
+> <po.liu@nxp.com>; Nipun Gupta <nipun.gupta@nxp.com>; Horia Geant?
+> <horia.geanta@nxp.com>; Priyanka Jain <priyanka.jain@nxp.com>; Sumit
+> Garg <sumit.garg@nxp.com>; costi <constantin.tudor@freescale.com>;
+> Bogdan Purcareata <bogdan.purcareata@nxp.com>; Meng Yi
+> <meng.yi@nxp.com>; Wang Dongsheng <dongsheng.wang@nxp.com>; open
+> list:CLOCKSOURCE, CLOCKEVENT DRIVERS <linux-kernel@vger.kernel.org>;
+> open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
+> <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; open
+> list:FREESCALE SOC DRIVERS <linuxppc-dev@lists.ozlabs.org>; Andy Tang
+> <andy.tang@nxp.com>; Ying Zhang <ying.zhang22455@nxp.com>
+> Subject: [PATCH 3/9] soc: fsl: set rcpm bit for FTM
 > 
-> On Wed, 2018-05-02 at 11:41 +0800, sean.wang at mediatek.com wrote:
->> From: Ryder Lee <ryder.lee@mediatek.com>
->>
->> Add audio device nodes and its proper setup for all used pins
->>
->> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
->> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> ---
->>  arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 11 +++-
->>  arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 89 ++++++++++++++++++++++++++++
->>  2 files changed, 98 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
->> index 45d8655..b783764 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
->> +++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
->> @@ -18,7 +18,7 @@
->>  	compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
->>  
->>  	chosen {
->> -		bootargs = "console=ttyS0,115200n1";
->> +		bootargs = "console=ttyS0,115200n1 swiotlb=512";
->>  	};
->>  
->>  	cpus {
->> @@ -163,10 +163,17 @@
->>  	i2s1_pins: i2s1-pins {
->>  		mux {
->>  			function = "i2s";
->> -			groups =  "i2s_out_bclk_ws_mclk",
->> +			groups =  "i2s_out_mclk_bclk_ws",
+> From: Zhang Ying-22455 <ying.zhang22455@nxp.com>
 > 
-> The old one ("i2s_out_bclk_ws_mclk") should be the indecisive value when
-> I initially worked on the pinctrl device.
+> Set RCPM for FTM when using FTM as wakeup source. Because the RCPM
+> module of each platform has different big-end and little-end mode, there
+> need to set RCPM depending on the platform.
 > 
-> It has to be corrected with "i2s_out_mclk_bclk_ws" to comply with the
-> final dt-bindings.
+> Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
+> Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
+> ---
+>  .../devicetree/bindings/timer/fsl,ftm-timer.txt    |    7 ++
+>  drivers/soc/fsl/layerscape/ftm_alarm.c             |   92 ++++++++++++++++++-
+>  2 files changed, 94 insertions(+), 5 deletions(-)
 > 
->>  				  "i2s1_in_data",
->>  				  "i2s1_out_data";
->>  		};
->> +
->> +		conf {
->> +			pins = "I2S1_IN", "I2S1_OUT", "I2S_BCLK",
->> +			       "I2S_WS", "I2S_MCLK";
->> +			drive-strength = <12>;
->> +			bias-pull-down;
->> +		};
->>  	};
->>  
->>  	irrx_pins: irrx-pins {
->> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
->> index 6bbabb6..9213c96 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
->> @@ -527,6 +527,95 @@
->>  		status = "disabled";
->>  	};
->>  
->> +	audsys: clock-controller at 11220000 {
->> +		compatible = "mediatek,mt7622-audsys", "syscon";
->> +		reg = <0 0x11220000 0 0x2000>;
->> +		#clock-cells = <1>;
+> diff --git a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+> b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+> index aa8c402..15ead58 100644
+> --- a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+> @@ -3,6 +3,13 @@ Freescale FlexTimer Module (FTM) Timer  Required
+> properties:
 > 
-> The binding have been through broonie/sound.git around a week ago
-> 
+>  - compatible : should be "fsl,ftm-timer"
 
-Thanks for the clarifications!
-Pushed to v4.17-next/dts64
+Hi Yingbo,
+
+This is a change that breaks backward compatibility and not acceptable.
+
+> + Possible compatibles for ARM:
+> +     "fsl,ls1012a-ftm"
+> +     "fsl,ls1021a-ftm"
+> +     "fsl,ls1043a-ftm"
+> +     "fsl,ls1046a-ftm"
+> +     "fsl,ls1088a-ftm"
+> +     "fsl,ls208xa-ftm"
+>  - reg : Specifies base physical address and size of the register sets for the
+>    clock event device and clock source device.
+>  - interrupts : Should be the clock event device interrupt.
+> diff --git a/drivers/soc/fsl/layerscape/ftm_alarm.c
+> b/drivers/soc/fsl/layerscape/ftm_alarm.c
+> index 6f9882f..811dcfa 100644
+> --- a/drivers/soc/fsl/layerscape/ftm_alarm.c
+> +++ b/drivers/soc/fsl/layerscape/ftm_alarm.c
+
+There is no such file in the mainline kernel.  So it looks like the patch set is based on some internal git repo instead of the upstream Linux kernel.  This kind of patches shouldn't be sent to the upstream mailing list for review.
 
 Regards,
-Matthias
-
->> +
->> +		afe: audio-controller {
->> +			compatible = "mediatek,mt7622-audio";
->> +			interrupts =  <GIC_SPI 144 IRQ_TYPE_LEVEL_LOW>,
->> +				      <GIC_SPI 145 IRQ_TYPE_LEVEL_LOW>;
->> +			interrupt-names	= "afe", "asys";
->> +
->> +			clocks = <&infracfg CLK_INFRA_AUDIO_PD>,
->> +				 <&topckgen CLK_TOP_AUD1_SEL>,
->> +				 <&topckgen CLK_TOP_AUD2_SEL>,
->> +				 <&topckgen CLK_TOP_A1SYS_HP_DIV_PD>,
->> +				 <&topckgen CLK_TOP_A2SYS_HP_DIV_PD>,
->> +				 <&topckgen CLK_TOP_I2S0_MCK_SEL>,
->> +				 <&topckgen CLK_TOP_I2S1_MCK_SEL>,
->> +				 <&topckgen CLK_TOP_I2S2_MCK_SEL>,
->> +				 <&topckgen CLK_TOP_I2S3_MCK_SEL>,
->> +				 <&topckgen CLK_TOP_I2S0_MCK_DIV>,
->> +				 <&topckgen CLK_TOP_I2S1_MCK_DIV>,
->> +				 <&topckgen CLK_TOP_I2S2_MCK_DIV>,
->> +				 <&topckgen CLK_TOP_I2S3_MCK_DIV>,
->> +				 <&topckgen CLK_TOP_I2S0_MCK_DIV_PD>,
->> +				 <&topckgen CLK_TOP_I2S1_MCK_DIV_PD>,
->> +				 <&topckgen CLK_TOP_I2S2_MCK_DIV_PD>,
->> +				 <&topckgen CLK_TOP_I2S3_MCK_DIV_PD>,
->> +				 <&audsys CLK_AUDIO_I2SO1>,
->> +				 <&audsys CLK_AUDIO_I2SO2>,
->> +				 <&audsys CLK_AUDIO_I2SO3>,
->> +				 <&audsys CLK_AUDIO_I2SO4>,
->> +				 <&audsys CLK_AUDIO_I2SIN1>,
->> +				 <&audsys CLK_AUDIO_I2SIN2>,
->> +				 <&audsys CLK_AUDIO_I2SIN3>,
->> +				 <&audsys CLK_AUDIO_I2SIN4>,
->> +				 <&audsys CLK_AUDIO_ASRCO1>,
->> +				 <&audsys CLK_AUDIO_ASRCO2>,
->> +				 <&audsys CLK_AUDIO_ASRCO3>,
->> +				 <&audsys CLK_AUDIO_ASRCO4>,
->> +				 <&audsys CLK_AUDIO_AFE>,
->> +				 <&audsys CLK_AUDIO_AFE_CONN>,
->> +				 <&audsys CLK_AUDIO_A1SYS>,
->> +				 <&audsys CLK_AUDIO_A2SYS>;
->> +
->> +			clock-names = "infra_sys_audio_clk",
->> +				      "top_audio_mux1_sel",
->> +				      "top_audio_mux2_sel",
->> +				      "top_audio_a1sys_hp",
->> +				      "top_audio_a2sys_hp",
->> +				      "i2s0_src_sel",
->> +				      "i2s1_src_sel",
->> +				      "i2s2_src_sel",
->> +				      "i2s3_src_sel",
->> +				      "i2s0_src_div",
->> +				      "i2s1_src_div",
->> +				      "i2s2_src_div",
->> +				      "i2s3_src_div",
->> +				      "i2s0_mclk_en",
->> +				      "i2s1_mclk_en",
->> +				      "i2s2_mclk_en",
->> +				      "i2s3_mclk_en",
->> +				      "i2so0_hop_ck",
->> +				      "i2so1_hop_ck",
->> +				      "i2so2_hop_ck",
->> +				      "i2so3_hop_ck",
->> +				      "i2si0_hop_ck",
->> +				      "i2si1_hop_ck",
->> +				      "i2si2_hop_ck",
->> +				      "i2si3_hop_ck",
->> +				      "asrc0_out_ck",
->> +				      "asrc1_out_ck",
->> +				      "asrc2_out_ck",
->> +				      "asrc3_out_ck",
->> +				      "audio_afe_pd",
->> +				      "audio_afe_conn_pd",
->> +				      "audio_a1sys_pd",
->> +				      "audio_a2sys_pd";
->> +
->> +			assigned-clocks = <&topckgen CLK_TOP_A1SYS_HP_SEL>,
->> +					  <&topckgen CLK_TOP_A2SYS_HP_SEL>,
->> +					  <&topckgen CLK_TOP_A1SYS_HP_DIV>,
->> +					  <&topckgen CLK_TOP_A2SYS_HP_DIV>;
->> +			assigned-clock-parents = <&topckgen CLK_TOP_AUD1PLL>,
->> +						 <&topckgen CLK_TOP_AUD2PLL>;
->> +			assigned-clock-rates = <0>, <0>, <49152000>, <45158400>;
->> +		};
->> +	};
->> +
->>  	mmc0: mmc at 11230000 {
->>  		compatible = "mediatek,mt7622-mmc";
->>  		reg = <0 0x11230000 0 0x1000>;
-> 
-> 
+Leo
