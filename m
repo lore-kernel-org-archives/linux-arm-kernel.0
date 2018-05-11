@@ -1,22 +1,16 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 11 May 2018 13:46:24 +0800
-Subject: [PATCH 1/2] ARM: dts: imx28-cfa10049: Remove unnecessary
- #address/#size-cells
-In-Reply-To: <1525655020-31260-1-git-send-email-festevam@gmail.com>
-References: <1525655020-31260-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180511054623.GA26863@dragon>
+Date: Fri, 11 May 2018 13:50:06 +0800
+Subject: [PATCH] ARM: dts: imx51-zii-rdu1: fix touchscreen bindings
+In-Reply-To: <20180507135309.32580-1-nikita.yoush@cogentembedded.com>
+References: <20180507135309.32580-1-nikita.yoush@cogentembedded.com>
+Message-ID: <20180511055005.GB26863@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 06, 2018 at 10:03:39PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, May 07, 2018 at 04:53:09PM +0300, Nikita Yushchenko wrote:
+> This fixes errors in RDU1 device tree that cause touch screens not
+> working.
 > 
-> Remove unnecessary #address-cells/#size-cells to fix the following
-> DTC warnings:
-> 
-> arch/arm/boot/dts/imx28-cfa10049.dtb: Warning (avoid_unnecessary_addr_size): /gpio_keys: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
-> 
-> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
 
-Applied both, thanks.
+Applied, thanks.
