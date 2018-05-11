@@ -1,31 +1,116 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Fri, 11 May 2018 12:00:00 +0200
-Subject: [PATCH 1/3] dt-bindings: media: rcar-vin: Add R8A77995 support
+Date: Fri, 11 May 2018 12:00:02 +0200
+Subject: [PATCH 3/3] arm64: dts: renesas: draak: Describe HDMI input
 In-Reply-To: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
 References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1526032802-14376-2-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1526032802-14376-4-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible string for R-Car D3 R8A7795 to list of SoCs supported by
-rcar-vin driver.
+Describe HDMI input connected to VIN4 interface for R-Car D3 Draak
+development board.
 
 Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 ---
- Documentation/devicetree/bindings/media/rcar_vin.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 68 ++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-index a19517e1..5c6f2a7 100644
---- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-+++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-@@ -22,6 +22,7 @@ on Gen3 platforms to a CSI-2 receiver.
-    - "renesas,vin-r8a7795" for the R8A7795 device
-    - "renesas,vin-r8a7796" for the R8A7796 device
-    - "renesas,vin-r8a77970" for the R8A77970 device
-+   - "renesas,vin-r8a77995" for the R8A77995 device
-    - "renesas,rcar-gen2-vin" for a generic R-Car Gen2 or RZ/G1 compatible
-      device.
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+index d03f194..e0ce462 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+@@ -59,6 +59,17 @@
+ 		};
+ 	};
  
++	hdmi-in {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&adv7612_in>;
++			};
++		};
++	};
++
+ 	memory at 48000000 {
+ 		device_type = "memory";
+ 		/* first 128MB is reserved for secure area. */
+@@ -142,6 +153,11 @@
+ 		groups = "usb0";
+ 		function = "usb0";
+ 	};
++
++	vin4_pins: vin4 {
++		groups = "vin4_data24", "vin4_sync", "vin4_clk", "vin4_clkenb";
++		function = "vin4";
++	};
+ };
+ 
+ &i2c0 {
+@@ -154,6 +170,35 @@
+ 		reg = <0x50>;
+ 		pagesize = <8>;
+ 	};
++
++	hdmi-decoder at 4c {
++		compatible = "adi,adv7612";
++		reg = <0x4c>;
++		default-input = <0>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7612_in: endpoint {
++					remote-endpoint = <&hdmi_con_in>;
++				};
++			};
++
++			port at 2 {
++				reg = <2>;
++				adv7612_out: endpoint {
++					pclk-sample = <0>;
++					hsync-active = <0>;
++					vsync-active = <0>;
++
++					remote-endpoint = <&vin4_in>;
++				};
++			};
++		};
++	};
+ };
+ 
+ &i2c1 {
+@@ -246,3 +291,26 @@
+ 	timeout-sec = <60>;
+ 	status = "okay";
+ };
++
++&vin4 {
++	pinctrl-0 = <&vin4_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++
++			vin4_in: endpoint {
++				hsync-active = <0>;
++				vsync-active = <0>;
++
++				remote-endpoint = <&adv7612_out>;
++			};
++		};
++	};
++};
 -- 
 2.7.4
