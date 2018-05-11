@@ -1,38 +1,84 @@
-From: Alexey.Brodkin@synopsys.com (Alexey Brodkin)
-Date: Fri, 11 May 2018 12:44:23 +0000
-Subject: [PATCH 03/20] arc: use generic dma_noncoherent_ops
-In-Reply-To: <20180511075945.16548-4-hch@lst.de>
-References: <20180511075945.16548-1-hch@lst.de>
- <20180511075945.16548-4-hch@lst.de>
-Message-ID: <1526042662.19036.31.camel@synopsys.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 11 May 2018 15:04:09 +0200
+Subject: Delivery Status Notification (Failure)
+In-Reply-To: <20180511123915.GC16141@n2100.armlinux.org.uk>
+References: <CAOuPNLjqJVsPOVPCnswtFyXudAJ88_F0QVUq-Z6qWE=UpH0mBA@mail.gmail.com>
+ <CAOuPNLjqJVsPOVPCnswtFyXudAJ88_F0QVUq-Z6qWE=UpH0mBA@mail.gmail.com>
+ <5af57fea.1c69fb81.885f0.2377.GMRIR@mx.google.com>
+ <CAOuPNLgbT59h=Jm5YiOCbrqFkDokJ8xutQ_OkpsFYzKazKhTHg@mail.gmail.com>
+ <20180511123915.GC16141@n2100.armlinux.org.uk>
+Message-ID: <f6f7b18644136323f4485d6123b330d0dde207a4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
-
-On Fri, 2018-05-11 at 09:59 +0200, Christoph Hellwig wrote:
-> Switch to the generic noncoherent direct mapping implementation.
+Am Freitag, den 11.05.2018, 13:39 +0100 schrieb Russell King - ARM Linux:
+> On Fri, May 11, 2018 at 05:07:37PM +0530, Pintu Kumar wrote:
+> > Hi,
+> > 
+> > I need one help.
+> > I am using i.MX7 Sabre board with kernel version 4.1.15
+> > 
+> > Let's say I am interested in GPIO number: 21
+> > I wanted to set CPU affinity for particular GPIO->IRQ number, so I
+> > tried the below steps:
+> > root at 10:~# echo 21 > /sys/class/gpio/export
+> > root at 10:~# echo "rising" > /sys/class/gpio/gpio21/edge
+> > root at 10:~# cat /proc/interrupts | grep 21
+> >   47: 0 0 gpio-mxc 21 Edge gpiolib
+> > root at 10:~# cat /sys/class/gpio/gpio21/direction
+> > in
+> > root at 10:~# cat /proc/irq/47/smp_affinity
+> > 3
+> > root at 10:~# echo 2 > /proc/irq/47/smp_affinity
+> > -bash: echo: write error: Input/output error
+> > 
+> > But I get input/output error.
+> > When I debug further, found that irq_can_set_affinity is returning 0:
+> > [    0.000000] genirq: irq_can_set_affinity (0): balance: 1,
+> > irq_data.chip: a81b7e48, irq_set_affinity:   (null)
+> > [    0.000000] write_irq_affinity: FAIL
+> > 
+> > I also tried first setting /proc/irq/default_smp_affinity to 2 (from 3).
+> > This change is working, but the smp_affinity setting for the new IRQ
+> > is not working.
+> > 
+> > When I try to set smp_affinity for mmc0, then it works.
+> > # cat /proc/interrupts | grep mmc
+> > 295:         55          0     GPCV2  22 Edge      mmc0
+> > 296:          0          0     GPCV2  23 Edge      mmc1
+> > 297:         52          0     GPCV2  24 Edge      mmc2
+> > 
+> > root at 10:~# echo 2 > /proc/irq/295/smp_affinity
+> > root at 10:~#
+> > 
+> > 
+> > So, I wanted to know what are the conditions for which setting
+> > smp_affinity for an IRQ will work ?
+> > 
+> > Is there any way by which I can set CPU affinity to a GPIO -> IRQ ?
+> > Whether, irq_set_affinity_hint() will work in this case ?
 > 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  arch/arc/Kconfig                   |   4 +
->  arch/arc/include/asm/Kbuild        |   1 +
->  arch/arc/include/asm/dma-mapping.h |  21 -----
->  arch/arc/mm/dma.c                  | 141 +++--------------------------
->  4 files changed, 19 insertions(+), 148 deletions(-)
->  delete mode 100644 arch/arc/include/asm/dma-mapping.h
+> IRQ affinity is only supported where interrupts are _directly_ wired to
+> the GIC.  It's the GIC which does the interrupt steering to the CPU
+> cores.
+> 
+> Interrupts on downstream interrupt controllers (such as GPCV2) have no
+> ability to be directed independently to other CPUs - the only possible
+> way to change the mapping is to move _all_ interrupts on that controller,
+> and any downstream chained interrupts at GIC level.
+> 
+> Hence why Interrupt 295 has no irq_set_affinity function: there is no way
+> for the interrupt controller itself to change the affinity of the input
+> interrupt.
 
-Sorry I didn't try your proposed fix earlier - was away for a couple of days.
+The GPCv2 though is a secondary IRQ controller which has a 1:1 mapping
+of its input IRQs to the upstream GIC IRQ lines. Affinity can thus be
+handled by forwarding the request to the GIC by
+irq_chip_set_affinity_parent().
 
-But that newer version with fixed lib/dma-noncoherent.c still doesn't work on ARC.
+As this is handled correctly in the upstream kernel since the first
+commit introducing support for the GPCv2, it seems the issue is only
+present in some downstream kernel.
 
-USB ECHI controller fails like that:
-------------------------->8-------------------------
-usb 1-1: new high-speed USB device number 2 using ehci-platform
-usb 1-1: can't set config #1, error -32
-------------------------->8-------------------------
-
-Again with entire series reverted USB starts to work.
-Let's wait for other arches previously affected to update on their status.
-
--Alexey
+Regards,
+Lucas
