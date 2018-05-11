@@ -1,41 +1,151 @@
-From: john.garry@huawei.com (John Garry)
-Date: Fri, 11 May 2018 14:56:16 +0100
-Subject: [PATCH 04/20] arm-nommu: use generic dma_noncoherent_ops
-In-Reply-To: <20180511075945.16548-5-hch@lst.de>
-References: <20180511075945.16548-1-hch@lst.de>
- <20180511075945.16548-5-hch@lst.de>
-Message-ID: <73603c68-da05-22bd-efab-d0387a98225d@huawei.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 11 May 2018 14:58:04 +0100
+Subject: [PATCH 1/3] arm64: dts: hi3798cv200: enable PCIe support for
+ poplar board
+In-Reply-To: <1526004220-17030-1-git-send-email-shawn.guo@linaro.org>
+References: <1526004220-17030-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <5AF5A16C.6090804@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2018 08:59, Christoph Hellwig wrote:
-> Switch to the generic noncoherent direct mapping implementation for
-> the nommu dma map implementation.
->
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+Hi Shawn,
+
+On 2018/5/11 3:03, Shawn Guo wrote:
+> It adds combophy devices under peripheral controller and enables PCIe
+> support for Hi3798CV200 Poplar board.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+
+Series applied into the hisilicon dt tree.
+Thanks!
+
+BR,
+Wei
+
 > ---
->  arch/arc/Kconfig                |   1 +
->  arch/arm/Kconfig                |   4 +
->  arch/arm/mm/dma-mapping-nommu.c | 139 +++++---------------------------
->  3 files changed, 23 insertions(+), 121 deletions(-)
->
-> diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
-> index 89d47eac18b2..3a492a9aeaad 100644
-> --- a/arch/arc/Kconfig
-> +++ b/arch/arc/Kconfig
-> @@ -9,6 +9,7 @@
->  config ARC
->  	def_bool y
->  	select ARC_TIMERS
-> +	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
->  	select ARCH_HAS_SYNC_DMA_FOR_CPU
->  	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
-
-I guess that this arc change is here by accident, no? And isn't 
-ARCH_HAS_SYNC_DMA_FOR_DEVICE already selected (by 3/20)?
-
->  	select ARCH_HAS_SG_CHAIN
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c43f5bb55ac8..76ddd0064f87 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
+>  .../boot/dts/hisilicon/hi3798cv200-poplar.dts      | 15 ++++++
+>  arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 63 ++++++++++++++++++++++
+>  2 files changed, 78 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+> index 4d5d644abb12..c4382e1f3c92 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+> @@ -61,6 +61,15 @@
+>  			default-state = "off";
+>  		};
+>  	};
+> +
+> +	reg_pcie: regulator-pcie {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "3V3_PCIE0";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio6 7 0>;
+> +		enable-active-high;
+> +	};
+>  };
+>  
+>  &gmac1 {
+> @@ -146,6 +155,12 @@
+>  	status = "okay";
+>  };
+>  
+> +&pcie {
+> +	reset-gpios = <&gpio4 4 GPIO_ACTIVE_HIGH>;
+> +	vpcie-supply = <&reg_pcie>;
+> +	status = "okay";
+> +};
+> +
+>  &sd0 {
+>  	bus-width = <4>;
+>  	cap-sd-highspeed;
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+> index 962bd79139e4..5b73403551e6 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+> @@ -8,7 +8,9 @@
+>   */
+>  
+>  #include <dt-bindings/clock/histb-clock.h>
+> +#include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/phy/phy.h>
+>  #include <dt-bindings/reset/ti-syscon.h>
+>  
+>  / {
+> @@ -106,6 +108,37 @@
+>  			#reset-cells = <2>;
+>  		};
+>  
+> +		perictrl: peripheral-controller at 8a20000 {
+> +			compatible = "hisilicon,hi3798cv200-perictrl", "syscon",
+> +				     "simple-mfd";
+> +			reg = <0x8a20000 0x1000>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x0 0x8a20000 0x1000>;
+> +
+> +			combphy0: phy at 850 {
+> +				compatible = "hisilicon,hi3798cv200-combphy";
+> +				reg = <0x850 0x8>;
+> +				#phy-cells = <1>;
+> +				clocks = <&crg HISTB_COMBPHY0_CLK>;
+> +				resets = <&crg 0x188 4>;
+> +				assigned-clocks = <&crg HISTB_COMBPHY0_CLK>;
+> +				assigned-clock-rates = <100000000>;
+> +				hisilicon,fixed-mode = <PHY_TYPE_USB3>;
+> +			};
+> +
+> +			combphy1: phy at 858 {
+> +				compatible = "hisilicon,hi3798cv200-combphy";
+> +				reg = <0x858 0x8>;
+> +				#phy-cells = <1>;
+> +				clocks = <&crg HISTB_COMBPHY1_CLK>;
+> +				resets = <&crg 0x188 12>;
+> +				assigned-clocks = <&crg HISTB_COMBPHY1_CLK>;
+> +				assigned-clock-rates = <100000000>;
+> +				hisilicon,mode-select-bits = <0x0008 11 (0x3 << 11)>;
+> +			};
+> +		};
+> +
+>  		uart0: serial at 8b00000 {
+>  			compatible = "arm,pl011", "arm,primecell";
+>  			reg = <0x8b00000 0x1000>;
+> @@ -419,5 +452,35 @@
+>  			clocks = <&sysctrl HISTB_IR_CLK>;
+>  			status = "disabled";
+>  		};
+> +
+> +		pcie: pcie at 9860000 {
+> +			compatible = "hisilicon,hi3798cv200-pcie";
+> +			reg = <0x9860000 0x1000>,
+> +			      <0x0 0x2000>,
+> +			      <0x2000000 0x01000000>;
+> +			reg-names = "control", "rc-dbi", "config";
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
+> +			bus-range = <0 15>;
+> +			num-lanes = <1>;
+> +			ranges = <0x81000000 0x0 0x00000000 0x4f00000 0x0 0x100000
+> +				  0x82000000 0x0 0x3000000 0x3000000 0x0 0x01f00000>;
+> +			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "msi";
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 0>;
+> +			interrupt-map = <0 0 0 0 &gic 0 131 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&crg HISTB_PCIE_AUX_CLK>,
+> +				 <&crg HISTB_PCIE_PIPE_CLK>,
+> +				 <&crg HISTB_PCIE_SYS_CLK>,
+> +				 <&crg HISTB_PCIE_BUS_CLK>;
+> +			clock-names = "aux", "pipe", "sys", "bus";
+> +			resets = <&crg 0x18c 6>, <&crg 0x18c 5>, <&crg 0x18c 4>;
+> +			reset-names = "soft", "sys", "bus";
+> +			phys = <&combphy1 PHY_TYPE_PCIE>;
+> +			phy-names = "phy";
+> +			status = "disabled";
+> +		};
+>  	};
+>  };
+> 
