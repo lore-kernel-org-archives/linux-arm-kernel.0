@@ -1,52 +1,75 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Fri, 11 May 2018 14:36:22 +0200
-Subject: [PATCH 4/6] mm, arm64: untag user addresses in mm/gup.c
-In-Reply-To: <20180508151137.zguepljs3pa7xv5g@armageddon.cambridge.arm.com>
-References: <cover.1524077494.git.andreyknvl@google.com>
- <0db34d04fa16be162336106e3b4a94f3dacc0af4.1524077494.git.andreyknvl@google.com>
- <20180426174714.4jtb72q56w3xonsa@armageddon.cambridge.arm.com>
- <CAAeHK+zY8p9E4FZa7mbdgR=wR0u-RDS552dn=h9fKRC-ArYLdw@mail.gmail.com>
- <20180502153645.fui4ju3scsze3zkq@black.fi.intel.com>
- <CAAeHK+yTbmZfkeNbqbo+J90zsjsM99rwnYBGfQBxphHMMfgD7A@mail.gmail.com>
- <20180508151137.zguepljs3pa7xv5g@armageddon.cambridge.arm.com>
-Message-ID: <CAAeHK+yR9=SYEBg-Pvi+x3qSqQSG1u+79pk5vQvOcsp+o=zkxw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 May 2018 13:39:16 +0100
+Subject: Delivery Status Notification (Failure)
+In-Reply-To: <CAOuPNLgbT59h=Jm5YiOCbrqFkDokJ8xutQ_OkpsFYzKazKhTHg@mail.gmail.com>
+References: <CAOuPNLjqJVsPOVPCnswtFyXudAJ88_F0QVUq-Z6qWE=UpH0mBA@mail.gmail.com>
+ <CAOuPNLjqJVsPOVPCnswtFyXudAJ88_F0QVUq-Z6qWE=UpH0mBA@mail.gmail.com>
+ <5af57fea.1c69fb81.885f0.2377.GMRIR@mx.google.com>
+ <CAOuPNLgbT59h=Jm5YiOCbrqFkDokJ8xutQ_OkpsFYzKazKhTHg@mail.gmail.com>
+Message-ID: <20180511123915.GC16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2018 at 5:11 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, May 02, 2018 at 07:25:17PM +0200, Andrey Konovalov wrote:
->> On Wed, May 2, 2018 at 5:36 PM, Kirill A. Shutemov
->> <kirill.shutemov@linux.intel.com> wrote:
->> > On Wed, May 02, 2018 at 02:38:42PM +0000, Andrey Konovalov wrote:
->> >> > Does having a tagged address here makes any difference? I couldn't hit a
->> >> > failure with my simple tests (LD_PRELOAD a library that randomly adds
->> >> > tags to pointers returned by malloc).
->> >>
->> >> I think you're right, follow_page_mask is only called from
->> >> __get_user_pages, which already untagged the address. I'll remove
->> >> untagging here.
->> >
->> > It also called from follow_page(). Have you covered all its callers?
->>
->> Oh, missed that, will take a look.
->>
->> Thinking about that, would it make sense to add untagging to find_vma
->> (and others) instead of trying to cover all find_vma callers?
->
-> I don't think adding the untagging to find_vma() is sufficient. In many
-> cases the caller does a subsequent check like 'start < vma->vm_start'
-> (see sys_msync() as an example, there are a few others as well).
+On Fri, May 11, 2018 at 05:07:37PM +0530, Pintu Kumar wrote:
+> Hi,
+> 
+> I need one help.
+> I am using i.MX7 Sabre board with kernel version 4.1.15
+> 
+> Let's say I am interested in GPIO number: 21
+> I wanted to set CPU affinity for particular GPIO->IRQ number, so I
+> tried the below steps:
+> root at 10:~# echo 21 > /sys/class/gpio/export
+> root at 10:~# echo "rising" > /sys/class/gpio/gpio21/edge
+> root at 10:~# cat /proc/interrupts | grep 21
+>   47: 0 0 gpio-mxc 21 Edge gpiolib
+> root at 10:~# cat /sys/class/gpio/gpio21/direction
+> in
+> root at 10:~# cat /proc/irq/47/smp_affinity
+> 3
+> root at 10:~# echo 2 > /proc/irq/47/smp_affinity
+> -bash: echo: write error: Input/output error
+> 
+> But I get input/output error.
+> When I debug further, found that irq_can_set_affinity is returning 0:
+> [    0.000000] genirq: irq_can_set_affinity (0): balance: 1,
+> irq_data.chip: a81b7e48, irq_set_affinity:   (null)
+> [    0.000000] write_irq_affinity: FAIL
+> 
+> I also tried first setting /proc/irq/default_smp_affinity to 2 (from 3).
+> This change is working, but the smp_affinity setting for the new IRQ
+> is not working.
+> 
+> When I try to set smp_affinity for mmc0, then it works.
+> # cat /proc/interrupts | grep mmc
+> 295:         55          0     GPCV2  22 Edge      mmc0
+> 296:          0          0     GPCV2  23 Edge      mmc1
+> 297:         52          0     GPCV2  24 Edge      mmc2
+> 
+> root at 10:~# echo 2 > /proc/irq/295/smp_affinity
+> root at 10:~#
+> 
+> 
+> So, I wanted to know what are the conditions for which setting
+> smp_affinity for an IRQ will work ?
+> 
+> Is there any way by which I can set CPU affinity to a GPIO -> IRQ ?
+> Whether, irq_set_affinity_hint() will work in this case ?
 
-OK.
+IRQ affinity is only supported where interrupts are _directly_ wired to
+the GIC.  It's the GIC which does the interrupt steering to the CPU
+cores.
 
-> What I
-> did in my tests was a WARN_ON_ONCE() in find_vma() if the address is
-> tagged.
+Interrupts on downstream interrupt controllers (such as GPCV2) have no
+ability to be directed independently to other CPUs - the only possible
+way to change the mapping is to move _all_ interrupts on that controller,
+and any downstream chained interrupts at GIC level.
 
-So this is similar to what I did.
+Hence why Interrupt 295 has no irq_set_affinity function: there is no way
+for the interrupt controller itself to change the affinity of the input
+interrupt.
 
-Do you think trying to find "all places where we cast out __user" with
-static analysis as Kirill suggested is something I should pursue? Or
-is this patchset is good as is as the first approximation, since we
-can fix more things where untagging is needed as we discover them one
-by one?
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
