@@ -1,55 +1,25 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 11 May 2018 14:43:38 -0700
-Subject: [GIT PULL 5/5] Broadcom soc changes for 4.18
-In-Reply-To: <20180511214339.24139-1-f.fainelli@gmail.com>
-References: <20180511214339.24139-1-f.fainelli@gmail.com>
-Message-ID: <20180511214339.24139-5-f.fainelli@gmail.com>
+Date: Fri, 11 May 2018 15:02:40 -0700
+Subject: [PATCH 0/2] soc: bcm: brcmstb: Updates to support newer controllers
+Message-ID: <20180511220242.837-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+Hi all,
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+This patch series adds support for newer reveisions of the memory controller
+which is necessary to make sure we do use the right programming sequence to
+enter S2 and S3 suspend/resume modes.
 
-are available in the git repository at:
+Doug Berger (1):
+  soc: bcm: brcmstb: pm: Add support for newer rev B3.0 controllers
 
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/soc
+Florian Fainelli (1):
+  soc: bcm: brcmstb: Add missing DDR MEMC compatible strings
 
-for you to fetch changes up to 56e4446df9c1214e886fdc7603a5c1cb99cb1843:
+ .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt         |  4 ++++
+ drivers/soc/bcm/brcmstb/pm/pm-arm.c                      | 16 ++++++++++++++++
+ 2 files changed, 20 insertions(+)
 
-  ARM: brcmstb: Add support for the V7 memory map (2018-05-09 12:14:42 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based machine/platform files
-changes for 4.18, please pull the following:
-
-- Doug updates arch/arm/include/asm/cpuinfo.h such that this header file
-can be used by both C and assembly code. This particular change will
-also be included in a Sunxi pull request to support A83T SMP support.
-
-- Doug also updates our DEBUG_LL routine to support newer chips such as
-7278 which have a version 7 memory map which moves the registers from
-physical address 0xf000_0000 down to 0x0800_0000. This requires us to
-look up the processor MIDR and determine the base address from the
-PERIPHBASE register.
-
-- Florian updates the Brahma-B15 read-ahead cache implementation such
-that it works on the Brahma-B53 CPUs, which also have an identical
-read-ahead cache implementation, with a different set of offsets. He
-also provides the Brahma-B15 MIDR definition such that it can be used by
-other pieces of code in the future.
-
-----------------------------------------------------------------
-Doug Berger (3):
-      ARM: Allow this header to be included by assembly files
-      ARM: add Broadcom Brahma-B53 main ID definition
-      ARM: brcmstb: Add support for the V7 memory map
-
-Florian Fainelli (2):
-      ARM: B15: Update to support Brahma-B53
-      ARM: add Broadcom Brahma-B15 main ID definition
-
- arch/arm/include/asm/cputype.h   | 15 ++++++++++++---
- arch/arm/include/debug/brcmstb.S | 21 ++++++++++++++++++++-
- arch/arm/mm/cache-b15-rac.c      | 30 ++++++++++++++++++++++++++----
- 3 files changed, 58 insertions(+), 8 deletions(-)
+-- 
+2.14.1
