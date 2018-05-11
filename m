@@ -1,107 +1,139 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 11 May 2018 10:59:38 +0200
-Subject: [PATCH v4 1/3] drm/panel: Add RGB666 variant of Innolux AT070TN90
-In-Reply-To: <c8ab5f472881063b90abe9461933baf6ee325dcd.camel@paulk.fr>
-References: <20180507220413.21990-1-contact@paulk.fr>
- <20180509071226.ivh4s3wtczg2u7zw@flea>
- <c8ab5f472881063b90abe9461933baf6ee325dcd.camel@paulk.fr>
-Message-ID: <20180511085938.wjmdsdjfvdxd4shk@flea>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 May 2018 10:11:15 +0100
+Subject: [PATCH 04/20] arm-nommu: use generic dma_noncoherent_ops
+In-Reply-To: <20180511075945.16548-5-hch@lst.de>
+References: <20180511075945.16548-1-hch@lst.de>
+ <20180511075945.16548-5-hch@lst.de>
+Message-ID: <20180511091114.GA16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 01:31:23PM +0200, Paul Kocialkowski wrote:
-> On Wed, 2018-05-09 at 09:12 +0200, Maxime Ripard wrote:
-> > On Tue, May 08, 2018 at 12:04:11AM +0200, Paul Kocialkowski wrote:
-> > > This adds timings for the RGB666 variant of the Innolux AT070TN90 panel,
-> > > as found on the Ainol AW1 tablet.
-> > > 
-> > > The panel also supports RGB888 output. When RGB666 mode is used instead,
-> > > the two extra lanes per component are grounded.
-> > > 
-> > > In the future, it might become necessary to introduce a dedicated
-> > > device-tree property to specify the bus format to use instead of the
-> > > default one for the panel. This will allow supporting different bus
-> > > formats for the same panel modes.
-> > > 
-> > > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> > > ---
-> > >  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
-> > >  1 file changed, 26 insertions(+)
-> > > 
-> > > diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-> > > index cbf1ab404ee7..32e30d5a8f08 100644
-> > > --- a/drivers/gpu/drm/panel/panel-simple.c
-> > > +++ b/drivers/gpu/drm/panel/panel-simple.c
-> > > @@ -1063,6 +1063,29 @@ static const struct panel_desc innolux_at043tn24 = {
-> > >  	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> > >  };
-> > >  
-> > > +static const struct drm_display_mode innolux_at070tn90_mode = {
-> > > +	.clock = 40000,
-> > > +	.hdisplay = 800,
-> > > +	.hsync_start = 800 + 112,
-> > > +	.hsync_end = 800 + 112 + 1,
-> > > +	.htotal = 800 + 112 + 1 + 87,
-> > > +	.vdisplay = 480,
-> > > +	.vsync_start = 480 + 141,
-> > > +	.vsync_end = 480 + 141 + 1,
-> > > +	.vtotal = 480 + 141 + 1 + 38,
-> > > +	.vrefresh = 60,
-> > > +};
-> > > +
-> > > +static const struct panel_desc innolux_at070tn90 = {
-> > > +	.modes = &innolux_at070tn90_mode,
-> > > +	.num_modes = 1,
-> > > +	.size = {
-> > > +		.width = 154,
-> > > +		.height = 86,
-> > > +	},
-> > > +	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-> > > +};
-> > > +
-> > 
-> > I'm not really convinced this is the right approach. You said it
-> > yourself, the panel is using a 24-bits interface, and you just happen
-> > to have a tablet that routed it using a 18-bits interface instead.
-> > 
-> > That doesn't belong in the driver, especially associated to the
-> > compatible, but where the routing is described: in the device
-> > tree. And given that the panel interface is a 24 bits panel, if we
-> > were to have a default, we should have this one, and not the one
-> > fitting your use case.
+On Fri, May 11, 2018 at 09:59:29AM +0200, Christoph Hellwig wrote:
+> Switch to the generic noncoherent direct mapping implementation for
+> the nommu dma map implementation.
 > 
-> I fully agree, this is why I suggested introducing a dedicated dt
-> property for selecting the bus format (in the commit message). I still
-> proposed this patch as a temporary solution, but I'm definitely willing
-> to craft a proper solution as well.
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arc/Kconfig                |   1 +
+>  arch/arm/Kconfig                |   4 +
+>  arch/arm/mm/dma-mapping-nommu.c | 139 +++++---------------------------
+>  3 files changed, 23 insertions(+), 121 deletions(-)
 > 
-> Here is an initial proposition:
-> 1. Making bus_format an array in struct panel_desc and listing all the
-> relevant bus formats that the panel can support there;
+> diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
+> index 89d47eac18b2..3a492a9aeaad 100644
+> --- a/arch/arc/Kconfig
+> +++ b/arch/arc/Kconfig
+> @@ -9,6 +9,7 @@
+>  config ARC
+>  	def_bool y
+>  	select ARC_TIMERS
+> +	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
+>  	select ARCH_HAS_SYNC_DMA_FOR_CPU
+>  	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
+>  	select ARCH_HAS_SG_CHAIN
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index c43f5bb55ac8..76ddd0064f87 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -12,6 +12,8 @@ config ARM
+>  	select ARCH_HAS_PHYS_TO_DMA
+>  	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+>  	select ARCH_HAS_STRICT_MODULE_RWX if MMU
+> +	select ARCH_HAS_SYNC_DMA_FOR_CPU if !MMU
+> +	select ARCH_HAS_SYNC_DMA_FOR_DEVICE if !MMU
+>  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+>  	select ARCH_HAVE_CUSTOM_GPIO_H
+>  	select ARCH_HAS_GCOV_PROFILE_ALL
+> @@ -27,6 +29,8 @@ config ARM
+>  	select CPU_PM if (SUSPEND || CPU_IDLE)
+>  	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
+>  	select DMA_DIRECT_OPS if !MMU
+> +	select DMA_NONCOHERENT_OPS if !MMU
+> +	select DMA_NONCOHERENT_MMAP if !MMU
+>  	select EDAC_SUPPORT
+>  	select EDAC_ATOMIC_SCRUB
+>  	select GENERIC_ALLOCATOR
+> diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
+> index f448a0663b10..a74ed6632982 100644
+> --- a/arch/arm/mm/dma-mapping-nommu.c
+> +++ b/arch/arm/mm/dma-mapping-nommu.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/export.h>
+>  #include <linux/mm.h>
+>  #include <linux/dma-direct.h>
+> +#include <linux/dma-noncoherent.h>
+>  #include <linux/scatterlist.h>
+>  
+>  #include <asm/cachetype.h>
+> @@ -26,18 +27,16 @@
+>   *   - MMU/MPU is off
+>   *   - cpu is v7m w/o cache support
+>   *   - device is coherent
+> - *  otherwise arm_nommu_dma_ops is used.
+> + *  otherwise dma_noncoherent_ops is used.
+>   *
+> - *  arm_nommu_dma_ops rely on consistent DMA memory (please, refer to
+> + *  dma_noncoherent_ops rely on consistent DMA memory (please, refer to
+>   *  [1] on how to declare such memory).
+>   *
+>   *  [1] Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+>   */
+>  
+> -static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
+> -				 dma_addr_t *dma_handle, gfp_t gfp,
+> -				 unsigned long attrs)
+> -
+> +void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
+> +		gfp_t gfp, unsigned long attrs)
+>  {
+>  	void *ret;
+>  
+> @@ -65,9 +64,8 @@ static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
+>  	return ret;
+>  }
+>  
+> -static void arm_nommu_dma_free(struct device *dev, size_t size,
+> -			       void *cpu_addr, dma_addr_t dma_addr,
+> -			       unsigned long attrs)
+> +void arch_dma_free(struct device *dev, size_t size, void *cpu_addr,
+> +		dma_addr_t dma_addr, unsigned long attrs)
+>  {
+>  	if (attrs & DMA_ATTR_NON_CONSISTENT) {
+>  		dma_direct_free(dev, size, cpu_addr, dma_addr, attrs);
+> @@ -81,9 +79,9 @@ static void arm_nommu_dma_free(struct device *dev, size_t size,
+>  	return;
+>  }
+>  
+> -static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+> -			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> -			      unsigned long attrs)
+> +int arch_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+> +		void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +		unsigned long attrs)
+>  {
+>  	int ret;
+>  
+> @@ -93,9 +91,8 @@ static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>  	return dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
+>  }
+>  
+> -
+> -static void __dma_page_cpu_to_dev(phys_addr_t paddr, size_t size,
+> -				  enum dma_data_direction dir)
+> +void arch_sync_dma_for_device(struct device *dev, phys_addr_t paddr,
+> +		size_t size, enum dma_data_direction dir)
 
-I'm not sure this is needed, the input format is always the same in
-your case, the panel will always take a 24 bits RGB value. What you
-want to change is the encoder output format (and I guess you want that
-to be meaningful to enable or not the dithering).
+Please no.  There is a lot of history of these (__dma_page_cpu_to_dev etc)
+functions being abused by out of tree drivers, because they think they
+know better.  This is stopped by making them static and ensuring that
+drivers have no access to these functions.
 
-> 2. Introducing an optional "bus-format" dt property that indicates which
-> bus format to use, and using the first index of the bus formats array if
-> the property is not present;
+Please do not re-expose these to the global kernel.
 
-I guess the width would be enough, and that way we can take the
-bus-width format that is already defined (but used in the v4l2
-framework, not in DRM yet).
-
-Maxime
+While it may make things easier for a cross-architecture point of view,
+it makes it a lot easier for people to abuse these private APIs.
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180511/29433d16/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
