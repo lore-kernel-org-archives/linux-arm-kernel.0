@@ -1,38 +1,44 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 11 May 2018 14:29:42 +0100
-Subject: [GIT PULL] firmware: scmi: fixes for v4.17 (part 2)
-Message-ID: <20180511132942.GA18590@e107155-lin>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 11 May 2018 15:28:44 +0200
+Subject: [PATCH] [stable 4.14] arm64: Add work around for Arm Cortex-A55
+ Erratum 1024718
+In-Reply-To: <1526037802-13305-1-git-send-email-suzuki.poulose@arm.com>
+References: <1526037802-13305-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180511132844.GC31231@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC team,
+On Fri, May 11, 2018 at 12:23:22PM +0100, Suzuki K Poulose wrote:
+> commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
+> 
+> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
+> from an erratum 1024718, which causes incorrect updates when DBM/AP
+> bits in a page table entry is modified without a break-before-make
+> sequence. The work around is to disable the hardware DBM feature
+> on the affected cores. The hardware Access Flag management features
+> is not affected.
+> 
+> The hardware DBM feature is a non-conflicting capability, i.e, the
+> kernel could handle cores using the feature and those without having
+> the features running at the same time. So this work around is detected
+> at early boot time, rather than delaying it until the CPUs are brought
+> up into the kernel with MMU turned on. This also avoids other complexities
+> with late CPUs turning online, with or without the hardware DBM features.
+> 
+> Cc: stable at vger.kernel.org # v4.14
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Note: The upstream commit is on top of a reworked capability
+> infrastructure for arm64 heterogeneous systems, which allows
+> delaying the CPU model checks. This backport is based on the
+> original version of the patch [0], which checks the affected
+> CPU models during the early boot.
+> 
+> [0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
 
-Please pull !
+Thanks for the backport, now applied.
 
-Regards,
-Sudeep
-
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-fixes-4.17
-
-for you to fetch changes up to 31c6085562a03124d3f6a5c43dd9888ac44495a5:
-
-  firmware: arm_scmi: Use after free in scmi_create_protocol_device() (2018-05-08 18:03:47 +0100)
-
-----------------------------------------------------------------
-SCMI fix for v4.17
-
-A single patch to ensure that the scmi device is not used for setting up
-scmi handle after it's freed(fixes use after free).
-
-----------------------------------------------------------------
-Dan Carpenter (1):
-      firmware: arm_scmi: Use after free in scmi_create_protocol_device()
-
- drivers/firmware/arm_scmi/driver.c | 1 +
- 1 file changed, 1 insertion(+)
+greg k-h
