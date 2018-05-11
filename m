@@ -1,46 +1,45 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 11 May 2018 13:19:54 +0200
-Subject: [PATCH 2/2] arm64: dts: Add Mediatek SoC MT8183 and evaluation
- board dts and Makefile
-In-Reply-To: <1526035267.13828.13.camel@mtksdaap41>
-References: <1526019083-20237-1-git-send-email-erin.lo@mediatek.com>
- <1526019083-20237-3-git-send-email-erin.lo@mediatek.com>
- <860cba8a-3af8-31d6-ec3f-81706d2d998b@gmail.com>
- <1526035267.13828.13.camel@mtksdaap41>
-Message-ID: <b2dfc052-bbf4-2154-985d-b1e2e7717cf4@gmail.com>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Fri, 11 May 2018 13:22:33 +0200
+Subject: [PATCH 1/3] dt-bindings: media: rcar-vin: Add R8A77995 support
+In-Reply-To: <1526032802-14376-2-git-send-email-jacopo+renesas@jmondi.org>
+References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526032802-14376-2-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180511112233.GJ18974@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jacopo,
 
+Thanks for your work.
 
-On 05/11/2018 12:41 PM, Erin Lo wrote:
-> On Fri, 2018-05-11 at 10:36 +0200, Matthias Brugger wrote:
->>
->> On 05/11/2018 08:11 AM, Erin Lo wrote:
-[...]
->>
->> I wonder if there aren't any other devices which can be supported out of the box.
->> I understand that for now we are missing the clock driver and the pinctrl
->> driver. Are you planning to submit them in the near future?
->>
->> I'm asking because I don't want to bloat the dts with boards that only can boot
->> to an initramfs with a serial console. Especially if there is no HW + datasheet
->> available for anyone in the community who wants to work on this.
->>
->> Regards,
->> Matthias
->>
->> Regards,
->> Matthias
+On 2018-05-11 12:00:00 +0200, Jacopo Mondi wrote:
+> Add compatible string for R-Car D3 R8A7795 to list of SoCs supported by
+> rcar-vin driver.
 > 
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+
+Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
+> ---
+>  Documentation/devicetree/bindings/media/rcar_vin.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> We have implement clock and pinctrl driver these days, and plan to
-> submit them maybe next month.
-> After that we will submit other drivers of MT8183 continuously.
+> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> index a19517e1..5c6f2a7 100644
+> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
+> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> @@ -22,6 +22,7 @@ on Gen3 platforms to a CSI-2 receiver.
+>     - "renesas,vin-r8a7795" for the R8A7795 device
+>     - "renesas,vin-r8a7796" for the R8A7796 device
+>     - "renesas,vin-r8a77970" for the R8A77970 device
+> +   - "renesas,vin-r8a77995" for the R8A77995 device
+>     - "renesas,rcar-gen2-vin" for a generic R-Car Gen2 or RZ/G1 compatible
+>       device.
+>  
+> -- 
+> 2.7.4
 > 
 
-I'm happy to hear this. So in this case I'm fine with merging these once you
-figured out the dt-bindings.
-
-Thanks a lot,
-Matthias
+-- 
+Regards,
+Niklas S?derlund
