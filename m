@@ -1,45 +1,44 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 May 2018 20:51:35 +0530
-Subject: [PATCH 2/3] ARM: davinci: board-dm646x-evm: pass correct I2C adapter
- id for VPIF
+Date: Fri, 11 May 2018 20:51:34 +0530
+Subject: [PATCH 1/3] ARM: davinci: dm646x: fix timer interrupt generation
 In-Reply-To: <20180511152136.29515-1-nsekhar@ti.com>
 References: <20180511152136.29515-1-nsekhar@ti.com>
-Message-ID: <20180511152136.29515-3-nsekhar@ti.com>
+Message-ID: <20180511152136.29515-2-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit a16cb91ad9c4 ("[media] media: vpif: use a configurable
-i2c_adapter_id for vpif display") removed hardcoded I2C adaptor
-setting in VPIF driver, but missed updating platform data passed
-from DM646x board.
+commit b38434145b34 ("ARM: davinci: irqs: Correct McASP1 TX
+interrupt definition for DM646x") inadvertently removed
+setting for priority for timer0_12 (bottom half of timer0).
+This timer is used as clockevent.
 
-Fix it.
+When INTPRIn register setting for an interrupt is left at 0,
+it is mapped to FIQ by the AINTC causing the timer interrupt to
+not get generated.
 
-Fixes: a16cb91ad9c4 ("[media] media: vpif: use a configurable i2c_adapter_id for vpif display")
+Fix it by including an entry for timer0_12 in interrupt
+priority map array. While at it, move the clockevent comment to
+the right place.
+
+Fixes: b38434145b34 ("ARM: davinci: irqs: Correct McASP1 TX interrupt definition for DM646x")
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/mach-davinci/board-dm646x-evm.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-davinci/dm646x.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 37c9e0ee4dcc..bf6f85048d17 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -533,6 +533,7 @@ static struct vpif_display_config dm646x_vpif_display_config = {
- 	.set_clock	= set_vpif_clock,
- 	.subdevinfo	= dm646x_vpif_subdev,
- 	.subdev_count	= ARRAY_SIZE(dm646x_vpif_subdev),
-+	.i2c_adapter_id = 1,
- 	.chan_config[0] = {
- 		.outputs = dm6467_ch0_outputs,
- 		.output_count = ARRAY_SIZE(dm6467_ch0_outputs),
-@@ -675,6 +676,7 @@ static struct vpif_capture_config dm646x_vpif_capture_cfg = {
- 	.setup_input_channel_mode = setup_vpif_input_channel_mode,
- 	.subdev_info = vpif_capture_sdev_info,
- 	.subdev_count = ARRAY_SIZE(vpif_capture_sdev_info),
-+	.i2c_adapter_id = 1,
- 	.chan_config[0] = {
- 		.inputs = dm6467_ch0_inputs,
- 		.input_count = ARRAY_SIZE(dm6467_ch0_inputs),
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 54a4299030de..6bd2ed069d0d 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -178,7 +178,8 @@ static u8 dm646x_default_priorities[DAVINCI_N_AINTC_IRQ] = {
+ 	[IRQ_DM646X_MCASP0TXINT]        = 7,
+ 	[IRQ_DM646X_MCASP0RXINT]        = 7,
+ 	[IRQ_DM646X_RESERVED_3]         = 7,
+-	[IRQ_DM646X_MCASP1TXINT]        = 7,    /* clockevent */
++	[IRQ_DM646X_MCASP1TXINT]        = 7,
++	[IRQ_TINT0_TINT12]              = 7,    /* clockevent */
+ 	[IRQ_TINT0_TINT34]              = 7,    /* clocksource */
+ 	[IRQ_TINT1_TINT12]              = 7,    /* DSP timer */
+ 	[IRQ_TINT1_TINT34]              = 7,    /* system tick */
 -- 
 2.16.2
