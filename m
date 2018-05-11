@@ -1,105 +1,101 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 11 May 2018 11:23:27 +0100
-Subject: [PATCH v2 1/2] ARM: dts: vexpress: use standard gpio bindings for
- sys_{led, mci, flash}
-In-Reply-To: <1525884482-19855-1-git-send-email-sudeep.holla@arm.com>
-References: <1525884482-19855-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1526034208-9690-1-git-send-email-sudeep.holla@arm.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Fri, 11 May 2018 18:35:18 +0800
+Subject: [PATCH 1/2] dt-bindings: arm: Add bindings for Mediatek MT8183
+ SoC Platform
+In-Reply-To: <4a32814b-e905-74e8-ed5c-5e68f38faa28@gmail.com>
+References: <1526019083-20237-1-git-send-email-erin.lo@mediatek.com>
+ <1526019083-20237-2-git-send-email-erin.lo@mediatek.com>
+ <4a32814b-e905-74e8-ed5c-5e68f38faa28@gmail.com>
+Message-ID: <1526034918.13828.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2cff6dba57b7 ("ARM: dts: vexpress: fix node name unit-address presence warnings")
-removed the unit address as there was no associated reg property in
-these sysreg nodes.
+On Fri, 2018-05-11 at 10:33 +0200, Matthias Brugger wrote:
+> 
+> On 05/11/2018 08:11 AM, Erin Lo wrote:
+> > This adds dt-binding documentation for Mediatek MT8183.
+> > Only include very basic items: cpu, gic and uart.
+> > 
+> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/mediatek.txt                    | 4 ++++
+> >  .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt      | 1 +
+> >  Documentation/devicetree/bindings/serial/mtk-uart.txt                 | 1 +
+> >  3 files changed, 6 insertions(+)
+> > 
+> 
+> This touches different maintainers and the patches should go through their
+> trees, so that no merge conflicts occur.
+> I'm fine with take it through my tree but it's more work as we might need a
+> stable branch that the other maintainers can merge. Apart I'd need the Acked-by
+> from the maintainers.
+> 
+> I'm fine with either way.
+> 
 
-Also the latest DTC throws warnings for character '_' in the node names.
+For prevent merge conflict and review convenient, I will split it into
+different patches in next round.
 
-Warning (node_name_chars_strict): /sysreg at 10000/sys_led: Character '_' not recommended in node name
-Warning (node_name_chars_strict): /sysreg at 10000/sys_mci: Character '_' not recommended in node name
-Warning (node_name_chars_strict): /sysreg at 10000/sys_flash: Character '_' not recommended in node name
 
-The correct way to fix this as well as the original unit-address presence
-warnings is to use the standard gpio controller binding and specify the
-reg properties as per the hardware as it was before.
+> > diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+> > index 7d21ab3..2754535 100644
+> > --- a/Documentation/devicetree/bindings/arm/mediatek.txt
+> > +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+> > @@ -19,6 +19,7 @@ compatible: Must contain one of
+> >     "mediatek,mt8127"
+> >     "mediatek,mt8135"
+> >     "mediatek,mt8173"
+> > +   "mediatek,mt8183"
+> >  
+> >  
+> >  Supported boards:
+> > @@ -73,3 +74,6 @@ Supported boards:
+> >  - MTK mt8173 tablet EVB:
+> >      Required root node properties:
+> >        - compatible = "mediatek,mt8173-evb", "mediatek,mt8173";
+> > +- Evaluation board for MT8183:
+> > +    Required root node properties:
+> > +      - compatible = "mediatek,mt8183-evb", "mediatek,mt8183";
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+> > index 07bf0b9..5ff48a8 100644
+> > --- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+> > @@ -5,6 +5,7 @@ interrupt.
+> >  
+> >  Required properties:
+> >  - compatible: should be
+> > +	"mediatek,mt8183-sysirq", "mediatek,mt6577-sysirq": for MT8183
+> >  	"mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq": for MT8173
+> >  	"mediatek,mt8135-sysirq", "mediatek,mt6577-sysirq": for MT8135
+> >  	"mediatek,mt8127-sysirq", "mediatek,mt6577-sysirq": for MT8127
+> > diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+> > index f73abff..6e6d168 100644
+> > --- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
+> > +++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+> > @@ -15,6 +15,7 @@ Required properties:
+> >    * "mediatek,mt8127-uart" for MT8127 compatible UARTS
+> >    * "mediatek,mt8135-uart" for MT8135 compatible UARTS
+> >    * "mediatek,mt8173-uart" for MT8173 compatible UARTS
+> > +  * "mediatek,mt8183-uart" for MT8183 compatible UARTS
+> 
+> If you add this compatible without a fallback that you will need an update in
+> the driver. Is there really anything new in the serial console with regard to
+> older devices?
+> 
+> Regards,
+> Matthias
+> 
 
-However note that Vexpress sysreg MFD driver will still continue to use
-the hardcoded values for compatibility reasons.
+No new function in MT8183..now
+How about this...
+ "mediatek,mt8183-uart", "mediatek,mt6577-uart" for MT8183 compatible
+UARTS
 
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Suggested-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 11 ++++++++---
- arch/arm/boot/dts/vexpress-v2m.dtsi     | 11 ++++++++---
- 2 files changed, 16 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-index 7b8ff5b3b912..a8586a0b957d 100644
---- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-+++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-@@ -76,21 +76,26 @@
- 				v2m_sysreg: sysreg at 10000 {
- 					compatible = "arm,vexpress-sysreg";
- 					reg = <0x010000 0x1000>;
-+					#address-cells = <1>;
-+					#size-cells = <1>;
+Regards,
+Erin
 
--					v2m_led_gpios: sys_led {
-+					v2m_led_gpios: gpio at 8 {
- 						compatible = "arm,vexpress-sysreg,sys_led";
-+						reg = <0x008 4>;
- 						gpio-controller;
- 						#gpio-cells = <2>;
- 					};
-
--					v2m_mmc_gpios: sys_mci {
-+					v2m_mmc_gpios: gpio at 48 {
- 						compatible = "arm,vexpress-sysreg,sys_mci";
-+						reg = <0x048 4>;
- 						gpio-controller;
- 						#gpio-cells = <2>;
- 					};
-
--					v2m_flash_gpios: sys_flash {
-+					v2m_flash_gpios: gpio at 4c {
- 						compatible = "arm,vexpress-sysreg,sys_flash";
-+						reg = <0x04c 4>;
- 						gpio-controller;
- 						#gpio-cells = <2>;
- 					};
-diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
-index 9cd5e146abd5..37ecccebd937 100644
---- a/arch/arm/boot/dts/vexpress-v2m.dtsi
-+++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
-@@ -76,21 +76,26 @@
- 				v2m_sysreg: sysreg at 0 {
- 					compatible = "arm,vexpress-sysreg";
- 					reg = <0x00000 0x1000>;
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-
--					v2m_led_gpios: sys_led {
-+					v2m_led_gpios: gpio at 8 {
- 						compatible = "arm,vexpress-sysreg,sys_led";
-+						reg = <0x008 4>;
- 						gpio-controller;
- 						#gpio-cells = <2>;
- 					};
-
--					v2m_mmc_gpios: sys_mci {
-+					v2m_mmc_gpios: gpio at 48 {
- 						compatible = "arm,vexpress-sysreg,sys_mci";
-+						reg = <0x048 4>;
- 						gpio-controller;
- 						#gpio-cells = <2>;
- 					};
-
--					v2m_flash_gpios: sys_flash {
-+					v2m_flash_gpios: gpio at 4c {
- 						compatible = "arm,vexpress-sysreg,sys_flash";
-+						reg = <0x04c 4>;
- 						gpio-controller;
- 						#gpio-cells = <2>;
- 					};
---
-2.7.4
+> >    * "mediatek,mt6577-uart" for MT6577 and all of the above
+> >  
+> >  - reg: The base address of the UART register bank.
+> > 
