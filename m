@@ -1,49 +1,52 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 11 May 2018 15:42:09 +0100
-Subject: [GIT PULL] arm64: hisi: SoC driver updates for v4.18
-Message-ID: <5AF5ABC1.60009@hisilicon.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Fri, 11 May 2018 10:43:05 -0400
+Subject: [PATCH v2 3/4] Documentation: bindings: add phy_config for
+ Rockchip USB Type-C PHY
+In-Reply-To: <1525861364-26323-3-git-send-email-hl@rock-chips.com>
+References: <1525861364-26323-1-git-send-email-hl@rock-chips.com>
+ <1525861364-26323-3-git-send-email-hl@rock-chips.com>
+Message-ID: <20180511144305.GP33053@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
+On Wed, May 09, 2018 at 06:22:43PM +0800, Lin Huang wrote:
+> If want to do training outside DP Firmware, need phy voltage swing
+> and pre_emphasis value.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
 
-Please help to pull the following changes.
-Sorry for the inconvenience, because it depends on this patch [1]
-which was merged in the rc3, I rebased the pull on rc3.
-Thanks!
+Adding Rob Herring so he has a hope of seeing this.
 
-[1] HISI LPC: Add Kconfig MFD_CORE dependency
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/bus?h=v4.17-rc3&id=4b313ca7b661ab8782f3dcb4a8996632a470b4da
+> ---
+> Changes in v2:
+> - rebase
+> 
+>  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> index 960da7f..eda26dd 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> @@ -17,7 +17,9 @@ Required properties:
+>  
+>  Optional properties:
+>   - extcon : extcon specifier for the Power Delivery
+> -
+> + - rockchip,phy_config : That's phy voltage swing and pre_emphasis
+> +			 setting, if want to do dp training outside
+> +			 dp firmware, need to add these value.
 
-Best Regards,
-Wei
+What are the units?
 
----
+Sean
 
-The following changes since commit 6da6c0db5316275015e8cc2959f12a17584aeb64:
+>  Required nodes : a sub-node is required for each port the phy provides.
+>  		 The sub-node name is used to identify dp or usb3 port,
+>  		 and shall be the following entries:
+> -- 
+> 2.7.4
+> 
 
-  Linux v4.17-rc3 (2018-04-29 14:17:42 -0700)
-
-are available in the Git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-drivers-for-4.18
-
-for you to fetch changes up to adf3457b4ce6940885be3e5ee832c6949fba4166:
-
-  HISI LPC: Add ACPI UART support (2018-05-10 17:45:52 +0100)
-
-----------------------------------------------------------------
-ARM64: hisi: SoC driver updates for 4.18
-
-- Update hisi LPC bus driver to use the platform driver APIs
-  other than the MFD APIs to support connected device like UART
-
-----------------------------------------------------------------
-John Garry (3):
-      HISI LPC: Stop using MFD APIs
-      HISI LPC: Re-Add ACPI child enumeration support
-      HISI LPC: Add ACPI UART support
-
- drivers/bus/Kconfig    |   1 -
- drivers/bus/hisi_lpc.c | 159 ++++++++++++++++++++++++++++++-------------------
- 2 files changed, 97 insertions(+), 63 deletions(-)
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
