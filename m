@@ -1,114 +1,189 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 11 May 2018 16:11:47 +0800
-Subject: [PATCH 1/2] arm64: dts: ls1012a: Add FRWY-LS1012A board support
-In-Reply-To: <1525760999-6187-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
-References: <1525760999-6187-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <20180511081145.GD26863@dragon>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 11 May 2018 09:12:59 +0100
+Subject: [PATCH v2 2/6] arm64: alternative: Apply alternatives early in
+ boot process
+In-Reply-To: <7a3afa42-821a-3d4a-3af8-00ba18653a4a@arm.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <1516190084-18978-3-git-send-email-julien.thierry@arm.com>
+ <c935a9e6-94a0-03cb-eb64-7e2eef8f8d86@arm.com>
+ <7a3afa42-821a-3d4a-3af8-00ba18653a4a@arm.com>
+Message-ID: <d170336d-8af0-893a-acb2-51900c28ade5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 11:59:58AM +0530, Bhaskar Upadhaya wrote:
-> FRWY-LS1012A is a different design from LS1012A-FRDM,
-> but has some common SoC features. Key feature on this
-> board is Micro SD, USB 3.0, DDR, UART.
-> 
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/Makefile             |  1 +
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts | 64 ++++++++++++++++++++++
->  2 files changed, 65 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-> index 86e18ad..d116144 100644
-> --- a/arch/arm64/boot/dts/freescale/Makefile
-> +++ b/arch/arm64/boot/dts/freescale/Makefile
-> @@ -1,4 +1,5 @@
->  # SPDX-License-Identifier: GPL-2.0
-> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frwy.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
-> new file mode 100644
-> index 0000000..f69086d
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
-> @@ -0,0 +1,64 @@
-> +/*
-> + * Device Tree file for NXP LS1012A FRWY Board.
-> + *
-> + * Copyright 2018 NXP
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +/dts-v1/;
-> +
-> +#include "fsl-ls1012a.dtsi"
-> +
-> +/ {
-> +	model = "LS1012A FRWY Board";
-> +	compatible = "fsl,frwy-ls1012a", "fsl,ls1012a";
-> +
-> +};
-> +
-> +&pcie {
-> +	status = "okay";
-> +};
-> +
-> +&duart0 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +};
 
-Please sort these nodes alphabetically in label name.
 
-Shawn
+On 09/05/18 22:52, Suzuki K Poulose wrote:
+> On 05/04/2018 11:06 AM, Julien Thierry wrote:
+>> Hi,
+>>
+>> In order to prepare the v3 of this patchset, I'd like people's opinion 
+>> on what this patch does. More below.
+>>
+>> On 17/01/18 11:54, Julien Thierry wrote:
+>>> From: Daniel Thompson <daniel.thompson@linaro.org>
+>>>
+>>> Currently alternatives are applied very late in the boot process (and
+>>> a long time after we enable scheduling). Some alternative sequences,
+>>> such as those that alter the way CPU context is stored, must be applied
+>>> much earlier in the boot sequence.
+> 
+>>> +/*
+>>> + * early-apply features are detected using only the boot CPU and 
+>>> checked on
+>>> + * secondary CPUs startup, even then,
+>>> + * These early-apply features should only include features where we 
+>>> must
+>>> + * patch the kernel very early in the boot process.
+>>> + *
+>>> + * Note that the cpufeature logic *must* be made aware of early-apply
+>>> + * features to ensure they are reported as enabled without waiting
+>>> + * for other CPUs to boot.
+>>> + */
+>>> +#define EARLY_APPLY_FEATURE_MASK BIT(ARM64_HAS_SYSREG_GIC_CPUIF)
+>>> +
+>>
+>> Following the change in the cpufeature infrastructure, 
+>> ARM64_HAS_SYSREG_GIC_CPUIF will have the scope 
+>> ARM64_CPUCAP_SCOPE_BOOT_CPU in order to be checked early in the boot 
+>> process.
+> 
+> Thats correct.
+> 
+>>
+>> Now, regarding the early application of alternative, I am wondering 
+>> whether we can apply all the alternatives associated with SCOPE_BOOT 
+>> features that *do not* have a cpu_enable callback.
+>>
+> 
+> I don't understand why would you skip the ones that have a "cpu_enable" 
+> callback. Could you explain this a bit ? Ideally you should be able to
+> apply the alternatives for features with the SCOPE_BOOT, provided the
+> cpu_enable() callback is written properly.
+> 
 
-> -- 
-> 1.9.1
+In my mind the "cpu_enable" callback is the setup a cpu should perform 
+before using the feature (i.e. the code getting patched in by the 
+alternative). So I was worried about the code getting patched by the 
+boot cpu and then have the secondary cpus ending up executing patched 
+code before the cpu_enable for the corresponding feature gets called.
+Or is there a requirement for secondary cpu startup code to be free of 
+alternative code?
+
 > 
+>> Otherwise we can keep the macro to list individually each feature that 
+>> is patchable at boot time as the current patch does (or put this info 
+>> in a flag within the arm64_cpu_capabilities structure)
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> You may be able to build up the mask of *available* capabilities with 
+> SCOPE_BOOT at boot time by playing some trick in the 
+> setup_boot_cpu_capabilities(), rather than embedding it in the 
+> capabilities (and then parsing the entire table(s)) or manually keeping
+> track of the capabilities by having a separate mask.
+> 
+
+Yes, I like that idea.
+
+Thanks,
+
+> Suzuki
+> 
+>>
+>> Any thoughts or preferences on this?
+>>
+>> Thanks,
+>>
+>>> ? #define __ALT_PTR(a,f)??????? ((void *)&(a)->f + (a)->f)
+>>> ? #define ALT_ORIG_PTR(a)??????? __ALT_PTR(a, orig_offset)
+>>> ? #define ALT_REPL_PTR(a)??????? __ALT_PTR(a, alt_offset)
+>>> @@ -105,7 +117,8 @@ static u32 get_alt_insn(struct alt_instr *alt, 
+>>> __le32 *insnptr, __le32 *altinsnp
+>>> ????? return insn;
+>>> ? }
+>>>
+>>> -static void __apply_alternatives(void *alt_region, bool 
+>>> use_linear_alias)
+>>> +static void __apply_alternatives(void *alt_region,? bool 
+>>> use_linear_alias,
+>>> +???????????????? unsigned long feature_mask)
+>>> ? {
+>>> ????? struct alt_instr *alt;
+>>> ????? struct alt_region *region = alt_region;
+>>> @@ -115,6 +128,9 @@ static void __apply_alternatives(void 
+>>> *alt_region, bool use_linear_alias)
+>>> ????????? u32 insn;
+>>> ????????? int i, nr_inst;
+>>>
+>>> +??????? if ((BIT(alt->cpufeature) & feature_mask) == 0)
+>>> +??????????? continue;
+>>> +
+>>> ????????? if (!cpus_have_cap(alt->cpufeature))
+>>> ????????????? continue;
+>>>
+>>> @@ -138,6 +154,21 @@ static void __apply_alternatives(void 
+>>> *alt_region, bool use_linear_alias)
+>>> ? }
+>>>
+>>> ? /*
+>>> + * This is called very early in the boot process (directly after we run
+>>> + * a feature detect on the boot CPU). No need to worry about other CPUs
+>>> + * here.
+>>> + */
+>>> +void apply_alternatives_early(void)
+>>> +{
+>>> +??? struct alt_region region = {
+>>> +??????? .begin??? = (struct alt_instr *)__alt_instructions,
+>>> +??????? .end??? = (struct alt_instr *)__alt_instructions_end,
+>>> +??? };
+>>> +
+>>> +??? __apply_alternatives(&region, true, EARLY_APPLY_FEATURE_MASK);
+>>> +}
+>>> +
+>>> +/*
+>>> ?? * We might be patching the stop_machine state machine, so implement a
+>>> ?? * really simple polling protocol here.
+>>> ?? */
+>>> @@ -156,7 +187,9 @@ static int __apply_alternatives_multi_stop(void 
+>>> *unused)
+>>> ????????? isb();
+>>> ????? } else {
+>>> ????????? BUG_ON(patched);
+>>> -??????? __apply_alternatives(&region, true);
+>>> +
+>>> +??????? __apply_alternatives(&region, true, ~EARLY_APPLY_FEATURE_MASK);
+>>> +
+>>> ????????? /* Barriers provided by the cache flushing */
+>>> ????????? WRITE_ONCE(patched, 1);
+>>> ????? }
+>>> @@ -177,5 +210,5 @@ void apply_alternatives(void *start, size_t length)
+>>> ????????? .end??? = start + length,
+>>> ????? };
+>>>
+>>> -??? __apply_alternatives(&region, false);
+>>> +??? __apply_alternatives(&region, false, -1);
+>>> ? }
+>>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>>> index 551eb07..37361b5 100644
+>>> --- a/arch/arm64/kernel/smp.c
+>>> +++ b/arch/arm64/kernel/smp.c
+>>> @@ -453,6 +453,12 @@ void __init smp_prepare_boot_cpu(void)
+>>> ?????? * cpuinfo_store_boot_cpu() above.
+>>> ?????? */
+>>> ????? update_cpu_errata_workarounds();
+>>> +??? /*
+>>> +???? * We now know enough about the boot CPU to apply the
+>>> +???? * alternatives that cannot wait until interrupt handling
+>>> +???? * and/or scheduling is enabled.
+>>> +???? */
+>>> +??? apply_alternatives_early();
+>>> ? }
+>>>
+>>> ? static u64 __init of_get_cpu_mpidr(struct device_node *dn)
+>>> -- 
+>>> 1.9.1
+>>>
+>>
+> 
+
+-- 
+Julien Thierry
