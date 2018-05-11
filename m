@@ -1,94 +1,39 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 11 May 2018 02:45:30 +0200 (CEST)
-Subject: [PATCH 2/3] ARM: dts: imx28: Remove unit-address from pinctrl
-In-Reply-To: <1525997810-10964-2-git-send-email-festevam@gmail.com>
-References: <1525997810-10964-1-git-send-email-festevam@gmail.com>
- <1525997810-10964-2-git-send-email-festevam@gmail.com>
-Message-ID: <435135292.243569.1525999530960@email.1und1.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 11 May 2018 09:11:41 +0800
+Subject: [arm:to-build 2/13] WARNING: vmlinux.o(.text+0x18ff0): Section
+ mismatch in reference from the function check_bugs() to the function
+ .init.text:check_writebuffer_bugs()
+Message-ID: <201805110939.2MJrkFPI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git to-build
+head:   7eac243a530d849d5e2502ff3015dd68d1b27de3
+commit: cc591a392bd5a56d60f3955c9c8bd15e14477ffa [2/13] ARM: bugs: prepare processor bug infrastructure
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout cc591a392bd5a56d60f3955c9c8bd15e14477ffa
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> Fabio Estevam <festevam@gmail.com> hat am 11. Mai 2018 um 02:16 geschrieben:
-> 
-> 
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Remove unit-address and reg property from pinctrl subnodes to fix
-> the following DTC warnings with W=1:
-> 
-> arch/arm/boot/dts/imx28-apf28dev.dtb: Warning (unique_unit_address): /apb at 80000000/apbh at 80000000/pinctrl at 80018000/hog at 0: duplicate unit-address (also used in node /apb at 80000000/apbh at 80000000
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx28-apf28dev.dts           |   9 +-
->  arch/arm/boot/dts/imx28-apx4devkit.dts         |  12 +-
->  arch/arm/boot/dts/imx28-cfa10036.dts           |  12 +-
->  arch/arm/boot/dts/imx28-cfa10037.dts           |   6 +-
->  arch/arm/boot/dts/imx28-cfa10049.dts           |  36 ++---
->  arch/arm/boot/dts/imx28-cfa10055.dts           |  12 +-
->  arch/arm/boot/dts/imx28-cfa10056.dts           |   9 +-
->  arch/arm/boot/dts/imx28-cfa10057.dts           |   9 +-
->  arch/arm/boot/dts/imx28-cfa10058.dts           |   6 +-
->  arch/arm/boot/dts/imx28-duckbill-2-485.dts     |  12 +-
->  arch/arm/boot/dts/imx28-duckbill-2-enocean.dts |  15 +-
->  arch/arm/boot/dts/imx28-duckbill-2-spi.dts     |  15 +-
->  arch/arm/boot/dts/imx28-duckbill-2.dts         |  12 +-
->  arch/arm/boot/dts/imx28-duckbill.dts           |   9 +-
->  arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dts   |   3 +-
->  arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dts   |   3 +-
->  arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi   |  24 ++--
->  arch/arm/boot/dts/imx28-evk.dts                |  12 +-
->  arch/arm/boot/dts/imx28-m28cu3.dts             |   9 +-
->  arch/arm/boot/dts/imx28-m28evk.dts             |   6 +-
->  arch/arm/boot/dts/imx28-sps1.dts               |   3 +-
->  arch/arm/boot/dts/imx28-ts4600.dts             |   3 +-
->  arch/arm/boot/dts/imx28-tx28.dts               |  33 ++---
->  arch/arm/boot/dts/imx28.dtsi                   | 191 ++++++++-----------------
->  24 files changed, 153 insertions(+), 308 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-> index c4fadbc..53ed2e2 100644
-> ...
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 9ad8d35..8f46b1f 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -169,14 +169,11 @@
->  			};
->  
->  			pinctrl: pinctrl at 80018000 {
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
->  				compatible = "fsl,imx28-pinctrl", "simple-bus";
->  				reg = <0x80018000 0x2000>;
->  
-> -				gpio0: gpio at 0 {
-> +				gpio0: gpio0 {
->  					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
-> -					reg = <0>;
->  					interrupts = <127>;
->  					gpio-controller;
->  					#gpio-cells = <2>;
-> @@ -184,9 +181,8 @@
->  					#interrupt-cells = <2>;
->  				};
+All warnings (new ones prefixed by >>):
 
-i'm not sure, but it looked to me like a proper way to address the gpio banks before.
+>> WARNING: vmlinux.o(.text+0x18ff0): Section mismatch in reference from the function check_bugs() to the function .init.text:check_writebuffer_bugs()
+   The function check_bugs() references
+   the function __init check_writebuffer_bugs().
+   This is often because check_bugs lacks a __init
+   annotation or the annotation of check_writebuffer_bugs is wrong.
 
-Regards
-Stefan
-
->  
-> -				gpio1: gpio at 1 {
-> +				gpio1: gpio1 {
->  					compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
-> -					reg = <1>;
->  					interrupts = <126>;
->  					gpio-controller;
->  					#gpio-cells = <2>;
-> @@ -194,9 +190,8 @@
->  					#interrupt-cells = <2>;
->  				};
->
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 64991 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180511/070af2b7/attachment-0001.gz>
