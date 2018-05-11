@@ -1,50 +1,37 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Fri, 11 May 2018 11:11:05 +0100
-Subject: [PATCH v3 6/8] arm64: module-plts: Extend veneer to address
- 52-bit VAs
-In-Reply-To: <CAKv+Gu_unCnhqE_Ort0zOjBj_ZmWja5unGON6KBuRxJzdhc5jA@mail.gmail.com>
-References: <20180510162347.3858-1-steve.capper@arm.com>
- <20180510162347.3858-7-steve.capper@arm.com>
- <CAKv+Gu_unCnhqE_Ort0zOjBj_ZmWja5unGON6KBuRxJzdhc5jA@mail.gmail.com>
-Message-ID: <20180511101104.6cv5mvqc6juh2mgt@capper-debian.cambridge.arm.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Fri, 11 May 2018 12:19:53 +0200
+Subject: [PATCH v2 0/3] Fix an Atmel USBA UDC issue introducted in 4.17-rc1
+Message-ID: <20180511101956.11782-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 12:01:05AM +0200, Ard Biesheuvel wrote:
-> On 10 May 2018 at 18:23, Steve Capper <steve.capper@arm.com> wrote:
-> > From: Ard Bieusheuval <ard.biesheuvel@linaro.org>
-> >
-> > In preparation for 52-bit VA support in the Linux kernel, we extend the
-> > plts veneer to support 52-bit addresses via an extra movk instruction.
-> >
-> > [Steve: code from Ard off-list, changed the #ifdef logic to inequality]
-> > Signed-off-by: Steve Capper <steve.capper@arm.com>
-> >
-> > ---
-> >
-> > New in V3 of the series.
-> >
-> > I'm not sure if this is strictly necessary as the VAs of the module
-> > space will fit within 48-bits of addressing even when a 52-bit VA space
-> > is enabled.
-> 
-> What about the kernel text itself? Is that also guaranteed to have
-> bits [51:48] of its VAs equal 0xf, even under randomization?
-> 
-> If so, I agree we don't need the patch.
-> 
+The use of GPIO descriptors takes care of inversion flags declared in
+the device tree. The conversion of the Atmel USBA UDC driver introduced
+in 4.17-rc1 missed it, and as a result the inversion will not work.
 
-Hi Ard,
-The kernel modules and text are guaranteed to have addresses greater
-than or equal to KASAN_SHADOW_END (same for both 48, 52-bit VAs) or
-_VA_START(VA_BITS_MIN) (same for both 48, 52-bit VAs). Also, IIUC, the
-KASLR displacemnt is always non-negative?
+In addition, cleanup the code to remove an include left behind after
+the suppression of the support of platform_data to declare USBA
+controllers.
 
-So I think we're safe in that modules and kernel text will be 48-bit
-addressable in 52-bit configurations.
+These changes have not been tested on any hardware, as I do not have
+a board that needs to use inverted GPIOs.
 
-I'll have a think about a BUILD_BUG to capture any change to the above.
+--
+Changes in v2:
+- Use the correct format for the "Fixes:" tag
+- Collect "Acked-by:" tags
 
-Cheers,
+
+Romain Izard (3):
+  usb: gadget: udc: atmel: GPIO inversion is handled by gpiod
+  usb: gadget: udc: atmel: Remove obsolete include
+  usb: gadget: udc: atmel: Fix indenting
+
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 22 ++++++++++------------
+ drivers/usb/gadget/udc/atmel_usba_udc.h |  1 -
+ include/linux/usb/atmel_usba_udc.h      | 24 ------------------------
+ 3 files changed, 10 insertions(+), 37 deletions(-)
+ delete mode 100644 include/linux/usb/atmel_usba_udc.h
+
 -- 
-Steve
+2.14.1
