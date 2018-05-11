@@ -1,57 +1,99 @@
-From: erin.lo@mediatek.com (Erin Lo)
-Date: Fri, 11 May 2018 17:38:26 +0800
-Subject: [PATCH 0/2] Add basic support for Mediatek MT8183 SoC
-In-Reply-To: <782e13c1-057b-164b-9270-d37c151aa9b4@gmail.com>
-References: <1526019083-20237-1-git-send-email-erin.lo@mediatek.com>
- <782e13c1-057b-164b-9270-d37c151aa9b4@gmail.com>
-Message-ID: <1526031506.24653.5.camel@mtksdaap41>
+From: steve.capper@arm.com (Steve Capper)
+Date: Fri, 11 May 2018 10:46:28 +0100
+Subject: [PATCH v3 1/8] arm/arm64: KVM: Formalise end of direct linear map
+In-Reply-To: <9272dd72-7bc9-daf9-2386-ceca04384c1c@arm.com>
+References: <20180510162347.3858-1-steve.capper@arm.com>
+ <20180510162347.3858-2-steve.capper@arm.com>
+ <9272dd72-7bc9-daf9-2386-ceca04384c1c@arm.com>
+Message-ID: <20180511094618.vlfg6h43ebkbk5x6@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-05-11 at 10:29 +0200, Matthias Brugger wrote:
-> Hi Erin,
-> 
-> Please include the linux-mediatek and arm-linux-kernel mailinglists in the next
-> round.
-> 
-> Some comments in the patches.
-> 
-> Regards,
-> Matthias
+On Thu, May 10, 2018 at 06:11:35PM +0100, Marc Zyngier wrote:
+> [+Christoffer]
+>
+> Hi Steve,
 
-I will add linux-mediatek, linux-arm-kernel, linux-kernel, linux-serial
-mailinglists in next round.
-Thanks for your reminder.
+Hi Marc,
 
-Regards,
-Erin
+>
+> On 10/05/18 17:23, Steve Capper wrote:
+> > We assume that the direct linear map ends at ~0 in the KVM HYP map
+> > intersection checking code. This assumption will become invalid later on
+> > for arm64 when the address space of the kernel is re-arranged.
+> >
+> > This patch introduces a new constant PAGE_OFFSET_END for both arm and
+> > arm64 and defines it to be ~0UL
+> >
+> > Signed-off-by: Steve Capper <steve.capper@arm.com>
+> > ---
+> >  arch/arm/include/asm/memory.h   | 1 +
+> >  arch/arm64/include/asm/memory.h | 1 +
+> >  virt/kvm/arm/mmu.c              | 4 ++--
+> >  3 files changed, 4 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> > index ed8fd0d19a3e..45c211fd50da 100644
+> > --- a/arch/arm/include/asm/memory.h
+> > +++ b/arch/arm/include/asm/memory.h
+> > @@ -24,6 +24,7 @@
+> >
+> >  /* PAGE_OFFSET - the virtual address of the start of the kernel image */
+> >  #define PAGE_OFFSET                UL(CONFIG_PAGE_OFFSET)
+> > +#define PAGE_OFFSET_END            (~0UL)
+> >
+> >  #ifdef CONFIG_MMU
+> >
+> > diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> > index 49d99214f43c..c5617cbbf1ff 100644
+> > --- a/arch/arm64/include/asm/memory.h
+> > +++ b/arch/arm64/include/asm/memory.h
+> > @@ -61,6 +61,7 @@
+> >     (UL(1) << VA_BITS) + 1)
+> >  #define PAGE_OFFSET                (UL(0xffffffffffffffff) - \
+> >     (UL(1) << (VA_BITS - 1)) + 1)
+> > +#define PAGE_OFFSET_END            (~0UL)
+> >  #define KIMAGE_VADDR               (MODULES_END)
+> >  #define MODULES_END                (MODULES_VADDR + MODULES_VSIZE)
+> >  #define MODULES_VADDR              (VA_START + KASAN_SHADOW_SIZE)
+> > diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> > index 7f6a944db23d..22af347d65f1 100644
+> > --- a/virt/kvm/arm/mmu.c
+> > +++ b/virt/kvm/arm/mmu.c
+> > @@ -1927,10 +1927,10 @@ int kvm_mmu_init(void)
+> >     kvm_debug("IDMAP page: %lx\n", hyp_idmap_start);
+> >     kvm_debug("HYP VA range: %lx:%lx\n",
+> >               kern_hyp_va(PAGE_OFFSET),
+> > -             kern_hyp_va((unsigned long)high_memory - 1));
+> > +             kern_hyp_va(PAGE_OFFSET_END));
+> >
+> >     if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
+> > -       hyp_idmap_start <  kern_hyp_va((unsigned long)high_memory - 1) &&
+> > +       hyp_idmap_start <  kern_hyp_va(PAGE_OFFSET_END) &&
+>
+> This doesn't feel right to me now that we have the HYP randomization
+> code merged. The way kern_hyp_va works now is only valid for addresses
+> between VA(memblock_start_of_DRAM()) and high_memory.
+>
+> I fear that you could trigger the failing condition below as you
+> evaluate the idmap address against something that is now not a HYP VA.
+>
+> >         hyp_idmap_start != (unsigned long)__hyp_idmap_text_start) {
+> >             /*
+> >              * The idmap page is intersecting with the VA space,
+> >
 
-> 
-> On 05/11/2018 08:11 AM, Erin Lo wrote:
-> > MT8183 is a SoC based on 64bit ARMv8 architecture.
-> > It contains 4 CA53 and 4 CA73 cores.
-> > MT8183 share many HW IP with MT65xx series.
-> > This patchset was tested on MT8183 evaluation board, and boot to shell ok.
-> > 
-> > This series contains document bindings, device tree including interrupt, uart.
-> > 
-> > Ben Ho (1):
-> >   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
-> >     Makefile
-> > 
-> > Erin Lo (1):
-> >   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
-> > 
-> >  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
-> >  .../interrupt-controller/mediatek,sysirq.txt       |   1 +
-> >  .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
-> >  arch/arm64/boot/dts/mediatek/Makefile              |   1 +
-> >  arch/arm64/boot/dts/mediatek/mt8183-evb.dts        |  31 ++++
-> >  arch/arm64/boot/dts/mediatek/mt8183.dtsi           | 178 +++++++++++++++++++++
-> >  6 files changed, 216 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
-> > 
-> > --
-> > 1.9.1
-> > 
+Thanks! Yes, this patch is completely spurious, apologies I think I
+made a mistake rebasing my V2 series on top of HASLR (originally I replaced
+~0LL with PAGE_OFFSET_END in V1). I will drop this patch from the next version
+of the series.
+
+>
+> I'd appreciate if you could keep me cc'd on this series.
+
+Apologies, I'll be much more careful with git send-email.
+
+Cheers,
+--
+Steve
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
