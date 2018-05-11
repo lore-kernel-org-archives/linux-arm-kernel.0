@@ -1,100 +1,61 @@
-From: pintu.ping@gmail.com (Pintu Kumar)
-Date: Fri, 11 May 2018 20:07:33 +0530
-Subject: Delivery Status Notification (Failure)
-In-Reply-To: <f6f7b18644136323f4485d6123b330d0dde207a4.camel@pengutronix.de>
-References: <CAOuPNLjqJVsPOVPCnswtFyXudAJ88_F0QVUq-Z6qWE=UpH0mBA@mail.gmail.com>
- <5af57fea.1c69fb81.885f0.2377.GMRIR@mx.google.com>
- <CAOuPNLgbT59h=Jm5YiOCbrqFkDokJ8xutQ_OkpsFYzKazKhTHg@mail.gmail.com>
- <20180511123915.GC16141@n2100.armlinux.org.uk>
- <f6f7b18644136323f4485d6123b330d0dde207a4.camel@pengutronix.de>
-Message-ID: <CAOuPNLgRHCasmsXTVwcy5ohq8TYjbr4MThxm4Q-HFWihJ7ARww@mail.gmail.com>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Fri, 11 May 2018 16:37:27 +0200
+Subject: [PATCH] arm: port KCOV to arm
+In-Reply-To: <20180508103016.GW16141@n2100.armlinux.org.uk>
+References: <20180426130846.130976-1-dvyukov@google.com>
+ <20180508103016.GW16141@n2100.armlinux.org.uk>
+Message-ID: <CACT4Y+ZkLCqPEicOsB1ewF8MfZd4wJpQHjxP_S6i+B0ZGZuj2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 6:34 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Am Freitag, den 11.05.2018, 13:39 +0100 schrieb Russell King - ARM Linux:
->> On Fri, May 11, 2018 at 05:07:37PM +0530, Pintu Kumar wrote:
->> > Hi,
->> >
->> > I need one help.
->> > I am using i.MX7 Sabre board with kernel version 4.1.15
->> >
->> > Let's say I am interested in GPIO number: 21
->> > I wanted to set CPU affinity for particular GPIO->IRQ number, so I
->> > tried the below steps:
->> > root at 10:~# echo 21 > /sys/class/gpio/export
->> > root at 10:~# echo "rising" > /sys/class/gpio/gpio21/edge
->> > root at 10:~# cat /proc/interrupts | grep 21
->> >   47: 0 0 gpio-mxc 21 Edge gpiolib
->> > root at 10:~# cat /sys/class/gpio/gpio21/direction
->> > in
->> > root at 10:~# cat /proc/irq/47/smp_affinity
->> > 3
->> > root at 10:~# echo 2 > /proc/irq/47/smp_affinity
->> > -bash: echo: write error: Input/output error
->> >
->> > But I get input/output error.
->> > When I debug further, found that irq_can_set_affinity is returning 0:
->> > [    0.000000] genirq: irq_can_set_affinity (0): balance: 1,
->> > irq_data.chip: a81b7e48, irq_set_affinity:   (null)
->> > [    0.000000] write_irq_affinity: FAIL
->> >
->> > I also tried first setting /proc/irq/default_smp_affinity to 2 (from 3).
->> > This change is working, but the smp_affinity setting for the new IRQ
->> > is not working.
->> >
->> > When I try to set smp_affinity for mmc0, then it works.
->> > # cat /proc/interrupts | grep mmc
->> > 295:         55          0     GPCV2  22 Edge      mmc0
->> > 296:          0          0     GPCV2  23 Edge      mmc1
->> > 297:         52          0     GPCV2  24 Edge      mmc2
->> >
->> > root at 10:~# echo 2 > /proc/irq/295/smp_affinity
->> > root at 10:~#
->> >
->> >
->> > So, I wanted to know what are the conditions for which setting
->> > smp_affinity for an IRQ will work ?
->> >
->> > Is there any way by which I can set CPU affinity to a GPIO -> IRQ ?
->> > Whether, irq_set_affinity_hint() will work in this case ?
+On Tue, May 8, 2018 at 12:30 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Thu, Apr 26, 2018 at 03:08:46PM +0200, Dmitry Vyukov wrote:
+>> KCOV is code coverage collection facility used, in particular, by syzkaller
+>> system call fuzzer. There is some interest in using syzkaller on arm devices.
+>> So port KCOV to arm.
 >>
->> IRQ affinity is only supported where interrupts are _directly_ wired to
->> the GIC.  It's the GIC which does the interrupt steering to the CPU
->> cores.
+>> On implementation level this merely declares that KCOV is supported and
+>> disables instrumentation of 3 special cases. Reasons for disabling are
+>> commented in code.
 >>
->> Interrupts on downstream interrupt controllers (such as GPCV2) have no
->> ability to be directed independently to other CPUs - the only possible
->> way to change the mapping is to move _all_ interrupts on that controller,
->> and any downstream chained interrupts at GIC level.
+>> Tested with qemu-system-arm/vexpress-a15.
 >>
->> Hence why Interrupt 295 has no irq_set_affinity function: there is no way
->> for the interrupt controller itself to change the affinity of the input
->> interrupt.
+>> Signed-off-by: Dmitry Vyukov <dvyukov@google.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Abbott Liu <liuwenliang@huawei.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Koguchi Takuo <takuo.koguchi.sw@hitachi.com>
+>> Cc: Atul Prakash <atulp@google.com>
+>> Cc: linux at armlinux.org.uk
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: syzkaller at googlegroups.com
+>> ---
+>>  arch/arm/Kconfig                  | 1 +
+>>  arch/arm/boot/compressed/Makefile | 3 +++
+>>  arch/arm/mm/Makefile              | 4 ++++
+>>  arch/arm/vdso/Makefile            | 3 +++
+>>  4 files changed, 11 insertions(+)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index a7f8e7f4b88f..60558a6bb744 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -105,6 +105,7 @@ config ARM
+>>       select REFCOUNT_FULL
+>>       select RTC_LIB
+>>       select SYS_SUPPORTS_APM_EMULATION
+>> +     select ARCH_HAS_KCOV
+>>       # Above selects are sorted alphabetically; please add new ones
+>>       # according to that.  Thanks.
 >
-> The GPCv2 though is a secondary IRQ controller which has a 1:1 mapping
-> of its input IRQs to the upstream GIC IRQ lines. Affinity can thus be
-> handled by forwarding the request to the GIC by
-> irq_chip_set_affinity_parent().
->
-> As this is handled correctly in the upstream kernel since the first
-> commit introducing support for the GPCv2, it seems the issue is only
-> present in some downstream kernel.
->
-
-OK. Thanks so much for your reply.
-
-I saw some of the drivers using irq_set_affinity_hint() to force the
-IRQ affinity to a particular CPU.
-This is the sample:
-{
-cpumask_clear(mask);
-cpumask_set_cpu(cpu, mask);
-irq_set_affinity_hint(irq, mask);
-}
-
-Whether this logic will work for a particular GPIO pin ?
+> Please read this comment and rework your patch, thanks.
 
 
-> Regards,
-> Lucas
+Now that Mark's fixes are in mm tree, I mailed v2 with the following changes:
+
+    Changes since v1:
+     - remove disable of instrumentation for arch/arm/mm/fault.c
+     - disable instrumentation of arch/arm/kvm/hyp/*
+     - resort ARCH_HAS_KCOV alphabetically
