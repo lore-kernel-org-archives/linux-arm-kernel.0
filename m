@@ -1,40 +1,31 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Fri, 11 May 2018 12:00:01 +0200
-Subject: [PATCH 2/3] arm64: dts: renesas: r8a77995: Add VIN4
+Date: Fri, 11 May 2018 12:00:00 +0200
+Subject: [PATCH 1/3] dt-bindings: media: rcar-vin: Add R8A77995 support
 In-Reply-To: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
 References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1526032802-14376-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1526032802-14376-2-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe VIN4 interface for R-Car D3 R8A77995 SoC.
+Add compatible string for R-Car D3 R8A7795 to list of SoCs supported by
+rcar-vin driver.
 
 Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 ---
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ Documentation/devicetree/bindings/media/rcar_vin.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index 82aed7e..bdf7017 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -783,6 +783,17 @@
- 				};
- 			};
- 		};
-+
-+		vin4: video at e6ef4000 {
-+			compatible = "renesas,vin-r8a77995";
-+			reg = <0 0xe6ef4000 0 0x1000>;
-+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 807>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 807>;
-+			renesas,id = <4>;
-+			status = "disabled";
-+		};
- 	};
+diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
+index a19517e1..5c6f2a7 100644
+--- a/Documentation/devicetree/bindings/media/rcar_vin.txt
++++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
+@@ -22,6 +22,7 @@ on Gen3 platforms to a CSI-2 receiver.
+    - "renesas,vin-r8a7795" for the R8A7795 device
+    - "renesas,vin-r8a7796" for the R8A7796 device
+    - "renesas,vin-r8a77970" for the R8A77970 device
++   - "renesas,vin-r8a77995" for the R8A77995 device
+    - "renesas,rcar-gen2-vin" for a generic R-Car Gen2 or RZ/G1 compatible
+      device.
  
- 	timer {
 -- 
 2.7.4
