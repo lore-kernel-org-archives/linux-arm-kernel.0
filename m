@@ -1,292 +1,179 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 11 May 2018 17:35:19 +0100
-Subject: [PATCH v2 26/27] coresight: perf: Remove reset_buffer call back
- for sinks
-In-Reply-To: <20180508194241.GC3389@xps15>
-References: <1525165857-11096-1-git-send-email-suzuki.poulose@arm.com>
- <1525165857-11096-27-git-send-email-suzuki.poulose@arm.com>
- <20180508194241.GC3389@xps15>
-Message-ID: <7478286d-cbbe-4bf2-4012-f4469133f4b2@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 11 May 2018 18:56:00 +0200
+Subject: [PATCH 2/2] arm64: dts: mt7622: add audio related device nodes
+In-Reply-To: <1525233238.14792.14.camel@mtkswgap22>
+References: <d208e8cf93f18b97ee9cf24cdd0220aa44188b8b.1525231985.git.sean.wang@mediatek.com>
+ <e48bc87f54d7f2e06664ee358822aa9a9e34256b.1525231985.git.sean.wang@mediatek.com>
+ <1525233238.14792.14.camel@mtkswgap22>
+Message-ID: <626c6741-00cd-c125-07f9-cfbbdbe36db4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/18 20:42, Mathieu Poirier wrote:
-> On Tue, May 01, 2018 at 10:10:56AM +0100, Suzuki K Poulose wrote:
->> Right now we issue an update_buffer() and reset_buffer() call backs
->> in succession when we stop tracing an event. The update_buffer is
->> supposed to check the status of the buffer and make sure the ring buffer
->> is updated with the trace data. And we store information about the
->> size of the data collected only to be consumed by the reset_buffer
->> callback which always follows the update_buffer. This was originally
->> designed for handling future IPs which could trigger a buffer overflow
->> interrupt. This patch gets rid of the reset_buffer callback altogether
->> and performs the actions in update_buffer, making it return the size
->> collected. We can always add the support for handling the overflow
->> interrupt case later.
+
+
+On 05/02/2018 05:53 AM, Sean Wang wrote:
+> Hi, Matthias
+> 
+> On Wed, 2018-05-02 at 11:41 +0800, sean.wang at mediatek.com wrote:
+>> From: Ryder Lee <ryder.lee@mediatek.com>
 >>
->> This removes some not-so pretty hack (storing the new head in the
->> size field for snapshot mode) and cleans it up a little bit.
-> 
-> IPs with an overflow interrupts will be arriving shortly, so it is not like the
-> future is uncertain - they are coming.  Right now the logic is there - I don't
-> see a real need to consolidate things only to split it again in the near future.
-> 
-> I agree the part about overloading buf->data_size with the head of the ring
-> buffer when operating in snapshot mode isn't pretty (though well documented).
-> If anything that can be improve, i.e add a buf->head and things will be clear.
-> Once again this could be part of another patchset.
-> 
-
-Mathieu,
-
-I am not sure how was this supposed to be used in conjunction with the overflow
-handling. Please could you help me here ? I might be able to retain
-the callback and possibly improve it with the changes for etr_buf infrastructure.
-
-Cheers
-Suzuki
-
-
+>> Add audio device nodes and its proper setup for all used pins
 >>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 >> ---
->>   drivers/hwtracing/coresight/coresight-etb10.c    | 56 +++++------------------
->>   drivers/hwtracing/coresight/coresight-etm-perf.c |  9 +---
->>   drivers/hwtracing/coresight/coresight-tmc-etf.c  | 58 +++++-------------------
->>   include/linux/coresight.h                        |  5 +-
->>   4 files changed, 26 insertions(+), 102 deletions(-)
+>>  arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 11 +++-
+>>  arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 89 ++++++++++++++++++++++++++++
+>>  2 files changed, 98 insertions(+), 2 deletions(-)
 >>
->> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
->> index d9c2f87..b13712a 100644
->> --- a/drivers/hwtracing/coresight/coresight-etb10.c
->> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
->> @@ -322,37 +322,7 @@ static int etb_set_buffer(struct coresight_device *csdev,
->>   	return ret;
->>   }
->>   
->> -static unsigned long etb_reset_buffer(struct coresight_device *csdev,
->> -				      struct perf_output_handle *handle,
->> -				      void *sink_config)
->> -{
->> -	unsigned long size = 0;
->> -	struct cs_buffers *buf = sink_config;
->> -
->> -	if (buf) {
->> -		/*
->> -		 * In snapshot mode ->data_size holds the new address of the
->> -		 * ring buffer's head.  The size itself is the whole address
->> -		 * range since we want the latest information.
->> -		 */
->> -		if (buf->snapshot)
->> -			handle->head = local_xchg(&buf->data_size,
->> -						  buf->nr_pages << PAGE_SHIFT);
->> -
->> -		/*
->> -		 * Tell the tracer PMU how much we got in this run and if
->> -		 * something went wrong along the way.  Nobody else can use
->> -		 * this cs_buffers instance until we are done.  As such
->> -		 * resetting parameters here and squaring off with the ring
->> -		 * buffer API in the tracer PMU is fine.
->> -		 */
->> -		size = local_xchg(&buf->data_size, 0);
->> -	}
->> -
->> -	return size;
->> -}
->> -
->> -static void etb_update_buffer(struct coresight_device *csdev,
->> +static unsigned long etb_update_buffer(struct coresight_device *csdev,
->>   			      struct perf_output_handle *handle,
->>   			      void *sink_config)
->>   {
->> @@ -361,13 +331,13 @@ static void etb_update_buffer(struct coresight_device *csdev,
->>   	u8 *buf_ptr;
->>   	const u32 *barrier;
->>   	u32 read_ptr, write_ptr, capacity;
->> -	u32 status, read_data, to_read;
->> -	unsigned long offset;
->> +	u32 status, read_data;
->> +	unsigned long offset, to_read;
->>   	struct cs_buffers *buf = sink_config;
->>   	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->>   
->>   	if (!buf)
->> -		return;
->> +		return 0;
->>   
->>   	capacity = drvdata->buffer_depth * ETB_FRAME_SIZE_WORDS;
->>   
->> @@ -472,18 +442,17 @@ static void etb_update_buffer(struct coresight_device *csdev,
->>   	writel_relaxed(0x0, drvdata->base + ETB_RAM_WRITE_POINTER);
->>   
->>   	/*
->> -	 * In snapshot mode all we have to do is communicate to
->> -	 * perf_aux_output_end() the address of the current head.  In full
->> -	 * trace mode the same function expects a size to move rb->aux_head
->> -	 * forward.
->> +	 * In snapshot mode we have to update the handle->head to point
->> +	 * to the new location.
->>   	 */
->> -	if (buf->snapshot)
->> -		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
->> -	else
->> -		local_add(to_read, &buf->data_size);
->> -
->> +	if (buf->snapshot) {
->> +		handle->head = (cur * PAGE_SIZE) + offset;
->> +		to_read = buf->nr_pages << PAGE_SHIFT;
->> +	}
->>   	etb_enable_hw(drvdata);
->>   	CS_LOCK(drvdata->base);
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+>> index 45d8655..b783764 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+>> +++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+>> @@ -18,7 +18,7 @@
+>>  	compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
+>>  
+>>  	chosen {
+>> -		bootargs = "console=ttyS0,115200n1";
+>> +		bootargs = "console=ttyS0,115200n1 swiotlb=512";
+>>  	};
+>>  
+>>  	cpus {
+>> @@ -163,10 +163,17 @@
+>>  	i2s1_pins: i2s1-pins {
+>>  		mux {
+>>  			function = "i2s";
+>> -			groups =  "i2s_out_bclk_ws_mclk",
+>> +			groups =  "i2s_out_mclk_bclk_ws",
+> 
+> The old one ("i2s_out_bclk_ws_mclk") should be the indecisive value when
+> I initially worked on the pinctrl device.
+> 
+> It has to be corrected with "i2s_out_mclk_bclk_ws" to comply with the
+> final dt-bindings.
+> 
+>>  				  "i2s1_in_data",
+>>  				  "i2s1_out_data";
+>>  		};
 >> +
->> +	return to_read;
->>   }
->>   
->>   static const struct coresight_ops_sink etb_sink_ops = {
->> @@ -492,7 +461,6 @@ static const struct coresight_ops_sink etb_sink_ops = {
->>   	.alloc_buffer	= etb_alloc_buffer,
->>   	.free_buffer	= etb_free_buffer,
->>   	.set_buffer	= etb_set_buffer,
->> -	.reset_buffer	= etb_reset_buffer,
->>   	.update_buffer	= etb_update_buffer,
->>   };
->>   
->> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
->> index 4e5ed65..5096def 100644
->> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
->> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
->> @@ -342,15 +342,8 @@ static void etm_event_stop(struct perf_event *event, int mode)
->>   		if (!sink_ops(sink)->update_buffer)
->>   			return;
->>   
->> -		sink_ops(sink)->update_buffer(sink, handle,
->> +		size = sink_ops(sink)->update_buffer(sink, handle,
->>   					      event_data->snk_config);
->> -
->> -		if (!sink_ops(sink)->reset_buffer)
->> -			return;
->> -
->> -		size = sink_ops(sink)->reset_buffer(sink, handle,
->> -						    event_data->snk_config);
->> -
->>   		perf_aux_output_end(handle, size);
->>   	}
->>   
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> index 0a32734..75ef5c4 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> @@ -360,36 +360,7 @@ static int tmc_set_etf_buffer(struct coresight_device *csdev,
->>   	return ret;
->>   }
->>   
->> -static unsigned long tmc_reset_etf_buffer(struct coresight_device *csdev,
->> -					  struct perf_output_handle *handle,
->> -					  void *sink_config)
->> -{
->> -	long size = 0;
->> -	struct cs_buffers *buf = sink_config;
->> -
->> -	if (buf) {
->> -		/*
->> -		 * In snapshot mode ->data_size holds the new address of the
->> -		 * ring buffer's head.  The size itself is the whole address
->> -		 * range since we want the latest information.
->> -		 */
->> -		if (buf->snapshot)
->> -			handle->head = local_xchg(&buf->data_size,
->> -						  buf->nr_pages << PAGE_SHIFT);
->> -		/*
->> -		 * Tell the tracer PMU how much we got in this run and if
->> -		 * something went wrong along the way.  Nobody else can use
->> -		 * this cs_buffers instance until we are done.  As such
->> -		 * resetting parameters here and squaring off with the ring
->> -		 * buffer API in the tracer PMU is fine.
->> -		 */
->> -		size = local_xchg(&buf->data_size, 0);
->> -	}
->> -
->> -	return size;
->> -}
->> -
->> -static void tmc_update_etf_buffer(struct coresight_device *csdev,
->> +static unsigned long tmc_update_etf_buffer(struct coresight_device *csdev,
->>   				  struct perf_output_handle *handle,
->>   				  void *sink_config)
->>   {
->> @@ -398,17 +369,17 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
->>   	const u32 *barrier;
->>   	u32 *buf_ptr;
->>   	u64 read_ptr, write_ptr;
->> -	u32 status, to_read;
->> -	unsigned long offset;
->> +	u32 status;
->> +	unsigned long offset, to_read;
->>   	struct cs_buffers *buf = sink_config;
->>   	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->>   
->>   	if (!buf)
->> -		return;
->> +		return 0;
->>   
->>   	/* This shouldn't happen */
->>   	if (WARN_ON_ONCE(drvdata->mode != CS_MODE_PERF))
->> -		return;
->> +		return 0;
->>   
->>   	CS_UNLOCK(drvdata->base);
->>   
->> @@ -497,18 +468,14 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
->>   		}
->>   	}
->>   
->> -	/*
->> -	 * In snapshot mode all we have to do is communicate to
->> -	 * perf_aux_output_end() the address of the current head.  In full
->> -	 * trace mode the same function expects a size to move rb->aux_head
->> -	 * forward.
->> -	 */
->> -	if (buf->snapshot)
->> -		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
->> -	else
->> -		local_add(to_read, &buf->data_size);
->> -
->> +	/* In snapshot mode we have to update the head */
->> +	if (buf->snapshot) {
->> +		handle->head = (cur * PAGE_SIZE) + offset;
->> +		to_read = buf->nr_pages << PAGE_SHIFT;
->> +	}
->>   	CS_LOCK(drvdata->base);
+>> +		conf {
+>> +			pins = "I2S1_IN", "I2S1_OUT", "I2S_BCLK",
+>> +			       "I2S_WS", "I2S_MCLK";
+>> +			drive-strength = <12>;
+>> +			bias-pull-down;
+>> +		};
+>>  	};
+>>  
+>>  	irrx_pins: irrx-pins {
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+>> index 6bbabb6..9213c96 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+>> @@ -527,6 +527,95 @@
+>>  		status = "disabled";
+>>  	};
+>>  
+>> +	audsys: clock-controller at 11220000 {
+>> +		compatible = "mediatek,mt7622-audsys", "syscon";
+>> +		reg = <0 0x11220000 0 0x2000>;
+>> +		#clock-cells = <1>;
+> 
+> The binding have been through broonie/sound.git around a week ago
+> 
+
+Thanks for the clarifications!
+Pushed to v4.17-next/dts64
+
+Regards,
+Matthias
+
 >> +
->> +	return to_read;
->>   }
->>   
->>   static const struct coresight_ops_sink tmc_etf_sink_ops = {
->> @@ -517,7 +484,6 @@ static const struct coresight_ops_sink tmc_etf_sink_ops = {
->>   	.alloc_buffer	= tmc_alloc_etf_buffer,
->>   	.free_buffer	= tmc_free_etf_buffer,
->>   	.set_buffer	= tmc_set_etf_buffer,
->> -	.reset_buffer	= tmc_reset_etf_buffer,
->>   	.update_buffer	= tmc_update_etf_buffer,
->>   };
->>   
->> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
->> index c0e1568..41b3729 100644
->> --- a/include/linux/coresight.h
->> +++ b/include/linux/coresight.h
->> @@ -212,10 +212,7 @@ struct coresight_ops_sink {
->>   	int (*set_buffer)(struct coresight_device *csdev,
->>   			  struct perf_output_handle *handle,
->>   			  void *sink_config);
->> -	unsigned long (*reset_buffer)(struct coresight_device *csdev,
->> -				      struct perf_output_handle *handle,
->> -				      void *sink_config);
->> -	void (*update_buffer)(struct coresight_device *csdev,
->> +	unsigned long (*update_buffer)(struct coresight_device *csdev,
->>   			      struct perf_output_handle *handle,
->>   			      void *sink_config);
->>   };
->> -- 
->> 2.7.4
->>
+>> +		afe: audio-controller {
+>> +			compatible = "mediatek,mt7622-audio";
+>> +			interrupts =  <GIC_SPI 144 IRQ_TYPE_LEVEL_LOW>,
+>> +				      <GIC_SPI 145 IRQ_TYPE_LEVEL_LOW>;
+>> +			interrupt-names	= "afe", "asys";
+>> +
+>> +			clocks = <&infracfg CLK_INFRA_AUDIO_PD>,
+>> +				 <&topckgen CLK_TOP_AUD1_SEL>,
+>> +				 <&topckgen CLK_TOP_AUD2_SEL>,
+>> +				 <&topckgen CLK_TOP_A1SYS_HP_DIV_PD>,
+>> +				 <&topckgen CLK_TOP_A2SYS_HP_DIV_PD>,
+>> +				 <&topckgen CLK_TOP_I2S0_MCK_SEL>,
+>> +				 <&topckgen CLK_TOP_I2S1_MCK_SEL>,
+>> +				 <&topckgen CLK_TOP_I2S2_MCK_SEL>,
+>> +				 <&topckgen CLK_TOP_I2S3_MCK_SEL>,
+>> +				 <&topckgen CLK_TOP_I2S0_MCK_DIV>,
+>> +				 <&topckgen CLK_TOP_I2S1_MCK_DIV>,
+>> +				 <&topckgen CLK_TOP_I2S2_MCK_DIV>,
+>> +				 <&topckgen CLK_TOP_I2S3_MCK_DIV>,
+>> +				 <&topckgen CLK_TOP_I2S0_MCK_DIV_PD>,
+>> +				 <&topckgen CLK_TOP_I2S1_MCK_DIV_PD>,
+>> +				 <&topckgen CLK_TOP_I2S2_MCK_DIV_PD>,
+>> +				 <&topckgen CLK_TOP_I2S3_MCK_DIV_PD>,
+>> +				 <&audsys CLK_AUDIO_I2SO1>,
+>> +				 <&audsys CLK_AUDIO_I2SO2>,
+>> +				 <&audsys CLK_AUDIO_I2SO3>,
+>> +				 <&audsys CLK_AUDIO_I2SO4>,
+>> +				 <&audsys CLK_AUDIO_I2SIN1>,
+>> +				 <&audsys CLK_AUDIO_I2SIN2>,
+>> +				 <&audsys CLK_AUDIO_I2SIN3>,
+>> +				 <&audsys CLK_AUDIO_I2SIN4>,
+>> +				 <&audsys CLK_AUDIO_ASRCO1>,
+>> +				 <&audsys CLK_AUDIO_ASRCO2>,
+>> +				 <&audsys CLK_AUDIO_ASRCO3>,
+>> +				 <&audsys CLK_AUDIO_ASRCO4>,
+>> +				 <&audsys CLK_AUDIO_AFE>,
+>> +				 <&audsys CLK_AUDIO_AFE_CONN>,
+>> +				 <&audsys CLK_AUDIO_A1SYS>,
+>> +				 <&audsys CLK_AUDIO_A2SYS>;
+>> +
+>> +			clock-names = "infra_sys_audio_clk",
+>> +				      "top_audio_mux1_sel",
+>> +				      "top_audio_mux2_sel",
+>> +				      "top_audio_a1sys_hp",
+>> +				      "top_audio_a2sys_hp",
+>> +				      "i2s0_src_sel",
+>> +				      "i2s1_src_sel",
+>> +				      "i2s2_src_sel",
+>> +				      "i2s3_src_sel",
+>> +				      "i2s0_src_div",
+>> +				      "i2s1_src_div",
+>> +				      "i2s2_src_div",
+>> +				      "i2s3_src_div",
+>> +				      "i2s0_mclk_en",
+>> +				      "i2s1_mclk_en",
+>> +				      "i2s2_mclk_en",
+>> +				      "i2s3_mclk_en",
+>> +				      "i2so0_hop_ck",
+>> +				      "i2so1_hop_ck",
+>> +				      "i2so2_hop_ck",
+>> +				      "i2so3_hop_ck",
+>> +				      "i2si0_hop_ck",
+>> +				      "i2si1_hop_ck",
+>> +				      "i2si2_hop_ck",
+>> +				      "i2si3_hop_ck",
+>> +				      "asrc0_out_ck",
+>> +				      "asrc1_out_ck",
+>> +				      "asrc2_out_ck",
+>> +				      "asrc3_out_ck",
+>> +				      "audio_afe_pd",
+>> +				      "audio_afe_conn_pd",
+>> +				      "audio_a1sys_pd",
+>> +				      "audio_a2sys_pd";
+>> +
+>> +			assigned-clocks = <&topckgen CLK_TOP_A1SYS_HP_SEL>,
+>> +					  <&topckgen CLK_TOP_A2SYS_HP_SEL>,
+>> +					  <&topckgen CLK_TOP_A1SYS_HP_DIV>,
+>> +					  <&topckgen CLK_TOP_A2SYS_HP_DIV>;
+>> +			assigned-clock-parents = <&topckgen CLK_TOP_AUD1PLL>,
+>> +						 <&topckgen CLK_TOP_AUD2PLL>;
+>> +			assigned-clock-rates = <0>, <0>, <49152000>, <45158400>;
+>> +		};
+>> +	};
+>> +
+>>  	mmc0: mmc at 11230000 {
+>>  		compatible = "mediatek,mt7622-mmc";
+>>  		reg = <0 0x11230000 0 0x1000>;
+> 
+> 
