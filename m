@@ -1,117 +1,87 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Fri, 11 May 2018 16:36:13 +0200
-Subject: [PATCH v2] arm: port KCOV to arm
-In-Reply-To: <20180511143248.112484-1-dvyukov@google.com>
-References: <20180511143248.112484-1-dvyukov@google.com>
-Message-ID: <CACT4Y+YVpA95QWSkK32urFZu+-jPp-C9ExKQx1+uEvYOrH8png@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 11 May 2018 16:36:47 +0200
+Subject: [PATCH v4 3/3] ARM: dts: sun7i: Add support for the Ainol AW1
+ tablet
+In-Reply-To: <20180507220413.21990-3-contact@paulk.fr>
+References: <20180507220413.21990-1-contact@paulk.fr>
+ <20180507220413.21990-3-contact@paulk.fr>
+Message-ID: <20180511143647.ici2bfoeeldto3ju@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 4:32 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
-> KCOV is code coverage collection facility used, in particular, by syzkaller
-> system call fuzzer. There is some interest in using syzkaller on arm devices.
-> So port KCOV to arm.
->
-> On implementation level this merely declares that KCOV is supported and
-> disables instrumentation of 3 special cases. Reasons for disabling are
-> commented in code.
->
-> Tested with qemu-system-arm/vexpress-a15.
->
-> Signed-off-by: Dmitry Vyukov <dvyukov@google.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Abbott Liu <liuwenliang@huawei.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Koguchi Takuo <takuo.koguchi.sw@hitachi.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-mm at kvack.org
-> Cc: syzkaller at googlegroups.com
->
-> ---
->
-> Changes since v1:
->  - remove disable of instrumentation for arch/arm/mm/fault.c
->  - disable instrumentation of arch/arm/kvm/hyp/*
->  - resort ARCH_HAS_KCOV alphabetically
+On Tue, May 08, 2018 at 12:04:13AM +0200, Paul Kocialkowski wrote:
+> +++ b/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
+> @@ -0,0 +1,297 @@
+> +/*
+> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 
+This really should be the first line, and with a C++ style comment, as
+in:
 
-Andrew, this is for MM tree because this depends on the following
-patches in MM tree:
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) ...
 
-    kcov: prefault the kcov_area
-    kcov: ensure irq code sees a valid area
-    sched/core / kcov: avoid kcov_area during task switch
+See Documentation/process/license-rules.rst
 
+> +	backlight: backlight {
+> +		compatible = "pwm-backlight";
+> +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
+> +		brightness-levels = <  0   1   1   1   1   2   2   2
+> +				       2   3   3   3   3   4   4   4
+> +				       5   5   5   6   6   6   7   7
+> +				       8   8   8   9   9   9  10  10
+> +				      10  11  11  12  12  12  13  13
+> +				      14  14  14  15  15  16  16  17
+> +				      17  17  18  18  19  19  20  20
+> +				      21  21  21  22  22  23  23  24
+> +				      24  25  25  26  26  27  27  28
+> +				      28  29  30  30  31  31  32  32
+> +				      33  33  34  35  35  36  36  37
+> +				      38  38  39  39  40  41  41  42
+> +				      43  43  44  44  45  46  47  47
+> +				      48  49  49  50  51  51  52  53
+> +				      54  54  55  56  57  57  58  59
+> +				      60  61  61  62  63  64  65  65
+> +				      66  67  68  69  70  71  71  72
+> +				      73  74  75  76  77  78  79  80
+> +				      81  82  83  84  85  86  87  88
+> +				      89  90  91  92  93  94  95  96
+> +				      97  98  99 101 102 103 104 105
+> +				     106 108 109 110 111 112 114 115
+> +				     116 117 119 120 121 123 124 125
+> +				     127 128 129 131 132 133 135 136
+> +				     138 139 141 142 144 145 147 148
+> +				     150 151 153 154 156 157 159 161
+> +				     162 164 166 167 169 171 173 174
+> +				     176 178 180 181 183 185 187 189
+> +				     191 192 194 196 198 200 202 204
+> +				     206 208 210 212 214 216 219 221
+> +				     223 225 227 229 232 234 236 238
+> +				     241 242 244 246 248 250 253 255>;
 
+You kind of overdid it here :)
 
-> ---
->  arch/arm/Kconfig                  | 3 ++-
->  arch/arm/boot/compressed/Makefile | 3 +++
->  arch/arm/kvm/hyp/Makefile         | 8 ++++++++
->  arch/arm/vdso/Makefile            | 3 +++
->  4 files changed, 16 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 3493f840e89c..34591796c36f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -8,9 +8,10 @@ config ARM
->         select ARCH_HAS_DEVMEM_IS_ALLOWED
->         select ARCH_HAS_ELF_RANDOMIZE
->         select ARCH_HAS_FORTIFY_SOURCE
-> +       select ARCH_HAS_KCOV
->         select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
-> -       select ARCH_HAS_SET_MEMORY
->         select ARCH_HAS_PHYS_TO_DMA
-> +       select ARCH_HAS_SET_MEMORY
->         select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
->         select ARCH_HAS_STRICT_MODULE_RWX if MMU
->         select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 6a4e7341ecd3..5f5f081e4879 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -25,6 +25,9 @@ endif
->
->  GCOV_PROFILE           := n
->
-> +# Prevents link failures: __sanitizer_cov_trace_pc() is not linked in.
-> +KCOV_INSTRUMENT                := n
-> +
->  #
->  # Architecture dependencies
->  #
-> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-> index 7fc0638f263a..d2b5ec9c4b92 100644
-> --- a/arch/arm/kvm/hyp/Makefile
-> +++ b/arch/arm/kvm/hyp/Makefile
-> @@ -23,3 +23,11 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
->  obj-$(CONFIG_KVM_ARM_HOST) += switch.o
->  CFLAGS_switch.o                   += $(CFLAGS_ARMV7VE)
->  obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
-> +
-> +# KVM code is run at a different exception code with a different map, so
-> +# compiler instrumentation that inserts callbacks or checks into the code may
-> +# cause crashes. Just disable it.
-> +GCOV_PROFILE   := n
-> +KASAN_SANITIZE := n
-> +UBSAN_SANITIZE := n
-> +KCOV_INSTRUMENT        := n
-> diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
-> index bb4118213fee..f4efff9d3afb 100644
-> --- a/arch/arm/vdso/Makefile
-> +++ b/arch/arm/vdso/Makefile
-> @@ -30,6 +30,9 @@ CFLAGS_vgettimeofday.o = -O2
->  # Disable gcov profiling for VDSO code
->  GCOV_PROFILE := n
->
-> +# Prevents link failures: __sanitizer_cov_trace_pc() is not linked in.
-> +KCOV_INSTRUMENT := n
-> +
->  # Force dependency
->  $(obj)/vdso.o : $(obj)/vdso.so
->
-> --
-> 2.17.0.441.gb46fe60e1d-goog
->
+What I meant to say before was that if you have 10 elements (and you
+really should have something in that magnitude) each step should
+increase the perceived brightness by 10%.
+
+In this particular case, I really think having something close to <0 4
+8 16 32 64 128 255> would be enough.
+
+And in general, that kind of odd looking table without any more
+context is just screaming for a comment :)
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180511/7d3492e5/attachment.sig>
