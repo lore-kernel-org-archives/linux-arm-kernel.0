@@ -1,69 +1,114 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 11 May 2018 07:24:43 -0500
-Subject: [PATCH v1 3/5] arm64: dts: rockchip: Add gpio-syscon10 to rk3328
-In-Reply-To: <3fdfcc9b-90b5-191c-37e0-c99389a4e872@t-chip.com.cn>
-References: <1525943800-14095-1-git-send-email-djw@t-chip.com.cn>
- <1525943800-14095-4-git-send-email-djw@t-chip.com.cn>
- <76f2bbde-e158-a186-f136-9fb610a810c5@arm.com>
- <3fdfcc9b-90b5-191c-37e0-c99389a4e872@t-chip.com.cn>
-Message-ID: <CAL_JsqLujC0nx9LpkWuSR0+fsZn4UJL9Ln6SHWyBmZ-7ErMzfw@mail.gmail.com>
+Date: Fri, 11 May 2018 07:31:45 -0500
+Subject: [PATCH] arm64: dts: stratix10: Add QSPI support for Stratix10
+In-Reply-To: <1525985204-11525-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1525985204-11525-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <CAL_JsqKN0TxFoGjoeXuOb1tJ4GhhC1yHRud3g6-DvZOH_Ago5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 10:45 PM, Levin Du <djw@t-chip.com.cn> wrote:
-> On 2018-05-10 8:50 PM, Robin Murphy wrote:
->>
->> On 10/05/18 10:16, djw at t-chip.com.cn wrote:
->>>
->>> From: Levin Du <djw@t-chip.com.cn>
->>>
->>> Adding a new gpio controller named "gpio-syscon10" to rk3328, providing
->>> access to the pins defined in the syscon GRF_SOC_CON10.
->>
->>
->> This is the GPIO_MUTE pin, right? The public TRM is rather vague, but
->> cross-referencing against the datasheet and schematics implies that it's the
->> "gpiomut_*" part of the GRF bit names which is most significant.
->>
->> It might be worth using a more descriptive name here, since "syscon10" is
->> pretty much meaningless at the board level.
->>
->> Robin.
->>
-> Previously I though other bits might be able to reference from syscon10,
-> other than GPIO_MUTE alone.
-> If it is renamed to gpio-mute, then the GPIO_MUTE pin is accessed as
-> `<&gpio-mute 1>`. Yet other
-> bits in syscon10 can also be referenced, say, `<&gpio-mute 10>`, which is
-> not good.
+On Thu, May 10, 2018 at 3:46 PM,  <thor.thayer@linux.intel.com> wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
 >
-> I'd like to add a `gpio,syscon-bit` property to gpio-syscon, which overrides
-> the properties
-> of bit_count,  data_bit_offset and dir_bit_offset in the driver. For
-
-No. Once you are describing individual register bits, it is too low
-level for DT.
-
-> example:
+> Add qspi_clock
+>    The qspi_clk frequency is updated by U-Boot before starting Linux.
+> Add QSPI interface node.
+> Add QSPI flash memory child node.
+>    Setup the QSPI memory in 2 partitions.
 >
->                 gpio_mute: gpio-mute {
->                         compatible = "rockchip,gpio-syscon";
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         gpio,syscon-dev = <0 0x0428 0>;
->                         gpio,syscon-bit = <1 1 0>;
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 22 +++++++++++++++
+>  .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 31 ++++++++++++++++++++++
+>  2 files changed, 53 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> index e6b059378dc0..ed47dfce3ba6 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> @@ -119,6 +119,12 @@
+>                                 #clock-cells = <0>;
+>                                 compatible = "fixed-clock";
+>                         };
+> +
+> +                       qspi_clk: qspi_clk {
+
+s/_/-/
+
+> +                               #clock-cells = <0>;
+> +                               compatible = "fixed-clock";
+> +                               clock-frequency = <200000000>;
+> +                       };
 >                 };
 >
-> That way, the mute pin is strictly specified as <&gpio_mute 0>, and
-> <&gpio_mute 1> will be invalid.
-> I think that is neat, and consistent with the gpio_mute name.
->
-> Thanks
-> Levin
->
->
->
+>                 gmac0: ethernet at ff800000 {
+> @@ -466,5 +472,21 @@
+>                                 interrupts = <16 4>, <48 4>;
+>                         };
+>                 };
+> +
+> +               qspi: spi at ff8d2000 {
+> +                       compatible = "cdns,qspi-nor";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <0xff8d2000 0x100>,
+> +                             <0xff900000 0x100000>;
+> +                       interrupts = <0 3 4>;
+> +                       cdns,fifo-depth = <128>;
+> +                       cdns,fifo-width = <4>;
+> +                       cdns,trigger-address = <0x00000000>;
+> +                       clocks = <&qspi_clk>;
+> +                       bus-num = <1>;
+> +
+> +                       status = "disabled";
+> +               };
+>         };
+>  };
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+> index f9b1ef12db48..60251462067a 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+> @@ -147,3 +147,34 @@
+>                 reg = <0x68>;
+>         };
+>  };
+> +
+> +&qspi {
+> +       flash0: n25q00 at 0 {
+
+flash at 0
+
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "n25q00aa";
+> +               reg = <0>;
+> +               spi-max-frequency = <50000000>;
+> +
+> +               m25p,fast-read;
+> +               cdns,page-size = <256>;
+> +               cdns,block-size = <16>;
+> +               cdns,read-delay = <1>;
+> +               cdns,tshsl-ns = <50>;
+> +               cdns,tsd2d-ns = <50>;
+> +               cdns,tchsh-ns = <4>;
+> +               cdns,tslch-ns = <4>;
+> +
+> +               partition at qspi-boot {
+
+use a 'partitions' node to contain all the partitions.
+
+> +                       label = "Boot and fpga data";
+> +                       /* 64MB for boot and FPGA data */
+> +                       reg = <0x0 0x4000000>;
+> +               };
+> +
+> +               partition at qspi-rootfs {
+> +                       label = "Root Filesystem - JFFS2";
+> +                       /* 64MB for Linux jffs2 */
+> +                       reg = <0x4000000 0x4000000>;
+> +               };
+> +       };
+> +};
 > --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.7.4
+>
