@@ -1,111 +1,202 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Fri, 11 May 2018 16:52:02 -0400
-Subject: [PATCH] iommu/arm-smmu-v3: Set GBPA to abort all transactions
-In-Reply-To: <265a41d4-ec3c-6697-0340-6830807ea10f@arm.com>
-References: <1522247980-31892-1-git-send-email-timur@codeaurora.org>
- <3350f0eb84c8c621cf43aa06ed117cfb@www.loen.fr>
- <3772fb2d-01b7-4820-6d13-a0263654dabc@codeaurora.org>
- <438a6180-fca8-d3a1-985f-e595529911f3@arm.com>
- <7756f245-6c63-92d4-d101-4040a45b660b@arm.com>
- <265a41d4-ec3c-6697-0340-6830807ea10f@arm.com>
-Message-ID: <f033e1a8-282a-764a-a001-5630a3c303c9@codeaurora.org>
+From: evgreen@chromium.org (Evan Green)
+Date: Fri, 11 May 2018 14:29:42 -0700
+Subject: [PATCH v4 5/7] interconnect: qcom: Add msm8916 interconnect
+ provider driver
+In-Reply-To: <20180309210958.16672-6-georgi.djakov@linaro.org>
+References: <20180309210958.16672-1-georgi.djakov@linaro.org>
+ <20180309210958.16672-6-georgi.djakov@linaro.org>
+Message-ID: <CAE=gft4LT_JSGytuiSx5uwzfeGc0DK140+D4c_J8FVUHioHdcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Georgi,
 
-On 4/12/2018 7:56 AM, Marc Zyngier wrote:
-> On 12/04/18 11:17, Robin Murphy wrote:
->> On 11/04/18 17:54, Marc Zyngier wrote:
->>> Hi Sammer,
->>>
->>> On 11/04/18 16:58, Goel, Sameer wrote:
->>>>
->>>>
->>>> On 3/28/2018 9:00 AM, Marc Zyngier wrote:
->>>>> On 2018-03-28 15:39, Timur Tabi wrote:
->>>>>> From: Sameer Goel <sgoel@codeaurora.org>
->>>>>>
->>>>>> Set SMMU_GBPA to abort all incoming translations during the SMMU reset
->>>>>> when SMMUEN==0.
->>>>>>
->>>>>> This prevents a race condition where a stray DMA from the crashed primary
->>>>>> kernel can try to access an IOVA address as an invalid PA when SMMU is
->>>>>> disabled during reset in the crash kernel.
->>>>>>
->>>>>> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
->>>>>> ---
->>>>>>   ?drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
->>>>>>   ?1 file changed, 12 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->>>>>> index 3f2f1fc68b52..c04a89310c59 100644
->>>>>> --- a/drivers/iommu/arm-smmu-v3.c
->>>>>> +++ b/drivers/iommu/arm-smmu-v3.c
->>>>>> @@ -2458,6 +2458,18 @@ static int arm_smmu_device_reset(struct
->>>>>> arm_smmu_device *smmu, bool bypass)
->>>>>>   ???? if (reg & CR0_SMMUEN)
->>>>>>   ???????? dev_warn(smmu->dev, "SMMU currently enabled! Resetting...\n");
->>>>>>
->>>>>> +??? /*
->>>>>> +???? * Abort all incoming translations. This can happen in a kdump case
->>>>>> +???? * where SMMU is initialized when a prior DMA is pending. Just
->>>>>> +???? * disabling the SMMU in this case might result in writes to invalid
->>>>>> +???? * PAs.
->>>>>> +???? */
->>>>>> +??? ret = arm_smmu_update_gbpa(smmu, 1, GBPA_ABORT);
->>>>>> +??? if (ret) {
->>>>>> +??????? dev_err(smmu->dev, "GBPA not responding to update\n");
->>>>>> +??????? return ret;
->>>>>> +??? }
->>>>>> +
->>>>>>   ???? ret = arm_smmu_device_disable(smmu);
->>>>>>   ???? if (ret)
->>>>>>   ???????? return ret;
->>>>>
->>>>> A tangential question: can we reliably detect that the SMMU already
->>>>> has valid mappings, which would indicate that we're in a pretty bad
->>>>> shape already by the time we set that bit? For all we know, memory
->>>>> could have been corrupted long before we hit this point, and this
->>>>> patch barely narrows the window of opportunity.
->>>>
->>>> :) Yes that is correct. This only covers the kdump scenario. Trying
->>>> to get some reliability when booting up the crash kernel. The system
->>>> is already in a bad state. I don't think that this will happen in a
->>>> normal scenario. But please point me to the GICv3 change and I'll
->>>> have a look.
->>>
->>> See this:
->>> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/tree/drivers/irqchip/irq-gic-v3-its.c?h=irq/irqchip-4.17&id=6eb486b66a3094cdcd68dc39c9df3a29d6a51dd5#n3407
->>
->> The nearest equivalent to that is probably the top-level SMMUEN check
->> that we already have (see the diff context above). To go beyond that
->> you'd have to chase the old stream table pointer and scan the whole
->> thing looking for valid contexts, then potentially walk page tables
->> within those contexts to check for live translations if you really
->> wanted to be sure. That would be a hell of a lot of work to do in the
->> boot path.
-> Yeah, feels a bit too involved for sanity. I'd simply suggest you taint
-> the kernel if you find the SMMU enabled, as you're already on shaky ground.
+On Fri, Mar 9, 2018 at 1:11 PM Georgi Djakov <georgi.djakov@linaro.org>
+wrote:
 
-Finding the SMMU already enabled does not necessarily indicate that
-anything catastrophic has occurred.
+> Add driver for the Qualcomm interconnect buses found in msm8916 based
+> platforms.
 
-For instance, to support OSes without an SMMUv3 driver, boot FW may have
-enabled the SMMU and installed 1-to-1 mappings for DDR and MSI target
-addr(s) to compensate for a MSI-capable master whose default DMA attrs
-needed tweaking (ex: non-coherent -> coherent).
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> ---
+>    drivers/interconnect/Kconfig        |   5 +
+>    drivers/interconnect/Makefile       |   1 +
+>    drivers/interconnect/qcom/Kconfig   |  11 +
+>    drivers/interconnect/qcom/Makefile  |   2 +
+>    drivers/interconnect/qcom/msm8916.c | 482
+++++++++++++++++++++++++++++++++++++
+>    include/linux/interconnect/qcom.h   | 350 ++++++++++++++++++++++++++
+>    6 files changed, 851 insertions(+)
+>    create mode 100644 drivers/interconnect/qcom/Kconfig
+>    create mode 100644 drivers/interconnect/qcom/msm8916.c
+>    create mode 100644 include/linux/interconnect/qcom.h
+...
+> diff --git a/drivers/interconnect/qcom/msm8916.c
+b/drivers/interconnect/qcom/msm8916.c
+> new file mode 100644
+> index 000000000000..d5b54f8261c8
+> --- /dev/null
+> +++ b/drivers/interconnect/qcom/msm8916.c
+...
+> +static int qnoc_probe(struct platform_device *pdev)
+> +{
+> +       const struct qcom_icc_desc *desc;
+> +       struct qcom_icc_node **qnodes;
+> +       struct qcom_icc_provider *qp;
+> +       struct resource *res;
+> +       struct icc_provider *provider;
+> +       size_t num_nodes, i;
+> +       int ret;
+> +
+> +       /* wait for RPM */
+> +       if (!qcom_icc_rpm_smd_available())
+> +               return -EPROBE_DEFER;
+> +
+> +       desc = of_device_get_match_data(&pdev->dev);
+> +       if (!desc)
+> +               return -EINVAL;
+> +
+> +       qnodes = desc->nodes;
+> +       num_nodes = desc->num_nodes;
+> +
+> +       qp = devm_kzalloc(&pdev->dev, sizeof(*qp), GFP_KERNEL);
+> +       if (!qp)
+> +               return -ENOMEM;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       qp->base = devm_ioremap_resource(&pdev->dev, res);
+> +       if (IS_ERR(qp->base))
+> +               return PTR_ERR(qp->base);
+> +
+> +       qp->bus_clk = devm_clk_get(&pdev->dev, "bus_clk");
+> +       if (IS_ERR(qp->bus_clk))
+> +               return PTR_ERR(qp->bus_clk);
+> +
+> +       qp->bus_a_clk = devm_clk_get(&pdev->dev, "bus_a_clk");
+> +       if (IS_ERR(qp->bus_a_clk))
+> +               return PTR_ERR(qp->bus_a_clk);
+> +
+> +       provider = &qp->provider;
+> +       provider->dev = &pdev->dev;
+> +       provider->set = &qcom_icc_set;
+> +       INIT_LIST_HEAD(&provider->nodes);
+> +       provider->data = qp;
+> +
+> +       ret = icc_add_provider(provider);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "error adding interconnect
+provider\n");
+> +               return ret;
+> +       }
+> +
+> +       for (i = 0; i < num_nodes; i++) {
+> +               struct icc_node *node;
+> +               int ret;
+> +               size_t j;
+> +
+> +               node = icc_node_create(qnodes[i]->id);
+> +               if (IS_ERR(node)) {
+> +                       ret = PTR_ERR(node);
+> +                       goto err;
+> +               }
+> +
+> +               node->name = qnodes[i]->name;
+> +               node->data = qnodes[i];
+> +               icc_node_add(node, provider);
+> +
+> +               dev_dbg(&pdev->dev, "registered node %p %s %d\n", node,
+> +                       qnodes[i]->name, node->id);
+> +
+> +               /* populate links */
+> +               for (j = 0; j < qnodes[i]->num_links; j++)
+> +                       if (qnodes[i]->links[j])
+> +                               icc_link_create(node,
+qnodes[i]->links[j]);
+> +
+> +               ret = qcom_icc_init(node);
+> +               if (ret)
+> +                       dev_err(&pdev->dev, "%s init error (%d)\n",
+node->name,
+> +                               ret);
 
-If such a configuration warrants tainting the kernel, then we should
-similarly check GBPA for attr overrides and taint the kernel if any are
-found there.
+Don't you want to call qcom_icc_init before icc_link_create? As soon as
+icc_link_create is called, the node is connected to the graph, and
+qcom_icc_set can be called.
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
+> +       }
+> +
+> +       platform_set_drvdata(pdev, provider);
+> +
+> +       return ret;
+> +err:
+> +       icc_del_provider(provider);
+> +       return ret;
+> +}
+> +
+> +static int qnoc_remove(struct platform_device *pdev)
+> +{
+> +       struct icc_provider *provider = platform_get_drvdata(pdev);
+> +
+> +       icc_del_provider(provider);
 
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Presumably in the framework nodes and links ought to get cleaned up
+somewhere too, right? As it is now, the devm code frees provider when this
+device is removed, even though provider is still very connected in the
+graph via the nodes and links.
+
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id qnoc_of_match[] = {
+> +       { .compatible = "qcom,msm8916-pnoc", .data = &msm8916_pnoc },
+> +       { .compatible = "qcom,msm8916-snoc", .data = &msm8916_snoc },
+> +       { .compatible = "qcom,msm8916-bimc", .data = &msm8916_bimc },
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(of, qnoc_of_match);
+> +
+> +static struct platform_driver qnoc_driver = {
+> +       .probe = qnoc_probe,
+> +       .remove = qnoc_remove,
+> +       .driver = {
+> +               .name = "qnoc-msm8916",
+> +               .of_match_table = qnoc_of_match,
+> +       },
+> +};
+> +module_platform_driver(qnoc_driver);
+> +MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org>");
+> +MODULE_DESCRIPTION("Qualcomm msm8916 NoC driver");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/interconnect/qcom.h
+b/include/linux/interconnect/qcom.h
+> new file mode 100644
+> index 000000000000..2cd378d2f575
+> --- /dev/null
+> +++ b/include/linux/interconnect/qcom.h
+> @@ -0,0 +1,350 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Qualcomm interconnect IDs
+> + *
+> + * Copyright (c) 2018, Linaro Ltd.
+> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
+> + */
+> +
+> +#ifndef __QCOM_INTERCONNECT_IDS_H
+> +#define __QCOM_INTERCONNECT_IDS_H
+> +
+> +#define FAB_BIMC 0
+> +#define FAB_SYS_NOC 1024
+> +#define FAB_MMSS_NOC 2048
+> +#define FAB_OCMEM_NOC 3072
+> +#define FAB_PERIPH_NOC 4096
+> +#define FAB_CONFIG_NOC 5120
+> +#define FAB_OCMEM_VNOC 6144
+
+Looks like you're still following that downstream convention of NoCs being
+divisible by 1024, masters in 1-512, and slaves in 512-1023, then I don't
+know about the 10000s. This was documented somewhere downstream, can you
+add that documentation somewhere in here?
+
+-Evan
