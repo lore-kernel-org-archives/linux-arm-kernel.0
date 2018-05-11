@@ -1,177 +1,41 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 11 May 2018 12:23:22 +0100
-Subject: [PATCH] [stable 4.14] arm64: Add work around for Arm Cortex-A55
- Erratum 1024718
-Message-ID: <1526037802-13305-1-git-send-email-suzuki.poulose@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 11 May 2018 13:25:02 +0200
+Subject: [PATCH v2 2/2] soc: mediatek: reuse regmap_read_poll_timeout
+ helpers
+In-Reply-To: <ed866d3345a27b2c87b570562d9ad9132bca6062.1524465345.git.sean.wang@mediatek.com>
+References: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
+ <ed866d3345a27b2c87b570562d9ad9132bca6062.1524465345.git.sean.wang@mediatek.com>
+Message-ID: <68d230e8-2f9f-ae84-95d0-d8bf22f8f43b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
+Hi Sean,
 
-Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
-from an erratum 1024718, which causes incorrect updates when DBM/AP
-bits in a page table entry is modified without a break-before-make
-sequence. The work around is to disable the hardware DBM feature
-on the affected cores. The hardware Access Flag management features
-is not affected.
+On 04/23/2018 08:42 AM, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> Reuse the common helpers regmap_read_poll_timeout provided by Linux core
+> instead of an open-coded handling.
+> 
+> v1 -> v2:
+>  - use macro definitions MTK_POLL_DELAY_US and MTK_POLL_TIMEOUT for
+>    arguments sleep_us and timeout_us passing in regmap_read_poll_timeout.
+>  - remove unnecessary linux/iopoll.h being included in.
+> 
 
-The hardware DBM feature is a non-conflicting capability, i.e, the
-kernel could handle cores using the feature and those without having
-the features running at the same time. So this work around is detected
-at early boot time, rather than delaying it until the CPUs are brought
-up into the kernel with MMU turned on. This also avoids other complexities
-with late CPUs turning online, with or without the hardware DBM features.
+I just realized that you wrote the changelog here, which will make it show up in
+the commit log. Thant's not what we want... (see below)
 
-Cc: stable at vger.kernel.org # v4.14
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
-Note: The upstream commit is on top of a reworked capability
-infrastructure for arm64 heterogeneous systems, which allows
-delaying the CPU model checks. This backport is based on the
-original version of the patch [0], which checks the affected
-CPU models during the early boot.
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Weiyi Lu <weiyi.lu@mediatek.com>
+> ---
+>  drivers/soc/mediatek/mtk-infracfg.c | 46 ++++++++++---------------------------
+>  1 file changed, 12 insertions(+), 34 deletions(-)
+> 
 
-[0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
----
-
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 14 ++++++++++++
- arch/arm64/include/asm/assembler.h     | 40 ++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/cputype.h       |  2 ++
- arch/arm64/mm/proc.S                   |  5 +++++
- 5 files changed, 62 insertions(+)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index f3d0d31..e4fe6ad 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -55,6 +55,7 @@ stable kernels.
- | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220        |
- | ARM            | Cortex-A72      | #853709         | N/A                         |
- | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
-+| ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
- | ARM            | MMU-500         | #841119,#826419 | N/A                         |
- |                |                 |                 |                             |
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c2abb4e..2d5f7ac 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -443,6 +443,20 @@ config ARM64_ERRATUM_843419
- 
- 	  If unsure, say Y.
- 
-+config ARM64_ERRATUM_1024718
-+	bool "Cortex-A55: 1024718: Update of DBM/AP bits without break before make might result in incorrect update"
-+	default y
-+	help
-+	  This option adds work around for Arm Cortex-A55 Erratum 1024718.
-+
-+	  Affected Cortex-A55 cores (r0p0, r0p1, r1p0) could cause incorrect
-+	  update of the hardware dirty bit when the DBM/AP bits are updated
-+	  without a break-before-make. The work around is to disable the usage
-+	  of hardware DBM locally on the affected cores. CPUs not affected by
-+	  erratum will continue to use the feature.
-+
-+	  If unsure, say Y.
-+
- config CAVIUM_ERRATUM_22375
- 	bool "Cavium erratum 22375, 24313"
- 	default y
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 463619d..25b2a41 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -25,6 +25,7 @@
- 
- #include <asm/asm-offsets.h>
- #include <asm/cpufeature.h>
-+#include <asm/cputype.h>
- #include <asm/page.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptrace.h>
-@@ -495,4 +496,43 @@ alternative_endif
- 	and	\phys, \pte, #(((1 << (48 - PAGE_SHIFT)) - 1) << PAGE_SHIFT)
- 	.endm
- 
-+/*
-+ * Check the MIDR_EL1 of the current CPU for a given model and a range of
-+ * variant/revision. See asm/cputype.h for the macros used below.
-+ *
-+ *	model:		MIDR_CPU_MODEL of CPU
-+ *	rv_min:		Minimum of MIDR_CPU_VAR_REV()
-+ *	rv_max:		Maximum of MIDR_CPU_VAR_REV()
-+ *	res:		Result register.
-+ *	tmp1, tmp2, tmp3: Temporary registers
-+ *
-+ * Corrupts: res, tmp1, tmp2, tmp3
-+ * Returns:  0, if the CPU id doesn't match. Non-zero otherwise
-+ */
-+	.macro	cpu_midr_match model, rv_min, rv_max, res, tmp1, tmp2, tmp3
-+	mrs		\res, midr_el1
-+	mov_q		\tmp1, (MIDR_REVISION_MASK | MIDR_VARIANT_MASK)
-+	mov_q		\tmp2, MIDR_CPU_MODEL_MASK
-+	and		\tmp3, \res, \tmp2	// Extract model
-+	and		\tmp1, \res, \tmp1	// rev & variant
-+	mov_q		\tmp2, \model
-+	cmp		\tmp3, \tmp2
-+	cset		\res, eq
-+	cbz		\res, .Ldone\@		// Model matches ?
-+
-+	.if (\rv_min != 0)			// Skip min check if rv_min == 0
-+	mov_q		\tmp3, \rv_min
-+	cmp		\tmp1, \tmp3
-+	cset		\res, ge
-+	.endif					// \rv_min != 0
-+	/* Skip rv_max check if rv_min == rv_max && rv_min != 0 */
-+	.if ((\rv_min != \rv_max) || \rv_min == 0)
-+	mov_q		\tmp2, \rv_max
-+	cmp		\tmp1, \tmp2
-+	cset		\tmp2, le
-+	and		\res, \res, \tmp2
-+	.endif
-+.Ldone\@:
-+	.endm
-+
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index be7bd19..30da091 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -78,6 +78,7 @@
- 
- #define ARM_CPU_PART_AEM_V8		0xD0F
- #define ARM_CPU_PART_FOUNDATION		0xD00
-+#define ARM_CPU_PART_CORTEX_A55		0xD05
- #define ARM_CPU_PART_CORTEX_A57		0xD07
- #define ARM_CPU_PART_CORTEX_A72		0xD08
- #define ARM_CPU_PART_CORTEX_A53		0xD03
-@@ -98,6 +99,7 @@
- #define QCOM_CPU_PART_KRYO		0x200
- 
- #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
-+#define MIDR_CORTEX_A55 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A55)
- #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
- #define MIDR_CORTEX_A72 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A72)
- #define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 139320a..e338165 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -438,6 +438,11 @@ ENTRY(__cpu_setup)
- 	cbz	x9, 2f
- 	cmp	x9, #2
- 	b.lt	1f
-+#ifdef CONFIG_ARM64_ERRATUM_1024718
-+	/* Disable hardware DBM on Cortex-A55 r0p0, r0p1 & r1p0 */
-+	cpu_midr_match MIDR_CORTEX_A55, MIDR_CPU_VAR_REV(0, 0), MIDR_CPU_VAR_REV(1, 0), x1, x2, x3, x4
-+	cbnz	x1, 1f
-+#endif
- 	orr	x10, x10, #TCR_HD		// hardware Dirty flag update
- 1:	orr	x10, x10, #TCR_HA		// hardware Access flag update
- 2:
--- 
-2.7.4
+Please write your changelog here in the future.
+I'll fix that up in my tree now, but please remember the next time :)
+Thanks
+Matthias
