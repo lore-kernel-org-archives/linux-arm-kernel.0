@@ -1,30 +1,34 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 11 May 2018 15:29:12 -0400
-Subject: [linux-next PATCH 4/4] ARM: keystone: k2g: enable micrel and dp83867
- phys
-In-Reply-To: <1526066952-5230-1-git-send-email-m-karicheri2@ti.com>
-References: <1526066952-5230-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1526066952-5230-5-git-send-email-m-karicheri2@ti.com>
+Date: Fri, 11 May 2018 15:29:08 -0400
+Subject: [linux-next PATCH 0/4] Enable network driver on K2G ICE and GP EVMs
+Message-ID: <1526066952-5230-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable micrel and dp83867 phys for K2G Boards in keystone_defconfig
-to support Network driver on these boards (K2G ICE and GP EVM).
+Now that NetCP driver patches for K2G SoC is merged to linux-next master
+this series add patches to enable network driver on K2G ICE and GP EVMs.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- arch/arm/configs/keystone_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Thanks
 
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index 2536c23..85cf2fc 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -235,3 +235,5 @@ CONFIG_INPUT_GPIO_DECODER=m
- CONFIG_GPIO_PCA953X=m
- CONFIG_LEDS_TRIGGER_ACTIVITY=y
- CONFIG_LEDS_TRIGGER_CPU=y
-+CONFIG_MICREL_PHY=y
-+CONFIG_DP83867_PHY=y
+Applied the patches on top of latest linux-next master, built kernel and
+booted up on both EVMs. The logs are below
+
+K2G GP EVM: https://pastebin.ubuntu.com/p/ycZDnZXYPx/
+K2G ICE EVM: https://pastebin.ubuntu.com/p/bdCpzgdrXr/
+
+Murali Karicheri (4):
+  ARM: dts: k2g: add dt bindings to support network driver
+  ARM: dts: keystone-k2g-evm: Enable netcp network driver
+  ARM: dts: keystone-k2g-ice: Enable netcp network driver
+  ARM: keystone: k2g: enable micrel and dp83867 phys
+
+ arch/arm/boot/dts/keystone-k2g-evm.dts    |  53 +++++++++++
+ arch/arm/boot/dts/keystone-k2g-ice.dts    |  59 ++++++++++++
+ arch/arm/boot/dts/keystone-k2g-netcp.dtsi | 147 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/keystone-k2g.dtsi       |  13 +++
+ arch/arm/configs/keystone_defconfig       |   2 +
+ 5 files changed, 274 insertions(+)
+ create mode 100644 arch/arm/boot/dts/keystone-k2g-netcp.dtsi
+
 -- 
 1.9.1
