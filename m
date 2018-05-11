@@ -1,44 +1,99 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 May 2018 20:51:34 +0530
-Subject: [PATCH 1/3] ARM: davinci: dm646x: fix timer interrupt generation
-In-Reply-To: <20180511152136.29515-1-nsekhar@ti.com>
-References: <20180511152136.29515-1-nsekhar@ti.com>
-Message-ID: <20180511152136.29515-2-nsekhar@ti.com>
+Date: Fri, 11 May 2018 20:56:40 +0530
+Subject: =?UTF-8?Q?Re:_[PATCH_v10_00/27]_ARM:_davinci:_convert_to_common_clo?=
+ =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
+In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
+References: <20180509172606.29387-1-david@lechnology.com>
+Message-ID: <45ce3129-4a9e-54d2-e594-49b451571842@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit b38434145b34 ("ARM: davinci: irqs: Correct McASP1 TX
-interrupt definition for DM646x") inadvertently removed
-setting for priority for timer0_12 (bottom half of timer0).
-This timer is used as clockevent.
+Hi David,
 
-When INTPRIn register setting for an interrupt is left at 0,
-it is mapped to FIQ by the AINTC causing the timer interrupt to
-not get generated.
+On Wednesday 09 May 2018 10:55 PM, David Lechner wrote:
+> This series converts mach-davinci to use the common clock framework.
+> 
+> The series works like this, the first 3 patches fix some issues with the clock
+> drivers that have already been accepted into the mainline kernel.
 
-Fix it by including an entry for timer0_12 in interrupt
-priority map array. While at it, move the clockevent comment to
-the right place.
+I have not yet looked at the patches, but I got a bunch of W=1 warnings 
+and some sparse warnings when building your branch. Please take a look 
+at these. Unfortunately the output is mixed between sparse and compiler.
+The "expression using sizeof(void)" can be ignored as its a known issue
+with sparse, I believe.
 
-Fixes: b38434145b34 ("ARM: davinci: irqs: Correct McASP1 TX interrupt definition for DM646x")
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/dm646x.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Thanks,
+Sekhar
 
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 54a4299030de..6bd2ed069d0d 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -178,7 +178,8 @@ static u8 dm646x_default_priorities[DAVINCI_N_AINTC_IRQ] = {
- 	[IRQ_DM646X_MCASP0TXINT]        = 7,
- 	[IRQ_DM646X_MCASP0RXINT]        = 7,
- 	[IRQ_DM646X_RESERVED_3]         = 7,
--	[IRQ_DM646X_MCASP1TXINT]        = 7,    /* clockevent */
-+	[IRQ_DM646X_MCASP1TXINT]        = 7,
-+	[IRQ_TINT0_TINT12]              = 7,    /* clockevent */
- 	[IRQ_TINT0_TINT34]              = 7,    /* clocksource */
- 	[IRQ_TINT1_TINT12]              = 7,    /* DSP timer */
- 	[IRQ_TINT1_TINT34]              = 7,    /* system tick */
--- 
-2.16.2
+drivers/clk/davinci/pll-da830.c:39:5: warning: symbol 'da830_pll_init' was not declared. Should it be static?
+drivers/clk/davinci/pll.c:142:16: warning: expression using sizeof(void)
+drivers/clk/davinci/pll.c:142:16: warning: expression using sizeof(void)
+drivers/clk/davinci/pll-da850.c:87:5: warning: symbol 'da850_pll0_init' was not declared. Should it be static?
+drivers/clk/davinci/pll-da830.c:39:5: warning: no previous prototype for ?da830_pll_init? [-Wmissing-prototypes]
+ int da830_pll_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
+     ^~~~~~~~~~~~~~
+drivers/clk/davinci/pll-da850.c:87:5: warning: no previous prototype for ?da850_pll0_init? [-Wmissing-prototypes]
+ int da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
+     ^~~~~~~~~~~~~~~
+drivers/clk/davinci/pll-dm355.c:30:5: warning: symbol 'dm355_pll1_init' was not declared. Should it be static?
+drivers/clk/davinci/pll-dm365.c:59:5: warning: symbol 'dm365_pll1_init' was not declared. Should it be static?
+drivers/clk/davinci/pll-dm365.c:122:5: warning: symbol 'dm365_pll2_init' was not declared. Should it be static?
+drivers/clk/davinci/da8xx-cfgchip.c:581: warning: Function parameter or member 'dev' not described in 'da8xx_cfgchip_register_usb1_clk48'
+drivers/clk/davinci/pll-dm646x.c:32:5: warning: symbol 'dm646x_pll1_init' was not declared. Should it be static?
+drivers/clk/davinci/pll-dm644x.c:30:5: warning: symbol 'dm644x_pll1_init' was not declared. Should it be static?
+drivers/clk/davinci/pll-dm365.c:59:5: warning: no previous prototype for ?dm365_pll1_init? [-Wmissing-prototypes]
+ int dm365_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
+     ^~~~~~~~~~~~~~~
+drivers/clk/davinci/pll-dm365.c:122:5: warning: no previous prototype for ?dm365_pll2_init? [-Wmissing-prototypes]
+ int dm365_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
+     ^~~~~~~~~~~~~~~
+drivers/clk/davinci/pll-dm355.c:30:5: warning: no previous prototype for ?dm355_pll1_init? [-Wmissing-prototypes]
+ int dm355_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
+     ^~~~~~~~~~~~~~~
+drivers/clk/davinci/psc.c:310:5: warning: symbol 'davinci_clk_reset_assert' was not declared. Should it be static?
+drivers/clk/davinci/psc.c:316:5: warning: symbol 'davinci_clk_reset_deassert' was not declared. Should it be static?
+drivers/clk/davinci/psc-dm644x.c:66:5: warning: symbol 'dm644x_psc_init' was not declared. Should it be static?
+drivers/clk/davinci/psc-dm355.c:71:5: warning: symbol 'dm355_psc_init' was not declared. Should it be static?
+drivers/clk/davinci/pll-dm646x.c:32:5: warning: no previous prototype for ?dm646x_pll1_init? [-Wmissing-prototypes]
+ int dm646x_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
+     ^~~~~~~~~~~~~~~~
+drivers/clk/davinci/psc-dm365.c:76:5: warning: symbol 'dm365_psc_init' was not declared. Should it be static?
+drivers/clk/davinci/psc-dm646x.c:61:5: warning: symbol 'dm646x_psc_init' was not declared. Should it be static?
+drivers/clk/davinci/pll-dm644x.c:30:5: warning: no previous prototype for ?dm644x_pll1_init? [-Wmissing-prototypes]
+ int dm644x_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
+     ^~~~~~~~~~~~~~~~
+drivers/clk/davinci/psc-dm355.c:71:5: warning: no previous prototype for ?dm355_psc_init? [-Wmissing-prototypes]
+ int dm355_psc_init(struct device *dev, void __iomem *base)
+     ^~~~~~~~~~~~~~
+In file included from drivers/clk/davinci/psc-dm355.c:15:0:
+drivers/clk/davinci/psc-dm355.c:26:14: warning: ?mcbsp0_clkdev? defined but not used [-Wunused-const-variable=]
+ LPSC_CLKDEV1(mcbsp0_clkdev,  NULL,  "davinci-mcbsp.0");
+              ^
+drivers/clk/davinci/psc.h:31:46: note: in definition of macro ?LPSC_CLKDEV1?
+ static const struct davinci_lpsc_clkdev_info n[] __initconst = { \
+                                              ^
+drivers/clk/davinci/psc-dm355.c:21:14: warning: ?mcbsp1_clkdev? defined but not used [-Wunused-const-variable=]
+ LPSC_CLKDEV1(mcbsp1_clkdev,  NULL,  "davinci-mcbsp.1");
+              ^
+drivers/clk/davinci/psc.h:31:46: note: in definition of macro ?LPSC_CLKDEV1?
+ static const struct davinci_lpsc_clkdev_info n[] __initconst = { \
+                                              ^
+drivers/clk/davinci/psc-dm365.c:76:5: warning: no previous prototype for ?dm365_psc_init? [-Wmissing-prototypes]
+ int dm365_psc_init(struct device *dev, void __iomem *base)
+     ^~~~~~~~~~~~~~
+drivers/clk/davinci/psc-dm646x.c:61:5: warning: no previous prototype for ?dm646x_psc_init? [-Wmissing-prototypes]
+ int dm646x_psc_init(struct device *dev, void __iomem *base)
+     ^~~~~~~~~~~~~~~
+drivers/clk/davinci/psc-dm644x.c:66:5: warning: no previous prototype for ?dm644x_psc_init? [-Wmissing-prototypes]
+ int dm644x_psc_init(struct device *dev, void __iomem *base)
+     ^~~~~~~~~~~~~~~
+drivers/clk/davinci/pll.c:496: warning: Function parameter or member 'dev' not described in 'davinci_pll_auxclk_register'
+drivers/clk/davinci/psc.c:310:5: warning: no previous prototype for ?davinci_clk_reset_assert? [-Wmissing-prototypes]
+ int davinci_clk_reset_assert(struct clk *clk)
+     ^~~~~~~~~~~~~~~~~~~~~~~~
+drivers/clk/davinci/psc.c:316:5: warning: no previous prototype for ?davinci_clk_reset_deassert? [-Wmissing-prototypes]
+ int davinci_clk_reset_deassert(struct clk *clk)
+     ^~~~~~~~~~~~~~~~~~~~~~~~~~
+drivers/clk/davinci/pll.c:509: warning: Function parameter or member 'dev' not described in 'davinci_pll_sysclkbp_clk_register'
+drivers/clk/davinci/pll.c:524: warning: Function parameter or member 'dev' not described in 'davinci_pll_obsclk_register'
+drivers/clk/davinci/pll.c:605: warning: Function parameter or member 'dev' not described in 'davinci_pll_sysclk_register'
