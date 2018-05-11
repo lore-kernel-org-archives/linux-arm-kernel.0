@@ -1,176 +1,66 @@
-From: samuel@sholland.org (Samuel Holland)
-Date: Thu, 10 May 2018 21:27:50 -0500
-Subject: [PATCH 1/2] arm64: arch_timer: Workaround for Allwinner A64 timer
- instability
-In-Reply-To: <20180511022751.9096-1-samuel@sholland.org>
-References: <20180511022751.9096-1-samuel@sholland.org>
-Message-ID: <20180511022751.9096-2-samuel@sholland.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 11 May 2018 03:36:52 +0100 (BST)
+Subject: Applied "ARM: ep93xx: i2s: Add IRQ to platform device resources" to
+ the asoc tree
+In-Reply-To: <20180428205142.31921-5-alexander.sverdlin@gmail.com>
+Message-ID: <20180511023652.3546E44007A@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A64 SoC is known [1] to have an unstable architectural
-timer, which manifests itself most obviously in the time jumping forward
-a multiple of 95 years [2][3]. This coincides with 2^56 cycles at a
-timer frequency of 24 MHz, implying that the time went slightly backward
-(and this was interpreted by the kernel as it jumping forward and
-wrapping around past the epoch).
+The patch
 
-Further investigation revealed instability in the low bits of CNTVCT at
-the point a high bit rolls over. This leads to power-of-two cycle
-forward and backward jumps. (Testing shows that forward jumps are about
-twice as likely as backward jumps.)
+   ARM: ep93xx: i2s: Add IRQ to platform device resources
 
-Without trapping reads to CNTVCT, a userspace program is able to read it
-in a loop faster than it changes. A test program running on all 4 CPU
-cores that reported jumps larger than 100 ms was run for 13.6 hours and
-reported the following:
+has been applied to the asoc tree at
 
- Count | Event
--------+---------------------------
-  9940 | jumped backward      699ms
-   268 | jumped backward     1398ms
-     1 | jumped backward     2097ms
- 16020 | jumped forward       175ms
-  6443 | jumped forward       699ms
-  2976 | jumped forward      1398ms
-     9 | jumped forward    356516ms
-     9 | jumped forward    357215ms
-     4 | jumped forward    714430ms
-     1 | jumped forward   3578440ms
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-This works out to a jump larger than 100 ms about every 5.5 seconds on
-each CPU core.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-The largest jump (almost an hour!) was the following sequence of reads:
-      0x0000007fffffffff ? 0x00000093feffffff ? 0x0000008000000000
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Note that the middle bits don't necessarily all read as all zeroes or
-all ones during the anomalous behavior; however the low 11 bits checked
-by the function in this patch have never been observed with any other
-value.
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-Also note that smaller jumps are much more common, with the smallest
-backward jumps of 2048 cycles observed over 400 times per second on each
-core. (Of course, this is partially due to lower bits rolling over more
-frequently.) Any one of these could have caused the 95 year time skip.
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
-Similar anomalies were observed while reading CNTPCT (after patching the
-kernel to allow reads from userspace). However, the jumps are much less
-frequent, and only small jumps were observed. The same program as before
-(except now reading CNTPCT) observed after 72 hours:
+Thanks,
+Mark
 
- Count | Event
--------+---------------------------
-    17 | jumped backward      699ms
-    52 | jumped forward       175ms
-  2831 | jumped forward       699ms
-     5 | jumped forward      1398ms
+>From 6ea8a84806ac91809e1759a200bf3c272b12aeb9 Mon Sep 17 00:00:00 2001
+From: Alexander Sverdlin <alexander.sverdlin@gmail.com>
+Date: Sat, 28 Apr 2018 22:51:41 +0200
+Subject: [PATCH] ARM: ep93xx: i2s: Add IRQ to platform device resources
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
-========================================================================
+According to "EP93xx User???s Guide" it's called I2SINTR and has number 60.
 
-Because the CPU can read the CNTPCT/CNTVCT registers faster than they
-change, performing two reads of the register and comparing the high bits
-(like other workarounds) is not a workable solution. And because the
-timer can jump both forward and backward, no pair of reads can
-distinguish a good value from a bad one. The only way to guarantee a
-good value from consecutive reads would be to read _three_ times, and
-take the middle value iff the three values are 1) individually unique
-and 2) increasing. This takes at minimum 3 cycles (125 ns), or more if
-an anomaly is detected.
-
-However, since there is a distinct pattern to the bad values, we can
-optimize the common case (2046/2048 of the time) to a single read by
-simply ignoring values that match the pattern. This still takes no more
-than 3 cycles in the worst case, and requires much less code.
-
-[1]: https://github.com/armbian/build/commit/a08cd6fe7ae9
-[2]: https://forum.armbian.com/topic/3458-a64-datetime-clock-issue/
-[3]: https://irclog.whitequark.org/linux-sunxi/2018-01-26
-
-Signed-off-by: Samuel Holland <samuel@sholland.org>
+Signed-off-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/clocksource/Kconfig          | 11 ++++++++++
- drivers/clocksource/arm_arch_timer.c | 39 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
+ arch/arm/mach-ep93xx/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 8e8a09755d10..7a5d434dd30b 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -364,6 +364,17 @@ config ARM64_ERRATUM_858921
- 	  The workaround will be dynamically enabled when an affected
- 	  core is detected.
- 
-+config SUN50I_A64_UNSTABLE_TIMER
-+	bool "Workaround for Allwinner A64 timer instability"
-+	default y
-+	depends on ARM_ARCH_TIMER && ARM64 && ARCH_SUNXI
-+	select ARM_ARCH_TIMER_OOL_WORKAROUND
-+	help
-+	  This option enables a workaround for instability in the timer on
-+	  the Allwinner A64 SoC. The workaround will only be active if the
-+	  allwinner,sun50i-a64-unstable-timer property is found in the
-+	  timer node.
-+
- config ARM_GLOBAL_TIMER
- 	bool "Support for the ARM global timer" if COMPILE_TEST
- 	select TIMER_OF if OF
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 57cb2f00fc07..66ce13578c52 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -319,6 +319,36 @@ static u64 notrace arm64_858921_read_cntvct_el0(void)
- }
- #endif
- 
-+#ifdef CONFIG_SUN50I_A64_UNSTABLE_TIMER
-+/*
-+ * The low bits of each register can transiently read as all ones or all zeroes
-+ * when bit 11 or greater rolls over. Since the value can jump both backward
-+ * (7ff -> 000 -> 800) and forward (7ff -> fff -> 800), it is simplest to just
-+ * ignore register values with all ones or zeros in the low bits.
-+ */
-+static u64 notrace sun50i_a64_read_cntpct_el0(void)
-+{
-+	u64 val;
-+
-+	do {
-+		val = read_sysreg(cntpct_el0);
-+	} while (((val + 1) & GENMASK(10, 0)) <= 1);
-+
-+	return val;
-+}
-+
-+static u64 notrace sun50i_a64_read_cntvct_el0(void)
-+{
-+	u64 val;
-+
-+	do {
-+		val = read_sysreg(cntvct_el0);
-+	} while (((val + 1) & GENMASK(10, 0)) <= 1);
-+
-+	return val;
-+}
-+#endif
-+
- #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
- DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *, timer_unstable_counter_workaround);
- EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
-@@ -408,6 +438,15 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- 		.read_cntvct_el0 = arm64_858921_read_cntvct_el0,
- 	},
- #endif
-+#ifdef CONFIG_SUN50I_A64_UNSTABLE_TIMER
-+	{
-+		.match_type = ate_match_dt,
-+		.id = "allwinner,sun50i-a64-unstable-timer",
-+		.desc = "Allwinner A64 timer instability",
-+		.read_cntpct_el0 = sun50i_a64_read_cntpct_el0,
-+		.read_cntvct_el0 = sun50i_a64_read_cntvct_el0,
-+	},
-+#endif
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index e70feec6fad5..48d6a9e01dc8 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -635,6 +635,7 @@ EXPORT_SYMBOL(ep93xx_keypad_release_gpio);
+  *************************************************************************/
+ static struct resource ep93xx_i2s_resource[] = {
+ 	DEFINE_RES_MEM(EP93XX_I2S_PHYS_BASE, 0x100),
++	DEFINE_RES_IRQ(IRQ_EP93XX_SAI),
  };
  
- typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
+ static struct platform_device ep93xx_i2s_device = {
 -- 
-2.16.1
+2.17.0
