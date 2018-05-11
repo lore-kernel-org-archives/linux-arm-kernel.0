@@ -1,35 +1,44 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 11 May 2018 18:20:18 +0200
-Subject: [PATCH 02/12] platform/early: don't WARN() on non-empty devres list
- for early devices
+Date: Fri, 11 May 2018 18:20:21 +0200
+Subject: [PATCH 05/12] platform: export platform_device_release() locally
 In-Reply-To: <20180511162028.20616-1-brgl@bgdev.pl>
 References: <20180511162028.20616-1-brgl@bgdev.pl>
-Message-ID: <20180511162028.20616-3-brgl@bgdev.pl>
+Message-ID: <20180511162028.20616-6-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Early platform devices can have devres objects allocated in
-early_probe(). This is not a bug so don't dump stack in this case.
+The early platform driver mechanism will use this function as the
+device release callback. Make it available in drivers/base.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/base/dd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/base/base.h     | 1 +
+ drivers/base/platform.c | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index c9f54089429b..0b94d9426757 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -410,7 +410,7 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- 	atomic_inc(&probe_count);
- 	pr_debug("bus: '%s': %s: probing driver %s with device %s\n",
- 		 drv->bus->name, __func__, drv->name, dev_name(dev));
--	WARN_ON(!list_empty(&dev->devres_head));
-+	WARN_ON(!dev->early && !list_empty(&dev->devres_head));
+diff --git a/drivers/base/base.h b/drivers/base/base.h
+index 7a72ae72a98e..514a6d198f14 100644
+--- a/drivers/base/base.h
++++ b/drivers/base/base.h
+@@ -164,3 +164,4 @@ extern void device_links_unbind_consumers(struct device *dev);
  
- re_probe:
- 	dev->driver = drv;
+ /* Platform device helpers. */
+ extern int platform_match(struct device *dev, struct device_driver *drv);
++extern void platform_device_release(struct device *dev);
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 0ba4effb9618..417ab6071350 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -239,7 +239,7 @@ void platform_device_put(struct platform_device *pdev)
+ }
+ EXPORT_SYMBOL_GPL(platform_device_put);
+ 
+-static void platform_device_release(struct device *dev)
++void platform_device_release(struct device *dev)
+ {
+ 	struct platform_object *pa = container_of(dev, struct platform_object,
+ 						  pdev.dev);
 -- 
 2.17.0
