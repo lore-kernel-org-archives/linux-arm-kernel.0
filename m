@@ -1,50 +1,40 @@
-From: evgreen@chromium.org (Evan Green)
-Date: Fri, 11 May 2018 14:30:16 -0700
-Subject: [PATCH v4 4/7] interconnect: qcom: Add RPM communication
-In-Reply-To: <20180309210958.16672-5-georgi.djakov@linaro.org>
-References: <20180309210958.16672-1-georgi.djakov@linaro.org>
- <20180309210958.16672-5-georgi.djakov@linaro.org>
-Message-ID: <CAE=gft6HTU76M8AqzvN-VeDWE6c8Bgk+TimHHLMfLztWYhCSYQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 11 May 2018 14:43:34 -0700
+Subject: [GIT PULL 1/5] Broadcom defconfig changes for 4.18
+Message-ID: <20180511214339.24139-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 9, 2018 at 1:11 PM Georgi Djakov <georgi.djakov@linaro.org>
-wrote:
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-> On some Qualcomm SoCs, there is a remote processor, which controls some of
-> the Network-On-Chip interconnect resources. Other CPUs express their needs
-> by communicating with this processor. Add a driver to handle comminication
-> with this remote processor.
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->   .../devicetree/bindings/interconnect/qcom-smd.txt  | 31 ++++++++
->   drivers/interconnect/qcom/Makefile                 |  1 +
->   drivers/interconnect/qcom/smd-rpm.c                | 90
-++++++++++++++++++++++
->   drivers/interconnect/qcom/smd-rpm.h                | 15 ++++
->   4 files changed, 137 insertions(+)
->   create mode 100644
-Documentation/devicetree/bindings/interconnect/qcom-smd.txt
->   create mode 100644 drivers/interconnect/qcom/Makefile
->   create mode 100644 drivers/interconnect/qcom/smd-rpm.c
->   create mode 100644 drivers/interconnect/qcom/smd-rpm.h
+are available in the git repository at:
 
-> diff --git a/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
-b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
-> new file mode 100644
-> index 000000000000..14e83ed7019b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
-> @@ -0,0 +1,31 @@
-> +Qualcomm SMD-RPM interconnect driver binding
-> +------------------------------------------------
-> +The RPM is a dedicated hardware engine for managing the shared
-> +SoC resources in order to keep the lowest power profile. It
-> +communicates with other hardware subsystems via shared memory
-> +and accepts requests for various resources.
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/defconfig
 
-You never say what RPM or SMD stands for. RPM is Resource Power Manager,
-right? But I'm not in the know about SMD. Can you define these somewhere?
+for you to fetch changes up to f8928381021121123e9f4f783606c51cd37ab5d9:
 
--Evan
+  Merge tag 'bcm2835-defconfig-next-2018-04-30' into defconfig/next (2018-05-01 11:53:24 -0700)
+
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs defconfig changes for
+4.18, please pull the following:
+
+- Stefan provides a set of updates targeting the Raspberry Pi 3 B+
+  platform: LAN7515 USB Ethernet driver, Cypress CYW43455 Bluetooth and
+  he also enables the VCHIQ driver to help with continous testing on
+  kernelci.org.
+
+----------------------------------------------------------------
+Florian Fainelli (1):
+      Merge tag 'bcm2835-defconfig-next-2018-04-30' into defconfig/next
+
+Stefan Wahren (3):
+      ARM: bcm2835_defconfig: Enable LAN78XX driver
+      ARM: bcm2835_defconfig: Enable VCHIQ driver
+      ARM: multi_v7_defconfig: Enable LAN and BT for RPi 3 B+
+
+ arch/arm/configs/bcm2835_defconfig  | 2 ++
+ arch/arm/configs/multi_v7_defconfig | 4 ++++
+ 2 files changed, 6 insertions(+)
