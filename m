@@ -1,60 +1,57 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 11 May 2018 11:26:58 +0200
-Subject: [PATCH V5 2/4] soc: mediatek: pwrap: fix cipher init setting error
-In-Reply-To: <1525957319-20557-3-git-send-email-argus.lin@mediatek.com>
-References: <1525957319-20557-1-git-send-email-argus.lin@mediatek.com>
- <1525957319-20557-3-git-send-email-argus.lin@mediatek.com>
-Message-ID: <318abd43-a2ac-121c-8c18-dd32248a4676@gmail.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Fri, 11 May 2018 17:38:26 +0800
+Subject: [PATCH 0/2] Add basic support for Mediatek MT8183 SoC
+In-Reply-To: <782e13c1-057b-164b-9270-d37c151aa9b4@gmail.com>
+References: <1526019083-20237-1-git-send-email-erin.lo@mediatek.com>
+ <782e13c1-057b-164b-9270-d37c151aa9b4@gmail.com>
+Message-ID: <1526031506.24653.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/10/2018 03:01 PM, argus.lin at mediatek.com wrote:
-> From: Argus Lin <argus.lin@mediatek.com>
+On Fri, 2018-05-11 at 10:29 +0200, Matthias Brugger wrote:
+> Hi Erin,
 > 
-> PWRAP_DEW_CIPHER_LOAD and PWRAP_DEW_CIPHER_START only exist at
-> PMIC_mt6397 datasheet. We fix it before merge PMIC_mt6351 driver.
+> Please include the linux-mediatek and arm-linux-kernel mailinglists in the next
+> round.
+> 
+> Some comments in the patches.
+> 
+> Regards,
+> Matthias
 
-Please don't put info like "We fix it before merge PMIC_mt6351 driver." in the
-commit message. You can see this from the git log later and it does not add any
-value.
+I will add linux-mediatek, linux-arm-kernel, linux-kernel, linux-serial
+mailinglists in next round.
+Thanks for your reminder.
 
 Regards,
-Matthias
+Erin
 
 > 
-> Fixes: 5ae48040aa47 ("soc: mediatek: PMIC wrap: add mt6323 slave support")
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index e9e054a..9a01e30 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -1080,8 +1080,6 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
->  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_SWRST], 0x0);
->  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_KEY_SEL], 0x1);
->  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_IV_SEL], 0x2);
-> -	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_LOAD], 0x1);
-> -	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_START], 0x1);
->  
->  	switch (wrp->slave->type) {
->  	case PMIC_MT6397:
-> -- 
-> 1.8.1.1.dirty
-> 
-> ************* Email Confidentiality Notice ********************
-> The information contained in this e-mail message (including any 
-> attachments) may be confidential, proprietary, privileged, or otherwise
-> exempt from disclosure under applicable laws. It is intended to be 
-> conveyed only to the designated recipient(s). Any use, dissemination, 
-> distribution, printing, retaining or copying of this e-mail (including its 
-> attachments) by unintended recipient(s) is strictly prohibited and may 
-> be unlawful. If you are not an intended recipient of this e-mail, or believe 
-> that you have received this e-mail in error, please notify the sender 
-> immediately (by replying to this e-mail), delete any and all copies of 
-> this e-mail (including any attachments) from your system, and do not
-> disclose the content of this e-mail to any other person. Thank you!
-> 
+> On 05/11/2018 08:11 AM, Erin Lo wrote:
+> > MT8183 is a SoC based on 64bit ARMv8 architecture.
+> > It contains 4 CA53 and 4 CA73 cores.
+> > MT8183 share many HW IP with MT65xx series.
+> > This patchset was tested on MT8183 evaluation board, and boot to shell ok.
+> > 
+> > This series contains document bindings, device tree including interrupt, uart.
+> > 
+> > Ben Ho (1):
+> >   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
+> >     Makefile
+> > 
+> > Erin Lo (1):
+> >   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
+> > 
+> >  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+> >  .../interrupt-controller/mediatek,sysirq.txt       |   1 +
+> >  .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
+> >  arch/arm64/boot/dts/mediatek/Makefile              |   1 +
+> >  arch/arm64/boot/dts/mediatek/mt8183-evb.dts        |  31 ++++
+> >  arch/arm64/boot/dts/mediatek/mt8183.dtsi           | 178 +++++++++++++++++++++
+> >  6 files changed, 216 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
+> > 
+> > --
+> > 1.9.1
+> > 
