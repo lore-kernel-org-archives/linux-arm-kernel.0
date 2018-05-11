@@ -1,149 +1,265 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 11 May 2018 19:24:10 +0100
-Subject: [PATCH 3/3] iommu: armsmmu: set iommu ops for rpmsg bus
-In-Reply-To: <CAOCOHw4RDwmbCySN==-zT7cQ6abzLzKUhBHBSdv_EvWnU4g4Pg@mail.gmail.com>
-References: <20180302145531.20463-1-srinivas.kandagatla@linaro.org>
- <20180302145531.20463-4-srinivas.kandagatla@linaro.org>
- <57fc5480-c57e-dfd3-e6af-5e5bba296430@arm.com>
- <CAOCOHw4RDwmbCySN==-zT7cQ6abzLzKUhBHBSdv_EvWnU4g4Pg@mail.gmail.com>
-Message-ID: <61ded3c7-d367-1557-a2e8-f69fcd48964d@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Fri, 11 May 2018 20:06:02 +0100
+Subject: [PATCH v2 01/40] iommu: Introduce Shared Virtual Addressing API
+In-Reply-To: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+Message-ID: <20180511190641.23008-2-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/18 20:28, Bjorn Andersson wrote:
-> On Fri, Mar 2, 2018 at 8:59 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->> On 02/03/18 14:55, srinivas.kandagatla at linaro.org wrote:
->>>
->>> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>>
->>> On Qualcomm SoCs, ADSP exposes many functions like audio and
->>> others. These services need iommu access to allocate any
->>> memory for the DSP. As these drivers are childeren of
->>> rpmsg bus, able to allocate memory from iommus is basic
->>> requirement. So set arm smmu iommu ops for this bus type.
->>
-> 
-> Forgot to answer this and the dma_ops patch seems to be going in the
-> right direction.
-> 
->>
->> Documentation/rpmsg.txt: "Every rpmsg device is a communication channel with
->> a remote processor (thus rpmsg devices are called channels)."
->>
->> I'd instinctively assume that a remote processor already has its own memory,
->> and that a communication channel doesn't somehow go directly through an
->> IOMMU, so that "basic requirement" seems like a pretty big assumption.
->>
-> 
-> As of today rpmsg exclusively uses system memory for implementing the
-> communication fifos, but this memory is owned/handled by the rpmsg
-> bus. The need here is for drivers on top of the rpmsg_bus,
-> implementing some application-level protocol that requires indirection
-> buffers; e.g. to achieve zero copy of audio or image buffers that the
-> remote processor is expected to operate on. In this case the device
-> sitting on top of the rpmsg bus will have to map the buffer to the
-> appropriate context and can then send application specific control
-> requests referencing this mapping.
+Shared Virtual Addressing (SVA) provides a way for device drivers to bind
+process address spaces to devices. This requires the IOMMU to support page
+table format and features compatible with the CPUs, and usually requires
+the system to support I/O Page Faults (IOPF) and Process Address Space ID
+(PASID). When all of these are available, DMA can access virtual addresses
+of a process. A PASID is allocated for each process, and the device driver
+programs it into the device in an implementation-specific way.
 
-Right, but that's more or less what I was getting at - rpmsg can be used 
-as a means to signal some DMA master device to start doing a thing, but 
-that thing itself is unrelated to rpmsg, and it by no means implies that 
-everything which rpmsg can talk to is always capable of system-wide DMA. 
-It's no different if that communication channel is a hardware mailbox or 
-an I2C/SPI/USB/etc. link, rather than virtio; we wouldn't automatically 
-consider devices on the other end of those to be directly connected to 
-an IOMMU either.
+Add a new API for sharing process page tables with devices. Introduce two
+IOMMU operations, sva_device_init() and sva_device_shutdown(), that
+prepare the IOMMU driver for SVA. For example allocate PASID tables and
+fault queues. Subsequent patches will implement the bind() and unbind()
+operations.
 
-IOMMU and DMA operations are highly dependent on the physical hardware 
-topology, which is why I really don't like trying to shoehorn them into 
-software constructs without modelling the actual hardware reasonably 
-accurately. For instance it's not unheard of for remote processors in a 
-SoC to see a different physical memory map from the main application 
-processors - how would rpmsg try to describe that? What even is the 
-address space of the rpmsg "bus"?
+Support for I/O Page Faults will be added in a later patch using a new
+feature bit (IOMMU_SVA_FEAT_IOPF). With the current API users must pin
+down all shared mappings. Other feature bits that may be added in the
+future are IOMMU_SVA_FEAT_PRIVATE, to support private PASID address
+spaces, and IOMMU_SVA_FEAT_NO_PASID, to bind the whole device address
+space to a process.
 
-> As different parts of the firmware might operate in different contexts
-> it's not feasible to utilize the parent's (the rpmsg_bus) context for
-> these indirection buffers.
+Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 
-Indeed, and I maintain that that wouldn't be the right thing to do 
-anyway. As before, I think the most accurate way to model the situation 
-with the tools we have available is to have the actual hardware function 
-represented by a platform device, which is associated with a 
-corresponding rpmsg endpoint. Then the driver can manage communication 
-in the rpmsg context, and physical DMA setup in the 'real' hardware 
-context, and everything looks sane without questionable abstraction 
-breakage. Since this looked to be more or less what is actually 
-implemented anyway, it doesn't seem all that hard to refine; if there 
-are multiple DMA master functions identified distinctly to the IOMMU, 
-then they could either be represented as separate platform devices with 
-explicit IOMMU specifiers, or you could model the actual DSP subsystem 
-hardware as its own bus-like arrangement with an iommu-map arrangement 
-translating function identifiers to IOMMU identifiers.
+---
+v1->v2:
+* Add sva_param structure to iommu_param
+* CONFIG option is only selectable by IOMMU drivers
+---
+ drivers/iommu/Kconfig     |   4 ++
+ drivers/iommu/Makefile    |   1 +
+ drivers/iommu/iommu-sva.c | 110 ++++++++++++++++++++++++++++++++++++++
+ include/linux/iommu.h     |  32 +++++++++++
+ 4 files changed, 147 insertions(+)
+ create mode 100644 drivers/iommu/iommu-sva.c
 
-What I don't like is forcing IOMMU drivers to pretend that some data in 
-a shared memory buffer is itself directly capable of generating 
-transactions on the interconnect. If other 'indirect' bus abstractions 
-like CoreSight can get this right, I don't see why rpmsg deserves to be 
-special.
-
->>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->>> ---
->>>    drivers/iommu/arm-smmu.c | 5 +++++
->>>    1 file changed, 5 insertions(+)
->>>
->>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->>> index e6920d32ac9e..9b63489af15c 100644
->>> --- a/drivers/iommu/arm-smmu.c
->>> +++ b/drivers/iommu/arm-smmu.c
->>> @@ -53,6 +53,7 @@
->>>    #include <linux/spinlock.h>
->>>      #include <linux/amba/bus.h>
->>> +#include <linux/rpmsg.h>
->>>      #include "io-pgtable.h"
->>>    #include "arm-smmu-regs.h"
->>> @@ -2168,6 +2169,10 @@ static void arm_smmu_bus_init(void)
->>>                  bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
->>>          }
->>>    #endif
->>> +#ifdef CONFIG_RPMSG
->>
->>
->> Ah, so this will at least build OK with RPMSG=m, but I doubt it does what
->> you want it to in that case.
->>
-> 
-> Things have been refactored but the core has remained tristate,
-> causing extra head aches in various areas. I think it's very
-> reasonable to review the rpmsg config options and make CONFIG_RPMSG
-> bool.
-> 
-> So with the addition of making CONFIG_RPMSG bool the patch has my Acked-by.
-> 
-> That said I'm generally concerned about the first probed iommu
-> implementation assigning itself as the sole iommu implementation for
-> all busses, but I guess we haven't yet hit the point where there are
-> different iommu implementations in a single SoC?
-
-As it happens I do know of one such SoC already - Rockchip RK3288 seems 
-to have an undocumented Arm SMMU alongside all the rockchip-iommu 
-instances, but it's not used by Linux (and I have no idea what it was 
-intended for; I just went and poked the intriguing "peripheral MMU" 
-region of the memory map and found what looks an awful lot like an Arm 
-MMU-400). More realistically, I also know of folks using the Arm Juno 
-dev board with an MMU-600 in the add-on FPGA tile, which would have that 
-driver-probe-order fight with the MMU-401 instances in the SoC, but I 
-figure they were either using an older firmware which didn't enable the 
-latter or just got lucky with not having the SMMUv2 driver enabled.
-
-But yes, the per-bus ops thing is awful and I've been complaining about 
-it for years now. Since iommu_fwspec we at least have the foundations 
-for per-device ops in place now, but as is often the case, getting 80% 
-of the way there is simple[1], whilst the last 20% (like replacing 
-iommu_domain_alloc(), and where to call iommu_{add,remove}_device() 
-from) is really hard.
-
-Robin.
-
-[1] 
-https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg14576.html
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 7564237f788d..cca8e06903c7 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -74,6 +74,10 @@ config IOMMU_DMA
+ 	select IOMMU_IOVA
+ 	select NEED_SG_DMA_LENGTH
+ 
++config IOMMU_SVA
++	bool
++	select IOMMU_API
++
+ config FSL_PAMU
+ 	bool "Freescale IOMMU support"
+ 	depends on PCI
+diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+index 1fb695854809..1dbcc89ebe4c 100644
+--- a/drivers/iommu/Makefile
++++ b/drivers/iommu/Makefile
+@@ -3,6 +3,7 @@ obj-$(CONFIG_IOMMU_API) += iommu.o
+ obj-$(CONFIG_IOMMU_API) += iommu-traces.o
+ obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
+ obj-$(CONFIG_IOMMU_DMA) += dma-iommu.o
++obj-$(CONFIG_IOMMU_SVA) += iommu-sva.o
+ obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
+ obj-$(CONFIG_IOMMU_IO_PGTABLE_ARMV7S) += io-pgtable-arm-v7s.o
+ obj-$(CONFIG_IOMMU_IO_PGTABLE_LPAE) += io-pgtable-arm.o
+diff --git a/drivers/iommu/iommu-sva.c b/drivers/iommu/iommu-sva.c
+new file mode 100644
+index 000000000000..8b4afb7c63ae
+--- /dev/null
++++ b/drivers/iommu/iommu-sva.c
+@@ -0,0 +1,110 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Manage PASIDs and bind process address spaces to devices.
++ *
++ * Copyright (C) 2018 ARM Ltd.
++ */
++
++#include <linux/iommu.h>
++#include <linux/slab.h>
++
++/**
++ * iommu_sva_device_init() - Initialize Shared Virtual Addressing for a device
++ * @dev: the device
++ * @features: bitmask of features that need to be initialized
++ * @max_pasid: max PASID value supported by the device
++ *
++ * Users of the bind()/unbind() API must call this function to initialize all
++ * features required for SVA.
++ *
++ * The device must support multiple address spaces (e.g. PCI PASID). By default
++ * the PASID allocated during bind() is limited by the IOMMU capacity, and by
++ * the device PASID width defined in the PCI capability or in the firmware
++ * description. Setting @max_pasid to a non-zero value smaller than this limit
++ * overrides it.
++ *
++ * The device should not be performing any DMA while this function is running,
++ * otherwise the behavior is undefined.
++ *
++ * Return 0 if initialization succeeded, or an error.
++ */
++int iommu_sva_device_init(struct device *dev, unsigned long features,
++			  unsigned int max_pasid)
++{
++	int ret;
++	struct iommu_sva_param *param;
++	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
++
++	if (!domain || !domain->ops->sva_device_init)
++		return -ENODEV;
++
++	if (features)
++		return -EINVAL;
++
++	param = kzalloc(sizeof(*param), GFP_KERNEL);
++	if (!param)
++		return -ENOMEM;
++
++	param->features		= features;
++	param->max_pasid	= max_pasid;
++
++	/*
++	 * IOMMU driver updates the limits depending on the IOMMU and device
++	 * capabilities.
++	 */
++	ret = domain->ops->sva_device_init(dev, param);
++	if (ret)
++		goto err_free_param;
++
++	mutex_lock(&dev->iommu_param->lock);
++	if (dev->iommu_param->sva_param)
++		ret = -EEXIST;
++	else
++		dev->iommu_param->sva_param = param;
++	mutex_unlock(&dev->iommu_param->lock);
++	if (ret)
++		goto err_device_shutdown;
++
++	return 0;
++
++err_device_shutdown:
++	if (domain->ops->sva_device_shutdown)
++		domain->ops->sva_device_shutdown(dev, param);
++
++err_free_param:
++	kfree(param);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(iommu_sva_device_init);
++
++/**
++ * iommu_sva_device_shutdown() - Shutdown Shared Virtual Addressing for a device
++ * @dev: the device
++ *
++ * Disable SVA. Device driver should ensure that the device isn't performing any
++ * DMA while this function is running.
++ */
++int iommu_sva_device_shutdown(struct device *dev)
++{
++	struct iommu_sva_param *param;
++	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
++
++	if (!domain)
++		return -ENODEV;
++
++	mutex_lock(&dev->iommu_param->lock);
++	param = dev->iommu_param->sva_param;
++	dev->iommu_param->sva_param = NULL;
++	mutex_unlock(&dev->iommu_param->lock);
++	if (!param)
++		return -ENODEV;
++
++	if (domain->ops->sva_device_shutdown)
++		domain->ops->sva_device_shutdown(dev, param);
++
++	kfree(param);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(iommu_sva_device_shutdown);
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 0933f726d2e6..2efe7738bedb 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -212,6 +212,12 @@ struct page_response_msg {
+ 	u64 private_data;
+ };
+ 
++struct iommu_sva_param {
++	unsigned long features;
++	unsigned int min_pasid;
++	unsigned int max_pasid;
++};
++
+ /**
+  * struct iommu_ops - iommu ops and capabilities
+  * @capable: check capability
+@@ -219,6 +225,8 @@ struct page_response_msg {
+  * @domain_free: free iommu domain
+  * @attach_dev: attach device to an iommu domain
+  * @detach_dev: detach device from an iommu domain
++ * @sva_device_init: initialize Shared Virtual Adressing for a device
++ * @sva_device_shutdown: shutdown Shared Virtual Adressing for a device
+  * @map: map a physically contiguous memory region to an iommu domain
+  * @unmap: unmap a physically contiguous memory region from an iommu domain
+  * @map_sg: map a scatter-gather list of physically contiguous memory chunks
+@@ -256,6 +264,10 @@ struct iommu_ops {
+ 
+ 	int (*attach_dev)(struct iommu_domain *domain, struct device *dev);
+ 	void (*detach_dev)(struct iommu_domain *domain, struct device *dev);
++	int (*sva_device_init)(struct device *dev,
++			       struct iommu_sva_param *param);
++	void (*sva_device_shutdown)(struct device *dev,
++				    struct iommu_sva_param *param);
+ 	int (*map)(struct iommu_domain *domain, unsigned long iova,
+ 		   phys_addr_t paddr, size_t size, int prot);
+ 	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
+@@ -413,6 +425,7 @@ struct iommu_fault_param {
+  * struct iommu_param - collection of per-device IOMMU data
+  *
+  * @fault_param: IOMMU detected device fault reporting data
++ * @sva_param: SVA parameters
+  *
+  * TODO: migrate other per device data pointers under iommu_dev_data, e.g.
+  *	struct iommu_group	*iommu_group;
+@@ -421,6 +434,7 @@ struct iommu_fault_param {
+ struct iommu_param {
+ 	struct mutex lock;
+ 	struct iommu_fault_param *fault_param;
++	struct iommu_sva_param *sva_param;
+ };
+ 
+ int  iommu_device_register(struct iommu_device *iommu);
+@@ -920,4 +934,22 @@ static inline int iommu_sva_invalidate(struct iommu_domain *domain,
+ 
+ #endif /* CONFIG_IOMMU_API */
+ 
++#ifdef CONFIG_IOMMU_SVA
++extern int iommu_sva_device_init(struct device *dev, unsigned long features,
++				 unsigned int max_pasid);
++extern int iommu_sva_device_shutdown(struct device *dev);
++#else /* CONFIG_IOMMU_SVA */
++static inline int iommu_sva_device_init(struct device *dev,
++					unsigned long features,
++					unsigned int max_pasid)
++{
++	return -ENODEV;
++}
++
++static inline int iommu_sva_device_shutdown(struct device *dev)
++{
++	return -ENODEV;
++}
++#endif /* CONFIG_IOMMU_SVA */
++
+ #endif /* __LINUX_IOMMU_H */
+-- 
+2.17.0
