@@ -1,99 +1,107 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 May 2018 20:56:40 +0530
-Subject: =?UTF-8?Q?Re:_[PATCH_v10_00/27]_ARM:_davinci:_convert_to_common_clo?=
- =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
-In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
-References: <20180509172606.29387-1-david@lechnology.com>
-Message-ID: <45ce3129-4a9e-54d2-e594-49b451571842@ti.com>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Fri, 11 May 2018 18:50:09 +0300
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
+References: <20180502203326.9491-1-labbott@redhat.com>
+ <20180502203326.9491-3-labbott@redhat.com>
+ <20180503071917.xm2xvgagvzkworay@salmiak>
+ <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
+ <20180504110907.c2dw33kjmyybso6t@lakrids.cambridge.arm.com>
+ <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
+Message-ID: <71199506-b46b-5f91-e489-e6450b6d1067@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hello everyone,
 
-On Wednesday 09 May 2018 10:55 PM, David Lechner wrote:
-> This series converts mach-davinci to use the common clock framework.
+On 06.05.2018 11:22, Alexander Popov wrote:
+> On 04.05.2018 14:09, Mark Rutland wrote:
+>>>>> +	stack_left = sp & (THREAD_SIZE - 1);
+>>>>> +	BUG_ON(stack_left < 256 || size >= stack_left - 256);
+>>>>
+>>>> Is this arbitrary, or is there something special about 256?
+>>>>
+>>>> Even if this is arbitrary, can we give it some mnemonic?
+>>>
+>>> It's just a reasonable number. We can introduce a macro for it.
+>>
+>> I'm just not sure I see the point in the offset, given things like
+>> VMAP_STACK exist. BUG_ON() handling will likely require *more* than 256
+>> bytes of stack, so it seems superfluous, as we'd be relying on stack
+>> overflow detection at that point.
+>>
+>> I can see that we should take the CONFIG_SCHED_STACK_END_CHECK offset
+>> into account, though.
 > 
-> The series works like this, the first 3 patches fix some issues with the clock
-> drivers that have already been accepted into the mainline kernel.
+> Mark, thank you for such an important remark!
+> 
+> In Kconfig STACKLEAK implies but doesn't depend on VMAP_STACK. In fact x86_32
+> doesn't have VMAP_STACK at all but can have STACKLEAK.
+> 
+> [Adding Andy Lutomirski]
+> 
+> I've made some additional experiments: I exhaust the thread stack to have only
+> (MIN_STACK_LEFT - 1) bytes left and then force alloca. If VMAP_STACK is
+> disabled, BUG_ON() handling causes stack depth overflow, which is detected by
+> SCHED_STACK_END_CHECK. If VMAP_STACK is enabled, the kernel hangs on BUG_ON()
+> handling! Enabling CONFIG_PROVE_LOCKING gives the needed report from VMAP_STACK:
 
-I have not yet looked at the patches, but I got a bunch of W=1 warnings 
-and some sparse warnings when building your branch. Please take a look 
-at these. Unfortunately the output is mixed between sparse and compiler.
-The "expression using sizeof(void)" can be ignored as its a known issue
-with sparse, I believe.
+[...]
 
-Thanks,
-Sekhar
+> I can't say why VMAP_STACK report hangs during BUG_ON() handling on defconfig.
+> Andy, can you give a clue?
+> 
+> I see that MIN_STACK_LEFT = 2048 is enough for BUG_ON() handling on both x86_64
+> and x86_32. So I'm going to:
+>  - set MIN_STACK_LEFT to 2048;
+>  - improve the lkdtm test to cover this case.
+> 
+> Mark, Kees, Laura, does it sound good?
 
-drivers/clk/davinci/pll-da830.c:39:5: warning: symbol 'da830_pll_init' was not declared. Should it be static?
-drivers/clk/davinci/pll.c:142:16: warning: expression using sizeof(void)
-drivers/clk/davinci/pll.c:142:16: warning: expression using sizeof(void)
-drivers/clk/davinci/pll-da850.c:87:5: warning: symbol 'da850_pll0_init' was not declared. Should it be static?
-drivers/clk/davinci/pll-da830.c:39:5: warning: no previous prototype for ?da830_pll_init? [-Wmissing-prototypes]
- int da830_pll_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
-     ^~~~~~~~~~~~~~
-drivers/clk/davinci/pll-da850.c:87:5: warning: no previous prototype for ?da850_pll0_init? [-Wmissing-prototypes]
- int da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
-     ^~~~~~~~~~~~~~~
-drivers/clk/davinci/pll-dm355.c:30:5: warning: symbol 'dm355_pll1_init' was not declared. Should it be static?
-drivers/clk/davinci/pll-dm365.c:59:5: warning: symbol 'dm365_pll1_init' was not declared. Should it be static?
-drivers/clk/davinci/pll-dm365.c:122:5: warning: symbol 'dm365_pll2_init' was not declared. Should it be static?
-drivers/clk/davinci/da8xx-cfgchip.c:581: warning: Function parameter or member 'dev' not described in 'da8xx_cfgchip_register_usb1_clk48'
-drivers/clk/davinci/pll-dm646x.c:32:5: warning: symbol 'dm646x_pll1_init' was not declared. Should it be static?
-drivers/clk/davinci/pll-dm644x.c:30:5: warning: symbol 'dm644x_pll1_init' was not declared. Should it be static?
-drivers/clk/davinci/pll-dm365.c:59:5: warning: no previous prototype for ?dm365_pll1_init? [-Wmissing-prototypes]
- int dm365_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
-     ^~~~~~~~~~~~~~~
-drivers/clk/davinci/pll-dm365.c:122:5: warning: no previous prototype for ?dm365_pll2_init? [-Wmissing-prototypes]
- int dm365_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
-     ^~~~~~~~~~~~~~~
-drivers/clk/davinci/pll-dm355.c:30:5: warning: no previous prototype for ?dm355_pll1_init? [-Wmissing-prototypes]
- int dm355_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
-     ^~~~~~~~~~~~~~~
-drivers/clk/davinci/psc.c:310:5: warning: symbol 'davinci_clk_reset_assert' was not declared. Should it be static?
-drivers/clk/davinci/psc.c:316:5: warning: symbol 'davinci_clk_reset_deassert' was not declared. Should it be static?
-drivers/clk/davinci/psc-dm644x.c:66:5: warning: symbol 'dm644x_psc_init' was not declared. Should it be static?
-drivers/clk/davinci/psc-dm355.c:71:5: warning: symbol 'dm355_psc_init' was not declared. Should it be static?
-drivers/clk/davinci/pll-dm646x.c:32:5: warning: no previous prototype for ?dm646x_pll1_init? [-Wmissing-prototypes]
- int dm646x_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
-     ^~~~~~~~~~~~~~~~
-drivers/clk/davinci/psc-dm365.c:76:5: warning: symbol 'dm365_psc_init' was not declared. Should it be static?
-drivers/clk/davinci/psc-dm646x.c:61:5: warning: symbol 'dm646x_psc_init' was not declared. Should it be static?
-drivers/clk/davinci/pll-dm644x.c:30:5: warning: no previous prototype for ?dm644x_pll1_init? [-Wmissing-prototypes]
- int dm644x_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
-     ^~~~~~~~~~~~~~~~
-drivers/clk/davinci/psc-dm355.c:71:5: warning: no previous prototype for ?dm355_psc_init? [-Wmissing-prototypes]
- int dm355_psc_init(struct device *dev, void __iomem *base)
-     ^~~~~~~~~~~~~~
-In file included from drivers/clk/davinci/psc-dm355.c:15:0:
-drivers/clk/davinci/psc-dm355.c:26:14: warning: ?mcbsp0_clkdev? defined but not used [-Wunused-const-variable=]
- LPSC_CLKDEV1(mcbsp0_clkdev,  NULL,  "davinci-mcbsp.0");
-              ^
-drivers/clk/davinci/psc.h:31:46: note: in definition of macro ?LPSC_CLKDEV1?
- static const struct davinci_lpsc_clkdev_info n[] __initconst = { \
-                                              ^
-drivers/clk/davinci/psc-dm355.c:21:14: warning: ?mcbsp1_clkdev? defined but not used [-Wunused-const-variable=]
- LPSC_CLKDEV1(mcbsp1_clkdev,  NULL,  "davinci-mcbsp.1");
-              ^
-drivers/clk/davinci/psc.h:31:46: note: in definition of macro ?LPSC_CLKDEV1?
- static const struct davinci_lpsc_clkdev_info n[] __initconst = { \
-                                              ^
-drivers/clk/davinci/psc-dm365.c:76:5: warning: no previous prototype for ?dm365_psc_init? [-Wmissing-prototypes]
- int dm365_psc_init(struct device *dev, void __iomem *base)
-     ^~~~~~~~~~~~~~
-drivers/clk/davinci/psc-dm646x.c:61:5: warning: no previous prototype for ?dm646x_psc_init? [-Wmissing-prototypes]
- int dm646x_psc_init(struct device *dev, void __iomem *base)
-     ^~~~~~~~~~~~~~~
-drivers/clk/davinci/psc-dm644x.c:66:5: warning: no previous prototype for ?dm644x_psc_init? [-Wmissing-prototypes]
- int dm644x_psc_init(struct device *dev, void __iomem *base)
-     ^~~~~~~~~~~~~~~
-drivers/clk/davinci/pll.c:496: warning: Function parameter or member 'dev' not described in 'davinci_pll_auxclk_register'
-drivers/clk/davinci/psc.c:310:5: warning: no previous prototype for ?davinci_clk_reset_assert? [-Wmissing-prototypes]
- int davinci_clk_reset_assert(struct clk *clk)
-     ^~~~~~~~~~~~~~~~~~~~~~~~
-drivers/clk/davinci/psc.c:316:5: warning: no previous prototype for ?davinci_clk_reset_deassert? [-Wmissing-prototypes]
- int davinci_clk_reset_deassert(struct clk *clk)
-     ^~~~~~~~~~~~~~~~~~~~~~~~~~
-drivers/clk/davinci/pll.c:509: warning: Function parameter or member 'dev' not described in 'davinci_pll_sysclkbp_clk_register'
-drivers/clk/davinci/pll.c:524: warning: Function parameter or member 'dev' not described in 'davinci_pll_obsclk_register'
-drivers/clk/davinci/pll.c:605: warning: Function parameter or member 'dev' not described in 'davinci_pll_sysclk_register'
+
+Could you have a look at the following changes in check_alloca() before I send
+the next version?
+
+If VMAP_STACK is enabled and alloca causes stack depth overflow, I write to
+guard page below the thread stack to cause double fault and VMAP_STACK report.
+
+If VMAP_STACK is disabled, I use MIN_STACK_LEFT = 2048, which seems to be enough
+for BUG_ON() handling both on x86_32 and x86_64. Unfortunately, I can't
+guarantee that it is always enough.
+
+
+ #ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+-#define MIN_STACK_LEFT 256
++#define MIN_STACK_LEFT 2048
+
+ void __used check_alloca(unsigned long size)
+ {
+        unsigned long sp = (unsigned long)&sp;
+        struct stack_info stack_info = {0};
+        unsigned long visit_mask = 0;
+        unsigned long stack_left;
+
+        BUG_ON(get_stack_info(&sp, current, &stack_info, &visit_mask));
+
+        stack_left = sp - (unsigned long)stack_info.begin;
++
++#ifdef CONFIG_VMAP_STACK
++       /*
++        * If alloca oversteps the thread stack boundary, we touch the guard
++        * page provided by VMAP_STACK to trigger handle_stack_overflow().
++        */
++       if (size >= stack_left)
++               *(stack_info.begin - 1) = 42;
++#else
+        BUG_ON(stack_left < MIN_STACK_LEFT ||
+                                size >= stack_left - MIN_STACK_LEFT);
++#endif
+ }
+ EXPORT_SYMBOL(check_alloca);
+ #endif
+
+
+Looking forward to your feedback.
+
+Best regards,
+Alexander
