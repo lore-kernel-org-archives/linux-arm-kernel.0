@@ -1,40 +1,39 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Fri, 11 May 2018 09:47:18 +0200
-Subject: [PATCH 01/11] irqchip: stm32: Optimizes and cleans up stm32-exti
- irq_domain
-In-Reply-To: <20a1b5f0-7494-01a9-635f-c46c337a23b3@arm.com>
-References: <1524759514-12392-1-git-send-email-ludovic.Barre@st.com>
- <1524759514-12392-2-git-send-email-ludovic.Barre@st.com>
- <20a1b5f0-7494-01a9-635f-c46c337a23b3@arm.com>
-Message-ID: <364a4b45-0276-8e99-4902-f6dfc2aaff2d@st.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Fri, 11 May 2018 09:59:25 +0200
+Subject: common non-cache coherent direct dma mapping ops
+Message-ID: <20180511075945.16548-1-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
+this series continues consolidating the dma-mapping code, with a focus
+on architectures that do not (always) provide cache coherence for DMA.
+Three architectures (arm, mips and powerpc) are still left to be
+converted later due to complexity of their dma ops selection.
 
-On 05/08/2018 04:47 PM, Marc Zyngier wrote:
-> On 26/04/18 17:18, Ludovic Barre wrote:
->> From: radek <radoslaw.pietrzyk@gmail.com>
->>
->> - In stm32_exti_alloc function, discards irq_domain_set_info
->>    with handle_simple_irq. This overwrite the setting defined while init
->>    of generic chips. Exti controller manages edge irq type.
->> - Removes acking in chained irq handler as this is done by
->>    irq_chip itself inside handle_edge_irq
->> - removes unneeded irq_domain_ops.xlate callback
->>
->> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
->> Acked-by: Ludovic Barre <ludovic.barre@st.com>
->> Tested-by: Ludovic Barre <ludovic.barre@st.com>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> 
-> Nit: the "From:" should match the SoB line (the address does, but not
-> the name). I can fix that up when I apply the series.
-> 
+The dma-noncoherent ops calls the dma-direct ops for the actual
+translation of streaming mappins and allow the architecture to provide
+any cache flushing required for cpu to device and/or device to cpu
+ownership transfers.  The dma coherent allocator is for now still left
+entirely to architecture supplied implementations due the amount of
+variations.  Hopefully we can do some consolidation for them later on
+as well.
 
-Thanks
+A lot of architectures are currently doing very questionable things
+in their dma mapping routines, which are documented in the changelogs
+for each patch.  Please review them very careful and correct me on
+incorrect assumptions.
 
-> Thanks,
-> 
-> 	M.
-> 
+Because this series sits on top of two previously submitted series
+a git tree might be useful to actually test it.  It is provided here:
+
+    git://git.infradead.org/users/hch/misc.git generic-dma-noncoherent
+
+Gitweb:
+
+    http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/generic-dma-noncoherent
+
+Changes since RFC:
+ - fix a typo accidentally disabling the device to cpu transfer sync
+ - fixed a few compile failures
