@@ -1,84 +1,73 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 11 May 2018 09:43:55 +0100
-Subject: [RFC 2/2] nvmem: zynqmp: Added zynqmp nvmem firmware driver
-In-Reply-To: <20180324174638.12621-2-chinnikishore369@gmail.com>
+Date: Fri, 11 May 2018 09:44:25 +0100
+Subject: [RFC 1/2] documentation: Add nvmem bindings documentation
+In-Reply-To: <20180324174638.12621-1-chinnikishore369@gmail.com>
 References: <20180324174638.12621-1-chinnikishore369@gmail.com>
- <20180324174638.12621-2-chinnikishore369@gmail.com>
-Message-ID: <4b6a5199-6226-965a-5dc0-f796f83a128e@linaro.org>
+Message-ID: <4c6115db-2272-6d35-e220-be0f61b37cb0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
 
 
 
 On 24/03/18 17:46, chinnikishore369 at gmail.com wrote:
 > From: Nava kishore Manne <navam@xilinx.com>
 > 
-> This patch adds zynqmp nvmem firmware driver to access the
-> SoC revision information from the hardware register.
+> This patch add the bindings document of zynqmp silicon id driver.
 > 
 > Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+
+I see that you have not included DT maintainers in to/cc list, I can not 
+accept new drivers whose bindings are not Acked/Reviewed by DT maintainers.
+
+Overall the driver looks fine for me.
+
+
+thanks,
+srini
+
+
 > ---
->   drivers/nvmem/Kconfig        |  9 +++++
->   drivers/nvmem/Makefile       |  2 ++
->   drivers/nvmem/zynqmp_nvmem.c | 85 ++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 96 insertions(+)
->   create mode 100644 drivers/nvmem/zynqmp_nvmem.c
+>   .../devicetree/bindings/nvmem/zynqmp_nvmem.txt     | 32 ++++++++++++++++++++++
+>   1 file changed, 32 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/nvmem/zynqmp_nvmem.txt
 > 
-> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> index ff505af064ba..a9349281d05a 100644
-> --- a/drivers/nvmem/Kconfig
-> +++ b/drivers/nvmem/Kconfig
-> @@ -175,4 +175,13 @@ config NVMEM_SNVS_LPGPR
->   	  This driver can also be built as a module. If so, the module
->   	  will be called nvmem-snvs-lpgpr.
->   
-> +config NVMEM_ZYNQMP
-> +        bool "Xilinx ZYNQMP SoC nvmem firmware support"
-> +        depends on ARCH_ZYNQMP
-> +        help
-> +          This is a driver to access hardware related data like soc revision,
-> +          IDCODE... etc.
+> diff --git a/Documentation/devicetree/bindings/nvmem/zynqmp_nvmem.txt b/Documentation/devicetree/bindings/nvmem/zynqmp_nvmem.txt
+> new file mode 100644
+> index 000000000000..94332f160a92
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/nvmem/zynqmp_nvmem.txt
+> @@ -0,0 +1,32 @@
+> +=  Zynq UltraScale+ MPSoC nvmem firmware driver binding =
 > +
-> +          If sure, say yes. If unsure, say no.
+> +Required properties:
+> +- compatible: should be "xlnx,zynqmp-nvmem-fw"
 > +
->   endif
-> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-> index e54dcfa6565a..932b4cebcb6c 100644
-> --- a/drivers/nvmem/Makefile
-> +++ b/drivers/nvmem/Makefile
-> @@ -37,3 +37,5 @@ obj-$(CONFIG_MESON_MX_EFUSE)	+= nvmem_meson_mx_efuse.o
->   nvmem_meson_mx_efuse-y		:= meson-mx-efuse.o
->   obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
->   nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
-> +obj-$(CONFIG_NVMEM_ZYNQMP)	+= nvmem_zynqmp_nvmem.o
-> +nvmem_zynqmp_nvmem-y		:= zynqmp_nvmem.o
-> diff --git a/drivers/nvmem/zynqmp_nvmem.c b/drivers/nvmem/zynqmp_nvmem.c
-
-...
+> += Data cells =
+> +Are child nodes of silicon id, bindings of which as described in
+> +bindings/nvmem/nvmem.txt
 > +
-> +static int zynqmp_nvmem_probe(struct platform_device *pdev)
-> +{
-> +	struct nvmem_device *nvmem;
+> +Example:
 > +
-> +	econfig.dev = &pdev->dev;
-> +	econfig.reg_read = zynqmp_nvmem_read;
+> +	nvmem_firmware {
+> +		compatible = "xlnx,zynqmp-nvmem-fw";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
 > +
-> +	nvmem = nvmem_register(&econfig);
-> +	if (IS_ERR(nvmem))
-> +		return PTR_ERR(nvmem);
+> +		 /* Data cells */
+> +		soc_revision: soc_revision at 0 {
+> +			reg = <0x0 0x4>;
+> +		};
+> +	};
 > +
-You could use devm version of this..
-
-> +	platform_set_drvdata(pdev, nvmem);
+> += Data consumers =
+> +Are device nodes which consume nvmem data cells.
 > +
-> +	return 0;
-> +}
-> 
-...
-
-> +module_platform_driver(zynqmp_nvmem_driver);
+> +For example:
 > +
-> +MODULE_AUTHOR("Michal Simek <michal.simek@xilinx.com>, Nava kishore Manne <navam@xilinx.com>");
-> +MODULE_DESCRIPTION("ZynqMP NVMEM driver");
-> +MODULE_LICENSE("GPL");
+> +	pcap {
+> +		...
+> +		nvmem-cells = <&soc_revision>;
+> +		nvmem-cell-names = "soc_revision";
+> +	};
 > 
