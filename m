@@ -1,74 +1,282 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 May 2018 11:39:01 +0100
-Subject: [PATCH] armpmu: broadcast overflow irq on multi-core system
- having one muxed SPI for PMU.
-In-Reply-To: <010c01d3e8b5$8839a480$98aced80$@lge.com>
-References: <1525941385-12766-1-git-send-email-hoeun.ryu@lge.com.com>
- <20180510102114.obmctt3nn7xakggi@lakrids.cambridge.arm.com>
- <010c01d3e8b5$8839a480$98aced80$@lge.com>
-Message-ID: <20180511103901.osi5lckq55jrms64@lakrids.cambridge.arm.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Fri, 11 May 2018 18:41:07 +0800
+Subject: [PATCH 2/2] arm64: dts: Add Mediatek SoC MT8183 and evaluation
+ board dts and Makefile
+In-Reply-To: <860cba8a-3af8-31d6-ec3f-81706d2d998b@gmail.com>
+References: <1526019083-20237-1-git-send-email-erin.lo@mediatek.com>
+ <1526019083-20237-3-git-send-email-erin.lo@mediatek.com>
+ <860cba8a-3af8-31d6-ec3f-81706d2d998b@gmail.com>
+Message-ID: <1526035267.13828.13.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 08:20:49AM +0900, ????? wrote:
-> Thank you for the reply.
+On Fri, 2018-05-11 at 10:36 +0200, Matthias Brugger wrote:
 > 
-> > -----Original Message-----
-> > From: Mark Rutland [mailto:mark.rutland at arm.com]
-> > Sent: Thursday, May 10, 2018 7:21 PM
-> > To: Hoeun Ryu <hoeun.ryu@lge.com.com>
-> > Cc: Will Deacon <will.deacon@arm.com>; Hoeun Ryu <hoeun.ryu@lge.com>;
-> > linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> > Subject: Re: [PATCH] armpmu: broadcast overflow irq on multi-core system
-> > having one muxed SPI for PMU.
-
-> > Muxing the PMU IRQs is a really broken system design, and there's no good
-> > way of supporting it.
-
-> > What we should do for such systems is:
+> On 05/11/2018 08:11 AM, Erin Lo wrote:
+> > From: Ben Ho <Ben.Ho@mediatek.com>
 > > 
-> > * Add a flag to the DT to describe that the IRQs are muxed, as this
-> >   cannot be probed.
+> > Add basic chip support for Mediatek 8183
 > > 
-> > * Add hrtimer code to periodically update the counters, to avoid
-> >   overflow (e.g. as we do in the l2x0 PMU).
+> > Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
+> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> > ---
+> >  arch/arm64/boot/dts/mediatek/Makefile       |   1 +
+> >  arch/arm64/boot/dts/mediatek/mt8183-evb.dts |  31 +++++
+> >  arch/arm64/boot/dts/mediatek/mt8183.dtsi    | 178 ++++++++++++++++++++++++++++
+> >  3 files changed, 210 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
 > > 
-> > * Reject sampling for such systems, as this cannot be done reliably or
-> >   efficiently.
+> > diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+> > index ac17f60..2836261 100644
+> > --- a/arch/arm64/boot/dts/mediatek/Makefile
+> > +++ b/arch/arm64/boot/dts/mediatek/Makefile
+> > @@ -5,3 +5,4 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
+> > +dtb-$(CONFIG_ARCH_MEDIATEK) += mt8183-evb.dtb
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8183-evb.dts b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+> > new file mode 100644
+> > index 0000000..9a3d6b7
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+> > @@ -0,0 +1,31 @@
+> > +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> > +/*
+> > + * Copyright (c) 2017 MediaTek Inc.
+> > + * Author: Ben Ho <ben.ho@mediatek.com>
+> > + *	   Erin Lo <erin.lo@mediatek.com>
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "mt8183.dtsi"
+> > +
+> > +/ {
+> > +	model = "MediaTek MT8183 evaluation board";
+> > +	compatible = "mediatek,mt8183-evb", "mediatek,mt8183";
+> > +
+> > +	aliases {
+> > +		serial0 = &uart0;
+> > +	};
+> > +
+> > +	memory at 40000000 {
+> > +		device_type = "memory";
+> > +		reg = <0 0x40000000 0 0x80000000>;
+> > +	};
+> > +
+> > +	chosen {
+> > +		stdout-path = "serial0:921600n8";
+> > +	};
+> > +};
+> > +
+> > +&uart0 {
+> > +	status = "okay";
+> > +};
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+> > new file mode 100644
+> > index 0000000..8564a26
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+> > @@ -0,0 +1,178 @@
+> > +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> > +/*
+> > + * Copyright (c) 2017 MediaTek Inc.
+> > + * Author: Ben Ho <ben.ho@mediatek.com>
+> > + *	   Erin Lo <erin.lo@mediatek.com>
+> > + */
+> > +
+> > +#include <dt-bindings/interrupt-controller/irq.h>
+> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +
+> > +/ {
+> > +	compatible = "mediatek,mt8183";
+> > +	interrupt-parent = <&sysirq>;
+> > +	#address-cells = <2>;
+> > +	#size-cells = <2>;
+> > +
+> > +	cpus {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu-map {
+> > +			cluster0 {
+> > +				core0 {
+> > +					cpu = <&cpu0>;
+> > +				};
+> > +				core1 {
+> > +					cpu = <&cpu1>;
+> > +				};
+> > +				core2 {
+> > +					cpu = <&cpu2>;
+> > +				};
+> > +				core3 {
+> > +					cpu = <&cpu3>;
+> > +				};
+> > +			};
+> > +
+> > +			cluster1 {
+> > +				core0 {
+> > +					cpu = <&cpu4>;
+> > +				};
+> > +				core1 {
+> > +					cpu = <&cpu5>;
+> > +				};
+> > +				core2 {
+> > +					cpu = <&cpu6>;
+> > +				};
+> > +				core3 {
+> > +					cpu = <&cpu7>;
+> > +				};
+> > +			};
+> > +		};
+> > +
+> > +		cpu0: cpu at 000 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a53";
+> > +			reg = <0x000>;
+> > +			enable-method = "psci";
+> > +		};
+> > +
+> > +		cpu1: cpu at 001 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a53";
+> > +			reg = <0x001>;
+> > +			enable-method = "psci";
+> > +		};
+> > +
+> > +		cpu2: cpu at 002 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a53";
+> > +			reg = <0x002>;
+> > +			enable-method = "psci";
+> > +		};
+> > +
+> > +		cpu3: cpu at 003 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a53";
+> > +			reg = <0x003>;
+> > +			enable-method = "psci";
+> > +		};
+> > +
+> > +		cpu4: cpu at 100 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a73";
+> > +			reg = <0x100>;
+> > +			enable-method = "psci";
+> > +		};
+> > +
+> > +		cpu5: cpu at 101 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a73";
+> > +			reg = <0x101>;
+> > +			enable-method = "psci";
+> > +		};
+> > +
+> > +		cpu6: cpu at 102 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a73";
+> > +			reg = <0x102>;
+> > +			enable-method = "psci";
+> > +		};
+> > +
+> > +		cpu7: cpu at 103 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a73";
+> > +			reg = <0x103>;
+> > +			enable-method = "psci";
+> > +		};
+> > +	};
+> > +
+> > +	psci {
+> > +		compatible      = "arm,psci-1.0";
+> > +		method          = "smc";
+> > +	};
+> > +
+> > +	uart_clk: dummy26m {
+> > +		compatible = "fixed-clock";
+> > +		clock-frequency = <26000000>;
+> > +		#clock-cells = <0>;
+> > +	};
+> > +
+> > +	timer {
+> > +		compatible = "arm,armv8-timer";
+> > +		interrupt-parent = <&gic>;
+> > +		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
+> > +			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+> > +			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+> > +			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
+> > +	};
+> > +
+> > +	gic: interrupt-controller at 0c000000 {
+> > +		compatible = "arm,gic-v3";
+> > +		#interrupt-cells = <3>;
+> > +		interrupt-parent = <&gic>;
+> > +		interrupt-controller;
+> > +		reg = <0 0x0c000000 0 0x40000>,  // CID
+> > +		      <0 0x0c100000 0 0x200000>; // CIR
+> > +		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> > +	};
+> > +
+> > +	sysirq: intpol-controller at 0c530a80 {
+> > +		compatible = "mediatek,mt8183-sysirq",
+> > +			     "mediatek,mt6577-sysirq";
+> > +		interrupt-controller;
+> > +		#interrupt-cells = <3>;
+> > +		interrupt-parent = <&gic>;
+> > +		reg = <0 0x0c530a80 0 0x50>;
+> > +	};
+> > +
+> > +	uart0: serial at 11002000 {
+> > +		compatible = "mediatek,mt8183-uart",
+> > +			     "mediatek,mt6577-uart";
+> > +		reg = <0 0x11002000 0 0x1000>;
+> > +		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&uart_clk>, <&uart_clk>;
+> > +		clock-names = "baud", "bus";
+> > +		status = "disabled";
+> > +	};
+> > +
+> > +	uart1: serial at 11003000 {
+> > +		compatible = "mediatek,mt8183-uart",
+> > +			     "mediatek,mt6577-uart";
+> > +		reg = <0 0x11003000 0 0x1000>;
+> > +		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&uart_clk>, <&uart_clk>;
+> > +		clock-names = "baud", "bus";
+> > +		status = "disabled";
+> > +	};
+> > +
+> > +	uart2: serial at 11004000 {
+> > +		compatible = "mediatek,mt8183-uart",
+> > +			     "mediatek,mt6577-uart";
+> > +		reg = <0 0x11004000 0 0x1000>;
+> > +		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&uart_clk>, <&uart_clk>;
+> > +		clock-names = "baud", "bus";
+> > +		status = "disabled";
+> > +	};
+> > +};
 > > 
-> > NAK to broadcasting the IRQ -- there are a number of issues with the
-> > general approach.
 > 
-> The second solution would be good if sampling is necessary even like those
-> systems.
-
-Please note that I mean *all* of the above. There would be no sampling
-on systems with muxed PMU IRQs, since there's no correlation between
-overflow events and the hrtimer interrupts -- the results of sampling
-would be misleading.
-
-> Actually I'm working on FIQ available ARM32 system and trying to enable the
-> hard lockup detector by routing the PMU IRQ to FIQ.
-> Because of that, I really need the interrupt event if it is a muxed SPI,
-> beside I also need to make an dedicated IPI FIQ to broadcast the IRQ in
-> this approach.
-> What would you do if you were in the same situation ?
-
-I don't think that this can work with a muxed IRQ, sorry.
-
-It would be better to use some kind of timer.
-
-[...]
-
-> > Futher, If you ever encounter a case where you need to avoid preemption
-> > across enabling IRQs, preemption must be disabled *before* enabling IRQs.
+> I wonder if there aren't any other devices which can be supported out of the box.
+> I understand that for now we are missing the clock driver and the pinctrl
+> driver. Are you planning to submit them in the near future?
 > 
-> Ah, OK.
-> Enabling IRQs can cause scheduling tasks in the end of exception or other
-> scheduling points, right ?
+> I'm asking because I don't want to bloat the dts with boards that only can boot
+> to an initramfs with a serial console. Especially if there is no HW + datasheet
+> available for anyone in the community who wants to work on this.
+> 
+> Regards,
+> Matthias
+> 
+> Regards,
+> Matthias
 
-Yes. If an IRQ was taken *between* enabling IRQs and disabling
-preemption, preemption may occur as part of the exception return.
 
-Thanks,
-Mark.
+We have implement clock and pinctrl driver these days, and plan to
+submit them maybe next month.
+After that we will submit other drivers of MT8183 continuously.
+
+Regards,
+Erin
