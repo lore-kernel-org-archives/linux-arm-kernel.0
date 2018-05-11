@@ -1,92 +1,85 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 11 May 2018 20:06:27 +0100
-Subject: [PATCH v2 26/40] iommu/arm-smmu-v3: Enable broadcast TLB maintenance
-In-Reply-To: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
-Message-ID: <20180511190641.23008-27-jean-philippe.brucker@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 11 May 2018 15:13:35 -0500
+Subject: [PATCH 00/12] introduce support for early platform drivers
+In-Reply-To: <20180511162028.20616-1-brgl@bgdev.pl>
+References: <20180511162028.20616-1-brgl@bgdev.pl>
+Message-ID: <CAL_JsqL3CWFSpKEGoGwQDxCQ04g4uT1hiDTxXzjz4XTjPbfsoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMMUv3 can handle invalidation targeted at TLB entries with shared
-ASIDs. If the implementation supports broadcast TLB maintenance, enable it
-and keep track of it in a feature bit. The SMMU will then be affected by
-inner-shareable TLB invalidations from other agents.
+On Fri, May 11, 2018 at 11:20 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> This series is a follow-up to the RFC[1] posted a couple days ago.
+>
+> NOTE: this series applies on top of my recent patches[2] that move the previous
+> implementation of early platform devices to arch/sh.
+>
+> Problem:
+>
+> Certain class of devices, such as timers, certain clock drivers and irq chip
+> drivers need to be probed early in the boot sequence. The currently preferred
+> approach is using one of the OF_DECLARE() macros. This however does not create
+> a platform device which has many drawbacks - such as not being able to use
+> devres routines, dev_ log functions or no way of deferring the init OF function
+> if some other resources are missing.
 
-A major side-effect of this change is that stage-2 translation contexts
-are now affected by all invalidations by VMID. VMIDs are all shared and
-the only ways to prevent over-invalidation, since the stage-2 page tables
-are not shared between CPU and SMMU, are to either disable BTM or allocate
-different VMIDs. This patch does not address the problem.
+I skimmed though this and it doesn't look horrible (how's that for
+positive feedback? ;) ). But before going into the details, I think
+first there needs to be agreement this is the right direction.
 
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+The question does remain though as to whether this class of devices
+should be platform drivers. They can't be modules. They can't be
+hotplugged. Can they be runtime-pm enabled? So the advantage is ...
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 280a5d9be839..073cba33ae6c 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -64,6 +64,7 @@
- #define IDR0_ASID16			(1 << 12)
- #define IDR0_ATS			(1 << 10)
- #define IDR0_HYP			(1 << 9)
-+#define IDR0_BTM			(1 << 5)
- #define IDR0_COHACC			(1 << 4)
- #define IDR0_TTF			GENMASK(3, 2)
- #define IDR0_TTF_AARCH64		2
-@@ -523,6 +524,7 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_STALL_FORCE	(1 << 13)
- #define ARM_SMMU_FEAT_VAX		(1 << 14)
- #define ARM_SMMU_FEAT_E2H		(1 << 15)
-+#define ARM_SMMU_FEAT_BTM		(1 << 16)
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-@@ -2459,11 +2461,14 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
- 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR1);
- 
- 	/* CR2 (random crap) */
--	reg = CR2_PTM | CR2_RECINVSID;
-+	reg = CR2_RECINVSID;
- 
- 	if (smmu->features & ARM_SMMU_FEAT_E2H)
- 		reg |= CR2_E2H;
- 
-+	if (!(smmu->features & ARM_SMMU_FEAT_BTM))
-+		reg |= CR2_PTM;
-+
- 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR2);
- 
- 	/* Stream table */
-@@ -2564,6 +2569,7 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- {
- 	u32 reg;
- 	bool coherent = smmu->features & ARM_SMMU_FEAT_COHERENCY;
-+	bool vhe = cpus_have_cap(ARM64_HAS_VIRT_HOST_EXTN);
- 
- 	/* IDR0 */
- 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR0);
-@@ -2613,10 +2619,19 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 
- 	if (reg & IDR0_HYP) {
- 		smmu->features |= ARM_SMMU_FEAT_HYP;
--		if (cpus_have_cap(ARM64_HAS_VIRT_HOST_EXTN))
-+		if (vhe)
- 			smmu->features |= ARM_SMMU_FEAT_E2H;
- 	}
- 
-+	/*
-+	 * If the CPU is using VHE, but the SMMU doesn't support it, the SMMU
-+	 * will create TLB entries for NH-EL1 world and will miss the
-+	 * broadcasted TLB invalidations that target EL2-E2H world. Don't enable
-+	 * BTM in that case.
-+	 */
-+	if (reg & IDR0_BTM && (!vhe || reg & IDR0_HYP))
-+		smmu->features |= ARM_SMMU_FEAT_BTM;
-+
- 	/*
- 	 * The coherency feature as set by FW is used in preference to the ID
- 	 * register, but warn on mismatch.
--- 
-2.17.0
+I assume that the clock maintainers had some reason to move clocks to
+be platform drivers. It's just not clear to me what that was.
+
+> For drivers that use both platform drivers and OF_DECLARE the situation is even
+> more complicated as the code needs to take into account that there can possibly
+> be no struct device present. For a specific use case that we're having problems
+> with, please refer to the recent DaVinci common-clock conversion patches and
+> the nasty workaround that this problem implies[3].
+
+So devm_kzalloc will work with this solution? Why did we need
+devm_kzalloc in the first place? The clocks can never be removed and
+cleaning up on error paths is kind of pointless. The system would be
+hosed, right?
+
+> We also used to have an early platform drivers implementation but they were not
+> integrated with the linux device model at all - they merely used the same data
+> structures. The users could not use devres, defer probe and the early devices
+> never became actual platform devices later on.
+>
+> Proposed solution:
+>
+> This series aims at solving this problem by (re-)introducing the concept of
+> early platform drivers and devices - this time however in a way that seamlessly
+> integrates with the existing platform drivers and also offers device-tree
+> support.
+>
+> The idea is to provide a way for users to probe devices early, while already
+> being able to use devres, devices resources and properties and also deferred
+> probing.
+>
+> New structures are introduced: the early platform driver contains the
+> early_probe callback which has the same signature as regular platform_device
+> probe. This callback is called early on. The user can have both the early and
+> regular probe speficied or only one of them and they both receive the same
+> platform device object as argument. Any device data allocated early will be
+> carried over to the normal probe.
+>
+> The architecture code is responsible for calling early_platform_start() in
+> which the early drivers will be registered and devices populated from DT.
+
+Can we really do this in one spot for different devices (clk, timers,
+irq). The sequence is all very carefully crafted. Platform specific
+hooks is another thing to consider.
+
+> Once the device and kobject mechanisms are ready, all early drivers and devices
+> will be converted into real platform drivers and devices. Also: if any of the
+> early platform registration functions will be called once early initialization
+> is done, these functions will work like regular platform_device/driver ones.
+
+This could leave devices in a weird state. They've successfully probed
+early, but then are on the deferred list for normal probe for example.
+
+Rob
