@@ -1,79 +1,52 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 11 May 2018 15:02:42 -0700
-Subject: [PATCH 2/2] soc: bcm: brcmstb: Add missing DDR MEMC compatible strings
-In-Reply-To: <20180511220242.837-1-f.fainelli@gmail.com>
-References: <20180511220242.837-1-f.fainelli@gmail.com>
-Message-ID: <20180511220242.837-3-f.fainelli@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 12 May 2018 00:11:24 +0200
+Subject: [PATCH v1 11/13] dt-bindings: power: add PX30 SoCs header for
+ power-domain
+In-Reply-To: <1526009672-2097-1-git-send-email-zhangqing@rock-chips.com>
+References: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
+ <1526009672-2097-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <508694354.7btLQf7nsA@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We would not be matching the following chip/compatible strings
-combinations, which would lead to not setting the warm boot flag
-correctly, fix that:
+Hi Elaine,
 
-    7260A0/B0: brcm,brcmstb-memc-ddr-rev-b.2.1
-    7255A0: brcm,brcmstb-memc-ddr-rev-b.2.3
-    7278Bx: brcm,brcmstb-memc-ddr-rev-b.3.1
 
-The B2.1 core (which is in 7260 A0 and B0) doesn't have the
-SHIMPHY_ADDR_CNTL_0_DDR_PAD_CNTRL setup in the memsys init code, nor
-does it have the warm boot flag re-definition on entry. Those changes
-were for B2.2 and later MEMSYS cores. Fall back to the previous S2/S3
-entry method for these specific chips.
+Am Freitag, 11. Mai 2018, 05:34:32 CEST schrieb Elaine Zhang:
+> According to a description from TRM, add all the power domains.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 
-Fixes: 0b741b8234c8 ("soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)")
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt |  3 +++
- drivers/soc/bcm/brcmstb/pm/pm-arm.c                        | 12 ++++++++++++
- 2 files changed, 15 insertions(+)
+that's a bit ambigous, having the Signed-offs like above.
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-index fb762059e68e..104cc9b41df4 100644
---- a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-+++ b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-@@ -189,8 +189,11 @@ Power-Down (SRPD), among other things.
- 
- Required properties:
- - compatible     : should contain one of these
-+	"brcm,brcmstb-memc-ddr-rev-b.2.1"
- 	"brcm,brcmstb-memc-ddr-rev-b.2.2"
-+	"brcm,brcmstb-memc-ddr-rev-b.2.3"
- 	"brcm,brcmstb-memc-ddr-rev-b.3.0"
-+	"brcm,brcmstb-memc-ddr-rev-b.3.1"
- 	"brcm,brcmstb-memc-ddr"
- - reg            : the MEMC DDR register range
- 
-diff --git a/drivers/soc/bcm/brcmstb/pm/pm-arm.c b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-index ade724677238..a5577dd5eb08 100644
---- a/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-+++ b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-@@ -627,14 +627,26 @@ static const struct of_device_id ddr_shimphy_dt_ids[] = {
- };
- 
- static const struct of_device_id brcmstb_memc_of_match[] = {
-+	{
-+		.compatible = "brcm,brcmstb-memc-ddr-rev-b.2.1",
-+		.data = &ddr_seq,
-+	},
- 	{
- 		.compatible = "brcm,brcmstb-memc-ddr-rev-b.2.2",
- 		.data = &ddr_seq_b22,
- 	},
-+	{
-+		.compatible = "brcm,brcmstb-memc-ddr-rev-b.2.3",
-+		.data = &ddr_seq_b22,
-+	},
- 	{
- 		.compatible = "brcm,brcmstb-memc-ddr-rev-b.3.0",
- 		.data = &ddr_seq_b22,
- 	},
-+	{
-+		.compatible = "brcm,brcmstb-memc-ddr-rev-b.3.1",
-+		.data = &ddr_seq_b22,
-+	},
- 	{
- 		.compatible = "brcm,brcmstb-memc-ddr",
- 		.data = &ddr_seq,
--- 
-2.14.1
+Either you are the author+sender of the patch, then Finley's
+Signed-off should go away ... or Finley is the author and you
+are the sender, then the author of the patch should be set
+correctly (--author option for git) and the Signed-offs should
+switch places (= Finley first, then yours). Please fix.
+
+This seems to be true for most patches in this series.
+
+> ---
+>  include/dt-bindings/power/px30-power.h | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 include/dt-bindings/power/px30-power.h
+> 
+> diff --git a/include/dt-bindings/power/px30-power.h b/include/dt-bindings/power/px30-power.h
+> new file mode 100644
+> index 000000000000..4ed482e80950
+> --- /dev/null
+> +++ b/include/dt-bindings/power/px30-power.h
+
+Here I have a naming question. When looking at the vendor kernel
+it looks like the px30 is largely related to the rk3326.
+(rk3326.dtsi includeing the px30.dtsi)
+
+What is the reason for basing the naming on the px30 this time? And could
+we possibly keep to rkXXXX names for the basic things in the kernel, thus
+keeping the pxXX as second name, like with the other px-variants before?
+
+
+Thanks
+Heiko
