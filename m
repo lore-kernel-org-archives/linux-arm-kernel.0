@@ -1,48 +1,45 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 May 2018 20:51:36 +0530
-Subject: [PATCH 3/3] ARM: davinci: board-dm646x-evm: set VPIF capture card name
+Date: Fri, 11 May 2018 20:51:35 +0530
+Subject: [PATCH 2/3] ARM: davinci: board-dm646x-evm: pass correct I2C adapter
+ id for VPIF
 In-Reply-To: <20180511152136.29515-1-nsekhar@ti.com>
 References: <20180511152136.29515-1-nsekhar@ti.com>
-Message-ID: <20180511152136.29515-4-nsekhar@ti.com>
+Message-ID: <20180511152136.29515-3-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VPIF capture driver expects card name to be set since it
-uses it without checking for NULL. The commit which
-introduced VPIF display and capture support added card
-name only for display, not for capture.
+commit a16cb91ad9c4 ("[media] media: vpif: use a configurable
+i2c_adapter_id for vpif display") removed hardcoded I2C adaptor
+setting in VPIF driver, but missed updating platform data passed
+from DM646x board.
 
-Set it in platform data to probe driver successfully.
+Fix it.
 
-While at it, also fix the display card name to something more
-appropriate.
-
-Fixes: 85609c1ccda6 ("DaVinci: DM646x - platform changes for vpif capture and display drivers")
+Fixes: a16cb91ad9c4 ("[media] media: vpif: use a configurable i2c_adapter_id for vpif display")
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/mach-davinci/board-dm646x-evm.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-davinci/board-dm646x-evm.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index bf6f85048d17..867ab2fa6cfd 100644
+index 37c9e0ee4dcc..bf6f85048d17 100644
 --- a/arch/arm/mach-davinci/board-dm646x-evm.c
 +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -538,7 +538,7 @@ static struct vpif_display_config dm646x_vpif_display_config = {
+@@ -533,6 +533,7 @@ static struct vpif_display_config dm646x_vpif_display_config = {
+ 	.set_clock	= set_vpif_clock,
+ 	.subdevinfo	= dm646x_vpif_subdev,
+ 	.subdev_count	= ARRAY_SIZE(dm646x_vpif_subdev),
++	.i2c_adapter_id = 1,
+ 	.chan_config[0] = {
  		.outputs = dm6467_ch0_outputs,
  		.output_count = ARRAY_SIZE(dm6467_ch0_outputs),
- 	},
--	.card_name	= "DM646x EVM",
-+	.card_name	= "DM646x EVM Video Display",
- };
- 
- /**
-@@ -697,6 +697,7 @@ static struct vpif_capture_config dm646x_vpif_capture_cfg = {
- 			.fid_pol = 0,
- 		},
- 	},
-+	.card_name = "DM646x EVM Video Capture",
- };
- 
- static void __init evm_init_video(void)
+@@ -675,6 +676,7 @@ static struct vpif_capture_config dm646x_vpif_capture_cfg = {
+ 	.setup_input_channel_mode = setup_vpif_input_channel_mode,
+ 	.subdev_info = vpif_capture_sdev_info,
+ 	.subdev_count = ARRAY_SIZE(vpif_capture_sdev_info),
++	.i2c_adapter_id = 1,
+ 	.chan_config[0] = {
+ 		.inputs = dm6467_ch0_inputs,
+ 		.input_count = ARRAY_SIZE(dm6467_ch0_inputs),
 -- 
 2.16.2
