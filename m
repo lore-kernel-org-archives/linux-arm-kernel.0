@@ -1,93 +1,53 @@
-From: chenyao11@huawei.com (chenyao (F))
-Date: Fri, 11 May 2018 08:30:59 +0000
-Subject: [PATCH v2 1/2] PCI: kirin: Add MSI support
-In-Reply-To: <20180510140431.GJ173327@bhelgaas-glaptop.roam.corp.google.com>
-References: <1525854012-24228-1-git-send-email-chenyao11@huawei.com>
- <1525854012-24228-2-git-send-email-chenyao11@huawei.com>
- <20180510140431.GJ173327@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1F615B5A909C3342A3B7B4843796B9151C35E2A4@dggemi502-mbs.china.huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 11 May 2018 16:35:56 +0800
+Subject: [PATCH] arm: dts: imx: fix IPU OF graph endpoint node names
+In-Reply-To: <CAL_JsqKcz=i0ELosVvuhevMSxa2q8pE+2WcAk57sg8ns5X-mtg@mail.gmail.com>
+References: <20180508135930.5768-1-robh@kernel.org>
+ <20180508135930.5768-2-robh@kernel.org>
+ <CAOMZO5A+7YW89E5PEo6841hk8GQUr2k7D+xWPGb1iqvpD096Rg@mail.gmail.com>
+ <CAL_JsqKcz=i0ELosVvuhevMSxa2q8pE+2WcAk57sg8ns5X-mtg@mail.gmail.com>
+Message-ID: <20180511083554.GF26863@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-> 
-> [+cc Tejun, Wolfram]
-> 
-> On Wed, May 09, 2018 at 04:20:11PM +0800, Yao Chen wrote:
-> > Add support for MSI.
-> > ...
-> 
-> > @@ -448,6 +467,26 @@ static int kirin_pcie_host_init(struct pcie_port
-> > *pp)  static int __init kirin_add_pcie_port(struct dw_pcie *pci,
-> >  				      struct platform_device *pdev)  {
-> > +	int ret;
-> > +
-> > +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> > +		pci->pp.msi_irq = platform_get_irq(pdev, 0);
-> > +		if (!pci->pp.msi_irq) {
-> 
-> I think this test is incorrect.  platform_get_irq() returns a negative errno
-> value when it fails.  Most calls test "irq < 0" to check for failure.
-> 
-> There's a lot of duplicated code like this, so maybe we should consider
-> putting that check into devm_request_irq(), similar to what
-> devm_ioremap_resource() does, so the driver code could look like this:
-> 
->   pci->pp.msi_irq = platform_get_irq(pdev, 0);
->   ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq, ...);
->   if (ret) {
->     dev_err(&pdev->dev, "failed to request MSI IRQ\n");
->     return ret;
->   }
-> 
-> The basic devm_ioremap_resource() motivation is here: 72f8c0bfa0de ("lib:
-> devres: add convenience function to remap a resource") and the same
-> considerations seem to apply here.
-> 
-> But that's more than you need to do for *this* series.  So for now, I would
-> simply fix the test to check for "irq < 0" and update the messages as I
-> mention below.
-
-Thank you for pointing out my mistake.  I'll fix it.
-
-> 
-> > +			dev_err(&pdev->dev, "failed to get msi irq[%d]\n",
-> > +				pci->pp.msi_irq);
-> > +			return -ENODEV;
-> > +		}
-> > +		ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
-> > +				       kirin_pcie_msi_irq_handler,
-> > +				       IRQF_SHARED | IRQF_NO_THREAD,
-> > +				       "kirin_pcie_msi", &pci->pp);
-> > +		if (ret) {
-> > +			dev_err(&pdev->dev, "failed to request msi
-> irq[%d]\n",
-> 
-> s/msi irq/MSI IRQ/ in both dev_err() messages above.  This is because the
-> message is English text (not code), and the convention is that non-words like
-> these initialisms written in all caps.
-> 
-> I would style the first one as "failed to get MSI IRQ (%d)" because the %d
-> there is a return code, probably -ENXIO.
-> 
-> The second one should be "failed to request MSI IRQ %d" because here
-> the %d is the actual IRQ.
-> 
-
-I'll fix it. Thanks again.
-
-> > +				pci->pp.msi_irq);
-> > +			return ret;
-> > +		}
-> > +	}
-> > +
-> >  	pci->pp.ops = &kirin_pcie_host_ops;
+On Tue, May 08, 2018 at 10:22:29AM -0500, Rob Herring wrote:
+> On Tue, May 8, 2018 at 9:06 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> > Hi Rob,
 > >
-> >  	return dw_pcie_host_init(&pci->pp);
-> > --
-> > 1.9.1
+> > On Tue, May 8, 2018 at 10:59 AM, Rob Herring <robh@kernel.org> wrote:
 > >
+> >> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> >> index 18b65052553d..654cf2c9b073 100644
+> >> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> >> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> >> @@ -379,9 +379,6 @@
+> >>                 powerdown-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>; /* NANDF_WP_B */
+> >>
+> >>                 port {
+> >> -                       #address-cells = <1>;
+> >> -                       #size-cells = <0>;
+> >> -
+> >>                         ov5640_to_mipi_csi2: endpoint {
+> >>                                 remote-endpoint = <&mipi_csi2_in>;
+> >>                                 clock-lanes = <0>;
+> >> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> >> index f019f9900369..c2de2250718c 100644
+> >> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> >> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> >> @@ -294,9 +294,6 @@
+> >>                 reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
+> >>
+> >>                 port {
+> >> -                       #address-cells = <1>;
+> >> -                       #size-cells = <0>;
+> >> -
+> >>                         ov5640_to_mipi_csi2: endpoint {
+> >
+> > These two changes seem unrelated and I have already fixed them at:
+> > https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=1b215c73d1586e6f2586e9a6d6dfaf49cc142b3a
+> 
+> Right. Will drop them.
 
-Best regards,
-Yao
+Applied.  The git am command dropped them automatically.  Thanks.
+
+Shawn
