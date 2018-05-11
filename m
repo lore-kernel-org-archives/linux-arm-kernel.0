@@ -1,102 +1,40 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 11 May 2018 09:59:40 +0200
-Subject: [PATCH 15/20] sh: use dma_direct_ops for the CONFIG_DMA_COHERENT case
-In-Reply-To: <20180511075945.16548-1-hch@lst.de>
-References: <20180511075945.16548-1-hch@lst.de>
-Message-ID: <20180511075945.16548-16-hch@lst.de>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 11 May 2018 10:01:54 +0200
+Subject: [PATCH v4 3/3] ARM: dts: sun8i: h3: Add SY8106A regulator to
+ Orange Pi PC
+In-Reply-To: <20180507122942.25758-4-icenowy@aosc.io>
+References: <20180507122942.25758-1-icenowy@aosc.io>
+ <20180507122942.25758-4-icenowy@aosc.io>
+Message-ID: <20180511080154.iubx6jidtxdojgfx@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a slight change in behavior as we avoid the detour through the
-virtual mapping for the coherent allocator, but if this CPU really is
-coherent that should be the right thing to do.
+On Mon, May 07, 2018 at 08:29:42PM +0800, Icenowy Zheng wrote:
+> From: Ondrej Jirman <megous@megous.com>
+> 
+> Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
+> Orange Pi PC, then set the power supply of the ARM cores to this
+> regulator, in order to enable DVFS.
+> 
+> Signed-off-by: Ondrej Jirman <megous@megous.com>
+> [Icenowy: Enable DVFS in this patch, slight changes and change commit
+>  message]
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> [wens at csie.org: Rename regulator label]
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- arch/sh/Kconfig                   | 1 +
- arch/sh/include/asm/dma-mapping.h | 4 ++++
- arch/sh/kernel/Makefile           | 4 ++--
- arch/sh/kernel/dma-nommu.c        | 4 ----
- 4 files changed, 7 insertions(+), 6 deletions(-)
+Dropped Chen-Yu's SoB and applied, thanks!
+Maxime
 
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index 7d521926041e..d0b095323d62 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -157,6 +157,7 @@ config SWAP_IO_SPACE
- 	bool
- 
- config DMA_COHERENT
-+	select DMA_DIRECT_OPS
- 	bool
- 
- config DMA_NONCOHERENT
-diff --git a/arch/sh/include/asm/dma-mapping.h b/arch/sh/include/asm/dma-mapping.h
-index 149e71f95be7..1ebc6a4eb1c5 100644
---- a/arch/sh/include/asm/dma-mapping.h
-+++ b/arch/sh/include/asm/dma-mapping.h
-@@ -6,7 +6,11 @@ extern const struct dma_map_ops nommu_dma_ops;
- 
- static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- {
-+#ifdef CONFIG_DMA_NONCOHERENT
- 	return &nommu_dma_ops;
-+#else
-+	return &dma_direct_ops;
-+#endif
- }
- 
- extern void *dma_generic_alloc_coherent(struct device *dev, size_t size,
-diff --git a/arch/sh/kernel/Makefile b/arch/sh/kernel/Makefile
-index dc80041f7363..cb5f1bfb52de 100644
---- a/arch/sh/kernel/Makefile
-+++ b/arch/sh/kernel/Makefile
-@@ -12,7 +12,7 @@ endif
- 
- CFLAGS_REMOVE_return_address.o = -pg
- 
--obj-y	:= debugtraps.o dma-nommu.o dumpstack.o 		\
-+obj-y	:= debugtraps.o dumpstack.o 		\
- 	   idle.o io.o irq.o irq_$(BITS).o kdebugfs.o			\
- 	   machvec.o nmi_debug.o process.o				\
- 	   process_$(BITS).o ptrace.o ptrace_$(BITS).o			\
-@@ -45,7 +45,7 @@ obj-$(CONFIG_DUMP_CODE)		+= disassemble.o
- obj-$(CONFIG_HIBERNATION)	+= swsusp.o
- obj-$(CONFIG_DWARF_UNWINDER)	+= dwarf.o
- obj-$(CONFIG_PERF_EVENTS)	+= perf_event.o perf_callchain.o
--
-+obj-$(CONFIG_DMA_NONCOHERENT)	+= dma-nommu.o
- obj-$(CONFIG_HAVE_HW_BREAKPOINT)		+= hw_breakpoint.o
- 
- ccflags-y := -Werror
-diff --git a/arch/sh/kernel/dma-nommu.c b/arch/sh/kernel/dma-nommu.c
-index 79a9edafa5b0..d8689b1cb743 100644
---- a/arch/sh/kernel/dma-nommu.c
-+++ b/arch/sh/kernel/dma-nommu.c
-@@ -51,7 +51,6 @@ static int nommu_map_sg(struct device *dev, struct scatterlist *sg,
- 	return nents;
- }
- 
--#ifdef CONFIG_DMA_NONCOHERENT
- static void nommu_sync_single_for_device(struct device *dev, dma_addr_t addr,
- 			      size_t size, enum dma_data_direction dir)
- {
-@@ -67,16 +66,13 @@ static void nommu_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
- 	for_each_sg(sg, s, nelems, i)
- 		sh_sync_dma_for_device(sg_virt(s), s->length, dir);
- }
--#endif
- 
- const struct dma_map_ops nommu_dma_ops = {
- 	.alloc			= dma_generic_alloc_coherent,
- 	.free			= dma_generic_free_coherent,
- 	.map_page		= nommu_map_page,
- 	.map_sg			= nommu_map_sg,
--#ifdef CONFIG_DMA_NONCOHERENT
- 	.sync_single_for_device	= nommu_sync_single_for_device,
- 	.sync_sg_for_device	= nommu_sync_sg_for_device,
--#endif
- };
- EXPORT_SYMBOL(nommu_dma_ops);
 -- 
-2.17.0
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180511/a86fc707/attachment.sig>
