@@ -1,112 +1,93 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 11 May 2018 10:26:53 +0200
-Subject: [PATCH 1/2] arm64: arch_timer: Workaround for Allwinner A64
- timer instability
-In-Reply-To: <20180511022751.9096-2-samuel@sholland.org>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <20180511022751.9096-2-samuel@sholland.org>
-Message-ID: <20180511082653.qhfdjliofmelmtwp@flea>
+From: chenyao11@huawei.com (chenyao (F))
+Date: Fri, 11 May 2018 08:30:59 +0000
+Subject: [PATCH v2 1/2] PCI: kirin: Add MSI support
+In-Reply-To: <20180510140431.GJ173327@bhelgaas-glaptop.roam.corp.google.com>
+References: <1525854012-24228-1-git-send-email-chenyao11@huawei.com>
+ <1525854012-24228-2-git-send-email-chenyao11@huawei.com>
+ <20180510140431.GJ173327@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1F615B5A909C3342A3B7B4843796B9151C35E2A4@dggemi502-mbs.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 09:27:50PM -0500, Samuel Holland wrote:
-> The Allwinner A64 SoC is known [1] to have an unstable architectural
-> timer, which manifests itself most obviously in the time jumping forward
-> a multiple of 95 years [2][3]. This coincides with 2^56 cycles at a
-> timer frequency of 24 MHz, implying that the time went slightly backward
-> (and this was interpreted by the kernel as it jumping forward and
-> wrapping around past the epoch).
-> 
-> Further investigation revealed instability in the low bits of CNTVCT at
-> the point a high bit rolls over. This leads to power-of-two cycle
-> forward and backward jumps. (Testing shows that forward jumps are about
-> twice as likely as backward jumps.)
-> 
-> Without trapping reads to CNTVCT, a userspace program is able to read it
-> in a loop faster than it changes. A test program running on all 4 CPU
-> cores that reported jumps larger than 100 ms was run for 13.6 hours and
-> reported the following:
-> 
->  Count | Event
-> -------+---------------------------
->   9940 | jumped backward      699ms
->    268 | jumped backward     1398ms
->      1 | jumped backward     2097ms
->  16020 | jumped forward       175ms
->   6443 | jumped forward       699ms
->   2976 | jumped forward      1398ms
->      9 | jumped forward    356516ms
->      9 | jumped forward    357215ms
->      4 | jumped forward    714430ms
->      1 | jumped forward   3578440ms
-> 
-> This works out to a jump larger than 100 ms about every 5.5 seconds on
-> each CPU core.
-> 
-> The largest jump (almost an hour!) was the following sequence of reads:
->       0x0000007fffffffff ? 0x00000093feffffff ? 0x0000008000000000
-> 
-> Note that the middle bits don't necessarily all read as all zeroes or
-> all ones during the anomalous behavior; however the low 11 bits checked
-> by the function in this patch have never been observed with any other
-> value.
-> 
-> Also note that smaller jumps are much more common, with the smallest
-> backward jumps of 2048 cycles observed over 400 times per second on each
-> core. (Of course, this is partially due to lower bits rolling over more
-> frequently.) Any one of these could have caused the 95 year time skip.
-> 
-> Similar anomalies were observed while reading CNTPCT (after patching the
-> kernel to allow reads from userspace). However, the jumps are much less
-> frequent, and only small jumps were observed. The same program as before
-> (except now reading CNTPCT) observed after 72 hours:
-> 
->  Count | Event
-> -------+---------------------------
->     17 | jumped backward      699ms
->     52 | jumped forward       175ms
->   2831 | jumped forward       699ms
->      5 | jumped forward      1398ms
-> 
-> ========================================================================
-> 
-> Because the CPU can read the CNTPCT/CNTVCT registers faster than they
-> change, performing two reads of the register and comparing the high bits
-> (like other workarounds) is not a workable solution. And because the
-> timer can jump both forward and backward, no pair of reads can
-> distinguish a good value from a bad one. The only way to guarantee a
-> good value from consecutive reads would be to read _three_ times, and
-> take the middle value iff the three values are 1) individually unique
-> and 2) increasing. This takes at minimum 3 cycles (125 ns), or more if
-> an anomaly is detected.
-> 
-> However, since there is a distinct pattern to the bad values, we can
-> optimize the common case (2046/2048 of the time) to a single read by
-> simply ignoring values that match the pattern. This still takes no more
-> than 3 cycles in the worst case, and requires much less code.
+Hi Bjorn,
 
-That's an awesome commit log, thanks!
+> 
+> [+cc Tejun, Wolfram]
+> 
+> On Wed, May 09, 2018 at 04:20:11PM +0800, Yao Chen wrote:
+> > Add support for MSI.
+> > ...
+> 
+> > @@ -448,6 +467,26 @@ static int kirin_pcie_host_init(struct pcie_port
+> > *pp)  static int __init kirin_add_pcie_port(struct dw_pcie *pci,
+> >  				      struct platform_device *pdev)  {
+> > +	int ret;
+> > +
+> > +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> > +		pci->pp.msi_irq = platform_get_irq(pdev, 0);
+> > +		if (!pci->pp.msi_irq) {
+> 
+> I think this test is incorrect.  platform_get_irq() returns a negative errno
+> value when it fails.  Most calls test "irq < 0" to check for failure.
+> 
+> There's a lot of duplicated code like this, so maybe we should consider
+> putting that check into devm_request_irq(), similar to what
+> devm_ioremap_resource() does, so the driver code could look like this:
+> 
+>   pci->pp.msi_irq = platform_get_irq(pdev, 0);
+>   ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq, ...);
+>   if (ret) {
+>     dev_err(&pdev->dev, "failed to request MSI IRQ\n");
+>     return ret;
+>   }
+> 
+> The basic devm_ioremap_resource() motivation is here: 72f8c0bfa0de ("lib:
+> devres: add convenience function to remap a resource") and the same
+> considerations seem to apply here.
+> 
+> But that's more than you need to do for *this* series.  So for now, I would
+> simply fix the test to check for "irq < 0" and update the messages as I
+> mention below.
 
-For both patches:
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Thank you for pointing out my mistake.  I'll fix it.
 
-> [1]: https://github.com/armbian/build/commit/a08cd6fe7ae9
-> [2]: https://forum.armbian.com/topic/3458-a64-datetime-clock-issue/
+> 
+> > +			dev_err(&pdev->dev, "failed to get msi irq[%d]\n",
+> > +				pci->pp.msi_irq);
+> > +			return -ENODEV;
+> > +		}
+> > +		ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
+> > +				       kirin_pcie_msi_irq_handler,
+> > +				       IRQF_SHARED | IRQF_NO_THREAD,
+> > +				       "kirin_pcie_msi", &pci->pp);
+> > +		if (ret) {
+> > +			dev_err(&pdev->dev, "failed to request msi
+> irq[%d]\n",
+> 
+> s/msi irq/MSI IRQ/ in both dev_err() messages above.  This is because the
+> message is English text (not code), and the convention is that non-words like
+> these initialisms written in all caps.
+> 
+> I would style the first one as "failed to get MSI IRQ (%d)" because the %d
+> there is a return code, probably -ENXIO.
+> 
+> The second one should be "failed to request MSI IRQ %d" because here
+> the %d is the actual IRQ.
+> 
 
-Sigh. So armbian knew about this for more than a year and had a fix,
-and didn't judge necessary to report it anywhere. That's some solid,
-responsible, development right there...
+I'll fix it. Thanks again.
 
-Maxime
+> > +				pci->pp.msi_irq);
+> > +			return ret;
+> > +		}
+> > +	}
+> > +
+> >  	pci->pp.ops = &kirin_pcie_host_ops;
+> >
+> >  	return dw_pcie_host_init(&pci->pp);
+> > --
+> > 1.9.1
+> >
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180511/3e662f74/attachment-0001.sig>
+Best regards,
+Yao
