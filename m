@@ -1,202 +1,753 @@
 From: evgreen@chromium.org (Evan Green)
-Date: Fri, 11 May 2018 14:29:42 -0700
-Subject: [PATCH v4 5/7] interconnect: qcom: Add msm8916 interconnect
- provider driver
-In-Reply-To: <20180309210958.16672-6-georgi.djakov@linaro.org>
+Date: Fri, 11 May 2018 14:30:48 -0700
+Subject: [PATCH v4 1/7] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <20180309210958.16672-2-georgi.djakov@linaro.org>
 References: <20180309210958.16672-1-georgi.djakov@linaro.org>
- <20180309210958.16672-6-georgi.djakov@linaro.org>
-Message-ID: <CAE=gft4LT_JSGytuiSx5uwzfeGc0DK140+D4c_J8FVUHioHdcg@mail.gmail.com>
+ <20180309210958.16672-2-georgi.djakov@linaro.org>
+Message-ID: <CAE=gft76VpU1mXgNPK9-XTj6WoLHj-_SxAGuV-bUSNYVpfSn6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Georgi,
 
-On Fri, Mar 9, 2018 at 1:11 PM Georgi Djakov <georgi.djakov@linaro.org>
+On Fri, Mar 9, 2018 at 1:12 PM Georgi Djakov <georgi.djakov@linaro.org>
 wrote:
 
-> Add driver for the Qualcomm interconnect buses found in msm8916 based
-> platforms.
+> This patch introduce a new API to get requirements and configure the
+> interconnect buses across the entire chipset to fit with the current
+> demand.
+
+> The API is using a consumer/provider-based model, where the providers are
+> the interconnect buses and the consumers could be various drivers.
+> The consumers request interconnect resources (path) between endpoints and
+> set the desired constraints on this data flow path. The providers receive
+> requests from consumers and aggregate these requests for all master-slave
+> pairs on that path. Then the providers configure each participating in the
+> topology node according to the requested data flow path, physical links
+and
+> constraints. The topology could be complicated and multi-tiered and is SoC
+> specific.
 
 > Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 > ---
->    drivers/interconnect/Kconfig        |   5 +
->    drivers/interconnect/Makefile       |   1 +
->    drivers/interconnect/qcom/Kconfig   |  11 +
->    drivers/interconnect/qcom/Makefile  |   2 +
->    drivers/interconnect/qcom/msm8916.c | 482
-++++++++++++++++++++++++++++++++++++
->    include/linux/interconnect/qcom.h   | 350 ++++++++++++++++++++++++++
->    6 files changed, 851 insertions(+)
->    create mode 100644 drivers/interconnect/qcom/Kconfig
->    create mode 100644 drivers/interconnect/qcom/msm8916.c
->    create mode 100644 include/linux/interconnect/qcom.h
+>   Documentation/interconnect/interconnect.rst |  96 ++++++
+>   drivers/Kconfig                             |   2 +
+>   drivers/Makefile                            |   1 +
+>   drivers/interconnect/Kconfig                |  10 +
+>   drivers/interconnect/Makefile               |   1 +
+>   drivers/interconnect/core.c                 | 489
+++++++++++++++++++++++++++++
+>   include/linux/interconnect-provider.h       | 109 +++++++
+>   include/linux/interconnect.h                |  40 +++
+>   8 files changed, 748 insertions(+)
+>   create mode 100644 Documentation/interconnect/interconnect.rst
+>   create mode 100644 drivers/interconnect/Kconfig
+>   create mode 100644 drivers/interconnect/Makefile
+>   create mode 100644 drivers/interconnect/core.c
+>   create mode 100644 include/linux/interconnect-provider.h
+>   create mode 100644 include/linux/interconnect.h
+
 ...
-> diff --git a/drivers/interconnect/qcom/msm8916.c
-b/drivers/interconnect/qcom/msm8916.c
+> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
 > new file mode 100644
-> index 000000000000..d5b54f8261c8
+> index 000000000000..6306e258b9b9
 > --- /dev/null
-> +++ b/drivers/interconnect/qcom/msm8916.c
-...
-> +static int qnoc_probe(struct platform_device *pdev)
-> +{
-> +       const struct qcom_icc_desc *desc;
-> +       struct qcom_icc_node **qnodes;
-> +       struct qcom_icc_provider *qp;
-> +       struct resource *res;
-> +       struct icc_provider *provider;
-> +       size_t num_nodes, i;
-> +       int ret;
-> +
-> +       /* wait for RPM */
-> +       if (!qcom_icc_rpm_smd_available())
-> +               return -EPROBE_DEFER;
-> +
-> +       desc = of_device_get_match_data(&pdev->dev);
-> +       if (!desc)
-> +               return -EINVAL;
-> +
-> +       qnodes = desc->nodes;
-> +       num_nodes = desc->num_nodes;
-> +
-> +       qp = devm_kzalloc(&pdev->dev, sizeof(*qp), GFP_KERNEL);
-> +       if (!qp)
-> +               return -ENOMEM;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       qp->base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(qp->base))
-> +               return PTR_ERR(qp->base);
-> +
-> +       qp->bus_clk = devm_clk_get(&pdev->dev, "bus_clk");
-> +       if (IS_ERR(qp->bus_clk))
-> +               return PTR_ERR(qp->bus_clk);
-> +
-> +       qp->bus_a_clk = devm_clk_get(&pdev->dev, "bus_a_clk");
-> +       if (IS_ERR(qp->bus_a_clk))
-> +               return PTR_ERR(qp->bus_a_clk);
-> +
-> +       provider = &qp->provider;
-> +       provider->dev = &pdev->dev;
-> +       provider->set = &qcom_icc_set;
-> +       INIT_LIST_HEAD(&provider->nodes);
-> +       provider->data = qp;
-> +
-> +       ret = icc_add_provider(provider);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "error adding interconnect
-provider\n");
-> +               return ret;
-> +       }
-> +
-> +       for (i = 0; i < num_nodes; i++) {
-> +               struct icc_node *node;
-> +               int ret;
-> +               size_t j;
-> +
-> +               node = icc_node_create(qnodes[i]->id);
-> +               if (IS_ERR(node)) {
-> +                       ret = PTR_ERR(node);
-> +                       goto err;
-> +               }
-> +
-> +               node->name = qnodes[i]->name;
-> +               node->data = qnodes[i];
-> +               icc_node_add(node, provider);
-> +
-> +               dev_dbg(&pdev->dev, "registered node %p %s %d\n", node,
-> +                       qnodes[i]->name, node->id);
-> +
-> +               /* populate links */
-> +               for (j = 0; j < qnodes[i]->num_links; j++)
-> +                       if (qnodes[i]->links[j])
-> +                               icc_link_create(node,
-qnodes[i]->links[j]);
-> +
-> +               ret = qcom_icc_init(node);
-> +               if (ret)
-> +                       dev_err(&pdev->dev, "%s init error (%d)\n",
-node->name,
-> +                               ret);
-
-Don't you want to call qcom_icc_init before icc_link_create? As soon as
-icc_link_create is called, the node is connected to the graph, and
-qcom_icc_set can be called.
-
-> +       }
-> +
-> +       platform_set_drvdata(pdev, provider);
-> +
-> +       return ret;
-> +err:
-> +       icc_del_provider(provider);
-> +       return ret;
-> +}
-> +
-> +static int qnoc_remove(struct platform_device *pdev)
-> +{
-> +       struct icc_provider *provider = platform_get_drvdata(pdev);
-> +
-> +       icc_del_provider(provider);
-
-Presumably in the framework nodes and links ought to get cleaned up
-somewhere too, right? As it is now, the devm code frees provider when this
-device is removed, even though provider is still very connected in the
-graph via the nodes and links.
-
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id qnoc_of_match[] = {
-> +       { .compatible = "qcom,msm8916-pnoc", .data = &msm8916_pnoc },
-> +       { .compatible = "qcom,msm8916-snoc", .data = &msm8916_snoc },
-> +       { .compatible = "qcom,msm8916-bimc", .data = &msm8916_bimc },
-> +       { },
-> +};
-> +MODULE_DEVICE_TABLE(of, qnoc_of_match);
-> +
-> +static struct platform_driver qnoc_driver = {
-> +       .probe = qnoc_probe,
-> +       .remove = qnoc_remove,
-> +       .driver = {
-> +               .name = "qnoc-msm8916",
-> +               .of_match_table = qnoc_of_match,
-> +       },
-> +};
-> +module_platform_driver(qnoc_driver);
-> +MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org>");
-> +MODULE_DESCRIPTION("Qualcomm msm8916 NoC driver");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/interconnect/qcom.h
-b/include/linux/interconnect/qcom.h
-> new file mode 100644
-> index 000000000000..2cd378d2f575
-> --- /dev/null
-> +++ b/include/linux/interconnect/qcom.h
-> @@ -0,0 +1,350 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
+> +++ b/drivers/interconnect/core.c
+> @@ -0,0 +1,489 @@
+> +// SPDX-License-Identifier: GPL-2.0
 > +/*
-> + * Qualcomm interconnect IDs
+> + * Interconnect framework core driver
 > + *
 > + * Copyright (c) 2018, Linaro Ltd.
 > + * Author: Georgi Djakov <georgi.djakov@linaro.org>
 > + */
 > +
-> +#ifndef __QCOM_INTERCONNECT_IDS_H
-> +#define __QCOM_INTERCONNECT_IDS_H
+> +#include <linux/device.h>
+> +#include <linux/idr.h>
+> +#include <linux/init.h>
+> +#include <linux/interconnect.h>
+> +#include <linux/interconnect-provider.h>
+> +#include <linux/list.h>
+> +#include <linux/module.h>
+> +#include <linux/mutex.h>
+> +#include <linux/slab.h>
 > +
-> +#define FAB_BIMC 0
-> +#define FAB_SYS_NOC 1024
-> +#define FAB_MMSS_NOC 2048
-> +#define FAB_OCMEM_NOC 3072
-> +#define FAB_PERIPH_NOC 4096
-> +#define FAB_CONFIG_NOC 5120
-> +#define FAB_OCMEM_VNOC 6144
+> +static DEFINE_IDR(icc_idr);
+> +static LIST_HEAD(icc_provider_list);
+> +static DEFINE_MUTEX(icc_provider_list_mutex);
+> +static DEFINE_MUTEX(icc_path_mutex);
+> +
+> +/**
+> + * struct icc_req - constraints that are attached to each node
+> + *
+> + * @req_node: entry in list of requests for the particular @node
+> + * @node: the interconnect node to which this constraint applies
+> + * @avg_bw: an integer describing the average bandwidth in kbps
+> + * @peak_bw: an integer describing the peak bandwidth in kbps
+> + */
+> +struct icc_req {
+> +       struct hlist_node req_node;
+> +       struct icc_node *node;
+> +       u32 avg_bw;
+> +       u32 peak_bw;
+> +};
+> +
+> +/**
+> + * struct icc_path - interconnect path structure
+> + * @num_nodes: number of hops (nodes)
+> + * @reqs: array of the requests applicable to this path of nodes
+> + */
+> +struct icc_path {
+> +       size_t num_nodes;
+> +       struct icc_req reqs[0];
+> +};
+> +
+> +static struct icc_node *node_find(const int id)
+> +{
+> +       struct icc_node *node;
+> +
+> +       node = idr_find(&icc_idr, id);
+> +
+> +       return node;
+> +}
+> +
+> +static struct icc_path *path_allocate(struct icc_node *node, ssize_t
+num_nodes)
+> +{
 
-Looks like you're still following that downstream convention of NoCs being
-divisible by 1024, masters in 1-512, and slaves in 512-1023, then I don't
-know about the 10000s. This was documented somewhere downstream, can you
-add that documentation somewhere in here?
+So node is really the destination, correct? Then we use ->reverse to walk
+backwards num_nodes steps towards the source. It might increase readability
+to call the parameter dest, then assign that to a local called node for
+traversal.
+
+> +       struct icc_path *path;
+> +       size_t i;
+> +
+> +       path = kzalloc(sizeof(*path) + num_nodes * sizeof(*path->reqs),
+> +                      GFP_KERNEL);
+> +       if (!path)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       path->num_nodes = num_nodes;
+> +
+> +       for (i = 0; i < num_nodes; i++) {
+> +               hlist_add_head(&path->reqs[i].req_node, &node->req_list);
+> +
+> +               path->reqs[i].node = node;
+> +               /* reference to previous node was saved during path
+traversal */
+> +               node = node->reverse;
+> +       }
+> +
+> +       return path;
+> +}
+> +
+> +static struct icc_path *path_find(struct icc_node *src, struct icc_node
+*dst)
+> +{
+> +       struct icc_node *node = NULL;
+> +       struct list_head traverse_list;
+> +       struct list_head edge_list;
+> +       struct list_head tmp_list;
+> +       size_t i, number = 0;
+> +       bool found = false;
+> +
+> +       INIT_LIST_HEAD(&traverse_list);
+> +       INIT_LIST_HEAD(&edge_list);
+> +       INIT_LIST_HEAD(&tmp_list);
+
+tmp_list is really the list of nodes you've already visited and need to
+remember to reset is_traversed for. Maybe calling this done_list or
+visited_list would be more descriptive.
+
+> +
+> +       list_add_tail(&src->search_list, &traverse_list);
+
+For added paranoia, you could set src->reverse to NULL so that somebody
+elsewhere who had a bug in their back-traversal would fall off the end,
+rather than into some previous scrapped path.
+
+> +
+> +       do {
+> +               list_for_each_entry(node, &traverse_list, search_list) {
+> +                       if (node == dst) {
+> +                               found = true;
+> +                               list_add(&node->search_list, &tmp_list);
+> +                               break;
+> +                       }
+> +                       for (i = 0; i < node->num_links; i++) {
+> +                               struct icc_node *tmp = node->links[i];
+> +
+> +                               if (!tmp)
+> +                                       return ERR_PTR(-ENOENT);
+
+You just bail out here, but never clean up the nodes is_traversed, which
+will ruin later searches. Maybe a goto towards the common cleanup path?
+
+> +
+> +                               if (tmp->is_traversed)
+> +                                       continue;
+> +
+> +                               tmp->is_traversed = true;
+> +                               tmp->reverse = node;
+> +                               list_add_tail(&tmp->search_list,
+&edge_list);
+> +                       }
+> +               }
+> +               if (found)
+> +                       break;
+> +
+> +               list_splice_init(&traverse_list, &tmp_list);
+> +               list_splice_init(&edge_list, &traverse_list);
+> +
+> +               /* count the number of nodes */
+> +               number++;
+
+Depth might be a better name for this, since this really counts the hops
+away from the source, rather than the number of nodes you've processed.
+
+> +
+> +       } while (!list_empty(&traverse_list));
+> +
+> +       /* reset the traversed state */
+> +       list_for_each_entry(node, &tmp_list, search_list)
+> +               node->is_traversed = false;
+> +
+> +       if (found)
+> +               return path_allocate(dst, number);
+> +
+> +       return ERR_PTR(-EPROBE_DEFER);
+> +}
+> +
+> +static int path_init(struct icc_path *path)
+> +{
+> +       struct icc_node *node;
+> +       size_t i;
+> +
+> +       for (i = 0; i < path->num_nodes; i++) {
+> +               node = path->reqs[i].node;
+> +
+> +               mutex_lock(&node->provider->lock);
+> +               node->provider->users++;
+> +               mutex_unlock(&node->provider->lock);
+> +       }
+> +
+> +       return 0;
+> +}
+
+This function cannot fail, nor do you check its return value, so you should
+change the return type to void.
+
+I'm wondering if the locking here is a little sketchy. I was in the process
+of typing a suggestion that you call path_init from within path_find, since
+it seemed weird to have this gray zone of a path without its reference
+counts, when I noticed the locks.
+
+I can't evaluate fully, since the implementation seems to be missing
+icc_node_remove, a critical function in terms of evaluating the locks. You
+have an icc_del_provider, but its warning of if (provider->users) is pretty
+weak, since without node removal provider->users could easily be
+incremented after the provider lock is released. It also leaks all of its
+nodes, since there's no way to remove them.
+
+Here's my suggestion as far as the locking goes:
+* To add or remove links/nodes from the graph, you're going to need to hold
+a global lock to avoid colliding with traversals. You've already got an
+icc_path_mutex, so that would work.
+* icc_link_create needs to hold the global icc_path_mutex, since it's
+messing with arrays and connections used in path traversal, and doesn't
+need to hold the provider lock, since it's not changing anything there.
+* The presumably upcoming icc_link_destroy, or its parent icc_node_destroy,
+also needs to hold the global lock. node_destroy may also need the provider
+lock in symmetry with icc_node_add.
+* Provider->users will be protected under the global icc_path_mutex, rather
+than the provider lock. Then move path_init into path_find, or inline it
+into path_allocate.
+* Once you do that, provider->lock is now only protecting its node list.
+For now, it's probably more efficient to roll the protection of
+provider->nodes under the global lock as well, and remove the lock from the
+provider altogether. If you anticipate other functions in the future that
+will require a lock in the provider, then it might make sense to keep the
+lock, or maybe just add it later with that new functionality.
+
+> +
+> +static void node_aggregate(struct icc_node *node)
+> +{
+> +       struct icc_req *r;
+> +       u32 agg_avg = 0;
+> +       u32 agg_peak = 0;
+> +
+> +       hlist_for_each_entry(r, &node->req_list, req_node) {
+> +               /* sum(averages) and max(peaks) */
+> +               agg_avg += r->avg_bw;
+> +               agg_peak = max(agg_peak, r->peak_bw);
+> +       }
+> +
+> +       node->avg_bw = agg_avg;
+> +       node->peak_bw = agg_peak;
+> +}
+> +
+> +static void provider_aggregate(struct icc_provider *provider, u32
+*avg_bw,
+> +                              u32 *peak_bw)
+> +{
+> +       struct icc_node *n;
+> +       u32 agg_avg = 0;
+> +       u32 agg_peak = 0;
+> +
+> +       /* aggregate for the interconnect provider */
+> +       list_for_each_entry(n, &provider->nodes, node_list) {
+> +               /* sum the average and max the peak */
+> +               agg_avg += n->avg_bw;
+> +               agg_peak = max(agg_peak, n->peak_bw);
+> +       }
+> +
+> +       *avg_bw = agg_avg;
+> +       *peak_bw = agg_peak;
+> +}
+> +
+> +static int constraints_apply(struct icc_path *path)
+> +{
+
+Nit: maybe name it apply_constraints, since constraints_apply sounds like a
+query (do the constraints apply?).
+
+> +       struct icc_node *next, *prev = NULL;
+> +       int i;
+> +
+> +       for (i = 0; i < path->num_nodes; i++, prev = next) {
+> +               struct icc_provider *provider;
+> +               u32 avg_bw = 0;
+> +               u32 peak_bw = 0;
+> +               int ret;
+> +
+> +               next = path->reqs[i].node;
+> +               /*
+> +                * Both endpoints should be valid master-slave pairs of
+the
+> +                * same interconnect provider that will be configured.
+> +                */
+> +               if (!next || !prev)
+> +                       continue;
+> +
+> +               if (next->provider != prev->provider)
+> +                       continue;
+
+next should never be null, right? So you could shorten this to if (!prev ||
+(next->provider != prev->provider))
+
+> +
+> +               provider = next->provider;
+> +               mutex_lock(&provider->lock);
+> +
+> +               /* aggregate requests for the provider */
+> +               provider_aggregate(provider, &avg_bw, &peak_bw);
+> +
+> +               if (provider->set) {
+> +                       /* set the constraints */
+> +                       ret = provider->set(prev, next, avg_bw, peak_bw);
+> +               }
+> +
+> +               mutex_unlock(&provider->lock);
+> +
+> +               if (ret)
+> +                       return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +/**
+> + * icc_set() - set constraints on an interconnect path between two
+endpoints
+> + * @path: reference to the path returned by icc_get()
+> + * @avg_bw: average bandwidth in kbps
+> + * @peak_bw: peak bandwidth in kbps
+> + *
+> + * This function is used by an interconnect consumer to express its own
+needs
+> + * in term of bandwidth and QoS for a previously requested path between
+two
+
+"in terms of" rather than "in term of", and not really QoS yet, right?
+
+> + * endpoints. The requests are aggregated and each node is updated
+accordingly.
+> + *
+> + * Returns 0 on success, or an approproate error code otherwise.
+
+appropriate
+
+> + */
+> +int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw)
+> +{
+> +       struct icc_node *node;
+> +       size_t i;
+> +       int ret;
+> +
+> +       if (!path)
+> +               return 0;
+
+Can we ditch this null check? My understanding is it's generally preferred
+to skip this if it's only there to avoid developer errors.
+
+> +
+> +       for (i = 0; i < path->num_nodes; i++) {
+> +               node = path->reqs[i].node;
+> +
+> +               mutex_lock(&icc_path_mutex);
+> +
+> +               /* update the consumer request for this path */
+> +               path->reqs[i].avg_bw = avg_bw;
+> +               path->reqs[i].peak_bw = peak_bw;
+> +
+> +               /* aggregate requests for this node */
+> +               node_aggregate(node);
+> +
+> +               mutex_unlock(&icc_path_mutex);
+> +       }
+> +
+> +       ret = constraints_apply(path);
+> +       if (ret)
+> +               pr_err("interconnect: error applying constraints (%d)",
+ret);
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(icc_set);
+> +
+> +/**
+> + * icc_get() - return a handle for path between two endpoints
+> + * @src_id: source device port id
+> + * @dst_id: destination device port id
+> + *
+> + * This function will search for a path between two endpoints and return
+an
+> + * icc_path handle on success. Use icc_put() to release
+> + * constraints when the they are not needed anymore.
+> + *
+> + * Return: icc_path pointer on success, or ERR_PTR() on error
+> + */
+> +struct icc_path *icc_get(const int src_id, const int dst_id)
+> +{
+> +       struct icc_node *src, *dst;
+> +       struct icc_path *path = ERR_PTR(-EPROBE_DEFER);
+> +
+> +       src = node_find(src_id);
+> +       if (!src)
+> +               goto out;
+> +
+> +       dst = node_find(dst_id);
+> +       if (!dst)
+> +               goto out;
+> +
+> +       mutex_lock(&icc_path_mutex);
+> +       path = path_find(src, dst);
+> +       mutex_unlock(&icc_path_mutex);
+> +       if (IS_ERR(path))
+> +               goto out;
+> +
+> +       path_init(path);
+> +
+> +out:
+> +       return path;
+> +}
+> +EXPORT_SYMBOL_GPL(icc_get);
+> +
+> +/**
+> + * icc_put() - release the reference to the icc_path
+> + * @path: interconnect path
+> + *
+> + * Use this function to release the constraints on a path when the path
+is
+> + * no longer needed. The constraints will be re-aggregated.
+> + */
+> +void icc_put(struct icc_path *path)
+> +{
+> +       struct icc_node *node;
+> +       size_t i;
+> +       int ret;
+> +
+> +       if (!path || WARN_ON_ONCE(IS_ERR(path)))
+> +               return;
+> +
+> +       ret = icc_set(path, 0, 0);
+> +       if (ret)
+> +               pr_err("%s: error (%d)\n", __func__, ret);
+> +
+> +       for (i = 0; i < path->num_nodes; i++) {
+> +               node = path->reqs[i].node;
+> +               hlist_del(&path->reqs[i].req_node);
+> +
+> +               mutex_lock(&node->provider->lock);
+> +               node->provider->users--;
+> +               mutex_unlock(&node->provider->lock);
+> +       }
+> +
+> +       kfree(path);
+> +}
+> +EXPORT_SYMBOL_GPL(icc_put);
+> +
+> +/**
+> + * icc_node_create() - create a node
+> + * @id: node id
+> + *
+> + * Return: icc_node pointer on success, or ERR_PTR() on error
+> + */
+> +struct icc_node *icc_node_create(int id)
+> +{
+> +       struct icc_node *node;
+> +
+> +       /* check if node already exists */
+> +       node = node_find(id);
+> +       if (node)
+> +               return node;
+
+This is probably going to do more harm than good once icc_node_delete comes
+in, since it almost certainly indicates a programmer error or ID collision,
+and will likely result in a double free. We should probably fail with
+EEXIST instead.
+
+> +
+> +       node = kzalloc(sizeof(*node), GFP_KERNEL);
+> +       if (!node)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       id = idr_alloc(&icc_idr, node, id, id + 1, GFP_KERNEL);
+> +       if (WARN(id < 0, "couldn't get idr"))
+> +               return ERR_PTR(id);
+> +
+> +       node->id = id;
+> +
+> +       return node;
+> +}
+> +EXPORT_SYMBOL_GPL(icc_node_create);
+> +
+> +/**
+> + * icc_link_create() - create a link between two nodes
+> + * @src_id: source node id
+> + * @dst_id: destination node id
+> + *
+> + * Return: 0 on success, or an error code otherwise
+> + */
+> +int icc_link_create(struct icc_node *node, const int dst_id)
+> +{
+> +       struct icc_node *dst;
+> +       struct icc_node **new;
+> +       int ret = 0;
+> +
+> +       if (IS_ERR_OR_NULL(node))
+> +               return PTR_ERR(node);
+
+Remove this.
+
+> +
+> +       mutex_lock(&node->provider->lock);
+> +
+> +       dst = node_find(dst_id);
+> +       if (!dst)
+> +               dst = icc_node_create(dst_id);
+
+icc_node_create can fail, you should fail here if it does.
+
+> +
+> +       new = krealloc(node->links,
+> +                      (node->num_links + 1) * sizeof(*node->links),
+> +                      GFP_KERNEL);
+> +       if (!new) {
+> +               ret = -ENOMEM;
+> +               goto out;
+> +       }
+> +
+> +       node->links = new;
+> +       node->links[node->num_links++] = dst;
+> +
+> +out:
+> +       mutex_unlock(&node->provider->lock);
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(icc_link_create);
+> +
+> +/**
+> + * icc_add_node() - add an interconnect node to interconnect provider
+> + * @node: pointer to the interconnect node
+> + * @provider: pointer to the interconnect provider
+> + *
+> + * Return: 0 on success, or an error code otherwise
+> + */
+> +int icc_node_add(struct icc_node *node, struct icc_provider *provider)
+> +{
+> +       if (WARN_ON(!node))
+> +               return -EINVAL;
+> +
+> +       if (WARN_ON(!provider))
+> +               return -EINVAL;
+
+Remove these.
+
+> +
+> +       node->provider = provider;
+> +
+> +       mutex_lock(&provider->lock);
+> +       list_add_tail(&node->node_list, &provider->nodes);
+> +       mutex_unlock(&provider->lock);
+> +
+> +       return 0;
+> +}
+
+icc_node_add should be exported, right? I see it being used in msm8916.c.
+You should make sure that "make allmodconfig" still builds with your
+changes.
+
+I think you should add a safety check in icc_link_create to ensure that the
+node has a provider before adding any links. If some consumer made a
+mistake and added links before adding the node to the provider, path
+traversal would use the uninitialized or NULL provider pointer. I was
+thinking about this while noticing that you assign node->provider before
+acquiring the lock.
+
+> +
+> +/**
+> + * icc_add_provider() - add a new interconnect provider
+> + * @icc_provider: the interconnect provider that will be added into
+topology
+> + *
+> + * Return: 0 on success, or an error code otherwise
+> + */
+> +int icc_add_provider(struct icc_provider *provider)
+> +{
+> +       if (WARN_ON(!provider))
+> +               return -EINVAL;
+> +
+
+Remove this one. The one below is okay.
+
+> +       if (WARN_ON(!provider->set))
+> +               return -EINVAL;
+> +
+> +       mutex_init(&provider->lock);
+> +       INIT_LIST_HEAD(&provider->nodes);
+> +
+> +       mutex_lock(&icc_provider_list_mutex);
+> +       list_add(&provider->provider_list, &icc_provider_list);
+> +       mutex_unlock(&icc_provider_list_mutex);
+> +
+> +       dev_dbg(provider->dev, "interconnect provider added to
+topology\n");
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(icc_add_provider);
+> +
+> +/**
+> + * icc_del_provider() - delete previously added interconnect provider
+> + * @icc_provider: the interconnect provider that will be removed from
+topology
+> + *
+> + * Return: 0 on success, or an error code otherwise
+> + */
+> +int icc_del_provider(struct icc_provider *provider)
+> +{
+> +       mutex_lock(&provider->lock);
+> +       if (provider->users) {
+> +               pr_warn("interconnect provider still has %d users\n",
+> +                       provider->users);
+> +       }
+> +       mutex_unlock(&provider->lock);
+> +
+> +       mutex_lock(&icc_provider_list_mutex);
+> +       list_del(&provider->provider_list);
+> +       mutex_unlock(&icc_provider_list_mutex);
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(icc_del_provider);
+> +
+> +MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org");
+> +MODULE_DESCRIPTION("Interconnect Driver Core");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/interconnect-provider.h
+b/include/linux/interconnect-provider.h
+> new file mode 100644
+> index 000000000000..779b5b5b1306
+> --- /dev/null
+> +++ b/include/linux/interconnect-provider.h
+> @@ -0,0 +1,109 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (c) 2018, Linaro Ltd.
+> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
+> + */
+> +
+> +#ifndef _LINUX_INTERCONNECT_PROVIDER_H
+> +#define _LINUX_INTERCONNECT_PROVIDER_H
+> +
+> +#include <linux/interconnect.h>
+> +
+> +struct icc_node;
+> +
+> +/**
+> + * struct icc_provider - interconnect provider (controller) entity that
+might
+> + * provide multiple interconnect controls
+> + *
+> + * @provider_list: list of the registered interconnect providers
+> + * @nodes: internal list of the interconnect provider nodes
+> + * @set: pointer to device specific set operation function
+> + * @dev: the device this interconnect provider belongs to
+> + * @lock: lock to provide consistency during aggregation/update of
+constraints
+> + * @users: count of active users
+> + * @data: pointer to private data
+> + */
+> +struct icc_provider {
+> +       struct list_head        provider_list;
+> +       struct list_head        nodes;
+> +       int (*set)(struct icc_node *src, struct icc_node *dst,
+> +                  u32 avg_bw, u32 peak_bw);
+> +       struct device           *dev;
+> +       struct mutex            lock;
+> +       int                     users;
+> +       void                    *data;
+> +};
+> +
+> +/**
+> + * struct icc_node - entity that is part of the interconnect topology
+> + *
+> + * @id: platform specific node id
+> + * @name: node name used in debugfs
+> + * @links: a list of targets where we can go next when traversing
+> + * @num_links: number of links to other interconnect nodes
+> + * @provider: points to the interconnect provider of this node
+> + * @node_list: list of interconnect nodes associated with @provider
+> + * @search_list: list used when walking the nodes graph
+> + * @reverse: pointer to previous node when walking the nodes graph
+> + * @is_traversed: flag that is used when walking the nodes graph
+> + * @req_list: a list of QoS constraint requests associated with this node
+> + * @avg_bw: aggregated value of average bandwidth
+> + * @peak_bw: aggregated value of peak bandwidth
+> + * @data: pointer to private data
+> + */
+> +struct icc_node {
+> +       int                     id;
+
+Why int here? Are you expecting negative numbers? Maybe u32 instead? Or
+even better, maybe a typedef u32 icc_id? Ooh yeah, that way we know when
+parameters and such are passed around that they refer to this.
+
+> +       const char              *name;
+> +       struct icc_node         **links;
+> +       size_t                  num_links;
+> +
+> +       struct icc_provider     *provider;
+> +       struct list_head        node_list;
+
+So the difference between node_list and links is that node_list nodes live
+inside this node, whereas links point at other peers?
+
+Oh no, I get it now after reading the .c file: node_list is the list entry
+in the parent provider's "nodes" list. The comment description could be
+clearer about that.
 
 -Evan
