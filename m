@@ -1,41 +1,54 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 11 May 2018 13:25:02 +0200
-Subject: [PATCH v2 2/2] soc: mediatek: reuse regmap_read_poll_timeout
- helpers
-In-Reply-To: <ed866d3345a27b2c87b570562d9ad9132bca6062.1524465345.git.sean.wang@mediatek.com>
-References: <ccea364eeb830b2092987d271c8308b97fe59d8f.1524465345.git.sean.wang@mediatek.com>
- <ed866d3345a27b2c87b570562d9ad9132bca6062.1524465345.git.sean.wang@mediatek.com>
-Message-ID: <68d230e8-2f9f-ae84-95d0-d8bf22f8f43b@gmail.com>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Fri, 11 May 2018 13:25:23 +0200
+Subject: [PATCH 2/3] arm64: dts: renesas: r8a77995: Add VIN4
+In-Reply-To: <1526032802-14376-3-git-send-email-jacopo+renesas@jmondi.org>
+References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526032802-14376-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180511112523.GK18974@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi Jacopo,
 
-On 04/23/2018 08:42 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Reuse the common helpers regmap_read_poll_timeout provided by Linux core
-> instead of an open-coded handling.
-> 
-> v1 -> v2:
->  - use macro definitions MTK_POLL_DELAY_US and MTK_POLL_TIMEOUT for
->    arguments sleep_us and timeout_us passing in regmap_read_poll_timeout.
->  - remove unnecessary linux/iopoll.h being included in.
-> 
+Thanks for your work.
 
-I just realized that you wrote the changelog here, which will make it show up in
-the commit log. Thant's not what we want... (see below)
+On 2018-05-11 12:00:01 +0200, Jacopo Mondi wrote:
+> Describe VIN4 interface for R-Car D3 R8A77995 SoC.
+> 
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Weiyi Lu <weiyi.lu@mediatek.com>
+Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
 > ---
->  drivers/soc/mediatek/mtk-infracfg.c | 46 ++++++++++---------------------------
->  1 file changed, 12 insertions(+), 34 deletions(-)
+>  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> index 82aed7e..bdf7017 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> @@ -783,6 +783,17 @@
+>  				};
+>  			};
+>  		};
+> +
+> +		vin4: video at e6ef4000 {
+> +			compatible = "renesas,vin-r8a77995";
+> +			reg = <0 0xe6ef4000 0 0x1000>;
+> +			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 807>;
+> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+> +			resets = <&cpg 807>;
+> +			renesas,id = <4>;
+> +			status = "disabled";
+> +		};
+>  	};
+>  
+>  	timer {
+> -- 
+> 2.7.4
 > 
 
-Please write your changelog here in the future.
-I'll fix that up in my tree now, but please remember the next time :)
-Thanks
-Matthias
+-- 
+Regards,
+Niklas S?derlund
