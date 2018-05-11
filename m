@@ -1,39 +1,41 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 11 May 2018 12:03:15 -0500
-Subject: [PATCH 0/6] hwspinlock: Convert to use SPDX license identifiers
-Message-ID: <20180511170321.2452-1-s-anna@ti.com>
+Date: Fri, 11 May 2018 12:03:21 -0500
+Subject: [PATCH 6/6] hwspinlock: sprd: Switch to SPDX license identifier
+In-Reply-To: <20180511170321.2452-1-s-anna@ti.com>
+References: <20180511170321.2452-1-s-anna@ti.com>
+Message-ID: <20180511170321.2452-7-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Use the appropriate SPDX license identifiers in the Spreadtrum hardware
+spinlock driver source file and drop the previous boilerplate license text.
 
-The following series switches over the current licensing text in
-various HwSpinlock drivers to the SPDX licensing format. Please
-let me know if you need any changes. If you are ok with the changes,
-I will make similar changes to the remoteproc and rpmsg drivers and
-post them at the earliest so that they can be picked up for 4.18.
+Cc: Baolin Wang <baolin.wang@spreadtrum.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ drivers/hwspinlock/sprd_hwspinlock.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-regards
-Suman
-
-Suman Anna (6):
-  hwspinlock/core: Switch to SPDX license identifier
-  hwspinlock/omap: Switch to SPDX license identifier
-  hwspinlock: qcom: Switch to SPDX license identifier
-  hwspinlock/sirf: Switch to SPDX license identifier
-  hwspinlock/u8500: Switch to SPDX license identifier
-  hwspinlock: sprd: Switch to SPDX license identifier
-
- drivers/hwspinlock/Kconfig               |  1 +
- drivers/hwspinlock/hwspinlock_core.c     | 10 +---------
- drivers/hwspinlock/hwspinlock_internal.h | 10 +---------
- drivers/hwspinlock/omap_hwspinlock.c     | 10 +---------
- drivers/hwspinlock/qcom_hwspinlock.c     | 10 +---------
- drivers/hwspinlock/sirf_hwspinlock.c     |  3 +--
- drivers/hwspinlock/sprd_hwspinlock.c     | 10 +---------
- drivers/hwspinlock/u8500_hsem.c          | 10 +---------
- include/linux/hwspinlock.h               | 10 +---------
- 9 files changed, 9 insertions(+), 65 deletions(-)
-
+diff --git a/drivers/hwspinlock/sprd_hwspinlock.c b/drivers/hwspinlock/sprd_hwspinlock.c
+index 638e64ac18f5..dc42bf51f3e6 100644
+--- a/drivers/hwspinlock/sprd_hwspinlock.c
++++ b/drivers/hwspinlock/sprd_hwspinlock.c
+@@ -1,15 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Spreadtrum hardware spinlock driver
+  * Copyright (C) 2017 Spreadtrum  - http://www.spreadtrum.com
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
+  */
+ 
+ #include <linux/bitops.h>
 -- 
 2.17.0
