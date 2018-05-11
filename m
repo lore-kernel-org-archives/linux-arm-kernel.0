@@ -1,63 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 11 May 2018 03:55:15 +0100 (BST)
-Subject: Applied "ASoC: zx-i2s: fix spelling mistake: "timeing" -> "timing""
- to the asoc tree
-Message-ID: <20180511025516.0816E440084@finisterre.ee.mobilebroadband>
+From: udknight@gmail.com (Wang YanQing)
+Date: Fri, 11 May 2018 10:52:17 +0800
+Subject: [PATCH v2] bpf, arm32: Fix inconsistent naming about
+ emit_a32_lsr_r64|emit_a32_lsr_i64
+Message-ID: <20180511025217.GA7621@udknight>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+The names for BPF_ALU64 | BPF_ARSH are emit_a32_arsh_*,
+the names for BPF_ALU64 | BPF_LSH are emit_a32_lsh_*, but
+the names for BPF_ALU64 | BPF_RSH are emit_a32_lsr_*.
 
-   ASoC: zx-i2s: fix spelling mistake: "timeing" -> "timing"
+For consistence reason, let's rename emit_a32_lsr_* to
+emit_a32_rsh_*.
 
-has been applied to the asoc tree at
+This patch also correct a wrong comment.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From d165b5a86fcad715aea1f164186224fe0c2f57f3 Mon Sep 17 00:00:00 2001
-From: Colin Ian King <colin.king@canonical.com>
-Date: Thu, 10 May 2018 15:58:38 +0100
-Subject: [PATCH] ASoC: zx-i2s: fix spelling mistake: "timeing" -> "timing"
-
-Trivial fix to spelling mistake in dev_err message text
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Wang YanQing <udknight@gmail.com>
 ---
- sound/soc/zte/zx-i2s.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Changes v1-v2:
+ 1:Rewords the changelog.
 
-diff --git a/sound/soc/zte/zx-i2s.c b/sound/soc/zte/zx-i2s.c
-index 9a0565937d1f..b6b056c607fa 100644
---- a/sound/soc/zte/zx-i2s.c
-+++ b/sound/soc/zte/zx-i2s.c
-@@ -197,7 +197,7 @@ static int zx_i2s_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- 		val |= (ZX_I2S_TIMING_I2S | ZX_I2S_TIMING_LSB_JUSTIF);
- 		break;
- 	default:
--		dev_err(cpu_dai->dev, "Unknown i2s timeing\n");
-+		dev_err(cpu_dai->dev, "Unknown i2s timing\n");
- 		return -EINVAL;
+ arch/arm/net/bpf_jit_32.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index b5030e1..caccc78 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -708,7 +708,7 @@ static inline void emit_a32_arsh_r64(const u8 dst[], const u8 src[], bool dstk,
+ }
+ 
+ /* dst = dst >> src */
+-static inline void emit_a32_lsr_r64(const u8 dst[], const u8 src[], bool dstk,
++static inline void emit_a32_rsh_r64(const u8 dst[], const u8 src[], bool dstk,
+ 				     bool sstk, struct jit_ctx *ctx) {
+ 	const u8 *tmp = bpf2a32[TMP_REG_1];
+ 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
+@@ -724,7 +724,7 @@ static inline void emit_a32_lsr_r64(const u8 dst[], const u8 src[], bool dstk,
+ 		emit(ARM_LDR_I(rm, ARM_SP, STACK_VAR(dst_hi)), ctx);
  	}
  
+-	/* Do LSH operation */
++	/* Do RSH operation */
+ 	emit(ARM_RSB_I(ARM_IP, rt, 32), ctx);
+ 	emit(ARM_SUBS_I(tmp2[0], rt, 32), ctx);
+ 	emit(ARM_MOV_SR(ARM_LR, rd, SRTYPE_LSR, rt), ctx);
+@@ -774,7 +774,7 @@ static inline void emit_a32_lsh_i64(const u8 dst[], bool dstk,
+ }
+ 
+ /* dst = dst >> val */
+-static inline void emit_a32_lsr_i64(const u8 dst[], bool dstk,
++static inline void emit_a32_rsh_i64(const u8 dst[], bool dstk,
+ 				    const u32 val, struct jit_ctx *ctx) {
+ 	const u8 *tmp = bpf2a32[TMP_REG_1];
+ 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
+@@ -1330,7 +1330,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 	case BPF_ALU64 | BPF_RSH | BPF_K:
+ 		if (unlikely(imm > 63))
+ 			return -EINVAL;
+-		emit_a32_lsr_i64(dst, dstk, imm, ctx);
++		emit_a32_rsh_i64(dst, dstk, imm, ctx);
+ 		break;
+ 	/* dst = dst << src */
+ 	case BPF_ALU64 | BPF_LSH | BPF_X:
+@@ -1338,7 +1338,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 		break;
+ 	/* dst = dst >> src */
+ 	case BPF_ALU64 | BPF_RSH | BPF_X:
+-		emit_a32_lsr_r64(dst, src, dstk, sstk, ctx);
++		emit_a32_rsh_r64(dst, src, dstk, sstk, ctx);
+ 		break;
+ 	/* dst = dst >> src (signed) */
+ 	case BPF_ALU64 | BPF_ARSH | BPF_X:
 -- 
-2.17.0
+1.8.5.6.2.g3d8a54e.dirty
