@@ -1,54 +1,40 @@
 From: yinbo.zhu@nxp.com (Yinbo Zhu)
-Date: Fri, 11 May 2018 11:35:23 +0800
-Subject: [PATCH 2/9] armv8: pm: Fix issue of rcpm driver wrongly program other
- IP control bits
+Date: Fri, 11 May 2018 11:35:25 +0800
+Subject: [PATCH 4/9] arm64: dts: ls208xa: Add the identify of the platform to
+ support to set rcpm bit
 In-Reply-To: <20180511033530.7931-1-yinbo.zhu@nxp.com>
 References: <20180511033530.7931-1-yinbo.zhu@nxp.com>
-Message-ID: <20180511033530.7931-2-yinbo.zhu@nxp.com>
+Message-ID: <20180511033530.7931-4-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ran Wang <ran.wang_1@nxp.com>
+From: Zhang Ying-22455 <ying.zhang22455@nxp.com>
 
-When rcpm driver get target register data from DTS property 'fsl,
-rcpm-wakeup' (second value), it directly write that data to register
-RCPM_IPPDEXPCRx rather than 'OR' the value read from it before. This
-operation will over-write those non-related IP control bit which
-might have been programmed, should be prevented.
+Add the identify of the platform to support set the rcpm with
+big-endian or little-endian.
 
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
+Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
 ---
- drivers/soc/fsl/rcpm.c |   10 +++++++---
- 1 files changed, 7 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/soc/fsl/rcpm.c b/drivers/soc/fsl/rcpm.c
-index ff0477b..39eabfb 100644
---- a/drivers/soc/fsl/rcpm.c
-+++ b/drivers/soc/fsl/rcpm.c
-@@ -75,6 +75,7 @@ static void rcpm_wakeup_fixup(struct device *dev, void *data)
- static int rcpm_suspend_prepare(void)
- {
- 	int i;
-+	u32 val;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+index fec61af..973e646 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+@@ -896,9 +896,11 @@
+ 		};
  
- 	WARN_ON(!rcpm);
+ 		ftm0: ftm0 at 2800000 {
+-			compatible = "fsl,ftm-alarm";
+-			reg = <0x0 0x2800000 0x0 0x10000>;
++			compatible = "fsl,ls208xa-ftm";
++			reg = <0x0 0x2800000 0x0 0x10000>,
++			      <0x0 0x1e34050 0x0 0x4>;
+ 			interrupts = <0 44 4>;
++			reg-names = "ftm", "FlexTimer1";
+ 		};
+ 	};
  
-@@ -84,9 +85,12 @@ static int rcpm_suspend_prepare(void)
- 	dpm_for_each_dev(NULL, rcpm_wakeup_fixup);
- 
- 	for (i = 0; i < rcpm->ipp_num; i++) {
--		rcpm_reg_write(rcpm->ippdexpcr_offset + 4 * i,
--			       rcpm->ippdexpcr[i]);
--		pr_debug("ippdexpcr%d = 0x%x\n", i, rcpm->ippdexpcr[i]);
-+		if (rcpm->ippdexpcr[i]) {
-+			val = rcpm_reg_read(rcpm->ippdexpcr_offset + 4 * i);
-+			rcpm_reg_write(rcpm->ippdexpcr_offset + 4 * i,
-+					       val | rcpm->ippdexpcr[i]);
-+			pr_debug("ippdexpcr%d = 0x%x\n", i, rcpm->ippdexpcr[i]);
-+		}
- 	}
- 
- 	return 0;
 -- 
 1.7.1
