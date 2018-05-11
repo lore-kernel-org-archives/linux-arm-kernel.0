@@ -1,54 +1,47 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Fri, 11 May 2018 11:30:46 +0800
-Subject: [PATCH v1 01/13] dt-bindings: power: add RK3036 SoCs header for
- power-domain
+Date: Fri, 11 May 2018 11:30:47 +0800
+Subject: [PATCH v1 02/13] dt-bindings: add binding for rk3036 power domains
 In-Reply-To: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
 References: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1526009458-28579-2-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1526009458-28579-3-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to a description from TRM, add all the power domains.
+Add binding documentation for the power domains
+found on Rockchip RK3036 SoCs.
 
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
- include/dt-bindings/power/rk3036-power.h | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 include/dt-bindings/power/rk3036-power.h
+ Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/include/dt-bindings/power/rk3036-power.h b/include/dt-bindings/power/rk3036-power.h
-new file mode 100644
-index 000000000000..59e09f1c5af7
---- /dev/null
-+++ b/include/dt-bindings/power/rk3036-power.h
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (c) 2017 Rockchip Electronics Co. Ltd.
-+ * Author: Caesar Wang <wxt@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __DT_BINDINGS_POWER_RK3036_POWER_H__
-+#define __DT_BINDINGS_POWER_RK3036_POWER_H__
-+
-+#define RK3036_PD_MSCH		0
-+#define RK3036_PD_CORE		1
-+#define RK3036_PD_PERI		2
-+#define RK3036_PD_VIO		3
-+#define RK3036_PD_VPU		4
-+#define RK3036_PD_GPU		5
-+#define RK3036_PD_SYS		6
-+
-+#endif
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+index 301d2a9bc1b8..79924ee9ae86 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+@@ -5,6 +5,7 @@ powered up/down by software based on different application scenes to save power.
+ 
+ Required properties for power domain controller:
+ - compatible: Should be one of the following.
++	"rockchip,rk3036-power-controller" - for RK3036 SoCs.
+ 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+ 	"rockchip,rk3328-power-controller" - for RK3328 SoCs.
+ 	"rockchip,rk3366-power-controller" - for RK3366 SoCs.
+@@ -17,6 +18,7 @@ Required properties for power domain controller:
+ 
+ Required properties for power domain sub nodes:
+ - reg: index of the power domain, should use macros in:
++	"include/dt-bindings/power/rk3036-power.h" - for RK3036 type power domain.
+ 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+ 	"include/dt-bindings/power/rk3328-power.h" - for RK3328 type power domain.
+ 	"include/dt-bindings/power/rk3366-power.h" - for RK3366 type power domain.
+@@ -93,6 +95,7 @@ Node of a device using power domains must have a power-domains property,
+ containing a phandle to the power device node and an index specifying which
+ power domain to use.
+ The index should use macros in:
++	"include/dt-bindings/power/rk3036-power.h" - for rk3036 type power domain.
+ 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
+ 	"include/dt-bindings/power/rk3328-power.h" - for rk3328 type power domain.
+ 	"include/dt-bindings/power/rk3366-power.h" - for rk3366 type power domain.
 -- 
 1.9.1
