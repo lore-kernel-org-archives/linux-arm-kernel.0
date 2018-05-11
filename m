@@ -1,45 +1,50 @@
-From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Fri, 11 May 2018 11:59:59 +0200
-Subject: [PATCH 0/3] arm64: dts: Draak: Enable HDMI input and VIN4
-Message-ID: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
+From: steve.capper@arm.com (Steve Capper)
+Date: Fri, 11 May 2018 11:11:05 +0100
+Subject: [PATCH v3 6/8] arm64: module-plts: Extend veneer to address
+ 52-bit VAs
+In-Reply-To: <CAKv+Gu_unCnhqE_Ort0zOjBj_ZmWja5unGON6KBuRxJzdhc5jA@mail.gmail.com>
+References: <20180510162347.3858-1-steve.capper@arm.com>
+ <20180510162347.3858-7-steve.capper@arm.com>
+ <CAKv+Gu_unCnhqE_Ort0zOjBj_ZmWja5unGON6KBuRxJzdhc5jA@mail.gmail.com>
+Message-ID: <20180511101104.6cv5mvqc6juh2mgt@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-   this series enables HDMI input and VIN4 on R-Car D3 Draak board.
+On Fri, May 11, 2018 at 12:01:05AM +0200, Ard Biesheuvel wrote:
+> On 10 May 2018 at 18:23, Steve Capper <steve.capper@arm.com> wrote:
+> > From: Ard Bieusheuval <ard.biesheuvel@linaro.org>
+> >
+> > In preparation for 52-bit VA support in the Linux kernel, we extend the
+> > plts veneer to support 52-bit addresses via an extra movk instruction.
+> >
+> > [Steve: code from Ard off-list, changed the #ifdef logic to inequality]
+> > Signed-off-by: Steve Capper <steve.capper@arm.com>
+> >
+> > ---
+> >
+> > New in V3 of the series.
+> >
+> > I'm not sure if this is strictly necessary as the VAs of the module
+> > space will fit within 48-bits of addressing even when a 52-bit VA space
+> > is enabled.
+> 
+> What about the kernel text itself? Is that also guaranteed to have
+> bits [51:48] of its VAs equal 0xf, even under randomization?
+> 
+> If so, I agree we don't need the patch.
+> 
 
-The Draak board has an HDMI input connected to an HDMI decoder that feeds
-the VIN capture interface through its parallel video interface.
+Hi Ard,
+The kernel modules and text are guaranteed to have addresses greater
+than or equal to KASAN_SHADOW_END (same for both 48, 52-bit VAs) or
+_VA_START(VA_BITS_MIN) (same for both 48, 52-bit VAs). Also, IIUC, the
+KASLR displacemnt is always non-negative?
 
-The series requires the just sent:
-[PATCH 0/5] rcar-vin: Add support for digital input on Gen3
+So I think we're safe in that modules and kernel text will be 48-bit
+addressable in 52-bit configurations.
 
-and enables image capture operations on D3 Draak board.
+I'll have a think about a BUILD_BUG to capture any change to the above.
 
-The series has been developed on top of media-master tree but applies cleanly
-on top of latest renesas-driver.
-
-Geert: would you like a topic branch for this series to be included in
-renesas-drivers?
-
-Patches for testing are available at:
-git://jmondi.org/linux d3/media-master/driver
-git://jmondi.org/linux d3/media-master/dts
-git://jmondi.org/linux d3/media-master/test
-git://jmondi.org/vin-tests d3
-
-Thanks
-    j
-
-Jacopo Mondi (3):
-  dt-bindings: media: rcar-vin: Add R8A77995 support
-  arm64: dts: renesas: r8a77995: Add VIN4
-  arm64: dts: renesas: draak: Describe HDMI input
-
- .../devicetree/bindings/media/rcar_vin.txt         |  1 +
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts     | 68 ++++++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a77995.dtsi          | 11 ++++
- 3 files changed, 80 insertions(+)
-
---
-2.7.4
+Cheers,
+-- 
+Steve
