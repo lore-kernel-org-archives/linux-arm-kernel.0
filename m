@@ -1,44 +1,17 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 11 May 2018 15:28:44 +0200
-Subject: [PATCH] [stable 4.14] arm64: Add work around for Arm Cortex-A55
- Erratum 1024718
-In-Reply-To: <1526037802-13305-1-git-send-email-suzuki.poulose@arm.com>
-References: <1526037802-13305-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180511132844.GC31231@kroah.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 11 May 2018 15:35:14 +0200
+Subject: [PATCH 1/3] dt-bindings: media: rcar-vin: Add R8A77995 support
+In-Reply-To: <1526032802-14376-2-git-send-email-jacopo+renesas@jmondi.org>
+References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526032802-14376-2-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180511133513.25dldevvnlnxl7y6@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 12:23:22PM +0100, Suzuki K Poulose wrote:
-> commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
+On Fri, May 11, 2018 at 12:00:00PM +0200, Jacopo Mondi wrote:
+> Add compatible string for R-Car D3 R8A7795 to list of SoCs supported by
+> rcar-vin driver.
 > 
-> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
-> from an erratum 1024718, which causes incorrect updates when DBM/AP
-> bits in a page table entry is modified without a break-before-make
-> sequence. The work around is to disable the hardware DBM feature
-> on the affected cores. The hardware Access Flag management features
-> is not affected.
-> 
-> The hardware DBM feature is a non-conflicting capability, i.e, the
-> kernel could handle cores using the feature and those without having
-> the features running at the same time. So this work around is detected
-> at early boot time, rather than delaying it until the CPUs are brought
-> up into the kernel with MMU turned on. This also avoids other complexities
-> with late CPUs turning online, with or without the hardware DBM features.
-> 
-> Cc: stable at vger.kernel.org # v4.14
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
-> Note: The upstream commit is on top of a reworked capability
-> infrastructure for arm64 heterogeneous systems, which allows
-> delaying the CPU model checks. This backport is based on the
-> original version of the patch [0], which checks the affected
-> CPU models during the early boot.
-> 
-> [0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Thanks for the backport, now applied.
-
-greg k-h
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
