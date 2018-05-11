@@ -1,128 +1,51 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 11 May 2018 10:09:47 +0200
-Subject: [PATCH] ARM: dts: exynos: Use dedicated DT bindings for Odroid
- X/X2, U3
-References: <CGME20180511081032epcas2p30f381cf699cb7524d9a143390e9c74b5@epcas2p3.samsung.com>
-Message-ID: <20180511080947.3057-1-s.nawrocki@samsung.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 11 May 2018 10:20:25 +0200
+Subject: [PATCH] i2c: i2c-stm32f7: fix documentation typo
+Message-ID: <1526026825-2996-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dedicated Odroid audio subsystem DT bindings instead of the simple-card.
-This adds support for audio on the HDMI interface.
+Some data structure members were either misspelled or missing.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Fixes: aeb068c572 ("i2c: i2c-stm32f7: add driver")
+Fixes: 380b8a85e7 ("i2c: i2c-stm32f7: Add initial SMBus protocols support")
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 33 ++++++++++++++-----------
- arch/arm/boot/dts/exynos4412-odroidu3.dts       |  7 +++---
- arch/arm/boot/dts/exynos4412-odroidx.dts        |  7 +++---
- 3 files changed, 27 insertions(+), 20 deletions(-)
+  Version history:
+    v1:
+       * Initial
+---
+---
+ drivers/i2c/busses/i2c-stm32f7.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index d7ad07fd48f9..bad08e70358a 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -37,20 +37,12 @@
- 	};
+diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
+index 0f87449..62d023e 100644
+--- a/drivers/i2c/busses/i2c-stm32f7.c
++++ b/drivers/i2c/busses/i2c-stm32f7.c
+@@ -211,11 +211,12 @@ struct stm32f7_i2c_setup {
  
- 	sound: sound {
--		compatible = "simple-audio-card";
--
--		simple-audio-card,format = "i2s";
--		simple-audio-card,bitclock-master = <&link0_codec>;
--		simple-audio-card,frame-master = <&link0_codec>;
--
--		simple-audio-card,cpu {
-+		cpu {
- 			sound-dai = <&i2s0 0>;
--			system-clock-frequency = <19200000>;
- 		};
- 
--		link0_codec: simple-audio-card,codec {
--			sound-dai = <&max98090>;
--			clocks = <&i2s0 CLK_I2S_CDCLK>;
-+		codec {
-+			sound-dai = <&hdmi>, <&max98090>;
- 		};
- 	};
- 
-@@ -142,14 +134,25 @@
- 	pinctrl-0 = <>;
- };
- 
-+&clock {
-+	assigned-clocks = <&clock CLK_FOUT_EPLL>;
-+	assigned-clock-rates = <45158401>;
-+};
-+
- &clock_audss {
- 	assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
- 			<&clock_audss EXYNOS_MOUT_I2S>,
- 			<&clock_audss EXYNOS_DOUT_SRP>,
--			<&clock_audss EXYNOS_DOUT_AUD_BUS>;
-+			<&clock_audss EXYNOS_DOUT_AUD_BUS>,
-+			<&clock_audss EXYNOS_DOUT_I2S>;
-+
- 	assigned-clock-parents = <&clock CLK_FOUT_EPLL>,
--			<&clock_audss EXYNOS_MOUT_AUDSS>;
--	assigned-clock-rates = <0>, <0>, <192000000>, <19200000>;
-+			  <&clock_audss EXYNOS_MOUT_AUDSS>;
-+
-+	assigned-clock-rates = <0>, <0>,
-+			<196608001>,
-+			<(196608001 / 2)>,
-+			<(196608001 / 8)>;
- };
- 
- &cpu0 {
-@@ -498,6 +501,8 @@
- 	pinctrl-0 = <&i2s0_bus>;
- 	pinctrl-names = "default";
- 	status = "okay";
-+	assigned-clocks = <&i2s0 CLK_I2S_RCLK_SRC>;
-+	assigned-clock-parents = <&clock_audss EXYNOS_SCLK_I2S>;
- };
- 
- &mixer {
-diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-index bdcd4523cc1c..7a94a423097d 100644
---- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-@@ -113,11 +113,12 @@
- };
- 
- &sound {
--	simple-audio-card,name = "Odroid-U3";
--	simple-audio-card,widgets =
-+	compatible = "hardkernel,odroid-xu4-audio";
-+	model = "Odroid-U3";
-+	samsung,audio-widgets =
- 		"Headphone", "Headphone Jack",
- 		"Speakers", "Speakers";
--	simple-audio-card,routing =
-+	samsung,audio-routing =
- 		"Headphone Jack", "HPL",
- 		"Headphone Jack", "HPR",
- 		"Headphone Jack", "MICBIAS",
-diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-index 2dff129bc2ad..f0d5037f3a5d 100644
---- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-@@ -97,12 +97,13 @@
- };
- 
- &sound {
--	simple-audio-card,name = "Odroid-X";
--	simple-audio-card,widgets =
-+	compatible = "hardkernel,odroid-xu4-audio";
-+	model = "Odroid-X";
-+	samsung,audio-widgets =
- 		"Headphone", "Headphone Jack",
- 		"Microphone", "Mic Jack",
- 		"Microphone", "DMIC";
--	simple-audio-card,routing =
-+	samsung,audio-routing =
- 		"Headphone Jack", "HPL",
- 		"Headphone Jack", "HPR",
- 		"IN1", "Mic Jack",
+ /**
+  * struct stm32f7_i2c_timings - private I2C output parameters
+- * @prec: Prescaler value
++ * @node: List entry
++ * @presc: Prescaler value
+  * @scldel: Data setup time
+  * @sdadel: Data hold time
+  * @sclh: SCL high period (master mode)
+- * @sclh: SCL low period (master mode)
++ * @scll: SCL low period (master mode)
+  */
+ struct stm32f7_i2c_timings {
+ 	struct list_head node;
+@@ -237,7 +238,7 @@ struct stm32f7_i2c_timings {
+  * @size: type of SMBus protocol
+  * @read_write: direction of SMBus protocol
+  * SMBus block read and SMBus block write - block read process call protocols
+- * @smbus_buff: buffer to be used for SMBus protocol transfer. It will
++ * @smbus_buf: buffer to be used for SMBus protocol transfer. It will
+  * contain a maximum of 32 bytes of data + byte command + byte count + PEC
+  * This buffer has to be 32-bit aligned to be compliant with memory address
+  * register in DMA mode.
 -- 
-2.14.2
+2.7.4
