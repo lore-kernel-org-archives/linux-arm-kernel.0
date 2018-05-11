@@ -1,107 +1,44 @@
-From: alex.popov@linux.com (Alexander Popov)
-Date: Fri, 11 May 2018 18:50:09 +0300
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
-References: <20180502203326.9491-1-labbott@redhat.com>
- <20180502203326.9491-3-labbott@redhat.com>
- <20180503071917.xm2xvgagvzkworay@salmiak>
- <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
- <20180504110907.c2dw33kjmyybso6t@lakrids.cambridge.arm.com>
- <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
-Message-ID: <71199506-b46b-5f91-e489-e6450b6d1067@linux.com>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 11 May 2018 17:47:21 +0200
+Subject: [PATCH] [stable 4.9] arm64: Add work around for Arm Cortex-A55
+ Erratum 1024718
+In-Reply-To: <1526046675-23790-1-git-send-email-suzuki.poulose@arm.com>
+References: <1526046675-23790-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180511154721.GC17038@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
-
-On 06.05.2018 11:22, Alexander Popov wrote:
-> On 04.05.2018 14:09, Mark Rutland wrote:
->>>>> +	stack_left = sp & (THREAD_SIZE - 1);
->>>>> +	BUG_ON(stack_left < 256 || size >= stack_left - 256);
->>>>
->>>> Is this arbitrary, or is there something special about 256?
->>>>
->>>> Even if this is arbitrary, can we give it some mnemonic?
->>>
->>> It's just a reasonable number. We can introduce a macro for it.
->>
->> I'm just not sure I see the point in the offset, given things like
->> VMAP_STACK exist. BUG_ON() handling will likely require *more* than 256
->> bytes of stack, so it seems superfluous, as we'd be relying on stack
->> overflow detection at that point.
->>
->> I can see that we should take the CONFIG_SCHED_STACK_END_CHECK offset
->> into account, though.
+On Fri, May 11, 2018 at 02:51:15PM +0100, Suzuki K Poulose wrote:
+> commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
 > 
-> Mark, thank you for such an important remark!
+> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
+> from an erratum 1024718, which causes incorrect updates when DBM/AP
+> bits in a page table entry is modified without a break-before-make
+> sequence. The work around is to disable the hardware DBM feature
+> on the affected cores. The hardware Access Flag management features
+> is not affected.
 > 
-> In Kconfig STACKLEAK implies but doesn't depend on VMAP_STACK. In fact x86_32
-> doesn't have VMAP_STACK at all but can have STACKLEAK.
+> The hardware DBM feature is a non-conflicting capability, i.e, the
+> kernel could handle cores using the feature and those without having
+> the features running at the same time. So this work around is detected
+> at early boot time, rather than delaying it until the CPUs are brought
+> up into the kernel with MMU turned on. This also avoids other complexities
+> with late CPUs turning online, with or without the hardware DBM features.
 > 
-> [Adding Andy Lutomirski]
+> Cc: stable at vger.kernel.org # v4.9
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Note: The upstream commit is on top of a reworked capability
+> infrastructure for arm64 heterogeneous systems, which allows
+> delaying the CPU model checks. This backport is based on the
+> original version of the patch [0], which checks the affected
+> CPU models during the early boot.
 > 
-> I've made some additional experiments: I exhaust the thread stack to have only
-> (MIN_STACK_LEFT - 1) bytes left and then force alloca. If VMAP_STACK is
-> disabled, BUG_ON() handling causes stack depth overflow, which is detected by
-> SCHED_STACK_END_CHECK. If VMAP_STACK is enabled, the kernel hangs on BUG_ON()
-> handling! Enabling CONFIG_PROVE_LOCKING gives the needed report from VMAP_STACK:
+> [0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
 
-[...]
+Now applied, thanks.
 
-> I can't say why VMAP_STACK report hangs during BUG_ON() handling on defconfig.
-> Andy, can you give a clue?
-> 
-> I see that MIN_STACK_LEFT = 2048 is enough for BUG_ON() handling on both x86_64
-> and x86_32. So I'm going to:
->  - set MIN_STACK_LEFT to 2048;
->  - improve the lkdtm test to cover this case.
-> 
-> Mark, Kees, Laura, does it sound good?
-
-
-Could you have a look at the following changes in check_alloca() before I send
-the next version?
-
-If VMAP_STACK is enabled and alloca causes stack depth overflow, I write to
-guard page below the thread stack to cause double fault and VMAP_STACK report.
-
-If VMAP_STACK is disabled, I use MIN_STACK_LEFT = 2048, which seems to be enough
-for BUG_ON() handling both on x86_32 and x86_64. Unfortunately, I can't
-guarantee that it is always enough.
-
-
- #ifdef CONFIG_GCC_PLUGIN_STACKLEAK
--#define MIN_STACK_LEFT 256
-+#define MIN_STACK_LEFT 2048
-
- void __used check_alloca(unsigned long size)
- {
-        unsigned long sp = (unsigned long)&sp;
-        struct stack_info stack_info = {0};
-        unsigned long visit_mask = 0;
-        unsigned long stack_left;
-
-        BUG_ON(get_stack_info(&sp, current, &stack_info, &visit_mask));
-
-        stack_left = sp - (unsigned long)stack_info.begin;
-+
-+#ifdef CONFIG_VMAP_STACK
-+       /*
-+        * If alloca oversteps the thread stack boundary, we touch the guard
-+        * page provided by VMAP_STACK to trigger handle_stack_overflow().
-+        */
-+       if (size >= stack_left)
-+               *(stack_info.begin - 1) = 42;
-+#else
-        BUG_ON(stack_left < MIN_STACK_LEFT ||
-                                size >= stack_left - MIN_STACK_LEFT);
-+#endif
- }
- EXPORT_SYMBOL(check_alloca);
- #endif
-
-
-Looking forward to your feedback.
-
-Best regards,
-Alexander
+greg k-h
