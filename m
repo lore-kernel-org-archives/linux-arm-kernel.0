@@ -1,61 +1,117 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Fri, 11 May 2018 16:37:27 +0200
-Subject: [PATCH] arm: port KCOV to arm
-In-Reply-To: <20180508103016.GW16141@n2100.armlinux.org.uk>
-References: <20180426130846.130976-1-dvyukov@google.com>
- <20180508103016.GW16141@n2100.armlinux.org.uk>
-Message-ID: <CACT4Y+ZkLCqPEicOsB1ewF8MfZd4wJpQHjxP_S6i+B0ZGZuj2Q@mail.gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Fri, 11 May 2018 10:41:40 -0400
+Subject: [PATCH v2 2/4] phy: rockchip-typec: support variable phy config
+ value
+In-Reply-To: <1525861364-26323-2-git-send-email-hl@rock-chips.com>
+References: <1525861364-26323-1-git-send-email-hl@rock-chips.com>
+ <1525861364-26323-2-git-send-email-hl@rock-chips.com>
+Message-ID: <20180511144140.GO33053@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2018 at 12:30 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Thu, Apr 26, 2018 at 03:08:46PM +0200, Dmitry Vyukov wrote:
->> KCOV is code coverage collection facility used, in particular, by syzkaller
->> system call fuzzer. There is some interest in using syzkaller on arm devices.
->> So port KCOV to arm.
->>
->> On implementation level this merely declares that KCOV is supported and
->> disables instrumentation of 3 special cases. Reasons for disabling are
->> commented in code.
->>
->> Tested with qemu-system-arm/vexpress-a15.
->>
->> Signed-off-by: Dmitry Vyukov <dvyukov@google.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Abbott Liu <liuwenliang@huawei.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Koguchi Takuo <takuo.koguchi.sw@hitachi.com>
->> Cc: Atul Prakash <atulp@google.com>
->> Cc: linux at armlinux.org.uk
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: syzkaller at googlegroups.com
->> ---
->>  arch/arm/Kconfig                  | 1 +
->>  arch/arm/boot/compressed/Makefile | 3 +++
->>  arch/arm/mm/Makefile              | 4 ++++
->>  arch/arm/vdso/Makefile            | 3 +++
->>  4 files changed, 11 insertions(+)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index a7f8e7f4b88f..60558a6bb744 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -105,6 +105,7 @@ config ARM
->>       select REFCOUNT_FULL
->>       select RTC_LIB
->>       select SYS_SUPPORTS_APM_EMULATION
->> +     select ARCH_HAS_KCOV
->>       # Above selects are sorted alphabetically; please add new ones
->>       # according to that.  Thanks.
->
-> Please read this comment and rework your patch, thanks.
+On Wed, May 09, 2018 at 06:22:42PM +0800, Lin Huang wrote:
+> the phy config values used to fix in dp firmware, but some boards
+> need change these values to do training and get the better eye diagram
+> result. So support that in phy driver.
+> 
+FTR, I've previously reviewed this at
+https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/985573
 
+This patch should come _after_ the dt binding addition.
 
-Now that Mark's fixes are in mm tree, I mailed v2 with the following changes:
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v2:
+> - update patch following Enric suggest
+> 
+>  drivers/phy/rockchip/phy-rockchip-typec.c | 284 +++++++++++++++++++-----------
+>  include/soc/rockchip/rockchip_phy_typec.h |  64 +++++++
+>  2 files changed, 250 insertions(+), 98 deletions(-)
+>  create mode 100644 include/soc/rockchip/rockchip_phy_typec.h
+> 
 
-    Changes since v1:
-     - remove disable of instrumentation for arch/arm/mm/fault.c
-     - disable instrumentation of arch/arm/kvm/hyp/*
-     - resort ARCH_HAS_KCOV alphabetically
+/snip
+
+> diff --git a/include/soc/rockchip/rockchip_phy_typec.h b/include/soc/rockchip/rockchip_phy_typec.h
+> new file mode 100644
+> index 0000000..4a328221
+> --- /dev/null
+> +++ b/include/soc/rockchip/rockchip_phy_typec.h
+> @@ -0,0 +1,64 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
+> + * Author: Lin Huang <hl@rock-chips.com>
+> + */
+> +
+> +#ifndef __SOC_ROCKCHIP_PHY_TYPEC_H
+> +#define __SOC_ROCKCHIP_PHY_TYPEC_H
+> +
+> +struct usb3phy_reg {
+> +	u32 offset;
+> +	u32 enable_bit;
+> +	u32 write_enable;
+> +};
+> +
+> +/**
+> + * struct rockchip_usb3phy_port_cfg: usb3-phy port configuration.
+> + * @reg: the base address for usb3-phy config.
+> + * @typec_conn_dir: the register of type-c connector direction.
+> + * @usb3tousb2_en: the register of type-c force usb2 to usb2 enable.
+> + * @external_psm: the register of type-c phy external psm clock.
+> + * @pipe_status: the register of type-c phy pipe status.
+> + * @usb3_host_disable: the register of type-c usb3 host disable.
+> + * @usb3_host_port: the register of type-c usb3 host port.
+> + * @uphy_dp_sel: the register of type-c phy DP select control.
+> + */
+> +struct rockchip_usb3phy_port_cfg {
+> +	unsigned int reg;
+> +	struct usb3phy_reg typec_conn_dir;
+> +	struct usb3phy_reg usb3tousb2_en;
+> +	struct usb3phy_reg external_psm;
+> +	struct usb3phy_reg pipe_status;
+> +	struct usb3phy_reg usb3_host_disable;
+> +	struct usb3phy_reg usb3_host_port;
+> +	struct usb3phy_reg uphy_dp_sel;
+> +};
+> +
+> +struct phy_config {
+> +	int swing;
+> +	int pe;
+> +};
+> +
+> +struct rockchip_typec_phy {
+> +	struct device *dev;
+> +	void __iomem *base;
+> +	struct extcon_dev *extcon;
+> +	struct regmap *grf_regs;
+> +	struct clk *clk_core;
+> +	struct clk *clk_ref;
+> +	struct reset_control *uphy_rst;
+> +	struct reset_control *pipe_rst;
+> +	struct reset_control *tcphy_rst;
+> +	const struct rockchip_usb3phy_port_cfg *port_cfgs;
+> +	/* mutex to protect access to individual PHYs */
+> +	struct mutex lock;
+> +	struct phy_config config[3][4];
+> +	u8 need_software_training;
+
+I thought we decided to always do sw training and then fallback to fw training.
+If so, we don't need this.
+
+Sean
+
+> +	bool flip;
+> +	u8 mode;
+> +	int (*typec_phy_config)(struct phy *phy, int link_rate,
+> +				int lanes, u8 swing, u8 pre_emp);
+> +};
+> +
+> +#endif
+> -- 
+> 2.7.4
+> 
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
