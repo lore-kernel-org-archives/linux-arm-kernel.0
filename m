@@ -1,53 +1,48 @@
-From: djw@t-chip.com.cn (Levin Du)
-Date: Fri, 11 May 2018 11:45:24 +0800
-Subject: [PATCH v1 3/5] arm64: dts: rockchip: Add gpio-syscon10 to rk3328
-In-Reply-To: <76f2bbde-e158-a186-f136-9fb610a810c5@arm.com>
-References: <1525943800-14095-1-git-send-email-djw@t-chip.com.cn>
- <1525943800-14095-4-git-send-email-djw@t-chip.com.cn>
- <76f2bbde-e158-a186-f136-9fb610a810c5@arm.com>
-Message-ID: <3fdfcc9b-90b5-191c-37e0-c99389a4e872@t-chip.com.cn>
+From: pku.leo@gmail.com (Yang Li)
+Date: Thu, 10 May 2018 23:03:18 -0500
+Subject: [GIT PULL] arm64: updates for 4.17
+In-Reply-To: <20180404143239.GA18238@arm.com>
+References: <20180404143239.GA18238@arm.com>
+Message-ID: <CADRPPNQhoXSGr4hpHaomcyamW51wT_F4fRTqZi4qtAD-jBHjxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-10 8:50 PM, Robin Murphy wrote:
-> On 10/05/18 10:16, djw at t-chip.com.cn wrote:
->> From: Levin Du <djw@t-chip.com.cn>
->>
->> Adding a new gpio controller named "gpio-syscon10" to rk3328, providing
->> access to the pins defined in the syscon GRF_SOC_CON10.
+On Wed, Apr 4, 2018 at 9:32 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Linus,
 >
-> This is the GPIO_MUTE pin, right? The public TRM is rather vague, but 
-> cross-referencing against the datasheet and schematics implies that 
-> it's the "gpiomut_*" part of the GRF bit names which is most significant.
+> Please pull these arm64 updates for 4.17. Note that I've pulled in a
+> stable branch from Eric Biederman here to fulfil some siginfo dependencies,
+> so the diffstat strays slightly out of arm64 due to his changes.
+{snip}
 >
-> It might be worth using a more descriptive name here, since "syscon10" 
-> is pretty much meaningless at the board level.
+> Catalin Marinas (1):
+>       arm64: Revert L1_CACHE_SHIFT back to 6 (64-byte cache line size)
 >
-> Robin.
+
+{snip}
+
 >
-Previously I though other bits might be able to reference from syscon10, 
-other than GPIO_MUTE alone.
-If it is renamed to gpio-mute, then the GPIO_MUTE pin is accessed as 
-`<&gpio-mute 1>`. Yet other
-bits in syscon10 can also be referenced, say, `<&gpio-mute 10>`, which 
-is not good.
+> Will Deacon (20):
+>       arm64: signal: Make force_signal_inject more robust
+>       arm64: signal: Force SIGKILL for unknown signals in force_signal_inject
+>       arm64: Introduce arm64_force_sig_info and hook up in arm64_notify_die
+>       arm64: signal: Don't print anything directly in force_signal_inject
+>       arm64: Pass user fault info to arm64_notify_die instead of printing it
+>       arm64: mm: Rework unhandled user pagefaults to call arm64_force_sig_info
+>       arm64: signal: Call arm64_notify_segfault when failing to deliver signal
+>       arm64: Move show_unhandled_signals_ratelimited into traps.c
+>       arm64: Use arm64_force_sig_info instead of force_sig_info
+>       arm64: lse: Pass -fomit-frame-pointer to out-of-line ll/sc atomics
+>       arm64: kaslr: Set TCR_EL1.NFD1 when CONFIG_RANDOMIZE_BASE=y
+>       Merge tag 'acpi/iort-for-v4.17' of git://git.kernel.org/.../lpieralisi/linux into aarch64/for-next/core
+>       Merge branch 'siginfo-next' of git://git.kernel.org/.../ebiederm/user-namespace into aarch64/for-next/core
+>       arm64: cpufeature: Avoid warnings due to unused symbols
+>       Revert "arm64: Revert L1_CACHE_SHIFT back to 6 (64-byte cache line size)"
 
-I'd like to add a `gpio,syscon-bit` property to gpio-syscon, which 
-overrides the properties
-of bit_count,? data_bit_offset and dir_bit_offset in the driver. For 
-example:
+Hi Will,
 
- ??????????????? gpio_mute: gpio-mute {
- ??????????????????????? compatible = "rockchip,gpio-syscon";
- ??????????????????????? gpio-controller;
- ??????????????????????? #gpio-cells = <2>;
- ??????????????????????? gpio,syscon-dev = <0 0x0428 0>;
- ??????????????????????? gpio,syscon-bit = <1 1 0>;
- ??????????????? };
+I'm wondering if we are changing the L1_CACHE_SHIFT to 6 in 4.17?
+This is causing big performance differences for us now.
 
-That way, the mute pin is strictly specified as <&gpio_mute 0>, and 
-<&gpio_mute 1> will be invalid.
-I think that is neat, and consistent with the gpio_mute name.
-
-Thanks
-Levin
+Regards,
+Leo
