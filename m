@@ -1,57 +1,60 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 11 May 2018 10:24:48 +0100
-Subject: [PATCH 0/2] Allwinner A64 timer workaround
-In-Reply-To: <20180511022751.9096-1-samuel@sholland.org>
-References: <20180511022751.9096-1-samuel@sholland.org>
-Message-ID: <9d12075e-745d-b7d7-9847-f1493fc8647e@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 11 May 2018 11:26:58 +0200
+Subject: [PATCH V5 2/4] soc: mediatek: pwrap: fix cipher init setting error
+In-Reply-To: <1525957319-20557-3-git-send-email-argus.lin@mediatek.com>
+References: <1525957319-20557-1-git-send-email-argus.lin@mediatek.com>
+ <1525957319-20557-3-git-send-email-argus.lin@mediatek.com>
+Message-ID: <318abd43-a2ac-121c-8c18-dd32248a4676@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 11/05/18 03:27, Samuel Holland wrote:
-> Hello,
-> 
-> Several people (including me) have experienced extremely large system
-> clock jumps on their A64-based devices, apparently due to the
-> architectural timer going backward, which is interpreted by Linux as
-> the timer wrapping around after 2^56 cycles.
 
-So I experienced this before, though I didn't see actual clock jumps,
-only that subsequent reads of CNTVCT_EL0, both directly via mrs and
-indirectly via CLOCK_MONOTONIC, from userland (triggered by a directed
-test) *sometimes* went backwards, with a number of '1's in the lower bits.
-But that didn't happen on every boot, and I was suspecting that some
-timer setup was missing on the hardware/firmware side. And later on I
-failed to reproduce it anymore.
-So do you see it on every boot, with recent U-Boot/ATF?
+On 05/10/2018 03:01 PM, argus.lin at mediatek.com wrote:
+> From: Argus Lin <argus.lin@mediatek.com>
+> 
+> PWRAP_DEW_CIPHER_LOAD and PWRAP_DEW_CIPHER_START only exist at
+> PMIC_mt6397 datasheet. We fix it before merge PMIC_mt6351 driver.
 
-Cheers,
-Andre.
+Please don't put info like "We fix it before merge PMIC_mt6351 driver." in the
+commit message. You can see this from the git log later and it does not add any
+value.
 
-> Investigation led to discovery of some obvious problems with this SoC's
-> architectural timer, and this patch series introduces what I believe is
-> the simplest workaround. More details are in the commit message for
-> patch 1. Patch 2 simply enables the workaround in the device tree.
+Regards,
+Matthias
+
 > 
-> Thanks,
-> Samuel
+> Fixes: 5ae48040aa47 ("soc: mediatek: PMIC wrap: add mt6323 slave support")
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-> Samuel Holland (2):
->   arm64: arch_timer: Workaround for Allwinner A64 timer instability
->   arm64: dts: allwinner: a64: Enable A64 timer workaround
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index e9e054a..9a01e30 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -1080,8 +1080,6 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+>  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_SWRST], 0x0);
+>  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_KEY_SEL], 0x1);
+>  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_IV_SEL], 0x2);
+> -	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_LOAD], 0x1);
+> -	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_START], 0x1);
+>  
+>  	switch (wrp->slave->type) {
+>  	case PMIC_MT6397:
+> -- 
+> 1.8.1.1.dirty
 > 
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  1 +
->  drivers/clocksource/Kconfig                   | 11 ++++++++
->  drivers/clocksource/arm_arch_timer.c          | 39 +++++++++++++++++++++++++++
->  3 files changed, 51 insertions(+)
-> 
-> --
-> 2.16.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> ************* Email Confidentiality Notice ********************
+> The information contained in this e-mail message (including any 
+> attachments) may be confidential, proprietary, privileged, or otherwise
+> exempt from disclosure under applicable laws. It is intended to be 
+> conveyed only to the designated recipient(s). Any use, dissemination, 
+> distribution, printing, retaining or copying of this e-mail (including its 
+> attachments) by unintended recipient(s) is strictly prohibited and may 
+> be unlawful. If you are not an intended recipient of this e-mail, or believe 
+> that you have received this e-mail in error, please notify the sender 
+> immediately (by replying to this e-mail), delete any and all copies of 
+> this e-mail (including any attachments) from your system, and do not
+> disclose the content of this e-mail to any other person. Thank you!
 > 
