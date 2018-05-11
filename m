@@ -1,124 +1,63 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 11 May 2018 18:20:23 +0200
-Subject: [PATCH 07/12] of/platform: provide a separate routine for setting up
- device resources
+Date: Fri, 11 May 2018 18:20:24 +0200
+Subject: [PATCH 08/12] of/platform: provide a separate routine for device
+ initialization
 In-Reply-To: <20180511162028.20616-1-brgl@bgdev.pl>
 References: <20180511162028.20616-1-brgl@bgdev.pl>
-Message-ID: <20180511162028.20616-8-brgl@bgdev.pl>
+Message-ID: <20180511162028.20616-9-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-The early platform driver framework will need to setup the device
-resources before the regular populating of the device tree happens.
-
-Provide a separate function for that.
+The early platform device framework will need to initialize the
+platform device objects without them being allocated in
+of_device_alloc(). Provide a routine that allows it.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/of/platform.c       | 54 +++++++++++++++++++++++--------------
- include/linux/of_platform.h |  2 ++
- 2 files changed, 36 insertions(+), 20 deletions(-)
+ drivers/of/platform.c | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index c00d81dfac0b..24791e558ec5 100644
+index 24791e558ec5..0e554fe1f325 100644
 --- a/drivers/of/platform.c
 +++ b/drivers/of/platform.c
-@@ -99,24 +99,12 @@ static void of_device_make_bus_id(struct device *dev)
- 	}
+@@ -132,6 +132,19 @@ int of_device_init_resources(struct platform_device *pdev,
+ 	return 0;
  }
  
--/**
-- * of_device_alloc - Allocate and initialize an of_device
-- * @np: device node to assign to device
-- * @bus_id: Name to assign to the device.  May be null to use default name.
-- * @parent: Parent device.
-- */
--struct platform_device *of_device_alloc(struct device_node *np,
--				  const char *bus_id,
--				  struct device *parent)
-+int of_device_init_resources(struct platform_device *pdev,
-+			     struct device_node *np)
- {
--	struct platform_device *dev;
- 	int rc, i, num_reg = 0, num_irq;
- 	struct resource *res, temp_res;
- 
--	dev = platform_device_alloc("", PLATFORM_DEVID_NONE);
--	if (!dev)
--		return NULL;
--
- 	/* count the io and irq resources */
- 	while (of_address_to_resource(np, num_reg, &temp_res) == 0)
- 		num_reg++;
-@@ -125,22 +113,48 @@ struct platform_device *of_device_alloc(struct device_node *np,
- 	/* Populate the resource table */
- 	if (num_irq || num_reg) {
- 		res = kzalloc(sizeof(*res) * (num_irq + num_reg), GFP_KERNEL);
--		if (!res) {
--			platform_device_put(dev);
--			return NULL;
--		}
-+		if (!res)
-+			return -ENOMEM;
++static void of_device_init(struct platform_device *pdev, struct device_node *np,
++			   const char *bus_id, struct device *parent)
++{
++	pdev->dev.of_node = of_node_get(np);
++	pdev->dev.fwnode = &np->fwnode;
++	pdev->dev.parent = parent ? : &platform_bus;
 +
-+		pdev->num_resources = num_reg + num_irq;
-+		pdev->resource = res;
- 
--		dev->num_resources = num_reg + num_irq;
--		dev->resource = res;
- 		for (i = 0; i < num_reg; i++, res++) {
- 			rc = of_address_to_resource(np, i, res);
- 			WARN_ON(rc);
- 		}
-+
- 		if (of_irq_to_resource_table(np, res, num_irq) != num_irq)
- 			pr_debug("not all legacy IRQ resources mapped for %s\n",
- 				 np->name);
- 	}
- 
-+	return 0;
++	if (bus_id)
++		dev_set_name(&pdev->dev, "%s", bus_id);
++	else
++		of_device_make_bus_id(&pdev->dev);
 +}
 +
-+/**
-+ * of_device_alloc - Allocate and initialize an of_device
-+ * @np: device node to assign to device
-+ * @bus_id: Name to assign to the device.  May be null to use default name.
-+ * @parent: Parent device.
-+ */
-+struct platform_device *of_device_alloc(struct device_node *np,
-+				  const char *bus_id,
-+				  struct device *parent)
-+{
-+	struct platform_device *dev;
-+	int rc;
-+
-+	dev = platform_device_alloc("", PLATFORM_DEVID_NONE);
-+	if (!dev)
-+		return NULL;
-+
-+	rc = of_device_init_resources(dev, np);
-+	if (rc) {
-+		platform_device_put(dev);
-+		return NULL;
-+	}
-+
- 	dev->dev.of_node = of_node_get(np);
- 	dev->dev.fwnode = &np->fwnode;
- 	dev->dev.parent = parent ? : &platform_bus;
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index 84a966623e78..387ab4d4a210 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -52,6 +52,8 @@ extern const struct of_device_id of_default_bus_match_table[];
- extern struct platform_device *of_device_alloc(struct device_node *np,
- 					 const char *bus_id,
- 					 struct device *parent);
-+extern int of_device_init_resources(struct platform_device *pdev,
-+				    struct device_node *np);
- #ifdef CONFIG_OF
- extern struct platform_device *of_find_device_by_node(struct device_node *np);
- #else
+ /**
+  * of_device_alloc - Allocate and initialize an of_device
+  * @np: device node to assign to device
+@@ -155,14 +168,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 		return NULL;
+ 	}
+ 
+-	dev->dev.of_node = of_node_get(np);
+-	dev->dev.fwnode = &np->fwnode;
+-	dev->dev.parent = parent ? : &platform_bus;
+-
+-	if (bus_id)
+-		dev_set_name(&dev->dev, "%s", bus_id);
+-	else
+-		of_device_make_bus_id(&dev->dev);
++	of_device_init(dev, np, bus_id, parent);
+ 
+ 	return dev;
+ }
 -- 
 2.17.0
