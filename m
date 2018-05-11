@@ -1,76 +1,145 @@
-From: udknight@gmail.com (Wang YanQing)
-Date: Fri, 11 May 2018 10:52:17 +0800
-Subject: [PATCH v2] bpf, arm32: Fix inconsistent naming about
- emit_a32_lsr_r64|emit_a32_lsr_i64
-Message-ID: <20180511025217.GA7621@udknight>
+From: samuel@sholland.org (Samuel Holland)
+Date: Thu, 10 May 2018 22:01:24 -0500
+Subject: [PATCH 2/2] arm64: dts: allwinner: h5: Update Orange Pi Zero Plus
+In-Reply-To: <20180511030124.9356-1-samuel@sholland.org>
+References: <20180511030124.9356-1-samuel@sholland.org>
+Message-ID: <20180511030124.9356-2-samuel@sholland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The names for BPF_ALU64 | BPF_ARSH are emit_a32_arsh_*,
-the names for BPF_ALU64 | BPF_LSH are emit_a32_lsh_*, but
-the names for BPF_ALU64 | BPF_RSH are emit_a32_lsr_*.
+The Orange Pi Zero Plus has an additional LED that was missing from the
+device tree, and the power sequence for the SDIO Wi-Fi was missing.
 
-For consistence reason, let's rename emit_a32_lsr_* to
-emit_a32_rsh_*.
+The board also has UARTs 1, 2, and 3 exposed on a 26-pin GPIO header. As
+the header is not populated by the manufacturer, disable the UARTs by
+default.
 
-This patch also correct a wrong comment.
+Additionally, fix up an incorrect comment, remove an unnecessary header
+inclusion, sort existing nodes, and fix some indentation issues.
 
-Signed-off-by: Wang YanQing <udknight@gmail.com>
+Signed-off-by: Samuel Holland <samuel@sholland.org>
 ---
- Changes v1-v2:
- 1:Rewords the changelog.
+ .../dts/allwinner/sun50i-h5-orangepi-zero-plus.dts | 58 ++++++++++++++++------
+ 1 file changed, 42 insertions(+), 16 deletions(-)
 
- arch/arm/net/bpf_jit_32.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index b5030e1..caccc78 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -708,7 +708,7 @@ static inline void emit_a32_arsh_r64(const u8 dst[], const u8 src[], bool dstk,
- }
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
+index 1238de25a969..78edcb9d9167 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
+@@ -10,23 +10,18 @@
  
- /* dst = dst >> src */
--static inline void emit_a32_lsr_r64(const u8 dst[], const u8 src[], bool dstk,
-+static inline void emit_a32_rsh_r64(const u8 dst[], const u8 src[], bool dstk,
- 				     bool sstk, struct jit_ctx *ctx) {
- 	const u8 *tmp = bpf2a32[TMP_REG_1];
- 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
-@@ -724,7 +724,7 @@ static inline void emit_a32_lsr_r64(const u8 dst[], const u8 src[], bool dstk,
- 		emit(ARM_LDR_I(rm, ARM_SP, STACK_VAR(dst_hi)), ctx);
- 	}
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+-#include <dt-bindings/pinctrl/sun4i-a10.h>
  
--	/* Do LSH operation */
-+	/* Do RSH operation */
- 	emit(ARM_RSB_I(ARM_IP, rt, 32), ctx);
- 	emit(ARM_SUBS_I(tmp2[0], rt, 32), ctx);
- 	emit(ARM_MOV_SR(ARM_LR, rd, SRTYPE_LSR, rt), ctx);
-@@ -774,7 +774,7 @@ static inline void emit_a32_lsh_i64(const u8 dst[], bool dstk,
- }
+ / {
+ 	model = "Xunlong Orange Pi Zero Plus";
+ 	compatible = "xunlong,orangepi-zero-plus", "allwinner,sun50i-h5";
  
- /* dst = dst >> val */
--static inline void emit_a32_lsr_i64(const u8 dst[], bool dstk,
-+static inline void emit_a32_rsh_i64(const u8 dst[], bool dstk,
- 				    const u32 val, struct jit_ctx *ctx) {
- 	const u8 *tmp = bpf2a32[TMP_REG_1];
- 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
-@@ -1330,7 +1330,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 	case BPF_ALU64 | BPF_RSH | BPF_K:
- 		if (unlikely(imm > 63))
- 			return -EINVAL;
--		emit_a32_lsr_i64(dst, dstk, imm, ctx);
-+		emit_a32_rsh_i64(dst, dstk, imm, ctx);
- 		break;
- 	/* dst = dst << src */
- 	case BPF_ALU64 | BPF_LSH | BPF_X:
-@@ -1338,7 +1338,7 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 		break;
- 	/* dst = dst >> src */
- 	case BPF_ALU64 | BPF_RSH | BPF_X:
--		emit_a32_lsr_r64(dst, src, dstk, sstk, ctx);
-+		emit_a32_rsh_r64(dst, src, dstk, sstk, ctx);
- 		break;
- 	/* dst = dst >> src (signed) */
- 	case BPF_ALU64 | BPF_ARSH | BPF_X:
+-	reg_vcc3v3: vcc3v3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vcc3v3";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-	};
+-
+ 	aliases {
+ 		ethernet0 = &emac;
+ 		ethernet1 = &rtl8189ftv;
+ 		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
+ 	};
+ 
+ 	chosen {
+@@ -38,7 +33,7 @@
+ 
+ 		pwr {
+ 			label = "orangepi:green:pwr";
+-			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
+ 			default-state = "on";
+ 		};
+ 
+@@ -57,6 +52,18 @@
+ 		enable-active-high;
+ 		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
+ 	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
++	};
+ };
+ 
+ &ehci0 {
+@@ -92,6 +99,7 @@
+ 
+ &mmc1 {
+ 	vmmc-supply = <&reg_vcc3v3>;
++	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
+ 	non-removable;
+ 	status = "okay";
+@@ -105,7 +113,15 @@
+ 	};
+ };
+ 
+-&spi0  {
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&spi0 {
+ 	status = "okay";
+ 
+ 	flash at 0 {
+@@ -117,18 +133,28 @@
+ 	};
+ };
+ 
+-&ohci0 {
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
+ 	status = "okay";
+ };
+ 
+-&ohci1 {
+-	status = "okay";
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
++	status = "disabled";
+ };
+ 
+-&uart0 {
++&uart2 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins_a>;
+-	status = "okay";
++	pinctrl-0 = <&uart2_pins>;
++	status = "disabled";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins>;
++	status = "disabled";
+ };
+ 
+ &usb_otg {
 -- 
-1.8.5.6.2.g3d8a54e.dirty
+2.16.1
