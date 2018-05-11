@@ -1,59 +1,102 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 11 May 2018 15:31:38 +0100
-Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.18
-Message-ID: <5AF5A94A.4080308@hisilicon.com>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Fri, 11 May 2018 16:32:48 +0200
+Subject: [PATCH v2] arm: port KCOV to arm
+Message-ID: <20180511143248.112484-1-dvyukov@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
+KCOV is code coverage collection facility used, in particular, by syzkaller
+system call fuzzer. There is some interest in using syzkaller on arm devices.
+So port KCOV to arm.
 
-Please help to pull the following changes.
+On implementation level this merely declares that KCOV is supported and
+disables instrumentation of 3 special cases. Reasons for disabling are
+commented in code.
 
-About the CLOCK_STUB and the MAILBOX consolidate patch,
-Jassi and Stephen have acked it.
-Could you let me know how to handle this kind case
-if it is not OK to be in this pull?
-Thanks!
+Tested with qemu-system-arm/vexpress-a15.
 
-Best Regards,
-Wei
+Signed-off-by: Dmitry Vyukov <dvyukov@google.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Abbott Liu <liuwenliang@huawei.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Koguchi Takuo <takuo.koguchi.sw@hitachi.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mm at kvack.org
+Cc: syzkaller at googlegroups.com
 
 ---
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+Changes since v1:
+ - remove disable of instrumentation for arch/arm/mm/fault.c
+ - disable instrumentation of arch/arm/kvm/hyp/*
+ - resort ARCH_HAS_KCOV alphabetically
+---
+ arch/arm/Kconfig                  | 3 ++-
+ arch/arm/boot/compressed/Makefile | 3 +++
+ arch/arm/kvm/hyp/Makefile         | 8 ++++++++
+ arch/arm/vdso/Makefile            | 3 +++
+ 4 files changed, 16 insertions(+), 1 deletion(-)
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.18
-
-for you to fetch changes up to fafb929ce189a84d9915854f3323dded6cbb3e74:
-
-  hisi: Consolidate the Kconfigs for the CLOCK_STUB and the MAILBOX (2018-05-11 11:49:31 +0100)
-
-----------------------------------------------------------------
-ARM64: hisilicon: defconfig updates for 4.18
-
-- Sync the arm64 defconfig with savedefconfig
-- Enable the support of ethernet, eMMC, Combo/INNO phy
-  and PCIe for Hi3798CV200
-- Enable the LPC for hip06 and hip07
-- Consolidate the configs of the CLOCK_STUB and the MAILBOX
-  for hi6220 and hi3660
-
-----------------------------------------------------------------
-Daniel Lezcano (1):
-      hisi: Consolidate the Kconfigs for the CLOCK_STUB and the MAILBOX
-
-John Garry (1):
-      arm64: defconfig: Enable HISILICON_LPC
-
-Shawn Guo (2):
-      arm64: defconfig: sync it with savedefconfig
-      arm64: defconfig: enable drivers for Poplar support
-
- arch/arm64/configs/defconfig  | 87 ++++++++++++++++++-------------------------
- drivers/clk/hisilicon/Kconfig | 13 ++++---
- drivers/mailbox/Kconfig       | 12 ++++--
- 3 files changed, 52 insertions(+), 60 deletions(-)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3493f840e89c..34591796c36f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -8,9 +8,10 @@ config ARM
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_FORTIFY_SOURCE
++	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
+-	select ARCH_HAS_SET_MEMORY
+ 	select ARCH_HAS_PHYS_TO_DMA
++	select ARCH_HAS_SET_MEMORY
+ 	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+ 	select ARCH_HAS_STRICT_MODULE_RWX if MMU
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 6a4e7341ecd3..5f5f081e4879 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -25,6 +25,9 @@ endif
+ 
+ GCOV_PROFILE		:= n
+ 
++# Prevents link failures: __sanitizer_cov_trace_pc() is not linked in.
++KCOV_INSTRUMENT		:= n
++
+ #
+ # Architecture dependencies
+ #
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index 7fc0638f263a..d2b5ec9c4b92 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -23,3 +23,11 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+ obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+ CFLAGS_switch.o		   += $(CFLAGS_ARMV7VE)
+ obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
++
++# KVM code is run at a different exception code with a different map, so
++# compiler instrumentation that inserts callbacks or checks into the code may
++# cause crashes. Just disable it.
++GCOV_PROFILE	:= n
++KASAN_SANITIZE	:= n
++UBSAN_SANITIZE	:= n
++KCOV_INSTRUMENT	:= n
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+index bb4118213fee..f4efff9d3afb 100644
+--- a/arch/arm/vdso/Makefile
++++ b/arch/arm/vdso/Makefile
+@@ -30,6 +30,9 @@ CFLAGS_vgettimeofday.o = -O2
+ # Disable gcov profiling for VDSO code
+ GCOV_PROFILE := n
+ 
++# Prevents link failures: __sanitizer_cov_trace_pc() is not linked in.
++KCOV_INSTRUMENT := n
++
+ # Force dependency
+ $(obj)/vdso.o : $(obj)/vdso.so
+ 
+-- 
+2.17.0.441.gb46fe60e1d-goog
