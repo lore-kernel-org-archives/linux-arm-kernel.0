@@ -1,282 +1,91 @@
-From: erin.lo@mediatek.com (Erin Lo)
-Date: Fri, 11 May 2018 18:41:07 +0800
-Subject: [PATCH 2/2] arm64: dts: Add Mediatek SoC MT8183 and evaluation
- board dts and Makefile
-In-Reply-To: <860cba8a-3af8-31d6-ec3f-81706d2d998b@gmail.com>
-References: <1526019083-20237-1-git-send-email-erin.lo@mediatek.com>
- <1526019083-20237-3-git-send-email-erin.lo@mediatek.com>
- <860cba8a-3af8-31d6-ec3f-81706d2d998b@gmail.com>
-Message-ID: <1526035267.13828.13.camel@mtksdaap41>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 11 May 2018 12:12:32 +0100
+Subject: [RFC][PATCH] arm64: update iomem_resource.end
+In-Reply-To: <20180510222920.GA20553@Asurada-Nvidia>
+References: <1525906703-28481-1-git-send-email-nicoleotsuka@gmail.com>
+ <cfb81f55-f917-431f-0afd-c97e7641a2f8@arm.com>
+ <20180510222920.GA20553@Asurada-Nvidia>
+Message-ID: <f183a131-fbf7-3b73-71bf-f898c3b0f757@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-05-11 at 10:36 +0200, Matthias Brugger wrote:
+On 10/05/18 23:29, Nicolin Chen wrote:
+> Thanks for the comments, Robin.
 > 
-> On 05/11/2018 08:11 AM, Erin Lo wrote:
-> > From: Ben Ho <Ben.Ho@mediatek.com>
-> > 
-> > Add basic chip support for Mediatek 8183
-> > 
-> > Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
-> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/Makefile       |   1 +
-> >  arch/arm64/boot/dts/mediatek/mt8183-evb.dts |  31 +++++
-> >  arch/arm64/boot/dts/mediatek/mt8183.dtsi    | 178 ++++++++++++++++++++++++++++
-> >  3 files changed, 210 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> > index ac17f60..2836261 100644
-> > --- a/arch/arm64/boot/dts/mediatek/Makefile
-> > +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> > @@ -5,3 +5,4 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> > +dtb-$(CONFIG_ARCH_MEDIATEK) += mt8183-evb.dtb
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8183-evb.dts b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
-> > new file mode 100644
-> > index 0000000..9a3d6b7
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
-> > @@ -0,0 +1,31 @@
-> > +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: Ben Ho <ben.ho@mediatek.com>
-> > + *	   Erin Lo <erin.lo@mediatek.com>
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "mt8183.dtsi"
-> > +
-> > +/ {
-> > +	model = "MediaTek MT8183 evaluation board";
-> > +	compatible = "mediatek,mt8183-evb", "mediatek,mt8183";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +	};
-> > +
-> > +	memory at 40000000 {
-> > +		device_type = "memory";
-> > +		reg = <0 0x40000000 0 0x80000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial0:921600n8";
-> > +	};
-> > +};
-> > +
-> > +&uart0 {
-> > +	status = "okay";
-> > +};
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
-> > new file mode 100644
-> > index 0000000..8564a26
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
-> > @@ -0,0 +1,178 @@
-> > +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> > +/*
-> > + * Copyright (c) 2017 MediaTek Inc.
-> > + * Author: Ben Ho <ben.ho@mediatek.com>
-> > + *	   Erin Lo <erin.lo@mediatek.com>
-> > + */
-> > +
-> > +#include <dt-bindings/interrupt-controller/irq.h>
-> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> > +
-> > +/ {
-> > +	compatible = "mediatek,mt8183";
-> > +	interrupt-parent = <&sysirq>;
-> > +	#address-cells = <2>;
-> > +	#size-cells = <2>;
-> > +
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu-map {
-> > +			cluster0 {
-> > +				core0 {
-> > +					cpu = <&cpu0>;
-> > +				};
-> > +				core1 {
-> > +					cpu = <&cpu1>;
-> > +				};
-> > +				core2 {
-> > +					cpu = <&cpu2>;
-> > +				};
-> > +				core3 {
-> > +					cpu = <&cpu3>;
-> > +				};
-> > +			};
-> > +
-> > +			cluster1 {
-> > +				core0 {
-> > +					cpu = <&cpu4>;
-> > +				};
-> > +				core1 {
-> > +					cpu = <&cpu5>;
-> > +				};
-> > +				core2 {
-> > +					cpu = <&cpu6>;
-> > +				};
-> > +				core3 {
-> > +					cpu = <&cpu7>;
-> > +				};
-> > +			};
-> > +		};
-> > +
-> > +		cpu0: cpu at 000 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a53";
-> > +			reg = <0x000>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu1: cpu at 001 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a53";
-> > +			reg = <0x001>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu2: cpu at 002 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a53";
-> > +			reg = <0x002>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu3: cpu at 003 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a53";
-> > +			reg = <0x003>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu4: cpu at 100 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a73";
-> > +			reg = <0x100>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu5: cpu at 101 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a73";
-> > +			reg = <0x101>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu6: cpu at 102 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a73";
-> > +			reg = <0x102>;
-> > +			enable-method = "psci";
-> > +		};
-> > +
-> > +		cpu7: cpu at 103 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a73";
-> > +			reg = <0x103>;
-> > +			enable-method = "psci";
-> > +		};
-> > +	};
-> > +
-> > +	psci {
-> > +		compatible      = "arm,psci-1.0";
-> > +		method          = "smc";
-> > +	};
-> > +
-> > +	uart_clk: dummy26m {
-> > +		compatible = "fixed-clock";
-> > +		clock-frequency = <26000000>;
-> > +		#clock-cells = <0>;
-> > +	};
-> > +
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupt-parent = <&gic>;
-> > +		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
-> > +			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
-> > +			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
-> > +			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-> > +	};
-> > +
-> > +	gic: interrupt-controller at 0c000000 {
-> > +		compatible = "arm,gic-v3";
-> > +		#interrupt-cells = <3>;
-> > +		interrupt-parent = <&gic>;
-> > +		interrupt-controller;
-> > +		reg = <0 0x0c000000 0 0x40000>,  // CID
-> > +		      <0 0x0c100000 0 0x200000>; // CIR
-> > +		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
-> > +	};
-> > +
-> > +	sysirq: intpol-controller at 0c530a80 {
-> > +		compatible = "mediatek,mt8183-sysirq",
-> > +			     "mediatek,mt6577-sysirq";
-> > +		interrupt-controller;
-> > +		#interrupt-cells = <3>;
-> > +		interrupt-parent = <&gic>;
-> > +		reg = <0 0x0c530a80 0 0x50>;
-> > +	};
-> > +
-> > +	uart0: serial at 11002000 {
-> > +		compatible = "mediatek,mt8183-uart",
-> > +			     "mediatek,mt6577-uart";
-> > +		reg = <0 0x11002000 0 0x1000>;
-> > +		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks = <&uart_clk>, <&uart_clk>;
-> > +		clock-names = "baud", "bus";
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	uart1: serial at 11003000 {
-> > +		compatible = "mediatek,mt8183-uart",
-> > +			     "mediatek,mt6577-uart";
-> > +		reg = <0 0x11003000 0 0x1000>;
-> > +		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks = <&uart_clk>, <&uart_clk>;
-> > +		clock-names = "baud", "bus";
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	uart2: serial at 11004000 {
-> > +		compatible = "mediatek,mt8183-uart",
-> > +			     "mediatek,mt6577-uart";
-> > +		reg = <0 0x11004000 0 0x1000>;
-> > +		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks = <&uart_clk>, <&uart_clk>;
-> > +		clock-names = "baud", "bus";
-> > +		status = "disabled";
-> > +	};
-> > +};
-> > 
+> On Thu, May 10, 2018 at 06:45:59PM +0100, Robin Murphy wrote:
+>> On 09/05/18 23:58, Nicolin Chen wrote:
+>>> The iomem_resource.end is -1 by default and should be updated in
+>>> arch-level code.
+>>>
+>>> ARM64 so far hasn't updated it while core kernel code (mm/hmm.c)
+>>> started to use iomem_resource.end for boundary check. So it'd be
+>>> better to assign iomem_resource.end using a valid value, the end
+>>> of physical address space for example because iomem_resource.end
+>>> in theory should reflect that.
+>>>
+>>> However, VA_BITS might be smaller than PA_BITS in ARM64. So using
+>>> the end of physical address space doesn't make a lot of sense in
+>>> this case, or could be even harmful since virtual address cannot
+>>> reach that memory region.
+>>
+>> Why? There's plenty of stuff in the physical address space that will
+>> only ever be accessed via ioremap/memremap. There's no reason you
+>> shouldn't be able to run a VA_BITS < 48 kernel on a Cavium ThunderX
 > 
-> I wonder if there aren't any other devices which can be supported out of the box.
-> I understand that for now we are missing the clock driver and the pinctrl
-> driver. Are you planning to submit them in the near future?
+> I'm running VA_BITS_39 and PA_BITS_48 on Tegra 210. There had
+> not been any problem of it, however with hmm.....
 > 
-> I'm asking because I don't want to bloat the dts with boards that only can boot
-> to an initramfs with a serial console. Especially if there is no HW + datasheet
-> available for anyone in the community who wants to work on this.
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/mm/hmm.c#n1144
 > 
-> Regards,
-> Matthias
-> 
-> Regards,
-> Matthias
+> This hmm_devmem_add() requests a region with PFNs being outside
+> of the linear region in ARM64 case which takes MAX_PHYSMEM_BITS
+> (48 bits) over iomem_resource.end without this patch. Then when
+> dealing with page structures in vmemmap region from a given PFN
+> directly (CONFIG_SPARSEMEM_VMEMMAP=y), and the given PFN is the
+> last one based on physical region (48 bits), the address of its
+> page structure will go beyond vmemmap region. Does this sound a
+> problem?
 
+Yes, but as far as we're concerned here it's not a problem with arm64:
 
-We have implement clock and pinctrl driver these days, and plan to
-submit them maybe next month.
-After that we will submit other drivers of MT8183 continuously.
+	config ARCH_HAS_HMM
+		...
+		depends on (X86_64 || PPC64)
+		depends on ZONE_DEVICE
+		...
+		depends on MEMORY_HOTPLUG
+		depends on MEMORY_HOTREMOVE
+		...
 
-Regards,
-Erin
+Whatever out-of-tree changes you have to address all of those are 
+clearly implemented incorrectly; *that's* your problem.
+
+>> where *all* the I/O is in the top half of the PA space. We already
+>> constrain RAM in this very function to those regions which fit into
+>> the linear map, and if you're accessing anything other than RAM
+>> through the linear map you're probably doing something wrong.
+> 
+> If I understand this part correctly, since ARM64 has applied the
+> memory limit already, does it mean that probably we should fix
+> something in the region_intersects() or add an extra check in the
+> hmm_devmem_add(), instead of limiting the iomem_resource?
+
+It means we should implement memory hotplug correctly. Which, 
+unfortunately, I happen to know is really hard (it's something I've been 
+looking at from the device-DAX angle).
+
+>> Furthermore, the physical region covered by the linear map doesn't
+>> necessarily start at physical address 0 anyway - see PHYS_OFFSET.
+> 
+> Hmm...okay...but there still should be a protection somewhere if
+> it happens to access a page structure via pfn_to_page() while the
+> PFN is not covered by the vmemmap linear mapping, right?
+
+There already is: pfn_valid() will return false for anything outside the 
+intersection of memblock regions and the linear map region as calculated 
+by arm64_memblock_init(); anything calling pfn_to_page() without 
+checking pfn_valid() first is fundamentally broken. Or if you have 
+out-of-tree changes to the pfn_valid() implementation then all bets are 
+off, and it's not something for mainline to work around.
+
+Robin.
