@@ -1,70 +1,44 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 11 May 2018 15:19:20 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.18
-Message-ID: <5AF5A668.8010903@hisilicon.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 11 May 2018 15:20:13 +0100
+Subject: [PATCH 2/4] KVM: arm/arm64: VGIC/ITS: Promote irq_lock() in
+ update_affinity
+In-Reply-To: <20180511142015.21953-1-andre.przywara@arm.com>
+References: <20180511142015.21953-1-andre.przywara@arm.com>
+Message-ID: <20180511142015.21953-3-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
+Apparently the development of update_affinity() overlapped with the
+promotion of irq_lock to be _irqsave, so the patch didn't convert this
+lock over. This will make lockdep complain.
 
-Please help to pull the following changes.
-Thanks!
+Fix this by disabling IRQs around the lock.
 
-Best Regards,
-Wei
-
+Cc: stable at vger.kernel.org
+Fixes: 08c9fd042117 ("KVM: arm/arm64: vITS: Add a helper to update the affinity of an LPI")
+Reported-by: Jan Glauber <jan.glauber@caviumnetworks.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
+ virt/kvm/arm/vgic/vgic-its.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.18
-
-for you to fetch changes up to 84f7ed0f22e8eb42e81b69cd7772c3600c9f4959:
-
-  arm64: dts: hi3798cv200: enable emmc support for poplar board (2018-05-11 11:23:10 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.18
-
-- Add mailbox, stub clock, CPU frequency scaling, thermal cooling
-  management and pcie msi interruption support for hi3660
-- Add LPC support for hip06 and hip07
-- Add PCIe, usb and emmc support for hi3798cv200
-
-----------------------------------------------------------------
-John Garry (2):
-      arm64: dts: hisi: Enable Hisi LPC node for hip06
-      arm64: dts: hisi: Enable Hisi LPC node for hip07
-
-Kaihua Zhong (2):
-      dts: arm64: hi3660: Add mailbox node
-      dts: arm64: hi3660: Add stub clock node
-
-Leo Yan (1):
-      dts: arm64: hi3660: Add CPU frequency scaling support
-
-Shawn Guo (3):
-      arm64: dts: hi3798cv200: enable PCIe support for poplar board
-      arm64: dts: hi3798cv200: enable usb2 support for poplar board
-      arm64: dts: hi3798cv200: enable emmc support for poplar board
-
-Tao Wang (1):
-      dts: arm64: hi3660: Add thermal cooling management
-
-Yao Chen (1):
-      arm64: dts: hi3660: Add pcie msi interrupt attribute
-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 147 +++++++++++++++
- .../boot/dts/hisilicon/hi3798cv200-poplar.dts      |  38 ++++
- arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 205 ++++++++++++++++++++-
- arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |   8 +
- arch/arm64/boot/dts/hisilicon/hip06.dtsi           |  21 +++
- arch/arm64/boot/dts/hisilicon/hip07-d05.dts        |   4 +
- arch/arm64/boot/dts/hisilicon/hip07.dtsi           |  14 ++
- arch/arm64/boot/dts/hisilicon/poplar-pinctrl.dtsi  |  98 ++++++++++
- 8 files changed, 532 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/poplar-pinctrl.dtsi
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 41abf92f2699..51a80b600632 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -350,10 +350,11 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+ static int update_affinity(struct vgic_irq *irq, struct kvm_vcpu *vcpu)
+ {
+ 	int ret = 0;
++	unsigned long flags;
+ 
+-	spin_lock(&irq->irq_lock);
++	spin_lock_irqsave(&irq->irq_lock, flags);
+ 	irq->target_vcpu = vcpu;
+-	spin_unlock(&irq->irq_lock);
++	spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 
+ 	if (irq->hw) {
+ 		struct its_vlpi_map map;
+-- 
+2.14.1
