@@ -1,44 +1,47 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Sat, 12 May 2018 12:33:31 +0200
-Subject: [PATCH] edac: altera: Add Stratix10 SDRAM Uncorrectable Errors
-In-Reply-To: <1526079610-5527-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1526079610-5527-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <20180512103331.GC27593@pd.tnic>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 12 May 2018 13:13:36 +0200
+Subject: [PATCH v6 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20180504185052.bjhfkvpgrblc7tfc@pengutronix.de>
+References: <20180305102524.5905-1-o.rempel@pengutronix.de>
+ <20180305102524.5905-4-o.rempel@pengutronix.de>
+ <20180504185052.bjhfkvpgrblc7tfc@pengutronix.de>
+Message-ID: <1937901.oyadCYFYNo@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 06:00:10PM -0500, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+On Friday, May 4, 2018 8:50:52 PM CEST Oleksij Rempel wrote:
+> Hallo Andrew,
+> I need your ACK or NACK for this patch.
 > 
-> On Stratix10, uncorrectable errors are routed to the SError
-> exception instead of the IRQ exceptions. In Stratix10,
-> uncorrectable SErrors must be treated as fatal and will cause
-> a panic.
-> Older Altera/Intel parts printed out a message for UE so do
-> that here using the notifier framework.
+> This function is used to configure external PMIC to interpret
+> signal which will be triggered by pm_power_off as power off.
+> Since same signal can be used for stand by, I linked PMIC configuration
+> with pm_power_off_prepare to avoid possible conflicts.
 > 
-> Record the UE in sticky registers that retain the state
-> through a reset. Check these registers on probe and printout the
-> error on startup.
+> On Mon, Mar 05, 2018 at 11:25:20AM +0100, Oleksij Rempel wrote:
+> > Export pm_power_off_prepare. It is needed to implement power off on
+> > Freescale/NXP iMX6 based boards with external power management
+> > integrated circuit (PMIC).
+> > 
+> > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> > ---
+> >  kernel/reboot.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/kernel/reboot.c b/kernel/reboot.c
+> > index e4ced883d8de..350be6baa60d 100644
+> > --- a/kernel/reboot.c
+> > +++ b/kernel/reboot.c
+> > @@ -49,6 +49,7 @@ int reboot_force;
+> >   */
+> >  
+> >  void (*pm_power_off_prepare)(void);
+> > +EXPORT_SYMBOL(pm_power_off_prepare);
+
+Why not EXPORT_SYMBOL_GPL() ?
+
+> >  
+> >  /**
+> >   *	emergency_restart - reboot the system
 > 
-> Depends on previous patch:
-> commit 2a4ff60626b0 ("arm64: dts: stratix10: add sdram ecc")
 > 
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
->  drivers/edac/altera_edac.c | 67 +++++++++++++++++++++++++++++++++++++++-------
->  drivers/edac/altera_edac.h |  8 +++++-
->  2 files changed, 64 insertions(+), 11 deletions(-)
-
-Ok, I think I have collected everything. Pls double-check me I haven't missed
-anything:
-
-https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/log/?h=for-next
-
-Thx.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
