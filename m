@@ -1,53 +1,64 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 12 May 2018 16:11:00 +0200
-Subject: [PATCH v1 04/13] soc: rockchip: power-domain: Fix wrong value
- when power up pd
-In-Reply-To: <1526009458-28579-5-git-send-email-zhangqing@rock-chips.com>
-References: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
- <1526009458-28579-5-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <2785491.5jVj6F0Ubh@phil>
+From: greg@kroah.com (Greg KH)
+Date: Sat, 12 May 2018 16:15:22 +0200
+Subject: [PATCH] [stable 4.9] arm64: Add work around for Arm Cortex-A55
+ Erratum 1024718
+In-Reply-To: <843d0226-f715-6a09-276f-ef14d5a06185@arm.com>
+References: <1526046675-23790-1-git-send-email-suzuki.poulose@arm.com>
+ <20180511154721.GC17038@kroah.com>
+ <843d0226-f715-6a09-276f-ef14d5a06185@arm.com>
+Message-ID: <20180512141522.GE6591@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
-
-Am Freitag, 11. Mai 2018, 05:30:49 CEST schrieb Elaine Zhang:
-
-please provide a patch description. This seems to affect rk3328
-alone right now, but seems that rk3328 could only ever turn off
-power-domains but never turn them on again, right?
-
-Authorship comment from my previous comment applies here
-as well.
-
-And please add a
-
-Fixes: 9bb17ce8edb3 ("soc: rockchip: power-domain: Support domain control in hiword-registers")
-Cc: stable at vger.kernel.org
-
-to the patch description.
-
-
-Thanks
-Heiko
-
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-> ---
->  drivers/soc/rockchip/pm_domains.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, May 11, 2018 at 05:06:20PM +0100, Suzuki K Poulose wrote:
+> On 11/05/18 16:47, Greg KH wrote:
+> > On Fri, May 11, 2018 at 02:51:15PM +0100, Suzuki K Poulose wrote:
+> > > commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
+> > > 
+> > > Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
+> > > from an erratum 1024718, which causes incorrect updates when DBM/AP
+> > > bits in a page table entry is modified without a break-before-make
+> > > sequence. The work around is to disable the hardware DBM feature
+> > > on the affected cores. The hardware Access Flag management features
+> > > is not affected.
+> > > 
+> > > The hardware DBM feature is a non-conflicting capability, i.e, the
+> > > kernel could handle cores using the feature and those without having
+> > > the features running at the same time. So this work around is detected
+> > > at early boot time, rather than delaying it until the CPUs are brought
+> > > up into the kernel with MMU turned on. This also avoids other complexities
+> > > with late CPUs turning online, with or without the hardware DBM features.
+> > > 
+> > > Cc: stable at vger.kernel.org # v4.9
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > > ---
+> > > Note: The upstream commit is on top of a reworked capability
+> > > infrastructure for arm64 heterogeneous systems, which allows
+> > > delaying the CPU model checks. This backport is based on the
+> > > original version of the patch [0], which checks the affected
+> > > CPU models during the early boot.
+> > > 
+> > > [0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
+> > 
+> > Now applied, thanks.
 > 
-> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-> index ebd7c41898c0..01d4ba26a054 100644
-> --- a/drivers/soc/rockchip/pm_domains.c
-> +++ b/drivers/soc/rockchip/pm_domains.c
-> @@ -264,7 +264,7 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
->  		return;
->  	else if (pd->info->pwr_w_mask)
->  		regmap_write(pmu->regmap, pmu->info->pwr_offset,
-> -			     on ? pd->info->pwr_mask :
-> +			     on ? pd->info->pwr_w_mask :
->  			     (pd->info->pwr_mask | pd->info->pwr_w_mask));
->  	else
->  		regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
+> Greg,
 > 
+> I have the backport for v4.4 ready. But it needs to cherry-pick a commit
+> (commit 30b5ba5cf33 : arm64: introduce mov_q macro to move a constant into a 64-bit register)
+> which adds the assembly helper and that seems to result in a conflict with
+> an obvious resolution. What do you prefer in this case ?
+> 
+> 1) Go ahead with the cherry-pick
+
+Have 2 patches, the first be the cherry pick and the second be your
+backported other patch.  I almost always want the original patches that
+are in Linus's tree, otherwise we always get the
+merging/squashing/rewrite wrong.
+
+thanks,
+
+greg k-h
