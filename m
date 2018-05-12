@@ -1,32 +1,23 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Sat, 12 May 2018 07:23:58 -0500
-Subject: [PATCH V3] ARM: dts: da850-evm: add WP and CD to MMC
-Message-ID: <20180512122358.17459-1-aford173@gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Sat, 12 May 2018 14:38:29 +0200
+Subject: [PATCH v3 3/3] arm64: Force swiotlb bounce buffering for
+ non-coherent DMA with large CWG
+In-Reply-To: <20180511135547.34521-4-catalin.marinas@arm.com>
+References: <20180511135547.34521-1-catalin.marinas@arm.com>
+ <20180511135547.34521-4-catalin.marinas@arm.com>
+Message-ID: <20180512123829.GA8024@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy mode uses the write protect and card detect but DT does not.
-This patch enables Write-Protect and Card-Detect pins for the MMC card, and
-the gpio-ranges property sets the gpio pinmuxing for those respective pins.
+On Fri, May 11, 2018 at 02:55:47PM +0100, Catalin Marinas wrote:
+> On systems with a Cache Writeback Granule (CTR_EL0.CWG) greater than
+> ARCH_DMA_MINALIGN, DMA cache maintenance on sub-CWG ranges is not safe,
+> leading to data corruption. If such configuration is detected, the
+> kernel will force swiotlb bounce buffering for all non-coherent devices.
 
-Signed-off-by: Adam Ford <aford173@gmail.com>
---
+Per the previous discussion I understand that so far this is a
+purely theoretical condition.  Given that I'd rather avoid commiting
+this patch and just refuse too boot in this case.
 
-V3: Update description of the patch. Rebase on davinci 4.18/dt
-V2: Rebase on davinci master and remove GPIO pinmuxing
-
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index e91f81f21b22..2e817da37fdb 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -149,6 +149,8 @@
- 	status = "okay";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-+	cd-gpios = <&gpio 64 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio 65 GPIO_ACTIVE_HIGH>;
- };
- 
- &spi1 {
--- 
-2.17.0
+In a merge window or two I plan to have a noncoherent flag in struct
+device, at which point we can handle this entirely in common code.
