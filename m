@@ -1,56 +1,53 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 12 May 2018 16:08:40 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a77970: add SMP support
-In-Reply-To: <110ba99c-1a8d-98a1-3ca0-5fc99e79572b@cogentembedded.com>
-References: <14666252.G84Ipxe6EL@wasted.cogentembedded.com>
- <54dbd1d2-8279-5073-cffb-c647fba91e42@cogentembedded.com>
- <CAMuHMdUqVVWz0jLb2Vmrkk3BQBsYVsCOW1zsaPUi8o6jr_mojQ@mail.gmail.com>
- <db136ee6-4ce6-756e-743d-3342b2e65f2b@cogentembedded.com>
- <20180509190517.ho5og3grbuzf4wz4@verge.net.au>
- <110ba99c-1a8d-98a1-3ca0-5fc99e79572b@cogentembedded.com>
-Message-ID: <20180512140836.jwducouc7j4sm5od@verge.net.au>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 12 May 2018 16:11:00 +0200
+Subject: [PATCH v1 04/13] soc: rockchip: power-domain: Fix wrong value
+ when power up pd
+In-Reply-To: <1526009458-28579-5-git-send-email-zhangqing@rock-chips.com>
+References: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
+ <1526009458-28579-5-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <2785491.5jVj6F0Ubh@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 07:43:03PM +0300, Sergei Shtylyov wrote:
-> Hello!
-> 
-> On 05/09/2018 10:05 PM, Simon Horman wrote:
-> 
-> >>>> Add the device node for the second Cortex-A53 CPU core.
-> >>>>
-> >>>> Based on the original (and large) patch by Daisuke Matsushita
-> >>>> <daisuke.matsushita.ns@hitachi.com>.
-> >>>>
-> >>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> >>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>
-> >>> Dupe of https://patchwork.kernel.org/patch/10032875/
-> >>
-> >>    Sorry!
-> >>    Not an exact dupe, though -- mine has clock/power #define's used,
-> >> yours -- only bare #s. :-)
-> >>
-> >>> From series "[PATCH 0/2] arm64: dts: renesas: r8a77970: Add SMP Support"
-> >>> (https://www.spinics.net/lists/linux-renesas-soc/msg19681.html)
-> >>
-> >>    Hmm... what's the fate of this series?
-> > 
-> > There is now a v2 of Geert's series which incorporates your enhancements.
-> 
->    I suggested to respin it. :-)
+Hi Elaine,
 
-Thanks, that would have been my suggestion too :)
+Am Freitag, 11. Mai 2018, 05:30:49 CEST schrieb Elaine Zhang:
 
-> > I will apply that.
+please provide a patch description. This seems to affect rk3328
+alone right now, but seems that rk3328 could only ever turn off
+power-domains but never turn them on again, right?
+
+Authorship comment from my previous comment applies here
+as well.
+
+And please add a
+
+Fixes: 9bb17ce8edb3 ("soc: rockchip: power-domain: Support domain control in hiword-registers")
+Cc: stable at vger.kernel.org
+
+to the patch description.
+
+
+Thanks
+Heiko
+
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> ---
+>  drivers/soc/rockchip/pm_domains.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->    Thank you.
->    For the record, I had better luck than Geert testing SMP on Eagle:
->    only CPU0 couldn't be offlined (and I was unable to find a
->    workaround), others could be on/ offlined w/o issues. As for
->    suspend/resume -- it did work but I could only test s2idle
->    (/sys/power/mem_sleep had no other variants)...
-
-Thanks. Perhaps you have a more recent firmware than Geert.
-I would expect the CPU0 issue you describe will be resolved in time in
-the firmware.
+> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+> index ebd7c41898c0..01d4ba26a054 100644
+> --- a/drivers/soc/rockchip/pm_domains.c
+> +++ b/drivers/soc/rockchip/pm_domains.c
+> @@ -264,7 +264,7 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
+>  		return;
+>  	else if (pd->info->pwr_w_mask)
+>  		regmap_write(pmu->regmap, pmu->info->pwr_offset,
+> -			     on ? pd->info->pwr_mask :
+> +			     on ? pd->info->pwr_w_mask :
+>  			     (pd->info->pwr_mask | pd->info->pwr_w_mask));
+>  	else
+>  		regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
+> 
