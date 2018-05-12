@@ -1,50 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 12 May 2018 21:00:22 +0200
-Subject: [PATCH v2] tty: implement led triggers
-In-Reply-To: <01dcbf5c-70a0-b067-20c3-f99e22ed4512@arm.com>
-References: <0c1bb915-bd92-4433-61ec-78fdba453396@arm.com>
- <20180503201952.16592-1-u.kleine-koenig@pengutronix.de>
- <20180507080252.GO2285@localhost>
- <20180507084127.ekpd3ze2itkzo7fd@pengutronix.de>
- <20180507092710.GQ2285@localhost> <20180510111434.GC6977@amd>
- <01dcbf5c-70a0-b067-20c3-f99e22ed4512@arm.com>
-Message-ID: <20180512190022.rx7ix5gpx5kncvcj@pengutronix.de>
+From: david@lechnology.com (David Lechner)
+Date: Sat, 12 May 2018 16:11:06 -0500
+Subject: =?UTF-8?Q?Re:_[PATCH_v10_00/27]_ARM:_davinci:_convert_to_common_clo?=
+ =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
+In-Reply-To: <45ce3129-4a9e-54d2-e594-49b451571842@ti.com>
+References: <20180509172606.29387-1-david@lechnology.com>
+ <45ce3129-4a9e-54d2-e594-49b451571842@ti.com>
+Message-ID: <0b62ac7b-aa02-6641-2a02-6cefb4076262@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 12:25:21PM +0100, Robin Murphy wrote:
-> On 10/05/18 12:14, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > > > > @@ -499,6 +500,7 @@ static void flush_to_ldisc(struct work_struct *work)
-> > > > > >   		struct tty_buffer *head = buf->head;
-> > > > > >   		struct tty_buffer *next;
-> > > > > >   		int count;
-> > > > > > +		unsigned long delay = 50 /* ms */;
-> > > > > 
-> > > > > Comment after the semicolon?
-> > > > 
-> > > > Given that this comment is about the 50 and not the delay member, I
-> > > > prefer it before the ;.
-> > > 
-> > > Hmm. I personally find it hard to read and can only find about 30
-> > > instances of this comment style (for assignments) in the kernel. And
-> > > arguably the comment applies equally well to the delay variable in this
-> > > case too.
-> > 
-> > It is not too traditional, but I believe it makes sense....
-> > 
-> > (and yes, I wish we had kernel in Rust, so we could have real units
-> > attached to our variables...)
+On 05/11/2018 10:26 AM, Sekhar Nori wrote:
+> Hi David,
 > 
-> Well, the variable itself could always be named "delay_ms" if it's really
-> that important.
+> On Wednesday 09 May 2018 10:55 PM, David Lechner wrote:
+>> This series converts mach-davinci to use the common clock framework.
+>>
+>> The series works like this, the first 3 patches fix some issues with the clock
+>> drivers that have already been accepted into the mainline kernel.
+> 
+> I have not yet looked at the patches, but I got a bunch of W=1 warnings
+> and some sparse warnings when building your branch. Please take a look
+> at these. Unfortunately the output is mixed between sparse and compiler.
+> The "expression using sizeof(void)" can be ignored as its a known issue
+> with sparse, I believe.
+> 
 
-FTR: That's what I did for v3.
+I've started a common-clk-v11 branch on my GitHub that fixes most of these.
+Also submitted "clk: davinci: psc-dm355: fix ASP0/1 clkdev lookups" that
+fixes a couple more. I've purposely not fixed the davinci_clk_reset_* functions
+since there is already a patch that will remove those functions in the future.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I'll wait a bit longer for DT review before re-sending v11 of this series.
