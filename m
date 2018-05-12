@@ -1,331 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 12 May 2018 13:22:16 +0200
-Subject: [PATCH 7/7 v2] ARM: dts: Fix DTC warnings
-Message-ID: <20180512112216.18261-1-linus.walleij@linaro.org>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Sat, 12 May 2018 20:31:37 +0900
+Subject: [BUGFIX PATCH v3 0/4] arm: kprobes: Fix to prohibit probing on
+ unsafe functions
+In-Reply-To: <20180508112503.GD16141@n2100.armlinux.org.uk>
+References: <152540727123.29650.13679359124038587629.stgit@devbox>
+ <20180508112503.GD16141@n2100.armlinux.org.uk>
+Message-ID: <20180512203137.4c00f301c4359de1f6253154@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DTC was warning a lot about unit names etc, I think I fixed
-them all. Stopping to include skeleton.dtsi fixes the last one.
+Hi Russell,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Stop including skeleton.dtsi and rid the last warning.
----
- arch/arm/boot/dts/gemini-dlink-dir-685.dts |  5 ++---
- arch/arm/boot/dts/gemini-dlink-dns-313.dts |  5 ++---
- arch/arm/boot/dts/gemini-nas4220b.dts      | 12 +++++-------
- arch/arm/boot/dts/gemini-rut1xx.dts        | 10 ++++------
- arch/arm/boot/dts/gemini-sq201.dts         | 10 ++++------
- arch/arm/boot/dts/gemini-wbd111.dts        | 15 +++++++--------
- arch/arm/boot/dts/gemini-wbd222.dts        | 14 ++++++--------
- arch/arm/boot/dts/gemini.dtsi              |  2 --
- 8 files changed, 30 insertions(+), 43 deletions(-)
+On Tue, 8 May 2018 12:25:03 +0100
+Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-diff --git a/arch/arm/boot/dts/gemini-dlink-dir-685.dts b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-index 89ce0d1916e3..fb5c954ab95a 100644
---- a/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-+++ b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-@@ -13,7 +13,7 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
--	memory {
-+	memory at 0 {
- 		/* 128 MB SDRAM in 2 x Hynix HY5DU121622DTP-D43 */
- 		device_type = "memory";
- 		reg = <0x00000000 0x8000000>;
-@@ -26,8 +26,7 @@
- 
- 	gpio_keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
-+
- 		button-esc {
- 			debounce-interval = <50>;
- 			wakeup-source;
-diff --git a/arch/arm/boot/dts/gemini-dlink-dns-313.dts b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-index da78a0aa389a..d1329322b968 100644
---- a/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-+++ b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-@@ -15,7 +15,7 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
--	memory {
-+	memory at 0 {
- 		/* 64 MB SDRAM in a Nanya NT5DS32M16BS-6K package */
- 		device_type = "memory";
- 		reg = <0x00000000 0x4000000>;
-@@ -32,8 +32,7 @@
- 
- 	gpio_keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
-+
- 		button-esc {
- 			debounce-interval = <50>;
- 			wakeup-source;
-diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts b/arch/arm/boot/dts/gemini-nas4220b.dts
-index 9f78803b2456..963ea890c87f 100644
---- a/arch/arm/boot/dts/gemini-nas4220b.dts
-+++ b/arch/arm/boot/dts/gemini-nas4220b.dts
-@@ -14,7 +14,7 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
--	memory { /* 128 MB */
-+	memory at 0 { /* 128 MB */
- 		device_type = "memory";
- 		reg = <0x00000000 0x8000000>;
- 	};
-@@ -26,10 +26,8 @@
- 
- 	gpio_keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 
--		button at 29 {
-+		button-setup {
- 			debounce-interval = <50>;
- 			wakeup-source;
- 			linux,code = <KEY_SETUP>;
-@@ -37,7 +35,7 @@
- 			/* Conflict with TVC */
- 			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
- 		};
--		button at 31 {
-+		button-restart {
- 			debounce-interval = <50>;
- 			wakeup-source;
- 			linux,code = <KEY_RESTART>;
-@@ -49,13 +47,13 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
--		led at 28 {
-+		led-orange-hdd {
- 			label = "nas4220b:orange:hdd";
- 			/* Conflict with TVC */
- 			gpios = <&gpio1 28 GPIO_ACTIVE_HIGH>;
- 			default-state = "on";
- 		};
--		led at 30 {
-+		led-green-os {
- 			label = "nas4220b:green:os";
- 			/* Conflict with TVC */
- 			gpios = <&gpio1 30 GPIO_ACTIVE_HIGH>;
-diff --git a/arch/arm/boot/dts/gemini-rut1xx.dts b/arch/arm/boot/dts/gemini-rut1xx.dts
-index a2f14ee37599..eb4f0bf074da 100644
---- a/arch/arm/boot/dts/gemini-rut1xx.dts
-+++ b/arch/arm/boot/dts/gemini-rut1xx.dts
-@@ -14,7 +14,7 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
--	memory { /* 128 MB */
-+	memory at 0 { /* 128 MB */
- 		device_type = "memory";
- 		reg = <0x00000000 0x8000000>;
- 	};
-@@ -26,10 +26,8 @@
- 
- 	gpio_keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 
--		button at 28 {
-+		button-setup {
- 			debounce-interval = <50>;
- 			wakeup-source;
- 			linux,code = <KEY_SETUP>;
-@@ -41,14 +39,14 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
--		led at 7 {
-+		led-gsm {
- 			/* FIXME: add the LED color */
- 			label = "rut1xx::gsm";
- 			/* Conflict with ICE */
- 			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
- 			default-state = "on";
- 		};
--		led at 31 {
-+		led-power {
- 			/* FIXME: add the LED color */
- 			label = "rut1xx::power";
- 			/* Conflict with NAND CE0 */
-diff --git a/arch/arm/boot/dts/gemini-sq201.dts b/arch/arm/boot/dts/gemini-sq201.dts
-index 229c0267617a..e5cf9d1a98cd 100644
---- a/arch/arm/boot/dts/gemini-sq201.dts
-+++ b/arch/arm/boot/dts/gemini-sq201.dts
-@@ -14,7 +14,7 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
--	memory { /* 128 MB */
-+	memory at 0 { /* 128 MB */
- 		device_type = "memory";
- 		reg = <0x00000000 0x8000000>;
- 	};
-@@ -26,10 +26,8 @@
- 
- 	gpio_keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 
--		button at 18 {
-+		button-setup {
- 			debounce-interval = <50>;
- 			wakeup-source;
- 			linux,code = <KEY_SETUP>;
-@@ -41,14 +39,14 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
--		led at 20 {
-+		led-green-info {
- 			label = "sq201:green:info";
- 			/* Conflict with parallel flash */
- 			gpios = <&gpio0 20 GPIO_ACTIVE_HIGH>;
- 			default-state = "on";
- 			linux,default-trigger = "heartbeat";
- 		};
--		led at 31 {
-+		led-green-usb {
- 			label = "sq201:green:usb";
- 			/* Conflict with parallel and NAND flash */
- 			gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
-diff --git a/arch/arm/boot/dts/gemini-wbd111.dts b/arch/arm/boot/dts/gemini-wbd111.dts
-index b31a9189083f..29af86cd10f7 100644
---- a/arch/arm/boot/dts/gemini-wbd111.dts
-+++ b/arch/arm/boot/dts/gemini-wbd111.dts
-@@ -14,7 +14,8 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
--	memory { /* 128 MB */
-+	memory at 0 {
-+		/* 128 MB */
- 		device_type = "memory";
- 		reg = <0x00000000 0x8000000>;
- 	};
-@@ -26,10 +27,8 @@
- 
- 	gpio_keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 
--		button at 5 {
-+		button-setup {
- 			debounce-interval = <50>;
- 			wakeup-source;
- 			linux,code = <KEY_SETUP>;
-@@ -42,25 +41,25 @@
- 	leds {
- 		compatible = "gpio-leds";
- 
--		led at 1 {
-+		led-red-l3 {
- 			label = "wbd111:red:L3";
- 			/* Conflict with TVC and extended parallel flash */
- 			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
- 			default-state = "off";
- 		};
--		led at 2 {
-+		led-green-l4 {
- 			label = "wbd111:green:L4";
- 			/* Conflict with TVC and extended parallel flash */
- 			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
- 			default-state = "off";
- 		};
--		led at 3 {
-+		led-red-l4 {
- 			label = "wbd111:red:L4";
- 			/* Conflict with TVC and extended parallel flash */
- 			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
- 			default-state = "off";
- 		};
--		led at 5 {
-+		led-greeb-l3 {
- 			label = "wbd111:green:L3";
- 			/* Conflict with TVC and extended parallel flash */
- 			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-diff --git a/arch/arm/boot/dts/gemini-wbd222.dts b/arch/arm/boot/dts/gemini-wbd222.dts
-index 0be867fbfc69..24e6ae3616f7 100644
---- a/arch/arm/boot/dts/gemini-wbd222.dts
-+++ b/arch/arm/boot/dts/gemini-wbd222.dts
-@@ -14,7 +14,7 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
--	memory { /* 128 MB */
-+	memory at 0 { /* 128 MB */
- 		device_type = "memory";
- 		reg = <0x00000000 0x8000000>;
- 	};
-@@ -26,10 +26,8 @@
- 
- 	gpio_keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 
--		button at 5 {
-+		button-setup {
- 			debounce-interval = <50>;
- 			wakeup-source;
- 			linux,code = <KEY_SETUP>;
-@@ -42,25 +40,25 @@
- 	leds {
- 		compatible = "gpio-leds";
- 
--		led at 1 {
-+		led-red-l3 {
- 			label = "wbd111:red:L3";
- 			/* Conflict with TVC and extended parallel flash */
- 			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
- 			default-state = "off";
- 		};
--		led at 2 {
-+		led-green-l4 {
- 			label = "wbd111:green:L4";
- 			/* Conflict with TVC and extended parallel flash */
- 			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
- 			default-state = "off";
- 		};
--		led at 3 {
-+		led-red-l4 {
- 			label = "wbd111:red:L4";
- 			/* Conflict with TVC and extended parallel flash */
- 			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
- 			default-state = "off";
- 		};
--		led at 5 {
-+		led-green-l3 {
- 			label = "wbd111:green:L3";
- 			/* Conflict with TVC and extended parallel flash */
- 			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
-index 0568baca500a..eb752e9495de 100644
---- a/arch/arm/boot/dts/gemini.dtsi
-+++ b/arch/arm/boot/dts/gemini.dtsi
-@@ -3,8 +3,6 @@
-  * Device Tree file for Cortina systems Gemini SoC
-  */
- 
--/include/ "skeleton.dtsi"
--
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/clock/cortina,gemini-clock.h>
- #include <dt-bindings/reset/cortina,gemini-reset.h>
+> On Fri, May 04, 2018 at 01:14:31PM +0900, Masami Hiramatsu wrote:
+> > Hi,
+> > 
+> > This is the 3rd version of bugfix series for kprobes on arm.
+> > This series fixes 4 different issues which I found.
+> > 
+> >  - Fix to use smp_processor_id() after disabling preemption.
+> >  - Prohibit probing on optimized_callback() for avoiding
+> >    recursive probe.
+> >  - Prohibit kprobes on do_undefinstr() by same reason.
+> >  - Prohibit kprobes on get_user() by same reason.
+> > 
+> > >From v2, I included another 2 bugfixes (1/4 and 2/4)
+> > which are not merged yet, and added "Cc: stable at vger.kernel.org",
+> > since there are obvious bugs.
+> 
+> Please submit them to the patch system, thanks.
+
+Could you tell me what you mean the patch system?
+
+Thank you,
+
+> 
+> > 
+> > Thanks,
+> > 
+> > ---
+> > 
+> > Masami Hiramatsu (4):
+> >       arm: kprobes: Fix to use get_kprobe_ctlblk after irq-disabed
+> >       arm: kprobes: Prohibit probing on optimized_callback
+> >       arm: kprobes: Prohibit kprobes on do_undefinstr
+> >       arm: kprobes: Prohibit kprobes on get_user functions
+> > 
+> > 
+> >  arch/arm/include/asm/assembler.h  |   10 ++++++++++
+> >  arch/arm/kernel/traps.c           |    5 ++++-
+> >  arch/arm/lib/getuser.S            |   10 ++++++++++
+> >  arch/arm/probes/kprobes/opt-arm.c |    4 +++-
+> >  4 files changed, 27 insertions(+), 2 deletions(-)
+> > 
+> > --
+> > Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
+
+
 -- 
-2.17.0
+Masami Hiramatsu <mhiramat@kernel.org>
