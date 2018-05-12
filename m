@@ -1,148 +1,67 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 11 May 2018 18:58:07 -0500
-Subject: [PATCH v9 12/12] arm64: topology: divorce MC scheduling domain from
- core_siblings
-In-Reply-To: <20180511235807.30834-1-jeremy.linton@arm.com>
-References: <20180511235807.30834-1-jeremy.linton@arm.com>
-Message-ID: <20180511235807.30834-13-jeremy.linton@arm.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Sat, 12 May 2018 09:42:21 +0900
+Subject: [BUGFIX PATCH v3 0/4] arm: kprobes: Fix to prohibit probing on
+ unsafe functions
+In-Reply-To: <20180508112503.GD16141@n2100.armlinux.org.uk>
+References: <152540727123.29650.13679359124038587629.stgit@devbox>
+ <20180508112503.GD16141@n2100.armlinux.org.uk>
+Message-ID: <20180512094221.e911fa262d8ca9a70ab8869e@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have an accurate view of the physical topology
-we need to represent it correctly to the scheduler. Generally MC
-should equal the LLC in the system, but there are a number of
-special cases that need to be dealt with.
+Hi Greg,
 
-In the case of NUMA in socket, we need to assure that the sched
-domain we build for the MC layer isn't larger than the DIE above it.
-Similarly for LLC's that might exist in cross socket interconnect or
-directory hardware we need to assure that MC is shrunk to the socket
-or NUMA node.
+Could you pick this series to stable?
 
-This patch builds a sibling mask for the LLC, and then picks the
-smallest of LLC, socket siblings, or NUMA node siblings, which
-gives us the behavior described above. This is ever so slightly
-different than the similar alternative where we look for a cache
-layer less than or equal to the socket/NUMA siblings.
+Thank you,
 
-The logic to pick the MC layer affects all arm64 machines, but
-only changes the behavior for DT/MPIDR systems if the NUMA domain
-is smaller than the core siblings (generally set to the cluster).
-Potentially this fixes a possible bug in DT systems, but really
-it only affects ACPI systems where the core siblings is correctly
-set to the socket siblings. Thus all currently available ACPI
-systems should have MC equal to LLC, including the NUMA in socket
-machines where the LLC is partitioned between the NUMA nodes.
+On Tue, 8 May 2018 12:25:03 +0100
+Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Vijaya Kumar K <vkilari@codeaurora.org>
-Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
-Tested-by: Tomasz Nowicki <Tomasz.Nowicki@cavium.com>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Morten Rasmussen <morten.rasmussen@arm.com>
----
- arch/arm64/include/asm/topology.h |  2 ++
- arch/arm64/kernel/topology.c      | 36 +++++++++++++++++++++++++++++++++++-
- 2 files changed, 37 insertions(+), 1 deletion(-)
+> On Fri, May 04, 2018 at 01:14:31PM +0900, Masami Hiramatsu wrote:
+> > Hi,
+> > 
+> > This is the 3rd version of bugfix series for kprobes on arm.
+> > This series fixes 4 different issues which I found.
+> > 
+> >  - Fix to use smp_processor_id() after disabling preemption.
+> >  - Prohibit probing on optimized_callback() for avoiding
+> >    recursive probe.
+> >  - Prohibit kprobes on do_undefinstr() by same reason.
+> >  - Prohibit kprobes on get_user() by same reason.
+> > 
+> > >From v2, I included another 2 bugfixes (1/4 and 2/4)
+> > which are not merged yet, and added "Cc: stable at vger.kernel.org",
+> > since there are obvious bugs.
+> 
+> Please submit them to the patch system, thanks.
+> 
+> > 
+> > Thanks,
+> > 
+> > ---
+> > 
+> > Masami Hiramatsu (4):
+> >       arm: kprobes: Fix to use get_kprobe_ctlblk after irq-disabed
+> >       arm: kprobes: Prohibit probing on optimized_callback
+> >       arm: kprobes: Prohibit kprobes on do_undefinstr
+> >       arm: kprobes: Prohibit kprobes on get_user functions
+> > 
+> > 
+> >  arch/arm/include/asm/assembler.h  |   10 ++++++++++
+> >  arch/arm/kernel/traps.c           |    5 ++++-
+> >  arch/arm/lib/getuser.S            |   10 ++++++++++
+> >  arch/arm/probes/kprobes/opt-arm.c |    4 +++-
+> >  4 files changed, 27 insertions(+), 2 deletions(-)
+> > 
+> > --
+> > Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
 
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-index 6b10459e6905..df48212f767b 100644
---- a/arch/arm64/include/asm/topology.h
-+++ b/arch/arm64/include/asm/topology.h
-@@ -8,8 +8,10 @@ struct cpu_topology {
- 	int thread_id;
- 	int core_id;
- 	int package_id;
-+	int llc_id;
- 	cpumask_t thread_sibling;
- 	cpumask_t core_sibling;
-+	cpumask_t llc_siblings;
- };
- 
- extern struct cpu_topology cpu_topology[NR_CPUS];
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 047d98e68502..7415c166281f 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/acpi.h>
- #include <linux/arch_topology.h>
-+#include <linux/cacheinfo.h>
- #include <linux/cpu.h>
- #include <linux/cpumask.h>
- #include <linux/init.h>
-@@ -214,7 +215,19 @@ EXPORT_SYMBOL_GPL(cpu_topology);
- 
- const struct cpumask *cpu_coregroup_mask(int cpu)
- {
--	return &cpu_topology[cpu].core_sibling;
-+	const cpumask_t *core_mask = cpumask_of_node(cpu_to_node(cpu));
-+
-+	/* Find the smaller of NUMA, core or LLC siblings */
-+	if (cpumask_subset(&cpu_topology[cpu].core_sibling, core_mask)) {
-+		/* not numa in package, lets use the package siblings */
-+		core_mask = &cpu_topology[cpu].core_sibling;
-+	}
-+	if (cpu_topology[cpu].llc_id != -1) {
-+		if (cpumask_subset(&cpu_topology[cpu].llc_siblings, core_mask))
-+			core_mask = &cpu_topology[cpu].llc_siblings;
-+	}
-+
-+	return core_mask;
- }
- 
- static void update_siblings_masks(unsigned int cpuid)
-@@ -226,6 +239,9 @@ static void update_siblings_masks(unsigned int cpuid)
- 	for_each_possible_cpu(cpu) {
- 		cpu_topo = &cpu_topology[cpu];
- 
-+		if (cpuid_topo->llc_id == cpu_topo->llc_id)
-+			cpumask_set_cpu(cpu, &cpuid_topo->llc_siblings);
-+
- 		if (cpuid_topo->package_id != cpu_topo->package_id)
- 			continue;
- 
-@@ -291,6 +307,10 @@ static void __init reset_cpu_topology(void)
- 		cpu_topo->core_id = 0;
- 		cpu_topo->package_id = -1;
- 
-+		cpu_topo->llc_id = -1;
-+		cpumask_clear(&cpu_topo->llc_siblings);
-+		cpumask_set_cpu(cpu, &cpu_topo->llc_siblings);
-+
- 		cpumask_clear(&cpu_topo->core_sibling);
- 		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
- 		cpumask_clear(&cpu_topo->thread_sibling);
-@@ -311,6 +331,8 @@ static int __init parse_acpi_topology(void)
- 	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
- 
- 	for_each_possible_cpu(cpu) {
-+		int i, cache_id;
-+
- 		topology_id = find_acpi_cpu_topology(cpu, 0);
- 		if (topology_id < 0)
- 			return topology_id;
-@@ -325,6 +347,18 @@ static int __init parse_acpi_topology(void)
- 		}
- 		topology_id = find_acpi_cpu_topology_package(cpu);
- 		cpu_topology[cpu].package_id = topology_id;
-+
-+		i = acpi_find_last_cache_level(cpu);
-+
-+		if (i > 0) {
-+			/*
-+			 * this is the only part of cpu_topology that has
-+			 * a direct relationship with the cache topology
-+			 */
-+			cache_id = find_acpi_cpu_cache_topology(cpu, i);
-+			if (cache_id > 0)
-+				cpu_topology[cpu].llc_id = cache_id;
-+		}
- 	}
- 
- 	return 0;
+
 -- 
-2.13.6
+Masami Hiramatsu <mhiramat@kernel.org>
