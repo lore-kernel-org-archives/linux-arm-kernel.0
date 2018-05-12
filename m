@@ -1,68 +1,74 @@
-From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
-Date: Sat, 12 May 2018 01:47:44 +0000
-Subject: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-In-Reply-To: <907eb976-7a26-2800-bf1a-563aca482235@arm.com>
-References: <8898674D84E3B24BA3A2D289B872026A69EECF90@G01JPEXMBKW03>
- <ce2c6191-1f74-4cec-9009-0a770d32673a@arm.com>
- <8898674D84E3B24BA3A2D289B872026A69EF9AF9@G01JPEXMBKW03>
- <78df845d-0788-3cbd-e435-5a3a8221fdc8@redhat.com>
- <8898674D84E3B24BA3A2D289B872026A69F09954@G01JPEXMBKW03>
- <907eb976-7a26-2800-bf1a-563aca482235@arm.com>
-Message-ID: <8898674D84E3B24BA3A2D289B872026A69F0ACA3@G01JPEXMBKW03>
+From: collinsd@codeaurora.org (David Collins)
+Date: Fri, 11 May 2018 19:28:04 -0700
+Subject: [PATCH v3 0/2] regulator: add QCOM RPMh regulator driver
+Message-ID: <cover.1526088081.git.collinsd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
-> -----Original Message-----
-> From: linux-arm-kernel
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Marc
-> Zyngier
-> Sent: Thursday, May 10, 2018 11:12 PM
-> To: Zhang, Lei/? ?; 'Mark Langsdorf'; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
-for device.
-> 
-> I do not believe this is required. nvec already describes the number of
-> LPIs that are expected by the device. Why should we add a new parameter
-> that looks to be the exact same thing?
-yes. As you referred, it seems not really required. I will delete this parameter. 
+This patch series adds a driver and device tree binding documentation for
+PMIC regulator control via Resource Power Manager-hardened (RPMh) on some
+Qualcomm Technologies, Inc. SoCs such as SDM845.  RPMh is a hardware block
+which contains several accelerators which are used to manage various
+hardware resources that are shared between the processors of the SoC.  The
+final hardware state of a regulator is determined within RPMh by performing
+max aggregation of the requests made by all of the processors.
 
-> 
-> Another problem is that this approach isn't really practical.
-> msi_prepare is part of a generic structure, and changing it will impact
-> all the others users of that structure. I'd rather you don't change its
-> prototype for something that is implementation specific.
-> 
-> Instead, we have the msi_alloc_info_t structure, which is explicitly
-> designed to collate information pertaining to the allocation
-> requirements in an implementation agnostic way.
-> At the moment, the ITS code only uses the first entry of the scratchpad
-> area to store the DeviceID (and subsequently a pointer to the
-> corresponding its_device).
-> 
-> You could use the second entry to encode the alignment requirement.
-I think it is a good idea for compatibility. I accept your suggestion.
- 
+The RPMh regulator driver depends upon the RPMh driver [1] and command DB
+driver [2] which are both still undergoing review.  It also depends upon
+two recent of_regulator changes: [3] and [4].
 
-> The problem is that you now increase the footprint of the bitmap by a
-> factor of 32:
-> 
-> - For a system with 16bit INTIDs, you go from 256 bytes to 8kB. That's
-> bad, but OK, fine.
-> 
-> - For a system with 32bit INTIDs, you go from 16MB (which was already
-> horrible) to 512MB. That's unacceptable.
-> 
-> At that point, using a simple bitmap doesn't work anymore, and we're
-> better off switching to a free list of some sort that would keep the
-> memory overhead to a minimum (and actually radically reduce the
-> footprint even in the smallest configurations).
-I will reconsider how to management LPI with small
-memory overhead as possible as I can. 
+Changes since v2 [5]:
+ - Replaced '_' with '-' in device tree supply property names
+ - Renamed qcom_rpmh-regulator.c to be qcom-rpmh-regulator.c
+ - Updated various DT property names to use "microvolt" and "microamp"
+ - Moved allowed modes constraint specification out of the driver [4]
+ - Replaced rpmh_client with device pointer to match new RPMh API [1]
+ - Corrected drms mode threshold checking
+ - Initialized voltage_selector to -EINVAL when not specified in DT
+ - Added constants for PMIC regulator hardware modes
+ - Corrected type sign of mode mapping tables
+ - Made variable names for mode arrays plural
+ - Simplified Kconfig depends on
+ - Removed unnecessary constants and struct fields
+ - Added some descriptive comments
 
-By the way I will finish my patch in the next week.
+Changes since v1 [6]:
+ - Addressed review feedback from Doug, Mark, and Stephen
+ - Replaced set_voltage()/get_voltage() callbacks with set_voltage_sel()/
+   get_voltage_sel()
+ - Added set_bypass()/get_bypass() callbacks for BOB pass-through mode
+   control
+ - Removed top-level PMIC data structures
+ - Removed initialization variables from structs and passed them as
+   function parameters
+ - Removed various comments and error messages
+ - Simplified mode handling
+ - Refactored per-PMIC rpmh-regulator data specification
+ - Simplified probe function
+ - Moved header into DT patch
+ - Removed redundant property listings from DT binding documentation
 
-Regards,
-Lei Zhang
---
-Lei Zhang  e-mail: zhang.lei at jp.fujitsu.com FUJITSU LIMITED
+[1]: https://lkml.org/lkml/2018/5/9/729
+[2]: https://lkml.org/lkml/2018/4/10/714
+[3]: https://patchwork.kernel.org/patch/10348629
+[4]: https://lkml.org/lkml/2018/5/11/696
+[5]: https://lkml.org/lkml/2018/4/13/687
+[6]: https://lkml.org/lkml/2018/3/16/1431
+
+David Collins (2):
+  regulator: dt-bindings: add QCOM RPMh regulator bindings
+  regulator: add QCOM RPMh regulator driver
+
+ .../bindings/regulator/qcom,rpmh-regulator.txt     | 208 +++++
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/qcom-rpmh-regulator.c            | 925 +++++++++++++++++++++
+ .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 +
+ 5 files changed, 1179 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
+ create mode 100644 drivers/regulator/qcom-rpmh-regulator.c
+ create mode 100644 include/dt-bindings/regulator/qcom,rpmh-regulator.h
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
