@@ -1,67 +1,64 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Sat, 12 May 2018 09:42:21 +0900
-Subject: [BUGFIX PATCH v3 0/4] arm: kprobes: Fix to prohibit probing on
- unsafe functions
-In-Reply-To: <20180508112503.GD16141@n2100.armlinux.org.uk>
-References: <152540727123.29650.13679359124038587629.stgit@devbox>
- <20180508112503.GD16141@n2100.armlinux.org.uk>
-Message-ID: <20180512094221.e911fa262d8ca9a70ab8869e@kernel.org>
+From: songxiaowei@hisilicon.com (songxiaowei)
+Date: Sat, 12 May 2018 00:52:56 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIHYzIDIvMl0gYXJtNjQ6IGR0czogaGkzNjYwOiBBZGQg?=
+ =?gb2312?Q?pcie_msi_interrupt_attribute?=
+In-Reply-To: <5AF5A411.4010507@hisilicon.com>
+References: <1526030149-23985-1-git-send-email-chenyao11@huawei.com>
+ <1526030149-23985-3-git-send-email-chenyao11@huawei.com>
+ <5AF5A411.4010507@hisilicon.com>
+Message-ID: <99B4C6BADD9E3241B25E52B02BA737C54127E1D9@DGGEMA505-MBS.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi Wei,
 
-Could you pick this series to stable?
+Thanks a lot.
 
-Thank you,
+Xiaowei.
 
-On Tue, 8 May 2018 12:25:03 +0100
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-
-> On Fri, May 04, 2018 at 01:14:31PM +0900, Masami Hiramatsu wrote:
-> > Hi,
-> > 
-> > This is the 3rd version of bugfix series for kprobes on arm.
-> > This series fixes 4 different issues which I found.
-> > 
-> >  - Fix to use smp_processor_id() after disabling preemption.
-> >  - Prohibit probing on optimized_callback() for avoiding
-> >    recursive probe.
-> >  - Prohibit kprobes on do_undefinstr() by same reason.
-> >  - Prohibit kprobes on get_user() by same reason.
-> > 
-> > >From v2, I included another 2 bugfixes (1/4 and 2/4)
-> > which are not merged yet, and added "Cc: stable at vger.kernel.org",
-> > since there are obvious bugs.
+> -----????-----
+> ???: xuwei (O)
+> ????: 2018?5?11? 22:09
+> ???: chenyao (F) <chenyao11@huawei.com>; songxiaowei
+> <songxiaowei@hisilicon.com>; Wangbinghui <wangbinghui@hisilicon.com>;
+> lorenzo.pieralisi at arm.com; bhelgaas at google.com; robh+dt at kernel.org;
+> mark.rutland at arm.com; catalin.marinas at arm.com; will.deacon at arm.com;
+> linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org
+> ??: dimitrysh at google.com; guodong.xu at linaro.org; Suzhuangluan
+> <suzhuangluan@hisilicon.com>; Kongfei <kongfei@hisilicon.com>; xuwei (O)
+> <xuwei5@huawei.com>
+> ??: Re: [PATCH v3 2/2] arm64: dts: hi3660: Add pcie msi interrupt attribute
 > 
-> Please submit them to the patch system, thanks.
+> Hi Yao,
 > 
-> > 
-> > Thanks,
-> > 
+> On 2018/5/11 10:15, Yao Chen wrote:
+> > Add pcie msi interrupt attribute for hi3660 SOC.
+> >
+> > Signed-off-by: Yao Chen <chenyao11@huawei.com>
+> 
+> Applied patch 2 into the hisilicon dt tree.
+> Thanks!
+> 
+> BR,
+> Wei
+> 
 > > ---
-> > 
-> > Masami Hiramatsu (4):
-> >       arm: kprobes: Fix to use get_kprobe_ctlblk after irq-disabed
-> >       arm: kprobes: Prohibit probing on optimized_callback
-> >       arm: kprobes: Prohibit kprobes on do_undefinstr
-> >       arm: kprobes: Prohibit kprobes on get_user functions
-> > 
-> > 
-> >  arch/arm/include/asm/assembler.h  |   10 ++++++++++
-> >  arch/arm/kernel/traps.c           |    5 ++++-
-> >  arch/arm/lib/getuser.S            |   10 ++++++++++
-> >  arch/arm/probes/kprobes/opt-arm.c |    4 +++-
-> >  4 files changed, 27 insertions(+), 2 deletions(-)
-> > 
-> > --
-> > Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
-
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+> >  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> > index ec3eb8e..2cef8f4 100644
+> > --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> > +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> > @@ -872,6 +872,8 @@
+> >  				  0x0 0x02000000>;
+> >  			num-lanes = <1>;
+> >  			#interrupt-cells = <1>;
+> > +			interrupts = <0 283 4>;
+> > +			interrupt-names = "msi";
+> >  			interrupt-map-mask = <0xf800 0 0 7>;
+> >  			interrupt-map = <0x0 0 0 1
+> >  					 &gic GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
+> >
