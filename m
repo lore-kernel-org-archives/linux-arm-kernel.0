@@ -1,84 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 12 May 2018 10:06:44 +0100
-Subject: [BUGFIX PATCH v3 0/4] arm: kprobes: Fix to prohibit probing on
- unsafe functions
-In-Reply-To: <20180512094221.e911fa262d8ca9a70ab8869e@kernel.org>
-References: <152540727123.29650.13679359124038587629.stgit@devbox>
- <20180508112503.GD16141@n2100.armlinux.org.uk>
- <20180512094221.e911fa262d8ca9a70ab8869e@kernel.org>
-Message-ID: <20180512090644.GD16141@n2100.armlinux.org.uk>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 12 May 2018 11:10:26 +0200 (CEST)
+Subject: [PATCH] arm64: defconfig: Increase CMA size for VC4
+In-Reply-To: <87bmdwo2qd.fsf@anholt.net>
+References: <1525296700-3588-1-git-send-email-stefan.wahren@i2se.com>
+ <87bmdwo2qd.fsf@anholt.net>
+Message-ID: <1763641548.255653.1526116226370@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 12, 2018 at 09:42:21AM +0900, Masami Hiramatsu wrote:
-> Hi Greg,
-> 
-> Could you pick this series to stable?
+Hi Florian,
 
-You've added the Cc for stable, so when they get committed to mainline,
-they will be automatically picked up without further need to ask.
+> Eric Anholt <eric@anholt.net> hat am 3. Mai 2018 um 23:20 geschrieben:
+> 
+> 
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
+> 
+> > The VC4 needs more memory than the default setting (16 MB):
+> >
+> >   vc4-drm soc:gpu: swiotlb: coherent allocation failed, size=16777216
+> >   [drm:vc4_bo_create [vc4]] *ERROR* Failed to allocate from CMA:
+> >   vc4_v3d 3fc00000.v3d: Failed to allocate memory for tile binning: -12.
+> >     You may need to enable CMA or give it more memory.
+> >   vc4-drm soc:gpu: failed to bind 3fc00000.v3d (ops vc4_v3d_ops [vc4]): -12
+> >   vc4-drm soc:gpu: master bind failed: -12
+> >   vc4-drm: probe of soc:gpu failed with error -12
+> >
+> > So increase the value to 32 MB and fix this issue.
+> >
+> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> 
+> If there was a way to check how big the CMA pool is, then we could
+> probably have V3D disable itself when the pool was too small.  It's not
+> like V3D rendering is going to actually *work* with just a 32mb pool to
+> play in.
+> 
+> That said, I'd also be fine with this patch.
 
-However, they do _first_ need to end up in mainline before they can go
-anywhere near stable trees as per stable tree rules.  For more
-information on stable trees and their rules, please see:
-
-  Documentation/process/stable-kernel-rules.rst
-
-> 
-> Thank you,
-> 
-> On Tue, 8 May 2018 12:25:03 +0100
-> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> 
-> > On Fri, May 04, 2018 at 01:14:31PM +0900, Masami Hiramatsu wrote:
-> > > Hi,
-> > > 
-> > > This is the 3rd version of bugfix series for kprobes on arm.
-> > > This series fixes 4 different issues which I found.
-> > > 
-> > >  - Fix to use smp_processor_id() after disabling preemption.
-> > >  - Prohibit probing on optimized_callback() for avoiding
-> > >    recursive probe.
-> > >  - Prohibit kprobes on do_undefinstr() by same reason.
-> > >  - Prohibit kprobes on get_user() by same reason.
-> > > 
-> > > >From v2, I included another 2 bugfixes (1/4 and 2/4)
-> > > which are not merged yet, and added "Cc: stable at vger.kernel.org",
-> > > since there are obvious bugs.
-> > 
-> > Please submit them to the patch system, thanks.
-> > 
-> > > 
-> > > Thanks,
-> > > 
-> > > ---
-> > > 
-> > > Masami Hiramatsu (4):
-> > >       arm: kprobes: Fix to use get_kprobe_ctlblk after irq-disabed
-> > >       arm: kprobes: Prohibit probing on optimized_callback
-> > >       arm: kprobes: Prohibit kprobes on do_undefinstr
-> > >       arm: kprobes: Prohibit kprobes on get_user functions
-> > > 
-> > > 
-> > >  arch/arm/include/asm/assembler.h  |   10 ++++++++++
-> > >  arch/arm/kernel/traps.c           |    5 ++++-
-> > >  arch/arm/lib/getuser.S            |   10 ++++++++++
-> > >  arch/arm/probes/kprobes/opt-arm.c |    4 +++-
-> > >  4 files changed, 27 insertions(+), 2 deletions(-)
-> > > 
-> > > --
-> > > Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
-> > 
-> > -- 
-> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> > According to speedtest.net: 8.21Mbps down 510kbps up
-> 
-> 
-> -- 
-> Masami Hiramatsu <mhiramat@kernel.org>
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+should i rebase my patch?
