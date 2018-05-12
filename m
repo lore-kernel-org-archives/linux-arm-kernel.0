@@ -1,101 +1,84 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Sat, 12 May 2018 13:28:26 +0800
-Subject: [PATCH v2 03/12] arm: dts: mt7623: fix invalid memory node
- being generated
-In-Reply-To: <4dcb0435-1f98-0753-0feb-d17ad02077ae@gmail.com>
-References: <cover.1523434757.git.sean.wang@mediatek.com>
- <d887b72e1839c7e476179e384cfc712216096f20.1523434758.git.sean.wang@mediatek.com>
- <4dcb0435-1f98-0753-0feb-d17ad02077ae@gmail.com>
-Message-ID: <1526102906.18877.42.camel@mtkswgap22>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 12 May 2018 10:06:44 +0100
+Subject: [BUGFIX PATCH v3 0/4] arm: kprobes: Fix to prohibit probing on
+ unsafe functions
+In-Reply-To: <20180512094221.e911fa262d8ca9a70ab8869e@kernel.org>
+References: <152540727123.29650.13679359124038587629.stgit@devbox>
+ <20180508112503.GD16141@n2100.armlinux.org.uk>
+ <20180512094221.e911fa262d8ca9a70ab8869e@kernel.org>
+Message-ID: <20180512090644.GD16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-05-11 at 17:03 +0200, Matthias Brugger wrote:
+On Sat, May 12, 2018 at 09:42:21AM +0900, Masami Hiramatsu wrote:
+> Hi Greg,
 > 
-> On 04/11/2018 10:53 AM, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > Below two wrong nodes in existing DTS files would cause a fail boot since
-> > in fact the address 0 is not the correct place the memory device locates
-> > at.
-> > 
-> > memory {
-> >         device_type = "memory";
-> >         reg = <0x0 0x0 0x0 0x0>;
-> > };
-> > 
-> > memory at 80000000 {
-> >         reg = <0x0 0x80000000 0x0 0x40000000>;
-> > };
-> > 
-> > In order to avoid having a memory node starting at address 0, we can't
-> > include file skeleton64.dtsi and instead need to explicitly manually
-> > define a few of properties the DTS relies on such as #address-cells
-> > and #size-cells in root node and device_type in the node memory at 80000000.
-> > 
-> > Cc: stable at vger.kernel.org
-> > Fixes: 31ac0d69a1d4 ("ARM: dts: mediatek: add MT7623 basic support")
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > ---
-> >  arch/arm/boot/dts/mt7623.dtsi                 | 3 ++-
-> >  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 1 +
-> >  arch/arm/boot/dts/mt7623n-rfb.dtsi            | 1 +
-> >  3 files changed, 4 insertions(+), 1 deletion(-)
-> > 
-> 
-> merged. We would need this at least for mt2701 as well, correct?
-> Would you mind to provide a patch.
-> 
-> Regards,
-> Matthias
-> 
+> Could you pick this series to stable?
 
-Thanks! I totally think the same problem could happen on mt2701, so I'm 
-happy to come up with a patch for that.
+You've added the Cc for stable, so when they get committed to mainline,
+they will be automatically picked up without further need to ask.
 
-	Sean
+However, they do _first_ need to end up in mainline before they can go
+anywhere near stable trees as per stable tree rules.  For more
+information on stable trees and their rules, please see:
 
-> > diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-> > index fec4715..406a9f3 100644
-> > --- a/arch/arm/boot/dts/mt7623.dtsi
-> > +++ b/arch/arm/boot/dts/mt7623.dtsi
-> > @@ -15,11 +15,12 @@
-> >  #include <dt-bindings/phy/phy.h>
-> >  #include <dt-bindings/reset/mt2701-resets.h>
-> >  #include <dt-bindings/thermal/thermal.h>
-> > -#include "skeleton64.dtsi"
-> >  
-> >  / {
-> >  	compatible = "mediatek,mt7623";
-> >  	interrupt-parent = <&sysirq>;
-> > +	#address-cells = <2>;
-> > +	#size-cells = <2>;
-> >  
-> >  	cpu_opp_table: opp-table {
-> >  		compatible = "operating-points-v2";
-> > diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > index bbf56f8..5938e4c 100644
-> > --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > @@ -109,6 +109,7 @@
-> >  	};
-> >  
-> >  	memory at 80000000 {
-> > +		device_type = "memory";
-> >  		reg = <0 0x80000000 0 0x40000000>;
-> >  	};
-> >  };
-> > diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-> > index a199ae7..343e8ef 100644
-> > --- a/arch/arm/boot/dts/mt7623n-rfb.dtsi
-> > +++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-> > @@ -40,6 +40,7 @@
-> >  	};
-> >  
-> >  	memory at 80000000 {
-> > +		device_type = "memory";
-> >  		reg = <0 0x80000000 0 0x40000000>;
-> >  	};
-> >  
+  Documentation/process/stable-kernel-rules.rst
+
+> 
+> Thank you,
+> 
+> On Tue, 8 May 2018 12:25:03 +0100
+> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> 
+> > On Fri, May 04, 2018 at 01:14:31PM +0900, Masami Hiramatsu wrote:
+> > > Hi,
+> > > 
+> > > This is the 3rd version of bugfix series for kprobes on arm.
+> > > This series fixes 4 different issues which I found.
+> > > 
+> > >  - Fix to use smp_processor_id() after disabling preemption.
+> > >  - Prohibit probing on optimized_callback() for avoiding
+> > >    recursive probe.
+> > >  - Prohibit kprobes on do_undefinstr() by same reason.
+> > >  - Prohibit kprobes on get_user() by same reason.
+> > > 
+> > > >From v2, I included another 2 bugfixes (1/4 and 2/4)
+> > > which are not merged yet, and added "Cc: stable at vger.kernel.org",
+> > > since there are obvious bugs.
 > > 
+> > Please submit them to the patch system, thanks.
+> > 
+> > > 
+> > > Thanks,
+> > > 
+> > > ---
+> > > 
+> > > Masami Hiramatsu (4):
+> > >       arm: kprobes: Fix to use get_kprobe_ctlblk after irq-disabed
+> > >       arm: kprobes: Prohibit probing on optimized_callback
+> > >       arm: kprobes: Prohibit kprobes on do_undefinstr
+> > >       arm: kprobes: Prohibit kprobes on get_user functions
+> > > 
+> > > 
+> > >  arch/arm/include/asm/assembler.h  |   10 ++++++++++
+> > >  arch/arm/kernel/traps.c           |    5 ++++-
+> > >  arch/arm/lib/getuser.S            |   10 ++++++++++
+> > >  arch/arm/probes/kprobes/opt-arm.c |    4 +++-
+> > >  4 files changed, 27 insertions(+), 2 deletions(-)
+> > > 
+> > > --
+> > > Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
+> > 
+> > -- 
+> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> > According to speedtest.net: 8.21Mbps down 510kbps up
+> 
+> 
+> -- 
+> Masami Hiramatsu <mhiramat@kernel.org>
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
