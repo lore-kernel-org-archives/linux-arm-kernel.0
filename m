@@ -1,68 +1,68 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Fri, 11 May 2018 18:46:47 -0700
-Subject: [PATCH 2/2] regulator: of: add support for allowed modes configuration
-In-Reply-To: <cover.1526088289.git.collinsd@codeaurora.org>
-References: <cover.1526088289.git.collinsd@codeaurora.org>
-Message-ID: <58bb4f965515a67a6cbbc726b0d7b092c22b79d7.1526088289.git.collinsd@codeaurora.org>
+From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
+Date: Sat, 12 May 2018 01:47:44 +0000
+Subject: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+In-Reply-To: <907eb976-7a26-2800-bf1a-563aca482235@arm.com>
+References: <8898674D84E3B24BA3A2D289B872026A69EECF90@G01JPEXMBKW03>
+ <ce2c6191-1f74-4cec-9009-0a770d32673a@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A69EF9AF9@G01JPEXMBKW03>
+ <78df845d-0788-3cbd-e435-5a3a8221fdc8@redhat.com>
+ <8898674D84E3B24BA3A2D289B872026A69F09954@G01JPEXMBKW03>
+ <907eb976-7a26-2800-bf1a-563aca482235@arm.com>
+Message-ID: <8898674D84E3B24BA3A2D289B872026A69F0ACA3@G01JPEXMBKW03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for configuring the machine constraints
-valid_modes_mask element based on a list of allowed modes
-specified via a device tree property.
+Hi Marc
+> -----Original Message-----
+> From: linux-arm-kernel
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Marc
+> Zyngier
+> Sent: Thursday, May 10, 2018 11:12 PM
+> To: Zhang, Lei/? ?; 'Mark Langsdorf'; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH]irqchip/irq-gic-v3:Avoid a waste of LPI resource
+for device.
+> 
+> I do not believe this is required. nvec already describes the number of
+> LPIs that are expected by the device. Why should we add a new parameter
+> that looks to be the exact same thing?
+yes. As you referred, it seems not really required. I will delete this parameter. 
 
-Signed-off-by: David Collins <collinsd@codeaurora.org>
----
- drivers/regulator/of_regulator.c | 29 ++++++++++++++++++++++++++++-
- 1 file changed, 28 insertions(+), 1 deletion(-)
+> 
+> Another problem is that this approach isn't really practical.
+> msi_prepare is part of a generic structure, and changing it will impact
+> all the others users of that structure. I'd rather you don't change its
+> prototype for something that is implementation specific.
+> 
+> Instead, we have the msi_alloc_info_t structure, which is explicitly
+> designed to collate information pertaining to the allocation
+> requirements in an implementation agnostic way.
+> At the moment, the ITS code only uses the first entry of the scratchpad
+> area to store the DeviceID (and subsequently a pointer to the
+> corresponding its_device).
+> 
+> You could use the second entry to encode the alignment requirement.
+I think it is a good idea for compatibility. I accept your suggestion.
+ 
 
-diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
-index 0d3f73e..d61fed2 100644
---- a/drivers/regulator/of_regulator.c
-+++ b/drivers/regulator/of_regulator.c
-@@ -32,7 +32,7 @@ static void of_get_regulation_constraints(struct device_node *np,
- 	struct regulator_state *suspend_state;
- 	struct device_node *suspend_np;
- 	unsigned int mode;
--	int ret, i;
-+	int ret, i, len;
- 	u32 pval;
- 
- 	constraints->name = of_get_property(np, "regulator-name", NULL);
-@@ -136,6 +136,33 @@ static void of_get_regulation_constraints(struct device_node *np,
- 		}
- 	}
- 
-+	len = of_property_count_elems_of_size(np, "regulator-allowed-modes",
-+						sizeof(u32));
-+	if (len > 0) {
-+		if (desc && desc->of_map_mode) {
-+			for (i = 0; i < len; i++) {
-+				ret = of_property_read_u32_index(np,
-+					"regulator-allowed-modes", i, &pval);
-+				if (ret) {
-+					pr_err("%s: couldn't read allowed modes index %d, ret=%d\n",
-+						np->name, i, ret);
-+					break;
-+				}
-+				mode = desc->of_map_mode(pval);
-+				if (mode == REGULATOR_MODE_INVALID)
-+					pr_err("%s: invalid regulator-allowed-modes element %u\n",
-+						np->name, pval);
-+				else
-+					constraints->valid_modes_mask |= mode;
-+			}
-+			if (constraints->valid_modes_mask)
-+				constraints->valid_ops_mask
-+					|= REGULATOR_CHANGE_MODE;
-+		} else {
-+			pr_warn("%s: mode mapping not defined\n", np->name);
-+		}
-+	}
-+
- 	if (!of_property_read_u32(np, "regulator-system-load", &pval))
- 		constraints->system_load = pval;
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> The problem is that you now increase the footprint of the bitmap by a
+> factor of 32:
+> 
+> - For a system with 16bit INTIDs, you go from 256 bytes to 8kB. That's
+> bad, but OK, fine.
+> 
+> - For a system with 32bit INTIDs, you go from 16MB (which was already
+> horrible) to 512MB. That's unacceptable.
+> 
+> At that point, using a simple bitmap doesn't work anymore, and we're
+> better off switching to a free list of some sort that would keep the
+> memory overhead to a minimum (and actually radically reduce the
+> footprint even in the smallest configurations).
+I will reconsider how to management LPI with small
+memory overhead as possible as I can. 
+
+By the way I will finish my patch in the next week.
+
+Regards,
+Lei Zhang
+--
+Lei Zhang  e-mail: zhang.lei at jp.fujitsu.com FUJITSU LIMITED
