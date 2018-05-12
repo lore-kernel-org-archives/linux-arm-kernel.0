@@ -1,68 +1,59 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Sat, 12 May 2018 20:31:37 +0900
-Subject: [BUGFIX PATCH v3 0/4] arm: kprobes: Fix to prohibit probing on
- unsafe functions
-In-Reply-To: <20180508112503.GD16141@n2100.armlinux.org.uk>
-References: <152540727123.29650.13679359124038587629.stgit@devbox>
- <20180508112503.GD16141@n2100.armlinux.org.uk>
-Message-ID: <20180512203137.4c00f301c4359de1f6253154@kernel.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 12 May 2018 13:41:07 +0200
+Subject: [GIT PULL] Gemini DTS updates for v4.18
+Message-ID: <CACRpkdZ+GR2j01CMAnU=pYwZHPZ6j5hhEefF7HckUM4jq=n2MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi ARM SoC folks!
 
-On Tue, 8 May 2018 12:25:03 +0100
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+This fixes a host of issues and adds some new stuff to the
+Gemini platforms. We now have them all running (more or
+less) with OpenWRT. Details in the patches and signed tag.
 
-> On Fri, May 04, 2018 at 01:14:31PM +0900, Masami Hiramatsu wrote:
-> > Hi,
-> > 
-> > This is the 3rd version of bugfix series for kprobes on arm.
-> > This series fixes 4 different issues which I found.
-> > 
-> >  - Fix to use smp_processor_id() after disabling preemption.
-> >  - Prohibit probing on optimized_callback() for avoiding
-> >    recursive probe.
-> >  - Prohibit kprobes on do_undefinstr() by same reason.
-> >  - Prohibit kprobes on get_user() by same reason.
-> > 
-> > >From v2, I included another 2 bugfixes (1/4 and 2/4)
-> > which are not merged yet, and added "Cc: stable at vger.kernel.org",
-> > since there are obvious bugs.
-> 
-> Please submit them to the patch system, thanks.
+Please pull this to ARM SoC DTS updates for v4.18.
 
-Could you tell me what you mean the patch system?
+Yours,
+Linus Walleij
 
-Thank you,
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-> 
-> > 
-> > Thanks,
-> > 
-> > ---
-> > 
-> > Masami Hiramatsu (4):
-> >       arm: kprobes: Fix to use get_kprobe_ctlblk after irq-disabed
-> >       arm: kprobes: Prohibit probing on optimized_callback
-> >       arm: kprobes: Prohibit kprobes on do_undefinstr
-> >       arm: kprobes: Prohibit kprobes on get_user functions
-> > 
-> > 
-> >  arch/arm/include/asm/assembler.h  |   10 ++++++++++
-> >  arch/arm/kernel/traps.c           |    5 ++++-
-> >  arch/arm/lib/getuser.S            |   10 ++++++++++
-> >  arch/arm/probes/kprobes/opt-arm.c |    4 +++-
-> >  4 files changed, 27 insertions(+), 2 deletions(-)
-> > 
-> > --
-> > Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
+are available in the Git repository at:
 
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/gemini-dts-arm-soc
+
+for you to fetch changes up to e7c881596baf8d1a4a1b872c4670da6723246936:
+
+  ARM: dts: Fix DTC warnings (2018-05-12 13:27:24 +0200)
+
+----------------------------------------------------------------
+DTS updates for the Gemini:
+- Set righ flashes on DNS-313
+- Activate ATA1 on NAS4220B
+- Set right harddisk triggers on the D-Link devices
+- Fix all DTC warnings
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: dts: gemini: Fix "debounce-interval" property misspelling
+
+Linus Walleij (6):
+      ARM: dtd: Set DNS-313 LEDs to use better triggers
+      ARM: dts: Set DNS-685 LEDs to use better triggers
+      ARM: dts: Fix the DNS-313 flash compatible
+      ARM: dts: Fix bootargs for Gemini D-Link devices
+      ARM: dts: Add second ATA to NAS4220B
+      ARM: dts: Fix DTC warnings
+
+ arch/arm/boot/dts/gemini-dlink-dir-685.dts | 16 +++++++++-------
+ arch/arm/boot/dts/gemini-dlink-dns-313.dts | 19 +++++++++++--------
+ arch/arm/boot/dts/gemini-nas4220b.dts      | 20 +++++++++++---------
+ arch/arm/boot/dts/gemini-rut1xx.dts        | 12 +++++-------
+ arch/arm/boot/dts/gemini-sq201.dts         | 12 +++++-------
+ arch/arm/boot/dts/gemini-wbd111.dts        | 17 ++++++++---------
+ arch/arm/boot/dts/gemini-wbd222.dts        | 16 +++++++---------
+ arch/arm/boot/dts/gemini.dtsi              |  2 --
+ 8 files changed, 56 insertions(+), 58 deletions(-)
