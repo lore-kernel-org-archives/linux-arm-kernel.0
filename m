@@ -1,39 +1,39 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 12 May 2018 11:10:26 +0200 (CEST)
-Subject: [PATCH] arm64: defconfig: Increase CMA size for VC4
-In-Reply-To: <87bmdwo2qd.fsf@anholt.net>
-References: <1525296700-3588-1-git-send-email-stefan.wahren@i2se.com>
- <87bmdwo2qd.fsf@anholt.net>
-Message-ID: <1763641548.255653.1526116226370@email.1und1.de>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 12 May 2018 10:33:24 +0100
+Subject: [PATCH] iio: adc: stm32-dfsdm: Add support for stm32mp1
+In-Reply-To: <20180507205151.GA25321@rob-hp-laptop>
+References: <1525266323-4922-1-git-send-email-fabrice.gasnier@st.com>
+ <20180507205151.GA25321@rob-hp-laptop>
+Message-ID: <20180512103324.5068c893@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Mon, 7 May 2018 15:51:51 -0500
+Rob Herring <robh@kernel.org> wrote:
 
-> Eric Anholt <eric@anholt.net> hat am 3. Mai 2018 um 23:20 geschrieben:
+> On Wed, May 02, 2018 at 03:05:23PM +0200, Fabrice Gasnier wrote:
+> > Add support for DFSDM (Digital Filter For Sigma Delta Modulators)
+> > to STM32MP1. This variant is close to STM32H7 DFSDM, it implements
+> > 6 filter instances. Registers map is also increased.
+> > 
+> > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> > ---
+> >  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt         |  7 +++++--
+> >  drivers/iio/adc/stm32-dfsdm-core.c                  | 21 +++++++++++++++++++++
+> >  2 files changed, 26 insertions(+), 2 deletions(-)  
 > 
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> > The VC4 needs more memory than the default setting (16 MB):
-> >
-> >   vc4-drm soc:gpu: swiotlb: coherent allocation failed, size=16777216
-> >   [drm:vc4_bo_create [vc4]] *ERROR* Failed to allocate from CMA:
-> >   vc4_v3d 3fc00000.v3d: Failed to allocate memory for tile binning: -12.
-> >     You may need to enable CMA or give it more memory.
-> >   vc4-drm soc:gpu: failed to bind 3fc00000.v3d (ops vc4_v3d_ops [vc4]): -12
-> >   vc4-drm soc:gpu: master bind failed: -12
-> >   vc4-drm: probe of soc:gpu failed with error -12
-> >
-> > So increase the value to 32 MB and fix this issue.
-> >
-> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
-> If there was a way to check how big the CMA pool is, then we could
-> probably have V3D disable itself when the pool was too small.  It's not
-> like V3D rendering is going to actually *work* with just a 32mb pool to
-> play in.
-> 
-> That said, I'd also be fine with this patch.
+> Reviewed-by: Rob Herring <robh@kernel.org>
+Applied.   Whilst doing this I note that I'm getting a few sparse
+warnings for this driver that would be nice to clean up...
 
-should i rebase my patch?
+  CHECK   drivers/iio/adc/stm32-dfsdm-adc.c
+drivers/iio/adc/stm32-dfsdm-adc.c:503:21: warning: expression using sizeof(void)
+drivers/iio/adc/stm32-dfsdm-adc.c:503:21: warning: expression using sizeof(void)
+
+Which is mystifying at first glance... Something deep and dirty in the min macro
+but I can't see what..
+
+drivers/iio/adc/stm32-dfsdm-adc.c:680:5: warning: symbol 'stm32_dfsdm_get_buff_cb' was not declared. Should it be static?
+drivers/iio/adc/stm32-dfsdm-adc.c:703:5: warning: symbol 'stm32_dfsdm_release_buff_cb' was not declared. Should it be static?
+
+Are rather more obvious
