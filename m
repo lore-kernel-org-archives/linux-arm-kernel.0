@@ -1,73 +1,100 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Sun, 13 May 2018 21:06:37 +0300
-Subject: [PATCH 6/8] serial: Add Tegra Combined UART driver
-In-Reply-To: <CABb+yY3snB9o4e14by4xui+o_Vhqpe2zh6Pp_e0t-DCTKvMHWA@mail.gmail.com>
-References: <20180508114403.14499-1-mperttunen@nvidia.com>
- <20180508114403.14499-7-mperttunen@nvidia.com>
- <CABb+yY3snB9o4e14by4xui+o_Vhqpe2zh6Pp_e0t-DCTKvMHWA@mail.gmail.com>
-Message-ID: <4d6aab52-9c99-8dd8-556d-86f32d9f6234@kapsi.fi>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Sun, 13 May 2018 20:30:35 +0200
+Subject: [PATCH 2/3] arm64: dts: renesas: r8a77995: Add VIN4
+In-Reply-To: <20180511134516.omsv25i2wi4cxypc@verge.net.au>
+References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526032802-14376-3-git-send-email-jacopo+renesas@jmondi.org>
+ <20180511112523.GK18974@bigcity.dyn.berto.se>
+ <20180511134516.omsv25i2wi4cxypc@verge.net.au>
+Message-ID: <20180513183035.6ufwkdtlyg4gyco3@apu3b>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2018 06:36 PM, Jassi Brar wrote:
-> On Tue, May 8, 2018 at 5:14 PM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
+Hi Simon,
+
+On Fri, May 11, 2018 at 03:45:16PM +0200, Simon Horman wrote:
+> On Fri, May 11, 2018 at 01:25:23PM +0200, Niklas S?derlund wrote:
+> > Hi Jacopo,
+> > 
+> > Thanks for your work.
+> > 
+> > On 2018-05-11 12:00:01 +0200, Jacopo Mondi wrote:
+> > > Describe VIN4 interface for R-Car D3 R8A77995 SoC.
+> > > 
+> > > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> > 
+> > Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> > 
+> > > ---
+> > >  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 11 +++++++++++
+> > >  1 file changed, 11 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> > > index 82aed7e..bdf7017 100644
+> > > --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> > > +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> > > @@ -783,6 +783,17 @@
+> > >  				};
+> > >  			};
+> > >  		};
+> > > +
+> > > +		vin4: video at e6ef4000 {
+> > > +			compatible = "renesas,vin-r8a77995";
+> > > +			reg = <0 0xe6ef4000 0 0x1000>;
+> > > +			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+> > > +			clocks = <&cpg CPG_MOD 807>;
+> > > +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+> > > +			resets = <&cpg 807>;
+> > > +			renesas,id = <4>;
+> > > +			status = "disabled";
+> > > +		};
+> > >  	};
 > 
-> ....
->>
->> +config SERIAL_TEGRA_TCU
->> +       tristate "NVIDIA Tegra Combined UART"
->> +       depends on ARCH_TEGRA && MAILBOX
->> +       select SERIAL_CORE
->> +       help
->> +         Support for the mailbox-based TCU (Tegra Combined UART) serial port.
->> +         TCU is a virtual serial port that allows multiplexing multiple data
->> +         streams into a single hardware serial port.
->> +
-> Maybe make it depend upon TEGRA_HSP_MBOX ?
+> Thanks, I have moved the new node to preserve sorting of nodes by bus
+> address and applied the result. It is as follows:
 
-Yeah, that probably makes more sense. MAILBOX is enough to build it but 
-it won't be of any use without TEGRA_HSP_MBOX.
+Great, thanks for doing this, I should have take care of sorting nodes
+opprtunely.
+
+Thanks
+   j
 
 > 
-> ......
+> From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Subject: [PATCH] arm64: dts: renesas: r8a77995: Add VIN4
 > 
->> +
->> +static void tegra_tcu_write(const char *s, unsigned int count)
->> +{
->> +       struct tegra_tcu *tcu = tegra_tcu_uart_port.private_data;
->> +       unsigned int written = 0, i = 0;
->> +       bool insert_nl = false;
->> +       uint32_t value = 0;
->> +
->> +       while (i < count) {
->> +               if (insert_nl) {
->> +                       value |= '\n' << (written++ * 8);
->> +                       insert_nl = false;
->> +                       i++;
->> +               } else if (s[i] == '\n') {
->> +                       value |= '\r' << (written++ * 8);
->> +                       insert_nl = true;
->> +               } else {
->> +                       value |= s[i++] << (written++ * 8);
->> +               }
->> +
->> +               if (written == 3) {
->> +                       value |= 3 << 24;
->> +                       value |= BIT(26);
->> +                       mbox_send_message(tcu->tx, &value);
->>
-> How is this supposed to work? tegra_hsp_doorbell_send_data() ignores
-> the second argument.
-
-The previous patch in the series adds support for what are called 
-"shared mailboxes" to the tegra-hsp driver. For these the second 
-argument is used.
-
-Thanks,
-Mikko
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Describe VIN4 interface for R-Car D3 R8A77995 SoC.
+> 
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> [simon: sorted node by bus address]
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> index ba98865b0c9b..2506f46293e8 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> @@ -610,6 +610,17 @@
+>  			status = "disabled";
+>  		};
+s  
+> +		vin4: video at e6ef4000 {
+> +			compatible = "renesas,vin-r8a77995";
+> +			reg = <0 0xe6ef4000 0 0x1000>;
+> +			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 807>;
+> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+> +			resets = <&cpg 807>;
+> +			renesas,id = <4>;
+> +			status = "disabled";
+> +		};
+> +
+>  		ohci0: usb at ee080000 {
+>  			compatible = "generic-ohci";
+>  			reg = <0 0xee080000 0 0x100>;
+> -- 
+> 2.11.0
 > 
