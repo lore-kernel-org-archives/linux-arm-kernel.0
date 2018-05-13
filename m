@@ -1,36 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 13 May 2018 22:53:00 +0200
-Subject: [PATCH v1 11/13] dt-bindings: power: add PX30 SoCs header for
- power-domain
-In-Reply-To: <9c9606f0-5c97-1a6e-a3c5-f6380c16fea4@rock-chips.com>
-References: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
- <508694354.7btLQf7nsA@phil>
- <9c9606f0-5c97-1a6e-a3c5-f6380c16fea4@rock-chips.com>
-Message-ID: <1550439.0mAU4944n0@diego>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 May 2018 00:01:31 +0200
+Subject: [RFC PATCH] driver core: make deferring probe forever optional
+In-Reply-To: <91dad272-e07d-2ab6-2afa-538294e9cefa@suse.de>
+References: <20180501213114.20183-1-robh@kernel.org>
+ <20180507183106.GF2259@tuxbook-pro>
+ <91dad272-e07d-2ab6-2afa-538294e9cefa@suse.de>
+Message-ID: <CACRpkdaYN-wKErERP_65T2NH6L-+8O_ugSgg7pXfkaLkn1A2KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 9, 2018 at 11:44 AM, Alexander Graf <agraf@suse.de> wrote:
+> On 05/07/2018 08:31 PM, Bjorn Andersson wrote:
 
-Am Sonntag, 13. Mai 2018, 17:18:12 CEST schrieb Tao Huang:
-> Hi Heiko:
-> 
-> On 2018?05?12? 06:11, Heiko Stuebner wrote:
-> > Here I have a naming question. When looking at the vendor kernel
-> > it looks like the px30 is largely related to the rk3326.
-> > (rk3326.dtsi includeing the px30.dtsi)
-> > 
-> > What is the reason for basing the naming on the px30 this time? And could
-> > we possibly keep to rkXXXX names for the basic things in the kernel, thus
-> > keeping the pxXX as second name, like with the other px-variants before?
-> 
-> PX30 and RK3326 are different chips. PX30 has more features. You can simply
-> think that RK3326 is a subset of PX30. The RK3326 is more like a PX30
-> derivative chip. This is not the same as the previous chips. So we use PX30
-> instead of RK3326 for name, and the opening document is only for PX30, we
-> think this is more convenient for developers.
+>> Can you please name platform that has enough support for Alexander to
+>> care about backwards and forwards compatibility but lacks a pinctrl
+>> driver.
+>
+> ZynqMP is one example that immediately comes to my mind. I'm sure there are
+> others too.
 
-ok, sounds reasonable :-) ... So we'll stay with the PX30.
+Why isn't that using drivers/pinctrl/pinctrl-zynq.c?
 
+How is it so very different from (old) Zynq as it is already using
+the same GPIO driver?
 
-Heiko
+Yours,
+Linus Walleij
