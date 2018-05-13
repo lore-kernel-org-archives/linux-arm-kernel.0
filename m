@@ -1,45 +1,172 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 13 May 2018 19:54:02 +0200
-Subject: [PATCH] thermal: exynos: Reduce severity of too early temperature read
-Message-ID: <20180513175402.28887-1-krzk@kernel.org>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Sun, 13 May 2018 21:04:51 +0300
+Subject: [PATCH 6/8] serial: Add Tegra Combined UART driver
+In-Reply-To: <CAHp75VfYF_u2bZ+temGbReEB9K-t3A75aUNYwffyv9-=zEi0Lw@mail.gmail.com>
+References: <20180508114403.14499-1-mperttunen@nvidia.com>
+ <20180508114403.14499-7-mperttunen@nvidia.com>
+ <CAHp75VfYF_u2bZ+temGbReEB9K-t3A75aUNYwffyv9-=zEi0Lw@mail.gmail.com>
+Message-ID: <662ce972-56a9-9daa-d332-faa08b89c05a@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thermal core tries to read temperature during sensor registering in
-thermal_zone_of_sensor_register().  In that time Exynos TMU driver and
-hardware are not yet initialized.  Commit 0eb875d88aaa ("thermal:
-exynos: Reading temperature makes sense only when TMU is turned on")
-added a boolean flag to prevent reading bogus temperature in such
-case but it exposed warning message during boot:
-	[    3.864913] thermal thermal_zone0: failed to read out thermal zone (-22)
+On 05/13/2018 05:16 PM, Andy Shevchenko wrote:
+> On Tue, May 8, 2018 at 2:44 PM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
+>> The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
+>> multiplexing multiple "virtual UARTs" into a single hardware serial
+>> port. The TCU is the primary serial port on Tegra194 devices.
+>>
+>> Add a TCU driver utilizing the mailbox framework, as the used mailboxes
+>> are part of Tegra HSP blocks that are already controlled by the Tegra
+>> HSP mailbox driver.
+> 
+> First question, can it be done utilizing SERDEV framework?
 
-Return EAGAIN in such case to skip omitting such message because it
-might mislead user.
+Based on some brief research, the SERDEV framework is for devices that 
+are behind some UART interface. In this case, this driver implements the 
+UART interface itself, so by my understanding SERDEV is not appropriate. 
+Please correct me if I'm wrong.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- drivers/thermal/samsung/exynos_tmu.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+>> +static void tegra_tcu_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
+>> +{
+> 
+>> +       (void)port;
+>> +       (void)mctrl;
+> 
+> Huh?
 
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 3b20309789e3..c24969d740d1 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -666,8 +666,14 @@ static int exynos_get_temp(void *p, int *temp)
- 	struct exynos_tmu_data *data = p;
- 	int value, ret = 0;
- 
--	if (!data || !data->tmu_read || !data->enabled)
-+	if (!data || !data->tmu_read)
- 		return -EINVAL;
-+	else if (!data->enabled)
-+		/*
-+		 * Called too early, probably
-+		 * from thermal_zone_of_sensor_register().
-+		 */
-+		return -EAGAIN;
- 
- 	mutex_lock(&data->lock);
- 	clk_enable(data->clk);
--- 
-2.14.1
+The serial core calls these callbacks without checking if they are set. 
+They don't make sense for this driver so they are stubbed out.
+
+> 
+>> +}
+> 
+>> +static void tegra_tcu_uart_stop_tx(struct uart_port *port)
+>> +{
+>> +       (void)port;
+>> +}
+> 
+> Ditto.
+> 
+>> +               if (written == 3) {
+>> +                       value |= 3 << 24;
+>> +                       value |= BIT(26);
+>> +                       mbox_send_message(tcu->tx, &value);
+> 
+>> +               }
+> 
+> (1)
+> 
+>> +       }
+>> +
+>> +       if (written) {
+>> +               value |= written << 24;
+>> +               value |= BIT(26);
+>> +               mbox_send_message(tcu->tx, &value);
+>> +       }
+> 
+> (2)
+> 
+> These are code duplications.
+
+Indeed - the length of the duplicated code is so short, and the 
+instances are so close to each other, that I don't find it necessary (or 
+clearer) to have an extra function.
+
+> 
+>> +static void tegra_tcu_uart_stop_rx(struct uart_port *port)
+>> +{
+>> +       (void)port;
+>> +}
+>> +
+>> +static void tegra_tcu_uart_break_ctl(struct uart_port *port, int ctl)
+>> +{
+>> +       (void)port;
+>> +       (void)ctl;
+>> +}
+>> +
+>> +static int tegra_tcu_uart_startup(struct uart_port *port)
+>> +{
+>> +       (void)port;
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static void tegra_tcu_uart_shutdown(struct uart_port *port)
+>> +{
+>> +       (void)port;
+>> +}
+>> +
+>> +static void tegra_tcu_uart_set_termios(struct uart_port *port,
+>> +                                      struct ktermios *new,
+>> +                                      struct ktermios *old)
+>> +{
+>> +       (void)port;
+>> +       (void)new;
+>> +       (void)old;
+>> +}
+> 
+> Remove those unused stub contents.
+
+Sure. I had these here so that we don't get unused parameter warnings, 
+but I can just as well remove the parameter names.
+
+> 
+>> +       return uart_set_options(&tegra_tcu_uart_port, cons,
+>> +                               115200, 'n', 8, 'n');
+> 
+> Can't it be one line?
+
+It would be a total of 81 characters in length on one line, so no.
+
+> 
+>> +static void tegra_tcu_receive(struct mbox_client *client, void *msg_p)
+>> +{
+>> +       struct tty_port *port = &tegra_tcu_uart_port.state->port;
+> 
+>> +       uint32_t msg = *(uint32_t *)msg_p;
+> 
+> Redundant casting.
+
+Will remove.
+
+> 
+>> +       unsigned int num_bytes;
+>> +       int i;
+>> +
+> 
+>> +       num_bytes = (msg >> 24) & 0x3;
+> 
+> Two magic numbers.
+
+Sure, will add defines.
+
+> 
+>> +       for (i = 0; i < num_bytes; i++)
+>> +               tty_insert_flip_char(port, (msg >> (i*8)) & 0xff, TTY_NORMAL);
+>> +
+>> +       tty_flip_buffer_push(port);
+>> +}
+> 
+>> +MODULE_AUTHOR("Mikko Perttunen <mperttunen@nvidia.com>");
+>> +MODULE_LICENSE("GPL v2");
+>> +MODULE_DESCRIPTION("NVIDIA Tegra Combined UART driver");
+>> diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
+>> index dce5f9dae121..eaf3c303cba6 100644
+>> --- a/include/uapi/linux/serial_core.h
+>> +++ b/include/uapi/linux/serial_core.h
+>> @@ -281,4 +281,7 @@
+>>   /* MediaTek BTIF */
+>>   #define PORT_MTK_BTIF  117
+>>
+>> +/* NVIDIA Tegra Combined UART */
+>> +#define PORT_TEGRA_TCU 118
+> 
+> Check if there is an unused gap. IIRC we still have one near to 40ish.
+> 
+
+Correct, looks like 41-43 are unused. I'll change this 41.
+
+Thanks for reviewing!
+
+Mikko
