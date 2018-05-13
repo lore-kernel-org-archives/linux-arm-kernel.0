@@ -1,47 +1,48 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Sun, 13 May 2018 15:11:17 +0200
-Subject: [PATCH] media: rcar-vin:  Drop unnecessary register properties
- from example vin port
-In-Reply-To: <20180509184558.14960-1-horms+renesas@verge.net.au>
-References: <20180509184558.14960-1-horms+renesas@verge.net.au>
-Message-ID: <20180513131117.GR18974@bigcity.dyn.berto.se>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 13 May 2018 16:14:38 +0300
+Subject: [PATCH v3 3/6] MAINTAINERS: add at91 usart spi driver
+In-Reply-To: <20180511103822.31698-4-radu.pirea@microchip.com>
+References: <20180511103822.31698-1-radu.pirea@microchip.com>
+ <20180511103822.31698-4-radu.pirea@microchip.com>
+Message-ID: <CAHp75VdXrQ_NKBmP0L9o8_2MSqehNuriQ0gBJ3dDWQdegALSaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Fri, May 11, 2018 at 1:38 PM, Radu Pirea <radu.pirea@microchip.com> wrote:
+> Added entry for at91 usart mfd driver.
+>
 
-Thanks for your patch.
+You are adding a record for not existing file?
 
-On 2018-05-09 20:45:58 +0200, Simon Horman wrote:
-> The example vin port node does not have an address and thus does not
-> need address-cells or address size-properties.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-
+> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
 > ---
->  Documentation/devicetree/bindings/media/rcar_vin.txt | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> index a19517e1c669..2a0c59e97f40 100644
-> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> @@ -107,9 +107,6 @@ Board setup example for Gen2 platforms (vin1 composite video input)
->          status = "okay";
->  
->          port {
-> -                #address-cells = <1>;
-> -                #size-cells = <0>;
-> -
->                  vin1ep0: endpoint {
->                          remote-endpoint = <&adv7180>;
->                          bus-width = <8>;
-> -- 
-> 2.11.0
-> 
+>  MAINTAINERS | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index ca06c6f58299..9243b9007966 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -9199,6 +9199,13 @@ S:       Supported
+>  F:     drivers/mfd/at91-usart.c
+>  F:     include/dt-bindings/mfd/at91-usart.h
+>
+> +MICROCHIP AT91 USART SPI DRIVER
+> +M:     Radu Pirea <radu.pirea@microchip.com>
+> +L:     linux-spi at vger.kernel.org
+> +S:     Supported
+> +F:     drivers/spi/spi-at91-usart.c
+> +F:     Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
+> +
+>  MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
+>  M:     Woojung Huh <Woojung.Huh@microchip.com>
+>  M:     Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
+> --
+> 2.17.0
+>
+
+
 
 -- 
-Regards,
-Niklas S?derlund
+With Best Regards,
+Andy Shevchenko
