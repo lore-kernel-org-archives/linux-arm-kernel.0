@@ -1,184 +1,94 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 May 2018 03:14:22 +0800
-Subject: [PATCH RESEND net-next v2 5/8] net: stmmac: dwmac-sun8i: Use
- regmap_field for syscon register access
-In-Reply-To: <20180513191425.9801-1-wens@csie.org>
-References: <20180513191425.9801-1-wens@csie.org>
-Message-ID: <20180513191425.9801-6-wens@csie.org>
+Date: Sun, 13 May 2018 12:37:49 -0700
+Subject: [PATCH net-next v2 15/15] arm64: dts: allwinner: a64: add SRAM
+ controller device tree node
+In-Reply-To: <20180502115437.zlu2rafrguufutvp@flea>
+References: <20180501161227.2110-1-wens@csie.org>
+ <20180501161227.2110-16-wens@csie.org>
+ <20180502095118.rqnfwy576xh6ercm@flea>
+ <CAGb2v67pvL58Pes1ZFDZtPu_nL2+m6dgf_XOOymG9nVAkXVpEw@mail.gmail.com>
+ <29E5670C-9D17-4EC1-AAAC-0CF33DD0534C@aosc.io>
+ <20180502115437.zlu2rafrguufutvp@flea>
+Message-ID: <CAGb2v64xTNqQQSppw2NZoLn+ViQNQLytn1EukLqw+HJzf1=5ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Allwinner R40, the "GMAC clock" register is located in the CCU
-block, at a different register address than the other SoCs that have
-it in the "system control" block.
+On Wed, May 2, 2018 at 4:54 AM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Wed, May 02, 2018 at 06:19:51PM +0800, Icenowy Zheng wrote:
+>>
+>>
+>> ? 2018?5?2? GMT+08:00 ??5:53:21, Chen-Yu Tsai <wens@csie.org> ??:
+>> >On Wed, May 2, 2018 at 5:51 PM, Maxime Ripard
+>> ><maxime.ripard@bootlin.com> wrote:
+>> >> Hi,
+>> >>
+>> >> On Wed, May 02, 2018 at 12:12:27AM +0800, Chen-Yu Tsai wrote:
+>> >>> From: Icenowy Zheng <icenowy@aosc.io>
+>> >>>
+>> >>> Allwinner A64 has a SRAM controller, and in the device tree
+>> >currently
+>> >>> we have a syscon node to enable EMAC driver to access the EMAC clock
+>> >>> register. As SRAM controller driver can now export regmap for this
+>> >>> register, replace the syscon node to the SRAM controller device
+>> >node,
+>> >>> and let EMAC driver to acquire its EMAC clock regmap.
+>> >>>
+>> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> >>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >>> ---
+>> >>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 23
+>> >+++++++++++++++----
+>> >>>  1 file changed, 19 insertions(+), 4 deletions(-)
+>> >>>
+>> >>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> >b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> >>> index 1b2ef28c42bd..1c37659d9d41 100644
+>> >>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> >>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> >>> @@ -168,10 +168,25 @@
+>> >>>               #size-cells = <1>;
+>> >>>               ranges;
+>> >>>
+>> >>> -             syscon: syscon at 1c00000 {
+>> >>> -                     compatible =
+>> >"allwinner,sun50i-a64-system-controller",
+>> >>> -                             "syscon";
+>> >>> +             sram_controller: sram-controller at 1c00000 {
+>> >>> +                     compatible =
+>> >"allwinner,sun50i-a64-sram-controller";
+>> >>
+>> >> I don't think there's anything preventing us from keeping the
+>> >> -system-controller compatible. It's what was in the DT before, and
+>> >> it's how it's called in the datasheet.
+>> >
+>> >I actually meant to ask you about this. The -system-controller
+>> >compatible matches the datasheet better. Maybe we should just
+>> >switch to that one?
+>>
+>> No, if we do the switch the system-controller compatible,
+>> the device will be probed on the same memory region with
+>> a syscon on old DTs.
+>
+> The device hasn't magically changed either. Maybe we just need to add
+> a check to make sure we don't have the syscon compatible in the SRAM
+> driver probe so that the double driver issue doesn't happen?
 
-This patch converts the use of regmap to regmap_field for mapping and
-accessing the syscon register, so we can have the register address in
-the variants data, and not in the actual register manipulation code.
+The syscon interface (which is not even a full blown device driver)
+only looks at the "syscon" compatible. Either way we're removing that
+part from the device tree so things should be ok for new device trees.
+As Maxime mentioned we can do a check for the syscon compatible and
+either give a warning to the user asking them to update their device
+tree, or not register our custom regmap, or not probe the SRAM driver.
+Personally I prefer the first option. The system controller block is
+probed before any syscon users, so we should be fine, given the dwmac
+driver goes the custom regmap path first.
 
-This patch only converts regmap_read() and regmap_write() calls to
-regmap_field_read() and regmap_field_write() calls. There are some
-places where it might make sense to switch to regmap_field_update_bits(),
-but this is not done here to keep the patch simple.
+BTW, I still might end up changing the compatible. The manual uses
+"system control", not "system controller", which I think makes sense,
+since it is just a bunch of register files, kind of like the GRF
+(General Register Files) block found in Rockchip SoCs [1], and not an
+actual "controller".
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- .../net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 42 ++++++++++++++-----
- 1 file changed, 31 insertions(+), 11 deletions(-)
+ChenYu
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index a3fa65b1ca8e..bbc051474806 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -42,6 +42,7 @@
-  *				This value is used for disabling properly EMAC
-  *				and used as a good starting value in case of the
-  *				boot process(uboot) leave some stuff.
-+ * @syscon_field		reg_field for the syscon's gmac register
-  * @soc_has_internal_phy:	Does the MAC embed an internal PHY
-  * @support_mii:		Does the MAC handle MII
-  * @support_rmii:		Does the MAC handle RMII
-@@ -49,6 +50,7 @@
-  */
- struct emac_variant {
- 	u32 default_syscon_value;
-+	const struct reg_field *syscon_field;
- 	bool soc_has_internal_phy;
- 	bool support_mii;
- 	bool support_rmii;
-@@ -71,13 +73,21 @@ struct sunxi_priv_data {
- 	struct regulator *regulator;
- 	struct reset_control *rst_ephy;
- 	const struct emac_variant *variant;
--	struct regmap *regmap;
-+	struct regmap_field *regmap_field;
- 	bool internal_phy_powered;
- 	void *mux_handle;
- };
- 
-+/* EMAC clock register @ 0x30 in the "system control" address range */
-+static const struct reg_field sun8i_syscon_reg_field = {
-+	.reg = 0x30,
-+	.lsb = 0,
-+	.msb = 31,
-+};
-+
- static const struct emac_variant emac_variant_h3 = {
- 	.default_syscon_value = 0x58000,
-+	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = true,
- 	.support_mii = true,
- 	.support_rmii = true,
-@@ -86,12 +96,14 @@ static const struct emac_variant emac_variant_h3 = {
- 
- static const struct emac_variant emac_variant_v3s = {
- 	.default_syscon_value = 0x38000,
-+	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = true,
- 	.support_mii = true
- };
- 
- static const struct emac_variant emac_variant_a83t = {
- 	.default_syscon_value = 0,
-+	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = false,
- 	.support_mii = true,
- 	.support_rgmii = true
-@@ -99,6 +111,7 @@ static const struct emac_variant emac_variant_a83t = {
- 
- static const struct emac_variant emac_variant_a64 = {
- 	.default_syscon_value = 0,
-+	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = false,
- 	.support_mii = true,
- 	.support_rmii = true,
-@@ -216,7 +229,6 @@ static const struct emac_variant emac_variant_a64 = {
- #define SYSCON_ETCS_MII		0x0
- #define SYSCON_ETCS_EXT_GMII	0x1
- #define SYSCON_ETCS_INT_GMII	0x2
--#define SYSCON_EMAC_REG		0x30
- 
- /* sun8i_dwmac_dma_reset() - reset the EMAC
-  * Called from stmmac via stmmac_dma_ops->reset
-@@ -745,7 +757,7 @@ static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
- 	bool need_power_ephy = false;
- 
- 	if (current_child ^ desired_child) {
--		regmap_read(gmac->regmap, SYSCON_EMAC_REG, &reg);
-+		regmap_field_read(gmac->regmap_field, &reg);
- 		switch (desired_child) {
- 		case DWMAC_SUN8I_MDIO_MUX_INTERNAL_ID:
- 			dev_info(priv->device, "Switch mux to internal PHY");
-@@ -763,7 +775,7 @@ static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
- 				desired_child);
- 			return -EINVAL;
- 		}
--		regmap_write(gmac->regmap, SYSCON_EMAC_REG, val);
-+		regmap_field_write(gmac->regmap_field, val);
- 		if (need_power_ephy) {
- 			ret = sun8i_dwmac_power_internal_phy(priv);
- 			if (ret)
-@@ -801,7 +813,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
- 	int ret;
- 	u32 reg, val;
- 
--	regmap_read(gmac->regmap, SYSCON_EMAC_REG, &val);
-+	regmap_field_read(gmac->regmap_field, &val);
- 	reg = gmac->variant->default_syscon_value;
- 	if (reg != val)
- 		dev_warn(priv->device,
-@@ -883,7 +895,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
- 		return -EINVAL;
- 	}
- 
--	regmap_write(gmac->regmap, SYSCON_EMAC_REG, reg);
-+	regmap_field_write(gmac->regmap_field, reg);
- 
- 	return 0;
- }
-@@ -892,7 +904,7 @@ static void sun8i_dwmac_unset_syscon(struct sunxi_priv_data *gmac)
- {
- 	u32 reg = gmac->variant->default_syscon_value;
- 
--	regmap_write(gmac->regmap, SYSCON_EMAC_REG, reg);
-+	regmap_field_write(gmac->regmap_field, reg);
- }
- 
- static void sun8i_dwmac_exit(struct platform_device *pdev, void *priv)
-@@ -980,6 +992,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
- 	int ret;
- 	struct stmmac_priv *priv;
- 	struct net_device *ndev;
-+	struct regmap *regmap;
- 
- 	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
- 	if (ret)
-@@ -1014,14 +1027,21 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
- 		gmac->regulator = NULL;
- 	}
- 
--	gmac->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
--						       "syscon");
--	if (IS_ERR(gmac->regmap)) {
--		ret = PTR_ERR(gmac->regmap);
-+	regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "syscon");
-+	if (IS_ERR(regmap)) {
-+		ret = PTR_ERR(regmap);
- 		dev_err(&pdev->dev, "Unable to map syscon: %d\n", ret);
- 		return ret;
- 	}
- 
-+	gmac->regmap_field = devm_regmap_field_alloc(dev, regmap,
-+						     *gmac->variant->syscon_field);
-+	if (IS_ERR(gmac->regmap_field)) {
-+		ret = PTR_ERR(gmac->regmap_field);
-+		dev_err(dev, "Unable to map syscon register: %d\n", ret);
-+		return ret;
-+	}
-+
- 	plat_dat->interface = of_get_phy_mode(dev->of_node);
- 
- 	/* platform data specifying hardware features and callbacks.
--- 
-2.17.0
+[1] https://www.kernel.org/doc/Documentation/devicetree/bindings/soc/rockchip/grf.txt
