@@ -1,48 +1,51 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 13 May 2018 16:14:38 +0300
-Subject: [PATCH v3 3/6] MAINTAINERS: add at91 usart spi driver
-In-Reply-To: <20180511103822.31698-4-radu.pirea@microchip.com>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-4-radu.pirea@microchip.com>
-Message-ID: <CAHp75VdXrQ_NKBmP0L9o8_2MSqehNuriQ0gBJ3dDWQdegALSaA@mail.gmail.com>
+From: deller@gmx.de (Helge Deller)
+Date: Sun, 13 May 2018 15:26:20 +0200
+Subject: common non-cache coherent direct dma mapping ops
+In-Reply-To: <20180511075945.16548-1-hch@lst.de>
+References: <20180511075945.16548-1-hch@lst.de>
+Message-ID: <1834767f-0430-8f7f-61b1-560353cd6e5f@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 1:38 PM, Radu Pirea <radu.pirea@microchip.com> wrote:
-> Added entry for at91 usart mfd driver.
->
-
-You are adding a record for not existing file?
-
-> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-> ---
->  MAINTAINERS | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index ca06c6f58299..9243b9007966 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -9199,6 +9199,13 @@ S:       Supported
->  F:     drivers/mfd/at91-usart.c
->  F:     include/dt-bindings/mfd/at91-usart.h
->
-> +MICROCHIP AT91 USART SPI DRIVER
-> +M:     Radu Pirea <radu.pirea@microchip.com>
-> +L:     linux-spi at vger.kernel.org
-> +S:     Supported
-> +F:     drivers/spi/spi-at91-usart.c
-> +F:     Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
-> +
->  MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
->  M:     Woojung Huh <Woojung.Huh@microchip.com>
->  M:     Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
-> --
-> 2.17.0
->
-
+On 11.05.2018 09:59, Christoph Hellwig wrote:
+> this series continues consolidating the dma-mapping code, with a focus
+> on architectures that do not (always) provide cache coherence for DMA.
+> Three architectures (arm, mips and powerpc) are still left to be
+> converted later due to complexity of their dma ops selection.
+> 
+> The dma-noncoherent ops calls the dma-direct ops for the actual
+> translation of streaming mappins and allow the architecture to provide
+> any cache flushing required for cpu to device and/or device to cpu
+> ownership transfers.  The dma coherent allocator is for now still left
+> entirely to architecture supplied implementations due the amount of
+> variations.  Hopefully we can do some consolidation for them later on
+> as well.
+> 
+> A lot of architectures are currently doing very questionable things
+> in their dma mapping routines, which are documented in the changelogs
+> for each patch.  Please review them very careful and correct me on
+> incorrect assumptions.
+> 
+> Because this series sits on top of two previously submitted series
+> a git tree might be useful to actually test it.  It is provided here:
+> 
+>     git://git.infradead.org/users/hch/misc.git generic-dma-noncoherent
+> 
+> Gitweb:
+> 
+>     http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/generic-dma-noncoherent
+> 
+> Changes since RFC:
+>  - fix a typo accidentally disabling the device to cpu transfer sync
+>  - fixed a few compile failures
 
 
--- 
-With Best Regards,
-Andy Shevchenko
+I tested it again on parisc (this time again on top of git head) and it still breaks
+the same way as I reported in my mail on April 21st: the lasi82956 network driver works
+unreliable. NIC gets IP, but ping doesn't work.
+See drivers/net/ethernet/i825xx/lasi_82596.c, it uses dma*sync() functions.
+
+See comment in James mail from April 21st too:
+-> you just made every 32 bit parisc system unnecessarily use non-coherent.
+
+Helge
