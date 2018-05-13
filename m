@@ -1,49 +1,95 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 13 May 2018 10:48:04 +0200
-Subject: [PATCH V3 0/3] cpufreq: dt: Allow platforms to provide
- suspend/resume hooks
-In-Reply-To: <cover.1524561482.git.viresh.kumar@linaro.org>
-References: <cover.1524561482.git.viresh.kumar@linaro.org>
-Message-ID: <2141918.GL8YPaupJ4@aspire.rjw.lan>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Sun, 13 May 2018 11:08:55 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a77990: Add GPIO device nodes
+Message-ID: <20180513090855.25982-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 24, 2018 11:39:44 AM CEST Viresh Kumar wrote:
-> Hi Rafael,
-> 
-> These patches are already tested by Miquel and are ready to get merged.
-> Please pick them as part of 4.18 stuff whenever you do that.
-> 
-> I have updated the cpufreq-dt driver to allow platform specific
-> suspend/resume hooks and done some minor cleanup in the driver. I have
-> updated Miquel's patch and applied that on top of all this.
-> 
-> Thanks.
-> 
-> V2->V3:
-> - Don't double put the clock.
-> - Fix commit log of 3/3.
-> - Add tested-by from Miquel.
-> - There was no V2 of 1-2/3 but only 3/3 on the lists. All are marked as
->   V3 to clear things out.
-> 
-> --
-> viresh
-> 
-> [1] https://lkml.kernel.org/r/20180421141943.25705-1-miquel.raynal at bootlin.com
-> 
-> Miquel Raynal (1):
->   cpufreq: add suspend/resume support in Armada 37xx DVFS driver
-> 
-> Viresh Kumar (2):
->   cpufreq: dt: Allow platform specific suspend/resume callbacks
->   cpufreq: armada: Free resources on error paths
-> 
->  drivers/cpufreq/armada-37xx-cpufreq.c | 100 +++++++++++++++++++++++++++++-----
->  drivers/cpufreq/cpufreq-dt.c          |  10 +++-
->  drivers/cpufreq/cpufreq-dt.h          |   5 ++
->  3 files changed, 100 insertions(+), 15 deletions(-)
-> 
-> 
+The compat string renesas,gpio-rcar has been deprecated since v4.14,
+the same release that r8a77990 SoC support was added. Thus
+renesas,gpio-rcar can safely be removed without any risk of behaviour
+changes between old and new mainline kernels and DTBs.
 
-Applied including the v4 of patch [3/3], thanks!
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi | 21 +++++++--------------
+ 1 file changed, 7 insertions(+), 14 deletions(-)
+
+ Based on renesas-devel-20180511-v4.17-rc4
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index 2506f46293e8..f3426266b5ea 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -88,8 +88,7 @@
+ 
+ 		gpio0: gpio at e6050000 {
+ 			compatible = "renesas,gpio-r8a77995",
+-				     "renesas,rcar-gen3-gpio",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen3-gpio";
+ 			reg = <0 0xe6050000 0 0x50>;
+ 			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -104,8 +103,7 @@
+ 
+ 		gpio1: gpio at e6051000 {
+ 			compatible = "renesas,gpio-r8a77995",
+-				     "renesas,rcar-gen3-gpio",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen3-gpio";
+ 			reg = <0 0xe6051000 0 0x50>;
+ 			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -120,8 +118,7 @@
+ 
+ 		gpio2: gpio at e6052000 {
+ 			compatible = "renesas,gpio-r8a77995",
+-				     "renesas,rcar-gen3-gpio",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen3-gpio";
+ 			reg = <0 0xe6052000 0 0x50>;
+ 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -136,8 +133,7 @@
+ 
+ 		gpio3: gpio at e6053000 {
+ 			compatible = "renesas,gpio-r8a77995",
+-				     "renesas,rcar-gen3-gpio",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen3-gpio";
+ 			reg = <0 0xe6053000 0 0x50>;
+ 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -152,8 +148,7 @@
+ 
+ 		gpio4: gpio at e6054000 {
+ 			compatible = "renesas,gpio-r8a77995",
+-				     "renesas,rcar-gen3-gpio",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen3-gpio";
+ 			reg = <0 0xe6054000 0 0x50>;
+ 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -168,8 +163,7 @@
+ 
+ 		gpio5: gpio at e6055000 {
+ 			compatible = "renesas,gpio-r8a77995",
+-				     "renesas,rcar-gen3-gpio",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen3-gpio";
+ 			reg = <0 0xe6055000 0 0x50>;
+ 			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+@@ -184,8 +178,7 @@
+ 
+ 		gpio6: gpio at e6055400 {
+ 			compatible = "renesas,gpio-r8a77995",
+-				     "renesas,rcar-gen3-gpio",
+-				     "renesas,gpio-rcar";
++				     "renesas,rcar-gen3-gpio";
+ 			reg = <0 0xe6055400 0 0x50>;
+ 			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+ 			#gpio-cells = <2>;
+-- 
+2.11.0
