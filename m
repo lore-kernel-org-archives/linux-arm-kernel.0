@@ -1,54 +1,38 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sun, 13 May 2018 21:06:46 +0530
-Subject: [PATCH 6/8] serial: Add Tegra Combined UART driver
-In-Reply-To: <20180508114403.14499-7-mperttunen@nvidia.com>
-References: <20180508114403.14499-1-mperttunen@nvidia.com>
- <20180508114403.14499-7-mperttunen@nvidia.com>
-Message-ID: <CABb+yY3snB9o4e14by4xui+o_Vhqpe2zh6Pp_e0t-DCTKvMHWA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 13 May 2018 17:42:37 +0200
+Subject: [GIT PULL 4/5] arm64: dts: exynos: Stuff for v4.18
+In-Reply-To: <20180513154238.22508-1-krzk@kernel.org>
+References: <20180513154238.22508-1-krzk@kernel.org>
+Message-ID: <20180513154238.22508-5-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2018 at 5:14 PM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-....
->
-> +config SERIAL_TEGRA_TCU
-> +       tristate "NVIDIA Tegra Combined UART"
-> +       depends on ARCH_TEGRA && MAILBOX
-> +       select SERIAL_CORE
-> +       help
-> +         Support for the mailbox-based TCU (Tegra Combined UART) serial port.
-> +         TCU is a virtual serial port that allows multiplexing multiple data
-> +         streams into a single hardware serial port.
-> +
-Maybe make it depend upon TEGRA_HSP_MBOX ?
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-......
+are available in the git repository at:
 
-> +
-> +static void tegra_tcu_write(const char *s, unsigned int count)
-> +{
-> +       struct tegra_tcu *tcu = tegra_tcu_uart_port.private_data;
-> +       unsigned int written = 0, i = 0;
-> +       bool insert_nl = false;
-> +       uint32_t value = 0;
-> +
-> +       while (i < count) {
-> +               if (insert_nl) {
-> +                       value |= '\n' << (written++ * 8);
-> +                       insert_nl = false;
-> +                       i++;
-> +               } else if (s[i] == '\n') {
-> +                       value |= '\r' << (written++ * 8);
-> +                       insert_nl = true;
-> +               } else {
-> +                       value |= s[i++] << (written++ * 8);
-> +               }
-> +
-> +               if (written == 3) {
-> +                       value |= 3 << 24;
-> +                       value |= BIT(26);
-> +                       mbox_send_message(tcu->tx, &value);
->
-How is this supposed to work? tegra_hsp_doorbell_send_data() ignores
-the second argument.
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.18
+
+for you to fetch changes up to 8dd6203f32f20cb83469eb859efded9e403b3e9f:
+
+  arm64: dts: exynos: Add mem-2-mem Scaler devices (2018-05-13 11:26:13 +0200)
+
+----------------------------------------------------------------
+Samsung DTS ARM64 changes for v4.18
+
+1. Fix DTC warnings.
+2. Add mem-2-mem Scaler devices.
+
+----------------------------------------------------------------
+Andrzej Pietrasiewicz (1):
+      arm64: dts: exynos: Add mem-2-mem Scaler devices
+
+Krzysztof Kozlowski (2):
+      arm64: dts: exynos: Move syscon poweroff and restart nodes under the PMU
+      arm64: dts: exynos: Remove unneeded address space mapping for soc node
+
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 66 +++++++++++++++++++++++++-----
+ arch/arm64/boot/dts/exynos/exynos7.dtsi    | 18 ++++----
+ 2 files changed, 65 insertions(+), 19 deletions(-)
