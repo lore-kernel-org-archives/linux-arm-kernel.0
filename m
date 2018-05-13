@@ -1,36 +1,40 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 13 May 2018 21:10:10 +0200 (CEST)
-Subject: [PATCH] arm64: defconfig: Increase CMA size for VC4
-In-Reply-To: <968ffb1f-8a3a-00d6-996d-35d5db30d25b@gmail.com>
-References: <1525296700-3588-1-git-send-email-stefan.wahren@i2se.com>
- <968ffb1f-8a3a-00d6-996d-35d5db30d25b@gmail.com>
-Message-ID: <1911092892.196672.1526238610532@email.1und1.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 14 May 2018 03:14:19 +0800
+Subject: [PATCH RESEND net-next v2 2/8] dt-bindings: net: dwmac-sun8i: Sort
+ syscon compatibles by alphabetical order
+In-Reply-To: <20180513191425.9801-1-wens@csie.org>
+References: <20180513191425.9801-1-wens@csie.org>
+Message-ID: <20180513191425.9801-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The A83T syscon compatible was appended to the syscon compatibles list,
+instead of inserted in to preserve the ordering.
 
-> Florian Fainelli <f.fainelli@gmail.com> hat am 13. Mai 2018 um 18:58 geschrieben:
-> 
-> 
-> Le 05/02/18 ? 14:31, Stefan Wahren a ?crit?:
-> > The VC4 needs more memory than the default setting (16 MB):
-> > 
-> >   vc4-drm soc:gpu: swiotlb: coherent allocation failed, size=16777216
-> >   [drm:vc4_bo_create [vc4]] *ERROR* Failed to allocate from CMA:
-> >   vc4_v3d 3fc00000.v3d: Failed to allocate memory for tile binning: -12.
-> >     You may need to enable CMA or give it more memory.
-> >   vc4-drm soc:gpu: failed to bind 3fc00000.v3d (ops vc4_v3d_ops [vc4]): -12
-> >   vc4-drm soc:gpu: master bind failed: -12
-> >   vc4-drm: probe of soc:gpu failed with error -12
-> > 
-> > So increase the value to 32 MB and fix this issue.
-> > 
-> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
-> Applied to defconfig-arm64/next, thanks!
-> -- 
-> Florian
+Move it to the proper place to keep the list sorted.
 
-Thank you, i will add a note next time.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Stefan
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+index e04ce75e24a3..1b8e33e71651 100644
+--- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -22,10 +22,10 @@ Required properties:
+ - #size-cells: shall be 0
+ - syscon: A phandle to the syscon of the SoC with one of the following
+  compatible string:
++  - allwinner,sun8i-a83t-system-controller
+   - allwinner,sun8i-h3-system-controller
+   - allwinner,sun8i-v3s-system-controller
+   - allwinner,sun50i-a64-system-controller
+-  - allwinner,sun8i-a83t-system-controller
+ 
+ Optional properties:
+ - allwinner,tx-delay-ps: TX clock delay chain value in ps.
+-- 
+2.17.0
