@@ -1,30 +1,25 @@
 From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 13 May 2018 17:23:34 +0300
-Subject: [PATCH v3 3/3] tty: implement led triggers
-In-Reply-To: <20180508100543.12559-4-u.kleine-koenig@pengutronix.de>
+Date: Sun, 13 May 2018 17:34:42 +0300
+Subject: [PATCH v3 1/3] leds: triggers: provide
+ led_trigger_register_format()
+In-Reply-To: <20180510112229.GE6977@amd>
 References: <20180508100543.12559-1-u.kleine-koenig@pengutronix.de>
- <20180508100543.12559-4-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAHp75Vf0RmAU8Qvk13JkFJob95pBEv27o4k8FVKo+0vs-SxYRg@mail.gmail.com>
+ <20180508100543.12559-2-u.kleine-koenig@pengutronix.de>
+ <20180510112101.GD6977@amd> <20180510112229.GE6977@amd>
+Message-ID: <CAHp75VeWsbT+XuacdrKM6drzcxwx0inAUjtyU0WBX_SUTg6Lbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2018 at 1:05 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> The rx trigger fires when data is pushed to the ldisc by the driver. This
-> is a bit later than the actual receiving of data but has the nice benefit
-> that it doesn't need adaption for each driver and isn't in the hot path.
+On Thu, May 10, 2018 at 2:22 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Thu 2018-05-10 13:21:01, Pavel Machek wrote:
+
+>> I know this is not your fault, but if you have a space or "[]" in
+>> netdev names, confusing things will happen.
 >
-> Similarly the tx trigger fires when data was copied from userspace and is
-> given to the ldisc.
+> Hmm. If we are doing this we really should check trigger names for
+> forbidden characters. At least "[] " should be forbidden.
 
->  #include <uapi/linux/tty.h>
->  #include <linux/rwsem.h>
->  #include <linux/llist.h>
-> +#include <linux/leds.h>
-
-Even for unordered lists of inclusions I would still try to put new
-lines in "somehow" ordered positions.
-For example here, I would rather put it before llist.h.
+So, string_escape_mem() is your helper here.
 
 -- 
 With Best Regards,
