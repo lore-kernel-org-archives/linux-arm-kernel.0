@@ -1,94 +1,54 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 13 May 2018 12:37:49 -0700
-Subject: [PATCH net-next v2 15/15] arm64: dts: allwinner: a64: add SRAM
- controller device tree node
-In-Reply-To: <20180502115437.zlu2rafrguufutvp@flea>
-References: <20180501161227.2110-1-wens@csie.org>
- <20180501161227.2110-16-wens@csie.org>
- <20180502095118.rqnfwy576xh6ercm@flea>
- <CAGb2v67pvL58Pes1ZFDZtPu_nL2+m6dgf_XOOymG9nVAkXVpEw@mail.gmail.com>
- <29E5670C-9D17-4EC1-AAAC-0CF33DD0534C@aosc.io>
- <20180502115437.zlu2rafrguufutvp@flea>
-Message-ID: <CAGb2v64xTNqQQSppw2NZoLn+ViQNQLytn1EukLqw+HJzf1=5ig@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 13 May 2018 21:49:19 +0200
+Subject: [PATCH RESEND net-next v2 1/8] dt-bindings: net: dwmac-sun8i:
+ Clean up clock delay chain descriptions
+In-Reply-To: <20180513191425.9801-2-wens@csie.org>
+References: <20180513191425.9801-1-wens@csie.org>
+ <20180513191425.9801-2-wens@csie.org>
+Message-ID: <20180513194919.GE12738@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 2, 2018 at 4:54 AM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> On Wed, May 02, 2018 at 06:19:51PM +0800, Icenowy Zheng wrote:
->>
->>
->> ? 2018?5?2? GMT+08:00 ??5:53:21, Chen-Yu Tsai <wens@csie.org> ??:
->> >On Wed, May 2, 2018 at 5:51 PM, Maxime Ripard
->> ><maxime.ripard@bootlin.com> wrote:
->> >> Hi,
->> >>
->> >> On Wed, May 02, 2018 at 12:12:27AM +0800, Chen-Yu Tsai wrote:
->> >>> From: Icenowy Zheng <icenowy@aosc.io>
->> >>>
->> >>> Allwinner A64 has a SRAM controller, and in the device tree
->> >currently
->> >>> we have a syscon node to enable EMAC driver to access the EMAC clock
->> >>> register. As SRAM controller driver can now export regmap for this
->> >>> register, replace the syscon node to the SRAM controller device
->> >node,
->> >>> and let EMAC driver to acquire its EMAC clock regmap.
->> >>>
->> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> >>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >>> ---
->> >>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 23
->> >+++++++++++++++----
->> >>>  1 file changed, 19 insertions(+), 4 deletions(-)
->> >>>
->> >>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> >b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> >>> index 1b2ef28c42bd..1c37659d9d41 100644
->> >>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> >>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> >>> @@ -168,10 +168,25 @@
->> >>>               #size-cells = <1>;
->> >>>               ranges;
->> >>>
->> >>> -             syscon: syscon at 1c00000 {
->> >>> -                     compatible =
->> >"allwinner,sun50i-a64-system-controller",
->> >>> -                             "syscon";
->> >>> +             sram_controller: sram-controller at 1c00000 {
->> >>> +                     compatible =
->> >"allwinner,sun50i-a64-sram-controller";
->> >>
->> >> I don't think there's anything preventing us from keeping the
->> >> -system-controller compatible. It's what was in the DT before, and
->> >> it's how it's called in the datasheet.
->> >
->> >I actually meant to ask you about this. The -system-controller
->> >compatible matches the datasheet better. Maybe we should just
->> >switch to that one?
->>
->> No, if we do the switch the system-controller compatible,
->> the device will be probed on the same memory region with
->> a syscon on old DTs.
->
-> The device hasn't magically changed either. Maybe we just need to add
-> a check to make sure we don't have the syscon compatible in the SRAM
-> driver probe so that the double driver issue doesn't happen?
+On Mon, May 14, 2018 at 03:14:18AM +0800, Chen-Yu Tsai wrote:
+> The clock delay chains found in the glue layer for dwmac-sun8i are only
+> used with RGMII PHYs. They are not intended for non-RGMII PHYs, such as
+> MII external PHYs or the internal PHY. Also, a recent SoC has a smaller
+> range of possible values for the delay chain.
+> 
+> This patch reformats the delay chain section of the device tree binding
+> to make it clear that the delay chains only apply to RGMII PHYs, and
+> make it easier to add the R40-specific bits later.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> index 3d6d5fa0c4d5..e04ce75e24a3 100644
+> --- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> +++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> @@ -28,10 +28,13 @@ Required properties:
+>    - allwinner,sun8i-a83t-system-controller
+>  
+>  Optional properties:
+> -- allwinner,tx-delay-ps: TX clock delay chain value in ps. Range value is 0-700. Default is 0)
+> -- allwinner,rx-delay-ps: RX clock delay chain value in ps. Range value is 0-3100. Default is 0)
+> -Both delay properties need to be a multiple of 100. They control the delay for
+> -external PHY.
+> +- allwinner,tx-delay-ps: TX clock delay chain value in ps.
+> +			 Range is 0-700. Default is 0.
+> +- allwinner,rx-delay-ps: RX clock delay chain value in ps.
+> +			 Range is 0-3100. Default is 0.
+> +Both delay properties need to be a multiple of 100. They control the
+> +clock delay for external RGMII PHY. They do not apply to the internal
+> +PHY or external non-RGMII PHYs.
 
-The syscon interface (which is not even a full blown device driver)
-only looks at the "syscon" compatible. Either way we're removing that
-part from the device tree so things should be ok for new device trees.
-As Maxime mentioned we can do a check for the syscon compatible and
-either give a warning to the user asking them to update their device
-tree, or not register our custom regmap, or not probe the SRAM driver.
-Personally I prefer the first option. The system controller block is
-probed before any syscon users, so we should be fine, given the dwmac
-driver goes the custom regmap path first.
+Hi Chen-Yu
 
-BTW, I still might end up changing the compatible. The manual uses
-"system control", not "system controller", which I think makes sense,
-since it is just a bunch of register files, kind of like the GRF
-(General Register Files) block found in Rockchip SoCs [1], and not an
-actual "controller".
+Are these delays the MAC applies? Not the PHY. It would be good to
+make it clear here these are MAC imposed delays.
 
-ChenYu
-
-[1] https://www.kernel.org/doc/Documentation/devicetree/bindings/soc/rockchip/grf.txt
+     Andrew
