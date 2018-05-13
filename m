@@ -1,27 +1,41 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 13 May 2018 09:58:49 -0700
-Subject: [PATCH] arm64: defconfig: Increase CMA size for VC4
-In-Reply-To: <1525296700-3588-1-git-send-email-stefan.wahren@i2se.com>
-References: <1525296700-3588-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <968ffb1f-8a3a-00d6-996d-35d5db30d25b@gmail.com>
+Date: Sun, 13 May 2018 10:01:34 -0700
+Subject: [GIT PULL 2/5 v2] Broadcom defconfig-arm64 changes for 4.18
+In-Reply-To: <20180511214339.24139-2-f.fainelli@gmail.com>
+References: <20180511214339.24139-2-f.fainelli@gmail.com>
+Message-ID: <20180513170134.11472-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/02/18 ? 14:31, Stefan Wahren a ?crit?:
-> The VC4 needs more memory than the default setting (16 MB):
-> 
->   vc4-drm soc:gpu: swiotlb: coherent allocation failed, size=16777216
->   [drm:vc4_bo_create [vc4]] *ERROR* Failed to allocate from CMA:
->   vc4_v3d 3fc00000.v3d: Failed to allocate memory for tile binning: -12.
->     You may need to enable CMA or give it more memory.
->   vc4-drm soc:gpu: failed to bind 3fc00000.v3d (ops vc4_v3d_ops [vc4]): -12
->   vc4-drm soc:gpu: master bind failed: -12
->   vc4-drm: probe of soc:gpu failed with error -12
-> 
-> So increase the value to 32 MB and fix this issue.
-> 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-Applied to defconfig-arm64/next, thanks!
--- 
-Florian
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the git repository at:
+
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/defconfig-arm64
+
+for you to fetch changes up to ebf089248dab2ef569e5e26a607f0977a71182b7:
+
+  arm64: defconfig: Increase CMA size for VC4 (2018-05-13 09:55:21 -0700)
+
+----------------------------------------------------------------
+This pull request contains Broadcom ARM64-based SoCs defconfig changes
+for 4.18, please pull the following:
+
+- Stefan provides a set of updates targeting the Raspberry Pi 3 B+
+  platform: LAN7515 USB Ethernet driver, Cypress CYW43455 Bluetooth when
+  using the Pi 3 B+ in AArch64 boot mode. He also updates the ARM64
+  defconfig to create a bigger default CMA region to let the VideoCore 4
+  driver initialize correctly.
+
+----------------------------------------------------------------
+Florian Fainelli (1):
+      Merge tag 'bcm2835-defconfig-64-next-2018-04-30' into defconfig-arm64/next
+
+Stefan Wahren (2):
+      arm64: defconfig: Enable LAN and BT support for RPi 3 B+
+      arm64: defconfig: Increase CMA size for VC4
+
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
