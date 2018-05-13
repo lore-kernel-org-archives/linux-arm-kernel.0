@@ -1,167 +1,139 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Sun, 13 May 2018 16:12:18 +0200
-Subject: [PATCH 00/13] drm/kms/mode: using helper func
- drm_display_mode_to/from_videomode for calculating timing parameters
-In-Reply-To: <1525866725-16685-1-git-send-email-satendra.t@samsung.com>
-References: <CGME20180509115224epcas5p1c958418bc36fd224e8d36b9511c5beea@epcas5p1.samsung.com>
- <1525777110-11378-1-git-send-email-satendra.t@samsung.com>
- <1525866725-16685-1-git-send-email-satendra.t@samsung.com>
-Message-ID: <CAKMK7uGb_psf+H4oWqwpWYg6OT6YV3Gm_CrjEpfzk=WtxH3MjQ@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 13 May 2018 17:16:36 +0300
+Subject: [PATCH 6/8] serial: Add Tegra Combined UART driver
+In-Reply-To: <20180508114403.14499-7-mperttunen@nvidia.com>
+References: <20180508114403.14499-1-mperttunen@nvidia.com>
+ <20180508114403.14499-7-mperttunen@nvidia.com>
+Message-ID: <CAHp75VfYF_u2bZ+temGbReEB9K-t3A75aUNYwffyv9-=zEi0Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2018 at 1:52 PM, Satendra Singh Thakur
-<satendra.t@samsung.com> wrote:
-> On Thu, May 08, 2018 at 16:28:30 +0530, Satendra Singh Thakur wrote:
->> On Thu, May 07, 2018 at 15:46:02 +0200, Daniel Vetter wrote:
->> > On Thu, May 03, 2018 at 01:53:55PM +0530, Satendra Singh Thakur wrote:
->> > > 1.There is a function in drm-core to calculate display timing parameters:
->> > > horizontal front porch, back porch, sync length,
->> > > vertical front porch, back porch, sync length and
->> > > clock in Hz.
->> > > However, some drivers are still calculating these parameters themselves.
->> > > Therefore, there is a duplication of the code.
->> > > This patch series replaces this redundant code with the function
->> > > drm_display_mode_to_videomode.
->> > > This removes nearly 100 redundant lines from the related drivers.
->> > > 2.For some drivers (sun4i) the reverse helper
->> > > drm_display_mode_from_videomode is used.
->> > > 3.For some drivers it replaces arithmatic operators (*, /) with shifting
->> > > operators (>>, <<).
->> > > 4.For some drivers DRM_MODE_FLAG_* are replaced with DISPLAY_FLAGS_* flags.
->> > > 5.These changes apply to following crtc and encoder drivers:
->> > > atmel-hlcdc
->> > > bridge-tc358767
->> > > exynos-dsi
->> > > fsl-dcu
->> > > gma500-mdfld_dsi_dpi
->> > > hisilicon-kirin_dsi, ade
->> > > meson-encoder
->> > > pl111-display
->> > > sun4i-tv
->> > > ti lcdc
->> > > tegra dc
->> > > mediatek dpi dsi
->> > > bridge-adv7533
->> >
->> > The drm_mode_to_videomode helper is meant for interop between drm and v4l,
->> > which have different internal structures to represent modes.
->> >
->> > For drivers that only use drm I think the better option would be to add
->> > these fields to struct drm_display_mode as another set of crtc_* values
->> > (the computed values are stored in crtc_ prefixed members). And compute
->> > front/back porch in drm_mode_set_crtcinfo.
->> >
->> > Then we can use these new drm_display_mode->crtc_h|vfront|back_porch
->> > fields in all the drivers you're changing. This way you avoid having to
->> > change all the drm drivers to use v4l #defines.
->> >
->> > Thanks,
->> > Daniel
->>
->> Hi Daniel,
->> Thanks for the comments.
->> I will look into it.
->>
->> Thanks
->> -Satendra
+On Tue, May 8, 2018 at 2:44 PM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
+> The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
+> multiplexing multiple "virtual UARTs" into a single hardware serial
+> port. The TCU is the primary serial port on Tegra194 devices.
 >
-> Hi Daniel,
-> Thanks for the comments.
-> Please find below my understanding in this direction.
->
-> 1. Currently struct videomode is being used in 50 drm drivers and 14 fbdev drivers.
->    Since, it's already being used by so many drm drivers, that is the reason
->    these fbdev objects (struct videmode and func drm_display_mode_to_videomode) were used in this patch series.
+> Add a TCU driver utilizing the mailbox framework, as the used mailboxes
+> are part of Tegra HSP blocks that are already controlled by the Tegra
+> HSP mailbox driver.
 
-The biggest contributor for that seems to be of_get_videomode. We
-should probably have a of_drm_get_display_mode helper, which
-automatically converts the of/dt video description into the drm
-display mode structure.
+First question, can it be done utilizing SERDEV framework?
 
-And I found way less than 50 drm drivers using videomode, much less if
-we ignore of.
+> +static void tegra_tcu_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
+> +{
 
-> 2. Anyway, if fbdev related objects (struct/func) are not encouraged in drm drivers, then we may add
->    h/v front/back porches in struct drm_display_mode as adviced by you.
->
-> 3. We can calculate these params in func drm_mode_set_crtcinfo at the end of it.
->    int drm_mode_set_crtcinfo ()
->    {
->    .
->    .
->    crtc_hfront_porch = crtc_hsync_start - crtc_hdisplay;
->    crtc_vfront_porch = crtc_vsync_start - crtc_vdisplay;
->    .
->    .
->    crtc_clock_hz = crtc_clock*1000;
->    };
->
-> 4. Normally mode is programmed in HW in following callbacks of crtc and encoder drivers
->    -mode_set
->    -mode_set_nofb
->    -atomic_enable
->
->
->    Normally drm_mode_set_crtcinfo is used in
->    -mode_fixup callbacks (CBs)
->    of encoder and crtc drivers.
->
->    if mode_fixup CBs are called before mode_set CBs then
->    drm_mode_set_crtcinfo is right place to calculate sync/porch params.
->    We can use crtc_hfront/back_porches directly and program them to HW
->    in above mentioned callbacks.
->
->    int my_mode_set ()
->    {
->         REG_WRITE(crtc_hfront_porch);
->         REG_WRITE(crtc_hback_porch);
->         .
->         .
->    }
+> +       (void)port;
+> +       (void)mctrl;
 
-Agreed with your plan up to point 5 here.
+Huh?
 
->  6.  However, if these params are being modified after calling drm_set_crtcinfo as mentioned below:
->
->    bool amdgpu_atombios_encoder_mode_fixup(struct drm_encoder *encoder,
->                                  const struct drm_display_mode *mode,
->                                  struct drm_display_mode *adjusted_mode)
->    {
->         struct amdgpu_encoder *amdgpu_encoder = to_amdgpu_encoder(encoder);
->
->         /* set the active encoder to connector routing */
->         amdgpu_encoder_set_active_device(encoder);
->         ***drm_mode_set_crtcinfo(adjusted_mode, 0);****
->
->         /* hw bug */
->         if ((mode->flags & DRM_MODE_FLAG_INTERLACE)
->             && (mode->crtc_vsync_start < (mode->crtc_vdisplay + 2)))
->                 adjusted_mode->crtc_vsync_start = adjusted_mode->crtc_vdisplay + 2;
->
->   Then we may need to define new func like
->
->   void drm_calc_hv_porches_sync()
->   {
->    crtc_hfront_porch = crtc_hsync_start - crtc_hdisplay;
->    crtc_vfront_porch = crtc_vsync_start - crtc_vdisplay;
->    .
->    .
->    crtc_clock_hz = crtc_clock*1000;
->   }  and call this func in mode_set*, atomic_enable CBS before programming the HW with this mode.
->
->
->   Should I create patches around this idea ?
->   Please let me know your comments.
+> +}
 
-I'm not sure about point 6. I think we should wait with coming up with
-a solution to this problem once there's a clear need for it. Most
-likely I think drivers who both need to adjust computed timings and
-who need v/hfront/back porch just need to adjust everything on their
-own. And we won't provide any additional helpers.
+> +static void tegra_tcu_uart_stop_tx(struct uart_port *port)
+> +{
+> +       (void)port;
+> +}
 
-Cheers, Daniel
+Ditto.
+
+> +               if (written == 3) {
+> +                       value |= 3 << 24;
+> +                       value |= BIT(26);
+> +                       mbox_send_message(tcu->tx, &value);
+
+> +               }
+
+(1)
+
+> +       }
+> +
+> +       if (written) {
+> +               value |= written << 24;
+> +               value |= BIT(26);
+> +               mbox_send_message(tcu->tx, &value);
+> +       }
+
+(2)
+
+These are code duplications.
+
+> +static void tegra_tcu_uart_stop_rx(struct uart_port *port)
+> +{
+> +       (void)port;
+> +}
+> +
+> +static void tegra_tcu_uart_break_ctl(struct uart_port *port, int ctl)
+> +{
+> +       (void)port;
+> +       (void)ctl;
+> +}
+> +
+> +static int tegra_tcu_uart_startup(struct uart_port *port)
+> +{
+> +       (void)port;
+> +
+> +       return 0;
+> +}
+> +
+> +static void tegra_tcu_uart_shutdown(struct uart_port *port)
+> +{
+> +       (void)port;
+> +}
+> +
+> +static void tegra_tcu_uart_set_termios(struct uart_port *port,
+> +                                      struct ktermios *new,
+> +                                      struct ktermios *old)
+> +{
+> +       (void)port;
+> +       (void)new;
+> +       (void)old;
+> +}
+
+Remove those unused stub contents.
+
+> +       return uart_set_options(&tegra_tcu_uart_port, cons,
+> +                               115200, 'n', 8, 'n');
+
+Can't it be one line?
+
+> +static void tegra_tcu_receive(struct mbox_client *client, void *msg_p)
+> +{
+> +       struct tty_port *port = &tegra_tcu_uart_port.state->port;
+
+> +       uint32_t msg = *(uint32_t *)msg_p;
+
+Redundant casting.
+
+> +       unsigned int num_bytes;
+> +       int i;
+> +
+
+> +       num_bytes = (msg >> 24) & 0x3;
+
+Two magic numbers.
+
+> +       for (i = 0; i < num_bytes; i++)
+> +               tty_insert_flip_char(port, (msg >> (i*8)) & 0xff, TTY_NORMAL);
+> +
+> +       tty_flip_buffer_push(port);
+> +}
+
+> +MODULE_AUTHOR("Mikko Perttunen <mperttunen@nvidia.com>");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DESCRIPTION("NVIDIA Tegra Combined UART driver");
+> diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
+> index dce5f9dae121..eaf3c303cba6 100644
+> --- a/include/uapi/linux/serial_core.h
+> +++ b/include/uapi/linux/serial_core.h
+> @@ -281,4 +281,7 @@
+>  /* MediaTek BTIF */
+>  #define PORT_MTK_BTIF  117
+>
+> +/* NVIDIA Tegra Combined UART */
+> +#define PORT_TEGRA_TCU 118
+
+Check if there is an unused gap. IIRC we still have one near to 40ish.
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+With Best Regards,
+Andy Shevchenko
