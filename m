@@ -1,27 +1,54 @@
-From: huangtao@rock-chips.com (Tao Huang)
-Date: Sun, 13 May 2018 23:18:12 +0800
-Subject: [PATCH v1 11/13] dt-bindings: power: add PX30 SoCs header for
- power-domain
-In-Reply-To: <508694354.7btLQf7nsA@phil>
-References: <1526009458-28579-1-git-send-email-zhangqing@rock-chips.com>
- <1526009672-2097-1-git-send-email-zhangqing@rock-chips.com>
- <508694354.7btLQf7nsA@phil>
-Message-ID: <9c9606f0-5c97-1a6e-a3c5-f6380c16fea4@rock-chips.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sun, 13 May 2018 21:06:46 +0530
+Subject: [PATCH 6/8] serial: Add Tegra Combined UART driver
+In-Reply-To: <20180508114403.14499-7-mperttunen@nvidia.com>
+References: <20180508114403.14499-1-mperttunen@nvidia.com>
+ <20180508114403.14499-7-mperttunen@nvidia.com>
+Message-ID: <CABb+yY3snB9o4e14by4xui+o_Vhqpe2zh6Pp_e0t-DCTKvMHWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko:
-On 2018?05?12? 06:11, Heiko Stuebner wrote:
-> Here I have a naming question. When looking at the vendor kernel
-> it looks like the px30 is largely related to the rk3326.
-> (rk3326.dtsi includeing the px30.dtsi)
->
-> What is the reason for basing the naming on the px30 this time? And could
-> we possibly keep to rkXXXX names for the basic things in the kernel, thus
-> keeping the pxXX as second name, like with the other px-variants before?
->
-PX30 and RK3326 are different chips. PX30 has more features. You can simply think that RK3326 is a subset of PX30. The RK3326 is more like a PX30 derivative chip. This is not the same as the previous chips.
-So we use PX30 instead of RK3326 for name, and the opening document is only for PX30, we think this is more convenient for developers.
+On Tue, May 8, 2018 at 5:14 PM, Mikko Perttunen <mperttunen@nvidia.com> wrote:
 
-Best Regards,
-Tao Huang
+....
+>
+> +config SERIAL_TEGRA_TCU
+> +       tristate "NVIDIA Tegra Combined UART"
+> +       depends on ARCH_TEGRA && MAILBOX
+> +       select SERIAL_CORE
+> +       help
+> +         Support for the mailbox-based TCU (Tegra Combined UART) serial port.
+> +         TCU is a virtual serial port that allows multiplexing multiple data
+> +         streams into a single hardware serial port.
+> +
+Maybe make it depend upon TEGRA_HSP_MBOX ?
+
+......
+
+> +
+> +static void tegra_tcu_write(const char *s, unsigned int count)
+> +{
+> +       struct tegra_tcu *tcu = tegra_tcu_uart_port.private_data;
+> +       unsigned int written = 0, i = 0;
+> +       bool insert_nl = false;
+> +       uint32_t value = 0;
+> +
+> +       while (i < count) {
+> +               if (insert_nl) {
+> +                       value |= '\n' << (written++ * 8);
+> +                       insert_nl = false;
+> +                       i++;
+> +               } else if (s[i] == '\n') {
+> +                       value |= '\r' << (written++ * 8);
+> +                       insert_nl = true;
+> +               } else {
+> +                       value |= s[i++] << (written++ * 8);
+> +               }
+> +
+> +               if (written == 3) {
+> +                       value |= 3 << 24;
+> +                       value |= BIT(26);
+> +                       mbox_send_message(tcu->tx, &value);
+>
+How is this supposed to work? tegra_hsp_doorbell_send_data() ignores
+the second argument.
