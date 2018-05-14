@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 May 2018 23:29:53 +0200
-Subject: [PATCH 09/12] platform/early: add an init section for early
- driver data
-In-Reply-To: <20180511162028.20616-10-brgl@bgdev.pl>
+Date: Mon, 14 May 2018 23:32:02 +0200
+Subject: [PATCH 12/12] of/platform: make the OF code aware of early
+ platform drivers
+In-Reply-To: <20180511162028.20616-13-brgl@bgdev.pl>
 References: <20180511162028.20616-1-brgl@bgdev.pl>
- <20180511162028.20616-10-brgl@bgdev.pl>
-Message-ID: <CAMuHMdUnG0YLg=HXMrUVJ34sZEDuuZRYxnrPPC45-KpAkO3bcw@mail.gmail.com>
+ <20180511162028.20616-13-brgl@bgdev.pl>
+Message-ID: <CAMuHMdWrOL7gN4Uxx5KipD6ZZ971LmP2yZe3XERz8jQ4TGwDCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,31 +14,48 @@ Hi Bartosz,
 On Fri, May 11, 2018 at 6:20 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >
-> Provide a separate section in which pointers to early platform driver
-> structs will be stored.
+> Check the relevant flag in the device node and skip the allocation
+> part for devices that were populated early.
 >
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
 Thanks for your patch!
 
-> --- a/include/asm-generic/vmlinux.lds.h
-> +++ b/include/asm-generic/vmlinux.lds.h
-> @@ -214,6 +214,16 @@
->  #define CPU_METHOD_OF_TABLES() OF_TABLE(CONFIG_SMP, cpu_method)
->  #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+
+> @@ -196,9 +197,17 @@ static struct platform_device *of_platform_device_create_pdata(
+>             of_node_test_and_set_flag(np, OF_POPULATED))
+>                 return NULL;
 >
-> +#ifdef CONFIG_EARLY_PLATFORM
-> +#define EARLY_PLATFORM_DRIVERS_TABLE()                                 \
-> +       . = ALIGN(8);                                                   \
+> -       dev = of_device_alloc(np, bus_id, parent);
+> -       if (!dev)
+> -               goto err_clear_flag;
+> +       if (of_node_check_flag(np, OF_POPULATED_EARLY)) {
+> +               dev = of_early_to_platform_device(np);
+> +               if (IS_ERR(dev))
+> +                       goto err_clear_flag;
+> +
+> +               of_device_init(dev, np, bus_id, parent);
+> +       } else {
+> +               dev = of_device_alloc(np, bus_id, parent);
+> +               if (!dev)
+> +                       goto err_clear_flag;
+> +       }
 
-Should this use STRUCT_ALIGN() instead?
+The above may become cleaner if:
+  1. of_early_to_platform_device() would return NULL instead -ENOENT,
+  2. of_device_alloc() would be split in alloc and init phases, too.
 
-> +       VMLINUX_SYMBOL(__early_platform_drivers_table) = .;             \
-> +       KEEP(*(__early_platform_drivers_table))                         \
-> +       VMLINUX_SYMBOL(__early_platform_drivers_table_end) = .;
-> +#else
-> +#define EARLY_PLATFORM_DRIVERS_TABLE()
-> +#endif
+Then you can do:
+
+        dev = of_node_check_flag(np, OF_POPULATED_EARLY)
+                ? of_early_to_platform_device(np)
+                 : __of_device_alloc(np, bus_id, parent);
+        if (!dev)
+                goto err_clear_flag;
+
+        of_device_init(dev, np, bus_id, parent);
 
 Gr{oetje,eeting}s,
 
