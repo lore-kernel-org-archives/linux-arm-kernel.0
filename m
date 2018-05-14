@@ -1,67 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 09:22:55 -0700
-Subject: [GIT PULL 3/3] omap sdhci dts changes for v4.18 merge window
-In-Reply-To: <CAPDyKFrFDFO3ZLx3_daSo0E9xGcumTbdx9uR4kp_+xPb0C0JGA@mail.gmail.com>
-References: <pull-1525450571-674978@atomide.com>
- <pull-1525450571-674978@atomide.com-3>
- <20180514082224.dx63ao3vz3ay5ng5@localhost>
- <CAPDyKFrFDFO3ZLx3_daSo0E9xGcumTbdx9uR4kp_+xPb0C0JGA@mail.gmail.com>
-Message-ID: <20180514162255.p7y4i4ndc6wcxova@localhost>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Mon, 14 May 2018 09:24:45 -0700
+Subject: Clang arm64 build is broken
+In-Reply-To: <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
+References: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
+ <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
+ <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
+Message-ID: <CAKwvOdkedxmstRytbWeYU8Pj9ahgWOe7rODJJ8BDtRzUroQeXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 11:41:18AM +0200, Ulf Hansson wrote:
-> On 14 May 2018 at 10:22, Olof Johansson <olof@lixom.net> wrote:
-> > On Fri, May 04, 2018 at 09:17:33AM -0700, Tony Lindgren wrote:
-> >> From: "Tony Lindgren" <tony@atomide.com>
-> >>
-> >> The following changes since commit 3f4028780287ff5a7308f40e10bbba9a42b993aa:
-> >>
-> >>   mmc: sdhci-omap: Get IODelay values for 3.3v DDR mode (2018-05-03 09:37:13 +0200)
-> >>
-> >> are available in the Git repository at:
-> >>
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/dt-sdhci-signed
-> >>
-> >> for you to fetch changes up to 24a6f1f65ea567d017c598faf1374ee443f73851:
-> >>
-> >>   Documentation: ARM: Add new MMC requirements for DRA7/K2G (2018-05-03 10:32:20 -0700)
-> >>
-> >> ----------------------------------------------------------------
-> >> Device tree changes for omap variants for SDHCI
-> >>
-> >> This series adds the devicetree configuration needed for pinctrl on
-> >> dra7 variants to use the SDHCI SDIO driver instead of mmc-omap-hs
-> >> driver. To use SDHCI, both the pins and the iodelay needs to be
-> >> configured.
-> >>
-> >> This series is based on the related SDHCI drivers changes on a branch
-> >> set up by Ulf.
+On Fri, Apr 20, 2018 at 7:59 AM Andrey Konovalov <andreyknvl@google.com>
+wrote:
+> On Fri, Apr 20, 2018 at 10:13 AM, Marc Zyngier <marc.zyngier@arm.com>
+wrote:
+> >> The issue is that
+> >> clang doesn't know about the "S" asm constraint. I reported this to
+> >> clang [2], and hopefully this will get fixed. In the meantime, would
+> >> it possible to work around using the "S" constraint in the kernel?
 > >
-> > Hi Tony,
-> >
-> > Just to make sure Ulf isn't taken by surprise (since I didn't see the initial
-> > agreement of a stable branch), it's a good idea to include him on the pull
-> > request.
-> 
-> No surprise.
-> 
-> >
-> > Also, the diffstat doesn't take that branch into consideration so it doesn't
-> > match with what I've merged with. Having the URL of Ulf's branch helps, in that
-> > case I'd just merge that branch first and get the dependency documented.
-> >
-> >
-> > Ulf, does the above sound OK with you, and said branch is 100% guaranteed to
-> > not be rebased?
-> 
-> Right, the branch is immutable. Feel free to pull it.
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git sdhci_omap
-> 
-> Or if you prefer a signed tag: sdhci-omap-v4.17-rc3
+> > I have no idea, I've never used clang to build the kernel. Clang isn't
+> > really supported to build the arm64 kernel anyway (as you mention
+> > below), and working around clang deficiencies would mean that we leave
+> > with the workaround forever. I'd rather enable clang once it is at
+> > feature parity with GCC.
 
-Great, thanks!
+> The fact that there are some existing issues with building arm64
+> kernel with clang doesn't sound like a good justification for adding
+> new issues :)
 
+> However in this case I do believe that this is more of a bug in clang
+> that should be fixed.
 
--Olof
+Just to follow up with this thread;
+
+Support for "S" constraints is being (re-)added to Clang in:
+https://reviews.llvm.org/D46745
+
+-- 
+Thanks,
+~Nick Desaulniers
