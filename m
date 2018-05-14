@@ -1,61 +1,33 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 14 May 2018 09:11:48 +0200
-Subject: [PATCH] ARM: dts: socfpga: Fix NAND controller node compatible
-In-Reply-To: <20180510125223.16056-1-marex@denx.de>
-References: <20180510125223.16056-1-marex@denx.de>
-Message-ID: <73h8nak8y3.fsf@pengutronix.de>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 14 May 2018 10:16:54 +0300
+Subject: reply: [PATCH v3 1/2] PCI: kirin: Add MSI support
+In-Reply-To: <99B4C6BADD9E3241B25E52B02BA737C54127E3BF@DGGEMA505-MBS.china.huawei.com>
+References: <99B4C6BADD9E3241B25E52B02BA737C54127E3BF@DGGEMA505-MBS.china.huawei.com>
+Message-ID: <CAHp75VfHfUCNKNun4-bb2BhwV6D9jg2+hzVjrDER+af0SrzqjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 14, 2018 at 4:11 AM, songxiaowei <songxiaowei@hisilicon.com> wrote:
 
-Marek Vasut <marex@denx.de> writes:
+>> > +       int ret;
+>> > +
+>> > +       if (IS_ENABLED(CONFIG_PCI_MSI)) {
+>>
+>> > +               pci->pp.msi_irq = platform_get_irq(pdev, 0);
+>> > +               if (pci->pp.msi_irq < 0) {
+>> > +                       dev_err(&pdev->dev, "failed to get MSI IRQ
+>> (%d)\n",
+>> > +                               pci->pp.msi_irq);
+>>
+>> > +                       return -ENODEV;
+>>
+>> Why shadowing actual error code?
+> [songxiaowei]  Sorry, I can't get your point about this, would you explain it for me.
 
-> The compatible string for the Denali NAND controller is 
-> incorrect,
-> fix it by replacing it with one matching the DT bindings and the
-> driver.
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Fixes: d837a80d19 ("ARM: dts: socfpga: add nand controller 
-> nodes")
-> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Cc: Dinh Nguyen <dinguyen@kernel.org>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi 
-> b/arch/arm/boot/dts/socfpga.dtsi
-> index 7e24dc8e82d4..d697f5062624 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -744,7 +744,7 @@
->  		nand0: nand at ff900000 {
->  			#address-cells = <0x1>;
->  			#size-cells = <0x1>;
-> -			compatible = "denali,denali-nand-dt";
-> +			compatible = "altr,socfpga-denali-nand";
->  			reg = <0xff900000 0x100000>,
->  			      <0xffb80000 0x10000>;
->  			reg-names = "nand_data", "denali_reg";
-
-Ack. As the binding was changed after d837a80d19 this is obviously
-correct.
-
-@Dinh: Maybe you also want to cleanup the socfpga_arria10.dtsi? It 
-has
-both compatibles, but the "denali,denali-nand-dt" seems to be 
-obsolete.
-
-Thanks,
-Steffen
+platform_get_irq() returns either correct IRQ number or negative error code.
+In the code above you shadow the actual error (as returned by that
+call) by -ENODEV. Any reason why?
 
 -- 
-Pengutronix e.K.                           | Steffen Trumtrar 
-|
-Industrial Linux Solutions                 | 
-http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: 
-+49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax: 
-+49-5121-206917-5555 |
+With Best Regards,
+Andy Shevchenko
