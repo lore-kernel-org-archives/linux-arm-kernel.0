@@ -1,105 +1,60 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Mon, 14 May 2018 05:52:39 -0500
-Subject: [PATCH V3] ARM: dts: da850-evm: Enable LCD and Backlight
-In-Reply-To: <aba13450-1e8f-4aed-6248-16b71abcc0dd@ti.com>
-References: <20180513232033.22571-1-aford173@gmail.com>
- <aba13450-1e8f-4aed-6248-16b71abcc0dd@ti.com>
-Message-ID: <CAHCN7xJgTBGHL_VzhXGz1HEmEn-LW8pcG0BWJDysx0pkHXT-Mg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 May 2018 11:53:03 +0100
+Subject: Difference between IOVA and bus address when SMMU is enabled
+In-Reply-To: <c4fe00a3-33b1-7cd4-f613-768dee06ef6b@gmail.com>
+References: <c4fe00a3-33b1-7cd4-f613-768dee06ef6b@gmail.com>
+Message-ID: <20180514105303.GE16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 12:29 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Hi Adam,
->
-> On Monday 14 May 2018 04:50 AM, Adam Ford wrote:
->> When using the board files the LCD works, but not with the DT.
->> This adds enables the original da850-evm to work with the same
->> LCD in device tree mode.
->>
->> The EVM has a gpio for the regulator and a gpio enable.  The LCD and
->> the vpif display pins are mutually exclusive, so if using the LCD,
->> do not load the vpif driver.
->
-> Its not sufficient just note this in patch description.
->
-> a) Disable (status = "disabled") the VPIF node which clashes for pins
-> with LCD.
-> b) Add a comment on top of the status = "disabled" giving information on
-> how user can enable it (disable lcdc node and then change to status =
-> "okay").
->
->>
->> Signed-off-by: Adam Ford <aford173@gmail.com>
->> ---
->> V3:  Fix errant GPIO, label GPIO pins, and rename the regulator to be more explict to
->>      backlight which better matches the schematic.  Updated the description to explain
->>      that it cannot be used at the same time as the vpif driver.
->>
->> V2:  Add regulator and GPIO enable pins. Remove PWM backlight and replace with GPIO
->>
->> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
->> index 2e817da37fdb..3f1c8be07efe 100644
->> --- a/arch/arm/boot/dts/da850-evm.dts
->> +++ b/arch/arm/boot/dts/da850-evm.dts
->> @@ -27,6 +27,50 @@
->>               spi0 = &spi1;
->>       };
->>
->> +     backlight {
->> +             compatible = "gpio-backlight";
->> +             enable-gpios = <&gpio 7 GPIO_ACTIVE_HIGH>; /* GP0[7] */
->
-> The gpio-backlight binding does not describe a property called
-> enable-gpios. It should just be gpios.
+On Sat, May 12, 2018 at 06:25:13PM +0530, valmiki wrote:
+> Hi All,
+> 
+> What is the difference between IOVA address and bus address
+> when SMMU is enabled ?
+> 
+> Is IOVA address term used only when hypervisor is present ?
 
-I will fix that.
+IOVA = IO virtual address.  IOVA is the term normally used to describe
+the address used on the _device_ side of an IOMMU.
 
->
-> a) Are you using gpio-backlight because you are not able to get the PWM
-> to work?
->
-Yes,  You told me not to worry about doing a PWM backlight because the
-legacy board does not PWM either.
+For any general setup:
 
-> b) What is GP0[7] connected to in the schematic you have? In the
-> schematic I have I see LCD_PWM0 is connected to
-> SPI1_SCS[0]/EPWM1B/GP2[14]/TM64P3_IN12.
+RAM ----- MMU ----- DEVICE
+      ^         ^
+  physical   virtual
+  address    address
 
-I have schematic 1016572 dated Wednesday, August 18, 2010.  According
-to it, AXR15 / EPWMN0_TZ[0] / ECAP2_APWM2 / GPIO0[7] connects to U25,
-Pin 46 to generate M_LCD_PWM0.  You might have one of the early,
-pre-release versions.
+where "device" can be an IO device or a CPU, the terms still apply.
 
->
-> c) The /* GP0[7] */ comment is not really useful on its own as it can be
-> computed. What I wanted to see is the schematic symbol like "LCD_PWM0".
-> Same for other places like this below.
+If you have something like this:
 
-I can do that.
->
->> @@ -35,6 +79,16 @@
->>               regulator-boot-on;
->>       };
->>
->> +     backlight_reg: backlight-regulator {
->> +             compatible = "regulator-fixed";
->> +             regulator-name = "lcd_backlight_pwr";
->> +             regulator-min-microvolt = <3300000>;
->> +             regulator-max-microvolt = <3300000>;
->> +             gpio = <&gpio 47 GPIO_ACTIVE_HIGH>; /* GP2[15] */
->> +             regulator-always-on;
->
-> Why should this regulator never be disabled?
+RAM ----- PCI bridge ----- MMU ----- DEVICE
+      ^                ^         ^
+   physical           bus     virtual
+   address          address   address
 
-The gpio-backlight does not have a way that I can see to associate the
-regulator to it.  I read through the bindings, but I didn't see an
-option to associate a regulator it.  I use this regulator to drive
-lcd_backlight_pwr and the backlight driver to write lcd_pwm0.  Without
-this option, the system disables lcd_backlight_pwr and the screen is
-blank
+You could also have (eg, in the case of a system MMU):
 
+RAM ----- MMU ----- PCI bridge ----- DEVICE
+      ^         ^                ^
+   physical  virtual            bus
+   address   address          address
+           (this can also be
+            considered a bus
+            address!)
 
-adam
->
-> Thanks,
-> Sekhar
+In both of the above two cases, the PCI bridge may perform some address
+translation, meaning that the bus address is different from the address
+seen on the other side of the bridge.
+
+So, the terms used depend exactly on the overall bus topology.
+
+In the case of a system MMU, where the system MMU sits between peripheral
+devices and RAM, then the bus addresses are the same as the
+_IOVA of the system MMU_.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
