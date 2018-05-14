@@ -1,16 +1,22 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 14 May 2018 13:28:16 +0200
-Subject: [GIT PULL] ARM: mediatek: dts64 updates for v4.18
-Message-ID: <e36e9a49-4913-25a8-16a9-31c1fbbfddc9@gmail.com>
+Date: Mon, 14 May 2018 13:32:49 +0200
+Subject: [GIT PULL] ARM: mediatek: soc driver updates for v4.18
+Message-ID: <bd033549-4998-e376-eb92-16111ec71a07@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi you two,
+Hi Arnd and Olof,
 
-Please take into account the following commit to 64-bit DTS.
+Below the commits for mediatek soc drivers.
+Please beware that we need the regmap-ktime-fix [1] from Mark Browns static tag.
+I merged that into my branch, but I wanted to let you know, so that you don't
+hit any breakage when pulling in my branch.
 
-Thanks a lot,
+Regards,
 Matthias
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git
+tags/regmap-ktime-fix
 
 ---
 
@@ -21,33 +27,35 @@ The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 are available in the Git repository at:
 
   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-tags/v4.17-next-dts64
+tags/v4.17-next-soc
 
-for you to fetch changes up to f1e0d0d8cf454202d21140aace184cc5512a9fdd:
+for you to fetch changes up to 0afd32c6bb59e41b6692dec4473efaffffcad67b:
 
-  arm64: dts: mt7622: add audio related device nodes (2018-05-11 18:42:20 +0200)
-
-----------------------------------------------------------------
-- add clock and pinctrl nodes for mt2712e
-- add High-Speed DMA and audio nodes for mt7622
+  Merge commit 'f15cd6d99198e9c15229aefec639a34a6e8174c6' into
+v.4.17-next/soc-test (2018-05-14 12:22:03 +0200)
 
 ----------------------------------------------------------------
+- use timeout helpers for scpsys and infracfg drivers
+- use of_device_get_match_data in pmic wrapper and scpsys
+
+----------------------------------------------------------------
+Matthias Brugger (1):
+      Merge commit 'f15cd6d99198e9c15229aefec639a34a6e8174c6' into
+v.4.17-next/soc-test
+
 Ryder Lee (1):
-      arm64: dts: mt7622: add audio related device nodes
+      soc: mediatek: use of_device_get_match_data()
 
-Sean Wang (1):
-      arm64: dts: mt7622: add High-Speed DMA device nodes
+Sean Wang (6):
+      soc: mediatek: reuse read[l,x]_poll_timeout helpers
+      regmap: include <linux/ktime.h> from include/linux/regmap.h
+      soc: mediatek: reuse regmap_read_poll_timeout helpers
+      soc: mediatek: introduce a CAPS flag for scp_domain_data
+      soc: mediatek: add a fixed wait for SRAM stable
+      soc: mediatek: remove unneeded semicolon
 
-Zhiyong Tao (2):
-      arm64: dts: mt2712: add pintcrl file
-      arm64: dts: mt2712: add pintcrl device node.
-
-weiyi.lu at mediatek.com (1):
-      arm64: dts: add clock device nodes of MT2712
-
- arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1123 +++++++++++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi     |   46 +
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts  |   11 +-
- arch/arm64/boot/dts/mediatek/mt7622.dtsi      |   99 +++
- 4 files changed, 1277 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h
+ drivers/soc/mediatek/mtk-infracfg.c  |  46 +++-------
+ drivers/soc/mediatek/mtk-pmic-wrap.c |  13 +--
+ drivers/soc/mediatek/mtk-scpsys.c    | 167 ++++++++++++++---------------------
+ include/linux/regmap.h               |   1 +
+ 4 files changed, 83 insertions(+), 144 deletions(-)
