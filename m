@@ -1,72 +1,29 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 14 May 2018 10:58:21 -0400
-Subject: [PATCH v3 3/4] phy: rockchip-typec: support variable phy config
- value
-In-Reply-To: <1526291635-31122-3-git-send-email-hl@rock-chips.com>
-References: <1526291635-31122-1-git-send-email-hl@rock-chips.com>
- <1526291635-31122-3-git-send-email-hl@rock-chips.com>
-Message-ID: <20180514145821.GB3373@art_vandelay>
+From: antoine.tenart@bootlin.com (Antoine Tenart)
+Date: Mon, 14 May 2018 16:58:59 +0200
+Subject: [PATCH] arm64: defconfig: enable the Armada thermal driver
+Message-ID: <20180514145859.22812-1-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 05:53:54PM +0800, Lin Huang wrote:
-> the phy config values used to fix in dp firmware, but some boards
-> need change these values to do training and get the better eye diagram
-> result. So support that in phy driver.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v2:
-> - update patch following Enric suggest
-> Changes in v3:
-> - delete need_software_training variable
-> - add default phy config value, if dts do not define phy config value, use these value
-> 
->  drivers/phy/rockchip/phy-rockchip-typec.c | 305 ++++++++++++++++++++----------
->  include/soc/rockchip/rockchip_phy_typec.h |  63 ++++++
->  2 files changed, 270 insertions(+), 98 deletions(-)
->  create mode 100644 include/soc/rockchip/rockchip_phy_typec.h
-> 
-> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
-> index 76a4b58..10253ad 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
+This patch enables the Armada thermal driver to support thermal
+management on Marvell EBU Armada SoCs (7K,8K).
 
-/snip
+Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->  
-> +/* default phy config */
-> +struct phy_config configs[3][4] = {
-
-static const
-
-Also, configs isn't a good name. How about tcphy_default_config?
-
-
-> +	{{ 0x2a, 0x00 },
-
-Can you please expand the assignment for all of these, ie:
-
-         { .swing = 0x2a, .pe = 0x00 },
-
-> +	 { 0x1f, 0x15 },
-> +	 { 0x14, 0x22 },
-> +	 { 0x02, 0x2b } },
-> +
-> +	{{ 0x21, 0x00 },
-> +	 { 0x12, 0x15 },
-> +	 { 0x02, 0x22 },
-> +	 {    0,    0 } },
-> +
-> +	{{ 0x15, 0x00 },
-> +	 { 0x00, 0x15 },
-> +	 {    0,    0 },
-> +	 {    0,    0 } },
-> +};
-> +
-
-/snip
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index ecf613761e78..8f0707bcc54d 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -343,6 +343,7 @@ CONFIG_SENSORS_INA2XX=m
+ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_THERMAL_EMULATION=y
++CONFIG_ARMADA_THERMAL=y
+ CONFIG_BRCMSTB_THERMAL=m
+ CONFIG_EXYNOS_THERMAL=y
+ CONFIG_RCAR_GEN3_THERMAL=y
 -- 
-Sean Paul, Software Engineer, Google / Chromium OS
+2.17.0
