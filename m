@@ -1,72 +1,190 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 14 May 2018 15:10:04 -0700
-Subject: [PATCH v2] arm64: dts: qcom: Collapse usb support into one node
-In-Reply-To: <1523973390-2387-1-git-send-email-yossim@codeaurora.org>
-References: <1523973390-2387-1-git-send-email-yossim@codeaurora.org>
-Message-ID: <152633580491.34267.3508281594437081335@swboyd.mtv.corp.google.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 15 May 2018 07:20:04 +0900
+Subject: [RFC PATCH 03/10] devfreq: rk3399_dmc: Pass ODT and auto power
+ down parameters to TF-A.
+In-Reply-To: <20180514211610.26618-4-enric.balletbo@collabora.com>
+References: <20180514211610.26618-1-enric.balletbo@collabora.com>
+ <CGME20180514211840epcas3p41708e430bc22d7e61e8b894b12a083f9@epcas3p4.samsung.com>
+ <20180514211610.26618-4-enric.balletbo@collabora.com>
+Message-ID: <5AFA0B94.4000100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Yossi Mansharoff (2018-04-17 06:56:30)
-> We currently have three device nodes for the same USB hardware
-> block, as evident by the reuse of the same reg address multiple
-> times. Now that the chipidea driver fully supports OTG with the
-> MSM wrapper we can collapse all these nodes into one USB device
-> node, reflecting the true nature of the hardware.
+Hi,
 
-None of this makes sense. Commit text is totally bogus now.
+On 2018? 05? 15? 06:16, Enric Balletbo i Serra wrote:
+> Trusted Firmware-A (TF-A) for rk3399 implements a SiP call to get the
+> on-die termination (ODT) and auto power down parameters from kernel,
+> this patch adds the functionality to do this. Also, if DDR clock
+> frequency is lower than the on-die termination (ODT) disable frequency
+> this driver should disable the DDR ODT.
+
+I have a question.
+'disable frequency' is the same meaning of 'disable the DDR ODT'?
 
 > 
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> index 9ff8487..1505921 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> @@ -371,18 +372,18 @@
->                         adp-disable;
->                         hnp-disable;
->                         srp-disable;
-> -                       dr_mode = "host";
-> -                       pinctrl-names = "default";
-> -                       pinctrl-0 = <&usb_sw_sel_pm>;
-> +                       mux-controls = <&usb_switch>;
-> +                       mux-control-names = "usb_switch";
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
+> 
+>  drivers/devfreq/rk3399_dmc.c        | 50 ++++++++++++++++++++++++++++-
+>  include/soc/rockchip/rockchip_sip.h |  1 +
+>  2 files changed, 50 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
+> index d5c03e5abe13..cc1bbca3fb15 100644
+> --- a/drivers/devfreq/rk3399_dmc.c
+> +++ b/drivers/devfreq/rk3399_dmc.c
+> @@ -18,14 +18,17 @@
+>  #include <linux/devfreq.h>
+>  #include <linux/devfreq-event.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/mfd/syscon.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_opp.h>
+> +#include <linux/regmap.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/rwsem.h>
+>  #include <linux/suspend.h>
+>  
+> +#include <soc/rockchip/rk3399_grf.h>
+>  #include <soc/rockchip/rockchip_sip.h>
+>  
+>  struct dram_timing {
+> @@ -69,8 +72,11 @@ struct rk3399_dmcfreq {
+>  	struct mutex lock;
+>  	struct dram_timing timing;
+>  	struct regulator *vdd_center;
+> +	struct regmap *regmap_pmu;
+>  	unsigned long rate, target_rate;
+>  	unsigned long volt, target_volt;
+> +	unsigned int odt_dis_freq;
+> +	int odt_pd_arg0, odt_pd_arg1;
+>  };
+>  
+>  static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
+> @@ -80,6 +86,8 @@ static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
+>  	struct dev_pm_opp *opp;
+>  	unsigned long old_clk_rate = dmcfreq->rate;
+>  	unsigned long target_volt, target_rate;
+> +	struct arm_smccc_res res;
+> +	int dram_flag;
+>  	int err;
+>  
+>  	opp = devfreq_recommended_opp(dev, freq, flags);
+> @@ -95,6 +103,15 @@ static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
+>  
+>  	mutex_lock(&dmcfreq->lock);
+>  
+> +	dram_flag = 0;
+
+Also, if dram_flag is 0, it mean that disable ODT frequency?
+If it's right, you better to define the precise variables as following
+instead of just integer(0 or 1).
+For example,
+- ROCKCHIP_SIP_DRAM_FREQ_ENABLE
+- ROCKCHIP_SIP_DRAM_FREQ_DISABLE
+
+> +	if (target_rate >= dmcfreq->odt_dis_freq)
+> +		dram_flag = 1;
 > +
->                         ulpi {
->                                 phy {
->                                         v1p8-supply = <&pm8916_l7>;
->                                         v3p3-supply = <&pm8916_l13>;
-> -                                       extcon = <&usb_id>;
->                                 };
->                         };
->                 };
->  
+> +	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, dmcfreq->odt_pd_arg0,
+> +		      dmcfreq->odt_pd_arg1,
+> +		      ROCKCHIP_SIP_CONFIG_DRAM_SET_ODT_PD,
+> +		      dram_flag, 0, 0, 0, &res);
 > +
 
-Why the newline?
+This operation is special for only rk3399_dmc. It is difficult
+to understand what to do. I recommend you better to add the detailed comment
+with code.
 
->                 lpass at 7708000 {
->                         status = "okay";
->                 };
-> @@ -512,11 +513,17 @@
+>  	/*
+>  	 * If frequency scaling from low to high, adjust voltage first.
+>  	 * If frequency scaling from high to low, adjust frequency first.
+> @@ -294,11 +311,13 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
+>  {
+>  	struct arm_smccc_res res;
+>  	struct device *dev = &pdev->dev;
+> -	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *np = pdev->dev.of_node, *node;
+>  	struct rk3399_dmcfreq *data;
+>  	int ret, index, size;
+>  	uint32_t *timing;
+>  	struct dev_pm_opp *opp;
+> +	u32 ddr_type;
+> +	u32 val;
 >  
->         usb_id: usb-id {
->                 compatible = "linux,extcon-usb-gpio";
-> -               vbus-gpio = <&msmgpio 121 GPIO_ACTIVE_HIGH>;
-> +               id-gpio = <&msmgpio 121 GPIO_ACTIVE_HIGH>;
-
-Hmm?
-
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&usb_id_default>;
->         };
+>  	data = devm_kzalloc(dev, sizeof(struct rk3399_dmcfreq), GFP_KERNEL);
+>  	if (!data)
+> @@ -334,6 +353,29 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
 >  
-> +       usb_switch: usb-switch {
-> +               compatible = "gpio-mux";
+> +	/* Try to find the optional reference to the pmu syscon */
+> +	node = of_parse_phandle(np, "rockchip,pmu", 0);
+> +	if (node) {
+> +		data->regmap_pmu = syscon_node_to_regmap(node);
+> +		if (IS_ERR(data->regmap_pmu))
+> +			return PTR_ERR(data->regmap_pmu);
+> +	}
+> +
+> +	/* Get DDR type */
+> +	regmap_read(data->regmap_pmu, RK3399_PMUGRF_OS_REG2, &val);
+> +	ddr_type = (val >> RK3399_PMUGRF_DDRTYPE_SHIFT) &
+> +		    RK3399_PMUGRF_DDRTYPE_MASK;
+> +
+> +	/* Get the odt_dis_freq parameter in function of the DDR type */
+> +	if (ddr_type == RK3399_PMUGRF_DDRTYPE_DDR3)
+> +		data->odt_dis_freq = data->timing.ddr3_odt_dis_freq;
+> +	else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR3)
+> +		data->odt_dis_freq = data->timing.lpddr3_odt_dis_freq;
+> +	else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR4)
+> +		data->odt_dis_freq = data->timing.lpddr4_odt_dis_freq;
+> +	else
+> +		return -EINVAL;
+> +
 
-Needs a better compatible string for the actual mux part. The gpio-mux
-can come after that because it's generic, but it's good to record the
-actual mux part too.
+how about using 'switch' statement?
 
-> +               mux-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
-> +               #mux-control-cells = <0>;
-> +       };
+>  	/*
+>  	 * Get dram timing and pass it to arm trust firmware,
+>  	 * the dram drvier in arm trust firmware will get these
+> @@ -358,6 +400,12 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
+>  		      ROCKCHIP_SIP_CONFIG_DRAM_INIT,
+>  		      0, 0, 0, 0, &res);
+>  
+> +	data->odt_pd_arg0 = (data->timing.sr_idle & 0xff) |
+> +			    ((data->timing.sr_mc_gate_idle & 0xff) << 8) |
+> +			    ((data->timing.standby_idle & 0xffff) << 16);
+> +	data->odt_pd_arg1 = (data->timing.pd_idle & 0xfff) |
+> +			    ((data->timing.srpd_lite_idle & 0xfff) << 16);
+> +
+
+odt_pd_arg0 and odt_pd_arg1 might be used for disabling/enabling the ODT frequency.
+As I commented, it depend on only rk3399_dmc. You better to add detailed comment.
+
+And I prefer to define the XXX_SHIFT/XXX_MASK definition instead of
+using 8/16/0xff/0xffff for the readability.
+
+>  	/*
+>  	 * We add a devfreq driver to our parent since it has a device tree node
+>  	 * with operating points.
+> diff --git a/include/soc/rockchip/rockchip_sip.h b/include/soc/rockchip/rockchip_sip.h
+> index 7e28092c4d3d..ad9482c56797 100644
+> --- a/include/soc/rockchip/rockchip_sip.h
+> +++ b/include/soc/rockchip/rockchip_sip.h
+> @@ -23,5 +23,6 @@
+>  #define ROCKCHIP_SIP_CONFIG_DRAM_GET_RATE	0x05
+>  #define ROCKCHIP_SIP_CONFIG_DRAM_CLR_IRQ	0x06
+>  #define ROCKCHIP_SIP_CONFIG_DRAM_SET_PARAM	0x07
+> +#define ROCKCHIP_SIP_CONFIG_DRAM_SET_ODT_PD	0x08
+>  
+>  #endif
+> 
+
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
