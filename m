@@ -1,136 +1,55 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Mon, 14 May 2018 10:18:50 +0100
-Subject: [PATCH v2] tty: pl011: Avoid spuriously stuck-off interrupts
-In-Reply-To: <1525972103-26691-1-git-send-email-Dave.Martin@arm.com>
-References: <1525972103-26691-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <5AF9547A.1010809@hisilicon.com>
+From: antoine.tenart@bootlin.com (Antoine Tenart)
+Date: Mon, 14 May 2018 11:26:00 +0200
+Subject: [PATCH net-next v2 02/13] net: phy: sfp: handle non-wired SFP
+ connectors
+In-Reply-To: <20180508115247.GF16141@n2100.armlinux.org.uk>
+References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
+ <20180504135643.23466-3-antoine.tenart@bootlin.com>
+ <20180508115247.GF16141@n2100.armlinux.org.uk>
+Message-ID: <20180514092600.GA20663@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Hi Russell,
 
-On 2018/5/10 18:08, Dave Martin wrote:
-> Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-> clears the RX and receive timeout interrupts on pl011 startup, to
-> avoid a screaming-interrupt scenario that can occur when the
-> firmware or bootloader leaves these interrupts asserted.
+On Tue, May 08, 2018 at 12:52:47PM +0100, Russell King - ARM Linux wrote:
+> On Fri, May 04, 2018 at 03:56:32PM +0200, Antoine Tenart wrote:
+> > SFP connectors can be solder on a board without having any of their pins
+> > (LOS, i2c...) wired. In such cases the SFP link state cannot be guessed,
+> > and the overall link status reporting is left to other layers.
+> > 
+> > In order to achieve this, a new SFP_DEV status is added, named UNKNOWN.
+> > This mode is set when it is not possible for the SFP code to get the
+> > link status and as a result the link status is reported to be always UP
+> > from the SFP point of view.
 > 
-> This has been noted as an issue when running Linux on qemu [1].
-> 
-> Unfortunately, the above fix seems to lead to potential
-> misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
-> on driver startup, if the RX FIFO is also already full to the
-> trigger level.
-> 
-> Clearing the RX FIFO interrupt does not change the FIFO fill level.
-> In this scenario, because the interrupt is now clear and because
-> the FIFO is already full to the trigger level, no new assertion of
-> the RX FIFO interrupt can occur unless the FIFO is drained back
-> below the trigger level.  This never occurs because the pl011
-> driver is waiting for an RX FIFO interrupt to tell it that there is
-> something to read, and does not read the FIFO at all until that
-> interrupt occurs.
-> 
-> Thus, simply clearing "spurious" interrupts on startup may be
-> misguided, since there is no way to be sure that the interrupts are
-> truly spurious, and things can go wrong if they are not.
-> 
-> This patch instead clears the interrupt condition by draining the
-> RX FIFO during UART startup, after clearing any potentially
-> spurious interrupt.  This should ensure that an interrupt will
-> definitely be asserted if the RX FIFO subsequently becomes
-> sufficiently full.
-> 
-> The drain is done at the point of enabling interrupts only.  This
-> means that it will occur any time the UART is newly opened through
-> the tty layer.  It will not apply to polled-mode use of the UART by
-> kgdboc: since that scenario cannot use interrupts by design, this
-> should not matter.  kgdboc will interact badly with "normal" use of
-> the UART in any case: this patch makes no attempt to paper over
-> such issues.
-> 
-> This patch does not attempt to address the case where the RX FIFO
-> fills faster than it can be drained: that is a pathological
-> hardware design problem that is beyond the scope of the driver to
-> work around.  As a failsafe, the number of poll iterations for
-> draining the FIFO is limited to twice the FIFO size.  This will
-> ensure that the kernel at least boots even if it is impossible to
-> drain the FIFO for some reason.
-> 
-> [1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
-> before enabled the interruption
-> https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
-> 
-> Reported-by: Wei Xu <xuwei5@hisilicon.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Peter Maydell <peter.maydell@linaro.org>
-> Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> This looks weird to me.  SFP_DEV_* states track the netdevice up/down
+> state and have little to do with whether LOS or MODDEF0 are implemented.
 
-Thanks!
-Tested on hisilicon D05 board.
+That's right.
 
-Tested-by: Wei Xu <xuwei5@hisilicon.com>
+> I think it would be better to have a new SFP_MOD_* and to force
+> sm_mod_state to that in this circumstance.
 
-Best Regards,
-Wei
+The idea was to avoid depending on the state machine, as this could be
+difficult to maintain in the future (it's hard to tell exactly what are
+all the possible paths). But I get your point about SFP_DEV_.
 
-> 
-> ---
-> 
-> Changes since v1 [1]
-> 
->  * Deleted Andrew Jones' Reviewed/Tested-bys due to the following
->    change.
-> 
->    If you can please retest that the updated patch fixes your
->    issue that would be appreciated.
-> 
-> Suggested by Russell King:
-> 
->  * Only drain 2 * FIFO size, to avoid going into an infinite spin
->    if something does wrong.  If the FIFO still couldn't be drained
->    sufficiently then pl011 RX won't work properly, but the kernel
->    will at least boot.
-> 
-> 
-> [1] [PATCH] tty: pl011: Avoid spuriously stuck-off interrupts
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/574362.html
-> 
-> ---
->  drivers/tty/serial/amba-pl011.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 4b40a5b..ebd33c0 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -1727,10 +1727,26 @@ static int pl011_allocate_irq(struct uart_amba_port *uap)
->   */
->  static void pl011_enable_interrupts(struct uart_amba_port *uap)
->  {
-> +	unsigned int i;
-> +
->  	spin_lock_irq(&uap->port.lock);
->  
->  	/* Clear out any spuriously appearing RX interrupts */
->  	pl011_write(UART011_RTIS | UART011_RXIS, uap, REG_ICR);
-> +
-> +	/*
-> +	 * RXIS is asserted only when the RX FIFO transitions from below
-> +	 * to above the trigger threshold.  If the RX FIFO is already
-> +	 * full to the threshold this can't happen and RXIS will now be
-> +	 * stuck off.  Drain the RX FIFO explicitly to fix this:
-> +	 */
-> +	for (i = 0; i < uap->fifosize * 2; ++i) {
-> +		if (pl011_read(uap, REG_FR) & UART01x_FR_RXFE)
-> +			break;
-> +
-> +		pl011_read(uap, REG_DR);
-> +	}
-> +
->  	uap->im = UART011_RTIM;
->  	if (!pl011_dma_rx_running(uap))
->  		uap->im |= UART011_RXIM;
-> 
+I can have a look at adding a new SFP_MOD_, or I could add a broken flag
+into 'struct sfp', although having a SFP_MOD_ would be proper.
+
+Before doing so, we should decide whether or not this approach is valid,
+as there were comments from Florian and Andrew asking for a fixed-link
+solution. I think fixed-link wouldn't be perfect from the user point of
+view, but I understand the point. If we go with fixed-link, then this
+patch can be dropped (the two others net: sfp: patches could be kept).
+
+What do you think?
+
+Thanks,
+Antoine
+
+-- 
+Antoine T?nart, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
