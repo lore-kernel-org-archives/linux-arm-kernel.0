@@ -1,84 +1,161 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 14 May 2018 23:16:10 +0200
-Subject: [RFC PATCH 10/10] arm64: dts: rockchip: Enable dmc and dfi nodes on
- gru.
+Date: Mon, 14 May 2018 23:16:06 +0200
+Subject: [RFC PATCH 06/10] devfreq: rk3399_dmc / clk: rockchip: Disable DDR
+ clk timeout on suspend.
 In-Reply-To: <20180514211610.26618-1-enric.balletbo@collabora.com>
 References: <20180514211610.26618-1-enric.balletbo@collabora.com>
-Message-ID: <20180514211610.26618-11-enric.balletbo@collabora.com>
+Message-ID: <20180514211610.26618-7-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lin Huang <hl@rock-chips.com>
+From: Derek Basehore <dbasehore@chromium.org>
 
-Enable the DMC (Dynamic Memory Controller) and the DFI (DDR PHY Interface)
-nodes on gru/kevin boards so we can support DDR DVFS.
+This disables the timeout for the DDR clk when the governor is
+suspended or stopped. This makes sure that the suspend frequency is
+set. It also makes sure that the userspace governor will be able to
+change the frequency without failing.
 
-Signed-off-by: Lin Huang <hl@rock-chips.com>
+Signed-off-by: Derek Basehore <dbasehore@chromium.org>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
 
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 21 ++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi     |  2 +-
- 2 files changed, 22 insertions(+), 1 deletion(-)
+ drivers/clk/rockchip/clk-ddr.c    | 21 ++++++++++++++++++---
+ drivers/devfreq/rk3399_dmc.c      | 20 +++++++++++++++-----
+ drivers/devfreq/rk3399_dmc_priv.h |  1 +
+ 3 files changed, 34 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index 18f546f2dfd1..ba2cfdd082b8 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -525,6 +525,12 @@
- 	extcon = <&usbc_extcon0>, <&usbc_extcon1>;
- };
+diff --git a/drivers/clk/rockchip/clk-ddr.c b/drivers/clk/rockchip/clk-ddr.c
+index 707be1bd8910..de00590af167 100644
+--- a/drivers/clk/rockchip/clk-ddr.c
++++ b/drivers/clk/rockchip/clk-ddr.c
+@@ -32,6 +32,7 @@ struct rockchip_ddrclk {
+ 	int		div_shift;
+ 	int		div_width;
+ 	int		ddr_flag;
++	bool		timeout_en;
+ 	unsigned long	cached_rate;
+ 	struct work_struct set_rate_work;
+ 	struct mutex	lock;
+@@ -52,8 +53,9 @@ static void rockchip_ddrclk_set_rate_func(struct work_struct *work)
  
-+&dmc_opp_table {
-+	opp04 {
-+		opp-suspend;
-+	};
-+};
-+
- /*
-  * Set some suspend operating points to avoid OVP in suspend
-  *
-@@ -600,6 +606,10 @@
- 		<400000000>;
- };
+ 	mutex_lock(&ddrclk->lock);
+ 	for (i = 0; i < DDRCLK_SET_RATE_MAX_RETRIES; i++) {
+-		ret = raw_notifier_call_chain(&ddrclk->sync_chain, 0, &timeout);
+-		if (ret == NOTIFY_BAD)
++		ret = raw_notifier_call_chain(&ddrclk->sync_chain, 0,
++					      &timeout);
++		if (ddrclk->timeout_en && ret == NOTIFY_BAD)
+ 			goto out;
  
-+&display_subsystem {
-+	devfreq = <&dmc>;
-+};
-+
- &emmc_phy {
- 	status = "okay";
- };
-@@ -766,6 +776,17 @@ ap_i2c_audio: &i2c8 {
- 	status = "okay";
- };
+ 		/*
+@@ -63,7 +65,8 @@ static void rockchip_ddrclk_set_rate_func(struct work_struct *work)
+ 		 * at the wrong time.
+ 		 */
+ 		local_irq_disable();
+-		if (ktime_after(ktime_add_ns(ktime_get(), DMC_MIN_VBLANK_NS),
++		if (ddrclk->timeout_en &&
++		    ktime_after(ktime_add_ns(ktime_get(), DMC_MIN_VBLANK_NS),
+ 				timeout)) {
+ 			local_irq_enable();
+ 			continue;
+@@ -79,6 +82,17 @@ static void rockchip_ddrclk_set_rate_func(struct work_struct *work)
+ 	mutex_unlock(&ddrclk->lock);
+ }
  
-+&dfi {
-+	status = "okay";
-+};
++void rockchip_ddrclk_set_timeout_en(struct clk *clk, bool enable)
++{
++	struct clk_hw *hw = __clk_get_hw(clk);
++	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
 +
-+&dmc {
-+	status = "okay";
-+	center-supply = <&ppvar_centerlogic>;
-+	upthreshold = <25>;
-+	downdifferential = <15>;
-+};
++	mutex_lock(&ddrclk->lock);
++	ddrclk->timeout_en = enable;
++	mutex_unlock(&ddrclk->lock);
++}
++EXPORT_SYMBOL(rockchip_ddrclk_set_timeout_en);
 +
- &sdhci {
- 	/*
- 	 * Signal integrity isn't great at 200 MHz and 150 MHz (DDR) gives the
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index e012cc8ae3d4..518c742293fc 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -160,7 +160,7 @@
- 		};
- 	};
+ int rockchip_ddrclk_register_sync_nb(struct clk *clk, struct notifier_block *nb)
+ {
+ 	struct clk_hw *hw = __clk_get_hw(clk);
+@@ -232,6 +246,7 @@ struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
+ 	ddrclk->div_shift = div_shift;
+ 	ddrclk->div_width = div_width;
+ 	ddrclk->ddr_flag = ddr_flag;
++	ddrclk->timeout_en = true;
+ 	mutex_init(&ddrclk->lock);
+ 	INIT_WORK(&ddrclk->set_rate_work, rockchip_ddrclk_set_rate_func);
+ 	RAW_INIT_NOTIFIER_HEAD(&ddrclk->sync_chain);
+diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
+index c174d13afe92..2fa4ab653c35 100644
+--- a/drivers/devfreq/rk3399_dmc.c
++++ b/drivers/devfreq/rk3399_dmc.c
+@@ -308,14 +308,18 @@ int rockchip_dmcfreq_register_clk_sync_nb(struct devfreq *devfreq,
+ 	 * one notifier is not generally possible. Thus, if more than one sync
+ 	 * notifier is registered, disable dmcfreq.
+ 	 */
+-	if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0)
++	if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0) {
++		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, false);
+ 		devfreq_suspend_device(devfreq);
++	}
  
--	display-subsystem {
-+	display_subsystem: display-subsystem {
- 		compatible = "rockchip,display-subsystem";
- 		ports = <&vopl_out>, <&vopb_out>;
- 	};
+ 	ret = rockchip_ddrclk_register_sync_nb(dmcfreq->dmc_clk, nb);
+ 	if (ret == 0)
+ 		dmcfreq->num_sync_nb++;
+-	else if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0)
++	else if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0) {
++		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, true);
+ 		devfreq_resume_device(devfreq);
++	}
+ 
+ 	mutex_unlock(&dmcfreq->en_lock);
+ 	return ret;
+@@ -332,8 +336,10 @@ int rockchip_dmcfreq_unregister_clk_sync_nb(struct devfreq *devfreq,
+ 	ret = rockchip_ddrclk_unregister_sync_nb(dmcfreq->dmc_clk, nb);
+ 	if (ret == 0) {
+ 		dmcfreq->num_sync_nb--;
+-		if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0)
++		if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0) {
++			rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, true);
+ 			devfreq_resume_device(devfreq);
++		}
+ 	}
+ 
+ 	mutex_unlock(&dmcfreq->en_lock);
+@@ -348,8 +354,10 @@ int rockchip_dmcfreq_block(struct devfreq *devfreq)
+ 	int ret = 0;
+ 
+ 	mutex_lock(&dmcfreq->en_lock);
+-	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count <= 0)
++	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count <= 0) {
++		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, false);
+ 		ret = devfreq_suspend_device(devfreq);
++	}
+ 
+ 	if (!ret)
+ 		dmcfreq->disable_count++;
+@@ -365,8 +373,10 @@ int rockchip_dmcfreq_unblock(struct devfreq *devfreq)
+ 	int ret = 0;
+ 
+ 	mutex_lock(&dmcfreq->en_lock);
+-	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count == 1)
++	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count == 1) {
++		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, true);
+ 		ret = devfreq_resume_device(devfreq);
++	}
+ 
+ 	if (!ret)
+ 		dmcfreq->disable_count--;
+diff --git a/drivers/devfreq/rk3399_dmc_priv.h b/drivers/devfreq/rk3399_dmc_priv.h
+index 8ac0340a4990..1ad46f4b15cc 100644
+--- a/drivers/devfreq/rk3399_dmc_priv.h
++++ b/drivers/devfreq/rk3399_dmc_priv.h
+@@ -7,6 +7,7 @@
+ #ifndef __RK3399_DMC_PRIV_H
+ #define __RK3399_DMC_PRIV_H
+ 
++void rockchip_ddrclk_set_timeout_en(struct clk *clk, bool enable);
+ void rockchip_ddrclk_wait_set_rate(struct clk *clk);
+ int rockchip_ddrclk_register_sync_nb(struct clk *clk,
+ 				     struct notifier_block *nb);
 -- 
 2.17.0
