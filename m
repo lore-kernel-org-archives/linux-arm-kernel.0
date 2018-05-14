@@ -1,16 +1,15 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 14 May 2018 14:29:52 +0200
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 14 May 2018 14:30:47 +0200
 Subject: [FAIL bisect] Sound card probe error
 In-Reply-To: <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
 References: <CGME20180514101728epcas4p3108760546a415b36252df93dfe38e0fb@epcas4p3.samsung.com>
  <CAJKOXPfD8gZR8nZkmAr=Ldt3xESuFocQLnMtrDsNZu=ba55jcw@mail.gmail.com>
  <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
-Message-ID: <CAJKOXPc+kLA+BPBmaP14zMLbbxxCmWF1eZnKoa_PcO2z9jG9JQ@mail.gmail.com>
+Message-ID: <CAPDyKFoQFxHqupyqH3JsriUDdJHpUDecD37OqOSKn-sT26gEiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 2:22 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
+On 14 May 2018 at 14:22, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
 > Hi,
 >
 > On 05/14/2018 12:17 PM, Krzysztof Kozlowski wrote:
@@ -45,12 +44,42 @@ On Mon, May 14, 2018 at 2:22 PM, Sylwester Nawrocki
 > was masked by code removed in the above commit and platform_drv_probe()
 > was could complete successfully.
 
-Thanks Sylwester!
+Thanks for providing this information!
 
-Ah, I missed these messages because I was looking at err dmesg level
-(and for some reason these are warn). Anyway do you have any thoughts
-how is it connected with missing Odroid XU3 sound card and max98090
-codec?
+I was about to tell that I overlooked the fact that there is more than
+one way to assign PM domain pointers to devices. To fix the problem,
+dev_pm_domain_attach() should return 0, not -EEXIST when it finds and
+existing PM domain pointer.
 
-Best regards,
-Krzysztof
+Does the below patch fix the problem?
+
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Mon, 14 May 2018 14:26:16 +0200
+Subject: [PATCH] PM / Domains: Don't return -EEXIST at attach when PM domain
+ exists
+
+As dev_pm_domain_attach() isn't the only way to assign PM domain pointers
+to devices, clearly we must allow a device to have the pointer already
+being assigned. For this reason, return 0 instead of -EEXIST.
+
+Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/base/power/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+index 5e4b481..390868c 100644
+--- a/drivers/base/power/common.c
++++ b/drivers/base/power/common.c
+@@ -106,7 +106,7 @@ int dev_pm_domain_attach(struct device *dev, bool power_on)
+        int ret;
+
+        if (dev->pm_domain)
+-               return -EEXIST;
++               return 0;
+
+        ret = acpi_dev_pm_attach(dev, power_on);
+        if (!ret)
+-- 
+2.7.4
