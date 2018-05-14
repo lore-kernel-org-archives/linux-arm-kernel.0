@@ -1,98 +1,176 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 14 May 2018 05:36:41 +0300
-Subject: [PATCH 2/3] arm64: dts: renesas: r8a77995: Add VIN4
-In-Reply-To: <20180511134516.omsv25i2wi4cxypc@verge.net.au>
+Date: Mon, 14 May 2018 05:49:41 +0300
+Subject: [PATCH 3/3] arm64: dts: renesas: draak: Describe HDMI input
+In-Reply-To: <20180513125755.GQ18974@bigcity.dyn.berto.se>
 References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
- <20180511112523.GK18974@bigcity.dyn.berto.se>
- <20180511134516.omsv25i2wi4cxypc@verge.net.au>
-Message-ID: <3456643.qNU80MrgjU@avalon>
+ <1526032802-14376-4-git-send-email-jacopo+renesas@jmondi.org>
+ <20180513125755.GQ18974@bigcity.dyn.berto.se>
+Message-ID: <26780153.JLo9OE30iv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Friday, 11 May 2018 16:45:16 EEST Simon Horman wrote:
-> On Fri, May 11, 2018 at 01:25:23PM +0200, Niklas S?derlund wrote:
-> > Hi Jacopo,
+On Sunday, 13 May 2018 15:57:55 EEST Niklas S?derlund wrote:
+> On 2018-05-11 12:00:02 +0200, Jacopo Mondi wrote:
+> > Describe HDMI input connected to VIN4 interface for R-Car D3 Draak
+> > development board.
 > > 
-> > Thanks for your work.
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> > ---
 > > 
-> > On 2018-05-11 12:00:01 +0200, Jacopo Mondi wrote:
-> > > Describe VIN4 interface for R-Car D3 R8A77995 SoC.
-> > > 
-> > > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> >  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 68 +++++++++++++++++++++
+> >  1 file changed, 68 insertions(+)
 > > 
-> > Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> > diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts index d03f194..e0ce462
+> > 100644
+> > --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > @@ -59,6 +59,17 @@
 > > 
-> >> ---
-> >> 
-> >>  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 11 +++++++++++
-> >>  1 file changed, 11 insertions(+)
-> >> 
-> >> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> >> b/arch/arm64/boot/dts/renesas/r8a77995.dtsi index 82aed7e..bdf7017
-> >> 100644
-> >> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> >> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> >> @@ -783,6 +783,17 @@
-> >>  				};
-> >>  			};
-> >>  		};
-> >> +
-> >> +		vin4: video at e6ef4000 {
-> >> +			compatible = "renesas,vin-r8a77995";
-> >> +			reg = <0 0xe6ef4000 0 0x1000>;
-> >> +			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-> >> +			clocks = <&cpg CPG_MOD 807>;
-> >> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-> >> +			resets = <&cpg 807>;
-> >> +			renesas,id = <4>;
-> >> +			status = "disabled";
-> >> +		};
-> >>  	};
+> >  		};
+> >  	
+> >  	};
+> > 
+> > +	hdmi-in {
+> > +		compatible = "hdmi-connector";
+> > +		type = "a";
+> > +
+> > +		port {
+> > +			hdmi_con_in: endpoint {
+> > +				remote-endpoint = <&adv7612_in>;
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > 
+> >  	memory at 48000000 {
+> >  	
+> >  		device_type = "memory";
+> >  		/* first 128MB is reserved for secure area. */
+> > 
+> > @@ -142,6 +153,11 @@
+> > 
+> >  		groups = "usb0";
+> >  		function = "usb0";
+> >  	
+> >  	};
+> > 
+> > +
+> > +	vin4_pins: vin4 {
+> > +		groups = "vin4_data24", "vin4_sync", "vin4_clk", "vin4_clkenb";
+> > +		function = "vin4";
+> > +	};
+> > 
+> >  };
+> >  
+> >  &i2c0 {
+> > 
+> > @@ -154,6 +170,35 @@
+> > 
+> >  		reg = <0x50>;
+> >  		pagesize = <8>;
+> >  	
+> >  	};
+> > 
+> > +
+> > +	hdmi-decoder at 4c {
+> > +		compatible = "adi,adv7612";
+> > +		reg = <0x4c>;
+> > +		default-input = <0>;
+> > +
+> > +		ports {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			port at 0 {
+> > +				reg = <0>;
+> > +				adv7612_in: endpoint {
+> > +					remote-endpoint = <&hdmi_con_in>;
+> > +				};
+> > +			};
+> > +
+> > +			port at 2 {
+> > +				reg = <2>;
+> > +				adv7612_out: endpoint {
+> > +					pclk-sample = <0>;
+> > +					hsync-active = <0>;
+> > +					vsync-active = <0>;
 > 
-> Thanks, I have moved the new node to preserve sorting of nodes by bus
-> address and applied the result. It is as follows:
+> This differs from the Gen2 DT bindings which is a very similar hardware
+> setup using the same components. Defining these properties will make the
+> bus marked as V4L2_MBUS_PARALLEL instead of V4L2_MBUS_BT656.
 > 
-> From: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> Subject: [PATCH] arm64: dts: renesas: r8a77995: Add VIN4
+> This will change how the hardware is configured for capture if the media
+> bus is in a UYVY format, see VNMC_INF register in rvin_setup(). Maybe
+> this it not an issue here but still I'm curious to why this differ
+> between Gen2 and Gen3 :-)
 > 
-> Describe VIN4 interface for R-Car D3 R8A77995 SoC.
+> > +
+> > +					remote-endpoint = <&vin4_in>;
+> > +				};
+> > +			};
+> > +		};
+> > +	};
+> > 
+> >  };
+> >  
+> >  &i2c1 {
+> > 
+> > @@ -246,3 +291,26 @@
+> > 
+> >  	timeout-sec = <60>;
+> >  	status = "okay";
+> >  
+> >  };
+> > 
+> > +
+> > +&vin4 {
+> > +	pinctrl-0 = <&vin4_pins>;
+> > +	pinctrl-names = "default";
+> > +
+> > +	status = "okay";
+> > +
+> > +	ports {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		port at 0 {
+> > +			reg = <0>;
+> > +
+> > +			vin4_in: endpoint {
+> > +				hsync-active = <0>;
+> > +				vsync-active = <0>;
 > 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> [simon: sorted node by bus address]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Comparing this to the Gen2 bindings some properties are missing,
+> 
+> bus-width = <24>;
+> pclk-sample = <1>;
+> data-active = <1>;
+> 
+> This is not a big deal as the VIN driver don't use these properties so
+> no functional change should come of this but still a difference.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+I think the VIN DT bindings should be updated to explicitly list the endpoint 
+properties that are mandatory, optional, or not allowed.
 
-> ---
->  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+> Over all I'm happy with this change but before I add my tag I would like
+> to understand why it differs from the Gen2 configuration for the adv7612
+> properties.
 > 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> b/arch/arm64/boot/dts/renesas/r8a77995.dtsi index
-> ba98865b0c9b..2506f46293e8 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> @@ -610,6 +610,17 @@
->  			status = "disabled";
->  		};
+> Also on a side not it is possible with hardware switches on the board
+> switch the VIN4 source to a completely different pipeline CVBS connector
+> -> adv7180 -> VIN4. But I think it's best we keep the HDMI as default as
+> this seems to be how the boards are shipped. But maybe mentioning this
+> in the commit message would not hurt if you end-up resending the patch.
 > 
-> +		vin4: video at e6ef4000 {
-> +			compatible = "renesas,vin-r8a77995";
-> +			reg = <0 0xe6ef4000 0 0x1000>;
-> +			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cpg CPG_MOD 807>;
-> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-> +			resets = <&cpg 807>;
-> +			renesas,id = <4>;
-> +			status = "disabled";
-> +		};
-> +
->  		ohci0: usb at ee080000 {
->  			compatible = "generic-ohci";
->  			reg = <0 0xee080000 0 0x100>;
+> > +
+> > +				remote-endpoint = <&adv7612_out>;
+> > +			};
+> > +		};
+> > +	};
+> > +};
 
 -- 
 Regards,
