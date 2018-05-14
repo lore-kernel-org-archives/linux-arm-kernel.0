@@ -1,77 +1,62 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 14 May 2018 16:05:30 +0200
-Subject: [PATCH v14 2/8] ASoC: sun4i-codec: Add Mic1 Boost Volume, Mic2
- Boost Volume
-In-Reply-To: <20180505090513.7e3f02c2@scratchpost.org>
+Date: Mon, 14 May 2018 16:06:40 +0200
+Subject: [PATCH v14 3/8] ASoC: sun4i-codec: Merge
+ sun4i_codec_left_mixer_controls and sun4i_codec_right_mixer_controls into
+ sun4i_codec_mixer_controls
+In-Reply-To: <20180505085056.6c6011ca@scratchpost.org>
 References: <20180502210800.1971-1-dannym@scratchpost.org>
- <20180502210800.1971-3-dannym@scratchpost.org>
- <20180503143319.4vyh2y5sluatssnv@flea>
- <20180505090513.7e3f02c2@scratchpost.org>
-Message-ID: <20180514140530.bnedijfm6hvnpyq4@flea>
+ <20180502210800.1971-4-dannym@scratchpost.org>
+ <20180503144618.oojhvmey44dtg5fa@flea>
+ <20180505085056.6c6011ca@scratchpost.org>
+Message-ID: <20180514140640.oig6hqbh5utvzhmd@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2018 at 09:05:13AM +0200, Danny Milosavljevic wrote:
+On Sat, May 05, 2018 at 08:51:43AM +0200, Danny Milosavljevic wrote:
 > Hi Maxime,
 > 
-> On Thu, 3 May 2018 16:33:19 +0200
+> On Thu, 3 May 2018 16:46:19 +0200
 > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 > 
-> > > +struct sun4i_codec_quirks {
-> > > +	const struct regmap_config *regmap_config;
-> > > +	const struct snd_soc_component_driver *codec;
-> > > +	struct snd_soc_card * (*create_card)(struct device *dev);
-> > > +	struct reg_field reg_adc_fifoc;	/* used for regmap_field */
-> > > +	unsigned int reg_dac_txdata;	/* TX FIFO offset for DMA config */
-> > > +	unsigned int reg_adc_rxdata;	/* RX FIFO offset for DMA config */
-> > > +	bool has_reset;
-> > > +	const struct snd_kcontrol_new *controls;
-> > > +	unsigned int num_controls;
-> > > +};
-> > > +
-> > > +static int sun4i_codec_component_driver_probe(struct snd_soc_component *codec)
-> > > +{
-> > > +	const struct sun4i_codec_quirks *quirks;
-> > > +
-> > > +	quirks = of_device_get_match_data(codec->dev);
-> > > +	return snd_soc_add_component_controls(codec,
-> > > +					      quirks->controls,
-> > > +					      quirks->num_controls);  
-> > 
-> > Why not just extending the sun4i_codec_controls to add it, and create
-> > a duplicate one for the A20?
+> > Doesn't that mean that the controls will be shared between the right
+> > and left mixers now, which wasn't the case before?
 > 
-> Because sun4i_codec_controls has five controls shared between A10 and A20,
-> and only two not shared.
->
-> And if we extended sun4i_codec_controls, we'd also have to duplicate
-> sun4i_codec_codec in order to use sun4i_codec_controls vs. sun7i_codec_controls,
-> which really contains exactly the same data otherwise.
-
-What I don't really like is that with this patch we have two variants
-of the same mechanism: one to add the controls that are mostly shared,
-and one to add the controls that are not shared, without any clear
-definition of when you should add a new control to one list or the
-other.
-
-So far, we had one mechanism, it was easy to understand and to know
-what to do about it. And the code was simple as well.
-
-> The quirks here are just for two controls, Mic1 Boost Volume and
-> Mic2 Boost Volume, and there not even for the names or anything -
-> just for some reason the register moved away.
+> Yes.  However Chen-Yu said that except for debugfs that cannot be
+> observed by user space anyway.
 > 
-> The simplest way was to add it to the quirks - which already have a
-> variant selection etc.
+> It's nice to have the NEW controls have multiple channels, which is what
+> this does.
+> 
+> >And also, wouldn't
+> > the controls be called "Left Mixer Left Mixer Left DAC Playback
+> > Switch" (for the first one) now?
+> 
+> No.  I checked using "amixer" - the names look fine,
+> "Left Mixer Left DAC Playback Switch".
+> 
+> With the patch series, amixer says:
+> 
+> numid=10,iface=MIXER,name='FM Playback Switch'
+> numid=6,iface=MIXER,name='FM Playback Volume'
+> numid=5,iface=MIXER,name='Line Boost Volume'
+> numid=9,iface=MIXER,name='Line Playback Switch'
+> numid=4,iface=MIXER,name='Line Playback Volume'
+> numid=1,iface=MIXER,name='Mic1 Boost Volume'
+> numid=11,iface=MIXER,name='Mic1 Playback Switch'
+> numid=2,iface=MIXER,name='Mic2 Boost Volume'
+> numid=12,iface=MIXER,name='Mic2 Playback Switch'
+> numid=7,iface=MIXER,name='Mic Playback Volume'
+> numid=18,iface=MIXER,name='Capture Source'
+> numid=19,iface=MIXER,name='Differential Line Source'
+> numid=8,iface=MIXER,name='Left Mixer Left DAC Playback Switch'
+> numid=15,iface=MIXER,name='Power Amplifier DAC Playback Switch'
+> numid=16,iface=MIXER,name='Power Amplifier Mixer Playback Switch'
+> numid=17,iface=MIXER,name='Power Amplifier Mute Switch'
+> numid=3,iface=MIXER,name='Power Amplifier Volume'
+> numid=14,iface=MIXER,name='Right Mixer Left DAC Playback Switch'
+> numid=13,iface=MIXER,name='Right Mixer Right DAC Playback Switch'
 
-Actually, I think that having to do add a new control explicitly to an
-A10 and an A20 list is a feature if the two controls set aren't
-exactly the same. It makes you explicitly think about what you're
-doing, and hopefully double check if it is actually shared or not,
-instead of exposing a control because one didn't pay attention that it
-was shared.
-
-Chen-Yu, any opinion on this?
+Great then :)
 
 Maxime
 
@@ -85,4 +70,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/56573f41/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/5b428001/attachment.sig>
