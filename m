@@ -1,57 +1,116 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 14 May 2018 12:01:03 +0100
-Subject: [PATCH 1/2][stable-4.4] arm64: introduce mov_q macro to move a
- constant into a 64-bit register
-Message-ID: <1526295664-22187-1-git-send-email-suzuki.poulose@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 14 May 2018 12:06:50 +0100
+Subject: [PATCH 06/18] arm64: move sve_user_{enable, disable} to
+ <asm/fpsimd.h>
+In-Reply-To: <20180514094640.27569-7-mark.rutland@arm.com>
+References: <20180514094640.27569-1-mark.rutland@arm.com>
+ <20180514094640.27569-7-mark.rutland@arm.com>
+Message-ID: <20180514110649.GC7753@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 30b5ba5cf333cc650e474eaf2cc1ae91bc7cf89f upstream
+On Mon, May 14, 2018 at 10:46:28AM +0100, Mark Rutland wrote:
+> In subsequent patches, we'll want to make use of sve_user_enable() and
+> sve_user_disable() outside of kernel/fpsimd.c. Let's move these to
+> <asm/fpsimd.h> where we can make use of them.
+> 
+> To avoid ifdeffery in sequences like:
+> 
+> if (system_supports_sve() && some_condition
+> 	sve_user_disable();
+> 
+> ... empty stubs are provided when support for SVE is not enabled.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Dave Martin <dave.martin@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/fpsimd.h | 17 ++++++++++++++++-
+>  arch/arm64/kernel/fpsimd.c      | 11 -----------
+>  2 files changed, 16 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index aa7162ae93e3..7377d7593c06 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -16,11 +16,13 @@
+>  #ifndef __ASM_FP_H
+>  #define __ASM_FP_H
+>  
+> -#include <asm/ptrace.h>
+>  #include <asm/errno.h>
+> +#include <asm/ptrace.h>
+> +#include <asm/sysreg.h>
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> +#include <linux/build_bug.h>
+>  #include <linux/cache.h>
+>  #include <linux/init.h>
+>  #include <linux/stddef.h>
+> @@ -81,6 +83,16 @@ extern int sve_set_vector_length(struct task_struct *task,
+>  extern int sve_set_current_vl(unsigned long arg);
+>  extern int sve_get_current_vl(void);
+>  
+> +static inline void sve_user_disable(void)
+> +{
+> +	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
+> +}
+> +
+> +static inline void sve_user_enable(void)
+> +{
+> +	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
+> +}
+> +
+>  /*
+>   * Probing and setup functions.
+>   * Calls to these functions must be serialised with one another.
+> @@ -107,6 +119,9 @@ static inline int sve_get_current_vl(void)
+>  	return -EINVAL;
+>  }
+>  
+> +static inline void sve_user_disable(void) { }
+> +static inline void sve_user_enable(void) { }
+> +
 
-Implement a macro mov_q that can be used to move an immediate constant
-into a 64-bit register, using between 2 and 4 movz/movk instructions
-(depending on the operand)
+Alternatively, just move the full definitions outside the #ifdef
+CONFIG_ARM64_SVE.
 
-Cc: stable at vger.kernel.org # v4.4
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
-  Cherry picked for backport of
-  "commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream"
----
- arch/arm64/include/asm/assembler.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+All calls to these should be shadowed by an if
+(system_supports_sve()) in any case, and setting/clearing ZEN_EL0EN
+in the CPACR_EL1 ought to be harmless now that the meaning of these
+bits architecturally committed.
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 12eff92..83e2309 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -204,4 +204,24 @@ lr	.req	x30		// link register
- 	.size	__pi_##x, . - x;	\
- 	ENDPROC(x)
- 
-+	/*
-+	 * mov_q - move an immediate constant into a 64-bit register using
-+	 *         between 2 and 4 movz/movk instructions (depending on the
-+	 *         magnitude and sign of the operand)
-+	 */
-+	.macro	mov_q, reg, val
-+	.if (((\val) >> 31) == 0 || ((\val) >> 31) == 0x1ffffffff)
-+	movz	\reg, :abs_g1_s:\val
-+	.else
-+	.if (((\val) >> 47) == 0 || ((\val) >> 47) == 0x1ffff)
-+	movz	\reg, :abs_g2_s:\val
-+	.else
-+	movz	\reg, :abs_g3:\val
-+	movk	\reg, :abs_g2_nc:\val
-+	.endif
-+	movk	\reg, :abs_g1_nc:\val
-+	.endif
-+	movk	\reg, :abs_g0_nc:\val
-+	.endm
-+
- #endif	/* __ASM_ASSEMBLER_H */
--- 
-2.7.4
+Ideally we would have a BUG_ON(!system_supports_sve()) in those
+functions, but we won't won't to pay the cost in a production kernel.
+
+>  static inline void sve_init_vq_map(void) { }
+>  static inline void sve_update_vq_map(void) { }
+>  static inline int sve_verify_vq_map(void) { return 0; }
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 088940387a4d..79a81c7d85c6 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -159,7 +159,6 @@ static void sve_free(struct task_struct *task)
+>  	__sve_free(task);
+>  }
+>  
+> -
+
+Hmmm, Ack.  Check for conflicts with the KVM FPSIMD rework [1] (though
+trivial).
+
+[...]
+
+Cheers
+---Dave
+
+
+[1]
+
+[PATCH v7 10/16] arm64/sve: Switch sve_pffr() argument from task to thread
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/576601.html
+
+[PATCH v7 11/16] arm64/sve: Move sve_pffr() to fpsimd.h and make inline
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/576606.html
