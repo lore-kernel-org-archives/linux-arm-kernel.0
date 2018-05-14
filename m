@@ -1,99 +1,63 @@
-From: alex.popov@linux.com (Alexander Popov)
-Date: Mon, 14 May 2018 12:35:25 +0300
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <20180514051555.bpbydgr56hyffjch@salmiak>
-References: <20180502203326.9491-1-labbott@redhat.com>
- <20180502203326.9491-3-labbott@redhat.com>
- <20180503071917.xm2xvgagvzkworay@salmiak>
- <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
- <20180504110907.c2dw33kjmyybso6t@lakrids.cambridge.arm.com>
- <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
- <71199506-b46b-5f91-e489-e6450b6d1067@linux.com>
- <20180511161317.57k6prl54xjmsit3@lakrids.cambridge.arm.com>
- <f180b312-d1cf-3992-4e89-9632c1674cd6@linux.com>
- <20180514051555.bpbydgr56hyffjch@salmiak>
-Message-ID: <6c311899-7131-d21b-10f6-d2ba7380a392@linux.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 14 May 2018 11:41:18 +0200
+Subject: [GIT PULL 3/3] omap sdhci dts changes for v4.18 merge window
+In-Reply-To: <20180514082224.dx63ao3vz3ay5ng5@localhost>
+References: <pull-1525450571-674978@atomide.com>
+ <pull-1525450571-674978@atomide.com-3>
+ <20180514082224.dx63ao3vz3ay5ng5@localhost>
+Message-ID: <CAPDyKFrFDFO3ZLx3_daSo0E9xGcumTbdx9uR4kp_+xPb0C0JGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.05.2018 08:15, Mark Rutland wrote:
-> On Sun, May 13, 2018 at 11:40:07AM +0300, Alexander Popov wrote:
->> It seems that previously I was very "lucky" to accidentally have those MIN_STACK_LEFT,
->> call trace depth and oops=panic together to experience a hang on stack overflow
->> during BUG().
+On 14 May 2018 at 10:22, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, May 04, 2018 at 09:17:33AM -0700, Tony Lindgren wrote:
+>> From: "Tony Lindgren" <tony@atomide.com>
 >>
+>> The following changes since commit 3f4028780287ff5a7308f40e10bbba9a42b993aa:
 >>
->> When I run my test in a loop _without_ VMAP_STACK, I manage to corrupt the neighbour
->> processes with BUG() handling overstepping the stack boundary. It's a pity, but
->> I have an idea.
-> 
-> I think that in the absence of VMAP_STACK, there will always be cases where we
-> *could* corrupt a neighbouring stack, but I agree that trying to minimize that
-> possibility would be good.
-
-Ok!
-
->> In kernel/sched/core.c we already have:
+>>   mmc: sdhci-omap: Get IODelay values for 3.3v DDR mode (2018-05-03 09:37:13 +0200)
 >>
->> #ifdef CONFIG_SCHED_STACK_END_CHECK
->>   	if (task_stack_end_corrupted(prev))
->> 		panic("corrupted stack end detected inside scheduler\n");
->> #endif
+>> are available in the Git repository at:
 >>
->> So what would you think if I do the following in check_alloca():
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/dt-sdhci-signed
 >>
->> 	if (size >= stack_left) {
->> #if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
->> 		panic("alloca over the kernel stack boundary\n");
->> #else
->> 		BUG();
->> #endif
-> 
-> Given this is already out-of-line, how about we always use panic(), regardless
-> of VMAP_STACK and SCHED_STACK_END_CHECK? i.e. just
-> 
-> 	if (unlikely(size >= stack_left))
-> 		panic("alloca over the kernel stack boundary");
-> 
-> If we have VMAP_STACK selected, and overflow during the panic, it's the same as
-> if we overflowed during the BUG(). It's likely that panic() will use less stack
-> space than BUG(), and the compiler can put the call in a slow path that
-> shouldn't affect most calls, so in all cases it's likely preferable.
+>> for you to fetch changes up to 24a6f1f65ea567d017c598faf1374ee443f73851:
+>>
+>>   Documentation: ARM: Add new MMC requirements for DRA7/K2G (2018-05-03 10:32:20 -0700)
+>>
+>> ----------------------------------------------------------------
+>> Device tree changes for omap variants for SDHCI
+>>
+>> This series adds the devicetree configuration needed for pinctrl on
+>> dra7 variants to use the SDHCI SDIO driver instead of mmc-omap-hs
+>> driver. To use SDHCI, both the pins and the iodelay needs to be
+>> configured.
+>>
+>> This series is based on the related SDHCI drivers changes on a branch
+>> set up by Ulf.
+>
+> Hi Tony,
+>
+> Just to make sure Ulf isn't taken by surprise (since I didn't see the initial
+> agreement of a stable branch), it's a good idea to include him on the pull
+> request.
 
-I'm sure that maintainers and Linus will strongly dislike my patch if I always
-use panic() here. panic() kills the whole kernel and we shouldn't use it when we
-can safely continue to work.
+No surprise.
 
-Let me describe my logic. So let's have size >= stack_left on a thread stack.
+>
+> Also, the diffstat doesn't take that branch into consideration so it doesn't
+> match with what I've merged with. Having the URL of Ulf's branch helps, in that
+> case I'd just merge that branch first and get the dependency documented.
+>
+>
+> Ulf, does the above sound OK with you, and said branch is 100% guaranteed to
+> not be rebased?
 
-1. If CONFIG_VMAP_STACK is enabled, we can safely use BUG(). Even if BUG()
-handling overflows the thread stack into the guard page, handle_stack_overflow()
-is called and the neighbour memory is not corrupted. The kernel can proceed to live.
+Right, the branch is immutable. Feel free to pull it.
 
-2. If CONFIG_VMAP_STACK is disabled, BUG() handling can corrupt the neighbour
-kernel memory and cause the undefined behaviour of the whole kernel. I see it on
-my lkdtm test. That is a cogent reason for panic().
+git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git sdhci_omap
 
-2.a. If CONFIG_SCHED_STACK_END_CHECK is enabled, the kernel already does panic()
-when STACK_END_MAGIC is corrupted. So we will _not_ break the safety policy if
-we do panic() in a similar situation in check_alloca().
+Or if you prefer a signed tag: sdhci-omap-v4.17-rc3
 
-2.b. If CONFIG_SCHED_STACK_END_CHECK is disabled, the user has some real reasons
-not to do panic() when the kernel stack is corrupted. So we should not do it in
-check_alloca() as well, just use BUG() and hope for the best.
-
-That logic can be expressed this way:
-
-	if (size >= stack_left) {
-#if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
-		panic("alloca over the kernel stack boundary\n");
-#else
-		BUG();
-#endif
-
-I think I should add a proper comment to describe it.
-
-Thank you.
-
-Best regards,
-Alexander
+Kind regards
+Uffe
