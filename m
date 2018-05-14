@@ -1,124 +1,105 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 14 May 2018 14:03:16 -0700
-Subject: [PATCH v3] coresight: documentation: update sysfs section
-In-Reply-To: <20180514141800.f1be30ce9d1f6ae20ca2d04c@arm.com>
-References: <20180507172915.c032cd71c07b1849bf419a5f@arm.com>
- <CANLsYkyQLan3XajOz2uuoOF8OQchGfeu2ZkZJ9H1Xm9q==aXTw@mail.gmail.com>
- <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
- <a09cbbb5-0237-31f5-dc81-d816c9ec26c5@infradead.org>
- <20180514141800.f1be30ce9d1f6ae20ca2d04c@arm.com>
-Message-ID: <8bcf5490-aeea-e531-fc2d-e8aff8a62dbc@infradead.org>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Mon, 14 May 2018 23:16:01 +0200
+Subject: [RFC PATCH 01/10] devfreq: rockchip-dfi: Move GRF definitions to a
+ common place.
+In-Reply-To: <20180514211610.26618-1-enric.balletbo@collabora.com>
+References: <20180514211610.26618-1-enric.balletbo@collabora.com>
+Message-ID: <20180514211610.26618-2-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2018 12:18 PM, Kim Phillips wrote:
-> - Align and show updated ls devices output from the TC2, based on
->   current driver
-> 
-> - Provide an example from an ETMv4 based system (Juno)
-> 
-> - Reflect changes to the way the RAM write pointer is accessed since
->   it got changed in commit 7d83d17795ef ("coresight: tmc: adding sysFS
->   management entries").
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Randy Dunlap <rdunlap@infradead.org>
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+Some rk3399 GRF (Generic Register Files) definitions can be used for
+different drivers. Move these definitions to a common include so we
+don't need to duplicate these definitions.
 
-FWIW:
-Acked-by: Randy Dunlap <rdunlap@infradead.org>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
 
-Thanks.
+ drivers/devfreq/event/rockchip-dfi.c | 23 +++++++----------------
+ include/soc/rockchip/rk3399_grf.h    | 21 +++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 16 deletions(-)
+ create mode 100644 include/soc/rockchip/rk3399_grf.h
 
-> ---
-> v3: address Randy Dunlap's showns->shown,  corrected - and + line merging
-> v2: address Mathieu's comment about clarifying the sinks on the Juno
->     vs. TC2 platforms.
-> 
->  Documentation/trace/coresight.txt | 43 +++++++++++++++++++------------
->  1 file changed, 26 insertions(+), 17 deletions(-)
-> 
-> diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-> index 6f0120c3a4f1..15d2a0f1e1b8 100644
-> --- a/Documentation/trace/coresight.txt
-> +++ b/Documentation/trace/coresight.txt
-> @@ -141,13 +141,25 @@ register the device with the core framework.  The unregister function takes
->  a reference to a "struct coresight_device", obtained at registration time.
->  
->  If everything goes well during the registration process the new devices will
-> -show up under /sys/bus/coresight/devices, as showns here for a TC2 platform:
-> +show up under /sys/bus/coresight/devices, as shown here for a TC2 platform:
->  
->  root:~# ls /sys/bus/coresight/devices/
-> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
-> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
-> +20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm  replicator
-> +20030000.tpiu  2201c000.ptm	2203c000.etm  2203e000.etm
->  root:~#
->  
-> +and here for a Juno platform:
-> +
-> +root at juno:~# ls /sys/bus/coresight/devices/
-> +20010000.etf	 20120000.replicator  22040000.etm     230c0000.funnel
-> +20030000.tpiu	 20130000.funnel      220c0000.funnel  23140000.etm
-> +20040000.funnel  20140000.etf	      22140000.etm     23240000.etm
-> +20070000.etr	 20150000.funnel      23040000.etm     23340000.etm
-> +root at juno:~# 
-> +
-> +Note that on Juno users can select the ETF, ETR and TPIU as a sink target while
-> +on TC2, the ETB and TPIU can be selected.
-> +
->  The functions take a "struct coresight_device", which looks like this:
->  
->  struct coresight_desc {
-> @@ -193,16 +205,16 @@ the information carried in "THIS_MODULE".
->  How to use the tracer modules
->  -----------------------------
->  
-> -Before trace collection can start, a coresight sink needs to be identify.
-> +Before trace collection can start, a coresight sink needs to be identified.
->  There is no limit on the amount of sinks (nor sources) that can be enabled at
->  any given moment.  As a generic operation, all device pertaining to the sink
->  class will have an "active" entry in sysfs:
->  
->  root:/sys/bus/coresight/devices# ls
-> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
-> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
-> +20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm  replicator
-> +20030000.tpiu  2201c000.ptm	2203c000.etm  2203e000.etm
->  root:/sys/bus/coresight/devices# ls 20010000.etb
-> -enable_sink  status  trigger_cntr
-> +enable_sink  mgmt  power  subsystem  trigger_cntr  uevent
->  root:/sys/bus/coresight/devices# echo 1 > 20010000.etb/enable_sink
->  root:/sys/bus/coresight/devices# cat 20010000.etb/enable_sink
->  1
-> @@ -216,16 +228,13 @@ trigger a trace capture:
->  root:/sys/bus/coresight/devices# echo 1 > 2201c000.ptm/enable_source
->  root:/sys/bus/coresight/devices# cat 2201c000.ptm/enable_source
->  1
-> -root:/sys/bus/coresight/devices# cat 20010000.etb/status
-> -Depth:          0x2000
-> -Status:         0x1
-> -RAM read ptr:   0x0
-> -RAM wrt ptr:    0x19d3   <----- The write pointer is moving
-> -Trigger cnt:    0x0
-> -Control:        0x1
-> -Flush status:   0x0
-> -Flush ctrl:     0x2001
-> -root:/sys/bus/coresight/devices#
-> +
-> +Observe the write pointer moving:
-> +
-> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
-> +0x1a8
-> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
-> +0x19a6
->  
->  Trace collection is stopped the same way:
->  
-> 
-
-
+diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
+index 22b113363ffc..2fbbcbeb644f 100644
+--- a/drivers/devfreq/event/rockchip-dfi.c
++++ b/drivers/devfreq/event/rockchip-dfi.c
+@@ -26,6 +26,8 @@
+ #include <linux/list.h>
+ #include <linux/of.h>
+ 
++#include <soc/rockchip/rk3399_grf.h>
++
+ #define RK3399_DMC_NUM_CH	2
+ 
+ /* DDRMON_CTRL */
+@@ -43,18 +45,6 @@
+ #define DDRMON_CH1_COUNT_NUM		0x3c
+ #define DDRMON_CH1_DFI_ACCESS_NUM	0x40
+ 
+-/* pmu grf */
+-#define PMUGRF_OS_REG2	0x308
+-#define DDRTYPE_SHIFT	13
+-#define DDRTYPE_MASK	7
+-
+-enum {
+-	DDR3 = 3,
+-	LPDDR3 = 6,
+-	LPDDR4 = 7,
+-	UNUSED = 0xFF
+-};
+-
+ struct dmc_usage {
+ 	u32 access;
+ 	u32 total;
+@@ -83,16 +73,17 @@ static void rockchip_dfi_start_hardware_counter(struct devfreq_event_dev *edev)
+ 	u32 ddr_type;
+ 
+ 	/* get ddr type */
+-	regmap_read(info->regmap_pmu, PMUGRF_OS_REG2, &val);
+-	ddr_type = (val >> DDRTYPE_SHIFT) & DDRTYPE_MASK;
++	regmap_read(info->regmap_pmu, RK3399_PMUGRF_OS_REG2, &val);
++	ddr_type = (val >> RK3399_PMUGRF_DDRTYPE_SHIFT) &
++		    RK3399_PMUGRF_DDRTYPE_MASK;
+ 
+ 	/* clear DDRMON_CTRL setting */
+ 	writel_relaxed(CLR_DDRMON_CTRL, dfi_regs + DDRMON_CTRL);
+ 
+ 	/* set ddr type to dfi */
+-	if (ddr_type == LPDDR3)
++	if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR3)
+ 		writel_relaxed(LPDDR3_EN, dfi_regs + DDRMON_CTRL);
+-	else if (ddr_type == LPDDR4)
++	else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR4)
+ 		writel_relaxed(LPDDR4_EN, dfi_regs + DDRMON_CTRL);
+ 
+ 	/* enable count, use software mode */
+diff --git a/include/soc/rockchip/rk3399_grf.h b/include/soc/rockchip/rk3399_grf.h
+new file mode 100644
+index 000000000000..0f94034e2e9a
+--- /dev/null
++++ b/include/soc/rockchip/rk3399_grf.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Rockchip Generic Register Files definitions
++ *
++ * Copyright (c) 2018, Collabora Ltd.
++ * Author: Enric Balletbo i Serra <enric.balletbo@collabora.com>
++ */
++
++#ifndef __SOC_RK3399_GRF_H
++#define __SOC_RK3399_GRF_H
++
++/* PMU GRF Registers */
++#define RK3399_PMUGRF_OS_REG2		0x308
++#define RK3399_PMUGRF_DDRTYPE_SHIFT	13
++#define RK3399_PMUGRF_DDRTYPE_MASK	7
++#define RK3399_PMUGRF_DDRTYPE_DDR3	3
++#define RK3399_PMUGRF_DDRTYPE_LPDDR2	5
++#define RK3399_PMUGRF_DDRTYPE_LPDDR3	6
++#define RK3399_PMUGRF_DDRTYPE_LPDDR4	7
++
++#endif
 -- 
-~Randy
+2.17.0
