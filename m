@@ -1,43 +1,67 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Mon, 14 May 2018 09:10:42 -0500
-Subject: [PATCH] edac: altera: Add Stratix10 SDRAM Uncorrectable Errors
-In-Reply-To: <20180512103331.GC27593@pd.tnic>
-References: <1526079610-5527-1-git-send-email-thor.thayer@linux.intel.com>
- <20180512103331.GC27593@pd.tnic>
-Message-ID: <2a21f8e1-4376-c148-de33-f39778716d80@linux.intel.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 14 May 2018 16:11:26 +0200
+Subject: [PATCH v14 8/8] ASoC: sun4i-codec: Add Left Capture Select,
+ Right Capture Select
+In-Reply-To: <20180505124050.66f74999@scratchpost.org>
+References: <20180502210800.1971-1-dannym@scratchpost.org>
+ <20180502210800.1971-9-dannym@scratchpost.org>
+ <20180503145408.yymk2ndt4sm2yt4i@flea>
+ <20180505124050.66f74999@scratchpost.org>
+Message-ID: <20180514141126.mv7iso2d4xrfnsax@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2018 05:33 AM, Borislav Petkov wrote:
-> On Fri, May 11, 2018 at 06:00:10PM -0500, thor.thayer at linux.intel.com wrote:
->> From: Thor Thayer <thor.thayer@linux.intel.com>
->>
->> On Stratix10, uncorrectable errors are routed to the SError
->> exception instead of the IRQ exceptions. In Stratix10,
->> uncorrectable SErrors must be treated as fatal and will cause
->> a panic.
->> Older Altera/Intel parts printed out a message for UE so do
->> that here using the notifier framework.
->>
->> Record the UE in sticky registers that retain the state
->> through a reset. Check these registers on probe and printout the
->> error on startup.
->>
->> Depends on previous patch:
->> commit 2a4ff60626b0 ("arm64: dts: stratix10: add sdram ecc")
->>
->> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
->> ---
->>   drivers/edac/altera_edac.c | 67 +++++++++++++++++++++++++++++++++++++++-------
->>   drivers/edac/altera_edac.h |  8 +++++-
->>   2 files changed, 64 insertions(+), 11 deletions(-)
+On Sat, May 05, 2018 at 12:40:50PM +0200, Danny Milosavljevic wrote:
+> Hi Maxime,
 > 
-> Ok, I think I have collected everything. Pls double-check me I haven't missed
-> anything:
+> On Thu, 3 May 2018 16:54:08 +0200
+> Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 > 
-> https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/log/?h=for-next
+> > > +static const char * const sun4i_codec_capture_source[] = {
+> > > +	"Line",
+> > > +	"FM",
+> > > +	"Mic1",
+> > > +	"Mic2",
+> > > +	"Mic1,Mic2",
+> > > +	"Mic1+Mic2",
+> > > +	"Output Mixer",
+> > > +	"Line,Mic1",
+> > > +};  
+> > 
+> > Shouldn't that be defined in a more generic way? As far as I know,
+> > there's no way to tell what the difference between "Mic1,Mic2" and
+> > "Mic1+Mic2" would be from the userspace.
 > 
-> Thx.
+> Sounds good - but how?
 > 
-Yes, You have the entire series (aside from DT that Dinh is taking). 
-Thank you!
+> Here, "Mic1,Mic2" means the left channel captured is Mic1 and the right
+> channel captured is Mic2.
+> 
+> On the other hand, "Mic1+Mic2" means that the signals from Mic1 and
+> Mic2 are added together and that is captured (both as left and as right).
+> 
+> "Mic1" means both the left channel and the right channel captured is
+> from Mic1.  Likewise "Mic2".
+
+Right, and my point isn't that it is difficult to understand or
+remember once you get it, but that it's difficult to get it in the
+first place, and that this convention is solely based on the one used
+in the datasheet, which is an abstraction violation in itself.
+
+I guess that's really up to Mark here, but one solution would be to
+allow to couple the controls explicitly instead of relying solely on
+the fact that they share the same controls array pointer.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/9e1abc0a/attachment-0001.sig>
