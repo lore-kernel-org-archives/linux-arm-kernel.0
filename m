@@ -1,19 +1,21 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 May 2018 23:25:46 +0200
-Subject: [PATCH 06/12] of: add a new flag for OF device nodes
-In-Reply-To: <20180511162028.20616-7-brgl@bgdev.pl>
+Date: Mon, 14 May 2018 23:26:09 +0200
+Subject: [PATCH 07/12] of/platform: provide a separate routine for setting
+ up device resources
+In-Reply-To: <20180511162028.20616-8-brgl@bgdev.pl>
 References: <20180511162028.20616-1-brgl@bgdev.pl>
- <20180511162028.20616-7-brgl@bgdev.pl>
-Message-ID: <CAMuHMdWbmdGWz_h_77iHX6=ooadOHsiCMo1-iH33qw-4wZO4CQ@mail.gmail.com>
+ <20180511162028.20616-8-brgl@bgdev.pl>
+Message-ID: <CAMuHMdU8vU=wHDfrSA4Y_cM9GgrY-ERH=9C1mvoAy9EzhRsjOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, May 11, 2018 at 6:20 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >
-> This flag indicates that a device node has been populated early and
-> that it needs different handling when called from
-> of_platform_populate().
+> The early platform driver framework will need to setup the device
+> resources before the regular populating of the device tree happens.
+>
+> Provide a separate function for that.
 >
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
