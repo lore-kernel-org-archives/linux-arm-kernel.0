@@ -1,56 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 May 2018 11:35:45 +0100
-Subject: [PATCH v2 4/4] arm64: dts: Add Mediatek SoC MT8183 and evaluation
- board dts and Makefile
-In-Reply-To: <1526293351-32794-5-git-send-email-erin.lo@mediatek.com>
-References: <1526293351-32794-1-git-send-email-erin.lo@mediatek.com>
- <1526293351-32794-5-git-send-email-erin.lo@mediatek.com>
-Message-ID: <efa91778-e81f-9ba4-22a6-43ff0f94af4f@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 14 May 2018 12:08:06 +0100
+Subject: [PATCH 12/18] kernel: add ksys_personality()
+In-Reply-To: <20180514094640.27569-13-mark.rutland@arm.com>
+References: <20180514094640.27569-1-mark.rutland@arm.com>
+ <20180514094640.27569-13-mark.rutland@arm.com>
+Message-ID: <20180514110805.GH7753@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/05/18 11:22, Erin Lo wrote:
-> From: Ben Ho <Ben.Ho@mediatek.com>
+On Mon, May 14, 2018 at 10:46:34AM +0100, Mark Rutland wrote:
+> Using this helper allows us to avoid the in-kernel call to the
+> sys_personality() syscall. The ksys_ prefix denotes that this function
+> is meant as a drop-in replacement for the syscall. In particular, it
+> uses the same calling convention as sys_personality().
 > 
-> Add basic chip support for Mediatek 8183
+> This is necessary to enable conversion of arm64's syscall handling to
+> use pt_regs wrappers.
 > 
-> Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
-> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Al Viro <viro@zeniv.linux.org.uk>
+> Cc: Dominik Brodowski <linux@dominikbrodowski.net>
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
 > ---
->  arch/arm64/boot/dts/mediatek/Makefile       |   1 +
->  arch/arm64/boot/dts/mediatek/mt8183-evb.dts |  31 +++++
->  arch/arm64/boot/dts/mediatek/mt8183.dtsi    | 178 ++++++++++++++++++++++++++++
->  3 files changed, 210 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
+>  include/linux/syscalls.h | 1 +
+>  kernel/exec_domain.c     | 7 ++++++-
+>  2 files changed, 7 insertions(+), 1 deletion(-)
 > 
-
-[...]
-
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
-> new file mode 100644
-> index 0000000..8564a26
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
-
-[...]
-
-> +	gic: interrupt-controller at 0c000000 {
-> +		compatible = "arm,gic-v3";
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&gic>;
-> +		interrupt-controller;
-> +		reg = <0 0x0c000000 0 0x40000>,  // CID
-> +		      <0 0x0c100000 0 0x200000>; // CIR
-
-You're missing the GICV and GICH regions that are present on both A53
-and A73 at an offset from PERIPHBASE.
-
-> +		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+> index 70fcda1a9049..6723ea51ec99 100644
+> --- a/include/linux/syscalls.h
+> +++ b/include/linux/syscalls.h
+> @@ -1148,6 +1148,7 @@ unsigned long ksys_mmap_pgoff(unsigned long addr, unsigned long len,
+>  			      unsigned long prot, unsigned long flags,
+>  			      unsigned long fd, unsigned long pgoff);
+>  ssize_t ksys_readahead(int fd, loff_t offset, size_t count);
+> +unsigned int ksys_personality(unsigned int personality);
+>  
+>  /*
+>   * The following kernel syscall equivalents are just wrappers to fs-internal
+> diff --git a/kernel/exec_domain.c b/kernel/exec_domain.c
+> index a5697119290e..4ba2b404cba2 100644
+> --- a/kernel/exec_domain.c
+> +++ b/kernel/exec_domain.c
+> @@ -47,7 +47,7 @@ static int __init proc_execdomains_init(void)
+>  module_init(proc_execdomains_init);
+>  #endif
+>  
+> -SYSCALL_DEFINE1(personality, unsigned int, personality)
+> +unsigned int ksys_personality(unsigned int personality)
+>  {
+>  	unsigned int old = current->personality;
+>  
+> @@ -56,3 +56,8 @@ SYSCALL_DEFINE1(personality, unsigned int, personality)
+>  
+>  	return old;
+>  }
+> +
+> +SYSCALL_DEFINE1(personality, unsigned int, personality)
+> +{
+> +	return ksys_personality(personality);
+> +}
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
