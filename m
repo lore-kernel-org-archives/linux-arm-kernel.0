@@ -1,62 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 10:46:37 +0100
-Subject: [PATCH 15/18] arm64: use {COMPAT,}SYSCALL_DEFINE0 for sigreturn
-In-Reply-To: <20180514094640.27569-1-mark.rutland@arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
-Message-ID: <20180514094640.27569-16-mark.rutland@arm.com>
+From: hl@rock-chips.com (Lin Huang)
+Date: Mon, 14 May 2018 17:53:53 +0800
+Subject: [PATCH v3 2/4] Documentation: bindings: add phy_config for Rockchip
+ USB Type-C PHY
+In-Reply-To: <1526291635-31122-1-git-send-email-hl@rock-chips.com>
+References: <1526291635-31122-1-git-send-email-hl@rock-chips.com>
+Message-ID: <1526291635-31122-2-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't currently annotate our various sigreturn functions as syscalls,
-as we need to do to use pt_regs syscall wrappers.
+If want to do training outside DP Firmware, need phy voltage swing
+and pre_emphasis value.
 
-Let's mark them as real syscalls.
-
-For compat_sys_sigreturn and compat_sys_rt_sigreturn, this changes the
-return type from int to long, matching the prototypes in sys32.c.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Lin Huang <hl@rock-chips.com>
 ---
- arch/arm64/kernel/signal.c   | 2 +-
- arch/arm64/kernel/signal32.c | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Changes in v2:
+- rebase
+Changes in v3:
+- modify property description and add this property to example
 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index caa7a68cf2d2..04a26dcbea32 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -538,7 +538,7 @@ static int restore_sigframe(struct pt_regs *regs,
- 	return err;
- }
+ .../devicetree/bindings/phy/phy-rockchip-typec.txt | 29 +++++++++++++++++++++-
+ 1 file changed, 28 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+index 960da7f..af298f2 100644
+--- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+@@ -17,7 +17,8 @@ Required properties:
  
--asmlinkage long sys_rt_sigreturn(void)
-+SYSCALL_DEFINE0(rt_sigreturn)
- {
- 	struct pt_regs *regs = current_pt_regs();
- 	struct rt_sigframe __user *frame;
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index cb10588a7cb2..1948566dcccf 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -282,7 +282,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
- 	return err;
- }
+ Optional properties:
+  - extcon : extcon specifier for the Power Delivery
+-
++ - rockchip,phy_config : A list of voltage swing(mv) and pre-emphasis
++			(dB) pairs.
+ Required nodes : a sub-node is required for each port the phy provides.
+ 		 The sub-node name is used to identify dp or usb3 port,
+ 		 and shall be the following entries:
+@@ -50,6 +51,19 @@ Example:
+ 			 <&cru SRST_P_UPHY0_TCPHY>;
+ 		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
  
--asmlinkage int compat_sys_sigreturn(void)
-+COMPAT_SYSCALL_DEFINE0(sigreturn)
- {
- 	struct pt_regs *regs = current_pt_regs();
- 	struct compat_sigframe __user *frame;
-@@ -313,7 +313,7 @@ asmlinkage int compat_sys_sigreturn(void)
- 	return 0;
- }
++		rockchip,phy_config =<0x2a 0x00
++			0x1f 0x15
++			0x14 0x22
++			0x02 0x2b
++			0x21 0x00
++			0x12 0x15
++			0x02 0x22
++			0 0
++			0x15 0x00
++			0x00 0x15
++			0 0
++			0 0>;
++
+ 		tcphy0_dp: dp-port {
+ 			#phy-cells = <0>;
+ 		};
+@@ -74,6 +88,19 @@ Example:
+ 			 <&cru SRST_P_UPHY1_TCPHY>;
+ 		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
  
--asmlinkage int compat_sys_rt_sigreturn(void)
-+COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
- {
- 	struct pt_regs *regs = current_pt_regs();
- 	struct compat_rt_sigframe __user *frame;
++		rockchip,phy_config =<0x2a 0x00
++			0x1f 0x15
++			0x14 0x22
++			0x02 0x2b
++			0x21 0x00
++			0x12 0x15
++			0x02 0x22
++			0 0
++			0x15 0x00
++			0x00 0x15
++			0 0
++			0 0>;
++
+ 		tcphy1_dp: dp-port {
+ 			#phy-cells = <0>;
+ 		};
 -- 
-2.11.0
+2.7.4
