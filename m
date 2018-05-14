@@ -1,64 +1,60 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon, 14 May 2018 07:10:42 +0200
-Subject: [PATCH v6 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <a431b0e1-f4f4-1439-f0bf-736018c6ab0c@pengutronix.de>
-References: <20180305102524.5905-1-o.rempel@pengutronix.de>
- <20180305102524.5905-4-o.rempel@pengutronix.de>
- <20180504185052.bjhfkvpgrblc7tfc@pengutronix.de>
- <1937901.oyadCYFYNo@aspire.rjw.lan>
- <a431b0e1-f4f4-1439-f0bf-736018c6ab0c@pengutronix.de>
-Message-ID: <091ccf85-ae4c-f6fd-0455-1a70e973c85c@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 May 2018 06:15:55 +0100
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <f180b312-d1cf-3992-4e89-9632c1674cd6@linux.com>
+References: <20180502203326.9491-1-labbott@redhat.com>
+ <20180502203326.9491-3-labbott@redhat.com>
+ <20180503071917.xm2xvgagvzkworay@salmiak>
+ <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
+ <20180504110907.c2dw33kjmyybso6t@lakrids.cambridge.arm.com>
+ <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
+ <71199506-b46b-5f91-e489-e6450b6d1067@linux.com>
+ <20180511161317.57k6prl54xjmsit3@lakrids.cambridge.arm.com>
+ <f180b312-d1cf-3992-4e89-9632c1674cd6@linux.com>
+Message-ID: <20180514051555.bpbydgr56hyffjch@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 14.05.2018 06:33, Oleksij Rempel wrote:
+On Sun, May 13, 2018 at 11:40:07AM +0300, Alexander Popov wrote:
+> It seems that previously I was very "lucky" to accidentally have those MIN_STACK_LEFT,
+> call trace depth and oops=panic together to experience a hang on stack overflow
+> during BUG().
 > 
 > 
-> On 12.05.2018 13:13, Rafael J. Wysocki wrote:
->> On Friday, May 4, 2018 8:50:52 PM CEST Oleksij Rempel wrote:
->>> Hallo Andrew,
->>> I need your ACK or NACK for this patch.
->>>
->>> This function is used to configure external PMIC to interpret
->>> signal which will be triggered by pm_power_off as power off.
->>> Since same signal can be used for stand by, I linked PMIC configuration
->>> with pm_power_off_prepare to avoid possible conflicts.
->>>
->>> On Mon, Mar 05, 2018 at 11:25:20AM +0100, Oleksij Rempel wrote:
->>>> Export pm_power_off_prepare. It is needed to implement power off on
->>>> Freescale/NXP iMX6 based boards with external power management
->>>> integrated circuit (PMIC).
->>>>
->>>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
->>>> ---
->>>>  kernel/reboot.c | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/kernel/reboot.c b/kernel/reboot.c
->>>> index e4ced883d8de..350be6baa60d 100644
->>>> --- a/kernel/reboot.c
->>>> +++ b/kernel/reboot.c
->>>> @@ -49,6 +49,7 @@ int reboot_force;
->>>>   */
->>>>  
->>>>  void (*pm_power_off_prepare)(void);
->>>> +EXPORT_SYMBOL(pm_power_off_prepare);
->>
->> Why not EXPORT_SYMBOL_GPL() ?
-> 
-> No special reason. Fixed.
-> Any other comments?
-> 
+> When I run my test in a loop _without_ VMAP_STACK, I manage to corrupt the neighbour
+> processes with BUG() handling overstepping the stack boundary. It's a pity, but
+> I have an idea.
 
-Or with other words, will it be enough to get your Signed-of-by for this
-patch?
+I think that in the absence of VMAP_STACK, there will always be cases where we
+*could* corrupt a neighbouring stack, but I agree that trying to minimize that
+possibility would be good.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/3f63f47f/attachment-0001.sig>
+> In kernel/sched/core.c we already have:
+> 
+> #ifdef CONFIG_SCHED_STACK_END_CHECK
+>   	if (task_stack_end_corrupted(prev))
+> 		panic("corrupted stack end detected inside scheduler\n");
+> #endif
+> 
+> So what would you think if I do the following in check_alloca():
+> 
+> 	if (size >= stack_left) {
+> #if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
+> 		panic("alloca over the kernel stack boundary\n");
+> #else
+> 		BUG();
+> #endif
+
+Given this is already out-of-line, how about we always use panic(), regardless
+of VMAP_STACK and SCHED_STACK_END_CHECK? i.e. just
+
+	if (unlikely(size >= stack_left))
+		panic("alloca over the kernel stack boundary");
+
+If we have VMAP_STACK selected, and overflow during the panic, it's the same as
+if we overflowed during the BUG(). It's likely that panic() will use less stack
+space than BUG(), and the compiler can put the call in a slow path that
+shouldn't affect most calls, so in all cases it's likely preferable.
+
+Thanks,
+Mark.
