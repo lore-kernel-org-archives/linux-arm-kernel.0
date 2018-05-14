@@ -1,56 +1,117 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 14 May 2018 15:29:36 -0300
-Subject: [PATCH 2/2] ARM: dts: iimx51-eukrea-mbimxsd51-baseboard: Fix USB PHY
- duplicate unit-address
-In-Reply-To: <1526322576-5838-1-git-send-email-festevam@gmail.com>
-References: <1526322576-5838-1-git-send-email-festevam@gmail.com>
-Message-ID: <1526322576-5838-2-git-send-email-festevam@gmail.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 14 May 2018 11:54:48 -0700
+Subject: [PATCH v2] coresight: documentation: update sysfs section
+In-Reply-To: <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
+References: <20180507172915.c032cd71c07b1849bf419a5f@arm.com>
+ <CANLsYkyQLan3XajOz2uuoOF8OQchGfeu2ZkZJ9H1Xm9q==aXTw@mail.gmail.com>
+ <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
+Message-ID: <a09cbbb5-0237-31f5-dc81-d816c9ec26c5@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On 05/14/2018 10:19 AM, Kim Phillips wrote:
+> - Align and show updated ls devices output from the TC2, based on
+>   current driver
+> 
+> - Provide an example from an ETMv4 based system (Juno)
+> 
+> - Reflect changes to the way the RAM write pointer is accessed since
+>   it got changed in commit 7d83d17795ef ("coresight: tmc: adding sysFS
+>   management entries").
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+> ---
+> v2: address Mathieu's comment about clarifying the sinks on the Juno
+> vs. TC2 platforms.
+> 
+>  Documentation/trace/coresight.txt | 41 +++++++++++++++++++------------
+>  1 file changed, 25 insertions(+), 16 deletions(-)
+> 
+> diff --git a/Documentation/trace/coresight.txt
+> b/Documentation/trace/coresight.txt index 6f0120c3a4f1..134994e9fa6d
+> 100644
+> --- a/Documentation/trace/coresight.txt
+> +++ b/Documentation/trace/coresight.txt
+> @@ -144,10 +144,22 @@ If everything goes well during the registration
+> process the new devices will show up under /sys/bus/coresight/devices,
+> as showns here for a TC2 platform: 
 
-Currently the following DTC warning is seen with W=1:
+  as shown here
 
-arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
+>  root:~# ls /sys/bus/coresight/devices/
+> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
+> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
+> +20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm
+> replicator +20030000.tpiu  2201c000.ptm	2203c000.etm
+> 2203e000.etm root:~#
+>  
+> +and here for a Juno platform:
+> +
+> +root at juno:~# ls /sys/bus/coresight/devices/
+> +20010000.etf	 20120000.replicator  22040000.etm
+> 230c0000.funnel +20030000.tpiu	 20130000.funnel
+> 220c0000.funnel  23140000.etm +20040000.funnel
+> 20140000.etf	      22140000.etm     23240000.etm
+> +20070000.etr	 20150000.funnel      23040000.etm
+> 23340000.etm +root at juno:~# +
+> +Note that on Juno users can select the ETF, ETR and TPIU as a sink
+> target while +on TC2, the ETB and TPIU can be selected.
+> +
+>  The functions take a "struct coresight_device", which looks like this:
+>  
+>  struct coresight_desc {
+> @@ -193,16 +205,16 @@ the information carried in "THIS_MODULE".
+>  How to use the tracer modules
+>  -----------------------------
+>  
+> -Before trace collection can start, a coresight sink needs to be
+> identify. +Before trace collection can start, a coresight sink needs to
 
-Fix it by moving the USB PHY node outside of simple-bus and drop the
-unneeded unit-address.
+The - and + lines seems to be merged...
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- .../arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts | 19 ++++++-------------
- 1 file changed, 6 insertions(+), 13 deletions(-)
+> be identified. There is no limit on the amount of sinks (nor sources)
+> that can be enabled at any given moment.  As a generic operation, all
+> device pertaining to the sink class will have an "active" entry in
+> sysfs: 
+>  root:/sys/bus/coresight/devices# ls
+> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
+> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
+> +20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm
+> replicator +20030000.tpiu  2201c000.ptm	2203c000.etm
+> 2203e000.etm root:/sys/bus/coresight/devices# ls 20010000.etb
+> -enable_sink  status  trigger_cntr
+> +enable_sink  mgmt  power  subsystem  trigger_cntr  uevent
+>  root:/sys/bus/coresight/devices# echo 1 > 20010000.etb/enable_sink
+>  root:/sys/bus/coresight/devices# cat 20010000.etb/enable_sink
+>  1
+> @@ -216,16 +228,13 @@ trigger a trace capture:
+>  root:/sys/bus/coresight/devices# echo 1 > 2201c000.ptm/enable_source
+>  root:/sys/bus/coresight/devices# cat 2201c000.ptm/enable_source
+>  1
+> -root:/sys/bus/coresight/devices# cat 20010000.etb/status
+> -Depth:          0x2000
+> -Status:         0x1
+> -RAM read ptr:   0x0
+> -RAM wrt ptr:    0x19d3   <----- The write pointer is moving
+> -Trigger cnt:    0x0
+> -Control:        0x1
+> -Flush status:   0x0
+> -Flush ctrl:     0x2001
+> -root:/sys/bus/coresight/devices#
+> +
+> +Observe the write pointer moving:
+> +
+> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
+> +0x1a8
+> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
+> +0x19a6
+>  
+>  Trace collection is stopped the same way:
+>  
+> 
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-index b3d952f..29b0b7b 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-@@ -83,19 +83,12 @@
- 		fsl,mux-ext-port = <3>;
- 	};
- 
--	usbphy {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		compatible = "simple-bus";
--
--		usbh1phy: usbh1phy at 0 {
--			compatible = "usb-nop-xceiv";
--			reg = <0>;
--			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
--			clock-names = "main_clk";
--			clock-frequency = <19200000>;
--			#phy-cells = <0>;
--		};
-+	usbh1phy: usbphy {
-+		compatible = "usb-nop-xceiv";
-+		clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
-+		clock-names = "main_clk";
-+		clock-frequency = <19200000>;
-+		#phy-cells = <0>;
- 	};
- };
- 
+
 -- 
-2.7.4
+~Randy
