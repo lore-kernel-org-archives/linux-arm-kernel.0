@@ -1,32 +1,39 @@
 From: erin.lo@mediatek.com (Erin Lo)
-Date: Mon, 14 May 2018 18:22:29 +0800
-Subject: [PATCH v2 2/4] dt-bindings: mtk-sysirq: Add compatible for Mediatek
- MT8183
-In-Reply-To: <1526293351-32794-1-git-send-email-erin.lo@mediatek.com>
-References: <1526293351-32794-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1526293351-32794-3-git-send-email-erin.lo@mediatek.com>
+Date: Mon, 14 May 2018 18:22:27 +0800
+Subject: [PATCH v2 0/4] Add basic support for Mediatek MT8183 SoC
+Message-ID: <1526293351-32794-1-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds dt-binding documentation of SYSIRQ for Mediatek MT8183 SoC
-Platform.
+MT8183 is a SoC based on 64bit ARMv8 architecture.
+It contains 4 CA53 and 4 CA73 cores.
+MT8183 share many HW IP with MT65xx series.
+This patchset was tested on MT8183 evaluation board, and boot to shell ok.
 
-Signed-off-by: Erin Lo <erin.lo@mediatek.com>
----
- .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt         | 1 +
- 1 file changed, 1 insertion(+)
+This series contains document bindings, device tree including interrupt, uart.
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-index 07bf0b9..5ff48a8 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-@@ -5,6 +5,7 @@ interrupt.
- 
- Required properties:
- - compatible: should be
-+	"mediatek,mt8183-sysirq", "mediatek,mt6577-sysirq": for MT8183
- 	"mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq": for MT8173
- 	"mediatek,mt8135-sysirq", "mediatek,mt6577-sysirq": for MT8135
- 	"mediatek,mt8127-sysirq", "mediatek,mt6577-sysirq": for MT8127
--- 
+Change in v2:
+1. Split dt-bindings into different patches
+2. Correct bindings for supported SoCs (mtk-uart.txt)
+
+Ben Ho (1):
+  arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
+    Makefile
+
+Erin Lo (3):
+  dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
+  dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
+  dt-bindings: serial: Add compatible for Mediatek MT8183
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ .../interrupt-controller/mediatek,sysirq.txt       |   1 +
+ .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
+ arch/arm64/boot/dts/mediatek/Makefile              |   1 +
+ arch/arm64/boot/dts/mediatek/mt8183-evb.dts        |  31 ++++
+ arch/arm64/boot/dts/mediatek/mt8183.dtsi           | 178 +++++++++++++++++++++
+ 6 files changed, 216 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
+
+--
 1.9.1
