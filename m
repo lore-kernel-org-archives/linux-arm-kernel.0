@@ -1,29 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 00:58:44 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.17
-In-Reply-To: <cover.1525256178.git.horms+renesas@verge.net.au>
-References: <cover.1525256178.git.horms+renesas@verge.net.au>
-Message-ID: <20180514075844.j35p2ndfoecvvdu3@localhost>
+Date: Mon, 14 May 2018 01:04:12 -0700
+Subject: [GIT PULL] one bug fix and other omap fixes for v4.17-rc cycle
+In-Reply-To: <pull-1525967831-865303@atomide.com>
+References: <pull-1525967831-865303@atomide.com>
+Message-ID: <20180514080412.e2d7djqhj6yuy5qx@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 02, 2018 at 12:18:14PM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, May 10, 2018 at 09:00:26AM -0700, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
-> Please consider these Renesas ARM based SoC fixes for v4.17.
+> The following changes since commit fb289e3ab10c16834741bb02be740fa9d025fde0:
 > 
+>   Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes (2018-04-19 15:48:46 -0700)
 > 
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+> are available in the Git repository at:
 > 
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v17/fixes-rc4
 > 
-> are available in the git repository at:
+> for you to fetch changes up to 41bd6adf3c5d3990d7a67639aff53d54483744fa:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.17
+>   Revert "ARM: dts: logicpd-som-lv: Fix pinmux controller references" (2018-05-07 08:28:17 -0700)
 > 
-> for you to fetch changes up to edb0c3affe5214a21d71ffb82ca92ed068e828df:
+> ----------------------------------------------------------------
+> Fixes for omap variants for v4.17
 > 
->   ARM: dts: r8a7793: Convert to new LVDS DT bindings (2018-04-23 12:31:42 +0200)
+> This series of patches contains one BUG fix for trace if
+> CONFIG_DEBUG_PREEMPT is enabled and a regression fix for omap1 FIQ
+> handling on ams-delta. Then there's a dts fix for missing SoC
+> compatible on ti81xx board dts files that did matter until we added
+> the clkctrl clocks and without that some clocks are now not found.
+> 
+> Then there are two logicpd-som-lv specific dts fixes that fix
+> misconfigured pins for WLAN and audio. Turns out we had to revert
+> the third one because it caused another regression for USB.
 
 Merged, thanks.
 
