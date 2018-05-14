@@ -1,94 +1,50 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 14 May 2018 15:12:49 +0530
-Subject: Allwinner A64: Issue on external rtc clock to wifi chip
-In-Reply-To: <20180514090618.r5xc3elzpvfp47f4@flea>
-References: <CAMty3ZCNyuEwmLGdDZLM_9qKJ2NsT33rodug7ZpKAE-OHymVEg@mail.gmail.com>
- <20180514075727.uxggyhmbahvhestx@flea>
- <CAMty3ZDew=+zytKUx5+nX27CjCe0UfJpyYOy2s07NoJvbe57mQ@mail.gmail.com>
- <20180514082744.ydmfg5mzsbol5onu@flea>
- <CAMty3ZC3ggxkZwirpQ-aRP8Udg=aYypBArb0KcR0_Z0AG8wATA@mail.gmail.com>
- <20180514090618.r5xc3elzpvfp47f4@flea>
-Message-ID: <CAMty3ZCAWBHtemeeWcgLy5PoYLn10MwxpHdirqpsxFY3BA7=4g@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 14 May 2018 11:45:05 +0200
+Subject: [PATCH v2 04/13] soc: rockchip: power-domain: Fix wrong value
+ when power up pd
+In-Reply-To: <1526268578-9361-1-git-send-email-zhangqing@rock-chips.com>
+References: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
+ <1526268578-9361-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1861053.XlXe5vHN1s@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 2:36 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Mon, May 14, 2018 at 02:34:22PM +0530, Jagan Teki wrote:
->> On Mon, May 14, 2018 at 1:57 PM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > On Mon, May 14, 2018 at 01:34:56PM +0530, Jagan Teki wrote:
->> >> On Mon, May 14, 2018 at 1:27 PM, Maxime Ripard
->> >> <maxime.ripard@bootlin.com> wrote:
->> >> > Hi,
->> >> >
->> >> > On Mon, May 14, 2018 at 12:37:49PM +0530, Jagan Teki wrote:
->> >> >> Hi Maxime and All,
->> >> >>
->> >> >> We are trying to bring-up AP6330 Wifi chip for A64 board. We noticed
->> >> >> to have an external rtc clock has driven from wifi chip.
->> >> >>
->> >> >> So the devicetree is configured according to this as below.
->> >> >>
->> >> >> / {
->> >> >>         wifi_pwrseq: wifi-pwrseq {
->> >> >>                 compatible = "mmc-pwrseq-simple";
->> >> >>                 clocks = <&rtc 1>;
->> >> >>                 clock-names = "ext_clock";
->> >> >>                 reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
->> >> >>                 post-power-on-delay-ms = <400>;
->> >> >>         };
->> >> >> };
->> >> >>
->> >> >> &rtc {
->> >> >>         clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
->> >> >>         clocks = <&osc32k>;
->> >> >>         #clock-cells = <1>;
->> >> >> };
->> >> >>
->> >> >> &mmc1 {
->> >> >>         pinctrl-names = "default";
->> >> >>         pinctrl-0 = <&mmc1_pins>;
->> >> >>         vmmc-supply = <&reg_dcdc1>;
->> >> >>         vqmmc-supply = <&reg_eldo1>;
->> >> >>         mmc-pwrseq = <&wifi_pwrseq>;
->> >> >>         bus-width = <4>;
->> >> >>         non-removable;
->> >> >>         status = "okay";
->> >> >>
->> >> >>         brcmf: wifi at 1 {
->> >> >>                 reg = <1>;
->> >> >>                 compatible = "brcm,bcm4329-fmac";
->> >> >>                 interrupt-parent = <&r_pio>;
->> >> >>                 interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;  /* WL-WAKE-AP: PL3 */
->> >> >>                 interrupt-names = "host-wake";
->> >> >>         };
->> >> >> };
->> >> >>
->> >> >> And observed rtc-osc32k-out clock is never enabled[1] and the value of
->> >> >> LOSC_OUT_GATING is 0x0 which eventually not enabling
->> >> >> LOSC_OUT_GATING_EN
->> >> >>
->> >> >> Pls. let us know if we miss anything here?
->> >> >>
->> >> >> [1] https://paste.ubuntu.com/p/X2By4q8kD2/
->> >> >
->> >> > Could you paste your config and the logs from a boot to?
->> >>
->> >> .config
->> >> https://paste.ubuntu.com/p/w9w2KB7RFc/
->> >>
->> >> dmesg
->> >> https://paste.ubuntu.com/p/mrZGk5bWRR/
->> >
->> > This is kind of weird. Have you tested with a 4.17 kernel? We have
->> > runtime_pm changes lined up in next, so that might be a regression
->> > there, even though we tested it with Quentin at some point.
->>
->> This is 4.17-rc4 do you want to try it on 4.16 ?
->
-> No, this is next-20180503. Please try with 4.17-rc4
+Hi Elaine,
 
-Couldn't find any different in behaviour [2]
+Am Montag, 14. Mai 2018, 05:29:38 CEST schrieb Elaine Zhang:
+> From: Finley Xiao <finley.xiao@rock-chips.com>
+> 
+> Solve the pd could only ever turn off but never turn them on again,
+> If the pd registers have the writemask bits.
+> 
+> Fix up the code error for commit:
+> 	commit 79bb17ce8edb3141339b5882e372d0ec7346217c
+> 	Author: Elaine Zhang <zhangqing@rock-chips.com>
+> 	Date:   Fri Dec 23 11:47:52 2016 +0800
+> 
+> 	soc: rockchip: power-domain: Support domain control in hiword-registers
+> 
+> 	New Rockchips SoCs may have their power-domain control in registers
+> 	using a writemask-based access scheme (upper 16bit being the write
+> 	mask). So add a DOMAIN_M type and handle this case accordingly.
+> 	Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> 	Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 
-[2] https://paste.ubuntu.com/p/m3PGBwrv6W/
+As Gregs automated mail noted, the stable-notice needed some changes.
+
+I've done these changes and applied the result for 4.18.
+
+When you look at [0] you'll see  the two lines "Fixes:..." and "Cc:..."
+in the commit message. Greg then has automated scripts running that
+extract so marked patches from Linus' tree and queue them for possible
+stable-inclusion.
+
+[The other patches need to wait a bit to give Rob a chance to Ack them]
+
+Heiko
+
+
+[0] https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=ed726894761c056b3513ce15915af74ce5d7d57b
