@@ -1,13 +1,11 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 01:28:28 -0700
+Date: Mon, 14 May 2018 01:23:42 -0700
 Subject: [GIT PULL 1/2] ARM: SOC driver update v4.18
 In-Reply-To: <1525815697-6338-1-git-send-email-santosh.shilimkar@oracle.com>
 References: <1525815697-6338-1-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <20180514082828.ap52ygg3kxsdz26k@localhost>
+Message-ID: <20180514082342.wpqnj2jmsnjh5yro@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Santosh,
 
 On Tue, May 08, 2018 at 02:41:36PM -0700, Santosh Shilimkar wrote:
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
@@ -30,7 +28,7 @@ On Tue, May 08, 2018 at 02:41:36PM -0700, Santosh Shilimkar wrote:
 >  - Use percpu counters for qmss datapath stats
 >  - License update for TI SCI
 
-Merged!
+Merged, thanks.
 
 
 -Olof
