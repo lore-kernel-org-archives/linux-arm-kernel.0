@@ -1,73 +1,47 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 14 May 2018 16:06:40 +0200
-Subject: [PATCH v14 3/8] ASoC: sun4i-codec: Merge
- sun4i_codec_left_mixer_controls and sun4i_codec_right_mixer_controls into
- sun4i_codec_mixer_controls
-In-Reply-To: <20180505085056.6c6011ca@scratchpost.org>
-References: <20180502210800.1971-1-dannym@scratchpost.org>
- <20180502210800.1971-4-dannym@scratchpost.org>
- <20180503144618.oojhvmey44dtg5fa@flea>
- <20180505085056.6c6011ca@scratchpost.org>
-Message-ID: <20180514140640.oig6hqbh5utvzhmd@flea>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 May 2018 15:07:15 +0100
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <c5bebf0b-9667-5725-2800-97c5a85635c4@linux.com>
+References: <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
+ <20180504110907.c2dw33kjmyybso6t@lakrids.cambridge.arm.com>
+ <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
+ <71199506-b46b-5f91-e489-e6450b6d1067@linux.com>
+ <20180511161317.57k6prl54xjmsit3@lakrids.cambridge.arm.com>
+ <f180b312-d1cf-3992-4e89-9632c1674cd6@linux.com>
+ <20180514051555.bpbydgr56hyffjch@salmiak>
+ <6c311899-7131-d21b-10f6-d2ba7380a392@linux.com>
+ <20180514100639.v3erlzbuv2e4awfh@lakrids.cambridge.arm.com>
+ <c5bebf0b-9667-5725-2800-97c5a85635c4@linux.com>
+Message-ID: <20180514140714.sfmvfpwco63eomor@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2018 at 08:51:43AM +0200, Danny Milosavljevic wrote:
-> Hi Maxime,
+On Mon, May 14, 2018 at 04:53:12PM +0300, Alexander Popov wrote:
+> On 14.05.2018 13:06, Mark Rutland wrote:
+> > I think it is reasonable to panic() here even with CONFIG_VMAP_STACK
+> > selected.
 > 
-> On Thu, 3 May 2018 16:46:19 +0200
-> Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> 
-> > Doesn't that mean that the controls will be shared between the right
-> > and left mixers now, which wasn't the case before?
-> 
-> Yes.  However Chen-Yu said that except for debugfs that cannot be
-> observed by user space anyway.
-> 
-> It's nice to have the NEW controls have multiple channels, which is what
-> this does.
-> 
-> >And also, wouldn't
-> > the controls be called "Left Mixer Left Mixer Left DAC Playback
-> > Switch" (for the first one) now?
-> 
-> No.  I checked using "amixer" - the names look fine,
-> "Left Mixer Left DAC Playback Switch".
-> 
-> With the patch series, amixer says:
-> 
-> numid=10,iface=MIXER,name='FM Playback Switch'
-> numid=6,iface=MIXER,name='FM Playback Volume'
-> numid=5,iface=MIXER,name='Line Boost Volume'
-> numid=9,iface=MIXER,name='Line Playback Switch'
-> numid=4,iface=MIXER,name='Line Playback Volume'
-> numid=1,iface=MIXER,name='Mic1 Boost Volume'
-> numid=11,iface=MIXER,name='Mic1 Playback Switch'
-> numid=2,iface=MIXER,name='Mic2 Boost Volume'
-> numid=12,iface=MIXER,name='Mic2 Playback Switch'
-> numid=7,iface=MIXER,name='Mic Playback Volume'
-> numid=18,iface=MIXER,name='Capture Source'
-> numid=19,iface=MIXER,name='Differential Line Source'
-> numid=8,iface=MIXER,name='Left Mixer Left DAC Playback Switch'
-> numid=15,iface=MIXER,name='Power Amplifier DAC Playback Switch'
-> numid=16,iface=MIXER,name='Power Amplifier Mixer Playback Switch'
-> numid=17,iface=MIXER,name='Power Amplifier Mute Switch'
-> numid=3,iface=MIXER,name='Power Amplifier Volume'
-> numid=14,iface=MIXER,name='Right Mixer Left DAC Playback Switch'
-> numid=13,iface=MIXER,name='Right Mixer Right DAC Playback Switch'
+> It's too tough for CONFIG_VMAP_STACK on x86 - the system can proceed to live.
+> Anyway, the check_alloca() code will not be shared between x86 and arm64, I've
+> described the reasons in this thread. So I can have BUG() for CONFIG_VMAP_STACK
+> on x86 and Laura can consistently use panic() on arm64.
 
-Great then :)
+If we need arch-specific implementations anyway, then that's fine by me.
 
-Maxime
+> >> So we should not do it in check_alloca() as well, just use BUG() and
+> >> hope for the best.
+> > 
+> > Regardless of whether we BUG() or panic(), we're hoping for the best.
+> > 
+> > Consistently using panic() here will keep things simpler, so any failure
+> > reported will be easier to reason about, and easier to debug.
+> 
+> Let me keep BUG() for !CONFIG_SCHED_STACK_END_CHECK. I beware of using panic()
+> by default, let distro/user decide this. I remember very well how I was shouted
+> at, when this one was merged:
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=ce6fa91b93630396ca220c33dd38ffc62686d499
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/5b428001/attachment.sig>
+Sure; my comments needn't hold up your patches.
+
+Thanks,
+Mark.
