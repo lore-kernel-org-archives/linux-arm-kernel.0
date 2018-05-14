@@ -1,94 +1,25 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Mon, 14 May 2018 09:23:19 -0300
-Subject: [PATCH 3/5] perf cs-etm: Support unknown_thread in cs_etm_auxtrace
-In-Reply-To: <20180514122321.27304-1-acme@kernel.org>
-References: <20180514122321.27304-1-acme@kernel.org>
-Message-ID: <20180514122321.27304-4-acme@kernel.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 14 May 2018 14:40:35 +0200
+Subject: [FAIL bisect] Sound card probe error
+In-Reply-To: <CAJKOXPc+kLA+BPBmaP14zMLbbxxCmWF1eZnKoa_PcO2z9jG9JQ@mail.gmail.com>
+References: <CGME20180514101728epcas4p3108760546a415b36252df93dfe38e0fb@epcas4p3.samsung.com>
+ <CAJKOXPfD8gZR8nZkmAr=Ldt3xESuFocQLnMtrDsNZu=ba55jcw@mail.gmail.com>
+ <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
+ <CAJKOXPc+kLA+BPBmaP14zMLbbxxCmWF1eZnKoa_PcO2z9jG9JQ@mail.gmail.com>
+Message-ID: <4c61c422-a036-8fec-1153-d612fe5df878@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+On 05/14/2018 02:29 PM, Krzysztof Kozlowski wrote:
+> Ah, I missed these messages because I was looking at err dmesg level
+> (and for some reason these are warn). Anyway do you have any thoughts
+> how is it connected with missing Odroid XU3 sound card and max98090
+> codec?
 
-CoreSight doesn't allocate thread structure for unknown_thread in ETM
-auxtrace, so unknown_thread is NULL pointer.  If the perf data doesn't
-contain valid tid and then cs_etm__mem_access() uses unknown_thread
-instead as thread handler, this results in a segmentation fault when
-thread__find_addr_map() accesses the thread handler.
+One reason is that the DRM driver registers an ASoC codec object which
+is required for the sound card registration to complete. But I wonder
+why there is no any error messages related to this.
 
-This commit creates a new thread data which is used by unknown_thread, so
-CoreSight tracing can roll back to use unknown_thread if perf data
-doesn't include valid thread info.  This commit also releases thread
-data for initialization failure case and for normal auxtrace free flow.
-
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1525924920-4381-1-git-send-email-leo.yan at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/util/cs-etm.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
-
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 40020b1ca54f..2bf28b5acc08 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -239,6 +239,7 @@ static void cs_etm__free(struct perf_session *session)
- 	for (i = 0; i < aux->num_cpu; i++)
- 		zfree(&aux->metadata[i]);
- 
-+	thread__zput(aux->unknown_thread);
- 	zfree(&aux->metadata);
- 	zfree(&aux);
- }
-@@ -1357,6 +1358,23 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
- 	etm->auxtrace.free = cs_etm__free;
- 	session->auxtrace = &etm->auxtrace;
- 
-+	etm->unknown_thread = thread__new(999999999, 999999999);
-+	if (!etm->unknown_thread)
-+		goto err_free_queues;
-+
-+	/*
-+	 * Initialize list node so that at thread__zput() we can avoid
-+	 * segmentation fault at list_del_init().
-+	 */
-+	INIT_LIST_HEAD(&etm->unknown_thread->node);
-+
-+	err = thread__set_comm(etm->unknown_thread, "unknown", 0);
-+	if (err)
-+		goto err_delete_thread;
-+
-+	if (thread__init_map_groups(etm->unknown_thread, etm->machine))
-+		goto err_delete_thread;
-+
- 	if (dump_trace) {
- 		cs_etm__print_auxtrace_info(auxtrace_info->priv, num_cpu);
- 		return 0;
-@@ -1371,16 +1389,18 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
- 
- 	err = cs_etm__synth_events(etm, session);
- 	if (err)
--		goto err_free_queues;
-+		goto err_delete_thread;
- 
- 	err = auxtrace_queues__process_index(&etm->queues, session);
- 	if (err)
--		goto err_free_queues;
-+		goto err_delete_thread;
- 
- 	etm->data_queued = etm->queues.populated;
- 
- 	return 0;
- 
-+err_delete_thread:
-+	thread__zput(etm->unknown_thread);
- err_free_queues:
- 	auxtrace_queues__free(&etm->queues);
- 	session->auxtrace = NULL;
 -- 
-2.14.3
+Regards,
+Sylwester
