@@ -1,80 +1,47 @@
-From: hao5781286@gmail.com (Hao Zhang)
-Date: Mon, 14 May 2018 22:45:44 +0800
-Subject: [PATCH v2 4/4] ARM: PWM: add allwinner sun8i pwm support.
-In-Reply-To: <20180226090038.etk5q4pd4rl5dvf6@flea.lan>
-References: <20180225135308.GA14561@arx-s1>
- <20180226090038.etk5q4pd4rl5dvf6@flea.lan>
-Message-ID: <CAJeuY7-Dz1u9J8GMu=OdzJ2cJUnE3wEobJoQz6RV-ibjBjoW4A@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 14 May 2018 16:52:37 +0200
+Subject: [PATCH] PM / Domains: Don't return -EEXIST at attach when PM domain
+ exists
+Message-ID: <1526309557-7995-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-26 17:00 GMT+08:00 Maxime Ripard <maxime.ripard@bootlin.com>:
-> Hi,
->
-> Thanks for respinning this serie. It looks mostly good, but you still
-> have a quite significant number of checkpatch (--strict) warnings that
-> you should address.
+As dev_pm_domain_attach() isn't the only way to assign PM domain pointers
+to devices, clearly we must allow a device to have the pointer already
+being assigned. For this reason, return 0 instead of -EEXIST.
 
-Thanks for reviews :) ,i'm sorry for that, it will be fixed next time.
-and, besides, in what situation were the checkpatch warning can be ignore?
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Tested-by: Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
 
->
-> On Sun, Feb 25, 2018 at 09:53:08PM +0800, hao_zhang wrote:
->> +#define CAPTURE_IRQ_ENABLE_REG       0x0010
->> +#define CFIE(ch)     BIT(ch << 1 + 1)
->> +#define CRIE(ch)     BIT(ch << 1)
->
-> You should also put your argument between parentheses here (and in all
-> your other macros).
+Krzysztof reported problems for an Exynos5 board, where some devices are added
+to their PM domains (genpd) via calling of_genpd_add_device(). As also pointed
+out by Sylvester, this leads to probe failure when dev_pm_domain_attach()
+returns -EXISTS.
 
-Do you mean like this ?
-#define CFIE(ch)     BIT((ch) << 1 + 1)
-#define CRIE(ch)     BIT((ch) << 1)
+Rafael, potentially this change could be squashed with the recently queued
+patch: "PM / Domains: Check for existing PM domain in dev_pm_domain_attach()",
+but perhaps its too late for that and the fix is better applied on top!?
 
->
->> +static const u16 div_m_table[] = {
->> +     1,
->> +     2,
->> +     4,
->> +     8,
->> +     16,
->> +     32,
->> +     64,
->> +     128,
->> +     256
->> +};
->
-> If this is just a power of two, you can use either the power of two /
-> ilog2 to switch back and forth, instead of using that table.
+---
+ drivers/base/power/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I think using table is more explicit and extended...
-
->
->> +static int sun8i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->> +             struct pwm_state *state)
->> +{
->> +     int ret;
->> +     struct sun8i_pwm_chip *sun8i_pwm = to_sun8i_pwm_chip(chip);
->> +     struct pwm_state cstate;
->> +
->> +     pwm_get_state(pwm, &cstate);
->> +     if (!cstate.enabled) {
->> +             ret = clk_prepare_enable(sun8i_pwm->clk);
->> +             if (ret) {
->> +                     dev_err(chip->dev, "Failed to enable PWM clock\n");
->> +                     return ret;
->> +             }
->> +     }
->> +
->> +     spin_lock(&sun8i_pwm->ctrl_lock);
->
-> What do you need that spinlock for? Can you use a mutex instead?
-It should be remove.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+index 5e4b481..390868c 100644
+--- a/drivers/base/power/common.c
++++ b/drivers/base/power/common.c
+@@ -106,7 +106,7 @@ int dev_pm_domain_attach(struct device *dev, bool power_on)
+ 	int ret;
+ 
+ 	if (dev->pm_domain)
+-		return -EEXIST;
++		return 0;
+ 
+ 	ret = acpi_dev_pm_attach(dev, power_on);
+ 	if (!ret)
+-- 
+2.7.4
