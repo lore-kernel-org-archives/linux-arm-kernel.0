@@ -1,54 +1,73 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 May 2018 12:31:19 +0200
-Subject: [PATCH v3 6/8] arm64: module-plts: Extend veneer to address
- 52-bit VAs
-In-Reply-To: <20180511101104.6cv5mvqc6juh2mgt@capper-debian.cambridge.arm.com>
-References: <20180510162347.3858-1-steve.capper@arm.com>
- <20180510162347.3858-7-steve.capper@arm.com>
- <CAKv+Gu_unCnhqE_Ort0zOjBj_ZmWja5unGON6KBuRxJzdhc5jA@mail.gmail.com>
- <20180511101104.6cv5mvqc6juh2mgt@capper-debian.cambridge.arm.com>
-Message-ID: <CAKv+Gu9sEY86sN6N2q51FNTs6C3xXuOwszjwracj1Gn_CydO4Q@mail.gmail.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Mon, 14 May 2018 12:12:19 +0200
+Subject: [PATCH v6 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <091ccf85-ae4c-f6fd-0455-1a70e973c85c@pengutronix.de>
+References: <20180305102524.5905-1-o.rempel@pengutronix.de>
+ <20180305102524.5905-4-o.rempel@pengutronix.de>
+ <20180504185052.bjhfkvpgrblc7tfc@pengutronix.de>
+ <1937901.oyadCYFYNo@aspire.rjw.lan>
+ <a431b0e1-f4f4-1439-f0bf-736018c6ab0c@pengutronix.de>
+ <091ccf85-ae4c-f6fd-0455-1a70e973c85c@pengutronix.de>
+Message-ID: <12a60556-deaf-1b2a-e073-ba2a70389141@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 May 2018 at 12:11, Steve Capper <steve.capper@arm.com> wrote:
-> On Fri, May 11, 2018 at 12:01:05AM +0200, Ard Biesheuvel wrote:
->> On 10 May 2018 at 18:23, Steve Capper <steve.capper@arm.com> wrote:
->> > From: Ard Bieusheuval <ard.biesheuvel@linaro.org>
->> >
->> > In preparation for 52-bit VA support in the Linux kernel, we extend the
->> > plts veneer to support 52-bit addresses via an extra movk instruction.
->> >
->> > [Steve: code from Ard off-list, changed the #ifdef logic to inequality]
->> > Signed-off-by: Steve Capper <steve.capper@arm.com>
->> >
->> > ---
->> >
->> > New in V3 of the series.
->> >
->> > I'm not sure if this is strictly necessary as the VAs of the module
->> > space will fit within 48-bits of addressing even when a 52-bit VA space
->> > is enabled.
->>
->> What about the kernel text itself? Is that also guaranteed to have
->> bits [51:48] of its VAs equal 0xf, even under randomization?
->>
->> If so, I agree we don't need the patch.
->>
->
-> Hi Ard,
-> The kernel modules and text are guaranteed to have addresses greater
-> than or equal to KASAN_SHADOW_END (same for both 48, 52-bit VAs) or
-> _VA_START(VA_BITS_MIN) (same for both 48, 52-bit VAs). Also, IIUC, the
-> KASLR displacemnt is always non-negative?
->
 
-Correct.
 
-> So I think we're safe in that modules and kernel text will be 48-bit
-> addressable in 52-bit configurations.
->
-> I'll have a think about a BUILD_BUG to capture any change to the above.
->
+On 14.05.2018 07:10, Oleksij Rempel wrote:
+> 
+> 
+> On 14.05.2018 06:33, Oleksij Rempel wrote:
+>>
+>>
+>> On 12.05.2018 13:13, Rafael J. Wysocki wrote:
+>>> On Friday, May 4, 2018 8:50:52 PM CEST Oleksij Rempel wrote:
+>>>> Hallo Andrew,
+>>>> I need your ACK or NACK for this patch.
+>>>>
+>>>> This function is used to configure external PMIC to interpret
+>>>> signal which will be triggered by pm_power_off as power off.
+>>>> Since same signal can be used for stand by, I linked PMIC configuration
+>>>> with pm_power_off_prepare to avoid possible conflicts.
+>>>>
+>>>> On Mon, Mar 05, 2018 at 11:25:20AM +0100, Oleksij Rempel wrote:
+>>>>> Export pm_power_off_prepare. It is needed to implement power off on
+>>>>> Freescale/NXP iMX6 based boards with external power management
+>>>>> integrated circuit (PMIC).
+>>>>>
+>>>>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>>>>> ---
+>>>>>  kernel/reboot.c | 1 +
+>>>>>  1 file changed, 1 insertion(+)
+>>>>>
+>>>>> diff --git a/kernel/reboot.c b/kernel/reboot.c
+>>>>> index e4ced883d8de..350be6baa60d 100644
+>>>>> --- a/kernel/reboot.c
+>>>>> +++ b/kernel/reboot.c
+>>>>> @@ -49,6 +49,7 @@ int reboot_force;
+>>>>>   */
+>>>>>  
+>>>>>  void (*pm_power_off_prepare)(void);
+>>>>> +EXPORT_SYMBOL(pm_power_off_prepare);
+>>>
+>>> Why not EXPORT_SYMBOL_GPL() ?
+>>
+>> No special reason. Fixed.
+>> Any other comments?
+>>
+> 
+> Or with other words, will it be enough to get your Signed-of-by for this
+> patch?
 
-Yes please
+Hi again,
+
+i was punished by my colleagues and actually by Russel for asking
+"Signed-of-by". So, I correct my self, is it enough for a Reviewed-by?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/61f11d48/attachment.sig>
