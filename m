@@ -1,97 +1,42 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Mon, 14 May 2018 16:09:19 +0800
-Subject: [PATCH 3/3] ARM: dts: imx: add cooling-cells for cpufreq cooling
- device
-In-Reply-To: <1526285359-17978-1-git-send-email-Anson.Huang@nxp.com>
-References: <1526285359-17978-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1526285359-17978-3-git-send-email-Anson.Huang@nxp.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 14 May 2018 01:02:24 -0700
+Subject: [GIT PULL] tee driver fixes for v4.17
+In-Reply-To: <20180507124731.GA21011@jax.urgonet>
+References: <20180507124731.GA21011@jax.urgonet>
+Message-ID: <20180514080224.zy7s4f5d2uiibwce@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add #cooling-cells for i.MX6/7 SoCs for cpufreq
-cooling device usage.
+On Mon, May 07, 2018 at 02:47:31PM +0200, Jens Wiklander wrote:
+> Hello arm-soc maintainers,
+> 
+> Please pull these tee driver fixes. Of particular interest is a fix for a
+> use-after-free issue. There's also a fix making sure that memory references
+> are kept within the used shm object.
+> 
+> Thanks,
+> Jens
+> 
+> The following changes since commit 75bc37fefc4471e718ba8e651aa74673d4e0a9eb:
+> 
+>   Linux 4.17-rc4 (2018-05-06 16:57:38 -1000)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.linaro.org/people/jens.wiklander/linux-tee.git/ tags/tee-drv-fixes-for-4.17
+> 
+> for you to fetch changes up to ab9d3db5b320a052452b9cd035599ee3c84bbee9:
+> 
+>   tee: check shm references are consistent in offset/size (2018-05-07 11:51:03 +0200)
+> 
+> ----------------------------------------------------------------
+> Small fixes for tee subsystem
+> 
+> * Fixes for use-after-free via temporarily dropped reference
+> * Checks that passed shm references are consistent in offset/size
+>   with regards to the shm object
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6dl.dtsi | 1 +
- arch/arm/boot/dts/imx6q.dtsi  | 1 +
- arch/arm/boot/dts/imx6sl.dtsi | 1 +
- arch/arm/boot/dts/imx6sx.dtsi | 1 +
- arch/arm/boot/dts/imx6ul.dtsi | 1 +
- arch/arm/boot/dts/imx7d.dtsi  | 1 +
- 6 files changed, 6 insertions(+)
+Merged, thanks!
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 558bce8..b830dfd 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -39,6 +39,7 @@
- 				396000	1175000
- 			>;
- 			clock-latency = <61036>; /* two CLK32 periods */
-+			#cooling-cells = <2>;
- 			clocks = <&clks IMX6QDL_CLK_ARM>,
- 				 <&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
- 				 <&clks IMX6QDL_CLK_STEP>,
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index ae7b3f1..ac9f5cb 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -44,6 +44,7 @@
- 				396000	1175000
- 			>;
- 			clock-latency = <61036>; /* two CLK32 periods */
-+			#cooling-cells = <2>;
- 			clocks = <&clks IMX6QDL_CLK_ARM>,
- 				 <&clks IMX6QDL_CLK_PLL2_PFD2_396M>,
- 				 <&clks IMX6QDL_CLK_STEP>,
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index ab6a7e2..d35d4e9 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -65,6 +65,7 @@
- 				396000          1175000
- 			>;
- 			clock-latency = <61036>; /* two CLK32 periods */
-+			#cooling-cells = <2>;
- 			clocks = <&clks IMX6SL_CLK_ARM>, <&clks IMX6SL_CLK_PLL2_PFD2>,
- 					<&clks IMX6SL_CLK_STEP>, <&clks IMX6SL_CLK_PLL1_SW>,
- 					<&clks IMX6SL_CLK_PLL1_SYS>;
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 49c7205..966e39a 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -83,6 +83,7 @@
- 				198000	    1175000
- 			>;
- 			clock-latency = <61036>; /* two CLK32 periods */
-+			#cooling-cells = <2>;
- 			clocks = <&clks IMX6SX_CLK_ARM>,
- 				 <&clks IMX6SX_CLK_PLL2_PFD2>,
- 				 <&clks IMX6SX_CLK_STEP>,
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 1241972..14b6ac7 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -66,6 +66,7 @@
- 			device_type = "cpu";
- 			reg = <0>;
- 			clock-latency = <61036>; /* two CLK32 periods */
-+			#cooling-cells = <2>;
- 			operating-points = <
- 				/* kHz	uV */
- 				696000	1275000
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 200714e..49913717 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -53,6 +53,7 @@
- 				792000	975000
- 			>;
- 			clock-frequency = <996000000>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu1: cpu at 1 {
--- 
-2.7.4
+
+-Olof
