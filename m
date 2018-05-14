@@ -1,31 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 13:51:52 -0700
-Subject: [GIT PULL 4/5] arm64: dts: exynos: Stuff for v4.18
-In-Reply-To: <20180513154238.22508-5-krzk@kernel.org>
-References: <20180513154238.22508-1-krzk@kernel.org>
- <20180513154238.22508-5-krzk@kernel.org>
-Message-ID: <20180514205152.q7luql3st5bzqddz@localhost>
+Date: Mon, 14 May 2018 13:33:21 -0700
+Subject: [GIT PULL] Gemini DTS updates for v4.18
+In-Reply-To: <CACRpkdZ+GR2j01CMAnU=pYwZHPZ6j5hhEefF7HckUM4jq=n2MA@mail.gmail.com>
+References: <CACRpkdZ+GR2j01CMAnU=pYwZHPZ6j5hhEefF7HckUM4jq=n2MA@mail.gmail.com>
+Message-ID: <20180514203321.mmn7cibu4y37p56f@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 13, 2018 at 05:42:37PM +0200, Krzysztof Kozlowski wrote:
+On Sat, May 12, 2018 at 01:41:07PM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks!
+> 
+> This fixes a host of issues and adds some new stuff to the
+> Gemini platforms. We now have them all running (more or
+> less) with OpenWRT. Details in the patches and signed tag.
+> 
+> Please pull this to ARM SoC DTS updates for v4.18.
+> 
+> Yours,
+> Linus Walleij
+> 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.18
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+> tags/gemini-dts-arm-soc
 > 
-> for you to fetch changes up to 8dd6203f32f20cb83469eb859efded9e403b3e9f:
+> for you to fetch changes up to e7c881596baf8d1a4a1b872c4670da6723246936:
 > 
->   arm64: dts: exynos: Add mem-2-mem Scaler devices (2018-05-13 11:26:13 +0200)
+>   ARM: dts: Fix DTC warnings (2018-05-12 13:27:24 +0200)
 > 
 > ----------------------------------------------------------------
-> Samsung DTS ARM64 changes for v4.18
-> 
-> 1. Fix DTC warnings.
-> 2. Add mem-2-mem Scaler devices.
+> DTS updates for the Gemini:
+> - Set righ flashes on DNS-313
+> - Activate ATA1 on NAS4220B
+> - Set right harddisk triggers on the D-Link devices
+> - Fix all DTC warnings
 
 Merged, thanks!
 
