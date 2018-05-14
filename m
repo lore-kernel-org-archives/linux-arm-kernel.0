@@ -1,92 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 11:06:40 +0100
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <6c311899-7131-d21b-10f6-d2ba7380a392@linux.com>
-References: <20180502203326.9491-3-labbott@redhat.com>
- <20180503071917.xm2xvgagvzkworay@salmiak>
- <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
- <20180504110907.c2dw33kjmyybso6t@lakrids.cambridge.arm.com>
- <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
- <71199506-b46b-5f91-e489-e6450b6d1067@linux.com>
- <20180511161317.57k6prl54xjmsit3@lakrids.cambridge.arm.com>
- <f180b312-d1cf-3992-4e89-9632c1674cd6@linux.com>
- <20180514051555.bpbydgr56hyffjch@salmiak>
- <6c311899-7131-d21b-10f6-d2ba7380a392@linux.com>
-Message-ID: <20180514100639.v3erlzbuv2e4awfh@lakrids.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 14 May 2018 15:35:53 +0530
+Subject: [PATCH 1/2] clk: davinci: pll-dm646x: keep PLL2 SYSCLK1 always
+ enabled
+In-Reply-To: <ea0d545c-90b5-bc2f-71cf-7ab6183b7ecd@lechnology.com>
+References: <20180511141037.25250-1-nsekhar@ti.com>
+ <20180511141037.25250-2-nsekhar@ti.com>
+ <ea0d545c-90b5-bc2f-71cf-7ab6183b7ecd@lechnology.com>
+Message-ID: <7d060dec-562e-993c-7af4-c3524ba0b946@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 12:35:25PM +0300, Alexander Popov wrote:
-> On 14.05.2018 08:15, Mark Rutland wrote:
-> > On Sun, May 13, 2018 at 11:40:07AM +0300, Alexander Popov wrote:
-> >> So what would you think if I do the following in check_alloca():
-> >>
-> >> 	if (size >= stack_left) {
-> >> #if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
-> >> 		panic("alloca over the kernel stack boundary\n");
-> >> #else
-> >> 		BUG();
-> >> #endif
-> > 
-> > Given this is already out-of-line, how about we always use panic(), regardless
-> > of VMAP_STACK and SCHED_STACK_END_CHECK? i.e. just
-> > 
-> > 	if (unlikely(size >= stack_left))
-> > 		panic("alloca over the kernel stack boundary");
-> > 
-> > If we have VMAP_STACK selected, and overflow during the panic, it's the same as
-> > if we overflowed during the BUG(). It's likely that panic() will use less stack
-> > space than BUG(), and the compiler can put the call in a slow path that
-> > shouldn't affect most calls, so in all cases it's likely preferable.
+On Sunday 13 May 2018 02:50 AM, David Lechner wrote:
+> On 05/11/2018 09:10 AM, Sekhar Nori wrote:
+>> PLL2 SYSCLK1 on DM646x is connected to DDR2 PHY and cannot
+>> be disabled. Mark it so to prevent unused clock disable
+>> infrastructure from disabling it.
+>>
+>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>> ---
+>> ? drivers/clk/davinci/pll-dm646x.c | 2 +-
+>> ? 1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/davinci/pll-dm646x.c
+>> b/drivers/clk/davinci/pll-dm646x.c
+>> index eb96dd72b6b7..5bdf1cb5fda8 100644
+>> --- a/drivers/clk/davinci/pll-dm646x.c
+>> +++ b/drivers/clk/davinci/pll-dm646x.c
+>> @@ -72,7 +72,7 @@ static const struct davinci_pll_clk_info
+>> dm646x_pll2_info = {
+>> ????? .flags = 0,
+>> ? };
+>> ? -SYSCLK(1, pll2_sysclk1, pll2_pllen, 4, 0);
+>> +SYSCLK(1, pll2_sysclk1, pll2_pllen, 4, SYSCLK_ALWAYS_ENABLED);
+>> ? ? int dm646x_pll2_init(struct device *dev, void __iomem *base,
+>> struct regmap *cfgchip)
+>> ? {
+>>
 > 
-> I'm sure that maintainers and Linus will strongly dislike my patch if I always
-> use panic() here. panic() kills the whole kernel and we shouldn't use it when we
-> can safely continue to work.
-> 
-> Let me describe my logic. So let's have size >= stack_left on a thread stack.
-> 
-> 1. If CONFIG_VMAP_STACK is enabled, we can safely use BUG(). Even if BUG()
-> handling overflows the thread stack into the guard page, handle_stack_overflow()
-> is called and the neighbour memory is not corrupted. The kernel can proceed to live.
+> FYI, this only applies on top of "clk: davinci: pll: allow dev == NULL".
+> Not sure if that was intentional.
 
-On arm64 with CONFIG_VMAP_STACK, a stack overflow will result in a
-panic(). My understanding was that the same is true on x86.
-
-> 2. If CONFIG_VMAP_STACK is disabled, BUG() handling can corrupt the neighbour
-> kernel memory and cause the undefined behaviour of the whole kernel. I see it on
-> my lkdtm test. That is a cogent reason for panic().
-
-In this case, panic() can also corrupt the neighbour stack, and could
-also fail.
-
-When CONFIG_VMAP_STACK is not selected, a stack overflow simply cannot
-be handled reliably -- while panic() may be more likely to succeed, it
-is not gauranteed to.
-
-> 2.a. If CONFIG_SCHED_STACK_END_CHECK is enabled, the kernel already does panic()
-> when STACK_END_MAGIC is corrupted. So we will _not_ break the safety policy if
-> we do panic() in a similar situation in check_alloca().
-
-Sure, I'm certainly happy with panic() here.
-
-> 2.b. If CONFIG_SCHED_STACK_END_CHECK is disabled, the user has some real reasons
-> not to do panic() when the kernel stack is corrupted. 
-
-I believe that CONFIG_SCHED_STACK_END_CHECK is seen as a debug feature,
-and hence people don't select it. I strongly doubt that people have
-reasons to disable it other than not wanting the overhead associated
-with debug features.
-
-I think it is reasonable to panic() here even with CONFIG_VMAP_STACK
-selected.
-
-> So we should not do it in check_alloca() as well, just use BUG() and
-> hope for the best.
-
-Regardless of whether we BUG() or panic(), we're hoping for the best.
-
-Consistently using panic() here will keep things simpler, so any failure
-reported will be easier to reason about, and easier to debug.
+Not actually. I will resend the series as it applies to v4.17-rc1.
 
 Thanks,
-Mark.
+Sekhar
