@@ -1,42 +1,56 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 14 May 2018 20:27:24 +0200
-Subject: [PATCH 07/21] i2c: efm32: make use of i2c_8bit_addr_from_msg
-In-Reply-To: <20180514145330.4857-8-peda@axentia.se>
-References: <20180514145330.4857-1-peda@axentia.se>
- <20180514145330.4857-8-peda@axentia.se>
-Message-ID: <20180514182724.sw3c4xmq5av4pphf@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 14 May 2018 15:29:35 -0300
+Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Fix USB PHY duplicate
+ unit-address
+Message-ID: <1526322576-5838-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peter,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On Mon, May 14, 2018 at 04:53:16PM +0200, Peter Rosin wrote:
-> Because it looks neater.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  drivers/i2c/busses/i2c-efm32.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-efm32.c b/drivers/i2c/busses/i2c-efm32.c
-> index aa336ba89aa3..5f2bab878b2c 100644
-> --- a/drivers/i2c/busses/i2c-efm32.c
-> +++ b/drivers/i2c/busses/i2c-efm32.c
-> @@ -144,8 +144,7 @@ static void efm32_i2c_send_next_msg(struct efm32_i2c_ddata *ddata)
->  	struct i2c_msg *cur_msg = &ddata->msgs[ddata->current_msg];
->  
->  	efm32_i2c_write32(ddata, REG_CMD, REG_CMD_START);
-> -	efm32_i2c_write32(ddata, REG_TXDATA, cur_msg->addr << 1 |
-> -			(cur_msg->flags & I2C_M_RD ? 1 : 0));
-> +	efm32_i2c_write32(ddata, REG_TXDATA, i2c_8bit_addr_from_msg(cur_msg));
+Currently the following DTC warning is seen with W=1:
 
-Nice,
+arch/arm/boot/dts/imx51-babbage.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Fix it by moving the USB PHY node outside of simple-bus and drop the
+unneeded unit-address.
 
-Best regards and thanks,
-Uwe
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx51-babbage.dts | 21 +++++++--------------
+ 1 file changed, 7 insertions(+), 14 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index b8ca73d..de46906 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -170,20 +170,13 @@
+ 		mux-ext-port = <3>;
+ 	};
+ 
+-	usbphy {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		compatible = "simple-bus";
+-
+-		usbh1phy: usbh1phy at 0 {
+-			compatible = "usb-nop-xceiv";
+-			reg = <0>;
+-			clocks = <&clk_usb>;
+-			clock-names = "main_clk";
+-			reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
+-			vcc-supply = <&vusb_reg>;
+-			#phy-cells = <0>;
+-		};
++	usbh1phy: usbphy1 {
++		compatible = "usb-nop-xceiv";
++		clocks = <&clk_usb>;
++		clock-names = "main_clk";
++		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
++		vcc-supply = <&vusb_reg>;
++		#phy-cells = <0>;
+ 	};
+ };
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.7.4
