@@ -1,42 +1,79 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 09:26:47 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.17 (#1)
-In-Reply-To: <87zi123adf.fsf@bootlin.com>
-References: <87zi123adf.fsf@bootlin.com>
-Message-ID: <20180514162647.yoyjidyzgayyru3w@localhost>
+Date: Mon, 14 May 2018 09:24:55 -0700
+Subject: [PATCH] ARM: keystone: fix platform_domain_notifier array overrun
+In-Reply-To: <e78da70c-4be4-9bfe-5d78-67e0ec95e0e1@oracle.com>
+References: <E1fGlYS-0001CN-Sd@rmk-PC.armlinux.org.uk>
+ <e78da70c-4be4-9bfe-5d78-67e0ec95e0e1@oracle.com>
+Message-ID: <20180514162455.gahb7ikp3bev4b7d@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 10:33:00AM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Thu, May 10, 2018 at 10:55:39AM -0700, Santosh Shilimkar wrote:
+> On 5/10/2018 6:24 AM, Russell King wrote:
+> > platform_domain_notifier contains a variable sized array, which the
+> > pm_clk_notify() notifier treats as a NULL terminated array:
+> > 
+> >       for (con_id = clknb->con_ids; *con_id; con_id++)
+> >               pm_clk_add(dev, *con_id);
+> > 
+> > Omitting the initialiser for con_ids means that the array is zero
+> > sized, and there is no NULL terminator.  This leads to pm_clk_notify()
+> > overrunning into what ever structure follows, which may not be NULL.
+> > This leads to an oops:
+> > 
+> > Unable to handle kernel NULL pointer dereference at virtual address 0000008c
+> > pgd = c0003000
+> > [0000008c] *pgd=80000800004003c, *pmd=00000000c
+> > Internal error: Oops: 206 [#1] PREEMPT SMP ARM
+> > Modules linked in:c
+> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.16.0+ #9
+> > Hardware name: Keystone
+> > PC is at strlen+0x0/0x34
+> > LR is at kstrdup+0x18/0x54
+> > pc : [<c0623340>]    lr : [<c0111d6c>]    psr: 20000013
+> > sp : eec73dc0  ip : eed780c0  fp : 00000001
+> > r10: 00000000  r9 : 00000000  r8 : eed71e10
+> > r7 : 0000008c  r6 : 0000008c  r5 : 014000c0  r4 : c03a6ff4
+> > r3 : c09445d0  r2 : 00000000  r1 : 014000c0  r0 : 0000008c
+> > Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> > Control: 30c5387d  Table: 00003000  DAC: fffffffd
+> > Process swapper/0 (pid: 1, stack limit = 0xeec72210)
+> > Stack: (0xeec73dc0 to 0xeec74000)
+> > ...
+> > [<c0623340>] (strlen) from [<c0111d6c>] (kstrdup+0x18/0x54)
+> > [<c0111d6c>] (kstrdup) from [<c03a6ff4>] (__pm_clk_add+0x58/0x120)
+> > [<c03a6ff4>] (__pm_clk_add) from [<c03a731c>] (pm_clk_notify+0x64/0xa8)
+> > [<c03a731c>] (pm_clk_notify) from [<c004614c>] (notifier_call_chain+0x44/0x84)
+> > [<c004614c>] (notifier_call_chain) from [<c0046320>] (__blocking_notifier_call_chain+0x48/0x60)
+> > [<c0046320>] (__blocking_notifier_call_chain) from [<c0046350>] (blocking_notifier_call_chain+0x18/0x20)
+> > [<c0046350>] (blocking_notifier_call_chain) from [<c0390234>] (device_add+0x36c/0x534)
+> > [<c0390234>] (device_add) from [<c047fc00>] (of_platform_device_create_pdata+0x70/0xa4)
+> > [<c047fc00>] (of_platform_device_create_pdata) from [<c047fea0>] (of_platform_bus_create+0xf0/0x1ec)
+> > [<c047fea0>] (of_platform_bus_create) from [<c047fff8>] (of_platform_populate+0x5c/0xac)
+> > [<c047fff8>] (of_platform_populate) from [<c08b1f04>] (of_platform_default_populate_init+0x8c/0xa8)
+> > [<c08b1f04>] (of_platform_default_populate_init) from [<c000a78c>] (do_one_initcall+0x3c/0x164)
+> > [<c000a78c>] (do_one_initcall) from [<c087bd9c>] (kernel_init_freeable+0x10c/0x1d0)
+> > [<c087bd9c>] (kernel_init_freeable) from [<c0628db0>] (kernel_init+0x8/0xf0)
+> > [<c0628db0>] (kernel_init) from [<c00090d8>] (ret_from_fork+0x14/0x3c)
+> > Exception stack(0xeec73fb0 to 0xeec73ff8)
+> > 3fa0:                                     00000000 00000000 00000000 00000000
+> > 3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> > 3fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+> > Code: e3520000 1afffff7 e12fff1e c0801730 (e5d02000)
+> > ---[ end trace cafa8f148e262e80 ]---
+> > 
+> > Fix this by adding the necessary initialiser.
+> > 
+> > Fixes: fc20ffe1213b ("ARM: keystone: add PM domain support for clock management")
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> Looks good. Thanks Russell !!
+> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 > 
-> Here is the first pull request for fixes for mvebu for v4.17.
-> 
-> Gregory
-> 
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-> 
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-> 
-> are available in the Git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.17-1
-> 
-> for you to fetch changes up to f43194c1447c9536efb0859c2f3f46f6bf2b9154:
-> 
->   ARM64: dts: marvell: armada-cp110: Add mg_core_clk for ethernet node (2018-04-27 17:47:24 +0200)
-> 
-> ----------------------------------------------------------------
-> mvebu fixes for 4.17 (part 1)
-> 
-> Declare missing clocks needed for network on Armada 8040 base boards
-> (such as the McBin)
+> Arnd, olof,
+> Could you please pick this up for the fixes branch ?
 
-Thanks!
-
-How well should I expect mcbin to work with a mainline kernel now? I
-still use the 4.4 mcbin kernel on mine in "production" (I use one for
-all my maintainer work). What's missing from that kernel on mainline?
+Applied to fixes. Thanks!
 
 
 -Olof
