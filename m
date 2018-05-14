@@ -1,78 +1,42 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 14 May 2018 09:57:27 +0200
-Subject: Allwinner A64: Issue on external rtc clock to wifi chip
-In-Reply-To: <CAMty3ZCNyuEwmLGdDZLM_9qKJ2NsT33rodug7ZpKAE-OHymVEg@mail.gmail.com>
-References: <CAMty3ZCNyuEwmLGdDZLM_9qKJ2NsT33rodug7ZpKAE-OHymVEg@mail.gmail.com>
-Message-ID: <20180514075727.uxggyhmbahvhestx@flea>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 14 May 2018 10:01:55 +0200
+Subject: [PATCH] ARM: dts: exynos: Use dedicated DT bindings for Odroid
+ X/X2, U3
+In-Reply-To: <20180513122412.shxdxtxt2phb46l5@kozik-lap>
+References: <CGME20180511081032epcas2p30f381cf699cb7524d9a143390e9c74b5@epcas2p3.samsung.com>
+ <20180511080947.3057-1-s.nawrocki@samsung.com>
+ <20180513122412.shxdxtxt2phb46l5@kozik-lap>
+Message-ID: <1ac92405-897a-d16b-13a2-e968c687b07d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/13/2018 02:24 PM, Krzysztof Kozlowski wrote:
+> On Fri, May 11, 2018 at 10:09:47AM +0200, Sylwester Nawrocki wrote:
+>> Use dedicated Odroid audio subsystem DT bindings instead of the simple-card.
+>> This adds support for audio on the HDMI interface.
 
-On Mon, May 14, 2018 at 12:37:49PM +0530, Jagan Teki wrote:
-> Hi Maxime and All,
-> 
-> We are trying to bring-up AP6330 Wifi chip for A64 board. We noticed
-> to have an external rtc clock has driven from wifi chip.
-> 
-> So the devicetree is configured according to this as below.
-> 
-> / {
->         wifi_pwrseq: wifi-pwrseq {
->                 compatible = "mmc-pwrseq-simple";
->                 clocks = <&rtc 1>;
->                 clock-names = "ext_clock";
->                 reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
->                 post-power-on-delay-ms = <400>;
->         };
-> };
-> 
-> &rtc {
->         clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
->         clocks = <&osc32k>;
->         #clock-cells = <1>;
-> };
-> 
-> &mmc1 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&mmc1_pins>;
->         vmmc-supply = <&reg_dcdc1>;
->         vqmmc-supply = <&reg_eldo1>;
->         mmc-pwrseq = <&wifi_pwrseq>;
->         bus-width = <4>;
->         non-removable;
->         status = "okay";
-> 
->         brcmf: wifi at 1 {
->                 reg = <1>;
->                 compatible = "brcm,bcm4329-fmac";
->                 interrupt-parent = <&r_pio>;
->                 interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;  /* WL-WAKE-AP: PL3 */
->                 interrupt-names = "host-wake";
->         };
-> };
-> 
-> And observed rtc-osc32k-out clock is never enabled[1] and the value of
-> LOSC_OUT_GATING is 0x0 which eventually not enabling
-> LOSC_OUT_GATING_EN
-> 
-> Pls. let us know if we miss anything here?
-> 
-> [1] https://paste.ubuntu.com/p/X2By4q8kD2/
+> How about changing the subject to "Add suppor for audio over HDMI for
+> Odroid X/X2/U3"?
 
-Could you paste your config and the logs from a boot to?
+Sure, I don't mind.
 
-Thanks!
-Maxime
+>> diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+>> index bdcd4523cc1c..7a94a423097d 100644
+>> --- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
+>> +++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+>> @@ -113,11 +113,12 @@
+>>  };
+>>  
+>>  &sound {
+>> -	simple-audio-card,name = "Odroid-U3";
+>> -	simple-audio-card,widgets =
+>> +	compatible = "hardkernel,odroid-xu4-audio";
+
+> The compatible is the same for all users using DTSI so it could be moved
+> to the exynos4412-odroid-common.dtsi itself.
+
+Corrected.
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/b265a2f1/attachment.sig>
+Regards,
+Sylwester
