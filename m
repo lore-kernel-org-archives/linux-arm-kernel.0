@@ -1,61 +1,136 @@
-From: bst@pengutronix.de (Bastian Stender)
-Date: Mon, 14 May 2018 11:18:12 +0200
-Subject: [PATCH 1/3] thermal: imx: remove cpufreq cooling registration
-In-Reply-To: <AM3PR04MB1315B6320421800346313075F59C0@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <1526285359-17978-1-git-send-email-Anson.Huang@nxp.com>
- <5a449fc0-4d3e-c7c7-0e9a-43efb4b909cf@pengutronix.de>
- <AM3PR04MB1315B6320421800346313075F59C0@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <1c485c97-f667-7cbd-a6a0-bc74d8aa0918@pengutronix.de>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 14 May 2018 10:18:50 +0100
+Subject: [PATCH v2] tty: pl011: Avoid spuriously stuck-off interrupts
+In-Reply-To: <1525972103-26691-1-git-send-email-Dave.Martin@arm.com>
+References: <1525972103-26691-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <5AF9547A.1010809@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2018 11:10 AM, Anson Huang wrote:
->> -----Original Message-----
->> From: Bastian Stender [mailto:bst at pengutronix.de]
->> Sent: Monday, May 14, 2018 4:37 PM
->> To: Anson Huang <anson.huang@nxp.com>; shawnguo at kernel.org;
->> s.hauer at pengutronix.de; kernel at pengutronix.de; Fabio Estevam
->> <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
->> rjw at rjwysocki.net; viresh.kumar at linaro.org; rui.zhang at intel.com;
->> edubezval at gmail.com
->> Cc: devicetree at vger.kernel.org; linux-pm at vger.kernel.org; dl-linux-imx
->> <linux-imx@nxp.com>; linux-arm-kernel at lists.infradead.org;
->> linux-kernel at vger.kernel.org
->> Subject: Re: [PATCH 1/3] thermal: imx: remove cpufreq cooling registration
->>
->> Hi,
->>
->> On 05/14/2018 10:09 AM, Anson Huang wrote:
->>> This patch removes cpufreq cooling registration in thermal .probe
->>> function, cpufreq cooling should be done in cpufreq driver when it is
->>> ready.
->>>
->>> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
->>
->> It seems you are trying to achieve something similar to a patch I sent a couple
->> of month ago. Unfortunately I did not have the time to rework it yet:
->>
->>
->> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpatch
->> work.kernel.org%2Fpatch%2F10059085%2F&data=02%7C01%7Canson.huang
->> %40nxp.com%7C179da3635cab4a14deef08d5b975ecb6%7C686ea1d3bc2b4c6f
->> a92cd99c5c301635%7C0%7C0%7C636618838508978629&sdata=BcQ9tc%2BE
->> CZ%2Fk4AsZFxshgmvSsPg7eRN0ASzP8LO8yBI%3D&reserved=0
->>
->> Some of the comments might apply here too.
+Hi Dave,
+
+On 2018/5/10 18:08, Dave Martin wrote:
+> Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+> clears the RX and receive timeout interrupts on pl011 startup, to
+> avoid a screaming-interrupt scenario that can occur when the
+> firmware or bootloader leaves these interrupts asserted.
 > 
-> Ah, I did NOT notice this thread, so how to proceed, will you 
-> continue to finish your patch? If yes, then you can just ignore/skip
-> my patch, thanks.
-Yes, I will revisit the patch in a couple of weeks. It would be nice to
-get your feedback then.
+> This has been noted as an issue when running Linux on qemu [1].
+> 
+> Unfortunately, the above fix seems to lead to potential
+> misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
+> on driver startup, if the RX FIFO is also already full to the
+> trigger level.
+> 
+> Clearing the RX FIFO interrupt does not change the FIFO fill level.
+> In this scenario, because the interrupt is now clear and because
+> the FIFO is already full to the trigger level, no new assertion of
+> the RX FIFO interrupt can occur unless the FIFO is drained back
+> below the trigger level.  This never occurs because the pl011
+> driver is waiting for an RX FIFO interrupt to tell it that there is
+> something to read, and does not read the FIFO at all until that
+> interrupt occurs.
+> 
+> Thus, simply clearing "spurious" interrupts on startup may be
+> misguided, since there is no way to be sure that the interrupts are
+> truly spurious, and things can go wrong if they are not.
+> 
+> This patch instead clears the interrupt condition by draining the
+> RX FIFO during UART startup, after clearing any potentially
+> spurious interrupt.  This should ensure that an interrupt will
+> definitely be asserted if the RX FIFO subsequently becomes
+> sufficiently full.
+> 
+> The drain is done at the point of enabling interrupts only.  This
+> means that it will occur any time the UART is newly opened through
+> the tty layer.  It will not apply to polled-mode use of the UART by
+> kgdboc: since that scenario cannot use interrupts by design, this
+> should not matter.  kgdboc will interact badly with "normal" use of
+> the UART in any case: this patch makes no attempt to paper over
+> such issues.
+> 
+> This patch does not attempt to address the case where the RX FIFO
+> fills faster than it can be drained: that is a pathological
+> hardware design problem that is beyond the scope of the driver to
+> work around.  As a failsafe, the number of poll iterations for
+> draining the FIFO is limited to twice the FIFO size.  This will
+> ensure that the kernel at least boots even if it is impossible to
+> drain the FIFO for some reason.
+> 
+> [1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
+> before enabled the interruption
+> https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
+> 
+> Reported-by: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Peter Maydell <peter.maydell@linaro.org>
+> Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Regards,
-Bastian	
+Thanks!
+Tested on hisilicon D05 board.
 
--- 
-Pengutronix e.K.
-Industrial Linux Solutions
-http://www.pengutronix.de/
-Peiner Str. 6-8, 31137 Hildesheim, Germany
-Amtsgericht Hildesheim, HRA 2686
+Tested-by: Wei Xu <xuwei5@hisilicon.com>
+
+Best Regards,
+Wei
+
+> 
+> ---
+> 
+> Changes since v1 [1]
+> 
+>  * Deleted Andrew Jones' Reviewed/Tested-bys due to the following
+>    change.
+> 
+>    If you can please retest that the updated patch fixes your
+>    issue that would be appreciated.
+> 
+> Suggested by Russell King:
+> 
+>  * Only drain 2 * FIFO size, to avoid going into an infinite spin
+>    if something does wrong.  If the FIFO still couldn't be drained
+>    sufficiently then pl011 RX won't work properly, but the kernel
+>    will at least boot.
+> 
+> 
+> [1] [PATCH] tty: pl011: Avoid spuriously stuck-off interrupts
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/574362.html
+> 
+> ---
+>  drivers/tty/serial/amba-pl011.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 4b40a5b..ebd33c0 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -1727,10 +1727,26 @@ static int pl011_allocate_irq(struct uart_amba_port *uap)
+>   */
+>  static void pl011_enable_interrupts(struct uart_amba_port *uap)
+>  {
+> +	unsigned int i;
+> +
+>  	spin_lock_irq(&uap->port.lock);
+>  
+>  	/* Clear out any spuriously appearing RX interrupts */
+>  	pl011_write(UART011_RTIS | UART011_RXIS, uap, REG_ICR);
+> +
+> +	/*
+> +	 * RXIS is asserted only when the RX FIFO transitions from below
+> +	 * to above the trigger threshold.  If the RX FIFO is already
+> +	 * full to the threshold this can't happen and RXIS will now be
+> +	 * stuck off.  Drain the RX FIFO explicitly to fix this:
+> +	 */
+> +	for (i = 0; i < uap->fifosize * 2; ++i) {
+> +		if (pl011_read(uap, REG_FR) & UART01x_FR_RXFE)
+> +			break;
+> +
+> +		pl011_read(uap, REG_DR);
+> +	}
+> +
+>  	uap->im = UART011_RTIM;
+>  	if (!pl011_dma_rx_running(uap))
+>  		uap->im |= UART011_RXIM;
+> 
