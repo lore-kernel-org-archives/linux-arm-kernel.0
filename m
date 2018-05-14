@@ -1,68 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 14 May 2018 11:09:56 -0300
-Subject: [RFC] ARM: dts: imx7s: Fix the port reg properties
-Message-ID: <1526306996-25045-1-git-send-email-festevam@gmail.com>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Mon, 14 May 2018 09:10:42 -0500
+Subject: [PATCH] edac: altera: Add Stratix10 SDRAM Uncorrectable Errors
+In-Reply-To: <20180512103331.GC27593@pd.tnic>
+References: <1526079610-5527-1-git-send-email-thor.thayer@linux.intel.com>
+ <20180512103331.GC27593@pd.tnic>
+Message-ID: <2a21f8e1-4376-c148-de33-f39778716d80@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
-
-The 'reg' property must match the unit address, so fix them
-to avoid the following DTC warnings with W=1:
-
-arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /replicator/ports/port at 2: graph node unit address error, expected "0"
-arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /soc/funnel at 30041000/ports/port at 2: graph node unit address error, expected "0"
-arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /soc/funnel at 30083000/ports/port at 2: graph node unit address error, expected "0"
-arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /soc/etf at 30084000/ports/port at 1: graph node unit address error, expected "0"
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Hi Rob,
-
-Is this the correct way to fix these warnings?
-
- arch/arm/boot/dts/imx7s.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 7d33993..55b6241 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -126,7 +126,7 @@
- 
- 			/* replicator input port */
- 			port at 2 {
--				reg = <0>;
-+				reg = <2>;
- 				replicator_in_port0: endpoint {
- 					slave-mode;
- 					remote-endpoint = <&etf_out_port>;
-@@ -183,7 +183,7 @@
- 
- 				/* funnel output port */
- 				port at 2 {
--					reg = <0>;
-+					reg = <2>;
- 					ca_funnel_out_port0: endpoint {
- 						remote-endpoint = <&hugo_funnel_in_port0>;
- 					};
-@@ -234,7 +234,7 @@
- 				};
- 
- 				port at 2 {
--					reg = <0>;
-+					reg = <2>;
- 					hugo_funnel_out_port0: endpoint {
- 						remote-endpoint = <&etf_in_port>;
- 					};
-@@ -263,7 +263,7 @@
- 				};
- 
- 				port at 1 {
--					reg = <0>;
-+					reg = <1>;
- 					etf_out_port: endpoint {
- 						remote-endpoint = <&replicator_in_port0>;
- 					};
--- 
-2.7.4
+On 05/12/2018 05:33 AM, Borislav Petkov wrote:
+> On Fri, May 11, 2018 at 06:00:10PM -0500, thor.thayer at linux.intel.com wrote:
+>> From: Thor Thayer <thor.thayer@linux.intel.com>
+>>
+>> On Stratix10, uncorrectable errors are routed to the SError
+>> exception instead of the IRQ exceptions. In Stratix10,
+>> uncorrectable SErrors must be treated as fatal and will cause
+>> a panic.
+>> Older Altera/Intel parts printed out a message for UE so do
+>> that here using the notifier framework.
+>>
+>> Record the UE in sticky registers that retain the state
+>> through a reset. Check these registers on probe and printout the
+>> error on startup.
+>>
+>> Depends on previous patch:
+>> commit 2a4ff60626b0 ("arm64: dts: stratix10: add sdram ecc")
+>>
+>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+>> ---
+>>   drivers/edac/altera_edac.c | 67 +++++++++++++++++++++++++++++++++++++++-------
+>>   drivers/edac/altera_edac.h |  8 +++++-
+>>   2 files changed, 64 insertions(+), 11 deletions(-)
+> 
+> Ok, I think I have collected everything. Pls double-check me I haven't missed
+> anything:
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/log/?h=for-next
+> 
+> Thx.
+> 
+Yes, You have the entire series (aside from DT that Dinh is taking). 
+Thank you!
