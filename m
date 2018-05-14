@@ -1,43 +1,200 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Mon, 14 May 2018 09:37:15 +0200
-Subject: [RFC PATCH] driver core: make deferring probe forever optional
-In-Reply-To: <CACRpkdaYN-wKErERP_65T2NH6L-+8O_ugSgg7pXfkaLkn1A2KQ@mail.gmail.com>
-References: <20180501213114.20183-1-robh@kernel.org>
- <20180507183106.GF2259@tuxbook-pro>
- <91dad272-e07d-2ab6-2afa-538294e9cefa@suse.de>
- <CACRpkdaYN-wKErERP_65T2NH6L-+8O_ugSgg7pXfkaLkn1A2KQ@mail.gmail.com>
-Message-ID: <c6655f84-747f-c08b-7b9c-f76ff8857567@suse.de>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Mon, 14 May 2018 09:39:34 +0200
+Subject: [PATCH 3/3] arm64: dts: renesas: draak: Describe HDMI input
+In-Reply-To: <20180513125755.GQ18974@bigcity.dyn.berto.se>
+References: <1526032802-14376-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526032802-14376-4-git-send-email-jacopo+renesas@jmondi.org>
+ <20180513125755.GQ18974@bigcity.dyn.berto.se>
+Message-ID: <20180514073520.GA5956@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2018 12:01 AM, Linus Walleij wrote:
-> On Wed, May 9, 2018 at 11:44 AM, Alexander Graf <agraf@suse.de> wrote:
->> On 05/07/2018 08:31 PM, Bjorn Andersson wrote:
->>> Can you please name platform that has enough support for Alexander to
->>> care about backwards and forwards compatibility but lacks a pinctrl
->>> driver.
->> ZynqMP is one example that immediately comes to my mind. I'm sure there are
->> others too.
-> Why isn't that using drivers/pinctrl/pinctrl-zynq.c?
+Hi Niklas,
+
+On Sun, May 13, 2018 at 02:57:55PM +0200, Niklas S?derlund wrote:
+> Hi Jacopo,
 >
-> How is it so very different from (old) Zynq as it is already using
-> the same GPIO driver?
+> Thanks for your patch.
+>
+> On 2018-05-11 12:00:02 +0200, Jacopo Mondi wrote:
+> > Describe HDMI input connected to VIN4 interface for R-Car D3 Draak
+> > development board.
+> >
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> > ---
+> >  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 68 ++++++++++++++++++++++++++
+> >  1 file changed, 68 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > index d03f194..e0ce462 100644
+> > --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > @@ -59,6 +59,17 @@
+> >  		};
+> >  	};
+> >
+> > +	hdmi-in {
+> > +		compatible = "hdmi-connector";
+> > +		type = "a";
+> > +
+> > +		port {
+> > +			hdmi_con_in: endpoint {
+> > +				remote-endpoint = <&adv7612_in>;
+> > +			};
+> > +		};
+> > +	};
+> > +
+> >  	memory at 48000000 {
+> >  		device_type = "memory";
+> >  		/* first 128MB is reserved for secure area. */
+> > @@ -142,6 +153,11 @@
+> >  		groups = "usb0";
+> >  		function = "usb0";
+> >  	};
+> > +
+> > +	vin4_pins: vin4 {
+> > +		groups = "vin4_data24", "vin4_sync", "vin4_clk", "vin4_clkenb";
+> > +		function = "vin4";
+> > +	};
+> >  };
+> >
+> >  &i2c0 {
+> > @@ -154,6 +170,35 @@
+> >  		reg = <0x50>;
+> >  		pagesize = <8>;
+> >  	};
+> > +
+> > +	hdmi-decoder at 4c {
+> > +		compatible = "adi,adv7612";
+> > +		reg = <0x4c>;
+> > +		default-input = <0>;
+> > +
+> > +		ports {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			port at 0 {
+> > +				reg = <0>;
+> > +				adv7612_in: endpoint {
+> > +					remote-endpoint = <&hdmi_con_in>;
+> > +				};
+> > +			};
+> > +
+> > +			port at 2 {
+> > +				reg = <2>;
+> > +				adv7612_out: endpoint {
+> > +					pclk-sample = <0>;
+> > +					hsync-active = <0>;
+> > +					vsync-active = <0>;
+>
+> This differs from the Gen2 DT bindings which is a very similar hardware
+> setup using the same components. Defining these properties will make the
+> bus marked as V4L2_MBUS_PARALLEL instead of V4L2_MBUS_BT656.
 
-That one is very simple: ZynqMP is usually an AMP system where Linux 
-doesn't have full knowledge of the overall system. IIUC they have a tiny 
-microblaze (PMU) that does the actual full system configuration for 
-peripherals that may interfere with each other. This architecture also 
-allows for safety critical code to run alongside a (less safe) Linux system.
+And that's what we want....
 
-I think we'll see architectures like this pop up more over time. TI 
-Sitara has similar issues. I know that Jailhouse ran into exactly that 
-problem before. I also know that during Linaro Connect Budapest even the 
-OP-TEE people realized the current model is bad, because Linux may 
-control pins/clocks/etc of devices that the secure world wants to use.
+>
+> This will change how the hardware is configured for capture if the media
+> bus is in a UYVY format, see VNMC_INF register in rvin_setup(). Maybe
+> this it not an issue here but still I'm curious to why this differ
+> between Gen2 and Gen3 :-)
 
-So I actually believe we will see more SoCs in the future that may even 
-start with Linux controllable pinctrl or no pinctrl driver but then will 
-move to firmware controlled drivers once it starts being necessary.
+Actually this won't impact the VIN configuration as this is the
+'remote endpoint' from VIN perspective and the properties used to
+configure the interface are the ones in the 'local endpoint'.
 
+>
+> > +
+> > +					remote-endpoint = <&vin4_in>;
+> > +				};
+> > +			};
+> > +		};
+> > +	};
+> >  };
+> >
+> >  &i2c1 {
+> > @@ -246,3 +291,26 @@
+> >  	timeout-sec = <60>;
+> >  	status = "okay";
+> >  };
+> > +
+> > +&vin4 {
+> > +	pinctrl-0 = <&vin4_pins>;
+> > +	pinctrl-names = "default";
+> > +
+> > +	status = "okay";
+> > +
+> > +	ports {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		port at 0 {
+> > +			reg = <0>;
+> > +
+> > +			vin4_in: endpoint {
+> > +				hsync-active = <0>;
+> > +				vsync-active = <0>;
+>
+> Comparing this to the Gen2 bindings some properties are missing,
+>
+> bus-width = <24>;
+> pclk-sample = <1>;
+> data-active = <1>;
 
-Alex
+The VIN driver does not parse them, so there is no value in having
+them there, if not confusing people as it happened to me reading the
+Gen2 DT.
+
+>
+> This is not a big deal as the VIN driver don't use these properties so
+> no functional change should come of this but still a difference.
+
+Exactly.
+
+On a side note. I have not seen a way to configure the pixel clock
+sampling level in the interface datasheet. The register used to
+configure synchronism signals polarities is VnDMR2, and there I read
+we can configure HSYNC/VSYNC and CLOCKENB (which is data enable, not
+pixel clock) polarities. Is it configured through some other
+register?
+>
+> Over all I'm happy with this change but before I add my tag I would like
+> to understand why it differs from the Gen2 configuration for the adv7612
+> properties.
+>
+> Also on a side not it is possible with hardware switches on the board
+> switch the VIN4 source to a completely different pipeline CVBS connector
+> -> adv7180 -> VIN4. But I think it's best we keep the HDMI as default as
+> this seems to be how the boards are shipped. But maybe mentioning this
+> in the commit message would not hurt if you end-up resending the patch.
+
+Oh I see. SW-49 to SW-52 enables the HDMI input, SW53-SW54 CVBS one.
+And actually, reading the 'initial setting of slide switches' in the
+Draak board manual, it turns out that the board default configuration
+is with CVBS input selected... What should we do here? reflect
+defaults in the DT, or prioritize HDMI?
+
+Thanks
+   j
+
+>
+> > +
+> > +				remote-endpoint = <&adv7612_out>;
+> > +			};
+> > +		};
+> > +	};
+> > +};
+> > --
+> > 2.7.4
+> >
+>
+> --
+> Regards,
+> Niklas S?derlund
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/5816d47b/attachment-0001.sig>
