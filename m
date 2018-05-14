@@ -1,46 +1,115 @@
-From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Mon, 14 May 2018 10:37:03 +0200
-Subject: [PATCH net-next v2 06/13] phy: add 2.5G SGMII mode to the
- phy_mode enum
-In-Reply-To: <20180508123408.GK16141@n2100.armlinux.org.uk>
-References: <20180504135643.23466-1-antoine.tenart@bootlin.com>
- <20180504135643.23466-7-antoine.tenart@bootlin.com>
- <20180508123408.GK16141@n2100.armlinux.org.uk>
-Message-ID: <20180514083703.GG24660@kwain>
+From: bst@pengutronix.de (Bastian Stender)
+Date: Mon, 14 May 2018 10:37:21 +0200
+Subject: [PATCH 1/3] thermal: imx: remove cpufreq cooling registration
+In-Reply-To: <1526285359-17978-1-git-send-email-Anson.Huang@nxp.com>
+References: <1526285359-17978-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <5a449fc0-4d3e-c7c7-0e9a-43efb4b909cf@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-On Tue, May 08, 2018 at 01:34:08PM +0100, Russell King - ARM Linux wrote:
-> On Fri, May 04, 2018 at 03:56:36PM +0200, Antoine Tenart wrote:
-> > This patch adds one more generic PHY mode to the phy_mode enum, to allow
-> > configuring generic PHYs to the 2.5G SGMII mode by using the set_mode
-> > callback.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
-> > Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+On 05/14/2018 10:09 AM, Anson Huang wrote:
+> This patch removes cpufreq cooling registration in
+> thermal .probe function, cpufreq cooling should be
+> done in cpufreq driver when it is ready.
 > 
-> Would it be possible to get the 2.5G SGMII comphy support merged
-> ahead of the rest of this series please - I don't think there's been
-> any objections to it, and having it in mainline would then mean I can
-> drop the Marvell Comphy code from my tree and transition to the bootlin
-> Comphy code instead.
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+
+It seems you are trying to achieve something similar to a patch I sent a
+couple of month ago. Unfortunately I did not have the time to rework it yet:
+
+   https://patchwork.kernel.org/patch/10059085/
+
+Some of the comments might apply here too.
+
+Regards,
+Bastian
+
+> ---
+>   drivers/thermal/imx_thermal.c | 16 ----------------
+>   1 file changed, 16 deletions(-)
 > 
-> Of course, the perfect solution would be to get the whole series merged,
-> but I'm just thinking about the situation where we're still discussing
-> points when the next merge window opens.
-
-That would be great, and there are no dependency issue if patches 6 and
-7 are taken ahead.
-
-Kishon: since there are no objection to these two phy patches, could you
-take them?
-
-Thanks!
-Antoine
+> diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+> index c30dc21..8eedb97 100644
+> --- a/drivers/thermal/imx_thermal.c
+> +++ b/drivers/thermal/imx_thermal.c
+> @@ -9,7 +9,6 @@
+>   
+>   #include <linux/clk.h>
+>   #include <linux/cpufreq.h>
+> -#include <linux/cpu_cooling.h>
+>   #include <linux/delay.h>
+>   #include <linux/device.h>
+>   #include <linux/init.h>
+> @@ -207,7 +206,6 @@ static struct thermal_soc_data thermal_imx7d_data = {
+>   struct imx_thermal_data {
+>   	struct cpufreq_policy *policy;
+>   	struct thermal_zone_device *tz;
+> -	struct thermal_cooling_device *cdev;
+>   	enum thermal_device_mode mode;
+>   	struct regmap *tempmon;
+>   	u32 c1, c2; /* See formula in imx_init_calib() */
+> @@ -729,22 +727,12 @@ static int imx_thermal_probe(struct platform_device *pdev)
+>   		return -EPROBE_DEFER;
+>   	}
+>   
+> -	data->cdev = cpufreq_cooling_register(data->policy);
+> -	if (IS_ERR(data->cdev)) {
+> -		ret = PTR_ERR(data->cdev);
+> -		dev_err(&pdev->dev,
+> -			"failed to register cpufreq cooling device: %d\n", ret);
+> -		cpufreq_cpu_put(data->policy);
+> -		return ret;
+> -	}
+> -
+>   	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
+>   	if (IS_ERR(data->thermal_clk)) {
+>   		ret = PTR_ERR(data->thermal_clk);
+>   		if (ret != -EPROBE_DEFER)
+>   			dev_err(&pdev->dev,
+>   				"failed to get thermal clk: %d\n", ret);
+> -		cpufreq_cooling_unregister(data->cdev);
+>   		cpufreq_cpu_put(data->policy);
+>   		return ret;
+>   	}
+> @@ -759,7 +747,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
+>   	ret = clk_prepare_enable(data->thermal_clk);
+>   	if (ret) {
+>   		dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
+> -		cpufreq_cooling_unregister(data->cdev);
+>   		cpufreq_cpu_put(data->policy);
+>   		return ret;
+>   	}
+> @@ -775,7 +762,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
+>   		dev_err(&pdev->dev,
+>   			"failed to register thermal zone device %d\n", ret);
+>   		clk_disable_unprepare(data->thermal_clk);
+> -		cpufreq_cooling_unregister(data->cdev);
+>   		cpufreq_cpu_put(data->policy);
+>   		return ret;
+>   	}
+> @@ -811,7 +797,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
+>   		dev_err(&pdev->dev, "failed to request alarm irq: %d\n", ret);
+>   		clk_disable_unprepare(data->thermal_clk);
+>   		thermal_zone_device_unregister(data->tz);
+> -		cpufreq_cooling_unregister(data->cdev);
+>   		cpufreq_cpu_put(data->policy);
+>   		return ret;
+>   	}
+> @@ -831,7 +816,6 @@ static int imx_thermal_remove(struct platform_device *pdev)
+>   		clk_disable_unprepare(data->thermal_clk);
+>   
+>   	thermal_zone_device_unregister(data->tz);
+> -	cpufreq_cooling_unregister(data->cdev);
+>   	cpufreq_cpu_put(data->policy);
+>   
+>   	return 0;
+> 
 
 -- 
-Antoine T?nart, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Pengutronix e.K.
+Industrial Linux Solutions
+http://www.pengutronix.de/
+Peiner Str. 6-8, 31137 Hildesheim, Germany
+Amtsgericht Hildesheim, HRA 2686
