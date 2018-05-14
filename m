@@ -1,64 +1,94 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 14 May 2018 14:36:21 +0200
-Subject: [FAIL bisect] Sound card probe error
-In-Reply-To: <CAJKOXPc+kLA+BPBmaP14zMLbbxxCmWF1eZnKoa_PcO2z9jG9JQ@mail.gmail.com>
-References: <CGME20180514101728epcas4p3108760546a415b36252df93dfe38e0fb@epcas4p3.samsung.com>
- <CAJKOXPfD8gZR8nZkmAr=Ldt3xESuFocQLnMtrDsNZu=ba55jcw@mail.gmail.com>
- <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
- <CAJKOXPc+kLA+BPBmaP14zMLbbxxCmWF1eZnKoa_PcO2z9jG9JQ@mail.gmail.com>
-Message-ID: <27b46bcd-a146-7f89-3682-3407ccc8643d@samsung.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Mon, 14 May 2018 09:23:19 -0300
+Subject: [PATCH 3/5] perf cs-etm: Support unknown_thread in cs_etm_auxtrace
+In-Reply-To: <20180514122321.27304-1-acme@kernel.org>
+References: <20180514122321.27304-1-acme@kernel.org>
+Message-ID: <20180514122321.27304-4-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+From: Leo Yan <leo.yan@linaro.org>
 
-On 2018-05-14 14:29, Krzysztof Kozlowski wrote:
-> On Mon, May 14, 2018 at 2:22 PM, Sylwester Nawrocki
-> <s.nawrocki@samsung.com> wrote:
->> Hi,
->>
->> On 05/14/2018 12:17 PM, Krzysztof Kozlowski wrote:
->>
->>> Bisected to:
->>> 8c123c14bbba4add148536b6d47a9226deda2f7a is the first bad commit
->>> commit 8c123c14bbba4add148536b6d47a9226deda2f7a
->>> Author: Ulf Hansson <ulf.hansson@linaro.org>
->>> Date:   Thu Apr 26 10:53:06 2018 +0200
->>>
->>>      driver core: Respect all error codes from dev_pm_domain_attach()
->>>
->>>      The limitation of being able to check only for -EPROBE_DEFER from
->>>      dev_pm_domain_attach() has been removed. Hence let's respect all error
->>>      codes and bail out accordingly.
->>>
->>>      Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>>      Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>>      Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->> The DRM driver creates the HDMI codec but its registration fails, due
->> to some missing clocks. The clock are missing because the exynos5-subcmu
->> driver probing fails.
->>
->> [    0.678578] exynos5-subcmu: probe of GSC failed with error -17
->> [    0.679250] exynos5-subcmu: probe of MFC failed with error -17
->> [    0.679992] exynos5-subcmu: probe of DISP failed with error -17
->>
->> The exynos5-subcmu driver before registering platform device makes
->> of_genpd_add_device() call, so in platform_drv_probe() dev_pm_domain_attach()
->> call will fail, as dev->pm_domain is already set. Previously the error
->> was masked by code removed in the above commit and platform_drv_probe()
->> was could complete successfully.
-> Thanks Sylwester!
->
-> Ah, I missed these messages because I was looking at err dmesg level
-> (and for some reason these are warn). Anyway do you have any thoughts
-> how is it connected with missing Odroid XU3 sound card and max98090
-> codec?
+CoreSight doesn't allocate thread structure for unknown_thread in ETM
+auxtrace, so unknown_thread is NULL pointer.  If the perf data doesn't
+contain valid tid and then cs_etm__mem_access() uses unknown_thread
+instead as thread handler, this results in a segmentation fault when
+thread__find_addr_map() accesses the thread handler.
 
-Odroid XU3 sound card driver is waiting for HDMI codec, which is being 
-created
-by Exynos DRM HDMI driver, which was deferred by lack of clocks.
+This commit creates a new thread data which is used by unknown_thread, so
+CoreSight tracing can roll back to use unknown_thread if perf data
+doesn't include valid thread info.  This commit also releases thread
+data for initialization failure case and for normal auxtrace free flow.
 
-Best regards
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1525924920-4381-1-git-send-email-leo.yan at linaro.org
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+---
+ tools/perf/util/cs-etm.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 40020b1ca54f..2bf28b5acc08 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -239,6 +239,7 @@ static void cs_etm__free(struct perf_session *session)
+ 	for (i = 0; i < aux->num_cpu; i++)
+ 		zfree(&aux->metadata[i]);
+ 
++	thread__zput(aux->unknown_thread);
+ 	zfree(&aux->metadata);
+ 	zfree(&aux);
+ }
+@@ -1357,6 +1358,23 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
+ 	etm->auxtrace.free = cs_etm__free;
+ 	session->auxtrace = &etm->auxtrace;
+ 
++	etm->unknown_thread = thread__new(999999999, 999999999);
++	if (!etm->unknown_thread)
++		goto err_free_queues;
++
++	/*
++	 * Initialize list node so that at thread__zput() we can avoid
++	 * segmentation fault at list_del_init().
++	 */
++	INIT_LIST_HEAD(&etm->unknown_thread->node);
++
++	err = thread__set_comm(etm->unknown_thread, "unknown", 0);
++	if (err)
++		goto err_delete_thread;
++
++	if (thread__init_map_groups(etm->unknown_thread, etm->machine))
++		goto err_delete_thread;
++
+ 	if (dump_trace) {
+ 		cs_etm__print_auxtrace_info(auxtrace_info->priv, num_cpu);
+ 		return 0;
+@@ -1371,16 +1389,18 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
+ 
+ 	err = cs_etm__synth_events(etm, session);
+ 	if (err)
+-		goto err_free_queues;
++		goto err_delete_thread;
+ 
+ 	err = auxtrace_queues__process_index(&etm->queues, session);
+ 	if (err)
+-		goto err_free_queues;
++		goto err_delete_thread;
+ 
+ 	etm->data_queued = etm->queues.populated;
+ 
+ 	return 0;
+ 
++err_delete_thread:
++	thread__zput(etm->unknown_thread);
+ err_free_queues:
+ 	auxtrace_queues__free(&etm->queues);
+ 	session->auxtrace = NULL;
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.14.3
