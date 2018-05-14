@@ -1,40 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 09:22:45 -0700
-Subject: [GIT PULL 3/3] omap sdhci dts changes for v4.18 merge window
-In-Reply-To: <pull-1525450571-674978@atomide.com-3>
-References: <pull-1525450571-674978@atomide.com>
- <pull-1525450571-674978@atomide.com-3>
-Message-ID: <20180514162245.tdsuxonucsiwyqoq@localhost>
+Date: Mon, 14 May 2018 09:27:45 -0700
+Subject: [GIT PULL] Reset controller fixes for v4.17
+In-Reply-To: <1526313274.4936.21.camel@pengutronix.de>
+References: <1526313274.4936.21.camel@pengutronix.de>
+Message-ID: <20180514162745.igpxliy2apv3ioqc@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 09:17:33AM -0700, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Mon, May 14, 2018 at 05:54:34PM +0200, Philipp Zabel wrote:
+> Dear arm-soc maintainers,
 > 
-> The following changes since commit 3f4028780287ff5a7308f40e10bbba9a42b993aa:
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
->   mmc: sdhci-omap: Get IODelay values for 3.3v DDR mode (2018-05-03 09:37:13 +0200)
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/dt-sdhci-signed
+>   git://git.pengutronix.de/pza/linux.git tags/reset-fixes-for-4.17
 > 
-> for you to fetch changes up to 24a6f1f65ea567d017c598faf1374ee443f73851:
+> for you to fetch changes up to e6914365fd280fce303a89b8a8d4529af5a2e0f9:
 > 
->   Documentation: ARM: Add new MMC requirements for DRA7/K2G (2018-05-03 10:32:20 -0700)
-> 
-> ----------------------------------------------------------------
-> Device tree changes for omap variants for SDHCI
-> 
-> This series adds the devicetree configuration needed for pinctrl on
-> dra7 variants to use the SDHCI SDIO driver instead of mmc-omap-hs
-> driver. To use SDHCI, both the pins and the iodelay needs to be
-> configured.
-> 
-> This series is based on the related SDHCI drivers changes on a branch
-> set up by Ulf.
+>   reset: uniphier: fix USB clock line for LD20 (2018-04-27 11:51:12 +0200)
 
-Thanks, merged now.
+Merged, thanks.
 
 
 -Olof
