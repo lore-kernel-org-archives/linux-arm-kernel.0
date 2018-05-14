@@ -1,129 +1,43 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Mon, 14 May 2018 10:36:35 +0300
-Subject: [PATCH 6/8] serial: Add Tegra Combined UART driver
-In-Reply-To: <CAHp75VeJcqaiWUVr=oXEH5YurY3yCDdE1eeoWumo6jCa_4PWEQ@mail.gmail.com>
-References: <20180508114403.14499-1-mperttunen@nvidia.com>
- <20180508114403.14499-7-mperttunen@nvidia.com>
- <CAHp75VfYF_u2bZ+temGbReEB9K-t3A75aUNYwffyv9-=zEi0Lw@mail.gmail.com>
- <662ce972-56a9-9daa-d332-faa08b89c05a@kapsi.fi>
- <CAHp75VeJcqaiWUVr=oXEH5YurY3yCDdE1eeoWumo6jCa_4PWEQ@mail.gmail.com>
-Message-ID: <513a6287-9bb3-1441-b3ea-6866f2e74c99@kapsi.fi>
+From: agraf@suse.de (Alexander Graf)
+Date: Mon, 14 May 2018 09:37:15 +0200
+Subject: [RFC PATCH] driver core: make deferring probe forever optional
+In-Reply-To: <CACRpkdaYN-wKErERP_65T2NH6L-+8O_ugSgg7pXfkaLkn1A2KQ@mail.gmail.com>
+References: <20180501213114.20183-1-robh@kernel.org>
+ <20180507183106.GF2259@tuxbook-pro>
+ <91dad272-e07d-2ab6-2afa-538294e9cefa@suse.de>
+ <CACRpkdaYN-wKErERP_65T2NH6L-+8O_ugSgg7pXfkaLkn1A2KQ@mail.gmail.com>
+Message-ID: <c6655f84-747f-c08b-7b9c-f76ff8857567@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.05.2018 01:20, Andy Shevchenko wrote:
-> On Sun, May 13, 2018 at 9:04 PM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
->> On 05/13/2018 05:16 PM, Andy Shevchenko wrote:
->>>
->>> On Tue, May 8, 2018 at 2:44 PM, Mikko Perttunen <mperttunen@nvidia.com>
->>> wrote:
->>>>
->>>> The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
->>>> multiplexing multiple "virtual UARTs" into a single hardware serial
->>>> port. The TCU is the primary serial port on Tegra194 devices.
->>>>
->>>> Add a TCU driver utilizing the mailbox framework, as the used mailboxes
->>>> are part of Tegra HSP blocks that are already controlled by the Tegra
->>>> HSP mailbox driver.
+On 05/14/2018 12:01 AM, Linus Walleij wrote:
+> On Wed, May 9, 2018 at 11:44 AM, Alexander Graf <agraf@suse.de> wrote:
+>> On 05/07/2018 08:31 PM, Bjorn Andersson wrote:
+>>> Can you please name platform that has enough support for Alexander to
+>>> care about backwards and forwards compatibility but lacks a pinctrl
+>>> driver.
+>> ZynqMP is one example that immediately comes to my mind. I'm sure there are
+>> others too.
+> Why isn't that using drivers/pinctrl/pinctrl-zynq.c?
 >
->>>> +static void tegra_tcu_uart_set_mctrl(struct uart_port *port, unsigned
->>>> int mctrl)
->>>> +{
->>>
->>>
->>>> +       (void)port;
->>>> +       (void)mctrl;
->>>
->>>
->>> Huh?
->>
->>
->> The serial core calls these callbacks without checking if they are set. They
->> don't make sense for this driver so they are stubbed out.
->
-> My question why do you need these ugly lines? I'm pretty sure no other
-> driver with stubs using such style.
+> How is it so very different from (old) Zynq as it is already using
+> the same GPIO driver?
 
-It's my personal style, being explicit about unused variables in this 
-way - I don't consider them ugly. But I can certainly remove them for 
-the next version.
+That one is very simple: ZynqMP is usually an AMP system where Linux 
+doesn't have full knowledge of the overall system. IIUC they have a tiny 
+microblaze (PMU) that does the actual full system configuration for 
+peripherals that may interfere with each other. This architecture also 
+allows for safety critical code to run alongside a (less safe) Linux system.
 
->
->>>> +}
->
->>>> +               if (written == 3) {
->>>> +                       value |= 3 << 24;
->>>> +                       value |= BIT(26);
->>>> +                       mbox_send_message(tcu->tx, &value);
->>>
->>>
->>>> +               }
->>>
->>>
->>> (1)
->>>
->>>> +       }
->>>> +
->>>> +       if (written) {
->>>> +               value |= written << 24;
->>>> +               value |= BIT(26);
->>>> +               mbox_send_message(tcu->tx, &value);
->>>> +       }
->>>
->>>
->>> (2)
->>>
->>> These are code duplications.
->>
->>
->> Indeed - the length of the duplicated code is so short, and the instances
->> are so close to each other, that I don't find it necessary (or clearer) to
->> have an extra function.
->
-> It makes sense. Consider to refactor other way w/o duplication then.
+I think we'll see architectures like this pop up more over time. TI 
+Sitara has similar issues. I know that Jailhouse ran into exactly that 
+problem before. I also know that during Linaro Connect Budapest even the 
+OP-TEE people realized the current model is bad, because Linux may 
+control pins/clocks/etc of devices that the secure world wants to use.
 
-I'll see if I can refactor it out.
+So I actually believe we will see more SoCs in the future that may even 
+start with Linux controllable pinctrl or no pinctrl driver but then will 
+move to firmware controlled drivers once it starts being necessary.
 
->
->>>> +static void tegra_tcu_uart_set_termios(struct uart_port *port,
->>>> +                                      struct ktermios *new,
->>>> +                                      struct ktermios *old)
->>>> +{
->>>> +       (void)port;
->>>> +       (void)new;
->>>> +       (void)old;
->>>> +}
->>>
->>>
->>> Remove those unused stub contents.
->>
->>
->> Sure. I had these here so that we don't get unused parameter warnings, but I
->> can just as well remove the parameter names.
->
-> What warnings? How did you get them? We have them disabled as far as I
-> know even with W=1.
 
-May be - it's just a habit, maybe from other projects where the warning 
-is enabled.
-
->
->>
->>>
->>>> +       return uart_set_options(&tegra_tcu_uart_port, cons,
->>>> +                               115200, 'n', 8, 'n');
->>>
->>>
->>> Can't it be one line?
->>
->>
->> It would be a total of 81 characters in length on one line, so no.
->
-> So, yes. 1 character doesn't prevent us make the readability better.
-> Please, put to one line.
->
-
-Ok, I'll change this.
-
-Thanks,
-Mikko
+Alex
