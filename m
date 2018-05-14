@@ -1,46 +1,24 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 14 May 2018 16:12:08 +0100
-Subject: [PATCH] ghes_edac: enable HIP08 platform edac driver
-In-Reply-To: <20180514094709.GC23049@pd.tnic>
-References: <1526039543-180996-1-git-send-email-zhengqiang10@huawei.com>
- <20180511121901.GA12705@pd.tnic> <5AF90C70.408@huawei.com>
- <20180514094709.GC23049@pd.tnic>
-Message-ID: <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
+Date: Mon, 14 May 2018 16:12:42 +0100
+Subject: [PATCH 4/4] firmware: arm_sdei: use common SMCCC_CONDUIT_*
+In-Reply-To: <20180503170330.5591-5-mark.rutland@arm.com>
+References: <20180503170330.5591-1-mark.rutland@arm.com>
+ <20180503170330.5591-5-mark.rutland@arm.com>
+Message-ID: <a8de1829-c7d8-d61a-b5b1-3fa4a36db67c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
+Hi Mark,
 
-(CC: +linux-arm list, just in case there is wider discussion)
-
-On 14/05/18 10:47, Borislav Petkov wrote:
-> On Mon, May 14, 2018 at 12:11:28PM +0800, Zhengqiang wrote:
->> In ARM64 defconfig, ghes_edac is default load. memory error report to
->> user space rasdaemon tool through function ghes_edac_report_mem_error,
->> we need it.
+On 03/05/18 18:03, Mark Rutland wrote:
+> Now that we have common definitions for SMCCC conduits, move the SDEI
+> code over to them, and remove the SDEI-specific definitions.
 > 
-> So depending on whether there will be an ARM64 edac driver, we can do
+> There should be no functional change as a result of this patch.
 
-I'm afraid there could be a mix: The v8.2 CPU RAS Extensions mean the kernel can
-do kernel first. (I agree for those systems there should only be one edac driver).
-For systems without the v8.2 CPU RAS Extensions firmware-first is the only way
-of doing it.
+Thanks for clearing this up!
 
+Acked-by: James Morse <james.morse@arm.com>
 
-> the platform whitelisting on x86 only if ARM prefers to do the reporting
-> through ghes_edac. James?
-
-I'm afraid I'd like to keep both doors open. Kernel-first handling will require
-some ACPI-table/DT property as some aspects of the CPU extensions aren't
-discover-able. Can't we use this to pick up whether the platform supports
-firmware-first (HEST and GHES entries) or kernel-first via some as-yet-undefined
-HEST bits?
-
-Without GHES entries this code would never be run. So we 'just' need to catch
-systems that are describing both. (which can be the platform specific kernel
-first bits problem to do)
-
-
-Thanks,
 
 James
