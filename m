@@ -1,93 +1,71 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Mon, 14 May 2018 16:09:17 +0800
-Subject: [PATCH 1/3] thermal: imx: remove cpufreq cooling registration
-Message-ID: <1526285359-17978-1-git-send-email-Anson.Huang@nxp.com>
+Date: Mon, 14 May 2018 16:09:18 +0800
+Subject: [PATCH 2/3] cpufreq: imx6q: add cpufreq cooling device based on
+ device tree
+In-Reply-To: <1526285359-17978-1-git-send-email-Anson.Huang@nxp.com>
+References: <1526285359-17978-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1526285359-17978-2-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes cpufreq cooling registration in
-thermal .probe function, cpufreq cooling should be
-done in cpufreq driver when it is ready.
+Register the imx6q cpufreq driver as a cooling device
+based on the thermal device tree framework.
+
+When temperature exceeds the passive trip point, cpufreq
+driver will be used to throttle CPUs.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- drivers/thermal/imx_thermal.c | 16 ----------------
- 1 file changed, 16 deletions(-)
+ drivers/cpufreq/imx6q-cpufreq.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-index c30dc21..8eedb97 100644
---- a/drivers/thermal/imx_thermal.c
-+++ b/drivers/thermal/imx_thermal.c
-@@ -9,7 +9,6 @@
- 
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 83cf631..27ce84d 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -9,6 +9,7 @@
  #include <linux/clk.h>
+ #include <linux/cpu.h>
  #include <linux/cpufreq.h>
--#include <linux/cpu_cooling.h>
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/init.h>
-@@ -207,7 +206,6 @@ static struct thermal_soc_data thermal_imx7d_data = {
- struct imx_thermal_data {
- 	struct cpufreq_policy *policy;
- 	struct thermal_zone_device *tz;
--	struct thermal_cooling_device *cdev;
- 	enum thermal_device_mode mode;
- 	struct regmap *tempmon;
- 	u32 c1, c2; /* See formula in imx_init_calib() */
-@@ -729,22 +727,12 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 		return -EPROBE_DEFER;
- 	}
++#include <linux/cpu_cooling.h>
+ #include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+@@ -50,6 +51,7 @@ static struct clk_bulk_data clks[] = {
+ };
  
--	data->cdev = cpufreq_cooling_register(data->policy);
--	if (IS_ERR(data->cdev)) {
--		ret = PTR_ERR(data->cdev);
--		dev_err(&pdev->dev,
--			"failed to register cpufreq cooling device: %d\n", ret);
--		cpufreq_cpu_put(data->policy);
--		return ret;
--	}
--
- 	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(data->thermal_clk)) {
- 		ret = PTR_ERR(data->thermal_clk);
- 		if (ret != -EPROBE_DEFER)
- 			dev_err(&pdev->dev,
- 				"failed to get thermal clk: %d\n", ret);
--		cpufreq_cooling_unregister(data->cdev);
- 		cpufreq_cpu_put(data->policy);
- 		return ret;
- 	}
-@@ -759,7 +747,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 	ret = clk_prepare_enable(data->thermal_clk);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
--		cpufreq_cooling_unregister(data->cdev);
- 		cpufreq_cpu_put(data->policy);
- 		return ret;
- 	}
-@@ -775,7 +762,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev,
- 			"failed to register thermal zone device %d\n", ret);
- 		clk_disable_unprepare(data->thermal_clk);
--		cpufreq_cooling_unregister(data->cdev);
- 		cpufreq_cpu_put(data->policy);
- 		return ret;
- 	}
-@@ -811,7 +797,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "failed to request alarm irq: %d\n", ret);
- 		clk_disable_unprepare(data->thermal_clk);
- 		thermal_zone_device_unregister(data->tz);
--		cpufreq_cooling_unregister(data->cdev);
- 		cpufreq_cpu_put(data->policy);
- 		return ret;
- 	}
-@@ -831,7 +816,6 @@ static int imx_thermal_remove(struct platform_device *pdev)
- 		clk_disable_unprepare(data->thermal_clk);
+ static struct device *cpu_dev;
++struct thermal_cooling_device *cdev;
+ static bool free_opp;
+ static struct cpufreq_frequency_table *freq_table;
+ static unsigned int max_freq;
+@@ -202,6 +204,11 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+ 	return ret;
+ }
  
- 	thermal_zone_device_unregister(data->tz);
--	cpufreq_cooling_unregister(data->cdev);
- 	cpufreq_cpu_put(data->policy);
++static void imx6q_cpufreq_ready(struct cpufreq_policy *policy)
++{
++	cdev = of_cpufreq_cooling_register(policy);
++}
++
+ static struct cpufreq_driver imx6q_cpufreq_driver = {
+ 	.flags = CPUFREQ_NEED_INITIAL_FREQ_CHECK,
+ 	.verify = cpufreq_generic_frequency_table_verify,
+@@ -210,6 +217,7 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
+ 	.init = imx6q_cpufreq_init,
+ 	.name = "imx6q-cpufreq",
+ 	.attr = cpufreq_generic_attr,
++	.ready = imx6q_cpufreq_ready,
+ 	.suspend = cpufreq_generic_suspend,
+ };
  
- 	return 0;
+@@ -482,6 +490,7 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 
+ static int imx6q_cpufreq_remove(struct platform_device *pdev)
+ {
++	cpufreq_cooling_unregister(cdev);
+ 	cpufreq_unregister_driver(&imx6q_cpufreq_driver);
+ 	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
+ 	if (free_opp)
 -- 
 2.7.4
