@@ -1,78 +1,49 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 14 May 2018 14:43:09 +0200
-Subject: [FAIL bisect] Sound card probe error
-In-Reply-To: <CAPDyKFoQFxHqupyqH3JsriUDdJHpUDecD37OqOSKn-sT26gEiA@mail.gmail.com>
-References: <CGME20180514101728epcas4p3108760546a415b36252df93dfe38e0fb@epcas4p3.samsung.com>
- <CAJKOXPfD8gZR8nZkmAr=Ldt3xESuFocQLnMtrDsNZu=ba55jcw@mail.gmail.com>
- <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
- <CAPDyKFoQFxHqupyqH3JsriUDdJHpUDecD37OqOSKn-sT26gEiA@mail.gmail.com>
-Message-ID: <CAJKOXPcTQX82UdcBROBc18C-M0_3bOnStLqJzUzRDqHC33m-1g@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 14 May 2018 14:44:50 +0200
+Subject: [RFC PATCH] driver core: make deferring probe forever optional
+In-Reply-To: <c6655f84-747f-c08b-7b9c-f76ff8857567@suse.de>
+References: <20180501213114.20183-1-robh@kernel.org>
+ <20180507183106.GF2259@tuxbook-pro>
+ <91dad272-e07d-2ab6-2afa-538294e9cefa@suse.de>
+ <CACRpkdaYN-wKErERP_65T2NH6L-+8O_ugSgg7pXfkaLkn1A2KQ@mail.gmail.com>
+ <c6655f84-747f-c08b-7b9c-f76ff8857567@suse.de>
+Message-ID: <45eca00d-57f5-21b5-1f6e-b5f3f60ad276@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 2:30 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 14 May 2018 at 14:22, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
->> Hi,
+On 14.5.2018 09:37, Alexander Graf wrote:
+> 
+> On 05/14/2018 12:01 AM, Linus Walleij wrote:
+>> On Wed, May 9, 2018 at 11:44 AM, Alexander Graf <agraf@suse.de> wrote:
+>>> On 05/07/2018 08:31 PM, Bjorn Andersson wrote:
+>>>> Can you please name platform that has enough support for Alexander to
+>>>> care about backwards and forwards compatibility but lacks a pinctrl
+>>>> driver.
+>>> ZynqMP is one example that immediately comes to my mind. I'm sure
+>>> there are
+>>> others too.
+>> Why isn't that using drivers/pinctrl/pinctrl-zynq.c?
 >>
->> On 05/14/2018 12:17 PM, Krzysztof Kozlowski wrote:
->>
->>> Bisected to:
->>> 8c123c14bbba4add148536b6d47a9226deda2f7a is the first bad commit
->>> commit 8c123c14bbba4add148536b6d47a9226deda2f7a
->>> Author: Ulf Hansson <ulf.hansson@linaro.org>
->>> Date:   Thu Apr 26 10:53:06 2018 +0200
->>>
->>>     driver core: Respect all error codes from dev_pm_domain_attach()
->>>
->>>     The limitation of being able to check only for -EPROBE_DEFER from
->>>     dev_pm_domain_attach() has been removed. Hence let's respect all error
->>>     codes and bail out accordingly.
->>>
->>>     Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>>     Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>>     Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->>
->> The DRM driver creates the HDMI codec but its registration fails, due
->> to some missing clocks. The clock are missing because the exynos5-subcmu
->> driver probing fails.
->>
->> [    0.678578] exynos5-subcmu: probe of GSC failed with error -17
->> [    0.679250] exynos5-subcmu: probe of MFC failed with error -17
->> [    0.679992] exynos5-subcmu: probe of DISP failed with error -17
->>
->> The exynos5-subcmu driver before registering platform device makes
->> of_genpd_add_device() call, so in platform_drv_probe() dev_pm_domain_attach()
->> call will fail, as dev->pm_domain is already set. Previously the error
->> was masked by code removed in the above commit and platform_drv_probe()
->> was could complete successfully.
->
-> Thanks for providing this information!
->
-> I was about to tell that I overlooked the fact that there is more than
-> one way to assign PM domain pointers to devices. To fix the problem,
-> dev_pm_domain_attach() should return 0, not -EEXIST when it finds and
-> existing PM domain pointer.
->
-> Does the below patch fix the problem?
->
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> Date: Mon, 14 May 2018 14:26:16 +0200
-> Subject: [PATCH] PM / Domains: Don't return -EEXIST at attach when PM domain
->  exists
->
-> As dev_pm_domain_attach() isn't the only way to assign PM domain pointers
-> to devices, clearly we must allow a device to have the pointer already
-> being assigned. For this reason, return 0 instead of -EEXIST.
->
-> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/base/power/common.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>> How is it so very different from (old) Zynq as it is already using
+>> the same GPIO driver?
+> 
+> That one is very simple: ZynqMP is usually an AMP system where Linux
+> doesn't have full knowledge of the overall system. IIUC they have a tiny
+> microblaze (PMU) that does the actual full system configuration for
+> peripherals that may interfere with each other. This architecture also
+> allows for safety critical code to run alongside a (less safe) Linux
+> system.
 
+Linux is running in non secure world that's why Linux can't have full
+system visibility and Linux should ask firmware. It doesn't matter if
+firmware is running on specific unit or just secure SW in EL3/EL1-S, EL0-S.
+You can also configure ZynqMP to protect these address ranges not to be
+accessible from NS sw.
+If you don't care about security you can use normal read/write accesses
+at least for gpio case. Pinctrl/clk will be driven via firmware interface.
 
-Yes, this fixes the issue.
-Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
+On Zynq we have never finished running Linux in NS and having firmware
+to handle it that's why only read/write is used there.
 
-Best regards,
-Krzysztof
+Thanks,
+Michal
