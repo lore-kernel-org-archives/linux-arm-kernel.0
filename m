@@ -1,48 +1,34 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Mon, 14 May 2018 15:52:36 +0800
-Subject: [PATCH v1 0/7] drm/mediatek: support hdmi output for mt2701 and mt7623
-Message-ID: <20180514075243.5442-1-bibby.hsieh@mediatek.com>
+Date: Mon, 14 May 2018 15:52:42 +0800
+Subject: [PATCH v1 6/7] drm/mediatek: add a error return value when clock
+ driver has been prepared
+In-Reply-To: <20180514075243.5442-1-bibby.hsieh@mediatek.com>
+References: <20180514075243.5442-1-bibby.hsieh@mediatek.com>
+Message-ID: <20180514075243.5442-7-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support HDMI on mt2701,
-we have to make some modifications.
-1) Add the HDMI driver.
-2) Add the DPI driver.
-3) Add a mechanism that config output component by dts.
+DRM driver get the comp->clk by of_clk_get(), we only
+assign NULL to comp->clk when error happened, but do
+not return the error number.
 
-Changes since v0:
- - Correct some typos in commit message.
- - Fixup the build warning (tmp variable didn't be initialized)
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Bibby Hsieh (3):
-  drm/mediatek: implement connection from BLS to DPI0
-  drm/mediatek: add a error return value when clock driver has been
-    prepared
-  drm/mediatek: config component output by device node port
-
-chunhui dai (4):
-  drm/mediatek: move dpi private data to device
-  drm/mediatek: fix to get right bridge for dpi encoder
-  drm/mediatek: add dpi driver for mt2701 and mt7623
-  drm/mediatek: add hdmi driver for different hardware
-
- drivers/gpu/drm/mediatek/Makefile              |   4 +-
- drivers/gpu/drm/mediatek/mtk_dpi.c             | 125 +++++++---
- drivers/gpu/drm/mediatek/mtk_dpi_regs.h        |   2 +-
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c         |  14 +-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c    |   2 +-
- drivers/gpu/drm/mediatek/mtk_drm_drv.c         |  38 ++-
- drivers/gpu/drm/mediatek/mtk_drm_drv.h         |   4 +-
- drivers/gpu/drm/mediatek/mtk_hdmi.c            |  88 +++++--
- drivers/gpu/drm/mediatek/mtk_hdmi.h            |  28 +++
- drivers/gpu/drm/mediatek/mtk_hdmi_phy.c        | 157 +++++++++++++
- drivers/gpu/drm/mediatek/mtk_hdmi_regs.h       |   1 +
- drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c | 307 +++++++++++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c | 129 +----------
- 13 files changed, 716 insertions(+), 183 deletions(-)
- create mode 100644 drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
- create mode 100644 drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+index 4672317e3ad1..d38a5303f8fc 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+@@ -283,7 +283,7 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
+ 	comp->irq = of_irq_get(node, 0);
+ 	comp->clk = of_clk_get(node, 0);
+ 	if (IS_ERR(comp->clk))
+-		comp->clk = NULL;
++		return PTR_ERR(comp->clk);
+ 
+ 	/* Only DMA capable components need the LARB property */
+ 	comp->larb_dev = NULL;
 -- 
 2.12.5
