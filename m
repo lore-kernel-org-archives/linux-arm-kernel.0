@@ -1,69 +1,75 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 May 2018 23:32:02 +0200
-Subject: [PATCH 12/12] of/platform: make the OF code aware of early
- platform drivers
-In-Reply-To: <20180511162028.20616-13-brgl@bgdev.pl>
-References: <20180511162028.20616-1-brgl@bgdev.pl>
- <20180511162028.20616-13-brgl@bgdev.pl>
-Message-ID: <CAMuHMdWrOL7gN4Uxx5KipD6ZZ971LmP2yZe3XERz8jQ4TGwDCw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 14 May 2018 23:37:20 +0200
+Subject: [PATCH 1/7] i2c: i2c-gpio: move header to platform_data
+In-Reply-To: <20180419200015.15095-2-wsa@the-dreams.de>
+References: <20180419200015.15095-1-wsa@the-dreams.de>
+ <20180419200015.15095-2-wsa@the-dreams.de>
+Message-ID: <20180514213719.o6ceftp2quem3s7f@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
 
-On Fri, May 11, 2018 at 6:20 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->
-> Check the relevant flag in the device node and skip the allocation
-> part for devices that were populated early.
->
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>  arch/arm/mach-ks8695/board-acs5k.c               | 2 +-
+>  arch/arm/mach-sa1100/simpad.c                    | 2 +-
+>  arch/mips/alchemy/board-gpr.c                    | 2 +-
 
-Thanks for your patch!
+Those still need acks...
 
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
+> diff --git a/arch/arm/mach-ks8695/board-acs5k.c b/arch/arm/mach-ks8695/board-acs5k.c
+> index 937eb1d47e7b..ef835d82cdb9 100644
+> --- a/arch/arm/mach-ks8695/board-acs5k.c
+> +++ b/arch/arm/mach-ks8695/board-acs5k.c
+> @@ -19,7 +19,7 @@
+>  #include <linux/gpio/machine.h>
+>  #include <linux/i2c.h>
+>  #include <linux/i2c-algo-bit.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/platform_data/pca953x.h>
+>  
+>  #include <linux/mtd/mtd.h>
 
-> @@ -196,9 +197,17 @@ static struct platform_device *of_platform_device_create_pdata(
->             of_node_test_and_set_flag(np, OF_POPULATED))
->                 return NULL;
->
-> -       dev = of_device_alloc(np, bus_id, parent);
-> -       if (!dev)
-> -               goto err_clear_flag;
-> +       if (of_node_check_flag(np, OF_POPULATED_EARLY)) {
-> +               dev = of_early_to_platform_device(np);
-> +               if (IS_ERR(dev))
-> +                       goto err_clear_flag;
-> +
-> +               of_device_init(dev, np, bus_id, parent);
-> +       } else {
-> +               dev = of_device_alloc(np, bus_id, parent);
-> +               if (!dev)
-> +                       goto err_clear_flag;
-> +       }
+...
 
-The above may become cleaner if:
-  1. of_early_to_platform_device() would return NULL instead -ENOENT,
-  2. of_device_alloc() would be split in alloc and init phases, too.
+> diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+> index ace010479eb6..49a61e6f3c5f 100644
+> --- a/arch/arm/mach-sa1100/simpad.c
+> +++ b/arch/arm/mach-sa1100/simpad.c
+> @@ -37,7 +37,7 @@
+>  #include <linux/input.h>
+>  #include <linux/gpio_keys.h>
+>  #include <linux/leds.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  
+>  #include "generic.h"
+>  
+> diff --git a/arch/mips/alchemy/board-gpr.c b/arch/mips/alchemy/board-gpr.c
+> index 4e79dbd54a33..fa75d75b5ba9 100644
+> --- a/arch/mips/alchemy/board-gpr.c
+> +++ b/arch/mips/alchemy/board-gpr.c
+> @@ -29,7 +29,7 @@
+>  #include <linux/leds.h>
+>  #include <linux/gpio.h>
+>  #include <linux/i2c.h>
+> -#include <linux/i2c-gpio.h>
+> +#include <linux/platform_data/i2c-gpio.h>
+>  #include <linux/gpio/machine.h>
+>  #include <asm/bootinfo.h>
+>  #include <asm/idle.h>
 
-Then you can do:
+... and this was the shortened diff for those.
 
-        dev = of_node_check_flag(np, OF_POPULATED_EARLY)
-                ? of_early_to_platform_device(np)
-                 : __of_device_alloc(np, bus_id, parent);
-        if (!dev)
-                goto err_clear_flag;
+Greg, Russell, Ralf, James? Is it okay if I take this via my tree?
 
-        of_device_init(dev, np, bus_id, parent);
+Thanks,
 
-Gr{oetje,eeting}s,
+   Wolfram
 
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/f3c37915/attachment.sig>
