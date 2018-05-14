@@ -1,96 +1,52 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 14 May 2018 16:35:43 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a77995: don't use deprecated renesas,
- gpio-rcar
-Message-ID: <20180514143543.16590-1-horms+renesas@verge.net.au>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 May 2018 15:38:52 +0100
+Subject: [PATCH] arm64: allowing mmap to be traced
+In-Reply-To: <1526308362-45443-1-git-send-email-chansen3@cisco.com>
+References: <1526308362-45443-1-git-send-email-chansen3@cisco.com>
+Message-ID: <20180514143852.tmbzqij2t35wjtdy@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compat string renesas,gpio-rcar has been deprecated since v4.14,
-the same release that r8a77990 SoC support was added. Thus
-renesas,gpio-rcar can safely be removed without any risk of behaviour
-changes between old and new mainline kernels and DTBs.
+On Mon, May 14, 2018 at 02:32:42PM +0000, Christian Hansen wrote:
+> Adding missing macro which is present all other system calls to
+> to mmap declaration for ARM.  This allows it to appear as a kernel
+> tracing target.
+> 
+> Signed-off-by: Christian Hansen <chansen3@cisco.com>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
+FWIW, I sent out a patch doing this earlier today [1], which is
+identical modulo some spacing.
 
- Based on renesas-devel-20180511-v4.17-rc4
+Mark.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index 2506f46293e8..f3426266b5ea 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -88,8 +88,7 @@
- 
- 		gpio0: gpio at e6050000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6050000 0 0x50>;
- 			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -104,8 +103,7 @@
- 
- 		gpio1: gpio at e6051000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6051000 0 0x50>;
- 			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -120,8 +118,7 @@
- 
- 		gpio2: gpio at e6052000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6052000 0 0x50>;
- 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -136,8 +133,7 @@
- 
- 		gpio3: gpio at e6053000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6053000 0 0x50>;
- 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -152,8 +148,7 @@
- 
- 		gpio4: gpio at e6054000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6054000 0 0x50>;
- 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -168,8 +163,7 @@
- 
- 		gpio5: gpio at e6055000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055000 0 0x50>;
- 			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -184,8 +178,7 @@
- 
- 		gpio6: gpio at e6055400 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055400 0 0x50>;
- 			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
--- 
-2.11.0
+[1] https://lkml.kernel.org/r/20180514094640.27569-17-mark.rutland at arm.com
+
+> ---
+>  arch/arm64/kernel/sys.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+> index 72981ba..1ccdbfc 100644
+> --- a/arch/arm64/kernel/sys.c
+> +++ b/arch/arm64/kernel/sys.c
+> @@ -27,9 +27,9 @@
+>  #include <linux/syscalls.h>
+>  #include <asm/cpufeature.h>
+>  
+> -asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+> -			 unsigned long prot, unsigned long flags,
+> -			 unsigned long fd, off_t off)
+> +SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,
+> +		unsigned long, prot, unsigned long, flags,
+> +		unsigned long, fd, off_t, off)
+>  {
+>  	if (offset_in_page(off) != 0)
+>  		return -EINVAL;
+> -- 
+> 2.5.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
