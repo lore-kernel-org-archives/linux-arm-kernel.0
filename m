@@ -1,20 +1,18 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 May 2018 23:25:21 +0200
-Subject: [PATCH 04/12] platform: provide a separate function for
- initializing platform devices
-In-Reply-To: <20180511162028.20616-5-brgl@bgdev.pl>
+Date: Mon, 14 May 2018 23:25:33 +0200
+Subject: [PATCH 05/12] platform: export platform_device_release() locally
+In-Reply-To: <20180511162028.20616-6-brgl@bgdev.pl>
 References: <20180511162028.20616-1-brgl@bgdev.pl>
- <20180511162028.20616-5-brgl@bgdev.pl>
-Message-ID: <CAMuHMdX1F6dj5AbWB_LZRb1gDS3dqifa5+p_t5jH7ViFrTe2EA@mail.gmail.com>
+ <20180511162028.20616-6-brgl@bgdev.pl>
+Message-ID: <CAMuHMdX6hvFgOqKopY+CLiktU-XeVZbAXcFma7r7RAXf3+oJbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, May 11, 2018 at 6:20 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >
-> The early platform driver framework will allocate platform devices
-> using its own internal mechanisms. Provide a function that allows to
-> initialize a platform device object without allocating it.
+> The early platform driver mechanism will use this function as the
+> device release callback. Make it available in drivers/base.
 >
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
