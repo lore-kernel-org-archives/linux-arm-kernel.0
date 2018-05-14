@@ -1,52 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 15:38:52 +0100
-Subject: [PATCH] arm64: allowing mmap to be traced
-In-Reply-To: <1526308362-45443-1-git-send-email-chansen3@cisco.com>
-References: <1526308362-45443-1-git-send-email-chansen3@cisco.com>
-Message-ID: <20180514143852.tmbzqij2t35wjtdy@lakrids.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 14 May 2018 15:41:28 +0100
+Subject: [PATCH v9 04/12] arm64/acpi: Create arch specific cpu to acpi id
+ helper
+In-Reply-To: <20180511235807.30834-5-jeremy.linton@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180511235807.30834-5-jeremy.linton@arm.com>
+Message-ID: <d64175c1-3ab4-8854-e26e-486ada09e308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 02:32:42PM +0000, Christian Hansen wrote:
-> Adding missing macro which is present all other system calls to
-> to mmap declaration for ARM.  This allows it to appear as a kernel
-> tracing target.
-> 
-> Signed-off-by: Christian Hansen <chansen3@cisco.com>
 
-FWIW, I sent out a patch doing this earlier today [1], which is
-identical modulo some spacing.
 
-Mark.
+On 12/05/18 00:57, Jeremy Linton wrote:
+> Its helpful to be able to lookup the acpi_processor_id associated
+> with a logical cpu. Provide an arm64 helper to do this.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Tested-by: Vijaya Kumar K <vkilari@codeaurora.org>
+> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+> Tested-by: Tomasz Nowicki <Tomasz.Nowicki@cavium.com>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-[1] https://lkml.kernel.org/r/20180514094640.27569-17-mark.rutland at arm.com
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-> ---
->  arch/arm64/kernel/sys.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
-> index 72981ba..1ccdbfc 100644
-> --- a/arch/arm64/kernel/sys.c
-> +++ b/arch/arm64/kernel/sys.c
-> @@ -27,9 +27,9 @@
->  #include <linux/syscalls.h>
->  #include <asm/cpufeature.h>
->  
-> -asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
-> -			 unsigned long prot, unsigned long flags,
-> -			 unsigned long fd, off_t off)
-> +SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,
-> +		unsigned long, prot, unsigned long, flags,
-> +		unsigned long, fd, off_t, off)
->  {
->  	if (offset_in_page(off) != 0)
->  		return -EINVAL;
-> -- 
-> 2.5.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Regards,
+Sudeep
