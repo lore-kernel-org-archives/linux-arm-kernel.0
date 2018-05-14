@@ -1,39 +1,20 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 14 May 2018 13:24:03 +0200
-Subject: [GIT PULL] defconfig updates for v4.18
-Message-ID: <268190dc-bca5-d86a-c56c-75013dc20d38@gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 14 May 2018 13:24:48 +0200
+Subject: [PATCH v4 5/6] bus: fsl-mc: supoprt dma configure for devices on
+ fsl-mc bus
+In-Reply-To: <1525069641-8523-6-git-send-email-nipun.gupta@nxp.com>
+References: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
+ <1525069641-8523-1-git-send-email-nipun.gupta@nxp.com>
+ <1525069641-8523-6-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <20180514112448.GA26428@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof and Arnd,
+On Mon, Apr 30, 2018 at 11:57:20AM +0530, Nipun Gupta wrote:
+> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> ---
 
-Please merge the following patch for defconfig.
+I can't take patches without any changelog text at all, sorry.  Please
+fix up and resend.
 
-Thanks,
-Matthias
-
----
-
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-tags/v4.17-next-defconfig
-
-for you to fetch changes up to 1e31927aa64545ee97a2a41db9984c9931afc50a:
-
-  arm64: defconfig: Enable CONFIG_PINCTRL_MT7622 by default (2018-04-27 11:48:37
-+0200)
-
-----------------------------------------------------------------
-enable mt7622 pinctrl to fix boot issue
-
-----------------------------------------------------------------
-Sean Wang (1):
-      arm64: defconfig: Enable CONFIG_PINCTRL_MT7622 by default
-
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+greg k-h
