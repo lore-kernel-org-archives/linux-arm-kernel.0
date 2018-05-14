@@ -1,49 +1,65 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 14 May 2018 20:38:15 +0300
-Subject: [PATCH v3 5/6] spi: at91-usart: add driver for at91-usart as spi
-In-Reply-To: <5a3930b867cf8c279953d08c5d5dd1d93113a43b.camel@microchip.com>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-6-radu.pirea@microchip.com>
- <CAHp75Ve3Ugnjjm8EZkPQTZSvH1qad1e5SqjOn8zz5syHSQea_g@mail.gmail.com>
- <5a3930b867cf8c279953d08c5d5dd1d93113a43b.camel@microchip.com>
-Message-ID: <CAHp75VdRrL25Jgnbk64Qqc5RY3uJdcntJ3xwRdp3F+rRFeTHBA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 14 May 2018 18:51:09 +0100
+Subject: [PATCH] arm64/sve: Write ZCR_EL1 on context switch only if changed
+Message-ID: <1526320269-27088-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First of all, do not remove mailing lists from Cc and people if you
-are not sure they do not need your stuff.
+Writes to ZCR_EL1 are self-synchronising, and so may be expensive
+in typical implementations.
 
-On Mon, May 14, 2018 at 11:11 AM, Radu Pirea <radu.pirea@microchip.com> wrote:
-> On Sun, 2018-05-13 at 16:33 +0300, Andy Shevchenko wrote:
->> On Fri, May 11, 2018 at 1:38 PM, Radu Pirea <radu.pirea@microchip.com
->> > wrote:
+This patch adopts the approach used for costly system register
+writes elsewhere in the kernel: the system register write is
+suppressed if it would not change the stored value.
 
->> > +static void at91_usart_spi_cleanup(struct spi_device *spi)
->> > +{
->> > +       struct at91_usart_spi_device *ausd = spi->controller_state;
->> > +
->> > +       if (!ausd)
->> > +               return;
->>
->> Is it even possible?
-> Theoretically yes.
+Since the common case will be that of switching between tasks that
+use the same vector length as one another, prediction hit rates on
+the conditional branch should be reasonably good, with lower
+expected amortised cost than the unconditional execution of a
+heavyweight self-synchronising instruction.
 
-I would like to know real circumstances when it might happen.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/asm/fpsimdmacros.h | 12 +++++++-----
+ arch/arm64/kernel/entry-fpsimd.S      |  2 +-
+ 2 files changed, 8 insertions(+), 6 deletions(-)
 
->>
->> Anyway the code below will work fine even if it's the case.
->>
->> > +
->> > +       spi->controller_state = NULL;
->> > +       kfree(ausd);
->> > +}
-
->> The question is, why you didn't utilize what SPI core provides you?
-> I tried, but it did not work the way I expected.
-
-So, what is not going as expected in "SPI core takes care of CSs" case?
-Did you use oscilloscope for that?
-
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index e050d76..4684351 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -207,12 +207,14 @@
+ 		str		w\nxtmp, [\xpfpsr, #4]
+ .endm
+ 
+-.macro sve_load nxbase, xpfpsr, xvqminus1, nxtmp
++.macro sve_load nxbase, xpfpsr, xvqminus1, nxtmp, xtmp2
+ 		mrs_s		x\nxtmp, SYS_ZCR_EL1
+-		bic		x\nxtmp, x\nxtmp, ZCR_ELx_LEN_MASK
+-		orr		x\nxtmp, x\nxtmp, \xvqminus1
+-		msr_s		SYS_ZCR_EL1, x\nxtmp	// self-synchronising
+-
++		bic		\xtmp2, x\nxtmp, ZCR_ELx_LEN_MASK
++		orr		\xtmp2, \xtmp2, \xvqminus1
++		cmp		\xtmp2, x\nxtmp
++		b.eq		921f
++		msr_s		SYS_ZCR_EL1, \xtmp2	// self-synchronising
++921:
+  _for n, 0, 31,	_sve_ldr_v	\n, \nxbase, \n - 34
+ 		_sve_ldr_p	0, \nxbase
+ 		_sve_wrffr	0
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
+index 73f17bf..12d4958 100644
+--- a/arch/arm64/kernel/entry-fpsimd.S
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -49,7 +49,7 @@ ENTRY(sve_save_state)
+ ENDPROC(sve_save_state)
+ 
+ ENTRY(sve_load_state)
+-	sve_load 0, x1, x2, 3
++	sve_load 0, x1, x2, 3, x4
+ 	ret
+ ENDPROC(sve_load_state)
+ 
 -- 
-With Best Regards,
-Andy Shevchenko
+2.1.4
