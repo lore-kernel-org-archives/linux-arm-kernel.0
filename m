@@ -1,33 +1,93 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 01:05:46 -0700
-Subject: [GIT PULL] i.MX fixes for 4.17
-In-Reply-To: <20180514063335.GI26863@dragon>
-References: <20180514063335.GI26863@dragon>
-Message-ID: <20180514080546.mrytfnab5sjyez7h@localhost>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Mon, 14 May 2018 16:09:17 +0800
+Subject: [PATCH 1/3] thermal: imx: remove cpufreq cooling registration
+Message-ID: <1526285359-17978-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 02:33:36PM +0800, Shawn Guo wrote:
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-> 
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.17
-> 
-> for you to fetch changes up to 6d3299aef7df7225ecff653feedafb5d1646998b:
-> 
->   ARM: dts: imx51-zii-rdu1: fix touchscreen bindings (2018-05-11 13:50:27 +0800)
-> 
-> ----------------------------------------------------------------
-> i.MX fixes for 4.17:
->  - Add missing 'fsl,sec-era' property for i.MX7S device tree CAAM node,
->    as the era information is used in various places inside CAAM driver.
->  - There are a few errors in imx51-zii-rdu1 device tree touchscreen
->    node.  Fix them to get touchscreen actually work.
+This patch removes cpufreq cooling registration in
+thermal .probe function, cpufreq cooling should be
+done in cpufreq driver when it is ready.
 
-Merged, thanks!
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ drivers/thermal/imx_thermal.c | 16 ----------------
+ 1 file changed, 16 deletions(-)
 
-
--Olof
+diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+index c30dc21..8eedb97 100644
+--- a/drivers/thermal/imx_thermal.c
++++ b/drivers/thermal/imx_thermal.c
+@@ -9,7 +9,6 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/cpufreq.h>
+-#include <linux/cpu_cooling.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/init.h>
+@@ -207,7 +206,6 @@ static struct thermal_soc_data thermal_imx7d_data = {
+ struct imx_thermal_data {
+ 	struct cpufreq_policy *policy;
+ 	struct thermal_zone_device *tz;
+-	struct thermal_cooling_device *cdev;
+ 	enum thermal_device_mode mode;
+ 	struct regmap *tempmon;
+ 	u32 c1, c2; /* See formula in imx_init_calib() */
+@@ -729,22 +727,12 @@ static int imx_thermal_probe(struct platform_device *pdev)
+ 		return -EPROBE_DEFER;
+ 	}
+ 
+-	data->cdev = cpufreq_cooling_register(data->policy);
+-	if (IS_ERR(data->cdev)) {
+-		ret = PTR_ERR(data->cdev);
+-		dev_err(&pdev->dev,
+-			"failed to register cpufreq cooling device: %d\n", ret);
+-		cpufreq_cpu_put(data->policy);
+-		return ret;
+-	}
+-
+ 	data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(data->thermal_clk)) {
+ 		ret = PTR_ERR(data->thermal_clk);
+ 		if (ret != -EPROBE_DEFER)
+ 			dev_err(&pdev->dev,
+ 				"failed to get thermal clk: %d\n", ret);
+-		cpufreq_cooling_unregister(data->cdev);
+ 		cpufreq_cpu_put(data->policy);
+ 		return ret;
+ 	}
+@@ -759,7 +747,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
+ 	ret = clk_prepare_enable(data->thermal_clk);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
+-		cpufreq_cooling_unregister(data->cdev);
+ 		cpufreq_cpu_put(data->policy);
+ 		return ret;
+ 	}
+@@ -775,7 +762,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev,
+ 			"failed to register thermal zone device %d\n", ret);
+ 		clk_disable_unprepare(data->thermal_clk);
+-		cpufreq_cooling_unregister(data->cdev);
+ 		cpufreq_cpu_put(data->policy);
+ 		return ret;
+ 	}
+@@ -811,7 +797,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "failed to request alarm irq: %d\n", ret);
+ 		clk_disable_unprepare(data->thermal_clk);
+ 		thermal_zone_device_unregister(data->tz);
+-		cpufreq_cooling_unregister(data->cdev);
+ 		cpufreq_cpu_put(data->policy);
+ 		return ret;
+ 	}
+@@ -831,7 +816,6 @@ static int imx_thermal_remove(struct platform_device *pdev)
+ 		clk_disable_unprepare(data->thermal_clk);
+ 
+ 	thermal_zone_device_unregister(data->tz);
+-	cpufreq_cooling_unregister(data->cdev);
+ 	cpufreq_cpu_put(data->policy);
+ 
+ 	return 0;
+-- 
+2.7.4
