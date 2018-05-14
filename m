@@ -1,29 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 May 2018 16:30:33 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a77990: Add GPIO device nodes
-In-Reply-To: <e9646f33-9a82-f3ea-c4a6-cd2469b7658a@cogentembedded.com>
-References: <20180513090855.25982-1-horms+renesas@verge.net.au>
- <e9646f33-9a82-f3ea-c4a6-cd2469b7658a@cogentembedded.com>
-Message-ID: <20180514143032.fxk4gcww6xihilrl@verge.net.au>
+From: chansen3@cisco.com (Christian Hansen)
+Date: Mon, 14 May 2018 14:32:42 +0000
+Subject: [PATCH] arm64: allowing mmap to be traced
+Message-ID: <1526308362-45443-1-git-send-email-chansen3@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 13, 2018 at 12:12:27PM +0300, Sergei Shtylyov wrote:
-> Hello!
-> 
-> On 5/13/2018 12:08 PM, Simon Horman wrote:
-> 
-> > The compat string renesas,gpio-rcar has been deprecated since v4.14,
-> > the same release that r8a77990 SoC support was added. Thus
-> > renesas,gpio-rcar can safely be removed without any risk of behaviour
-> > changes between old and new mainline kernels and DTBs.
-> 
->    This hardly matches the subject. :-)
+Adding missing macro which is present all other system calls to
+to mmap declaration for ARM.  This allows it to appear as a kernel
+tracing target.
 
-Indeed, I will resubmit.
+Signed-off-by: Christian Hansen <chansen3@cisco.com>
+---
+ arch/arm64/kernel/sys.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> [...]
-> 
-> MBR, Sergei
-> 
+diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+index 72981ba..1ccdbfc 100644
+--- a/arch/arm64/kernel/sys.c
++++ b/arch/arm64/kernel/sys.c
+@@ -27,9 +27,9 @@
+ #include <linux/syscalls.h>
+ #include <asm/cpufeature.h>
+ 
+-asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+-			 unsigned long prot, unsigned long flags,
+-			 unsigned long fd, off_t off)
++SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,
++		unsigned long, prot, unsigned long, flags,
++		unsigned long, fd, off_t, off)
+ {
+ 	if (offset_in_page(off) != 0)
+ 		return -EINVAL;
+-- 
+2.5.0
