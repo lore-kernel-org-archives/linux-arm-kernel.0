@@ -1,100 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 16:01:29 +0100
-Subject: [PATCH 10/18] arm64: convert native/compat syscall entry to C
-In-Reply-To: <20180514144331.GL7753@e103592.cambridge.arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-11-mark.rutland@arm.com>
- <20180514110729.GF7753@e103592.cambridge.arm.com>
- <20180514115805.bdlcxsw6q3xsbjb7@lakrids.cambridge.arm.com>
- <20180514144331.GL7753@e103592.cambridge.arm.com>
-Message-ID: <20180514150128.n65oafuw2ehvecrr@lakrids.cambridge.arm.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Mon, 14 May 2018 10:03:52 -0500
+Subject: [PATCH] ARM: dts: socfpga: Fix NAND controller clock supply
+In-Reply-To: <20180510143726.8047-1-marex@denx.de>
+References: <20180510143726.8047-1-marex@denx.de>
+Message-ID: <57ff625c-bba5-a4ad-0b5a-c6b122e30edd@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 03:43:36PM +0100, Dave Martin wrote:
-> On Mon, May 14, 2018 at 12:58:05PM +0100, Mark Rutland wrote:
-> > On Mon, May 14, 2018 at 12:07:30PM +0100, Dave Martin wrote:
-> > > On Mon, May 14, 2018 at 10:46:32AM +0100, Mark Rutland wrote:
-> > > > +{
-> > > > +	if (!system_supports_sve())
-> > > > +		return;
-> > > > +
-> > > > +	/*
-> > > > +	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
-> > > > +	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
-> > > > +	 * happens if a context switch or kernel_neon_begin() or context
-> > > > +	 * modification (sigreturn, ptrace) intervenes.
-> > > > +	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
-> > > > +	 */
-> > > > +	if (test_and_clear_thread_flag(TIF_SVE))
-> > > > +		sve_user_disable();
-> > > 
-> > > sve_user_disable() is already inline, and incorporates the if()
-> > > internally via sysreg_clear_set().
-> > > 
-> > > So, should this just be
-> > > 
-> > > 	clear_thread_flag(TIF_SVE);
-> > > 	sve_user_disable();
-> > 
-> > Sure. That does mean we'll unconditionally read cpacr_el1, but I assume
-> > you're happy with that. I'll note the difference in the commit message.
+
+
+On 05/10/2018 09:37 AM, Marek Vasut wrote:
+> The Denali NAND x-clock should be supplied by nand_x_clk, not by
+> nand_clk. Fix this, otherwise the Denali driver gets incorrect
+> clock frequency information and incorrectly configures the NAND
+> timing.
 > 
-> This is what the code does today, conditioned no system_supports_sve().
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Fixes: d837a80d19 ("ARM: dts: socfpga: add nand controller nodes")
+> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Cc: Dinh Nguyen <dinguyen@kernel.org>
+> ---
+>  arch/arm/boot/dts/socfpga.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I'm assuming that reading CPACR_EL1 is cheap ... or have you come across
-> counterexamples to that?
-
-I have no data either way. :)
-
-> > > > +}
-> > > > +
-> > > > +extern syscall_fn_t sys_call_table[];
-> > > > +
-> > > > +asmlinkage void el0_svc_handler(struct pt_regs *regs)
-> > > > +{
-> > > 
-> > > if (system_supports_sve()) ?
-> > > 
-> > > > +	sve_user_disable();
-> > > 
-> > > Or should this be replaced by a call to sve_user_reset()?
-> > > 
-> > > I suspect the latter, since we do want to be clearing TIF_SVE here too.
-> > 
-> > Yes, this was mean to be sve_user_reset().
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index d697f5062624..e719c20a0e65 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -750,7 +750,7 @@
+>  			reg-names = "nand_data", "denali_reg";
+>  			interrupts = <0x0 0x90 0x4>;
+>  			dma-mask = <0xffffffff>;
+> -			clocks = <&nand_clk>;
+> +			clocks = <&nand_x_clk>;
+>  			status = "disabled";
+>  		};
+>  
 > 
-> OK.  Just to be clear, I think there should be a system_supports_sve()
-> check here (in case that wasn't obvious from my previous reply).
 
-I understood that; the check is inside sve_user_reset(), which I had
-mean to call here.
-
-With your above comments, I now have the following:
-
-static inline void sve_user_reset(void)
-{
-	if (!system_supports_sve())
-		return;
-
-	/*
-	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
-	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
-	 * happens if a context switch or kernel_neon_begin() or context
-	 * modification (sigreturn, ptrace) intervenes.
-	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
-	 */
-	clear_thread_flag(TIF_SVE);
-	sve_user_disable();
-}
-
-asmlinkage void el0_svc_handler(struct pt_regs *regs)
-{
-	sve_user_reset();
-	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
-}
-
-... which I think alleviates that concern?
+Applied and cc'ed stable kernel.
 
 Thanks,
-Mark.
+Dinh
