@@ -1,58 +1,115 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 10:46:27 +0100
-Subject: [PATCH 05/18] arm64: kill change_cpacr()
+Date: Mon, 14 May 2018 10:46:26 +0100
+Subject: [PATCH 04/18] arm64: kill config_sctlr_el1()
 In-Reply-To: <20180514094640.27569-1-mark.rutland@arm.com>
 References: <20180514094640.27569-1-mark.rutland@arm.com>
-Message-ID: <20180514094640.27569-6-mark.rutland@arm.com>
+Message-ID: <20180514094640.27569-5-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have sysreg_clear_set(), we can use this instead of
-change_cpacr().
-
-Note that the order of the set and clear arguments differs between
-change_cpacr() and sysreg_clear_set(), so these are flipped as part of
-the conversion. Also, sve_user_enable() redundantly clears
-CPACR_EL1_ZEN_EL0EN before setting it; this is removed for clarity.
+Now that we have sysreg_clear_set(), we can consistently use this
+instead of config_sctlr_el1().
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
+ arch/arm64/include/asm/sysreg.h      | 10 ----------
+ arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
+ arch/arm64/kernel/cpu_errata.c       |  3 +--
+ arch/arm64/kernel/traps.c            |  2 +-
+ arch/arm64/mm/fault.c                |  2 +-
+ 5 files changed, 7 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 87a35364e750..088940387a4d 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -172,23 +172,14 @@ static void *sve_pffr(struct task_struct *task)
- 		sve_ffr_offset(task->thread.sve_vl);
- }
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index b52762769329..3493c7048994 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -740,16 +740,6 @@ asm(
+ 		write_sysreg(__scs_new, sysreg);			\
+ } while (0)
  
--static void change_cpacr(u64 val, u64 mask)
+-static inline void config_sctlr_el1(u32 clear, u32 set)
 -{
--	u64 cpacr = read_sysreg(CPACR_EL1);
--	u64 new = (cpacr & ~mask) | val;
+-	u32 val;
 -
--	if (new != cpacr)
--		write_sysreg(new, CPACR_EL1);
+-	val = read_sysreg(sctlr_el1);
+-	val &= ~clear;
+-	val |= set;
+-	write_sysreg(val, sctlr_el1);
 -}
 -
- static void sve_user_disable(void)
+ #endif
+ 
+ #endif	/* __ASM_SYSREG_H */
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index 6e47fc3ab549..778cf810f0d8 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -512,9 +512,9 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+ static int cp15_barrier_set_hw_mode(bool enable)
  {
--	change_cpacr(0, CPACR_EL1_ZEN_EL0EN);
-+	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
+ 	if (enable)
+-		config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
++		sysreg_clear_set(sctlr_el1, 0, SCTLR_EL1_CP15BEN);
+ 	else
+-		config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
++		sysreg_clear_set(sctlr_el1, SCTLR_EL1_CP15BEN, 0);
+ 	return 0;
  }
  
- static void sve_user_enable(void)
- {
--	change_cpacr(CPACR_EL1_ZEN_EL0EN, CPACR_EL1_ZEN_EL0EN);
-+	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
+@@ -549,9 +549,9 @@ static int setend_set_hw_mode(bool enable)
+ 		return -EINVAL;
+ 
+ 	if (enable)
+-		config_sctlr_el1(SCTLR_EL1_SED, 0);
++		sysreg_clear_set(sctlr_el1, SCTLR_EL1_SED, 0);
+ 	else
+-		config_sctlr_el1(0, SCTLR_EL1_SED);
++		sysreg_clear_set(sctlr_el1, 0, SCTLR_EL1_SED);
+ 	return 0;
  }
  
- /*
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index a900befadfe8..879daf8ea0f8 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -74,8 +74,7 @@ has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
+ static void
+ cpu_enable_trap_ctr_access(const struct arm64_cpu_capabilities *__unused)
+ {
+-	/* Clear SCTLR_EL1.UCT */
+-	config_sctlr_el1(SCTLR_EL1_UCT, 0);
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCT, 0);
+ }
+ 
+ atomic_t arm64_el2_vector_last_slot = ATOMIC_INIT(-1);
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 8bbdc17e49df..b8d3e0d8c616 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -411,7 +411,7 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ 
+ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
+ {
+-	config_sctlr_el1(SCTLR_EL1_UCI, 0);
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCI, 0);
+ }
+ 
+ #define __user_cache_maint(insn, address, res)			\
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 4165485e8b6e..e7977d932038 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -812,7 +812,7 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
+ 	 */
+ 	WARN_ON_ONCE(in_interrupt());
+ 
+-	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_SPAN, 0);
+ 	asm(SET_PSTATE_PAN(1));
+ }
+ #endif /* CONFIG_ARM64_PAN */
 -- 
 2.11.0
