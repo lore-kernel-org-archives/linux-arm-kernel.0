@@ -1,59 +1,98 @@
-From: david@lechnology.com (David Lechner)
-Date: Sun, 13 May 2018 20:50:04 -0500
-Subject: =?UTF-8?Q?Re:_[PATCH_v10_00/27]_ARM:_davinci:_convert_to_common_clo?=
- =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
-In-Reply-To: <CAHCN7xJ6+vmyrTQGYH=pKz5GRf7rLT4otreNgu6TJi_3UAEX5w@mail.gmail.com>
-References: <20180509172606.29387-1-david@lechnology.com>
- <CAHCN7xJ6+vmyrTQGYH=pKz5GRf7rLT4otreNgu6TJi_3UAEX5w@mail.gmail.com>
-Message-ID: <ba7da252-20be-590b-74fb-0ca4a04beba7@lechnology.com>
+From: hoeun.ryu@lge.com (Hoeun Ryu)
+Date: Mon, 14 May 2018 11:26:30 +0900
+Subject: [PATCH] armpmu: broadcast overflow irq on multi-core system
+ having one muxed SPI for PMU.
+In-Reply-To: <20180511103901.osi5lckq55jrms64@lakrids.cambridge.arm.com>
+References: <1525941385-12766-1-git-send-email-hoeun.ryu@lge.com.com>
+ <20180510102114.obmctt3nn7xakggi@lakrids.cambridge.arm.com>
+ <010c01d3e8b5$8839a480$98aced80$@lge.com>
+ <20180511103901.osi5lckq55jrms64@lakrids.cambridge.arm.com>
+Message-ID: <014701d3eb2a$f8211db0$e8635910$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2018 07:40 PM, Adam Ford wrote:
-> On Wed, May 9, 2018 at 12:25 PM, David Lechner <david@lechnology.com> wrote:
->> This series converts mach-davinci to use the common clock framework.
->>
->> The series works like this, the first 3 patches fix some issues with the clock
->> drivers that have already been accepted into the mainline kernel.
->>
->> Then, starting with "ARM: davinci: pass clock as parameter to
->> davinci_timer_init()", we get the mach code ready for the switch by adding the
->> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
->> around the legacy clocks so that we can switch easily between the old and the
->> new.
->>
->> "ARM: davinci: switch to common clock framework" actually flips the switch
->> to start using the new clock drivers. Then the next 8 patches remove all
->> of the old clock code.
->>
->> The final four patches add device tree clock support to the one SoC that
->> supports it.
->>
->> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
->> board file).
->>
-> 
-> I am not sure if I did something wrong, but I attempted to build and I
-> wasn't able to boot the da850-evm.dtb your repo common-clk-v11,
-> however the legacy board file boot was OK.
-> 
-> make davinci_all_defconfig ARCH=arm
-> make zImage modules da850-evm.dtb ARCH=arm CROSS_COMPILE=arm-linux- -j8
-> 
-> 3140416 bytes read in 1464 ms (2 MiB/s)
-> 20353 bytes read in 15 ms (1.3 MiB/s)
-> ## Flattened Device Tree blob at c0600000
->     Booting using the fdt blob at 0xc0600000
->     Loading Device Tree to c7e57000, end c7e5ef80 ... OK
-> 
-> Starting kernel ...
-> 
-> Uncompressing Linux... done, booting the kernel.
-> 
-> (and hang)
-> 
-> If you have some suggestions, I am try them as I get time.
-> 
+Thank you for the review.
+I understand your NACK.
 
-As with each revision of this series, I have included debugging tips
-in the cover letter, e.g. earlyprink and not disabling unused clocks.
+But I'd like to just fix the part of smp_call_function() in the next version.
+You can simply ignore it.
+
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Friday, May 11, 2018 7:39 PM
+> To: ????? <hoeun.ryu@lge.com>
+> Cc: 'Hoeun Ryu' <hoeun.ryu@lge.com.com>; 'Will Deacon'
+> <will.deacon@arm.com>; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [PATCH] armpmu: broadcast overflow irq on multi-core system
+> having one muxed SPI for PMU.
+> 
+> On Fri, May 11, 2018 at 08:20:49AM +0900, ????? wrote:
+> > Thank you for the reply.
+> >
+> > > -----Original Message-----
+> > > From: Mark Rutland [mailto:mark.rutland at arm.com]
+> > > Sent: Thursday, May 10, 2018 7:21 PM
+> > > To: Hoeun Ryu <hoeun.ryu@lge.com.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>; Hoeun Ryu <hoeun.ryu@lge.com>;
+> > > linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> > > Subject: Re: [PATCH] armpmu: broadcast overflow irq on multi-core
+> system
+> > > having one muxed SPI for PMU.
+> 
+> > > Muxing the PMU IRQs is a really broken system design, and there's no
+> good
+> > > way of supporting it.
+> 
+> > > What we should do for such systems is:
+> > >
+> > > * Add a flag to the DT to describe that the IRQs are muxed, as this
+> > >   cannot be probed.
+> > >
+> > > * Add hrtimer code to periodically update the counters, to avoid
+> > >   overflow (e.g. as we do in the l2x0 PMU).
+> > >
+> > > * Reject sampling for such systems, as this cannot be done reliably or
+> > >   efficiently.
+> > >
+> > > NAK to broadcasting the IRQ -- there are a number of issues with the
+> > > general approach.
+> >
+> > The second solution would be good if sampling is necessary even like
+> those
+> > systems.
+> 
+> Please note that I mean *all* of the above. There would be no sampling
+> on systems with muxed PMU IRQs, since there's no correlation between
+> overflow events and the hrtimer interrupts -- the results of sampling
+> would be misleading.
+> 
+> > Actually I'm working on FIQ available ARM32 system and trying to enable
+> the
+> > hard lockup detector by routing the PMU IRQ to FIQ.
+> > Because of that, I really need the interrupt event if it is a muxed SPI,
+> > beside I also need to make an dedicated IPI FIQ to broadcast the IRQ in
+> > this approach.
+> > What would you do if you were in the same situation ?
+> 
+> I don't think that this can work with a muxed IRQ, sorry.
+> 
+> It would be better to use some kind of timer.
+> 
+> [...]
+> 
+> > > Futher, If you ever encounter a case where you need to avoid
+> preemption
+> > > across enabling IRQs, preemption must be disabled *before* enabling
+> IRQs.
+> >
+> > Ah, OK.
+> > Enabling IRQs can cause scheduling tasks in the end of exception or
+> other
+> > scheduling points, right ?
+> 
+> Yes. If an IRQ was taken *between* enabling IRQs and disabling
+> preemption, preemption may occur as part of the exception return.
+> 
+> Thanks,
+> Mark.
