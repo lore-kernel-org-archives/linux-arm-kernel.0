@@ -1,47 +1,64 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 14 May 2018 15:34:29 +0200
-Subject: [FAIL bisect] Sound card probe error
-In-Reply-To: <CAJKOXPeNJtmU2+8CdMRwXignMTetn=LScdcMspfkP3MVmTSHrg@mail.gmail.com>
-References: <CGME20180514101728epcas4p3108760546a415b36252df93dfe38e0fb@epcas4p3.samsung.com>
- <CAJKOXPfD8gZR8nZkmAr=Ldt3xESuFocQLnMtrDsNZu=ba55jcw@mail.gmail.com>
- <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
- <CAJKOXPc+kLA+BPBmaP14zMLbbxxCmWF1eZnKoa_PcO2z9jG9JQ@mail.gmail.com>
- <4c61c422-a036-8fec-1153-d612fe5df878@samsung.com>
- <CAJKOXPc6Yj0+Z6zd-Gm-fYvfQB4rPPn0k6ED8bWScJ-tdZ=Ysw@mail.gmail.com>
- <CAJKOXPeNJtmU2+8CdMRwXignMTetn=LScdcMspfkP3MVmTSHrg@mail.gmail.com>
-Message-ID: <c62a6f86-4c6f-f7ed-f615-93d6db7412ec@samsung.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 14 May 2018 14:34:52 +0100
+Subject: [PATCH v2 2/3] perf/arm-cci: Remove pointless PMU disabling
+In-Reply-To: <cover.1526303815.git.robin.murphy@arm.com>
+References: <cover.1526303815.git.robin.murphy@arm.com>
+Message-ID: <2befe1cf83b94856fa574f7f483c08bb4c3cc8c6.1526303815.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2018 02:50 PM, Krzysztof Kozlowski wrote:
-> On Mon, May 14, 2018 at 2:45 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On Mon, May 14, 2018 at 2:40 PM, Sylwester Nawrocki
->> <s.nawrocki@samsung.com> wrote:
->>> On 05/14/2018 02:29 PM, Krzysztof Kozlowski wrote:
->>>> Ah, I missed these messages because I was looking at err dmesg level
->>>> (and for some reason these are warn). Anyway do you have any thoughts
->>>> how is it connected with missing Odroid XU3 sound card and max98090
->>>> codec?
->>> One reason is that the DRM driver registers an ASoC codec object which
->>> is required for the sound card registration to complete. But I wonder
->>> why there is no any error messages related to this.
->> Thanks Marek and Sylwester. Another point is that probably OOPS later
->> should not happen...
+The CCI PMU driver bears some legacy remnants of the arm_pmu framework
+from when it was split in c6f85cb4305b ("bus: cci: move away from
+arm_pmu framework"). In particular this perf_pmu_{dis,en}able() dance
+around pmu->add which was fixed for arm_pmu in a9e469d1c89b
+("drivers/perf: arm_pmu: remove pointless PMU disabling").
 
-> Separate topic (trim Cc list):
-> 
-> ... and this means that disabling Exynos DRM causes lack of Audio. I
-> tried it now and indeed without DRM there is no audio again. I think
-> it is not nice... There are not many such use cases but there are
-> (playing audio from console/ssh with a headless board).\
+For the exact same reasons (i.e. perf core already does this around the
+call anyway), give cci_pmu_add() the exact same change, which also
+prevents having to export those core functions to build it as a module.
 
-As we discussed off the mailing list, what we could probably do now
-is to add a compile time dependency on CONFIG_DRM_EXYNOS_HDMI, a fallback
-to the max98098 codec only when the HDMI driver is disabled. 
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-That might require modifying snd_soc_of_get_dai_link_codecs() so it can 
-skip optional codecs.
+v2: Add Mark's ack
 
+ drivers/perf/arm-cci.c | 13 +++----------
+ 1 file changed, 3 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
+index 53c774b20563..7029d8fe8f44 100644
+--- a/drivers/perf/arm-cci.c
++++ b/drivers/perf/arm-cci.c
+@@ -1184,16 +1184,11 @@ static int cci_pmu_add(struct perf_event *event, int flags)
+ 	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
+ 	struct hw_perf_event *hwc = &event->hw;
+ 	int idx;
+-	int err = 0;
+-
+-	perf_pmu_disable(event->pmu);
+ 
+ 	/* If we don't have a space for the counter then finish early. */
+ 	idx = pmu_get_event_idx(hw_events, event);
+-	if (idx < 0) {
+-		err = idx;
+-		goto out;
+-	}
++	if (idx < 0)
++		return idx;
+ 
+ 	event->hw.idx = idx;
+ 	hw_events->events[idx] = event;
+@@ -1205,9 +1200,7 @@ static int cci_pmu_add(struct perf_event *event, int flags)
+ 	/* Propagate our changes to the userspace mapping. */
+ 	perf_event_update_userpage(event);
+ 
+-out:
+-	perf_pmu_enable(event->pmu);
+-	return err;
++	return 0;
+ }
+ 
+ static void cci_pmu_del(struct perf_event *event, int flags)
 -- 
-Regards,
-Sylwester
+2.17.0.dirty
