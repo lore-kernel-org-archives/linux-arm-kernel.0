@@ -1,125 +1,152 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Mon, 14 May 2018 22:40:15 +0200
-Subject: [PATCH v4 1/3] drm/panel: Add RGB666 variant of Innolux AT070TN90
-In-Reply-To: <20180511085938.wjmdsdjfvdxd4shk@flea>
-References: <20180507220413.21990-1-contact@paulk.fr>
- <20180509071226.ivh4s3wtczg2u7zw@flea>
- <c8ab5f472881063b90abe9461933baf6ee325dcd.camel@paulk.fr>
- <20180511085938.wjmdsdjfvdxd4shk@flea>
-Message-ID: <abeac1ee792b8f063001c4c280ca7f0167ac59be.camel@paulk.fr>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 14 May 2018 22:40:58 +0200
+Subject: [PATCH v2 26/26] drm/bridge: establish a link between the bridge
+ supplier and consumer
+In-Reply-To: <20180514162828.GE28661@phenom.ffwll.local>
+References: <20180504135212.26977-1-peda@axentia.se>
+ <CGME20180504135432epcas3p368bb7541ca52bc8bc301dec794851214@epcas3p3.samsung.com>
+ <20180504135212.26977-27-peda@axentia.se>
+ <a723ad4a-8caa-4ff5-d39d-52db98a56d7b@samsung.com>
+ <c25f81e0-5b7b-c605-5b58-0ecc88830124@axentia.se>
+ <20180514162828.GE28661@phenom.ffwll.local>
+Message-ID: <73fa1ca3-28e4-96c5-1fc6-23e9c0cebb49@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Le vendredi 11 mai 2018 ? 10:59 +0200, Maxime Ripard a ?crit :
-> On Wed, May 09, 2018 at 01:31:23PM +0200, Paul Kocialkowski wrote:
-> > On Wed, 2018-05-09 at 09:12 +0200, Maxime Ripard wrote:
-> > > On Tue, May 08, 2018 at 12:04:11AM +0200, Paul Kocialkowski wrote:
-> > > > This adds timings for the RGB666 variant of the Innolux AT070TN90 panel,
-> > > > as found on the Ainol AW1 tablet.
-> > > > 
-> > > > The panel also supports RGB888 output. When RGB666 mode is used instead,
-> > > > the two extra lanes per component are grounded.
-> > > > 
-> > > > In the future, it might become necessary to introduce a dedicated
-> > > > device-tree property to specify the bus format to use instead of the
-> > > > default one for the panel. This will allow supporting different bus
-> > > > formats for the same panel modes.
-> > > > 
-> > > > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> > > > ---
-> > > >  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
-> > > >  1 file changed, 26 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-> > > > index cbf1ab404ee7..32e30d5a8f08 100644
-> > > > --- a/drivers/gpu/drm/panel/panel-simple.c
-> > > > +++ b/drivers/gpu/drm/panel/panel-simple.c
-> > > > @@ -1063,6 +1063,29 @@ static const struct panel_desc innolux_at043tn24 = {
-> > > >  	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> > > >  };
-> > > >  
-> > > > +static const struct drm_display_mode innolux_at070tn90_mode = {
-> > > > +	.clock = 40000,
-> > > > +	.hdisplay = 800,
-> > > > +	.hsync_start = 800 + 112,
-> > > > +	.hsync_end = 800 + 112 + 1,
-> > > > +	.htotal = 800 + 112 + 1 + 87,
-> > > > +	.vdisplay = 480,
-> > > > +	.vsync_start = 480 + 141,
-> > > > +	.vsync_end = 480 + 141 + 1,
-> > > > +	.vtotal = 480 + 141 + 1 + 38,
-> > > > +	.vrefresh = 60,
-> > > > +};
-> > > > +
-> > > > +static const struct panel_desc innolux_at070tn90 = {
-> > > > +	.modes = &innolux_at070tn90_mode,
-> > > > +	.num_modes = 1,
-> > > > +	.size = {
-> > > > +		.width = 154,
-> > > > +		.height = 86,
-> > > > +	},
-> > > > +	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-> > > > +};
-> > > > +
-> > > 
-> > > I'm not really convinced this is the right approach. You said it
-> > > yourself, the panel is using a 24-bits interface, and you just happen
-> > > to have a tablet that routed it using a 18-bits interface instead.
-> > > 
-> > > That doesn't belong in the driver, especially associated to the
-> > > compatible, but where the routing is described: in the device
-> > > tree. And given that the panel interface is a 24 bits panel, if we
-> > > were to have a default, we should have this one, and not the one
-> > > fitting your use case.
-> > 
-> > I fully agree, this is why I suggested introducing a dedicated dt
-> > property for selecting the bus format (in the commit message). I still
-> > proposed this patch as a temporary solution, but I'm definitely willing
-> > to craft a proper solution as well.
-> > 
-> > Here is an initial proposition:
-> > 1. Making bus_format an array in struct panel_desc and listing all the
-> > relevant bus formats that the panel can support there;
+On 2018-05-14 18:28, Daniel Vetter wrote:
+> On Fri, May 11, 2018 at 09:37:47AM +0200, Peter Rosin wrote:
+>> On 2018-05-10 10:10, Andrzej Hajda wrote:
+>>> On 04.05.2018 15:52, Peter Rosin wrote:
+>>>> If the bridge supplier is unbound, this will bring the bridge consumer
+>>>> down along with the bridge. Thus, there will no longer linger any
+>>>> dangling pointers from the bridge consumer (the drm_device) to some
+>>>> non-existent bridge supplier.
+>>>>
+>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>>>> ---
+>>>>  drivers/gpu/drm/drm_bridge.c | 18 ++++++++++++++++++
+>>>>  include/drm/drm_bridge.h     |  2 ++
+>>>>  2 files changed, 20 insertions(+)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
+>>>> index 78d186b6831b..0259f0a3ff27 100644
+>>>> --- a/drivers/gpu/drm/drm_bridge.c
+>>>> +++ b/drivers/gpu/drm/drm_bridge.c
+>>>> @@ -26,6 +26,7 @@
+>>>>  #include <linux/mutex.h>
+>>>>  
+>>>>  #include <drm/drm_bridge.h>
+>>>> +#include <drm/drm_device.h>
+>>>>  #include <drm/drm_encoder.h>
+>>>>  
+>>>>  #include "drm_crtc_internal.h"
+>>>> @@ -127,12 +128,25 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
+>>>>  	if (bridge->dev)
+>>>>  		return -EBUSY;
+>>>>  
+>>>> +	if (encoder->dev->dev != bridge->odev) {
+>>>
+>>> I wonder why device_link_add does not handle this case (self dependency)
+>>> silently as noop, as it seems to be a correct behavior.
+>>
+>> It's kind-of a silly corner-case though, so perfectly understandable
+>> that it isn't handled.
+>>
+>>>> +		bridge->link = device_link_add(encoder->dev->dev,
+>>>> +					       bridge->odev, 0);
+>>>> +		if (!bridge->link) {
+>>>> +			dev_err(bridge->odev, "failed to link bridge to %s\n",
+>>>> +				dev_name(encoder->dev->dev));
+>>>> +			return -EINVAL;
+>>>> +		}
+>>>> +	}
+>>>> +
+>>>>  	bridge->dev = encoder->dev;
+>>>>  	bridge->encoder = encoder;
+>>>>  
+>>>>  	if (bridge->funcs->attach) {
+>>>>  		ret = bridge->funcs->attach(bridge);
+>>>>  		if (ret < 0) {
+>>>> +			if (bridge->link)
+>>>> +				device_link_del(bridge->link);
+>>>> +			bridge->link = NULL;
+>>>>  			bridge->dev = NULL;
+>>>>  			bridge->encoder = NULL;
+>>>>  			return ret;
+>>>> @@ -159,6 +173,10 @@ void drm_bridge_detach(struct drm_bridge *bridge)
+>>>>  	if (bridge->funcs->detach)
+>>>>  		bridge->funcs->detach(bridge);
+>>>>  
+>>>> +	if (bridge->link)
+>>>> +		device_link_del(bridge->link);
+>>>> +	bridge->link = NULL;
+>>>> +
+>>>>  	bridge->dev = NULL;
+>>>>  }
+>>>>  
+>>>> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+>>>> index b656e505d11e..804189c63a4c 100644
+>>>> --- a/include/drm/drm_bridge.h
+>>>> +++ b/include/drm/drm_bridge.h
+>>>> @@ -261,6 +261,7 @@ struct drm_bridge_timings {
+>>>>   * @list: to keep track of all added bridges
+>>>>   * @timings: the timing specification for the bridge, if any (may
+>>>>   * be NULL)
+>>>> + * @link: drm consumer <-> bridge supplier
+>>>
+>>> Nitpick: "<->" suggests symmetry, maybe "device link from drm consumer
+>>> to the bridge" would be better.
+>>
+>> I meant "<->" to indicate that the link is bidirectional, not that the
+>> relationship is in any way symmetric. I wasn't aware of any implication
+>> of a symmetric relationship when using "<->", do you have a reference?
+>> But I guess the different arrow notations in math are somewhat overloaded
+>> and that someone at some point must have used "<->" to indicate a
+>> symmetric relationship...
 > 
-> I'm not sure this is needed, the input format is always the same in
-> your case, the panel will always take a 24 bits RGB value. What you
-> want to change is the encoder output format (and I guess you want that
-> to be meaningful to enable or not the dithering).
+> Yeah I agree with Andrzej here, for me <-> implies a symmetric
+> relationship. Spelling it out like Andrzej suggested sounds like the
+> better idea.
+> -Daniel
 
-Isn't the panel format supposed to match what the encoder's output
-should be aiming for? In my case, that would be RGB666, so the idea
-would be specifying both MEDIA_BUS_FMT_RGB666_1X18 and
-MEDIA_BUS_FMT_RGB888_1X24 in a list of supported bus formats for the
-panel. This way, both my setup and RGB888 setups can be supported.
+Ok, I guess that means I have to do a v3 after all. Or can this
+trivial documentation update be done by the committer? I hate to
+spam everyone with another volley...
 
-> > 2. Introducing an optional "bus-format" dt property that indicates which
-> > bus format to use, and using the first index of the bus formats array if
-> > the property is not present;
-> 
-> I guess the width would be enough, and that way we can take the
-> bus-width format that is already defined (but used in the v4l2
-> framework, not in DRM yet).
-
-Well, we already have bus-format defines on the DRM side and it feels
-like mapping these directly in device-tree would be more useful as a
-description of the hardware than just having the bus width.
+Or perhaps I should squash patches 2-23 that are all rather similar
+and mechanic? I separated them to allow for easier review from
+individual driver maintainers, but that didn't seem to happen
+anyway...
 
 Cheers,
+Peter
 
-Paul
-
--- 
-Developer of free digital technology and hardware support.
-
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/0cca7363/attachment.sig>
+> 
+>>
+>>> Anyway:
+>>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+>>
+>> Thanks!
+>>
+>> Cheers,
+>> Peter
+>>
+>>> ?--
+>>> Regards
+>>> Andrzej
+>>>
+>>>>   * @funcs: control functions
+>>>>   * @driver_private: pointer to the bridge driver's internal context
+>>>>   */
+>>>> @@ -271,6 +272,7 @@ struct drm_bridge {
+>>>>  	struct drm_bridge *next;
+>>>>  	struct list_head list;
+>>>>  	const struct drm_bridge_timings *timings;
+>>>> +	struct device_link *link;
+>>>>  
+>>>>  	const struct drm_bridge_funcs *funcs;
+>>>>  	void *driver_private;
+>>>
+>>>
+>>
+> 
