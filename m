@@ -1,61 +1,35 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 10:46:34 +0100
-Subject: [PATCH 12/18] kernel: add ksys_personality()
+Date: Mon, 14 May 2018 10:46:36 +0100
+Subject: [PATCH 14/18] arm64: remove in-kernel call to sys_personality()
 In-Reply-To: <20180514094640.27569-1-mark.rutland@arm.com>
 References: <20180514094640.27569-1-mark.rutland@arm.com>
-Message-ID: <20180514094640.27569-13-mark.rutland@arm.com>
+Message-ID: <20180514094640.27569-15-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using this helper allows us to avoid the in-kernel call to the
-sys_personality() syscall. The ksys_ prefix denotes that this function
-is meant as a drop-in replacement for the syscall. In particular, it
-uses the same calling convention as sys_personality().
-
-This is necessary to enable conversion of arm64's syscall handling to
-use pt_regs wrappers.
+With pt_regs syscall wrappers, the calling convention for
+sys_personality() will change. Use ksys_personality(), which is
+functionally equivalent.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Al Viro <viro@zeniv.linux.org.uk>
-Cc: Dominik Brodowski <linux@dominikbrodowski.net>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- include/linux/syscalls.h | 1 +
- kernel/exec_domain.c     | 7 ++++++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/sys.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index 70fcda1a9049..6723ea51ec99 100644
---- a/include/linux/syscalls.h
-+++ b/include/linux/syscalls.h
-@@ -1148,6 +1148,7 @@ unsigned long ksys_mmap_pgoff(unsigned long addr, unsigned long len,
- 			      unsigned long prot, unsigned long flags,
- 			      unsigned long fd, unsigned long pgoff);
- ssize_t ksys_readahead(int fd, loff_t offset, size_t count);
-+unsigned int ksys_personality(unsigned int personality);
+diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+index 31045f3fed92..a82c3f7a9a90 100644
+--- a/arch/arm64/kernel/sys.c
++++ b/arch/arm64/kernel/sys.c
+@@ -42,7 +42,7 @@ SYSCALL_DEFINE1(arm64_personality, unsigned int, personality)
+ 	if (personality(personality) == PER_LINUX32 &&
+ 		!system_supports_32bit_el0())
+ 		return -EINVAL;
+-	return sys_personality(personality);
++	return ksys_personality(personality);
+ }
  
  /*
-  * The following kernel syscall equivalents are just wrappers to fs-internal
-diff --git a/kernel/exec_domain.c b/kernel/exec_domain.c
-index a5697119290e..4ba2b404cba2 100644
---- a/kernel/exec_domain.c
-+++ b/kernel/exec_domain.c
-@@ -47,7 +47,7 @@ static int __init proc_execdomains_init(void)
- module_init(proc_execdomains_init);
- #endif
- 
--SYSCALL_DEFINE1(personality, unsigned int, personality)
-+unsigned int ksys_personality(unsigned int personality)
- {
- 	unsigned int old = current->personality;
- 
-@@ -56,3 +56,8 @@ SYSCALL_DEFINE1(personality, unsigned int, personality)
- 
- 	return old;
- }
-+
-+SYSCALL_DEFINE1(personality, unsigned int, personality)
-+{
-+	return ksys_personality(personality);
-+}
 -- 
 2.11.0
