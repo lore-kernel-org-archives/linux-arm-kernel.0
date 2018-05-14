@@ -1,18 +1,19 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 May 2018 23:25:33 +0200
-Subject: [PATCH 05/12] platform: export platform_device_release() locally
-In-Reply-To: <20180511162028.20616-6-brgl@bgdev.pl>
+Date: Mon, 14 May 2018 23:25:46 +0200
+Subject: [PATCH 06/12] of: add a new flag for OF device nodes
+In-Reply-To: <20180511162028.20616-7-brgl@bgdev.pl>
 References: <20180511162028.20616-1-brgl@bgdev.pl>
- <20180511162028.20616-6-brgl@bgdev.pl>
-Message-ID: <CAMuHMdX6hvFgOqKopY+CLiktU-XeVZbAXcFma7r7RAXf3+oJbA@mail.gmail.com>
+ <20180511162028.20616-7-brgl@bgdev.pl>
+Message-ID: <CAMuHMdWbmdGWz_h_77iHX6=ooadOHsiCMo1-iH33qw-4wZO4CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, May 11, 2018 at 6:20 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >
-> The early platform driver mechanism will use this function as the
-> device release callback. Make it available in drivers/base.
+> This flag indicates that a device node has been populated early and
+> that it needs different handling when called from
+> of_platform_populate().
 >
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
