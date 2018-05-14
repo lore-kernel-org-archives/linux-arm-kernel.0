@@ -1,72 +1,71 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 14 May 2018 11:01:36 -0700
-Subject: [patch v20 1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1526314803-3532-2-git-send-email-oleksandrs@mellanox.com>
-References: <1526314803-3532-1-git-send-email-oleksandrs@mellanox.com>
- <1526314803-3532-2-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <338d958b-f3c3-15b8-32b9-9d30bfb348b5@infradead.org>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 14 May 2018 23:33:40 +0530
+Subject: [PATCH 4/6] drm/panel: simple: Add support for Banana Pi 7"
+ S070WV20-CT16 panel
+In-Reply-To: <20180419093225.614-5-wens@csie.org>
+References: <20180419093225.614-1-wens@csie.org>
+ <20180419093225.614-5-wens@csie.org>
+Message-ID: <CAMty3ZD7MbvX5eJ9U4QZRSPTXKD3Ps=hQF2hJSsF17YosXFmmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2018 09:20 AM, Oleksandr Shamray wrote:
-
-Hi,
-Just a bit more Kconfig fixing below.
-
+On Thu, Apr 19, 2018 at 3:02 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> This panel is marketed as Banana Pi 7" LCD display. On the back is
+> a sticker denoting the model name S070WV20-CT16.
+>
+> This is a 7" 800x480 panel connected through a 24-bit RGB interface.
+> However the panel only does 262k colors.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  Documentation/ioctl/ioctl-number.txt |    2 +
->  MAINTAINERS                          |   10 ++
->  drivers/Kconfig                      |    2 +
->  drivers/Makefile                     |    1 +
->  drivers/jtag/Kconfig                 |   18 +++
->  drivers/jtag/Makefile                |    1 +
->  drivers/jtag/jtag.c                  |  274 ++++++++++++++++++++++++++++++++++
->  include/linux/jtag.h                 |   41 +++++
->  include/uapi/linux/jtag.h            |  105 +++++++++++++
->  9 files changed, 454 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/jtag/Kconfig
->  create mode 100644 drivers/jtag/Makefile
->  create mode 100644 drivers/jtag/jtag.c
->  create mode 100644 include/linux/jtag.h
->  create mode 100644 include/uapi/linux/jtag.h
-
-> diff --git a/drivers/jtag/Kconfig b/drivers/jtag/Kconfig
+>  .../display/panel/bananapi,s070wv20-ct16.txt  |  7 ++++++
+>  drivers/gpu/drm/panel/panel-simple.c          | 25 +++++++++++++++++++
+>  2 files changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
+>
+> diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
 > new file mode 100644
-> index 0000000..ba72a2b
+> index 000000000000..2ec35ce36e9a
 > --- /dev/null
-> +++ b/drivers/jtag/Kconfig
-> @@ -0,0 +1,18 @@
-> +menuconfig JTAG
-> +	tristate "JTAG support"
-> +	help
-> +	  This provides basic core functionality support for JTAG class devices
-
-(end sentence above with '.')                                           devices.
-
-> +	  Hardware that is equipped with a JTAG microcontroller can be
-> +	  supported by using this driver's interfaces.
-> +	  This driver exposes a set of IOCTL to the user space for
-
-	                               IOCTLs
-
-> +	  another commands:
-
-	  various commands:
-or
-	  the following commands:
-or
-	  associated commands:
-
-> +	  SDR: (Scan Data Register) Performs an IEEE 1149.1 Data Register scan
-> +	  SIR: (Scan Instruction Register) Performs an IEEE 1149.1 Instruction
-> +	  Register scan.
-> +	  RUNTEST: Forces the IEEE 1149.1 bus to a run state for a specified
-> +	  number of clocks or a specified time period.
+> +++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
+> @@ -0,0 +1,7 @@
+> +Banana Pi 7" (S070WV20-CT16) TFT LCD Panel
 > +
-> +	  If you want this support, you should say Y here.
+> +Required properties:
+> +- compatible: should be "bananapi,s070wv20-ct16"
 > +
-> +	  To compile this driver as a module, choose M here: the module will
-> +	  be called jtag.
-thanks,
--- 
-~Randy
+> +This binding is compatible with the simple-panel binding, which is specified
+> +in simple-panel.txt in this directory.
+> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> index cbf1ab404ee7..9bc037f74d6c 100644
+> --- a/drivers/gpu/drm/panel/panel-simple.c
+> +++ b/drivers/gpu/drm/panel/panel-simple.c
+> @@ -745,6 +745,28 @@ static const struct panel_desc avic_tm070ddh03 = {
+>         },
+>  };
+>
+> +static const struct drm_display_mode bananapi_s070wv20_ct16_mode = {
+> +       .clock = 30000,
+> +       .hdisplay = 800,
+> +       .hsync_start = 800 + 40,
+> +       .hsync_end = 800 + 40 + 48,
+> +       .htotal = 800 + 40 + 48 + 40,
+> +       .vdisplay = 480,
+> +       .vsync_start = 480 + 13,
+> +       .vsync_end = 480 + 13 + 3,
+> +       .vtotal = 480 + 13 + 3 + 29,
+> +};
+> +
+> +static const struct panel_desc bananapi_s070wv20_ct16 = {
+> +       .modes = &bananapi_s070wv20_ct16_mode,
+> +       .num_modes = 1,
+> +       .bpc = 6,
+> +       .size = {
+> +               .width = 154,
+> +               .height = 86,
+> +       },
+> +};
+
+I think this parallel RGB interface right? I too have same display
+with DSI I'm sure these setting will not useful right? do we need to
+write separate panel driver for that?
