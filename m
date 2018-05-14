@@ -1,59 +1,59 @@
-From: djw@t-chip.com.cn (Levin Du)
-Date: Mon, 14 May 2018 09:28:40 +0800
-Subject: [PATCH v1 3/5] arm64: dts: rockchip: Add gpio-syscon10 to rk3328
-In-Reply-To: <CAL_JsqLujC0nx9LpkWuSR0+fsZn4UJL9Ln6SHWyBmZ-7ErMzfw@mail.gmail.com>
-References: <1525943800-14095-1-git-send-email-djw@t-chip.com.cn>
- <1525943800-14095-4-git-send-email-djw@t-chip.com.cn>
- <76f2bbde-e158-a186-f136-9fb610a810c5@arm.com>
- <3fdfcc9b-90b5-191c-37e0-c99389a4e872@t-chip.com.cn>
- <CAL_JsqLujC0nx9LpkWuSR0+fsZn4UJL9Ln6SHWyBmZ-7ErMzfw@mail.gmail.com>
-Message-ID: <62ff43c8-8f98-1bc4-b208-c2bed4bf192e@t-chip.com.cn>
+From: david@lechnology.com (David Lechner)
+Date: Sun, 13 May 2018 20:50:04 -0500
+Subject: =?UTF-8?Q?Re:_[PATCH_v10_00/27]_ARM:_davinci:_convert_to_common_clo?=
+ =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
+In-Reply-To: <CAHCN7xJ6+vmyrTQGYH=pKz5GRf7rLT4otreNgu6TJi_3UAEX5w@mail.gmail.com>
+References: <20180509172606.29387-1-david@lechnology.com>
+ <CAHCN7xJ6+vmyrTQGYH=pKz5GRf7rLT4otreNgu6TJi_3UAEX5w@mail.gmail.com>
+Message-ID: <ba7da252-20be-590b-74fb-0ca4a04beba7@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-11 8:24 PM, Rob Herring wrote:
-> On Thu, May 10, 2018 at 10:45 PM, Levin Du <djw@t-chip.com.cn> wrote:
->> On 2018-05-10 8:50 PM, Robin Murphy wrote:
->>> On 10/05/18 10:16, djw at t-chip.com.cn wrote:
->>>> From: Levin Du <djw@t-chip.com.cn>
->>>>
->>>> Adding a new gpio controller named "gpio-syscon10" to rk3328, providing
->>>> access to the pins defined in the syscon GRF_SOC_CON10.
->>>
->>> This is the GPIO_MUTE pin, right? The public TRM is rather vague, but
->>> cross-referencing against the datasheet and schematics implies that it's the
->>> "gpiomut_*" part of the GRF bit names which is most significant.
->>>
->>> It might be worth using a more descriptive name here, since "syscon10" is
->>> pretty much meaningless at the board level.
->>>
->>> Robin.
->>>
->> Previously I though other bits might be able to reference from syscon10,
->> other than GPIO_MUTE alone.
->> If it is renamed to gpio-mute, then the GPIO_MUTE pin is accessed as
->> `<&gpio-mute 1>`. Yet other
->> bits in syscon10 can also be referenced, say, `<&gpio-mute 10>`, which is
->> not good.
+On 05/13/2018 07:40 PM, Adam Ford wrote:
+> On Wed, May 9, 2018 at 12:25 PM, David Lechner <david@lechnology.com> wrote:
+>> This series converts mach-davinci to use the common clock framework.
 >>
->> I'd like to add a `gpio,syscon-bit` property to gpio-syscon, which overrides
->> the properties
->> of bit_count,  data_bit_offset and dir_bit_offset in the driver. For
-> No. Once you are describing individual register bits, it is too low
-> level for DT.
+>> The series works like this, the first 3 patches fix some issues with the clock
+>> drivers that have already been accepted into the mainline kernel.
+>>
+>> Then, starting with "ARM: davinci: pass clock as parameter to
+>> davinci_timer_init()", we get the mach code ready for the switch by adding the
+>> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
+>> around the legacy clocks so that we can switch easily between the old and the
+>> new.
+>>
+>> "ARM: davinci: switch to common clock framework" actually flips the switch
+>> to start using the new clock drivers. Then the next 8 patches remove all
+>> of the old clock code.
+>>
+>> The final four patches add device tree clock support to the one SoC that
+>> supports it.
+>>
+>> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
+>> board file).
+>>
+> 
+> I am not sure if I did something wrong, but I attempted to build and I
+> wasn't able to boot the da850-evm.dtb your repo common-clk-v11,
+> however the legacy board file boot was OK.
+> 
+> make davinci_all_defconfig ARCH=arm
+> make zImage modules da850-evm.dtb ARCH=arm CROSS_COMPILE=arm-linux- -j8
+> 
+> 3140416 bytes read in 1464 ms (2 MiB/s)
+> 20353 bytes read in 15 ms (1.3 MiB/s)
+> ## Flattened Device Tree blob at c0600000
+>     Booting using the fdt blob at 0xc0600000
+>     Loading Device Tree to c7e57000, end c7e5ef80 ... OK
+> 
+> Starting kernel ...
+> 
+> Uncompressing Linux... done, booting the kernel.
+> 
+> (and hang)
+> 
+> If you have some suggestions, I am try them as I get time.
+> 
 
-Okay. So I'll rename it to gpio_mute, and reference the output pin as 
-<&gpio_mute 1>:
-
-+               // Use <&gpio_mute 1> to ref to GPIO_MUTE pin
-+		gpio_mute: gpio-mute {
-+			compatible = "rockchip,gpio-syscon";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <0 0x0428 0>;
-+		};
-  	};
-
-
-Thanks
-Levin
+As with each revision of this series, I have included debugging tips
+in the cover letter, e.g. earlyprink and not disabling unused clocks.
