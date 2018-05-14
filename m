@@ -1,39 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 01:04:12 -0700
-Subject: [GIT PULL] one bug fix and other omap fixes for v4.17-rc cycle
-In-Reply-To: <pull-1525967831-865303@atomide.com>
-References: <pull-1525967831-865303@atomide.com>
-Message-ID: <20180514080412.e2d7djqhj6yuy5qx@localhost>
+Date: Mon, 14 May 2018 01:05:06 -0700
+Subject: [GIT PULL] firmware: scmi: fixes for v4.17 (part 2)
+In-Reply-To: <20180511132942.GA18590@e107155-lin>
+References: <20180511132942.GA18590@e107155-lin>
+Message-ID: <20180514080506.v6svbjukel23os6y@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 09:00:26AM -0700, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Fri, May 11, 2018 at 02:29:42PM +0100, Sudeep Holla wrote:
+> Hi ARM-SoC team,
 > 
-> The following changes since commit fb289e3ab10c16834741bb02be740fa9d025fde0:
+> Please pull !
 > 
->   Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes (2018-04-19 15:48:46 -0700)
+> Regards,
+> Sudeep
 > 
-> are available in the Git repository at:
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v17/fixes-rc4
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> for you to fetch changes up to 41bd6adf3c5d3990d7a67639aff53d54483744fa:
+> are available in the git repository at:
 > 
->   Revert "ARM: dts: logicpd-som-lv: Fix pinmux controller references" (2018-05-07 08:28:17 -0700)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-fixes-4.17
+> 
+> for you to fetch changes up to 31c6085562a03124d3f6a5c43dd9888ac44495a5:
+> 
+>   firmware: arm_scmi: Use after free in scmi_create_protocol_device() (2018-05-08 18:03:47 +0100)
 > 
 > ----------------------------------------------------------------
-> Fixes for omap variants for v4.17
+> SCMI fix for v4.17
 > 
-> This series of patches contains one BUG fix for trace if
-> CONFIG_DEBUG_PREEMPT is enabled and a regression fix for omap1 FIQ
-> handling on ams-delta. Then there's a dts fix for missing SoC
-> compatible on ti81xx board dts files that did matter until we added
-> the clkctrl clocks and without that some clocks are now not found.
-> 
-> Then there are two logicpd-som-lv specific dts fixes that fix
-> misconfigured pins for WLAN and audio. Turns out we had to revert
-> the third one because it caused another regression for USB.
+> A single patch to ensure that the scmi device is not used for setting up
+> scmi handle after it's freed(fixes use after free).
 
 Merged, thanks.
 
