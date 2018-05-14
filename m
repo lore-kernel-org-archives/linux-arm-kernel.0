@@ -1,117 +1,79 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 14 May 2018 11:54:48 -0700
-Subject: [PATCH v2] coresight: documentation: update sysfs section
-In-Reply-To: <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
-References: <20180507172915.c032cd71c07b1849bf419a5f@arm.com>
- <CANLsYkyQLan3XajOz2uuoOF8OQchGfeu2ZkZJ9H1Xm9q==aXTw@mail.gmail.com>
- <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
-Message-ID: <a09cbbb5-0237-31f5-dc81-d816c9ec26c5@infradead.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 14 May 2018 20:57:17 +0200
+Subject: [PATCH 07/11] driver core: Respect all error codes from
+ dev_pm_domain_attach()
+In-Reply-To: <20180514151907.GK98604@atomide.com>
+References: <1524732790-2234-1-git-send-email-ulf.hansson@linaro.org>
+ <1524732790-2234-8-git-send-email-ulf.hansson@linaro.org>
+ <20180514151907.GK98604@atomide.com>
+Message-ID: <CAPDyKFqY5u3=db7-Xd9JXWo228PSNbH7-m-QNfSY9z8Z3p8t8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2018 10:19 AM, Kim Phillips wrote:
-> - Align and show updated ls devices output from the TC2, based on
->   current driver
-> 
-> - Provide an example from an ETMv4 based system (Juno)
-> 
-> - Reflect changes to the way the RAM write pointer is accessed since
->   it got changed in commit 7d83d17795ef ("coresight: tmc: adding sysFS
->   management entries").
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
-> ---
-> v2: address Mathieu's comment about clarifying the sinks on the Juno
-> vs. TC2 platforms.
-> 
->  Documentation/trace/coresight.txt | 41 +++++++++++++++++++------------
->  1 file changed, 25 insertions(+), 16 deletions(-)
-> 
-> diff --git a/Documentation/trace/coresight.txt
-> b/Documentation/trace/coresight.txt index 6f0120c3a4f1..134994e9fa6d
-> 100644
-> --- a/Documentation/trace/coresight.txt
-> +++ b/Documentation/trace/coresight.txt
-> @@ -144,10 +144,22 @@ If everything goes well during the registration
-> process the new devices will show up under /sys/bus/coresight/devices,
-> as showns here for a TC2 platform: 
+On 14 May 2018 at 17:19, Tony Lindgren <tony@atomide.com> wrote:
+> Ulf,
+>
+> * Ulf Hansson <ulf.hansson@linaro.org> [180426 09:01]:
+>> The limitation of being able to check only for -EPROBE_DEFER from
+>> dev_pm_domain_attach() has been removed. Hence let's respect all error
+>> codes and bail out accordingly.
+>>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/base/platform.c | 17 ++++++++---------
+>>  1 file changed, 8 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+>> index 8075ddc..9460139 100644
+>> --- a/drivers/base/platform.c
+>> +++ b/drivers/base/platform.c
+>> @@ -572,17 +572,16 @@ static int platform_drv_probe(struct device *_dev)
+>>               return ret;
+>>
+>>       ret = dev_pm_domain_attach(_dev, true);
+>> -     if (ret != -EPROBE_DEFER) {
+>> -             if (drv->probe) {
+>> -                     ret = drv->probe(dev);
+>> -                     if (ret)
+>> -                             dev_pm_domain_detach(_dev, true);
+>> -             } else {
+>> -                     /* don't fail if just dev_pm_domain_attach failed */
+>> -                     ret = 0;
+>> -             }
+>> +     if (ret)
+>> +             goto out;
+>> +
+>> +     if (drv->probe) {
+>> +             ret = drv->probe(dev);
+>> +             if (ret)
+>> +                     dev_pm_domain_detach(_dev, true);
+>>       }
+>>
+>> +out:
+>>       if (drv->prevent_deferred_probe && ret == -EPROBE_DEFER) {
+>>               dev_warn(_dev, "probe deferral not supported\n");
+>>               ret = -ENXIO;
+>> --
+>
+> Looks like this causes Linux next to not boot for me with device
+> probes failing with error -17. So that's at least omaps, looks
+> like kernelci has others failing too.
 
-  as shown here
+Yep, problem also reported for some Exynos5 platforms.
 
->  root:~# ls /sys/bus/coresight/devices/
-> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
-> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
-> +20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm
-> replicator +20030000.tpiu  2201c000.ptm	2203c000.etm
-> 2203e000.etm root:~#
->  
-> +and here for a Juno platform:
-> +
-> +root at juno:~# ls /sys/bus/coresight/devices/
-> +20010000.etf	 20120000.replicator  22040000.etm
-> 230c0000.funnel +20030000.tpiu	 20130000.funnel
-> 220c0000.funnel  23140000.etm +20040000.funnel
-> 20140000.etf	      22140000.etm     23240000.etm
-> +20070000.etr	 20150000.funnel      23040000.etm
-> 23340000.etm +root at juno:~# +
-> +Note that on Juno users can select the ETF, ETR and TPIU as a sink
-> target while +on TC2, the ETB and TPIU can be selected.
-> +
->  The functions take a "struct coresight_device", which looks like this:
->  
->  struct coresight_desc {
-> @@ -193,16 +205,16 @@ the information carried in "THIS_MODULE".
->  How to use the tracer modules
->  -----------------------------
->  
-> -Before trace collection can start, a coresight sink needs to be
-> identify. +Before trace collection can start, a coresight sink needs to
+Omap suffers from the similar problem, because of its SoC specific way
+of attaching devices to PM domains.
 
-The - and + lines seems to be merged...
+>
+> Reverting for 8c123c14bbba ("driver core: Respect all error codes from
+> dev_pm_domain_attach()") fixes the issue for me.
+>
+> Sounds like something is missing, any ideas?
 
-> be identified. There is no limit on the amount of sinks (nor sources)
-> that can be enabled at any given moment.  As a generic operation, all
-> device pertaining to the sink class will have an "active" entry in
-> sysfs: 
->  root:/sys/bus/coresight/devices# ls
-> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
-> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
-> +20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm
-> replicator +20030000.tpiu  2201c000.ptm	2203c000.etm
-> 2203e000.etm root:/sys/bus/coresight/devices# ls 20010000.etb
-> -enable_sink  status  trigger_cntr
-> +enable_sink  mgmt  power  subsystem  trigger_cntr  uevent
->  root:/sys/bus/coresight/devices# echo 1 > 20010000.etb/enable_sink
->  root:/sys/bus/coresight/devices# cat 20010000.etb/enable_sink
->  1
-> @@ -216,16 +228,13 @@ trigger a trace capture:
->  root:/sys/bus/coresight/devices# echo 1 > 2201c000.ptm/enable_source
->  root:/sys/bus/coresight/devices# cat 2201c000.ptm/enable_source
->  1
-> -root:/sys/bus/coresight/devices# cat 20010000.etb/status
-> -Depth:          0x2000
-> -Status:         0x1
-> -RAM read ptr:   0x0
-> -RAM wrt ptr:    0x19d3   <----- The write pointer is moving
-> -Trigger cnt:    0x0
-> -Control:        0x1
-> -Flush status:   0x0
-> -Flush ctrl:     0x2001
-> -root:/sys/bus/coresight/devices#
-> +
-> +Observe the write pointer moving:
-> +
-> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
-> +0x1a8
-> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
-> +0x19a6
->  
->  Trace collection is stopped the same way:
->  
-> 
+This should solve the problem:
 
+https://patchwork.kernel.org/patch/10398597/
 
--- 
-~Randy
+Kind regards
+Uffe
