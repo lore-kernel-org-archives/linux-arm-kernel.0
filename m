@@ -1,50 +1,40 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 14 May 2018 11:45:05 +0200
-Subject: [PATCH v2 04/13] soc: rockchip: power-domain: Fix wrong value
- when power up pd
-In-Reply-To: <1526268578-9361-1-git-send-email-zhangqing@rock-chips.com>
-References: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
- <1526268578-9361-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1861053.XlXe5vHN1s@phil>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 May 2018 10:46:23 +0100
+Subject: [PATCH 01/18] arm64: consistently use unsigned long for thread flags
+In-Reply-To: <20180514094640.27569-1-mark.rutland@arm.com>
+References: <20180514094640.27569-1-mark.rutland@arm.com>
+Message-ID: <20180514094640.27569-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
+In do_notify_resume, we manipulate thread_flags as a 32-bit unsigned
+int, whereas thread_info::flags is a 64-bit unsigned long, and elsewhere
+(e.g. in the entry assembly) we manipulate the flags as a 64-bit
+quantity.
 
-Am Montag, 14. Mai 2018, 05:29:38 CEST schrieb Elaine Zhang:
-> From: Finley Xiao <finley.xiao@rock-chips.com>
-> 
-> Solve the pd could only ever turn off but never turn them on again,
-> If the pd registers have the writemask bits.
-> 
-> Fix up the code error for commit:
-> 	commit 79bb17ce8edb3141339b5882e372d0ec7346217c
-> 	Author: Elaine Zhang <zhangqing@rock-chips.com>
-> 	Date:   Fri Dec 23 11:47:52 2016 +0800
-> 
-> 	soc: rockchip: power-domain: Support domain control in hiword-registers
-> 
-> 	New Rockchips SoCs may have their power-domain control in registers
-> 	using a writemask-based access scheme (upper 16bit being the write
-> 	mask). So add a DOMAIN_M type and handle this case accordingly.
-> 	Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> 	Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+For consistency, and to avoid problems if we end up with more than 32
+flags, let's make do_notify_resume take the flags as a 64-bit unsigned
+long.
 
-As Gregs automated mail noted, the stable-notice needed some changes.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/signal.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I've done these changes and applied the result for 4.18.
-
-When you look at [0] you'll see  the two lines "Fixes:..." and "Cc:..."
-in the commit message. Greg then has automated scripts running that
-extract so marked patches from Linus' tree and queue them for possible
-stable-inclusion.
-
-[The other patches need to wait a bit to give Rob a chance to Ack them]
-
-Heiko
-
-
-[0] https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=ed726894761c056b3513ce15915af74ce5d7d57b
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 154b7d30145d..8e624fec4707 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -896,7 +896,7 @@ static void do_signal(struct pt_regs *regs)
+ }
+ 
+ asmlinkage void do_notify_resume(struct pt_regs *regs,
+-				 unsigned int thread_flags)
++				 unsigned long thread_flags)
+ {
+ 	/*
+ 	 * The assembly code enters us with IRQs off, but it hasn't
+-- 
+2.11.0
