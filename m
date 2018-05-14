@@ -1,50 +1,69 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 14 May 2018 18:47:20 +0200
-Subject: [PATCH] ghes_edac: enable HIP08 platform edac driver
-In-Reply-To: <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
-References: <1526039543-180996-1-git-send-email-zhengqiang10@huawei.com>
- <20180511121901.GA12705@pd.tnic> <5AF90C70.408@huawei.com>
- <20180514094709.GC23049@pd.tnic>
- <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
-Message-ID: <20180514164720.GH23049@pd.tnic>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 14 May 2018 18:48:58 +0200
+Subject: [PATCH] thermal: exynos: Reduce severity of too early
+ temperature read
+In-Reply-To: <20180513175402.28887-1-krzk@kernel.org>
+References: <CGME20180513175436epcas1p1475e12e647ec135d0fedd29e5992c152@epcas1p1.samsung.com>
+ <20180513175402.28887-1-krzk@kernel.org>
+Message-ID: <5680419.dyeeL7KHIb@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 04:12:08PM +0100, James Morse wrote:
-> I'm afraid I'd like to keep both doors open. Kernel-first handling will require
-> some ACPI-table/DT property as some aspects of the CPU extensions aren't
-> discover-able. Can't we use this to pick up whether the platform supports
-> firmware-first (HEST and GHES entries) or kernel-first via some as-yet-undefined
-> HEST bits?
+On Sunday, May 13, 2018 07:54:02 PM Krzysztof Kozlowski wrote:
+> Thermal core tries to read temperature during sensor registering in
+> thermal_zone_of_sensor_register().  In that time Exynos TMU driver and
+> hardware are not yet initialized.  Commit 0eb875d88aaa ("thermal:
+> exynos: Reading temperature makes sense only when TMU is turned on")
+> added a boolean flag to prevent reading bogus temperature in such
+> case but it exposed warning message during boot:
+> 	[    3.864913] thermal thermal_zone0: failed to read out thermal zone (-22)
+> 
+> Return EAGAIN in such case to skip omitting such message because it
+> might mislead user.
 
-So how you detect those platforms is largely undefined as we're walking
-new grounds here with the FF crap on the one hand and platform-specific
-drivers on the other. So whatever works for you and as long as the
-ugliness is nicely hidden. :-)
+Hi Krzysztof,
 
-> Without GHES entries this code would never be run. So we 'just' need to catch
-> systems that are describing both. (which can be the platform specific kernel
-> first bits problem to do)
+I've fixed this in generic way a month ago:
 
-So the reason why we're doing this on x86 is that the majority of
-GHES-advertizing platforms out there are a serious turd when it comes
-to functioning fw.
+	https://lkml.org/lkml/2018/4/10/376
 
-So we've opted for known-good platforms list where there's backing from
-the vendor to have firmware which is getting fixes and is being tested
-properly.
+(there has been not much feedback on it yet)
 
-And everything else we assume is crap. Thus we use the platform-specific
-EDAC driver which we know it works and we can fix if there's an issue.
-VS firmware which we can't. (I doubt anyone can, for that matter. :)...)
+However since my patchset is not v4.17 material:
 
-Anyway, this is the story in x86 land. JFYI guys in case it helps making
-some decisions.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Thx.
+Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
--- 
-Regards/Gruss,
-    Boris.
+Eduardo, please queue it for v4.17 if possible, thanks.
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+> ---
+>  drivers/thermal/samsung/exynos_tmu.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index 3b20309789e3..c24969d740d1 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -666,8 +666,14 @@ static int exynos_get_temp(void *p, int *temp)
+>  	struct exynos_tmu_data *data = p;
+>  	int value, ret = 0;
+>  
+> -	if (!data || !data->tmu_read || !data->enabled)
+> +	if (!data || !data->tmu_read)
+>  		return -EINVAL;
+> +	else if (!data->enabled)
+> +		/*
+> +		 * Called too early, probably
+> +		 * from thermal_zone_of_sensor_register().
+> +		 */
+> +		return -EAGAIN;
+>  
+>  	mutex_lock(&data->lock);
+>  	clk_enable(data->clk);
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
