@@ -1,83 +1,99 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 14 May 2018 14:34:22 +0530
-Subject: Allwinner A64: Issue on external rtc clock to wifi chip
-In-Reply-To: <20180514082744.ydmfg5mzsbol5onu@flea>
-References: <CAMty3ZCNyuEwmLGdDZLM_9qKJ2NsT33rodug7ZpKAE-OHymVEg@mail.gmail.com>
- <20180514075727.uxggyhmbahvhestx@flea>
- <CAMty3ZDew=+zytKUx5+nX27CjCe0UfJpyYOy2s07NoJvbe57mQ@mail.gmail.com>
- <20180514082744.ydmfg5mzsbol5onu@flea>
-Message-ID: <CAMty3ZC3ggxkZwirpQ-aRP8Udg=aYypBArb0KcR0_Z0AG8wATA@mail.gmail.com>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Mon, 14 May 2018 12:35:25 +0300
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <20180514051555.bpbydgr56hyffjch@salmiak>
+References: <20180502203326.9491-1-labbott@redhat.com>
+ <20180502203326.9491-3-labbott@redhat.com>
+ <20180503071917.xm2xvgagvzkworay@salmiak>
+ <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
+ <20180504110907.c2dw33kjmyybso6t@lakrids.cambridge.arm.com>
+ <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
+ <71199506-b46b-5f91-e489-e6450b6d1067@linux.com>
+ <20180511161317.57k6prl54xjmsit3@lakrids.cambridge.arm.com>
+ <f180b312-d1cf-3992-4e89-9632c1674cd6@linux.com>
+ <20180514051555.bpbydgr56hyffjch@salmiak>
+Message-ID: <6c311899-7131-d21b-10f6-d2ba7380a392@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 1:57 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Mon, May 14, 2018 at 01:34:56PM +0530, Jagan Teki wrote:
->> On Mon, May 14, 2018 at 1:27 PM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > Hi,
->> >
->> > On Mon, May 14, 2018 at 12:37:49PM +0530, Jagan Teki wrote:
->> >> Hi Maxime and All,
->> >>
->> >> We are trying to bring-up AP6330 Wifi chip for A64 board. We noticed
->> >> to have an external rtc clock has driven from wifi chip.
->> >>
->> >> So the devicetree is configured according to this as below.
->> >>
->> >> / {
->> >>         wifi_pwrseq: wifi-pwrseq {
->> >>                 compatible = "mmc-pwrseq-simple";
->> >>                 clocks = <&rtc 1>;
->> >>                 clock-names = "ext_clock";
->> >>                 reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
->> >>                 post-power-on-delay-ms = <400>;
->> >>         };
->> >> };
->> >>
->> >> &rtc {
->> >>         clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
->> >>         clocks = <&osc32k>;
->> >>         #clock-cells = <1>;
->> >> };
->> >>
->> >> &mmc1 {
->> >>         pinctrl-names = "default";
->> >>         pinctrl-0 = <&mmc1_pins>;
->> >>         vmmc-supply = <&reg_dcdc1>;
->> >>         vqmmc-supply = <&reg_eldo1>;
->> >>         mmc-pwrseq = <&wifi_pwrseq>;
->> >>         bus-width = <4>;
->> >>         non-removable;
->> >>         status = "okay";
->> >>
->> >>         brcmf: wifi at 1 {
->> >>                 reg = <1>;
->> >>                 compatible = "brcm,bcm4329-fmac";
->> >>                 interrupt-parent = <&r_pio>;
->> >>                 interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;  /* WL-WAKE-AP: PL3 */
->> >>                 interrupt-names = "host-wake";
->> >>         };
->> >> };
->> >>
->> >> And observed rtc-osc32k-out clock is never enabled[1] and the value of
->> >> LOSC_OUT_GATING is 0x0 which eventually not enabling
->> >> LOSC_OUT_GATING_EN
->> >>
->> >> Pls. let us know if we miss anything here?
->> >>
->> >> [1] https://paste.ubuntu.com/p/X2By4q8kD2/
->> >
->> > Could you paste your config and the logs from a boot to?
+On 14.05.2018 08:15, Mark Rutland wrote:
+> On Sun, May 13, 2018 at 11:40:07AM +0300, Alexander Popov wrote:
+>> It seems that previously I was very "lucky" to accidentally have those MIN_STACK_LEFT,
+>> call trace depth and oops=panic together to experience a hang on stack overflow
+>> during BUG().
 >>
->> .config
->> https://paste.ubuntu.com/p/w9w2KB7RFc/
 >>
->> dmesg
->> https://paste.ubuntu.com/p/mrZGk5bWRR/
->
-> This is kind of weird. Have you tested with a 4.17 kernel? We have
-> runtime_pm changes lined up in next, so that might be a regression
-> there, even though we tested it with Quentin at some point.
+>> When I run my test in a loop _without_ VMAP_STACK, I manage to corrupt the neighbour
+>> processes with BUG() handling overstepping the stack boundary. It's a pity, but
+>> I have an idea.
+> 
+> I think that in the absence of VMAP_STACK, there will always be cases where we
+> *could* corrupt a neighbouring stack, but I agree that trying to minimize that
+> possibility would be good.
 
-This is 4.17-rc4 do you want to try it on 4.16 ?
+Ok!
+
+>> In kernel/sched/core.c we already have:
+>>
+>> #ifdef CONFIG_SCHED_STACK_END_CHECK
+>>   	if (task_stack_end_corrupted(prev))
+>> 		panic("corrupted stack end detected inside scheduler\n");
+>> #endif
+>>
+>> So what would you think if I do the following in check_alloca():
+>>
+>> 	if (size >= stack_left) {
+>> #if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
+>> 		panic("alloca over the kernel stack boundary\n");
+>> #else
+>> 		BUG();
+>> #endif
+> 
+> Given this is already out-of-line, how about we always use panic(), regardless
+> of VMAP_STACK and SCHED_STACK_END_CHECK? i.e. just
+> 
+> 	if (unlikely(size >= stack_left))
+> 		panic("alloca over the kernel stack boundary");
+> 
+> If we have VMAP_STACK selected, and overflow during the panic, it's the same as
+> if we overflowed during the BUG(). It's likely that panic() will use less stack
+> space than BUG(), and the compiler can put the call in a slow path that
+> shouldn't affect most calls, so in all cases it's likely preferable.
+
+I'm sure that maintainers and Linus will strongly dislike my patch if I always
+use panic() here. panic() kills the whole kernel and we shouldn't use it when we
+can safely continue to work.
+
+Let me describe my logic. So let's have size >= stack_left on a thread stack.
+
+1. If CONFIG_VMAP_STACK is enabled, we can safely use BUG(). Even if BUG()
+handling overflows the thread stack into the guard page, handle_stack_overflow()
+is called and the neighbour memory is not corrupted. The kernel can proceed to live.
+
+2. If CONFIG_VMAP_STACK is disabled, BUG() handling can corrupt the neighbour
+kernel memory and cause the undefined behaviour of the whole kernel. I see it on
+my lkdtm test. That is a cogent reason for panic().
+
+2.a. If CONFIG_SCHED_STACK_END_CHECK is enabled, the kernel already does panic()
+when STACK_END_MAGIC is corrupted. So we will _not_ break the safety policy if
+we do panic() in a similar situation in check_alloca().
+
+2.b. If CONFIG_SCHED_STACK_END_CHECK is disabled, the user has some real reasons
+not to do panic() when the kernel stack is corrupted. So we should not do it in
+check_alloca() as well, just use BUG() and hope for the best.
+
+That logic can be expressed this way:
+
+	if (size >= stack_left) {
+#if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
+		panic("alloca over the kernel stack boundary\n");
+#else
+		BUG();
+#endif
+
+I think I should add a proper comment to describe it.
+
+Thank you.
+
+Best regards,
+Alexander
