@@ -1,7 +1,7 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 14 May 2018 17:23:17 +0100
-Subject: [GIT PULL] arm64: dts: juno: updates for v4.18
-Message-ID: <20180514162317.GB8409@e107155-lin>
+Date: Mon, 14 May 2018 17:26:07 +0100
+Subject: [GIT PULL] firmware: scmi: updates for v4.18
+Message-ID: <20180514162607.GC8409@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,58 +9,53 @@ Hi ARM-SoC team,
 
 Please pull !
 
-Note that the tag is based on v4.17-rc3 instead of -rc1 as a fix went in
--rc3 and conflicts with changes here. The conflicts themselves are
-trivial and hence I can based the change on -rc1 if required.
-
 Regards,
 Sudeep
 
 --
 
-The following changes since commit 6da6c0db5316275015e8cc2959f12a17584aeb64:
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-  Linux v4.17-rc3 (2018-04-29 14:17:42 -0700)
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-updates-4.18
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-updates-4.18
 
-for you to fetch changes up to 349b0f95e1ea718d912ca6875a40813e52a4ba39:
+for you to fetch changes up to 632de8f542bcd44c756637da0e7d824e7129e496:
 
-  arm64: dts: juno/rtsm: re-structure motherboard includes (2018-05-10 11:01:56 +0100)
-
-----------------------------------------------------------------
-ARMv8 Juno/Vexpress updates/cleanups for v4.18
-
-1. Add the missing connections to the STM output port as all endpoint
-   connections must be bidirectional.
-
-2. Replace all the custom OF graph endpoint node names with the standard
-   'endpoint'
-
-3. Cleanup to replace all underscores('_') with hyphens('-') in the
-   device node names
-
-4. Syntactic restructuring of motherboard include file so that it can be
-   included at the top of any other DTS file as it should be rather than
-   existing include in the middle of the file at a specific location
+  firmware: arm_scmi: simplify exit path by returning on error (2018-05-10 10:52:00 +0100)
 
 ----------------------------------------------------------------
-Rob Herring (2):
-      arm64: dts: juno: fix missing Coresight STM graph connection
-      arm64: dts: juno: fix OF graph endpoint node names
+SCMI cleanups for v4.18
 
-Sudeep Holla (3):
-      arm64: dts: juno: Fix "debounce-interval" property misspelling
-      arm64: dts: juno: replace '_' with '-' in node names
-      arm64: dts: juno/rtsm: re-structure motherboard includes
+This contains all of the trivial review comments that were not
+addressed as the series was already queued up for v4.17 and were not
+critical to go as fixes.
 
- arch/arm64/boot/dts/arm/juno-base.dtsi           |  15 +-
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi    |  18 +-
- arch/arm64/boot/dts/arm/juno-r1.dts              |   8 +-
- arch/arm64/boot/dts/arm/juno-r2.dts              |   8 +-
- arch/arm64/boot/dts/arm/juno.dts                 |   4 +-
- arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts       |   4 +-
- arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi | 453 ++++++++++++-----------
- 7 files changed, 262 insertions(+), 248 deletions(-)
+They generally just improve code readability, fix kernel-docs, remove
+unused/unnecessary code, follow standard function naming and simplifies
+certain exit paths.
+
+----------------------------------------------------------------
+Sudeep Holla (8):
+      firmware: arm_scmi: improve code readability using bitfield accessor macros
+      firmware: arm_scmi: fix kernel-docs documentation
+      firmware: arm_scmi: rename get_transition_latency and add_opps_to_device
+      firmware: arm_scmi: rename scmi_xfer_{init,get,put}
+      firmware: arm_scmi: drop unused `con_priv` structure member
+      firmware: arm_scmi: remove unnecessary bitmap_zero
+      firmware: arm_scmi: improve exit paths and code readability
+      firmware: arm_scmi: simplify exit path by returning on error
+
+ drivers/cpufreq/scmi-cpufreq.c      |   4 +-
+ drivers/firmware/arm_scmi/base.c    |  43 +++++++-------
+ drivers/firmware/arm_scmi/bus.c     |  22 ++++----
+ drivers/firmware/arm_scmi/clock.c   |  24 ++++----
+ drivers/firmware/arm_scmi/common.h  |  22 ++++----
+ drivers/firmware/arm_scmi/driver.c  | 109 ++++++++++++++++++------------------
+ drivers/firmware/arm_scmi/perf.c    |  38 ++++++-------
+ drivers/firmware/arm_scmi/power.c   |  16 +++---
+ drivers/firmware/arm_scmi/sensors.c |  20 +++----
+ include/linux/scmi_protocol.h       |  18 ++++--
+ 10 files changed, 166 insertions(+), 150 deletions(-)
