@@ -1,30 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 13:48:30 -0700
-Subject: [GIT PULL 1/5] ARM: defconfig: Exynos for v4.18
-In-Reply-To: <20180513154238.22508-2-krzk@kernel.org>
-References: <20180513154238.22508-1-krzk@kernel.org>
- <20180513154238.22508-2-krzk@kernel.org>
-Message-ID: <20180514204830.l5rvzubqiuwex434@localhost>
+Date: Mon, 14 May 2018 13:27:11 -0700
+Subject: [GIT PULL 4/5] Broadcom drivers changes for 4.18
+In-Reply-To: <20180511214339.24139-4-f.fainelli@gmail.com>
+References: <20180511214339.24139-1-f.fainelli@gmail.com>
+ <20180511214339.24139-4-f.fainelli@gmail.com>
+Message-ID: <20180514202711.ekhyp5ltb42yvz4t@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 13, 2018 at 05:42:34PM +0200, Krzysztof Kozlowski wrote:
+On Fri, May 11, 2018 at 02:43:37PM -0700, Florian Fainelli wrote:
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.18
+>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/drivers
 > 
-> for you to fetch changes up to b0121046cacdbc99475871aceb2e9e57995c2ba1:
+> for you to fetch changes up to b1d0973e9a1b4742ec80f3cf59ecc84a0998465b:
 > 
->   ARM: multi_v7_config: enable S6E63J0X03 panel driver (2018-04-16 20:22:28 +0200)
+>   memory: brcmstb: dpfe: Remove need for dpfe_dev (2018-05-09 12:15:26 -0700)
 > 
 > ----------------------------------------------------------------
-> Samsung defconfig changes for v4.18
+> This pull request contains Broadcom ARM/ARM64/MIPS SoCs drivers changes
+> for 4.18, please pull the following:
 > 
-> 1. Enable Samsung S6E63J0X03 DSI panel.
+> - Florian removes the synthetic struct device in the DPFE driver which
+>   was used to attach sysfs attributes and uses the platform_device we are
+>   probed from instead.
 
 Merged, thanks.
 
