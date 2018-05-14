@@ -1,80 +1,48 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Tue, 15 May 2018 09:03:08 +1000
-Subject: [PATCH 1/7] i2c: i2c-gpio: move header to platform_data
-In-Reply-To: <20180514213719.o6ceftp2quem3s7f@ninjato>
-References: <20180419200015.15095-1-wsa@the-dreams.de>
- <20180419200015.15095-2-wsa@the-dreams.de>
- <20180514213719.o6ceftp2quem3s7f@ninjato>
-Message-ID: <40bb677a-e6e1-7906-28fe-9e74cdfbefd7@uclinux.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 15 May 2018 09:09:01 +1000
+Subject: linux-next: manual merge of the samsung-krzk tree with the
+ dma-mapping tree
+In-Reply-To: <20180510091634.7fb3aaf2@canb.auug.org.au>
+References: <20180510091634.7fb3aaf2@canb.auug.org.au>
+Message-ID: <20180515090901.74c9429e@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
-Hi Wolfram,
+On Thu, 10 May 2018 09:16:34 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> Today's linux-next merge of the samsung-krzk tree got a conflict in:
+> 
+>   arch/arm/mach-exynos/Kconfig
+> 
+> between commit:
+> 
+>   4965a68780c5 ("arch: define the ARCH_DMA_ADDR_T_64BIT config symbol in lib/Kconfig")
+> 
+> from the dma-mapping tree and commit:
+> 
+>   c5deb598089c ("ARM: exynos: Remove support for Exynos5440")
+> 
+> from the samsung-krzk tree.
+> 
+> I fixed it up (the latter removed the whole section modified by
+> the former, so I just removed the section) and can carry the fix as
+> necessary. This is now fixed as far as linux-next is concerned, but any
+> non trivial conflicts should be mentioned to your upstream maintainer
+> when your tree is submitted for merging.  You may also want to consider
+> cooperating with the maintainer of the conflicting tree to minimise any
+> particularly complex conflicts.
 
-On 15/05/18 07:37, Wolfram Sang wrote:
->>   arch/arm/mach-ks8695/board-acs5k.c               | 2 +-
->>   arch/arm/mach-sa1100/simpad.c                    | 2 +-
->>   arch/mips/alchemy/board-gpr.c                    | 2 +-
-> 
-> Those still need acks...
-> 
->> diff --git a/arch/arm/mach-ks8695/board-acs5k.c b/arch/arm/mach-ks8695/board-acs5k.c
->> index 937eb1d47e7b..ef835d82cdb9 100644
->> --- a/arch/arm/mach-ks8695/board-acs5k.c
->> +++ b/arch/arm/mach-ks8695/board-acs5k.c
->> @@ -19,7 +19,7 @@
->>   #include <linux/gpio/machine.h>
->>   #include <linux/i2c.h>
->>   #include <linux/i2c-algo-bit.h>
->> -#include <linux/i2c-gpio.h>
->> +#include <linux/platform_data/i2c-gpio.h>
->>   #include <linux/platform_data/pca953x.h>
->>   
->>   #include <linux/mtd/mtd.h>
-> 
-> ...
-> 
->> diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
->> index ace010479eb6..49a61e6f3c5f 100644
->> --- a/arch/arm/mach-sa1100/simpad.c
->> +++ b/arch/arm/mach-sa1100/simpad.c
->> @@ -37,7 +37,7 @@
->>   #include <linux/input.h>
->>   #include <linux/gpio_keys.h>
->>   #include <linux/leds.h>
->> -#include <linux/i2c-gpio.h>
->> +#include <linux/platform_data/i2c-gpio.h>
->>   
->>   #include "generic.h"
->>   
->> diff --git a/arch/mips/alchemy/board-gpr.c b/arch/mips/alchemy/board-gpr.c
->> index 4e79dbd54a33..fa75d75b5ba9 100644
->> --- a/arch/mips/alchemy/board-gpr.c
->> +++ b/arch/mips/alchemy/board-gpr.c
->> @@ -29,7 +29,7 @@
->>   #include <linux/leds.h>
->>   #include <linux/gpio.h>
->>   #include <linux/i2c.h>
->> -#include <linux/i2c-gpio.h>
->> +#include <linux/platform_data/i2c-gpio.h>
->>   #include <linux/gpio/machine.h>
->>   #include <asm/bootinfo.h>
->>   #include <asm/idle.h>
-> 
-> ... and this was the shortened diff for those.
-> 
-> Greg, Russell, Ralf, James? Is it okay if I take this via my tree?
+This is now a conflict between the arm-soc tree and the dma-mapping tree.
 
-Yes, I have no problem with that for the ks8695 part.
-
-Acked-by: Greg Ungerer <gerg@uclinux.org>
-
-Thanks
-Greg
-
-
-> Thanks,
-> 
->     Wolfram
-> 
+-- 
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180515/e2b00e44/attachment.sig>
