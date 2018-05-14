@@ -1,152 +1,103 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 14 May 2018 23:16:04 +0200
-Subject: [RFC PATCH 04/10] devfreq: rk3399_dmc / rockchip: pm_domains:
- Register notify to DMC driver.
-In-Reply-To: <20180514211610.26618-1-enric.balletbo@collabora.com>
-References: <20180514211610.26618-1-enric.balletbo@collabora.com>
-Message-ID: <20180514211610.26618-5-enric.balletbo@collabora.com>
+Date: Mon, 14 May 2018 23:16:00 +0200
+Subject: [RFC PATCH 00/10] Add support for drm/rockchip to dynamically control
+ the DDR frequency.
+Message-ID: <20180514211610.26618-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lin Huang <hl@rock-chips.com>
+Dear all,
 
-The DMC (Dynamic Memory Interface) controller does a SiP call to the
-Trusted Firmware-A (TF-A) to change the DDR clock frequency. When this
-happens the TF-A writes to the PMU bus idle request register
-(PMU_BUS_IDLE_REQ) but at the same time it is possible that the Rockchip
-power domain driver writes to the same register. So, add a notification
-mechanism to ensure that the DMC and the PD driver does not access to this
-register at the same time.
+The rk3399 platform has a DFI controller that can monitor DDR load and a
+DMC driver that talks with the TF-A (Trusted Firmware-A) to dynamically
+set the DDR frequency with following flow.
 
-Signed-off-by: Lin Huang <hl@rock-chips.com>
-[rewrite commit message]
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
-As I explained in the cover letter I have doubts regarding this patch
-but I did not find another way to do it. So I will appreciate any
-feedback on this.
+             kernel                          Trusted Firmware-A
+                                                  (bl31)
+        monitor ddr load
+                |
+                |
+        get_target_rate
+                |
+                |           pass rate to TF-A
+        clk_set_rate(ddr) --------------------->run ddr dvs flow
+                                                    |
+                                                    |
+                 <------------------------------end ddr dvs flow
+                |
+                |
+              return
 
- drivers/devfreq/rk3399_dmc.c      |  7 ++++++
- drivers/soc/rockchip/pm_domains.c | 36 +++++++++++++++++++++++++++++++
- include/soc/rockchip/rk3399_dmc.h | 14 ++++++++++++
- 3 files changed, 57 insertions(+)
+These patches add support for devfreq to dynamically control the DDR
+frequency into the drm rockchip driver. By default it uses the
+'simple_ondemand' governor which can adjust the frequency based on the
+DDR load.
+
+Although the patches were present in the chromeos kernel for long time I
+am sending this as a RFC because I have doubts on some of them,
+specially patch 4/10 that tries to sync the TF-A with the kernel using a
+mutex, to be honest I did not find another way to do it so feedback is
+more than welcome.
+
+The patches apply on top of current 4.17-rc5 and depends on the
+following series to apply cleanly.
+
+ 1. https://lkml.org/lkml/2018/5/9/464
+ 2. https://lkml.org/lkml/2018/4/23/354
+
+Waiting for your feedback.
+
+Best regards,
+ Enric
+
+
+Derek Basehore (3):
+  devfreq: rk3399_dmc / clk: rockchip: Sync with vblank in the kernel
+    for DDRfreq.
+  devfreq: rk3399_dmc / clk: rockchip: Disable DDR clk timeout on
+    suspend.
+  clk: rockchip: set clk-ddr to GET_RATE_NOCACHE.
+
+Enric Balletbo i Serra (3):
+  devfreq: rockchip-dfi: Move GRF definitions to a common place.
+  dt-bindings: devfreq: rk3399_dmc: Add rockchip,pmu phandle.
+  devfreq: rk3399_dmc: Pass ODT and auto power down parameters to TF-A.
+
+Lin Huang (3):
+  devfreq: rk3399_dmc / rockchip: pm_domains: Register notify to DMC
+    driver.
+  arm64: dts: rk3399: Add dfi and dmc nodes.
+  arm64: dts: rockchip: Enable dmc and dfi nodes on gru.
+
+Sean Paul (1):
+  drm: rockchip: Add DDR devfreq support.
+
+ .../bindings/devfreq/rk3399_dmc.txt           |   2 +
+ .../rockchip/rk3399-dram-default-timing.dtsi  |  38 ++++
+ arch/arm64/boot/dts/rockchip/rk3399-dram.h    |  73 +++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi  |  21 ++
+ .../boot/dts/rockchip/rk3399-op1-opp.dtsi     |  29 +++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi      |  22 +-
+ drivers/clk/rockchip/clk-ddr.c                | 159 ++++++++++++---
+ drivers/clk/rockchip/clk.c                    |   2 +-
+ drivers/clk/rockchip/clk.h                    |   3 +-
+ drivers/devfreq/event/rockchip-dfi.c          |  23 +--
+ drivers/devfreq/rk3399_dmc.c                  | 191 +++++++++++++++---
+ drivers/devfreq/rk3399_dmc_priv.h             |  16 ++
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c   |  46 +++++
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h   |   9 +
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c    |  35 ++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c   |  34 ++++
+ drivers/soc/rockchip/pm_domains.c             |  36 ++++
+ include/soc/rockchip/rk3399_dmc.h             |  44 ++++
+ include/soc/rockchip/rk3399_grf.h             |  21 ++
+ include/soc/rockchip/rockchip_sip.h           |   1 +
+ 20 files changed, 734 insertions(+), 71 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-dram.h
+ create mode 100644 drivers/devfreq/rk3399_dmc_priv.h
  create mode 100644 include/soc/rockchip/rk3399_dmc.h
+ create mode 100644 include/soc/rockchip/rk3399_grf.h
 
-diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
-index cc1bbca3fb15..2c4985a501cb 100644
---- a/drivers/devfreq/rk3399_dmc.c
-+++ b/drivers/devfreq/rk3399_dmc.c
-@@ -28,6 +28,7 @@
- #include <linux/rwsem.h>
- #include <linux/suspend.h>
- 
-+#include <soc/rockchip/rk3399_dmc.h>
- #include <soc/rockchip/rk3399_grf.h>
- #include <soc/rockchip/rockchip_sip.h>
- 
-@@ -443,6 +444,12 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
- 	data->dev = dev;
- 	platform_set_drvdata(pdev, data);
- 
-+	rockchip_pm_register_dmcfreq_notifier(data->devfreq);
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to register dmcfreq notifier\n");
-+		return ret;
-+	}
-+
- 	return 0;
- }
- 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 53efc386b1ad..b0e66f24b3e3 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/devfreq.h>
- #include <linux/io.h>
- #include <linux/iopoll.h>
- #include <linux/err.h>
-@@ -76,9 +77,13 @@ struct rockchip_pmu {
- 	const struct rockchip_pmu_info *info;
- 	struct mutex mutex; /* mutex lock for pmu */
- 	struct genpd_onecell_data genpd_data;
-+	struct devfreq *devfreq;
-+	struct notifier_block dmc_nb;
- 	struct generic_pm_domain *domains[];
- };
- 
-+static struct rockchip_pmu *dmc_pmu;
-+
- #define to_rockchip_pd(gpd) container_of(gpd, struct rockchip_pm_domain, genpd)
- 
- #define DOMAIN(pwr, status, req, idle, ack, wakeup)	\
-@@ -601,6 +606,35 @@ static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
- 	return error;
- }
- 
-+static int rk3399_dmcfreq_notify(struct notifier_block *nb,
-+				 unsigned long event, void *data)
-+{
-+	if (event == DEVFREQ_PRECHANGE)
-+		mutex_lock(&dmc_pmu->mutex);
-+	else if (event == DEVFREQ_POSTCHANGE)
-+		mutex_unlock(&dmc_pmu->mutex);
-+
-+	return NOTIFY_OK;
-+}
-+
-+int rockchip_pm_register_dmcfreq_notifier(struct devfreq *devfreq)
-+{
-+	int ret;
-+
-+	if (!dmc_pmu)
-+		return -EPROBE_DEFER;
-+
-+	dmc_pmu->devfreq = devfreq;
-+	dmc_pmu->dmc_nb.notifier_call = rk3399_dmcfreq_notify;
-+	ret = devm_devfreq_register_notifier(devfreq->dev.parent,
-+					     dmc_pmu->devfreq,
-+					     &dmc_pmu->dmc_nb,
-+					     DEVFREQ_TRANSITION_NOTIFIER);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(rockchip_pm_register_dmcfreq_notifier);
-+
- static int rockchip_pm_domain_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -694,6 +728,8 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 		goto err_out;
- 	}
- 
-+	dmc_pmu = pmu;
-+
- 	return 0;
- 
- err_out:
-diff --git a/include/soc/rockchip/rk3399_dmc.h b/include/soc/rockchip/rk3399_dmc.h
-new file mode 100644
-index 000000000000..031a62607f61
---- /dev/null
-+++ b/include/soc/rockchip/rk3399_dmc.h
-@@ -0,0 +1,14 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (c) 2016-2018, Fuzhou Rockchip Electronics Co., Ltd
-+ * Author: Lin Huang <hl@rock-chips.com>
-+ */
-+
-+#ifndef __SOC_RK3399_DMC_H
-+#define __SOC_RK3399_DMC_H
-+
-+#include <linux/devfreq.h>
-+
-+int rockchip_pm_register_dmcfreq_notifier(struct devfreq *devfreq);
-+
-+#endif
 -- 
 2.17.0
