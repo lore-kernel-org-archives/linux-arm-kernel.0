@@ -1,103 +1,36 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 14 May 2018 23:16:00 +0200
-Subject: [RFC PATCH 00/10] Add support for drm/rockchip to dynamically control
- the DDR frequency.
-Message-ID: <20180514211610.26618-1-enric.balletbo@collabora.com>
+From: linux@dominikbrodowski.net (Dominik Brodowski)
+Date: Mon, 14 May 2018 22:57:44 +0200
+Subject: [PATCH 18/18] arm64: implement syscall wrappers
+In-Reply-To: <20180514094640.27569-19-mark.rutland@arm.com>
+References: <20180514094640.27569-1-mark.rutland@arm.com>
+ <20180514094640.27569-19-mark.rutland@arm.com>
+Message-ID: <20180514205744.GC26773@light.dominikbrodowski.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+On Mon, May 14, 2018 at 10:46:40AM +0100, Mark Rutland wrote:
+> Note that we play games with sys_ni_syscall(). It can't be defined with
+> SYSCALL_DEFINE0() because we must avoid the possibility of error
+> injection. Additionally, there are a couple of locations where we need
+> to call it from C code, and we don't (currently) have a
+> ksys_ni_syscall().  While it has no wrapper, passing in a redundant
+> pt_regs pointer is benign per the AAPCS.
+> 
+> When ARCH_HAS_SYSCALL_WRAPPER is selected, no prototype is define for
+> sys_ni_syscall(). Since we need to treat it differently for in-kernel
+> calls and the syscall tables, the prototype is defined as-required.
 
-The rk3399 platform has a DFI controller that can monitor DDR load and a
-DMC driver that talks with the TF-A (Trusted Firmware-A) to dynamically
-set the DDR frequency with following flow.
+> Largely the wrappers are largely the same as their x86 counterparts, but
 
-             kernel                          Trusted Firmware-A
-                                                  (bl31)
-        monitor ddr load
-                |
-                |
-        get_target_rate
-                |
-                |           pass rate to TF-A
-        clk_set_rate(ddr) --------------------->run ddr dvs flow
-                                                    |
-                                                    |
-                 <------------------------------end ddr dvs flow
-                |
-                |
-              return
+That's one "Largely" too much.
 
-These patches add support for devfreq to dynamically control the DDR
-frequency into the drm rockchip driver. By default it uses the
-'simple_ondemand' governor which can adjust the frequency based on the
-DDR load.
+> simplified as we don't have a variety of compat calling conventions that
+> require separate stubs. Unlike x86, we have some zero-argument compat
+> syscalls, and must define COMPAT_SYSCALL_DEFINE0().
 
-Although the patches were present in the chromeos kernel for long time I
-am sending this as a RFC because I have doubts on some of them,
-specially patch 4/10 that tries to sync the TF-A with the kernel using a
-mutex, to be honest I did not find another way to do it so feedback is
-more than welcome.
+... for consistent naming, or is there another reason for that?
 
-The patches apply on top of current 4.17-rc5 and depends on the
-following series to apply cleanly.
+This patch looks good in any case.
 
- 1. https://lkml.org/lkml/2018/5/9/464
- 2. https://lkml.org/lkml/2018/4/23/354
-
-Waiting for your feedback.
-
-Best regards,
- Enric
-
-
-Derek Basehore (3):
-  devfreq: rk3399_dmc / clk: rockchip: Sync with vblank in the kernel
-    for DDRfreq.
-  devfreq: rk3399_dmc / clk: rockchip: Disable DDR clk timeout on
-    suspend.
-  clk: rockchip: set clk-ddr to GET_RATE_NOCACHE.
-
-Enric Balletbo i Serra (3):
-  devfreq: rockchip-dfi: Move GRF definitions to a common place.
-  dt-bindings: devfreq: rk3399_dmc: Add rockchip,pmu phandle.
-  devfreq: rk3399_dmc: Pass ODT and auto power down parameters to TF-A.
-
-Lin Huang (3):
-  devfreq: rk3399_dmc / rockchip: pm_domains: Register notify to DMC
-    driver.
-  arm64: dts: rk3399: Add dfi and dmc nodes.
-  arm64: dts: rockchip: Enable dmc and dfi nodes on gru.
-
-Sean Paul (1):
-  drm: rockchip: Add DDR devfreq support.
-
- .../bindings/devfreq/rk3399_dmc.txt           |   2 +
- .../rockchip/rk3399-dram-default-timing.dtsi  |  38 ++++
- arch/arm64/boot/dts/rockchip/rk3399-dram.h    |  73 +++++++
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi  |  21 ++
- .../boot/dts/rockchip/rk3399-op1-opp.dtsi     |  29 +++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi      |  22 +-
- drivers/clk/rockchip/clk-ddr.c                | 159 ++++++++++++---
- drivers/clk/rockchip/clk.c                    |   2 +-
- drivers/clk/rockchip/clk.h                    |   3 +-
- drivers/devfreq/event/rockchip-dfi.c          |  23 +--
- drivers/devfreq/rk3399_dmc.c                  | 191 +++++++++++++++---
- drivers/devfreq/rk3399_dmc_priv.h             |  16 ++
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c   |  46 +++++
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h   |   9 +
- drivers/gpu/drm/rockchip/rockchip_drm_fb.c    |  35 ++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c   |  34 ++++
- drivers/soc/rockchip/pm_domains.c             |  36 ++++
- include/soc/rockchip/rk3399_dmc.h             |  44 ++++
- include/soc/rockchip/rk3399_grf.h             |  21 ++
- include/soc/rockchip/rockchip_sip.h           |   1 +
- 20 files changed, 734 insertions(+), 71 deletions(-)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-dram.h
- create mode 100644 drivers/devfreq/rk3399_dmc_priv.h
- create mode 100644 include/soc/rockchip/rk3399_dmc.h
- create mode 100644 include/soc/rockchip/rk3399_grf.h
-
--- 
-2.17.0
+Thanks,
+	Dominik
