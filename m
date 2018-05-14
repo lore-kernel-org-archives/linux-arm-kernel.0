@@ -1,44 +1,28 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon, 14 May 2018 15:56:08 +0000
-Subject: [GIT PULL] STi DT update for v4.18 round 1
-Message-ID: <11f8376c-860d-26cf-92f6-38737e513656@st.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 14 May 2018 18:57:04 +0300
+Subject: [PATCH] arm64: dts: renesas: r8a77990: Add GPIO device nodes
+In-Reply-To: <20180514143032.fxk4gcww6xihilrl@verge.net.au>
+References: <20180513090855.25982-1-horms+renesas@verge.net.au>
+ <e9646f33-9a82-f3ea-c4a6-cd2469b7658a@cogentembedded.com>
+ <20180514143032.fxk4gcww6xihilrl@verge.net.au>
+Message-ID: <d232d79b-2d95-9938-bc1c-55b705c455c8@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof
+On 05/14/2018 05:30 PM, Simon Horman wrote:
 
-PLease consider this first round of STi dts update for v4.18
+>>> The compat string renesas,gpio-rcar has been deprecated since v4.14,
+>>> the same release that r8a77990 SoC support was added. Thus
+>>> renesas,gpio-rcar can safely be removed without any risk of behaviour
+>>> changes between old and new mainline kernels and DTBs.
+>>
+>>    This hardly matches the subject. :-)
+> 
+> Indeed, I will resubmit.
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+   I'm seeing this patch merged on Sunday...
 
-   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> [...]
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
-tags/sti-dt-for-v4.18-round1
-
-for you to fetch changes up to c5bf208a0dc4aee18e03c6ed97eada70ffa9a4d8:
-
-   ARM: dts: stihxxx-b2120: Fix complain about IRQ_TYPE_NONE usage 
-(2018-05-14 17:40:26 +0200)
-
-----------------------------------------------------------------
-STi DT update for 4.18:
-  - Fix complain about IRQ_TYPE_NONE_usage
-
-----------------------------------------------------------------
-Patrice Chotard (5):
-       ARM: dts: stih407-family: Fix complain about IRQ_TYPE_NONE usage
-       ARM: dts: stih407-pinctrl: Fix complain about IRQ_TYPE_NONE usage
-       ARM: dts: stih407: Fix complain about IRQ_TYPE_NONE usage
-       ARM: dts: stih410: Fix complain about IRQ_TYPE_NONE usage
-       ARM: dts: stihxxx-b2120: Fix complain about IRQ_TYPE_NONE usage
-
-  arch/arm/boot/dts/stih407-family.dtsi  | 52 
-+++++++++++++++++-----------------
-  arch/arm/boot/dts/stih407-pinctrl.dtsi | 10 +++----
-  arch/arm/boot/dts/stih407.dtsi         |  2 +-
-  arch/arm/boot/dts/stih410.dtsi         | 18 ++++++------
-  arch/arm/boot/dts/stihxxx-b2120.dtsi   |  4 +--
-  5 files changed, 43 insertions(+), 43 deletions(-)
+MBR, Sergei
