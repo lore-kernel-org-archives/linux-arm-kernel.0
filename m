@@ -1,75 +1,39 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 14 May 2018 07:47:57 -0500
-Subject: [PATCH v4 5/6] bus: fsl-mc: supoprt dma configure for devices on
- fsl-mc bus
-In-Reply-To: <1525069641-8523-6-git-send-email-nipun.gupta@nxp.com>
-References: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
- <1525069641-8523-1-git-send-email-nipun.gupta@nxp.com>
- <1525069641-8523-6-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <20180514124757.GA253589@bhelgaas-glaptop.roam.corp.google.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 14 May 2018 14:50:52 +0200
+Subject: [FAIL bisect] Sound card probe error
+In-Reply-To: <CAJKOXPc6Yj0+Z6zd-Gm-fYvfQB4rPPn0k6ED8bWScJ-tdZ=Ysw@mail.gmail.com>
+References: <CGME20180514101728epcas4p3108760546a415b36252df93dfe38e0fb@epcas4p3.samsung.com>
+ <CAJKOXPfD8gZR8nZkmAr=Ldt3xESuFocQLnMtrDsNZu=ba55jcw@mail.gmail.com>
+ <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
+ <CAJKOXPc+kLA+BPBmaP14zMLbbxxCmWF1eZnKoa_PcO2z9jG9JQ@mail.gmail.com>
+ <4c61c422-a036-8fec-1153-d612fe5df878@samsung.com>
+ <CAJKOXPc6Yj0+Z6zd-Gm-fYvfQB4rPPn0k6ED8bWScJ-tdZ=Ysw@mail.gmail.com>
+Message-ID: <CAJKOXPeNJtmU2+8CdMRwXignMTetn=LScdcMspfkP3MVmTSHrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When you add the changleog, please also fix the subject typo:
+On Mon, May 14, 2018 at 2:45 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Mon, May 14, 2018 at 2:40 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> On 05/14/2018 02:29 PM, Krzysztof Kozlowski wrote:
+>>> Ah, I missed these messages because I was looking at err dmesg level
+>>> (and for some reason these are warn). Anyway do you have any thoughts
+>>> how is it connected with missing Odroid XU3 sound card and max98090
+>>> codec?
+>>
+>> One reason is that the DRM driver registers an ASoC codec object which
+>> is required for the sound card registration to complete. But I wonder
+>> why there is no any error messages related to this.
+>
+> Thanks Marek and Sylwester. Another point is that probably OOPS later
+> should not happen...
 
-- bus: fsl-mc: supoprt dma configure for devices on fsl-mc bus
-               ^^^^^^^
-+ bus: fsl-mc: support dma configure for devices on fsl-mc bus
+Separate topic (trim Cc list):
 
-On Mon, Apr 30, 2018 at 11:57:20AM +0530, Nipun Gupta wrote:
-> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> ---
->  drivers/bus/fsl-mc/fsl-mc-bus.c | 16 ++++++++++++----
->  1 file changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/bus/fsl-mc/fsl-mc-bus.c b/drivers/bus/fsl-mc/fsl-mc-bus.c
-> index 5d8266c..624828b 100644
-> --- a/drivers/bus/fsl-mc/fsl-mc-bus.c
-> +++ b/drivers/bus/fsl-mc/fsl-mc-bus.c
-> @@ -127,6 +127,16 @@ static int fsl_mc_bus_uevent(struct device *dev, struct kobj_uevent_env *env)
->  	return 0;
->  }
->  
-> +static int fsl_mc_dma_configure(struct device *dev)
-> +{
-> +	struct device *dma_dev = dev;
-> +
-> +	while (dev_is_fsl_mc(dma_dev))
-> +		dma_dev = dma_dev->parent;
-> +
-> +	return of_dma_configure(dev, dma_dev->of_node, 0);
-> +}
-> +
->  static ssize_t modalias_show(struct device *dev, struct device_attribute *attr,
->  			     char *buf)
->  {
-> @@ -148,6 +158,7 @@ struct bus_type fsl_mc_bus_type = {
->  	.name = "fsl-mc",
->  	.match = fsl_mc_bus_match,
->  	.uevent = fsl_mc_bus_uevent,
-> +	.dma_configure  = fsl_mc_dma_configure,
->  	.dev_groups = fsl_mc_dev_groups,
->  };
->  EXPORT_SYMBOL_GPL(fsl_mc_bus_type);
-> @@ -616,6 +627,7 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc *obj_desc,
->  		mc_dev->icid = parent_mc_dev->icid;
->  		mc_dev->dma_mask = FSL_MC_DEFAULT_DMA_MASK;
->  		mc_dev->dev.dma_mask = &mc_dev->dma_mask;
-> +		mc_dev->dev.coherent_dma_mask = mc_dev->dma_mask;
->  		dev_set_msi_domain(&mc_dev->dev,
->  				   dev_get_msi_domain(&parent_mc_dev->dev));
->  	}
-> @@ -633,10 +645,6 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc *obj_desc,
->  			goto error_cleanup_dev;
->  	}
->  
-> -	/* Objects are coherent, unless 'no shareability' flag set. */
-> -	if (!(obj_desc->flags & FSL_MC_OBJ_FLAG_NO_MEM_SHAREABILITY))
-> -		arch_setup_dma_ops(&mc_dev->dev, 0, 0, NULL, true);
-> -
->  	/*
->  	 * The device-specific probe callback will get invoked by device_add()
->  	 */
-> -- 
-> 1.9.1
-> 
+... and this means that disabling Exynos DRM causes lack of Audio. I
+tried it now and indeed without DRM there is no audio again. I think
+it is not nice... There are not many such use cases but there are
+(playing audio from console/ssh with a headless board).\
+
+Best regards,
+Krzysztof
