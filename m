@@ -1,36 +1,64 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 May 2018 14:33:36 +0800
-Subject: [GIT PULL] i.MX fixes for 4.17
-Message-ID: <20180514063335.GI26863@dragon>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 14 May 2018 12:37:49 +0530
+Subject: Allwinner A64: Issue on external rtc clock to wifi chip
+Message-ID: <CAMty3ZCNyuEwmLGdDZLM_9qKJ2NsT33rodug7ZpKAE-OHymVEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+Hi Maxime and All,
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+We are trying to bring-up AP6330 Wifi chip for A64 board. We noticed
+to have an external rtc clock has driven from wifi chip.
 
-are available in the git repository at:
+So the devicetree is configured according to this as below.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.17
+/ {
+        wifi_pwrseq: wifi-pwrseq {
+                compatible = "mmc-pwrseq-simple";
+                clocks = <&rtc 1>;
+                clock-names = "ext_clock";
+                reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+                post-power-on-delay-ms = <400>;
+        };
+};
 
-for you to fetch changes up to 6d3299aef7df7225ecff653feedafb5d1646998b:
+&rtc {
+        clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
+        clocks = <&osc32k>;
+        #clock-cells = <1>;
+};
 
-  ARM: dts: imx51-zii-rdu1: fix touchscreen bindings (2018-05-11 13:50:27 +0800)
+&mmc1 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&mmc1_pins>;
+        vmmc-supply = <&reg_dcdc1>;
+        vqmmc-supply = <&reg_eldo1>;
+        mmc-pwrseq = <&wifi_pwrseq>;
+        bus-width = <4>;
+        non-removable;
+        status = "okay";
 
-----------------------------------------------------------------
-i.MX fixes for 4.17:
- - Add missing 'fsl,sec-era' property for i.MX7S device tree CAAM node,
-   as the era information is used in various places inside CAAM driver.
- - There are a few errors in imx51-zii-rdu1 device tree touchscreen
-   node.  Fix them to get touchscreen actually work.
+        brcmf: wifi at 1 {
+                reg = <1>;
+                compatible = "brcm,bcm4329-fmac";
+                interrupt-parent = <&r_pio>;
+                interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;  /* WL-WAKE-AP: PL3 */
+                interrupt-names = "host-wake";
+        };
+};
 
-----------------------------------------------------------------
-Fabio Estevam (1):
-      ARM: dts: imx7s: Pass the 'fsl,sec-era' property
+And observed rtc-osc32k-out clock is never enabled[1] and the value of
+LOSC_OUT_GATING is 0x0 which eventually not enabling
+LOSC_OUT_GATING_EN
 
-Nikita Yushchenko (1):
-      ARM: dts: imx51-zii-rdu1: fix touchscreen bindings
+Pls. let us know if we miss anything here?
 
- arch/arm/boot/dts/imx51-zii-rdu1.dts | 6 +++---
- arch/arm/boot/dts/imx7s.dtsi         | 1 +
- 2 files changed, 4 insertions(+), 3 deletions(-)
+[1] https://paste.ubuntu.com/p/X2By4q8kD2/
+
+Jagan.
+
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
