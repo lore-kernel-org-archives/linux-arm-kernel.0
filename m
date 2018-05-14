@@ -1,18 +1,20 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 May 2018 23:25:03 +0200
-Subject: [PATCH 03/12] platform/early: export platform_match() locally
-In-Reply-To: <20180511162028.20616-4-brgl@bgdev.pl>
+Date: Mon, 14 May 2018 23:25:21 +0200
+Subject: [PATCH 04/12] platform: provide a separate function for
+ initializing platform devices
+In-Reply-To: <20180511162028.20616-5-brgl@bgdev.pl>
 References: <20180511162028.20616-1-brgl@bgdev.pl>
- <20180511162028.20616-4-brgl@bgdev.pl>
-Message-ID: <CAMuHMdW+Ma4BE61+U0J5bBaBG6i3Nf9Ei9h0WVzY+gn84469pw@mail.gmail.com>
+ <20180511162028.20616-5-brgl@bgdev.pl>
+Message-ID: <CAMuHMdX1F6dj5AbWB_LZRb1gDS3dqifa5+p_t5jH7ViFrTe2EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, May 11, 2018 at 6:20 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >
-> We will use this function to match devices in the early platform core
-> code. Export it locally in drivers/base.
+> The early platform driver framework will allocate platform devices
+> using its own internal mechanisms. Provide a function that allows to
+> initialize a platform device object without allocating it.
 >
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
