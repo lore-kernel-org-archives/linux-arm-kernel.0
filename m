@@ -1,39 +1,37 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 May 2018 10:33:00 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.17 (#1)
-Message-ID: <87zi123adf.fsf@bootlin.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 14 May 2018 14:03:36 +0530
+Subject: [PATCH 09/21] arm64: dts: allwinner: a64: Add HDMI support
+In-Reply-To: <20180502113413.vv2r3ubfoh7gm3ms@flea>
+References: <20180430114058.5061-1-jagan@amarulasolutions.com>
+ <20180430114058.5061-10-jagan@amarulasolutions.com>
+ <20180502113413.vv2r3ubfoh7gm3ms@flea>
+Message-ID: <CAMty3ZBheurXewQ8R53G_0gNLgv1jQkZbjAbaN30JQ6_ZVn7Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 2, 2018 at 5:04 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> Hi,
+>
+> On Mon, Apr 30, 2018 at 05:10:46PM +0530, Jagan Teki wrote:
+>> +             hdmi_phy: hdmi-phy at 1ef0000 {
+>> +                     compatible = "allwinner,sun50i-a64-hdmi-phy",
+>> +                                  "allwinner,sun8i-h3-hdmi-phy";
+>> +                     reg = <0x01ef0000 0x10000>;
+>> +                     clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
+>> +                              <&ccu CLK_PLL_VIDEO1>;
+>
+> You were discussing that the PLL0 could also be used to clock the PHY,
+> has that been figured out?
 
-Here is the first pull request for fixes for mvebu for v4.17.
+This is what I understand from Fig: 3-3. Module Clock Diagram, both
+tcon0 and tcon1 are using HDMI. I'm thinking based on the tcon
+configuration we need use proper PLL or some logic to get common PLL
+don't know yet. Since this series adding tcon1 I've attached PLL1.
 
-Gregory
+Jagan.
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.17-1
-
-for you to fetch changes up to f43194c1447c9536efb0859c2f3f46f6bf2b9154:
-
-  ARM64: dts: marvell: armada-cp110: Add mg_core_clk for ethernet node (2018-04-27 17:47:24 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.17 (part 1)
-
-Declare missing clocks needed for network on Armada 8040 base boards
-(such as the McBin)
-
-----------------------------------------------------------------
-Maxime Chevallier (2):
-      ARM64: dts: marvell: armada-cp110: Add clocks for the xmdio node
-      ARM64: dts: marvell: armada-cp110: Add mg_core_clk for ethernet node
-
- Documentation/devicetree/bindings/net/marvell-pp2.txt | 9 +++++----
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi         | 7 +++++--
- 2 files changed, 10 insertions(+), 6 deletions(-)
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
