@@ -1,106 +1,49 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Mon, 14 May 2018 12:19:59 -0500
-Subject: [PATCH v2] coresight: documentation: update sysfs section
-In-Reply-To: <CANLsYkyQLan3XajOz2uuoOF8OQchGfeu2ZkZJ9H1Xm9q==aXTw@mail.gmail.com>
-References: <20180507172915.c032cd71c07b1849bf419a5f@arm.com>
- <CANLsYkyQLan3XajOz2uuoOF8OQchGfeu2ZkZJ9H1Xm9q==aXTw@mail.gmail.com>
-Message-ID: <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 14 May 2018 20:38:15 +0300
+Subject: [PATCH v3 5/6] spi: at91-usart: add driver for at91-usart as spi
+In-Reply-To: <5a3930b867cf8c279953d08c5d5dd1d93113a43b.camel@microchip.com>
+References: <20180511103822.31698-1-radu.pirea@microchip.com>
+ <20180511103822.31698-6-radu.pirea@microchip.com>
+ <CAHp75Ve3Ugnjjm8EZkPQTZSvH1qad1e5SqjOn8zz5syHSQea_g@mail.gmail.com>
+ <5a3930b867cf8c279953d08c5d5dd1d93113a43b.camel@microchip.com>
+Message-ID: <CAHp75VdRrL25Jgnbk64Qqc5RY3uJdcntJ3xwRdp3F+rRFeTHBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Align and show updated ls devices output from the TC2, based on
-  current driver
+First of all, do not remove mailing lists from Cc and people if you
+are not sure they do not need your stuff.
 
-- Provide an example from an ETMv4 based system (Juno)
+On Mon, May 14, 2018 at 11:11 AM, Radu Pirea <radu.pirea@microchip.com> wrote:
+> On Sun, 2018-05-13 at 16:33 +0300, Andy Shevchenko wrote:
+>> On Fri, May 11, 2018 at 1:38 PM, Radu Pirea <radu.pirea@microchip.com
+>> > wrote:
 
-- Reflect changes to the way the RAM write pointer is accessed since
-  it got changed in commit 7d83d17795ef ("coresight: tmc: adding sysFS
-  management entries").
+>> > +static void at91_usart_spi_cleanup(struct spi_device *spi)
+>> > +{
+>> > +       struct at91_usart_spi_device *ausd = spi->controller_state;
+>> > +
+>> > +       if (!ausd)
+>> > +               return;
+>>
+>> Is it even possible?
+> Theoretically yes.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Jonathan Corbet <corbet@lwn.net>
-Signed-off-by: Kim Phillips <kim.phillips@arm.com>
----
-v2: address Mathieu's comment about clarifying the sinks on the Juno
-vs. TC2 platforms.
+I would like to know real circumstances when it might happen.
 
- Documentation/trace/coresight.txt | 41 +++++++++++++++++++------------
- 1 file changed, 25 insertions(+), 16 deletions(-)
+>>
+>> Anyway the code below will work fine even if it's the case.
+>>
+>> > +
+>> > +       spi->controller_state = NULL;
+>> > +       kfree(ausd);
+>> > +}
 
-diff --git a/Documentation/trace/coresight.txt
-b/Documentation/trace/coresight.txt index 6f0120c3a4f1..134994e9fa6d
-100644
---- a/Documentation/trace/coresight.txt
-+++ b/Documentation/trace/coresight.txt
-@@ -144,10 +144,22 @@ If everything goes well during the registration
-process the new devices will show up under /sys/bus/coresight/devices,
-as showns here for a TC2 platform: 
- root:~# ls /sys/bus/coresight/devices/
--replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
--20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
-+20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm
-replicator +20030000.tpiu  2201c000.ptm	2203c000.etm
-2203e000.etm root:~#
- 
-+and here for a Juno platform:
-+
-+root at juno:~# ls /sys/bus/coresight/devices/
-+20010000.etf	 20120000.replicator  22040000.etm
-230c0000.funnel +20030000.tpiu	 20130000.funnel
-220c0000.funnel  23140000.etm +20040000.funnel
-20140000.etf	      22140000.etm     23240000.etm
-+20070000.etr	 20150000.funnel      23040000.etm
-23340000.etm +root at juno:~# +
-+Note that on Juno users can select the ETF, ETR and TPIU as a sink
-target while +on TC2, the ETB and TPIU can be selected.
-+
- The functions take a "struct coresight_device", which looks like this:
- 
- struct coresight_desc {
-@@ -193,16 +205,16 @@ the information carried in "THIS_MODULE".
- How to use the tracer modules
- -----------------------------
- 
--Before trace collection can start, a coresight sink needs to be
-identify. +Before trace collection can start, a coresight sink needs to
-be identified. There is no limit on the amount of sinks (nor sources)
-that can be enabled at any given moment.  As a generic operation, all
-device pertaining to the sink class will have an "active" entry in
-sysfs: 
- root:/sys/bus/coresight/devices# ls
--replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
--20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
-+20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm
-replicator +20030000.tpiu  2201c000.ptm	2203c000.etm
-2203e000.etm root:/sys/bus/coresight/devices# ls 20010000.etb
--enable_sink  status  trigger_cntr
-+enable_sink  mgmt  power  subsystem  trigger_cntr  uevent
- root:/sys/bus/coresight/devices# echo 1 > 20010000.etb/enable_sink
- root:/sys/bus/coresight/devices# cat 20010000.etb/enable_sink
- 1
-@@ -216,16 +228,13 @@ trigger a trace capture:
- root:/sys/bus/coresight/devices# echo 1 > 2201c000.ptm/enable_source
- root:/sys/bus/coresight/devices# cat 2201c000.ptm/enable_source
- 1
--root:/sys/bus/coresight/devices# cat 20010000.etb/status
--Depth:          0x2000
--Status:         0x1
--RAM read ptr:   0x0
--RAM wrt ptr:    0x19d3   <----- The write pointer is moving
--Trigger cnt:    0x0
--Control:        0x1
--Flush status:   0x0
--Flush ctrl:     0x2001
--root:/sys/bus/coresight/devices#
-+
-+Observe the write pointer moving:
-+
-+root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
-+0x1a8
-+root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
-+0x19a6
- 
- Trace collection is stopped the same way:
- 
+>> The question is, why you didn't utilize what SPI core provides you?
+> I tried, but it did not work the way I expected.
+
+So, what is not going as expected in "SPI core takes care of CSs" case?
+Did you use oscilloscope for that?
+
 -- 
-2.17.0
+With Best Regards,
+Andy Shevchenko
