@@ -1,17 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 00:57:53 -0700
-Subject: [GIT PULL] ARM: uniphier: fixes for v4.17
-In-Reply-To: <CAK7LNASuFh4wcSJ7HTW-+ZQCjZWt0QtjrOQQogoqzbM2W9n+nA@mail.gmail.com>
-References: <CAK7LNASuFh4wcSJ7HTW-+ZQCjZWt0QtjrOQQogoqzbM2W9n+nA@mail.gmail.com>
-Message-ID: <20180514075753.f4zhj7n5bgq3yyza@localhost>
+Date: Mon, 14 May 2018 00:58:44 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.17
+In-Reply-To: <cover.1525256178.git.horms+renesas@verge.net.au>
+References: <cover.1525256178.git.horms+renesas@verge.net.au>
+Message-ID: <20180514075844.j35p2ndfoecvvdu3@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 29, 2018 at 12:47:00AM +0900, Masahiro Yamada wrote:
-> Hi Arnd, Olof,
+On Wed, May 02, 2018 at 12:18:14PM +0200, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please pull some fixes of ARM UniPhier DT.
-> 
+> Please consider these Renesas ARM based SoC fixes for v4.17.
 > 
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
@@ -20,13 +19,11 @@ On Sun, Apr 29, 2018 at 12:47:00AM +0900, Masahiro Yamada wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-> tags/uniphier-fixes-v4.17
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.17
 > 
-> for you to fetch changes up to 8b82b66e68b32dd8e22a04db6a0494bfdd65156f:
+> for you to fetch changes up to edb0c3affe5214a21d71ffb82ca92ed068e828df:
 > 
->   arm64: dts: uniphier: stabilize ethernet of LD20 reference board
-> (2018-04-29 00:33:42 +0900)
+>   ARM: dts: r8a7793: Convert to new LVDS DT bindings (2018-04-23 12:31:42 +0200)
 
 Merged, thanks.
 
