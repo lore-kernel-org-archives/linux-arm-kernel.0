@@ -1,53 +1,56 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 14 May 2018 12:07:40 +0100
-Subject: [PATCH 11/18] arm64: zero GPRs upon entry from EL0
-In-Reply-To: <20180514094640.27569-12-mark.rutland@arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-12-mark.rutland@arm.com>
-Message-ID: <20180514110738.GG7753@e103592.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 May 2018 11:35:45 +0100
+Subject: [PATCH v2 4/4] arm64: dts: Add Mediatek SoC MT8183 and evaluation
+ board dts and Makefile
+In-Reply-To: <1526293351-32794-5-git-send-email-erin.lo@mediatek.com>
+References: <1526293351-32794-1-git-send-email-erin.lo@mediatek.com>
+ <1526293351-32794-5-git-send-email-erin.lo@mediatek.com>
+Message-ID: <efa91778-e81f-9ba4-22a6-43ff0f94af4f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 10:46:33AM +0100, Mark Rutland wrote:
-> We can zero GPRs x0 - x29 upon entry from EL0 to make it harder for
-> userspace to control values consumed by speculative gadgets.
+On 14/05/18 11:22, Erin Lo wrote:
+> From: Ben Ho <Ben.Ho@mediatek.com>
 > 
-> We don't blat x30, since this is stashed much later, and we'll blat it
-> before invoking C code.
+> Add basic chip support for Mediatek 8183
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 > ---
->  arch/arm64/kernel/entry.S | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
+>  arch/arm64/boot/dts/mediatek/Makefile       |   1 +
+>  arch/arm64/boot/dts/mediatek/mt8183-evb.dts |  31 +++++
+>  arch/arm64/boot/dts/mediatek/mt8183.dtsi    | 178 ++++++++++++++++++++++++++++
+>  3 files changed, 210 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
 > 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 13afefbf608f..4dd529fd03fd 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -62,6 +62,12 @@
->  #endif
->  	.endm
->  
-> +	.macro	clear_gp_regs
-> +	.irp	n,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
-> +	mov	x\n, xzr
-> +	.endr
-> +	.endm
-> +
-
-Looks OK, but consider moving _for from fpsimdmacros.h to assembler.h
-and just writing
-
- _for n, 0, 29,	mov	x\n, xzr
-
-(could even omit the wrapper macro, since this is a one-liner).
-
-The implementation of _for is a bit gross, but since we already have it,
-we might as well use it.
 
 [...]
 
-Cheers
----Dave
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+> new file mode 100644
+> index 0000000..8564a26
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+
+[...]
+
+> +	gic: interrupt-controller at 0c000000 {
+> +		compatible = "arm,gic-v3";
+> +		#interrupt-cells = <3>;
+> +		interrupt-parent = <&gic>;
+> +		interrupt-controller;
+> +		reg = <0 0x0c000000 0 0x40000>,  // CID
+> +		      <0 0x0c100000 0 0x200000>; // CIR
+
+You're missing the GICV and GICH regions that are present on both A53
+and A73 at an offset from PERIPHBASE.
+
+> +		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
