@@ -1,111 +1,125 @@
-From: yinbo.zhu@nxp.com (Yinbo Zhu)
-Date: Mon, 14 May 2018 07:47:45 +0000
-Subject: [PATCH 3/9] soc: fsl: set rcpm bit for FTM
-In-Reply-To: <AM4PR0401MB16995DFED0376ACE0DD5E7A78F9F0@AM4PR0401MB1699.eurprd04.prod.outlook.com>
-References: <20180511033530.7931-1-yinbo.zhu@nxp.com>
- <20180511033530.7931-3-yinbo.zhu@nxp.com>
- <AM4PR0401MB16995DFED0376ACE0DD5E7A78F9F0@AM4PR0401MB1699.eurprd04.prod.outlook.com>
-Message-ID: <HE1PR0401MB1945EAD443377803A9F9EA5CE99C0@HE1PR0401MB1945.eurprd04.prod.outlook.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Mon, 14 May 2018 15:52:43 +0800
+Subject: [PATCH v1 7/7] drm/mediatek: config component output by device node
+ port
+In-Reply-To: <20180514075243.5442-1-bibby.hsieh@mediatek.com>
+References: <20180514075243.5442-1-bibby.hsieh@mediatek.com>
+Message-ID: <20180514075243.5442-8-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We can select output component by device node port.
+Main path default output component is DSI.
+External path default output component is DPI.
 
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c | 37 ++++++++++++++++++++++++++++++----
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h |  4 ++--
+ 2 files changed, 35 insertions(+), 6 deletions(-)
 
------Original Message-----
-From: Leo Li 
-Sent: 2018?5?12? 1:00
-To: Yinbo Zhu <yinbo.zhu@nxp.com>; Yinbo Zhu <yinbo.zhu@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Catalin Marinas ) <catalin.marinas@arm.com>; Will Deacon ) <will.deacon@arm.com>; Lorenzo Pieralisi ) <lorenzo.pieralisi@arm.com>
-Cc: Xiaobo Xie <xiaobo.xie@nxp.com>; Ran Wang <ran.wang_1@nxp.com>; Daniel Lezcano <daniel.lezcano@linaro.org>; Thomas Gleixner <tglx@linutronix.de>; Shawn Guo <shawnguo@kernel.org>; Madalin-cristian Bucur <madalin.bucur@nxp.com>; Z.q. Hou <zhiqiang.hou@nxp.com>; Jerry Huang <jerry.huang@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>; Qiang Zhao <qiang.zhao@nxp.com>; Fabio Estevam <fabio.estevam@nxp.com>; Jiaheng Fan <jiaheng.fan@nxp.com>; Po Liu <po.liu@nxp.com>; Nipun Gupta <nipun.gupta@nxp.com>; Horia Geant? <horia.geanta@nxp.com>; Priyanka Jain <priyanka.jain@nxp.com>; Sumit Garg <sumit.garg@nxp.com>; costi <constantin.tudor@freescale.com>; Bogdan Purcareata <bogdan.purcareata@nxp.com>; open list:CLOCKSOURCE, CLOCKEVENT DRIVERS <linux-kernel@vger.kernel.org>; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; open list:FREESCALE SOC DRIVERS <linuxppc-dev@lists.ozlabs.org>; Andy Tang <andy.tang@nxp.com>; Ying Zhang <ying.zhang22455@nxp.com>
-Subject: RE: [PATCH 3/9] soc: fsl: set rcpm bit for FTM
-
-
-
-> -----Original Message-----
-> From: Yinbo Zhu [mailto:yinbo.zhu at nxp.com]
-> Sent: Thursday, May 10, 2018 10:35 PM
-> To: Yinbo Zhu <yinbo.zhu@nxp.com>; Rob Herring <robh+dt@kernel.org>; 
-> Mark Rutland <mark.rutland@arm.com>; Catalin Marinas ) 
-> <catalin.marinas@arm.com>; Will Deacon ) <will.deacon@arm.com>; 
-> Lorenzo Pieralisi ) <lorenzo.pieralisi@arm.com>; Leo Li 
-> <leoyang.li@nxp.com>
-> Cc: Xiaobo Xie <xiaobo.xie@nxp.com>; Ran Wang <ran.wang_1@nxp.com>; 
-> Daniel Lezcano <daniel.lezcano@linaro.org>; Thomas Gleixner 
-> <tglx@linutronix.de>; Shawn Guo <shawnguo@kernel.org>; 
-> Madalin-cristian Bucur <madalin.bucur@nxp.com>; Z.q. Hou 
-> <zhiqiang.hou@nxp.com>; Jerry Huang <jerry.huang@nxp.com>; M.h. Lian 
-> <minghuan.lian@nxp.com>; Qiang Zhao <qiang.zhao@nxp.com>; Fabio 
-> Estevam <fabio.estevam@nxp.com>; Jiaheng Fan <jiaheng.fan@nxp.com>; Po 
-> Liu <po.liu@nxp.com>; Nipun Gupta <nipun.gupta@nxp.com>; Horia Geant? 
-> <horia.geanta@nxp.com>; Priyanka Jain <priyanka.jain@nxp.com>; Sumit 
-> Garg <sumit.garg@nxp.com>; costi <constantin.tudor@freescale.com>; 
-> Bogdan Purcareata <bogdan.purcareata@nxp.com>; Meng Yi 
-> <meng.yi@nxp.com>; Wang Dongsheng <dongsheng.wang@nxp.com>; open 
-> list:CLOCKSOURCE, CLOCKEVENT DRIVERS <linux-kernel@vger.kernel.org>; 
-> open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS 
-> <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; 
-> open list:FREESCALE SOC DRIVERS <linuxppc-dev@lists.ozlabs.org>; Andy 
-> Tang <andy.tang@nxp.com>; Ying Zhang <ying.zhang22455@nxp.com>
-> Subject: [PATCH 3/9] soc: fsl: set rcpm bit for FTM
-> 
-> From: Zhang Ying-22455 <ying.zhang22455@nxp.com>
-> 
-> Set RCPM for FTM when using FTM as wakeup source. Because the RCPM 
-> module of each platform has different big-end and little-end mode, 
-> there need to set RCPM depending on the platform.
-> 
-> Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
-> Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
-> ---
->  .../devicetree/bindings/timer/fsl,ftm-timer.txt    |    7 ++
->  drivers/soc/fsl/layerscape/ftm_alarm.c             |   92 ++++++++++++++++++-
->  2 files changed, 94 insertions(+), 5 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> index aa8c402..15ead58 100644
-> --- a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> +++ b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> @@ -3,6 +3,13 @@ Freescale FlexTimer Module (FTM) Timer  Required
-> properties:
-> 
->  - compatible : should be "fsl,ftm-timer"
-
->Hi Yingbo,
-
->This is a change that breaks backward compatibility and not acceptable.
-Hi leo,
-
-This patch if I keep the change as inner patch and push it to dash-linnux but I will not push it to upstream, It's okay?
-As far as I know, there was a other patch and file for replace the file and that the patch is already on the upstream 
-https://patchwork.kernel.org/patch/9391293/
-
-> + Possible compatibles for ARM:
-> +     "fsl,ls1012a-ftm"
-> +     "fsl,ls1021a-ftm"
-> +     "fsl,ls1043a-ftm"
-> +     "fsl,ls1046a-ftm"
-> +     "fsl,ls1088a-ftm"
-> +     "fsl,ls208xa-ftm"
->  - reg : Specifies base physical address and size of the register sets for the
->    clock event device and clock source device.
->  - interrupts : Should be the clock event device interrupt.
-> diff --git a/drivers/soc/fsl/layerscape/ftm_alarm.c
-> b/drivers/soc/fsl/layerscape/ftm_alarm.c
-> index 6f9882f..811dcfa 100644
-> --- a/drivers/soc/fsl/layerscape/ftm_alarm.c
-> +++ b/drivers/soc/fsl/layerscape/ftm_alarm.c
-
->There is no such file in the mainline kernel.  So it looks like the patch set is
-
-> based on some internal git repo instead of the upstream Linux kernel.  This kind of patches
-
-> shouldn't be sent to the upstream mailing list for review.
-
->Regards,
-
->Leo
-This patch will not to upstream.
-
-Regards,
-
-Yinbo.
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index f4fb86ab7b8d..05333769d862 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -24,6 +24,8 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of.h>
++#include <linux/of_graph.h>
+ 
+ #include "mtk_drm_crtc.h"
+ #include "mtk_drm_ddp.h"
+@@ -133,7 +135,7 @@ static const struct drm_mode_config_funcs mtk_drm_mode_config_funcs = {
+ 	.atomic_commit = mtk_atomic_commit,
+ };
+ 
+-static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
++static enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_OVL0,
+ 	DDP_COMPONENT_RDMA0,
+ 	DDP_COMPONENT_COLOR0,
+@@ -141,12 +143,12 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_DSI0,
+ };
+ 
+-static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
++static enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
+ 	DDP_COMPONENT_RDMA1,
+ 	DDP_COMPONENT_DPI0,
+ };
+ 
+-static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
++static enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_OVL0,
+ 	DDP_COMPONENT_COLOR0,
+ 	DDP_COMPONENT_AAL,
+@@ -157,7 +159,7 @@ static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_PWM0,
+ };
+ 
+-static const enum mtk_ddp_comp_id mt8173_mtk_ddp_ext[] = {
++static enum mtk_ddp_comp_id mt8173_mtk_ddp_ext[] = {
+ 	DDP_COMPONENT_OVL1,
+ 	DDP_COMPONENT_COLOR1,
+ 	DDP_COMPONENT_GAMMA,
+@@ -411,6 +413,7 @@ static int mtk_drm_probe(struct platform_device *pdev)
+ 
+ 	/* Iterate over sibling DISP function blocks */
+ 	for_each_child_of_node(dev->of_node->parent, node) {
++		struct device_node *port, *ep, *remote;
+ 		const struct of_device_id *of_id;
+ 		enum mtk_ddp_comp_type comp_type;
+ 		int comp_id;
+@@ -470,6 +473,32 @@ static int mtk_drm_probe(struct platform_device *pdev)
+ 
+ 			private->ddp_comp[comp_id] = comp;
+ 		}
++
++		if (comp_type != MTK_DSI && comp_type != MTK_DPI) {
++			port = of_graph_get_port_by_id(node, 0);
++			if (!port)
++				continue;
++			ep = of_get_child_by_name(port, "endpoint");
++			of_node_put(port);
++			if (!ep)
++				continue;
++			remote = of_graph_get_remote_port_parent(ep);
++			of_node_put(ep);
++			if (!remote)
++				continue;
++			of_id = of_match_node(mtk_ddp_comp_dt_ids, remote);
++			if (!of_id)
++				continue;
++			comp_type = (enum mtk_ddp_comp_type)of_id->data;
++			for (i = 0; i < private->data->main_len - 1; i++)
++				if (private->data->main_path[i] == comp_id)
++					private->data->main_path[i + 1] =
++					mtk_ddp_comp_get_id(node, comp_type);
++			for (i = 0; i < private->data->ext_len - 1; i++)
++				if (private->data->ext_path[i] == comp_id)
++					private->data->ext_path[i + 1] =
++					mtk_ddp_comp_get_id(node, comp_type);
++		}
+ 	}
+ 
+ 	if (!private->mutex_node) {
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+index c3378c452c0a..2bcba8eb06f4 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+@@ -29,9 +29,9 @@ struct drm_property;
+ struct regmap;
+ 
+ struct mtk_mmsys_driver_data {
+-	const enum mtk_ddp_comp_id *main_path;
++	enum mtk_ddp_comp_id *main_path;
+ 	unsigned int main_len;
+-	const enum mtk_ddp_comp_id *ext_path;
++	enum mtk_ddp_comp_id *ext_path;
+ 	unsigned int ext_len;
+ 	bool shadow_register;
+ };
+-- 
+2.12.5
