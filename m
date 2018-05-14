@@ -1,91 +1,114 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Mon, 14 May 2018 22:36:08 +0200
-Subject: [PATCH v4 3/3] ARM: dts: sun7i: Add support for the Ainol AW1
- tablet
-In-Reply-To: <20180511143647.ici2bfoeeldto3ju@flea>
+Date: Mon, 14 May 2018 22:40:15 +0200
+Subject: [PATCH v4 1/3] drm/panel: Add RGB666 variant of Innolux AT070TN90
+In-Reply-To: <20180511085938.wjmdsdjfvdxd4shk@flea>
 References: <20180507220413.21990-1-contact@paulk.fr>
- <20180507220413.21990-3-contact@paulk.fr>
- <20180511143647.ici2bfoeeldto3ju@flea>
-Message-ID: <0da5787f0ce2309a74db88820bc58b3b3501c451.camel@paulk.fr>
+ <20180509071226.ivh4s3wtczg2u7zw@flea>
+ <c8ab5f472881063b90abe9461933baf6ee325dcd.camel@paulk.fr>
+ <20180511085938.wjmdsdjfvdxd4shk@flea>
+Message-ID: <abeac1ee792b8f063001c4c280ca7f0167ac59be.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi and thanks for the review!
+Hi,
 
-Le vendredi 11 mai 2018 ? 16:36 +0200, Maxime Ripard a ?crit :
-> On Tue, May 08, 2018 at 12:04:13AM +0200, Paul Kocialkowski wrote:
-> > +++ b/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
-> > @@ -0,0 +1,297 @@
-> > +/*
-> > + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+Le vendredi 11 mai 2018 ? 10:59 +0200, Maxime Ripard a ?crit :
+> On Wed, May 09, 2018 at 01:31:23PM +0200, Paul Kocialkowski wrote:
+> > On Wed, 2018-05-09 at 09:12 +0200, Maxime Ripard wrote:
+> > > On Tue, May 08, 2018 at 12:04:11AM +0200, Paul Kocialkowski wrote:
+> > > > This adds timings for the RGB666 variant of the Innolux AT070TN90 panel,
+> > > > as found on the Ainol AW1 tablet.
+> > > > 
+> > > > The panel also supports RGB888 output. When RGB666 mode is used instead,
+> > > > the two extra lanes per component are grounded.
+> > > > 
+> > > > In the future, it might become necessary to introduce a dedicated
+> > > > device-tree property to specify the bus format to use instead of the
+> > > > default one for the panel. This will allow supporting different bus
+> > > > formats for the same panel modes.
+> > > > 
+> > > > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > > > ---
+> > > >  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
+> > > >  1 file changed, 26 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> > > > index cbf1ab404ee7..32e30d5a8f08 100644
+> > > > --- a/drivers/gpu/drm/panel/panel-simple.c
+> > > > +++ b/drivers/gpu/drm/panel/panel-simple.c
+> > > > @@ -1063,6 +1063,29 @@ static const struct panel_desc innolux_at043tn24 = {
+> > > >  	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_POSEDGE,
+> > > >  };
+> > > >  
+> > > > +static const struct drm_display_mode innolux_at070tn90_mode = {
+> > > > +	.clock = 40000,
+> > > > +	.hdisplay = 800,
+> > > > +	.hsync_start = 800 + 112,
+> > > > +	.hsync_end = 800 + 112 + 1,
+> > > > +	.htotal = 800 + 112 + 1 + 87,
+> > > > +	.vdisplay = 480,
+> > > > +	.vsync_start = 480 + 141,
+> > > > +	.vsync_end = 480 + 141 + 1,
+> > > > +	.vtotal = 480 + 141 + 1 + 38,
+> > > > +	.vrefresh = 60,
+> > > > +};
+> > > > +
+> > > > +static const struct panel_desc innolux_at070tn90 = {
+> > > > +	.modes = &innolux_at070tn90_mode,
+> > > > +	.num_modes = 1,
+> > > > +	.size = {
+> > > > +		.width = 154,
+> > > > +		.height = 86,
+> > > > +	},
+> > > > +	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+> > > > +};
+> > > > +
+> > > 
+> > > I'm not really convinced this is the right approach. You said it
+> > > yourself, the panel is using a 24-bits interface, and you just happen
+> > > to have a tablet that routed it using a 18-bits interface instead.
+> > > 
+> > > That doesn't belong in the driver, especially associated to the
+> > > compatible, but where the routing is described: in the device
+> > > tree. And given that the panel interface is a 24 bits panel, if we
+> > > were to have a default, we should have this one, and not the one
+> > > fitting your use case.
+> > 
+> > I fully agree, this is why I suggested introducing a dedicated dt
+> > property for selecting the bus format (in the commit message). I still
+> > proposed this patch as a temporary solution, but I'm definitely willing
+> > to craft a proper solution as well.
+> > 
+> > Here is an initial proposition:
+> > 1. Making bus_format an array in struct panel_desc and listing all the
+> > relevant bus formats that the panel can support there;
 > 
-> This really should be the first line, and with a C++ style comment, as
-> in:
-> 
-> // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> /*
->  * Copyright (C) ...
-> 
-> See Documentation/process/license-rules.rst
+> I'm not sure this is needed, the input format is always the same in
+> your case, the panel will always take a 24 bits RGB value. What you
+> want to change is the encoder output format (and I guess you want that
+> to be meaningful to enable or not the dithering).
 
-Okay, will do in v5.
+Isn't the panel format supposed to match what the encoder's output
+should be aiming for? In my case, that would be RGB666, so the idea
+would be specifying both MEDIA_BUS_FMT_RGB666_1X18 and
+MEDIA_BUS_FMT_RGB888_1X24 in a list of supported bus formats for the
+panel. This way, both my setup and RGB888 setups can be supported.
 
-> > +	backlight: backlight {
-> > +		compatible = "pwm-backlight";
-> > +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-> > +		brightness-levels = <  0   1   1   1   1   2   2   2
-> > +				       2   3   3   3   3   4   4   4
-> > +				       5   5   5   6   6   6   7   7
-> > +				       8   8   8   9   9   9  10  10
-> > +				      10  11  11  12  12  12  13  13
-> > +				      14  14  14  15  15  16  16  17
-> > +				      17  17  18  18  19  19  20  20
-> > +				      21  21  21  22  22  23  23  24
-> > +				      24  25  25  26  26  27  27  28
-> > +				      28  29  30  30  31  31  32  32
-> > +				      33  33  34  35  35  36  36  37
-> > +				      38  38  39  39  40  41  41  42
-> > +				      43  43  44  44  45  46  47  47
-> > +				      48  49  49  50  51  51  52  53
-> > +				      54  54  55  56  57  57  58  59
-> > +				      60  61  61  62  63  64  65  65
-> > +				      66  67  68  69  70  71  71  72
-> > +				      73  74  75  76  77  78  79  80
-> > +				      81  82  83  84  85  86  87  88
-> > +				      89  90  91  92  93  94  95  96
-> > +				      97  98  99 101 102 103 104 105
-> > +				     106 108 109 110 111 112 114 115
-> > +				     116 117 119 120 121 123 124 125
-> > +				     127 128 129 131 132 133 135 136
-> > +				     138 139 141 142 144 145 147 148
-> > +				     150 151 153 154 156 157 159 161
-> > +				     162 164 166 167 169 171 173 174
-> > +				     176 178 180 181 183 185 187 189
-> > +				     191 192 194 196 198 200 202 204
-> > +				     206 208 210 212 214 216 219 221
-> > +				     223 225 227 229 232 234 236 238
-> > +				     241 242 244 246 248 250 253 255>;
+> > 2. Introducing an optional "bus-format" dt property that indicates which
+> > bus format to use, and using the first index of the bus formats array if
+> > the property is not present;
 > 
-> You kind of overdid it here :)
-> 
-> What I meant to say before was that if you have 10 elements (and you
-> really should have something in that magnitude) each step should
-> increase the perceived brightness by 10%.
+> I guess the width would be enough, and that way we can take the
+> bus-width format that is already defined (but used in the v4l2
+> framework, not in DRM yet).
 
-Mhh I think 10 elements would fall too short to really depict the curve
-with appropriate precision. Given the usual size for brightness cursors
-in e.g. gnome-shell, it feels like a bigger number would be more
-appropriate. Let's make it to 100 with values from 0 to 255!
+Well, we already have bus-format defines on the DRM side and it feels
+like mapping these directly in device-tree would be more useful as a
+description of the hardware than just having the bus width.
 
-> In this particular case, I really think having something close to <0 4
-> 8 16 32 64 128 255> would be enough.
-> 
-> And in general, that kind of odd looking table without any more
-> context is just screaming for a comment :)
+Cheers,
 
-Noted, I will explain the idea, but probably without the exact formula
-that's really a nasty hack written down on a piece of paper sitting in
-my garbage at this point.
+Paul
 
 -- 
 Developer of free digital technology and hardware support.
@@ -99,4 +122,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/c7a25e06/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/0cca7363/attachment.sig>
