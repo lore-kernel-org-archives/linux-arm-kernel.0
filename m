@@ -1,59 +1,58 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 10:46:25 +0100
-Subject: [PATCH 03/18] arm64: introduce sysreg_clear_set()
+Date: Mon, 14 May 2018 10:46:27 +0100
+Subject: [PATCH 05/18] arm64: kill change_cpacr()
 In-Reply-To: <20180514094640.27569-1-mark.rutland@arm.com>
 References: <20180514094640.27569-1-mark.rutland@arm.com>
-Message-ID: <20180514094640.27569-4-mark.rutland@arm.com>
+Message-ID: <20180514094640.27569-6-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we have a couple of helpers to manipulate bits in particular
-sysregs:
+Now that we have sysreg_clear_set(), we can use this instead of
+change_cpacr().
 
- * config_sctlr_el1(u32 clear, u32 set)
-
- * change_cpacr(u64 val, u64 mask)
-
-The parameters of these differ in naming convention, order, and size,
-which is unfortunate. They also differ slightly in behaviour, as
-change_cpacr() skips the sysreg write if the bits are unchanged, which
-is a useful optimization when sysreg writes are expensive.
-
-Before we gain more yet another sysreg manipulation function, let's
-unify these with a common helper, providing a consistent order for
-clear/set operands, and the write skipping behaviour from
-change_cpacr(). Code will be migrated to the new helper in subsequent
-patches.
+Note that the order of the set and clear arguments differs between
+change_cpacr() and sysreg_clear_set(), so these are flipped as part of
+the conversion. Also, sve_user_enable() redundantly clears
+CPACR_EL1_ZEN_EL0EN before setting it; this is removed for clarity.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Dave Martin <dave.martin@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/kernel/fpsimd.c | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index bd1d1194a5e7..b52762769329 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -729,6 +729,17 @@ asm(
- 	asm volatile("msr_s " __stringify(r) ", %x0" : : "rZ" (__val));	\
- } while (0)
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 87a35364e750..088940387a4d 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -172,23 +172,14 @@ static void *sve_pffr(struct task_struct *task)
+ 		sve_ffr_offset(task->thread.sve_vl);
+ }
  
-+/*
-+ * Modify bits in a sysreg. Bits in the clear mask are zeroed, then bits in the
-+ * set mask are set. Other bits are left as-is.
-+ */
-+#define sysreg_clear_set(sysreg, clear, set) do {			\
-+	u64 __scs_val = read_sysreg(sysreg);				\
-+	u64 __scs_new = (__scs_val & ~(u64)(clear)) | (set);		\
-+	if (__scs_new != __scs_val)					\
-+		write_sysreg(__scs_new, sysreg);			\
-+} while (0)
-+
- static inline void config_sctlr_el1(u32 clear, u32 set)
+-static void change_cpacr(u64 val, u64 mask)
+-{
+-	u64 cpacr = read_sysreg(CPACR_EL1);
+-	u64 new = (cpacr & ~mask) | val;
+-
+-	if (new != cpacr)
+-		write_sysreg(new, CPACR_EL1);
+-}
+-
+ static void sve_user_disable(void)
  {
- 	u32 val;
+-	change_cpacr(0, CPACR_EL1_ZEN_EL0EN);
++	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
+ }
+ 
+ static void sve_user_enable(void)
+ {
+-	change_cpacr(CPACR_EL1_ZEN_EL0EN, CPACR_EL1_ZEN_EL0EN);
++	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
+ }
+ 
+ /*
 -- 
 2.11.0
