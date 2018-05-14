@@ -1,41 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 May 2018 15:57:03 +0100
-Subject: [PATCH v3 3/3] arm64: Force swiotlb bounce buffering for
- non-coherent DMA with large CWG
-In-Reply-To: <20180512123829.GA8024@lst.de>
-References: <20180511135547.34521-1-catalin.marinas@arm.com>
- <20180511135547.34521-4-catalin.marinas@arm.com>
- <20180512123829.GA8024@lst.de>
-Message-ID: <20180514145703.celnlobzn3uh5tc2@localhost>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 14 May 2018 10:58:21 -0400
+Subject: [PATCH v3 3/4] phy: rockchip-typec: support variable phy config
+ value
+In-Reply-To: <1526291635-31122-3-git-send-email-hl@rock-chips.com>
+References: <1526291635-31122-1-git-send-email-hl@rock-chips.com>
+ <1526291635-31122-3-git-send-email-hl@rock-chips.com>
+Message-ID: <20180514145821.GB3373@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 12, 2018 at 02:38:29PM +0200, Christoph Hellwig wrote:
-> On Fri, May 11, 2018 at 02:55:47PM +0100, Catalin Marinas wrote:
-> > On systems with a Cache Writeback Granule (CTR_EL0.CWG) greater than
-> > ARCH_DMA_MINALIGN, DMA cache maintenance on sub-CWG ranges is not safe,
-> > leading to data corruption. If such configuration is detected, the
-> > kernel will force swiotlb bounce buffering for all non-coherent devices.
+On Mon, May 14, 2018 at 05:53:54PM +0800, Lin Huang wrote:
+> the phy config values used to fix in dp firmware, but some boards
+> need change these values to do training and get the better eye diagram
+> result. So support that in phy driver.
 > 
-> Per the previous discussion I understand that so far this is a
-> purely theoretical condition. 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v2:
+> - update patch following Enric suggest
+> Changes in v3:
+> - delete need_software_training variable
+> - add default phy config value, if dts do not define phy config value, use these value
+> 
+>  drivers/phy/rockchip/phy-rockchip-typec.c | 305 ++++++++++++++++++++----------
+>  include/soc/rockchip/rockchip_phy_typec.h |  63 ++++++
+>  2 files changed, 270 insertions(+), 98 deletions(-)
+>  create mode 100644 include/soc/rockchip/rockchip_phy_typec.h
+> 
+> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
+> index 76a4b58..10253ad 100644
+> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
+> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
 
-That's what we think, at least for publicly available hardware.
+/snip
 
-> Given that I'd rather avoid commiting this patch and just refuse too
-> boot in this case.
+>  
+> +/* default phy config */
+> +struct phy_config configs[3][4] = {
 
-I'll keep it to a WARN_TAINT() for now. Given that the warn triggers
-only when cache_line_size() > ARCH_DMA_MINALIGN and we keep this
-constant unchanged (128), it shouldn't be much different from our
-current assumptions and no-one complained of DMA corruption so far.
+static const
 
-> In a merge window or two I plan to have a noncoherent flag in struct
-> device, at which point we can handle this entirely in common code.
+Also, configs isn't a good name. How about tcphy_default_config?
 
-Sounds ok, looking forward to this.
 
-Thanks.
+> +	{{ 0x2a, 0x00 },
+
+Can you please expand the assignment for all of these, ie:
+
+         { .swing = 0x2a, .pe = 0x00 },
+
+> +	 { 0x1f, 0x15 },
+> +	 { 0x14, 0x22 },
+> +	 { 0x02, 0x2b } },
+> +
+> +	{{ 0x21, 0x00 },
+> +	 { 0x12, 0x15 },
+> +	 { 0x02, 0x22 },
+> +	 {    0,    0 } },
+> +
+> +	{{ 0x15, 0x00 },
+> +	 { 0x00, 0x15 },
+> +	 {    0,    0 },
+> +	 {    0,    0 } },
+> +};
+> +
+
+/snip
 
 -- 
-Catalin
+Sean Paul, Software Engineer, Google / Chromium OS
