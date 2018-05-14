@@ -1,42 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 01:02:24 -0700
-Subject: [GIT PULL] tee driver fixes for v4.17
-In-Reply-To: <20180507124731.GA21011@jax.urgonet>
-References: <20180507124731.GA21011@jax.urgonet>
-Message-ID: <20180514080224.zy7s4f5d2uiibwce@localhost>
+Date: Mon, 14 May 2018 00:59:52 -0700
+Subject: [GIT PULL] DaVinci fixes for v4.17
+In-Reply-To: <8a5aef77-d983-03a4-6387-31f4e6fd0bb7@ti.com>
+References: <8a5aef77-d983-03a4-6387-31f4e6fd0bb7@ti.com>
+Message-ID: <20180514075952.jfocktvpgj7nhgrf@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2018 at 02:47:31PM +0200, Jens Wiklander wrote:
-> Hello arm-soc maintainers,
+On Wed, May 02, 2018 at 08:24:54PM +0530, Sekhar Nori wrote:
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
-> Please pull these tee driver fixes. Of particular interest is a fix for a
-> use-after-free issue. There's also a fix making sure that memory references
-> are kept within the used shm object.
-> 
-> Thanks,
-> Jens
-> 
-> The following changes since commit 75bc37fefc4471e718ba8e651aa74673d4e0a9eb:
-> 
->   Linux 4.17-rc4 (2018-05-06 16:57:38 -1000)
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
 > are available in the Git repository at:
 > 
->   git://git.linaro.org/people/jens.wiklander/linux-tee.git/ tags/tee-drv-fixes-for-4.17
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.17
 > 
-> for you to fetch changes up to ab9d3db5b320a052452b9cd035599ee3c84bbee9:
+> for you to fetch changes up to 9411ac07cd764be34bbd7ff09125a6b7b9175d4c:
 > 
->   tee: check shm references are consistent in offset/size (2018-05-07 11:51:03 +0200)
+>   ARM: davinci: fix GPIO lookup for I2C (2018-05-02 14:55:06 +0530)
 > 
 > ----------------------------------------------------------------
-> Small fixes for tee subsystem
-> 
-> * Fixes for use-after-free via temporarily dropped reference
-> * Checks that passed shm references are consistent in offset/size
->   with regards to the shm object
+> DaVinci fixes for v4.17
+> * W=1 warning fixes in device-tree files
+> * GPIO look-up fixes for legacy boot on several platforms
 
-Merged, thanks!
+The warning fixes might be a bit late at this point, but this has been
+sitting there for a while so I can't really ask you to respin without them.
+
+Merged as-is. Thanks!
 
 
 -Olof
