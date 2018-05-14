@@ -1,69 +1,62 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 14 May 2018 17:18:52 +0100
-Subject: [PATCH] dmaengine: qcom: bam_dma: check if the runtime pm enabled
-Message-ID: <20180514161852.9620-1-srinivas.kandagatla@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 14 May 2018 17:21:44 +0100
+Subject: [GIT PULL] ARM: dts: vexpress: updates for v4.18
+Message-ID: <20180514162144.GA8409@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disabling pm runtime at probe is not sufficient to get BAM working
-on remotely controller instances. pm_runtime_get_sync() would return
--EACCES in such cases.
-So check if runtime pm is enabled before returning error from bam functions.
+Hi ARM-SoC team,
 
-Fixes: 5b4a68952a89 ("dmaengine: qcom: bam_dma: disable runtime pm on remote controlled")
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/dma/qcom/bam_dma.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Please pull !
 
-diff --git a/drivers/dma/qcom/bam_dma.c b/drivers/dma/qcom/bam_dma.c
-index d29275b97e84..5f4babebc508 100644
---- a/drivers/dma/qcom/bam_dma.c
-+++ b/drivers/dma/qcom/bam_dma.c
-@@ -540,7 +540,7 @@ static void bam_free_chan(struct dma_chan *chan)
- 	int ret;
- 
- 	ret = pm_runtime_get_sync(bdev->dev);
--	if (ret < 0)
-+	if (pm_runtime_enabled(bdev->dev) && ret < 0)
- 		return;
- 
- 	vchan_free_chan_resources(to_virt_chan(chan));
-@@ -721,7 +721,7 @@ static int bam_pause(struct dma_chan *chan)
- 	int ret;
- 
- 	ret = pm_runtime_get_sync(bdev->dev);
--	if (ret < 0)
-+	if (pm_runtime_enabled(bdev->dev) && ret < 0)
- 		return ret;
- 
- 	spin_lock_irqsave(&bchan->vc.lock, flag);
-@@ -747,7 +747,7 @@ static int bam_resume(struct dma_chan *chan)
- 	int ret;
- 
- 	ret = pm_runtime_get_sync(bdev->dev);
--	if (ret < 0)
-+	if (pm_runtime_enabled(bdev->dev) && ret < 0)
- 		return ret;
- 
- 	spin_lock_irqsave(&bchan->vc.lock, flag);
-@@ -853,7 +853,7 @@ static irqreturn_t bam_dma_irq(int irq, void *data)
- 		tasklet_schedule(&bdev->task);
- 
- 	ret = pm_runtime_get_sync(bdev->dev);
--	if (ret < 0)
-+	if (pm_runtime_enabled(bdev->dev) && ret < 0)
- 		return ret;
- 
- 	if (srcs & BAM_IRQ) {
-@@ -970,7 +970,7 @@ static void bam_start_dma(struct bam_chan *bchan)
- 		return;
- 
- 	ret = pm_runtime_get_sync(bdev->dev);
--	if (ret < 0)
-+	if (pm_runtime_enabled(bdev->dev) && ret < 0)
- 		return;
- 
- 	while (vd && !IS_BUSY(bchan)) {
--- 
-2.16.2
+Note that the commit restructuring motherboard dtsi touches the file
+in ARM64 DT but that's because of the way the file gets included and
+it's not something newly introduced here.
+
+Regards,
+Sudeep
+
+--
+
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-updates-4.18
+
+for you to fetch changes up to b67b00eeddac0fea494d6339618ffd3da071c2e4:
+
+  ARM: dts: vexpress: replace '_' with '-' in node names (2018-05-11 14:12:32 +0100)
+
+----------------------------------------------------------------
+ARMv7 Vexpress updates/cleanups for v4.18
+
+1. Syntactic restructuring of motherboard include file so that it can be
+   included at the top of any other DTS file as it should be rather than
+   existing include in the middle of the file at a specific location
+
+2. Use of standard GPIO controller bindings for few sysreg components
+   like LED, MMC Write Protect/Card Detect and Flash Write Protect
+   to fix some of the new DTC warnings
+
+3. Cleanup to replace all underscores('_') with hyphens('-') in the
+   device node names
+
+----------------------------------------------------------------
+Linus Walleij (1):
+      ARM: dts: vexpress: Restructure motherboard includes
+
+Sudeep Holla (2):
+      ARM: dts: vexpress: use standard gpio bindings for sys_{led,mci,flash}
+      ARM: dts: vexpress: replace '_' with '-' in node names
+
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            | 712 +++++++++++----------
+ arch/arm/boot/dts/vexpress-v2m.dtsi                | 710 ++++++++++----------
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |   3 +-
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |   9 +-
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |   5 +-
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts             |   5 +-
+ .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      |   5 +-
+ 7 files changed, 732 insertions(+), 717 deletions(-)
