@@ -1,50 +1,61 @@
 From: tommyhebb@gmail.com (Thomas Hebb)
-Date: Mon, 14 May 2018 17:56:45 -0400
-Subject: [PATCH] ARM: dts: chromecast: override bad bootloader memory info
-Message-ID: <20180514215645.17592-2-tommyhebb@gmail.com>
+Date: Mon, 14 May 2018 17:58:15 -0400
+Subject: [PATCH 2/2] ARM: dts: chromecast: use PWM for LEDs
+In-Reply-To: <da60a97a0c6f754faa1f996334b3568ddb2f5ed0.1526334654.git.tommyhebb@gmail.com>
+References: <da60a97a0c6f754faa1f996334b3568ddb2f5ed0.1526334654.git.tommyhebb@gmail.com>
+Message-ID: <90316a6c92204399a4fecfe7cd2a2b808548fa48.1526334654.git.tommyhebb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Chromecast, the bootloader provides us with an ATAG_MEM of
-start=0x01000000 and size=0x3eff8000. This is clearly incorrect, as the
-range given encompasses nearly a GiB but the Chromecast only has 512MiB
-of RAM! Additionally, this causes the kernel to be decompressed at
-0x00008000, below the claimed beginning of RAM, and so the boot fails.
-
-Since the existing ATAG parsing code runs before the kernel is even
-decompressed and irrevocably patches the device tree, don't even try
-to bypass it. Instead, use the "linux,usable-memory" property instead
-of the "reg" property to define the real range. The ATAG code only
-overwrites reg, but linux,usable-memory is checked first in the OF
-driver, so the fact that reg gets changed makes no difference.
+Control the Chromecast's two LEDs using PWM instead of GPIO pins. This
+allows for variable brightness.
 
 Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
 ---
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ .../boot/dts/berlin2cd-google-chromecast.dts  | 20 ++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-index 20f31cdeaf38..54221f55bfa2 100644
+index 54221f55bfa2..fb71e5436420 100644
 --- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
 +++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-@@ -52,7 +52,17 @@
- 
- 	memory at 0 {
- 		device_type = "memory";
--		reg = <0x00000000 0x20000000>; /* 512 MB */
-+
-+		/*
-+		 * We're using "linux,usable-memory" instead of "reg" here
-+		 * because the (signed and encrypted) bootloader that shipped
-+		 * with this device provides an incorrect memory range in
-+		 * ATAG_MEM. Linux helpfully overrides the "reg" property with
-+		 * data from the ATAG, so we can't specify the proper range
-+		 * normally. Fortunately, this alternate property is checked
-+		 * first by the OF driver, so we can (ab)use it instead.
-+		 */
-+		linux,usable-memory = <0x00000000 0x20000000>; /* 512 MB */
+@@ -66,18 +66,21 @@
  	};
  
  	leds {
+-		compatible = "gpio-leds";
++		compatible = "pwm-leds";
++		pinctrl-0 = <&ledpwm_pmux>;
++		pinctrl-names = "default";
+ 
+ 		white {
+ 			label = "white";
+-			gpios = <&portc 1 GPIO_ACTIVE_HIGH>;
+-			default-state = "keep";
++			pwms = <&pwm 0 600000 0>;
++			max-brightness = <255>;
++			linux,default-trigger = "default-on";
+ 		};
+ 
+ 		red {
+ 			label = "red";
+-			gpios = <&portc 2 GPIO_ACTIVE_HIGH>;
+-			default-state = "keep";
++			pwms = <&pwm 1 600000 0>;
++			max-brightness = <255>;
+ 		};
+ 	};
+ };
+@@ -96,3 +99,10 @@
+ &usb_phy1 { status = "okay"; };
+ 
+ &usb1 { status = "okay"; };
++
++&soc_pinctrl {
++	ledpwm_pmux: ledpwm-pmux {
++		groups = "G0";
++		function = "pwm";
++	};
++};
 -- 
 2.17.0
