@@ -1,75 +1,72 @@
-From: songxiaowei@hisilicon.com (songxiaowei)
-Date: Mon, 14 May 2018 01:11:10 +0000
-Subject: reply: [PATCH v3 1/2] PCI: kirin: Add MSI support
-Message-ID: <99B4C6BADD9E3241B25E52B02BA737C54127E3BF@DGGEMA505-MBS.china.huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 14 May 2018 09:11:46 +0800
+Subject: [PATCH] ARM: dts: imx: add proper #address-cells/#size-cells for
+ ipu_di port nodes
+Message-ID: <1526260306-14063-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Andy Shevchenko
+It adds proper #address-cells/#size-cells for ipu_di port nodes to fix
+the following DTC warnings.
 
-Yao is on maternity leave, and I'll take over the job after discussing with her.
+arch/arm/boot/dts/imx6dl-aristainetos_7.dtb: Warning (reg_format): /soc/ipu at 2400000/port at 2/endpoint at 0:reg: property has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+arch/arm/boot/dts/imx6dl-aristainetos_7.dtb: Warning (pci_device_bus_num): Failed prerequisite 'reg_format'
+arch/arm/boot/dts/imx6dl-aristainetos_7.dtb: Warning (simple_bus_reg): Failed prerequisite 'reg_format'
+arch/arm/boot/dts/imx6dl-aristainetos_7.dtb: Warning (avoid_default_addr_size): /soc/ipu at 2400000/port at 2/endpoint at 0: Relying on default #address-cells value
+...
 
-> -----????-----
-> ???: Andy Shevchenko [mailto:andy.shevchenko at gmail.com]
-> ????: 2018?5?14? 7:16
-> ???: chenyao (F) <chenyao11@huawei.com>
-> ??: songxiaowei <songxiaowei@hisilicon.com>; Wangbinghui
-> <wangbinghui@hisilicon.com>; Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>;
-> Bjorn Helgaas <bhelgaas@google.com>; xuwei (O) <xuwei5@huawei.com>;
-> Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Catalin Marinas <catalin.marinas@arm.com>; Will Deacon
-> <will.deacon@arm.com>; linux-pci at vger.kernel.org; Linux Kernel Mailing List
-> <linux-kernel@vger.kernel.org>; linux-arm Mailing List
-> <linux-arm-kernel@lists.infradead.org>; devicetree
-> <devicetree@vger.kernel.org>; dimitrysh at google.com;
-> guodong.xu at linaro.org; Suzhuangluan <suzhuangluan@hisilicon.com>; Kongfei
-> <kongfei@hisilicon.com>
-> ??: Re: [PATCH v3 1/2] PCI: kirin: Add MSI support
-> 
-> On Fri, May 11, 2018 at 12:15 PM, Yao Chen <chenyao11@huawei.com> wrote:
-> > Add support for MSI.
-> 
-> 
-> > +       int ret;
-> > +
-> > +       if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> 
-> > +               pci->pp.msi_irq = platform_get_irq(pdev, 0);
-> > +               if (pci->pp.msi_irq < 0) {
-> > +                       dev_err(&pdev->dev, "failed to get MSI IRQ
-> (%d)\n",
-> > +                               pci->pp.msi_irq);
-> 
-> > +                       return -ENODEV;
-> 
-> Why shadowing actual error code?
-[songxiaowei]  Sorry, I can't get your point about this, would you explain it for me.
-> 
-> > +               }
-> > +               ret = devm_request_irq(&pdev->dev, pci->pp.msi_irq,
-> > +                                      kirin_pcie_msi_irq_handler,
-> > +                                      IRQF_SHARED |
-> IRQF_NO_THREAD,
-> > +                                      "kirin_pcie_msi", &pci->pp);
-> > +               if (ret) {
-> > +                       dev_err(&pdev->dev, "failed to request MSI
-> IRQ %d\n",
-> > +                               pci->pp.msi_irq);
-> > +                       return ret;
-> > +               }
-> 
-> It would be easy to read and maintain if this would be a separate function.
-[songxiaowei] Yes, a separate function will be better, and I'll fix it.
-> 
-> > +       }
-> 
-> 
-> 
-> --
-> With Best Regards,
-> Andy Shevchenko
+Fixes: e6bb17850d1e ("ARM: dts: imx: fix IPU OF graph endpoint node names")
+Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+Cc: Rob Herring <robh@kernel.org>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+---
+ arch/arm/boot/dts/imx6q.dtsi   | 4 ++++
+ arch/arm/boot/dts/imx6qdl.dtsi | 4 ++++
+ 2 files changed, 8 insertions(+)
 
-Thanks a lot,
-
-Best Regards,
-Xiaowei Song
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 40d85888a6b3..70483ce72ba6 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -152,6 +152,8 @@
+ 			};
+ 
+ 			ipu2_di0: port at 2 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <2>;
+ 
+ 				ipu2_di0_disp0: endpoint at 0 {
+@@ -180,6 +182,8 @@
+ 			};
+ 
+ 			ipu2_di1: port at 3 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <3>;
+ 
+ 				ipu2_di1_hdmi: endpoint at 1 {
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 087379c21842..e50fd1cfaee2 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1284,6 +1284,8 @@
+ 			};
+ 
+ 			ipu1_di0: port at 2 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <2>;
+ 
+ 				ipu1_di0_disp0: endpoint at 0 {
+@@ -1312,6 +1314,8 @@
+ 			};
+ 
+ 			ipu1_di1: port at 3 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <3>;
+ 
+ 				ipu1_di1_disp1: endpoint at 0 {
+-- 
+1.9.1
