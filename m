@@ -1,24 +1,37 @@
-From: linux@dominikbrodowski.net (Dominik Brodowski)
-Date: Mon, 14 May 2018 22:24:45 +0200
-Subject: [PATCH 08/18] arm64: convert raw syscall invocation to C
-In-Reply-To: <20180514125351.GK7753@e103592.cambridge.arm.com>
- <20180514114104.oubxdf526hf2m6t5@lakrids.cambridge.arm.com>
-Message-ID: <20180514202445.GA26773@light.dominikbrodowski.net>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Mon, 14 May 2018 23:16:07 +0200
+Subject: [RFC PATCH 07/10] clk: rockchip: set clk-ddr to GET_RATE_NOCACHE.
+In-Reply-To: <20180514211610.26618-1-enric.balletbo@collabora.com>
+References: <20180514211610.26618-1-enric.balletbo@collabora.com>
+Message-ID: <20180514211610.26618-8-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 12:41:10PM +0100, Mark Rutland wrote:
-> I agree it would be nicer if it had a wrapper that took a pt_regs, even
-> if it does nothing with it.
-> 
-> We can't use SYSCALL_DEFINE0() due to the fault injection muck, we'd
-> need a ksys_ni_syscall() for our traps.c logic, and adding this
-> uniformly would involve some arch-specific rework for x86, too, so I
-> decided it was not worth the effort.
+From: Derek Basehore <dbasehore@chromium.org>
 
-Couldn't you just open-code the "return -ENOSYS;" in traps.c? Error
-injection has no reasonable stable ABI/API expectations, so that's not a
-show-stopper either.
+This adds the flag to the clk-ddr in rockchip to not use the cached
+rate for get_rate. This is to handle timeout error conditions in SMC
+for the set rate function.
 
-Thanks,
-	Dominik
+Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+
+ drivers/clk/rockchip/clk-ddr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/rockchip/clk-ddr.c b/drivers/clk/rockchip/clk-ddr.c
+index de00590af167..dffd5ac5847b 100644
+--- a/drivers/clk/rockchip/clk-ddr.c
++++ b/drivers/clk/rockchip/clk-ddr.c
+@@ -226,7 +226,7 @@ struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
+ 	init.num_parents = num_parents;
+ 
+ 	init.flags = flags;
+-	init.flags |= CLK_SET_RATE_NO_REPARENT;
++	init.flags |= CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE;
+ 
+ 	switch (ddr_flag) {
+ 	case ROCKCHIP_DDRCLK_SIP:
+-- 
+2.17.0
