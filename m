@@ -1,110 +1,52 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 14 May 2018 10:03:10 +0200
-Subject: [PATCH net-next v2 15/15] arm64: dts: allwinner: a64: add SRAM
- controller device tree node
-In-Reply-To: <CAGb2v64xTNqQQSppw2NZoLn+ViQNQLytn1EukLqw+HJzf1=5ig@mail.gmail.com>
-References: <20180501161227.2110-1-wens@csie.org>
- <20180501161227.2110-16-wens@csie.org>
- <20180502095118.rqnfwy576xh6ercm@flea>
- <CAGb2v67pvL58Pes1ZFDZtPu_nL2+m6dgf_XOOymG9nVAkXVpEw@mail.gmail.com>
- <29E5670C-9D17-4EC1-AAAC-0CF33DD0534C@aosc.io>
- <20180502115437.zlu2rafrguufutvp@flea>
- <CAGb2v64xTNqQQSppw2NZoLn+ViQNQLytn1EukLqw+HJzf1=5ig@mail.gmail.com>
-Message-ID: <20180514080310.ngev5h6cqe4taedl@flea>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 14 May 2018 13:50:12 +0530
+Subject: [PATCH 03/21] clk: sunxi-ng: Enable DE2_CCU for Allwinner 64-bit
+ SoCs
+In-Reply-To: <CAGb2v66MKooAAroCzYdsXZDY0Oh66Dydpy59xj80QfiY+5mz_A@mail.gmail.com>
+References: <20180430114058.5061-1-jagan@amarulasolutions.com>
+ <20180430114058.5061-4-jagan@amarulasolutions.com>
+ <CAGb2v66MKooAAroCzYdsXZDY0Oh66Dydpy59xj80QfiY+5mz_A@mail.gmail.com>
+Message-ID: <CAMty3ZAOVg6EZoMi=LRuKEcrnDM_tzYfK1WnBN-_d-pmjNS6Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;5201;0c
-On Sun, May 13, 2018 at 12:37:49PM -0700, Chen-Yu Tsai wrote:
-> On Wed, May 2, 2018 at 4:54 AM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > On Wed, May 02, 2018 at 06:19:51PM +0800, Icenowy Zheng wrote:
-> >>
-> >>
-> >> ? 2018?5?2? GMT+08:00 ??5:53:21, Chen-Yu Tsai <wens@csie.org> ??:
-> >> >On Wed, May 2, 2018 at 5:51 PM, Maxime Ripard
-> >> ><maxime.ripard@bootlin.com> wrote:
-> >> >> Hi,
-> >> >>
-> >> >> On Wed, May 02, 2018 at 12:12:27AM +0800, Chen-Yu Tsai wrote:
-> >> >>> From: Icenowy Zheng <icenowy@aosc.io>
-> >> >>>
-> >> >>> Allwinner A64 has a SRAM controller, and in the device tree
-> >> >currently
-> >> >>> we have a syscon node to enable EMAC driver to access the EMAC clock
-> >> >>> register. As SRAM controller driver can now export regmap for this
-> >> >>> register, replace the syscon node to the SRAM controller device
-> >> >node,
-> >> >>> and let EMAC driver to acquire its EMAC clock regmap.
-> >> >>>
-> >> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> >>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >>> ---
-> >> >>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 23
-> >> >+++++++++++++++----
-> >> >>>  1 file changed, 19 insertions(+), 4 deletions(-)
-> >> >>>
-> >> >>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> >b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> >>> index 1b2ef28c42bd..1c37659d9d41 100644
-> >> >>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> >>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> >>> @@ -168,10 +168,25 @@
-> >> >>>               #size-cells = <1>;
-> >> >>>               ranges;
-> >> >>>
-> >> >>> -             syscon: syscon at 1c00000 {
-> >> >>> -                     compatible =
-> >> >"allwinner,sun50i-a64-system-controller",
-> >> >>> -                             "syscon";
-> >> >>> +             sram_controller: sram-controller at 1c00000 {
-> >> >>> +                     compatible =
-> >> >"allwinner,sun50i-a64-sram-controller";
-> >> >>
-> >> >> I don't think there's anything preventing us from keeping the
-> >> >> -system-controller compatible. It's what was in the DT before, and
-> >> >> it's how it's called in the datasheet.
-> >> >
-> >> >I actually meant to ask you about this. The -system-controller
-> >> >compatible matches the datasheet better. Maybe we should just
-> >> >switch to that one?
-> >>
-> >> No, if we do the switch the system-controller compatible,
-> >> the device will be probed on the same memory region with
-> >> a syscon on old DTs.
-> >
-> > The device hasn't magically changed either. Maybe we just need to add
-> > a check to make sure we don't have the syscon compatible in the SRAM
-> > driver probe so that the double driver issue doesn't happen?
-> 
-> The syscon interface (which is not even a full blown device driver)
-> only looks at the "syscon" compatible. Either way we're removing that
-> part from the device tree so things should be ok for new device trees.
-> As Maxime mentioned we can do a check for the syscon compatible and
-> either give a warning to the user asking them to update their device
-> tree, or not register our custom regmap, or not probe the SRAM driver.
-> Personally I prefer the first option. The system controller block is
-> probed before any syscon users, so we should be fine, given the dwmac
-> driver goes the custom regmap path first.
-> 
-> BTW, I still might end up changing the compatible. The manual uses
-> "system control", not "system controller", which I think makes sense,
-> since it is just a bunch of register files, kind of like the GRF
-> (General Register Files) block found in Rockchip SoCs [1], and not an
-> actual "controller".
+On Tue, May 1, 2018 at 9:53 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Mon, Apr 30, 2018 at 7:40 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+>> Allwinner 64-bit SoC like H5/A64 has DE2 CCU so enable them
+>> as default.
+>>
+>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>> ---
+>>  drivers/clk/sunxi-ng/Kconfig | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+>> index 79dfd296c3d1..1fffd3bf6ff3 100644
+>> --- a/drivers/clk/sunxi-ng/Kconfig
+>> +++ b/drivers/clk/sunxi-ng/Kconfig
+>> @@ -58,6 +58,8 @@ config SUN8I_V3S_CCU
+>>
+>>  config SUN8I_DE2_CCU
+>>         bool "Support for the Allwinner SoCs DE2 CCU"
+>> +       default ARM64 && ARCH_SUNXI
+>> +       depends on (DRM_SUN4I && (ARM64 && ARCH_SUNXI)) || COMPILE_TEST
+>
+> There is no reason to depend on DRM_SUN4I. There is no compile dependency.
 
-I'm not really fond of that, but we should at least make it consistent
-on the other patches Paul sent then.
+Since this CCU is for DE2 I've make DRM_SUN4I for that matter, any problem?
 
-Maxime
+>
+> Also, this is needed on SUN8I as well, pretty much anything with DE 2.0.
+> So you shouldn't limit it to ARM64. That pretty much breaks things for
+> people with A83T's or H3's. In fact you should enable it by default for
+> these as well.
+
+True, I've skipped SUN8I since this series for A64.
+
+Jagan.
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/1e0da858/attachment-0001.sig>
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
