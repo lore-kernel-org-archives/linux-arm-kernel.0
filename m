@@ -1,74 +1,67 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 10:46:22 +0100
-Subject: [PATCH 00/18] arm64: invoke syscalls with pt_regs
-Message-ID: <20180514094640.27569-1-mark.rutland@arm.com>
+Date: Mon, 14 May 2018 10:46:24 +0100
+Subject: [PATCH 02/18] arm64: move SCTLR_EL{1,2} assertions to <asm/sysreg.h>
+In-Reply-To: <20180514094640.27569-1-mark.rutland@arm.com>
+References: <20180514094640.27569-1-mark.rutland@arm.com>
+Message-ID: <20180514094640.27569-3-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series reworks arm64's syscall handling to minimize the propagation
-of user-controlled register values into speculated code paths. As with
-x86 [1], a wrapper is generated for each syscall, which extracts the
-argument from a struct pt_regs. During kernel entry from userspace,
-registers are zeroed.
+Currently we assert that the SCTLR_EL{1,2}_{SET,CLEAR} bits are
+self-consistent with an assertion in config_sctlr_el1(). This is a bit
+unusual, since config_sctlr_el1() doesn't make use of these definitions,
+and is far away from the definitions themselves.
 
-The arm64 kernel code directly invokes some syscalls which the x86 code
-doesn't, so I've added ksys_* wrappers for these, following the x86
-example. The rest of the series is arm64-specific.
+We can use the CPP #error directive to have equivalent assertions in
+<asm/sysreg.h>, next to the definitions of the set/clear bits, which is
+a bit clearer and simpler.
 
-I've pushed the series out to my arm64/syscall-regs branch [2] on
-kernel.org.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-Thanks,
-Mark.
-
-[1] https://lkml.kernel.org/r/20180330093720.6780-1-linux at dominikbrodowski.net
-[2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git
-
-Mark Rutland (18):
-  arm64: consistently use unsigned long for thread flags
-  arm64: move SCTLR_EL{1,2} assertions to <asm/sysreg.h>
-  arm64: introduce sysreg_clear_set()
-  arm64: kill config_sctlr_el1()
-  arm64: kill change_cpacr()
-  arm64: move sve_user_{enable,disable} to <asm/fpsimd.h>
-  arm64: remove sigreturn wrappers
-  arm64: convert raw syscall invocation to C
-  arm64: convert syscall trace logic to C
-  arm64: convert native/compat syscall entry to C
-  arm64: zero GPRs upon entry from EL0
-  kernel: add ksys_personality()
-  kernel: add kcompat_sys_{f,}statfs64()
-  arm64: remove in-kernel call to sys_personality()
-  arm64: use {COMPAT,}SYSCALL_DEFINE0 for sigreturn
-  arm64: use SYSCALL_DEFINE6() for mmap
-  arm64: convert compat wrappers to C
-  arm64: implement syscall wrappers
-
- arch/arm64/Kconfig                       |   1 +
- arch/arm64/include/asm/fpsimd.h          |  17 ++++-
- arch/arm64/include/asm/syscall_wrapper.h |  80 ++++++++++++++++++++
- arch/arm64/include/asm/sysreg.h          |  33 ++++----
- arch/arm64/include/asm/unistd32.h        |  26 +++----
- arch/arm64/kernel/Makefile               |   5 +-
- arch/arm64/kernel/armv8_deprecated.c     |   8 +-
- arch/arm64/kernel/cpu_errata.c           |   3 +-
- arch/arm64/kernel/entry.S                | 126 +++----------------------------
- arch/arm64/kernel/entry32.S              | 121 -----------------------------
- arch/arm64/kernel/fpsimd.c               |  20 -----
- arch/arm64/kernel/signal.c               |   5 +-
- arch/arm64/kernel/signal32.c             |   6 +-
- arch/arm64/kernel/sys.c                  |  19 +++--
- arch/arm64/kernel/sys32.c                | 116 ++++++++++++++++++++++++----
- arch/arm64/kernel/syscall.c              | 113 +++++++++++++++++++++++++++
- arch/arm64/kernel/traps.c                |   4 +-
- arch/arm64/mm/fault.c                    |   2 +-
- fs/statfs.c                              |  14 +++-
- include/linux/syscalls.h                 |   9 +++
- kernel/exec_domain.c                     |   7 +-
- 21 files changed, 411 insertions(+), 324 deletions(-)
- create mode 100644 arch/arm64/include/asm/syscall_wrapper.h
- delete mode 100644 arch/arm64/kernel/entry32.S
- create mode 100644 arch/arm64/kernel/syscall.c
-
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 6171178075dc..bd1d1194a5e7 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -452,9 +452,9 @@
+ 			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
+ 			 ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
+ 
+-/* Check all the bits are accounted for */
+-#define SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != ~0)
+-
++#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffff
++#error "Inconsistent SCTLR_EL2 set/clear bits"
++#endif
+ 
+ /* SCTLR_EL1 specific flags. */
+ #define SCTLR_EL1_UCI		(1 << 26)
+@@ -492,8 +492,9 @@
+ 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
+ 			 SCTLR_EL1_RES0)
+ 
+-/* Check all the bits are accounted for */
+-#define SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != ~0)
++#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffff
++#error "Inconsistent SCTLR_EL1 set/clear bits"
++#endif
+ 
+ /* id_aa64isar0 */
+ #define ID_AA64ISAR0_TS_SHIFT		52
+@@ -732,9 +733,6 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+ {
+ 	u32 val;
+ 
+-	SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS;
+-	SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS;
+-
+ 	val = read_sysreg(sctlr_el1);
+ 	val &= ~clear;
+ 	val |= set;
 -- 
 2.11.0
