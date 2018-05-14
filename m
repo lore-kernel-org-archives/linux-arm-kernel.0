@@ -1,60 +1,118 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Mon, 14 May 2018 08:50:48 +0000
-Subject: clk: stm32mp1: Fix a memory leak in
- 'clk_stm32_register_gate_ops()'
-In-Reply-To: <20180513111704.31842-1-christophe.jaillet@wanadoo.fr>
-References: <20180513111704.31842-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <3d149e1f-3290-8b6f-9b5b-1a1133461ed0@st.com>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Mon, 14 May 2018 16:55:26 +0800
+Subject: [RFC PATCH 00/10] Add persistent clock support
+Message-ID: <cover.1526285602.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christophe,
+Hi,
 
-Many thanks !
+We will meet below issues when compensating the suspend time for the timekeeping.
 
-Acked-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+1. We have too many different ways of dealing with persistent timekeeping
+across architectures, so it is hard for one driver to compatable with different
+architectures.
+
+2. On some platforms (such as Spreadtrum platform), we registered the high
+resolution timer as one clocksource to update the OS time, but the high
+resolution timer will be stopped in suspend state. So we use another one
+always-on timer (but low resolution) to calculate the suspend time to
+compensate the OS time. Though we can register the always-on timer as one
+clocksource, we need re-calculate the mult/shift with one larger conversion
+range to calculate the suspend time and need update the clock in case of
+running over the always-on timer.
+
+More duplicate code will be added if other platforms meet this case.
+
+3. Now we have 3 sources that could be used to compensate the OS time:
+Nonstop clocksource during suspend, persistent clock and rtc device,
+which is complicated. Another hand is that the nonstop clocksource can
+risk wrapping if the suspend time is too long, so we need one mechanism
+to wake up the system before the nonstop clocksource wrapping.
+
+According to above issues, we can introduce one common persistent clock
+framework to compatable with different architectures, in future we will
+remove the persistent clock implementation for each architecture. Also
+this framework will implement common code to help drivers to register easily.
+Moreover if we converted all SUSPEND_NONSTOP clocksource to register to
+be one persistent clock, we can remove the SUSPEND_NONSTOP clocksource
+accounting in timekeeping, which means we can only compensate the OS time
+from persistent clock and RTC.
+
+Will be appreciated for any comments. Thank you all.
 
 
-On 05/13/2018 01:17 PM, Christophe Jaillet wrote:
-> We allocate some memory which is neither used, nor referenced by anything.
-> So axe it.
->
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> ---
-> This patch as not been compile-tested, I don't have the corresponding arch
-> and have not taken time to cross-compile it.
-> ---
->   drivers/clk/clk-stm32mp1.c | 9 +--------
->   1 file changed, 1 insertion(+), 8 deletions(-)
->
-> diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
-> index edd3cf451401..dfb9cb5bd0c4 100644
-> --- a/drivers/clk/clk-stm32mp1.c
-> +++ b/drivers/clk/clk-stm32mp1.c
-> @@ -579,14 +579,9 @@ clk_stm32_register_gate_ops(struct device *dev,
->   			    spinlock_t *lock)
->   {
->   	struct clk_init_data init = { NULL };
-> -	struct clk_gate *gate;
->   	struct clk_hw *hw;
->   	int ret;
->   
-> -	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> -	if (!gate)
-> -		return ERR_PTR(-ENOMEM);
-> -
->   	init.name = name;
->   	init.parent_names = &parent_name;
->   	init.num_parents = 1;
-> @@ -604,10 +599,8 @@ clk_stm32_register_gate_ops(struct device *dev,
->   	hw->init = &init;
->   
->   	ret = clk_hw_register(dev, hw);
-> -	if (ret) {
-> -		kfree(gate);
-> +	if (ret)
->   		hw = ERR_PTR(ret);
-> -	}
->   
->   	return hw;
->   }
+Arnd posted some comments as below last time, but we did not get a general
+consensus, so I post them again.
+
+Arnd said:
+
+"I was planning to discuss this with Daniel and John during Linaro Connect,
+but that didn't happen, so I'd like to bring up the bigger picture here again.
+
+Today, we have a number of subsystem-type interfaces that deal with
+time keeping in the wider sense (I might be missing some):
+ - clock source
+ - clock event
+ - sched clock
+ - real time clock
+ - ptp clock
+ - persistent clock
+
+The first five have separate registration interfaces and may all refer
+to different hardware blocks, or (more commonly) have some overlap
+in the hardware. The fifth one is generalized by your series, without it
+it's really architecture specific (as the other ones were one one point).
+
+Are we happy with that structure in the long run? One of my earlier
+comments on this series was that I thought it should be combined with
+the clocksource registration, but upon talking to Baolin about it more,
+I realized that this just follows the same structure that we have for the
+others.
+
+In theory, we could have a more abstract way of registering a clock
+hardware that interfaces with any combination of the six subsystems
+I mentioned above, with a superset of the subsystem specific structures
+and a set of flags that indicate what a particular device is usable for.
+
+Combining all six might be a bit too much (in particular rtc, though
+it clearly overlaps the persistent-clk case), but what your general
+ideas on where we should be heading? Is it worth reworking the
+core kernel portion of the subsystems to simplify the individual
+drivers?"
+
+Baolin Wang (10):
+  time: Add persistent clock support
+  clocksource: sprd: Add one persistent timer for Spreadtrum platform
+  arm: omap: Convert 32K counter to use persistent clock
+  clocksource: tegra20_timer: Remove register_persistent_clock() API
+  arm: time: Remove the persistent clock support for ARM
+  clocksource: arm_arch_timer: Register the persistent clock
+  clocksource: timer-ti-32k: Register the persistent clock
+  clocksource: time-pistachio: Register the persistent clock
+  x86: tsc: Register the persistent clock
+  time: timekeeping: Remove time compensating from nonstop clocksources
+
+ arch/arm/include/asm/mach/time.h     |    4 -
+ arch/arm/kernel/time.c               |   36 -------
+ arch/arm/plat-omap/Kconfig           |    1 +
+ arch/arm/plat-omap/counter_32k.c     |   44 ++-------
+ arch/x86/Kconfig                     |    1 +
+ arch/x86/kernel/tsc.c                |   16 +++
+ drivers/clocksource/Kconfig          |    4 +
+ drivers/clocksource/arm_arch_timer.c |   10 ++
+ drivers/clocksource/tegra20_timer.c  |   12 ++-
+ drivers/clocksource/time-pistachio.c |    3 +
+ drivers/clocksource/timer-sprd.c     |   80 +++++++++++++++
+ drivers/clocksource/timer-ti-32k.c   |    4 +
+ include/linux/persistent_clock.h     |   21 ++++
+ kernel/time/Kconfig                  |    4 +
+ kernel/time/Makefile                 |    1 +
+ kernel/time/persistent_clock.c       |  180 ++++++++++++++++++++++++++++++++++
+ kernel/time/timekeeping.c            |   19 +---
+ 17 files changed, 345 insertions(+), 95 deletions(-)
+ create mode 100644 include/linux/persistent_clock.h
+ create mode 100644 kernel/time/persistent_clock.c
+
+-- 
+1.7.9.5
