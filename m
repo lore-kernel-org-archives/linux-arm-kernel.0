@@ -1,43 +1,56 @@
-From: chansen3@cisco.com (Christian Hansen (chansen3))
-Date: Mon, 14 May 2018 15:09:30 +0000
-Subject: [PATCH] arm64: allowing mmap to be traced
-In-Reply-To: <1526308362-45443-1-git-send-email-chansen3@cisco.com>
-References: <1526308362-45443-1-git-send-email-chansen3@cisco.com>
-Message-ID: <370F7C12-ADF7-4365-BA32-35148B7D0280@cisco.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Mon, 14 May 2018 10:11:39 -0500
+Subject: [PATCH] ARM: dts: socfpga: Fix NAND controller node compatible
+In-Reply-To: <73h8nak8y3.fsf@pengutronix.de>
+References: <20180510125223.16056-1-marex@denx.de>
+ <73h8nak8y3.fsf@pengutronix.de>
+Message-ID: <058358a7-89fa-f945-4394-de5ccf42182c@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Indeed, you have the quicker draw.  I concede to your patch.
 
-?On 2018-05-14, 10:32 AM, "Christian Hansen (chansen3)" <chansen3@cisco.com> wrote:
 
-    Adding missing macro which is present all other system calls to
-    to mmap declaration for ARM.  This allows it to appear as a kernel
-    tracing target.
-    
-    Signed-off-by: Christian Hansen <chansen3@cisco.com>
-    ---
-     arch/arm64/kernel/sys.c | 6 +++---
-     1 file changed, 3 insertions(+), 3 deletions(-)
-    
-    diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
-    index 72981ba..1ccdbfc 100644
-    --- a/arch/arm64/kernel/sys.c
-    +++ b/arch/arm64/kernel/sys.c
-    @@ -27,9 +27,9 @@
-     #include <linux/syscalls.h>
-     #include <asm/cpufeature.h>
-     
-    -asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
-    -			 unsigned long prot, unsigned long flags,
-    -			 unsigned long fd, off_t off)
-    +SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,
-    +		unsigned long, prot, unsigned long, flags,
-    +		unsigned long, fd, off_t, off)
-     {
-     	if (offset_in_page(off) != 0)
-     		return -EINVAL;
-    -- 
-    2.5.0
-    
-    
+On 05/14/2018 02:11 AM, Steffen Trumtrar wrote:
+> 
+> Marek Vasut <marex@denx.de> writes:
+> 
+>> The compatible string for the Denali NAND controller is incorrect,
+>> fix it by replacing it with one matching the DT bindings and the
+>> driver.
+>>
+>> Signed-off-by: Marek Vasut <marex@denx.de>
+>> Fixes: d837a80d19 ("ARM: dts: socfpga: add nand controller nodes")
+>> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>> Cc: Dinh Nguyen <dinguyen@kernel.org>
+>> ---
+>> ?arch/arm/boot/dts/socfpga.dtsi | 2 +-
+>> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/socfpga.dtsi
+>> b/arch/arm/boot/dts/socfpga.dtsi
+>> index 7e24dc8e82d4..d697f5062624 100644
+>> --- a/arch/arm/boot/dts/socfpga.dtsi
+>> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>> @@ -744,7 +744,7 @@
+>> ???????? nand0: nand at ff900000 {
+>> ???????????? #address-cells = <0x1>;
+>> ???????????? #size-cells = <0x1>;
+>> -??????????? compatible = "denali,denali-nand-dt";
+>> +??????????? compatible = "altr,socfpga-denali-nand";
+>> ???????????? reg = <0xff900000 0x100000>,
+>> ?????????????????? <0xffb80000 0x10000>;
+>> ???????????? reg-names = "nand_data", "denali_reg";
+> 
+> Ack. As the binding was changed after d837a80d19 this is obviously
+> correct.
+> 
+> @Dinh: Maybe you also want to cleanup the socfpga_arria10.dtsi? It has
+> both compatibles, but the "denali,denali-nand-dt" seems to be obsolete.
+> 
+
+Patch applied and cc'd stable kernel.
+
+Will clean up arria10.
+
+Thanks,
+Dinh
