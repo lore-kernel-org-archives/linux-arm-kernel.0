@@ -1,106 +1,59 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 10:46:28 +0100
-Subject: [PATCH 06/18] arm64: move sve_user_{enable, disable} to <asm/fpsimd.h>
+Date: Mon, 14 May 2018 10:46:25 +0100
+Subject: [PATCH 03/18] arm64: introduce sysreg_clear_set()
 In-Reply-To: <20180514094640.27569-1-mark.rutland@arm.com>
 References: <20180514094640.27569-1-mark.rutland@arm.com>
-Message-ID: <20180514094640.27569-7-mark.rutland@arm.com>
+Message-ID: <20180514094640.27569-4-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In subsequent patches, we'll want to make use of sve_user_enable() and
-sve_user_disable() outside of kernel/fpsimd.c. Let's move these to
-<asm/fpsimd.h> where we can make use of them.
+Currently we have a couple of helpers to manipulate bits in particular
+sysregs:
 
-To avoid ifdeffery in sequences like:
+ * config_sctlr_el1(u32 clear, u32 set)
 
-if (system_supports_sve() && some_condition
-	sve_user_disable();
+ * change_cpacr(u64 val, u64 mask)
 
-... empty stubs are provided when support for SVE is not enabled.
+The parameters of these differ in naming convention, order, and size,
+which is unfortunate. They also differ slightly in behaviour, as
+change_cpacr() skips the sysreg write if the bits are unchanged, which
+is a useful optimization when sysreg writes are expensive.
+
+Before we gain more yet another sysreg manipulation function, let's
+unify these with a common helper, providing a consistent order for
+clear/set operands, and the write skipping behaviour from
+change_cpacr(). Code will be migrated to the new helper in subsequent
+patches.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Dave Martin <dave.martin@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h | 17 ++++++++++++++++-
- arch/arm64/kernel/fpsimd.c      | 11 -----------
- 2 files changed, 16 insertions(+), 12 deletions(-)
+ arch/arm64/include/asm/sysreg.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index aa7162ae93e3..7377d7593c06 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -16,11 +16,13 @@
- #ifndef __ASM_FP_H
- #define __ASM_FP_H
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index bd1d1194a5e7..b52762769329 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -729,6 +729,17 @@ asm(
+ 	asm volatile("msr_s " __stringify(r) ", %x0" : : "rZ" (__val));	\
+ } while (0)
  
--#include <asm/ptrace.h>
- #include <asm/errno.h>
-+#include <asm/ptrace.h>
-+#include <asm/sysreg.h>
- 
- #ifndef __ASSEMBLY__
- 
-+#include <linux/build_bug.h>
- #include <linux/cache.h>
- #include <linux/init.h>
- #include <linux/stddef.h>
-@@ -81,6 +83,16 @@ extern int sve_set_vector_length(struct task_struct *task,
- extern int sve_set_current_vl(unsigned long arg);
- extern int sve_get_current_vl(void);
- 
-+static inline void sve_user_disable(void)
-+{
-+	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
-+}
++/*
++ * Modify bits in a sysreg. Bits in the clear mask are zeroed, then bits in the
++ * set mask are set. Other bits are left as-is.
++ */
++#define sysreg_clear_set(sysreg, clear, set) do {			\
++	u64 __scs_val = read_sysreg(sysreg);				\
++	u64 __scs_new = (__scs_val & ~(u64)(clear)) | (set);		\
++	if (__scs_new != __scs_val)					\
++		write_sysreg(__scs_new, sysreg);			\
++} while (0)
 +
-+static inline void sve_user_enable(void)
-+{
-+	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
-+}
-+
- /*
-  * Probing and setup functions.
-  * Calls to these functions must be serialised with one another.
-@@ -107,6 +119,9 @@ static inline int sve_get_current_vl(void)
- 	return -EINVAL;
- }
- 
-+static inline void sve_user_disable(void) { }
-+static inline void sve_user_enable(void) { }
-+
- static inline void sve_init_vq_map(void) { }
- static inline void sve_update_vq_map(void) { }
- static inline int sve_verify_vq_map(void) { return 0; }
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 088940387a4d..79a81c7d85c6 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -159,7 +159,6 @@ static void sve_free(struct task_struct *task)
- 	__sve_free(task);
- }
- 
--
- /* Offset of FFR in the SVE register dump */
- static size_t sve_ffr_offset(int vl)
+ static inline void config_sctlr_el1(u32 clear, u32 set)
  {
-@@ -172,16 +171,6 @@ static void *sve_pffr(struct task_struct *task)
- 		sve_ffr_offset(task->thread.sve_vl);
- }
- 
--static void sve_user_disable(void)
--{
--	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
--}
--
--static void sve_user_enable(void)
--{
--	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
--}
--
- /*
-  * TIF_SVE controls whether a task can use SVE without trapping while
-  * in userspace, and also the way a task's FPSIMD/SVE state is stored
+ 	u32 val;
 -- 
 2.11.0
