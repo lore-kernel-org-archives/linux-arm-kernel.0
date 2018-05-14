@@ -1,50 +1,148 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 14:10:13 +0100
-Subject: [PATCH 02/18] arm64: move SCTLR_EL{1,2} assertions to
- <asm/sysreg.h>
-In-Reply-To: <20180514124122.GJ7753@e103592.cambridge.arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-3-mark.rutland@arm.com>
- <20180514100053.GX7753@e103592.cambridge.arm.com>
- <20180514100858.4xjp5d3axbyy74ap@lakrids.cambridge.arm.com>
- <20180514112036.GI7753@e103592.cambridge.arm.com>
- <8d66d231-d8a2-07c1-6c5b-24c9474c851f@arm.com>
- <20180514120609.3vd2s4l3rknd2b3e@lakrids.cambridge.arm.com>
- <20180514124122.GJ7753@e103592.cambridge.arm.com>
-Message-ID: <20180514131012.7y3vmvoxvtjsqdyn@lakrids.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 14 May 2018 15:11:38 +0200
+Subject: Delivery Status Notification (Failure)
+In-Reply-To: <CAOuPNLiFr3qbNVAwF4wj2aAG0UXRVsgRo-8JfaKFCsoL+Ggk9w@mail.gmail.com>
+References: <CAOuPNLjqJVsPOVPCnswtFyXudAJ88_F0QVUq-Z6qWE=UpH0mBA@mail.gmail.com>
+ <5af57fea.1c69fb81.885f0.2377.GMRIR@mx.google.com>
+ <CAOuPNLgbT59h=Jm5YiOCbrqFkDokJ8xutQ_OkpsFYzKazKhTHg@mail.gmail.com>
+ <20180511123915.GC16141@n2100.armlinux.org.uk>
+ <f6f7b18644136323f4485d6123b330d0dde207a4.camel@pengutronix.de>
+ <CAOuPNLgRHCasmsXTVwcy5ohq8TYjbr4MThxm4Q-HFWihJ7ARww@mail.gmail.com>
+ <CAOuPNLiFr3qbNVAwF4wj2aAG0UXRVsgRo-8JfaKFCsoL+Ggk9w@mail.gmail.com>
+Message-ID: <1526303498.3494.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 01:41:23PM +0100, Dave Martin wrote:
-> On Mon, May 14, 2018 at 01:06:10PM +0100, Mark Rutland wrote:
-> > On Mon, May 14, 2018 at 12:56:09PM +0100, Robin Murphy wrote:
-> > > On 14/05/18 12:20, Dave Martin wrote:
-> > > > How about the following?
+Am Montag, den 14.05.2018, 17:42 +0530 schrieb Pintu Kumar:
+> Hi,
+> 
+> Is there any work around possible to set IRQ affinity for some GPIO
+> interrupt ?
+> How to avoid CPU0 to receive the current GPIO interrupt ?
+> How do we assign GPIO interrupts to any CPU other than CPU0 ?
+> Is it possible to isolate CPU0 for a sometime, from my GPIO driver so
+> that GPIO interrupt can be served by another CPU ?
+> 
+> Need your inputs to decide whether it is still possible to set
+> affinity for GPIO interrupt, or its impossible ?
+
+This is not possible. The GPIO IRQs are aggregated into one GPC/GIC IRQ
+line per GPIO bank, so it is not possible to change affinity of a
+single GPIO interrupt to another CPU. Best we could do is change the
+affinity of the whole bank, but given the limited usefulness of
+something like that, nobody bothered to implement such a thing.
+
+Regards,
+Lucas
+
+> 
+> 
+> On Fri, May 11, 2018 at 8:07 PM, Pintu Kumar <pintu.ping@gmail.com>
+> wrote:
+> > On Fri, May 11, 2018 at 6:34 PM, Lucas Stach <l.stach@pengutronix.d
+> > e> wrote:
+> > > Am Freitag, den 11.05.2018, 13:39 +0100 schrieb Russell King -
+> > > ARM Linux:
+> > > > On Fri, May 11, 2018 at 05:07:37PM +0530, Pintu Kumar wrote:
+> > > > > Hi,
+> > > > > 
+> > > > > I need one help.
+> > > > > I am using i.MX7 Sabre board with kernel version 4.1.15
+> > > > > 
+> > > > > Let's say I am interested in GPIO number: 21
+> > > > > I wanted to set CPU affinity for particular GPIO->IRQ number,
+> > > > > so I
+> > > > > tried the below steps:
+> > > > > root at 10:~# echo 21 > /sys/class/gpio/export
+> > > > > root at 10:~# echo "rising" > /sys/class/gpio/gpio21/edge
+> > > > > root at 10:~# cat /proc/interrupts | grep 21
+> > > > > ? 47: 0 0 gpio-mxc 21 Edge gpiolib
+> > > > > root at 10:~# cat /sys/class/gpio/gpio21/direction
+> > > > > in
+> > > > > root at 10:~# cat /proc/irq/47/smp_affinity
+> > > > > 3
+> > > > > root at 10:~# echo 2 > /proc/irq/47/smp_affinity
+> > > > > -bash: echo: write error: Input/output error
+> > > > > 
+> > > > > But I get input/output error.
+> > > > > When I debug further, found that irq_can_set_affinity is
+> > > > > returning 0:
+> > > > > [????0.000000] genirq: irq_can_set_affinity (0): balance: 1,
+> > > > > irq_data.chip: a81b7e48, irq_set_affinity:???(null)
+> > > > > [????0.000000] write_irq_affinity: FAIL
+> > > > > 
+> > > > > I also tried first setting /proc/irq/default_smp_affinity to
+> > > > > 2 (from 3).
+> > > > > This change is working, but the smp_affinity setting for the
+> > > > > new IRQ
+> > > > > is not working.
+> > > > > 
+> > > > > When I try to set smp_affinity for mmc0, then it works.
+> > > > > # cat /proc/interrupts | grep mmc
+> > > > > 295:?????????55??????????0?????GPCV2??22 Edge??????mmc0
+> > > > > 296:??????????0??????????0?????GPCV2??23 Edge??????mmc1
+> > > > > 297:?????????52??????????0?????GPCV2??24 Edge??????mmc2
+> > > > > 
+> > > > > root at 10:~# echo 2 > /proc/irq/295/smp_affinity
+> > > > > root at 10:~#
+> > > > > 
+> > > > > 
+> > > > > So, I wanted to know what are the conditions for which
+> > > > > setting
+> > > > > smp_affinity for an IRQ will work ?
+> > > > > 
+> > > > > Is there any way by which I can set CPU affinity to a GPIO ->
+> > > > > IRQ ?
+> > > > > Whether, irq_set_affinity_hint() will work in this case ?
 > > > > 
-> > > > /* Watch out for #if evaluation rules: ~0 is not ~(int)0! */
+> > > > IRQ affinity is only supported where interrupts are _directly_
+> > > > wired to
+> > > > the GIC.??It's the GIC which does the interrupt steering to the
+> > > > CPU
+> > > > cores.
+> > > > 
+> > > > Interrupts on downstream interrupt controllers (such as GPCV2)
+> > > > have no
+> > > > ability to be directed independently to other CPUs - the only
+> > > > possible
+> > > > way to change the mapping is to move _all_ interrupts on that
+> > > > controller,
+> > > > and any downstream chained interrupts at GIC level.
+> > > > 
+> > > > Hence why Interrupt 295 has no irq_set_affinity function: there
+> > > > is no way
+> > > > for the interrupt controller itself to change the affinity of
+> > > > the input
+> > > > interrupt.
 > > > 
-> > > Or, more formally, perhaps something even less vague like "Note that in
-> > > preprocessor arithmetic these constants are effectively of type intmax_t,
-> > > which is 64-bit, thus ~0 is not what we want."
+> > > The GPCv2 though is a secondary IRQ controller which has a 1:1
+> > > mapping
+> > > of its input IRQs to the upstream GIC IRQ lines. Affinity can
+> > > thus be
+> > > handled by forwarding the request to the GIC by
+> > > irq_chip_set_affinity_parent().
+> > > 
+> > > As this is handled correctly in the upstream kernel since the
+> > > first
+> > > commit introducing support for the GPCv2, it seems the issue is
+> > > only
+> > > present in some downstream kernel.
+> > > 
 > > 
-> > I'll drop something in the commit message to that effect, rather than a
-> > comment.
+> > OK. Thanks so much for your reply.
 > > 
-> > A comment will end up terse and vague or large and bloatsome (and
-> > redundant as we have this pattern twice).
+> > I saw some of the drivers using irq_set_affinity_hint() to force
+> > the
+> > IRQ affinity to a particular CPU.
+> > This is the sample:
+> > {
+> > cpumask_clear(mask);
+> > cpumask_set_cpu(cpu, mask);
+> > irq_set_affinity_hint(irq, mask);
+> > }
 > > 
-> > Anyone attempting to "clean" this up will find things break, and they can
-> > look at the git log to find out why it is the way it is...
-> 
-> Fair enough.  So long as we say something somewhere, that's
-> sufficient for me.
-> 
-> With that,
-> 
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> (as previously stated).
-
-Cheers!
-
-Mark.
+> > Whether this logic will work for a particular GPIO pin ?
+> > 
+> > 
+> > > Regards,
+> > > Lucas
