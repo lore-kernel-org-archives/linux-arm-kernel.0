@@ -1,25 +1,33 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 15 May 2018 07:22:17 +1000
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-Message-ID: <20180515072217.0a2ffe25@canb.auug.org.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 May 2018 23:24:23 +0200
+Subject: [PATCH 01/12] platform/early: add a new field to struct device
+In-Reply-To: <20180511162028.20616-2-brgl@bgdev.pl>
+References: <20180511162028.20616-1-brgl@bgdev.pl>
+ <20180511162028.20616-2-brgl@bgdev.pl>
+Message-ID: <CAMuHMdX-QbDTgzpeigMQmHe3LmBQL3DCWXN2=zDqohHm2tpUWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, May 11, 2018 at 6:20 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>
+> Add a new single-bit field to struct device which will be used to
+> indicate that a device was probed early in the boot sequence.
+>
+> This does not affect the size of struct device on any architecture
+> I built on (ARM, ARM64, x86_64).
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Commit
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-  949a0c0dec85 ("ARM: dts: stm32: add USB Host (USBH) support to stm32mp157c")
+Gr{oetje,eeting}s,
 
-is missing a Signed-off-by from its committer.
+                        Geert
 
 -- 
-Cheers,
-Stephen Rothwell
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180515/c8b126fe/attachment-0001.sig>
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
