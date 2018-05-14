@@ -1,115 +1,132 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 14 May 2018 13:17:26 +0200
-Subject: Allwinner A64: Issue on external rtc clock to wifi chip
-In-Reply-To: <CAMty3ZCAWBHtemeeWcgLy5PoYLn10MwxpHdirqpsxFY3BA7=4g@mail.gmail.com>
-References: <CAMty3ZCNyuEwmLGdDZLM_9qKJ2NsT33rodug7ZpKAE-OHymVEg@mail.gmail.com>
- <20180514075727.uxggyhmbahvhestx@flea>
- <CAMty3ZDew=+zytKUx5+nX27CjCe0UfJpyYOy2s07NoJvbe57mQ@mail.gmail.com>
- <20180514082744.ydmfg5mzsbol5onu@flea>
- <CAMty3ZC3ggxkZwirpQ-aRP8Udg=aYypBArb0KcR0_Z0AG8wATA@mail.gmail.com>
- <20180514090618.r5xc3elzpvfp47f4@flea>
- <CAMty3ZCAWBHtemeeWcgLy5PoYLn10MwxpHdirqpsxFY3BA7=4g@mail.gmail.com>
-Message-ID: <20180514111726.lnxpegipqklyetmv@flea>
+From: aford173@gmail.com (Adam Ford)
+Date: Mon, 14 May 2018 06:19:28 -0500
+Subject: [PATCH V4] ARM: dts: da850-evm: Enable LCD and Backlight
+Message-ID: <20180514111928.28172-1-aford173@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 03:12:49PM +0530, Jagan Teki wrote:
-> On Mon, May 14, 2018 at 2:36 PM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > On Mon, May 14, 2018 at 02:34:22PM +0530, Jagan Teki wrote:
-> >> On Mon, May 14, 2018 at 1:57 PM, Maxime Ripard
-> >> <maxime.ripard@bootlin.com> wrote:
-> >> > On Mon, May 14, 2018 at 01:34:56PM +0530, Jagan Teki wrote:
-> >> >> On Mon, May 14, 2018 at 1:27 PM, Maxime Ripard
-> >> >> <maxime.ripard@bootlin.com> wrote:
-> >> >> > Hi,
-> >> >> >
-> >> >> > On Mon, May 14, 2018 at 12:37:49PM +0530, Jagan Teki wrote:
-> >> >> >> Hi Maxime and All,
-> >> >> >>
-> >> >> >> We are trying to bring-up AP6330 Wifi chip for A64 board. We noticed
-> >> >> >> to have an external rtc clock has driven from wifi chip.
-> >> >> >>
-> >> >> >> So the devicetree is configured according to this as below.
-> >> >> >>
-> >> >> >> / {
-> >> >> >>         wifi_pwrseq: wifi-pwrseq {
-> >> >> >>                 compatible = "mmc-pwrseq-simple";
-> >> >> >>                 clocks = <&rtc 1>;
-> >> >> >>                 clock-names = "ext_clock";
-> >> >> >>                 reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-> >> >> >>                 post-power-on-delay-ms = <400>;
-> >> >> >>         };
-> >> >> >> };
-> >> >> >>
-> >> >> >> &rtc {
-> >> >> >>         clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
-> >> >> >>         clocks = <&osc32k>;
-> >> >> >>         #clock-cells = <1>;
-> >> >> >> };
-> >> >> >>
-> >> >> >> &mmc1 {
-> >> >> >>         pinctrl-names = "default";
-> >> >> >>         pinctrl-0 = <&mmc1_pins>;
-> >> >> >>         vmmc-supply = <&reg_dcdc1>;
-> >> >> >>         vqmmc-supply = <&reg_eldo1>;
-> >> >> >>         mmc-pwrseq = <&wifi_pwrseq>;
-> >> >> >>         bus-width = <4>;
-> >> >> >>         non-removable;
-> >> >> >>         status = "okay";
-> >> >> >>
-> >> >> >>         brcmf: wifi at 1 {
-> >> >> >>                 reg = <1>;
-> >> >> >>                 compatible = "brcm,bcm4329-fmac";
-> >> >> >>                 interrupt-parent = <&r_pio>;
-> >> >> >>                 interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;  /* WL-WAKE-AP: PL3 */
-> >> >> >>                 interrupt-names = "host-wake";
-> >> >> >>         };
-> >> >> >> };
-> >> >> >>
-> >> >> >> And observed rtc-osc32k-out clock is never enabled[1] and the value of
-> >> >> >> LOSC_OUT_GATING is 0x0 which eventually not enabling
-> >> >> >> LOSC_OUT_GATING_EN
-> >> >> >>
-> >> >> >> Pls. let us know if we miss anything here?
-> >> >> >>
-> >> >> >> [1] https://paste.ubuntu.com/p/X2By4q8kD2/
-> >> >> >
-> >> >> > Could you paste your config and the logs from a boot to?
-> >> >>
-> >> >> .config
-> >> >> https://paste.ubuntu.com/p/w9w2KB7RFc/
-> >> >>
-> >> >> dmesg
-> >> >> https://paste.ubuntu.com/p/mrZGk5bWRR/
-> >> >
-> >> > This is kind of weird. Have you tested with a 4.17 kernel? We have
-> >> > runtime_pm changes lined up in next, so that might be a regression
-> >> > there, even though we tested it with Quentin at some point.
-> >>
-> >> This is 4.17-rc4 do you want to try it on 4.16 ?
-> >
-> > No, this is next-20180503. Please try with 4.17-rc4
-> 
-> Couldn't find any different in behaviour [2]
-> 
-> [2] https://paste.ubuntu.com/p/m3PGBwrv6W/
+When using the board files the LCD works, but not with the DT.
+This adds enables the original da850-evm to work with the same
+LCD in device tree mode.
 
-It's hard to tell without the board, but have you looked at the return
-value of devm_clk_get in the pwrseq code?
+The EVM has a gpios for the lcd_panel_pwr, lcd_backlight_pwr,
+and lcd_pwm0.  Both lcd_backlight_pwr and lcd_pwm0 must be driven
+to enable the backlight, so a gpio-regulator is used to drive
+lcd_backlight_prw.
 
-Enabling the clk ftrace events would also help.
+The LCD and the vpif display pins are mutually exclusive, so if
+using the LCD, disable the vpif.  If using the vpif, disable panel.
+Extra code comments are inserted to further explain this
 
-Maxime
+Signed-off-by: Adam Ford <aford173@gmail.com>
+---
+V4:  Add comments into the code explaining the LCD and VPIF are mutually
+     exclusive with instructions on how to enable/disable each.  Rename 
+     GPIO pins based on schematic net name. Fix gpio enable in backlight
 
+V3:  Fix errant GPIO, label GPIO pins, and rename the regulator to be 
+     more explict to backlight which better matches the schematic.
+     Updated the description to explain that it cannot be used at the 
+     same time as the vpif driver.
+
+V2:  Add regulator and GPIO enable pins. Remove PWM backlight and 
+     replace with GPIO  
+
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 2e817da37fdb..f6a5497d9c97 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -27,6 +27,53 @@
+ 		spi0 = &spi1;
+ 	};
+ 
++	backlight {
++		compatible = "gpio-backlight";
++		gpios = <&gpio 7 GPIO_ACTIVE_HIGH>; /* lcd_pwm0 */
++	};
++
++	panel {
++		compatible = "ti,tilcdc,panel";
++		pinctrl-names = "default";
++		pinctrl-0 = <&lcd_pins>;
++		/* The vpif and the LCD are mutually exclusive.
++		 * To enable VPIF, change the status below to 'disabled' then
++		 * then change the status of the vpif below to 'okay' */
++		status = "okay";
++		enable-gpios = <&gpio 40 GPIO_ACTIVE_HIGH>; /* lcd_panel_pwr */
++
++		panel-info {
++			ac-bias		= <255>;
++			ac-bias-intrpt	= <0>;
++			dma-burst-sz	= <16>;
++			bpp		= <16>;
++			fdd		= <0x80>;
++			sync-edge	= <0>;
++			sync-ctrl	= <1>;
++			raster-order	= <0>;
++			fifo-th		= <0>;
++		};
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: 480x272 {
++				clock-frequency = <9000000>;
++				hactive = <480>;
++				vactive = <272>;
++				hfront-porch = <3>;
++				hback-porch = <2>;
++				hsync-len = <42>;
++				vback-porch = <3>;
++				vfront-porch = <4>;
++				vsync-len = <11>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <1>;
++				pixelclk-active = <1>;
++			};
++		};
++	};
++
+ 	vbat: fixedregulator0 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vbat";
+@@ -35,6 +82,16 @@
+ 		regulator-boot-on;
+ 	};
+ 
++	backlight_reg: backlight-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "lcd_backlight_pwr";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio 47 GPIO_ACTIVE_HIGH>; /* lcd_backlight_pwr */
++		regulator-always-on;
++		enable-active-high;
++	};
++
+ 	sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "DA850/OMAP-L138 EVM";
+@@ -109,6 +166,10 @@
+ 	status = "okay";
+ };
+ 
++&lcdc {
++	status = "okay";
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 	clock-frequency = <100000>;
+@@ -339,5 +400,8 @@
+ &vpif {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
+-	status = "okay";
++	/* The vpif and the LCD are mutually exclusive.
++	 * To enable VPIF, disable the ti,tilcdc,panel then
++	 * changed the status below to 'okay' */
++	status = "disabled";
+ };
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/4e65385a/attachment.sig>
+2.17.0
