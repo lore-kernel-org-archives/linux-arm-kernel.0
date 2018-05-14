@@ -1,44 +1,43 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 14 May 2018 10:03:52 -0500
-Subject: [PATCH] ARM: dts: socfpga: Fix NAND controller clock supply
-In-Reply-To: <20180510143726.8047-1-marex@denx.de>
-References: <20180510143726.8047-1-marex@denx.de>
-Message-ID: <57ff625c-bba5-a4ad-0b5a-c6b122e30edd@kernel.org>
+From: chansen3@cisco.com (Christian Hansen (chansen3))
+Date: Mon, 14 May 2018 15:09:30 +0000
+Subject: [PATCH] arm64: allowing mmap to be traced
+In-Reply-To: <1526308362-45443-1-git-send-email-chansen3@cisco.com>
+References: <1526308362-45443-1-git-send-email-chansen3@cisco.com>
+Message-ID: <370F7C12-ADF7-4365-BA32-35148B7D0280@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Indeed, you have the quicker draw.  I concede to your patch.
 
+?On 2018-05-14, 10:32 AM, "Christian Hansen (chansen3)" <chansen3@cisco.com> wrote:
 
-On 05/10/2018 09:37 AM, Marek Vasut wrote:
-> The Denali NAND x-clock should be supplied by nand_x_clk, not by
-> nand_clk. Fix this, otherwise the Denali driver gets incorrect
-> clock frequency information and incorrectly configures the NAND
-> timing.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Fixes: d837a80d19 ("ARM: dts: socfpga: add nand controller nodes")
-> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Cc: Dinh Nguyen <dinguyen@kernel.org>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index d697f5062624..e719c20a0e65 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -750,7 +750,7 @@
->  			reg-names = "nand_data", "denali_reg";
->  			interrupts = <0x0 0x90 0x4>;
->  			dma-mask = <0xffffffff>;
-> -			clocks = <&nand_clk>;
-> +			clocks = <&nand_x_clk>;
->  			status = "disabled";
->  		};
->  
-> 
-
-Applied and cc'ed stable kernel.
-
-Thanks,
-Dinh
+    Adding missing macro which is present all other system calls to
+    to mmap declaration for ARM.  This allows it to appear as a kernel
+    tracing target.
+    
+    Signed-off-by: Christian Hansen <chansen3@cisco.com>
+    ---
+     arch/arm64/kernel/sys.c | 6 +++---
+     1 file changed, 3 insertions(+), 3 deletions(-)
+    
+    diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+    index 72981ba..1ccdbfc 100644
+    --- a/arch/arm64/kernel/sys.c
+    +++ b/arch/arm64/kernel/sys.c
+    @@ -27,9 +27,9 @@
+     #include <linux/syscalls.h>
+     #include <asm/cpufeature.h>
+     
+    -asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+    -			 unsigned long prot, unsigned long flags,
+    -			 unsigned long fd, off_t off)
+    +SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,
+    +		unsigned long, prot, unsigned long, flags,
+    +		unsigned long, fd, off_t, off)
+     {
+     	if (offset_in_page(off) != 0)
+     		return -EINVAL;
+    -- 
+    2.5.0
+    
+    
