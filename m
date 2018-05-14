@@ -1,44 +1,94 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 14 May 2018 12:56:09 +0100
-Subject: [PATCH 02/18] arm64: move SCTLR_EL{1,2} assertions to
- <asm/sysreg.h>
-In-Reply-To: <20180514112036.GI7753@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 May 2018 12:58:05 +0100
+Subject: [PATCH 10/18] arm64: convert native/compat syscall entry to C
+In-Reply-To: <20180514110729.GF7753@e103592.cambridge.arm.com>
 References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-3-mark.rutland@arm.com>
- <20180514100053.GX7753@e103592.cambridge.arm.com>
- <20180514100858.4xjp5d3axbyy74ap@lakrids.cambridge.arm.com>
- <20180514112036.GI7753@e103592.cambridge.arm.com>
-Message-ID: <8d66d231-d8a2-07c1-6c5b-24c9474c851f@arm.com>
+ <20180514094640.27569-11-mark.rutland@arm.com>
+ <20180514110729.GF7753@e103592.cambridge.arm.com>
+Message-ID: <20180514115805.bdlcxsw6q3xsbjb7@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/05/18 12:20, Dave Martin wrote:
-> On Mon, May 14, 2018 at 11:08:59AM +0100, Mark Rutland wrote:
->> On Mon, May 14, 2018 at 11:00:53AM +0100, Dave Martin wrote:
->>> On Mon, May 14, 2018 at 10:46:24AM +0100, Mark Rutland wrote:
->>>> -/* Check all the bits are accounted for */
->>>> -#define SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != ~0)
->>>> -
->>>> +#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffff
->>>> +#error "Inconsistent SCTLR_EL2 set/clear bits"
->>>> +#endif
->>>
->>> Can we have a comment on the != 0xffffffff versus != ~0 here?
->>>
->>> The subtle differences in evaluation semantics between #if and
->>> other contexts here may well trip people up during maintenance...
->>
->> Do you have any suggestion as to the wording?
->>
->> I'm happy to add a comment, but I don't really know what to say.
-> 
-> 
-> How about the following?
-> 
-> /* Watch out for #if evaluation rules: ~0 is not ~(int)0! */
+On Mon, May 14, 2018 at 12:07:30PM +0100, Dave Martin wrote:
+> On Mon, May 14, 2018 at 10:46:32AM +0100, Mark Rutland wrote:
 
-Or, more formally, perhaps something even less vague like "Note that in 
-preprocessor arithmetic these constants are effectively of type 
-intmax_t, which is 64-bit, thus ~0 is not what we want."
+> > diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
+> > index 5df857e32b48..4706f841e758 100644
+> > --- a/arch/arm64/kernel/syscall.c
+> > +++ b/arch/arm64/kernel/syscall.c
+> > @@ -6,7 +6,9 @@
+> >  #include <linux/ptrace.h>
+> >  
+> >  #include <asm/daifflags.h>
+> > +#include <asm/fpsimd.h>
+> >  #include <asm/thread_info.h>
+> > +#include <asm/unistd.h>
+> >  
+> >  long do_ni_syscall(struct pt_regs *regs);
+> >  
+> > @@ -41,8 +43,8 @@ static inline bool has_syscall_work(unsigned long flags)
+> >  int syscall_trace_enter(struct pt_regs *regs);
+> >  void syscall_trace_exit(struct pt_regs *regs);
+> >  
+> > -asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
+> > -			       syscall_fn_t syscall_table[])
+> > +static void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
+> > +			   syscall_fn_t syscall_table[])
+> >  {
+> >  	unsigned long flags = current_thread_info()->flags;
+> >  
+> > @@ -79,3 +81,37 @@ asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
+> >  trace_exit:
+> >  	syscall_trace_exit(regs);
+> >  }
+> > +
+> > +static inline void sve_user_reset(void)
+> 
+> Static function with no caller...
 
-Robin.
+Ugh, this was intended to be called below in el0_svc_handler().
+
+> > +{
+> > +	if (!system_supports_sve())
+> > +		return;
+> > +
+> > +	/*
+> > +	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
+> > +	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
+> > +	 * happens if a context switch or kernel_neon_begin() or context
+> > +	 * modification (sigreturn, ptrace) intervenes.
+> > +	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
+> > +	 */
+> > +	if (test_and_clear_thread_flag(TIF_SVE))
+> > +		sve_user_disable();
+> 
+> sve_user_disable() is already inline, and incorporates the if()
+> internally via sysreg_clear_set().
+> 
+> So, should this just be
+> 
+> 	clear_thread_flag(TIF_SVE);
+> 	sve_user_disable();
+
+Sure. That does mean we'll unconditionally read cpacr_el1, but I assume
+you're happy with that. I'll note the difference in the commit message.
+
+> > +}
+> > +
+> > +extern syscall_fn_t sys_call_table[];
+> > +
+> > +asmlinkage void el0_svc_handler(struct pt_regs *regs)
+> > +{
+> 
+> if (system_supports_sve()) ?
+> 
+> > +	sve_user_disable();
+> 
+> Or should this be replaced by a call to sve_user_reset()?
+> 
+> I suspect the latter, since we do want to be clearing TIF_SVE here too.
+
+Yes, this was mean to be sve_user_reset().
+
+Thanks,
+Mark.
