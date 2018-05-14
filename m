@@ -1,34 +1,44 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 14 May 2018 17:54:34 +0200
-Subject: [GIT PULL] Reset controller fixes for v4.17
-Message-ID: <1526313274.4936.21.camel@pengutronix.de>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Mon, 14 May 2018 15:56:08 +0000
+Subject: [GIT PULL] STi DT update for v4.18 round 1
+Message-ID: <11f8376c-860d-26cf-92f6-38737e513656@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+Hi Arnd, Kevin, Olof
+
+PLease consider this first round of STi dts update for v4.18
 
 The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
 are available in the git repository at:
 
-  git://git.pengutronix.de/pza/linux.git tags/reset-fixes-for-4.17
+   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+tags/sti-dt-for-v4.18-round1
 
-for you to fetch changes up to e6914365fd280fce303a89b8a8d4529af5a2e0f9:
+for you to fetch changes up to c5bf208a0dc4aee18e03c6ed97eada70ffa9a4d8:
 
-  reset: uniphier: fix USB clock line for LD20 (2018-04-27 11:51:12 +0200)
-
-----------------------------------------------------------------
-Reset controller fixes for v4.17
-
-Fix the USB3 reset (offset 0x200c, bit 5) on Uniphier LD20. It was
-incorrectly labeled as GIO reset. This reset line is not yet used in
-uniphier-ld20.dtsi.
+   ARM: dts: stihxxx-b2120: Fix complain about IRQ_TYPE_NONE usage 
+(2018-05-14 17:40:26 +0200)
 
 ----------------------------------------------------------------
-Masahiro Yamada (1):
-      reset: uniphier: fix USB clock line for LD20
+STi DT update for 4.18:
+  - Fix complain about IRQ_TYPE_NONE_usage
 
- drivers/reset/reset-uniphier.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+----------------------------------------------------------------
+Patrice Chotard (5):
+       ARM: dts: stih407-family: Fix complain about IRQ_TYPE_NONE usage
+       ARM: dts: stih407-pinctrl: Fix complain about IRQ_TYPE_NONE usage
+       ARM: dts: stih407: Fix complain about IRQ_TYPE_NONE usage
+       ARM: dts: stih410: Fix complain about IRQ_TYPE_NONE usage
+       ARM: dts: stihxxx-b2120: Fix complain about IRQ_TYPE_NONE usage
+
+  arch/arm/boot/dts/stih407-family.dtsi  | 52 
++++++++++++++++++-----------------
+  arch/arm/boot/dts/stih407-pinctrl.dtsi | 10 +++----
+  arch/arm/boot/dts/stih407.dtsi         |  2 +-
+  arch/arm/boot/dts/stih410.dtsi         | 18 ++++++------
+  arch/arm/boot/dts/stihxxx-b2120.dtsi   |  4 +--
+  5 files changed, 43 insertions(+), 43 deletions(-)
