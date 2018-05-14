@@ -1,40 +1,54 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 14 May 2018 16:01:15 +0530
-Subject: [PATCH 09/21] arm64: dts: allwinner: a64: Add HDMI support
-In-Reply-To: <20180514084050.ix5corfuvx33gsyn@flea>
-References: <20180430114058.5061-1-jagan@amarulasolutions.com>
- <20180430114058.5061-10-jagan@amarulasolutions.com>
- <20180502113413.vv2r3ubfoh7gm3ms@flea>
- <CAMty3ZBheurXewQ8R53G_0gNLgv1jQkZbjAbaN30JQ6_ZVn7Eg@mail.gmail.com>
- <20180514084050.ix5corfuvx33gsyn@flea>
-Message-ID: <CAMty3ZDCubM2sLBfNVar-kA9djZ8PJDQJOS0Jwi6wWNVeK9mCg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 May 2018 12:31:19 +0200
+Subject: [PATCH v3 6/8] arm64: module-plts: Extend veneer to address
+ 52-bit VAs
+In-Reply-To: <20180511101104.6cv5mvqc6juh2mgt@capper-debian.cambridge.arm.com>
+References: <20180510162347.3858-1-steve.capper@arm.com>
+ <20180510162347.3858-7-steve.capper@arm.com>
+ <CAKv+Gu_unCnhqE_Ort0zOjBj_ZmWja5unGON6KBuRxJzdhc5jA@mail.gmail.com>
+ <20180511101104.6cv5mvqc6juh2mgt@capper-debian.cambridge.arm.com>
+Message-ID: <CAKv+Gu9sEY86sN6N2q51FNTs6C3xXuOwszjwracj1Gn_CydO4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 2:10 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Mon, May 14, 2018 at 02:03:36PM +0530, Jagan Teki wrote:
->> On Wed, May 2, 2018 at 5:04 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->> > Hi,
+On 11 May 2018 at 12:11, Steve Capper <steve.capper@arm.com> wrote:
+> On Fri, May 11, 2018 at 12:01:05AM +0200, Ard Biesheuvel wrote:
+>> On 10 May 2018 at 18:23, Steve Capper <steve.capper@arm.com> wrote:
+>> > From: Ard Bieusheuval <ard.biesheuvel@linaro.org>
 >> >
->> > On Mon, Apr 30, 2018 at 05:10:46PM +0530, Jagan Teki wrote:
->> >> +             hdmi_phy: hdmi-phy at 1ef0000 {
->> >> +                     compatible = "allwinner,sun50i-a64-hdmi-phy",
->> >> +                                  "allwinner,sun8i-h3-hdmi-phy";
->> >> +                     reg = <0x01ef0000 0x10000>;
->> >> +                     clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
->> >> +                              <&ccu CLK_PLL_VIDEO1>;
+>> > In preparation for 52-bit VA support in the Linux kernel, we extend the
+>> > plts veneer to support 52-bit addresses via an extra movk instruction.
 >> >
->> > You were discussing that the PLL0 could also be used to clock the PHY,
->> > has that been figured out?
+>> > [Steve: code from Ard off-list, changed the #ifdef logic to inequality]
+>> > Signed-off-by: Steve Capper <steve.capper@arm.com>
+>> >
+>> > ---
+>> >
+>> > New in V3 of the series.
+>> >
+>> > I'm not sure if this is strictly necessary as the VAs of the module
+>> > space will fit within 48-bits of addressing even when a 52-bit VA space
+>> > is enabled.
 >>
->> This is what I understand from Fig: 3-3. Module Clock Diagram, both
->> tcon0 and tcon1 are using HDMI. I'm thinking based on the tcon
->> configuration we need use proper PLL or some logic to get common PLL
->> don't know yet. Since this series adding tcon1 I've attached PLL1.
+>> What about the kernel text itself? Is that also guaranteed to have
+>> bits [51:48] of its VAs equal 0xf, even under randomization?
+>>
+>> If so, I agree we don't need the patch.
+>>
 >
-> You're not describing the TCON node here though, but the HDMI one, and
-> the HDMI block is listed in both the PLL video 0 and 1.
+> Hi Ard,
+> The kernel modules and text are guaranteed to have addresses greater
+> than or equal to KASAN_SHADOW_END (same for both 48, 52-bit VAs) or
+> _VA_START(VA_BITS_MIN) (same for both 48, 52-bit VAs). Also, IIUC, the
+> KASLR displacemnt is always non-negative?
+>
 
-So how can we attach particular PLL with particular HDMI(PLL0 to HDMI0
-and so-on) or do we need to attached both the PLL's any suggestion?
+Correct.
+
+> So I think we're safe in that modules and kernel text will be 48-bit
+> addressable in 52-bit configurations.
+>
+> I'll have a think about a BUILD_BUG to capture any change to the above.
+>
+
+Yes please
