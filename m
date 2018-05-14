@@ -1,60 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 06:15:55 +0100
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <f180b312-d1cf-3992-4e89-9632c1674cd6@linux.com>
-References: <20180502203326.9491-1-labbott@redhat.com>
- <20180502203326.9491-3-labbott@redhat.com>
- <20180503071917.xm2xvgagvzkworay@salmiak>
- <dd6ad26c-1d2c-88f3-8f01-e68d2b31d6ea@linux.com>
- <20180504110907.c2dw33kjmyybso6t@lakrids.cambridge.arm.com>
- <4badae50-be9b-2c6d-854b-57ab48664800@linux.com>
- <71199506-b46b-5f91-e489-e6450b6d1067@linux.com>
- <20180511161317.57k6prl54xjmsit3@lakrids.cambridge.arm.com>
- <f180b312-d1cf-3992-4e89-9632c1674cd6@linux.com>
-Message-ID: <20180514051555.bpbydgr56hyffjch@salmiak>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 14 May 2018 13:18:30 +0800
+Subject: [PATCH RESEND net-next v2 1/8] dt-bindings: net: dwmac-sun8i:
+ Clean up clock delay chain descriptions
+In-Reply-To: <CAGb2v66F_Ho2OZdrF3p6xe9mQ=zJZ_KjE9MnW1VmWs9jw65eEg@mail.gmail.com>
+References: <20180513191425.9801-1-wens@csie.org>
+ <20180513191425.9801-2-wens@csie.org> <20180513194919.GE12738@lunn.ch>
+ <CAGb2v66nqWnioS1pwfWFtMZFZSWvf4SwXr_ExnnGvYsK9RU_LA@mail.gmail.com>
+ <20180513200529.GF12738@lunn.ch>
+ <CAGb2v64ACc1tQRhy4LhnvCC7VJ3nVM-wMbgUgzviGMWKPFsSuQ@mail.gmail.com>
+ <20180513202938.GH12738@lunn.ch>
+ <CAGb2v66F_Ho2OZdrF3p6xe9mQ=zJZ_KjE9MnW1VmWs9jw65eEg@mail.gmail.com>
+Message-ID: <AC88E7D0-DDC9-4EB9-91EE-441C1C017BDB@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 13, 2018 at 11:40:07AM +0300, Alexander Popov wrote:
-> It seems that previously I was very "lucky" to accidentally have those MIN_STACK_LEFT,
-> call trace depth and oops=panic together to experience a hang on stack overflow
-> during BUG().
-> 
-> 
-> When I run my test in a loop _without_ VMAP_STACK, I manage to corrupt the neighbour
-> processes with BUG() handling overstepping the stack boundary. It's a pity, but
-> I have an idea.
 
-I think that in the absence of VMAP_STACK, there will always be cases where we
-*could* corrupt a neighbouring stack, but I agree that trying to minimize that
-possibility would be good.
 
-> In kernel/sched/core.c we already have:
-> 
-> #ifdef CONFIG_SCHED_STACK_END_CHECK
->   	if (task_stack_end_corrupted(prev))
-> 		panic("corrupted stack end detected inside scheduler\n");
-> #endif
-> 
-> So what would you think if I do the following in check_alloca():
-> 
-> 	if (size >= stack_left) {
-> #if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
-> 		panic("alloca over the kernel stack boundary\n");
-> #else
-> 		BUG();
-> #endif
+? 2018?5?14? GMT+08:00 ??12:59:22, Chen-Yu Tsai <wens@csie.org> ??:
+>On Sun, May 13, 2018 at 1:29 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> On Sun, May 13, 2018 at 01:11:08PM -0700, Chen-Yu Tsai wrote:
+>>> On Sun, May 13, 2018 at 1:05 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>>> >> > Hi Chen-Yu
+>>> >> >
+>>> >> > Are these delays the MAC applies? Not the PHY. It would be good
+>to
+>>> >> > make it clear here these are MAC imposed delays.
+>>> >>
+>>> >> Yes these are applied on the MAC side. Being described in the
+>device
+>>> >> tree bindings for the MAC, I thought this was implied to be the
+>case?
+>>> >> Are there known exceptions?
+>>> >
+>>> > There is frequent confusion with this. Most of the time, the PHY
+>does
+>>> > the delay, not the MAC, based on the phy-mode. So the MAC doing it
+>is
+>>> > an exception in itself.
+>>> >
+>>> > Do you actually need these delays for the board you adding support
+>>> > for? Does the PHY not support adding the needed delays? If you
+>don't
+>>> > need the delays, i would not even implement them.
+>>>
+>>> Yes this is already used on the Bananapi M3. This patch merely
+>reformats
+>>> the description and adds a note saying this only applies to RGMII
+>mode.
+>>
+>> Yes, the current code is needed for the Bananapi M3. But you have
+>> another patch which extends the code to support a smaller range. Do
+>> you have a board which actually needs this? If not, i would not add
+>> that new code.
+>
+>IIRC the delay on the PHY side is either 2ns or none. The delay on the
+>MAC side here is an order smaller, likely fine tuning to cope with
+>board
+>design deficiencies.
 
-Given this is already out-of-line, how about we always use panic(), regardless
-of VMAP_STACK and SCHED_STACK_END_CHECK? i.e. just
+And the weird thing is that the delay fails to work on some batches
+of RTL8211E, notably many cases are shown on Pine A64+
+board.
 
-	if (unlikely(size >= stack_left))
-		panic("alloca over the kernel stack boundary");
+P.S. The delay is intended to be set via wires on PCB, other than
+by software. Although Realtek provided some magic numbers
+to Pine64, in order to fix the network problem due to PHY
+delay failure.
 
-If we have VMAP_STACK selected, and overflow during the panic, it's the same as
-if we overflowed during the BUG(). It's likely that panic() will use less stack
-space than BUG(), and the compiler can put the call in a slow path that
-shouldn't affect most calls, so in all cases it's likely preferable.
-
-Thanks,
-Mark.
+>
+>Currently no other board requires this, but this is already part of the
+>binding. The new stuff limits the range for a specific SoC, simply
+>because
+>that is the range supported by the control register. Not implementing,
+>i.e.
+>supporting the whole range from the property, which might get
+>truncated,
+>doesn't make much sense to me.
+>
+>Regards
+>ChenYu
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
