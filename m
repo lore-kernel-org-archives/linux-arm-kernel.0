@@ -1,40 +1,74 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 May 2018 10:46:23 +0100
-Subject: [PATCH 01/18] arm64: consistently use unsigned long for thread flags
-In-Reply-To: <20180514094640.27569-1-mark.rutland@arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
-Message-ID: <20180514094640.27569-2-mark.rutland@arm.com>
+Date: Mon, 14 May 2018 10:46:22 +0100
+Subject: [PATCH 00/18] arm64: invoke syscalls with pt_regs
+Message-ID: <20180514094640.27569-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In do_notify_resume, we manipulate thread_flags as a 32-bit unsigned
-int, whereas thread_info::flags is a 64-bit unsigned long, and elsewhere
-(e.g. in the entry assembly) we manipulate the flags as a 64-bit
-quantity.
+This series reworks arm64's syscall handling to minimize the propagation
+of user-controlled register values into speculated code paths. As with
+x86 [1], a wrapper is generated for each syscall, which extracts the
+argument from a struct pt_regs. During kernel entry from userspace,
+registers are zeroed.
 
-For consistency, and to avoid problems if we end up with more than 32
-flags, let's make do_notify_resume take the flags as a 64-bit unsigned
-long.
+The arm64 kernel code directly invokes some syscalls which the x86 code
+doesn't, so I've added ksys_* wrappers for these, following the x86
+example. The rest of the series is arm64-specific.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/signal.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I've pushed the series out to my arm64/syscall-regs branch [2] on
+kernel.org.
 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 154b7d30145d..8e624fec4707 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -896,7 +896,7 @@ static void do_signal(struct pt_regs *regs)
- }
- 
- asmlinkage void do_notify_resume(struct pt_regs *regs,
--				 unsigned int thread_flags)
-+				 unsigned long thread_flags)
- {
- 	/*
- 	 * The assembly code enters us with IRQs off, but it hasn't
+Thanks,
+Mark.
+
+[1] https://lkml.kernel.org/r/20180330093720.6780-1-linux at dominikbrodowski.net
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git
+
+Mark Rutland (18):
+  arm64: consistently use unsigned long for thread flags
+  arm64: move SCTLR_EL{1,2} assertions to <asm/sysreg.h>
+  arm64: introduce sysreg_clear_set()
+  arm64: kill config_sctlr_el1()
+  arm64: kill change_cpacr()
+  arm64: move sve_user_{enable,disable} to <asm/fpsimd.h>
+  arm64: remove sigreturn wrappers
+  arm64: convert raw syscall invocation to C
+  arm64: convert syscall trace logic to C
+  arm64: convert native/compat syscall entry to C
+  arm64: zero GPRs upon entry from EL0
+  kernel: add ksys_personality()
+  kernel: add kcompat_sys_{f,}statfs64()
+  arm64: remove in-kernel call to sys_personality()
+  arm64: use {COMPAT,}SYSCALL_DEFINE0 for sigreturn
+  arm64: use SYSCALL_DEFINE6() for mmap
+  arm64: convert compat wrappers to C
+  arm64: implement syscall wrappers
+
+ arch/arm64/Kconfig                       |   1 +
+ arch/arm64/include/asm/fpsimd.h          |  17 ++++-
+ arch/arm64/include/asm/syscall_wrapper.h |  80 ++++++++++++++++++++
+ arch/arm64/include/asm/sysreg.h          |  33 ++++----
+ arch/arm64/include/asm/unistd32.h        |  26 +++----
+ arch/arm64/kernel/Makefile               |   5 +-
+ arch/arm64/kernel/armv8_deprecated.c     |   8 +-
+ arch/arm64/kernel/cpu_errata.c           |   3 +-
+ arch/arm64/kernel/entry.S                | 126 +++----------------------------
+ arch/arm64/kernel/entry32.S              | 121 -----------------------------
+ arch/arm64/kernel/fpsimd.c               |  20 -----
+ arch/arm64/kernel/signal.c               |   5 +-
+ arch/arm64/kernel/signal32.c             |   6 +-
+ arch/arm64/kernel/sys.c                  |  19 +++--
+ arch/arm64/kernel/sys32.c                | 116 ++++++++++++++++++++++++----
+ arch/arm64/kernel/syscall.c              | 113 +++++++++++++++++++++++++++
+ arch/arm64/kernel/traps.c                |   4 +-
+ arch/arm64/mm/fault.c                    |   2 +-
+ fs/statfs.c                              |  14 +++-
+ include/linux/syscalls.h                 |   9 +++
+ kernel/exec_domain.c                     |   7 +-
+ 21 files changed, 411 insertions(+), 324 deletions(-)
+ create mode 100644 arch/arm64/include/asm/syscall_wrapper.h
+ delete mode 100644 arch/arm64/kernel/entry32.S
+ create mode 100644 arch/arm64/kernel/syscall.c
+
 -- 
 2.11.0
