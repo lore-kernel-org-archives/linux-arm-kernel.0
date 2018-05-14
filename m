@@ -1,67 +1,124 @@
-From: linux@dominikbrodowski.net (Dominik Brodowski)
-Date: Mon, 14 May 2018 22:34:14 +0200
-Subject: [PATCH 13/18] kernel: add kcompat_sys_{f,}statfs64()
-In-Reply-To: <20180514171427.qyietn3fhilwokb2@lakrids.cambridge.arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-14-mark.rutland@arm.com>
- <20180514171427.qyietn3fhilwokb2@lakrids.cambridge.arm.com>
-Message-ID: <20180514203414.GB26773@light.dominikbrodowski.net>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 14 May 2018 14:03:16 -0700
+Subject: [PATCH v3] coresight: documentation: update sysfs section
+In-Reply-To: <20180514141800.f1be30ce9d1f6ae20ca2d04c@arm.com>
+References: <20180507172915.c032cd71c07b1849bf419a5f@arm.com>
+ <CANLsYkyQLan3XajOz2uuoOF8OQchGfeu2ZkZJ9H1Xm9q==aXTw@mail.gmail.com>
+ <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
+ <a09cbbb5-0237-31f5-dc81-d816c9ec26c5@infradead.org>
+ <20180514141800.f1be30ce9d1f6ae20ca2d04c@arm.com>
+Message-ID: <8bcf5490-aeea-e531-fc2d-e8aff8a62dbc@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 06:14:28PM +0100, Mark Rutland wrote:
-> On Mon, May 14, 2018 at 10:46:35AM +0100, Mark Rutland wrote:
-> > Using this helper allows us to avoid the in-kernel calls to the
-> > compat_sys_{f,}statfs64() sycalls, as are necessary for parameter
-> > mangling in arm64's compat handling.
-> > 
-> > Following the example of ksys_* functions, kcompat_sys_* functions are
-> > intended to be a drop-in replacement for their compat_sys_*
-> > counterparts, with the same calling convention.
-> > 
-> > This is necessary to enable conversion of arm64's syscall handling to
-> > use pt_regs wrappers.
+On 05/14/2018 12:18 PM, Kim Phillips wrote:
+> - Align and show updated ls devices output from the TC2, based on
+>   current driver
 > 
-> > diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-> > index 6723ea51ec99..e0bf3e4bb897 100644
-> > --- a/include/linux/syscalls.h
-> > +++ b/include/linux/syscalls.h
-> > @@ -59,6 +59,7 @@ struct tms;
-> >  struct utimbuf;
-> >  struct mq_attr;
-> >  struct compat_stat;
-> > +struct compat_statfs64;
-> >  struct compat_timeval;
-> >  struct robust_list_head;
-> >  struct getcpu_cache;
-> > @@ -1150,6 +1151,13 @@ unsigned long ksys_mmap_pgoff(unsigned long addr, unsigned long len,
-> >  ssize_t ksys_readahead(int fd, loff_t offset, size_t count);
-> >  unsigned int ksys_personality(unsigned int personality);
-> >  
-> > +#ifdef CONFIG_COMPAT
-> > +int kcompat_sys_statfs64(const char __user * pathname, compat_size_t sz,
-> > +		     struct compat_statfs64 __user * buf);
-> > +int kcompat_sys_fstatfs64(unsigned int fd, compat_size_t sz,
-> > +			  struct compat_statfs64 __user * buf);
-> > +#endif
+> - Provide an example from an ETMv4 based system (Juno)
 > 
-> I've moved these to <linux/compat.h>, so that they live with the rest of
-> the compat syscall stuff. That should avoid build failures the kbuild
-> test robot picked up where compat_size_t wasn't dfined.
+> - Reflect changes to the way the RAM write pointer is accessed since
+>   it got changed in commit 7d83d17795ef ("coresight: tmc: adding sysFS
+>   management entries").
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Randy Dunlap <rdunlap@infradead.org>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
 
-Please add a comment there, similar to what is in syscalls.h:
+FWIW:
+Acked-by: Randy Dunlap <rdunlap@infradead.org>
 
-	/*
-	 * Kernel code should not call syscalls (i.e., sys_xyzyyz()) directly.
-	 * Instead, use one of the functions which work equivalently, such as
-	 * the ksys_xyzyyz() functions prototyped below.
-	 */
+Thanks.
 
-Once you have done so, feel free to add my
+> ---
+> v3: address Randy Dunlap's showns->shown,  corrected - and + line merging
+> v2: address Mathieu's comment about clarifying the sinks on the Juno
+>     vs. TC2 platforms.
+> 
+>  Documentation/trace/coresight.txt | 43 +++++++++++++++++++------------
+>  1 file changed, 26 insertions(+), 17 deletions(-)
+> 
+> diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
+> index 6f0120c3a4f1..15d2a0f1e1b8 100644
+> --- a/Documentation/trace/coresight.txt
+> +++ b/Documentation/trace/coresight.txt
+> @@ -141,13 +141,25 @@ register the device with the core framework.  The unregister function takes
+>  a reference to a "struct coresight_device", obtained at registration time.
+>  
+>  If everything goes well during the registration process the new devices will
+> -show up under /sys/bus/coresight/devices, as showns here for a TC2 platform:
+> +show up under /sys/bus/coresight/devices, as shown here for a TC2 platform:
+>  
+>  root:~# ls /sys/bus/coresight/devices/
+> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
+> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
+> +20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm  replicator
+> +20030000.tpiu  2201c000.ptm	2203c000.etm  2203e000.etm
+>  root:~#
+>  
+> +and here for a Juno platform:
+> +
+> +root at juno:~# ls /sys/bus/coresight/devices/
+> +20010000.etf	 20120000.replicator  22040000.etm     230c0000.funnel
+> +20030000.tpiu	 20130000.funnel      220c0000.funnel  23140000.etm
+> +20040000.funnel  20140000.etf	      22140000.etm     23240000.etm
+> +20070000.etr	 20150000.funnel      23040000.etm     23340000.etm
+> +root at juno:~# 
+> +
+> +Note that on Juno users can select the ETF, ETR and TPIU as a sink target while
+> +on TC2, the ETB and TPIU can be selected.
+> +
+>  The functions take a "struct coresight_device", which looks like this:
+>  
+>  struct coresight_desc {
+> @@ -193,16 +205,16 @@ the information carried in "THIS_MODULE".
+>  How to use the tracer modules
+>  -----------------------------
+>  
+> -Before trace collection can start, a coresight sink needs to be identify.
+> +Before trace collection can start, a coresight sink needs to be identified.
+>  There is no limit on the amount of sinks (nor sources) that can be enabled at
+>  any given moment.  As a generic operation, all device pertaining to the sink
+>  class will have an "active" entry in sysfs:
+>  
+>  root:/sys/bus/coresight/devices# ls
+> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
+> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
+> +20010000.etb   20040000.funnel	2201d000.ptm  2203d000.etm  replicator
+> +20030000.tpiu  2201c000.ptm	2203c000.etm  2203e000.etm
+>  root:/sys/bus/coresight/devices# ls 20010000.etb
+> -enable_sink  status  trigger_cntr
+> +enable_sink  mgmt  power  subsystem  trigger_cntr  uevent
+>  root:/sys/bus/coresight/devices# echo 1 > 20010000.etb/enable_sink
+>  root:/sys/bus/coresight/devices# cat 20010000.etb/enable_sink
+>  1
+> @@ -216,16 +228,13 @@ trigger a trace capture:
+>  root:/sys/bus/coresight/devices# echo 1 > 2201c000.ptm/enable_source
+>  root:/sys/bus/coresight/devices# cat 2201c000.ptm/enable_source
+>  1
+> -root:/sys/bus/coresight/devices# cat 20010000.etb/status
+> -Depth:          0x2000
+> -Status:         0x1
+> -RAM read ptr:   0x0
+> -RAM wrt ptr:    0x19d3   <----- The write pointer is moving
+> -Trigger cnt:    0x0
+> -Control:        0x1
+> -Flush status:   0x0
+> -Flush ctrl:     0x2001
+> -root:/sys/bus/coresight/devices#
+> +
+> +Observe the write pointer moving:
+> +
+> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
+> +0x1a8
+> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
+> +0x19a6
+>  
+>  Trace collection is stopped the same way:
+>  
+> 
 
-	Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
 
-tag to this patch.
-
-Thanks,
-	Dominik
+-- 
+~Randy
