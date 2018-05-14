@@ -1,296 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 14 May 2018 10:31:54 -0300
-Subject: [PATCH v2] ARM: dts: imx6/7: Remove unit-address from anatop
- regulators
-Message-ID: <1526304714-23821-1-git-send-email-festevam@gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 14 May 2018 15:34:29 +0200
+Subject: [FAIL bisect] Sound card probe error
+In-Reply-To: <CAJKOXPeNJtmU2+8CdMRwXignMTetn=LScdcMspfkP3MVmTSHrg@mail.gmail.com>
+References: <CGME20180514101728epcas4p3108760546a415b36252df93dfe38e0fb@epcas4p3.samsung.com>
+ <CAJKOXPfD8gZR8nZkmAr=Ldt3xESuFocQLnMtrDsNZu=ba55jcw@mail.gmail.com>
+ <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
+ <CAJKOXPc+kLA+BPBmaP14zMLbbxxCmWF1eZnKoa_PcO2z9jG9JQ@mail.gmail.com>
+ <4c61c422-a036-8fec-1153-d612fe5df878@samsung.com>
+ <CAJKOXPc6Yj0+Z6zd-Gm-fYvfQB4rPPn0k6ED8bWScJ-tdZ=Ysw@mail.gmail.com>
+ <CAJKOXPeNJtmU2+8CdMRwXignMTetn=LScdcMspfkP3MVmTSHrg@mail.gmail.com>
+Message-ID: <c62a6f86-4c6f-f7ed-f615-93d6db7412ec@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On 05/14/2018 02:50 PM, Krzysztof Kozlowski wrote:
+> On Mon, May 14, 2018 at 2:45 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> On Mon, May 14, 2018 at 2:40 PM, Sylwester Nawrocki
+>> <s.nawrocki@samsung.com> wrote:
+>>> On 05/14/2018 02:29 PM, Krzysztof Kozlowski wrote:
+>>>> Ah, I missed these messages because I was looking at err dmesg level
+>>>> (and for some reason these are warn). Anyway do you have any thoughts
+>>>> how is it connected with missing Odroid XU3 sound card and max98090
+>>>> codec?
+>>> One reason is that the DRM driver registers an ASoC codec object which
+>>> is required for the sound card registration to complete. But I wonder
+>>> why there is no any error messages related to this.
+>> Thanks Marek and Sylwester. Another point is that probably OOPS later
+>> should not happen...
 
-Remove unit-address and reg property from anatop regulators to fix
-the following DTC warnings with W=1:
+> Separate topic (trim Cc list):
+> 
+> ... and this means that disabling Exynos DRM causes lack of Audio. I
+> tried it now and indeed without DRM there is no audio again. I think
+> it is not nice... There are not many such use cases but there are
+> (playing audio from console/ssh with a headless board).\
 
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unique_unit_address): /soc/aips-bus at 2000000/anatop at 20c8000/regulator-vddcore at 20c8140: duplicate unit-address (also used in node /soc/aips-bus at 2000000/anatop at 20c8000/regulator-vddpu at 20c8140)
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unique_unit_address): /soc/aips-bus at 2000000/anatop at 20c8000/regulator-vddcore at 20c8140: duplicate unit-address (also used in node /soc/aips-bus at 2000000/anatop at 20c8000/regulator-vddsoc at 20c8140)
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unique_unit_address): /soc/aips-bus at 2000000/anatop at 20c8000/regulator-vddpu at 20c8140: duplicate unit-address (also used in node /soc/aips-bus at 2000000/anatop at 20c8000/regulator-vddsoc at 20c8140)
+As we discussed off the mailing list, what we could probably do now
+is to add a compile time dependency on CONFIG_DRM_EXYNOS_HDMI, a fallback
+to the max98098 codec only when the HDMI driver is disabled. 
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Send it is a standalone patch instead of a patch series.
+That might require modifying snd_soc_of_get_dai_link_codecs() so it can 
+skip optional codecs.
 
- arch/arm/boot/dts/imx6qdl.dtsi | 20 ++++++--------------
- arch/arm/boot/dts/imx6sl.dtsi  | 20 ++++++--------------
- arch/arm/boot/dts/imx6sx.dtsi  | 20 ++++++--------------
- arch/arm/boot/dts/imx6ul.dtsi  | 11 +++--------
- arch/arm/boot/dts/imx7s.dtsi   |  8 ++------
- 5 files changed, 23 insertions(+), 56 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 69648e2..22942dd 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -692,11 +692,8 @@
- 				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 127 IRQ_TYPE_LEVEL_HIGH>;
--				#address-cells = <1>;
--				#size-cells = <0>;
- 
--				regulator-1p1 at 20c8110 {
--					reg = <0x20c8110>;
-+				regulator-1p1 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p1";
- 					regulator-min-microvolt = <1000000>;
-@@ -711,8 +708,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				regulator-3p0 at 20c8120 {
--					reg = <0x20c8120>;
-+				regulator-3p0 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2800000>;
-@@ -727,8 +723,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				regulator-2p5 at 20c8130 {
--					reg = <0x20c8130>;
-+				regulator-2p5 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd2p5";
- 					regulator-min-microvolt = <2250000>;
-@@ -743,8 +738,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				reg_arm: regulator-vddcore at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_arm: regulator-vddcore {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
-@@ -761,8 +755,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_pu: regulator-vddpu at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_pu: regulator-vddpu {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
-@@ -779,8 +772,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_soc: regulator-vddsoc {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 2002db2..8c838ba 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -524,11 +524,8 @@
- 				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 127 IRQ_TYPE_LEVEL_HIGH>;
--				#address-cells = <1>;
--				#size-cells = <0>;
- 
--				regulator-1p1 at 20c8110 {
--					reg = <0x20c8110>;
-+				regulator-1p1 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p1";
- 					regulator-min-microvolt = <800000>;
-@@ -543,8 +540,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				regulator-3p0 at 20c8120 {
--					reg = <0x20c8120>;
-+				regulator-3p0 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2800000>;
-@@ -559,8 +555,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				regulator-2p5 at 20c8130 {
--					reg = <0x20c8130>;
-+				regulator-2p5 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd2p5";
- 					regulator-min-microvolt = <2100000>;
-@@ -575,8 +570,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				reg_arm: regulator-vddcore at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_arm: regulator-vddcore {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
-@@ -593,8 +587,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_pu: regulator-vddpu at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_pu: regulator-vddpu {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
-@@ -611,8 +604,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_soc: regulator-vddsoc {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 7e463d2..4a97513 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -591,11 +591,8 @@
- 				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
--				#address-cells = <1>;
--				#size-cells = <0>;
- 
--				regulator-1p1 at 20c8110 {
--					reg = <0x20c8110>;
-+				regulator-1p1 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p1";
- 					regulator-min-microvolt = <800000>;
-@@ -610,8 +607,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				regulator-3p0 at 20c8120 {
--					reg = <0x20c8120>;
-+				regulator-3p0 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2800000>;
-@@ -626,8 +622,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				regulator-2p5 at 20c8130 {
--					reg = <0x20c8130>;
-+				regulator-2p5 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd2p5";
- 					regulator-min-microvolt = <2100000>;
-@@ -642,8 +637,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				reg_arm: regulator-vddcore at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_arm: regulator-vddcore {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
-@@ -660,8 +654,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_pcie: regulator-vddpcie at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_pcie: regulator-vddpcie {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpcie";
- 					regulator-min-microvolt = <725000>;
-@@ -677,8 +670,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_soc: regulator-vddsoc {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 2b854d1..1818b6c 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -551,11 +551,8 @@
- 				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
--				#address-cells = <1>;
--				#size-cells = <0>;
- 
--				reg_3p0: regulator-3p0 at 20c8110 {
--					reg = <0x20c8110>;
-+				reg_3p0: regulator-3p0 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2625000>;
-@@ -569,8 +566,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				reg_arm: regulator-vddcore at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_arm: regulator-vddcore {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "cpu";
- 					regulator-min-microvolt = <725000>;
-@@ -587,8 +583,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc at 20c8140 {
--					reg = <0x20c8140>;
-+				reg_soc: regulator-vddsoc {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index b416d2b..99f92ec 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -557,11 +557,8 @@
- 				reg = <0x30360000 0x10000>;
- 				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
- 					<GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
--				#address-cells = <1>;
--				#size-cells = <0>;
- 
--				reg_1p0d: regulator-vdd1p0d at 30360210 {
--					reg = <0x30360210>;
-+				reg_1p0d: regulator-vdd1p0d {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p0d";
- 					regulator-min-microvolt = <800000>;
-@@ -575,8 +572,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				reg_1p2: regulator-vdd1p2 at 30360220 {
--					reg = <0x30360220>;
-+				reg_1p2: regulator-vdd1p2 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p2";
- 					regulator-min-microvolt = <1100000>;
 -- 
-2.7.4
+Regards,
+Sylwester
