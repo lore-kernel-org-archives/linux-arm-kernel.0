@@ -1,172 +1,179 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 14 May 2018 12:57:23 +0200
-Subject: [PATCH v3 6/6] tty/serial: atmel: changed the driver to work
- under at91-usart mfd
-In-Reply-To: <20180511103822.31698-7-radu.pirea@microchip.com>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-7-radu.pirea@microchip.com>
-Message-ID: <4a75568e-a52e-3872-f465-d707372a5c12@sorico.fr>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 14 May 2018 12:01:04 +0100
+Subject: [PATCH 2/2] [stable 4.4] arm64: Add work around for Arm Cortex-A55
+ Erratum 1024718
+In-Reply-To: <1526295664-22187-1-git-send-email-suzuki.poulose@arm.com>
+References: <1526295664-22187-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1526295664-22187-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+commit ece1397cbc89c51914fae1aec729539cfd8bd62b upstream
 
-On 11/05/2018 12:38, Radu Pirea wrote:
-> This patch modifies the place where resources and device tree properties
-> are searched.
-> 
-> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-> ---
->  drivers/tty/serial/Kconfig        |  1 +
->  drivers/tty/serial/atmel_serial.c | 29 +++++++++++++++--------------
->  2 files changed, 16 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 3682fd3e960c..25e55332f8b1 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -119,6 +119,7 @@ config SERIAL_ATMEL
->  	depends on ARCH_AT91 || COMPILE_TEST
->  	select SERIAL_CORE
->  	select SERIAL_MCTRL_GPIO if GPIOLIB
-> +	select MFD_AT91_USART
->  	help
->  	  This enables the driver for the on-chip UARTs of the Atmel
->  	  AT91 processors.
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index df46a9e88c34..6b4494352853 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -193,8 +193,8 @@ static struct console atmel_console;
->  
->  #if defined(CONFIG_OF)
->  static const struct of_device_id atmel_serial_dt_ids[] = {
-> -	{ .compatible = "atmel,at91rm9200-usart" },
-> -	{ .compatible = "atmel,at91sam9260-usart" },
-> +	{ .compatible = "atmel,at91rm9200-usart-serial" },
-> +	{ .compatible = "atmel,at91sam9260-usart-serial" },
->  	{ /* sentinel */ }
->  };
->  #endif
-> @@ -1631,7 +1631,7 @@ static void atmel_tasklet_tx_func(unsigned long data)
->  static void atmel_init_property(struct atmel_uart_port *atmel_port,
->  				struct platform_device *pdev)
->  {
-> -	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *np = pdev->dev.parent->of_node;
->  
->  	/* DMA/PDC usage specification */
->  	if (of_property_read_bool(np, "atmel,use-dma-rx")) {
-> @@ -2223,7 +2223,8 @@ static const char *atmel_type(struct uart_port *port)
->  static void atmel_release_port(struct uart_port *port)
->  {
->  	struct platform_device *pdev = to_platform_device(port->dev);
-> -	int size = pdev->resource[0].end - pdev->resource[0].start + 1;
-> +	int size = to_platform_device(pdev->dev.parent)->resource[0].end -
-> +		to_platform_device(pdev->dev.parent)->resource[0].start + 1;
-I think it may be simpler with something like:
-+	struct platform_device *mfd_pdev = to_platform_device(port->dev->parent);
-+	int size = mfd_pdev->resource[0].end - mfd_pdev->resource[0].start + 1;
+Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
+from an erratum 1024718, which causes incorrect updates when DBM/AP
+bits in a page table entry is modified without a break-before-make
+sequence. The work around is to disable the hardware DBM feature
+on the affected cores. The hardware Access Flag management features
+is not affected.
 
->  
->  	release_mem_region(port->mapbase, size);
->  
-> @@ -2239,7 +2240,8 @@ static void atmel_release_port(struct uart_port *port)
->  static int atmel_request_port(struct uart_port *port)
->  {
->  	struct platform_device *pdev = to_platform_device(port->dev);
-> -	int size = pdev->resource[0].end - pdev->resource[0].start + 1;
-> +	int size = to_platform_device(pdev->dev.parent)->resource[0].end -
-> +		to_platform_device(pdev->dev.parent)->resource[0].start + 1;
->  
-ditto
+The hardware DBM feature is a non-conflicting capability, i.e, the
+kernel could handle cores using the feature and those without having
+the features running at the same time. So this work around is detected
+at early boot time, rather than delaying it until the CPUs are brought
+up into the kernel with MMU turned on. This also avoids other complexities
+with late CPUs turning online, with or without the hardware DBM features.
 
->  	if (!request_mem_region(port->mapbase, size, "atmel_serial"))
->  		return -EBUSY;
-> @@ -2345,23 +2347,23 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
-Here, we could also add:
-+	struct device *mfd_dev = pdev->dev.parent;
-+	struct platform_device *mfd_pdev = to_platform_device(mfd_dev);
+Cc: stable at vger.kernel.org # v4.4
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+Note: The upstream commit is on top of a reworked capability
+infrastructure for arm64 heterogeneous systems, which allows
+delaying the CPU model checks. This backport is based on the
+original version of the patch [0], which checks the affected
+CPU models during the early boot.
 
->  	atmel_init_property(atmel_port, pdev);
->  	atmel_set_ops(port);
->  
-> -	uart_get_rs485_mode(&pdev->dev, &port->rs485);
-> +	uart_get_rs485_mode(pdev->dev.parent, &port->rs485);
-...and use them here
+[0] https://lkml.kernel.org/r/20180116102323.3470-1-suzuki.poulose at arm.com
+---
+ arch/arm64/Kconfig                 | 14 +++++++++++++
+ arch/arm64/include/asm/assembler.h | 40 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/cputype.h   | 11 +++++++++++
+ arch/arm64/mm/proc.S               |  5 +++++
+ 4 files changed, 70 insertions(+)
 
->  
->  	port->iotype		= UPIO_MEM;
->  	port->flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP;
->  	port->ops		= &atmel_pops;
->  	port->fifosize		= 1;
->  	port->dev		= &pdev->dev;
-> -	port->mapbase	= pdev->resource[0].start;
-> -	port->irq	= pdev->resource[1].start;
-> +	port->mapbase		= to_platform_device(pdev->dev.parent)->resource[0].start;
-> +	port->irq		= to_platform_device(pdev->dev.parent)->resource[1].start;
-and here
-I think it would be easier to read.
-
->  	port->rs485_config	= atmel_config_rs485;
-> -	port->membase	= NULL;
-> +	port->membase		= NULL;
->  
->  	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
->  
->  	/* for console, the clock could already be configured */
->  	if (!atmel_port->clk) {
-> -		atmel_port->clk = clk_get(&pdev->dev, "usart");
-> +		atmel_port->clk = clk_get(pdev->dev.parent, "usart");
-and here
-
->  		if (IS_ERR(atmel_port->clk)) {
->  			ret = PTR_ERR(atmel_port->clk);
->  			atmel_port->clk = NULL;
-> @@ -2656,7 +2658,7 @@ static void atmel_serial_probe_fifos(struct atmel_uart_port *atmel_port,
->  	atmel_port->rts_low = 0;
->  	atmel_port->rts_high = 0;
->  
-> -	if (of_property_read_u32(pdev->dev.of_node,
-> +	if (of_property_read_u32(pdev->dev.parent->of_node,
->  				 "atmel,fifo-size",
->  				 &atmel_port->fifo_size))
->  		return;
-> @@ -2694,11 +2696,10 @@ static void atmel_serial_probe_fifos(struct atmel_uart_port *atmel_port,
->  static int atmel_serial_probe(struct platform_device *pdev)
->  {
->  	struct atmel_uart_port *atmel_port;
-> -	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *np = pdev->dev.parent->of_node;
->  	void *data;
->  	int ret = -ENODEV;
->  	bool rs485_enabled;
-> -
-I think this line feed wasn't so bad.
-
->  	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
->  
->  	ret = of_alias_get_id(np, "serial");
-> @@ -2845,7 +2846,7 @@ static struct platform_driver atmel_serial_driver = {
->  	.suspend	= atmel_serial_suspend,
->  	.resume		= atmel_serial_resume,
->  	.driver		= {
-> -		.name			= "atmel_usart",
-> +		.name			= "atmel_usart_serial",
->  		.of_match_table		= of_match_ptr(atmel_serial_dt_ids),
->  	},
->  };
-> 
-
-After your patch, the DMA is not selected anymore:
-atmel_usart_serial atmel_usart_serial.0.auto: TX channel not available, switch to pio
-instead of:
-atmel_usart fffff200.serial: using dma1chan2 for tx DMA transfers
-
-And the kernel doesn't log anymore on the serial console, despite the loglevel=8
-(after reverting this series, the kernel logs reappears on the serial console)
-
-(tests done on sam9g35)
-
-regards,
-Richard
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 02c0867..5b47218 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -375,6 +375,20 @@ config ARM64_ERRATUM_843419
+ 
+ 	  If unsure, say Y.
+ 
++config ARM64_ERRATUM_1024718
++	bool "Cortex-A55: 1024718: Update of DBM/AP bits without break before make might result in incorrect update"
++	default y
++	help
++	  This option adds work around for Arm Cortex-A55 Erratum 1024718.
++
++	  Affected Cortex-A55 cores (r0p0, r0p1, r1p0) could cause incorrect
++	  update of the hardware dirty bit when the DBM/AP bits are updated
++	  without a break-before-make. The work around is to disable the usage
++	  of hardware DBM locally on the affected cores. CPUs not affected by
++	  erratum will continue to use the feature.
++
++	  If unsure, say Y.
++
+ config CAVIUM_ERRATUM_22375
+ 	bool "Cavium erratum 22375, 24313"
+ 	default y
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 83e2309..f68abb1 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -23,6 +23,7 @@
+ #ifndef __ASM_ASSEMBLER_H
+ #define __ASM_ASSEMBLER_H
+ 
++#include <asm/cputype.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+ 
+@@ -224,4 +225,43 @@ lr	.req	x30		// link register
+ 	movk	\reg, :abs_g0_nc:\val
+ 	.endm
+ 
++/*
++ * Check the MIDR_EL1 of the current CPU for a given model and a range of
++ * variant/revision. See asm/cputype.h for the macros used below.
++ *
++ *	model:		MIDR_CPU_PART of CPU
++ *	rv_min:		Minimum of MIDR_CPU_VAR_REV()
++ *	rv_max:		Maximum of MIDR_CPU_VAR_REV()
++ *	res:		Result register.
++ *	tmp1, tmp2, tmp3: Temporary registers
++ *
++ * Corrupts: res, tmp1, tmp2, tmp3
++ * Returns:  0, if the CPU id doesn't match. Non-zero otherwise
++ */
++	.macro	cpu_midr_match model, rv_min, rv_max, res, tmp1, tmp2, tmp3
++	mrs		\res, midr_el1
++	mov_q		\tmp1, (MIDR_REVISION_MASK | MIDR_VARIANT_MASK)
++	mov_q		\tmp2, MIDR_CPU_PART_MASK
++	and		\tmp3, \res, \tmp2	// Extract model
++	and		\tmp1, \res, \tmp1	// rev & variant
++	mov_q		\tmp2, \model
++	cmp		\tmp3, \tmp2
++	cset		\res, eq
++	cbz		\res, .Ldone\@		// Model matches ?
++
++	.if (\rv_min != 0)			// Skip min check if rv_min == 0
++	mov_q		\tmp3, \rv_min
++	cmp		\tmp1, \tmp3
++	cset		\res, ge
++	.endif					// \rv_min != 0
++	/* Skip rv_max check if rv_min == rv_max && rv_min != 0 */
++	.if ((\rv_min != \rv_max) || \rv_min == 0)
++	mov_q		\tmp2, \rv_max
++	cmp		\tmp1, \tmp2
++	cset		\tmp2, le
++	and		\res, \res, \tmp2
++	.endif
++.Ldone\@:
++	.endm
++
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 1a59493..f43e10c 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -57,6 +57,14 @@
+ #define MIDR_IMPLEMENTOR(midr)	\
+ 	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
+ 
++#define MIDR_CPU_VAR_REV(var, rev) \
++	(((var) << MIDR_VARIANT_SHIFT) | (rev))
++
++#define MIDR_CPU_PART_MASK	  \
++	(MIDR_IMPLEMENTOR_MASK	| \
++	 MIDR_ARCHITECTURE_MASK | \
++	 MIDR_PARTNUM_MASK)
++
+ #define MIDR_CPU_PART(imp, partnum) \
+ 	(((imp)			<< MIDR_IMPLEMENTOR_SHIFT) | \
+ 	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
+@@ -70,11 +78,14 @@
+ #define ARM_CPU_PART_FOUNDATION		0xD00
+ #define ARM_CPU_PART_CORTEX_A57		0xD07
+ #define ARM_CPU_PART_CORTEX_A53		0xD03
++#define ARM_CPU_PART_CORTEX_A55		0xD05
+ 
+ #define APM_CPU_PART_POTENZA		0x000
+ 
+ #define CAVIUM_CPU_PART_THUNDERX	0x0A1
+ 
++#define MIDR_CORTEX_A55 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A55)
++
+ #ifndef __ASSEMBLY__
+ 
+ /*
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 18201e9..f096367 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -221,6 +221,11 @@ ENTRY(__cpu_setup)
+ 	cbz	x9, 2f
+ 	cmp	x9, #2
+ 	b.lt	1f
++#ifdef CONFIG_ARM64_ERRATUM_1024718
++	/* Disable hardware DBM on Cortex-A55 r0p0, r0p1 & r1p0 */
++	cpu_midr_match MIDR_CORTEX_A55, MIDR_CPU_VAR_REV(0, 0), MIDR_CPU_VAR_REV(1, 0), x1, x2, x3, x4
++	cbnz	x1, 1f
++#endif
+ 	orr	x10, x10, #TCR_HD		// hardware Dirty flag update
+ 1:	orr	x10, x10, #TCR_HA		// hardware Access flag update
+ 2:
+-- 
+2.7.4
