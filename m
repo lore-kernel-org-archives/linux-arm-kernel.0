@@ -1,77 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 13:09:56 -0700
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.18
-In-Reply-To: <5AF5A668.8010903@hisilicon.com>
-References: <5AF5A668.8010903@hisilicon.com>
-Message-ID: <20180514200956.jzvglfib3kgjf6xs@localhost>
+Date: Mon, 14 May 2018 13:24:58 -0700
+Subject: [GIT PULL 2/5 v2] Broadcom defconfig-arm64 changes for 4.18
+In-Reply-To: <20180513170134.11472-1-f.fainelli@gmail.com>
+References: <20180511214339.24139-2-f.fainelli@gmail.com>
+ <20180513170134.11472-1-f.fainelli@gmail.com>
+Message-ID: <20180514202458.ftyney2mfqa3qyov@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, May 11, 2018 at 03:19:20PM +0100, Wei Xu wrote:
-> Hi Arnd, Hi Olof,
-> 
-> Please help to pull the following changes.
-> Thanks!
-> 
-> Best Regards,
-> Wei
-> 
-> ---
-> 
+On Sun, May 13, 2018 at 10:01:34AM -0700, Florian Fainelli wrote:
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.18
+>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/defconfig-arm64
 > 
-> for you to fetch changes up to 84f7ed0f22e8eb42e81b69cd7772c3600c9f4959:
+> for you to fetch changes up to ebf089248dab2ef569e5e26a607f0977a71182b7:
 > 
->   arm64: dts: hi3798cv200: enable emmc support for poplar board (2018-05-11 11:23:10 +0100)
-> 
-> ----------------------------------------------------------------
-> ARM64: DT: Hisilicon SoC DT updates for 4.18
-> 
-> - Add mailbox, stub clock, CPU frequency scaling, thermal cooling
->   management and pcie msi interruption support for hi3660
-> - Add LPC support for hip06 and hip07
-> - Add PCIe, usb and emmc support for hi3798cv200
+>   arm64: defconfig: Increase CMA size for VC4 (2018-05-13 09:55:21 -0700)
 > 
 > ----------------------------------------------------------------
-> John Garry (2):
->       arm64: dts: hisi: Enable Hisi LPC node for hip06
->       arm64: dts: hisi: Enable Hisi LPC node for hip07
+> This pull request contains Broadcom ARM64-based SoCs defconfig changes
+> for 4.18, please pull the following:
 > 
-> Kaihua Zhong (2):
->       dts: arm64: hi3660: Add mailbox node
->       dts: arm64: hi3660: Add stub clock node
+> - Stefan provides a set of updates targeting the Raspberry Pi 3 B+
+>   platform: LAN7515 USB Ethernet driver, Cypress CYW43455 Bluetooth when
+>   using the Pi 3 B+ in AArch64 boot mode. He also updates the ARM64
+>   defconfig to create a bigger default CMA region to let the VideoCore 4
+>   driver initialize correctly.
 > 
-> Leo Yan (1):
->       dts: arm64: hi3660: Add CPU frequency scaling support
+> ----------------------------------------------------------------
+> Florian Fainelli (1):
+>       Merge tag 'bcm2835-defconfig-64-next-2018-04-30' into defconfig-arm64/next
 > 
-> Shawn Guo (3):
->       arm64: dts: hi3798cv200: enable PCIe support for poplar board
->       arm64: dts: hi3798cv200: enable usb2 support for poplar board
->       arm64: dts: hi3798cv200: enable emmc support for poplar board
-> 
-> Tao Wang (1):
->       dts: arm64: hi3660: Add thermal cooling management
-> 
-> Yao Chen (1):
->       arm64: dts: hi3660: Add pcie msi interrupt attribute
+> Stefan Wahren (2):
+>       arm64: defconfig: Enable LAN and BT support for RPi 3 B+
+>       arm64: defconfig: Increase CMA size for VC4
 
-We try to use a very consistent patch prefix format on device tree changes to
-make it easier to get an overview, and you're unfortunately a bit inconsistent
-here.
-
-Would you mind respinning this with "arm64: dts: hi<...>:" as the consistent
-prefix please?
-
-
-Thanks!
+Merged, thanks. When you revisit, feel free to delete the previous tag and
+using a new name (-2 suffix or something). That way there's less risk for
+confusion at our end.
 
 
 -Olof
