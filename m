@@ -1,43 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 13:33:21 -0700
-Subject: [GIT PULL] Gemini DTS updates for v4.18
-In-Reply-To: <CACRpkdZ+GR2j01CMAnU=pYwZHPZ6j5hhEefF7HckUM4jq=n2MA@mail.gmail.com>
-References: <CACRpkdZ+GR2j01CMAnU=pYwZHPZ6j5hhEefF7HckUM4jq=n2MA@mail.gmail.com>
-Message-ID: <20180514203321.mmn7cibu4y37p56f@localhost>
+Date: Mon, 14 May 2018 13:52:41 -0700
+Subject: [GIT PULL 5/5] ARM: exynos: mach/soc for v4.18
+In-Reply-To: <20180513154238.22508-6-krzk@kernel.org>
+References: <20180513154238.22508-1-krzk@kernel.org>
+ <20180513154238.22508-6-krzk@kernel.org>
+Message-ID: <20180514205241.al6v4ejxwy26j4ue@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 12, 2018 at 01:41:07PM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks!
-> 
-> This fixes a host of issues and adds some new stuff to the
-> Gemini platforms. We now have them all running (more or
-> less) with OpenWRT. Details in the patches and signed tag.
-> 
-> Please pull this to ARM SoC DTS updates for v4.18.
-> 
-> Yours,
-> Linus Walleij
-> 
+On Sun, May 13, 2018 at 05:42:38PM +0200, Krzysztof Kozlowski wrote:
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-> tags/gemini-dts-arm-soc
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.18
 > 
-> for you to fetch changes up to e7c881596baf8d1a4a1b872c4670da6723246936:
+> for you to fetch changes up to 9ad9a2183bf51da7f8840f2e7087816c0fc8c91d:
 > 
->   ARM: dts: Fix DTC warnings (2018-05-12 13:27:24 +0200)
+>   ARM: exynos: Remove unused soc_is_exynos{4,5} (2018-05-13 14:07:03 +0200)
 > 
 > ----------------------------------------------------------------
-> DTS updates for the Gemini:
-> - Set righ flashes on DNS-313
-> - Activate ATA1 on NAS4220B
-> - Set right harddisk triggers on the D-Link devices
-> - Fix all DTC warnings
+> Samsung mach/soc changes for v4.18
+> 
+> 1. Remove at24_platform_data in S3C2440.
+> 2. Fix invalid SPDX identifier.
+> 3. Remove Exynos5440 entirely.
+> 4. Cleanups.
+> 5. Remove static mapping of SCU SFR and rely on DTS.
 
 Merged, thanks!
 
