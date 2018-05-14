@@ -1,74 +1,129 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 14 May 2018 09:21:13 +0200
-Subject: [PATCH RESEND net-next v2 1/8] dt-bindings: net: dwmac-sun8i:
- Clean up clock delay chain descriptions
-In-Reply-To: <CAGb2v66F_Ho2OZdrF3p6xe9mQ=zJZ_KjE9MnW1VmWs9jw65eEg@mail.gmail.com>
-References: <20180513191425.9801-1-wens@csie.org>
- <20180513191425.9801-2-wens@csie.org>
- <20180513194919.GE12738@lunn.ch>
- <CAGb2v66nqWnioS1pwfWFtMZFZSWvf4SwXr_ExnnGvYsK9RU_LA@mail.gmail.com>
- <20180513200529.GF12738@lunn.ch>
- <CAGb2v64ACc1tQRhy4LhnvCC7VJ3nVM-wMbgUgzviGMWKPFsSuQ@mail.gmail.com>
- <20180513202938.GH12738@lunn.ch>
- <CAGb2v66F_Ho2OZdrF3p6xe9mQ=zJZ_KjE9MnW1VmWs9jw65eEg@mail.gmail.com>
-Message-ID: <20180514072113.yts3shbojvbxj4tq@flea>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Mon, 14 May 2018 10:36:35 +0300
+Subject: [PATCH 6/8] serial: Add Tegra Combined UART driver
+In-Reply-To: <CAHp75VeJcqaiWUVr=oXEH5YurY3yCDdE1eeoWumo6jCa_4PWEQ@mail.gmail.com>
+References: <20180508114403.14499-1-mperttunen@nvidia.com>
+ <20180508114403.14499-7-mperttunen@nvidia.com>
+ <CAHp75VfYF_u2bZ+temGbReEB9K-t3A75aUNYwffyv9-=zEi0Lw@mail.gmail.com>
+ <662ce972-56a9-9daa-d332-faa08b89c05a@kapsi.fi>
+ <CAHp75VeJcqaiWUVr=oXEH5YurY3yCDdE1eeoWumo6jCa_4PWEQ@mail.gmail.com>
+Message-ID: <513a6287-9bb3-1441-b3ea-6866f2e74c99@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 13, 2018 at 09:59:22PM -0700, Chen-Yu Tsai wrote:
-> On Sun, May 13, 2018 at 1:29 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> > On Sun, May 13, 2018 at 01:11:08PM -0700, Chen-Yu Tsai wrote:
-> >> On Sun, May 13, 2018 at 1:05 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> >> >> > Hi Chen-Yu
-> >> >> >
-> >> >> > Are these delays the MAC applies? Not the PHY. It would be good to
-> >> >> > make it clear here these are MAC imposed delays.
-> >> >>
-> >> >> Yes these are applied on the MAC side. Being described in the device
-> >> >> tree bindings for the MAC, I thought this was implied to be the case?
-> >> >> Are there known exceptions?
-> >> >
-> >> > There is frequent confusion with this. Most of the time, the PHY does
-> >> > the delay, not the MAC, based on the phy-mode. So the MAC doing it is
-> >> > an exception in itself.
-> >> >
-> >> > Do you actually need these delays for the board you adding support
-> >> > for? Does the PHY not support adding the needed delays? If you don't
-> >> > need the delays, i would not even implement them.
-> >>
-> >> Yes this is already used on the Bananapi M3. This patch merely reformats
-> >> the description and adds a note saying this only applies to RGMII mode.
-> >
-> > Yes, the current code is needed for the Bananapi M3. But you have
-> > another patch which extends the code to support a smaller range. Do
-> > you have a board which actually needs this? If not, i would not add
-> > that new code.
-> 
-> IIRC the delay on the PHY side is either 2ns or none. The delay on the
-> MAC side here is an order smaller, likely fine tuning to cope with board
-> design deficiencies.
-> 
-> Currently no other board requires this, but this is already part of the
-> binding. The new stuff limits the range for a specific SoC, simply because
-> that is the range supported by the control register. Not implementing, i.e.
-> supporting the whole range from the property, which might get truncated,
-> doesn't make much sense to me.
+On 14.05.2018 01:20, Andy Shevchenko wrote:
+> On Sun, May 13, 2018 at 9:04 PM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
+>> On 05/13/2018 05:16 PM, Andy Shevchenko wrote:
+>>>
+>>> On Tue, May 8, 2018 at 2:44 PM, Mikko Perttunen <mperttunen@nvidia.com>
+>>> wrote:
+>>>>
+>>>> The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
+>>>> multiplexing multiple "virtual UARTs" into a single hardware serial
+>>>> port. The TCU is the primary serial port on Tegra194 devices.
+>>>>
+>>>> Add a TCU driver utilizing the mailbox framework, as the used mailboxes
+>>>> are part of Tegra HSP blocks that are already controlled by the Tegra
+>>>> HSP mailbox driver.
+>
+>>>> +static void tegra_tcu_uart_set_mctrl(struct uart_port *port, unsigned
+>>>> int mctrl)
+>>>> +{
+>>>
+>>>
+>>>> +       (void)port;
+>>>> +       (void)mctrl;
+>>>
+>>>
+>>> Huh?
+>>
+>>
+>> The serial core calls these callbacks without checking if they are set. They
+>> don't make sense for this driver so they are stubbed out.
+>
+> My question why do you need these ugly lines? I'm pretty sure no other
+> driver with stubs using such style.
 
-With that driver we don't, but the previous design had the same
-feature and it was used on more boards. It was simply initialized
-statically in U-Boot, and not in Linux through the DT like it is done
-here.
+It's my personal style, being explicit about unused variables in this 
+way - I don't consider them ugly. But I can certainly remove them for 
+the next version.
 
-Maxime
+>
+>>>> +}
+>
+>>>> +               if (written == 3) {
+>>>> +                       value |= 3 << 24;
+>>>> +                       value |= BIT(26);
+>>>> +                       mbox_send_message(tcu->tx, &value);
+>>>
+>>>
+>>>> +               }
+>>>
+>>>
+>>> (1)
+>>>
+>>>> +       }
+>>>> +
+>>>> +       if (written) {
+>>>> +               value |= written << 24;
+>>>> +               value |= BIT(26);
+>>>> +               mbox_send_message(tcu->tx, &value);
+>>>> +       }
+>>>
+>>>
+>>> (2)
+>>>
+>>> These are code duplications.
+>>
+>>
+>> Indeed - the length of the duplicated code is so short, and the instances
+>> are so close to each other, that I don't find it necessary (or clearer) to
+>> have an extra function.
+>
+> It makes sense. Consider to refactor other way w/o duplication then.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/e639ce99/attachment.sig>
+I'll see if I can refactor it out.
+
+>
+>>>> +static void tegra_tcu_uart_set_termios(struct uart_port *port,
+>>>> +                                      struct ktermios *new,
+>>>> +                                      struct ktermios *old)
+>>>> +{
+>>>> +       (void)port;
+>>>> +       (void)new;
+>>>> +       (void)old;
+>>>> +}
+>>>
+>>>
+>>> Remove those unused stub contents.
+>>
+>>
+>> Sure. I had these here so that we don't get unused parameter warnings, but I
+>> can just as well remove the parameter names.
+>
+> What warnings? How did you get them? We have them disabled as far as I
+> know even with W=1.
+
+May be - it's just a habit, maybe from other projects where the warning 
+is enabled.
+
+>
+>>
+>>>
+>>>> +       return uart_set_options(&tegra_tcu_uart_port, cons,
+>>>> +                               115200, 'n', 8, 'n');
+>>>
+>>>
+>>> Can't it be one line?
+>>
+>>
+>> It would be a total of 81 characters in length on one line, so no.
+>
+> So, yes. 1 character doesn't prevent us make the readability better.
+> Please, put to one line.
+>
+
+Ok, I'll change this.
+
+Thanks,
+Mikko
