@@ -1,636 +1,469 @@
-From: hao5781286@gmail.com (Hao Zhang)
-Date: Mon, 14 May 2018 23:39:16 +0800
-Subject: [linux-sunxi] [PATCH v2 4/4] ARM: PWM: add allwinner sun8i pwm
- support.
-In-Reply-To: <8bd4247f-45fd-1385-3ba2-accd7a1e7eb9@arm.com>
-References: <20180225135308.GA14561@arx-s1>
- <8bd4247f-45fd-1385-3ba2-accd7a1e7eb9@arm.com>
-Message-ID: <CAJeuY7-s595ceJugYEoedS3HTq06XQqBaOzW=FykHL3ZYD+nMQ@mail.gmail.com>
+From: fabien.dessenne@st.com (Fabien DESSENNE)
+Date: Mon, 14 May 2018 15:54:06 +0000
+Subject: [v4,2/2] mailbox: add STMicroelectronics STM32 IPCC driver
+In-Reply-To: <1523515661-8318-3-git-send-email-fabien.dessenne@st.com>
+References: <1523515661-8318-3-git-send-email-fabien.dessenne@st.com>
+Message-ID: <1e910554-3b6a-6799-7d2b-c3e8bac0ba37@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-28 9:55 GMT+08:00 Andr? Przywara <andre.przywara@arm.com>:
-> Hi,
->
-> On 25/02/18 13:53, hao_zhang wrote:
->> This patch add allwinner sun8i pwm support.
->
-> Again, the subject line is too generic. Mention the R40?
->
-> Can you elaborate here a bit? Mention that is used on the R40, but not
-> other sun8i SoCs, for instance. And mention that this is very different
-> from the sun4i-pwm device, so justifies a new driver. Possibly mention
-> some features? And that we for now just implement a subset of them.
+Hi Jassi,
 
-Thanks for reviews, elaborate it next patch:)
+Do you have any more comments or do you plan to have this patch part of 
+the 4.18 pull request ?
 
->
->>
->> Signed-off-by: hao_zhang <hao5781286@gmail.com>
->> ---
->>  drivers/pwm/Kconfig     |  10 ++
->>  drivers/pwm/Makefile    |   1 +
->>  drivers/pwm/pwm-sun8i.c | 401 ++++++++++++++++++++++++++++++++++++++++++++++++
->
-> I am not too happy with this name, but I guess there are no better
-> alternatives, so it's probably OK to keep it.
->
->>  3 files changed, 412 insertions(+)
->>  create mode 100644 drivers/pwm/pwm-sun8i.c
->>
->> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
->> index 763ee50..7e68d0f 100644
->> --- a/drivers/pwm/Kconfig
->> +++ b/drivers/pwm/Kconfig
->> @@ -444,6 +444,16 @@ config PWM_SUN4I
->>         To compile this driver as a module, choose M here: the module
->>         will be called pwm-sun4i.
->>
->> +config PWM_SUN8I
->> +     tristate "Allwinner PWM SUN8I support"
->> +     depends on ARCH_SUNXI || COMPILE_TEST
->> +     depends on HAS_IOMEM && COMMON_CLK
->> +     help
->> +       Generic PWM framework driver for Allwinner SoCs.
->
-> Mmh, not really. So far there is only one SoC using this. Maybe:
->           Driver for the enhanced PWM IP used in some newer Allwinner
->           SoCs.
->
->> +
->> +       To compile this driver as a module, choose M here: the module
->> +       will be called pwm-sun8i.
->> +
->>  config PWM_TEGRA
->>       tristate "NVIDIA Tegra PWM support"
->>       depends on ARCH_TEGRA
->> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
->> index 0258a74..cd6bf40 100644
->> --- a/drivers/pwm/Makefile
->> +++ b/drivers/pwm/Makefile
->> @@ -44,6 +44,7 @@ obj-$(CONFIG_PWM_STM32)             += pwm-stm32.o
->>  obj-$(CONFIG_PWM_STM32_LP)   += pwm-stm32-lp.o
->>  obj-$(CONFIG_PWM_STMPE)              += pwm-stmpe.o
->>  obj-$(CONFIG_PWM_SUN4I)              += pwm-sun4i.o
->> +obj-$(CONFIG_PWM_SUN8I)              += pwm-sun8i.o
->>  obj-$(CONFIG_PWM_TEGRA)              += pwm-tegra.o
->>  obj-$(CONFIG_PWM_TIECAP)     += pwm-tiecap.o
->>  obj-$(CONFIG_PWM_TIEHRPWM)   += pwm-tiehrpwm.o
->> diff --git a/drivers/pwm/pwm-sun8i.c b/drivers/pwm/pwm-sun8i.c
->> new file mode 100644
->> index 0000000..cf23b0a
->> --- /dev/null
->> +++ b/drivers/pwm/pwm-sun8i.c
->> @@ -0,0 +1,401 @@
->> +#include <linux/bitops.h>
->> +#include <linux/clk.h>
->> +#include <linux/delay.h>
->> +#include <linux/err.h>
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/pwm.h>
->> +#include <linux/slab.h>
->> +#include <linux/spinlock.h>
->> +#include <linux/time.h>
->> +#include <linux/regmap.h>
->> +
->> +#define PWM_IRQ_ENABLE_REG   0x0000
->> +#define PCIE(ch)     BIT(ch)
->
-> Can you please align those:
-> #define PWM_IRQ_ENABLE_REG      0x0000
-> #define PCIE(ch)                BIT(ch)
->
-> And all those below as well? Which means you might want to insert
-> another tab to cater for those longer symbols.
+BR
 
-yep, align it is batter :-)
+Fabien
 
->
->> +
->> +#define PWM_IRQ_STATUS_REG   0x0004
->> +#define PIS(ch)      BIT(ch)
->> +
->> +#define CAPTURE_IRQ_ENABLE_REG       0x0010
->> +#define CFIE(ch)     BIT(ch << 1 + 1)
->> +#define CRIE(ch)     BIT(ch << 1)
->> +
->> +#define CAPTURE_IRQ_STATUS_REG       0x0014
->> +#define CFIS(ch)     BIT(ch << 1 + 1)
->> +#define CRIS(ch)     BIT(ch << 1)
->> +
->> +#define CLK_CFG_REG(ch)      (0x0020 + (ch >> 1) * 4)
->> +#define CLK_SRC      BIT(7)
->> +#define CLK_SRC_BYPASS_SEC   BIT(6)
->> +#define CLK_SRC_BYPASS_FIR   BIT(5)
->> +#define CLK_GATING   BIT(4)
->> +#define CLK_DIV_M    GENMASK(3, 0)
->> +
->> +#define PWM_DZ_CTR_REG(ch)   (0x0030 + (ch >> 1) * 4)
->> +#define PWM_DZ_INTV  GENMASK(15, 8)
->> +#define PWM_DZ_EN    BIT(0)
->> +
->> +#define PWM_ENABLE_REG       0x0040
->> +#define PWM_EN(ch)   BIT(ch)
->> +
->> +#define CAPTURE_ENABLE_REG   0x0044
->> +#define CAP_EN(ch)   BIT(ch)
->> +
->> +#define PWM_CTR_REG(ch)      (0x0060 + ch * 0x20)
->> +#define PWM_PERIOD_RDY       BIT(11)
->> +#define PWM_PUL_START        BIT(10)
->> +#define PWM_MODE     BIT(9)
->> +#define PWM_ACT_STA  BIT(8)
->> +#define PWM_PRESCAL_K        GENMASK(7, 0)
->> +
->> +#define PWM_PERIOD_REG(ch)   (0x0064 + ch * 0x20)
->> +#define PWM_ENTIRE_CYCLE     GENMASK(31, 16)
->> +#define PWM_ACT_CYCLE        GENMASK(15, 0)
->> +
->> +#define PWM_CNT_REG(ch)      (0x0068 + ch * 0x20)
->> +#define PWM_CNT_VAL  GENMASK(15, 0)
->> +
->> +#define CAPTURE_CTR_REG(ch)  (0x006c + ch * 0x20)
->> +#define CAPTURE_CRLF BIT(2)
->> +#define CAPTURE_CFLF BIT(1)
->> +#define CAPINV       BIT(0)
->> +
->> +#define CAPTURE_RISE_REG(ch) (0x0070 + ch * 0x20)
->> +#define CAPTURE_CRLR GENMASK(15, 0)
->> +
->> +#define CAPTURE_FALL_REG(ch) (0x0074 + ch * 0x20)
->> +#define CAPTURE_CFLR GENMASK(15, 0)
->> +
->> +struct sun8i_pwm_data {
->> +     bool has_prescaler_bypass;
->> +     bool has_rdy;
->> +     unsigned int npwm;
->> +};
->
-> I believe you don't need this structure. See below.
 
-yep, clock will output directly while bypass has been set,
-and equivalent to 50% duty cycles...
-
+On 12/04/18 08:47, Fabien DESSENNE wrote:
+> The STMicroelectronics STM32 Inter-Processor Communication Controller
+> (IPCC) is used for communicating data between two processors.
+> It provides a non blocking signaling mechanism to post and retrieve
+> communication data in an atomic way.
 >
->> +
->> +struct sun8i_pwm_chip {
->> +     struct pwm_chip chip;
->> +     struct clk *clk;
->> +     void __iomem *base;
->> +     spinlock_t ctrl_lock;
->> +     const struct sun8i_pwm_data *data;
->> +     struct regmap *regmap;
->> +};
->> +
->> +static const u16 div_m_table[] = {
->> +     1,
->> +     2,
->> +     4,
->> +     8,
->> +     16,
->> +     32,
->> +     64,
->> +     128,
->> +     256
->> +};
+> Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> ---
+>   drivers/mailbox/Kconfig      |   8 +
+>   drivers/mailbox/Makefile     |   2 +
+>   drivers/mailbox/stm32-ipcc.c | 402 +++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 412 insertions(+)
+>   create mode 100644 drivers/mailbox/stm32-ipcc.c
 >
-> That looks very much like: "1U << x" to me.
-
-uhmm, i think using table is more explicit and extended...
-
->
->> +
->> +static inline struct sun8i_pwm_chip *to_sun8i_pwm_chip(struct pwm_chip *chip)
->
-> No need for "inline", the compiler knows better. static is enough.
-
-okey :-)
-
->
->> +{
->> +     return container_of(chip, struct sun8i_pwm_chip, chip);
->> +}
->> +
->> +static u32 sun8i_pwm_read(struct sun8i_pwm_chip *sun8i_pwm,
->> +             unsigned long offset)
->
-> Can you please align those continuation lines properly? The first
-> character in the new line should be aligned to the first character of
-> the first argument. Use tabs first, then fill up with spaces:
-
-Align it next :-)
-
->
-> static u32 sun8i_pwm_read(struct sun8i_pwm_chip *sun8i_pwm,
->                           unsigned long offset)
->
-> This applies to the rest of the file as well.
->
->> +{
->> +     u32 val;
->> +
->> +     regmap_read(sun8i_pwm->regmap, offset, &val);
->> +
->> +     return val;
->> +}
->> +
->> +static inline void sun8i_pwm_set_bit(struct sun8i_pwm_chip *sun8i_pwm,
->
-> no inline (for those below as well)
->
->> +             unsigned long reg, u32 bit)
->> +{
->> +     regmap_update_bits(sun8i_pwm->regmap, reg, bit, bit);
->> +}
->> +
->> +static inline void sun8i_pwm_clear_bit(struct sun8i_pwm_chip *sun8i_pwm,
->> +             unsigned long reg, u32 bit)
->> +{
->> +     regmap_update_bits(sun8i_pwm->regmap, reg, bit, 0);
->> +}
->> +
->> +static inline void sun8i_pwm_set_value(struct sun8i_pwm_chip *sun8i_pwm,
->> +             unsigned long reg, u32 mask, u32 val)
->> +{
->> +     regmap_update_bits(sun8i_pwm->regmap, reg, mask, val);
->> +}
->> +
->> +static void sun8i_pwm_set_polarity(struct sun8i_pwm_chip *chip, u32 ch,
->> +             enum pwm_polarity polarity)
->> +{
->> +     if (polarity == PWM_POLARITY_NORMAL)
->> +             sun8i_pwm_set_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
->> +     else
->> +             sun8i_pwm_clear_bit(chip, PWM_CTR_REG(ch), PWM_ACT_STA);
->> +}
->> +
->> +static int sun8i_pwm_config(struct sun8i_pwm_chip *sun8i_pwm, u8 ch,
->> +             struct pwm_state *state)
->> +{
->> +     u64 clk_rate, clk_div, val;
->> +     u16 prescaler = 0;
->> +     u8 id = 0;
->> +
->> +     clk_rate = clk_get_rate(sun8i_pwm->clk);
->> +
->> +     if (clk_rate == 24000000)
->> +             sun8i_pwm_clear_bit(sun8i_pwm, CLK_CFG_REG(ch), CLK_SRC);
->> +     else
->> +             sun8i_pwm_set_bit(sun8i_pwm, CLK_CFG_REG(ch), CLK_SRC);
->
-> This hardcoded 24MHz looks slightly dodgy and should be replaced with
-> some proper code to select the best matching clock, out of a number of
-> them given in the DT (see the DT binding mail).
-> Without thinking too deeply about it, I guess we try which clocks gives
-> the least error for the given configuration. The frequency alone might
-> be a good first guide.
-> If you can't be bothered with coding this, we might just go ahead with
-> the first specified clock and always use this, for now.
-
-Dose the framework support parse 2 or more clk from DT ?
-yep, It is better to set the clk automatically
-
->
->> +
->> +     if (sun8i_pwm->data->has_prescaler_bypass) {
->
-> What is this about? I think this is a misunderstanding:
-> The bypass bits allows to directly pass on the input clock to the output
-> pin, without any actual PWM properties. So if one channel is (by
-> chance?) configured for a 50% duty cycle and the same frequency as one
-> of the input clocks, you might want to use the bypass bit instead. But I
-> don't see many advantages in doing so, so I guess we can ignore it in a
-> generic PWM driver.
-> Anyway using some hardcoded value from the "data" structure looks just
-> wrong to me. I guess you can just remove this, along with the
-> has_prescaler_bypass variable from the sun8i_pwm_data structure.
-
-Agree to remove it.
-
->
->> +             /* pwm output bypass */
->> +             if (ch % 2)
->> +                     sun8i_pwm_set_bit(sun8i_pwm, CLK_CFG_REG(ch),
->> +                                     CLK_SRC_BYPASS_FIR);
->> +             else
->> +                     sun8i_pwm_set_bit(sun8i_pwm, CLK_CFG_REG(ch),
->> +                                     CLK_SRC_BYPASS_SEC);
->> +             return 0;
->> +     }
->> +
->> +     val = state->period * clk_rate;
->> +     do_div(val, NSEC_PER_SEC);
->> +     if (val < 1) {
->> +             dev_err(sun8i_pwm->chip.dev,
->> +                             "Period expects a larger value\n");
->
-> Alignment.
-> And you might want to hook in here to select a higher frequency input clock.
->
->> +             return -EINVAL;
->> +     }
->> +
->> +     /* calculate and set prescalar, div table, pwn entrie cycle */
->
->                              prescaler             PWM entire
->
-> though I believe this "entire cycle" term is an Allwinner invention.
-> Wouldn't period be a better term here, also matching the framework?
-
-It seem no...
-referent the manual,  "entire cycle" seem means the count of
-prescaler_clk(divide by prescaler),
-you shoule multiply Tprescaler_clk, then is Tperiod.
-
->
->> +     clk_div = val;
->> +
->> +     while (clk_div > 65535) {
->> +             prescaler++;
->> +             clk_div = val;
->> +             do_div(clk_div, prescaler + 1);
->> +             do_div(clk_div, div_m_table[id]);
->
->                                 1U << id
->
->> +
->> +             if (prescaler == 255) {
->> +                     prescaler = 0;
->> +                     id++;
->> +                     if (id == 9)
->> +                             return -EINVAL;
->> +             }
->> +     }
->> +
->> +     sun8i_pwm_set_value(sun8i_pwm, PWM_PERIOD_REG(ch),
->> +                     PWM_ENTIRE_CYCLE, clk_div << 16);
->> +     sun8i_pwm_set_value(sun8i_pwm, PWM_CTR_REG(ch),
->> +                     PWM_PRESCAL_K, prescaler << 0);
->> +     sun8i_pwm_set_value(sun8i_pwm, CLK_CFG_REG(ch),
->> +                     CLK_DIV_M, id << 0);
->> +
->> +     /* set duty cycle */
->> +     val = (prescaler + 1) * div_m_table[id] * clk_div;
->
->                                 (1U << id)
->
-> You might want to check for the range, though.
-
-Yep :-)
-
->
->> +     val = state->period;
->> +     do_div(val, clk_div);
->> +     clk_div = state->duty_cycle;
->> +     do_div(clk_div, val);
->> +
->> +     sun8i_pwm_set_value(sun8i_pwm, PWM_PERIOD_REG(ch),
->> +                     PWM_ACT_CYCLE, clk_div << 0);
->> +
->> +     return 0;
->> +}
->> +
->> +static int sun8i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->> +             struct pwm_state *state)
->> +{
->> +     int ret;
->> +     struct sun8i_pwm_chip *sun8i_pwm = to_sun8i_pwm_chip(chip);
->> +     struct pwm_state cstate;
->> +
->> +     pwm_get_state(pwm, &cstate);
->> +     if (!cstate.enabled) {
->> +             ret = clk_prepare_enable(sun8i_pwm->clk);
->> +             if (ret) {
->> +                     dev_err(chip->dev, "Failed to enable PWM clock\n");
->> +                     return ret;
->> +             }
->> +     }
->> +
->> +     spin_lock(&sun8i_pwm->ctrl_lock);
->> +
->> +     if ((cstate.period != state->period) ||
->> +                     (cstate.duty_cycle != state->duty_cycle)) {
->> +             ret = sun8i_pwm_config(sun8i_pwm, pwm->hwpwm, state);
->> +             if (ret) {
->> +                     spin_unlock(&sun8i_pwm->ctrl_lock);
->> +                     dev_err(chip->dev, "Failed to config PWM\n");
->> +                     return ret;
->> +             }
->> +     }
->> +
->> +     if (state->polarity != cstate.polarity)
->> +             sun8i_pwm_set_polarity(sun8i_pwm, pwm->hwpwm, state->polarity);
->> +
->> +     if (state->enabled) {
->> +             sun8i_pwm_set_bit(sun8i_pwm,
->> +                             CLK_CFG_REG(pwm->hwpwm), CLK_GATING);
->> +
->> +             sun8i_pwm_set_bit(sun8i_pwm,
->> +                             PWM_ENABLE_REG, PWM_EN(pwm->hwpwm));
->> +     } else {
->> +             sun8i_pwm_clear_bit(sun8i_pwm,
->> +                             CLK_CFG_REG(pwm->hwpwm), CLK_GATING);
->> +
->> +             sun8i_pwm_clear_bit(sun8i_pwm,
->> +                             PWM_ENABLE_REG, PWM_EN(pwm->hwpwm));
->> +     }
->> +
->> +     spin_unlock(&sun8i_pwm->ctrl_lock);
->> +
->> +     return 0;
->> +}
->> +
->> +static void sun8i_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
->> +             struct pwm_state *state)
->> +{
->> +     struct sun8i_pwm_chip *sun8i_pwm = to_sun8i_pwm_chip(chip);
->> +     u64 clk_rate, tmp;
->> +     u32 val;
->> +     u16 clk_div, act_cycle;
->> +     u8 prescal, id;
->
-> You might want to add a channel variable to increase readability:
->         int channel = pwm->hwpwm;
->
-
-Okey
-
->> +
->> +     clk_rate = clk_get_rate(sun8i_pwm->clk);
->> +
->> +     val = sun8i_pwm_read(sun8i_pwm, PWM_CTR_REG(pwm->hwpwm));
->> +     if (PWM_ACT_STA & val)
->> +             state->polarity = PWM_POLARITY_NORMAL;
->> +     else
->> +             state->polarity = PWM_POLARITY_INVERSED;
->> +
->> +     prescal = PWM_PRESCAL_K & val;
->> +
->> +     val = sun8i_pwm_read(sun8i_pwm, PWM_ENABLE_REG);
->> +     if (PWM_EN(pwm->hwpwm) & val)
->> +             state->enabled = true;
->> +     else
->> +             state->enabled = false;
->> +
->> +     val = sun8i_pwm_read(sun8i_pwm, PWM_PERIOD_REG(pwm->hwpwm));
->> +     act_cycle = PWM_ACT_CYCLE & val;
->> +     clk_div = val >> 16;
->> +
->> +     val = sun8i_pwm_read(sun8i_pwm, CLK_CFG_REG(pwm->hwpwm));
->> +     id = CLK_DIV_M & val;
->> +
->> +     tmp = act_cycle * prescal * div_m_table[id] * NSEC_PER_SEC;
->> +     state->duty_cycle = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
->> +     tmp = clk_div * prescal * div_m_table[id] * NSEC_PER_SEC;
->> +     state->period = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
->> +}
->> +
->> +static const struct regmap_config sun8i_pwm_regmap_config = {
->> +     .reg_bits = 32,
->> +     .reg_stride = 4,
->> +     .val_bits = 32,
->> +     .max_register = CAPTURE_FALL_REG(7),
->> +};
->> +
->> +static const struct pwm_ops sun8i_pwm_ops = {
->> +     .apply = sun8i_pwm_apply,
->> +     .get_state = sun8i_pwm_get_state,
->> +     .owner = THIS_MODULE,
->> +};
->> +
->> +static const struct sun8i_pwm_data sun8i_pwm_data_r40 = {
->> +     .has_prescaler_bypass = false,
->
-> This is not needed (see my comment above).
-
-yep.
-
->
->> +     .has_rdy = true,
->
-> And this is not used. Copied from sun4i? Where it interestingly isn't
-> used either ;-)
->
->> +     .npwm = 8,
->
-> I would really love to see this being moved to the DT (see my other mail
-> to Thierry about the generic property).
->
-> This would mean you don't need a SoC specific structure at all.
-
-okey.
-
->
->> +};
->> +
->> +static const struct of_device_id sun8i_pwm_dt_ids[] = {
->> +     {
->> +             .compatible = "allwinner,sun8i-r40-pwm",
->> +             .data = &sun8i_pwm_data_r40,
->> +     },
->> +     {},
->> +};
->> +MODULE_DEVICE_TABLE(of, sun8i_pwm_dt_ids);
->> +
->> +static int sun8i_pwm_probe(struct platform_device *pdev)
->> +{
->> +     struct sun8i_pwm_chip *pwm;
->> +     struct resource *res;
->> +     int ret;
->> +     const struct of_device_id *match;
->> +
->> +     match = of_match_device(sun8i_pwm_dt_ids, &pdev->dev);
->> +     if (!match) {
->> +             dev_err(&pdev->dev, "Error: No device match found\n");
->> +             return -ENODEV;
->> +     }
->> +
->> +     pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
->> +     if (!pwm)
->> +             return -ENOMEM;
->> +
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +     pwm->base = devm_ioremap_resource(&pdev->dev, res);
->> +     if (IS_ERR(pwm->base))
->> +             return PTR_ERR(pwm->base);
->> +
->> +     pwm->regmap = devm_regmap_init_mmio(&pdev->dev, pwm->base,
->> +                     &sun8i_pwm_regmap_config);
->> +     if (IS_ERR(pwm->regmap)) {
->> +             dev_err(&pdev->dev, "Failed to create regmap\n");
->> +             return PTR_ERR(pwm->regmap);
->> +     }
->> +
->> +     pwm->clk = devm_clk_get(&pdev->dev, NULL);
->> +     if (IS_ERR(pwm->clk))
->> +             return PTR_ERR(pwm->clk);
->
-> This would need to be extended to get multiple clocks.
-
-okey.
-
->
->> +
->> +     pwm->data = match->data;
->> +     pwm->chip.dev = &pdev->dev;
->> +     pwm->chip.ops = &sun8i_pwm_ops;
->> +     pwm->chip.base = -1;
->> +     pwm->chip.npwm = pwm->data->npwm;
->
-> It should be fairly easy to initialise this from some DT property.
->
-> That's it for the my first review round. Haven't checked the actual
-> algorithm and bit assignments yet.
-> Did you manage to test this?
-
-Sure :-)
-All has been tested on my T3 board (compatible V40, R40)
-PWM signal is work well observe from oscilloscope.
-
->
-> Cheers,
-> Andre.
->
->> +     pwm->chip.of_xlate = of_pwm_xlate_with_flags;
->> +     pwm->chip.of_pwm_n_cells = 3;
->> +
->> +     spin_lock_init(&pwm->ctrl_lock);
->> +
->> +     ret = pwmchip_add(&pwm->chip);
->> +     if (ret < 0) {
->> +             dev_err(&pdev->dev, "Failed to add PWM chip: %d\n", ret);
->> +             return ret;
->> +     }
->> +
->> +     platform_set_drvdata(pdev, pwm);
->> +
->> +     return 0;
->> +}
->> +
->> +static int sun8i_pwm_remove(struct platform_device *pdev)
->> +{
->> +     struct sun8i_pwm_chip *pwm = platform_get_drvdata(pdev);
->> +
->> +     return pwmchip_remove(&pwm->chip);
->> +}
->> +
->> +static struct platform_driver sun8i_pwm_driver = {
->> +     .driver = {
->> +             .name = "sun8i-pwm",
->> +             .of_match_table = sun8i_pwm_dt_ids,
->> +     },
->> +     .probe = sun8i_pwm_probe,
->> +     .remove = sun8i_pwm_remove,
->> +};
->> +module_platform_driver(sun8i_pwm_driver);
->> +
->> +MODULE_ALIAS("platform: sun8i-pwm");
->> +MODULE_AUTHOR("Hao Zhang <hao5781286@gmail.com>");
->> +MODULE_DESCRIPTION("Allwinner sun8i PWM driver");
->> +MODULE_LICENSE("GPL v2");
->>
->
+> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+> index ba2f152..d7581f0 100644
+> --- a/drivers/mailbox/Kconfig
+> +++ b/drivers/mailbox/Kconfig
+> @@ -171,4 +171,12 @@ config BCM_FLEXRM_MBOX
+>   	  Mailbox implementation of the Broadcom FlexRM ring manager,
+>   	  which provides access to various offload engines on Broadcom
+>   	  SoCs. Say Y here if you want to use the Broadcom FlexRM.
+> +
+> +config STM32_IPCC
+> +	tristate "STM32 IPCC Mailbox"
+> +	depends on MACH_STM32MP157
+> +	help
+> +	  Mailbox implementation for STMicroelectonics STM32 family chips
+> +	  with hardware for Inter-Processor Communication Controller (IPCC)
+> +	  between processors. Say Y here if you want to have this support.
+>   endif
+> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+> index 4896f8d..7ea9654 100644
+> --- a/drivers/mailbox/Makefile
+> +++ b/drivers/mailbox/Makefile
+> @@ -36,3 +36,5 @@ obj-$(CONFIG_BCM_FLEXRM_MBOX)	+= bcm-flexrm-mailbox.o
+>   obj-$(CONFIG_QCOM_APCS_IPC)	+= qcom-apcs-ipc-mailbox.o
+>   
+>   obj-$(CONFIG_TEGRA_HSP_MBOX)	+= tegra-hsp.o
+> +
+> +obj-$(CONFIG_STM32_IPCC) 	+= stm32-ipcc.o
+> diff --git a/drivers/mailbox/stm32-ipcc.c b/drivers/mailbox/stm32-ipcc.c
+> new file mode 100644
+> index 0000000..533b0da
+> --- /dev/null
+> +++ b/drivers/mailbox/stm32-ipcc.c
+> @@ -0,0 +1,402 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
+> + * Authors: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
+> + *          Fabien Dessenne <fabien.dessenne@st.com> for STMicroelectronics.
+> + */
+> +
+> +#include <linux/bitfield.h>
+> +#include <linux/clk.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/mailbox_controller.h>
+> +#include <linux/module.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_wakeirq.h>
+> +
+> +#define IPCC_XCR		0x000
+> +#define XCR_RXOIE		BIT(0)
+> +#define XCR_TXOIE		BIT(16)
+> +
+> +#define IPCC_XMR		0x004
+> +#define IPCC_XSCR		0x008
+> +#define IPCC_XTOYSR		0x00c
+> +
+> +#define IPCC_PROC_OFFST		0x010
+> +
+> +#define IPCC_HWCFGR		0x3f0
+> +#define IPCFGR_CHAN_MASK	GENMASK(7, 0)
+> +
+> +#define IPCC_VER		0x3f4
+> +#define VER_MINREV_MASK		GENMASK(3, 0)
+> +#define VER_MAJREV_MASK		GENMASK(7, 4)
+> +
+> +#define RX_BIT_MASK		GENMASK(15, 0)
+> +#define RX_BIT_CHAN(chan)	BIT(chan)
+> +#define TX_BIT_SHIFT		16
+> +#define TX_BIT_MASK		GENMASK(31, 16)
+> +#define TX_BIT_CHAN(chan)	BIT(TX_BIT_SHIFT + (chan))
+> +
+> +#define STM32_MAX_PROCS		2
+> +
+> +enum {
+> +	IPCC_IRQ_RX,
+> +	IPCC_IRQ_TX,
+> +	IPCC_IRQ_NUM,
+> +};
+> +
+> +struct stm32_ipcc {
+> +	struct mbox_controller controller;
+> +	void __iomem *reg_base;
+> +	void __iomem *reg_proc;
+> +	struct clk *clk;
+> +	int irqs[IPCC_IRQ_NUM];
+> +	int wkp;
+> +	u32 proc_id;
+> +	u32 n_chans;
+> +	u32 xcr;
+> +	u32 xmr;
+> +};
+> +
+> +static inline void stm32_ipcc_set_bits(void __iomem *reg, u32 mask)
+> +{
+> +	writel_relaxed(readl_relaxed(reg) | mask, reg);
+> +}
+> +
+> +static inline void stm32_ipcc_clr_bits(void __iomem *reg, u32 mask)
+> +{
+> +	writel_relaxed(readl_relaxed(reg) & ~mask, reg);
+> +}
+> +
+> +static irqreturn_t stm32_ipcc_rx_irq(int irq, void *data)
+> +{
+> +	struct stm32_ipcc *ipcc = data;
+> +	struct device *dev = ipcc->controller.dev;
+> +	u32 status, mr, tosr, chan;
+> +	irqreturn_t ret = IRQ_NONE;
+> +	int proc_offset;
+> +
+> +	/* read 'channel occupied' status from other proc */
+> +	proc_offset = ipcc->proc_id ? -IPCC_PROC_OFFST : IPCC_PROC_OFFST;
+> +	tosr = readl_relaxed(ipcc->reg_proc + proc_offset + IPCC_XTOYSR);
+> +	mr = readl_relaxed(ipcc->reg_proc + IPCC_XMR);
+> +
+> +	/* search for unmasked 'channel occupied' */
+> +	status = tosr & FIELD_GET(RX_BIT_MASK, ~mr);
+> +
+> +	for (chan = 0; chan < ipcc->n_chans; chan++) {
+> +		if (!(status & (1 << chan)))
+> +			continue;
+> +
+> +		dev_dbg(dev, "%s: chan:%d rx\n", __func__, chan);
+> +
+> +		mbox_chan_received_data(&ipcc->controller.chans[chan], NULL);
+> +
+> +		stm32_ipcc_set_bits(ipcc->reg_proc + IPCC_XSCR,
+> +				    RX_BIT_CHAN(chan));
+> +
+> +		ret = IRQ_HANDLED;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static irqreturn_t stm32_ipcc_tx_irq(int irq, void *data)
+> +{
+> +	struct stm32_ipcc *ipcc = data;
+> +	struct device *dev = ipcc->controller.dev;
+> +	u32 status, mr, tosr, chan;
+> +	irqreturn_t ret = IRQ_NONE;
+> +
+> +	tosr = readl_relaxed(ipcc->reg_proc + IPCC_XTOYSR);
+> +	mr = readl_relaxed(ipcc->reg_proc + IPCC_XMR);
+> +
+> +	/* search for unmasked 'channel free' */
+> +	status = ~tosr & FIELD_GET(TX_BIT_MASK, ~mr);
+> +
+> +	for (chan = 0; chan < ipcc->n_chans ; chan++) {
+> +		if (!(status & (1 << chan)))
+> +			continue;
+> +
+> +		dev_dbg(dev, "%s: chan:%d tx\n", __func__, chan);
+> +
+> +		/* mask 'tx channel free' interrupt */
+> +		stm32_ipcc_set_bits(ipcc->reg_proc + IPCC_XMR,
+> +				    TX_BIT_CHAN(chan));
+> +
+> +		mbox_chan_txdone(&ipcc->controller.chans[chan], 0);
+> +
+> +		ret = IRQ_HANDLED;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int stm32_ipcc_send_data(struct mbox_chan *link, void *data)
+> +{
+> +	unsigned int chan = (unsigned int)link->con_priv;
+> +	struct stm32_ipcc *ipcc = container_of(link->mbox, struct stm32_ipcc,
+> +					       controller);
+> +
+> +	dev_dbg(ipcc->controller.dev, "%s: chan:%d\n", __func__, chan);
+> +
+> +	/* set channel n occupied */
+> +	stm32_ipcc_set_bits(ipcc->reg_proc + IPCC_XSCR, TX_BIT_CHAN(chan));
+> +
+> +	/* unmask 'tx channel free' interrupt */
+> +	stm32_ipcc_clr_bits(ipcc->reg_proc + IPCC_XMR, TX_BIT_CHAN(chan));
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_ipcc_startup(struct mbox_chan *link)
+> +{
+> +	unsigned int chan = (unsigned int)link->con_priv;
+> +	struct stm32_ipcc *ipcc = container_of(link->mbox, struct stm32_ipcc,
+> +					       controller);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(ipcc->clk);
+> +	if (ret) {
+> +		dev_err(ipcc->controller.dev, "can not enable the clock\n");
+> +		return ret;
+> +	}
+> +
+> +	/* unmask 'rx channel occupied' interrupt */
+> +	stm32_ipcc_clr_bits(ipcc->reg_proc + IPCC_XMR, RX_BIT_CHAN(chan));
+> +
+> +	return 0;
+> +}
+> +
+> +static void stm32_ipcc_shutdown(struct mbox_chan *link)
+> +{
+> +	unsigned int chan = (unsigned int)link->con_priv;
+> +	struct stm32_ipcc *ipcc = container_of(link->mbox, struct stm32_ipcc,
+> +					       controller);
+> +
+> +	/* mask rx/tx interrupt */
+> +	stm32_ipcc_set_bits(ipcc->reg_proc + IPCC_XMR,
+> +			    RX_BIT_CHAN(chan) | TX_BIT_CHAN(chan));
+> +
+> +	clk_disable_unprepare(ipcc->clk);
+> +}
+> +
+> +static const struct mbox_chan_ops stm32_ipcc_ops = {
+> +	.send_data	= stm32_ipcc_send_data,
+> +	.startup	= stm32_ipcc_startup,
+> +	.shutdown	= stm32_ipcc_shutdown,
+> +};
+> +
+> +static int stm32_ipcc_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct stm32_ipcc *ipcc;
+> +	struct resource *res;
+> +	unsigned int i;
+> +	int ret;
+> +	u32 ip_ver;
+> +	static const char * const irq_name[] = {"rx", "tx"};
+> +	irq_handler_t irq_thread[] = {stm32_ipcc_rx_irq, stm32_ipcc_tx_irq};
+> +
+> +	if (!np) {
+> +		dev_err(dev, "No DT found\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	ipcc = devm_kzalloc(dev, sizeof(*ipcc), GFP_KERNEL);
+> +	if (!ipcc)
+> +		return -ENOMEM;
+> +
+> +	/* proc_id */
+> +	if (of_property_read_u32(np, "st,proc-id", &ipcc->proc_id)) {
+> +		dev_err(dev, "Missing st,proc-id\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (ipcc->proc_id >= STM32_MAX_PROCS) {
+> +		dev_err(dev, "Invalid proc_id (%d)\n", ipcc->proc_id);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* regs */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	ipcc->reg_base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(ipcc->reg_base))
+> +		return PTR_ERR(ipcc->reg_base);
+> +
+> +	ipcc->reg_proc = ipcc->reg_base + ipcc->proc_id * IPCC_PROC_OFFST;
+> +
+> +	/* clock */
+> +	ipcc->clk = devm_clk_get(dev, NULL);
+> +	if (IS_ERR(ipcc->clk))
+> +		return PTR_ERR(ipcc->clk);
+> +
+> +	ret = clk_prepare_enable(ipcc->clk);
+> +	if (ret) {
+> +		dev_err(dev, "can not enable the clock\n");
+> +		return ret;
+> +	}
+> +
+> +	/* irq */
+> +	for (i = 0; i < IPCC_IRQ_NUM; i++) {
+> +		ipcc->irqs[i] = of_irq_get_byname(dev->of_node, irq_name[i]);
+> +		if (ipcc->irqs[i] < 0) {
+> +			dev_err(dev, "no IRQ specified %s\n", irq_name[i]);
+> +			ret = ipcc->irqs[i];
+> +			goto err_clk;
+> +		}
+> +
+> +		ret = devm_request_threaded_irq(dev, ipcc->irqs[i], NULL,
+> +						irq_thread[i], IRQF_ONESHOT,
+> +						dev_name(dev), ipcc);
+> +		if (ret) {
+> +			dev_err(dev, "failed to request irq %d (%d)\n", i, ret);
+> +			goto err_clk;
+> +		}
+> +	}
+> +
+> +	/* mask and enable rx/tx irq */
+> +	stm32_ipcc_set_bits(ipcc->reg_proc + IPCC_XMR,
+> +			    RX_BIT_MASK | TX_BIT_MASK);
+> +	stm32_ipcc_set_bits(ipcc->reg_proc + IPCC_XCR, XCR_RXOIE | XCR_TXOIE);
+> +
+> +	/* wakeup */
+> +	if (of_property_read_bool(np, "wakeup-source")) {
+> +		ipcc->wkp = of_irq_get_byname(dev->of_node, "wakeup");
+> +		if (ipcc->wkp < 0) {
+> +			dev_err(dev, "could not get wakeup IRQ\n");
+> +			ret = ipcc->wkp;
+> +			goto err_clk;
+> +		}
+> +
+> +		device_init_wakeup(dev, true);
+> +		ret = dev_pm_set_dedicated_wake_irq(dev, ipcc->wkp);
+> +		if (ret) {
+> +			dev_err(dev, "Failed to set wake up irq\n");
+> +			goto err_init_wkp;
+> +		}
+> +	} else {
+> +		device_init_wakeup(dev, false);
+> +	}
+> +
+> +	/* mailbox controller */
+> +	ipcc->n_chans = readl_relaxed(ipcc->reg_base + IPCC_HWCFGR);
+> +	ipcc->n_chans &= IPCFGR_CHAN_MASK;
+> +
+> +	ipcc->controller.dev = dev;
+> +	ipcc->controller.txdone_irq = true;
+> +	ipcc->controller.ops = &stm32_ipcc_ops;
+> +	ipcc->controller.num_chans = ipcc->n_chans;
+> +	ipcc->controller.chans = devm_kcalloc(dev, ipcc->controller.num_chans,
+> +					      sizeof(*ipcc->controller.chans),
+> +					      GFP_KERNEL);
+> +	if (!ipcc->controller.chans) {
+> +		ret = -ENOMEM;
+> +		goto err_irq_wkp;
+> +	}
+> +
+> +	for (i = 0; i < ipcc->controller.num_chans; i++)
+> +		ipcc->controller.chans[i].con_priv = (void *)i;
+> +
+> +	ret = mbox_controller_register(&ipcc->controller);
+> +	if (ret)
+> +		goto err_irq_wkp;
+> +
+> +	platform_set_drvdata(pdev, ipcc);
+> +
+> +	ip_ver = readl_relaxed(ipcc->reg_base + IPCC_VER);
+> +
+> +	dev_info(dev, "ipcc rev:%ld.%ld enabled, %d chans, proc %d\n",
+> +		 FIELD_GET(VER_MAJREV_MASK, ip_ver),
+> +		 FIELD_GET(VER_MINREV_MASK, ip_ver),
+> +		 ipcc->controller.num_chans, ipcc->proc_id);
+> +
+> +	clk_disable_unprepare(ipcc->clk);
+> +	return 0;
+> +
+> +err_irq_wkp:
+> +	if (ipcc->wkp)
+> +		dev_pm_clear_wake_irq(dev);
+> +err_init_wkp:
+> +	device_init_wakeup(dev, false);
+> +err_clk:
+> +	clk_disable_unprepare(ipcc->clk);
+> +	return ret;
+> +}
+> +
+> +static int stm32_ipcc_remove(struct platform_device *pdev)
+> +{
+> +	struct stm32_ipcc *ipcc = platform_get_drvdata(pdev);
+> +
+> +	mbox_controller_unregister(&ipcc->controller);
+> +
+> +	if (ipcc->wkp)
+> +		dev_pm_clear_wake_irq(&pdev->dev);
+> +
+> +	device_init_wakeup(&pdev->dev, false);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static void stm32_ipcc_set_irq_wake(struct device *dev, bool enable)
+> +{
+> +	struct stm32_ipcc *ipcc = dev_get_drvdata(dev);
+> +	unsigned int i;
+> +
+> +	if (device_may_wakeup(dev))
+> +		for (i = 0; i < IPCC_IRQ_NUM; i++)
+> +			irq_set_irq_wake(ipcc->irqs[i], enable);
+> +}
+> +
+> +static int stm32_ipcc_suspend(struct device *dev)
+> +{
+> +	struct stm32_ipcc *ipcc = dev_get_drvdata(dev);
+> +
+> +	ipcc->xmr = readl_relaxed(ipcc->reg_proc + IPCC_XMR);
+> +	ipcc->xcr = readl_relaxed(ipcc->reg_proc + IPCC_XCR);
+> +
+> +	stm32_ipcc_set_irq_wake(dev, true);
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_ipcc_resume(struct device *dev)
+> +{
+> +	struct stm32_ipcc *ipcc = dev_get_drvdata(dev);
+> +
+> +	stm32_ipcc_set_irq_wake(dev, false);
+> +
+> +	writel_relaxed(ipcc->xmr, ipcc->reg_proc + IPCC_XMR);
+> +	writel_relaxed(ipcc->xcr, ipcc->reg_proc + IPCC_XCR);
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(stm32_ipcc_pm_ops,
+> +			 stm32_ipcc_suspend, stm32_ipcc_resume);
+> +
+> +static const struct of_device_id stm32_ipcc_of_match[] = {
+> +	{ .compatible = "st,stm32mp1-ipcc" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, stm32_ipcc_of_match);
+> +
+> +static struct platform_driver stm32_ipcc_driver = {
+> +	.driver = {
+> +		.name = "stm32-ipcc",
+> +		.pm = &stm32_ipcc_pm_ops,
+> +		.of_match_table = stm32_ipcc_of_match,
+> +	},
+> +	.probe		= stm32_ipcc_probe,
+> +	.remove		= stm32_ipcc_remove,
+> +};
+> +
+> +module_platform_driver(stm32_ipcc_driver);
+> +
+> +MODULE_AUTHOR("Ludovic Barre <ludovic.barre@st.com>");
+> +MODULE_AUTHOR("Fabien Dessenne <fabien.dessenne@st.com>");
+> +MODULE_DESCRIPTION("STM32 IPCC driver");
+> +MODULE_LICENSE("GPL v2");
