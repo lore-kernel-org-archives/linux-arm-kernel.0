@@ -1,34 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 01:23:42 -0700
-Subject: [GIT PULL 1/2] ARM: SOC driver update v4.18
-In-Reply-To: <1525815697-6338-1-git-send-email-santosh.shilimkar@oracle.com>
-References: <1525815697-6338-1-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <20180514082342.wpqnj2jmsnjh5yro@localhost>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 14 May 2018 10:40:50 +0200
+Subject: [PATCH 09/21] arm64: dts: allwinner: a64: Add HDMI support
+In-Reply-To: <CAMty3ZBheurXewQ8R53G_0gNLgv1jQkZbjAbaN30JQ6_ZVn7Eg@mail.gmail.com>
+References: <20180430114058.5061-1-jagan@amarulasolutions.com>
+ <20180430114058.5061-10-jagan@amarulasolutions.com>
+ <20180502113413.vv2r3ubfoh7gm3ms@flea>
+ <CAMty3ZBheurXewQ8R53G_0gNLgv1jQkZbjAbaN30JQ6_ZVn7Eg@mail.gmail.com>
+Message-ID: <20180514084050.ix5corfuvx33gsyn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 08, 2018 at 02:41:36PM -0700, Santosh Shilimkar wrote:
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+On Mon, May 14, 2018 at 02:03:36PM +0530, Jagan Teki wrote:
+> On Wed, May 2, 2018 at 5:04 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > Hi,
+> >
+> > On Mon, Apr 30, 2018 at 05:10:46PM +0530, Jagan Teki wrote:
+> >> +             hdmi_phy: hdmi-phy at 1ef0000 {
+> >> +                     compatible = "allwinner,sun50i-a64-hdmi-phy",
+> >> +                                  "allwinner,sun8i-h3-hdmi-phy";
+> >> +                     reg = <0x01ef0000 0x10000>;
+> >> +                     clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
+> >> +                              <&ccu CLK_PLL_VIDEO1>;
+> >
+> > You were discussing that the PLL0 could also be used to clock the PHY,
+> > has that been figured out?
 > 
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/soc_drivers_for_4.18
-> 
-> for you to fetch changes up to 1e0a601437a6111ecf384df010812c53cada6497:
-> 
->   firmware: ti_sci: Switch to SPDX Licensing (2018-05-04 23:10:23 -0700)
-> 
-> ----------------------------------------------------------------
-> ARM: SOC driver update for 4.18
-> 
->  - AEMIF driver update to support board files and remove
->    need of mach-davinci aemif code
->  - Use percpu counters for qmss datapath stats
->  - License update for TI SCI
+> This is what I understand from Fig: 3-3. Module Clock Diagram, both
+> tcon0 and tcon1 are using HDMI. I'm thinking based on the tcon
+> configuration we need use proper PLL or some logic to get common PLL
+> don't know yet. Since this series adding tcon1 I've attached PLL1.
 
-Merged, thanks.
+You're not describing the TCON node here though, but the HDMI one, and
+the HDMI block is listed in both the PLL video 0 and 1.
 
+Maxime
 
--Olof
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/63d5d7fa/attachment.sig>
