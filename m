@@ -1,37 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 01:18:17 -0700
-Subject: [GIT PULL] STM32 DT changes for v4.18 #1
-In-Reply-To: <28c73dd0-fa87-83c1-5a93-217124e0f484@st.com>
-References: <28c73dd0-fa87-83c1-5a93-217124e0f484@st.com>
-Message-ID: <20180514081817.w67ytk437bg3eo4o@localhost>
+Date: Mon, 14 May 2018 01:19:42 -0700
+Subject: [GIT PULL 2/3] omap dts changes for v4.18 merge window
+In-Reply-To: <pull-1525450571-674978@atomide.com-2>
+References: <pull-1525450571-674978@atomide.com>
+ <pull-1525450571-674978@atomide.com-2>
+Message-ID: <20180514081942.4j3i4h7qged62zdc@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 03:46:51PM +0200, Alexandre Torgue wrote:
-> Hi Arnd, Olof and Kevin,
-> 
-> Please consider this first round of STM32 DT updates for v4.18. As you will
-> see, main part of patches concerns support for STM32MP157 platform.
-> I didn't squash DT patches (as I like the way there are split) but let me
-> know if for next time you prefer I do it.
-> 
-> Regards
-> Alex
-> 
+On Fri, May 04, 2018 at 09:17:32AM -0700, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/stm32-dt-for-v4.18-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/dt-signed
 > 
-> for you to fetch changes up to 0a84a00094eea4080288f5c62aff8a90e510a252:
+> for you to fetch changes up to 8dfa75524a0e0e2b4eaf2a3dc178f6b4d8db85d9:
 > 
->   ARM: dts: stm32: update pwm-cells for LPTimer on stm32h743 (2018-05-04
-> 09:45:54 +0200)
+>   ARM: dts: correct invalid I/O definition for MMC/SD card detect on T410 (2018-05-03 10:03:01 -0700)
+> 
+> ----------------------------------------------------------------
+> Device tree changes for omap variants for v4.18 merge window
+> 
+> This series adds support for am335x-pockebeagle and also add missing
+> pinctrl configuration for am335x evm and beagle bone variants.
+> 
+> There are also changes to add missing omap3 oscillator clocks for audio,
+> and fixes am437x tps65218 irq type used for various board specific
+> files.
+> 
+> There are also few minor fixes included that are not urgent. The
+> fixes for n8x0 audio also depend on driver changes, and the hp t410
+> mmc card detect mux typo is harmless.
 
 Merged, thanks!
 
