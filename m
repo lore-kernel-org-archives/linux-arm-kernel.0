@@ -1,55 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 May 2018 09:43:51 -0700
-Subject: [PATCH 03/21] clk: sunxi-ng: Enable DE2_CCU for Allwinner 64-bit
- SoCs
-In-Reply-To: <CAMty3ZAOVg6EZoMi=LRuKEcrnDM_tzYfK1WnBN-_d-pmjNS6Nw@mail.gmail.com>
-References: <20180430114058.5061-1-jagan@amarulasolutions.com>
- <20180430114058.5061-4-jagan@amarulasolutions.com>
- <CAGb2v66MKooAAroCzYdsXZDY0Oh66Dydpy59xj80QfiY+5mz_A@mail.gmail.com>
- <CAMty3ZAOVg6EZoMi=LRuKEcrnDM_tzYfK1WnBN-_d-pmjNS6Nw@mail.gmail.com>
-Message-ID: <CAGb2v64tGLyYTG63VvHiXfhif0wiDCNKoBKbjEs+Jm5-6CNxXw@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 14 May 2018 18:47:20 +0200
+Subject: [PATCH] ghes_edac: enable HIP08 platform edac driver
+In-Reply-To: <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
+References: <1526039543-180996-1-git-send-email-zhengqiang10@huawei.com>
+ <20180511121901.GA12705@pd.tnic> <5AF90C70.408@huawei.com>
+ <20180514094709.GC23049@pd.tnic>
+ <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
+Message-ID: <20180514164720.GH23049@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 1:20 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> On Tue, May 1, 2018 at 9:53 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> On Mon, Apr 30, 2018 at 7:40 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
->>> Allwinner 64-bit SoC like H5/A64 has DE2 CCU so enable them
->>> as default.
->>>
->>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->>> ---
->>>  drivers/clk/sunxi-ng/Kconfig | 2 ++
->>>  1 file changed, 2 insertions(+)
->>>
->>> diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
->>> index 79dfd296c3d1..1fffd3bf6ff3 100644
->>> --- a/drivers/clk/sunxi-ng/Kconfig
->>> +++ b/drivers/clk/sunxi-ng/Kconfig
->>> @@ -58,6 +58,8 @@ config SUN8I_V3S_CCU
->>>
->>>  config SUN8I_DE2_CCU
->>>         bool "Support for the Allwinner SoCs DE2 CCU"
->>> +       default ARM64 && ARCH_SUNXI
->>> +       depends on (DRM_SUN4I && (ARM64 && ARCH_SUNXI)) || COMPILE_TEST
->>
->> There is no reason to depend on DRM_SUN4I. There is no compile dependency.
->
-> Since this CCU is for DE2 I've make DRM_SUN4I for that matter, any problem?
+On Mon, May 14, 2018 at 04:12:08PM +0100, James Morse wrote:
+> I'm afraid I'd like to keep both doors open. Kernel-first handling will require
+> some ACPI-table/DT property as some aspects of the CPU extensions aren't
+> discover-able. Can't we use this to pick up whether the platform supports
+> firmware-first (HEST and GHES entries) or kernel-first via some as-yet-undefined
+> HEST bits?
 
-Users may very well be just using simplefb, but with all the clock drivers
-enabled. That is a valid, if very limited, use case. So again, you should
-not limit this driver based on DRM_SUN4I. There is no compile dependency.
+So how you detect those platforms is largely undefined as we're walking
+new grounds here with the FF crap on the one hand and platform-specific
+drivers on the other. So whatever works for you and as long as the
+ugliness is nicely hidden. :-)
 
->
->>
->> Also, this is needed on SUN8I as well, pretty much anything with DE 2.0.
->> So you shouldn't limit it to ARM64. That pretty much breaks things for
->> people with A83T's or H3's. In fact you should enable it by default for
->> these as well.
->
-> True, I've skipped SUN8I since this series for A64.
+> Without GHES entries this code would never be run. So we 'just' need to catch
+> systems that are describing both. (which can be the platform specific kernel
+> first bits problem to do)
 
-And yet you are breaking existing users, which is a big no-no.
+So the reason why we're doing this on x86 is that the majority of
+GHES-advertizing platforms out there are a serious turd when it comes
+to functioning fw.
 
-ChenYu
+So we've opted for known-good platforms list where there's backing from
+the vendor to have firmware which is getting fixes and is being tested
+properly.
+
+And everything else we assume is crap. Thus we use the platform-specific
+EDAC driver which we know it works and we can fix if there's an issue.
+VS firmware which we can't. (I doubt anyone can, for that matter. :)...)
+
+Anyway, this is the story in x86 land. JFYI guys in case it helps making
+some decisions.
+
+Thx.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
