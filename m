@@ -1,54 +1,39 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 14 May 2018 10:57:30 +0100
-Subject: [PATCH 01/18] arm64: consistently use unsigned long for thread
- flags
-In-Reply-To: <20180514094640.27569-2-mark.rutland@arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-2-mark.rutland@arm.com>
-Message-ID: <20180514095722.GW7753@e103592.cambridge.arm.com>
+From: lionel.debieve@st.com (Lionel Debieve)
+Date: Mon, 14 May 2018 12:00:34 +0200
+Subject: [PATCH 1/1] ARM: dts: stm32: Add HASH support on stm32mp157c
+Message-ID: <20180514100034.10282-1-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 10:46:23AM +0100, Mark Rutland wrote:
-> In do_notify_resume, we manipulate thread_flags as a 32-bit unsigned
-> int, whereas thread_info::flags is a 64-bit unsigned long, and elsewhere
-> (e.g. in the entry assembly) we manipulate the flags as a 64-bit
-> quantity.
-> 
-> For consistency, and to avoid problems if we end up with more than 32
-> flags, let's make do_notify_resume take the flags as a 64-bit unsigned
-> long.
+This patch add HASH instance of the stm32mp157c SoC
 
-Looks sensible.
+Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+---
+ arch/arm/boot/dts/stm32mp157c.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/signal.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index 154b7d30145d..8e624fec4707 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -896,7 +896,7 @@ static void do_signal(struct pt_regs *regs)
->  }
->  
->  asmlinkage void do_notify_resume(struct pt_regs *regs,
-> -				 unsigned int thread_flags)
-> +				 unsigned long thread_flags)
->  {
->  	/*
->  	 * The assembly code enters us with IRQs off, but it hasn't
-> -- 
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index b66f673b5038..cb39fb6d9960 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -702,6 +702,18 @@
+ 			status = "disabled";
+ 		};
+ 
++		hash1: hash at 54002000 {
++			compatible = "st,stm32f756-hash";
++			reg = <0x54002000 0x400>;
++			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&rcc HASH1>;
++			resets = <&rcc HASH1_R>;
++			dmas = <&mdma1 31 0x10 0x1000A02 0x0 0x0 0x0>;
++			dma-names = "in";
++			dma-maxburst = <2>;
++			status = "disabled";
++		};
++
+ 		rng1: rng at 54003000 {
+ 			compatible = "st,stm32-rng";
+ 			reg = <0x54003000 0x400>;
+-- 
+2.15.1
