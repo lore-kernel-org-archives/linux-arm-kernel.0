@@ -1,26 +1,50 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Mon, 14 May 2018 16:49:26 -0500
-Subject: [PATCH 1/4] amba: Export amba_bustype
-In-Reply-To: <19c4b830-9f50-d5ea-3e31-587477210ee1@arm.com>
-References: <20180508140628.f30774c70c4c481bff3f8000@arm.com>
- <8c2648ec-1379-fb2a-35d2-b3fa8fc9f063@arm.com>
- <20180509154055.GB25559@xps15>
- <19c4b830-9f50-d5ea-3e31-587477210ee1@arm.com>
-Message-ID: <20180514164926.61c11b9b96256599491269d9@arm.com>
+From: tommyhebb@gmail.com (Thomas Hebb)
+Date: Mon, 14 May 2018 17:56:45 -0400
+Subject: [PATCH] ARM: dts: chromecast: override bad bootloader memory info
+Message-ID: <20180514215645.17592-2-tommyhebb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 May 2018 17:02:34 +0100
-Robin Murphy <robin.murphy@arm.com> wrote:
+On the Chromecast, the bootloader provides us with an ATAG_MEM of
+start=0x01000000 and size=0x3eff8000. This is clearly incorrect, as the
+range given encompasses nearly a GiB but the Chromecast only has 512MiB
+of RAM! Additionally, this causes the kernel to be decompressed at
+0x00008000, below the claimed beginning of RAM, and so the boot fails.
 
-> probe (and thus call coresight_register()) first. Oh well, I guess 
-> poking amba_bustype really does remain the only reasonable answer.
+Since the existing ATAG parsing code runs before the kernel is even
+decompressed and irrevocably patches the device tree, don't even try
+to bypass it. Instead, use the "linux,usable-memory" property instead
+of the "reg" property to define the real range. The ATAG code only
+overwrites reg, but linux,usable-memory is checked first in the OF
+driver, so the fact that reg gets changed makes no difference.
 
-Thanks all, I've added Robin's Reviewed-by, and submitted this patch to
-RMK's patch tracking system, here:
+Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
+---
+ arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8773/1
-
-Cheers,
-
-Kim
+diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
+index 20f31cdeaf38..54221f55bfa2 100644
+--- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
++++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
+@@ -52,7 +52,17 @@
+ 
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x00000000 0x20000000>; /* 512 MB */
++
++		/*
++		 * We're using "linux,usable-memory" instead of "reg" here
++		 * because the (signed and encrypted) bootloader that shipped
++		 * with this device provides an incorrect memory range in
++		 * ATAG_MEM. Linux helpfully overrides the "reg" property with
++		 * data from the ATAG, so we can't specify the proper range
++		 * normally. Fortunately, this alternate property is checked
++		 * first by the OF driver, so we can (ab)use it instead.
++		 */
++		linux,usable-memory = <0x00000000 0x20000000>; /* 512 MB */
+ 	};
+ 
+ 	leds {
+-- 
+2.17.0
