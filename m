@@ -1,8 +1,10 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 14 May 2018 15:29:35 -0300
-Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Fix USB PHY duplicate
- unit-address
-Message-ID: <1526322576-5838-1-git-send-email-festevam@gmail.com>
+Date: Mon, 14 May 2018 15:29:36 -0300
+Subject: [PATCH 2/2] ARM: dts: iimx51-eukrea-mbimxsd51-baseboard: Fix USB PHY
+ duplicate unit-address
+In-Reply-To: <1526322576-5838-1-git-send-email-festevam@gmail.com>
+References: <1526322576-5838-1-git-send-email-festevam@gmail.com>
+Message-ID: <1526322576-5838-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,22 +12,22 @@ From: Fabio Estevam <fabio.estevam@nxp.com>
 
 Currently the following DTC warning is seen with W=1:
 
-arch/arm/boot/dts/imx51-babbage.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
+arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
 
 Fix it by moving the USB PHY node outside of simple-bus and drop the
 unneeded unit-address.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx51-babbage.dts | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
+ .../arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts | 19 ++++++-------------
+ 1 file changed, 6 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index b8ca73d..de46906 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -170,20 +170,13 @@
- 		mux-ext-port = <3>;
+diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+index b3d952f..29b0b7b 100644
+--- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
++++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
+@@ -83,19 +83,12 @@
+ 		fsl,mux-ext-port = <3>;
  	};
  
 -	usbphy {
@@ -36,18 +38,16 @@ index b8ca73d..de46906 100644
 -		usbh1phy: usbh1phy at 0 {
 -			compatible = "usb-nop-xceiv";
 -			reg = <0>;
--			clocks = <&clk_usb>;
+-			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
 -			clock-names = "main_clk";
--			reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
--			vcc-supply = <&vusb_reg>;
+-			clock-frequency = <19200000>;
 -			#phy-cells = <0>;
 -		};
-+	usbh1phy: usbphy1 {
++	usbh1phy: usbphy {
 +		compatible = "usb-nop-xceiv";
-+		clocks = <&clk_usb>;
++		clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
 +		clock-names = "main_clk";
-+		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
-+		vcc-supply = <&vusb_reg>;
++		clock-frequency = <19200000>;
 +		#phy-cells = <0>;
  	};
  };
