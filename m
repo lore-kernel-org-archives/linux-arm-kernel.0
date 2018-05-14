@@ -1,47 +1,66 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 14 May 2018 16:52:37 +0200
-Subject: [PATCH] PM / Domains: Don't return -EEXIST at attach when PM domain
- exists
-Message-ID: <1526309557-7995-1-git-send-email-ulf.hansson@linaro.org>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 14 May 2018 16:53:09 +0200
+Subject: [PATCH 00/21] i2c: make use of i2c_8bit_addr_from_msg
+Message-ID: <20180514145330.4857-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As dev_pm_domain_attach() isn't the only way to assign PM domain pointers
-to devices, clearly we must allow a device to have the pointer already
-being assigned. For this reason, return 0 instead of -EEXIST.
+Hi!
 
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Tested-by: Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
----
+The nice little inline i2c_8bit_addr_from_msg is not getting
+enough use. This series improves the situation and drops a
+bunch of lines in the process.
 
-Krzysztof reported problems for an Exynos5 board, where some devices are added
-to their PM domains (genpd) via calling of_genpd_add_device(). As also pointed
-out by Sylvester, this leads to probe failure when dev_pm_domain_attach()
-returns -EXISTS.
+I have only compile-tested (that part fine, at least over here).
 
-Rafael, potentially this change could be squashed with the recently queued
-patch: "PM / Domains: Check for existing PM domain in dev_pm_domain_attach()",
-but perhaps its too late for that and the fix is better applied on top!?
+Cheers,
+Peter
 
----
- drivers/base/power/common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Peter Rosin (21):
+  i2c: algo: bit: make use of i2c_8bit_addr_from_msg
+  i2c: algo: pca: make use of i2c_8bit_addr_from_msg
+  i2c: algo: pcf: make use of i2c_8bit_addr_from_msg
+  i2c: aspeed: make use of i2c_8bit_addr_from_msg
+  i2c: axxia: make use of i2c_8bit_addr_from_msg
+  i2c: diolan: make use of i2c_8bit_addr_from_msg
+  i2c: efm32: make use of i2c_8bit_addr_from_msg
+  i2c: eg20t: make use of i2c_8bit_addr_from_msg
+  i2c: emev2: make use of i2c_8bit_addr_from_msg
+  i2c: hix5hd2: make use of i2c_8bit_addr_from_msg
+  i2c: imx-lpi2c: make use of i2c_8bit_addr_from_msg
+  i2c: imx: make use of i2c_8bit_addr_from_msg
+  i2c: kempld: make use of i2c_8bit_addr_from_msg
+  i2c: mxs: make use of i2c_8bit_addr_from_msg
+  i2c: ocores: make use of i2c_8bit_addr_from_msg
+  i2c: pasemi: make use of i2c_8bit_addr_from_msg
+  i2c: qup: make use of i2c_8bit_addr_from_msg
+  i2c: rcar: make use of i2c_8bit_addr_from_msg
+  i2c: riic: make use of i2c_8bit_addr_from_msg
+  i2c: stu300: make use of i2c_8bit_addr_from_msg
+  i2c: xiic: make use of i2c_8bit_addr_from_msg
 
-diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
-index 5e4b481..390868c 100644
---- a/drivers/base/power/common.c
-+++ b/drivers/base/power/common.c
-@@ -106,7 +106,7 @@ int dev_pm_domain_attach(struct device *dev, bool power_on)
- 	int ret;
- 
- 	if (dev->pm_domain)
--		return -EEXIST;
-+		return 0;
- 
- 	ret = acpi_dev_pm_attach(dev, power_on);
- 	if (!ret)
+ drivers/i2c/algos/i2c-algo-bit.c    |  4 +---
+ drivers/i2c/algos/i2c-algo-pca.c    |  5 +----
+ drivers/i2c/algos/i2c-algo-pcf.c    |  5 +----
+ drivers/i2c/busses/i2c-aspeed.c     |  3 +--
+ drivers/i2c/busses/i2c-axxia.c      |  5 +++--
+ drivers/i2c/busses/i2c-diolan-u2c.c | 11 ++++-------
+ drivers/i2c/busses/i2c-efm32.c      |  3 +--
+ drivers/i2c/busses/i2c-eg20t.c      |  5 ++---
+ drivers/i2c/busses/i2c-emev2.c      |  2 +-
+ drivers/i2c/busses/i2c-hix5hd2.c    |  9 ++-------
+ drivers/i2c/busses/i2c-imx-lpi2c.c  |  4 +---
+ drivers/i2c/busses/i2c-imx.c        | 10 +++++-----
+ drivers/i2c/busses/i2c-kempld.c     |  7 +++----
+ drivers/i2c/busses/i2c-mxs.c        |  9 +++------
+ drivers/i2c/busses/i2c-ocores.c     |  5 +----
+ drivers/i2c/busses/i2c-pasemi.c     |  2 +-
+ drivers/i2c/busses/i2c-qup.c        |  2 +-
+ drivers/i2c/busses/i2c-rcar.c       |  2 +-
+ drivers/i2c/busses/i2c-riic.c       |  5 ++---
+ drivers/i2c/busses/i2c-stu300.c     | 22 +++++++++++++---------
+ drivers/i2c/busses/i2c-xiic.c       | 11 ++---------
+ 21 files changed, 50 insertions(+), 81 deletions(-)
+
 -- 
-2.7.4
+2.11.0
