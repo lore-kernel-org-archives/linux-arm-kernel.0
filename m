@@ -1,49 +1,47 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Mon, 14 May 2018 11:29:38 +0800
-Subject: [PATCH v2 04/13] soc: rockchip: power-domain: Fix wrong value when
- power up pd
+Date: Mon, 14 May 2018 11:30:26 +0800
+Subject: [PATCH v2 06/13] dt-bindings: add binding for rk3128 power domains
 In-Reply-To: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
 References: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1526268578-9361-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1526268626-11855-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Finley Xiao <finley.xiao@rock-chips.com>
+Add binding documentation for the power domains
+found on Rockchip RK3128 SoCs.
 
-Solve the pd could only ever turn off but never turn them on again,
-If the pd registers have the writemask bits.
-
-Fix up the code error for commit:
-	commit 79bb17ce8edb3141339b5882e372d0ec7346217c
-	Author: Elaine Zhang <zhangqing@rock-chips.com>
-	Date:   Fri Dec 23 11:47:52 2016 +0800
-
-	soc: rockchip: power-domain: Support domain control in hiword-registers
-
-	New Rockchips SoCs may have their power-domain control in registers
-	using a writemask-based access scheme (upper 16bit being the write
-	mask). So add a DOMAIN_M type and handle this case accordingly.
-	Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-	Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-
-Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- drivers/soc/rockchip/pm_domains.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index ebd7c41898c0..01d4ba26a054 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -264,7 +264,7 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
- 		return;
- 	else if (pd->info->pwr_w_mask)
- 		regmap_write(pmu->regmap, pmu->info->pwr_offset,
--			     on ? pd->info->pwr_mask :
-+			     on ? pd->info->pwr_w_mask :
- 			     (pd->info->pwr_mask | pd->info->pwr_w_mask));
- 	else
- 		regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+index 79924ee9ae86..9a3f5fd36a80 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+@@ -6,6 +6,7 @@ powered up/down by software based on different application scenes to save power.
+ Required properties for power domain controller:
+ - compatible: Should be one of the following.
+ 	"rockchip,rk3036-power-controller" - for RK3036 SoCs.
++	"rockchip,rk3128-power-controller" - for RK3128 SoCs.
+ 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+ 	"rockchip,rk3328-power-controller" - for RK3328 SoCs.
+ 	"rockchip,rk3366-power-controller" - for RK3366 SoCs.
+@@ -19,6 +20,7 @@ Required properties for power domain controller:
+ Required properties for power domain sub nodes:
+ - reg: index of the power domain, should use macros in:
+ 	"include/dt-bindings/power/rk3036-power.h" - for RK3036 type power domain.
++	"include/dt-bindings/power/rk3128-power.h" - for RK3128 type power domain.
+ 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+ 	"include/dt-bindings/power/rk3328-power.h" - for RK3328 type power domain.
+ 	"include/dt-bindings/power/rk3366-power.h" - for RK3366 type power domain.
+@@ -96,6 +98,7 @@ containing a phandle to the power device node and an index specifying which
+ power domain to use.
+ The index should use macros in:
+ 	"include/dt-bindings/power/rk3036-power.h" - for rk3036 type power domain.
++	"include/dt-bindings/power/rk3128-power.h" - for rk3128 type power domain.
+ 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
+ 	"include/dt-bindings/power/rk3328-power.h" - for rk3328 type power domain.
+ 	"include/dt-bindings/power/rk3366-power.h" - for rk3366 type power domain.
 -- 
 1.9.1
