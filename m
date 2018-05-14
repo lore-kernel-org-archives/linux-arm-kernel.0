@@ -4,7 +4,7 @@ Subject: [PATCH] ARM: dts: socfpga: Fix NAND controller node compatible
 In-Reply-To: <73h8nak8y3.fsf@pengutronix.de>
 References: <20180510125223.16056-1-marex@denx.de>
  <73h8nak8y3.fsf@pengutronix.de>
-Message-ID: <058358a7-89fa-f945-4394-de5ccf42182c@kernel.org>
+Message-ID: <a6da918e-e7d7-8bdc-4cfd-c0e74ab42417@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
