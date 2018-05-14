@@ -1,91 +1,56 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Mon, 14 May 2018 11:32:44 +0800
-Subject: [PATCH v2 13/13] soc: rockchip: power-domain: add power domain
- support for px30
-In-Reply-To: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
-References: <1526268455-9133-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1526268764-26141-1-git-send-email-zhangqing@rock-chips.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Mon, 14 May 2018 06:33:19 +0200
+Subject: [PATCH v6 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <1937901.oyadCYFYNo@aspire.rjw.lan>
+References: <20180305102524.5905-1-o.rempel@pengutronix.de>
+ <20180305102524.5905-4-o.rempel@pengutronix.de>
+ <20180504185052.bjhfkvpgrblc7tfc@pengutronix.de>
+ <1937901.oyadCYFYNo@aspire.rjw.lan>
+Message-ID: <a431b0e1-f4f4-1439-f0bf-736018c6ab0c@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Finley Xiao <finley.xiao@rock-chips.com>
 
-This driver is modified to support PX30 SoC.
 
-Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- drivers/soc/rockchip/pm_domains.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+On 12.05.2018 13:13, Rafael J. Wysocki wrote:
+> On Friday, May 4, 2018 8:50:52 PM CEST Oleksij Rempel wrote:
+>> Hallo Andrew,
+>> I need your ACK or NACK for this patch.
+>>
+>> This function is used to configure external PMIC to interpret
+>> signal which will be triggered by pm_power_off as power off.
+>> Since same signal can be used for stand by, I linked PMIC configuration
+>> with pm_power_off_prepare to avoid possible conflicts.
+>>
+>> On Mon, Mar 05, 2018 at 11:25:20AM +0100, Oleksij Rempel wrote:
+>>> Export pm_power_off_prepare. It is needed to implement power off on
+>>> Freescale/NXP iMX6 based boards with external power management
+>>> integrated circuit (PMIC).
+>>>
+>>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>>> ---
+>>>  kernel/reboot.c | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/kernel/reboot.c b/kernel/reboot.c
+>>> index e4ced883d8de..350be6baa60d 100644
+>>> --- a/kernel/reboot.c
+>>> +++ b/kernel/reboot.c
+>>> @@ -49,6 +49,7 @@ int reboot_force;
+>>>   */
+>>>  
+>>>  void (*pm_power_off_prepare)(void);
+>>> +EXPORT_SYMBOL(pm_power_off_prepare);
+> 
+> Why not EXPORT_SYMBOL_GPL() ?
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 90dcd5e21ae6..d0c5615132e3 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -18,6 +18,7 @@
- #include <linux/clk.h>
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
-+#include <dt-bindings/power/px30-power.h>
- #include <dt-bindings/power/rk3036-power.h>
- #include <dt-bindings/power/rk3128-power.h>
- #include <dt-bindings/power/rk3228-power.h>
-@@ -114,6 +115,9 @@ struct rockchip_pmu {
- 	.active_wakeup = wakeup,			\
- }
- 
-+#define DOMAIN_PX30(pwr, status, req, wakeup)		\
-+	DOMAIN_M(pwr, status, req, (req) + 16, req, wakeup)
-+
- #define DOMAIN_RK3288(pwr, status, req, wakeup)		\
- 	DOMAIN(pwr, status, req, req, (req) + 16, wakeup)
- 
-@@ -712,6 +716,17 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 	return error;
- }
- 
-+static const struct rockchip_domain_info px30_pm_domains[] = {
-+	[PX30_PD_USB]		= DOMAIN_PX30(5, 5, 10, false),
-+	[PX30_PD_SDCARD]	= DOMAIN_PX30(8, 8, 9, false),
-+	[PX30_PD_GMAC]		= DOMAIN_PX30(10, 10, 6, false),
-+	[PX30_PD_MMC_NAND]	= DOMAIN_PX30(11, 11, 5, false),
-+	[PX30_PD_VPU]		= DOMAIN_PX30(12, 12, 14, false),
-+	[PX30_PD_VO]		= DOMAIN_PX30(13, 13, 7, false),
-+	[PX30_PD_VI]		= DOMAIN_PX30(14, 14, 8, false),
-+	[PX30_PD_GPU]		= DOMAIN_PX30(15, 15, 2, false),
-+};
-+
- static const struct rockchip_domain_info rk3036_pm_domains[] = {
- 	[RK3036_PD_MSCH]	= DOMAIN_RK3036(14, 23, 30, true),
- 	[RK3036_PD_CORE]	= DOMAIN_RK3036(13, 17, 24, false),
-@@ -811,6 +826,17 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 	[RK3399_PD_SDIOAUDIO]	= DOMAIN_RK3399(31, 31, 29, true),
- };
- 
-+static const struct rockchip_pmu_info px30_pmu = {
-+	.pwr_offset = 0x18,
-+	.status_offset = 0x20,
-+	.req_offset = 0x64,
-+	.idle_offset = 0x6c,
-+	.ack_offset = 0x6c,
-+
-+	.num_domains = ARRAY_SIZE(px30_pm_domains),
-+	.domain_info = px30_pm_domains,
-+};
-+
- static const struct rockchip_pmu_info rk3036_pmu = {
- 	.req_offset = 0x148,
- 	.idle_offset = 0x14c,
-@@ -915,6 +941,10 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 
- static const struct of_device_id rockchip_pm_domain_dt_match[] = {
- 	{
-+		.compatible = "rockchip,px30-power-controller",
-+		.data = (void *)&px30_pmu,
-+	},
-+	{
- 		.compatible = "rockchip,rk3036-power-controller",
- 		.data = (void *)&rk3036_pmu,
- 	},
--- 
-1.9.1
+No special reason. Fixed.
+Any other comments?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180514/8e85cd06/attachment.sig>
