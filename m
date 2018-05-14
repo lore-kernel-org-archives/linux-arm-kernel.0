@@ -1,44 +1,56 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Mon, 14 May 2018 09:23:20 -0300
-Subject: [PATCH 4/5] perf cs-etm: Remove redundant space
-In-Reply-To: <20180514122321.27304-1-acme@kernel.org>
-References: <20180514122321.27304-1-acme@kernel.org>
-Message-ID: <20180514122321.27304-5-acme@kernel.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 14 May 2018 14:29:52 +0200
+Subject: [FAIL bisect] Sound card probe error
+In-Reply-To: <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
+References: <CGME20180514101728epcas4p3108760546a415b36252df93dfe38e0fb@epcas4p3.samsung.com>
+ <CAJKOXPfD8gZR8nZkmAr=Ldt3xESuFocQLnMtrDsNZu=ba55jcw@mail.gmail.com>
+ <b193b8a0-ad25-1895-8f8d-ffab97261dc1@samsung.com>
+Message-ID: <CAJKOXPc+kLA+BPBmaP14zMLbbxxCmWF1eZnKoa_PcO2z9jG9JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+On Mon, May 14, 2018 at 2:22 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> Hi,
+>
+> On 05/14/2018 12:17 PM, Krzysztof Kozlowski wrote:
+>
+>> Bisected to:
+>> 8c123c14bbba4add148536b6d47a9226deda2f7a is the first bad commit
+>> commit 8c123c14bbba4add148536b6d47a9226deda2f7a
+>> Author: Ulf Hansson <ulf.hansson@linaro.org>
+>> Date:   Thu Apr 26 10:53:06 2018 +0200
+>>
+>>     driver core: Respect all error codes from dev_pm_domain_attach()
+>>
+>>     The limitation of being able to check only for -EPROBE_DEFER from
+>>     dev_pm_domain_attach() has been removed. Hence let's respect all error
+>>     codes and bail out accordingly.
+>>
+>>     Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>     Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>     Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>
+> The DRM driver creates the HDMI codec but its registration fails, due
+> to some missing clocks. The clock are missing because the exynos5-subcmu
+> driver probing fails.
+>
+> [    0.678578] exynos5-subcmu: probe of GSC failed with error -17
+> [    0.679250] exynos5-subcmu: probe of MFC failed with error -17
+> [    0.679992] exynos5-subcmu: probe of DISP failed with error -17
+>
+> The exynos5-subcmu driver before registering platform device makes
+> of_genpd_add_device() call, so in platform_drv_probe() dev_pm_domain_attach()
+> call will fail, as dev->pm_domain is already set. Previously the error
+> was masked by code removed in the above commit and platform_drv_probe()
+> was could complete successfully.
 
-There have two spaces ahead function name cs_etm__set_pid_tid_cpu(), so
-remove one space and correct indentation.
+Thanks Sylwester!
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1525924920-4381-2-git-send-email-leo.yan at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/util/cs-etm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Ah, I missed these messages because I was looking at err dmesg level
+(and for some reason these are warn). Anyway do you have any thoughts
+how is it connected with missing Odroid XU3 sound card and max98090
+codec?
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 2bf28b5acc08..bf16dc9ee507 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -613,8 +613,8 @@ cs_etm__get_trace(struct cs_etm_buffer *buff, struct cs_etm_queue *etmq)
- 	return buff->len;
- }
- 
--static void  cs_etm__set_pid_tid_cpu(struct cs_etm_auxtrace *etm,
--				     struct auxtrace_queue *queue)
-+static void cs_etm__set_pid_tid_cpu(struct cs_etm_auxtrace *etm,
-+				    struct auxtrace_queue *queue)
- {
- 	struct cs_etm_queue *etmq = queue->priv;
- 
--- 
-2.14.3
+Best regards,
+Krzysztof
