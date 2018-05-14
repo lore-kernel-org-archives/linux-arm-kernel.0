@@ -1,128 +1,72 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 14 May 2018 10:01:48 +0200
-Subject: [PATCH v2] ARM: dts: exynos: Add support for audio over HDMI for
- Odroid X/X2/U3
-References: <CGME20180514080220epcas2p110497f1deca1e9c10db9b9edb890d76b@epcas2p1.samsung.com>
-Message-ID: <20180514080148.10150-1-s.nawrocki@samsung.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 14 May 2018 13:34:56 +0530
+Subject: Allwinner A64: Issue on external rtc clock to wifi chip
+In-Reply-To: <20180514075727.uxggyhmbahvhestx@flea>
+References: <CAMty3ZCNyuEwmLGdDZLM_9qKJ2NsT33rodug7ZpKAE-OHymVEg@mail.gmail.com>
+ <20180514075727.uxggyhmbahvhestx@flea>
+Message-ID: <CAMty3ZDew=+zytKUx5+nX27CjCe0UfJpyYOy2s07NoJvbe57mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch switches Odroid X/X2/U3 to use dedicated Odroid audio subsystem
-DT bindings instead of the simple-card in order to add support for audio
-over HDMI.
+On Mon, May 14, 2018 at 1:27 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> Hi,
+>
+> On Mon, May 14, 2018 at 12:37:49PM +0530, Jagan Teki wrote:
+>> Hi Maxime and All,
+>>
+>> We are trying to bring-up AP6330 Wifi chip for A64 board. We noticed
+>> to have an external rtc clock has driven from wifi chip.
+>>
+>> So the devicetree is configured according to this as below.
+>>
+>> / {
+>>         wifi_pwrseq: wifi-pwrseq {
+>>                 compatible = "mmc-pwrseq-simple";
+>>                 clocks = <&rtc 1>;
+>>                 clock-names = "ext_clock";
+>>                 reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+>>                 post-power-on-delay-ms = <400>;
+>>         };
+>> };
+>>
+>> &rtc {
+>>         clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
+>>         clocks = <&osc32k>;
+>>         #clock-cells = <1>;
+>> };
+>>
+>> &mmc1 {
+>>         pinctrl-names = "default";
+>>         pinctrl-0 = <&mmc1_pins>;
+>>         vmmc-supply = <&reg_dcdc1>;
+>>         vqmmc-supply = <&reg_eldo1>;
+>>         mmc-pwrseq = <&wifi_pwrseq>;
+>>         bus-width = <4>;
+>>         non-removable;
+>>         status = "okay";
+>>
+>>         brcmf: wifi at 1 {
+>>                 reg = <1>;
+>>                 compatible = "brcm,bcm4329-fmac";
+>>                 interrupt-parent = <&r_pio>;
+>>                 interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;  /* WL-WAKE-AP: PL3 */
+>>                 interrupt-names = "host-wake";
+>>         };
+>> };
+>>
+>> And observed rtc-osc32k-out clock is never enabled[1] and the value of
+>> LOSC_OUT_GATING is 0x0 which eventually not enabling
+>> LOSC_OUT_GATING_EN
+>>
+>> Pls. let us know if we miss anything here?
+>>
+>> [1] https://paste.ubuntu.com/p/X2By4q8kD2/
+>
+> Could you paste your config and the logs from a boot to?
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 33 +++++++++++++++----------
- arch/arm/boot/dts/exynos4412-odroidu3.dts       |  6 ++---
- arch/arm/boot/dts/exynos4412-odroidx.dts        |  6 ++---
- 3 files changed, 26 insertions(+), 19 deletions(-)
+.config
+https://paste.ubuntu.com/p/w9w2KB7RFc/
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index d7ad07fd48f9..a09e46c9dbc0 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -37,20 +37,14 @@
- 	};
- 
- 	sound: sound {
--		compatible = "simple-audio-card";
-+		compatible = "hardkernel,odroid-xu4-audio";
- 
--		simple-audio-card,format = "i2s";
--		simple-audio-card,bitclock-master = <&link0_codec>;
--		simple-audio-card,frame-master = <&link0_codec>;
--
--		simple-audio-card,cpu {
-+		cpu {
- 			sound-dai = <&i2s0 0>;
--			system-clock-frequency = <19200000>;
- 		};
- 
--		link0_codec: simple-audio-card,codec {
--			sound-dai = <&max98090>;
--			clocks = <&i2s0 CLK_I2S_CDCLK>;
-+		codec {
-+			sound-dai = <&hdmi>, <&max98090>;
- 		};
- 	};
- 
-@@ -142,14 +136,25 @@
- 	pinctrl-0 = <>;
- };
- 
-+&clock {
-+	assigned-clocks = <&clock CLK_FOUT_EPLL>;
-+	assigned-clock-rates = <45158401>;
-+};
-+
- &clock_audss {
- 	assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
- 			<&clock_audss EXYNOS_MOUT_I2S>,
- 			<&clock_audss EXYNOS_DOUT_SRP>,
--			<&clock_audss EXYNOS_DOUT_AUD_BUS>;
-+			<&clock_audss EXYNOS_DOUT_AUD_BUS>,
-+			<&clock_audss EXYNOS_DOUT_I2S>;
-+
- 	assigned-clock-parents = <&clock CLK_FOUT_EPLL>,
--			<&clock_audss EXYNOS_MOUT_AUDSS>;
--	assigned-clock-rates = <0>, <0>, <192000000>, <19200000>;
-+			  <&clock_audss EXYNOS_MOUT_AUDSS>;
-+
-+	assigned-clock-rates = <0>, <0>,
-+			<196608001>,
-+			<(196608001 / 2)>,
-+			<(196608001 / 8)>;
- };
- 
- &cpu0 {
-@@ -498,6 +503,8 @@
- 	pinctrl-0 = <&i2s0_bus>;
- 	pinctrl-names = "default";
- 	status = "okay";
-+	assigned-clocks = <&i2s0 CLK_I2S_RCLK_SRC>;
-+	assigned-clock-parents = <&clock_audss EXYNOS_SCLK_I2S>;
- };
- 
- &mixer {
-diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-index bdcd4523cc1c..459919b65df8 100644
---- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-@@ -113,11 +113,11 @@
- };
- 
- &sound {
--	simple-audio-card,name = "Odroid-U3";
--	simple-audio-card,widgets =
-+	model = "Odroid-U3";
-+	samsung,audio-widgets =
- 		"Headphone", "Headphone Jack",
- 		"Speakers", "Speakers";
--	simple-audio-card,routing =
-+	samsung,audio-routing =
- 		"Headphone Jack", "HPL",
- 		"Headphone Jack", "HPR",
- 		"Headphone Jack", "MICBIAS",
-diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-index 2dff129bc2ad..348556fcdd9d 100644
---- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-@@ -97,12 +97,12 @@
- };
- 
- &sound {
--	simple-audio-card,name = "Odroid-X";
--	simple-audio-card,widgets =
-+	model = "Odroid-X";
-+	samsung,audio-widgets =
- 		"Headphone", "Headphone Jack",
- 		"Microphone", "Mic Jack",
- 		"Microphone", "DMIC";
--	simple-audio-card,routing =
-+	samsung,audio-routing =
- 		"Headphone Jack", "HPL",
- 		"Headphone Jack", "HPR",
- 		"IN1", "Mic Jack",
--- 
-2.14.2
+dmesg
+https://paste.ubuntu.com/p/mrZGk5bWRR/
