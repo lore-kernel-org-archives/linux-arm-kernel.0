@@ -1,21 +1,20 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 May 2018 23:26:09 +0200
-Subject: [PATCH 07/12] of/platform: provide a separate routine for setting
- up device resources
-In-Reply-To: <20180511162028.20616-8-brgl@bgdev.pl>
+Date: Mon, 14 May 2018 23:26:28 +0200
+Subject: [PATCH 08/12] of/platform: provide a separate routine for device
+ initialization
+In-Reply-To: <20180511162028.20616-9-brgl@bgdev.pl>
 References: <20180511162028.20616-1-brgl@bgdev.pl>
- <20180511162028.20616-8-brgl@bgdev.pl>
-Message-ID: <CAMuHMdU8vU=wHDfrSA4Y_cM9GgrY-ERH=9C1mvoAy9EzhRsjOw@mail.gmail.com>
+ <20180511162028.20616-9-brgl@bgdev.pl>
+Message-ID: <CAMuHMdX=Fsw=wJ1Gc6RkAcpVaJaFtrmacqhDM4AsjrWwJwX3yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, May 11, 2018 at 6:20 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >
-> The early platform driver framework will need to setup the device
-> resources before the regular populating of the device tree happens.
->
-> Provide a separate function for that.
+> The early platform device framework will need to initialize the
+> platform device objects without them being allocated in
+> of_device_alloc(). Provide a routine that allows it.
 >
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
