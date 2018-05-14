@@ -1,55 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 14 May 2018 01:22:24 -0700
-Subject: [GIT PULL 3/3] omap sdhci dts changes for v4.18 merge window
-In-Reply-To: <pull-1525450571-674978@atomide.com-3>
-References: <pull-1525450571-674978@atomide.com>
- <pull-1525450571-674978@atomide.com-3>
-Message-ID: <20180514082224.dx63ao3vz3ay5ng5@localhost>
+Date: Mon, 14 May 2018 01:18:17 -0700
+Subject: [GIT PULL] STM32 DT changes for v4.18 #1
+In-Reply-To: <28c73dd0-fa87-83c1-5a93-217124e0f484@st.com>
+References: <28c73dd0-fa87-83c1-5a93-217124e0f484@st.com>
+Message-ID: <20180514081817.w67ytk437bg3eo4o@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 09:17:33AM -0700, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Fri, May 04, 2018 at 03:46:51PM +0200, Alexandre Torgue wrote:
+> Hi Arnd, Olof and Kevin,
 > 
-> The following changes since commit 3f4028780287ff5a7308f40e10bbba9a42b993aa:
+> Please consider this first round of STM32 DT updates for v4.18. As you will
+> see, main part of patches concerns support for STM32MP157 platform.
+> I didn't squash DT patches (as I like the way there are split) but let me
+> know if for next time you prefer I do it.
 > 
->   mmc: sdhci-omap: Get IODelay values for 3.3v DDR mode (2018-05-03 09:37:13 +0200)
+> Regards
+> Alex
 > 
-> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/dt-sdhci-signed
+> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
-> for you to fetch changes up to 24a6f1f65ea567d017c598faf1374ee443f73851:
+>   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
->   Documentation: ARM: Add new MMC requirements for DRA7/K2G (2018-05-03 10:32:20 -0700)
+> are available in the git repository at:
 > 
-> ----------------------------------------------------------------
-> Device tree changes for omap variants for SDHCI
+>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
+> tags/stm32-dt-for-v4.18-1
 > 
-> This series adds the devicetree configuration needed for pinctrl on
-> dra7 variants to use the SDHCI SDIO driver instead of mmc-omap-hs
-> driver. To use SDHCI, both the pins and the iodelay needs to be
-> configured.
+> for you to fetch changes up to 0a84a00094eea4080288f5c62aff8a90e510a252:
 > 
-> This series is based on the related SDHCI drivers changes on a branch
-> set up by Ulf.
+>   ARM: dts: stm32: update pwm-cells for LPTimer on stm32h743 (2018-05-04
+> 09:45:54 +0200)
 
-Hi Tony,
-
-Just to make sure Ulf isn't taken by surprise (since I didn't see the initial
-agreement of a stable branch), it's a good idea to include him on the pull
-request.
-
-Also, the diffstat doesn't take that branch into consideration so it doesn't
-match with what I've merged with. Having the URL of Ulf's branch helps, in that
-case I'd just merge that branch first and get the dependency documented.
-
-
-Ulf, does the above sound OK with you, and said branch is 100% guaranteed to
-not be rebased?
-
-
-Thanks,
+Merged, thanks!
 
 
 -Olof
