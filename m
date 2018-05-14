@@ -1,161 +1,227 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 14 May 2018 23:16:06 +0200
-Subject: [RFC PATCH 06/10] devfreq: rk3399_dmc / clk: rockchip: Disable DDR
- clk timeout on suspend.
+Date: Mon, 14 May 2018 23:16:09 +0200
+Subject: [RFC PATCH 09/10] arm64: dts: rk3399: Add dfi and dmc nodes.
 In-Reply-To: <20180514211610.26618-1-enric.balletbo@collabora.com>
 References: <20180514211610.26618-1-enric.balletbo@collabora.com>
-Message-ID: <20180514211610.26618-7-enric.balletbo@collabora.com>
+Message-ID: <20180514211610.26618-10-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Derek Basehore <dbasehore@chromium.org>
+From: Lin Huang <hl@rock-chips.com>
 
-This disables the timeout for the DDR clk when the governor is
-suspended or stopped. This makes sure that the suspend frequency is
-set. It also makes sure that the userspace governor will be able to
-change the frequency without failing.
+These are required to support DDR DVFS on rk3399 platform. The patch also
+introduces two new files (rk3399-dram.h and rk3399-dram-default-timing)
+with default DRAM settings.
 
-Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+Signed-off-by: Lin Huang <hl@rock-chips.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
 
- drivers/clk/rockchip/clk-ddr.c    | 21 ++++++++++++++++++---
- drivers/devfreq/rk3399_dmc.c      | 20 +++++++++++++++-----
- drivers/devfreq/rk3399_dmc_priv.h |  1 +
- 3 files changed, 34 insertions(+), 8 deletions(-)
+ .../rockchip/rk3399-dram-default-timing.dtsi  | 38 ++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-dram.h    | 73 +++++++++++++++++++
+ .../boot/dts/rockchip/rk3399-op1-opp.dtsi     | 29 ++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi      | 20 +++++
+ 4 files changed, 160 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-dram.h
 
-diff --git a/drivers/clk/rockchip/clk-ddr.c b/drivers/clk/rockchip/clk-ddr.c
-index 707be1bd8910..de00590af167 100644
---- a/drivers/clk/rockchip/clk-ddr.c
-+++ b/drivers/clk/rockchip/clk-ddr.c
-@@ -32,6 +32,7 @@ struct rockchip_ddrclk {
- 	int		div_shift;
- 	int		div_width;
- 	int		ddr_flag;
-+	bool		timeout_en;
- 	unsigned long	cached_rate;
- 	struct work_struct set_rate_work;
- 	struct mutex	lock;
-@@ -52,8 +53,9 @@ static void rockchip_ddrclk_set_rate_func(struct work_struct *work)
- 
- 	mutex_lock(&ddrclk->lock);
- 	for (i = 0; i < DDRCLK_SET_RATE_MAX_RETRIES; i++) {
--		ret = raw_notifier_call_chain(&ddrclk->sync_chain, 0, &timeout);
--		if (ret == NOTIFY_BAD)
-+		ret = raw_notifier_call_chain(&ddrclk->sync_chain, 0,
-+					      &timeout);
-+		if (ddrclk->timeout_en && ret == NOTIFY_BAD)
- 			goto out;
- 
- 		/*
-@@ -63,7 +65,8 @@ static void rockchip_ddrclk_set_rate_func(struct work_struct *work)
- 		 * at the wrong time.
- 		 */
- 		local_irq_disable();
--		if (ktime_after(ktime_add_ns(ktime_get(), DMC_MIN_VBLANK_NS),
-+		if (ddrclk->timeout_en &&
-+		    ktime_after(ktime_add_ns(ktime_get(), DMC_MIN_VBLANK_NS),
- 				timeout)) {
- 			local_irq_enable();
- 			continue;
-@@ -79,6 +82,17 @@ static void rockchip_ddrclk_set_rate_func(struct work_struct *work)
- 	mutex_unlock(&ddrclk->lock);
- }
- 
-+void rockchip_ddrclk_set_timeout_en(struct clk *clk, bool enable)
-+{
-+	struct clk_hw *hw = __clk_get_hw(clk);
-+	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi
+new file mode 100644
+index 000000000000..4dfe3e1d8bdf
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3399-dram-default-timing.dtsi
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR X11)
++/*
++ * Copyright (c) 2016-2018, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * Author: Lin Huang <hl@rock-chips.com>
++ */
 +
-+	mutex_lock(&ddrclk->lock);
-+	ddrclk->timeout_en = enable;
-+	mutex_unlock(&ddrclk->lock);
-+}
-+EXPORT_SYMBOL(rockchip_ddrclk_set_timeout_en);
++#include "rk3399-dram.h"
 +
- int rockchip_ddrclk_register_sync_nb(struct clk *clk, struct notifier_block *nb)
- {
- 	struct clk_hw *hw = __clk_get_hw(clk);
-@@ -232,6 +246,7 @@ struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
- 	ddrclk->div_shift = div_shift;
- 	ddrclk->div_width = div_width;
- 	ddrclk->ddr_flag = ddr_flag;
-+	ddrclk->timeout_en = true;
- 	mutex_init(&ddrclk->lock);
- 	INIT_WORK(&ddrclk->set_rate_work, rockchip_ddrclk_set_rate_func);
- 	RAW_INIT_NOTIFIER_HEAD(&ddrclk->sync_chain);
-diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
-index c174d13afe92..2fa4ab653c35 100644
---- a/drivers/devfreq/rk3399_dmc.c
-+++ b/drivers/devfreq/rk3399_dmc.c
-@@ -308,14 +308,18 @@ int rockchip_dmcfreq_register_clk_sync_nb(struct devfreq *devfreq,
- 	 * one notifier is not generally possible. Thus, if more than one sync
- 	 * notifier is registered, disable dmcfreq.
- 	 */
--	if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0)
-+	if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0) {
-+		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, false);
- 		devfreq_suspend_device(devfreq);
-+	}
++rockchip,ddr3_speed_bin = <21>;
++rockchip,pd_idle = <0x40>;
++rockchip,sr_idle = <0x2>;
++rockchip,sr_mc_gate_idle = <0x3>;
++rockchip,srpd_lite_idle	= <0x4>;
++rockchip,standby_idle = <0x2000>;
++rockchip,dram_dll_dis_freq = <300000000>;
++rockchip,phy_dll_dis_freq = <125000000>;
++rockchip,auto_pd_dis_freq = <666000000>;
++rockchip,ddr3_odt_dis_freq = <333000000>;
++rockchip,ddr3_drv = <DDR3_DS_40ohm>;
++rockchip,ddr3_odt = <DDR3_ODT_120ohm>;
++rockchip,phy_ddr3_ca_drv = <PHY_DRV_ODT_40>;
++rockchip,phy_ddr3_dq_drv = <PHY_DRV_ODT_40>;
++rockchip,phy_ddr3_odt = <PHY_DRV_ODT_240>;
++rockchip,lpddr3_odt_dis_freq = <333000000>;
++rockchip,lpddr3_drv = <LP3_DS_34ohm>;
++rockchip,lpddr3_odt = <LP3_ODT_240ohm>;
++rockchip,phy_lpddr3_ca_drv = <PHY_DRV_ODT_40>;
++rockchip,phy_lpddr3_dq_drv = <PHY_DRV_ODT_40>;
++rockchip,phy_lpddr3_odt = <PHY_DRV_ODT_240>;
++rockchip,lpddr4_odt_dis_freq = <333000000>;
++rockchip,lpddr4_drv = <LP4_PDDS_60ohm>;
++rockchip,lpddr4_dq_odt = <LP4_DQ_ODT_40ohm>;
++rockchip,lpddr4_ca_odt = <LP4_CA_ODT_40ohm>;
++rockchip,phy_lpddr4_ca_drv = <PHY_DRV_ODT_40>;
++rockchip,phy_lpddr4_ck_cs_drv = <PHY_DRV_ODT_80>;
++rockchip,phy_lpddr4_dq_drv = <PHY_DRV_ODT_80>;
++rockchip,phy_lpddr4_odt = <PHY_DRV_ODT_60>;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-dram.h b/arch/arm64/boot/dts/rockchip/rk3399-dram.h
+new file mode 100644
+index 000000000000..4b3d4a79923b
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3399-dram.h
+@@ -0,0 +1,73 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR X11) */
++/*
++ * Copyright (c) 2016-2018, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * Author: Lin Huang <hl@rock-chips.com>
++ */
++
++#ifndef _DTS_DRAM_ROCKCHIP_RK3399_H
++#define _DTS_DRAM_ROCKCHIP_RK3399_H
++
++#define DDR3_DS_34ohm		34
++#define DDR3_DS_40ohm		40
++
++#define DDR3_ODT_DIS		0
++#define DDR3_ODT_40ohm		40
++#define DDR3_ODT_60ohm		60
++#define DDR3_ODT_120ohm		120
++
++#define LP2_DS_34ohm		34
++#define LP2_DS_40ohm		40
++#define LP2_DS_48ohm		48
++#define LP2_DS_60ohm		60
++#define LP2_DS_68_6ohm		68	/* optional */
++#define LP2_DS_80ohm		80
++#define LP2_DS_120ohm		120	/* optional */
++
++#define LP3_DS_34ohm		34
++#define LP3_DS_40ohm		40
++#define LP3_DS_48ohm		48
++#define LP3_DS_60ohm		60
++#define LP3_DS_80ohm		80
++#define LP3_DS_34D_40U		3440
++#define LP3_DS_40D_48U		4048
++#define LP3_DS_34D_48U		3448
++
++#define LP3_ODT_DIS		0
++#define LP3_ODT_60ohm		60
++#define LP3_ODT_120ohm		120
++#define LP3_ODT_240ohm		240
++
++#define LP4_PDDS_40ohm		40
++#define LP4_PDDS_48ohm		48
++#define LP4_PDDS_60ohm		60
++#define LP4_PDDS_80ohm		80
++#define LP4_PDDS_120ohm		120
++#define LP4_PDDS_240ohm		240
++
++#define LP4_DQ_ODT_40ohm	40
++#define LP4_DQ_ODT_48ohm	48
++#define LP4_DQ_ODT_60ohm	60
++#define LP4_DQ_ODT_80ohm	80
++#define LP4_DQ_ODT_120ohm	120
++#define LP4_DQ_ODT_240ohm	240
++#define LP4_DQ_ODT_DIS		0
++
++#define LP4_CA_ODT_40ohm	40
++#define LP4_CA_ODT_48ohm	48
++#define LP4_CA_ODT_60ohm	60
++#define LP4_CA_ODT_80ohm	80
++#define LP4_CA_ODT_120ohm	120
++#define LP4_CA_ODT_240ohm	240
++#define LP4_CA_ODT_DIS		0
++
++#define PHY_DRV_ODT_Hi_Z	0
++#define PHY_DRV_ODT_240		240
++#define PHY_DRV_ODT_120		120
++#define PHY_DRV_ODT_80		80
++#define PHY_DRV_ODT_60		60
++#define PHY_DRV_ODT_48		48
++#define PHY_DRV_ODT_40		40
++#define PHY_DRV_ODT_34_3	34
++
++#endif /* _DTS_DRAM_ROCKCHIP_RK3399_H */
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
+index d8a120f945c8..4c634e58425d 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi
+@@ -147,6 +147,31 @@
+ 			opp-microvolt = <1075000>;
+ 		};
+ 	};
++
++	dmc_opp_table: dmc_opp_table {
++		compatible = "operating-points-v2";
++
++		opp00 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <900000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <900000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <666000000>;
++			opp-microvolt = <900000>;
++		};
++		opp03 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <900000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <928000000>;
++			opp-microvolt = <900000>;
++		};
++	};
+ };
  
- 	ret = rockchip_ddrclk_register_sync_nb(dmcfreq->dmc_clk, nb);
- 	if (ret == 0)
- 		dmcfreq->num_sync_nb++;
--	else if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0)
-+	else if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0) {
-+		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, true);
- 		devfreq_resume_device(devfreq);
-+	}
+ &cpu_l0 {
+@@ -176,3 +201,7 @@
+ &gpu {
+ 	operating-points-v2 = <&gpu_opp_table>;
+ };
++
++&dmc {
++	operating-points-v2 = <&dmc_opp_table>;
++};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 4550c0f82be9..e012cc8ae3d4 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1830,6 +1830,26 @@
+ 		status = "disabled";
+ 	};
  
- 	mutex_unlock(&dmcfreq->en_lock);
- 	return ret;
-@@ -332,8 +336,10 @@ int rockchip_dmcfreq_unregister_clk_sync_nb(struct devfreq *devfreq,
- 	ret = rockchip_ddrclk_unregister_sync_nb(dmcfreq->dmc_clk, nb);
- 	if (ret == 0) {
- 		dmcfreq->num_sync_nb--;
--		if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0)
-+		if (dmcfreq->num_sync_nb == 1 && dmcfreq->disable_count <= 0) {
-+			rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, true);
- 			devfreq_resume_device(devfreq);
-+		}
- 	}
- 
- 	mutex_unlock(&dmcfreq->en_lock);
-@@ -348,8 +354,10 @@ int rockchip_dmcfreq_block(struct devfreq *devfreq)
- 	int ret = 0;
- 
- 	mutex_lock(&dmcfreq->en_lock);
--	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count <= 0)
-+	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count <= 0) {
-+		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, false);
- 		ret = devfreq_suspend_device(devfreq);
-+	}
- 
- 	if (!ret)
- 		dmcfreq->disable_count++;
-@@ -365,8 +373,10 @@ int rockchip_dmcfreq_unblock(struct devfreq *devfreq)
- 	int ret = 0;
- 
- 	mutex_lock(&dmcfreq->en_lock);
--	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count == 1)
-+	if (dmcfreq->num_sync_nb <= 1 && dmcfreq->disable_count == 1) {
-+		rockchip_ddrclk_set_timeout_en(dmcfreq->dmc_clk, true);
- 		ret = devfreq_resume_device(devfreq);
-+	}
- 
- 	if (!ret)
- 		dmcfreq->disable_count--;
-diff --git a/drivers/devfreq/rk3399_dmc_priv.h b/drivers/devfreq/rk3399_dmc_priv.h
-index 8ac0340a4990..1ad46f4b15cc 100644
---- a/drivers/devfreq/rk3399_dmc_priv.h
-+++ b/drivers/devfreq/rk3399_dmc_priv.h
-@@ -7,6 +7,7 @@
- #ifndef __RK3399_DMC_PRIV_H
- #define __RK3399_DMC_PRIV_H
- 
-+void rockchip_ddrclk_set_timeout_en(struct clk *clk, bool enable);
- void rockchip_ddrclk_wait_set_rate(struct clk *clk);
- int rockchip_ddrclk_register_sync_nb(struct clk *clk,
- 				     struct notifier_block *nb);
++	dfi: dfi at ff630000 {
++		reg = <0x00 0xff630000 0x00 0x4000>;
++		compatible = "rockchip,rk3399-dfi";
++		rockchip,pmu = <&pmugrf>;
++		interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH 0>;
++		clocks = <&cru PCLK_DDR_MON>;
++		clock-names = "pclk_ddr_mon";
++		status = "disabled";
++	};
++
++	dmc: dmc {
++		compatible = "rockchip,rk3399-dmc";
++		rockchip,pmu = <&pmugrf>;
++		devfreq-events = <&dfi>;
++		clocks = <&cru SCLK_DDRC>;
++		clock-names = "dmc_clk";
++		#include "rk3399-dram-default-timing.dtsi"
++		status = "disabled";
++	};
++
+ 	pinctrl: pinctrl {
+ 		compatible = "rockchip,rk3399-pinctrl";
+ 		rockchip,grf = <&grf>;
 -- 
 2.17.0
