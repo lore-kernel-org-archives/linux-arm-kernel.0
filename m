@@ -1,64 +1,61 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 14 May 2018 12:37:49 +0530
-Subject: Allwinner A64: Issue on external rtc clock to wifi chip
-Message-ID: <CAMty3ZCNyuEwmLGdDZLM_9qKJ2NsT33rodug7ZpKAE-OHymVEg@mail.gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 14 May 2018 09:11:48 +0200
+Subject: [PATCH] ARM: dts: socfpga: Fix NAND controller node compatible
+In-Reply-To: <20180510125223.16056-1-marex@denx.de>
+References: <20180510125223.16056-1-marex@denx.de>
+Message-ID: <73h8nak8y3.fsf@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime and All,
 
-We are trying to bring-up AP6330 Wifi chip for A64 board. We noticed
-to have an external rtc clock has driven from wifi chip.
+Marek Vasut <marex@denx.de> writes:
 
-So the devicetree is configured according to this as below.
+> The compatible string for the Denali NAND controller is 
+> incorrect,
+> fix it by replacing it with one matching the DT bindings and the
+> driver.
+>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Fixes: d837a80d19 ("ARM: dts: socfpga: add nand controller 
+> nodes")
+> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Cc: Dinh Nguyen <dinguyen@kernel.org>
+> ---
+>  arch/arm/boot/dts/socfpga.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi 
+> b/arch/arm/boot/dts/socfpga.dtsi
+> index 7e24dc8e82d4..d697f5062624 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -744,7 +744,7 @@
+>  		nand0: nand at ff900000 {
+>  			#address-cells = <0x1>;
+>  			#size-cells = <0x1>;
+> -			compatible = "denali,denali-nand-dt";
+> +			compatible = "altr,socfpga-denali-nand";
+>  			reg = <0xff900000 0x100000>,
+>  			      <0xffb80000 0x10000>;
+>  			reg-names = "nand_data", "denali_reg";
 
-/ {
-        wifi_pwrseq: wifi-pwrseq {
-                compatible = "mmc-pwrseq-simple";
-                clocks = <&rtc 1>;
-                clock-names = "ext_clock";
-                reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-                post-power-on-delay-ms = <400>;
-        };
-};
+Ack. As the binding was changed after d837a80d19 this is obviously
+correct.
 
-&rtc {
-        clock-output-names = "rtc-osc32k", "rtc-osc32k-out";
-        clocks = <&osc32k>;
-        #clock-cells = <1>;
-};
+@Dinh: Maybe you also want to cleanup the socfpga_arria10.dtsi? It 
+has
+both compatibles, but the "denali,denali-nand-dt" seems to be 
+obsolete.
 
-&mmc1 {
-        pinctrl-names = "default";
-        pinctrl-0 = <&mmc1_pins>;
-        vmmc-supply = <&reg_dcdc1>;
-        vqmmc-supply = <&reg_eldo1>;
-        mmc-pwrseq = <&wifi_pwrseq>;
-        bus-width = <4>;
-        non-removable;
-        status = "okay";
-
-        brcmf: wifi at 1 {
-                reg = <1>;
-                compatible = "brcm,bcm4329-fmac";
-                interrupt-parent = <&r_pio>;
-                interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>;  /* WL-WAKE-AP: PL3 */
-                interrupt-names = "host-wake";
-        };
-};
-
-And observed rtc-osc32k-out clock is never enabled[1] and the value of
-LOSC_OUT_GATING is 0x0 which eventually not enabling
-LOSC_OUT_GATING_EN
-
-Pls. let us know if we miss anything here?
-
-[1] https://paste.ubuntu.com/p/X2By4q8kD2/
-
-Jagan.
+Thanks,
+Steffen
 
 -- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Pengutronix e.K.                           | Steffen Trumtrar 
+|
+Industrial Linux Solutions                 | 
+http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: 
++49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax: 
++49-5121-206917-5555 |
