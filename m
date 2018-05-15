@@ -1,39 +1,38 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 15 May 2018 12:26:59 +0200
-Subject: [PATCH 0/4] KVM: arm/arm64: Fix locking issues
-In-Reply-To: <20180511142015.21953-1-andre.przywara@arm.com>
-References: <20180511142015.21953-1-andre.przywara@arm.com>
-Message-ID: <20180515102659.GA38551@C02W217FHV2R.local>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 15 May 2018 12:27:15 +0200
+Subject: [RFC PATCH 00/10] Add persistent clock support
+In-Reply-To: <cover.1526285602.git.baolin.wang@linaro.org>
+References: <cover.1526285602.git.baolin.wang@linaro.org>
+Message-ID: <20180515102715.GO29062@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 03:20:11PM +0100, Andre Przywara wrote:
-> Jan recently reported lockdep complaints regarding various locks in our
-> VGIC emulation [1][2].
-> This boiled down to two separate issues:
-> - When promoting the vgic_irq->irq_lock to require IRQs being disabled,
->   we forgot to amend some instances of this lock on the way. Also this
->   needs to be applied to dependent locks as well. The first two patches
->   fix that. The patch split is designed to simplify backporting.
->   Those patches have been posted before, I am resending them as part
->   of this series.
-> - Calling kvm_read_guest() requires us to be inside an SRCU critical
->   section. On some architectures we are always in it when handling VCPU
->   exits, but on ARM we need to lock it individually. Patches 3 and 4
->   fix that, the split is again made to ease backporting.
->   Each of the hunks fix an indiviual commit, but I refrained from
->   splitting this down into eight patches just to put proper Fixes: tags
->   on it. Eventually those commits are part of one out of two series, I put
->   the respective kernel release version as a tag to the Cc: stable line.
+On Mon, May 14, 2018 at 04:55:26PM +0800, Baolin Wang wrote:
+> Hi,
 > 
-> I couldn't reproduce the full lockdep splat on my setup, but at least
-> could show one instance and prove that these patches fixes that.
+> We will meet below issues when compensating the suspend time for the timekeeping.
 > 
+> 1. We have too many different ways of dealing with persistent timekeeping
+> across architectures, so it is hard for one driver to compatable with different
+> architectures.
 > 
-For the series:
+> 2. On some platforms (such as Spreadtrum platform), we registered the high
+> resolution timer as one clocksource to update the OS time, but the high
+> resolution timer will be stopped in suspend state. So we use another one
+> always-on timer (but low resolution) to calculate the suspend time to
+> compensate the OS time. Though we can register the always-on timer as one
+> clocksource, we need re-calculate the mult/shift with one larger conversion
+> range to calculate the suspend time and need update the clock in case of
+> running over the always-on timer.
 
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+First, can you elaborate what you mean by 'suspend state' ? On which power
+domain the clocksource belongs to?
 
 
-Thanks for fixing this,
--Christoffer
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
