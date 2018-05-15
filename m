@@ -1,19 +1,9 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 15 May 2018 15:29:46 -0700
-Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.18
-Message-ID: <7hh8n8tuw5.fsf@baylibre.com>
+Date: Tue, 15 May 2018 15:33:01 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.18
+Message-ID: <7hd0xwtuqq.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Arnd, Olof,
-
-This is mostly DT, but contains also contains the mach-meson change to
-build the new DT, which might be more appropriate for the 'soc' branch,
-but I left it here because it's just about enabling the new DT.  Let me
-know if you prefer it split out.
-
-Kevin
-
 
 The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
@@ -21,39 +11,55 @@ The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
 
-for you to fetch changes up to 35ee52bea66c74a7c33cebda8692d61b1ed7c6e9:
+for you to fetch changes up to c51fb2d458a6d62215c1ff6bbca8e5c876370e71:
 
-  ARM: dts: meson8m2: add support for the Tronsmart MXIII Plus (2018-05-10 17:03:28 -0700)
-
-----------------------------------------------------------------
-Amlogic 32-bit DT updates for v4.18
-- add support for meson8m2 SoC
-- new board: Tronsmart MXIII Plus using meson8m2 SoC
-- odroid-c1: add IR
+  dt-bindings: arm: amlogic: add support for the Tronsmart MXIII Plus (2018-05-09 15:25:20 -0700)
 
 ----------------------------------------------------------------
-Martin Blumenstingl (7):
-      ARM: dts: meson8: add the cortex-a9-pmu compatible PMU
-      ARM: dts: meson8b: add the cortex-a5-pmu compatible PMU
-      ARM: dts: meson8b: odroid-c1: sort nodes alphabetically
-      ARM: dts: meson8b: odroid-c1: enable the IR receiver
-      ARM: meson: add support for the Meson8m2 SoCs
-      ARM: dts: meson: add support for the Meson8m2 SoC
-      ARM: dts: meson8: add the uart_A pins
+Amlogic 64-bit DT updates for v4.18
+- AXG family: support more peripherals (wifi, eMMC, clocks)
+- GX family: add/enable USB host support
 
-Oleg Ivanov (1):
-      ARM: dts: meson8m2: add support for the Tronsmart MXIII Plus
+----------------------------------------------------------------
+Jerome Brunet (6):
+      dt-bindings: clock: meson: update documentation with hhi syscon
+      ARM64: dts: meson-gx: sysctrl is the parent of the clock controller
+      ARM64: dts: meson-axg: use hhi syscon for the clock controller
+      ARM64: dts: meson-gx: fix gxl clock controller compatible
+      ARM64: dts: meson-axg: add tdm pins
+      ARM64: dts: meson: add MMC resets
 
- arch/arm/boot/dts/Makefile                |   3 +-
- arch/arm/boot/dts/meson8.dtsi             |  33 +++++++++++--
- arch/arm/boot/dts/meson8b-odroidc1.dts    |  68 ++++++++++++++------------
- arch/arm/boot/dts/meson8b.dtsi            |  24 +++++++--
- arch/arm/boot/dts/meson8m2-mxiii-plus.dts | 244 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/meson8m2.dtsi           |  54 ++++++++++++++++++++
- arch/arm/mach-meson/Kconfig               |   2 +-
- arch/arm/mach-meson/meson.c               |   1 +
- 8 files changed, 388 insertions(+), 41 deletions(-)
- create mode 100644 arch/arm/boot/dts/meson8m2-mxiii-plus.dts
- create mode 100644 arch/arm/boot/dts/meson8m2.dtsi
+Martin Blumenstingl (9):
+      ARM64: dts: meson-gxl: add USB host support
+      ARM64: dts: meson-gxm: add GXM specific USB host configuration
+      ARM64: dts: meson-gxl-s905x-p212: enable the USB controller
+      ARM64: dts: meson-gx-p23x-q20x: enable the USB controller
+      ARM64: dts: meson-gxl-s905x-libretech-cc: enable the USB controller
+      ARM64: dts: meson-gxl-nexbox-a95x: enable the USB controller
+      ARM64: dts: meson-gxm-khadas-vim2: enable the USB controller
+      dt-bindings: arm: amlogic: add support for the Meson8m2 SoC
+      dt-bindings: arm: amlogic: add support for the Tronsmart MXIII Plus
+
+Nan Li (1):
+      ARM64: dts: meson-axg: enable the eMMC controller
+
+Yixun Lan (3):
+      ARM64: dts: meson-axg: add GPIO interrupt controller support
+      ARM64: dts: meson-axg: add an 32K alt aoclk
+      ARM64: dts: meson-axg: enable AP6255 wifi module
+
+ Documentation/devicetree/bindings/arm/amlogic.txt             |   6 ++
+ Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt |  16 +++-
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts                | 100 ++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi                    | 358 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi           |   4 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                   |   8 +-
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts  |  12 +++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts   |   4 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi         |   4 +
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                    |  73 ++++++++++++++-
+ arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts         |   4 +
+ arch/arm64/boot/dts/amlogic/meson-gxm.dtsi                    |  17 ++++
+ 12 files changed, 589 insertions(+), 17 deletions(-)
