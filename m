@@ -1,46 +1,53 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 May 2018 13:43:37 -0700
-Subject: [GIT PULL] ARM: mediatek: soc driver updates for v4.18
-In-Reply-To: <bd033549-4998-e376-eb92-16111ec71a07@gmail.com>
-References: <bd033549-4998-e376-eb92-16111ec71a07@gmail.com>
-Message-ID: <20180515204337.5ymnsofo35a64yxz@localhost>
+Date: Tue, 15 May 2018 13:47:42 -0700
+Subject: [GIT PULL] ARM: dts: vexpress: updates for v4.18
+In-Reply-To: <20180514162144.GA8409@e107155-lin>
+References: <20180514162144.GA8409@e107155-lin>
+Message-ID: <20180515204742.3pptod2a5w6fpawx@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 01:32:49PM +0200, Matthias Brugger wrote:
-> Hi Arnd and Olof,
+On Mon, May 14, 2018 at 05:21:44PM +0100, Sudeep Holla wrote:
+> Hi ARM-SoC team,
 > 
-> Below the commits for mediatek soc drivers.
-> Please beware that we need the regmap-ktime-fix [1] from Mark Browns static tag.
-> I merged that into my branch, but I wanted to let you know, so that you don't
-> hit any breakage when pulling in my branch.
-
-Great, and thanks for mentioning it.
-
+> Please pull !
+> 
+> Note that the commit restructuring motherboard dtsi touches the file
+> in ARM64 DT but that's because of the way the file gets included and
+> it's not something newly introduced here.
 > 
 > Regards,
-> Matthias
+> Sudeep
 > 
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git
-> tags/regmap-ktime-fix
-> 
-> ---
+> --
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-> tags/v4.17-next-soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-updates-4.18
 > 
-> for you to fetch changes up to 0afd32c6bb59e41b6692dec4473efaffffcad67b:
+> for you to fetch changes up to b67b00eeddac0fea494d6339618ffd3da071c2e4:
 > 
->   Merge commit 'f15cd6d99198e9c15229aefec639a34a6e8174c6' into
-> v.4.17-next/soc-test (2018-05-14 12:22:03 +0200)
+>   ARM: dts: vexpress: replace '_' with '-' in node names (2018-05-11 14:12:32 +0100)
+> 
+> ----------------------------------------------------------------
+> ARMv7 Vexpress updates/cleanups for v4.18
+> 
+> 1. Syntactic restructuring of motherboard include file so that it can be
+>    included at the top of any other DTS file as it should be rather than
+>    existing include in the middle of the file at a specific location
+> 
+> 2. Use of standard GPIO controller bindings for few sysreg components
+>    like LED, MMC Write Protect/Card Detect and Flash Write Protect
+>    to fix some of the new DTC warnings
+> 
+> 3. Cleanup to replace all underscores('_') with hyphens('-') in the
+>    device node names
 
-Merged into next/drivers. Thanks!
+Merged, thanks!
 
 
 -Olof
