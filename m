@@ -1,99 +1,97 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Tue, 15 May 2018 10:54:33 +0300
-Subject: [PATCH v3 4/8] PCI: Replace dev_node parameter of
- of_pci_get_host_bridge_resources with device
-In-Reply-To: <5f2226585c6af9920b266d0503e32042d4c9e440.1526363896.git.jan.kiszka@siemens.com>
-References: <cover.1526363896.git.jan.kiszka@siemens.com>
- <5f2226585c6af9920b266d0503e32042d4c9e440.1526363896.git.jan.kiszka@siemens.com>
-Message-ID: <f74386a1-48b5-ebe0-1b6c-dbef1847cda8@mentor.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 15 May 2018 15:55:33 +0800
+Subject: [PATCH] ARM: dts: imx: Switch NXP boards to SPDX identifier
+In-Reply-To: <1526320727-29157-1-git-send-email-festevam@gmail.com>
+References: <1526320727-29157-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180515075532.GQ26863@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan,
-
-On 05/15/2018 08:58 AM, Jan Kiszka wrote:
-> From: Jan Kiszka <jan.kiszka@siemens.com>
+On Mon, May 14, 2018 at 02:58:47PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Another step towards a managed version of
-> of_pci_get_host_bridge_resources(): Feed in the underlying device,
-> rather than just the OF node. This will allow to use managed resource
-> allocation internally later on.
+> Adopt the SPDX license identifier headers to ease license compliance
+> management.
 > 
-> CC: Jingoo Han <jingoohan1@gmail.com>
-> CC: Joao Pinto <Joao.Pinto@synopsys.com>
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-
-[snip]
-
-> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-> index 8d4778ef5806..ac97491ba377 100644
-> --- a/drivers/pci/of.c
-> +++ b/drivers/pci/of.c
-> @@ -245,7 +245,7 @@ EXPORT_SYMBOL_GPL(of_pci_check_probe_only);
->  #if defined(CONFIG_OF_ADDRESS)
->  /**
->   * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
-> - * @dev_node: device node of the host bridge having the range property
-> + * @dev: host bridge device
->   * @busno: bus number associated with the bridge root bus
->   * @bus_max: maximum number of buses for this bridge
->   * @resources: list where the range of resources will be added after DT parsing
-> @@ -262,10 +262,11 @@ EXPORT_SYMBOL_GPL(of_pci_check_probe_only);
->   * It returns zero if the range parsing has been successful or a standard error
->   * value if it failed.
->   */
-> -int of_pci_get_host_bridge_resources(struct device_node *dev_node,
-> +int of_pci_get_host_bridge_resources(struct device *dev,
->  			unsigned char busno, unsigned char bus_max,
->  			struct list_head *resources, resource_size_t *io_base)
->  {
-> +	struct device_node *dev_node = dev->of_node;
->  	struct resource_entry *window;
->  	struct resource *res;
->  	struct resource *bus_range;
-> @@ -599,12 +600,12 @@ int pci_parse_request_of_pci_ranges(struct device *dev,
->  				    struct resource **bus_range)
->  {
->  	int err, res_valid = 0;
-> -	struct device_node *np = dev->of_node;
->  	resource_size_t iobase;
->  	struct resource_entry *win, *tmp;
->  
->  	INIT_LIST_HEAD(resources);
-> -	err = of_pci_get_host_bridge_resources(np, 0, 0xff, resources, &iobase);
-> +	err = of_pci_get_host_bridge_resources(dev, 0, 0xff, resources,
-> +						    &iobase);
-
-just a note, it's a funny selected indentation style across this change
-to avoid indentation issues in v3 6/8. It seems to be innocent though.
-
->  	if (err)
->  		return err;
->  
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index 74eec1943ad2..e6684c68cb94 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -71,11 +71,11 @@ of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin)
->  #endif
->  
->  #if defined(CONFIG_OF_ADDRESS)
-> -int of_pci_get_host_bridge_resources(struct device_node *dev_node,
-> +int of_pci_get_host_bridge_resources(struct device *dev,
->  			unsigned char busno, unsigned char bus_max,
->  			struct list_head *resources, resource_size_t *io_base);
->  #else
-> -static inline int of_pci_get_host_bridge_resources(struct device_node *dev_node,
-> +static inline int of_pci_get_host_bridge_resources(struct device *dev,
->  			unsigned char busno, unsigned char bus_max,
->  			struct list_head *resources, resource_size_t *io_base)
->  {
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx23-evk.dts          | 13 +++-------
+>  arch/arm/boot/dts/imx25-pdk.dts          | 13 +++-------
+>  arch/arm/boot/dts/imx27-pdk.dts          | 13 +++-------
+>  arch/arm/boot/dts/imx28-evk.dts          | 13 +++-------
+>  arch/arm/boot/dts/imx35-pdk.dts          | 15 +++--------
+>  arch/arm/boot/dts/imx50-evk.dts          | 17 ++++--------
+>  arch/arm/boot/dts/imx51-babbage.dts      | 15 +++--------
+>  arch/arm/boot/dts/imx53-qsb-common.dtsi  | 15 +++--------
+>  arch/arm/boot/dts/imx53-qsb.dts          | 15 +++--------
+>  arch/arm/boot/dts/imx53-qsrb.dts         | 15 +++--------
+>  arch/arm/boot/dts/imx53-smd.dts          | 17 ++++--------
+>  arch/arm/boot/dts/imx6dl-sabreauto.dts   | 10 +++-----
+>  arch/arm/boot/dts/imx6dl-sabresd.dts     | 10 +++-----
+>  arch/arm/boot/dts/imx6q-sabreauto.dts    | 16 ++++--------
+>  arch/arm/boot/dts/imx6q-sabresd.dts      | 15 +++--------
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 15 +++--------
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi   | 15 +++--------
+>  arch/arm/boot/dts/imx6qp-sabreauto.dts   | 44 +++-----------------------------
+>  arch/arm/boot/dts/imx6qp-sabresd.dts     | 44 +++-----------------------------
+>  arch/arm/boot/dts/imx6sl-evk.dts         | 10 +++-----
+>  arch/arm/boot/dts/imx6sx-sabreauto.dts   | 10 +++-----
+>  arch/arm/boot/dts/imx6ul-14x14-evk.dts   | 10 +++-----
+>  arch/arm/boot/dts/imx7d-sdb-sht11.dts    | 44 +++-----------------------------
+>  arch/arm/boot/dts/imx7d-sdb.dts          | 44 +++-----------------------------
+>  24 files changed, 86 insertions(+), 362 deletions(-)
 > 
+> diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+> index 9d92ece82..d3cdd3b 100644
+> --- a/arch/arm/boot/dts/imx23-evk.dts
+> +++ b/arch/arm/boot/dts/imx23-evk.dts
+> @@ -1,13 +1,6 @@
+> -/*
+> - * Copyright 2012 Freescale Semiconductor, Inc.
+> - *
+> - * The code contained herein is licensed under the GNU General Public
+> - * License. You may obtain a copy of the GNU General Public License
+> - * Version 2 or later at the following locations:
+> - *
+> - * http://www.opensource.org/licenses/gpl-license.html
+> - * http://www.gnu.org/copyleft/gpl.html
+> - */
+> +// SPDX-License-Identifier: GPL-2.0+
+> +//
+> +// Copyright 2012 Freescale Semiconductor, I/*
 
-Tested-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+I/*?  Should be Inc.
 
---
-With best wishes,
-Vladimir
+<snip>
+
+> diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-sabreauto.dts
+> index 334b924..66f2728 100644
+> --- a/arch/arm/boot/dts/imx6q-sabreauto.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabreauto.dts
+> @@ -1,14 +1,8 @@
+> -/*
+> - * Copyright 2012 Freescale Semiconductor, Inc.
+> - * Copyright 2011 Linaro Ltd.
+> - *
+> - * The code contained herein is licensed under the GNU General Public
+> - * License. You may obtain a copy of the GNU General Public License
+> - * Version 2 or later at the following locations:
+> - *
+> - * http://www.opensource.org/licenses/gpl-license.html
+> - * http://www.gnu.org/copyleft/gpl.html
+> - */
+> +// SPDX-License-Identifier: GPL-2.0+
+> +//
+> +// Copyright 2012 Freescale Semiconductor, Inc.
+> +// Copyright 2011 Linaro Ltd.
+> +
+
+Unnecessary newline.
+
+>  
+>  /dts-v1/;
+>  
+
+I fixed them up and applied the patch.
+
+Shawn
