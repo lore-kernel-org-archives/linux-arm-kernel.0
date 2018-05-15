@@ -1,53 +1,133 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 15 May 2018 11:31:30 +0200
-Subject: [PATCH V5 1/4] dt-bindings: pwrap: mediatek: add pwrap support
- for MT6797
-In-Reply-To: <1525957319-20557-2-git-send-email-argus.lin@mediatek.com>
-References: <1525957319-20557-1-git-send-email-argus.lin@mediatek.com>
- <1525957319-20557-2-git-send-email-argus.lin@mediatek.com>
-Message-ID: <2cb5230e-f8be-e0b3-3521-3145ab02a0c1@gmail.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Tue, 15 May 2018 17:23:37 +0800
+Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for PX30
+Message-ID: <1526376217-3833-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds the necessary data for handling io voltage domains on PX30.
+As interesting tidbit, the PX30 contains two separate iodomain areas.
+One in the regular General Register Files (GRF) and one in PMUGRF in the
+pmu power domain.
 
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ .../bindings/power/rockchip-io-domain.txt          |  2 +
+ drivers/power/avs/rockchip-io-domain.c             | 68 ++++++++++++++++++++++
+ 2 files changed, 70 insertions(+)
 
-On 05/10/2018 03:01 PM, argus.lin at mediatek.com wrote:
-> From: Argus Lin <argus.lin@mediatek.com>
-> 
-> We add pwrap support for MT6797 SoCs.
-> 
-
-You forgot the Signed-off-by tag.
-
-> ---
->  Documentation/devicetree/bindings/soc/mediatek/pwrap.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
-> index bf80e3f..f9987c3 100644
-> --- a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
-> @@ -19,6 +19,7 @@ IP Pairing
->  Required properties in pwrap device node.
->  - compatible:
->  	"mediatek,mt2701-pwrap" for MT2701/7623 SoCs
-> +	"mediatek,mt6797-pwrap" for MT6797 SoCs
->  	"mediatek,mt7622-pwrap" for MT7622 SoCs
->  	"mediatek,mt8135-pwrap" for MT8135 SoCs
->  	"mediatek,mt8173-pwrap" for MT8173 SoCs
-> -- 
-> 1.8.1.1.dirty
-> 
-> ************* Email Confidentiality Notice ********************
-> The information contained in this e-mail message (including any 
-> attachments) may be confidential, proprietary, privileged, or otherwise
-> exempt from disclosure under applicable laws. It is intended to be 
-> conveyed only to the designated recipient(s). Any use, dissemination, 
-> distribution, printing, retaining or copying of this e-mail (including its 
-> attachments) by unintended recipient(s) is strictly prohibited and may 
-> be unlawful. If you are not an intended recipient of this e-mail, or believe 
-> that you have received this e-mail in error, please notify the sender 
-> immediately (by replying to this e-mail), delete any and all copies of 
-> this e-mail (including any attachments) from your system, and do not
-> disclose the content of this e-mail to any other person. Thank you!
-> 
+diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+index 4a4766e..c2595ba 100644
+--- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
++++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+@@ -31,6 +31,8 @@ SoC is on the same page.
+ 
+ Required properties:
+ - compatible: should be one of:
++  - "rockchip,px30-io-voltage-domain" for px30
++  - "rockchip,px30-pmu-io-voltage-domain" for px30 pmu-domains
+   - "rockchip,rk3188-io-voltage-domain" for rk3188
+   - "rockchip,rk3228-io-voltage-domain" for rk3228
+   - "rockchip,rk3288-io-voltage-domain" for rk3288
+diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
+index ed2b109..41c2b83 100644
+--- a/drivers/power/avs/rockchip-io-domain.c
++++ b/drivers/power/avs/rockchip-io-domain.c
+@@ -39,6 +39,10 @@
+ #define MAX_VOLTAGE_1_8		1980000
+ #define MAX_VOLTAGE_3_3		3600000
+ 
++#define PX30_IO_VSEL			0x180
++#define PX30_IO_VSEL_VCCIO6_SRC		BIT(0)
++#define PX30_IO_VSEL_VCCIO6_SUPPLY_NUM	1
++
+ #define RK3288_SOC_CON2			0x24c
+ #define RK3288_SOC_CON2_FLASH0		BIT(7)
+ #define RK3288_SOC_FLASH_SUPPLY_NUM	2
+@@ -151,6 +155,25 @@ static int rockchip_iodomain_notify(struct notifier_block *nb,
+ 	return NOTIFY_OK;
+ }
+ 
++static void px30_iodomain_init(struct rockchip_iodomain *iod)
++{
++	int ret;
++	u32 val;
++
++	/* if no VCCIO0 supply we should leave things alone */
++	if (!iod->supplies[PX30_IO_VSEL_VCCIO6_SUPPLY_NUM].reg)
++		return;
++
++	/*
++	 * set vccio0 iodomain to also use this framework
++	 * instead of a special gpio.
++	 */
++	val = PX30_IO_VSEL_VCCIO6_SRC | (PX30_IO_VSEL_VCCIO6_SRC << 16);
++	ret = regmap_write(iod->grf, PX30_IO_VSEL, val);
++	if (ret < 0)
++		dev_warn(iod->dev, "couldn't update vccio0 ctrl\n");
++}
++
+ static void rk3288_iodomain_init(struct rockchip_iodomain *iod)
+ {
+ 	int ret;
+@@ -227,6 +250,43 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
+ 		dev_warn(iod->dev, "couldn't update pmu io iodomain ctrl\n");
+ }
+ 
++static const struct rockchip_iodomain_soc_data soc_data_px30 = {
++	.grf_offset = 0x180,
++	.supply_names = {
++		NULL,
++		"vccio6",
++		"vccio1",
++		"vccio2",
++		"vccio3",
++		"vccio4",
++		"vccio5",
++		"vccio_oscgpi",
++	},
++	.init = px30_iodomain_init,
++};
++
++static const struct rockchip_iodomain_soc_data soc_data_px30_pmu = {
++	.grf_offset = 0x100,
++	.supply_names = {
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		"pmuio1",
++		"pmuio2",
++	},
++};
++
+ /*
+  * On the rk3188 the io-domains are handled by a shared register with the
+  * lower 8 bits being still being continuing drive-strength settings.
+@@ -381,6 +441,14 @@ static const struct rockchip_iodomain_soc_data soc_data_rv1108_pmu = {
+ 
+ static const struct of_device_id rockchip_iodomain_match[] = {
+ 	{
++		.compatible = "rockchip,px30-io-voltage-domain",
++		.data = (void *)&soc_data_px30
++	},
++	{
++		.compatible = "rockchip,px30-pmu-io-voltage-domain",
++		.data = (void *)&soc_data_px30_pmu
++	},
++	{
+ 		.compatible = "rockchip,rk3188-io-voltage-domain",
+ 		.data = &soc_data_rk3188
+ 	},
+-- 
+2.7.4
