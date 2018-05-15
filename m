@@ -1,36 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 May 2018 18:22:01 +0100
-Subject: [PATCH v3 4/4] KVM: arm64: Add support for PUD hugepages at
- stage 2
-In-Reply-To: <20180514144304.10484-5-punit.agrawal@arm.com>
-References: <20180514144304.10484-1-punit.agrawal@arm.com>
- <20180514144304.10484-5-punit.agrawal@arm.com>
-Message-ID: <20180515172200.hw24lgd6qh436xvy@armageddon.cambridge.arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 15 May 2018 19:26:51 +0200
+Subject: [PATCH v4 0/6] clocksource: rework Atmel TCB timer driver
+In-Reply-To: <20180502181046.GG19273@piout.net>
+References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
+ <20180426164623.tlv6kz5yopk6voxx@breakpoint.cc>
+ <20180426185233.GU4813@piout.net>
+ <20180502133418.xa26c5ta2ytxxjcn@linutronix.de>
+ <20180502181046.GG19273@piout.net>
+Message-ID: <20180515172651.bhgaxta3czqgjpgu@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 03:43:04PM +0100, Punit Agrawal wrote:
-> KVM only supports PMD hugepages at stage 2. Extend the stage 2 fault
-> handling to add support for PUD hugepages.
+On 2018-05-02 20:10:46 [+0200], Alexandre Belloni wrote:
+> > > As said below, this is solving multiple issues, including the one for
+> > > SoCs that don't have the PIT.
+> > will the PIT be removed? Where it needs the PIT?
+> > 
 > 
-> Addition of pud hugepage support enables additional hugepage
-> sizes (e.g., 1G with 4K granule) which can be useful on cores that
-> support mapping larger block sizes in the TLB entries.
+> The last patch is unselecting the PIT driver so by default it is not
+> enabled. The PIT driver will stay just in case someone has to use it
+> e.g. when they are using all the TCB channels for something else.
+> However, recent Atmel SoC have a TCB without any output so it can ony be
+> used as a timer. Some other SoCs don't have a PIT at all.
+
+The question was more "does it make sense to keep the 'old' PIT driver
+around or can it be removed and the TCB driver will be used by
+everyone"?
+
+> > > The remaining one would be "clocksource: TCLIB: Allow higher clock rates
+> > > for clock events"
+> > 
+> > I see. So I would need to keep that patch in queue after it was
+> > dismissed from duty?
 > 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/kvm_mmu.h         | 19 ++++++++++++
->  arch/arm64/include/asm/kvm_mmu.h       | 15 ++++++++++
->  arch/arm64/include/asm/pgtable-hwdef.h |  4 +++
->  arch/arm64/include/asm/pgtable.h       |  2 ++
->  virt/kvm/arm/mmu.c                     | 40 ++++++++++++++++++++++++--
->  5 files changed, 77 insertions(+), 3 deletions(-)
+> Boris suggested a DT binding to allow changing the rate but it didn't
+> reach consensus at the time. this is something that will ne to be
+> revived at some point and I would very much like having that upstream
+> too.
 
-It looks like I acked an earlier version. I'll ack it again here:
+Does make sense to have a low frequency clock here? I think from
+clocksource point of view it makes sense to have it (highres) enabled
+and not having to adjust the DT first (not to mention to learn about
+it).
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Sebastian
