@@ -1,75 +1,37 @@
 From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Tue, 15 May 2018 13:29:27 +0100
-Subject: [PATCH 1/3] crypto: ccree: drop signature register check
+Date: Tue, 15 May 2018 13:29:29 +0100
+Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
 In-Reply-To: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
 References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1526387370-17142-2-git-send-email-gilad@benyossef.com>
+Message-ID: <1526387370-17142-4-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were using the content of the signature register as a sanity
-check for the hardware functioning but it turns out not all
-implementers use the same values so the check is giving false
-negative on certain SoCs and so we drop it.
+Add bindings for CryptoCell instance in the SoC.
 
 Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 ---
- drivers/crypto/ccree/cc_driver.c | 18 +++---------------
- 1 file changed, 3 insertions(+), 15 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/crypto/ccree/cc_driver.c b/drivers/crypto/ccree/cc_driver.c
-index 89ce013..f8ff358 100644
---- a/drivers/crypto/ccree/cc_driver.c
-+++ b/drivers/crypto/ccree/cc_driver.c
-@@ -38,21 +38,20 @@ MODULE_PARM_DESC(cc_dump_bytes, "Dump buffers to kernel log as debugging aid");
- struct cc_hw_data {
- 	char *name;
- 	enum cc_hw_rev rev;
--	u32 sig;
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 91486b4..6c76841 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -528,6 +528,14 @@
+ 			status = "disabled";
+ 		};
  
- /* Hardware revisions defs. */
- 
- static const struct cc_hw_data cc712_hw = {
--	.name = "712", .rev = CC_HW_REV_712, .sig =  0xDCC71200U
-+	.name = "712", .rev = CC_HW_REV_712
- };
- 
- static const struct cc_hw_data cc710_hw = {
--	.name = "710", .rev = CC_HW_REV_710, .sig =  0xDCC63200U
-+	.name = "710", .rev = CC_HW_REV_710
- };
- 
- static const struct cc_hw_data cc630p_hw = {
--	.name = "630P", .rev = CC_HW_REV_630, .sig = 0xDCC63000U
-+	.name = "630P", .rev = CC_HW_REV_630
- };
- 
- static const struct of_device_id arm_ccree_dev_of_match[] = {
-@@ -186,7 +185,6 @@ static int init_cc_resources(struct platform_device *plat_dev)
- 	struct cc_drvdata *new_drvdata;
- 	struct device *dev = &plat_dev->dev;
- 	struct device_node *np = dev->of_node;
--	u32 signature_val;
- 	u64 dma_mask;
- 	const struct cc_hw_data *hw_rev;
- 	const struct of_device_id *dev_id;
-@@ -275,16 +273,6 @@ static int init_cc_resources(struct platform_device *plat_dev)
- 		return rc;
- 	}
- 
--	/* Verify correct mapping */
--	signature_val = cc_ioread(new_drvdata, CC_REG(HOST_SIGNATURE));
--	if (signature_val != hw_rev->sig) {
--		dev_err(dev, "Invalid CC signature: SIGNATURE=0x%08X != expected=0x%08X\n",
--			signature_val, hw_rev->sig);
--		rc = -EINVAL;
--		goto post_clk_err;
--	}
--	dev_dbg(dev, "CC SIGNATURE=0x%08X\n", signature_val);
--
- 	/* Display HW versions */
- 	dev_info(dev, "ARM CryptoCell %s Driver: HW version 0x%08X, Driver version %s\n",
- 		 hw_rev->name, cc_ioread(new_drvdata, CC_REG(HOST_VERSION)),
++		arm_cc630p: crypto at e6601000 {
++			compatible = "arm,cryptocell-630p-ree";
++			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <2>;
++			reg = <0x0 0xe6601000 0 0x1000>;
++			clocks = <&cpg CPG_MOD 229>;
++		};
++
+ 		i2c3: i2c at e66d0000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
 2.7.4
