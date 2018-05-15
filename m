@@ -1,19 +1,18 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 15 May 2018 14:16:43 -0700
-Subject: [PATCH RESEND] clk: uniphier: add LD11/LD20 stream demux system
- clock
-In-Reply-To: <20180515021416.31760-1-suzuki.katsuhiro@socionext.com>
-References: <20180515021416.31760-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <152641900347.237094.18265233819644553080@swboyd.mtv.corp.google.com>
+Date: Tue, 15 May 2018 14:05:44 -0700
+Subject: [PATCH 05/61] clk: samsung: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-6-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-6-wsa+renesas@sang-engineering.com>
+Message-ID: <152641834430.237094.6970165334408131900@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Katsuhiro Suzuki (2018-05-14 19:14:16)
-> Add clock for MPEG2 transport stream I/O and demux system (HSC) on
-> UniPhier LD11/LD20 SoCs.
+Quoting Wolfram Sang (2018-04-19 07:05:35)
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
 > 
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > ---
 
 Applied to clk-next
