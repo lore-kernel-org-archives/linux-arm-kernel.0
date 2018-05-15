@@ -1,28 +1,25 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 15 May 2018 19:39:24 +0200
-Subject: [PATCH v2] ARM: dts: exynos: Add support for audio over HDMI for
- Odroid X/X2/U3
-In-Reply-To: <20180514080148.10150-1-s.nawrocki@samsung.com>
-References: <CGME20180514080220epcas2p110497f1deca1e9c10db9b9edb890d76b@epcas2p1.samsung.com>
- <20180514080148.10150-1-s.nawrocki@samsung.com>
-Message-ID: <20180515173924.goxxl4wic7tlhzyw@kozik-lap>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 May 2018 11:11:02 -0700
+Subject: [PATCH] arm: dts: omap: fix OF graph in omap3-devkit8000
+In-Reply-To: <20180508135930.5768-5-robh@kernel.org>
+References: <20180508135930.5768-1-robh@kernel.org>
+ <20180508135930.5768-5-robh@kernel.org>
+Message-ID: <20180515181102.GT98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 10:01:48AM +0200, Sylwester Nawrocki wrote:
-> This patch switches Odroid X/X2/U3 to use dedicated Odroid audio subsystem
-> DT bindings instead of the simple-card in order to add support for audio
-> over HDMI.
+* Rob Herring <robh@kernel.org> [180508 07:01]:
+> omap3-devkit8000-common.dtsi defines a graph connection for DVI, but
+> then omap3-devkit8000-lcd-common.dtsi overrides that with a graph
+> connection for the LCD as the same output signals are used. This
+> leaves an incomplete graph as the TFP410 output has only half a
+> connection. The result is the following warning:
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 33 +++++++++++++++----------
->  arch/arm/boot/dts/exynos4412-odroidu3.dts       |  6 ++---
->  arch/arm/boot/dts/exynos4412-odroidx.dts        |  6 ++---
->  3 files changed, 26 insertions(+), 19 deletions(-)
+> arch/arm/boot/dts/omap3-devkit8000-lcd70.dtb: Warning (graph_endpoint): /encoder0/ports/port at 0/endpoint: graph connection to node '/ocp at 68000000/dss at 48050000/port/endpoint' is not bidirectional
 > 
+> Fix this by defining multiple endpoints which is the correct way to show
+> a 1 to many connection.
 
-Thanks, applied.
+Applying into omap-for-v4.18/dt-fixes thanks.
 
-Best regards,
-Krzysztof
+Tony
