@@ -1,28 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 May 2018 10:56:46 +0100
-Subject: [PATCH 12/18] kernel: add ksys_personality()
-In-Reply-To: <20180514120756.GA11638@infradead.org>
+From: linux@dominikbrodowski.net (Dominik Brodowski)
+Date: Tue, 15 May 2018 11:58:14 +0200
+Subject: [PATCH 13/18] kernel: add kcompat_sys_{f,}statfs64()
+In-Reply-To: <20180515095351.lw5gxap4ii5iobtb@lakrids.cambridge.arm.com>
 References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-13-mark.rutland@arm.com>
- <20180514120756.GA11638@infradead.org>
-Message-ID: <20180515095645.zrkwsvhifecghkk4@lakrids.cambridge.arm.com>
+ <20180514094640.27569-14-mark.rutland@arm.com>
+ <20180514171427.qyietn3fhilwokb2@lakrids.cambridge.arm.com>
+ <20180514203414.GB26773@light.dominikbrodowski.net>
+ <20180515095351.lw5gxap4ii5iobtb@lakrids.cambridge.arm.com>
+Message-ID: <20180515095814.GA14007@isilmar-4.linta.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 05:07:56AM -0700, Christoph Hellwig wrote:
-> On Mon, May 14, 2018 at 10:46:34AM +0100, Mark Rutland wrote:
-> > Using this helper allows us to avoid the in-kernel call to the
-> > sys_personality() syscall. The ksys_ prefix denotes that this function
-> > is meant as a drop-in replacement for the syscall. In particular, it
-> > uses the same calling convention as sys_personality().
+On Tue, May 15, 2018 at 10:53:51AM +0100, Mark Rutland wrote:
+> On Mon, May 14, 2018 at 10:34:14PM +0200, Dominik Brodowski wrote:
+> > On Mon, May 14, 2018 at 06:14:28PM +0100, Mark Rutland wrote:
+> > > On Mon, May 14, 2018 at 10:46:35AM +0100, Mark Rutland wrote:
+> > > > +#ifdef CONFIG_COMPAT
+> > > > +int kcompat_sys_statfs64(const char __user * pathname, compat_size_t sz,
+> > > > +		     struct compat_statfs64 __user * buf);
+> > > > +int kcompat_sys_fstatfs64(unsigned int fd, compat_size_t sz,
+> > > > +			  struct compat_statfs64 __user * buf);
+> > > > +#endif
+> > > 
+> > > I've moved these to <linux/compat.h>, so that they live with the rest of
+> > > the compat syscall stuff. That should avoid build failures the kbuild
+> > > test robot picked up where compat_size_t wasn't dfined.
 > > 
-> > This is necessary to enable conversion of arm64's syscall handling to
-> > use pt_regs wrappers.
+> > Please add a comment there, similar to what is in syscalls.h:
+> > 
+> > 	/*
+> > 	 * Kernel code should not call syscalls (i.e., sys_xyzyyz()) directly.
+> > 	 * Instead, use one of the functions which work equivalently, such as
+> > 	 * the ksys_xyzyyz() functions prototyped below.
+> > 	 */
 > 
-> Plese just opencode the trivial sys_personality logic instead.
+> To make the kcompat_sys_* naming scheme clearer, I've added compat references to
+> the above, i.e.
+> 
+> /*
+>  * Kernel code should not call compat syscalls (i.e., compat_sys_xyzyyz())
+>  * directly. Instead, use one of the functions which work equivalently, such
+>  * as the kcompat_sys_xyzyyz() functions prototyped below.
+>  */
 
-Sure, I'll make that a static inline in <linux/syscalls.h> as with
-ksys_close() and friends.
+That's what I meant ;)
 
-Thanks,
-Mark.
+> > Once you have done so, feel free to add my
+> > 
+> > 	Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
+> 
+> I hope that this still stands with the changes above?
+
+It does. Thanks!
+
+	Dominik
