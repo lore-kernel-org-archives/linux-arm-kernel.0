@@ -1,221 +1,235 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 15 May 2018 17:21:22 +0100
-Subject: [PATCH] KVM: arm/arm64: fix unaligned hva start and end in
- handle_hva_to_gpa
-In-Reply-To: <5efb2da1-fed8-443b-d06b-cc03152b2c2e@gmail.com>
-References: <1525244911-5519-1-git-send-email-hejianet@gmail.com>
- <04e6109f-cbbd-24b0-03bb-9247b930d42c@arm.com>
- <85e04362-05dd-c697-e9c4-ad5824e63819@gmail.com>
- <0f134188-12d5-7184-3fbd-0ec8204cf649@arm.com>
- <aa5b37dc-7ac3-2999-fa67-848cd693977f@gmail.com>
- <695beacb-ff51-bb2c-72ef-d268f7d4e59d@arm.com>
- <1e065e9b-4dad-611d-fc5b-26fe6c031507@gmail.com>
- <14954b3a-6a2a-fe05-47b7-1890375ab8a4@arm.com>
- <b9e28c64-78cd-042e-0add-e06b0f57fc36@gmail.com>
- <5efb2da1-fed8-443b-d06b-cc03152b2c2e@gmail.com>
-Message-ID: <09c30e43-7107-395c-bde3-0310bbdbca91@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 15 May 2018 17:20:00 +0100
+Subject: [PATCH v9 05/11] arm64: kexec_file: load initrd and device-tree
+In-Reply-To: <20180425062629.29404-6-takahiro.akashi@linaro.org>
+References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
+ <20180425062629.29404-6-takahiro.akashi@linaro.org>
+Message-ID: <c10624c0-9962-af38-1dd5-656902180ace@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jia,
+Hi Akashi,
 
-On 15/05/18 14:15, Jia He wrote:
-> 
-> 
-> On 5/15/2018 8:38 PM, Jia He Wrote:
->> Hi Suzuki
->>
->> On 5/15/2018 4:36 PM, Suzuki K Poulose Wrote:
->>>
->>> Hi Jia
->>>
->>> On 05/15/2018 03:03 AM, Jia He wrote:
->>>> Hi Suzuki
->>>>
->>>> I will merge the other thread into this, and add the necessary CC list
->>>>
->>>> That WARN_ON call trace is very easy to reproduce in my armv8a server after I
->>>> start 20 guests
->>>>
->>>> and run memhog in the host. Of course, ksm should be enabled
->>>>
->>>> For you question about my inject fault debug patch:
->>>
->>>
->>> Thanks for the patch, comments below.
->>>
->>>>
->>>
->>> ...
->>>
->>>> index 7f6a944..ab8545e 100644
->>>> --- a/virt/kvm/arm/mmu.c
->>>> +++ b/virt/kvm/arm/mmu.c
->>>> @@ -290,12 +290,17 @@ static void unmap_stage2_puds(struct kvm *kvm, pgd_t *pgd,
->>>>  ?? * destroying the VM), otherwise another faulting VCPU may come in and mess
->>>>  ?? * with things behind our backs.
->>>>  ?? */
->>>> +extern int trigger_by_ksm;
->>>>  ??static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->>>>  ??{
->>>>  ???????? pgd_t *pgd;
->>>>  ???????? phys_addr_t addr = start, end = start + size;
->>>>  ???????? phys_addr_t next;
->>>>
->>>> +?????? if(trigger_by_ksm) {
->>>> +?????????????? end -= 0x200;
->>>> +?????? }
->>>> +
->>>>  ???????? assert_spin_locked(&kvm->mmu_lock);
->>>>  ???????? pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->>>>  ???????? do {
->>>>
->>>> I need to point out that I never reproduced it without this debugging patch.
->>>
->>> That could trigger the panic iff your "size" <= 0x200, leading to the
->>> condition (end < start), which can make the loop go forever, as we
->>> do while(addr < end) and end up accessing something which may not be PGD entry
->>> and thus get a bad page with bad numbers all around. This case could be hit only
->>> with your change and the bug in the KSM which gives us an address near the page
->>> boundary.
->> No, I injected the fault on purpose to simulate the case when size is less than
->> PAGE_SIZE(eg. PAGE_SIZE-0x200=65024)
->> I ever got the panic info [1] *without* the debugging patch only once
->>
->> [1] https://lkml.org/lkml/2018/5/9/992
->>>
->>> So, I think we can safely ignore the PANIC().
->>> More below.
+On 25/04/18 07:26, AKASHI Takahiro wrote:
+> load_other_segments() is expected to allocate and place all the necessary
+> memory segments other than kernel, including initrd and device-tree
+> blob (and elf core header for crash).
+> While most of the code was borrowed from kexec-tools' counterpart,
+> users may not be allowed to specify dtb explicitly, instead, the dtb
+> presented by a boot loader is reused.
 
-I am a bit confused now. Do you mean, the panic was triggered *without* the debugging
-patch ? If that is the case, it is really worrying.
+(Nit: "a boot loader" -> "the original boot loader")
 
->>>
->>>
->>>>>> Suzuki, thanks for the comments.
->>>>>>
->>>>>> I proposed another ksm patch https://lkml.org/lkml/2018/5/3/1042
->>>>>> The root cause is ksm will add some extra flags to indicate that the page
->>>>>> is in/not_in the stable tree. This makes address not be aligned with PAGE_SIZE.
->>>>> Thanks for the pointer. In the future, please Cc the people relevant to the
->>>>> discussion in the patches.
->>>>>
->>>>>>  ? From arm kvm mmu point of view, do you think handle_hva_to_gpa still need
->>>>>> to handle
->>>>>> the unalignment case?
->>>>> I don't think we should do that. Had we done this, we would never have caught
->>>>> this bug
->>>>> in KSM. Eventually if some other new implementation comes up with the a new
->>>>> notifier
->>>>> consumer which doesn't check alignment and doesn't WARN, it could simply do
->>>>> the wrong
->>>>> thing. So I believe what we have is a good measure to make sure that things are
->>>>> in the right order.
->>>>>
->>>>>> IMO, the PAGE_SIZE alignment is still needed because we should not let the
->>>>>> bottom function
->>>>>> kvm_age_hva_handler to handle the exception. Please refer to the
->>>>>> implementation in X86 and
->>>>>> powerpc kvm_handle_hva_range(). They both aligned the hva with
->>>>>> hva_to_gfn_memslot.
->>>>>>
->>>>>  ? From an API perspective, you are passed on a "start" and "end" address. So,
->>>>> you could potentially
->>>>> do the wrong thing if you align the "start" and "end". May be those handlers
->>>>> should also do the
->>>>> same thing as we do.
->>>
->>>> But handle_hva_to_gpa has partially adjusted the alignment possibly:
->>>>  ??? 1750???????? kvm_for_each_memslot(memslot, slots) {
->>>>  ??? 1751???????????????? unsigned long hva_start, hva_end;
->>>>  ??? 1752???????????????? gfn_t gpa;
->>>>  ??? 1753
->>>>  ??? 1754???????????????? hva_start = max(start, memslot->userspace_addr);
->>>>  ??? 1755???????????????? hva_end = min(end, memslot->userspace_addr +
->>>>  ??? 1756???????????????????????????? (memslot->npages << PAGE_SHIFT));
->>>>
->>>> at line 1755, let us assume that end=0x12340200 and
->>>> memslot->userspace_addr + (memslot->npages << PAGE_SHIFT)=0x12340000
->>>> Then, hva_start is not page_size aligned and hva_end is aligned, and the size
->>>> will be PAGE_SIZE-0x200,
->>>> just as what I had done in the inject fault debugging patch.
->>>
->>> Thats because we want to limit the handling of the hva/gpa range by memslot. So,
->>> we make sure we pass on the range within the given memslot
->>> to hva_to_gfn_memslot(). But we do iterate over the next memslot if the
->>> original range falls in to the next slot. So, in practice, there is no
->>> alignment/trimming of the range. Its just that we pass on the appropriate range
->>> for each slot.
->>>
->> Yes, I understand what the codes did in hva_to_gfn_memslot(). What I mean is
->> hva_end may be changed and (hva_end - hva_start) will not be same as the
->> parameter _size_ ?
->>
->>> ret |= handler(kvm, gpa, (u64)(hva_end - hva_start), data);
->>
->> Anyway, I have to admit that all the exceptions are originally caused by the
->> STABLE_FLAG in ksm code. What I want to discuss here is how to make arm kvm
->> handle the exception more gracefully.
+> arch_kimage_kernel_post_load_cleanup() is responsible for freeing arm64-
+> specific data allocated in load_other_segments().
 
-Thats my point. We need the fix in ksm. Once we have the fix in place, do
-we hit the WARN_ON() any more ?
 
->>
-> Hi Suzuki
-> How about this patch (balance of avoiding the WARN_ON storm and debugging
-> convenience):
-
-The problem with WARN_ON_ONCE() is, it could potentially suppress the different
-call paths that could lead to the triggers. e.g, unmap_stage2_range() could be
-called from different paths and having a WARN_ON_ONCE() could potentially
-hide the other call paths.
-
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 7f6a944..4033946 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -297,6 +297,8 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t
-> start, u64 size)
->   	phys_addr_t next;
-> 
->   	assert_spin_locked(&kvm->mmu_lock);
+> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+> index f9ebf54ca247..b3b9b1725d8a 100644
+> --- a/arch/arm64/kernel/machine_kexec_file.c
+> +++ b/arch/arm64/kernel/machine_kexec_file.c
+> @@ -13,7 +13,26 @@
+>  #include <linux/ioport.h>
+>  #include <linux/kernel.h>
+>  #include <linux/kexec.h>
+> +#include <linux/libfdt.h>
+>  #include <linux/memblock.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/types.h>
+> +#include <asm/byteorder.h>
 > +
-> +	WARN_ON_ONCE(size & ~PAGE_MASK);
->   	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->   	do {
->   		/*
-> @@ -1792,7 +1794,7 @@ static int kvm_set_spte_handler(struct kvm *kvm, gpa_t
-> gpa, u64 size, void *data
->   {
->   	pte_t *pte = (pte_t *)data;
-> 
-> -	WARN_ON(size != PAGE_SIZE);
-> +	WARN_ON_ONCE(size != PAGE_SIZE);
->   	/*
->   	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
->   	 * flag clear because MMU notifiers will have unmapped a huge PMD before
-> @@ -1823,7 +1825,7 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa,
-> u64 size, void *data)
->   	pmd_t *pmd;
->   	pte_t *pte;
-> 
-> -	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
-> +	WARN_ON_ONCE(size != PAGE_SIZE && size != PMD_SIZE);
->   	pmd = stage2_get_pmd(kvm, NULL, gpa);
->   	if (!pmd || pmd_none(*pmd))	/* Nothing there */
->   		return 0;
-> @@ -1843,7 +1845,7 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t
-> gpa, u64 size, void *
->   	pmd_t *pmd;
->   	pte_t *pte;
-> 
-> -	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
-> +	WARN_ON_ONCE(size != PAGE_SIZE && size != PMD_SIZE);
->   	pmd = stage2_get_pmd(kvm, NULL, gpa);
->   	if (!pmd || pmd_none(*pmd))	/* Nothing there */
->   		return 0;
-> 
+> +static int __dt_root_addr_cells;
+> +static int __dt_root_size_cells;
+
+> @@ -55,3 +74,144 @@ int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+>  
+>  	return ret;
+>  }
+> +
+> +static int setup_dtb(struct kimage *image,
+> +		unsigned long initrd_load_addr, unsigned long initrd_len,
+> +		char *cmdline, unsigned long cmdline_len,
+> +		char **dtb_buf, size_t *dtb_buf_len)
+> +{
+> +	char *buf = NULL;
+> +	size_t buf_size;
+> +	int nodeoffset;
+> +	u64 value;
+> +	int range_len;
+> +	int ret;
+> +
+> +	/* duplicate dt blob */
+> +	buf_size = fdt_totalsize(initial_boot_params);
+> +	range_len = (__dt_root_addr_cells + __dt_root_size_cells) * sizeof(u32);
+
+These two cells values are 0 here. Did you want
+arch_kexec_file_init() in patch 7 in this patch?
+
+Ah, range_len isn't used, so, did you want the cells values and this range_len
+thing in in patch 7!?
 
 
-Cheers
-Suzuki
+> +
+> +	if (initrd_load_addr)
+> +		buf_size += fdt_prop_len("linux,initrd-start", sizeof(u64))
+> +				+ fdt_prop_len("linux,initrd-end", sizeof(u64));
+> +
+> +	if (cmdline)
+> +		buf_size += fdt_prop_len("bootargs", cmdline_len + 1);
+
+I can't find where fdt_prop_len() .... oh, patch 7. fdt_prop_len() doesn't look
+like the sort of thing that should be created here, but I agree there isn't an
+existing API to do this.
+
+(This must be why powerpc guesses that the fdt won't be more than double in size).
+
+
+> +	buf = vmalloc(buf_size);
+> +	if (!buf) {
+> +		ret = -ENOMEM;
+> +		goto out_err;
+> +	}
+> +
+> +	ret = fdt_open_into(initial_boot_params, buf, buf_size);
+> +	if (ret)
+> +		goto out_err;
+> +
+> +	nodeoffset = fdt_path_offset(buf, "/chosen");
+> +	if (nodeoffset < 0)
+> +		goto out_err;
+> +
+> +	/* add bootargs */
+> +	if (cmdline) {
+> +		ret = fdt_setprop(buf, nodeoffset, "bootargs",
+> +						cmdline, cmdline_len + 1);
+
+fdt_setprop_string()?
+
+
+> +		if (ret)
+> +			goto out_err;
+> +	}
+> +
+> +	/* add initrd-* */
+> +	if (initrd_load_addr) {
+> +		value = cpu_to_fdt64(initrd_load_addr);
+> +		ret = fdt_setprop(buf, nodeoffset, "linux,initrd-start",
+> +				&value, sizeof(value));
+
+sizeof(value) was assumed to be the same as sizeof(u64) earlier.
+fdt_setprop_u64()?
+
+
+> +		if (ret)
+> +			goto out_err;
+> +
+> +		value = cpu_to_fdt64(initrd_load_addr + initrd_len);
+> +		ret = fdt_setprop(buf, nodeoffset, "linux,initrd-end",
+> +				&value, sizeof(value));
+> +		if (ret)
+> +			goto out_err;
+> +	}
+> +
+> +	/* trim a buffer */
+> +	fdt_pack(buf);
+> +	*dtb_buf = buf;
+> +	*dtb_buf_len = fdt_totalsize(buf);
+> +
+> +	return 0;
+> +
+> +out_err:
+> +	vfree(buf);
+> +	return ret;
+> +}
+
+While powerpc has some similar code for updating the initrd and cmdline, it
+makes different assumptions about the size of the dt, and has different behavior
+for memreserve. (looks like we don't expect the initramfs to be memreserved).
+Lets leave unifying that stuff where possible for the future.
+
+
+> +int load_other_segments(struct kimage *image,
+> +			char *initrd, unsigned long initrd_len,
+> +			char *cmdline, unsigned long cmdline_len)
+> +{
+> +	struct kexec_segment *kern_seg;
+> +	struct kexec_buf kbuf;
+> +	unsigned long initrd_load_addr = 0;
+> +	char *dtb = NULL;
+> +	unsigned long dtb_len = 0;
+> +	int ret = 0;
+> +
+> +	kern_seg = &image->segment[image->arch.kern_segment];
+> +	kbuf.image = image;
+> +	/* not allocate anything below the kernel */
+> +	kbuf.buf_min = kern_seg->mem + kern_seg->memsz;
+
+> +	/* load initrd */
+> +	if (initrd) {
+> +		kbuf.buffer = initrd;
+> +		kbuf.bufsz = initrd_len;
+> +		kbuf.memsz = initrd_len;
+
+> +		kbuf.buf_align = 0;
+
+I'm surprised there initrd has no alignment requirement, but kexec_add_buffer()
+rounds this up to PAGE_SIZE.
+
+
+> +		/* within 1GB-aligned window of up to 32GB in size */
+> +		kbuf.buf_max = round_down(kern_seg->mem, SZ_1G)
+> +						+ (unsigned long)SZ_1G * 32;
+> +		kbuf.top_down = false;
+> +
+> +		ret = kexec_add_buffer(&kbuf);
+> +		if (ret)
+> +			goto out_err;
+> +		initrd_load_addr = kbuf.mem;
+> +
+> +		pr_debug("Loaded initrd at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
+> +				initrd_load_addr, initrd_len, initrd_len);
+> +	}
+> +
+> +	/* load dtb blob */
+> +	ret = setup_dtb(image, initrd_load_addr, initrd_len,
+> +				cmdline, cmdline_len, &dtb, &dtb_len);
+> +	if (ret) {
+> +		pr_err("Preparing for new dtb failed\n");
+> +		goto out_err;
+> +	}
+> +
+> +	kbuf.buffer = dtb;
+> +	kbuf.bufsz = dtb_len;
+> +	kbuf.memsz = dtb_len;
+> +	/* not across 2MB boundary */
+> +	kbuf.buf_align = SZ_2M;
+> +	kbuf.buf_max = ULONG_MAX;
+> +	kbuf.top_down = true;
+> +
+> +	ret = kexec_add_buffer(&kbuf);
+> +	if (ret)
+> +		goto out_err;
+> +	image->arch.dtb_mem = kbuf.mem;
+> +	image->arch.dtb_buf = dtb;
+> +
+> +	pr_debug("Loaded dtb at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
+> +			kbuf.mem, dtb_len, dtb_len);
+> +
+> +	return 0;
+> +
+> +out_err:
+> +	vfree(dtb);
+> +	image->arch.dtb_buf = NULL;
+
+Won't kimage_file_post_load_cleanup() always be called if we return an error
+here? Why not leave the free()ing until then?
+
+
+> +	return ret;
+> +}
+
+
+
+Thanks,
+
+James
