@@ -1,43 +1,38 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 15 May 2018 13:35:23 +0200
-Subject: [PATCH 0/4] KVM: arm/arm64: Fix locking issues
-In-Reply-To: <20180515102659.GA38551@C02W217FHV2R.local>
-References: <20180511142015.21953-1-andre.przywara@arm.com>
- <20180515102659.GA38551@C02W217FHV2R.local>
-Message-ID: <da25660f-7d57-34be-fe99-f42c10d81845@redhat.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 15 May 2018 08:44:53 -0300
+Subject: [PATCH] ARM: dts: imx7d: correct cpu supply name for voltage
+ scaling
+In-Reply-To: <1526375609-17676-1-git-send-email-Anson.Huang@nxp.com>
+References: <1526375609-17676-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5Ci6Kmb9hK7=pvYXURWLfRun1gu+XOskXAe0xo=v1NTpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/2018 12:26, Christoffer Dall wrote:
-> On Fri, May 11, 2018 at 03:20:11PM +0100, Andre Przywara wrote:
->> Jan recently reported lockdep complaints regarding various locks in our
->> VGIC emulation [1][2].
->> This boiled down to two separate issues:
->> - When promoting the vgic_irq->irq_lock to require IRQs being disabled,
->>   we forgot to amend some instances of this lock on the way. Also this
->>   needs to be applied to dependent locks as well. The first two patches
->>   fix that. The patch split is designed to simplify backporting.
->>   Those patches have been posted before, I am resending them as part
->>   of this series.
->> - Calling kvm_read_guest() requires us to be inside an SRCU critical
->>   section. On some architectures we are always in it when handling VCPU
->>   exits, but on ARM we need to lock it individually. Patches 3 and 4
->>   fix that, the split is again made to ease backporting.
->>   Each of the hunks fix an indiviual commit, but I refrained from
->>   splitting this down into eight patches just to put proper Fixes: tags
->>   on it. Eventually those commits are part of one out of two series, I put
->>   the respective kernel release version as a tag to the Cc: stable line.
->>
->> I couldn't reproduce the full lockdep splat on my setup, but at least
->> could show one instance and prove that these patches fixes that.
->>
->>
-> For the series:
-> 
-> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+On Tue, May 15, 2018 at 6:13 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
 
-Shall I put the patches on their route to Linus?
+> diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+> index 7f64568..60deaf9 100644
+> --- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+> +++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+> @@ -33,7 +33,7 @@
+>  };
+>
+>  &cpu0 {
+> -       arm-supply = <&sw1a_reg>;
+> +       cpu-supply = <&sw1a_reg>;
+>  };
+>
+>  &fec1 {
+> @@ -284,4 +284,4 @@
+>                         MX7D_PAD_LPSR_GPIO1_IO05__GPIO1_IO5     0x14 /* OTG PWREN */
+>                 >;
+>         };
+> -};
+> \ No newline at end of file
+> +};
 
-Thanks,
+This change seems unrelated.
 
-Paolo
+Other than that:
+
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
