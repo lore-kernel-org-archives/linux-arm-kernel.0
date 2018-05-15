@@ -1,38 +1,39 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 15 May 2018 17:33:19 +0200
-Subject: [PATCH] MAINTAINERS: Add entry for STM32 timer and lptimer drivers
-Message-ID: <1526398399-31753-1-git-send-email-fabrice.gasnier@st.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 15 May 2018 10:36:31 -0500
+Subject: [PATCH v2 1/2] clk: davinci: pll-dm646x: keep PLL2 SYSCLK1 always
+ enabled
+In-Reply-To: <20180515112224.30122-2-nsekhar@ti.com>
+References: <20180515112224.30122-1-nsekhar@ti.com>
+ <20180515112224.30122-2-nsekhar@ti.com>
+Message-ID: <3f023a9b-f976-4ee7-59bf-7653e7b56ded@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an entry to make myself a maintainer of STM32 timer and lptimer
-drivers.
+On 05/15/2018 06:22 AM, Sekhar Nori wrote:
+> PLL2 SYSCLK1 on DM646x is connected to DDR2 PHY and cannot
+> be disabled. Mark it so to prevent unused clock disable
+> infrastructure from disabling it.
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+> v2: rebased to apply to v4.17-rc1. No functional change.
+> 
+>   drivers/clk/davinci/pll-dm646x.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/davinci/pll-dm646x.c b/drivers/clk/davinci/pll-dm646x.c
+> index a61cc3256418..0ae827e3ce80 100644
+> --- a/drivers/clk/davinci/pll-dm646x.c
+> +++ b/drivers/clk/davinci/pll-dm646x.c
+> @@ -72,7 +72,7 @@ static const struct davinci_pll_clk_info dm646x_pll2_info = {
+>   	.flags = 0,
+>   };
+>   
+> -SYSCLK(1, pll2_sysclk1, pll2_pllen, 4, 0);
+> +SYSCLK(1, pll2_sysclk1, pll2_pllen, 4, SYSCLK_ALWAYS_ENABLED);
+>   
+>   int dm646x_pll2_init(struct device *dev, void __iomem *base)
+>   {
+> 
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4b65225..94d8e47 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -13425,6 +13425,16 @@ T:	git git://linuxtv.org/media_tree.git
- S:	Maintained
- F:	drivers/media/usb/stk1160/
- 
-+STM32 TIMER/LPTIMER DRIVERS
-+M:	Fabrice Gasnier <fabrice.gasnier@st.com>
-+S:	Maintained
-+F:	drivers/*/stm32-*timer*
-+F:	drivers/pwm/pwm-stm32*
-+F:	include/linux/*/stm32-*tim*
-+F:	Documentation/ABI/testing/*timer-stm32
-+F:	Documentation/devicetree/bindings/*/stm32-*timer
-+F:	Documentation/devicetree/bindings/pwm/pwm-stm32*
-+
- STMMAC ETHERNET DRIVER
- M:	Giuseppe Cavallaro <peppe.cavallaro@st.com>
- M:	Alexandre Torgue <alexandre.torgue@st.com>
--- 
-1.9.1
+Reviewed-by: David Lechner <david@lechnology.com>
