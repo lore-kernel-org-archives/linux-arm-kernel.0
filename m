@@ -1,69 +1,53 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 15 May 2018 10:11:02 -0500
-Subject: [PATCHv2] arm64: dts: stratix10: Add QSPI support for Stratix10
-In-Reply-To: <1526055052-11371-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1526055052-11371-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <20b33e1d-0609-78dd-dc9c-922658a11f18@kernel.org>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 15 May 2018 17:19:17 +0200
+Subject: [PATCH] iio: adc: stm32-dfsdm: include stm32-dfsdm-adc.h
+Message-ID: <1526397557-31389-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Fix the following sparse warnings:
+  CHECK   drivers/iio/adc/stm32-dfsdm-adc.c
+symbol 'stm32_dfsdm_get_buff_cb' was not declared. Should it be static?
+symbol 'stm32_dfsdm_release_buff_cb' was not declared. Should it be static?
 
+BTW, move interrupt.h to sort headers alphabetically.
 
-On 05/11/2018 11:10 AM, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
-> 
-> Add qspi_clock
->    The qspi_clk frequency is updated by U-Boot before starting Linux.
-> Add QSPI interface node.
-> Add QSPI flash memory child node.
->    Setup the QSPI memory in 2 partitions.
-> 
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
-> v2  s/_/-/ in qspi-clk
->     rename flash node.
->     use partition child node notation
-> ---
->  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 22 ++++++++++++++
->  .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 35 ++++++++++++++++++++++
->  2 files changed, 57 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> index e6b059378dc0..bac01b0b7907 100644
-> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> @@ -119,6 +119,12 @@
->  				#clock-cells = <0>;
->  				compatible = "fixed-clock";
->  			};
-> +
-> +			qspi_clk: qspi-clk {
-> +				#clock-cells = <0>;
-> +				compatible = "fixed-clock";
-> +				clock-frequency = <200000000>;
-> +			};
->  		};
->  
->  		gmac0: ethernet at ff800000 {
-> @@ -466,5 +472,21 @@
->  				interrupts = <16 4>, <48 4>;
->  			};
->  		};
-> +
-> +		qspi: spi at ff8d2000 {
-> +			compatible = "cdns,qspi-nor";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0xff8d2000 0x100>,
-> +			      <0xff900000 0x100000>;
-> +			interrupts = <0 3 4>;
-> +			cdns,fifo-depth = <128>;
-> +			cdns,fifo-width = <4>;
-> +			cdns,trigger-address = <0x00000000>;
-> +			clocks = <&qspi_clk>;
-> +			bus-num = <1>;
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/iio/adc/stm32-dfsdm-adc.c       | 4 ++--
+ include/linux/iio/adc/stm32-dfsdm-adc.h | 2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-I don't you need "bus-num" anymore right? I don't see it getting used
-anywhere in the driver.
-
-Dinh
+diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
+index 1b78bec..31462ae 100644
+--- a/drivers/iio/adc/stm32-dfsdm-adc.c
++++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+@@ -8,11 +8,11 @@
+ 
+ #include <linux/dmaengine.h>
+ #include <linux/dma-mapping.h>
+-#include <linux/interrupt.h>
++#include <linux/iio/adc/stm32-dfsdm-adc.h>
+ #include <linux/iio/buffer.h>
+ #include <linux/iio/hw-consumer.h>
+-#include <linux/iio/iio.h>
+ #include <linux/iio/sysfs.h>
++#include <linux/interrupt.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+diff --git a/include/linux/iio/adc/stm32-dfsdm-adc.h b/include/linux/iio/adc/stm32-dfsdm-adc.h
+index e7dc7a5..0da298b 100644
+--- a/include/linux/iio/adc/stm32-dfsdm-adc.h
++++ b/include/linux/iio/adc/stm32-dfsdm-adc.h
+@@ -9,6 +9,8 @@
+ #ifndef STM32_DFSDM_ADC_H
+ #define STM32_DFSDM_ADC_H
+ 
++#include <linux/iio/iio.h>
++
+ int stm32_dfsdm_get_buff_cb(struct iio_dev *iio_dev,
+ 			    int (*cb)(const void *data, size_t size,
+ 				      void *private),
+-- 
+1.9.1
