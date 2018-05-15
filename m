@@ -1,184 +1,82 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 15 May 2018 13:09:59 +0200
-Subject: [PATCH v2 26/26] drm/bridge: establish a link between the bridge
- supplier and consumer
-In-Reply-To: <CAKMK7uECSUo5k6uG3-y+yKQTGxB3FfGcwzMT+ZP5uux2SbpfUg@mail.gmail.com>
-References: <20180504135212.26977-1-peda@axentia.se>
- <CGME20180504135432epcas3p368bb7541ca52bc8bc301dec794851214@epcas3p3.samsung.com>
- <20180504135212.26977-27-peda@axentia.se>
- <a723ad4a-8caa-4ff5-d39d-52db98a56d7b@samsung.com>
- <c25f81e0-5b7b-c605-5b58-0ecc88830124@axentia.se>
- <20180514162828.GE28661@phenom.ffwll.local>
- <73fa1ca3-28e4-96c5-1fc6-23e9c0cebb49@axentia.se>
- <CAKMK7uECSUo5k6uG3-y+yKQTGxB3FfGcwzMT+ZP5uux2SbpfUg@mail.gmail.com>
-Message-ID: <f8215ba1-4cdb-69b9-39ff-68feca3ec502@axentia.se>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 15 May 2018 13:17:11 +0200
+Subject: [PATCH v2 4/4] ARM: PWM: add allwinner sun8i pwm support.
+In-Reply-To: <CAJeuY7-Dz1u9J8GMu=OdzJ2cJUnE3wEobJoQz6RV-ibjBjoW4A@mail.gmail.com>
+References: <20180225135308.GA14561@arx-s1>
+ <20180226090038.etk5q4pd4rl5dvf6@flea.lan>
+ <CAJeuY7-Dz1u9J8GMu=OdzJ2cJUnE3wEobJoQz6RV-ibjBjoW4A@mail.gmail.com>
+Message-ID: <20180515111711.l2g4vgsal7yr6dbr@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-15 12:22, Daniel Vetter wrote:
-> On Mon, May 14, 2018 at 10:40 PM, Peter Rosin <peda@axentia.se> wrote:
->> On 2018-05-14 18:28, Daniel Vetter wrote:
->>> On Fri, May 11, 2018 at 09:37:47AM +0200, Peter Rosin wrote:
->>>> On 2018-05-10 10:10, Andrzej Hajda wrote:
->>>>> On 04.05.2018 15:52, Peter Rosin wrote:
->>>>>> If the bridge supplier is unbound, this will bring the bridge consumer
->>>>>> down along with the bridge. Thus, there will no longer linger any
->>>>>> dangling pointers from the bridge consumer (the drm_device) to some
->>>>>> non-existent bridge supplier.
->>>>>>
->>>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
->>>>>> ---
->>>>>>  drivers/gpu/drm/drm_bridge.c | 18 ++++++++++++++++++
->>>>>>  include/drm/drm_bridge.h     |  2 ++
->>>>>>  2 files changed, 20 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
->>>>>> index 78d186b6831b..0259f0a3ff27 100644
->>>>>> --- a/drivers/gpu/drm/drm_bridge.c
->>>>>> +++ b/drivers/gpu/drm/drm_bridge.c
->>>>>> @@ -26,6 +26,7 @@
->>>>>>  #include <linux/mutex.h>
->>>>>>
->>>>>>  #include <drm/drm_bridge.h>
->>>>>> +#include <drm/drm_device.h>
->>>>>>  #include <drm/drm_encoder.h>
->>>>>>
->>>>>>  #include "drm_crtc_internal.h"
->>>>>> @@ -127,12 +128,25 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
->>>>>>    if (bridge->dev)
->>>>>>            return -EBUSY;
->>>>>>
->>>>>> +  if (encoder->dev->dev != bridge->odev) {
->>>>>
->>>>> I wonder why device_link_add does not handle this case (self dependency)
->>>>> silently as noop, as it seems to be a correct behavior.
->>>>
->>>> It's kind-of a silly corner-case though, so perfectly understandable
->>>> that it isn't handled.
->>>>
->>>>>> +          bridge->link = device_link_add(encoder->dev->dev,
->>>>>> +                                         bridge->odev, 0);
->>>>>> +          if (!bridge->link) {
->>>>>> +                  dev_err(bridge->odev, "failed to link bridge to %s\n",
->>>>>> +                          dev_name(encoder->dev->dev));
->>>>>> +                  return -EINVAL;
->>>>>> +          }
->>>>>> +  }
->>>>>> +
->>>>>>    bridge->dev = encoder->dev;
->>>>>>    bridge->encoder = encoder;
->>>>>>
->>>>>>    if (bridge->funcs->attach) {
->>>>>>            ret = bridge->funcs->attach(bridge);
->>>>>>            if (ret < 0) {
->>>>>> +                  if (bridge->link)
->>>>>> +                          device_link_del(bridge->link);
->>>>>> +                  bridge->link = NULL;
->>>>>>                    bridge->dev = NULL;
->>>>>>                    bridge->encoder = NULL;
->>>>>>                    return ret;
->>>>>> @@ -159,6 +173,10 @@ void drm_bridge_detach(struct drm_bridge *bridge)
->>>>>>    if (bridge->funcs->detach)
->>>>>>            bridge->funcs->detach(bridge);
->>>>>>
->>>>>> +  if (bridge->link)
->>>>>> +          device_link_del(bridge->link);
->>>>>> +  bridge->link = NULL;
->>>>>> +
->>>>>>    bridge->dev = NULL;
->>>>>>  }
->>>>>>
->>>>>> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
->>>>>> index b656e505d11e..804189c63a4c 100644
->>>>>> --- a/include/drm/drm_bridge.h
->>>>>> +++ b/include/drm/drm_bridge.h
->>>>>> @@ -261,6 +261,7 @@ struct drm_bridge_timings {
->>>>>>   * @list: to keep track of all added bridges
->>>>>>   * @timings: the timing specification for the bridge, if any (may
->>>>>>   * be NULL)
->>>>>> + * @link: drm consumer <-> bridge supplier
->>>>>
->>>>> Nitpick: "<->" suggests symmetry, maybe "device link from drm consumer
->>>>> to the bridge" would be better.
->>>>
->>>> I meant "<->" to indicate that the link is bidirectional, not that the
->>>> relationship is in any way symmetric. I wasn't aware of any implication
->>>> of a symmetric relationship when using "<->", do you have a reference?
->>>> But I guess the different arrow notations in math are somewhat overloaded
->>>> and that someone at some point must have used "<->" to indicate a
->>>> symmetric relationship...
->>>
->>> Yeah I agree with Andrzej here, for me <-> implies a symmetric
->>> relationship. Spelling it out like Andrzej suggested sounds like the
->>> better idea.
->>> -Daniel
->>
->> Ok, I guess that means I have to do a v3 after all. Or can this
->> trivial documentation update be done by the committer? I hate to
->> spam everyone with another volley...
->>
->> Or perhaps I should squash patches 2-23 that are all rather similar
->> and mechanic? I separated them to allow for easier review from
->> individual driver maintainers, but that didn't seem to happen
->> anyway...
-> 
-> Do another volley of the full set, or in-reply-to to just replace the
-> patch that needs to be respun (but some people don't like that).
-> 
-> When resending just make sure you're picking up all the acks/r-bs you
-> have already.
+Hi,
 
-Right, I always try to do that. One Ack that I did not include in v2
-was the one you had on v1 24/24 (i.e. this patch). The reason I did
-not add your Ack for v2 even on the patch where it obviously applied
-was that I didn't know if you'd barf on the odev name.
-
-But it was (and still is) a bit unclear if that was on Ack on the
-last patch only, or if it was for the whole series? I think it might
-have been for the whole series, but I'm not sure and I hate to be a
-presumptuous idiot...
-
-Cheers,
-Peter
-
-> -Daniel
->> Cheers,
->> Peter
->>
->>>
->>>>
->>>>> Anyway:
->>>>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->>>>
->>>> Thanks!
->>>>
->>>> Cheers,
->>>> Peter
->>>>
->>>>>  --
->>>>> Regards
->>>>> Andrzej
->>>>>
->>>>>>   * @funcs: control functions
->>>>>>   * @driver_private: pointer to the bridge driver's internal context
->>>>>>   */
->>>>>> @@ -271,6 +272,7 @@ struct drm_bridge {
->>>>>>    struct drm_bridge *next;
->>>>>>    struct list_head list;
->>>>>>    const struct drm_bridge_timings *timings;
->>>>>> +  struct device_link *link;
->>>>>>
->>>>>>    const struct drm_bridge_funcs *funcs;
->>>>>>    void *driver_private;
->>>>>
->>>>>
->>>>
->>>
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+On Mon, May 14, 2018 at 10:45:44PM +0800, Hao Zhang wrote:
+> 2018-02-26 17:00 GMT+08:00 Maxime Ripard <maxime.ripard@bootlin.com>:
+> > Thanks for respinning this serie. It looks mostly good, but you still
+> > have a quite significant number of checkpatch (--strict) warnings that
+> > you should address.
 > 
+> Thanks for reviews :) ,i'm sorry for that, it will be fixed next
+> time.  and, besides, in what situation were the checkpatch warning
+> can be ignore?
+
+The only one that can be reasonably be ignored is the long line
+warning, and only if complying to the limit would make it less easy to
+understand.
+
+> >
+> > On Sun, Feb 25, 2018 at 09:53:08PM +0800, hao_zhang wrote:
+> >> +#define CAPTURE_IRQ_ENABLE_REG       0x0010
+> >> +#define CFIE(ch)     BIT(ch << 1 + 1)
+> >> +#define CRIE(ch)     BIT(ch << 1)
+> >
+> > You should also put your argument between parentheses here (and in all
+> > your other macros).
 > 
+> Do you mean like this ?
+> #define CFIE(ch)     BIT((ch) << 1 + 1)
+> #define CRIE(ch)     BIT((ch) << 1)
+
+Yep, exactly. Otherwise, if you do something like CRIE(1 + 1), the
+result will be BIT(1 + 1 << 1), which will expand to 3, instead of 4.
+
+Also, CFIE looks a bit weird here, is it the offset that is
+incremented, or the value? You should probably have parentheses to
+make it explicit.
+
+> >
+> >> +static const u16 div_m_table[] = {
+> >> +     1,
+> >> +     2,
+> >> +     4,
+> >> +     8,
+> >> +     16,
+> >> +     32,
+> >> +     64,
+> >> +     128,
+> >> +     256
+> >> +};
+> >
+> > If this is just a power of two, you can use either the power of two /
+> > ilog2 to switch back and forth, instead of using that table.
 > 
+> I think using table is more explicit and extended...
+
+If you didn't have a simple mapping between the register values and
+the divider value, then yeah, sure. But it's not the case here.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180515/23ba351d/attachment.sig>
