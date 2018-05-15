@@ -1,65 +1,116 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 15 May 2018 12:39:26 +0200
-Subject: [GIT PULL 3/4] Rockchip dts64 updates for 4.18 round 1
-In-Reply-To: <2000491.bLgWuj0xar@phil>
-References: <2000491.bLgWuj0xar@phil>
-Message-ID: <20114925.REm1YfjZS7@phil>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 May 2018 11:39:36 +0100
+Subject: [PATCH 06/18] arm64: move sve_user_{enable, disable} to
+ <asm/fpsimd.h>
+In-Reply-To: <20180514110649.GC7753@e103592.cambridge.arm.com>
+References: <20180514094640.27569-1-mark.rutland@arm.com>
+ <20180514094640.27569-7-mark.rutland@arm.com>
+ <20180514110649.GC7753@e103592.cambridge.arm.com>
+Message-ID: <20180515103936.v5ytofdq3qqtsomn@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+On Mon, May 14, 2018 at 12:06:50PM +0100, Dave Martin wrote:
+> On Mon, May 14, 2018 at 10:46:28AM +0100, Mark Rutland wrote:
+> > In subsequent patches, we'll want to make use of sve_user_enable() and
+> > sve_user_disable() outside of kernel/fpsimd.c. Let's move these to
+> > <asm/fpsimd.h> where we can make use of them.
+> > 
+> > To avoid ifdeffery in sequences like:
+> > 
+> > if (system_supports_sve() && some_condition
+> > 	sve_user_disable();
+> > 
+> > ... empty stubs are provided when support for SVE is not enabled.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Dave Martin <dave.martin@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/include/asm/fpsimd.h | 17 ++++++++++++++++-
+> >  arch/arm64/kernel/fpsimd.c      | 11 -----------
+> >  2 files changed, 16 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> > index aa7162ae93e3..7377d7593c06 100644
+> > --- a/arch/arm64/include/asm/fpsimd.h
+> > +++ b/arch/arm64/include/asm/fpsimd.h
+> > @@ -16,11 +16,13 @@
+> >  #ifndef __ASM_FP_H
+> >  #define __ASM_FP_H
+> >  
+> > -#include <asm/ptrace.h>
+> >  #include <asm/errno.h>
+> > +#include <asm/ptrace.h>
+> > +#include <asm/sysreg.h>
+> >  
+> >  #ifndef __ASSEMBLY__
+> >  
+> > +#include <linux/build_bug.h>
+> >  #include <linux/cache.h>
+> >  #include <linux/init.h>
+> >  #include <linux/stddef.h>
+> > @@ -81,6 +83,16 @@ extern int sve_set_vector_length(struct task_struct *task,
+> >  extern int sve_set_current_vl(unsigned long arg);
+> >  extern int sve_get_current_vl(void);
+> >  
+> > +static inline void sve_user_disable(void)
+> > +{
+> > +	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
+> > +}
+> > +
+> > +static inline void sve_user_enable(void)
+> > +{
+> > +	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
+> > +}
+> > +
+> >  /*
+> >   * Probing and setup functions.
+> >   * Calls to these functions must be serialised with one another.
+> > @@ -107,6 +119,9 @@ static inline int sve_get_current_vl(void)
+> >  	return -EINVAL;
+> >  }
+> >  
+> > +static inline void sve_user_disable(void) { }
+> > +static inline void sve_user_enable(void) { }
+> > +
+> 
+> Alternatively, just move the full definitions outside the #ifdef
+> CONFIG_ARM64_SVE.
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+Can do, though I was trying to keep the exsting pattern with empty
+inlines for the !CONFIG_ARM64_SVE case.
 
-are available in the Git repository at:
+> 
+> All calls to these should be shadowed by an if
+> (system_supports_sve()) in any case, and setting/clearing ZEN_EL0EN
+> in the CPACR_EL1 ought to be harmless now that the meaning of these
+> bits architecturally committed.
+> 
+> Ideally we would have a BUG_ON(!system_supports_sve()) in those
+> functions, but we won't won't to pay the cost in a production kernel.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-dts64-1
+Earlier I'd put BUILD_BUG() in the body for the !CONFIG_ARM64_SVE case,
+to catch that kind of thing -- I could restore that.
 
-for you to fetch changes up to 17bd0737948aa841b76278a601217b914aa5f18e:
+> >  static inline void sve_init_vq_map(void) { }
+> >  static inline void sve_update_vq_map(void) { }
+> >  static inline int sve_verify_vq_map(void) { return 0; }
+> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > index 088940387a4d..79a81c7d85c6 100644
+> > --- a/arch/arm64/kernel/fpsimd.c
+> > +++ b/arch/arm64/kernel/fpsimd.c
+> > @@ -159,7 +159,6 @@ static void sve_free(struct task_struct *task)
+> >  	__sve_free(task);
+> >  }
+> >  
+> > -
+> 
+> Hmmm, Ack.  Check for conflicts with the KVM FPSIMD rework [1] (though
+> trivial).
 
-  arm64: dts: rockchip: enable hdmi on rk3399-puma-haikou (2018-05-03 14:38:20 +0200)
+I'll assume that Ack stands regardless. :)
 
-----------------------------------------------------------------
-All iommus got their clocks added and rk3399 got support for its
-usb3-phy otg-port and better ajustment for the cpll child clocks.
-On the board side, all rk3399 got their typec phys enabled - which
-is needed for better usb support, the sapphire board got some more
-properties moved to the excavator baseboard where they really belong,
-kevin got a fix to use a real devicetree compatible and puma-haikou
-got its hdmi port enabled.
-
-----------------------------------------------------------------
-Dmitry Torokhov (1):
-      arm64: dts: rockchip: use canonical compatible for touchpad/touchscreen on gru-kevin
-
-Enric Balletbo i Serra (5):
-      arm64: dts: rockchip: enable typec-phy for rk3399-sapphire
-      arm64: dts: rockchip: enable typec-phy for rk3399-firefly
-      arm64: dts: rockchip: enable typec-phy1 for rk3399-puma
-      arm64: dts: rockchip: enable typec-phy0 for rk3399-puma-haikou
-      arm64: dts: rockchip: add usb3-phy otg-port support for rk3399
-
-Jakob Unterwurzacher (1):
-      arm64: dts: rockchip: enable hdmi on rk3399-puma-haikou
-
-Jeffy Chen (1):
-      arm64: dts: rockchip: add clocks in iommu nodes
-
-Lin Huang (1):
-      arm64: dts: rockchip: assign clock rate for cpll child clocks on rk3399
-
-Vicente Bergas (2):
-      arm64: dts: rockchip: move rk3399-sapphire PCIe to excavator baseboard
-      arm64: dts: rockchip: remove PCIe assigned-clocks in excavator baseboard
-
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 10 ++++++
- arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 10 ++++++
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts    |  8 +++++
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  |  4 +--
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       |  8 +++--
- .../arm64/boot/dts/rockchip/rk3399-puma-haikou.dts | 25 +++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi      |  4 +++
- .../dts/rockchip/rk3399-sapphire-excavator.dts     | 12 ++++++++
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi  | 23 +++++---------
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 36 ++++++++++++++++------
- 10 files changed, 111 insertions(+), 29 deletions(-)
+Thanks,
+Mark.
