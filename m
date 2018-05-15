@@ -1,278 +1,222 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 15 May 2018 18:11:15 +0100
-Subject: [PATCH v9 07/11] arm64: kexec_file: add crash dump support
-In-Reply-To: <20180425062629.29404-8-takahiro.akashi@linaro.org>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-8-takahiro.akashi@linaro.org>
-Message-ID: <f8d8305d-42f5-e1e2-20c4-733cb38cbb8d@arm.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 15 May 2018 12:15:08 -0500
+Subject: [PATCH v9 02/12] drivers: base: cacheinfo: setup DT cache
+ properties early
+In-Reply-To: <20180511235807.30834-3-jeremy.linton@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180511235807.30834-3-jeremy.linton@arm.com>
+Message-ID: <78b08b68-ff57-8dd8-6eb1-00548f275eac@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+Hi Greg,
 
-On 25/04/18 07:26, AKASHI Takahiro wrote:
-> Enabling crash dump (kdump) includes
-> * prepare contents of ELF header of a core dump file, /proc/vmcore,
->   using crash_prepare_elf64_headers(), and
-> * add two device tree properties, "linux,usable-memory-range" and
->   "linux,elfcorehdr", which represent repsectively a memory range
+Have you had a chance to look at the cachinfo parts of this patch?
 
-(Nit: respectively)
-
-
->   to be used by crash dump kernel and the header's location
-
->  arch/arm64/include/asm/kexec.h         |   4 +
->  arch/arm64/kernel/kexec_image.c        |   9 +-
->  arch/arm64/kernel/machine_kexec_file.c | 202 +++++++++++++++++++++++++
-
-In this patch, machine_kexec_file.c gains its own private fdt array encoder.
-
-
-> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-> index 37c0a9dc2e47..ec674f4d267c 100644
-> --- a/arch/arm64/kernel/machine_kexec_file.c
-> +++ b/arch/arm64/kernel/machine_kexec_file.c
-> @@ -76,6 +81,78 @@ int arch_kexec_walk_mem(struct kexec_buf *kbuf,
->  	return ret;
->  }
->  
-> +static int __init arch_kexec_file_init(void)
-> +{
-> +	/* Those values are used later on loading the kernel */
-> +	__dt_root_addr_cells = dt_root_addr_cells;
-> +	__dt_root_size_cells = dt_root_size_cells;
-> +
-> +	return 0;
-> +}
-> +late_initcall(arch_kexec_file_init);
-
-If we need these is it worth taking them out of __initdata? I note they've been
-'temporary' for quite a long time.
-
-
-> +
-> +#define FDT_ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
-> +#define FDT_TAGALIGN(x)	(FDT_ALIGN((x), FDT_TAGSIZE))
-> +
-> +static int fdt_prop_len(const char *prop_name, int len)
-> +{
-> +	return (strlen(prop_name) + 1) +
-> +		sizeof(struct fdt_property) +
-> +		FDT_TAGALIGN(len);
-> +}
-
-This stuff should really be in libfdt.h  Those macros come from
-libfdt_internal.h, so we're probably doing something wrong here.
-
-
-> +static bool cells_size_fitted(unsigned long base, unsigned long size)
-> +{
-> +	/* if *_cells >= 2, cells can hold 64-bit values anyway */
-> +	if ((__dt_root_addr_cells == 1) && (base >= (1ULL << 32)))
-> +		return false;
-> +
-> +	if ((__dt_root_size_cells == 1) && (size >= (1ULL << 32)))
-> +		return false;
-
-Using '> U32_MAX' here may be more readable.
-
-
-> +	return true;
-> +}
-> +
-> +static void fill_property(void *buf, u64 val64, int cells)
-> +{
-> +	u32 val32;
-> +
-> +	if (cells == 1) {
-> +		val32 = cpu_to_fdt32((u32)val64);
-> +		memcpy(buf, &val32, sizeof(val32));
-> +	} else {
-
-> +		memset(buf, 0, cells * sizeof(u32) - sizeof(u64));
-> +		buf += cells * sizeof(u32) - sizeof(u64);
-
-Is this trying to clear the 'top' cells and shuffle the pointer to point at the
-'bottom' 2? I'm pretty sure this isn't endian safe.
-
-Do we really expect a system to have #address-cells > 2?
-
-
-> +		val64 = cpu_to_fdt64(val64);
-> +		memcpy(buf, &val64, sizeof(val64));
-> +	}
-> +}
-> +
-> +static int fdt_setprop_range(void *fdt, int nodeoffset, const char *name,
-> +				unsigned long addr, unsigned long size)
-
-(the device-tree spec describes a 'ranges' property, which had me confused. This
-is encoding a prop-encoded-array)
-
-> +{
-> +	void *buf, *prop;
-> +	size_t buf_size;
-> +	int result;
-> +
-> +	buf_size = (__dt_root_addr_cells + __dt_root_size_cells) * sizeof(u32);
-> +	prop = buf = vmalloc(buf_size);
-
-virtual memory allocation for something less than PAGE_SIZE?
-
-
-> +	if (!buf)
-> +		return -ENOMEM;
-> +
-> +	fill_property(prop, addr, __dt_root_addr_cells);
-> +	prop += __dt_root_addr_cells * sizeof(u32);
-> +
-> +	fill_property(prop, size, __dt_root_size_cells);
-> +
-> +	result = fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
-> +
-> +	vfree(buf);
-> +
-> +	return result;
-> +}
-
-Doesn't this stuff belong in libfdt? I guess there is no 'add array element' api
-because this the first time we've wanted to create a node with more than
-key=fixed-size-value.
-
-I don't think this belongs in arch C code. Do we have a plan for getting libfdt
-to support encoding prop-arrays? Can we put it somewhere anyone else duplicating
-this will find it, until we can (re)move it?
-
-I have no idea how that happens... it looks like the devicetree list is the
-place to ask.
-
-
->  static int setup_dtb(struct kimage *image,
->  		unsigned long initrd_load_addr, unsigned long initrd_len,
->  		char *cmdline, unsigned long cmdline_len,
-> @@ -88,10 +165,26 @@ static int setup_dtb(struct kimage *image,
->  	int range_len;
->  	int ret;
->  
-> +	/* check ranges against root's #address-cells and #size-cells */
-> +	if (image->type == KEXEC_TYPE_CRASH &&
-> +		(!cells_size_fitted(image->arch.elf_load_addr,
-> +				image->arch.elf_headers_sz) ||
-> +		 !cells_size_fitted(crashk_res.start,
-> +				crashk_res.end - crashk_res.start + 1))) {
-> +		pr_err("Crash memory region doesn't fit into DT's root cell sizes.\n");
-> +		ret = -EINVAL;
-> +		goto out_err;
-> +	}
-
-To check I've understood this properly: This can happen if the firmware provided
-a DTB with 32bit address/size cells, but at least some of the memory requires 64
-bit address/size cells. This could only happen on a UEFI system where the
-firmware-DTB doesn't describe memory. ACPI-only systems would have the EFIstub DT.
-
-
->  	/* duplicate dt blob */
->  	buf_size = fdt_totalsize(initial_boot_params);
->  	range_len = (__dt_root_addr_cells + __dt_root_size_cells) * sizeof(u32);
->  
-> +	if (image->type == KEXEC_TYPE_CRASH)
-> +		buf_size += fdt_prop_len("linux,elfcorehdr", range_len)
-> +				+ fdt_prop_len("linux,usable-memory-range",
-> +								range_len);
-> +
->  	if (initrd_load_addr)
->  		buf_size += fdt_prop_len("linux,initrd-start", sizeof(u64))
->  				+ fdt_prop_len("linux,initrd-end", sizeof(u64));
-> @@ -113,6 +206,23 @@ static int setup_dtb(struct kimage *image,
->  	if (nodeoffset < 0)
->  		goto out_err;
->  
-> +	if (image->type == KEXEC_TYPE_CRASH) {
-> +		/* add linux,elfcorehdr */
-> +		ret = fdt_setprop_range(buf, nodeoffset, "linux,elfcorehdr",
-> +				image->arch.elf_load_addr,
-> +				image->arch.elf_headers_sz);
-> +		if (ret)
-> +			goto out_err;
-> +
-> +		/* add linux,usable-memory-range */
-> +		ret = fdt_setprop_range(buf, nodeoffset,
-> +				"linux,usable-memory-range",
-> +				crashk_res.start,
-> +				crashk_res.end - crashk_res.start + 1);
-
-Don't you need to add "linux,usable-memory-range" to the buf_size estimate?
-
-
-> +		if (ret)
-> +			goto out_err;
-> +	}
-
-> @@ -148,17 +258,109 @@ static int setup_dtb(struct kimage *image,
-
-> +static struct crash_mem *get_crash_memory_ranges(void)
-> +{
-> +	unsigned int nr_ranges;
-> +	struct crash_mem *cmem;
-> +
-> +	nr_ranges = 1; /* for exclusion of crashkernel region */
-> +	walk_system_ram_res(0, -1, &nr_ranges, get_nr_ranges_callback);
-> +
-> +	cmem = vmalloc(sizeof(struct crash_mem) +
-> +			sizeof(struct crash_mem_range) * nr_ranges);
-> +	if (!cmem)
-> +		return NULL;
-> +
-> +	cmem->max_nr_ranges = nr_ranges;
-> +	cmem->nr_ranges = 0;
-> +	walk_system_ram_res(0, -1, cmem, add_mem_range_callback);
-> +
-> +	/* Exclude crashkernel region */
-> +	if (crash_exclude_mem_range(cmem, crashk_res.start, crashk_res.end)) {
-> +		vfree(cmem);
-> +		return NULL;
-> +	}
-> +
-> +	return cmem;
-> +}
-
-Could this function be included in prepare_elf_headers() so that the alloc() and
-free() occur together.
-
-
-> +static int prepare_elf_headers(void **addr, unsigned long *sz)
-> +{
-> +	struct crash_mem *cmem;
-> +	int ret = 0;
-> +
-> +	cmem = get_crash_memory_ranges();
-> +	if (!cmem)
-> +		return -ENOMEM;
-> +
-> +	ret =  crash_prepare_elf64_headers(cmem, true, addr, sz);
-> +
-> +	vfree(cmem);
-
-> +	return ret;
-> +}
-
-All this is moving memory-range information from core-code's
-walk_system_ram_res() into core-code's struct crash_mem, and excluding
-crashk_res, which again is accessible to the core code.
-
-It looks like this is duplicated in arch/x86 and arch/arm64 because arm64
-doesn't have a second 'crashk_low_res' region, and always wants elf64, instead
-of when IS_ENABLED(CONFIG_X86_64).
-If we can abstract just those two, more of this could be moved to core code
-where powerpc can make use of it if they want to support kdump with
-kexec_file_load().
-
-But, its getting late for cross-architecture dependencies, lets put that on the
-for-later list. (assuming there isn't a powerpc-kdump series out there adding a
-third copy of this)
-
+Comments?
 
 Thanks,
 
-James
+
+
+
+On 05/11/2018 06:57 PM, Jeremy Linton wrote:
+> The original intent in cacheinfo was that an architecture
+> specific populate_cache_leaves() would probe the hardware
+> and then cache_shared_cpu_map_setup() and
+> cache_override_properties() would provide firmware help to
+> extend/expand upon what was probed. Arm64 was really
+> the only architecture that was working this way, and
+> with the removal of most of the hardware probing logic it
+> became clear that it was possible to simplify the logic a bit.
+> 
+> This patch combines the walk of the DT nodes with the
+> code updating the cache size/line_size and nr_sets.
+> cache_override_properties() (which was DT specific) is
+> then removed. The result is that cacheinfo.of_node is
+> no longer used as a temporary place to hold DT references
+> for future calls that update cache properties. That change
+> helps to clarify its one remaining use (matching
+> cacheinfo nodes that represent shared caches) which
+> will be used by the ACPI/PPTT code in the following patches.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Tested-by: Vijaya Kumar K <vkilari@codeaurora.org>
+> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+> Tested-by: Tomasz Nowicki <Tomasz.Nowicki@cavium.com>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>   arch/riscv/kernel/cacheinfo.c |  1 -
+>   drivers/base/cacheinfo.c      | 65 +++++++++++++++++++------------------------
+>   2 files changed, 29 insertions(+), 37 deletions(-)
+> 
+> diff --git a/arch/riscv/kernel/cacheinfo.c b/arch/riscv/kernel/cacheinfo.c
+> index 10ed2749e246..0bc86e5f8f3f 100644
+> --- a/arch/riscv/kernel/cacheinfo.c
+> +++ b/arch/riscv/kernel/cacheinfo.c
+> @@ -20,7 +20,6 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+>   			 struct device_node *node,
+>   			 enum cache_type type, unsigned int level)
+>   {
+> -	this_leaf->of_node = node;
+>   	this_leaf->level = level;
+>   	this_leaf->type = type;
+>   	/* not a sector cache */
+> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+> index 09ccef7ddc99..a872523e8951 100644
+> --- a/drivers/base/cacheinfo.c
+> +++ b/drivers/base/cacheinfo.c
+> @@ -71,7 +71,7 @@ static inline int get_cacheinfo_idx(enum cache_type type)
+>   	return type;
+>   }
+>   
+> -static void cache_size(struct cacheinfo *this_leaf)
+> +static void cache_size(struct cacheinfo *this_leaf, struct device_node *np)
+>   {
+>   	const char *propname;
+>   	const __be32 *cache_size;
+> @@ -80,13 +80,14 @@ static void cache_size(struct cacheinfo *this_leaf)
+>   	ct_idx = get_cacheinfo_idx(this_leaf->type);
+>   	propname = cache_type_info[ct_idx].size_prop;
+>   
+> -	cache_size = of_get_property(this_leaf->of_node, propname, NULL);
+> +	cache_size = of_get_property(np, propname, NULL);
+>   	if (cache_size)
+>   		this_leaf->size = of_read_number(cache_size, 1);
+>   }
+>   
+>   /* not cache_line_size() because that's a macro in include/linux/cache.h */
+> -static void cache_get_line_size(struct cacheinfo *this_leaf)
+> +static void cache_get_line_size(struct cacheinfo *this_leaf,
+> +				struct device_node *np)
+>   {
+>   	const __be32 *line_size;
+>   	int i, lim, ct_idx;
+> @@ -98,7 +99,7 @@ static void cache_get_line_size(struct cacheinfo *this_leaf)
+>   		const char *propname;
+>   
+>   		propname = cache_type_info[ct_idx].line_size_props[i];
+> -		line_size = of_get_property(this_leaf->of_node, propname, NULL);
+> +		line_size = of_get_property(np, propname, NULL);
+>   		if (line_size)
+>   			break;
+>   	}
+> @@ -107,7 +108,7 @@ static void cache_get_line_size(struct cacheinfo *this_leaf)
+>   		this_leaf->coherency_line_size = of_read_number(line_size, 1);
+>   }
+>   
+> -static void cache_nr_sets(struct cacheinfo *this_leaf)
+> +static void cache_nr_sets(struct cacheinfo *this_leaf, struct device_node *np)
+>   {
+>   	const char *propname;
+>   	const __be32 *nr_sets;
+> @@ -116,7 +117,7 @@ static void cache_nr_sets(struct cacheinfo *this_leaf)
+>   	ct_idx = get_cacheinfo_idx(this_leaf->type);
+>   	propname = cache_type_info[ct_idx].nr_sets_prop;
+>   
+> -	nr_sets = of_get_property(this_leaf->of_node, propname, NULL);
+> +	nr_sets = of_get_property(np, propname, NULL);
+>   	if (nr_sets)
+>   		this_leaf->number_of_sets = of_read_number(nr_sets, 1);
+>   }
+> @@ -135,32 +136,27 @@ static void cache_associativity(struct cacheinfo *this_leaf)
+>   		this_leaf->ways_of_associativity = (size / nr_sets) / line_size;
+>   }
+>   
+> -static bool cache_node_is_unified(struct cacheinfo *this_leaf)
+> +static bool cache_node_is_unified(struct cacheinfo *this_leaf,
+> +				  struct device_node *np)
+>   {
+> -	return of_property_read_bool(this_leaf->of_node, "cache-unified");
+> +	return of_property_read_bool(np, "cache-unified");
+>   }
+>   
+> -static void cache_of_override_properties(unsigned int cpu)
+> +static void cache_of_set_props(struct cacheinfo *this_leaf,
+> +			       struct device_node *np)
+>   {
+> -	int index;
+> -	struct cacheinfo *this_leaf;
+> -	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+> -
+> -	for (index = 0; index < cache_leaves(cpu); index++) {
+> -		this_leaf = this_cpu_ci->info_list + index;
+> -		/*
+> -		 * init_cache_level must setup the cache level correctly
+> -		 * overriding the architecturally specified levels, so
+> -		 * if type is NONE at this stage, it should be unified
+> -		 */
+> -		if (this_leaf->type == CACHE_TYPE_NOCACHE &&
+> -		    cache_node_is_unified(this_leaf))
+> -			this_leaf->type = CACHE_TYPE_UNIFIED;
+> -		cache_size(this_leaf);
+> -		cache_get_line_size(this_leaf);
+> -		cache_nr_sets(this_leaf);
+> -		cache_associativity(this_leaf);
+> -	}
+> +	/*
+> +	 * init_cache_level must setup the cache level correctly
+> +	 * overriding the architecturally specified levels, so
+> +	 * if type is NONE at this stage, it should be unified
+> +	 */
+> +	if (this_leaf->type == CACHE_TYPE_NOCACHE &&
+> +	    cache_node_is_unified(this_leaf, np))
+> +		this_leaf->type = CACHE_TYPE_UNIFIED;
+> +	cache_size(this_leaf, np);
+> +	cache_get_line_size(this_leaf, np);
+> +	cache_nr_sets(this_leaf, np);
+> +	cache_associativity(this_leaf);
+>   }
+>   
+>   static int cache_setup_of_node(unsigned int cpu)
+> @@ -193,6 +189,7 @@ static int cache_setup_of_node(unsigned int cpu)
+>   			np = of_node_get(np);/* cpu node itself */
+>   		if (!np)
+>   			break;
+> +		cache_of_set_props(this_leaf, np);
+>   		this_leaf->of_node = np;
+>   		index++;
+>   	}
+> @@ -203,7 +200,6 @@ static int cache_setup_of_node(unsigned int cpu)
+>   	return 0;
+>   }
+>   #else
+> -static void cache_of_override_properties(unsigned int cpu) { }
+>   static inline int cache_setup_of_node(unsigned int cpu) { return 0; }
+>   static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+>   					   struct cacheinfo *sib_leaf)
+> @@ -286,12 +282,6 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
+>   	}
+>   }
+>   
+> -static void cache_override_properties(unsigned int cpu)
+> -{
+> -	if (of_have_populated_dt())
+> -		return cache_of_override_properties(cpu);
+> -}
+> -
+>   static void free_cache_attributes(unsigned int cpu)
+>   {
+>   	if (!per_cpu_cacheinfo(cpu))
+> @@ -325,6 +315,10 @@ static int detect_cache_attributes(unsigned int cpu)
+>   	if (per_cpu_cacheinfo(cpu) == NULL)
+>   		return -ENOMEM;
+>   
+> +	/*
+> +	 * populate_cache_leaves() may completely setup the cache leaves and
+> +	 * shared_cpu_map or it may leave it partially setup.
+> +	 */
+>   	ret = populate_cache_leaves(cpu);
+>   	if (ret)
+>   		goto free_ci;
+> @@ -338,7 +332,6 @@ static int detect_cache_attributes(unsigned int cpu)
+>   		goto free_ci;
+>   	}
+>   
+> -	cache_override_properties(cpu);
+>   	return 0;
+>   
+>   free_ci:
+> 
