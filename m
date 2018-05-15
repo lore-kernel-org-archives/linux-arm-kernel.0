@@ -1,46 +1,135 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 15 May 2018 09:41:24 +0530
-Subject: [PATCH v6 14/14] dt: qcom: Add qcom-cpufreq-kryo driver
- configuration
-In-Reply-To: <1526303520-5843-15-git-send-email-ilialin@codeaurora.org>
-References: <1526303520-5843-1-git-send-email-ilialin@codeaurora.org>
- <1526303520-5843-15-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180515041124.7e7qkzqd2jkokqhz@vireshk-i7>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 15 May 2018 12:23:33 +0800
+Subject: [PATCH] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+ demodulator driver
+In-Reply-To: <20180515003749.9980-1-suzuki.katsuhiro@socionext.com>
+References: <20180515003749.9980-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <201805151022.Jp9guzZj%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-05-18, 16:12, Ilia Lin wrote:
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> ---
->  arch/arm64/boot/dts/qcom/apq8096-db820c.dts |   2 +-
->  arch/arm64/boot/dts/qcom/msm8996.dtsi       | 310 +++++++++++++++++++++++++++-
->  2 files changed, 309 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
-> index 230e9c8..da23bda 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
-> +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
-> @@ -17,5 +17,5 @@
->  
->  / {
->  	model = "Qualcomm Technologies, Inc. DB820c";
-> -	compatible = "arrow,apq8096-db820c", "qcom,apq8096-sbc";
-> +	compatible = "arrow,apq8096-db820c", "qcom,apq8096-sbc", "qcom,apq8096";
->  };
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index d7adef9..fbf92f6 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> @@ -174,218 +174,519 @@
->  	};
->  
->  	cluster0_opp: opp_table0 {
-> -		compatible = "operating-points-v2";
-> +		compatible = "operating-points-v2-kryo-cpu";
+Hi Katsuhiro,
 
-I think you need to mention both the above compatible strings here
-with the kyro one mentioned first.
+I love your patch! Perhaps something to improve:
+
+[auto build test WARNING on linuxtv-media/master]
+[also build test WARNING on v4.17-rc5 next-20180514]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Katsuhiro-Suzuki/media-dvb-frontends-add-Socionext-SC1501A-ISDB-S-T-demodulator-driver/20180515-091453
+base:   git://linuxtv.org/media_tree.git master
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
 
--- 
-viresh
+sparse warnings: (new ones prefixed by >>)
+
+>> drivers/media/dvb-frontends/sc1501a.c:313:47: sparse: constant 211243671486 is so big it is long
+
+vim +313 drivers/media/dvb-frontends/sc1501a.c
+
+   258	
+   259	static int sc1501a_s_read_status(struct sc1501a_priv *chip,
+   260					 struct dtv_frontend_properties *c,
+   261					 enum fe_status *status)
+   262	{
+   263		struct regmap *r_s = chip->regmap_s;
+   264		u32 cpmon, tmpu, tmpl, flg;
+   265		u64 tmp;
+   266	
+   267		/* Sync detection */
+   268		regmap_read(r_s, CPMON1_S, &cpmon);
+   269	
+   270		*status = 0;
+   271		if (cpmon & CPMON1_S_FSYNC)
+   272			*status |= FE_HAS_VITERBI | FE_HAS_SYNC | FE_HAS_LOCK;
+   273		if (cpmon & CPMON1_S_W2LOCK)
+   274			*status |= FE_HAS_SIGNAL | FE_HAS_CARRIER;
+   275	
+   276		/* Signal strength */
+   277		c->strength.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+   278	
+   279		if (*status & FE_HAS_SIGNAL) {
+   280			u32 agc;
+   281	
+   282			regmap_read(r_s, AGCREAD_S, &tmpu);
+   283			agc = tmpu << 8;
+   284	
+   285			c->strength.len = 1;
+   286			c->strength.stat[0].scale = FE_SCALE_RELATIVE;
+   287			c->strength.stat[0].uvalue = agc;
+   288		}
+   289	
+   290		/* C/N rate */
+   291		c->cnr.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+   292	
+   293		if (*status & FE_HAS_VITERBI) {
+   294			u32 cnr = 0, x, y, d;
+   295			u64 d_3 = 0;
+   296	
+   297			regmap_read(r_s, CNRDXU_S, &tmpu);
+   298			regmap_read(r_s, CNRDXL_S, &tmpl);
+   299			x = (tmpu << 8) | tmpl;
+   300			regmap_read(r_s, CNRDYU_S, &tmpu);
+   301			regmap_read(r_s, CNRDYL_S, &tmpl);
+   302			y = (tmpu << 8) | tmpl;
+   303	
+   304			/* CNR[dB]: 10 * log10(D) - 30.74 / D^3 - 3 */
+   305			/*   D = x^2 / (2^15 * y - x^2) */
+   306			d = (y << 15) - x * x;
+   307			if (d > 0) {
+   308				/* (2^4 * D)^3 = 2^12 * D^3 */
+   309				/* 3.074 * 2^(12 + 24) = 211243671486 */
+   310				d_3 = div_u64(16 * x * x, d);
+   311				d_3 = d_3 * d_3 * d_3;
+   312				if (d_3)
+ > 313					d_3 = div_u64(211243671486, d_3);
+   314			}
+   315	
+   316			if (d_3) {
+   317				/* 0.3 * 2^24 = 5033164 */
+   318				tmp = (s64)2 * intlog10(x) - intlog10(abs(d)) - d_3
+   319					- 5033164;
+   320				cnr = div_u64(tmp * 10000, 1 << 24);
+   321			}
+   322	
+   323			if (cnr) {
+   324				c->cnr.len = 1;
+   325				c->cnr.stat[0].scale = FE_SCALE_DECIBEL;
+   326				c->cnr.stat[0].uvalue = cnr;
+   327			}
+   328		}
+   329	
+   330		/* BER */
+   331		c->post_bit_error.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+   332		c->post_bit_count.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
+   333	
+   334		regmap_read(r_s, BERCNFLG_S, &flg);
+   335	
+   336		if ((*status & FE_HAS_VITERBI) && (flg & BERCNFLG_S_BERVRDY)) {
+   337			u32 bit_err, bit_cnt;
+   338	
+   339			regmap_read(r_s, BERVRDU_S, &tmpu);
+   340			regmap_read(r_s, BERVRDL_S, &tmpl);
+   341			bit_err = (tmpu << 8) | tmpl;
+   342			bit_cnt = (1 << 13) * 204;
+   343	
+   344			if (bit_cnt) {
+   345				c->post_bit_error.len = 1;
+   346				c->post_bit_error.stat[0].scale = FE_SCALE_COUNTER;
+   347				c->post_bit_error.stat[0].uvalue = bit_err;
+   348				c->post_bit_count.len = 1;
+   349				c->post_bit_count.stat[0].scale = FE_SCALE_COUNTER;
+   350				c->post_bit_count.stat[0].uvalue = bit_cnt;
+   351			}
+   352		}
+   353	
+   354		return 0;
+   355	}
+   356	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
