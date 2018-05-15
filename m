@@ -1,41 +1,18 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 15 May 2018 10:34:18 +0100
-Subject: [PATCH v6 04/11] firmware: xilinx: Add query data API
-In-Reply-To: <SN1PR02MB37587E3AB2718E1DB510E35AB89C0@SN1PR02MB3758.namprd02.prod.outlook.com>
-References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
- <1523389127-14243-5-git-send-email-jollys@xilinx.com>
- <85f8f8c5-a177-dad8-e095-a9dd1c513e8d@arm.com>
- <SN1PR02MB37587E3AB2718E1DB510E35AB89C0@SN1PR02MB3758.namprd02.prod.outlook.com>
-Message-ID: <ab9632f5-882d-462d-d830-0316cad56baf@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 15 May 2018 11:46:41 +0200
+Subject: [PATCH 27/61] media: platform: s5p-mfc: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-28-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-28-wsa+renesas@sang-engineering.com>
+ <CGME20180515094647epcas1p49b3c5d47dcedd034aec9589aab473cc0@epcas1p4.samsung.com>
+Message-ID: <0684984f-6e52-5e91-f6bb-1084c588e1b4@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 14/05/18 20:16, Jolly Shah wrote:
-> HI Sudeep,
+On 04/19/2018 04:05 PM, Wolfram Sang wrote:
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
 > 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-[...]
-
->> 
->> Can you give more insight into this ? How will be this used ? How
->> this aligns with data we get from DT ? I am just trying to
->> understand how is this information split between this API and DT
->> for example.
->> 
-> 
-> This API is used to get clock information from firmware and register
-> clocks accordingly in driver. In our case, firmware maintains
-> database of all clocks available on chip. DT will provide information
-> for off chip reference clocks only. This is to avoid duplication of
-> clocks data in DT and firmware both as firmware anyways need clock
-> data to manage them.
-> 
-
-I wanted to understand the difference with example. What kind of
-information you get from DT and what you get from firmware ?
-
--- 
-Regards,
-Sudeep
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
