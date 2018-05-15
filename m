@@ -1,65 +1,30 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 15 May 2018 17:13:29 +0800
-Subject: [PATCH] ARM: dts: imx7d: correct cpu supply name for voltage scaling
-Message-ID: <1526375609-17676-1-git-send-email-Anson.Huang@nxp.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Tue, 15 May 2018 17:16:36 +0800
+Subject: [PATCH] ARM: dts: berlin2q: fix irq type for arm twd timer
+Message-ID: <20180515171636.6414cbc5@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct CPU supply name to meet cpufreq-dt driver's
-requirement for voltage scaling.
+fix below warning about PPI interrupts configuration:
+"GIC: PPI13 is secure or misconfigured"
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 ---
- arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 4 ++--
- arch/arm/boot/dts/imx7d-nitrogen7.dts   | 2 +-
- arch/arm/boot/dts/imx7d-sdb.dts         | 2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-index 7f64568..60deaf9 100644
---- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-+++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-@@ -33,7 +33,7 @@
- };
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 7cba798152b9..f11254e70f57 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -164,7 +164,7 @@
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xad0600 0x20>;
+ 			clocks = <&chip_clk CLKID_TWD>;
+-			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
+ 		};
  
- &cpu0 {
--	arm-supply = <&sw1a_reg>;
-+	cpu-supply = <&sw1a_reg>;
- };
- 
- &fec1 {
-@@ -284,4 +284,4 @@
- 			MX7D_PAD_LPSR_GPIO1_IO05__GPIO1_IO5	0x14 /* OTG PWREN */
- 		>;
- 	};
--};
-\ No newline at end of file
-+};
-diff --git a/arch/arm/boot/dts/imx7d-nitrogen7.dts b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-index b8e73b4..70c53e5 100644
---- a/arch/arm/boot/dts/imx7d-nitrogen7.dts
-+++ b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-@@ -144,7 +144,7 @@
- };
- 
- &cpu0 {
--	arm-supply = <&sw1a_reg>;
-+	cpu-supply = <&sw1a_reg>;
- };
- 
- &fec1 {
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 722a45a..9408491 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -141,7 +141,7 @@
- };
- 
- &cpu0 {
--	arm-supply = <&sw1a_reg>;
-+	cpu-supply = <&sw1a_reg>;
- };
- 
- &ecspi3 {
+ 		gic: interrupt-controller at ad1000 {
 -- 
-2.7.4
+2.17.0
