@@ -1,56 +1,51 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 15 May 2018 15:47:34 +0200
-Subject: [PATCH v3 4/6] drm/rockchip: dw_hdmi: allow including external phys
+Date: Tue, 15 May 2018 15:47:32 +0200
+Subject: [PATCH v3 2/6] drm/rockchip: dw_hdmi: Allow outputs that don't need
+ output switching
 In-Reply-To: <20180515134736.5824-1-heiko@sntech.de>
 References: <20180515134736.5824-1-heiko@sntech.de>
-Message-ID: <20180515134736.5824-5-heiko@sntech.de>
+Message-ID: <20180515134736.5824-3-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some variants of the dw-hdmi on Rockchip socs use a separate phy block
-accessed via the generic phy framework, so allow them to be included
-if such a phy reference is found.
+So far we always encountered socs with 2 output crtcs needing the driver
+to tell the hdmi block which output to connect to. But there also exist
+socs with only one crtc like the rk3228, rk3328 and rk3368.
+
+So adapt the register field to simply carry a negative value to signal
+that no output-switching is necessary.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Tested-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+changes in v3:
+- fixed wording issue found by Robin Murphy
+
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index b09c3531305b..57e76dfd5f6d 100644
+index 11309a2a4e43..b09c3531305b 100644
 --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -11,6 +11,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/phy/phy.h>
- #include <linux/regmap.h>
- 
- #include <drm/drm_of.h>
-@@ -49,6 +50,7 @@ struct rockchip_hdmi {
- 	struct clk *vpll_clk;
- 	struct clk *grf_clk;
- 	struct dw_hdmi *hdmi;
-+	struct phy *phy;
+@@ -36,7 +36,7 @@
+  * @lcdsel_lit: reg value of selecting vop little for HDMI
+  */
+ struct rockchip_hdmi_chip_data {
+-	u32	lcdsel_grf_reg;
++	int	lcdsel_grf_reg;
+ 	u32	lcdsel_big;
+ 	u32	lcdsel_lit;
  };
+@@ -245,6 +245,9 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
+ 	u32 val;
+ 	int ret;
  
- #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-@@ -376,6 +378,14 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 		return ret;
- 	}
- 
-+	hdmi->phy = devm_phy_optional_get(dev, "hdmi");
-+	if (IS_ERR(hdmi->phy)) {
-+		ret = PTR_ERR(hdmi->phy);
-+		if (ret != -EPROBE_DEFER)
-+			DRM_DEV_ERROR(hdmi->dev, "failed to get phy\n");
-+		return ret;
-+	}
++	if (hdmi->chip_data->lcdsel_grf_reg < 0)
++		return;
 +
- 	drm_encoder_helper_add(encoder, &dw_hdmi_rockchip_encoder_helper_funcs);
- 	drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
- 			 DRM_MODE_ENCODER_TMDS, NULL);
+ 	ret = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
+ 	if (ret)
+ 		val = hdmi->chip_data->lcdsel_lit;
 -- 
 2.17.0
