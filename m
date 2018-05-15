@@ -1,24 +1,29 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 May 2018 17:53:42 -0700
-Subject: [PATCH] PM / Domains: Don't return -EEXIST at attach when PM
- domain exists
-In-Reply-To: <1526309557-7995-1-git-send-email-ulf.hansson@linaro.org>
-References: <1526309557-7995-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20180515005342.GM98604@atomide.com>
+Date: Mon, 14 May 2018 17:54:42 -0700
+Subject: [PATCH 07/11] driver core: Respect all error codes from
+ dev_pm_domain_attach()
+In-Reply-To: <CAPDyKFqY5u3=db7-Xd9JXWo228PSNbH7-m-QNfSY9z8Z3p8t8A@mail.gmail.com>
+References: <1524732790-2234-1-git-send-email-ulf.hansson@linaro.org>
+ <1524732790-2234-8-git-send-email-ulf.hansson@linaro.org>
+ <20180514151907.GK98604@atomide.com>
+ <CAPDyKFqY5u3=db7-Xd9JXWo228PSNbH7-m-QNfSY9z8Z3p8t8A@mail.gmail.com>
+Message-ID: <20180515005442.GN98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [180514 14:55]:
-> As dev_pm_domain_attach() isn't the only way to assign PM domain pointers
-> to devices, clearly we must allow a device to have the pointer already
-> being assigned. For this reason, return 0 instead of -EEXIST.
+* Ulf Hansson <ulf.hansson@linaro.org> [180514 18:59]:
+> On 14 May 2018 at 17:19, Tony Lindgren <tony@atomide.com> wrote:
+> > Reverting for 8c123c14bbba ("driver core: Respect all error codes from
+> > dev_pm_domain_attach()") fixes the issue for me.
+> >
+> > Sounds like something is missing, any ideas?
 > 
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Tested-by: Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
+> This should solve the problem:
+> 
+> https://patchwork.kernel.org/patch/10398597/
 
-Fixes the issue for me too:
+Thanks yeah that fixes it for me too.
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+Regards,
+
+Tony
