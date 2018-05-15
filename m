@@ -1,52 +1,69 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 15 May 2018 09:07:44 -0600
-Subject: [PATCH 1/4] amba: Export amba_bustype
-In-Reply-To: <20180515093718.19ca71295fc36fe65c5df021@arm.com>
-References: <20180508140628.f30774c70c4c481bff3f8000@arm.com>
- <CAPDyKFqagt5zhz-8hLSXOqofv-nBqg4i-EVjA=UV3Jfi4zktKg@mail.gmail.com>
- <20180515081519.22751a39c49e63224da3acac@arm.com>
- <20180515134831.GG16141@n2100.armlinux.org.uk>
- <20180515093718.19ca71295fc36fe65c5df021@arm.com>
-Message-ID: <CANLsYkyND-hspG3zH5LwwcWTbb_s7WqcRFAAy1mNOhwQ3RNW9Q@mail.gmail.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 15 May 2018 10:11:02 -0500
+Subject: [PATCHv2] arm64: dts: stratix10: Add QSPI support for Stratix10
+In-Reply-To: <1526055052-11371-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1526055052-11371-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <20b33e1d-0609-78dd-dc9c-922658a11f18@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2018 at 08:37, Kim Phillips <kim.phillips@arm.com> wrote:
-> On Tue, 15 May 2018 14:48:31 +0100
-> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
->
->> On Tue, May 15, 2018 at 08:15:19AM -0500, Kim Phillips wrote:
->> > On Tue, 15 May 2018 08:59:02 +0200
->> > Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> >
->> > > On 8 May 2018 at 21:06, Kim Phillips <kim.phillips@arm.com> wrote:
->> > > > This patch is provided in the context of allowing the Coresight driver
->> > > > subsystem to be loaded as modules.  Coresight uses amba_bus in its call
->> > > > to bus_find_device() in of_coresight_get_endpoint_device() when
->> > > > searching for a configurable endpoint device.  This patch allows
->> > > > Coresight to reference amba_bustype when built as a module.
->> > >
->> > > Sounds like you are fixing a bug, don't your want this to go for
->> > > stable and then also add a fixes tag?
->> >
->> > How do you consider this a bug fix?  What commit would the fixes tag
->> > reference?  The introduction of the amba bus?  Not only aren't busses
->> > required to export their bus_type, but that commit predates git.
->>
->> I do not consider it a bug fix (see my reply to Ulf) and I certainly
->
-> I agree this isn't a bug fix.
->
->> The only problem which we're aware of is with Coresight, and only then
->> when your patches to allow Coresight to be modular are merged.  That's
->
-> Just to clarify: the Coresight modularization patch depends on this
-> patch, so this patch is to be merged first.
 
-I think the whole feature should be merge at the same time and (with
-Russell's ACK) probably easier through my tree.
 
->
-> Cheers,
->
-> Kim
+On 05/11/2018 11:10 AM, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
+> 
+> Add qspi_clock
+>    The qspi_clk frequency is updated by U-Boot before starting Linux.
+> Add QSPI interface node.
+> Add QSPI flash memory child node.
+>    Setup the QSPI memory in 2 partitions.
+> 
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+> v2  s/_/-/ in qspi-clk
+>     rename flash node.
+>     use partition child node notation
+> ---
+>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 22 ++++++++++++++
+>  .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 35 ++++++++++++++++++++++
+>  2 files changed, 57 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> index e6b059378dc0..bac01b0b7907 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> @@ -119,6 +119,12 @@
+>  				#clock-cells = <0>;
+>  				compatible = "fixed-clock";
+>  			};
+> +
+> +			qspi_clk: qspi-clk {
+> +				#clock-cells = <0>;
+> +				compatible = "fixed-clock";
+> +				clock-frequency = <200000000>;
+> +			};
+>  		};
+>  
+>  		gmac0: ethernet at ff800000 {
+> @@ -466,5 +472,21 @@
+>  				interrupts = <16 4>, <48 4>;
+>  			};
+>  		};
+> +
+> +		qspi: spi at ff8d2000 {
+> +			compatible = "cdns,qspi-nor";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0xff8d2000 0x100>,
+> +			      <0xff900000 0x100000>;
+> +			interrupts = <0 3 4>;
+> +			cdns,fifo-depth = <128>;
+> +			cdns,fifo-width = <4>;
+> +			cdns,trigger-address = <0x00000000>;
+> +			clocks = <&qspi_clk>;
+> +			bus-num = <1>;
+
+I don't you need "bus-num" anymore right? I don't see it getting used
+anywhere in the driver.
+
+Dinh
