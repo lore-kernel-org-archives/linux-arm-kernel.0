@@ -1,17 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 May 2018 11:14:17 -0700
-Subject: [PATCH] ARM: dts: am335x-evmsk: Add phandle for the backlight
- for the panel
-In-Reply-To: <20180508100433.1051-1-peter.ujfalusi@ti.com>
-References: <20180508100433.1051-1-peter.ujfalusi@ti.com>
-Message-ID: <20180515181417.GV98604@atomide.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue, 15 May 2018 11:23:04 -0700
+Subject: [PATCH] clk: stm32mp1: Add CLK_IGNORE_UNUSED to ck_sys_dbg clock
+In-Reply-To: <1524556723-26926-1-git-send-email-gabriel.fernandez@st.com>
+References: <1524556723-26926-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <152640858418.34267.5971648282268914967@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [180508 03:05]:
-> With the backlight phandle the driver can manage the backlight on/off in
-> sync with the panel enable/disable.
+Quoting gabriel.fernandez at st.com (2018-04-24 00:58:43)
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> 
+> Don't disable the dbg clock if was set by bootloader.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
 
-Applying into omap-for-v4.18/dt thanks.
-
-Tony
+Applied to clk-next
