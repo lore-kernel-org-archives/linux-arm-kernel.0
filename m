@@ -1,68 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 15 May 2018 19:12:35 +0530
-Subject: [PATCH v10 03/27] clk: davinci: psc: allow for dev == NULL
-In-Reply-To: <20180509172606.29387-4-david@lechnology.com>
-References: <20180509172606.29387-1-david@lechnology.com>
- <20180509172606.29387-4-david@lechnology.com>
-Message-ID: <2f1056b3-6d29-0651-1d7d-9c74cd50861c@ti.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 15 May 2018 08:44:16 -0500
+Subject: [GIT PULL] ARM: dts: socfpga: NAND fixes for v4.17
+Message-ID: <20180515134416.11349-1-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 May 2018 10:55 PM, David Lechner wrote:
-> @@ -261,10 +263,14 @@ davinci_lpsc_clk_register(struct device *dev, const char *name,
->  	lpsc->pd = pd;
->  	lpsc->flags = flags;
->  
-> -	ret = devm_clk_hw_register(dev, &lpsc->hw);
-> +	ret = clk_hw_register(dev, &lpsc->hw);
->  	if (ret < 0)
->  		return ERR_PTR(ret);
->  
-> +	/* for now, genpd is only registered when using device-tree */
-> +	if (!dev || !dev->of_node)
-> +		return lpsc;
-> +
->  	/* genpd attach needs a way to look up this clock */
->  	ret = clk_hw_register_clkdev(&lpsc->hw, name, best_dev_name(dev));
->  
-> @@ -378,11 +384,11 @@ __davinci_psc_register_clocks(struct device *dev,
->  	struct regmap *regmap;
->  	int i, ret;
->  
-> -	psc = devm_kzalloc(dev, sizeof(*psc), GFP_KERNEL);
-> +	psc = kzalloc(sizeof(*psc), GFP_KERNEL);
->  	if (!psc)
->  		return ERR_PTR(-ENOMEM);
->  
-> -	clks = devm_kmalloc_array(dev, num_clks, sizeof(*clks), GFP_KERNEL);
-> +	clks = kmalloc_array(num_clks, sizeof(*clks), GFP_KERNEL);
->  	if (!clks)
->  		return ERR_PTR(-ENOMEM);
->  
-> @@ -396,14 +402,14 @@ __davinci_psc_register_clocks(struct device *dev,
->  	for (i = 0; i < num_clks; i++)
->  		clks[i] = ERR_PTR(-ENOENT);
->  
-> -	pm_domains = devm_kcalloc(dev, num_clks, sizeof(*pm_domains), GFP_KERNEL);
-> +	pm_domains = kcalloc(num_clks, sizeof(*pm_domains), GFP_KERNEL);
->  	if (!pm_domains)
->  		return ERR_PTR(-ENOMEM);
->  
->  	psc->pm_data.domains = pm_domains;
->  	psc->pm_data.num_domains = num_clks;
->  
-> -	regmap = devm_regmap_init_mmio(dev, base, &davinci_psc_regmap_config);
-> +	regmap = regmap_init_mmio(dev, base, &davinci_psc_regmap_config);
->  	if (IS_ERR(regmap))
->  		return ERR_CAST(regmap);
+Hi Arnd, Kevin, and Olof:
 
-Here and in the PLL driver, you have dropped the devm_* variants (like
-agreed upon), but not added any error path handling. For the clocks
-needed for boot, its probably fine, but the same code path is used for
-non-essential clocks too. Just from a code completeness perspective, it
-will be nice to see the error path correctly handled.
-
-Apart from that both 1/27 and 3/27 look good to me.
+Please pull in these NAND fixes for v4.17.
 
 Thanks,
-Sekhar
+Dinh
+
+The following changes since commit 67b8d5c7081221efa252e111cd52532ec6d4266f:
+
+  Linux 4.17-rc5 (2018-05-13 16:15:17 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_nand_fix_v4.17
+
+for you to fetch changes up to 3877ef7a1ccecaae378c497e1dcddbc2dccb664c:
+
+  ARM: dts: socfpga: Fix NAND controller node compatible for Arria10 (2018-05-14 10:16:56 -0500)
+
+----------------------------------------------------------------
+ARM: dts: socfpga: fix NAND support
+- NAND should be using nand_x_clk, not nand_clk
+- fix NAND node compatible for Cyclone5 and Arria10
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: dts: socfpga: Fix NAND controller node compatible for Arria10
+
+Marek Vasut (2):
+      ARM: dts: socfpga: Fix NAND controller clock supply
+      ARM: dts: socfpga: Fix NAND controller node compatible
+
+ arch/arm/boot/dts/socfpga.dtsi         | 4 ++--
+ arch/arm/boot/dts/socfpga_arria10.dtsi | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
