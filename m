@@ -1,45 +1,68 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 15 May 2018 08:10:14 +0200
-Subject: linux-next: manual merge of the samsung-krzk tree with the
- dma-mapping tree
-In-Reply-To: <20180515090901.74c9429e@canb.auug.org.au>
-References: <20180510091634.7fb3aaf2@canb.auug.org.au>
- <20180515090901.74c9429e@canb.auug.org.au>
-Message-ID: <CAJKOXPdUi6SxhyYcm5GeS=6+=52kZevkn=ws4i8uKjpaiwXNYA@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 15 May 2018 08:21:48 +0200
+Subject: [GIT PULL 0/5] perf/urgent fixes
+In-Reply-To: <20180514122321.27304-1-acme@kernel.org>
+References: <20180514122321.27304-1-acme@kernel.org>
+Message-ID: <20180515062148.GA7581@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 1:09 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi all,
->
-> On Thu, 10 May 2018 09:16:34 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->>
->> Today's linux-next merge of the samsung-krzk tree got a conflict in:
->>
->>   arch/arm/mach-exynos/Kconfig
->>
->> between commit:
->>
->>   4965a68780c5 ("arch: define the ARCH_DMA_ADDR_T_64BIT config symbol in lib/Kconfig")
->>
->> from the dma-mapping tree and commit:
->>
->>   c5deb598089c ("ARM: exynos: Remove support for Exynos5440")
->>
->> from the samsung-krzk tree.
->>
->> I fixed it up (the latter removed the whole section modified by
->> the former, so I just removed the section) and can carry the fix as
->> necessary. This is now fixed as far as linux-next is concerned, but any
->> non trivial conflicts should be mentioned to your upstream maintainer
->> when your tree is submitted for merging.  You may also want to consider
->> cooperating with the maintainer of the conflicting tree to minimise any
->> particularly complex conflicts.
->
-> This is now a conflict between the arm-soc tree and the dma-mapping tree.
 
-Yes, this is expected. Thanks for letting us know. I mentioned this
-also in my pull request to arm-soc.
+* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
 
-Best regards,
-Krzysztof
+> Hi Ingo,
+> 
+> 	Please consider pulling,
+> 
+> - Arnaldo
+> 
+> Test results at the end of this message, as usual.
+> 
+> The following changes since commit 49cf4a4b3f5a8b02556dd4f45c5cee598d4fc799:
+> 
+>   Merge tag 'perf-urgent-for-mingo-4.17-20180507' of git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux into perf/urgent (2018-05-10 20:09:00 +0200)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-urgent-for-mingo-4.17-20180514
+> 
+> for you to fetch changes up to c23080a6e4e853cff2834436e3cf33eae7723900:
+> 
+>   perf tools: Add missing newline when parsing empty BPF proggie (2018-05-11 12:10:02 -0300)
+> 
+> ----------------------------------------------------------------
+> perf/urgent fixes:
+> 
+> - Fix segfault when processing unknown threads in cs-etm (Leo Yan)
+> 
+> - Fix "perf test inet_pton" on s390 failing due to missing inline (Thomas Richter)
+> 
+> - Display all available events on 'perf annotate --stdio' (Jin Yao)
+> 
+> - Add missing newline when parsing empty BPF proggie (Arnaldo Carvalho de Melo)
+> 
+> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+> 
+> ----------------------------------------------------------------
+> Arnaldo Carvalho de Melo (1):
+>       perf tools: Add missing newline when parsing empty BPF proggie
+> 
+> Jin Yao (1):
+>       perf annotate: Display all available events on --stdio
+> 
+> Leo Yan (2):
+>       perf cs-etm: Support unknown_thread in cs_etm_auxtrace
+>       perf cs-etm: Remove redundant space
+> 
+> Thomas Richter (1):
+>       perf test: "probe libc's inet_pton" fails on s390 due to missing inline
+> 
+>  .../tests/shell/record+probe_libc_inet_pton.sh     |  2 +-
+>  tools/perf/util/annotate.c                         |  3 +++
+>  tools/perf/util/cs-etm.c                           | 28 ++++++++++++++++++----
+>  tools/perf/util/parse-events.c                     |  2 +-
+>  4 files changed, 29 insertions(+), 6 deletions(-)
+
+Pulled, thanks a lot Arnaldo!
+
+	Ingo
