@@ -1,37 +1,63 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 15 May 2018 11:23:33 +0200
-Subject: [PATCH] edac: altera: Fix ARM64 warning
-In-Reply-To: <1526317441-4996-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1526317441-4996-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <20180515092333.GA11928@pd.tnic>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 15 May 2018 11:25:38 +0200
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v10_00=2F27=5D_ARM=3A_davinci=3A_convert_to_commo?=
+ =?UTF-8?Q?n_clock_framework=E2=80=8B?=
+In-Reply-To: <CAHCN7xJ6+vmyrTQGYH=pKz5GRf7rLT4otreNgu6TJi_3UAEX5w@mail.gmail.com>
+References: <20180509172606.29387-1-david@lechnology.com>
+ <CAHCN7xJ6+vmyrTQGYH=pKz5GRf7rLT4otreNgu6TJi_3UAEX5w@mail.gmail.com>
+Message-ID: <CAMRc=MdO0EtzDHp3RF4ym3umWM_KfhvpWHV2+Y3270ygKz9iGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 12:04:01PM -0500, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
-> 
-> The kbuild test robot reported the following warning on altera_edac.c:
-> 
-> drivers//edac/altera_edac.c: In function 'ocram_free_mem':
-> drivers//edac/altera_edac.c:1410:42: warning: cast from pointer to integer
->       of different size [-Wpointer-to-int-cast]
->   gen_pool_free((struct gen_pool *)other, (u32)p, size);
->                                            ^^^
-> After adding support for ARM64 architectures, the unsigned long parameter
-> is 64bits and causes a build warning with arm64-allyesconfig
-> Fix by casting to the correct size (unsigned long) instead of u32.
-> 
-> Reported-by: kbuild test robot <lkp@intel.com>
-> Fixes: c3eea1942a16 ("EDAC, altera: Add Altera L2 cache and OCRAM support")
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
->  drivers/edac/altera_edac.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+2018-05-14 2:40 GMT+02:00 Adam Ford <aford173@gmail.com>:
+> On Wed, May 9, 2018 at 12:25 PM, David Lechner <david@lechnology.com> wrote:
+>> This series converts mach-davinci to use the common clock framework.
+>>
+>> The series works like this, the first 3 patches fix some issues with the clock
+>> drivers that have already been accepted into the mainline kernel.
+>>
+>> Then, starting with "ARM: davinci: pass clock as parameter to
+>> davinci_timer_init()", we get the mach code ready for the switch by adding the
+>> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
+>> around the legacy clocks so that we can switch easily between the old and the
+>> new.
+>>
+>> "ARM: davinci: switch to common clock framework" actually flips the switch
+>> to start using the new clock drivers. Then the next 8 patches remove all
+>> of the old clock code.
+>>
+>> The final four patches add device tree clock support to the one SoC that
+>> supports it.
+>>
+>> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
+>> board file).
+>>
+>
+> I am not sure if I did something wrong, but I attempted to build and I
+> wasn't able to boot the da850-evm.dtb your repo common-clk-v11,
+> however the legacy board file boot was OK.
+>
+> make davinci_all_defconfig ARCH=arm
+> make zImage modules da850-evm.dtb ARCH=arm CROSS_COMPILE=arm-linux- -j8
+>
+> 3140416 bytes read in 1464 ms (2 MiB/s)
+> 20353 bytes read in 15 ms (1.3 MiB/s)
+> ## Flattened Device Tree blob at c0600000
+>    Booting using the fdt blob at 0xc0600000
+>    Loading Device Tree to c7e57000, end c7e5ef80 ... OK
+>
+> Starting kernel ...
+>
+> Uncompressing Linux... done, booting the kernel.
+>
+> (and hang)
+>
+> If you have some suggestions, I am try them as I get time.
+>
+> adam
+>
 
-Applied, thanks.
+Runs fine on da850-lcdk and dm365-evm. I'll test the da850-evm
+tomorrow when I'll have access to it.
 
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Bart
