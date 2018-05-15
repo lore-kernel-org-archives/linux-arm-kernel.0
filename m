@@ -1,34 +1,45 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 15 May 2018 08:09:23 +0200
-Subject: [GIT PULL 0/5] ARM: samsung/exynos: Stuff for v4.18
-In-Reply-To: <20180514205502.u25kugxkym4tz34e@localhost>
-References: <20180513154238.22508-1-krzk@kernel.org>
- <20180514205502.u25kugxkym4tz34e@localhost>
-Message-ID: <CAJKOXPcA-+uXof-as=5MNbHiMPBSypKmDsefDcLYVH=WhOA0ag@mail.gmail.com>
+Date: Tue, 15 May 2018 08:10:14 +0200
+Subject: linux-next: manual merge of the samsung-krzk tree with the
+ dma-mapping tree
+In-Reply-To: <20180515090901.74c9429e@canb.auug.org.au>
+References: <20180510091634.7fb3aaf2@canb.auug.org.au>
+ <20180515090901.74c9429e@canb.auug.org.au>
+Message-ID: <CAJKOXPdUi6SxhyYcm5GeS=6+=52kZevkn=ws4i8uKjpaiwXNYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 10:55 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Sun, May 13, 2018 at 05:42:33PM +0200, Krzysztof Kozlowski wrote:
->> Hi,
->>
->> Changes for v4.18. No dependencies, no specific order of pulls.
->>
->> Support for Exynos5440 is removed step by step through different trees.
+On Tue, May 15, 2018 at 1:09 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi all,
 >
-> 5440 was always a bit of a weird fit, it clearly was never an exynos5-family
-> platform. I take it there are no substantial users left that would need
-> mainline kernel support for it?
+> On Thu, 10 May 2018 09:16:34 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>>
+>> Today's linux-next merge of the samsung-krzk tree got a conflict in:
+>>
+>>   arch/arm/mach-exynos/Kconfig
+>>
+>> between commit:
+>>
+>>   4965a68780c5 ("arch: define the ARCH_DMA_ADDR_T_64BIT config symbol in lib/Kconfig")
+>>
+>> from the dma-mapping tree and commit:
+>>
+>>   c5deb598089c ("ARM: exynos: Remove support for Exynos5440")
+>>
+>> from the samsung-krzk tree.
+>>
+>> I fixed it up (the latter removed the whole section modified by
+>> the former, so I just removed the section) and can carry the fix as
+>> necessary. This is now fixed as far as linux-next is concerned, but any
+>> non trivial conflicts should be mentioned to your upstream maintainer
+>> when your tree is submitted for merging.  You may also want to consider
+>> cooperating with the maintainer of the conflicting tree to minimise any
+>> particularly complex conflicts.
+>
+> This is now a conflict between the arm-soc tree and the dma-mapping tree.
 
-I forgot to mention this in pull request (it is in the commit) - there
-are no known users. There are no real products and development boards
-are unpopular (probably only Samsung LSI has it).
-
-> Also, I noticed your PGP key has expired, so you should probably start
-> collecting signatures on a fresh subkey.
-
-It should be good, I prolonged it some time ago. Can you refresh it in
-your keyring?
+Yes, this is expected. Thanks for letting us know. I mentioned this
+also in my pull request to arm-soc.
 
 Best regards,
 Krzysztof
