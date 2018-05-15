@@ -1,50 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 May 2018 13:53:54 -0700
-Subject: [GIT PULL 4/4] Rockchip arm64 defconfig updates for 4.18 round 1
-In-Reply-To: <2676342.8y6AX4oR9f@phil>
+Date: Tue, 15 May 2018 13:52:28 -0700
+Subject: [GIT PULL 3/4] Rockchip dts64 updates for 4.18 round 1
+In-Reply-To: <20114925.REm1YfjZS7@phil>
 References: <2000491.bLgWuj0xar@phil>
- <2676342.8y6AX4oR9f@phil>
-Message-ID: <20180515205354.whll4pj74exaci5h@localhost>
+ <20114925.REm1YfjZS7@phil>
+Message-ID: <20180515205228.s5tfj5v5zngg2x64@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 12:40:05PM +0200, Heiko Stuebner wrote:
+On Tue, May 15, 2018 at 12:39:26PM +0200, Heiko Stuebner wrote:
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-defconfig64-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-dts64-1
 > 
-> for you to fetch changes up to 214f2c319a140f8a0121f362ad8e73ea1576d5ad:
+> for you to fetch changes up to 17bd0737948aa841b76278a601217b914aa5f18e:
 > 
->   arm64: defconfig: enable rockchip efuse (2018-05-09 16:33:09 +0200)
-> 
-> ----------------------------------------------------------------
-> Enablement of Rockchip-specific efuse, io-domain and typec drivers
-> as well as general cros-ec, hid, touchscreen bluetooth and wifi-drivers
-> on 64bit arm platforms.
+>   arm64: dts: rockchip: enable hdmi on rk3399-puma-haikou (2018-05-03 14:38:20 +0200)
 > 
 > ----------------------------------------------------------------
-> Enric Balletbo i Serra (3):
->       arm64: defconfig: Enable typec-phy and extcon-usbc-cros-ec for rk3399
->       arm64: defconfig: Enable Rockchip io-domain driver
->       arm64: defconfig: Enable ChromeOS EC drivers for supported Chromebooks.
-> 
-> Ezequiel Garcia (4):
->       arm64: defconfig: Enable HID over I2C drivers
->       arm64: defconfig: Enable Atmel Maxtouch driver
->       arm64: defconfig: Enable Marvell WiFi-Ex PCIe driver
->       arm64: defconfig: Enable bluetooth USB support
-> 
-> Heiko Stuebner (1):
->       arm64: defconfig: enable rockchip efuse
+> All iommus got their clocks added and rk3399 got support for its
+> usb3-phy otg-port and better ajustment for the cpll child clocks.
+> On the board side, all rk3399 got their typec phys enabled - which
+> is needed for better usb support, the sapphire board got some more
+> properties moved to the excavator baseboard where they really belong,
+> kevin got a fix to use a real devicetree compatible and puma-haikou
+> got its hdmi port enabled.
 
-Merged. Not sure if it's useful to split defconfig updates quite this granular,
-might make sense to just do slightly more consolidated patches.
-
-Anyway, no harm, just a bit verbose.
+Merged, thanks!
 
 
 -Olof
