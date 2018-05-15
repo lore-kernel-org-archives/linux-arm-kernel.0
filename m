@@ -1,117 +1,61 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 May 2018 09:23:03 +0100
-Subject: [PATCH v2 5/5] hisi: Consolidate the Kconfigs for the CLOCK_STUB
- and the MAILBOX
-In-Reply-To: <1526352795-6991-6-git-send-email-leo.yan@linaro.org>
-References: <1526352795-6991-1-git-send-email-leo.yan@linaro.org>
- <1526352795-6991-6-git-send-email-leo.yan@linaro.org>
-Message-ID: <5AFA98E7.9050609@hisilicon.com>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Tue, 15 May 2018 10:23:10 +0200
+Subject: [PATCH v2] ARM: dts: r8a7740: Add CEU1
+In-Reply-To: <20180515080038.7438-1-horms+renesas@verge.net.au>
+References: <20180515080038.7438-1-horms+renesas@verge.net.au>
+Message-ID: <20180515082310.GQ5956@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo, Daniel,
+Hi Simon,
 
-On 2018/5/15 3:53, Leo Yan wrote:
-> From: Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
-> The current defconfig is inconsistent as it selects the mailbox and
-> the clock for the hi6220 and the hi3660 without having their Kconfigs
-> making sure the dependencies are correct. It ends up when selecting
-> different versions for the kernel (for example when git bisecting)
-> those options disappear and they don't get back, leading to unexpected
-> behaviors. In our case, the cpufreq driver does no longer work because
-> the clock fails to initialize due to the clock stub and the mailbox
-> missing.
-> 
-> In order to have the dependencies correctly set when defaulting, let's
-> do the same as commit 3a49afb84ca074e ("clk: enable hi655x common clk
-> automatically") where we select automatically the driver when the
-> parent driver is selected. With sensible defaults in place, we can leave
-> other choices for EXPERT.
-> 
-> Acked-by: Stephen Boyd <sboyd@kernel.org>
-> Acked-by: Jassi Brar <jaswinder.singh@linaro.org>
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+On Tue, May 15, 2018 at 10:00:38AM +0200, Simon Horman wrote:
+> Describe CEU1 peripheral for Renesas R-Mobile A1 R8A7740 Soc.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+
+Thank you!
+   j
+
 > ---
->  arch/arm64/configs/defconfig  |  1 -
->  drivers/clk/hisilicon/Kconfig | 13 ++++++++-----
->  drivers/mailbox/Kconfig       | 12 ++++++++----
->  3 files changed, 16 insertions(+), 10 deletions(-)
-
-Could you separate this patch into clk, mailbox and defconfig 3 parts?
-Thanks!
-
-Best Regards,
-Wei
-
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index ecf6137..1d9d8b9 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -549,7 +549,6 @@ CONFIG_HWSPINLOCK_QCOM=y
->  CONFIG_ARM_MHU=y
->  CONFIG_PLATFORM_MHU=y
->  CONFIG_BCM2835_MBOX=y
-> -CONFIG_HI6220_MBOX=y
->  CONFIG_QCOM_APCS_IPC=y
->  CONFIG_ROCKCHIP_IOMMU=y
->  CONFIG_TEGRA_IOMMU_SMMU=y
-> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
-> index 1bd4355..becdb1d 100644
-> --- a/drivers/clk/hisilicon/Kconfig
-> +++ b/drivers/clk/hisilicon/Kconfig
-> @@ -44,14 +44,17 @@ config RESET_HISI
->  	  Build reset controller driver for HiSilicon device chipsets.
->  
->  config STUB_CLK_HI6220
-> -	bool "Hi6220 Stub Clock Driver"
-> -	depends on COMMON_CLK_HI6220 && MAILBOX
-> -	default ARCH_HISI
-> +	bool "Hi6220 Stub Clock Driver" if EXPERT
-> +	depends on (COMMON_CLK_HI6220 || COMPILE_TEST)
-> +	depends on MAILBOX
-> +	default COMMON_CLK_HI6220
->  	help
->  	  Build the Hisilicon Hi6220 stub clock driver.
->  
->  config STUB_CLK_HI3660
-> -	bool "Hi3660 Stub Clock Driver"
-> -	depends on COMMON_CLK_HI3660 && MAILBOX
-> +	bool "Hi3660 Stub Clock Driver" if EXPERT
-> +	depends on (COMMON_CLK_HI3660 || COMPILE_TEST)
-> +	depends on MAILBOX
-> +	default COMMON_CLK_HI3660
->  	help
->  	  Build the Hisilicon Hi3660 stub clock driver.
-> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-> index a2bb274..567cd02 100644
-> --- a/drivers/mailbox/Kconfig
-> +++ b/drivers/mailbox/Kconfig
-> @@ -109,16 +109,20 @@ config TI_MESSAGE_MANAGER
->  	  platform has support for the hardware block.
->  
->  config HI3660_MBOX
-> -	tristate "Hi3660 Mailbox"
-> -	depends on ARCH_HISI && OF
-> +	tristate "Hi3660 Mailbox" if EXPERT
-> +	depends on (ARCH_HISI || COMPILE_TEST)
-> +	depends on OF
-> +	default ARCH_HISI
->  	help
->  	  An implementation of the hi3660 mailbox. It is used to send message
->  	  between application processors and other processors/MCU/DSP. Select
->  	  Y here if you want to use Hi3660 mailbox controller.
->  
->  config HI6220_MBOX
-> -	tristate "Hi6220 Mailbox"
-> -	depends on ARCH_HISI
-> +	tristate "Hi6220 Mailbox" if EXPERT
-> +	depends on (ARCH_HISI || COMPILE_TEST)
-> +	depends on OF
-> +	default ARCH_HISI
->  	help
->  	  An implementation of the hi6220 mailbox. It is used to send message
->  	  between application processors and MCU. Say Y here if you want to
-> 
+> v2
+> * Correct register range start address
+>
+>   Based on renesas-devel-20180514-v4.17-rc5
+> ---
+>  arch/arm/boot/dts/r8a7740.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+> index 508d93440ee8..35e2fc957458 100644
+> --- a/arch/arm/boot/dts/r8a7740.dtsi
+> +++ b/arch/arm/boot/dts/r8a7740.dtsi
+> @@ -77,6 +77,16 @@
+>  		status = "disabled";
+>  	};
+>
+> +	ceu1: ceu at fe914000 {
+> +		reg = <0xfe914000 0x3000>;
+> +		compatible = "renesas,r8a7740-ceu";
+> +		interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp1_clks R8A7740_CLK_CEU21>;
+> +		clock-names = "ceu21";
+> +		power-domains = <&pd_a4r>;
+> +		status = "disabled";
+> +	};
+> +
+>  	cmt1: timer at e6138000 {
+>  		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
+>  		reg = <0xe6138000 0x170>;
+> --
+> 2.11.0
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180515/4878e59e/attachment.sig>
