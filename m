@@ -1,235 +1,104 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 15 May 2018 17:20:00 +0100
-Subject: [PATCH v9 05/11] arm64: kexec_file: load initrd and device-tree
-In-Reply-To: <20180425062629.29404-6-takahiro.akashi@linaro.org>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-6-takahiro.akashi@linaro.org>
-Message-ID: <c10624c0-9962-af38-1dd5-656902180ace@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 May 2018 17:33:52 +0100
+Subject: [PATCH 06/18] arm64: move sve_user_{enable, disable} to
+ <asm/fpsimd.h>
+In-Reply-To: <20180515121921.GN7753@e103592.cambridge.arm.com>
+References: <20180514094640.27569-1-mark.rutland@arm.com>
+ <20180514094640.27569-7-mark.rutland@arm.com>
+ <20180514110649.GC7753@e103592.cambridge.arm.com>
+ <20180515103936.v5ytofdq3qqtsomn@lakrids.cambridge.arm.com>
+ <20180515121921.GN7753@e103592.cambridge.arm.com>
+Message-ID: <20180515163352.sl7sfaswv4hsktl7@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+On Tue, May 15, 2018 at 01:19:26PM +0100, Dave Martin wrote:
+> On Tue, May 15, 2018 at 11:39:36AM +0100, Mark Rutland wrote:
+> > On Mon, May 14, 2018 at 12:06:50PM +0100, Dave Martin wrote:
+> > > On Mon, May 14, 2018 at 10:46:28AM +0100, Mark Rutland wrote:
+> > > > +static inline void sve_user_disable(void)
+> > > > +{
+> > > > +	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
+> > > > +}
+> > > > +
+> > > > +static inline void sve_user_enable(void)
+> > > > +{
+> > > > +	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
+> > > > +}
+> > > > +
+> > > >  /*
+> > > >   * Probing and setup functions.
+> > > >   * Calls to these functions must be serialised with one another.
+> > > > @@ -107,6 +119,9 @@ static inline int sve_get_current_vl(void)
+> > > >  	return -EINVAL;
+> > > >  }
+> > > >  
+> > > > +static inline void sve_user_disable(void) { }
+> > > > +static inline void sve_user_enable(void) { }
+> > > > +
+> > > 
+> > > Alternatively, just move the full definitions outside the #ifdef
+> > > CONFIG_ARM64_SVE.
+> > 
+> > Can do, though I was trying to keep the exsting pattern with empty
+> > inlines for the !CONFIG_ARM64_SVE case.
+> 
+> There isn't really a pattern.  I tried to avoid dummy versions where
+> there's no real reason to have them.  I don't _think_ they're really
+> needed here, unless I missed something.  Did you get build failures
+> without them?
 
-On 25/04/18 07:26, AKASHI Takahiro wrote:
-> load_other_segments() is expected to allocate and place all the necessary
-> memory segments other than kernel, including initrd and device-tree
-> blob (and elf core header for crash).
-> While most of the code was borrowed from kexec-tools' counterpart,
-> users may not be allowed to specify dtb explicitly, instead, the dtb
-> presented by a boot loader is reused.
+I need *some* definition so that sve_user_reset() in the syscall path
+can compile without ifdeferry. 
 
-(Nit: "a boot loader" -> "the original boot loader")
+In sve_user_reset() I first check system_supports_sve(), which checks
+IS_ENABLED(CONFIG_ARM64_SVE), so the call should be optimised away when
+!CONFIG_ARM64_SVE, but I need a prototype regardless.
 
-> arch_kimage_kernel_post_load_cleanup() is responsible for freeing arm64-
-> specific data allocated in load_other_segments().
+> > > All calls to these should be shadowed by an if
+> > > (system_supports_sve()) in any case, and setting/clearing ZEN_EL0EN
+> > > in the CPACR_EL1 ought to be harmless now that the meaning of these
+> > > bits architecturally committed.
+> > > 
+> > > Ideally we would have a BUG_ON(!system_supports_sve()) in those
+> > > functions, but we won't won't to pay the cost in a production kernel.
+> > 
+> > Earlier I'd put BUILD_BUG() in the body for the !CONFIG_ARM64_SVE case,
+> > to catch that kind of thing -- I could restore that.
+> 
+> IIUC:
+> 
+> 	if (0) {
+> 		BUILD_BUG_ON(1);
+> 	}
+> 
+> can still fire, in which case it's futile checking for CONFIG_ARM64_SVE
+> in most of the SVE support code.
 
+We already rely on BUILD_BUG() not firing in paths that can be trivially
+optimized away. e.g. in the cmpxchg code.
+ 
+> > > >  static inline void sve_init_vq_map(void) { }
+> > > >  static inline void sve_update_vq_map(void) { }
+> > > >  static inline int sve_verify_vq_map(void) { return 0; }
+> > > > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > > > index 088940387a4d..79a81c7d85c6 100644
+> > > > --- a/arch/arm64/kernel/fpsimd.c
+> > > > +++ b/arch/arm64/kernel/fpsimd.c
+> > > > @@ -159,7 +159,6 @@ static void sve_free(struct task_struct *task)
+> > > >  	__sve_free(task);
+> > > >  }
+> > > >  
+> > > > -
+> > > 
+> > > Hmmm, Ack.  Check for conflicts with the KVM FPSIMD rework [1] (though
+> > > trivial).
+> > 
+> > I'll assume that Ack stands regardless. :)
+> 
+> Actually, I was just commenting on the deleted blank line... 
 
-> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-> index f9ebf54ca247..b3b9b1725d8a 100644
-> --- a/arch/arm64/kernel/machine_kexec_file.c
-> +++ b/arch/arm64/kernel/machine_kexec_file.c
-> @@ -13,7 +13,26 @@
->  #include <linux/ioport.h>
->  #include <linux/kernel.h>
->  #include <linux/kexec.h>
-> +#include <linux/libfdt.h>
->  #include <linux/memblock.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/types.h>
-> +#include <asm/byteorder.h>
-> +
-> +static int __dt_root_addr_cells;
-> +static int __dt_root_size_cells;
-
-> @@ -55,3 +74,144 @@ int arch_kexec_walk_mem(struct kexec_buf *kbuf,
->  
->  	return ret;
->  }
-> +
-> +static int setup_dtb(struct kimage *image,
-> +		unsigned long initrd_load_addr, unsigned long initrd_len,
-> +		char *cmdline, unsigned long cmdline_len,
-> +		char **dtb_buf, size_t *dtb_buf_len)
-> +{
-> +	char *buf = NULL;
-> +	size_t buf_size;
-> +	int nodeoffset;
-> +	u64 value;
-> +	int range_len;
-> +	int ret;
-> +
-> +	/* duplicate dt blob */
-> +	buf_size = fdt_totalsize(initial_boot_params);
-> +	range_len = (__dt_root_addr_cells + __dt_root_size_cells) * sizeof(u32);
-
-These two cells values are 0 here. Did you want
-arch_kexec_file_init() in patch 7 in this patch?
-
-Ah, range_len isn't used, so, did you want the cells values and this range_len
-thing in in patch 7!?
-
-
-> +
-> +	if (initrd_load_addr)
-> +		buf_size += fdt_prop_len("linux,initrd-start", sizeof(u64))
-> +				+ fdt_prop_len("linux,initrd-end", sizeof(u64));
-> +
-> +	if (cmdline)
-> +		buf_size += fdt_prop_len("bootargs", cmdline_len + 1);
-
-I can't find where fdt_prop_len() .... oh, patch 7. fdt_prop_len() doesn't look
-like the sort of thing that should be created here, but I agree there isn't an
-existing API to do this.
-
-(This must be why powerpc guesses that the fdt won't be more than double in size).
-
-
-> +	buf = vmalloc(buf_size);
-> +	if (!buf) {
-> +		ret = -ENOMEM;
-> +		goto out_err;
-> +	}
-> +
-> +	ret = fdt_open_into(initial_boot_params, buf, buf_size);
-> +	if (ret)
-> +		goto out_err;
-> +
-> +	nodeoffset = fdt_path_offset(buf, "/chosen");
-> +	if (nodeoffset < 0)
-> +		goto out_err;
-> +
-> +	/* add bootargs */
-> +	if (cmdline) {
-> +		ret = fdt_setprop(buf, nodeoffset, "bootargs",
-> +						cmdline, cmdline_len + 1);
-
-fdt_setprop_string()?
-
-
-> +		if (ret)
-> +			goto out_err;
-> +	}
-> +
-> +	/* add initrd-* */
-> +	if (initrd_load_addr) {
-> +		value = cpu_to_fdt64(initrd_load_addr);
-> +		ret = fdt_setprop(buf, nodeoffset, "linux,initrd-start",
-> +				&value, sizeof(value));
-
-sizeof(value) was assumed to be the same as sizeof(u64) earlier.
-fdt_setprop_u64()?
-
-
-> +		if (ret)
-> +			goto out_err;
-> +
-> +		value = cpu_to_fdt64(initrd_load_addr + initrd_len);
-> +		ret = fdt_setprop(buf, nodeoffset, "linux,initrd-end",
-> +				&value, sizeof(value));
-> +		if (ret)
-> +			goto out_err;
-> +	}
-> +
-> +	/* trim a buffer */
-> +	fdt_pack(buf);
-> +	*dtb_buf = buf;
-> +	*dtb_buf_len = fdt_totalsize(buf);
-> +
-> +	return 0;
-> +
-> +out_err:
-> +	vfree(buf);
-> +	return ret;
-> +}
-
-While powerpc has some similar code for updating the initrd and cmdline, it
-makes different assumptions about the size of the dt, and has different behavior
-for memreserve. (looks like we don't expect the initramfs to be memreserved).
-Lets leave unifying that stuff where possible for the future.
-
-
-> +int load_other_segments(struct kimage *image,
-> +			char *initrd, unsigned long initrd_len,
-> +			char *cmdline, unsigned long cmdline_len)
-> +{
-> +	struct kexec_segment *kern_seg;
-> +	struct kexec_buf kbuf;
-> +	unsigned long initrd_load_addr = 0;
-> +	char *dtb = NULL;
-> +	unsigned long dtb_len = 0;
-> +	int ret = 0;
-> +
-> +	kern_seg = &image->segment[image->arch.kern_segment];
-> +	kbuf.image = image;
-> +	/* not allocate anything below the kernel */
-> +	kbuf.buf_min = kern_seg->mem + kern_seg->memsz;
-
-> +	/* load initrd */
-> +	if (initrd) {
-> +		kbuf.buffer = initrd;
-> +		kbuf.bufsz = initrd_len;
-> +		kbuf.memsz = initrd_len;
-
-> +		kbuf.buf_align = 0;
-
-I'm surprised there initrd has no alignment requirement, but kexec_add_buffer()
-rounds this up to PAGE_SIZE.
-
-
-> +		/* within 1GB-aligned window of up to 32GB in size */
-> +		kbuf.buf_max = round_down(kern_seg->mem, SZ_1G)
-> +						+ (unsigned long)SZ_1G * 32;
-> +		kbuf.top_down = false;
-> +
-> +		ret = kexec_add_buffer(&kbuf);
-> +		if (ret)
-> +			goto out_err;
-> +		initrd_load_addr = kbuf.mem;
-> +
-> +		pr_debug("Loaded initrd at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
-> +				initrd_load_addr, initrd_len, initrd_len);
-> +	}
-> +
-> +	/* load dtb blob */
-> +	ret = setup_dtb(image, initrd_load_addr, initrd_len,
-> +				cmdline, cmdline_len, &dtb, &dtb_len);
-> +	if (ret) {
-> +		pr_err("Preparing for new dtb failed\n");
-> +		goto out_err;
-> +	}
-> +
-> +	kbuf.buffer = dtb;
-> +	kbuf.bufsz = dtb_len;
-> +	kbuf.memsz = dtb_len;
-> +	/* not across 2MB boundary */
-> +	kbuf.buf_align = SZ_2M;
-> +	kbuf.buf_max = ULONG_MAX;
-> +	kbuf.top_down = true;
-> +
-> +	ret = kexec_add_buffer(&kbuf);
-> +	if (ret)
-> +		goto out_err;
-> +	image->arch.dtb_mem = kbuf.mem;
-> +	image->arch.dtb_buf = dtb;
-> +
-> +	pr_debug("Loaded dtb at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
-> +			kbuf.mem, dtb_len, dtb_len);
-> +
-> +	return 0;
-> +
-> +out_err:
-> +	vfree(dtb);
-> +	image->arch.dtb_buf = NULL;
-
-Won't kimage_file_post_load_cleanup() always be called if we return an error
-here? Why not leave the free()ing until then?
-
-
-> +	return ret;
-> +}
-
-
+Ah. I've restored that now.
 
 Thanks,
-
-James
+Mark.
