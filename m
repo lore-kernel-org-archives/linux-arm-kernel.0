@@ -1,92 +1,56 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 15 May 2018 17:15:52 +0100
-Subject: [PATCH v9 03/11] arm64: kexec_file: invoke the kernel without
- purgatory
-In-Reply-To: <20180515044542.GC2737@linaro.org>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-4-takahiro.akashi@linaro.org>
- <9c830fe8-56d8-b43a-6265-43d31dffe61a@arm.com>
- <20180507052208.GD11326@linaro.org>
- <ece8d3cc-127f-6855-52fb-24e4a1d4e823@arm.com>
- <20180515044542.GC2737@linaro.org>
-Message-ID: <fbd2c6c6-be20-a9fa-0303-e4448225df18@arm.com>
+From: christophe.roullier@st.com (Christophe ROULLIER)
+Date: Tue, 15 May 2018 16:19:53 +0000
+Subject: [PATCH V2 8/8] dt-bindings: stm32: add compatible for syscon
+In-Reply-To: <20180507163537.GA15212@rob-hp-laptop>
+References: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
+ <1525270723-18241-9-git-send-email-christophe.roullier@st.com>
+ <20180507163537.GA15212@rob-hp-laptop>
+Message-ID: <d2b4cd1845b949a7bf9c42a17a5358a2@SFHDAG5NODE3.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+Hi Rob,
 
-On 15/05/18 05:45, AKASHI Takahiro wrote:
-> On Fri, May 11, 2018 at 06:03:49PM +0100, James Morse wrote:
->> On 07/05/18 06:22, AKASHI Takahiro wrote:
->>> On Tue, May 01, 2018 at 06:46:06PM +0100, James Morse wrote:
->>>> On 25/04/18 07:26, AKASHI Takahiro wrote:
->>>>> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
->>>>> index f76ea92dff91..f7dbba00be10 100644
->>>>> --- a/arch/arm64/kernel/machine_kexec.c
->>>>> +++ b/arch/arm64/kernel/machine_kexec.c
->>>>> @@ -205,10 +205,17 @@ void machine_kexec(struct kimage *kimage)
->>
->>>>>  	cpu_soft_restart(kimage != kexec_crash_image,
->>>>> -		reboot_code_buffer_phys, kimage->head, kimage->start, 0);
->>>>> +		reboot_code_buffer_phys, kimage->head, kimage->start,
->>>>> +#ifdef CONFIG_KEXEC_FILE
->>>>> +				kimage->purgatory_info.purgatory_buf ?
->>>>> +						0 : kimage->arch.dtb_mem);
->>>>> +#else
->>>>> +				0);
->>>>> +#endif
->>
->>
->>>> purgatory_buf seems to only be set in kexec_purgatory_setup_kbuf(), called from
->>>> kexec_load_purgatory(), which we don't use. How does this get a value?
->>>>
->>>> Would it be better to always use kimage->arch.dtb_mem, and ensure that is 0 for
->>>> regular kexec (as we can't know where the dtb is)? (image_arg may then be a
->>>> better name).
->>>
->>> The problem is arch.dtb_mem is currently defined only if CONFIG_KEXEC_FILE.
->>
->> I thought it was ARCH_HAS_KIMAGE_ARCH, which we can define all the time if
->> that's what we want.
->>
->>
->>> So I would like to
->>> - merge this patch with patch#8
->>> - change the condition
->>>         #ifdef CONFIG_KEXEC_FILE
->>>        				kimage->file_mode ? kimage->arch.dtb_mem : 0);
->>>         #else
->>>         			0);
->>>         #endif
->>
->> If we can avoid even this #ifdef by always having kimage->arch, I'd prefer that.
->> If we do that 'dtb_mem' would need some thing that indicates its for kexec_file,
->> as kexec has a DTB too, we just don't know where it is...
+I do not understand, so let me explain our status:
+
+We have syscfg IP Harware in our SOC. 
+But we do not have SoC specific driver to manage syscfg, we are using a generic driver "syscon".
+So can you tell me what you wish to describe this part in our SOC bindings ?
+
+Thanks for your help.
+
+Christophe.
+
+-----Original Message-----
+From: Rob Herring [mailto:robh at kernel.org] 
+Sent: lundi 7 mai 2018 18:36
+To: Christophe ROULLIER <christophe.roullier@st.com>
+Cc: mark.rutland at arm.com; mcoquelin.stm32 at gmail.com; Alexandre TORGUE <alexandre.torgue@st.com>; Peppe CAVALLARO <peppe.cavallaro@st.com>; devicetree at vger.kernel.org; andrew at lunn.ch; linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org
+Subject: Re: [PATCH V2 8/8] dt-bindings: stm32: add compatible for syscon
+
+On Wed, May 02, 2018 at 04:18:43PM +0200, Christophe Roullier wrote:
+> This patch describes syscon DT bindings.
 > 
-> OK, but I want to have a minimum of kexec.arch always exist.
+> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
+> ---
+>  Documentation/devicetree/bindings/arm/stm32.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/stm32.txt 
+> b/Documentation/devicetree/bindings/arm/stm32.txt
+> index 6808ed9..06e3834 100644
+> --- a/Documentation/devicetree/bindings/arm/stm32.txt
+> +++ b/Documentation/devicetree/bindings/arm/stm32.txt
+> @@ -8,3 +8,7 @@ using one of the following compatible strings:
+>    st,stm32f746
+>    st,stm32h743
+>    st,stm32mp157
+> +
+> +Required nodes:
+> +- syscon: the soc bus node must have a system controller node 
+> +pointing to the
+> +  global control registers, with the compatible string "syscon";
 
-I'm curious, why? Its 32bytes that is allocated a maximum of twice.
+You misunderstood my prior comment. 'syscon' alone is not valid. You need SoC specific compatible string for it and 'stm32' is not SoC specific. IOW, the compatible property for a syscon should imply every single register field in the block.
 
-(my questions on what needs to go in there were because it looked like a third
-user was missing...)
-
-
-> How about this?
->
-> | struct kimage_arch {
-> | 	phys_addr_t dtb_mem;
-> | #ifdef CONFIG_KEXEC_FILE
-
-#ifdef in structs just breeds more #ifdefs, as the code that accesses those
-members has to be behind the same set of conditions.
-
-Given this, I prefer the #ifdefs around cpu_soft_restart() as it doesn't force
-us to add more #ifdefs later.
-
-For either option without purgatory_info:
-Reviewed-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
+Rob
