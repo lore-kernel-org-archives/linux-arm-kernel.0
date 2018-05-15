@@ -1,98 +1,80 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 15 May 2018 14:00:57 -0500
-Subject: [PATCH v4 0/8] PCI: leak fixes, removable generic PCI host,
- assorted stuff
-In-Reply-To: <cover.1526375226.git.jan.kiszka@siemens.com>
-References: <cover.1526375226.git.jan.kiszka@siemens.com>
-Message-ID: <20180515190057.GA11156@bhelgaas-glaptop.roam.corp.google.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 15 May 2018 22:11:51 +0300
+Subject: [PATCH 01/24] arm64: signal: Make parse_user_sigframe() independent
+ of rt_sigframe layout
+In-Reply-To: <20180515191214.5045-1-ynorov@caviumnetworks.com>
+References: <20180515191214.5045-1-ynorov@caviumnetworks.com>
+Message-ID: <20180515191214.5045-2-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 11:06:59AM +0200, Jan Kiszka wrote:
-> Changes in v4:
->  - restore pci_free_resource_list() in error path of
->    of_pci_get_host_bridge_resources()
-> 
-> Changes in v3:
->  - refactor series to be both bisectable and simpler while reworking
->    of_pci_get_host_bridge_resources()
->  - include of_pci_get_host_bridge_resources() removal
->  - include devm_of_pci_get_host_bridge_resources() error path fixes
->  - effectively, no functional changes to v2
-> 
-> Changes in v2:
->  - patch 1: commit message reworking as suggested by Lorenzo
->  - patch 3-6: split-up as suggested by Bjorn
->  - patch 8: new
->  - patch 10: select PCI_DOMAINS from PCI_HOST_GENERIC, rather than
->    allowing manual choice, as suggested by Lorenzo
-> 
-> This primarily enables to unbind the generic PCI host controller without
-> leaving lots of memory leaks behind. A previous proposal patch 5 was
-> rejected because of those issues [1].
-> 
-> The fixes have been validated in the Jailhouse setup, where we add and
-> remove a virtual PCI host controller on hypervisor activation/
-> deactivation, with the help of kmemleak.
-> 
-> Besides that, there is tiny PCI API cleanup at the beginning and
-> support for manually enabled PCI domains at the end that enables the
-> Jailhouse scenario.
+From: Dave Martin <Dave.Martin@arm.com>
 
-This is beautiful!  Thanks for tweaking this one more time; I think it
-really makes the patches much more readable.
+ILP32 uses the same struct sigcontext as the native ABI (i.e.,
+LP64), but a different layout for the rest of the signal frame (since
+siginfo_t and ucontext_t are both ABI-dependent).
 
-I applied these with the tested-by/reviewed-by/acks to pci/resource for
-v4.18.
+Since the purpose of parse_user_sigframe() is really to parse sigcontext
+and not the whole signal frame, the function does not need to depend
+on the layout of rt_sigframe -- the only purpose of the rt_sigframe
+pointer is for use as a base to measure the signal frame size.
 
-Andy's comments certainly make sense, but doing it in the "Rework
-of_pci_get_host_bridge_resources()" patch would make that patch less
-obvious, so I'd rather do it as a cleanup on top.
+So, this patch renames the function to make it clear that only the
+sigcontext is really being parsed, and makes the sigframe base pointer
+generic.  A macro is defined to provide a suitable duck-typed interface
+that can be used with both sigframe definitions.
 
-> [1] http://lkml.iu.edu/hypermail/linux/kernel/1606.3/00072.html
-> 
-> 
-> CC: Jingoo Han <jingoohan1@gmail.com>
-> CC: Joao Pinto <Joao.Pinto@synopsys.com>
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> 
-> Jan Kiszka (8):
->   PCI: Make pci_get_new_domain_nr() static
->   PCI: Fix memory leak of devm_pci_alloc_host_bridge()
->   PCI: Rename device node parameter of
->     of_pci_get_host_bridge_resources()
->   PCI: Replace dev_node parameter of of_pci_get_host_bridge_resources
->     with device
->   PCI: Replace pr_*() with dev_*() in of_pci_get_host_bridge_resources()
->   PCI: Rework of_pci_get_host_bridge_resources() to
->     devm_of_pci_get_host_bridge_resources()
->   PCI: Add support for unbinding the generic PCI host controller
->   PCI: Enable PCI_DOMAINS along with generic PCI host controller
-> 
->  drivers/pci/dwc/pcie-designware-host.c |  2 +-
->  drivers/pci/host/Kconfig               |  1 +
->  drivers/pci/host/pci-aardvark.c        |  5 ++-
->  drivers/pci/host/pci-ftpci100.c        |  4 +--
->  drivers/pci/host/pci-host-common.c     | 13 +++++++
->  drivers/pci/host/pci-host-generic.c    |  1 +
->  drivers/pci/host/pci-v3-semi.c         |  3 +-
->  drivers/pci/host/pci-versatile.c       |  3 +-
->  drivers/pci/host/pci-xgene.c           |  3 +-
->  drivers/pci/host/pcie-altera.c         |  5 ++-
->  drivers/pci/host/pcie-iproc-platform.c |  4 +--
->  drivers/pci/host/pcie-rcar.c           |  5 ++-
->  drivers/pci/host/pcie-rockchip.c       |  4 +--
->  drivers/pci/host/pcie-xilinx-nwl.c     |  4 +--
->  drivers/pci/host/pcie-xilinx.c         |  4 +--
->  drivers/pci/of.c                       | 65 ++++++++++++++++------------------
->  drivers/pci/pci.c                      |  6 ++--
->  drivers/pci/probe.c                    |  4 ++-
->  include/linux/of_pci.h                 |  4 +--
->  include/linux/pci-ecam.h               |  1 +
->  include/linux/pci.h                    |  3 --
->  21 files changed, 76 insertions(+), 68 deletions(-)
-> 
-> -- 
-> 2.13.6
-> 
+Suggested-by: Yury Norov <ynorov@caviumnetworks.com>
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ arch/arm64/kernel/signal.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index f60c052e8d1c..65406218743c 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -334,17 +334,16 @@ extern int restore_sve_fpsimd_context(struct user_ctxs *user);
+ 
+ #endif /* ! CONFIG_ARM64_SVE */
+ 
+-
+-static int parse_user_sigframe(struct user_ctxs *user,
+-			       struct rt_sigframe __user *sf)
++static int __parse_user_sigcontext(struct user_ctxs *user,
++				   struct sigcontext __user const *sc,
++				   void __user const *sigframe_base)
+ {
+-	struct sigcontext __user *const sc = &sf->uc.uc_mcontext;
+ 	struct _aarch64_ctx __user *head;
+ 	char __user *base = (char __user *)&sc->__reserved;
+ 	size_t offset = 0;
+ 	size_t limit = sizeof(sc->__reserved);
+ 	bool have_extra_context = false;
+-	char const __user *const sfp = (char const __user *)sf;
++	char const __user *const sfp = (char const __user *)sigframe_base;
+ 
+ 	user->fpsimd = NULL;
+ 	user->sve = NULL;
+@@ -493,6 +492,9 @@ static int parse_user_sigframe(struct user_ctxs *user,
+ 	return -EINVAL;
+ }
+ 
++#define parse_user_sigcontext(user, sf)					\
++	__parse_user_sigcontext(user, &(sf)->uc.uc_mcontext, sf)
++
+ static int restore_sigframe(struct pt_regs *regs,
+ 			    struct rt_sigframe __user *sf)
+ {
+@@ -518,7 +520,7 @@ static int restore_sigframe(struct pt_regs *regs,
+ 
+ 	err |= !valid_user_regs(&regs->user_regs, current);
+ 	if (err == 0)
+-		err = parse_user_sigframe(&user, sf);
++		err = parse_user_sigcontext(&user, sf);
+ 
+ 	if (err == 0) {
+ 		if (!user.fpsimd)
+-- 
+2.17.0
