@@ -1,100 +1,61 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 May 2018 14:41:45 +0100
-Subject: [PATCH 1/4] amba: Export amba_bustype
-In-Reply-To: <CAPDyKFqagt5zhz-8hLSXOqofv-nBqg4i-EVjA=UV3Jfi4zktKg@mail.gmail.com>
-References: <20180508140628.f30774c70c4c481bff3f8000@arm.com>
- <CAPDyKFqagt5zhz-8hLSXOqofv-nBqg4i-EVjA=UV3Jfi4zktKg@mail.gmail.com>
-Message-ID: <20180515134144.GF16141@n2100.armlinux.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 15 May 2018 15:47:35 +0200
+Subject: [PATCH v3 5/6] drm/rockchip: dw_hdmi: store rockchip_hdmi reference
+ in phy_data object
+In-Reply-To: <20180515134736.5824-1-heiko@sntech.de>
+References: <20180515134736.5824-1-heiko@sntech.de>
+Message-ID: <20180515134736.5824-6-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 08:59:02AM +0200, Ulf Hansson wrote:
-> On 8 May 2018 at 21:06, Kim Phillips <kim.phillips@arm.com> wrote:
-> > This patch is provided in the context of allowing the Coresight driver
-> > subsystem to be loaded as modules.  Coresight uses amba_bus in its call
-> > to bus_find_device() in of_coresight_get_endpoint_device() when
-> > searching for a configurable endpoint device.  This patch allows
-> > Coresight to reference amba_bustype when built as a module.
-> 
-> Sounds like you are fixing a bug, don't your want this to go for
-> stable and then also add a fixes tag?
+When using special phy handling operations we'll often need access to
+the rockchip_hdmi struct.
 
-What bug is this fixing exactly that would qualify it for stable
-backporting?
+As the chip-data that occupies the phy_data pointer initially gets
+assigned to the rockchip_hdmi struct, we can now re-use this phy_data
+pointer to hold the reference to the rockchip_hdmi struct and use this
+reference later on.
 
-The lack of an export is never a bug unless there is some existing
-user which requires it.  This is not the case here.
+Inspiration for this comes from meson and sunxi dw-hdmi, which are using
+the same method.
 
-What Kim is doing in his new patch series is making Coresight - which
-is currently only available as either disabled or built-in - possible
-to be loaded as a module.  This is a new feature, and in the process
-of creating this new feature, Kim needs a symbol that wasn't previously
-needed to be exported.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Robin Murphy <robin.murphy@arm.com>
+---
+changes in v3:
+- reword commit message
 
-I think it would be hard to argue that Coresight not being available
-as a module is a bug worthy of backporting to older kernels.
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-Therefore, it is not a bug, and it certainly does not qualify for
-backporting to stable trees:
-
- - It must be obviously correct and tested.
-
-Probably.
-
- - It cannot be bigger than 100 lines, with context.
-
-Is.
-
- - It must fix only one thing.
-
-Does.
-
- - It must fix a real bug that bothers people (not a, "This could be a
-   problem..." type thing).
-
-Nope.
-
- - It must fix a problem that causes a build error (but not for things
-   marked CONFIG_BROKEN), an oops, a hang, data corruption, a real
-   security issue, or some "oh, that's not good" issue.  In short, something
-   critical.
-
-Nope, not in any stable tree.
-
- - Serious issues as reported by a user of a distribution kernel may also
-   be considered if they fix a notable performance or interactivity issue.
-   As these fixes are not as obvious and have a higher risk of a subtle
-   regression they should only be submitted by a distribution kernel
-   maintainer and include an addendum linking to a bugzilla entry if it
-   exists and additional information on the user-visible impact.
-
-Hasn't been.
-
- - New device IDs and quirks are also accepted.
-
-Is not that.
-
- - No "theoretical race condition" issues, unless an explanation of how the
-   race can be exploited is also provided.
-
-Is not that.
-
- - It cannot contain any "trivial" fixes in it (spelling changes,
-   whitespace cleanups, etc).
-
-Doesn't (so okay.)
-
- - It must follow the
-   :ref:`Documentation/process/submitting-patches.rst <submittingpatches>`
-   rules.
-
-Does.
-
- - It or an equivalent fix must already exist in Linus' tree (upstream).
-
-Eventually.
-
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 57e76dfd5f6d..19f002fa0a09 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -335,7 +335,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 				 void *data)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	const struct dw_hdmi_plat_data *plat_data;
++	struct dw_hdmi_plat_data *plat_data;
+ 	const struct of_device_id *match;
+ 	struct drm_device *drm = data;
+ 	struct drm_encoder *encoder;
+@@ -350,9 +350,14 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 		return -ENOMEM;
+ 
+ 	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
+-	plat_data = match->data;
++	plat_data = devm_kmemdup(&pdev->dev, match->data,
++					     sizeof(*plat_data), GFP_KERNEL);
++	if (!plat_data)
++		return -ENOMEM;
++
+ 	hdmi->dev = &pdev->dev;
+ 	hdmi->chip_data = plat_data->phy_data;
++	plat_data->phy_data = hdmi;
+ 	encoder = &hdmi->encoder;
+ 
+ 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.17.0
