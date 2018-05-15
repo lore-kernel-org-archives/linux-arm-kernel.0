@@ -1,72 +1,62 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 15 May 2018 13:48:44 +0100
-Subject: [PATCH v7 08/16] KVM: arm64: Optimise FPSIMD handling to reduce
- guest/host thrashing
-In-Reply-To: <20180515105523.GC38551@C02W217FHV2R.local>
-References: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
- <1525882385-29181-9-git-send-email-Dave.Martin@arm.com>
- <20180515105523.GC38551@C02W217FHV2R.local>
-Message-ID: <20180515124843.GO7753@e103592.cambridge.arm.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Wed, 16 May 2018 04:58:03 +0800
+Subject: [PATCH v12 0/4] set VSESR_EL2 by user space and support NOTIFY_SEI
+ notification
+Message-ID: <1526417887-25843-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 12:55:23PM +0200, Christoffer Dall wrote:
-> On Wed, May 09, 2018 at 05:12:57PM +0100, Dave Martin wrote:
-> > This patch refactors KVM to align the host and guest FPSIMD
-> > save/restore logic with each other for arm64.  This reduces the
-> > number of redundant save/restore operations that must occur, and
-> > reduces the common-case IRQ blackout time during guest exit storms
-> > by saving the host state lazily and optimising away the need to
-> > restore the host state before returning to the run loop.
+1. Detect whether KVM can set set guest SError syndrome
+2. Support to Set VSESR_EL2 and inject SError by user space.
+3. Support live migration to keep SError pending state and VSESR_EL2 value.
+4. ACPI 6.1 adds support for NOTIFY_SEI as a GHES notification mechanism, so support this
+   notification in software, KVM or kernel ARCH code call handle_guest_sei() to let ACP driver
+   to handle this notification.
 
-[...]
+Change since V11:
+Address James's comments, thanks James
+1. Align the struct of kvm_vcpu_events to 64 bytes
+2. Avoid exposing the stale ESR value in the kvm_arm_vcpu_get_events()
+3. Change variables 'injected' name to 'serror_pending' in the kvm_arm_vcpu_set_events()
+4. Change to sizeof(events) from sizeof(struct kvm_vcpu_events) in kvm_arch_vcpu_ioctl()
+5. Update the patches commit message and document description
 
-> > diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
 
-[...]
+Change since V10:
+Address James's comments, thanks James
+1. Merge the helper function with the user.
+2. Move the ISS_MASK into pend_guest_serror() to clear top bits
+3. Make kvm_vcpu_events struct align to 4 bytes
+4. Add something check in the kvm_arm_vcpu_set_events()
+5. Check kvm_arm_vcpu_get/set_events()'s return value.
+6. Initialise kvm_vcpu_events to 0 so that padding transferred to user-space doesn't
+    contain kernel stack.
 
-> > +/*
-> > + * Prepare vcpu for saving the host's FPSIMD state and loading the guest's.
-> > + * The actual loading is done by the FPSIMD access trap taken to hyp.
-> > + *
-> > + * Here, we just set the correct metadata to indicate that the FPSIMD
-> > + * state in the cpu regs (if any) belongs to current on the host.
-> > + *
-> > + * TIF_SVE is backed up here, since it may get clobbered with guest state.
-> > + * This flag is restored by kvm_arch_vcpu_put_fp(vcpu).
-> > + */
-> > +void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
-> > +{
-> > +	BUG_ON(system_supports_sve());
-> > +	BUG_ON(!current->mm);
-> > +
-> > +	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
-> > +	vcpu->arch.flags |= KVM_ARM64_FP_HOST;
-> > +	if (test_thread_flag(TIF_SVE))
-> > +		vcpu->arch.flags |= KVM_ARM64_HOST_SVE_IN_USE;
-> > +}
-> > +
-> > +/*
-> > + * If the guest FPSIMD state was loaded, update the host's context
-> > + * tracking data mark the CPU FPSIMD regs as dirty for vcpu so that they
-> 
-> nit: by marking the CPU FPSIMD regs as dirty and belonging to the
-> vcpu... ?
 
-Changed locally.
+Dongjiu Geng (4):
+  arm64: KVM: export the capability to set guest SError syndrome
+  arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
+  ACPI / APEI: Add SEI notification type support for ARMv8
+  arm64: handle NOTIFY_SEI notification by the APEI driver
 
-Marc, let me know if you can pick this up or want me to repost.  There
-are a couple of pending FWIWs now.
+ Documentation/virtual/kvm/api.txt    | 42 ++++++++++++++++++++++++++--
+ arch/arm/include/asm/kvm_host.h      |  6 ++++
+ arch/arm/kvm/guest.c                 | 12 ++++++++
+ arch/arm64/include/asm/kvm_emulate.h |  5 ++++
+ arch/arm64/include/asm/kvm_host.h    |  7 +++++
+ arch/arm64/include/asm/system_misc.h |  1 +
+ arch/arm64/include/uapi/asm/kvm.h    | 13 +++++++++
+ arch/arm64/kernel/traps.c            |  4 +++
+ arch/arm64/kvm/guest.c               | 36 ++++++++++++++++++++++++
+ arch/arm64/kvm/inject_fault.c        |  7 ++++-
+ arch/arm64/kvm/reset.c               |  4 +++
+ arch/arm64/mm/fault.c                | 10 +++++++
+ drivers/acpi/apei/Kconfig            | 15 ++++++++++
+ drivers/acpi/apei/ghes.c             | 53 ++++++++++++++++++++++++++++++++++++
+ include/acpi/ghes.h                  |  1 +
+ include/uapi/linux/kvm.h             |  1 +
+ virt/kvm/arm/arm.c                   | 21 ++++++++++++++
+ 17 files changed, 234 insertions(+), 4 deletions(-)
 
-There is also the option to include the separate update_thread_flags()
-patches that now have maintainer acks, though I will need to confirm
-with the respective maintainers that they're OK with this.
-
-> Otherwise:
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-
-[...]
-
-Thanks
----Dave
+-- 
+1.9.1
