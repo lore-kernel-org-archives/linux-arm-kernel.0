@@ -1,28 +1,67 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 15 May 2018 10:06:48 +0200
-Subject: [PATCH] PM / Domains: Don't return -EEXIST at attach when PM
- domain exists
-In-Reply-To: <20180515005342.GM98604@atomide.com>
-References: <1526309557-7995-1-git-send-email-ulf.hansson@linaro.org>
- <20180515005342.GM98604@atomide.com>
-Message-ID: <CAJZ5v0iaF9NfajAUT_m8E_AKySnjV-A6xpiXXz=_8LGe8oD1qg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 15 May 2018 16:06:26 +0800
+Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Fix USB PHY duplicate
+ unit-address
+In-Reply-To: <1526322576-5838-1-git-send-email-festevam@gmail.com>
+References: <1526322576-5838-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180515080624.GR26863@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 2:53 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Ulf Hansson <ulf.hansson@linaro.org> [180514 14:55]:
->> As dev_pm_domain_attach() isn't the only way to assign PM domain pointers
->> to devices, clearly we must allow a device to have the pointer already
->> being assigned. For this reason, return 0 instead of -EEXIST.
->>
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> Tested-by: Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
->
-> Fixes the issue for me too:
->
-> Tested-by: Tony Lindgren <tony@atomide.com>
+On Mon, May 14, 2018 at 03:29:35PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Currently the following DTC warning is seen with W=1:
+> 
+> arch/arm/boot/dts/imx51-babbage.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
+> 
+> Fix it by moving the USB PHY node outside of simple-bus and drop the
+> unneeded unit-address.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx51-babbage.dts | 21 +++++++--------------
+>  1 file changed, 7 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+> index b8ca73d..de46906 100644
+> --- a/arch/arm/boot/dts/imx51-babbage.dts
+> +++ b/arch/arm/boot/dts/imx51-babbage.dts
+> @@ -170,20 +170,13 @@
+>  		mux-ext-port = <3>;
+>  	};
+>  
+> -	usbphy {
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -		compatible = "simple-bus";
+> -
+> -		usbh1phy: usbh1phy at 0 {
+> -			compatible = "usb-nop-xceiv";
+> -			reg = <0>;
+> -			clocks = <&clk_usb>;
+> -			clock-names = "main_clk";
+> -			reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
+> -			vcc-supply = <&vusb_reg>;
+> -			#phy-cells = <0>;
+> -		};
+> +	usbh1phy: usbphy1 {
+> +		compatible = "usb-nop-xceiv";
+> +		clocks = <&clk_usb>;
+> +		clock-names = "main_clk";
+> +		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
+> +		vcc-supply = <&vusb_reg>;
+> +		#phy-cells = <0>;
 
-I've applied the patch with the tag above, thanks!
+This should be considered as a whole together with usbphy in imx51.dtsi.
+Also, I would like to get some input from DT folks on how we should name
+the node uniquely.  @Rob.
+
+Shawn
+
+>  	};
+>  };
+>  
+> -- 
+> 2.7.4
+> 
