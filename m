@@ -1,22 +1,11 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 15 May 2018 12:38:09 +0200
-Subject: [GIT PULL 1/4] Rockchip driver updates for 4.18 round 1
-Message-ID: <2000491.bLgWuj0xar@phil>
+Date: Tue, 15 May 2018 12:38:49 +0200
+Subject: [GIT PULL 2/4] Rockchip dts32 updates for 4.18 round 1
+In-Reply-To: <2000491.bLgWuj0xar@phil>
+References: <2000491.bLgWuj0xar@phil>
+Message-ID: <2461510.NP0ZiRnFEz@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Arnd, Kevin Olof,
-
-please find below and in the replies the main pull requests for Rockchip
-stuff for 4.18. Depending on timing there may or may not be a second
-round but so far I don't have anything big on the radar.
-
-The signed tags should explain the individual contents, so please pull.
-
-
-Thanks
-Heiko
-
 
 The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
@@ -24,19 +13,40 @@ The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-drivers-1
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-dts32-1
 
-for you to fetch changes up to 9e59c5f66c624b43c766a9fe3b2430e0e976bf0e:
+for you to fetch changes up to 08624814cbec12b1ce877bf80f6990ad2b9cdcd7:
 
-  soc: rockchip: power-domain: Fix wrong value when power up pd with writemask (2018-05-14 11:53:26 +0200)
-
-----------------------------------------------------------------
-Fix for an issue introduced in 2016 where some powerdomains could only
-be turned off but not on again.
+  ARM: dts: rockchip: default serial for rk3288 Tinker Board (2018-04-20 14:55:07 +0200)
 
 ----------------------------------------------------------------
-Finley Xiao (1):
-      soc: rockchip: power-domain: Fix wrong value when power up pd with writemask
+Fixed pin numbers for uart4 on rk3288, iommu clocks and small changes
+over multiple boards like default serial setting for rk3288-tinker,
+output selection for the dp83867 on the phycore-som and the newly
+added pwm-backlight delay properties for veyron boards.
 
- drivers/soc/rockchip/pm_domains.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+----------------------------------------------------------------
+Daniel Schultz (1):
+      ARM: dts: rockchip: Add dp83867 CLK_OUT muxing on rk3288-phycore-som
+
+Enric Balletbo i Serra (2):
+      ARM: dts: rockchip: set PWM delay backlight settings for Veyron
+      ARM: dts: rockchip: set PWM delay backlight settings for Minnie
+
+Heinrich Schuchardt (1):
+      ARM: dts: rockchip: default serial for rk3288 Tinker Board
+
+Jacob Chen (1):
+      ARM: dts: rockchip: fix uart4 pin-numbers for rk3288
+
+Jeffy Chen (1):
+      ARM: dts: rockchip: add clocks in iommu nodes
+
+ arch/arm/boot/dts/rk3036.dtsi                   |  2 ++
+ arch/arm/boot/dts/rk322x.dtsi                   |  8 ++++++++
+ arch/arm/boot/dts/rk3288-phycore-som.dtsi       |  1 +
+ arch/arm/boot/dts/rk3288-tinker.dts             |  4 ++++
+ arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi |  3 ++-
+ arch/arm/boot/dts/rk3288-veyron-minnie.dts      |  2 ++
+ arch/arm/boot/dts/rk3288.dtsi                   | 20 ++++++++++++++++----
+ 7 files changed, 35 insertions(+), 5 deletions(-)
