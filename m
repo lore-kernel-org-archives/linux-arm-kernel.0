@@ -1,116 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 May 2018 11:39:36 +0100
-Subject: [PATCH 06/18] arm64: move sve_user_{enable, disable} to
- <asm/fpsimd.h>
-In-Reply-To: <20180514110649.GC7753@e103592.cambridge.arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-7-mark.rutland@arm.com>
- <20180514110649.GC7753@e103592.cambridge.arm.com>
-Message-ID: <20180515103936.v5ytofdq3qqtsomn@lakrids.cambridge.arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 15 May 2018 12:40:05 +0200
+Subject: [GIT PULL 4/4] Rockchip arm64 defconfig updates for 4.18 round 1
+In-Reply-To: <2000491.bLgWuj0xar@phil>
+References: <2000491.bLgWuj0xar@phil>
+Message-ID: <2676342.8y6AX4oR9f@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 12:06:50PM +0100, Dave Martin wrote:
-> On Mon, May 14, 2018 at 10:46:28AM +0100, Mark Rutland wrote:
-> > In subsequent patches, we'll want to make use of sve_user_enable() and
-> > sve_user_disable() outside of kernel/fpsimd.c. Let's move these to
-> > <asm/fpsimd.h> where we can make use of them.
-> > 
-> > To avoid ifdeffery in sequences like:
-> > 
-> > if (system_supports_sve() && some_condition
-> > 	sve_user_disable();
-> > 
-> > ... empty stubs are provided when support for SVE is not enabled.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Dave Martin <dave.martin@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/include/asm/fpsimd.h | 17 ++++++++++++++++-
-> >  arch/arm64/kernel/fpsimd.c      | 11 -----------
-> >  2 files changed, 16 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> > index aa7162ae93e3..7377d7593c06 100644
-> > --- a/arch/arm64/include/asm/fpsimd.h
-> > +++ b/arch/arm64/include/asm/fpsimd.h
-> > @@ -16,11 +16,13 @@
-> >  #ifndef __ASM_FP_H
-> >  #define __ASM_FP_H
-> >  
-> > -#include <asm/ptrace.h>
-> >  #include <asm/errno.h>
-> > +#include <asm/ptrace.h>
-> > +#include <asm/sysreg.h>
-> >  
-> >  #ifndef __ASSEMBLY__
-> >  
-> > +#include <linux/build_bug.h>
-> >  #include <linux/cache.h>
-> >  #include <linux/init.h>
-> >  #include <linux/stddef.h>
-> > @@ -81,6 +83,16 @@ extern int sve_set_vector_length(struct task_struct *task,
-> >  extern int sve_set_current_vl(unsigned long arg);
-> >  extern int sve_get_current_vl(void);
-> >  
-> > +static inline void sve_user_disable(void)
-> > +{
-> > +	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
-> > +}
-> > +
-> > +static inline void sve_user_enable(void)
-> > +{
-> > +	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
-> > +}
-> > +
-> >  /*
-> >   * Probing and setup functions.
-> >   * Calls to these functions must be serialised with one another.
-> > @@ -107,6 +119,9 @@ static inline int sve_get_current_vl(void)
-> >  	return -EINVAL;
-> >  }
-> >  
-> > +static inline void sve_user_disable(void) { }
-> > +static inline void sve_user_enable(void) { }
-> > +
-> 
-> Alternatively, just move the full definitions outside the #ifdef
-> CONFIG_ARM64_SVE.
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-Can do, though I was trying to keep the exsting pattern with empty
-inlines for the !CONFIG_ARM64_SVE case.
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-> 
-> All calls to these should be shadowed by an if
-> (system_supports_sve()) in any case, and setting/clearing ZEN_EL0EN
-> in the CPACR_EL1 ought to be harmless now that the meaning of these
-> bits architecturally committed.
-> 
-> Ideally we would have a BUG_ON(!system_supports_sve()) in those
-> functions, but we won't won't to pay the cost in a production kernel.
+are available in the Git repository at:
 
-Earlier I'd put BUILD_BUG() in the body for the !CONFIG_ARM64_SVE case,
-to catch that kind of thing -- I could restore that.
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-defconfig64-1
 
-> >  static inline void sve_init_vq_map(void) { }
-> >  static inline void sve_update_vq_map(void) { }
-> >  static inline int sve_verify_vq_map(void) { return 0; }
-> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > index 088940387a4d..79a81c7d85c6 100644
-> > --- a/arch/arm64/kernel/fpsimd.c
-> > +++ b/arch/arm64/kernel/fpsimd.c
-> > @@ -159,7 +159,6 @@ static void sve_free(struct task_struct *task)
-> >  	__sve_free(task);
-> >  }
-> >  
-> > -
-> 
-> Hmmm, Ack.  Check for conflicts with the KVM FPSIMD rework [1] (though
-> trivial).
+for you to fetch changes up to 214f2c319a140f8a0121f362ad8e73ea1576d5ad:
 
-I'll assume that Ack stands regardless. :)
+  arm64: defconfig: enable rockchip efuse (2018-05-09 16:33:09 +0200)
 
-Thanks,
-Mark.
+----------------------------------------------------------------
+Enablement of Rockchip-specific efuse, io-domain and typec drivers
+as well as general cros-ec, hid, touchscreen bluetooth and wifi-drivers
+on 64bit arm platforms.
+
+----------------------------------------------------------------
+Enric Balletbo i Serra (3):
+      arm64: defconfig: Enable typec-phy and extcon-usbc-cros-ec for rk3399
+      arm64: defconfig: Enable Rockchip io-domain driver
+      arm64: defconfig: Enable ChromeOS EC drivers for supported Chromebooks.
+
+Ezequiel Garcia (4):
+      arm64: defconfig: Enable HID over I2C drivers
+      arm64: defconfig: Enable Atmel Maxtouch driver
+      arm64: defconfig: Enable Marvell WiFi-Ex PCIe driver
+      arm64: defconfig: Enable bluetooth USB support
+
+Heiko Stuebner (1):
+      arm64: defconfig: enable rockchip efuse
+
+ arch/arm64/configs/defconfig | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
