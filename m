@@ -1,61 +1,45 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 15 May 2018 15:47:35 +0200
-Subject: [PATCH v3 5/6] drm/rockchip: dw_hdmi: store rockchip_hdmi reference
- in phy_data object
-In-Reply-To: <20180515134736.5824-1-heiko@sntech.de>
-References: <20180515134736.5824-1-heiko@sntech.de>
-Message-ID: <20180515134736.5824-6-heiko@sntech.de>
+Date: Tue, 15 May 2018 15:47:30 +0200
+Subject: [PATCH v3 0/6] drm/rockchip: hdmi support for rk3328
+Message-ID: <20180515134736.5824-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using special phy handling operations we'll often need access to
-the rockchip_hdmi struct.
+The rk3228/rk3229 and rk3328 socs started using a new type of hdmi-phy
+from Innosilicon that resides completely separate from the dw-hdmi block
+and gets accessed via mmio.
 
-As the chip-data that occupies the phy_data pointer initially gets
-assigned to the rockchip_hdmi struct, we can now re-use this phy_data
-pointer to hold the reference to the rockchip_hdmi struct and use this
-reference later on.
+Additionally the rk3328 dw-hdmi does not report the vendor-phy type
+but a different one instead, so add the possibility to override the
+phy type when the glue driver knows better than the ip block itself.
 
-Inspiration for this comes from meson and sunxi dw-hdmi, which are using
-the same method.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
----
 changes in v3:
-- reword commit message
+- split off phy driver into a separate series
+- only allow forcing vendor phy type
+- wording fixes and other nits
 
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+changes in v2:
+- phy: prevent overflow in tmdsclk calculation
+  as reported by Martin Cerveny
+- phy: use unsigned long for all tmdsclk rate uses
+- phy: simplify tmds rate calculation
+- dropped patch exporting some dw-hdmi phy functions
+  as a similar patch entered drm-misc already
 
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 57e76dfd5f6d..19f002fa0a09 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -335,7 +335,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 				 void *data)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
--	const struct dw_hdmi_plat_data *plat_data;
-+	struct dw_hdmi_plat_data *plat_data;
- 	const struct of_device_id *match;
- 	struct drm_device *drm = data;
- 	struct drm_encoder *encoder;
-@@ -350,9 +350,14 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 		return -ENOMEM;
- 
- 	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
--	plat_data = match->data;
-+	plat_data = devm_kmemdup(&pdev->dev, match->data,
-+					     sizeof(*plat_data), GFP_KERNEL);
-+	if (!plat_data)
-+		return -ENOMEM;
-+
- 	hdmi->dev = &pdev->dev;
- 	hdmi->chip_data = plat_data->phy_data;
-+	plat_data->phy_data = hdmi;
- 	encoder = &hdmi->encoder;
- 
- 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
+Heiko Stuebner (6):
+  drm/bridge: dw-hdmi: allow forcing vendor phy-type
+  drm/rockchip: dw_hdmi: Allow outputs that don't need output switching
+  dt-bindings: allow optional phys in Rockchip dw_hdmi binding
+  drm/rockchip: dw_hdmi: allow including external phys
+  drm/rockchip: dw_hdmi: store rockchip_hdmi reference in phy_data
+    object
+  drm/rockchip: dw_hdmi: add dw-hdmi support for the rk3328
+
+ .../display/rockchip/dw_hdmi-rockchip.txt     |   3 +
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c     |   4 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c   | 130 +++++++++++++++++-
+ include/drm/bridge/dw_hdmi.h                  |   1 +
+ 4 files changed, 134 insertions(+), 4 deletions(-)
+
 -- 
 2.17.0
