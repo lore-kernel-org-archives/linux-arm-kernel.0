@@ -1,47 +1,38 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Tue, 15 May 2018 11:34:38 -0400
-Subject: [PATCH v4 4/8] PCI: Replace dev_node parameter of
- of_pci_get_host_bridge_resources with device
-In-Reply-To: <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
-References: <cover.1526375226.git.jan.kiszka@siemens.com>
- <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
-Message-ID: <000101d3ec62$3ca4f4b0$b5eede10$@gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 15 May 2018 17:33:19 +0200
+Subject: [PATCH] MAINTAINERS: Add entry for STM32 timer and lptimer drivers
+Message-ID: <1526398399-31753-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 15, 2018 5:07 AM, Jan Kiszka wrote:
-> 
-> From: Jan Kiszka <jan.kiszka@siemens.com>
-> 
-> Another step towards a managed version of
-> of_pci_get_host_bridge_resources(): Feed in the underlying device,
-> rather than just the OF node. This will allow to use managed resource
-> allocation internally later on.
-> 
-> CC: Jingoo Han <jingoohan1@gmail.com>
-> CC: Joao Pinto <Joao.Pinto@synopsys.com>
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+Add an entry to make myself a maintainer of STM32 timer and lptimer
+drivers.
 
-Acked-by: Jingoo Han <jingoohan1@gmail.com>
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Best regards,
-Jingoo Han
-
-> ---
->  drivers/pci/dwc/pcie-designware-host.c | 2 +-
->  drivers/pci/host/pci-aardvark.c        | 5 ++---
->  drivers/pci/host/pci-ftpci100.c        | 4 ++--
->  drivers/pci/host/pci-v3-semi.c         | 3 ++-
->  drivers/pci/host/pci-versatile.c       | 3 +--
->  drivers/pci/host/pci-xgene.c           | 3 ++-
->  drivers/pci/host/pcie-altera.c         | 5 ++---
->  drivers/pci/host/pcie-iproc-platform.c | 4 ++--
->  drivers/pci/host/pcie-rcar.c           | 5 ++---
->  drivers/pci/host/pcie-rockchip.c       | 4 ++--
->  drivers/pci/host/pcie-xilinx-nwl.c     | 4 ++--
->  drivers/pci/host/pcie-xilinx.c         | 4 ++--
->  drivers/pci/of.c                       | 9 +++++----
->  include/linux/of_pci.h                 | 4 ++--
->  14 files changed, 29 insertions(+), 30 deletions(-)
-> 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4b65225..94d8e47 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -13425,6 +13425,16 @@ T:	git git://linuxtv.org/media_tree.git
+ S:	Maintained
+ F:	drivers/media/usb/stk1160/
+ 
++STM32 TIMER/LPTIMER DRIVERS
++M:	Fabrice Gasnier <fabrice.gasnier@st.com>
++S:	Maintained
++F:	drivers/*/stm32-*timer*
++F:	drivers/pwm/pwm-stm32*
++F:	include/linux/*/stm32-*tim*
++F:	Documentation/ABI/testing/*timer-stm32
++F:	Documentation/devicetree/bindings/*/stm32-*timer
++F:	Documentation/devicetree/bindings/pwm/pwm-stm32*
++
+ STMMAC ETHERNET DRIVER
+ M:	Giuseppe Cavallaro <peppe.cavallaro@st.com>
+ M:	Alexandre Torgue <alexandre.torgue@st.com>
+-- 
+1.9.1
