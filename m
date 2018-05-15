@@ -1,38 +1,45 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 15 May 2018 16:47:12 +0200
-Subject: [PATCH 2/3] clk: renesas: r8a7795: Add ccree clock
-In-Reply-To: <1526387370-17142-3-git-send-email-gilad@benyossef.com>
+Date: Tue, 15 May 2018 16:50:44 +0200
+Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
+In-Reply-To: <1526387370-17142-4-git-send-email-gilad@benyossef.com>
 References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
- <1526387370-17142-3-git-send-email-gilad@benyossef.com>
-Message-ID: <CAMuHMdXWPwW_p=D56BhNF274m+JLe+mbD2fqQu8-we-uMW4b8Q@mail.gmail.com>
+ <1526387370-17142-4-git-send-email-gilad@benyossef.com>
+Message-ID: <CAMuHMdWzeNqsho1V6ezZb81T3_HcRzrtuQpmGXsjtFgt9BtZDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Gilad,
 
 On Tue, May 15, 2018 at 2:29 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
-> This patch adds the clock used by the CryptoCell 630p instance in the SoC.
+> Add bindings for CryptoCell instance in the SoC.
 >
 > Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 
 Thanks for your patch!
 
-> --- a/drivers/clk/renesas/r8a7795-cpg-mssr.c
-> +++ b/drivers/clk/renesas/r8a7795-cpg-mssr.c
-> @@ -132,6 +132,7 @@ static struct mssr_mod_clk r8a7795_mod_clks[] __initdata = {
->         DEF_MOD("sys-dmac2",             217,   R8A7795_CLK_S0D3),
->         DEF_MOD("sys-dmac1",             218,   R8A7795_CLK_S0D3),
->         DEF_MOD("sys-dmac0",             219,   R8A7795_CLK_S0D3),
-> +       DEF_MOD("ccree",                 229,   R8A7795_CLK_S3D2),
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> @@ -528,6 +528,14 @@
+>                         status = "disabled";
+>                 };
+>
+> +               arm_cc630p: crypto at e6601000 {
+> +                       compatible = "arm,cryptocell-630p-ree";
+> +                       interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+> +                       #interrupt-cells = <2>;
 
-I don't know if "ccree" is the proper name for this clock, as there
-may be multiple
-instances.
-I also can't verify the parent clock.
+I believe the #interrupt-cells property is not needed.
 
->         DEF_MOD("cmt3",                  300,   R8A7795_CLK_R),
->         DEF_MOD("cmt2",                  301,   R8A7795_CLK_R),
->         DEF_MOD("cmt1",                  302,   R8A7795_CLK_R),
+> +                       reg = <0x0 0xe6601000 0 0x1000>;
+> +                       clocks = <&cpg CPG_MOD 229>;
+> +               };
+
+The rest looks good, but I cannot verify the register block.
+
+> +
+>                 i2c3: i2c at e66d0000 {
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
 
 Gr{oetje,eeting}s,
 
