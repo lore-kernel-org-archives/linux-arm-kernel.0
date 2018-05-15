@@ -1,29 +1,92 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 15 May 2018 18:02:02 +0200
-Subject: [PATCH] arm64: dts: exynos: fix type of thermal trip points for
- Exynos7
-In-Reply-To: <CAJKOXPdW7Ovo9GW=29tqa3rEAkSFgrEzbxm_wdGmRpamgk2-ig@mail.gmail.com>
-References: <CGME20180515123755eucas1p278a9c1e9cb0101e406e3839e27f8b3b1@eucas1p2.samsung.com>
- <1702366.qL959G52Hi@amdc3058>
- <CAJKOXPdW7Ovo9GW=29tqa3rEAkSFgrEzbxm_wdGmRpamgk2-ig@mail.gmail.com>
-Message-ID: <66371602.d1UHUK4g0h@amdc3058>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 15 May 2018 17:15:52 +0100
+Subject: [PATCH v9 03/11] arm64: kexec_file: invoke the kernel without
+ purgatory
+In-Reply-To: <20180515044542.GC2737@linaro.org>
+References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
+ <20180425062629.29404-4-takahiro.akashi@linaro.org>
+ <9c830fe8-56d8-b43a-6265-43d31dffe61a@arm.com>
+ <20180507052208.GD11326@linaro.org>
+ <ece8d3cc-127f-6855-52fb-24e4a1d4e823@arm.com>
+ <20180515044542.GC2737@linaro.org>
+Message-ID: <fbd2c6c6-be20-a9fa-0303-e4448225df18@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 15, 2018 02:59:33 PM Krzysztof Kozlowski wrote:
-> On Tue, May 15, 2018 at 2:37 PM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> > Currently Exynos thermal driver treats as "active" all specified
-> > trip points before reaching maximum number of hardware supported
-> > trip points.
+Hi Akashi,
+
+On 15/05/18 05:45, AKASHI Takahiro wrote:
+> On Fri, May 11, 2018 at 06:03:49PM +0100, James Morse wrote:
+>> On 07/05/18 06:22, AKASHI Takahiro wrote:
+>>> On Tue, May 01, 2018 at 06:46:06PM +0100, James Morse wrote:
+>>>> On 25/04/18 07:26, AKASHI Takahiro wrote:
+>>>>> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+>>>>> index f76ea92dff91..f7dbba00be10 100644
+>>>>> --- a/arch/arm64/kernel/machine_kexec.c
+>>>>> +++ b/arch/arm64/kernel/machine_kexec.c
+>>>>> @@ -205,10 +205,17 @@ void machine_kexec(struct kimage *kimage)
+>>
+>>>>>  	cpu_soft_restart(kimage != kexec_crash_image,
+>>>>> -		reboot_code_buffer_phys, kimage->head, kimage->start, 0);
+>>>>> +		reboot_code_buffer_phys, kimage->head, kimage->start,
+>>>>> +#ifdef CONFIG_KEXEC_FILE
+>>>>> +				kimage->purgatory_info.purgatory_buf ?
+>>>>> +						0 : kimage->arch.dtb_mem);
+>>>>> +#else
+>>>>> +				0);
+>>>>> +#endif
+>>
+>>
+>>>> purgatory_buf seems to only be set in kexec_purgatory_setup_kbuf(), called from
+>>>> kexec_load_purgatory(), which we don't use. How does this get a value?
+>>>>
+>>>> Would it be better to always use kimage->arch.dtb_mem, and ensure that is 0 for
+>>>> regular kexec (as we can't know where the dtb is)? (image_arg may then be a
+>>>> better name).
+>>>
+>>> The problem is arch.dtb_mem is currently defined only if CONFIG_KEXEC_FILE.
+>>
+>> I thought it was ARCH_HAS_KIMAGE_ARCH, which we can define all the time if
+>> that's what we want.
+>>
+>>
+>>> So I would like to
+>>> - merge this patch with patch#8
+>>> - change the condition
+>>>         #ifdef CONFIG_KEXEC_FILE
+>>>        				kimage->file_mode ? kimage->arch.dtb_mem : 0);
+>>>         #else
+>>>         			0);
+>>>         #endif
+>>
+>> If we can avoid even this #ifdef by always having kimage->arch, I'd prefer that.
+>> If we do that 'dtb_mem' would need some thing that indicates its for kexec_file,
+>> as kexec has a DTB too, we just don't know where it is...
 > 
-> The trip point type describe the way how system should act - use
-> active or passive cooling. It is independent of thermal driver. I do
+> OK, but I want to have a minimum of kexec.arch always exist.
 
-OK, I see it now. Please disregard this patch.
+I'm curious, why? Its 32bytes that is allocated a maximum of twice.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+(my questions on what needs to go in there were because it looked like a third
+user was missing...)
+
+
+> How about this?
+>
+> | struct kimage_arch {
+> | 	phys_addr_t dtb_mem;
+> | #ifdef CONFIG_KEXEC_FILE
+
+#ifdef in structs just breeds more #ifdefs, as the code that accesses those
+members has to be behind the same set of conditions.
+
+Given this, I prefer the #ifdefs around cpu_soft_restart() as it doesn't force
+us to add more #ifdefs later.
+
+For either option without purgatory_info:
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
