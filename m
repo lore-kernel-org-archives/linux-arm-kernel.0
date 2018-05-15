@@ -1,19 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 May 2018 13:39:50 -0700
-Subject: [GIT PULL] ARM: mediatek: dts64 updates for v4.18
-In-Reply-To: <e36e9a49-4913-25a8-16a9-31c1fbbfddc9@gmail.com>
-References: <e36e9a49-4913-25a8-16a9-31c1fbbfddc9@gmail.com>
-Message-ID: <20180515203950.m4mbqihqhfxnj6fa@localhost>
+Date: Tue, 15 May 2018 13:43:37 -0700
+Subject: [GIT PULL] ARM: mediatek: soc driver updates for v4.18
+In-Reply-To: <bd033549-4998-e376-eb92-16111ec71a07@gmail.com>
+References: <bd033549-4998-e376-eb92-16111ec71a07@gmail.com>
+Message-ID: <20180515204337.5ymnsofo35a64yxz@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 01:28:16PM +0200, Matthias Brugger wrote:
-> Hi you two,
+On Mon, May 14, 2018 at 01:32:49PM +0200, Matthias Brugger wrote:
+> Hi Arnd and Olof,
 > 
-> Please take into account the following commit to 64-bit DTS.
+> Below the commits for mediatek soc drivers.
+> Please beware that we need the regmap-ktime-fix [1] from Mark Browns static tag.
+> I merged that into my branch, but I wanted to let you know, so that you don't
+> hit any breakage when pulling in my branch.
+
+Great, and thanks for mentioning it.
+
 > 
-> Thanks a lot,
+> Regards,
 > Matthias
+> 
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git
+> tags/regmap-ktime-fix
 > 
 > ---
 > 
@@ -24,13 +33,14 @@ On Mon, May 14, 2018 at 01:28:16PM +0200, Matthias Brugger wrote:
 > are available in the Git repository at:
 > 
 >   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-> tags/v4.17-next-dts64
+> tags/v4.17-next-soc
 > 
-> for you to fetch changes up to f1e0d0d8cf454202d21140aace184cc5512a9fdd:
+> for you to fetch changes up to 0afd32c6bb59e41b6692dec4473efaffffcad67b:
 > 
->   arm64: dts: mt7622: add audio related device nodes (2018-05-11 18:42:20 +0200)
+>   Merge commit 'f15cd6d99198e9c15229aefec639a34a6e8174c6' into
+> v.4.17-next/soc-test (2018-05-14 12:22:03 +0200)
 
-Merged, thanks.
+Merged into next/drivers. Thanks!
 
 
 -Olof
