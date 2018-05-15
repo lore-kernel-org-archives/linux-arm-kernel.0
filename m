@@ -1,43 +1,73 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 15 May 2018 12:40:05 +0200
-Subject: [GIT PULL 4/4] Rockchip arm64 defconfig updates for 4.18 round 1
-In-Reply-To: <2000491.bLgWuj0xar@phil>
-References: <2000491.bLgWuj0xar@phil>
-Message-ID: <2676342.8y6AX4oR9f@phil>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Tue, 15 May 2018 12:46:38 +0200
+Subject: [PATCH v7 14/16] KVM: arm64: Remove redundant *exit_code changes
+ in fpsimd_guest_exit()
+In-Reply-To: <1525882385-29181-15-git-send-email-Dave.Martin@arm.com>
+References: <1525882385-29181-1-git-send-email-Dave.Martin@arm.com>
+ <1525882385-29181-15-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180515104638.GB38551@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+On Wed, May 09, 2018 at 05:13:03PM +0100, Dave Martin wrote:
+> In fixup_guest_exit(), there are a couple of cases where after
+> checking what the exit code was, we assign it explicitly with the
+> value it already had.
+> 
+> Assuming this is not indicative of a bug, these assignments are not
+> needed.
+> 
+> This patch removes the redundant assignments, and simplifies some
+> if-nesting that becomes trivial as a result.
+> 
+> No functional change.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/switch.c | 16 ++++------------
+>  1 file changed, 4 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index a6a8c7d..18d0faa 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -403,12 +403,8 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+>  		if (valid) {
+>  			int ret = __vgic_v2_perform_cpuif_access(vcpu);
+>  
+> -			if (ret == 1) {
+> -				if (__skip_instr(vcpu))
+> -					return true;
+> -				else
+> -					*exit_code = ARM_EXCEPTION_TRAP;
+> -			}
+> +			if (ret ==  1 && __skip_instr(vcpu))
+> +				return true;
+>  
+>  			if (ret == -1) {
+>  				/* Promote an illegal access to an
+> @@ -430,12 +426,8 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+>  	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
+>  		int ret = __vgic_v3_perform_cpuif_access(vcpu);
+>  
+> -		if (ret == 1) {
+> -			if (__skip_instr(vcpu))
+> -				return true;
+> -			else
+> -				*exit_code = ARM_EXCEPTION_TRAP;
+> -		}
+> +		if (ret == 1 && __skip_instr(vcpu))
+> +			return true;
+>  	}
+>  
+>  	/* Return to the host kernel and handle the exit */
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+I can't seem to easily convince myself that we couldn't have the
+ARM_EXIT_WITH_SERROR_BIT set here and thus instead should be using
+ARM_EXCEPTION_CODE() in the upper check.
 
-are available in the Git repository at:
+Marc, can you help?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-defconfig64-1
-
-for you to fetch changes up to 214f2c319a140f8a0121f362ad8e73ea1576d5ad:
-
-  arm64: defconfig: enable rockchip efuse (2018-05-09 16:33:09 +0200)
-
-----------------------------------------------------------------
-Enablement of Rockchip-specific efuse, io-domain and typec drivers
-as well as general cros-ec, hid, touchscreen bluetooth and wifi-drivers
-on 64bit arm platforms.
-
-----------------------------------------------------------------
-Enric Balletbo i Serra (3):
-      arm64: defconfig: Enable typec-phy and extcon-usbc-cros-ec for rk3399
-      arm64: defconfig: Enable Rockchip io-domain driver
-      arm64: defconfig: Enable ChromeOS EC drivers for supported Chromebooks.
-
-Ezequiel Garcia (4):
-      arm64: defconfig: Enable HID over I2C drivers
-      arm64: defconfig: Enable Atmel Maxtouch driver
-      arm64: defconfig: Enable Marvell WiFi-Ex PCIe driver
-      arm64: defconfig: Enable bluetooth USB support
-
-Heiko Stuebner (1):
-      arm64: defconfig: enable rockchip efuse
-
- arch/arm64/configs/defconfig | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Thanks,
+-Christoffer
