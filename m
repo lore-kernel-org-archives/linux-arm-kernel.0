@@ -1,56 +1,56 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 15 May 2018 15:47:31 +0200
-Subject: [PATCH v3 1/6] drm/bridge: dw-hdmi: allow forcing vendor phy-type
+Date: Tue, 15 May 2018 15:47:34 +0200
+Subject: [PATCH v3 4/6] drm/rockchip: dw_hdmi: allow including external phys
 In-Reply-To: <20180515134736.5824-1-heiko@sntech.de>
 References: <20180515134736.5824-1-heiko@sntech.de>
-Message-ID: <20180515134736.5824-2-heiko@sntech.de>
+Message-ID: <20180515134736.5824-5-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some IP implementations the reading of the phy-type may be broken.
-One example are the Rockchip rk3228 and rk3328 socs that use a separate
-vendor-type phy from Innosilicon but still report the HDMI20_TX type.
-
-So allow the glue driver to force the vendor-phy for these cases.
-In the future it may be necessary to allow forcing other types, but
-for now we'll keep it simply to the case actually seen in the wild.
+Some variants of the dw-hdmi on Rockchip socs use a separate phy block
+accessed via the generic phy framework, so allow them to be included
+if such a phy reference is found.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Tested-by: Robin Murphy <robin.murphy@arm.com>
 ---
-changes in v3:
-- only allow forcing vendor type, as suggested by Laurent
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 4 +++-
- include/drm/bridge/dw_hdmi.h              | 1 +
- 2 files changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index ec8d0006ef7c..4de82ced9370 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -2212,7 +2212,9 @@ static int dw_hdmi_detect_phy(struct dw_hdmi *hdmi)
- 	unsigned int i;
- 	u8 phy_type;
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index b09c3531305b..57e76dfd5f6d 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -11,6 +11,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/phy/phy.h>
+ #include <linux/regmap.h>
  
--	phy_type = hdmi_readb(hdmi, HDMI_CONFIG2_ID);
-+	phy_type = hdmi->plat_data->phy_force_vendor ?
-+				DW_HDMI_PHY_VENDOR_PHY :
-+				hdmi_readb(hdmi, HDMI_CONFIG2_ID);
+ #include <drm/drm_of.h>
+@@ -49,6 +50,7 @@ struct rockchip_hdmi {
+ 	struct clk *vpll_clk;
+ 	struct clk *grf_clk;
+ 	struct dw_hdmi *hdmi;
++	struct phy *phy;
+ };
  
- 	if (phy_type == DW_HDMI_PHY_VENDOR_PHY) {
- 		/* Vendor PHYs require support from the glue layer. */
-diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-index dd2a8cf7d20b..53f0ce9aeb4a 100644
---- a/include/drm/bridge/dw_hdmi.h
-+++ b/include/drm/bridge/dw_hdmi.h
-@@ -133,6 +133,7 @@ struct dw_hdmi_plat_data {
- 	const struct dw_hdmi_phy_ops *phy_ops;
- 	const char *phy_name;
- 	void *phy_data;
-+	bool phy_force_vendor;
+ #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
+@@ -376,6 +378,14 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 		return ret;
+ 	}
  
- 	/* Synopsys PHY support */
- 	const struct dw_hdmi_mpll_config *mpll_cfg;
++	hdmi->phy = devm_phy_optional_get(dev, "hdmi");
++	if (IS_ERR(hdmi->phy)) {
++		ret = PTR_ERR(hdmi->phy);
++		if (ret != -EPROBE_DEFER)
++			DRM_DEV_ERROR(hdmi->dev, "failed to get phy\n");
++		return ret;
++	}
++
+ 	drm_encoder_helper_add(encoder, &dw_hdmi_rockchip_encoder_helper_funcs);
+ 	drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
+ 			 DRM_MODE_ENCODER_TMDS, NULL);
 -- 
 2.17.0
