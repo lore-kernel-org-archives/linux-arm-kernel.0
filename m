@@ -1,56 +1,71 @@
-From: christophe.roullier@st.com (Christophe ROULLIER)
-Date: Tue, 15 May 2018 16:19:53 +0000
-Subject: [PATCH V2 8/8] dt-bindings: stm32: add compatible for syscon
-In-Reply-To: <20180507163537.GA15212@rob-hp-laptop>
-References: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
- <1525270723-18241-9-git-send-email-christophe.roullier@st.com>
- <20180507163537.GA15212@rob-hp-laptop>
-Message-ID: <d2b4cd1845b949a7bf9c42a17a5358a2@SFHDAG5NODE3.st.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 15 May 2018 17:17:41 +0100
+Subject: [PATCH v9 04/11] arm64: kexec_file: allocate memory walking
+ through memblock list
+In-Reply-To: <20180515043538.GB2737@linaro.org>
+References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
+ <20180425062629.29404-5-takahiro.akashi@linaro.org>
+ <648656ef-1f1e-b0ac-581c-aba1e62f4eee@arm.com>
+ <20180507055906.GE11326@linaro.org> <20180515043538.GB2737@linaro.org>
+Message-ID: <84d5da84-81c4-d311-10e9-ba6afaf72a8e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Akashi,
 
-I do not understand, so let me explain our status:
+On 15/05/18 05:35, AKASHI Takahiro wrote:
+> On Mon, May 07, 2018 at 02:59:07PM +0900, AKASHI Takahiro wrote:
+>> On Tue, May 01, 2018 at 06:46:09PM +0100, James Morse wrote:
+>>> On 25/04/18 07:26, AKASHI Takahiro wrote:
+>>>> We need to prevent firmware-reserved memory regions, particularly EFI
+>>>> memory map as well as ACPI tables, from being corrupted by loading
+>>>> kernel/initrd (or other kexec buffers). We also want to support memory
+>>>> allocation in top-down manner in addition to default bottom-up.
+>>>> So let's have arm64 specific arch_kexec_walk_mem() which will search
+>>>> for available memory ranges in usable memblock list,
+>>>> i.e. !NOMAP & !reserved, 
+>>>
+>>>> instead of system resource tree.
+>>>
+>>> Didn't we try to fix the system-resource-tree in order to fix regular-kexec to
+>>> be safe in the EFI-memory-map/ACPI-tables case?
+>>>
+>>> It would be good to avoid having two ways of doing this, and I would like to
+>>> avoid having extra arch code...
+>>
+>> I know what you mean.
+>> /proc/iomem or system resource is, in my opinion, not the best place to
+>> describe memory usage of kernel but rather to describe *physical* hardware
+>> layout. As we are still discussing about "reserved" memory, I don't want
+>> to depend on it.
 
-We have syscfg IP Harware in our SOC. 
-But we do not have SoC specific driver to manage syscfg, we are using a generic driver "syscon".
-So can you tell me what you wish to describe this part in our SOC bindings ?
+I agree. We have funny stuff that isn't hardware-layout, but is important for
+the next boot. The kernel doesn't have an ABI to support when it queries the
+list itself.
 
-Thanks for your help.
 
-Christophe.
+>> Along with memblock list, we will have more accurate control over memory
+>> usage.
 
------Original Message-----
-From: Rob Herring [mailto:robh at kernel.org] 
-Sent: lundi 7 mai 2018 18:36
-To: Christophe ROULLIER <christophe.roullier@st.com>
-Cc: mark.rutland at arm.com; mcoquelin.stm32 at gmail.com; Alexandre TORGUE <alexandre.torgue@st.com>; Peppe CAVALLARO <peppe.cavallaro@st.com>; devicetree at vger.kernel.org; andrew at lunn.ch; linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org
-Subject: Re: [PATCH V2 8/8] dt-bindings: stm32: add compatible for syscon
+>>> If the argument is walking memblock gives a better answer than the stringy
+>>> walk_system_ram_res() thing, is there any mileage in moving this code into
+>>> kexec_file.c, and using it if !IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK)?
+>>>
+>>> This would save arm64/powerpc having near-identical implementations.
+>>> 32bit arm keeps memblock if it has kexec, so it may be useful there too if
+>>> kexec_file_load() support is added.
 
-On Wed, May 02, 2018 at 04:18:43PM +0200, Christophe Roullier wrote:
-> This patch describes syscon DT bindings.
-> 
-> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
-> ---
->  Documentation/devicetree/bindings/arm/stm32.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/stm32.txt 
-> b/Documentation/devicetree/bindings/arm/stm32.txt
-> index 6808ed9..06e3834 100644
-> --- a/Documentation/devicetree/bindings/arm/stm32.txt
-> +++ b/Documentation/devicetree/bindings/arm/stm32.txt
-> @@ -8,3 +8,7 @@ using one of the following compatible strings:
->    st,stm32f746
->    st,stm32h743
->    st,stm32mp157
-> +
-> +Required nodes:
-> +- syscon: the soc bus node must have a system controller node 
-> +pointing to the
-> +  global control registers, with the compatible string "syscon";
+> If you don't have further objection, I will take memblock approach
+> (with factoring out powerpc's arch_kexec_walk_mem()).
 
-You misunderstood my prior comment. 'syscon' alone is not valid. You need SoC specific compatible string for it and 'stm32' is not SoC specific. IOW, the compatible property for a syscon should imply every single register field in the block.
+If we're agreed that the memblock walking is generic, then it would be quicker
+to make the arm64 version as close as possible and merge them as a later series.
+(saves a cross arch dependency)
 
-Rob
+With that,
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
