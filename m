@@ -1,19 +1,67 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 15 May 2018 11:47:49 +0200
-Subject: [PATCH 26/61] media: platform: exynos4-is: simplify getting
- .drvdata
-In-Reply-To: <20180419140641.27926-27-wsa+renesas@sang-engineering.com>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <20180419140641.27926-27-wsa+renesas@sang-engineering.com>
- <CGME20180515094754epcas2p2715cc9c6376ddbb5f400830ef41b514b@epcas2p2.samsung.com>
-Message-ID: <613c3648-1d2e-e008-60a8-d9f21eca9fae@samsung.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 15 May 2018 11:49:10 +0200
+Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
+ PX30
+In-Reply-To: <1526376217-3833-1-git-send-email-david.wu@rock-chips.com>
+References: <1526376217-3833-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <7587293.TUNouLJ331@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2018 04:05 PM, Wolfram Sang wrote:
-> We should get drvdata from struct device directly. Going via
-> platform_device is an unneeded step back and forth.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Hi David,
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+looks good overall, some small things below.
+
+Am Dienstag, 15. Mai 2018, 11:23:37 CEST schrieb David Wu:
+> This adds the necessary data for handling io voltage domains on PX30.
+> As interesting tidbit, the PX30 contains two separate iodomain areas.
+> One in the regular General Register Files (GRF) and one in PMUGRF in the
+> pmu power domain.
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+>  .../bindings/power/rockchip-io-domain.txt          |  2 +
+>  drivers/power/avs/rockchip-io-domain.c             | 68 ++++++++++++++++++++++
+>  2 files changed, 70 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> index 4a4766e..c2595ba 100644
+> --- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> +++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> @@ -31,6 +31,8 @@ SoC is on the same page.
+>  
+>  Required properties:
+>  - compatible: should be one of:
+> +  - "rockchip,px30-io-voltage-domain" for px30
+> +  - "rockchip,px30-pmu-io-voltage-domain" for px30 pmu-domains
+>    - "rockchip,rk3188-io-voltage-domain" for rk3188
+>    - "rockchip,rk3228-io-voltage-domain" for rk3228
+>    - "rockchip,rk3288-io-voltage-domain" for rk3288
+
+please also define the px30-specific supply names as can be seen in that
+file for the other socs.
+
+Also, please include devicetree maintainers, when modifying
+binding documents.
+
+
+> +static const struct rockchip_iodomain_soc_data soc_data_px30 = {
+> +	.grf_offset = 0x180,
+> +	.supply_names = {
+> +		NULL,
+> +		"vccio6",
+> +		"vccio1",
+> +		"vccio2",
+> +		"vccio3",
+> +		"vccio4",
+> +		"vccio5",
+> +		"vccio_oscgpi",
+
+vccio-oscgpi ... aka with a "-" instead of "_"
+
+With the above fixed
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+Thanks
+Heiko
