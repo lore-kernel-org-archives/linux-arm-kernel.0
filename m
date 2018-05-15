@@ -1,67 +1,55 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 15 May 2018 11:49:10 +0200
-Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
- PX30
-In-Reply-To: <1526376217-3833-1-git-send-email-david.wu@rock-chips.com>
-References: <1526376217-3833-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <7587293.TUNouLJ331@phil>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 15 May 2018 11:50:12 +0200
+Subject: [PATCH V5 2/4] soc: mediatek: pwrap: fix cipher init setting error
+In-Reply-To: <1525957319-20557-3-git-send-email-argus.lin@mediatek.com>
+References: <1525957319-20557-1-git-send-email-argus.lin@mediatek.com>
+ <1525957319-20557-3-git-send-email-argus.lin@mediatek.com>
+Message-ID: <d754bbdd-93ee-fadd-e4e7-439032f8b173@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
 
-looks good overall, some small things below.
 
-Am Dienstag, 15. Mai 2018, 11:23:37 CEST schrieb David Wu:
-> This adds the necessary data for handling io voltage domains on PX30.
-> As interesting tidbit, the PX30 contains two separate iodomain areas.
-> One in the regular General Register Files (GRF) and one in PMUGRF in the
-> pmu power domain.
+On 05/10/2018 03:01 PM, argus.lin at mediatek.com wrote:
+> From: Argus Lin <argus.lin@mediatek.com>
 > 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> PWRAP_DEW_CIPHER_LOAD and PWRAP_DEW_CIPHER_START only exist at
+> PMIC_mt6397 datasheet. We fix it before merge PMIC_mt6351 driver.
+> 
+> Fixes: 5ae48040aa47 ("soc: mediatek: PMIC wrap: add mt6323 slave support")
+
+Same here, you forgot Signed-off-by tag.
+
 > ---
->  .../bindings/power/rockchip-io-domain.txt          |  2 +
->  drivers/power/avs/rockchip-io-domain.c             | 68 ++++++++++++++++++++++
->  2 files changed, 70 insertions(+)
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-> index 4a4766e..c2595ba 100644
-> --- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-> +++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-> @@ -31,6 +31,8 @@ SoC is on the same page.
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index e9e054a..9a01e30 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -1080,8 +1080,6 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+>  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_SWRST], 0x0);
+>  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_KEY_SEL], 0x1);
+>  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_IV_SEL], 0x2);
+> -	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_LOAD], 0x1);
+> -	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_START], 0x1);
 >  
->  Required properties:
->  - compatible: should be one of:
-> +  - "rockchip,px30-io-voltage-domain" for px30
-> +  - "rockchip,px30-pmu-io-voltage-domain" for px30 pmu-domains
->    - "rockchip,rk3188-io-voltage-domain" for rk3188
->    - "rockchip,rk3228-io-voltage-domain" for rk3228
->    - "rockchip,rk3288-io-voltage-domain" for rk3288
-
-please also define the px30-specific supply names as can be seen in that
-file for the other socs.
-
-Also, please include devicetree maintainers, when modifying
-binding documents.
-
-
-> +static const struct rockchip_iodomain_soc_data soc_data_px30 = {
-> +	.grf_offset = 0x180,
-> +	.supply_names = {
-> +		NULL,
-> +		"vccio6",
-> +		"vccio1",
-> +		"vccio2",
-> +		"vccio3",
-> +		"vccio4",
-> +		"vccio5",
-> +		"vccio_oscgpi",
-
-vccio-oscgpi ... aka with a "-" instead of "_"
-
-With the above fixed
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-
-Thanks
-Heiko
+>  	switch (wrp->slave->type) {
+>  	case PMIC_MT6397:
+> -- 
+> 1.8.1.1.dirty
+> 
+> ************* Email Confidentiality Notice ********************
+> The information contained in this e-mail message (including any 
+> attachments) may be confidential, proprietary, privileged, or otherwise
+> exempt from disclosure under applicable laws. It is intended to be 
+> conveyed only to the designated recipient(s). Any use, dissemination, 
+> distribution, printing, retaining or copying of this e-mail (including its 
+> attachments) by unintended recipient(s) is strictly prohibited and may 
+> be unlawful. If you are not an intended recipient of this e-mail, or believe 
+> that you have received this e-mail in error, please notify the sender 
+> immediately (by replying to this e-mail), delete any and all copies of 
+> this e-mail (including any attachments) from your system, and do not
+> disclose the content of this e-mail to any other person. Thank you!
+> 
