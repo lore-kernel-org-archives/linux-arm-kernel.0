@@ -1,18 +1,131 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 15 May 2018 14:05:44 -0700
-Subject: [PATCH 05/61] clk: samsung: simplify getting .drvdata
-In-Reply-To: <20180419140641.27926-6-wsa+renesas@sang-engineering.com>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <20180419140641.27926-6-wsa+renesas@sang-engineering.com>
-Message-ID: <152641834430.237094.6970165334408131900@swboyd.mtv.corp.google.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 16 May 2018 00:21:35 +0300
+Subject: [patch v21 1/4] drivers: jtag: Add JTAG core driver
+In-Reply-To: <1526394095-5069-2-git-send-email-oleksandrs@mellanox.com>
+References: <1526394095-5069-1-git-send-email-oleksandrs@mellanox.com>
+ <1526394095-5069-2-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <CAHp75VctG5RBtLF3nT5e_j7_e9O12u=5gerJ6OMxWbABM9ft2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Wolfram Sang (2018-04-19 07:05:35)
-> We should get drvdata from struct device directly. Going via
-> platform_device is an unneeded step back and forth.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> ---
+On Tue, May 15, 2018 at 5:21 PM, Oleksandr Shamray
+<oleksandrs@mellanox.com> wrote:
+> Initial patch for JTAG driver
+> JTAG class driver provide infrastructure to support hardware/software
+> JTAG platform drivers. It provide user layer API interface for flashing
+> and debugging external devices which equipped with JTAG interface
+> using standard transactions.
+>
+> Driver exposes set of IOCTL to user space for:
+> - XFER:
+> - SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
+> - SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
+> - RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
+>   number of clocks).
+> - SIOCFREQ/GIOCFREQ for setting and reading JTAG frequency.
+>
+> Driver core provides set of internal APIs for allocation and
+> registration:
+> - jtag_register;
+> - jtag_unregister;
+> - jtag_alloc;
+> - jtag_free;
+>
+> Platform driver on registration with jtag-core creates the next
+> entry in dev folder:
+> /dev/jtagX
 
-Applied to clk-next
+>  0xB0   all     RATIO devices           in development:
+>                                         <mailto:vgo@ratio.de>
+>  0xB1   00-1F   PPPoX                   <mailto:mostrows@styx.uwaterloo.ca>
+> +0xB2   00-0f   linux/jtag.h            JTAG driver
+> +                                       <mailto:oleksandrs@mellanox.com>
+
+Consider to preserve style (upper vs. lower).
+
+> +         This provides basic core functionality support for JTAG class devices.
+> +         Hardware that is equipped with a JTAG microcontroller can be
+> +         supported by using this driver's interfaces.
+> +         This driver exposes a set of IOCTLs to the user space for
+> +         the following commands:
+> +         SDR: (Scan Data Register) Performs an IEEE 1149.1 Data Register scan
+> +         SIR: (Scan Instruction Register) Performs an IEEE 1149.1 Instruction
+> +         Register scan.
+> +         RUNTEST: Forces the IEEE 1149.1 bus to a run state for a specified
+> +         number of clocks or a specified time period.
+
+Something feels wrong with formatting here.
+
+> +#define MAX_JTAG_NAME_LEN (sizeof("jtag") + 5)
+
+Interesting definition. Why not to set to 10 explicitly? And why 10?
+(16 sounds better)
+
+> +struct jtag {
+> +       struct miscdevice miscdev;
+
+> +       struct device *dev;
+
+Doesn't miscdev parent contain exactly this one?
+
+> +       const struct jtag_ops *ops;
+> +       int id;
+> +       bool opened;
+> +       struct mutex open_lock;
+> +       unsigned long priv[0];
+> +};
+
+> +               err = copy_to_user(u64_to_user_ptr(xfer.tdio),
+> +                                  (void *)(xfer_data), data_size);
+
+Redundant parens in one case. Check the rest similar places.
+
+> +static int jtag_open(struct inode *inode, struct file *file)
+> +{
+
+> +       struct jtag *jtag = container_of(file->private_data, struct jtag,
+> +                                        miscdev);
+
+I would don't care about length and put it on one line.
+
+> +       if (jtag->opened) {
+> +       jtag->opened = true;
+> +       jtag->opened = false;
+
+Can it be opened non exclusively several times? If so, this needs to
+be a ref counter instead.
+
+> +       if (!ops->idle || !ops->mode_set || !ops->status_get || !ops->xfer)
+> +               return NULL;
+
+Are all of them mandatory?
+
+> +int jtag_register(struct jtag *jtag)
+
+Perhaps devm_ variant.
+
+> +#define jtag_u64_to_ptr(arg) ((void *)(uintptr_t)arg)
+
+Where is this used or supposed to be used?
+
+> +#define JTAG_MAX_XFER_DATA_LEN 65535
+
+Is this limitation from some spec?
+Otherwise why not to allow 64K?
+
+> +/**
+> + * struct jtag_ops - callbacks for jtag control functions:
+> + *
+> + * @freq_get: get frequency function. Filled by device driver
+> + * @freq_set: set frequency function. Filled by device driver
+> + * @status_get: set status function. Filled by device driver
+> + * @idle: set JTAG to idle state function. Filled by device driver
+> + * @xfer: send JTAG xfer function. Filled by device driver
+> + */
+
+Perhaps you need to describe which of them are _really_ mandatory and
+which are optional.
+
+-- 
+With Best Regards,
+Andy Shevchenko
