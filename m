@@ -1,45 +1,30 @@
-From: linux@dominikbrodowski.net (Dominik Brodowski)
-Date: Tue, 15 May 2018 12:01:58 +0200
-Subject: [PATCH 08/18] arm64: convert raw syscall invocation to C
-In-Reply-To: <20180515082222.rcoyf6dsf2s2edgq@salmiak>
-References: <20180514125351.GK7753@e103592.cambridge.arm.com>
- <20180514114104.oubxdf526hf2m6t5@lakrids.cambridge.arm.com>
- <20180514202445.GA26773@light.dominikbrodowski.net>
- <20180515082222.rcoyf6dsf2s2edgq@salmiak>
-Message-ID: <20180515100158.GC14007@isilmar-4.linta.de>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Tue, 15 May 2018 13:05:13 +0300
+Subject: [PATCH v4 4/8] PCI: Replace dev_node parameter of
+ of_pci_get_host_bridge_resources with device
+In-Reply-To: <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
+References: <cover.1526375226.git.jan.kiszka@siemens.com>
+ <5f2226585c6af9920b266d0503e32042d4c9e440.1526375226.git.jan.kiszka@siemens.com>
+Message-ID: <6bbbb011-7cae-80a3-4cce-6608b4aace2c@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 09:22:23AM +0100, Mark Rutland wrote:
-> On Mon, May 14, 2018 at 10:24:45PM +0200, Dominik Brodowski wrote:
-> > On Mon, May 14, 2018 at 12:41:10PM +0100, Mark Rutland wrote:
-> > > I agree it would be nicer if it had a wrapper that took a pt_regs, even
-> > > if it does nothing with it.
-> > > 
-> > > We can't use SYSCALL_DEFINE0() due to the fault injection muck, we'd
-> > > need a ksys_ni_syscall() for our traps.c logic, and adding this
-> > > uniformly would involve some arch-specific rework for x86, too, so I
-> > > decided it was not worth the effort.
-> > 
-> > Couldn't you just open-code the "return -ENOSYS;" in traps.c?
+On 05/15/2018 12:07 PM, Jan Kiszka wrote:
+> From: Jan Kiszka <jan.kiszka@siemens.com>
 > 
-> I guess so. I was just worried that debug logic might be added to the generic
-> ni_syscall() in future, and wanted to avoid potential divergence.
+> Another step towards a managed version of
+> of_pci_get_host_bridge_resources(): Feed in the underlying device,
+> rather than just the OF node. This will allow to use managed resource
+> allocation internally later on.
 > 
-> > Error injection has no reasonable stable ABI/API expectations, so that's not
-> > a show-stopper either.
-> 
-> If people are happy with using SYSCALL_DEFINE0() for ni_syscall, I'm happy to
-> do that -- it's just that we'll need a fixup for x86 as that will change the
-> symbol name.
+> CC: Jingoo Han <jingoohan1@gmail.com>
+> CC: Joao Pinto <Joao.Pinto@synopsys.com>
+> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 
-For me, it's less about using SYSCALL_DEFINE0() for ni_syscall, but more
-about keeping the syscall invokation easy. Therefore, we do pass a pointer
-struct pt_regs to sys_ni_syscall() on x86, even though it does not expect
-it.
+Tested-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 
-	/* this is a lie, but it does not hurt as sys_ni_syscall just returns -EINVAL */
-	extern asmlinkage long sys_ni_syscall(const struct pt_regs *);
-
-Thanks,
-	Dominik
+--
+With best wishes,
+Vladimir
