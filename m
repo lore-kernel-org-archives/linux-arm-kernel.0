@@ -1,36 +1,260 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 May 2018 13:52:28 -0700
-Subject: [GIT PULL 3/4] Rockchip dts64 updates for 4.18 round 1
-In-Reply-To: <20114925.REm1YfjZS7@phil>
-References: <2000491.bLgWuj0xar@phil>
- <20114925.REm1YfjZS7@phil>
-Message-ID: <20180515205228.s5tfj5v5zngg2x64@localhost>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 16 May 2018 00:00:00 +0300
+Subject: [patch v21 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
+ families JTAG master driver
+In-Reply-To: <1526394095-5069-3-git-send-email-oleksandrs@mellanox.com>
+References: <1526394095-5069-1-git-send-email-oleksandrs@mellanox.com>
+ <1526394095-5069-3-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <CAHp75Ve7EYiWBiE73i0CmyJhPMOdSKsGzCr0SUvta3Uya=Ov1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 12:39:26PM +0200, Heiko Stuebner wrote:
-> The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-> 
->   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-dts64-1
-> 
-> for you to fetch changes up to 17bd0737948aa841b76278a601217b914aa5f18e:
-> 
->   arm64: dts: rockchip: enable hdmi on rk3399-puma-haikou (2018-05-03 14:38:20 +0200)
-> 
-> ----------------------------------------------------------------
-> All iommus got their clocks added and rk3399 got support for its
-> usb3-phy otg-port and better ajustment for the cpll child clocks.
-> On the board side, all rk3399 got their typec phys enabled - which
-> is needed for better usb support, the sapphire board got some more
-> properties moved to the excavator baseboard where they really belong,
-> kevin got a fix to use a real devicetree compatible and puma-haikou
-> got its hdmi port enabled.
+On Tue, May 15, 2018 at 5:21 PM, Oleksandr Shamray
+<oleksandrs@mellanox.com> wrote:
+> Driver adds support of Aspeed 2500/2400 series SOC JTAG master controller.
+>
+> Driver implements the following jtag ops:
+> - freq_get;
+> - freq_set;
+> - status_get;
+> - idle;
+> - xfer;
+>
+> It has been tested on Mellanox system with BMC equipped with
+> Aspeed 2520 SoC for programming CPLD devices.
 
-Merged, thanks!
+> +#define ASPEED_JTAG_DATA               0x00
+> +#define ASPEED_JTAG_INST               0x04
+> +#define ASPEED_JTAG_CTRL               0x08
+> +#define ASPEED_JTAG_ISR                        0x0C
+> +#define ASPEED_JTAG_SW                 0x10
+> +#define ASPEED_JTAG_TCK                        0x14
+> +#define ASPEED_JTAG_EC                 0x18
+> +
+> +#define ASPEED_JTAG_DATA_MSB           0x01
+> +#define ASPEED_JTAG_DATA_CHUNK_SIZE    0x20
 
 
--Olof
+> +#define ASPEED_JTAG_IOUT_LEN(len)      (ASPEED_JTAG_CTL_ENG_EN |\
+> +                                        ASPEED_JTAG_CTL_ENG_OUT_EN |\
+> +                                        ASPEED_JTAG_CTL_INST_LEN(len))
+
+Better to read
+
+#define MY_COOL_CONST_OR_MACRO(xxx) \
+ ...
+
+> +#define ASPEED_JTAG_DOUT_LEN(len)      (ASPEED_JTAG_CTL_ENG_EN |\
+> +                                        ASPEED_JTAG_CTL_ENG_OUT_EN |\
+> +                                        ASPEED_JTAG_CTL_DATA_LEN(len))
+
+Ditto.
+
+> +static char *end_status_str[] = {"idle", "ir pause", "drpause"};
+
+> +static int aspeed_jtag_freq_set(struct jtag *jtag, u32 freq)
+> +{
+> +       struct aspeed_jtag *aspeed_jtag = jtag_priv(jtag);
+> +       unsigned long apb_frq;
+> +       u32 tck_val;
+> +       u16 div;
+> +
+> +       apb_frq = clk_get_rate(aspeed_jtag->pclk);
+
+> +       div = (apb_frq % freq == 0) ? (apb_frq / freq) - 1 : (apb_frq / freq);
+
+Isn't it the same as
+
+div = (apb_frq - 1) / freq;
+
+?
+
+> +       tck_val = aspeed_jtag_read(aspeed_jtag, ASPEED_JTAG_TCK);
+> +       aspeed_jtag_write(aspeed_jtag,
+> +                         (tck_val & ASPEED_JTAG_TCK_DIVISOR_MASK) | div,
+> +                         ASPEED_JTAG_TCK);
+> +       return 0;
+> +}
+
+> +static void aspeed_jtag_sw_delay(struct aspeed_jtag *aspeed_jtag, int cnt)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < cnt; i++)
+> +               aspeed_jtag_read(aspeed_jtag, ASPEED_JTAG_SW);
+
+Isn't it readsl() (or how it's called, I don't remember).
+
+> +}
+
+> +static void aspeed_jtag_wait_instruction_pause(struct aspeed_jtag *aspeed_jtag)
+> +{
+> +       wait_event_interruptible(aspeed_jtag->jtag_wq, aspeed_jtag->flag &
+> +                                ASPEED_JTAG_ISR_INST_PAUSE);
+
+In such cases I prefer to see a new line with a parameter in full.
+Check all places.
+
+> +       aspeed_jtag->flag &= ~ASPEED_JTAG_ISR_INST_PAUSE;
+> +}
+
+> +static void aspeed_jtag_sm_cycle(struct aspeed_jtag *aspeed_jtag, const u8 *tms,
+> +                                int len)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < len; i++)
+> +               aspeed_jtag_tck_cycle(aspeed_jtag, tms[i], 0);
+> +}
+> +
+> +static void aspeed_jtag_run_test_idle_sw(struct aspeed_jtag *aspeed_jtag,
+> +                                        struct jtag_run_test_idle *runtest)
+> +{
+> +       static const u8 sm_pause_irpause[] = {1, 1, 1, 1, 0, 1, 0};
+> +       static const u8 sm_pause_drpause[] = {1, 1, 1, 0, 1, 0};
+> +       static const u8 sm_idle_irpause[] = {1, 1, 0, 1, 0};
+> +       static const u8 sm_idle_drpause[] = {1, 0, 1, 0};
+> +       static const u8 sm_pause_idle[] = {1, 1, 0};
+> +       int i;
+> +
+> +       /* SW mode from idle/pause-> to pause/idle */
+> +       if (runtest->reset) {
+> +               for (i = 0; i < ASPEED_JTAG_RESET_CNTR; i++)
+> +                       aspeed_jtag_tck_cycle(aspeed_jtag, 1, 0);
+> +       }
+
+I would rather split this big switch to a few helper functions per
+each status of surrounding switch.
+
+> +
+> +       /* Stay on IDLE for at least  TCK cycle */
+> +       for (i = 0; i < runtest->tck; i++)
+> +               aspeed_jtag_tck_cycle(aspeed_jtag, 0, 0);
+> +}
+
+
+> +/**
+> + * aspeed_jtag_run_test_idle:
+> + * JTAG reset: generates at least 9 TMS high and 1 TMS low to force
+> + * devices into Run-Test/Idle State.
+> + */
+
+It's rather broken kernel doc.
+
+> +               aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_CTL_ENG_EN |
+> +                                 ASPEED_JTAG_CTL_ENG_OUT_EN |
+> +                                 ASPEED_JTAG_CTL_FORCE_TMS, ASPEED_JTAG_CTRL);
+
+> +               aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_EC_GO_IDLE,
+> +                                 ASPEED_JTAG_EC);
+
+> +       aspeed_jtag_write(aspeed_jtag, ASPEED_JTAG_SW_MODE_EN |
+> +                         ASPEED_JTAG_SW_MODE_TDIO, ASPEED_JTAG_SW);
+
+Here you have permutations of flag some of which are repeatetive in
+the code. Perhaps make additional definitions instead.
+Check other similar places.
+
+
+> +       char          tdo;
+
+Indentation.
+
+> +       if (xfer->direction == JTAG_READ_XFER)
+> +               tdi = UINT_MAX;
+> +       else
+> +               tdi = data[index];
+
+> +                       if (xfer->direction == JTAG_READ_XFER)
+> +                               tdi = UINT_MAX;
+> +                       else
+> +                               tdi = data[index];
+
+Take your time to think how the above duplication can be avoided.
+
+> +               }
+> +       }
+> +
+> +       tdo = aspeed_jtag_tck_cycle(aspeed_jtag, 1, tdi & ASPEED_JTAG_DATA_MSB);
+> +       data[index] |= tdo << (shift_bits % ASPEED_JTAG_DATA_CHUNK_SIZE);
+> +}
+
+
+> +       if (endstate != JTAG_STATE_IDLE) {
+
+Why not to use positive check?
+
+> +       int i;
+> +
+> +       for (i = 0; i <= xfer->length / BITS_PER_BYTE; i++) {
+> +               pos += snprintf(&dbg_str[pos], sizeof(dbg_str) - pos,
+> +                               "0x%02x ", xfer_data[i]);
+> +       }
+
+Oh, NO! Consider reading printk-formats (for %*ph) and other
+documentation about available APIs.
+
+> +       if (!(aspeed_jtag->mode & JTAG_XFER_HW_MODE)) {
+> +               /* SW mode */
+
+This is rather too complex to be in one function.
+
+> +       } else {
+
+> +               /* hw mode */
+> +               aspeed_jtag_write(aspeed_jtag, 0, ASPEED_JTAG_SW);
+> +               aspeed_jtag_xfer_hw(aspeed_jtag, xfer, data);
+
+For symmetry it might be another function.
+
+> +       }
+
+> +       dev_dbg(aspeed_jtag->dev, "status %x\n", status);
+
+Perhaps someone should become familiar with tracepoints?
+
+> +               dev_err(aspeed_jtag->dev, "irq status:%x\n",
+> +                       status);
+
+
+Huh, really?! SPAM.
+
+(I would drop it completely, though you may use ratelimited variant)
+
+> +               ret = IRQ_NONE;
+> +       }
+> +       return ret;
+> +}
+
+> +       clk_prepare_enable(aspeed_jtag->pclk);
+
+This might fail.
+
+> +       dev_dbg(&pdev->dev, "IRQ %d.\n", aspeed_jtag->irq);
+
+Noise even for debug.
+
+> +       err = jtag_register(jtag);
+
+Perhaps we might have devm_ variant of this. Check how SPI framework
+deal with a such.
+
+> +static int aspeed_jtag_remove(struct platform_device *pdev)
+> +{
+
+> +       struct jtag *jtag;
+> +
+> +       jtag = platform_get_drvdata(pdev);
+
+Usually we put this on one line
+
+> +       aspeed_jtag_deinit(pdev, jtag_priv(jtag));
+> +       jtag_unregister(jtag);
+> +       jtag_free(jtag);
+> +       return 0;
+> +}
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
