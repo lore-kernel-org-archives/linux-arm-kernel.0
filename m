@@ -1,283 +1,156 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 15 May 2018 14:13:11 +0900
-Subject: [PATCH v9 06/11] arm64: kexec_file: allow for loading
- Image-format kernel
-In-Reply-To: <6f0df3a8-a691-80f1-85de-3e0ead852f12@arm.com>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-7-takahiro.akashi@linaro.org>
- <c604b578-6667-3532-eac9-55c428001025@arm.com>
- <20180507072139.GF11326@linaro.org>
- <6f0df3a8-a691-80f1-85de-3e0ead852f12@arm.com>
-Message-ID: <20180515051308.GD2737@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 May 2018 10:49:31 +0530
+Subject: [PATCH V3] ARM: dts: da850-evm: Enable LCD and Backlight
+In-Reply-To: <CAHCN7xKgop-SMZpQm4jca3NB0rrc_CCcMG8JL6mayLx4u+zW9w@mail.gmail.com>
+References: <20180513232033.22571-1-aford173@gmail.com>
+ <aba13450-1e8f-4aed-6248-16b71abcc0dd@ti.com>
+ <CAHCN7xJgTBGHL_VzhXGz1HEmEn-LW8pcG0BWJDysx0pkHXT-Mg@mail.gmail.com>
+ <825847d0-c29c-859b-43fd-0987f94e28a5@ti.com>
+ <CAHCN7xKgop-SMZpQm4jca3NB0rrc_CCcMG8JL6mayLx4u+zW9w@mail.gmail.com>
+Message-ID: <8caf4483-a85b-ad75-6121-fa1dedcd16be@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
+On Monday 14 May 2018 11:34 PM, Adam Ford wrote:
+> On Mon, May 14, 2018 at 7:35 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On Monday 14 May 2018 04:22 PM, Adam Ford wrote:
+>>> On Mon, May 14, 2018 at 12:29 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>>>> Hi Adam,
+> 
+> Added Tomi, Laurent, and Jyri for feedback.
+> 
+>>>>
+>>>> On Monday 14 May 2018 04:50 AM, Adam Ford wrote:
+>>>>> When using the board files the LCD works, but not with the DT.
+>>>>> This adds enables the original da850-evm to work with the same
+>>>>> LCD in device tree mode.
+>>>>>
+>>>>> The EVM has a gpio for the regulator and a gpio enable.  The LCD and
+>>>>> the vpif display pins are mutually exclusive, so if using the LCD,
+>>>>> do not load the vpif driver.
+>>>>
+>>>> Its not sufficient just note this in patch description.
+>>>>
+>>>> a) Disable (status = "disabled") the VPIF node which clashes for pins
+>>>> with LCD.
+>>>> b) Add a comment on top of the status = "disabled" giving information on
+>>>> how user can enable it (disable lcdc node and then change to status =
+>>>> "okay").
+>>>>
+>>>>>
+>>>>> Signed-off-by: Adam Ford <aford173@gmail.com>
+>>>>> ---
+>>>>> V3:  Fix errant GPIO, label GPIO pins, and rename the regulator to be more explict to
+>>>>>      backlight which better matches the schematic.  Updated the description to explain
+>>>>>      that it cannot be used at the same time as the vpif driver.
+>>>>>
+>>>>> V2:  Add regulator and GPIO enable pins. Remove PWM backlight and replace with GPIO
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+>>>>> index 2e817da37fdb..3f1c8be07efe 100644
+>>>>> --- a/arch/arm/boot/dts/da850-evm.dts
+>>>>> +++ b/arch/arm/boot/dts/da850-evm.dts
+>>>>> @@ -27,6 +27,50 @@
+>>>>>               spi0 = &spi1;
+>>>>>       };
+>>>>>
+>>>>> +     backlight {
+>>>>> +             compatible = "gpio-backlight";
+>>>>> +             enable-gpios = <&gpio 7 GPIO_ACTIVE_HIGH>; /* GP0[7] */
+>>>>
+>>>> The gpio-backlight binding does not describe a property called
+>>>> enable-gpios. It should just be gpios.
+>>>
+>>> I will fix that.
+>>>
+>>>>
+>>>> a) Are you using gpio-backlight because you are not able to get the PWM
+>>>> to work?
+>>>>
+>>> Yes,  You told me not to worry about doing a PWM backlight because the
+>>> legacy board does not PWM either.
+>>
+>> Yeah, I meant not to add backlight control till the time we are able to
+>> get it working using PWM. Is this needed for the basic LCD functionality
+>> to work? I would like to avoid the churn of adding it using GPIO now and
+>> changing to PWM later, if possible.
+>>
+>>>
+>>>> b) What is GP0[7] connected to in the schematic you have? In the
+>>>> schematic I have I see LCD_PWM0 is connected to
+>>>> SPI1_SCS[0]/EPWM1B/GP2[14]/TM64P3_IN12.
+>>>
+>>> I have schematic 1016572 dated Wednesday, August 18, 2010.  According
+>>> to it, AXR15 / EPWMN0_TZ[0] / ECAP2_APWM2 / GPIO0[7] connects to U25,
+>>> Pin 46 to generate M_LCD_PWM0.  You might have one of the early,
+>>> pre-release versions.
+>>
+>> Ah, okay. In your schematic, is GP2[14] connected to anything?
+>>
+>>>
+>>>>
+>>>> c) The /* GP0[7] */ comment is not really useful on its own as it can be
+>>>> computed. What I wanted to see is the schematic symbol like "LCD_PWM0".
+>>>> Same for other places like this below.
+>>>
+>>> I can do that.
+>>>>
+>>>>> @@ -35,6 +79,16 @@
+>>>>>               regulator-boot-on;
+>>>>>       };
+>>>>>
+>>>>> +     backlight_reg: backlight-regulator {
+>>>>> +             compatible = "regulator-fixed";
+>>>>> +             regulator-name = "lcd_backlight_pwr";
+>>>>> +             regulator-min-microvolt = <3300000>;
+>>>>> +             regulator-max-microvolt = <3300000>;
+>>>>> +             gpio = <&gpio 47 GPIO_ACTIVE_HIGH>; /* GP2[15] */
+>>>>> +             regulator-always-on;
+>>>>
+>>>> Why should this regulator never be disabled?
+>>>
+>>> The gpio-backlight does not have a way that I can see to associate the
+>>> regulator to it.  I read through the bindings, but I didn't see an
+>>> option to associate a regulator it.  I use this regulator to drive
+>>> lcd_backlight_pwr and the backlight driver to write lcd_pwm0.  Without
+>>> this option, the system disables lcd_backlight_pwr and the screen is
+>>> blank
+>>
+>> It sounds like this is a hack to enable backlight on this board. I think
+>> either the backlight driver needs to gain functionality to enable the
+>> GPIO. Or backlight could be treated as part of the panel and enabled
+>> using enable-gpios property in the panel. TBH, I will be okay either
+>> way. Can you check with Jyri, Tomi and rest of the DRM folks on what
+>> should be right way of dealing with this?
+> 
+> Per your request I added them into this thread.  I added Tomi, Jyri,
+> and Laurent to this as Laurent's name is associated with the gpio
+> backlight driver.
 
-On Fri, May 11, 2018 at 06:07:06PM +0100, James Morse wrote:
-> Hi Akashi,
-> 
-> On 07/05/18 08:21, AKASHI Takahiro wrote:
-> > On Tue, May 01, 2018 at 06:46:11PM +0100, James Morse wrote:
-> >> On 25/04/18 07:26, AKASHI Takahiro wrote:
-> >>> This patch provides kexec_file_ops for "Image"-format kernel. In this
-> >>> implementation, a binary is always loaded with a fixed offset identified
-> >>> in text_offset field of its header.
-> 
-> >>> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-> >>> index e4de1223715f..3cba4161818a 100644
-> >>> --- a/arch/arm64/include/asm/kexec.h
-> >>> +++ b/arch/arm64/include/asm/kexec.h
-> >>> @@ -102,6 +102,56 @@ struct kimage_arch {
-> >>>  	void *dtb_buf;
-> >>>  };
-> >>>  
-> >>> +/**
-> >>> + * struct arm64_image_header - arm64 kernel image header
-> >>> + *
-> >>> + * @pe_sig: Optional PE format 'MZ' signature
+Okay. The reason I did not loop them in myself is because I thought a
+fresh thread with background will be better. But okay.
 
-To be precise, this is NOT a PE signature but MS-DOS header's magic.
-(There is another "PE" signature in PE COFF file header pointed to by
-'pe_header'.)
-I will correct its name.
+> I am not sure why you think it's a hack.  I pulled up the schematic
+> for the LCD to see what it's doing, and the  lcd_backlight_pwr pin
+> controls the power-on sequence of the back-light controller.  Without
+> this, there is no power, so it seems to me that the 'regulator-fixed'
+> device is the correct way to do it.
 
-> >>> + * @branch_code: Instruction to branch to stext
-> >>> + * @text_offset: Image load offset, little endian
-> >>> + * @image_size: Effective image size, little endian
-> >>> + * @flags:
-> >>> + *	Bit 0: Kernel endianness. 0=little endian, 1=big endian
-> >>
-> >> Page size? What about 'phys_base'?, (whatever that is...)
-> >> Probably best to refer to Documentation/arm64/booting.txt here, its the
-> >> authoritative source of what these fields mean.
-> > 
-> > While we don't care other bit fields for now, I will add the reference
-> > to the Documentation file.
-> 
-> Thanks, I don't want to create a second, incomplete set of documentation!
-
-I will leave a minimum of description of parameters here.
+Not questioning modeling the GPIO as a regulator.
 
 > 
-> 
-> >>> +	u64 reserved[3];
-> >>> +	u8 magic[4];
-> >>> +	u32 pe_header;
-> >>> +};
-> >>
-> >> I'm surprised we don't have a definition for this already, I guess its always
-> >> done in asm. We have kernel/image.h that holds some of this stuff, if we are
-> >> going to validate the flags, is it worth adding the code there, (and moving it
-> >> to include/asm)?
-> > 
-> > A comment at the beginning of this file says,
-> >     #ifndef LINKER_SCRIPT
-> >     #error This file should only be included in vmlinux.lds.S
-> >     #endif
-> > Let me think about.
-> 
-> Ah, I missed that.
-> 
-> Having two definitions of something makes me nervous that they can become
-> different... looks like that header belongs to the linker, and shouldn't be used
-> here then.
+> The separate pin associated to the gpio is used to tell the backlight
+> IC to actually turn on/off the back-light.  Ideally it seems like it
+> would nice to have the gpio-backlight driver be able to specify the
+> regulator, so when the backlight is in use, it would power the
+> regulator, but until that's available, the it seems like
+> 'regulator-always-on' is the way to make it stay on.
 
-OK.
-
-> 
-> >> I guess you skip the MZ prefix as its not present for !EFI?
-
-Correct, but MZ checking in probe function is just an informative message.
-
-> > 
-> > CONFIG_KEXEC_IMAGE_VERIFY_SIG depends on the fact that the file
-> > format is PE (that is, EFI is enabled).
-> 
-> So if the signature checking is enabled, its already been checked.
-
-The signature, either MZ or PE, in a file will be actually checked
-in verify_pefile_signature().
-
-> 
-> >> Could we check branch_code is non-zero, and text-offset points within image-size?
-> > 
-> > We could do it, but I don't think this check is very useful.
-> > 
-> >>
-> >> We could check that this platform supports the page-size/endian config that this
-> >> Image was built with... We get a message from the EFI stub if the page-size
-> >> can't be supported, it would be nice to do the same here (as we can).
-> > 
-> > There is no restriction on page-size or endianness for kexec.
-> 
-> No, but it won't boot if the hardware doesn't support it. The kernel will spin
-> at a magic address that is, difficult, to debug without JTAG. The bug report
-> will be "it didn't boot".
-
-OK.
-Added sanity checks for cpu features, endianness as well as page size.
-
-> 
-> > What will be the purpose of this check?
-> 
-> These values are in the header so that the bootloader can check them, then print
-> a meaningful error. Here, kexec_file_load() is playing the part of the bootloader.
-> 
-> I'm assuming kexec_file_load() can only be used to kexec linux... unlike regular
-> kexec. Is this where I'm going wrong?
-> 
-> 
-> >>> diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-> >>> new file mode 100644
-> >>> index 000000000000..4dd524ad6611
-> >>> --- /dev/null
-> >>> +++ b/arch/arm64/kernel/kexec_image.c
-> >>> @@ -0,0 +1,79 @@
-> >>
-> >>> +static void *image_load(struct kimage *image,
-> >>> +				char *kernel, unsigned long kernel_len,
-> >>> +				char *initrd, unsigned long initrd_len,
-> >>> +				char *cmdline, unsigned long cmdline_len)
-> >>> +{
-> >>> +	struct kexec_buf kbuf;
-> >>> +	struct arm64_image_header *h = (struct arm64_image_header *)kernel;
-> >>> +	unsigned long text_offset;
-> >>> +	int ret;
-> >>> +
-> >>> +	/* Load the kernel */
-> >>> +	kbuf.image = image;
-> >>> +	kbuf.buf_min = 0;
-> >>> +	kbuf.buf_max = ULONG_MAX;
-> >>> +	kbuf.top_down = false;
-> >>> +
-> >>> +	kbuf.buffer = kernel;
-> >>> +	kbuf.bufsz = kernel_len;
-> >>> +	kbuf.memsz = le64_to_cpu(h->image_size);
-> >>> +	text_offset = le64_to_cpu(h->text_offset);
-> >>> +	kbuf.buf_align = SZ_2M;
-> >>
-> >>> +	/* Adjust kernel segment with TEXT_OFFSET */
-> >>> +	kbuf.memsz += text_offset;
-> >>> +
-> >>> +	ret = kexec_add_buffer(&kbuf);
-> >>> +	if (ret)
-> >>> +		goto out;
-> >>> +
-> >>> +	image->arch.kern_segment = image->nr_segments - 1;
-> >>
-> >> You only seem to use kern_segment here, and in load_other_segments() called
-> >> below. Could it not be a local variable passed in? Instead of arch-specific data
-> >> we keep forever?
-> > 
-> > No, kern_segment is also used in load_other_segments() in machine_kexec_file.c.
-> > To optimize memory hole allocation logic in locate_mem_hole_callback(),
-> > we need to know the exact range of kernel image (start and end).
-> 
-> That's the second user. My badly-made point is one calls the other, but passes
-> the data via some until-kexec lifetime struct. (its not important, just an
-> indicator this worked differently in the past and hasn't been cleaned up).
-> I meant something like [0].
-
-OK, but instead of adding kern_seg, I want to change the interface to:
-
-| extern int load_other_segments(struct kimage *image,
-|		unsigned long kernel_load_addr, unsigned long kernel_size,
-|		char *initrd, unsigned long initrd_len,
-|		char *cmdline, unsigned long cmdline_len);
-
-This way, we will in future be able to address an issue I mentioned in
-my previous e-mail. (If we support vmlinux, the kernel occupies two segments
-for text and data, respectively.)
+We need to add support for this in backlight driver. Using
+regulator-always-on to paper over this lack of support in backlight
+driver is what I am calling a hack. 'regulator-always-on' means the
+regulator cannot be turned off. Thats certainly not the case as you have
+pointed out.
 
 Thanks,
--Takahiro AKASHI
-
-
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> [0] a diff is worth a thousand words:
-> --------------------%<--------------------
-> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_
-> kexec_file.c
-> index 762f9102899c..c50ce844f09e 100644
-> --- a/arch/arm64/kernel/machine_kexec_file.c
-> +++ b/arch/arm64/kernel/machine_kexec_file.c
-> @@ -325,11 +325,10 @@ static int prepare_elf_headers(void **addr, unsigned long *sz)
->         return ret;
->  }
-> 
-> -int load_other_segments(struct kimage *image,
-> +int load_other_segments(struct kimage *image, struct kexec_segment *kern_seg,
->                         char *initrd, unsigned long initrd_len,
->                         char *cmdline, unsigned long cmdline_len)
->  {
-> -       struct kexec_segment *kern_seg;
->         struct kexec_buf kbuf;
->         void *hdrs_addr;
->         unsigned long hdrs_sz;
-> @@ -368,7 +367,6 @@ int load_other_segments(struct kimage *image,
->                                  image->arch.elf_load_addr, hdrs_sz, hdrs_sz);
->         }
-> 
-> -       kern_seg = &image->segment[image->arch.kern_segment];
->         kbuf.image = image;
->         /* not allocate anything below the kernel */
->         kbuf.buf_min = kern_seg->mem + kern_seg->memsz;
-> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-> index 891f2484969d..085cb69293ca 100644
-> --- a/arch/arm64/include/asm/kexec.h
-> +++ b/arch/arm64/include/asm/kexec.h
-> @@ -173,8 +172,10 @@ static inline int arm64_header_check_pe_sig(const struct ar
-> m64_image_header *h)
->  extern const struct kexec_file_ops kexec_image_ops;
-> 
->  struct kimage;
-> +struct kexec_segment;
-> 
->  extern int load_other_segments(struct kimage *image,
-> +               struct kexec_segment *kern_seg,
->                 char *initrd, unsigned long initrd_len,
->                 char *cmdline, unsigned long cmdline_len);
->  #endif
-> diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-> index 7c11beefe65f..0e032d30a79c 100644
-> --- a/arch/arm64/kernel/kexec_image.c
-> +++ b/arch/arm64/kernel/kexec_image.c
-> @@ -37,6 +37,7 @@ static void *image_load(struct kimage *image,
->                                 char *cmdline, unsigned long cmdline_len)
->  {
->         struct kexec_buf kbuf;
-> +       struct kexec_segment *kern_seg;
->         struct arm64_image_header *h = (struct arm64_image_header *)kernel;
->         unsigned long text_offset;
->         int ret;
-> @@ -65,17 +66,17 @@ static void *image_load(struct kimage *image,
->         if (ret)
->                 goto out;
-> 
-> -       image->arch.kern_segment = image->nr_segments - 1;
-> -       image->segment[image->arch.kern_segment].mem += text_offset;
-> -       image->segment[image->arch.kern_segment].memsz -= text_offset;
-> -       image->start = image->segment[image->arch.kern_segment].mem;
-> +       kern_seg = &image->segment[image->nr_segments - 1];
-> +       kern_seg->mem += text_offset;
-> +       kern_seg->memsz -= text_offset;
-> +       image->start = kern_seg->mem;
-> 
->         pr_debug("Loaded kernel at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
-> -                               image->segment[image->arch.kern_segment].mem,
-> +                               kern_seg->mem,
->                                 kbuf.bufsz, kbuf.memsz);
-> 
->         /* Load additional data */
-> -       ret = load_other_segments(image, initrd, initrd_len,
-> +       ret = load_other_segments(image, kern_seg, initrd, initrd_len,
->                                 cmdline, cmdline_len);
-> 
->  out:
-> --------------------%<--------------------
+Sekhar
