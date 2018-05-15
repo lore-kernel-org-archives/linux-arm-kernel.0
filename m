@@ -1,135 +1,167 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 15 May 2018 12:23:33 +0800
-Subject: [PATCH] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
- demodulator driver
-In-Reply-To: <20180515003749.9980-1-suzuki.katsuhiro@socionext.com>
-References: <20180515003749.9980-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <201805151022.Jp9guzZj%fengguang.wu@intel.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 15 May 2018 13:35:40 +0900
+Subject: [PATCH v9 04/11] arm64: kexec_file: allocate memory walking
+ through memblock list
+In-Reply-To: <20180507055906.GE11326@linaro.org>
+References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
+ <20180425062629.29404-5-takahiro.akashi@linaro.org>
+ <648656ef-1f1e-b0ac-581c-aba1e62f4eee@arm.com>
+ <20180507055906.GE11326@linaro.org>
+Message-ID: <20180515043538.GB2737@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Katsuhiro,
+James,
 
-I love your patch! Perhaps something to improve:
+On Mon, May 07, 2018 at 02:59:07PM +0900, AKASHI Takahiro wrote:
+> James,
+> 
+> On Tue, May 01, 2018 at 06:46:09PM +0100, James Morse wrote:
+> > Hi Akashi,
+> > 
+> > On 25/04/18 07:26, AKASHI Takahiro wrote:
+> > > We need to prevent firmware-reserved memory regions, particularly EFI
+> > > memory map as well as ACPI tables, from being corrupted by loading
+> > > kernel/initrd (or other kexec buffers). We also want to support memory
+> > > allocation in top-down manner in addition to default bottom-up.
+> > > So let's have arm64 specific arch_kexec_walk_mem() which will search
+> > > for available memory ranges in usable memblock list,
+> > > i.e. !NOMAP & !reserved, 
+> > 
+> > > instead of system resource tree.
+> > 
+> > Didn't we try to fix the system-resource-tree in order to fix regular-kexec to
+> > be safe in the EFI-memory-map/ACPI-tables case?
+> > 
+> > It would be good to avoid having two ways of doing this, and I would like to
+> > avoid having extra arch code...
+> 
+> I know what you mean.
+> /proc/iomem or system resource is, in my opinion, not the best place to
+> describe memory usage of kernel but rather to describe *physical* hardware
+> layout. As we are still discussing about "reserved" memory, I don't want
+> to depend on it.
+> Along with memblock list, we will have more accurate control over memory
+> usage.
 
-[auto build test WARNING on linuxtv-media/master]
-[also build test WARNING on v4.17-rc5 next-20180514]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+If you don't have further objection, I will take memblock approach
+(with factoring out powerpc's arch_kexec_walk_mem()).
 
-url:    https://github.com/0day-ci/linux/commits/Katsuhiro-Suzuki/media-dvb-frontends-add-Socionext-SC1501A-ISDB-S-T-demodulator-driver/20180515-091453
-base:   git://linuxtv.org/media_tree.git master
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
+Thanks,
+-Takahiro AKASHI
 
 
-sparse warnings: (new ones prefixed by >>)
-
->> drivers/media/dvb-frontends/sc1501a.c:313:47: sparse: constant 211243671486 is so big it is long
-
-vim +313 drivers/media/dvb-frontends/sc1501a.c
-
-   258	
-   259	static int sc1501a_s_read_status(struct sc1501a_priv *chip,
-   260					 struct dtv_frontend_properties *c,
-   261					 enum fe_status *status)
-   262	{
-   263		struct regmap *r_s = chip->regmap_s;
-   264		u32 cpmon, tmpu, tmpl, flg;
-   265		u64 tmp;
-   266	
-   267		/* Sync detection */
-   268		regmap_read(r_s, CPMON1_S, &cpmon);
-   269	
-   270		*status = 0;
-   271		if (cpmon & CPMON1_S_FSYNC)
-   272			*status |= FE_HAS_VITERBI | FE_HAS_SYNC | FE_HAS_LOCK;
-   273		if (cpmon & CPMON1_S_W2LOCK)
-   274			*status |= FE_HAS_SIGNAL | FE_HAS_CARRIER;
-   275	
-   276		/* Signal strength */
-   277		c->strength.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
-   278	
-   279		if (*status & FE_HAS_SIGNAL) {
-   280			u32 agc;
-   281	
-   282			regmap_read(r_s, AGCREAD_S, &tmpu);
-   283			agc = tmpu << 8;
-   284	
-   285			c->strength.len = 1;
-   286			c->strength.stat[0].scale = FE_SCALE_RELATIVE;
-   287			c->strength.stat[0].uvalue = agc;
-   288		}
-   289	
-   290		/* C/N rate */
-   291		c->cnr.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
-   292	
-   293		if (*status & FE_HAS_VITERBI) {
-   294			u32 cnr = 0, x, y, d;
-   295			u64 d_3 = 0;
-   296	
-   297			regmap_read(r_s, CNRDXU_S, &tmpu);
-   298			regmap_read(r_s, CNRDXL_S, &tmpl);
-   299			x = (tmpu << 8) | tmpl;
-   300			regmap_read(r_s, CNRDYU_S, &tmpu);
-   301			regmap_read(r_s, CNRDYL_S, &tmpl);
-   302			y = (tmpu << 8) | tmpl;
-   303	
-   304			/* CNR[dB]: 10 * log10(D) - 30.74 / D^3 - 3 */
-   305			/*   D = x^2 / (2^15 * y - x^2) */
-   306			d = (y << 15) - x * x;
-   307			if (d > 0) {
-   308				/* (2^4 * D)^3 = 2^12 * D^3 */
-   309				/* 3.074 * 2^(12 + 24) = 211243671486 */
-   310				d_3 = div_u64(16 * x * x, d);
-   311				d_3 = d_3 * d_3 * d_3;
-   312				if (d_3)
- > 313					d_3 = div_u64(211243671486, d_3);
-   314			}
-   315	
-   316			if (d_3) {
-   317				/* 0.3 * 2^24 = 5033164 */
-   318				tmp = (s64)2 * intlog10(x) - intlog10(abs(d)) - d_3
-   319					- 5033164;
-   320				cnr = div_u64(tmp * 10000, 1 << 24);
-   321			}
-   322	
-   323			if (cnr) {
-   324				c->cnr.len = 1;
-   325				c->cnr.stat[0].scale = FE_SCALE_DECIBEL;
-   326				c->cnr.stat[0].uvalue = cnr;
-   327			}
-   328		}
-   329	
-   330		/* BER */
-   331		c->post_bit_error.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
-   332		c->post_bit_count.stat[0].scale = FE_SCALE_NOT_AVAILABLE;
-   333	
-   334		regmap_read(r_s, BERCNFLG_S, &flg);
-   335	
-   336		if ((*status & FE_HAS_VITERBI) && (flg & BERCNFLG_S_BERVRDY)) {
-   337			u32 bit_err, bit_cnt;
-   338	
-   339			regmap_read(r_s, BERVRDU_S, &tmpu);
-   340			regmap_read(r_s, BERVRDL_S, &tmpl);
-   341			bit_err = (tmpu << 8) | tmpl;
-   342			bit_cnt = (1 << 13) * 204;
-   343	
-   344			if (bit_cnt) {
-   345				c->post_bit_error.len = 1;
-   346				c->post_bit_error.stat[0].scale = FE_SCALE_COUNTER;
-   347				c->post_bit_error.stat[0].uvalue = bit_err;
-   348				c->post_bit_count.len = 1;
-   349				c->post_bit_count.stat[0].scale = FE_SCALE_COUNTER;
-   350				c->post_bit_count.stat[0].uvalue = bit_cnt;
-   351			}
-   352		}
-   353	
-   354		return 0;
-   355	}
-   356	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> > 
+> > > diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+> > > new file mode 100644
+> > > index 000000000000..f9ebf54ca247
+> > > --- /dev/null
+> > > +++ b/arch/arm64/kernel/machine_kexec_file.c
+> > > @@ -0,0 +1,57 @@
+> > > +// SPDX-License-Identifier: GPL-2.0
+> > > +/*
+> > > + * kexec_file for arm64
+> > > + *
+> > > + * Copyright (C) 2018 Linaro Limited
+> > > + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > + *
+> > 
+> > > + * Most code is derived from arm64 port of kexec-tools
+> > 
+> > How does kexec-tools walk memblock?
+> 
+> Will remove this comment from this patch.
+> Obviously, this comment is for the rest of the code which will be
+> added to succeeding patches (patch #5 and #7).
+> 
+> 
+> > 
+> > > + */
+> > > +
+> > > +#define pr_fmt(fmt) "kexec_file: " fmt
+> > > +
+> > > +#include <linux/ioport.h>
+> > > +#include <linux/kernel.h>
+> > > +#include <linux/kexec.h>
+> > > +#include <linux/memblock.h>
+> > > +
+> > > +int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> > > +				int (*func)(struct resource *, void *))
+> > > +{
+> > > +	phys_addr_t start, end;
+> > > +	struct resource res;
+> > > +	u64 i;
+> > > +	int ret = 0;
+> > > +
+> > > +	if (kbuf->image->type == KEXEC_TYPE_CRASH)
+> > > +		return func(&crashk_res, kbuf);
+> > > +
+> > > +	if (kbuf->top_down)
+> > > +		for_each_mem_range_rev(i, &memblock.memory, &memblock.reserved,
+> > > +				NUMA_NO_NODE, MEMBLOCK_NONE,
+> > > +				&start, &end, NULL) {
+> > 
+> > for_each_free_mem_range_reverse() is a more readable version of this helper.
+> 
+> OK. I used to use my own limited list of reserved memory instead of
+> memblock.reserved here to exclude verbose ranges.
+> 
+> 
+> > > +			if (!memblock_is_map_memory(start))
+> > > +				continue;
+> > 
+> > Passing MEMBLOCK_NONE means this walk will never find MEMBLOCK_NOMAP memory.
+> 
+> Sure, I confirmed it.
+> 
+> > 
+> > > +			res.start = start;
+> > > +			res.end = end;
+> > > +			ret = func(&res, kbuf);
+> > > +			if (ret)
+> > > +				break;
+> > > +		}
+> > > +	else
+> > > +		for_each_mem_range(i, &memblock.memory, &memblock.reserved,
+> > > +				NUMA_NO_NODE, MEMBLOCK_NONE,
+> > > +				&start, &end, NULL) {
+> > 
+> > for_each_free_mem_range()?
+> 
+> OK.
+> 
+> > > +			if (!memblock_is_map_memory(start))
+> > > +				continue;
+> > > +
+> > > +			res.start = start;
+> > > +			res.end = end;
+> > > +			ret = func(&res, kbuf);
+> > > +			if (ret)
+> > > +				break;
+> > > +		}
+> > > +
+> > > +	return ret;
+> > > +}
+> > > 
+> > 
+> > With these changes, what we have is almost:
+> > arch/powerpc/kernel/machine_kexec_file_64.c::arch_kexec_walk_mem() !
+> > (the difference being powerpc doesn't yet support crash-kernels here)
+> > 
+> > If the argument is walking memblock gives a better answer than the stringy
+> > walk_system_ram_res() thing, is there any mileage in moving this code into
+> > kexec_file.c, and using it if !IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK)?
+> > 
+> > This would save arm64/powerpc having near-identical implementations.
+> > 32bit arm keeps memblock if it has kexec, so it may be useful there too if
+> > kexec_file_load() support is added.
+> 
+> Thanks. I've forgot ppc.
+> 
+> -Takahiro AKASHI
+> 
+> 
+> > 
+> > Thanks,
+> > 
+> > James
