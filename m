@@ -1,70 +1,46 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 May 2018 15:40:26 +0100
-Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.18
-Message-ID: <5AFAF15A.20500@hisilicon.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 15 May 2018 16:47:12 +0200
+Subject: [PATCH 2/3] clk: renesas: r8a7795: Add ccree clock
+In-Reply-To: <1526387370-17142-3-git-send-email-gilad@benyossef.com>
+References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
+ <1526387370-17142-3-git-send-email-gilad@benyossef.com>
+Message-ID: <CAMuHMdXWPwW_p=D56BhNF274m+JLe+mbD2fqQu8-we-uMW4b8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+Hi Gilad,
 
-Please help to pull the following changes.
-Thanks!
+On Tue, May 15, 2018 at 2:29 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+> This patch adds the clock used by the CryptoCell 630p instance in the SoC.
+>
+> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 
-Best Regards,
-Wei
+Thanks for your patch!
 
----
+> --- a/drivers/clk/renesas/r8a7795-cpg-mssr.c
+> +++ b/drivers/clk/renesas/r8a7795-cpg-mssr.c
+> @@ -132,6 +132,7 @@ static struct mssr_mod_clk r8a7795_mod_clks[] __initdata = {
+>         DEF_MOD("sys-dmac2",             217,   R8A7795_CLK_S0D3),
+>         DEF_MOD("sys-dmac1",             218,   R8A7795_CLK_S0D3),
+>         DEF_MOD("sys-dmac0",             219,   R8A7795_CLK_S0D3),
+> +       DEF_MOD("ccree",                 229,   R8A7795_CLK_S3D2),
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+I don't know if "ccree" is the proper name for this clock, as there
+may be multiple
+instances.
+I also can't verify the parent clock.
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+>         DEF_MOD("cmt3",                  300,   R8A7795_CLK_R),
+>         DEF_MOD("cmt2",                  301,   R8A7795_CLK_R),
+>         DEF_MOD("cmt1",                  302,   R8A7795_CLK_R),
 
-are available in the Git repository at:
+Gr{oetje,eeting}s,
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.18v2
+                        Geert
 
-for you to fetch changes up to bb61c53601b4af0f33f99ec0a8c9315246a0b6d4:
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-  arm64: dts: hi3798cv200: enable emmc support for poplar board (2018-05-15 14:54:03 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.18v2
-
-- Add mailbox, stub clock, CPU frequency scaling, thermal cooling
-  management and pcie msi interruption support for hi3660
-- Add LPC support for hip06 and hip07
-- Add PCIe, usb and emmc support for hi3798cv200
-
-----------------------------------------------------------------
-John Garry (2):
-      arm64: dts: hisi: Enable Hisi LPC node for hip06
-      arm64: dts: hisi: Enable Hisi LPC node for hip07
-
-Kaihua Zhong (2):
-      arm64: dts: hi3660: Add mailbox node
-      arm64: dts: hi3660: Add stub clock node
-
-Leo Yan (1):
-      arm64: dts: hi3660: Add CPU frequency scaling support
-
-Shawn Guo (3):
-      arm64: dts: hi3798cv200: enable PCIe support for poplar board
-      arm64: dts: hi3798cv200: enable usb2 support for poplar board
-      arm64: dts: hi3798cv200: enable emmc support for poplar board
-
-Tao Wang (1):
-      arm64: dts: hi3660: Add thermal cooling management
-
-Yao Chen (1):
-      arm64: dts: hi3660: Add pcie msi interrupt attribute
-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 147 +++++++++++++++
- .../boot/dts/hisilicon/hi3798cv200-poplar.dts      |  38 ++++
- arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 205 ++++++++++++++++++++-
- arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |   8 +
- arch/arm64/boot/dts/hisilicon/hip06.dtsi           |  21 +++
- arch/arm64/boot/dts/hisilicon/hip07-d05.dts        |   4 +
- arch/arm64/boot/dts/hisilicon/hip07.dtsi           |  14 ++
- arch/arm64/boot/dts/hisilicon/poplar-pinctrl.dtsi  |  98 ++++++++++
- 8 files changed, 532 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/poplar-pinctrl.dtsi
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
