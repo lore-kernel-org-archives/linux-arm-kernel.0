@@ -1,35 +1,117 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 May 2018 09:22:23 +0100
-Subject: [PATCH 08/18] arm64: convert raw syscall invocation to C
-In-Reply-To: <20180514202445.GA26773@light.dominikbrodowski.net>
-References: <20180514125351.GK7753@e103592.cambridge.arm.com>
- <20180514114104.oubxdf526hf2m6t5@lakrids.cambridge.arm.com>
- <20180514202445.GA26773@light.dominikbrodowski.net>
-Message-ID: <20180515082222.rcoyf6dsf2s2edgq@salmiak>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 15 May 2018 09:23:03 +0100
+Subject: [PATCH v2 5/5] hisi: Consolidate the Kconfigs for the CLOCK_STUB
+ and the MAILBOX
+In-Reply-To: <1526352795-6991-6-git-send-email-leo.yan@linaro.org>
+References: <1526352795-6991-1-git-send-email-leo.yan@linaro.org>
+ <1526352795-6991-6-git-send-email-leo.yan@linaro.org>
+Message-ID: <5AFA98E7.9050609@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 10:24:45PM +0200, Dominik Brodowski wrote:
-> On Mon, May 14, 2018 at 12:41:10PM +0100, Mark Rutland wrote:
-> > I agree it would be nicer if it had a wrapper that took a pt_regs, even
-> > if it does nothing with it.
-> > 
-> > We can't use SYSCALL_DEFINE0() due to the fault injection muck, we'd
-> > need a ksys_ni_syscall() for our traps.c logic, and adding this
-> > uniformly would involve some arch-specific rework for x86, too, so I
-> > decided it was not worth the effort.
+Hi Leo, Daniel,
+
+On 2018/5/15 3:53, Leo Yan wrote:
+> From: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
-> Couldn't you just open-code the "return -ENOSYS;" in traps.c?
+> The current defconfig is inconsistent as it selects the mailbox and
+> the clock for the hi6220 and the hi3660 without having their Kconfigs
+> making sure the dependencies are correct. It ends up when selecting
+> different versions for the kernel (for example when git bisecting)
+> those options disappear and they don't get back, leading to unexpected
+> behaviors. In our case, the cpufreq driver does no longer work because
+> the clock fails to initialize due to the clock stub and the mailbox
+> missing.
+> 
+> In order to have the dependencies correctly set when defaulting, let's
+> do the same as commit 3a49afb84ca074e ("clk: enable hi655x common clk
+> automatically") where we select automatically the driver when the
+> parent driver is selected. With sensible defaults in place, we can leave
+> other choices for EXPERT.
+> 
+> Acked-by: Stephen Boyd <sboyd@kernel.org>
+> Acked-by: Jassi Brar <jaswinder.singh@linaro.org>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  arch/arm64/configs/defconfig  |  1 -
+>  drivers/clk/hisilicon/Kconfig | 13 ++++++++-----
+>  drivers/mailbox/Kconfig       | 12 ++++++++----
+>  3 files changed, 16 insertions(+), 10 deletions(-)
 
-I guess so. I was just worried that debug logic might be added to the generic
-ni_syscall() in future, and wanted to avoid potential divergence.
+Could you separate this patch into clk, mailbox and defconfig 3 parts?
+Thanks!
 
-> Error injection has no reasonable stable ABI/API expectations, so that's not
-> a show-stopper either.
+Best Regards,
+Wei
 
-If people are happy with using SYSCALL_DEFINE0() for ni_syscall, I'm happy to
-do that -- it's just that we'll need a fixup for x86 as that will change the
-symbol name.
-
-Thanks,
-Mark.
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index ecf6137..1d9d8b9 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -549,7 +549,6 @@ CONFIG_HWSPINLOCK_QCOM=y
+>  CONFIG_ARM_MHU=y
+>  CONFIG_PLATFORM_MHU=y
+>  CONFIG_BCM2835_MBOX=y
+> -CONFIG_HI6220_MBOX=y
+>  CONFIG_QCOM_APCS_IPC=y
+>  CONFIG_ROCKCHIP_IOMMU=y
+>  CONFIG_TEGRA_IOMMU_SMMU=y
+> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+> index 1bd4355..becdb1d 100644
+> --- a/drivers/clk/hisilicon/Kconfig
+> +++ b/drivers/clk/hisilicon/Kconfig
+> @@ -44,14 +44,17 @@ config RESET_HISI
+>  	  Build reset controller driver for HiSilicon device chipsets.
+>  
+>  config STUB_CLK_HI6220
+> -	bool "Hi6220 Stub Clock Driver"
+> -	depends on COMMON_CLK_HI6220 && MAILBOX
+> -	default ARCH_HISI
+> +	bool "Hi6220 Stub Clock Driver" if EXPERT
+> +	depends on (COMMON_CLK_HI6220 || COMPILE_TEST)
+> +	depends on MAILBOX
+> +	default COMMON_CLK_HI6220
+>  	help
+>  	  Build the Hisilicon Hi6220 stub clock driver.
+>  
+>  config STUB_CLK_HI3660
+> -	bool "Hi3660 Stub Clock Driver"
+> -	depends on COMMON_CLK_HI3660 && MAILBOX
+> +	bool "Hi3660 Stub Clock Driver" if EXPERT
+> +	depends on (COMMON_CLK_HI3660 || COMPILE_TEST)
+> +	depends on MAILBOX
+> +	default COMMON_CLK_HI3660
+>  	help
+>  	  Build the Hisilicon Hi3660 stub clock driver.
+> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+> index a2bb274..567cd02 100644
+> --- a/drivers/mailbox/Kconfig
+> +++ b/drivers/mailbox/Kconfig
+> @@ -109,16 +109,20 @@ config TI_MESSAGE_MANAGER
+>  	  platform has support for the hardware block.
+>  
+>  config HI3660_MBOX
+> -	tristate "Hi3660 Mailbox"
+> -	depends on ARCH_HISI && OF
+> +	tristate "Hi3660 Mailbox" if EXPERT
+> +	depends on (ARCH_HISI || COMPILE_TEST)
+> +	depends on OF
+> +	default ARCH_HISI
+>  	help
+>  	  An implementation of the hi3660 mailbox. It is used to send message
+>  	  between application processors and other processors/MCU/DSP. Select
+>  	  Y here if you want to use Hi3660 mailbox controller.
+>  
+>  config HI6220_MBOX
+> -	tristate "Hi6220 Mailbox"
+> -	depends on ARCH_HISI
+> +	tristate "Hi6220 Mailbox" if EXPERT
+> +	depends on (ARCH_HISI || COMPILE_TEST)
+> +	depends on OF
+> +	default ARCH_HISI
+>  	help
+>  	  An implementation of the hi6220 mailbox. It is used to send message
+>  	  between application processors and MCU. Say Y here if you want to
+> 
