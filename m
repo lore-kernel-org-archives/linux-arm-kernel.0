@@ -1,97 +1,24 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 15 May 2018 15:55:33 +0800
-Subject: [PATCH] ARM: dts: imx: Switch NXP boards to SPDX identifier
-In-Reply-To: <1526320727-29157-1-git-send-email-festevam@gmail.com>
-References: <1526320727-29157-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180515075532.GQ26863@dragon>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Tue, 15 May 2018 10:57:05 +0300
+Subject: [PATCH v3 5/8] PCI: Replace pr_*() with dev_*() in
+ of_pci_get_host_bridge_resources()
+In-Reply-To: <95f6ca417e2bc74d15f707e577b098e46b4b3ba4.1526363896.git.jan.kiszka@siemens.com>
+References: <cover.1526363896.git.jan.kiszka@siemens.com>
+ <95f6ca417e2bc74d15f707e577b098e46b4b3ba4.1526363896.git.jan.kiszka@siemens.com>
+Message-ID: <ae4ea7f6-b9a5-40ca-b0b3-4e55e7741fc4@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 02:58:47PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On 05/15/2018 08:58 AM, Jan Kiszka wrote:
+> From: Jan Kiszka <jan.kiszka@siemens.com>
 > 
-> Adopt the SPDX license identifier headers to ease license compliance
-> management.
+> Now that we have a device reference, make use of it for printing.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx23-evk.dts          | 13 +++-------
->  arch/arm/boot/dts/imx25-pdk.dts          | 13 +++-------
->  arch/arm/boot/dts/imx27-pdk.dts          | 13 +++-------
->  arch/arm/boot/dts/imx28-evk.dts          | 13 +++-------
->  arch/arm/boot/dts/imx35-pdk.dts          | 15 +++--------
->  arch/arm/boot/dts/imx50-evk.dts          | 17 ++++--------
->  arch/arm/boot/dts/imx51-babbage.dts      | 15 +++--------
->  arch/arm/boot/dts/imx53-qsb-common.dtsi  | 15 +++--------
->  arch/arm/boot/dts/imx53-qsb.dts          | 15 +++--------
->  arch/arm/boot/dts/imx53-qsrb.dts         | 15 +++--------
->  arch/arm/boot/dts/imx53-smd.dts          | 17 ++++--------
->  arch/arm/boot/dts/imx6dl-sabreauto.dts   | 10 +++-----
->  arch/arm/boot/dts/imx6dl-sabresd.dts     | 10 +++-----
->  arch/arm/boot/dts/imx6q-sabreauto.dts    | 16 ++++--------
->  arch/arm/boot/dts/imx6q-sabresd.dts      | 15 +++--------
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 15 +++--------
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi   | 15 +++--------
->  arch/arm/boot/dts/imx6qp-sabreauto.dts   | 44 +++-----------------------------
->  arch/arm/boot/dts/imx6qp-sabresd.dts     | 44 +++-----------------------------
->  arch/arm/boot/dts/imx6sl-evk.dts         | 10 +++-----
->  arch/arm/boot/dts/imx6sx-sabreauto.dts   | 10 +++-----
->  arch/arm/boot/dts/imx6ul-14x14-evk.dts   | 10 +++-----
->  arch/arm/boot/dts/imx7d-sdb-sht11.dts    | 44 +++-----------------------------
->  arch/arm/boot/dts/imx7d-sdb.dts          | 44 +++-----------------------------
->  24 files changed, 86 insertions(+), 362 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
-> index 9d92ece82..d3cdd3b 100644
-> --- a/arch/arm/boot/dts/imx23-evk.dts
-> +++ b/arch/arm/boot/dts/imx23-evk.dts
-> @@ -1,13 +1,6 @@
-> -/*
-> - * Copyright 2012 Freescale Semiconductor, Inc.
-> - *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> - *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> - */
-> +// SPDX-License-Identifier: GPL-2.0+
-> +//
-> +// Copyright 2012 Freescale Semiconductor, I/*
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 
-I/*?  Should be Inc.
+Tested-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 
-<snip>
-
-> diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-sabreauto.dts
-> index 334b924..66f2728 100644
-> --- a/arch/arm/boot/dts/imx6q-sabreauto.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabreauto.dts
-> @@ -1,14 +1,8 @@
-> -/*
-> - * Copyright 2012 Freescale Semiconductor, Inc.
-> - * Copyright 2011 Linaro Ltd.
-> - *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> - *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> - */
-> +// SPDX-License-Identifier: GPL-2.0+
-> +//
-> +// Copyright 2012 Freescale Semiconductor, Inc.
-> +// Copyright 2011 Linaro Ltd.
-> +
-
-Unnecessary newline.
-
->  
->  /dts-v1/;
->  
-
-I fixed them up and applied the patch.
-
-Shawn
+--
+With best wishes,
+Vladimir
