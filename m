@@ -1,39 +1,28 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 15 May 2018 15:14:47 +0200
-Subject: [PATCH v3 6/6] tty/serial: atmel: changed the driver to work
- under at91-usart mfd
-In-Reply-To: <95a51c6c69bf1a2422f545ac1f06846ebcdb186a.camel@microchip.com>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-7-radu.pirea@microchip.com>
- <4a75568e-a52e-3872-f465-d707372a5c12@sorico.fr>
- <95a51c6c69bf1a2422f545ac1f06846ebcdb186a.camel@microchip.com>
-Message-ID: <4d70c73e-9db7-bdff-7414-04a4843acae3@sorico.fr>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Tue, 15 May 2018 08:15:19 -0500
+Subject: [PATCH 1/4] amba: Export amba_bustype
+In-Reply-To: <CAPDyKFqagt5zhz-8hLSXOqofv-nBqg4i-EVjA=UV3Jfi4zktKg@mail.gmail.com>
+References: <20180508140628.f30774c70c4c481bff3f8000@arm.com>
+ <CAPDyKFqagt5zhz-8hLSXOqofv-nBqg4i-EVjA=UV3Jfi4zktKg@mail.gmail.com>
+Message-ID: <20180515081519.22751a39c49e63224da3acac@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/2018 14:47, Radu Pirea wrote:
-> On Mon, 2018-05-14 at 12:57 +0200, Richard Genoud wrote:
->> After your patch, the DMA is not selected anymore:
->> atmel_usart_serial atmel_usart_serial.0.auto: TX channel not
->> available, switch to pio
->> instead of:
->> atmel_usart fffff200.serial: using dma1chan2 for tx DMA transfers
->>
-> Fixed.
->> And the kernel doesn't log anymore on the serial console, despite the
->> loglevel=8
->> (after reverting this series, the kernel logs reappears on the serial
->> console)
->>
-> Which serial are you using as console? 
-fffff200.serial (sam9g35-cm)
-( stdout-path = "serial0:115200n8"; in the DTS )
+On Tue, 15 May 2018 08:59:02 +0200
+Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-With this series applied, all the kernel log goes on the screen.
-Without, it goes on the serial debug.
+> On 8 May 2018 at 21:06, Kim Phillips <kim.phillips@arm.com> wrote:
+> > This patch is provided in the context of allowing the Coresight driver
+> > subsystem to be loaded as modules.  Coresight uses amba_bus in its call
+> > to bus_find_device() in of_coresight_get_endpoint_device() when
+> > searching for a configurable endpoint device.  This patch allows
+> > Coresight to reference amba_bustype when built as a module.
+> 
+> Sounds like you are fixing a bug, don't your want this to go for
+> stable and then also add a fixes tag?
 
->> (tests done on sam9g35)
->>
-> I will consider the rest of suggestions. 
->> regards,
->> Richard
+How do you consider this a bug fix?  What commit would the fixes tag
+reference?  The introduction of the amba bus?  Not only aren't busses
+required to export their bus_type, but that commit predates git.
+
+Kim
