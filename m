@@ -1,41 +1,62 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Tue, 15 May 2018 10:39:30 +0200
-Subject: [PATCH v3 0/8] PCI: leak fixes, removable generic PCI host,
- assorted stuff
-In-Reply-To: <72f23e5f-4641-9ef3-09e6-70c4724f21a4@mentor.com>
-References: <cover.1526363896.git.jan.kiszka@siemens.com>
- <72f23e5f-4641-9ef3-09e6-70c4724f21a4@mentor.com>
-Message-ID: <8f40ba94-d730-5f45-c113-2cd53c722467@siemens.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Tue, 15 May 2018 16:39:31 +0800
+Subject: [PATCH v2 4/4] arm64: dts: Add Mediatek SoC MT8183 and
+ evaluation board dts and Makefile
+In-Reply-To: <efa91778-e81f-9ba4-22a6-43ff0f94af4f@arm.com>
+References: <1526293351-32794-1-git-send-email-erin.lo@mediatek.com>
+ <1526293351-32794-5-git-send-email-erin.lo@mediatek.com>
+ <efa91778-e81f-9ba4-22a6-43ff0f94af4f@arm.com>
+Message-ID: <1526373571.3345.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-15 09:58, Vladimir Zapolskiy wrote:
-> Hi Jan,
+On Mon, 2018-05-14 at 11:35 +0100, Marc Zyngier wrote:
+> On 14/05/18 11:22, Erin Lo wrote:
+> > From: Ben Ho <Ben.Ho@mediatek.com>
+> > 
+> > Add basic chip support for Mediatek 8183
+> > 
+> > Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
+> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> > ---
+> >  arch/arm64/boot/dts/mediatek/Makefile       |   1 +
+> >  arch/arm64/boot/dts/mediatek/mt8183-evb.dts |  31 +++++
+> >  arch/arm64/boot/dts/mediatek/mt8183.dtsi    | 178 ++++++++++++++++++++++++++++
+> >  3 files changed, 210 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
+> > 
 > 
-> On 05/15/2018 08:58 AM, Jan Kiszka wrote:
->> Changes in v3:
->>  - refactor series to be both bisectable and simpler while reworking
->>    of_pci_get_host_bridge_resources()
->>  - include of_pci_get_host_bridge_resources() removal
->>  - include devm_of_pci_get_host_bridge_resources() error path fixes
->>  - effectively, no functional changes to v2
+> [...]
 > 
-> while the previous version of the changeset plus the fixup found on Bjorn's
-> pci/resource branch is sufficient, I can't argue with the fact that this
-> series is way better.
-
-0day-testing found a build breakage in the middle of the old series.
-Wasn't straightforward to fix, so Bjorn suggested a different series
-structure which I try to implement with v3.
-
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+> > new file mode 100644
+> > index 0000000..8564a26
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
 > 
-> In case if this series is accepted I'll review and test the fix of
-> of_pci_get_host_bridge_resources() memleak again, no worries.
+> [...]
+> 
+> > +	gic: interrupt-controller at 0c000000 {
+> > +		compatible = "arm,gic-v3";
+> > +		#interrupt-cells = <3>;
+> > +		interrupt-parent = <&gic>;
+> > +		interrupt-controller;
+> > +		reg = <0 0x0c000000 0 0x40000>,  // CID
+> > +		      <0 0x0c100000 0 0x200000>; // CIR
+> 
+> You're missing the GICV and GICH regions that are present on both A53
+> and A73 at an offset from PERIPHBASE.
+> 
+> > +		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> > +	};
+> 
+> Thanks,
+> 
+> 	M.
 
-Thanks, will address that issue first.
+I will fill out the GICV and GICH in next round.
+Thanks.
 
-Jan
-
--- 
-Siemens AG, Corporate Technology, CT RDA IOT SES-DE
-Corporate Competence Center Embedded Linux
+Regards,
+Erin
