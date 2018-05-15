@@ -1,68 +1,41 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 15 May 2018 08:21:48 +0200
-Subject: [GIT PULL 0/5] perf/urgent fixes
-In-Reply-To: <20180514122321.27304-1-acme@kernel.org>
-References: <20180514122321.27304-1-acme@kernel.org>
-Message-ID: <20180515062148.GA7581@gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 15 May 2018 08:28:56 +0200
+Subject: [PATCH v3 6/6] tty/serial: atmel: changed the driver to work
+ under at91-usart mfd
+In-Reply-To: <CAHp75Vdcd0MmqCMGkFXcvKLrzcHtxBDcB8U1qTzysaH9By4Y8A@mail.gmail.com>
+References: <20180511103822.31698-1-radu.pirea@microchip.com>
+ <20180511103822.31698-7-radu.pirea@microchip.com>
+ <4a75568e-a52e-3872-f465-d707372a5c12@sorico.fr>
+ <CAHp75Vdcd0MmqCMGkFXcvKLrzcHtxBDcB8U1qTzysaH9By4Y8A@mail.gmail.com>
+Message-ID: <f3caeaf5-a61b-bf28-2d4e-0dd4a76224c2@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 14/05/2018 18:56, Andy Shevchenko wrote:
+> On Mon, May 14, 2018 at 1:57 PM, Richard Genoud
+> <richard.genoud@gmail.com> wrote:
+>> On 11/05/2018 12:38, Radu Pirea wrote:
+>>> This patch modifies the place where resources and device tree properties
+>>> are searched.
+> 
+>> I think it may be simpler with something like:
+> 
+>> +       int size = mfd_pdev->resource[0].end - mfd_pdev->resource[0].start + 1;
+> 
+> Isn't resource_size() macro for this very purpose?
+Indeed.
++       int size = resource_size(mfd_pdev->resource);
+would be even simpler !
 
-* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> 
+>>> +     int size = to_platform_device(pdev->dev.parent)->resource[0].end -
+>>> +             to_platform_device(pdev->dev.parent)->resource[0].start + 1;
+>>>
+>> ditto
+> 
+> Ditto.
+> 
 
-> Hi Ingo,
-> 
-> 	Please consider pulling,
-> 
-> - Arnaldo
-> 
-> Test results at the end of this message, as usual.
-> 
-> The following changes since commit 49cf4a4b3f5a8b02556dd4f45c5cee598d4fc799:
-> 
->   Merge tag 'perf-urgent-for-mingo-4.17-20180507' of git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux into perf/urgent (2018-05-10 20:09:00 +0200)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-urgent-for-mingo-4.17-20180514
-> 
-> for you to fetch changes up to c23080a6e4e853cff2834436e3cf33eae7723900:
-> 
->   perf tools: Add missing newline when parsing empty BPF proggie (2018-05-11 12:10:02 -0300)
-> 
-> ----------------------------------------------------------------
-> perf/urgent fixes:
-> 
-> - Fix segfault when processing unknown threads in cs-etm (Leo Yan)
-> 
-> - Fix "perf test inet_pton" on s390 failing due to missing inline (Thomas Richter)
-> 
-> - Display all available events on 'perf annotate --stdio' (Jin Yao)
-> 
-> - Add missing newline when parsing empty BPF proggie (Arnaldo Carvalho de Melo)
-> 
-> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-> 
-> ----------------------------------------------------------------
-> Arnaldo Carvalho de Melo (1):
->       perf tools: Add missing newline when parsing empty BPF proggie
-> 
-> Jin Yao (1):
->       perf annotate: Display all available events on --stdio
-> 
-> Leo Yan (2):
->       perf cs-etm: Support unknown_thread in cs_etm_auxtrace
->       perf cs-etm: Remove redundant space
-> 
-> Thomas Richter (1):
->       perf test: "probe libc's inet_pton" fails on s390 due to missing inline
-> 
->  .../tests/shell/record+probe_libc_inet_pton.sh     |  2 +-
->  tools/perf/util/annotate.c                         |  3 +++
->  tools/perf/util/cs-etm.c                           | 28 ++++++++++++++++++----
->  tools/perf/util/parse-events.c                     |  2 +-
->  4 files changed, 29 insertions(+), 6 deletions(-)
+Thanks !
 
-Pulled, thanks a lot Arnaldo!
-
-	Ingo
+Richard.
