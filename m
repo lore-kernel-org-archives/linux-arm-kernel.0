@@ -1,52 +1,123 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 15 May 2018 10:42:54 -0500
-Subject: [PATCH v10 02/27] clk: davinci: da850-pll: change PLL0 to
- CLK_OF_DECLARE
-In-Reply-To: <9203489d-0a5a-103a-67ea-d3e89bb7ebc4@ti.com>
-References: <20180509172606.29387-1-david@lechnology.com>
- <20180509172606.29387-3-david@lechnology.com>
- <9203489d-0a5a-103a-67ea-d3e89bb7ebc4@ti.com>
-Message-ID: <88dec9b1-5f4d-a1ac-2b63-b30ae7665851@lechnology.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 15 May 2018 10:00:51 -0600
+Subject: [PATCH v3] coresight: documentation: update sysfs section
+In-Reply-To: <20180514141800.f1be30ce9d1f6ae20ca2d04c@arm.com>
+References: <20180507172915.c032cd71c07b1849bf419a5f@arm.com>
+ <CANLsYkyQLan3XajOz2uuoOF8OQchGfeu2ZkZJ9H1Xm9q==aXTw@mail.gmail.com>
+ <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
+ <a09cbbb5-0237-31f5-dc81-d816c9ec26c5@infradead.org>
+ <20180514141800.f1be30ce9d1f6ae20ca2d04c@arm.com>
+Message-ID: <CANLsYkzaFYd=Uo7ZNxiuE3bsg7FrRTyaVEqj=j5mg6zoXDXNLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2018 08:31 AM, Sekhar Nori wrote:
-> On Wednesday 09 May 2018 10:55 PM, David Lechner wrote:
->> +void of_da850_pll0_init(struct device_node *node)
->>   {
->> -	return of_davinci_pll_init(dev, dev->of_node, &da850_pll0_info,
->> -				   &da850_pll0_obsclk_info,
->> -				   da850_pll0_sysclk_info, 7, base, cfgchip);
->> +	void __iomem *base;
->> +	struct regmap *cfgchip;
->> +
->> +	base = of_iomap(node, 0);
->> +	if (!base) {
->> +		pr_err("%s: ioremap failed\n", __func__);
->> +		return;
->> +	}
->> +
->> +	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
+On 14 May 2018 at 13:18, Kim Phillips <kim.phillips@arm.com> wrote:
+> - Align and show updated ls devices output from the TC2, based on
+>   current driver
+>
+> - Provide an example from an ETMv4 based system (Juno)
+>
+> - Reflect changes to the way the RAM write pointer is accessed since
+>   it got changed in commit 7d83d17795ef ("coresight: tmc: adding sysFS
+>   management entries").
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Randy Dunlap <rdunlap@infradead.org>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
 
-In your previous review, you pointed out that the error did not need to
-be handled here because it is handled later in davinci_pll_clk_register().
+I'm good with this version - Jonathan, should I take this through my
+tree of you'll take care of it?
 
-We get a warning there because cfgchip is only needed for unlocking the
-PLL for CPU frequency scaling and is not critical for operation of the
-clocks.
+In case of the former:
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-> 
-> It will be nice to handle the error case here.
-> 
->> +
->> +	of_davinci_pll_init(NULL, node, &da850_pll0_info,
->> +			    &da850_pll0_obsclk_info,
->> +			    da850_pll0_sysclk_info, 7, base, cfgchip);
-> 
-> Apart from that, it looks good to me.
-> 
-> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> Thanks,
-> Sekhar
-> 
+> ---
+> v3: address Randy Dunlap's showns->shown,  corrected - and + line merging
+> v2: address Mathieu's comment about clarifying the sinks on the Juno
+>     vs. TC2 platforms.
+>
+>  Documentation/trace/coresight.txt | 43 +++++++++++++++++++------------
+>  1 file changed, 26 insertions(+), 17 deletions(-)
+>
+> diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
+> index 6f0120c3a4f1..15d2a0f1e1b8 100644
+> --- a/Documentation/trace/coresight.txt
+> +++ b/Documentation/trace/coresight.txt
+> @@ -141,13 +141,25 @@ register the device with the core framework.  The unregister function takes
+>  a reference to a "struct coresight_device", obtained at registration time.
+>
+>  If everything goes well during the registration process the new devices will
+> -show up under /sys/bus/coresight/devices, as showns here for a TC2 platform:
+> +show up under /sys/bus/coresight/devices, as shown here for a TC2 platform:
+>
+>  root:~# ls /sys/bus/coresight/devices/
+> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
+> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
+> +20010000.etb   20040000.funnel 2201d000.ptm  2203d000.etm  replicator
+> +20030000.tpiu  2201c000.ptm    2203c000.etm  2203e000.etm
+>  root:~#
+>
+> +and here for a Juno platform:
+> +
+> +root at juno:~# ls /sys/bus/coresight/devices/
+> +20010000.etf    20120000.replicator  22040000.etm     230c0000.funnel
+> +20030000.tpiu   20130000.funnel      220c0000.funnel  23140000.etm
+> +20040000.funnel  20140000.etf        22140000.etm     23240000.etm
+> +20070000.etr    20150000.funnel      23040000.etm     23340000.etm
+> +root at juno:~#
+> +
+> +Note that on Juno users can select the ETF, ETR and TPIU as a sink target while
+> +on TC2, the ETB and TPIU can be selected.
+> +
+>  The functions take a "struct coresight_device", which looks like this:
+>
+>  struct coresight_desc {
+> @@ -193,16 +205,16 @@ the information carried in "THIS_MODULE".
+>  How to use the tracer modules
+>  -----------------------------
+>
+> -Before trace collection can start, a coresight sink needs to be identify.
+> +Before trace collection can start, a coresight sink needs to be identified.
+>  There is no limit on the amount of sinks (nor sources) that can be enabled at
+>  any given moment.  As a generic operation, all device pertaining to the sink
+>  class will have an "active" entry in sysfs:
+>
+>  root:/sys/bus/coresight/devices# ls
+> -replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
+> -20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
+> +20010000.etb   20040000.funnel 2201d000.ptm  2203d000.etm  replicator
+> +20030000.tpiu  2201c000.ptm    2203c000.etm  2203e000.etm
+>  root:/sys/bus/coresight/devices# ls 20010000.etb
+> -enable_sink  status  trigger_cntr
+> +enable_sink  mgmt  power  subsystem  trigger_cntr  uevent
+>  root:/sys/bus/coresight/devices# echo 1 > 20010000.etb/enable_sink
+>  root:/sys/bus/coresight/devices# cat 20010000.etb/enable_sink
+>  1
+> @@ -216,16 +228,13 @@ trigger a trace capture:
+>  root:/sys/bus/coresight/devices# echo 1 > 2201c000.ptm/enable_source
+>  root:/sys/bus/coresight/devices# cat 2201c000.ptm/enable_source
+>  1
+> -root:/sys/bus/coresight/devices# cat 20010000.etb/status
+> -Depth:          0x2000
+> -Status:         0x1
+> -RAM read ptr:   0x0
+> -RAM wrt ptr:    0x19d3   <----- The write pointer is moving
+> -Trigger cnt:    0x0
+> -Control:        0x1
+> -Flush status:   0x0
+> -Flush ctrl:     0x2001
+> -root:/sys/bus/coresight/devices#
+> +
+> +Observe the write pointer moving:
+> +
+> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
+> +0x1a8
+> +root:/sys/bus/coresight/devices# cat 20010000.etb/mgmt/rwp
+> +0x19a6
+>
+>  Trace collection is stopped the same way:
+>
+> --
+> 2.17.0
+>
