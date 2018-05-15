@@ -1,134 +1,36 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 15 May 2018 18:14:37 +0100
-Subject: [PATCH v9 06/11] arm64: kexec_file: allow for loading
- Image-format kernel
-In-Reply-To: <20180515051308.GD2737@linaro.org>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-7-takahiro.akashi@linaro.org>
- <c604b578-6667-3532-eac9-55c428001025@arm.com>
- <20180507072139.GF11326@linaro.org>
- <6f0df3a8-a691-80f1-85de-3e0ead852f12@arm.com>
- <20180515051308.GD2737@linaro.org>
-Message-ID: <4a8409dc-27b3-1ddc-0427-0ca55edcb893@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 May 2018 18:22:01 +0100
+Subject: [PATCH v3 4/4] KVM: arm64: Add support for PUD hugepages at
+ stage 2
+In-Reply-To: <20180514144304.10484-5-punit.agrawal@arm.com>
+References: <20180514144304.10484-1-punit.agrawal@arm.com>
+ <20180514144304.10484-5-punit.agrawal@arm.com>
+Message-ID: <20180515172200.hw24lgd6qh436xvy@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
-
-On 15/05/18 06:13, AKASHI Takahiro wrote:
-> On Fri, May 11, 2018 at 06:07:06PM +0100, James Morse wrote:
->> On 07/05/18 08:21, AKASHI Takahiro wrote:
->>> On Tue, May 01, 2018 at 06:46:11PM +0100, James Morse wrote:
->>>> On 25/04/18 07:26, AKASHI Takahiro wrote:
->>>>> This patch provides kexec_file_ops for "Image"-format kernel. In this
->>>>> implementation, a binary is always loaded with a fixed offset identified
->>>>> in text_offset field of its header.
->>
->>>>> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
->>>>> index e4de1223715f..3cba4161818a 100644
->>>>> --- a/arch/arm64/include/asm/kexec.h
->>>>> +++ b/arch/arm64/include/asm/kexec.h
-
->>>> Could we check branch_code is non-zero, and text-offset points within image-size?
->>>
->>> We could do it, but I don't think this check is very useful.
->>>
->>>>
->>>> We could check that this platform supports the page-size/endian config that this
->>>> Image was built with... We get a message from the EFI stub if the page-size
->>>> can't be supported, it would be nice to do the same here (as we can).
->>>
->>> There is no restriction on page-size or endianness for kexec.
->>
->> No, but it won't boot if the hardware doesn't support it. The kernel will spin
->> at a magic address that is, difficult, to debug without JTAG. The bug report
->> will be "it didn't boot".
+On Mon, May 14, 2018 at 03:43:04PM +0100, Punit Agrawal wrote:
+> KVM only supports PMD hugepages at stage 2. Extend the stage 2 fault
+> handling to add support for PUD hugepages.
 > 
-> OK.
-> Added sanity checks for cpu features, endianness as well as page size.
+> Addition of pud hugepage support enables additional hugepage
+> sizes (e.g., 1G with 4K granule) which can be useful on cores that
+> support mapping larger block sizes in the TLB entries.
 > 
->>
->>> What will be the purpose of this check?
->>
->> These values are in the header so that the bootloader can check them, then print
->> a meaningful error. Here, kexec_file_load() is playing the part of the bootloader.
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h         | 19 ++++++++++++
+>  arch/arm64/include/asm/kvm_mmu.h       | 15 ++++++++++
+>  arch/arm64/include/asm/pgtable-hwdef.h |  4 +++
+>  arch/arm64/include/asm/pgtable.h       |  2 ++
+>  virt/kvm/arm/mmu.c                     | 40 ++++++++++++++++++++++++--
+>  5 files changed, 77 insertions(+), 3 deletions(-)
 
->> I'm assuming kexec_file_load() can only be used to kexec linux... unlike regular
->> kexec. Is this where I'm going wrong?
+It looks like I acked an earlier version. I'll ack it again here:
 
-Trying to work this out for myself: we can't support any UEFI application as we
-can't give it the boot-services environment, so I'm pretty sure
-kexec_file_load() must be linux-specific.
-
-Can we state somewhere that we only expect arm64 linux to be booted with
-kexec_file_load()? Its not clear from the kconfig text, which refers to kexec,
-which explicitly states it can boot other OS. But for kexec_file_load() we're
-following the kernel's booting.txt.
-
-
->>>>> diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
->>>>> new file mode 100644
->>>>> index 000000000000..4dd524ad6611
->>>>> --- /dev/null
->>>>> +++ b/arch/arm64/kernel/kexec_image.c
->>>>> @@ -0,0 +1,79 @@
->>>>
->>>>> +static void *image_load(struct kimage *image,
->>>>> +				char *kernel, unsigned long kernel_len,
->>>>> +				char *initrd, unsigned long initrd_len,
->>>>> +				char *cmdline, unsigned long cmdline_len)
->>>>> +{
->>>>> +	struct kexec_buf kbuf;
->>>>> +	struct arm64_image_header *h = (struct arm64_image_header *)kernel;
->>>>> +	unsigned long text_offset;
->>>>> +	int ret;
->>>>> +
->>>>> +	/* Load the kernel */
->>>>> +	kbuf.image = image;
->>>>> +	kbuf.buf_min = 0;
->>>>> +	kbuf.buf_max = ULONG_MAX;
->>>>> +	kbuf.top_down = false;
->>>>> +
->>>>> +	kbuf.buffer = kernel;
->>>>> +	kbuf.bufsz = kernel_len;
->>>>> +	kbuf.memsz = le64_to_cpu(h->image_size);
->>>>> +	text_offset = le64_to_cpu(h->text_offset);
->>>>> +	kbuf.buf_align = SZ_2M;
->>>>
->>>>> +	/* Adjust kernel segment with TEXT_OFFSET */
->>>>> +	kbuf.memsz += text_offset;
->>>>> +
->>>>> +	ret = kexec_add_buffer(&kbuf);
->>>>> +	if (ret)
->>>>> +		goto out;
->>>>> +
->>>>> +	image->arch.kern_segment = image->nr_segments - 1;
->>>>
->>>> You only seem to use kern_segment here, and in load_other_segments() called
->>>> below. Could it not be a local variable passed in? Instead of arch-specific data
->>>> we keep forever?
->>>
->>> No, kern_segment is also used in load_other_segments() in machine_kexec_file.c.
->>> To optimize memory hole allocation logic in locate_mem_hole_callback(),
->>> we need to know the exact range of kernel image (start and end).
->>
->> That's the second user. My badly-made point is one calls the other, but passes
->> the data via some until-kexec lifetime struct. (its not important, just an
->> indicator this worked differently in the past and hasn't been cleaned up).
->> I meant something like [0].
-> 
-> OK, but instead of adding kern_seg, I want to change the interface to:
-> 
-> | extern int load_other_segments(struct kimage *image,
-> |		unsigned long kernel_load_addr, unsigned long kernel_size,
-> |		char *initrd, unsigned long initrd_len,
-> |		char *cmdline, unsigned long cmdline_len);
-> 
-> This way, we will in future be able to address an issue I mentioned in
-> my previous e-mail. (If we support vmlinux, the kernel occupies two segments
-> for text and data, respectively.)
-
-Aha, its not from old-stuff, its for future-stuff!
-
-
-James
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
