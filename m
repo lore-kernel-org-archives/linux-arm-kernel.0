@@ -1,18 +1,19 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 15 May 2018 13:37:56 -0700
-Subject: [PATCH] clk: stm32mp1: Fix a memory leak in
- 'clk_stm32_register_gate_ops()'
-In-Reply-To: <20180513111704.31842-1-christophe.jaillet@wanadoo.fr>
-References: <20180513111704.31842-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <152641667642.237094.1285725983406005947@swboyd.mtv.corp.google.com>
+Date: Tue, 15 May 2018 13:41:56 -0700
+Subject: [RFC PATCH 07/10] clk: rockchip: set clk-ddr to GET_RATE_NOCACHE.
+In-Reply-To: <20180514211610.26618-8-enric.balletbo@collabora.com>
+References: <20180514211610.26618-1-enric.balletbo@collabora.com>
+ <20180514211610.26618-8-enric.balletbo@collabora.com>
+Message-ID: <152641691632.237094.11483387696003404182@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Christophe JAILLET (2018-05-13 04:17:04)
-> We allocate some memory which is neither used, nor referenced by anything.
-> So axe it.
+Quoting Enric Balletbo i Serra (2018-05-14 14:16:07)
+> From: Derek Basehore <dbasehore@chromium.org>
 > 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> ---
+> This adds the flag to the clk-ddr in rockchip to not use the cached
+> rate for get_rate. This is to handle timeout error conditions in SMC
+> for the set rate function.
 
-Applied to clk-next
+We need some more information here. Why does timeout error condition in
+set_rate() matter for get_rate()?
