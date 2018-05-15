@@ -1,42 +1,29 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 15 May 2018 10:00:38 +0200
-Subject: [PATCH v2] ARM: dts: r8a7740: Add CEU1
-Message-ID: <20180515080038.7438-1-horms+renesas@verge.net.au>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 May 2018 09:18:53 +0100
+Subject: [PATCH 08/18] arm64: convert raw syscall invocation to C
+In-Reply-To: <20180514180029.GA23250@light.dominikbrodowski.net>
+References: <20180514094640.27569-1-mark.rutland@arm.com>
+ <20180514094640.27569-9-mark.rutland@arm.com>
+ <20180514180029.GA23250@light.dominikbrodowski.net>
+Message-ID: <20180515081839.aenqaruro5me42av@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe CEU1 peripheral for Renesas R-Mobile A1 R8A7740 Soc.
+On Mon, May 14, 2018 at 08:00:29PM +0200, Dominik Brodowski wrote:
+> > +static void __invoke_syscall(struct pt_regs *regs, syscall_fn_t syscall_fn)
+> > +{
+> > +	regs->regs[0] = syscall_fn(regs->regs[0], regs->regs[1],
+> > +				   regs->regs[2], regs->regs[3],
+> > +				   regs->regs[4], regs->regs[5]);
+> > +}
+> 
+> Any specific reason to have this in a separate function? This seems to be
+> called only from one instance, namely
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-v2
-* Correct register range start address
+I wanted to keep the raw syscall invocation logically separate from the syscall
+table lookup and ni_syscall fallback, so that it was easier to verify in isolation.
 
-  Based on renesas-devel-20180514-v4.17-rc5
----
- arch/arm/boot/dts/r8a7740.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+I don't think it's a big deal either way, though.
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 508d93440ee8..35e2fc957458 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -77,6 +77,16 @@
- 		status = "disabled";
- 	};
- 
-+	ceu1: ceu at fe914000 {
-+		reg = <0xfe914000 0x3000>;
-+		compatible = "renesas,r8a7740-ceu";
-+		interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp1_clks R8A7740_CLK_CEU21>;
-+		clock-names = "ceu21";
-+		power-domains = <&pd_a4r>;
-+		status = "disabled";
-+	};
-+
- 	cmt1: timer at e6138000 {
- 		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
- 		reg = <0xe6138000 0x170>;
--- 
-2.11.0
+Thanks,
+Mark.
