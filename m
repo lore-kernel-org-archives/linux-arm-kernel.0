@@ -1,104 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 May 2018 17:33:52 +0100
-Subject: [PATCH 06/18] arm64: move sve_user_{enable, disable} to
- <asm/fpsimd.h>
-In-Reply-To: <20180515121921.GN7753@e103592.cambridge.arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-7-mark.rutland@arm.com>
- <20180514110649.GC7753@e103592.cambridge.arm.com>
- <20180515103936.v5ytofdq3qqtsomn@lakrids.cambridge.arm.com>
- <20180515121921.GN7753@e103592.cambridge.arm.com>
-Message-ID: <20180515163352.sl7sfaswv4hsktl7@lakrids.cambridge.arm.com>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Tue, 15 May 2018 16:34:24 +0000
+Subject: [PATCH 2/3] x86/mm: add TLB purge to free pmd/pte page interfaces
+In-Reply-To: <20180515140549.GE18595@8bytes.org>
+References: <20180430175925.2657-1-toshi.kani@hpe.com>
+ <20180430175925.2657-3-toshi.kani@hpe.com>
+ <20180515140549.GE18595@8bytes.org>
+Message-ID: <1526401993.2693.605.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 01:19:26PM +0100, Dave Martin wrote:
-> On Tue, May 15, 2018 at 11:39:36AM +0100, Mark Rutland wrote:
-> > On Mon, May 14, 2018 at 12:06:50PM +0100, Dave Martin wrote:
-> > > On Mon, May 14, 2018 at 10:46:28AM +0100, Mark Rutland wrote:
-> > > > +static inline void sve_user_disable(void)
-> > > > +{
-> > > > +	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
-> > > > +}
-> > > > +
-> > > > +static inline void sve_user_enable(void)
-> > > > +{
-> > > > +	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
-> > > > +}
-> > > > +
-> > > >  /*
-> > > >   * Probing and setup functions.
-> > > >   * Calls to these functions must be serialised with one another.
-> > > > @@ -107,6 +119,9 @@ static inline int sve_get_current_vl(void)
-> > > >  	return -EINVAL;
-> > > >  }
-> > > >  
-> > > > +static inline void sve_user_disable(void) { }
-> > > > +static inline void sve_user_enable(void) { }
-> > > > +
-> > > 
-> > > Alternatively, just move the full definitions outside the #ifdef
-> > > CONFIG_ARM64_SVE.
-> > 
-> > Can do, though I was trying to keep the exsting pattern with empty
-> > inlines for the !CONFIG_ARM64_SVE case.
+On Tue, 2018-05-15 at 16:05 +0200, Joerg Roedel wrote:
+> On Mon, Apr 30, 2018 at 11:59:24AM -0600, Toshi Kani wrote:
+> >  int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+> >  {
+> > -	pmd_t *pmd;
+> > +	pmd_t *pmd, *pmd_sv;
+> > +	pte_t *pte;
+> >  	int i;
+> >  
+> >  	if (pud_none(*pud))
+> >  		return 1;
+> >  
+> >  	pmd = (pmd_t *)pud_page_vaddr(*pud);
+> > +	pmd_sv = (pmd_t *)__get_free_page(GFP_KERNEL);
 > 
-> There isn't really a pattern.  I tried to avoid dummy versions where
-> there's no real reason to have them.  I don't _think_ they're really
-> needed here, unless I missed something.  Did you get build failures
-> without them?
+> So you need to allocate a page to free a page? It is better to put the
+> pages into a list with a list_head on the stack.
 
-I need *some* definition so that sve_user_reset() in the syscall path
-can compile without ifdeferry. 
+The code should have checked if pmd_sv is NULL...  I will update the
+patch.
 
-In sve_user_reset() I first check system_supports_sve(), which checks
-IS_ENABLED(CONFIG_ARM64_SVE), so the call should be optimised away when
-!CONFIG_ARM64_SVE, but I need a prototype regardless.
+For performance, I do not think this page alloc is a problem.  Unlike
+pmd_free_pte_page(), pud_free_pmd_page() covers an extremely rare case. 
+  Since pud requires 1GB-alignment, pud and pmd/pte mappings do not
+share the same ranges within the vmalloc space.  I had to instrument the
+kernel to force them share the same ranges in order to test this patch.
 
-> > > All calls to these should be shadowed by an if
-> > > (system_supports_sve()) in any case, and setting/clearing ZEN_EL0EN
-> > > in the CPACR_EL1 ought to be harmless now that the meaning of these
-> > > bits architecturally committed.
-> > > 
-> > > Ideally we would have a BUG_ON(!system_supports_sve()) in those
-> > > functions, but we won't won't to pay the cost in a production kernel.
-> > 
-> > Earlier I'd put BUILD_BUG() in the body for the !CONFIG_ARM64_SVE case,
-> > to catch that kind of thing -- I could restore that.
-> 
-> IIUC:
-> 
-> 	if (0) {
-> 		BUILD_BUG_ON(1);
-> 	}
-> 
-> can still fire, in which case it's futile checking for CONFIG_ARM64_SVE
-> in most of the SVE support code.
+> I am still on favour of just reverting the broken commit and do a
+> correct and working fix for the/a merge window.
 
-We already rely on BUILD_BUG() not firing in paths that can be trivially
-optimized away. e.g. in the cmpxchg code.
- 
-> > > >  static inline void sve_init_vq_map(void) { }
-> > > >  static inline void sve_update_vq_map(void) { }
-> > > >  static inline int sve_verify_vq_map(void) { return 0; }
-> > > > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > > > index 088940387a4d..79a81c7d85c6 100644
-> > > > --- a/arch/arm64/kernel/fpsimd.c
-> > > > +++ b/arch/arm64/kernel/fpsimd.c
-> > > > @@ -159,7 +159,6 @@ static void sve_free(struct task_struct *task)
-> > > >  	__sve_free(task);
-> > > >  }
-> > > >  
-> > > > -
-> > > 
-> > > Hmmm, Ack.  Check for conflicts with the KVM FPSIMD rework [1] (though
-> > > trivial).
-> > 
-> > I'll assume that Ack stands regardless. :)
-> 
-> Actually, I was just commenting on the deleted blank line... 
+I will reorder the patch series, and change patch 3/3 to 1/3 so that we
+can take it first to fix the BUG_ON on PAE.  This revert will disable
+2MB ioremap on PAE in some cases, but I do not think it's important on
+PAE anyway.
 
-Ah. I've restored that now.
+I do not think revert on x86/64 is necessary and I am more worried about
+disabling 2MB ioremap in some cases, which can be seen as degradation. 
+Patch 2/3 fixes a possible page-directory cache issue that I cannot hit
+even though I put ioremap/iounmap with various sizes into a tight loop
+for a day.
 
 Thanks,
-Mark.
+-Toshi
