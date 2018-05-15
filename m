@@ -1,46 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 May 2018 13:49:01 -0700
-Subject: [GIT PULL] firmware: scmi: updates for v4.18
-In-Reply-To: <20180514162607.GC8409@e107155-lin>
-References: <20180514162607.GC8409@e107155-lin>
-Message-ID: <20180515204901.nqi4euifqa3wnor3@localhost>
+Date: Tue, 15 May 2018 13:51:29 -0700
+Subject: [GIT PULL 1/4] Rockchip driver updates for 4.18 round 1
+In-Reply-To: <2000491.bLgWuj0xar@phil>
+References: <2000491.bLgWuj0xar@phil>
+Message-ID: <20180515205129.krdwrceinbhs3zcq@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 05:26:07PM +0100, Sudeep Holla wrote:
-> Hi ARM-SoC team,
+On Tue, May 15, 2018 at 12:38:09PM +0200, Heiko Stuebner wrote:
+> Hi Arnd, Kevin Olof,
 > 
-> Please pull !
+> please find below and in the replies the main pull requests for Rockchip
+> stuff for 4.18. Depending on timing there may or may not be a second
+> round but so far I don't have anything big on the radar.
 > 
-> Regards,
-> Sudeep
+> The signed tags should explain the individual contents, so please pull.
 > 
-> --
+> 
+> Thanks
+> Heiko
+> 
 > 
 > The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 > 
 >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-updates-4.18
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-drivers-1
 > 
-> for you to fetch changes up to 632de8f542bcd44c756637da0e7d824e7129e496:
+> for you to fetch changes up to 9e59c5f66c624b43c766a9fe3b2430e0e976bf0e:
 > 
->   firmware: arm_scmi: simplify exit path by returning on error (2018-05-10 10:52:00 +0100)
+>   soc: rockchip: power-domain: Fix wrong value when power up pd with writemask (2018-05-14 11:53:26 +0200)
 > 
 > ----------------------------------------------------------------
-> SCMI cleanups for v4.18
-> 
-> This contains all of the trivial review comments that were not
-> addressed as the series was already queued up for v4.17 and were not
-> critical to go as fixes.
-> 
-> They generally just improve code readability, fix kernel-docs, remove
-> unused/unnecessary code, follow standard function naming and simplifies
-> certain exit paths.
+> Fix for an issue introduced in 2016 where some powerdomains could only
+> be turned off but not on again.
 
-Nice! Merged into next/drivers now.
+Merged, thanks!
 
 
 -Olof
