@@ -1,35 +1,55 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 15 May 2018 13:50:43 -0700
-Subject: [GIT PULL] DaVinci fixes for v4.17 (part 2)
-In-Reply-To: <fcf8613b-31df-733b-3443-c1a6176cbdd1@ti.com>
-References: <fcf8613b-31df-733b-3443-c1a6176cbdd1@ti.com>
-Message-ID: <20180515205043.icbkcuugupmk6kas@localhost>
+Date: Tue, 15 May 2018 13:48:21 -0700
+Subject: [GIT PULL] arm64: dts: juno: updates for v4.18
+In-Reply-To: <20180514162317.GB8409@e107155-lin>
+References: <20180514162317.GB8409@e107155-lin>
+Message-ID: <20180515204821.qxdnwl5u3rndg7if@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 02:52:14PM +0530, Sekhar Nori wrote:
-> The following changes since commit 9411ac07cd764be34bbd7ff09125a6b7b9175d4c:
+On Mon, May 14, 2018 at 05:23:17PM +0100, Sudeep Holla wrote:
+> Hi ARM-SoC team,
 > 
->   ARM: davinci: fix GPIO lookup for I2C (2018-05-02 14:55:06 +0530)
+> Please pull !
 > 
-> are available in the Git repository at:
+> Note that the tag is based on v4.17-rc3 instead of -rc1 as a fix went in
+> -rc3 and conflicts with changes here. The conflicts themselves are
+> trivial and hence I can based the change on -rc1 if required.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.17-part-2
+> Regards,
+> Sudeep
 > 
-> for you to fetch changes up to bb7298a7e87cf3430eb62be8746e5d7a07ca9d7c:
+> --
 > 
->   ARM: davinci: board-dm646x-evm: set VPIF capture card name (2018-05-15 14:31:12 +0530)
+> The following changes since commit 6da6c0db5316275015e8cc2959f12a17584aeb64:
+> 
+>   Linux v4.17-rc3 (2018-04-29 14:17:42 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-updates-4.18
+> 
+> for you to fetch changes up to 349b0f95e1ea718d912ca6875a40813e52a4ba39:
+> 
+>   arm64: dts: juno/rtsm: re-structure motherboard includes (2018-05-10 11:01:56 +0100)
 > 
 > ----------------------------------------------------------------
-> Second set of fixes for TI DaVinci.
+> ARMv8 Juno/Vexpress updates/cleanups for v4.18
 > 
-> They are needed for DM6467 EVM to work. The first patch fixes an
-> issue with timer interrupt and the second two are needed for video
-> driver to probe successfully.
+> 1. Add the missing connections to the STM output port as all endpoint
+>    connections must be bidirectional.
+> 
+> 2. Replace all the custom OF graph endpoint node names with the standard
+>    'endpoint'
+> 
+> 3. Cleanup to replace all underscores('_') with hyphens('-') in the
+>    device node names
+> 
+> 4. Syntactic restructuring of motherboard include file so that it can be
+>    included at the top of any other DTS file as it should be rather than
+>    existing include in the middle of the file at a specific location
 
-Merged, thanks.
-
-Was DM6467 ever working, so is this a regression?
+Merged, thanks!
 
 
 -Olof
