@@ -1,47 +1,16 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 May 2018 09:10:06 +0200
-Subject: [PATCH] ARM: dts: r8a7740: Add CEU1
-In-Reply-To: <20180507123757.4708-1-horms+renesas@verge.net.au>
-References: <20180507123757.4708-1-horms+renesas@verge.net.au>
-Message-ID: <20180515071006.vmtxzwrppzrgekmf@verge.net.au>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 15 May 2018 15:10:23 +0800
+Subject: [PATCH] ARM: dts: vf-colibri-eval-v3.dtsi: Use IRQ_TYPE specifier
+In-Reply-To: <1526253894-3709-1-git-send-email-hernan@vanguardiasur.com.ar>
+References: <1526253894-3709-1-git-send-email-hernan@vanguardiasur.com.ar>
+Message-ID: <20180515071021.GL26863@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 07, 2018 at 02:37:57PM +0200, Simon Horman wrote:
-> Describe CEU1 peripheral for Renesas R-Mobile A1 R8A7740 Soc.
+On Sun, May 13, 2018 at 08:24:54PM -0300, Hern?n Gonzalez wrote:
+> GPIO_ACTIVE_LOW was being used to specify an interrupt, use
+> IRQ_TYPE_EDGE_RISING instead. This improves DT readability.
 > 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Signed-off-by: Hern?n Gonzalez <hernan@vanguardiasur.com.ar>
 
-Would anyone care to review this change?
-
-> ---
->  arch/arm/boot/dts/r8a7740.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
->  Depends and based on:
->  "[PATCH v2 2/2] ARM: dts: r8a7740: Add CEU0"
-> 
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index 508d93440ee8..af4c071c9178 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
-> @@ -77,6 +77,16 @@
->  		status = "disabled";
->  	};
->  
-> +	ceu1: ceu at fe914000 {
-> +		reg = <0xfe910000 0x3000>;
-> +		compatible = "renesas,r8a7740-ceu";
-> +		interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp1_clks R8A7740_CLK_CEU21>;
-> +		clock-names = "ceu21";
-> +		power-domains = <&pd_a4r>;
-> +		status = "disabled";
-> +	};
-> +
->  	cmt1: timer at e6138000 {
->  		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
->  		reg = <0xe6138000 0x170>;
-> -- 
-> 2.11.0
-> 
+Applied, thanks.
