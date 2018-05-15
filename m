@@ -1,18 +1,18 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Tue, 15 May 2018 13:05:29 +0300
-Subject: [PATCH v4 5/8] PCI: Replace pr_*() with dev_*() in
+Date: Tue, 15 May 2018 13:04:49 +0300
+Subject: [PATCH v4 3/8] PCI: Rename device node parameter of
  of_pci_get_host_bridge_resources()
-In-Reply-To: <95f6ca417e2bc74d15f707e577b098e46b4b3ba4.1526375226.git.jan.kiszka@siemens.com>
+In-Reply-To: <4df503604897aebbcb6e7ab98ef5f24916c6d382.1526375226.git.jan.kiszka@siemens.com>
 References: <cover.1526375226.git.jan.kiszka@siemens.com>
- <95f6ca417e2bc74d15f707e577b098e46b4b3ba4.1526375226.git.jan.kiszka@siemens.com>
-Message-ID: <f5a8fd42-6de7-8aa2-fdc7-a5d43e3e4d98@mentor.com>
+ <4df503604897aebbcb6e7ab98ef5f24916c6d382.1526375226.git.jan.kiszka@siemens.com>
+Message-ID: <0f3e4eb2-2836-d97c-211a-ce1bda393122@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/15/2018 12:07 PM, Jan Kiszka wrote:
 > From: Jan Kiszka <jan.kiszka@siemens.com>
 > 
-> Now that we have a device reference, make use of it for printing.
+> We will add a real device parameter to this function soon.
 > 
 > Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 
