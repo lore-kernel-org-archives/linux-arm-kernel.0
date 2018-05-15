@@ -1,61 +1,67 @@
-From: jacopo@jmondi.org (jacopo mondi)
-Date: Tue, 15 May 2018 10:23:10 +0200
-Subject: [PATCH v2] ARM: dts: r8a7740: Add CEU1
-In-Reply-To: <20180515080038.7438-1-horms+renesas@verge.net.au>
-References: <20180515080038.7438-1-horms+renesas@verge.net.au>
-Message-ID: <20180515082310.GQ5956@w540>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 15 May 2018 09:25:20 +0100
+Subject: [GIT PULL] arm64: hisi: SoC driver updates for v4.18
+In-Reply-To: <20180514201859.fihe7n5jmvm5h6k3@localhost>
+References: <5AF5ABC1.60009@hisilicon.com>
+ <20180514201859.fihe7n5jmvm5h6k3@localhost>
+Message-ID: <5AFA9970.3050008@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Olof,
 
-On Tue, May 15, 2018 at 10:00:38AM +0200, Simon Horman wrote:
-> Describe CEU1 peripheral for Renesas R-Mobile A1 R8A7740 Soc.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 2018/5/14 21:18, Olof Johansson wrote:
+> On Fri, May 11, 2018 at 03:42:09PM +0100, Wei Xu wrote:
+>> Hi Arnd, Hi Olof,
+>>
+>> Please help to pull the following changes.
+>> Sorry for the inconvenience, because it depends on this patch [1]
+>> which was merged in the rc3, I rebased the pull on rc3.
+>> Thanks!
+>>
+>> [1] HISI LPC: Add Kconfig MFD_CORE dependency
+>> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/bus?h=v4.17-rc3&id=4b313ca7b661ab8782f3dcb4a8996632a470b4da
+>>
+>> Best Regards,
+>> Wei
+>>
+>> ---
+>>
+>> The following changes since commit 6da6c0db5316275015e8cc2959f12a17584aeb64:
+>>
+>>   Linux v4.17-rc3 (2018-04-29 14:17:42 -0700)
+>>
+>> are available in the Git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hisi-drivers-for-4.18
+>>
+>> for you to fetch changes up to adf3457b4ce6940885be3e5ee832c6949fba4166:
+>>
+>>   HISI LPC: Add ACPI UART support (2018-05-10 17:45:52 +0100)
+>>
+>> ----------------------------------------------------------------
+>> ARM64: hisi: SoC driver updates for 4.18
+>>
+>> - Update hisi LPC bus driver to use the platform driver APIs
+>>   other than the MFD APIs to support connected device like UART
+> 
+> Merged, thanks.
+> 
+> Same thing here as with the DT branch though -- if you look at a lot
+> of other patches under drivers/bus, nearly all of them use "bus: <...>"
+> as prefix, so please move over to using that for yours as well on future
+> patches/pull requests.
+> 
 
-Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Sorry, I will take care these kind of things in the future.
+Thanks!
 
-Thank you!
-   j
+Best Regards,
+Wei
 
-> ---
-> v2
-> * Correct register range start address
->
->   Based on renesas-devel-20180514-v4.17-rc5
-> ---
->  arch/arm/boot/dts/r8a7740.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index 508d93440ee8..35e2fc957458 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
-> @@ -77,6 +77,16 @@
->  		status = "disabled";
->  	};
->
-> +	ceu1: ceu at fe914000 {
-> +		reg = <0xfe914000 0x3000>;
-> +		compatible = "renesas,r8a7740-ceu";
-> +		interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp1_clks R8A7740_CLK_CEU21>;
-> +		clock-names = "ceu21";
-> +		power-domains = <&pd_a4r>;
-> +		status = "disabled";
-> +	};
-> +
->  	cmt1: timer at e6138000 {
->  		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
->  		reg = <0xe6138000 0x170>;
-> --
-> 2.11.0
->
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180515/4878e59e/attachment.sig>
+> 
+> 
+> -Olof
+> 
+> .
+> 
