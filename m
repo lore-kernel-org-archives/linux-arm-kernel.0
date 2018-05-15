@@ -1,37 +1,72 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Tue, 15 May 2018 13:29:29 +0100
-Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
-In-Reply-To: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
-References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1526387370-17142-4-git-send-email-gilad@benyossef.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 15 May 2018 14:37:54 +0200
+Subject: [PATCH] arm64: dts: exynos: fix type of thermal trip points for
+ Exynos7
+References: <CGME20180515123755eucas1p278a9c1e9cb0101e406e3839e27f8b3b1@eucas1p2.samsung.com>
+Message-ID: <1702366.qL959G52Hi@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for CryptoCell instance in the SoC.
+Currently Exynos thermal driver treats as "active" all specified
+trip points before reaching maximum number of hardware supported
+trip points. Moreover polling-delay-passive is specified as "0"
+in exynos7.dtsi (IOW passive polling is disabled). Therefore fix
+type of cpu-alert-0 to cpu-alert6 trip points to be "active"
+instead of "passive" (cpu-alert-7 type is "critical" so it
+doesn't need a fixup).
 
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+Cc: Alim Akhtar <alim.akhtar@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 91486b4..6c76841 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -528,6 +528,14 @@
- 			status = "disabled";
- 		};
- 
-+		arm_cc630p: crypto at e6601000 {
-+			compatible = "arm,cryptocell-630p-ree";
-+			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+			#interrupt-cells = <2>;
-+			reg = <0x0 0xe6601000 0 0x1000>;
-+			clocks = <&cpg CPG_MOD 229>;
-+		};
-+
- 		i2c3: i2c at e66d0000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--- 
-2.7.4
+Index: b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+===================================================================
+--- a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi	2018-05-15 13:57:55.822172496 +0200
++++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi	2018-05-15 14:23:12.594016481 +0200
+@@ -10,37 +10,37 @@ trips {
+ 	cpu-alert-0 {
+ 		temperature = <75000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+-		type = "passive";
++		type = "active";
+ 	};
+ 	cpu-alert-1 {
+ 		temperature = <80000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+-		type = "passive";
++		type = "active";
+ 	};
+ 	cpu-alert-2 {
+ 		temperature = <85000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+-		type = "passive";
++		type = "active";
+ 	};
+ 	cpu-alert-3 {
+ 		temperature = <90000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+-		type = "passive";
++		type = "active";
+ 	};
+ 	cpu-alert-4 {
+ 		temperature = <95000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+-		type = "passive";
++		type = "active";
+ 	};
+ 	cpu-alert-5 {
+ 		temperature = <100000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+-		type = "passive";
++		type = "active";
+ 	};
+ 	cpu-alert-6 {
+ 		temperature = <110000>; /* millicelsius */
+ 		hysteresis = <10000>; /* millicelsius */
+-		type = "passive";
++		type = "active";
+ 	};
+ 	cpu-crit-0 {
+ 		temperature = <115000>; /* millicelsius */
