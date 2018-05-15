@@ -1,67 +1,42 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 15 May 2018 16:06:26 +0800
-Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Fix USB PHY duplicate
- unit-address
-In-Reply-To: <1526322576-5838-1-git-send-email-festevam@gmail.com>
-References: <1526322576-5838-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180515080624.GR26863@dragon>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 15 May 2018 10:00:38 +0200
+Subject: [PATCH v2] ARM: dts: r8a7740: Add CEU1
+Message-ID: <20180515080038.7438-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 03:29:35PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Currently the following DTC warning is seen with W=1:
-> 
-> arch/arm/boot/dts/imx51-babbage.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
-> 
-> Fix it by moving the USB PHY node outside of simple-bus and drop the
-> unneeded unit-address.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts | 21 +++++++--------------
->  1 file changed, 7 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index b8ca73d..de46906 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -170,20 +170,13 @@
->  		mux-ext-port = <3>;
->  	};
->  
-> -	usbphy {
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -		compatible = "simple-bus";
-> -
-> -		usbh1phy: usbh1phy at 0 {
-> -			compatible = "usb-nop-xceiv";
-> -			reg = <0>;
-> -			clocks = <&clk_usb>;
-> -			clock-names = "main_clk";
-> -			reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
-> -			vcc-supply = <&vusb_reg>;
-> -			#phy-cells = <0>;
-> -		};
-> +	usbh1phy: usbphy1 {
-> +		compatible = "usb-nop-xceiv";
-> +		clocks = <&clk_usb>;
-> +		clock-names = "main_clk";
-> +		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
-> +		vcc-supply = <&vusb_reg>;
-> +		#phy-cells = <0>;
+Describe CEU1 peripheral for Renesas R-Mobile A1 R8A7740 Soc.
 
-This should be considered as a whole together with usbphy in imx51.dtsi.
-Also, I would like to get some input from DT folks on how we should name
-the node uniquely.  @Rob.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+v2
+* Correct register range start address
 
-Shawn
+  Based on renesas-devel-20180514-v4.17-rc5
+---
+ arch/arm/boot/dts/r8a7740.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
->  	};
->  };
->  
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index 508d93440ee8..35e2fc957458 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -77,6 +77,16 @@
+ 		status = "disabled";
+ 	};
+ 
++	ceu1: ceu at fe914000 {
++		reg = <0xfe914000 0x3000>;
++		compatible = "renesas,r8a7740-ceu";
++		interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp1_clks R8A7740_CLK_CEU21>;
++		clock-names = "ceu21";
++		power-domains = <&pd_a4r>;
++		status = "disabled";
++	};
++
+ 	cmt1: timer at e6138000 {
+ 		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
+ 		reg = <0xe6138000 0x170>;
+-- 
+2.11.0
