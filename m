@@ -1,18 +1,98 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 15 May 2018 11:23:04 -0700
-Subject: [PATCH] clk: stm32mp1: Add CLK_IGNORE_UNUSED to ck_sys_dbg clock
-In-Reply-To: <1524556723-26926-1-git-send-email-gabriel.fernandez@st.com>
-References: <1524556723-26926-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <152640858418.34267.5971648282268914967@swboyd.mtv.corp.google.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 15 May 2018 14:00:57 -0500
+Subject: [PATCH v4 0/8] PCI: leak fixes, removable generic PCI host,
+ assorted stuff
+In-Reply-To: <cover.1526375226.git.jan.kiszka@siemens.com>
+References: <cover.1526375226.git.jan.kiszka@siemens.com>
+Message-ID: <20180515190057.GA11156@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting gabriel.fernandez at st.com (2018-04-24 00:58:43)
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On Tue, May 15, 2018 at 11:06:59AM +0200, Jan Kiszka wrote:
+> Changes in v4:
+>  - restore pci_free_resource_list() in error path of
+>    of_pci_get_host_bridge_resources()
 > 
-> Don't disable the dbg clock if was set by bootloader.
+> Changes in v3:
+>  - refactor series to be both bisectable and simpler while reworking
+>    of_pci_get_host_bridge_resources()
+>  - include of_pci_get_host_bridge_resources() removal
+>  - include devm_of_pci_get_host_bridge_resources() error path fixes
+>  - effectively, no functional changes to v2
 > 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> ---
+> Changes in v2:
+>  - patch 1: commit message reworking as suggested by Lorenzo
+>  - patch 3-6: split-up as suggested by Bjorn
+>  - patch 8: new
+>  - patch 10: select PCI_DOMAINS from PCI_HOST_GENERIC, rather than
+>    allowing manual choice, as suggested by Lorenzo
+> 
+> This primarily enables to unbind the generic PCI host controller without
+> leaving lots of memory leaks behind. A previous proposal patch 5 was
+> rejected because of those issues [1].
+> 
+> The fixes have been validated in the Jailhouse setup, where we add and
+> remove a virtual PCI host controller on hypervisor activation/
+> deactivation, with the help of kmemleak.
+> 
+> Besides that, there is tiny PCI API cleanup at the beginning and
+> support for manually enabled PCI domains at the end that enables the
+> Jailhouse scenario.
 
-Applied to clk-next
+This is beautiful!  Thanks for tweaking this one more time; I think it
+really makes the patches much more readable.
+
+I applied these with the tested-by/reviewed-by/acks to pci/resource for
+v4.18.
+
+Andy's comments certainly make sense, but doing it in the "Rework
+of_pci_get_host_bridge_resources()" patch would make that patch less
+obvious, so I'd rather do it as a cleanup on top.
+
+> [1] http://lkml.iu.edu/hypermail/linux/kernel/1606.3/00072.html
+> 
+> 
+> CC: Jingoo Han <jingoohan1@gmail.com>
+> CC: Joao Pinto <Joao.Pinto@synopsys.com>
+> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> 
+> Jan Kiszka (8):
+>   PCI: Make pci_get_new_domain_nr() static
+>   PCI: Fix memory leak of devm_pci_alloc_host_bridge()
+>   PCI: Rename device node parameter of
+>     of_pci_get_host_bridge_resources()
+>   PCI: Replace dev_node parameter of of_pci_get_host_bridge_resources
+>     with device
+>   PCI: Replace pr_*() with dev_*() in of_pci_get_host_bridge_resources()
+>   PCI: Rework of_pci_get_host_bridge_resources() to
+>     devm_of_pci_get_host_bridge_resources()
+>   PCI: Add support for unbinding the generic PCI host controller
+>   PCI: Enable PCI_DOMAINS along with generic PCI host controller
+> 
+>  drivers/pci/dwc/pcie-designware-host.c |  2 +-
+>  drivers/pci/host/Kconfig               |  1 +
+>  drivers/pci/host/pci-aardvark.c        |  5 ++-
+>  drivers/pci/host/pci-ftpci100.c        |  4 +--
+>  drivers/pci/host/pci-host-common.c     | 13 +++++++
+>  drivers/pci/host/pci-host-generic.c    |  1 +
+>  drivers/pci/host/pci-v3-semi.c         |  3 +-
+>  drivers/pci/host/pci-versatile.c       |  3 +-
+>  drivers/pci/host/pci-xgene.c           |  3 +-
+>  drivers/pci/host/pcie-altera.c         |  5 ++-
+>  drivers/pci/host/pcie-iproc-platform.c |  4 +--
+>  drivers/pci/host/pcie-rcar.c           |  5 ++-
+>  drivers/pci/host/pcie-rockchip.c       |  4 +--
+>  drivers/pci/host/pcie-xilinx-nwl.c     |  4 +--
+>  drivers/pci/host/pcie-xilinx.c         |  4 +--
+>  drivers/pci/of.c                       | 65 ++++++++++++++++------------------
+>  drivers/pci/pci.c                      |  6 ++--
+>  drivers/pci/probe.c                    |  4 ++-
+>  include/linux/of_pci.h                 |  4 +--
+>  include/linux/pci-ecam.h               |  1 +
+>  include/linux/pci.h                    |  3 --
+>  21 files changed, 76 insertions(+), 68 deletions(-)
+> 
+> -- 
+> 2.13.6
+> 
