@@ -1,50 +1,48 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 15 May 2018 17:23:35 +0200
-Subject: [PATCH] iio: adc: stm32-dfsdm: Add support for stm32mp1
-In-Reply-To: <20180512103324.5068c893@archlinux>
-References: <1525266323-4922-1-git-send-email-fabrice.gasnier@st.com>
- <20180507205151.GA25321@rob-hp-laptop> <20180512103324.5068c893@archlinux>
-Message-ID: <781b346a-e457-9c67-2e11-6f6edba88d63@st.com>
+From: jingoohan1@gmail.com (Jingoo Han)
+Date: Tue, 15 May 2018 11:31:47 -0400
+Subject: [PATCH v4 6/8] PCI: Rework of_pci_get_host_bridge_resources() to
+ devm_of_pci_get_host_bridge_resources()
+In-Reply-To: <3aeb2ed038cbce8fe744b614dc19d414555a7e8f.1526375226.git.jan.kiszka@siemens.com>
+References: <cover.1526375226.git.jan.kiszka@siemens.com>
+ <3aeb2ed038cbce8fe744b614dc19d414555a7e8f.1526375226.git.jan.kiszka@siemens.com>
+Message-ID: <000001d3ec61$d70e2e50$852a8af0$@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2018 11:33 AM, Jonathan Cameron wrote:
-> On Mon, 7 May 2018 15:51:51 -0500
-> Rob Herring <robh@kernel.org> wrote:
+On Tuesday, May 15, 2018 5:07 AM, Jan Kiszka wrote:
 > 
->> On Wed, May 02, 2018 at 03:05:23PM +0200, Fabrice Gasnier wrote:
->>> Add support for DFSDM (Digital Filter For Sigma Delta Modulators)
->>> to STM32MP1. This variant is close to STM32H7 DFSDM, it implements
->>> 6 filter instances. Registers map is also increased.
->>>
->>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>> ---
->>>  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt         |  7 +++++--
->>>  drivers/iio/adc/stm32-dfsdm-core.c                  | 21 +++++++++++++++++++++
->>>  2 files changed, 26 insertions(+), 2 deletions(-)  
->>
->> Reviewed-by: Rob Herring <robh@kernel.org>
-> Applied.   Whilst doing this I note that I'm getting a few sparse
-> warnings for this driver that would be nice to clean up...
+> From: Jan Kiszka <jan.kiszka@siemens.com>
 > 
->   CHECK   drivers/iio/adc/stm32-dfsdm-adc.c
-> drivers/iio/adc/stm32-dfsdm-adc.c:503:21: warning: expression using sizeof(void)
-> drivers/iio/adc/stm32-dfsdm-adc.c:503:21: warning: expression using sizeof(void)
+> of_pci_get_host_bridge_resources() allocates the resource structures it
+> fills dynamically, but none of its callers care to release them so far.
+> Rather than requiring everyone to do this explicitly, convert the
+> existing function to a managed version.
 > 
-> Which is mystifying at first glance... Something deep and dirty in the min macro
-> but I can't see what..
+> CC: Jingoo Han <jingoohan1@gmail.com>
+> CC: Joao Pinto <Joao.Pinto@synopsys.com>
+> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 
-Hi Jonathan,
+Acked-by: Jingoo Han <jingoohan1@gmail.com>
 
-I just sent a patch to clean bellow warning. But this is more obscure
-regarding min macro...
+Best regards,
+Jingoo Han
 
-Many thanks,
-Fabrice
-
-> 
-> drivers/iio/adc/stm32-dfsdm-adc.c:680:5: warning: symbol 'stm32_dfsdm_get_buff_cb' was not declared. Should it be static?
-> drivers/iio/adc/stm32-dfsdm-adc.c:703:5: warning: symbol 'stm32_dfsdm_release_buff_cb' was not declared. Should it be static?
-> 
-> Are rather more obvious
+> ---
+>  drivers/pci/dwc/pcie-designware-host.c |  2 +-
+>  drivers/pci/host/pci-aardvark.c        |  2 +-
+>  drivers/pci/host/pci-ftpci100.c        |  2 +-
+>  drivers/pci/host/pci-v3-semi.c         |  2 +-
+>  drivers/pci/host/pci-versatile.c       |  2 +-
+>  drivers/pci/host/pci-xgene.c           |  2 +-
+>  drivers/pci/host/pcie-altera.c         |  2 +-
+>  drivers/pci/host/pcie-iproc-platform.c |  2 +-
+>  drivers/pci/host/pcie-rcar.c           |  2 +-
+>  drivers/pci/host/pcie-rockchip.c       |  2 +-
+>  drivers/pci/host/pcie-xilinx-nwl.c     |  2 +-
+>  drivers/pci/host/pcie-xilinx.c         |  2 +-
+>  drivers/pci/of.c                       | 30
+++++++++++++------------------
+>  include/linux/of_pci.h                 |  4 ++--
+>  14 files changed, 26 insertions(+), 32 deletions(-)
 > 
