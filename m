@@ -1,29 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 May 2018 17:54:42 -0700
-Subject: [PATCH 07/11] driver core: Respect all error codes from
- dev_pm_domain_attach()
-In-Reply-To: <CAPDyKFqY5u3=db7-Xd9JXWo228PSNbH7-m-QNfSY9z8Z3p8t8A@mail.gmail.com>
-References: <1524732790-2234-1-git-send-email-ulf.hansson@linaro.org>
- <1524732790-2234-8-git-send-email-ulf.hansson@linaro.org>
- <20180514151907.GK98604@atomide.com>
- <CAPDyKFqY5u3=db7-Xd9JXWo228PSNbH7-m-QNfSY9z8Z3p8t8A@mail.gmail.com>
-Message-ID: <20180515005442.GN98604@atomide.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 15 May 2018 09:51:44 +0800
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.18
+In-Reply-To: <20180514200956.jzvglfib3kgjf6xs@localhost>
+References: <5AF5A668.8010903@hisilicon.com>
+ <20180514200956.jzvglfib3kgjf6xs@localhost>
+Message-ID: <20180515015144.GB6049@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ulf Hansson <ulf.hansson@linaro.org> [180514 18:59]:
-> On 14 May 2018 at 17:19, Tony Lindgren <tony@atomide.com> wrote:
-> > Reverting for 8c123c14bbba ("driver core: Respect all error codes from
-> > dev_pm_domain_attach()") fixes the issue for me.
-> >
-> > Sounds like something is missing, any ideas?
+Hi Olof,
+
+On Mon, May 14, 2018 at 01:09:56PM -0700, Olof Johansson wrote:
+
+[...]
+
+> > Leo Yan (1):
+> >       dts: arm64: hi3660: Add CPU frequency scaling support
+> > Tao Wang (1):
+> >       dts: arm64: hi3660: Add thermal cooling management
+
+> We try to use a very consistent patch prefix format on device tree changes to
+> make it easier to get an overview, and you're unfortunately a bit inconsistent
+> here.
 > 
-> This should solve the problem:
-> 
-> https://patchwork.kernel.org/patch/10398597/
+> Would you mind respinning this with "arm64: dts: hi<...>:" as the consistent
+> prefix please?
 
-Thanks yeah that fixes it for me too.
+Sorry for this, I should take care for this ahead.  Will respin the
+patch series and send them out ASAP.
 
-Regards,
-
-Tony
+Thanks,
+Leo Yan
