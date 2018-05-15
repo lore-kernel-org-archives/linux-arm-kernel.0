@@ -1,69 +1,72 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Tue, 15 May 2018 17:53:17 -0500
-Subject: [PATCH 2/4] ARM: davinci: board-da850-evm: fix GPIO lookup for
- MMC/SD
-In-Reply-To: <fa8feb04-2231-88b8-4d2b-10264187ba7e@lechnology.com>
-References: <20180424143506.25793-1-nsekhar@ti.com>
- <20180424143506.25793-3-nsekhar@ti.com>
- <fa8feb04-2231-88b8-4d2b-10264187ba7e@lechnology.com>
-Message-ID: <CAHCN7x+eNpeyv27WPqZyy-X9S7Ffvujo+y3Mmt1ZP=LEk+4+=g@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 16 May 2018 01:00:14 +0200
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.18
+In-Reply-To: <20180515203755.esjnphfep5ep7wbe@localhost>
+References: <5AF5A94A.4080308@hisilicon.com>
+ <20180514201445.6sglddhalvclu36v@localhost>
+ <20180515082811.GL29062@mai>
+ <20180515203755.esjnphfep5ep7wbe@localhost>
+Message-ID: <20180515230014.GS29062@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 8:40 PM, David Lechner <david@lechnology.com> wrote:
-> On 04/24/2018 09:35 AM, Sekhar Nori wrote:
->>
->> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
->> mmc can correctly lookup the wp and cp gpios. Also fix the GPIO numbers
->> as they are not offsets within a bank.
->>
->> Note that it is the gpio-davinci driver that sets the gpiochip label to
->> davinci_gpio.0.
->>
->> Fixes: bdf0e8364fd3 ("ARM: davinci: da850-evm: use gpio descriptor for mmc
->> pins")
->> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->> ---
->>   arch/arm/mach-davinci/board-da850-evm.c | 9 +++++++--
->>   1 file changed, 7 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/board-da850-evm.c
->> b/arch/arm/mach-davinci/board-da850-evm.c
->> index 3063478bcc36..158ed9a1483f 100644
->> --- a/arch/arm/mach-davinci/board-da850-evm.c
->> +++ b/arch/arm/mach-davinci/board-da850-evm.c
->> @@ -763,12 +763,17 @@ static const short da850_evm_mcasp_pins[]
->> __initconst = {
->>         -1
->>   };
->>   +#define DA850_MMCSD_CD_PIN           GPIO_TO_PIN(4, 0)
->> +#define DA850_MMCSD_WP_PIN             GPIO_TO_PIN(4, 1)
->> +
->>   static struct gpiod_lookup_table mmc_gpios_table = {
->>         .dev_id = "da830-mmc.0",
->>         .table = {
->>                 /* gpio chip 2 contains gpio range 64-95 */
->> -               GPIO_LOOKUP("davinci_gpio.2", 0, "cd", GPIO_ACTIVE_LOW),
->> -               GPIO_LOOKUP("davinci_gpio.2", 1, "wp", GPIO_ACTIVE_LOW),
->> +               GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_CD_PIN, "cd",
->> +                           GPIO_ACTIVE_LOW),
->> +               GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_WP_PIN, "wp",
->> +                           GPIO_ACTIVE_LOW),
+On Tue, May 15, 2018 at 01:37:55PM -0700, Olof Johansson wrote:
+> On Tue, May 15, 2018 at 10:28:11AM +0200, Daniel Lezcano wrote:
+> > On Mon, May 14, 2018 at 01:14:45PM -0700, Olof Johansson wrote:
+> > > Hi Wei,
+> > > 
+> > > On Fri, May 11, 2018 at 03:31:38PM +0100, Wei Xu wrote:
+> > > > Hi Arnd, Hi Olof,
+> > > > 
+> > > > Please help to pull the following changes.
+> > > > 
+> > > > About the CLOCK_STUB and the MAILBOX consolidate patch,
+> > > > Jassi and Stephen have acked it.
+> > > > Could you let me know how to handle this kind case
+> > > > if it is not OK to be in this pull?
+> > > 
+> > > I don't think there's any need to group the Kconfig changes with the defconfig
+> > > updates here, is there?
+> > 
+> > I don't have the patches history, but likely this patch should come together with:
+> > 
+> > https://patchwork.kernel.org/patch/10399799/
+> > https://patchwork.kernel.org/patch/10399801/
+> > 
+> > Otherwise the compilation options won't be consistent with what is enabled in
+> > the DT.
+> 
+> As long as neither side regresses due to the changes, there should be no
+> problem. Just because a DT node is added in the tree there's no need to
+> configure the driver. Or am I missing some aspect of it here?
 
-I don't think the WP polarity is working correctly.  If I boot the
-board 'rw' enabled but WP disabled on the SD card, the system crashes.
-If I enable WP, the board boots correctly.
+Actually, the DT node being added do not introduce regressions.
 
-Comparing this to the device tree version that I did, and double
-checking the behavior for my sanity, I believe WP needs to be
-GPIO_ACTIVE_HIGH
+However it is expected by adding the clock stub and the mailbox to have the
+cpufreq working which is not necessarily the case because the config may be
+inconsistent, so the cpufreq may be working on some config if the user had the
+options for the clock and the mailbox enabled but these options can disappear
+and not come back because of this Kconfig inconsistencies.
 
-adam
+>From my point of view, by adding those DT nodes, it makes sense to give a
+consolidated Kconfig coming together and ensuring the drivers are enabled when
+the node is parsed.
 
->>         },
->>   };
->>
->
->
-> Reviewed-by: David Lechner <david@lechnology.com>
->
+On the other side, the patch is simple enough to be split and submitted in
+separated trees, hoping the maintainer Wu Xei and the branch users keep in mind
+if the board does not boot or has inconsistent behavior they will have to
+double check the options are enabled for the clock stub and the mailbox.
+
+I don't have a strong opinion on this actually, whatever the decision is, I
+will be fine with resubmitting the patch to the different trees, or keep it as
+is and merge it through the hisi tree.
+
+  -- Daniel
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
