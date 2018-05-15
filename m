@@ -1,72 +1,49 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 15 May 2018 13:17:11 +0200
-Subject: [PATCH v2 4/4] ARM: PWM: add allwinner sun8i pwm support.
-In-Reply-To: <CAJeuY7-Dz1u9J8GMu=OdzJ2cJUnE3wEobJoQz6RV-ibjBjoW4A@mail.gmail.com>
-References: <20180225135308.GA14561@arx-s1>
- <20180226090038.etk5q4pd4rl5dvf6@flea.lan>
- <CAJeuY7-Dz1u9J8GMu=OdzJ2cJUnE3wEobJoQz6RV-ibjBjoW4A@mail.gmail.com>
-Message-ID: <20180515111711.l2g4vgsal7yr6dbr@flea>
+Date: Tue, 15 May 2018 13:19:38 +0200
+Subject: [PATCH 09/21] arm64: dts: allwinner: a64: Add HDMI support
+In-Reply-To: <CAMty3ZDCubM2sLBfNVar-kA9djZ8PJDQJOS0Jwi6wWNVeK9mCg@mail.gmail.com>
+References: <20180430114058.5061-1-jagan@amarulasolutions.com>
+ <20180430114058.5061-10-jagan@amarulasolutions.com>
+ <20180502113413.vv2r3ubfoh7gm3ms@flea>
+ <CAMty3ZBheurXewQ8R53G_0gNLgv1jQkZbjAbaN30JQ6_ZVn7Eg@mail.gmail.com>
+ <20180514084050.ix5corfuvx33gsyn@flea>
+ <CAMty3ZDCubM2sLBfNVar-kA9djZ8PJDQJOS0Jwi6wWNVeK9mCg@mail.gmail.com>
+Message-ID: <20180515111938.ia6jttqijj2erxy4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, May 14, 2018 at 10:45:44PM +0800, Hao Zhang wrote:
-> 2018-02-26 17:00 GMT+08:00 Maxime Ripard <maxime.ripard@bootlin.com>:
-> > Thanks for respinning this serie. It looks mostly good, but you still
-> > have a quite significant number of checkpatch (--strict) warnings that
-> > you should address.
+On Mon, May 14, 2018 at 04:01:15PM +0530, Jagan Teki wrote:
+> On Mon, May 14, 2018 at 2:10 PM, Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> > On Mon, May 14, 2018 at 02:03:36PM +0530, Jagan Teki wrote:
+> >> On Wed, May 2, 2018 at 5:04 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >> > Hi,
+> >> >
+> >> > On Mon, Apr 30, 2018 at 05:10:46PM +0530, Jagan Teki wrote:
+> >> >> +             hdmi_phy: hdmi-phy at 1ef0000 {
+> >> >> +                     compatible = "allwinner,sun50i-a64-hdmi-phy",
+> >> >> +                                  "allwinner,sun8i-h3-hdmi-phy";
+> >> >> +                     reg = <0x01ef0000 0x10000>;
+> >> >> +                     clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
+> >> >> +                              <&ccu CLK_PLL_VIDEO1>;
+> >> >
+> >> > You were discussing that the PLL0 could also be used to clock the PHY,
+> >> > has that been figured out?
+> >>
+> >> This is what I understand from Fig: 3-3. Module Clock Diagram, both
+> >> tcon0 and tcon1 are using HDMI. I'm thinking based on the tcon
+> >> configuration we need use proper PLL or some logic to get common PLL
+> >> don't know yet. Since this series adding tcon1 I've attached PLL1.
+> >
+> > You're not describing the TCON node here though, but the HDMI one, and
+> > the HDMI block is listed in both the PLL video 0 and 1.
 > 
-> Thanks for reviews :) ,i'm sorry for that, it will be fixed next
-> time.  and, besides, in what situation were the checkpatch warning
-> can be ignore?
+> So how can we attach particular PLL with particular HDMI(PLL0 to HDMI0
+> and so-on) or do we need to attached both the PLL's any suggestion?
 
-The only one that can be reasonably be ignored is the long line
-warning, and only if complying to the limit would make it less easy to
-understand.
+I'm not sure what your question is here, just add the possibility to
+have an extra PLL if that makes sense to the binding.
 
-> >
-> > On Sun, Feb 25, 2018 at 09:53:08PM +0800, hao_zhang wrote:
-> >> +#define CAPTURE_IRQ_ENABLE_REG       0x0010
-> >> +#define CFIE(ch)     BIT(ch << 1 + 1)
-> >> +#define CRIE(ch)     BIT(ch << 1)
-> >
-> > You should also put your argument between parentheses here (and in all
-> > your other macros).
-> 
-> Do you mean like this ?
-> #define CFIE(ch)     BIT((ch) << 1 + 1)
-> #define CRIE(ch)     BIT((ch) << 1)
-
-Yep, exactly. Otherwise, if you do something like CRIE(1 + 1), the
-result will be BIT(1 + 1 << 1), which will expand to 3, instead of 4.
-
-Also, CFIE looks a bit weird here, is it the offset that is
-incremented, or the value? You should probably have parentheses to
-make it explicit.
-
-> >
-> >> +static const u16 div_m_table[] = {
-> >> +     1,
-> >> +     2,
-> >> +     4,
-> >> +     8,
-> >> +     16,
-> >> +     32,
-> >> +     64,
-> >> +     128,
-> >> +     256
-> >> +};
-> >
-> > If this is just a power of two, you can use either the power of two /
-> > ilog2 to switch back and forth, instead of using that table.
-> 
-> I think using table is more explicit and extended...
-
-If you didn't have a simple mapping between the register values and
-the divider value, then yeah, sure. But it's not the case here.
-
-Thanks!
 Maxime
 
 -- 
@@ -79,4 +56,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180515/23ba351d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180515/755566d1/attachment-0001.sig>
