@@ -1,53 +1,50 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 15 May 2018 17:19:17 +0200
-Subject: [PATCH] iio: adc: stm32-dfsdm: include stm32-dfsdm-adc.h
-Message-ID: <1526397557-31389-1-git-send-email-fabrice.gasnier@st.com>
+Date: Tue, 15 May 2018 17:23:35 +0200
+Subject: [PATCH] iio: adc: stm32-dfsdm: Add support for stm32mp1
+In-Reply-To: <20180512103324.5068c893@archlinux>
+References: <1525266323-4922-1-git-send-email-fabrice.gasnier@st.com>
+ <20180507205151.GA25321@rob-hp-laptop> <20180512103324.5068c893@archlinux>
+Message-ID: <781b346a-e457-9c67-2e11-6f6edba88d63@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following sparse warnings:
-  CHECK   drivers/iio/adc/stm32-dfsdm-adc.c
-symbol 'stm32_dfsdm_get_buff_cb' was not declared. Should it be static?
-symbol 'stm32_dfsdm_release_buff_cb' was not declared. Should it be static?
+On 05/12/2018 11:33 AM, Jonathan Cameron wrote:
+> On Mon, 7 May 2018 15:51:51 -0500
+> Rob Herring <robh@kernel.org> wrote:
+> 
+>> On Wed, May 02, 2018 at 03:05:23PM +0200, Fabrice Gasnier wrote:
+>>> Add support for DFSDM (Digital Filter For Sigma Delta Modulators)
+>>> to STM32MP1. This variant is close to STM32H7 DFSDM, it implements
+>>> 6 filter instances. Registers map is also increased.
+>>>
+>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>> ---
+>>>  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt         |  7 +++++--
+>>>  drivers/iio/adc/stm32-dfsdm-core.c                  | 21 +++++++++++++++++++++
+>>>  2 files changed, 26 insertions(+), 2 deletions(-)  
+>>
+>> Reviewed-by: Rob Herring <robh@kernel.org>
+> Applied.   Whilst doing this I note that I'm getting a few sparse
+> warnings for this driver that would be nice to clean up...
+> 
+>   CHECK   drivers/iio/adc/stm32-dfsdm-adc.c
+> drivers/iio/adc/stm32-dfsdm-adc.c:503:21: warning: expression using sizeof(void)
+> drivers/iio/adc/stm32-dfsdm-adc.c:503:21: warning: expression using sizeof(void)
+> 
+> Which is mystifying at first glance... Something deep and dirty in the min macro
+> but I can't see what..
 
-BTW, move interrupt.h to sort headers alphabetically.
+Hi Jonathan,
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/adc/stm32-dfsdm-adc.c       | 4 ++--
- include/linux/iio/adc/stm32-dfsdm-adc.h | 2 ++
- 2 files changed, 4 insertions(+), 2 deletions(-)
+I just sent a patch to clean bellow warning. But this is more obscure
+regarding min macro...
 
-diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
-index 1b78bec..31462ae 100644
---- a/drivers/iio/adc/stm32-dfsdm-adc.c
-+++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-@@ -8,11 +8,11 @@
- 
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
--#include <linux/interrupt.h>
-+#include <linux/iio/adc/stm32-dfsdm-adc.h>
- #include <linux/iio/buffer.h>
- #include <linux/iio/hw-consumer.h>
--#include <linux/iio/iio.h>
- #include <linux/iio/sysfs.h>
-+#include <linux/interrupt.h>
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-diff --git a/include/linux/iio/adc/stm32-dfsdm-adc.h b/include/linux/iio/adc/stm32-dfsdm-adc.h
-index e7dc7a5..0da298b 100644
---- a/include/linux/iio/adc/stm32-dfsdm-adc.h
-+++ b/include/linux/iio/adc/stm32-dfsdm-adc.h
-@@ -9,6 +9,8 @@
- #ifndef STM32_DFSDM_ADC_H
- #define STM32_DFSDM_ADC_H
- 
-+#include <linux/iio/iio.h>
-+
- int stm32_dfsdm_get_buff_cb(struct iio_dev *iio_dev,
- 			    int (*cb)(const void *data, size_t size,
- 				      void *private),
--- 
-1.9.1
+Many thanks,
+Fabrice
+
+> 
+> drivers/iio/adc/stm32-dfsdm-adc.c:680:5: warning: symbol 'stm32_dfsdm_get_buff_cb' was not declared. Should it be static?
+> drivers/iio/adc/stm32-dfsdm-adc.c:703:5: warning: symbol 'stm32_dfsdm_release_buff_cb' was not declared. Should it be static?
+> 
+> Are rather more obvious
+> 
