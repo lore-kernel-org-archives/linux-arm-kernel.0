@@ -1,85 +1,64 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 15 May 2018 16:06:15 +0200
-Subject: [PATCH 10/12] platform/early: implement support for early
- platform drivers
-In-Reply-To: <CAL_JsqJw8UXktcLK8ADUfo1P+1un+omJ31sGcq7GFbNwJMsHKg@mail.gmail.com>
-References: <20180511162028.20616-1-brgl@bgdev.pl>
- <20180511162028.20616-11-brgl@bgdev.pl>
- <CAL_JsqJw8UXktcLK8ADUfo1P+1un+omJ31sGcq7GFbNwJMsHKg@mail.gmail.com>
-Message-ID: <CAMRc=MdsDWb0Ve29_d=30nc1F0aVhTrG74GX=sv0iB5WycWwLw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 May 2018 15:16:58 +0100
+Subject: [PATCH v2 16/40] arm64: mm: Pin down ASIDs for sharing mm with
+ devices
+In-Reply-To: <20180511190641.23008-17-jean-philippe.brucker@arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-17-jean-philippe.brucker@arm.com>
+Message-ID: <20180515141658.vivrgcyww2pxumye@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-05-14 15:37 GMT+02:00 Rob Herring <robh+dt@kernel.org>:
-> On Fri, May 11, 2018 at 11:20 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> This introduces the core part of support for early platform drivers
->> and devices.
->>
->
-> It looks like most of your prep patches are to separate the alloc and
-> init of platform devices because you are essentially making early
-> devices/drivers a sub-class. Maybe you could avoid doing that and
-> simplify things a bit. Comments below based on doing that...
->
+Hi Jean-Philippe,
 
-My aim was to change as little as possible for everybody else while
-fixing our problem. These changes are already controversial enough
-without risky reusing of existing fields in common structures. I was
-just afraid that there are too many intricacies for it to be safe.
+On Fri, May 11, 2018 at 08:06:17PM +0100, Jean-Philippe Brucker wrote:
+> +unsigned long mm_context_get(struct mm_struct *mm)
+> +{
+> +	unsigned long flags;
+> +	u64 asid;
+> +
+> +	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
+> +
+> +	asid = atomic64_read(&mm->context.id);
+> +
+> +	if (mm->context.pinned) {
+> +		mm->context.pinned++;
+> +		asid &= ~ASID_MASK;
+> +		goto out_unlock;
+> +	}
+> +
+> +	if (nr_pinned_asids >= max_pinned_asids) {
+> +		asid = 0;
+> +		goto out_unlock;
+> +	}
+> +
+> +	if (!asid_gen_match(asid)) {
+> +		/*
+> +		 * We went through one or more rollover since that ASID was
+> +		 * used. Ensure that it is still valid, or generate a new one.
+> +		 * The cpu argument isn't used by new_context.
+> +		 */
+> +		asid = new_context(mm, 0);
+> +		atomic64_set(&mm->context.id, asid);
+> +	}
+> +
+> +	asid &= ~ASID_MASK;
+> +
+> +	nr_pinned_asids++;
+> +	__set_bit(asid2idx(asid), pinned_asid_map);
+> +	mm->context.pinned++;
+> +
+> +out_unlock:
+> +	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
+> +
+> +	return asid;
+> +}
 
->> +/**
->> + * struct early_platform_driver
->> + *
->> + * @pdrv: real platform driver associated with this early platform driver
->> + * @list: list head for the list of early platform drivers
->> + * @early_probe: early probe callback
->> + */
->> +struct early_platform_driver {
->> +       struct platform_driver pdrv;
->> +       struct list_head list;
->
-> Couldn't you use an existing list in driver_private until you move
-> over to the normal bus infra.
->
+With CONFIG_UNMAP_KERNEL_AT_EL0 (a.k.a. KPTI), the hardware ASID has bit
+0 set automatically when entering user space (and cleared when getting
+back to the kernel). If the returned asid value here is going to be used
+as is in the calling code, you should probably set bit 0 when KPTI is
+enabled.
 
-This is something that the previous implementation did. It was quite
-unreadable, so I decided to go with a separate list.
-
->> +       int (*early_probe)(struct platform_device *);
->
-> Just add this to platform_driver.
->
-
-This would extend the structure for everybody else while there'll be
-very few such devices and not all systems would even require it.
-
->> +};
->> +
->> +/**
->> + * struct early_platform_device
->> + *
->> + * @pdev: real platform device associated with this early platform device
->> + * @list: list head for the list of early platform devices
->> + * @deferred: true if this device's early probe was deferred
->> + * @deferred_drv: early platform driver with which this device was matched
->> + */
->> +struct early_platform_device {
->> +       struct platform_device pdev;
->> +       struct list_head list;
->
-> Use a list in device_private?
->
->> +       bool deferred;
->> +       struct early_platform_driver *deferred_drv;
->
-> Can't you use the existing deferred probe list?
->
-
-I thought about it, but I was afraid there could be some timing issues
-with that and decided against it. The early deferral also doesn't work
-in a workque, but is synchronous instead.
-
-Best regards,
-Bartosz Golaszewski
+-- 
+Catalin
