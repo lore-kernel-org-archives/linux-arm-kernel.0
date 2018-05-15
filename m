@@ -1,80 +1,61 @@
-From: tommyhebb@gmail.com (Tom Hebb)
-Date: Tue, 15 May 2018 02:04:50 -0400
-Subject: [PATCH] ARM: dts: chromecast: override bad bootloader memory info
-In-Reply-To: <20180515102939.3ab8797c@xhacker.debian>
-References: <20180514215645.17592-2-tommyhebb@gmail.com>
- <20180515102939.3ab8797c@xhacker.debian>
-Message-ID: <9d800fe2-6c59-1125-5d05-9ca0faa95150@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 15 May 2018 14:42:36 +0800
+Subject: [PATCH] ARM: dts: imx28-tx28: Fix alias DTC warnings
+In-Reply-To: <1525693192-3579-1-git-send-email-festevam@gmail.com>
+References: <1525693192-3579-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180515064234.GJ26863@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/14/2018 10:29 PM, Jisheng Zhang wrote:
-> Hi,
+On Mon, May 07, 2018 at 08:39:52AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> On Mon, 14 May 2018 17:56:45 -0400 Thomas Hebb  wrote:
+> Remove underscore from alias entries to fix the following DTC warnings
+> with W=1:
 > 
->> On the Chromecast, the bootloader provides us with an ATAG_MEM of
->> start=0x01000000 and size=0x3eff8000. This is clearly incorrect, as the
->> range given encompasses nearly a GiB but the Chromecast only has 512MiB
->> of RAM! Additionally, this causes the kernel to be decompressed at
->> 0x00008000, below the claimed beginning of RAM, and so the boot fails.
->>
->> Since the existing ATAG parsing code runs before the kernel is even
->> decompressed and irrevocably patches the device tree, don't even try
+> arch/arm/boot/dts/imx28-tx28.dtb: Warning (alias_paths): /aliases: aliases property name must include only lowercase and '-'
 > 
-> This means you enabled ARM_ATAG_DTB_COMPAT. could we disable it instead?
-> The ATAG is useless when we provide dtb. And IIRC, the ATAG is provided due
-> to legacy history code.
+> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx28-tx28.dts | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 > 
-> Thanks
+> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+> index e4f19f9b..a5d6c97 100644
+> --- a/arch/arm/boot/dts/imx28-tx28.dts
+> +++ b/arch/arm/boot/dts/imx28-tx28.dts
+> @@ -56,11 +56,11 @@
+>  		ds1339 = &ds1339;
+>  		gpio5 = &gpio5;
+>  		lcdif = &lcdif;
+> -		lcdif_23bit_pins = &tx28_lcdif_23bit_pins;
+> -		lcdif_24bit_pins = &lcdif_24bit_pins_a;
+> -		reg_can_xcvr = &reg_can_xcvr;
+> -		spi_gpio = &spi_gpio;
+> -		spi_mxs = &ssp3;
+> +		lcdif-23bit-pins = &tx28_lcdif_23bit_pins;
+> +		lcdif-24bit-pins = &lcdif_24bit_pins_a;
+> +		reg-can-xcvr = &reg_can_xcvr;
+> +		spigpio = &spi_gpio;
+> +		spi-mxs = &ssp3;
+>  		stk5led = &user_led;
+>  		usbotg = &usb0;
+>  	};
+> @@ -220,7 +220,7 @@
+>  		linux,no-autorepeat;
+>  	};
+>  
+> -	spi_gpio: spi-gpio {
+> +	spi_gpio: spi {
 
-Thanks for the quick review! It's true that compiling without
-ARM_ATAG_DTB_COMPAT will prevent ATAG_MEM from getting parsed at all.
-However, it will also prevent ATAG_CMDLINE from getting parsed, and the
-command line from the Chromecast's bootloader does actually contain some
-useful information--notably the mode in which the system was booted
-(normal or recovery).
+Not sure why the node name needs to be changed here.
 
-Userspace could conceivably want this information, so it's preferable
-for the kernel to boot regardless of whether ARM_ATAG_DTB_COMPAT is
-enabled. That's the intent of this patch.
+Shawn
 
-I do agree in principle that ARM_ATAG_DTB_COMPAT should be disabled
-whenever possible.
-
->> to bypass it. Instead, use the "linux,usable-memory" property instead
->> of the "reg" property to define the real range. The ATAG code only
->> overwrites reg, but linux,usable-memory is checked first in the OF
->> driver, so the fact that reg gets changed makes no difference.
->>
->> Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
->> ---
->>  arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 12 +++++++++++-
->>  1 file changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
->> index 20f31cdeaf38..54221f55bfa2 100644
->> --- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
->> +++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
->> @@ -52,7 +52,17 @@
->>  
->>  	memory at 0 {
->>  		device_type = "memory";
->> -		reg = <0x00000000 0x20000000>; /* 512 MB */
->> +
->> +		/*
->> +		 * We're using "linux,usable-memory" instead of "reg" here
->> +		 * because the (signed and encrypted) bootloader that shipped
->> +		 * with this device provides an incorrect memory range in
->> +		 * ATAG_MEM. Linux helpfully overrides the "reg" property with
->> +		 * data from the ATAG, so we can't specify the proper range
->> +		 * normally. Fortunately, this alternate property is checked
->> +		 * first by the OF driver, so we can (ab)use it instead.
->> +		 */
->> +		linux,usable-memory = <0x00000000 0x20000000>; /* 512 MB */
->>  	};
->>  
->>  	leds {
+>  		compatible = "spi-gpio";
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> -- 
+> 2.7.4
 > 
