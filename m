@@ -1,114 +1,54 @@
-From: toshi.kani@hpe.com (Toshi Kani)
-Date: Tue, 15 May 2018 15:39:31 -0600
-Subject: [PATCH v2 3/3] x86/mm: add TLB purge to free pmd/pte page interfaces
-In-Reply-To: <20180515213931.23885-1-toshi.kani@hpe.com>
-References: <20180515213931.23885-1-toshi.kani@hpe.com>
-Message-ID: <20180515213931.23885-4-toshi.kani@hpe.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 15 May 2018 23:41:26 +0200
+Subject: [GIT PULL 4/4] Rockchip arm64 defconfig updates for 4.18 round 1
+In-Reply-To: <20180515205354.whll4pj74exaci5h@localhost>
+References: <2000491.bLgWuj0xar@phil> <2676342.8y6AX4oR9f@phil>
+ <20180515205354.whll4pj74exaci5h@localhost>
+Message-ID: <5941903.uzDxGiH5hI@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ioremap() calls pud_free_pmd_page() / pmd_free_pte_page() when it creates
-a pud / pmd map.  The following preconditions are met at their entry.
- - All pte entries for a target pud/pmd address range have been cleared.
- - System-wide TLB purges have been peformed for a target pud/pmd address
-   range.
+Am Dienstag, 15. Mai 2018, 22:53:54 CEST schrieb Olof Johansson:
+> On Tue, May 15, 2018 at 12:40:05PM +0200, Heiko Stuebner wrote:
+> > The following changes since commit 
+60cc43fc888428bb2f18f08997432d426a243338:
+> >   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+> > 
+> > are available in the Git repository at:
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git
+> >   tags/v4.18-rockchip-defconfig64-1> 
+> > for you to fetch changes up to 214f2c319a140f8a0121f362ad8e73ea1576d5ad:
+> >   arm64: defconfig: enable rockchip efuse (2018-05-09 16:33:09 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > Enablement of Rockchip-specific efuse, io-domain and typec drivers
+> > as well as general cros-ec, hid, touchscreen bluetooth and wifi-drivers
+> > on 64bit arm platforms.
+> > 
+> > ----------------------------------------------------------------
+> > 
+> > Enric Balletbo i Serra (3):
+> >       arm64: defconfig: Enable typec-phy and extcon-usbc-cros-ec for
+> >       rk3399
+> >       arm64: defconfig: Enable Rockchip io-domain driver
+> >       arm64: defconfig: Enable ChromeOS EC drivers for supported
+> >       Chromebooks.
+> > 
+> > Ezequiel Garcia (4):
+> >       arm64: defconfig: Enable HID over I2C drivers
+> >       arm64: defconfig: Enable Atmel Maxtouch driver
+> >       arm64: defconfig: Enable Marvell WiFi-Ex PCIe driver
+> >       arm64: defconfig: Enable bluetooth USB support
+> > 
+> > Heiko Stuebner (1):
+> >       arm64: defconfig: enable rockchip efuse
+> 
+> Merged. Not sure if it's useful to split defconfig updates quite this
+> granular, might make sense to just do slightly more consolidated patches.
+> 
+> Anyway, no harm, just a bit verbose.
 
-The preconditions assure that there is no stale TLB entry for the range.
-Speculation may not cache TLB entries since it requires all levels of page
-entries, including ptes, to have P & A-bits set for an associated address.
-However, speculation may cache pud/pmd entries (paging-structure caches)
-when they have P-bit set.
+ok, I'll check if things can be merged more, the next time :-)
 
-Add a system-wide TLB purge (INVLPG) to a single page after clearing
-pud/pmd entry's P-bit.
 
-SDM 4.10.4.1, Operation that Invalidate TLBs and Paging-Structure Caches,
-states that:
-  INVLPG invalidates all paging-structure caches associated with the
-  current PCID regardless of the liner addresses to which they correspond.
-
-Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
-Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: <stable@vger.kernel.org>
----
- arch/x86/mm/pgtable.c |   34 ++++++++++++++++++++++++++++------
- 1 file changed, 28 insertions(+), 6 deletions(-)
-
-diff --git a/arch/x86/mm/pgtable.c b/arch/x86/mm/pgtable.c
-index f60fdf411103..7e96594c7e97 100644
---- a/arch/x86/mm/pgtable.c
-+++ b/arch/x86/mm/pgtable.c
-@@ -721,24 +721,42 @@ int pmd_clear_huge(pmd_t *pmd)
-  * @pud: Pointer to a PUD.
-  * @addr: Virtual address associated with pud.
-  *
-- * Context: The pud range has been unmaped and TLB purged.
-+ * Context: The pud range has been unmapped and TLB purged.
-  * Return: 1 if clearing the entry succeeded. 0 otherwise.
-  */
- int pud_free_pmd_page(pud_t *pud, unsigned long addr)
- {
--	pmd_t *pmd;
-+	pmd_t *pmd, *pmd_sv;
-+	pte_t *pte;
- 	int i;
- 
- 	if (pud_none(*pud))
- 		return 1;
- 
- 	pmd = (pmd_t *)pud_page_vaddr(*pud);
-+	pmd_sv = (pmd_t *)__get_free_page(GFP_KERNEL);
-+	if (!pmd_sv)
-+		return 0;
- 
--	for (i = 0; i < PTRS_PER_PMD; i++)
--		if (!pmd_free_pte_page(&pmd[i], addr + (i * PMD_SIZE)))
--			return 0;
-+	for (i = 0; i < PTRS_PER_PMD; i++) {
-+		pmd_sv[i] = pmd[i];
-+		if (!pmd_none(pmd[i]))
-+			pmd_clear(&pmd[i]);
-+	}
- 
- 	pud_clear(pud);
-+
-+	/* INVLPG to clear all paging-structure caches */
-+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE-1);
-+
-+	for (i = 0; i < PTRS_PER_PMD; i++) {
-+		if (!pmd_none(pmd_sv[i])) {
-+			pte = (pte_t *)pmd_page_vaddr(pmd_sv[i]);
-+			free_page((unsigned long)pte);
-+		}
-+	}
-+
-+	free_page((unsigned long)pmd_sv);
- 	free_page((unsigned long)pmd);
- 
- 	return 1;
-@@ -749,7 +767,7 @@ int pud_free_pmd_page(pud_t *pud, unsigned long addr)
-  * @pmd: Pointer to a PMD.
-  * @addr: Virtual address associated with pmd.
-  *
-- * Context: The pmd range has been unmaped and TLB purged.
-+ * Context: The pmd range has been unmapped and TLB purged.
-  * Return: 1 if clearing the entry succeeded. 0 otherwise.
-  */
- int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
-@@ -761,6 +779,10 @@ int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
- 
- 	pte = (pte_t *)pmd_page_vaddr(*pmd);
- 	pmd_clear(pmd);
-+
-+	/* INVLPG to clear all paging-structure caches */
-+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE-1);
-+
- 	free_page((unsigned long)pte);
- 
- 	return 1;
+Heiko
