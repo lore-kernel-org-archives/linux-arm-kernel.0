@@ -1,67 +1,52 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 May 2018 09:25:20 +0100
-Subject: [GIT PULL] arm64: hisi: SoC driver updates for v4.18
-In-Reply-To: <20180514201859.fihe7n5jmvm5h6k3@localhost>
-References: <5AF5ABC1.60009@hisilicon.com>
- <20180514201859.fihe7n5jmvm5h6k3@localhost>
-Message-ID: <5AFA9970.3050008@hisilicon.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 15 May 2018 10:28:11 +0200
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.18
+In-Reply-To: <20180514201445.6sglddhalvclu36v@localhost>
+References: <5AF5A94A.4080308@hisilicon.com>
+ <20180514201445.6sglddhalvclu36v@localhost>
+Message-ID: <20180515082811.GL29062@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On 2018/5/14 21:18, Olof Johansson wrote:
-> On Fri, May 11, 2018 at 03:42:09PM +0100, Wei Xu wrote:
->> Hi Arnd, Hi Olof,
->>
->> Please help to pull the following changes.
->> Sorry for the inconvenience, because it depends on this patch [1]
->> which was merged in the rc3, I rebased the pull on rc3.
->> Thanks!
->>
->> [1] HISI LPC: Add Kconfig MFD_CORE dependency
->> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/bus?h=v4.17-rc3&id=4b313ca7b661ab8782f3dcb4a8996632a470b4da
->>
->> Best Regards,
->> Wei
->>
->> ---
->>
->> The following changes since commit 6da6c0db5316275015e8cc2959f12a17584aeb64:
->>
->>   Linux v4.17-rc3 (2018-04-29 14:17:42 -0700)
->>
->> are available in the Git repository at:
->>
->>   git://github.com/hisilicon/linux-hisi.git tags/hisi-drivers-for-4.18
->>
->> for you to fetch changes up to adf3457b4ce6940885be3e5ee832c6949fba4166:
->>
->>   HISI LPC: Add ACPI UART support (2018-05-10 17:45:52 +0100)
->>
->> ----------------------------------------------------------------
->> ARM64: hisi: SoC driver updates for 4.18
->>
->> - Update hisi LPC bus driver to use the platform driver APIs
->>   other than the MFD APIs to support connected device like UART
+On Mon, May 14, 2018 at 01:14:45PM -0700, Olof Johansson wrote:
+> Hi Wei,
 > 
-> Merged, thanks.
+> On Fri, May 11, 2018 at 03:31:38PM +0100, Wei Xu wrote:
+> > Hi Arnd, Hi Olof,
+> > 
+> > Please help to pull the following changes.
+> > 
+> > About the CLOCK_STUB and the MAILBOX consolidate patch,
+> > Jassi and Stephen have acked it.
+> > Could you let me know how to handle this kind case
+> > if it is not OK to be in this pull?
 > 
-> Same thing here as with the DT branch though -- if you look at a lot
-> of other patches under drivers/bus, nearly all of them use "bus: <...>"
-> as prefix, so please move over to using that for yours as well on future
-> patches/pull requests.
+> I don't think there's any need to group the Kconfig changes with the defconfig
+> updates here, is there?
+
+I don't have the patches history, but likely this patch should come together with:
+
+https://patchwork.kernel.org/patch/10399799/
+https://patchwork.kernel.org/patch/10399801/
+
+Otherwise the compilation options won't be consistent with what is enabled in
+the DT.
+
+ 
+> So, the clk Kconfig change can go in through the clk maintainer (in one patch),
+> the mailbox can go in through that maintainer as a separate patch. The update
+> to the defconfig is just removing what's now the new default, so it's not
+> urgent to do.
 > 
-
-Sorry, I will take care these kind of things in the future.
-Thanks!
-
-Best Regards,
-Wei
-
+> Based on this, can you respin the pull request with that patch dropped? Thanks!
 > 
 > 
 > -Olof
-> 
-> .
-> 
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
