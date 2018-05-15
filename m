@@ -1,56 +1,35 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Tue, 15 May 2018 12:22:24 +0300
-Subject: [PATCH v3 5/6] spi: at91-usart: add driver for at91-usart as spi
-In-Reply-To: <CAHp75VdRrL25Jgnbk64Qqc5RY3uJdcntJ3xwRdp3F+rRFeTHBA@mail.gmail.com>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-6-radu.pirea@microchip.com>
- <CAHp75Ve3Ugnjjm8EZkPQTZSvH1qad1e5SqjOn8zz5syHSQea_g@mail.gmail.com>
- <5a3930b867cf8c279953d08c5d5dd1d93113a43b.camel@microchip.com>
- <CAHp75VdRrL25Jgnbk64Qqc5RY3uJdcntJ3xwRdp3F+rRFeTHBA@mail.gmail.com>
-Message-ID: <c23cdde58b9f724f51787c6c38478df983be6efa.camel@microchip.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 May 2018 14:52:14 +0530
+Subject: [GIT PULL] DaVinci fixes for v4.17 (part 2)
+Message-ID: <fcf8613b-31df-733b-3443-c1a6176cbdd1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-05-14 at 20:38 +0300, Andy Shevchenko wrote:
-> First of all, do not remove mailing lists from Cc and people if you
-> are not sure they do not need your stuff.
-> 
-Sorry. My mistake. 
-> On Mon, May 14, 2018 at 11:11 AM, Radu Pirea
-> <radu.pirea@microchip.com> wrote:
-> > On Sun, 2018-05-13 at 16:33 +0300, Andy Shevchenko wrote:
-> > > On Fri, May 11, 2018 at 1:38 PM, Radu Pirea <radu.pirea@microchip
-> > > .com
-> > > > wrote:
-> > > > +static void at91_usart_spi_cleanup(struct spi_device *spi)
-> > > > +{
-> > > > +       struct at91_usart_spi_device *ausd = spi-
-> > > > >controller_state;
-> > > > +
-> > > > +       if (!ausd)
-> > > > +               return;
-> > > 
-> > > Is it even possible?
-> > 
-> > Theoretically yes.
-> 
-> I would like to know real circumstances when it might happen.
-That check was used in debug stage of driver. I will remove.
-> 
-> > > 
-> > > Anyway the code below will work fine even if it's the case.
-> > > 
-> > > > +
-> > > > +       spi->controller_state = NULL;
-> > > > +       kfree(ausd);
-> > > > +}
-> > > The question is, why you didn't utilize what SPI core provides
-> > > you?
-> > 
-> > I tried, but it did not work the way I expected.
-> 
-> So, what is not going as expected in "SPI core takes care of CSs"
-> case?
-> Did you use oscilloscope for that?
-Yes, I used and CSs was not asserted. Anyway, I will will try again.
-> 
+The following changes since commit 9411ac07cd764be34bbd7ff09125a6b7b9175d4c:
+
+  ARM: davinci: fix GPIO lookup for I2C (2018-05-02 14:55:06 +0530)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.17-part-2
+
+for you to fetch changes up to bb7298a7e87cf3430eb62be8746e5d7a07ca9d7c:
+
+  ARM: davinci: board-dm646x-evm: set VPIF capture card name (2018-05-15 14:31:12 +0530)
+
+----------------------------------------------------------------
+Second set of fixes for TI DaVinci.
+
+They are needed for DM6467 EVM to work. The first patch fixes an
+issue with timer interrupt and the second two are needed for video
+driver to probe successfully.
+
+----------------------------------------------------------------
+Sekhar Nori (3):
+      ARM: davinci: dm646x: fix timer interrupt generation
+      ARM: davinci: board-dm646x-evm: pass correct I2C adapter id for VPIF
+      ARM: davinci: board-dm646x-evm: set VPIF capture card name
+
+ arch/arm/mach-davinci/board-dm646x-evm.c | 5 ++++-
+ arch/arm/mach-davinci/dm646x.c           | 3 ++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
