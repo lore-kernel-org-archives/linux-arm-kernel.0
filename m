@@ -1,113 +1,35 @@
 From: ilialin@codeaurora.org (Ilia Lin)
-Date: Tue, 15 May 2018 12:13:22 +0300
-Subject: [PATCH v7 00/14] CPU scaling support for msm8996
-Message-ID: <1526375616-16904-1-git-send-email-ilialin@codeaurora.org>
+Date: Tue, 15 May 2018 12:13:24 +0300
+Subject: [PATCH v7 02/14] clk: qcom: Make clk_alpha_pll_configure available to
+ modules
+In-Reply-To: <1526375616-16904-1-git-send-email-ilialin@codeaurora.org>
+References: <1526375616-16904-1-git-send-email-ilialin@codeaurora.org>
+Message-ID: <1526375616-16904-3-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[v7]
- * Addressed comments from Viresh about resourses deallocation
-   and DT compatible
+From: Rajendra Nayak <rnayak@codeaurora.org>
 
-[v6]
- * Addressed comments from Viresh about:
- ** Comments style
- ** Kconfig bool instead of tristate
- ** DT and documentation style
- ** Resourses deallocation on an error
- ** Typos
+Allow clk_alpha_pll_configure to be called from loadable
+kernel modules.
 
-[v5]
- * Rebased
- * Addressed comments from Bjorn about SPDX style,
-   functions and parameters naming
- * Addressed comments from Viresh DT properties and style, comments style,
-   resourses deallocation, documentation placement
- * Addressed comments from Sricharan about unnessesary include
- * Addressed comments from Nicolas
- * Addressed comments from Rob about the commit messages and acks
- * Addressed comments from Mark
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+---
+ drivers/clk/qcom/clk-alpha-pll.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-[v4]
- * Adressed all comments from Stephen
- * Added CPU regulator support
- * Added qcom-cpufreq-kryo driver
-
-[v3]
- * Rebased on top of the latest PLL driver changes
- * Addressed comment from Rob Herring for bindings
-
-[v2]
- * Addressed comments from Rob Herring for bindings
- * Addressed comments from Mark Rutland for memory barrier
- * Addressed comments from Julien Thierry for clock reenabling condition
- * Tuned the HW configuration for clock frequencies below 600MHz
-
-Clocks:
-This series adds support for the CPU clocks on msm8996 devices.
-The driver uses the existing PLL drivers and is required to control
-the CPU frequency scaling on the MSM8996.
-
-Regulators:
-Added SAW regulator support to the SPMI regulator driver. The SAW regulators
-will be controlled through special CPU registers instead of direct
-SPMI accesses.
-
-Cpufreq:
-The qcom-cpufreq-kryo driver is aimed to support different SOC versions.
-The driver reads eFuse information and chooses the required OPP subset
-by passing the OPP supported-hw parameter.
-
-A previous post of RFC can be found here:
-https://patchwork.kernel.org/patch/10398455/
-
-Ilia Lin (11):
-  soc: qcom: Separate kryo l2 accessors from PMU driver
-  clk: qcom: Add CPU clock driver for msm8996
-  clk: qcom: Add DT bindings for CPU clock driver for msm8996
-  clk: qcom: Add ACD path to CPU clock driver for msm8996
-  dt: qcom: Add opp and thermal to the msm8996
-  regulator: qcom_spmi: Add support for SAW
-  dt-bindings: qcom_spmi: Add support for SAW documentation
-  dt: qcom: Add SAW regulator for 8x96 CPUs
-  cpufreq: Add Kryo CPU scaling driver
-  dt-bindings: cpufreq: Document operating-points-v2-kryo-cpu
-  dt: qcom: Add qcom-cpufreq-kryo driver configuration
-
-Rajendra Nayak (3):
-  clk: qcom: Make clk_alpha_pll_configure available to modules
-  clk: qcom: cpu-8996: Add support to switch to alternate PLL
-  clk: qcom: cpu-8996: Add support to switch below 600Mhz
-
- .../devicetree/bindings/clock/qcom,kryocc.txt      |  17 +
- .../devicetree/bindings/opp/kryo-cpufreq.txt       | 680 +++++++++++++++++++++
- .../bindings/regulator/qcom,spmi-regulator.txt     |  45 ++
- arch/arm64/boot/dts/qcom/apq8096-db820c.dts        |   2 +-
- arch/arm64/boot/dts/qcom/msm8996.dtsi              | 651 +++++++++++++++++++-
- drivers/clk/clk-fixed-factor.c                     |   2 +-
- drivers/clk/qcom/Kconfig                           |   9 +
- drivers/clk/qcom/Makefile                          |   1 +
- drivers/clk/qcom/clk-alpha-pll.c                   |   1 +
- drivers/clk/qcom/clk-alpha-pll.h                   |   6 +
- drivers/clk/qcom/clk-cpu-8996.c                    | 519 ++++++++++++++++
- drivers/cpufreq/Kconfig.arm                        |  11 +
- drivers/cpufreq/Makefile                           |   1 +
- drivers/cpufreq/cpufreq-dt-platdev.c               |   3 +
- drivers/cpufreq/qcom-cpufreq-kryo.c                | 150 +++++
- drivers/perf/Kconfig                               |   1 +
- drivers/perf/qcom_l2_pmu.c                         |  90 +--
- drivers/regulator/qcom_spmi-regulator.c            | 133 +++-
- drivers/soc/qcom/Kconfig                           |   3 +
- drivers/soc/qcom/Makefile                          |   1 +
- drivers/soc/qcom/kryo-l2-accessors.c               |  65 ++
- include/soc/qcom/kryo-l2-accessors.h               |  21 +
- 22 files changed, 2332 insertions(+), 80 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,kryocc.txt
- create mode 100644 Documentation/devicetree/bindings/opp/kryo-cpufreq.txt
- create mode 100644 drivers/clk/qcom/clk-cpu-8996.c
- create mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
- create mode 100644 drivers/soc/qcom/kryo-l2-accessors.c
- create mode 100644 include/soc/qcom/kryo-l2-accessors.h
-
+diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
+index 9722b70..57f2084 100644
+--- a/drivers/clk/qcom/clk-alpha-pll.c
++++ b/drivers/clk/qcom/clk-alpha-pll.c
+@@ -228,6 +228,7 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
+ 	if (pll->flags & SUPPORTS_FSM_MODE)
+ 		qcom_pll_set_fsm_mode(regmap, PLL_MODE(pll), 6, 0);
+ }
++EXPORT_SYMBOL_GPL(clk_alpha_pll_configure);
+ 
+ static int clk_alpha_pll_hwfsm_enable(struct clk_hw *hw)
+ {
 -- 
 1.9.1
