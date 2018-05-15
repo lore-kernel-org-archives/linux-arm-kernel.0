@@ -1,115 +1,43 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 15 May 2018 12:23:28 +0100
-Subject: [RFC PATCH 01/10] devfreq: rockchip-dfi: Move GRF definitions to
- a common place.
-In-Reply-To: <20180514211610.26618-2-enric.balletbo@collabora.com>
-References: <20180514211610.26618-1-enric.balletbo@collabora.com>
- <20180514211610.26618-2-enric.balletbo@collabora.com>
-Message-ID: <c217cf74-c5fe-4e4b-7b55-7672381b3eaf@arm.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 15 May 2018 13:35:23 +0200
+Subject: [PATCH 0/4] KVM: arm/arm64: Fix locking issues
+In-Reply-To: <20180515102659.GA38551@C02W217FHV2R.local>
+References: <20180511142015.21953-1-andre.przywara@arm.com>
+ <20180515102659.GA38551@C02W217FHV2R.local>
+Message-ID: <da25660f-7d57-34be-fe99-f42c10d81845@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric,
-
-On 14/05/18 22:16, Enric Balletbo i Serra wrote:
-> Some rk3399 GRF (Generic Register Files) definitions can be used for
-> different drivers. Move these definitions to a common include so we
-> don't need to duplicate these definitions.
+On 15/05/2018 12:26, Christoffer Dall wrote:
+> On Fri, May 11, 2018 at 03:20:11PM +0100, Andre Przywara wrote:
+>> Jan recently reported lockdep complaints regarding various locks in our
+>> VGIC emulation [1][2].
+>> This boiled down to two separate issues:
+>> - When promoting the vgic_irq->irq_lock to require IRQs being disabled,
+>>   we forgot to amend some instances of this lock on the way. Also this
+>>   needs to be applied to dependent locks as well. The first two patches
+>>   fix that. The patch split is designed to simplify backporting.
+>>   Those patches have been posted before, I am resending them as part
+>>   of this series.
+>> - Calling kvm_read_guest() requires us to be inside an SRCU critical
+>>   section. On some architectures we are always in it when handling VCPU
+>>   exits, but on ARM we need to lock it individually. Patches 3 and 4
+>>   fix that, the split is again made to ease backporting.
+>>   Each of the hunks fix an indiviual commit, but I refrained from
+>>   splitting this down into eight patches just to put proper Fixes: tags
+>>   on it. Eventually those commits are part of one out of two series, I put
+>>   the respective kernel release version as a tag to the Cc: stable line.
+>>
+>> I couldn't reproduce the full lockdep splat on my setup, but at least
+>> could show one instance and prove that these patches fixes that.
+>>
+>>
+> For the series:
 > 
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
-> 
->   drivers/devfreq/event/rockchip-dfi.c | 23 +++++++----------------
->   include/soc/rockchip/rk3399_grf.h    | 21 +++++++++++++++++++++
->   2 files changed, 28 insertions(+), 16 deletions(-)
->   create mode 100644 include/soc/rockchip/rk3399_grf.h
-> 
-> diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
-> index 22b113363ffc..2fbbcbeb644f 100644
-> --- a/drivers/devfreq/event/rockchip-dfi.c
-> +++ b/drivers/devfreq/event/rockchip-dfi.c
-> @@ -26,6 +26,8 @@
->   #include <linux/list.h>
->   #include <linux/of.h>
->   
-> +#include <soc/rockchip/rk3399_grf.h>
-> +
->   #define RK3399_DMC_NUM_CH	2
->   
->   /* DDRMON_CTRL */
-> @@ -43,18 +45,6 @@
->   #define DDRMON_CH1_COUNT_NUM		0x3c
->   #define DDRMON_CH1_DFI_ACCESS_NUM	0x40
->   
-> -/* pmu grf */
-> -#define PMUGRF_OS_REG2	0x308
-> -#define DDRTYPE_SHIFT	13
-> -#define DDRTYPE_MASK	7
-> -
-> -enum {
-> -	DDR3 = 3,
-> -	LPDDR3 = 6,
-> -	LPDDR4 = 7,
-> -	UNUSED = 0xFF
-> -};
-> -
->   struct dmc_usage {
->   	u32 access;
->   	u32 total;
-> @@ -83,16 +73,17 @@ static void rockchip_dfi_start_hardware_counter(struct devfreq_event_dev *edev)
->   	u32 ddr_type;
->   
->   	/* get ddr type */
-> -	regmap_read(info->regmap_pmu, PMUGRF_OS_REG2, &val);
-> -	ddr_type = (val >> DDRTYPE_SHIFT) & DDRTYPE_MASK;
-> +	regmap_read(info->regmap_pmu, RK3399_PMUGRF_OS_REG2, &val);
-> +	ddr_type = (val >> RK3399_PMUGRF_DDRTYPE_SHIFT) &
-> +		    RK3399_PMUGRF_DDRTYPE_MASK;
->   
->   	/* clear DDRMON_CTRL setting */
->   	writel_relaxed(CLR_DDRMON_CTRL, dfi_regs + DDRMON_CTRL);
->   
->   	/* set ddr type to dfi */
-> -	if (ddr_type == LPDDR3)
-> +	if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR3)
->   		writel_relaxed(LPDDR3_EN, dfi_regs + DDRMON_CTRL);
-> -	else if (ddr_type == LPDDR4)
-> +	else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR4)
->   		writel_relaxed(LPDDR4_EN, dfi_regs + DDRMON_CTRL);
->   
->   	/* enable count, use software mode */
-> diff --git a/include/soc/rockchip/rk3399_grf.h b/include/soc/rockchip/rk3399_grf.h
-> new file mode 100644
-> index 000000000000..0f94034e2e9a
-> --- /dev/null
-> +++ b/include/soc/rockchip/rk3399_grf.h
-> @@ -0,0 +1,21 @@
-> +/* SPDX-License-Identifier: GPL-2.0+ */
-> +/*
-> + * Rockchip Generic Register Files definitions
+> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
 
-Nit: s/Generic/General/
+Shall I put the patches on their route to Linus?
 
-(that's what the TRMs say)
+Thanks,
 
-Robin.
-
-> + *
-> + * Copyright (c) 2018, Collabora Ltd.
-> + * Author: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> + */
-> +
-> +#ifndef __SOC_RK3399_GRF_H
-> +#define __SOC_RK3399_GRF_H
-> +
-> +/* PMU GRF Registers */
-> +#define RK3399_PMUGRF_OS_REG2		0x308
-> +#define RK3399_PMUGRF_DDRTYPE_SHIFT	13
-> +#define RK3399_PMUGRF_DDRTYPE_MASK	7
-> +#define RK3399_PMUGRF_DDRTYPE_DDR3	3
-> +#define RK3399_PMUGRF_DDRTYPE_LPDDR2	5
-> +#define RK3399_PMUGRF_DDRTYPE_LPDDR3	6
-> +#define RK3399_PMUGRF_DDRTYPE_LPDDR4	7
-> +
-> +#endif
-> 
+Paolo
