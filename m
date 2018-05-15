@@ -1,150 +1,95 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Wed, 16 May 2018 04:58:06 +0800
-Subject: [PATCH v12 3/4] ACPI / APEI: Add SEI notification type support for
- ARMv8
-In-Reply-To: <1526417887-25843-1-git-send-email-gengdongjiu@huawei.com>
-References: <1526417887-25843-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1526417887-25843-4-git-send-email-gengdongjiu@huawei.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 15 May 2018 14:59:33 +0200
+Subject: [PATCH] arm64: dts: exynos: fix type of thermal trip points for
+ Exynos7
+In-Reply-To: <1702366.qL959G52Hi@amdc3058>
+References: <CGME20180515123755eucas1p278a9c1e9cb0101e406e3839e27f8b3b1@eucas1p2.samsung.com>
+ <1702366.qL959G52Hi@amdc3058>
+Message-ID: <CAJKOXPdW7Ovo9GW=29tqa3rEAkSFgrEzbxm_wdGmRpamgk2-ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI 6.x adds support for NOTIFY_SEI as a GHES notification
-mechanism, so add new GHES notification handling functions.
-Expose API ghes_notify_sei() to arch code, arch code will call
-this API when it gets this NOTIFY_SEI.
+On Tue, May 15, 2018 at 2:37 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> Currently Exynos thermal driver treats as "active" all specified
+> trip points before reaching maximum number of hardware supported
+> trip points.
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+The trip point type describe the way how system should act - use
+active or passive cooling. It is independent of thermal driver. I do
+not understand what is exactly wrong... maybe except whether the trip
+point is active/passive looks like property of board, not SoC itself,
+but your patch does not address it.
 
-Note:
-Firmware will follow the SError mask rule, if the SError is masked,
-the firmware will not deliver NOTIFY_SEI notification.
----
- drivers/acpi/apei/Kconfig | 15 ++++++++++++++
- drivers/acpi/apei/ghes.c  | 53 +++++++++++++++++++++++++++++++++++++++++++++++
- include/acpi/ghes.h       |  1 +
- 3 files changed, 69 insertions(+)
+> Moreover polling-delay-passive is specified as "0"
+> in exynos7.dtsi (IOW passive polling is disabled).
 
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index 52ae543..ff4afc3 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -55,6 +55,21 @@ config ACPI_APEI_SEA
- 	  option allows the OS to look for such hardware error record, and
- 	  take appropriate action.
- 
-+config ACPI_APEI_SEI
-+	bool "APEI SError(System Error) Interrupt logging/recovering support"
-+	depends on ARM64 && ACPI_APEI_GHES
-+	default y
-+	help
-+	  This option should be enabled if the system supports
-+	  firmware first handling of SEI (SError interrupt).
-+
-+	  SEI happens with asynchronous external abort for errors on device
-+	  memory reads on ARMv8 systems. If a system supports firmware first
-+	  handling of SEI, the platform analyzes and handles hardware error
-+	  notifications from SEI, and it may then form a hardware error record for
-+	  the OS to parse and handle. This option allows the OS to look for
-+	  such hardware error record, and take appropriate action.
-+
- config ACPI_APEI_MEMORY_FAILURE
- 	bool "APEI memory error recovering support"
- 	depends on ACPI_APEI && MEMORY_FAILURE
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 1efefe9..33f77ae 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -827,6 +827,46 @@ static inline void ghes_sea_add(struct ghes *ghes) { }
- static inline void ghes_sea_remove(struct ghes *ghes) { }
- #endif /* CONFIG_ACPI_APEI_SEA */
- 
-+#ifdef CONFIG_ACPI_APEI_SEI
-+static LIST_HEAD(ghes_sei);
-+
-+/*
-+ * Return 0 only if one of the SEI error sources successfully reported an error
-+ * record sent from the firmware.
-+ */
-+int ghes_notify_sei(void)
-+{
-+	struct ghes *ghes;
-+	int ret = -ENOENT;
-+
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(ghes, &ghes_sei, list) {
-+		if (!ghes_proc(ghes))
-+			ret = 0;
-+	}
-+	rcu_read_unlock();
-+	return ret;
-+}
-+
-+static void ghes_sei_add(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_add_rcu(&ghes->list, &ghes_sei);
-+	mutex_unlock(&ghes_list_mutex);
-+}
-+
-+static void ghes_sei_remove(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_del_rcu(&ghes->list);
-+	mutex_unlock(&ghes_list_mutex);
-+	synchronize_rcu();
-+}
-+#else /* CONFIG_ACPI_APEI_SEI */
-+static inline void ghes_sei_add(struct ghes *ghes) { }
-+static inline void ghes_sei_remove(struct ghes *ghes) { }
-+#endif /* CONFIG_ACPI_APEI_SEI */
-+
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
- /*
-  * printk is not safe in NMI context.  So in NMI handler, we allocate
-@@ -1055,6 +1095,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 			goto err;
- 		}
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
-+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEI is not supported!\n",
-+				generic->header.source_id);
-+		goto err;
-+	}
-+	break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
- 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-@@ -1126,6 +1173,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_add(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_add(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_add(ghes);
- 		break;
-@@ -1179,6 +1229,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_remove(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_remove(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_remove(ghes);
- 		break;
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 8feb0c8..9ba59e2 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -120,5 +120,6 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
- 	     section = acpi_hest_get_next(section))
- 
- int ghes_notify_sea(void);
-+int ghes_notify_sei(void);
- 
- #endif /* GHES_H */
--- 
-1.9.1
+Which is perfectly fine. TMU driver for Exynos7 supports up to eight
+trip points in interrupt mode so having polling mode = 0 is good. IOW
+passive polling is disabled just like active polling is disabled so
+what did you want to say here?
+
+Best regards,
+Krzysztof
+
+> Therefore fix
+> type of cpu-alert-0 to cpu-alert6 trip points to be "active"
+> instead of "passive" (cpu-alert-7 type is "critical" so it
+> doesn't need a fixup).
+>
+> Cc: Alim Akhtar <alim.akhtar@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> Index: b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+> ===================================================================
+> --- a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi       2018-05-15 13:57:55.822172496 +0200
+> +++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi       2018-05-15 14:23:12.594016481 +0200
+> @@ -10,37 +10,37 @@ trips {
+>         cpu-alert-0 {
+>                 temperature = <75000>; /* millicelsius */
+>                 hysteresis = <10000>; /* millicelsius */
+> -               type = "passive";
+> +               type = "active";
+>         };
+>         cpu-alert-1 {
+>                 temperature = <80000>; /* millicelsius */
+>                 hysteresis = <10000>; /* millicelsius */
+> -               type = "passive";
+> +               type = "active";
+>         };
+>         cpu-alert-2 {
+>                 temperature = <85000>; /* millicelsius */
+>                 hysteresis = <10000>; /* millicelsius */
+> -               type = "passive";
+> +               type = "active";
+>         };
+>         cpu-alert-3 {
+>                 temperature = <90000>; /* millicelsius */
+>                 hysteresis = <10000>; /* millicelsius */
+> -               type = "passive";
+> +               type = "active";
+>         };
+>         cpu-alert-4 {
+>                 temperature = <95000>; /* millicelsius */
+>                 hysteresis = <10000>; /* millicelsius */
+> -               type = "passive";
+> +               type = "active";
+>         };
+>         cpu-alert-5 {
+>                 temperature = <100000>; /* millicelsius */
+>                 hysteresis = <10000>; /* millicelsius */
+> -               type = "passive";
+> +               type = "active";
+>         };
+>         cpu-alert-6 {
+>                 temperature = <110000>; /* millicelsius */
+>                 hysteresis = <10000>; /* millicelsius */
+> -               type = "passive";
+> +               type = "active";
+>         };
+>         cpu-crit-0 {
+>                 temperature = <115000>; /* millicelsius */
+>
