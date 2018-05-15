@@ -1,62 +1,76 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Wed, 16 May 2018 04:58:03 +0800
-Subject: [PATCH v12 0/4] set VSESR_EL2 by user space and support NOTIFY_SEI
- notification
-Message-ID: <1526417887-25843-1-git-send-email-gengdongjiu@huawei.com>
+Date: Wed, 16 May 2018 04:58:04 +0800
+Subject: [PATCH v12 1/4] arm64: KVM: export the capability to set guest SError
+ syndrome
+In-Reply-To: <1526417887-25843-1-git-send-email-gengdongjiu@huawei.com>
+References: <1526417887-25843-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1526417887-25843-2-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Detect whether KVM can set set guest SError syndrome
-2. Support to Set VSESR_EL2 and inject SError by user space.
-3. Support live migration to keep SError pending state and VSESR_EL2 value.
-4. ACPI 6.1 adds support for NOTIFY_SEI as a GHES notification mechanism, so support this
-   notification in software, KVM or kernel ARCH code call handle_guest_sei() to let ACP driver
-   to handle this notification.
+For the arm64 RAS Extension, user space can inject a virtual-SError
+with specified ESR. So user space needs to know whether KVM support
+to inject such SError, this interface adds this query for this capability.
 
-Change since V11:
-Address James's comments, thanks James
-1. Align the struct of kvm_vcpu_events to 64 bytes
-2. Avoid exposing the stale ESR value in the kvm_arm_vcpu_get_events()
-3. Change variables 'injected' name to 'serror_pending' in the kvm_arm_vcpu_set_events()
-4. Change to sizeof(events) from sizeof(struct kvm_vcpu_events) in kvm_arch_vcpu_ioctl()
-5. Update the patches commit message and document description
+KVM will check whether system support RAS Extension, if supported, KVM
+returns true to user space, otherwise returns false.
 
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Reviewed-by: James Morse <james.morse@arm.com>
 
-Change since V10:
-Address James's comments, thanks James
-1. Merge the helper function with the user.
-2. Move the ISS_MASK into pend_guest_serror() to clear top bits
-3. Make kvm_vcpu_events struct align to 4 bytes
-4. Add something check in the kvm_arm_vcpu_set_events()
-5. Check kvm_arm_vcpu_get/set_events()'s return value.
-6. Initialise kvm_vcpu_events to 0 so that padding transferred to user-space doesn't
-    contain kernel stack.
+Change from V11:
+1. Change the commit message
+2. Update the Documentation/virtual/kvm/api.tx
+---
+ Documentation/virtual/kvm/api.txt | 11 +++++++++++
+ arch/arm64/kvm/reset.c            |  3 +++
+ include/uapi/linux/kvm.h          |  1 +
+ 3 files changed, 15 insertions(+)
 
-
-Dongjiu Geng (4):
-  arm64: KVM: export the capability to set guest SError syndrome
-  arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
-  ACPI / APEI: Add SEI notification type support for ARMv8
-  arm64: handle NOTIFY_SEI notification by the APEI driver
-
- Documentation/virtual/kvm/api.txt    | 42 ++++++++++++++++++++++++++--
- arch/arm/include/asm/kvm_host.h      |  6 ++++
- arch/arm/kvm/guest.c                 | 12 ++++++++
- arch/arm64/include/asm/kvm_emulate.h |  5 ++++
- arch/arm64/include/asm/kvm_host.h    |  7 +++++
- arch/arm64/include/asm/system_misc.h |  1 +
- arch/arm64/include/uapi/asm/kvm.h    | 13 +++++++++
- arch/arm64/kernel/traps.c            |  4 +++
- arch/arm64/kvm/guest.c               | 36 ++++++++++++++++++++++++
- arch/arm64/kvm/inject_fault.c        |  7 ++++-
- arch/arm64/kvm/reset.c               |  4 +++
- arch/arm64/mm/fault.c                | 10 +++++++
- drivers/acpi/apei/Kconfig            | 15 ++++++++++
- drivers/acpi/apei/ghes.c             | 53 ++++++++++++++++++++++++++++++++++++
- include/acpi/ghes.h                  |  1 +
- include/uapi/linux/kvm.h             |  1 +
- virt/kvm/arm/arm.c                   | 21 ++++++++++++++
- 17 files changed, 234 insertions(+), 4 deletions(-)
-
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index fc3ae95..66494a5 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -4415,3 +4415,14 @@ Parameters: none
+ This capability indicates if the flic device will be able to get/set the
+ AIS states for migration via the KVM_DEV_FLIC_AISM_ALL attribute and allows
+ to discover this without having to create a flic device.
++
++8.14 KVM_CAP_ARM_SET_SERROR_ESR
++
++Architectures: arm, arm64
++
++This capability indicates that userspace can specify the syndrome value reported
++to the guest OS when guest takes a virtual SError interrupt exception.
++If KVM has this capability, userspace can only specify the ISS field for the ESR
++syndrome, it can not specify the EC field which is not under control by KVM.
++If this virtual SError is taken to EL1 using AArch64, this value will be reported
++in ISS filed of ESR_EL1.
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 3256b92..38c8a64 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PMU_V3:
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
++	case KVM_CAP_ARM_INJECT_SERROR_ESR:
++		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
++		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
+ 	case KVM_CAP_VCPU_ATTRIBUTES:
+ 		r = 1;
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 8fb90a0..3587b33 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -934,6 +934,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_S390_AIS_MIGRATION 150
+ #define KVM_CAP_PPC_GET_CPU_CHAR 151
+ #define KVM_CAP_S390_BPB 152
++#define KVM_CAP_ARM_INJECT_SERROR_ESR 153
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
 -- 
 1.9.1
