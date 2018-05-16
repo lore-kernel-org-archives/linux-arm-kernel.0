@@ -1,10 +1,10 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Wed, 16 May 2018 12:15:03 +0200
-Subject: [PATCH v3 19/26] drm/exynos: mic: provide an owner .odev device for
- the bridge
+Date: Wed, 16 May 2018 12:15:04 +0200
+Subject: [PATCH v3 20/26] drm/mediatek: hdmi: provide an owner .odev device
+ for the bridge
 In-Reply-To: <20180516101510.13215-1-peda@axentia.se>
 References: <20180516101510.13215-1-peda@axentia.se>
-Message-ID: <20180516101510.13215-20-peda@axentia.se>
+Message-ID: <20180516101510.13215-21-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,22 +12,22 @@ The .of_node member is going away.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/gpu/drm/exynos/exynos_drm_mic.c | 2 +-
+ drivers/gpu/drm/mediatek/mtk_hdmi.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_mic.c b/drivers/gpu/drm/exynos/exynos_drm_mic.c
-index 2174814273e2..f9ff8d3ec937 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_mic.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_mic.c
-@@ -417,8 +417,8 @@ static int exynos_mic_probe(struct platform_device *pdev)
+diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+index 59a11026dceb..d8c7d93d0a87 100644
+--- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
++++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+@@ -1694,8 +1694,8 @@ static int mtk_drm_hdmi_probe(struct platform_device *pdev)
  
- 	platform_set_drvdata(pdev, mic);
+ 	mtk_hdmi_register_audio_driver(dev);
  
-+	mic->bridge.odev = dev;
- 	mic->bridge.funcs = &mic_bridge_funcs;
--	mic->bridge.of_node = dev->of_node;
++	hdmi->bridge.odev = &pdev->dev;
+ 	hdmi->bridge.funcs = &mtk_hdmi_bridge_funcs;
+-	hdmi->bridge.of_node = pdev->dev.of_node;
+ 	drm_bridge_add(&hdmi->bridge);
  
- 	drm_bridge_add(&mic->bridge);
- 
+ 	ret = mtk_hdmi_clk_enable_audio(hdmi);
 -- 
 2.11.0
