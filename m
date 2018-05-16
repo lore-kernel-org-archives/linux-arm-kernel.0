@@ -1,113 +1,64 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 16 May 2018 15:51:14 +0100
-Subject: [PATCH v3 07/12] ACPI / APEI: Make the nmi_fixmap_idx per-ghes to
- allow multiple in_nmi() users
-In-Reply-To: <20180516110348.GA17092@pd.tnic>
-References: <20180427153510.5799-1-james.morse@arm.com>
- <20180427153510.5799-8-james.morse@arm.com> <20180505122719.GE3708@pd.tnic>
- <1511cfcc-dcd1-b3c5-01c7-6b6b8fb65b05@arm.com>
- <20180516110348.GA17092@pd.tnic>
-Message-ID: <7c871e15-689c-226d-760d-dd92614de2e9@arm.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Wed, 16 May 2018 15:01:10 +0000
+Subject: [PATCH 1/5] dt-bindings: pinctrl: document the STMFX pinctrl
+ bindings
+In-Reply-To: <CACRpkda2VGo0FOdR09tKiTpg66NgoWjubaHp_J3372y=a772Zg@mail.gmail.com>
+References: <1523440025-18077-1-git-send-email-amelie.delaunay@st.com>
+ <1523440025-18077-2-git-send-email-amelie.delaunay@st.com>
+ <20180416181940.4b5z4svbde3ompij@rob-hp-laptop>
+ <CACRpkdYOMjjYyWQz7PK34jqUK7z5-CmH1HY6un4k8nBn7Cq8ag@mail.gmail.com>
+ <55392fe7-20d2-9447-60f9-4bd226b60195@st.com>
+ <CACRpkda2VGo0FOdR09tKiTpg66NgoWjubaHp_J3372y=a772Zg@mail.gmail.com>
+Message-ID: <b9005dd8-8214-ceab-0f88-ff1a51b44e34@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
-
-On 16/05/18 12:05, Borislav Petkov wrote:
-> On Tue, May 08, 2018 at 09:45:01AM +0100, James Morse wrote:
->> NOTIFY_NMI is x86's NMI, arm doesn't have anything that behaves in the same way,
->> so doesn't use it. The equivalent notifications with NMI-like behaviour are:
->> * SEA (synchronous external abort)
->> * SEI (SError Interrupt)
->> * SDEI (software delegated exception interface)
-> > Oh wow, three! :)
-
-The first two overload existing architectural behavior, the third improves all
-this with a third standard option. Its the standard story!
 
 
->> Alternatively, I can put the fixmap-page and spinlock in some 'struct
->> ghes_notification' that only the NMI-like struct-ghes need. This is just moving
->> the indirection up a level, but it does pair the lock with the thing it locks,
->> and gets rid of assigning spinlock pointers.
+On 05/16/2018 04:20 PM, Linus Walleij wrote:
+> On Wed, May 9, 2018 at 9:56 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
 > 
-> Keeping the lock and what it protects in one place certainly sounds
-> better.
-
-Yup, I was about to post a v4...
-
-
-> I guess you could so something like this:
+>> Indeed, stmfx has other functions than GPIO. But, after comments done
+>> here: [1] and there: [2], it has been decided to move MFD parent/GPIO
+>> child drivers into a single PINCTRL/GPIO driver because of the following
+>> reasons:
+>> - Other stmfx functions (IDD measurement and TouchScreen controller) are
+>> not used on any of the boards using an stmfx and supported by Linux, so
+>> no way to test these functions, and no need to maintain them while they
+>> are not being used.
+>> - But, in the case a new board will use more than GPIO function on
+>> stmfx, the actual implementation allow to easily extract common init
+>> part of stmfx and put it in an MFD driver.
+>>
+>> So I could remove gpio sub-node and put its contents in stmfx node and
+>> keep single PINCTRL/GPIO driver for the time being.
+>> Please advise,
 > 
-> struct ghes_fixmap {
->  union {
->   raw_spinlock_t nmi_lock;
->    spinlock_t lock;
->  };
-
-(heh, spinlock_t already contains a raw_spinlock_t)
-
->  void __iomem *(map)(struct ghes_fixmap *);
-> };
+> I would normally advice to use the right modeling from the start, create
+> the MFD driver and spawn the devices from there. It is confusing
+> if the layout of the driver(s) doesn't really match the layout of the
+> hardware.
 > 
-> and assign the proper ghes_ioremap function to ->map.
-
-The function pointer is a problem because SDEI is effectively two notification
-methods. Critical can interrupt normal. I'd really like to keep the differences
-buried in the SDEI driver.
-
-v4 has a separate structure for the fixmap-entry and lock, which
-ghes_copy_tofrom_phys() reaches into if in_nmi().
-
-
-> The spin_lock_irqsave() call in ghes_copy_tofrom_phys() is kinda
-> questionable. Because we should have disabled interrupts so that you can
-> do
+> I understand that it is a pain to write new MFD drivers to get your
+> things going and it would be "nice to get this working really quick
+> now" but in my experience it is better to do it right from the start.
 > 
-> spin_lock(map->lock);
 
-I thought this was for the polled driver, but that must be backed by an
-interrupt too...
+Hi Linus,
 
-linux/timer.h has:
-|  * An irqsafe timer is executed with IRQ disabled and it's safe to wait for
-|  * the completion of the running instance from IRQ handlers, for example,
-|  * by calling del_timer_sync().
-|  *
-|  * Note: The irq disabled callback execution is a special case for
-|  * workqueue locking issues. It's not meant for executing random crap
-|  * with interrupts disabled. Abuse is monitored!
+Thanks for your advice. I understand the point.
+So, the right modeling would be to:
+- create an MFD driver with the common init part of stmfx
+- remove all common init part of stmfx-pinctrl driver and keep only all 
+gpio/pinctrl functions.
 
-This irq-disable behaviour is controlled by the flags field:
-| #define TIMER_DEFERRABLE	0x00080000
-| #define TIMER_IRQSAFE		0x00200000
+I will not develop the other stmfx functions (IDD measurement driver and 
+TouchScreen controller driver) because, as explained ealier, they are 
+not used on any of the boards using an stmfx and supported by Linux, so 
+no way to test these functions, and no need to maintain them while they 
+are not being used.
 
-and ghes_probe() does this:
-| timer_setup(&ghes->timer, ghes_poll_func, TIMER_DEFERRABLE);
+Lee, are you OK with that ?
 
-So I think the ghes_poll_func() can be called with IRQs unmasked, hence the
-spin_lock_irqsave().
-
-
-> Except that we do get called with IRQs on and looking at that call of
-> ghes_proc() at the end of ghes_probe(), that's a deadlock waiting to
-> happen.
-> 
-> And that comes from:
-> 
->   77b246b32b2c ("acpi: apei: check for pending errors when probing GHES entries")
-> 
-> Tyler, this can't work in any context: imagine the GHES NMI or IRQ or
-> the timer fires while that ghes_proc() runs...
-
-I thought this was safe because its just ghes_copy_tofrom_phys()s access to the
-fixmap slots that needs mutual exclusion.
-
-Polled and all the IRQ flavours are kept apart by the spin_lock_irqsave(), and
-the NMIs have their own fixmap entry. (This is fine until there is more than
-once source of NMI)
-
-
-Thanks,
-
-James
+Regards,
+Amelie
