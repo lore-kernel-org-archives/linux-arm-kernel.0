@@ -1,93 +1,70 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 16 May 2018 11:13:08 +0100
-Subject: [RESEND PATCH v5 0/6] Add support for PWM input capture on STM32
-In-Reply-To: <c48acc96-1eca-9adc-abb7-131921305ee8@st.com>
-References: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
- <20180516080635.GE5130@dell>
- <c48acc96-1eca-9adc-abb7-131921305ee8@st.com>
-Message-ID: <20180516101308.GH5130@dell>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 16 May 2018 15:44:12 +0530
+Subject: [PATCH 2/4] ARM: davinci: board-da850-evm: fix GPIO lookup for
+ MMC/SD
+In-Reply-To: <CAHCN7x+eNpeyv27WPqZyy-X9S7Ffvujo+y3Mmt1ZP=LEk+4+=g@mail.gmail.com>
+References: <20180424143506.25793-1-nsekhar@ti.com>
+ <20180424143506.25793-3-nsekhar@ti.com>
+ <fa8feb04-2231-88b8-4d2b-10264187ba7e@lechnology.com>
+ <CAHCN7x+eNpeyv27WPqZyy-X9S7Ffvujo+y3Mmt1ZP=LEk+4+=g@mail.gmail.com>
+Message-ID: <bf023e5e-5831-c9ad-bcd6-c9bb587ba848@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 May 2018, Fabrice Gasnier wrote:
-
-> On 05/16/2018 10:06 AM, Lee Jones wrote:
-> > On Wed, 16 May 2018, Fabrice Gasnier wrote:
-> > 
-> >> This series adds support for capture to stm32-pwm driver.
-> >> Capture is based on DMAs.
-> >> - First two patches add support for requesting DMAs to MFD core
-> >> - Next three patches add support for capture to stm32-pwm driver
-> >> - This has been tested on stm32429i-eval board.
-> >>
-> >> ---
-> >> Changes in v5:
-> >> - update patch 2 (mfd: stm32-timers: add support for dmas)
-> >>   move stm32_timers_dma struct to header file,
-> >>   fix warning on dma_mapping_error().
-> >>
-> >> Changes in v4:
-> >> - Lee's comments on patch 2 (mfd: stm32-timers: add support for dmas)
-> >>   Add kerneldoc header, better format comments.
-> >>
-> >> Changes in v3:
-> >> - Dropped 2 precusor patches applied by Thierry in pwm tree:
-> >>   "pwm: stm32: fix, remove unused struct device"
-> >>   "pwm: stm32: protect common prescaler for all channels"
-> >> - Note: this series applies on top on pwm tree
-> >> - Implements Lee's comments on MFD part: rework stm32_timers_dma struct,
-> >>   exported routine prototype now use generic device struct, more
-> >>   various comments (see patch 2 changelog).
-> >>
-> >> Resend v2:
-> >> - Add collected Acks
-> >>
-> >> Changes in v2:
-> >> - Abstract DMA handling from child driver: move it to MFD core
-> >> - Rework pwm capture routines to adopt this change
-> >> - Comment on optional dma support, beautify DMAs probe
-> >>
-> >> Fabrice Gasnier (6):
-> >>   dt-bindings: mfd: stm32-timers: add support for dmas
-> >>   mfd: stm32-timers: add support for dmas
-> >>   pwm: stm32: add capture support
-> >>   pwm: stm32: improve capture by tuning counter prescaler
-> >>   pwm: stm32: use input prescaler to improve period capture
-> >>   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
-> > 
-> > Applied patches 1-5.
+On Wednesday 16 May 2018 04:23 AM, Adam Ford wrote:
+> On Thu, Apr 26, 2018 at 8:40 PM, David Lechner <david@lechnology.com> wrote:
+>> On 04/24/2018 09:35 AM, Sekhar Nori wrote:
+>>>
+>>> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
+>>> mmc can correctly lookup the wp and cp gpios. Also fix the GPIO numbers
+>>> as they are not offsets within a bank.
+>>>
+>>> Note that it is the gpio-davinci driver that sets the gpiochip label to
+>>> davinci_gpio.0.
+>>>
+>>> Fixes: bdf0e8364fd3 ("ARM: davinci: da850-evm: use gpio descriptor for mmc
+>>> pins")
+>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>>> ---
+>>>   arch/arm/mach-davinci/board-da850-evm.c | 9 +++++++--
+>>>   1 file changed, 7 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-davinci/board-da850-evm.c
+>>> b/arch/arm/mach-davinci/board-da850-evm.c
+>>> index 3063478bcc36..158ed9a1483f 100644
+>>> --- a/arch/arm/mach-davinci/board-da850-evm.c
+>>> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+>>> @@ -763,12 +763,17 @@ static const short da850_evm_mcasp_pins[]
+>>> __initconst = {
+>>>         -1
+>>>   };
+>>>   +#define DA850_MMCSD_CD_PIN           GPIO_TO_PIN(4, 0)
+>>> +#define DA850_MMCSD_WP_PIN             GPIO_TO_PIN(4, 1)
+>>> +
+>>>   static struct gpiod_lookup_table mmc_gpios_table = {
+>>>         .dev_id = "da830-mmc.0",
+>>>         .table = {
+>>>                 /* gpio chip 2 contains gpio range 64-95 */
+>>> -               GPIO_LOOKUP("davinci_gpio.2", 0, "cd", GPIO_ACTIVE_LOW),
+>>> -               GPIO_LOOKUP("davinci_gpio.2", 1, "wp", GPIO_ACTIVE_LOW),
+>>> +               GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_CD_PIN, "cd",
+>>> +                           GPIO_ACTIVE_LOW),
+>>> +               GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_WP_PIN, "wp",
+>>> +                           GPIO_ACTIVE_LOW),
 > 
-> Many thanks Lee !
+> I don't think the WP polarity is working correctly.  If I boot the
+> board 'rw' enabled but WP disabled on the SD card, the system crashes.
+> If I enable WP, the board boots correctly.
 > 
-> Maybe I missed something, but just in case...
-> In your pull request ("[GIT PULL] Immutable branch between MFD and PWM
-> due for the v4.18 merge window") I only see 4 patches:
-> Fabrice Gasnier (4):
->       mfd: stm32-timers: Add support for DMAs
->       pwm: stm32: Add capture support
->       pwm: stm32: Improve capture by tuning counter prescaler
->       pwm: stm32: Use input prescaler to improve period capture
-> 
-> I can't see patch 1 ("dt-bindings: mfd: stm32-timers: add support for dmas")
-> Is it applied on another tree ?
+> Comparing this to the device tree version that I did, and double
+> checking the behavior for my sanity, I believe WP needs to be
+> GPIO_ACTIVE_HIGH
 
-Good spot.
+You are right, I see the issue on my board too. Although this patch did
+not touch the polarity, we could have fixed it here.
 
-Looks like a fumbled the key combination for the bindings patch.
+Anyway, do you want to send a patch for that? Or I can do it too. A
+similar fix is needed for DA830 EVM too.
 
-Pull-request to follow.
-
-> >>  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
-> >>  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
-> >>  drivers/mfd/stm32-timers.c                         | 201 +++++++++++++++-
-> >>  drivers/pwm/pwm-stm32.c                            | 257 +++++++++++++++++++++
-> >>  include/linux/mfd/stm32-timers.h                   |  58 +++++
-> >>  5 files changed, 537 insertions(+), 2 deletions(-)
-> >>
-> > 
-
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Sekhar
