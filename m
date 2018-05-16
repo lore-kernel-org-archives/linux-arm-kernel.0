@@ -1,30 +1,38 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 16 May 2018 15:37:06 +0200
-Subject: [PATCH RFC 5/6] ARM: multi_v7_defconfig: Enable RPi voltage sensor
-In-Reply-To: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
-References: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1526477827-10859-6-git-send-email-stefan.wahren@i2se.com>
+Date: Wed, 16 May 2018 15:37:01 +0200
+Subject: [PATCH RFC 0/6] hwmon: Add support for Raspberry Pi voltage sensor
+Message-ID: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch enables the hwmon driver for the Raspberry Pi.
+A common issue for the Raspberry Pi is an inadequate power supply. 
+Noralf Tr?nnes started a discussion [1] about writting such under-voltage
+conditions into the kernel log.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+This series is a draft to upstream the resulting kernel patch and is not
+intended for 4.18.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 720461b..5c9dc00 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -477,6 +477,7 @@ CONFIG_SENSORS_LM90=y
- CONFIG_SENSORS_LM95245=y
- CONFIG_SENSORS_NTC_THERMISTOR=m
- CONFIG_SENSORS_PWM_FAN=m
-+CONFIG_SENSORS_RASPBERRYPI_HWMON=m
- CONFIG_SENSORS_INA2XX=m
- CONFIG_CPU_THERMAL=y
- CONFIG_BCM2835_THERMAL=m
+[1] - https://github.com/raspberrypi/linux/issues/2367
+
+Stefan Wahren (6):
+  ARM: bcm2835: Add GET_THROTTLED firmware property
+  dt-bindings: hwmon: Add Raspberry Pi voltage sensor
+  hwmon: Add support for RPi voltage sensor
+  ARM: bcm2835_defconfig: Enable RPi voltage sensor
+  ARM: multi_v7_defconfig: Enable RPi voltage sensor
+  arm64: defconfig: Enable RPi voltage sensor
+
+ .../bindings/hwmon/raspberrypi-hwmon.txt           |  19 ++
+ arch/arm/configs/bcm2835_defconfig                 |   2 +-
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/hwmon/Kconfig                              |  10 +
+ drivers/hwmon/Makefile                             |   1 +
+ drivers/hwmon/raspberrypi-hwmon.c                  | 207 +++++++++++++++++++++
+ include/soc/bcm2835/raspberrypi-firmware.h         |   1 +
+ 8 files changed, 241 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
+ create mode 100644 drivers/hwmon/raspberrypi-hwmon.c
+
 -- 
 2.7.4
