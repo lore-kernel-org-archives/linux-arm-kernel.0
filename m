@@ -1,44 +1,114 @@
-From: rishabhb@codeaurora.org (rishabhb at codeaurora.org)
-Date: Wed, 16 May 2018 16:32:27 -0700
-Subject: [PATCH v6 1/2] dt-bindings: Documentation for qcom, llcc
-In-Reply-To: <152649413707.210890.2655572242392552759@swboyd.mtv.corp.google.com>
-References: <1525810921-15878-1-git-send-email-rishabhb@codeaurora.org>
- <1525810921-15878-2-git-send-email-rishabhb@codeaurora.org>
- <152649021310.210890.14841324536807182632@swboyd.mtv.corp.google.com>
- <385198cbb91c4a36ad758997916ad271@codeaurora.org>
- <152649413707.210890.2655572242392552759@swboyd.mtv.corp.google.com>
-Message-ID: <079348edcb511cefb9f4d76877d50cb7@codeaurora.org>
+From: toshi.kani@hpe.com (Toshi Kani)
+Date: Wed, 16 May 2018 17:32:07 -0600
+Subject: [PATCH v3 3/3] x86/mm: add TLB purge to free pmd/pte page interfaces
+In-Reply-To: <20180516233207.1580-1-toshi.kani@hpe.com>
+References: <20180516233207.1580-1-toshi.kani@hpe.com>
+Message-ID: <20180516233207.1580-4-toshi.kani@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-16 11:08, Stephen Boyd wrote:
-> Quoting rishabhb at codeaurora.org (2018-05-16 10:33:14)
->> On 2018-05-16 10:03, Stephen Boyd wrote:
->> > Quoting Rishabh Bhatnagar (2018-05-08 13:22:00)
->> 
->> >> +
->> >> +- max-slices:
->> >> +       usage: required
->> >> +       Value Type: <u32>
->> >> +       Definition: Number of cache slices supported by hardware
->> >> +
->> >> +Example:
->> >> +
->> >> +       llcc: qcom,llcc at 1100000 {
->> >
->> > cache-controller at 1100000 ?
->> >
->> We have tried to use consistent naming convention as in llcc_*
->> everywhere.
->> Using cache-controller will mix and match the naming convention. Also 
->> in
->> the documentation it is explained what llcc is and its full form.
->> 
-> 
-> DT prefers standard node names as opposed to vendor specific node 
-> names.
-> Isn't it a cache controller? I fail to see why this can't be done.
-Hi Stephen,
-The driver is vendor specific and also for uniformity purposes we 
-preferred
-to go with this name.
+ioremap() calls pud_free_pmd_page() / pmd_free_pte_page() when it creates
+a pud / pmd map.  The following preconditions are met at their entry.
+ - All pte entries for a target pud/pmd address range have been cleared.
+ - System-wide TLB purges have been peformed for a target pud/pmd address
+   range.
+
+The preconditions assure that there is no stale TLB entry for the range.
+Speculation may not cache TLB entries since it requires all levels of page
+entries, including ptes, to have P & A-bits set for an associated address.
+However, speculation may cache pud/pmd entries (paging-structure caches)
+when they have P-bit set.
+
+Add a system-wide TLB purge (INVLPG) to a single page after clearing
+pud/pmd entry's P-bit.
+
+SDM 4.10.4.1, Operation that Invalidate TLBs and Paging-Structure Caches,
+states that:
+  INVLPG invalidates all paging-structure caches associated with the
+  current PCID regardless of the liner addresses to which they correspond.
+
+Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
+Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Michal Hocko <mhocko@suse.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: <stable@vger.kernel.org>
+---
+ arch/x86/mm/pgtable.c |   34 ++++++++++++++++++++++++++++------
+ 1 file changed, 28 insertions(+), 6 deletions(-)
+
+diff --git a/arch/x86/mm/pgtable.c b/arch/x86/mm/pgtable.c
+index f60fdf411103..7e96594c7e97 100644
+--- a/arch/x86/mm/pgtable.c
++++ b/arch/x86/mm/pgtable.c
+@@ -721,24 +721,42 @@ int pmd_clear_huge(pmd_t *pmd)
+  * @pud: Pointer to a PUD.
+  * @addr: Virtual address associated with pud.
+  *
+- * Context: The pud range has been unmaped and TLB purged.
++ * Context: The pud range has been unmapped and TLB purged.
+  * Return: 1 if clearing the entry succeeded. 0 otherwise.
+  */
+ int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+ {
+-	pmd_t *pmd;
++	pmd_t *pmd, *pmd_sv;
++	pte_t *pte;
+ 	int i;
+ 
+ 	if (pud_none(*pud))
+ 		return 1;
+ 
+ 	pmd = (pmd_t *)pud_page_vaddr(*pud);
++	pmd_sv = (pmd_t *)__get_free_page(GFP_KERNEL);
++	if (!pmd_sv)
++		return 0;
+ 
+-	for (i = 0; i < PTRS_PER_PMD; i++)
+-		if (!pmd_free_pte_page(&pmd[i], addr + (i * PMD_SIZE)))
+-			return 0;
++	for (i = 0; i < PTRS_PER_PMD; i++) {
++		pmd_sv[i] = pmd[i];
++		if (!pmd_none(pmd[i]))
++			pmd_clear(&pmd[i]);
++	}
+ 
+ 	pud_clear(pud);
++
++	/* INVLPG to clear all paging-structure caches */
++	flush_tlb_kernel_range(addr, addr + PAGE_SIZE-1);
++
++	for (i = 0; i < PTRS_PER_PMD; i++) {
++		if (!pmd_none(pmd_sv[i])) {
++			pte = (pte_t *)pmd_page_vaddr(pmd_sv[i]);
++			free_page((unsigned long)pte);
++		}
++	}
++
++	free_page((unsigned long)pmd_sv);
+ 	free_page((unsigned long)pmd);
+ 
+ 	return 1;
+@@ -749,7 +767,7 @@ int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+  * @pmd: Pointer to a PMD.
+  * @addr: Virtual address associated with pmd.
+  *
+- * Context: The pmd range has been unmaped and TLB purged.
++ * Context: The pmd range has been unmapped and TLB purged.
+  * Return: 1 if clearing the entry succeeded. 0 otherwise.
+  */
+ int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+@@ -761,6 +779,10 @@ int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+ 
+ 	pte = (pte_t *)pmd_page_vaddr(*pmd);
+ 	pmd_clear(pmd);
++
++	/* INVLPG to clear all paging-structure caches */
++	flush_tlb_kernel_range(addr, addr + PAGE_SIZE-1);
++
+ 	free_page((unsigned long)pte);
+ 
+ 	return 1;
