@@ -1,94 +1,84 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 16 May 2018 12:15:10 +0200
-Subject: [PATCH v3 26/26] drm/bridge: establish a link between the bridge
- supplier and consumer
-In-Reply-To: <20180516101510.13215-1-peda@axentia.se>
-References: <20180516101510.13215-1-peda@axentia.se>
-Message-ID: <20180516101510.13215-27-peda@axentia.se>
+From: lambertarthur22@gmail.com (Arthur LAMBERT)
+Date: Wed, 16 May 2018 12:31:20 +0200
+Subject: issue with kexec/kdump on imx6ull
+In-Reply-To: <20180409143123.GA4251@n2100.armlinux.org.uk>
+References: <20180320100427.GA21933@arthur-bzh>
+ <20180320104302.GG2743@n2100.armlinux.org.uk>
+ <20180320150723.GH2743@n2100.armlinux.org.uk>
+ <20180320171608.GB32282@arthur-bzh>
+ <20180320191259.GI2743@n2100.armlinux.org.uk>
+ <20180321132548.GA32618@arthur-bzh>
+ <20180329205413.GG16141@n2100.armlinux.org.uk>
+ <20180409135852.GA22168@arthur-bzh>
+ <20180409143123.GA4251@n2100.armlinux.org.uk>
+Message-ID: <20180516103120.GA17813@arthur-bzh>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the bridge supplier is unbound, this will bring the bridge consumer
-down along with the bridge. Thus, there will no longer linger any
-dangling pointers from the bridge consumer (the drm_device) to some
-non-existent bridge supplier.
+Le Monday 09 Apr 2018 ? 15:31:23 (+0100), Russell King - ARM Linux a ?crit :
+> 
+> >    kernel command line: "console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw earlyprintk maxcpus=1 reset_devices elfcorehdr=0x9b100000 mem=50176K"
+> 
+> This is the command line which the target kernel should boot with, but...
+> 
+> > [    0.000000] Kernel command line: console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw crashkernel=50M
+> 
+> it appears that it hasn't, so something is still wrong.  Without the
+> right command line, you won't get the vmcore.
 
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/gpu/drm/drm_bridge.c | 18 ++++++++++++++++++
- include/drm/drm_bridge.h     |  2 ++
- 2 files changed, 20 insertions(+)
+Sorry for my very late answer Russell.
 
-diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
-index 78d186b6831b..0259f0a3ff27 100644
---- a/drivers/gpu/drm/drm_bridge.c
-+++ b/drivers/gpu/drm/drm_bridge.c
-@@ -26,6 +26,7 @@
- #include <linux/mutex.h>
- 
- #include <drm/drm_bridge.h>
-+#include <drm/drm_device.h>
- #include <drm/drm_encoder.h>
- 
- #include "drm_crtc_internal.h"
-@@ -127,12 +128,25 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
- 	if (bridge->dev)
- 		return -EBUSY;
- 
-+	if (encoder->dev->dev != bridge->odev) {
-+		bridge->link = device_link_add(encoder->dev->dev,
-+					       bridge->odev, 0);
-+		if (!bridge->link) {
-+			dev_err(bridge->odev, "failed to link bridge to %s\n",
-+				dev_name(encoder->dev->dev));
-+			return -EINVAL;
-+		}
-+	}
-+
- 	bridge->dev = encoder->dev;
- 	bridge->encoder = encoder;
- 
- 	if (bridge->funcs->attach) {
- 		ret = bridge->funcs->attach(bridge);
- 		if (ret < 0) {
-+			if (bridge->link)
-+				device_link_del(bridge->link);
-+			bridge->link = NULL;
- 			bridge->dev = NULL;
- 			bridge->encoder = NULL;
- 			return ret;
-@@ -159,6 +173,10 @@ void drm_bridge_detach(struct drm_bridge *bridge)
- 	if (bridge->funcs->detach)
- 		bridge->funcs->detach(bridge);
- 
-+	if (bridge->link)
-+		device_link_del(bridge->link);
-+	bridge->link = NULL;
-+
- 	bridge->dev = NULL;
- }
- 
-diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-index b656e505d11e..bd1265c5a0bc 100644
---- a/include/drm/drm_bridge.h
-+++ b/include/drm/drm_bridge.h
-@@ -261,6 +261,7 @@ struct drm_bridge_timings {
-  * @list: to keep track of all added bridges
-  * @timings: the timing specification for the bridge, if any (may
-  * be NULL)
-+ * @link: device link between the drm consumer and the bridge supplier
-  * @funcs: control functions
-  * @driver_private: pointer to the bridge driver's internal context
-  */
-@@ -271,6 +272,7 @@ struct drm_bridge {
- 	struct drm_bridge *next;
- 	struct list_head list;
- 	const struct drm_bridge_timings *timings;
-+	struct device_link *link;
- 
- 	const struct drm_bridge_funcs *funcs;
- 	void *driver_private;
--- 
-2.11.0
+We can see that kexec is able to build the correct command line but instead of booting with this kernel
+command line. Kexec boot the target kernel with default kernel command line.
+
+I am currently forcing kernel command line on my target kernel :
+
+CONFIG_CMDLINE="console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw earlyprintk crashkernel=50M"
+# CONFIG_CMDLINE_FROM_BOOTLOADER is not set
+# CONFIG_CMDLINE_EXTEND is not set
+CONFIG_CMDLINE_FORCE=y
+
+By just using extend bootlader command line, it seems to be better :
+
+CONFIG_CMDLINE="bazinga"
+# CONFIG_CMDLINE_FROM_BOOTLOADER is not set
+CONFIG_CMDLINE_EXTEND=y
+# CONFIG_CMDLINE_FORCE is not set
+
+New result :
+
+[  117.998829] Loading crashdump kernel...
+[  118.002830] Bye!
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.16.0-rc7KEXEC (arthur at arthur-bzh) (gcc version 5.4.0 (Buildroot 2017.05-git-38202-gb94bcd1-dirty)) #9 SMP Tue May 15 15:50:55 CEST 2018
+[    0.000000] CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7), cr=10c5387d
+[    0.000000] CPU: div instructions available: patching division code
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+[    0.000000] OF: fdt: Machine model: Freescale i.MX6 UlltraLite 14x14 EVK Board
+[    0.000000] OF: fdt: Ignoring memory range 0x80000000 - 0x98000000
+[    0.000000] Memory policy: Data cache writealloc
+[    0.000000] cma: Failed to reserve 64 MiB
+[    0.000000] random: fast init done
+[    0.000000] percpu: Embedded 16 pages/cpu @(ptrval) s36136 r8192 d21208 u65536
+[    0.000000] Built 1 zonelists, mobility grouping off.  Total pages: 12446
+[    0.000000] Kernel command line: console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw earlyprintk elfcorehdr=0x9b100000 mem=50176K bazinga
+
+(...)
+
+# cat /proc/cmdline
+console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw earlyprintk elfcorehdr=0x9b100000 mem=50176K bazinga
+# ls -l /proc/vmcore
+-r--------    1 root     root     484450304 Jan  1 00:07 /proc/vmcore
+
+Now I just need to compare behavior between kernel mainline and nxp bsp to understand and fix the kernel freeze
+issue with the bsp. At least now I have a working setup. I will try to find some time to work on that
+next week.
+
+Do you have a reliable method to analyze vmcore from ARM architecture ?
+On your first message you wrote :
+
+>> There's also a ti-keystone2 branch which contains an additional
+>> (hacky and untested) patch which allows reading the coredump
+>> generated by kexec on a crash.
+
+Thanks for your help !
