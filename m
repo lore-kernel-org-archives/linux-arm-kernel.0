@@ -1,11 +1,11 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 16 May 2018 09:33:18 -0700
+Date: Wed, 16 May 2018 09:34:31 -0700
 Subject: [PATCH 07/14] ARM: spectre-v2: add Cortex A8 and A15 validation
  of the IBE bit
 In-Reply-To: <E1fIuBF-0003q0-3d@rmk-PC.armlinux.org.uk>
 References: <20180516105949.GJ16141@n2100.armlinux.org.uk>
  <E1fIuBF-0003q0-3d@rmk-PC.armlinux.org.uk>
-Message-ID: <a3ea8562-40b1-88b8-8bba-f6de8f9ac8cb@gmail.com>
+Message-ID: <48736d8c-cebf-5381-f62a-b8ef5c6445b9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,10 +20,5 @@ On 05/16/2018 04:01 AM, Russell King wrote:
 > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-
-I would be keen on updating arch/arm/kernel/head.S to to attempt setting
-ACTRL[0]=1 on A15/B15, if the kernel executes at the appropriate
-privilege level, this will succeed, if not, this should result in an
-ignored write. What do you think?
 -- 
 Florian
