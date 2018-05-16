@@ -1,45 +1,54 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 16 May 2018 19:42:25 +0200
-Subject: [PATCH 0/2] ARM: Update multi_v7_defconfig and add add Marvel NAND
-In-Reply-To: <20180424081528.25883-1-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Tue, 24 Apr 2018 10:15:26 +0200")
-References: <20180424081528.25883-1-gregory.clement@bootlin.com>
-Message-ID: <87wow31oqm.fsf@bootlin.com>
+From: rishabhb@codeaurora.org (Rishabh Bhatnagar)
+Date: Wed, 16 May 2018 10:43:42 -0700
+Subject: [PATCH v7 1/2] dt-bindings: Documentation for qcom, llcc
+In-Reply-To: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
+References: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
+Message-ID: <1526492623-20527-2-git-send-email-rishabhb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mar., avril 24 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+Documentation for last level cache controller device tree bindings,
+client bindings usage examples.
 
-> Hi,
->
-> While adding Marvel NAND controller support in to the
-> multi_v7_defconfig, I noticed that this file had greatly diverged, so
-> the first patch updates it.
->
-> Maybe this first patch should be merged in the current rc to reduce
-> the number of merge conflict.
->
-> Gregpry
->
-> Gregory CLEMENT (2):
->   ARM: multi_v7_defconfig: Update with current configuration
->   ARM: multi_v7_defconfig: Add Marvel NAND controller support
+Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
+---
+ .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
 
-Both applied on mvebu/arm with fixes reported by Thomas.
-
-Gregory
-
->
->  arch/arm/configs/multi_v7_defconfig | 369 +++++++++++++++---------------------
->  1 file changed, 153 insertions(+), 216 deletions(-)
->
-> -- 
-> 2.16.3
->
-
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+new file mode 100644
+index 0000000..0ebbf0a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+@@ -0,0 +1,26 @@
++== Introduction==
++
++LLCC (Last Level Cache Controller) provides last level of cache memory in SOC,
++that can be shared by multiple clients. Clients here are different cores in the
++SOC, the idea is to minimize the local caches at the clients and migrate to
++common pool of memory. Cache memory is divided into partitions called slices
++which are assigned to clients. Clients can query the slice details, activate
++and deactivate them.
++
++Properties:
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be "qcom,sdm845-llcc"
++
++- reg:
++	Usage: required
++	Value Type: <prop-encoded-array>
++	Definition: Start address and the the size of the register region.
++
++Example:
++
++	qcom,llcc at 1100000 {
++		compatible = "qcom,sdm845-llcc";
++		reg = <0x1100000 0x250000>;
++	};
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
