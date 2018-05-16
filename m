@@ -1,130 +1,281 @@
 From: vilhelm.gray@gmail.com (William Breathitt Gray)
-Date: Wed, 16 May 2018 13:50:10 -0400
-Subject: [PATCH v6 0/9] Introduce the Counter subsystem
-Message-ID: <cover.1526487615.git.vilhelm.gray@gmail.com>
+Date: Wed, 16 May 2018 13:50:55 -0400
+Subject: [PATCH v6 2/9] counter: Documentation: Add Generic Counter sysfs
+ documentation
+In-Reply-To: <cover.1526487615.git.vilhelm.gray@gmail.com>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+Message-ID: <1bf56af37a1d6dab8181ce71f827914acdf5c4f7.1526487615.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This revision is primarily a code refactor and formatting cleanup -- the
-interface has remained essentially the same as revision 5, with some
-minor additions.
+This patch adds standard documentation for the userspace sysfs
+attributes of the Generic Counter interface.
 
-Here's a brief summary of the Generic Counter interface and related code
-changes in this revision:
-
-    * checkpatch.pl formatting suggestions implemented (parameters line
-      up with opening round bracket, etc.)
-    * Implement struct counter_ops to enable const structure for
-      driver callbacks
-    * Provide const string array for count_direction and count_mode
-      options to help maintain a consistent interface
-    * Reduce local variables by inlining where appropriate
-    * Bring memory cleanup code closer to respective allocations for
-      clarity and easier debugging
-    * Implement counter_name_attribute_create function to reduce
-      repeated code for various "name" attributes
-    * Implement counter_global_attr_register function to organize global
-      counter attribute registration together
-    * Implement prepare_counter_device_groups_list and
-      prepare_counter_device_groups functions to organize sysfs
-      attribute configuration into logical groups (this makes the
-      counter_register function logic much easier to follow)
-
-Furthermore, the following additions have been made:
-
-    * The "ceiling" and "floor" attributes are defined to represent the
-      upper limit and lower limit respectively for a Count
-    * The following attributes are now part of the main Generic Counter
-      interface: count_mode, direction, enable, preset, preset_enable,
-      and error_noise
-    * The "Quadrature x1" and "Quadrature x2" function modes are now
-      known as "Quadrature x1 A" and "Quadrature x2 A" respectively
-    * The following new function modes are defined in order to support
-      the STM32 LP Timer quadrature modes: Quadrature x1 B, Quadrature
-      x2 B, Quadrature x2 Rising, and Quadrature x2 Falling
-    * The "num_counts" and "num_signals" attributes are defined to
-      represent the total number of Counts and total number of Signals
-      respectively
-
-The 104-QUAD-8 counter driver has been updated to make use of the
-Generic Counter API changes ("ceiling" and "floor" attributes, constant
-counter_ops structure, count_mode and direction string arrays, etc.).
-
-The STM32 Timer counter driver has been updated to make use of the
-Generic Counter API changes ("ceiling" attribute, constant counter_ops
-structure, etc.). In addition, Fabrice Gasnier added support for a
-missing encoder mode (see STM32_COUNT_ENCODER_MODE_2).
-
-Proper Generic Counter interface support for the STM32 LP Timer has been
-added to its respective counter driver. This is the last in-tree Linux
-kernel driver using the deprecated IIO Counter interface, so we can
-safely remove that interface in the future now.
-
-I've added deprecation notices to the IIO Counter attributes to
-encourage the switch to the Generic Counter interface. I didn't mention
-a removal date for the relevant code, but perhaps before the next
-longterm kernel release would be a good idea -- this should prevent the
-IIO Counter API from persisting longer than necessary.
-
-William Breathitt Gray
-
-Benjamin Gaignard (2):
-  dt-bindings: counter: Document stm32 quadrature encoder
-  counter: Add STM32 Timer quadrature encoder
-
-Fabrice Gasnier (1):
-  counter: stm32-lptimer: add counter device
-
-William Breathitt Gray (6):
-  counter: Introduce the Generic Counter interface
-  counter: Documentation: Add Generic Counter sysfs documentation
-  docs: Add Generic Counter interface documentation
-  counter: 104-quad-8: Add Generic Counter interface support
-  counter: 104-quad-8: Documentation: Add Generic Counter sysfs
-    documentation
-  iio: counter: Remove IIO counter subdirectory
-
- Documentation/ABI/testing/sysfs-bus-counter   |  241 +++
- .../ABI/testing/sysfs-bus-counter-104-quad-8  |   36 +
- Documentation/ABI/testing/sysfs-bus-iio       |    8 +
- .../testing/sysfs-bus-iio-counter-104-quad-8  |   16 +
- .../{iio => }/counter/stm32-lptimer-cnt.txt   |    0
- .../bindings/counter/stm32-timer-cnt.txt      |   26 +
- .../devicetree/bindings/mfd/stm32-lptimer.txt |    2 +-
- .../devicetree/bindings/mfd/stm32-timers.txt  |    7 +
- Documentation/driver-api/generic-counter.rst  |  336 ++++
- Documentation/driver-api/index.rst            |    1 +
- MAINTAINERS                                   |   14 +-
- drivers/Kconfig                               |    2 +
- drivers/Makefile                              |    1 +
- drivers/counter/104-quad-8.c                  | 1335 ++++++++++++++
- drivers/counter/Kconfig                       |   59 +
- drivers/{iio => }/counter/Makefile            |    6 +-
- drivers/counter/generic-counter.c             | 1541 +++++++++++++++++
- drivers/counter/stm32-lptimer-cnt.c           |  722 ++++++++
- drivers/counter/stm32-timer-cnt.c             |  390 +++++
- drivers/iio/Kconfig                           |    1 -
- drivers/iio/Makefile                          |    1 -
- drivers/iio/counter/104-quad-8.c              |  596 -------
- drivers/iio/counter/Kconfig                   |   34 -
- drivers/iio/counter/stm32-lptimer-cnt.c       |  382 ----
- include/linux/counter.h                       |  554 ++++++
- 25 files changed, 5293 insertions(+), 1018 deletions(-)
+Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+---
+ Documentation/ABI/testing/sysfs-bus-counter | 241 ++++++++++++++++++++
+ MAINTAINERS                                 |   1 +
+ 2 files changed, 242 insertions(+)
  create mode 100644 Documentation/ABI/testing/sysfs-bus-counter
- create mode 100644 Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
- rename Documentation/devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt (100%)
- create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
- create mode 100644 Documentation/driver-api/generic-counter.rst
- create mode 100644 drivers/counter/104-quad-8.c
- create mode 100644 drivers/counter/Kconfig
- rename drivers/{iio => }/counter/Makefile (52%)
- create mode 100644 drivers/counter/generic-counter.c
- create mode 100644 drivers/counter/stm32-lptimer-cnt.c
- create mode 100644 drivers/counter/stm32-timer-cnt.c
- delete mode 100644 drivers/iio/counter/104-quad-8.c
- delete mode 100644 drivers/iio/counter/Kconfig
- delete mode 100644 drivers/iio/counter/stm32-lptimer-cnt.c
- create mode 100644 include/linux/counter.h
 
+diff --git a/Documentation/ABI/testing/sysfs-bus-counter b/Documentation/ABI/testing/sysfs-bus-counter
+new file mode 100644
+index 000000000000..e4a45d231b4f
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-bus-counter
+@@ -0,0 +1,241 @@
++What:		/sys/bus/counter/devices/counterX/countY/count
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Count data of Count Y represented as a string.
++
++What:		/sys/bus/counter/devices/counterX/countY/ceiling
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Count value ceiling for Count Y. This is the upper limit for the
++		respective counter.
++
++What:		/sys/bus/counter/devices/counterX/countY/floor
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Count value floor for Count Y. This is the lower limit for the
++		respective counter.
++
++What:		/sys/bus/counter/devices/counterX/countY/count_mode
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Count mode for channel Y. The ceiling and floor values for
++		Count Y are used by the count mode where required. The following
++		count modes are available:
++
++		Normal:
++			Counting is continuous in either direction.
++
++		Range Limit:
++			An upper or lower limit is set, mimicking limit switches
++			in the mechanical counterpart. The upper limit is set to
++			the Count Y ceiling value, while the lower limit is set
++			to the Count Y floor value. The counter freezes at
++			count = ceiling when counting up, and at count = floor
++			when counting down. At either of these limits, the
++			counting is resumed only when the count direction is
++			reversed.
++
++		Non-Recycle:
++			The counter is disabled whenever a counter overflow or
++			underflow takes place. The counter is re-enabled when a
++			new count value is loaded to the counter via a preset
++			operation or direct write.
++
++		Modulo-N:
++			A count value boundary is set between the Count Y floor
++			value and the Count Y ceiling value. The counter is
++			reset to the Cunt Y floor value at count = ceiling when
++			counting up, while the counter is set to the Count Y
++			ceiling value at count = floor when counting down; the
++			counter does not freeze at the boundary points, but
++			counts continuously throughout.
++
++What:		/sys/bus/counter/devices/counterX/countY/count_mode_available
++What:		/sys/bus/counter/devices/counterX/countY/error_noise_available
++What:		/sys/bus/counter/devices/counterX/countY/function_available
++What:		/sys/bus/counter/devices/counterX/countY/signalZ_action_available
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Discrete set of available values for the respective Count Y
++		configuration are listed in this file. Values are delineated by
++		newline characters.
++
++What:		/sys/bus/counter/devices/counterX/countY/direction
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Read-only attribute that indicates the count direction of Count
++		Y. Two count directions are available: forward and backward.
++
++		Some counter devices are able to determine the direction of
++		their counting. For example, quadrature encoding counters can
++		determine the direction of movement by evaluating the leading
++		phase of the respective A and B quadrature encoding signals.
++		This attribute exposes such count directions.
++
++What:		/sys/bus/counter/devices/counterX/countY/enable
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Whether channel Y counter is enabled. Valid attribute values are
++		boolean.
++
++		This attribute is intended to serve as a pause/unpause mechanism
++		for Count Y. Suppose a counter device is used to count the total
++		movement of a conveyor belt: this attribute allows an operator
++		to temporarily pause the counter, service the conveyor belt,
++		and then finally unpause the counter to continue where it had
++		left off.
++
++What:		/sys/bus/counter/devices/counterX/countY/error_noise
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Read-only attribute that indicates whether excessive noise is
++		present at the channel Y counter inputs.
++
++What:		/sys/bus/counter/devices/counterX/countY/function
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Count function mode of Count Y; count function evaluation is
++		triggered by conditions specified by the Count Y signalZ_action
++		attributes. The following count functions are available:
++
++		Increase:
++			Accumulated count is incremented.
++
++		Decrease:
++			Accumulated count is decremented.
++
++		Pulse-Direction:
++			Rising edges on quadrature pair signal A updates the
++			respective count. The input level of quadrature pair
++			signal B determines direction.
++
++		Quadrature x1 A:
++			If direction is forward, rising edges on quadrature pair
++			signal A updates the respective count; if the direction
++			is backward, falling edges on quadrature pair signal A
++			updates the respective count. Quadrature encoding
++			determines the direction.
++
++		Quadrature x1 B:
++			If direction is forward, rising edges on quadrature pair
++			signal B updates the respective count; if the direction
++			is backward, falling edges on quadrature pair signal B
++			updates the respective count. Quadrature encoding
++			determines the direction.
++
++		Quadrature x2 A:
++			Any state transition on quadrature pair signal A updates
++			the respective count. Quadrature encoding determines the
++			direction.
++
++		Quadrature x2 B:
++			Any state transition on quadrature pair signal B updates
++			the respective count. Quadrature encoding determines the
++			direction.
++
++		Quadrature x2 Rising:
++			Rising edges on either quadrature pair signals updates
++			the respective count. Quadrature encoding determines the
++			direction.
++
++		Quadrature x2 Falling:
++			Falling edges on either quadrature pair signals updates
++			the respective count. Quadrature encoding determines the
++			direction.
++
++		Quadrature x4:
++			Any state transition on either quadrature pair signals
++			updates	the respective count. Quadrature encoding
++			determines the direction.
++
++What:		/sys/bus/counter/devices/counterX/countY/name
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Read-only attribute that indicates the device-specific name of
++		Count Y. If possible, this should match the name of the
++		respective channel as it appears in the device datasheet
++		documentation text.
++
++What:		/sys/bus/counter/devices/counterX/countY/preset
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		If the counter device supports preset registers, the preset
++		count for channel Y is provided by this attribute.
++
++What:		/sys/bus/counter/devices/counterX/countY/preset_enable
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Whether channel Y counter preset operation is enabled. Valid
++		attribute values are boolean.
++
++What:		/sys/bus/counter/devices/counterX/countY/signalZ_action
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Action mode of Count Y for Signal Z. This attribute indicates
++		the condition of Signal Z that triggers the count function
++		evaluation for Count Y. The following action modes are
++		available:
++
++		None:
++			Signal does not trigger the count function. In
++			Pulse-Direction count function mode, this Signal is
++			evaluated as Direction.
++
++		Rising Edge:
++			Low state transitions to high state.
++
++		Falling Edge:
++			High state transitions to low state.
++
++		Both Edges:
++			Any state transition.
++
++What:		/sys/bus/counter/devices/counterX/name
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Read-only attribute that indicates the device-specific name of
++		the Counter. This should match the name of the device as it
++		appears in its respective datasheet documentation text.
++
++What:		/sys/bus/counter/devices/counterX/num_counts
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Read-only attribute that indicates the total number of Counts
++		belonging to the Counter.
++
++What:		/sys/bus/counter/devices/counterX/num_signals
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Read-only attribute that indicates the total number of Signals
++		belonging to the Counter.
++
++What:		/sys/bus/counter/devices/counterX/signalY/signal
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Signal data of Signal Y represented as a string.
++
++What:		/sys/bus/counter/devices/counterX/signalY/name
++KernelVersion:	4.18
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Read-only attribute that indicates the device-specific name of
++		Signal Y. If possible, this should match the name of the
++		respective signal as it appears in the device datasheet
++		documentation text.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2a016d73ab72..1413e3eb49e5 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3673,6 +3673,7 @@ COUNTER SUBSYSTEM
+ M:	William Breathitt Gray <vilhelm.gray@gmail.com>
+ L:	linux-iio at vger.kernel.org
+ S:	Maintained
++F:	Documentation/ABI/testing/sysfs-bus-counter*
+ F:	drivers/counter/
+ F:	include/linux/counter.h
+ 
 -- 
 2.17.0
