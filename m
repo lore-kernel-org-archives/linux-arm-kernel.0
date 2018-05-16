@@ -1,49 +1,69 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 16 May 2018 12:13:37 +0800
-Subject: [PATCH v7 12/14] cpufreq: Add Kryo CPU scaling driver
-In-Reply-To: <1526375616-16904-13-git-send-email-ilialin@codeaurora.org>
-References: <1526375616-16904-13-git-send-email-ilialin@codeaurora.org>
-Message-ID: <201805161233.KgANSDKh%fengguang.wu@intel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 16 May 2018 10:02:18 +0530
+Subject: [PATCH] cpufreq: brcmstb-avs-cpufreq: sort frequencies in
+ ascending order
+In-Reply-To: <20180516034954.56475-1-code@mmayer.net>
+References: <20180516034954.56475-1-code@mmayer.net>
+Message-ID: <20180516043218.7ktq5vjq2rhcszz5@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ilia,
+On 15-05-18, 20:49, Markus Mayer wrote:
+> From: Markus Mayer <mmayer@broadcom.com>
+> 
+> Most CPUfreq drivers (at least on ARM) seem to be sorting the available
+> frequencies from lowest to highest. To match this behaviour, we reverse
+> the sorting order in brcmstb-avs-cpufreq, so it is now also lowest to
+> highest.
 
-Thank you for the patch! Yet something to improve:
+The reasoning isn't correct. Just because everyone else is doing it
+doesn't make it right and so you shouldn't change just because of
+that.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.17-rc5]
-[cannot apply to clk/clk-next next-20180515]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+What you must written instead in the commit log is that the cpufreq
+core performs better if the table is sorted (in any order), and so we
+must sort it as well.
 
-url:    https://github.com/0day-ci/linux/commits/Ilia-Lin/CPU-scaling-support-for-msm8996/20180516-064721
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+But I feel the table is already sorted for your platform, isn't it?
+And I don't see a clear advantage of merging this patch.
 
-All errors (new ones prefixed by >>):
+> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> ---
+>  drivers/cpufreq/brcmstb-avs-cpufreq.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+> index b07559b9ed99..7dac3205d3eb 100644
+> --- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
+> +++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+> @@ -403,7 +403,7 @@ brcm_avs_get_freq_table(struct device *dev, struct private_data *priv)
+>  {
+>  	struct cpufreq_frequency_table *table;
+>  	unsigned int pstate;
+> -	int i, ret;
+> +	int p, i, ret;
+>  
+>  	/* Remember P-state for later */
+>  	ret = brcm_avs_get_pstate(priv, &pstate);
+> @@ -415,12 +415,13 @@ brcm_avs_get_freq_table(struct device *dev, struct private_data *priv)
+>  	if (!table)
+>  		return ERR_PTR(-ENOMEM);
+>  
+> -	for (i = AVS_PSTATE_P0; i <= AVS_PSTATE_MAX; i++) {
+> -		ret = brcm_avs_set_pstate(priv, i);
+> +	for (p = AVS_PSTATE_MAX, i = 0; p >= 0; p--, i++) {
+> +		ret = brcm_avs_set_pstate(priv, p);
+>  		if (ret)
+>  			return ERR_PTR(ret);
+>  		table[i].frequency = brcm_avs_get_frequency(priv->base);
+> -		table[i].driver_data = i;
+> +		/* Store the corresponding P-state with each frequency */
+> +		table[i].driver_data = p;
+>  	}
+>  	table[i].frequency = CPUFREQ_TABLE_END;
+>  
+> -- 
+> 2.7.4
 
-   aarch64-linux-gnu-ld: arch/arm64/kernel/head.o: relocation R_AARCH64_ABS32 against `_kernel_offset_le_lo32' can not be used when making a shared object
-   arch/arm64/kernel/head.o: In function `kimage_vaddr':
-   (.idmap.text+0x0): dangerous relocation: unsupported relocation
-   arch/arm64/kernel/head.o: In function `__primary_switch':
-   (.idmap.text+0x350): dangerous relocation: unsupported relocation
-   (.idmap.text+0x358): dangerous relocation: unsupported relocation
-   drivers/cpufreq/qcom-cpufreq-kryo.o: In function `qcom_cpufreq_kryo_driver_init':
->> qcom-cpufreq-kryo.c:(.init.text+0xd8): undefined reference to `qcom_smem_get'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 59061 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180516/2b801114/attachment-0001.gz>
+-- 
+viresh
