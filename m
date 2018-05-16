@@ -1,73 +1,109 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Wed, 16 May 2018 17:51:57 +0800
-Subject: [PATCH] arm64: dts: move berlin SoC files from marvell dir to
- synaptics dir
-Message-ID: <20180516175157.3d02dbdc@xhacker.debian>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 16 May 2018 11:53:03 +0200
+Subject: [PATCH 10/14] vgem: separate errno from VM_FAULT_* values
+In-Reply-To: <20180516054348.15950-11-hch@lst.de>
+References: <20180516054348.15950-1-hch@lst.de>
+ <20180516054348.15950-11-hch@lst.de>
+Message-ID: <20180516095303.GH3438@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move device tree files as part of transition from Marvell berlin to
-Synaptics berlin.
+On Wed, May 16, 2018 at 07:43:44AM +0200, Christoph Hellwig wrote:
+> And streamline the code in vgem_fault with early returns so that it is
+> a little bit more readable.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  drivers/gpu/drm/vgem/vgem_drv.c | 51 +++++++++++++++------------------
+>  1 file changed, 23 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/vgem/vgem_drv.c b/drivers/gpu/drm/vgem/vgem_drv.c
+> index 2524ff116f00..a261e0aab83a 100644
+> --- a/drivers/gpu/drm/vgem/vgem_drv.c
+> +++ b/drivers/gpu/drm/vgem/vgem_drv.c
+> @@ -61,12 +61,13 @@ static void vgem_gem_free_object(struct drm_gem_object *obj)
+>  	kfree(vgem_obj);
+>  }
+>  
+> -static int vgem_gem_fault(struct vm_fault *vmf)
+> +static vm_fault_t vgem_gem_fault(struct vm_fault *vmf)
+>  {
+>  	struct vm_area_struct *vma = vmf->vma;
+>  	struct drm_vgem_gem_object *obj = vma->vm_private_data;
+>  	/* We don't use vmf->pgoff since that has the fake offset */
+>  	unsigned long vaddr = vmf->address;
+> +	struct page *page;
+>  	int ret;
+>  	loff_t num_pages;
+>  	pgoff_t page_offset;
+> @@ -85,35 +86,29 @@ static int vgem_gem_fault(struct vm_fault *vmf)
+>  		ret = 0;
+>  	}
+>  	mutex_unlock(&obj->pages_lock);
+> -	if (ret) {
+> -		struct page *page;
+> -
+> -		page = shmem_read_mapping_page(
+> -					file_inode(obj->base.filp)->i_mapping,
+> -					page_offset);
+> -		if (!IS_ERR(page)) {
+> -			vmf->page = page;
+> -			ret = 0;
+> -		} else switch (PTR_ERR(page)) {
+> -			case -ENOSPC:
+> -			case -ENOMEM:
+> -				ret = VM_FAULT_OOM;
+> -				break;
+> -			case -EBUSY:
+> -				ret = VM_FAULT_RETRY;
+> -				break;
+> -			case -EFAULT:
+> -			case -EINVAL:
+> -				ret = VM_FAULT_SIGBUS;
+> -				break;
+> -			default:
+> -				WARN_ON(PTR_ERR(page));
+> -				ret = VM_FAULT_SIGBUS;
+> -				break;
+> -		}
+> +	if (!ret)
+> +		return 0;
+> +
+> +	page = shmem_read_mapping_page(file_inode(obj->base.filp)->i_mapping,
+> +			page_offset);
+> +	if (!IS_ERR(page)) {
+> +		vmf->page = page;
+> +		return 0;
+> +	}
+>  
+> +	switch (PTR_ERR(page)) {
+> +	case -ENOSPC:
+> +	case -ENOMEM:
+> +		return VM_FAULT_OOM;
+> +	case -EBUSY:
+> +		return VM_FAULT_RETRY;
+> +	case -EFAULT:
+> +	case -EINVAL:
+> +		return VM_FAULT_SIGBUS;
+> +	default:
+> +		WARN_ON(PTR_ERR(page));
+> +		return VM_FAULT_SIGBUS;
+>  	}
+> -	return ret;
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- arch/arm64/boot/dts/Makefile                                 | 1 +
- arch/arm64/boot/dts/marvell/Makefile                         | 4 ----
- arch/arm64/boot/dts/synaptics/Makefile                       | 4 ++++
- arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-dmp.dts | 0
- arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-stb.dts | 0
- arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct.dtsi    | 0
- 6 files changed, 5 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/boot/dts/synaptics/Makefile
- rename arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-dmp.dts (100%)
- rename arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-stb.dts (100%)
- rename arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct.dtsi (100%)
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 4aa50b9b26bc..3543bc324553 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -22,5 +22,6 @@ subdir-y += renesas
- subdir-y += rockchip
- subdir-y += socionext
- subdir-y += sprd
-+subdir-y += synaptics
- subdir-y += xilinx
- subdir-y += zte
-diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-index cb454beede55..ea9d49f2a911 100644
---- a/arch/arm64/boot/dts/marvell/Makefile
-+++ b/arch/arm64/boot/dts/marvell/Makefile
-@@ -1,8 +1,4 @@
- # SPDX-License-Identifier: GPL-2.0
--# Berlin SoC Family
--dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
--dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
--
- # Mvebu SoC Family
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
-diff --git a/arch/arm64/boot/dts/synaptics/Makefile b/arch/arm64/boot/dts/synaptics/Makefile
-new file mode 100644
-index 000000000000..de71ddda6835
---- /dev/null
-+++ b/arch/arm64/boot/dts/synaptics/Makefile
-@@ -0,0 +1,4 @@
-+# SPDX-License-Identifier: GPL-2.0
-+# Berlin SoC Family
-+dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
-+dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts b/arch/arm64/boot/dts/synaptics/berlin4ct-dmp.dts
-similarity index 100%
-rename from arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-rename to arch/arm64/boot/dts/synaptics/berlin4ct-dmp.dts
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts b/arch/arm64/boot/dts/synaptics/berlin4ct-stb.dts
-similarity index 100%
-rename from arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-rename to arch/arm64/boot/dts/synaptics/berlin4ct-stb.dts
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/synaptics/berlin4ct.dtsi
-similarity index 100%
-rename from arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-rename to arch/arm64/boot/dts/synaptics/berlin4ct.dtsi
+Want me to merge this through drm-misc or plan to pick it up yourself?
+-Daniel
+
+>  }
+>  
+>  static const struct vm_operations_struct vgem_gem_vm_ops = {
+> -- 
+> 2.17.0
+> 
+
 -- 
-2.17.0
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
