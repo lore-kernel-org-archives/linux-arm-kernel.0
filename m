@@ -1,82 +1,87 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 16 May 2018 10:43:38 +0200
-Subject: [RESEND PATCH v5 0/6] Add support for PWM input capture on STM32
-In-Reply-To: <20180516080635.GE5130@dell>
-References: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
- <20180516080635.GE5130@dell>
-Message-ID: <c48acc96-1eca-9adc-abb7-131921305ee8@st.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Wed, 16 May 2018 08:48:57 +0000
+Subject: [PATCH 5/6 v3] bus: fsl-mc: supoprt dma configure for devices on
+ fsl-mc bus
+In-Reply-To: <5AF9916E.8000504@nxp.com>
+References: <1524824826-29473-1-git-send-email-nipun.gupta@nxp.com>
+ <1524824826-29473-6-git-send-email-nipun.gupta@nxp.com>
+ <5AF9916E.8000504@nxp.com>
+Message-ID: <HE1PR0401MB24253CF729DDCF3F883AC256E6920@HE1PR0401MB2425.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2018 10:06 AM, Lee Jones wrote:
-> On Wed, 16 May 2018, Fabrice Gasnier wrote:
+
+
+> -----Original Message-----
+> From: Laurentiu Tudor
+> Sent: Monday, May 14, 2018 7:10 PM
+> To: Nipun Gupta <nipun.gupta@nxp.com>; robin.murphy at arm.com;
+> will.deacon at arm.com; mark.rutland at arm.com; catalin.marinas at arm.com
+> Cc: hch at lst.de; gregkh at linuxfoundation.org; joro at 8bytes.org;
+> robh+dt at kernel.org; m.szyprowski at samsung.com; shawnguo at kernel.org;
+> frowand.list at gmail.com; bhelgaas at google.com; iommu at lists.linux-
+> foundation.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; linux-
+> pci at vger.kernel.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
+> stuyoder at gmail.com; Leo Li <leoyang.li@nxp.com>
+> Subject: Re: [PATCH 5/6 v3] bus: fsl-mc: supoprt dma configure for devices
+> on fsl-mc bus
 > 
->> This series adds support for capture to stm32-pwm driver.
->> Capture is based on DMAs.
->> - First two patches add support for requesting DMAs to MFD core
->> - Next three patches add support for capture to stm32-pwm driver
->> - This has been tested on stm32429i-eval board.
->>
->> ---
->> Changes in v5:
->> - update patch 2 (mfd: stm32-timers: add support for dmas)
->>   move stm32_timers_dma struct to header file,
->>   fix warning on dma_mapping_error().
->>
->> Changes in v4:
->> - Lee's comments on patch 2 (mfd: stm32-timers: add support for dmas)
->>   Add kerneldoc header, better format comments.
->>
->> Changes in v3:
->> - Dropped 2 precusor patches applied by Thierry in pwm tree:
->>   "pwm: stm32: fix, remove unused struct device"
->>   "pwm: stm32: protect common prescaler for all channels"
->> - Note: this series applies on top on pwm tree
->> - Implements Lee's comments on MFD part: rework stm32_timers_dma struct,
->>   exported routine prototype now use generic device struct, more
->>   various comments (see patch 2 changelog).
->>
->> Resend v2:
->> - Add collected Acks
->>
->> Changes in v2:
->> - Abstract DMA handling from child driver: move it to MFD core
->> - Rework pwm capture routines to adopt this change
->> - Comment on optional dma support, beautify DMAs probe
->>
->> Fabrice Gasnier (6):
->>   dt-bindings: mfd: stm32-timers: add support for dmas
->>   mfd: stm32-timers: add support for dmas
->>   pwm: stm32: add capture support
->>   pwm: stm32: improve capture by tuning counter prescaler
->>   pwm: stm32: use input prescaler to improve period capture
->>   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
+> Hi Nipun,
 > 
-> Applied patches 1-5.
+> On 04/27/2018 01:27 PM, Nipun Gupta wrote:
+> > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> > ---
+> >   drivers/bus/fsl-mc/fsl-mc-bus.c | 16 ++++++++++++----
+> >   1 file changed, 12 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/bus/fsl-mc/fsl-mc-bus.c b/drivers/bus/fsl-mc/fsl-mc-
+> bus.c
+> > index 5d8266c..624828b 100644
+> > --- a/drivers/bus/fsl-mc/fsl-mc-bus.c
+> > +++ b/drivers/bus/fsl-mc/fsl-mc-bus.c
+> > @@ -127,6 +127,16 @@ static int fsl_mc_bus_uevent(struct device *dev,
+> struct kobj_uevent_env *env)
+> >   	return 0;
+> >   }
+> >
+> > +static int fsl_mc_dma_configure(struct device *dev)
+> > +{
+> > +	struct device *dma_dev = dev;
+> > +
+> > +	while (dev_is_fsl_mc(dma_dev))
+> > +		dma_dev = dma_dev->parent;
+> > +
+> > +	return of_dma_configure(dev, dma_dev->of_node, 0);
+> > +}
+> > +
+> >   static ssize_t modalias_show(struct device *dev, struct device_attribute
+> *attr,
+> >   			     char *buf)
+> >   {
+> > @@ -148,6 +158,7 @@ struct bus_type fsl_mc_bus_type = {
+> >   	.name = "fsl-mc",
+> >   	.match = fsl_mc_bus_match,
+> >   	.uevent = fsl_mc_bus_uevent,
+> > +	.dma_configure  = fsl_mc_dma_configure,
+> >   	.dev_groups = fsl_mc_dev_groups,
+> >   };
+> >   EXPORT_SYMBOL_GPL(fsl_mc_bus_type);
+> > @@ -616,6 +627,7 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc
+> *obj_desc,
+> >   		mc_dev->icid = parent_mc_dev->icid;
+> >   		mc_dev->dma_mask = FSL_MC_DEFAULT_DMA_MASK;
+> >   		mc_dev->dev.dma_mask = &mc_dev->dma_mask;
+> > +		mc_dev->dev.coherent_dma_mask = mc_dev->dma_mask;
+> 
+> This change seems a bit unrelated to the patch subject. I wonder if it
+> makes sense to split it it in a distinct patch.
 
-Many thanks Lee !
+Okay. I will spin a v5 after splitting this patch and adding changelog (Greg's comment), fixing typo (Bjorn's comment).
 
-Maybe I missed something, but just in case...
-In your pull request ("[GIT PULL] Immutable branch between MFD and PWM
-due for the v4.18 merge window") I only see 4 patches:
-Fabrice Gasnier (4):
-      mfd: stm32-timers: Add support for DMAs
-      pwm: stm32: Add capture support
-      pwm: stm32: Improve capture by tuning counter prescaler
-      pwm: stm32: Use input prescaler to improve period capture
-
-I can't see patch 1 ("dt-bindings: mfd: stm32-timers: add support for dmas")
-Is it applied on another tree ?
-
-Best Regards,
-Fabrice
+Regards,
+Nipun
 
 > 
->>  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
->>  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
->>  drivers/mfd/stm32-timers.c                         | 201 +++++++++++++++-
->>  drivers/pwm/pwm-stm32.c                            | 257 +++++++++++++++++++++
->>  include/linux/mfd/stm32-timers.h                   |  58 +++++
->>  5 files changed, 537 insertions(+), 2 deletions(-)
->>
-> 
+> ---
+> Best Regards, Laurentiu
