@@ -1,53 +1,30 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 16 May 2018 15:37:03 +0200
-Subject: [PATCH RFC 2/6] dt-bindings: hwmon: Add Raspberry Pi voltage sensor
+Date: Wed, 16 May 2018 15:37:07 +0200
+Subject: [PATCH RFC 6/6] arm64: defconfig: Enable RPi voltage sensor
 In-Reply-To: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
 References: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1526477827-10859-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1526477827-10859-7-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent VC4 firmware provides a hardware-independent way to retrieve the
-under-voltage sensor on the following Raspberry Pi boards:
-  - Raspberry Pi B+ (via GPIO on SoC)
-  - Raspberry Pi A+ (via GPIO on SoC)
-  - Raspberry Pi 2 B (via GPIO on SoC)
-  - Raspberry Pi 3 B (via GPIO on port expander)
-  - Raspberry Pi 3 B+ (via PMIC)
-
-TODO:
-  - try to make bcm2835 firmware a bus driver
+The patch enables the hwmon driver for the Raspberry Pi.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- .../devicetree/bindings/hwmon/raspberrypi-hwmon.txt   | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt b/Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
-new file mode 100644
-index 0000000..ec2523f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
-@@ -0,0 +1,19 @@
-+Raspberry Pi voltage sensor
-+---------------------------
-+
-+The VC4 firmware exposes a mailbox interface that allows the ARM core
-+to access the board's voltage sensor.
-+
-+Required properties :
-+- compatible : Should be "raspberrypi,bcm2835-hwmon"
-+
-+Example:
-+
-+firmware: firmware-rpi {
-+	compatible = "raspberrypi,bcm2835-firmware";
-+	mboxes = <&mailbox>;
-+
-+	voltage-sensor {
-+		compatible = "raspberrypi,bcm2835-hwmon";
-+	};
-+};
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index d25121b..5cdecef 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -352,6 +352,7 @@ CONFIG_BATTERY_BQ27XXX=y
+ CONFIG_SENSORS_ARM_SCPI=y
+ CONFIG_SENSORS_LM90=m
+ CONFIG_SENSORS_INA2XX=m
++CONFIG_SENSORS_RASPBERRYPI_HWMON=m
+ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_THERMAL_EMULATION=y
 -- 
 2.7.4
