@@ -1,94 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 16 May 2018 00:56:36 -0700
-Subject: [PATCH 4/6] drm/panel: simple: Add support for Banana Pi 7"
- S070WV20-CT16 panel
-In-Reply-To: <CAMty3ZBSkrdV=SPqK5UoBTN8b+KLD9vsgDkx6DYLxEfb9_TazA@mail.gmail.com>
-References: <20180419093225.614-1-wens@csie.org>
- <20180419093225.614-5-wens@csie.org>
- <CAMty3ZD7MbvX5eJ9U4QZRSPTXKD3Ps=hQF2hJSsF17YosXFmmg@mail.gmail.com>
- <CAGb2v64CASge22O0CviNmgEV0CSFgipkKu86F-6hiaLChPh_EA@mail.gmail.com>
- <CAMty3ZBSkrdV=SPqK5UoBTN8b+KLD9vsgDkx6DYLxEfb9_TazA@mail.gmail.com>
-Message-ID: <CAGb2v679hCrS3zjjb5oPkiODha2tnc0sGVSv2f92JBPf6N7+6A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 16 May 2018 09:06:35 +0100
+Subject: [RESEND PATCH v5 0/6] Add support for PWM input capture on STM32
+In-Reply-To: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
+References: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180516080635.GE5130@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 12:20 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> On Wed, May 16, 2018 at 12:12 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> On Mon, May 14, 2018 at 11:03 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
->>> On Thu, Apr 19, 2018 at 3:02 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->>>> This panel is marketed as Banana Pi 7" LCD display. On the back is
->>>> a sticker denoting the model name S070WV20-CT16.
->>>>
->>>> This is a 7" 800x480 panel connected through a 24-bit RGB interface.
->>>> However the panel only does 262k colors.
->>>>
->>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>> ---
->>>>  .../display/panel/bananapi,s070wv20-ct16.txt  |  7 ++++++
->>>>  drivers/gpu/drm/panel/panel-simple.c          | 25 +++++++++++++++++++
->>>>  2 files changed, 32 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->>>> new file mode 100644
->>>> index 000000000000..2ec35ce36e9a
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->>>> @@ -0,0 +1,7 @@
->>>> +Banana Pi 7" (S070WV20-CT16) TFT LCD Panel
->>>> +
->>>> +Required properties:
->>>> +- compatible: should be "bananapi,s070wv20-ct16"
->>>> +
->>>> +This binding is compatible with the simple-panel binding, which is specified
->>>> +in simple-panel.txt in this directory.
->>>> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
->>>> index cbf1ab404ee7..9bc037f74d6c 100644
->>>> --- a/drivers/gpu/drm/panel/panel-simple.c
->>>> +++ b/drivers/gpu/drm/panel/panel-simple.c
->>>> @@ -745,6 +745,28 @@ static const struct panel_desc avic_tm070ddh03 = {
->>>>         },
->>>>  };
->>>>
->>>> +static const struct drm_display_mode bananapi_s070wv20_ct16_mode = {
->>>> +       .clock = 30000,
->>>> +       .hdisplay = 800,
->>>> +       .hsync_start = 800 + 40,
->>>> +       .hsync_end = 800 + 40 + 48,
->>>> +       .htotal = 800 + 40 + 48 + 40,
->>>> +       .vdisplay = 480,
->>>> +       .vsync_start = 480 + 13,
->>>> +       .vsync_end = 480 + 13 + 3,
->>>> +       .vtotal = 480 + 13 + 3 + 29,
->>>> +};
->>>> +
->>>> +static const struct panel_desc bananapi_s070wv20_ct16 = {
->>>> +       .modes = &bananapi_s070wv20_ct16_mode,
->>>> +       .num_modes = 1,
->>>> +       .bpc = 6,
->>>> +       .size = {
->>>> +               .width = 154,
->>>> +               .height = 86,
->>>> +       },
->>>> +};
->>>
->>> I think this parallel RGB interface right? I too have same display
->>> with DSI I'm sure these setting will not useful right? do we need to
->>> write separate panel driver for that?
->>
->> AFAIK the DSI model is an RGB panel with a MIPI DSI bridge on the
->> connector board. The model I have is dual interface.
->
-> Yes, this is what I have [1] where same strip can use for both RGB and
-> MIPI DSI. can bananapi,s070wv20-ct16 work for DSI interface as well?
+On Wed, 16 May 2018, Fabrice Gasnier wrote:
 
-In theory yes. You can use RGB with Banana Pi M1+ and DSI with Banana Pi M3.
-However, DSI on A83T is not supported yet, and I don't intend to spend my
-time writing a driver for the MIPI DSI bridge on that panel. The bridge IC
-is the one on top of the DSI FPC connector.
+> This series adds support for capture to stm32-pwm driver.
+> Capture is based on DMAs.
+> - First two patches add support for requesting DMAs to MFD core
+> - Next three patches add support for capture to stm32-pwm driver
+> - This has been tested on stm32429i-eval board.
+> 
+> ---
+> Changes in v5:
+> - update patch 2 (mfd: stm32-timers: add support for dmas)
+>   move stm32_timers_dma struct to header file,
+>   fix warning on dma_mapping_error().
+> 
+> Changes in v4:
+> - Lee's comments on patch 2 (mfd: stm32-timers: add support for dmas)
+>   Add kerneldoc header, better format comments.
+> 
+> Changes in v3:
+> - Dropped 2 precusor patches applied by Thierry in pwm tree:
+>   "pwm: stm32: fix, remove unused struct device"
+>   "pwm: stm32: protect common prescaler for all channels"
+> - Note: this series applies on top on pwm tree
+> - Implements Lee's comments on MFD part: rework stm32_timers_dma struct,
+>   exported routine prototype now use generic device struct, more
+>   various comments (see patch 2 changelog).
+> 
+> Resend v2:
+> - Add collected Acks
+> 
+> Changes in v2:
+> - Abstract DMA handling from child driver: move it to MFD core
+> - Rework pwm capture routines to adopt this change
+> - Comment on optional dma support, beautify DMAs probe
+> 
+> Fabrice Gasnier (6):
+>   dt-bindings: mfd: stm32-timers: add support for dmas
+>   mfd: stm32-timers: add support for dmas
+>   pwm: stm32: add capture support
+>   pwm: stm32: improve capture by tuning counter prescaler
+>   pwm: stm32: use input prescaler to improve period capture
+>   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
 
-ChenYu
+Applied patches 1-5.
 
-> [1] https://www.aliexpress.com/item/New-Arrival-Banana-Pro-Pi-7-inch-LCD-Display-Touch-Screen-Raspberry-Pi-Car-GPS-FreeShipping/32335608836.html
->
-> Jagan.
+>  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
+>  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
+>  drivers/mfd/stm32-timers.c                         | 201 +++++++++++++++-
+>  drivers/pwm/pwm-stm32.c                            | 257 +++++++++++++++++++++
+>  include/linux/mfd/stm32-timers.h                   |  58 +++++
+>  5 files changed, 537 insertions(+), 2 deletions(-)
+> 
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
