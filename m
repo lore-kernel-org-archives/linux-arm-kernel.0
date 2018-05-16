@@ -1,43 +1,31 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 16 May 2018 15:37:02 +0200
-Subject: [PATCH RFC 1/6] ARM: bcm2835: Add GET_THROTTLED firmware property
+Date: Wed, 16 May 2018 15:37:05 +0200
+Subject: [PATCH RFC 4/6] ARM: bcm2835_defconfig: Enable RPi voltage sensor
 In-Reply-To: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
 References: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1526477827-10859-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1526477827-10859-5-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent Raspberry Pi firmware provides a mailbox property to detect
-under-voltage conditions. Here is the current definition.
-
-The u32 value returned by the firmware is divided into 2 parts:
-  - lower 16-bits are the live value
-  - upper 16-bits are the history or sticky value
-
-  Bits:
-  0: under-voltage
-  1: arm frequency capped
-  2: currently throttled 
-  16: under-voltage has occurred
-  17: arm frequency capped has occurred
-  18: throttling has occurred
+The patch enables the hwmon driver for the Raspberry Pi.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- include/soc/bcm2835/raspberrypi-firmware.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/bcm2835_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
-index 8ee8991..c4a5c9e 100644
---- a/include/soc/bcm2835/raspberrypi-firmware.h
-+++ b/include/soc/bcm2835/raspberrypi-firmware.h
-@@ -75,6 +75,7 @@ enum rpi_firmware_property_tag {
- 	RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
- 	RPI_FIRMWARE_GET_CUSTOMER_OTP =                       0x00030021,
- 	RPI_FIRMWARE_GET_DOMAIN_STATE =                       0x00030030,
-+	RPI_FIRMWARE_GET_THROTTLED =                          0x00030046,
- 	RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
- 	RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
- 	RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index e4d188f..e9bc889 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -86,7 +86,7 @@ CONFIG_SPI=y
+ CONFIG_SPI_BCM2835=y
+ CONFIG_SPI_BCM2835AUX=y
+ CONFIG_GPIO_SYSFS=y
+-# CONFIG_HWMON is not set
++CONFIG_SENSORS_RASPBERRYPI_HWMON=m
+ CONFIG_THERMAL=y
+ CONFIG_BCM2835_THERMAL=y
+ CONFIG_WATCHDOG=y
 -- 
 2.7.4
