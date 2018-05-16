@@ -1,27 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 May 2018 16:10:44 +0200
-Subject: [PATCH v2 1/1] dts: qcom: db820c: Add gpio-line-names property
-In-Reply-To: <20180418134601.8502-2-manivannan.sadhasivam@linaro.org>
-References: <20180418134601.8502-1-manivannan.sadhasivam@linaro.org>
- <20180418134601.8502-2-manivannan.sadhasivam@linaro.org>
-Message-ID: <CACRpkdZ6oFdnnXWE6anKR9DQGVo5v_ecfveAVKYDhLr-067nHA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 16 May 2018 19:41:32 +0530
+Subject: [PATCH v7 12/14] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <CAHLCerOYq4q2GE+m3MQAbMfxM4azPr95XiLKVtoPVG1Kv2Db=A@mail.gmail.com>
+References: <1526375616-16904-1-git-send-email-ilialin@codeaurora.org>
+ <1526375616-16904-13-git-send-email-ilialin@codeaurora.org>
+ <CAHLCerOYq4q2GE+m3MQAbMfxM4azPr95XiLKVtoPVG1Kv2Db=A@mail.gmail.com>
+Message-ID: <20180516141132.aqjif7d5motmmnlo@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 3:46 PM, Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
+On 16-05-18, 16:12, Amit Kucheria wrote:
+> > +       ret = PTR_ERR_OR_ZERO(opp_temp =
+> > +                             dev_pm_opp_set_supported_hw(cpu_dev,&versions,1));
+> > +       if (0 > ret)
+> 
+> Any particular reason to prefer this over (ret < 0) that is generally
+> used? I've seen it used to avoid the == vs. = typos, but not for other
+> comparisons.
+> 
+> Suggest sticking to what is commonly used i.e. ret < 0.
+> 
+> > +               goto free_opp;
+> > +
+> > +       cpu_dev = get_cpu_device(GOLD_LEAD);
+> 
+> Error check cpu_dev here?
+> 
+> > +       ret = PTR_ERR_OR_ZERO(opp_temp =
+> > +                             dev_pm_opp_set_supported_hw(cpu_dev,&versions,1));
+> > +       if (0 > ret)
+> > +               goto free_opp;
 
-> Add gpio-line-names property for Dragonboard820c based on APQ8096 SoC.
-> There are 4 gpio-controllers present on this board, including the
-> APQ8096 SoC, PM8994 (GPIO and MPP) and PMI8994 (GPIO).
->
-> Lines names are derived from 96Boards CE Specification 1.0, Appendix
-> "Expansion Connector Signal Description". Line names for PMI8994 MPP
-> pins are not added due to the absence of the gpio-controller support.
->
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+The goto here is wrong
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> > +
+> > +
+> > +       ret = PTR_ERR_OR_ZERO(platform_device_register_simple("cpufreq-dt",
+> > +                                                             -1, NULL, 0));
+> > +
+> > +       if (0 == ret)
+> > +               return 0;
+> > +
+> > +free_opp:
+> > +       dev_pm_opp_put_supported_hw(opp_temp);
+> 
+> This is not needed because dev_pm_opp_set_supported_hw will free
+> memory in case of failure. This call in only needed in case of a
+> successful get.
 
-Yours,
-Linus Walleij
+But this is still required for the case where platform device
+registration fails.
+
+-- 
+viresh
