@@ -1,47 +1,32 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Wed, 16 May 2018 14:28:29 +0200
-Subject: [PATCH 3/3] ARM: dts: imx28/imx53: enable edt-ft5x06 wakeup source
-In-Reply-To: <20180516122829.23694-1-daniel@zonque.org>
-References: <20180516122829.23694-1-daniel@zonque.org>
-Message-ID: <20180516122829.23694-4-daniel@zonque.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 16 May 2018 09:35:43 -0300
+Subject: [PATCH v2] ARM: dts: imx6/7: Remove unit-address from anatop
+ regulators
+In-Reply-To: <20180515074042.GP26863@dragon>
+References: <1526304714-23821-1-git-send-email-festevam@gmail.com>
+ <20180515074042.GP26863@dragon>
+Message-ID: <CAOMZO5AxTjyrDeT+HvPN_4Ue8yBG0U4tnwFU5nS9zTPOwFDqAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The touchscreen driver no longer configures the device as wakeup source by
-default. A "wakeup-source" property is needed.
+Hi Shawn,
 
-To avoid regressions, this patch changes the DTS files for the only two
-users of this driver that didn't have this property yet.
+On Tue, May 15, 2018 at 4:40 AM, Shawn Guo <shawnguo@kernel.org> wrote:
 
-Signed-off-by: Daniel Mack <daniel@zonque.org>
----
- arch/arm/boot/dts/imx28-tx28.dts      | 1 +
- arch/arm/boot/dts/imx53-tx53-x03x.dts | 1 +
- 2 files changed, 2 insertions(+)
+> I'm a bit confused.  It looks that the change is just to revert commit
+> 685e1321ba74 ("ARM: dts: imx6: Add unit address and reg for the anatop
+> nodes").  But what about the simple_bus_reg warning the commit was
+> fixing?
 
-diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-index 0ebbc83852d0..094a39a67ec8 100644
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -328,6 +328,7 @@
- 		interrupts = <5 IRQ_TYPE_EDGE_FALLING>;
- 		reset-gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
- 		wake-gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>;
-+		wakeup-source;
- 	};
- 
- 	touchscreen: tsc2007 at 48 {
-diff --git a/arch/arm/boot/dts/imx53-tx53-x03x.dts b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-index 0ecb43d88522..dbf0d73dc7b9 100644
---- a/arch/arm/boot/dts/imx53-tx53-x03x.dts
-+++ b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-@@ -220,6 +220,7 @@
- 		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
- 		reset-gpios = <&gpio2 22 GPIO_ACTIVE_LOW>;
- 		wake-gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
-+		wakeup-source;
- 	};
- 
- 	touchscreen: tsc2007 at 48 {
--- 
-2.14.3
+Yes, I don't get the original simple_bus_reg warning anymore.
+
+I think we don't need the unit address and reg properties to the
+anatop regulators.
+
+There is already a 'anatop-reg-offset' property that indicates the
+anatop register offset.
+
+Rob, is this patch the correct solution to fix the duplicate
+unit-address dtc warnings?
+
+Thanks
