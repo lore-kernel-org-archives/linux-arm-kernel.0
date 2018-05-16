@@ -1,82 +1,80 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Wed, 16 May 2018 15:42:09 +0200
-Subject: [PATCH v2 3/3] arm64: dts: renesas: draak: Describe HDMI input
-In-Reply-To: <1526478129-16465-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1526478129-16465-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1526478129-16465-4-git-send-email-jacopo+renesas@jmondi.org>
+Date: Wed, 16 May 2018 15:42:06 +0200
+Subject: [PATCH v2 0/3] arm64: dts: Draak: Enable video inputs and VIN4
+Message-ID: <1526478129-16465-1-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe HDMI input connector and ADV7612 HDMI decoder installed on
-R-Car Gen3 Draak board.
+Hello,
+   the second iteration of this series enables HDMI and CVBS video inputs
+for the Draak board.
 
-The video signal routing to the HDMI decoder to the video input interface
-VIN4 is multiplexed with CVBS input path, and enabled/disabled through
-on-board switches SW-49, SW-50, SW-51 and SW-52.
+>From v1 series the description of VIN4 video interface for R8A77995 SoC has
+already been collected by Simon, thus I'm not resending it.
 
-As the default board switches configuration connects CVBS input to VIN4,
-leave the HDMI decoder unconnected in DTS.
+This new version describes the HDMI input as v1 did, but does not connect it
+to the VIN4 interface, as the video input path is shared between HDMI and
+CVBS, and the default switches configuration selects CVBS.
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
----
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 38 ++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+I've not been able to test CVBS capture as I don't have any CVBS video source
+here, but the devices shows up in the media controller graph as expected.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-index 9aba28f..ea99dc9 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-@@ -59,6 +59,17 @@
- 		};
- 	};
- 
-+	hdmi-in {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&adv7612_in>;
-+			};
-+		};
-+	};
-+
- 	memory at 48000000 {
- 		device_type = "memory";
- 		/* first 128MB is reserved for secure area. */
-@@ -170,6 +181,33 @@
- 			};
- 		};
- 	};
-+
-+	hdmi-decoder at 4c {
-+		compatible = "adi,adv7612";
-+		reg = <0x4c>;
-+		default-input = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7612_in: endpoint {
-+					remote-endpoint = <&hdmi_con_in>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				adv7612_out: endpoint {
-+					pclk-sample = <0>;
-+					hsync-active = <0>;
-+					vsync-active = <0>;
-+				};
-+			};
-+		};
-+	};
- };
- 
- &i2c1 {
--- 
+-------------------------------------------------------------------------------
+[root at alarm ~]# media-ctl  -p -d /dev/media1
+Media controller API version 4.17.0
+
+Media device information
+------------------------
+driver          rcar_vin
+model           renesas,vin-r8a77995
+serial
+bus info        platform:e6ef4000.video
+hw revision     0x0
+driver version  4.17.0
+
+Device topology
+- entity 1: adv7180 0-0020 (1 pad, 1 link)
+            type V4L2 subdev subtype Unknown flags 20004
+            device node name /dev/v4l-subdev6
+        pad0: Source
+                [fmt:UYVY8_2X8/720x480 field:interlaced colorspace:smpte170m]
+                -> "VIN4 output":0 []
+
+- entity 5: VIN4 output (1 pad, 1 link)
+            type Node subtype V4L flags 0
+            device node name /dev/video3
+        pad0: Sink
+                <- "adv7180 0-0020":0 []
+-------------------------------------------------------------------------------
+
+Compared to Gen2 boards that use adv7180 (Lager, Alt, Koelsch, Porter, Gose
+and Silk) I have removed the 'bus-width' property as it is not parsed by the
+driver nor mentioned in the chip device tree binding description.
+
+Switching from CVBS to HDMI input requires connecting the HDMI decoder endpoint
+to VIN4, change the pin muxing to increase the VIN4 input bus width to 24 bits,
+and add the synchronism signal polarities to the vin endpoint, as the HDMI
+decoder uses BT.601 while the analog video decoder uses BT.656 unconditionally.
+
+The series has been developed on top of media-master tree but applies cleanly
+on top of latest renesas-driver.
+
+Patches for testing are available at:
+git://jmondi.org/linux d3/media-master/driver-v2
+git://jmondi.org/linux d3/media-master/dts-v2
+git://jmondi.org/vin-tests d3
+
+Thanks
+    j
+
+Jacopo Mondi (3):
+  dt-bindings: media: rcar-vin: Add R8A77995 support
+  arm64: dts: renesas: draak: Describe CVBS input
+  arm64: dts: renesas: draak: Describe HDMI input
+
+ .../devicetree/bindings/media/rcar_vin.txt         |  1 +
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts     | 74 ++++++++++++++++++++++
+ 2 files changed, 75 insertions(+)
+
+--
 2.7.4
