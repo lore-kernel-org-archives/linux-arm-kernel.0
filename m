@@ -1,45 +1,66 @@
-From: aospan@netup.ru (Abylay Ospan)
-Date: Wed, 16 May 2018 06:58:13 -0400
-Subject: [PATCH] media: helene: fix tuning frequency of satellite
-In-Reply-To: <20180516084111.28618-1-suzuki.katsuhiro@socionext.com>
-References: <20180516084111.28618-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAK3bHNW8=z2WH6xCijAP2XCX94iE5z-HwHRYNhbJwZvbOav10A@mail.gmail.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Wed, 16 May 2018 12:00:47 +0100
+Subject: [PATCH 02/14] ARM: bugs: prepare processor bug infrastructure
+In-Reply-To: <20180516105949.GJ16141@n2100.armlinux.org.uk>
+References: <20180516105949.GJ16141@n2100.armlinux.org.uk>
+Message-ID: <E1fIuAp-0003jj-H5@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-True.
-I'm curious but how did it worked before ...
-Which hardware (dvb adapter) are you using ?
+Prepare the processor bug infrastructure so that it can be expanded to
+check for per-processor bugs.
 
-2018-05-16 4:41 GMT-04:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> This patch fixes tuning frequency of satellite to kHz. That as same
-> as terrestrial one.
->
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
->  drivers/media/dvb-frontends/helene.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/media/dvb-frontends/helene.c b/drivers/media/dvb-frontends/helene.c
-> index 04033f0c278b..0a4f312c4368 100644
-> --- a/drivers/media/dvb-frontends/helene.c
-> +++ b/drivers/media/dvb-frontends/helene.c
-> @@ -523,7 +523,7 @@ static int helene_set_params_s(struct dvb_frontend *fe)
->         enum helene_tv_system_t tv_system;
->         struct dtv_frontend_properties *p = &fe->dtv_property_cache;
->         struct helene_priv *priv = fe->tuner_priv;
-> -       int frequencykHz = p->frequency;
-> +       int frequencykHz = p->frequency / 1000;
->         uint32_t frequency4kHz = 0;
->         u32 symbol_rate = p->symbol_rate/1000;
->
-> --
-> 2.17.0
->
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/include/asm/bugs.h | 4 ++--
+ arch/arm/kernel/Makefile    | 1 +
+ arch/arm/kernel/bugs.c      | 9 +++++++++
+ 3 files changed, 12 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/kernel/bugs.c
 
-
-
+diff --git a/arch/arm/include/asm/bugs.h b/arch/arm/include/asm/bugs.h
+index a97f1ea708d1..ed122d294f3f 100644
+--- a/arch/arm/include/asm/bugs.h
++++ b/arch/arm/include/asm/bugs.h
+@@ -10,10 +10,10 @@
+ #ifndef __ASM_BUGS_H
+ #define __ASM_BUGS_H
+ 
+-#ifdef CONFIG_MMU
+ extern void check_writebuffer_bugs(void);
+ 
+-#define check_bugs() check_writebuffer_bugs()
++#ifdef CONFIG_MMU
++extern void check_bugs(void);
+ #else
+ #define check_bugs() do { } while (0)
+ #endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index b59ac4bf82b8..8cad59465af3 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -31,6 +31,7 @@ else
+ obj-y		+= entry-armv.o
+ endif
+ 
++obj-$(CONFIG_MMU)		+= bugs.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ obj-$(CONFIG_ISA_DMA_API)	+= dma.o
+ obj-$(CONFIG_FIQ)		+= fiq.o fiqasm.o
+diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
+new file mode 100644
+index 000000000000..88024028bb70
+--- /dev/null
++++ b/arch/arm/kernel/bugs.c
+@@ -0,0 +1,9 @@
++// SPDX-Identifier: GPL-2.0
++#include <linux/init.h>
++#include <asm/bugs.h>
++#include <asm/proc-fns.h>
++
++void __init check_bugs(void)
++{
++	check_writebuffer_bugs();
++}
 -- 
-Abylay Ospan,
-NetUP Inc.
-http://www.netup.tv
+2.7.4
