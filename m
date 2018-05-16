@@ -1,51 +1,54 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Wed, 16 May 2018 15:11:48 +0800
-Subject: [RFC PATCH 00/10] Add persistent clock support
-In-Reply-To: <CAMz4kuJjhhty7HigPEA6Gm4HtFk_3t1aCwbX3c0mLLQF8SZBLw@mail.gmail.com>
-References: <cover.1526285602.git.baolin.wang@linaro.org>
- <20180515102715.GO29062@mai>
- <CAMz4kuJjhhty7HigPEA6Gm4HtFk_3t1aCwbX3c0mLLQF8SZBLw@mail.gmail.com>
-Message-ID: <CAMz4kuJomy9Lkjm47qdKrTTmohaGYZNAUG5gV7kf+L46bQfpdg@mail.gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 16 May 2018 09:16:45 +0200
+Subject: [PATCH v2 0/2] i2c: make use of i2c_8bit_addr_from_msg
+Message-ID: <20180516071647.29277-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 May 2018 at 10:20, Baolin Wang <baolin.wang@linaro.org> wrote:
-> Hi Daniel,
->
-> On 15 May 2018 at 18:27, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->> On Mon, May 14, 2018 at 04:55:26PM +0800, Baolin Wang wrote:
->>> Hi,
->>>
->>> We will meet below issues when compensating the suspend time for the timekeeping.
->>>
->>> 1. We have too many different ways of dealing with persistent timekeeping
->>> across architectures, so it is hard for one driver to compatable with different
->>> architectures.
->>>
->>> 2. On some platforms (such as Spreadtrum platform), we registered the high
->>> resolution timer as one clocksource to update the OS time, but the high
->>> resolution timer will be stopped in suspend state. So we use another one
->>> always-on timer (but low resolution) to calculate the suspend time to
->>> compensate the OS time. Though we can register the always-on timer as one
->>> clocksource, we need re-calculate the mult/shift with one larger conversion
->>> range to calculate the suspend time and need update the clock in case of
->>> running over the always-on timer.
->>
->> First, can you elaborate what you mean by 'suspend state' ? On which power
->
-> What I mean is the high resolution timer will be stopped when the
-> system goes into suspend state.
->
->> domain the clocksource belongs to?
->
-> On Spreadtrum platform, It belongs to one power domain named
-> "APCPU_TOP", that will be power down when the system goes into suspend
-> state.
+Hi!
 
-Sorry, I made a mistake here. Our high resolution timer is on one
-always-on power domain, but it's clock will be shut down when the
-system goes into suspend.
+The nice little inline i2c_8bit_addr_from_msg is not getting
+enough use. This series improves the situation and drops a
+bunch of lines in the process.
+
+I have only compile-tested (that part fine, at least over here).
+
+Changes since v1     https://lkml.org/lkml/2018/5/14/919
+
+- Squashed patches 1-3 (algos) and patches 4-21 (busses) making
+  the series consist of just two patches instead of 21.
+- Added ack-bys and reviewed-bys from Guenter, Uwe and LinusW.
+- Eliminated the flags variable in algos/i2c-algo-pcf.c
+
+Cheers,
+Peter
+
+Peter Rosin (2):
+  i2c: algos: make use of i2c_8bit_addr_from_msg
+  i2c: busses: make use of i2c_8bit_addr_from_msg
+
+ drivers/i2c/algos/i2c-algo-bit.c    |  4 +---
+ drivers/i2c/algos/i2c-algo-pca.c    |  5 +----
+ drivers/i2c/algos/i2c-algo-pcf.c    |  8 ++------
+ drivers/i2c/busses/i2c-aspeed.c     |  3 +--
+ drivers/i2c/busses/i2c-axxia.c      |  5 +++--
+ drivers/i2c/busses/i2c-diolan-u2c.c | 11 ++++-------
+ drivers/i2c/busses/i2c-efm32.c      |  3 +--
+ drivers/i2c/busses/i2c-eg20t.c      |  5 ++---
+ drivers/i2c/busses/i2c-emev2.c      |  2 +-
+ drivers/i2c/busses/i2c-hix5hd2.c    |  9 ++-------
+ drivers/i2c/busses/i2c-imx-lpi2c.c  |  4 +---
+ drivers/i2c/busses/i2c-imx.c        | 10 +++++-----
+ drivers/i2c/busses/i2c-kempld.c     |  7 +++----
+ drivers/i2c/busses/i2c-mxs.c        |  9 +++------
+ drivers/i2c/busses/i2c-ocores.c     |  5 +----
+ drivers/i2c/busses/i2c-pasemi.c     |  2 +-
+ drivers/i2c/busses/i2c-qup.c        |  2 +-
+ drivers/i2c/busses/i2c-rcar.c       |  2 +-
+ drivers/i2c/busses/i2c-riic.c       |  5 ++---
+ drivers/i2c/busses/i2c-stu300.c     | 22 +++++++++++++---------
+ drivers/i2c/busses/i2c-xiic.c       | 11 ++---------
+ 21 files changed, 51 insertions(+), 83 deletions(-)
 
 -- 
-Baolin.wang
-Best Regards
+2.11.0
