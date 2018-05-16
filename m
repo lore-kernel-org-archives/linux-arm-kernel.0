@@ -1,28 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 May 2018 09:04:09 +0200
-Subject: [PATCH 2/2] arm64: dts: renesas: initial V3HSK board device tree
-In-Reply-To: <20180513080704.yeypjjtv7hdmqajt@verge.net.au>
-References: <3923fc5f-103c-94c9-57ba-cb29e8c55d05@cogentembedded.com>
- <50de037c-7560-c261-f96a-f86065674c9b@cogentembedded.com>
- <20180513080704.yeypjjtv7hdmqajt@verge.net.au>
-Message-ID: <20180516070409.rz6cle4n2k6qgi7t@verge.net.au>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Wed, 16 May 2018 15:11:48 +0800
+Subject: [RFC PATCH 00/10] Add persistent clock support
+In-Reply-To: <CAMz4kuJjhhty7HigPEA6Gm4HtFk_3t1aCwbX3c0mLLQF8SZBLw@mail.gmail.com>
+References: <cover.1526285602.git.baolin.wang@linaro.org>
+ <20180515102715.GO29062@mai>
+ <CAMz4kuJjhhty7HigPEA6Gm4HtFk_3t1aCwbX3c0mLLQF8SZBLw@mail.gmail.com>
+Message-ID: <CAMz4kuJomy9Lkjm47qdKrTTmohaGYZNAUG5gV7kf+L46bQfpdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 13, 2018 at 10:07:04AM +0200, Simon Horman wrote:
-> On Thu, May 10, 2018 at 09:12:30PM +0300, Sergei Shtylyov wrote:
-> > Add the initial device  tree for  the V3H Starter Kit board.
-> > The board has 1 debug serial port (SCIF0); include support for it,
-> > so that the serial console can work.
-> > 
-> > Based on the original (and large) patch by Vladimir Barinov.
-> > 
-> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> This looks fine but I will wait to see if there are other reviews before
-> applying.
-> 
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+On 16 May 2018 at 10:20, Baolin Wang <baolin.wang@linaro.org> wrote:
+> Hi Daniel,
+>
+> On 15 May 2018 at 18:27, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>> On Mon, May 14, 2018 at 04:55:26PM +0800, Baolin Wang wrote:
+>>> Hi,
+>>>
+>>> We will meet below issues when compensating the suspend time for the timekeeping.
+>>>
+>>> 1. We have too many different ways of dealing with persistent timekeeping
+>>> across architectures, so it is hard for one driver to compatable with different
+>>> architectures.
+>>>
+>>> 2. On some platforms (such as Spreadtrum platform), we registered the high
+>>> resolution timer as one clocksource to update the OS time, but the high
+>>> resolution timer will be stopped in suspend state. So we use another one
+>>> always-on timer (but low resolution) to calculate the suspend time to
+>>> compensate the OS time. Though we can register the always-on timer as one
+>>> clocksource, we need re-calculate the mult/shift with one larger conversion
+>>> range to calculate the suspend time and need update the clock in case of
+>>> running over the always-on timer.
+>>
+>> First, can you elaborate what you mean by 'suspend state' ? On which power
+>
+> What I mean is the high resolution timer will be stopped when the
+> system goes into suspend state.
+>
+>> domain the clocksource belongs to?
+>
+> On Spreadtrum platform, It belongs to one power domain named
+> "APCPU_TOP", that will be power down when the system goes into suspend
+> state.
 
-Applied
+Sorry, I made a mistake here. Our high resolution timer is on one
+always-on power domain, but it's clock will be shut down when the
+system goes into suspend.
+
+-- 
+Baolin.wang
+Best Regards
