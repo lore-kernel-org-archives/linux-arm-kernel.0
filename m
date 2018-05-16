@@ -1,78 +1,84 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 15 May 2018 23:42:01 -0700
-Subject: [PATCH 4/6] drm/panel: simple: Add support for Banana Pi 7"
- S070WV20-CT16 panel
-In-Reply-To: <CAMty3ZD7MbvX5eJ9U4QZRSPTXKD3Ps=hQF2hJSsF17YosXFmmg@mail.gmail.com>
-References: <20180419093225.614-1-wens@csie.org>
- <20180419093225.614-5-wens@csie.org>
- <CAMty3ZD7MbvX5eJ9U4QZRSPTXKD3Ps=hQF2hJSsF17YosXFmmg@mail.gmail.com>
-Message-ID: <CAGb2v64CASge22O0CviNmgEV0CSFgipkKu86F-6hiaLChPh_EA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 16 May 2018 08:44:45 +0200
+Subject: linux-next: manual merge of the rockchip tree with the renesas
+ tree
+In-Reply-To: <20180516113918.1ccdd8ec@canb.auug.org.au>
+References: <20180503083654.625b1f9b@canb.auug.org.au>
+ <20180516113918.1ccdd8ec@canb.auug.org.au>
+Message-ID: <20180516064440.xpwm7liozhvx4aro@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 14, 2018 at 11:03 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> On Thu, Apr 19, 2018 at 3:02 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> This panel is marketed as Banana Pi 7" LCD display. On the back is
->> a sticker denoting the model name S070WV20-CT16.
->>
->> This is a 7" 800x480 panel connected through a 24-bit RGB interface.
->> However the panel only does 262k colors.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  .../display/panel/bananapi,s070wv20-ct16.txt  |  7 ++++++
->>  drivers/gpu/drm/panel/panel-simple.c          | 25 +++++++++++++++++++
->>  2 files changed, 32 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->> new file mode 100644
->> index 000000000000..2ec35ce36e9a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->> @@ -0,0 +1,7 @@
->> +Banana Pi 7" (S070WV20-CT16) TFT LCD Panel
->> +
->> +Required properties:
->> +- compatible: should be "bananapi,s070wv20-ct16"
->> +
->> +This binding is compatible with the simple-panel binding, which is specified
->> +in simple-panel.txt in this directory.
->> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
->> index cbf1ab404ee7..9bc037f74d6c 100644
->> --- a/drivers/gpu/drm/panel/panel-simple.c
->> +++ b/drivers/gpu/drm/panel/panel-simple.c
->> @@ -745,6 +745,28 @@ static const struct panel_desc avic_tm070ddh03 = {
->>         },
->>  };
->>
->> +static const struct drm_display_mode bananapi_s070wv20_ct16_mode = {
->> +       .clock = 30000,
->> +       .hdisplay = 800,
->> +       .hsync_start = 800 + 40,
->> +       .hsync_end = 800 + 40 + 48,
->> +       .htotal = 800 + 40 + 48 + 40,
->> +       .vdisplay = 480,
->> +       .vsync_start = 480 + 13,
->> +       .vsync_end = 480 + 13 + 3,
->> +       .vtotal = 480 + 13 + 3 + 29,
->> +};
->> +
->> +static const struct panel_desc bananapi_s070wv20_ct16 = {
->> +       .modes = &bananapi_s070wv20_ct16_mode,
->> +       .num_modes = 1,
->> +       .bpc = 6,
->> +       .size = {
->> +               .width = 154,
->> +               .height = 86,
->> +       },
->> +};
->
-> I think this parallel RGB interface right? I too have same display
-> with DSI I'm sure these setting will not useful right? do we need to
-> write separate panel driver for that?
+Thanks Stephen,
 
-AFAIK the DSI model is an RGB panel with a MIPI DSI bridge on the
-connector board. The model I have is dual interface.
+On Wed, May 16, 2018 at 11:39:18AM +1000, Stephen Rothwell wrote:
+> Hi all,
+> 
+> On Thu, 3 May 2018 08:36:54 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> >
+> > Today's linux-next merge of the rockchip tree got a conflict in:
+> > 
+> >   arch/arm64/configs/defconfig
+> > 
+> > between commits:
+> > 
+> >   93f7bfd930c0 ("arm64: defconfig: makes SND_SIMPLE_CARD to module")
+> >   ddf3fa8b8a16 ("arm64: defconfig: Enable CONFIG_SND_AUDIO_GRAPH_CARD")
+> > 
+> > from the renesas tree and commit:
+> > 
+> >   e9cfce4195ec ("arm64: defconfig: Enable HID over I2C drivers")
+> > 
+> > from the rockchip tree.
+> > 
+> > I fixed it up (see below) and can carry the fix as necessary. This
+> > is now fixed as far as linux-next is concerned, but any non trivial
+> > conflicts should be mentioned to your upstream maintainer when your tree
+> > is submitted for merging.  You may also want to consider cooperating
+> > with the maintainer of the conflicting tree to minimise any particularly
+> > complex conflicts.
 
-ChenYu
+The resolution looks correct to me.
+
+As the renesas tree reaches Linus via the arm-soc tree I believe
+this is likely best resolved by the arm-soc maintainers once I
+send them a pull-request for the renesas tree. And I do not expect
+it to bubble-up to Linus.
+
+> > 
+> > -- 
+> > Cheers,
+> > Stephen Rothwell
+> > 
+> > diff --cc arch/arm64/configs/defconfig
+> > index 7930caf5dde4,34037d24fbf4..000000000000
+> > --- a/arch/arm64/configs/defconfig
+> > +++ b/arch/arm64/configs/defconfig
+> > @@@ -158,9 -157,9 +158,10 @@@ CONFIG_BT_HIDP=
+> >   # CONFIG_BT_LE is not set
+> >   CONFIG_BT_LEDS=y
+> >   # CONFIG_BT_DEBUGFS is not set
+> > + CONFIG_BT_HCIBTUSB=m
+> >   CONFIG_BT_HCIUART=m
+> >   CONFIG_BT_HCIUART_LL=y
+> >  +CONFIG_BT_HCIUART_BCM=y
+> >   CONFIG_CFG80211=m
+> >   CONFIG_MAC80211=m
+> >   CONFIG_MAC80211_LEDS=y
+> > @@@ -443,8 -447,8 +451,9 @@@ CONFIG_SND_BCM2835_SOC_I2S=
+> >   CONFIG_SND_SOC_SAMSUNG=y
+> >   CONFIG_SND_SOC_RCAR=m
+> >   CONFIG_SND_SOC_AK4613=m
+> >  -CONFIG_SND_SIMPLE_CARD=y
+> >  +CONFIG_SND_SIMPLE_CARD=m
+> >  +CONFIG_SND_AUDIO_GRAPH_CARD=m
+> > + CONFIG_I2C_HID=m
+> >   CONFIG_USB=y
+> >   CONFIG_USB_OTG=y
+> >   CONFIG_USB_XHCI_HCD=y
+> 
+> This is now a conflict between the renesas tree and the arm-soc tree.
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell
