@@ -1,168 +1,32 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 16 May 2018 11:19:05 +0300
-Subject: [PATCH 20/24] arm64: ilp32: introduce ilp32-specific sigframe and
- ucontext
-In-Reply-To: <20180516081910.10067-1-ynorov@caviumnetworks.com>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
-Message-ID: <20180516081910.10067-21-ynorov@caviumnetworks.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Wed, 16 May 2018 17:41:20 +0900
+Subject: [PATCH] media: helene: fix xtal frequency setting at power on
+Message-ID: <20180516084120.28674-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yury Norov <ynorov@caviumnetworks.comk>
+This patch fixes crystal frequency setting when power on this device.
 
-ILP32 uses AARCH32 compat structures and syscall handlers for signals. But
-ILP32 rt_sigframe and ucontext structures differ from both LP64 and AARCH32.
->From software point of view ILP32 is typical 32-bit compat ABI, and from
-hardware point of view, it's just like LP64.
-
-struct rt_sigframe defined in this patch in
-arch/arm64/kernel/signal_ilp32.c redefines one in
-arch/arm64/kernel/signal.c. And functions located in
-arch/arm64/include/signal_common.h pick up new structure to generate the
-code suitable for ILP32.
-
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
- arch/arm64/include/asm/signal_ilp32.h | 23 ++++++++++
- arch/arm64/kernel/Makefile            |  3 +-
- arch/arm64/kernel/entry_ilp32.S       | 12 +++++
- arch/arm64/kernel/signal_ilp32.c      | 65 +++++++++++++++++++++++++++
- 4 files changed, 102 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/signal_ilp32.h
- create mode 100644 arch/arm64/kernel/entry_ilp32.S
- create mode 100644 arch/arm64/kernel/signal_ilp32.c
+ drivers/media/dvb-frontends/helene.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/signal_ilp32.h b/arch/arm64/include/asm/signal_ilp32.h
-new file mode 100644
-index 000000000000..7ee97c133605
---- /dev/null
-+++ b/arch/arm64/include/asm/signal_ilp32.h
-@@ -0,0 +1,23 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
-+
-+#ifndef __ASM_SIGNAL_ILP32_H
-+#define __ASM_SIGNAL_ILP32_H
-+
-+#ifdef CONFIG_ARM64_ILP32
-+
-+#include <linux/compat.h>
-+
-+int ilp32_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
-+			  struct pt_regs *regs);
-+
-+#else
-+
-+static inline int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
-+					sigset_t *set, struct pt_regs *regs)
-+{
-+	return -ENOSYS;
-+}
-+
-+#endif /* CONFIG_ARM64_ILP32 */
-+
-+#endif /* __ASM_SIGNAL_ILP32_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 9e127c47a25c..27ddf5369f89 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -28,7 +28,8 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+diff --git a/drivers/media/dvb-frontends/helene.c b/drivers/media/dvb-frontends/helene.c
+index 0a4f312c4368..8fcf7a00782a 100644
+--- a/drivers/media/dvb-frontends/helene.c
++++ b/drivers/media/dvb-frontends/helene.c
+@@ -924,7 +924,10 @@ static int helene_x_pon(struct helene_priv *priv)
+ 	helene_write_regs(priv, 0x99, cdata, sizeof(cdata));
  
- arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o entry32.o binfmt_elf32.o
--arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
-+arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o 		\
-+					   signal_ilp32.o entry_ilp32.o
- arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o signal32_common.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
-diff --git a/arch/arm64/kernel/entry_ilp32.S b/arch/arm64/kernel/entry_ilp32.S
-new file mode 100644
-index 000000000000..562d5d0a7d82
---- /dev/null
-+++ b/arch/arm64/kernel/entry_ilp32.S
-@@ -0,0 +1,12 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
-+
-+/*
-+ * ILP32 system call wrappers
-+ */
-+
-+#include <linux/linkage.h>
-+
-+ENTRY(ilp32_sys_rt_sigreturn_wrapper)
-+	mov	x0, sp
-+	b	ilp32_sys_rt_sigreturn
-+ENDPROC(ilp32_sys_rt_sigreturn_wrapper)
-diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
-new file mode 100644
-index 000000000000..f4bcb7332010
---- /dev/null
-+++ b/arch/arm64/kernel/signal_ilp32.c
-@@ -0,0 +1,65 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+
-+/*
-+ * Copyright (C) 1995-2009 Russell King
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2018 Cavium Networks.
-+ * Yury Norov <ynorov@caviumnetworks.com>
-+ */
-+
-+#include <linux/compat.h>
-+#include <linux/signal.h>
-+#include <linux/syscalls.h>
-+
-+#include <asm/fpsimd.h>
-+#include <asm/unistd.h>
-+#include <asm/ucontext.h>
-+#include <asm/vdso.h>
-+
-+#include <asm/signal_ilp32.h>
-+#include <asm/signal32_common.h>
-+
-+#define get_sigset(s, m) get_sigset_t(s, m)
-+#define put_sigset(s, m) put_sigset_t(m, s)
-+
-+#define restore_altstack(stack) compat_restore_altstack(stack)
-+#define __save_altstack(stack, sp) __compat_save_altstack(stack, sp)
-+#define copy_siginfo_to_user(frame_info, ksig_info) \
-+		copy_siginfo_to_user32(frame_info, ksig_info)
-+
-+#define setup_return(regs, ka, user_layout, usig)			\
-+{									\
-+	__setup_return(regs, ka, user_layout, usig);			\
-+	regs->regs[30] =						\
-+		(unsigned long)VDSO_SYMBOL(current->mm->context.vdso,	\
-+						    sigtramp_ilp32);	\
-+}
-+
-+struct ilp32_ucontext {
-+	u32		uc_flags;
-+	u32		uc_link;
-+	compat_stack_t	uc_stack;
-+	compat_sigset_t	uc_sigmask;
-+	/* glibc uses a 1024-bit sigset_t */
-+	__u8		__unused[1024 / 8 - sizeof(compat_sigset_t)];
-+	/* last for future expansion */
-+	struct sigcontext uc_mcontext;
-+};
-+
-+struct rt_sigframe {
-+	struct compat_siginfo info;
-+	struct ilp32_ucontext uc;
-+};
-+
-+#include <asm/signal_common.h>
-+
-+asmlinkage long ilp32_sys_rt_sigreturn(struct pt_regs *regs)
-+{
-+	return __sys_rt_sigreturn(regs);
-+}
-+
-+int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
-+			  sigset_t *set, struct pt_regs *regs)
-+{
-+	return __setup_rt_frame(usig, ksig, set, regs);
-+}
+ 	/* 0x81 - 0x94 */
+-	data[0] = 0x18; /* xtal 24 MHz */
++	if (priv->xtal == SONY_HELENE_XTAL_16000)
++		data[0] = 0x10; /* xtal 16 MHz */
++	else
++		data[0] = 0x18; /* xtal 24 MHz */
+ 	data[1] = (uint8_t)(0x80 | (0x04 & 0x1F)); /* 4 x 25 = 100uA */
+ 	data[2] = (uint8_t)(0x80 | (0x26 & 0x7F)); /* 38 x 0.25 = 9.5pF */
+ 	data[3] = 0x80; /* REFOUT signal output 500mVpp */
 -- 
 2.17.0
