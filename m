@@ -1,44 +1,57 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 16 May 2018 09:38:45 +0200
-Subject: [PATCH] MAINTAINERS: Add entry for STM32 timer and lptimer drivers
-In-Reply-To: <1526398399-31753-1-git-send-email-fabrice.gasnier@st.com>
-References: <1526398399-31753-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <c2539e10-81c1-d5e9-c284-14d5142e1a2a@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 16 May 2018 09:40:10 +0200
+Subject: [PATCH v2] ARM: dts: r8a7740: Add CEU1
+In-Reply-To: <20180515080038.7438-1-horms+renesas@verge.net.au>
+References: <20180515080038.7438-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXzc3YLm8u+JgQMhXtErAgBgc4bti9cyUboPZmpB+rVyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrice
+Hi Simon,
 
-On 05/15/2018 05:33 PM, Fabrice Gasnier wrote:
-> Add an entry to make myself a maintainer of STM32 timer and lptimer
-> drivers.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+On Tue, May 15, 2018 at 10:00 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Describe CEU1 peripheral for Renesas R-Mobile A1 R8A7740 Soc.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->   MAINTAINERS | 10 ++++++++++
->   1 file changed, 10 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 4b65225..94d8e47 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -13425,6 +13425,16 @@ T:	git git://linuxtv.org/media_tree.git
->   S:	Maintained
->   F:	drivers/media/usb/stk1160/
->   
-> +STM32 TIMER/LPTIMER DRIVERS
-> +M:	Fabrice Gasnier <fabrice.gasnier@st.com>
-> +S:	Maintained
-> +F:	drivers/*/stm32-*timer*
-> +F:	drivers/pwm/pwm-stm32*
-> +F:	include/linux/*/stm32-*tim*
-> +F:	Documentation/ABI/testing/*timer-stm32
-> +F:	Documentation/devicetree/bindings/*/stm32-*timer
-> +F:	Documentation/devicetree/bindings/pwm/pwm-stm32*
-> +
->   STMMAC ETHERNET DRIVER
->   M:	Giuseppe Cavallaro <peppe.cavallaro@st.com>
->   M:	Alexandre Torgue <alexandre.torgue@st.com>
-> 
+> v2
+> * Correct register range start address
 
-Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Thanks for your patch!
+
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Minor question below.
+
+> --- a/arch/arm/boot/dts/r8a7740.dtsi
+> +++ b/arch/arm/boot/dts/r8a7740.dtsi
+> @@ -77,6 +77,16 @@
+>                 status = "disabled";
+>         };
+>
+> +       ceu1: ceu at fe914000 {
+> +               reg = <0xfe914000 0x3000>;
+> +               compatible = "renesas,r8a7740-ceu";
+> +               interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&mstp1_clks R8A7740_CLK_CEU21>;
+> +               clock-names = "ceu21";
+
+Why the "clock-names" property? It's not mentioned in the DT bindings, and
+may cause issues if the bindings are ever amended.
+
+> +               power-domains = <&pd_a4r>;
+> +               status = "disabled";
+> +       };
+> +
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
