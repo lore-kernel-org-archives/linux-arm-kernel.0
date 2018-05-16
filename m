@@ -1,64 +1,73 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 16 May 2018 11:18:48 +0300
-Subject: [PATCH 03/24] compat ABI: use non-compat openat and open_by_handle_at
- variants
-In-Reply-To: <20180516081910.10067-1-ynorov@caviumnetworks.com>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
-Message-ID: <20180516081910.10067-4-ynorov@caviumnetworks.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Wed, 16 May 2018 16:19:23 +0800
+Subject: [PATCH] ARM: berlin: switch to SPDX license identifier
+Message-ID: <20180516161923.2a39d8f2@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only difference between native and compat openat and open_by_handle_at
-is that non-compat version forces O_LARGEFILE, and it should be the
-default behaviour for all architectures, as we are going to drop the
-support of 32-bit userspace off_t.
+Use the appropriate SPDX license identifier and drop the previous
+boilerplate license text.
 
-The exception is tile32 that continues with compat version of syscalls.
-
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Chris Metcalf <cmetcalf@ezchip.com> [for tile]
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 ---
- arch/tile/kernel/compat.c         | 3 +++
- include/uapi/asm-generic/unistd.h | 5 ++---
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/mach-berlin/berlin.c  | 5 +----
+ arch/arm/mach-berlin/headsmp.S | 5 +----
+ arch/arm/mach-berlin/platsmp.c | 5 +----
+ 3 files changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/tile/kernel/compat.c b/arch/tile/kernel/compat.c
-index bdaf71d31a4a..3b7853c59395 100644
---- a/arch/tile/kernel/compat.c
-+++ b/arch/tile/kernel/compat.c
-@@ -103,6 +103,9 @@ COMPAT_SYSCALL_DEFINE5(llseek, unsigned int, fd, unsigned int, offset_high,
- #define compat_sys_readahead sys32_readahead
- #define sys_llseek compat_sys_llseek
+diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+index ac181c6797ee..2424ad40190c 100644
+--- a/arch/arm/mach-berlin/berlin.c
++++ b/arch/arm/mach-berlin/berlin.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Device Tree support for Marvell Berlin SoCs.
+  *
+@@ -5,10 +6,6 @@
+  *
+  * based on GPL'ed 2.6 kernel sources
+  *  (c) Marvell International Ltd.
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+  */
  
-+#define sys_openat		compat_sys_openat
-+#define sys_open_by_handle_at	compat_sys_open_by_handle_at
-+
- /* Call the assembly trampolines where necessary. */
- #define compat_sys_rt_sigreturn _compat_sys_rt_sigreturn
- #define sys_clone _sys_clone
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index 8b87de067bc7..426a1a496d9d 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -179,7 +179,7 @@ __SYSCALL(__NR_fchownat, sys_fchownat)
- #define __NR_fchown 55
- __SYSCALL(__NR_fchown, sys_fchown)
- #define __NR_openat 56
--__SC_COMP(__NR_openat, sys_openat, compat_sys_openat)
-+__SYSCALL(__NR_openat, sys_openat)
- #define __NR_close 57
- __SYSCALL(__NR_close, sys_close)
- #define __NR_vhangup 58
-@@ -676,8 +676,7 @@ __SYSCALL(__NR_fanotify_mark, sys_fanotify_mark)
- #define __NR_name_to_handle_at         264
- __SYSCALL(__NR_name_to_handle_at, sys_name_to_handle_at)
- #define __NR_open_by_handle_at         265
--__SC_COMP(__NR_open_by_handle_at, sys_open_by_handle_at, \
--	  compat_sys_open_by_handle_at)
-+__SYSCALL(__NR_open_by_handle_at, sys_open_by_handle_at)
- #define __NR_clock_adjtime 266
- __SC_COMP(__NR_clock_adjtime, sys_clock_adjtime, compat_sys_clock_adjtime)
- #define __NR_syncfs 267
+ #include <linux/init.h>
+diff --git a/arch/arm/mach-berlin/headsmp.S b/arch/arm/mach-berlin/headsmp.S
+index dc82a3486b05..3057885d9772 100644
+--- a/arch/arm/mach-berlin/headsmp.S
++++ b/arch/arm/mach-berlin/headsmp.S
+@@ -1,11 +1,8 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (C) 2014 Marvell Technology Group Ltd.
+  *
+  * Antoine T?nart <antoine.tenart@free-electrons.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/linkage.h>
+diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
+index a8ae4a566d99..593fc4a69d84 100644
+--- a/arch/arm/mach-berlin/platsmp.c
++++ b/arch/arm/mach-berlin/platsmp.c
+@@ -1,11 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (C) 2014 Marvell Technology Group Ltd.
+  *
+  * Antoine T?nart <antoine.tenart@free-electrons.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include <linux/io.h>
 -- 
 2.17.0
