@@ -1,27 +1,30 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 16 May 2018 11:10:28 +0530
-Subject: [PATCH 0/2] pinctrl: pinctrl-single: Add functions to save and
- restore pinctrl contex
-Message-ID: <1526449230-27618-1-git-send-email-j-keerthy@ti.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 16 May 2018 07:43:34 +0200
+Subject: vm_fault_t conversion, for real
+Message-ID: <20180516054348.15950-1-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series adds save/restore functions to pinctrl-single driver.
-This is specially needed in case of RTC only mode with
-DDR in self refresh where the register contents are lost.
+Hi all,
 
-Tested on am437x-gp-evm.
+this series tries to actually turn vm_fault_t into a type that can be
+typechecked and checks the fallout instead of sprinkling random
+annotations without context.
 
-Keerthy (2):
-  arm: mach-omap2: pdata-quirks: Add a quirk function to convey off mode
-    state
-  pinctrl: pinctrl-single: Add functions to save and restore pinctrl
-    context
+The first one fixes a real bug in orangefs, the second and third fix
+mismatched existing vm_fault_t annotations on the same function, the
+fourth removes an unused export that was in the chain.  The remainder
+until the last one do some not quite trivial conversions, and the last
+one does the trivial mass annotation and flips vm_fault_t to a __bitwise
+unsigned int - the unsigned means we also get plain compiler type
+checking for the new ->fault signature even without sparse.
 
- arch/arm/mach-omap2/pdata-quirks.c           |  6 ++
- drivers/pinctrl/pinctrl-single.c             | 95 +++++++++++++++++++++++++++-
- include/linux/platform_data/pinctrl-single.h |  1 +
- 3 files changed, 101 insertions(+), 1 deletion(-)
+This has survived an x86 allyesconfig build, and got a SUCCESS from the
+buildbot that I don't really trust - I'm pretty sure there are bits
+and pieces hiding in other architectures that it hasn't caught up to.
 
--- 
-1.9.1
+The sparse annotations are manuall verified for the core MM code and
+a few other interesting bits (e.g. DAX and the x86 fault code)
+
+The series is against linux-next as of 2018/05/15 to make sure any
+annotations in subsystem trees are picked up.
