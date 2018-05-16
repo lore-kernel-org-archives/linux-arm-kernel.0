@@ -1,71 +1,28 @@
-From: rishabhb@codeaurora.org (rishabhb at codeaurora.org)
-Date: Wed, 16 May 2018 10:33:14 -0700
-Subject: [PATCH v6 1/2] dt-bindings: Documentation for qcom, llcc
-In-Reply-To: <152649021310.210890.14841324536807182632@swboyd.mtv.corp.google.com>
-References: <1525810921-15878-1-git-send-email-rishabhb@codeaurora.org>
- <1525810921-15878-2-git-send-email-rishabhb@codeaurora.org>
- <152649021310.210890.14841324536807182632@swboyd.mtv.corp.google.com>
-Message-ID: <385198cbb91c4a36ad758997916ad271@codeaurora.org>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Wed, 16 May 2018 12:44:51 -0500
+Subject: [PATCH 0/3] coresight: Don't use contextID with PID namespaces
+In-Reply-To: <1526404417-32507-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1526404417-32507-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20180516124451.52f07a2c04cb5211241742a5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-05-16 10:03, Stephen Boyd wrote:
-> Quoting Rishabh Bhatnagar (2018-05-08 13:22:00)
->> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt 
->> b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
->> new file mode 100644
->> index 0000000..a586a17
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
->> @@ -0,0 +1,32 @@
->> +== Introduction==
->> +
->> +LLCC (Last Level Cache Controller) provides last level of cache 
->> memory in SOC,
->> +that can be shared by multiple clients. Clients here are different 
->> cores in the
->> +SOC, the idea is to minimize the local caches at the clients and 
->> migrate to
->> +common pool of memory. Cache memory is divided into partitions called 
->> slices
->> +which are assigned to clients. Clients can query the slice details, 
->> activate
->> +and deactivate them.
->> +
->> +Properties:
->> +- compatible:
->> +       Usage: required
->> +       Value type: <string>
->> +       Definition: must be "qcom,sdm845-llcc"
->> +
->> +- reg:
->> +       Usage: required
->> +       Value Type: <prop-encoded-array>
->> +       Definition: Start address and the range of the LLCC registers.
-> 
-> Start address and size?
-> 
-Yes i'll change it to Start address and size of the register region.
+On Tue, 15 May 2018 11:13:34 -0600
+Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
 
->> +
->> +- max-slices:
->> +       usage: required
->> +       Value Type: <u32>
->> +       Definition: Number of cache slices supported by hardware
->> +
->> +Example:
->> +
->> +       llcc: qcom,llcc at 1100000 {
+> Since the in-kernel value of a PID differs from what is seen from 
+> PID namespaces, using contextID tracing with PID namespaces makes the
+> feature confusing to use and potentially subject to leaking out internal
+> kernel information.
 > 
-> cache-controller at 1100000 ?
-> 
-We have tried to use consistent naming convention as in llcc_* 
-everywhere.
-Using cache-controller will mix and match the naming convention. Also in
-the documentation it is explained what llcc is and its full form.
+> This set returns an error if contextID and PID namespaces are used in
+> conjunction and gets rid of the vpid-to-pid translation function as it
+> is no longer needed.
 
->> +               compatible = "qcom,sdm845-llcc";
->> +               reg = <0x1100000 0x250000>;
->> +               max-slices = <32>;
->> +       };
->> --
+For the series:
+
+Reviewed-by: Kim Phillips <kim.phillips@arm.com>
+
+Thanks,
+
+Kim
