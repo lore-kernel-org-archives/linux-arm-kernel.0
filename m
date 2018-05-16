@@ -1,81 +1,181 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 16 May 2018 19:00:53 +0800
-Subject: [PATCH v2 1/3] x86/mm: disable ioremap free page handling on
- x86-PAE
-In-Reply-To: <20180515213931.23885-2-toshi.kani@hpe.com>
-References: <20180515213931.23885-2-toshi.kani@hpe.com>
-Message-ID: <201805161819.uT7J37yy%fengguang.wu@intel.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Wed, 16 May 2018 12:01:18 +0100
+Subject: [PATCH 08/14] ARM: spectre-v2: harden user aborts in kernel space
+In-Reply-To: <20180516105949.GJ16141@n2100.armlinux.org.uk>
+References: <20180516105949.GJ16141@n2100.armlinux.org.uk>
+Message-ID: <E1fIuBK-0003q7-9n@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Toshi,
+In order to prevent aliasing attacks on the branch predictor,
+invalidate the BTB or instruction cache on CPUs that are known to be
+affected when taking an abort on a address that is outside of a user
+task limit:
 
-Thank you for the patch! Yet something to improve:
+Cortex A8, A9, A12, A17, A73, A75: flush BTB.
+Cortex A15, Brahma B15: invalidate icache.
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.17-rc5 next-20180515]
-[cannot apply to tip/x86/core]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Toshi-Kani/fix-free-pmd-pte-page-handlings-on-x86/20180516-183317
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: i386-randconfig-x013-201819 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-Note: the linux-review/Toshi-Kani/fix-free-pmd-pte-page-handlings-on-x86/20180516-183317 HEAD 93944422fcef9bfadf22e345c1d7a34723cc3203 builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
->> arch/x86/mm/pgtable.c:757:5: error: conflicting types for 'pud_free_pmd_page'
-    int pud_free_pmd_page(pud_t *pud, unsigned long addr)
-        ^~~~~~~~~~~~~~~~~
-   In file included from arch/x86/include/asm/pgtable.h:1301:0,
-                    from include/linux/memremap.h:8,
-                    from include/linux/mm.h:27,
-                    from arch/x86/mm/pgtable.c:2:
-   include/asm-generic/pgtable.h:1022:5: note: previous declaration of 'pud_free_pmd_page' was here
-    int pud_free_pmd_page(pud_t *pud);
-        ^~~~~~~~~~~~~~~~~
->> arch/x86/mm/pgtable.c:766:5: error: conflicting types for 'pmd_free_pte_page'
-    int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
-        ^~~~~~~~~~~~~~~~~
-   In file included from arch/x86/include/asm/pgtable.h:1301:0,
-                    from include/linux/memremap.h:8,
-                    from include/linux/mm.h:27,
-                    from arch/x86/mm/pgtable.c:2:
-   include/asm-generic/pgtable.h:1023:5: note: previous declaration of 'pmd_free_pte_page' was here
-    int pmd_free_pte_page(pmd_t *pmd);
-        ^~~~~~~~~~~~~~~~~
-
-vim +/pud_free_pmd_page +757 arch/x86/mm/pgtable.c
-
-   756	
- > 757	int pud_free_pmd_page(pud_t *pud, unsigned long addr)
-   758	{
-   759		return pud_none(*pud);
-   760	}
-   761	
-   762	/*
-   763	 * Disable free page handling on x86-PAE. This assures that ioremap()
-   764	 * does not update sync'd pmd entries. See vmalloc_sync_one().
-   765	 */
- > 766	int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
-   767	{
-   768		return pmd_none(*pmd);
-   769	}
-   770	
-
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 34248 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180516/6de8a15a/attachment-0001.gz>
+ arch/arm/include/asm/cp15.h        |  3 +++
+ arch/arm/include/asm/system_misc.h |  8 ++++++
+ arch/arm/mm/fault.c                |  3 +++
+ arch/arm/mm/proc-v7-bugs.c         | 51 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S              |  8 +++---
+ 5 files changed, 70 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+index 4c9fa72b59f5..07e27f212dc7 100644
+--- a/arch/arm/include/asm/cp15.h
++++ b/arch/arm/include/asm/cp15.h
+@@ -65,6 +65,9 @@
+ #define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
+ #define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
+ 
++#define BPIALL				__ACCESS_CP15(c7, 0, c5, 6)
++#define ICIALLU				__ACCESS_CP15(c7, 0, c5, 0)
++
+ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+ 
+ static inline unsigned long get_cr(void)
+diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+index 78f6db114faf..3cfe010c5734 100644
+--- a/arch/arm/include/asm/system_misc.h
++++ b/arch/arm/include/asm/system_misc.h
+@@ -15,6 +15,14 @@ void soft_restart(unsigned long);
+ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ extern void (*arm_pm_idle)(void);
+ 
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++extern void (*harden_branch_predictor)(void);
++#define harden_branch_predictor() \
++	do { if (harden_branch_predictor) harden_branch_predictor(); } while (0)
++#else
++#define harden_branch_predictor() do { } while (0)
++#endif
++
+ #define UDBG_UNDEFINED	(1 << 0)
+ #define UDBG_SYSCALL	(1 << 1)
+ #define UDBG_BADABORT	(1 << 2)
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index b75eada23d0a..3b1ba003c4f9 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -163,6 +163,9 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ {
+ 	struct siginfo si;
+ 
++	if (addr > TASK_SIZE)
++		harden_branch_predictor();
++
+ #ifdef CONFIG_DEBUG_USER
+ 	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
+ 	    ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) {
+diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
+index a32ce13479d9..65a9b8141f86 100644
+--- a/arch/arm/mm/proc-v7-bugs.c
++++ b/arch/arm/mm/proc-v7-bugs.c
+@@ -2,6 +2,12 @@
+ #include <linux/kernel.h>
+ #include <linux/smp.h>
+ 
++#include <asm/cp15.h>
++#include <asm/cputype.h>
++#include <asm/system_misc.h>
++
++void cpu_v7_bugs_init(void);
++
+ static __maybe_unused void cpu_v7_check_auxcr_set(u32 mask, const char *msg)
+ {
+ 	u32 aux_cr;
+@@ -21,9 +27,54 @@ static void check_spectre_auxcr(u32 bit)
+ void cpu_v7_ca8_ibe(void)
+ {
+ 	check_spectre_auxcr(BIT(6));
++	cpu_v7_bugs_init();
+ }
+ 
+ void cpu_v7_ca15_ibe(void)
+ {
+ 	check_spectre_auxcr(BIT(0));
++	cpu_v7_bugs_init();
++}
++
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++void (*harden_branch_predictor)(void);
++
++static void harden_branch_predictor_bpiall(void)
++{
++	write_sysreg(0, BPIALL);
++}
++
++static void harden_branch_predictor_iciallu(void)
++{
++	write_sysreg(0, ICIALLU);
++}
++
++void cpu_v7_bugs_init(void)
++{
++	const char *spectre_v2_method = NULL;
++
++	if (harden_branch_predictor)
++		return;
++
++	switch (read_cpuid_part()) {
++	case ARM_CPU_PART_CORTEX_A8:
++	case ARM_CPU_PART_CORTEX_A9:
++	case ARM_CPU_PART_CORTEX_A12:
++	case ARM_CPU_PART_CORTEX_A17:
++	case ARM_CPU_PART_CORTEX_A73:
++	case ARM_CPU_PART_CORTEX_A75:
++		harden_branch_predictor = harden_branch_predictor_bpiall;
++		spectre_v2_method = "BPIALL";
++		break;
++
++	case ARM_CPU_PART_CORTEX_A15:
++	case ARM_CPU_PART_BRAHMA_B15:
++		harden_branch_predictor = harden_branch_predictor_iciallu;
++		spectre_v2_method = "ICIALLU";
++		break;
++	}
++	if (spectre_v2_method)
++		pr_info("CPU: Spectre v2: using %s workaround\n",
++			spectre_v2_method);
+ }
++#endif
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 5cfed34fd1af..989864676f8b 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -533,8 +533,10 @@ ENDPROC(__v7_setup)
+ 
+ 	__INITDATA
+ 
++	.weak cpu_v7_bugs_init
++
+ 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
+-	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_bugs_init
+ 
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ 	@ generic v7 bpiall on context switch
+@@ -549,7 +551,7 @@ ENDPROC(__v7_setup)
+ 	globl_equ	cpu_v7_bpiall_do_suspend,	cpu_v7_do_suspend
+ 	globl_equ	cpu_v7_bpiall_do_resume,	cpu_v7_do_resume
+ #endif
+-	define_processor_functions v7_bpiall, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions v7_bpiall, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_bugs_init
+ 
+ #define HARDENED_BPIALL_PROCESSOR_FUNCTIONS v7_bpiall_processor_functions
+ #else
+@@ -585,7 +587,7 @@ ENDPROC(__v7_setup)
+ 	globl_equ	cpu_ca9mp_switch_mm,	cpu_v7_switch_mm
+ #endif
+ 	globl_equ	cpu_ca9mp_set_pte_ext,	cpu_v7_set_pte_ext
+-	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1, bugs=cpu_v7_bugs_init
+ #endif
+ 
+ 	@ Cortex-A15 - needs iciallu switch_mm for hardening
+-- 
+2.7.4
