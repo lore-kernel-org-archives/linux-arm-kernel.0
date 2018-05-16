@@ -1,73 +1,144 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 May 2018 11:59:49 +0100
-Subject: [PATCH 0/14] ARM Spectre variant 2 fixes
-Message-ID: <20180516105949.GJ16141@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Wed, 16 May 2018 12:01:23 +0100
+Subject: [PATCH 09/14] ARM: spectre-v2: add PSCI based hardening
+In-Reply-To: <20180516105949.GJ16141@n2100.armlinux.org.uk>
+References: <20180516105949.GJ16141@n2100.armlinux.org.uk>
+Message-ID: <E1fIuBP-0003qE-DZ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series addresses the Spectre variant 2 issues on ARM Cortex and
-Broadcom Brahma B15 CPUs.  Due to the complexity of the bug, it is not
-possible to verify that this series fixes any of the bugs, since it
-has not been able to reproduce these exact scenarios using test
-programs.
+Add PSCI based hardening for cores that require more complex handling in
+firmware.
 
-I believe that this covers the entire extent of the Spectre variant 2
-issues, with the exception of Cortex A53 and Cortex A72 processors as
-these require a substantially more complex solution (except where the
-workaround is implemented in PSCI firmware.)
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/mm/proc-v7-bugs.c | 50 ++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S      | 21 +++++++++++++++++++
+ 2 files changed, 71 insertions(+)
 
-Spectre variant 1 is not covered by this series.
-
-The patch series is based partly on Marc Zyngier's work from February -
-two of the KVM patches are from Marc's work.
-
-The main differences are:
-- Inclusion of more processors as per current ARM Ltd security update
-  documentation.
-- Extension of "bugs" infrastructure to detect Cortex A8 and Cortex A15
-  CPUs missing out on the IBE bit being set on (re-)entry to the kernel
-  through all paths.
-- Handle all suspect userspace-touching-kernelspace aborts irrespective
-  of mapping type.
-
-The first patch will trivially conflict with the Broadcom Brahma
-updates already in arm-soc - it has been necessary to independently
-add the ID definitions for the B15 CPU.
-
-Having worked through this series, I'm of the opinion that the
-define_processor_functions macro in proc-v7 are probably  more hassle
-than they're worth - here, we don't need the global equivalent symbols,
-because we never refer to them from the kernel code for any V7
-processor (MULTI_CPU is always defined.)
-
-This series is currently in my "spectre" branch (along with some
-Spectre variant 1 patches.)
-
-Please carefully review.
-
- arch/arm/include/asm/bugs.h        |   6 +-
- arch/arm/include/asm/cp15.h        |   3 +
- arch/arm/include/asm/cputype.h     |   5 ++
- arch/arm/include/asm/kvm_asm.h     |   2 -
- arch/arm/include/asm/kvm_host.h    |  14 +++-
- arch/arm/include/asm/kvm_mmu.h     |  23 +++++-
- arch/arm/include/asm/proc-fns.h    |   4 +
- arch/arm/include/asm/system_misc.h |   8 ++
- arch/arm/kernel/Makefile           |   1 +
- arch/arm/kernel/bugs.c             |  18 +++++
- arch/arm/kernel/smp.c              |   4 +
- arch/arm/kernel/suspend.c          |   2 +
- arch/arm/kvm/hyp/hyp-entry.S       | 108 ++++++++++++++++++++++++-
- arch/arm/mm/Kconfig                |  23 ++++++
- arch/arm/mm/Makefile               |   2 +-
- arch/arm/mm/fault.c                |   3 +
- arch/arm/mm/proc-macros.S          |   3 +-
- arch/arm/mm/proc-v7-2level.S       |   6 --
- arch/arm/mm/proc-v7-bugs.c         | 130 ++++++++++++++++++++++++++++++
- arch/arm/mm/proc-v7.S              | 158 +++++++++++++++++++++++++++++--------
- 20 files changed, 471 insertions(+), 52 deletions(-)
-
+diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
+index 65a9b8141f86..81de4a8e74c6 100644
+--- a/arch/arm/mm/proc-v7-bugs.c
++++ b/arch/arm/mm/proc-v7-bugs.c
+@@ -1,9 +1,12 @@
+ // SPDX-License-Identifier: GPL-2.0
++#include <linux/arm-smccc.h>
+ #include <linux/kernel.h>
++#include <linux/psci.h>
+ #include <linux/smp.h>
+ 
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
++#include <asm/proc-fns.h>
+ #include <asm/system_misc.h>
+ 
+ void cpu_v7_bugs_init(void);
+@@ -39,6 +42,9 @@ void cpu_v7_ca15_ibe(void)
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ void (*harden_branch_predictor)(void);
+ 
++extern void cpu_v7_smc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
++extern void cpu_v7_hvc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
++
+ static void harden_branch_predictor_bpiall(void)
+ {
+ 	write_sysreg(0, BPIALL);
+@@ -49,6 +55,18 @@ static void harden_branch_predictor_iciallu(void)
+ 	write_sysreg(0, ICIALLU);
+ }
+ 
++#ifdef CONFIG_ARM_PSCI
++static void call_smc_arch_workaround_1(void)
++{
++	arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
++}
++
++static void call_hvc_arch_workaround_1(void)
++{
++	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
++}
++#endif
++
+ void cpu_v7_bugs_init(void)
+ {
+ 	const char *spectre_v2_method = NULL;
+@@ -73,6 +91,38 @@ void cpu_v7_bugs_init(void)
+ 		spectre_v2_method = "ICIALLU";
+ 		break;
+ 	}
++
++#ifdef CONFIG_ARM_PSCI
++	if (psci_ops.smccc_version != SMCCC_VERSION_1_0) {
++		struct arm_smccc_res res;
++
++		switch (psci_ops.conduit) {
++		case PSCI_CONDUIT_HVC:
++			arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++			if ((int)res.a0 < 0)
++				break;
++			harden_branch_predictor = call_hvc_arch_workaround_1;
++			processor.switch_mm = cpu_v7_hvc_switch_mm;
++			spectre_v2_method = "hypervisor PSCI";
++			break;
++
++		case PSCI_CONDUIT_SMC:
++			arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++			if ((int)res.a0 < 0)
++				break;
++			harden_branch_predictor = call_smc_arch_workaround_1;
++			processor.switch_mm = cpu_v7_smc_switch_mm;
++			spectre_v2_method = "firmware PSCI";
++			break;
++
++		default:
++			break;
++		}
++	}
++#endif
++
+ 	if (spectre_v2_method)
+ 		pr_info("CPU: Spectre v2: using %s workaround\n",
+ 			spectre_v2_method);
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 989864676f8b..7e6719a0eada 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -9,6 +9,7 @@
+  *
+  *  This is the "shell" of the ARMv7 processor support.
+  */
++#include <linux/arm-smccc.h>
+ #include <linux/init.h>
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+@@ -93,6 +94,26 @@ ENTRY(cpu_v7_dcache_clean_area)
+ 	ret	lr
+ ENDPROC(cpu_v7_dcache_clean_area)
+ 
++#ifdef CONFIG_ARM_PSCI
++	.arch_extension sec
++ENTRY(cpu_v7_smc_switch_mm)
++	stmfd	sp!, {r0 - r3}
++	movw	r0, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
++	movt	r0, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
++	smc	#0
++	ldmfd	sp!, {r0 - r3}
++	b	cpu_v7_switch_mm
++ENDPROC(cpu_v7_smc_switch_mm)
++	.arch_extension virt
++ENTRY(cpu_v7_hvc_switch_mm)
++	stmfd	sp!, {r0 - r3}
++	movw	r0, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
++	movt	r0, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
++	hvc	#0
++	ldmfd	sp!, {r0 - r3}
++	b	cpu_v7_switch_mm
++ENDPROC(cpu_v7_smc_switch_mm)
++#endif
+ ENTRY(cpu_v7_iciallu_switch_mm)
+ 	mov	r3, #0
+ 	mcr	p15, 0, r3, c7, c5, 0		@ ICIALLU
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
