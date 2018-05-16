@@ -1,34 +1,29 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 16 May 2018 14:41:12 -0400
-Subject: [RFC PATCH] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <3120434b-9831-bf33-25b8-11aba1c1b648@codeaurora.org>
-References: <1526495029-25783-1-git-send-email-okaya@codeaurora.org>
- <3120434b-9831-bf33-25b8-11aba1c1b648@codeaurora.org>
-Message-ID: <9f8ea8f6-6005-1b46-4d75-4f89e04ad9c1@codeaurora.org>
+From: corbet@lwn.net (Jonathan Corbet)
+Date: Wed, 16 May 2018 13:18:23 -0600
+Subject: [PATCH v2] coresight: documentation: update sysfs section
+In-Reply-To: <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
+References: <20180507172915.c032cd71c07b1849bf419a5f@arm.com>
+ <CANLsYkyQLan3XajOz2uuoOF8OQchGfeu2ZkZJ9H1Xm9q==aXTw@mail.gmail.com>
+ <20180514121959.a9a3d2fb3d3d270849ffbc39@arm.com>
+Message-ID: <20180516131823.4b1a3ecb@lwn.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/16/2018 2:31 PM, Timur Tabi wrote:
-> On 05/16/2018 01:23 PM, Sinan Kaya wrote:
->> +??????? win_start = window->res->start - window->offset;
+On Mon, 14 May 2018 12:19:59 -0500
+Kim Phillips <kim.phillips@arm.com> wrote:
+
+> - Align and show updated ls devices output from the TC2, based on
+>   current driver
 > 
-> Can you guarantee that window->res->start is always >= window->offset?
+> - Provide an example from an ETMv4 based system (Juno)
 > 
+> - Reflect changes to the way the RAM write pointer is accessed since
+>   it got changed in commit 7d83d17795ef ("coresight: tmc: adding sysFS
+>   management entries").
 
-Resource offset is generally 0 when not translating or a positive number
-that you subtract from the resource start to reach to the translating window.
+So I was going to apply this, but it's been pretty badly corrupted by
+your mailer.  Could I ask you to retry, please?
 
-Having a bigger offset than resource start should be considered a BIOS bug.
+Thanks,
 
->> +??????? win_size = window->res->end - window->res->start + 1;
-> 
-> Use resource_size() instead.
-> 
-
-I'll fix it.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+jon
