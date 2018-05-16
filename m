@@ -1,146 +1,201 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 May 2018 10:25:40 +0100
-Subject: [PATCH] arm64: KVM: reduce guest fpsimd trap
-In-Reply-To: <F348A9E21A573744858FF7E5D32E29D81BDF52AC@dggemi509-mbs.china.huawei.com>
-References: <1526460738-11157-1-git-send-email-zhangshaokun@hisilicon.com>
- <F348A9E21A573744858FF7E5D32E29D81BDF52AC@dggemi509-mbs.china.huawei.com>
-Message-ID: <4a812440-b5c6-8a11-a89d-0bad0e7d5150@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 16 May 2018 11:31:10 +0200
+Subject: [PATCH v2 26/26] drm/bridge: establish a link between the bridge
+ supplier and consumer
+In-Reply-To: <f8215ba1-4cdb-69b9-39ff-68feca3ec502@axentia.se>
+References: <20180504135212.26977-1-peda@axentia.se>
+ <CGME20180504135432epcas3p368bb7541ca52bc8bc301dec794851214@epcas3p3.samsung.com>
+ <20180504135212.26977-27-peda@axentia.se>
+ <a723ad4a-8caa-4ff5-d39d-52db98a56d7b@samsung.com>
+ <c25f81e0-5b7b-c605-5b58-0ecc88830124@axentia.se>
+ <20180514162828.GE28661@phenom.ffwll.local>
+ <73fa1ca3-28e4-96c5-1fc6-23e9c0cebb49@axentia.se>
+ <CAKMK7uECSUo5k6uG3-y+yKQTGxB3FfGcwzMT+ZP5uux2SbpfUg@mail.gmail.com>
+ <f8215ba1-4cdb-69b9-39ff-68feca3ec502@axentia.se>
+Message-ID: <20180516093110.GC3438@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Dave]
-
-Hi Nianyao,
-
-On 16/05/18 10:08, Tangnianyao (ICT) wrote:
-> Add last_fpsimd_trap to notify if guest last exit reason is handling fpsimd. If guest is using fpsimd frequently, save host's fpsimd state and restore guest's fpsimd state and deactive fpsimd trap before returning to guest. It can avoid guest fpsimd trap soon to improve performance.
+On Tue, May 15, 2018 at 01:09:59PM +0200, Peter Rosin wrote:
+> On 2018-05-15 12:22, Daniel Vetter wrote:
+> > On Mon, May 14, 2018 at 10:40 PM, Peter Rosin <peda@axentia.se> wrote:
+> >> On 2018-05-14 18:28, Daniel Vetter wrote:
+> >>> On Fri, May 11, 2018 at 09:37:47AM +0200, Peter Rosin wrote:
+> >>>> On 2018-05-10 10:10, Andrzej Hajda wrote:
+> >>>>> On 04.05.2018 15:52, Peter Rosin wrote:
+> >>>>>> If the bridge supplier is unbound, this will bring the bridge consumer
+> >>>>>> down along with the bridge. Thus, there will no longer linger any
+> >>>>>> dangling pointers from the bridge consumer (the drm_device) to some
+> >>>>>> non-existent bridge supplier.
+> >>>>>>
+> >>>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
+> >>>>>> ---
+> >>>>>>  drivers/gpu/drm/drm_bridge.c | 18 ++++++++++++++++++
+> >>>>>>  include/drm/drm_bridge.h     |  2 ++
+> >>>>>>  2 files changed, 20 insertions(+)
+> >>>>>>
+> >>>>>> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
+> >>>>>> index 78d186b6831b..0259f0a3ff27 100644
+> >>>>>> --- a/drivers/gpu/drm/drm_bridge.c
+> >>>>>> +++ b/drivers/gpu/drm/drm_bridge.c
+> >>>>>> @@ -26,6 +26,7 @@
+> >>>>>>  #include <linux/mutex.h>
+> >>>>>>
+> >>>>>>  #include <drm/drm_bridge.h>
+> >>>>>> +#include <drm/drm_device.h>
+> >>>>>>  #include <drm/drm_encoder.h>
+> >>>>>>
+> >>>>>>  #include "drm_crtc_internal.h"
+> >>>>>> @@ -127,12 +128,25 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
+> >>>>>>    if (bridge->dev)
+> >>>>>>            return -EBUSY;
+> >>>>>>
+> >>>>>> +  if (encoder->dev->dev != bridge->odev) {
+> >>>>>
+> >>>>> I wonder why device_link_add does not handle this case (self dependency)
+> >>>>> silently as noop, as it seems to be a correct behavior.
+> >>>>
+> >>>> It's kind-of a silly corner-case though, so perfectly understandable
+> >>>> that it isn't handled.
+> >>>>
+> >>>>>> +          bridge->link = device_link_add(encoder->dev->dev,
+> >>>>>> +                                         bridge->odev, 0);
+> >>>>>> +          if (!bridge->link) {
+> >>>>>> +                  dev_err(bridge->odev, "failed to link bridge to %s\n",
+> >>>>>> +                          dev_name(encoder->dev->dev));
+> >>>>>> +                  return -EINVAL;
+> >>>>>> +          }
+> >>>>>> +  }
+> >>>>>> +
+> >>>>>>    bridge->dev = encoder->dev;
+> >>>>>>    bridge->encoder = encoder;
+> >>>>>>
+> >>>>>>    if (bridge->funcs->attach) {
+> >>>>>>            ret = bridge->funcs->attach(bridge);
+> >>>>>>            if (ret < 0) {
+> >>>>>> +                  if (bridge->link)
+> >>>>>> +                          device_link_del(bridge->link);
+> >>>>>> +                  bridge->link = NULL;
+> >>>>>>                    bridge->dev = NULL;
+> >>>>>>                    bridge->encoder = NULL;
+> >>>>>>                    return ret;
+> >>>>>> @@ -159,6 +173,10 @@ void drm_bridge_detach(struct drm_bridge *bridge)
+> >>>>>>    if (bridge->funcs->detach)
+> >>>>>>            bridge->funcs->detach(bridge);
+> >>>>>>
+> >>>>>> +  if (bridge->link)
+> >>>>>> +          device_link_del(bridge->link);
+> >>>>>> +  bridge->link = NULL;
+> >>>>>> +
+> >>>>>>    bridge->dev = NULL;
+> >>>>>>  }
+> >>>>>>
+> >>>>>> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+> >>>>>> index b656e505d11e..804189c63a4c 100644
+> >>>>>> --- a/include/drm/drm_bridge.h
+> >>>>>> +++ b/include/drm/drm_bridge.h
+> >>>>>> @@ -261,6 +261,7 @@ struct drm_bridge_timings {
+> >>>>>>   * @list: to keep track of all added bridges
+> >>>>>>   * @timings: the timing specification for the bridge, if any (may
+> >>>>>>   * be NULL)
+> >>>>>> + * @link: drm consumer <-> bridge supplier
+> >>>>>
+> >>>>> Nitpick: "<->" suggests symmetry, maybe "device link from drm consumer
+> >>>>> to the bridge" would be better.
+> >>>>
+> >>>> I meant "<->" to indicate that the link is bidirectional, not that the
+> >>>> relationship is in any way symmetric. I wasn't aware of any implication
+> >>>> of a symmetric relationship when using "<->", do you have a reference?
+> >>>> But I guess the different arrow notations in math are somewhat overloaded
+> >>>> and that someone at some point must have used "<->" to indicate a
+> >>>> symmetric relationship...
+> >>>
+> >>> Yeah I agree with Andrzej here, for me <-> implies a symmetric
+> >>> relationship. Spelling it out like Andrzej suggested sounds like the
+> >>> better idea.
+> >>> -Daniel
+> >>
+> >> Ok, I guess that means I have to do a v3 after all. Or can this
+> >> trivial documentation update be done by the committer? I hate to
+> >> spam everyone with another volley...
+> >>
+> >> Or perhaps I should squash patches 2-23 that are all rather similar
+> >> and mechanic? I separated them to allow for easier review from
+> >> individual driver maintainers, but that didn't seem to happen
+> >> anyway...
+> > 
+> > Do another volley of the full set, or in-reply-to to just replace the
+> > patch that needs to be respun (but some people don't like that).
+> > 
+> > When resending just make sure you're picking up all the acks/r-bs you
+> > have already.
 > 
-> Signed-off-by: Nianyao Tang <tangnianyao@huawei.com>
-> ---
->  arch/arm64/kernel/asm-offsets.c |  1 +
->  arch/arm64/kvm/hyp/entry.S      |  5 +++++
->  arch/arm64/kvm/hyp/switch.c     | 38 ++++++++++++++++++++++++++++++++++++--
->  include/linux/kvm_host.h        |  1 +
->  4 files changed, 43 insertions(+), 2 deletions(-)
+> Right, I always try to do that. One Ack that I did not include in v2
+> was the one you had on v1 24/24 (i.e. this patch). The reason I did
+> not add your Ack for v2 even on the patch where it obviously applied
+> was that I didn't know if you'd barf on the odev name.
 > 
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c index 5bdda65..35a9c5c 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -136,6 +136,7 @@ int main(void)
->  #ifdef CONFIG_KVM_ARM_HOST
->    DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
->    DEFINE(VCPU_FAULT_DISR,	offsetof(struct kvm_vcpu, arch.fault.disr_el1));
-> +  DEFINE(VCPU_LAST_FPSIMD_TRAP, offsetof(struct kvm_vcpu, 
-> + last_fpsimd_trap));
->    DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
->    DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
->    DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
-> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S index e41a161..956e042 100644
-> --- a/arch/arm64/kvm/hyp/entry.S
-> +++ b/arch/arm64/kvm/hyp/entry.S
-> @@ -197,6 +197,11 @@ alternative_endif
->  	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
->  	bl	__fpsimd_restore_state
->  
-> +	// Mark guest using fpsimd now
-> +	ldr x0, [x3, #VCPU_LAST_FPSIMD_TRAP]
-> +	add x0, x0, #1
-> +	str x0, [x3, #VCPU_LAST_FPSIMD_TRAP]
-> +
->  	// Skip restoring fpexc32 for AArch64 guests
->  	mrs	x1, hcr_el2
->  	tbnz	x1, #HCR_RW_SHIFT, 1f
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c index d964523..86eea1b 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -92,7 +92,13 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
->  
->  	val = read_sysreg(cpacr_el1);
->  	val |= CPACR_EL1_TTA;
-> -	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
-> +	val &= ~CPACR_EL1_ZEN;
-> +
-> +	if (vcpu->last_fpsimd_trap)
-> +		val |= CPACR_EL1_FPEN;
-> +	else
-> +		val &= ~CPACR_EL1_FPEN;
-> +
->  	write_sysreg(val, cpacr_el1);
->  
->  	write_sysreg(kvm_get_hyp_vector(), vbar_el1); @@ -105,7 +111,13 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
->  	__activate_traps_common(vcpu);
->  
->  	val = CPTR_EL2_DEFAULT;
-> -	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
-> +	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
-> +
-> +	if (vcpu->last_fpsimd_trap)
-> +		val &= ~CPTR_EL2_TFP;
-> +	else
-> +		val |= CPTR_EL2_TFP;
-> +
->  	write_sysreg(val, cptr_el2);
->  }
->  
-> @@ -406,6 +418,17 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->  	__activate_traps(vcpu);
->  	__activate_vm(vcpu->kvm);
->  
-> +	/*
-> +	 * If guest last trap to host for handling fpsimd, last_fpsimd_trap
-> +	 * is set. Restore guest's fpsimd state and deactivate fpsimd trap
-> +	 * to avoid guest traping soon.
-> +	 */
-> +	if (vcpu->last_fpsimd_trap) {
-> +		__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
-> +		__fpsimd_restore_state(&guest_ctxt->gp_regs.fp_regs);
-> +		vcpu->last_fpsimd_trap = 0;
-> +	}
-> +
->  	sysreg_restore_guest_state_vhe(guest_ctxt);
->  	__debug_switch_to_guest(vcpu);
->  
-> @@ -454,6 +477,17 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  	__activate_traps(vcpu);
->  	__activate_vm(kern_hyp_va(vcpu->kvm));
->  
-> +	/*
-> +	 * If guest last trap to host for handling fpsimd, last_fpsimd_trap
-> +	 * is set. Restore guest's fpsimd state and deactivate fpsimd trap
-> +	 * to avoid guest traping soon.
-> +	 */
-> +	if (vcpu->last_fpsimd_trap) {
-> +		__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
-> +		__fpsimd_restore_state(&guest_ctxt->gp_regs.fp_regs);
-> +		vcpu->last_fpsimd_trap = 0;
-> +	}
-> +
->  	__hyp_vgic_restore_state(vcpu);
->  	__timer_enable_traps(vcpu);
->  
-> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h index 6930c63..46bdf0d 100644
-> --- a/include/linux/kvm_host.h
-> +++ b/include/linux/kvm_host.h
-> @@ -274,6 +274,7 @@ struct kvm_vcpu {
->  	bool preempted;
->  	struct kvm_vcpu_arch arch;
->  	struct dentry *debugfs_dentry;
-> +	unsigned int last_fpsimd_trap;
->  };
->  
->  static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
-> --
-> 2.7.4
+> But it was (and still is) a bit unclear if that was on Ack on the
+> last patch only, or if it was for the whole series? I think it might
+> have been for the whole series, but I'm not sure and I hate to be a
+> presumptuous idiot...
+
+Ack on the overall concept, and I'm ok with odev too. But definitely get
+acks from relevant people (bridge/driver maintainers). In terms of
+patches, I'd say patch 1 + 24-26 have my
+
+Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+
+-Daniel
+
+> 
+> Cheers,
+> Peter
+> 
+> > -Daniel
+> >> Cheers,
+> >> Peter
+> >>
+> >>>
+> >>>>
+> >>>>> Anyway:
+> >>>>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> >>>>
+> >>>> Thanks!
+> >>>>
+> >>>> Cheers,
+> >>>> Peter
+> >>>>
+> >>>>>  --
+> >>>>> Regards
+> >>>>> Andrzej
+> >>>>>
+> >>>>>>   * @funcs: control functions
+> >>>>>>   * @driver_private: pointer to the bridge driver's internal context
+> >>>>>>   */
+> >>>>>> @@ -271,6 +272,7 @@ struct drm_bridge {
+> >>>>>>    struct drm_bridge *next;
+> >>>>>>    struct list_head list;
+> >>>>>>    const struct drm_bridge_timings *timings;
+> >>>>>> +  struct device_link *link;
+> >>>>>>
+> >>>>>>    const struct drm_bridge_funcs *funcs;
+> >>>>>>    void *driver_private;
+> >>>>>
+> >>>>>
+> >>>>
+> >>>
+> >>
+> >> _______________________________________________
+> >> dri-devel mailing list
+> >> dri-devel at lists.freedesktop.org
+> >> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> > 
+> > 
+> > 
 > 
 
-This doesn't seem to be the 100% correct. I can't see how this works
-when being preempted, for example... I suggest you look at Dave Martin's
-series[1], which does this correctly.
-
-Thanks,
-
-	M.
-
-[1] https://www.mail-archive.com/kvmarm at lists.cs.columbia.edu/msg17563.html
 -- 
-Jazz is not dead. It just smells funny...
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
