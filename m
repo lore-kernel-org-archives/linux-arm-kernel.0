@@ -1,31 +1,24 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Wed, 16 May 2018 12:01:38 +0100
-Subject: [PATCH 12/14] ARM: spectre-v2: KVM: invalidate icache on guest exit
- for Brahma B15
-In-Reply-To: <20180516105949.GJ16141@n2100.armlinux.org.uk>
-References: <20180516105949.GJ16141@n2100.armlinux.org.uk>
-Message-ID: <E1fIuBe-0003qZ-PD@rmk-PC.armlinux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 May 2018 12:22:09 +0100
+Subject: [PATCH] arm64: cmpwait: Clear event register before arming
+ exclusive monitor
+In-Reply-To: <1525092992-16819-1-git-send-email-will.deacon@arm.com>
+References: <1525092992-16819-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20180516112208.izapa5qdd5m4t6fy@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include Brahma B15 in the Spectre v2 KVM workarounds.
+On Mon, Apr 30, 2018 at 01:56:32PM +0100, Will Deacon wrote:
+> When waiting for a cacheline to change state in cmpwait, we may immediately
+> wake-up the first time around the outer loop if the event register was
+> already set (for example, because of the event stream).
+> 
+> Avoid these spurious wakeups by explicitly clearing the event register
+> before loading the cacheline and setting the exclusive monitor.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/include/asm/kvm_mmu.h | 1 +
- 1 file changed, 1 insertion(+)
+Queued for 4.18. Thanks.
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 48edb1f4ced4..fea770f78144 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -306,6 +306,7 @@ static inline void *kvm_get_hyp_vector(void)
- 		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
- 	}
- 
-+	case ARM_CPU_PART_BRAHMA_B15:
- 	case ARM_CPU_PART_CORTEX_A15:
- 	{
- 		extern char __kvm_hyp_vector_ic_inv[];
 -- 
-2.7.4
+Catalin
