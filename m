@@ -1,69 +1,61 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 16 May 2018 10:02:18 +0530
-Subject: [PATCH] cpufreq: brcmstb-avs-cpufreq: sort frequencies in
- ascending order
-In-Reply-To: <20180516034954.56475-1-code@mmayer.net>
-References: <20180516034954.56475-1-code@mmayer.net>
-Message-ID: <20180516043218.7ktq5vjq2rhcszz5@vireshk-i7>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Wed, 16 May 2018 12:48:17 +0800
+Subject: [PATCH] ARM: dts: imx7d: use operating-points-v2 for cpu
+Message-ID: <1526446097-7111-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-05-18, 20:49, Markus Mayer wrote:
-> From: Markus Mayer <mmayer@broadcom.com>
-> 
-> Most CPUfreq drivers (at least on ARM) seem to be sorting the available
-> frequencies from lowest to highest. To match this behaviour, we reverse
-> the sorting order in brcmstb-avs-cpufreq, so it is now also lowest to
-> highest.
+This patch uses "operating-points-v2" instead of
+"operating-points" to be more fit with cpufreq-dt
+driver.
 
-The reasoning isn't correct. Just because everyone else is doing it
-doesn't make it right and so you shouldn't change just because of
-that.
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx7d.dtsi | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
 
-What you must written instead in the commit log is that the cpufreq
-core performs better if the table is sorted (in any order), and so we
-must sort it as well.
-
-But I feel the table is already sorted for your platform, isn't it?
-And I don't see a clear advantage of merging this patch.
-
-> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
-> ---
->  drivers/cpufreq/brcmstb-avs-cpufreq.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
-> index b07559b9ed99..7dac3205d3eb 100644
-> --- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
-> +++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
-> @@ -403,7 +403,7 @@ brcm_avs_get_freq_table(struct device *dev, struct private_data *priv)
->  {
->  	struct cpufreq_frequency_table *table;
->  	unsigned int pstate;
-> -	int i, ret;
-> +	int p, i, ret;
->  
->  	/* Remember P-state for later */
->  	ret = brcm_avs_get_pstate(priv, &pstate);
-> @@ -415,12 +415,13 @@ brcm_avs_get_freq_table(struct device *dev, struct private_data *priv)
->  	if (!table)
->  		return ERR_PTR(-ENOMEM);
->  
-> -	for (i = AVS_PSTATE_P0; i <= AVS_PSTATE_MAX; i++) {
-> -		ret = brcm_avs_set_pstate(priv, i);
-> +	for (p = AVS_PSTATE_MAX, i = 0; p >= 0; p--, i++) {
-> +		ret = brcm_avs_set_pstate(priv, p);
->  		if (ret)
->  			return ERR_PTR(ret);
->  		table[i].frequency = brcm_avs_get_frequency(priv->base);
-> -		table[i].driver_data = i;
-> +		/* Store the corresponding P-state with each frequency */
-> +		table[i].driver_data = p;
->  	}
->  	table[i].frequency = CPUFREQ_TABLE_END;
->  
-> -- 
-> 2.7.4
-
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 4c9877e..28980c8 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -9,12 +9,8 @@
+ / {
+ 	cpus {
+ 		cpu0: cpu at 0 {
+-			operating-points = <
+-				/* KHz	uV */
+-				996000	1075000
+-				792000	975000
+-			>;
+ 			clock-frequency = <996000000>;
++			operating-points-v2 = <&cpu0_opp_table>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -22,6 +18,24 @@
+ 			device_type = "cpu";
+ 			reg = <1>;
+ 			clock-frequency = <996000000>;
++			operating-points-v2 = <&cpu0_opp_table>;
++		};
++	};
++
++	cpu0_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp-792000000 {
++			opp-hz = /bits/ 64 <792000000>;
++			opp-microvolt = <975000>;
++			clock-latency-ns = <150000>;
++		};
++		opp-996000000 {
++			opp-hz = /bits/ 64 <996000000>;
++			opp-microvolt = <1075000>;
++			clock-latency-ns = <150000>;
++			opp-suspend;
+ 		};
+ 	};
+ 
 -- 
-viresh
+2.7.4
