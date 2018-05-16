@@ -1,47 +1,47 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 16 May 2018 10:24:54 +0200
-Subject: [PATCH v9 05/12] ACPI/PPTT: Add Processor Properties Topology
- Table parsing
-In-Reply-To: <7cefb087-f41a-0a73-ef77-b560d338be4b@arm.com>
-References: <20180511235807.30834-1-jeremy.linton@arm.com>
- <20180511235807.30834-6-jeremy.linton@arm.com>
- <CAJZ5v0h4OeTaG2h0Q1c8zX93tici_nfLftpEyKWSkXoztHuUDg@mail.gmail.com>
- <7cefb087-f41a-0a73-ef77-b560d338be4b@arm.com>
-Message-ID: <CAJZ5v0jE4JJbcK-BiFg_JVf00JZCvbMFRnrkTdJTOwz0vW_ZMg@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 16 May 2018 11:18:55 +0300
+Subject: [PATCH 10/24] arm64: uapi: set __BITS_PER_LONG correctly for ILP32
+ and LP64
+In-Reply-To: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+Message-ID: <20180516081910.10067-11-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 11:42 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> Hi,
->
->
-> On 05/12/2018 05:09 AM, Rafael J. Wysocki wrote:
->>
->> On Sat, May 12, 2018 at 1:58 AM, Jeremy Linton <jeremy.linton@arm.com>
->> wrote:
->>>
+From: Andrew Pinski <apinski@cavium.com>
 
-[cut]
+Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
+__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
+determine the appropriate type definitions for the system call interface.
 
->>
->>
->> I don't think you really need the explicit type cast here and above,
->> but that's very minor.
->>
->>> +}
->>
->>
->> Please feel free to add
->>
->> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->>
->> to the patch and route it through the arch tree as needed.
->
->
-> Thanks for looking at this (and the ack of course)!
->
-> As an FYI, the in my build without the type cast, the
-> -Werror=incompatible-pointer-types (sourced from the root Makefile) triggers
-> an error.
+Signed-off-by: Andrew Pinski <apinski@cavium.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+---
+ arch/arm64/include/uapi/asm/bitsperlong.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Fair enough.
+diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
+index 485d60bee26c..9a05a9659e76 100644
+--- a/arch/arm64/include/uapi/asm/bitsperlong.h
++++ b/arch/arm64/include/uapi/asm/bitsperlong.h
+@@ -17,7 +17,14 @@
+ #ifndef __ASM_BITSPERLONG_H
+ #define __ASM_BITSPERLONG_H
+ 
+-#define __BITS_PER_LONG 64
++#if defined(__LP64__)
++/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
++#  define __BITS_PER_LONG 64
++#elif defined(__ILP32__)
++#  define __BITS_PER_LONG 32
++#else
++#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
++#endif
+ 
+ #include <asm-generic/bitsperlong.h>
+ 
+-- 
+2.17.0
