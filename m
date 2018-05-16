@@ -1,22 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 May 2018 14:17:47 +0200
-Subject: [PATCH v1] pinctrl: armada-37xx: Convert to use match_string()
- helper
-In-Reply-To: <20180503172642.21031-1-andriy.shevchenko@linux.intel.com>
-References: <20180503172642.21031-1-andriy.shevchenko@linux.intel.com>
-Message-ID: <CACRpkdbBqxr1AHNRLyt0QkkgwayZ+SeomN2_u7BkKOQCV6XULA@mail.gmail.com>
+Date: Wed, 16 May 2018 14:20:06 +0200
+Subject: [PATCH 3/7] pinctrl: sunxi: add support for H6 R_PIO pin
+ controller
+In-Reply-To: <20180503183847.11046-4-icenowy@aosc.io>
+References: <20180503183847.11046-1-icenowy@aosc.io>
+ <20180503183847.11046-4-icenowy@aosc.io>
+Message-ID: <CACRpkdY2HXmn8iez3LhVUPQKcxwxRW1t18jWj0PbQi6=wFf_2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 3, 2018 at 7:26 PM, Andy Shevchenko
-<andriy.shevchenko@linux.intel.com> wrote:
+On Thu, May 3, 2018 at 8:38 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
 
-> The new helper returns index of the matching string in an array.
-> We are going to use it here.
+> Allwinner H6 SoC has a R_PIO pin controller like other Allwinner SoCs,
+> which controls the PL and PM pin banks.
 >
-> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Add support for it.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Patch applied.
+Patch applied with the ACKs.
 
 Yours,
 Linus Walleij
