@@ -1,64 +1,63 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Wed, 16 May 2018 15:01:10 +0000
-Subject: [PATCH 1/5] dt-bindings: pinctrl: document the STMFX pinctrl
- bindings
-In-Reply-To: <CACRpkda2VGo0FOdR09tKiTpg66NgoWjubaHp_J3372y=a772Zg@mail.gmail.com>
-References: <1523440025-18077-1-git-send-email-amelie.delaunay@st.com>
- <1523440025-18077-2-git-send-email-amelie.delaunay@st.com>
- <20180416181940.4b5z4svbde3ompij@rob-hp-laptop>
- <CACRpkdYOMjjYyWQz7PK34jqUK7z5-CmH1HY6un4k8nBn7Cq8ag@mail.gmail.com>
- <55392fe7-20d2-9447-60f9-4bd226b60195@st.com>
- <CACRpkda2VGo0FOdR09tKiTpg66NgoWjubaHp_J3372y=a772Zg@mail.gmail.com>
-Message-ID: <b9005dd8-8214-ceab-0f88-ff1a51b44e34@st.com>
+From: darrick.wong@oracle.com (Darrick J. Wong)
+Date: Wed, 16 May 2018 08:08:29 -0700
+Subject: [PATCH 14/14] mm: turn on vm_fault_t type checking
+In-Reply-To: <20180516054348.15950-15-hch@lst.de>
+References: <20180516054348.15950-1-hch@lst.de>
+ <20180516054348.15950-15-hch@lst.de>
+Message-ID: <20180516150829.GA4904@magnolia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/16/2018 04:20 PM, Linus Walleij wrote:
-> On Wed, May 9, 2018 at 9:56 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+On Wed, May 16, 2018 at 07:43:48AM +0200, Christoph Hellwig wrote:
+> Switch vm_fault_t to point to an unsigned int with __b?twise annotations.
+> This both catches any old ->fault or ->page_mkwrite instance with plain
+> compiler type checking, as well as finding more intricate problems with
+> sparse.
 > 
->> Indeed, stmfx has other functions than GPIO. But, after comments done
->> here: [1] and there: [2], it has been decided to move MFD parent/GPIO
->> child drivers into a single PINCTRL/GPIO driver because of the following
->> reasons:
->> - Other stmfx functions (IDD measurement and TouchScreen controller) are
->> not used on any of the boards using an stmfx and supported by Linux, so
->> no way to test these functions, and no need to maintain them while they
->> are not being used.
->> - But, in the case a new board will use more than GPIO function on
->> stmfx, the actual implementation allow to easily extract common init
->> part of stmfx and put it in an MFD driver.
->>
->> So I could remove gpio sub-node and put its contents in stmfx node and
->> keep single PINCTRL/GPIO driver for the time being.
->> Please advise,
-> 
-> I would normally advice to use the right modeling from the start, create
-> the MFD driver and spawn the devices from there. It is confusing
-> if the layout of the driver(s) doesn't really match the layout of the
-> hardware.
-> 
-> I understand that it is a pain to write new MFD drivers to get your
-> things going and it would be "nice to get this working really quick
-> now" but in my experience it is better to do it right from the start.
-> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
 
-Hi Linus,
+<ULTRASNIP>
 
-Thanks for your advice. I understand the point.
-So, the right modeling would be to:
-- create an MFD driver with the common init part of stmfx
-- remove all common init part of stmfx-pinctrl driver and keep only all 
-gpio/pinctrl functions.
+For the iomap and xfs parts,
+Reviewed-by: Darrick J. Wong <darrick.wong@oracle.com>
 
-I will not develop the other stmfx functions (IDD measurement driver and 
-TouchScreen controller driver) because, as explained ealier, they are 
-not used on any of the boards using an stmfx and supported by Linux, so 
-no way to test these functions, and no need to maintain them while they 
-are not being used.
+That said...
 
-Lee, are you OK with that ?
+> diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+> index 54f1e05ecf3e..da2b77a19911 100644
+> --- a/include/linux/mm_types.h
+> +++ b/include/linux/mm_types.h
+> @@ -22,7 +22,8 @@
+>  #endif
+>  #define AT_VECTOR_SIZE (2*(AT_VECTOR_SIZE_ARCH + AT_VECTOR_SIZE_BASE + 1))
+>  
+> -typedef int vm_fault_t;
+> +typedef unsigned __bitwise vm_fault_t;
+> +
+>  
+>  struct address_space;
+>  struct mem_cgroup;
+> @@ -619,7 +620,7 @@ struct vm_special_mapping {
+>  	 * If non-NULL, then this is called to resolve page faults
+>  	 * on the special mapping.  If used, .pages is not checked.
+>  	 */
+> -	int (*fault)(const struct vm_special_mapping *sm,
+> +	vm_fault_t (*fault)(const struct vm_special_mapping *sm,
 
-Regards,
-Amelie
+Uh, we're changing function signatures /and/ redefinining vm_fault_t?
+All in the same 90K patch?
+
+I /was/ expecting a series of "convert XXXXX and all callers/users"
+patches followed by a trivial one to switch the definition, not a giant
+pile of change.  FWIW I don't mind so much if you make a patch
+containing a change for some super-common primitive and a hojillion
+little diff hunks tree-wide, but only one logical change at a time for a
+big patch, please...
+
+I quite prefer seeing the whole series from start to finish all packaged
+up in one series, but wow this was overwhelming. :/
+
+--D
+
+<ULTRASNIP>
