@@ -1,93 +1,128 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Wed, 16 May 2018 10:58:26 +0800
-Subject: [RFC PATCH 00/10] Add persistent clock support
-In-Reply-To: <20180515135612.GQ29062@mai>
-References: <cover.1526285602.git.baolin.wang@linaro.org>
- <20180515135612.GQ29062@mai>
-Message-ID: <CAMz4kuJpip-7wT=Z7izm_CJHzz-U81_a6XB3E-B5rXLVF2YUqA@mail.gmail.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed, 16 May 2018 11:38:45 +0800
+Subject: [PATCH] ethernet: stmmac: dwmac-rk: Add GMAC support for px30
+Message-ID: <1526441925-12654-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Daniel,
+Add constants and callback functions for the dwmac on px30 soc.
+The base structure is the same, but registers and the bits in
+them moved slightly, and add the clk_mac_speed for the select
+of mac speed.
 
-On 15 May 2018 at 21:56, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> On Mon, May 14, 2018 at 04:55:26PM +0800, Baolin Wang wrote:
->> Hi,
->>
->> We will meet below issues when compensating the suspend time for the timekeeping.
->>
->> 1. We have too many different ways of dealing with persistent timekeeping
->> across architectures, so it is hard for one driver to compatable with different
->> architectures.
->>
->> 2. On some platforms (such as Spreadtrum platform), we registered the high
->> resolution timer as one clocksource to update the OS time, but the high
->> resolution timer will be stopped in suspend state. So we use another one
->> always-on timer (but low resolution) to calculate the suspend time to
->> compensate the OS time. Though we can register the always-on timer as one
->> clocksource, we need re-calculate the mult/shift with one larger conversion
->> range to calculate the suspend time and need update the clock in case of
->> running over the always-on timer.
->>
->> More duplicate code will be added if other platforms meet this case.
->>
->> 3. Now we have 3 sources that could be used to compensate the OS time:
->> Nonstop clocksource during suspend, persistent clock and rtc device,
->> which is complicated. Another hand is that the nonstop clocksource can
->> risk wrapping if the suspend time is too long, so we need one mechanism
->> to wake up the system before the nonstop clocksource wrapping.
->>
->> According to above issues, we can introduce one common persistent clock
->> framework to compatable with different architectures, in future we will
->> remove the persistent clock implementation for each architecture. Also
->> this framework will implement common code to help drivers to register easily.
->> Moreover if we converted all SUSPEND_NONSTOP clocksource to register to
->> be one persistent clock, we can remove the SUSPEND_NONSTOP clocksource
->> accounting in timekeeping, which means we can only compensate the OS time
->> from persistent clock and RTC.
->>
->> Will be appreciated for any comments. Thank you all.
->
-> Why do we need another API ?
->
-> Why not remove the present persistent API and rely on the SUSPEND_NONSTOP flag
-> to do the right action at suspend and resume?
->
-> We register different clocksources, the rating does the selection.
->
-> When entering 'suspend', we check against the SUSPEND_NONSTOP flag and switch
-> to the first clocksource with the best rating and the flag set. When resuming,
-> we switch back to the highest rating.
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ .../devicetree/bindings/net/rockchip-dwmac.txt     |  1 +
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 64 ++++++++++++++++++++++
+ 2 files changed, 65 insertions(+)
 
-I agree with John's view he posted before, he said:
-
-"For context, these abstractions have grown out of the need for using
-different hardware components for all of these. It was quite common
-for x86 hardware to use the acpi_pm for clocksource, lapic/PIT for
-clockevent, tsc for sched_clock and CMOS RTC for persistent clock.
-While some of these could be backed by the same hardware, it wasn't
-common. However, hardware with less restrictions have allowed in some
-cases for these to be more unified, but I'm not sure if its particularly common.
-
-Another part of the reason that we don't combine the above
-abstractions, even when they are backed by the same hardware, is
-because some of the fields used for freq conversion (mult/shift) have
-different needs for the different types of accounting.
-
-For instance, with a clocksource, we are very focused on avoiding
-error to keep timekeeing accurate, thus we want to use as large a
-shift (and thus mult) as possible (and do our shifting as late as
-possible in our accounting). However, that then shrinks the amount of
-time that can be accumulated in one go w/o causing an overflow.
-
-Where as with sched_clock, we don't worry as much as about accuracy,
-so we can use smaller shifts (and thus mults), and thus can go for
-longer periods of time between accumulating without worrying.
-
-Similarly for the persistent clock case we don't need need to worry as
-much about accuracy, so we can can use smaller shifts, but we are not
-in as much of a hot patch, so we can also"
-
+diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+index 9c16ee2..3b71da7 100644
+--- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
++++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+@@ -4,6 +4,7 @@ The device node has following properties.
+ 
+ Required properties:
+  - compatible: should be "rockchip,<name>-gamc"
++   "rockchip,px30-gmac":   found on PX30 SoCs
+    "rockchip,rk3128-gmac": found on RK312x SoCs
+    "rockchip,rk3228-gmac": found on RK322x SoCs
+    "rockchip,rk3288-gmac": found on RK3288 SoCs
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+index 13133b3..4b2ab71 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+@@ -61,6 +61,7 @@ struct rk_priv_data {
+ 	struct clk *mac_clk_tx;
+ 	struct clk *clk_mac_ref;
+ 	struct clk *clk_mac_refout;
++	struct clk *clk_mac_speed;
+ 	struct clk *aclk_mac;
+ 	struct clk *pclk_mac;
+ 	struct clk *clk_phy;
+@@ -83,6 +84,64 @@ struct rk_priv_data {
+ 	(((tx) ? soc##_GMAC_TXCLK_DLY_ENABLE : soc##_GMAC_TXCLK_DLY_DISABLE) | \
+ 	 ((rx) ? soc##_GMAC_RXCLK_DLY_ENABLE : soc##_GMAC_RXCLK_DLY_DISABLE))
+ 
++#define PX30_GRF_GMAC_CON1		0X0904
++
++/* PX30_GRF_GMAC_CON1 */
++#define PX30_GMAC_PHY_INTF_SEL_RMII	(GRF_CLR_BIT(4) | GRF_CLR_BIT(5) | \
++					GRF_BIT(6))
++#define PX30_GMAC_SPEED_10M		GRF_CLR_BIT(2)
++#define PX30_GMAC_SPEED_100M		GRF_BIT(2)
++
++static void px30_set_to_rmii(struct rk_priv_data *bsp_priv)
++{
++	struct device *dev = &bsp_priv->pdev->dev;
++
++	if (IS_ERR(bsp_priv->grf)) {
++		dev_err(dev, "%s: Missing rockchip,grf property\n", __func__);
++		return;
++	}
++
++	regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
++		     PX30_GMAC_PHY_INTF_SEL_RMII);
++}
++
++static void px30_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
++{
++	struct device *dev = &bsp_priv->pdev->dev;
++	int ret;
++
++	if (IS_ERR(bsp_priv->clk_mac_speed)) {
++		dev_err(dev, "%s: Missing clk_mac_speed clock\n", __func__);
++		return;
++	}
++
++	if (speed == 10) {
++		regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
++			     PX30_GMAC_SPEED_10M);
++
++		ret = clk_set_rate(bsp_priv->clk_mac_speed, 2500000);
++		if (ret)
++			dev_err(dev, "%s: set clk_mac_speed rate 2500000 failed: %d\n",
++				__func__, ret);
++	} else if (speed == 100) {
++		regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
++			     PX30_GMAC_SPEED_100M);
++
++		ret = clk_set_rate(bsp_priv->clk_mac_speed, 25000000);
++		if (ret)
++			dev_err(dev, "%s: set clk_mac_speed rate 25000000 failed: %d\n",
++				__func__, ret);
++
++	} else {
++		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
++	}
++}
++
++static const struct rk_gmac_ops px30_ops = {
++	.set_to_rmii = px30_set_to_rmii,
++	.set_rmii_speed = px30_set_rmii_speed,
++};
++
+ #define RK3128_GRF_MAC_CON0	0x0168
+ #define RK3128_GRF_MAC_CON1	0x016c
+ 
+@@ -1042,6 +1101,10 @@ static int rk_gmac_clk_init(struct plat_stmmacenet_data *plat)
+ 		}
+ 	}
+ 
++	bsp_priv->clk_mac_speed = devm_clk_get(dev, "clk_mac_speed");
++	if (IS_ERR(bsp_priv->clk_mac_speed))
++		dev_err(dev, "cannot get clock %s\n", "clk_mac_speed");
++
+ 	if (bsp_priv->clock_input) {
+ 		dev_info(dev, "clock input from PHY\n");
+ 	} else {
+@@ -1424,6 +1487,7 @@ static int rk_gmac_resume(struct device *dev)
+ static SIMPLE_DEV_PM_OPS(rk_gmac_pm_ops, rk_gmac_suspend, rk_gmac_resume);
+ 
+ static const struct of_device_id rk_gmac_dwmac_match[] = {
++	{ .compatible = "rockchip,px30-gmac",	.data = &px30_ops   },
+ 	{ .compatible = "rockchip,rk3128-gmac", .data = &rk3128_ops },
+ 	{ .compatible = "rockchip,rk3228-gmac", .data = &rk3228_ops },
+ 	{ .compatible = "rockchip,rk3288-gmac", .data = &rk3288_ops },
 -- 
-Baolin.wang
-Best Regards
+2.7.4
