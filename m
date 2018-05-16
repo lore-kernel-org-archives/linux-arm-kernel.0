@@ -1,70 +1,115 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 16 May 2018 15:44:12 +0530
-Subject: [PATCH 2/4] ARM: davinci: board-da850-evm: fix GPIO lookup for
- MMC/SD
-In-Reply-To: <CAHCN7x+eNpeyv27WPqZyy-X9S7Ffvujo+y3Mmt1ZP=LEk+4+=g@mail.gmail.com>
-References: <20180424143506.25793-1-nsekhar@ti.com>
- <20180424143506.25793-3-nsekhar@ti.com>
- <fa8feb04-2231-88b8-4d2b-10264187ba7e@lechnology.com>
- <CAHCN7x+eNpeyv27WPqZyy-X9S7Ffvujo+y3Mmt1ZP=LEk+4+=g@mail.gmail.com>
-Message-ID: <bf023e5e-5831-c9ad-bcd6-c9bb587ba848@ti.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 16 May 2018 12:14:44 +0200
+Subject: [PATCH v3 00/26] device link, bridge supplier <-> drm device
+Message-ID: <20180516101510.13215-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 May 2018 04:23 AM, Adam Ford wrote:
-> On Thu, Apr 26, 2018 at 8:40 PM, David Lechner <david@lechnology.com> wrote:
->> On 04/24/2018 09:35 AM, Sekhar Nori wrote:
->>>
->>> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
->>> mmc can correctly lookup the wp and cp gpios. Also fix the GPIO numbers
->>> as they are not offsets within a bank.
->>>
->>> Note that it is the gpio-davinci driver that sets the gpiochip label to
->>> davinci_gpio.0.
->>>
->>> Fixes: bdf0e8364fd3 ("ARM: davinci: da850-evm: use gpio descriptor for mmc
->>> pins")
->>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->>> ---
->>>   arch/arm/mach-davinci/board-da850-evm.c | 9 +++++++--
->>>   1 file changed, 7 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-davinci/board-da850-evm.c
->>> b/arch/arm/mach-davinci/board-da850-evm.c
->>> index 3063478bcc36..158ed9a1483f 100644
->>> --- a/arch/arm/mach-davinci/board-da850-evm.c
->>> +++ b/arch/arm/mach-davinci/board-da850-evm.c
->>> @@ -763,12 +763,17 @@ static const short da850_evm_mcasp_pins[]
->>> __initconst = {
->>>         -1
->>>   };
->>>   +#define DA850_MMCSD_CD_PIN           GPIO_TO_PIN(4, 0)
->>> +#define DA850_MMCSD_WP_PIN             GPIO_TO_PIN(4, 1)
->>> +
->>>   static struct gpiod_lookup_table mmc_gpios_table = {
->>>         .dev_id = "da830-mmc.0",
->>>         .table = {
->>>                 /* gpio chip 2 contains gpio range 64-95 */
->>> -               GPIO_LOOKUP("davinci_gpio.2", 0, "cd", GPIO_ACTIVE_LOW),
->>> -               GPIO_LOOKUP("davinci_gpio.2", 1, "wp", GPIO_ACTIVE_LOW),
->>> +               GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_CD_PIN, "cd",
->>> +                           GPIO_ACTIVE_LOW),
->>> +               GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_WP_PIN, "wp",
->>> +                           GPIO_ACTIVE_LOW),
-> 
-> I don't think the WP polarity is working correctly.  If I boot the
-> board 'rw' enabled but WP disabled on the SD card, the system crashes.
-> If I enable WP, the board boots correctly.
-> 
-> Comparing this to the device tree version that I did, and double
-> checking the behavior for my sanity, I believe WP needs to be
-> GPIO_ACTIVE_HIGH
+Hi!
 
-You are right, I see the issue on my board too. Although this patch did
-not touch the polarity, we could have fixed it here.
+It was noted by Russell King [1] that bridges (not using components)
+might disappear unexpectedly if the owner of the bridge was unbound.
+Jyri Sarha had previously noted the same thing with panels [2]. Jyri
+came up with using device links to resolve the panel issue, which
+was also my (independent) reaction to the note from Russell.
 
-Anyway, do you want to send a patch for that? Or I can do it too. A
-similar fix is needed for DA830 EVM too.
+This series builds up to the addition of that link in the last
+patch, but in my opinion the other 25 patches do have merit on their
+own.
 
-Thanks,
-Sekhar
+The last patch needs testing, while the others look trivial. Jyri, are
+you able to test? That said, I might have missed some subtlety.
+
+Oh, and the reason I'm pushing this is of course so that the issue
+noted by Russell in [1] is addressed which in turn means that the
+tda998x bridge driver can be patched according to that series without
+objection (hopefully) and then used from the atmel-hlcdc driver (and
+other drivers that are not componentized).
+
+Changes since v2    https://lkml.org/lkml/2018/5/4/443
+
+- Russell King spells his name this way. Sorry!
+- Add review tag from Andrzej Hajda (patches 1, 25 and 26).
+- Add ack tag from Daniel Vetter (patches 1, 24, 25 and 26).
+- Mention the interaction with the rockchip_lvds driver in the
+  commit message for patch 1.
+- Change the comment for the new @link member in patch 26, so that a
+  symmetric relationchip between cunsumer/supplier isn't implied.
+
+Changes since v1    https://lkml.org/lkml/2018/4/26/1018
+
+- rename .owner to .odev to not get mixed up with the module owner.
+- added patches for new recent drivers thc63lvd1024 and cdns-dsi
+- fix for problem in the rockchip_lvds driver reported by 0day
+- added a WARN in drm_bridge_add if there is no .odev owner device
+
+Cheers,
+Peter
+
+[1] https://lkml.org/lkml/2018/4/23/769
+[2] https://www.spinics.net/lists/dri-devel/msg174275.html
+
+Peter Rosin (26):
+  drm/bridge: allow optionally specifying an owner .odev device
+  drm/bridge: adv7511: provide an owner .odev device
+  drm/bridge/analogix: core: specify the owner .odev of the bridge
+  drm/bridge: analogix-anx78xx: provide an owner .odev device
+  drm/bridge: cdns-dsi: provide an owner .odev device
+  drm/bridge: vga-dac: provide an owner .odev device
+  drm/bridge: lvds-encoder: provide an owner .odev device
+  drm/bridge: megachips-stdpxxxx-ge-b850v3-fw: provide an owner .odev
+    device
+  drm/bridge: nxp-ptn3460: provide an owner .odev device
+  drm/bridge: panel: provide an owner .odev device
+  drm/bridge: ps8622: provide an owner .odev device
+  drm/bridge: sii902x: provide an owner .odev device
+  drm/bridge: sii9234: provide an owner .odev device
+  drm/bridge: sii8620: provide an owner .odev device
+  drm/bridge: synopsys: provide an owner .odev device for the bridges
+  drm/bridge: tc358767: provide an owner .odev device
+  drm/bridge: thc63lvd1024: provide an owner .odev device
+  drm/bridge: ti-tfp410: provide an owner .odev device
+  drm/exynos: mic: provide an owner .odev device for the bridge
+  drm/mediatek: hdmi: provide an owner .odev device for the bridge
+  drm/msm: specify the owner .odev of the bridges
+  drm/rcar-du: lvds: provide an owner .odev device for the bridge
+  drm/sti: provide an owner .odev device for the bridges
+  drm/bridge: remove the .of_node member
+  drm/bridge: require the owner .odev to be filled in on
+    drm_bridge_add/attach
+  drm/bridge: establish a link between the bridge supplier and consumer
+
+ drivers/gpu/drm/bridge/adv7511/adv7511_drv.c       |  2 +-
+ drivers/gpu/drm/bridge/analogix-anx78xx.c          |  5 +----
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  1 +
+ drivers/gpu/drm/bridge/cdns-dsi.c                  |  2 +-
+ drivers/gpu/drm/bridge/dumb-vga-dac.c              |  2 +-
+ drivers/gpu/drm/bridge/lvds-encoder.c              |  2 +-
+ .../drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c   |  2 +-
+ drivers/gpu/drm/bridge/nxp-ptn3460.c               |  2 +-
+ drivers/gpu/drm/bridge/panel.c                     |  4 +---
+ drivers/gpu/drm/bridge/parade-ps8622.c             |  2 +-
+ drivers/gpu/drm/bridge/sii902x.c                   |  2 +-
+ drivers/gpu/drm/bridge/sii9234.c                   |  2 +-
+ drivers/gpu/drm/bridge/sil-sii8620.c               |  2 +-
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |  4 +---
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c      |  4 +---
+ drivers/gpu/drm/bridge/tc358767.c                  |  2 +-
+ drivers/gpu/drm/bridge/thc63lvd1024.c              |  2 +-
+ drivers/gpu/drm/bridge/ti-tfp410.c                 |  2 +-
+ drivers/gpu/drm/drm_bridge.c                       | 26 +++++++++++++++++++++-
+ drivers/gpu/drm/exynos/exynos_drm_mic.c            |  2 +-
+ drivers/gpu/drm/mediatek/mtk_hdmi.c                |  2 +-
+ drivers/gpu/drm/msm/dsi/dsi_manager.c              |  1 +
+ drivers/gpu/drm/msm/edp/edp_bridge.c               |  1 +
+ drivers/gpu/drm/msm/hdmi/hdmi_bridge.c             |  1 +
+ drivers/gpu/drm/rcar-du/rcar_lvds.c                |  2 +-
+ drivers/gpu/drm/rockchip/rockchip_lvds.c           |  2 +-
+ drivers/gpu/drm/sti/sti_dvo.c                      |  2 +-
+ drivers/gpu/drm/sti/sti_hda.c                      |  1 +
+ drivers/gpu/drm/sti/sti_hdmi.c                     |  1 +
+ include/drm/drm_bridge.h                           |  8 +++----
+ 30 files changed, 57 insertions(+), 36 deletions(-)
+
+-- 
+2.11.0
