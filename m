@@ -1,23 +1,73 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 16 May 2018 09:33:51 +0200
-Subject: [PATCH v2 2/2] i2c: busses: make use of i2c_8bit_addr_from_msg
-In-Reply-To: <20180516071647.29277-3-peda@axentia.se>
-References: <20180516071647.29277-1-peda@axentia.se>
- <20180516071647.29277-3-peda@axentia.se>
-Message-ID: <20180516073351.y5avitvaj5ouu6m3@pengutronix.de>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 16 May 2018 09:35:59 +0200
+Subject: [RESEND PATCH v5 4/6] pwm: stm32: improve capture by tuning counter
+ prescaler
+In-Reply-To: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
+References: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1526456161-27865-5-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peter,
+Currently, capture is based on timeout window to configure prescaler.
+PWM capture framework provides 1s window at the time of writing.
 
-On Wed, May 16, 2018 at 09:16:47AM +0200, Peter Rosin wrote:
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [emf32 and imx]
+There's place for improvement, after input signal has been captured once:
+- Finer tune counter clock prescaler, by using 1st capture result (with
+arbitrary margin).
+- Do a 2nd capture, with scaled capture window.
+This increases accuracy, especially at high rates.
 
-s/emf/efm/
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Acked-by: Thierry Reding <thierry.reding@gmail.com>
+---
+Changes in v2:
+- Adopt DMA read from MFD core.
+---
+ drivers/pwm/pwm-stm32.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-Best regards
-Uwe
-
+diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+index ed3961b..9a50acd 100644
+--- a/drivers/pwm/pwm-stm32.c
++++ b/drivers/pwm/pwm-stm32.c
+@@ -168,7 +168,7 @@ static int stm32_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
+ 	unsigned long long prd, div, dty;
+ 	unsigned long rate;
+-	unsigned int psc = 0;
++	unsigned int psc = 0, scale;
+ 	u32 raw_prd, raw_dty;
+ 	int ret = 0;
+ 
+@@ -219,6 +219,28 @@ static int stm32_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	if (ret)
+ 		goto stop;
+ 
++	/*
++	 * Got a capture. Try to improve accuracy at high rates:
++	 * - decrease counter clock prescaler, scale up to max rate.
++	 */
++	if (raw_prd) {
++		u32 max_arr = priv->max_arr - 0x1000; /* arbitrary margin */
++
++		scale = max_arr / min(max_arr, raw_prd);
++	} else {
++		scale = priv->max_arr; /* bellow resolution, use max scale */
++	}
++
++	if (psc && scale > 1) {
++		/* 2nd measure with new scale */
++		psc /= scale;
++		regmap_write(priv->regmap, TIM_PSC, psc);
++		ret = stm32_pwm_raw_capture(priv, pwm, tmo_ms, &raw_prd,
++					    &raw_dty);
++		if (ret)
++			goto stop;
++	}
++
+ 	prd = (unsigned long long)raw_prd * (psc + 1) * NSEC_PER_SEC;
+ 	result->period = DIV_ROUND_UP_ULL(prd, rate);
+ 	dty = (unsigned long long)raw_dty * (psc + 1) * NSEC_PER_SEC;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.1
