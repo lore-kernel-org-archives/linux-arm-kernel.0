@@ -1,113 +1,92 @@
 From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 17 May 2018 00:15:06 +0200
-Subject: [PATCH 6/6] ARM: dts: rcar-gen2: Add 'data-active' property
-In-Reply-To: <1526488352-898-7-git-send-email-jacopo+renesas@jmondi.org>
-References: <1526488352-898-1-git-send-email-jacopo+renesas@jmondi.org>
- <1526488352-898-7-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180516221506.GG17948@bigcity.dyn.berto.se>
+Date: Thu, 17 May 2018 00:18:36 +0200
+Subject: [PATCH v2 2/3] arm64: dts: renesas: draak: Describe CVBS input
+In-Reply-To: <1526478129-16465-3-git-send-email-jacopo+renesas@jmondi.org>
+References: <1526478129-16465-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526478129-16465-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180516221836.GH17948@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jacopo,
 
-Thanks for your work.
+Thanks for your patch.
 
-On 2018-05-16 18:32:32 +0200, Jacopo Mondi wrote:
-> The 'data-active' property needs to be specified when using embedded
-> synchronization. Add it to the Gen-2 boards using composite video input.
+On 2018-05-16 15:42:08 +0200, Jacopo Mondi wrote:
+> Describe CVBS video input through analog video decoder ADV7180
+> connected to video input interface VIN4.
 > 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> The video input signal path is shared with HDMI video input, and
+> selected by on-board switches SW-53 and SW-54 with CVBS input selected
+> by the default switches configuration.
+
+You are missing your SoB line :-)
+
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
 > ---
->  arch/arm/boot/dts/r8a7790-lager.dts   | 1 +
->  arch/arm/boot/dts/r8a7791-koelsch.dts | 1 +
->  arch/arm/boot/dts/r8a7791-porter.dts  | 1 +
->  arch/arm/boot/dts/r8a7793-gose.dts    | 1 +
->  arch/arm/boot/dts/r8a7794-alt.dts     | 1 +
->  arch/arm/boot/dts/r8a7794-silk.dts    | 1 +
->  6 files changed, 6 insertions(+)
+>  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 36 ++++++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> index b56b309..48fcb44 100644
-> --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> @@ -893,6 +893,7 @@
-> 
->  		vin1ep0: endpoint {
->  			remote-endpoint = <&adv7180>;
-> +			data-active = <1>;
->  		};
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> index d03f194..9aba28f 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> @@ -142,6 +142,11 @@
+>  		groups = "usb0";
+>  		function = "usb0";
 >  	};
+> +
+> +	vin4_pins_cvbs: vin4 {
+> +		groups = "vin4_data8", "vin4_sync", "vin4_clk";
+> +		function = "vin4";
+> +	};
 >  };
-> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> index 9967666..fa0b25f 100644
-> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> @@ -868,6 +868,7 @@
-> 
->  		vin1ep: endpoint {
->  			remote-endpoint = <&adv7180>;
-> +			data-active = <1>;
-
-Depending on how we interpret the data-active property this can be good 
-or bad. But if we interpret it as the polarity of the VIn_CLKENB pin 
-this is not good as this is not connected for the adv7180 on Koelsch.
-
-I have not checked all the Gen2 schematics as I'm still not sure how to 
-interpret the property.
-
-
->  		};
+>  
+>  &i2c0 {
+> @@ -154,6 +159,17 @@
+>  		reg = <0x50>;
+>  		pagesize = <8>;
 >  	};
+> +
+> +	analog-video at 20 {
+> +		compatible = "adi,adv7180";
+> +		reg = <0x20>;
+> +
+> +		port {
+> +			adv7180_out: endpoint {
+> +				remote-endpoint = <&vin4_in>;
+> +			};
+> +		};
+> +	};
 >  };
-> diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-> index 055a7f1..96b9605 100644
-> --- a/arch/arm/boot/dts/r8a7791-porter.dts
-> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-> @@ -391,6 +391,7 @@
-> 
->  		vin0ep: endpoint {
->  			remote-endpoint = <&adv7180>;
-> +			data-active = <1>;
->  		};
->  	};
+>  
+>  &i2c1 {
+> @@ -246,3 +262,23 @@
+>  	timeout-sec = <60>;
+>  	status = "okay";
 >  };
-> diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-> index 9d3fba2..80b4fa8 100644
-> --- a/arch/arm/boot/dts/r8a7793-gose.dts
-> +++ b/arch/arm/boot/dts/r8a7793-gose.dts
-> @@ -779,6 +779,7 @@
-> 
->  		vin1ep: endpoint {
->  			remote-endpoint = <&adv7180_out>;
-> +			data-active = <1>;
->  		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-> index 4bbb9cc..00df605d 100644
-> --- a/arch/arm/boot/dts/r8a7794-alt.dts
-> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
-> @@ -380,6 +380,7 @@
-> 
->  		vin0ep: endpoint {
->  			remote-endpoint = <&adv7180>;
-> +			data-active = <1>;
->  		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-> index c0c5d31..ed17376 100644
-> --- a/arch/arm/boot/dts/r8a7794-silk.dts
-> +++ b/arch/arm/boot/dts/r8a7794-silk.dts
-> @@ -480,6 +480,7 @@
-> 
->  		vin0ep: endpoint {
->  			remote-endpoint = <&adv7180>;
-> +			data-active = <1>;
->  		};
->  	};
->  };
-> --
+> +
+> +&vin4 {
+> +	pinctrl-0 = <&vin4_pins_cvbs>;
+> +	pinctrl-names = "default";
+> +
+> +	status = "okay";
+> +
+> +	ports {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +
+> +			vin4_in: endpoint {
+> +				remote-endpoint = <&adv7180_out>;
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
 > 2.7.4
 > 
 
