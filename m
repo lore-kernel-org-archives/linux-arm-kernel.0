@@ -1,72 +1,113 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Wed, 16 May 2018 23:18:15 +0200
-Subject: [PATCH 1/6] dt-bindings: media: rcar-vin: Describe optional ep
- properties
-In-Reply-To: <1526488352-898-2-git-send-email-jacopo+renesas@jmondi.org>
-References: <1526488352-898-1-git-send-email-jacopo+renesas@jmondi.org>
- <1526488352-898-2-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180516211815.GB17948@bigcity.dyn.berto.se>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 16 May 2018 15:30:37 -0600
+Subject: [PATCH] arm64: dts: juno: fix graph node unit addresses for
+ coresight components
+In-Reply-To: <dd4796b7-a078-27db-0fdc-099a834ce8bc@arm.com>
+References: <1526466862-19173-1-git-send-email-sudeep.holla@arm.com>
+ <574f6959-6a84-9e0e-3d89-84d2d75d9191@arm.com>
+ <eba4cddf-f668-a5e1-acea-5e6538c230f0@arm.com>
+ <CANLsYkyi+m_uQydSWZkf_e1PNSoU-n1rLixuJ0+P9G8hpm68TA@mail.gmail.com>
+ <dd4796b7-a078-27db-0fdc-099a834ce8bc@arm.com>
+Message-ID: <CANLsYkxHbV_h=GUjKwOAwjhupineDuHh7xKWRVo3aNk-uPKD2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+On 16 May 2018 at 11:40, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 16/05/18 18:29, Mathieu Poirier wrote:
+>> On 16 May 2018 at 05:49, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>>
+>>> On 16/05/18 12:23, Suzuki K Poulose wrote:
+>>>> On 05/16/2018 11:34 AM, Sudeep Holla wrote:
+>>>
+>>> [..]
+>>>
+>>>>> Hi Suzuki/Mathieu,
+>>>>>
+>>>>> I did a quick scan @ drivers/hwtracing/coresight/of_coresight.c to
+>>>>> check if reg field is being used or not and whether this change
+>>>>> causes any regression. I don't think so, but I may be wrong, let me
+>>>>> know.
+>>>>
+>>>> Unfortunately, I think this would break the components like funnel,
+>>>> where we need the input port number for the connected master to enable
+>>>> the port. Similarly for the output port number for master components in
+>>>> the paths. I have a set of patches which address this by taking care of
+>>>> the port number order to find out the hardware port number.
+>>>>
+>>>
+>>> Ah ok, I now see of_graph_parse_endpoint, sorry for missing that.
+>>
+>> The problem is not with of_graph_parse_endpoint(), that will work just
+>> fine.  In fact you can add whatever number you want there without
+>> impact on how devices see each other in the framework.  The problem is
+>> that the port numbering doesn't reflect the HW layout anymore and as
+>> such  you can't rely on the port value when configuring the HW.
+>>
+>
+> Exactly, I had a chat with Suzuki. One option is to introduce new hwid
+> field to fix that. If the field is present, it will be used and reg
+> field will be ignored. In that way, you won't break the compatibility.
 
-Thanks for your patch.
+I had the same idea a while back and something Grant Likely and I
+talked about at ELC-E 2017 in Prague.  This is the way I would prefer
+to move forward on this.
 
-On 2018-05-16 18:32:27 +0200, Jacopo Mondi wrote:
-> Describe the optional endpoint properties for endpoint nodes of port at 0
-> and port at 1 of the R-Car VIN driver device tree bindings documentation.
-> 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Just my thoughts. I am not sure if we need to support old kernel with
+> updated DTs though. That may be difficult.
 
-Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Not sure that can be done.  The only way to do that would be to
+continue using the reg property, which isn't possible anymore.  As
+such said DT wouldn't be upstream and I'm not sure we need to care
+about those.
 
-> ---
->  Documentation/devicetree/bindings/media/rcar_vin.txt | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> index a19517e1..c53ce4e 100644
-> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> @@ -53,6 +53,16 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
->        from external SoC pins described in video-interfaces.txt[1].
->        Describing more then one endpoint in port 0 is invalid. Only VIN
->        instances that are connected to external pins should have port 0.
-> +
-> +      - Optional properties for endpoint nodes of port at 0:
-> +        - hsync-active: active state of the HSYNC signal, 0/1 for LOW/HIGH
-> +	  respectively. Default is active high.
-> +        - vsync-active: active state of the VSYNC signal, 0/1 for LOW/HIGH
-> +	  respectively. Default is active high.
-> +
-> +	If both HSYNC and VSYNC polarities are not specified, embedded
-> +	synchronization is selected.
-> +
->      - port 1 - sub-nodes describing one or more endpoints connected to
->        the VIN from local SoC CSI-2 receivers. The endpoint numbers must
->        use the following schema.
-> @@ -62,6 +72,8 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
->          - Endpoint 2 - sub-node describing the endpoint connected to CSI40
->          - Endpoint 3 - sub-node describing the endpoint connected to CSI41
-> 
-> +      Endpoint nodes of port at 1 do not support any optional endpoint property.
-> +
->  Device node example for Gen2 platforms
->  --------------------------------------
-> 
-> @@ -112,7 +124,6 @@ Board setup example for Gen2 platforms (vin1 composite video input)
-> 
->                  vin1ep0: endpoint {
->                          remote-endpoint = <&adv7180>;
-> -                        bus-width = <8>;
->                  };
->          };
->  };
+>
+>>>
+>>>> I will dust it up and send it. That would bring up another important
+>>>> question.
+>>>>
+>>>
+>>> Cool
+>>>
+>>>> How do we deal with the change in the port number scheme ? e.g, should
+>>>> the new kernel support DTBs with old scheme ?
+>>>
+>>
+>> DT files following the old scheme will spew out warnings like we're
+>> getting on Juno and are bound to be fixed.
+>>
+> True, they can pick up the new changes too along with changes just
+> fixing the warning.
+>
+>>> IIUC, that's needed for backward compatibility as it was used schema.
+>>> Again I may be wrong.
+>>>
+>>>> If so, how do we specify that the DT uses new scheme.
+>>>
+>>> Perhaps, add something to indicate the change in numbering scheme ?
+>>
+>> The current customers should be moved to the new scheme.  That way we
+>> don't have to support two different DT scheme (where one will die
+>> eventually).
+>>
+>
+> But the problem is if someone has DT which can't be modified and we move
+> to new scheme only in the kernel, then they will see regression on their
+> platforms. If that's fine, it simplifies things a lot. But I am not so
+> sure of that ...
+
+You have a point.  The code could check for both reg and hwid
+properties.  If both are there hwid is preferred.  Otherwise the reg
+property is used.  That wouldn't be too difficult to implement and
+avoid introducing a regression.  Of course all this is fantasy until
+we actually try things out.
+
+Thanks,
+Mathieu
+
+>
 > --
-> 2.7.4
-> 
-
--- 
-Regards,
-Niklas S?derlund
+> Regards,
+> Sudeep
