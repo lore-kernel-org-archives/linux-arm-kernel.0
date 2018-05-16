@@ -1,26 +1,18 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 16 May 2018 15:03:44 +0200
-Subject: [PATCH 14/14] mm: turn on vm_fault_t type checking
-In-Reply-To: <20180516112813.GC20670@bombadil.infradead.org>
+Date: Wed, 16 May 2018 15:01:59 +0200
+Subject: [PATCH 10/14] vgem: separate errno from VM_FAULT_* values
+In-Reply-To: <20180516095303.GH3438@phenom.ffwll.local>
 References: <20180516054348.15950-1-hch@lst.de>
- <20180516054348.15950-15-hch@lst.de>
- <20180516112813.GC20670@bombadil.infradead.org>
-Message-ID: <20180516130344.GC32454@lst.de>
+ <20180516054348.15950-11-hch@lst.de>
+ <20180516095303.GH3438@phenom.ffwll.local>
+Message-ID: <20180516130159.GA32454@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 04:28:13AM -0700, Matthew Wilcox wrote:
-> On Wed, May 16, 2018 at 07:43:48AM +0200, Christoph Hellwig wrote:
-> > Switch vm_fault_t to point to an unsigned int with __b?twise annotations.
-> > This both catches any old ->fault or ->page_mkwrite instance with plain
-> > compiler type checking, as well as finding more intricate problems with
-> > sparse.
+On Wed, May 16, 2018 at 11:53:03AM +0200, Daniel Vetter wrote:
+> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 > 
-> Come on, Christoph; you know better than this.  This patch is completely
-> unreviewable.  Split it into one patch per maintainer tree, and in any
-> event, the patch to convert vm_fault_t to an unsigned int should be
-> separated from all the trivial conversions.
+> Want me to merge this through drm-misc or plan to pick it up yourself?
 
-The whole point is that tiny split patches for mechnical translations
-are totally pointless.  Switching the typedef might be worth splitting
-if people really insist.
+For now I just want a honest discussion if people really actually
+want the vm_fault_t change with the whole picture in place.
