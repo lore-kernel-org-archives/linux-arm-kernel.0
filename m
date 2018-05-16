@@ -1,55 +1,19 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 16 May 2018 10:05:16 -0700
-Subject: [PATCH 2/3] input: touchscreen: edt-ft5x06: assert reset during
- suspend
-In-Reply-To: <20180516122829.23694-3-daniel@zonque.org>
-References: <20180516122829.23694-1-daniel@zonque.org>
- <20180516122829.23694-3-daniel@zonque.org>
-Message-ID: <20180516170516.GB21971@dtor-ws>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 16 May 2018 19:32:34 +0200
+Subject: vm_fault_t conversion, for real
+In-Reply-To: <20180516132256.GG20670@bombadil.infradead.org>
+References: <20180516054348.15950-1-hch@lst.de>
+ <20180516112347.GB20670@bombadil.infradead.org>
+ <20180516130309.GB32454@lst.de>
+ <20180516132256.GG20670@bombadil.infradead.org>
+Message-ID: <20180516173234.GB6022@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 02:28:28PM +0200, Daniel Mack wrote:
-> If the device is not configured as wakeup source, it can be put in reset
-> during suspend to save some power.
-> 
-> Signed-off-by: Daniel Mack <daniel@zonque.org>
-> ---
->  drivers/input/touchscreen/edt-ft5x06.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-> index 955f085627fa..c34a0b23f90a 100644
-> --- a/drivers/input/touchscreen/edt-ft5x06.c
-> +++ b/drivers/input/touchscreen/edt-ft5x06.c
-> @@ -1036,9 +1036,12 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
->  static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
->  {
->  	struct i2c_client *client = to_i2c_client(dev);
-> +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
->  
->  	if (device_may_wakeup(dev))
->  		enable_irq_wake(client->irq);
-> +	else if (tsdata->reset_gpio)
-> +		gpiod_set_value_cansleep(tsdata->reset_gpio, 1);
->  
->  	return 0;
->  }
-> @@ -1046,9 +1049,12 @@ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
->  static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
->  {
->  	struct i2c_client *client = to_i2c_client(dev);
-> +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
->  
->  	if (device_may_wakeup(dev))
->  		disable_irq_wake(client->irq);
-> +	else if (tsdata->reset_gpio)
-> +		gpiod_set_value_cansleep(tsdata->reset_gpio, 0);
+On Wed, May 16, 2018 at 06:22:56AM -0700, Matthew Wilcox wrote:
+> Perhaps you should try being less of an arsehole if you don't want to
+> get yelled at?  I don't mind when you're an arsehole towards me, but I
+> do mind when you're an arsehole towards newcomers.  How are we supposed
+> to attract and retain new maintainers when you're so rude?
 
-I think you need msleep() here as the chip needs a bit to get out of
-reset before it is ready. FWIW we have 300 ms delay in probe().
-
-Thanks.
-
--- 
-Dmitry
+*plonk*  The only one I'm seeing being extremely rude here is you.
