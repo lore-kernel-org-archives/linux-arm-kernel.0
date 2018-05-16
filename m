@@ -1,42 +1,82 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 May 2018 18:51:39 +0100
-Subject: [PATCH RFC 2/6] dt-bindings: hwmon: Add Raspberry Pi voltage
- sensor
-In-Reply-To: <30fc5bac-0c4a-b2c4-a018-ea521510aaea@arm.com>
-References: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
- <1526477827-10859-3-git-send-email-stefan.wahren@i2se.com>
- <30fc5bac-0c4a-b2c4-a018-ea521510aaea@arm.com>
-Message-ID: <874lj7cwus.fsf@anholt.net>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Wed, 16 May 2018 13:51:55 -0400
+Subject: [PATCH v6 6/9] dt-bindings: counter: Document stm32 quadrature encoder
+In-Reply-To: <cover.1526487615.git.vilhelm.gray@gmail.com>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+Message-ID: <ccdbbfb2833d274b6bfa234aada57e68d9793dd5.1526487615.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robin Murphy <robin.murphy@arm.com> writes:
+From: Benjamin Gaignard <benjamin.gaignard@st.com>
 
-> On 16/05/18 14:37, Stefan Wahren wrote:
->> Recent VC4 firmware provides a hardware-independent way to retrieve the
->> under-voltage sensor on the following Raspberry Pi boards:
->>    - Raspberry Pi B+ (via GPIO on SoC)
->>    - Raspberry Pi A+ (via GPIO on SoC)
->>    - Raspberry Pi 2 B (via GPIO on SoC)
->>    - Raspberry Pi 3 B (via GPIO on port expander)
->>    - Raspberry Pi 3 B+ (via PMIC)
->> 
->> TODO:
->>    - try to make bcm2835 firmware a bus driver
->
-> Do you actually need a DT binding? From the probe routine in patch 2 it 
-> looks like this capability can be discovered dynamically by asking the 
-> firmware, therefore it might be more straightforward for the firmware 
-> driver itself to probe that and create a child device iff the feature is 
-> present, which the hwmon driver can then bind to as a pure platform driver.
+Add bindings for STM32 Timer quadrature encoder.
+It is a sub-node of STM32 Timer which implement the
+counter part of the hardware.
 
-Agreed, let's skip doing this in DT.  I just switched the bcm2835-camera
-driver over to not need DT, and I think you could do something similar
-(and use the pdev->dev.parent to get at the firmware device).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180516/14e9e2c9/attachment.sig>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+---
+ .../bindings/counter/stm32-timer-cnt.txt      | 26 +++++++++++++++++++
+ .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
+ 2 files changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+
+diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+new file mode 100644
+index 000000000000..377728128bef
+--- /dev/null
++++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+@@ -0,0 +1,26 @@
++STMicroelectronics STM32 Timer quadrature encoder
++
++STM32 Timer provides quadrature encoder counter mode to detect
++angular position and direction of rotary elements,
++from IN1 and IN2 input signals.
++
++Must be a sub-node of an STM32 Timer device tree node.
++See ../mfd/stm32-timers.txt for details about the parent node.
++
++Required properties:
++- compatible:		Must be "st,stm32-timer-counter".
++- pinctrl-names: 	Set to "default".
++- pinctrl-0: 		List of phandles pointing to pin configuration nodes,
++			to set IN1/IN2 pins in mode of operation for Low-Power
++			Timer input on external pin.
++
++Example:
++	timers at 40010000  {
++		compatible = "st,stm32-timers";
++		...
++		counter {
++			compatible = "st,stm32-timer-counter";
++			pinctrl-names = "default";
++			pinctrl-0 = <&tim1_in_pins>;
++		};
++	};
+diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+index 1db6e0057a63..ff9c14ada30b 100644
+--- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
++++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+@@ -23,6 +23,7 @@ Optional parameters:
+ Optional subnodes:
+ - pwm:			See ../pwm/pwm-stm32.txt
+ - timer:		See ../iio/timer/stm32-timer-trigger.txt
++- counter:		See ../counter/stm32-timer-cnt.txt
+ 
+ Example:
+ 	timers at 40010000 {
+@@ -43,4 +44,10 @@ Example:
+ 			compatible = "st,stm32-timer-trigger";
+ 			reg = <0>;
+ 		};
++
++		counter {
++			compatible = "st,stm32-timer-counter";
++			pinctrl-names = "default";
++			pinctrl-0 = <&tim1_in_pins>;
++		};
+ 	};
+-- 
+2.17.0
