@@ -1,62 +1,54 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Wed, 16 May 2018 14:31:44 +0200
-Subject: [PATCH] PCI: Clean up resource allocation in
- devm_of_pci_get_host_bridge_resources()
-In-Reply-To: <CAHp75VeM7_8+9QJjOypXaiBhpWP4B5KACdUQ-p3frbS3jPh=OQ@mail.gmail.com>
-References: <cover.1526375226.git.jan.kiszka@siemens.com>
- <3aeb2ed038cbce8fe744b614dc19d414555a7e8f.1526375226.git.jan.kiszka@siemens.com>
- <CAHp75VeUbjobse6uLeM4h_xXRUw+YUQUN+EOye67AJy77a5euQ@mail.gmail.com>
- <CAHp75VeM7_8+9QJjOypXaiBhpWP4B5KACdUQ-p3frbS3jPh=OQ@mail.gmail.com>
-Message-ID: <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Wed, 16 May 2018 18:19:53 +0530
+Subject: [PATCH V6 01/12] ARM: dts: ipq4019: Add a default chosen node
+In-Reply-To: <1526475004-10341-1-git-send-email-sricharan@codeaurora.org>
+References: <1526475004-10341-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1526475004-10341-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of first allocating and then freeing memory for struct resource
-in case we cannot parse a PCI resource from the device tree, work
-against a local struct and kmemdup it when we decide to go with it.
+Add a 'chosen' node to select the serial console.
+This is needed when bootloaders do not pass the
+'console=' bootargs.
 
-Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- drivers/pci/of.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 8 ++++++++
+ arch/arm/boot/dts/qcom-ipq4019.dtsi           | 2 +-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index b06585a1da75..fc0f906c5c25 100644
---- a/drivers/pci/of.c
-+++ b/drivers/pci/of.c
-@@ -266,7 +266,7 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
- 			struct list_head *resources, resource_size_t *io_base)
- {
- 	struct device_node *dev_node = dev->of_node;
--	struct resource *res;
-+	struct resource *res, tmp_res;
- 	struct resource *bus_range;
- 	struct of_pci_range range;
- 	struct of_pci_range_parser parser;
-@@ -320,18 +320,16 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
- 		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
- 			continue;
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+index e413b21e..ef8d8c8 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+@@ -20,6 +20,14 @@
+ 	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
+ 	compatible = "qcom,ipq4019";
  
--		res = devm_kzalloc(dev, sizeof(struct resource), GFP_KERNEL);
-+		err = of_pci_range_to_resource(&range, dev_node, &tmp_res);
-+		if (err)
-+			continue;
++	aliases {
++		serial0 = &blsp1_uart1;
++	};
 +
-+		res = devm_kmemdup(dev, &tmp_res, sizeof(tmp_res), GFP_KERNEL);
- 		if (!res) {
- 			err = -ENOMEM;
- 			goto failed;
- 		}
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
+ 	soc {
+ 		rng at 22000 {
+ 			status = "ok";
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+index 10d112a..ea9202a 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -256,7 +256,7 @@
+                         regulator;
+                 };
  
--		err = of_pci_range_to_resource(&range, dev_node, res);
--		if (err) {
--			devm_kfree(dev, res);
--			continue;
--		}
--
- 		if (resource_type(res) == IORESOURCE_IO) {
- 			if (!io_base) {
- 				dev_err(dev,
+-		serial at 78af000 {
++		blsp1_uart1: serial at 78af000 {
+ 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+ 			reg = <0x78af000 0x200>;
+ 			interrupts = <0 107 0>;
 -- 
-2.13.6
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
