@@ -1,38 +1,53 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 16 May 2018 15:37:01 +0200
-Subject: [PATCH RFC 0/6] hwmon: Add support for Raspberry Pi voltage sensor
-Message-ID: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
+Date: Wed, 16 May 2018 15:37:03 +0200
+Subject: [PATCH RFC 2/6] dt-bindings: hwmon: Add Raspberry Pi voltage sensor
+In-Reply-To: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
+References: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1526477827-10859-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A common issue for the Raspberry Pi is an inadequate power supply. 
-Noralf Tr?nnes started a discussion [1] about writting such under-voltage
-conditions into the kernel log.
+Recent VC4 firmware provides a hardware-independent way to retrieve the
+under-voltage sensor on the following Raspberry Pi boards:
+  - Raspberry Pi B+ (via GPIO on SoC)
+  - Raspberry Pi A+ (via GPIO on SoC)
+  - Raspberry Pi 2 B (via GPIO on SoC)
+  - Raspberry Pi 3 B (via GPIO on port expander)
+  - Raspberry Pi 3 B+ (via PMIC)
 
-This series is a draft to upstream the resulting kernel patch and is not
-intended for 4.18.
+TODO:
+  - try to make bcm2835 firmware a bus driver
 
-[1] - https://github.com/raspberrypi/linux/issues/2367
-
-Stefan Wahren (6):
-  ARM: bcm2835: Add GET_THROTTLED firmware property
-  dt-bindings: hwmon: Add Raspberry Pi voltage sensor
-  hwmon: Add support for RPi voltage sensor
-  ARM: bcm2835_defconfig: Enable RPi voltage sensor
-  ARM: multi_v7_defconfig: Enable RPi voltage sensor
-  arm64: defconfig: Enable RPi voltage sensor
-
- .../bindings/hwmon/raspberrypi-hwmon.txt           |  19 ++
- arch/arm/configs/bcm2835_defconfig                 |   2 +-
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm64/configs/defconfig                       |   1 +
- drivers/hwmon/Kconfig                              |  10 +
- drivers/hwmon/Makefile                             |   1 +
- drivers/hwmon/raspberrypi-hwmon.c                  | 207 +++++++++++++++++++++
- include/soc/bcm2835/raspberrypi-firmware.h         |   1 +
- 8 files changed, 241 insertions(+), 1 deletion(-)
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ .../devicetree/bindings/hwmon/raspberrypi-hwmon.txt   | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
- create mode 100644 drivers/hwmon/raspberrypi-hwmon.c
 
+diff --git a/Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt b/Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
+new file mode 100644
+index 0000000..ec2523f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
+@@ -0,0 +1,19 @@
++Raspberry Pi voltage sensor
++---------------------------
++
++The VC4 firmware exposes a mailbox interface that allows the ARM core
++to access the board's voltage sensor.
++
++Required properties :
++- compatible : Should be "raspberrypi,bcm2835-hwmon"
++
++Example:
++
++firmware: firmware-rpi {
++	compatible = "raspberrypi,bcm2835-firmware";
++	mboxes = <&mailbox>;
++
++	voltage-sensor {
++		compatible = "raspberrypi,bcm2835-hwmon";
++	};
++};
 -- 
 2.7.4
