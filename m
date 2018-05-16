@@ -1,118 +1,127 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 16 May 2018 10:01:32 +0100
-Subject: [PATCH 06/18] arm64: move sve_user_{enable, disable} to
- <asm/fpsimd.h>
-In-Reply-To: <20180515163352.sl7sfaswv4hsktl7@lakrids.cambridge.arm.com>
-References: <20180514094640.27569-1-mark.rutland@arm.com>
- <20180514094640.27569-7-mark.rutland@arm.com>
- <20180514110649.GC7753@e103592.cambridge.arm.com>
- <20180515103936.v5ytofdq3qqtsomn@lakrids.cambridge.arm.com>
- <20180515121921.GN7753@e103592.cambridge.arm.com>
- <20180515163352.sl7sfaswv4hsktl7@lakrids.cambridge.arm.com>
-Message-ID: <20180516090121.GQ7753@e103592.cambridge.arm.com>
+From: tangnianyao@huawei.com (Tangnianyao (ICT))
+Date: Wed, 16 May 2018 09:08:45 +0000
+Subject: [PATCH] arm64: KVM: reduce guest fpsimd trap
+In-Reply-To: <1526460738-11157-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1526460738-11157-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <F348A9E21A573744858FF7E5D32E29D81BDF52AC@dggemi509-mbs.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 05:33:52PM +0100, Mark Rutland wrote:
-> On Tue, May 15, 2018 at 01:19:26PM +0100, Dave Martin wrote:
-> > On Tue, May 15, 2018 at 11:39:36AM +0100, Mark Rutland wrote:
-> > > On Mon, May 14, 2018 at 12:06:50PM +0100, Dave Martin wrote:
-> > > > On Mon, May 14, 2018 at 10:46:28AM +0100, Mark Rutland wrote:
+Add last_fpsimd_trap to notify if guest last exit reason is handling fpsimd. If guest is using fpsimd frequently, save host's fpsimd state and restore guest's fpsimd state and deactive fpsimd trap before returning to guest. It can avoid guest fpsimd trap soon to improve performance.
 
-[...]
+Signed-off-by: Nianyao Tang <tangnianyao@huawei.com>
+---
+ arch/arm64/kernel/asm-offsets.c |  1 +
+ arch/arm64/kvm/hyp/entry.S      |  5 +++++
+ arch/arm64/kvm/hyp/switch.c     | 38 ++++++++++++++++++++++++++++++++++++--
+ include/linux/kvm_host.h        |  1 +
+ 4 files changed, 43 insertions(+), 2 deletions(-)
 
-> > > > > @@ -107,6 +119,9 @@ static inline int sve_get_current_vl(void)
-> > > > >  	return -EINVAL;
-> > > > >  }
-> > > > >  
-> > > > > +static inline void sve_user_disable(void) { }
-> > > > > +static inline void sve_user_enable(void) { }
-> > > > > +
-> > > > 
-> > > > Alternatively, just move the full definitions outside the #ifdef
-> > > > CONFIG_ARM64_SVE.
-> > > 
-> > > Can do, though I was trying to keep the exsting pattern with empty
-> > > inlines for the !CONFIG_ARM64_SVE case.
-> > 
-> > There isn't really a pattern.  I tried to avoid dummy versions where
-> > there's no real reason to have them.  I don't _think_ they're really
-> > needed here, unless I missed something.  Did you get build failures
-> > without them?
-> 
-> I need *some* definition so that sve_user_reset() in the syscall path
-> can compile without ifdeferry. 
-> 
-> In sve_user_reset() I first check system_supports_sve(), which checks
-> IS_ENABLED(CONFIG_ARM64_SVE), so the call should be optimised away when
-> !CONFIG_ARM64_SVE, but I need a prototype regardless.
-
-What I envisaged is that you move the real definitions outside the
-#ifdef so that they're defined unconditionally, and get rid of the
-dummies.
-
-Having a dummy definition of sve_user_enable() really feels like it's
-papering over something.  How could it be appropriate to call this in a
-non-SVE enabled system?  You _do_ guard the call to this already, so
-hiding the real function body for CONFIG_ARM64_SVE=n doesn't appear to
-achieve anything.  Maybe I missed something somewhere.
-
-A dummy sve_user_disable() is a bit more reasonable though, but we want
-this to be a nop on non-SVE hardware even if CONFIG_ARM64_SVE=y.
-
-What about moving the system_supports_sve() check inside
-sve_user_disable()?
-
-[...]
-
-> > > Earlier I'd put BUILD_BUG() in the body for the !CONFIG_ARM64_SVE case,
-> > > to catch that kind of thing -- I could restore that.
-> > 
-> > IIUC:
-> > 
-> > 	if (0) {
-> > 		BUILD_BUG_ON(1);
-> > 	}
-> > 
-> > can still fire, in which case it's futile checking for CONFIG_ARM64_SVE
-> > in most of the SVE support code.
-> 
-> We already rely on BUILD_BUG() not firing in paths that can be trivially
-> optimized away. e.g. in the cmpxchg code.
-
-Fair enough.  I had been unsure on this point.
-
-If you want to put a BUILD_BUG_ON(!IS_ENABLED(CONFIG_ARM64_SVE)) in
-sve_user_enable() and build with CONFIG_ARM64_SVE=n to check it works,
-then I'd be fine with that.
-
-This doesn't capture the runtime part of the condition, but it's better
-than nothing.
-
-[...]
-
-> > > > > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > > > > index 088940387a4d..79a81c7d85c6 100644
-> > > > > --- a/arch/arm64/kernel/fpsimd.c
-> > > > > +++ b/arch/arm64/kernel/fpsimd.c
-> > > > > @@ -159,7 +159,6 @@ static void sve_free(struct task_struct *task)
-> > > > >  	__sve_free(task);
-> > > > >  }
-> > > > >  
-> > > > > -
-> > > > 
-> > > > Hmmm, Ack.  Check for conflicts with the KVM FPSIMD rework [1] (though
-> > > > trivial).
-> > > 
-> > > I'll assume that Ack stands regardless. :)
-> > 
-> > Actually, I was just commenting on the deleted blank line... 
-> 
-> Ah. I've restored that now.
-
-I meant Ack to the deletion.  It looks like the blank line was
-spuriously introduced in the first place.  But it doesn't hugely matter
-either way.
-
-Cheers
----Dave
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c index 5bdda65..35a9c5c 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -136,6 +136,7 @@ int main(void)
+ #ifdef CONFIG_KVM_ARM_HOST
+   DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
+   DEFINE(VCPU_FAULT_DISR,	offsetof(struct kvm_vcpu, arch.fault.disr_el1));
++  DEFINE(VCPU_LAST_FPSIMD_TRAP, offsetof(struct kvm_vcpu, 
++ last_fpsimd_trap));
+   DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
+   DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
+   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S index e41a161..956e042 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -197,6 +197,11 @@ alternative_endif
+ 	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+ 	bl	__fpsimd_restore_state
+ 
++	// Mark guest using fpsimd now
++	ldr x0, [x3, #VCPU_LAST_FPSIMD_TRAP]
++	add x0, x0, #1
++	str x0, [x3, #VCPU_LAST_FPSIMD_TRAP]
++
+ 	// Skip restoring fpexc32 for AArch64 guests
+ 	mrs	x1, hcr_el2
+ 	tbnz	x1, #HCR_RW_SHIFT, 1f
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c index d964523..86eea1b 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -92,7 +92,13 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
+ 
+ 	val = read_sysreg(cpacr_el1);
+ 	val |= CPACR_EL1_TTA;
+-	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
++	val &= ~CPACR_EL1_ZEN;
++
++	if (vcpu->last_fpsimd_trap)
++		val |= CPACR_EL1_FPEN;
++	else
++		val &= ~CPACR_EL1_FPEN;
++
+ 	write_sysreg(val, cpacr_el1);
+ 
+ 	write_sysreg(kvm_get_hyp_vector(), vbar_el1); @@ -105,7 +111,13 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ 	__activate_traps_common(vcpu);
+ 
+ 	val = CPTR_EL2_DEFAULT;
+-	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
++	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
++
++	if (vcpu->last_fpsimd_trap)
++		val &= ~CPTR_EL2_TFP;
++	else
++		val |= CPTR_EL2_TFP;
++
+ 	write_sysreg(val, cptr_el2);
+ }
+ 
+@@ -406,6 +418,17 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ 	__activate_traps(vcpu);
+ 	__activate_vm(vcpu->kvm);
+ 
++	/*
++	 * If guest last trap to host for handling fpsimd, last_fpsimd_trap
++	 * is set. Restore guest's fpsimd state and deactivate fpsimd trap
++	 * to avoid guest traping soon.
++	 */
++	if (vcpu->last_fpsimd_trap) {
++		__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
++		__fpsimd_restore_state(&guest_ctxt->gp_regs.fp_regs);
++		vcpu->last_fpsimd_trap = 0;
++	}
++
+ 	sysreg_restore_guest_state_vhe(guest_ctxt);
+ 	__debug_switch_to_guest(vcpu);
+ 
+@@ -454,6 +477,17 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	__activate_traps(vcpu);
+ 	__activate_vm(kern_hyp_va(vcpu->kvm));
+ 
++	/*
++	 * If guest last trap to host for handling fpsimd, last_fpsimd_trap
++	 * is set. Restore guest's fpsimd state and deactivate fpsimd trap
++	 * to avoid guest traping soon.
++	 */
++	if (vcpu->last_fpsimd_trap) {
++		__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
++		__fpsimd_restore_state(&guest_ctxt->gp_regs.fp_regs);
++		vcpu->last_fpsimd_trap = 0;
++	}
++
+ 	__hyp_vgic_restore_state(vcpu);
+ 	__timer_enable_traps(vcpu);
+ 
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h index 6930c63..46bdf0d 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -274,6 +274,7 @@ struct kvm_vcpu {
+ 	bool preempted;
+ 	struct kvm_vcpu_arch arch;
+ 	struct dentry *debugfs_dentry;
++	unsigned int last_fpsimd_trap;
+ };
+ 
+ static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
+--
+2.7.4
