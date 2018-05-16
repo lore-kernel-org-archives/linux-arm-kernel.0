@@ -1,92 +1,93 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 16 May 2018 11:06:02 +0100
-Subject: [PATCH v9 07/11] arm64: kexec_file: add crash dump support
-In-Reply-To: <f8d8305d-42f5-e1e2-20c4-733cb38cbb8d@arm.com>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-8-takahiro.akashi@linaro.org>
- <f8d8305d-42f5-e1e2-20c4-733cb38cbb8d@arm.com>
-Message-ID: <512cde7d-d84b-3623-cb09-a2d78acc11dc@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 16 May 2018 11:13:08 +0100
+Subject: [RESEND PATCH v5 0/6] Add support for PWM input capture on STM32
+In-Reply-To: <c48acc96-1eca-9adc-abb7-131921305ee8@st.com>
+References: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
+ <20180516080635.GE5130@dell>
+ <c48acc96-1eca-9adc-abb7-131921305ee8@st.com>
+Message-ID: <20180516101308.GH5130@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+On Wed, 16 May 2018, Fabrice Gasnier wrote:
 
-On 15/05/18 18:11, James Morse wrote:
-> On 25/04/18 07:26, AKASHI Takahiro wrote:
->> Enabling crash dump (kdump) includes
->> * prepare contents of ELF header of a core dump file, /proc/vmcore,
->>   using crash_prepare_elf64_headers(), and
->> * add two device tree properties, "linux,usable-memory-range" and
->>   "linux,elfcorehdr", which represent repsectively a memory range
->>   to be used by crash dump kernel and the header's location
-
->> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
->> index 37c0a9dc2e47..ec674f4d267c 100644
->> --- a/arch/arm64/kernel/machine_kexec_file.c
->> +++ b/arch/arm64/kernel/machine_kexec_file.c
-
->> +static struct crash_mem *get_crash_memory_ranges(void)
->> +{
->> +	unsigned int nr_ranges;
->> +	struct crash_mem *cmem;
->> +
->> +	nr_ranges = 1; /* for exclusion of crashkernel region */
->> +	walk_system_ram_res(0, -1, &nr_ranges, get_nr_ranges_callback);
->> +
->> +	cmem = vmalloc(sizeof(struct crash_mem) +
->> +			sizeof(struct crash_mem_range) * nr_ranges);
->> +	if (!cmem)
->> +		return NULL;
->> +
->> +	cmem->max_nr_ranges = nr_ranges;
->> +	cmem->nr_ranges = 0;
->> +	walk_system_ram_res(0, -1, cmem, add_mem_range_callback);
->> +
->> +	/* Exclude crashkernel region */
->> +	if (crash_exclude_mem_range(cmem, crashk_res.start, crashk_res.end)) {
->> +		vfree(cmem);
->> +		return NULL;
->> +	}
->> +
->> +	return cmem;
->> +}
+> On 05/16/2018 10:06 AM, Lee Jones wrote:
+> > On Wed, 16 May 2018, Fabrice Gasnier wrote:
+> > 
+> >> This series adds support for capture to stm32-pwm driver.
+> >> Capture is based on DMAs.
+> >> - First two patches add support for requesting DMAs to MFD core
+> >> - Next three patches add support for capture to stm32-pwm driver
+> >> - This has been tested on stm32429i-eval board.
+> >>
+> >> ---
+> >> Changes in v5:
+> >> - update patch 2 (mfd: stm32-timers: add support for dmas)
+> >>   move stm32_timers_dma struct to header file,
+> >>   fix warning on dma_mapping_error().
+> >>
+> >> Changes in v4:
+> >> - Lee's comments on patch 2 (mfd: stm32-timers: add support for dmas)
+> >>   Add kerneldoc header, better format comments.
+> >>
+> >> Changes in v3:
+> >> - Dropped 2 precusor patches applied by Thierry in pwm tree:
+> >>   "pwm: stm32: fix, remove unused struct device"
+> >>   "pwm: stm32: protect common prescaler for all channels"
+> >> - Note: this series applies on top on pwm tree
+> >> - Implements Lee's comments on MFD part: rework stm32_timers_dma struct,
+> >>   exported routine prototype now use generic device struct, more
+> >>   various comments (see patch 2 changelog).
+> >>
+> >> Resend v2:
+> >> - Add collected Acks
+> >>
+> >> Changes in v2:
+> >> - Abstract DMA handling from child driver: move it to MFD core
+> >> - Rework pwm capture routines to adopt this change
+> >> - Comment on optional dma support, beautify DMAs probe
+> >>
+> >> Fabrice Gasnier (6):
+> >>   dt-bindings: mfd: stm32-timers: add support for dmas
+> >>   mfd: stm32-timers: add support for dmas
+> >>   pwm: stm32: add capture support
+> >>   pwm: stm32: improve capture by tuning counter prescaler
+> >>   pwm: stm32: use input prescaler to improve period capture
+> >>   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
+> > 
+> > Applied patches 1-5.
 > 
-> Could this function be included in prepare_elf_headers() so that the alloc() and
-> free() occur together.
+> Many thanks Lee !
 > 
+> Maybe I missed something, but just in case...
+> In your pull request ("[GIT PULL] Immutable branch between MFD and PWM
+> due for the v4.18 merge window") I only see 4 patches:
+> Fabrice Gasnier (4):
+>       mfd: stm32-timers: Add support for DMAs
+>       pwm: stm32: Add capture support
+>       pwm: stm32: Improve capture by tuning counter prescaler
+>       pwm: stm32: Use input prescaler to improve period capture
 > 
->> +static int prepare_elf_headers(void **addr, unsigned long *sz)
->> +{
->> +	struct crash_mem *cmem;
->> +	int ret = 0;
->> +
->> +	cmem = get_crash_memory_ranges();
->> +	if (!cmem)
->> +		return -ENOMEM;
->> +
->> +	ret =  crash_prepare_elf64_headers(cmem, true, addr, sz);
->> +
->> +	vfree(cmem);
-> 
->> +	return ret;
->> +}
-> 
-> All this is moving memory-range information from core-code's
-> walk_system_ram_res() into core-code's struct crash_mem, and excluding
-> crashk_res, which again is accessible to the core code.
-> 
-> It looks like this is duplicated in arch/x86 and arch/arm64 because arm64
-> doesn't have a second 'crashk_low_res' region, and always wants elf64, instead
-> of when IS_ENABLED(CONFIG_X86_64).
+> I can't see patch 1 ("dt-bindings: mfd: stm32-timers: add support for dmas")
+> Is it applied on another tree ?
 
-Thinking about it some more: don't we want to walk memblock here, not
-walk_system_ram_res()? What we want is a list of not-nomap regions that the
-kernel may have been using, to form part of vmcore.
-walk_system_ram_res() is becoming a murkier list of maybe-nomap, maybe-reserved.
+Good spot.
 
-I think we should walk the same list here as we do in patch 4.
+Looks like a fumbled the key combination for the bindings patch.
 
+Pull-request to follow.
 
-Thanks,
+> >>  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
+> >>  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
+> >>  drivers/mfd/stm32-timers.c                         | 201 +++++++++++++++-
+> >>  drivers/pwm/pwm-stm32.c                            | 257 +++++++++++++++++++++
+> >>  include/linux/mfd/stm32-timers.h                   |  58 +++++
+> >>  5 files changed, 537 insertions(+), 2 deletions(-)
+> >>
+> > 
 
-James
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
