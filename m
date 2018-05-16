@@ -1,42 +1,50 @@
 From: daniel@zonque.org (Daniel Mack)
-Date: Wed, 16 May 2018 14:28:26 +0200
-Subject: [PATCH 0/3] input: touchscreen: edt-ft5x06: make wakeup source
- behavior configurable
-Message-ID: <20180516122829.23694-1-daniel@zonque.org>
+Date: Wed, 16 May 2018 14:28:28 +0200
+Subject: [PATCH 2/3] input: touchscreen: edt-ft5x06: assert reset during
+ suspend
+In-Reply-To: <20180516122829.23694-1-daniel@zonque.org>
+References: <20180516122829.23694-1-daniel@zonque.org>
+Message-ID: <20180516122829.23694-3-daniel@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+If the device is not configured as wakeup source, it can be put in reset
+during suspend to save some power.
 
-I have a platform that features an edt-ft5x06 touch panel and that
-doesn't want to wake on touch screen activity.
+Signed-off-by: Daniel Mack <daniel@zonque.org>
+---
+ drivers/input/touchscreen/edt-ft5x06.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Here's a trivial series of patches that make the edt-ft5x06 driver only
-act as wakeup source when requested through device properties or DTS.
-
-The third patch changes the default in two DTS files that use this
-driver.
-
-I guess the first two patches should go through the input tree, while
-the third can be picked by the IMX people. There are no compile-time
-dependencies, so the order doesn't matter.
-
-
-Thanks,
-Daniel
-
-
-Daniel Mack (3):
-  input: touchscreen: edt-ft5x06: make wakeup source behavior
-    configurable
-  input: touchscreen: edt-ft5x06: assert reset during suspend
-  ARM: dts: imx28/imx53: enable edt-ft5x06 wakeup source
-
- .../devicetree/bindings/input/touchscreen/edt-ft5x06.txt         | 3 +++
- arch/arm/boot/dts/imx28-tx28.dts                                 | 1 +
- arch/arm/boot/dts/imx53-tx53-x03x.dts                            | 1 +
- drivers/input/touchscreen/edt-ft5x06.c                           | 9 ++++++++-
- 4 files changed, 13 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+index 955f085627fa..c34a0b23f90a 100644
+--- a/drivers/input/touchscreen/edt-ft5x06.c
++++ b/drivers/input/touchscreen/edt-ft5x06.c
+@@ -1036,9 +1036,12 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
+ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
+ {
+ 	struct i2c_client *client = to_i2c_client(dev);
++	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
+ 
+ 	if (device_may_wakeup(dev))
+ 		enable_irq_wake(client->irq);
++	else if (tsdata->reset_gpio)
++		gpiod_set_value_cansleep(tsdata->reset_gpio, 1);
+ 
+ 	return 0;
+ }
+@@ -1046,9 +1049,12 @@ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
+ static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
+ {
+ 	struct i2c_client *client = to_i2c_client(dev);
++	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
+ 
+ 	if (device_may_wakeup(dev))
+ 		disable_irq_wake(client->irq);
++	else if (tsdata->reset_gpio)
++		gpiod_set_value_cansleep(tsdata->reset_gpio, 0);
+ 
+ 	return 0;
+ }
 -- 
 2.14.3
