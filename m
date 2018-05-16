@@ -1,47 +1,118 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 16 May 2018 10:57:06 +0200
-Subject: [PATCH 1/4] amba: Export amba_bustype
-In-Reply-To: <20180515134144.GF16141@n2100.armlinux.org.uk>
-References: <20180508140628.f30774c70c4c481bff3f8000@arm.com>
- <CAPDyKFqagt5zhz-8hLSXOqofv-nBqg4i-EVjA=UV3Jfi4zktKg@mail.gmail.com>
- <20180515134144.GF16141@n2100.armlinux.org.uk>
-Message-ID: <CAPDyKFp-CRiUJq-kS5GqguncaEJE7wBsTHy_orQO_rmS-xzgBA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 16 May 2018 10:01:32 +0100
+Subject: [PATCH 06/18] arm64: move sve_user_{enable, disable} to
+ <asm/fpsimd.h>
+In-Reply-To: <20180515163352.sl7sfaswv4hsktl7@lakrids.cambridge.arm.com>
+References: <20180514094640.27569-1-mark.rutland@arm.com>
+ <20180514094640.27569-7-mark.rutland@arm.com>
+ <20180514110649.GC7753@e103592.cambridge.arm.com>
+ <20180515103936.v5ytofdq3qqtsomn@lakrids.cambridge.arm.com>
+ <20180515121921.GN7753@e103592.cambridge.arm.com>
+ <20180515163352.sl7sfaswv4hsktl7@lakrids.cambridge.arm.com>
+Message-ID: <20180516090121.GQ7753@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2018 at 15:41, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> On Tue, May 15, 2018 at 08:59:02AM +0200, Ulf Hansson wrote:
->> On 8 May 2018 at 21:06, Kim Phillips <kim.phillips@arm.com> wrote:
->> > This patch is provided in the context of allowing the Coresight driver
->> > subsystem to be loaded as modules.  Coresight uses amba_bus in its call
->> > to bus_find_device() in of_coresight_get_endpoint_device() when
->> > searching for a configurable endpoint device.  This patch allows
->> > Coresight to reference amba_bustype when built as a module.
->>
->> Sounds like you are fixing a bug, don't your want this to go for
->> stable and then also add a fixes tag?
->
-> What bug is this fixing exactly that would qualify it for stable
-> backporting?
-
-That was my question, as when reading the changelog of $subject patch,
-this isn't clear to me.
-
->
-> The lack of an export is never a bug unless there is some existing
-> user which requires it.  This is not the case here.
->
-> What Kim is doing in his new patch series is making Coresight - which
-> is currently only available as either disabled or built-in - possible
-> to be loaded as a module.  This is a new feature, and in the process
-> of creating this new feature, Kim needs a symbol that wasn't previously
-> needed to be exported.
-
-Thanks for clarifying, I did not review the entire series. The change
-make perfect sense, no objections - and of course I agree it's not a
-bug fix.
+On Tue, May 15, 2018 at 05:33:52PM +0100, Mark Rutland wrote:
+> On Tue, May 15, 2018 at 01:19:26PM +0100, Dave Martin wrote:
+> > On Tue, May 15, 2018 at 11:39:36AM +0100, Mark Rutland wrote:
+> > > On Mon, May 14, 2018 at 12:06:50PM +0100, Dave Martin wrote:
+> > > > On Mon, May 14, 2018 at 10:46:28AM +0100, Mark Rutland wrote:
 
 [...]
 
-Kind regards
-Uffe
+> > > > > @@ -107,6 +119,9 @@ static inline int sve_get_current_vl(void)
+> > > > >  	return -EINVAL;
+> > > > >  }
+> > > > >  
+> > > > > +static inline void sve_user_disable(void) { }
+> > > > > +static inline void sve_user_enable(void) { }
+> > > > > +
+> > > > 
+> > > > Alternatively, just move the full definitions outside the #ifdef
+> > > > CONFIG_ARM64_SVE.
+> > > 
+> > > Can do, though I was trying to keep the exsting pattern with empty
+> > > inlines for the !CONFIG_ARM64_SVE case.
+> > 
+> > There isn't really a pattern.  I tried to avoid dummy versions where
+> > there's no real reason to have them.  I don't _think_ they're really
+> > needed here, unless I missed something.  Did you get build failures
+> > without them?
+> 
+> I need *some* definition so that sve_user_reset() in the syscall path
+> can compile without ifdeferry. 
+> 
+> In sve_user_reset() I first check system_supports_sve(), which checks
+> IS_ENABLED(CONFIG_ARM64_SVE), so the call should be optimised away when
+> !CONFIG_ARM64_SVE, but I need a prototype regardless.
+
+What I envisaged is that you move the real definitions outside the
+#ifdef so that they're defined unconditionally, and get rid of the
+dummies.
+
+Having a dummy definition of sve_user_enable() really feels like it's
+papering over something.  How could it be appropriate to call this in a
+non-SVE enabled system?  You _do_ guard the call to this already, so
+hiding the real function body for CONFIG_ARM64_SVE=n doesn't appear to
+achieve anything.  Maybe I missed something somewhere.
+
+A dummy sve_user_disable() is a bit more reasonable though, but we want
+this to be a nop on non-SVE hardware even if CONFIG_ARM64_SVE=y.
+
+What about moving the system_supports_sve() check inside
+sve_user_disable()?
+
+[...]
+
+> > > Earlier I'd put BUILD_BUG() in the body for the !CONFIG_ARM64_SVE case,
+> > > to catch that kind of thing -- I could restore that.
+> > 
+> > IIUC:
+> > 
+> > 	if (0) {
+> > 		BUILD_BUG_ON(1);
+> > 	}
+> > 
+> > can still fire, in which case it's futile checking for CONFIG_ARM64_SVE
+> > in most of the SVE support code.
+> 
+> We already rely on BUILD_BUG() not firing in paths that can be trivially
+> optimized away. e.g. in the cmpxchg code.
+
+Fair enough.  I had been unsure on this point.
+
+If you want to put a BUILD_BUG_ON(!IS_ENABLED(CONFIG_ARM64_SVE)) in
+sve_user_enable() and build with CONFIG_ARM64_SVE=n to check it works,
+then I'd be fine with that.
+
+This doesn't capture the runtime part of the condition, but it's better
+than nothing.
+
+[...]
+
+> > > > > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > > > > index 088940387a4d..79a81c7d85c6 100644
+> > > > > --- a/arch/arm64/kernel/fpsimd.c
+> > > > > +++ b/arch/arm64/kernel/fpsimd.c
+> > > > > @@ -159,7 +159,6 @@ static void sve_free(struct task_struct *task)
+> > > > >  	__sve_free(task);
+> > > > >  }
+> > > > >  
+> > > > > -
+> > > > 
+> > > > Hmmm, Ack.  Check for conflicts with the KVM FPSIMD rework [1] (though
+> > > > trivial).
+> > > 
+> > > I'll assume that Ack stands regardless. :)
+> > 
+> > Actually, I was just commenting on the deleted blank line... 
+> 
+> Ah. I've restored that now.
+
+I meant Ack to the deletion.  It looks like the blank line was
+spuriously introduced in the first place.  But it doesn't hugely matter
+either way.
+
+Cheers
+---Dave
