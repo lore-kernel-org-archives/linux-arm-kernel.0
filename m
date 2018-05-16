@@ -1,128 +1,49 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Wed, 16 May 2018 11:38:45 +0800
-Subject: [PATCH] ethernet: stmmac: dwmac-rk: Add GMAC support for px30
-Message-ID: <1526441925-12654-1-git-send-email-david.wu@rock-chips.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 16 May 2018 12:13:37 +0800
+Subject: [PATCH v7 12/14] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <1526375616-16904-13-git-send-email-ilialin@codeaurora.org>
+References: <1526375616-16904-13-git-send-email-ilialin@codeaurora.org>
+Message-ID: <201805161233.KgANSDKh%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add constants and callback functions for the dwmac on px30 soc.
-The base structure is the same, but registers and the bits in
-them moved slightly, and add the clk_mac_speed for the select
-of mac speed.
+Hi Ilia,
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
+Thank you for the patch! Yet something to improve:
+
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.17-rc5]
+[cannot apply to clk/clk-next next-20180515]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Ilia-Lin/CPU-scaling-support-for-msm8996/20180516-064721
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+   aarch64-linux-gnu-ld: arch/arm64/kernel/head.o: relocation R_AARCH64_ABS32 against `_kernel_offset_le_lo32' can not be used when making a shared object
+   arch/arm64/kernel/head.o: In function `kimage_vaddr':
+   (.idmap.text+0x0): dangerous relocation: unsupported relocation
+   arch/arm64/kernel/head.o: In function `__primary_switch':
+   (.idmap.text+0x350): dangerous relocation: unsupported relocation
+   (.idmap.text+0x358): dangerous relocation: unsupported relocation
+   drivers/cpufreq/qcom-cpufreq-kryo.o: In function `qcom_cpufreq_kryo_driver_init':
+>> qcom-cpufreq-kryo.c:(.init.text+0xd8): undefined reference to `qcom_smem_get'
+
 ---
- .../devicetree/bindings/net/rockchip-dwmac.txt     |  1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 64 ++++++++++++++++++++++
- 2 files changed, 65 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-index 9c16ee2..3b71da7 100644
---- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-+++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-@@ -4,6 +4,7 @@ The device node has following properties.
- 
- Required properties:
-  - compatible: should be "rockchip,<name>-gamc"
-+   "rockchip,px30-gmac":   found on PX30 SoCs
-    "rockchip,rk3128-gmac": found on RK312x SoCs
-    "rockchip,rk3228-gmac": found on RK322x SoCs
-    "rockchip,rk3288-gmac": found on RK3288 SoCs
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-index 13133b3..4b2ab71 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-@@ -61,6 +61,7 @@ struct rk_priv_data {
- 	struct clk *mac_clk_tx;
- 	struct clk *clk_mac_ref;
- 	struct clk *clk_mac_refout;
-+	struct clk *clk_mac_speed;
- 	struct clk *aclk_mac;
- 	struct clk *pclk_mac;
- 	struct clk *clk_phy;
-@@ -83,6 +84,64 @@ struct rk_priv_data {
- 	(((tx) ? soc##_GMAC_TXCLK_DLY_ENABLE : soc##_GMAC_TXCLK_DLY_DISABLE) | \
- 	 ((rx) ? soc##_GMAC_RXCLK_DLY_ENABLE : soc##_GMAC_RXCLK_DLY_DISABLE))
- 
-+#define PX30_GRF_GMAC_CON1		0X0904
-+
-+/* PX30_GRF_GMAC_CON1 */
-+#define PX30_GMAC_PHY_INTF_SEL_RMII	(GRF_CLR_BIT(4) | GRF_CLR_BIT(5) | \
-+					GRF_BIT(6))
-+#define PX30_GMAC_SPEED_10M		GRF_CLR_BIT(2)
-+#define PX30_GMAC_SPEED_100M		GRF_BIT(2)
-+
-+static void px30_set_to_rmii(struct rk_priv_data *bsp_priv)
-+{
-+	struct device *dev = &bsp_priv->pdev->dev;
-+
-+	if (IS_ERR(bsp_priv->grf)) {
-+		dev_err(dev, "%s: Missing rockchip,grf property\n", __func__);
-+		return;
-+	}
-+
-+	regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
-+		     PX30_GMAC_PHY_INTF_SEL_RMII);
-+}
-+
-+static void px30_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
-+{
-+	struct device *dev = &bsp_priv->pdev->dev;
-+	int ret;
-+
-+	if (IS_ERR(bsp_priv->clk_mac_speed)) {
-+		dev_err(dev, "%s: Missing clk_mac_speed clock\n", __func__);
-+		return;
-+	}
-+
-+	if (speed == 10) {
-+		regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
-+			     PX30_GMAC_SPEED_10M);
-+
-+		ret = clk_set_rate(bsp_priv->clk_mac_speed, 2500000);
-+		if (ret)
-+			dev_err(dev, "%s: set clk_mac_speed rate 2500000 failed: %d\n",
-+				__func__, ret);
-+	} else if (speed == 100) {
-+		regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
-+			     PX30_GMAC_SPEED_100M);
-+
-+		ret = clk_set_rate(bsp_priv->clk_mac_speed, 25000000);
-+		if (ret)
-+			dev_err(dev, "%s: set clk_mac_speed rate 25000000 failed: %d\n",
-+				__func__, ret);
-+
-+	} else {
-+		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
-+	}
-+}
-+
-+static const struct rk_gmac_ops px30_ops = {
-+	.set_to_rmii = px30_set_to_rmii,
-+	.set_rmii_speed = px30_set_rmii_speed,
-+};
-+
- #define RK3128_GRF_MAC_CON0	0x0168
- #define RK3128_GRF_MAC_CON1	0x016c
- 
-@@ -1042,6 +1101,10 @@ static int rk_gmac_clk_init(struct plat_stmmacenet_data *plat)
- 		}
- 	}
- 
-+	bsp_priv->clk_mac_speed = devm_clk_get(dev, "clk_mac_speed");
-+	if (IS_ERR(bsp_priv->clk_mac_speed))
-+		dev_err(dev, "cannot get clock %s\n", "clk_mac_speed");
-+
- 	if (bsp_priv->clock_input) {
- 		dev_info(dev, "clock input from PHY\n");
- 	} else {
-@@ -1424,6 +1487,7 @@ static int rk_gmac_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(rk_gmac_pm_ops, rk_gmac_suspend, rk_gmac_resume);
- 
- static const struct of_device_id rk_gmac_dwmac_match[] = {
-+	{ .compatible = "rockchip,px30-gmac",	.data = &px30_ops   },
- 	{ .compatible = "rockchip,rk3128-gmac", .data = &rk3128_ops },
- 	{ .compatible = "rockchip,rk3228-gmac", .data = &rk3228_ops },
- 	{ .compatible = "rockchip,rk3288-gmac", .data = &rk3288_ops },
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59061 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180516/2b801114/attachment-0001.gz>
