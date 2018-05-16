@@ -1,105 +1,193 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 17 May 2018 00:23:18 +0200
-Subject: [PATCH v2 3/3] arm64: dts: renesas: draak: Describe HDMI input
-In-Reply-To: <1526478129-16465-4-git-send-email-jacopo+renesas@jmondi.org>
-References: <1526478129-16465-1-git-send-email-jacopo+renesas@jmondi.org>
- <1526478129-16465-4-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180516222318.GI17948@bigcity.dyn.berto.se>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 17 May 2018 08:47:27 +1000
+Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
+Message-ID: <20180517084727.1d6772e1@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+Hi all,
 
-Thanks for your patch.
+Today's linux-next merge of the mvebu tree got a conflict in:
 
-On 2018-05-16 15:42:09 +0200, Jacopo Mondi wrote:
-> Describe HDMI input connector and ADV7612 HDMI decoder installed on
-> R-Car Gen3 Draak board.
-> 
-> The video signal routing to the HDMI decoder to the video input interface
-> VIN4 is multiplexed with CVBS input path, and enabled/disabled through
-> on-board switches SW-49, SW-50, SW-51 and SW-52.
-> 
-> As the default board switches configuration connects CVBS input to VIN4,
-> leave the HDMI decoder unconnected in DTS.
-> 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+  arch/arm/configs/multi_v7_defconfig
 
-I'm not sure we have a policy about describing hardware which can't be 
-used without flipping switches. I have no opinion on if we should do 
-that or not I leave that to others, but for the change itself.
+between various commits from the arm-soc tree and commit:
 
-Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+  873edb2930ef ("ARM: multi_v7_defconfig: Update with current configuration")
 
-I think it's good we describe it as it's part of the Draak board itself 
-and not an expansion board which we have seen a lot of :-) Maybe even 
-add a commented out line in the adv7612 port at 2 which hints which VIN 
-this is connected to if the switches are flipped?
+from the mvebu tree.
 
-> ---
->  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 38 ++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> index 9aba28f..ea99dc9 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> @@ -59,6 +59,17 @@
->  		};
->  	};
->  
-> +	hdmi-in {
-> +		compatible = "hdmi-connector";
-> +		type = "a";
-> +
-> +		port {
-> +			hdmi_con_in: endpoint {
-> +				remote-endpoint = <&adv7612_in>;
-> +			};
-> +		};
-> +	};
-> +
->  	memory at 48000000 {
->  		device_type = "memory";
->  		/* first 128MB is reserved for secure area. */
-> @@ -170,6 +181,33 @@
->  			};
->  		};
->  	};
-> +
-> +	hdmi-decoder at 4c {
-> +		compatible = "adi,adv7612";
-> +		reg = <0x4c>;
-> +		default-input = <0>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				adv7612_in: endpoint {
-> +					remote-endpoint = <&hdmi_con_in>;
-> +				};
-> +			};
-> +
-> +			port at 2 {
-> +				reg = <2>;
-> +				adv7612_out: endpoint {
-> +					pclk-sample = <0>;
-> +					hsync-active = <0>;
-> +					vsync-active = <0>;
-> +				};
-> +			};
-> +		};
-> +	};
->  };
->  
->  &i2c1 {
-> -- 
-> 2.7.4
-> 
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
 
 -- 
-Regards,
-Niklas S?derlund
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm/configs/multi_v7_defconfig
+index 0c7abc87f01a,2b008248fb52..000000000000
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@@ -169,26 -153,14 +153,16 @@@ CONFIG_IPV6_MIP6=
+  CONFIG_IPV6_TUNNEL=m
+  CONFIG_IPV6_MULTIPLE_TABLES=y
+  CONFIG_NET_DSA=m
+- CONFIG_NET_SWITCHDEV=y
+  CONFIG_CAN=y
+- CONFIG_CAN_RAW=y
+- CONFIG_CAN_BCM=y
+- CONFIG_CAN_DEV=y
+  CONFIG_CAN_AT91=m
+  CONFIG_CAN_FLEXCAN=m
+- CONFIG_CAN_RCAR=m
++ CONFIG_CAN_SUN4I=y
+  CONFIG_CAN_XILINXCAN=y
++ CONFIG_CAN_RCAR=m
+  CONFIG_CAN_MCP251X=y
+- CONFIG_NET_DSA_BCM_SF2=m
+- CONFIG_B53=m
+- CONFIG_B53_SPI_DRIVER=m
+- CONFIG_B53_MDIO_DRIVER=m
+- CONFIG_B53_MMAP_DRIVER=m
+- CONFIG_B53_SRAB_DRIVER=m
+- CONFIG_CAN_SUN4I=y
+  CONFIG_BT=m
+ +CONFIG_BT_HCIUART=m
+ +CONFIG_BT_HCIUART_BCM=y
+  CONFIG_BT_MRVL=m
+  CONFIG_BT_MRVL_SDIO=m
+  CONFIG_CFG80211=m
+@@@ -272,17 -247,15 +249,16 @@@ CONFIG_DWMAC_DWC_QOS_ETH=
+  CONFIG_TI_CPSW=y
+  CONFIG_XILINX_EMACLITE=y
+  CONFIG_AT803X_PHY=y
+- CONFIG_MARVELL_PHY=y
+- CONFIG_SMSC_PHY=y
+  CONFIG_BROADCOM_PHY=y
+  CONFIG_ICPLUS_PHY=y
+- CONFIG_REALTEK_PHY=y
++ CONFIG_MARVELL_PHY=y
+  CONFIG_MICREL_PHY=y
+- CONFIG_FIXED_PHY=y
++ CONFIG_REALTEK_PHY=y
+  CONFIG_ROCKCHIP_PHY=y
++ CONFIG_SMSC_PHY=y
+  CONFIG_USB_PEGASUS=y
+  CONFIG_USB_RTL8152=m
+ +CONFIG_USB_LAN78XX=m
+  CONFIG_USB_USBNET=y
+  CONFIG_USB_NET_SMSC75XX=y
+  CONFIG_USB_NET_SMSC95XX=y
+@@@ -363,13 -334,10 +337,11 @@@ CONFIG_SERIAL_ST_ASC=
+  CONFIG_SERIAL_ST_ASC_CONSOLE=y
+  CONFIG_SERIAL_STM32=y
+  CONFIG_SERIAL_STM32_CONSOLE=y
+ +CONFIG_SERIAL_DEV_BUS=y
+- CONFIG_HVC_DRIVER=y
+  CONFIG_VIRTIO_CONSOLE=y
++ CONFIG_HW_RANDOM=y
++ CONFIG_HW_RANDOM_ST=y
+  CONFIG_I2C_CHARDEV=y
+- CONFIG_I2C_DAVINCI=y
+- CONFIG_I2C_MESON=y
+- CONFIG_I2C_MUX=y
+  CONFIG_I2C_ARB_GPIO_CHALLENGE=m
+  CONFIG_I2C_MUX_PCA954x=y
+  CONFIG_I2C_MUX_PINCTRL=y
+@@@ -381,8 -350,7 +354,8 @@@ CONFIG_I2C_DESIGNWARE_PLATFORM=
+  CONFIG_I2C_DIGICOLOR=m
+  CONFIG_I2C_EMEV2=m
+  CONFIG_I2C_GPIO=m
+- CONFIG_I2C_EXYNOS5=y
+  CONFIG_I2C_IMX=y
+++CONFIG_I2C_MESON=y
+  CONFIG_I2C_MV64XXX=y
+  CONFIG_I2C_RIIC=y
+  CONFIG_I2C_RK3X=y
+@@@ -643,13 -602,17 +608,18 @@@ CONFIG_DRM_RCAR_LVDS=
+  CONFIG_DRM_SUN4I=m
+  CONFIG_DRM_FSL_DCU=m
+  CONFIG_DRM_TEGRA=y
++ CONFIG_DRM_PANEL_SIMPLE=y
+  CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
+ +CONFIG_DRM_PANEL_SAMSUNG_S6E63J0X03=m
+  CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+- CONFIG_DRM_PANEL_SIMPLE=y
++ CONFIG_DRM_DUMB_VGA_DAC=m
++ CONFIG_DRM_NXP_PTN3460=m
++ CONFIG_DRM_PARADE_PS8622=m
+  CONFIG_DRM_SII9234=m
++ CONFIG_DRM_I2C_ADV7511=m
++ CONFIG_DRM_I2C_ADV7511_AUDIO=y
+  CONFIG_DRM_STI=m
+- CONFIG_DRM_VC4=y
++ CONFIG_DRM_VC4=m
+  CONFIG_DRM_ETNAVIV=m
+  CONFIG_DRM_MXSFB=m
+  CONFIG_FB_ARMCLCD=y
+@@@ -953,8 -901,9 +908,10 @@@ CONFIG_PWM=
+  CONFIG_PWM_ATMEL=m
+  CONFIG_PWM_ATMEL_HLCDC_PWM=m
+  CONFIG_PWM_ATMEL_TCB=m
++ CONFIG_PWM_BCM2835=y
++ CONFIG_PWM_BRCMSTB=m
+  CONFIG_PWM_FSL_FTM=m
+ +CONFIG_PWM_MESON=m
+  CONFIG_PWM_RCAR=m
+  CONFIG_PWM_RENESAS_TPU=y
+  CONFIG_PWM_ROCKCHIP=m
+@@@ -962,31 -912,25 +920,26 @@@ CONFIG_PWM_STI=
+  CONFIG_PWM_SUN4I=y
+  CONFIG_PWM_TEGRA=y
+  CONFIG_PWM_VT8500=y
++ CONFIG_KEYSTONE_IRQ=y
+++CONFIG_PHY_STM32_USBPHYC=y
++ CONFIG_PHY_SUN4I_USB=y
++ CONFIG_PHY_SUN9I_USB=y
+  CONFIG_PHY_HIX5HD2_SATA=y
+- CONFIG_E1000E=y
+- CONFIG_PWM_STI=y
+- CONFIG_PWM_BCM2835=y
+- CONFIG_PWM_BRCMSTB=m
+- CONFIG_PHY_DM816X_USB=m
+- CONFIG_OMAP_USB2=y
+- CONFIG_TI_PIPE3=y
+- CONFIG_TWL4030_USB=m
++ CONFIG_PHY_BERLIN_SATA=y
+  CONFIG_PHY_BERLIN_USB=y
+  CONFIG_PHY_CPCAP_USB=m
+- CONFIG_PHY_BERLIN_SATA=y
++ CONFIG_PHY_QCOM_APQ8064_SATA=m
++ CONFIG_PHY_RCAR_GEN2=m
+  CONFIG_PHY_ROCKCHIP_DP=m
+  CONFIG_PHY_ROCKCHIP_USB=y
+- CONFIG_PHY_QCOM_APQ8064_SATA=m
++ CONFIG_PHY_SAMSUNG_USB2=m
+  CONFIG_PHY_MIPHY28LP=y
+- CONFIG_PHY_RCAR_GEN2=m
+  CONFIG_PHY_STIH407_USB=y
+- CONFIG_PHY_STM32_USBPHYC=y
+- CONFIG_PHY_SUN4I_USB=y
+- CONFIG_PHY_SUN9I_USB=y
+- CONFIG_PHY_SAMSUNG_USB2=m
+  CONFIG_PHY_TEGRA_XUSB=y
+- CONFIG_PHY_BRCM_SATA=y
+- CONFIG_NVMEM=y
++ CONFIG_PHY_DM816X_USB=m
++ CONFIG_OMAP_USB2=y
++ CONFIG_TI_PIPE3=y
++ CONFIG_TWL4030_USB=m
+  CONFIG_NVMEM_IMX_OCOTP=y
+  CONFIG_NVMEM_SUNXI_SID=y
+  CONFIG_NVMEM_VF610_OCOTP=y
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/98b2243d/attachment.sig>
