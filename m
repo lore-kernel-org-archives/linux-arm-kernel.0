@@ -1,41 +1,27 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Wed, 16 May 2018 14:05:45 +0000
-Subject: [PATCH v2 1/3] x86/mm: disable ioremap free page handling on
- x86-PAE
-In-Reply-To: <201805161819.uT7J37yy%fengguang.wu@intel.com>
-References: <20180515213931.23885-2-toshi.kani@hpe.com>
- <201805161819.uT7J37yy%fengguang.wu@intel.com>
-Message-ID: <1526479474.2693.607.camel@hpe.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 May 2018 16:10:44 +0200
+Subject: [PATCH v2 1/1] dts: qcom: db820c: Add gpio-line-names property
+In-Reply-To: <20180418134601.8502-2-manivannan.sadhasivam@linaro.org>
+References: <20180418134601.8502-1-manivannan.sadhasivam@linaro.org>
+ <20180418134601.8502-2-manivannan.sadhasivam@linaro.org>
+Message-ID: <CACRpkdZ6oFdnnXWE6anKR9DQGVo5v_ecfveAVKYDhLr-067nHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-05-16 at 19:00 +0800, kbuild test robot wrote:
-> Hi Toshi,
-> 
-> Thank you for the patch! Yet something to improve:
-> 
-> [auto build test ERROR on arm64/for-next/core]
-> [also build test ERROR on v4.17-rc5 next-20180515]
-> [cannot apply to tip/x86/core]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Toshi-Kani/fix-free-pmd-pte-page-handlings-on-x86/20180516-183317
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-> config: i386-randconfig-x013-201819 (attached as .config)
-> compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=i386 
-> 
-> Note: the linux-review/Toshi-Kani/fix-free-pmd-pte-page-handlings-on-x86/20180516-183317 HEAD 93944422fcef9bfadf22e345c1d7a34723cc3203 builds fine.
->       It only hurts bisectibility.
-> 
-> All errors (new ones prefixed by >>):
-> 
-> > > arch/x86/mm/pgtable.c:757:5: error: conflicting types for 'pud_free_pmd_page'
-> 
->     int pud_free_pmd_page(pud_t *pud, unsigned long addr)
->         ^~~~~~~~~~~~~~~~~
+On Wed, Apr 18, 2018 at 3:46 PM, Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
 
-Thanks for catching this!  Patch reordering caused this.  Will fix.
--Toshi
+> Add gpio-line-names property for Dragonboard820c based on APQ8096 SoC.
+> There are 4 gpio-controllers present on this board, including the
+> APQ8096 SoC, PM8994 (GPIO and MPP) and PMI8994 (GPIO).
+>
+> Lines names are derived from 96Boards CE Specification 1.0, Appendix
+> "Expansion Connector Signal Description". Line names for PMI8994 MPP
+> pins are not added due to the absence of the gpio-controller support.
+>
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
