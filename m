@@ -1,76 +1,67 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 16 May 2018 08:31:16 -0700
-Subject: [PATCH v4] pinctrl: msm: fix gpio-hog related boot issues
-In-Reply-To: <CACRpkdZPEHvnQdwh5Uu5kwqK7yVGTaw_cZR+GOzsG9pg4oEktA@mail.gmail.com>
-References: <20180412190138.12372-1-chunkeey@gmail.com>
- <CACRpkdZPEHvnQdwh5Uu5kwqK7yVGTaw_cZR+GOzsG9pg4oEktA@mail.gmail.com>
-Message-ID: <152648467672.210890.17814748620132622851@swboyd.mtv.corp.google.com>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Wed, 16 May 2018 11:38:16 -0400
+Subject: [PATCH v3 07/12] ACPI / APEI: Make the nmi_fixmap_idx per-ghes to
+ allow multiple in_nmi() users
+In-Reply-To: <20180516110348.GA17092@pd.tnic>
+References: <20180427153510.5799-1-james.morse@arm.com>
+ <20180427153510.5799-8-james.morse@arm.com> <20180505122719.GE3708@pd.tnic>
+ <1511cfcc-dcd1-b3c5-01c7-6b6b8fb65b05@arm.com>
+ <20180516110348.GA17092@pd.tnic>
+Message-ID: <39bde8c5-4dfb-c1b9-02a4-ba467539ea24@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2018-04-26 05:03:45)
-> On Thu, Apr 12, 2018 at 9:01 PM, Christian Lamparter <chunkeey@gmail.com> wrote:
-> 
-> > Sven Eckelmann reported an issue with the current IPQ4019 pinctrl.
-> > Setting up any gpio-hog in the device-tree for his device would
-> > "kill the bootup completely":
-> >
-> > | [    0.477838] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
-> > | [    0.499828] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferring probe
-> > | [    1.298883] requesting hog GPIO enable USB2 power (chip 1000000.pinctrl, offset 58) failed, -517
-> > | [    1.299609] gpiochip_add_data: GPIOs 0..99 (1000000.pinctrl) failed to register
-> > | [    1.308589] ipq4019-pinctrl 1000000.pinctrl: Failed register gpiochip
-> > | [    1.316586] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
-> > | [    1.322415] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferri
-> >
-> > This was also verified on a RT-AC58U (IPQ4018) which would
-> > no longer boot, if a gpio-hog was specified. (Tried forcing
-> > the USB LED PIN (GPIO0) to high.).
-> >
-> > The problem is that Pinctrl+GPIO registration is currently
-> > peformed in the following order in pinctrl-msm.c:
-> >         1. pinctrl_register()
-> >         2. gpiochip_add()
-> >         3. gpiochip_add_pin_range()
-> >
-> > The actual error code -517 == -EPROBE_DEFER is coming from
-> > pinctrl_get_device_gpio_range(), which is called through:
-> >         gpiochip_add
-> >             of_gpiochip_add
-> >                 of_gpiochip_scan_gpios
-> >                     gpiod_hog
-> >                         gpiochip_request_own_desc
-> >                             __gpiod_request
-> >                                 chip->request
-> >                                     gpiochip_generic_request
-> >                                        pinctrl_gpio_request
-> >                                           pinctrl_get_device_gpio_range
-> >
-> > pinctrl_get_device_gpio_range() is unable to find any valid
-> > pin ranges, since nothing has been added to the pinctrldev_list yet.
-> > so the range can't be found, and the operation fails with -EPROBE_DEFER.
-> >
-> > This patch fixes the issue by adding the "gpio-ranges" property to
-> > the pinctrl device node of all upstream Qcom SoC. The pin ranges are
-> > then added by the gpio core.
-> >
-> > In order to remain compatible with older, existing DTs (and ACPI)
-> > a check for the "gpio-ranges" property has been added to
-> > msm_gpio_init(). This prevents the driver of adding the same entry
-> > to the pinctrldev_list twice.
-> >
-> > Reported-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
-> > Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
-> 
-> This patch looks VERY good to me.
-> 
+On 5/16/2018 7:05 AM, Borislav Petkov wrote:
+> On Tue, May 08, 2018 at 09:45:01AM +0100, James Morse wrote:
+>> Alternatively, I can put the fixmap-page and spinlock in some 'struct
+>> ghes_notification' that only the NMI-like struct-ghes need. This is just moving
+>> the indirection up a level, but it does pair the lock with the thing it locks,
+>> and gets rid of assigning spinlock pointers.
+> Keeping the lock and what it protects in one place certainly sounds
+> better. I guess you could so something like this:
+>
+> struct ghes_fixmap {
+>   union {
+>    raw_spinlock_t nmi_lock;
+>     spinlock_t lock;
+>   };
+>   void __iomem *(map)(struct ghes_fixmap *);
+> };
+>
+> and assign the proper ghes_ioremap function to ->map.
+>
+> The spin_lock_irqsave() call in ghes_copy_tofrom_phys() is kinda
+> questionable. Because we should have disabled interrupts so that you can
+> do
+>
+> spin_lock(map->lock);
+>
+> Except that we do get called with IRQs on and looking at that call of
+> ghes_proc() at the end of ghes_probe(), that's a deadlock waiting to
+> happen.
+>
+> And that comes from:
+>
+>    77b246b32b2c ("acpi: apei: check for pending errors when probing GHES entries")
+>
+> Tyler, this can't work in any context: imagine the GHES NMI or IRQ or
+> the timer fires while that ghes_proc() runs...
+>
+> What's up?
+Hello Boris,
 
-Why can't we register the gpiochip and tell it about the pin ranges in
-one API call instead of adding the chip and then adding the ranges? It
-doesn't look right to have to go and update all the DT nodes to list
-this information that is already known in the driver because the kernel
-implementation can't handle the order of operations correctly.
+I haven't seen a deadlock from that, but it looks possible. What if the 
+ghes_proc() call in ghes_probe()
+is moved before the second switch statement? That way it is before the 
+NMI/IRQ/poll is setup. At quick
+glance I think that should avoid the deadlock and still provide the 
+functionality that call was added for. I
+can test that out if you all agree.
 
-Furthermore, it looks like this becomes a silent requirement to add the
-gpio-ranges property into the DT so that hogs work, but none of the
-bindings have been updated in this patch to indicate that.
+Thanks,
+Tyler
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
