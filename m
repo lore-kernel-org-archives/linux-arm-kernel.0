@@ -1,96 +1,79 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 15 May 2018 20:06:52 -0500
-Subject: [PATCH 10/12] platform/early: implement support for early
- platform drivers
-In-Reply-To: <CAMRc=MdsDWb0Ve29_d=30nc1F0aVhTrG74GX=sv0iB5WycWwLw@mail.gmail.com>
-References: <20180511162028.20616-1-brgl@bgdev.pl>
- <20180511162028.20616-11-brgl@bgdev.pl>
- <CAL_JsqJw8UXktcLK8ADUfo1P+1un+omJ31sGcq7GFbNwJMsHKg@mail.gmail.com>
- <CAMRc=MdsDWb0Ve29_d=30nc1F0aVhTrG74GX=sv0iB5WycWwLw@mail.gmail.com>
-Message-ID: <CAL_JsqK0o_xRLhkZPjpM2NN5_hm_3-XLGzymgD1ae1DZCUFtkQ@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 16 May 2018 11:39:18 +1000
+Subject: linux-next: manual merge of the rockchip tree with the renesas
+ tree
+In-Reply-To: <20180503083654.625b1f9b@canb.auug.org.au>
+References: <20180503083654.625b1f9b@canb.auug.org.au>
+Message-ID: <20180516113918.1ccdd8ec@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 9:06 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> 2018-05-14 15:37 GMT+02:00 Rob Herring <robh+dt@kernel.org>:
->> On Fri, May 11, 2018 at 11:20 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> This introduces the core part of support for early platform drivers
->>> and devices.
->>>
->>
->> It looks like most of your prep patches are to separate the alloc and
->> init of platform devices because you are essentially making early
->> devices/drivers a sub-class. Maybe you could avoid doing that and
->> simplify things a bit. Comments below based on doing that...
->>
->
-> My aim was to change as little as possible for everybody else while
-> fixing our problem. These changes are already controversial enough
-> without risky reusing of existing fields in common structures. I was
-> just afraid that there are too many intricacies for it to be safe.
+Hi all,
 
-I don't think those intricacies would go away just by having separate
-fields. Perhaps it would make things fail more explicitly. After all,
-I think it needs to be a very atomic operation when a device is
-switched.
+On Thu, 3 May 2018 08:36:54 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> Today's linux-next merge of the rockchip tree got a conflict in:
+> 
+>   arch/arm64/configs/defconfig
+> 
+> between commits:
+> 
+>   93f7bfd930c0 ("arm64: defconfig: makes SND_SIMPLE_CARD to module")
+>   ddf3fa8b8a16 ("arm64: defconfig: Enable CONFIG_SND_AUDIO_GRAPH_CARD")
+> 
+> from the renesas tree and commit:
+> 
+>   e9cfce4195ec ("arm64: defconfig: Enable HID over I2C drivers")
+> 
+> from the rockchip tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary. This
+> is now fixed as far as linux-next is concerned, but any non trivial
+> conflicts should be mentioned to your upstream maintainer when your tree
+> is submitted for merging.  You may also want to consider cooperating
+> with the maintainer of the conflicting tree to minimise any particularly
+> complex conflicts.
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell
+> 
+> diff --cc arch/arm64/configs/defconfig
+> index 7930caf5dde4,34037d24fbf4..000000000000
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@@ -158,9 -157,9 +158,10 @@@ CONFIG_BT_HIDP=
+>   # CONFIG_BT_LE is not set
+>   CONFIG_BT_LEDS=y
+>   # CONFIG_BT_DEBUGFS is not set
+> + CONFIG_BT_HCIBTUSB=m
+>   CONFIG_BT_HCIUART=m
+>   CONFIG_BT_HCIUART_LL=y
+>  +CONFIG_BT_HCIUART_BCM=y
+>   CONFIG_CFG80211=m
+>   CONFIG_MAC80211=m
+>   CONFIG_MAC80211_LEDS=y
+> @@@ -443,8 -447,8 +451,9 @@@ CONFIG_SND_BCM2835_SOC_I2S=
+>   CONFIG_SND_SOC_SAMSUNG=y
+>   CONFIG_SND_SOC_RCAR=m
+>   CONFIG_SND_SOC_AK4613=m
+>  -CONFIG_SND_SIMPLE_CARD=y
+>  +CONFIG_SND_SIMPLE_CARD=m
+>  +CONFIG_SND_AUDIO_GRAPH_CARD=m
+> + CONFIG_I2C_HID=m
+>   CONFIG_USB=y
+>   CONFIG_USB_OTG=y
+>   CONFIG_USB_XHCI_HCD=y
 
->>> +/**
->>> + * struct early_platform_driver
->>> + *
->>> + * @pdrv: real platform driver associated with this early platform driver
->>> + * @list: list head for the list of early platform drivers
->>> + * @early_probe: early probe callback
->>> + */
->>> +struct early_platform_driver {
->>> +       struct platform_driver pdrv;
->>> +       struct list_head list;
->>
->> Couldn't you use an existing list in driver_private until you move
->> over to the normal bus infra.
->>
->
-> This is something that the previous implementation did. It was quite
-> unreadable, so I decided to go with a separate list.
->
->>> +       int (*early_probe)(struct platform_device *);
->>
->> Just add this to platform_driver.
->>
->
-> This would extend the structure for everybody else while there'll be
-> very few such devices and not all systems would even require it.
->
->>> +};
->>> +
->>> +/**
->>> + * struct early_platform_device
->>> + *
->>> + * @pdev: real platform device associated with this early platform device
->>> + * @list: list head for the list of early platform devices
->>> + * @deferred: true if this device's early probe was deferred
->>> + * @deferred_drv: early platform driver with which this device was matched
->>> + */
->>> +struct early_platform_device {
->>> +       struct platform_device pdev;
->>> +       struct list_head list;
->>
->> Use a list in device_private?
->>
->>> +       bool deferred;
->>> +       struct early_platform_driver *deferred_drv;
->>
->> Can't you use the existing deferred probe list?
->>
->
-> I thought about it, but I was afraid there could be some timing issues
-> with that and decided against it. The early deferral also doesn't work
-> in a workque, but is synchronous instead.
+This is now a conflict between the renesas tree and the arm-soc tree.
 
-I didn't mean use the wq, but just the list fields. You'd still have
-the early list and normal list with different list heads. If you ever
-had a device wanting to be on both lists at the same time, then you've
-got major problems.
-
-Rob
+-- 
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180516/730c2667/attachment.sig>
