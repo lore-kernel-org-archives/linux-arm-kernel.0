@@ -1,32 +1,82 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 16 May 2018 17:41:20 +0900
-Subject: [PATCH] media: helene: fix xtal frequency setting at power on
-Message-ID: <20180516084120.28674-1-suzuki.katsuhiro@socionext.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 16 May 2018 10:43:38 +0200
+Subject: [RESEND PATCH v5 0/6] Add support for PWM input capture on STM32
+In-Reply-To: <20180516080635.GE5130@dell>
+References: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
+ <20180516080635.GE5130@dell>
+Message-ID: <c48acc96-1eca-9adc-abb7-131921305ee8@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes crystal frequency setting when power on this device.
+On 05/16/2018 10:06 AM, Lee Jones wrote:
+> On Wed, 16 May 2018, Fabrice Gasnier wrote:
+> 
+>> This series adds support for capture to stm32-pwm driver.
+>> Capture is based on DMAs.
+>> - First two patches add support for requesting DMAs to MFD core
+>> - Next three patches add support for capture to stm32-pwm driver
+>> - This has been tested on stm32429i-eval board.
+>>
+>> ---
+>> Changes in v5:
+>> - update patch 2 (mfd: stm32-timers: add support for dmas)
+>>   move stm32_timers_dma struct to header file,
+>>   fix warning on dma_mapping_error().
+>>
+>> Changes in v4:
+>> - Lee's comments on patch 2 (mfd: stm32-timers: add support for dmas)
+>>   Add kerneldoc header, better format comments.
+>>
+>> Changes in v3:
+>> - Dropped 2 precusor patches applied by Thierry in pwm tree:
+>>   "pwm: stm32: fix, remove unused struct device"
+>>   "pwm: stm32: protect common prescaler for all channels"
+>> - Note: this series applies on top on pwm tree
+>> - Implements Lee's comments on MFD part: rework stm32_timers_dma struct,
+>>   exported routine prototype now use generic device struct, more
+>>   various comments (see patch 2 changelog).
+>>
+>> Resend v2:
+>> - Add collected Acks
+>>
+>> Changes in v2:
+>> - Abstract DMA handling from child driver: move it to MFD core
+>> - Rework pwm capture routines to adopt this change
+>> - Comment on optional dma support, beautify DMAs probe
+>>
+>> Fabrice Gasnier (6):
+>>   dt-bindings: mfd: stm32-timers: add support for dmas
+>>   mfd: stm32-timers: add support for dmas
+>>   pwm: stm32: add capture support
+>>   pwm: stm32: improve capture by tuning counter prescaler
+>>   pwm: stm32: use input prescaler to improve period capture
+>>   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
+> 
+> Applied patches 1-5.
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
----
- drivers/media/dvb-frontends/helene.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Many thanks Lee !
 
-diff --git a/drivers/media/dvb-frontends/helene.c b/drivers/media/dvb-frontends/helene.c
-index 0a4f312c4368..8fcf7a00782a 100644
---- a/drivers/media/dvb-frontends/helene.c
-+++ b/drivers/media/dvb-frontends/helene.c
-@@ -924,7 +924,10 @@ static int helene_x_pon(struct helene_priv *priv)
- 	helene_write_regs(priv, 0x99, cdata, sizeof(cdata));
- 
- 	/* 0x81 - 0x94 */
--	data[0] = 0x18; /* xtal 24 MHz */
-+	if (priv->xtal == SONY_HELENE_XTAL_16000)
-+		data[0] = 0x10; /* xtal 16 MHz */
-+	else
-+		data[0] = 0x18; /* xtal 24 MHz */
- 	data[1] = (uint8_t)(0x80 | (0x04 & 0x1F)); /* 4 x 25 = 100uA */
- 	data[2] = (uint8_t)(0x80 | (0x26 & 0x7F)); /* 38 x 0.25 = 9.5pF */
- 	data[3] = 0x80; /* REFOUT signal output 500mVpp */
--- 
-2.17.0
+Maybe I missed something, but just in case...
+In your pull request ("[GIT PULL] Immutable branch between MFD and PWM
+due for the v4.18 merge window") I only see 4 patches:
+Fabrice Gasnier (4):
+      mfd: stm32-timers: Add support for DMAs
+      pwm: stm32: Add capture support
+      pwm: stm32: Improve capture by tuning counter prescaler
+      pwm: stm32: Use input prescaler to improve period capture
+
+I can't see patch 1 ("dt-bindings: mfd: stm32-timers: add support for dmas")
+Is it applied on another tree ?
+
+Best Regards,
+Fabrice
+
+> 
+>>  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
+>>  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
+>>  drivers/mfd/stm32-timers.c                         | 201 +++++++++++++++-
+>>  drivers/pwm/pwm-stm32.c                            | 257 +++++++++++++++++++++
+>>  include/linux/mfd/stm32-timers.h                   |  58 +++++
+>>  5 files changed, 537 insertions(+), 2 deletions(-)
+>>
+> 
