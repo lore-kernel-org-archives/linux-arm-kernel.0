@@ -1,198 +1,320 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Wed, 16 May 2018 11:16:54 -0700
-Subject: [patch v21 4/4] Documentation: jtag: Add ABI documentation
-In-Reply-To: <1526394095-5069-5-git-send-email-oleksandrs@mellanox.com>
-References: <1526394095-5069-1-git-send-email-oleksandrs@mellanox.com>
- <1526394095-5069-5-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <31c3b10e-7f8a-f997-4942-aed533d8801b@infradead.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 16 May 2018 11:21:44 -0700
+Subject: [PATCH RFC 3/6] hwmon: Add support for RPi voltage sensor
+In-Reply-To: <1526477827-10859-4-git-send-email-stefan.wahren@i2se.com>
+References: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
+ <1526477827-10859-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20180516182144.GB22705@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2018 07:21 AM, Oleksandr Shamray wrote:
-> Added document that describe the ABI for JTAG class drivrer
+On Wed, May 16, 2018 at 03:37:04PM +0200, Stefan Wahren wrote:
+> Currently there is no easy way to detect under-voltage conditions on a remote
+> Raspberry Pi. This hwmon driver retrieves the state of the under-voltage sensor
+> via mailbox interface. The handling based on Noralf's modifications to the
+> downstream firmware driver. In case of an under-voltage condition only an entry
+> is written to the kernel log.
 > 
+
+My major concern is how this is displayed with the 'sensors' command.
+Can you test and report ?
+
+Of course, it would be much better if the firmware would also report
+the actual voltage, but I guess we can't have everything.
+
+More comments inline.
+
+Thanks,
+Guenter
+
+> CC: "Noralf Tr?nnes" <noralf@tronnes.org>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 > ---
->  Documentation/ABI/testing/jtag-dev |   27 +++++++++
->  Documentation/jtag/overview        |   28 +++++++++
->  Documentation/jtag/transactions    |  109 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 164 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/ABI/testing/jtag-dev
->  create mode 100644 Documentation/jtag/overview
->  create mode 100644 Documentation/jtag/transactions
+>  drivers/hwmon/Kconfig             |  10 ++
+>  drivers/hwmon/Makefile            |   1 +
+>  drivers/hwmon/raspberrypi-hwmon.c | 207 ++++++++++++++++++++++++++++++++++++++
+
+Please also provide Documentation/hwmon/raspberrypi-hwmon.
+
+>  3 files changed, 218 insertions(+)
+>  create mode 100644 drivers/hwmon/raspberrypi-hwmon.c
 > 
-
-> diff --git a/Documentation/jtag/overview b/Documentation/jtag/overview
+> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+> index 768aed5..7f935cf 100644
+> --- a/drivers/hwmon/Kconfig
+> +++ b/drivers/hwmon/Kconfig
+> @@ -1298,6 +1298,16 @@ config SENSORS_PWM_FAN
+>  	  This driver can also be built as a module.  If so, the module
+>  	  will be called pwm-fan.
+>  
+> +config SENSORS_RASPBERRYPI_HWMON
+> +	tristate "Raspberry Pi voltage monitor"
+> +	depends on (ARCH_BCM2835 && RASPBERRYPI_FIRMWARE) || (COMPILE_TEST && !RASPBERRYPI_FIRMWARE)
+> +	help
+> +	  If you say yes here you get support for voltage sensor on the
+> +	  Raspberry Pi.
+> +
+> +	  This driver can also be built as a module. If so, the module
+> +	  will be called raspberrypi-hwmon.
+> +
+>  config SENSORS_SHT15
+>  	tristate "Sensiron humidity and temperature sensors. SHT15 and compat."
+>  	depends on GPIOLIB || COMPILE_TEST
+> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
+> index e7d52a3..a929770 100644
+> --- a/drivers/hwmon/Makefile
+> +++ b/drivers/hwmon/Makefile
+> @@ -141,6 +141,7 @@ obj-$(CONFIG_SENSORS_PC87427)	+= pc87427.o
+>  obj-$(CONFIG_SENSORS_PCF8591)	+= pcf8591.o
+>  obj-$(CONFIG_SENSORS_POWR1220)  += powr1220.o
+>  obj-$(CONFIG_SENSORS_PWM_FAN)	+= pwm-fan.o
+> +obj-$(CONFIG_SENSORS_RASPBERRYPI_HWMON)	+= raspberrypi-hwmon.o
+>  obj-$(CONFIG_SENSORS_S3C)	+= s3c-hwmon.o
+>  obj-$(CONFIG_SENSORS_SCH56XX_COMMON)+= sch56xx-common.o
+>  obj-$(CONFIG_SENSORS_SCH5627)	+= sch5627.o
+> diff --git a/drivers/hwmon/raspberrypi-hwmon.c b/drivers/hwmon/raspberrypi-hwmon.c
 > new file mode 100644
-> index 0000000..a86f188
+> index 0000000..2003f6c
 > --- /dev/null
-> +++ b/Documentation/jtag/overview
-> @@ -0,0 +1,28 @@
-> +Linux kernel JTAG support
-> +=========================
-> +
-> +The JTAG is an industry standard for verifying hardware
+> +++ b/drivers/hwmon/raspberrypi-hwmon.c
+> @@ -0,0 +1,207 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Raspberry Pi voltage sensor driver
+> + *
+> + * Based on firmware/raspberrypi.c by Noralf Tr?nnes
+> + *
+> + * Copyright (C) 2018 Stefan Wahren <stefan.wahren@i2se.com>
+> + */
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/hwmon.h>
+> +#include <linux/hwmon-sysfs.h>
 
-   JTAG is an industry standard for verifying hardware.
+Unnecessary include
 
-> +JTAG provides access to many logic signals of a complex integrated circuit,
-> +including the device pins.
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/workqueue.h>
+> +#include <soc/bcm2835/raspberrypi-firmware.h>
 > +
-> +A JTAG interface is a special interface added to a chip.
-> +Depending on the version of JTAG, two, four, or five pins are added.
+> +#define UNDERVOLTAGE_STICKY_BIT	BIT(16)
 > +
-> +The connector pins are:
-> +	TDI (Test Data In)
-> +	TDO (Test Data Out)
-> +	TCK (Test Clock)
-> +	TMS (Test Mode Select)
-> +	TRST (Test Reset) optional.
-> +
-> +JTAG interface is designed to have two parts - basic core driver and
-> +hardware specific driver. The basic driver introduces a general interface
-> +which is not dependent of specific hardware. It provides communication
-> +between user space and hardware specific driver.
-> +Each JTAG device is represented as a char device from (jtag0, jtag1, ...).
-> +Access to a JTAG device is performed through IOCTL calls.
-> +
-> +Call flow example:
-> +User: open  -> /dev/jatgX
-> +User: ioctl -> /dev/jtagX -> JTAG core driver -> JTAG hw specific driver
-
-                                                    JTAG hardware specific driver
-
-> +User: close -> /dev/jatgX
-> diff --git a/Documentation/jtag/transactions b/Documentation/jtag/transactions
-> new file mode 100644
-> index 0000000..6a857c8
-> --- /dev/null
-> +++ b/Documentation/jtag/transactions
-> @@ -0,0 +1,109 @@
-> +The JTAG API
-> +=============
-> +
-> +JTAG master devices can be accessed through a character misc-device.
-> +Each JTAG master interface can be accessed by using /dev/jtagN
-
-                                                       /dev/jtagN.
-
-> +
-> +JTAG system calls set:
-> +- SIR (Scan Instruction Register, IEEE 1149.1 Instruction Register scan);
-> +- SDR (Scan Data Register, IEEE 1149.1 Data Register scan);
-> +- RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
-> +number of clocks.
-> +
-> +open(), close()
-> +-------
-> +open() opens JTAG device. Only one open operation per JTAG device
-> +can be performed. Two or more open for one device will return error
-
-                                                     will return error.
-
-> +
-> +Open/Close  device:
-> +- open("/dev/jtag0", O_RDWR);
-> +- close(jtag_fd');
-
-     close(jtag_fd);
-
-> +
-> +ioctl()
-> +-------
-> +All access operations to JTAG devices performed through ioctl interface.
-> +The IOCTL interface supports this requests:
-
-                                these requests:
-
-> +	JTAG_IOCRUNTEST - Force JTAG state machine to RUN_TEST/IDLE state
-> +	JTAG_SIOCFREQ - Set JTAG TCK frequency
-> +	JTAG_GIOCFREQ - Get JTAG TCK frequency
-> +	JTAG_IOCXFER - send JTAG data Xfer
-> +	JTAG_GIOCSTATUS - get current JTAG TAP status
-> +	JTAG_SIOCMODE - set JTAG mode flags.
-> +
-> +JTAG_SIOCFREQ, JTAG_GIOCFREQ
-> +------
-> +Set/Get JTAG clock speed:
-> +
-> +	unsigned int jtag_fd;
-> +	ioctl(jtag_fd, JTAG_SIOCFREQ, &frq);
-> +	ioctl(jtag_fd, JTAG_GIOCFREQ, &frq);
-> +
-> +JTAG_IOCRUNTEST
-> +------
-> +Force JTAG state machine to RUN_TEST/IDLE state
-> +
-> +struct jtag_run_test_idle {
-> +	__u8	reset;
-> +	__u8	endstate;
-> +	__u8	tck;
+> +struct rpi_hwmon_data {
+> +	struct device *hwmon_dev;
+> +	struct rpi_firmware *fw;
+> +	u32 last_throttled;
+> +	struct delayed_work get_values_poll_work;
 > +};
 > +
-> +reset: 0 - run IDLE/PAUSE from current state
-> +	   1 - go through TEST_LOGIC/RESET state before  IDLE/PAUSE
-> +endstate: completion flag
-> +tck: clock counter
+> +static void rpi_firmware_get_throttled(struct rpi_hwmon_data *data)
+> +{
+> +	u32 new_uv, old_uv, value;
+> +	int ret;
 > +
-> +Example:
-> +	struct jtag_run_test_idle runtest;
+> +	/* Clear sticky bits */
+
+Please make more explicit that this is a request/command sent to the firmware.
+
+> +	value = 0xffff;
 > +
-> +	runtest.endstate = JTAG_STATE_IDLE;
-> +	runtest.reset = 0;
-> +	runtest.tck = data_p->tck;
-> +	usleep(25 * 1000);
-> +	ioctl(jtag_fd, JTAG_IOCRUNTEST, &runtest);
+> +	ret = rpi_firmware_property(data->fw, RPI_FIRMWARE_GET_THROTTLED,
+> +				    &value, sizeof(value));
+> +	if (ret) {
+> +		dev_err_once(data->hwmon_dev, "%s: Failed to get throttled (%d)\n",
+> +			     __func__, ret);
+
+The function name seems unnecessary.
+
+> +		return;
+> +	}
 > +
-> +JTAG_IOCXFER
-> +------
-> +Send SDR/SIR transaction
+> +	new_uv = value & UNDERVOLTAGE_STICKY_BIT;
+> +	old_uv = data->last_throttled & UNDERVOLTAGE_STICKY_BIT;
+> +	data->last_throttled = value;
 > +
-> +struct jtag_xfer {
-> +	__u8	type;
-> +	__u8	direction;
-> +	__u8	endstate;
-> +	__u8	padding;
-> +	__u32	length;
-> +	__u64	tdio;
-> +};
+> +	if (new_uv == old_uv)
+> +		return;
 > +
-> +type: transfer type - JTAG_SIR_XFER/JTAG_SDR_XFER
-> +direction: xfer direction - JTAG_SIR_XFER/JTAG_SDR_XFER,
-> +length: xfer data len in bits
-> +tdio : xfer data array
-> +endstate: xfer end state after transaction finish
-> +	   can be: JTAG_STATE_IDLE/JTAG_STATE_PAUSEIR/JTAG_STATE_PAUSEDR
-> +
-> +Example:
-> +	struct jtag_xfer xfer;
-> +	static char buf[64];
-> +	static unsigned int buf_len = 0;
-> +	[...]
-> +	xfer.type = JTAG_SDR_XFER;
-> +	xfer.tdio = (__u64)buf;
-> +	xfer.length = buf_len;
-> +	xfer.endstate = JTAG_STATE_IDLE;
-> +
-> +	if (is_read)
-> +		xfer.direction = JTAG_READ_XFER;
+> +	if (new_uv)
+> +		dev_crit(data->hwmon_dev, "Under-voltage detected! (0x%08x)\n",
+> +			 value);
 > +	else
-> +		xfer.direction = JTAG_WRITE_XFER;
-> +
-> +	ioctl(jtag_fd, JTAG_IOCXFER, &xfer);
-> +
-> +JTAG_SIOCMODE
-> +------
-> +If hw driver can support different running modes you can change it.
+> +		dev_info(data->hwmon_dev, "Voltage normalised (0x%08x)\n",
+> +			 value);
 
-   If hardware driver
+What value do those hex values provide to the user ?
 
 > +
-> +Example:
-> +	unsigned int mode;
-> +	mode = JTAG_XFER_HW_MODE;
-> +	ioctl(jtag_fd, JTAG_SIOCMODE, &mode);
+> +	sysfs_notify(&data->hwmon_dev->kobj, NULL, "in0_lcrit_alarm");
+> +}
+> +
+> +static void get_values_poll(struct work_struct *work)
+> +{
+> +	struct rpi_hwmon_data *data;
+> +
+> +	data = container_of(work, struct rpi_hwmon_data,
+> +			    get_values_poll_work.work);
+> +
+> +	rpi_firmware_get_throttled(data);
+> +
+> +	/*
+> +	 * We can't run faster than the sticky shift (100ms) since we get
+> +	 * flipping in the sticky bits that are cleared.
+> +	 */
+> +	schedule_delayed_work(&data->get_values_poll_work, 2 * HZ);
+> +}
+> +
+> +static int rpi_read(struct device *dev, enum hwmon_sensor_types type,
+> +		    u32 attr, int channel, long *val)
+> +{
+> +	struct rpi_hwmon_data *data = dev_get_drvdata(dev);
+> +
+> +	if (type != hwmon_in)
+> +		return -EOPNOTSUPP;
+> +
+> +	if (attr != hwmon_in_lcrit_alarm)
+> +		return -EOPNOTSUPP;
+> +
+> +	if (channel)
+> +		return -EOPNOTSUPP;
+> +
+There is only one channel, one attribute, and one type supported.
+As such, the checks are unnecessary.
+
+> +	*val = !!(data->last_throttled & UNDERVOLTAGE_STICKY_BIT);
+> +	return 0;
+> +}
+> +
+> +static umode_t rpi_is_visible(const void *_data, enum hwmon_sensor_types type,
+> +			      u32 attr, int channel)
+> +{
+> +	if (type != hwmon_in)
+> +		return 0;
+> +
+> +	if (attr != hwmon_in_lcrit_alarm)
+> +		return 0;
+> +
+> +	if (channel)
+> +		return 0;
+
+Same as above. In the list below, there is not a single conditional attribute.
+Given that, the checks should be unnecessary, and it should be sufficient to
+just return 0444.
+
+> +
+> +	return 0444;
+> +}
+> +
+> +static const u32 rpi_in_config[] = {
+> +	HWMON_I_LCRIT_ALARM,
+> +	0
+> +};
+> +
+> +static const struct hwmon_channel_info rpi_in = {
+> +	.type = hwmon_in,
+> +	.config = rpi_in_config,
+> +};
+> +
+> +static const struct hwmon_channel_info *rpi_info[] = {
+> +	&rpi_in,
+> +	NULL
+> +};
+> +
+> +static const struct hwmon_ops rpi_hwmon_ops = {
+> +	.is_visible = rpi_is_visible,
+> +	.read = rpi_read,
+> +};
+> +
+> +static const struct hwmon_chip_info rpi_chip_info = {
+> +	.ops = &rpi_hwmon_ops,
+> +	.info = rpi_info,
+> +};
+> +
+> +static int rpi_hwmon_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *fw_node;
+> +	struct rpi_hwmon_data *data;
+> +	int ret;
+> +
+> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	fw_node = of_get_parent(dev->of_node);
+> +	if (!fw_node) {
+> +		dev_err(dev, "Missing firmware node\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	data->fw = rpi_firmware_get(fw_node);
+> +	of_node_put(fw_node);
+> +	if (!data->fw)
+> +		return -EPROBE_DEFER;
+> +
+> +	ret = rpi_firmware_property(data->fw, RPI_FIRMWARE_GET_THROTTLED,
+> +				    &data->last_throttled,
+> +				    sizeof(data->last_throttled));
+> +	if (ret) {
+> +		dev_info(dev, "Firmware doesn't support GET_THROTTLED\n");
+
+If this is an error -> dev_err().
+
+> +		return -EOPNOTSUPP;
+
+or return -ENODEV.
+
+> +	}
+> +
+> +	data->hwmon_dev = devm_hwmon_device_register_with_info(dev, "rpi_volt",
+> +							       data,
+> +							       &rpi_chip_info,
+> +							       NULL);
+> +
+> +	INIT_DELAYED_WORK(&data->get_values_poll_work, get_values_poll);
+> +	platform_set_drvdata(pdev, data);
+> +
+> +	if (!PTR_ERR_OR_ZERO(data->hwmon_dev))
+> +		schedule_delayed_work(&data->get_values_poll_work, 2 * HZ);
+> +
+> +	return PTR_ERR_OR_ZERO(data->hwmon_dev);
+> +}
+> +
+> +static int rpi_hwmon_remove(struct platform_device *pdev)
+> +{
+> +	struct rpi_hwmon_data *data = platform_get_drvdata(pdev);
+> +
+> +	cancel_delayed_work_sync(&data->get_values_poll_work);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id rpi_hwmon_of_match[] = {
+> +	{ .compatible = "raspberrypi,bcm2835-hwmon", },
+> +	{ /* sentinel */},
+> +};
+> +MODULE_DEVICE_TABLE(of, rpi_hwmon_of_match);
+> +
+> +static struct platform_driver rpi_hwmon_driver = {
+> +	.probe = rpi_hwmon_probe,
+> +	.remove = rpi_hwmon_remove,
+> +	.driver = {
+> +		.name = "raspberrypi-hwmon",
+> +		.of_match_table = rpi_hwmon_of_match,
+> +	},
+> +};
+> +module_platform_driver(rpi_hwmon_driver);
+> +
+> +MODULE_AUTHOR("Stefan Wahren <stefan.wahren@i2se.com>");
+> +MODULE_DESCRIPTION("Raspberry Pi voltage sensor driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.7.4
 > 
-
-
--- 
-~Randy
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-hwmon" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
