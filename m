@@ -1,127 +1,36 @@
-From: tangnianyao@huawei.com (Tangnianyao (ICT))
-Date: Wed, 16 May 2018 09:08:45 +0000
-Subject: [PATCH] arm64: KVM: reduce guest fpsimd trap
-In-Reply-To: <1526460738-11157-1-git-send-email-zhangshaokun@hisilicon.com>
-References: <1526460738-11157-1-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <F348A9E21A573744858FF7E5D32E29D81BDF52AC@dggemi509-mbs.china.huawei.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 16 May 2018 12:16:28 +0300
+Subject: [PATCH 1/4] amba: Export amba_bustype
+In-Reply-To: <20180508140628.f30774c70c4c481bff3f8000@arm.com>
+References: <20180508140628.f30774c70c4c481bff3f8000@arm.com>
+Message-ID: <CAHp75VfGpS_QkLj4XM8uHW0BAJV0EBWZ_yLP0R2D+ok4Mt=SQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add last_fpsimd_trap to notify if guest last exit reason is handling fpsimd. If guest is using fpsimd frequently, save host's fpsimd state and restore guest's fpsimd state and deactive fpsimd trap before returning to guest. It can avoid guest fpsimd trap soon to improve performance.
+On Tue, May 8, 2018 at 10:06 PM, Kim Phillips <kim.phillips@arm.com> wrote:
+> This patch is provided in the context of allowing the Coresight driver
+> subsystem to be loaded as modules.  Coresight uses amba_bus in its call
+> to bus_find_device() in of_coresight_get_endpoint_device() when
+> searching for a configurable endpoint device.  This patch allows
+> Coresight to reference amba_bustype when built as a module.
 
-Signed-off-by: Nianyao Tang <tangnianyao@huawei.com>
----
- arch/arm64/kernel/asm-offsets.c |  1 +
- arch/arm64/kvm/hyp/entry.S      |  5 +++++
- arch/arm64/kvm/hyp/switch.c     | 38 ++++++++++++++++++++++++++++++++++++--
- include/linux/kvm_host.h        |  1 +
- 4 files changed, 43 insertions(+), 2 deletions(-)
+> --- a/drivers/amba/bus.c
+> +++ b/drivers/amba/bus.c
+> @@ -197,6 +197,7 @@ struct bus_type amba_bustype = {
+>         .pm             = &amba_pm,
+>         .force_dma      = true,
+>  };
+> +EXPORT_SYMBOL_GPL(amba_bustype);
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c index 5bdda65..35a9c5c 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -136,6 +136,7 @@ int main(void)
- #ifdef CONFIG_KVM_ARM_HOST
-   DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
-   DEFINE(VCPU_FAULT_DISR,	offsetof(struct kvm_vcpu, arch.fault.disr_el1));
-+  DEFINE(VCPU_LAST_FPSIMD_TRAP, offsetof(struct kvm_vcpu, 
-+ last_fpsimd_trap));
-   DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
-   DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
-   DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S index e41a161..956e042 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -197,6 +197,11 @@ alternative_endif
- 	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
- 	bl	__fpsimd_restore_state
- 
-+	// Mark guest using fpsimd now
-+	ldr x0, [x3, #VCPU_LAST_FPSIMD_TRAP]
-+	add x0, x0, #1
-+	str x0, [x3, #VCPU_LAST_FPSIMD_TRAP]
-+
- 	// Skip restoring fpexc32 for AArch64 guests
- 	mrs	x1, hcr_el2
- 	tbnz	x1, #HCR_RW_SHIFT, 1f
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c index d964523..86eea1b 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -92,7 +92,13 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
- 
- 	val = read_sysreg(cpacr_el1);
- 	val |= CPACR_EL1_TTA;
--	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
-+	val &= ~CPACR_EL1_ZEN;
-+
-+	if (vcpu->last_fpsimd_trap)
-+		val |= CPACR_EL1_FPEN;
-+	else
-+		val &= ~CPACR_EL1_FPEN;
-+
- 	write_sysreg(val, cpacr_el1);
- 
- 	write_sysreg(kvm_get_hyp_vector(), vbar_el1); @@ -105,7 +111,13 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
- 	__activate_traps_common(vcpu);
- 
- 	val = CPTR_EL2_DEFAULT;
--	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
-+	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
-+
-+	if (vcpu->last_fpsimd_trap)
-+		val &= ~CPTR_EL2_TFP;
-+	else
-+		val |= CPTR_EL2_TFP;
-+
- 	write_sysreg(val, cptr_el2);
- }
- 
-@@ -406,6 +418,17 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 	__activate_traps(vcpu);
- 	__activate_vm(vcpu->kvm);
- 
-+	/*
-+	 * If guest last trap to host for handling fpsimd, last_fpsimd_trap
-+	 * is set. Restore guest's fpsimd state and deactivate fpsimd trap
-+	 * to avoid guest traping soon.
-+	 */
-+	if (vcpu->last_fpsimd_trap) {
-+		__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
-+		__fpsimd_restore_state(&guest_ctxt->gp_regs.fp_regs);
-+		vcpu->last_fpsimd_trap = 0;
-+	}
-+
- 	sysreg_restore_guest_state_vhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
-@@ -454,6 +477,17 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	__activate_traps(vcpu);
- 	__activate_vm(kern_hyp_va(vcpu->kvm));
- 
-+	/*
-+	 * If guest last trap to host for handling fpsimd, last_fpsimd_trap
-+	 * is set. Restore guest's fpsimd state and deactivate fpsimd trap
-+	 * to avoid guest traping soon.
-+	 */
-+	if (vcpu->last_fpsimd_trap) {
-+		__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
-+		__fpsimd_restore_state(&guest_ctxt->gp_regs.fp_regs);
-+		vcpu->last_fpsimd_trap = 0;
-+	}
-+
- 	__hyp_vgic_restore_state(vcpu);
- 	__timer_enable_traps(vcpu);
- 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h index 6930c63..46bdf0d 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -274,6 +274,7 @@ struct kvm_vcpu {
- 	bool preempted;
- 	struct kvm_vcpu_arch arch;
- 	struct dentry *debugfs_dentry;
-+	unsigned int last_fpsimd_trap;
- };
- 
- static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
---
-2.7.4
+Oh,
+
+What wrong with the approach let's say similar to PCI bus?
+
+Whenever you have a struct device you may use two helpers:
+
+dev_is_pci() -> is the device of PCI bus type?
+to_pci_dev() -> get's container of struct device for PCI bus case
+
+-- 
+With Best Regards,
+Andy Shevchenko
