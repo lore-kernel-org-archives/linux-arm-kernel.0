@@ -1,26 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 May 2018 11:51:44 +0100
-Subject: [PATCH] arm64: Select ARCH_HAS_FAST_MULTIPLIER
-In-Reply-To: <877b532d8d240c1d9e9db923c84b924443a218ed.1524583390.git.robin.murphy@arm.com>
-References: <877b532d8d240c1d9e9db923c84b924443a218ed.1524583390.git.robin.murphy@arm.com>
-Message-ID: <20180516105144.yt6kwvxy64hdepsj@armageddon.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 16 May 2018 11:56:26 +0100
+Subject: [PATCH v9 02/12] drivers: base: cacheinfo: setup DT cache
+ properties early
+In-Reply-To: <CAHp75VciOAMX1HWifZ+K9GiVicZRFrwHaGteJFVe1uFrh+qu0w@mail.gmail.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180511235807.30834-3-jeremy.linton@arm.com>
+ <78b08b68-ff57-8dd8-6eb1-00548f275eac@arm.com>
+ <CAHp75VciOAMX1HWifZ+K9GiVicZRFrwHaGteJFVe1uFrh+qu0w@mail.gmail.com>
+Message-ID: <a64ed431-0f60-2711-4138-eeefc7ba2d8b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 24, 2018 at 04:25:47PM +0100, Robin Murphy wrote:
-> It is probably safe to assume that all Armv8-A implementations have a
-> multiplier whose efficiency is comparable or better than a sequence of
-> three or so register-dependent arithmetic instructions. Select
-> ARCH_HAS_FAST_MULTIPLIER to get ever-so-slightly nicer codegen in the
-> few dusty old corners which care.
-> 
-> In a contrived benchmark calling hweight64() in a loop, this does indeed
-> turn out to be a small win overall, with no measurable impact on
-> Cortex-A57 but about 5% performance improvement on Cortex-A53.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Hi Andy,
 
-Queued for 4.18. Thanks.
+On 15/05/18 20:32, Andy Shevchenko wrote:
+> On Tue, May 15, 2018 at 8:15 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>> On 05/11/2018 06:57 PM, Jeremy Linton wrote:
+> 
+>>>   -     cache_size = of_get_property(this_leaf->of_node, propname, NULL);
+>>> +       cache_size = of_get_property(np, propname, NULL);
+>>>         if (cache_size)
+>>>                 this_leaf->size = of_read_number(cache_size, 1);
+> 
+> Can't you switch to of_read_property_uXX() variant here?
+> 
+
+This patch is just changing the first argument to the calls. So if we
+need to change, it has to be separate patch.
+
+Now, we can use of_property_read_u64() but is there any particular
+reason you mention that ? One reason I can see is that we can avoid
+making explicit of_get_property call. Just wanted to the motive before I
+can write the patch.
 
 -- 
-Catalin
+Regards,
+Sudeep
