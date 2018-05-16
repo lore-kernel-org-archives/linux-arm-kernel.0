@@ -1,54 +1,80 @@
 From: rishabhb@codeaurora.org (Rishabh Bhatnagar)
-Date: Wed, 16 May 2018 10:43:42 -0700
-Subject: [PATCH v7 1/2] dt-bindings: Documentation for qcom, llcc
-In-Reply-To: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
-References: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
-Message-ID: <1526492623-20527-2-git-send-email-rishabhb@codeaurora.org>
+Date: Wed, 16 May 2018 10:43:41 -0700
+Subject: [PATCH v7 0/2] SDM845 System Cache Driver
+Message-ID: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation for last level cache controller device tree bindings,
-client bindings usage examples.
+This series implements system cache or LLCC(Last Level Cache Controller)
+driver for SDM845 SOC. The purpose of the driver is to partition the
+system cache and program the settings such as priortiy, lines to probe
+while doing a look up in the system cache, low power related settings etc.
+The partitions are called cache slices. Each cache slice is associated
+with size and SCID(System Cache ID). The driver also provides API for
+clients to query the cache slice details,activate and deactivate them.
 
-Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
-Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
----
- .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+The driver can be broadly classified into:
+* SOC specific driver: llcc-sdm845.c: Cache partitioning and cache slice
+properties for usecases on sdm845 that need to use system cache.
+
+* API : llcc-slice.c: Exports APIs to clients to query cache slice details,
+activate and deactivate cache slices.
+
+Changes since v6:
+* Remove the max-slices property from DT.
+* Make client's slice_ids as macros.
+* Unlock mutex while returning from function in case of error.
+
+Changes since v5:
+* Remove client information from DT.
+* Make the llcc driver data as global.
+* Check return value of llcc_update_act_ctrl function
+* Change error returned from -EFAULT to -EINVAL
+
+Changes since v4:
+* Remove null pointer checks as per comments.
+* Remove extra blank lines.
+
+Changes since v3:
+* Use the regmap_read_poll_timeout function
+* Check for regmap read/write errors.
+* Remove memory barrier after regmap write
+* Derive memory bank offsets using stride macro variable
+* Remove debug statements from code
+* Remove the qcom_llcc_remove function
+* Use if IS_ENABLED in place of ifdef for built-in module
+* Change EXPORT_SYMBOL to EXPORT_SYMBOL_GPL
+* Remove unnecessary free functions
+* Change the variable names as per review comments
+
+Changes since v2:
+* Corrected the Makefile to fix compilation.
+
+Changes since v1:
+* Added Makefile and Kconfig.
+
+Changes since v0:
+* Removed the syscon and simple-mfd approach
+* Updated the device tree nodes to mention LLCC as a single HW block
+* Moved llcc bank offsets from device tree and handled the offset
+  in the driver.
+
+ckadabi at codeaurora.org (2):
+  dt-bindings: Documentation for qcom, llcc
+  drivers: soc: Add LLCC driver
+
+ .../devicetree/bindings/arm/msm/qcom,llcc.txt      |  26 ++
+ drivers/soc/qcom/Kconfig                           |  17 ++
+ drivers/soc/qcom/Makefile                          |   2 +
+ drivers/soc/qcom/llcc-sdm845.c                     | 106 +++++++
+ drivers/soc/qcom/llcc-slice.c                      | 337 +++++++++++++++++++++
+ include/linux/soc/qcom/llcc-qcom.h                 | 180 +++++++++++
+ 6 files changed, 668 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+ create mode 100644 drivers/soc/qcom/llcc-sdm845.c
+ create mode 100644 drivers/soc/qcom/llcc-slice.c
+ create mode 100644 include/linux/soc/qcom/llcc-qcom.h
 
-diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
-new file mode 100644
-index 0000000..0ebbf0a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
-@@ -0,0 +1,26 @@
-+== Introduction==
-+
-+LLCC (Last Level Cache Controller) provides last level of cache memory in SOC,
-+that can be shared by multiple clients. Clients here are different cores in the
-+SOC, the idea is to minimize the local caches at the clients and migrate to
-+common pool of memory. Cache memory is divided into partitions called slices
-+which are assigned to clients. Clients can query the slice details, activate
-+and deactivate them.
-+
-+Properties:
-+- compatible:
-+	Usage: required
-+	Value type: <string>
-+	Definition: must be "qcom,sdm845-llcc"
-+
-+- reg:
-+	Usage: required
-+	Value Type: <prop-encoded-array>
-+	Definition: Start address and the the size of the register region.
-+
-+Example:
-+
-+	qcom,llcc at 1100000 {
-+		compatible = "qcom,sdm845-llcc";
-+		reg = <0x1100000 0x250000>;
-+	};
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
