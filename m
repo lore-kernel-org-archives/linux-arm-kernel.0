@@ -1,43 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 May 2018 16:20:35 +0200
-Subject: [PATCH 1/5] dt-bindings: pinctrl: document the STMFX pinctrl
- bindings
-In-Reply-To: <55392fe7-20d2-9447-60f9-4bd226b60195@st.com>
-References: <1523440025-18077-1-git-send-email-amelie.delaunay@st.com>
- <1523440025-18077-2-git-send-email-amelie.delaunay@st.com>
- <20180416181940.4b5z4svbde3ompij@rob-hp-laptop>
- <CACRpkdYOMjjYyWQz7PK34jqUK7z5-CmH1HY6un4k8nBn7Cq8ag@mail.gmail.com>
- <55392fe7-20d2-9447-60f9-4bd226b60195@st.com>
-Message-ID: <CACRpkda2VGo0FOdR09tKiTpg66NgoWjubaHp_J3372y=a772Zg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 16 May 2018 15:23:27 +0100
+Subject: [PATCH RFC 2/6] dt-bindings: hwmon: Add Raspberry Pi voltage
+ sensor
+In-Reply-To: <1526477827-10859-3-git-send-email-stefan.wahren@i2se.com>
+References: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
+ <1526477827-10859-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <30fc5bac-0c4a-b2c4-a018-ea521510aaea@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 9, 2018 at 9:56 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+On 16/05/18 14:37, Stefan Wahren wrote:
+> Recent VC4 firmware provides a hardware-independent way to retrieve the
+> under-voltage sensor on the following Raspberry Pi boards:
+>    - Raspberry Pi B+ (via GPIO on SoC)
+>    - Raspberry Pi A+ (via GPIO on SoC)
+>    - Raspberry Pi 2 B (via GPIO on SoC)
+>    - Raspberry Pi 3 B (via GPIO on port expander)
+>    - Raspberry Pi 3 B+ (via PMIC)
+> 
+> TODO:
+>    - try to make bcm2835 firmware a bus driver
 
-> Indeed, stmfx has other functions than GPIO. But, after comments done
-> here: [1] and there: [2], it has been decided to move MFD parent/GPIO
-> child drivers into a single PINCTRL/GPIO driver because of the following
-> reasons:
-> - Other stmfx functions (IDD measurement and TouchScreen controller) are
-> not used on any of the boards using an stmfx and supported by Linux, so
-> no way to test these functions, and no need to maintain them while they
-> are not being used.
-> - But, in the case a new board will use more than GPIO function on
-> stmfx, the actual implementation allow to easily extract common init
-> part of stmfx and put it in an MFD driver.
->
-> So I could remove gpio sub-node and put its contents in stmfx node and
-> keep single PINCTRL/GPIO driver for the time being.
-> Please advise,
+Do you actually need a DT binding? From the probe routine in patch 2 it 
+looks like this capability can be discovered dynamically by asking the 
+firmware, therefore it might be more straightforward for the firmware 
+driver itself to probe that and create a child device iff the feature is 
+present, which the hwmon driver can then bind to as a pure platform driver.
 
-I would normally advice to use the right modeling from the start, create
-the MFD driver and spawn the devices from there. It is confusing
-if the layout of the driver(s) doesn't really match the layout of the
-hardware.
+Robin.
 
-I understand that it is a pain to write new MFD drivers to get your
-things going and it would be "nice to get this working really quick
-now" but in my experience it is better to do it right from the start.
-
-Yours,
-Linus Walleij
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>   .../devicetree/bindings/hwmon/raspberrypi-hwmon.txt   | 19 +++++++++++++++++++
+>   1 file changed, 19 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt b/Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
+> new file mode 100644
+> index 0000000..ec2523f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/hwmon/raspberrypi-hwmon.txt
+> @@ -0,0 +1,19 @@
+> +Raspberry Pi voltage sensor
+> +---------------------------
+> +
+> +The VC4 firmware exposes a mailbox interface that allows the ARM core
+> +to access the board's voltage sensor.
+> +
+> +Required properties :
+> +- compatible : Should be "raspberrypi,bcm2835-hwmon"
+> +
+> +Example:
+> +
+> +firmware: firmware-rpi {
+> +	compatible = "raspberrypi,bcm2835-firmware";
+> +	mboxes = <&mailbox>;
+> +
+> +	voltage-sensor {
+> +		compatible = "raspberrypi,bcm2835-hwmon";
+> +	};
+> +};
+> 
