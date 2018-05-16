@@ -1,38 +1,45 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 16 May 2018 11:56:26 +0100
-Subject: [PATCH v9 02/12] drivers: base: cacheinfo: setup DT cache
- properties early
-In-Reply-To: <CAHp75VciOAMX1HWifZ+K9GiVicZRFrwHaGteJFVe1uFrh+qu0w@mail.gmail.com>
-References: <20180511235807.30834-1-jeremy.linton@arm.com>
- <20180511235807.30834-3-jeremy.linton@arm.com>
- <78b08b68-ff57-8dd8-6eb1-00548f275eac@arm.com>
- <CAHp75VciOAMX1HWifZ+K9GiVicZRFrwHaGteJFVe1uFrh+qu0w@mail.gmail.com>
-Message-ID: <a64ed431-0f60-2711-4138-eeefc7ba2d8b@arm.com>
+From: aospan@netup.ru (Abylay Ospan)
+Date: Wed, 16 May 2018 06:56:58 -0400
+Subject: [PATCH] media: helene: fix xtal frequency setting at power on
+In-Reply-To: <20180516084120.28674-1-suzuki.katsuhiro@socionext.com>
+References: <20180516084120.28674-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <CAK3bHNVS26fjJVnccoTKAbT-nzd7RmY+3Y=DXddB+DWbgHTEmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Acked-by: Abylay Ospan <aospan@netup.ru>
 
-On 15/05/18 20:32, Andy Shevchenko wrote:
-> On Tue, May 15, 2018 at 8:15 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
->> On 05/11/2018 06:57 PM, Jeremy Linton wrote:
-> 
->>>   -     cache_size = of_get_property(this_leaf->of_node, propname, NULL);
->>> +       cache_size = of_get_property(np, propname, NULL);
->>>         if (cache_size)
->>>                 this_leaf->size = of_read_number(cache_size, 1);
-> 
-> Can't you switch to of_read_property_uXX() variant here?
-> 
+2018-05-16 4:41 GMT-04:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+> This patch fixes crystal frequency setting when power on this device.
+>
+> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> ---
+>  drivers/media/dvb-frontends/helene.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/media/dvb-frontends/helene.c b/drivers/media/dvb-frontends/helene.c
+> index 0a4f312c4368..8fcf7a00782a 100644
+> --- a/drivers/media/dvb-frontends/helene.c
+> +++ b/drivers/media/dvb-frontends/helene.c
+> @@ -924,7 +924,10 @@ static int helene_x_pon(struct helene_priv *priv)
+>         helene_write_regs(priv, 0x99, cdata, sizeof(cdata));
+>
+>         /* 0x81 - 0x94 */
+> -       data[0] = 0x18; /* xtal 24 MHz */
+> +       if (priv->xtal == SONY_HELENE_XTAL_16000)
+> +               data[0] = 0x10; /* xtal 16 MHz */
+> +       else
+> +               data[0] = 0x18; /* xtal 24 MHz */
+>         data[1] = (uint8_t)(0x80 | (0x04 & 0x1F)); /* 4 x 25 = 100uA */
+>         data[2] = (uint8_t)(0x80 | (0x26 & 0x7F)); /* 38 x 0.25 = 9.5pF */
+>         data[3] = 0x80; /* REFOUT signal output 500mVpp */
+> --
+> 2.17.0
+>
 
-This patch is just changing the first argument to the calls. So if we
-need to change, it has to be separate patch.
 
-Now, we can use of_property_read_u64() but is there any particular
-reason you mention that ? One reason I can see is that we can avoid
-making explicit of_get_property call. Just wanted to the motive before I
-can write the patch.
 
 -- 
-Regards,
-Sudeep
+Abylay Ospan,
+NetUP Inc.
+http://www.netup.tv
