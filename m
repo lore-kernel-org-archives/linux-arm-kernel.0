@@ -1,18 +1,24 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 May 2018 11:47:32 +0100
-Subject: [PATCH] arm64: remove no-op macro VMLINUX_SYMBOL()
-In-Reply-To: <1525851986-28631-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1525851986-28631-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20180516104732.dxt7di6t4hcss23e@armageddon.cambridge.arm.com>
+Date: Wed, 16 May 2018 11:48:14 +0100
+Subject: [PATCH v2] arm64: Remove duplicate include
+In-Reply-To: <1523630675-30687-1-git-send-email-vincenzo.frascino@arm.com>
+References: <1523630675-30687-1-git-send-email-vincenzo.frascino@arm.com>
+Message-ID: <20180516104814.i7sgeodnmgygjceg@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 04:46:26PM +0900, Masahiro Yamada wrote:
-> VMLINUX_SYMBOL() is no-op unless CONFIG_HAVE_UNDERSCORE_SYMBOL_PREFIX
-> is defined.  It has ever been selected only by BLACKFIN and METAG.
-> VMLINUX_SYMBOL() is unneeded for ARM64-specific code.
+On Fri, Apr 13, 2018 at 03:44:35PM +0100, Vincenzo Frascino wrote:
+> "make includecheck" detected few duplicated includes in arch/arm64.
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> This patch removes the double inclusions.
+> 
+> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_mmu.h     | 1 -
+>  arch/arm64/kernel/armv8_deprecated.c | 3 +--
+>  arch/arm64/kernel/fpsimd.c           | 1 -
+>  arch/arm64/kernel/ptrace.c           | 2 --
+>  4 files changed, 1 insertion(+), 6 deletions(-)
 
 Queued for 4.18. Thanks.
 
