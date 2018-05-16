@@ -1,74 +1,53 @@
-From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Wed, 16 May 2018 14:38:08 +0300
-Subject: [PATCH 1/1] ARM:dts:sunxi: Add Olimex A20-SOM-EVB-eMMC board
-Message-ID: <1526470689-6275-1-git-send-email-stefan@olimex.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 16 May 2018 12:49:25 +0100
+Subject: [PATCH] arm64: dts: juno: fix graph node unit addresses for
+ coresight components
+In-Reply-To: <574f6959-6a84-9e0e-3d89-84d2d75d9191@arm.com>
+References: <1526466862-19173-1-git-send-email-sudeep.holla@arm.com>
+ <574f6959-6a84-9e0e-3d89-84d2d75d9191@arm.com>
+Message-ID: <eba4cddf-f668-a5e1-acea-5e6538c230f0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new rev.E of A20-SOM-EVB, there is option for 16GB eMMC.
-Currently used card is KLMAG2GEND, wired to MMC2 slot.
 
-Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
----
- arch/arm/boot/dts/Makefile                         |  1 +
- .../arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts | 37 ++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1db91ec..7f1ee65 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -959,6 +959,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-m3.dtb \
- 	sun7i-a20-mk808c.dtb \
- 	sun7i-a20-olimex-som-evb.dtb \
-+	sun7i-a20-olimex-som-evb-emmc.dtb \
- 	sun7i-a20-olimex-som204-evb.dtb \
- 	sun7i-a20-olimex-som204-evb-emmc.dtb \
- 	sun7i-a20-olinuxino-lime.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts
-new file mode 100644
-index 0000000..81ebc97
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts
-@@ -0,0 +1,37 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Device Tree Source for A20-Olimex-SOM-EVB-eMMC Board
-+ *
-+ * Copyright (C) 2018 Olimex Ltd.
-+ *   Author: Stefan Mavrodiev <stefan@olimex.com>
-+ */
-+
-+/dts-v1/;
-+#include "sun7i-a20-olimex-som-evb.dts"
-+
-+/ {
-+
-+	model = "Olimex A20-Olimex-SOM-EVB-eMMC";
-+	compatible = "olimex,a20-olimex-som-evb-emmc", "allwinner,sun7i-a20";
-+
-+	mmc2_pwrseq: mmc2_pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&pio 2 18 GPIO_ACTIVE_LOW>;
-+	};
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&mmc2_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	emmc: emmc at 0 {
-+		reg = <0>;
-+		compatible = "mmc-card";
-+		broken-hpi;
-+	};
-+};
+On 16/05/18 12:23, Suzuki K Poulose wrote:
+> On 05/16/2018 11:34 AM, Sudeep Holla wrote:
+
+[..]
+
+>> Hi Suzuki/Mathieu,
+>>
+>> I did a quick scan @ drivers/hwtracing/coresight/of_coresight.c to
+>> check if reg field is being used or not and whether this change
+>> causes any regression. I don't think so, but I may be wrong, let me
+>> know.
+> 
+> Unfortunately, I think this would break the components like funnel,
+> where we need the input port number for the connected master to enable
+> the port. Similarly for the output port number for master components in
+> the paths. I have a set of patches which address this by taking care of
+> the port number order to find out the hardware port number.
+> 
+
+Ah ok, I now see of_graph_parse_endpoint, sorry for missing that.
+
+> I will dust it up and send it. That would bring up another important
+> question.
+> 
+
+Cool
+
+> How do we deal with the change in the port number scheme ? e.g, should
+> the new kernel support DTBs with old scheme ? 
+
+IIUC, that's needed for backward compatibility as it was used schema.
+Again I may be wrong.
+
+> If so, how do we specify that the DT uses new scheme.
+
+Perhaps, add something to indicate the change in numbering scheme ?
+
 -- 
-2.7.4
+Regards,
+Sudeep
