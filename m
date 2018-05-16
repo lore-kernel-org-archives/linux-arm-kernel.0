@@ -1,33 +1,17 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Wed, 16 May 2018 09:53:49 +0300
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: cleanup eMMC node
-Message-ID: <20180516065349.11160-1-nikita.yoush@cogentembedded.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 16 May 2018 08:59:32 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable RENESAS_WDT
+In-Reply-To: <20180502094353.27488-1-horms+renesas@verge.net.au>
+References: <20180502094353.27488-1-horms+renesas@verge.net.au>
+Message-ID: <20180516065931.amccl5sr7i6dengd@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On RDU1, sdhc1 is used for eMMC, and that is 3.3V only.
+On Wed, May 02, 2018 at 11:43:53AM +0200, Simon Horman wrote:
+> R-Car Gen2 and RZ/G1 platforms come with a watchdog IP, therefore enable
+> its driver by default. It is enabled as a module to avoid increasing
+> the kernel image size.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thus configure device node not to probe it as SD/SDIO and not try 1.8V.
-
-Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
----
- arch/arm/boot/dts/imx51-zii-rdu1.dts | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-index 0c99ac04ad08..ad2a7c9b203e 100644
---- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-+++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-@@ -462,7 +462,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
- 	bus-width = <4>;
-+	no-1-8-v;
- 	non-removable;
-+	no-sdio;
-+	no-sd;
- 	status = "okay";
- };
- 
--- 
-2.11.0
+Applied.
