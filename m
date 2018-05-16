@@ -1,45 +1,62 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Wed, 16 May 2018 10:20:17 +0800
-Subject: [RFC PATCH 00/10] Add persistent clock support
-In-Reply-To: <20180515102715.GO29062@mai>
-References: <cover.1526285602.git.baolin.wang@linaro.org>
- <20180515102715.GO29062@mai>
-Message-ID: <CAMz4kuJjhhty7HigPEA6Gm4HtFk_3t1aCwbX3c0mLLQF8SZBLw@mail.gmail.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Wed, 16 May 2018 10:25:48 +0800
+Subject: [PATCH V2] ARM: dts: imx7d: correct cpu supply name for voltage
+ scaling
+Message-ID: <1526437548-32372-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Correct CPU supply name to meet cpufreq-dt driver's
+requirement for voltage scaling.
 
-On 15 May 2018 at 18:27, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> On Mon, May 14, 2018 at 04:55:26PM +0800, Baolin Wang wrote:
->> Hi,
->>
->> We will meet below issues when compensating the suspend time for the timekeeping.
->>
->> 1. We have too many different ways of dealing with persistent timekeeping
->> across architectures, so it is hard for one driver to compatable with different
->> architectures.
->>
->> 2. On some platforms (such as Spreadtrum platform), we registered the high
->> resolution timer as one clocksource to update the OS time, but the high
->> resolution timer will be stopped in suspend state. So we use another one
->> always-on timer (but low resolution) to calculate the suspend time to
->> compensate the OS time. Though we can register the always-on timer as one
->> clocksource, we need re-calculate the mult/shift with one larger conversion
->> range to calculate the suspend time and need update the clock in case of
->> running over the always-on timer.
->
-> First, can you elaborate what you mean by 'suspend state' ? On which power
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+changes since V1:
+	fix the "No newline at end of file" caused by vim editor.
+ arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 2 +-
+ arch/arm/boot/dts/imx7d-nitrogen7.dts   | 2 +-
+ arch/arm/boot/dts/imx7d-sdb.dts         | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-What I mean is the high resolution timer will be stopped when the
-system goes into suspend state.
-
-> domain the clocksource belongs to?
-
-On Spreadtrum platform, It belongs to one power domain named
-"APCPU_TOP", that will be power down when the system goes into suspend
-state.
-
+diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+index 7f64568..8bf365d 100644
+--- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
++++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+@@ -33,7 +33,7 @@
+ };
+ 
+ &cpu0 {
+-	arm-supply = <&sw1a_reg>;
++	cpu-supply = <&sw1a_reg>;
+ };
+ 
+ &fec1 {
+diff --git a/arch/arm/boot/dts/imx7d-nitrogen7.dts b/arch/arm/boot/dts/imx7d-nitrogen7.dts
+index b8e73b4..70c53e5 100644
+--- a/arch/arm/boot/dts/imx7d-nitrogen7.dts
++++ b/arch/arm/boot/dts/imx7d-nitrogen7.dts
+@@ -144,7 +144,7 @@
+ };
+ 
+ &cpu0 {
+-	arm-supply = <&sw1a_reg>;
++	cpu-supply = <&sw1a_reg>;
+ };
+ 
+ &fec1 {
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 722a45a..9408491 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -141,7 +141,7 @@
+ };
+ 
+ &cpu0 {
+-	arm-supply = <&sw1a_reg>;
++	cpu-supply = <&sw1a_reg>;
+ };
+ 
+ &ecspi3 {
 -- 
-Baolin.wang
-Best Regards
+2.7.4
