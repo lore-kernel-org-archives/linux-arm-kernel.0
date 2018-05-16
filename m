@@ -1,54 +1,151 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed, 16 May 2018 17:28:20 +0100
-Subject: [PATCH v4 03/12] ACPI / APEI: don't wait to serialise with oops
- messages when panic()ing
+Date: Wed, 16 May 2018 17:28:22 +0100
+Subject: [PATCH v4 05/12] KVM: arm/arm64: Add kvm_ras.h to collect kvm
+ specific RAS plumbing
 In-Reply-To: <20180516162829.14348-1-james.morse@arm.com>
 References: <20180516162829.14348-1-james.morse@arm.com>
-Message-ID: <20180516162829.14348-4-james.morse@arm.com>
+Message-ID: <20180516162829.14348-6-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-oops_begin() exists to group printk() messages with the oops message
-printed by die(). To reach this caller we know that platform firmware
-took this error first, then notified the OS via NMI with a 'panic'
-severity.
+To split up APEIs in_nmi() path, we need any nmi-like callers to always
+be in_nmi(). KVM shouldn't have to know about this, pull the RAS plumbing
+out into a header file.
 
-Don't wait for another CPU to release the die-lock before we can
-panic(), our only goal is to print this fatal error and panic().
+Currently guest synchronous external aborts are claimed as RAS
+notifications by handle_guest_sea(), which is hidden in the arch codes
+mm/fault.c. 32bit gets a dummy declaration in system_misc.h.
 
-This code is always called in_nmi(), and since 42a0bb3f7138 ("printk/nmi:
-generic solution for safe printk in NMI"), it has been safe to call
-printk() from this context. Messages are batched in a per-cpu buffer
-and printed via irq-work, or a call back from panic().
+There is going to be more of this in the future if/when we support
+the SError-based firmware-first notification mechanism and/or
+kernel-first notifications for both synchronous external abort and
+SError. Each of these will come with some Kconfig symbols and a
+handful of header files.
 
-Link: https://patchwork.kernel.org/patch/10313555/
-Acked-by: Borislav Petkov <bp@suse.de>
+Create a header file for all this.
+
+This patch gives handle_guest_sea() a 'kvm_' prefix, and moves the
+declarations to kvm_ras.h as preparation for a future patch that moves
+the ACPI-specific RAS code out of mm/fault.c.
+
 Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 ---
- drivers/acpi/apei/ghes.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/include/asm/kvm_ras.h       | 14 ++++++++++++++
+ arch/arm/include/asm/system_misc.h   |  5 -----
+ arch/arm64/include/asm/kvm_ras.h     | 11 +++++++++++
+ arch/arm64/include/asm/system_misc.h |  2 --
+ arch/arm64/mm/fault.c                |  2 +-
+ virt/kvm/arm/mmu.c                   |  4 ++--
+ 6 files changed, 28 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/include/asm/kvm_ras.h
+ create mode 100644 arch/arm64/include/asm/kvm_ras.h
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 5a0b8a1bddb1..9b5f9642ee32 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -33,7 +33,6 @@
- #include <linux/interrupt.h>
- #include <linux/timer.h>
- #include <linux/cper.h>
--#include <linux/kdebug.h>
- #include <linux/platform_device.h>
- #include <linux/mutex.h>
- #include <linux/ratelimit.h>
-@@ -758,9 +757,6 @@ static int _in_nmi_notify_one(struct ghes *ghes)
+diff --git a/arch/arm/include/asm/kvm_ras.h b/arch/arm/include/asm/kvm_ras.h
+new file mode 100644
+index 000000000000..aaff56bf338f
+--- /dev/null
++++ b/arch/arm/include/asm/kvm_ras.h
+@@ -0,0 +1,14 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (C) 2018 - Arm Ltd
++
++#ifndef __ARM_KVM_RAS_H__
++#define __ARM_KVM_RAS_H__
++
++#include <linux/types.h>
++
++static inline int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
++{
++	return -1;
++}
++
++#endif /* __ARM_KVM_RAS_H__ */
+diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+index 78f6db114faf..51e5ab50b35f 100644
+--- a/arch/arm/include/asm/system_misc.h
++++ b/arch/arm/include/asm/system_misc.h
+@@ -23,11 +23,6 @@ extern void (*arm_pm_idle)(void);
  
- 	sev = ghes_severity(ghes->estatus->error_severity);
- 	if (sev >= GHES_SEV_PANIC) {
--#ifdef CONFIG_X86
--		oops_begin();
--#endif
- 		ghes_print_queued_estatus();
- 		__ghes_panic(ghes);
- 	}
+ extern unsigned int user_debug;
+ 
+-static inline int handle_guest_sea(phys_addr_t addr, unsigned int esr)
+-{
+-	return -1;
+-}
+-
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* __ASM_ARM_SYSTEM_MISC_H */
+diff --git a/arch/arm64/include/asm/kvm_ras.h b/arch/arm64/include/asm/kvm_ras.h
+new file mode 100644
+index 000000000000..5f72b07b7912
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_ras.h
+@@ -0,0 +1,11 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (C) 2018 - Arm Ltd
++
++#ifndef __ARM64_KVM_RAS_H__
++#define __ARM64_KVM_RAS_H__
++
++#include <linux/types.h>
++
++int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr);
++
++#endif /* __ARM64_KVM_RAS_H__ */
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 28893a0b141d..48ded3628a89 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -45,8 +45,6 @@ extern void __show_regs(struct pt_regs *);
+ 
+ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ 
+-int handle_guest_sea(phys_addr_t addr, unsigned int esr);
+-
+ #endif	/* __ASSEMBLY__ */
+ 
+ #endif	/* __ASM_SYSTEM_MISC_H */
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 4165485e8b6e..d61a886afec7 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -662,7 +662,7 @@ static const struct fault_info fault_info[] = {
+ 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 63"			},
+ };
+ 
+-int handle_guest_sea(phys_addr_t addr, unsigned int esr)
++int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
+ {
+ 	int ret = -ENOENT;
+ 
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 7f6a944db23d..673141de1e67 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -27,10 +27,10 @@
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_mmio.h>
++#include <asm/kvm_ras.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/virt.h>
+-#include <asm/system_misc.h>
+ 
+ #include "trace.h"
+ 
+@@ -1647,7 +1647,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * For RAS the host kernel may handle this abort.
+ 		 * There is no need to pass the error into the guest.
+ 		 */
+-		if (!handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
++		if (!kvm_handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
+ 			return 1;
+ 
+ 		if (unlikely(!is_iabt)) {
 -- 
 2.16.2
