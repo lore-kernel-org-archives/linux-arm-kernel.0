@@ -1,53 +1,22 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 16 May 2018 12:49:25 +0100
-Subject: [PATCH] arm64: dts: juno: fix graph node unit addresses for
- coresight components
-In-Reply-To: <574f6959-6a84-9e0e-3d89-84d2d75d9191@arm.com>
-References: <1526466862-19173-1-git-send-email-sudeep.holla@arm.com>
- <574f6959-6a84-9e0e-3d89-84d2d75d9191@arm.com>
-Message-ID: <eba4cddf-f668-a5e1-acea-5e6538c230f0@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 May 2018 14:17:47 +0200
+Subject: [PATCH v1] pinctrl: armada-37xx: Convert to use match_string()
+ helper
+In-Reply-To: <20180503172642.21031-1-andriy.shevchenko@linux.intel.com>
+References: <20180503172642.21031-1-andriy.shevchenko@linux.intel.com>
+Message-ID: <CACRpkdbBqxr1AHNRLyt0QkkgwayZ+SeomN2_u7BkKOQCV6XULA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 3, 2018 at 7:26 PM, Andy Shevchenko
+<andriy.shevchenko@linux.intel.com> wrote:
 
+> The new helper returns index of the matching string in an array.
+> We are going to use it here.
+>
+> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-On 16/05/18 12:23, Suzuki K Poulose wrote:
-> On 05/16/2018 11:34 AM, Sudeep Holla wrote:
+Patch applied.
 
-[..]
-
->> Hi Suzuki/Mathieu,
->>
->> I did a quick scan @ drivers/hwtracing/coresight/of_coresight.c to
->> check if reg field is being used or not and whether this change
->> causes any regression. I don't think so, but I may be wrong, let me
->> know.
-> 
-> Unfortunately, I think this would break the components like funnel,
-> where we need the input port number for the connected master to enable
-> the port. Similarly for the output port number for master components in
-> the paths. I have a set of patches which address this by taking care of
-> the port number order to find out the hardware port number.
-> 
-
-Ah ok, I now see of_graph_parse_endpoint, sorry for missing that.
-
-> I will dust it up and send it. That would bring up another important
-> question.
-> 
-
-Cool
-
-> How do we deal with the change in the port number scheme ? e.g, should
-> the new kernel support DTBs with old scheme ? 
-
-IIUC, that's needed for backward compatibility as it was used schema.
-Again I may be wrong.
-
-> If so, how do we specify that the DT uses new scheme.
-
-Perhaps, add something to indicate the change in numbering scheme ?
-
--- 
-Regards,
-Sudeep
+Yours,
+Linus Walleij
