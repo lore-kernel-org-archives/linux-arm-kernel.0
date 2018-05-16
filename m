@@ -1,72 +1,90 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 16 May 2018 17:46:04 +0100
-Subject: [PATCH v4 00/12] APEI in_nmi() rework and arm64 SDEI wire-up
-In-Reply-To: <20180516162829.14348-1-james.morse@arm.com>
-References: <20180516162829.14348-1-james.morse@arm.com>
-Message-ID: <15bfc50c-c789-bd79-7495-d040a354d306@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 16 May 2018 18:40:59 +0100
+Subject: [PATCH] arm64: dts: juno: fix graph node unit addresses for
+ coresight components
+In-Reply-To: <CANLsYkyi+m_uQydSWZkf_e1PNSoU-n1rLixuJ0+P9G8hpm68TA@mail.gmail.com>
+References: <1526466862-19173-1-git-send-email-sudeep.holla@arm.com>
+ <574f6959-6a84-9e0e-3d89-84d2d75d9191@arm.com>
+ <eba4cddf-f668-a5e1-acea-5e6538c230f0@arm.com>
+ <CANLsYkyi+m_uQydSWZkf_e1PNSoU-n1rLixuJ0+P9G8hpm68TA@mail.gmail.com>
+Message-ID: <dd4796b7-a078-27db-0fdc-099a834ce8bc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/18 17:28, James Morse wrote:
-> The aim of this series is to wire arm64's SDEI into APEI.
-
-... and I missed the 'l' from the beginning of the well know inux-mm at kvack.org
-mailing list. I won't increase the spam by resending, please fix it when
-pointing out my other mistakes!
-
-Thanks,
-
-James
 
 
-> Since v3 the NMI fixmap entries and locks have moved into their own
-> structure. This moves the indirection up from the 'lock', which should
-> be more acceptable to polite society.
-> Changes are noted in each patch.
+On 16/05/18 18:29, Mathieu Poirier wrote:
+> On 16 May 2018 at 05:49, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On 16/05/18 12:23, Suzuki K Poulose wrote:
+>>> On 05/16/2018 11:34 AM, Sudeep Holla wrote:
+>>
+>> [..]
+>>
+>>>> Hi Suzuki/Mathieu,
+>>>>
+>>>> I did a quick scan @ drivers/hwtracing/coresight/of_coresight.c to
+>>>> check if reg field is being used or not and whether this change
+>>>> causes any regression. I don't think so, but I may be wrong, let me
+>>>> know.
+>>>
+>>> Unfortunately, I think this would break the components like funnel,
+>>> where we need the input port number for the connected master to enable
+>>> the port. Similarly for the output port number for master components in
+>>> the paths. I have a set of patches which address this by taking care of
+>>> the port number order to find out the hardware port number.
+>>>
+>>
+>> Ah ok, I now see of_graph_parse_endpoint, sorry for missing that.
 > 
-> This touches a few trees, so I'm not sure how best it should be merged.
-> Patches 11 and 12 are reducing a race that is made worse by patch 4, I'd
-> like them to arrive together, even though patch 11 doesn't depend on anything
-> else in the series. A partial merge of this would  be 1-3 and 11.
-
-[...]
-
-> Patch 11 makes the reschedule to memory_failure() run as soon as possible.
-
-[...]
-
-> James Morse (12):
->   ACPI / APEI: Move the estatus queue code up, and under its own ifdef
->   ACPI / APEI: Generalise the estatus queue's add/remove and notify code
->   ACPI / APEI: don't wait to serialise with oops messages when
->     panic()ing
->   ACPI / APEI: Switch NOTIFY_SEA to use the estatus queue
->   KVM: arm/arm64: Add kvm_ras.h to collect kvm specific RAS plumbing
->   arm64: KVM/mm: Move SEA handling behind a single 'claim' interface
->   ACPI / APEI: Make the nmi_fixmap_idx per-ghes to allow multiple
->     in_nmi() users
->   ACPI / APEI: Split fixmap pages for arm64 NMI-like notifications
->   firmware: arm_sdei: Add ACPI GHES registration helper
->   ACPI / APEI: Add support for the SDEI GHES Notification type
->   mm/memory-failure: increase queued recovery work's priority
->   arm64: acpi: Make apei_claim_sea() synchronise with APEI's irq work
+> The problem is not with of_graph_parse_endpoint(), that will work just
+> fine.  In fact you can add whatever number you want there without
+> impact on how devices see each other in the framework.  The problem is
+> that the port numbering doesn't reflect the HW layout anymore and as
+> such  you can't rely on the port value when configuring the HW.
 > 
->  arch/arm/include/asm/kvm_ras.h       |  14 +
->  arch/arm/include/asm/system_misc.h   |   5 -
->  arch/arm64/include/asm/acpi.h        |   4 +
->  arch/arm64/include/asm/daifflags.h   |   1 +
->  arch/arm64/include/asm/fixmap.h      |   8 +-
->  arch/arm64/include/asm/kvm_ras.h     |  24 ++
->  arch/arm64/include/asm/system_misc.h |   2 -
->  arch/arm64/kernel/acpi.c             |  49 ++++
->  arch/arm64/mm/fault.c                |  30 +-
->  drivers/acpi/apei/ghes.c             | 518 ++++++++++++++++++++---------------
->  drivers/firmware/arm_sdei.c          |  67 +++++
->  include/acpi/ghes.h                  |  17 ++
->  include/linux/arm_sdei.h             |   8 +
->  mm/memory-failure.c                  |  11 +-
->  virt/kvm/arm/mmu.c                   |   4 +-
->  15 files changed, 503 insertions(+), 259 deletions(-)
->  create mode 100644 arch/arm/include/asm/kvm_ras.h
->  create mode 100644 arch/arm64/include/asm/kvm_ras.h
+
+Exactly, I had a chat with Suzuki. One option is to introduce new hwid
+field to fix that. If the field is present, it will be used and reg
+field will be ignored. In that way, you won't break the compatibility.
+Just my thoughts. I am not sure if we need to support old kernel with
+updated DTs though. That may be difficult.
+
+>>
+>>> I will dust it up and send it. That would bring up another important
+>>> question.
+>>>
+>>
+>> Cool
+>>
+>>> How do we deal with the change in the port number scheme ? e.g, should
+>>> the new kernel support DTBs with old scheme ?
+>>
 > 
+> DT files following the old scheme will spew out warnings like we're
+> getting on Juno and are bound to be fixed.
+> 
+True, they can pick up the new changes too along with changes just
+fixing the warning.
+
+>> IIUC, that's needed for backward compatibility as it was used schema.
+>> Again I may be wrong.
+>>
+>>> If so, how do we specify that the DT uses new scheme.
+>>
+>> Perhaps, add something to indicate the change in numbering scheme ?
+> 
+> The current customers should be moved to the new scheme.  That way we
+> don't have to support two different DT scheme (where one will die
+> eventually).
+> 
+
+But the problem is if someone has DT which can't be modified and we move
+to new scheme only in the kernel, then they will see regression on their
+platforms. If that's fine, it simplifies things a lot. But I am not so
+sure of that ...
+
+-- 
+Regards,
+Sudeep
