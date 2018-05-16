@@ -1,113 +1,58 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 16 May 2018 15:30:37 -0600
-Subject: [PATCH] arm64: dts: juno: fix graph node unit addresses for
- coresight components
-In-Reply-To: <dd4796b7-a078-27db-0fdc-099a834ce8bc@arm.com>
-References: <1526466862-19173-1-git-send-email-sudeep.holla@arm.com>
- <574f6959-6a84-9e0e-3d89-84d2d75d9191@arm.com>
- <eba4cddf-f668-a5e1-acea-5e6538c230f0@arm.com>
- <CANLsYkyi+m_uQydSWZkf_e1PNSoU-n1rLixuJ0+P9G8hpm68TA@mail.gmail.com>
- <dd4796b7-a078-27db-0fdc-099a834ce8bc@arm.com>
-Message-ID: <CANLsYkxHbV_h=GUjKwOAwjhupineDuHh7xKWRVo3aNk-uPKD2g@mail.gmail.com>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Wed, 16 May 2018 23:55:38 +0200
+Subject: [PATCH 2/6] dt-bindings: media: rcar-vin: Document data-active
+In-Reply-To: <1526488352-898-3-git-send-email-jacopo+renesas@jmondi.org>
+References: <1526488352-898-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526488352-898-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <20180516215538.GC17948@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 May 2018 at 11:40, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 16/05/18 18:29, Mathieu Poirier wrote:
->> On 16 May 2018 at 05:49, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>
->>>
->>> On 16/05/18 12:23, Suzuki K Poulose wrote:
->>>> On 05/16/2018 11:34 AM, Sudeep Holla wrote:
->>>
->>> [..]
->>>
->>>>> Hi Suzuki/Mathieu,
->>>>>
->>>>> I did a quick scan @ drivers/hwtracing/coresight/of_coresight.c to
->>>>> check if reg field is being used or not and whether this change
->>>>> causes any regression. I don't think so, but I may be wrong, let me
->>>>> know.
->>>>
->>>> Unfortunately, I think this would break the components like funnel,
->>>> where we need the input port number for the connected master to enable
->>>> the port. Similarly for the output port number for master components in
->>>> the paths. I have a set of patches which address this by taking care of
->>>> the port number order to find out the hardware port number.
->>>>
->>>
->>> Ah ok, I now see of_graph_parse_endpoint, sorry for missing that.
->>
->> The problem is not with of_graph_parse_endpoint(), that will work just
->> fine.  In fact you can add whatever number you want there without
->> impact on how devices see each other in the framework.  The problem is
->> that the port numbering doesn't reflect the HW layout anymore and as
->> such  you can't rely on the port value when configuring the HW.
->>
->
-> Exactly, I had a chat with Suzuki. One option is to introduce new hwid
-> field to fix that. If the field is present, it will be used and reg
-> field will be ignored. In that way, you won't break the compatibility.
+Hi Jacopo,
 
-I had the same idea a while back and something Grant Likely and I
-talked about at ELC-E 2017 in Prague.  This is the way I would prefer
-to move forward on this.
+Thanks for your work.
 
-> Just my thoughts. I am not sure if we need to support old kernel with
-> updated DTs though. That may be difficult.
+On 2018-05-16 18:32:28 +0200, Jacopo Mondi wrote:
+> Document 'data-active' property in R-Car VIN device tree bindings.
+> The property is optional when running with explicit synchronization
+> (eg. BT.601) but mandatory when embedded synchronization is in use (eg.
+> BT.656) as specified by the hardware manual.
+> 
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> ---
+>  Documentation/devicetree/bindings/media/rcar_vin.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> index c53ce4e..17eac8a 100644
+> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
+> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> @@ -63,6 +63,11 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
+>  	If both HSYNC and VSYNC polarities are not specified, embedded
+>  	synchronization is selected.
+> 
+> +        - data-active: active state of data enable signal (CLOCKENB pin).
 
-Not sure that can be done.  The only way to do that would be to
-continue using the reg property, which isn't possible anymore.  As
-such said DT wouldn't be upstream and I'm not sure we need to care
-about those.
+I'm not sure what you mean by active state here. video-interfaces.txt 
+defines data-active as 'similar to HSYNC and VSYNC, specifies data line 
+polarity' so I assume this is the polarity of the CLOCKENB pin?
 
->
->>>
->>>> I will dust it up and send it. That would bring up another important
->>>> question.
->>>>
->>>
->>> Cool
->>>
->>>> How do we deal with the change in the port number scheme ? e.g, should
->>>> the new kernel support DTBs with old scheme ?
->>>
->>
->> DT files following the old scheme will spew out warnings like we're
->> getting on Juno and are bound to be fixed.
->>
-> True, they can pick up the new changes too along with changes just
-> fixing the warning.
->
->>> IIUC, that's needed for backward compatibility as it was used schema.
->>> Again I may be wrong.
->>>
->>>> If so, how do we specify that the DT uses new scheme.
->>>
->>> Perhaps, add something to indicate the change in numbering scheme ?
->>
->> The current customers should be moved to the new scheme.  That way we
->> don't have to support two different DT scheme (where one will die
->> eventually).
->>
->
-> But the problem is if someone has DT which can't be modified and we move
-> to new scheme only in the kernel, then they will see regression on their
-> platforms. If that's fine, it simplifies things a lot. But I am not so
-> sure of that ...
+> +          0/1 for LOW/HIGH respectively. If not specified, use HSYNC as
+> +          data enable signal. When using embedded synchronization this
+> +          property is mandatory.
 
-You have a point.  The code could check for both reg and hwid
-properties.  If both are there hwid is preferred.  Otherwise the reg
-property is used.  That wouldn't be too difficult to implement and
-avoid introducing a regression.  Of course all this is fantasy until
-we actually try things out.
+I'm confused, why is this mandatory if we have no embedded sync (that is 
+hsync-active and vsync-active not defined)? I can't find any reference 
+to this in the Gen2 datasheet but I'm sure I'm just missing it :-)
 
-Thanks,
-Mathieu
-
->
+> +
+>      - port 1 - sub-nodes describing one or more endpoints connected to
+>        the VIN from local SoC CSI-2 receivers. The endpoint numbers must
+>        use the following schema.
 > --
-> Regards,
-> Sudeep
+> 2.7.4
+> 
+
+-- 
+Regards,
+Niklas S?derlund
