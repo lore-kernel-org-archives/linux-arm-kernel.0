@@ -1,130 +1,78 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 16 May 2018 15:31:12 +0200
-Subject: [PATCH net-next v2 15/15] arm64: dts: allwinner: a64: add SRAM
- controller device tree node
-In-Reply-To: <CAGb2v65uZeueE=2FfsxWen9zNvCtMsJ+b=KgMfSh-ZKmO+S=cQ@mail.gmail.com>
-References: <20180501161227.2110-1-wens@csie.org>
- <20180501161227.2110-16-wens@csie.org>
- <20180502095118.rqnfwy576xh6ercm@flea>
- <CAGb2v67pvL58Pes1ZFDZtPu_nL2+m6dgf_XOOymG9nVAkXVpEw@mail.gmail.com>
- <29E5670C-9D17-4EC1-AAAC-0CF33DD0534C@aosc.io>
- <20180502115437.zlu2rafrguufutvp@flea>
- <CAGb2v64xTNqQQSppw2NZoLn+ViQNQLytn1EukLqw+HJzf1=5ig@mail.gmail.com>
- <20180514080310.ngev5h6cqe4taedl@flea>
- <CAGb2v65uZeueE=2FfsxWen9zNvCtMsJ+b=KgMfSh-ZKmO+S=cQ@mail.gmail.com>
-Message-ID: <20180516133112.67ewwsf2gfffnkbu@flea>
+From: aford173@gmail.com (Adam Ford)
+Date: Wed, 16 May 2018 08:34:30 -0500
+Subject: [PATCH 2/4] ARM: davinci: board-da850-evm: fix GPIO lookup for
+ MMC/SD
+In-Reply-To: <bf023e5e-5831-c9ad-bcd6-c9bb587ba848@ti.com>
+References: <20180424143506.25793-1-nsekhar@ti.com>
+ <20180424143506.25793-3-nsekhar@ti.com>
+ <fa8feb04-2231-88b8-4d2b-10264187ba7e@lechnology.com>
+ <CAHCN7x+eNpeyv27WPqZyy-X9S7Ffvujo+y3Mmt1ZP=LEk+4+=g@mail.gmail.com>
+ <bf023e5e-5831-c9ad-bcd6-c9bb587ba848@ti.com>
+Message-ID: <CAHCN7xKi-+=yyom5pU4YEtEutJiwpx8AJHBAF+5rjg-oBw8e3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 16, 2018 at 5:14 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On Wednesday 16 May 2018 04:23 AM, Adam Ford wrote:
+>> On Thu, Apr 26, 2018 at 8:40 PM, David Lechner <david@lechnology.com> wrote:
+>>> On 04/24/2018 09:35 AM, Sekhar Nori wrote:
+>>>>
+>>>> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
+>>>> mmc can correctly lookup the wp and cp gpios. Also fix the GPIO numbers
+>>>> as they are not offsets within a bank.
+>>>>
+>>>> Note that it is the gpio-davinci driver that sets the gpiochip label to
+>>>> davinci_gpio.0.
+>>>>
+>>>> Fixes: bdf0e8364fd3 ("ARM: davinci: da850-evm: use gpio descriptor for mmc
+>>>> pins")
+>>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>>>> ---
+>>>>   arch/arm/mach-davinci/board-da850-evm.c | 9 +++++++--
+>>>>   1 file changed, 7 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-davinci/board-da850-evm.c
+>>>> b/arch/arm/mach-davinci/board-da850-evm.c
+>>>> index 3063478bcc36..158ed9a1483f 100644
+>>>> --- a/arch/arm/mach-davinci/board-da850-evm.c
+>>>> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+>>>> @@ -763,12 +763,17 @@ static const short da850_evm_mcasp_pins[]
+>>>> __initconst = {
+>>>>         -1
+>>>>   };
+>>>>   +#define DA850_MMCSD_CD_PIN           GPIO_TO_PIN(4, 0)
+>>>> +#define DA850_MMCSD_WP_PIN             GPIO_TO_PIN(4, 1)
+>>>> +
+>>>>   static struct gpiod_lookup_table mmc_gpios_table = {
+>>>>         .dev_id = "da830-mmc.0",
+>>>>         .table = {
+>>>>                 /* gpio chip 2 contains gpio range 64-95 */
+>>>> -               GPIO_LOOKUP("davinci_gpio.2", 0, "cd", GPIO_ACTIVE_LOW),
+>>>> -               GPIO_LOOKUP("davinci_gpio.2", 1, "wp", GPIO_ACTIVE_LOW),
+>>>> +               GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_CD_PIN, "cd",
+>>>> +                           GPIO_ACTIVE_LOW),
+>>>> +               GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_WP_PIN, "wp",
+>>>> +                           GPIO_ACTIVE_LOW),
+>>
+>> I don't think the WP polarity is working correctly.  If I boot the
+>> board 'rw' enabled but WP disabled on the SD card, the system crashes.
+>> If I enable WP, the board boots correctly.
+>>
+>> Comparing this to the device tree version that I did, and double
+>> checking the behavior for my sanity, I believe WP needs to be
+>> GPIO_ACTIVE_HIGH
+>
+> You are right, I see the issue on my board too. Although this patch did
+> not touch the polarity, we could have fixed it here.
+>
+> Anyway, do you want to send a patch for that? Or I can do it too. A
+> similar fix is needed for DA830 EVM too.
 
-On Tue, May 15, 2018 at 11:47:16PM -0700, Chen-Yu Tsai wrote:
-> On Mon, May 14, 2018 at 1:03 AM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > 1;5201;0c
-> > On Sun, May 13, 2018 at 12:37:49PM -0700, Chen-Yu Tsai wrote:
-> >> On Wed, May 2, 2018 at 4:54 AM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> >> > On Wed, May 02, 2018 at 06:19:51PM +0800, Icenowy Zheng wrote:
-> >> >>
-> >> >>
-> >> >> ? 2018?5?2? GMT+08:00 ??5:53:21, Chen-Yu Tsai <wens@csie.org> ??:
-> >> >> >On Wed, May 2, 2018 at 5:51 PM, Maxime Ripard
-> >> >> ><maxime.ripard@bootlin.com> wrote:
-> >> >> >> Hi,
-> >> >> >>
-> >> >> >> On Wed, May 02, 2018 at 12:12:27AM +0800, Chen-Yu Tsai wrote:
-> >> >> >>> From: Icenowy Zheng <icenowy@aosc.io>
-> >> >> >>>
-> >> >> >>> Allwinner A64 has a SRAM controller, and in the device tree
-> >> >> >currently
-> >> >> >>> we have a syscon node to enable EMAC driver to access the EMAC clock
-> >> >> >>> register. As SRAM controller driver can now export regmap for this
-> >> >> >>> register, replace the syscon node to the SRAM controller device
-> >> >> >node,
-> >> >> >>> and let EMAC driver to acquire its EMAC clock regmap.
-> >> >> >>>
-> >> >> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> >> >>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >> >>> ---
-> >> >> >>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 23
-> >> >> >+++++++++++++++----
-> >> >> >>>  1 file changed, 19 insertions(+), 4 deletions(-)
-> >> >> >>>
-> >> >> >>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> >> >b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> >> >>> index 1b2ef28c42bd..1c37659d9d41 100644
-> >> >> >>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> >> >>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> >> >>> @@ -168,10 +168,25 @@
-> >> >> >>>               #size-cells = <1>;
-> >> >> >>>               ranges;
-> >> >> >>>
-> >> >> >>> -             syscon: syscon at 1c00000 {
-> >> >> >>> -                     compatible =
-> >> >> >"allwinner,sun50i-a64-system-controller",
-> >> >> >>> -                             "syscon";
-> >> >> >>> +             sram_controller: sram-controller at 1c00000 {
-> >> >> >>> +                     compatible =
-> >> >> >"allwinner,sun50i-a64-sram-controller";
-> >> >> >>
-> >> >> >> I don't think there's anything preventing us from keeping the
-> >> >> >> -system-controller compatible. It's what was in the DT before, and
-> >> >> >> it's how it's called in the datasheet.
-> >> >> >
-> >> >> >I actually meant to ask you about this. The -system-controller
-> >> >> >compatible matches the datasheet better. Maybe we should just
-> >> >> >switch to that one?
-> >> >>
-> >> >> No, if we do the switch the system-controller compatible,
-> >> >> the device will be probed on the same memory region with
-> >> >> a syscon on old DTs.
-> >> >
-> >> > The device hasn't magically changed either. Maybe we just need to add
-> >> > a check to make sure we don't have the syscon compatible in the SRAM
-> >> > driver probe so that the double driver issue doesn't happen?
-> >>
-> >> The syscon interface (which is not even a full blown device driver)
-> >> only looks at the "syscon" compatible. Either way we're removing that
-> >> part from the device tree so things should be ok for new device trees.
-> >> As Maxime mentioned we can do a check for the syscon compatible and
-> >> either give a warning to the user asking them to update their device
-> >> tree, or not register our custom regmap, or not probe the SRAM driver.
-> >> Personally I prefer the first option. The system controller block is
-> >> probed before any syscon users, so we should be fine, given the dwmac
-> >> driver goes the custom regmap path first.
-> >>
-> >> BTW, I still might end up changing the compatible. The manual uses
-> >> "system control", not "system controller", which I think makes sense,
-> >> since it is just a bunch of register files, kind of like the GRF
-> >> (General Register Files) block found in Rockchip SoCs [1], and not an
-> >> actual "controller".
-> >
-> > I'm not really fond of that, but we should at least make it consistent
-> > on the other patches Paul sent then.
-> 
-> For the A10s / A13 right?
+I don't have a DA830, so if I do a patch, it will be limited to the
+DA850-evm.  I can submit a patch later this afternoon, but if you have
+time and want to do both at the same time, go head.
 
-And A33, yep.
-
-> I think my naming is slightly better, but it's just a minor detail.
-
-Let's do this then.
-
-> While we're still debating this, can I merge the R40 stuff first?
-> The driver bits are already in.
-
-Yep, go ahead.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180516/7dfafd46/attachment.sig>
+adam
+>
+> Thanks,
+> Sekhar
