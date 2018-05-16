@@ -1,29 +1,44 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 16 May 2018 17:08:49 +0900
-Subject: [PATCH v6 09/17] media: rkisp1: add rockchip isp1 core driver
-In-Reply-To: <20180308094807.9443-10-jacob-chen@iotwrt.com>
-References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
- <20180308094807.9443-10-jacob-chen@iotwrt.com>
-Message-ID: <CAAFQd5BZm6+s=o1xEu_+E56R-k+ujAFxfytjA+N_SAcU=4A9FA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 16 May 2018 09:19:10 +0100
+Subject: [GIT PULL] Immutable branch between MFD and PWM due for the v4.18
+ merge window
+In-Reply-To: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
+References: <1526456161-27865-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180516081910.GF5130@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob, Shunqian,
+Enjoy!
 
-On Thu, Mar 8, 2018 at 6:49 PM Jacob Chen <jacob-chen@iotwrt.com> wrote:
-[snip]
-> +static const struct of_device_id rkisp1_plat_of_match[] = {
-> +       {
-> +               .compatible = "rockchip,rk3288-cif-isp",
-> +               .data = &rk3288_isp_clk_data,
-> +       }, {
-> +               .compatible = "rockchip,rk3399-cif-isp",
-> +               .data = &rk3399_isp_clk_data,
-> +       },
-> +       {},
-> +};
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-We need MODULE_DEVICE_TABLE() here.
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-Best regards,
-Tomasz
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-pwm-v4.18
+
+for you to fetch changes up to ab3a897847834bf3e864fb07b733c444895a24ba:
+
+  pwm: stm32: Use input prescaler to improve period capture (2018-05-16 09:11:19 +0100)
+
+----------------------------------------------------------------
+Immutable branch between MFD and PWM due for the v4.18 merge window
+
+----------------------------------------------------------------
+Fabrice Gasnier (4):
+      mfd: stm32-timers: Add support for DMAs
+      pwm: stm32: Add capture support
+      pwm: stm32: Improve capture by tuning counter prescaler
+      pwm: stm32: Use input prescaler to improve period capture
+
+ drivers/mfd/stm32-timers.c       | 201 +++++++++++++++++++++++++++++-
+ drivers/pwm/pwm-stm32.c          | 257 +++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/stm32-timers.h |  58 +++++++++
+ 3 files changed, 514 insertions(+), 2 deletions(-)
+ 
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
