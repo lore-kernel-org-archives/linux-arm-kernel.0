@@ -1,38 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 May 2018 14:28:17 +0200
-Subject: [PATCH v4] pinctrl: msm: fix gpio-hog related boot issues
-In-Reply-To: <CACRpkdZPEHvnQdwh5Uu5kwqK7yVGTaw_cZR+GOzsG9pg4oEktA@mail.gmail.com>
-References: <20180412190138.12372-1-chunkeey@gmail.com>
- <CACRpkdZPEHvnQdwh5Uu5kwqK7yVGTaw_cZR+GOzsG9pg4oEktA@mail.gmail.com>
-Message-ID: <CACRpkdbND_LWJmoH9yPQ2ruorM8CRWVk2S0nd1GCChZ=fuz_Eg@mail.gmail.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Wed, 16 May 2018 14:28:27 +0200
+Subject: [PATCH 1/3] input: touchscreen: edt-ft5x06: make wakeup source
+ behavior configurable
+In-Reply-To: <20180516122829.23694-1-daniel@zonque.org>
+References: <20180516122829.23694-1-daniel@zonque.org>
+Message-ID: <20180516122829.23694-2-daniel@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 26, 2018 at 2:03 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Apr 12, 2018 at 9:01 PM, Christian Lamparter <chunkeey@gmail.com> wrote:
->
->> Sven Eckelmann reported an issue with the current IPQ4019 pinctrl.
->> Setting up any gpio-hog in the device-tree for his device would
->> "kill the bootup completely":
-(...)
->> Reported-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
->> Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
->
-> This patch looks VERY good to me.
->
-> I am fine in merging it into pin control including the ranges
-> fixes.
->
-> I need Andy's and Bjorn's ACKs on it though!
->
-> Can you guys provide that?
+Allow configuring the device as wakeup source through device properties, as
+not all platforms want to wake up on touch screen activity.
 
-Hm? Andy, Bjorn?
+Note that by default, the device will now no longer be a wakeup source.
 
-Seems you guys are a bit snowed under.
+Signed-off-by: Daniel Mack <daniel@zonque.org>
+---
+ Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt | 3 +++
+ drivers/input/touchscreen/edt-ft5x06.c                             | 3 ++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-I guess I have to just apply it at some point and see what
-happens...
-
-Yours,
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+index 025cf8c9324a..83f792d4d88c 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+@@ -52,6 +52,8 @@ Optional properties:
+  - touchscreen-inverted-y  : See touchscreen.txt
+  - touchscreen-swapped-x-y : See touchscreen.txt
+ 
++ - wakeup-source: touchscreen acts as wakeup source
++
+ Example:
+ 	polytouch: edt-ft5x06 at 38 {
+ 		compatible = "edt,edt-ft5406", "edt,edt-ft5x06";
+@@ -62,4 +64,5 @@ Example:
+ 		interrupts = <5 IRQ_TYPE_EDGE_FALLING>;
+ 		reset-gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
+ 		wake-gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>;
++		wakeup-source;
+ 	};
+diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+index 5bf63f76ddda..955f085627fa 100644
+--- a/drivers/input/touchscreen/edt-ft5x06.c
++++ b/drivers/input/touchscreen/edt-ft5x06.c
+@@ -1007,7 +1007,8 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+ 		goto err_remove_attrs;
+ 
+ 	edt_ft5x06_ts_prepare_debugfs(tsdata, dev_driver_string(&client->dev));
+-	device_init_wakeup(&client->dev, 1);
++	device_init_wakeup(&client->dev,
++			    device_property_read_bool(dev, "wakeup-source"));
+ 
+ 	dev_dbg(&client->dev,
+ 		"EDT FT5x06 initialized: IRQ %d, WAKE pin %d, Reset pin %d.\n",
+-- 
+2.14.3
