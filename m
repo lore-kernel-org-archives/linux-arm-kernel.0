@@ -1,36 +1,49 @@
-From: swboyd@chromium.org (Stephen Boyd)
-Date: Wed, 16 May 2018 11:08:57 -0700
-Subject: [PATCH v6 1/2] dt-bindings: Documentation for qcom, llcc
-In-Reply-To: <385198cbb91c4a36ad758997916ad271@codeaurora.org>
-References: <1525810921-15878-1-git-send-email-rishabhb@codeaurora.org>
- <1525810921-15878-2-git-send-email-rishabhb@codeaurora.org>
- <152649021310.210890.14841324536807182632@swboyd.mtv.corp.google.com>
- <385198cbb91c4a36ad758997916ad271@codeaurora.org>
-Message-ID: <152649413707.210890.2655572242392552759@swboyd.mtv.corp.google.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 16 May 2018 20:08:54 +0200
+Subject: [PATCH] arm64: defconfig: enable the Armada thermal driver
+In-Reply-To: <20180514145859.22812-1-antoine.tenart@bootlin.com> (Antoine
+ Tenart's message of "Mon, 14 May 2018 16:58:59 +0200")
+References: <20180514145859.22812-1-antoine.tenart@bootlin.com>
+Message-ID: <87o9hf1nih.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting rishabhb at codeaurora.org (2018-05-16 10:33:14)
-> On 2018-05-16 10:03, Stephen Boyd wrote:
-> > Quoting Rishabh Bhatnagar (2018-05-08 13:22:00)
-> 
-> >> +
-> >> +- max-slices:
-> >> +       usage: required
-> >> +       Value Type: <u32>
-> >> +       Definition: Number of cache slices supported by hardware
-> >> +
-> >> +Example:
-> >> +
-> >> +       llcc: qcom,llcc at 1100000 {
-> > 
-> > cache-controller at 1100000 ?
-> > 
-> We have tried to use consistent naming convention as in llcc_* 
-> everywhere.
-> Using cache-controller will mix and match the naming convention. Also in
-> the documentation it is explained what llcc is and its full form.
-> 
+Hi Antoine,
+ 
+ On lun., mai 14 2018, Antoine Tenart <antoine.tenart@bootlin.com> wrote:
 
-DT prefers standard node names as opposed to vendor specific node names.
-Isn't it a cache controller? I fail to see why this can't be done.
+> This patch enables the Armada thermal driver to support thermal
+> management on Marvell EBU Armada SoCs (7K,8K).
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+
+Applied on mvebu/arm64
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index ecf613761e78..8f0707bcc54d 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -343,6 +343,7 @@ CONFIG_SENSORS_INA2XX=m
+>  CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+>  CONFIG_CPU_THERMAL=y
+>  CONFIG_THERMAL_EMULATION=y
+> +CONFIG_ARMADA_THERMAL=y
+>  CONFIG_BRCMSTB_THERMAL=m
+>  CONFIG_EXYNOS_THERMAL=y
+>  CONFIG_RCAR_GEN3_THERMAL=y
+> -- 
+> 2.17.0
+>
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
