@@ -1,24 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 May 2018 12:22:09 +0100
-Subject: [PATCH] arm64: cmpwait: Clear event register before arming
- exclusive monitor
-In-Reply-To: <1525092992-16819-1-git-send-email-will.deacon@arm.com>
-References: <1525092992-16819-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180516112208.izapa5qdd5m4t6fy@armageddon.cambridge.arm.com>
+From: willy@infradead.org (Matthew Wilcox)
+Date: Wed, 16 May 2018 04:23:47 -0700
+Subject: vm_fault_t conversion, for real
+In-Reply-To: <20180516054348.15950-1-hch@lst.de>
+References: <20180516054348.15950-1-hch@lst.de>
+Message-ID: <20180516112347.GB20670@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 30, 2018 at 01:56:32PM +0100, Will Deacon wrote:
-> When waiting for a cacheline to change state in cmpwait, we may immediately
-> wake-up the first time around the outer loop if the event register was
-> already set (for example, because of the event stream).
-> 
-> Avoid these spurious wakeups by explicitly clearing the event register
-> before loading the cacheline and setting the exclusive monitor.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Wed, May 16, 2018 at 07:43:34AM +0200, Christoph Hellwig wrote:
+> this series tries to actually turn vm_fault_t into a type that can be
+> typechecked and checks the fallout instead of sprinkling random
+> annotations without context.
 
-Queued for 4.18. Thanks.
+Yes, why should we have small tasks that newcomers can do when the mighty
+Christoph Hellwig can swoop in and take over from them?  Seriously,
+can't your talents find a better use than this?
 
--- 
-Catalin
+> The first one fixes a real bug in orangefs, the second and third fix
+> mismatched existing vm_fault_t annotations on the same function, the
+> fourth removes an unused export that was in the chain.  The remainder
+> until the last one do some not quite trivial conversions, and the last
+> one does the trivial mass annotation and flips vm_fault_t to a __bitwise
+> unsigned int - the unsigned means we also get plain compiler type
+> checking for the new ->fault signature even without sparse.
+
+Yes, that was (part of) the eventual goal.  Well done.  Would you like
+a biscuit?
