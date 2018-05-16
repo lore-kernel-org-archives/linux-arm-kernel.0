@@ -1,121 +1,127 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 16 May 2018 11:18:57 +0300
-Subject: [PATCH 12/24] arm64: ilp32: add is_ilp32_compat_{task,
- thread} and TIF_32BIT_AARCH64
+Date: Wed, 16 May 2018 11:19:00 +0300
+Subject: [PATCH 15/24] arm64: ilp32: introduce binfmt_ilp32.c
 In-Reply-To: <20180516081910.10067-1-ynorov@caviumnetworks.com>
 References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
-Message-ID: <20180516081910.10067-13-ynorov@caviumnetworks.com>
+Message-ID: <20180516081910.10067-16-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ILP32 tasks are needed to be distinguished from LP64 and AARCH32.
-This patch adds helper functions is_ilp32_compat_{task,thread} and
-thread flag TIF_32BIT_AARCH64 to address it. This is a preparation
-for following patches in ILP32 patchset.
+Like binfmt_elf32.c for AARCH32, binfmt_ilp32.c is needed to handle
+ILP32 binaries.
 
-For consistency, SET_PERSONALITY is changed here accordingly.
-
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+Signed-off-by: Bamvor Jian Zhang <bamv2005@gmail.com>
 ---
- arch/arm64/include/asm/elf.h         |  2 ++
- arch/arm64/include/asm/is_compat.h   | 30 ++++++++++++++++++++++++++--
- arch/arm64/include/asm/thread_info.h |  2 ++
- 3 files changed, 32 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/Makefile       |  1 +
+ arch/arm64/kernel/binfmt_ilp32.c | 87 ++++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+)
+ create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index b4b10eefc667..023b2fbc1454 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -143,6 +143,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index c63e0164fc12..3114191750ae 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -28,6 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
  
- #define SET_PERSONALITY(ex)						\
- ({									\
-+	clear_thread_flag(TIF_32BIT_AARCH64);				\
- 	clear_thread_flag(TIF_32BIT);					\
- 	current->personality &= ~READ_IMPLIES_EXEC;			\
- })
-@@ -194,6 +195,7 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
-  */
- #define COMPAT_SET_PERSONALITY(ex)					\
- ({									\
-+	clear_thread_flag(TIF_32BIT_AARCH64);				\
- 	set_thread_flag(TIF_32BIT);					\
-  })
- #define COMPAT_ARCH_DLINFO
-diff --git a/arch/arm64/include/asm/is_compat.h b/arch/arm64/include/asm/is_compat.h
-index 19868588fbef..484c01def030 100644
---- a/arch/arm64/include/asm/is_compat.h
-+++ b/arch/arm64/include/asm/is_compat.h
-@@ -33,18 +33,44 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
- 
- #endif /* CONFIG_AARCH32_EL0 */
- 
-+#ifdef CONFIG_ARM64_ILP32
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o binfmt_elf32.o
++arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+new file mode 100644
+index 000000000000..26b2477d190d
+--- /dev/null
++++ b/arch/arm64/kernel/binfmt_ilp32.c
+@@ -0,0 +1,87 @@
++// SPDX-License-Identifier: GPL-2.0+
 +
-+static inline int is_ilp32_compat_task(void)
-+{
-+	return test_thread_flag(TIF_32BIT_AARCH64);
-+}
++/*
++ * Support for ILP32 Linux/aarch64 ELF binaries.
++ */
++#undef CONFIG_AARCH32_EL0
++#define compat_elf_gregset_t	elf_gregset_t
 +
-+static inline int is_ilp32_compat_thread(struct thread_info *thread)
-+{
-+	return test_ti_thread_flag(thread, TIF_32BIT_AARCH64);
-+}
++#include <linux/elfcore-compat.h>
++#include <linux/time.h>
 +
++#undef	ELF_CLASS
++#define ELF_CLASS	ELFCLASS32
++
++#undef	elfhdr
++#undef	elf_phdr
++#undef	elf_shdr
++#undef	elf_note
++#undef	elf_addr_t
++#define elfhdr		elf32_hdr
++#define elf_phdr	elf32_phdr
++#define elf_shdr	elf32_shdr
++#define elf_note	elf32_note
++#define elf_addr_t	Elf32_Addr
++
++/*
++ * Some data types as stored in coredump.
++ */
++#define user_long_t		compat_long_t
++#define user_siginfo_t		compat_siginfo_t
++#define copy_siginfo_to_user	copy_siginfo_to_user32
++
++/*
++ * The machine-dependent core note format types are defined in elfcore-compat.h,
++ * which requires asm/elf.h to define compat_elf_gregset_t et al.
++ */
++#define elf_prstatus	compat_elf_prstatus
++#define elf_prpsinfo	compat_elf_prpsinfo
++
++/* AARCH64 ILP32 EABI. */
++#undef elf_check_arch
++#define elf_check_arch(x)		(((x)->e_machine == EM_AARCH64)	\
++					&& (x)->e_ident[EI_CLASS] == ELFCLASS32)
++
++#undef SET_PERSONALITY
++#define SET_PERSONALITY(ex)						\
++do {									\
++	set_bit(TIF_32BIT, &current->mm->context.flags);	\
++	set_thread_flag(TIF_32BIT_AARCH64);				\
++	clear_thread_flag(TIF_32BIT);					\
++} while (0)
++
++#undef ARCH_DLINFO
++#define ARCH_DLINFO							\
++do {									\
++	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
++		    (elf_addr_t)(long)current->mm->context.vdso);	\
++} while (0)
++
++#undef ELF_PLATFORM
++#ifdef __AARCH64EB__
++#define ELF_PLATFORM		("aarch64_be:ilp32")
 +#else
++#define ELF_PLATFORM		("aarch64:ilp32")
++#endif
 +
-+static inline int is_ilp32_compat_task(void)
-+{
-+	return 0;
-+}
++#undef ELF_ET_DYN_BASE
++#define ELF_ET_DYN_BASE COMPAT_ELF_ET_DYN_BASE
 +
-+static inline int is_ilp32_compat_thread(struct thread_info *thread)
-+{
-+	return 0;
-+}
++#undef ELF_HWCAP
++#undef ELF_HWCAP2
++#define ELF_HWCAP			((u32) elf_hwcap)
++#define ELF_HWCAP2			((u32) (elf_hwcap >> 32))
 +
-+#endif /* CONFIG_ARM64_ILP32 */
++/*
++ * Rename a few of the symbols that binfmt_elf.c will define.
++ * These are all local so the names don't really matter, but it
++ * might make some debugging less confusing not to duplicate them.
++ */
++#define elf_format		compat_elf_format
++#define init_elf_binfmt		init_compat_elf_binfmt
++#define exit_elf_binfmt		exit_compat_elf_binfmt
 +
- #ifdef CONFIG_COMPAT
- 
- static inline int is_compat_task(void)
- {
--	return is_a32_compat_task();
-+	return is_a32_compat_task() || is_ilp32_compat_task();
- }
- 
- #endif /* CONFIG_COMPAT */
- 
- static inline int is_compat_thread(struct thread_info *thread)
- {
--	return is_a32_compat_thread(thread);
-+	return is_a32_compat_thread(thread) || is_ilp32_compat_thread(thread);
- }
- 
- 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 6d2d58daa9d7..8ed56630e6a5 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -94,6 +94,7 @@ void arch_release_task_struct(struct task_struct *tsk);
- #define TIF_32BIT		22	/* AARCH32 process */
- #define TIF_SVE			23	/* Scalable Vector Extension in use */
- #define TIF_SVE_VL_INHERIT	24	/* Inherit sve_vl_onexec across exec */
-+#define TIF_32BIT_AARCH64	25	/* 32 bit process on AArch64(ILP32) */
- 
- #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
- #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
-@@ -108,6 +109,7 @@ void arch_release_task_struct(struct task_struct *tsk);
- #define _TIF_FSCHECK		(1 << TIF_FSCHECK)
- #define _TIF_32BIT		(1 << TIF_32BIT)
- #define _TIF_SVE		(1 << TIF_SVE)
-+#define _TIF_32BIT_AARCH64	(1 << TIF_32BIT_AARCH64)
- 
- #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
- 				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
++#undef ns_to_timeval
++#define ns_to_timeval ns_to_compat_timeval
++
++#include "../../../fs/binfmt_elf.c"
 -- 
 2.17.0
