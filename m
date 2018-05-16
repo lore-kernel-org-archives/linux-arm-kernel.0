@@ -1,21 +1,28 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 May 2018 09:02:40 +0200
-Subject: [PATCH v2] ARM: dts: r8a7740: Add CEU1
-In-Reply-To: <20180515082310.GQ5956@w540>
-References: <20180515080038.7438-1-horms+renesas@verge.net.au>
- <20180515082310.GQ5956@w540>
-Message-ID: <20180516070239.ssumjdpxhn4v3di5@verge.net.au>
+Date: Wed, 16 May 2018 09:04:09 +0200
+Subject: [PATCH 2/2] arm64: dts: renesas: initial V3HSK board device tree
+In-Reply-To: <20180513080704.yeypjjtv7hdmqajt@verge.net.au>
+References: <3923fc5f-103c-94c9-57ba-cb29e8c55d05@cogentembedded.com>
+ <50de037c-7560-c261-f96a-f86065674c9b@cogentembedded.com>
+ <20180513080704.yeypjjtv7hdmqajt@verge.net.au>
+Message-ID: <20180516070409.rz6cle4n2k6qgi7t@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 10:23:10AM +0200, jacopo mondi wrote:
-> Hi Simon,
+On Sun, May 13, 2018 at 10:07:04AM +0200, Simon Horman wrote:
+> On Thu, May 10, 2018 at 09:12:30PM +0300, Sergei Shtylyov wrote:
+> > Add the initial device  tree for  the V3H Starter Kit board.
+> > The board has 1 debug serial port (SCIF0); include support for it,
+> > so that the serial console can work.
+> > 
+> > Based on the original (and large) patch by Vladimir Barinov.
+> > 
+> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> On Tue, May 15, 2018 at 10:00:38AM +0200, Simon Horman wrote:
-> > Describe CEU1 peripheral for Renesas R-Mobile A1 R8A7740 Soc.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> This looks fine but I will wait to see if there are other reviews before
+> applying.
 > 
-> Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks, applied.
+Applied
