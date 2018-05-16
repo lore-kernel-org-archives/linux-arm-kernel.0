@@ -1,83 +1,26 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 16 May 2018 11:49:42 +0100
-Subject: [PULL v8] KVM: arm64: Optimise FPSIMD context switching
-Message-ID: <20180516104942.GS7753@e103592.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 May 2018 11:51:44 +0100
+Subject: [PATCH] arm64: Select ARCH_HAS_FAST_MULTIPLIER
+In-Reply-To: <877b532d8d240c1d9e9db923c84b924443a218ed.1524583390.git.robin.murphy@arm.com>
+References: <877b532d8d240c1d9e9db923c84b924443a218ed.1524583390.git.robin.murphy@arm.com>
+Message-ID: <20180516105144.yt6kwvxy64hdepsj@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Tue, Apr 24, 2018 at 04:25:47PM +0100, Robin Murphy wrote:
+> It is probably safe to assume that all Armv8-A implementations have a
+> multiplier whose efficiency is comparable or better than a sequence of
+> three or so register-dependent arithmetic instructions. Select
+> ARCH_HAS_FAST_MULTIPLIER to get ever-so-slightly nicer codegen in the
+> few dusty old corners which care.
+> 
+> In a contrived benchmark calling hweight64() in a loop, this does indeed
+> turn out to be a small win overall, with no measurable impact on
+> Cortex-A57 but about 5% performance improvement on Cortex-A53.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-This is a trivial update to the previously posted v7 [1].  The only
-changes are a couple of minor cosmetic changes requested by reviewers,
-on-list and the addition of Acked-by/Reviewed-by tags received since the
-series was posted.
+Queued for 4.18. Thanks.
 
-Let me know if you need anything else on this.
-
-Cheers
----Dave
-
-[1] [PATCH v7 00/16] KVM: arm64: Optimise FPSIMD context switching
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/576595.html
-
-
-The following changes since commit 6da6c0db5316275015e8cc2959f12a17584aeb64:
-
-  Linux v4.17-rc3 (2018-04-29 14:17:42 -0700)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-dm.git 
-
-for you to fetch changes up to 90255dd95fe71a9bd1c4ce728abad4b0eec240d9:
-
-  KVM: arm64: Invoke FPSIMD context switch trap from C (2018-05-16 10:44:00 +0100)
-
-----------------------------------------------------------------
-Christoffer Dall (1):
-      KVM: arm/arm64: Introduce kvm_arch_vcpu_run_pid_change
-
-Dave Martin (15):
-      thread_info: Add update_thread_flag() helpers
-      arm64: Use update{,_tsk}_thread_flag()
-      KVM: arm64: Convert lazy FPSIMD context switch trap to C
-      arm64: fpsimd: Generalise context saving for non-task contexts
-      arm64/sve: Refactor user SVE trap maintenance for external use
-      KVM: arm64: Repurpose vcpu_arch.debug_flags for general-purpose flags
-      KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing
-      arm64/sve: Move read_zcr_features() out of cpufeature.h
-      arm64/sve: Switch sve_pffr() argument from task to thread
-      arm64/sve: Move sve_pffr() to fpsimd.h and make inline
-      KVM: arm64: Save host SVE context as appropriate
-      KVM: arm64: Remove eager host SVE state saving
-      KVM: arm64: Remove redundant *exit_code changes in fpsimd_guest_exit()
-      KVM: arm64: Fold redundant exit code checks out of fixup_guest_exit()
-      KVM: arm64: Invoke FPSIMD context switch trap from C
-
- arch/arm/include/asm/kvm_host.h     |   9 ++-
- arch/arm64/Kconfig                  |   7 ++
- arch/arm64/include/asm/cpufeature.h |  29 -------
- arch/arm64/include/asm/fpsimd.h     |  21 ++++++
- arch/arm64/include/asm/kvm_asm.h    |   3 -
- arch/arm64/include/asm/kvm_host.h   |  32 +++++---
- arch/arm64/include/asm/processor.h  |   2 +
- arch/arm64/kernel/fpsimd.c          | 147 +++++++++++++++++++-----------------
- arch/arm64/kernel/ptrace.c          |   1 +
- arch/arm64/kvm/Kconfig              |   1 +
- arch/arm64/kvm/Makefile             |   2 +-
- arch/arm64/kvm/debug.c              |   8 +-
- arch/arm64/kvm/fpsimd.c             | 111 +++++++++++++++++++++++++++
- arch/arm64/kvm/hyp/debug-sr.c       |   6 +-
- arch/arm64/kvm/hyp/entry.S          |  43 -----------
- arch/arm64/kvm/hyp/hyp-entry.S      |  19 -----
- arch/arm64/kvm/hyp/switch.c         | 124 ++++++++++++++++++++----------
- arch/arm64/kvm/hyp/sysreg-sr.c      |   4 +-
- arch/arm64/kvm/sys_regs.c           |   9 +--
- include/linux/kvm_host.h            |   9 +++
- include/linux/sched.h               |   6 ++
- include/linux/thread_info.h         |  11 +++
- virt/kvm/Kconfig                    |   3 +
- virt/kvm/arm/arm.c                  |  25 +++++-
- virt/kvm/kvm_main.c                 |   7 +-
- 25 files changed, 406 insertions(+), 233 deletions(-)
- create mode 100644 arch/arm64/kvm/fpsimd.c
+-- 
+Catalin
