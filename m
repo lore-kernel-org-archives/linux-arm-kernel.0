@@ -1,68 +1,88 @@
-From: toshi.kani@hpe.com (Toshi Kani)
-Date: Wed, 16 May 2018 17:32:05 -0600
-Subject: [PATCH v3 1/3] x86/mm: disable ioremap free page handling on x86-PAE
-In-Reply-To: <20180516233207.1580-1-toshi.kani@hpe.com>
-References: <20180516233207.1580-1-toshi.kani@hpe.com>
-Message-ID: <20180516233207.1580-2-toshi.kani@hpe.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 16 May 2018 16:51:26 -0700
+Subject: [PATCH v4 4/4] drm/rockchip: support dp training outside dp
+ firmware
+In-Reply-To: <1526354560-23135-4-git-send-email-hl@rock-chips.com>
+References: <1526354560-23135-1-git-send-email-hl@rock-chips.com>
+ <1526354560-23135-4-git-send-email-hl@rock-chips.com>
+Message-ID: <20180516235125.GB219198@rodete-desktop-imager.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ioremap() supports pmd mappings on x86-PAE.  However, kernel's pmd
-tables are not shared among processes on x86-PAE.  Therefore, any
-update to sync'd pmd entries need re-syncing.  Freeing a pte page
-also leads to a vmalloc fault and hits the BUG_ON in vmalloc_sync_one().
++ Kishon
 
-Disable free page handling on x86-PAE.  pud_free_pmd_page() and
-pmd_free_pte_page() simply return 0 if a given pud/pmd entry is present.
-This assures that ioremap() does not update sync'd pmd entries at the
-cost of falling back to pte mappings.
+Hi,
 
-Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
-Reported-by: Joerg Roedel <joro@8bytes.org>
-Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: <stable@vger.kernel.org>
----
- arch/x86/mm/pgtable.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+On Tue, May 15, 2018 at 11:22:40AM +0800, Lin Huang wrote:
+> DP firmware uses fixed phy config values to do training, but some
+> boards need to adjust these values to fit for their unique hardware
+> design. So get phy config values from dts and use software link training
+> instead of relying on firmware, if software training fail, keep firmware
+> training as a fallback if sw training fails.
+> 
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v2:
+> - update patch following Enric suggest
+> Changes in v3:
+> - use variable fw_training instead sw_training_success
+> - base on DP SPCE, if training fail use lower link rate to retry training
+> Changes in v4:
+> - improve cdn_dp_get_lower_link_rate() and cdn_dp_software_train_link() follow Sean suggest
+> 
+>  drivers/gpu/drm/rockchip/Makefile               |   3 +-
+>  drivers/gpu/drm/rockchip/cdn-dp-core.c          |  24 +-
+>  drivers/gpu/drm/rockchip/cdn-dp-core.h          |   2 +
+>  drivers/gpu/drm/rockchip/cdn-dp-link-training.c | 420 ++++++++++++++++++++++++
+>  drivers/gpu/drm/rockchip/cdn-dp-reg.c           |  31 +-
+>  drivers/gpu/drm/rockchip/cdn-dp-reg.h           |  38 ++-
+>  6 files changed, 505 insertions(+), 13 deletions(-)
+>  create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-link-training.c
 
-diff --git a/arch/x86/mm/pgtable.c b/arch/x86/mm/pgtable.c
-index ffc8c13c50e4..3f7180bc5f52 100644
---- a/arch/x86/mm/pgtable.c
-+++ b/arch/x86/mm/pgtable.c
-@@ -715,6 +715,7 @@ int pmd_clear_huge(pmd_t *pmd)
- 	return 0;
- }
- 
-+#ifdef CONFIG_X86_64
- /**
-  * pud_free_pmd_page - Clear pud entry and free pmd page.
-  * @pud: Pointer to a PUD.
-@@ -762,4 +763,22 @@ int pmd_free_pte_page(pmd_t *pmd)
- 
- 	return 1;
- }
-+
-+#else /* !CONFIG_X86_64 */
-+
-+int pud_free_pmd_page(pud_t *pud)
-+{
-+	return pud_none(*pud);
-+}
-+
-+/*
-+ * Disable free page handling on x86-PAE. This assures that ioremap()
-+ * does not update sync'd pmd entries. See vmalloc_sync_one().
-+ */
-+int pmd_free_pte_page(pmd_t *pmd)
-+{
-+	return pmd_none(*pmd);
-+}
-+
-+#endif /* CONFIG_X86_64 */
- #endif	/* CONFIG_HAVE_ARCH_HUGE_VMAP */
+...
+
+> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-link-training.c b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
+> new file mode 100644
+> index 0000000..7efd070
+> --- /dev/null
+> +++ b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
+> @@ -0,0 +1,420 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
+> + * Author: Chris Zhong <zyw@rock-chips.com>
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/delay.h>
+> +#include <linux/phy/phy.h>
+> +#include <soc/rockchip/rockchip_phy_typec.h>
+> +
+> +#include "cdn-dp-core.h"
+> +#include "cdn-dp-reg.h"
+> +
+> +static void cdn_dp_set_signal_levels(struct cdn_dp_device *dp)
+> +{
+> +	struct cdn_dp_port *port = dp->port[dp->active_port];
+> +	struct rockchip_typec_phy *tcphy = phy_get_drvdata(port->phy);
+
+This is still antithetical to the PHY framework; you're assuming that
+this is a particular type of PHY here.
+
+> +
+> +	int rate = drm_dp_bw_code_to_link_rate(dp->link.rate);
+> +	u8 swing = (dp->train_set[0] & DP_TRAIN_VOLTAGE_SWING_MASK) >>
+> +		   DP_TRAIN_VOLTAGE_SWING_SHIFT;
+> +	u8 pre_emphasis = (dp->train_set[0] & DP_TRAIN_PRE_EMPHASIS_MASK)
+> +			  >> DP_TRAIN_PRE_EMPHASIS_SHIFT;
+> +
+> +	tcphy->typec_phy_config(port->phy, rate, dp->link.num_lanes,
+> +				swing, pre_emphasis);
+
+Is this something generic that could be added as a new PHY API instead?
+
+> +}
+
+Brian
