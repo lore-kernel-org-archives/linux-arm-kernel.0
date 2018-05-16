@@ -1,44 +1,168 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 16 May 2018 11:21:15 +0530
-Subject: [PATCH v10 02/27] clk: davinci: da850-pll: change PLL0 to
- CLK_OF_DECLARE
-In-Reply-To: <88dec9b1-5f4d-a1ac-2b63-b30ae7665851@lechnology.com>
-References: <20180509172606.29387-1-david@lechnology.com>
- <20180509172606.29387-3-david@lechnology.com>
- <9203489d-0a5a-103a-67ea-d3e89bb7ebc4@ti.com>
- <88dec9b1-5f4d-a1ac-2b63-b30ae7665851@lechnology.com>
-Message-ID: <665f5ea0-1865-0545-a1ef-7e971f3ba9d9@ti.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Wed, 16 May 2018 14:34:21 +0800
+Subject: [PATCH] ethernet: stmmac: dwmac-rk: Add GMAC support for px30
+In-Reply-To: <1526441925-12654-1-git-send-email-david.wu@rock-chips.com>
+References: <1526441925-12654-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <f7f67fbe-41e7-4497-cb01-a1fa2195d4b0@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 May 2018 09:12 PM, David Lechner wrote:
-> On 05/15/2018 08:31 AM, Sekhar Nori wrote:
->> On Wednesday 09 May 2018 10:55 PM, David Lechner wrote:
->>> +void of_da850_pll0_init(struct device_node *node)
->>> ? {
->>> -??? return of_davinci_pll_init(dev, dev->of_node, &da850_pll0_info,
->>> -?????????????????? &da850_pll0_obsclk_info,
->>> -?????????????????? da850_pll0_sysclk_info, 7, base, cfgchip);
->>> +??? void __iomem *base;
->>> +??? struct regmap *cfgchip;
->>> +
->>> +??? base = of_iomap(node, 0);
->>> +??? if (!base) {
->>> +??????? pr_err("%s: ioremap failed\n", __func__);
->>> +??????? return;
->>> +??? }
->>> +
->>> +??? cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
+Hi David,
+
+On 2018/5/16 11:38, David Wu wrote:
+> Add constants and callback functions for the dwmac on px30 soc.
+
+s/soc/SoC
+
+> The base structure is the same, but registers and the bits in
+> them moved slightly, and add the clk_mac_speed for the select
+
+s/moved/are moved
+
+> of mac speed.
+
+for selecting mas speed.
+
 > 
-> In your previous review, you pointed out that the error did not need to
-> be handled here because it is handled later in davinci_pll_clk_register().>
-> We get a warning there because cfgchip is only needed for unlocking the
-> PLL for CPU frequency scaling and is not critical for operation of the
-> clocks.
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
 
-Oops, forgot about that :)
+git log --oneline  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+shows very inconsistent format wrt. commit title, so please
+follow the exsiting exsamples as possible.
 
-Thanks,
-Sekhar
+> ---
+>   .../devicetree/bindings/net/rockchip-dwmac.txt     |  1 +
+>   drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 64 ++++++++++++++++++++++
+>   2 files changed, 65 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> index 9c16ee2..3b71da7 100644
+> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+
+It'd be better to split doc changes into a separate patch.
+
+> @@ -4,6 +4,7 @@ The device node has following properties.
+>   
+>   Required properties:
+>    - compatible: should be "rockchip,<name>-gamc"
+> +   "rockchip,px30-gmac":   found on PX30 SoCs
+>      "rockchip,rk3128-gmac": found on RK312x SoCs
+>      "rockchip,rk3228-gmac": found on RK322x SoCs
+>      "rockchip,rk3288-gmac": found on RK3288 SoCs
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+> index 13133b3..4b2ab71 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+> @@ -61,6 +61,7 @@ struct rk_priv_data {
+>   	struct clk *mac_clk_tx;
+>   	struct clk *clk_mac_ref;
+>   	struct clk *clk_mac_refout;
+> +	struct clk *clk_mac_speed;
+
+No need to do anything now but it seems you could consider doing some
+cleanup by using clk bulk APIs in the future.
+
+>   	struct clk *aclk_mac;
+>   	struct clk *pclk_mac;
+>   	struct clk *clk_phy;
+> @@ -83,6 +84,64 @@ struct rk_priv_data {
+>   	(((tx) ? soc##_GMAC_TXCLK_DLY_ENABLE : soc##_GMAC_TXCLK_DLY_DISABLE) | \
+>   	 ((rx) ? soc##_GMAC_RXCLK_DLY_ENABLE : soc##_GMAC_RXCLK_DLY_DISABLE))
+>   
+> +#define PX30_GRF_GMAC_CON1		0X0904
+
+s/0X0904/0x0904 , since the other constants in this file follow the
+same format.
+
+> +
+> +/* PX30_GRF_GMAC_CON1 */
+> +#define PX30_GMAC_PHY_INTF_SEL_RMII	(GRF_CLR_BIT(4) | GRF_CLR_BIT(5) | \
+> +					GRF_BIT(6))
+> +#define PX30_GMAC_SPEED_10M		GRF_CLR_BIT(2)
+> +#define PX30_GMAC_SPEED_100M		GRF_BIT(2)
+> +
+> +static void px30_set_to_rmii(struct rk_priv_data *bsp_priv)
+> +{
+> +	struct device *dev = &bsp_priv->pdev->dev;
+> +
+> +	if (IS_ERR(bsp_priv->grf)) {
+> +		dev_err(dev, "%s: Missing rockchip,grf property\n", __func__);
+> +		return;
+> +	}
+> +
+> +	regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
+> +		     PX30_GMAC_PHY_INTF_SEL_RMII);
+> +}
+> +
+> +static void px30_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+> +{
+> +	struct device *dev = &bsp_priv->pdev->dev;
+> +	int ret;
+> +
+> +	if (IS_ERR(bsp_priv->clk_mac_speed)) {
+> +		dev_err(dev, "%s: Missing clk_mac_speed clock\n", __func__);
+> +		return;
+> +	}
+> +
+> +	if (speed == 10) {
+> +		regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
+> +			     PX30_GMAC_SPEED_10M);
+> +
+> +		ret = clk_set_rate(bsp_priv->clk_mac_speed, 2500000);
+> +		if (ret)
+> +			dev_err(dev, "%s: set clk_mac_speed rate 2500000 failed: %d\n",
+> +				__func__, ret);
+> +	} else if (speed == 100) {
+> +		regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
+> +			     PX30_GMAC_SPEED_100M);
+> +
+> +		ret = clk_set_rate(bsp_priv->clk_mac_speed, 25000000);
+> +		if (ret)
+> +			dev_err(dev, "%s: set clk_mac_speed rate 25000000 failed: %d\n",
+> +				__func__, ret);
+
+I know it follows the existing examples, but IMHO it duplicates
+unnecessary code as all the difference is PX30_GMAC_SPEED_*
+
+> +
+> +	} else {
+> +		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
+> +	}
+> +}
+> +
+> +static const struct rk_gmac_ops px30_ops = {
+> +	.set_to_rmii = px30_set_to_rmii,
+> +	.set_rmii_speed = px30_set_rmii_speed,
+> +};
+> +
+>   #define RK3128_GRF_MAC_CON0	0x0168
+>   #define RK3128_GRF_MAC_CON1	0x016c
+>   
+> @@ -1042,6 +1101,10 @@ static int rk_gmac_clk_init(struct plat_stmmacenet_data *plat)
+>   		}
+>   	}
+>   
+> +	bsp_priv->clk_mac_speed = devm_clk_get(dev, "clk_mac_speed");
+
+Mightbe it'd be better to use "mac-speed" in DT bindings.
+
+> +	if (IS_ERR(bsp_priv->clk_mac_speed))
+> +		dev_err(dev, "cannot get clock %s\n", "clk_mac_speed");
+> +
+
+Would you like to handle deferred probe?
+
+>   	if (bsp_priv->clock_input) {
+>   		dev_info(dev, "clock input from PHY\n");
+>   	} else {
+> @@ -1424,6 +1487,7 @@ static int rk_gmac_resume(struct device *dev)
+>   static SIMPLE_DEV_PM_OPS(rk_gmac_pm_ops, rk_gmac_suspend, rk_gmac_resume);
+>   
+>   static const struct of_device_id rk_gmac_dwmac_match[] = {
+> +	{ .compatible = "rockchip,px30-gmac",	.data = &px30_ops   },
+>   	{ .compatible = "rockchip,rk3128-gmac", .data = &rk3128_ops },
+>   	{ .compatible = "rockchip,rk3228-gmac", .data = &rk3228_ops },
+>   	{ .compatible = "rockchip,rk3288-gmac", .data = &rk3288_ops },
+> 
