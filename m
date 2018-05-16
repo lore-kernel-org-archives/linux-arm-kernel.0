@@ -1,50 +1,38 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Wed, 16 May 2018 09:39:21 +0300
-Subject: [PATCH] ARM: dts: vf610-zii-dev: enable vf610 builtin temp sensor
-Message-ID: <20180516063921.10406-1-nikita.yoush@cogentembedded.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue, 15 May 2018 23:39:42 -0700
+Subject: [PATCH V4] clk: at91: PLL recalc_rate() now using cached MUL and
+ DIV values
+In-Reply-To: <20180429190111.14247-1-marcin@ziemianowicz.com>
+References: <20180429190111.14247-1-marcin@ziemianowicz.com>
+Message-ID: <152645278298.237094.13637070780064221668@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vybrid has single internal temperature sensor connected to both internal
-ADC modules.
+Quoting Marcin Ziemianowicz (2018-04-29 12:01:11)
+> When a USB device is connected to the USB host port on the SAM9N12 then
+> you get "-62" error which seems to indicate USB replies from the device
+> are timing out. Based on a logic sniffer, I saw the USB bus was running
+> at half speed.
+> 
+> The PLL code uses cached MUL and DIV values which get set in set_rate()
+> and applied in prepare(), but the recalc_rate() function instead
+> queries the hardware instead of using these cached values. Therefore,
+> if recalc_rate() is called between a set_rate() and prepare(), the
+> wrong frequency is calculated and later the USB clock divider for the
+> SAM9N12 SOC will be configured for an incorrect clock.
+> 
+> In my case, the PLL hardware was set to 96 Mhz before the OHCI
+> driver loads, and therefore the usb clock divider was being set
+> to /2 even though the OHCI driver set the PLL to 48 Mhz.
+> 
+> As an alternative explanation, I noticed this was fixed in the past by
+> 87e2ed338f1b ("clk: at91: fix recalc_rate implementation of PLL
+> driver") but the bug was later re-introduced by 1bdf02326b71 ("clk:
+> at91: make use of syscon/regmap internally").
+> 
+> Fixes: 1bdf02326b71 ("clk: at91: make use of syscon/regmap internally)
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
+> ---
 
-vf610-zii-dev already has ADC0 enabled. Now, to get temperature sensor
-captured by iio_hwmon driver, need to configure iio_hwmon node to use
-that ADC.
-
-Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
----
- arch/arm/boot/dts/vf610-zii-dev.dtsi | 4 ++++
- arch/arm/boot/dts/vfxxx.dtsi         | 2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/vf610-zii-dev.dtsi b/arch/arm/boot/dts/vf610-zii-dev.dtsi
-index 4890b8a5aa44..5ae5abfe1d55 100644
---- a/arch/arm/boot/dts/vf610-zii-dev.dtsi
-+++ b/arch/arm/boot/dts/vf610-zii-dev.dtsi
-@@ -222,6 +222,10 @@
- 	status = "okay";
- };
- 
-+&tempsensor {
-+	io-channels = <&adc0 16>;
-+};
-+
- &iomuxc {
- 	pinctrl_adc0_ad5: adc0ad5grp {
- 		fsl,pins = <
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index c3f09b737924..d392794d9c13 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -84,7 +84,7 @@
- 		mask = <0x1000>;
- 	};
- 
--	iio-hwmon {
-+	tempsensor: iio-hwmon {
- 		compatible = "iio-hwmon";
- 		io-channels = <&adc0 16>, <&adc1 16>;
- 	};
--- 
-2.11.0
+Applied to clk-next
