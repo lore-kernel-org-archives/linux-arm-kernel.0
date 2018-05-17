@@ -1,66 +1,124 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Thu, 17 May 2018 11:01:57 +0300
-Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
-In-Reply-To: <20180516074333.i2672u435ymwffk3@verge.net.au>
-References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
- <1526387370-17142-4-git-send-email-gilad@benyossef.com>
- <CAMuHMdWzeNqsho1V6ezZb81T3_HcRzrtuQpmGXsjtFgt9BtZDQ@mail.gmail.com>
- <20180516074333.i2672u435ymwffk3@verge.net.au>
-Message-ID: <CAOtvUMfFjokOLCg6aHNQESJ_q4Jiok3izrPtae5wR+cND=XL6g@mail.gmail.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Thu, 17 May 2018 09:14:33 +0100
+Subject: [PATCH 1/8] firmware: arm_scmi: improve code readability using
+ bitfield accessor macros
+In-Reply-To: <1525885634-22348-2-git-send-email-sudeep.holla@arm.com>
+References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
+ <1525885634-22348-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180517091433.0000513b@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 10:43 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, May 15, 2018 at 04:50:44PM +0200, Geert Uytterhoeven wrote:
->> Hi Gilad,
->>
->> On Tue, May 15, 2018 at 2:29 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
->> > Add bindings for CryptoCell instance in the SoC.
->> >
->> > Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
->>
->> Thanks for your patch!
->>
->> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> > @@ -528,6 +528,14 @@
->> >                         status = "disabled";
->> >                 };
->> >
->> > +               arm_cc630p: crypto at e6601000 {
->> > +                       compatible = "arm,cryptocell-630p-ree";
->> > +                       interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
->> > +                       #interrupt-cells = <2>;
->>
->> I believe the #interrupt-cells property is not needed.
->>
->> > +                       reg = <0x0 0xe6601000 0 0x1000>;
->> > +                       clocks = <&cpg CPG_MOD 229>;
->> > +               };
->>
->> The rest looks good, but I cannot verify the register block.
->>
->> > +
->> >                 i2c3: i2c at e66d0000 {
->> >                         #address-cells = <1>;
->> >                         #size-cells = <0>;
->
-> Thanks, I have applied this after dropping the #interrupt-cells property.
+On Wed, 9 May 2018 18:07:07 +0100
+Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-Thanks you!
+> By using FIELD_{FIT,GET,PREP} and GENMASK macro accessors we can avoid
+> some clumpsy custom shifting and masking macros and also improve the
+> code better readability.
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Hi Sudeep,
 
-Alas, it will not work without the clk patch (the previous one in the
-series) so they need to be
-taken or dropped together.
+A minor comment inline.
 
-Gilad
+Jonathan
+> ---
+>  drivers/firmware/arm_scmi/common.h |  9 +++++----
+>  drivers/firmware/arm_scmi/driver.c | 31 ++++++++++++++-----------------
+>  2 files changed, 19 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
+> index 0c30234f9098..e8f332c9c469 100644
+> --- a/drivers/firmware/arm_scmi/common.h
+> +++ b/drivers/firmware/arm_scmi/common.h
+> @@ -7,6 +7,7 @@
+>   * Copyright (C) 2018 ARM Ltd.
+>   */
+>  
+> +#include <linux/bitfield.h>
+>  #include <linux/completion.h>
+>  #include <linux/device.h>
+>  #include <linux/errno.h>
+> @@ -14,10 +15,10 @@
+>  #include <linux/scmi_protocol.h>
+>  #include <linux/types.h>
+>  
+> -#define PROTOCOL_REV_MINOR_BITS	16
+> -#define PROTOCOL_REV_MINOR_MASK	((1U << PROTOCOL_REV_MINOR_BITS) - 1)
+> -#define PROTOCOL_REV_MAJOR(x)	((x) >> PROTOCOL_REV_MINOR_BITS)
+> -#define PROTOCOL_REV_MINOR(x)	((x) & PROTOCOL_REV_MINOR_MASK)
+> +#define PROTOCOL_REV_MINOR_MASK	GENMASK(15, 0)
+> +#define PROTOCOL_REV_MAJOR_MASK	GENMASK(31, 16)
+> +#define PROTOCOL_REV_MAJOR(x)	(u16)(FIELD_GET(PROTOCOL_REV_MAJOR_MASK, (x)))
+> +#define PROTOCOL_REV_MINOR(x)	(u16)(FIELD_GET(PROTOCOL_REV_MINOR_MASK, (x)))
+>  #define MAX_PROTOCOLS_IMP	16
+>  #define MAX_OPPS		16
+>  
+> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+> index 14b147135a0c..917786d91f55 100644
+> --- a/drivers/firmware/arm_scmi/driver.c
+> +++ b/drivers/firmware/arm_scmi/driver.c
+> @@ -29,16 +29,12 @@
+>  
+>  #include "common.h"
+>  
+> -#define MSG_ID_SHIFT		0
+> -#define MSG_ID_MASK		0xff
+> -#define MSG_TYPE_SHIFT		8
+> -#define MSG_TYPE_MASK		0x3
+> -#define MSG_PROTOCOL_ID_SHIFT	10
+> -#define MSG_PROTOCOL_ID_MASK	0xff
+> -#define MSG_TOKEN_ID_SHIFT	18
+> -#define MSG_TOKEN_ID_MASK	0x3ff
+> -#define MSG_XTRACT_TOKEN(header)	\
+> -	(((header) >> MSG_TOKEN_ID_SHIFT) & MSG_TOKEN_ID_MASK)
+> +#define MSG_ID_MASK		GENMASK(7, 0)
+> +#define MSG_TYPE_MASK		GENMASK(9, 8)
+> +#define MSG_PROTOCOL_ID_MASK	GENMASK(17, 10)
+> +#define MSG_TOKEN_ID_MASK	GENMASK(27, 18)
+> +#define MSG_XTRACT_TOKEN(hdr)	FIELD_GET(MSG_TOKEN_ID_MASK, (hdr))
+> +#define MSG_TOKEN_MAX		(MSG_XTRACT_TOKEN(MSG_TOKEN_ID_MASK) + 1)
 
+This feels a little odd. It's not the Max value, I think, but rather one more than
+it. I would set it to this -1 and use > than in the test below.
 
+>  
+>  enum scmi_error_codes {
+>  	SCMI_SUCCESS = 0,	/* Success */
+> @@ -255,9 +251,9 @@ static void scmi_rx_callback(struct mbox_client *cl, void *m)
+>   */
+>  static inline u32 pack_scmi_header(struct scmi_msg_hdr *hdr)
+>  {
+> -	return ((hdr->id & MSG_ID_MASK) << MSG_ID_SHIFT) |
+> -	   ((hdr->seq & MSG_TOKEN_ID_MASK) << MSG_TOKEN_ID_SHIFT) |
+> -	   ((hdr->protocol_id & MSG_PROTOCOL_ID_MASK) << MSG_PROTOCOL_ID_SHIFT);
+> +	return FIELD_PREP(MSG_ID_MASK, hdr->id) |
+> +		FIELD_PREP(MSG_TOKEN_ID_MASK, hdr->seq) |
+> +		FIELD_PREP(MSG_PROTOCOL_ID_MASK, hdr->protocol_id);
+>  }
+>  
+>  /**
+> @@ -621,9 +617,9 @@ static int scmi_xfer_info_init(struct scmi_info *sinfo)
+>  	struct scmi_xfers_info *info = &sinfo->minfo;
+>  
+>  	/* Pre-allocated messages, no more than what hdr.seq can support */
+> -	if (WARN_ON(desc->max_msg >= (MSG_TOKEN_ID_MASK + 1))) {
+> -		dev_err(dev, "Maximum message of %d exceeds supported %d\n",
+> -			desc->max_msg, MSG_TOKEN_ID_MASK + 1);
+> +	if (WARN_ON(desc->max_msg >= MSG_TOKEN_MAX)) {
 
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
-
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+> +		dev_err(dev, "Maximum message of %d exceeds supported %ld\n",
+> +			desc->max_msg, MSG_TOKEN_MAX);
+>  		return -EINVAL;
+>  	}
+>  
+> @@ -840,7 +836,8 @@ static int scmi_probe(struct platform_device *pdev)
+>  		if (of_property_read_u32(child, "reg", &prot_id))
+>  			continue;
+>  
+> -		prot_id &= MSG_PROTOCOL_ID_MASK;
+> +		if (!FIELD_FIT(MSG_PROTOCOL_ID_MASK, prot_id))
+> +			dev_err(dev, "Out of range protocol %d\n", prot_id);
+>  
+>  		if (!scmi_is_protocol_implemented(handle, prot_id)) {
+>  			dev_err(dev, "SCMI protocol %d not implemented\n",
