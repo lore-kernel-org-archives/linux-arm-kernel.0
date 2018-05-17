@@ -1,245 +1,30 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Thu, 17 May 2018 10:05:33 +0900
-Subject: [PATCH v2] media: helene: add I2C device probe function
-In-Reply-To: <CAK3bHNVH1476vtJOTR0oFpFC8bvwLecYmgJEQCGp0Y+E4=LSsA@mail.gmail.com>
-References: <20180516083753.15510-1-suzuki.katsuhiro@socionext.com>
- <CAK3bHNVH1476vtJOTR0oFpFC8bvwLecYmgJEQCGp0Y+E4=LSsA@mail.gmail.com>
-Message-ID: <000701d3ed7b$282e7550$788b5ff0$@socionext.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Wed, 16 May 2018 20:12:26 -0500
+Subject: [PATCH 0/3] coresight: Don't use contextID with PID namespaces
+In-Reply-To: <1526404417-32507-1-git-send-email-mathieu.poirier@linaro.org>
+ (Mathieu Poirier's message of "Tue, 15 May 2018 11:13:34 -0600")
+References: <1526404417-32507-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <87po1vjdad.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abylay,
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-> -----Original Message-----
-> From: Abylay Ospan <aospan@netup.ru>
-> Sent: Wednesday, May 16, 2018 7:54 PM
-> To: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>
-> Cc: Mauro Carvalho Chehab <mchehab@kernel.org>; linux-media
-> <linux-media@vger.kernel.org>; Masami Hiramatsu <masami.hiramatsu@linaro.org>;
-> Jassi Brar <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v2] media: helene: add I2C device probe function
-> 
-> Hi Katsuhiro,
-> 
-> Thanks for patch.
-> 
-> What is the purpose to rework helene_set_params(_t|_s) ?
-> other part of this patch looks ok for me, but not tested due to lack of spare time ;(
-> 
+> Since the in-kernel value of a PID differs from what is seen from 
+> PID namespaces, using contextID tracing with PID namespaces makes the
+> feature confusing to use and potentially subject to leaking out internal
+> kernel information.
+>
+> This set returns an error if contextID and PID namespaces are used in
+> conjunction and gets rid of the vpid-to-pid translation function as it
+> is no longer needed.
 
-I'm using Socionext SC1501A (or MN88443x) ISDB-S/ISDB-T demodulator with this 
-tuner. This demodulator has 1 port, and can use ISDB-S or ISDB-T exclusively.
+I looked the file can only be written by root.  So limiting things to
+the initial pid namespace seems like the right solutions.  Especially as
+the trace stream will include the global pid and be available to the
+tracer.
 
-So I think I cannot use ISDB-S features of this tuner if I use helene_attach(), 
-and I cannot use ISDB-T if I use helene_attach_s() too.
+This sounds like a simple code with a minimal chance of breaking
+userspace.
 
-
-Regards,
---
-Katsuhiro Suzuki
-
-
-> 
-> 2018-05-16 4:37 GMT-04:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com
-> <mailto:suzuki.katsuhiro@socionext.com> >:
-> 
-> 
-> 	This patch adds I2C probe function to use dvb_module_probe()
-> 	with this driver.
-> 
-> 	Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com
-> <mailto:suzuki.katsuhiro@socionext.com> >
-> 
-> 	---
-> 
-> 	Changes since v1:
-> 	  - Add documents for dvb_frontend member of helene_config
-> 	---
-> 	 drivers/media/dvb-frontends/helene.c | 88 ++++++++++++++++++++++++++--
-> 	 drivers/media/dvb-frontends/helene.h |  3 +
-> 	 2 files changed, 87 insertions(+), 4 deletions(-)
-> 
-> 	diff --git a/drivers/media/dvb-frontends/helene.c
-> b/drivers/media/dvb-frontends/helene.c
-> 	index a0d0b53c91d7..04033f0c278b 100644
-> 	--- a/drivers/media/dvb-frontends/helene.c
-> 	+++ b/drivers/media/dvb-frontends/helene.c
-> 	@@ -666,7 +666,7 @@ static int helene_set_params_s(struct dvb_frontend *fe)
-> 	        return 0;
-> 	 }
-> 
-> 	-static int helene_set_params(struct dvb_frontend *fe)
-> 	+static int helene_set_params_t(struct dvb_frontend *fe)
-> 	 {
-> 	        u8 data[MAX_WRITE_REGSIZE];
-> 	        u32 frequency;
-> 	@@ -835,6 +835,19 @@ static int helene_set_params(struct dvb_frontend *fe)
-> 	        return 0;
-> 	 }
-> 
-> 	+static int helene_set_params(struct dvb_frontend *fe)
-> 	+{
-> 	+       struct dtv_frontend_properties *p = &fe->dtv_property_cache;
-> 	+
-> 	+       if (p->delivery_system == SYS_DVBT ||
-> 	+           p->delivery_system == SYS_DVBT2 ||
-> 	+           p->delivery_system == SYS_ISDBT ||
-> 	+           p->delivery_system == SYS_DVBC_ANNEX_A)
-> 	+               return helene_set_params_t(fe);
-> 	+
-> 	+       return helene_set_params_s(fe);
-> 	+}
-> 	+
-> 	 static int helene_get_frequency(struct dvb_frontend *fe, u32 *frequency)
-> 	 {
-> 	        struct helene_priv *priv = fe->tuner_priv;
-> 	@@ -843,7 +856,7 @@ static int helene_get_frequency(struct dvb_frontend *fe,
-> u32 *frequency)
-> 	        return 0;
-> 	 }
-> 
-> 	-static const struct dvb_tuner_ops helene_tuner_ops = {
-> 	+static const struct dvb_tuner_ops helene_tuner_ops_t = {
-> 	        .info = {
-> 	                .name = "Sony HELENE Ter tuner",
-> 	                .frequency_min = 1000000,
-> 	@@ -853,7 +866,7 @@ static const struct dvb_tuner_ops helene_tuner_ops = {
-> 	        .init = helene_init,
-> 	        .release = helene_release,
-> 	        .sleep = helene_sleep,
-> 	-       .set_params = helene_set_params,
-> 	+       .set_params = helene_set_params_t,
-> 	        .get_frequency = helene_get_frequency,
-> 	 };
-> 
-> 	@@ -871,6 +884,20 @@ static const struct dvb_tuner_ops helene_tuner_ops_s
-> = {
-> 	        .get_frequency = helene_get_frequency,
-> 	 };
-> 
-> 	+static const struct dvb_tuner_ops helene_tuner_ops = {
-> 	+       .info = {
-> 	+               .name = "Sony HELENE Sat/Ter tuner",
-> 	+               .frequency_min = 500000,
-> 	+               .frequency_max = 1200000000,
-> 	+               .frequency_step = 1000,
-> 	+       },
-> 	+       .init = helene_init,
-> 	+       .release = helene_release,
-> 	+       .sleep = helene_sleep,
-> 	+       .set_params = helene_set_params,
-> 	+       .get_frequency = helene_get_frequency,
-> 	+};
-> 	+
-> 	 /* power-on tuner
-> 	  * call once after reset
-> 	  */
-> 	@@ -1032,7 +1059,7 @@ struct dvb_frontend *helene_attach(struct
-> dvb_frontend *fe,
-> 	        if (fe->ops.i2c_gate_ctrl)
-> 	                fe->ops.i2c_gate_ctrl(fe, 0);
-> 
-> 	-       memcpy(&fe->ops.tuner_ops, &helene_tuner_ops,
-> 	+       memcpy(&fe->ops.tuner_ops, &helene_tuner_ops_t,
-> 	                        sizeof(struct dvb_tuner_ops));
-> 	        fe->tuner_priv = priv;
-> 	        dev_info(&priv->i2c->dev,
-> 	@@ -1042,6 +1069,59 @@ struct dvb_frontend *helene_attach(struct
-> dvb_frontend *fe,
-> 	 }
-> 	 EXPORT_SYMBOL(helene_attach);
-> 
-> 	+static int helene_probe(struct i2c_client *client,
-> 	+                       const struct i2c_device_id *id)
-> 	+{
-> 	+       struct helene_config *config = client->dev.platform_data;
-> 	+       struct dvb_frontend *fe = config->fe;
-> 	+       struct device *dev = &client->dev;
-> 	+       struct helene_priv *priv;
-> 	+
-> 	+       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> 	+       if (!priv)
-> 	+               return -ENOMEM;
-> 	+
-> 	+       priv->i2c_address = client->addr;
-> 	+       priv->i2c = client->adapter;
-> 	+       priv->set_tuner_data = config->set_tuner_priv;
-> 	+       priv->set_tuner = config->set_tuner_callback;
-> 	+       priv->xtal = config->xtal;
-> 	+
-> 	+       if (fe->ops.i2c_gate_ctrl)
-> 	+               fe->ops.i2c_gate_ctrl(fe, 1);
-> 	+
-> 	+       if (helene_x_pon(priv) != 0)
-> 	+               return -EINVAL;
-> 	+
-> 	+       if (fe->ops.i2c_gate_ctrl)
-> 	+               fe->ops.i2c_gate_ctrl(fe, 0);
-> 	+
-> 	+       memcpy(&fe->ops.tuner_ops, &helene_tuner_ops,
-> 	+              sizeof(struct dvb_tuner_ops));
-> 	+       fe->tuner_priv = priv;
-> 	+       i2c_set_clientdata(client, priv);
-> 	+
-> 	+       dev_info(dev, "Sony HELENE attached on addr=%x at I2C adapter %p\n",
-> 	+                priv->i2c_address, priv->i2c);
-> 	+
-> 	+       return 0;
-> 	+}
-> 	+
-> 	+static const struct i2c_device_id helene_id[] = {
-> 	+       { "helene", },
-> 	+       {}
-> 	+};
-> 	+MODULE_DEVICE_TABLE(i2c, helene_id);
-> 	+
-> 	+static struct i2c_driver helene_driver = {
-> 	+       .driver = {
-> 	+               .name = "helene",
-> 	+       },
-> 	+       .probe    = helene_probe,
-> 	+       .id_table = helene_id,
-> 	+};
-> 	+module_i2c_driver(helene_driver);
-> 	+
-> 	 MODULE_DESCRIPTION("Sony HELENE Sat/Ter tuner driver");
-> 	 MODULE_AUTHOR("Abylay Ospan <aospan at netup.ru <mailto:aospan@netup.ru>
-> >");
-> 	 MODULE_LICENSE("GPL");
-> 	diff --git a/drivers/media/dvb-frontends/helene.h
-> b/drivers/media/dvb-frontends/helene.h
-> 	index c9fc81c7e4e7..8562d01bc93e 100644
-> 	--- a/drivers/media/dvb-frontends/helene.h
-> 	+++ b/drivers/media/dvb-frontends/helene.h
-> 	@@ -39,6 +39,7 @@ enum helene_xtal {
-> 	  * @set_tuner_callback:        Callback function that notifies the parent
-> driver
-> 	  *                     which tuner is active now
-> 	  * @xtal: Cristal frequency as described by &enum helene_xtal
-> 	+ * @fe: Frontend for which connects this tuner
-> 	  */
-> 	 struct helene_config {
-> 	        u8      i2c_address;
-> 	@@ -46,6 +47,8 @@ struct helene_config {
-> 	        void    *set_tuner_priv;
-> 	        int     (*set_tuner_callback)(void *, int);
-> 	        enum helene_xtal xtal;
-> 	+
-> 	+       struct dvb_frontend *fe;
-> 	 };
-> 
-> 	 #if IS_REACHABLE(CONFIG_DVB_HELENE)
-> 	--
-> 	2.17.0
-> 
-> 
-> 
-> 
-> 
-> 
-> --
-> 
-> Abylay Ospan,
-> NetUP Inc.
-> http://www.netup.tv <http://www.netup.tv/>
+Acked-by: "Eric W. Biederman" <ebiederm@xmission.com>
