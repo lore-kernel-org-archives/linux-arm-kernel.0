@@ -1,101 +1,70 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 17 May 2018 14:23:00 +0200
-Subject: [PATCH net-next v3 00/10] net: mvpp2: phylink conversion
-In-Reply-To: <20180517082939.14598-1-antoine.tenart@bootlin.com> (Antoine
- Tenart's message of "Thu, 17 May 2018 10:29:29 +0200")
-References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
-Message-ID: <877eo21nff.fsf@bootlin.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 May 2018 07:37:27 -0500
+Subject: [PATCH V2 8/8] dt-bindings: stm32: add compatible for syscon
+In-Reply-To: <d2b4cd1845b949a7bf9c42a17a5358a2@SFHDAG5NODE3.st.com>
+References: <1525270723-18241-1-git-send-email-christophe.roullier@st.com>
+ <1525270723-18241-9-git-send-email-christophe.roullier@st.com>
+ <20180507163537.GA15212@rob-hp-laptop>
+ <d2b4cd1845b949a7bf9c42a17a5358a2@SFHDAG5NODE3.st.com>
+Message-ID: <CAL_JsqLqNXKbPE_+kFZROOrx3_7hjG-acwHRjry_KkG3XD2O6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On jeu., mai 17 2018, Antoine Tenart <antoine.tenart@bootlin.com> wrote:
+On Tue, May 15, 2018 at 11:19 AM, Christophe ROULLIER
+<christophe.roullier@st.com> wrote:
+> Hi Rob,
 
-> Hi Dave, Russell,
+Please don't top post to lists.
 >
-> This series convert the Marvell PPv2 driver to phylink (models the MAC
-> to PHY link).
+> I do not understand, so let me explain our status:
 >
-> One important point is the PPv2 driver supports two probe modes: device
-> tree and ACPI. This series only brings phylink support for the device
-> tree mode, as the ACPI one will need further work. Still, the driver
-> should be working as before when using ACPI. This split should be
-> temporary, and was discussed with Marcin (in Cc.) who added ACPI support
-> to the driver.
->
-> Also as the SFP cages on both DB boards can be considered as non-wired.
-> We thus chose not to describe those SFP cages and we use fixed-link.
->
-> The rest of the series uses phylink to add support for 1000BaseX and
-> 2500BaseX modes in the PPv2 driver. To do this, two patches are needed
-> in the common PHY framework (patches 3 and 4). The last 4 patches modify
-> the device tree to use the new PPv2 functionalities.
->
-> The series has been tested for the device tree mode on the 7040-db,
-> 8040-db and 8040-mcbin boards, to ensure all the interface where working
-> as expected.
->
-> @Dave: patches 7 to 10 should go through the mvebu tree (Gregory in
-> Cc.) to avoid any conflict with the other mvebu dt patches taken during
-> this cycle.
+> We have syscfg IP Harware in our SOC.
 
-Patches 7 to 10 have been applied on mvebu/dt64.
+Add a compatible string that uniquely identifies what the block is. So
+something like "st,stm32f746-syscfg".
 
-Thanks,
+> But we do not have SoC specific driver to manage syscfg, we are using a generic driver "syscon".
 
-Gregory
+That does not matter. We're talking about the binding. Design
+decisions in the OS should not define the binding. It doesn't matter
+that the OS currently doesn't use the compatible string.
 
+> So can you tell me what you wish to describe this part in our SOC bindings ?
 >
-> The series is based on today's net-next.
+> Thanks for your help.
 >
-> Thanks!
-> Antoine
+> Christophe.
 >
-> Since v2:
->   - Removed the SFP description from the DB boards, as their SFP cages
->     are wired properly. We now use fixed-link.
->   - Because of this rework, split the series in two, so that the SFP
->     part is reviewed separately.
->   - Small fixes in the phylink patch.
->   - Rebased on the latest net-next branch.
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: lundi 7 mai 2018 18:36
+> To: Christophe ROULLIER <christophe.roullier@st.com>
+> Cc: mark.rutland at arm.com; mcoquelin.stm32 at gmail.com; Alexandre TORGUE <alexandre.torgue@st.com>; Peppe CAVALLARO <peppe.cavallaro@st.com>; devicetree at vger.kernel.org; andrew at lunn.ch; linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org
+> Subject: Re: [PATCH V2 8/8] dt-bindings: stm32: add compatible for syscon
 >
-> Since v1:
->   - Chose a different approach to the SFP changes, as the previous ones
->     weren't valid and reworked both BD boards device trees.
->   - Misc fixes.
->   - Added Kishon's acked-by on one patch.
->   - Rebaed on latest net-next branch.
+> On Wed, May 02, 2018 at 04:18:43PM +0200, Christophe Roullier wrote:
+>> This patch describes syscon DT bindings.
+>>
+>> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/stm32.txt | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/stm32.txt
+>> b/Documentation/devicetree/bindings/arm/stm32.txt
+>> index 6808ed9..06e3834 100644
+>> --- a/Documentation/devicetree/bindings/arm/stm32.txt
+>> +++ b/Documentation/devicetree/bindings/arm/stm32.txt
+>> @@ -8,3 +8,7 @@ using one of the following compatible strings:
+>>    st,stm32f746
+>>    st,stm32h743
+>>    st,stm32mp157
+>> +
+>> +Required nodes:
+>> +- syscon: the soc bus node must have a system controller node
+>> +pointing to the
+>> +  global control registers, with the compatible string "syscon";
 >
-> Antoine Tenart (9):
->   net: mvpp2: align the ethtool ops definition
->   net: mvpp2: phylink support
->   phy: add 2.5G SGMII mode to the phy_mode enum
->   phy: cp110-comphy: 2.5G SGMII mode
->   net: mvpp2: 1000baseX support
->   net: mvpp2: 2500baseX support
->   arm64: dts: marvell: mcbin: enable the fourth network interface
->   arm64: dts: marvell: 8040-db: describe the 10G interfaces as
->     fixed-link
->   arm64: dts: marvell: 7040-db: describe the 10G interface as fixed-link
+> You misunderstood my prior comment. 'syscon' alone is not valid. You need SoC specific compatible string for it and 'stm32' is not SoC specific. IOW, the compatible property for a syscon should imply every single register field in the block.
 >
-> Russell King (1):
->   arm64: dts: marvell: mcbin: add 10G SFP support
->
->  .../arm64/boot/dts/marvell/armada-7040-db.dts |   5 +
->  .../arm64/boot/dts/marvell/armada-8040-db.dts |  10 +
->  .../boot/dts/marvell/armada-8040-mcbin.dts    |  70 ++
->  drivers/net/ethernet/marvell/Kconfig          |   1 +
->  drivers/net/ethernet/marvell/mvpp2.c          | 931 +++++++++++-------
->  drivers/phy/marvell/phy-mvebu-cp110-comphy.c  |  17 +-
->  include/linux/phy/phy.h                       |   1 +
->  7 files changed, 680 insertions(+), 355 deletions(-)
->
-> -- 
-> 2.17.0
->
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+> Rob
