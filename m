@@ -1,45 +1,46 @@
-From: vkoul@kernel.org (Vinod)
-Date: Thu, 17 May 2018 10:51:07 +0530
-Subject: [PATCH] dmaengine: qcom: bam_dma: check if the runtime pm enabled
-In-Reply-To: <20180514161852.9620-1-srinivas.kandagatla@linaro.org>
-References: <20180514161852.9620-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180517052107.GT13271@vkoul-mobl>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Thu, 17 May 2018 00:39:37 -0500
+Subject: [PATCH 2/4] pid: Export find_task_by_vpid for use in external
+ modules
+In-Reply-To: <20180510194422.GX16141@n2100.armlinux.org.uk> (Russell King's
+ message of "Thu, 10 May 2018 20:44:22 +0100")
+References: <20180508140640.0e312dba025df75cbf205cdb@arm.com>
+ <87d0y5toed.fsf@xmission.com> <20180509152505.GA25559@xps15>
+ <87k1scs0f8.fsf@xmission.com>
+ <20180510084057.GT16141@n2100.armlinux.org.uk>
+ <CANLsYkwaNmZCUjwJXK0X1ia+RnzumfbpB8EvZJ-HDtOHj8rafQ@mail.gmail.com>
+ <20180510194422.GX16141@n2100.armlinux.org.uk>
+Message-ID: <87k1s2j0x2.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-05-18, 17:18, Srinivas Kandagatla wrote:
-> Disabling pm runtime at probe is not sufficient to get BAM working
-> on remotely controller instances. pm_runtime_get_sync() would return
-> -EACCES in such cases.
-> So check if runtime pm is enabled before returning error from bam functions.
-> 
-> Fixes: 5b4a68952a89 ("dmaengine: qcom: bam_dma: disable runtime pm on remote controlled")
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  drivers/dma/qcom/bam_dma.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/dma/qcom/bam_dma.c b/drivers/dma/qcom/bam_dma.c
-> index d29275b97e84..5f4babebc508 100644
-> --- a/drivers/dma/qcom/bam_dma.c
-> +++ b/drivers/dma/qcom/bam_dma.c
-> @@ -540,7 +540,7 @@ static void bam_free_chan(struct dma_chan *chan)
->  	int ret;
->  
->  	ret = pm_runtime_get_sync(bdev->dev);
-> -	if (ret < 0)
-> +	if (pm_runtime_enabled(bdev->dev) && ret < 0)
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-would it make sense to first check enabled and do _get_sync() 
+> On Thu, May 10, 2018 at 01:39:18PM -0600, Mathieu Poirier wrote:
+>> Hi Russell,
+>> 
+>> On 10 May 2018 at 02:40, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+>> > This does not leak information from other namespaces because of the
+>> > uniqueness of the global PID.  However, what it does leak is the value
+>> > of the global PID which is meaningless in the namespace.  So, before
+>> > the event stream is delivered to userspace, this value needs to be
+>> > re-written to the namespace's PID value.
+>> 
+>> Unfortunately that can't be done.  The trace stream is compressed and
+>> needs to be decompressed using an external library.  I think the only
+>> option is to return an error if a user is trying to use this feature
+>> from a namespace.
+>
+> That sounds like a sensible approach, and that should get rid of the
+> vpid stuff too.
+>
+> Eric, would this solve all your concerns?
 
-        if (pm_runtime_enabled()) {
-                ret = pm_runtime_get_sync() {
-                ...
-                }
-        }
+It does, and I have given my ack to the respin.
 
-thus making clear in code that we do calls only when it is enabled. Also you can
-add a local macro for this code and use that rather than copy pasting :)
+I am moderately concerned about using the global pid with hardware.  But
+pids are a core abstraction that aren't going anywhere.  As long as
+hardware does not impose constraints on pids that software already does
+not we should be fine.
 
--- 
-~Vinod
+Eric
