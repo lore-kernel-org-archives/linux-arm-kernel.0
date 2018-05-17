@@ -1,58 +1,66 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 17 May 2018 15:17:42 +0200
-Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
-In-Reply-To: <CAMuHMdVM55S7+PdnKusX-qkTxioc=0kQ6EGSbwv+kbLk5RCUYw@mail.gmail.com>
-References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
- <1526387370-17142-4-git-send-email-gilad@benyossef.com>
- <CAMuHMdWzeNqsho1V6ezZb81T3_HcRzrtuQpmGXsjtFgt9BtZDQ@mail.gmail.com>
- <20180516074333.i2672u435ymwffk3@verge.net.au>
- <CAOtvUMfFjokOLCg6aHNQESJ_q4Jiok3izrPtae5wR+cND=XL6g@mail.gmail.com>
- <CAMuHMdVM55S7+PdnKusX-qkTxioc=0kQ6EGSbwv+kbLk5RCUYw@mail.gmail.com>
-Message-ID: <CAMuHMdUd9A_JG4zvFTtJtKEJF4NFs11vWdG+vCnFAtoqYS0Yog@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 17 May 2018 09:22:23 -0400
+Subject: [PATCH] efi/fb: Convert PCI bus address to resource if translated by
+ the bridge
+Message-ID: <1526563343-28721-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 12:16 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Thu, May 17, 2018 at 10:01 AM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
->> On Wed, May 16, 2018 at 10:43 AM, Simon Horman <horms@verge.net.au> wrote:
->>> On Tue, May 15, 2018 at 04:50:44PM +0200, Geert Uytterhoeven wrote:
->>>> On Tue, May 15, 2018 at 2:29 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
->>>> > Add bindings for CryptoCell instance in the SoC.
->>>> >
->>>> > Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
->>>>
->>>> Thanks for your patch!
->>>>
->>>> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>>> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>>> > @@ -528,6 +528,14 @@
->>>> >                         status = "disabled";
->>>> >                 };
->>>> >
->>>> > +               arm_cc630p: crypto at e6601000 {
->>>> > +                       compatible = "arm,cryptocell-630p-ree";
->>>> > +                       interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
->>>> > +                       #interrupt-cells = <2>;
->>>>
->>>> I believe the #interrupt-cells property is not needed.
->>>>
->>>> > +                       reg = <0x0 0xe6601000 0 0x1000>;
->>>> > +                       clocks = <&cpg CPG_MOD 229>;
->
-> Missing "power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;", as
-> the Secure Engine is part of the CPG/MSSR clock domain (see below [*]).
+A host bridge is allowed to remap BAR addresses using _TRA attribute in
+_CRS windows.
 
-And missing "resets = <&cpg 229>;", as the module is tied to the CPG/MSSR
-reset controller.
+pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
+pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
 
-Gr{oetje,eeting}s,
+When a VGA device is behind such a host bridge and the resource is
+translated efifb driver is trying to do ioremap against bus address
+rather than the resource address and is failing to probe.
 
-                        Geert
+efifb driver is having difficulty locating the base address from BAR
+address when
 
+efifb: probing for efifb
+efifb: cannot reserve video memory at 0x1e000000
+efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
+efifb: mode is 800x600x32, linelength=3200, pages=1
+efifb: scrolling: redraw
+efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
+
+Use the host bridge offset information to convert bus address to
+resource address in the fixup.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/video/fbdev/efifb.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
+index 46a4484..ea68d5c 100644
+--- a/drivers/video/fbdev/efifb.c
++++ b/drivers/video/fbdev/efifb.c
+@@ -428,6 +428,8 @@ static void efifb_fixup_resources(struct pci_dev *dev)
+ {
+ 	u64 base = screen_info.lfb_base;
+ 	u64 size = screen_info.lfb_size;
++	struct pci_bus_region region;
++	struct resource res;
+ 	int i;
+ 
+ 	if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+@@ -439,6 +441,14 @@ static void efifb_fixup_resources(struct pci_dev *dev)
+ 	if (!base)
+ 		return;
+ 
++	region.start = base;
++	region.end = base + size - 1;
++	res.start = 0;
++	res.flags = IORESOURCE_MEM;
++	pcibios_bus_to_resource(dev->bus, &res, &region);
++	if (res.start)
++		base = res.start;
++
+ 	for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
+ 		struct resource *res = &dev->resource[i];
+ 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.7.4
