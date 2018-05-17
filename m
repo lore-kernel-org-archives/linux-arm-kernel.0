@@ -1,50 +1,34 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 17 May 2018 15:30:11 +0100
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <alpine.DEB.2.21.1805171007260.7820@macbook-air>
-References: <20180517131727.29263-1-eric@anholt.net>
- <alpine.DEB.2.21.1805171007260.7820@macbook-air>
-Message-ID: <87efia1hjg.fsf@anholt.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 17 May 2018 16:32:03 +0200
+Subject: [PATCH 0/7] i2c: clean up include/linux/i2c-*
+In-Reply-To: <20180419200015.15095-1-wsa@the-dreams.de>
+References: <20180419200015.15095-1-wsa@the-dreams.de>
+Message-ID: <20180517143202.vzwmqkemlqxj2xgu@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vince Weaver <vincent.weaver@maine.edu> writes:
+On Thu, Apr 19, 2018 at 10:00:06PM +0200, Wolfram Sang wrote:
+> Move all plain platform_data includes to the platform_data-dir
+> (except for i2c-pnx which can be moved into the driver itself).
+> 
+> My preference is to take these patches via the i2c tree. I can provide an
+> immutable branch if needed. But we can also discuss those going in via
+> arch-trees if dependencies are against us.
 
-> On Thu, 17 May 2018, Eric Anholt wrote:
->
->> diff --git a/arch/arm/boot/dts/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
->> index 7704bb029605..1f5e5c782835 100644
->> --- a/arch/arm/boot/dts/bcm2837.dtsi
->> +++ b/arch/arm/boot/dts/bcm2837.dtsi
->> @@ -17,6 +17,12 @@
->>  		};
->>  	};
->>  
->> +	arm-pmu {
->> +		compatible = "arm,cortex-a53-pmu", "arm,cortex-a7-pmu";
->> +		interrupt-parent = <&local_intc>;
->> +		interrupts = <9 IRQ_TYPE_LEVEL_HIGH>;
->> +	};
->> +
->
-> why this and not
->
-> arm-pmu {
-> 	compatible = "arm,armv8-pmuv3";
-> 	interrupt-parent = <&local_intc>;
-> 	interrupts = <9>;
-> };
->
-> which works, though when I didn't get very far when I submitted the patch 
-> to add this last August.
+All applied to for-next!
 
-Is that better than a53?  I'm happy to switch to that.  The important
-part to me is the a7, since basically everyone with this hw is running
-arm32.
+The immutable branch is here:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/platform_data-immutable
+
+Thanks,
+
+   Wolfram
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 832 bytes
+Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/78df2543/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/41d00c49/attachment.sig>
