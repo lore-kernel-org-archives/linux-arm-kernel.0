@@ -1,38 +1,24 @@
-From: vincent.weaver@maine.edu (Vince Weaver)
-Date: Thu, 17 May 2018 10:11:02 -0400 (EDT)
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <20180517131727.29263-1-eric@anholt.net>
-References: <20180517131727.29263-1-eric@anholt.net>
-Message-ID: <alpine.DEB.2.21.1805171007260.7820@macbook-air>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Thu, 17 May 2018 16:21:41 +0200
+Subject: [PATCH 0/3] Add STM32 SPI support on stm32mp157c
+Message-ID: <1526566904-24514-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 May 2018, Eric Anholt wrote:
+This patch adds STM32 SPI support on stm32mp157c SoC.
+SPI1, available on GPIO expansion connector, is kept disabled, so these
+pins can be used as GPIOs by default.
 
-> diff --git a/arch/arm/boot/dts/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
-> index 7704bb029605..1f5e5c782835 100644
-> --- a/arch/arm/boot/dts/bcm2837.dtsi
-> +++ b/arch/arm/boot/dts/bcm2837.dtsi
-> @@ -17,6 +17,12 @@
->  		};
->  	};
->  
-> +	arm-pmu {
-> +		compatible = "arm,cortex-a53-pmu", "arm,cortex-a7-pmu";
-> +		interrupt-parent = <&local_intc>;
-> +		interrupts = <9 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> +
+Amelie Delaunay (3):
+  ARM: dts: stm32: add STM32 SPI support on stm32mp157c
+  ARM: dts: stm32: add SPI1 support on stm32mp157c-ev1
+  ARM: multi_v7_defconfig: enable STM32 SPI
 
-why this and not
+ arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 16 +++++-
+ arch/arm/boot/dts/stm32mp157c-ev1.dts     |  6 +++
+ arch/arm/boot/dts/stm32mp157c.dtsi        | 84 +++++++++++++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig       |  1 +
+ 4 files changed, 106 insertions(+), 1 deletion(-)
 
-arm-pmu {
-	compatible = "arm,armv8-pmuv3";
-	interrupt-parent = <&local_intc>;
-	interrupts = <9>;
-};
-
-which works, though when I didn't get very far when I submitted the patch 
-to add this last August.
-
-Vince
+-- 
+2.7.4
