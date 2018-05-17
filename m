@@ -1,121 +1,32 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 17 May 2018 19:02:18 +0100
-Subject: [PATCH] ghes_edac: enable HIP08 platform edac driver
-In-Reply-To: <20180516182958.GB17092@pd.tnic>
-References: <1526039543-180996-1-git-send-email-zhengqiang10@huawei.com>
- <20180511121901.GA12705@pd.tnic> <5AF90C70.408@huawei.com>
- <20180514094709.GC23049@pd.tnic>
- <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
- <20180514164720.GH23049@pd.tnic>
- <da776696-ddbf-c35e-1dd4-b6e0ce91aed6@arm.com>
- <20180516182958.GB17092@pd.tnic>
-Message-ID: <8602b133-e0fa-57e2-5159-9d34a1ded85f@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 17 May 2018 20:07:59 +0200
+Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
+In-Reply-To: <307323036.63872.1526576126537@email.1und1.de>
+References: <20180517131727.29263-1-eric@anholt.net>
+ <1412187220.62585.1526572780332@email.1und1.de>
+ <alpine.DEB.2.21.1805171233500.7984@macbook-air>
+ <307323036.63872.1526576126537@email.1und1.de>
+Message-ID: <20180517180758.GK12198@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+On Thu, May 17, 2018 at 06:55:26PM +0200, Stefan Wahren wrote:
+> > Vince Weaver <vincent.weaver@maine.edu> hat am 17. Mai 2018 um 18:34 geschrieben:
+> > On Thu, 17 May 2018, Stefan Wahren wrote:
+> > > > Eric Anholt <eric@anholt.net> hat am 17. Mai 2018 um 15:17 geschrieben:
 
-Tyler, Zhengqiang, I assume all your shipped platforms with HEST->GHES entries
-also have DMI tables.
-
-
-On 16/05/18 19:29, Borislav Petkov wrote:
-> On Wed, May 16, 2018 at 02:38:38PM +0100, James Morse wrote:
->> XGene has its own edac driver, but it doesn't probe when booted via ACPI so
->> won't conflict with ghes_edac.
+> > > > The a53 and a7 counters seem to match up, so we advertise a7 so that
+> > > > arm32 can probe.
+> > 
+> > so how closely did you look at the a53/a7 differences?  I see some major 
+> > differences, especially with the CPU_CYCLES event (0xff vs 0x11).
+> > 
+> > The proper fix here might be to add a cortex-a53 PMU entry to the armv7 
+> > code rather than trying to treat it as a cortex-a7.
 > 
-> Actually it will. EDAC core can have only one EDAC driver loaded. Don't
-> ask me why - it has been that way since forever.
-
-By won't probe I mean it only works on DT systems:
-
-| static const struct of_device_id xgene_edac_of_match[] = {
-|	{ .compatible = "apm,xgene-edac" },
-|	{},
-| };
-
-|	.driver = {
-|		.name = "xgene-edac",
-|		.of_match_table = xgene_edac_of_match,
-|	},
-
-To work on a system with GHES it would need an 'struct acpi_device_id' to
-describe the HID (?) and populate driver's acpi_match_table.
-
-
-> We can change it some
-> day but frankly, I don't see reasoning for it. One driver can easily
-> manage *all* error sources on a system, I'd say.
-
-I agree, there is no reason to support two at the same time, if this happens
-then there is probably something wrong with the platform (e.g. races with
-firmware reading the same hardware registers), so we should make some noise.
-
-Xgene's edac driver would be a good example of this, it looks like it reads data
-from some mmio region, if something else is doing the same we're going to make a
-mess.
-
-
->> So I think we're good to make the whitelist x86 only.
->> Your diff-hunk makes 'idx=-1', so we always get the 'Unfortunately' warning. I'd
->> like to suppress this unless force_load has been used.
+> we like to use the PMU of BCM2837 SoC (4x A53 cores) under arm32 and arm64.
 > 
-> Yeah, we should handle that differently for ARM. Toshi added the idx
-> thing in
-> 
->   5deed6b6a479 ("EDAC, ghes: Add platform check")
-> 
-> to dump this when the platform is not whitelisted. So let's do that:
-> 
-> ---
-> diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
-> index 863fbf3db29f..473aeec4b1da 100644
-> --- a/drivers/edac/ghes_edac.c
-> +++ b/drivers/edac/ghes_edac.c
-> @@ -440,12 +440,16 @@ int ghes_edac_register(struct ghes *ghes, struct device *dev)
->  	struct mem_ctl_info *mci;
->  	struct edac_mc_layer layers[1];
->  	struct ghes_edac_dimm_fill dimm_fill;
-> -	int idx;
-> +	int idx = -1;
->  
-> -	/* Check if safe to enable on this system */
-> -	idx = acpi_match_platform_list(plat_list);
-> -	if (!force_load && idx < 0)
-> -		return -ENODEV;
+> What is the right way (tm) to the define the DT compatibles?
+> Does the arm32 PMU driver need patching for proper A53 support?
 
-v4.17-rc5 has 'return 0' here. Wouldn't this change means no ghes can be
-registered unless ghes_edac is also supported by the platform?
-Shouldn't this be '0' for a silent failure?
-
-
-> +	if (IS_ENABLED(CONFIG_X86)) {
-> +		/* Check if safe to enable on this system */
-> +		idx = acpi_match_platform_list(plat_list);
-> +		if (!force_load && idx < 0)
-> +			return -ENODEV;
-> +	} else {
-> +		idx = 0;
-> +	}
->  
->  	/*
->  	 * We have only one logical memory controller to which all DIMMs belong.
-
-Tested on Seattle and some cranky homebrew-no-DMI firmware:
-Tested-by: James Morse <james.morse@arm.com>
-
-With the ENODEV/0 thing above:
-Reviewed-by: James Morse <james.morse@arm.com>
-
-
->> It looks like even the oldest Arm64 ACPI systems have dmi tables, so we can
->> probably require DMI or the 'force' flag.
-> 
-> Well, with the hunk above it would still do ghes_edac_count_dimms() on
-> ARM and if it fails to find something, it will set fake, which is a good
-> sanity-check as it screams loudly. :)
-
-
-Thanks,
-
-James
+I'm completely clueless on all of this; Mark might have ideas.
