@@ -1,22 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 May 2018 15:38:06 +0900
-Subject: [PATCH 43/45] sound/soc/zte: remove duplicate includes
-In-Reply-To: <1512930723-5037-1-git-send-email-pravin.shedge4linux@gmail.com>
-References: <1512930723-5037-1-git-send-email-pravin.shedge4linux@gmail.com>
-Message-ID: <20180517063806.GN20254@sirena.org.uk>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 17 May 2018 18:09:34 +0100
+Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
+In-Reply-To: <alpine.DEB.2.21.1805171233500.7984@macbook-air>
+References: <20180517131727.29263-1-eric@anholt.net>
+ <1412187220.62585.1526572780332@email.1und1.de>
+ <alpine.DEB.2.21.1805171233500.7984@macbook-air>
+Message-ID: <877eo2mcoh.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 11, 2017 at 12:02:03AM +0530, Pravin Shedge wrote:
-> These duplicate includes have been found with scripts/checkincludes.pl but
-> they have been removed manually to avoid removing false positives.
+Vince Weaver <vincent.weaver@maine.edu> writes:
 
-Please use subject lines matching the style for the subsystem.  This
-makes it easier for people to identify relevant patches.
+> On Thu, 17 May 2018, Stefan Wahren wrote:
+>
+>> 
+>> > Eric Anholt <eric@anholt.net> hat am 17. Mai 2018 um 15:17 geschrieben:
+>> > 
+>> > 
+>> > The a53 and a7 counters seem to match up, so we advertise a7 so that
+>> > arm32 can probe.
+>
+> so how closely did you look at the a53/a7 differences?  I see some major 
+> differences, especially with the CPU_CYCLES event (0xff vs 0x11).
+
+I'm a bit lost in the code, but it seemed like the 0xff was a
+placeholder for a bit of special behavior, but that the cpu_cycles ->
+ARMV7_PERFCTR_CLOCK_CYCLES mapping got you that same value in the end.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 488 bytes
+Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/4fdcdff7/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/24fefc2e/attachment-0001.sig>
