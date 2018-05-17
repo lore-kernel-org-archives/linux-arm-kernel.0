@@ -1,172 +1,75 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 17 May 2018 22:44:32 +0200
-Subject: [PATCH RFC] ARM: dts: add Raspberry Pi Compute Module and IO board
-Message-ID: <1526589872-13459-1-git-send-email-stefan.wahren@i2se.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Thu, 17 May 2018 13:48:41 -0700
+Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <20180517060948.GI20254@sirena.org.uk>
+References: <cover.1521246069.git.collinsd@codeaurora.org>
+ <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
+ <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
+ <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
+ <152411734938.46528.9676451637772936597@swboyd.mtv.corp.google.com>
+ <20180419120813.GD27188@sirena.org.uk>
+ <38f42537-f801-115a-4120-1344a67a0462@codeaurora.org>
+ <20180424174111.GH22073@sirena.org.uk>
+ <d82ef514-b94f-8ed9-6b1e-e07de2a5f455@codeaurora.org>
+ <20180517060948.GI20254@sirena.org.uk>
+Message-ID: <6cb2ac52-258c-332b-e912-809d16e14114@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi Compute Module (CM1) is a SoM which contains a
-BCM2835 processor, 512 MB RAM and a 4 GB eMMC. There is also a carrier
-board which is called Compute Module IO Board.
+On 05/16/2018 11:09 PM, Mark Brown wrote:
+> On Tue, Apr 24, 2018 at 01:46:21PM -0700, David Collins wrote:
+>> The RPMh hardware is aware of the parent-child connections between
+>> regulators as well as minimum headroom to ensure stable LDO voltage output
+>> for subregulated LDOs.  The intention of having the headroom be a
+>> configurable property for processors is to support usecases in which
+>> subregulated LDO loads are particularly sensitive to noise and require
+>> additional headroom.  Such usecases are board dependent and beyond the
+>> baseline configurations set in RPMh hardware.
+> 
+> So the hardware implementation is some hard coding stuff that doesn't
+> really adequately reflect reality?  This seems unfortunate.  However do
+> we really need to tell the hardware about the fact that we're adding
+> extra headroom - are there actual interactions with non-Linux things
+> here?
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/Makefile                |  1 +
- arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts | 92 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi    | 34 ++++++++++++
- 3 files changed, 127 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
+The RPMh hardware is configured by the boot loader.  The configuration
+does reflect reality; however, it cannot handle all configurations at
+initialization time.  Specific headroom management typically comes up in
+modem usecases for RF supplies that are sensitive to noise.  This feature
+allows RPMh masters (application processor, modem processor, etc) to make
+requests only for the regulators that they directly care about without
+having to worry about power grid parent-child details and setting the
+voltage of parent regulators in order to ensure sufficient headroom.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ec2024e..a9883e8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-b-rev2.dtb \
- 	bcm2835-rpi-b-plus.dtb \
- 	bcm2835-rpi-a-plus.dtb \
-+	bcm2835-rpi-cm1-io1.dtb \
- 	bcm2836-rpi-2-b.dtb \
- 	bcm2837-rpi-3-b.dtb \
- 	bcm2837-rpi-3-b-plus.dtb \
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
-new file mode 100644
-index 0000000..4d9aa22
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
-@@ -0,0 +1,92 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/dts-v1/;
-+#include "bcm2835-rpi-cm1.dtsi"
-+#include "bcm283x-rpi-usb-host.dtsi"
-+
-+/ {
-+	compatible = "raspberrypi,compute-module", "brcm,bcm2835";
-+	model = "Raspberry Pi Compute Module IO board rev1";
-+};
-+
-+&dsi1 {
-+	status = "okay";
-+};
-+
-+&gpio {
-+	/*
-+	 * This is based on the official GPU firmware DT blob.
-+	 *
-+	 * Legend:
-+	 * "NC" = not connected (no rail from the SoC)
-+	 * "FOO" = GPIO line named "FOO" on the schematic
-+	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
-+	 */
-+	gpio-line-names = "GPIO0",
-+			  "GPIO1",
-+			  "GPIO2",
-+			  "GPIO3",
-+			  "GPIO4",
-+			  "GPIO5",
-+			  "GPIO6",
-+			  "GPIO7",
-+			  "GPIO8",
-+			  "GPIO9",
-+			  "GPIO10",
-+			  "GPIO11",
-+			  "GPIO12",
-+			  "GPIO13",
-+			  "GPIO14",
-+			  "GPIO15",
-+			  "GPIO16",
-+			  "GPIO17",
-+			  "GPIO18",
-+			  "GPIO19",
-+			  "GPIO20",
-+			  "GPIO21",
-+			  "GPIO22",
-+			  "GPIO23",
-+			  "GPIO24",
-+			  "GPIO25",
-+			  "GPIO26",
-+			  "GPIO27",
-+			  "GPIO28",
-+			  "GPIO29",
-+			  "GPIO30",
-+			  "GPIO31",
-+			  "GPIO32",
-+			  "GPIO33",
-+			  "GPIO34",
-+			  "GPIO35",
-+			  "GPIO36",
-+			  "GPIO37",
-+			  "GPIO38",
-+			  "GPIO39",
-+			  "GPIO40",
-+			  "GPIO41",
-+			  "GPIO42",
-+			  "GPIO43",
-+			  "GPIO44",
-+			  "GPIO45",
-+			  "HDMI_HPD_N",
-+			  /* Also used as ACT LED */
-+			  "EMMC_EN_N",
-+			  /* Used by eMMC */
-+			  "SD_CLK_R",
-+			  "SD_CMD_R",
-+			  "SD_DATA0_R",
-+			  "SD_DATA1_R",
-+			  "SD_DATA2_R",
-+			  "SD_DATA3_R";
-+
-+	pinctrl-0 = <&gpioout &alt0>;
-+};
-+
-+&hdmi {
-+	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
-new file mode 100644
-index 0000000..ef22c2d
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
-@@ -0,0 +1,34 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/dts-v1/;
-+#include "bcm2835.dtsi"
-+#include "bcm2835-rpi.dtsi"
-+
-+/ {
-+	leds {
-+		act {
-+			gpios = <&gpio 47 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	reg_3v3: fixed-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	reg_1v8: fixed-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "1V8";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
-+};
-+
-+&sdhost {
-+	non-removable;
-+	vmmc-supply = <&reg_3v3>;
-+	vqmmc-supply = <&reg_1v8>;
-+};
+If you really don't like having this feature present in the Linux RPMh
+regulator driver, then I'd be ok removing it.  It is not required for
+SDM845 which the driver is initially targeting.
+
+
+>>>> XOB managed regulators physically cannot change voltage.  Therefore, do
+>>>> you agree that it is reasonable to use fixed_uV for them?  Note that I
+>>>> removed init_data->constraints.apply_uV manipulation in version 2 of this
+>>>> patch.
+> 
+>>> If these regulators can't change voltage then surely we know what
+>>> voltage they have without needing it to be specified in DT?
+> 
+>> In the case of XOB managed LDO regulators, the LDOs physically can be
+>> configured to different voltages by the bootloader.  However, the RPMh
+>> interface provides no mechanism for the application processor to read or
+>> change that voltage.  Therefore, we need a way to specify such voltages in
+>> a board specific (as opposed to driver specific) manner (i.e. device tree).
+> 
+> Is the kernel somehow prevented from varying these voltages?
+
+Yes.  Physically, there exists no RPMh register to read or write the
+voltage of LDOs managed via XOB.  Additionally, the kernel running on the
+application processor is blocked from configuring the voltage via a direct
+SPMI writes by access permissions that crash the system when violated.
+
+Take care,
+David
+
 -- 
-2.7.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
