@@ -1,19 +1,41 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 17 May 2018 17:59:40 +0200 (CEST)
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <20180517131727.29263-1-eric@anholt.net>
-References: <20180517131727.29263-1-eric@anholt.net>
-Message-ID: <1412187220.62585.1526572780332@email.1und1.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 17 May 2018 18:04:36 +0200
+Subject: [GIT PULL] arm64: tegra: Device tree fixes for v4.17
+Message-ID: <20180517160436.12180-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi ARM SoC maintainers,
 
-> Eric Anholt <eric@anholt.net> hat am 17. Mai 2018 um 15:17 geschrieben:
-> 
-> 
-> The a53 and a7 counters seem to match up, so we advertise a7 so that
-> arm32 can probe.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-fixes-2
+
+for you to fetch changes up to 9df50ba76ac1485b844beffa1f3f5d9659d9cdaf:
+
+  arm64: tegra: Make BCM89610 PHY interrupt as active low (2018-05-03 11:48:16 +0200)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+arm64: tegra: Device tree fixes for v4.17
+
+This contains a one-line update to the device tree of the Tegra186 P3310
+processor module, fixing the polarity of the PHY interrupt. Originally,
+this was queued to go into v4.18, but the PHY ID matching patch has now
+found its way into v4.17-rc5, which means that the PHY driver will know
+how to identify the PHY on this board and try to use the interrupt. This
+will unfortunately cause networking to break on P3310, hence why I think
+this should go into v4.17.
+
+----------------------------------------------------------------
+Bhadram Varka (1):
+      arm64: tegra: Make BCM89610 PHY interrupt as active low
+
+ arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
