@@ -1,34 +1,51 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 17 May 2018 17:03:53 +0100
-Subject: [PATCH] soc: qcom: apr: fix invalid msg_type check
-Message-ID: <20180517160353.27561-1-srinivas.kandagatla@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 17 May 2018 18:06:32 +0200 (CEST)
+Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
+In-Reply-To: <alpine.DEB.2.21.1805171007260.7820@macbook-air>
+References: <20180517131727.29263-1-eric@anholt.net>
+ <alpine.DEB.2.21.1805171007260.7820@macbook-air>
+Message-ID: <385156660.62726.1526573192894@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed invalid msg_type check.
-This also fixes below static checker warning:
-apr.c:95:35: warning: comparison is always true due to limited range of
- data type [-Wtype-limits]
-warn: always true condition '(msg_type != 69864) => (0-u16max != 69864)'
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/soc/qcom/apr.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Vince Weaver <vincent.weaver@maine.edu> hat am 17. Mai 2018 um 16:11 geschrieben:
+> 
+> 
+> On Thu, 17 May 2018, Eric Anholt wrote:
+> 
+> > diff --git a/arch/arm/boot/dts/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
+> > index 7704bb029605..1f5e5c782835 100644
+> > --- a/arch/arm/boot/dts/bcm2837.dtsi
+> > +++ b/arch/arm/boot/dts/bcm2837.dtsi
+> > @@ -17,6 +17,12 @@
+> >  		};
+> >  	};
+> >  
+> > +	arm-pmu {
+> > +		compatible = "arm,cortex-a53-pmu", "arm,cortex-a7-pmu";
+> > +		interrupt-parent = <&local_intc>;
+> > +		interrupts = <9 IRQ_TYPE_LEVEL_HIGH>;
+> > +	};
+> > +
+> 
+> why this and not
+> 
+> arm-pmu {
+> 	compatible = "arm,armv8-pmuv3";
+> 	interrupt-parent = <&local_intc>;
+> 	interrupts = <9>;
+> };
+> 
+> which works, though when I didn't get very far when I submitted the patch 
+> to add this last August.
 
-diff --git a/drivers/soc/qcom/apr.c b/drivers/soc/qcom/apr.c
-index 97f3622da535..57af8a537332 100644
---- a/drivers/soc/qcom/apr.c
-+++ b/drivers/soc/qcom/apr.c
-@@ -92,7 +92,7 @@ static int apr_callback(struct rpmsg_device *rpdev, void *buf,
- 	}
- 
- 	msg_type = APR_HDR_FIELD_MT(hdr->hdr_field);
--	if (msg_type >= APR_MSG_TYPE_MAX && msg_type != APR_BASIC_RSP_RESULT) {
-+	if (msg_type >= APR_MSG_TYPE_MAX) {
- 		dev_err(apr->dev, "APR: Wrong message type: %d\n", msg_type);
- 		return -EINVAL;
- 	}
--- 
-2.16.2
+Eric's variant is more specific so we better chose this. The init code diverse between the general arm,armv8-pmuv3 and arm,cortex-a53-pmu.
+
+> 
+> Vince
+> 
+> _______________________________________________
+> linux-rpi-kernel mailing list
+> linux-rpi-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
