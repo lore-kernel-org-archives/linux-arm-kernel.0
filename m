@@ -1,68 +1,172 @@
-From: willy@infradead.org (Matthew Wilcox)
-Date: Thu, 17 May 2018 13:41:03 -0700
-Subject: [PATCH] mm/dmapool: localize page allocations
-In-Reply-To: <d49e594a-c18a-160f-ca4c-91520ff3b293@codeaurora.org>
-References: <1526578581-7658-1-git-send-email-okaya@codeaurora.org>
- <20180517181815.GC26718@bombadil.infradead.org>
- <9844a638-bc4e-46bd-133e-0c82a3e9d6ea@codeaurora.org>
- <20180517194612.GG26718@bombadil.infradead.org>
- <d49e594a-c18a-160f-ca4c-91520ff3b293@codeaurora.org>
-Message-ID: <20180517204103.GJ26718@bombadil.infradead.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 17 May 2018 22:44:32 +0200
+Subject: [PATCH RFC] ARM: dts: add Raspberry Pi Compute Module and IO board
+Message-ID: <1526589872-13459-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 04:05:45PM -0400, Sinan Kaya wrote:
-> On 5/17/2018 3:46 PM, Matthew Wilcox wrote:
-> >> Remember that the CPU core that is running this driver is most probably on
-> >> the same NUMA node as the device itself.
-> > Umm ... says who?  If my process is running on NUMA node 5 and I submit
-> > an I/O, it should be allocating from a pool on node 5, not from a pool
-> > on whichever node the device is attached to.
-> 
-> OK, let's do an exercise. Maybe, I'm missing something in the big picture.
+The Raspberry Pi Compute Module (CM1) is a SoM which contains a
+BCM2835 processor, 512 MB RAM and a 4 GB eMMC. There is also a carrier
+board which is called Compute Module IO Board.
 
-Sure.
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/Makefile                |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts | 92 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi    | 34 ++++++++++++
+ 3 files changed, 127 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
+ create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
 
-> If a user process is running at node 5, it submits some work to the hardware
-> via block layer that is eventually invoked by syscall. 
-> 
-> Whatever buffer process is using, it gets copied into the kernel space as
-> it is crossing a userspace/kernel space boundary.
-> 
-> Block layer packages a block request with the kernel pointers and makes a
-> request to the NVMe driver for consumption.
-> 
-> Last time I checked, dma_alloc_coherent() API uses the locality information
-> from the device not from the CPU for allocation.
-
-Yes, it does.  I wonder why that is; it doesn't actually make any sense.
-It'd be far more sensible to allocate it on memory local to the user
-than memory local to the device.
-
-> While the metadata for dma_pool is pointing to the currently running CPU core,
-> the DMA buffer itself is created using the device node itself today without
-> my patch.
-
-Umm ... dma_alloc_coherent memory is for metadata about the transfer, not
-for the memory used for the transaction.
-
-> I would think that you actually want to run the process at the same NUMA node
-> as the CPU and device itself for performance reasons. Otherwise, performance
-> expectations should be low. 
-
-That's foolish.  Consider a database appliance with four sockets, each
-with its own memory and I/O devices attached.  You can't tell the user
-to shard the database into four pieces and have each socket only work on
-the quarter of the database that's available to each socket.  They may
-as well buy four smaller machines.  The point of buying a large NUMA
-machine is to use all of it.
-
-Let's try a different example.  I have a four-socket system with one
-NVMe device with lots of hardware queues.  Each CPU has its own queue
-assigned to it.  If I allocate all the PRP metadata on the socket with
-the NVMe device attached to it, I'm sending a lot of coherency traffic
-in the direction of that socket, in addition to the actual data.  If the
-PRP lists are allocated randomly on the various sockets, the traffic
-is heading all over the fabric.  If the PRP lists are allocated on the
-local socket, the only time those lists move off this node is when the
-device requests them.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ec2024e..a9883e8 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+ 	bcm2835-rpi-b-rev2.dtb \
+ 	bcm2835-rpi-b-plus.dtb \
+ 	bcm2835-rpi-a-plus.dtb \
++	bcm2835-rpi-cm1-io1.dtb \
+ 	bcm2836-rpi-2-b.dtb \
+ 	bcm2837-rpi-3-b.dtb \
+ 	bcm2837-rpi-3-b-plus.dtb \
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
+new file mode 100644
+index 0000000..4d9aa22
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
+@@ -0,0 +1,92 @@
++// SPDX-License-Identifier: GPL-2.0
++/dts-v1/;
++#include "bcm2835-rpi-cm1.dtsi"
++#include "bcm283x-rpi-usb-host.dtsi"
++
++/ {
++	compatible = "raspberrypi,compute-module", "brcm,bcm2835";
++	model = "Raspberry Pi Compute Module IO board rev1";
++};
++
++&dsi1 {
++	status = "okay";
++};
++
++&gpio {
++	/*
++	 * This is based on the official GPU firmware DT blob.
++	 *
++	 * Legend:
++	 * "NC" = not connected (no rail from the SoC)
++	 * "FOO" = GPIO line named "FOO" on the schematic
++	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
++	 */
++	gpio-line-names = "GPIO0",
++			  "GPIO1",
++			  "GPIO2",
++			  "GPIO3",
++			  "GPIO4",
++			  "GPIO5",
++			  "GPIO6",
++			  "GPIO7",
++			  "GPIO8",
++			  "GPIO9",
++			  "GPIO10",
++			  "GPIO11",
++			  "GPIO12",
++			  "GPIO13",
++			  "GPIO14",
++			  "GPIO15",
++			  "GPIO16",
++			  "GPIO17",
++			  "GPIO18",
++			  "GPIO19",
++			  "GPIO20",
++			  "GPIO21",
++			  "GPIO22",
++			  "GPIO23",
++			  "GPIO24",
++			  "GPIO25",
++			  "GPIO26",
++			  "GPIO27",
++			  "GPIO28",
++			  "GPIO29",
++			  "GPIO30",
++			  "GPIO31",
++			  "GPIO32",
++			  "GPIO33",
++			  "GPIO34",
++			  "GPIO35",
++			  "GPIO36",
++			  "GPIO37",
++			  "GPIO38",
++			  "GPIO39",
++			  "GPIO40",
++			  "GPIO41",
++			  "GPIO42",
++			  "GPIO43",
++			  "GPIO44",
++			  "GPIO45",
++			  "HDMI_HPD_N",
++			  /* Also used as ACT LED */
++			  "EMMC_EN_N",
++			  /* Used by eMMC */
++			  "SD_CLK_R",
++			  "SD_CMD_R",
++			  "SD_DATA0_R",
++			  "SD_DATA1_R",
++			  "SD_DATA2_R",
++			  "SD_DATA3_R";
++
++	pinctrl-0 = <&gpioout &alt0>;
++};
++
++&hdmi {
++	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio14>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
+new file mode 100644
+index 0000000..ef22c2d
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
+@@ -0,0 +1,34 @@
++// SPDX-License-Identifier: GPL-2.0
++/dts-v1/;
++#include "bcm2835.dtsi"
++#include "bcm2835-rpi.dtsi"
++
++/ {
++	leds {
++		act {
++			gpios = <&gpio 47 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	reg_3v3: fixed-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_1v8: fixed-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "1V8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++};
++
++&sdhost {
++	non-removable;
++	vmmc-supply = <&reg_3v3>;
++	vqmmc-supply = <&reg_1v8>;
++};
+-- 
+2.7.4
