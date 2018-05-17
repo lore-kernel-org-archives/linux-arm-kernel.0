@@ -1,35 +1,39 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Thu, 17 May 2018 22:19:23 +0300
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: add rave-sp subdevices
-Message-ID: <20180517191923.16212-1-nikita.yoush@cogentembedded.com>
+From: vincent.weaver@maine.edu (Vince Weaver)
+Date: Thu, 17 May 2018 15:31:38 -0400 (EDT)
+Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
+In-Reply-To: <alpine.DEB.2.21.1805171422450.8529@macbook-air>
+References: <20180517131727.29263-1-eric@anholt.net>
+ <1412187220.62585.1526572780332@email.1und1.de>
+ <alpine.DEB.2.21.1805171233500.7984@macbook-air>
+ <307323036.63872.1526576126537@email.1und1.de>
+ <20180517180758.GK12198@hirez.programming.kicks-ass.net>
+ <alpine.DEB.2.21.1805171422450.8529@macbook-air>
+Message-ID: <alpine.DEB.2.21.1805171530080.8529@macbook-air>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds rave-sp powerbutton and backlight devices to RDU1 device tree.
+On Thu, 17 May 2018, Vince Weaver wrote:
 
-Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
----
- arch/arm/boot/dts/imx51-zii-rdu1.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> On Thu, 17 May 2018, Peter Zijlstra wrote:
+> with cortex-a7 now, would it be possible to later drop that if proper 
+> cortex-a53 support is added to the armv7 pmu driver?  Or would that lead 
+> to all kinds of back-compatability mess?
 
-diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-index 0c99ac04ad08..98cc107098e0 100644
---- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-+++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-@@ -581,6 +581,14 @@
- 		watchdog {
- 			compatible = "zii,rave-sp-watchdog";
- 		};
-+
-+		backlight {
-+			compatible = "zii,rave-sp-backlight";
-+		};
-+
-+		pwrbutton {
-+			compatible = "zii,rave-sp-pwrbutton";
-+		};
- 	};
- };
- 
--- 
-2.11.0
+For what it's worth, the pi-foundation kernel bcm2710 device tree file 
+does:
+
+		arm-pmu {
+#ifdef RPI364
+			compatible = "arm,armv8-pmuv3", "arm,cortex-a7-pmu";
+#else
+			compatible = "arm,cortex-a7-pmu";
+#endif
+			interrupt-parent = <&local_intc>;
+			interrupts = <9>;
+		};
+
+
+Which is probably where I was getting the arm,armv8-pmuv3 from in my 
+original patch.
+
+Vince
