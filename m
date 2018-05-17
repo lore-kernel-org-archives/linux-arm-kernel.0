@@ -1,32 +1,260 @@
 From: erin.lo@mediatek.com (Erin Lo)
-Date: Thu, 17 May 2018 14:22:04 +0800
-Subject: [PATCH v3 2/4] dt-bindings: mtk-sysirq: Add compatible for Mediatek
- MT8183
+Date: Thu, 17 May 2018 14:22:06 +0800
+Subject: [PATCH v3 4/4] arm64: dts: Add Mediatek SoC MT8183 and evaluation
+ board dts and Makefile
 In-Reply-To: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
 References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1526538126-51497-3-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1526538126-51497-5-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds dt-binding documentation of SYSIRQ for Mediatek MT8183 SoC
-Platform.
+From: Ben Ho <Ben.Ho@mediatek.com>
 
+Add basic chip support for Mediatek 8183
+
+Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
 Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 ---
- .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt         | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/mediatek/Makefile       |   1 +
+ arch/arm64/boot/dts/mediatek/mt8183-evb.dts |  31 +++++
+ arch/arm64/boot/dts/mediatek/mt8183.dtsi    | 182 ++++++++++++++++++++++++++++
+ 3 files changed, 214 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-index 07bf0b9..5ff48a8 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
-@@ -5,6 +5,7 @@ interrupt.
- 
- Required properties:
- - compatible: should be
-+	"mediatek,mt8183-sysirq", "mediatek,mt6577-sysirq": for MT8183
- 	"mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq": for MT8173
- 	"mediatek,mt8135-sysirq", "mediatek,mt6577-sysirq": for MT8135
- 	"mediatek,mt8127-sysirq", "mediatek,mt6577-sysirq": for MT8127
+diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+index ac17f60..2836261 100644
+--- a/arch/arm64/boot/dts/mediatek/Makefile
++++ b/arch/arm64/boot/dts/mediatek/Makefile
+@@ -5,3 +5,4 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
++dtb-$(CONFIG_ARCH_MEDIATEK) += mt8183-evb.dtb
+diff --git a/arch/arm64/boot/dts/mediatek/mt8183-evb.dts b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+new file mode 100644
+index 0000000..9b52559
+--- /dev/null
++++ b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+@@ -0,0 +1,31 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++/*
++ * Copyright (c) 2018 MediaTek Inc.
++ * Author: Ben Ho <ben.ho@mediatek.com>
++ *	   Erin Lo <erin.lo@mediatek.com>
++ */
++
++/dts-v1/;
++#include "mt8183.dtsi"
++
++/ {
++	model = "MediaTek MT8183 evaluation board";
++	compatible = "mediatek,mt8183-evb", "mediatek,mt8183";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x80000000>;
++	};
++
++	chosen {
++		stdout-path = "serial0:921600n8";
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+new file mode 100644
+index 0000000..03edf9c
+--- /dev/null
++++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+@@ -0,0 +1,182 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++/*
++ * Copyright (c) 2018 MediaTek Inc.
++ * Author: Ben Ho <ben.ho@mediatek.com>
++ *	   Erin Lo <erin.lo@mediatek.com>
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	compatible = "mediatek,mt8183";
++	interrupt-parent = <&sysirq>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&cpu0>;
++				};
++				core1 {
++					cpu = <&cpu1>;
++				};
++				core2 {
++					cpu = <&cpu2>;
++				};
++				core3 {
++					cpu = <&cpu3>;
++				};
++			};
++
++			cluster1 {
++				core0 {
++					cpu = <&cpu4>;
++				};
++				core1 {
++					cpu = <&cpu5>;
++				};
++				core2 {
++					cpu = <&cpu6>;
++				};
++				core3 {
++					cpu = <&cpu7>;
++				};
++			};
++		};
++
++		cpu0: cpu at 000 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			reg = <0x000>;
++			enable-method = "psci";
++		};
++
++		cpu1: cpu at 001 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			reg = <0x001>;
++			enable-method = "psci";
++		};
++
++		cpu2: cpu at 002 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			reg = <0x002>;
++			enable-method = "psci";
++		};
++
++		cpu3: cpu at 003 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			reg = <0x003>;
++			enable-method = "psci";
++		};
++
++		cpu4: cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a73";
++			reg = <0x100>;
++			enable-method = "psci";
++		};
++
++		cpu5: cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a73";
++			reg = <0x101>;
++			enable-method = "psci";
++		};
++
++		cpu6: cpu at 102 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a73";
++			reg = <0x102>;
++			enable-method = "psci";
++		};
++
++		cpu7: cpu at 103 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a73";
++			reg = <0x103>;
++			enable-method = "psci";
++		};
++	};
++
++	psci {
++		compatible      = "arm,psci-1.0";
++		method          = "smc";
++	};
++
++	uart_clk: dummy26m {
++		compatible = "fixed-clock";
++		clock-frequency = <26000000>;
++		#clock-cells = <0>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	gic: interrupt-controller at 0c000000 {
++		compatible = "arm,gic-v3";
++		#interrupt-cells = <3>;
++		interrupt-parent = <&gic>;
++		interrupt-controller;
++		reg = <0 0x0c000000 0 0x40000>,  /* GICD */
++		      <0 0x0c100000 0 0x200000>; /* GICR */
++		      <0 0x0c400000 0 0x2000>;   /* GICC */
++		      <0 0x0c410000 0 0x1000>;   /* GICH */
++		      <0 0x0c420000 0 0x2000>;   /* GICV */
++
++		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	sysirq: intpol-controller at 0c530a80 {
++		compatible = "mediatek,mt8183-sysirq",
++			     "mediatek,mt6577-sysirq";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&gic>;
++		reg = <0 0x0c530a80 0 0x50>;
++	};
++
++	uart0: serial at 11002000 {
++		compatible = "mediatek,mt8183-uart",
++			     "mediatek,mt6577-uart";
++		reg = <0 0x11002000 0 0x1000>;
++		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&uart_clk>, <&uart_clk>;
++		clock-names = "baud", "bus";
++		status = "disabled";
++	};
++
++	uart1: serial at 11003000 {
++		compatible = "mediatek,mt8183-uart",
++			     "mediatek,mt6577-uart";
++		reg = <0 0x11003000 0 0x1000>;
++		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&uart_clk>, <&uart_clk>;
++		clock-names = "baud", "bus";
++		status = "disabled";
++	};
++
++	uart2: serial at 11004000 {
++		compatible = "mediatek,mt8183-uart",
++			     "mediatek,mt6577-uart";
++		reg = <0 0x11004000 0 0x1000>;
++		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&uart_clk>, <&uart_clk>;
++		clock-names = "baud", "bus";
++		status = "disabled";
++	};
++};
 -- 
 1.9.1
