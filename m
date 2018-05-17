@@ -1,31 +1,32 @@
 From: erin.lo@mediatek.com (Erin Lo)
-Date: Thu, 17 May 2018 14:22:05 +0800
-Subject: [PATCH v3 3/4] dt-bindings: serial: Add compatible for Mediatek MT8183
+Date: Thu, 17 May 2018 14:22:04 +0800
+Subject: [PATCH v3 2/4] dt-bindings: mtk-sysirq: Add compatible for Mediatek
+ MT8183
 In-Reply-To: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
 References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1526538126-51497-4-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1526538126-51497-3-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds dt-binding documentation of uart for Mediatek MT8183 SoC
+This adds dt-binding documentation of SYSIRQ for Mediatek MT8183 SoC
 Platform.
 
 Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 ---
- Documentation/devicetree/bindings/serial/mtk-uart.txt | 1 +
+ .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt         | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-index f73abff..4783336 100644
---- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-@@ -15,6 +15,7 @@ Required properties:
-   * "mediatek,mt8127-uart" for MT8127 compatible UARTS
-   * "mediatek,mt8135-uart" for MT8135 compatible UARTS
-   * "mediatek,mt8173-uart" for MT8173 compatible UARTS
-+  * "mediatek,mt8183-uart", "mediatek,mt6577-uart" for MT8183 compatible UARTS
-   * "mediatek,mt6577-uart" for MT6577 and all of the above
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+index 07bf0b9..5ff48a8 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+@@ -5,6 +5,7 @@ interrupt.
  
- - reg: The base address of the UART register bank.
+ Required properties:
+ - compatible: should be
++	"mediatek,mt8183-sysirq", "mediatek,mt6577-sysirq": for MT8183
+ 	"mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq": for MT8173
+ 	"mediatek,mt8135-sysirq", "mediatek,mt6577-sysirq": for MT8135
+ 	"mediatek,mt8127-sysirq", "mediatek,mt6577-sysirq": for MT8127
 -- 
 1.9.1
