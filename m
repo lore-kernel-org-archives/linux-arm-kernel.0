@@ -1,32 +1,43 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Thu, 17 May 2018 15:54:17 +0300
-Subject: [PATCH 1/3] crypto: ccree: drop signature register check
-In-Reply-To: <1526387370-17142-2-git-send-email-gilad@benyossef.com>
-References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
- <1526387370-17142-2-git-send-email-gilad@benyossef.com>
-Message-ID: <CAOtvUMcN2kYFQEiMc7ignecPTdt9yOnfs2=TDjRnMAJ9WNRbuQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 17 May 2018 14:59:42 +0200
+Subject: [GIT PULL] ARM: mvebu: arm for v4.18 (#1)
+Message-ID: <87603m1lq9.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Herbert,
+Hi,
 
-On Tue, May 15, 2018 at 3:29 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
-> We were using the content of the signature register as a sanity
-> check for the hardware functioning but it turns out not all
-> implementers use the same values so the check is giving false
-> negative on certain SoCs and so we drop it.
->
+Here is the first pull request for arm for mvebu for v4.18.
 
-Please drop this patch. I have found a better fix and will send a v2 soon.
+As I feared, there were (trivial) merge issues due to the defconfig
+update in linux-next. The best place to solve them is in your tree, so
+as soon as you will pull this, I will remove from my mvebu/for-next
+branch.
 
-Thanks,
-Gilad
+Gregory
 
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm-4.18-1
+
+for you to fetch changes up to 95fbfe2f63d0838fed56d2f93604f205719bc51c:
+
+  ARM: multi_v7_defconfig: Add Marvell NAND controller support (2018-05-16 19:38:34 +0200)
+
+----------------------------------------------------------------
+mvebu arm for 4.18 (part 1)
+
+Updating multi_v7_defconfig and adding marvell NAND controller
+support.
+
+----------------------------------------------------------------
+Gregory CLEMENT (2):
+      ARM: multi_v7_defconfig: Update with current configuration
+      ARM: multi_v7_defconfig: Add Marvell NAND controller support
+
+ arch/arm/configs/multi_v7_defconfig | 369 +++++++++++++++---------------------
+ 1 file changed, 153 insertions(+), 216 deletions(-)
