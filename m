@@ -1,55 +1,68 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 17 May 2018 18:10:49 +0100
-Subject: [PATCH v8 09/24] ASoC: qdsp6: q6afe: Add q6afe driver
-In-Reply-To: <20180517065544.GO20254@sirena.org.uk>
-References: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
- <20180509125635.5653-10-srinivas.kandagatla@linaro.org>
- <20180517065544.GO20254@sirena.org.uk>
-Message-ID: <507b8b76-0846-a492-73e6-782b9953bc36@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 17 May 2018 18:12:49 +0100 (BST)
+Subject: Applied "soc: qcom: apr: fix invalid msg_type check" to the asoc tree
+In-Reply-To: <20180517160353.27561-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180517171249.8B9FB44007C@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review.
+The patch
 
-On 17/05/18 07:55, Mark Brown wrote:
-> On Wed, May 09, 2018 at 01:56:20PM +0100, Srinivas Kandagatla wrote:
-> 
->> +static struct q6afe_port *afe_find_port(struct q6afe *afe, int token)
->> +{
->> +	struct q6afe_port *p = NULL;
->> +	struct q6afe_port *ret = NULL;
->> +	unsigned long flags;
->> +
->> +	spin_lock_irqsave(&afe->port_list_lock, flags);
->> +	list_for_each_entry(p, &afe->port_list, node)
->> +		if (p->token == token) {
->> +			ret = p;
->> +			break;
->> +		}
->> +
->> +	spin_unlock_irqrestore(&afe->port_list_lock, flags);
->> +	return ret;
-> 
-> This lock only protects the list, it does nothing to ensure that the
-> port we look up is still valid by the time we return to the caller.
-> That means we won't crash during list traversal but does nothing to
-> ensure we won't crash immediately afterwards if the port is deallocated
-> just after we look it up.  What stops that happening?
+   soc: qcom: apr: fix invalid msg_type check
 
-Each port is allocated and de-allocated in dai probe and remove calls 
-respectively.
+has been applied to the asoc tree at
 
-Lets say... So for this case to happen the dai has to be removed (unload 
-module) at the same time when the interrupt callback happens due to 
-delayed response from previous commands.
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-This case would be almost impossible because all the calls to afe 
-service are synchronous with timeouts, if any of the previous calls 
-times out the respective caller would get an error, this should prevent 
-him from unloading the module in the first place.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-thanks,
-srini
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-> 
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From e744619d056e6ec5cd9db38e55511a22dc463f89 Mon Sep 17 00:00:00 2001
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Date: Thu, 17 May 2018 17:03:53 +0100
+Subject: [PATCH] soc: qcom: apr: fix invalid msg_type check
+
+Removed invalid msg_type check.
+This also fixes below static checker warning:
+apr.c:95:35: warning: comparison is always true due to limited range of
+ data type [-Wtype-limits]
+warn: always true condition '(msg_type != 69864) => (0-u16max != 69864)'
+
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/soc/qcom/apr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/qcom/apr.c b/drivers/soc/qcom/apr.c
+index 97f3622da535..57af8a537332 100644
+--- a/drivers/soc/qcom/apr.c
++++ b/drivers/soc/qcom/apr.c
+@@ -92,7 +92,7 @@ static int apr_callback(struct rpmsg_device *rpdev, void *buf,
+ 	}
+ 
+ 	msg_type = APR_HDR_FIELD_MT(hdr->hdr_field);
+-	if (msg_type >= APR_MSG_TYPE_MAX && msg_type != APR_BASIC_RSP_RESULT) {
++	if (msg_type >= APR_MSG_TYPE_MAX) {
+ 		dev_err(apr->dev, "APR: Wrong message type: %d\n", msg_type);
+ 		return -EINVAL;
+ 	}
+-- 
+2.17.0
