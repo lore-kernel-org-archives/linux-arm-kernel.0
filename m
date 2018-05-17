@@ -1,88 +1,97 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 16 May 2018 16:51:26 -0700
-Subject: [PATCH v4 4/4] drm/rockchip: support dp training outside dp
- firmware
-In-Reply-To: <1526354560-23135-4-git-send-email-hl@rock-chips.com>
-References: <1526354560-23135-1-git-send-email-hl@rock-chips.com>
- <1526354560-23135-4-git-send-email-hl@rock-chips.com>
-Message-ID: <20180516235125.GB219198@rodete-desktop-imager.corp.google.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Wed, 16 May 2018 19:25:28 -0500
+Subject: [PATCH] drivers/perf: arm-ccn: stop spamming dmesg in event_init
+In-Reply-To: <cee9c043-3d64-56b9-4f23-e8c8370387dd@gmail.com>
+References: <20180504104117.8086-1-mark.rutland@arm.com>
+ <20180508184050.75c60b82ba538d0ecdeb2d78@arm.com>
+ <1525882003.4199.55.camel@arm.com>
+ <20180509184154.9994df2874e7a08025b56dea@arm.com>
+ <cee9c043-3d64-56b9-4f23-e8c8370387dd@gmail.com>
+Message-ID: <20180516192528.5519d2faf59766e0544bb2ee@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Kishon
+[adding acme, LKML, linux-perf-users, and other potentially interested]
 
-Hi,
+On Wed, 9 May 2018 17:22:42 -0700
+Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-On Tue, May 15, 2018 at 11:22:40AM +0800, Lin Huang wrote:
-> DP firmware uses fixed phy config values to do training, but some
-> boards need to adjust these values to fit for their unique hardware
-> design. So get phy config values from dts and use software link training
-> instead of relying on firmware, if software training fail, keep firmware
-> training as a fallback if sw training fails.
+> On 05/09/2018 04:41 PM, Kim Phillips wrote:
+> > On Wed, 9 May 2018 17:06:43 +0100
+> > Pawel Moll <pawel.moll@arm.com> wrote:
+> > 
+> >> On Wed, 2018-05-09 at 00:40 +0100, Kim Phillips wrote:
+> >>> On Fri,  4 May 2018 11:41:17 +0100 Mark Rutland <mark.rutland@arm.com> wrote:
+> >>>
+> >>> [adding Pawel, arm-ccn driver author]
+> >>
+> >> We had this discussion way too many times for my liking. As I said
+> >> before - *I* will be fine with the debug messages in the CCN driver.
+> >> Now, if there ever turns out to be other user of this thing and gets
+> > 
+> > Sure, this isn't just about Pawel using the driver he wrote - we know
+> > you know how to use it because you wrote it.  No, it's about all the
+> > other potential users out there, esp. first time users, as I once was.
+> > 
+> >> into problems with event configuration, I'd hope that he/she can count
+> >> on support from the knowledgable people here... (just checked and both
+> > 
+> > I abhor having to suggest our users email this list in order to find out
+> > how to use the PMU drivers.  First time users are going to tend to
+> > steer completely away if they don't have the patience to debug a silent
+> > PMU, rather than email this mailing list - sorry, but that's just
+> > adding a huge usage barrier - for what - fuzzer runner's convenience?
+> > 
+> >> RHEL 7.5 and Ubuntu 16.04.3 kernels on AArch64 come with
+> >> CONFIG_DYNAMIC_DEBUG=y, so it's a matter of explaining what has to be
+> >> enabled where; sadly this information did not find its way into the
+> >> commit description)
+> > 
+> > I can't think of a more difficult to find, more far-away, alien
+> > place for end users to find help with perf, sorry.
+> > 
+> >>>> The ARM CCN PMU driver uses dev_warn() to complain about parameters
+> >>> in
+> >>>> the user-provided perf_event_attr. This means that under normal
+> >>>> operation (e.g. a single invocation of the perf tool), dmesg may be
+> >>>> spammed with multiple messages.
+> >>
+> >> Surely Mark, in his role as maintainer of drivers/perf/ (and a few
+> >> other locations), meant to use much more technical and emotion-free
+> >> subject, along the lines of "reduce a number of dmesg warnings at event
+> >> init".
+> > 
+> > 'reduce a number' is the wrong word:  warnings are completely
+> > eliminated. Debug-level messages occur at exactly the same
+> > frequency/amount.
+> > 
+> > But I still object to the rationale overall - it seems this is about
+> > running fuzzers?  I even offered an alternative for fuzzer runners: is
+> > modifying the loglevel prior to fuzzing somehow unacceptable?
 > 
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v2:
-> - update patch following Enric suggest
-> Changes in v3:
-> - use variable fw_training instead sw_training_success
-> - base on DP SPCE, if training fail use lower link rate to retry training
-> Changes in v4:
-> - improve cdn_dp_get_lower_link_rate() and cdn_dp_software_train_link() follow Sean suggest
-> 
->  drivers/gpu/drm/rockchip/Makefile               |   3 +-
->  drivers/gpu/drm/rockchip/cdn-dp-core.c          |  24 +-
->  drivers/gpu/drm/rockchip/cdn-dp-core.h          |   2 +
->  drivers/gpu/drm/rockchip/cdn-dp-link-training.c | 420 ++++++++++++++++++++++++
->  drivers/gpu/drm/rockchip/cdn-dp-reg.c           |  31 +-
->  drivers/gpu/drm/rockchip/cdn-dp-reg.h           |  38 ++-
->  6 files changed, 505 insertions(+), 13 deletions(-)
->  create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-link-training.c
+> I don't have any dog in this, but maybe if providing information to the
+> users is so essential to having a pleasant user experience, then
+> rethinking the whole way these messages are funneled is necessary
+> because the kernel log + dmesg is by no means appropriate. Take a look
+> at what the networking maintainers recently did with netlink extended
+> ack. You used to just get an "unsupported" error, and now you know
+> exactly what is wrong when extack is available. It seems to me like
+> something like this is what you might want here since you want to have
+> perf be as user friendly as possible.
 
-...
+Thanks, Florian.
 
-> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-link-training.c b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
-> new file mode 100644
-> index 0000000..7efd070
-> --- /dev/null
-> +++ b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
-> @@ -0,0 +1,420 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
-> + * Author: Chris Zhong <zyw@rock-chips.com>
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/delay.h>
-> +#include <linux/phy/phy.h>
-> +#include <soc/rockchip/rockchip_phy_typec.h>
-> +
-> +#include "cdn-dp-core.h"
-> +#include "cdn-dp-reg.h"
-> +
-> +static void cdn_dp_set_signal_levels(struct cdn_dp_device *dp)
-> +{
-> +	struct cdn_dp_port *port = dp->port[dp->active_port];
-> +	struct rockchip_typec_phy *tcphy = phy_get_drvdata(port->phy);
+Acme & other perf people, do you foresee a problem adding netlink
+extended ack support to the perf subsystem for extended error message
+communication?
 
-This is still antithetical to the PHY framework; you're assuming that
-this is a particular type of PHY here.
+If not, is struct perf_event_attr amenable to having error reporting
+bit(s) added?  Recall my last attempt failed because it couldn't
+discriminate between the perf core and the PMU driver returning the
+-Evalue:
 
-> +
-> +	int rate = drm_dp_bw_code_to_link_rate(dp->link.rate);
-> +	u8 swing = (dp->train_set[0] & DP_TRAIN_VOLTAGE_SWING_MASK) >>
-> +		   DP_TRAIN_VOLTAGE_SWING_SHIFT;
-> +	u8 pre_emphasis = (dp->train_set[0] & DP_TRAIN_PRE_EMPHASIS_MASK)
-> +			  >> DP_TRAIN_PRE_EMPHASIS_SHIFT;
-> +
-> +	tcphy->typec_phy_config(port->phy, rate, dp->link.num_lanes,
-> +				swing, pre_emphasis);
+https://patchwork.kernel.org/patch/10025555/
 
-Is this something generic that could be added as a new PHY API instead?
+Thanks,
 
-> +}
-
-Brian
+Kim
