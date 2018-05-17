@@ -1,49 +1,87 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 17 May 2018 10:59:16 +0100
-Subject: [PATCH] dmaengine: qcom: bam_dma: fix invalid assignment warning
-In-Reply-To: <20180517095916.11362-1-srinivas.kandagatla@linaro.org>
-References: <20180517095916.11362-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180517095916.11362-2-srinivas.kandagatla@linaro.org>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Thu, 17 May 2018 10:01:49 +0000
+Subject: [PATCH v2 1/3] rtc: stm32: rework register management to prepare
+ other version of RTC
+In-Reply-To: <20180516202552.GA24496@piout.net>
+References: <1525880770-22263-1-git-send-email-amelie.delaunay@st.com>
+ <1525880770-22263-2-git-send-email-amelie.delaunay@st.com>
+ <20180516202552.GA24496@piout.net>
+Message-ID: <d08bcefc-7698-a968-7a35-ed9ab62bd623@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building kernel with W=1 throws below invalid assignment warnings.
-bam_dma.c:676:44: warning: invalid assignment: +=
-bam_dma.c:676:44:    left side has type unsigned long
-bam_dma.c:676:44:    right side has type restricted __le16
-bam_dma.c:921:41: warning: invalid assignment: +=
-bam_dma.c:921:41:    left side has type unsigned long
-bam_dma.c:921:41:    right side has type restricted __le16
+Hi,
 
-Fix them!.
+On 05/16/2018 10:25 PM, Alexandre Belloni wrote:
+> Hi,
+> 
+> On 09/05/2018 17:46:08+0200, Amelie Delaunay wrote:
+>>   static void stm32_rtc_wpr_unlock(struct stm32_rtc *rtc)
+>>   {
+>> -	writel_relaxed(RTC_WPR_1ST_KEY, rtc->base + STM32_RTC_WPR);
+>> -	writel_relaxed(RTC_WPR_2ND_KEY, rtc->base + STM32_RTC_WPR);
+>> +	struct stm32_rtc_registers regs = rtc->data->regs;
+> 
+> regs should probably be a pointer to ensure that no copy is made. I've
+> actually checked and it doesn't make a difference because gcc is smart
+> enough to not make the copy.
+> 
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/dma/qcom/bam_dma.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+...
 
-diff --git a/drivers/dma/qcom/bam_dma.c b/drivers/dma/qcom/bam_dma.c
-index a05fff8a1447..fac1ac910d75 100644
---- a/drivers/dma/qcom/bam_dma.c
-+++ b/drivers/dma/qcom/bam_dma.c
-@@ -673,7 +673,7 @@ static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
- 				remainder = 0;
- 			}
- 
--			async_desc->length += desc->size;
-+			async_desc->length += le16_to_cpu(desc->size);
- 			desc++;
- 		} while (remainder > 0);
- 	}
-@@ -918,7 +918,8 @@ static enum dma_status bam_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
- 				continue;
- 
- 			for (i = 0; i < async_desc->num_desc; i++)
--				residue += async_desc->curr_desc[i].size;
-+				residue += le16_to_cpu(
-+						async_desc->curr_desc[i].size);
- 		}
- 	}
- 
--- 
-2.16.2
+>>   static irqreturn_t stm32_rtc_alarm_irq(int irq, void *dev_id)
+>>   {
+>>   	struct stm32_rtc *rtc = (struct stm32_rtc *)dev_id;
+>> -	unsigned int isr, cr;
+>> +	struct stm32_rtc_registers regs = rtc->data->regs;
+>> +	struct stm32_rtc_events evts = rtc->data->events;
+> 
+> Ditto for evts.
+>
+
+I prepare a v3 with const struct stm32_rtc_registers *regs and const 
+struct stm32_rtc_events *evts.
+
+>> +	unsigned int status, cr;
+>>   
+>>   	mutex_lock(&rtc->rtc_dev->ops_lock);
+>>   
+>> -	isr = readl_relaxed(rtc->base + STM32_RTC_ISR);
+>> -	cr = readl_relaxed(rtc->base + STM32_RTC_CR);
+>> +	status = readl_relaxed(rtc->base + regs.isr);
+>> +	cr = readl_relaxed(rtc->base + regs.cr);
+>>   
+>> -	if ((isr & STM32_RTC_ISR_ALRAF) &&
+>> +	if ((status & evts.alra) &&
+>>   	    (cr & STM32_RTC_CR_ALRAIE)) {
+>>   		/* Alarm A flag - Alarm interrupt */
+>>   		dev_dbg(&rtc->rtc_dev->dev, "Alarm occurred\n");
+> 
+> ...
+> 
+>> @@ -641,7 +710,7 @@ static int stm32_rtc_probe(struct platform_device *pdev)
+>>   
+>>   	/*
+>>   	 * After a system reset, RTC_ISR.INITS flag can be read to check if
+>> -	 * the calendar has been initalized or not. INITS flag is reset by a
+>> +	 * the calendar has been initialized or not. INITS flag is reset by a
+>>   	 * power-on reset (no vbat, no power-supply). It is not reset if
+>>   	 * rtc_ck parent clock has changed (so RTC prescalers need to be
+>>   	 * changed). That's why we cannot rely on this flag to know if RTC
+>> @@ -666,7 +735,7 @@ static int stm32_rtc_probe(struct platform_device *pdev)
+>>   			 "alarm won't be able to wake up the system");
+>>   
+>>   	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
+>> -			&stm32_rtc_ops, THIS_MODULE);
+>> +						&stm32_rtc_ops, THIS_MODULE);
+>>   	if (IS_ERR(rtc->rtc_dev)) {
+>>   		ret = PTR_ERR(rtc->rtc_dev);
+>>   		dev_err(&pdev->dev, "rtc device registration failed, err=%d\n",
+> 
+> Those two changes should go into a separate cleanup patch.
+> 
+
+OK, new patch for these two changes in v3.
+
+Thanks for reviewing,
+Amelie
