@@ -1,35 +1,44 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 17 May 2018 11:02:42 +0100
-Subject: [PATCH v2 03/40] iommu/sva: Manage process address spaces
-In-Reply-To: <20180516163117.622693ea@jacob-builder>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-4-jean-philippe.brucker@arm.com>
- <20180516163117.622693ea@jacob-builder>
-Message-ID: <de478769-9f7a-d40b-a55e-e2c63ad883e8@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 17 May 2018 11:03:33 +0100
+Subject: [PATCH 1/2] ARM: dts: Restructure Vexpress motherboard includes
+In-Reply-To: <CACRpkdZgP3whauuV2G3m_eXY9bkQ-waBS0x9Jf91yE6oQE-E_Q@mail.gmail.com>
+References: <20180427185404.19205-1-linus.walleij@linaro.org>
+ <f8bf7e48-72ab-8749-5d23-32346475a440@arm.com>
+ <CACRpkdZgP3whauuV2G3m_eXY9bkQ-waBS0x9Jf91yE6oQE-E_Q@mail.gmail.com>
+Message-ID: <a03c16b9-e12e-9fc8-310c-574134a856b6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/18 00:31, Jacob Pan wrote:
-> On Fri, 11 May 2018 20:06:04 +0100
-> I am a little confused about domain vs. pasid relationship. If
-> each domain represents a address space, should there be a domain for
-> each pasid?
+Hi Linus,
 
-I don't think there is a formal definition, but from previous discussion
-the consensus seems to be: domains are a collection of devices that have
-the same virtual address spaces (one or many).
+On 17/05/18 10:04, Linus Walleij wrote:
+> On Wed, May 9, 2018 at 6:44 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> 
+>> Please copy me and Lorenzo also in future.
+>> Applied now(with typo in hierarchy fixed), thanks.
+> 
+> Sure thing, sorry I didn't realize you were working actively with
+> the Versatile Express, glad to see this :)
+> 
 
-Keeping that definition makes things easier, in my opinion. Some time
-ago, I did try to represent PASIDs using "subdomains" (introducing a
-hierarchy of struct iommu_domain), but it required invasive changes in
-the IOMMU subsystem and probably all over the tree.
+I generally send PR to ARM-SoC for Vexpress platforms(mainly
+arch/arm/boot/dts/vexpress-*) only not the older Versatile
+platforms(arch/arm/boot/dts/versatile-*) :). I know you work
+on them more actively.
 
-You do need some kind of "root domain" for each device, so that
-"iommu_get_domain_for_dev()" still makes sense. That root domain doesn't
-have a single address space but a collection of subdomains. If you need
-this anyway, representing a PASID with an iommu_domain doesn't seem
-preferable than using a different structure (io_mm), because they don't
-have anything in common.
+> I will send you my Versatile Express transition to DRI/DRM series
+> today since my Pl111 work for Vexpress is now pending in linux-next,
+> if I can find the right commits to base it on, do you have
+> a Vexpress git branch somewhere?
+> 
 
-Thanks,
-Jean
+I just sent PR[1] to ARM-SoC for v4.18, so you can use that branch/tag
+itself for now. Are you planning to get that in for v4.18 ? I can try to
+send 2nd PR but not sure of ARM SoC team will be happy since it may be
+too late for them.
+
+-- 
+Regards,
+Sudeep
+
+[1] https://www.spinics.net/lists/arm-kernel/msg652377.html
