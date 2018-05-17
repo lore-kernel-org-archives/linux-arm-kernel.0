@@ -1,37 +1,89 @@
-From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 17 May 2018 16:36:52 +0200
-Subject: [PATCH] ARM: dts: stm32: enable USB Host (USBH) EHCI controller on
- stm32mp157c-ev1
-Message-ID: <1526567812-6458-1-git-send-email-amelie.delaunay@st.com>
+From: hao5781286@gmail.com (Hao Zhang)
+Date: Thu, 17 May 2018 22:48:58 +0800
+Subject: [PATCH v2 4/4] ARM: PWM: add allwinner sun8i pwm support.
+In-Reply-To: <20180515111711.l2g4vgsal7yr6dbr@flea>
+References: <20180225135308.GA14561@arx-s1>
+ <20180226090038.etk5q4pd4rl5dvf6@flea.lan>
+ <CAJeuY7-Dz1u9J8GMu=OdzJ2cJUnE3wEobJoQz6RV-ibjBjoW4A@mail.gmail.com>
+ <20180515111711.l2g4vgsal7yr6dbr@flea>
+Message-ID: <CAJeuY79ObkssY_=SLG==7xZri10P3yWFhXC3=CUVrdQ+7cBoHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables USB Host (USBH) EHCI controller on stm32mp157c-ev1.
-As a hub is used between USBH and USB connectors, no need to enable
-USBH OHCI controller: all low- and full-speed traffic is managed by the
-hub.
+2018-05-15 19:17 GMT+08:00 Maxime Ripard <maxime.ripard@bootlin.com>:
+> Hi,
+>
+> On Mon, May 14, 2018 at 10:45:44PM +0800, Hao Zhang wrote:
+>> 2018-02-26 17:00 GMT+08:00 Maxime Ripard <maxime.ripard@bootlin.com>:
+>> > Thanks for respinning this serie. It looks mostly good, but you still
+>> > have a quite significant number of checkpatch (--strict) warnings that
+>> > you should address.
+>>
+>> Thanks for reviews :) ,i'm sorry for that, it will be fixed next
+>> time.  and, besides, in what situation were the checkpatch warning
+>> can be ignore?
+>
+> The only one that can be reasonably be ignored is the long line
+> warning, and only if complying to the limit would make it less easy to
+> understand.
+>
+>> >
+>> > On Sun, Feb 25, 2018 at 09:53:08PM +0800, hao_zhang wrote:
+>> >> +#define CAPTURE_IRQ_ENABLE_REG       0x0010
+>> >> +#define CFIE(ch)     BIT(ch << 1 + 1)
+>> >> +#define CRIE(ch)     BIT(ch << 1)
+>> >
+>> > You should also put your argument between parentheses here (and in all
+>> > your other macros).
+>>
+>> Do you mean like this ?
+>> #define CFIE(ch)     BIT((ch) << 1 + 1)
+>> #define CRIE(ch)     BIT((ch) << 1)
+>
+> Yep, exactly. Otherwise, if you do something like CRIE(1 + 1), the
+> result will be BIT(1 + 1 << 1), which will expand to 3, instead of 4.
+>
+> Also, CFIE looks a bit weird here, is it the offset that is
+> incremented, or the value? You should probably have parentheses to
+> make it explicit.
 
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
----
- arch/arm/boot/dts/stm32mp157c-ev1.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+The vallue,
+BIT(((ch) << 1) + 1) It seem not very nice...
 
-diff --git a/arch/arm/boot/dts/stm32mp157c-ev1.dts b/arch/arm/boot/dts/stm32mp157c-ev1.dts
-index 9382d80..933036b 100644
---- a/arch/arm/boot/dts/stm32mp157c-ev1.dts
-+++ b/arch/arm/boot/dts/stm32mp157c-ev1.dts
-@@ -103,6 +103,12 @@
- 	};
- };
- 
-+&usbh_ehci {
-+	phys = <&usbphyc_port0>;
-+	phy-names = "usb";
-+	status = "okay";
-+};
-+
- &usbphyc {
- 	status = "okay";
- };
--- 
-2.7.4
+uhmm...
+In CAPTURE_IRQ_ENABLE_REG odd number is CFIE, even number is CRIE
+each channel has one CFIE and CRIE.
+
+we can also describe like this:
+#define CFIE(ch)     BIT((ch) * 2 + 1)
+#define CRIE(ch)     BIT((ch) * 2)
+
+>
+>> >
+>> >> +static const u16 div_m_table[] = {
+>> >> +     1,
+>> >> +     2,
+>> >> +     4,
+>> >> +     8,
+>> >> +     16,
+>> >> +     32,
+>> >> +     64,
+>> >> +     128,
+>> >> +     256
+>> >> +};
+>> >
+>> > If this is just a power of two, you can use either the power of two /
+>> > ilog2 to switch back and forth, instead of using that table.
+>>
+>> I think using table is more explicit and extended...
+>
+> If you didn't have a simple mapping between the register values and
+> the divider value, then yeah, sure. But it's not the case here.
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
