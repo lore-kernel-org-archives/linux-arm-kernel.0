@@ -1,84 +1,128 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 17 May 2018 10:42:32 +0100
-Subject: [PATCH v2] dmaengine: qcom: bam_dma: check if the runtime pm enabled
-Message-ID: <20180517094232.27924-1-srinivas.kandagatla@linaro.org>
+From: keiichiw@google.com (Keiichi Watanabe)
+Date: Thu, 17 May 2018 18:53:49 +0900
+Subject: [PATCH] media: v4l2-ctrl: Add control for VP9 profile
+Message-ID: <20180517095349.203865-1-keiichiw@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disabling pm runtime at probe is not sufficient to get BAM working
-on remotely controller instances. pm_runtime_get_sync() would return
--EACCES in such cases.
-So check if runtime pm is enabled before returning error from bam functions.
+Add a new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE for selecting desired
+profile for VP9 encoder and querying for supported profiles by VP9 encoder
+or decoder.
 
-Fixes: 5b4a68952a89 ("dmaengine: qcom: bam_dma: disable runtime pm on remote controlled")
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+An existing control V4L2_CID_MPEG_VIDEO_VPX_PROFILE cannot be
+used for querying since it is not a menu control but an integer
+control, which cannot return an arbitrary set of supported profiles.
+
+The new control V4L2_CID_MPEG_VIDEO_VP9_PROFILE is a menu control as
+with controls for other codec profiles. (e.g. H264)
+
+Signed-off-by: Keiichi Watanabe <keiichiw@chromium.org>
 ---
- drivers/dma/qcom/bam_dma.c | 18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/dma/qcom/bam_dma.c b/drivers/dma/qcom/bam_dma.c
-index d29275b97e84..4a828c18099a 100644
---- a/drivers/dma/qcom/bam_dma.c
-+++ b/drivers/dma/qcom/bam_dma.c
-@@ -524,6 +524,14 @@ static int bam_alloc_chan(struct dma_chan *chan)
- 	return 0;
- }
+ .../media/uapi/v4l/extended-controls.rst      | 26 +++++++++++++++++++
+ drivers/media/v4l2-core/v4l2-ctrls.c          | 12 +++++++++
+ include/uapi/linux/v4l2-controls.h            |  8 ++++++
+ 3 files changed, 46 insertions(+)
+
+diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
+index 03931f9b1285..4f7f128a4998 100644
+--- a/Documentation/media/uapi/v4l/extended-controls.rst
++++ b/Documentation/media/uapi/v4l/extended-controls.rst
+@@ -1959,6 +1959,32 @@ enum v4l2_vp8_golden_frame_sel -
+     Select the desired profile for VPx encoder. Acceptable values are 0,
+     1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
  
-+static int bam_pm_runtime_get_sync(struct device *dev)
-+{
-+	if (pm_runtime_enabled(dev))
-+		return pm_runtime_get_sync(dev);
++.. _v4l2-mpeg-video-vp9-profile:
 +
-+	return 0;
-+}
++``V4L2_CID_MPEG_VIDEO_VP9_PROFILE``
++    (enum)
 +
- /**
-  * bam_free_chan - Frees dma resources associated with specific channel
-  * @chan: specified channel
-@@ -539,7 +547,7 @@ static void bam_free_chan(struct dma_chan *chan)
- 	unsigned long flags;
- 	int ret;
++enum v4l2_mpeg_video_vp9_profile -
++    This control allows to select the profile for VP9 encoder.
++    This is also used to enumerate supported profiles by VP9 encoder or decoder.
++    Possible values are:
++
++
++
++.. flat-table::
++    :header-rows:  0
++    :stub-columns: 0
++
++    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_0``
++      - Profile 0
++    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_1``
++      - Profile 1
++    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_2``
++      - Profile 2
++    * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_3``
++      - Profile 3
++
++
  
--	ret = pm_runtime_get_sync(bdev->dev);
-+	ret = bam_pm_runtime_get_sync(bdev->dev);
- 	if (ret < 0)
- 		return;
+ High Efficiency Video Coding (HEVC/H.265) Control Reference
+ -----------------------------------------------------------
+diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+index d29e45516eb7..401ce21c2e63 100644
+--- a/drivers/media/v4l2-core/v4l2-ctrls.c
++++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+@@ -431,6 +431,13 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+ 		"Use Previous Specific Frame",
+ 		NULL,
+ 	};
++	static const char * const vp9_profile[] = {
++		"0",
++		"1",
++		"2",
++		"3",
++		NULL,
++	};
  
-@@ -720,7 +728,7 @@ static int bam_pause(struct dma_chan *chan)
- 	unsigned long flag;
- 	int ret;
+ 	static const char * const flash_led_mode[] = {
+ 		"Off",
+@@ -614,6 +621,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+ 		return mpeg4_profile;
+ 	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
+ 		return vpx_golden_frame_sel;
++	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
++		return vp9_profile;
+ 	case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
+ 		return jpeg_chroma_subsampling;
+ 	case V4L2_CID_DV_TX_MODE:
+@@ -841,6 +850,8 @@ const char *v4l2_ctrl_get_name(u32 id)
+ 	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
+ 	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
  
--	ret = pm_runtime_get_sync(bdev->dev);
-+	ret = bam_pm_runtime_get_sync(bdev->dev);
- 	if (ret < 0)
- 		return ret;
++	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:			return "VP9 Profile";
++
+ 	/* HEVC controls */
+ 	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:		return "HEVC I-Frame QP Value";
+ 	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:		return "HEVC P-Frame QP Value";
+@@ -1180,6 +1191,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+ 	case V4L2_CID_DEINTERLACING_MODE:
+ 	case V4L2_CID_TUNE_DEEMPHASIS:
+ 	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
++	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
+ 	case V4L2_CID_DETECT_MD_MODE:
+ 	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
+ 	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
+diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+index 8d473c979b61..56203b7b715c 100644
+--- a/include/uapi/linux/v4l2-controls.h
++++ b/include/uapi/linux/v4l2-controls.h
+@@ -589,6 +589,14 @@ enum v4l2_vp8_golden_frame_sel {
+ #define V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP		(V4L2_CID_MPEG_BASE+510)
+ #define V4L2_CID_MPEG_VIDEO_VPX_PROFILE			(V4L2_CID_MPEG_BASE+511)
  
-@@ -746,7 +754,7 @@ static int bam_resume(struct dma_chan *chan)
- 	unsigned long flag;
- 	int ret;
++#define V4L2_CID_MPEG_VIDEO_VP9_PROFILE			(V4L2_CID_MPEG_BASE+512)
++enum v4l2_mpeg_video_vp9_profile {
++	V4L2_MPEG_VIDEO_VP9_PROFILE_0				= 0,
++	V4L2_MPEG_VIDEO_VP9_PROFILE_1				= 1,
++	V4L2_MPEG_VIDEO_VP9_PROFILE_2				= 2,
++	V4L2_MPEG_VIDEO_VP9_PROFILE_3				= 3,
++};
++
+ /* CIDs for HEVC encoding. */
  
--	ret = pm_runtime_get_sync(bdev->dev);
-+	ret = bam_pm_runtime_get_sync(bdev->dev);
- 	if (ret < 0)
- 		return ret;
- 
-@@ -852,7 +860,7 @@ static irqreturn_t bam_dma_irq(int irq, void *data)
- 	if (srcs & P_IRQ)
- 		tasklet_schedule(&bdev->task);
- 
--	ret = pm_runtime_get_sync(bdev->dev);
-+	ret = bam_pm_runtime_get_sync(bdev->dev);
- 	if (ret < 0)
- 		return ret;
- 
-@@ -969,7 +977,7 @@ static void bam_start_dma(struct bam_chan *bchan)
- 	if (!vd)
- 		return;
- 
--	ret = pm_runtime_get_sync(bdev->dev);
-+	ret = bam_pm_runtime_get_sync(bdev->dev);
- 	if (ret < 0)
- 		return;
- 
+ #define V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP		(V4L2_CID_MPEG_BASE + 600)
 -- 
-2.16.2
+2.17.0.441.gb46fe60e1d-goog
