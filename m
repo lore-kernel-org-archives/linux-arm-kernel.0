@@ -1,50 +1,154 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 17 May 2018 09:44:48 +0530
-Subject: [PATCH] cpufreq: brcmstb-avs-cpufreq: sort frequencies in
- ascending order
-In-Reply-To: <71309e94-90d4-2b58-729b-9ab488c6d554@gmail.com>
-References: <20180516034954.56475-1-code@mmayer.net>
- <20180516043218.7ktq5vjq2rhcszz5@vireshk-i7>
- <71309e94-90d4-2b58-729b-9ab488c6d554@gmail.com>
-Message-ID: <20180517041448.ceh4g5fs2qfqqojm@vireshk-i7>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 17 May 2018 10:10:21 +0530
+Subject: [PATCH v2] pinctrl: pinctrl-single: Add functions to save and restore
+ pinctrl context
+Message-ID: <1526532021-16387-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-05-18, 12:24, Florian Fainelli wrote:
-> On 05/15/2018 09:32 PM, Viresh Kumar wrote:
-> > On 15-05-18, 20:49, Markus Mayer wrote:
-> >> From: Markus Mayer <mmayer@broadcom.com>
-> >>
-> >> Most CPUfreq drivers (at least on ARM) seem to be sorting the available
-> >> frequencies from lowest to highest. To match this behaviour, we reverse
-> >> the sorting order in brcmstb-avs-cpufreq, so it is now also lowest to
-> >> highest.
-> > 
-> > The reasoning isn't correct. Just because everyone else is doing it
-> > doesn't make it right and so you shouldn't change just because of
-> > that.
-> > 
-> > What you must written instead in the commit log is that the cpufreq
-> > core performs better if the table is sorted (in any order), and so we
-> > must sort it as well.
-> 
-> Is there a reason why set_freq_table_sorted() tries an ascending or
-> descending sort, but does not enforce one versus another for all drivers?
+This adds a pair of context save/restore functions to save/restore the
+state of a set of pinctrl registers. The context is lost during rtc only
+suspend with ddr in self-refresh on am43xx. Currently the save/restore
+is being done unconditionally. This will be optimized later with a
+pdata-quirk function which will allow is to save/restore only when doing
+the rtc only mode with ddr in self refresh.
 
-set_freq_table_sorted() doesn't sort the frequency table but checks if
-the table is already sorted in a particular order. And then
-cpufreq_frequency_table_target() is optimized based on this flag. We
-don't have to enforce any particular ordering here.
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
 
-> > But I feel the table is already sorted for your platform, isn't it?
-> > And I don't see a clear advantage of merging this patch.
-> 
-> The patch changes the order to have the lowest to highest, whereas the
-> current implementation has them from highest to lowest. From what you
-> are saying, it sounds like this is unnecessary, since the sorting is
-> already making things efficient enough, so this is just a cosmetic thing?
+Changes in v2:
 
-Right. It shouldn't make any performance improvements.
+  * As this is needed only the in the suspend/resume path
+    removed the cpu_pm notifier and added the save/restore in
+    the suspend/resume calls.
+  * Saving/Restoring unconditionally at the moment. This will
+    be optimized later with the help of a pdata-quirk function.
 
+ drivers/pinctrl/pinctrl-single.c | 72 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 71 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index a7c5eb3..9c3c005 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -144,6 +144,7 @@ struct pcs_soc_data {
+  * struct pcs_device - pinctrl device instance
+  * @res:	resources
+  * @base:	virtual address of the controller
++ * @saved_vals: saved values for the controller
+  * @size:	size of the ioremapped area
+  * @dev:	device entry
+  * @np:		device tree node
+@@ -172,11 +173,13 @@ struct pcs_soc_data {
+ struct pcs_device {
+ 	struct resource *res;
+ 	void __iomem *base;
++	void *saved_vals;
+ 	unsigned size;
+ 	struct device *dev;
+ 	struct device_node *np;
+ 	struct pinctrl_dev *pctl;
+ 	unsigned flags;
++#define PCS_CONTEXT_LOSS_OFF	(1 << 3)
+ #define PCS_QUIRK_SHARED_IRQ	(1 << 2)
+ #define PCS_FEAT_IRQ		(1 << 1)
+ #define PCS_FEAT_PINCONF	(1 << 0)
+@@ -1576,6 +1579,67 @@ static int pcs_irq_init_chained_handler(struct pcs_device *pcs,
+ }
+ 
+ #ifdef CONFIG_PM
++static int pcs_save_context(struct pcs_device *pcs)
++{
++	int i, mux_bytes;
++	u64 *regsl;
++	u32 *regsw;
++	u16 *regshw;
++
++	mux_bytes = pcs->width / BITS_PER_BYTE;
++
++	if (!pcs->saved_vals)
++		pcs->saved_vals = devm_kzalloc(pcs->dev, pcs->size, GFP_ATOMIC);
++
++	switch (pcs->width) {
++	case 64:
++		regsl = (u64 *)pcs->saved_vals;
++		for (i = 0; i < pcs->size / mux_bytes; i++)
++			regsl[i] = pcs->read(pcs->base + i * mux_bytes);
++		break;
++	case 32:
++		regsw = (u32 *)pcs->saved_vals;
++		for (i = 0; i < pcs->size / mux_bytes; i++)
++			regsw[i] = pcs->read(pcs->base + i * mux_bytes);
++		break;
++	case 16:
++		regshw = (u16 *)pcs->saved_vals;
++		for (i = 0; i < pcs->size / mux_bytes; i++)
++			regshw[i] = pcs->read(pcs->base + i * mux_bytes);
++		break;
++	}
++
++	return 0;
++}
++
++static void pcs_restore_context(struct pcs_device *pcs)
++{
++	int i, mux_bytes;
++	u64 *regsl;
++	u32 *regsw;
++	u16 *regshw;
++
++	mux_bytes = pcs->width / BITS_PER_BYTE;
++
++	switch (pcs->width) {
++	case 64:
++		regsl = (u64 *)pcs->saved_vals;
++		for (i = 0; i < pcs->size / mux_bytes; i++)
++			pcs->write(regsl[i], pcs->base + i * mux_bytes);
++		break;
++	case 32:
++		regsw = (u32 *)pcs->saved_vals;
++		for (i = 0; i < pcs->size / mux_bytes; i++)
++			pcs->write(regsw[i], pcs->base + i * mux_bytes);
++		break;
++	case 16:
++		regshw = (u16 *)pcs->saved_vals;
++		for (i = 0; i < pcs->size / mux_bytes; i++)
++			pcs->write(regshw[i], pcs->base + i * mux_bytes);
++		break;
++	}
++}
++
+ static int pinctrl_single_suspend(struct platform_device *pdev,
+ 					pm_message_t state)
+ {
+@@ -1585,6 +1649,9 @@ static int pinctrl_single_suspend(struct platform_device *pdev,
+ 	if (!pcs)
+ 		return -EINVAL;
+ 
++	if (pcs->flags & PCS_CONTEXT_LOSS_OFF)
++		pcs_save_context(pcs);
++
+ 	return pinctrl_force_sleep(pcs->pctl);
+ }
+ 
+@@ -1596,6 +1663,9 @@ static int pinctrl_single_resume(struct platform_device *pdev)
+ 	if (!pcs)
+ 		return -EINVAL;
+ 
++	if (pcs->flags & PCS_CONTEXT_LOSS_OFF)
++		pcs_restore_context(pcs);
++
+ 	return pinctrl_force_default(pcs->pctl);
+ }
+ #endif
+@@ -1824,7 +1894,7 @@ static int pcs_remove(struct platform_device *pdev)
+ };
+ 
+ static const struct pcs_soc_data pinctrl_single_am437x = {
+-	.flags = PCS_QUIRK_SHARED_IRQ,
++	.flags = PCS_QUIRK_SHARED_IRQ | PCS_CONTEXT_LOSS_OFF,
+ 	.irq_enable_mask = (1 << 29),   /* OMAP_WAKEUP_EN */
+ 	.irq_status_mask = (1 << 30),   /* OMAP_WAKEUP_EVENT */
+ };
 -- 
-viresh
+1.9.1
