@@ -1,40 +1,68 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 May 2018 15:55:44 +0900
-Subject: [PATCH v8 09/24] ASoC: qdsp6: q6afe: Add q6afe driver
-In-Reply-To: <20180509125635.5653-10-srinivas.kandagatla@linaro.org>
-References: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
- <20180509125635.5653-10-srinivas.kandagatla@linaro.org>
-Message-ID: <20180517065544.GO20254@sirena.org.uk>
+Date: Thu, 17 May 2018 17:41:46 +0100 (BST)
+Subject: Applied "regulator: of: add property for allowed modes specification"
+ to the regulator tree
+In-Reply-To: <f3aa166ddd11c8f9813602be68aa5b10e5c90979.1526088289.git.collinsd@codeaurora.org>
+Message-ID: <20180517164146.4A3B044007E@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 09, 2018 at 01:56:20PM +0100, Srinivas Kandagatla wrote:
+The patch
 
-> +static struct q6afe_port *afe_find_port(struct q6afe *afe, int token)
-> +{
-> +	struct q6afe_port *p = NULL;
-> +	struct q6afe_port *ret = NULL;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&afe->port_list_lock, flags);
-> +	list_for_each_entry(p, &afe->port_list, node)
-> +		if (p->token == token) {
-> +			ret = p;
-> +			break;
-> +		}
-> +
-> +	spin_unlock_irqrestore(&afe->port_list_lock, flags);
-> +	return ret;
+   regulator: of: add property for allowed modes specification
 
-This lock only protects the list, it does nothing to ensure that the
-port we look up is still valid by the time we return to the caller.
-That means we won't crash during list traversal but does nothing to
-ensure we won't crash immediately afterwards if the port is deallocated
-just after we look it up.  What stops that happening?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/2294767d/attachment-0001.sig>
+has been applied to the regulator tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From d73e2842a3e236a1f58ba498e4d6ae58e18f660a Mon Sep 17 00:00:00 2001
+From: David Collins <collinsd@codeaurora.org>
+Date: Fri, 11 May 2018 18:46:46 -0700
+Subject: [PATCH] regulator: of: add property for allowed modes specification
+
+Add a common device tree property for regulator nodes to support
+the specification of allowed operating modes.
+
+Signed-off-by: David Collins <collinsd@codeaurora.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/regulator/regulator.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
+index 2babe15b618d..c627aa08f0da 100644
+--- a/Documentation/devicetree/bindings/regulator/regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+@@ -59,6 +59,11 @@ Optional properties:
+ - regulator-initial-mode: initial operating mode. The set of possible operating
+   modes depends on the capabilities of every hardware so each device binding
+   documentation explains which values the regulator supports.
++- regulator-allowed-modes: list of operating modes that software is allowed to
++  configure for the regulator at run-time.  Elements may be specified in any
++  order.  The set of possible operating modes depends on the capabilities of
++  every hardware so each device binding document explains which values the
++  regulator supports.
+ - regulator-system-load: Load in uA present on regulator that is not captured by
+   any consumer request.
+ - regulator-pull-down: Enable pull down resistor when the regulator is disabled.
+-- 
+2.17.0
