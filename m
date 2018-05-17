@@ -1,92 +1,39 @@
 From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Thu, 17 May 2018 10:29:37 +0200
-Subject: [PATCH net-next v3 08/10] arm64: dts: marvell: mcbin: enable the
- fourth network interface
+Date: Thu, 17 May 2018 10:29:39 +0200
+Subject: [PATCH net-next v3 10/10] arm64: dts: marvell: 7040-db: describe the
+ 10G interface as fixed-link
 In-Reply-To: <20180517082939.14598-1-antoine.tenart@bootlin.com>
 References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
-Message-ID: <20180517082939.14598-9-antoine.tenart@bootlin.com>
+Message-ID: <20180517082939.14598-11-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the fourth network interface on the Marvell
-Macchiatobin. It is configured in the 2500Base-X PHY mode. The SFP cage
-is also described.
+This patch adds a fixed-link node to the 10G interface of the 7040-db
+board. This is required as the mvpp2 driver now uses phylink. The best
+solution would have been to describe the SFP cage but they are not
+wired correctly, and thus unusable, so we chose to use fixed-link
+instead.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
 ---
- .../boot/dts/marvell/armada-8040-mcbin.dts    | 32 +++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-index eaa67de8c2bb..a66958ff4de6 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-@@ -27,6 +27,7 @@
- 		ethernet0 = &cp0_eth0;
- 		ethernet1 = &cp1_eth0;
- 		ethernet2 = &cp1_eth1;
-+		ethernet3 = &cp1_eth2;
- 	};
- 
- 	/* Regulator labels correspond with schematics */
-@@ -88,6 +89,18 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&cp1_sfpp1_pins &cp0_sfpp1_pins>;
- 	};
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+index d6bec058a30a..412efdb46e7c 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+@@ -242,6 +242,11 @@
+ 	phy-mode = "10gbase-kr";
+ 	/* Generic PHY, providing serdes lanes */
+ 	phys = <&cp0_comphy2 0>;
 +
-+	sfp_eth3: sfp-eth3 {
-+		/* CON3,4 - CPS lane 5 */
-+		compatible = "sff,sfp";
-+		i2c-bus = <&sfp_1g_i2c>;
-+		los-gpio = <&cp0_gpio2 22 GPIO_ACTIVE_HIGH>;
-+		mod-def0-gpio = <&cp0_gpio2 21 GPIO_ACTIVE_LOW>;
-+		tx-disable-gpio = <&cp1_gpio1 24 GPIO_ACTIVE_HIGH>;
-+		tx-fault-gpio = <&cp0_gpio2 19 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&cp0_sfp_1g_pins &cp1_sfp_1g_pins>;
++	fixed-link {
++		speed = <10000>;
++		full-duplex;
 +	};
  };
  
- &uart0 {
-@@ -195,6 +208,10 @@
- 		marvell,pins = "mpp47";
- 		marvell,function = "gpio";
- 	};
-+	cp0_sfp_1g_pins: sfp-1g-pins {
-+		marvell,pins = "mpp51", "mpp53", "mpp54";
-+		marvell,function = "gpio";
-+	};
- 	cp0_pcie_pins: pcie-pins {
- 		marvell,pins = "mpp52";
- 		marvell,function = "gpio";
-@@ -287,6 +304,17 @@
- 	phys = <&cp1_comphy0 1>;
- };
- 
-+&cp1_eth2 {
-+	/* CPS Lane 5 */
-+	status = "okay";
-+	/* Network PHY */
-+	phy-mode = "2500base-x";
-+	managed = "in-band-status";
-+	/* Generic PHY, providing serdes lanes */
-+	phys = <&cp1_comphy5 2>;
-+	sfp = <&sfp_eth3>;
-+};
-+
- &cp1_pinctrl {
- 	cp1_sfpp1_pins: sfpp1-pins {
- 		marvell,pins = "mpp8", "mpp10", "mpp11";
-@@ -300,6 +328,10 @@
- 		marvell,pins = "mpp6", "mpp7";
- 		marvell,function = "uart0";
- 	};
-+	cp1_sfp_1g_pins: sfp-1g-pins {
-+		marvell,pins = "mpp24";
-+		marvell,function = "gpio";
-+	};
- 	cp1_sfpp0_pins: sfpp0-pins {
- 		marvell,pins = "mpp26", "mpp27", "mpp28", "mpp29";
- 		marvell,function = "gpio";
+ &cp0_eth1 {
 -- 
 2.17.0
