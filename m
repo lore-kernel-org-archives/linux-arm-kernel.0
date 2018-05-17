@@ -1,20 +1,26 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 17 May 2018 11:56:13 +0100
+From: vkoul@kernel.org (Vinod)
+Date: Thu, 17 May 2018 16:29:49 +0530
 Subject: [PATCH] dmaengine: qcom: bam_dma: fix some doc warnings.
-In-Reply-To: <20180517105517.GA13271@vkoul-mobl>
+In-Reply-To: <20180517095916.11362-1-srinivas.kandagatla@linaro.org>
 References: <20180517095916.11362-1-srinivas.kandagatla@linaro.org>
- <20180517105049.GZ13271@vkoul-mobl>
- <c3b63215-ed0f-93ee-69df-6b22053f0479@linaro.org>
- <20180517105517.GA13271@vkoul-mobl>
-Message-ID: <6d0d7e0d-16eb-2f91-5ca7-9a7ab2196ee3@linaro.org>
+Message-ID: <20180517105949.GA2932@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 17-05-18, 10:59, Srinivas Kandagatla wrote:
+> Building kernel with W=1 throws up below warnings:
+> bam_dma.c:459: warning: Function parameter or member 'dir'
+> 	not described in 'bam_chan_init_hw'
+> bam_dma.c:697: warning: Function parameter or member 'chan'
+> 	not described in 'bam_dma_terminate_all'
+> bam_dma.c:697: warning: Excess function parameter 'bchan'
+> 	description in 'bam_dma_terminate_all'
+> bam_dma.c:964: warning: Function parameter or member 'bchan'
+> 	not described in 'bam_start_dma'
+> 
+> Fix these!.
 
+Applied both, thanks
 
-On 17/05/18 11:55, Vinod wrote:
->> let me know if you still want an empty line, I can respin.
-> Yeah that's why asked, I can edit while applying so no issues
-Thanks, that will work!
-
---srini
+-- 
+~Vinod
