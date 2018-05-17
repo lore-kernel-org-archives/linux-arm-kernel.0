@@ -1,71 +1,39 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 17 May 2018 11:30:59 +0200
-Subject: [PATCH v2 3/4] ARM64: dts: meson-axg: add i2c AO pins
-In-Reply-To: <20180517093100.22225-1-jbrunet@baylibre.com>
-References: <20180517093100.22225-1-jbrunet@baylibre.com>
-Message-ID: <20180517093100.22225-4-jbrunet@baylibre.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 17 May 2018 11:35:23 +0200
+Subject: [PATCH v9 02/12] drivers: base: cacheinfo: setup DT cache
+ properties early
+In-Reply-To: <829ce0f6-0234-c0f1-0f30-7fbb36fa6049@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180511235807.30834-3-jeremy.linton@arm.com>
+ <78b08b68-ff57-8dd8-6eb1-00548f275eac@arm.com>
+ <20180517065449.GA13589@kroah.com>
+ <829ce0f6-0234-c0f1-0f30-7fbb36fa6049@arm.com>
+Message-ID: <20180517093523.GC17597@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the pins related to the i2c AO controller of the meson-axg platform
+On Thu, May 17, 2018 at 10:08:25AM +0100, Sudeep Holla wrote:
+> Hi Greg,
+> 
+> On 17/05/18 07:54, Greg KH wrote:
+> > On Tue, May 15, 2018 at 12:15:08PM -0500, Jeremy Linton wrote:
+> >> Hi Greg,
+> >>
+> >> Have you had a chance to look at the cachinfo parts of this patch?
+> > 
+> > Nope :)
+> > 
+> > I didn't write that, and while it is dumped in the driver core section
+> > of the kernel, I know nothing about it. 
+> 
+> Sorry for that, I didn't find any better place at that time(neither
+> now), so I did put it there following topology :)
+> 
+> > If you get an ack from Sudeep for this, which you did, that's fine
+> > with me, merge away!
+> > 
+> 
+> Thanks, we plan to take it via ARM64, hence we needed your official
+> say(ACK) for that.
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 42 ++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index d213ab715e03..e315701cb6ac 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -1046,6 +1046,48 @@
- 					gpio-ranges = <&pinctrl_aobus 0 0 15>;
- 				};
- 
-+				i2c_ao_sck_4_pins: i2c_ao_sck_4 {
-+					mux {
-+						groups = "i2c_ao_sck_4";
-+						function = "i2c_ao";
-+					};
-+				};
-+
-+				i2c_ao_sck_8_pins: i2c_ao_sck_8 {
-+					mux {
-+						groups = "i2c_ao_sck_8";
-+						function = "i2c_ao";
-+					};
-+				};
-+
-+				i2c_ao_sck_10_pins: i2c_ao_sck_10 {
-+					mux {
-+						groups = "i2c_ao_sck_10";
-+						function = "i2c_ao";
-+					};
-+				};
-+
-+				i2c_ao_sda_5_pins: i2c_ao_sda_5 {
-+					mux {
-+						groups = "i2c_ao_sda_5";
-+						function = "i2c_ao";
-+					};
-+				};
-+
-+				i2c_ao_sda_9_pins: i2c_ao_sda_9 {
-+					mux {
-+						groups = "i2c_ao_sda_9";
-+						function = "i2c_ao";
-+					};
-+				};
-+
-+				i2c_ao_sda_11_pins: i2c_ao_sda_11 {
-+					mux {
-+						groups = "i2c_ao_sda_11";
-+						function = "i2c_ao";
-+					};
-+				};
-+
- 				remote_input_ao_pins: remote_input_ao {
- 					mux {
- 						groups = "remote_input_ao";
--- 
-2.14.3
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
