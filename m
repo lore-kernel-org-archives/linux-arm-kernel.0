@@ -1,54 +1,78 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 17 May 2018 12:59:28 -0700
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <alpine.DEB.2.21.1805171530080.8529@macbook-air>
-References: <20180517131727.29263-1-eric@anholt.net>
- <1412187220.62585.1526572780332@email.1und1.de>
- <alpine.DEB.2.21.1805171233500.7984@macbook-air>
- <307323036.63872.1526576126537@email.1und1.de>
- <20180517180758.GK12198@hirez.programming.kicks-ass.net>
- <alpine.DEB.2.21.1805171422450.8529@macbook-air>
- <alpine.DEB.2.21.1805171530080.8529@macbook-air>
-Message-ID: <0a643984-1586-8c56-6627-430f0c2a4ba8@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 17 May 2018 16:05:45 -0400
+Subject: [PATCH] mm/dmapool: localize page allocations
+In-Reply-To: <20180517194612.GG26718@bombadil.infradead.org>
+References: <1526578581-7658-1-git-send-email-okaya@codeaurora.org>
+ <20180517181815.GC26718@bombadil.infradead.org>
+ <9844a638-bc4e-46bd-133e-0c82a3e9d6ea@codeaurora.org>
+ <20180517194612.GG26718@bombadil.infradead.org>
+Message-ID: <d49e594a-c18a-160f-ca4c-91520ff3b293@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2018 12:31 PM, Vince Weaver wrote:
-> On Thu, 17 May 2018, Vince Weaver wrote:
-> 
->> On Thu, 17 May 2018, Peter Zijlstra wrote:
->> with cortex-a7 now, would it be possible to later drop that if proper 
->> cortex-a53 support is added to the armv7 pmu driver?  Or would that lead 
->> to all kinds of back-compatability mess?
-> 
-> For what it's worth, the pi-foundation kernel bcm2710 device tree file 
-> does:
-> 
-> 		arm-pmu {
-> #ifdef RPI364
-> 			compatible = "arm,armv8-pmuv3", "arm,cortex-a7-pmu";
-> #else
-> 			compatible = "arm,cortex-a7-pmu";
-> #endif
-> 			interrupt-parent = <&local_intc>;
-> 			interrupts = <9>;
-> 		};
-> 
-> 
-> Which is probably where I was getting the arm,armv8-pmuv3 from in my 
-> original patch.
+On 5/17/2018 3:46 PM, Matthew Wilcox wrote:
+>> Remember that the CPU core that is running this driver is most probably on
+>> the same NUMA node as the device itself.
+> Umm ... says who?  If my process is running on NUMA node 5 and I submit
+> an I/O, it should be allocating from a pool on node 5, not from a pool
+> on whichever node the device is attached to.
 
-I thought somehow that Marc Z. had unified
-arch/arm/kernel/perf_event_v7.c and arch/arm64/kernel/perf_event.c into
-a common driver entry point under drivers/perf/arm_pmu.c but I don't see
-it and after about 15 minutes looking at it, it does not look as trivial
-as I though to separate out those files so the ARMv8 PMU description can
-be moved into a generic location for instance.
+OK, let's do an exercise. Maybe, I'm missing something in the big picture.
 
-FWIW, Broadcom STB chips, even when 64-bit capable or often used with an
-32-bit ARM kernel, so having the ARMv8 PMUs work under a 32-bit ARM
-kernel would be great. The downstream solution we have sued thus far is
-to find the closest compatible string to represent those, which is not
-great...
+If a user process is running at node 5, it submits some work to the hardware
+via block layer that is eventually invoked by syscall. 
+
+Whatever buffer process is using, it gets copied into the kernel space as
+it is crossing a userspace/kernel space boundary.
+
+Block layer packages a block request with the kernel pointers and makes a
+request to the NVMe driver for consumption.
+
+Last time I checked, dma_alloc_coherent() API uses the locality information
+from the device not from the CPU for allocation.
+
+While the metadata for dma_pool is pointing to the currently running CPU core,
+the DMA buffer itself is created using the device node itself today without
+my patch.
+
+I would think that you actually want to run the process at the same NUMA node
+as the CPU and device itself for performance reasons. Otherwise, performance
+expectations should be low. 
+
+Even if user says please keep my process to a particular NUMA node,
+we keep pointing to the memory on the other node today. 
+
+I don't know what is so special about memory on the default node. IMO, all memory
+allocations used by a driver need to follow the device. 
+
+I wish I could do this in kmalloc(). devm_kmalloc() follows the device as another
+example not CPU.
+
+With these assumptions, even though user said please use the NUMA node from the
+device, we still keep pointing to the default domain for pointers.
+
+Isn't this wrong?
+
+> 
+> If it actually makes a performance difference, then NVMe should allocate
+> one pool per queue, rather than one pool per device like it currently
+> does.
+> 
+>> Also, if it was a one time init kind of thing, I'd say "yeah, leave it alone". 
+>> DMA pool is used by a wide range of drivers and it is used to allocate
+>> fixed size buffers at runtime. 
+>  * DMA Pool allocator
+>  *
+>  * Copyright 2001 David Brownell
+>  * Copyright 2007 Intel Corporation
+>  *   Author: Matthew Wilcox <willy@linux.intel.com>
+> 
+> I know what it's used for.
+> 
+
+cool, good to know.
+
 -- 
-Florian
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
