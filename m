@@ -1,271 +1,128 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 17 May 2018 16:45:41 +0100
-Subject: [PATCH v3] arm64: signal: Report signal frame size to userspace via
- auxv
-Message-ID: <1526571941-9816-1-git-send-email-Dave.Martin@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 17 May 2018 16:47:01 +0100
+Subject: [PATCH v9 02/12] drivers: base: cacheinfo: setup DT cache
+ properties early
+In-Reply-To: <a64ed431-0f60-2711-4138-eeefc7ba2d8b@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180511235807.30834-3-jeremy.linton@arm.com>
+ <78b08b68-ff57-8dd8-6eb1-00548f275eac@arm.com>
+ <CAHp75VciOAMX1HWifZ+K9GiVicZRFrwHaGteJFVe1uFrh+qu0w@mail.gmail.com>
+ <a64ed431-0f60-2711-4138-eeefc7ba2d8b@arm.com>
+Message-ID: <20180517154701.GA20281@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stateful CPU architecture extensions may require the signal frame
-to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
-However, changing this #define is an ABI break.
+On 16/05/18 11:56, Sudeep Holla wrote:
+> Hi Andy,
+> 
+> On 15/05/18 20:32, Andy Shevchenko wrote:
+>> On Tue, May 15, 2018 at 8:15 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>>> On 05/11/2018 06:57 PM, Jeremy Linton wrote:
+>>
+>>>>   -     cache_size = of_get_property(this_leaf->of_node, propname, NULL);
+>>>> +       cache_size = of_get_property(np, propname, NULL);
+>>>>         if (cache_size)
+>>>>                 this_leaf->size = of_read_number(cache_size, 1);
+>>
+>> Can't you switch to of_read_property_uXX() variant here?
+>>
+> 
+> This patch is just changing the first argument to the calls. So if we
+> need to change, it has to be separate patch.
+> 
+> Now, we can use of_property_read_u64() but is there any particular
+> reason you mention that ? One reason I can see is that we can avoid
+> making explicit of_get_property call. Just wanted to the motive before I
+> can write the patch.
+> 
 
-To allow userspace the option of determining the signal frame size
-in a more forwards-compatible way, this patch adds a new auxv entry
-tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
-size that the process can observe during its lifetime.
+Is below patch does what you were looking for ?
 
-If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
-assume that the MINSIGSTKSZ #define is sufficient.  This allows for
-a consistent interface with older kernels that do not provide
-AT_MINSIGSTKSZ.
+Regards,
+Sudeep
 
-The idea is that libc could expose this via sysconf() or some
-similar mechanism.
+--
+>From 71f1c10ddb5915a92fa74d38a4e2406d0ab27845 Mon Sep 17 00:00:00 2001
+From: Sudeep Holla <sudeep.holla@arm.com>
+Date: Wed, 16 May 2018 13:45:53 +0100
+Subject: [PATCH] drivers: base: cacheinfo: use OF property_read_u64 instead of
+ get_property,read_number
 
-There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
-about userspace's own stack overheads and should not pretend to
-know.
+of_property_read_u64 searches for a property in a device node and read
+a 64-bit value from it. Instead of using of_get_property to get the
+property and then read 64-bit value using of_read_number, we can make
+use of of_property_read_u64.
 
-For arm64:
-
-The primary motivation for this interface is the Scalable Vector
-Extension, which can require at least 4KB or so of extra space
-in the signal frame for the largest hardware implementations.
-
-To determine the correct value, a "Christmas tree" mode (via the
-add_all argument) is added to setup_sigframe_layout(), to simulate
-addition of all possible records to the signal frame at maximum
-possible size.
-
-If this procedure goes wrong somehow, resulting in a stupidly large
-frame layout and hence failure of sigframe_alloc() to allocate a
-record to the frame, then this is indicative of a kernel bug: the
-kernel's internal SIGFRAME_MAXSZ is supposed to sanity-check
-against generting frames that we consider _impossibly_ large.  In
-this case, SIGSTKSZ is returned as a "reasonable guess that is at
-least bigger than MINSIGSTKSZ" and we WARN().
-
-For arm64 SVE:
-
-The SVE context block in the signal frame needs to be considered
-too when computing the maximum possible signal frame size.
-
-Because the size of this block depends on the vector length, this
-patch computes the size based not on the thread's current vector
-length but instead on the maximum possible vector length: this
-determines the maximum size of SVE context block that can be
-observed in any signal frame for the lifetime of the process.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Alex Benn?e <alex.bennee@linaro.org>
-
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
+ drivers/base/cacheinfo.c | 24 +++++++++++-------------
+ 1 file changed, 11 insertions(+), 13 deletions(-)
 
-Changes since v2:
-
- * Redefine AT_MINSIGSTKSZ as 51 to avoid clash with values defined by
-   other architectures.
-
-   This turns out to be a problem for glibc; also random userspace
-   software does not necessary check the architecture before using
-   getauxval() or otherwise parsing the aux vector, which can make
-   aliased tags problematic.
-
-   Really, the headers need cleaning up tree-wide in such away that the
-   AT_* definitions do not appear to be arch-private.  To be addressed
-   separately.
----
- arch/arm64/include/asm/elf.h         | 11 ++++++++
- arch/arm64/include/asm/processor.h   |  5 ++++
- arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
- arch/arm64/kernel/cpufeature.c       |  1 +
- arch/arm64/kernel/signal.c           | 51 +++++++++++++++++++++++++++++++-----
- 5 files changed, 63 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index fac1c4d..dc32adb 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -24,6 +24,11 @@
- #include <asm/ptrace.h>
- #include <asm/user.h>
+diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+index 2880e2ab01f5..56715014f07b 100644
+--- a/drivers/base/cacheinfo.c
++++ b/drivers/base/cacheinfo.c
+@@ -74,22 +74,21 @@ static inline int get_cacheinfo_idx(enum cache_type type)
+ static void cache_size(struct cacheinfo *this_leaf, struct device_node *np)
+ {
+ 	const char *propname;
+-	const __be32 *cache_size;
++	u64 cache_size;
+ 	int ct_idx;
  
-+#ifndef __ASSEMBLY__
-+#include <linux/bug.h>
-+#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
-+#endif
-+
- /*
-  * AArch64 static relocation types.
-  */
-@@ -146,8 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
- /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
- #define ARCH_DLINFO							\
- do {									\
-+	int minsigstksz = signal_minsigstksz;				\
-+									\
-+	if (WARN_ON(minsigstksz <= 0))					\
-+		minsigstksz = MINSIGSTKSZ;				\
-+									\
- 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
- 		    (elf_addr_t)current->mm->context.vdso);		\
-+	NEW_AUX_ENT(AT_MINSIGSTKSZ, minsigstksz);			\
- } while (0)
+ 	ct_idx = get_cacheinfo_idx(this_leaf->type);
+ 	propname = cache_type_info[ct_idx].size_prop;
  
- #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 7675989..6f60e92 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -35,6 +35,8 @@
- #ifdef __KERNEL__
- 
- #include <linux/build_bug.h>
-+#include <linux/cache.h>
-+#include <linux/init.h>
- #include <linux/stddef.h>
- #include <linux/string.h>
- 
-@@ -244,6 +246,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
- void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
- void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
- 
-+extern int __ro_after_init signal_minsigstksz;	/* user signal frame size */
-+extern void __init minsigstksz_setup(void);
-+
- /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
- #define SVE_GET_VL()	sve_get_current_vl()
-diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
-index ec0a86d..743c0b8 100644
---- a/arch/arm64/include/uapi/asm/auxvec.h
-+++ b/arch/arm64/include/uapi/asm/auxvec.h
-@@ -19,7 +19,8 @@
- 
- /* vDSO location */
- #define AT_SYSINFO_EHDR	33
-+#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
- 
--#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
-+#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
- 
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9d1b06d..0e0b53d 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1619,6 +1619,7 @@ void __init setup_cpu_features(void)
- 		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
- 
- 	sve_setup();
-+	minsigstksz_setup();
- 
- 	/* Advertise that we have computed the system capabilities */
- 	set_sys_caps_initialised();
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 154b7d3..ae8d4ea 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -17,6 +17,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/cache.h>
- #include <linux/compat.h>
- #include <linux/errno.h>
- #include <linux/kernel.h>
-@@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	return 0;
+-	cache_size = of_get_property(np, propname, NULL);
+-	if (cache_size)
+-		this_leaf->size = of_read_number(cache_size, 1);
++	if (!of_property_read_u64(np, propname, &cache_size))
++		this_leaf->size = cache_size;
  }
  
--/* Determine the layout of optional records in the signal frame */
--static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
-+/*
-+ * Determine the layout of optional records in the signal frame
-+ *
-+ * add_all: if true, lays out the biggest possible signal frame for
-+ *	this task; otherwise, generates a layout for the current state
-+ *	of the task.
-+ */
-+static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
-+				 bool add_all)
+ /* not cache_line_size() because that's a macro in include/linux/cache.h */
+ static void cache_get_line_size(struct cacheinfo *this_leaf,
+ 				struct device_node *np)
  {
- 	int err;
+-	const __be32 *line_size;
++	u64 line_size;
+ 	int i, lim, ct_idx;
  
-@@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 		return err;
+ 	ct_idx = get_cacheinfo_idx(this_leaf->type);
+@@ -99,27 +98,26 @@ static void cache_get_line_size(struct cacheinfo *this_leaf,
+ 		const char *propname;
  
- 	/* fault information, if valid */
--	if (current->thread.fault_code) {
-+	if (add_all || current->thread.fault_code) {
- 		err = sigframe_alloc(user, &user->esr_offset,
- 				     sizeof(struct esr_context));
- 		if (err)
-@@ -591,8 +599,18 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 	if (system_supports_sve()) {
- 		unsigned int vq = 0;
- 
--		if (test_thread_flag(TIF_SVE))
--			vq = sve_vq_from_vl(current->thread.sve_vl);
-+		if (add_all || test_thread_flag(TIF_SVE)) {
-+			int vl = sve_max_vl;
-+
-+			if (!add_all)
-+				vl = current->thread.sve_vl;
-+
-+			/* Fail safe if something wasn't initialised */
-+			if (WARN_ON(!sve_vl_valid(vl)))
-+				vl = SVE_VL_MIN;
-+
-+			vq = sve_vq_from_vl(vl);
+ 		propname = cache_type_info[ct_idx].line_size_props[i];
+-		line_size = of_get_property(np, propname, NULL);
+-		if (line_size)
++		line_size = of_property_read_u64(np, propname, &line_size);
++		if (line_size) {
++			this_leaf->coherency_line_size = line_size;
+ 			break;
 +		}
+ 	}
  
- 		err = sigframe_alloc(user, &user->sve_offset,
- 				     SVE_SIG_CONTEXT_SIZE(vq));
-@@ -603,7 +621,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 	return sigframe_alloc_end(user);
+-	if (line_size)
+-		this_leaf->coherency_line_size = of_read_number(line_size, 1);
  }
  
--
- static int setup_sigframe(struct rt_sigframe_user_layout *user,
- 			  struct pt_regs *regs, sigset_t *set)
+ static void cache_nr_sets(struct cacheinfo *this_leaf, struct device_node *np)
  {
-@@ -701,7 +718,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
- 	int err;
+ 	const char *propname;
+-	const __be32 *nr_sets;
++	u64 nr_sets;
+ 	int ct_idx;
  
- 	init_user_layout(user);
--	err = setup_sigframe_layout(user);
-+	err = setup_sigframe_layout(user, false);
- 	if (err)
- 		return err;
+ 	ct_idx = get_cacheinfo_idx(this_leaf->type);
+ 	propname = cache_type_info[ct_idx].nr_sets_prop;
  
-@@ -936,3 +953,23 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 		thread_flags = READ_ONCE(current_thread_info()->flags);
- 	} while (thread_flags & _TIF_WORK_MASK);
+-	nr_sets = of_get_property(np, propname, NULL);
+-	if (nr_sets)
+-		this_leaf->number_of_sets = of_read_number(nr_sets, 1);
++	if (!of_property_read_u64(np, propname, &nr_sets))
++		this_leaf->number_of_sets = nr_sets;
  }
-+
-+int __ro_after_init signal_minsigstksz;
-+
-+/*
-+ * Determine the stack space required for guaranteed signal devliery.
-+ * This function is used to populate AT_MINSIGSTKSZ at process startup.
-+ */
-+void __init minsigstksz_setup(void)
-+{
-+	struct rt_sigframe_user_layout user;
-+
-+	init_user_layout(&user);
-+
-+	if (WARN_ON(setup_sigframe_layout(&user, true)))
-+		signal_minsigstksz = SIGSTKSZ;
-+	else
-+		signal_minsigstksz = sigframe_size(&user) +
-+			round_up(sizeof(struct frame_record), 16) +
-+			16; /* max alignment padding */
-+}
+ 
+ static void cache_associativity(struct cacheinfo *this_leaf)
 -- 
-2.1.4
+2.7.4
