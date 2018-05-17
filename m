@@ -1,87 +1,69 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Thu, 17 May 2018 10:01:49 +0000
-Subject: [PATCH v2 1/3] rtc: stm32: rework register management to prepare
- other version of RTC
-In-Reply-To: <20180516202552.GA24496@piout.net>
-References: <1525880770-22263-1-git-send-email-amelie.delaunay@st.com>
- <1525880770-22263-2-git-send-email-amelie.delaunay@st.com>
- <20180516202552.GA24496@piout.net>
-Message-ID: <d08bcefc-7698-a968-7a35-ed9ab62bd623@st.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 17 May 2018 11:01:55 +0100
+Subject: [PATCH v2 16/40] arm64: mm: Pin down ASIDs for sharing mm with
+ devices
+In-Reply-To: <20180515141658.vivrgcyww2pxumye@armageddon.cambridge.arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-17-jean-philippe.brucker@arm.com>
+ <20180515141658.vivrgcyww2pxumye@armageddon.cambridge.arm.com>
+Message-ID: <81662b4f-2210-665f-21cf-7679bfa9f97a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/16/2018 10:25 PM, Alexandre Belloni wrote:
-> Hi,
+On 15/05/18 15:16, Catalin Marinas wrote:
+> Hi Jean-Philippe,
 > 
-> On 09/05/2018 17:46:08+0200, Amelie Delaunay wrote:
->>   static void stm32_rtc_wpr_unlock(struct stm32_rtc *rtc)
->>   {
->> -	writel_relaxed(RTC_WPR_1ST_KEY, rtc->base + STM32_RTC_WPR);
->> -	writel_relaxed(RTC_WPR_2ND_KEY, rtc->base + STM32_RTC_WPR);
->> +	struct stm32_rtc_registers regs = rtc->data->regs;
+> On Fri, May 11, 2018 at 08:06:17PM +0100, Jean-Philippe Brucker wrote:
+>> +unsigned long mm_context_get(struct mm_struct *mm)
+>> +{
+>> +	unsigned long flags;
+>> +	u64 asid;
+>> +
+>> +	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
+>> +
+>> +	asid = atomic64_read(&mm->context.id);
+>> +
+>> +	if (mm->context.pinned) {
+>> +		mm->context.pinned++;
+>> +		asid &= ~ASID_MASK;
+>> +		goto out_unlock;
+>> +	}
+>> +
+>> +	if (nr_pinned_asids >= max_pinned_asids) {
+>> +		asid = 0;
+>> +		goto out_unlock;
+>> +	}
+>> +
+>> +	if (!asid_gen_match(asid)) {
+>> +		/*
+>> +		 * We went through one or more rollover since that ASID was
+>> +		 * used. Ensure that it is still valid, or generate a new one.
+>> +		 * The cpu argument isn't used by new_context.
+>> +		 */
+>> +		asid = new_context(mm, 0);
+>> +		atomic64_set(&mm->context.id, asid);
+>> +	}
+>> +
+>> +	asid &= ~ASID_MASK;
+>> +
+>> +	nr_pinned_asids++;
+>> +	__set_bit(asid2idx(asid), pinned_asid_map);
+>> +	mm->context.pinned++;
+>> +
+>> +out_unlock:
+>> +	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
+>> +
+>> +	return asid;
+>> +}
 > 
-> regs should probably be a pointer to ensure that no copy is made. I've
-> actually checked and it doesn't make a difference because gcc is smart
-> enough to not make the copy.
-> 
-
-...
-
->>   static irqreturn_t stm32_rtc_alarm_irq(int irq, void *dev_id)
->>   {
->>   	struct stm32_rtc *rtc = (struct stm32_rtc *)dev_id;
->> -	unsigned int isr, cr;
->> +	struct stm32_rtc_registers regs = rtc->data->regs;
->> +	struct stm32_rtc_events evts = rtc->data->events;
-> 
-> Ditto for evts.
->
-
-I prepare a v3 with const struct stm32_rtc_registers *regs and const 
-struct stm32_rtc_events *evts.
-
->> +	unsigned int status, cr;
->>   
->>   	mutex_lock(&rtc->rtc_dev->ops_lock);
->>   
->> -	isr = readl_relaxed(rtc->base + STM32_RTC_ISR);
->> -	cr = readl_relaxed(rtc->base + STM32_RTC_CR);
->> +	status = readl_relaxed(rtc->base + regs.isr);
->> +	cr = readl_relaxed(rtc->base + regs.cr);
->>   
->> -	if ((isr & STM32_RTC_ISR_ALRAF) &&
->> +	if ((status & evts.alra) &&
->>   	    (cr & STM32_RTC_CR_ALRAIE)) {
->>   		/* Alarm A flag - Alarm interrupt */
->>   		dev_dbg(&rtc->rtc_dev->dev, "Alarm occurred\n");
-> 
-> ...
-> 
->> @@ -641,7 +710,7 @@ static int stm32_rtc_probe(struct platform_device *pdev)
->>   
->>   	/*
->>   	 * After a system reset, RTC_ISR.INITS flag can be read to check if
->> -	 * the calendar has been initalized or not. INITS flag is reset by a
->> +	 * the calendar has been initialized or not. INITS flag is reset by a
->>   	 * power-on reset (no vbat, no power-supply). It is not reset if
->>   	 * rtc_ck parent clock has changed (so RTC prescalers need to be
->>   	 * changed). That's why we cannot rely on this flag to know if RTC
->> @@ -666,7 +735,7 @@ static int stm32_rtc_probe(struct platform_device *pdev)
->>   			 "alarm won't be able to wake up the system");
->>   
->>   	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
->> -			&stm32_rtc_ops, THIS_MODULE);
->> +						&stm32_rtc_ops, THIS_MODULE);
->>   	if (IS_ERR(rtc->rtc_dev)) {
->>   		ret = PTR_ERR(rtc->rtc_dev);
->>   		dev_err(&pdev->dev, "rtc device registration failed, err=%d\n",
-> 
-> Those two changes should go into a separate cleanup patch.
+> With CONFIG_UNMAP_KERNEL_AT_EL0 (a.k.a. KPTI), the hardware ASID has bit
+> 0 set automatically when entering user space (and cleared when getting
+> back to the kernel). If the returned asid value here is going to be used
+> as is in the calling code, you should probably set bit 0 when KPTI is
+> enabled.
 > 
 
-OK, new patch for these two changes in v3.
+Oh right, I'll change this
 
-Thanks for reviewing,
-Amelie
+Thanks,
+Jean
