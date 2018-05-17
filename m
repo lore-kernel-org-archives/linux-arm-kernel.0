@@ -1,97 +1,236 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Wed, 16 May 2018 19:25:28 -0500
-Subject: [PATCH] drivers/perf: arm-ccn: stop spamming dmesg in event_init
-In-Reply-To: <cee9c043-3d64-56b9-4f23-e8c8370387dd@gmail.com>
-References: <20180504104117.8086-1-mark.rutland@arm.com>
- <20180508184050.75c60b82ba538d0ecdeb2d78@arm.com>
- <1525882003.4199.55.camel@arm.com>
- <20180509184154.9994df2874e7a08025b56dea@arm.com>
- <cee9c043-3d64-56b9-4f23-e8c8370387dd@gmail.com>
-Message-ID: <20180516192528.5519d2faf59766e0544bb2ee@arm.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Wed, 16 May 2018 19:46:54 -0500
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v10_00=2F27=5D_ARM=3A_davinci=3A_convert_to_commo?=
+ =?UTF-8?Q?n_clock_framework=E2=80=8B?=
+In-Reply-To: <20180509172606.29387-1-david@lechnology.com>
+References: <20180509172606.29387-1-david@lechnology.com>
+Message-ID: <CAHCN7xL_QbHALJeBaJk9TyfBz5BUYeZHkYR6uyrxXDdnguKjtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding acme, LKML, linux-perf-users, and other potentially interested]
+On Wed, May 9, 2018 at 12:25 PM, David Lechner <david@lechnology.com> wrote:
+> This series converts mach-davinci to use the common clock framework.
+>
+> The series works like this, the first 3 patches fix some issues with the clock
+> drivers that have already been accepted into the mainline kernel.
+>
+> Then, starting with "ARM: davinci: pass clock as parameter to
+> davinci_timer_init()", we get the mach code ready for the switch by adding the
+> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
+> around the legacy clocks so that we can switch easily between the old and the
+> new.
+>
+> "ARM: davinci: switch to common clock framework" actually flips the switch
+> to start using the new clock drivers. Then the next 8 patches remove all
+> of the old clock code.
+>
+> The final four patches add device tree clock support to the one SoC that
+> supports it.
+>
+> This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
+> board file).
+>
+I am find.  I don't know what I did wrong, but it's working fine.  If
+you want to add my 'tested-by' go ahead.
 
-On Wed, 9 May 2018 17:22:42 -0700
-Florian Fainelli <f.fainelli@gmail.com> wrote:
+Tested-by: Adam Ford <aford173@gmail.com> #da850-evm, ethernet, spi
+flash, SD, UART
 
-> On 05/09/2018 04:41 PM, Kim Phillips wrote:
-> > On Wed, 9 May 2018 17:06:43 +0100
-> > Pawel Moll <pawel.moll@arm.com> wrote:
-> > 
-> >> On Wed, 2018-05-09 at 00:40 +0100, Kim Phillips wrote:
-> >>> On Fri,  4 May 2018 11:41:17 +0100 Mark Rutland <mark.rutland@arm.com> wrote:
-> >>>
-> >>> [adding Pawel, arm-ccn driver author]
-> >>
-> >> We had this discussion way too many times for my liking. As I said
-> >> before - *I* will be fine with the debug messages in the CCN driver.
-> >> Now, if there ever turns out to be other user of this thing and gets
-> > 
-> > Sure, this isn't just about Pawel using the driver he wrote - we know
-> > you know how to use it because you wrote it.  No, it's about all the
-> > other potential users out there, esp. first time users, as I once was.
-> > 
-> >> into problems with event configuration, I'd hope that he/she can count
-> >> on support from the knowledgable people here... (just checked and both
-> > 
-> > I abhor having to suggest our users email this list in order to find out
-> > how to use the PMU drivers.  First time users are going to tend to
-> > steer completely away if they don't have the patience to debug a silent
-> > PMU, rather than email this mailing list - sorry, but that's just
-> > adding a huge usage barrier - for what - fuzzer runner's convenience?
-> > 
-> >> RHEL 7.5 and Ubuntu 16.04.3 kernels on AArch64 come with
-> >> CONFIG_DYNAMIC_DEBUG=y, so it's a matter of explaining what has to be
-> >> enabled where; sadly this information did not find its way into the
-> >> commit description)
-> > 
-> > I can't think of a more difficult to find, more far-away, alien
-> > place for end users to find help with perf, sorry.
-> > 
-> >>>> The ARM CCN PMU driver uses dev_warn() to complain about parameters
-> >>> in
-> >>>> the user-provided perf_event_attr. This means that under normal
-> >>>> operation (e.g. a single invocation of the perf tool), dmesg may be
-> >>>> spammed with multiple messages.
-> >>
-> >> Surely Mark, in his role as maintainer of drivers/perf/ (and a few
-> >> other locations), meant to use much more technical and emotion-free
-> >> subject, along the lines of "reduce a number of dmesg warnings at event
-> >> init".
-> > 
-> > 'reduce a number' is the wrong word:  warnings are completely
-> > eliminated. Debug-level messages occur at exactly the same
-> > frequency/amount.
-> > 
-> > But I still object to the rationale overall - it seems this is about
-> > running fuzzers?  I even offered an alternative for fuzzer runners: is
-> > modifying the loglevel prior to fuzzing somehow unacceptable?
-> 
-> I don't have any dog in this, but maybe if providing information to the
-> users is so essential to having a pleasant user experience, then
-> rethinking the whole way these messages are funneled is necessary
-> because the kernel log + dmesg is by no means appropriate. Take a look
-> at what the networking maintainers recently did with netlink extended
-> ack. You used to just get an "unsupported" error, and now you know
-> exactly what is wrong when extack is available. It seems to me like
-> something like this is what you might want here since you want to have
-> perf be as user friendly as possible.
-
-Thanks, Florian.
-
-Acme & other perf people, do you foresee a problem adding netlink
-extended ack support to the perf subsystem for extended error message
-communication?
-
-If not, is struct perf_event_attr amenable to having error reporting
-bit(s) added?  Recall my last attempt failed because it couldn't
-discriminate between the perf core and the PMU driver returning the
--Evalue:
-
-https://patchwork.kernel.org/patch/10025555/
-
-Thanks,
-
-Kim
+>
+> Changes:
+>
+> v10 changes (also see individual patches for details):
+> - Reworked device tree bindings for DaVinci timer.
+> - Dropped helper functions to conditionally call devm_* versions of functions
+> - Fix some typos
+> - Fix some rebasing issues introduced in v9
+>
+> v9 changes (also see individual patches for details):
+> - Rebased on linux-davnci/master (f5e3203bb775)
+> - Dropped drivers/clk patches that landed in v4.17
+> - New drivers/clk patches for early boot special case
+> - New patch for ti,davinci-timer device tree bindings
+> - Updated mach/davinci patches to register clocks in early boot when needed
+>
+> v8 changes (also see individual patches for details):
+> - Rebased on linux-davinci/master
+> - Dropped use of __init and __initconst attributes in clk drivers
+> - Add clkdev lookups for PLL SYSCLKs
+> - Fix genpd clock reference counting issue
+> - Fix PSC clock driver loading order issue
+> - Fix typo in device tree and add more power-domains properties
+>
+> v7 changes (also see individual patches for details):
+> - Rebased on linux-davinci/master (v4.16-rc)
+> - Convert clock drivers to platform devices
+> - New patch "ARM: davinci: pass clock as parameter to davinci_timer_init()"
+> - Fix issues with lcdk and aemif clock lookups and power domains
+> - Fixed other minor issues brought up in v6 review
+>
+> v6 changes (also see individual patches for details):
+> - All of the device tree bindings are changed
+> - All of the clock drivers are changed significantly
+> - Fixed issues brought up during review of v5
+> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
+>   series and submitted separately
+>
+> v5 changes:
+> - Basically, this is an entirely new series
+> - Patches are broken up into bite-sized pieces
+> - Converted PSC clock driver to use regmap
+> - Restored "force" flag for certain DA850 clocks
+> - Added device tree bindings
+> - Moved more of the clock init to drivers/clk
+> - Fixed frequency scaling (maybe*)
+>
+> * I have frequency scaling using cpufreq-dt, so I know the clocks are doing
+>   what they need to do to make this work, but I haven't figured out how to
+>   test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
+>   sent separately after this series has landed.)
+>
+>
+> Dependencies:
+>
+> There are still some outstanding fixes to get everything working correctly.
+> These are all just runtime dependencies and only needed for certain platforms.
+>
+> - "drm/tilcdc: Fix setting clock divider for omap-l138"[1]
+> - "clk: davinci: pll-dm355: fix SYSCLKn parent names"[2]
+> - "remoteproc/davinci: common clock framework related fixes"[3]
+>
+> [1]: https://patchwork.freedesktop.org/patch/210696/
+> [2]: https://lkml.org/lkml/2018/5/9/626
+> [3]: https://lkml.org/lkml/2018/5/2/201
+>
+> You can find a working branch with everything included (plus a few extras, like
+> cpufreq-dt) in the "common-clk-v10" branch of https://github.com/dlech/ev3dev-kernel.git.
+>
+>
+> Testing/debugging for the uninitiated:
+>
+> I only have one device to test with, which is based on da850, so I will
+> have to rely on others to do some testing here. Since we are dealing with
+> clocks, if something isn't working, you most likely won't see output on
+> the serial port. To figure out what is going on, you need to enable...
+>
+>         CONFIG_DEBUG_LL=y
+>         CONFIG_EARLY_PRINTK=y
+>
+> and add "earlyprintk clk_ignore_unused" to the kernel command line options.
+> You may need to select a different UART for this depending on your board. I
+> think UART1 is the default in the kernel configuration.
+>
+> On da850 devices comment out the lines:
+>
+>         /* pll1_sysclk2 is not affected by CPU scaling, so use it for async3 */
+>         parent = clk_hw_get_parent_by_index(&mux->hw, 1);
+>         if (parent)
+>                 clk_set_parent(mux->hw.clk, parent->clk);
+>         else
+>                 dev_warn(dev, "Failed to find async3 parent clock\n");
+>
+> in da8xx-cfgchip.c or, if using device tree, comment out the lines:
+>
+>         assigned-clocks = <&async3_clk>;
+>         assigned-clock-parents = <&pll1_sysclk 2>;
+>
+> in da850.dtsi when doing earlyprintk, otherwise the UART1 and UART2 clock
+> source will change during boot and cause garbled output after a point.
+>
+>
+> David Lechner (27):
+>   clk: davinci: pll: allow dev == NULL
+>   clk: davinci: da850-pll: change PLL0 to CLK_OF_DECLARE
+>   clk: davinci: psc: allow for dev == NULL
+>   ARM: davinci: pass clock as parameter to davinci_timer_init()
+>   ARM: davinci: da830: add new clock init using common clock framework
+>   ARM: davinci: da850: add new clock init using common clock framework
+>   ARM: davinci: dm355: add new clock init using common clock framework
+>   ARM: davinci: dm365: add new clock init using common clock framework
+>   ARM: davinci: dm644x: add new clock init using common clock framework
+>   ARM: davinci: dm646x: add new clock init using common clock framework
+>   ARM: davinci: da8xx: add new USB PHY clock init using common clock
+>     framework
+>   ARM: davinci: da8xx: add new sata_refclk init using common clock
+>     framework
+>   ARM: davinci: remove CONFIG_DAVINCI_RESET_CLOCKS
+>   ARM: davinci_all_defconfig: remove CONFIG_DAVINCI_RESET_CLOCKS
+>   ARM: davinci: switch to common clock framework
+>   ARM: davinci: da830: Remove legacy clock init
+>   ARM: davinci: da850: Remove legacy clock init
+>   ARM: davinci: dm355: Remove legacy clock init
+>   ARM: davinci: dm365: Remove legacy clock init
+>   ARM: davinci: dm644x: Remove legacy clock init
+>   ARM: davinci: dm646x: Remove legacy clock init
+>   ARM: davinci: da8xx: Remove legacy USB and SATA clock init
+>   ARM: davinci: remove legacy clocks
+>   dt-bindings: timer: new bindings for TI DaVinci timer
+>   ARM: davinci: add device tree support to timer
+>   ARM: davinci: da8xx-dt: switch to device tree clocks
+>   ARM: dts: da850: Add clocks
+>
+>  .../bindings/timer/ti,davinci-timer.txt       |  37 +
+>  arch/arm/Kconfig                              |   5 +-
+>  arch/arm/boot/dts/da850-enbw-cmc.dts          |   4 +
+>  arch/arm/boot/dts/da850-evm.dts               |   4 +
+>  arch/arm/boot/dts/da850-lcdk.dts              |   9 +
+>  arch/arm/boot/dts/da850-lego-ev3.dts          |   4 +
+>  arch/arm/boot/dts/da850.dtsi                  | 168 ++++
+>  arch/arm/configs/davinci_all_defconfig        |   1 -
+>  arch/arm/mach-davinci/Kconfig                 |  13 +-
+>  arch/arm/mach-davinci/Makefile                |   4 +-
+>  arch/arm/mach-davinci/board-da830-evm.c       |  12 +-
+>  arch/arm/mach-davinci/board-da850-evm.c       |   2 +
+>  arch/arm/mach-davinci/board-dm355-evm.c       |   2 +
+>  arch/arm/mach-davinci/board-dm355-leopard.c   |   2 +
+>  arch/arm/mach-davinci/board-dm365-evm.c       |   2 +
+>  arch/arm/mach-davinci/board-dm644x-evm.c      |   2 +
+>  arch/arm/mach-davinci/board-dm646x-evm.c      |   2 +
+>  arch/arm/mach-davinci/board-mityomapl138.c    |   2 +
+>  arch/arm/mach-davinci/board-neuros-osd2.c     |   2 +
+>  arch/arm/mach-davinci/board-omapl138-hawk.c   |  11 +-
+>  arch/arm/mach-davinci/board-sffsdr.c          |   2 +
+>  arch/arm/mach-davinci/clock.c                 | 745 -----------------
+>  arch/arm/mach-davinci/clock.h                 |  76 --
+>  arch/arm/mach-davinci/common.c                |   3 -
+>  arch/arm/mach-davinci/da830.c                 | 462 ++---------
+>  arch/arm/mach-davinci/da850.c                 | 778 +++---------------
+>  arch/arm/mach-davinci/da8xx-dt.c              |  66 --
+>  arch/arm/mach-davinci/davinci.h               |   8 +
+>  arch/arm/mach-davinci/devices-da8xx.c         |  43 +-
+>  arch/arm/mach-davinci/devices.c               |   1 -
+>  arch/arm/mach-davinci/dm355.c                 | 406 ++-------
+>  arch/arm/mach-davinci/dm365.c                 | 485 +----------
+>  arch/arm/mach-davinci/dm644x.c                | 344 +-------
+>  arch/arm/mach-davinci/dm646x.c                | 372 +--------
+>  arch/arm/mach-davinci/include/mach/clock.h    |   3 -
+>  arch/arm/mach-davinci/include/mach/common.h   |  11 +-
+>  arch/arm/mach-davinci/include/mach/da8xx.h    |   6 +-
+>  arch/arm/mach-davinci/pm_domain.c             |   5 +
+>  arch/arm/mach-davinci/psc.c                   | 137 ---
+>  arch/arm/mach-davinci/psc.h                   |  12 -
+>  arch/arm/mach-davinci/time.c                  |  39 +-
+>  arch/arm/mach-davinci/usb-da8xx.c             | 242 +-----
+>  drivers/clk/davinci/pll-da830.c               |   4 +-
+>  drivers/clk/davinci/pll-da850.c               |  36 +-
+>  drivers/clk/davinci/pll-dm355.c               |   8 +-
+>  drivers/clk/davinci/pll-dm365.c               |   8 +-
+>  drivers/clk/davinci/pll-dm644x.c              |   8 +-
+>  drivers/clk/davinci/pll-dm646x.c              |   8 +-
+>  drivers/clk/davinci/pll.c                     | 110 +--
+>  drivers/clk/davinci/pll.h                     |  30 +-
+>  drivers/clk/davinci/psc-dm355.c               |   2 +-
+>  drivers/clk/davinci/psc-dm365.c               |   2 +-
+>  drivers/clk/davinci/psc-dm644x.c              |   2 +-
+>  drivers/clk/davinci/psc-dm646x.c              |   2 +-
+>  drivers/clk/davinci/psc.c                     |  27 +-
+>  include/linux/clk/davinci.h                   |  29 +
+>  56 files changed, 860 insertions(+), 3950 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
+>  delete mode 100644 arch/arm/mach-davinci/clock.c
+>  delete mode 100644 arch/arm/mach-davinci/psc.c
+>  create mode 100644 include/linux/clk/davinci.h
+>
+> --
+> 2.17.0
+>
