@@ -1,75 +1,52 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Thu, 17 May 2018 13:48:41 -0700
-Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <20180517060948.GI20254@sirena.org.uk>
-References: <cover.1521246069.git.collinsd@codeaurora.org>
- <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
- <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
- <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
- <152411734938.46528.9676451637772936597@swboyd.mtv.corp.google.com>
- <20180419120813.GD27188@sirena.org.uk>
- <38f42537-f801-115a-4120-1344a67a0462@codeaurora.org>
- <20180424174111.GH22073@sirena.org.uk>
- <d82ef514-b94f-8ed9-6b1e-e07de2a5f455@codeaurora.org>
- <20180517060948.GI20254@sirena.org.uk>
-Message-ID: <6cb2ac52-258c-332b-e912-809d16e14114@codeaurora.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 17 May 2018 17:05:53 -0400
+Subject: [PATCH] mm/dmapool: localize page allocations
+In-Reply-To: <20180517204103.GJ26718@bombadil.infradead.org>
+References: <1526578581-7658-1-git-send-email-okaya@codeaurora.org>
+ <20180517181815.GC26718@bombadil.infradead.org>
+ <9844a638-bc4e-46bd-133e-0c82a3e9d6ea@codeaurora.org>
+ <20180517194612.GG26718@bombadil.infradead.org>
+ <d49e594a-c18a-160f-ca4c-91520ff3b293@codeaurora.org>
+ <20180517204103.GJ26718@bombadil.infradead.org>
+Message-ID: <bbd1c867-7ca8-1364-cedb-39f52bb586d9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2018 11:09 PM, Mark Brown wrote:
-> On Tue, Apr 24, 2018 at 01:46:21PM -0700, David Collins wrote:
->> The RPMh hardware is aware of the parent-child connections between
->> regulators as well as minimum headroom to ensure stable LDO voltage output
->> for subregulated LDOs.  The intention of having the headroom be a
->> configurable property for processors is to support usecases in which
->> subregulated LDO loads are particularly sensitive to noise and require
->> additional headroom.  Such usecases are board dependent and beyond the
->> baseline configurations set in RPMh hardware.
-> 
-> So the hardware implementation is some hard coding stuff that doesn't
-> really adequately reflect reality?  This seems unfortunate.  However do
-> we really need to tell the hardware about the fact that we're adding
-> extra headroom - are there actual interactions with non-Linux things
-> here?
+On 5/17/2018 4:41 PM, Matthew Wilcox wrote:
+> Let's try a different example.  I have a four-socket system with one
+> NVMe device with lots of hardware queues.  Each CPU has its own queue
+> assigned to it.  If I allocate all the PRP metadata on the socket with
+> the NVMe device attached to it, I'm sending a lot of coherency traffic
+> in the direction of that socket, in addition to the actual data.  If the
+> PRP lists are allocated randomly on the various sockets, the traffic
+> is heading all over the fabric.  If the PRP lists are allocated on the
+> local socket, the only time those lists move off this node is when the
+> device requests them.
 
-The RPMh hardware is configured by the boot loader.  The configuration
-does reflect reality; however, it cannot handle all configurations at
-initialization time.  Specific headroom management typically comes up in
-modem usecases for RF supplies that are sensitive to noise.  This feature
-allows RPMh masters (application processor, modem processor, etc) to make
-requests only for the regulators that they directly care about without
-having to worry about power grid parent-child details and setting the
-voltage of parent regulators in order to ensure sufficient headroom.
+So.., your reasoning is that you actually want to keep the memory as close
+as possible to the CPU rather than the device itself. CPU would do
+frequent updates the buffer until the point where it hands off the buffer
+to the hardware. Device would fetch the memory via coherency when it needs
+to consume the data but this would be a one time penalty.
 
-If you really don't like having this feature present in the Linux RPMh
-regulator driver, then I'd be ok removing it.  It is not required for
-SDM845 which the driver is initially targeting.
+It sounds logical to me. I was always told that you want to keep buffers
+as close as possible to the device.
 
+Maybe, it makes sense for things that device needs frequent access like
+receive buffers.
 
->>>> XOB managed regulators physically cannot change voltage.  Therefore, do
->>>> you agree that it is reasonable to use fixed_uV for them?  Note that I
->>>> removed init_data->constraints.apply_uV manipulation in version 2 of this
->>>> patch.
-> 
->>> If these regulators can't change voltage then surely we know what
->>> voltage they have without needing it to be specified in DT?
-> 
->> In the case of XOB managed LDO regulators, the LDOs physically can be
->> configured to different voltages by the bootloader.  However, the RPMh
->> interface provides no mechanism for the application processor to read or
->> change that voltage.  Therefore, we need a way to specify such voltages in
->> a board specific (as opposed to driver specific) manner (i.e. device tree).
-> 
-> Is the kernel somehow prevented from varying these voltages?
+If the majority user is CPU, then the buffer needs to be kept closer to
+the CPU. 
 
-Yes.  Physically, there exists no RPMh register to read or write the
-voltage of LDOs managed via XOB.  Additionally, the kernel running on the
-application processor is blocked from configuring the voltage via a direct
-SPMI writes by access permissions that crash the system when violated.
+dma_alloc_coherent() is generally used for receiver buffer allocation in
+network adapters in general. People allocate a chunk and then create a
+queue that hardware owns for dumping events and data.
 
-Take care,
-David
+Since DMA pool is a generic API, we should maybe request where we want
+to keep the buffers closer to and allocate buffers from the appropriate
+NUMA node based on that.
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
