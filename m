@@ -1,27 +1,55 @@
-From: vincent.weaver@maine.edu (Vince Weaver)
-Date: Thu, 17 May 2018 12:02:08 -0400 (EDT)
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <87efia1hjg.fsf@anholt.net>
-References: <20180517131727.29263-1-eric@anholt.net>
- <alpine.DEB.2.21.1805171007260.7820@macbook-air> <87efia1hjg.fsf@anholt.net>
-Message-ID: <alpine.DEB.2.21.1805171159110.7984@macbook-air>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 18 May 2018 00:31:57 +0800
+Subject: [PATCH v7 03/14] clk: qcom: Add CPU clock driver for msm8996
+In-Reply-To: <1526375616-16904-4-git-send-email-ilialin@codeaurora.org>
+References: <1526375616-16904-4-git-send-email-ilialin@codeaurora.org>
+Message-ID: <201805172306.Un6aKldO%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 May 2018, Eric Anholt wrote:
-> 
-> Is that better than a53?  I'm happy to switch to that.  The important
-> part to me is the a7, since basically everyone with this hw is running
-> arm32.
+Hi Ilia,
 
-no, on further investigation it looks like a53 is more proper to use than 
-the generic armv8.
+Thank you for the patch! Perhaps something to improve:
 
-Is the armv8 pmu on the cortex-a53 backwards compatible with armv7?  I'm 
-dreading having to pull up the various ARM ARMs to look for myself so if 
-it works for you I'm fine with that part too.
+[auto build test WARNING on robh/for-next]
+[also build test WARNING on v4.17-rc5]
+[cannot apply to clk/clk-next next-20180517]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-The biggest pushback I had with my original patch was no one believing irq 
-9 was the right one to use.
+url:    https://github.com/0day-ci/linux/commits/Ilia-Lin/CPU-scaling-support-for-msm8996/20180516-064721
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: xtensa-allyesconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
 
-Vince
+All warnings (new ones prefixed by >>):
+
+>> drivers/clk/qcom/clk-cpu-8996.c:142:2: warning: this decimal constant is unsigned only in ISO C90
+     VCO(0, 1000000000, 2150400000),
+     ^~~
+
+vim +142 drivers/clk/qcom/clk-cpu-8996.c
+
+   137	
+   138	static const struct pll_vco alt_pll_vco_modes[] = {
+   139		VCO(3,  250000000,  500000000),
+   140		VCO(2,  500000000,  750000000),
+   141		VCO(1,  750000000, 1000000000),
+ > 142		VCO(0, 1000000000, 2150400000),
+   143	};
+   144	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 52971 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/8304b1ad/attachment-0001.gz>
