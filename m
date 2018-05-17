@@ -1,45 +1,64 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 17 May 2018 21:31:47 +0800
-Subject: [PATCH V6 10/12] ARM: dts: ipq8074: Add peripheral nodes
-In-Reply-To: <1526475004-10341-11-git-send-email-sricharan@codeaurora.org>
-References: <1526475004-10341-11-git-send-email-sricharan@codeaurora.org>
-Message-ID: <201805172143.Ej5ox0Yj%fengguang.wu@intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 17 May 2018 15:35:07 +0200
+Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
+In-Reply-To: <CAOtvUMdVNX_vBRofpc5rNiVL-a1NvWMDyWSOaXKYPkm57wkR_A@mail.gmail.com>
+References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
+ <1526387370-17142-4-git-send-email-gilad@benyossef.com>
+ <CAMuHMdWzeNqsho1V6ezZb81T3_HcRzrtuQpmGXsjtFgt9BtZDQ@mail.gmail.com>
+ <20180516074333.i2672u435ymwffk3@verge.net.au>
+ <CAOtvUMfFjokOLCg6aHNQESJ_q4Jiok3izrPtae5wR+cND=XL6g@mail.gmail.com>
+ <CAMuHMdVM55S7+PdnKusX-qkTxioc=0kQ6EGSbwv+kbLk5RCUYw@mail.gmail.com>
+ <CAOtvUMdVNX_vBRofpc5rNiVL-a1NvWMDyWSOaXKYPkm57wkR_A@mail.gmail.com>
+Message-ID: <CAMuHMdX5quhZzaPkcrtB4CuHWeaKsyF1SustjB9V0SWw_SzXVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+Hi Gilad,
 
-Thank you for the patch! Yet something to improve:
+On Thu, May 17, 2018 at 3:09 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+> On Thu, May 17, 2018 at 1:16 PM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> However, even with your clock patch, the signature checking fails for me,
+>> on both R-Car H3 ES1.0 and ES2.0.
+>> Does this need changes to the ARM Trusted Firmware, to allow Linux to
+>> access the public SCEG module?
+>
+> Well, this is actually something different. If you look you will
+> notice that my patch was part of a 3 part patch series,
+> the first of which disabled this test.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.17-rc5]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Sorry, I had completely forgotten about the first patch from the series.
+With that applied, it continues:
 
-url:    https://github.com/0day-ci/linux/commits/Sricharan-R/ARM-dts-ipq-updates-to-enable-a-few-peripherals/20180517-155124
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+        ccree e6601000.crypto: ARM CryptoCell 630P Driver: HW version
+0x00000000, Driver version 4.0
+        ccree e6601000.crypto: Cache params previous: 0x00000777
+        ccree e6601000.crypto: Cache params current: 0x00000000
+(expect: 0x00000000)
+        alg: No test for cts1(cbc(aes)) (cts1-cbc-aes-ccree)
+        alg: No test for authenc(xcbc(aes),cbc(aes))
+(authenc-xcbc-aes-cbc-aes-ccree)
+        alg: No test for authenc(xcbc(aes),rfc3686(ctr(aes)))
+(authenc-xcbc-aes-rfc3686-ctr-aes-ccree)
+        ccree e6601000.crypto: ARM ccree device initialized
 
-Note: the linux-review/Sricharan-R/ARM-dts-ipq-updates-to-enable-a-few-peripherals/20180517-155124 HEAD 1e054800261138fd8f0f8f93340f5781ff622233 builds fine.
-      It only hurts bisectibility.
+Is HW version 0x00000000 expected?
 
-All errors (new ones prefixed by >>):
+> If you take all the 3 patches, it will work.
 
-   arch/arm64/boot/dts/qcom/ipq8074-hk01.dtb: ERROR (duplicate_label): /soc/pinctrl at 1000000/serial4_pinmux: Duplicate label 'serial_4_pins' on /soc/pinctrl at 1000000/serial4_pinmux and /soc/pinctrl at 1000000/serial4-pinmux
->> ERROR: Input tree has errors, aborting (use -f to force output)
+is there an easy way to test proper operation?
+I enabled CONFIG_CRYPT_TEST, and did insmod tcrypt.ko, but I mostly see
+"Failed to load transform" messages.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 38151 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/78988781/attachment-0001.gz>
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
