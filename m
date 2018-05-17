@@ -1,151 +1,87 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Thu, 17 May 2018 22:52:56 +0800
-Subject: [PATCH] ethernet: stmmac: dwmac-rk: Add GMAC support for px30
-In-Reply-To: <f7f67fbe-41e7-4497-cb01-a1fa2195d4b0@rock-chips.com>
-References: <1526441925-12654-1-git-send-email-david.wu@rock-chips.com>
- <f7f67fbe-41e7-4497-cb01-a1fa2195d4b0@rock-chips.com>
-Message-ID: <4c9cdacb-4865-20f1-bad9-e9d826319bb7@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 17 May 2018 17:00:49 +0200
+Subject: [PATCH] efi/fb: Convert PCI bus address to resource if translated
+ by the bridge
+In-Reply-To: <20180517145512.cmr3twodfyz7lzon@redhat.com>
+References: <1526563343-28721-1-git-send-email-okaya@codeaurora.org>
+ <20180517145512.cmr3twodfyz7lzon@redhat.com>
+Message-ID: <CAKv+Gu-q-=nQCYut0B=Kfv_YeJOQ4ik9rWnTB5ZYwT08U+=rHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Shawn,
-
-Thanks for the suggestion, the most is okay.
-
-? 2018?05?16? 14:34, Shawn Lin ??:
-> Hi David,
-> 
-> On 2018/5/16 11:38, David Wu wrote:
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c 
->> b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
->> index 13133b3..4b2ab71 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
->> @@ -61,6 +61,7 @@ struct rk_priv_data {
->> ????? struct clk *mac_clk_tx;
->> ????? struct clk *clk_mac_ref;
->> ????? struct clk *clk_mac_refout;
->> +??? struct clk *clk_mac_speed;
-> 
-> No need to do anything now but it seems you could consider doing some
-> cleanup by using clk bulk APIs in the future.
-
-The use of this may seem to be less applicable because there are many 
-scenarios using different clocks.
-
-> 
->> ????? struct clk *aclk_mac;
->> ????? struct clk *pclk_mac;
->> ????? struct clk *clk_phy;
->> @@ -83,6 +84,64 @@ struct rk_priv_data {
->> ????? (((tx) ? soc##_GMAC_TXCLK_DLY_ENABLE : 
->> soc##_GMAC_TXCLK_DLY_DISABLE) | \
->> ?????? ((rx) ? soc##_GMAC_RXCLK_DLY_ENABLE : 
->> soc##_GMAC_RXCLK_DLY_DISABLE))
->> +#define PX30_GRF_GMAC_CON1??????? 0X0904
-> 
-> s/0X0904/0x0904 , since the other constants in this file follow the
-> same format.
-> 
->> +
->> +/* PX30_GRF_GMAC_CON1 */
->> +#define PX30_GMAC_PHY_INTF_SEL_RMII??? (GRF_CLR_BIT(4) | 
->> GRF_CLR_BIT(5) | \
->> +??????????????????? GRF_BIT(6))
->> +#define PX30_GMAC_SPEED_10M??????? GRF_CLR_BIT(2)
->> +#define PX30_GMAC_SPEED_100M??????? GRF_BIT(2)
->> +
->> +static void px30_set_to_rmii(struct rk_priv_data *bsp_priv)
->> +{
->> +??? struct device *dev = &bsp_priv->pdev->dev;
->> +
->> +??? if (IS_ERR(bsp_priv->grf)) {
->> +??????? dev_err(dev, "%s: Missing rockchip,grf property\n", __func__);
->> +??????? return;
->> +??? }
->> +
->> +??? regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
->> +???????????? PX30_GMAC_PHY_INTF_SEL_RMII);
->> +}
->> +
->> +static void px30_set_rmii_speed(struct rk_priv_data *bsp_priv, int 
->> speed)
->> +{
->> +??? struct device *dev = &bsp_priv->pdev->dev;
->> +??? int ret;
->> +
->> +??? if (IS_ERR(bsp_priv->clk_mac_speed)) {
->> +??????? dev_err(dev, "%s: Missing clk_mac_speed clock\n", __func__);
->> +??????? return;
->> +??? }
->> +
->> +??? if (speed == 10) {
->> +??????? regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
->> +???????????????? PX30_GMAC_SPEED_10M);
->> +
->> +??????? ret = clk_set_rate(bsp_priv->clk_mac_speed, 2500000);
->> +??????? if (ret)
->> +??????????? dev_err(dev, "%s: set clk_mac_speed rate 2500000 failed: 
->> %d\n",
->> +??????????????? __func__, ret);
->> +??? } else if (speed == 100) {
->> +??????? regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
->> +???????????????? PX30_GMAC_SPEED_100M);
->> +
->> +??????? ret = clk_set_rate(bsp_priv->clk_mac_speed, 25000000);
->> +??????? if (ret)
->> +??????????? dev_err(dev, "%s: set clk_mac_speed rate 25000000 failed: 
->> %d\n",
->> +??????????????? __func__, ret);
-> 
-> I know it follows the existing examples, but IMHO it duplicates
-> unnecessary code as all the difference is PX30_GMAC_SPEED_*
-> 
-
-i think the difference is the register offset and bits.
-
->> +
->> +??? } else {
->> +??????? dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
->> +??? }
->> +}
->> +
->> +static const struct rk_gmac_ops px30_ops = {
->> +??? .set_to_rmii = px30_set_to_rmii,
->> +??? .set_rmii_speed = px30_set_rmii_speed,
->> +};
->> +
->> ? #define RK3128_GRF_MAC_CON0??? 0x0168
->> ? #define RK3128_GRF_MAC_CON1??? 0x016c
->> @@ -1042,6 +1101,10 @@ static int rk_gmac_clk_init(struct 
->> plat_stmmacenet_data *plat)
->> ????????? }
->> ????? }
->> +??? bsp_priv->clk_mac_speed = devm_clk_get(dev, "clk_mac_speed");
-> 
-> Mightbe it'd be better to use "mac-speed" in DT bindings.
-> 
->> +??? if (IS_ERR(bsp_priv->clk_mac_speed))
->> +??????? dev_err(dev, "cannot get clock %s\n", "clk_mac_speed");
->> +
-> 
-> Would you like to handle deferred probe >
-
-No,
-
->> ????? if (bsp_priv->clock_input) {
->> ????????? dev_info(dev, "clock input from PHY\n");
->> ????? } else {
->> @@ -1424,6 +1487,7 @@ static int rk_gmac_resume(struct device *dev)
->> ? static SIMPLE_DEV_PM_OPS(rk_gmac_pm_ops, rk_gmac_suspend, 
->> rk_gmac_resume);
->> ? static const struct of_device_id rk_gmac_dwmac_match[] = {
->> +??? { .compatible = "rockchip,px30-gmac",??? .data = &px30_ops?? },
->> ????? { .compatible = "rockchip,rk3128-gmac", .data = &rk3128_ops },
->> ????? { .compatible = "rockchip,rk3228-gmac", .data = &rk3228_ops },
->> ????? { .compatible = "rockchip,rk3288-gmac", .data = &rk3288_ops },
+On 17 May 2018 at 16:55, Peter Jones <pjones@redhat.com> wrote:
+> On Thu, May 17, 2018 at 09:22:23AM -0400, Sinan Kaya wrote:
+>> A host bridge is allowed to remap BAR addresses using _TRA attribute in
+>> _CRS windows.
 >>
-> 
-> 
-> 
+>> pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
+>> pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
+>>
+>> When a VGA device is behind such a host bridge and the resource is
+>> translated efifb driver is trying to do ioremap against bus address
+>> rather than the resource address and is failing to probe.
+>>
+>> efifb driver is having difficulty locating the base address from BAR
+>> address when
+>>
+>> efifb: probing for efifb
+>> efifb: cannot reserve video memory at 0x1e000000
+>> efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
+>> efifb: mode is 800x600x32, linelength=3200, pages=1
+>> efifb: scrolling: redraw
+>> efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
+>>
+>> Use the host bridge offset information to convert bus address to
+>> resource address in the fixup.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>
+> Looks reasonable to me - Ard, do you want to take this up through the
+> EFI tree?
+>
+
+Sure
+
+> Signed-off-by: Peter Jones <pjones@redhat.com>
+>
+
+I'll take that as a reviewed-by, thanks.
+
+>> ---
+>>  drivers/video/fbdev/efifb.c | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
+>> index 46a4484..ea68d5c 100644
+>> --- a/drivers/video/fbdev/efifb.c
+>> +++ b/drivers/video/fbdev/efifb.c
+>> @@ -428,6 +428,8 @@ static void efifb_fixup_resources(struct pci_dev *dev)
+>>  {
+>>       u64 base = screen_info.lfb_base;
+>>       u64 size = screen_info.lfb_size;
+>> +     struct pci_bus_region region;
+>> +     struct resource res;
+>>       int i;
+>>
+>>       if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+>> @@ -439,6 +441,14 @@ static void efifb_fixup_resources(struct pci_dev *dev)
+>>       if (!base)
+>>               return;
+>>
+>> +     region.start = base;
+>> +     region.end = base + size - 1;
+>> +     res.start = 0;
+>> +     res.flags = IORESOURCE_MEM;
+>> +     pcibios_bus_to_resource(dev->bus, &res, &region);
+>> +     if (res.start)
+>> +             base = res.start;
+>> +
+>>       for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
+>>               struct resource *res = &dev->resource[i];
+>>
+>> --
+>> 2.7.4
+>>
+>
+> --
+>   Peter
