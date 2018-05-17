@@ -1,101 +1,66 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 17 May 2018 19:04:31 +0100
-Subject: [PATCH v9 04/11] arm64: kexec_file: allocate memory walking
- through memblock list
-In-Reply-To: <20180517021547.GJ24627@MiWiFi-R3L-srv>
-References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-5-takahiro.akashi@linaro.org>
- <648656ef-1f1e-b0ac-581c-aba1e62f4eee@arm.com>
- <20180507055906.GE11326@linaro.org> <20180517021024.GI24627@MiWiFi-R3L-srv>
- <20180517021547.GJ24627@MiWiFi-R3L-srv>
-Message-ID: <d9b8a3ca-93bc-87f9-1316-f45c0dfe47ae@arm.com>
+Date: Thu, 17 May 2018 19:11:21 +0100
+Subject: [PATCH v3 07/12] ACPI / APEI: Make the nmi_fixmap_idx per-ghes to
+ allow multiple in_nmi() users
+In-Reply-To: <20180517133653.GA27738@pd.tnic>
+References: <20180427153510.5799-1-james.morse@arm.com>
+ <20180427153510.5799-8-james.morse@arm.com> <20180505122719.GE3708@pd.tnic>
+ <1511cfcc-dcd1-b3c5-01c7-6b6b8fb65b05@arm.com>
+ <20180516110348.GA17092@pd.tnic>
+ <7c871e15-689c-226d-760d-dd92614de2e9@arm.com>
+ <20180517133653.GA27738@pd.tnic>
+Message-ID: <8a6fa0e4-98c5-6880-1611-f1ab0534bbbc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baoquan,
+Hi Borislav,
 
-On 17/05/18 03:15, Baoquan He wrote:
-> On 05/17/18 at 10:10am, Baoquan He wrote:
->> On 05/07/18 at 02:59pm, AKASHI Takahiro wrote:
->>> On Tue, May 01, 2018 at 06:46:09PM +0100, James Morse wrote:
->>>> On 25/04/18 07:26, AKASHI Takahiro wrote:
->>>>> We need to prevent firmware-reserved memory regions, particularly EFI
->>>>> memory map as well as ACPI tables, from being corrupted by loading
->>>>> kernel/initrd (or other kexec buffers). We also want to support memory
->>>>> allocation in top-down manner in addition to default bottom-up.
->>>>> So let's have arm64 specific arch_kexec_walk_mem() which will search
->>>>> for available memory ranges in usable memblock list,
->>>>> i.e. !NOMAP & !reserved, 
->>>>
->>>>> instead of system resource tree.
->>>>
->>>> Didn't we try to fix the system-resource-tree in order to fix regular-kexec to
->>>> be safe in the EFI-memory-map/ACPI-tables case?
->>>>
->>>> It would be good to avoid having two ways of doing this, and I would like to
->>>> avoid having extra arch code...
->>>
->>> I know what you mean.
->>> /proc/iomem or system resource is, in my opinion, not the best place to
->>> describe memory usage of kernel but rather to describe *physical* hardware
->>> layout. As we are still discussing about "reserved" memory, I don't want
->>> to depend on it.
->>> Along with memblock list, we will have more accurate control over memory
->>> usage.
->>
->> In kexec-tools, we see any usable memory as candidate which can be used
+On 17/05/18 14:36, Borislav Petkov wrote:
+> On Wed, May 16, 2018 at 03:51:14PM +0100, James Morse wrote:
+>> I thought this was safe because its just ghes_copy_tofrom_phys()s access to the
+>> fixmap slots that needs mutual exclusion.
+
+and here is where I was wrong: I was only looking at reading the data, we then
+dump it in struct ghes assuming it can only be notified on once CPU at a time. Oops.
+
+> For example:
+
+> ghes->estatus from above, before the NMI fired, has gotten some nice
+> scribbling over. AFAICT.
+
+Yup, thanks for the example!
+
+
+> Now, I don't know whether this can happen with the ARM facilities but if
+> they're NMI-like, I don't see why not.
+
+NOTIFY_SEA is synchronous so the error has to be something to do with the
+instruction that was interrupted. In your example this would mean the APEI
+code/data was corrupted, which there is little point trying to handle.
+
+NOTIFY_{SEI, SDEI} on the other hand are asynchronous, so this could happen.
+
+
+> Which means, that this code is not really reentrant and if should be
+> fixed to be callable from different contexts, then it should use private
+> buffers and be careful about locking.
+
+... I need to go through this thing again to work out how the firmware-buffers
+map on to estatus=>ghes ...
+
+
+> Oh, and that
 > 
-> Here I said 'any', it's not accurate. Those memory which need be passed
-> to 2nd kernel for use need be excluded, just as we have done in
-> kexec-tools.
+> 	if (in_nmi)
+> 		lock()
+> 	else
+> 		lock_irqsave()
 > 
->> to load kexec kernel image/initrd etc. However kexec loading is a
->> preparation work, it just books those position for later kexec kernel
->> jumping after "kexec -e", that is why we need kexec_buf to remember
->> them and do the real content copy of kernel/initrd.
+> pattern is really yucky. And it is an explosion waiting to happen.
 
-The problem we have on arm64 is /proc/iomem is being used for two things.
-1) Kexec's this is memory I can book for the new kernel.
-2) Kdump's this is memory I must describe for vmcore.
-
-We get the memory map from UEFI via the EFI stub, and leave it in
-memblock_reserved() memory. A new kexec kernel needs this to boot: it mustn't
-overwrite it. The same goes for the ACPI tables, they could be reclaimed and
-used as memory, but the new kexec kernel needs them to boot, they are
-memblock_reserved() too.
-
-If we knock all memblock_reserved() regions out of /proc/iomem then kdump
-doesn't work, because /proc/iomem is only generated once. Its a snapshot. The
-initcode/data is an example of memory we release from memblock_reserve() after
-this, then gets used for data we need in the vmcore.
-
-Ideally we would describe all this in /proc/iomem with:
-| 8001e80000-83ff186fff : System RAM
-|   8002080000-8002feffff : [Data you really need to boot]
-
-kexec-tools should not overwrite 'data you really need to boot' unless it knows
-what it is, and that the system will never need it again. (examples: overwrite
-the ACPI tables when booting a non-acpi kernel, overwrite the UEFI memory map if
-the DT has been regenerated for a non-uefi kernel)
-
-But, kexec-tools doesn't parse those second level entries properly. We have a
-bug in user-space, and a bug in the kernel.
-
-Because /proc/iomem is being used for two things, and kexec-tools only parses
-one level, I don't think we can fix this in the kernel without breaking one of
-the use-cases. I think Akashi's fix user-space too approach is the most
-pragmatic approach.
-
-
->> Here you use
->> memblock to search available memory, isn't it deviating too far away
->> from the original design in kexec-tools. Assume kexec loading and
->> kexec_file loading should be consistent on loading even though they are
->> done in different space, kernel space and user space.
-
-Its much easier for us to parse memblock in the kernel as the helpers step over
-the regions we know we don't want. For the resource list we would need to
-strcmp(), and a bunch of handling for the second level entries.
+The whole in_nmi()=>other-lock think looks like a hack to make a warning go
+away. We could get the notification to take whatever lock is appropriate further
+out, but it may mean some code duplication. (I'll put it on my list...)
 
 
 Thanks,
