@@ -1,55 +1,69 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 18 May 2018 00:31:57 +0800
-Subject: [PATCH v7 03/14] clk: qcom: Add CPU clock driver for msm8996
-In-Reply-To: <1526375616-16904-4-git-send-email-ilialin@codeaurora.org>
-References: <1526375616-16904-4-git-send-email-ilialin@codeaurora.org>
-Message-ID: <201805172306.Un6aKldO%fengguang.wu@intel.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 17 May 2018 11:23:22 -0500
+Subject: [PATCH v6 6/9] dt-bindings: counter: Document stm32 quadrature
+ encoder
+In-Reply-To: <ccdbbfb2833d274b6bfa234aada57e68d9793dd5.1526487615.git.vilhelm.gray@gmail.com>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+ <ccdbbfb2833d274b6bfa234aada57e68d9793dd5.1526487615.git.vilhelm.gray@gmail.com>
+Message-ID: <CAL_Jsq+a4s=5N6wUWifoHWQoornbDBY-UY2xrwj1kggNH4Q5pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ilia,
+On Wed, May 16, 2018 at 12:51 PM, William Breathitt Gray
+<vilhelm.gray@gmail.com> wrote:
+> From: Benjamin Gaignard <benjamin.gaignard@st.com>
 
-Thank you for the patch! Perhaps something to improve:
+v6? Where's v1-v5?
 
-[auto build test WARNING on robh/for-next]
-[also build test WARNING on v4.17-rc5]
-[cannot apply to clk/clk-next next-20180517]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> Add bindings for STM32 Timer quadrature encoder.
+> It is a sub-node of STM32 Timer which implement the
+> counter part of the hardware.
+>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+> ---
+>  .../bindings/counter/stm32-timer-cnt.txt      | 26 +++++++++++++++++++
+>  .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
+>  2 files changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>
+> diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+> new file mode 100644
+> index 000000000000..377728128bef
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+> @@ -0,0 +1,26 @@
+> +STMicroelectronics STM32 Timer quadrature encoder
+> +
+> +STM32 Timer provides quadrature encoder counter mode to detect
 
-url:    https://github.com/0day-ci/linux/commits/Ilia-Lin/CPU-scaling-support-for-msm8996/20180516-064721
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: xtensa-allyesconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+'mode' does not sound like a sub-block of the timers block.
 
-All warnings (new ones prefixed by >>):
+> +angular position and direction of rotary elements,
+> +from IN1 and IN2 input signals.
+> +
+> +Must be a sub-node of an STM32 Timer device tree node.
+> +See ../mfd/stm32-timers.txt for details about the parent node.
+> +
+> +Required properties:
+> +- compatible:          Must be "st,stm32-timer-counter".
+> +- pinctrl-names:       Set to "default".
+> +- pinctrl-0:           List of phandles pointing to pin configuration nodes,
+> +                       to set IN1/IN2 pins in mode of operation for Low-Power
+> +                       Timer input on external pin.
+> +
+> +Example:
+> +       timers at 40010000  {
+> +               compatible = "st,stm32-timers";
+> +               ...
+> +               counter {
+> +                       compatible = "st,stm32-timer-counter";
 
->> drivers/clk/qcom/clk-cpu-8996.c:142:2: warning: this decimal constant is unsigned only in ISO C90
-     VCO(0, 1000000000, 2150400000),
-     ^~~
+Is there only 1? How is the counter addressed?
 
-vim +142 drivers/clk/qcom/clk-cpu-8996.c
-
-   137	
-   138	static const struct pll_vco alt_pll_vco_modes[] = {
-   139		VCO(3,  250000000,  500000000),
-   140		VCO(2,  500000000,  750000000),
-   141		VCO(1,  750000000, 1000000000),
- > 142		VCO(0, 1000000000, 2150400000),
-   143	};
-   144	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 52971 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/8304b1ad/attachment-0001.gz>
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&tim1_in_pins>;
+> +               };
+> +       };
