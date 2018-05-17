@@ -1,30 +1,38 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 17 May 2018 14:07:08 +0200
-Subject: [PATCH v2 3/3] ARM: multi_v7_defconfig: enable STM32 RTC
+Date: Thu, 17 May 2018 14:07:06 +0200
+Subject: [PATCH v2 1/3] ARM: dts: stm32: add RTC support to stm32mp157c
 In-Reply-To: <1526558828-24456-1-git-send-email-amelie.delaunay@st.com>
 References: <1526558828-24456-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1526558828-24456-4-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1526558828-24456-2-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the STM32 Real Time Clock (RTC) driver, implemented on STM32MP1 SoC.
+Add support for RTC (Real Time Clock) to STM32MP157C SoC.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stm32mp157c.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 89167cd..8e02f86 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -863,6 +863,7 @@ CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_SUNXI=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
-+CONFIG_RTC_DRV_STM32=y
- CONFIG_RTC_DRV_CPCAP=m
- CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index b66f673..df2d874 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -818,6 +818,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		rtc: rtc at 5c004000 {
++			compatible = "st,stm32mp1-rtc";
++			reg = <0x5c004000 0x400>;
++			clocks = <&rcc RTCAPB>, <&rcc RTC>;
++			clock-names = "pclk", "rtc_ck";
++			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
+ 		i2c6: i2c at 5c009000 {
+ 			compatible = "st,stm32f7-i2c";
+ 			reg = <0x5c009000 0x400>;
 -- 
 2.7.4
