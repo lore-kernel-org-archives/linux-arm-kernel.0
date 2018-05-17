@@ -1,171 +1,97 @@
-From: jacopo@jmondi.org (jacopo mondi)
-Date: Thu, 17 May 2018 11:01:10 +0200
-Subject: [PATCH 5/6] ARM: dts: rcar-gen2: Remove unused VIN properties
-In-Reply-To: <20180516221307.GF17948@bigcity.dyn.berto.se>
-References: <1526488352-898-1-git-send-email-jacopo+renesas@jmondi.org>
- <1526488352-898-6-git-send-email-jacopo+renesas@jmondi.org>
- <20180516221307.GF17948@bigcity.dyn.berto.se>
-Message-ID: <20180517090110.GA20190@w540>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Thu, 17 May 2018 10:13:07 +0100
+Subject: [PATCH 7/8] firmware: arm_scmi: improve exit paths and code
+ readability
+In-Reply-To: <1525885634-22348-8-git-send-email-sudeep.holla@arm.com>
+References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
+ <1525885634-22348-8-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180517094927.0000690f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+On Wed, 9 May 2018 18:07:13 +0100
+Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-On Thu, May 17, 2018 at 12:13:07AM +0200, Niklas S?derlund wrote:
-> Hi Jacopo,
->
-> Thanks for your work.
->
-> On 2018-05-16 18:32:31 +0200, Jacopo Mondi wrote:
-> > The 'bus-width' and 'pclk-sample' properties are not parsed by the VIN
-> > driver and only confuse users. Remove them in all Gen2 SoC that used
-> > them.
-> >
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> > ---
-> >  arch/arm/boot/dts/r8a7790-lager.dts   | 3 ---
-> >  arch/arm/boot/dts/r8a7791-koelsch.dts | 3 ---
-> >  arch/arm/boot/dts/r8a7791-porter.dts  | 1 -
-> >  arch/arm/boot/dts/r8a7793-gose.dts    | 3 ---
-> >  arch/arm/boot/dts/r8a7794-alt.dts     | 1 -
-> >  arch/arm/boot/dts/r8a7794-silk.dts    | 1 -
-> >  6 files changed, 12 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> > index 063fdb6..b56b309 100644
-> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> > @@ -873,10 +873,8 @@
-> >  	port {
-> >  		vin0ep2: endpoint {
-> >  			remote-endpoint = <&adv7612_out>;
-> > -			bus-width = <24>;
->
-> I can't really make up my mind if this is a good thing or not. Device
-> tree describes the hardware and not what the drivers make use of. And
-> the fact is that this bus is 24 bits wide. So I'm not sure we should
-> remove these properties. But I would love to hear what others think
-> about this.
->
+> The existing code intends the good path to reduce the code which is so
+> uncommon. It's obvious to have more readable code with a goto used for
+> the error path. This patch adds more appropriate error paths and makes
+> code more readable. It also moves a error logging outside the scope of
+> locking.
+> 
+> Suggested-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Just to point out those properties are not even documented in rcar-vin
-bindings (actually, none of them was).
+It could be argued the lock move is unrelated and should be in a separate
+patch... Not particularly important though.
 
-I feel it's wrong to have them here, as someone may think that
-changing their value should actually change the VIN interface behavior,
-which it's not true, leading to massive confusion and quite some code
-digging for no reason (and they will get mad at us at some point, probably :)
+Some comments inline, but I'm happy with how you did this.
 
-Thanks
-   j
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 
-> >  			hsync-active = <0>;
-> >  			vsync-active = <0>;
-> > -			pclk-sample = <1>;
-> >  			data-active = <1>;
-> >  		};
-> >  	};
-> > @@ -895,7 +893,6 @@
-> >
-> >  		vin1ep0: endpoint {
-> >  			remote-endpoint = <&adv7180>;
-> > -			bus-width = <8>;
-> >  		};
-> >  	};
-> >  };
-> > diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > index f40321a..9967666 100644
-> > --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > @@ -849,10 +849,8 @@
-> >
-> >  		vin0ep2: endpoint {
-> >  			remote-endpoint = <&adv7612_out>;
-> > -			bus-width = <24>;
-> >  			hsync-active = <0>;
-> >  			vsync-active = <0>;
-> > -			pclk-sample = <1>;
-> >  			data-active = <1>;
-> >  		};
-> >  	};
-> > @@ -870,7 +868,6 @@
-> >
-> >  		vin1ep: endpoint {
-> >  			remote-endpoint = <&adv7180>;
-> > -			bus-width = <8>;
-> >  		};
-> >  	};
-> >  };
-> > diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-> > index c14e6fe..055a7f1 100644
-> > --- a/arch/arm/boot/dts/r8a7791-porter.dts
-> > +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-> > @@ -391,7 +391,6 @@
-> >
-> >  		vin0ep: endpoint {
-> >  			remote-endpoint = <&adv7180>;
-> > -			bus-width = <8>;
-> >  		};
-> >  	};
-> >  };
-> > diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-> > index 9ed6961..9d3fba2 100644
-> > --- a/arch/arm/boot/dts/r8a7793-gose.dts
-> > +++ b/arch/arm/boot/dts/r8a7793-gose.dts
-> > @@ -759,10 +759,8 @@
-> >
-> >  		vin0ep2: endpoint {
-> >  			remote-endpoint = <&adv7612_out>;
-> > -			bus-width = <24>;
-> >  			hsync-active = <0>;
-> >  			vsync-active = <0>;
-> > -			pclk-sample = <1>;
-> >  			data-active = <1>;
-> >  		};
-> >  	};
-> > @@ -781,7 +779,6 @@
-> >
-> >  		vin1ep: endpoint {
-> >  			remote-endpoint = <&adv7180_out>;
-> > -			bus-width = <8>;
-> >  		};
-> >  	};
-> >  };
-> > diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-> > index 26a8834..4bbb9cc 100644
-> > --- a/arch/arm/boot/dts/r8a7794-alt.dts
-> > +++ b/arch/arm/boot/dts/r8a7794-alt.dts
-> > @@ -380,7 +380,6 @@
-> >
-> >  		vin0ep: endpoint {
-> >  			remote-endpoint = <&adv7180>;
-> > -			bus-width = <8>;
-> >  		};
-> >  	};
-> >  };
-> > diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-> > index 351cb3b..c0c5d31 100644
-> > --- a/arch/arm/boot/dts/r8a7794-silk.dts
-> > +++ b/arch/arm/boot/dts/r8a7794-silk.dts
-> > @@ -480,7 +480,6 @@
-> >
-> >  		vin0ep: endpoint {
-> >  			remote-endpoint = <&adv7180>;
-> > -			bus-width = <8>;
-> >  		};
-> >  	};
-> >  };
-> > --
-> > 2.7.4
-> >
->
-> --
-> Regards,
-> Niklas S?derlund
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/c1578eef/attachment-0001.sig>
+> ---
+>  drivers/firmware/arm_scmi/bus.c | 22 ++++++++++++----------
+>  1 file changed, 12 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/firmware/arm_scmi/bus.c b/drivers/firmware/arm_scmi/bus.c
+> index f2760a596c28..472c88ae1c0f 100644
+> --- a/drivers/firmware/arm_scmi/bus.c
+> +++ b/drivers/firmware/arm_scmi/bus.c
+> @@ -125,13 +125,13 @@ scmi_device_create(struct device_node *np, struct device *parent, int protocol)
+>  	int id, retval;
+>  	struct scmi_device *scmi_dev;
+>  
+> -	id = ida_simple_get(&scmi_bus_id, 1, 0, GFP_KERNEL);
+> -	if (id < 0)
+> -		return NULL;
+> -
+>  	scmi_dev = kzalloc(sizeof(*scmi_dev), GFP_KERNEL);
+>  	if (!scmi_dev)
+> -		goto no_mem;
+> +		return NULL;
+> +
+> +	id = ida_simple_get(&scmi_bus_id, 1, 0, GFP_KERNEL);
+> +	if (id < 0)
+> +		goto free_mem;
+
+I guess this reorder was to match what is done in remove?
+
+Personally I would have reordered remove as that was a one line change, but
+it really doesn't matter.
+
+>  
+>  	scmi_dev->id = id;
+>  	scmi_dev->protocol_id = protocol;
+> @@ -141,13 +141,15 @@ scmi_device_create(struct device_node *np, struct device *parent, int protocol)
+>  	dev_set_name(&scmi_dev->dev, "scmi_dev.%d", id);
+>  
+>  	retval = device_register(&scmi_dev->dev);
+> -	if (!retval)
+> -		return scmi_dev;
+> +	if (retval)
+> +		goto put_dev;
+>  
+> +	return scmi_dev;
+
+If you are respinning I'd add a blank line here for readability.
+
+> +put_dev:
+>  	put_device(&scmi_dev->dev);
+> -	kfree(scmi_dev);
+> -no_mem:
+>  	ida_simple_remove(&scmi_bus_id, id);
+> +free_mem:
+> +	kfree(scmi_dev);
+>  	return NULL;
+>  }
+>  
+> @@ -171,9 +173,9 @@ int scmi_protocol_register(int protocol_id, scmi_prot_init_fn_t fn)
+>  	spin_lock(&protocol_lock);
+>  	ret = idr_alloc(&scmi_protocols, fn, protocol_id, protocol_id + 1,
+>  			GFP_ATOMIC);
+> +	spin_unlock(&protocol_lock);
+>  	if (ret != protocol_id)
+>  		pr_err("unable to allocate SCMI idr slot, err %d\n", ret);
+> -	spin_unlock(&protocol_lock);
+>  
+>  	return ret;
+>  }
