@@ -1,39 +1,42 @@
-From: vincent.weaver@maine.edu (Vince Weaver)
-Date: Thu, 17 May 2018 15:31:38 -0400 (EDT)
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <alpine.DEB.2.21.1805171422450.8529@macbook-air>
-References: <20180517131727.29263-1-eric@anholt.net>
- <1412187220.62585.1526572780332@email.1und1.de>
- <alpine.DEB.2.21.1805171233500.7984@macbook-air>
- <307323036.63872.1526576126537@email.1und1.de>
- <20180517180758.GK12198@hirez.programming.kicks-ass.net>
- <alpine.DEB.2.21.1805171422450.8529@macbook-air>
-Message-ID: <alpine.DEB.2.21.1805171530080.8529@macbook-air>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 17 May 2018 15:37:21 -0400
+Subject: [PATCH] mm/dmapool: localize page allocations
+In-Reply-To: <20180517181815.GC26718@bombadil.infradead.org>
+References: <1526578581-7658-1-git-send-email-okaya@codeaurora.org>
+ <20180517181815.GC26718@bombadil.infradead.org>
+Message-ID: <9844a638-bc4e-46bd-133e-0c82a3e9d6ea@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 May 2018, Vince Weaver wrote:
+On 5/17/2018 2:18 PM, Matthew Wilcox wrote:
+> On Thu, May 17, 2018 at 01:36:19PM -0400, Sinan Kaya wrote:
+>> Try to keep the pool closer to the device's NUMA node by changing kmalloc()
+>> to kmalloc_node() and devres_alloc() to devres_alloc_node().
+> Have you measured any performance gains by doing this?  The thing is that
+> these allocations are for the metadata about the page, and the page is
+> going to be used by CPUs in every node.  So it's not clear to me that
+> allocating it on the node nearest to the device is going to be any sort
+> of a win.
+> 
 
-> On Thu, 17 May 2018, Peter Zijlstra wrote:
-> with cortex-a7 now, would it be possible to later drop that if proper 
-> cortex-a53 support is added to the armv7 pmu driver?  Or would that lead 
-> to all kinds of back-compatability mess?
+It is true that this is metadata but it is one of the things that is most
+frequently used in spite of its small size.
 
-For what it's worth, the pi-foundation kernel bcm2710 device tree file 
-does:
+I don't think it makes any sense to cross a chip boundary for accessing a
+pointer location on every single pool allocation. 
 
-		arm-pmu {
-#ifdef RPI364
-			compatible = "arm,armv8-pmuv3", "arm,cortex-a7-pmu";
-#else
-			compatible = "arm,cortex-a7-pmu";
-#endif
-			interrupt-parent = <&local_intc>;
-			interrupts = <9>;
-		};
+Remember that the CPU core that is running this driver is most probably on
+the same NUMA node as the device itself.
 
+Also, if it was a one time init kind of thing, I'd say "yeah, leave it alone". 
+DMA pool is used by a wide range of drivers and it is used to allocate
+fixed size buffers at runtime. 
 
-Which is probably where I was getting the arm,armv8-pmuv3 from in my 
-original patch.
+Performance impact changes depending on the driver in use. This particular
+code is in use by network adapters as well as the NVMe driver. It does
+have a wide range of impact.
 
-Vince
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
