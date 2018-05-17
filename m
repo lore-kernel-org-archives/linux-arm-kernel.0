@@ -1,65 +1,33 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 May 2018 17:38:43 +0100 (BST)
-Subject: Applied "ASoC: zte: remove duplicate includes" to the asoc tree
-In-Reply-To: <1512930723-5037-1-git-send-email-pravin.shedge4linux@gmail.com>
-Message-ID: <20180517163843.7AFDF44007E@finisterre.ee.mobilebroadband>
+Date: Thu, 17 May 2018 13:54:37 +0900
+Subject: [PATCH v3 5/6] spi: at91-usart: add driver for at91-usart as spi
+In-Reply-To: <c23cdde58b9f724f51787c6c38478df983be6efa.camel@microchip.com>
+References: <20180511103822.31698-1-radu.pirea@microchip.com>
+ <20180511103822.31698-6-radu.pirea@microchip.com>
+ <CAHp75Ve3Ugnjjm8EZkPQTZSvH1qad1e5SqjOn8zz5syHSQea_g@mail.gmail.com>
+ <5a3930b867cf8c279953d08c5d5dd1d93113a43b.camel@microchip.com>
+ <CAHp75VdRrL25Jgnbk64Qqc5RY3uJdcntJ3xwRdp3F+rRFeTHBA@mail.gmail.com>
+ <c23cdde58b9f724f51787c6c38478df983be6efa.camel@microchip.com>
+Message-ID: <20180517045437.GE20254@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Tue, May 15, 2018 at 12:22:24PM +0300, Radu Pirea wrote:
+> On Mon, 2018-05-14 at 20:38 +0300, Andy Shevchenko wrote:
 
-   ASoC: zte: remove duplicate includes
+> > So, what is not going as expected in "SPI core takes care of CSs"
+> > case?
+> > Did you use oscilloscope for that?
 
-has been applied to the asoc tree at
+> Yes, I used and CSs was not asserted. Anyway, I will will try again.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 3439a083a13981f0da276cb2aeae84bd4e437b2e Mon Sep 17 00:00:00 2001
-From: Pravin Shedge <pravin.shedge4linux@gmail.com>
-Date: Mon, 11 Dec 2017 00:02:03 +0530
-Subject: [PATCH] ASoC: zte: remove duplicate includes
-
-These duplicate includes have been found with scripts/checkincludes.pl but
-they have been removed manually to avoid removing false positives.
-
-Signed-off-by: Pravin Shedge <pravin.shedge4linux@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/zte/zx-i2s.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/sound/soc/zte/zx-i2s.c b/sound/soc/zte/zx-i2s.c
-index b6b056c607fa..0d36630aa1a7 100644
---- a/sound/soc/zte/zx-i2s.c
-+++ b/sound/soc/zte/zx-i2s.c
-@@ -20,9 +20,6 @@
- #include <sound/core.h>
- #include <sound/dmaengine_pcm.h>
- #include <sound/initval.h>
--#include <sound/pcm.h>
--#include <sound/pcm_params.h>
--#include <sound/soc.h>
- 
- #define ZX_I2S_PROCESS_CTRL	0x04
- #define ZX_I2S_TIMING_CTRL	0x08
--- 
-2.17.0
+If the core chip select handling is not working properly for some reason
+then the core chip select handling should be fixed rather than just open
+coding in your driver - probably it's also broken for other users.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/795c8270/attachment-0001.sig>
