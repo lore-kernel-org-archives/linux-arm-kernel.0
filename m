@@ -1,48 +1,32 @@
-From: vincent.weaver@maine.edu (Vince Weaver)
-Date: Thu, 17 May 2018 14:27:27 -0400 (EDT)
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <20180517180758.GK12198@hirez.programming.kicks-ass.net>
-References: <20180517131727.29263-1-eric@anholt.net>
- <1412187220.62585.1526572780332@email.1und1.de>
- <alpine.DEB.2.21.1805171233500.7984@macbook-air>
- <307323036.63872.1526576126537@email.1und1.de>
- <20180517180758.GK12198@hirez.programming.kicks-ass.net>
-Message-ID: <alpine.DEB.2.21.1805171422450.8529@macbook-air>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 May 2018 11:46:12 -0700
+Subject: [PATCH v2] pinctrl: pinctrl-single: Add functions to save and
+ restore pinctrl context
+In-Reply-To: <1526532021-16387-1-git-send-email-j-keerthy@ti.com>
+References: <1526532021-16387-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20180517184612.GM98604@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 May 2018, Peter Zijlstra wrote:
-
-> On Thu, May 17, 2018 at 06:55:26PM +0200, Stefan Wahren wrote:
-> > > Vince Weaver <vincent.weaver@maine.edu> hat am 17. Mai 2018 um 18:34 geschrieben:
-> > > On Thu, 17 May 2018, Stefan Wahren wrote:
-> > > > > Eric Anholt <eric@anholt.net> hat am 17. Mai 2018 um 15:17 geschrieben:
+* Keerthy <j-keerthy@ti.com> [180517 04:42]:
+> This adds a pair of context save/restore functions to save/restore the
+> state of a set of pinctrl registers. The context is lost during rtc only
+> suspend with ddr in self-refresh on am43xx. Currently the save/restore
+> is being done unconditionally. This will be optimized later with a
+> pdata-quirk function which will allow is to save/restore only when doing
+> the rtc only mode with ddr in self refresh.
 > 
-> > > > > The a53 and a7 counters seem to match up, so we advertise a7 so that
-> > > > > arm32 can probe.
-> > > 
-> > > so how closely did you look at the a53/a7 differences?  I see some major 
-> > > differences, especially with the CPU_CYCLES event (0xff vs 0x11).
-> > > 
-> > > The proper fix here might be to add a cortex-a53 PMU entry to the armv7 
-> > > code rather than trying to treat it as a cortex-a7.
-> > 
-> > we like to use the PMU of BCM2837 SoC (4x A53 cores) under arm32 and arm64.
-> > 
-> > What is the right way (tm) to the define the DT compatibles?
-> > Does the arm32 PMU driver need patching for proper A53 support?
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
 > 
-> I'm completely clueless on all of this; Mark might have ideas.
+> Changes in v2:
+> 
+>   * As this is needed only the in the suspend/resume path
+>     removed the cpu_pm notifier and added the save/restore in
+>     the suspend/resume calls.
+>   * Saving/Restoring unconditionally at the moment. This will
+>     be optimized later with the help of a pdata-quirk function.
 
-Spending more time looking at it the only obvious differences are the 
-previously mentioned CYCLES difference, as well as the cortex-a7 has
-18 events in the perf_cache_map but cortex-a53 only has 3.  Plus probably 
-support for the various other features of the armv8v3 pmu that the a7 
-knows nothing about.
+Looks good to me:
 
-Is it hard to get lines in the DT changed once they are there?  If we go 
-with cortex-a7 now, would it be possible to later drop that if proper 
-cortex-a53 support is added to the armv7 pmu driver?  Or would that lead 
-to all kinds of back-compatability mess?
-
-Vince
+Acked-by: Tony Lindgren <tony@atomide.com>
