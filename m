@@ -1,54 +1,34 @@
 From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Thu, 17 May 2018 10:29:30 +0200
-Subject: [PATCH net-next v3 01/10] net: mvpp2: align the ethtool ops definition
+Date: Thu, 17 May 2018 10:29:32 +0200
+Subject: [PATCH net-next v3 03/10] phy: add 2.5G SGMII mode to the phy_mode
+ enum
 In-Reply-To: <20180517082939.14598-1-antoine.tenart@bootlin.com>
 References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
-Message-ID: <20180517082939.14598-2-antoine.tenart@bootlin.com>
+Message-ID: <20180517082939.14598-4-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cosmetic patch to align the ethtool functions to ops definitions. This
-patch does not change in any way the driver's behaviour.
+This patch adds one more generic PHY mode to the phy_mode enum, to allow
+configuring generic PHYs to the 2.5G SGMII mode by using the set_mode
+callback.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ include/linux/phy/phy.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 6f410235987c..77dd91e3d962 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -7859,18 +7859,18 @@ static const struct net_device_ops mvpp2_netdev_ops = {
- };
- 
- static const struct ethtool_ops mvpp2_eth_tool_ops = {
--	.nway_reset	= phy_ethtool_nway_reset,
--	.get_link	= ethtool_op_get_link,
--	.set_coalesce	= mvpp2_ethtool_set_coalesce,
--	.get_coalesce	= mvpp2_ethtool_get_coalesce,
--	.get_drvinfo	= mvpp2_ethtool_get_drvinfo,
--	.get_ringparam	= mvpp2_ethtool_get_ringparam,
--	.set_ringparam	= mvpp2_ethtool_set_ringparam,
--	.get_strings	= mvpp2_ethtool_get_strings,
--	.get_ethtool_stats = mvpp2_ethtool_get_stats,
--	.get_sset_count	= mvpp2_ethtool_get_sset_count,
--	.get_link_ksettings = phy_ethtool_get_link_ksettings,
--	.set_link_ksettings = phy_ethtool_set_link_ksettings,
-+	.nway_reset		= phy_ethtool_nway_reset,
-+	.get_link		= ethtool_op_get_link,
-+	.set_coalesce		= mvpp2_ethtool_set_coalesce,
-+	.get_coalesce		= mvpp2_ethtool_get_coalesce,
-+	.get_drvinfo		= mvpp2_ethtool_get_drvinfo,
-+	.get_ringparam		= mvpp2_ethtool_get_ringparam,
-+	.set_ringparam		= mvpp2_ethtool_set_ringparam,
-+	.get_strings		= mvpp2_ethtool_get_strings,
-+	.get_ethtool_stats	= mvpp2_ethtool_get_stats,
-+	.get_sset_count		= mvpp2_ethtool_get_sset_count,
-+	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
-+	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
- };
- 
- /* Used for PPv2.1, or PPv2.2 with the old Device Tree binding that
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index c9d14eeee7f5..9713aebdd348 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -36,6 +36,7 @@ enum phy_mode {
+ 	PHY_MODE_USB_DEVICE_SS,
+ 	PHY_MODE_USB_OTG,
+ 	PHY_MODE_SGMII,
++	PHY_MODE_2500SGMII,
+ 	PHY_MODE_10GKR,
+ 	PHY_MODE_UFS_HS_A,
+ 	PHY_MODE_UFS_HS_B,
 -- 
 2.17.0
