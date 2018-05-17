@@ -1,28 +1,26 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Thu, 17 May 2018 08:47:55 +0200
-Subject: [PATCH v3 2/3] ioremap: Update pgtable free interfaces with addr
-In-Reply-To: <20180516233207.1580-3-toshi.kani@hpe.com>
-References: <20180516233207.1580-1-toshi.kani@hpe.com>
- <20180516233207.1580-3-toshi.kani@hpe.com>
-Message-ID: <20180517064755.GP12670@dhcp22.suse.cz>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 17 May 2018 08:54:49 +0200
+Subject: [PATCH v9 02/12] drivers: base: cacheinfo: setup DT cache
+ properties early
+In-Reply-To: <78b08b68-ff57-8dd8-6eb1-00548f275eac@arm.com>
+References: <20180511235807.30834-1-jeremy.linton@arm.com>
+ <20180511235807.30834-3-jeremy.linton@arm.com>
+ <78b08b68-ff57-8dd8-6eb1-00548f275eac@arm.com>
+Message-ID: <20180517065449.GA13589@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 16-05-18 17:32:06, Kani Toshimitsu wrote:
-> From: Chintan Pandya <cpandya@codeaurora.org>
+On Tue, May 15, 2018 at 12:15:08PM -0500, Jeremy Linton wrote:
+> Hi Greg,
 > 
-> This patch ("mm/vmalloc: Add interfaces to free unmapped
-> page table") adds following 2 interfaces to free the page
-> table in case we implement huge mapping.
-> 
-> pud_free_pmd_page() and pmd_free_pte_page()
-> 
-> Some architectures (like arm64) needs to do proper TLB
-> maintanance after updating pagetable entry even in map.
-> Why ? Read this,
-> https://patchwork.kernel.org/patch/10134581/
+> Have you had a chance to look at the cachinfo parts of this patch?
 
-Please add that information to the changelog.
--- 
-Michal Hocko
-SUSE Labs
+Nope :)
+
+I didn't write that, and while it is dumped in the driver core section
+of the kernel, I know nothing about it.  If you get an ack from Sundeep
+for this, which you did, that's fine with me, merge away!
+
+thanks,
+
+greg k-h
