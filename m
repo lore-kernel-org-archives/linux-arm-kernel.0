@@ -1,154 +1,36 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 17 May 2018 10:10:21 +0530
-Subject: [PATCH v2] pinctrl: pinctrl-single: Add functions to save and restore
- pinctrl context
-Message-ID: <1526532021-16387-1-git-send-email-j-keerthy@ti.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Thu, 17 May 2018 13:00:47 +0800
+Subject: [PATCH] clk: imx6sx: disable unnecessary clocks during clock
+ initialization
+Message-ID: <1526533248-21990-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a pair of context save/restore functions to save/restore the
-state of a set of pinctrl registers. The context is lost during rtc only
-suspend with ddr in self-refresh on am43xx. Currently the save/restore
-is being done unconditionally. This will be optimized later with a
-pdata-quirk function which will allow is to save/restore only when doing
-the rtc only mode with ddr in self refresh.
+Disable those unnecessary clocks during kernel boot up to save power,
+those modules clock should be managed by modules driver in runtime.
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
+ drivers/clk/imx/clk-imx6sx.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-Changes in v2:
-
-  * As this is needed only the in the suspend/resume path
-    removed the cpu_pm notifier and added the save/restore in
-    the suspend/resume calls.
-  * Saving/Restoring unconditionally at the moment. This will
-    be optimized later with the help of a pdata-quirk function.
-
- drivers/pinctrl/pinctrl-single.c | 72 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 71 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index a7c5eb3..9c3c005 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -144,6 +144,7 @@ struct pcs_soc_data {
-  * struct pcs_device - pinctrl device instance
-  * @res:	resources
-  * @base:	virtual address of the controller
-+ * @saved_vals: saved values for the controller
-  * @size:	size of the ioremapped area
-  * @dev:	device entry
-  * @np:		device tree node
-@@ -172,11 +173,13 @@ struct pcs_soc_data {
- struct pcs_device {
- 	struct resource *res;
- 	void __iomem *base;
-+	void *saved_vals;
- 	unsigned size;
- 	struct device *dev;
- 	struct device_node *np;
- 	struct pinctrl_dev *pctl;
- 	unsigned flags;
-+#define PCS_CONTEXT_LOSS_OFF	(1 << 3)
- #define PCS_QUIRK_SHARED_IRQ	(1 << 2)
- #define PCS_FEAT_IRQ		(1 << 1)
- #define PCS_FEAT_PINCONF	(1 << 0)
-@@ -1576,6 +1579,67 @@ static int pcs_irq_init_chained_handler(struct pcs_device *pcs,
- }
- 
- #ifdef CONFIG_PM
-+static int pcs_save_context(struct pcs_device *pcs)
-+{
-+	int i, mux_bytes;
-+	u64 *regsl;
-+	u32 *regsw;
-+	u16 *regshw;
-+
-+	mux_bytes = pcs->width / BITS_PER_BYTE;
-+
-+	if (!pcs->saved_vals)
-+		pcs->saved_vals = devm_kzalloc(pcs->dev, pcs->size, GFP_ATOMIC);
-+
-+	switch (pcs->width) {
-+	case 64:
-+		regsl = (u64 *)pcs->saved_vals;
-+		for (i = 0; i < pcs->size / mux_bytes; i++)
-+			regsl[i] = pcs->read(pcs->base + i * mux_bytes);
-+		break;
-+	case 32:
-+		regsw = (u32 *)pcs->saved_vals;
-+		for (i = 0; i < pcs->size / mux_bytes; i++)
-+			regsw[i] = pcs->read(pcs->base + i * mux_bytes);
-+		break;
-+	case 16:
-+		regshw = (u16 *)pcs->saved_vals;
-+		for (i = 0; i < pcs->size / mux_bytes; i++)
-+			regshw[i] = pcs->read(pcs->base + i * mux_bytes);
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static void pcs_restore_context(struct pcs_device *pcs)
-+{
-+	int i, mux_bytes;
-+	u64 *regsl;
-+	u32 *regsw;
-+	u16 *regshw;
-+
-+	mux_bytes = pcs->width / BITS_PER_BYTE;
-+
-+	switch (pcs->width) {
-+	case 64:
-+		regsl = (u64 *)pcs->saved_vals;
-+		for (i = 0; i < pcs->size / mux_bytes; i++)
-+			pcs->write(regsl[i], pcs->base + i * mux_bytes);
-+		break;
-+	case 32:
-+		regsw = (u32 *)pcs->saved_vals;
-+		for (i = 0; i < pcs->size / mux_bytes; i++)
-+			pcs->write(regsw[i], pcs->base + i * mux_bytes);
-+		break;
-+	case 16:
-+		regshw = (u16 *)pcs->saved_vals;
-+		for (i = 0; i < pcs->size / mux_bytes; i++)
-+			pcs->write(regshw[i], pcs->base + i * mux_bytes);
-+		break;
-+	}
-+}
-+
- static int pinctrl_single_suspend(struct platform_device *pdev,
- 					pm_message_t state)
- {
-@@ -1585,6 +1649,9 @@ static int pinctrl_single_suspend(struct platform_device *pdev,
- 	if (!pcs)
- 		return -EINVAL;
- 
-+	if (pcs->flags & PCS_CONTEXT_LOSS_OFF)
-+		pcs_save_context(pcs);
-+
- 	return pinctrl_force_sleep(pcs->pctl);
- }
- 
-@@ -1596,6 +1663,9 @@ static int pinctrl_single_resume(struct platform_device *pdev)
- 	if (!pcs)
- 		return -EINVAL;
- 
-+	if (pcs->flags & PCS_CONTEXT_LOSS_OFF)
-+		pcs_restore_context(pcs);
-+
- 	return pinctrl_force_default(pcs->pctl);
- }
- #endif
-@@ -1824,7 +1894,7 @@ static int pcs_remove(struct platform_device *pdev)
+diff --git a/drivers/clk/imx/clk-imx6sx.c b/drivers/clk/imx/clk-imx6sx.c
+index 0178ee2..10c771b 100644
+--- a/drivers/clk/imx/clk-imx6sx.c
++++ b/drivers/clk/imx/clk-imx6sx.c
+@@ -97,12 +97,7 @@ static int const clks_init_on[] __initconst = {
+ 	IMX6SX_CLK_IPMUX1, IMX6SX_CLK_IPMUX2, IMX6SX_CLK_IPMUX3,
+ 	IMX6SX_CLK_WAKEUP, IMX6SX_CLK_MMDC_P0_FAST, IMX6SX_CLK_MMDC_P0_IPG,
+ 	IMX6SX_CLK_ROM, IMX6SX_CLK_ARM, IMX6SX_CLK_IPG, IMX6SX_CLK_OCRAM,
+-	IMX6SX_CLK_PER2_MAIN, IMX6SX_CLK_PERCLK, IMX6SX_CLK_M4,
+-	IMX6SX_CLK_QSPI1, IMX6SX_CLK_QSPI2, IMX6SX_CLK_UART_IPG,
+-	IMX6SX_CLK_UART_SERIAL, IMX6SX_CLK_I2C3, IMX6SX_CLK_ECSPI5,
+-	IMX6SX_CLK_CAN1_IPG, IMX6SX_CLK_CAN1_SERIAL, IMX6SX_CLK_CAN2_IPG,
+-	IMX6SX_CLK_CAN2_SERIAL, IMX6SX_CLK_CANFD, IMX6SX_CLK_EPIT1,
+-	IMX6SX_CLK_EPIT2,
++	IMX6SX_CLK_PER2_MAIN, IMX6SX_CLK_PERCLK, IMX6SX_CLK_TZASC1,
  };
  
- static const struct pcs_soc_data pinctrl_single_am437x = {
--	.flags = PCS_QUIRK_SHARED_IRQ,
-+	.flags = PCS_QUIRK_SHARED_IRQ | PCS_CONTEXT_LOSS_OFF,
- 	.irq_enable_mask = (1 << 29),   /* OMAP_WAKEUP_EN */
- 	.irq_status_mask = (1 << 30),   /* OMAP_WAKEUP_EVENT */
- };
+ static const struct clk_div_table clk_enet_ref_table[] = {
 -- 
-1.9.1
+2.7.4
