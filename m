@@ -1,19 +1,18 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 May 2018 17:41:44 +0100 (BST)
-Subject: Applied "regulator: of: add support for allowed modes configuration"
- to the regulator tree
-In-Reply-To: <58bb4f965515a67a6cbbc726b0d7b092c22b79d7.1526088289.git.collinsd@codeaurora.org>
-Message-ID: <20180517164144.0CD3D44007E@finisterre.ee.mobilebroadband>
+Date: Thu, 17 May 2018 17:38:43 +0100 (BST)
+Subject: Applied "ASoC: zte: remove duplicate includes" to the asoc tree
+In-Reply-To: <1512930723-5037-1-git-send-email-pravin.shedge4linux@gmail.com>
+Message-ID: <20180517163843.7AFDF44007E@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   regulator: of: add support for allowed modes configuration
+   ASoC: zte: remove duplicate includes
 
-has been applied to the regulator tree at
+has been applied to the asoc tree at
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,67 +33,33 @@ to this mail.
 Thanks,
 Mark
 
->From 54557ad9737e28b06b632cce723ef2373fe6bf12 Mon Sep 17 00:00:00 2001
-From: David Collins <collinsd@codeaurora.org>
-Date: Fri, 11 May 2018 18:46:47 -0700
-Subject: [PATCH] regulator: of: add support for allowed modes configuration
+>From 3439a083a13981f0da276cb2aeae84bd4e437b2e Mon Sep 17 00:00:00 2001
+From: Pravin Shedge <pravin.shedge4linux@gmail.com>
+Date: Mon, 11 Dec 2017 00:02:03 +0530
+Subject: [PATCH] ASoC: zte: remove duplicate includes
 
-Add support for configuring the machine constraints
-valid_modes_mask element based on a list of allowed modes
-specified via a device tree property.
+These duplicate includes have been found with scripts/checkincludes.pl but
+they have been removed manually to avoid removing false positives.
 
-Signed-off-by: David Collins <collinsd@codeaurora.org>
+Signed-off-by: Pravin Shedge <pravin.shedge4linux@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/regulator/of_regulator.c | 29 ++++++++++++++++++++++++++++-
- 1 file changed, 28 insertions(+), 1 deletion(-)
+ sound/soc/zte/zx-i2s.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
-index 0d3f73eacb99..d61fed28fdb9 100644
---- a/drivers/regulator/of_regulator.c
-+++ b/drivers/regulator/of_regulator.c
-@@ -32,7 +32,7 @@ static void of_get_regulation_constraints(struct device_node *np,
- 	struct regulator_state *suspend_state;
- 	struct device_node *suspend_np;
- 	unsigned int mode;
--	int ret, i;
-+	int ret, i, len;
- 	u32 pval;
+diff --git a/sound/soc/zte/zx-i2s.c b/sound/soc/zte/zx-i2s.c
+index b6b056c607fa..0d36630aa1a7 100644
+--- a/sound/soc/zte/zx-i2s.c
++++ b/sound/soc/zte/zx-i2s.c
+@@ -20,9 +20,6 @@
+ #include <sound/core.h>
+ #include <sound/dmaengine_pcm.h>
+ #include <sound/initval.h>
+-#include <sound/pcm.h>
+-#include <sound/pcm_params.h>
+-#include <sound/soc.h>
  
- 	constraints->name = of_get_property(np, "regulator-name", NULL);
-@@ -136,6 +136,33 @@ static void of_get_regulation_constraints(struct device_node *np,
- 		}
- 	}
- 
-+	len = of_property_count_elems_of_size(np, "regulator-allowed-modes",
-+						sizeof(u32));
-+	if (len > 0) {
-+		if (desc && desc->of_map_mode) {
-+			for (i = 0; i < len; i++) {
-+				ret = of_property_read_u32_index(np,
-+					"regulator-allowed-modes", i, &pval);
-+				if (ret) {
-+					pr_err("%s: couldn't read allowed modes index %d, ret=%d\n",
-+						np->name, i, ret);
-+					break;
-+				}
-+				mode = desc->of_map_mode(pval);
-+				if (mode == REGULATOR_MODE_INVALID)
-+					pr_err("%s: invalid regulator-allowed-modes element %u\n",
-+						np->name, pval);
-+				else
-+					constraints->valid_modes_mask |= mode;
-+			}
-+			if (constraints->valid_modes_mask)
-+				constraints->valid_ops_mask
-+					|= REGULATOR_CHANGE_MODE;
-+		} else {
-+			pr_warn("%s: mode mapping not defined\n", np->name);
-+		}
-+	}
-+
- 	if (!of_property_read_u32(np, "regulator-system-load", &pval))
- 		constraints->system_load = pval;
- 
+ #define ZX_I2S_PROCESS_CTRL	0x04
+ #define ZX_I2S_TIMING_CTRL	0x08
 -- 
 2.17.0
