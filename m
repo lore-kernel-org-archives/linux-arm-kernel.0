@@ -1,40 +1,50 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 17 May 2018 12:00:07 +0800
-Subject: [PATCH v3 08/14] media: v4l: Add definitions for MPEG2 frame
- format and header metadata
-In-Reply-To: <20180507124500.20434-9-paul.kocialkowski@bootlin.com>
-References: <20180507124500.20434-9-paul.kocialkowski@bootlin.com>
-Message-ID: <201805171117.7dfYXI2F%fengguang.wu@intel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 17 May 2018 09:44:48 +0530
+Subject: [PATCH] cpufreq: brcmstb-avs-cpufreq: sort frequencies in
+ ascending order
+In-Reply-To: <71309e94-90d4-2b58-729b-9ab488c6d554@gmail.com>
+References: <20180516034954.56475-1-code@mmayer.net>
+ <20180516043218.7ktq5vjq2rhcszz5@vireshk-i7>
+ <71309e94-90d4-2b58-729b-9ab488c6d554@gmail.com>
+Message-ID: <20180517041448.ceh4g5fs2qfqqojm@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florent,
+On 16-05-18, 12:24, Florian Fainelli wrote:
+> On 05/15/2018 09:32 PM, Viresh Kumar wrote:
+> > On 15-05-18, 20:49, Markus Mayer wrote:
+> >> From: Markus Mayer <mmayer@broadcom.com>
+> >>
+> >> Most CPUfreq drivers (at least on ARM) seem to be sorting the available
+> >> frequencies from lowest to highest. To match this behaviour, we reverse
+> >> the sorting order in brcmstb-avs-cpufreq, so it is now also lowest to
+> >> highest.
+> > 
+> > The reasoning isn't correct. Just because everyone else is doing it
+> > doesn't make it right and so you shouldn't change just because of
+> > that.
+> > 
+> > What you must written instead in the commit log is that the cpufreq
+> > core performs better if the table is sorted (in any order), and so we
+> > must sort it as well.
+> 
+> Is there a reason why set_freq_table_sorted() tries an ascending or
+> descending sort, but does not enforce one versus another for all drivers?
 
-Thank you for the patch! Perhaps something to improve:
+set_freq_table_sorted() doesn't sort the frequency table but checks if
+the table is already sorted in a particular order. And then
+cpufreq_frequency_table_target() is optimized based on this flag. We
+don't have to enforce any particular ordering here.
 
-[auto build test WARNING on linuxtv-media/master]
-[also build test WARNING on v4.17-rc5 next-20180516]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> > But I feel the table is already sorted for your platform, isn't it?
+> > And I don't see a clear advantage of merging this patch.
+> 
+> The patch changes the order to have the lowest to highest, whereas the
+> current implementation has them from highest to lowest. From what you
+> are saying, it sounds like this is unnecessary, since the sorting is
+> already making things efficient enough, so this is just a cosmetic thing?
 
-url:    https://github.com/0day-ci/linux/commits/Paul-Kocialkowski/Sunxi-Cedrus-driver-for-the-Allwinner-Video-Engine-using-media-requests/20180508-004955
-base:   git://linuxtv.org/media_tree.git master
-config: x86_64-acpi-redef (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+Right. It shouldn't make any performance improvements.
 
-All warnings (new ones prefixed by >>):
-
->> ./usr/include/linux/v4l2-controls.h:1082: found __[us]{8,16,32,64} type without #include <linux/types.h>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 30376 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/fa20e902/attachment-0001.gz>
+-- 
+viresh
