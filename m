@@ -1,45 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 May 2018 18:23:08 +0100
-Subject: [PATCH v8 09/24] ASoC: qdsp6: q6afe: Add q6afe driver
-In-Reply-To: <507b8b76-0846-a492-73e6-782b9953bc36@linaro.org>
-References: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
- <20180509125635.5653-10-srinivas.kandagatla@linaro.org>
- <20180517065544.GO20254@sirena.org.uk>
- <507b8b76-0846-a492-73e6-782b9953bc36@linaro.org>
-Message-ID: <20180517172308.GX20254@sirena.org.uk>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 17 May 2018 18:25:31 +0100
+Subject: [PATCH RFC 3/6] hwmon: Add support for RPi voltage sensor
+In-Reply-To: <20180517164320.GA30364@roeck-us.net>
+References: <1526477827-10859-1-git-send-email-stefan.wahren@i2se.com>
+ <1526477827-10859-4-git-send-email-stefan.wahren@i2se.com>
+ <20180516182144.GB22705@roeck-us.net>
+ <1560428919.21731.1526500741266@email.1und1.de>
+ <20180517164320.GA30364@roeck-us.net>
+Message-ID: <87sh6qdwj8.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 06:10:49PM +0100, Srinivas Kandagatla wrote:
-> On 17/05/18 07:55, Mark Brown wrote:
-> > On Wed, May 09, 2018 at 01:56:20PM +0100, Srinivas Kandagatla wrote:
+Guenter Roeck <linux@roeck-us.net> writes:
 
-> > This lock only protects the list, it does nothing to ensure that the
-> > port we look up is still valid by the time we return to the caller.
-> > That means we won't crash during list traversal but does nothing to
-> > ensure we won't crash immediately afterwards if the port is deallocated
-> > just after we look it up.  What stops that happening?
+> On Wed, May 16, 2018 at 09:59:01PM +0200, Stefan Wahren wrote:
+>> Hi Guenter,
+>> 
+>> > Guenter Roeck <linux@roeck-us.net> hat am 16. Mai 2018 um 20:21 geschrieben:
+>> > 
+>> > 
+>> > On Wed, May 16, 2018 at 03:37:04PM +0200, Stefan Wahren wrote:
+>> > > Currently there is no easy way to detect under-voltage conditions on a remote
+>> > > Raspberry Pi. This hwmon driver retrieves the state of the under-voltage sensor
+>> > > via mailbox interface. The handling based on Noralf's modifications to the
+>> > > downstream firmware driver. In case of an under-voltage condition only an entry
+>> > > is written to the kernel log.
+>> > > 
+>> > 
+>> > My major concern is how this is displayed with the 'sensors' command.
+>> > Can you test and report ?
+>> 
+>> I get the following output:
+>> rpi_volt-isa-0000
+>> Adapter: ISA adapter
+>> in0:              N/A  
+>> 
+> Ok, that works.
 
-> Each port is allocated and de-allocated in dai probe and remove calls
-> respectively.
-
-> Lets say... So for this case to happen the dai has to be removed (unload
-> module) at the same time when the interrupt callback happens due to delayed
-> response from previous commands.
-
-> This case would be almost impossible because all the calls to afe service
-> are synchronous with timeouts, if any of the previous calls times out the
-> respective caller would get an error, this should prevent him from unloading
-> the module in the first place.
-
-The user can also trigger manual unbinds without unloading the module,
-and to be honet the scenario where the DSP has stopped responding well
-and is delaying responses sounds like exactly the sort of time when
-users might try to reload the driver...
+Thanks for the quick review on this, Guenter!  This driver is going to
+help save a lot of people debugging time on rpis in the upstream kernel.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 488 bytes
+Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/98b47dad/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/f9ce6988/attachment.sig>
