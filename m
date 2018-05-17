@@ -1,33 +1,91 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 17 May 2018 15:39:24 +0200
-Subject: [PATCH v3 07/12] ACPI / APEI: Make the nmi_fixmap_idx per-ghes
- to allow multiple in_nmi() users
-In-Reply-To: <39bde8c5-4dfb-c1b9-02a4-ba467539ea24@codeaurora.org>
-References: <20180427153510.5799-1-james.morse@arm.com>
- <20180427153510.5799-8-james.morse@arm.com>
- <20180505122719.GE3708@pd.tnic>
- <1511cfcc-dcd1-b3c5-01c7-6b6b8fb65b05@arm.com>
- <20180516110348.GA17092@pd.tnic>
- <39bde8c5-4dfb-c1b9-02a4-ba467539ea24@codeaurora.org>
-Message-ID: <20180517133924.GB27738@pd.tnic>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Thu, 17 May 2018 16:41:11 +0300
+Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
+In-Reply-To: <CAMuHMdX5quhZzaPkcrtB4CuHWeaKsyF1SustjB9V0SWw_SzXVg@mail.gmail.com>
+References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
+ <1526387370-17142-4-git-send-email-gilad@benyossef.com>
+ <CAMuHMdWzeNqsho1V6ezZb81T3_HcRzrtuQpmGXsjtFgt9BtZDQ@mail.gmail.com>
+ <20180516074333.i2672u435ymwffk3@verge.net.au>
+ <CAOtvUMfFjokOLCg6aHNQESJ_q4Jiok3izrPtae5wR+cND=XL6g@mail.gmail.com>
+ <CAMuHMdVM55S7+PdnKusX-qkTxioc=0kQ6EGSbwv+kbLk5RCUYw@mail.gmail.com>
+ <CAOtvUMdVNX_vBRofpc5rNiVL-a1NvWMDyWSOaXKYPkm57wkR_A@mail.gmail.com>
+ <CAMuHMdX5quhZzaPkcrtB4CuHWeaKsyF1SustjB9V0SWw_SzXVg@mail.gmail.com>
+Message-ID: <CAOtvUMee+cn+=bEuB5iBiU9yeSsCiDPDwej8Uw-_3wVP4fagpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 11:38:16AM -0400, Tyler Baicar wrote:
-> I haven't seen a deadlock from that, but it looks possible. What if
-> the ghes_proc() call in ghes_probe() is moved before the second switch
-> statement? That way it is before the NMI/IRQ/poll is setup. At quick
-> glance I think that should avoid the deadlock and still provide the
-> functionality that call was added for. I can test that out if you all
-> agree.
+On Thu, May 17, 2018 at 4:35 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Gilad,
+>
+> On Thu, May 17, 2018 at 3:09 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+>> On Thu, May 17, 2018 at 1:16 PM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>>> However, even with your clock patch, the signature checking fails for me,
+>>> on both R-Car H3 ES1.0 and ES2.0.
+>>> Does this need changes to the ARM Trusted Firmware, to allow Linux to
+>>> access the public SCEG module?
+>>
+>> Well, this is actually something different. If you look you will
+>> notice that my patch was part of a 3 part patch series,
+>> the first of which disabled this test.
+>
+> Sorry, I had completely forgotten about the first patch from the series.
+> With that applied, it continues:
+>
+>         ccree e6601000.crypto: ARM CryptoCell 630P Driver: HW version
+> 0x00000000, Driver version 4.0
+>         ccree e6601000.crypto: Cache params previous: 0x00000777
+>         ccree e6601000.crypto: Cache params current: 0x00000000
+> (expect: 0x00000000)
+>         alg: No test for cts1(cbc(aes)) (cts1-cbc-aes-ccree)
+>         alg: No test for authenc(xcbc(aes),cbc(aes))
+> (authenc-xcbc-aes-cbc-aes-ccree)
+>         alg: No test for authenc(xcbc(aes),rfc3686(ctr(aes)))
+> (authenc-xcbc-aes-rfc3686-ctr-aes-ccree)
+>         ccree e6601000.crypto: ARM ccree device initialized
+>
+> Is HW version 0x00000000 expected?
 
-Makes sense but please audit it properly before doing the change. That
-code is full of landmines and could use a proper scrubbing first.
+It's related to the problem with reading the wrong register I've
+mentioned before.
 
-Thx.
+>
+>> If you take all the 3 patches, it will work.
+>
+> is there an easy way to test proper operation?
+
+The lines of the form "  alg: No test for cts1(cbc(aes))
+(cts1-cbc-aes-ccree)" indicates
+you have the Crypto API testmgr enable (or rather not disabled would
+be more accurate) so every
+cryptographic algorithm except those specified in these messages was
+tested with test
+vectors from crypto/testmgr.c upon registration. If you don't seen
+failure warnings, it works.
+
+You can also check /proc/crypto for all the algorithm with ccree
+listed as their driver and check
+that their test passed.
+
+
+> I enabled CONFIG_CRYPT_TEST, and did insmod tcrypt.ko, but I mostly see
+> "Failed to load transform" messages.
+>
+
+tcrypt.ko is a rather crude developer tool. It has hard coded lists of
+test for different algorithms that does
+not take into account if some crypto algs are enagled in the build or
+not. It's more of a stress test.
+
+
+Gilad
+
 
 -- 
-Regards/Gruss,
-    Boris.
+Gilad Ben-Yossef
+Chief Coffee Drinker
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+"If you take a class in large-scale robotics, can you end up in a
+situation where the homework eats your dog?"
+ -- Jean-Baptiste Queru
