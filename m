@@ -1,70 +1,84 @@
-From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Thu, 17 May 2018 10:34:06 +0300
-Subject: [PATCH 1/1] ARM:dts:sunxi: Add Olimex A20-SOM-EVB-eMMC board
-In-Reply-To: <96201051.35560.1526541952287@email.1und1.de>
-References: <1526470689-6275-1-git-send-email-stefan@olimex.com>
- <96201051.35560.1526541952287@email.1und1.de>
-Message-ID: <7ad11904-be61-a459-f2be-ff37fcd02402@olimex.com>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Thu, 17 May 2018 10:50:34 +0300
+Subject: [PATCH v7 12/14] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <20180516141132.aqjif7d5motmmnlo@vireshk-i7>
+References: <1526375616-16904-1-git-send-email-ilialin@codeaurora.org>
+ <1526375616-16904-13-git-send-email-ilialin@codeaurora.org>
+ <CAHLCerOYq4q2GE+m3MQAbMfxM4azPr95XiLKVtoPVG1Kv2Db=A@mail.gmail.com>
+ <20180516141132.aqjif7d5motmmnlo@vireshk-i7>
+Message-ID: <017601d3edb3$c0d96d40$428c47c0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2018 10:25 AM, Stefan Wahren wrote:
-> Hi Stefan,
->
->> Stefan Mavrodiev <stefan@olimex.com> hat am 16. Mai 2018 um 13:38 geschrieben:
->>
->>
->> With the new rev.E of A20-SOM-EVB, there is option for 16GB eMMC.
->> Currently used card is KLMAG2GEND, wired to MMC2 slot.
->>
->> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
->> ---
->>   arch/arm/boot/dts/Makefile                         |  1 +
->>   .../arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts | 37 ++++++++++++++++++++++
->>   2 files changed, 38 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 1db91ec..7f1ee65 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -959,6 +959,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>   	sun7i-a20-m3.dtb \
->>   	sun7i-a20-mk808c.dtb \
->>   	sun7i-a20-olimex-som-evb.dtb \
->> +	sun7i-a20-olimex-som-evb-emmc.dtb \
->>   	sun7i-a20-olimex-som204-evb.dtb \
->>   	sun7i-a20-olimex-som204-evb-emmc.dtb \
->>   	sun7i-a20-olinuxino-lime.dtb \
->> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts
->> new file mode 100644
->> index 0000000..81ebc97
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts
->> @@ -0,0 +1,37 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->> +/*
->> + * Device Tree Source for A20-Olimex-SOM-EVB-eMMC Board
->> + *
->> + * Copyright (C) 2018 Olimex Ltd.
->> + *   Author: Stefan Mavrodiev <stefan@olimex.com>
->> + */
->> +
->> +/dts-v1/;
->> +#include "sun7i-a20-olimex-som-evb.dts"
->> +
->> +/ {
->> +
->> +	model = "Olimex A20-Olimex-SOM-EVB-eMMC";
->> +	compatible = "olimex,a20-olimex-som-evb-emmc", "allwinner,sun7i-a20";
-> the file Documentation/devicetree/bindings/arm/olimex.txt seems to be out of date. I cannot find any recent board compatible.
->
-> Didn't checkpatch complain about it?
-Yes it did. I didn't get is seriously because neither Olimex A20 based 
-board is documented in the binding.
->
-> Regards
-> Stefan
 
-Regards,
-Stefan Mavrodiev
+
+> -----Original Message-----
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Sent: Wednesday, May 16, 2018 17:12
+> To: Amit Kucheria <amit.kucheria@linaro.org>
+> Cc: Ilia Lin <ilialin@codeaurora.org>; Michael Turquette
+> <mturquette@baylibre.com>; sboyd at kernel.org; Rob Herring
+> <robh@kernel.org>; Mark Rutland <mark.rutland@arm.com>; nm at ti.com;
+> lgirdwood at gmail.com; broonie at kernel.org; Andy Gross
+> <andy.gross@linaro.org>; David Brown <david.brown@linaro.org>;
+> catalin.marinas at arm.com; will.deacon at arm.com; Rafael J. Wysocki
+> <rjw@rjwysocki.net>; linux-clk at vger.kernel.org;
+> devicetree at vger.kernel.org; LKML <linux-kernel@vger.kernel.org>; Linux
+> PM list <linux-pm@vger.kernel.org>; linux-arm-msm at vger.kernel.org; linux-
+> soc at vger.kernel.org; lakml <linux-arm-kernel@lists.infradead.org>;
+> Rajendra Nayak <rnayak@codeaurora.org>; nicolas.dechesne at linaro.org;
+> celster at codeaurora.org; tfinkel at codeaurora.org
+> Subject: Re: [PATCH v7 12/14] cpufreq: Add Kryo CPU scaling driver
+> 
+> On 16-05-18, 16:12, Amit Kucheria wrote:
+> > > +       ret = PTR_ERR_OR_ZERO(opp_temp =
+> > > +
+> dev_pm_opp_set_supported_hw(cpu_dev,&versions,1));
+> > > +       if (0 > ret)
+> >
+> > Any particular reason to prefer this over (ret < 0) that is generally
+> > used? I've seen it used to avoid the == vs. = typos, but not for other
+> > comparisons.
+> >
+> > Suggest sticking to what is commonly used i.e. ret < 0.
+> >
+> > > +               goto free_opp;
+> > > +
+> > > +       cpu_dev = get_cpu_device(GOLD_LEAD);
+> >
+> > Error check cpu_dev here?
+> >
+> > > +       ret = PTR_ERR_OR_ZERO(opp_temp =
+> > > +
+> dev_pm_opp_set_supported_hw(cpu_dev,&versions,1));
+> > > +       if (0 > ret)
+> > > +               goto free_opp;
+> 
+> The goto here is wrong
+
+If we are here, then the first dev_pm_opp_set_supported_hw() succeeded. And
+should be deallocated before exit with error.
+
+> 
+> > > +
+> > > +
+> > > +       ret =
+> PTR_ERR_OR_ZERO(platform_device_register_simple("cpufreq-dt",
+> > > +                                                             -1,
+> > > + NULL, 0));
+> > > +
+> > > +       if (0 == ret)
+> > > +               return 0;
+> > > +
+> > > +free_opp:
+> > > +       dev_pm_opp_put_supported_hw(opp_temp);
+> >
+> > This is not needed because dev_pm_opp_set_supported_hw will free
+> > memory in case of failure. This call in only needed in case of a
+> > successful get.
+> 
+> But this is still required for the case where platform device registration
+fails.
+> 
+> --
+> viresh
