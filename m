@@ -1,41 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 May 2018 18:04:36 +0200
-Subject: [GIT PULL] arm64: tegra: Device tree fixes for v4.17
-Message-ID: <20180517160436.12180-1-thierry.reding@gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 17 May 2018 17:03:53 +0100
+Subject: [PATCH] soc: qcom: apr: fix invalid msg_type check
+Message-ID: <20180517160353.27561-1-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+Removed invalid msg_type check.
+This also fixes below static checker warning:
+apr.c:95:35: warning: comparison is always true due to limited range of
+ data type [-Wtype-limits]
+warn: always true condition '(msg_type != 69864) => (0-u16max != 69864)'
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-fixes-2
-
-for you to fetch changes up to 9df50ba76ac1485b844beffa1f3f5d9659d9cdaf:
-
-  arm64: tegra: Make BCM89610 PHY interrupt as active low (2018-05-03 11:48:16 +0200)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-arm64: tegra: Device tree fixes for v4.17
-
-This contains a one-line update to the device tree of the Tegra186 P3310
-processor module, fixing the polarity of the PHY interrupt. Originally,
-this was queued to go into v4.18, but the PHY ID matching patch has now
-found its way into v4.17-rc5, which means that the PHY driver will know
-how to identify the PHY on this board and try to use the interrupt. This
-will unfortunately cause networking to break on P3310, hence why I think
-this should go into v4.17.
-
-----------------------------------------------------------------
-Bhadram Varka (1):
-      arm64: tegra: Make BCM89610 PHY interrupt as active low
-
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 2 +-
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/soc/qcom/apr.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/qcom/apr.c b/drivers/soc/qcom/apr.c
+index 97f3622da535..57af8a537332 100644
+--- a/drivers/soc/qcom/apr.c
++++ b/drivers/soc/qcom/apr.c
+@@ -92,7 +92,7 @@ static int apr_callback(struct rpmsg_device *rpdev, void *buf,
+ 	}
+ 
+ 	msg_type = APR_HDR_FIELD_MT(hdr->hdr_field);
+-	if (msg_type >= APR_MSG_TYPE_MAX && msg_type != APR_BASIC_RSP_RESULT) {
++	if (msg_type >= APR_MSG_TYPE_MAX) {
+ 		dev_err(apr->dev, "APR: Wrong message type: %d\n", msg_type);
+ 		return -EINVAL;
+ 	}
+-- 
+2.16.2
