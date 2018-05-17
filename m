@@ -1,35 +1,55 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 17 May 2018 18:09:34 +0100
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <alpine.DEB.2.21.1805171233500.7984@macbook-air>
-References: <20180517131727.29263-1-eric@anholt.net>
- <1412187220.62585.1526572780332@email.1und1.de>
- <alpine.DEB.2.21.1805171233500.7984@macbook-air>
-Message-ID: <877eo2mcoh.fsf@anholt.net>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 17 May 2018 18:10:49 +0100
+Subject: [PATCH v8 09/24] ASoC: qdsp6: q6afe: Add q6afe driver
+In-Reply-To: <20180517065544.GO20254@sirena.org.uk>
+References: <20180509125635.5653-1-srinivas.kandagatla@linaro.org>
+ <20180509125635.5653-10-srinivas.kandagatla@linaro.org>
+ <20180517065544.GO20254@sirena.org.uk>
+Message-ID: <507b8b76-0846-a492-73e6-782b9953bc36@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vince Weaver <vincent.weaver@maine.edu> writes:
+Thanks for the review.
 
-> On Thu, 17 May 2018, Stefan Wahren wrote:
->
->> 
->> > Eric Anholt <eric@anholt.net> hat am 17. Mai 2018 um 15:17 geschrieben:
->> > 
->> > 
->> > The a53 and a7 counters seem to match up, so we advertise a7 so that
->> > arm32 can probe.
->
-> so how closely did you look at the a53/a7 differences?  I see some major 
-> differences, especially with the CPU_CYCLES event (0xff vs 0x11).
+On 17/05/18 07:55, Mark Brown wrote:
+> On Wed, May 09, 2018 at 01:56:20PM +0100, Srinivas Kandagatla wrote:
+> 
+>> +static struct q6afe_port *afe_find_port(struct q6afe *afe, int token)
+>> +{
+>> +	struct q6afe_port *p = NULL;
+>> +	struct q6afe_port *ret = NULL;
+>> +	unsigned long flags;
+>> +
+>> +	spin_lock_irqsave(&afe->port_list_lock, flags);
+>> +	list_for_each_entry(p, &afe->port_list, node)
+>> +		if (p->token == token) {
+>> +			ret = p;
+>> +			break;
+>> +		}
+>> +
+>> +	spin_unlock_irqrestore(&afe->port_list_lock, flags);
+>> +	return ret;
+> 
+> This lock only protects the list, it does nothing to ensure that the
+> port we look up is still valid by the time we return to the caller.
+> That means we won't crash during list traversal but does nothing to
+> ensure we won't crash immediately afterwards if the port is deallocated
+> just after we look it up.  What stops that happening?
 
-I'm a bit lost in the code, but it seemed like the 0xff was a
-placeholder for a bit of special behavior, but that the cpu_cycles ->
-ARMV7_PERFCTR_CLOCK_CYCLES mapping got you that same value in the end.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/24fefc2e/attachment-0001.sig>
+Each port is allocated and de-allocated in dai probe and remove calls 
+respectively.
+
+Lets say... So for this case to happen the dai has to be removed (unload 
+module) at the same time when the interrupt callback happens due to 
+delayed response from previous commands.
+
+This case would be almost impossible because all the calls to afe 
+service are synchronous with timeouts, if any of the previous calls 
+times out the respective caller would get an error, this should prevent 
+him from unloading the module in the first place.
+
+
+thanks,
+srini
+
+> 
