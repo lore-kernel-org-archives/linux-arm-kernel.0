@@ -1,56 +1,73 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Thu, 17 May 2018 09:23:07 +0300
-Subject: [PATCH] PCI: Clean up resource allocation in
- devm_of_pci_get_host_bridge_resources()
-In-Reply-To: <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
-References: <cover.1526375226.git.jan.kiszka@siemens.com>
- <3aeb2ed038cbce8fe744b614dc19d414555a7e8f.1526375226.git.jan.kiszka@siemens.com>
- <CAHp75VeUbjobse6uLeM4h_xXRUw+YUQUN+EOye67AJy77a5euQ@mail.gmail.com>
- <CAHp75VeM7_8+9QJjOypXaiBhpWP4B5KACdUQ-p3frbS3jPh=OQ@mail.gmail.com>
- <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
-Message-ID: <97f42f4a-071a-4335-ca65-a0f26adc1b89@mentor.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 17 May 2018 07:36:40 +0100
+Subject: [PATCH 1/5] dt-bindings: pinctrl: document the STMFX pinctrl
+ bindings
+In-Reply-To: <b9005dd8-8214-ceab-0f88-ff1a51b44e34@st.com>
+References: <1523440025-18077-1-git-send-email-amelie.delaunay@st.com>
+ <1523440025-18077-2-git-send-email-amelie.delaunay@st.com>
+ <20180416181940.4b5z4svbde3ompij@rob-hp-laptop>
+ <CACRpkdYOMjjYyWQz7PK34jqUK7z5-CmH1HY6un4k8nBn7Cq8ag@mail.gmail.com>
+ <55392fe7-20d2-9447-60f9-4bd226b60195@st.com>
+ <CACRpkda2VGo0FOdR09tKiTpg66NgoWjubaHp_J3372y=a772Zg@mail.gmail.com>
+ <b9005dd8-8214-ceab-0f88-ff1a51b44e34@st.com>
+Message-ID: <20180517063640.GK5130@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2018 03:31 PM, Jan Kiszka wrote:
-> Instead of first allocating and then freeing memory for struct resource
-> in case we cannot parse a PCI resource from the device tree, work
-> against a local struct and kmemdup it when we decide to go with it.
+On Wed, 16 May 2018, Amelie DELAUNAY wrote:
+
 > 
-> Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> ---
->  drivers/pci/of.c | 14 ++++++--------
->  1 file changed, 6 insertions(+), 8 deletions(-)
 > 
-> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-> index b06585a1da75..fc0f906c5c25 100644
-> --- a/drivers/pci/of.c
-> +++ b/drivers/pci/of.c
-> @@ -266,7 +266,7 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
->  			struct list_head *resources, resource_size_t *io_base)
->  {
->  	struct device_node *dev_node = dev->of_node;
-> -	struct resource *res;
-> +	struct resource *res, tmp_res;
->  	struct resource *bus_range;
->  	struct of_pci_range range;
->  	struct of_pci_range_parser parser;
-> @@ -320,18 +320,16 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
->  		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
->  			continue;
->  
-> -		res = devm_kzalloc(dev, sizeof(struct resource), GFP_KERNEL);
-> +		err = of_pci_range_to_resource(&range, dev_node, &tmp_res);
-> +		if (err)
-> +			continue;
-> +
-> +		res = devm_kmemdup(dev, &tmp_res, sizeof(tmp_res), GFP_KERNEL);
+> On 05/16/2018 04:20 PM, Linus Walleij wrote:
+> > On Wed, May 9, 2018 at 9:56 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+> > 
+> >> Indeed, stmfx has other functions than GPIO. But, after comments done
+> >> here: [1] and there: [2], it has been decided to move MFD parent/GPIO
+> >> child drivers into a single PINCTRL/GPIO driver because of the following
+> >> reasons:
+> >> - Other stmfx functions (IDD measurement and TouchScreen controller) are
+> >> not used on any of the boards using an stmfx and supported by Linux, so
+> >> no way to test these functions, and no need to maintain them while they
+> >> are not being used.
+> >> - But, in the case a new board will use more than GPIO function on
+> >> stmfx, the actual implementation allow to easily extract common init
+> >> part of stmfx and put it in an MFD driver.
+> >>
+> >> So I could remove gpio sub-node and put its contents in stmfx node and
+> >> keep single PINCTRL/GPIO driver for the time being.
+> >> Please advise,
+> > 
+> > I would normally advice to use the right modeling from the start, create
+> > the MFD driver and spawn the devices from there. It is confusing
+> > if the layout of the driver(s) doesn't really match the layout of the
+> > hardware.
+> > 
+> > I understand that it is a pain to write new MFD drivers to get your
+> > things going and it would be "nice to get this working really quick
+> > now" but in my experience it is better to do it right from the start.
+> > 
+> 
+> Hi Linus,
+> 
+> Thanks for your advice. I understand the point.
+> So, the right modeling would be to:
+> - create an MFD driver with the common init part of stmfx
+> - remove all common init part of stmfx-pinctrl driver and keep only all 
+> gpio/pinctrl functions.
+> 
+> I will not develop the other stmfx functions (IDD measurement driver and 
+> TouchScreen controller driver) because, as explained ealier, they are 
+> not used on any of the boards using an stmfx and supported by Linux, so 
+> no way to test these functions, and no need to maintain them while they 
+> are not being used.
+> 
+> Lee, are you OK with that ?
 
-The change looks okay, apparently probable garbage in tmp_res.desc has no impact.
+I missed a lot of this conversation I think, but from what I've read,
+it sounds fine.
 
-Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-
---
-With best wishes,
-Vladimir
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
