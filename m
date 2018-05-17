@@ -1,124 +1,56 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Thu, 17 May 2018 09:14:33 +0100
-Subject: [PATCH 1/8] firmware: arm_scmi: improve code readability using
- bitfield accessor macros
-In-Reply-To: <1525885634-22348-2-git-send-email-sudeep.holla@arm.com>
-References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
- <1525885634-22348-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20180517091433.0000513b@huawei.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 17 May 2018 09:17:44 +0100
+Subject: [PATCH] KVM: arm/arm64: add WARN_ON if size is not PAGE_SIZE
+ aligned in unmap_stage2_range
+In-Reply-To: <1526537487-14804-1-git-send-email-hejianet@gmail.com>
+References: <1526537487-14804-1-git-send-email-hejianet@gmail.com>
+Message-ID: <698b0355-d430-86b8-cd09-83c6d9e566f8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 May 2018 18:07:07 +0100
-Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-> By using FIELD_{FIT,GET,PREP} and GENMASK macro accessors we can avoid
-> some clumpsy custom shifting and masking macros and also improve the
-> code better readability.
+Hi Jia,
+
+On 17/05/18 07:11, Jia He wrote:
+> I ever met a panic under memory pressure tests(start 20 guests and run
+> memhog in the host).
+
+Please avoid using "I" in the commit description and preferably stick to
+an objective description.
+
 > 
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Hi Sudeep,
+> The root cause might be what I fixed at [1]. But from arm kvm points of
+> view, it would be better we caught the exception earlier and clearer.
+> 
+> If the size is not PAGE_SIZE aligned, unmap_stage2_range might unmap the
+> wrong(more or less) page range. Hence it caused the "BUG: Bad page
+> state"
 
-A minor comment inline.
+I don't see why we should ever panic with a "positive" size value. Anyways,
+the unmap requests must be in units of pages. So this check might be useful.
 
-Jonathan
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
+> 
+> [1] https://lkml.org/lkml/2018/5/3/1042
+> 
+> Signed-off-by: jia.he at hxt-semitech.com
 > ---
->  drivers/firmware/arm_scmi/common.h |  9 +++++----
->  drivers/firmware/arm_scmi/driver.c | 31 ++++++++++++++-----------------
->  2 files changed, 19 insertions(+), 21 deletions(-)
+>   virt/kvm/arm/mmu.c | 2 ++
+>   1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
-> index 0c30234f9098..e8f332c9c469 100644
-> --- a/drivers/firmware/arm_scmi/common.h
-> +++ b/drivers/firmware/arm_scmi/common.h
-> @@ -7,6 +7,7 @@
->   * Copyright (C) 2018 ARM Ltd.
->   */
->  
-> +#include <linux/bitfield.h>
->  #include <linux/completion.h>
->  #include <linux/device.h>
->  #include <linux/errno.h>
-> @@ -14,10 +15,10 @@
->  #include <linux/scmi_protocol.h>
->  #include <linux/types.h>
->  
-> -#define PROTOCOL_REV_MINOR_BITS	16
-> -#define PROTOCOL_REV_MINOR_MASK	((1U << PROTOCOL_REV_MINOR_BITS) - 1)
-> -#define PROTOCOL_REV_MAJOR(x)	((x) >> PROTOCOL_REV_MINOR_BITS)
-> -#define PROTOCOL_REV_MINOR(x)	((x) & PROTOCOL_REV_MINOR_MASK)
-> +#define PROTOCOL_REV_MINOR_MASK	GENMASK(15, 0)
-> +#define PROTOCOL_REV_MAJOR_MASK	GENMASK(31, 16)
-> +#define PROTOCOL_REV_MAJOR(x)	(u16)(FIELD_GET(PROTOCOL_REV_MAJOR_MASK, (x)))
-> +#define PROTOCOL_REV_MINOR(x)	(u16)(FIELD_GET(PROTOCOL_REV_MINOR_MASK, (x)))
->  #define MAX_PROTOCOLS_IMP	16
->  #define MAX_OPPS		16
->  
-> diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-> index 14b147135a0c..917786d91f55 100644
-> --- a/drivers/firmware/arm_scmi/driver.c
-> +++ b/drivers/firmware/arm_scmi/driver.c
-> @@ -29,16 +29,12 @@
->  
->  #include "common.h"
->  
-> -#define MSG_ID_SHIFT		0
-> -#define MSG_ID_MASK		0xff
-> -#define MSG_TYPE_SHIFT		8
-> -#define MSG_TYPE_MASK		0x3
-> -#define MSG_PROTOCOL_ID_SHIFT	10
-> -#define MSG_PROTOCOL_ID_MASK	0xff
-> -#define MSG_TOKEN_ID_SHIFT	18
-> -#define MSG_TOKEN_ID_MASK	0x3ff
-> -#define MSG_XTRACT_TOKEN(header)	\
-> -	(((header) >> MSG_TOKEN_ID_SHIFT) & MSG_TOKEN_ID_MASK)
-> +#define MSG_ID_MASK		GENMASK(7, 0)
-> +#define MSG_TYPE_MASK		GENMASK(9, 8)
-> +#define MSG_PROTOCOL_ID_MASK	GENMASK(17, 10)
-> +#define MSG_TOKEN_ID_MASK	GENMASK(27, 18)
-> +#define MSG_XTRACT_TOKEN(hdr)	FIELD_GET(MSG_TOKEN_ID_MASK, (hdr))
-> +#define MSG_TOKEN_MAX		(MSG_XTRACT_TOKEN(MSG_TOKEN_ID_MASK) + 1)
-
-This feels a little odd. It's not the Max value, I think, but rather one more than
-it. I would set it to this -1 and use > than in the test below.
-
->  
->  enum scmi_error_codes {
->  	SCMI_SUCCESS = 0,	/* Success */
-> @@ -255,9 +251,9 @@ static void scmi_rx_callback(struct mbox_client *cl, void *m)
->   */
->  static inline u32 pack_scmi_header(struct scmi_msg_hdr *hdr)
->  {
-> -	return ((hdr->id & MSG_ID_MASK) << MSG_ID_SHIFT) |
-> -	   ((hdr->seq & MSG_TOKEN_ID_MASK) << MSG_TOKEN_ID_SHIFT) |
-> -	   ((hdr->protocol_id & MSG_PROTOCOL_ID_MASK) << MSG_PROTOCOL_ID_SHIFT);
-> +	return FIELD_PREP(MSG_ID_MASK, hdr->id) |
-> +		FIELD_PREP(MSG_TOKEN_ID_MASK, hdr->seq) |
-> +		FIELD_PREP(MSG_PROTOCOL_ID_MASK, hdr->protocol_id);
->  }
->  
->  /**
-> @@ -621,9 +617,9 @@ static int scmi_xfer_info_init(struct scmi_info *sinfo)
->  	struct scmi_xfers_info *info = &sinfo->minfo;
->  
->  	/* Pre-allocated messages, no more than what hdr.seq can support */
-> -	if (WARN_ON(desc->max_msg >= (MSG_TOKEN_ID_MASK + 1))) {
-> -		dev_err(dev, "Maximum message of %d exceeds supported %d\n",
-> -			desc->max_msg, MSG_TOKEN_ID_MASK + 1);
-> +	if (WARN_ON(desc->max_msg >= MSG_TOKEN_MAX)) {
-
-> +		dev_err(dev, "Maximum message of %d exceeds supported %ld\n",
-> +			desc->max_msg, MSG_TOKEN_MAX);
->  		return -EINVAL;
->  	}
->  
-> @@ -840,7 +836,8 @@ static int scmi_probe(struct platform_device *pdev)
->  		if (of_property_read_u32(child, "reg", &prot_id))
->  			continue;
->  
-> -		prot_id &= MSG_PROTOCOL_ID_MASK;
-> +		if (!FIELD_FIT(MSG_PROTOCOL_ID_MASK, prot_id))
-> +			dev_err(dev, "Out of range protocol %d\n", prot_id);
->  
->  		if (!scmi_is_protocol_implemented(handle, prot_id)) {
->  			dev_err(dev, "SCMI protocol %d not implemented\n",
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 7f6a944..8dac311 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -297,6 +297,8 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>   	phys_addr_t next;
+>   
+>   	assert_spin_locked(&kvm->mmu_lock);
+> +	WARN_ON(size & ~PAGE_MASK);
+> +
+>   	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+>   	do {
+>   		/*
+> 
