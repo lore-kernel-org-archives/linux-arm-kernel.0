@@ -1,32 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 May 2018 11:46:12 -0700
-Subject: [PATCH v2] pinctrl: pinctrl-single: Add functions to save and
- restore pinctrl context
-In-Reply-To: <1526532021-16387-1-git-send-email-j-keerthy@ti.com>
-References: <1526532021-16387-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20180517184612.GM98604@atomide.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu, 17 May 2018 20:59:40 +0200
+Subject: [PATCH v6 6/9] dt-bindings: counter: Document stm32 quadrature
+ encoder
+In-Reply-To: <CAL_Jsq+a4s=5N6wUWifoHWQoornbDBY-UY2xrwj1kggNH4Q5pQ@mail.gmail.com>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+ <ccdbbfb2833d274b6bfa234aada57e68d9793dd5.1526487615.git.vilhelm.gray@gmail.com>
+ <CAL_Jsq+a4s=5N6wUWifoHWQoornbDBY-UY2xrwj1kggNH4Q5pQ@mail.gmail.com>
+Message-ID: <CA+M3ks4vjE5JMmLjjPnf6ffD9QYSUmSyrpO+yxADT_8WqAA3Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [180517 04:42]:
-> This adds a pair of context save/restore functions to save/restore the
-> state of a set of pinctrl registers. The context is lost during rtc only
-> suspend with ddr in self-refresh on am43xx. Currently the save/restore
-> is being done unconditionally. This will be optimized later with a
-> pdata-quirk function which will allow is to save/restore only when doing
-> the rtc only mode with ddr in self refresh.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
-> 
-> Changes in v2:
-> 
->   * As this is needed only the in the suspend/resume path
->     removed the cpu_pm notifier and added the save/restore in
->     the suspend/resume calls.
->   * Saving/Restoring unconditionally at the moment. This will
->     be optimized later with the help of a pdata-quirk function.
+2018-05-17 18:23 GMT+02:00 Rob Herring <robh+dt@kernel.org>:
+> On Wed, May 16, 2018 at 12:51 PM, William Breathitt Gray
+> <vilhelm.gray@gmail.com> wrote:
+>> From: Benjamin Gaignard <benjamin.gaignard@st.com>
+>
+> v6? Where's v1-v5?
+>
+>> Add bindings for STM32 Timer quadrature encoder.
+>> It is a sub-node of STM32 Timer which implement the
+>> counter part of the hardware.
+>>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+>> ---
+>>  .../bindings/counter/stm32-timer-cnt.txt      | 26 +++++++++++++++++++
+>>  .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
+>>  2 files changed, 33 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>> new file mode 100644
+>> index 000000000000..377728128bef
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>> @@ -0,0 +1,26 @@
+>> +STMicroelectronics STM32 Timer quadrature encoder
+>> +
+>> +STM32 Timer provides quadrature encoder counter mode to detect
+>
+> 'mode' does not sound like a sub-block of the timers block.
 
-Looks good to me:
+quadrature encoding is one of the counting modes of this hardware
+block which is enable to count on other signals/triggers
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+>
+>> +angular position and direction of rotary elements,
+>> +from IN1 and IN2 input signals.
+>> +
+>> +Must be a sub-node of an STM32 Timer device tree node.
+>> +See ../mfd/stm32-timers.txt for details about the parent node.
+>> +
+>> +Required properties:
+>> +- compatible:          Must be "st,stm32-timer-counter".
+>> +- pinctrl-names:       Set to "default".
+>> +- pinctrl-0:           List of phandles pointing to pin configuration nodes,
+>> +                       to set IN1/IN2 pins in mode of operation for Low-Power
+>> +                       Timer input on external pin.
+>> +
+>> +Example:
+>> +       timers at 40010000  {
+>> +               compatible = "st,stm32-timers";
+>> +               ...
+>> +               counter {
+>> +                       compatible = "st,stm32-timer-counter";
+>
+> Is there only 1? How is the counter addressed?
+
+Yes there is only one counter per hardware block.
+Counter is addressed like the two others sub-nodes and the details
+about parent mode are describe in stm32-timers.txt
+Should I add them here too ? so example will be like that:
+timers at 40010000  {
+  #address-cells = <1>;
+  #size-cells = <0>;
+  compatible = "st,stm32-timers";
+  reg = <0x40010000 0x400>;
+  clocks = <&rcc 0 160>;
+  clock-names = "int";
+  counter {
+    compatible = "st,stm32-timer-counter";
+    pinctrl-names = "default";
+    pinctrl-0 = <&tim1_in_pins>;
+    };
+ };
+
+Benjamin
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
