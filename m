@@ -1,34 +1,32 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 17 May 2018 16:32:03 +0200
-Subject: [PATCH 0/7] i2c: clean up include/linux/i2c-*
-In-Reply-To: <20180419200015.15095-1-wsa@the-dreams.de>
-References: <20180419200015.15095-1-wsa@the-dreams.de>
-Message-ID: <20180517143202.vzwmqkemlqxj2xgu@ninjato>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 17 May 2018 14:32:01 +0000
+Subject: [PATCH v3 2/3] ioremap: Update pgtable free interfaces with addr
+In-Reply-To: <20180517064755.GP12670@dhcp22.suse.cz>
+References: <20180516233207.1580-1-toshi.kani@hpe.com>
+ <20180516233207.1580-3-toshi.kani@hpe.com>
+ <20180517064755.GP12670@dhcp22.suse.cz>
+Message-ID: <1526567449.2693.608.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 10:00:06PM +0200, Wolfram Sang wrote:
-> Move all plain platform_data includes to the platform_data-dir
-> (except for i2c-pnx which can be moved into the driver itself).
+On Thu, 2018-05-17 at 08:47 +0200, Michal Hocko wrote:
+> On Wed 16-05-18 17:32:06, Kani Toshimitsu wrote:
+> > From: Chintan Pandya <cpandya@codeaurora.org>
+> > 
+> > This patch ("mm/vmalloc: Add interfaces to free unmapped
+> > page table") adds following 2 interfaces to free the page
+> > table in case we implement huge mapping.
+> > 
+> > pud_free_pmd_page() and pmd_free_pte_page()
+> > 
+> > Some architectures (like arm64) needs to do proper TLB
+> > maintanance after updating pagetable entry even in map.
+> > Why ? Read this,
+> > https://patchwork.kernel.org/patch/10134581/
 > 
-> My preference is to take these patches via the i2c tree. I can provide an
-> immutable branch if needed. But we can also discuss those going in via
-> arch-trees if dependencies are against us.
+> Please add that information to the changelog.
 
-All applied to for-next!
+I will update the description and resend this patch.
 
-The immutable branch is here:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/platform_data-immutable
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/41d00c49/attachment.sig>
+Thanks!
+-Toshi
