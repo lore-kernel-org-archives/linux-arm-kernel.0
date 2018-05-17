@@ -1,9 +1,9 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 17 May 2018 18:38:44 +0530
-Subject: [GIT PULL 2/3] DaVinci device-tree updates for v4.18
+Date: Thu, 17 May 2018 18:38:45 +0530
+Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.18
 In-Reply-To: <20180517130845.863-1-nsekhar@ti.com>
 References: <20180517130845.863-1-nsekhar@ti.com>
-Message-ID: <20180517130845.863-2-nsekhar@ti.com>
+Message-ID: <20180517130845.863-3-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,31 +13,18 @@ The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.18/dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.18/defconfig
 
-for you to fetch changes up to fe9d2a40d995dc1da042a4fcd7813239d063554d:
+for you to fetch changes up to e081c754ad4b8665364fcfb07b8bec5289f23dd8:
 
-  ARM: dts: da850-evm: add WP and CD to MMC (2018-05-16 16:36:51 +0530)
-
-----------------------------------------------------------------
-DaVinci device-tree updates for v4.18
-
-* DA850 EVM gains USB support, SD card write-protect, card detect
-  and some clean-up
-* Support for gpio-ranges makes using gpios from DT much easier
-* Lego EV3 clean-up
+  ARM: davinci_all_defconfig: enable support for remoteproc drivers (2018-04-23 20:24:23 +0530)
 
 ----------------------------------------------------------------
-Adam Ford (3):
-      ARM: dts: da850-evm: Enable usb_phy, usb0 and usb1
-      ARM: dts: da850-evm: use phandles to extend nodes
-      ARM: dts: da850-evm: add WP and CD to MMC
+Enable DA8XX remoteproc driver support in davinci_all_defconfig
 
-David Lechner (2):
-      ARM: dts: da850: use gpio-ranges
-      ARM: dts: da850-lego-ev3: remove unnecessary gpio-keys properties
+----------------------------------------------------------------
+Bartosz Golaszewski (1):
+      ARM: davinci_all_defconfig: enable support for remoteproc drivers
 
- arch/arm/boot/dts/da850-evm.dts      | 298 +++++++++++++++++++----------------
- arch/arm/boot/dts/da850-lego-ev3.dts |  83 +---------
- arch/arm/boot/dts/da850.dtsi         | 154 ++++++++++++++++++
- 3 files changed, 319 insertions(+), 216 deletions(-)
+ arch/arm/configs/davinci_all_defconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
