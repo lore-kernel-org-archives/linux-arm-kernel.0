@@ -1,44 +1,46 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 17 May 2018 11:03:33 +0100
-Subject: [PATCH 1/2] ARM: dts: Restructure Vexpress motherboard includes
-In-Reply-To: <CACRpkdZgP3whauuV2G3m_eXY9bkQ-waBS0x9Jf91yE6oQE-E_Q@mail.gmail.com>
-References: <20180427185404.19205-1-linus.walleij@linaro.org>
- <f8bf7e48-72ab-8749-5d23-32346475a440@arm.com>
- <CACRpkdZgP3whauuV2G3m_eXY9bkQ-waBS0x9Jf91yE6oQE-E_Q@mail.gmail.com>
-Message-ID: <a03c16b9-e12e-9fc8-310c-574134a856b6@arm.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Thu, 17 May 2018 10:03:41 +0000
+Subject: [PATCH v2 3/3] rtc: stm32: add stm32mp1 rtc support
+In-Reply-To: <20180516203240.GB24496@piout.net>
+References: <1525880770-22263-1-git-send-email-amelie.delaunay@st.com>
+ <1525880770-22263-4-git-send-email-amelie.delaunay@st.com>
+ <20180516203240.GB24496@piout.net>
+Message-ID: <18a9abfc-a67c-509e-7f9b-af666ada52ae@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On 17/05/18 10:04, Linus Walleij wrote:
-> On Wed, May 9, 2018 at 6:44 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On 05/16/2018 10:32 PM, Alexandre Belloni wrote:
+> On 09/05/2018 17:46:10+0200, Amelie Delaunay wrote:
+>>   struct stm32_rtc_registers {
+>> @@ -86,6 +98,9 @@ struct stm32_rtc_registers {
+>>   	u8 prer;
+>>   	u8 alrmar;
+>>   	u8 wpr;
+>> +	u8 sr;
+>> +	u8 scr;
+>> +	u16 verr;
 > 
->> Please copy me and Lorenzo also in future.
->> Applied now(with typo in hierarchy fixed), thanks.
-> 
-> Sure thing, sorry I didn't realize you were working actively with
-> the Versatile Express, glad to see this :)
-> 
+> All those offsets should probably be u16 or u32...
+>
 
-I generally send PR to ARM-SoC for Vexpress platforms(mainly
-arch/arm/boot/dts/vexpress-*) only not the older Versatile
-platforms(arch/arm/boot/dts/versatile-*) :). I know you work
-on them more actively.
+OK, those offsets will be all u16 in v3, the maximum STM32 RTC register 
+offset value being 0x3FC.
 
-> I will send you my Versatile Express transition to DRI/DRM series
-> today since my Pl111 work for Vexpress is now pending in linux-next,
-> if I can find the right commits to base it on, do you have
-> a Vexpress git branch somewhere?
+>> +	if (regs.verr != UNDEF_REG) {
+> 
+> ...else, this is not working, as reported by kbuild
 > 
 
-I just sent PR[1] to ARM-SoC for v4.18, so you can use that branch/tag
-itself for now. Are you planning to get that in for v4.18 ? I can try to
-send 2nd PR but not sure of ARM SoC team will be happy since it may be
-too late for them.
+Yes, in v3, UNDEF_REG will be the maximum u16 value (0xFFFF) instead of ~0.
 
--- 
-Regards,
-Sudeep
+>> +		u32 ver = readl_relaxed(rtc->base + regs.verr);
+>> +
+>> +		dev_info(&pdev->dev, "registered rev:%d.%d\n",
+>> +			 (ver >> STM32_RTC_VERR_MAJREV_SHIFT) & 0xF,
+>> +			 (ver >> STM32_RTC_VERR_MINREV_SHIFT) & 0xF);
+>> +	}
+>> +
+> 
 
-[1] https://www.spinics.net/lists/arm-kernel/msg652377.html
+Thanks,
+Amelie
