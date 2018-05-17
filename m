@@ -1,552 +1,271 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Thu, 17 May 2018 16:25:55 +0100
-Subject: [PATCH v2 07/40] iommu: Add a page fault handler
-In-Reply-To: <20180511190641.23008-8-jean-philippe.brucker@arm.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-8-jean-philippe.brucker@arm.com>
-Message-ID: <20180517162555.00002bd3@huawei.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 17 May 2018 16:45:41 +0100
+Subject: [PATCH v3] arm64: signal: Report signal frame size to userspace via
+ auxv
+Message-ID: <1526571941-9816-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 May 2018 20:06:08 +0100
-Jean-Philippe Brucker <jean-philippe.brucker@arm.com> wrote:
+Stateful CPU architecture extensions may require the signal frame
+to grow to a size that exceeds the arch's MINSIGSTKSZ #define.
+However, changing this #define is an ABI break.
 
-> Some systems allow devices to handle I/O Page Faults in the core mm. For
-> example systems implementing the PCI PRI extension or Arm SMMU stall
-> model. Infrastructure for reporting these recoverable page faults was
-> recently added to the IOMMU core for SVA virtualisation. Add a page fault
-> handler for host SVA.
-> 
-> IOMMU driver can now instantiate several fault workqueues and link them to
-> IOPF-capable devices. Drivers can choose between a single global
-> workqueue, one per IOMMU device, one per low-level fault queue, one per
-> domain, etc.
-> 
-> When it receives a fault event, supposedly in an IRQ handler, the IOMMU
-> driver reports the fault using iommu_report_device_fault(), which calls
-> the registered handler. The page fault handler then calls the mm fault
-> handler, and reports either success or failure with iommu_page_response().
-> When the handler succeeded, the IOMMU retries the access.
-> 
-> The iopf_param pointer could be embedded into iommu_fault_param. But
-> putting iopf_param into the iommu_param structure allows us not to care
-> about ordering between calls to iopf_queue_add_device() and
-> iommu_register_device_fault_handler().
-> 
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+To allow userspace the option of determining the signal frame size
+in a more forwards-compatible way, this patch adds a new auxv entry
+tagged with AT_MINSIGSTKSZ, which provides the maximum signal frame
+size that the process can observe during its lifetime.
 
-Hi Jean-Phillipe,
+If AT_MINSIGSTKSZ is absent from the aux vector, the caller can
+assume that the MINSIGSTKSZ #define is sufficient.  This allows for
+a consistent interface with older kernels that do not provide
+AT_MINSIGSTKSZ.
 
-One question below on how we would end up with partial faults left when
-doing the queue remove. Code looks fine, but I'm not seeing how that
-would happen without buggy hardware... + we presumably have to rely on
-the hardware timing out on that request or it's dead anyway...
+The idea is that libc could expose this via sysconf() or some
+similar mechanism.
 
-Jonathan
+There is deliberately no AT_SIGSTKSZ.  The kernel knows nothing
+about userspace's own stack overheads and should not pretend to
+know.
 
-> 
-> ---
-> v1->v2: multiple queues registered by IOMMU driver
-> ---
->  drivers/iommu/Kconfig      |   4 +
->  drivers/iommu/Makefile     |   1 +
->  drivers/iommu/io-pgfault.c | 363 +++++++++++++++++++++++++++++++++++++
->  include/linux/iommu.h      |  58 ++++++
->  4 files changed, 426 insertions(+)
->  create mode 100644 drivers/iommu/io-pgfault.c
-> 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index 38434899e283..09f13a7c4b60 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -79,6 +79,10 @@ config IOMMU_SVA
->  	select IOMMU_API
->  	select MMU_NOTIFIER
->  
-> +config IOMMU_PAGE_FAULT
-> +	bool
-> +	select IOMMU_API
-> +
->  config FSL_PAMU
->  	bool "Freescale IOMMU support"
->  	depends on PCI
-> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
-> index 1dbcc89ebe4c..4b744e399a1b 100644
-> --- a/drivers/iommu/Makefile
-> +++ b/drivers/iommu/Makefile
-> @@ -4,6 +4,7 @@ obj-$(CONFIG_IOMMU_API) += iommu-traces.o
->  obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
->  obj-$(CONFIG_IOMMU_DMA) += dma-iommu.o
->  obj-$(CONFIG_IOMMU_SVA) += iommu-sva.o
-> +obj-$(CONFIG_IOMMU_PAGE_FAULT) += io-pgfault.o
->  obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
->  obj-$(CONFIG_IOMMU_IO_PGTABLE_ARMV7S) += io-pgtable-arm-v7s.o
->  obj-$(CONFIG_IOMMU_IO_PGTABLE_LPAE) += io-pgtable-arm.o
-> diff --git a/drivers/iommu/io-pgfault.c b/drivers/iommu/io-pgfault.c
-> new file mode 100644
-> index 000000000000..321c00dd3a3d
-> --- /dev/null
-> +++ b/drivers/iommu/io-pgfault.c
-> @@ -0,0 +1,363 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Handle device page faults
-> + *
-> + * Copyright (C) 2018 ARM Ltd.
-> + */
-> +
-> +#include <linux/iommu.h>
-> +#include <linux/list.h>
-> +#include <linux/slab.h>
-> +#include <linux/workqueue.h>
-> +
-> +/**
-> + * struct iopf_queue - IO Page Fault queue
-> + * @wq: the fault workqueue
-> + * @flush: low-level flush callback
-> + * @flush_arg: flush() argument
-> + * @refs: references to this structure taken by producers
-> + */
-> +struct iopf_queue {
-> +	struct workqueue_struct		*wq;
-> +	iopf_queue_flush_t		flush;
-> +	void				*flush_arg;
-> +	refcount_t			refs;
-> +};
-> +
-> +/**
-> + * struct iopf_device_param - IO Page Fault data attached to a device
-> + * @queue: IOPF queue
-> + * @partial: faults that are part of a Page Request Group for which the last
-> + *           request hasn't been submitted yet.
-> + */
-> +struct iopf_device_param {
-> +	struct iopf_queue		*queue;
-> +	struct list_head		partial;
-> +};
-> +
-> +struct iopf_context {
-> +	struct device			*dev;
-> +	struct iommu_fault_event	evt;
-> +	struct list_head		head;
-> +};
-> +
-> +struct iopf_group {
-> +	struct iopf_context		last_fault;
-> +	struct list_head		faults;
-> +	struct work_struct		work;
-> +};
-> +
-> +static int iopf_complete(struct device *dev, struct iommu_fault_event *evt,
-> +			 enum page_response_code status)
-> +{
-> +	struct page_response_msg resp = {
-> +		.addr			= evt->addr,
-> +		.pasid			= evt->pasid,
-> +		.pasid_present		= evt->pasid_valid,
-> +		.page_req_group_id	= evt->page_req_group_id,
-> +		.private_data		= evt->iommu_private,
-> +		.resp_code		= status,
-> +	};
-> +
-> +	return iommu_page_response(dev, &resp);
-> +}
-> +
-> +static enum page_response_code
-> +iopf_handle_single(struct iopf_context *fault)
-> +{
-> +	/* TODO */
-> +	return -ENODEV;
-> +}
-> +
-> +static void iopf_handle_group(struct work_struct *work)
-> +{
-> +	struct iopf_group *group;
-> +	struct iopf_context *fault, *next;
-> +	enum page_response_code status = IOMMU_PAGE_RESP_SUCCESS;
-> +
-> +	group = container_of(work, struct iopf_group, work);
-> +
-> +	list_for_each_entry_safe(fault, next, &group->faults, head) {
-> +		struct iommu_fault_event *evt = &fault->evt;
-> +		/*
-> +		 * Errors are sticky: don't handle subsequent faults in the
-> +		 * group if there is an error.
-> +		 */
-> +		if (status == IOMMU_PAGE_RESP_SUCCESS)
-> +			status = iopf_handle_single(fault);
-> +
-> +		if (!evt->last_req)
-> +			kfree(fault);
-> +	}
-> +
-> +	iopf_complete(group->last_fault.dev, &group->last_fault.evt, status);
-> +	kfree(group);
-> +}
-> +
-> +/**
-> + * iommu_queue_iopf - IO Page Fault handler
-> + * @evt: fault event
-> + * @cookie: struct device, passed to iommu_register_device_fault_handler.
-> + *
-> + * Add a fault to the device workqueue, to be handled by mm.
-> + */
-> +int iommu_queue_iopf(struct iommu_fault_event *evt, void *cookie)
-> +{
-> +	struct iopf_group *group;
-> +	struct iopf_context *fault, *next;
-> +	struct iopf_device_param *iopf_param;
-> +
-> +	struct device *dev = cookie;
-> +	struct iommu_param *param = dev->iommu_param;
-> +
-> +	if (WARN_ON(!mutex_is_locked(&param->lock)))
-> +		return -EINVAL;
-> +
-> +	if (evt->type != IOMMU_FAULT_PAGE_REQ)
-> +		/* Not a recoverable page fault */
-> +		return IOMMU_PAGE_RESP_CONTINUE;
-> +
-> +	/*
-> +	 * As long as we're holding param->lock, the queue can't be unlinked
-> +	 * from the device and therefore cannot disappear.
-> +	 */
-> +	iopf_param = param->iopf_param;
-> +	if (!iopf_param)
-> +		return -ENODEV;
-> +
-> +	if (!evt->last_req) {
-> +		fault = kzalloc(sizeof(*fault), GFP_KERNEL);
-> +		if (!fault)
-> +			return -ENOMEM;
-> +
-> +		fault->evt = *evt;
-> +		fault->dev = dev;
-> +
-> +		/* Non-last request of a group. Postpone until the last one */
-> +		list_add(&fault->head, &iopf_param->partial);
-> +
-> +		return IOMMU_PAGE_RESP_HANDLED;
-> +	}
-> +
-> +	group = kzalloc(sizeof(*group), GFP_KERNEL);
-> +	if (!group)
-> +		return -ENOMEM;
-> +
-> +	group->last_fault.evt = *evt;
-> +	group->last_fault.dev = dev;
-> +	INIT_LIST_HEAD(&group->faults);
-> +	list_add(&group->last_fault.head, &group->faults);
-> +	INIT_WORK(&group->work, iopf_handle_group);
-> +
-> +	/* See if we have partial faults for this group */
-> +	list_for_each_entry_safe(fault, next, &iopf_param->partial, head) {
-> +		if (fault->evt.page_req_group_id == evt->page_req_group_id)
-> +			/* Insert *before* the last fault */
-> +			list_move(&fault->head, &group->faults);
-> +	}
-> +
-> +	queue_work(iopf_param->queue->wq, &group->work);
-> +
-> +	/* Postpone the fault completion */
-> +	return IOMMU_PAGE_RESP_HANDLED;
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_queue_iopf);
-> +
-> +/**
-> + * iopf_queue_flush_dev - Ensure that all queued faults have been processed
-> + * @dev: the endpoint whose faults need to be flushed.
-> + *
-> + * Users must call this function when releasing a PASID, to ensure that all
-> + * pending faults for this PASID have been handled, and won't hit the address
-> + * space of the next process that uses this PASID.
-> + *
-> + * Return 0 on success.
-> + */
-> +int iopf_queue_flush_dev(struct device *dev)
-> +{
-> +	int ret = 0;
-> +	struct iopf_queue *queue;
-> +	struct iommu_param *param = dev->iommu_param;
-> +
-> +	if (!param)
-> +		return -ENODEV;
-> +
-> +	/*
-> +	 * It is incredibly easy to find ourselves in a deadlock situation if
-> +	 * we're not careful, because we're taking the opposite path as
-> +	 * iommu_queue_iopf:
-> +	 *
-> +	 *   iopf_queue_flush_dev()   |  PRI queue handler
-> +	 *    lock(mutex)             |   iommu_queue_iopf()
-> +	 *     queue->flush()         |    lock(mutex)
-> +	 *      wait PRI queue empty  |
-> +	 *
-> +	 * So we can't hold the device param lock while flushing. We don't have
-> +	 * to, because the queue or the device won't disappear until all flush
-> +	 * are finished.
-> +	 */
-> +	mutex_lock(&param->lock);
-> +	if (param->iopf_param) {
-> +		queue = param->iopf_param->queue;
-> +	} else {
-> +		ret = -ENODEV;
-> +	}
-> +	mutex_unlock(&param->lock);
-> +	if (ret)
-> +		return ret;
-> +
-> +	queue->flush(queue->flush_arg, dev);
-> +
-> +	/*
-> +	 * No need to clear the partial list. All PRGs containing the PASID that
-> +	 * needs to be decommissioned are whole (the device driver made sure of
-> +	 * it before this function was called). They have been submitted to the
-> +	 * queue by the above flush().
-> +	 */
-> +	flush_workqueue(queue->wq);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(iopf_queue_flush_dev);
-> +
-> +/**
-> + * iopf_queue_add_device - Add producer to the fault queue
-> + * @queue: IOPF queue
-> + * @dev: device to add
-> + */
-> +int iopf_queue_add_device(struct iopf_queue *queue, struct device *dev)
-> +{
-> +	int ret = -EINVAL;
-> +	struct iopf_device_param *iopf_param;
-> +	struct iommu_param *param = dev->iommu_param;
-> +
-> +	if (!param)
-> +		return -ENODEV;
-> +
-> +	iopf_param = kzalloc(sizeof(*iopf_param), GFP_KERNEL);
-> +	if (!iopf_param)
-> +		return -ENOMEM;
-> +
-> +	INIT_LIST_HEAD(&iopf_param->partial);
-> +	iopf_param->queue = queue;
-> +
-> +	mutex_lock(&param->lock);
-> +	if (!param->iopf_param) {
-> +		refcount_inc(&queue->refs);
-> +		param->iopf_param = iopf_param;
-> +		ret = 0;
-> +	}
-> +	mutex_unlock(&param->lock);
-> +
-> +	if (ret)
-> +		kfree(iopf_param);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(iopf_queue_add_device);
-> +
-> +/**
-> + * iopf_queue_remove_device - Remove producer from fault queue
-> + * @dev: device to remove
-> + *
-> + * Caller makes sure that no more fault is reported for this device, and no more
-> + * flush is scheduled for this device.
-> + *
-> + * Note: safe to call unconditionally on a cleanup path, even if the device
-> + * isn't registered to any IOPF queue.
-> + *
-> + * Return 0 if the device was attached to the IOPF queue
-> + */
-> +int iopf_queue_remove_device(struct device *dev)
-> +{
-> +	struct iopf_context *fault, *next;
-> +	struct iopf_device_param *iopf_param;
-> +	struct iommu_param *param = dev->iommu_param;
-> +
-> +	if (!param)
-> +		return -EINVAL;
-> +
-> +	mutex_lock(&param->lock);
-> +	iopf_param = param->iopf_param;
-> +	if (iopf_param) {
-> +		refcount_dec(&iopf_param->queue->refs);
-> +		param->iopf_param = NULL;
-> +	}
-> +	mutex_unlock(&param->lock);
-> +	if (!iopf_param)
-> +		return -EINVAL;
-> +
-> +	list_for_each_entry_safe(fault, next, &iopf_param->partial, head)
-> +		kfree(fault);
-> +
+For arm64:
 
-Why would we end up here with partials still in the list?  Buggy hardware?
+The primary motivation for this interface is the Scalable Vector
+Extension, which can require at least 4KB or so of extra space
+in the signal frame for the largest hardware implementations.
 
-> +	/*
-> +	 * No more flush is scheduled, and the caller removed all bonds from
-> +	 * this device. unbind() waited until any concurrent mm_exit() finished,
-> +	 * therefore there is no flush() running anymore and we can free the
-> +	 * param.
-> +	 */
-> +	kfree(iopf_param);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(iopf_queue_remove_device);
-> +
-> +/**
-> + * iopf_queue_alloc - Allocate and initialize a fault queue
-> + * @name: a unique string identifying the queue (for workqueue)
-> + * @flush: a callback that flushes the low-level queue
-> + * @cookie: driver-private data passed to the flush callback
-> + *
-> + * The callback is called before the workqueue is flushed. The IOMMU driver must
-> + * commit all faults that are pending in its low-level queues at the time of the
-> + * call, into the IOPF queue (with iommu_report_device_fault). The callback
-> + * takes a device pointer as argument, hinting what endpoint is causing the
-> + * flush. When the device is NULL, all faults should be committed.
-> + */
-> +struct iopf_queue *
-> +iopf_queue_alloc(const char *name, iopf_queue_flush_t flush, void *cookie)
-> +{
-> +	struct iopf_queue *queue;
-> +
-> +	queue = kzalloc(sizeof(*queue), GFP_KERNEL);
-> +	if (!queue)
-> +		return NULL;
-> +
-> +	/*
-> +	 * The WQ is unordered because the low-level handler enqueues faults by
-> +	 * group. PRI requests within a group have to be ordered, but once
-> +	 * that's dealt with, the high-level function can handle groups out of
-> +	 * order.
-> +	 */
-> +	queue->wq = alloc_workqueue("iopf_queue/%s", WQ_UNBOUND, 0, name);
-> +	if (!queue->wq) {
-> +		kfree(queue);
-> +		return NULL;
-> +	}
-> +
-> +	queue->flush = flush;
-> +	queue->flush_arg = cookie;
-> +	refcount_set(&queue->refs, 1);
-> +
-> +	return queue;
-> +}
-> +EXPORT_SYMBOL_GPL(iopf_queue_alloc);
-> +
-> +/**
-> + * iopf_queue_free - Free IOPF queue
-> + * @queue: queue to free
-> + *
-> + * Counterpart to iopf_queue_alloc(). Caller must make sure that all producers
-> + * have been removed.
-> + */
-> +void iopf_queue_free(struct iopf_queue *queue)
-> +{
-> +
+To determine the correct value, a "Christmas tree" mode (via the
+add_all argument) is added to setup_sigframe_layout(), to simulate
+addition of all possible records to the signal frame at maximum
+possible size.
 
-Nitpick : Blank line here doesn't add anything.
+If this procedure goes wrong somehow, resulting in a stupidly large
+frame layout and hence failure of sigframe_alloc() to allocate a
+record to the frame, then this is indicative of a kernel bug: the
+kernel's internal SIGFRAME_MAXSZ is supposed to sanity-check
+against generting frames that we consider _impossibly_ large.  In
+this case, SIGSTKSZ is returned as a "reasonable guess that is at
+least bigger than MINSIGSTKSZ" and we WARN().
 
-> +	/* Caller should have removed all producers first */
-> +	if (WARN_ON(!refcount_dec_and_test(&queue->refs)))
-> +		return;
-> +
-> +	destroy_workqueue(queue->wq);
-> +	kfree(queue);
-> +}
-> +EXPORT_SYMBOL_GPL(iopf_queue_free);
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index faf3390ce89d..fad3a60e1c14 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -461,11 +461,20 @@ struct iommu_fault_param {
->  	void *data;
->  };
->  
-> +/**
-> + * iopf_queue_flush_t - Flush low-level page fault queue
-> + *
-> + * Report all faults currently pending in the low-level page fault queue
-> + */
-> +struct iopf_queue;
-> +typedef int (*iopf_queue_flush_t)(void *cookie, struct device *dev);
-> +
->  /**
->   * struct iommu_param - collection of per-device IOMMU data
->   *
->   * @fault_param: IOMMU detected device fault reporting data
->   * @sva_param: SVA parameters
-> + * @iopf_param: I/O Page Fault queue and data
->   *
->   * TODO: migrate other per device data pointers under iommu_dev_data, e.g.
->   *	struct iommu_group	*iommu_group;
-> @@ -475,6 +484,7 @@ struct iommu_param {
->  	struct mutex lock;
->  	struct iommu_fault_param *fault_param;
->  	struct iommu_sva_param *sva_param;
-> +	struct iopf_device_param *iopf_param;
->  };
->  
->  int  iommu_device_register(struct iommu_device *iommu);
-> @@ -874,6 +884,12 @@ static inline int iommu_report_device_fault(struct device *dev, struct iommu_fau
->  	return 0;
->  }
->  
-> +static inline int iommu_page_response(struct device *dev,
-> +				      struct page_response_msg *msg)
-> +{
-> +	return -ENODEV;
-> +}
-> +
->  static inline int iommu_group_id(struct iommu_group *group)
->  {
->  	return -ENODEV;
-> @@ -1038,4 +1054,46 @@ static inline struct mm_struct *iommu_sva_find(int pasid)
->  }
->  #endif /* CONFIG_IOMMU_SVA */
->  
-> +#ifdef CONFIG_IOMMU_PAGE_FAULT
-> +extern int iommu_queue_iopf(struct iommu_fault_event *evt, void *cookie);
-> +
-> +extern int iopf_queue_add_device(struct iopf_queue *queue, struct device *dev);
-> +extern int iopf_queue_remove_device(struct device *dev);
-> +extern int iopf_queue_flush_dev(struct device *dev);
-> +extern struct iopf_queue *
-> +iopf_queue_alloc(const char *name, iopf_queue_flush_t flush, void *cookie);
-> +extern void iopf_queue_free(struct iopf_queue *queue);
-> +#else /* CONFIG_IOMMU_PAGE_FAULT */
-> +static inline int iommu_queue_iopf(struct iommu_fault_event *evt, void *cookie)
-> +{
-> +	return -ENODEV;
-> +}
-> +
-> +static inline int iopf_queue_add_device(struct iopf_queue *queue,
-> +					struct device *dev)
-> +{
-> +	return -ENODEV;
-> +}
-> +
-> +static inline int iopf_queue_remove_device(struct device *dev)
-> +{
-> +	return -ENODEV;
-> +}
-> +
-> +static inline int iopf_queue_flush_dev(struct device *dev)
-> +{
-> +	return -ENODEV;
-> +}
-> +
-> +static inline struct iopf_queue *
-> +iopf_queue_alloc(const char *name, iopf_queue_flush_t flush, void *cookie)
-> +{
-> +	return NULL;
-> +}
-> +
-> +static inline void iopf_queue_free(struct iopf_queue *queue)
-> +{
-> +}
-> +#endif /* CONFIG_IOMMU_PAGE_FAULT */
-> +
->  #endif /* __LINUX_IOMMU_H */
+For arm64 SVE:
+
+The SVE context block in the signal frame needs to be considered
+too when computing the maximum possible signal frame size.
+
+Because the size of this block depends on the vector length, this
+patch computes the size based not on the thread's current vector
+length but instead on the maximum possible vector length: this
+determines the maximum size of SVE context block that can be
+observed in any signal frame for the lifetime of the process.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Alex Benn?e <alex.bennee@linaro.org>
+
+---
+
+Changes since v2:
+
+ * Redefine AT_MINSIGSTKSZ as 51 to avoid clash with values defined by
+   other architectures.
+
+   This turns out to be a problem for glibc; also random userspace
+   software does not necessary check the architecture before using
+   getauxval() or otherwise parsing the aux vector, which can make
+   aliased tags problematic.
+
+   Really, the headers need cleaning up tree-wide in such away that the
+   AT_* definitions do not appear to be arch-private.  To be addressed
+   separately.
+---
+ arch/arm64/include/asm/elf.h         | 11 ++++++++
+ arch/arm64/include/asm/processor.h   |  5 ++++
+ arch/arm64/include/uapi/asm/auxvec.h |  3 ++-
+ arch/arm64/kernel/cpufeature.c       |  1 +
+ arch/arm64/kernel/signal.c           | 51 +++++++++++++++++++++++++++++++-----
+ 5 files changed, 63 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index fac1c4d..dc32adb 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -24,6 +24,11 @@
+ #include <asm/ptrace.h>
+ #include <asm/user.h>
+ 
++#ifndef __ASSEMBLY__
++#include <linux/bug.h>
++#include <asm/processor.h> /* for signal_minsigstksz, used by ARCH_DLINFO */
++#endif
++
+ /*
+  * AArch64 static relocation types.
+  */
+@@ -146,8 +151,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+ /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
+ #define ARCH_DLINFO							\
+ do {									\
++	int minsigstksz = signal_minsigstksz;				\
++									\
++	if (WARN_ON(minsigstksz <= 0))					\
++		minsigstksz = MINSIGSTKSZ;				\
++									\
+ 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+ 		    (elf_addr_t)current->mm->context.vdso);		\
++	NEW_AUX_ENT(AT_MINSIGSTKSZ, minsigstksz);			\
+ } while (0)
+ 
+ #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 7675989..6f60e92 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -35,6 +35,8 @@
+ #ifdef __KERNEL__
+ 
+ #include <linux/build_bug.h>
++#include <linux/cache.h>
++#include <linux/init.h>
+ #include <linux/stddef.h>
+ #include <linux/string.h>
+ 
+@@ -244,6 +246,9 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
+ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
+ void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
+ 
++extern int __ro_after_init signal_minsigstksz;	/* user signal frame size */
++extern void __init minsigstksz_setup(void);
++
+ /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
+ #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+ #define SVE_GET_VL()	sve_get_current_vl()
+diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+index ec0a86d..743c0b8 100644
+--- a/arch/arm64/include/uapi/asm/auxvec.h
++++ b/arch/arm64/include/uapi/asm/auxvec.h
+@@ -19,7 +19,8 @@
+ 
+ /* vDSO location */
+ #define AT_SYSINFO_EHDR	33
++#define AT_MINSIGSTKSZ	51	/* stack needed for signal delivery */
+ 
+-#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
++#define AT_VECTOR_SIZE_ARCH 2 /* entries in ARCH_DLINFO */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9d1b06d..0e0b53d 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1619,6 +1619,7 @@ void __init setup_cpu_features(void)
+ 		pr_info("emulated: Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
+ 
+ 	sve_setup();
++	minsigstksz_setup();
+ 
+ 	/* Advertise that we have computed the system capabilities */
+ 	set_sys_caps_initialised();
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 154b7d3..ae8d4ea 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -17,6 +17,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/cache.h>
+ #include <linux/compat.h>
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
+@@ -570,8 +571,15 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ 	return 0;
+ }
+ 
+-/* Determine the layout of optional records in the signal frame */
+-static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
++/*
++ * Determine the layout of optional records in the signal frame
++ *
++ * add_all: if true, lays out the biggest possible signal frame for
++ *	this task; otherwise, generates a layout for the current state
++ *	of the task.
++ */
++static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
++				 bool add_all)
+ {
+ 	int err;
+ 
+@@ -581,7 +589,7 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 		return err;
+ 
+ 	/* fault information, if valid */
+-	if (current->thread.fault_code) {
++	if (add_all || current->thread.fault_code) {
+ 		err = sigframe_alloc(user, &user->esr_offset,
+ 				     sizeof(struct esr_context));
+ 		if (err)
+@@ -591,8 +599,18 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 	if (system_supports_sve()) {
+ 		unsigned int vq = 0;
+ 
+-		if (test_thread_flag(TIF_SVE))
+-			vq = sve_vq_from_vl(current->thread.sve_vl);
++		if (add_all || test_thread_flag(TIF_SVE)) {
++			int vl = sve_max_vl;
++
++			if (!add_all)
++				vl = current->thread.sve_vl;
++
++			/* Fail safe if something wasn't initialised */
++			if (WARN_ON(!sve_vl_valid(vl)))
++				vl = SVE_VL_MIN;
++
++			vq = sve_vq_from_vl(vl);
++		}
+ 
+ 		err = sigframe_alloc(user, &user->sve_offset,
+ 				     SVE_SIG_CONTEXT_SIZE(vq));
+@@ -603,7 +621,6 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 	return sigframe_alloc_end(user);
+ }
+ 
+-
+ static int setup_sigframe(struct rt_sigframe_user_layout *user,
+ 			  struct pt_regs *regs, sigset_t *set)
+ {
+@@ -701,7 +718,7 @@ static int get_sigframe(struct rt_sigframe_user_layout *user,
+ 	int err;
+ 
+ 	init_user_layout(user);
+-	err = setup_sigframe_layout(user);
++	err = setup_sigframe_layout(user, false);
+ 	if (err)
+ 		return err;
+ 
+@@ -936,3 +953,23 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 		thread_flags = READ_ONCE(current_thread_info()->flags);
+ 	} while (thread_flags & _TIF_WORK_MASK);
+ }
++
++int __ro_after_init signal_minsigstksz;
++
++/*
++ * Determine the stack space required for guaranteed signal devliery.
++ * This function is used to populate AT_MINSIGSTKSZ at process startup.
++ */
++void __init minsigstksz_setup(void)
++{
++	struct rt_sigframe_user_layout user;
++
++	init_user_layout(&user);
++
++	if (WARN_ON(setup_sigframe_layout(&user, true)))
++		signal_minsigstksz = SIGSTKSZ;
++	else
++		signal_minsigstksz = sigframe_size(&user) +
++			round_up(sizeof(struct frame_record), 16) +
++			16; /* max alignment padding */
++}
+-- 
+2.1.4
