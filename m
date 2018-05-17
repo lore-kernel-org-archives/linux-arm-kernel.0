@@ -1,63 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 17 May 2018 10:41:46 +0200
-Subject: [PATCH 2/3] clk: renesas: r8a7795: Add ccree clock
-In-Reply-To: <CAOtvUMf0pnX1+MOz0KkB5LxqL5HTmLRYjVZTUrAx-eCvm26+LA@mail.gmail.com>
-References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
- <1526387370-17142-3-git-send-email-gilad@benyossef.com>
- <CAMuHMdXWPwW_p=D56BhNF274m+JLe+mbD2fqQu8-we-uMW4b8Q@mail.gmail.com>
- <CAOtvUMf0pnX1+MOz0KkB5LxqL5HTmLRYjVZTUrAx-eCvm26+LA@mail.gmail.com>
-Message-ID: <CAMuHMdWxfZO+a0+tcd+4juNTVwB_nnJi0_SFD2C3OLCF1nSbKw@mail.gmail.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Thu, 17 May 2018 09:41:51 +0100
+Subject: [PATCH 5/8] firmware: arm_scmi: drop unused `con_priv`
+ structure member
+In-Reply-To: <1525885634-22348-6-git-send-email-sudeep.holla@arm.com>
+References: <1525885634-22348-1-git-send-email-sudeep.holla@arm.com>
+ <1525885634-22348-6-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180517094151.00002623@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gilad,
+On Wed, 9 May 2018 18:07:11 +0100
+Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-On Thu, May 17, 2018 at 10:00 AM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
-> On Tue, May 15, 2018 at 5:47 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Tue, May 15, 2018 at 2:29 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
->>> This patch adds the clock used by the CryptoCell 630p instance in the SoC.
->>>
->>> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
->>
->> Thanks for your patch!
->>
->>> --- a/drivers/clk/renesas/r8a7795-cpg-mssr.c
->>> +++ b/drivers/clk/renesas/r8a7795-cpg-mssr.c
->>> @@ -132,6 +132,7 @@ static struct mssr_mod_clk r8a7795_mod_clks[] __initdata = {
->>>         DEF_MOD("sys-dmac2",             217,   R8A7795_CLK_S0D3),
->>>         DEF_MOD("sys-dmac1",             218,   R8A7795_CLK_S0D3),
->>>         DEF_MOD("sys-dmac0",             219,   R8A7795_CLK_S0D3),
->>> +       DEF_MOD("ccree",                 229,   R8A7795_CLK_S3D2),
->>
->> I don't know if "ccree" is the proper name for this clock, as there
->> may be multiple
->> instances.
->
-> I'd be happy to rename it to anything else. Suggestions?
+> Initially con_priv was supposedly used for transport specific data when
+> the SCMI driver had an abstraction to communicate with different mailbox
+> controllers. But after some discussions, the idea was dropped but this
+> variable slipped through the cracks.
+> 
+> This patch gets rid of this unused variable.
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-I believe it should be called "sceg-pub".
+Curious that it never had any docs :)  I'm glad we didn't add them two patches
+earlier to remove them here as that would have been silly.
 
->> I also can't verify the parent clock.
->
-> I'm afraid I can't really help. This is based on code snippet from
-> Renesas. I verified it works but
-> I am not an expert on the clock settings :-(
+Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 
-As your driver doesn't care about the clock rate, only about
-enabling/disabling the clock, the actual parent doesn't matter much.
-
-After some deeper diving into the datasheet, I believe the correct parent is
-the CR clock, which is unfortunately not yet supported by the R-Car H3 clock
-driver. I'll send a patch...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  drivers/firmware/arm_scmi/common.h | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
+> index 41b03e46cca8..937a930ce87d 100644
+> --- a/drivers/firmware/arm_scmi/common.h
+> +++ b/drivers/firmware/arm_scmi/common.h
+> @@ -86,9 +86,7 @@ struct scmi_msg {
+>   *	buffer for the rx path as we use for the tx path.
+>   * @done: completion event
+>   */
+> -
+>  struct scmi_xfer {
+> -	void *con_priv;
+>  	struct scmi_msg_hdr hdr;
+>  	struct scmi_msg tx;
+>  	struct scmi_msg rx;
