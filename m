@@ -1,32 +1,97 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 17 May 2018 20:07:59 +0200
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <307323036.63872.1526576126537@email.1und1.de>
-References: <20180517131727.29263-1-eric@anholt.net>
- <1412187220.62585.1526572780332@email.1und1.de>
- <alpine.DEB.2.21.1805171233500.7984@macbook-air>
- <307323036.63872.1526576126537@email.1und1.de>
-Message-ID: <20180517180758.GK12198@hirez.programming.kicks-ass.net>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Thu, 17 May 2018 14:07:07 -0400
+Subject: [PATCH v6 6/9] dt-bindings: counter: Document stm32 quadrature
+ encoder
+In-Reply-To: <CAL_Jsq+a4s=5N6wUWifoHWQoornbDBY-UY2xrwj1kggNH4Q5pQ@mail.gmail.com>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+ <ccdbbfb2833d274b6bfa234aada57e68d9793dd5.1526487615.git.vilhelm.gray@gmail.com>
+ <CAL_Jsq+a4s=5N6wUWifoHWQoornbDBY-UY2xrwj1kggNH4Q5pQ@mail.gmail.com>
+Message-ID: <20180517180707.GA30194@sophia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 06:55:26PM +0200, Stefan Wahren wrote:
-> > Vince Weaver <vincent.weaver@maine.edu> hat am 17. Mai 2018 um 18:34 geschrieben:
-> > On Thu, 17 May 2018, Stefan Wahren wrote:
-> > > > Eric Anholt <eric@anholt.net> hat am 17. Mai 2018 um 15:17 geschrieben:
+On Thu, May 17, 2018 at 11:23:22AM -0500, Rob Herring wrote:
+>On Wed, May 16, 2018 at 12:51 PM, William Breathitt Gray
+><vilhelm.gray@gmail.com> wrote:
+>> From: Benjamin Gaignard <benjamin.gaignard@st.com>
+>
+>v6? Where's v1-v5?
 
-> > > > The a53 and a7 counters seem to match up, so we advertise a7 so that
-> > > > arm32 can probe.
-> > 
-> > so how closely did you look at the a53/a7 differences?  I see some major 
-> > differences, especially with the CPU_CYCLES event (0xff vs 0x11).
-> > 
-> > The proper fix here might be to add a cortex-a53 PMU entry to the armv7 
-> > code rather than trying to treat it as a cortex-a7.
-> 
-> we like to use the PMU of BCM2837 SoC (4x A53 cores) under arm32 and arm64.
-> 
-> What is the right way (tm) to the define the DT compatibles?
-> Does the arm32 PMU driver need patching for proper A53 support?
+Hi Rob,
 
-I'm completely clueless on all of this; Mark might have ideas.
+I apologize, I should have CC you on the rest of the patchset to give
+you a better idea of the context of this particular patch. Benjamin
+Gaignard authored this particular patch, so I'll leave it up to him to
+respond to your inline comments, but I can at least provide a brief
+history of the revisions of this patchset as a whole.
+
+This patchset introduces a "Generic Counter" interface for drivers to
+support various counter devices (tally counters, rotary encoders, etc.).
+The v1 revision was submitted on 31 July 2017
+(https://lkml.org/lkml/2017/7/31/514) as a wrapper over existing
+IIO functionality. This implementation design was unsuitable for the
+needs of Generic Counter API, so the v4 revision submitted on 14
+December 2017 reimplemented the Generic Counter API as its own Counter
+subsystem (https://lkml.org/lkml/2017/12/14/778).
+
+The v5 revision was submitted on 9 March 2018
+(https://lkml.org/lkml/2018/3/9/728) and introduced the STM32 Timer
+quadrature encoder driver with Generic Counter interface support. I
+should have CC you in that revision to comment on the dt-bindings patch,
+but I overlooked it, so I made sure to CC you on this v6 revision.
+
+William Breathitt Gray
+
+>
+>> Add bindings for STM32 Timer quadrature encoder.
+>> It is a sub-node of STM32 Timer which implement the
+>> counter part of the hardware.
+>>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+>> ---
+>>  .../bindings/counter/stm32-timer-cnt.txt      | 26 +++++++++++++++++++
+>>  .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
+>>  2 files changed, 33 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>> new file mode 100644
+>> index 000000000000..377728128bef
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>> @@ -0,0 +1,26 @@
+>> +STMicroelectronics STM32 Timer quadrature encoder
+>> +
+>> +STM32 Timer provides quadrature encoder counter mode to detect
+>
+>'mode' does not sound like a sub-block of the timers block.
+>
+>> +angular position and direction of rotary elements,
+>> +from IN1 and IN2 input signals.
+>> +
+>> +Must be a sub-node of an STM32 Timer device tree node.
+>> +See ../mfd/stm32-timers.txt for details about the parent node.
+>> +
+>> +Required properties:
+>> +- compatible:          Must be "st,stm32-timer-counter".
+>> +- pinctrl-names:       Set to "default".
+>> +- pinctrl-0:           List of phandles pointing to pin configuration nodes,
+>> +                       to set IN1/IN2 pins in mode of operation for Low-Power
+>> +                       Timer input on external pin.
+>> +
+>> +Example:
+>> +       timers at 40010000  {
+>> +               compatible = "st,stm32-timers";
+>> +               ...
+>> +               counter {
+>> +                       compatible = "st,stm32-timer-counter";
+>
+>Is there only 1? How is the counter addressed?
+>
+>> +                       pinctrl-names = "default";
+>> +                       pinctrl-0 = <&tim1_in_pins>;
+>> +               };
+>> +       };
