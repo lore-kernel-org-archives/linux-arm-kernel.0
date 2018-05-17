@@ -1,140 +1,64 @@
-From: ilialin@codeaurora.org (ilialin at codeaurora.org)
-Date: Thu, 17 May 2018 10:24:05 +0300
-Subject: [PATCH v7 10/14] dt-bindings: qcom_spmi: Add support for SAW
- documentation
-In-Reply-To: <CAHLCerOxcUMTztT75rdkS-rrQWqEEgoVQr45Ueh_JRPE7CCm7Q@mail.gmail.com>
-References: <1526375616-16904-1-git-send-email-ilialin@codeaurora.org>
- <1526375616-16904-11-git-send-email-ilialin@codeaurora.org>
- <CAHLCerOxcUMTztT75rdkS-rrQWqEEgoVQr45Ueh_JRPE7CCm7Q@mail.gmail.com>
-Message-ID: <017401d3edb0$0e3d6d10$2ab84730$@codeaurora.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 17 May 2018 09:25:52 +0200 (CEST)
+Subject: [PATCH 1/1] ARM:dts:sunxi: Add Olimex A20-SOM-EVB-eMMC board
+In-Reply-To: <1526470689-6275-1-git-send-email-stefan@olimex.com>
+References: <1526470689-6275-1-git-send-email-stefan@olimex.com>
+Message-ID: <96201051.35560.1526541952287@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stefan,
 
+> Stefan Mavrodiev <stefan@olimex.com> hat am 16. Mai 2018 um 13:38 geschrieben:
+> 
+> 
+> With the new rev.E of A20-SOM-EVB, there is option for 16GB eMMC.
+> Currently used card is KLMAG2GEND, wired to MMC2 slot.
+> 
+> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+> ---
+>  arch/arm/boot/dts/Makefile                         |  1 +
+>  .../arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts | 37 ++++++++++++++++++++++
+>  2 files changed, 38 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 1db91ec..7f1ee65 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -959,6 +959,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>  	sun7i-a20-m3.dtb \
+>  	sun7i-a20-mk808c.dtb \
+>  	sun7i-a20-olimex-som-evb.dtb \
+> +	sun7i-a20-olimex-som-evb-emmc.dtb \
+>  	sun7i-a20-olimex-som204-evb.dtb \
+>  	sun7i-a20-olimex-som204-evb-emmc.dtb \
+>  	sun7i-a20-olinuxino-lime.dtb \
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts
+> new file mode 100644
+> index 0000000..81ebc97
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb-emmc.dts
+> @@ -0,0 +1,37 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Device Tree Source for A20-Olimex-SOM-EVB-eMMC Board
+> + *
+> + * Copyright (C) 2018 Olimex Ltd.
+> + *   Author: Stefan Mavrodiev <stefan@olimex.com>
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun7i-a20-olimex-som-evb.dts"
+> +
+> +/ {
+> +
+> +	model = "Olimex A20-Olimex-SOM-EVB-eMMC";
+> +	compatible = "olimex,a20-olimex-som-evb-emmc", "allwinner,sun7i-a20";
 
-> -----Original Message-----
-> From: amit.kucheria at verdurent.com <amit.kucheria@verdurent.com> On
-> Behalf Of Amit Kucheria
-> Sent: Wednesday, May 16, 2018 16:13
-> To: Ilia Lin <ilialin@codeaurora.org>
-> Cc: Michael Turquette <mturquette@baylibre.com>; sboyd at kernel.org; Rob
-> Herring <robh@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Viresh
-> Kumar <viresh.kumar@linaro.org>; nm at ti.com; lgirdwood at gmail.com;
-> broonie at kernel.org; Andy Gross <andy.gross@linaro.org>; David Brown
-> <david.brown@linaro.org>; catalin.marinas at arm.com;
-> will.deacon at arm.com; Rafael J. Wysocki <rjw@rjwysocki.net>; linux-
-> clk at vger.kernel.org; devicetree at vger.kernel.org; LKML <linux-
-> kernel at vger.kernel.org>; Linux PM list <linux-pm@vger.kernel.org>; linux-
-> arm-msm at vger.kernel.org; linux-soc at vger.kernel.org; lakml <linux-arm-
-> kernel at lists.infradead.org>; Rajendra Nayak <rnayak@codeaurora.org>;
-> nicolas.dechesne at linaro.org; celster at codeaurora.org;
-> tfinkel at codeaurora.org
-> Subject: Re: [PATCH v7 10/14] dt-bindings: qcom_spmi: Add support for SAW
-> documentation
-> 
-> On Tue, May 15, 2018 at 12:13 PM, Ilia Lin <ilialin@codeaurora.org> wrote:
-> > Add support for SAW controlled regulators.
-> > The regulators defined as SAW controlled in the device tree will be
-> > controlled through special CPU registers instead of direct SPMI
-> > accesses.
-> > This is required especially for CPU supply regulators to synchronize
-> > with clock scaling and for Automatic Voltage Switching.
-> > Document it.
-> 
-> Replace this boiler plate with what this patch actual does. Besides changing
-> the subject, it could be, for example,
-> 
-> "Document the DT bindings for the SAW regulators.
-> 
-> The saw-slave property allows ganging (grouping) of several regulators so
-> that their outputs can be combined... blah blah.
-> 
-> The saw-leader is the only one that then is configurable in DT"
+the file Documentation/devicetree/bindings/arm/olimex.txt seems to be out of date. I cannot find any recent board compatible.
 
-Actually, I invested some fantasy to write this explanation. But I'll try to revise it.
+Didn't checkpatch complain about it?
 
-> 
-> 
-> > Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> > Reviewed-by: Rob Herring <robh@kernel.org>
-> > ---
-> >  .../bindings/regulator/qcom,spmi-regulator.txt     | 45
-> ++++++++++++++++++++++
-> >  1 file changed, 45 insertions(+)
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
-> > b/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
-> > index 57d2c65..406f2e5 100644
-> > ---
-> > a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
-> > +++ b/Documentation/devicetree/bindings/regulator/qcom,spmi-
-> regulator.
-> > +++ txt
-> > @@ -110,6 +110,11 @@ Qualcomm SPMI Regulators
-> >         Definition: Reference to regulator supplying the input pin, as
-> >                     described in the data sheet.
-> >
-> > +- qcom,saw-reg:
-> > +       Usage: optional
-> > +       Value type: <phandle>
-> > +       Description: Reference to syscon node defining the SAW registers.
-> > +
-> >
-> >  The regulator node houses sub-nodes for each regulator within the
-> > device. Each  sub-node is identified using the node's name, with valid
-> > values listed for each @@ -201,6 +206,17 @@ see regulator.txt - with
-> additional custom properties described below:
-> >                         2 = 0.55 uA
-> >                         3 = 0.75 uA
-> >
-> > +- qcom,saw-slave:
-> > +       Usage: optional
-> > +       Value type: <boo>
-> > +       Description: SAW controlled gang slave. Will not be configured.
-> > +
-> > +- qcom,saw-leader:
-> > +       Usage: optional
-> > +       Value type: <boo>
-> > +       Description: SAW controlled gang leader. Will be configured as
-> > +                    SAW regulator.
-> > +
-> >  Example:
-> >
-> >         regulators {
-> > @@ -221,3 +237,32 @@ Example:
-> >
-> >                 ....
-> >         };
-> > +
-> > +Example 2:
-> > +
-> > +       saw3: syscon at 9A10000 {
-> > +               compatible = "syscon";
-> > +               reg = <0x9A10000 0x1000>;
-> > +       };
-> > +
-> > +       ...
-> > +
-> > +       spm-regulators {
-> > +               compatible = "qcom,pm8994-regulators";
-> > +               qcom,saw-reg = <&saw3>;
-> > +               s8 {
-> > +                       qcom,saw-slave;
-> > +               };
-> > +               s9 {
-> > +                       qcom,saw-slave;
-> > +               };
-> > +               s10 {
-> > +                       qcom,saw-slave;
-> > +               };
-> > +               pm8994_s11_saw: s11 {
-> > +                       qcom,saw-leader;
-> > +                       regulator-always-on;
-> > +                       regulator-min-microvolt = <900000>;
-> > +                       regulator-max-microvolt = <1140000>;
-> > +               };
-> > +       };
-> > --
-> > 1.9.1
-> >
+Regards
+Stefan
