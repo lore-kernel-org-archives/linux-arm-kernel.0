@@ -1,40 +1,44 @@
-From: manu@freebsd.org (Emmanuel Vadot)
-Date: Thu, 17 May 2018 12:34:35 +0200
-Subject: [PATCH] ARM64: dts: sun50i: h5: Add spi flash node for OrangePi PC2
-Message-ID: <20180517103435.92874-1-manu@freebsd.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 May 2018 11:35:44 +0100
+Subject: [PATCH 0/4] KVM/arm64: Cache maintenance relaxations
+Message-ID: <20180517103548.5622-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OrangePi PC2 have an mx25l1606e spi flash.
-Add a node for it.
+This small series makes use of features recently introduced in the
+ARMv8 architecture to relax the cache maintenance operations on CPUs
+that implement these features.
 
-Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
----
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts    | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+FWB is the most important one. It allows stage-2 to enforce the
+cacheability of memory, no matter what the guest says. It also
+mandates that the whole machine is cache coherent (no non-coherent
+I/O), meaning we can drop a whole class of cache maintenance
+operations.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-index 98862c7c7258..0b870e4b4fad 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-@@ -207,6 +207,18 @@
- 	status = "okay";
- };
- 
-+&spi0  {
-+	status = "okay";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "mx25l1606e", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <40000000>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+FWB, when combined with CTL_EL0.{IDC,DIC} allows the removal of all
+cache maintenance and tracking of pages being executed.
+
+We also take the opportunity to drop a few useless CMOs that were
+applied to the HYP page tables, but that were never necessary.
+
+Marc Zyngier (4):
+  arm64: KVM: Add support for Stage-2 control of memory types and
+    cacheability
+  arm64: KVM: Avoid marking pages as XN in Stage-2 if CTR_EL0.DIC is set
+  KVM: arm/arm64: Remove unnecessary CMOs when creating HYP page tables
+  arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is present
+
+ arch/arm64/include/asm/cpucaps.h      |  3 ++-
+ arch/arm64/include/asm/kvm_arm.h      |  1 +
+ arch/arm64/include/asm/kvm_emulate.h  |  2 ++
+ arch/arm64/include/asm/kvm_mmu.h      | 24 +++++++++++++++++-------
+ arch/arm64/include/asm/memory.h       |  7 +++++++
+ arch/arm64/include/asm/pgtable-prot.h | 24 ++++++++++++++++++++++--
+ arch/arm64/include/asm/sysreg.h       |  1 +
+ arch/arm64/kernel/cpufeature.c        | 20 ++++++++++++++++++++
+ arch/arm64/kvm/sys_regs.c             |  8 +++++++-
+ virt/kvm/arm/mmu.c                    |  9 +++++----
+ 10 files changed, 84 insertions(+), 15 deletions(-)
+
 -- 
-2.17.0
+2.14.2
