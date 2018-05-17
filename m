@@ -1,49 +1,42 @@
-From: pbrobinson@gmail.com (Peter Robinson)
-Date: Thu, 17 May 2018 17:44:36 +0100
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 17 May 2018 18:55:26 +0200 (CEST)
 Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <20180517131727.29263-1-eric@anholt.net>
+In-Reply-To: <alpine.DEB.2.21.1805171233500.7984@macbook-air>
 References: <20180517131727.29263-1-eric@anholt.net>
-Message-ID: <CALeDE9MCox38f9w5wrWtvefNCZoWSRHAqcec0Xi0qdZidHKHQw@mail.gmail.com>
+ <1412187220.62585.1526572780332@email.1und1.de>
+ <alpine.DEB.2.21.1805171233500.7984@macbook-air>
+Message-ID: <307323036.63872.1526576126537@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 2:17 PM, Eric Anholt <eric@anholt.net> wrote:
-> The a53 and a7 counters seem to match up, so we advertise a7 so that
-> arm32 can probe.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-Tested-by: Peter Robinson <pbrobinson@gmail.com>
+Hi,
 
-We've carried the same/equiv patch in Fedora for a while with no issues.
+[added Peter, Ingo and Arnaldo]
 
-Peter
+> Vince Weaver <vincent.weaver@maine.edu> hat am 17. Mai 2018 um 18:34 geschrieben:
+> 
+> 
+> On Thu, 17 May 2018, Stefan Wahren wrote:
+> 
+> > 
+> > > Eric Anholt <eric@anholt.net> hat am 17. Mai 2018 um 15:17 geschrieben:
+> > > 
+> > > 
+> > > The a53 and a7 counters seem to match up, so we advertise a7 so that
+> > > arm32 can probe.
+> 
+> so how closely did you look at the a53/a7 differences?  I see some major 
+> differences, especially with the CPU_CYCLES event (0xff vs 0x11).
+> 
+> The proper fix here might be to add a cortex-a53 PMU entry to the armv7 
+> code rather than trying to treat it as a cortex-a7.
 
-> ---
->  arch/arm/boot/dts/bcm2837.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
-> index 7704bb029605..1f5e5c782835 100644
-> --- a/arch/arm/boot/dts/bcm2837.dtsi
-> +++ b/arch/arm/boot/dts/bcm2837.dtsi
-> @@ -17,6 +17,12 @@
->                 };
->         };
->
-> +       arm-pmu {
-> +               compatible = "arm,cortex-a53-pmu", "arm,cortex-a7-pmu";
-> +               interrupt-parent = <&local_intc>;
-> +               interrupts = <9 IRQ_TYPE_LEVEL_HIGH>;
-> +       };
-> +
->         timer {
->                 compatible = "arm,armv7-timer";
->                 interrupt-parent = <&local_intc>;
-> --
-> 2.17.0
->
->
-> _______________________________________________
-> linux-rpi-kernel mailing list
-> linux-rpi-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
+we like to use the PMU of BCM2837 SoC (4x A53 cores) under arm32 and arm64.
+
+What is the right way (tm) to the define the DT compatibles?
+Does the arm32 PMU driver need patching for proper A53 support?
+
+Stefan
+
+> 
+> Vince
