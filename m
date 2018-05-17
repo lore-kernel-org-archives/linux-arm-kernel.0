@@ -1,25 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 17 May 2018 15:59:33 +0200
-Subject: [PATCH] i2c: i2c-stm32f7: fix documentation typo
-In-Reply-To: <1526026825-2996-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1526026825-2996-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20180517135933.mdh4femklasitbfy@ninjato>
+From: vincent.weaver@maine.edu (Vince Weaver)
+Date: Thu, 17 May 2018 10:11:02 -0400 (EDT)
+Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
+In-Reply-To: <20180517131727.29263-1-eric@anholt.net>
+References: <20180517131727.29263-1-eric@anholt.net>
+Message-ID: <alpine.DEB.2.21.1805171007260.7820@macbook-air>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 10:20:25AM +0200, Pierre-Yves MORDRET wrote:
-> Some data structure members were either misspelled or missing.
-> 
-> Fixes: aeb068c572 ("i2c: i2c-stm32f7: add driver")
-> Fixes: 380b8a85e7 ("i2c: i2c-stm32f7: Add initial SMBus protocols support")
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+On Thu, 17 May 2018, Eric Anholt wrote:
 
-Applied to for-next, thanks!
+> diff --git a/arch/arm/boot/dts/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
+> index 7704bb029605..1f5e5c782835 100644
+> --- a/arch/arm/boot/dts/bcm2837.dtsi
+> +++ b/arch/arm/boot/dts/bcm2837.dtsi
+> @@ -17,6 +17,12 @@
+>  		};
+>  	};
+>  
+> +	arm-pmu {
+> +		compatible = "arm,cortex-a53-pmu", "arm,cortex-a7-pmu";
+> +		interrupt-parent = <&local_intc>;
+> +		interrupts = <9 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> +
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180517/3a20af97/attachment.sig>
+why this and not
+
+arm-pmu {
+	compatible = "arm,armv8-pmuv3";
+	interrupt-parent = <&local_intc>;
+	interrupts = <9>;
+};
+
+which works, though when I didn't get very far when I submitted the patch 
+to add this last August.
+
+Vince
