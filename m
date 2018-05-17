@@ -1,25 +1,33 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 May 2018 14:45:07 -0700
-Subject: [PATCH 4/4] omap2: powerdomain: Inroduce cpu_pm notifiers for
- context save/restore
-In-Reply-To: <1526483821-25585-5-git-send-email-j-keerthy@ti.com>
-References: <1526483821-25585-1-git-send-email-j-keerthy@ti.com>
- <1526483821-25585-5-git-send-email-j-keerthy@ti.com>
-Message-ID: <20180517214507.GS98604@atomide.com>
+Date: Thu, 17 May 2018 15:14:40 -0700
+Subject: [PATCH] bus: ti-sysc: Fix optional clocks array access
+Message-ID: <20180517221440.91897-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [180516 15:21]:
-> +	/* Only AM43XX can lose pwrdm context during rtc-ddr suspend */
-> +	if (soc_is_am43xx()) {
-> +		nb.notifier_call = cpu_notifier;
-> +		cpu_pm_register_notifier(&nb);
-> +	}
-> +
+We should be checking ddata->clocks[i] instead of clock_names[i]
+for the optional clocks. Currently this just happens to work for
+the typical case of one fck and one optional clock.
 
-Hmm in patch 3/4 you add omap4_pwrdm_save_context(), I think
-that we'd want to run with the notifier for cpuidle on omap4?
+Fixes: 09dfe5810762 ("bus: ti-sysc: Add handling for clkctrl opt clocks")
+Cc: Dan Carpenter <dan.carpenter@oracle.com>
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ drivers/bus/ti-sysc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards,
-
-Tony
+diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
+--- a/drivers/bus/ti-sysc.c
++++ b/drivers/bus/ti-sysc.c
+@@ -128,7 +128,7 @@ static int sysc_get_one_clock(struct sysc *ddata, const char *name)
+ 
+ 	if (index < 0) {
+ 		for (i = SYSC_OPTFCK0; i < SYSC_MAX_CLOCKS; i++) {
+-			if (!clock_names[i]) {
++			if (!ddata->clocks[i]) {
+ 				index = i;
+ 				break;
+ 			}
+-- 
+2.17.0
