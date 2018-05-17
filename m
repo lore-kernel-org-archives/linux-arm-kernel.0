@@ -1,260 +1,56 @@
-From: erin.lo@mediatek.com (Erin Lo)
-Date: Thu, 17 May 2018 14:22:06 +0800
-Subject: [PATCH v3 4/4] arm64: dts: Add Mediatek SoC MT8183 and evaluation
- board dts and Makefile
-In-Reply-To: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
-References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1526538126-51497-5-git-send-email-erin.lo@mediatek.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 17 May 2018 09:23:07 +0300
+Subject: [PATCH] PCI: Clean up resource allocation in
+ devm_of_pci_get_host_bridge_resources()
+In-Reply-To: <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
+References: <cover.1526375226.git.jan.kiszka@siemens.com>
+ <3aeb2ed038cbce8fe744b614dc19d414555a7e8f.1526375226.git.jan.kiszka@siemens.com>
+ <CAHp75VeUbjobse6uLeM4h_xXRUw+YUQUN+EOye67AJy77a5euQ@mail.gmail.com>
+ <CAHp75VeM7_8+9QJjOypXaiBhpWP4B5KACdUQ-p3frbS3jPh=OQ@mail.gmail.com>
+ <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
+Message-ID: <97f42f4a-071a-4335-ca65-a0f26adc1b89@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Ho <Ben.Ho@mediatek.com>
+On 05/16/2018 03:31 PM, Jan Kiszka wrote:
+> Instead of first allocating and then freeing memory for struct resource
+> in case we cannot parse a PCI resource from the device tree, work
+> against a local struct and kmemdup it when we decide to go with it.
+> 
+> Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> ---
+>  drivers/pci/of.c | 14 ++++++--------
+>  1 file changed, 6 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+> index b06585a1da75..fc0f906c5c25 100644
+> --- a/drivers/pci/of.c
+> +++ b/drivers/pci/of.c
+> @@ -266,7 +266,7 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
+>  			struct list_head *resources, resource_size_t *io_base)
+>  {
+>  	struct device_node *dev_node = dev->of_node;
+> -	struct resource *res;
+> +	struct resource *res, tmp_res;
+>  	struct resource *bus_range;
+>  	struct of_pci_range range;
+>  	struct of_pci_range_parser parser;
+> @@ -320,18 +320,16 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
+>  		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+>  			continue;
+>  
+> -		res = devm_kzalloc(dev, sizeof(struct resource), GFP_KERNEL);
+> +		err = of_pci_range_to_resource(&range, dev_node, &tmp_res);
+> +		if (err)
+> +			continue;
+> +
+> +		res = devm_kmemdup(dev, &tmp_res, sizeof(tmp_res), GFP_KERNEL);
 
-Add basic chip support for Mediatek 8183
+The change looks okay, apparently probable garbage in tmp_res.desc has no impact.
 
-Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
-Signed-off-by: Erin Lo <erin.lo@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/Makefile       |   1 +
- arch/arm64/boot/dts/mediatek/mt8183-evb.dts |  31 +++++
- arch/arm64/boot/dts/mediatek/mt8183.dtsi    | 182 ++++++++++++++++++++++++++++
- 3 files changed, 214 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
+Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 
-diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-index ac17f60..2836261 100644
---- a/arch/arm64/boot/dts/mediatek/Makefile
-+++ b/arch/arm64/boot/dts/mediatek/Makefile
-@@ -5,3 +5,4 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt8183-evb.dtb
-diff --git a/arch/arm64/boot/dts/mediatek/mt8183-evb.dts b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
-new file mode 100644
-index 0000000..9b52559
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
-@@ -0,0 +1,31 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Ben Ho <ben.ho@mediatek.com>
-+ *	   Erin Lo <erin.lo@mediatek.com>
-+ */
-+
-+/dts-v1/;
-+#include "mt8183.dtsi"
-+
-+/ {
-+	model = "MediaTek MT8183 evaluation board";
-+	compatible = "mediatek,mt8183-evb", "mediatek,mt8183";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x80000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:921600n8";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
-new file mode 100644
-index 0000000..03edf9c
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
-@@ -0,0 +1,182 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Ben Ho <ben.ho@mediatek.com>
-+ *	   Erin Lo <erin.lo@mediatek.com>
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "mediatek,mt8183";
-+	interrupt-parent = <&sysirq>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&cpu0>;
-+				};
-+				core1 {
-+					cpu = <&cpu1>;
-+				};
-+				core2 {
-+					cpu = <&cpu2>;
-+				};
-+				core3 {
-+					cpu = <&cpu3>;
-+				};
-+			};
-+
-+			cluster1 {
-+				core0 {
-+					cpu = <&cpu4>;
-+				};
-+				core1 {
-+					cpu = <&cpu5>;
-+				};
-+				core2 {
-+					cpu = <&cpu6>;
-+				};
-+				core3 {
-+					cpu = <&cpu7>;
-+				};
-+			};
-+		};
-+
-+		cpu0: cpu at 000 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x000>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu1: cpu at 001 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x001>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu2: cpu at 002 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x002>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu3: cpu at 003 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x003>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu4: cpu at 100 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a73";
-+			reg = <0x100>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu5: cpu at 101 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a73";
-+			reg = <0x101>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu6: cpu at 102 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a73";
-+			reg = <0x102>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu7: cpu at 103 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a73";
-+			reg = <0x103>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	psci {
-+		compatible      = "arm,psci-1.0";
-+		method          = "smc";
-+	};
-+
-+	uart_clk: dummy26m {
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+		#clock-cells = <0>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+
-+	gic: interrupt-controller at 0c000000 {
-+		compatible = "arm,gic-v3";
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+		interrupt-controller;
-+		reg = <0 0x0c000000 0 0x40000>,  /* GICD */
-+		      <0 0x0c100000 0 0x200000>; /* GICR */
-+		      <0 0x0c400000 0 0x2000>;   /* GICC */
-+		      <0 0x0c410000 0 0x1000>;   /* GICH */
-+		      <0 0x0c420000 0 0x2000>;   /* GICV */
-+
-+		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
-+	sysirq: intpol-controller at 0c530a80 {
-+		compatible = "mediatek,mt8183-sysirq",
-+			     "mediatek,mt6577-sysirq";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+		reg = <0 0x0c530a80 0 0x50>;
-+	};
-+
-+	uart0: serial at 11002000 {
-+		compatible = "mediatek,mt8183-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11002000 0 0x1000>;
-+		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>, <&uart_clk>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
-+
-+	uart1: serial at 11003000 {
-+		compatible = "mediatek,mt8183-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11003000 0 0x1000>;
-+		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>, <&uart_clk>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
-+
-+	uart2: serial at 11004000 {
-+		compatible = "mediatek,mt8183-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11004000 0 0x1000>;
-+		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>, <&uart_clk>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
-+};
--- 
-1.9.1
+--
+With best wishes,
+Vladimir
