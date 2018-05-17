@@ -1,89 +1,151 @@
-From: hao5781286@gmail.com (Hao Zhang)
-Date: Thu, 17 May 2018 22:48:58 +0800
-Subject: [PATCH v2 4/4] ARM: PWM: add allwinner sun8i pwm support.
-In-Reply-To: <20180515111711.l2g4vgsal7yr6dbr@flea>
-References: <20180225135308.GA14561@arx-s1>
- <20180226090038.etk5q4pd4rl5dvf6@flea.lan>
- <CAJeuY7-Dz1u9J8GMu=OdzJ2cJUnE3wEobJoQz6RV-ibjBjoW4A@mail.gmail.com>
- <20180515111711.l2g4vgsal7yr6dbr@flea>
-Message-ID: <CAJeuY79ObkssY_=SLG==7xZri10P3yWFhXC3=CUVrdQ+7cBoHA@mail.gmail.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Thu, 17 May 2018 22:52:56 +0800
+Subject: [PATCH] ethernet: stmmac: dwmac-rk: Add GMAC support for px30
+In-Reply-To: <f7f67fbe-41e7-4497-cb01-a1fa2195d4b0@rock-chips.com>
+References: <1526441925-12654-1-git-send-email-david.wu@rock-chips.com>
+ <f7f67fbe-41e7-4497-cb01-a1fa2195d4b0@rock-chips.com>
+Message-ID: <4c9cdacb-4865-20f1-bad9-e9d826319bb7@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-05-15 19:17 GMT+08:00 Maxime Ripard <maxime.ripard@bootlin.com>:
-> Hi,
->
-> On Mon, May 14, 2018 at 10:45:44PM +0800, Hao Zhang wrote:
->> 2018-02-26 17:00 GMT+08:00 Maxime Ripard <maxime.ripard@bootlin.com>:
->> > Thanks for respinning this serie. It looks mostly good, but you still
->> > have a quite significant number of checkpatch (--strict) warnings that
->> > you should address.
+
+Hi Shawn,
+
+Thanks for the suggestion, the most is okay.
+
+? 2018?05?16? 14:34, Shawn Lin ??:
+> Hi David,
+> 
+> On 2018/5/16 11:38, David Wu wrote:
+>> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c 
+>> b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+>> index 13133b3..4b2ab71 100644
+>> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+>> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+>> @@ -61,6 +61,7 @@ struct rk_priv_data {
+>> ????? struct clk *mac_clk_tx;
+>> ????? struct clk *clk_mac_ref;
+>> ????? struct clk *clk_mac_refout;
+>> +??? struct clk *clk_mac_speed;
+> 
+> No need to do anything now but it seems you could consider doing some
+> cleanup by using clk bulk APIs in the future.
+
+The use of this may seem to be less applicable because there are many 
+scenarios using different clocks.
+
+> 
+>> ????? struct clk *aclk_mac;
+>> ????? struct clk *pclk_mac;
+>> ????? struct clk *clk_phy;
+>> @@ -83,6 +84,64 @@ struct rk_priv_data {
+>> ????? (((tx) ? soc##_GMAC_TXCLK_DLY_ENABLE : 
+>> soc##_GMAC_TXCLK_DLY_DISABLE) | \
+>> ?????? ((rx) ? soc##_GMAC_RXCLK_DLY_ENABLE : 
+>> soc##_GMAC_RXCLK_DLY_DISABLE))
+>> +#define PX30_GRF_GMAC_CON1??????? 0X0904
+> 
+> s/0X0904/0x0904 , since the other constants in this file follow the
+> same format.
+> 
+>> +
+>> +/* PX30_GRF_GMAC_CON1 */
+>> +#define PX30_GMAC_PHY_INTF_SEL_RMII??? (GRF_CLR_BIT(4) | 
+>> GRF_CLR_BIT(5) | \
+>> +??????????????????? GRF_BIT(6))
+>> +#define PX30_GMAC_SPEED_10M??????? GRF_CLR_BIT(2)
+>> +#define PX30_GMAC_SPEED_100M??????? GRF_BIT(2)
+>> +
+>> +static void px30_set_to_rmii(struct rk_priv_data *bsp_priv)
+>> +{
+>> +??? struct device *dev = &bsp_priv->pdev->dev;
+>> +
+>> +??? if (IS_ERR(bsp_priv->grf)) {
+>> +??????? dev_err(dev, "%s: Missing rockchip,grf property\n", __func__);
+>> +??????? return;
+>> +??? }
+>> +
+>> +??? regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
+>> +???????????? PX30_GMAC_PHY_INTF_SEL_RMII);
+>> +}
+>> +
+>> +static void px30_set_rmii_speed(struct rk_priv_data *bsp_priv, int 
+>> speed)
+>> +{
+>> +??? struct device *dev = &bsp_priv->pdev->dev;
+>> +??? int ret;
+>> +
+>> +??? if (IS_ERR(bsp_priv->clk_mac_speed)) {
+>> +??????? dev_err(dev, "%s: Missing clk_mac_speed clock\n", __func__);
+>> +??????? return;
+>> +??? }
+>> +
+>> +??? if (speed == 10) {
+>> +??????? regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
+>> +???????????????? PX30_GMAC_SPEED_10M);
+>> +
+>> +??????? ret = clk_set_rate(bsp_priv->clk_mac_speed, 2500000);
+>> +??????? if (ret)
+>> +??????????? dev_err(dev, "%s: set clk_mac_speed rate 2500000 failed: 
+>> %d\n",
+>> +??????????????? __func__, ret);
+>> +??? } else if (speed == 100) {
+>> +??????? regmap_write(bsp_priv->grf, PX30_GRF_GMAC_CON1,
+>> +???????????????? PX30_GMAC_SPEED_100M);
+>> +
+>> +??????? ret = clk_set_rate(bsp_priv->clk_mac_speed, 25000000);
+>> +??????? if (ret)
+>> +??????????? dev_err(dev, "%s: set clk_mac_speed rate 25000000 failed: 
+>> %d\n",
+>> +??????????????? __func__, ret);
+> 
+> I know it follows the existing examples, but IMHO it duplicates
+> unnecessary code as all the difference is PX30_GMAC_SPEED_*
+> 
+
+i think the difference is the register offset and bits.
+
+>> +
+>> +??? } else {
+>> +??????? dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
+>> +??? }
+>> +}
+>> +
+>> +static const struct rk_gmac_ops px30_ops = {
+>> +??? .set_to_rmii = px30_set_to_rmii,
+>> +??? .set_rmii_speed = px30_set_rmii_speed,
+>> +};
+>> +
+>> ? #define RK3128_GRF_MAC_CON0??? 0x0168
+>> ? #define RK3128_GRF_MAC_CON1??? 0x016c
+>> @@ -1042,6 +1101,10 @@ static int rk_gmac_clk_init(struct 
+>> plat_stmmacenet_data *plat)
+>> ????????? }
+>> ????? }
+>> +??? bsp_priv->clk_mac_speed = devm_clk_get(dev, "clk_mac_speed");
+> 
+> Mightbe it'd be better to use "mac-speed" in DT bindings.
+> 
+>> +??? if (IS_ERR(bsp_priv->clk_mac_speed))
+>> +??????? dev_err(dev, "cannot get clock %s\n", "clk_mac_speed");
+>> +
+> 
+> Would you like to handle deferred probe >
+
+No,
+
+>> ????? if (bsp_priv->clock_input) {
+>> ????????? dev_info(dev, "clock input from PHY\n");
+>> ????? } else {
+>> @@ -1424,6 +1487,7 @@ static int rk_gmac_resume(struct device *dev)
+>> ? static SIMPLE_DEV_PM_OPS(rk_gmac_pm_ops, rk_gmac_suspend, 
+>> rk_gmac_resume);
+>> ? static const struct of_device_id rk_gmac_dwmac_match[] = {
+>> +??? { .compatible = "rockchip,px30-gmac",??? .data = &px30_ops?? },
+>> ????? { .compatible = "rockchip,rk3128-gmac", .data = &rk3128_ops },
+>> ????? { .compatible = "rockchip,rk3228-gmac", .data = &rk3228_ops },
+>> ????? { .compatible = "rockchip,rk3288-gmac", .data = &rk3288_ops },
 >>
->> Thanks for reviews :) ,i'm sorry for that, it will be fixed next
->> time.  and, besides, in what situation were the checkpatch warning
->> can be ignore?
->
-> The only one that can be reasonably be ignored is the long line
-> warning, and only if complying to the limit would make it less easy to
-> understand.
->
->> >
->> > On Sun, Feb 25, 2018 at 09:53:08PM +0800, hao_zhang wrote:
->> >> +#define CAPTURE_IRQ_ENABLE_REG       0x0010
->> >> +#define CFIE(ch)     BIT(ch << 1 + 1)
->> >> +#define CRIE(ch)     BIT(ch << 1)
->> >
->> > You should also put your argument between parentheses here (and in all
->> > your other macros).
->>
->> Do you mean like this ?
->> #define CFIE(ch)     BIT((ch) << 1 + 1)
->> #define CRIE(ch)     BIT((ch) << 1)
->
-> Yep, exactly. Otherwise, if you do something like CRIE(1 + 1), the
-> result will be BIT(1 + 1 << 1), which will expand to 3, instead of 4.
->
-> Also, CFIE looks a bit weird here, is it the offset that is
-> incremented, or the value? You should probably have parentheses to
-> make it explicit.
-
-The vallue,
-BIT(((ch) << 1) + 1) It seem not very nice...
-
-uhmm...
-In CAPTURE_IRQ_ENABLE_REG odd number is CFIE, even number is CRIE
-each channel has one CFIE and CRIE.
-
-we can also describe like this:
-#define CFIE(ch)     BIT((ch) * 2 + 1)
-#define CRIE(ch)     BIT((ch) * 2)
-
->
->> >
->> >> +static const u16 div_m_table[] = {
->> >> +     1,
->> >> +     2,
->> >> +     4,
->> >> +     8,
->> >> +     16,
->> >> +     32,
->> >> +     64,
->> >> +     128,
->> >> +     256
->> >> +};
->> >
->> > If this is just a power of two, you can use either the power of two /
->> > ilog2 to switch back and forth, instead of using that table.
->>
->> I think using table is more explicit and extended...
->
-> If you didn't have a simple mapping between the register values and
-> the divider value, then yeah, sure. But it's not the case here.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+> 
+> 
+> 
