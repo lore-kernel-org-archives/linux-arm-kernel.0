@@ -1,44 +1,45 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 May 2018 11:35:44 +0100
-Subject: [PATCH 0/4] KVM/arm64: Cache maintenance relaxations
-Message-ID: <20180517103548.5622-1-marc.zyngier@arm.com>
+Date: Thu, 17 May 2018 11:35:48 +0100
+Subject: [PATCH 4/4] arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is present
+In-Reply-To: <20180517103548.5622-1-marc.zyngier@arm.com>
+References: <20180517103548.5622-1-marc.zyngier@arm.com>
+Message-ID: <20180517103548.5622-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This small series makes use of features recently introduced in the
-ARMv8 architecture to relax the cache maintenance operations on CPUs
-that implement these features.
+Set/Way handling is one of the ugliest corners of KVM. We shouldn't
+have to handle that, but better safe than sorry.
 
-FWB is the most important one. It allows stage-2 to enforce the
-cacheability of memory, no matter what the guest says. It also
-mandates that the whole machine is cache coherent (no non-coherent
-I/O), meaning we can drop a whole class of cache maintenance
-operations.
+Thankfully, FWB fixes this for us by not requiering any maintenance
+whatsoever, which means we don't have to emulate S/W CMOs, and don't
+have to track VM ops either.
 
-FWB, when combined with CTL_EL0.{IDC,DIC} allows the removal of all
-cache maintenance and tracking of pages being executed.
+We still have to trap S/W though, if only to prevent the guest from
+doing something bad.
 
-We also take the opportunity to drop a few useless CMOs that were
-applied to the HYP page tables, but that were never necessary.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/sys_regs.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Marc Zyngier (4):
-  arm64: KVM: Add support for Stage-2 control of memory types and
-    cacheability
-  arm64: KVM: Avoid marking pages as XN in Stage-2 if CTR_EL0.DIC is set
-  KVM: arm/arm64: Remove unnecessary CMOs when creating HYP page tables
-  arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is present
-
- arch/arm64/include/asm/cpucaps.h      |  3 ++-
- arch/arm64/include/asm/kvm_arm.h      |  1 +
- arch/arm64/include/asm/kvm_emulate.h  |  2 ++
- arch/arm64/include/asm/kvm_mmu.h      | 24 +++++++++++++++++-------
- arch/arm64/include/asm/memory.h       |  7 +++++++
- arch/arm64/include/asm/pgtable-prot.h | 24 ++++++++++++++++++++++--
- arch/arm64/include/asm/sysreg.h       |  1 +
- arch/arm64/kernel/cpufeature.c        | 20 ++++++++++++++++++++
- arch/arm64/kvm/sys_regs.c             |  8 +++++++-
- virt/kvm/arm/mmu.c                    |  9 +++++----
- 10 files changed, 84 insertions(+), 15 deletions(-)
-
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 806b0b126a64..ef373963bf95 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -195,7 +195,13 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
+ 	if (!p->is_write)
+ 		return read_from_write_only(vcpu, p, r);
+ 
+-	kvm_set_way_flush(vcpu);
++	/*
++	 * Only track S/W ops if we don't have FWB. It still indicates
++	 * that the guest is a bit broken...
++	 */
++	if (!cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
++		kvm_set_way_flush(vcpu);
++
+ 	return true;
+ }
+ 
 -- 
 2.14.2
