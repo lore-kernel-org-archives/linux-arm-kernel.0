@@ -1,153 +1,30 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Thu, 17 May 2018 06:39:02 +0000
-Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
- to netdev dma client
-In-Reply-To: <ee1dc551-7c11-6d10-651d-01bf6520f049@ti.com>
-References: <20180411090854.GY6014@localhost>
- <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
- <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
- <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
- <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
- <78828d31-e4cd-5211-f1b6-8918ac38f599@ti.com>
- <e5a6c1ad-e263-7b9d-a5e2-744884c9d6de@metafoo.de>
- <a6ac9ca8-91b4-c7b1-0f0c-c04dd10048e2@ti.com>
- <d7432292-cedd-7d61-f219-8b63eb6c1d50@metafoo.de>
- <8c7a5ac8-0747-9dad-f6e5-74890b64f618@ti.com>
- <20180424035548.GA6014@localhost>
- <ee1dc551-7c11-6d10-651d-01bf6520f049@ti.com>
-Message-ID: <MWHPR02MB3293486390485A6FCCEA7DECC7910@MWHPR02MB3293.namprd02.prod.outlook.com>
+From: jgross@suse.com (Juergen Gross)
+Date: Thu, 17 May 2018 08:42:00 +0200
+Subject: [PATCH v5] xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE
+In-Reply-To: <20180509131612.21107-1-paul.durrant@citrix.com>
+References: <20180509131612.21107-1-paul.durrant@citrix.com>
+Message-ID: <69c96876-e5b7-dd6e-8ebe-3493d736e578@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/05/18 15:16, Paul Durrant wrote:
+> My recent Xen patch series introduces a new HYPERVISOR_memory_op to
+> support direct priv-mapping of certain guest resources (such as ioreq
+> pages, used by emulators) by a tools domain, rather than having to access
+> such resources via the guest P2M.
+> 
+> This patch adds the necessary infrastructure to the privcmd driver and
+> Xen MMU code to support direct resource mapping.
+> 
+> NOTE: The adjustment in the MMU code is partially cosmetic. Xen will now
+>       allow a PV tools domain to map guest pages either by GFN or MFN, thus
+>       the term 'mfn' has been swapped for 'pfn' in the lower layers of the
+>       remap code.
+> 
+> Signed-off-by: Paul Durrant <paul.durrant@citrix.com>
+> Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 
-> -----Original Message-----
-> From: Peter Ujfalusi [mailto:peter.ujfalusi at ti.com]
-> Sent: Tuesday, April 24, 2018 3:21 PM
-> To: Vinod Koul <vinod.koul@intel.com>
-> Cc: Lars-Peter Clausen <lars@metafoo.de>; Radhey Shyam Pandey
-> <radheys@xilinx.com>; michal.simek at xilinx.com; linux-
-> kernel at vger.kernel.org; dmaengine at vger.kernel.org;
-> dan.j.williams at intel.com; Appana Durga Kedareswara Rao
-> <appanad@xilinx.com>; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
-> to netdev dma client
-> 
-> On 2018-04-24 06:55, Vinod Koul wrote:
-> > On Thu, Apr 19, 2018 at 02:40:26PM +0300, Peter Ujfalusi wrote:
-> >>
-> >> On 2018-04-18 16:06, Lars-Peter Clausen wrote:
-> >>>> Hrm, true, but it is hardly the metadata use case. It is more like
-> >>>> different DMA transfer type.
-> >>>
-> >>> When I look at this with my astronaut architect view from high high up
-> above
-> >>> I do not see a difference between metadata and multi-planar data.
-> >>
-> >> I tend to disagree.
-> >
-> > and we will love to hear more :)
-> 
-> It is getting pretty off topic from the subject ;) and I'm sorry about that.
-> 
-> Multi-planar data is _data_, the metadata is
-> parameters/commands/information on _how_ to use the data.
-> It is more like a replacement or extension of:
-> configure peripheral
-> send data
-> 
-> to
-> 
-> send data with configuration
-> 
-> In both cases the same data is sent, but the configuration,
-> parametrization is 'simplified' to allow per packet changes.
-> 
-> >>> Both split the data that is sent to the peripheral into multiple
-> >>> sub-streams, each carrying part of the data. I'm sure there are peripherals
-> >>> that interleave data and metadata on the same data stream. Similar to
-> how we
-> >>> have left and right channel interleaved in a audio stream.
-> >>
-> >> Slimbus, S/PDIF?
-> >>
-> >>> What about metadata that is not contiguous and split into multiple
-> segments.
-> >>> How do you handle passing a sgl to the metadata interface? And then it
-> >>> suddenly looks quite similar to the normal DMA descriptor interface.
-> >>
-> >> Well, the metadata is for the descriptor. The descriptor describe the
-> >> data transfer _and_ can convey additional information. Nothing is
-> >> interleaved, the data and the descriptor are different things. It is
-> >> more like TCP headers detached from the data (but pointing to it).
-> >>
-> >>> But maybe that's just one abstraction level to high.
-> >>
-> >> I understand your point, but at the end the metadata needs to end up in
-> >> the descriptor which is describing the data that is going to be moved.
-> >>
-> >> The descriptor is not sent as a separate DMA trasnfer, it is part of the
-> >> DMA transfer, it is handled internally by the DMA.
-> >
-> > That is bit confusing to me. I thought DMA was transparent to meta data and
-> > would blindly collect and transfer along with the descriptor. So at high
-> > level we are talking about two transfers (probably co-joined at hip and you
-> > want to call one transfer)
-> 
-> At the end yes, both the descriptor and the data is going to be sent to
-> the other end.
-> 
-> As a reference see [1]
-> 
-> The metadata is not a separate entity, it is part of the descriptor
-> (Host Packet Descriptor - HPD).
-> Each transfer (packet) is described with a HPD. The HPD have optional
-> fields, like EPIB (Extended Packet Info Block), PSdata (Protocol
-> Specific data).
-> 
-> When the DMA reads the HPD, is going to move the data described by the
-> HPD to the entry point (or from the entry point to memory), copies the
-> EPIB/PSdata from the HPD to a destination HPD. The other end will use
-> the destination HPD to know the size of the data and to get the metadata
-> from the descriptor.
-> 
-> In essence every entity within the Multicore Navigator system have
-> pktdma, they all work in a similar way, but their capabilities might
-> differ. Our entry to this mesh is via the DMA.
-> 
-> > but why can't we visualize this as just a DMA
-> > transfers. maybe you want to signal/attach to transfer, cant we do that with
-> > additional flag DMA_METADATA etc..?
-> 
-> For the data we need to call dmaengine_prep_slave_* to create the
-> descriptor (HPD). The metadata needs to be present in the HPD, hence I
-> was thinking of the attach_metadata as per descriptor API.
-> 
-> If separate dmaengine_prep_slave_* is used for allocating the HPD and
-> place the metadata in it then the consequent dmaengine_prep_slave_* call
-> must be for the data of the transfer and it is still unclear how the
-> prepare call would have any idea where to look for the HPD it needs to
-> update with the parameters for the data transfer.
-> 
-> I guess the driver could store the HPD pointer in the channel data if
-> the prepare is called with DMA_METADATA and it would be mandatory that
-> the next prepare is for the data portion. The driver would pick the
-> pointer to the HPD we stored away and update the descriptor belonging to
-> different tx_desc.
-> 
-> But if we are here, we could have a flag like DMA_DESCRIPTOR and let
-> client drivers to allocate the whole descriptor, fill in the metadata
-> and give that to the DMA driver, which will update the rest of the HPD.
-> 
-> Well, let's see where this is going to go when I can send the patches
-> for review.
-Thanks all. @Peter: If we have metadata patchset ready may be good
-to send an RFC?
+Pushed to xen/tip.git for-linus-4.18
 
-> 
-> [1] http://www.ti.com/lit/ug/sprugr9h/sprugr9h.pdf
-> 
-> - P?ter
-> 
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+
+Juergen
