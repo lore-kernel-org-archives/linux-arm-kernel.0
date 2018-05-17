@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 May 2018 17:41:46 +0100 (BST)
-Subject: Applied "regulator: of: add property for allowed modes specification"
+Date: Thu, 17 May 2018 17:41:44 +0100 (BST)
+Subject: Applied "regulator: of: add support for allowed modes configuration"
  to the regulator tree
-In-Reply-To: <f3aa166ddd11c8f9813602be68aa5b10e5c90979.1526088289.git.collinsd@codeaurora.org>
-Message-ID: <20180517164146.4A3B044007E@finisterre.ee.mobilebroadband>
+In-Reply-To: <58bb4f965515a67a6cbbc726b0d7b092c22b79d7.1526088289.git.collinsd@codeaurora.org>
+Message-ID: <20180517164144.0CD3D44007E@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   regulator: of: add property for allowed modes specification
+   regulator: of: add support for allowed modes configuration
 
 has been applied to the regulator tree at
 
@@ -34,35 +34,67 @@ to this mail.
 Thanks,
 Mark
 
->From d73e2842a3e236a1f58ba498e4d6ae58e18f660a Mon Sep 17 00:00:00 2001
+>From 54557ad9737e28b06b632cce723ef2373fe6bf12 Mon Sep 17 00:00:00 2001
 From: David Collins <collinsd@codeaurora.org>
-Date: Fri, 11 May 2018 18:46:46 -0700
-Subject: [PATCH] regulator: of: add property for allowed modes specification
+Date: Fri, 11 May 2018 18:46:47 -0700
+Subject: [PATCH] regulator: of: add support for allowed modes configuration
 
-Add a common device tree property for regulator nodes to support
-the specification of allowed operating modes.
+Add support for configuring the machine constraints
+valid_modes_mask element based on a list of allowed modes
+specified via a device tree property.
 
 Signed-off-by: David Collins <collinsd@codeaurora.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/regulator/regulator.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/regulator/of_regulator.c | 29 ++++++++++++++++++++++++++++-
+ 1 file changed, 28 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
-index 2babe15b618d..c627aa08f0da 100644
---- a/Documentation/devicetree/bindings/regulator/regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/regulator.txt
-@@ -59,6 +59,11 @@ Optional properties:
- - regulator-initial-mode: initial operating mode. The set of possible operating
-   modes depends on the capabilities of every hardware so each device binding
-   documentation explains which values the regulator supports.
-+- regulator-allowed-modes: list of operating modes that software is allowed to
-+  configure for the regulator at run-time.  Elements may be specified in any
-+  order.  The set of possible operating modes depends on the capabilities of
-+  every hardware so each device binding document explains which values the
-+  regulator supports.
- - regulator-system-load: Load in uA present on regulator that is not captured by
-   any consumer request.
- - regulator-pull-down: Enable pull down resistor when the regulator is disabled.
+diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
+index 0d3f73eacb99..d61fed28fdb9 100644
+--- a/drivers/regulator/of_regulator.c
++++ b/drivers/regulator/of_regulator.c
+@@ -32,7 +32,7 @@ static void of_get_regulation_constraints(struct device_node *np,
+ 	struct regulator_state *suspend_state;
+ 	struct device_node *suspend_np;
+ 	unsigned int mode;
+-	int ret, i;
++	int ret, i, len;
+ 	u32 pval;
+ 
+ 	constraints->name = of_get_property(np, "regulator-name", NULL);
+@@ -136,6 +136,33 @@ static void of_get_regulation_constraints(struct device_node *np,
+ 		}
+ 	}
+ 
++	len = of_property_count_elems_of_size(np, "regulator-allowed-modes",
++						sizeof(u32));
++	if (len > 0) {
++		if (desc && desc->of_map_mode) {
++			for (i = 0; i < len; i++) {
++				ret = of_property_read_u32_index(np,
++					"regulator-allowed-modes", i, &pval);
++				if (ret) {
++					pr_err("%s: couldn't read allowed modes index %d, ret=%d\n",
++						np->name, i, ret);
++					break;
++				}
++				mode = desc->of_map_mode(pval);
++				if (mode == REGULATOR_MODE_INVALID)
++					pr_err("%s: invalid regulator-allowed-modes element %u\n",
++						np->name, pval);
++				else
++					constraints->valid_modes_mask |= mode;
++			}
++			if (constraints->valid_modes_mask)
++				constraints->valid_ops_mask
++					|= REGULATOR_CHANGE_MODE;
++		} else {
++			pr_warn("%s: mode mapping not defined\n", np->name);
++		}
++	}
++
+ 	if (!of_property_read_u32(np, "regulator-system-load", &pval))
+ 		constraints->system_load = pval;
+ 
 -- 
 2.17.0
