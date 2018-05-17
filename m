@@ -1,41 +1,30 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 17 May 2018 14:04:22 +0200
-Subject: [PATCH v3 0/4] Introduce STM32MP1 RTC
-Message-ID: <1526558666-24243-1-git-send-email-amelie.delaunay@st.com>
+Date: Thu, 17 May 2018 14:07:08 +0200
+Subject: [PATCH v2 3/3] ARM: multi_v7_defconfig: enable STM32 RTC
+In-Reply-To: <1526558828-24456-1-git-send-email-amelie.delaunay@st.com>
+References: <1526558828-24456-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1526558828-24456-4-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduces STM32MP1 RTC.
-On STM32MP1:
-- two clocks are needed, plck and rtc_ck;
-- to wakeup the system, a wakeup alarm interrupt is needed;
-- some registers or bits have moved, but the operation is the same;
-- the Backup Domain Protection (DBP) is not managed by RTC driver.
+Enable the STM32 Real Time Clock (RTC) driver, implemented on STM32MP1 SoC.
 
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
-Changes in v3:
-* Move cleanup changes in a separate patch
-* Replace regs and evts by pointers to ensure no copy is made
-* Set all registers offset as u16 instead of u8 and u16
-* Fix Kbuild smatch warning:
-  drivers/rtc/rtc-stm32.c:827 stm32_rtc_probe()
-  warn: always true condition '(regs.verr != ~0) => (0-u16max != (-1))'
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes in v2:
-* One compatible per line in bindings file
-* Remove unnecessary comment under rtc_ck as this clock is required for all
-* Remove interrupts-extended and add stm32mp1 rtc alarm wakeup interrupt in
-  interrupts property description
-
-Amelie Delaunay (4):
-  rtc: stm32: fix misspelling and misalignment issues
-  rtc: stm32: rework register management to prepare other version of RTC
-  dt-bindings: rtc: update stm32-rtc documentation for stm32mp1 rtc
-  rtc: stm32: add stm32mp1 rtc support
-
- .../devicetree/bindings/rtc/st,stm32-rtc.txt       |  27 +-
- drivers/rtc/rtc-stm32.c                            | 273 ++++++++++++++++-----
- 2 files changed, 229 insertions(+), 71 deletions(-)
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 89167cd..8e02f86 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -863,6 +863,7 @@ CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_SUNXI=y
+ CONFIG_RTC_DRV_MV=y
+ CONFIG_RTC_DRV_TEGRA=y
++CONFIG_RTC_DRV_STM32=y
+ CONFIG_RTC_DRV_CPCAP=m
+ CONFIG_DMADEVICES=y
+ CONFIG_DW_DMAC=y
 -- 
 2.7.4
