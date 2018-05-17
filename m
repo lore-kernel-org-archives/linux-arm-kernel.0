@@ -1,56 +1,114 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 17 May 2018 09:17:44 +0100
-Subject: [PATCH] KVM: arm/arm64: add WARN_ON if size is not PAGE_SIZE
- aligned in unmap_stage2_range
-In-Reply-To: <1526537487-14804-1-git-send-email-hejianet@gmail.com>
-References: <1526537487-14804-1-git-send-email-hejianet@gmail.com>
-Message-ID: <698b0355-d430-86b8-cd09-83c6d9e566f8@arm.com>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Thu, 17 May 2018 11:20:24 +0300
+Subject: [PATCH v7 12/14] cpufreq: Add Kryo CPU scaling driver
+References: <1526375616-16904-1-git-send-email-ilialin@codeaurora.org>
+ <1526375616-16904-13-git-send-email-ilialin@codeaurora.org>
+ <CAHLCerOYq4q2GE+m3MQAbMfxM4azPr95XiLKVtoPVG1Kv2Db=A@mail.gmail.com>
+ <20180516141132.aqjif7d5motmmnlo@vireshk-i7>
+Message-ID: <017f01d3edb7$ec160320$c4420960$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Jia,
 
-On 17/05/18 07:11, Jia He wrote:
-> I ever met a panic under memory pressure tests(start 20 guests and run
-> memhog in the host).
+> -----Original Message-----
+> From: ilialin at codeaurora.org <ilialin@codeaurora.org>
+> Sent: Thursday, May 17, 2018 10:51
+> To: 'Viresh Kumar' <viresh.kumar@linaro.org>; 'Amit Kucheria'
+> <amit.kucheria@linaro.org>
+> Cc: 'Michael Turquette' <mturquette@baylibre.com>; 'sboyd at kernel.org'
+> <sboyd@kernel.org>; 'Rob Herring' <robh@kernel.org>; 'Mark Rutland'
+> <mark.rutland@arm.com>; 'nm at ti.com' <nm@ti.com>;
+> 'lgirdwood at gmail.com' <lgirdwood@gmail.com>; 'broonie at kernel.org'
+> <broonie@kernel.org>; 'Andy Gross' <andy.gross@linaro.org>; 'David Brown'
+> <david.brown@linaro.org>; 'catalin.marinas at arm.com'
+> <catalin.marinas@arm.com>; 'will.deacon at arm.com'
+> <will.deacon@arm.com>; 'Rafael J. Wysocki' <rjw@rjwysocki.net>; 'linux-
+> clk at vger.kernel.org' <linux-clk@vger.kernel.org>;
+> 'devicetree at vger.kernel.org' <devicetree@vger.kernel.org>; 'LKML' <linux-
+> kernel at vger.kernel.org>; 'Linux PM list' <linux-pm@vger.kernel.org>;
+'linux-
+> arm-msm at vger.kernel.org' <linux-arm-msm@vger.kernel.org>; 'linux-
+> soc at vger.kernel.org' <linux-soc@vger.kernel.org>; 'lakml' <linux-arm-
+> kernel at lists.infradead.org>; 'Rajendra Nayak' <rnayak@codeaurora.org>;
+> 'nicolas.dechesne at linaro.org' <nicolas.dechesne@linaro.org>;
+> 'celster at codeaurora.org' <celster@codeaurora.org>;
+> 'tfinkel at codeaurora.org' <tfinkel@codeaurora.org>
+> Subject: RE: [PATCH v7 12/14] cpufreq: Add Kryo CPU scaling driver
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Viresh Kumar <viresh.kumar@linaro.org>
+> > Sent: Wednesday, May 16, 2018 17:12
+> > To: Amit Kucheria <amit.kucheria@linaro.org>
+> > Cc: Ilia Lin <ilialin@codeaurora.org>; Michael Turquette
+> > <mturquette@baylibre.com>; sboyd at kernel.org; Rob Herring
+> > <robh@kernel.org>; Mark Rutland <mark.rutland@arm.com>; nm at ti.com;
+> > lgirdwood at gmail.com; broonie at kernel.org; Andy Gross
+> > <andy.gross@linaro.org>; David Brown <david.brown@linaro.org>;
+> > catalin.marinas at arm.com; will.deacon at arm.com; Rafael J. Wysocki
+> > <rjw@rjwysocki.net>; linux-clk at vger.kernel.org;
+> > devicetree at vger.kernel.org; LKML <linux-kernel@vger.kernel.org>; Linux
+> > PM list <linux-pm@vger.kernel.org>; linux-arm-msm at vger.kernel.org;
+> > linux- soc at vger.kernel.org; lakml
+> > <linux-arm-kernel@lists.infradead.org>;
+> > Rajendra Nayak <rnayak@codeaurora.org>; nicolas.dechesne at linaro.org;
+> > celster at codeaurora.org; tfinkel at codeaurora.org
+> > Subject: Re: [PATCH v7 12/14] cpufreq: Add Kryo CPU scaling driver
+> >
+> > On 16-05-18, 16:12, Amit Kucheria wrote:
+> > > > +       ret = PTR_ERR_OR_ZERO(opp_temp =
+> > > > +
+> > dev_pm_opp_set_supported_hw(cpu_dev,&versions,1));
+> > > > +       if (0 > ret)
+> > >
+> > > Any particular reason to prefer this over (ret < 0) that is
+> > > generally used? I've seen it used to avoid the == vs. = typos, but
+> > > not for other comparisons.
+> > >
+> > > Suggest sticking to what is commonly used i.e. ret < 0.
+> > >
+> > > > +               goto free_opp;
+> > > > +
+> > > > +       cpu_dev = get_cpu_device(GOLD_LEAD);
+> > >
+> > > Error check cpu_dev here?
+> > >
+> > > > +       ret = PTR_ERR_OR_ZERO(opp_temp =
+> > > > +
+> > dev_pm_opp_set_supported_hw(cpu_dev,&versions,1));
+> > > > +       if (0 > ret)
+> > > > +               goto free_opp;
+> >
+> > The goto here is wrong
+> 
+> If we are here, then the first dev_pm_opp_set_supported_hw() succeeded.
+> And should be deallocated before exit with error.
 
-Please avoid using "I" in the commit description and preferably stick to
-an objective description.
+My bad. Got you.
 
 > 
-> The root cause might be what I fixed at [1]. But from arm kvm points of
-> view, it would be better we caught the exception earlier and clearer.
-> 
-> If the size is not PAGE_SIZE aligned, unmap_stage2_range might unmap the
-> wrong(more or less) page range. Hence it caused the "BUG: Bad page
-> state"
-
-I don't see why we should ever panic with a "positive" size value. Anyways,
-the unmap requests must be in units of pages. So this check might be useful.
-
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-> 
-> [1] https://lkml.org/lkml/2018/5/3/1042
-> 
-> Signed-off-by: jia.he at hxt-semitech.com
-> ---
->   virt/kvm/arm/mmu.c | 2 ++
->   1 file changed, 2 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 7f6a944..8dac311 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -297,6 +297,8 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->   	phys_addr_t next;
->   
->   	assert_spin_locked(&kvm->mmu_lock);
-> +	WARN_ON(size & ~PAGE_MASK);
-> +
->   	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->   	do {
->   		/*
-> 
+> >
+> > > > +
+> > > > +
+> > > > +       ret =
+> > PTR_ERR_OR_ZERO(platform_device_register_simple("cpufreq-dt",
+> > > > +                                                             -1,
+> > > > + NULL, 0));
+> > > > +
+> > > > +       if (0 == ret)
+> > > > +               return 0;
+> > > > +
+> > > > +free_opp:
+> > > > +       dev_pm_opp_put_supported_hw(opp_temp);
+> > >
+> > > This is not needed because dev_pm_opp_set_supported_hw will free
+> > > memory in case of failure. This call in only needed in case of a
+> > > successful get.
+> >
+> > But this is still required for the case where platform device
+registration fails.
+> >
+> > --
+> > viresh
