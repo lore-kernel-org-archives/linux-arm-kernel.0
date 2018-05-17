@@ -1,188 +1,81 @@
 From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Thu, 17 May 2018 10:29:34 +0200
-Subject: [PATCH net-next v3 05/10] net: mvpp2: 1000baseX support
-In-Reply-To: <20180517082939.14598-1-antoine.tenart@bootlin.com>
-References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
-Message-ID: <20180517082939.14598-6-antoine.tenart@bootlin.com>
+Date: Thu, 17 May 2018 10:29:29 +0200
+Subject: [PATCH net-next v3 00/10] net: mvpp2: phylink conversion
+Message-ID: <20180517082939.14598-1-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the 1000Base-X PHY mode support in the Marvell PPv2
-driver. 1000Base-X is quite close the SGMII and uses nearly the same
-code path.
+Hi Dave, Russell,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
----
- drivers/net/ethernet/marvell/mvpp2.c | 72 ++++++++++++++++++++--------
- 1 file changed, 51 insertions(+), 21 deletions(-)
+This series convert the Marvell PPv2 driver to phylink (models the MAC
+to PHY link).
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 60093f1e6297..ece61f1727e4 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -4870,6 +4870,7 @@ static int mvpp22_gop_init(struct mvpp2_port *port)
- 		mvpp22_gop_init_rgmii(port);
- 		break;
- 	case PHY_INTERFACE_MODE_SGMII:
-+	case PHY_INTERFACE_MODE_1000BASEX:
- 		mvpp22_gop_init_sgmii(port);
- 		break;
- 	case PHY_INTERFACE_MODE_10GKR:
-@@ -4907,7 +4908,8 @@ static void mvpp22_gop_unmask_irq(struct mvpp2_port *port)
- 	u32 val;
- 
- 	if (phy_interface_mode_is_rgmii(port->phy_interface) ||
--	    port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
-+	    port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
- 		/* Enable the GMAC link status irq for this port */
- 		val = readl(port->base + MVPP22_GMAC_INT_SUM_MASK);
- 		val |= MVPP22_GMAC_INT_SUM_MASK_LINK_STAT;
-@@ -4937,7 +4939,8 @@ static void mvpp22_gop_mask_irq(struct mvpp2_port *port)
- 	}
- 
- 	if (phy_interface_mode_is_rgmii(port->phy_interface) ||
--	    port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
-+	    port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
- 		val = readl(port->base + MVPP22_GMAC_INT_SUM_MASK);
- 		val &= ~MVPP22_GMAC_INT_SUM_MASK_LINK_STAT;
- 		writel(val, port->base + MVPP22_GMAC_INT_SUM_MASK);
-@@ -4949,7 +4952,8 @@ static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
- 	u32 val;
- 
- 	if (phy_interface_mode_is_rgmii(port->phy_interface) ||
--	    port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
-+	    port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
- 		val = readl(port->base + MVPP22_GMAC_INT_MASK);
- 		val |= MVPP22_GMAC_INT_MASK_LINK_STAT;
- 		writel(val, port->base + MVPP22_GMAC_INT_MASK);
-@@ -4974,6 +4978,7 @@ static int mvpp22_comphy_init(struct mvpp2_port *port)
- 
- 	switch (port->phy_interface) {
- 	case PHY_INTERFACE_MODE_SGMII:
-+	case PHY_INTERFACE_MODE_1000BASEX:
- 		mode = PHY_MODE_SGMII;
- 		break;
- 	case PHY_INTERFACE_MODE_10GKR:
-@@ -5056,7 +5061,8 @@ static void mvpp2_port_loopback_set(struct mvpp2_port *port,
- 	else
- 		val &= ~MVPP2_GMAC_GMII_LB_EN_MASK;
- 
--	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII)
-+	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
-+	    port->phy_interface == PHY_INTERFACE_MODE_1000BASEX)
- 		val |= MVPP2_GMAC_PCS_LB_EN_MASK;
- 	else
- 		val &= ~MVPP2_GMAC_PCS_LB_EN_MASK;
-@@ -6266,7 +6272,8 @@ static irqreturn_t mvpp2_link_status_isr(int irq, void *dev_id)
- 				link = true;
- 		}
- 	} else if (phy_interface_mode_is_rgmii(port->phy_interface) ||
--		   port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
-+		   port->phy_interface == PHY_INTERFACE_MODE_SGMII ||
-+		   port->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
- 		val = readl(port->base + MVPP22_GMAC_INT_STAT);
- 		if (val & MVPP22_GMAC_INT_STAT_LINK) {
- 			event = true;
-@@ -8032,20 +8039,25 @@ static void mvpp2_phylink_validate(struct net_device *dev,
- 	phylink_set(mask, Pause);
- 	phylink_set(mask, Asym_Pause);
- 
--	phylink_set(mask, 10baseT_Half);
--	phylink_set(mask, 10baseT_Full);
--	phylink_set(mask, 100baseT_Half);
--	phylink_set(mask, 100baseT_Full);
--	phylink_set(mask, 1000baseT_Full);
--	phylink_set(mask, 10000baseT_Full);
--
--	if (state->interface == PHY_INTERFACE_MODE_10GKR) {
-+	switch (state->interface) {
-+	case PHY_INTERFACE_MODE_10GKR:
- 		phylink_set(mask, 10000baseCR_Full);
- 		phylink_set(mask, 10000baseSR_Full);
- 		phylink_set(mask, 10000baseLR_Full);
- 		phylink_set(mask, 10000baseLRM_Full);
- 		phylink_set(mask, 10000baseER_Full);
- 		phylink_set(mask, 10000baseKR_Full);
-+		/* Fall-through */
-+	default:
-+		phylink_set(mask, 10baseT_Half);
-+		phylink_set(mask, 10baseT_Full);
-+		phylink_set(mask, 100baseT_Half);
-+		phylink_set(mask, 100baseT_Full);
-+		phylink_set(mask, 10000baseT_Full);
-+		/* Fall-through */
-+	case PHY_INTERFACE_MODE_1000BASEX:
-+		phylink_set(mask, 1000baseT_Full);
-+		phylink_set(mask, 1000baseX_Full);
- 	}
- 
- 	bitmap_and(supported, supported, mask, __ETHTOOL_LINK_MODE_MASK_NBITS);
-@@ -8084,12 +8096,18 @@ static void mvpp2_gmac_link_state(struct mvpp2_port *port,
- 	state->link = !!(val & MVPP2_GMAC_STATUS0_LINK_UP);
- 	state->duplex = !!(val & MVPP2_GMAC_STATUS0_FULL_DUPLEX);
- 
--	if (val & MVPP2_GMAC_STATUS0_GMII_SPEED)
-+	switch (port->phy_interface) {
-+	case PHY_INTERFACE_MODE_1000BASEX:
- 		state->speed = SPEED_1000;
--	else if (val & MVPP2_GMAC_STATUS0_MII_SPEED)
--		state->speed = SPEED_100;
--	else
--		state->speed = SPEED_10;
-+		break;
-+	default:
-+		if (val & MVPP2_GMAC_STATUS0_GMII_SPEED)
-+			state->speed = SPEED_1000;
-+		else if (val & MVPP2_GMAC_STATUS0_MII_SPEED)
-+			state->speed = SPEED_100;
-+		else
-+			state->speed = SPEED_10;
-+	}
- 
- 	state->pause = 0;
- 	if (val & MVPP2_GMAC_STATUS0_RX_PAUSE)
-@@ -8181,8 +8199,18 @@ static void mvpp2_gmac_config(struct mvpp2_port *port, unsigned int mode,
- 	ctrl0 &= ~MVPP2_GMAC_PORT_TYPE_MASK;
- 	ctrl2 &= ~(MVPP2_GMAC_PORT_RESET_MASK | MVPP2_GMAC_PCS_ENABLE_MASK);
- 
--	if (!phy_interface_mode_is_rgmii(state->interface))
-+	if (state->interface == PHY_INTERFACE_MODE_1000BASEX) {
-+		/* 1000BaseX port cannot negotiate speed nor can it negotiate
-+		 * duplex: they are always operating with a fixed speed of
-+		 * 1000Mbps in full duplex, so force 1000 speed and full duplex
-+		 * here.
-+		 */
-+		ctrl0 |= MVPP2_GMAC_PORT_TYPE_MASK;
-+		an |= MVPP2_GMAC_CONFIG_GMII_SPEED |
-+		      MVPP2_GMAC_CONFIG_FULL_DUPLEX;
-+	} else if (!phy_interface_mode_is_rgmii(state->interface)) {
- 		an |= MVPP2_GMAC_AN_SPEED_EN | MVPP2_GMAC_FLOW_CTRL_AUTONEG;
-+	}
- 
- 	if (state->duplex)
- 		an |= MVPP2_GMAC_CONFIG_FULL_DUPLEX;
-@@ -8191,7 +8219,8 @@ static void mvpp2_gmac_config(struct mvpp2_port *port, unsigned int mode,
- 	if (phylink_test(state->advertising, Asym_Pause))
- 		an |= MVPP2_GMAC_FC_ADV_ASM_EN;
- 
--	if (state->interface == PHY_INTERFACE_MODE_SGMII) {
-+	if (state->interface == PHY_INTERFACE_MODE_SGMII ||
-+	    state->interface == PHY_INTERFACE_MODE_1000BASEX) {
- 		an |= MVPP2_GMAC_IN_BAND_AUTONEG;
- 		ctrl2 |= MVPP2_GMAC_INBAND_AN_MASK | MVPP2_GMAC_PCS_ENABLE_MASK;
- 
-@@ -8256,7 +8285,8 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
- 	if (state->interface == PHY_INTERFACE_MODE_10GKR)
- 		mvpp2_xlg_config(port, mode, state);
- 	else if (phy_interface_mode_is_rgmii(state->interface) ||
--		 state->interface == PHY_INTERFACE_MODE_SGMII)
-+		 state->interface == PHY_INTERFACE_MODE_SGMII ||
-+		 state->interface == PHY_INTERFACE_MODE_1000BASEX)
- 		mvpp2_gmac_config(port, mode, state);
- 
- 	if (port->priv->hw_version == MVPP21 && port->flags & MVPP2_F_LOOPBACK)
+One important point is the PPv2 driver supports two probe modes: device
+tree and ACPI. This series only brings phylink support for the device
+tree mode, as the ACPI one will need further work. Still, the driver
+should be working as before when using ACPI. This split should be
+temporary, and was discussed with Marcin (in Cc.) who added ACPI support
+to the driver.
+
+Also as the SFP cages on both DB boards can be considered as non-wired.
+We thus chose not to describe those SFP cages and we use fixed-link.
+
+The rest of the series uses phylink to add support for 1000BaseX and
+2500BaseX modes in the PPv2 driver. To do this, two patches are needed
+in the common PHY framework (patches 3 and 4). The last 4 patches modify
+the device tree to use the new PPv2 functionalities.
+
+The series has been tested for the device tree mode on the 7040-db,
+8040-db and 8040-mcbin boards, to ensure all the interface where working
+as expected.
+
+@Dave: patches 7 to 10 should go through the mvebu tree (Gregory in
+Cc.) to avoid any conflict with the other mvebu dt patches taken during
+this cycle.
+
+The series is based on today's net-next.
+
+Thanks!
+Antoine
+
+Since v2:
+  - Removed the SFP description from the DB boards, as their SFP cages
+    are wired properly. We now use fixed-link.
+  - Because of this rework, split the series in two, so that the SFP
+    part is reviewed separately.
+  - Small fixes in the phylink patch.
+  - Rebased on the latest net-next branch.
+
+Since v1:
+  - Chose a different approach to the SFP changes, as the previous ones
+    weren't valid and reworked both BD boards device trees.
+  - Misc fixes.
+  - Added Kishon's acked-by on one patch.
+  - Rebaed on latest net-next branch.
+
+Antoine Tenart (9):
+  net: mvpp2: align the ethtool ops definition
+  net: mvpp2: phylink support
+  phy: add 2.5G SGMII mode to the phy_mode enum
+  phy: cp110-comphy: 2.5G SGMII mode
+  net: mvpp2: 1000baseX support
+  net: mvpp2: 2500baseX support
+  arm64: dts: marvell: mcbin: enable the fourth network interface
+  arm64: dts: marvell: 8040-db: describe the 10G interfaces as
+    fixed-link
+  arm64: dts: marvell: 7040-db: describe the 10G interface as fixed-link
+
+Russell King (1):
+  arm64: dts: marvell: mcbin: add 10G SFP support
+
+ .../arm64/boot/dts/marvell/armada-7040-db.dts |   5 +
+ .../arm64/boot/dts/marvell/armada-8040-db.dts |  10 +
+ .../boot/dts/marvell/armada-8040-mcbin.dts    |  70 ++
+ drivers/net/ethernet/marvell/Kconfig          |   1 +
+ drivers/net/ethernet/marvell/mvpp2.c          | 931 +++++++++++-------
+ drivers/phy/marvell/phy-mvebu-cp110-comphy.c  |  17 +-
+ include/linux/phy/phy.h                       |   1 +
+ 7 files changed, 680 insertions(+), 355 deletions(-)
+
 -- 
 2.17.0
