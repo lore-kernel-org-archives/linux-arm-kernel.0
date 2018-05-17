@@ -1,104 +1,35 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 17 May 2018 11:30:57 +0200
-Subject: [PATCH v2 1/4] ARM64: dts: meson-axg: clean-up i2c nodes
+Date: Thu, 17 May 2018 11:31:00 +0200
+Subject: [PATCH v2 4/4] ARM64: dts: meson-axg: enable i2c AO on the S400 board
 In-Reply-To: <20180517093100.22225-1-jbrunet@baylibre.com>
 References: <20180517093100.22225-1-jbrunet@baylibre.com>
-Message-ID: <20180517093100.22225-2-jbrunet@baylibre.com>
+Message-ID: <20180517093100.22225-5-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove undocumented and unused "clk_i2c" clock name and the second
-interrupt from i2c nodes of meson-axg platform. Those seems to have
-been copy/pasted from the vendor kernel
+The i2c AO is used for the MIC daughter card of the S400 board
 
-Fixes: dc6f858e2690 ("ARM64: dts: meson-axg: add I2C DT info for Meson-AXG SoC")
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 37 +++++++++++-------------------
- 1 file changed, 14 insertions(+), 23 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 381bd2c707a7..b59f341104d7 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -214,50 +214,42 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+index b3e1bdca32bb..4b3331fbfe39 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+@@ -95,6 +95,12 @@
+ 	pinctrl-names = "default";
+ };
  
- 			i2c0: i2c at 1f000 {
- 				compatible = "amlogic,meson-axg-i2c";
--				status = "disabled";
- 				reg = <0x0 0x1f000 0x0 0x20>;
--				interrupts = <GIC_SPI 21 IRQ_TYPE_EDGE_RISING>,
--					<GIC_SPI 47 IRQ_TYPE_EDGE_RISING>;
-+				interrupts = <GIC_SPI 21 IRQ_TYPE_EDGE_RISING>;
-+				clocks = <&clkc CLKID_I2C>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				clocks = <&clkc CLKID_I2C>;
--				clock-names = "clk_i2c";
-+				status = "disabled";
- 			};
- 
- 			i2c1: i2c at 1e000 {
- 				compatible = "amlogic,meson-axg-i2c";
-+				reg = <0x0 0x1e000 0x0 0x20>;
-+				interrupts = <GIC_SPI 214 IRQ_TYPE_EDGE_RISING>;
-+				clocks = <&clkc CLKID_I2C>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				reg = <0x0 0x1e000 0x0 0x20>;
- 				status = "disabled";
--				interrupts = <GIC_SPI 214 IRQ_TYPE_EDGE_RISING>,
--					<GIC_SPI 48 IRQ_TYPE_EDGE_RISING>;
--				clocks = <&clkc CLKID_I2C>;
--				clock-names = "clk_i2c";
- 			};
- 
- 			i2c2: i2c at 1d000 {
- 				compatible = "amlogic,meson-axg-i2c";
--				status = "disabled";
- 				reg = <0x0 0x1d000 0x0 0x20>;
--				interrupts = <GIC_SPI 215 IRQ_TYPE_EDGE_RISING>,
--					<GIC_SPI 49 IRQ_TYPE_EDGE_RISING>;
-+				interrupts = <GIC_SPI 215 IRQ_TYPE_EDGE_RISING>;
-+				clocks = <&clkc CLKID_I2C>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				clocks = <&clkc CLKID_I2C>;
--				clock-names = "clk_i2c";
-+				status = "disabled";
- 			};
- 
- 			i2c3: i2c at 1c000 {
- 				compatible = "amlogic,meson-axg-i2c";
--				status = "disabled";
- 				reg = <0x0 0x1c000 0x0 0x20>;
--				interrupts = <GIC_SPI 39 IRQ_TYPE_EDGE_RISING>,
--					<GIC_SPI 50 IRQ_TYPE_EDGE_RISING>;
-+				interrupts = <GIC_SPI 39 IRQ_TYPE_EDGE_RISING>;
-+				clocks = <&clkc CLKID_I2C>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				clocks = <&clkc CLKID_I2C>;
--				clock-names = "clk_i2c";
-+				status = "disabled";
- 			};
- 
- 			uart_A: serial at 24000 {
-@@ -1116,13 +1108,12 @@
- 
- 			i2c_AO: i2c at 5000 {
- 				compatible = "amlogic,meson-axg-i2c";
--				status = "disabled";
- 				reg = <0x0 0x05000 0x0 0x20>;
- 				interrupts = <GIC_SPI 195 IRQ_TYPE_EDGE_RISING>;
-+				clocks = <&clkc CLKID_I2C>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				clocks = <&clkc CLKID_I2C>;
--				clock-names = "clk_i2c";
-+				status = "disabled";
- 			};
- 
- 			uart_AO: serial at 3000 {
++&i2c_AO {
++	status = "okay";
++	pinctrl-0 = <&i2c_ao_sck_10_pins>, <&i2c_ao_sda_11_pins>;
++	pinctrl-names = "default";
++};
++
+ &pwm_ab {
+ 	status = "okay";
+ 	pinctrl-0 = <&pwm_a_x20_pins>;
 -- 
 2.14.3
