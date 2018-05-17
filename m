@@ -1,39 +1,106 @@
 From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Thu, 17 May 2018 10:29:39 +0200
-Subject: [PATCH net-next v3 10/10] arm64: dts: marvell: 7040-db: describe the
- 10G interface as fixed-link
+Date: Thu, 17 May 2018 10:29:36 +0200
+Subject: [PATCH net-next v3 07/10] arm64: dts: marvell: mcbin: add 10G SFP
+ support
 In-Reply-To: <20180517082939.14598-1-antoine.tenart@bootlin.com>
 References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
-Message-ID: <20180517082939.14598-11-antoine.tenart@bootlin.com>
+Message-ID: <20180517082939.14598-8-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a fixed-link node to the 10G interface of the 7040-db
-board. This is required as the mvpp2 driver now uses phylink. The best
-solution would have been to describe the SFP cage but they are not
-wired correctly, and thus unusable, so we chose to use fixed-link
-instead.
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
+This patch adds the SFP cage description in the Marvell Armada 8040
+mcbin, for both 10G interfaces.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+[Antoine: small reworks, commit message]
 Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
 ---
- arch/arm64/boot/dts/marvell/armada-7040-db.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ .../boot/dts/marvell/armada-8040-mcbin.dts    | 38 +++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index d6bec058a30a..412efdb46e7c 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -242,6 +242,11 @@
- 	phy-mode = "10gbase-kr";
- 	/* Generic PHY, providing serdes lanes */
- 	phys = <&cp0_comphy2 0>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index 81de03ef860d..eaa67de8c2bb 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -64,6 +64,30 @@
+ 		compatible = "usb-nop-xceiv";
+ 		vcc-supply = <&v_5v0_usb3_hst_vbus>;
+ 	};
 +
-+	fixed-link {
-+		speed = <10000>;
-+		full-duplex;
++	sfp_eth0: sfp-eth0 {
++		/* CON15,16 - CPM lane 4 */
++		compatible = "sff,sfp";
++		i2c-bus = <&sfpp0_i2c>;
++		los-gpio = <&cp1_gpio1 28 GPIO_ACTIVE_HIGH>;
++		mod-def0-gpio = <&cp1_gpio1 27 GPIO_ACTIVE_LOW>;
++		tx-disable-gpio = <&cp1_gpio1 29 GPIO_ACTIVE_HIGH>;
++		tx-fault-gpio  = <&cp1_gpio1 26 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cp1_sfpp0_pins>;
++	};
++
++	sfp_eth1: sfp-eth1 {
++		/* CON17,18 - CPS lane 4 */
++		compatible = "sff,sfp";
++		i2c-bus = <&sfpp1_i2c>;
++		los-gpio = <&cp1_gpio1 8 GPIO_ACTIVE_HIGH>;
++		mod-def0-gpio = <&cp1_gpio1 11 GPIO_ACTIVE_LOW>;
++		tx-disable-gpio = <&cp1_gpio1 10 GPIO_ACTIVE_HIGH>;
++		tx-fault-gpio = <&cp0_gpio2 30 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cp1_sfpp1_pins &cp0_sfpp1_pins>;
 +	};
  };
  
- &cp0_eth1 {
+ &uart0 {
+@@ -180,6 +204,10 @@
+ 			       "mpp60", "mpp61";
+ 		marvell,function = "sdio";
+ 	};
++	cp0_sfpp1_pins: sfpp1-pins {
++		marvell,pins = "mpp62";
++		marvell,function = "gpio";
++	};
+ };
+ 
+ &cp0_xmdio {
+@@ -188,11 +216,13 @@
+ 	phy0: ethernet-phy at 0 {
+ 		compatible = "ethernet-phy-ieee802.3-c45";
+ 		reg = <0>;
++		sfp = <&sfp_eth0>;
+ 	};
+ 
+ 	phy8: ethernet-phy at 8 {
+ 		compatible = "ethernet-phy-ieee802.3-c45";
+ 		reg = <8>;
++		sfp = <&sfp_eth1>;
+ 	};
+ };
+ 
+@@ -258,6 +288,10 @@
+ };
+ 
+ &cp1_pinctrl {
++	cp1_sfpp1_pins: sfpp1-pins {
++		marvell,pins = "mpp8", "mpp10", "mpp11";
++		marvell,function = "gpio";
++	};
+ 	cp1_spi1_pins: spi1-pins {
+ 		marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15", "mpp16";
+ 		marvell,function = "spi1";
+@@ -266,6 +300,10 @@
+ 		marvell,pins = "mpp6", "mpp7";
+ 		marvell,function = "uart0";
+ 	};
++	cp1_sfpp0_pins: sfpp0-pins {
++		marvell,pins = "mpp26", "mpp27", "mpp28", "mpp29";
++		marvell,function = "gpio";
++	};
+ };
+ 
+ /* J27 UART header */
 -- 
 2.17.0
