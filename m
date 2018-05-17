@@ -1,48 +1,84 @@
 From: daniel@zonque.org (Daniel Mack)
-Date: Thu, 17 May 2018 11:05:49 +0200
-Subject: [PATCH v2 0/3] input: touchscreen: edt-ft5x06: make wakeup source
- behavior configurable
-Message-ID: <20180517090552.5704-1-daniel@zonque.org>
+Date: Thu, 17 May 2018 11:05:51 +0200
+Subject: [PATCH v2 2/3] input: touchscreen: edt-ft5x06: assert reset during
+ suspend
+In-Reply-To: <20180517090552.5704-1-daniel@zonque.org>
+References: <20180517090552.5704-1-daniel@zonque.org>
+Message-ID: <20180517090552.5704-3-daniel@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+If the device is not configured as wakeup source, it can be put in reset
+during suspend to save some power.
 
-I have a platform that features an edt-ft5x06 touch panel and that
-doesn't want to wake on touch screen activity.
+Signed-off-by: Daniel Mack <daniel@zonque.org>
+---
+ drivers/input/touchscreen/edt-ft5x06.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
-Here's a trivial series of patches that make the edt-ft5x06 driver only
-act as wakeup source when requested through device properties or DTS.
-
-The third patch changes the default in two DTS files that use this
-driver.
-
-I guess the first two patches should go through the input tree, while
-the third can be picked by the IMX people. There are no compile-time
-dependencies, so the order doesn't matter.
-
-
-Thanks,
-Daniel
-
-v1 ? v2:
-	* simply drop device_init_wakeup() as the I2C core does handles
-	  the wakeup-source property already (1/3)
-	* add a delay after reset deassertion at resume time (2/3)
-	* no changes in the DTS patch (3/3)
-
-
-Daniel Mack (3):
-  input: touchscreen: edt-ft5x06: don't make device a wakeup source by
-    default
-  input: touchscreen: edt-ft5x06: assert reset during suspend
-  ARM: dts: imx28/imx53: enable edt-ft5x06 wakeup source
-
- .../bindings/input/touchscreen/edt-ft5x06.txt      |  3 +++
- arch/arm/boot/dts/imx28-tx28.dts                   |  1 +
- arch/arm/boot/dts/imx53-tx53-x03x.dts              |  1 +
- drivers/input/touchscreen/edt-ft5x06.c             | 27 +++++++++++++++++-----
- 4 files changed, 26 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+index e18a2f215500..145499022e1c 100644
+--- a/drivers/input/touchscreen/edt-ft5x06.c
++++ b/drivers/input/touchscreen/edt-ft5x06.c
+@@ -883,6 +883,20 @@ edt_ft5x06_ts_set_regs(struct edt_ft5x06_ts_data *tsdata)
+ 	}
+ }
+ 
++static void edt_ft5x06_reset(struct edt_ft5x06_ts_data *tsdata, bool reset)
++{
++	if (!tsdata->reset_gpio)
++		return;
++
++	if (reset) {
++		gpiod_set_value_cansleep(tsdata->reset_gpio, 1);
++	} else {
++		usleep_range(5000, 6000);
++		gpiod_set_value_cansleep(tsdata->reset_gpio, 0);
++		msleep(300);
++	}
++}
++
+ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+ 					 const struct i2c_device_id *id)
+ {
+@@ -934,11 +948,7 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+ 		gpiod_set_value_cansleep(tsdata->wake_gpio, 1);
+ 	}
+ 
+-	if (tsdata->reset_gpio) {
+-		usleep_range(5000, 6000);
+-		gpiod_set_value_cansleep(tsdata->reset_gpio, 0);
+-		msleep(300);
+-	}
++	edt_ft5x06_reset(tsdata, false);
+ 
+ 	input = devm_input_allocate_device(&client->dev);
+ 	if (!input) {
+@@ -1034,9 +1044,12 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
+ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
+ {
+ 	struct i2c_client *client = to_i2c_client(dev);
++	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
+ 
+ 	if (device_may_wakeup(dev))
+ 		enable_irq_wake(client->irq);
++	else
++		edt_ft5x06_reset(tsdata, true);
+ 
+ 	return 0;
+ }
+@@ -1044,9 +1057,12 @@ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
+ static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
+ {
+ 	struct i2c_client *client = to_i2c_client(dev);
++	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
+ 
+ 	if (device_may_wakeup(dev))
+ 		disable_irq_wake(client->irq);
++	else
++		edt_ft5x06_reset(tsdata, false);
+ 
+ 	return 0;
+ }
 -- 
 2.14.3
