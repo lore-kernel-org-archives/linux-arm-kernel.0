@@ -1,33 +1,45 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Thu, 17 May 2018 13:00:48 +0800
-Subject: [PATCH] clk: imx6sl: correct ocram_podf clock type
-In-Reply-To: <1526533248-21990-1-git-send-email-Anson.Huang@nxp.com>
-References: <1526533248-21990-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1526533248-21990-2-git-send-email-Anson.Huang@nxp.com>
+From: vkoul@kernel.org (Vinod)
+Date: Thu, 17 May 2018 10:51:07 +0530
+Subject: [PATCH] dmaengine: qcom: bam_dma: check if the runtime pm enabled
+In-Reply-To: <20180514161852.9620-1-srinivas.kandagatla@linaro.org>
+References: <20180514161852.9620-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180517052107.GT13271@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IMX6SL_CLK_OCRAM_PODF is a busy divider, its name in
-CCM_CDHIPR register of Reference Manual CCM chapter
-is axi_podf_busy, correct its clock type.
+On 14-05-18, 17:18, Srinivas Kandagatla wrote:
+> Disabling pm runtime at probe is not sufficient to get BAM working
+> on remotely controller instances. pm_runtime_get_sync() would return
+> -EACCES in such cases.
+> So check if runtime pm is enabled before returning error from bam functions.
+> 
+> Fixes: 5b4a68952a89 ("dmaengine: qcom: bam_dma: disable runtime pm on remote controlled")
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  drivers/dma/qcom/bam_dma.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/dma/qcom/bam_dma.c b/drivers/dma/qcom/bam_dma.c
+> index d29275b97e84..5f4babebc508 100644
+> --- a/drivers/dma/qcom/bam_dma.c
+> +++ b/drivers/dma/qcom/bam_dma.c
+> @@ -540,7 +540,7 @@ static void bam_free_chan(struct dma_chan *chan)
+>  	int ret;
+>  
+>  	ret = pm_runtime_get_sync(bdev->dev);
+> -	if (ret < 0)
+> +	if (pm_runtime_enabled(bdev->dev) && ret < 0)
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- drivers/clk/imx/clk-imx6sl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+would it make sense to first check enabled and do _get_sync() 
 
-diff --git a/drivers/clk/imx/clk-imx6sl.c b/drivers/clk/imx/clk-imx6sl.c
-index 9642cdf..66b1dd1 100644
---- a/drivers/clk/imx/clk-imx6sl.c
-+++ b/drivers/clk/imx/clk-imx6sl.c
-@@ -330,7 +330,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SL_CLK_PERIPH2] = imx_clk_busy_mux("periph2", base + 0x14, 26,  1,   base + 0x48, 3,  periph2_sels, ARRAY_SIZE(periph2_sels));
- 
- 	/*                                                   name                 parent_name          reg       shift width */
--	clks[IMX6SL_CLK_OCRAM_PODF]        = imx_clk_divider("ocram_podf",        "ocram_sel",         base + 0x14, 16, 3);
-+	clks[IMX6SL_CLK_OCRAM_PODF]        = imx_clk_busy_divider("ocram_podf",   "ocram_sel",         base + 0x14, 16, 3, base + 0x48, 0);
- 	clks[IMX6SL_CLK_PERIPH_CLK2_PODF]  = imx_clk_divider("periph_clk2_podf",  "periph_clk2_sel",   base + 0x14, 27, 3);
- 	clks[IMX6SL_CLK_PERIPH2_CLK2_PODF] = imx_clk_divider("periph2_clk2_podf", "periph2_clk2_sel",  base + 0x14, 0,  3);
- 	clks[IMX6SL_CLK_IPG]               = imx_clk_divider("ipg",               "ahb",               base + 0x14, 8,  2);
+        if (pm_runtime_enabled()) {
+                ret = pm_runtime_get_sync() {
+                ...
+                }
+        }
+
+thus making clear in code that we do calls only when it is enabled. Also you can
+add a local macro for this code and use that rather than copy pasting :)
+
 -- 
-2.7.4
+~Vinod
