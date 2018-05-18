@@ -1,63 +1,53 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 18 May 2018 08:30:45 +0200
-Subject: [PATCH 1/2] dt-bindings: power: Add ZynqMP power domain bindings
-In-Reply-To: <SN1PR02MB37588BFF357865F4C9628D99B8910@SN1PR02MB3758.namprd02.prod.outlook.com>
-References: <1519775750-21297-1-git-send-email-jollys@xilinx.com>
- <1519775750-21297-2-git-send-email-jollys@xilinx.com>
- <20180305223905.65nnunv63fyg7bye@rob-hp-laptop>
- <CGME20180306075954epcas5p2bbfb21f146ab879b60d004b73187a5e5@epcas5p2.samsung.com>
- <CAMuHMdVpWciek2xow1Y1W7jga6BEbAZ7OhnyviRsXK39vYGyXw@mail.gmail.com>
- <d47ed37f-057f-b510-de70-1140dad1b7ad@samsung.com>
- <DM2PR0201MB07670C06F504F97EF4E4BAD4B8D00@DM2PR0201MB0767.namprd02.prod.outlook.com>
- <SN1PR02MB37588BFF357865F4C9628D99B8910@SN1PR02MB3758.namprd02.prod.outlook.com>
-Message-ID: <be5cecb2-3d0d-22f8-48a2-f94ed9546e04@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 18 May 2018 12:17:15 +0530
+Subject: [PATCH] clk: davinci: psc-da830: fix USB0 48MHz PHY clock
+ registration
+In-Reply-To: <9f8a876b-6a66-687c-f83f-51b8d896c50a@ti.com>
+References: <20180507113457.4716-1-nsekhar@ti.com>
+ <152642368847.237094.1884631416189964435@swboyd.mtv.corp.google.com>
+ <9f8a876b-6a66-687c-f83f-51b8d896c50a@ti.com>
+Message-ID: <4f289b8c-6dc2-a5e6-bda3-d3dc8e61ea1f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jolly,
+Hi Stephen,
 
-On 2018-05-17 23:10, Jolly Shah wrote:
-
->>>>>> +Example:
->>>>>> +     zynqmp-genpd {
->>>>>> +             compatible = "xlnx,zynqmp-genpd";
->>>>> What's the control interface for controlling the domains?
->>>>>> +
->>>>>> +             pd_usb0: pd-usb0 {
->>>>>> +                     pd-id = <22>;
->>>>>> +                     #power-domain-cells = <0>;
->>>>> There's no need for all these sub nodes. Make #power-domain-cells 1
->>>>> and put the id in the cell value.
->>>> That was my first reaction, too...
->>>>>> +             };
->>>>>> +
->>>>>> +             pd_sata: pd-sata {
->>>>>> +                     pd-id = <28>;
->>>>>> +                     #power-domain-cells = <0>;
->>>>>> +             };
->>>>>> +
->>>>>> +             pd_gpu: pd-gpu {
->>>>>> +                     pd-id = <58 20 21>;
->>>> ... until I saw the above.
->>>> Controlling the GPU power area requires controlling 3 physical areas?
->>>>
->>>> However, doing it this way may bite you in the future, if a need
->>>> arises to control a subset. And what about power up/down order?
->>> What about defining 3 separate domains and arranging them in
->>> parent-child relationship? generic power domains already supports that
->>> and this allows to nicely define the power on/off order.
+On Wednesday 16 May 2018 10:44 AM, Sekhar Nori wrote:
+> Hi Stephen,
+> 
+> On Wednesday 16 May 2018 04:04 AM, Stephen Boyd wrote:
+>> Quoting Sekhar Nori (2018-05-07 04:34:57)
+>>> USB0 48MHz PHY clock registration fails on DA830 because the
+>>> da8xx-cfgchip clock driver cannot get a reference to USB0
+>>> LPSC clock.
 >>>
->>>>>> +                     #power-domain-cells = <0x0>;
->>>>>> +             };
->>>>>> +     };
->> I agree it should be arranged in as parent child order to control subset or control
->> order. Will incorporate those changes in next version.
->
-> As suggested, I tried out parent, child approach. However what I found is Genpd core takes care of parent child dependencies for power on off routines only. In our case, We need them in attach-detach routines too. In that case, we need to handle dependencies manually for those routines. Please suggest better approach, if any.
+>>> The USB0 LPSC needs to be enabled during PHY clock enable. Setup
+>>> the clock lookup correctly to fix this.
+>>>
+>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>>> ---
+>>
+>> Applied to clk-next
+>>
+>> Did this need a fixes tag? And should it go into 4.17 final? Or it's not
+>> causing problems right now?
+> 
+> We have not switched DaVinci to use common clock framework still. So no,
+> this does not cause problems right now. All drivers/clk/davinci/*
+> patches can be included for v4.18.
 
-What do you mean to handle attach-detach?
+There are some more patches (fixes) to drivers/clk/davinci which have
+been reviewed and both David and I think are ready for merge[1].
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Do you have them in your queue? Else, I can send a pull request for you
+to take a look and merge.
+
+Thanks,
+Sekhar
+
+[1]
+clk: davinci: psc-dm365: fix few clocks
+clk: davinci: pll-dm646x: keep PLL2 SYSCLK1 always enabled
+clk: davinci: psc-dm355: fix ASP0/1 clkdev lookups
+clk: davinci: pll-dm355: fix SYSCLKn parent names
+clk: davinci: pll-dm355: drop pll2_sysclk2
