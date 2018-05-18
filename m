@@ -1,53 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:18:09 +0200
-Subject: [PATCH 11/14] arm: shmobile: Change platform dependency to
- ARCH_RENESAS
+Date: Fri, 18 May 2018 13:18:07 +0200
+Subject: [PATCH 09/14] soc: renesas: rcar-rst: Add support for R-Car E3
 In-Reply-To: <cover.1526639075.git.horms+renesas@verge.net.au>
 References: <cover.1526639075.git.horms+renesas@verge.net.au>
-Message-ID: <d9be9ceb1f72c7ac216ba164b6b15cf19e6e56b4.1526639075.git.horms+renesas@verge.net.au>
+Message-ID: <b0d77648e0cd910ff087853237502ff08dfdb352.1526639075.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
-ARCH_RENESAS is a more appropriate platform dependency than the legacy
-ARCH_SHMOBILE, hence use the former.
+Add support for R-Car E3 (R8A77990) to the R-Car RST driver.
+This driver is needed for the clock driver to work.
 
-This will allow to drop ARCH_SHMOBILE on ARM in the near future.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+[shimoda: rebase]
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/Kconfig  | 2 +-
- arch/arm/Makefile | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/reset/renesas,rst.txt | 1 +
+ drivers/soc/renesas/Kconfig                             | 3 ++-
+ drivers/soc/renesas/rcar-rst.c                          | 1 +
+ 3 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a7f8e7f4b88f..2d34c0a44877 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1467,7 +1467,7 @@ config ARM_PSCI
- config ARCH_NR_GPIO
- 	int
- 	default 2048 if ARCH_SOCFPGA
--	default 1024 if ARCH_BRCMSTB || ARCH_SHMOBILE || ARCH_TEGRA || \
-+	default 1024 if ARCH_BRCMSTB || ARCH_RENESAS || ARCH_TEGRA || \
- 		ARCH_ZYNQ
- 	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || \
- 		SOC_DRA7XX || ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index e4e537f27339..a92f5a876d96 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -212,7 +212,7 @@ machine-$(CONFIG_ARCH_S3C24XX)		+= s3c24xx
- machine-$(CONFIG_ARCH_S3C64XX)		+= s3c64xx
- machine-$(CONFIG_ARCH_S5PV210)		+= s5pv210
- machine-$(CONFIG_ARCH_SA1100)		+= sa1100
--machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
-+machine-$(CONFIG_ARCH_RENESAS)	 	+= shmobile
- machine-$(CONFIG_ARCH_SIRF)		+= prima2
- machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
- machine-$(CONFIG_ARCH_STI)		+= sti
+diff --git a/Documentation/devicetree/bindings/reset/renesas,rst.txt b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+index 7be61efc3c8a..67e83b02e10b 100644
+--- a/Documentation/devicetree/bindings/reset/renesas,rst.txt
++++ b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+@@ -30,6 +30,7 @@ Required properties:
+ 		  - "renesas,r8a77965-rst" (R-Car M3-N)
+ 		  - "renesas,r8a77970-rst" (R-Car V3M)
+ 		  - "renesas,r8a77980-rst" (R-Car V3H)
++		  - "renesas,r8a77990-rst" (R-Car E3)
+ 		  - "renesas,r8a77995-rst" (R-Car D3)
+   - reg: Address start and address range for the device.
+ 
+diff --git a/drivers/soc/renesas/Kconfig b/drivers/soc/renesas/Kconfig
+index 96dd93660359..c0e0286a2360 100644
+--- a/drivers/soc/renesas/Kconfig
++++ b/drivers/soc/renesas/Kconfig
+@@ -4,7 +4,8 @@ config SOC_RENESAS
+ 	select SOC_BUS
+ 	select RST_RCAR if ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2 || \
+ 			   ARCH_R8A7795 || ARCH_R8A7796 || ARCH_R8A77965 || \
+-			   ARCH_R8A77970 || ARCH_R8A77980 || ARCH_R8A77995
++			   ARCH_R8A77970 || ARCH_R8A77980 || ARCH_R8A77990 || \
++			   ARCH_R8A77995
+ 	select SYSC_R8A7743 if ARCH_R8A7743
+ 	select SYSC_R8A7745 if ARCH_R8A7745
+ 	select SYSC_R8A77470 if ARCH_R8A77470
+diff --git a/drivers/soc/renesas/rcar-rst.c b/drivers/soc/renesas/rcar-rst.c
+index 66d7dbac2ded..d9c1034e70e9 100644
+--- a/drivers/soc/renesas/rcar-rst.c
++++ b/drivers/soc/renesas/rcar-rst.c
+@@ -60,6 +60,7 @@ static const struct of_device_id rcar_rst_matches[] __initconst = {
+ 	{ .compatible = "renesas,r8a77965-rst", .data = &rcar_rst_gen3 },
+ 	{ .compatible = "renesas,r8a77970-rst", .data = &rcar_rst_gen3 },
+ 	{ .compatible = "renesas,r8a77980-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a77990-rst", .data = &rcar_rst_gen3 },
+ 	{ .compatible = "renesas,r8a77995-rst", .data = &rcar_rst_gen3 },
+ 	{ /* sentinel */ }
+ };
 -- 
 2.11.0
