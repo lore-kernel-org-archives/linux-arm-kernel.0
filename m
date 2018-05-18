@@ -1,99 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:15:11 +0200
-Subject: [PATCH 049/102] arm64: dts: renesas: r8a7795-salvator-x: enable HDMI
- sound
+Date: Fri, 18 May 2018 13:15:13 +0200
+Subject: [PATCH 051/102] arm64: dts: renesas: r8a7795-es1: Enable IPMMU devices
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <a4ff9aed55eb0172291005f0b1a0174be257b892.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <2246f002595aa942b906fc631b7a5e830aa74a39.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Remove 'status = "disabled"' to make sure all IPMMU devices are enabled
+in DT on the r8a7795 ES1.0 Soc.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Tested-by: Nguyen Viet Dung <nv-dung@jinso.co.jp>
+This is a follow up for a patch by Magnus Damm for the
+the r8a7795 ES2.0 and other R-Car Gen 3 SoCs.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index af467419266a..0efbef5ea9b7 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -56,6 +56,12 @@
- 	status = "okay";
- };
- 
-+&sound_card {
-+	dais = <&rsnd_port0	/* ak4613 */
-+		&rsnd_port1	/* HDMI0  */
-+		&rsnd_port2>;	/* HDMI1  */
-+};
-+
- &hdmi0 {
- 	status = "okay";
- 
-@@ -66,6 +72,12 @@
- 				remote-endpoint = <&hdmi0_con>;
- 			};
- 		};
-+		port at 2 {
-+			reg = <2>;
-+			dw_hdmi0_snd_in: endpoint {
-+				remote-endpoint = <&rsnd_endpoint1>;
-+			};
-+		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+index f9acd125d687..0177f5e60e5a 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+@@ -39,7 +39,6 @@
+ 		reg = <0 0xe7730000 0 0x1000>;
+ 		renesas,ipmmu-main = <&ipmmu_mm 8>;
+ 		#iommu-cells = <1>;
+-		status = "disabled";
  	};
- };
  
-@@ -83,6 +95,12 @@
- 				remote-endpoint = <&hdmi1_con>;
- 			};
- 		};
-+		port at 2 {
-+			reg = <2>;
-+			dw_hdmi1_snd_in: endpoint {
-+				remote-endpoint = <&rsnd_endpoint2>;
-+			};
-+		};
- 	};
- };
- 
-@@ -94,6 +112,34 @@
- 	status = "okay";
- };
- 
-+&rcar_sound {
-+	ports {
-+		/* rsnd_port0 is on salvator-common */
-+		rsnd_port1: port at 1 {
-+			rsnd_endpoint1: endpoint {
-+				remote-endpoint = <&dw_hdmi0_snd_in>;
-+
-+				dai-format = "i2s";
-+				bitclock-master = <&rsnd_endpoint1>;
-+				frame-master = <&rsnd_endpoint1>;
-+
-+				playback = <&ssi2>;
-+			};
-+		};
-+		rsnd_port2: port at 2 {
-+			rsnd_endpoint2: endpoint {
-+				remote-endpoint = <&dw_hdmi1_snd_in>;
-+
-+				dai-format = "i2s";
-+				bitclock-master = <&rsnd_endpoint2>;
-+				frame-master = <&rsnd_endpoint2>;
-+
-+				playback = <&ssi3>;
-+			};
-+		};
-+	};
-+};
-+
- &pfc {
- 	usb2_pins: usb2 {
- 		groups = "usb2";
+ 	/delete-node/ usb-phy at ee0e0200;
 -- 
 2.11.0
