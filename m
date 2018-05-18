@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:05 +0200
-Subject: [PATCH 32/69] ARM: dts: lager: Enable watchdog support
+Date: Fri, 18 May 2018 13:17:08 +0200
+Subject: [PATCH 35/69] ARM: dts: blanche: Enable watchdog support
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <53e480fcb1cb00a74d6af2070bfcd1e995b19d47.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <b27f039979a057c66e67c9310a625152b473cbe8.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,14 +16,14 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 5 +++++
+ arch/arm/boot/dts/r8a7792-blanche.dts | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 063fdb65dc60..3c66366f7c55 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -917,6 +917,11 @@
+diff --git a/arch/arm/boot/dts/r8a7792-blanche.dts b/arch/arm/boot/dts/r8a7792-blanche.dts
+index 9b67dca6c9ef..04fb70931b3b 100644
+--- a/arch/arm/boot/dts/r8a7792-blanche.dts
++++ b/arch/arm/boot/dts/r8a7792-blanche.dts
+@@ -239,6 +239,11 @@
  	};
  };
  
@@ -32,8 +32,8 @@ index 063fdb65dc60..3c66366f7c55 100644
 +	status = "okay";
 +};
 +
- &ssi1 {
- 	shared-pin;
- };
+ &scif0 {
+ 	pinctrl-0 = <&scif0_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.11.0
