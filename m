@@ -1,57 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:29 +0200
-Subject: [PATCH 56/69] ARM: dts: sh73a0: Add missing interrupt-affinity to PMU
- node
+Date: Fri, 18 May 2018 13:17:03 +0200
+Subject: [PATCH 30/69] ARM: dts: r8a7792: Add RWDT node
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <57a66497e1b7486609250a482f05935eae5035e9.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <49dba98c1981da471739e44a74244f658777c6fd.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The PMU node references two interrupts, but lacks the interrupt-affinity
-property, which is required in that case:
-
-    hw perfevents: no interrupt-affinity property for /pmu, guessing.
-
-Add the missing property to fix this.
+Add a device node for the Watchdog Timer (WDT) controller on the Renesas
+R-Car V2H (r8a7792) SoC.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7792.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 39cc58672bf4..c953648a5f41 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -22,7 +22,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index bea0f12f03d3..d2cf8dd2d9b0 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -101,6 +101,16 @@
+ 		#size-cells = <2>;
+ 		ranges;
  
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <0>;
-@@ -31,7 +31,7 @@
- 			power-domains = <&pd_a2sl>;
- 			next-level-cache = <&L2>;
- 		};
--		cpu at 1 {
-+		cpu1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <1>;
-@@ -91,6 +91,7 @@
- 		compatible = "arm,cortex-a9-pmu";
- 		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>, <&cpu1>;
- 	};
- 
- 	cmt1: timer at e6138000 {
++		rwdt: watchdog at e6020000 {
++			compatible = "renesas,r8a7792-wdt",
++				     "renesas,rcar-gen2-wdt";
++			reg = <0 0xe6020000 0 0x0c>;
++			clocks = <&cpg CPG_MOD 402>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++			resets = <&cpg 402>;
++			status = "disabled";
++		};
++
+ 		gpio0: gpio at e6050000 {
+ 			compatible = "renesas,gpio-r8a7792",
+ 				     "renesas,rcar-gen2-gpio";
 -- 
 2.11.0
