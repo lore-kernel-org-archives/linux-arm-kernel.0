@@ -1,58 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:16:48 +0200
-Subject: [PATCH 15/69] ARM: dts: r7s72100: Add Capture Engine Unit (CEU)
+Date: Fri, 18 May 2018 13:16:47 +0200
+Subject: [PATCH 14/69] ARM: dts: r8a77470: Add IRQC support
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <f558d42a9d1c4724a8b3880fe230a66fa16e21c8.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <141fb10294e3ba5ee2d34d464ddc8a9952bd3372.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Add Capture Engine Unit (CEU) node to device tree.
+Describe the IRQC interrupt controller in the R8A77470 device tree.
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-[simon: rebased]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100.dtsi | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a77470.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index ecf9516bcda8..4a1aade0e751 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -375,6 +375,15 @@
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a77470.dtsi b/arch/arm/boot/dts/r8a77470.dtsi
+index c39acebc6a72..2f89f33f5b88 100644
+--- a/arch/arm/boot/dts/r8a77470.dtsi
++++ b/arch/arm/boot/dts/r8a77470.dtsi
+@@ -81,6 +81,26 @@
+ 			#power-domain-cells = <1>;
  		};
  
-+		ceu: camera at e8210000 {
-+			reg = <0xe8210000 0x3000>;
-+			compatible = "renesas,r7s72100-ceu";
-+			interrupts = <GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp6_clks R7S72100_CLK_CEU>;
-+			power-domains = <&cpg_clocks>;
-+			status = "disabled";
++		irqc: interrupt-controller at e61c0000 {
++			compatible = "renesas,irqc-r8a77470", "renesas,irqc";
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			reg = <0 0xe61c0000 0 0x200>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 407>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 407>;
 +		};
 +
- 		wdt: watchdog at fcfe0000 {
- 			compatible = "renesas,r7s72100-wdt", "renesas,rza-wdt";
- 			reg = <0xfcfe0000 0x6>;
-@@ -429,9 +438,9 @@
- 			#clock-cells = <1>;
- 			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0xfcfe042c 4>;
--			clocks = <&p0_clk>;
--			clock-indices = <R7S72100_CLK_RTC>;
--			clock-output-names = "rtc";
-+			clocks = <&b_clk>, <&p0_clk>;
-+			clock-indices = <R7S72100_CLK_CEU R7S72100_CLK_RTC>;
-+			clock-output-names = "ceu", "rtc";
- 		};
- 
- 		mstp7_clks: mstp7_clks at fcfe0430 {
+ 		icram0:	sram at e63a0000 {
+ 			compatible = "mmio-sram";
+ 			reg = <0 0xe63a0000 0 0x12000>;
 -- 
 2.11.0
