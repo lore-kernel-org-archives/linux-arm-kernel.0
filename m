@@ -1,73 +1,66 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 18 May 2018 15:15:36 +0530
-Subject: [PATCH v2 26/26] arm64: dts: allwinner: a64: sopine: Enable HDMI
- output
+Date: Fri, 18 May 2018 15:15:15 +0530
+Subject: [PATCH v2 05/26] drm/sun4i: DE2 mixer: Add index quirk
 In-Reply-To: <20180518094536.17201-1-jagan@amarulasolutions.com>
 References: <20180518094536.17201-1-jagan@amarulasolutions.com>
-Message-ID: <20180518094536.17201-27-jagan@amarulasolutions.com>
+Message-ID: <20180518094536.17201-6-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable HDMI output on sopine board.
+From: Jernej Skrabec <jernej.skrabec@siol.net>
 
+When TCON set up TCON TOP, it needs to know mixer index. Here we do that
+by setting engine ID to number provided in mixer index quirk.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
-- none
+- New patch
 
- .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 4 ++--
+ drivers/gpu/drm/sun4i/sun8i_mixer.h | 2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index abe179de35d7..72f29b78117c 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -61,6 +61,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 126899d6f0d3..36d90c76317a 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -353,13 +353,13 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+ 	dev_set_drvdata(dev, mixer);
+ 	mixer->engine.ops = &sun8i_engine_ops;
+ 	mixer->engine.node = dev->of_node;
+-	/* The ID of the mixer currently doesn't matter */
+-	mixer->engine.id = -1;
  
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
+ 	mixer->cfg = of_device_get_match_data(dev);
+ 	if (!mixer->cfg)
+ 		return -EINVAL;
+ 
++	mixer->engine.id = mixer->cfg->index;
 +
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	reg_vcc1v8: vcc1v8 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc1v8";
-@@ -69,6 +80,10 @@
- 	};
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(regs))
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+index f34e70c42adf..aeda6e9a7627 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+@@ -123,6 +123,7 @@ struct de2_fmt_info {
+  *	are invalid.
+  * @mod_rate: module clock rate that needs to be set in order to have
+  *	a functional block.
++ * @index: mixer index, needed to properly set TCON TOP
+  */
+ struct sun8i_mixer_cfg {
+ 	int		vi_num;
+@@ -130,6 +131,7 @@ struct sun8i_mixer_cfg {
+ 	int		scaler_mask;
+ 	int		ccsc;
+ 	unsigned long	mod_rate;
++	int		index;
  };
  
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -86,6 +101,17 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	hvcc-supply = <&reg_dldo1>;
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &mdio {
- 	ext_rgmii_phy: ethernet-phy at 1 {
- 		compatible = "ethernet-phy-ieee802.3-c22";
+ struct sun8i_mixer {
 -- 
 2.14.3
