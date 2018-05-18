@@ -1,45 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:14:57 +0200
-Subject: [PATCH 035/102] arm64: dts: renesas: salvator-common: Rename EtherAVB
- "mdc" pin group to "mdio"
+Date: Fri, 18 May 2018 13:14:54 +0200
+Subject: [PATCH 032/102] arm64: dts: renesas: r8a77970: Enable IPMMU devices
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <77bf06adb128ef0b47b9c49b1ae8f3313c684a70.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <344aa8f37ebf2a028fb5a1d7fac68b9b1817a2c3.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-On other Renesas SoCs, the pin group for the MDIO bus is named "mdio"
-instead of "mdc".  Fix the inconsistency, now the pinctrl drivers for
-R-Car H3, M3-W, and M3-N have gained support for the traditional pin
-group name.
+Remove 'status = "disabled"' to make sure all IPMMU devices are enabled
+in DT on the r8a77970 SoC.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[simon: rebased]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index 2a7f36abd2dd..1642bc9c8906 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -416,12 +416,12 @@
- 
- 	avb_pins: avb {
- 		mux {
--			groups = "avb_link", "avb_mdc", "avb_mii";
-+			groups = "avb_link", "avb_mdio", "avb_mii";
- 			function = "avb";
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index c06d7fbfb7be..6ed2e95eb53d 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -567,7 +567,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 3>;
+ 			power-domains = <&sysc R8A77970_PD_A3IR>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
  		};
  
--		pins_mdc {
--			groups = "avb_mdc";
-+		pins_mdio {
-+			groups = "avb_mdio";
- 			drive-strength = <24>;
+ 		ipmmu_mm: mmu at e67b0000 {
+@@ -593,7 +592,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 9>;
+ 			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
  		};
  
+ 		gic: interrupt-controller at f1010000 {
 -- 
 2.11.0
