@@ -1,23 +1,16 @@
 From: david@lechnology.com (David Lechner)
-Date: Fri, 18 May 2018 11:48:08 -0500
-Subject: [PATCH v11 06/27] ARM: davinci: da850: add new clock init using
- common clock framework
+Date: Fri, 18 May 2018 11:48:04 -0500
+Subject: [PATCH v11 02/27] clk: davinci: da850-pll: change PLL0 to
+ CLK_OF_DECLARE
 In-Reply-To: <20180518164829.27052-1-david@lechnology.com>
 References: <20180518164829.27052-1-david@lechnology.com>
-Message-ID: <20180518164829.27052-7-david@lechnology.com>
+Message-ID: <20180518164829.27052-3-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the new board-specific clock init in mach-davinci/da850.c
-using the new common clock framework drivers.
-
-The #ifdefs are needed to prevent compile errors until the entire
-ARCH_DAVINCI is converted.
-
-Also clean up the #includes since we are adding some here.
-
-Some CFGCHIP macros were removed because we are now including
-linux/mfd/da8xx-cfgchip.h which defines the same values.
+PLL0 on davinci/da850-type device needs to be registered early in boot
+because it is needed for clocksource/clockevent. Change the driver
+to use CLK_OF_DECLARE for this special case.
 
 Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: David Lechner <david@lechnology.com>
@@ -27,325 +20,84 @@ v11 changes:
 - none
 
 v10 changes:
-- none
+- removed duplicate warning message
 
 v9 changes:
-- register PLL in da850_init_time() instead of as platform device so that we
-  get the correct timer0 clock for davinci_timer_init()
+- new patch in v9
 
-v8 changes:
-- add platform data for PLL clocks
+ drivers/clk/davinci/pll-da850.c | 21 +++++++++++++++++----
+ drivers/clk/davinci/pll.c       |  4 +++-
+ drivers/clk/davinci/pll.h       |  2 +-
+ 3 files changed, 21 insertions(+), 6 deletions(-)
 
-v7 changes:
-- add clock platform device declarations
-- register platform devices instead of registering clocks directly
-- clkdev lookup is moved to drivers/clk
-- add davinci prefix to commit description
-
-v6 changes:
-- add blank lines between function calls
-- include da8xx_register_cfgchip()
-- add async1 and async2 clock domains
-
-
- arch/arm/mach-davinci/board-da850-evm.c     |   2 +
- arch/arm/mach-davinci/board-mityomapl138.c  |   2 +
- arch/arm/mach-davinci/board-omapl138-hawk.c |   2 +
- arch/arm/mach-davinci/da850.c               | 155 ++++++++++++++++++--
- arch/arm/mach-davinci/da8xx-dt.c            |   2 +
- arch/arm/mach-davinci/include/mach/da8xx.h  |   1 +
- 6 files changed, 151 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index e22fb40e34bc..442c16773f09 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1340,6 +1340,8 @@ static __init void da850_evm_init(void)
- {
- 	int ret;
- 
-+	da850_register_clocks();
-+
- 	ret = da850_register_gpio();
- 	if (ret)
- 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 37b3e48a21d1..2cce0d7d2f2a 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -503,6 +503,8 @@ static void __init mityomapl138_init(void)
- {
- 	int ret;
- 
-+	da850_register_clocks();
-+
- 	/* for now, no special EDMA channels are reserved */
- 	ret = da850_register_edma(NULL);
- 	if (ret)
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index be8b892a6ea7..7653e9425d44 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -285,6 +285,8 @@ static __init void omapl138_hawk_init(void)
- {
- 	int ret;
- 
-+	da850_register_clocks();
-+
- 	ret = da850_register_gpio();
- 	if (ret)
- 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 1dbf01c4124b..9e00beb943c9 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -11,39 +11,45 @@
-  * is licensed "as is" without any warranty of any kind, whether express
-  * or implied.
-  */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clk/davinci.h>
- #include <linux/clkdev.h>
-+#include <linux/cpufreq.h>
- #include <linux/gpio.h>
+diff --git a/drivers/clk/davinci/pll-da850.c b/drivers/clk/davinci/pll-da850.c
+index 59cc2e3733f9..0f7198191ea2 100644
+--- a/drivers/clk/davinci/pll-da850.c
++++ b/drivers/clk/davinci/pll-da850.c
+@@ -13,6 +13,8 @@
  #include <linux/init.h>
--#include <linux/clk.h>
-+#include <linux/mfd/da8xx-cfgchip.h>
-+#include <linux/platform_data/clk-da8xx-cfgchip.h>
-+#include <linux/platform_data/clk-davinci-pll.h>
-+#include <linux/platform_data/gpio-davinci.h>
- #include <linux/platform_device.h>
--#include <linux/cpufreq.h>
-+#include <linux/regmap.h>
- #include <linux/regulator/consumer.h>
--#include <linux/platform_data/gpio-davinci.h>
+ #include <linux/kernel.h>
+ #include <linux/mfd/da8xx-cfgchip.h>
++#include <linux/mfd/syscon.h>
++#include <linux/of_address.h>
+ #include <linux/of.h>
+ #include <linux/types.h>
  
- #include <asm/mach/map.h>
- 
--#include "psc.h"
--#include <mach/irqs.h>
--#include <mach/cputype.h>
- #include <mach/common.h>
--#include <mach/time.h>
--#include <mach/da8xx.h>
- #include <mach/cpufreq.h>
-+#include <mach/cputype.h>
-+#include <mach/da8xx.h>
-+#include <mach/irqs.h>
- #include <mach/pm.h>
-+#include <mach/time.h>
- 
--#include "clock.h"
- #include "mux.h"
- 
-+#ifndef CONFIG_COMMON_CLK
-+#include "clock.h"
-+#include "psc.h"
-+#endif
-+
- #define DA850_PLL1_BASE		0x01e1a000
- #define DA850_TIMER64P2_BASE	0x01f0c000
- #define DA850_TIMER64P3_BASE	0x01f0d000
- 
- #define DA850_REF_FREQ		24000000
- 
--#define CFGCHIP3_ASYNC3_CLKSRC	BIT(4)
--#define CFGCHIP3_PLL1_MASTER_LOCK	BIT(5)
--#define CFGCHIP0_PLL_MASTER_LOCK	BIT(4)
--
-+#ifndef CONFIG_COMMON_CLK
- static int da850_set_armrate(struct clk *clk, unsigned long rate);
- static int da850_round_armrate(struct clk *clk, unsigned long rate);
- static int da850_set_pll0rate(struct clk *clk, unsigned long armrate);
-@@ -583,6 +589,7 @@ static struct clk_lookup da850_clks[] = {
- 	CLK("ecap.2",		"fck",		&ecap2_clk),
- 	CLK(NULL,		NULL,		NULL),
+@@ -136,11 +138,22 @@ static const struct davinci_pll_sysclk_info *da850_pll0_sysclk_info[] = {
+ 	NULL
  };
-+#endif
  
- /*
-  * Device specific mux setup
-@@ -1170,6 +1177,7 @@ int da850_register_cpufreq(char *async_clk)
- 	return platform_device_register(&da850_cpufreq_device);
- }
- 
-+#ifndef CONFIG_COMMON_CLK
- static int da850_round_armrate(struct clk *clk, unsigned long rate)
+-int of_da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip)
++void of_da850_pll0_init(struct device_node *node)
  {
- 	int ret = 0, diff;
-@@ -1232,12 +1240,14 @@ static int da850_set_pll0rate(struct clk *clk, unsigned long rate)
- 
- 	return 0;
- }
-+#endif /* CONFIG_COMMON_CLK */
- #else
- int __init da850_register_cpufreq(char *async_clk)
- {
- 	return 0;
- }
- 
-+#ifndef CONFIG_COMMON_CLK
- static int da850_set_armrate(struct clk *clk, unsigned long rate)
- {
- 	return -EINVAL;
-@@ -1252,6 +1262,7 @@ static int da850_round_armrate(struct clk *clk, unsigned long rate)
- {
- 	return clk->rate;
- }
-+#endif /* CONFIG_COMMON_CLK */
- #endif
- 
- /* VPIF resource, platform data */
-@@ -1395,6 +1406,124 @@ void __init da850_init(void)
- 
- void __init da850_init_time(void)
- {
-+#ifdef CONFIG_COMMON_CLK
-+	void __iomem *pll0;
+-	return of_davinci_pll_init(dev, dev->of_node, &da850_pll0_info,
+-				   &da850_pll0_obsclk_info,
+-				   da850_pll0_sysclk_info, 7, base, cfgchip);
++	void __iomem *base;
 +	struct regmap *cfgchip;
-+	struct clk *clk;
 +
-+	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DA850_REF_FREQ);
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: ioremap failed\n", __func__);
++		return;
++	}
 +
-+	pll0 = ioremap(DA8XX_PLL0_BASE, SZ_4K);
-+	cfgchip = da8xx_get_cfgchip();
++	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
 +
-+	da850_pll0_init(NULL, pll0, cfgchip);
-+
-+	clk = clk_get(NULL, "timer0");
-+
-+	davinci_timer_init(clk);
-+#else
- 	davinci_clk_init(da850_clks);
- 	davinci_timer_init(&timerp64_0_clk);
-+#endif
-+}
-+
-+static struct resource da850_pll1_resources[] = {
-+	{
-+		.start	= DA850_PLL1_BASE,
-+		.end	= DA850_PLL1_BASE + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct davinci_pll_platform_data da850_pll1_pdata;
-+
-+static struct platform_device da850_pll1_device = {
-+	.name		= "da850-pll1",
-+	.id		= -1,
-+	.resource	= da850_pll1_resources,
-+	.num_resources	= ARRAY_SIZE(da850_pll1_resources),
-+	.dev		= {
-+		.platform_data	= &da850_pll1_pdata,
-+	},
-+};
-+
-+static struct resource da850_psc0_resources[] = {
-+	{
-+		.start	= DA8XX_PSC0_BASE,
-+		.end	= DA8XX_PSC0_BASE + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device da850_psc0_device = {
-+	.name		= "da850-psc0",
-+	.id		= -1,
-+	.resource	= da850_psc0_resources,
-+	.num_resources	= ARRAY_SIZE(da850_psc0_resources),
-+};
-+
-+static struct resource da850_psc1_resources[] = {
-+	{
-+		.start	= DA8XX_PSC1_BASE,
-+		.end	= DA8XX_PSC1_BASE + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device da850_psc1_device = {
-+	.name		= "da850-psc1",
-+	.id		= -1,
-+	.resource	= da850_psc1_resources,
-+	.num_resources	= ARRAY_SIZE(da850_psc1_resources),
-+};
-+
-+static struct da8xx_cfgchip_clk_platform_data da850_async1_pdata;
-+
-+static struct platform_device da850_async1_clksrc_device = {
-+	.name		= "da850-async1-clksrc",
-+	.id		= -1,
-+	.dev		= {
-+		.platform_data	= &da850_async1_pdata,
-+	},
-+};
-+
-+static struct da8xx_cfgchip_clk_platform_data da850_async3_pdata;
-+
-+static struct platform_device da850_async3_clksrc_device = {
-+	.name		= "da850-async3-clksrc",
-+	.id		= -1,
-+	.dev		= {
-+		.platform_data	= &da850_async3_pdata,
-+	},
-+};
-+
-+static struct da8xx_cfgchip_clk_platform_data da850_tbclksync_pdata;
-+
-+static struct platform_device da850_tbclksync_device = {
-+	.name		= "da830-tbclksync",
-+	.id		= -1,
-+	.dev		= {
-+		.platform_data	= &da850_tbclksync_pdata,
-+	},
-+};
-+
-+void __init da850_register_clocks(void)
-+{
-+	/* PLL0 is registered in da850_init_time() */
-+
-+	da850_pll1_pdata.cfgchip = da8xx_get_cfgchip();
-+	platform_device_register(&da850_pll1_device);
-+
-+	da850_async1_pdata.cfgchip = da8xx_get_cfgchip();
-+	platform_device_register(&da850_async1_clksrc_device);
-+
-+	da850_async3_pdata.cfgchip = da8xx_get_cfgchip();
-+	platform_device_register(&da850_async3_clksrc_device);
-+
-+	platform_device_register(&da850_psc0_device);
-+
-+	platform_device_register(&da850_psc1_device);
-+
-+	da850_tbclksync_pdata.cfgchip = da8xx_get_cfgchip();
-+	platform_device_register(&da850_tbclksync_device);
++	of_davinci_pll_init(NULL, node, &da850_pll0_info,
++			    &da850_pll0_obsclk_info,
++			    da850_pll0_sysclk_info, 7, base, cfgchip);
  }
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index ab199f4b9ce4..91dd9cb6d113 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -67,6 +67,8 @@ static void __init da850_init_machine(void)
  
- 	int ret;
+ static const struct davinci_pll_clk_info da850_pll1_info = {
+diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
+index ae5f966b503f..8dc9854d44dd 100644
+--- a/drivers/clk/davinci/pll.c
++++ b/drivers/clk/davinci/pll.c
+@@ -857,8 +857,10 @@ static struct davinci_pll_platform_data *davinci_pll_get_pdata(struct device *de
+ 	return pdata;
+ }
  
-+	da850_register_clocks();
++/* needed in early boot for clocksource/clockevent */
++CLK_OF_DECLARE(da850_pll0, "ti,da850-pll0", of_da850_pll0_init);
 +
- 	ret = da8xx_register_usb20_phy_clk(false);
- 	if (ret)
- 		pr_warn("%s: registering USB 2.0 PHY clock failed: %d",
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 64861ac6a9d4..612e45437cec 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -93,6 +93,7 @@ void da830_register_clocks(void);
+ static const struct of_device_id davinci_pll_of_match[] = {
+-	{ .compatible = "ti,da850-pll0", .data = of_da850_pll0_init },
+ 	{ .compatible = "ti,da850-pll1", .data = of_da850_pll1_init },
+ 	{ }
+ };
+diff --git a/drivers/clk/davinci/pll.h b/drivers/clk/davinci/pll.h
+index 562652fc0759..b2e5c4496645 100644
+--- a/drivers/clk/davinci/pll.h
++++ b/drivers/clk/davinci/pll.h
+@@ -123,7 +123,7 @@ int of_davinci_pll_init(struct device *dev, struct device_node *node,
+ /* Platform-specific callbacks */
  
- void da850_init(void);
- void da850_init_time(void);
-+void da850_register_clocks(void);
+ int da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
+-int of_da850_pll0_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
++void of_da850_pll0_init(struct device_node *node);
+ int of_da850_pll1_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
  
- int da830_register_edma(struct edma_rsv_info *rsv);
- int da850_register_edma(struct edma_rsv_info *rsv[2]);
+ int dm355_pll2_init(struct device *dev, void __iomem *base, struct regmap *cfgchip);
 -- 
 2.17.0
