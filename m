@@ -1,60 +1,60 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 18 May 2018 10:17:51 -0400
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
+Date: Fri, 18 May 2018 10:17:50 -0400
+Subject: [PATCH V2 1/2] efi/fb: Simplify fixup code to prefer struct resource
+Message-ID: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A host bridge is allowed to remap BAR addresses using _TRA attribute in
-_CRS windows.
-
-pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
-pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
-
-When a VGA device is behind such a host bridge and the resource is
-translated efifb driver is trying to do ioremap against bus address
-rather than the resource address and is failing to probe.
-
-efifb: probing for efifb
-efifb: cannot reserve video memory at 0x1e000000
-efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
-efifb: mode is 800x600x32, linelength=3200, pages=1
-efifb: scrolling: redraw
-efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
-
-Use the host bridge offset information to convert bus address to
-resource address in the fixup.
+Get rid of base and size variables in favor of a struct resource.
+The conditional for checking window can be replaced with
+resource_contains().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/video/fbdev/efifb.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/video/fbdev/efifb.c | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
-index 6daac8d..429cc85 100644
+index 46a4484..6daac8d 100644
 --- a/drivers/video/fbdev/efifb.c
 +++ b/drivers/video/fbdev/efifb.c
-@@ -431,6 +431,7 @@ static void efifb_fixup_resources(struct pci_dev *dev)
- 		.end = screen_info.lfb_base + screen_info.lfb_size - 1,
- 		.flags = IORESOURCE_MEM,
- 	};
-+	struct pci_bus_region region;
+@@ -426,17 +426,20 @@ static void record_efifb_bar_resource(struct pci_dev *dev, int idx, u64 offset)
+ 
+ static void efifb_fixup_resources(struct pci_dev *dev)
+ {
+-	u64 base = screen_info.lfb_base;
+-	u64 size = screen_info.lfb_size;
++	struct resource screen_res = {
++		.start = screen_info.lfb_base,
++		.end = screen_info.lfb_base + screen_info.lfb_size - 1,
++		.flags = IORESOURCE_MEM,
++	};
  	int i;
  
  	if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
-@@ -442,6 +443,10 @@ static void efifb_fixup_resources(struct pci_dev *dev)
- 	if (!screen_res.start)
  		return;
  
-+	region.start = screen_res.start;
-+	region.end = screen_res.end;
-+	pcibios_bus_to_resource(dev->bus, &screen_res, &region);
-+
- 	for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
- 		struct resource *res = &dev->resource[i];
+ 	if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
+-		base |= (u64)screen_info.ext_lfb_base << 32;
++		screen_res.start |= (u64)screen_info.ext_lfb_base << 32;
  
+-	if (!base)
++	if (!screen_res.start)
+ 		return;
+ 
+ 	for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
+@@ -445,8 +448,10 @@ static void efifb_fixup_resources(struct pci_dev *dev)
+ 		if (!(res->flags & IORESOURCE_MEM))
+ 			continue;
+ 
+-		if (res->start <= base && res->end >= base + size - 1) {
+-			record_efifb_bar_resource(dev, i, base - res->start);
++		if (resource_contains(res, &screen_res)) {
++			u64 win_offset =  screen_res.start - res->start;
++
++			record_efifb_bar_resource(dev, i, win_offset);
+ 			break;
+ 		}
+ 	}
 -- 
 2.7.4
