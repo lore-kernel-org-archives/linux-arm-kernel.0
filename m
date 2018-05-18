@@ -1,244 +1,102 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 18 May 2018 11:48:02 -0500
-Subject: =?UTF-8?q?=5BPATCH=20v11=2000/27=5D=20ARM=3A=20davinci=3A=20convert=20to=20common=20clock=20framework=E2=80=8B?=
-Message-ID: <20180518164829.27052-1-david@lechnology.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 May 2018 11:41:05 -0500
+Subject: [PATCH v5 2/4] Documentation: bindings: add phy_config for
+ Rockchip USB Type-C PHY
+In-Reply-To: <1526548680-2552-2-git-send-email-hl@rock-chips.com>
+References: <1526548680-2552-1-git-send-email-hl@rock-chips.com>
+ <1526548680-2552-2-git-send-email-hl@rock-chips.com>
+Message-ID: <20180518164105.GA14201@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series converts mach-davinci to use the common clock framework.
+On Thu, May 17, 2018 at 05:17:58PM +0800, Lin Huang wrote:
+> If want to do training outside DP Firmware, need phy voltage swing
+> and pre_emphasis value.
 
-The series works like this, the first 3 patches fix some issues with the clock
-drivers that have already been accepted into the mainline kernel.
+"dt-bindings: phy: ..." for the subject please.
 
-Then, starting with "ARM: davinci: pass clock as parameter to
-davinci_timer_init()", we get the mach code ready for the switch by adding the
-code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
-around the legacy clocks so that we can switch easily between the old and the
-new.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v2:
+> - None 
+> Changes in v3:
+> - modify property description and add this property to Example
+> Change in v4:
+> - None
+> Change in v5:
+> - None
+> 
+>  .../devicetree/bindings/phy/phy-rockchip-typec.txt | 29 +++++++++++++++++++++-
+>  1 file changed, 28 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> index 960da7f..af298f2 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> @@ -17,7 +17,8 @@ Required properties:
+>  
+>  Optional properties:
+>   - extcon : extcon specifier for the Power Delivery
+> -
+> + - rockchip,phy_config : A list of voltage swing(mv) and pre-emphasis
+> +			(dB) pairs.
 
-"ARM: davinci: switch to common clock framework" actually flips the switch
-to start using the new clock drivers. Then the next 8 patches remove all
-of the old clock code.
+rockchip,phy-config
 
-The final four patches add device tree clock support to the one SoC that
-supports it.
+>  Required nodes : a sub-node is required for each port the phy provides.
+>  		 The sub-node name is used to identify dp or usb3 port,
+>  		 and shall be the following entries:
+> @@ -50,6 +51,19 @@ Example:
+>  			 <&cru SRST_P_UPHY0_TCPHY>;
+>  		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
+>  
+> +		rockchip,phy_config =<0x2a 0x00
 
-This series has been tested on TI OMAP-L138 LCDK (both device tree and legacy
-board file).
+space                                 ^
 
+And format with inner <> ("< <0 1> <0 2> ... >") to show the pairs.
 
-Changes:
+> +			0x1f 0x15
+> +			0x14 0x22
+> +			0x02 0x2b
+> +			0x21 0x00
+> +			0x12 0x15
+> +			0x02 0x22
+> +			0 0
+> +			0x15 0x00
+> +			0x00 0x15
+> +			0 0
+> +			0 0>;
 
-v11 changes  (also see individual patches for details):
-- Proper unwinding on error in clk patches
-- Dropped ref_clk fallback in device tree timer patch
-- Fix W=1 and sparse warnings
+Since you have <0 0> multiple times, I presume the index is significant 
+and the length is fixed. Please define the index meaning and length 
+above.
 
-v10 changes (also see individual patches for details):
-- Reworked device tree bindings for DaVinci timer.
-- Dropped helper functions to conditionally call devm_* versions of functions
-- Fix some typos
-- Fix some rebasing issues introduced in v9
-
-v9 changes (also see individual patches for details):
-- Rebased on linux-davnci/master (f5e3203bb775)
-- Dropped drivers/clk patches that landed in v4.17
-- New drivers/clk patches for early boot special case
-- New patch for ti,davinci-timer device tree bindings
-- Updated mach/davinci patches to register clocks in early boot when needed
-
-v8 changes (also see individual patches for details):
-- Rebased on linux-davinci/master
-- Dropped use of __init and __initconst attributes in clk drivers
-- Add clkdev lookups for PLL SYSCLKs
-- Fix genpd clock reference counting issue
-- Fix PSC clock driver loading order issue
-- Fix typo in device tree and add more power-domains properties
-
-v7 changes (also see individual patches for details):
-- Rebased on linux-davinci/master (v4.16-rc)
-- Convert clock drivers to platform devices
-- New patch "ARM: davinci: pass clock as parameter to davinci_timer_init()"
-- Fix issues with lcdk and aemif clock lookups and power domains
-- Fixed other minor issues brought up in v6 review
-
-v6 changes (also see individual patches for details):
-- All of the device tree bindings are changed
-- All of the clock drivers are changed significantly
-- Fixed issues brought up during review of v5
-- "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
-  series and submitted separately
-
-v5 changes:
-- Basically, this is an entirely new series
-- Patches are broken up into bite-sized pieces
-- Converted PSC clock driver to use regmap
-- Restored "force" flag for certain DA850 clocks
-- Added device tree bindings
-- Moved more of the clock init to drivers/clk
-- Fixed frequency scaling (maybe*)
-
-* I have frequency scaling using cpufreq-dt, so I know the clocks are doing
-  what they need to do to make this work, but I haven't figured out how to
-  test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
-  sent separately after this series has landed.)
-
-
-Dependencies:
-
-There are still some outstanding fixes to get everything working correctly.
-For the most part, these are just runtime dependencies and only needed for
-certain platforms.
-
-Of the clk patches, only "clk: davinci: psc-da830: fix USB0 48MHz PHY clock
-registration" has been picked up in clk-next so far. Theoretically, there has
-been a pull request made for "drm/tilcdc: Fix setting clock divider for
-omap-l138", but I haven't seen it land anywhere yet. The series "remoteproc/
-davinci: common clock framework related fixes" is in rproc-next already.
-
-- "drm/tilcdc: Fix setting clock divider for omap-l138"[1]
-- "clk: davinci: pll-dm355: fix SYSCLKn parent names"[2]
-- "remoteproc/davinci: common clock framework related fixes"[3]
-- "clk: davinci: psc-da830: fix USB0 48MHz PHY clock registration"[4]
-- "clk: davinci: some more fixes"[5]
-- "clk: davinci: psc-dm355: fix ASP0/1 clkdev lookups"[6]
-
-[1]: https://patchwork.freedesktop.org/patch/210696/
-[2]: https://lkml.org/lkml/2018/5/9/626
-[3]: https://lkml.org/lkml/2018/5/2/201
-[4]: https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/commit/?h=clk-davinci-psc-da830&id=a714dceb721407c2a5d2887938f37e34ed00669c
-[5]: https://www.spinics.net/lists/arm-kernel/msg652656.html
-[6]: https://patchwork.kernel.org/patch/10395979/
-
-You can find a working branch with everything included (plus a few extras, like
-cpufreq-dt) in the "common-clk-v11" branch of https://github.com/dlech/ev3dev-kernel.git.
-
-
-Testing/debugging for the uninitiated:
-
-I only have one device to test with, which is based on da850, so I will
-have to rely on others to do some testing here. Since we are dealing with
-clocks, if something isn't working, you most likely won't see output on
-the serial port. To figure out what is going on, you need to enable...
-
-	CONFIG_DEBUG_LL=y
-	CONFIG_EARLY_PRINTK=y
-
-and add "earlyprintk clk_ignore_unused" to the kernel command line options.
-You may need to select a different UART for this depending on your board. I
-think UART1 is the default in the kernel configuration.
-
-On da850 devices comment out the lines:
-
-	/* pll1_sysclk2 is not affected by CPU scaling, so use it for async3 */
-	parent = clk_hw_get_parent_by_index(&mux->hw, 1);
-	if (parent)
-		clk_set_parent(mux->hw.clk, parent->clk);
-	else
-		dev_warn(dev, "Failed to find async3 parent clock\n");
-
-in da8xx-cfgchip.c or, if using device tree, comment out the lines:
-
-	assigned-clocks = <&async3_clk>;
-	assigned-clock-parents = <&pll1_sysclk 2>;
-
-in da850.dtsi when doing earlyprintk, otherwise the UART1 and UART2 clock
-source will change during boot and cause garbled output after a point. 
-
-
-
-David Lechner (27):
-  clk: davinci: pll: allow dev == NULL
-  clk: davinci: da850-pll: change PLL0 to CLK_OF_DECLARE
-  clk: davinci: psc: allow for dev == NULL
-  ARM: davinci: pass clock as parameter to davinci_timer_init()
-  ARM: davinci: da830: add new clock init using common clock framework
-  ARM: davinci: da850: add new clock init using common clock framework
-  ARM: davinci: dm355: add new clock init using common clock framework
-  ARM: davinci: dm365: add new clock init using common clock framework
-  ARM: davinci: dm644x: add new clock init using common clock framework
-  ARM: davinci: dm646x: add new clock init using common clock framework
-  ARM: davinci: da8xx: add new USB PHY clock init using common clock
-    framework
-  ARM: davinci: da8xx: add new sata_refclk init using common clock
-    framework
-  ARM: davinci: remove CONFIG_DAVINCI_RESET_CLOCKS
-  ARM: davinci_all_defconfig: remove CONFIG_DAVINCI_RESET_CLOCKS
-  ARM: davinci: switch to common clock framework
-  ARM: davinci: da830: Remove legacy clock init
-  ARM: davinci: da850: Remove legacy clock init
-  ARM: davinci: dm355: Remove legacy clock init
-  ARM: davinci: dm365: Remove legacy clock init
-  ARM: davinci: dm644x: Remove legacy clock init
-  ARM: davinci: dm646x: Remove legacy clock init
-  ARM: davinci: da8xx: Remove legacy USB and SATA clock init
-  ARM: davinci: remove legacy clocks
-  dt-bindings: timer: new bindings for TI DaVinci timer
-  ARM: davinci: add device tree support to timer
-  ARM: davinci: da8xx-dt: switch to device tree clocks
-  ARM: dts: da850: Add clocks
-
- .../bindings/timer/ti,davinci-timer.txt       |  37 +
- arch/arm/Kconfig                              |   5 +-
- arch/arm/boot/dts/da850-enbw-cmc.dts          |   4 +
- arch/arm/boot/dts/da850-evm.dts               |   4 +
- arch/arm/boot/dts/da850-lcdk.dts              |   9 +
- arch/arm/boot/dts/da850-lego-ev3.dts          |   4 +
- arch/arm/boot/dts/da850.dtsi                  | 168 ++++
- arch/arm/configs/davinci_all_defconfig        |   1 -
- arch/arm/mach-davinci/Kconfig                 |  13 +-
- arch/arm/mach-davinci/Makefile                |   4 +-
- arch/arm/mach-davinci/board-da830-evm.c       |  12 +-
- arch/arm/mach-davinci/board-da850-evm.c       |   2 +
- arch/arm/mach-davinci/board-dm355-evm.c       |   2 +
- arch/arm/mach-davinci/board-dm355-leopard.c   |   2 +
- arch/arm/mach-davinci/board-dm365-evm.c       |   2 +
- arch/arm/mach-davinci/board-dm644x-evm.c      |   2 +
- arch/arm/mach-davinci/board-dm646x-evm.c      |   2 +
- arch/arm/mach-davinci/board-mityomapl138.c    |   2 +
- arch/arm/mach-davinci/board-neuros-osd2.c     |   2 +
- arch/arm/mach-davinci/board-omapl138-hawk.c   |  11 +-
- arch/arm/mach-davinci/board-sffsdr.c          |   2 +
- arch/arm/mach-davinci/clock.c                 | 745 -----------------
- arch/arm/mach-davinci/clock.h                 |  76 --
- arch/arm/mach-davinci/common.c                |   3 -
- arch/arm/mach-davinci/da830.c                 | 462 ++---------
- arch/arm/mach-davinci/da850.c                 | 778 +++---------------
- arch/arm/mach-davinci/da8xx-dt.c              |  66 --
- arch/arm/mach-davinci/davinci.h               |   8 +
- arch/arm/mach-davinci/devices-da8xx.c         |  43 +-
- arch/arm/mach-davinci/devices.c               |   1 -
- arch/arm/mach-davinci/dm355.c                 | 406 ++-------
- arch/arm/mach-davinci/dm365.c                 | 485 +----------
- arch/arm/mach-davinci/dm644x.c                | 344 +-------
- arch/arm/mach-davinci/dm646x.c                | 372 +--------
- arch/arm/mach-davinci/include/mach/clock.h    |   3 -
- arch/arm/mach-davinci/include/mach/common.h   |  11 +-
- arch/arm/mach-davinci/include/mach/da8xx.h    |   6 +-
- arch/arm/mach-davinci/pm_domain.c             |   5 +
- arch/arm/mach-davinci/psc.c                   | 137 ---
- arch/arm/mach-davinci/psc.h                   |  12 -
- arch/arm/mach-davinci/time.c                  |  22 +-
- arch/arm/mach-davinci/usb-da8xx.c             | 242 +-----
- drivers/clk/davinci/pll-da830.c               |   5 +-
- drivers/clk/davinci/pll-da850.c               |  37 +-
- drivers/clk/davinci/pll-dm355.c               |   9 +-
- drivers/clk/davinci/pll-dm365.c               |   9 +-
- drivers/clk/davinci/pll-dm644x.c              |   9 +-
- drivers/clk/davinci/pll-dm646x.c              |   9 +-
- drivers/clk/davinci/pll.c                     | 279 +++++--
- drivers/clk/davinci/pll.h                     |  30 +-
- drivers/clk/davinci/psc-dm355.c               |   3 +-
- drivers/clk/davinci/psc-dm365.c               |   3 +-
- drivers/clk/davinci/psc-dm644x.c              |   3 +-
- drivers/clk/davinci/psc-dm646x.c              |   3 +-
- drivers/clk/davinci/psc.c                     |  58 +-
- include/linux/clk/davinci.h                   |  29 +
- 56 files changed, 1005 insertions(+), 3998 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/ti,davinci-timer.txt
- delete mode 100644 arch/arm/mach-davinci/clock.c
- delete mode 100644 arch/arm/mach-davinci/psc.c
- create mode 100644 include/linux/clk/davinci.h
-
--- 
-2.17.0
+> +
+>  		tcphy0_dp: dp-port {
+>  			#phy-cells = <0>;
+>  		};
+> @@ -74,6 +88,19 @@ Example:
+>  			 <&cru SRST_P_UPHY1_TCPHY>;
+>  		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
+>  
+> +		rockchip,phy_config =<0x2a 0x00
+> +			0x1f 0x15
+> +			0x14 0x22
+> +			0x02 0x2b
+> +			0x21 0x00
+> +			0x12 0x15
+> +			0x02 0x22
+> +			0 0
+> +			0x15 0x00
+> +			0x00 0x15
+> +			0 0
+> +			0 0>;
+> +
+>  		tcphy1_dp: dp-port {
+>  			#phy-cells = <0>;
+>  		};
+> -- 
+> 2.7.4
+> 
