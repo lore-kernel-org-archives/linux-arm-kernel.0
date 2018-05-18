@@ -1,31 +1,34 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Thu, 17 May 2018 20:20:52 -0500
-Subject: [PATCH] ARM: davinci: board-da850-evm: fix WP pin polarity for MMC/SD
-Message-ID: <20180518012052.31345-1-aford173@gmail.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Thu, 17 May 2018 20:20:20 -0500
+Subject: [PATCH 2/6] coresight: fix CORESIGHT_STM -- STM dependency
+In-Reply-To: <20180518012024.22645-1-kim.phillips@arm.com>
+References: <20180517070643.GC13919@kroah.com>
+ <20180518012024.22645-1-kim.phillips@arm.com>
+Message-ID: <20180518012024.22645-2-kim.phillips@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting from MMC/SD in rw mode, the system crashes because
-the write protect pin should be active high and not active low.
-This patch fixes the polarity of the WP pin.
+coresight-stm unconditionally calls stm_register_device.  This
+patch makes it therefore depend on STM instead of just selecting STM.
 
-Fixes: 67c6b6ff221f ("ARM: davinci: board-da850-evm: fix GPIO
-lookup for MMC/SD")
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+---
+ drivers/hwtracing/coresight/Kconfig | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Signed-off-by: Adam Ford <aford173@gmail.com>
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index e22fb40e34bc..6d5beb11bd96 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -774,7 +774,7 @@ static struct gpiod_lookup_table mmc_gpios_table = {
- 		GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_CD_PIN, "cd",
- 			    GPIO_ACTIVE_LOW),
- 		GPIO_LOOKUP("davinci_gpio.0", DA850_MMCSD_WP_PIN, "wp",
--			    GPIO_ACTIVE_LOW),
-+			    GPIO_ACTIVE_HIGH),
- 	},
- };
+diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+index 83fb78651ef9..f9abdef5b0d9 100644
+--- a/drivers/hwtracing/coresight/Kconfig
++++ b/drivers/hwtracing/coresight/Kconfig
+@@ -74,8 +74,7 @@ config CORESIGHT_DYNAMIC_REPLICATOR
  
+ config CORESIGHT_STM
+ 	bool "CoreSight System Trace Macrocell driver"
+-	depends on (ARM && !(CPU_32v3 || CPU_32v4 || CPU_32v4T)) || ARM64
+-	select STM
++	depends on STM && ((ARM && !(CPU_32v3 || CPU_32v4 || CPU_32v4T)) || ARM64)
+ 	help
+ 	  This driver provides support for hardware assisted software
+ 	  instrumentation based tracing. This is primarily used for
 -- 
 2.17.0
