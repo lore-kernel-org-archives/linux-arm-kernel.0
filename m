@@ -1,45 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:14:58 +0200
-Subject: [PATCH 036/102] arm64: dts: renesas: ulcb: Rename EtherAVB "mdc" pin
- group to "mdio"
+Date: Fri, 18 May 2018 13:14:42 +0200
+Subject: [PATCH 020/102] arm64: dts: renesas: r8a77970: add DU support
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <1518ad140b9ea73cee8bc89e39f8962fbd2bb7bb.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <f66598b95dbac72365f5b81ffa61ca6357af6b22.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-On other Renesas SoCs, the pin group for the MDIO bus is named "mdio"
-instead of "mdc".  Fix the inconsistency, now the pinctrl drivers for
-R-Car H3, M3-W, and M3-N have gained support for the traditional pin
-group name.
+Define the generic R8A77970 part of the DU device node.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Based on the original (and large) patch by Daisuke Matsushita
+<daisuke.matsushita.ns@hitachi.com>.
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/ulcb.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-index 6f814845f8b6..93402783d52f 100644
---- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
-+++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-@@ -255,12 +255,12 @@
- 
- 	avb_pins: avb {
- 		mux {
--			groups = "avb_link", "avb_mdc", "avb_mii";
-+			groups = "avb_link", "avb_mdio", "avb_mii";
- 			function = "avb";
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index 9a7cf2ab099e..8efb5c3a5da1 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -635,6 +635,35 @@
+ 			resets = <&cpg 623>;
+ 			renesas,fcp = <&fcpvd0>;
  		};
++
++		du: display at feb00000 {
++			compatible = "renesas,du-r8a77970";
++			reg = <0 0xfeb00000 0 0x80000>;
++			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 724>;
++			clock-names = "du.0";
++			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
++			resets = <&cpg 724>;
++			vsps = <&vspd0>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					du_out_rgb: endpoint {
++					};
++				};
++
++				port at 1 {
++					reg = <1>;
++					du_out_lvds0: endpoint {
++					};
++				};
++			};
++		};
+ 	};
  
--		pins_mdc {
--			groups = "avb_mdc";
-+		pins_mdio {
-+			groups = "avb_mdio";
- 			drive-strength = <24>;
- 		};
- 
+ 	timer {
 -- 
 2.11.0
