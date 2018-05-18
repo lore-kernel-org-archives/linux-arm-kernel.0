@@ -1,35 +1,47 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 18 May 2018 12:58:40 +0200
-Subject: [PATCH] clkdev: Remove duplicated negative index check from
- __of_clk_get()
-Message-ID: <1526641120-1585-1-git-send-email-geert+renesas@glider.be>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 18 May 2018 11:58:40 +0100
+Subject: [GIT PULL v2] arm64: defconfig: hisilicon config updates for v4.18
+Message-ID: <5AFEB1E0.9030200@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__of_clk_get() calls of_parse_phandle_with_args(), which rejects
-negative indices since commit bd69f73f2c81eed9 ("of: Create function for
-counting number of phandles in a property").
+Hi Olof, Hi Arnd,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Commit bd69f73f2c81eed9 is in v3.9.
----
- drivers/clk/clkdev.c | 3 ---
- 1 file changed, 3 deletions(-)
+Please help to pull the following changes.
+Thanks!
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 7513411140b693ec..02fcee2012e05250 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -35,9 +35,6 @@ static struct clk *__of_clk_get(struct device_node *np, int index,
- 	struct clk *clk;
- 	int rc;
- 
--	if (index < 0)
--		return ERR_PTR(-EINVAL);
--
- 	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
- 					&clkspec);
- 	if (rc)
--- 
-2.7.4
+Best Regards,
+Wei
+
+---
+
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the Git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.18v2
+
+for you to fetch changes up to 9ab1c973324566baa314f8dd4e3827e4076a8675:
+
+  arm64: defconfig: Enable HISILICON_LPC (2018-05-11 11:39:01 +0100)
+
+----------------------------------------------------------------
+ARM64: hisilicon: defconfig updates for 4.18
+
+- Sync the arm64 defconfig with savedefconfig
+- Enable the support of ethernet, eMMC, Combo/INNO phy
+  and PCIe for Hi3798CV200
+- Enable the LPC for hip06 and hip07
+
+----------------------------------------------------------------
+John Garry (1):
+      arm64: defconfig: Enable HISILICON_LPC
+
+Shawn Guo (2):
+      arm64: defconfig: sync it with savedefconfig
+      arm64: defconfig: enable drivers for Poplar support
+
+ arch/arm64/configs/defconfig | 86 +++++++++++++++++++-------------------------
+ 1 file changed, 36 insertions(+), 50 deletions(-)
