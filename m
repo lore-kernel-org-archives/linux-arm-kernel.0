@@ -1,58 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:15:32 +0200
-Subject: [PATCH 070/102] arm64: dts: renesas: eagle: add CAN-FD support
+Date: Fri, 18 May 2018 13:15:53 +0200
+Subject: [PATCH 091/102] arm64: dts: renesas: r8a77990: Add PFC device node
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <bb8d20331f051a920df21aaf263a189e2ede20e6.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <4ab0df3399699c3d440940863234d318fa649b72.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Define the Eagle board dependent part of the CAN-FD device node.
+This patch adds PFC device node for r8a77990 (R-Car E3).
 
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77970-eagle.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts b/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-index b800a119753b..21f9cf5c6e84 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-@@ -95,6 +95,16 @@
- 	};
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index 46580290b7fb..efc3c0ba36c2 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -60,6 +60,11 @@
+ 		#size-cells = <2>;
+ 		ranges;
  
-+&canfd {
-+	pinctrl-0 = <&canfd0_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
++		pfc: pin-controller at e6060000 {
++			compatible = "renesas,pfc-r8a77990";
++			reg = <0 0xe6060000 0 0x508>;
++		};
 +
-+	channel0 {
-+		status = "okay";
-+	};
-+};
-+
- &extal_clk {
- 	clock-frequency = <16666666>;
- };
-@@ -156,6 +166,11 @@
- 		function = "avb0";
- 	};
- 
-+	canfd0_pins: canfd0 {
-+		groups = "canfd0_data_a";
-+		function = "canfd0";
-+	};
-+
- 	i2c0_pins: i2c0 {
- 		groups = "i2c0";
- 		function = "i2c0";
+ 		cpg: clock-controller at e6150000 {
+ 			compatible = "renesas,r8a77990-cpg-mssr";
+ 			reg = <0 0xe6150000 0 0x1000>;
 -- 
 2.11.0
