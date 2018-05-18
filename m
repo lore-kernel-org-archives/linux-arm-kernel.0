@@ -1,51 +1,60 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 18 May 2018 11:27:50 +0530
-Subject: [PATCH 2/4] omap2: clockdomain: Inroduce cpu_pm notifiers for
- context save/restore
-In-Reply-To: <20180517214347.GR98604@atomide.com>
-References: <1526483821-25585-1-git-send-email-j-keerthy@ti.com>
- <1526483821-25585-3-git-send-email-j-keerthy@ti.com>
- <20180517214347.GR98604@atomide.com>
-Message-ID: <18c013bb-4f3b-81af-f565-825513e2b501@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 18 May 2018 11:35:18 +0530
+Subject: [PATCH v10 25/27] ARM: davinci: add device tree support to timer
+In-Reply-To: <1162de58-00bc-fdfa-eef1-48a094834ac3@lechnology.com>
+References: <20180509172606.29387-1-david@lechnology.com>
+ <20180509172606.29387-26-david@lechnology.com>
+ <8fa98514-7651-58cb-595e-6c7f713540b8@ti.com>
+ <1162de58-00bc-fdfa-eef1-48a094834ac3@lechnology.com>
+Message-ID: <c7064bee-d385-4496-c19e-1b72853b01f1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Friday 18 May 2018 03:13 AM, Tony Lindgren wrote:
-> * Keerthy <j-keerthy@ti.com> [180516 15:21]:
->> Inroduce cpu_pm notifiers for context save/restore. This will be
->> needed for am43xx family in case of rtc only mode with ddr in
->> self-refresh.
-> ...
->> +static int cpu_notifier(struct notifier_block *nb, unsigned long cmd, void *v)
->> +{
->> +	switch (cmd) {
->> +	case CPU_CLUSTER_PM_ENTER:
->> +		if (enable_off_mode)
->> +			clkdm_save_context();
->> +		break;
->> +	case CPU_CLUSTER_PM_EXIT:
->> +		if (enable_off_mode)
->> +			clkdm_restore_context();
->> +		break;
->> +	}
->> +
->> +	return NOTIFY_OK;
->> +}
+On Thursday 17 May 2018 08:39 PM, David Lechner wrote:
+> On 05/17/2018 09:35 AM, Sekhar Nori wrote:
+>> Hi David,
+>>
+>> On Wednesday 09 May 2018 10:56 PM, David Lechner wrote:
+>>> This adds device tree support to the davinci timer so that when clocks
+>>> are moved to device tree, the timer will still work.
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>> ---
+>>
+>>> +static int __init of_davinci_timer_init(struct device_node *np)
+>>> +{
+>>> +??? struct clk *clk;
+>>> +
+>>> +??? clk = of_clk_get(np, 0);
+>>> +??? if (IS_ERR(clk)) {
+>>> +??????? struct of_phandle_args clkspec;
+>>> +
+>>> +??????? /*
+>>> +???????? * Fall back to using ref_clk if the actual clock is not
+>>> +???????? * available. There will be problems later if the real clock
+>>> +???????? * source is disabled.
+>>> +???????? */
+>>> +
+>>> +??????? pr_warn("%s: falling back to ref_clk\n", __func__);
+>>> +
+>>> +??????? clkspec.np = of_find_node_by_name(NULL, "ref_clk");
+>>> +??????? if (IS_ERR(clkspec.np)) {
+>>> +??????????? pr_err("%s: No clock available for timer!\n", __func__);
+>>> +??????????? return PTR_ERR(clkspec.np);
+>>> +??????? }
+>>> +??????? clk = of_clk_get_from_provider(&clkspec);
+>>> +??????? of_node_put(clkspec.np);
+>>> +??? }
+>>
+>> Do we need this error path now?
+>>
+>> Thanks,
+>> Sekhar
+>>
 > 
-> Can you do this too only on suspend instead of the cpu notifier?
-> If you need to call this eventually from cpuidle also then yeah
-> the notifier makes sense.
+> No, not really.
 
-Clockdomain under omap2 does not have suspend/resume calls as its still
-not a driver. The initial version of this patch had save/restore calls
-directly from pm33xx-core during suspend/resume platform ops are called.
+Then lets just print an error and return the error number.
 
-Are you suggesting that?
-
-> 
-> Regards,
-> 
-> Tony
-> 
+Thanks,
+Sekhar
