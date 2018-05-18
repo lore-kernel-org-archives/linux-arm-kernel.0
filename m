@@ -1,49 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:59 +0200
-Subject: [PATCH 01/14] soc: renesas: Identify RZ/G1C
+Date: Fri, 18 May 2018 13:18:00 +0200
+Subject: [PATCH 02/14] soc: renesas: rcar-rst: Add support for RZ/G1C
 In-Reply-To: <cover.1526639075.git.horms+renesas@verge.net.au>
 References: <cover.1526639075.git.horms+renesas@verge.net.au>
-Message-ID: <1daf13ba10378cad9ea4f5f26b83dd36c36dcdc0.1526639075.git.horms+renesas@verge.net.au>
+Message-ID: <a3a9033f1193842c6e0b518db196ade0f882cf78.1526639075.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Biju Das <biju.das@bp.renesas.com>
-
-Add support for identifying the RZ/G1C (r8a77470) SoC.
 
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/soc/renesas/renesas-soc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/reset/renesas,rst.txt | 1 +
+ drivers/soc/renesas/rcar-rst.c                          | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
-index ea71c413c926..3912a71bd417 100644
---- a/drivers/soc/renesas/renesas-soc.c
-+++ b/drivers/soc/renesas/renesas-soc.c
-@@ -100,6 +100,11 @@ static const struct renesas_soc soc_rz_g1e __initconst __maybe_unused = {
- 	.id	= 0x4c,
- };
- 
-+static const struct renesas_soc soc_rz_g1c __initconst __maybe_unused = {
-+	.family	= &fam_rzg,
-+	.id	= 0x53,
-+};
-+
- static const struct renesas_soc soc_rcar_m1a __initconst __maybe_unused = {
- 	.family	= &fam_rcar_gen1,
- };
-@@ -192,6 +197,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
- #ifdef CONFIG_ARCH_R8A7745
- 	{ .compatible = "renesas,r8a7745",	.data = &soc_rz_g1e },
- #endif
-+#ifdef CONFIG_ARCH_R8A77470
-+	{ .compatible = "renesas,r8a77470",	.data = &soc_rz_g1c },
-+#endif
- #ifdef CONFIG_ARCH_R8A7778
- 	{ .compatible = "renesas,r8a7778",	.data = &soc_rcar_m1a },
- #endif
+diff --git a/Documentation/devicetree/bindings/reset/renesas,rst.txt b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+index 294a0dae106a..7be61efc3c8a 100644
+--- a/Documentation/devicetree/bindings/reset/renesas,rst.txt
++++ b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+@@ -17,6 +17,7 @@ Required properties:
+ 		Examples with soctypes are:
+ 		  - "renesas,r8a7743-rst" (RZ/G1M)
+ 		  - "renesas,r8a7745-rst" (RZ/G1E)
++		  - "renesas,r8a77470-rst" (RZ/G1C)
+ 		  - "renesas,r8a7778-reset-wdt" (R-Car M1A)
+ 		  - "renesas,r8a7779-reset-wdt" (R-Car H1)
+ 		  - "renesas,r8a7790-rst" (R-Car H2)
+diff --git a/drivers/soc/renesas/rcar-rst.c b/drivers/soc/renesas/rcar-rst.c
+index 8e9cb7996ab0..66d7dbac2ded 100644
+--- a/drivers/soc/renesas/rcar-rst.c
++++ b/drivers/soc/renesas/rcar-rst.c
+@@ -44,6 +44,7 @@ static const struct of_device_id rcar_rst_matches[] __initconst = {
+ 	/* RZ/G is handled like R-Car Gen2 */
+ 	{ .compatible = "renesas,r8a7743-rst", .data = &rcar_rst_gen2 },
+ 	{ .compatible = "renesas,r8a7745-rst", .data = &rcar_rst_gen2 },
++	{ .compatible = "renesas,r8a77470-rst", .data = &rcar_rst_gen2 },
+ 	/* R-Car Gen1 */
+ 	{ .compatible = "renesas,r8a7778-reset-wdt", .data = &rcar_rst_gen1 },
+ 	{ .compatible = "renesas,r8a7779-reset-wdt", .data = &rcar_rst_gen1 },
 -- 
 2.11.0
