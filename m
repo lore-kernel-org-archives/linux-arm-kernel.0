@@ -1,64 +1,85 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 18 May 2018 13:49:22 +0530
-Subject: [PATCH V7 09/12] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c2
- board file
-In-Reply-To: <1526631565-9972-1-git-send-email-sricharan@codeaurora.org>
-References: <1526631565-9972-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1526631565-9972-10-git-send-email-sricharan@codeaurora.org>
+From: j-keerthy@ti.com (Keerthy)
+Date: Fri, 18 May 2018 14:10:22 +0530
+Subject: [PATCH 2/2] ARM: mach-omap2: prm44xx: Inroduce cpu_pm notifiers for
+ context save/restore
+In-Reply-To: <1526632822-26049-1-git-send-email-j-keerthy@ti.com>
+References: <1526632822-26049-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1526632822-26049-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts | 25 +++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+Inroduce cpu_pm notifiers for context save/restore. This will be
+needed for am43xx family in case of rtc only mode with ddr in
+self-refresh.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 596cce3..02b7f1d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -763,6 +763,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-ipq4019-ap.dk04.1-c1.dtb \
- 	qcom-ipq4019-ap.dk04.1-c3.dtb \
- 	qcom-ipq4019-ap.dk07.1-c1.dtb \
-+	qcom-ipq4019-ap.dk07.1-c2.dtb \
- 	qcom-ipq8064-ap148.dtb \
- 	qcom-msm8660-surf.dtb \
- 	qcom-msm8960-cdp.dtb \
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
-new file mode 100644
-index 0000000..af7a902
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
-@@ -0,0 +1,25 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, The Linux Foundation. All rights reserved.
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ arch/arm/mach-omap2/prm44xx.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index 0a4aa90..5478c71 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -12,6 +12,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/cpu_pm.h>
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
+ #include <linux/errno.h>
+@@ -30,6 +31,7 @@
+ #include "prcm44xx.h"
+ #include "prminst44xx.h"
+ #include "powerdomain.h"
++#include "pm.h"
+ 
+ /* Static data */
+ 
+@@ -718,6 +720,22 @@ void prm_restore_context(void)
+ 				 omap4_prcm_irq_setup.pm_ctrl);
+ }
+ 
++static int cpu_notifier(struct notifier_block *nb, unsigned long cmd, void *v)
++{
++	switch (cmd) {
++	case CPU_CLUSTER_PM_ENTER:
++		if (enable_off_mode)
++			prm_save_context();
++		break;
++	case CPU_CLUSTER_PM_EXIT:
++		if (enable_off_mode)
++			prm_restore_context();
++		break;
++	}
 +
-+#include "qcom-ipq4019-ap.dk07.1.dtsi"
++	return NOTIFY_OK;
++}
 +
-+/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK07.1-C2";
-+	compatible = "qcom,ipq4019-ap-dk07.1-c2";
+ /*
+  * XXX document
+  */
+@@ -738,6 +756,7 @@ void prm_restore_context(void)
+ 
+ int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
+ {
++	static struct notifier_block nb;
+ 	omap_prm_base_init();
+ 
+ 	prm_init_data = data;
+@@ -759,6 +778,12 @@ int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
+ 		omap4_prcm_irq_setup.mask = AM43XX_PRM_IRQENABLE_MPU_OFFSET;
+ 	}
+ 
++	/* Only AM43XX can lose prm context during rtc-ddr suspend */
++	if (soc_is_am43xx()) {
++		nb.notifier_call = cpu_notifier;
++		cpu_pm_register_notifier(&nb);
++	}
 +
-+	soc {
-+		pinctrl at 1000000 {
-+			serial_1_pins: serial1-pinmux {
-+				pins = "gpio8", "gpio9";
-+				function = "blsp_uart1";
-+				bias-disable;
-+			};
-+		};
-+
-+		serial at 78b0000 {
-+			pinctrl-0 = <&serial_1_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+	};
-+};
+ 	return prm_register(&omap44xx_prm_ll_data);
+ }
+ 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.9.1
