@@ -1,10 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 18 May 2018 18:12:15 +0300
-Subject: [PATCH v3 2/3] arm64: dts: renesas: draak: Describe CVBS input
-In-Reply-To: <1526654878-11143-3-git-send-email-jacopo+renesas@jmondi.org>
+Date: Fri, 18 May 2018 18:13:06 +0300
+Subject: [PATCH v3 3/3] arm64: dts: renesas: draak: Describe HDMI input
+In-Reply-To: <1526654878-11143-4-git-send-email-jacopo+renesas@jmondi.org>
 References: <1526654878-11143-1-git-send-email-jacopo+renesas@jmondi.org>
- <1526654878-11143-3-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1569661.saMqNra8vc@avalon>
+ <1526654878-11143-4-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <2264361.MLIkrGFxG7@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,95 +12,97 @@ Hi Jacopo,
 
 Thank you for the patch.
 
-On Friday, 18 May 2018 17:47:57 EEST Jacopo Mondi wrote:
-> Describe CVBS video input through analog video decoder ADV7180
-> connected to video input interface VIN4.
+On Friday, 18 May 2018 17:47:58 EEST Jacopo Mondi wrote:
+> Describe HDMI input connector and ADV7612 HDMI decoder installed on
+> R-Car Gen3 Draak board.
 > 
-> The video input signal path is shared with HDMI video input, and
-> selected by on-board switches SW-53 and SW-54 with CVBS input selected
-> by the default switches configuration.
+> The video signal routing to the HDMI decoder to the video input interface
+> VIN4 is multiplexed with CVBS input path, and enabled/disabled through
+> on-board switches SW-49, SW-50, SW-51 and SW-52.
+> 
+> As the default board switches configuration connects CVBS input to VIN4,
+> leave the HDMI decoder unconnected in DTS.
 > 
 > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 > Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> 
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 > ---
 > v2 -> v3:
-> - Add comment to describe the shared input video path
-> - Add my SoB and Niklas' R-b tags
+> - Add comment on HDMI output port about the shared CVBS/HDMI video path
+> - Add Niklas' R-b tag
 > ---
->  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 42 +++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
+>  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 48 +++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
 > 
 > diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts index 9d73de8..95745fc
+> b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts index 95745fc..1e475a4
 > 100644
 > --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
 > +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> @@ -142,6 +142,11 @@
->  		groups = "usb0";
->  		function = "usb0";
+> @@ -59,6 +59,17 @@
+>  		};
 >  	};
-> +
-> +	vin4_pins_cvbs: vin4 {
-> +		groups = "vin4_data8", "vin4_sync", "vin4_clk";
-> +		function = "vin4";
-> +	};
->  };
 > 
->  &i2c0 {
-> @@ -154,6 +159,23 @@
->  		reg = <0x50>;
->  		pagesize = <8>;
->  	};
-> +
-> +	analog-video at 20 {
-> +		compatible = "adi,adv7180";
-> +		reg = <0x20>;
+> +	hdmi-in {
+> +		compatible = "hdmi-connector";
+> +		type = "a";
 > +
 > +		port {
-
-The adv7180 DT bindings document the output port as 3 or 6 (respectively for 
-the CP and ST versions of the chip). You should thus number the port. Apart 
-from that the patch looks good.
-
-> +			/*
-> +			 * The VIN4 video input path is shared between
-> +			 * CVBS and HDMI inputs through SW[49-54] switches.
-> +			 *
-> +			 * CVBS is the default selection, link it to VIN4 here.
-> +			 */
-> +			adv7180_out: endpoint {
-> +				remote-endpoint = <&vin4_in>;
+> +			hdmi_con_in: endpoint {
+> +				remote-endpoint = <&adv7612_in>;
+> +			};
+> +		};
+> +	};
+> +
+>  	memory at 48000000 {
+>  		device_type = "memory";
+>  		/* first 128MB is reserved for secure area. */
+> @@ -176,6 +187,43 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	hdmi-decoder at 4c {
+> +		compatible = "adi,adv7612";
+> +		reg = <0x4c>;
+> +		default-input = <0>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +
+> +				adv7612_in: endpoint {
+> +					remote-endpoint = <&hdmi_con_in>;
+> +				};
+> +			};
+> +
+> +			port at 2 {
+> +				reg = <2>;
+> +
+> +				/*
+> +				 * The VIN4 video input path is shared between
+> +				 * CVBS and HDMI inputs through SW[49-54]
+> +				 * switches.
+> +				 *
+> +				 * CVBS is the default selection, leave HDMI
+> +				 * not connected here.
+> +				 */
+> +				adv7612_out: endpoint {
+> +					pclk-sample = <0>;
+> +					hsync-active = <0>;
+> +					vsync-active = <0>;
+> +				};
 > +			};
 > +		};
 > +	};
 >  };
 > 
 >  &i2c1 {
-> @@ -246,3 +268,23 @@
->  	timeout-sec = <60>;
->  	status = "okay";
->  };
-> +
-> +&vin4 {
-> +	pinctrl-0 = <&vin4_pins_cvbs>;
-> +	pinctrl-names = "default";
-> +
-> +	status = "okay";
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		port at 0 {
-> +			reg = <0>;
-> +
-> +			vin4_in: endpoint {
-> +				remote-endpoint = <&adv7180_out>;
-> +			};
-> +		};
-> +	};
-> +};
 
 -- 
 Regards,
