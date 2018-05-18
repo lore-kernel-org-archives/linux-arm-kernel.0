@@ -1,34 +1,30 @@
-From: hch@lst.de (hch at lst.de)
-Date: Fri, 18 May 2018 15:27:31 +0200
-Subject: [PATCH 02/20] dma-mapping: provide a generic dma-noncoherent
- implementation
-In-Reply-To: <bad125dff49f6e49c895e818c9d1abb346a46e8e.camel@synopsys.com>
-References: <20180511075945.16548-1-hch@lst.de>
- <20180511075945.16548-3-hch@lst.de>
- <bad125dff49f6e49c895e818c9d1abb346a46e8e.camel@synopsys.com>
-Message-ID: <20180518132731.GA31125@lst.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 18 May 2018 14:27:11 +0100
+Subject: [PATCH REPOST] mfd: syscon: atmel-smc: include string.h
+In-Reply-To: <20180504103446.20104-1-bigeasy@linutronix.de>
+References: <20180504103446.20104-1-bigeasy@linutronix.de>
+Message-ID: <20180518132711.GM5130@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 01:03:46PM +0000, Alexey Brodkin wrote:
-> Note mmc_get_dma_dir() is just "data->flags & MMC_DATA_WRITE ? DMA_TO_DEVICE : DMA_FROM_DEVICE".
-> I.e. if we're preparing for sending data dma_noncoherent_map_sg() will have DMA_TO_DEVICE which
-> is quite OK for passing to dma_noncoherent_sync_sg_for_device() but in case of reading we'll have
-> DMA_FROM_DEVICE which we'll pass to dma_noncoherent_sync_sg_for_device() in dma_noncoherent_map_sg().
+On Fri, 04 May 2018, Sebastian Andrzej Siewior wrote:
+
+> The string.h header file is needed for the memset() definition. The RT
+> build fails because it is not pulled in via other header files.
 > 
-> I'd say this is not entirely correct because IMHO arch_sync_dma_for_cpu() is supposed to only be used
-> in case of DMA_FROM_DEVICE and arch_sync_dma_for_device() only in case of DMA_TO_DEVICE.
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  drivers/mfd/atmel-smc.c |    1 +
+>  1 file changed, 1 insertion(+)
 
-arc overrides the dir paramter of the dma_sync_single_for_device/
-dma_sync_single_for_cpu calls.  My patches dropped that, and I have
-restored that, and audit for the other architectures is pending.
+Applied, thanks.
 
-That being said the existing arc code still looks rather odd as it
-didn't do the same thing for the scatterlist versions of the calls.
-I've thrown in a few patches into my new tree to make the sg versions
-make the normal calls, and to clean up the area a bit.
-
-> You seem to lost an offset in the page so if we happen to have a buffer not aligned to
-> a page boundary then we were obviously corrupting data outside our data :)
-
-Oops!  Thank you for all the debugging!
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
