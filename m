@@ -1,101 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:14:35 +0200
-Subject: [PATCH 013/102] arm64: dts: renesas: r8a77965: Add all MSIOF device
- nodes
+Date: Fri, 18 May 2018 13:14:40 +0200
+Subject: [PATCH 018/102] arm64: dts: renesas: r8a7796: decrease temperature
+ hysteresis
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <93b0e5643a684ff0843b9d0222eae168838b2ffa.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <1f153093b0bb6a9b46cb410ee3535d990348a2b3.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
-Add the device nodes for all MSIOF SPI controllers.
+To incorporate more tests by the hardware team decrease the hysteresis
+value to 1C.
 
-Based on several similar patches of the R8A7796 device tree
-by Geert Uytterhoeven <geert+renesas@glider.be>
-and Simon Horman <horms+renesas@verge.net.au>.
-
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[geert: Use numerical power domain indices for initial r8a77965.dtsi]
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 62 +++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 6f748e94a901..4371be3e869a 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -805,6 +805,68 @@
- 			/* placeholder */
- 		};
- 
-+		msiof0: spi at e6e90000 {
-+			compatible = "renesas,msiof-r8a77965",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6e90000 0 0x0064>;
-+			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 211>;
-+			dmas = <&dmac1 0x41>, <&dmac1 0x40>,
-+			       <&dmac2 0x41>, <&dmac2 0x40>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 211>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		msiof1: spi at e6ea0000 {
-+			compatible = "renesas,msiof-r8a77965",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6ea0000 0 0x0064>;
-+			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 210>;
-+			dmas = <&dmac1 0x43>, <&dmac1 0x42>,
-+			       <&dmac2 0x43>, <&dmac2 0x42>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 210>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		msiof2: spi at e6c00000 {
-+			compatible = "renesas,msiof-r8a77965",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6c00000 0 0x0064>;
-+			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 209>;
-+			dmas = <&dmac0 0x45>, <&dmac0 0x44>;
-+			dma-names = "tx", "rx";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 209>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		msiof3: spi at e6c10000 {
-+			compatible = "renesas,msiof-r8a77965",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6c10000 0 0x0064>;
-+			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 208>;
-+			dmas = <&dmac0 0x47>, <&dmac0 0x46>;
-+			dma-names = "tx", "rx";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 208>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		du: display at feb00000 {
- 			reg = <0 0xfeb00000 0 0x80000>,
- 			      <0 0xfeb90000 0 0x14>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 55a64169d3d4..e6254711556c 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -2072,12 +2072,12 @@
+ 			trips {
+ 				sensor1_passive: sensor1-passive {
+ 					temperature = <95000>;
+-					hysteresis = <2000>;
++					hysteresis = <1000>;
+ 					type = "passive";
+ 				};
+ 				sensor1_crit: sensor1-crit {
+ 					temperature = <120000>;
+-					hysteresis = <2000>;
++					hysteresis = <1000>;
+ 					type = "critical";
+ 				};
+ 			};
+@@ -2098,12 +2098,12 @@
+ 			trips {
+ 				sensor2_passive: sensor2-passive {
+ 					temperature = <95000>;
+-					hysteresis = <2000>;
++					hysteresis = <1000>;
+ 					type = "passive";
+ 				};
+ 				sensor2_crit: sensor2-crit {
+ 					temperature = <120000>;
+-					hysteresis = <2000>;
++					hysteresis = <1000>;
+ 					type = "critical";
+ 				};
+ 			};
+@@ -2124,12 +2124,12 @@
+ 			trips {
+ 				sensor3_passive: sensor3-passive {
+ 					temperature = <95000>;
+-					hysteresis = <2000>;
++					hysteresis = <1000>;
+ 					type = "passive";
+ 				};
+ 				sensor3_crit: sensor3-crit {
+ 					temperature = <120000>;
+-					hysteresis = <2000>;
++					hysteresis = <1000>;
+ 					type = "critical";
+ 				};
+ 			};
 -- 
 2.11.0
