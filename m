@@ -1,60 +1,53 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 18 May 2018 22:46:19 +0300
-Subject: [PATCH 2/2] arm64: dts: renesas: v3hsk: add GEther support
-In-Reply-To: <a4230699-e46f-0782-e3b1-22d58b9033c8@cogentembedded.com>
-References: <a4230699-e46f-0782-e3b1-22d58b9033c8@cogentembedded.com>
-Message-ID: <7a853b57-747e-7536-89fe-2e0c847f58f4@cogentembedded.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 18 May 2018 14:51:54 -0500
+Subject: [PATCH v7 2/2] PCI: mediatek: Using chained IRQ to setup IRQ
+ handle
+In-Reply-To: <1525412853-24367-3-git-send-email-honghui.zhang@mediatek.com>
+References: <1525412853-24367-1-git-send-email-honghui.zhang@mediatek.com>
+ <1525412853-24367-3-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20180518195154.GB41790@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the V3H Starter Kit board dependent part of the GEther device node.
+On Fri, May 04, 2018 at 01:47:33PM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> 
+> Using irq_chip solution to setup IRQs in order to consist
+> with IRQ framework.
+> 
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  drivers/pci/host/pcie-mediatek.c | 206 ++++++++++++++++++++++-----------------
+>  1 file changed, 115 insertions(+), 91 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+> index c3dc549..dabf1086 100644
+> --- a/drivers/pci/host/pcie-mediatek.c
+> +++ b/drivers/pci/host/pcie-mediatek.c
+> ...
 
-Based on the original (and large) patch by Vladimir Barinov.
+> -static int mtk_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+> -			    irq_hw_number_t hwirq)
+> +static struct msi_domain_info mtk_msi_domain_info = {
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+I think this patch should be amended to include this:
 
----
- arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index 0d0177ce436c..368b70d9371b 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -193,7 +193,7 @@ config PCIE_MEDIATEK
+ 	bool "MediaTek PCIe controller"
+ 	depends on (ARM || ARM64) && (ARCH_MEDIATEK || COMPILE_TEST)
+ 	depends on OF
+-	depends on PCI
++	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIEPORTBUS
+ 	help
+ 	  Say Y here if you want to enable PCIe controller support on
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-@@ -15,6 +15,7 @@
- 
- 	aliases {
- 		serial0 = &scif0;
-+		ethernet0 = &gether;
- 	};
- 
- 	chosen {
-@@ -36,7 +37,27 @@
- 	clock-frequency = <32768>;
- };
- 
-+&gether {
-+	pinctrl-0 = <&gether_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-mode = "rgmii";
-+	phy-handle = <&phy0>;
-+	renesas,no-ether-link;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
- &pfc {
-+	gether_pins: gether {
-+		groups = "gether_mdio_a", "gether_rgmii",
-+			 "gether_txcrefclk", "gether_txcrefclk_mega";
-+		function = "gether";
-+	};
-+
- 	scif0_pins: scif0 {
- 		groups = "scif0_data";
- 		function = "scif0";
+
+Lorenzo, if you want to fold that in and update your branch, I can pull it.
+If not, I can add a patch on top, which should only break compile-testing
+bisection.
