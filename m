@@ -1,21 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 May 2018 16:29:25 -0500
-Subject: [PATCH v3 1/2] dt-bindings: add MediaTek XS-PHY binding
-In-Reply-To: <1525932629-10603-2-git-send-email-chunfeng.yun@mediatek.com>
-References: <1525932629-10603-1-git-send-email-chunfeng.yun@mediatek.com>
- <1525932629-10603-2-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <20180518212925.GA25632@rob-hp-laptop>
+From: daniel@zonque.org (Daniel Mack)
+Date: Fri, 18 May 2018 23:31:02 +0200
+Subject: [PATCH 05/15] mtd: nand: pxa3xx: remove the dmaengine compat need
+In-Reply-To: <20180402142656.26815-6-robert.jarzmik@free.fr>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-6-robert.jarzmik@free.fr>
+Message-ID: <a09d80dc-e8fd-1e9a-1878-8875ddc83134@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 10, 2018 at 02:10:28PM +0800, Chunfeng Yun wrote:
-> Add a DT binding documentation of XS-PHY for MediaTek SoCs
-> with USB3.1 GEN2 controller
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  .../devicetree/bindings/phy/phy-mtk-xsphy.txt      |  110 ++++++++++++++++++++
->  1 file changed, 110 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
+Hi Robert,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Thanks for this series.
+
+On Monday, April 02, 2018 04:26 PM, Robert Jarzmik wrote:
+> From: Robert Jarzmik <robert.jarzmik@renault.com>
+> 
+> As the pxa architecture switched towards the dmaengine slave map, the
+> old compatibility mechanism to acquire the dma requestor line number and
+> priority are not needed anymore.
+> 
+> This patch simplifies the dma resource acquisition, using the more
+> generic function dma_request_slave_channel().
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>   drivers/mtd/nand/pxa3xx_nand.c | 10 +---------
+
+This driver was replaced by drivers/mtd/nand/raw/marvell_nand.c 
+recently, so this patch can be dropped. I attached a version for the new 
+driver which you can pick instead.
+
+
+Thanks,
+Daniel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mtd-rawnand-marvell-remove-dmaengine-compat-code.patch
+Type: text/x-patch
+Size: 1633 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/23dc3757/attachment.bin>
