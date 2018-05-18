@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 May 2018 16:22:42 +0200
-Subject: [GIT PULL 2/5] memory: tegra: Changes for v4.18-rc1
+Date: Fri, 18 May 2018 16:22:44 +0200
+Subject: [GIT PULL 4/5] ARM: tegra: Device tree changes for v4.18-rc1
 In-Reply-To: <20180518142245.20242-1-thierry.reding@gmail.com>
 References: <20180518142245.20242-1-thierry.reding@gmail.com>
-Message-ID: <20180518142245.20242-2-thierry.reding@gmail.com>
+Message-ID: <20180518142245.20242-4-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,62 +15,31 @@ The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.18-memory
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.18-arm-dt
 
-for you to fetch changes up to bef89a8d81ca97aca864778746b110cf52847868:
+for you to fetch changes up to dc4ea601be724d7ad37c8c5b1059417126e97e27:
 
-  memory: tegra: Remove Tegra114 SATA and AFI reset definitions (2018-05-18 12:33:02 +0200)
+  ARM: dts: tegra114: Add IOMMU nodes to Host1x and its clients (2018-05-04 17:21:02 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-memory: tegra: Changes for v4.18-rc1
+ARM: tegra: Device tree changes for v4.18-rc1
 
-This contains some cleanup of the memory controller driver as well as
-unification work to share more code between Tegra20 and later SoC
-generations. Also included are an implementation for the hot resets
-functionality by the memory controller which is required to properly
-reset busy hardware.
+Contains a fix for the high-speed UART on Toradex Apalis TK1 boards as
+well as IOMMU enablement for various devices on Tegra30 and Tegra30.
 
 ----------------------------------------------------------------
-Dmitry Osipenko (14):
-      dt-bindings: memory: tegra: Add hot resets definitions
-      memory: tegra: Do not handle spurious interrupts
-      memory: tegra: Setup interrupts mask before requesting IRQ
-      memory: tegra: Apply interrupts mask per SoC
-      memory: tegra: Remove unused headers inclusions
-      memory: tegra: Squash tegra20-mc into common tegra-mc driver
-      memory: tegra: Introduce memory client hot reset
-      memory: tegra: Add Tegra20 memory controller hot resets
-      memory: tegra: Add Tegra30 memory controller hot resets
-      memory: tegra: Add Tegra114 memory controller hot resets
-      memory: tegra: Add Tegra124 memory controller hot resets
-      memory: tegra: Register SMMU after MC driver became ready
-      dt-bindings: memory: tegra: Remove Tegra114 SATA and AFI reset definitions
-      memory: tegra: Remove Tegra114 SATA and AFI reset definitions
+Dmitry Osipenko (2):
+      ARM: dts: tegra30: Add IOMMU nodes to Host1x and its clients
+      ARM: dts: tegra114: Add IOMMU nodes to Host1x and its clients
 
-Thierry Reding (1):
-      memory: tegra: Add Tegra210 memory controller hot resets
+Marcel Ziswiler (1):
+      ARM: tegra: apalis-tk1: Fix high speed UART compatible
 
- drivers/memory/Kconfig                   |  10 -
- drivers/memory/Makefile                  |   1 -
- drivers/memory/tegra/Makefile            |   1 +
- drivers/memory/tegra/mc.c                | 362 +++++++++++++++++++++++++++----
- drivers/memory/tegra/mc.h                |  22 ++
- drivers/memory/tegra/tegra114.c          |  33 +++
- drivers/memory/tegra/tegra124.c          |  48 ++++
- drivers/memory/tegra/tegra20.c           | 296 +++++++++++++++++++++++++
- drivers/memory/tegra/tegra210.c          |  53 ++++-
- drivers/memory/tegra/tegra30.c           |  35 +++
- drivers/memory/tegra20-mc.c              | 254 ----------------------
- include/dt-bindings/memory/tegra114-mc.h |  17 ++
- include/dt-bindings/memory/tegra124-mc.h |  25 +++
- include/dt-bindings/memory/tegra20-mc.h  |  21 ++
- include/dt-bindings/memory/tegra210-mc.h |  31 +++
- include/dt-bindings/memory/tegra30-mc.h  |  19 ++
- include/soc/tegra/mc.h                   |  37 +++-
- 17 files changed, 956 insertions(+), 309 deletions(-)
- create mode 100644 drivers/memory/tegra/tegra20.c
- delete mode 100644 drivers/memory/tegra20-mc.c
- create mode 100644 include/dt-bindings/memory/tegra20-mc.h
+ arch/arm/boot/dts/tegra114.dtsi             |  5 +++++
+ arch/arm/boot/dts/tegra124-apalis-v1.2.dtsi |  6 +++---
+ arch/arm/boot/dts/tegra124-apalis.dtsi      |  6 +++---
+ arch/arm/boot/dts/tegra30.dtsi              | 14 ++++++++++++++
+ 4 files changed, 25 insertions(+), 6 deletions(-)
