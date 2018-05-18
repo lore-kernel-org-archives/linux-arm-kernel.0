@@ -1,89 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:15:22 +0200
-Subject: [PATCH 060/102] arm64: dts: renesas: condor: add eMMC support
+Date: Fri, 18 May 2018 13:15:24 +0200
+Subject: [PATCH 062/102] arm64: dts: renesas: r8a7795: Add address properties
+ to rcar_sound port nodes
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <cc9222448a339b62a05bb7cc6f3a091718ff182e.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <2d87dc0e5be26fd45d7e5d0a8e59aad6c74d54c1.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+The rcar_sound port nodes have unit names and thus should have register
+properties.
 
-Define the Condor board dependent part of the MMC0 (connected to eMMC chip)
-device node along with the necessary voltage regulators...
+This is flagged by dtc as follows:
+ # make dtbs W=1
+ ...
+ DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 0: node has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 1: node has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 2: node has a unit name, but no reg property
+  ...
+  DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb
+arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 0: node has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 1: node has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 2: node has a unit name, but no reg property
+  DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb
+arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 0: node has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 1: node has a unit name, but no reg property
+arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 2: node has a unit name, but no reg property
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Prior to this patch the port nodes only defined in board DTS files.
+As the register properties are common this patch defines the port nodes
+and provides register properties in the SoC DTS file.
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts | 43 +++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-index 7af5afa41795..b8df7604dece 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -27,6 +27,24 @@
- 		/* first 128MB is reserved for secure area. */
- 		reg = <0 0x48000000 0 0x78000000>;
- 	};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index b1c52dae4d49..9b080a864ea1 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1711,6 +1711,20 @@
+ 					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 			};
 +
-+	d3_3v: regulator-0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	vddq_vin01: regulator-1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDQ_VIN01";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
- };
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port at 0 {
++					reg = <0>;
++				};
++				port at 1 {
++					reg = <1>;
++				};
++				port at 2 {
++					reg = <2>;
++				};
++			};
+ 		};
  
- &avb {
-@@ -52,12 +70,37 @@
- 	clock-frequency = <32768>;
- };
- 
-+&mmc0 {
-+	pinctrl-0 = <&mmc_pins>;
-+	pinctrl-1 = <&mmc_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
-+
-+	vmmc-supply = <&d3_3v>;
-+	vqmmc-supply = <&vddq_vin01>;
-+	mmc-hs200-1_8v;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
- &pfc {
- 	avb_pins: avb {
- 		groups = "avb_mdio", "avb_rgmii";
- 		function = "avb";
- 	};
- 
-+	mmc_pins: mmc {
-+		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
-+		function = "mmc";
-+		power-source = <3300>;
-+	};
-+
-+	mmc_pins_uhs: mmc_uhs {
-+		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
-+		function = "mmc";
-+		power-source = <1800>;
-+	};
-+
- 	scif0_pins: scif0 {
- 		groups = "scif0_data";
- 		function = "scif0";
+ 		audma0: dma-controller at ec700000 {
 -- 
 2.11.0
