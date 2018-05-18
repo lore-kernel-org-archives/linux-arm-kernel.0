@@ -1,186 +1,121 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:15:23 +0200
-Subject: [PATCH 061/102] arm64: dts: renesas: v3msk: add DU/LVDS/HDMI support
+Date: Fri, 18 May 2018 13:15:27 +0200
+Subject: [PATCH 065/102] arm64: dts: renesas: r8a77980: use CPG core clock
+ macros
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <0c1861fe0a39e1f4d5d2684f1aec5a60b30c7400.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <c64cc3683ff2622fe3528af93a5df01a6584e871.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the V3M Starter Kit board dependent part of the DU and LVDS device
-nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
-Analog Devices ADV7511W HDMI transmitter...
+Now that the commit 35b3c462dae1 ("dt-bindings: clock: add R8A77980 CPG
+core clock definitions") has hit Linus' tree, we can replace the bare
+numbers (we had to use to avoid a cross tree dependency) with these macro
+definitions...
 
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts | 129 +++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts b/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
-index 55aa01b663e5..9fce031a596f 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
-@@ -29,6 +29,65 @@
- 		/* first 128MB is reserved for secure area. */
- 		reg = <0x0 0x48000000 0x0 0x38000000>;
- 	};
-+
-+	osc5_clk: osc5-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <148500000>;
-+	};
-+
-+	vcc_d1_8v: regulator-0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_D1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	vcc_d3_3v: regulator-1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	lvds-decoder {
-+		compatible = "thine,thc63lvd1024";
-+		vcc-supply = <&vcc_d3_3v>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				thc63lvd1024_in: endpoint {
-+					remote-endpoint = <&lvds0_out>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				thc63lvd1024_out: endpoint {
-+					remote-endpoint = <&adv7511_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	hdmi-out {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con: endpoint {
-+				remote-endpoint = <&adv7511_out>;
-+			};
-+		};
-+	};
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+index d27b80bcdbb4..fddbaf250087 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+@@ -6,9 +6,9 @@
+  * Copyright (C) 2018 Cogent Embedded, Inc.
+  */
  
- &avb {
-@@ -46,6 +105,13 @@
- 	};
- };
++#include <dt-bindings/clock/r8a77980-cpg-mssr.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+-#include <dt-bindings/clock/renesas-cpg-mssr.h>
  
-+&du {
-+	clocks = <&cpg CPG_MOD 724>,
-+		 <&osc5_clk>;
-+	clock-names = "du.0", "dclkin.0";
-+	status = "okay";
-+};
-+
- &extal_clk {
- 	clock-frequency = <16666666>;
- };
-@@ -60,12 +126,75 @@
- 		function = "avb0";
- 	};
- 
-+	i2c0_pins: i2c0 {
-+		groups = "i2c0";
-+		function = "i2c0";
-+	};
-+
- 	scif0_pins: scif0 {
- 		groups = "scif0_data";
- 		function = "scif0";
- 	};
- };
- 
-+&i2c0 {
-+	pinctrl-0 = <&i2c0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	hdmi at 39{
-+		compatible = "adi,adv7511w";
-+		#sound-dai-cells = <0>;
-+		reg = <0x39>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
-+		avdd-supply = <&vcc_d1_8v>;
-+		dvdd-supply = <&vcc_d1_8v>;
-+		pvdd-supply = <&vcc_d1_8v>;
-+		bgvdd-supply = <&vcc_d1_8v>;
-+		dvdd-3v-supply = <&vcc_d3_3v>;
-+
-+		adi,input-depth = <8>;
-+		adi,input-colorspace = "rgb";
-+		adi,input-clock = "1x";
-+		adi,input-style = <1>;
-+		adi,input-justification = "evenly";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7511_in: endpoint {
-+					remote-endpoint = <&thc63lvd1024_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				adv7511_out: endpoint {
-+					remote-endpoint = <&hdmi_con>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&lvds0 {
-+	status = "okay";
-+
-+	ports {
-+		port at 1 {
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&thc63lvd1024_in>;
-+			};
-+		};
-+	};
-+};
-+
- &scif0 {
- 	pinctrl-0 = <&scif0_pins>;
- 	pinctrl-names = "default";
+ / {
+ 	compatible = "renesas,r8a77980";
+@@ -23,7 +23,7 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0>;
+-			clocks = <&cpg CPG_CORE 0>;
++			clocks = <&cpg CPG_CORE R8A77980_CLK_Z2>;
+ 			power-domains = <&sysc 5>;
+ 			next-level-cache = <&L2_CA53>;
+ 			enable-method = "psci";
+@@ -104,7 +104,7 @@
+ 			reg = <0 0xe6540000 0 0x60>;
+ 			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 520>,
+-				 <&cpg CPG_CORE 19>,
++				 <&cpg CPG_CORE R8A77980_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
+@@ -122,7 +122,7 @@
+ 			reg = <0 0xe6550000 0 0x60>;
+ 			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 519>,
+-				 <&cpg CPG_CORE 19>,
++				 <&cpg CPG_CORE R8A77980_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac1 0x33>, <&dmac1 0x32>,
+@@ -140,7 +140,7 @@
+ 			reg = <0 0xe6560000 0 0x60>;
+ 			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 518>,
+-				 <&cpg CPG_CORE 19>,
++				 <&cpg CPG_CORE R8A77980_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac1 0x35>, <&dmac1 0x34>,
+@@ -158,7 +158,7 @@
+ 			reg = <0 0xe66a0000 0 0x60>;
+ 			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 517>,
+-				 <&cpg CPG_CORE 19>,
++				 <&cpg CPG_CORE R8A77980_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac1 0x37>, <&dmac1 0x36>,
+@@ -220,7 +220,7 @@
+ 			reg = <0 0xe6e60000 0 0x40>;
+ 			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 207>,
+-				 <&cpg CPG_CORE 19>,
++				 <&cpg CPG_CORE R8A77980_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
+@@ -238,7 +238,7 @@
+ 			reg = <0 0xe6e68000 0 0x40>;
+ 			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 206>,
+-				 <&cpg CPG_CORE 19>,
++				 <&cpg CPG_CORE R8A77980_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
+@@ -256,7 +256,7 @@
+ 			reg = <0 0xe6c50000 0 0x40>;
+ 			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 204>,
+-				 <&cpg CPG_CORE 19>,
++				 <&cpg CPG_CORE R8A77980_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac1 0x57>, <&dmac1 0x56>,
+@@ -274,7 +274,7 @@
+ 			reg = <0 0xe6c40000 0 0x40>;
+ 			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 203>,
+-				 <&cpg CPG_CORE 19>,
++				 <&cpg CPG_CORE R8A77980_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac1 0x59>, <&dmac1 0x58>,
 -- 
 2.11.0
