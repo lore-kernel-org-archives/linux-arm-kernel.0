@@ -1,50 +1,59 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 18 May 2018 17:39:19 +0100
-Subject: [PATCH 03/11] coresight: tmc-etr: Do not clean trace buffer
+Date: Fri, 18 May 2018 17:39:20 +0100
+Subject: [PATCH 04/11] coresight: tmc-etr: Disallow perf mode
 In-Reply-To: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
 References: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1526661567-4578-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1526661567-4578-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We zero out the entire trace buffer used for ETR before it is enabled,
-for helping with debugging. With the addition of scatter-gather mode,
-the buffer could be bigger and non-contiguous.
-
-Get rid of this step; if someone wants to debug, they can always add it
-as and when needed.
+We don't support ETR in perf mode yet. So, don't
+even try to enable the hardware, even by mistake.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 28 ++-----------------------
+ 1 file changed, 2 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index d3c2b04..c73bcb3 100644
+index c73bcb3..6c5e8d1 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -24,9 +24,6 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+@@ -223,32 +223,8 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
+ 
+ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev)
  {
- 	u32 axictl, sts;
- 
--	/* Zero out the memory to help with debug */
--	memset(drvdata->vaddr, 0, drvdata->size);
+-	int ret = 0;
+-	unsigned long flags;
+-	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 -
- 	CS_UNLOCK(drvdata->base);
+-	spin_lock_irqsave(&drvdata->spinlock, flags);
+-	if (drvdata->reading) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-
+-	/*
+-	 * In Perf mode there can be only one writer per sink.  There
+-	 * is also no need to continue if the ETR is already operated
+-	 * from sysFS.
+-	 */
+-	if (drvdata->mode != CS_MODE_DISABLED) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-
+-	drvdata->mode = CS_MODE_PERF;
+-	tmc_etr_enable_hw(drvdata);
+-out:
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-
+-	return ret;
++	/* We don't support perf mode yet ! */
++	return -EINVAL;
+ }
  
- 	/* Wait for TMCSReady bit to be set */
-@@ -352,9 +349,8 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
- 	if (drvdata->mode == CS_MODE_SYSFS) {
- 		/*
- 		 * The trace run will continue with the same allocated trace
--		 * buffer. The trace buffer is cleared in tmc_etr_enable_hw(),
--		 * so we don't have to explicitly clear it. Also, since the
--		 * tracer is still enabled drvdata::buf can't be NULL.
-+		 * buffer. Since the tracer is still enabled drvdata::buf can't
-+		 * be NULL.
- 		 */
- 		tmc_etr_enable_hw(drvdata);
- 	} else {
+ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
 -- 
 2.7.4
