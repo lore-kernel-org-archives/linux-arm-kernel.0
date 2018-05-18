@@ -1,58 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:18:06 +0200
-Subject: [PATCH 08/14] soc: renesas: Add r8a77990 SYSC PM Domain Binding
- Definitions
+Date: Fri, 18 May 2018 13:18:09 +0200
+Subject: [PATCH 11/14] arm: shmobile: Change platform dependency to
+ ARCH_RENESAS
 In-Reply-To: <cover.1526639075.git.horms+renesas@verge.net.au>
 References: <cover.1526639075.git.horms+renesas@verge.net.au>
-Message-ID: <355f9e6482b2e5c34aa46cac199eff56de286514.1526639075.git.horms+renesas@verge.net.au>
+Message-ID: <d9be9ceb1f72c7ac216ba164b6b15cf19e6e56b4.1526639075.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch adds power domain indices for R-Car E3.
+Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
+ARCH_RENESAS is a more appropriate platform dependency than the legacy
+ARCH_SHMOBILE, hence use the former.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[shimoda: add commit log and SPDX-License-Identifier]
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This will allow to drop ARCH_SHMOBILE on ARM in the near future.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- include/dt-bindings/power/r8a77990-sysc.h | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 include/dt-bindings/power/r8a77990-sysc.h
+ arch/arm/Kconfig  | 2 +-
+ arch/arm/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/dt-bindings/power/r8a77990-sysc.h b/include/dt-bindings/power/r8a77990-sysc.h
-new file mode 100644
-index 000000000000..944d85beec15
---- /dev/null
-+++ b/include/dt-bindings/power/r8a77990-sysc.h
-@@ -0,0 +1,26 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ */
-+#ifndef __DT_BINDINGS_POWER_R8A77990_SYSC_H__
-+#define __DT_BINDINGS_POWER_R8A77990_SYSC_H__
-+
-+/*
-+ * These power domain indices match the numbers of the interrupt bits
-+ * representing the power areas in the various Interrupt Registers
-+ * (e.g. SYSCISR, Interrupt Status Register)
-+ */
-+
-+#define R8A77990_PD_CA53_CPU0		5
-+#define R8A77990_PD_CA53_CPU1		6
-+#define R8A77990_PD_CR7			13
-+#define R8A77990_PD_A3VC		14
-+#define R8A77990_PD_3DG_A		17
-+#define R8A77990_PD_3DG_B		18
-+#define R8A77990_PD_CA53_SCU		21
-+#define R8A77990_PD_A2VC1		26
-+
-+/* Always-on power area */
-+#define R8A77990_PD_ALWAYS_ON		32
-+
-+#endif /* __DT_BINDINGS_POWER_R8A77990_SYSC_H__ */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a7f8e7f4b88f..2d34c0a44877 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1467,7 +1467,7 @@ config ARM_PSCI
+ config ARCH_NR_GPIO
+ 	int
+ 	default 2048 if ARCH_SOCFPGA
+-	default 1024 if ARCH_BRCMSTB || ARCH_SHMOBILE || ARCH_TEGRA || \
++	default 1024 if ARCH_BRCMSTB || ARCH_RENESAS || ARCH_TEGRA || \
+ 		ARCH_ZYNQ
+ 	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || \
+ 		SOC_DRA7XX || ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index e4e537f27339..a92f5a876d96 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -212,7 +212,7 @@ machine-$(CONFIG_ARCH_S3C24XX)		+= s3c24xx
+ machine-$(CONFIG_ARCH_S3C64XX)		+= s3c64xx
+ machine-$(CONFIG_ARCH_S5PV210)		+= s5pv210
+ machine-$(CONFIG_ARCH_SA1100)		+= sa1100
+-machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
++machine-$(CONFIG_ARCH_RENESAS)	 	+= shmobile
+ machine-$(CONFIG_ARCH_SIRF)		+= prima2
+ machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
+ machine-$(CONFIG_ARCH_STI)		+= sti
 -- 
 2.11.0
