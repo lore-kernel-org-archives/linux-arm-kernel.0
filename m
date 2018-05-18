@@ -1,22 +1,36 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 18 May 2018 10:20:29 -0400
-Subject: [PATCH] efi/fb: Convert PCI bus address to resource if translated
- by the bridge
-In-Reply-To: <36cf3f12-bfe8-1c38-4d2c-b785fc64a3f6@arm.com>
-References: <1526563343-28721-1-git-send-email-okaya@codeaurora.org>
- <36cf3f12-bfe8-1c38-4d2c-b785fc64a3f6@arm.com>
-Message-ID: <733101d0-9051-a5a6-ef64-162d8d1e10a1@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 May 2018 09:20:33 -0500
+Subject: [PATCH v5 4/9] dt-bindings: input: touchscreen:
+ resistive-adc-touch: create bindings
+In-Reply-To: <1525949114-29263-5-git-send-email-eugen.hristev@microchip.com>
+References: <1525949114-29263-1-git-send-email-eugen.hristev@microchip.com>
+ <1525949114-29263-5-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20180518142033.GA28077@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/18/2018 6:42 AM, Robin Murphy wrote:
+On Thu, May 10, 2018 at 01:45:09PM +0300, Eugen Hristev wrote:
+> Added bindings for generic resistive touchscreen ADC.
 > 
-> FWIW, now that I've actually gone and looked, it appears you could simplify the whole function quite a bit by getting rid of these and just using the new local resource directly, especially since the only actual use of size is an open-coded resource_contains().
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> ---
+> Changes in v5:
+>  - changed property name touchscreen-threshold-pressure to
+> touchscreen-min-pressure
+> 
+> Changes in v3:
+>  - renamed file and compatible to exclude "generic" keyword
+>  - removed the pressure threshold property, added it as a common
+> touchscreen property in the touchscreen common bindings in a separate
+> commit.
+> 
+> Changes in v2:
+>  - modified bindings to have a generic resistive touchscreen adc driver
+> instead of specific architecture one.
+> 
+> 
+>  .../input/touchscreen/resistive-adc-touch.txt      | 30 ++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/resistive-adc-touch.txt
 
-Posted V2 a minute ago. I did the simplification on a prior patch in order not to
-mix the issues.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Reviewed-by: Rob Herring <robh@kernel.org>
