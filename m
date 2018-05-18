@@ -1,100 +1,39 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 18 May 2018 17:39:27 +0100
-Subject: [PATCH 11/11] coresight: tmc: Add configuration support for trace
- buffer size
-In-Reply-To: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
-References: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1526661567-4578-12-git-send-email-suzuki.poulose@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 18 May 2018 18:49:09 +0200
+Subject: [GIT PULL] ARM: mvebu: arm64 for v4.18 (#1)
+Message-ID: <874lj429kq.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can dynamically switch between contiguous memory and
-SG table depending on the trace buffer size, provide the support
-for selecting an appropriate buffer size.
+Hi,
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- .../ABI/testing/sysfs-bus-coresight-devices-tmc    |  8 ++++++
- .../devicetree/bindings/arm/coresight.txt          |  3 +-
- drivers/hwtracing/coresight/coresight-tmc.c        | 33 ++++++++++++++++++++++
- 3 files changed, 43 insertions(+), 1 deletion(-)
+Here is the first pull request for arm64 for mvebu for v4.18.
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc b/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc
-index 4fe677e..ea78714 100644
---- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc
-+++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-tmc
-@@ -83,3 +83,11 @@ KernelVersion:	4.7
- Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
- Description:	(R) Indicates the capabilities of the Coresight TMC.
- 		The value is read directly from the DEVID register, 0xFC8,
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.tmc/buffer_size
-+Date:		August 2018
-+KernelVersion:	4.18
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Size of the trace buffer for TMC-ETR when used in SYSFS
-+		mode. Writable only for TMC-ETR configurations. The value
-+		should be aligned to the kernel pagesize.
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 603d3c6..9aa30a1 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -84,7 +84,8 @@ its hardware characteristcs.
- * Optional property for TMC:
- 
- 	* arm,buffer-size: size of contiguous buffer space for TMC ETR
--	 (embedded trace router)
-+	  (embedded trace router). This property is obsolete. The buffer size
-+	  can be configured dynamically via buffer_size property in sysfs.
- 
- 	* arm,scatter-gather: boolean. Indicates that the TMC-ETR can safely
- 	  use the SG mode on this system.
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 7d8331d..57b6621 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -285,8 +285,41 @@ static ssize_t trigger_cntr_store(struct device *dev,
- }
- static DEVICE_ATTR_RW(trigger_cntr);
- 
-+static ssize_t buffer_size_show(struct device *dev,
-+				struct device_attribute *attr, char *buf)
-+{
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	return sprintf(buf, "%#x\n", drvdata->size);
-+}
-+
-+static ssize_t buffer_size_store(struct device *dev,
-+				 struct device_attribute *attr,
-+				 const char *buf, size_t size)
-+{
-+	int ret;
-+	unsigned long val;
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	/* Only permitted for TMC-ETRs */
-+	if (drvdata->config_type != TMC_CONFIG_TYPE_ETR)
-+		return -EPERM;
-+
-+	ret = kstrtoul(buf, 0, &val);
-+	if (ret)
-+		return ret;
-+	/* The buffer size should be page aligned */
-+	if (val & (PAGE_SIZE - 1))
-+		return -EINVAL;
-+	drvdata->size = val;
-+	return size;
-+}
-+
-+static DEVICE_ATTR_RW(buffer_size);
-+
- static struct attribute *coresight_tmc_attrs[] = {
- 	&dev_attr_trigger_cntr.attr,
-+	&dev_attr_buffer_size.attr,
- 	NULL,
- };
- 
--- 
-2.7.4
+Gregory
+
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.18-1
+
+for you to fetch changes up to 3eb0a48af488b5e83d2986943a1b6905ca753571:
+
+  arm64: defconfig: enable the Armada thermal driver (2018-05-16 20:08:31 +0200)
+
+----------------------------------------------------------------
+mvebu arm64 for 4.18 (part 1)
+
+Adding thermal for Armada 7K/8K and SPI for Armada 3700
+
+----------------------------------------------------------------
+Antoine Tenart (1):
+      arm64: defconfig: enable the Armada thermal driver
+
+Gregory CLEMENT (1):
+      arm64: defconfig: enable CONFIG_SPI_ARMADA_3700
+
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
