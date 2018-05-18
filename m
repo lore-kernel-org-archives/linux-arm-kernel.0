@@ -1,327 +1,111 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Fri, 18 May 2018 11:34:06 -0700
-Subject: [PATCH] arm64: dts: stingray: use NUM_SATA to configure number of
- sata ports
-Message-ID: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Fri, 18 May 2018 11:43:21 -0700 (PDT)
+Subject: [PATCH] locking/atomics: Simplify the op definitions in atomic.h
+ some more
+In-Reply-To: <20180506145726.y4jxhvfolzvbuft5@gmail.com>
+Message-ID: <mhng-a03fd04a-0f6e-4e5a-a74a-3395a6f63f3d@palmer-si-x1c4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move remaining sata configuration to stingray-sata.dtsi and enable
-ports based on NUM_SATA defined.
-Now, all that needs to be done is define NUM_SATA per board.
+On Sun, 06 May 2018 07:57:27 PDT (-0700), mingo at kernel.org wrote:
+>
+> * Andrea Parri <andrea.parri@amarulasolutions.com> wrote:
+>
+>> Hi Ingo,
+>>
+>> > From 5affbf7e91901143f84f1b2ca64f4afe70e210fd Mon Sep 17 00:00:00 2001
+>> > From: Ingo Molnar <mingo@kernel.org>
+>> > Date: Sat, 5 May 2018 10:23:23 +0200
+>> > Subject: [PATCH] locking/atomics: Simplify the op definitions in atomic.h some more
+>> >
+>> > Before:
+>> >
+>> >  #ifndef atomic_fetch_dec_relaxed
+>> >  # ifndef atomic_fetch_dec
+>> >  #  define atomic_fetch_dec(v)			atomic_fetch_sub(1, (v))
+>> >  #  define atomic_fetch_dec_relaxed(v)		atomic_fetch_sub_relaxed(1, (v))
+>> >  #  define atomic_fetch_dec_acquire(v)		atomic_fetch_sub_acquire(1, (v))
+>> >  #  define atomic_fetch_dec_release(v)		atomic_fetch_sub_release(1, (v))
+>> >  # else
+>> >  #  define atomic_fetch_dec_relaxed		atomic_fetch_dec
+>> >  #  define atomic_fetch_dec_acquire		atomic_fetch_dec
+>> >  #  define atomic_fetch_dec_release		atomic_fetch_dec
+>> >  # endif
+>> >  #else
+>> >  # ifndef atomic_fetch_dec_acquire
+>> >  #  define atomic_fetch_dec_acquire(...)	__atomic_op_acquire(atomic_fetch_dec, __VA_ARGS__)
+>> >  # endif
+>> >  # ifndef atomic_fetch_dec_release
+>> >  #  define atomic_fetch_dec_release(...)	__atomic_op_release(atomic_fetch_dec, __VA_ARGS__)
+>> >  # endif
+>> >  # ifndef atomic_fetch_dec
+>> >  #  define atomic_fetch_dec(...)		__atomic_op_fence(atomic_fetch_dec, __VA_ARGS__)
+>> >  # endif
+>> >  #endif
+>> >
+>> > After:
+>> >
+>> >  #ifndef atomic_fetch_dec_relaxed
+>> >  # ifndef atomic_fetch_dec
+>> >  #  define atomic_fetch_dec(v)			atomic_fetch_sub(1, (v))
+>> >  #  define atomic_fetch_dec_relaxed(v)		atomic_fetch_sub_relaxed(1, (v))
+>> >  #  define atomic_fetch_dec_acquire(v)		atomic_fetch_sub_acquire(1, (v))
+>> >  #  define atomic_fetch_dec_release(v)		atomic_fetch_sub_release(1, (v))
+>> >  # else
+>> >  #  define atomic_fetch_dec_relaxed		atomic_fetch_dec
+>> >  #  define atomic_fetch_dec_acquire		atomic_fetch_dec
+>> >  #  define atomic_fetch_dec_release		atomic_fetch_dec
+>> >  # endif
+>> >  #else
+>> >  # ifndef atomic_fetch_dec
+>> >  #  define atomic_fetch_dec(...)		__atomic_op_fence(atomic_fetch_dec, __VA_ARGS__)
+>> >  #  define atomic_fetch_dec_acquire(...)	__atomic_op_acquire(atomic_fetch_dec, __VA_ARGS__)
+>> >  #  define atomic_fetch_dec_release(...)	__atomic_op_release(atomic_fetch_dec, __VA_ARGS__)
+>> >  # endif
+>> >  #endif
+>> >
+>> > The idea is that because we already group these APIs by certain defines
+>> > such as atomic_fetch_dec_relaxed and atomic_fetch_dec in the primary
+>> > branches - we can do the same in the secondary branch as well.
+>> >
+>> > ( Also remove some unnecessarily duplicate comments, as the API
+>> >   group defines are now pretty much self-documenting. )
+>> >
+>> > No change in functionality.
+>> >
+>> > Cc: Peter Zijlstra <peterz@infradead.org>
+>> > Cc: Linus Torvalds <torvalds@linux-foundation.org>
+>> > Cc: Andrew Morton <akpm@linux-foundation.org>
+>> > Cc: Thomas Gleixner <tglx@linutronix.de>
+>> > Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+>> > Cc: Will Deacon <will.deacon@arm.com>
+>> > Cc: linux-kernel at vger.kernel.org
+>> > Signed-off-by: Ingo Molnar <mingo@kernel.org>
+>>
+>> This breaks compilation on RISC-V. (For some of its atomics, the arch
+>> currently defines the _relaxed and the full variants and it relies on
+>> the generic definitions for the _acquire and the _release variants.)
+>
+> I don't have cross-compilation for RISC-V, which is a relatively new arch.
+> (Is there any RISC-V set of cross-compilation tools on kernel.org somewhere?)
 
-Signed-off-by: Scott Branden <scott.branden@broadcom.com>
----
- .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 64 --------------------
- .../boot/dts/broadcom/stingray/bcm958742k.dts      |  2 +
- .../boot/dts/broadcom/stingray/bcm958742t.dts      |  2 +
- .../boot/dts/broadcom/stingray/stingray-sata.dtsi  | 68 ++++++++++++++++++++++
- 4 files changed, 72 insertions(+), 64 deletions(-)
+Arnd added RISC-V to the cross compiler list a month or two ago when he updated 
+them all.  I use the "make.cross" script from the Intel test robot, which will 
+fetch the cross compilers for you.  It looks like I made a Git Hub pull request 
+to update the script for RISC-V, it fetches from kernel.org
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-index 8862ec9..cacc25e 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
-@@ -72,70 +72,6 @@
- 	      <0x00000008 0x80000000 0x1 0x80000000>; /* 6G @ 34G */
- };
- 
--&sata0 {
--	status = "okay";
--};
--
--&sata_phy0{
--	status = "okay";
--};
--
--&sata1 {
--	status = "okay";
--};
--
--&sata_phy1{
--	status = "okay";
--};
--
--&sata2 {
--	status = "okay";
--};
--
--&sata_phy2{
--	status = "okay";
--};
--
--&sata3 {
--	status = "okay";
--};
--
--&sata_phy3{
--	status = "okay";
--};
--
--&sata4 {
--	status = "okay";
--};
--
--&sata_phy4{
--	status = "okay";
--};
--
--&sata5 {
--	status = "okay";
--};
--
--&sata_phy5{
--	status = "okay";
--};
--
--&sata6 {
--	status = "okay";
--};
--
--&sata_phy6{
--	status = "okay";
--};
--
--&sata7 {
--	status = "okay";
--};
--
--&sata_phy7{
--	status = "okay";
--};
--
- &mdio_mux_iproc {
- 	mdio at 10 {
- 		gphy0: eth-phy at 10 {
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
-index 77efa28..a515346 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
-+++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
-@@ -32,6 +32,8 @@
- 
- /dts-v1/;
- 
-+#define NUM_SATA	8
-+
- #include "bcm958742-base.dtsi"
- 
- / {
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
-index 5084b03..6a4d19e 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
-+++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
-@@ -32,6 +32,8 @@
- 
- /dts-v1/;
- 
-+#define NUM_SATA	8
-+
- #include "bcm958742-base.dtsi"
- 
- / {
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
-index 8c68e0c..7f6d176 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
-@@ -43,7 +43,11 @@
- 			interrupts = <GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 0)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata0_port0: sata-port at 0 {
- 				reg = <0>;
-@@ -58,7 +62,11 @@
- 			reg-names = "phy";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 0)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata0_phy0: sata-phy at 0 {
- 				reg = <0>;
-@@ -73,7 +81,11 @@
- 			interrupts = <GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 1)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata1_port0: sata-port at 0 {
- 				reg = <0>;
-@@ -88,7 +100,11 @@
- 			reg-names = "phy";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 1)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata1_phy0: sata-phy at 0 {
- 				reg = <0>;
-@@ -103,7 +119,11 @@
- 			interrupts = <GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 2)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata2_port0: sata-port at 0 {
- 				reg = <0>;
-@@ -118,7 +138,11 @@
- 			reg-names = "phy";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 2)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata2_phy0: sata-phy at 0 {
- 				reg = <0>;
-@@ -133,7 +157,11 @@
- 			interrupts = <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 3)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata3_port0: sata-port at 0 {
- 				reg = <0>;
-@@ -148,7 +176,11 @@
- 			reg-names = "phy";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 3)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata3_phy0: sata-phy at 0 {
- 				reg = <0>;
-@@ -163,7 +195,11 @@
- 			interrupts = <GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 4)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata4_port0: sata-port at 0 {
- 				reg = <0>;
-@@ -178,7 +214,11 @@
- 			reg-names = "phy";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 4)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata4_phy0: sata-phy at 0 {
- 				reg = <0>;
-@@ -193,7 +233,11 @@
- 			interrupts = <GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 5)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata5_port0: sata-port at 0 {
- 				reg = <0>;
-@@ -208,7 +252,11 @@
- 			reg-names = "phy";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 5)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata5_phy0: sata-phy at 0 {
- 				reg = <0>;
-@@ -223,7 +271,11 @@
- 			interrupts = <GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 6)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata6_port0: sata-port at 0 {
- 				reg = <0>;
-@@ -238,7 +290,11 @@
- 			reg-names = "phy";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 6)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata6_phy0: sata-phy at 0 {
- 				reg = <0>;
-@@ -253,7 +309,11 @@
- 			interrupts = <GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 7)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata7_port0: sata-port at 0 {
- 				reg = <0>;
-@@ -268,11 +328,19 @@
- 			reg-names = "phy";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+#if (NUM_SATA > 7)
-+			status = "okay";
-+#else
- 			status = "disabled";
-+#endif
- 
- 			sata7_phy0: sata-phy at 0 {
- 				reg = <0>;
- 				#phy-cells = <0>;
- 			};
- 		};
-+
-+#if (NUM_SATA > 8)
-+#error "NUM_SATA > 8"
-+#endif
- 	};
--- 
-2.5.0
+    https://github.com/palmer-dabbelt/lkp-tests/blob/e14f4236ccd0572f4b87ffd480fecefee412dedc/sbin/make.cross
+    http://cdn.kernel.org/pub/tools/crosstool/files/bin/
+    http://cdn.kernel.org/pub/tools/crosstool/files/bin/x86_64/7.3.0/x86_64-gcc-7.3.0-nolibc_riscv64-linux.tar.gz
+
+> Could you please send a patch that defines those variants against Linus's tree,
+> like the PowerPC patch that does something similar:
+>
+>   0476a632cb3a: locking/atomics/powerpc: Move cmpxchg helpers to asm/cmpxchg.h and define the full set of cmpxchg APIs
+>
+> ?
+>
+> ... and I'll integrate it into the proper place to make it all bisectable, etc.
+
+Sorry, I got buried in email again.  Did this get merged, or is there a current 
+version of the patch set I should look at?
