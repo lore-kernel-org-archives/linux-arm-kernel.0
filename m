@@ -1,81 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:15:56 +0200
-Subject: [PATCH 094/102] arm64: dts: renesas: r8a77990: ebisu: Enable
- EthernetAVB
+Date: Fri, 18 May 2018 13:15:42 +0200
+Subject: [PATCH 080/102] arm64: dts: renesas: ulcb: Add BD9571 PMIC
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <8441ef643d7dc8b4df85cbd7d8b99efc08ec00f3.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <786f3cc022f73973eda247a0f80f73971ebda764.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch enables EthernetAVB for r8a77990 Ebisu board.
+Add a device node for the ROHM BD9571MWV PMIC.
 
-Based on a patch from Takeshi Kihara <takeshi.kihara.df@renesas.com>
+This was based on the example in the DT binding documentation, but using
+IRQ0 instead of a GPIO interrupt, as that matches the schematics, and
+because INTC-EX is a simpler block.
 
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 28 ++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm64/boot/dts/renesas/ulcb.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-index 63ee1347bb19..7a09d0524f9b 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-@@ -7,6 +7,7 @@
+diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+index 93402783d52f..ee4249287fbd 100644
+--- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
++++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+@@ -243,6 +243,30 @@
  
- /dts-v1/;
- #include "r8a77990.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Renesas Ebisu board based on r8a77990";
-@@ -14,6 +15,7 @@
- 
- 	aliases {
- 		serial0 = &scif2;
-+		ethernet0 = &avb;
- 	};
- 
- 	chosen {
-@@ -28,10 +30,36 @@
- 	};
- };
- 
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+	renesas,no-ether-link;
-+	phy-handle = <&phy0>;
-+	phy-mode = "rgmii-txid";
-+	status = "okay";
+ &i2c_dvfs {
+ 	status = "okay";
 +
-+	phy0: ethernet-phy at 0 {
-+		rxc-skew-ps = <1500>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
-+		reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
-+	};
-+};
++	pmic: pmic at 30 {
++		pinctrl-0 = <&irq0_pins>;
++		pinctrl-names = "default";
 +
- &extal_clk {
- 	clock-frequency = <48000000>;
- };
- 
-+&pfc {
-+	avb_pins: avb {
-+		mux {
-+			groups = "avb_link", "avb_mii";
-+			function = "avb";
++		compatible = "rohm,bd9571mwv";
++		reg = <0x30>;
++		interrupt-parent = <&intc_ex>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++
++		regulators {
++			dvfs: dvfs {
++				regulator-name = "dvfs";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt = <1030000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
 +		};
 +	};
-+};
-+
- &scif2 {
- 	status = "okay";
  };
+ 
+ &ohci1 {
+@@ -276,6 +300,11 @@
+ 		function = "i2c2";
+ 	};
+ 
++	irq0_pins: irq0 {
++		groups = "intc_ex_irq0";
++		function = "intc_ex";
++	};
++
+ 	scif2_pins: scif2 {
+ 		groups = "scif2_data_a";
+ 		function = "scif2";
 -- 
 2.11.0
