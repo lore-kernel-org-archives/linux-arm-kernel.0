@@ -1,35 +1,174 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri, 18 May 2018 08:00:56 +0530
-Subject: [PATCH 5/5] MAINTAINERS: Add Actions Semi S900 pinctrl entries
-In-Reply-To: <20180518023056.7869-1-manivannan.sadhasivam@linaro.org>
-References: <20180518023056.7869-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180518023056.7869-6-manivannan.sadhasivam@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 18 May 2018 11:44:20 +0900
+Subject: [RFC PATCH 04/10] devfreq: rk3399_dmc / rockchip: pm_domains:
+ Register notify to DMC driver.
+In-Reply-To: <20180514211610.26618-5-enric.balletbo@collabora.com>
+References: <20180514211610.26618-1-enric.balletbo@collabora.com>
+ <CGME20180514211809epcas3p47e2f67ad346dc2fc35c46465381fbffa@epcas3p4.samsung.com>
+ <20180514211610.26618-5-enric.balletbo@collabora.com>
+Message-ID: <5AFE3E04.6060801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add S900 pinctrl entries under ARCH_ACTIONS
+Hi,
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+As I already commented[1], I think that it is not proper in order to pass
+the devfreq instance to power_domain driver by separate defined function
+(rockchip_pm_register_dmcfreq_notifier()).
+[1] https://patchwork.kernel.org/patch/10349571/
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 640dabc4c311..9e1a17c9b4a7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1125,10 +1125,12 @@ F:	arch/arm/mach-actions/
- F:	arch/arm/boot/dts/owl-*
- F:	arch/arm64/boot/dts/actions/
- F:	drivers/clocksource/owl-*
-+F:	drivers/pinctrl/actions/*
- F:	drivers/soc/actions/
- F:	include/dt-bindings/power/owl-*
- F:	include/linux/soc/actions/
- F:	Documentation/devicetree/bindings/arm/actions.txt
-+F:	Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
- F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
- F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
- 
+Maybe, you could check the 'OF graph[1]' or 'device connection[2]'
+for the device connection. Unfortunately, I'm not sure what is
+best solution for this issue.
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/graph.txt
+[2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=f2d9b66d84f3ff5ea3aff111e6a403e04fa8bf37
+
+
+On 2018? 05? 15? 06:16, Enric Balletbo i Serra wrote:
+> From: Lin Huang <hl@rock-chips.com>
+> 
+> The DMC (Dynamic Memory Interface) controller does a SiP call to the
+> Trusted Firmware-A (TF-A) to change the DDR clock frequency. When this
+> happens the TF-A writes to the PMU bus idle request register
+> (PMU_BUS_IDLE_REQ) but at the same time it is possible that the Rockchip
+> power domain driver writes to the same register. So, add a notification
+> mechanism to ensure that the DMC and the PD driver does not access to this
+> register at the same time.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> [rewrite commit message]
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
+> As I explained in the cover letter I have doubts regarding this patch
+> but I did not find another way to do it. So I will appreciate any
+> feedback on this.
+> 
+>  drivers/devfreq/rk3399_dmc.c      |  7 ++++++
+>  drivers/soc/rockchip/pm_domains.c | 36 +++++++++++++++++++++++++++++++
+>  include/soc/rockchip/rk3399_dmc.h | 14 ++++++++++++
+>  3 files changed, 57 insertions(+)
+>  create mode 100644 include/soc/rockchip/rk3399_dmc.h
+> 
+> diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
+> index cc1bbca3fb15..2c4985a501cb 100644
+> --- a/drivers/devfreq/rk3399_dmc.c
+> +++ b/drivers/devfreq/rk3399_dmc.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/rwsem.h>
+>  #include <linux/suspend.h>
+>  
+> +#include <soc/rockchip/rk3399_dmc.h>
+>  #include <soc/rockchip/rk3399_grf.h>
+>  #include <soc/rockchip/rockchip_sip.h>
+>  
+> @@ -443,6 +444,12 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
+>  	data->dev = dev;
+>  	platform_set_drvdata(pdev, data);
+>  
+> +	rockchip_pm_register_dmcfreq_notifier(data->devfreq);
+> +	if (ret < 0) {
+> +		dev_err(dev, "Failed to register dmcfreq notifier\n");
+> +		return ret;
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+> index 53efc386b1ad..b0e66f24b3e3 100644
+> --- a/drivers/soc/rockchip/pm_domains.c
+> +++ b/drivers/soc/rockchip/pm_domains.c
+> @@ -8,6 +8,7 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/devfreq.h>
+>  #include <linux/io.h>
+>  #include <linux/iopoll.h>
+>  #include <linux/err.h>
+> @@ -76,9 +77,13 @@ struct rockchip_pmu {
+>  	const struct rockchip_pmu_info *info;
+>  	struct mutex mutex; /* mutex lock for pmu */
+>  	struct genpd_onecell_data genpd_data;
+> +	struct devfreq *devfreq;
+> +	struct notifier_block dmc_nb;
+>  	struct generic_pm_domain *domains[];
+>  };
+>  
+> +static struct rockchip_pmu *dmc_pmu;
+> +
+>  #define to_rockchip_pd(gpd) container_of(gpd, struct rockchip_pm_domain, genpd)
+>  
+>  #define DOMAIN(pwr, status, req, idle, ack, wakeup)	\
+> @@ -601,6 +606,35 @@ static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
+>  	return error;
+>  }
+>  
+> +static int rk3399_dmcfreq_notify(struct notifier_block *nb,
+> +				 unsigned long event, void *data)
+> +{
+> +	if (event == DEVFREQ_PRECHANGE)
+> +		mutex_lock(&dmc_pmu->mutex);
+> +	else if (event == DEVFREQ_POSTCHANGE)
+> +		mutex_unlock(&dmc_pmu->mutex);
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +int rockchip_pm_register_dmcfreq_notifier(struct devfreq *devfreq)
+> +{
+> +	int ret;
+> +
+> +	if (!dmc_pmu)
+> +		return -EPROBE_DEFER;
+> +
+> +	dmc_pmu->devfreq = devfreq;
+> +	dmc_pmu->dmc_nb.notifier_call = rk3399_dmcfreq_notify;
+> +	ret = devm_devfreq_register_notifier(devfreq->dev.parent,
+> +					     dmc_pmu->devfreq,
+> +					     &dmc_pmu->dmc_nb,
+> +					     DEVFREQ_TRANSITION_NOTIFIER);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(rockchip_pm_register_dmcfreq_notifier);
+> +
+>  static int rockchip_pm_domain_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -694,6 +728,8 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
+>  		goto err_out;
+>  	}
+>  
+> +	dmc_pmu = pmu;
+> +
+>  	return 0;
+>  
+>  err_out:
+> diff --git a/include/soc/rockchip/rk3399_dmc.h b/include/soc/rockchip/rk3399_dmc.h
+> new file mode 100644
+> index 000000000000..031a62607f61
+> --- /dev/null
+> +++ b/include/soc/rockchip/rk3399_dmc.h
+> @@ -0,0 +1,14 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (c) 2016-2018, Fuzhou Rockchip Electronics Co., Ltd
+> + * Author: Lin Huang <hl@rock-chips.com>
+> + */
+> +
+> +#ifndef __SOC_RK3399_DMC_H
+> +#define __SOC_RK3399_DMC_H
+> +
+> +#include <linux/devfreq.h>
+> +
+> +int rockchip_pm_register_dmcfreq_notifier(struct devfreq *devfreq);
+> +
+> +#endif
+> 
+
 -- 
-2.14.1
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
