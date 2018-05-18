@@ -1,93 +1,45 @@
 From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Fri, 18 May 2018 16:47:57 +0200
-Subject: [PATCH v3 2/3] arm64: dts: renesas: draak: Describe CVBS input
-In-Reply-To: <1526654878-11143-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1526654878-11143-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1526654878-11143-3-git-send-email-jacopo+renesas@jmondi.org>
+Date: Fri, 18 May 2018 16:47:55 +0200
+Subject: [PATCH v3 0/3] arm64: dts: Draak: Enable video inputs and VIN4
+Message-ID: <1526654878-11143-1-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe CVBS video input through analog video decoder ADV7180
-connected to video input interface VIN4.
+Hello,
+  this series enables HDMI, CVBS and VIN4 for R8A77995 Draak board.
 
-The video input signal path is shared with HDMI video input, and
-selected by on-board switches SW-53 and SW-54 with CVBS input selected
-by the default switches configuration.
+Compared to v2, I have added review tags and a missing Signed-off-by line.
+Two small comments added to Draak DTS to describe the shared video input path
+between CVBS and HDMI. As in v2, CVBS is the default video input and thus is
+connected to VIN in DTS.
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Switching to HDMI is shown in the patch on top of the following branch:
+git://jmondi.org/linux d3/media-master/salvator-x-dts_csi2/d3-hdmi
 
----
+Simon: once the series this one depends on [1] has been accepted, I guess this
+one is ready to get in, right?
+
+The series has been developed on top of media-master tree but applies cleanly
+on top of latest renesas-driver.
+
+Thanks
+   j
+
+[1] [PATCH v3 0/9] rcar-vin: Add support for parallel input on Gen3
+
 v2 -> v3:
-- Add comment to describe the shared input video path
-- Add my SoB and Niklas' R-b tags
----
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 42 ++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+- Add comment to CVBS and HDMI inputs
+- Add missing Signed-off-by to [2/3]
+- Add Niklas' tag
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-index 9d73de8..95745fc 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-@@ -142,6 +142,11 @@
- 		groups = "usb0";
- 		function = "usb0";
- 	};
-+
-+	vin4_pins_cvbs: vin4 {
-+		groups = "vin4_data8", "vin4_sync", "vin4_clk";
-+		function = "vin4";
-+	};
- };
+Jacopo Mondi (3):
+  dt-bindings: media: rcar-vin: Add R8A77995 support
+  arm64: dts: renesas: draak: Describe CVBS input
+  arm64: dts: renesas: draak: Describe HDMI input
 
- &i2c0 {
-@@ -154,6 +159,23 @@
- 		reg = <0x50>;
- 		pagesize = <8>;
- 	};
-+
-+	analog-video at 20 {
-+		compatible = "adi,adv7180";
-+		reg = <0x20>;
-+
-+		port {
-+			/*
-+			 * The VIN4 video input path is shared between
-+			 * CVBS and HDMI inputs through SW[49-54] switches.
-+			 *
-+			 * CVBS is the default selection, link it to VIN4 here.
-+			 */
-+			adv7180_out: endpoint {
-+				remote-endpoint = <&vin4_in>;
-+			};
-+		};
-+	};
- };
+ .../devicetree/bindings/media/rcar_vin.txt         |  1 +
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts     | 90 ++++++++++++++++++++++
+ 2 files changed, 91 insertions(+)
 
- &i2c1 {
-@@ -246,3 +268,23 @@
- 	timeout-sec = <60>;
- 	status = "okay";
- };
-+
-+&vin4 {
-+	pinctrl-0 = <&vin4_pins_cvbs>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			reg = <0>;
-+
-+			vin4_in: endpoint {
-+				remote-endpoint = <&adv7180_out>;
-+			};
-+		};
-+	};
-+};
 --
 2.7.4
