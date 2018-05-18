@@ -1,51 +1,327 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Fri, 18 May 2018 11:31:50 -0700
-Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
-In-Reply-To: <3fd89842-86cd-ee01-0c2c-5438dd2d5f2a@arm.com>
-References: <20180518170202.11458-1-samitolvanen@google.com>
- <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
- <CAKwvOdm1kYedukCq=g74AvqJHp6KC03oNoouQy2nkvfo4idoEw@mail.gmail.com>
- <8c7be44f-086d-65e3-9969-8182261ce82f@arm.com>
- <CAKwvOd=XZqg5=mkXZb-cxq3i_AGoJGAbmF=Fwc7Q98oi0tbN9g@mail.gmail.com>
- <3fd89842-86cd-ee01-0c2c-5438dd2d5f2a@arm.com>
-Message-ID: <CAKwvOdk+=JKcQP1ieLEkZftRGf-pqCTTzEuYvT_45YNMkEw_wA@mail.gmail.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Fri, 18 May 2018 11:34:06 -0700
+Subject: [PATCH] arm64: dts: stingray: use NUM_SATA to configure number of
+ sata ports
+Message-ID: <1526668446-20048-1-git-send-email-scott.branden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 11:13 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
-> What I'd really like is to apply that patch knowing that:
+Move remaining sata configuration to stingray-sata.dtsi and enable
+ports based on NUM_SATA defined.
+Now, all that needs to be done is define NUM_SATA per board.
 
-> - you have checked that with a released version of the compiler, you
-> don't observe any absolute address in any of the objects that are going
-> to be executed at EL2 on a mainline kernel,
+Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+---
+ .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 64 --------------------
+ .../boot/dts/broadcom/stingray/bcm958742k.dts      |  2 +
+ .../boot/dts/broadcom/stingray/bcm958742t.dts      |  2 +
+ .../boot/dts/broadcom/stingray/stingray-sata.dtsi  | 68 ++++++++++++++++++++++
+ 4 files changed, 72 insertions(+), 64 deletions(-)
 
-To verify, we should disassemble objects from arch/arm64/kvm/hyp/*.o and
-make sure we don't see absolute addresses?  I can work with Sami to get a
-sense of what the before and after of this patch looks like in disassembly,
-then verify those changes are pervasive.
-
-> - you have successfully run guests with a mainline kernel,
-
-I believe Andrey has already done this.  If he can verify (maybe during
-working hours next week), then maybe we can add his Tested-by to this
-patches commit message?
-
-> - it works for a reasonable set of common kernel configurations
-> (defconfig and some of the most useful debug options),
-
-It's easy for us to test our kernel configs for Android, ChromeOS, and
-defconfig.  I'd be curious to know the shortlist of "most useful debug
-options" just to be a better kernel developer, personally.
-
-> - I can reproduce your findings with the same released compiler.
-
-Lets wait for Andrey to confirm his test setup.  On the Android side, I
-think you should be able to get by with a released version, but I'd be
-curious to hear from Andrey.
-
-> Is that the case? I don't think any of the above is completely outlandish.
-
-These are all reasonable. Thanks for the feedback.
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+index 8862ec9..cacc25e 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+@@ -72,70 +72,6 @@
+ 	      <0x00000008 0x80000000 0x1 0x80000000>; /* 6G @ 34G */
+ };
+ 
+-&sata0 {
+-	status = "okay";
+-};
+-
+-&sata_phy0{
+-	status = "okay";
+-};
+-
+-&sata1 {
+-	status = "okay";
+-};
+-
+-&sata_phy1{
+-	status = "okay";
+-};
+-
+-&sata2 {
+-	status = "okay";
+-};
+-
+-&sata_phy2{
+-	status = "okay";
+-};
+-
+-&sata3 {
+-	status = "okay";
+-};
+-
+-&sata_phy3{
+-	status = "okay";
+-};
+-
+-&sata4 {
+-	status = "okay";
+-};
+-
+-&sata_phy4{
+-	status = "okay";
+-};
+-
+-&sata5 {
+-	status = "okay";
+-};
+-
+-&sata_phy5{
+-	status = "okay";
+-};
+-
+-&sata6 {
+-	status = "okay";
+-};
+-
+-&sata_phy6{
+-	status = "okay";
+-};
+-
+-&sata7 {
+-	status = "okay";
+-};
+-
+-&sata_phy7{
+-	status = "okay";
+-};
+-
+ &mdio_mux_iproc {
+ 	mdio at 10 {
+ 		gphy0: eth-phy at 10 {
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+index 77efa28..a515346 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dts
+@@ -32,6 +32,8 @@
+ 
+ /dts-v1/;
+ 
++#define NUM_SATA	8
++
+ #include "bcm958742-base.dtsi"
+ 
+ / {
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+index 5084b03..6a4d19e 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
++++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dts
+@@ -32,6 +32,8 @@
+ 
+ /dts-v1/;
+ 
++#define NUM_SATA	8
++
+ #include "bcm958742-base.dtsi"
+ 
+ / {
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+index 8c68e0c..7f6d176 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
+@@ -43,7 +43,11 @@
+ 			interrupts = <GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 0)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata0_port0: sata-port at 0 {
+ 				reg = <0>;
+@@ -58,7 +62,11 @@
+ 			reg-names = "phy";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 0)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata0_phy0: sata-phy at 0 {
+ 				reg = <0>;
+@@ -73,7 +81,11 @@
+ 			interrupts = <GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 1)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata1_port0: sata-port at 0 {
+ 				reg = <0>;
+@@ -88,7 +100,11 @@
+ 			reg-names = "phy";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 1)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata1_phy0: sata-phy at 0 {
+ 				reg = <0>;
+@@ -103,7 +119,11 @@
+ 			interrupts = <GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 2)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata2_port0: sata-port at 0 {
+ 				reg = <0>;
+@@ -118,7 +138,11 @@
+ 			reg-names = "phy";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 2)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata2_phy0: sata-phy at 0 {
+ 				reg = <0>;
+@@ -133,7 +157,11 @@
+ 			interrupts = <GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 3)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata3_port0: sata-port at 0 {
+ 				reg = <0>;
+@@ -148,7 +176,11 @@
+ 			reg-names = "phy";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 3)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata3_phy0: sata-phy at 0 {
+ 				reg = <0>;
+@@ -163,7 +195,11 @@
+ 			interrupts = <GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 4)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata4_port0: sata-port at 0 {
+ 				reg = <0>;
+@@ -178,7 +214,11 @@
+ 			reg-names = "phy";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 4)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata4_phy0: sata-phy at 0 {
+ 				reg = <0>;
+@@ -193,7 +233,11 @@
+ 			interrupts = <GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 5)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata5_port0: sata-port at 0 {
+ 				reg = <0>;
+@@ -208,7 +252,11 @@
+ 			reg-names = "phy";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 5)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata5_phy0: sata-phy at 0 {
+ 				reg = <0>;
+@@ -223,7 +271,11 @@
+ 			interrupts = <GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 6)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata6_port0: sata-port at 0 {
+ 				reg = <0>;
+@@ -238,7 +290,11 @@
+ 			reg-names = "phy";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 6)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata6_phy0: sata-phy at 0 {
+ 				reg = <0>;
+@@ -253,7 +309,11 @@
+ 			interrupts = <GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 7)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata7_port0: sata-port at 0 {
+ 				reg = <0>;
+@@ -268,11 +328,19 @@
+ 			reg-names = "phy";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++#if (NUM_SATA > 7)
++			status = "okay";
++#else
+ 			status = "disabled";
++#endif
+ 
+ 			sata7_phy0: sata-phy at 0 {
+ 				reg = <0>;
+ 				#phy-cells = <0>;
+ 			};
+ 		};
++
++#if (NUM_SATA > 8)
++#error "NUM_SATA > 8"
++#endif
+ 	};
 -- 
-Thanks,
-~Nick Desaulniers
+2.5.0
