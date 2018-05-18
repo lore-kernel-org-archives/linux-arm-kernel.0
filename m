@@ -1,155 +1,123 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:16:04 +0200
-Subject: [PATCH 102/102] arm64: dts: renesas: salvator-common: Add ADV7482
- support
+Date: Fri, 18 May 2018 13:14:52 +0200
+Subject: [PATCH 030/102] arm64: dts: renesas: r8a7795: Enable IPMMU devices
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <908001d778eba06ee1d832863d4e9a1e2cfd4746.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <d2ed9ffcab09f251aae6ac1d5da8a6ae62501150.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-The Salvator boards use an ADV7482 receiver for HDMI and CVBS inputs.
+Remove 'status = "disabled"' to make sure all IPMMU devices are enabled
+in DT on the r8a7795 SoC.
 
-Provide ADV7482 node on the i2c4 bus, along with connectors for the
-hdmi and cvbs inputs, and link to the csi20 and csi40 nodes as outputs.
-
-Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 103 +++++++++++++++++++++++
- 1 file changed, 103 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index 263e5787270e..9256fbaaab7f 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -66,6 +66,29 @@
- 		enable-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
- 	};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index acf0c6f72a4d..32870cbaf94d 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -947,7 +947,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 2>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
  
-+	cvbs-in {
-+		compatible = "composite-video-connector";
-+		label = "CVBS IN";
-+
-+		port {
-+			cvbs_con: endpoint {
-+				remote-endpoint = <&adv7482_ain7>;
-+			};
-+		};
-+	};
-+
-+	hdmi-in {
-+		compatible = "hdmi-connector";
-+		label = "HDMI IN";
-+		type = "a";
-+
-+		port {
-+			hdmi_in_con: endpoint {
-+				remote-endpoint = <&adv7482_hdmi>;
-+			};
-+		};
-+	};
-+
- 	reg_1p8v: regulator0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "fixed-1.8V";
-@@ -260,6 +283,37 @@
- 	};
- };
+ 		ipmmu_ir: mmu at ff8b0000 {
+@@ -956,7 +955,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 3>;
+ 			power-domains = <&sysc R8A7795_PD_A3IR>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
  
-+&csi20 {
-+	status = "okay";
-+
-+	ports {
-+		port at 0 {
-+			reg = <0>;
-+			csi20_in: endpoint {
-+				clock-lanes = <0>;
-+				data-lanes = <1>;
-+				remote-endpoint = <&adv7482_txb>;
-+			};
-+		};
-+	};
-+};
-+
-+&csi40 {
-+	status = "okay";
-+
-+	ports {
-+		port at 0 {
-+			reg = <0>;
-+
-+			csi40_in: endpoint {
-+				clock-lanes = <0>;
-+				data-lanes = <1 2 3 4>;
-+				remote-endpoint = <&adv7482_txa>;
-+			};
-+		};
-+	};
-+};
-+
- &du {
- 	pinctrl-0 = <&du_pins>;
- 	pinctrl-names = "default";
-@@ -357,6 +411,55 @@
+ 		ipmmu_mm: mmu at e67b0000 {
+@@ -974,7 +972,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 4>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
  
- 		shunt-resistor-micro-ohms = <5000>;
- 	};
-+
-+	video-receiver at 70 {
-+		compatible = "adi,adv7482";
-+		reg = <0x70>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		interrupt-parent = <&gpio6>;
-+		interrupt-names = "intrq1", "intrq2";
-+		interrupts = <30 IRQ_TYPE_LEVEL_LOW>,
-+			     <31 IRQ_TYPE_LEVEL_LOW>;
-+
-+		port at 7 {
-+			reg = <7>;
-+
-+			adv7482_ain7: endpoint {
-+				remote-endpoint = <&cvbs_con>;
-+			};
-+		};
-+
-+		port at 8 {
-+			reg = <8>;
-+
-+			adv7482_hdmi: endpoint {
-+				remote-endpoint = <&hdmi_in_con>;
-+			};
-+		};
-+
-+		port at 10 {
-+			reg = <10>;
-+
-+			adv7482_txa: endpoint {
-+				clock-lanes = <0>;
-+				data-lanes = <1 2 3 4>;
-+				remote-endpoint = <&csi40_in>;
-+			};
-+		};
-+
-+		port at 11 {
-+			reg = <11>;
-+
-+			adv7482_txb: endpoint {
-+				clock-lanes = <0>;
-+				data-lanes = <1>;
-+				remote-endpoint = <&csi20_in>;
-+			};
-+		};
-+	};
- };
+ 		ipmmu_pv0: mmu at fd800000 {
+@@ -983,7 +980,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 6>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
  
- &i2c_dvfs {
+ 		ipmmu_pv1: mmu at fd950000 {
+@@ -992,7 +988,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 7>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
+ 
+ 		ipmmu_pv2: mmu at fd960000 {
+@@ -1001,7 +996,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 8>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
+ 
+ 		ipmmu_pv3: mmu at fd970000 {
+@@ -1010,7 +1004,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 9>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
+ 
+ 		ipmmu_rt: mmu at ffc80000 {
+@@ -1019,7 +1012,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 10>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
+ 
+ 		ipmmu_vc0: mmu at fe6b0000 {
+@@ -1028,7 +1020,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 12>;
+ 			power-domains = <&sysc R8A7795_PD_A3VC>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
+ 
+ 		ipmmu_vc1: mmu at fe6f0000 {
+@@ -1037,7 +1028,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 13>;
+ 			power-domains = <&sysc R8A7795_PD_A3VC>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
+ 
+ 		ipmmu_vi0: mmu at febd0000 {
+@@ -1054,7 +1044,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 15>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
+ 
+ 		ipmmu_vp0: mmu at fe990000 {
+@@ -1063,7 +1052,6 @@
+ 			renesas,ipmmu-main = <&ipmmu_mm 16>;
+ 			power-domains = <&sysc R8A7795_PD_A3VP>;
+ 			#iommu-cells = <1>;
+-			status = "disabled";
+ 		};
+ 
+ 		ipmmu_vp1: mmu at fe980000 {
 -- 
 2.11.0
