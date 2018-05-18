@@ -1,24 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 May 2018 09:33:19 -0500
-Subject: [PATCH v7 1/2] dt-bindings: Documentation for qcom, llcc
-In-Reply-To: <1526492623-20527-2-git-send-email-rishabhb@codeaurora.org>
-References: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
- <1526492623-20527-2-git-send-email-rishabhb@codeaurora.org>
-Message-ID: <20180518143319.GA11439@rob-hp-laptop>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 May 2018 15:39:11 +0100
+Subject: [PATCH v3 3/5] ARM: Make CONFIG_CPU_V7 valid for 32bit ARMv8
+ implementations
+In-Reply-To: <20180518143913.26306-1-marc.zyngier@arm.com>
+References: <20180518143913.26306-1-marc.zyngier@arm.com>
+Message-ID: <20180518143913.26306-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 10:43:42AM -0700, Rishabh Bhatnagar wrote:
-> Documentation for last level cache controller device tree bindings,
-> client bindings usage examples.
-> 
-> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
-> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
-> ---
->  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+ARMv8 is a superset of ARMv7, and all the ARMv8 features are
+discoverable with a set of ID registers. It means that we can
+use CPU_V7 to guard ARMv8 features at compile time.
 
-Other than the node name discussed in v6,
+This commit simply amends the CPU_V7 configuration symbol comment
+to reflect that CPU_V7 also covers ARMv8.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 7f14acf67caf..86550040de19 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -402,7 +402,7 @@ config CPU_V6K
+ 	select CPU_THUMB_CAPABLE
+ 	select CPU_TLB_V6 if MMU
+ 
+-# ARMv7
++# ARMv7 and ARMv8 architectures
+ config CPU_V7
+ 	bool
+ 	select CPU_32v6K
+-- 
+2.14.2
