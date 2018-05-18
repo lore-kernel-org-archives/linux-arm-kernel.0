@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:15:08 +0200
-Subject: [PATCH 046/102] arm64: dts: renesas: r8a7795-es1-salvator-x: enable
- HDMI sound
+Date: Fri, 18 May 2018 13:15:09 +0200
+Subject: [PATCH 047/102] arm64: dts: renesas: r8a7795-salvator-xs: enable HDMI
+ sound
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <6b39e3b68babb7a85b1c4070229c001ca19a6a80.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <b27ebfa73de08c55414514f632758402529226b4.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,13 +14,13 @@ Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Tested-by: Nguyen Viet Dung <nv-dung@jinso.co.jp>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../boot/dts/renesas/r8a7795-es1-salvator-x.dts    | 46 ++++++++++++++++++++++
+ .../arm64/boot/dts/renesas/r8a7795-salvator-xs.dts | 46 ++++++++++++++++++++++
  1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-index 7f2a3d923f21..3f46345a4644 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
+index 8b50ceb746e8..83676684c6b4 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
 @@ -56,6 +56,12 @@
  	status = "okay";
  };
