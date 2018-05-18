@@ -1,105 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 May 2018 11:28:15 -0500
-Subject: [PATCH v6 6/9] dt-bindings: counter: Document stm32 quadrature
- encoder
-In-Reply-To: <CA+M3ks4vjE5JMmLjjPnf6ffD9QYSUmSyrpO+yxADT_8WqAA3Tg@mail.gmail.com>
-References: <cover.1526487615.git.vilhelm.gray@gmail.com>
- <ccdbbfb2833d274b6bfa234aada57e68d9793dd5.1526487615.git.vilhelm.gray@gmail.com>
- <CAL_Jsq+a4s=5N6wUWifoHWQoornbDBY-UY2xrwj1kggNH4Q5pQ@mail.gmail.com>
- <CA+M3ks4vjE5JMmLjjPnf6ffD9QYSUmSyrpO+yxADT_8WqAA3Tg@mail.gmail.com>
-Message-ID: <20180518162815.GA24966@rob-hp-laptop>
+From: vincent.weaver@maine.edu (Vince Weaver)
+Date: Fri, 18 May 2018 12:29:36 -0400 (EDT)
+Subject: [PATCH v3 0/5]
+In-Reply-To: <20180518143913.26306-1-marc.zyngier@arm.com>
+References: <20180518143913.26306-1-marc.zyngier@arm.com>
+Message-ID: <alpine.DEB.2.21.1805181222380.11339@macbook-air>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 08:59:40PM +0200, Benjamin Gaignard wrote:
-> 2018-05-17 18:23 GMT+02:00 Rob Herring <robh+dt@kernel.org>:
-> > On Wed, May 16, 2018 at 12:51 PM, William Breathitt Gray
-> > <vilhelm.gray@gmail.com> wrote:
-> >> From: Benjamin Gaignard <benjamin.gaignard@st.com>
-> >
-> > v6? Where's v1-v5?
-> >
-> >> Add bindings for STM32 Timer quadrature encoder.
-> >> It is a sub-node of STM32 Timer which implement the
-> >> counter part of the hardware.
-> >>
-> >> Cc: Rob Herring <robh+dt@kernel.org>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> >> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
-> >> ---
-> >>  .../bindings/counter/stm32-timer-cnt.txt      | 26 +++++++++++++++++++
-> >>  .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
-> >>  2 files changed, 33 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
-> >> new file mode 100644
-> >> index 000000000000..377728128bef
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
-> >> @@ -0,0 +1,26 @@
-> >> +STMicroelectronics STM32 Timer quadrature encoder
-> >> +
-> >> +STM32 Timer provides quadrature encoder counter mode to detect
-> >
-> > 'mode' does not sound like a sub-block of the timers block.
-> 
-> quadrature encoding is one of the counting modes of this hardware
-> block which is enable to count on other signals/triggers
+On Fri, 18 May 2018, Marc Zyngier wrote:
 
-You don't need a child node and compatible to set a mode.
+> There is also the case of people natively running 32bit kernels on
+> 64bit HW and trying to upstream unspeakable hacks, hoping that the
+> stars will align and that they'll win the lottery (see [1]).
 
-> >> +angular position and direction of rotary elements,
-> >> +from IN1 and IN2 input signals.
-> >> +
-> >> +Must be a sub-node of an STM32 Timer device tree node.
-> >> +See ../mfd/stm32-timers.txt for details about the parent node.
-> >> +
-> >> +Required properties:
-> >> +- compatible:          Must be "st,stm32-timer-counter".
-> >> +- pinctrl-names:       Set to "default".
-> >> +- pinctrl-0:           List of phandles pointing to pin configuration nodes,
-> >> +                       to set IN1/IN2 pins in mode of operation for Low-Power
-> >> +                       Timer input on external pin.
-> >> +
-> >> +Example:
-> >> +       timers at 40010000  {
-> >> +               compatible = "st,stm32-timers";
-> >> +               ...
-> >> +               counter {
-> >> +                       compatible = "st,stm32-timer-counter";
-> >
-> > Is there only 1? How is the counter addressed?
-> 
-> Yes there is only one counter per hardware block.
-> Counter is addressed like the two others sub-nodes and the details
-> about parent mode are describe in stm32-timers.txt
-> Should I add them here too ? so example will be like that:
+I've tested these patches on a Raspberry Pi 3B running a 32-bit upstream 
+(4.17-rc5-git) kernel and they work.
 
-No, you should drop the child node and add pinctrl to the parent.
+[    0.472906] hw perfevents: enabled with armv8_cortex_a53 PMU driver, 7 counters available
 
-Any other functions this block has that you plan on adding? Please make 
-bindings as complete as possible, not what you currently have drivers 
-for.
+I only needed to add this to the devicetree
 
-> timers at 40010000  {
->   #address-cells = <1>;
->   #size-cells = <0>;
->   compatible = "st,stm32-timers";
->   reg = <0x40010000 0x400>;
->   clocks = <&rcc 0 160>;
->   clock-names = "int";
->   counter {
->     compatible = "st,stm32-timer-counter";
->     pinctrl-names = "default";
->     pinctrl-0 = <&tim1_in_pins>;
->     };
->  };
-> 
-> Benjamin
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	arm-pmu {
+		compatible = "arm,cortex-a53-pmu";
+		interrupt-parent = <&local_intc>;
+		interrupts = <9 IRQ_TYPE_LEVEL_HIGH>;
+	};
+
+
+Tested-by: Vince Weaver <vincent.weaver@maine.edu>
+
+Vince
