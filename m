@@ -1,43 +1,116 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Fri, 18 May 2018 17:34:48 +0200
-Subject: [PATCH v2 12/26] drm/sun4i: Add support for multiple DW HDMI PHY
- clock parents
-In-Reply-To: <20180518152651.lfymc3kj7npj5tww@flea>
-References: <20180518094536.17201-1-jagan@amarulasolutions.com>
- <4909574.Q3IFWM0xt6@jernej-laptop> <20180518152651.lfymc3kj7npj5tww@flea>
-Message-ID: <3855913.NIurOIk8c1@jernej-laptop>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 18 May 2018 16:57:17 +0100
+Subject: [PATCH 6/6] arm64: perf: Add support for chaining counters
+In-Reply-To: <32f2d870-9b9c-0b10-880f-cc99cf969bf6@arm.com>
+References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
+ <1526638943-2110-7-git-send-email-suzuki.poulose@arm.com>
+ <32f2d870-9b9c-0b10-880f-cc99cf969bf6@arm.com>
+Message-ID: <5d53fe1d-dbd9-2aad-73bd-0c4284540240@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Robin,
 
-Dne petek, 18. maj 2018 ob 17:26:51 CEST je Maxime Ripard napisal(a):
-> On Fri, May 18, 2018 at 04:46:41PM +0200, Jernej ?krabec wrote:
-> > > And this is a bit sloppy, since if phy_clk_num == 3, you won't try to
-> > > lookup pll-2 either.
-> > 
-> > It is highly unlikely this will be higher than 2, at least for this HDMI
-> > PHY, since it has only 1 bit reserved for parent selection. But since I
-> > have to fix it, I'll add ">= 2"
-> 
-> If we're only going to have two parents at most, ever, why don't we
-> had just a single other boolean. This would be less intrusive, and we
-> wouldn't have to check for those corner cases.
+On 18/05/18 14:49, Robin Murphy wrote:
+> On 18/05/18 11:22, Suzuki K Poulose wrote:
+>> Add support for chained event counters. PMUv3 allows chaining
+>> a pair of adjacent PMU counters (with the lower counter number
+>> being always "even"). The low counter is programmed to count
+>> the event of interest and the high counter(odd numbered) is
+>> programmed with a special event code (0x1e - Chain). Thus
+>> we need special allocation schemes to make the full use of
+>> available counters. So, we allocate the counters from either
+>> ends. i.e, chained counters are allocated from the lower
+>> end in pairs of two and the normal counters are allocated
+>> from the higher number. Also makes necessary changes to
+>> handle the chained events as a single event with 2 counters.
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> ? arch/arm64/kernel/perf_event.c | 226 ++++++++++++++++++++++++++++++++++++-----
+>> ? 1 file changed, 202 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index ea8e060..5f81cd0 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -446,9 +446,11 @@ static struct attribute_group armv8_pmuv3_events_attr_group = {
 
-That works for me too. And since it's only the code, it can always be reworked 
-if there is the need.
+..
 
-Best regards,
-Jernej
+>> +static inline u64 armv8pmu_read_chain_counter(int idx)
+>> +{
+>> +??? u64 prev_hi, hi, lo;
+>> +
+>> +??? do {
+>> +??????? prev_hi = armv8pmu_read_evcntr(idx);
+>> +??????? isb();
+>> +??????? lo = armv8pmu_read_evcntr(idx - 1);
+>> +??????? isb();
+>> +??????? hi = armv8pmu_read_evcntr(idx);
+>> +??????? isb();
+>> +??? } while (prev_hi != hi);
+> 
+> Is it worth trying to elide that last isb() in the highly likely case that we don't need it?
 
+You're right. Also, I will rework the code to reuse the "hi".
+
+>> +static inline void armv8pmu_write_chain_counter(int idx, u64 value)
+>> +{
+>> +??? armv8pmu_write_evcntr(idx, value >> 32);
+>> +??? isb();
+>> +??? armv8pmu_write_evcntr(idx - 1, value);
+>> +??? isb();
 > 
-> > BTW, I'll resend fixed version of this patch for my R40 HDMI series, since
-> > there is nothing to hold it back, unlike for this.
+> Either that isb() is unnecessary, or we are (and have been) missing one after a non-chained write.
+
+Thats right, it is not necessary, will remove it.
+
+
+>> ? static inline int armv8pmu_disable_counter(int idx)
+>> ? {
+>> ????? u32 counter = ARMV8_IDX_TO_COUNTER(idx);
+>> @@ -567,6 +669,24 @@ static inline int armv8pmu_disable_counter(int idx)
+>> ????? return idx;
+>> ? }
+>> +static inline void armv8pmu_disable_event_counter(struct perf_event *event)
+>> +{
+>> +??? struct hw_perf_event *hwc = &event->hw;
 > 
-> Awesome, thanks!
-> Maxime
+> Nit: might as well drop this and be consistent with the enable case.
+
+Sure.
+
+>> ? static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
+>> ??????????????????? struct perf_event *event)
+>> ? {
+>> @@ -755,7 +915,10 @@ static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
+>> ????? struct hw_perf_event *hwc = &event->hw;
+>> ????? unsigned long evtype = hwc->config_base & ARMV8_PMU_EVTYPE_EVENT;
+>> -??? /* Always prefer to place a cycle counter into the cycle counter. */
+>> +??? /*
+>> +???? * Always prefer to place a cycle counter into the cycle counter
+>> +???? * irrespective of whether we are counting 32bit/64bit
 > 
-> --
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+> I don't think that comment change adds much :/
+> 
+
+Thats a left over from rebasing. Thanks for spotting.
+
+>> ? /*
+>> @@ -845,8 +1016,14 @@ static int __armv8_pmuv3_map_event(struct perf_event *event,
+>> ???????????????????????? &armv8_pmuv3_perf_cache_map,
+>> ???????????????????????? ARMV8_PMU_EVTYPE_EVENT);
+>> -??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES)
+>> +??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES) {
+>> +??????? /* Prevent chaining for cycle counter */
+> 
+> Why? Sure, we want to avoid executing the chaining logic if we're scheduling a cycles event in the dedicated counter (which is perhaps what the comment above wanted to say), but if one ends up allocated into a regular counter (e.g. if the user asks for multiple cycle counts with different filters), then I don't see any reason to forbid that being chained.
+
+Ah, I didn't think about that case. I was under the assumption that the
+cycles are *only* placed on the cycle counter. I will take care of that.
+Thanks for the review.
+
+Suzuki
