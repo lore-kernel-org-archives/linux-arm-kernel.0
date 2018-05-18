@@ -1,87 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 18 May 2018 12:59:53 +0100
-Subject: AArch64 memory
-In-Reply-To: <CAJ+vNU0RrmQMZ0P0LDWfLbryNSt02eDimKr4i6eWT7-ULMOUyg@mail.gmail.com>
-References: <CAJ+vNU0RrmQMZ0P0LDWfLbryNSt02eDimKr4i6eWT7-ULMOUyg@mail.gmail.com>
-Message-ID: <6f34d5bb-3581-93c3-583b-347e75acf3bf@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 18 May 2018 13:46:36 +0100
+Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
+ local_bh_disable()
+In-Reply-To: <20180517181932.GW7753@e103592.cambridge.arm.com>
+References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
+ <20180517181932.GW7753@e103592.cambridge.arm.com>
+Message-ID: <20180518124605.GA13470@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+On Thu, May 17, 2018 at 07:19:43PM +0100, Dave Martin wrote:
 
-On 17/05/18 16:58, Tim Harvey wrote:
-> Greetings,
+[...]
+
+> kernel_neon_begin() could then do
 > 
-> I'm trying to understand some details of the AArch64 memory
-> configuration in the kernel.
+> 	local_fpsimd_context_lock();
 > 
-> I've looked at Documentation/arm64/memory.txt which describes the
-> virtual memory layout used in terms of translation levels. This
-> relates to CONFIG_ARM64_{4K,16K,64K}_PAGES and CONFIG_ARM64_VA_BITS*.
+> 	/* ... */
 > 
-> My first question has to do with virtual memory layout: What are the
-> advantages and disadvantages for a system with a fixed 2GB of DRAM
-> when using using 4KB pages + 3 levels (CONFIG_ARM64_4K_PAGES=y
-> CONFIG_ARM64_VA_BITS=39) resulting in 512GB user / 512GB kernel vs
-> using 64KB pages + 3 levels (CONFIG_ARM64_64K_PAGES=y
-> CONFIG_ARM64_VA_BITS=48)? The physical memory is far less than what
-> any of the combinations would offer but I'm not clear if the number of
-> levels affects any sort of performance or how fragmentation could play
-> into performance.
+> 	preempt_disable();
+> 	local_unlock(fpsimd_context_lock);
+> 
+> ... with the following in kernel_neon_end():
+> 
+> 	local_unlock(fpsimd_lock);
+> 	preempt_enable();
+> 
+> 
+> If kernel-mode NEON was considered harmful to RT due to the context
+> switch overheads, then the above might be overkill.  SVE will be worse
+> in that regard, and also needs thinking about at some point -- I've not
+> looked at if from the RT angle at all.
 
-There have been a number of discussions on the lists about the general 
-topic in the contexts of several architectures, and I'm sure the last 
-one I saw regarding arm64 actually had some measurements in it, although 
-it's proving remarkably tricky to actually dig up again this morning :/
+Hmmm, !KERNEL_MODE_NEON breaks EFI, so this probably does want looking
+at.  Ard's recent rework to enable voluntary preemption the crypto
+backends for arm64 [1] should reduce the fpsimd_lock blackouts, but it
+still depends on the backends playing nice.
 
-I think the rough executive summary remains that for certain 
-memory-intensive workloads on AArch64, 64K pages *can* give a notable 
-performance benefit in terms of reduced TLB pressure (and potentially 
-also some for TLB miss overhead with 42-bit VA and 2-level tables). The 
-(major) tradeoff is that for most other workloads, including much of the 
-kernel itself, the increased allocation granularity leads to a 
-significant increase in wasted RAM.
+Cheers
+---Dave
 
-My gut feeling is that if you have relatively limited RAM and don't know 
-otherwise, then 39-bit VA is probably the way to go - notably, there are 
-also still drivers/filesystems/etc. which don't play too well with 
-PAGE_SIZE != 4096 - but I'm by no means an expert in this area. If 
-you're targeting a particular application area (e.g. networking) and can 
-benchmark some representative workloads to look at performance vs. RAM 
-usage for different configs, that would probably help inform your 
-decision the most.
-
-> My second question has to do with CMA and coherent_pool. I have
-> understood CMA as being a chunk of physical memory carved out by the
-> kernel for allocations from dma_alloc_coherent by drivers that need
-> chunks of contiguous memory for DMA buffers. I believe that before CMA
-> was introduced we had to do this by defining memory holes. I'm not
-> understanding the difference between CMA and the coherent pool. I've
-> noticed that if CONFIG_DMA_CMA=y then the coherent pool allocates from
-> CMA. Is there some disadvantage of CONFIG_DMA_CMA=y other than if
-> defined you need to make sure your CMA is larger than coherent_pool?
-> What drivers/calls use coherent_pool vs cma?
-
-coherent_pool is a special thing which exists for the sake of 
-non-hardware-coherent devices - normally for those we satisfy 
-DMA-coherent allocations by setting up a non-cacheable remap of the 
-allocated buffer - see dma_common_contiguous_remap(). However, drivers 
-may call dma_alloc_coherent(..., GFP_ATOMIC) from interrupt handlers, at 
-which point we can't call get_vm_area() to remap on demand, since that 
-might sleep, so we reserve a pool pre-mapped as non-cacheable to satisfy 
-such atomic allocations from. I'm not sure why its user-visible name is 
-"coherent pool" rather than the more descriptive "atomic pool" which 
-it's named internally, but there's probably some history there. If 
-you're lucky enough not to have any non-coherent DMA masters then you 
-can safely ignore the whole thing; otherwise it's still generally rare 
-that it should need adjusting.
-
-CMA is, as you surmise, a much more general thing for providing large 
-physically-contiguous areas, which the arch code correspondingly uses to 
-get DMA-contiguous buffers. Unless all your DMA masters are behind 
-IOMMUs (such that we can make any motley collection of pages look 
-DMA-contiguous), you probably don't want to turn it off. None of these 
-details should be relevant as far as drivers are concerned, since from 
-their viewpoint it's all abstracted behind dma_alloc_coherent().
-
-Robin.
+[1] [PATCH resend 00/10] crypto: arm64 - play nice with CONFIG_PREEMPT
+lists.infradead.org/pipermail/linux-arm-kernel/2018-April/574819.html
