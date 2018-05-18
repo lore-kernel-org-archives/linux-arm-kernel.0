@@ -1,63 +1,170 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 May 2018 15:39:08 +0100
-Subject: [PATCH v3 0/5]
-Message-ID: <20180518143913.26306-1-marc.zyngier@arm.com>
+Date: Fri, 18 May 2018 15:39:12 +0100
+Subject: [PATCH v3 4/5] ARM: perf: Allow the use of the PMUv3 driver on 32bit
+ ARM
+In-Reply-To: <20180518143913.26306-1-marc.zyngier@arm.com>
+References: <20180518143913.26306-1-marc.zyngier@arm.com>
+Message-ID: <20180518143913.26306-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PMUv3 has been introduced with ARMv8 and, while it has only been used
-on 64bit systems so far, it would definitely be useful for 32bit
-guests running under KVM/arm64, for example.
+The only thing stopping the PMUv3 driver from compiling on 32bit
+is the lack of defined system registers names. This is easily
+solved by providing the sysreg accessors and updating the Kconfig entry.
 
-There is also the case of people natively running 32bit kernels on
-64bit HW and trying to upstream unspeakable hacks, hoping that the
-stars will align and that they'll win the lottery (see [1]).
-
-So let's try again, and make the PMUv3 driver usable for everyone.
-
-This is done in three steps:
-(1) Move the driver from arch/arm64 to drivers/perf
-(2) Add a handful of system register accessors so that we can reuse
-    the driver on 32bit
-(3) Provide the same accessors on 32bit, enable compilation, and
-    make it the default selection for mach-virt.
-
-Tested on a Seattle box with 32bit guests.
-
-* From v1:
-  - Fixed encodings for some CP15 accessors
-  - Added a terse note saying that CPU_V7 also covers ARMv8
-  - Rebased on v4.12-rc5
-
-* From v2:
-  - SPDX tags on new and moved files. Yeah!
-  - Annual rebase on 4.17-rc5
-
-[1] https://patchwork.kernel.org/patch/10406793/
-
-Marc Zyngier (5):
-  arm64: perf: Move PMUv3 driver to drivers/perf
-  arm64: perf: Abstract system register accesses away
-  ARM: Make CONFIG_CPU_V7 valid for 32bit ARMv8 implementations
-  ARM: perf: Allow the use of the PMUv3 driver on 32bit ARM
-  ARM: mach-virt: Select PMUv3 driver by default
-
- arch/arm/Kconfig                                   |   1 +
- arch/arm/include/asm/arm_pmuv3.h                   | 125 +++++++++++++++++++++
- arch/arm/mm/Kconfig                                |   2 +-
- arch/arm64/include/asm/arm_pmuv3.h                 | 111 ++++++++++++++++++
- arch/arm64/include/asm/perf_event.h                |  55 ---------
- arch/arm64/kernel/Makefile                         |   1 -
- drivers/perf/Kconfig                               |   8 ++
- drivers/perf/Makefile                              |   1 +
- .../perf_event.c => drivers/perf/arm_pmuv3.c       |  42 ++++---
- include/kvm/arm_pmu.h                              |   2 +-
- include/linux/perf/arm_pmuv3.h                     |  78 +++++++++++++
- 11 files changed, 346 insertions(+), 80 deletions(-)
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/arm_pmuv3.h | 125 +++++++++++++++++++++++++++++++++++++++
+ drivers/perf/Kconfig             |   4 +-
+ 2 files changed, 127 insertions(+), 2 deletions(-)
  create mode 100644 arch/arm/include/asm/arm_pmuv3.h
- create mode 100644 arch/arm64/include/asm/arm_pmuv3.h
- rename arch/arm64/kernel/perf_event.c => drivers/perf/arm_pmuv3.c (97%)
- create mode 100644 include/linux/perf/arm_pmuv3.h
 
+diff --git a/arch/arm/include/asm/arm_pmuv3.h b/arch/arm/include/asm/arm_pmuv3.h
+new file mode 100644
+index 000000000000..e0f66c1d42b4
+--- /dev/null
++++ b/arch/arm/include/asm/arm_pmuv3.h
+@@ -0,0 +1,125 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ASM_PMUV3_H
++#define __ASM_PMUV3_H
++
++#include <asm/cp15.h>
++#include <asm/cputype.h>
++
++#define PMCCNTR		__ACCESS_CP15_64(0, c9)
++
++#define PMCR		__ACCESS_CP15(c9, 0, c12, 0)
++#define PMCNTENSET	__ACCESS_CP15(c9, 0, c12, 1)
++#define PMCNTENCLR	__ACCESS_CP15(c9, 0, c12, 2)
++#define PMOVSR		__ACCESS_CP15(c9, 0, c12, 3)
++#define PMSELR		__ACCESS_CP15(c9, 0, c12, 5)
++#define PMCEID0		__ACCESS_CP15(c9, 0, c12, 6)
++#define PMCEID1		__ACCESS_CP15(c9, 0, c12, 7)
++#define PMXEVTYPER	__ACCESS_CP15(c9, 0, c13, 1)
++#define PMXEVCNTR	__ACCESS_CP15(c9, 0, c13, 2)
++#define PMINTENSET	__ACCESS_CP15(c9, 0, c14, 1)
++#define PMINTENCLR	__ACCESS_CP15(c9, 0, c14, 2)
++
++static inline int read_pmuver(void)
++{
++	/* PMUVers is not a signed field */
++	u32 dfr0 = read_cpuid_ext(CPUID_EXT_DFR0);
++	return (dfr0 >> 24) & 0xf;
++}
++
++static inline void write_pmcr(u32 val)
++{
++	write_sysreg(val, PMCR);
++}
++
++static inline u32 read_pmcr(void)
++{
++	return read_sysreg(PMCR);
++}
++
++static inline void write_pmselr(u32 val)
++{
++	write_sysreg(val, PMSELR);
++}
++
++static inline void write_pmccntr(u64 val)
++{
++	write_sysreg(val, PMCCNTR);
++}
++
++static inline u64 read_pmccntr(void)
++{
++	return read_sysreg(PMCCNTR);
++}
++
++static inline void write_pmxevcntr(u32 val)
++{
++	write_sysreg(val, PMXEVCNTR);
++}
++
++static inline u32 read_pmxevcntr(void)
++{
++	return read_sysreg(PMXEVCNTR);
++}
++
++static inline void write_pmxevtyper(u32 val)
++{
++	write_sysreg(val, PMXEVTYPER);
++}
++
++static inline void write_pmcntenset(u32 val)
++{
++	write_sysreg(val, PMCNTENSET);
++}
++
++static inline void write_pmcntenclr(u32 val)
++{
++	write_sysreg(val, PMCNTENCLR);
++}
++
++static inline void write_pmintenset(u32 val)
++{
++	write_sysreg(val, PMINTENSET);
++}
++
++static inline void write_pmintenclr(u32 val)
++{
++	write_sysreg(val, PMINTENCLR);
++}
++
++static inline void write_pmovsclr(u32 val)
++{
++	write_sysreg(val, PMOVSR);
++}
++
++static inline u32 read_pmovsclr(void)
++{
++	return read_sysreg(PMOVSR);
++}
++
++static inline u32 read_pmceid0(void)
++{
++	return read_sysreg(PMCEID0);
++}
++
++static inline u32 read_pmceid1(void)
++{
++	return read_sysreg(PMCEID1);
++}
++
++#endif
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index 39808b86b346..bf01dc1414c8 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -51,9 +51,9 @@ config ARM_PMU_ACPI
+ 	def_bool y
+ 
+ config ARM_PMUV3
+-	depends on HW_PERF_EVENTS && ARM64
++	depends on HW_PERF_EVENTS && ((ARM && CPU_V7) || ARM64)
+ 	bool "ARM PMUv3 support" if !ARM64
+-	default y
++	default ARM64
+ 	help
+ 	  Say y if you want to use CPU performance monitors on ARMv8
+ 	  systems that implement the PMUv3 architecture.
 -- 
 2.14.2
