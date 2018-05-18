@@ -1,196 +1,101 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 18 May 2018 13:49:24 +0530
-Subject: [PATCH V7 11/12] ARM: dts: ipq8074: Add pcie nodes
+Date: Fri, 18 May 2018 13:49:20 +0530
+Subject: [PATCH V7 07/12] ARM: dts: ipq4019: Add ipq4019-ap.dk07.1 common data
 In-Reply-To: <1526631565-9972-1-git-send-email-sricharan@codeaurora.org>
 References: <1526631565-9972-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1526631565-9972-12-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1526631565-9972-8-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver/phy support for ipq8074 is available now.
-So enabling the nodes in DT.
+Add the common data for all dk07 based boards.
 
 Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm64/boot/dts/qcom/ipq8074.dtsi | 157 +++++++++++++++++++++++++++++++++-
- 1 file changed, 156 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi | 75 +++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
 
-diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-index bd58ab4..1822698 100644
---- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-+++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-@@ -24,7 +24,7 @@
- 		ranges = <0 0 0 0xffffffff>;
- 		compatible = "simple-bus";
- 
--		pinctrl at 1000000 {
-+		tlmm: pinctrl at 1000000 {
- 			compatible = "qcom,ipq8074-pinctrl";
- 			reg = <0x1000000 0x300000>;
- 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
-@@ -278,6 +278,161 @@
- 			pinctrl-names = "default";
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
+new file mode 100644
+index 0000000..9f1a5a66
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
+@@ -0,0 +1,75 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
 +
-+		pcie_phy0: phy at 86000 {
-+			compatible = "qcom,ipq8074-qmp-pcie-phy";
-+			reg = <0x86000 0x1000>;
-+			#phy-cells = <0>;
-+			clocks = <&gcc GCC_PCIE0_PIPE_CLK>;
-+			clock-names = "pipe_clk";
-+			clock-output-names = "pcie20_phy0_pipe_clk";
++#include "qcom-ipq4019.dtsi"
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/gpio/gpio.h>
 +
-+			resets = <&gcc GCC_PCIE0_PHY_BCR>,
-+				<&gcc GCC_PCIE0PHY_PHY_BCR>;
-+			reset-names = "phy",
-+				      "common";
-+			status = "disabled";
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK07.1";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x20000000>; /* 512MB */
++	};
++
++	aliases {
++		serial0 = &blsp1_uart1;
++		serial1 = &blsp1_uart2;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	soc {
++		pinctrl at 1000000 {
++			serial_0_pins: serial0-pinmux {
++				pins = "gpio16", "gpio17";
++				function = "blsp_uart0";
++				bias-disable;
++			};
++
++			i2c_0_pins: i2c-0-pinmux {
++				pins = "gpio20", "gpio21";
++				function = "blsp_i2c0";
++				bias-disable;
++			};
++
++			nand_pins: nand-pins {
++				pins = "gpio53", "gpio55", "gpio56",
++				       "gpio57", "gpio58", "gpio59",
++				       "gpio60", "gpio62", "gpio63",
++				       "gpio64", "gpio65", "gpio66",
++				       "gpio67", "gpio68", "gpio69";
++				function = "qpic";
++                        };
 +		};
 +
-+		pcie0: pci at 20000000 {
-+			compatible = "qcom,pcie-ipq8074";
-+			reg =  <0x20000000 0xf1d
-+				0x20000f20 0xa8
-+				0x80000 0x2000
-+				0x20100000 0x1000>;
-+			reg-names = "dbi", "elbi", "parf", "config";
-+			device_type = "pci";
-+			linux,pci-domain = <0>;
-+			bus-range = <0x00 0xff>;
-+			num-lanes = <1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			phys = <&pcie_phy0>;
-+			phy-names = "pciephy";
-+
-+			ranges = <0x81000000 0 0x20200000 0x20200000
-+				  0 0x100000   /* downstream I/O */
-+				  0x82000000 0 0x20300000 0x20300000
-+				  0 0xd00000>; /* non-prefetchable memory */
-+
-+			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "msi";
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc 0 75
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+					<0 0 0 2 &intc 0 78
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+					<0 0 0 3 &intc 0 79
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+					<0 0 0 4 &intc 0 83
-+					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+
-+			clocks = <&gcc GCC_SYS_NOC_PCIE0_AXI_CLK>,
-+				 <&gcc GCC_PCIE0_AXI_M_CLK>,
-+				 <&gcc GCC_PCIE0_AXI_S_CLK>,
-+				 <&gcc GCC_PCIE0_AHB_CLK>,
-+				 <&gcc GCC_PCIE0_AUX_CLK>;
-+
-+			clock-names = "iface",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "aux";
-+			resets = <&gcc GCC_PCIE0_PIPE_ARES>,
-+				 <&gcc GCC_PCIE0_SLEEP_ARES>,
-+				 <&gcc GCC_PCIE0_CORE_STICKY_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_MASTER_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_SLAVE_ARES>,
-+				 <&gcc GCC_PCIE0_AHB_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_MASTER_STICKY_ARES>;
-+			reset-names = "pipe",
-+				      "sleep",
-+				      "sticky",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "axi_m_sticky";
-+			status = "disabled";
++		serial at 78af000 {
++			pinctrl-0 = <&serial_0_pins>;
++			pinctrl-names = "default";
++			status = "ok";
 +		};
 +
-+		pcie_phy1: phy at 8e000 {
-+			compatible = "qcom,ipq8074-qmp-pcie-phy";
-+			reg = <0x8e000 0x1000>;
-+			#phy-cells = <0>;
-+			clocks = <&gcc GCC_PCIE1_PIPE_CLK>;
-+			clock-names = "pipe_clk";
-+			clock-output-names = "pcie20_phy1_pipe_clk";
-+
-+			resets = <&gcc GCC_PCIE1_PHY_BCR>,
-+				<&gcc GCC_PCIE1PHY_PHY_BCR>;
-+			reset-names = "phy",
-+				      "common";
-+			status = "disabled";
++		dma at 7884000 {
++			status = "ok";
 +		};
 +
-+		pcie1: pci at 10000000 {
-+			compatible = "qcom,pcie-ipq8074";
-+			reg =  <0x10000000 0xf1d
-+				0x10000f20 0xa8
-+				0x88000 0x2000
-+				0x10100000 0x1000>;
-+			reg-names = "dbi", "elbi", "parf", "config";
-+			device_type = "pci";
-+			linux,pci-domain = <1>;
-+			bus-range = <0x00 0xff>;
-+			num-lanes = <1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			phys = <&pcie_phy1>;
-+			phy-names = "pciephy";
-+
-+			ranges = <0x81000000 0 0x10200000 0x10200000
-+				  0 0x100000   /* downstream I/O */
-+				  0x82000000 0 0x10300000 0x10300000
-+				  0 0xd00000>; /* non-prefetchable memory */
-+
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "msi";
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc 0 142
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+					<0 0 0 2 &intc 0 143
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+					<0 0 0 3 &intc 0 144
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+					<0 0 0 4 &intc 0 145
-+					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+
-+			clocks = <&gcc GCC_SYS_NOC_PCIE1_AXI_CLK>,
-+				 <&gcc GCC_PCIE1_AXI_M_CLK>,
-+				 <&gcc GCC_PCIE1_AXI_S_CLK>,
-+				 <&gcc GCC_PCIE1_AHB_CLK>,
-+				 <&gcc GCC_PCIE1_AUX_CLK>;
-+			clock-names = "iface",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "aux";
-+			resets = <&gcc GCC_PCIE1_PIPE_ARES>,
-+				 <&gcc GCC_PCIE1_SLEEP_ARES>,
-+				 <&gcc GCC_PCIE1_CORE_STICKY_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_MASTER_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_SLAVE_ARES>,
-+				 <&gcc GCC_PCIE1_AHB_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_MASTER_STICKY_ARES>;
-+			reset-names = "pipe",
-+				      "sleep",
-+				      "sticky",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "axi_m_sticky";
-+			status = "disabled";
++		i2c at 78b7000 { /* BLSP1 QUP2 */
++			pinctrl-0 = <&i2c_0_pins>;
++			pinctrl-names = "default";
++			status = "ok";
 +		};
- 	};
- 
- 	cpus {
++
++		dma at 7984000 {
++			status = "ok";
++		};
++
++		qpic-nand at 79b0000 {
++			pinctrl-0 = <&nand_pins>;
++			pinctrl-names = "default";
++			status = "ok";
++		};
++	};
++};
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
