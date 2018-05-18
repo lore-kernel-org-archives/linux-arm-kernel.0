@@ -1,105 +1,73 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 18 May 2018 18:35:49 +0200
-Subject: [PATCH v5 4/4] drm/rockchip: support dp training outside dp
- firmware
-In-Reply-To: <20180518153656.GK3373@art_vandelay>
-References: <1526548680-2552-1-git-send-email-hl@rock-chips.com>
- <11928313.3EhRqhFFHB@phil> <20180518153656.GK3373@art_vandelay>
-Message-ID: <5918781.MvJIhHKAbg@phil>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 18 May 2018 17:39:17 +0100
+Subject: [PATCH 01/11] coresight: ETM: Add support for Arm Cortex-A73 and
+ Cortex-A35
+In-Reply-To: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
+References: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1526661567-4578-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 18. Mai 2018, 17:36:56 CEST schrieb Sean Paul:
-> On Fri, May 18, 2018 at 10:52:17AM +0200, Heiko Stuebner wrote:
-> > Am Freitag, 18. Mai 2018, 03:45:46 CEST schrieb Brian Norris:
-> > > On Thu, May 17, 2018 at 6:41 PM, hl <hl@rock-chips.com> wrote:
-> > > > On Thursday, May 17, 2018 09:51 PM, Sean Paul wrote:
-> > > >> On Thu, May 17, 2018 at 05:18:00PM +0800, Lin Huang wrote:
-> > > >>> DP firmware uses fixed phy config values to do training, but some
-> > > >>> boards need to adjust these values to fit for their unique hardware
-> > > >>> design. So get phy config values from dts and use software link training
-> > > >>> instead of relying on firmware, if software training fail, keep firmware
-> > > >>> training as a fallback if sw training fails.
-> > > >>>
-> > > >>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> > > >>> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> > > >>> ---
-> > > >>> Changes in v2:
-> > > >>> - update patch following Enric suggest
-> > > >>> Changes in v3:
-> > > >>> - use variable fw_training instead sw_training_success
-> > > >>> - base on DP SPCE, if training fail use lower link rate to retry training
-> > > >>> Changes in v4:
-> > > >>> - improve cdn_dp_get_lower_link_rate() and cdn_dp_software_train_link() follow Sean suggest
-> > > >>> Changes in v5:
-> > > >>> - fix some whitespcae issue
-> > > >>>
-> > > >>>   drivers/gpu/drm/rockchip/Makefile               |   3 +-
-> > > >>>   drivers/gpu/drm/rockchip/cdn-dp-core.c          |  24 +-
-> > > >>>   drivers/gpu/drm/rockchip/cdn-dp-core.h          |   2 +
-> > > >>>   drivers/gpu/drm/rockchip/cdn-dp-link-training.c | 420 ++++++++++++++++++++++++
-> > > >>>   drivers/gpu/drm/rockchip/cdn-dp-reg.c           |  31 +-
-> > > >>>   drivers/gpu/drm/rockchip/cdn-dp-reg.h           |  38 ++-
-> > > >>>   6 files changed, 505 insertions(+), 13 deletions(-)
-> > > >>>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-link-training.c
-> > > >>>
-> > > ...
-> > > >>> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-link-training.c b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
-> > > >>> new file mode 100644
-> > > >>> index 0000000..73c3290
-> > > >>> --- /dev/null
-> > > >>> +++ b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
-> > > >>> @@ -0,0 +1,420 @@
-> > > >>> +// SPDX-License-Identifier: GPL-2.0
-> > > >>> +/*
-> > > >>> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
-> > > >>> + * Author: Chris Zhong <zyw@rock-chips.com>
-> > > >>> + */
-> > > >>> +
-> > > >>> +#include <linux/device.h>
-> > > >>> +#include <linux/delay.h>
-> > > >>> +#include <linux/phy/phy.h>
-> > > >>> +#include <soc/rockchip/rockchip_phy_typec.h>
-> > > >>> +
-> > > >>> +#include "cdn-dp-core.h"
-> > > >>> +#include "cdn-dp-reg.h"
-> > > >>> +
-> > > >>> +static void cdn_dp_set_signal_levels(struct cdn_dp_device *dp)
-> > > >>> +{
-> > > >>> +       struct cdn_dp_port *port = dp->port[dp->active_port];
-> > > >>> +       struct rockchip_typec_phy *tcphy = phy_get_drvdata(port->phy);
-> > > >>
-> > > >> You ignored Brian's comment on the previous patch:
-> > > >>    This is still antithetical to the PHY framework; you're assuming that
-> > > >>    this is a particular type of PHY here.
-> > > >>
-> > > >> FWIW, the mediatek drm driver also assumes a certain PHY type. A quick grep of
-> > > >> drivers/ shows that the only other non-phy/ driver using this function
-> > > >> (pinctrl-tegra-xusb.c) also casts it.
-> > > >>
-> > > >> Sean
-> > > >
-> > > > Thanks Sean, except phy framework have new API to handle it, i have not
-> > > > idea how to do it in a better way.
-> > > 
-> > > Well, if Mediatek can do it for their MIPI and HDMI, then maybe we just do it...
-> > 
-> > I'd think so too. This is in Rockchip-specific code so it will always be
-> > possible to easily get the soc-type and thus phy-type, if that combination
-> > really changes down the road.
-> > 
-> 
-> So in the absence of a better solution, and with prior art,
-> 
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
-> 
-> 
-> We just need some eyes on the dt and phy changes in this set. Heiko, can you
-> help out with that?
+Add ETM PIDs of the Arm cortex-A CPUs to the white list of ETMs.
+While at it, also add description of the CPU to which the ETM belongs,
+to make it easier to identify the ETM devices.
 
-done, but both the binding + phy changes should also get Acks from
-Rob (dt) and Kishon (phy). Especially as the binding change is a bit more
-than a new simple property.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 32 +++++++++++++--------------
+ 1 file changed, 15 insertions(+), 17 deletions(-)
 
-
-Heiko
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index cf364a5..fe5b41c 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -1034,7 +1034,8 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 	}
+ 
+ 	pm_runtime_put(&adev->dev);
+-	dev_info(dev, "%s initialized\n", (char *)id->data);
++	dev_info(dev, "CPU%d: %s initialized\n",
++			drvdata->cpu, (char *)id->data);
+ 
+ 	if (boot_enable) {
+ 		coresight_enable(drvdata->csdev);
+@@ -1052,23 +1053,20 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 	return ret;
+ }
+ 
++#define ETM4_AMBA_ID(cpu, pid)			\
++	{					\
++		.id	= pid,			\
++		.mask	= 0x000fffff,		\
++		.data	= #cpu " ETM v4.x",	\
++	}
++
+ static const struct amba_id etm4_ids[] = {
+-	{       /* ETM 4.0 - Cortex-A53  */
+-		.id	= 0x000bb95d,
+-		.mask	= 0x000fffff,
+-		.data	= "ETM 4.0",
+-	},
+-	{       /* ETM 4.0 - Cortex-A57 */
+-		.id	= 0x000bb95e,
+-		.mask	= 0x000fffff,
+-		.data	= "ETM 4.0",
+-	},
+-	{       /* ETM 4.0 - A72, Maia, HiSilicon */
+-		.id = 0x000bb95a,
+-		.mask = 0x000fffff,
+-		.data = "ETM 4.0",
+-	},
+-	{ 0, 0},
++	ETM4_AMBA_ID(Cortex-A53, 0x000bb95d),
++	ETM4_AMBA_ID(Cortex-A57, 0x000bb95e),
++	ETM4_AMBA_ID(Cortex-A72, 0x000bb95a),
++	ETM4_AMBA_ID(Cortex-A73, 0x000bb959),
++	ETM4_AMBA_ID(Cortex-A35, 0x000bb9da),
++	{},
+ };
+ 
+ static struct amba_driver etm4x_driver = {
+-- 
+2.7.4
