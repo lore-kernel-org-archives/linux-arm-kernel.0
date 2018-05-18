@@ -1,81 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 May 2018 09:07:28 +0100
-Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <0a643984-1586-8c56-6627-430f0c2a4ba8@gmail.com>
-References: <20180517131727.29263-1-eric@anholt.net>
- <1412187220.62585.1526572780332@email.1und1.de>
- <alpine.DEB.2.21.1805171233500.7984@macbook-air>
- <307323036.63872.1526576126537@email.1und1.de>
- <20180517180758.GK12198@hirez.programming.kicks-ass.net>
- <alpine.DEB.2.21.1805171422450.8529@macbook-air>
- <alpine.DEB.2.21.1805171530080.8529@macbook-air>
- <0a643984-1586-8c56-6627-430f0c2a4ba8@gmail.com>
-Message-ID: <d6b6f632-2051-a239-3e44-4750f2ac89d5@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 18 May 2018 10:11:41 +0200
+Subject: [PATCH] ARM64: dts: sun50i: a64: Add spi flash node for sopine
+In-Reply-To: <20180517150613.11916-1-manu@freebsd.org>
+References: <20180517150613.11916-1-manu@freebsd.org>
+Message-ID: <20180518081141.itlc4pelwkkpfvtv@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/18 20:59, Florian Fainelli wrote:
-> On 05/17/2018 12:31 PM, Vince Weaver wrote:
->> On Thu, 17 May 2018, Vince Weaver wrote:
->>
->>> On Thu, 17 May 2018, Peter Zijlstra wrote:
->>> with cortex-a7 now, would it be possible to later drop that if proper 
->>> cortex-a53 support is added to the armv7 pmu driver?  Or would that lead 
->>> to all kinds of back-compatability mess?
->>
->> For what it's worth, the pi-foundation kernel bcm2710 device tree file 
->> does:
->>
->> 		arm-pmu {
->> #ifdef RPI364
->> 			compatible = "arm,armv8-pmuv3", "arm,cortex-a7-pmu";
+Hi,
 
-Hahaha. Funny that. Not. That's really silly. The DT *must* describe the
-HW, and having contradictory information is not helping. This is going
-to lead to all kind of miscounted events (to take the above example) A7
-and A53 are significantly different, and thus will count events
-differently....
-
-
->> #else
->> 			compatible = "arm,cortex-a7-pmu";
->> #endif
->> 			interrupt-parent = <&local_intc>;
->> 			interrupts = <9>;
->> 		};
->>
->>
->> Which is probably where I was getting the arm,armv8-pmuv3 from in my 
->> original patch.
+On Thu, May 17, 2018 at 05:06:13PM +0200, Emmanuel Vadot wrote:
+> The Sopine and Pine64-LTS have a winbond w25q128 spi flash on spi0.
+> Add a node for it.
 > 
-> I thought somehow that Marc Z. had unified
-> arch/arm/kernel/perf_event_v7.c and arch/arm64/kernel/perf_event.c into
-> a common driver entry point under drivers/perf/arm_pmu.c but I don't see
-> it and after about 15 minutes looking at it, it does not look as trivial
-> as I though to separate out those files so the ARMv8 PMU description can
-> be moved into a generic location for instance.
+> Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
+> index 43418bd881d8..3285aebc06d9 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
+> @@ -66,6 +66,18 @@
+>  	};
+>  };
+>  
+> +&spi0  {
+> +	status = "okay";
+> +
+> +	flash at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "w25q128", "jedec,spi-nor";
 
-I have a pretty simple series[1] which I used to profile 32bit guests on
-an arm64 KVM host. Nobody really cared about it because running a 32bit
-kernel on 64bit HW is a bit odd, to say the least, and I'm probably the
-only one actually running 32bit VMs.
+This applies to this patch and your previous Orange Pi PC2 one, but
+the part name must have a vendor. Or you can drop it entirely if the
+SPI-NOR driver can auto-detect it properly.
 
-> FWIW, Broadcom STB chips, even when 64-bit capable or often used with an
-> 32-bit ARM kernel, so having the ARMv8 PMUs work under a 32-bit ARM
-> kernel would be great. The downstream solution we have sued thus far is
-> to find the closest compatible string to represent those, which is not
-> great...
-Ah, so you're *really* doing that? I'm not going to ask why, I'm scared
-of the answer... ;-)
+Maxime
 
-Anyway, I can repost that series if that will prevent people from having
-that kind of silly hacks.
-
-Thanks,
-
-	M.
-
-[1]
-https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm/pmuv3-32bit
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/f22030f4/attachment.sig>
