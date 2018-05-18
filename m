@@ -1,50 +1,51 @@
 From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Fri, 18 May 2018 11:52:06 +0800
-Subject: [PATCH v2 3/5] arm64: dts: rockchip: Add gpio-mute to rk3328
+Date: Fri, 18 May 2018 11:52:07 +0800
+Subject: [PATCH v2 4/5] arm64: dts: rockchip: Add io-domain to roc-rk3328-cc
 In-Reply-To: <1526615528-9707-1-git-send-email-djw@t-chip.com.cn>
 References: <1526614328-6869-1-git-send-email-djw@t-chip.com.cn>
  <1526615528-9707-1-git-send-email-djw@t-chip.com.cn>
-Message-ID: <1526615528-9707-3-git-send-email-djw@t-chip.com.cn>
+Message-ID: <1526615528-9707-4-git-send-email-djw@t-chip.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Levin Du <djw@t-chip.com.cn>
 
-Adding a new gpio controller named "gpio-mute" to rk3328, providing
-access to the GPIO_MUTE pin defined in the syscon GRF_SOC_CON10.
-
-The GPIO_MUTE pin is referred to as <&gpio-mute 1>.
+It is necessary for the io domain setting of the SoC to match
+the voltage supplied by the regulators.
 
 Signed-off-by: Levin Du <djw@t-chip.com.cn>
 
 ---
 
-Changes in v2:
-- Rename gpio_syscon10 to gpio_mute in rk3328.dtsi
-
+Changes in v2: None
 Changes in v1:
-- Split from V0 and add to rk3328.dtsi for general use.
+- Split from V0.
 
- arch/arm64/boot/dts/rockchip/rk3328.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-index b8e9da1..5ba29d3 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-@@ -309,6 +309,13 @@
- 			mode-loader = <BOOT_BL_DOWNLOAD>;
- 		};
- 
-+		/* The GPIO_MUTE pin is referred to as <&gpio-mute 1>.*/
-+		gpio_mute: gpio-mute {
-+			compatible = "rockchip,gpio-syscon";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <0 0x0428 0>;
-+		};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+index 246c317..b983abd 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+@@ -208,6 +208,18 @@
  	};
+ };
  
- 	uart0: serial at ff110000 {
++&io_domains {
++	status = "okay";
++
++	vccio1-supply = <&vcc_io>;
++	vccio2-supply = <&vcc18_emmc>;
++	vccio3-supply = <&vcc_io>;
++	vccio4-supply = <&vcc_18>;
++	vccio5-supply = <&vcc_io>;
++	vccio6-supply = <&vcc_io>;
++	pmuio-supply = <&vcc_io>;
++};
++
+ &pinctrl {
+ 	pmic {
+ 		pmic_int_l: pmic-int-l {
 -- 
 2.7.4
