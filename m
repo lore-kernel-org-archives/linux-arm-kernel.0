@@ -1,90 +1,65 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 May 2018 17:24:45 -0500
-Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <869aad59-1cc5-28ef-1fb5-4ef846696c40@codeaurora.org>
-References: <cover.1526088081.git.collinsd@codeaurora.org>
- <41d5df73ddac772551d2966e0752bb0c357b1ded.1526088081.git.collinsd@codeaurora.org>
- <CAD=FV=XegPeFR8pdZM-YiBBJjrbej=C+2biBt4zJKnE90uTYZA@mail.gmail.com>
- <869aad59-1cc5-28ef-1fb5-4ef846696c40@codeaurora.org>
-Message-ID: <20180518222445.GA16342@rob-hp-laptop>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Sat, 19 May 2018 01:15:30 +0200
+Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
+In-Reply-To: <CAHp75VdNUW6KoM6oupyQ80A1WVRk7vewwDt6WEZOyjrAUifqRg@mail.gmail.com>
+References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+ <20180518210954.29044-5-jmkrzyszt@gmail.com>
+ <CAHp75VdNUW6KoM6oupyQ80A1WVRk7vewwDt6WEZOyjrAUifqRg@mail.gmail.com>
+Message-ID: <3427199.r4OBoDP6Xz@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 05:16:13PM -0700, David Collins wrote:
-> On 05/17/2018 02:22 PM, Doug Anderson wrote:
-> > On Fri, May 11, 2018 at 7:28 PM, David Collins <collinsd@codeaurora.org> wrote:
-> >> +- qcom,regulator-initial-microvolt
-> >> +       Usage:      optional; VRM regulators only
-> >> +       Value type: <u32>
-> >> +       Definition: Specifies the initial voltage in microvolts to request for a
-> >> +                   VRM regulator.
-> > 
-> > Now that Mark has landed the patch adding support for the
-> > -ENOTRECOVERABLE error code from get_voltage() / get_voltage_sel(), do
-> > we still need the qcom,regulator-initial-microvolt property?
+On Friday, May 18, 2018 11:21:14 PM CEST Andy Shevchenko wrote:
+> On Sat, May 19, 2018 at 12:09 AM, Janusz Krzysztofik
 > 
-> Yes, this is still needed.  The -ENOTRECOVERABLE patch ensures that
-> qcom-rpmh-regulator devices can be registered even if
-> qcom,regulator-initial-microvolt is not specified.  However, that will
-> result in the regulators being configured for the minimum voltage
-> supported in the DT specified min/max range.  The
-> qcom,regulator-initial-microvolt property allows us to set a specific
-> voltage that is larger than the min constraint.
+> <jmkrzyszt@gmail.com> wrote:
+> > +       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
+> > +       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
 > 
-> > If this is really still needed, can it be moved to the regulator core?
-> 
-> I'm not opposed to the idea, but I think that Mark is [1]:
-> 
-> >> Do you have a preference for qcom,regulator-initial-microvolt vs a generic
-> >> framework supported regulator-initial-microvolt property for configuring a
-> >> specific voltage at registration time?  We'll need to have support for one
-> >> or the other in order for the qcom_rpmh-regulator driver to be functional.
-> > 
-> > This is basically specific to Qualcomm, I can't off hand think of any
-> > other devices with similar issues.
-> 
-> 
-> >> +- regulator-initial-mode
-> >> +       Usage:      optional; VRM regulators only
-> >> +       Value type: <u32>
-> >> +       Definition: Specifies the initial mode to request for a VRM regulator.
-> >> +                   Supported values are RPMH_REGULATOR_MODE_* which are defined
-> >> +                   in [1] (i.e. 0 to 3).  This property may be specified even
-> >> +                   if the regulator-allow-set-load property is not specified.
-> > 
-> > Every time I read the above I wonder why you're documenting a standard
-> > regulator regulator property in your bindings.  ...then I realize it's
-> > because you're doing it because you want to explicitly document what
-> > the valid modes are.  I wonder if it makes sense to just put a
-> > reference somewhere else in this document to go look at the header
-> > file where these are all nicely documented.
-> 
-> Isn't that what the [1] in the above snippet is currently doing.  Further
-> down in qcom,rpmh-regulator.txt is this line:
-> 
-> +[1] include/dt-bindings/regulator/qcom,rpmh-regulator.h
-> 
-> 
-> > Speaking of documenting things like that, it might be worth finding
-> > somewhere in this doc to mention that the "bob" regulator on PMI8998
-> > can support "regulator-allow-bypass".  That tidbit got lost when we
-> > moved to the standard regulator bindings for bypass.
-> 
-> I suppose that I could add something like this:
-> 
-> +- regulator-allow-bypass
-> +	Usage:      optional; BOB type VRM regulators only
-> +	Value type: <empty>
-> +	Definition: See [2] for details.
-> ...
-> +[2]: Documentation/devicetree/bindings/regulator.txt
-> 
-> However, I don't want the patch to get NACKed because it is defining a
-> property that is already defined in the common regulator.txt file.
+> So, is it optional or not at the end?
+> If it is, why do we check for NULL?
 
-If all constraints are defined in the common doc, just "see 
-regulator.txt" is fine. You just need to say what properties this 
-binding uses.
+As far as I can understand, nand_chip->dev_ready() callback is optional. 
+That's why I decided to use the _optional variant of devm_gpiod_get(). In case 
+of ams-delta, the dev_ready() callback depends on availability of the 'rdy' 
+GPIO pin. As a consequence, I'm checking for both NULL and ERR in order to 
+decide if dev_ready() will be supported.
 
-Rob
+I can pretty well replace it with the standard form and check for ERR only if 
+the purpose of the _optional form is different.
+
+> >                 this->dev_ready = ams_delta_nand_ready;
+> >         
+> >         } else {
+> >         
+> >                 this->dev_ready = NULL;
+> >                 pr_notice("Couldn't request gpio for Delta NAND
+> >                 ready.\n");
+> 
+> dev_notice() ?
+
+Sure, but maybe in a separate patch? That's not a new code just being added 
+but an existing one, not the merit of the change.
+
+> >         }
+> > 
+> > +err_gpiod:
+> > +       if (err == -ENODEV || err == -ENOENT)
+> > +               err = -EPROBE_DEFER;
+> 
+> Hmm...
+
+Amstrad Delta uses gpio-mmio driver. Unfortunatelty that driver is not 
+availble before device init phase, unlike other crucial GPIO drivers which are 
+initialized earlier, e.g. during the postcore or at latetst the subsys phase. 
+Hence, devices which depend on GPIO pins provided by gpio-mmio must either be 
+declared late or fail softly so they get another chance of being probed 
+succesfully.
+
+I thought of replacing the gpio-mmio platform driver with bgpio functions it 
+exports but for now I haven't implemented it, not even shared the idea.
+
+Does it really hurt to return -EPROBE_DEFER if a GPIO pin can't be obtained?
+
+Thanks,
+Janusz
