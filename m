@@ -1,40 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:01 +0200
-Subject: [PATCH 28/69] ARM: dts: iwg20m: Add watchdog support to SoM dtsi
+Date: Fri, 18 May 2018 13:17:04 +0200
+Subject: [PATCH 31/69] ARM: dts: r8a7793: Add RWDT node
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <fc9d3be893f8f175879657f844040d0722eb17fe.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <5ba173e677100a79bc6bcfb063c3ea736f7319a1.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch enables the watchdog from within the iwg20m SoM dtsi.
+Add a device node for the Watchdog Timer (WDT) controller on the Renesas
+R-Car M2-N (r8a7793) SoC.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743-iwg20m.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/r8a7793.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-index 1d3e9503c5bd..d364685d9184 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-+++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-@@ -91,6 +91,11 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 72d9b0004928..6975b0efc46c 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -126,6 +126,16 @@
+ 		#size-cells = <2>;
+ 		ranges;
  
-+&rwdt {
-+	timeout-sec = <60>;
-+	status = "okay";
-+};
++		rwdt: watchdog at e6020000 {
++			compatible = "renesas,r8a7793-wdt",
++				     "renesas,rcar-gen2-wdt";
++			reg = <0 0xe6020000 0 0x0c>;
++			clocks = <&cpg CPG_MOD 402>;
++			power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
++			resets = <&cpg 402>;
++			status = "disabled";
++		};
 +
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
- 	pinctrl-names = "default";
+ 		gpio0: gpio at e6050000 {
+ 			compatible = "renesas,gpio-r8a7793",
+ 				     "renesas,rcar-gen2-gpio";
 -- 
 2.11.0
