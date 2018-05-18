@@ -1,433 +1,382 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 18 May 2018 13:56:02 +0100
-Subject: [PATCH v9 07/15] ASoC: qdsp6: q6asm: Add support to memory map and
- unmap
+Date: Fri, 18 May 2018 13:56:06 +0100
+Subject: [PATCH v9 11/15] ASoC: qdsp6: q6routing: Add support to MI2S Mixers
 In-Reply-To: <20180518125610.26200-1-srinivas.kandagatla@linaro.org>
 References: <20180518125610.26200-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180518125610.26200-8-srinivas.kandagatla@linaro.org>
+Message-ID: <20180518125610.26200-12-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to memory map and unmap regions commands in
-q6asm module.
+This patch add support to MI2S mixers required to select path between
+ASM stream and AFE ports.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 Reviewed-by: Banajit Goswami <bgoswami@codeaurora.org>
 ---
- sound/soc/qcom/qdsp6/q6asm.c | 347 +++++++++++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6asm.h |   5 +
- 2 files changed, 352 insertions(+)
+ sound/soc/qcom/qdsp6/q6routing.c | 329 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 329 insertions(+)
 
-diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
-index 585fcfbada6a..a20d243ed10a 100644
---- a/sound/soc/qcom/qdsp6/q6asm.c
-+++ b/sound/soc/qcom/qdsp6/q6asm.c
-@@ -19,10 +19,44 @@
- #include "q6dsp-errno.h"
- #include "q6dsp-common.h"
- 
-+#define ASM_CMD_SHARED_MEM_MAP_REGIONS		0x00010D92
-+#define ASM_CMDRSP_SHARED_MEM_MAP_REGIONS	0x00010D93
-+#define ASM_CMD_SHARED_MEM_UNMAP_REGIONS	0x00010D94
-+
- #define ASM_SYNC_IO_MODE		0x0001
- #define ASM_ASYNC_IO_MODE		0x0002
- #define ASM_TUN_READ_IO_MODE		0x0004	/* tunnel read write mode */
- #define ASM_TUN_WRITE_IO_MODE		0x0008	/* tunnel read write mode */
-+#define ASM_SHIFT_GAPLESS_MODE_FLAG	31
-+#define ADSP_MEMORY_MAP_SHMEM8_4K_POOL	3
-+
-+struct avs_cmd_shared_mem_map_regions {
-+	u16 mem_pool_id;
-+	u16 num_regions;
-+	u32 property_flag;
-+} __packed;
-+
-+struct avs_shared_map_region_payload {
-+	u32 shm_addr_lsw;
-+	u32 shm_addr_msw;
-+	u32 mem_size_bytes;
-+} __packed;
-+
-+struct avs_cmd_shared_mem_unmap_regions {
-+	u32 mem_map_handle;
-+} __packed;
-+
-+struct audio_buffer {
-+	phys_addr_t phys;
-+	uint32_t size;		/* size of buffer */
-+};
-+
-+struct audio_port_data {
-+	struct audio_buffer *buf;
-+	uint32_t num_periods;
-+	uint32_t dsp_buf;
-+	uint32_t mem_map_handle;
-+};
- 
- struct q6asm {
- 	struct apr_device *adev;
-@@ -44,6 +78,8 @@ struct audio_client {
- 	struct mutex cmd_lock;
- 	spinlock_t lock;
- 	struct kref refcount;
-+	/* idx:1 out port, 0: in port */
-+	struct audio_port_data port[2];
- 	wait_queue_head_t cmd_wait;
- 	struct aprv2_ibasic_rsp_result_t result;
- 	int perf_mode;
-@@ -52,6 +88,275 @@ struct audio_client {
- 	struct device *dev;
+diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
+index 43086913060a..08c25c26adf4 100644
+--- a/sound/soc/qcom/qdsp6/q6routing.c
++++ b/sound/soc/qcom/qdsp6/q6routing.c
+@@ -241,6 +241,103 @@ static const struct snd_kcontrol_new hdmi_mixer_controls[] = {
+ 		       msm_routing_put_audio_mixer),
  };
  
-+static inline void q6asm_add_hdr(struct audio_client *ac, struct apr_hdr *hdr,
-+				 uint32_t pkt_size, bool cmd_flg,
-+				 uint32_t stream_id)
-+{
-+	hdr->hdr_field = APR_SEQ_CMD_HDR_FIELD;
-+	hdr->src_port = ((ac->session << 8) & 0xFF00) | (stream_id);
-+	hdr->dest_port = ((ac->session << 8) & 0xFF00) | (stream_id);
-+	hdr->pkt_size = pkt_size;
-+	if (cmd_flg)
-+		hdr->token = ac->session;
-+}
++static const struct snd_kcontrol_new primary_mi2s_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", PRIMARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", PRIMARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", PRIMARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", PRIMARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", PRIMARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", PRIMARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", PRIMARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", PRIMARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
 +
-+static int q6asm_apr_send_session_pkt(struct q6asm *a, struct audio_client *ac,
-+				      struct apr_pkt *pkt, uint32_t rsp_opcode)
-+{
-+	struct apr_hdr *hdr = &pkt->hdr;
-+	int rc;
++static const struct snd_kcontrol_new secondary_mi2s_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", SECONDARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", SECONDARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", SECONDARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", SECONDARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", SECONDARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", SECONDARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", SECONDARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", SECONDARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
 +
-+	mutex_lock(&ac->cmd_lock);
-+	ac->result.opcode = 0;
-+	ac->result.status = 0;
-+	rc = apr_send_pkt(a->adev, pkt);
-+	if (rc < 0)
-+		goto err;
++static const struct snd_kcontrol_new quaternary_mi2s_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", QUATERNARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", QUATERNARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", QUATERNARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", QUATERNARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia5", QUATERNARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia6", QUATERNARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia7", QUATERNARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia8", QUATERNARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
 +
-+	if (rsp_opcode)
-+		rc = wait_event_timeout(a->mem_wait,
-+					(ac->result.opcode == hdr->opcode) ||
-+					(ac->result.opcode == rsp_opcode),
-+					5 * HZ);
-+	else
-+		rc = wait_event_timeout(a->mem_wait,
-+					(ac->result.opcode == hdr->opcode),
-+					5 * HZ);
-+
-+	if (!rc) {
-+		dev_err(a->dev, "CMD timeout\n");
-+		rc = -ETIMEDOUT;
-+	} else if (ac->result.status > 0) {
-+		dev_err(a->dev, "DSP returned error[%x]\n",
-+			ac->result.status);
-+		rc = -EINVAL;
-+	}
-+
-+err:
-+	mutex_unlock(&ac->cmd_lock);
-+	return rc;
-+}
-+
-+static int __q6asm_memory_unmap(struct audio_client *ac,
-+				phys_addr_t buf_add, int dir)
-+{
-+	struct avs_cmd_shared_mem_unmap_regions *mem_unmap;
-+	struct q6asm *a = dev_get_drvdata(ac->dev->parent);
-+	struct apr_pkt *pkt;
-+	int rc, pkt_size;
-+	void *p;
-+
-+	if (ac->port[dir].mem_map_handle == 0) {
-+		dev_err(ac->dev, "invalid mem handle\n");
-+		return -EINVAL;
-+	}
-+
-+	pkt_size = APR_HDR_SIZE + sizeof(*mem_unmap);
-+	p = kzalloc(pkt_size, GFP_KERNEL);
-+	if (!p)
-+		return -ENOMEM;
-+
-+	pkt = p;
-+	mem_unmap = p + APR_HDR_SIZE;
-+
-+	pkt->hdr.hdr_field = APR_SEQ_CMD_HDR_FIELD;
-+	pkt->hdr.src_port = 0;
-+	pkt->hdr.dest_port = 0;
-+	pkt->hdr.pkt_size = pkt_size;
-+	pkt->hdr.token = ((ac->session << 8) | dir);
-+
-+	pkt->hdr.opcode = ASM_CMD_SHARED_MEM_UNMAP_REGIONS;
-+	mem_unmap->mem_map_handle = ac->port[dir].mem_map_handle;
-+
-+	rc = q6asm_apr_send_session_pkt(a, ac, pkt, 0);
-+	if (rc < 0) {
-+		kfree(pkt);
-+		return rc;
-+	}
-+
-+	ac->port[dir].mem_map_handle = 0;
-+
-+	kfree(pkt);
-+	return 0;
-+}
-+
-+
-+static void q6asm_audio_client_free_buf(struct audio_client *ac,
-+					struct audio_port_data *port)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&ac->lock, flags);
-+	port->num_periods = 0;
-+	kfree(port->buf);
-+	port->buf = NULL;
-+	spin_unlock_irqrestore(&ac->lock, flags);
-+}
-+
-+/**
-+ * q6asm_unmap_memory_regions() - unmap memory regions in the dsp.
-+ *
-+ * @dir: direction of audio stream
-+ * @ac: audio client instanace
-+ *
-+ * Return: Will be an negative value on failure or zero on success
-+ */
-+int q6asm_unmap_memory_regions(unsigned int dir, struct audio_client *ac)
-+{
-+	struct audio_port_data *port;
-+	int cnt = 0;
-+	int rc = 0;
-+
-+	port = &ac->port[dir];
-+	if (!port->buf) {
-+		rc = -EINVAL;
-+		goto err;
-+	}
-+
-+	cnt = port->num_periods - 1;
-+	if (cnt >= 0) {
-+		rc = __q6asm_memory_unmap(ac, port->buf[dir].phys, dir);
-+		if (rc < 0) {
-+			dev_err(ac->dev, "%s: Memory_unmap_regions failed %d\n",
-+				__func__, rc);
-+			goto err;
-+		}
-+	}
-+
-+	q6asm_audio_client_free_buf(ac, port);
-+
-+err:
-+	return rc;
-+}
-+EXPORT_SYMBOL_GPL(q6asm_unmap_memory_regions);
-+
-+static int __q6asm_memory_map_regions(struct audio_client *ac, int dir,
-+				      size_t period_sz, unsigned int periods,
-+				      bool is_contiguous)
-+{
-+	struct avs_cmd_shared_mem_map_regions *cmd = NULL;
-+	struct avs_shared_map_region_payload *mregions = NULL;
-+	struct q6asm *a = dev_get_drvdata(ac->dev->parent);
-+	struct audio_port_data *port = NULL;
-+	struct audio_buffer *ab = NULL;
-+	struct apr_pkt *pkt;
-+	void *p;
-+	unsigned long flags;
-+	uint32_t num_regions, buf_sz;
-+	int rc, i, pkt_size;
-+
-+	if (is_contiguous) {
-+		num_regions = 1;
-+		buf_sz = period_sz * periods;
-+	} else {
-+		buf_sz = period_sz;
-+		num_regions = periods;
-+	}
-+
-+	/* DSP expects size should be aligned to 4K */
-+	buf_sz = ALIGN(buf_sz, 4096);
-+
-+	pkt_size = APR_HDR_SIZE + sizeof(*cmd) +
-+		   (sizeof(*mregions) * num_regions);
-+
-+	p = kzalloc(pkt_size, GFP_KERNEL);
-+	if (!p)
-+		return -ENOMEM;
-+
-+	pkt = p;
-+	cmd = p + APR_HDR_SIZE;
-+	mregions = p + APR_HDR_SIZE +  sizeof(*cmd);
-+
-+	pkt->hdr.hdr_field = APR_SEQ_CMD_HDR_FIELD;
-+	pkt->hdr.src_port = 0;
-+	pkt->hdr.dest_port = 0;
-+	pkt->hdr.pkt_size = pkt_size;
-+	pkt->hdr.token = ((ac->session << 8) | dir);
-+	pkt->hdr.opcode = ASM_CMD_SHARED_MEM_MAP_REGIONS;
-+
-+	cmd->mem_pool_id = ADSP_MEMORY_MAP_SHMEM8_4K_POOL;
-+	cmd->num_regions = num_regions;
-+	cmd->property_flag = 0x00;
-+
-+	spin_lock_irqsave(&ac->lock, flags);
-+	port = &ac->port[dir];
-+
-+	for (i = 0; i < num_regions; i++) {
-+		ab = &port->buf[i];
-+		mregions->shm_addr_lsw = lower_32_bits(ab->phys);
-+		mregions->shm_addr_msw = upper_32_bits(ab->phys);
-+		mregions->mem_size_bytes = buf_sz;
-+		++mregions;
-+	}
-+	spin_unlock_irqrestore(&ac->lock, flags);
-+
-+	rc = q6asm_apr_send_session_pkt(a, ac, pkt,
-+					ASM_CMDRSP_SHARED_MEM_MAP_REGIONS);
-+
-+	kfree(pkt);
-+
-+	return rc;
-+}
-+
-+/**
-+ * q6asm_map_memory_regions() - map memory regions in the dsp.
-+ *
-+ * @dir: direction of audio stream
-+ * @ac: audio client instanace
-+ * @phys: physcial address that needs mapping.
-+ * @period_sz: audio period size
-+ * @periods: number of periods
-+ *
-+ * Return: Will be an negative value on failure or zero on success
-+ */
-+int q6asm_map_memory_regions(unsigned int dir, struct audio_client *ac,
-+			     phys_addr_t phys,
-+			     size_t period_sz, unsigned int periods)
-+{
-+	struct audio_buffer *buf;
-+	unsigned long flags;
-+	int cnt;
-+	int rc;
-+
-+	spin_lock_irqsave(&ac->lock, flags);
-+	if (ac->port[dir].buf) {
-+		dev_err(ac->dev, "Buffer already allocated\n");
-+		spin_unlock_irqrestore(&ac->lock, flags);
-+		return 0;
-+	}
-+
-+	buf = kzalloc(((sizeof(struct audio_buffer)) * periods), GFP_ATOMIC);
-+	if (!buf) {
-+		spin_unlock_irqrestore(&ac->lock, flags);
-+		return -ENOMEM;
-+	}
++static const struct snd_kcontrol_new tertiary_mi2s_rx_mixer_controls[] = {
++	SOC_SINGLE_EXT("MultiMedia1", TERTIARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia2", TERTIARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia3", TERTIARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("MultiMedia4", TERTIARY_MI2S_RX,
++	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++	msm_routing_put_audio_mixer),
++};
 +
 +
-+	ac->port[dir].buf = buf;
-+
-+	buf[0].phys = phys;
-+	buf[0].size = period_sz;
-+
-+	for (cnt = 1; cnt < periods; cnt++) {
-+		if (period_sz > 0) {
-+			buf[cnt].phys = buf[0].phys + (cnt * period_sz);
-+			buf[cnt].size = period_sz;
-+		}
-+	}
-+	ac->port[dir].num_periods = periods;
-+
-+	spin_unlock_irqrestore(&ac->lock, flags);
-+
-+	rc = __q6asm_memory_map_regions(ac, dir, period_sz, periods, 1);
-+	if (rc < 0) {
-+		dev_err(ac->dev, "Memory_map_regions failed\n");
-+		q6asm_audio_client_free_buf(ac, &ac->port[dir]);
-+	}
-+
-+	return rc;
-+}
-+EXPORT_SYMBOL_GPL(q6asm_map_memory_regions);
-+
- static void q6asm_audio_client_release(struct kref *ref)
- {
- 	struct audio_client *ac;
-@@ -108,9 +413,13 @@ static int q6asm_srvc_callback(struct apr_device *adev,
- 			       struct apr_resp_pkt *data)
- {
- 	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
-+	struct aprv2_ibasic_rsp_result_t *result;
-+	struct audio_port_data *port;
- 	struct audio_client *ac = NULL;
- 	struct apr_hdr *hdr = &data->hdr;
-+	struct q6asm *a;
- 	uint32_t sid = 0;
-+	uint32_t dir = 0;
+ static const struct snd_kcontrol_new slimbus_rx_mixer_controls[] = {
+ 	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_0_RX,
+ 	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
+@@ -415,6 +512,126 @@ static const struct snd_kcontrol_new slimbus_6_rx_mixer_controls[] = {
+ 	msm_routing_put_audio_mixer),
+ };
  
- 	sid = (hdr->token >> 8) & 0x0F;
- 	ac = q6asm_get_audio_client(q6asm, sid);
-@@ -119,9 +428,47 @@ static int q6asm_srvc_callback(struct apr_device *adev,
- 		return 0;
- 	}
- 
-+	a = dev_get_drvdata(ac->dev->parent);
-+	dir = (hdr->token & 0x0F);
-+	port = &ac->port[dir];
-+	result = data->payload;
++static const struct snd_kcontrol_new mmul1_mixer_controls[] = {
++	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++};
 +
-+	switch (hdr->opcode) {
-+	case APR_BASIC_RSP_RESULT:
-+		switch (result->opcode) {
-+		case ASM_CMD_SHARED_MEM_MAP_REGIONS:
-+		case ASM_CMD_SHARED_MEM_UNMAP_REGIONS:
-+			ac->result = *result;
-+			wake_up(&a->mem_wait);
-+			break;
-+		default:
-+			dev_err(&adev->dev, "command[0x%x] not expecting rsp\n",
-+				 result->opcode);
-+			break;
-+		}
-+		goto done;
-+	case ASM_CMDRSP_SHARED_MEM_MAP_REGIONS:
-+		ac->result.status = 0;
-+		ac->result.opcode = hdr->opcode;
-+		port->mem_map_handle = result->opcode;
-+		wake_up(&a->mem_wait);
-+		break;
-+	case ASM_CMD_SHARED_MEM_UNMAP_REGIONS:
-+		ac->result.opcode = hdr->opcode;
-+		ac->result.status = 0;
-+		port->mem_map_handle = 0;
-+		wake_up(&a->mem_wait);
-+		break;
-+	default:
-+		dev_dbg(&adev->dev, "command[0x%x]success [0x%x]\n",
-+			result->opcode, result->status);
-+		break;
-+	}
++static const struct snd_kcontrol_new mmul2_mixer_controls[] = {
++	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++};
 +
- 	if (ac->cb)
- 		ac->cb(hdr->opcode, hdr->token, data->payload, ac->priv);
++static const struct snd_kcontrol_new mmul3_mixer_controls[] = {
++	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new mmul4_mixer_controls[] = {
++	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new mmul5_mixer_controls[] = {
++	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new mmul6_mixer_controls[] = {
++	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new mmul7_mixer_controls[] = {
++	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++};
++
++static const struct snd_kcontrol_new mmul8_mixer_controls[] = {
++	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
++		MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
++		msm_routing_put_audio_mixer),
++};
++
+ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
+ 	/* Frontend AIF */
+ 	SND_SOC_DAPM_AIF_IN("MM_DL1", "MultiMedia1 Playback", 0, 0, 0, 0),
+@@ -460,6 +677,35 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
+ 	SND_SOC_DAPM_MIXER("SLIMBUS_6_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
+ 			   slimbus_6_rx_mixer_controls,
+ 			   ARRAY_SIZE(slimbus_6_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("PRI_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   primary_mi2s_rx_mixer_controls,
++			   ARRAY_SIZE(primary_mi2s_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("SEC_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   secondary_mi2s_rx_mixer_controls,
++			   ARRAY_SIZE(secondary_mi2s_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("QUAT_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   quaternary_mi2s_rx_mixer_controls,
++			   ARRAY_SIZE(quaternary_mi2s_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("TERT_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
++			   tertiary_mi2s_rx_mixer_controls,
++			   ARRAY_SIZE(tertiary_mi2s_rx_mixer_controls)),
++	SND_SOC_DAPM_MIXER("MultiMedia1 Mixer", SND_SOC_NOPM, 0, 0,
++		mmul1_mixer_controls, ARRAY_SIZE(mmul1_mixer_controls)),
++	SND_SOC_DAPM_MIXER("MultiMedia2 Mixer", SND_SOC_NOPM, 0, 0,
++		mmul2_mixer_controls, ARRAY_SIZE(mmul2_mixer_controls)),
++	SND_SOC_DAPM_MIXER("MultiMedia3 Mixer", SND_SOC_NOPM, 0, 0,
++		mmul3_mixer_controls, ARRAY_SIZE(mmul3_mixer_controls)),
++	SND_SOC_DAPM_MIXER("MultiMedia4 Mixer", SND_SOC_NOPM, 0, 0,
++		mmul4_mixer_controls, ARRAY_SIZE(mmul4_mixer_controls)),
++	SND_SOC_DAPM_MIXER("MultiMedia5 Mixer", SND_SOC_NOPM, 0, 0,
++		mmul5_mixer_controls, ARRAY_SIZE(mmul5_mixer_controls)),
++	SND_SOC_DAPM_MIXER("MultiMedia6 Mixer", SND_SOC_NOPM, 0, 0,
++		mmul6_mixer_controls, ARRAY_SIZE(mmul6_mixer_controls)),
++	SND_SOC_DAPM_MIXER("MultiMedia7 Mixer", SND_SOC_NOPM, 0, 0,
++		mmul7_mixer_controls, ARRAY_SIZE(mmul7_mixer_controls)),
++	SND_SOC_DAPM_MIXER("MultiMedia8 Mixer", SND_SOC_NOPM, 0, 0,
++		mmul8_mixer_controls, ARRAY_SIZE(mmul8_mixer_controls)),
++
+ };
  
-+done:
- 	kref_put(&ac->refcount, q6asm_audio_client_release);
+ static const struct snd_soc_dapm_route intercon[] = {
+@@ -537,6 +783,89 @@ static const struct snd_soc_dapm_route intercon[] = {
+ 	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
+ 	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
+ 	{"SLIMBUS_6_RX", NULL, "SLIMBUS_6_RX Audio Mixer"},
++
++	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
++	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
++	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
++	{"QUAT_MI2S_RX", NULL, "QUAT_MI2S_RX Audio Mixer"},
++
++	{"TERT_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"TERT_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"TERT_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"TERT_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"TERT_MI2S_RX", NULL, "TERT_MI2S_RX Audio Mixer"},
++
++	{"SEC_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"SEC_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"SEC_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"SEC_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"SEC_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"SEC_MI2S_RX Audio Mixer", "MultiMedia6", "MM_DL5"},
++	{"SEC_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
++	{"SEC_MI2S_RX Audio Mixer", "MultiMedia8", "MM_DL7"},
++	{"SEC_MI2S_RX", NULL, "SEC_MI2S_RX Audio Mixer"},
++
++	{"PRI_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
++	{"PRI_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
++	{"PRI_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
++	{"PRI_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
++	{"PRI_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
++	{"PRI_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
++	{"PRI_MI2S_RX", NULL, "PRI_MI2S_RX Audio Mixer"},
++
++	{"MultiMedia1 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
++	{"MultiMedia1 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
++	{"MultiMedia1 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
++	{"MultiMedia1 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
++
++	{"MultiMedia2 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
++	{"MultiMedia2 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
++	{"MultiMedia2 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
++	{"MultiMedia2 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
++
++	{"MultiMedia3 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
++	{"MultiMedia3 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
++	{"MultiMedia3 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
++	{"MultiMedia3 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
++
++	{"MultiMedia4 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
++	{"MultiMedia4 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
++	{"MultiMedia4 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
++	{"MultiMedia4 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
++
++	{"MultiMedia5 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
++	{"MultiMedia5 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
++	{"MultiMedia5 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
++	{"MultiMedia5 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
++
++	{"MultiMedia6 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
++	{"MultiMedia6 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
++	{"MultiMedia6 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
++	{"MultiMedia6 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
++
++	{"MultiMedia7 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
++	{"MultiMedia7 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
++	{"MultiMedia7 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
++	{"MultiMedia7 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
++
++	{"MultiMedia8 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
++	{"MultiMedia8 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
++	{"MultiMedia8 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
++	{"MultiMedia8 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
++
++	{"MM_UL1", NULL, "MultiMedia1 Mixer"},
++	{"MM_UL2", NULL, "MultiMedia2 Mixer"},
++	{"MM_UL3", NULL, "MultiMedia3 Mixer"},
++	{"MM_UL4", NULL, "MultiMedia4 Mixer"},
++	{"MM_UL5", NULL, "MultiMedia5 Mixer"},
++	{"MM_UL6", NULL, "MultiMedia6 Mixer"},
++	{"MM_UL7", NULL, "MultiMedia7 Mixer"},
++	{"MM_UL8", NULL, "MultiMedia8 Mixer"},
+ };
  
- 	return 0;
-diff --git a/sound/soc/qcom/qdsp6/q6asm.h b/sound/soc/qcom/qdsp6/q6asm.h
-index b7816e6384e7..8c317b7b63c3 100644
---- a/sound/soc/qcom/qdsp6/q6asm.h
-+++ b/sound/soc/qcom/qdsp6/q6asm.h
-@@ -12,4 +12,9 @@ struct audio_client *q6asm_audio_client_alloc(struct device *dev,
- 					      int session_id, int perf_mode);
- void q6asm_audio_client_free(struct audio_client *ac);
- int q6asm_get_session_id(struct audio_client *ac);
-+int q6asm_map_memory_regions(unsigned int dir,
-+			     struct audio_client *ac,
-+			     phys_addr_t phys,
-+			     size_t bufsz, unsigned int bufcnt);
-+int q6asm_unmap_memory_regions(unsigned int dir, struct audio_client *ac);
- #endif /* __Q6_ASM_H__ */
+ static int routing_hw_params(struct snd_pcm_substream *substream,
 -- 
 2.16.2
