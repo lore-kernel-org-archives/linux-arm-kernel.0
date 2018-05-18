@@ -1,72 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:15:42 +0200
-Subject: [PATCH 080/102] arm64: dts: renesas: ulcb: Add BD9571 PMIC
+Date: Fri, 18 May 2018 13:15:43 +0200
+Subject: [PATCH 081/102] arm64: dts: renesas: salvator-common: Add PMIC DDR
+ Backup Power config
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <786f3cc022f73973eda247a0f80f73971ebda764.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <d666493fd6da3b13b9a0d4957ee1d0e52ece0e13.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add a device node for the ROHM BD9571MWV PMIC.
+On Salvator-X(S), all of the DDR0, DDR1, DDR0C, and DDR1C power rails
+need to be kept powered when backup mode is enabled.  Reflect this in
+the "rohm,ddr-backup-power" property for the BD9571MWV PMIC node.
 
-This was based on the example in the DT binding documentation, but using
-IRQ0 instead of a GPIO interrupt, as that matches the schematics, and
-because INTC-EX is a simpler block.
+The accessory power switch (SW23) is a toggle switch, hence specify
+"rohm,rstbmode-level".
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/ulcb.dtsi | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-index 93402783d52f..ee4249287fbd 100644
---- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
-+++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-@@ -243,6 +243,30 @@
+diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+index 803220a02f50..96b51e572666 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+@@ -374,6 +374,8 @@
+ 		#interrupt-cells = <2>;
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++		rohm,ddr-backup-power = <0xf>;
++		rohm,rstbmode-level;
  
- &i2c_dvfs {
- 	status = "okay";
-+
-+	pmic: pmic at 30 {
-+		pinctrl-0 = <&irq0_pins>;
-+		pinctrl-names = "default";
-+
-+		compatible = "rohm,bd9571mwv";
-+		reg = <0x30>;
-+		interrupt-parent = <&intc_ex>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		regulators {
-+			dvfs: dvfs {
-+				regulator-name = "dvfs";
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1030000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+	};
- };
- 
- &ohci1 {
-@@ -276,6 +300,11 @@
- 		function = "i2c2";
- 	};
- 
-+	irq0_pins: irq0 {
-+		groups = "intc_ex_irq0";
-+		function = "intc_ex";
-+	};
-+
- 	scif2_pins: scif2 {
- 		groups = "scif2_data_a";
- 		function = "scif2";
+ 		regulators {
+ 			dvfs: dvfs {
 -- 
 2.11.0
