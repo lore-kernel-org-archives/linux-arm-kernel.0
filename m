@@ -1,37 +1,92 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 18 May 2018 16:13:10 +0100
-Subject: [GIT PULL] ARM: mediatek: soc driver updates for v4.18
-In-Reply-To: <3e416f8f-b038-9bfe-7038-98aec5224620@gmail.com>
-References: <bd033549-4998-e376-eb92-16111ec71a07@gmail.com>
- <20180517044600.GC20254@sirena.org.uk>
- <3e416f8f-b038-9bfe-7038-98aec5224620@gmail.com>
-Message-ID: <20180518151310.GG24209@sirena.org.uk>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Fri, 18 May 2018 15:13:26 +0000
+Subject: [PATCH 1/5] dt-bindings: pinctrl: document the STMFX pinctrl
+ bindings
+In-Reply-To: <20180518135237.GQ5130@dell>
+References: <1523440025-18077-1-git-send-email-amelie.delaunay@st.com>
+ <1523440025-18077-2-git-send-email-amelie.delaunay@st.com>
+ <20180416181940.4b5z4svbde3ompij@rob-hp-laptop>
+ <CACRpkdYOMjjYyWQz7PK34jqUK7z5-CmH1HY6un4k8nBn7Cq8ag@mail.gmail.com>
+ <55392fe7-20d2-9447-60f9-4bd226b60195@st.com>
+ <CACRpkda2VGo0FOdR09tKiTpg66NgoWjubaHp_J3372y=a772Zg@mail.gmail.com>
+ <b9005dd8-8214-ceab-0f88-ff1a51b44e34@st.com> <20180517063640.GK5130@dell>
+ <28c374e6-b440-f785-b371-03fe15c8bc4b@st.com> <20180518135237.GQ5130@dell>
+Message-ID: <a07b3f72-299b-3da3-a618-0c88dc9d6ed1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 05:11:32PM +0200, Matthias Brugger wrote:
-> On 17/05/18 06:46, Mark Brown wrote:
-> > On Mon, May 14, 2018 at 01:32:49PM +0200, Matthias Brugger wrote:
+On 05/18/2018 03:52 PM, Lee Jones wrote:
+> On Fri, 18 May 2018, Amelie DELAUNAY wrote:
+> 
+>> On 05/17/2018 08:36 AM, Lee Jones wrote:
+>>> On Wed, 16 May 2018, Amelie DELAUNAY wrote:
+>>>
+>>>>
+>>>>
+>>>> On 05/16/2018 04:20 PM, Linus Walleij wrote:
+>>>>> On Wed, May 9, 2018 at 9:56 AM, Amelie DELAUNAY <amelie.delaunay@st.com> wrote:
+>>>>>
+>>>>>> Indeed, stmfx has other functions than GPIO. But, after comments done
+>>>>>> here: [1] and there: [2], it has been decided to move MFD parent/GPIO
+>>>>>> child drivers into a single PINCTRL/GPIO driver because of the following
+>>>>>> reasons:
+>>>>>> - Other stmfx functions (IDD measurement and TouchScreen controller) are
+>>>>>> not used on any of the boards using an stmfx and supported by Linux, so
+>>>>>> no way to test these functions, and no need to maintain them while they
+>>>>>> are not being used.
+>>>>>> - But, in the case a new board will use more than GPIO function on
+>>>>>> stmfx, the actual implementation allow to easily extract common init
+>>>>>> part of stmfx and put it in an MFD driver.
+>>>>>>
+>>>>>> So I could remove gpio sub-node and put its contents in stmfx node and
+>>>>>> keep single PINCTRL/GPIO driver for the time being.
+>>>>>> Please advise,
+>>>>>
+>>>>> I would normally advice to use the right modeling from the start, create
+>>>>> the MFD driver and spawn the devices from there. It is confusing
+>>>>> if the layout of the driver(s) doesn't really match the layout of the
+>>>>> hardware.
+>>>>>
+>>>>> I understand that it is a pain to write new MFD drivers to get your
+>>>>> things going and it would be "nice to get this working really quick
+>>>>> now" but in my experience it is better to do it right from the start.
+>>>>>
+>>>>
+>>>> Hi Linus,
+>>>>
+>>>> Thanks for your advice. I understand the point.
+>>>> So, the right modeling would be to:
+>>>> - create an MFD driver with the common init part of stmfx
+>>>> - remove all common init part of stmfx-pinctrl driver and keep only all
+>>>> gpio/pinctrl functions.
+>>>>
+>>>> I will not develop the other stmfx functions (IDD measurement driver and
+>>>> TouchScreen controller driver) because, as explained ealier, they are
+>>>> not used on any of the boards using an stmfx and supported by Linux, so
+>>>> no way to test these functions, and no need to maintain them while they
+>>>> are not being used.
+>>>>
+>>>> Lee, are you OK with that ?
+>>>
+>>> I missed a lot of this conversation I think, but from what I've read,
+>>> it sounds fine.
+>>>
+>>
+>> I summarize the situation:
+>> - I still don't have an official datasheet for STMFX device which could
+>> justify the use of an MFD driver;
+>> - the MFD driver will contain the STMFX chip initialization stuff such
+>> as regmap initialization (regmap structure will be shared with the
+>> child), chip initialization, global interrupt management;
+>> - there will be only one child (GPIO/PINCTRL node) for the time being.
+>>
+>> So, is "MFD driver + GPIO/PINCTRL driver" the right modeling, and does
+>> it still sound fine after this summary ? :)
+> 
+> It is starting to sound like there will only ever be one child device,
+> which starts to cross the line into "this is not an MFD" (M = Multi)
+> territory.
+> 
 
-> > > ----------------------------------------------------------------
-> > > Matthias Brugger (1):
-> > >        Merge commit 'f15cd6d99198e9c15229aefec639a34a6e8174c6' into
-> > > v.4.17-next/soc-test
-
-> > There is a signed tag for this - please don't ever pull anything from me
-> > without a signed tag, while I try to avoid rewriting history it does
-> > sometimes happen but if I've made a signed tag part of that is me saying
-> > I know other people might've merged the commit.
-
-> You are right I got confused about this.
-> Anrd, Olof do you want me to resubmit?
-
-I'm OK with leaving things as is - that was more a request for the
-future than a request to rewrite history (if it's already been merged).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/264bd0f3/attachment.sig>
+... for the time being. So, Linus, Lee, is it possible to find common 
+ground ?
