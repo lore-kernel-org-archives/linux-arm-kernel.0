@@ -1,42 +1,426 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:16:45 +0200
-Subject: [PATCH 12/69] ARM: dts: renesas: r8a7794: Add FDP1 instances
-In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
-References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <898cf5a67c169a8efb41cc6483935f1bc61e8157.1526641667.git.horms+renesas@verge.net.au>
+Date: Fri, 18 May 2018 13:15:58 +0200
+Subject: [PATCH 096/102] arm64: dts: renesas: r8a7795: add VIN and CSI-2 nodes
+In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
+References: <cover.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <15da7132f1da1c0c42c175a0b938af1e0615de90.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
-The r8a7794 has one FDP1 instance.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 389 +++++++++++++++++++++++++++++++
+ 1 file changed, 389 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index d588efa6aeaa..56f5fa6a2c0f 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -1323,6 +1323,15 @@
- 			resets = <&cpg 128>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 91486b4910ce..d842940b2f43 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1397,6 +1397,262 @@
+ 			status = "disabled";
  		};
  
-+		fdp1 at fe940000 {
-+			compatible = "renesas,fdp1";
-+			reg = <0 0xfe940000 0 0x2400>;
-+			interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 119>;
-+			power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
-+			resets = <&cpg 119>;
++		vin0: video at e6ef0000 {
++			compatible = "renesas,vin-r8a7795";
++			reg = <0 0xe6ef0000 0 0x1000>;
++			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 811>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 811>;
++			renesas,id = <0>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin0csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint= <&csi20vin0>;
++					};
++					vin0csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi40vin0>;
++					};
++				};
++			};
 +		};
 +
- 		du: display at feb00000 {
- 			compatible = "renesas,du-r8a7794";
- 			reg = <0 0xfeb00000 0 0x40000>;
++		vin1: video at e6ef1000 {
++			compatible = "renesas,vin-r8a7795";
++			reg = <0 0xe6ef1000 0 0x1000>;
++			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 810>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 810>;
++			renesas,id = <1>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin1csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint= <&csi20vin1>;
++					};
++					vin1csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi40vin1>;
++					};
++				};
++			};
++		};
++
++		vin2: video at e6ef2000 {
++			compatible = "renesas,vin-r8a7795";
++			reg = <0 0xe6ef2000 0 0x1000>;
++			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 809>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 809>;
++			renesas,id = <2>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin2csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint= <&csi20vin2>;
++					};
++					vin2csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi40vin2>;
++					};
++				};
++			};
++		};
++
++		vin3: video at e6ef3000 {
++			compatible = "renesas,vin-r8a7795";
++			reg = <0 0xe6ef3000 0 0x1000>;
++			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 808>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 808>;
++			renesas,id = <3>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin3csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint= <&csi20vin3>;
++					};
++					vin3csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi40vin3>;
++					};
++				};
++			};
++		};
++
++		vin4: video at e6ef4000 {
++			compatible = "renesas,vin-r8a7795";
++			reg = <0 0xe6ef4000 0 0x1000>;
++			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 807>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 807>;
++			renesas,id = <4>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin4csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint= <&csi20vin4>;
++					};
++					vin4csi41: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint= <&csi41vin4>;
++					};
++				};
++			};
++		};
++
++		vin5: video at e6ef5000 {
++			compatible = "renesas,vin-r8a7795";
++			reg = <0 0xe6ef5000 0 0x1000>;
++			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 806>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 806>;
++			renesas,id = <5>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin5csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint= <&csi20vin5>;
++					};
++					vin5csi41: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint= <&csi41vin5>;
++					};
++				};
++			};
++		};
++
++		vin6: video at e6ef6000 {
++			compatible = "renesas,vin-r8a7795";
++			reg = <0 0xe6ef6000 0 0x1000>;
++			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 805>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 805>;
++			renesas,id = <6>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin6csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint= <&csi20vin6>;
++					};
++					vin6csi41: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint= <&csi41vin6>;
++					};
++				};
++			};
++		};
++
++		vin7: video at e6ef7000 {
++			compatible = "renesas,vin-r8a7795";
++			reg = <0 0xe6ef7000 0 0x1000>;
++			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 804>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 804>;
++			renesas,id = <7>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin7csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint= <&csi20vin7>;
++					};
++					vin7csi41: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint= <&csi41vin7>;
++					};
++				};
++			};
++		};
++
+ 		drif00: rif at e6f40000 {
+ 			compatible = "renesas,r8a7795-drif",
+ 				     "renesas,rcar-gen3-drif";
+@@ -2327,6 +2583,139 @@
+ 			renesas,fcp = <&fcpvi1>;
+ 		};
+ 
++		csi20: csi2 at fea80000 {
++			compatible = "renesas,r8a7795-csi2";
++			reg = <0 0xfea80000 0 0x10000>;
++			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 714>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 714>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					csi20vin0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&vin0csi20>;
++					};
++					csi20vin1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&vin1csi20>;
++					};
++					csi20vin2: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&vin2csi20>;
++					};
++					csi20vin3: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint = <&vin3csi20>;
++					};
++					csi20vin4: endpoint at 4 {
++						reg = <4>;
++						remote-endpoint = <&vin4csi20>;
++					};
++					csi20vin5: endpoint at 5 {
++						reg = <5>;
++						remote-endpoint = <&vin5csi20>;
++					};
++					csi20vin6: endpoint at 6 {
++						reg = <6>;
++						remote-endpoint = <&vin6csi20>;
++					};
++					csi20vin7: endpoint at 7 {
++						reg = <7>;
++						remote-endpoint = <&vin7csi20>;
++					};
++				};
++			};
++		};
++
++		csi40: csi2 at feaa0000 {
++			compatible = "renesas,r8a7795-csi2";
++			reg = <0 0xfeaa0000 0 0x10000>;
++			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 716>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 716>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					csi40vin0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&vin0csi40>;
++					};
++					csi40vin1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&vin1csi40>;
++					};
++					csi40vin2: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&vin2csi40>;
++					};
++					csi40vin3: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint = <&vin3csi40>;
++					};
++				};
++			};
++		};
++
++		csi41: csi2 at feab0000 {
++			compatible = "renesas,r8a7795-csi2";
++			reg = <0 0xfeab0000 0 0x10000>;
++			interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 715>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 715>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					csi41vin4: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&vin4csi41>;
++					};
++					csi41vin5: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&vin5csi41>;
++					};
++					csi41vin6: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&vin6csi41>;
++					};
++					csi41vin7: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint = <&vin7csi41>;
++					};
++				};
++			};
++		};
++
+ 		hdmi0: hdmi at fead0000 {
+ 			compatible = "renesas,r8a7795-hdmi", "renesas,rcar-gen3-hdmi";
+ 			reg = <0 0xfead0000 0 0x10000>;
 -- 
 2.11.0
