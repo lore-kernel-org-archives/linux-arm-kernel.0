@@ -1,139 +1,142 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:16:37 +0200
-Subject: [PATCH 04/69] ARM: dts: r7s72100: stop grouping clocks under a
- "clocks" subnode
+Date: Fri, 18 May 2018 13:16:38 +0200
+Subject: [PATCH 05/69] ARM: dts: r7s72100: sort subnodes of root node
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <6f9fe6a6521c84f267a08ee74090fc45d3ee199b.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <5db40d7b26d30ac8b7c21313afe03d678cfffaa9.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current practice is to not group clocks under a "clocks" subnode,
-but just put them together with the other on-SoC devices.
+Sort the subnodes of the soc node to improve maintainability.
+The sort has been done alphabetically with the node name as the key.
 
-As per updates for R-Car Gen2 SoCs by Geert Uytterhoeven.
+This patch should not introduce any functional change.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r7s72100.dtsi | 104 +++++++++++++++++++---------------------
- 1 file changed, 49 insertions(+), 55 deletions(-)
+ arch/arm/boot/dts/r7s72100.dtsi | 78 +++++++++++++++++++++--------------------
+ 1 file changed, 40 insertions(+), 38 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 0d63dbe11e0d..d69d4810e597 100644
+index d69d4810e597..ecf9516bcda8 100644
 --- a/arch/arm/boot/dts/r7s72100.dtsi
 +++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -30,62 +30,56 @@
+@@ -30,43 +30,45 @@
  		spi4 = &spi4;
  	};
  
--	clocks {
--		ranges;
--		#address-cells = <1>;
--		#size-cells = <1>;
+-	/* External clocks */
+-	extal_clk: extal {
++	/* Fixed factor clocks */
++	b_clk: b {
+ 		#clock-cells = <0>;
+-		compatible = "fixed-clock";
+-		/* If clk present, value must be set by board */
+-		clock-frequency = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&cpg_clocks R7S72100_CLK_PLL>;
++		clock-mult = <1>;
++		clock-div = <3>;
+ 	};
+ 
+-	usb_x1_clk: usb_x1 {
+-		#clock-cells = <0>;
+-		compatible = "fixed-clock";
+-		/* If clk present, value must be set by board */
+-		clock-frequency = <0>;
+-	};
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 
+-	rtc_x1_clk: rtc_x1 {
+-		#clock-cells = <0>;
+-		compatible = "fixed-clock";
+-		/* If clk present, value must be set by board to 32678 */
+-		clock-frequency = <0>;
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++			clock-frequency = <400000000>;
++			clocks = <&cpg_clocks R7S72100_CLK_I>;
++			next-level-cache = <&L2>;
++		};
+ 	};
+ 
+-	rtc_x3_clk: rtc_x3 {
 +	/* External clocks */
 +	extal_clk: extal {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+-		/* If clk present, value must be set by board to 4000000 */
++		/* If clk present, value must be set by board */
+ 		clock-frequency = <0>;
+ 	};
+ 
+-	/* Fixed factor clocks */
+-	b_clk: b {
++	p0_clk: p0 {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+ 		clocks = <&cpg_clocks R7S72100_CLK_PLL>;
+ 		clock-mult = <1>;
+-		clock-div = <3>;
++		clock-div = <12>;
+ 	};
++
+ 	p1_clk: p1 {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+@@ -74,26 +76,19 @@
+ 		clock-mult = <1>;
+ 		clock-div = <6>;
+ 	};
+-	p0_clk: p0 {
++
++	rtc_x1_clk: rtc_x1 {
+ 		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clocks = <&cpg_clocks R7S72100_CLK_PLL>;
+-		clock-mult = <1>;
+-		clock-div = <12>;
++		compatible = "fixed-clock";
++		/* If clk present, value must be set by board to 32678 */
++		clock-frequency = <0>;
+ 	};
+ 
+-	cpus {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		cpu at 0 {
+-			device_type = "cpu";
+-			compatible = "arm,cortex-a9";
+-			reg = <0>;
+-			clock-frequency = <400000000>;
+-			clocks = <&cpg_clocks R7S72100_CLK_I>;
+-			next-level-cache = <&L2>;
+-		};
++	rtc_x3_clk: rtc_x3 {
 +		#clock-cells = <0>;
 +		compatible = "fixed-clock";
-+		/* If clk present, value must be set by board */
++		/* If clk present, value must be set by board to 4000000 */
 +		clock-frequency = <0>;
-+	};
+ 	};
  
--		/* External clocks */
--		extal_clk: extal {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			/* If clk present, value must be set by board */
--			clock-frequency = <0>;
--		};
--
--		usb_x1_clk: usb_x1 {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			/* If clk present, value must be set by board */
--			clock-frequency = <0>;
--		};
--
--		rtc_x1_clk: rtc_x1 {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			/* If clk present, value must be set by board to 32678 */
--			clock-frequency = <0>;
--		};
--
--		rtc_x3_clk: rtc_x3 {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			/* If clk present, value must be set by board to 4000000 */
--			clock-frequency = <0>;
--		};
--
--		/* Fixed factor clocks */
--		b_clk: b {
--			#clock-cells = <0>;
--			compatible = "fixed-factor-clock";
--			clocks = <&cpg_clocks R7S72100_CLK_PLL>;
--			clock-mult = <1>;
--			clock-div = <3>;
--		};
--		p1_clk: p1 {
--			#clock-cells = <0>;
--			compatible = "fixed-factor-clock";
--			clocks = <&cpg_clocks R7S72100_CLK_PLL>;
--			clock-mult = <1>;
--			clock-div = <6>;
--		};
--		p0_clk: p0 {
--			#clock-cells = <0>;
--			compatible = "fixed-factor-clock";
--			clocks = <&cpg_clocks R7S72100_CLK_PLL>;
--			clock-mult = <1>;
--			clock-div = <12>;
--		};
+ 	soc {
+@@ -689,4 +684,11 @@
+ 			status = "disabled";
+ 		};
+ 	};
++
 +	usb_x1_clk: usb_x1 {
 +		#clock-cells = <0>;
 +		compatible = "fixed-clock";
 +		/* If clk present, value must be set by board */
 +		clock-frequency = <0>;
 +	};
-+
-+	rtc_x1_clk: rtc_x1 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		/* If clk present, value must be set by board to 32678 */
-+		clock-frequency = <0>;
-+	};
-+
-+	rtc_x3_clk: rtc_x3 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		/* If clk present, value must be set by board to 4000000 */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* Fixed factor clocks */
-+	b_clk: b {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&cpg_clocks R7S72100_CLK_PLL>;
-+		clock-mult = <1>;
-+		clock-div = <3>;
-+	};
-+	p1_clk: p1 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&cpg_clocks R7S72100_CLK_PLL>;
-+		clock-mult = <1>;
-+		clock-div = <6>;
-+	};
-+	p0_clk: p0 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&cpg_clocks R7S72100_CLK_PLL>;
-+		clock-mult = <1>;
-+		clock-div = <12>;
- 	};
- 
- 	cpus {
+ };
 -- 
 2.11.0
