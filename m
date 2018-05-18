@@ -1,106 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:15:52 +0200
-Subject: [PATCH 090/102] arm64: dts: renesas: initial V3HSK board device tree
+Date: Fri, 18 May 2018 13:15:25 +0200
+Subject: [PATCH 063/102] arm64: dts: renesas: r8a7796: Add address properties
+ to rcar_sound port nodes
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <116a12f7d6c00e1e477aaec9e486cd510fa1895c.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <78bc93b3ffb2cd71341a3373fd14b62847091b7e.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+The rcar_sound port nodes have unit names and thus should have register
+properties.
 
-Add the initial device  tree for  the V3H Starter Kit board.
-The board has 1 debug serial port (SCIF0); include support for it,
-so that the serial console can work.
+This is flagged by dtc as follows:
+ # make dtbs W=1
+ ...
+ DTC     arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 0: node has a unit name, but no reg property
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 1: node has a unit name, but no reg property
+ ...
+ DTC     arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 0: node has a unit name, but no reg property
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-xs.dtb: Warning (unit_address_vs_reg): /soc/sound at ec500000/ports/port at 1: node has a unit name, but no reg property
 
-Based on the original (and large) patch by Vladimir Barinov.
+Prior to this patch the port nodes only defined in board DTS files.
+As the register properties are common this patch defines the port nodes
+and provides register properties in the SoC DTS file.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- arch/arm64/boot/dts/renesas/Makefile           |  2 +-
- arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts | 60 ++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
-index a235961c6532..9e2394bc3c62 100644
---- a/arch/arm64/boot/dts/renesas/Makefile
-+++ b/arch/arm64/boot/dts/renesas/Makefile
-@@ -9,6 +9,6 @@ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-m3ulcb-kf.dtb
- dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-xs.dtb
- dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-salvator-x.dtb r8a77965-salvator-xs.dtb
- dtb-$(CONFIG_ARCH_R8A77970) += r8a77970-eagle.dtb r8a77970-v3msk.dtb
--dtb-$(CONFIG_ARCH_R8A77980) += r8a77980-condor.dtb
-+dtb-$(CONFIG_ARCH_R8A77980) += r8a77980-condor.dtb r8a77980-v3hsk.dtb
- dtb-$(CONFIG_ARCH_R8A77990) += r8a77990-ebisu.dtb
- dtb-$(CONFIG_ARCH_R8A77995) += r8a77995-draak.dtb
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts b/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-new file mode 100644
-index 000000000000..c9680994555d
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-@@ -0,0 +1,60 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the V3H Starter Kit board
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ * Copyright (C) 2018 Cogent Embedded, Inc.
-+ */
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index f41bc25b3933..3fbd86590fb0 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -1594,6 +1594,17 @@
+ 					dma-names = "rx", "tx", "rxu", "txu";
+ 				};
+ 			};
 +
-+/dts-v1/;
-+#include "r8a77980.dtsi"
-+
-+/ {
-+	model = "Renesas V3H Starter Kit board";
-+	compatible = "renesas,v3hsk", "renesas,r8a77980";
-+
-+	aliases {
-+		serial0 = &scif0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 48000000 {
-+		device_type = "memory";
-+		/* first 128MB is reserved for secure area. */
-+		reg = <0 0x48000000 0 0x78000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <16666666>;
-+};
-+
-+&extalr_clk {
-+	clock-frequency = <32768>;
-+};
-+
-+&pfc {
-+	scif0_pins: scif0 {
-+		groups = "scif0_data";
-+		function = "scif0";
-+	};
-+
-+	scif_clk_pins: scif_clk {
-+		groups = "scif_clk_b";
-+		function = "scif_clk";
-+	};
-+};
-+
-+&scif0 {
-+	pinctrl-0 = <&scif0_pins>, <&scif_clk_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&scif_clk {
-+	clock-frequency = <14745600>;
-+};
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port at 0 {
++					reg = <0>;
++				};
++				port at 1 {
++					reg = <1>;
++				};
++			};
+ 		};
+ 
+ 		audma0: dma-controller at ec700000 {
 -- 
 2.11.0
