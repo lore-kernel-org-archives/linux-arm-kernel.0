@@ -1,70 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:16:42 +0200
-Subject: [PATCH 09/69] ARM: dts: renesas: replace toshiba,
- mmc-wrprotect-disable with disable-wp
+Date: Fri, 18 May 2018 13:16:43 +0200
+Subject: [PATCH 10/69] ARM: dts: renesas: r8a7791: Add FDP1 instances
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <9eb663e838aba244b97fed0000cb3917f6013e96.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <e7f36fb8ffafbda9c168e1aafab5b5ebe54ebaa8.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Follow up commit 788778b0d21a ("mmc: tmio: deprecate "toshiba,
-mmc-wrprotect-disable" DT property").
+The r8a7791 has two FDP1 instances.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4-ape6evm.dts | 4 ++--
- arch/arm/boot/dts/sh73a0.dtsi         | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index ec7c86e06538..125c39c0222f 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -234,7 +234,7 @@
- &sdhi0 {
- 	vmmc-supply = <&vcc_sdhi0>;
- 	bus-width = <4>;
--	toshiba,mmc-wrprotect-disable;
-+	disable-wp;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdhi0_pins>;
- 	status = "okay";
-@@ -244,7 +244,7 @@
- 	vmmc-supply = <&ape6evm_fixed_3v3>;
- 	bus-width = <4>;
- 	broken-cd;
--	toshiba,mmc-wrprotect-disable;
-+	disable-wp;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdhi1_pins>;
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 914a7c2a584f..39cc58672bf4 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -336,7 +336,7 @@
- 			      GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks SH73A0_CLK_SDHI1>;
- 		power-domains = <&pd_a3sp>;
--		toshiba,mmc-wrprotect-disable;
-+		disable-wp;
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
-@@ -348,7 +348,7 @@
- 			      GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks SH73A0_CLK_SDHI2>;
- 		power-domains = <&pd_a3sp>;
--		toshiba,mmc-wrprotect-disable;
-+		disable-wp;
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index f11dab71b03a..55b5a56da35e 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1621,6 +1621,24 @@
+ 			resets = <&cpg 127>;
+ 		};
+ 
++		fdp1 at fe940000 {
++			compatible = "renesas,fdp1";
++			reg = <0 0xfe940000 0 0x2400>;
++			interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 119>;
++			power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
++			resets = <&cpg 119>;
++		};
++
++		fdp1 at fe944000 {
++			compatible = "renesas,fdp1";
++			reg = <0 0xfe944000 0 0x2400>;
++			interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 118>;
++			power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
++			resets = <&cpg 118>;
++		};
++
+ 		jpu: jpeg-codec at fe980000 {
+ 			compatible = "renesas,jpu-r8a7791",
+ 				     "renesas,rcar-gen2-jpu";
 -- 
 2.11.0
