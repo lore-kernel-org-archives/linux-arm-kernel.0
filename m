@@ -1,53 +1,56 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 18 May 2018 12:17:15 +0530
-Subject: [PATCH] clk: davinci: psc-da830: fix USB0 48MHz PHY clock
- registration
-In-Reply-To: <9f8a876b-6a66-687c-f83f-51b8d896c50a@ti.com>
-References: <20180507113457.4716-1-nsekhar@ti.com>
- <152642368847.237094.1884631416189964435@swboyd.mtv.corp.google.com>
- <9f8a876b-6a66-687c-f83f-51b8d896c50a@ti.com>
-Message-ID: <4f289b8c-6dc2-a5e6-bda3-d3dc8e61ea1f@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 18 May 2018 10:00:08 +0300
+Subject: [PATCH 4/4] omap2: powerdomain: Inroduce cpu_pm notifiers for
+ context save/restore
+In-Reply-To: <7df065c3-5154-5059-891c-2855e3cdbe00@ti.com>
+References: <1526483821-25585-1-git-send-email-j-keerthy@ti.com>
+ <1526483821-25585-5-git-send-email-j-keerthy@ti.com>
+ <20180517214507.GS98604@atomide.com>
+ <7df065c3-5154-5059-891c-2855e3cdbe00@ti.com>
+Message-ID: <67b3758f-8616-22ab-786e-206f7e5de020@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Wednesday 16 May 2018 10:44 AM, Sekhar Nori wrote:
-> Hi Stephen,
+On 18/05/18 07:32, Keerthy wrote:
 > 
-> On Wednesday 16 May 2018 04:04 AM, Stephen Boyd wrote:
->> Quoting Sekhar Nori (2018-05-07 04:34:57)
->>> USB0 48MHz PHY clock registration fails on DA830 because the
->>> da8xx-cfgchip clock driver cannot get a reference to USB0
->>> LPSC clock.
->>>
->>> The USB0 LPSC needs to be enabled during PHY clock enable. Setup
->>> the clock lookup correctly to fix this.
->>>
->>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->>> ---
->>
->> Applied to clk-next
->>
->> Did this need a fixes tag? And should it go into 4.17 final? Or it's not
->> causing problems right now?
 > 
-> We have not switched DaVinci to use common clock framework still. So no,
-> this does not cause problems right now. All drivers/clk/davinci/*
-> patches can be included for v4.18.
+> On Friday 18 May 2018 03:15 AM, Tony Lindgren wrote:
+>> * Keerthy <j-keerthy@ti.com> [180516 15:21]:
+>>> +	/* Only AM43XX can lose pwrdm context during rtc-ddr suspend */
+>>> +	if (soc_is_am43xx()) {
+>>> +		nb.notifier_call = cpu_notifier;
+>>> +		cpu_pm_register_notifier(&nb);
+>>> +	}
+>>> +
+>>
+>> Hmm in patch 3/4 you add omap4_pwrdm_save_context(), I think
+>> that we'd want to run with the notifier for cpuidle on omap4?
+> 
+> Okay i believe that is not needed for cpuidle on omap4. PRCM on wakeup
+> domain so save/restore not needed for powerdomain on omap4.
+> 
+> Tero can confirm the same.
 
-There are some more patches (fixes) to drivers/clk/davinci which have
-been reviewed and both David and I think are ready for merge[1].
+Yea I don't believe this is needed. Only certain portions of the OMAP4 
+PRCM lose context during device off mode (which is currently not 
+supported by linux), and whatever portions do lose, they should use the 
+SAR_RAM approach for context save/restore, as that is supported by 
+HW/ROM code.
 
-Do you have them in your queue? Else, I can send a pull request for you
-to take a look and merge.
+-Tero
 
-Thanks,
-Sekhar
+> 
+> Should i rename omap4_pwrdm_save_context to am43xx_pwrdm_save_context to
+> avoid confusion?
+> 
+> Regards,
+> Keerthy
+> 
+>>
+>> Regards,
+>>
+>> Tony
+>>
 
-[1]
-clk: davinci: psc-dm365: fix few clocks
-clk: davinci: pll-dm646x: keep PLL2 SYSCLK1 always enabled
-clk: davinci: psc-dm355: fix ASP0/1 clkdev lookups
-clk: davinci: pll-dm355: fix SYSCLKn parent names
-clk: davinci: pll-dm355: drop pll2_sysclk2
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
