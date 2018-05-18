@@ -1,91 +1,178 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 18 May 2018 12:31:24 +0200
-Subject: [PATCH 3/9] PM / Domains: Drop genpd as in-param for
- pm_genpd_remove_device()
+Date: Fri, 18 May 2018 12:31:29 +0200
+Subject: [PATCH 8/9] PM / Domains: Add support for multi PM domains per device
+ to genpd
 In-Reply-To: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
 References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1526639490-12167-4-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1526639490-12167-9-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to pass a genpd struct to pm_genpd_remove_device(), as we
-already have the information about the PM domain (genpd) through the device
-structure.
+To support devices being partitioned across multiple PM domains, let's
+start by extending genpd to cope with these configurations.
 
-Additionally, we don't allow to remove a PM domain from a device, other
-than the one it may have assigned to it, so really it does not make sense
-to have a separate in-param for it.
+More precisely, add a new exported function, genpd_dev_pm_attach_by_id(),
+similar to genpd_dev_pm_attach(), but the new function also allows the
+caller to provide an index to what PM domain it wants to attach.
 
-For these reason, drop it and update the current only call to
-pm_genpd_remove_device() from amdgpu_acp.
+Furthermore, let genpd register a new virtual struct device via calling
+device_register() and attach it to the corresponding PM domain, which is
+looked up via calling the existing genpd OF functions. Note that the new
+device is needed, because only one PM domain can be attached per device. At
+successful attachment, genpd_dev_pm_attach_by_id() returns the new device,
+allowing the caller to operate on it to deal with power management.
 
-Cc: Alex Deucher <alexander.deucher@amd.com>
-Cc: Christian K?nig <christian.koenig@amd.com>
-Cc: David (ChunMing) Zhou <David1.Zhou@amd.com>
+To deal with detaching of a PM domain for multiple PM domain case, we can
+still re-use the existing genpd_dev_pm_detach() function, although we need
+to extend it to cover cleanup of the earlier registered device, via calling
+device_unregister().
+
+An important note, genpd_dev_pm_attach_by_id() shall only be called by the
+driver core / PM core, similar to how genpd_dev_pm_attach() is used.
+Following changes deploys this.
+
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain.c             | 8 ++++----
- drivers/gpu/drm/amd/amdgpu/amdgpu_acp.c | 2 +-
- include/linux/pm_domain.h               | 5 ++---
- 3 files changed, 7 insertions(+), 8 deletions(-)
+ drivers/base/power/domain.c | 79 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h   |  8 +++++
+ 2 files changed, 87 insertions(+)
 
 diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index d58aee3..f08fa15 100644
+index d538640..ffeb6ea 100644
 --- a/drivers/base/power/domain.c
 +++ b/drivers/base/power/domain.c
-@@ -1475,13 +1475,13 @@ static int genpd_remove_device(struct generic_pm_domain *genpd,
+@@ -2171,6 +2171,15 @@ struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
+ }
+ EXPORT_SYMBOL_GPL(of_genpd_remove_last);
  
- /**
-  * pm_genpd_remove_device - Remove a device from an I/O PM domain.
-- * @genpd: PM domain to remove the device from.
-  * @dev: Device to be removed.
-  */
--int pm_genpd_remove_device(struct generic_pm_domain *genpd,
--			   struct device *dev)
-+int pm_genpd_remove_device(struct device *dev)
- {
--	if (!genpd || genpd != genpd_lookup_dev(dev))
-+	struct generic_pm_domain *genpd = genpd_lookup_dev(dev);
++static void genpd_release_dev(struct device *dev)
++{
++	kfree(dev);
++}
 +
-+	if (!genpd)
- 		return -EINVAL;
++static struct bus_type genpd_bus_type = {
++	.name		= "genpd",
++};
++
+ /**
+  * genpd_dev_pm_detach - Detach a device from its PM domain.
+  * @dev: Device to detach.
+@@ -2208,6 +2217,10 @@ static void genpd_dev_pm_detach(struct device *dev, bool power_off)
  
- 	return genpd_remove_device(genpd, dev);
-diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_acp.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_acp.c
-index a29362f..1255804 100644
---- a/drivers/gpu/drm/amd/amdgpu/amdgpu_acp.c
-+++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_acp.c
-@@ -513,7 +513,7 @@ static int acp_hw_fini(void *handle)
- 	if (adev->acp.acp_genpd) {
- 		for (i = 0; i < ACP_DEVS ; i++) {
- 			dev = get_mfd_cell_dev(adev->acp.acp_cell[i].name, i);
--			ret = pm_genpd_remove_device(&adev->acp.acp_genpd->gpd, dev);
-+			ret = pm_genpd_remove_device(dev);
- 			/* If removal fails, dont giveup and try rest */
- 			if (ret)
- 				dev_err(dev, "remove dev from genpd failed\n");
+ 	/* Check if PM domain can be powered off after removing this device. */
+ 	genpd_queue_power_off_work(pd);
++
++	/* Unregister the device if it was created by genpd. */
++	if (dev->bus == &genpd_bus_type)
++		device_unregister(dev);
+ }
+ 
+ static void genpd_dev_pm_sync(struct device *dev)
+@@ -2298,6 +2311,66 @@ int genpd_dev_pm_attach(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+ 
++/**
++ * genpd_dev_pm_attach_by_id() - Attach a device to one of its PM domain.
++ * @dev: Device to attach.
++ * @index: The index of the PM domain.
++ *
++ * Parse device's OF node to find a PM domain specifier at the provided @index.
++ * If such is found, allocates a new device and attaches it to retrieved
++ * pm_domain ops.
++ *
++ * Returns the allocated device if successfully attached PM domain, NULL when
++ * the device don't need a PM domain or have a single PM domain, else PTR_ERR()
++ * in case of failures. Note that if a power-domain exists for the device, but
++ * cannot be found or turned on, then return PTR_ERR(-EPROBE_DEFER) to ensure
++ * that the device is not probed and to re-try again later.
++ */
++struct device *genpd_dev_pm_attach_by_id(struct device *dev,
++					 unsigned int index)
++{
++	struct device *genpd_dev;
++	int num_domains;
++	int ret;
++
++	if (!dev->of_node)
++		return NULL;
++
++	/* Deal only with devices using multiple PM domains. */
++	num_domains = of_count_phandle_with_args(dev->of_node, "power-domains",
++						 "#power-domain-cells");
++	if (num_domains < 2 || index >= num_domains)
++		return NULL;
++
++	/* Allocate and register device on the genpd bus. */
++	genpd_dev = kzalloc(sizeof(*genpd_dev), GFP_KERNEL);
++	if (!genpd_dev)
++		return ERR_PTR(-ENOMEM);
++
++	dev_set_name(genpd_dev, "genpd:%u:%s", index, dev_name(dev));
++	genpd_dev->bus = &genpd_bus_type;
++	genpd_dev->release = genpd_release_dev;
++
++	ret = device_register(genpd_dev);
++	if (ret) {
++		kfree(genpd_dev);
++		return ERR_PTR(ret);
++	}
++
++	/* Try to attach the device to the PM domain at the specified index. */
++	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index);
++	if (ret < 1) {
++		device_unregister(genpd_dev);
++		return ret ? ERR_PTR(ret) : NULL;
++	}
++
++	pm_runtime_set_active(genpd_dev);
++	pm_runtime_enable(genpd_dev);
++
++	return genpd_dev;
++}
++EXPORT_SYMBOL_GPL(genpd_dev_pm_attach_by_id);
++
+ static const struct of_device_id idle_state_match[] = {
+ 	{ .compatible = "domain-idle-state", },
+ 	{ }
+@@ -2456,6 +2529,12 @@ unsigned int of_genpd_opp_to_performance_state(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(of_genpd_opp_to_performance_state);
+ 
++static int __init genpd_bus_init(void)
++{
++	return bus_register(&genpd_bus_type);
++}
++core_initcall(genpd_bus_init);
++
+ #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
+ 
+ 
 diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 79888fb..42e0d64 100644
+index 42e0d64..82458e8 100644
 --- a/include/linux/pm_domain.h
 +++ b/include/linux/pm_domain.h
-@@ -144,7 +144,7 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
+@@ -237,6 +237,8 @@ unsigned int of_genpd_opp_to_performance_state(struct device *dev,
+ 				struct device_node *opp_node);
+ 
+ int genpd_dev_pm_attach(struct device *dev);
++struct device *genpd_dev_pm_attach_by_id(struct device *dev,
++					 unsigned int index);
+ #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+ static inline int of_genpd_add_provider_simple(struct device_node *np,
+ 					struct generic_pm_domain *genpd)
+@@ -282,6 +284,12 @@ static inline int genpd_dev_pm_attach(struct device *dev)
+ 	return 0;
  }
  
- int pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev);
--int pm_genpd_remove_device(struct generic_pm_domain *genpd, struct device *dev);
-+int pm_genpd_remove_device(struct device *dev);
- int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
- 			   struct generic_pm_domain *new_subdomain);
- int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
-@@ -167,8 +167,7 @@ static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
++static inline struct device *genpd_dev_pm_attach_by_id(struct device *dev,
++						       unsigned int index)
++{
++	return NULL;
++}
++
+ static inline
+ struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
  {
- 	return -ENOSYS;
- }
--static inline int pm_genpd_remove_device(struct generic_pm_domain *genpd,
--					 struct device *dev)
-+static inline int pm_genpd_remove_device(struct device *dev)
- {
- 	return -ENOSYS;
- }
 -- 
 2.7.4
