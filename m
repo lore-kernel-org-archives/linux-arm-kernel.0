@@ -1,41 +1,78 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Fri, 18 May 2018 10:28:09 -0700
-Subject: [PATCH 02/20] dma-mapping: provide a generic dma-noncoherent
- implementation
-In-Reply-To: <20180518132731.GA31125@lst.de>
-References: <20180511075945.16548-1-hch@lst.de>
- <20180511075945.16548-3-hch@lst.de>
- <bad125dff49f6e49c895e818c9d1abb346a46e8e.camel@synopsys.com>
- <20180518132731.GA31125@lst.de>
-Message-ID: <482e343c-bc87-9c0e-b6a8-bb69bcbeecda@synopsys.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 May 2018 18:30:41 +0100
+Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
+In-Reply-To: <20180518170202.11458-1-samitolvanen@google.com>
+References: <20180518170202.11458-1-samitolvanen@google.com>
+Message-ID: <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2018 06:23 AM, hch at lst.de wrote:
->   Fri, May 18, 2018 at 01:03:46PM +0000, Alexey Brodkin wrote:
->> Note mmc_get_dma_dir() is just "data->flags & MMC_DATA_WRITE ? DMA_TO_DEVICE : DMA_FROM_DEVICE".
->> I.e. if we're preparing for sending data dma_noncoherent_map_sg() will have DMA_TO_DEVICE which
->> is quite OK for passing to dma_noncoherent_sync_sg_for_device() but in case of reading we'll have
->> DMA_FROM_DEVICE which we'll pass to dma_noncoherent_sync_sg_for_device() in dma_noncoherent_map_sg().
->>
->> I'd say this is not entirely correct because IMHO arch_sync_dma_for_cpu() is supposed to only be used
->> in case of DMA_FROM_DEVICE and arch_sync_dma_for_device() only in case of DMA_TO_DEVICE.
-> arc overrides the dir paramter of the dma_sync_single_for_device/
-> dma_sync_single_for_cpu calls.  My patches dropped that, and I have
-> restored that, and audit for the other architectures is pending.
+On 18/05/18 18:02, Sami Tolvanen wrote:
+> Starting with LLVM r308050, clang generates a jump table with EL1
+> virtual addresses in __init_stage2_translation, which results in a
+> kernel panic when booting at EL2:
+> 
+>   Kernel panic - not syncing: HYP panic:
+>   PS:800003c9 PC:ffff0000089e6fd8 ESR:86000004
+>   FAR:ffff0000089e6fd8 HPFAR:0000000009825000 PAR:0000000000000000
+>   VCPU:000804fc20001221
+> 
+>   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc7-dirty #3
+>   Hardware name: ARM Juno development board (r1) (DT)
+>   Call trace:
+>   [<ffff000008088ea4>] dump_backtrace+0x0/0x34c
+>   [<ffff000008089208>] show_stack+0x18/0x20
+>   [<ffff0000089c73ec>] dump_stack+0xc4/0xfc
+>   [<ffff0000080c8e1c>] panic+0x138/0x2b4
+>   [<ffff0000080c8ce4>] panic+0x0/0x2b4
+>   SMP: stopping secondary CPUs
+>   SMP: failed to stop secondary CPUs 0-3,5
+>   Kernel Offset: disabled
+>   CPU features: 0x002086
+>   Memory Limit: none
+>   ---[ end Kernel panic - not syncing: HYP panic:
+>   PS:800003c9 PC:ffff0000089e6fd8 ESR:86000004
+>   FAR:ffff0000089e6fd8 HPFAR:0000000009825000 PAR:0000000000000000
+>   VCPU:000804fc20001221
+> 
+> This change adds -fno-jump-tables to arm64/hyp to work around the
+> bug.
+> 
+> Suggested-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+> ---
+>  arch/arm64/kvm/hyp/Makefile | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index 4313f74753332..745b3255e7832 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -5,6 +5,10 @@
+>  
+>  ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+>  
+> +ifeq ($(cc-name),clang)
+> +ccflags-y += -fno-jump-tables
+> +endif
+> +
+>  KVM=../../../../virt/kvm
+>  
+>  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+> 
 
-Right, for now lets retain that and do a sweeping audit of @direction - to me it 
-seems extraneous (as it did 10 years ago), but I'm not an expert in this are so 
-perhaps it is needed for some device / arches and it would be good to understand 
-that finally.
+I'm going to ask the question I've asked before when this patch cropped
+up (must be the 4th time now):
 
-> That being said the existing arc code still looks rather odd as it
-> didn't do the same thing for the scatterlist versions of the calls.
-> I've thrown in a few patches into my new tree to make the sg versions
-> make the normal calls, and to clean up the area a bit.
+Is it guaranteed that this is the only case where LLVM/clang is going to
+generate absolute addresses instead of using relative addressing?
 
-Not calling names or anything here, but it doesn't exist for sg variants, because 
-I didn't write that code :-)
-It was introduced by your commi:
+So far, nobody has answered that question. If you assure me that this is
+the case, I'll take that patch. Otherwise, we're just playing
+whack-a-mole, as with the profiling stuff.
 
-2016-01-20 052c96dbe33b arc: convert to dma_map_ops
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
