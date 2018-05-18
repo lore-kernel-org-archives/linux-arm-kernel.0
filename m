@@ -1,35 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:16:27 +0200
-Subject: [PATCH 1/6] ARM: shmobile: defconfig: Enable r8a77470 SoC
-In-Reply-To: <cover.1526548577.git.horms+renesas@verge.net.au>
-References: <cover.1526548577.git.horms+renesas@verge.net.au>
-Message-ID: <f794fa1e8f0f7e308edae8eaef2f9cd59aa62bc6.1526548577.git.horms+renesas@verge.net.au>
+Date: Fri, 18 May 2018 13:16:44 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.18
+Message-ID: <cover.1526549153.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Enable recently added r8a77470 (RZ/G1C) SoC.
+Please consider these Renesas ARM based SoC DT bindings updates for v4.18.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index a701601fbd76..dc650db70063 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -14,6 +14,7 @@ CONFIG_ARCH_R8A73A4=y
- CONFIG_ARCH_R8A7740=y
- CONFIG_ARCH_R8A7743=y
- CONFIG_ARCH_R8A7745=y
-+CONFIG_ARCH_R8A77470=y
- CONFIG_ARCH_R8A7778=y
- CONFIG_ARCH_R8A7779=y
- CONFIG_ARCH_R8A7790=y
--- 
-2.11.0
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.18
+
+for you to fetch changes up to c92db4a4a4c6c176c34604e456d6d355803d9ada:
+
+  dt-bindings: arm: document Renesas V3HSK board bindings (2018-05-15 09:17:45 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Bindings Updates for v4.18
+
+Document bindings for:
+
+* V3H Starter Kit, a board used with the R-Car V3H (r8a77980) SoC
+* R-Car E3 (R8A77990) SoC and its Ebisu board
+* iWave Systems RZ/G1C Single Board Computer (iW-RainboW-G23S)
+  which uses an RZ/G1C (R8A77470) SoC
+* RZ/G1M (R8A7743) and RZ/G1N (R8A7744) CMT support
+
+Cleanup:
+* Consistently name r8a77965 as R-Car M3-N
+
+----------------------------------------------------------------
+Biju Das (1):
+      dt-bindings: arm: Document iW-RainboW-G23S single board computer
+
+Fabrizio Castro (1):
+      dt-bindings: timer: renesas, cmt: Document r8a774[35] CMT support
+
+Sergei Shtylyov (1):
+      dt-bindings: arm: document Renesas V3HSK board bindings
+
+Simon Horman (1):
+      dt-bindings: arm: consistently name r8a77965 as M3-N
+
+Yoshihiro Shimoda (2):
+      dt-bindings: arm: Document R-Car E3 SoC DT bindings
+      dt-bindings: arm: Document Renesas Ebisu board DT bindings
+
+ Documentation/devicetree/bindings/arm/shmobile.txt      | 10 +++++++++-
+ Documentation/devicetree/bindings/timer/renesas,cmt.txt | 14 ++++++++++----
+ 2 files changed, 19 insertions(+), 5 deletions(-)
