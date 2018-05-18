@@ -1,37 +1,21 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sat, 19 May 2018 00:21:14 +0300
-Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
-In-Reply-To: <20180518210954.29044-5-jmkrzyszt@gmail.com>
-References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
- <20180518210954.29044-5-jmkrzyszt@gmail.com>
-Message-ID: <CAHp75VdNUW6KoM6oupyQ80A1WVRk7vewwDt6WEZOyjrAUifqRg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 May 2018 16:29:25 -0500
+Subject: [PATCH v3 1/2] dt-bindings: add MediaTek XS-PHY binding
+In-Reply-To: <1525932629-10603-2-git-send-email-chunfeng.yun@mediatek.com>
+References: <1525932629-10603-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1525932629-10603-2-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <20180518212925.GA25632@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2018 at 12:09 AM, Janusz Krzysztofik
-<jmkrzyszt@gmail.com> wrote:
+On Thu, May 10, 2018 at 02:10:28PM +0800, Chunfeng Yun wrote:
+> Add a DT binding documentation of XS-PHY for MediaTek SoCs
+> with USB3.1 GEN2 controller
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../devicetree/bindings/phy/phy-mtk-xsphy.txt      |  110 ++++++++++++++++++++
+>  1 file changed, 110 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-xsphy.txt
 
-> +       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
-> +       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
-
-So, is it optional or not at the end?
-If it is, why do we check for NULL?
-
->                 this->dev_ready = ams_delta_nand_ready;
->         } else {
->                 this->dev_ready = NULL;
->                 pr_notice("Couldn't request gpio for Delta NAND ready.\n");
-
-dev_notice() ?
-
->         }
-
-> +err_gpiod:
-> +       if (err == -ENODEV || err == -ENOENT)
-> +               err = -EPROBE_DEFER;
-
-Hmm...
-
--- 
-With Best Regards,
-Andy Shevchenko
+Reviewed-by: Rob Herring <robh@kernel.org>
