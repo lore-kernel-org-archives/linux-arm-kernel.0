@@ -1,110 +1,37 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 18 May 2018 18:13:06 +0300
-Subject: [PATCH v3 3/3] arm64: dts: renesas: draak: Describe HDMI input
-In-Reply-To: <1526654878-11143-4-git-send-email-jacopo+renesas@jmondi.org>
-References: <1526654878-11143-1-git-send-email-jacopo+renesas@jmondi.org>
- <1526654878-11143-4-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <2264361.MLIkrGFxG7@avalon>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 18 May 2018 16:13:10 +0100
+Subject: [GIT PULL] ARM: mediatek: soc driver updates for v4.18
+In-Reply-To: <3e416f8f-b038-9bfe-7038-98aec5224620@gmail.com>
+References: <bd033549-4998-e376-eb92-16111ec71a07@gmail.com>
+ <20180517044600.GC20254@sirena.org.uk>
+ <3e416f8f-b038-9bfe-7038-98aec5224620@gmail.com>
+Message-ID: <20180518151310.GG24209@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+On Fri, May 18, 2018 at 05:11:32PM +0200, Matthias Brugger wrote:
+> On 17/05/18 06:46, Mark Brown wrote:
+> > On Mon, May 14, 2018 at 01:32:49PM +0200, Matthias Brugger wrote:
 
-Thank you for the patch.
+> > > ----------------------------------------------------------------
+> > > Matthias Brugger (1):
+> > >        Merge commit 'f15cd6d99198e9c15229aefec639a34a6e8174c6' into
+> > > v.4.17-next/soc-test
 
-On Friday, 18 May 2018 17:47:58 EEST Jacopo Mondi wrote:
-> Describe HDMI input connector and ADV7612 HDMI decoder installed on
-> R-Car Gen3 Draak board.
-> 
-> The video signal routing to the HDMI decoder to the video input interface
-> VIN4 is multiplexed with CVBS input path, and enabled/disabled through
-> on-board switches SW-49, SW-50, SW-51 and SW-52.
-> 
-> As the default board switches configuration connects CVBS input to VIN4,
-> leave the HDMI decoder unconnected in DTS.
-> 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> > There is a signed tag for this - please don't ever pull anything from me
+> > without a signed tag, while I try to avoid rewriting history it does
+> > sometimes happen but if I've made a signed tag part of that is me saying
+> > I know other people might've merged the commit.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> You are right I got confused about this.
+> Anrd, Olof do you want me to resubmit?
 
-> ---
-> v2 -> v3:
-> - Add comment on HDMI output port about the shared CVBS/HDMI video path
-> - Add Niklas' R-b tag
-> ---
->  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 48 +++++++++++++++++++++++
->  1 file changed, 48 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts index 95745fc..1e475a4
-> 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> @@ -59,6 +59,17 @@
->  		};
->  	};
-> 
-> +	hdmi-in {
-> +		compatible = "hdmi-connector";
-> +		type = "a";
-> +
-> +		port {
-> +			hdmi_con_in: endpoint {
-> +				remote-endpoint = <&adv7612_in>;
-> +			};
-> +		};
-> +	};
-> +
->  	memory at 48000000 {
->  		device_type = "memory";
->  		/* first 128MB is reserved for secure area. */
-> @@ -176,6 +187,43 @@
->  			};
->  		};
->  	};
-> +
-> +	hdmi-decoder at 4c {
-> +		compatible = "adi,adv7612";
-> +		reg = <0x4c>;
-> +		default-input = <0>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +
-> +				adv7612_in: endpoint {
-> +					remote-endpoint = <&hdmi_con_in>;
-> +				};
-> +			};
-> +
-> +			port at 2 {
-> +				reg = <2>;
-> +
-> +				/*
-> +				 * The VIN4 video input path is shared between
-> +				 * CVBS and HDMI inputs through SW[49-54]
-> +				 * switches.
-> +				 *
-> +				 * CVBS is the default selection, leave HDMI
-> +				 * not connected here.
-> +				 */
-> +				adv7612_out: endpoint {
-> +					pclk-sample = <0>;
-> +					hsync-active = <0>;
-> +					vsync-active = <0>;
-> +				};
-> +			};
-> +		};
-> +	};
->  };
-> 
->  &i2c1 {
-
--- 
-Regards,
-
-Laurent Pinchart
+I'm OK with leaving things as is - that was more a request for the
+future than a request to rewrite history (if it's already been merged).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/264bd0f3/attachment.sig>
