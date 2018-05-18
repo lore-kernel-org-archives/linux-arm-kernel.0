@@ -1,122 +1,86 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 18 May 2018 07:15:38 +0530
-Subject: [PATCH v8 10/15] cpufreq: Add Kryo CPU scaling driver
-In-Reply-To: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
-References: <1526555955-29960-1-git-send-email-ilialin@codeaurora.org>
- <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180518014538.duphof6enscpm5vp@vireshk-i7>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 17 May 2018 18:45:46 -0700
+Subject: [PATCH v5 4/4] drm/rockchip: support dp training outside dp
+ firmware
+In-Reply-To: <d4c38236-7455-ccd5-a1d9-a000b7d78be9@rock-chips.com>
+References: <1526548680-2552-1-git-send-email-hl@rock-chips.com>
+ <1526548680-2552-4-git-send-email-hl@rock-chips.com>
+ <20180517135136.GD3373@art_vandelay>
+ <d4c38236-7455-ccd5-a1d9-a000b7d78be9@rock-chips.com>
+Message-ID: <CA+ASDXN2LT6FcX_2-MM=Qu7cZOHwVK3+2rGDLGcC1SnY3BJaSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-05-18, 14:19, Ilia Lin wrote:
-> +static int __init qcom_cpufreq_kryo_driver_init(void)
-> +{
-> +	size_t len;
-> +	int ret = 0;
-> +	u32 versions;
-> +	enum _msm8996_version msm8996_version;
-> +	u8 *speedbin;
-> +	struct device *cpu_dev_silver, *cpu_dev_gold;
-> +	struct device_node *np;
-> +	struct nvmem_cell *speedbin_nvmem;
-> +	struct platform_device *pdev;
-> +	struct opp_table *opp_silver = NULL;
-> +	struct opp_table *opp_gold = NULL;
+On Thu, May 17, 2018 at 6:41 PM, hl <hl@rock-chips.com> wrote:
+> On Thursday, May 17, 2018 09:51 PM, Sean Paul wrote:
+>> On Thu, May 17, 2018 at 05:18:00PM +0800, Lin Huang wrote:
+>>> DP firmware uses fixed phy config values to do training, but some
+>>> boards need to adjust these values to fit for their unique hardware
+>>> design. So get phy config values from dts and use software link training
+>>> instead of relying on firmware, if software training fail, keep firmware
+>>> training as a fallback if sw training fails.
+>>>
+>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>> Signed-off-by: Lin Huang <hl@rock-chips.com>
+>>> ---
+>>> Changes in v2:
+>>> - update patch following Enric suggest
+>>> Changes in v3:
+>>> - use variable fw_training instead sw_training_success
+>>> - base on DP SPCE, if training fail use lower link rate to retry training
+>>> Changes in v4:
+>>> - improve cdn_dp_get_lower_link_rate() and cdn_dp_software_train_link() follow Sean suggest
+>>> Changes in v5:
+>>> - fix some whitespcae issue
+>>>
+>>>   drivers/gpu/drm/rockchip/Makefile               |   3 +-
+>>>   drivers/gpu/drm/rockchip/cdn-dp-core.c          |  24 +-
+>>>   drivers/gpu/drm/rockchip/cdn-dp-core.h          |   2 +
+>>>   drivers/gpu/drm/rockchip/cdn-dp-link-training.c | 420 ++++++++++++++++++++++++
+>>>   drivers/gpu/drm/rockchip/cdn-dp-reg.c           |  31 +-
+>>>   drivers/gpu/drm/rockchip/cdn-dp-reg.h           |  38 ++-
+>>>   6 files changed, 505 insertions(+), 13 deletions(-)
+>>>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-link-training.c
+>>>
+...
+>>> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-link-training.c b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
+>>> new file mode 100644
+>>> index 0000000..73c3290
+>>> --- /dev/null
+>>> +++ b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
+>>> @@ -0,0 +1,420 @@
+>>> +// SPDX-License-Identifier: GPL-2.0
+>>> +/*
+>>> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
+>>> + * Author: Chris Zhong <zyw@rock-chips.com>
+>>> + */
+>>> +
+>>> +#include <linux/device.h>
+>>> +#include <linux/delay.h>
+>>> +#include <linux/phy/phy.h>
+>>> +#include <soc/rockchip/rockchip_phy_typec.h>
+>>> +
+>>> +#include "cdn-dp-core.h"
+>>> +#include "cdn-dp-reg.h"
+>>> +
+>>> +static void cdn_dp_set_signal_levels(struct cdn_dp_device *dp)
+>>> +{
+>>> +       struct cdn_dp_port *port = dp->port[dp->active_port];
+>>> +       struct rockchip_typec_phy *tcphy = phy_get_drvdata(port->phy);
+>>
+>> You ignored Brian's comment on the previous patch:
+>>    This is still antithetical to the PHY framework; you're assuming that
+>>    this is a particular type of PHY here.
+>>
+>> FWIW, the mediatek drm driver also assumes a certain PHY type. A quick grep of
+>> drivers/ shows that the only other non-phy/ driver using this function
+>> (pinctrl-tegra-xusb.c) also casts it.
+>>
+>> Sean
+>
+> Thanks Sean, except phy framework have new API to handle it, i have not
+> idea how to do it in a better way.
 
-No need to initialize them and you may want to arrange all above in
-decreasing order of their length.
+Well, if Mediatek can do it for their MIPI and HDMI, then maybe we just do it...
 
-> +
-> +	cpu_dev_silver = get_cpu_device(SILVER_LEAD);
-> +	if (IS_ERR_OR_NULL(cpu_dev_silver))
-> +		return PTR_ERR(cpu_dev_silver);
-> +
-> +	cpu_dev_gold = get_cpu_device(SILVER_LEAD);
-> +	if (IS_ERR_OR_NULL(cpu_dev_gold))
-> +		return PTR_ERR(cpu_dev_gold);
-> +
-> +	msm8996_version = qcom_cpufreq_kryo_get_msm_id();
-> +	if (NUM_OF_MSM8996_VERSIONS == msm8996_version) {
-> +		dev_err(cpu_dev_silver, "Not Snapdragon 820/821!");
-> +		return -ENODEV;
-> +	}
-> +
-> +	np = dev_pm_opp_of_get_opp_desc_node(cpu_dev_silver);
-> +	if (IS_ERR_OR_NULL(np))
-> +		return PTR_ERR(np);
-> +
-> +	if (!of_device_is_compatible(np, "operating-points-v2-kryo-cpu")) {
-> +		ret = -ENOENT;
-> +		goto free_np;
-> +	}
-> +
-> +	speedbin_nvmem = of_nvmem_cell_get(np, NULL);
-> +	if (IS_ERR(speedbin_nvmem)) {
-> +		ret = PTR_ERR(speedbin_nvmem);
-> +		dev_err(cpu_dev_silver, "Could not get nvmem cell: %d\n", ret);
-> +		goto free_np;
-> +	}
-> +
-> +	speedbin = nvmem_cell_read(speedbin_nvmem, &len);
-> +	nvmem_cell_put(speedbin_nvmem);
-> +
-> +	switch (msm8996_version) {
-> +	case MSM8996_V3:
-> +		versions = 1 << (unsigned int)(*speedbin);
-> +		break;
-> +	case MSM8996_SG:
-> +		versions = 1 << ((unsigned int)(*speedbin) + 4);
-> +		break;
-> +	default:
-> +		BUG();
-> +		break;
-> +	}
-> +
-> +	opp_silver = dev_pm_opp_set_supported_hw(cpu_dev_silver,&versions,1);
-> +	if (IS_ERR_OR_NULL(opp_silver)) {
-
-This API doesn't return NULL and so IS_ERR() would be sufficient.
-
-> +		dev_err(cpu_dev_silver, "Failed to set supported hardware\n");
-> +		ret = PTR_ERR(opp_silver);
-> +		goto free_np;
-> +	}
-> +
-> +	opp_gold = dev_pm_opp_set_supported_hw(cpu_dev_gold,&versions,1);
-> +	if (IS_ERR_OR_NULL(opp_gold)) {
-
-same here.
-
-> +		dev_err(cpu_dev_gold, "Failed to set supported hardware\n");
-> +		ret = PTR_ERR(opp_gold);
-> +		goto free_opp_silver;
-> +	}
-> +
-> +	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-> +	if (!IS_ERR_OR_NULL(pdev))
-> +		goto out;
-
-Simply return from here and remove the useless label out.
-
-> +
-> +	ret = PTR_ERR(pdev);
-> +	dev_err(cpu_dev_silver, "Failed to register platform device\n");
-> +	dev_pm_opp_put_supported_hw(opp_gold);
-> +
-> +free_opp_silver:
-> +	dev_pm_opp_put_supported_hw(opp_silver);
-> +
-> +free_np:
-> +	of_node_put(np);
-> +
-> +out:
-> +	return ret;
-> +}
-> +late_initcall(qcom_cpufreq_kryo_driver_init);
-
-Please resend only this patch now or just paste the new code in a mail
-here so that I can review it quickly and then you can resend the final
-version. Most of the patches aren't changing anyway.
-
--- 
-viresh
+Brian
