@@ -1,200 +1,178 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 18 May 2018 14:10:35 +0100
-Subject: [PATCH 1/6] arm_pmu: Refactor maximum period handling
-In-Reply-To: <1526638943-2110-2-git-send-email-suzuki.poulose@arm.com>
-References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
- <1526638943-2110-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <c657d966-f7c1-a41c-eac2-73248fee6fdc@arm.com>
+From: Alexey.Brodkin@synopsys.com (Alexey Brodkin)
+Date: Fri, 18 May 2018 13:03:46 +0000
+Subject: [PATCH 02/20] dma-mapping: provide a generic dma-noncoherent
+ implementation
+In-Reply-To: <20180511075945.16548-3-hch@lst.de>
+References: <20180511075945.16548-1-hch@lst.de>
+ <20180511075945.16548-3-hch@lst.de>
+Message-ID: <bad125dff49f6e49c895e818c9d1abb346a46e8e.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi Christoph,
 
-On 18/05/18 11:22, Suzuki K Poulose wrote:
-> Each PMU defines their max_period of the counter as the maximum
-> value that can be counted. In order to support chaining of the
-> counters, change this parameter to indicate the counter width
-> to deduce the max_period. This will be useful to compute the
-> max_period for chained counters.
-> 
-> No functional changes.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->   arch/arm/kernel/perf_event_v6.c     |  4 ++--
->   arch/arm/kernel/perf_event_v7.c     |  2 +-
->   arch/arm/kernel/perf_event_xscale.c |  4 ++--
->   arch/arm64/kernel/perf_event.c      |  2 +-
->   drivers/perf/arm_pmu.c              | 16 ++++++++++++----
->   include/linux/perf/arm_pmu.h        |  2 +-
->   6 files changed, 19 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-> index 1d7061a..d52a3fa 100644
-> --- a/arch/arm/kernel/perf_event_v6.c
-> +++ b/arch/arm/kernel/perf_event_v6.c
-> @@ -497,7 +497,7 @@ static void armv6pmu_init(struct arm_pmu *cpu_pmu)
->   	cpu_pmu->stop		= armv6pmu_stop;
->   	cpu_pmu->map_event	= armv6_map_event;
->   	cpu_pmu->num_events	= 3;
-> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
-> +	cpu_pmu->counter_width	= 32;
->   }
->   
->   static int armv6_1136_pmu_init(struct arm_pmu *cpu_pmu)
-> @@ -548,7 +548,7 @@ static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
->   	cpu_pmu->stop		= armv6pmu_stop;
->   	cpu_pmu->map_event	= armv6mpcore_map_event;
->   	cpu_pmu->num_events	= 3;
-> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
-> +	cpu_pmu->counter_width  = 32;
->   
->   	return 0;
->   }
-> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-> index 870b66c..3d8ec6a 100644
-> --- a/arch/arm/kernel/perf_event_v7.c
-> +++ b/arch/arm/kernel/perf_event_v7.c
-> @@ -1171,7 +1171,7 @@ static void armv7pmu_init(struct arm_pmu *cpu_pmu)
->   	cpu_pmu->start		= armv7pmu_start;
->   	cpu_pmu->stop		= armv7pmu_stop;
->   	cpu_pmu->reset		= armv7pmu_reset;
-> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
-> +	cpu_pmu->counter_width	= 32;
->   };
->   
->   static void armv7_read_num_pmnc_events(void *info)
-> diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
-> index fcf218d..6eb0e21 100644
-> --- a/arch/arm/kernel/perf_event_xscale.c
-> +++ b/arch/arm/kernel/perf_event_xscale.c
-> @@ -375,7 +375,7 @@ static int xscale1pmu_init(struct arm_pmu *cpu_pmu)
->   	cpu_pmu->stop		= xscale1pmu_stop;
->   	cpu_pmu->map_event	= xscale_map_event;
->   	cpu_pmu->num_events	= 3;
-> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
-> +	cpu_pmu->counter_width	= 32;
->   
->   	return 0;
->   }
-> @@ -745,7 +745,7 @@ static int xscale2pmu_init(struct arm_pmu *cpu_pmu)
->   	cpu_pmu->stop		= xscale2pmu_stop;
->   	cpu_pmu->map_event	= xscale_map_event;
->   	cpu_pmu->num_events	= 5;
-> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
-> +	cpu_pmu->counter_width	= 32;
->   
->   	return 0;
->   }
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 85a251b..408f92c 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -961,7 +961,7 @@ static int armv8_pmu_init(struct arm_pmu *cpu_pmu)
->   	cpu_pmu->start			= armv8pmu_start,
->   	cpu_pmu->stop			= armv8pmu_stop,
->   	cpu_pmu->reset			= armv8pmu_reset,
-> -	cpu_pmu->max_period		= (1LLU << 32) - 1,
-> +	cpu_pmu->counter_width		= 32;
+On Fri, 2018-05-11 at 09:59 +0200, Christoph Hellwig wrote:
 
-Given that none of the 6 instances above differ, this looks suspiciously 
-redundant. AFAICS max_period has been there from the very beginning with 
-no explicit justification, so I can only assume it was anticipating more 
-future variability than actually turned out. With 8 years of hindsight 
-now, I think it would be reasonable to assume that counters are 32-bit 
-except in certain special cases where they might be 64-bit; since that 
-can't be described by a single "counter size" value anyway, and by the 
-end of this series we have the means to handle it correctly via flags, I 
-propose that we just get rid of this and hard-code 32 in 
-arm_pmu_max_period().
+[snip]
 
->   	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
->   
->   	return 0;
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 1a0d340..e23e1a1 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -28,6 +28,11 @@
->   static DEFINE_PER_CPU(struct arm_pmu *, cpu_armpmu);
->   static DEFINE_PER_CPU(int, cpu_irq);
->   
-> +static inline u64 arm_pmu_max_period(struct arm_pmu *pmu)
+There seems to be one subtle issue with map/unmap code.
+While investigating problems on ARC I added instrumentation as below:
+---------------------------------------->8------------------------------------
+--- a/arch/arc/mm/dma.c
++++ b/arch/arc/mm/dma.c
+@@ -152,14 +152,37 @@ static void _dma_cache_sync(struct device *dev, phys_addr_t paddr, size_t size,
+        }
+ }
+ 
++static const char *dir_to_str(enum dma_data_direction dir)
++{
++       switch (dir) {
++       case DMA_BIDIRECTIONAL: return "DMA_BIDIRECTIONAL";
++       case DMA_TO_DEVICE: return "DMA_TO_DEVICE";
++       case DMA_FROM_DEVICE: return "DMA_FROM_DEVICE";
++       case DMA_NONE: return "DMA_NONE";
++       default: return "WRONG_VALUE!";
++       }
++}
++
+ void arch_sync_dma_for_device(struct device *dev, phys_addr_t paddr,
+                size_t size, enum dma_data_direction dir)
+ {
++       if (dir != DMA_TO_DEVICE){
++               dump_stack();
++               printk(" *** %s@%d: DMA direction is %s instead of %s\n",
++                      __func__, __LINE__, dir_to_str(dir), dir_to_str(DMA_TO_DEVICE));
++       }
++
+        return _dma_cache_sync(dev, paddr, size, dir);
+ }
+ 
+ void arch_sync_dma_for_cpu(struct device *dev, phys_addr_t paddr,
+                size_t size, enum dma_data_direction dir)
+ {
++       if (dir != DMA_FROM_DEVICE) {
++               dump_stack();
++               printk(" *** %s@%d: DMA direction is %s instead of %s\n",
++                      __func__, __LINE__, dir_to_str(dir), dir_to_str(DMA_FROM_DEVICE));
++       }
++
+        return _dma_cache_sync(dev, paddr, size, dir);
+ }
+---------------------------------------->8------------------------------------
+
+And with that I noticed a bit unexpected output, see below:
+---------------------------------------->8------------------------------------
+Stack Trace:
+  arc_unwind_core.constprop.1+0xd4/0xf8
+  dump_stack+0x68/0x80
+  arch_sync_dma_for_device+0x34/0xc4
+  dma_noncoherent_map_sg+0x80/0x94
+  __dw_mci_start_request+0x1ee/0x868
+  dw_mci_request+0x17e/0x1c8
+  mmc_wait_for_req+0x106/0x1ac
+  mmc_app_sd_status+0x108/0x130
+  mmc_sd_setup_card+0xc6/0x2e8
+  mmc_attach_sd+0x1b6/0x394
+  mmc_rescan+0x2f4/0x3bc
+  process_one_work+0x194/0x348
+  worker_thread+0xf2/0x478
+  kthread+0x120/0x13c
+  ret_from_fork+0x18/0x1c
+ *** arch_sync_dma_for_device at 172: DMA direction is DMA_FROM_DEVICE instead of DMA_TO_DEVICE
+...
+Stack Trace:
+  arc_unwind_core.constprop.1+0xd4/0xf8
+  dump_stack+0x68/0x80
+  arch_sync_dma_for_device+0x34/0xc4
+  dma_noncoherent_map_page+0x86/0x8c
+  usb_hcd_map_urb_for_dma+0x49e/0x53c
+  usb_hcd_submit_urb+0x43c/0x8c4
+  usb_control_msg+0xbe/0x16c
+  hub_port_init+0x5e0/0xb0c
+  hub_event+0x4e6/0x1164
+  process_one_work+0x194/0x348
+  worker_thread+0xf2/0x478
+  kthread+0x120/0x13c
+  ret_from_fork+0x18/0x1c
+ mmcblk0: p1 p2
+ *** arch_sync_dma_for_device at 172: DMA direction is DMA_FROM_DEVICE instead of DMA_TO_DEVICE
+
+...
+and quite some more of the similar
+...
+---------------------------------------->8------------------------------------
+
+In case of MMC/DW_MCI (AKA DesignWare MobileStorage controller) that's an execution flow:
+1) __dw_mci_start_request()
+2) dw_mci_pre_dma_transfer()
+3) dma_map_sg(..., mmc_get_dma_dir(data))
+
+Note mmc_get_dma_dir() is just "data->flags & MMC_DATA_WRITE ? DMA_TO_DEVICE : DMA_FROM_DEVICE".
+I.e. if we're preparing for sending data dma_noncoherent_map_sg() will have DMA_TO_DEVICE which
+is quite OK for passing to dma_noncoherent_sync_sg_for_device() but in case of reading we'll have
+DMA_FROM_DEVICE which we'll pass to dma_noncoherent_sync_sg_for_device() in dma_noncoherent_map_sg().
+
+I'd say this is not entirely correct because IMHO arch_sync_dma_for_cpu() is supposed to only be used
+in case of DMA_FROM_DEVICE and arch_sync_dma_for_device() only in case of DMA_TO_DEVICE.
+
+
+> +static dma_addr_t dma_noncoherent_map_page(struct device *dev, struct page *page,
+> +		unsigned long offset, size_t size, enum dma_data_direction dir,
+> +		unsigned long attrs)
 > +{
-> +	return (((u64)1) << (pmu->counter_width)) - 1;
-
-Nit: "1ULL << ..."
-
-Otherwise, looks fine to me.
-
-Robin.
-
+> +	dma_addr_t addr;
+> +
+> +	addr = dma_direct_map_page(dev, page, offset, size, dir, attrs);
+> +	if (!dma_mapping_error(dev, addr) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+> +		arch_sync_dma_for_device(dev, page_to_phys(page), size, dir);
+> +	return addr;
 > +}
 > +
->   static int
->   armpmu_map_cache_event(const unsigned (*cache_map)
->   				      [PERF_COUNT_HW_CACHE_MAX]
-> @@ -114,8 +119,10 @@ int armpmu_event_set_period(struct perf_event *event)
->   	struct hw_perf_event *hwc = &event->hw;
->   	s64 left = local64_read(&hwc->period_left);
->   	s64 period = hwc->sample_period;
-> +	u64 max_period;
->   	int ret = 0;
->   
-> +	max_period = arm_pmu_max_period(armpmu);
->   	if (unlikely(left <= -period)) {
->   		left = period;
->   		local64_set(&hwc->period_left, left);
-> @@ -136,8 +143,8 @@ int armpmu_event_set_period(struct perf_event *event)
->   	 * effect we are reducing max_period to account for
->   	 * interrupt latency (and we are being very conservative).
->   	 */
-> -	if (left > (armpmu->max_period >> 1))
-> -		left = armpmu->max_period >> 1;
-> +	if (left > (max_period >> 1))
-> +		left = (max_period >> 1);
->   
->   	local64_set(&hwc->prev_count, (u64)-left);
->   
-> @@ -153,6 +160,7 @@ u64 armpmu_event_update(struct perf_event *event)
->   	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
->   	struct hw_perf_event *hwc = &event->hw;
->   	u64 delta, prev_raw_count, new_raw_count;
-> +	u64 max_period = arm_pmu_max_period(armpmu);
->   
->   again:
->   	prev_raw_count = local64_read(&hwc->prev_count);
-> @@ -162,7 +170,7 @@ u64 armpmu_event_update(struct perf_event *event)
->   			     new_raw_count) != prev_raw_count)
->   		goto again;
->   
-> -	delta = (new_raw_count - prev_raw_count) & armpmu->max_period;
-> +	delta = (new_raw_count - prev_raw_count) & max_period;
->   
->   	local64_add(delta, &event->count);
->   	local64_sub(delta, &hwc->period_left);
-> @@ -402,7 +410,7 @@ __hw_perf_event_init(struct perf_event *event)
->   		 * is far less likely to overtake the previous one unless
->   		 * you have some serious IRQ latency issues.
->   		 */
-> -		hwc->sample_period  = armpmu->max_period >> 1;
-> +		hwc->sample_period  = arm_pmu_max_period(armpmu) >> 1;
->   		hwc->last_period    = hwc->sample_period;
->   		local64_set(&hwc->period_left, hwc->sample_period);
->   	}
-> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-> index 40036a5..c8c31cf 100644
-> --- a/include/linux/perf/arm_pmu.h
-> +++ b/include/linux/perf/arm_pmu.h
-> @@ -94,7 +94,7 @@ struct arm_pmu {
->   	void		(*reset)(void *);
->   	int		(*map_event)(struct perf_event *event);
->   	int		num_events;
-> -	u64		max_period;
-> +	u8		counter_width;
->   	bool		secure_access; /* 32-bit ARM only */
->   #define ARMV8_PMUV3_MAX_COMMON_EVENTS 0x40
->   	DECLARE_BITMAP(pmceid_bitmap, ARMV8_PMUV3_MAX_COMMON_EVENTS);
-> 
+> +static int dma_noncoherent_map_sg(struct device *dev, struct scatterlist *sgl,
+> +		int nents, enum dma_data_direction dir, unsigned long attrs)
+> +{
+> +	nents = dma_direct_map_sg(dev, sgl, nents, dir, attrs);
+> +	if (nents > 0 && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+> +		dma_noncoherent_sync_sg_for_device(dev, sgl, nents, dir);
+> +	return nents;
+> +}
+
+The same is for unmap functions.
+My guess is we need to respect direction in map/unmap functions and use
+either dma_noncoherent_sync_single_for_cpu(..., DMA_FROM_DEVICE) or
+dma_noncoherent_sync_single_for_device(...,DMA_TO_DEVICE).
+
+
+> +static void dma_noncoherent_unmap_page(struct device *dev, dma_addr_t addr,
+> +		size_t size, enum dma_data_direction dir, unsigned long attrs)
+> +{
+> +	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+> +		dma_noncoherent_sync_single_for_cpu(dev, addr, size, dir);
+> +}
+> +
+> +static void dma_noncoherent_unmap_sg(struct device *dev, struct scatterlist *sgl,
+> +		int nents, enum dma_data_direction dir, unsigned long attrs)
+> +{
+> +	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+> +		dma_noncoherent_sync_sg_for_cpu(dev, sgl, nents, dir);
+> +}
+> +#endif
+
+But the real fix of my problem is:
+---------------------------------------->8------------------------------------
+--- a/lib/dma-noncoherent.c
++++ b/lib/dma-noncoherent.c
+@@ -35,7 +35,7 @@ static dma_addr_t dma_noncoherent_map_page(struct device *dev, struct page *page
+ 
+        addr = dma_direct_map_page(dev, page, offset, size, dir, attrs);
+        if (!dma_mapping_error(dev, addr) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+-               arch_sync_dma_for_device(dev, page_to_phys(page), size, dir);
++               arch_sync_dma_for_device(dev, page_to_phys(page) + offset, size, dir);
+        return addr;
+ }
+---------------------------------------->8------------------------------------
+
+You seem to lost an offset in the page so if we happen to have a buffer not aligned to
+a page boundary then we were obviously corrupting data outside our data :)
+
+-Alexey
