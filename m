@@ -1,198 +1,314 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 18 May 2018 17:39:21 +0100
-Subject: [PATCH 05/11] coresight: Add helper for inserting synchronization
- packets
+Date: Fri, 18 May 2018 17:39:25 +0100
+Subject: [PATCH 09/11] coresight: Add support for TMC ETR SG unit
 In-Reply-To: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
 References: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1526661567-4578-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1526661567-4578-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now we open code filling the trace buffer with synchronization
-packets when the circular buffer wraps around in different drivers.
-Move this to a common place. While at it, clean up the barrier_pkt
-array to strip off the trailing '\0'.
+This patch adds support for setting up an SG table used by the
+TMC ETR inbuilt SG unit. The TMC ETR uses 4K page sized tables
+to hold pointers to the 4K data pages with the last entry in a
+table pointing to the next table with the entries, by kind of
+chaining. The 2 LSBs determine the type of the table entry, to
+one of :
+
+ Normal - Points to a 4KB data page.
+ Last   - Points to a 4KB data page, but is the last entry in the
+          page table.
+ Link   - Points to another 4KB table page with pointers to data.
+
+The code takes care of handling the system page size which could
+be different than 4K. So we could end up putting multiple ETR
+SG tables in a single system page, vice versa for the data pages.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mike Leach <mike.leach@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c   | 12 ++++-------
- drivers/hwtracing/coresight/coresight-priv.h    | 10 ++++++++-
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 27 ++++++++-----------------
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 13 +-----------
- drivers/hwtracing/coresight/coresight.c         |  3 +--
- 5 files changed, 23 insertions(+), 42 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 263 ++++++++++++++++++++++++
+ 1 file changed, 263 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 580cd38..74232e6 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -202,7 +202,6 @@ static void etb_dump_hw(struct etb_drvdata *drvdata)
- 	bool lost = false;
- 	int i;
- 	u8 *buf_ptr;
--	const u32 *barrier;
- 	u32 read_data, depth;
- 	u32 read_ptr, write_ptr;
- 	u32 frame_off, frame_endoff;
-@@ -233,19 +232,16 @@ static void etb_dump_hw(struct etb_drvdata *drvdata)
- 
- 	depth = drvdata->buffer_depth;
- 	buf_ptr = drvdata->buf;
--	barrier = barrier_pkt;
- 	for (i = 0; i < depth; i++) {
- 		read_data = readl_relaxed(drvdata->base +
- 					  ETB_RAM_READ_DATA_REG);
--		if (lost && *barrier) {
--			read_data = *barrier;
--			barrier++;
--		}
--
- 		*(u32 *)buf_ptr = read_data;
- 		buf_ptr += 4;
- 	}
- 
-+	if (lost)
-+		coresight_insert_barrier_packet(drvdata->buf);
-+
- 	if (frame_off) {
- 		buf_ptr -= (frame_endoff * 4);
- 		for (i = 0; i < frame_endoff; i++) {
-@@ -454,7 +450,7 @@ static void etb_update_buffer(struct coresight_device *csdev,
- 		buf_ptr = buf->data_pages[cur] + offset;
- 		read_data = readl_relaxed(drvdata->base +
- 					  ETB_RAM_READ_DATA_REG);
--		if (lost && *barrier) {
-+		if (lost && i < CORESIGHT_BARRIER_PKT_SIZE) {
- 			read_data = *barrier;
- 			barrier++;
- 		}
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index f1d0e21d..2bb0a15 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -64,7 +64,8 @@ static DEVICE_ATTR_RO(name)
- #define coresight_simple_reg64(type, name, lo_off, hi_off)		\
- 	__coresight_simple_func(type, NULL, name, lo_off, hi_off)
- 
--extern const u32 barrier_pkt[5];
-+extern const u32 barrier_pkt[4];
-+#define CORESIGHT_BARRIER_PKT_SIZE (sizeof(barrier_pkt))
- 
- enum etm_addr_type {
- 	ETM_ADDR_TYPE_NONE,
-@@ -98,6 +99,13 @@ struct cs_buffers {
- 	void			**data_pages;
- };
- 
-+static inline void coresight_insert_barrier_packet(void *buf)
-+{
-+	if (buf)
-+		memcpy(buf, barrier_pkt, CORESIGHT_BARRIER_PKT_SIZE);
-+}
-+
-+
- static inline void CS_LOCK(void __iomem *addr)
- {
- 	do {
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index e5edf46..f30e5d8 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -43,39 +43,28 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
- 
- static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- {
--	bool lost = false;
- 	char *bufp;
--	const u32 *barrier;
--	u32 read_data, status;
-+	u32 read_data, lost;
- 	int i;
- 
--	/*
--	 * Get a hold of the status register and see if a wrap around
--	 * has occurred.
--	 */
--	status = readl_relaxed(drvdata->base + TMC_STS);
--	if (status & TMC_STS_FULL)
--		lost = true;
--
-+	/* Check if the buffer wrapped around. */
-+	lost = readl_relaxed(drvdata->base + TMC_STS) & TMC_STS_FULL;
- 	bufp = drvdata->buf;
- 	drvdata->len = 0;
--	barrier = barrier_pkt;
- 	while (1) {
- 		for (i = 0; i < drvdata->memwidth; i++) {
- 			read_data = readl_relaxed(drvdata->base + TMC_RRD);
- 			if (read_data == 0xFFFFFFFF)
--				return;
--
--			if (lost && *barrier) {
--				read_data = *barrier;
--				barrier++;
--			}
--
-+				goto done;
- 			memcpy(bufp, &read_data, 4);
- 			bufp += 4;
- 			drvdata->len += 4;
- 		}
- 	}
-+done:
-+	if (lost)
-+		coresight_insert_barrier_packet(drvdata->buf);
-+	return;
- }
- 
- static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 6c5e8d1..9780798 100644
+index 1e844f8..7ab0fd1 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -102,9 +102,7 @@ ssize_t tmc_etr_get_sysfs_trace(struct tmc_drvdata *drvdata,
+@@ -22,6 +22,87 @@
+ #include "coresight-tmc.h"
  
- static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+ /*
++ * The TMC ETR SG has a page size of 4K. The SG table contains pointers
++ * to 4KB buffers. However, the OS may use a PAGE_SIZE different from
++ * 4K (i.e, 16KB or 64KB). This implies that a single OS page could
++ * contain more than one SG buffer and tables.
++ *
++ * A table entry has the following format:
++ *
++ * ---Bit31------------Bit4-------Bit1-----Bit0--
++ * |     Address[39:12]    | SBZ |  Entry Type  |
++ * ----------------------------------------------
++ *
++ * Address: Bits [39:12] of a physical page address. Bits [11:0] are
++ *	    always zero.
++ *
++ * Entry type:
++ *	b00 - Reserved.
++ *	b01 - Last entry in the tables, points to 4K page buffer.
++ *	b10 - Normal entry, points to 4K page buffer.
++ *	b11 - Link. The address points to the base of next table.
++ */
++
++typedef u32 sgte_t;
++
++#define ETR_SG_PAGE_SHIFT		12
++#define ETR_SG_PAGE_SIZE		(1UL << ETR_SG_PAGE_SHIFT)
++#define ETR_SG_PAGES_PER_SYSPAGE	(PAGE_SIZE / ETR_SG_PAGE_SIZE)
++#define ETR_SG_PTRS_PER_PAGE		(ETR_SG_PAGE_SIZE / sizeof(sgte_t))
++#define ETR_SG_PTRS_PER_SYSPAGE		(PAGE_SIZE / sizeof(sgte_t))
++
++#define ETR_SG_ET_MASK			0x3
++#define ETR_SG_ET_LAST			0x1
++#define ETR_SG_ET_NORMAL		0x2
++#define ETR_SG_ET_LINK			0x3
++
++#define ETR_SG_ADDR_SHIFT		4
++
++#define ETR_SG_ENTRY(addr, type) \
++	(sgte_t)((((addr) >> ETR_SG_PAGE_SHIFT) << ETR_SG_ADDR_SHIFT) | \
++		 (type & ETR_SG_ET_MASK))
++
++#define ETR_SG_ADDR(entry) \
++	(((dma_addr_t)(entry) >> ETR_SG_ADDR_SHIFT) << ETR_SG_PAGE_SHIFT)
++#define ETR_SG_ET(entry)		((entry) & ETR_SG_ET_MASK)
++
++/*
++ * struct etr_sg_table : ETR SG Table
++ * @sg_table:		Generic SG Table holding the data/table pages.
++ * @hwaddr:		hwaddress used by the TMC, which is the base
++ *			address of the table.
++ */
++struct etr_sg_table {
++	struct tmc_sg_table	*sg_table;
++	dma_addr_t		hwaddr;
++};
++
++/*
++ * tmc_etr_sg_table_entries: Total number of table entries required to map
++ * @nr_pages system pages.
++ *
++ * We need to map @nr_pages * ETR_SG_PAGES_PER_SYSPAGE data pages.
++ * Each TMC page can map (ETR_SG_PTRS_PER_PAGE - 1) buffer pointers,
++ * with the last entry pointing to another page of table entries.
++ * If we spill over to a new page for mapping 1 entry, we could as
++ * well replace the link entry of the previous page with the last entry.
++ */
++static inline unsigned long __attribute_const__
++tmc_etr_sg_table_entries(int nr_pages)
++{
++	unsigned long nr_sgpages = nr_pages * ETR_SG_PAGES_PER_SYSPAGE;
++	unsigned long nr_sglinks = nr_sgpages / (ETR_SG_PTRS_PER_PAGE - 1);
++	/*
++	 * If we spill over to a new page for 1 entry, we could as well
++	 * make it the LAST entry in the previous page, skipping the Link
++	 * address.
++	 */
++	if (nr_sglinks && (nr_sgpages % (ETR_SG_PTRS_PER_PAGE - 1) < 2))
++		nr_sglinks--;
++	return nr_sgpages + nr_sglinks;
++}
++
++/*
+  * tmc_pages_get_offset:  Go through all the pages in the tmc_pages
+  * and map the device address @addr to an offset within the virtual
+  * contiguous buffer.
+@@ -310,6 +391,188 @@ ssize_t tmc_sg_table_get_data(struct tmc_sg_table *sg_table,
+ 	return len;
+ }
+ 
++#ifdef ETR_SG_DEBUG
++/* Map a dma address to virtual address */
++static unsigned long
++tmc_sg_daddr_to_vaddr(struct tmc_sg_table *sg_table,
++		      dma_addr_t addr, bool table)
++{
++	long offset;
++	unsigned long base;
++	struct tmc_pages *tmc_pages;
++
++	if (table) {
++		tmc_pages = &sg_table->table_pages;
++		base = (unsigned long)sg_table->table_vaddr;
++	} else {
++		tmc_pages = &sg_table->data_pages;
++		base = (unsigned long)sg_table->data_vaddr;
++	}
++
++	offset = tmc_pages_get_offset(tmc_pages, addr);
++	if (offset < 0)
++		return 0;
++	return base + offset;
++}
++
++/* Dump the given sg_table */
++static void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table)
++{
++	sgte_t *ptr;
++	int i = 0;
++	dma_addr_t addr;
++	struct tmc_sg_table *sg_table = etr_table->sg_table;
++
++	ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
++					      etr_table->hwaddr, true);
++	while (ptr) {
++		addr = ETR_SG_ADDR(*ptr);
++		switch (ETR_SG_ET(*ptr)) {
++		case ETR_SG_ET_NORMAL:
++			dev_dbg(sg_table->dev,
++				"%05d: %p\t:[N] 0x%llx\n", i, ptr, addr);
++			ptr++;
++			break;
++		case ETR_SG_ET_LINK:
++			dev_dbg(sg_table->dev,
++				"%05d: *** %p\t:{L} 0x%llx ***\n",
++				 i, ptr, addr);
++			ptr = (sgte_t *)tmc_sg_daddr_to_vaddr(sg_table,
++							      addr, true);
++			break;
++		case ETR_SG_ET_LAST:
++			dev_dbg(sg_table->dev,
++				"%05d: ### %p\t:[L] 0x%llx ###\n",
++				 i, ptr, addr);
++			return;
++		default:
++			dev_dbg(sg_table->dev,
++				"%05d: xxx %p\t:[INVALID] 0x%llx xxx\n",
++				 i, ptr, addr);
++			return;
++		}
++		i++;
++	}
++	dev_dbg(sg_table->dev, "******* End of Table *****\n");
++}
++#else
++static inline void tmc_etr_sg_table_dump(struct etr_sg_table *etr_table) {}
++#endif
++
++/*
++ * Populate the SG Table page table entries from table/data
++ * pages allocated. Each Data page has ETR_SG_PAGES_PER_SYSPAGE SG pages.
++ * So does a Table page. So we keep track of indices of the tables
++ * in each system page and move the pointers accordingly.
++ */
++#define INC_IDX_ROUND(idx, size) ((idx) = ((idx) + 1) % (size))
++static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
++{
++	dma_addr_t paddr;
++	int i, type, nr_entries;
++	int tpidx = 0; /* index to the current system table_page */
++	int sgtidx = 0;	/* index to the sg_table within the current syspage */
++	int sgtentry = 0; /* the entry within the sg_table */
++	int dpidx = 0; /* index to the current system data_page */
++	int spidx = 0; /* index to the SG page within the current data page */
++	sgte_t *ptr; /* pointer to the table entry to fill */
++	struct tmc_sg_table *sg_table = etr_table->sg_table;
++	dma_addr_t *table_daddrs = sg_table->table_pages.daddrs;
++	dma_addr_t *data_daddrs = sg_table->data_pages.daddrs;
++
++	nr_entries = tmc_etr_sg_table_entries(sg_table->data_pages.nr_pages);
++	/*
++	 * Use the contiguous virtual address of the table to update entries.
++	 */
++	ptr = sg_table->table_vaddr;
++	/*
++	 * Fill all the entries, except the last entry to avoid special
++	 * checks within the loop.
++	 */
++	for (i = 0; i < nr_entries - 1; i++) {
++		if (sgtentry == ETR_SG_PTRS_PER_PAGE - 1) {
++			/*
++			 * Last entry in a sg_table page is a link address to
++			 * the next table page. If this sg_table is the last
++			 * one in the system page, it links to the first
++			 * sg_table in the next system page. Otherwise, it
++			 * links to the next sg_table page within the system
++			 * page.
++			 */
++			if (sgtidx == ETR_SG_PAGES_PER_SYSPAGE - 1) {
++				paddr = table_daddrs[tpidx + 1];
++			} else {
++				paddr = table_daddrs[tpidx] +
++					(ETR_SG_PAGE_SIZE * (sgtidx + 1));
++			}
++			type = ETR_SG_ET_LINK;
++		} else {
++			/*
++			 * Update the indices to the data_pages to point to the
++			 * next sg_page in the data buffer.
++			 */
++			type = ETR_SG_ET_NORMAL;
++			paddr = data_daddrs[dpidx] + spidx * ETR_SG_PAGE_SIZE;
++			if (!INC_IDX_ROUND(spidx, ETR_SG_PAGES_PER_SYSPAGE))
++				dpidx++;
++		}
++		*ptr++ = ETR_SG_ENTRY(paddr, type);
++		/*
++		 * Move to the next table pointer, moving the table page index
++		 * if necessary
++		 */
++		if (!INC_IDX_ROUND(sgtentry, ETR_SG_PTRS_PER_PAGE)) {
++			if (!INC_IDX_ROUND(sgtidx, ETR_SG_PAGES_PER_SYSPAGE))
++				tpidx++;
++		}
++	}
++
++	/* Set up the last entry, which is always a data pointer */
++	paddr = data_daddrs[dpidx] + spidx * ETR_SG_PAGE_SIZE;
++	*ptr++ = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
++}
++
++/*
++ * tmc_init_etr_sg_table: Allocate a TMC ETR SG table, data buffer of @size and
++ * populate the table.
++ *
++ * @dev		- Device pointer for the TMC
++ * @node	- NUMA node where the memory should be allocated
++ * @size	- Total size of the data buffer
++ * @pages	- Optional list of page virtual address
++ */
++static struct etr_sg_table __maybe_unused *
++tmc_init_etr_sg_table(struct device *dev, int node,
++		  unsigned long size, void **pages)
++{
++	int nr_entries, nr_tpages;
++	int nr_dpages = size >> PAGE_SHIFT;
++	struct tmc_sg_table *sg_table;
++	struct etr_sg_table *etr_table;
++
++	etr_table = kzalloc(sizeof(*etr_table), GFP_KERNEL);
++	if (!etr_table)
++		return ERR_PTR(-ENOMEM);
++	nr_entries = tmc_etr_sg_table_entries(nr_dpages);
++	nr_tpages = DIV_ROUND_UP(nr_entries, ETR_SG_PTRS_PER_SYSPAGE);
++
++	sg_table = tmc_alloc_sg_table(dev, node, nr_tpages, nr_dpages, pages);
++	if (IS_ERR(sg_table)) {
++		kfree(etr_table);
++		return ERR_PTR(PTR_ERR(sg_table));
++	}
++
++	etr_table->sg_table = sg_table;
++	/* TMC should use table base address for DBA */
++	etr_table->hwaddr = sg_table->table_daddr;
++	tmc_etr_sg_table_populate(etr_table);
++	/* Sync the table pages for the HW */
++	tmc_sg_table_sync_table(sg_table);
++	tmc_etr_sg_table_dump(etr_table);
++
++	return etr_table;
++}
++
+ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
  {
--	const u32 *barrier;
- 	u32 val;
--	u32 *temp;
- 	u64 rwp;
- 
- 	rwp = tmc_read_rwp(drvdata);
-@@ -117,16 +115,7 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
- 	if (val & TMC_STS_FULL) {
- 		drvdata->buf = drvdata->vaddr + rwp - drvdata->paddr;
- 		drvdata->len = drvdata->size;
--
--		barrier = barrier_pkt;
--		temp = (u32 *)drvdata->buf;
--
--		while (*barrier) {
--			*temp = *barrier;
--			temp++;
--			barrier++;
--		}
--
-+		coresight_insert_barrier_packet(drvdata->buf);
- 	} else {
- 		drvdata->buf = drvdata->vaddr;
- 		drvdata->len = rwp - drvdata->paddr;
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 389c4ba..0dcfe25 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -58,8 +58,7 @@ static struct list_head *stm_path;
-  * beginning of the data collected in a buffer.  That way the decoder knows that
-  * it needs to look for another sync sequence.
-  */
--const u32 barrier_pkt[5] = {0x7fffffff, 0x7fffffff,
--			    0x7fffffff, 0x7fffffff, 0x0};
-+const u32 barrier_pkt[4] = {0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff};
- 
- static int coresight_id_match(struct device *dev, void *data)
- {
+ 	u32 axictl, sts;
 -- 
 2.7.4
