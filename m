@@ -1,52 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:27 +0200
-Subject: [PATCH 54/69] ARM: dts: r8a7790: Correct mask for GIC PPI interrupts
+Date: Fri, 18 May 2018 13:17:29 +0200
+Subject: [PATCH 56/69] ARM: dts: sh73a0: Add missing interrupt-affinity to PMU
+ node
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <2acb79e15119512da9b6a49906840e7678cfb618.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <57a66497e1b7486609250a482f05935eae5035e9.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-R-Car H2 (r8a7790) contains four Cortex-A15 and four Cortex-A7 cores,
-hence the second interrupt specifier cell for Private Peripheral
-Interrupts should use "GIC_CPU_MASK_SIMPLE(8)", to make sure interrupts
-can be delivered to all 8 processor cores.
+The PMU node references two interrupts, but lacks the interrupt-affinity
+property, which is required in that case:
+
+    hw perfevents: no interrupt-affinity property for /pmu, guessing.
+
+Add the missing property to fix this.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/sh73a0.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index b64d99e3ad9d..0a426548a212 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1554,7 +1554,7 @@
- 			interrupt-controller;
- 			reg = <0 0xf1001000 0 0x1000>, <0 0xf1002000 0 0x2000>,
- 			      <0 0xf1004000 0 0x2000>, <0 0xf1006000 0 0x2000>;
--			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
- 			clocks = <&cpg CPG_MOD 408>;
- 			clock-names = "clk";
- 			power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
-@@ -1761,10 +1761,10 @@
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 39cc58672bf4..c953648a5f41 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -22,7 +22,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
- 	timer {
- 		compatible = "arm,armv7-timer";
--		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
+@@ -31,7 +31,7 @@
+ 			power-domains = <&pd_a2sl>;
+ 			next-level-cache = <&L2>;
+ 		};
+-		cpu at 1 {
++		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
+@@ -91,6 +91,7 @@
+ 		compatible = "arm,cortex-a9-pmu";
+ 		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>, <&cpu1>;
  	};
  
- 	/* External USB clock - can be overridden by the board */
+ 	cmt1: timer at e6138000 {
 -- 
 2.11.0
