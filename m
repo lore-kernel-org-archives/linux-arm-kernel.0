@@ -1,44 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:40 +0200
-Subject: [PATCH 67/69] ARM: dts: r8a7745: Add PMU device node
+Date: Fri, 18 May 2018 13:17:41 +0200
+Subject: [PATCH 68/69] ARM: dts: r8a7740: Add CEU0
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <9562a6b1d0f6a287f5dda16a4538526c59408927.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <6ff6991bb4adc74cc248f2aaea2e5560671b34c2.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Enable support for the ARM Performance Monitor Units in the Cortex-A7
-CPU cores on RZ/G1E by adding a device node for the PMU.
+Describe CEU0 peripheral for Renesas R-Mobile A1 R8A7740 Soc.
 
-New Linux output:
-
-    hw perfevents: enabled with armv7_cortex_a7 PMU driver, 5 counters available
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reported-by: Geert Uytterhoeven <geert@glider.be>
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[simon: dropped clock-names property]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 3de69cb66c44..1cb7a7ab0418 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -105,6 +105,13 @@
- 		clock-frequency = <0>;
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index afd3bc5e6cf2..180eb9d2a390 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -67,6 +67,15 @@
+ 		power-domains = <&pd_d4>;
  	};
  
-+	pmu {
-+		compatible = "arm,cortex-a7-pmu";
-+		interrupts-extended = <&gic GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>, <&cpu1>;
++	ceu0: ceu at fe910000 {
++		reg = <0xfe910000 0x3000>;
++		compatible = "renesas,r8a7740-ceu";
++		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp1_clks R8A7740_CLK_CEU20>;
++		power-domains = <&pd_a4r>;
++		status = "disabled";
 +	};
 +
- 	/* External SCIF clock */
- 	scif_clk: scif {
- 		compatible = "fixed-clock";
+ 	cmt1: timer at e6138000 {
+ 		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
+ 		reg = <0xe6138000 0x170>;
 -- 
 2.11.0
