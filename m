@@ -1,60 +1,22 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 18 May 2018 10:17:50 -0400
-Subject: [PATCH V2 1/2] efi/fb: Simplify fixup code to prefer struct resource
-Message-ID: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+Date: Fri, 18 May 2018 10:20:29 -0400
+Subject: [PATCH] efi/fb: Convert PCI bus address to resource if translated
+ by the bridge
+In-Reply-To: <36cf3f12-bfe8-1c38-4d2c-b785fc64a3f6@arm.com>
+References: <1526563343-28721-1-git-send-email-okaya@codeaurora.org>
+ <36cf3f12-bfe8-1c38-4d2c-b785fc64a3f6@arm.com>
+Message-ID: <733101d0-9051-a5a6-ef64-162d8d1e10a1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of base and size variables in favor of a struct resource.
-The conditional for checking window can be replaced with
-resource_contains().
+On 5/18/2018 6:42 AM, Robin Murphy wrote:
+> 
+> FWIW, now that I've actually gone and looked, it appears you could simplify the whole function quite a bit by getting rid of these and just using the new local resource directly, especially since the only actual use of size is an open-coded resource_contains().
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/video/fbdev/efifb.c | 17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+Posted V2 a minute ago. I did the simplification on a prior patch in order not to
+mix the issues.
 
-diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
-index 46a4484..6daac8d 100644
---- a/drivers/video/fbdev/efifb.c
-+++ b/drivers/video/fbdev/efifb.c
-@@ -426,17 +426,20 @@ static void record_efifb_bar_resource(struct pci_dev *dev, int idx, u64 offset)
- 
- static void efifb_fixup_resources(struct pci_dev *dev)
- {
--	u64 base = screen_info.lfb_base;
--	u64 size = screen_info.lfb_size;
-+	struct resource screen_res = {
-+		.start = screen_info.lfb_base,
-+		.end = screen_info.lfb_base + screen_info.lfb_size - 1,
-+		.flags = IORESOURCE_MEM,
-+	};
- 	int i;
- 
- 	if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
- 		return;
- 
- 	if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
--		base |= (u64)screen_info.ext_lfb_base << 32;
-+		screen_res.start |= (u64)screen_info.ext_lfb_base << 32;
- 
--	if (!base)
-+	if (!screen_res.start)
- 		return;
- 
- 	for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
-@@ -445,8 +448,10 @@ static void efifb_fixup_resources(struct pci_dev *dev)
- 		if (!(res->flags & IORESOURCE_MEM))
- 			continue;
- 
--		if (res->start <= base && res->end >= base + size - 1) {
--			record_efifb_bar_resource(dev, i, base - res->start);
-+		if (resource_contains(res, &screen_res)) {
-+			u64 win_offset =  screen_res.start - res->start;
-+
-+			record_efifb_bar_resource(dev, i, win_offset);
- 			break;
- 		}
- 	}
 -- 
-2.7.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
