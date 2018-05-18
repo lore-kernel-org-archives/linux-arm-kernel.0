@@ -1,40 +1,60 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 May 2018 09:26:39 -0500
-Subject: [PATCH v8 11/15] dt-bindings: cpufreq: Document
- operating-points-v2-kryo-cpu
-In-Reply-To: <1526555955-29960-12-git-send-email-ilialin@codeaurora.org>
-References: <1526555955-29960-1-git-send-email-ilialin@codeaurora.org>
- <1526555955-29960-12-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180518142639.GA3877@rob-hp-laptop>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 18 May 2018 16:29:55 +0200
+Subject: [PATCH v2 1/6] spi: sun6i: coding style/readability improvements
+In-Reply-To: <20180517070307.GP20254@sirena.org.uk>
+References: <20180330125047.13936-1-ssuloev@orpaltech.com>
+ <20180330125047.13936-2-ssuloev@orpaltech.com>
+ <20180517070307.GP20254@sirena.org.uk>
+Message-ID: <20180518142955.lmeb5bkeo4wyv2ue@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 02:19:11PM +0300, Ilia Lin wrote:
-> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
-> to provide the OPP framework with required information.
-> This is used to determine the voltage and frequency value for each OPP of
-> operating-points-v2 table when it is parsed by the OPP framework.
-> 
-> This change adds documentation for the DT bindings.
-> The "operating-points-v2-kryo-cpu" DT extends the "operating-points-v2"
-> with following parameters:
-> - nvmem-cells (NVMEM area containig the speedbin information)
-> - opp-supported-hw: A single 32 bit bitmap value,
->   representing compatible HW:
-> 			0:	MSM8996 V3, speedbin 0
-> 			1:	MSM8996 V3, speedbin 1
-> 			2:	MSM8996 V3, speedbin 2
-> 			3:	unused
-> 			4:	MSM8996 SG, speedbin 0
-> 			5:	MSM8996 SG, speedbin 1
-> 			6:	MSM8996 SG, speedbin 2
-> 			7-31:	unused
-> 
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  .../devicetree/bindings/opp/kryo-cpufreq.txt       | 680 +++++++++++++++++++++
->  1 file changed, 680 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/opp/kryo-cpufreq.txt
+Hi,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+On Thu, May 17, 2018 at 04:03:07PM +0900, Mark Brown wrote:
+> On Fri, Mar 30, 2018 at 03:50:42PM +0300, Sergey Suloev wrote:
+> > Minor changes to fulfill the coding style and improve
+> > the readability of the code.
+> > 
+> > Changes in v2:
+> > 1) Fixed issue with misplacing a piece of code that requires access
+> > to the transfer structure into sun6i_spi_prepare_message() function
+> > where the transfer structure is not available.
+> 
+> Place inter-version changelogs after the --- as covered in
+> SubmittingPatches.
+> 
+> > 
+> > Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
+> > 
+> > ---
+> >  drivers/spi/spi-sun6i.c | 97 +++++++++++++++++++++++++++++--------------------
+> 
+> This is a *very* large change doing a whole bunch of different things,
+> including some fairly substantial changes like moving things into
+> different functions but the changelog doesn't provide any details at all
+> on what the changes are supposed to be.  This makes it difficult to
+> review, it should be split into separate patches each doing one clerly
+> described thing (I'm guessing this might be part of why the AllWinner
+> maintainers haven't reviewed the series).
+
+We didn't really review them because most of the changes done here
+were also applicable to the sun4i series that was sent pretty much at
+the same time:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/570056.html
+
+We should have made that clearer, sorry.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/00ba89c6/attachment.sig>
