@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 May 2018 16:22:43 +0200
-Subject: [GIT PULL 3/5] ARM: tegra: Core changes for v4.18-rc1
+Date: Fri, 18 May 2018 16:22:42 +0200
+Subject: [GIT PULL 2/5] memory: tegra: Changes for v4.18-rc1
 In-Reply-To: <20180518142245.20242-1-thierry.reding@gmail.com>
 References: <20180518142245.20242-1-thierry.reding@gmail.com>
-Message-ID: <20180518142245.20242-3-thierry.reding@gmail.com>
+Message-ID: <20180518142245.20242-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,24 +15,62 @@ The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.18-arm-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.18-memory
 
-for you to fetch changes up to 15164e0072b579f77c9025f3da3ed931869b89cd:
+for you to fetch changes up to bef89a8d81ca97aca864778746b110cf52847868:
 
-  ARM: tegra: Create platform device for tegra20-cpufreq driver (2018-05-18 11:15:42 +0200)
+  memory: tegra: Remove Tegra114 SATA and AFI reset definitions (2018-05-18 12:33:02 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-ARM: tegra: Core changes for v4.18-rc1
+memory: tegra: Changes for v4.18-rc1
 
-Contains a single patch that instantiates a platform device for the CPU
-frequency driver.
+This contains some cleanup of the memory controller driver as well as
+unification work to share more code between Tegra20 and later SoC
+generations. Also included are an implementation for the hot resets
+functionality by the memory controller which is required to properly
+reset busy hardware.
 
 ----------------------------------------------------------------
-Dmitry Osipenko (1):
-      ARM: tegra: Create platform device for tegra20-cpufreq driver
+Dmitry Osipenko (14):
+      dt-bindings: memory: tegra: Add hot resets definitions
+      memory: tegra: Do not handle spurious interrupts
+      memory: tegra: Setup interrupts mask before requesting IRQ
+      memory: tegra: Apply interrupts mask per SoC
+      memory: tegra: Remove unused headers inclusions
+      memory: tegra: Squash tegra20-mc into common tegra-mc driver
+      memory: tegra: Introduce memory client hot reset
+      memory: tegra: Add Tegra20 memory controller hot resets
+      memory: tegra: Add Tegra30 memory controller hot resets
+      memory: tegra: Add Tegra114 memory controller hot resets
+      memory: tegra: Add Tegra124 memory controller hot resets
+      memory: tegra: Register SMMU after MC driver became ready
+      dt-bindings: memory: tegra: Remove Tegra114 SATA and AFI reset definitions
+      memory: tegra: Remove Tegra114 SATA and AFI reset definitions
 
- arch/arm/mach-tegra/tegra.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Thierry Reding (1):
+      memory: tegra: Add Tegra210 memory controller hot resets
+
+ drivers/memory/Kconfig                   |  10 -
+ drivers/memory/Makefile                  |   1 -
+ drivers/memory/tegra/Makefile            |   1 +
+ drivers/memory/tegra/mc.c                | 362 +++++++++++++++++++++++++++----
+ drivers/memory/tegra/mc.h                |  22 ++
+ drivers/memory/tegra/tegra114.c          |  33 +++
+ drivers/memory/tegra/tegra124.c          |  48 ++++
+ drivers/memory/tegra/tegra20.c           | 296 +++++++++++++++++++++++++
+ drivers/memory/tegra/tegra210.c          |  53 ++++-
+ drivers/memory/tegra/tegra30.c           |  35 +++
+ drivers/memory/tegra20-mc.c              | 254 ----------------------
+ include/dt-bindings/memory/tegra114-mc.h |  17 ++
+ include/dt-bindings/memory/tegra124-mc.h |  25 +++
+ include/dt-bindings/memory/tegra20-mc.h  |  21 ++
+ include/dt-bindings/memory/tegra210-mc.h |  31 +++
+ include/dt-bindings/memory/tegra30-mc.h  |  19 ++
+ include/soc/tegra/mc.h                   |  37 +++-
+ 17 files changed, 956 insertions(+), 309 deletions(-)
+ create mode 100644 drivers/memory/tegra/tegra20.c
+ delete mode 100644 drivers/memory/tegra20-mc.c
+ create mode 100644 include/dt-bindings/memory/tegra20-mc.h
