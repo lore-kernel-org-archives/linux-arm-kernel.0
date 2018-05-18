@@ -1,36 +1,45 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 18 May 2018 13:11:32 +0200
-Subject: [PATCH] ghes_edac: enable HIP08 platform edac driver
-In-Reply-To: <8602b133-e0fa-57e2-5159-9d34a1ded85f@arm.com>
-References: <1526039543-180996-1-git-send-email-zhengqiang10@huawei.com>
- <20180511121901.GA12705@pd.tnic> <5AF90C70.408@huawei.com>
- <20180514094709.GC23049@pd.tnic>
- <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
- <20180514164720.GH23049@pd.tnic>
- <da776696-ddbf-c35e-1dd4-b6e0ce91aed6@arm.com>
- <20180516182958.GB17092@pd.tnic>
- <8602b133-e0fa-57e2-5159-9d34a1ded85f@arm.com>
-Message-ID: <20180518111132.GC17285@pd.tnic>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 18 May 2018 13:14:48 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.18
+Message-ID: <cover.1526548323.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 07:02:18PM +0100, James Morse wrote:
-> v4.17-rc5 has 'return 0' here. Wouldn't this change means no ghes can be
-> registered unless ghes_edac is also supported by the platform?
-> Shouldn't this be '0' for a silent failure?
+Hi Olof, Hi Kevin, Hi Arnd,
 
-https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/commit/?h=for-next&id=cc7f3f132658289b6661ab8294ab08a9d32ea026
+Please consider these Renesas ARM64 based SoC defconfig updates for v4.18.
 
-> Tested on Seattle and some cranky homebrew-no-DMI firmware:
-> Tested-by: James Morse <james.morse@arm.com>
-> 
-> With the ENODEV/0 thing above:
-> Reviewed-by: James Morse <james.morse@arm.com>
 
-Thanks, adding.
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
--- 
-Regards/Gruss,
-    Boris.
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.18
+
+for you to fetch changes up to c1fcd2ec1b1970e0e7b0c40c64bc51cf667b1a75:
+
+  arm64: defconfig: enable R8A77990 SoC (2018-05-16 11:08:20 +0200)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC Defconfig Updates for v4.18
+
+* Enable in ARM64 defconfig:
+  - Recently mainlined support for R-Car E3 (r8a77990) SoC
+
+  - HDMI sound and depdencies.
+
+    HDMI sound is used by R-Car Gen 3.  These options are enabled as
+    modules to avoid unnecesesarily enlarging the kernel image.
+
+----------------------------------------------------------------
+Kuninori Morimoto (2):
+      arm64: defconfig: makes SND_SIMPLE_CARD to module
+      arm64: defconfig: Enable CONFIG_SND_AUDIO_GRAPH_CARD
+
+Simon Horman (1):
+      arm64: defconfig: enable R8A77990 SoC
+
+ arch/arm64/configs/defconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
