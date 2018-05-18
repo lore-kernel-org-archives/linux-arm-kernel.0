@@ -1,41 +1,26 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 May 2018 16:22:45 +0200
-Subject: [GIT PULL 5/5] arm64: tegra: Device tree changes for v4.18-rc1
-In-Reply-To: <20180518142245.20242-1-thierry.reding@gmail.com>
-References: <20180518142245.20242-1-thierry.reding@gmail.com>
-Message-ID: <20180518142245.20242-5-thierry.reding@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 May 2018 09:23:14 -0500
+Subject: [PATCH v2 16/26] dt-bindings: clock: sun50i-a64-ccu: Add
+ PLL_VIDEO[0-1] macros
+In-Reply-To: <20180518094536.17201-17-jagan@amarulasolutions.com>
+References: <20180518094536.17201-1-jagan@amarulasolutions.com>
+ <20180518094536.17201-17-jagan@amarulasolutions.com>
+Message-ID: <20180518142314.GA826@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Fri, May 18, 2018 at 03:15:26PM +0530, Jagan Teki wrote:
+> Allwinner A64 has two clock parents PLL_VIDEO0 and PLL_VIDEO1.
+> 
+> Include these macros on dt-bindings so-that the same can be
+> used while defining CCU clock phadles.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v2:
+> - new patch
+> 
+>  include/dt-bindings/clock/sun50i-a64-ccu.h | 2 ++
+>  1 file changed, 2 insertions(+)
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.18-arm64-dt
-
-for you to fetch changes up to 9df50ba76ac1485b844beffa1f3f5d9659d9cdaf:
-
-  arm64: tegra: Make BCM89610 PHY interrupt as active low (2018-05-03 11:48:16 +0200)
-
-I already sent this out as a fix for v4.17, so if you decide to pick
-that up you can ignore this one. I've only included it here in case you
-had objections to take it into v4.17 at this point.
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-arm64: tegra: Device tree changes for v4.18-rc1
-
-Contains a single fix for the network PHY interrupt polarity.
-
-----------------------------------------------------------------
-Bhadram Varka (1):
-      arm64: tegra: Make BCM89610 PHY interrupt as active low
-
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Rob Herring <robh@kernel.org>
