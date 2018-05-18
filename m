@@ -1,116 +1,125 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 18 May 2018 16:57:17 +0100
-Subject: [PATCH 6/6] arm64: perf: Add support for chaining counters
-In-Reply-To: <32f2d870-9b9c-0b10-880f-cc99cf969bf6@arm.com>
-References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
- <1526638943-2110-7-git-send-email-suzuki.poulose@arm.com>
- <32f2d870-9b9c-0b10-880f-cc99cf969bf6@arm.com>
-Message-ID: <5d53fe1d-dbd9-2aad-73bd-0c4284540240@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 18 May 2018 16:59:13 +0100
+Subject: [PATCH v9 05/11] arm64: kexec_file: load initrd and device-tree
+In-Reply-To: <20180518074203.GM2737@linaro.org>
+References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
+ <20180425062629.29404-6-takahiro.akashi@linaro.org>
+ <c10624c0-9962-af38-1dd5-656902180ace@arm.com>
+ <20180518071133.GL2737@linaro.org> <20180518074203.GM2737@linaro.org>
+Message-ID: <59963e4b-968f-7251-4000-5a545dd44628@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Akashi,
 
-On 18/05/18 14:49, Robin Murphy wrote:
-> On 18/05/18 11:22, Suzuki K Poulose wrote:
->> Add support for chained event counters. PMUv3 allows chaining
->> a pair of adjacent PMU counters (with the lower counter number
->> being always "even"). The low counter is programmed to count
->> the event of interest and the high counter(odd numbered) is
->> programmed with a special event code (0x1e - Chain). Thus
->> we need special allocation schemes to make the full use of
->> available counters. So, we allocate the counters from either
->> ends. i.e, chained counters are allocated from the lower
->> end in pairs of two and the normal counters are allocated
->> from the higher number. Also makes necessary changes to
->> handle the chained events as a single event with 2 counters.
+On 18/05/18 08:42, AKASHI Takahiro wrote:
+> On Fri, May 18, 2018 at 04:11:35PM +0900, AKASHI Takahiro wrote:
+>> On Tue, May 15, 2018 at 05:20:00PM +0100, James Morse wrote:
+>>> On 25/04/18 07:26, AKASHI Takahiro wrote:
+>>>> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+>>>> index f9ebf54ca247..b3b9b1725d8a 100644
+>>>> --- a/arch/arm64/kernel/machine_kexec_file.c
+>>>> +++ b/arch/arm64/kernel/machine_kexec_file.c
+
+>>>> @@ -55,3 +74,144 @@ int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+
+>>>> +	buf = vmalloc(buf_size);
+>>>> +	if (!buf) {
+>>>> +		ret = -ENOMEM;
+>>>> +		goto out_err;
+>>>> +	}
+>>>> +
+>>>> +	ret = fdt_open_into(initial_boot_params, buf, buf_size);
+>>>> +	if (ret)
+>>>> +		goto out_err;
+>>>> +
+>>>> +	nodeoffset = fdt_path_offset(buf, "/chosen");
+>>>> +	if (nodeoffset < 0)
+>>>> +		goto out_err;
+>>>> +
+>>>> +	/* add bootargs */
+>>>> +	if (cmdline) {
+>>>> +		ret = fdt_setprop(buf, nodeoffset, "bootargs",
+>>>> +						cmdline, cmdline_len + 1);
+>>>
+>>> fdt_setprop_string()?
 >>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->> ? arch/arm64/kernel/perf_event.c | 226 ++++++++++++++++++++++++++++++++++++-----
->> ? 1 file changed, 202 insertions(+), 24 deletions(-)
+>> OK
+> 
+> cmdline_len is passed by system call, kexec_file_load(), and this means
+> that we can't believe that cmdline is always terminated with '\0'.
+
+Yuck, we expect user-space to tell us how long the string is. It may be worth a
+comment that it isn't necessarily null-terminated, as that is surprising!
+
+(I assume the DT's property length is enough to make that safe for the new
+kernel to read).
+
+
+>>>> +		/* within 1GB-aligned window of up to 32GB in size */
+>>>> +		kbuf.buf_max = round_down(kern_seg->mem, SZ_1G)
+>>>> +						+ (unsigned long)SZ_1G * 32;
+>>>> +		kbuf.top_down = false;
+>>>> +
+>>>> +		ret = kexec_add_buffer(&kbuf);
+>>>> +		if (ret)
+>>>> +			goto out_err;
+>>>> +		initrd_load_addr = kbuf.mem;
+>>>> +
+>>>> +		pr_debug("Loaded initrd at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
+>>>> +				initrd_load_addr, initrd_len, initrd_len);
+>>>> +	}
+>>>> +
+>>>> +	/* load dtb blob */
+>>>> +	ret = setup_dtb(image, initrd_load_addr, initrd_len,
+>>>> +				cmdline, cmdline_len, &dtb, &dtb_len);
+>>>> +	if (ret) {
+>>>> +		pr_err("Preparing for new dtb failed\n");
+>>>> +		goto out_err;
+>>>> +	}
+>>>> +
+>>>> +	kbuf.buffer = dtb;
+>>>> +	kbuf.bufsz = dtb_len;
+>>>> +	kbuf.memsz = dtb_len;
+>>>> +	/* not across 2MB boundary */
+>>>> +	kbuf.buf_align = SZ_2M;
+>>>> +	kbuf.buf_max = ULONG_MAX;
+>>>> +	kbuf.top_down = true;
+>>>> +
+>>>> +	ret = kexec_add_buffer(&kbuf);
+>>>> +	if (ret)
+>>>> +		goto out_err;
+>>>> +	image->arch.dtb_mem = kbuf.mem;
+>>>> +	image->arch.dtb_buf = dtb;
+>>>> +
+>>>> +	pr_debug("Loaded dtb at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
+>>>> +			kbuf.mem, dtb_len, dtb_len);
+>>>> +
+>>>> +	return 0;
+>>>> +
+>>>> +out_err:
+>>>> +	vfree(dtb);
+>>>> +	image->arch.dtb_buf = NULL;
+>>>
+>>> Won't kimage_file_post_load_cleanup() always be called if we return an error
+>>> here? Why not leave the free()ing until then?
 >>
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index ea8e060..5f81cd0 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -446,9 +446,11 @@ static struct attribute_group armv8_pmuv3_events_attr_group = {
-
-..
-
->> +static inline u64 armv8pmu_read_chain_counter(int idx)
->> +{
->> +??? u64 prev_hi, hi, lo;
->> +
->> +??? do {
->> +??????? prev_hi = armv8pmu_read_evcntr(idx);
->> +??????? isb();
->> +??????? lo = armv8pmu_read_evcntr(idx - 1);
->> +??????? isb();
->> +??????? hi = armv8pmu_read_evcntr(idx);
->> +??????? isb();
->> +??? } while (prev_hi != hi);
+>> Right.
+>> The reason why I left the code here was that we'd better locally clean up
+>> all the stuff that were locally allocated if we trivially need to (and can)
+>> do so.
+>>
+>> As it's redundant, I will remove it.
 > 
-> Is it worth trying to elide that last isb() in the highly likely case that we don't need it?
+> will remove only "image->arch.dtb_buf = NULL."
 
-You're right. Also, I will rework the code to reuse the "hi".
+Ah, because you haven't set the arch.dtb_buf pointer yet.
 
->> +static inline void armv8pmu_write_chain_counter(int idx, u64 value)
->> +{
->> +??? armv8pmu_write_evcntr(idx, value >> 32);
->> +??? isb();
->> +??? armv8pmu_write_evcntr(idx - 1, value);
->> +??? isb();
-> 
-> Either that isb() is unnecessary, or we are (and have been) missing one after a non-chained write.
-
-Thats right, it is not necessary, will remove it.
+What about in patch 7 where you expect kimage_file_prepare_segments() to call
+arch_kimage_file_post_load_cleanup() to free the arch.elf_headers? I'd expect
+the free()ing to always happen in one place.
 
 
->> ? static inline int armv8pmu_disable_counter(int idx)
->> ? {
->> ????? u32 counter = ARMV8_IDX_TO_COUNTER(idx);
->> @@ -567,6 +669,24 @@ static inline int armv8pmu_disable_counter(int idx)
->> ????? return idx;
->> ? }
->> +static inline void armv8pmu_disable_event_counter(struct perf_event *event)
->> +{
->> +??? struct hw_perf_event *hwc = &event->hw;
-> 
-> Nit: might as well drop this and be consistent with the enable case.
+Thanks,
 
-Sure.
-
->> ? static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
->> ??????????????????? struct perf_event *event)
->> ? {
->> @@ -755,7 +915,10 @@ static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
->> ????? struct hw_perf_event *hwc = &event->hw;
->> ????? unsigned long evtype = hwc->config_base & ARMV8_PMU_EVTYPE_EVENT;
->> -??? /* Always prefer to place a cycle counter into the cycle counter. */
->> +??? /*
->> +???? * Always prefer to place a cycle counter into the cycle counter
->> +???? * irrespective of whether we are counting 32bit/64bit
-> 
-> I don't think that comment change adds much :/
-> 
-
-Thats a left over from rebasing. Thanks for spotting.
-
->> ? /*
->> @@ -845,8 +1016,14 @@ static int __armv8_pmuv3_map_event(struct perf_event *event,
->> ???????????????????????? &armv8_pmuv3_perf_cache_map,
->> ???????????????????????? ARMV8_PMU_EVTYPE_EVENT);
->> -??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES)
->> +??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES) {
->> +??????? /* Prevent chaining for cycle counter */
-> 
-> Why? Sure, we want to avoid executing the chaining logic if we're scheduling a cycles event in the dedicated counter (which is perhaps what the comment above wanted to say), but if one ends up allocated into a regular counter (e.g. if the user asks for multiple cycle counts with different filters), then I don't see any reason to forbid that being chained.
-
-Ah, I didn't think about that case. I was under the assumption that the
-cycles are *only* placed on the cycle counter. I will take care of that.
-Thanks for the review.
-
-Suzuki
+James
