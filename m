@@ -1,62 +1,200 @@
-From: hejianet@gmail.com (Jia He)
-Date: Fri, 18 May 2018 21:04:40 +0800
-Subject: [PATCH v2 2/2] KVM: arm/arm64: harden unmap_stage2_ptes in case
- end is not PAGE_SIZE aligned
-In-Reply-To: <2185a61e-c157-e177-9bad-83b6f27fd784@arm.com>
-References: <1526635630-18917-1-git-send-email-hejianet@gmail.com>
- <1526635630-18917-2-git-send-email-hejianet@gmail.com>
- <2185a61e-c157-e177-9bad-83b6f27fd784@arm.com>
-Message-ID: <50c98169-1606-48bf-0489-124adefd2a54@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 18 May 2018 14:10:35 +0100
+Subject: [PATCH 1/6] arm_pmu: Refactor maximum period handling
+In-Reply-To: <1526638943-2110-2-git-send-email-suzuki.poulose@arm.com>
+References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
+ <1526638943-2110-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <c657d966-f7c1-a41c-eac2-73248fee6fdc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Suzuki,
 
+On 18/05/18 11:22, Suzuki K Poulose wrote:
+> Each PMU defines their max_period of the counter as the maximum
+> value that can be counted. In order to support chaining of the
+> counters, change this parameter to indicate the counter width
+> to deduce the max_period. This will be useful to compute the
+> max_period for chained counters.
+> 
+> No functional changes.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>   arch/arm/kernel/perf_event_v6.c     |  4 ++--
+>   arch/arm/kernel/perf_event_v7.c     |  2 +-
+>   arch/arm/kernel/perf_event_xscale.c |  4 ++--
+>   arch/arm64/kernel/perf_event.c      |  2 +-
+>   drivers/perf/arm_pmu.c              | 16 ++++++++++++----
+>   include/linux/perf/arm_pmu.h        |  2 +-
+>   6 files changed, 19 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+> index 1d7061a..d52a3fa 100644
+> --- a/arch/arm/kernel/perf_event_v6.c
+> +++ b/arch/arm/kernel/perf_event_v6.c
+> @@ -497,7 +497,7 @@ static void armv6pmu_init(struct arm_pmu *cpu_pmu)
+>   	cpu_pmu->stop		= armv6pmu_stop;
+>   	cpu_pmu->map_event	= armv6_map_event;
+>   	cpu_pmu->num_events	= 3;
+> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
+> +	cpu_pmu->counter_width	= 32;
+>   }
+>   
+>   static int armv6_1136_pmu_init(struct arm_pmu *cpu_pmu)
+> @@ -548,7 +548,7 @@ static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
+>   	cpu_pmu->stop		= armv6pmu_stop;
+>   	cpu_pmu->map_event	= armv6mpcore_map_event;
+>   	cpu_pmu->num_events	= 3;
+> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
+> +	cpu_pmu->counter_width  = 32;
+>   
+>   	return 0;
+>   }
+> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+> index 870b66c..3d8ec6a 100644
+> --- a/arch/arm/kernel/perf_event_v7.c
+> +++ b/arch/arm/kernel/perf_event_v7.c
+> @@ -1171,7 +1171,7 @@ static void armv7pmu_init(struct arm_pmu *cpu_pmu)
+>   	cpu_pmu->start		= armv7pmu_start;
+>   	cpu_pmu->stop		= armv7pmu_stop;
+>   	cpu_pmu->reset		= armv7pmu_reset;
+> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
+> +	cpu_pmu->counter_width	= 32;
+>   };
+>   
+>   static void armv7_read_num_pmnc_events(void *info)
+> diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+> index fcf218d..6eb0e21 100644
+> --- a/arch/arm/kernel/perf_event_xscale.c
+> +++ b/arch/arm/kernel/perf_event_xscale.c
+> @@ -375,7 +375,7 @@ static int xscale1pmu_init(struct arm_pmu *cpu_pmu)
+>   	cpu_pmu->stop		= xscale1pmu_stop;
+>   	cpu_pmu->map_event	= xscale_map_event;
+>   	cpu_pmu->num_events	= 3;
+> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
+> +	cpu_pmu->counter_width	= 32;
+>   
+>   	return 0;
+>   }
+> @@ -745,7 +745,7 @@ static int xscale2pmu_init(struct arm_pmu *cpu_pmu)
+>   	cpu_pmu->stop		= xscale2pmu_stop;
+>   	cpu_pmu->map_event	= xscale_map_event;
+>   	cpu_pmu->num_events	= 5;
+> -	cpu_pmu->max_period	= (1LLU << 32) - 1;
+> +	cpu_pmu->counter_width	= 32;
+>   
+>   	return 0;
+>   }
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 85a251b..408f92c 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -961,7 +961,7 @@ static int armv8_pmu_init(struct arm_pmu *cpu_pmu)
+>   	cpu_pmu->start			= armv8pmu_start,
+>   	cpu_pmu->stop			= armv8pmu_stop,
+>   	cpu_pmu->reset			= armv8pmu_reset,
+> -	cpu_pmu->max_period		= (1LLU << 32) - 1,
+> +	cpu_pmu->counter_width		= 32;
 
-On 5/18/2018 5:48 PM, Marc Zyngier Wrote:
-> On 18/05/18 10:27, Jia He wrote:
->> If it passes addr=0x202920000,size=0xfe00 to unmap_stage2_range->
->> ...->unmap_stage2_ptes, unmap_stage2_ptes will get addr=0x202920000,
->> end=0x20292fe00. After first while loop addr=0x202930000, end=0x20292fe00,
->> then addr!=end. Thus it will touch another pages by put_pages() in the
->> 2nd loop.
->>
->> This patch fixes it by hardening the break condition of while loop.
->>
->> Signed-off-by: jia.he at hxt-semitech.com
->> ---
->> v2: newly added
->>
->>  virt/kvm/arm/mmu.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 8dac311..45cd040 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -217,7 +217,7 @@ static void unmap_stage2_ptes(struct kvm *kvm, pmd_t *pmd,
->>  
->>  			put_page(virt_to_page(pte));
->>  		}
->> -	} while (pte++, addr += PAGE_SIZE, addr != end);
->> +	} while (pte++, addr += PAGE_SIZE, addr < end);
->>  
->>  	if (stage2_pte_table_empty(start_pte))
->>  		clear_stage2_pmd_entry(kvm, pmd, start_addr);
->>
-> 
-> I don't think this change is the right thing to do. You get that failure
-> because you're being passed a size that is not a multiple of PAGE_SIZE.
-> That's the mistake.
-> 
-> You should ensure that this never happens, rather than changing the page
-> table walkers (which are consistent with the way this kind of code is
-> written in other places of the kernel). As you mentioned in your first
-> patch, the real issue is that KSM is broken, and this is what should be
-> fixed.
-> 
-Got it, thanks
-Should I resend the patch 1/2 without any changes after droping patch 2/2?
+Given that none of the 6 instances above differ, this looks suspiciously 
+redundant. AFAICS max_period has been there from the very beginning with 
+no explicit justification, so I can only assume it was anticipating more 
+future variability than actually turned out. With 8 years of hindsight 
+now, I think it would be reasonable to assume that counters are 32-bit 
+except in certain special cases where they might be 64-bit; since that 
+can't be described by a single "counter size" value anyway, and by the 
+end of this series we have the means to handle it correctly via flags, I 
+propose that we just get rid of this and hard-code 32 in 
+arm_pmu_max_period().
 
--- 
-Cheers,
-Jia
+>   	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
+>   
+>   	return 0;
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 1a0d340..e23e1a1 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -28,6 +28,11 @@
+>   static DEFINE_PER_CPU(struct arm_pmu *, cpu_armpmu);
+>   static DEFINE_PER_CPU(int, cpu_irq);
+>   
+> +static inline u64 arm_pmu_max_period(struct arm_pmu *pmu)
+> +{
+> +	return (((u64)1) << (pmu->counter_width)) - 1;
+
+Nit: "1ULL << ..."
+
+Otherwise, looks fine to me.
+
+Robin.
+
+> +}
+> +
+>   static int
+>   armpmu_map_cache_event(const unsigned (*cache_map)
+>   				      [PERF_COUNT_HW_CACHE_MAX]
+> @@ -114,8 +119,10 @@ int armpmu_event_set_period(struct perf_event *event)
+>   	struct hw_perf_event *hwc = &event->hw;
+>   	s64 left = local64_read(&hwc->period_left);
+>   	s64 period = hwc->sample_period;
+> +	u64 max_period;
+>   	int ret = 0;
+>   
+> +	max_period = arm_pmu_max_period(armpmu);
+>   	if (unlikely(left <= -period)) {
+>   		left = period;
+>   		local64_set(&hwc->period_left, left);
+> @@ -136,8 +143,8 @@ int armpmu_event_set_period(struct perf_event *event)
+>   	 * effect we are reducing max_period to account for
+>   	 * interrupt latency (and we are being very conservative).
+>   	 */
+> -	if (left > (armpmu->max_period >> 1))
+> -		left = armpmu->max_period >> 1;
+> +	if (left > (max_period >> 1))
+> +		left = (max_period >> 1);
+>   
+>   	local64_set(&hwc->prev_count, (u64)-left);
+>   
+> @@ -153,6 +160,7 @@ u64 armpmu_event_update(struct perf_event *event)
+>   	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+>   	struct hw_perf_event *hwc = &event->hw;
+>   	u64 delta, prev_raw_count, new_raw_count;
+> +	u64 max_period = arm_pmu_max_period(armpmu);
+>   
+>   again:
+>   	prev_raw_count = local64_read(&hwc->prev_count);
+> @@ -162,7 +170,7 @@ u64 armpmu_event_update(struct perf_event *event)
+>   			     new_raw_count) != prev_raw_count)
+>   		goto again;
+>   
+> -	delta = (new_raw_count - prev_raw_count) & armpmu->max_period;
+> +	delta = (new_raw_count - prev_raw_count) & max_period;
+>   
+>   	local64_add(delta, &event->count);
+>   	local64_sub(delta, &hwc->period_left);
+> @@ -402,7 +410,7 @@ __hw_perf_event_init(struct perf_event *event)
+>   		 * is far less likely to overtake the previous one unless
+>   		 * you have some serious IRQ latency issues.
+>   		 */
+> -		hwc->sample_period  = armpmu->max_period >> 1;
+> +		hwc->sample_period  = arm_pmu_max_period(armpmu) >> 1;
+>   		hwc->last_period    = hwc->sample_period;
+>   		local64_set(&hwc->period_left, hwc->sample_period);
+>   	}
+> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+> index 40036a5..c8c31cf 100644
+> --- a/include/linux/perf/arm_pmu.h
+> +++ b/include/linux/perf/arm_pmu.h
+> @@ -94,7 +94,7 @@ struct arm_pmu {
+>   	void		(*reset)(void *);
+>   	int		(*map_event)(struct perf_event *event);
+>   	int		num_events;
+> -	u64		max_period;
+> +	u8		counter_width;
+>   	bool		secure_access; /* 32-bit ARM only */
+>   #define ARMV8_PMUV3_MAX_COMMON_EVENTS 0x40
+>   	DECLARE_BITMAP(pmceid_bitmap, ARMV8_PMUV3_MAX_COMMON_EVENTS);
+> 
