@@ -1,60 +1,49 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 18 May 2018 16:29:55 +0200
-Subject: [PATCH v2 1/6] spi: sun6i: coding style/readability improvements
-In-Reply-To: <20180517070307.GP20254@sirena.org.uk>
-References: <20180330125047.13936-1-ssuloev@orpaltech.com>
- <20180330125047.13936-2-ssuloev@orpaltech.com>
- <20180517070307.GP20254@sirena.org.uk>
-Message-ID: <20180518142955.lmeb5bkeo4wyv2ue@flea>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 May 2018 09:31:54 -0500
+Subject: [PATCH v6 1/2] dt-bindings: Documentation for qcom, llcc
+In-Reply-To: <079348edcb511cefb9f4d76877d50cb7@codeaurora.org>
+References: <1525810921-15878-1-git-send-email-rishabhb@codeaurora.org>
+ <1525810921-15878-2-git-send-email-rishabhb@codeaurora.org>
+ <152649021310.210890.14841324536807182632@swboyd.mtv.corp.google.com>
+ <385198cbb91c4a36ad758997916ad271@codeaurora.org>
+ <152649413707.210890.2655572242392552759@swboyd.mtv.corp.google.com>
+ <079348edcb511cefb9f4d76877d50cb7@codeaurora.org>
+Message-ID: <20180518143154.GA6224@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, May 17, 2018 at 04:03:07PM +0900, Mark Brown wrote:
-> On Fri, Mar 30, 2018 at 03:50:42PM +0300, Sergey Suloev wrote:
-> > Minor changes to fulfill the coding style and improve
-> > the readability of the code.
+On Wed, May 16, 2018 at 04:32:27PM -0700, rishabhb at codeaurora.org wrote:
+> On 2018-05-16 11:08, Stephen Boyd wrote:
+> > Quoting rishabhb at codeaurora.org (2018-05-16 10:33:14)
+> > > On 2018-05-16 10:03, Stephen Boyd wrote:
+> > > > Quoting Rishabh Bhatnagar (2018-05-08 13:22:00)
+> > > 
+> > > >> +
+> > > >> +- max-slices:
+> > > >> +       usage: required
+> > > >> +       Value Type: <u32>
+> > > >> +       Definition: Number of cache slices supported by hardware
+> > > >> +
+> > > >> +Example:
+> > > >> +
+> > > >> +       llcc: qcom,llcc at 1100000 {
+> > > >
+> > > > cache-controller at 1100000 ?
+> > > >
+> > > We have tried to use consistent naming convention as in llcc_*
+> > > everywhere.
+> > > Using cache-controller will mix and match the naming convention.
+> > > Also in
+> > > the documentation it is explained what llcc is and its full form.
+> > > 
 > > 
-> > Changes in v2:
-> > 1) Fixed issue with misplacing a piece of code that requires access
-> > to the transfer structure into sun6i_spi_prepare_message() function
-> > where the transfer structure is not available.
-> 
-> Place inter-version changelogs after the --- as covered in
-> SubmittingPatches.
-> 
-> > 
-> > Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
-> > 
-> > ---
-> >  drivers/spi/spi-sun6i.c | 97 +++++++++++++++++++++++++++++--------------------
-> 
-> This is a *very* large change doing a whole bunch of different things,
-> including some fairly substantial changes like moving things into
-> different functions but the changelog doesn't provide any details at all
-> on what the changes are supposed to be.  This makes it difficult to
-> review, it should be split into separate patches each doing one clerly
-> described thing (I'm guessing this might be part of why the AllWinner
-> maintainers haven't reviewed the series).
+> > DT prefers standard node names as opposed to vendor specific node names.
+> > Isn't it a cache controller? I fail to see why this can't be done.
+> Hi Stephen,
+> The driver is vendor specific and also for uniformity purposes we preferred
+> to go with this name.
 
-We didn't really review them because most of the changes done here
-were also applicable to the sun4i series that was sent pretty much at
-the same time:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/570056.html
+Almost *every* node and driver is vendor specific. Please do as Stephen 
+suggested.
 
-We should have made that clearer, sorry.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/00ba89c6/attachment.sig>
+Rob
