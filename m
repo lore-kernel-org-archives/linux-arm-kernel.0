@@ -1,55 +1,132 @@
 From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Fri, 18 May 2018 11:32:03 +0800
-Subject: [PATCH v2 0/5] Add sdmmc UHS support to ROC-RK3328-CC board.
-Message-ID: <1526614328-6869-1-git-send-email-djw@t-chip.com.cn>
+Date: Fri, 18 May 2018 11:52:05 +0800
+Subject: [PATCH v2 2/5] gpio: syscon: Add gpio-syscon for rockchip
+In-Reply-To: <1526615528-9707-1-git-send-email-djw@t-chip.com.cn>
+References: <1526614328-6869-1-git-send-email-djw@t-chip.com.cn>
+ <1526615528-9707-1-git-send-email-djw@t-chip.com.cn>
+Message-ID: <1526615528-9707-2-git-send-email-djw@t-chip.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Levin Du <djw@t-chip.com.cn>
 
+Some GPIOs sit in the GRF_SOC_CON registers of Rockchip SoCs,
+which do not belong to the general pinctrl.
 
-Hi all, this is an attemp to add sdmmc UHS support to the
-ROC-RK3328-CC board.
+Adding gpio-syscon support makes controlling regulator or
+LED using these special pins very easy by reusing existing
+drivers, such as gpio-regulator and led-gpio.
 
-This patch series adds a new compatible `rockchip,gpio-syscon` to
-the gpio-syscon driver for general Rockchip SoC usage.
+Signed-off-by: Levin Du <djw@t-chip.com.cn>
 
-A new gpio controller named `gpio_mute` is defined in
-rk3328.dtsi so that all rk3328 boards has access to it.
-
-The ROC-RK3328-CC board use the new gpio <&gpio_mute 1> in
-gpio-regulator to control the signal voltage of the sdmmc.
-It is essential for UHS support which requires 1.8V signal voltage.
-
-Many thanks to Heiko's great advice!
+---
 
 Changes in v2:
 - Rename gpio_syscon10 to gpio_mute in doc
-- Rename gpio_syscon10 to gpio_mute in rk3328.dtsi
-- Rename gpio_syscon10 to gpio_mute in rk3328-roc-cc.dts
 
 Changes in v1:
-- New: allow fetching syscon from parent node in gpio-syscon driver
 - Refactured for general gpio-syscon usage for Rockchip SoCs.
 - Add doc rockchip,gpio-syscon.txt
-- Split from V0 into small patches
-- Sort dts properties in sdmmc node
-
-Heiko Stuebner (1):
-  gpio: syscon: allow fetching syscon from parent node
-
-Levin Du (4):
-  gpio: syscon: Add gpio-syscon for rockchip
-  arm64: dts: rockchip: Add gpio-mute to rk3328
-  arm64: dts: rockchip: Add io-domain to roc-rk3328-cc
-  arm64: dts: rockchip: Add sdmmc UHS support for roc-rk3328-cc
 
  .../bindings/gpio/rockchip,gpio-syscon.txt         | 41 ++++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts     | 30 ++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  7 ++++
- drivers/gpio/gpio-syscon.c                         | 32 +++++++++++++++++
- 4 files changed, 110 insertions(+)
+ drivers/gpio/gpio-syscon.c                         | 30 ++++++++++++++++
+ 2 files changed, 71 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
 
+diff --git a/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+new file mode 100644
+index 0000000..b1b2a67
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/rockchip,gpio-syscon.txt
+@@ -0,0 +1,41 @@
++* Rockchip GPIO support for GRF_SOC_CON registers
++
++Required properties:
++- compatible: Should contain "rockchip,gpio-syscon".
++- gpio-controller: Marks the device node as a gpio controller.
++- #gpio-cells: Should be two. The first cell is the pin number and
++  the second cell is used to specify the gpio polarity:
++    0 = Active high,
++    1 = Active low.
++- gpio,syscon-dev: Should contain <grf_phandle syscon_offset 0>.
++  If declared as child of the grf node, the grf_phandle can be 0.
++
++Example:
++
++1. As child of grf node:
++
++	grf: syscon at ff100000 {
++		compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
++
++		gpio_mute: gpio-mute {
++			compatible = "rockchip,gpio-syscon";
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio,syscon-dev = <0 0x0428 0>;
++		};
++	};
++
++
++2. Not child of grf node:
++
++	grf: syscon at ff100000 {
++		compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
++		//...
++	};
++
++	gpio_mute: gpio-mute {
++		compatible = "rockchip,gpio-syscon";
++		gpio-controller;
++		#gpio-cells = <2>;
++		gpio,syscon-dev = <&grf 0x0428 0>;
++	};
+diff --git a/drivers/gpio/gpio-syscon.c b/drivers/gpio/gpio-syscon.c
+index 7325b86..e24b408 100644
+--- a/drivers/gpio/gpio-syscon.c
++++ b/drivers/gpio/gpio-syscon.c
+@@ -135,6 +135,32 @@ static const struct syscon_gpio_data clps711x_mctrl_gpio = {
+ 	.dat_bit_offset	= 0x40 * 8 + 8,
+ };
+ 
++static void rockchip_gpio_set(struct gpio_chip *chip, unsigned int offset,
++			      int val)
++{
++	struct syscon_gpio_priv *priv = gpiochip_get_data(chip);
++	unsigned int offs;
++	u8 bit;
++	u32 data;
++	int ret;
++
++	offs = priv->dreg_offset + priv->data->dat_bit_offset + offset;
++	bit = offs % SYSCON_REG_BITS;
++	data = (val ? BIT(bit) : 0) | BIT(bit + 16);
++	ret = regmap_write(priv->syscon,
++			   (offs / SYSCON_REG_BITS) * SYSCON_REG_SIZE,
++			   data);
++	if (ret < 0)
++		dev_err(chip->parent, "gpio write failed ret(%d)\n", ret);
++}
++
++static const struct syscon_gpio_data rockchip_gpio_syscon = {
++	/* Rockchip GRF_SOC_CON Bits 0-15 */
++	.flags		= GPIO_SYSCON_FEAT_OUT,
++	.bit_count	= 16,
++	.set		= rockchip_gpio_set,
++};
++
+ #define KEYSTONE_LOCK_BIT BIT(0)
+ 
+ static void keystone_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+@@ -175,6 +201,10 @@ static const struct of_device_id syscon_gpio_ids[] = {
+ 		.compatible	= "ti,keystone-dsp-gpio",
+ 		.data		= &keystone_dsp_gpio,
+ 	},
++	{
++		.compatible	= "rockchip,gpio-syscon",
++		.data		= &rockchip_gpio_syscon,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, syscon_gpio_ids);
 -- 
 2.7.4
