@@ -1,88 +1,92 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 18 May 2018 15:15:14 +0530
-Subject: [PATCH v2 04/26] clk: sunxi-ng: a64: Add minimal rate for video PLLs
-In-Reply-To: <20180518094536.17201-1-jagan@amarulasolutions.com>
-References: <20180518094536.17201-1-jagan@amarulasolutions.com>
-Message-ID: <20180518094536.17201-5-jagan@amarulasolutions.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 18 May 2018 10:46:04 +0100
+Subject: [PATCH v3 2/3] arm64: KVM: Enable Common Not Private translations
+In-Reply-To: <1526636765-11289-1-git-send-email-vladimir.murzin@arm.com>
+References: <1526636765-11289-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1526636765-11289-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to documentation and experience with other similar SoCs, video
-PLLs don't work stable if their output frequency is set below 192 MHz.
+We rely on cpufeature framework to detect and enable CNP so for KVM we
+need to patch hyp to set CNP bit just before TTBR0_EL2 gets written.
 
-Because of that, set minimal rate to both A64 video PLLs to 192 MHz.
+For the guest we encode CNP bit while building vttbr, so we don't need
+to bother with that in a world switch.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
-Changes for v2:
-- New patch
+ arch/arm/include/asm/kvm_mmu.h   | 5 +++++
+ arch/arm64/include/asm/kvm_mmu.h | 5 +++++
+ arch/arm64/kvm/hyp-init.S        | 3 +++
+ virt/kvm/arm/arm.c               | 4 ++--
+ 4 files changed, 15 insertions(+), 2 deletions(-)
 
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 46 ++++++++++++++++++-----------------
- 1 file changed, 24 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-index ee9c12cf3f08..d0e30192f0cf 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-@@ -64,17 +64,18 @@ static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
- 				   BIT(28),	/* lock */
- 				   CLK_SET_RATE_UNGATE);
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index de1b919..7a9d614 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -307,6 +307,11 @@ static inline int kvm_map_vectors(void)
  
--static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video0_clk, "pll-video0",
--					"osc24M", 0x010,
--					8, 7,		/* N */
--					0, 4,		/* M */
--					BIT(24),	/* frac enable */
--					BIT(25),	/* frac select */
--					270000000,	/* frac rate 0 */
--					297000000,	/* frac rate 1 */
--					BIT(31),	/* gate */
--					BIT(28),	/* lock */
--					CLK_SET_RATE_UNGATE);
-+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video0_clk, "pll-video0",
-+					    "osc24M", 0x010,
-+					    192000000,	/* Minimum rate */
-+					    8, 7,		/* N */
-+					    0, 4,		/* M */
-+					    BIT(24),	/* frac enable */
-+					    BIT(25),	/* frac select */
-+					    270000000,	/* frac rate 0 */
-+					    297000000,	/* frac rate 1 */
-+					    BIT(31),	/* gate */
-+					    BIT(28),	/* lock */
-+					    CLK_SET_RATE_UNGATE);
+ #define kvm_phys_to_vttbr(addr)		(addr)
  
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_ve_clk, "pll-ve",
- 					"osc24M", 0x018,
-@@ -125,17 +126,18 @@ static struct ccu_nk pll_periph1_clk = {
- 	},
- };
++static inline bool kvm_cpu_has_cnp(void)
++{
++	return false;
++}
++
+ #endif	/* !__ASSEMBLY__ */
  
--static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video1_clk, "pll-video1",
--					"osc24M", 0x030,
--					8, 7,		/* N */
--					0, 4,		/* M */
--					BIT(24),	/* frac enable */
--					BIT(25),	/* frac select */
--					270000000,	/* frac rate 0 */
--					297000000,	/* frac rate 1 */
--					BIT(31),	/* gate */
--					BIT(28),	/* lock */
--					CLK_SET_RATE_UNGATE);
-+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video1_clk, "pll-video1",
-+					    "osc24M", 0x030,
-+					    192000000,	/* Minimum rate */
-+					    8, 7,		/* N */
-+					    0, 4,		/* M */
-+					    BIT(24),	/* frac enable */
-+					    BIT(25),	/* frac select */
-+					    270000000,	/* frac rate 0 */
-+					    297000000,	/* frac rate 1 */
-+					    BIT(31),	/* gate */
-+					    BIT(28),	/* lock */
-+					    CLK_SET_RATE_UNGATE);
+ #endif /* __ARM_KVM_MMU_H__ */
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 7faed6e..f8149d4 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -388,5 +388,10 @@ static inline int kvm_map_vectors(void)
  
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
- 					"osc24M", 0x038,
+ #define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
+ 
++static inline bool kvm_cpu_has_cnp(void)
++{
++	return system_supports_cnp();
++}
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 5aa9ccf..2e7a93a 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -64,6 +64,9 @@ __do_hyp_init:
+ 	b.lo	__kvm_handle_stub_hvc
+ 
+ 	phys_to_ttbr x4, x0
++alternative_if ARM64_HAS_CNP
++	orr	x4, x4, #TTBR_CNP_BIT
++alternative_else_nop_endif
+ 	msr	ttbr0_el2, x4
+ 
+ 	mrs	x4, tcr_el1
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 97d0ab2..a538ba3 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -470,7 +470,7 @@ static bool need_new_vmid_gen(struct kvm *kvm)
+ static void update_vttbr(struct kvm *kvm)
+ {
+ 	phys_addr_t pgd_phys;
+-	u64 vmid;
++	u64 vmid, cnp = kvm_cpu_has_cnp() ? 1 : 0;
+ 
+ 	if (!need_new_vmid_gen(kvm))
+ 		return;
+@@ -522,7 +522,7 @@ static void update_vttbr(struct kvm *kvm)
+ 	pgd_phys = virt_to_phys(kvm->arch.pgd);
+ 	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
+ 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
+-	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
++	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid | cnp;
+ 
+ 	spin_unlock(&kvm_vmid_lock);
+ 
 -- 
-2.14.3
+2.0.0
