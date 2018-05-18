@@ -1,58 +1,90 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 18 May 2018 13:49:18 +0530
-Subject: [PATCH V7 05/12] ARM: dts: ipq4019: Add ipq4019-ap.dk04.1-c1 board
- file
+Date: Fri, 18 May 2018 13:49:25 +0530
+Subject: [PATCH V7 12/12] ARM: dts: ipq8074: Enable few peripherals for hk01
+ board
 In-Reply-To: <1526631565-9972-1-git-send-email-sricharan@codeaurora.org>
 References: <1526631565-9972-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1526631565-9972-6-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1526631565-9972-13-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Tested-by: Varadarajan Narayanan <varada@codeaurora.org>
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts | 19 +++++++++++++++++++
- 2 files changed, 20 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+ arch/arm64/boot/dts/qcom/ipq8074-hk01.dts | 54 +++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7e24249..4e15d0d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -760,6 +760,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8084-ifc6540.dtb \
- 	qcom-apq8084-mtp.dtb \
- 	qcom-ipq4019-ap.dk01.1-c1.dtb \
-+	qcom-ipq4019-ap.dk04.1-c1.dtb \
- 	qcom-ipq8064-ap148.dtb \
- 	qcom-msm8660-surf.dtb \
- 	qcom-msm8960-cdp.dtb \
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
-new file mode 100644
-index 0000000..7a96f30
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
-@@ -0,0 +1,19 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, The Linux Foundation. All rights reserved.
+diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+index 72c5b4a3..c13ddee 100644
+--- a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
++++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+@@ -21,6 +21,7 @@
+ 
+ 	aliases {
+ 		serial0 = &blsp1_uart5;
++		serial1 = &blsp1_uart3;
+ 	};
+ 
+ 	chosen {
+@@ -36,5 +37,58 @@
+ 		serial at 78b3000 {
+ 			status = "ok";
+ 		};
 +
-+#include "qcom-ipq4019-ap.dk04.1.dtsi"
++		spi at 78b5000 {
++			status = "ok";
 +
-+/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1-C1";
-+	compatible = "qcom,ipq4019-dk04.1-c1";
++			m25p80 at 0 {
++				  #address-cells = <1>;
++				  #size-cells = <1>;
++				  compatible = "jedec,spi-nor";
++				  reg = <0>;
++				  spi-max-frequency = <50000000>;
++			};
++		};
 +
-+	soc {
++		serial at 78b1000 {
++			 status = "ok";
++		};
++
++		i2c at 78b6000 {
++			 status = "ok";
++		};
++
 +		dma at 7984000 {
++			 status = "ok";
++		};
++
++		nand at 79b0000 {
++			status = "ok";
++
++			nand at 0 {
++				reg = <0>;
++				nand-ecc-strength = <4>;
++				nand-ecc-step-size = <512>;
++				nand-bus-width = <8>;
++			};
++		};
++
++		phy at 86000 {
 +			status = "ok";
 +		};
 +
-+		qpic-nand at 79b0000 {
++		phy at 8e000 {
 +			status = "ok";
 +		};
-+	};
-+};
++
++		pci at 20000000 {
++			status = "ok";
++			perst-gpio = <&tlmm 58 0x1>;
++		};
++
++		pci at 10000000 {
++			status = "ok";
++			perst-gpio = <&tlmm 61 0x1>;
++		};
+ 	};
+ };
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
