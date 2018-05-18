@@ -1,166 +1,130 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 18 May 2018 18:07:04 +0530
-Subject: [PATCH V5] ARM: dts: da850-evm: Enable LCD and Backlight
-In-Reply-To: <20180518005935.29104-1-aford173@gmail.com>
-References: <20180518005935.29104-1-aford173@gmail.com>
-Message-ID: <2be19e7a-904e-379f-57d9-99e4c557241d@ti.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 18 May 2018 13:55:55 +0100
+Subject: [PATCH v9 00/15] ASoC: qcom: Add support to QDSP based Audio
+Message-ID: <20180518125610.26200-1-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
+Thankyou everyone for providing feedback and testing v8 patchset.
 
-On Friday 18 May 2018 06:29 AM, Adam Ford wrote:
-> When using the board files the LCD works, but not with the DT.
-> This adds enables the original da850-evm to work with the same
-> LCD in device tree mode.
-> 
-> The EVM has a gpio for the regulator and a PWM for dimming the
-> backlight.  The LCD and the vpif display pins are mutually
-> exclusive, so if using the LCD, do not load the vpif driver.
-> 
-> Signed-off-by: Adam Ford <aford173@gmail.com>
+Changes since v8 (https://lkml.org/lkml/2018/5/9/491)
+- Fixed usecase across afe, adm, asm where user can trigger
+ manual unbind if dsp does not respond/responds very lately.
+Spotted by Mark B.
+- rebased patchset on top of(removed patches arleady applied)
+https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/?h=for-next
 
-Looks good mostly, some comments below.
+This patchset aims to provide a basic version of QCOM DSP based
+audio support which is available in downstream andriod kernels.
+This patchset support audio playback on HDMI-RX, MI2S, SLIMBus and
+will add support to other features as we move on.
 
-> ---
-> V5:  Resync against v4.18/dt
-> 
-> V4:  Move the backlight to PWM, so the driver can control the regulator allowing the 
->      regulator to power down and enabling the ability to change the brightness of the
->      backlight
-> 
-> V3:  Fix errant GPIO, label GPIO pins, and rename the regulator to be more explict to
->      backlight which better matches the schematic.  Updated the description to explain
->      that it cannot be used at the same time as the vpif driver.
-> 
-> V2:  Add regulator and GPIO enable pins. Remove PWM backlight and replace with GPIO  
-> 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index 0e82bb988fde..5bf6ea513b12 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -27,6 +27,58 @@
->  		spi0 = &spi1;
->  	};
->  
-> +	backlight:backlight-pwm {
+QDSP has both static and dynamic modules. static modules like AFE
+(Audio FrontEnd), ADM (Audio Device Manager), ASM(Audio Stream Manager)
+and CORE to provide this audio services.
+All these services use APR (Asynchronous Packet Router) protocol
+via smd/glink transport to communicate with Application processor.
+More details on each module is available in there respective patch.
 
-Leave a space after the ':' as is the norm.
+This patchset is tested on DB820c, with HDMI audio playback, MI2S on
+DB410c on top of mainline, Also tested SLIMBus analog audio using
+wcd9355 with an additional patches. Patches are also tested on
+SDM845 by Rohit.
 
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&ecap2_pins>;
-> +		power-supply = <&backlight_reg>;
-> +		compatible = "pwm-backlight";
-> +		pwms = <&ecap2 0 50000 0>;
-> +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 99>;
-> +		default-brightness-level = <7>;
+Here is my test branch incase someone want to try these patches
+https://git.linaro.org/people/srinivas.kandagatla/linux.git/log/?h=v4.17-qdsp6
 
-Are you able to notice some brightness change at each of these levels?
+Here is block diagram to give a quick overview of the components
 
-> +	};
-> +
-> +	panel {
-> +		compatible = "ti,tilcdc,panel";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&lcd_pins>;
-> +		/* The vpif and the LCD are mutually exclusive.
-> +		 * To enable VPIF, change the status below to 'disabled' then
-> +		 * then change the status of the vpif below to 'okay' */
 
-Please follow the multi-line comment style described in
-Documentation/process/coding-style.rst
+  +---------+          +---------+         +---------+   
+  |  q6asm  |          |q6routing|         | q6afe   | 
+  |   dais  | <------> |  mixers | <-----> |  dais   |  
+  +---------+          +---------+         +---------+   
+      ^                     ^                   ^
+      |                     |                   |
+      |  +------------------+----------------+  |       
+      |  |                  |                |  |       
+      v  v                  v                v  v       
+  +---------+          +---------+         +---------+ 
+  |   q6ASM |          |  q6ADM  |         |   q6AFE |  
+  +---------+          +---------+         +---------+  
+      ^                     ^                   ^          ^
+      |                     |                   | CPU Side |
+------+---------------------+-------------------+--------
+      |                     |                   |
+      |                     |APR(smd/glink)     | 
+      |                     |                   |
+      |  +------------------+----------------+  |
+      |  |                  |                |  |
++-----+--+-----------------------------------+--+-------
+      |  |                  |                |  | QDSP Side |
+      v  v                  v                v  v           v
+ +---------+          +---------+         +---------+
+ |   ASM   | <------> |   ADM   | <-----> |   AFE   |
+ +---------+          +---------+         +---------+
+                                               ^
+                                               | 
+                           +-------------------+
+                           |
+---------------------------+--------------------------
+                           |            Audio I/O |
+                           v                      v
+    +--------------------------------------------------+
+    |                Audio devices                     |
+    | CODEC | HDMI-TX | PCM  | SLIMBUS | I2S |MI2S |...|
+    |                                                  |
+    +--------------------------------------------------+
 
-> +		status = "okay";
-> +		enable-gpios = <&gpio 40 GPIO_ACTIVE_HIGH>; /* lcd_panel_pwr */
-> +
-> +		panel-info {
-> +			ac-bias		= <255>;
-> +			ac-bias-intrpt	= <0>;
-> +			dma-burst-sz	= <16>;
-> +			bpp		= <16>;
-> +			fdd		= <0x80>;
-> +			sync-edge	= <0>;
-> +			sync-ctrl	= <1>;
-> +			raster-order	= <0>;
-> +			fifo-th		= <0>;
-> +		};
-> +
-> +		display-timings {
-> +			native-mode = <&timing0>;
-> +			timing0: 480x272 {
-> +				clock-frequency = <9000000>;
-> +				hactive = <480>;
-> +				vactive = <272>;
-> +				hfront-porch = <3>;
-> +				hback-porch = <2>;
-> +				hsync-len = <42>;
-> +				vback-porch = <3>;
-> +				vfront-porch = <4>;
-> +				vsync-len = <11>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <1>;
-> +			};
-> +		};
-> +	};
-> +
->  	vbat: fixedregulator0 {
->  		compatible = "regulator-fixed";
->  		regulator-name = "vbat";
-> @@ -35,6 +87,15 @@
->  		regulator-boot-on;
->  	};
->  
-> +	backlight_reg: backlight-regulator {
-
-"backlight_lcd:" perhaps?
-
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "lcd_backlight_pwr";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio 47 GPIO_ACTIVE_HIGH>; /* lcd_backlight_pwr */
-> +		enable-active-high;
-> +	};
-> +
->  	sound {
->  		compatible = "simple-audio-card";
->  		simple-audio-card,name = "DA850/OMAP-L138 EVM";
-> @@ -63,6 +124,10 @@
->  	};
->  };
->  
-> +&ecap2 {
-> +	status = "okay";
-> +};
-> +
->  &pmx_core {
->  	status = "okay";
->  
-> @@ -109,6 +174,10 @@
->  	status = "okay";
->  };
->  
-> +&lcdc {
-> +	status = "okay";
-> +};
-> +
->  &i2c0 {
->  	status = "okay";
->  	clock-frequency = <100000>;
-> @@ -336,5 +405,8 @@
->  &vpif {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
-> -	status = "okay";
-> +	/* The vpif and the LCD are mutually exclusive.
-> +	 * To enable VPIF, disable the ti,tilcdc,panel then
-> +	 * changed the status below to 'okay' */
-
-Here too, please follow the multi-line comment style.
-
-> +	status = "disabled";
 
 Thanks,
-Sekhar
+srini
+
+Srinivas Kandagatla (15):
+  ASoC: qdsp6: q6afe: Add q6afe driver
+  ASoC: qdsp6: qdafe: Add SLIMBus port Support
+  ASoC: qdsp6: q6afe: Add support to MI2S ports
+  ASoC: qdsp6: q6afe: Add support to MI2S sysclks
+  ASoC: qdsp6: q6adm: Add q6adm driver
+  ASoC: qdsp6: q6asm: Add q6asm driver
+  ASoC: qdsp6: q6asm: Add support to memory map and unmap
+  ASoC: qdsp6: q6asm: Add support to audio stream apis
+  ASoC: qdsp6: q6routing: Add q6routing driver
+  ASoC: qdsp6: q6routing: Add support to all SLIMBus Mixers
+  ASoC: qdsp6: q6routing: Add support to MI2S Mixers
+  ASoC: qdsp6: q6afe: Add q6afe dai driver
+  ASoC: qdsp6: q6asm: Add q6asm dai driver
+  ASoC: qdsp6: dt-bindings: Add apq8096 machine bindings
+  ASoC: qcom: apq8096: Add db820c machine driver
+
+ .../devicetree/bindings/sound/qcom,apq8096.txt     |  109 ++
+ sound/soc/qcom/Kconfig                             |   33 +
+ sound/soc/qcom/Makefile                            |    2 +
+ sound/soc/qcom/apq8096.c                           |  255 ++++
+ sound/soc/qcom/qdsp6/Makefile                      |    6 +
+ sound/soc/qcom/qdsp6/q6adm.c                       |  646 +++++++++
+ sound/soc/qcom/qdsp6/q6adm.h                       |   27 +
+ sound/soc/qcom/qdsp6/q6afe-dai.c                   |  748 +++++++++++
+ sound/soc/qcom/qdsp6/q6afe.c                       | 1068 +++++++++++++++
+ sound/soc/qcom/qdsp6/q6afe.h                       |  193 +++
+ sound/soc/qcom/qdsp6/q6asm-dai.c                   |  624 +++++++++
+ sound/soc/qcom/qdsp6/q6asm.c                       | 1399 ++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6asm.h                       |   69 +
+ sound/soc/qcom/qdsp6/q6routing.c                   |  990 ++++++++++++++
+ sound/soc/qcom/qdsp6/q6routing.h                   |    9 +
+ 15 files changed, 6178 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/qcom,apq8096.txt
+ create mode 100644 sound/soc/qcom/apq8096.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6adm.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6adm.h
+ create mode 100644 sound/soc/qcom/qdsp6/q6afe-dai.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6afe.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6afe.h
+ create mode 100644 sound/soc/qcom/qdsp6/q6asm-dai.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6asm.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6asm.h
+ create mode 100644 sound/soc/qcom/qdsp6/q6routing.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6routing.h
+
+-- 
+2.16.2
