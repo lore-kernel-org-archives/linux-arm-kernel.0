@@ -1,149 +1,60 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Fri, 18 May 2018 13:02:14 -0500
-Subject: [PATCH V6] ARM: dts: da850-evm: Enable LCD and Backlight
-Message-ID: <20180518180214.9487-1-aford173@gmail.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Fri, 18 May 2018 10:02:02 -0700
+Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
+Message-ID: <20180518170202.11458-1-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using the board files the LCD works, but not with the DT.
-This adds enables the original da850-evm to work with the same
-LCD in device tree mode.
+Starting with LLVM r308050, clang generates a jump table with EL1
+virtual addresses in __init_stage2_translation, which results in a
+kernel panic when booting at EL2:
 
-The EVM has a gpio for the regulator and a PWM for dimming the
-backlight.  The LCD and the vpif display pins are mutually
-exclusive, so if using the LCD, do not load the vpif driver.
+  Kernel panic - not syncing: HYP panic:
+  PS:800003c9 PC:ffff0000089e6fd8 ESR:86000004
+  FAR:ffff0000089e6fd8 HPFAR:0000000009825000 PAR:0000000000000000
+  VCPU:000804fc20001221
 
-Signed-off-by: Adam Ford <aford173@gmail.com>
+  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc7-dirty #3
+  Hardware name: ARM Juno development board (r1) (DT)
+  Call trace:
+  [<ffff000008088ea4>] dump_backtrace+0x0/0x34c
+  [<ffff000008089208>] show_stack+0x18/0x20
+  [<ffff0000089c73ec>] dump_stack+0xc4/0xfc
+  [<ffff0000080c8e1c>] panic+0x138/0x2b4
+  [<ffff0000080c8ce4>] panic+0x0/0x2b4
+  SMP: stopping secondary CPUs
+  SMP: failed to stop secondary CPUs 0-3,5
+  Kernel Offset: disabled
+  CPU features: 0x002086
+  Memory Limit: none
+  ---[ end Kernel panic - not syncing: HYP panic:
+  PS:800003c9 PC:ffff0000089e6fd8 ESR:86000004
+  FAR:ffff0000089e6fd8 HPFAR:0000000009825000 PAR:0000000000000000
+  VCPU:000804fc20001221
+
+This change adds -fno-jump-tables to arm64/hyp to work around the
+bug.
+
+Suggested-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 ---
-V6:  Fix some whitespace and comment formatting.  Rename backlight_reg to
-     backlight_lcd
+ arch/arm64/kvm/hyp/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-V5:  Resync against v4.18/dt
-
-V4:  Move the backlight to PWM, so the driver can control the regulator allowing the 
-     regulator to power down and enabling the ability to change the brightness of the
-     backlight
-
-V3:  Fix errant GPIO, label GPIO pins, and rename the regulator to be more explict to
-     backlight which better matches the schematic.  Updated the description to explain
-     that it cannot be used at the same time as the vpif driver.
-
-V2:  Add regulator and GPIO enable pins. Remove PWM backlight and replace with GPIO  
-
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 0e82bb988fde..3e760e23d88c 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -27,6 +27,60 @@
- 		spi0 = &spi1;
- 	};
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 4313f74753332..745b3255e7832 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -5,6 +5,10 @@
  
-+	backlight: backlight-pwm {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ecap2_pins>;
-+		power-supply = <&backlight_reg>;
-+		compatible = "pwm-backlight";
-+		pwms = <&ecap2 0 50000 0>;
-+		brightness-levels = <0 10 20 30 40 50 60 70 80 90 99>;
-+		default-brightness-level = <7>;
-+	};
-+
-+	panel {
-+		compatible = "ti,tilcdc,panel";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_pins>;
-+		/*
-+		 * The vpif and the LCD are mutually exclusive.
-+		 * To enable VPIF, change the status below to 'disabled' then
-+		 * then change the status of the vpif below to 'okay'
-+		*/
-+		status = "okay";
-+		enable-gpios = <&gpio 40 GPIO_ACTIVE_HIGH>; /* lcd_panel_pwr */
-+
-+		panel-info {
-+			ac-bias		= <255>;
-+			ac-bias-intrpt	= <0>;
-+			dma-burst-sz	= <16>;
-+			bpp		= <16>;
-+			fdd		= <0x80>;
-+			sync-edge	= <0>;
-+			sync-ctrl	= <1>;
-+			raster-order	= <0>;
-+			fifo-th		= <0>;
-+		};
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: 480x272 {
-+				clock-frequency = <9000000>;
-+				hactive = <480>;
-+				vactive = <272>;
-+				hfront-porch = <3>;
-+				hback-porch = <2>;
-+				hsync-len = <42>;
-+				vback-porch = <3>;
-+				vfront-porch = <4>;
-+				vsync-len = <11>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				de-active = <1>;
-+				pixelclk-active = <1>;
-+			};
-+		};
-+	};
-+
- 	vbat: fixedregulator0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vbat";
-@@ -35,6 +89,15 @@
- 		regulator-boot-on;
- 	};
+ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
  
-+	backlight_lcd: backlight-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lcd_backlight_pwr";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio 47 GPIO_ACTIVE_HIGH>; /* lcd_backlight_pwr */
-+		enable-active-high;
-+	};
++ifeq ($(cc-name),clang)
++ccflags-y += -fno-jump-tables
++endif
 +
- 	sound {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "DA850/OMAP-L138 EVM";
-@@ -63,6 +126,10 @@
- 	};
- };
+ KVM=../../../../virt/kvm
  
-+&ecap2 {
-+	status = "okay";
-+};
-+
- &pmx_core {
- 	status = "okay";
- 
-@@ -109,6 +176,10 @@
- 	status = "okay";
- };
- 
-+&lcdc {
-+	status = "okay";
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	clock-frequency = <100000>;
-@@ -336,5 +407,10 @@
- &vpif {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
--	status = "okay";
-+	/*
-+	 * The vpif and the LCD are mutually exclusive.
-+	 * To enable VPIF, disable the ti,tilcdc,panel then
-+	 * changed the status below to 'okay'
-+	*/
-+	status = "disabled";
- };
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
 -- 
-2.17.0
+2.17.0.441.gb46fe60e1d-goog
