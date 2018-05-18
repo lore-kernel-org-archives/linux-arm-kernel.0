@@ -1,68 +1,86 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:15:46 +0200
-Subject: [PATCH 084/102] arm64: dts: renesas: r8a77970: Add secondary CA53 CPU
- core
+Date: Fri, 18 May 2018 13:15:45 +0200
+Subject: [PATCH 083/102] arm64: dts: renesas: r8a77965: Add SDHI device nodes
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <77899dd2c094fc99413e18264384cc428c23cd23.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <aa7a6365d03aacd4714ae62630f0262cac82a478.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Add a device node for the second Cortex-A53 CPU core on the Renesas
-R-Car V3M (r8a77970) SoC, and adjust the interrupt delivery masks for
-ARM Generic Interrupt Controller and Architectured Timer.
+Add SDHI nodes to the DT of the r8a77965 SoC.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Based on several similar patches of the R8A7796 device tree
+by Simon Horman <horms+renesas@verge.net.au>.
+
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77970.dtsi | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 36 +++++++++++++++++++++++++++----
+ 1 file changed, 32 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-index 37b843c0677a..1efaad71804d 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -41,6 +41,16 @@
- 			enable-method = "psci";
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index ba0edda431a5..f51c1b2cbae4 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -978,23 +978,51 @@
  		};
  
-+		a53_1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <1>;
-+			clocks = <&cpg CPG_CORE R8A77970_CLK_Z2>;
-+			power-domains = <&sysc R8A77970_PD_CA53_CPU1>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
-+		};
-+
- 		L2_CA53: cache-controller {
- 			compatible = "cache";
- 			power-domains = <&sysc R8A77970_PD_CA53_SCU>;
-@@ -635,7 +645,7 @@
- 			      <0 0xf1020000 0 0x20000>,
- 			      <0 0xf1040000 0 0x20000>,
- 			      <0 0xf1060000 0 0x20000>;
--			interrupts = <GIC_PPI 9	(GIC_CPU_MASK_SIMPLE(1) |
-+			interrupts = <GIC_PPI 9	(GIC_CPU_MASK_SIMPLE(2) |
- 				      IRQ_TYPE_LEVEL_HIGH)>;
- 			clocks = <&cpg CPG_MOD 408>;
- 			clock-names = "clk";
-@@ -726,9 +736,9 @@
+ 		sdhi0: sd at ee100000 {
++			compatible = "renesas,sdhi-r8a77965",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee100000 0 0x2000>;
+-			/* placeholder */
++			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 314>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 314>;
++			status = "disabled";
+ 		};
  
- 	timer {
- 		compatible = "arm,armv8-timer";
--		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- };
+ 		sdhi1: sd at ee120000 {
++			compatible = "renesas,sdhi-r8a77965",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee120000 0 0x2000>;
+-			/* placeholder */
++			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 313>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 313>;
++			status = "disabled";
+ 		};
+ 
+ 		sdhi2: sd at ee140000 {
++			compatible = "renesas,sdhi-r8a77965",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee140000 0 0x2000>;
+-			/* placeholder */
++			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 312>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 312>;
++			status = "disabled";
+ 		};
+ 
+ 		sdhi3: sd at ee160000 {
++			compatible = "renesas,sdhi-r8a77965",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee160000 0 0x2000>;
+-			/* placeholder */
++			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 311>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 311>;
++			status = "disabled";
+ 		};
+ 
+ 		gic: interrupt-controller at f1010000 {
 -- 
 2.11.0
