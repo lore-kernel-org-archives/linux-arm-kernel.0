@@ -1,73 +1,50 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 18 May 2018 17:39:17 +0100
-Subject: [PATCH 01/11] coresight: ETM: Add support for Arm Cortex-A73 and
- Cortex-A35
+Date: Fri, 18 May 2018 17:39:19 +0100
+Subject: [PATCH 03/11] coresight: tmc-etr: Do not clean trace buffer
 In-Reply-To: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
 References: <1526661567-4578-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1526661567-4578-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1526661567-4578-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ETM PIDs of the Arm cortex-A CPUs to the white list of ETMs.
-While at it, also add description of the CPU to which the ETM belongs,
-to make it easier to identify the ETM devices.
+We zero out the entire trace buffer used for ETR before it is enabled,
+for helping with debugging. With the addition of scatter-gather mode,
+the buffer could be bigger and non-contiguous.
+
+Get rid of this step; if someone wants to debug, they can always add it
+as and when needed.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 32 +++++++++++++--------------
- 1 file changed, 15 insertions(+), 17 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index cf364a5..fe5b41c 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -1034,7 +1034,8 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	}
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index d3c2b04..c73bcb3 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -24,9 +24,6 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ {
+ 	u32 axictl, sts;
  
- 	pm_runtime_put(&adev->dev);
--	dev_info(dev, "%s initialized\n", (char *)id->data);
-+	dev_info(dev, "CPU%d: %s initialized\n",
-+			drvdata->cpu, (char *)id->data);
+-	/* Zero out the memory to help with debug */
+-	memset(drvdata->vaddr, 0, drvdata->size);
+-
+ 	CS_UNLOCK(drvdata->base);
  
- 	if (boot_enable) {
- 		coresight_enable(drvdata->csdev);
-@@ -1052,23 +1053,20 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	return ret;
- }
- 
-+#define ETM4_AMBA_ID(cpu, pid)			\
-+	{					\
-+		.id	= pid,			\
-+		.mask	= 0x000fffff,		\
-+		.data	= #cpu " ETM v4.x",	\
-+	}
-+
- static const struct amba_id etm4_ids[] = {
--	{       /* ETM 4.0 - Cortex-A53  */
--		.id	= 0x000bb95d,
--		.mask	= 0x000fffff,
--		.data	= "ETM 4.0",
--	},
--	{       /* ETM 4.0 - Cortex-A57 */
--		.id	= 0x000bb95e,
--		.mask	= 0x000fffff,
--		.data	= "ETM 4.0",
--	},
--	{       /* ETM 4.0 - A72, Maia, HiSilicon */
--		.id = 0x000bb95a,
--		.mask = 0x000fffff,
--		.data = "ETM 4.0",
--	},
--	{ 0, 0},
-+	ETM4_AMBA_ID(Cortex-A53, 0x000bb95d),
-+	ETM4_AMBA_ID(Cortex-A57, 0x000bb95e),
-+	ETM4_AMBA_ID(Cortex-A72, 0x000bb95a),
-+	ETM4_AMBA_ID(Cortex-A73, 0x000bb959),
-+	ETM4_AMBA_ID(Cortex-A35, 0x000bb9da),
-+	{},
- };
- 
- static struct amba_driver etm4x_driver = {
+ 	/* Wait for TMCSReady bit to be set */
+@@ -352,9 +349,8 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
+ 	if (drvdata->mode == CS_MODE_SYSFS) {
+ 		/*
+ 		 * The trace run will continue with the same allocated trace
+-		 * buffer. The trace buffer is cleared in tmc_etr_enable_hw(),
+-		 * so we don't have to explicitly clear it. Also, since the
+-		 * tracer is still enabled drvdata::buf can't be NULL.
++		 * buffer. Since the tracer is still enabled drvdata::buf can't
++		 * be NULL.
+ 		 */
+ 		tmc_etr_enable_hw(drvdata);
+ 	} else {
 -- 
 2.7.4
