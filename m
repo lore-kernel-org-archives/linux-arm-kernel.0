@@ -1,102 +1,116 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 May 2018 11:41:05 -0500
-Subject: [PATCH v5 2/4] Documentation: bindings: add phy_config for
- Rockchip USB Type-C PHY
-In-Reply-To: <1526548680-2552-2-git-send-email-hl@rock-chips.com>
-References: <1526548680-2552-1-git-send-email-hl@rock-chips.com>
- <1526548680-2552-2-git-send-email-hl@rock-chips.com>
-Message-ID: <20180518164105.GA14201@rob-hp-laptop>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 18 May 2018 11:48:14 -0500
+Subject: [PATCH v11 12/27] ARM: davinci: da8xx: add new sata_refclk init using
+ common clock framework
+In-Reply-To: <20180518164829.27052-1-david@lechnology.com>
+References: <20180518164829.27052-1-david@lechnology.com>
+Message-ID: <20180518164829.27052-13-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 05:17:58PM +0800, Lin Huang wrote:
-> If want to do training outside DP Firmware, need phy voltage swing
-> and pre_emphasis value.
+This adds the new SATA REFCLK clock init in mach-davinci/devices-da8xx.c
+using the new common clock framework drivers.
 
-"dt-bindings: phy: ..." for the subject please.
+The #ifdefs are needed to prevent compile errors until the entire
+ARCH_DAVINCI is converted.
 
-> 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v2:
-> - None 
-> Changes in v3:
-> - modify property description and add this property to Example
-> Change in v4:
-> - None
-> Change in v5:
-> - None
-> 
->  .../devicetree/bindings/phy/phy-rockchip-typec.txt | 29 +++++++++++++++++++++-
->  1 file changed, 28 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> index 960da7f..af298f2 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> @@ -17,7 +17,8 @@ Required properties:
->  
->  Optional properties:
->   - extcon : extcon specifier for the Power Delivery
-> -
-> + - rockchip,phy_config : A list of voltage swing(mv) and pre-emphasis
-> +			(dB) pairs.
+Also, the #includes are sorted since we are adding some here.
 
-rockchip,phy-config
+Signed-off-by: David Lechner <david@lechnology.com>
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+---
 
->  Required nodes : a sub-node is required for each port the phy provides.
->  		 The sub-node name is used to identify dp or usb3 port,
->  		 and shall be the following entries:
-> @@ -50,6 +51,19 @@ Example:
->  			 <&cru SRST_P_UPHY0_TCPHY>;
->  		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
->  
-> +		rockchip,phy_config =<0x2a 0x00
+v10 changes:
+- none
 
-space                                 ^
+v10 changes:
+- none
 
-And format with inner <> ("< <0 1> <0 2> ... >") to show the pairs.
+v9 changes:
+- none
 
-> +			0x1f 0x15
-> +			0x14 0x22
-> +			0x02 0x2b
-> +			0x21 0x00
-> +			0x12 0x15
-> +			0x02 0x22
-> +			0 0
-> +			0x15 0x00
-> +			0x00 0x15
-> +			0 0
-> +			0 0>;
+v8 changes:
+- none
 
-Since you have <0 0> multiple times, I presume the index is significant 
-and the length is fixed. Please define the index meaning and length 
-above.
+v7 changes:
+- none
 
-> +
->  		tcphy0_dp: dp-port {
->  			#phy-cells = <0>;
->  		};
-> @@ -74,6 +88,19 @@ Example:
->  			 <&cru SRST_P_UPHY1_TCPHY>;
->  		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
->  
-> +		rockchip,phy_config =<0x2a 0x00
-> +			0x1f 0x15
-> +			0x14 0x22
-> +			0x02 0x2b
-> +			0x21 0x00
-> +			0x12 0x15
-> +			0x02 0x22
-> +			0 0
-> +			0x15 0x00
-> +			0x00 0x15
-> +			0 0
-> +			0 0>;
-> +
->  		tcphy1_dp: dp-port {
->  			#phy-cells = <0>;
->  		};
-> -- 
-> 2.7.4
-> 
+v6 changes:
+- none
+
+ arch/arm/mach-davinci/devices-da8xx.c | 36 ++++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 78390c64e6ca..73de449bbc68 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -10,25 +10,30 @@
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  */
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/dma-contiguous.h>
+-#include <linux/serial_8250.h>
+ #include <linux/ahci_platform.h>
++#include <linux/clk-provider.h>
+ #include <linux/clk.h>
+-#include <linux/reboot.h>
++#include <linux/clkdev.h>
++#include <linux/dma-contiguous.h>
+ #include <linux/dmaengine.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++#include <linux/serial_8250.h>
+ 
+-#include <mach/cputype.h>
+ #include <mach/common.h>
+-#include <mach/time.h>
++#include <mach/cputype.h>
+ #include <mach/da8xx.h>
+-#include <mach/clock.h>
++#include <mach/time.h>
++
++#include "asp.h"
+ #include "cpuidle.h"
+ #include "sram.h"
+ 
++#ifndef CONFIG_COMMON_CLK
++#include <mach/clock.h>
+ #include "clock.h"
+-#include "asp.h"
++#endif
+ 
+ #define DA8XX_TPCC_BASE			0x01c00000
+ #define DA8XX_TPTC0_BASE		0x01c08000
+@@ -1040,6 +1045,7 @@ int __init da8xx_register_spi_bus(int instance, unsigned num_chipselect)
+ }
+ 
+ #ifdef CONFIG_ARCH_DAVINCI_DA850
++#ifndef CONFIG_COMMON_CLK
+ static struct clk sata_refclk = {
+ 	.name		= "sata_refclk",
+ 	.set_rate	= davinci_simple_set_rate,
+@@ -1061,6 +1067,18 @@ int __init da850_register_sata_refclk(int rate)
+ 
+ 	return 0;
+ }
++#else
++int __init da850_register_sata_refclk(int rate)
++{
++	struct clk *clk;
++
++	clk = clk_register_fixed_rate(NULL, "sata_refclk", NULL, 0, rate);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	return clk_register_clkdev(clk, "refclk", "ahci_da850");
++}
++#endif
+ 
+ static struct resource da850_sata_resources[] = {
+ 	{
+-- 
+2.17.0
