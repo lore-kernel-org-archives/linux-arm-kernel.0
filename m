@@ -1,73 +1,53 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 18 May 2018 15:15:31 +0530
-Subject: [PATCH v2 21/26] arm64: dts: allwinner: a64: bananapi-m64: Enable
- HDMI output
+Date: Fri, 18 May 2018 15:15:23 +0530
+Subject: [PATCH v2 13/26] drm/sun4i: Add support for A64 HDMI PHY
 In-Reply-To: <20180518094536.17201-1-jagan@amarulasolutions.com>
 References: <20180518094536.17201-1-jagan@amarulasolutions.com>
-Message-ID: <20180518094536.17201-22-jagan@amarulasolutions.com>
+Message-ID: <20180518094536.17201-14-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable HDMI output on Bananpi-m64 board.
+From: Jernej Skrabec <jernej.skrabec@siol.net>
 
+PHY is the same as in H3, except it can select between two clock parent.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
-- none
+- new patch
 
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 0716b1441187..bbbf7b17b70b 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -60,6 +60,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -86,6 +97,10 @@
- 	};
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index 0eadf087fc46..39fbf7257fce 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -392,6 +392,13 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
+ 	.name		= "phy"
  };
  
-+&de {
-+	status = "okay";
++static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
++	.phy_clk_num = 2,
++	.phy_init = &sun8i_hdmi_phy_init_h3,
++	.phy_disable = &sun8i_hdmi_phy_disable_h3,
++	.phy_config = &sun8i_hdmi_phy_config_h3,
 +};
 +
- &ehci0 {
- 	status = "okay";
- };
-@@ -103,6 +118,17 @@
- 	status = "okay";
+ static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
+ 	.phy_init = &sun8i_hdmi_phy_init_a83t,
+ 	.phy_disable = &sun8i_hdmi_phy_disable_a83t,
+@@ -406,6 +413,10 @@ static const struct sun8i_hdmi_phy_variant sun8i_h3_hdmi_phy = {
  };
  
-+&hdmi {
-+	hvcc-supply = <&reg_dldo1>;
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins>;
+ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
++	{
++		.compatible = "allwinner,sun50i-a64-hdmi-phy",
++		.data = &sun50i_a64_hdmi_phy,
++	},
+ 	{
+ 		.compatible = "allwinner,sun8i-a83t-hdmi-phy",
+ 		.data = &sun8i_a83t_hdmi_phy,
 -- 
 2.14.3
