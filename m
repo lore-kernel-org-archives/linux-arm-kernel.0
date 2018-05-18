@@ -1,92 +1,62 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 18 May 2018 10:46:04 +0100
-Subject: [PATCH v3 2/3] arm64: KVM: Enable Common Not Private translations
-In-Reply-To: <1526636765-11289-1-git-send-email-vladimir.murzin@arm.com>
-References: <1526636765-11289-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1526636765-11289-3-git-send-email-vladimir.murzin@arm.com>
+Date: Fri, 18 May 2018 10:46:02 +0100
+Subject: [PATCH v3 0/3]  Support Common Not Private translations
+Message-ID: <1526636765-11289-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We rely on cpufeature framework to detect and enable CNP so for KVM we
-need to patch hyp to set CNP bit just before TTBR0_EL2 gets written.
+Common Not Private (CNP) translations is a feature of ARMv8.2
+extension which allows translation table entries to be shared between
+different PEs in the same inner shareable domain, so the hardware can
+use this fact to optimise the caching of such entries in the TLB.
 
-For the guest we encode CNP bit while building vttbr, so we don't need
-to bother with that in a world switch.
+This patch set is an attempt to bring CNP support into Linux. It was
+tested on a v8.2 Fast Model with exploring traces and checking that
+TTBRx_ELy and VTTBR_EL2 have CnP bit set where appropriate.
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h   | 5 +++++
- arch/arm64/include/asm/kvm_mmu.h | 5 +++++
- arch/arm64/kvm/hyp-init.S        | 3 +++
- virt/kvm/arm/arm.c               | 4 ++--
- 4 files changed, 15 insertions(+), 2 deletions(-)
+Changelog:
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index de1b919..7a9d614 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -307,6 +307,11 @@ static inline int kvm_map_vectors(void)
- 
- #define kvm_phys_to_vttbr(addr)		(addr)
- 
-+static inline bool kvm_cpu_has_cnp(void)
-+{
-+	return false;
-+}
-+
- #endif	/* !__ASSEMBLY__ */
- 
- #endif /* __ARM_KVM_MMU_H__ */
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7faed6e..f8149d4 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -388,5 +388,10 @@ static inline int kvm_map_vectors(void)
- 
- #define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
- 
-+static inline bool kvm_cpu_has_cnp(void)
-+{
-+	return system_supports_cnp();
-+}
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 5aa9ccf..2e7a93a 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -64,6 +64,9 @@ __do_hyp_init:
- 	b.lo	__kvm_handle_stub_hvc
- 
- 	phys_to_ttbr x4, x0
-+alternative_if ARM64_HAS_CNP
-+	orr	x4, x4, #TTBR_CNP_BIT
-+alternative_else_nop_endif
- 	msr	ttbr0_el2, x4
- 
- 	mrs	x4, tcr_el1
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 97d0ab2..a538ba3 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -470,7 +470,7 @@ static bool need_new_vmid_gen(struct kvm *kvm)
- static void update_vttbr(struct kvm *kvm)
- {
- 	phys_addr_t pgd_phys;
--	u64 vmid;
-+	u64 vmid, cnp = kvm_cpu_has_cnp() ? 1 : 0;
- 
- 	if (!need_new_vmid_gen(kvm))
- 		return;
-@@ -522,7 +522,7 @@ static void update_vttbr(struct kvm *kvm)
- 	pgd_phys = virt_to_phys(kvm->arch.pgd);
- 	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
- 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
--	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
-+	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid | cnp;
- 
- 	spin_unlock(&kvm_vmid_lock);
- 
+	 v2 -> v3
+	    - do not enable CNP if we are crush kernel (per James)
+	    - default to "no"
+	    - rebased on 4.17-rc4
+
+  	 v1 -> v2
+            - handle cpuilde case (per James)
+	    - use lm_allias with swapper_pg_dir (per James)
+            - rule out ARM64_SW_TTBR0_PAN case (per Catalin)
+	    - s/BUG_ON/WARN_ON/ (per Catalin)
+	    - comment and commit message updates (per Catalin)
+	    - TTBR_CNP_BIT moved to asm/pgtable-hwdef.h (per Catalin)
+	    - has_useable_cnp() simplified (per Julien)
+
+	RFC -> v1
+            - dropped RFC tag
+            - rebased on 4.14-rc4
+
+Thanks!
+
+Vladimir Murzin (3):
+  arm64: mm: Support Common Not Private translations
+  arm64: KVM: Enable Common Not Private translations
+  arm64: Introduce command line parameter to disable CNP
+
+ Documentation/admin-guide/kernel-parameters.txt |  4 +++
+ arch/arm/include/asm/kvm_mmu.h                  |  5 ++++
+ arch/arm64/Kconfig                              | 13 ++++++++
+ arch/arm64/include/asm/cpucaps.h                |  3 +-
+ arch/arm64/include/asm/cpufeature.h             |  6 ++++
+ arch/arm64/include/asm/kvm_mmu.h                |  5 ++++
+ arch/arm64/include/asm/mmu_context.h            | 12 ++++++++
+ arch/arm64/include/asm/pgtable-hwdef.h          |  2 ++
+ arch/arm64/kernel/cpufeature.c                  | 40 +++++++++++++++++++++++++
+ arch/arm64/kernel/hibernate.c                   |  2 +-
+ arch/arm64/kernel/suspend.c                     |  4 +++
+ arch/arm64/kvm/hyp-init.S                       |  3 ++
+ arch/arm64/mm/context.c                         |  3 ++
+ arch/arm64/mm/proc.S                            |  6 ++++
+ virt/kvm/arm/arm.c                              |  4 +--
+ 15 files changed, 108 insertions(+), 4 deletions(-)
+
 -- 
 2.0.0
