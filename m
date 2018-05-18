@@ -1,57 +1,65 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 18 May 2018 15:15:17 +0530
-Subject: [PATCH v2 07/26] dt-bindings: display: Add compatible for A64 DE2
- tcon1 blocks
-In-Reply-To: <20180518094536.17201-1-jagan@amarulasolutions.com>
-References: <20180518094536.17201-1-jagan@amarulasolutions.com>
-Message-ID: <20180518094536.17201-8-jagan@amarulasolutions.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 18 May 2018 11:07:02 +0100
+Subject: [PATCH v4 3/3] arm64: Introduce command line parameter to disable CNP
+In-Reply-To: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
+References: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1526638022-4137-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 has DE2 pipeline with tcon0 and tcon1 block
-which is similar Allwinner A83T.
+There are cases when activating of Common Not Private (CNP) feature
+might not be desirable; this patch allows to forcefully disable CNP
+even it is supported by hardware.
 
-This patch adds dt-binding documentation for A64 DE2 tcon1 blocks.
-
-Mixer1 has different configuration for A64 so use separate compatible
-but tcon1 has similar behaviour with A83T so add fallback compatible.
-
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
-Changes for v2:
-- Add fallback compatible for tcon1
-- Add separate compatible for mixer1 
+ Documentation/admin-guide/kernel-parameters.txt |  4 ++++
+ arch/arm64/kernel/cpufeature.c                  | 11 ++++++++++-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 3346c1e2a7a0..863afad6a4df 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -148,6 +148,7 @@ Required properties:
-    * allwinner,sun8i-v3s-tcon
-    * allwinner,sun9i-a80-tcon-lcd
-    * allwinner,sun9i-a80-tcon-tv
-+   * "allwinner,sun50i-a64-tcon-tv", "allwinner,sun8i-a83t-tcon-tv"
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON.
-@@ -311,6 +312,7 @@ Required properties:
-     * allwinner,sun8i-a83t-de2-mixer-1
-     * allwinner,sun8i-h3-de2-mixer-0
-     * allwinner,sun8i-v3s-de2-mixer
-+    * allwinner,sun50i-a64-de2-mixer-1"
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-     * bus: the mixer interface clock
-@@ -343,6 +345,7 @@ Required properties:
-     * allwinner,sun8i-h3-display-engine
-     * allwinner,sun8i-v3s-display-engine
-     * allwinner,sun9i-a80-display-engine
-+    * allwinner,sun50i-a64-display-engine
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 11fc28e..8f59d47 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -2636,6 +2636,10 @@
  
-   - allwinner,pipelines: list of phandle to the display engine
-     frontends (DE 1.0) or mixers (DE 2.0) available.
+ 	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
+ 
++	nocnp		[ARM64]
++			Disable CNP (Common not Private translations)
++			even if it is supported by processor.
++
+ 	nodelayacct	[KNL] Disable per-task delay accounting
+ 
+ 	nodsp		[SH] Disable hardware DSP at boot time.
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 199e9dd..eee6a31 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -860,6 +860,15 @@ static bool has_cache_dic(const struct arm64_cpu_capabilities *entry,
+ 	return read_sanitised_ftr_reg(SYS_CTR_EL0) & BIT(CTR_DIC_SHIFT);
+ }
+ 
++static bool nocnp;
++
++static int __init early_nocnp(char *p)
++{
++	nocnp = true;
++	return 0;
++}
++early_param("nocnp", early_nocnp);
++
+ static bool __maybe_unused
+ has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
+ {
+@@ -867,7 +876,7 @@ has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
+ 	if (elfcorehdr_size)
+ 		return false;
+ #endif
+-	return has_cpuid_feature(entry, scope);
++	return has_cpuid_feature(entry, scope) && !nocnp;
+ }
+ 
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
 -- 
-2.14.3
+2.0.0
