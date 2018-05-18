@@ -1,34 +1,37 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Sat, 19 May 2018 00:05:17 +0200
-Subject: [PATCH 2/2] pwm: stm32: initialize raw local variables
-In-Reply-To: <1526657044-14879-3-git-send-email-fabrice.gasnier@st.com>
-References: <1526657044-14879-1-git-send-email-fabrice.gasnier@st.com>
- <1526657044-14879-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180518220517.GD28123@ulmo>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 May 2018 17:19:49 -0500
+Subject: [PATCH v3 2/6] mfd: at91-usart: added mfd driver for usart
+In-Reply-To: <20180511103822.31698-3-radu.pirea@microchip.com>
+References: <20180511103822.31698-1-radu.pirea@microchip.com>
+ <20180511103822.31698-3-radu.pirea@microchip.com>
+Message-ID: <20180518221949.GA13443@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 05:24:04PM +0200, Fabrice Gasnier wrote:
-> This removes build warning when COMPILE_TEST=y and MFD_STM32_TIMERS=n
-> in drivers/pwm/pwm-stm32.c. In function 'stm32_pwm_capture' 'raw_prd' and
-> 'raw_dty' may be used uninitialized in this function
-> [-Wmaybe-uninitialized]
+On Fri, May 11, 2018 at 01:38:18PM +0300, Radu Pirea wrote:
+> This mfd driver is just a wrapper over atmel_serial driver and
+> spi-at91-usart driver. Selection of one of the drivers is based on a
+> property from device tree. If the property is not specified, the default
+> driver is atmel_serial.
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
 > ---
->  drivers/pwm/pwm-stm32.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/mfd/Kconfig                  | 10 ++++
+>  drivers/mfd/Makefile                 |  1 +
+>  drivers/mfd/at91-usart.c             | 75 ++++++++++++++++++++++++++++
+>  include/dt-bindings/mfd/at91-usart.h | 17 +++++++
+>  4 files changed, 103 insertions(+)
+>  create mode 100644 drivers/mfd/at91-usart.c
+>  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> 
 
-Hi Lee,
+> +#ifndef __DT_BINDINGS_AT91_USART_H__
+> +#define __DT_BINDINGS_AT91_USART_H__
+> +
+> +#define AT91_USART_MODE_SERIAL	1
+> +#define AT91_USART_MODE_SPI	2
 
-I assume you'll pick this up into your branch where you applied the
-initial patches along with 1/2 in this series?
+Won't this require a DT update for serial mode to add the mode property? 
+That breaks compatibility.
 
-Acked-by: Thierry Reding <thierry.reding@gmail.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180519/a4364ea1/attachment-0001.sig>
+Rob
