@@ -1,86 +1,73 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 17 May 2018 18:45:46 -0700
-Subject: [PATCH v5 4/4] drm/rockchip: support dp training outside dp
- firmware
-In-Reply-To: <d4c38236-7455-ccd5-a1d9-a000b7d78be9@rock-chips.com>
-References: <1526548680-2552-1-git-send-email-hl@rock-chips.com>
- <1526548680-2552-4-git-send-email-hl@rock-chips.com>
- <20180517135136.GD3373@art_vandelay>
- <d4c38236-7455-ccd5-a1d9-a000b7d78be9@rock-chips.com>
-Message-ID: <CA+ASDXN2LT6FcX_2-MM=Qu7cZOHwVK3+2rGDLGcC1SnY3BJaSw@mail.gmail.com>
+From: hejianet@gmail.com (Jia He)
+Date: Fri, 18 May 2018 09:52:27 +0800
+Subject: [PATCH] KVM: arm/arm64: add WARN_ON if size is not PAGE_SIZE
+ aligned in unmap_stage2_range
+In-Reply-To: <25dbb8c1-631f-c810-4d75-349a0b291cf8@arm.com>
+References: <1526537487-14804-1-git-send-email-hejianet@gmail.com>
+ <698b0355-d430-86b8-cd09-83c6d9e566f8@arm.com>
+ <fbb269c0-e915-a9f2-da3b-5ae3a2b31396@gmail.com>
+ <25dbb8c1-631f-c810-4d75-349a0b291cf8@arm.com>
+Message-ID: <551c4ecc-412a-7087-8664-6e4b213bca17@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 6:41 PM, hl <hl@rock-chips.com> wrote:
-> On Thursday, May 17, 2018 09:51 PM, Sean Paul wrote:
->> On Thu, May 17, 2018 at 05:18:00PM +0800, Lin Huang wrote:
->>> DP firmware uses fixed phy config values to do training, but some
->>> boards need to adjust these values to fit for their unique hardware
->>> design. So get phy config values from dts and use software link training
->>> instead of relying on firmware, if software training fail, keep firmware
->>> training as a fallback if sw training fails.
->>>
->>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->>> Signed-off-by: Lin Huang <hl@rock-chips.com>
->>> ---
->>> Changes in v2:
->>> - update patch following Enric suggest
->>> Changes in v3:
->>> - use variable fw_training instead sw_training_success
->>> - base on DP SPCE, if training fail use lower link rate to retry training
->>> Changes in v4:
->>> - improve cdn_dp_get_lower_link_rate() and cdn_dp_software_train_link() follow Sean suggest
->>> Changes in v5:
->>> - fix some whitespcae issue
->>>
->>>   drivers/gpu/drm/rockchip/Makefile               |   3 +-
->>>   drivers/gpu/drm/rockchip/cdn-dp-core.c          |  24 +-
->>>   drivers/gpu/drm/rockchip/cdn-dp-core.h          |   2 +
->>>   drivers/gpu/drm/rockchip/cdn-dp-link-training.c | 420 ++++++++++++++++++++++++
->>>   drivers/gpu/drm/rockchip/cdn-dp-reg.c           |  31 +-
->>>   drivers/gpu/drm/rockchip/cdn-dp-reg.h           |  38 ++-
->>>   6 files changed, 505 insertions(+), 13 deletions(-)
->>>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-link-training.c
->>>
-...
->>> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-link-training.c b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
->>> new file mode 100644
->>> index 0000000..73c3290
->>> --- /dev/null
->>> +++ b/drivers/gpu/drm/rockchip/cdn-dp-link-training.c
->>> @@ -0,0 +1,420 @@
->>> +// SPDX-License-Identifier: GPL-2.0
->>> +/*
->>> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
->>> + * Author: Chris Zhong <zyw@rock-chips.com>
->>> + */
->>> +
->>> +#include <linux/device.h>
->>> +#include <linux/delay.h>
->>> +#include <linux/phy/phy.h>
->>> +#include <soc/rockchip/rockchip_phy_typec.h>
->>> +
->>> +#include "cdn-dp-core.h"
->>> +#include "cdn-dp-reg.h"
->>> +
->>> +static void cdn_dp_set_signal_levels(struct cdn_dp_device *dp)
->>> +{
->>> +       struct cdn_dp_port *port = dp->port[dp->active_port];
->>> +       struct rockchip_typec_phy *tcphy = phy_get_drvdata(port->phy);
->>
->> You ignored Brian's comment on the previous patch:
->>    This is still antithetical to the PHY framework; you're assuming that
->>    this is a particular type of PHY here.
->>
->> FWIW, the mediatek drm driver also assumes a certain PHY type. A quick grep of
->> drivers/ shows that the only other non-phy/ driver using this function
->> (pinctrl-tegra-xusb.c) also casts it.
->>
->> Sean
->
-> Thanks Sean, except phy framework have new API to handle it, i have not
-> idea how to do it in a better way.
+Hi Suzuki
 
-Well, if Mediatek can do it for their MIPI and HDMI, then maybe we just do it...
+On 5/17/2018 11:03 PM, Suzuki K Poulose Wrote:
+> On 17/05/18 13:46, Jia He wrote:
+>> Hi Suzuki
+>>
+>> On 5/17/2018 4:17 PM, Suzuki K Poulose Wrote:
+>>>
+>>> Hi Jia,
+>>>
+>>> On 17/05/18 07:11, Jia He wrote:
+>>>> I ever met a panic under memory pressure tests(start 20 guests and run
+>>>> memhog in the host).
+>>>
+>>> Please avoid using "I" in the commit description and preferably stick to
+>>> an objective description.
+>>
+>> Thanks for the pointing
+>>
+>>>
+>>>>
+>>>> The root cause might be what I fixed at [1]. But from arm kvm points of
+>>>> view, it would be better we caught the exception earlier and clearer.
+>>>>
+>>>> If the size is not PAGE_SIZE aligned, unmap_stage2_range might unmap the
+>>>> wrong(more or less) page range. Hence it caused the "BUG: Bad page
+>>>> state"
+>>>
+>>> I don't see why we should ever panic with a "positive" size value. Anyways,
+>>> the unmap requests must be in units of pages. So this check might be useful.
+>>>
+>>>
+>>
+>> good question,
+>>
+>> After further digging, maybe we need to harden the break condition as below?
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index 7f6a944..dac9b2e 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -217,7 +217,7 @@ static void unmap_stage2_ptes(struct kvm *kvm, pmd_t *pmd,
+>>
+>> ???????????????????????? put_page(virt_to_page(pte));
+>> ???????????????? }
+>> -?????? } while (pte++, addr += PAGE_SIZE, addr != end);
+>> +?????? } while (pte++, addr += PAGE_SIZE, addr < end);
+> 
+> I don't think this change is need as stage2_pgd_addr_end(addr, end) must return
+> the smaller of the next entry or end. Thus we can't miss "addr" == "end".
 
-Brian
+If it passes addr=202920000,size=fe00 to unmap_stage2_range->
+...->unmap_stage2_ptes
+
+unmap_stage2_ptes will get addr=202920000,end=20292fe00
+after first while loop addr=202930000, end=20292fe00, then addr!=end
+Thus it will touch another pages by put_pages() in the 2nd loop.
+
+-- 
+Cheers,
+Jia
