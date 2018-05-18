@@ -1,53 +1,86 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 18 May 2018 14:51:54 -0500
-Subject: [PATCH v7 2/2] PCI: mediatek: Using chained IRQ to setup IRQ
- handle
-In-Reply-To: <1525412853-24367-3-git-send-email-honghui.zhang@mediatek.com>
-References: <1525412853-24367-1-git-send-email-honghui.zhang@mediatek.com>
- <1525412853-24367-3-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20180518195154.GB41790@bhelgaas-glaptop.roam.corp.google.com>
+From: Alexey.Brodkin@synopsys.com (Alexey Brodkin)
+Date: Fri, 18 May 2018 19:57:34 +0000
+Subject: dma_sync_*_for_cpu and direction=TO_DEVICE (was Re: [PATCH
+ 02/20] dma-mapping: provide a generic dma-noncoherent implementation)
+In-Reply-To: <20180518175004.GF17671@n2100.armlinux.org.uk>
+References: <20180511075945.16548-1-hch@lst.de>
+ <20180511075945.16548-3-hch@lst.de>
+ <bad125dff49f6e49c895e818c9d1abb346a46e8e.camel@synopsys.com>
+ <5ac5b1e3-9b96-9c7c-4dfe-f65be45ec179@synopsys.com>
+ <20180518175004.GF17671@n2100.armlinux.org.uk>
+Message-ID: <182840dedb4890a88c672b1c5d556920bf89a8fb.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 04, 2018 at 01:47:33PM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+Hi Russel,
+
+On Fri, 2018-05-18 at 18:50 +0100, Russell King - ARM Linux wrote:
+> It's necessary.  Take a moment to think carefully about this:
 > 
-> Using irq_chip solution to setup IRQs in order to consist
-> with IRQ framework.
+>         dma_map_single(, dir)
 > 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/pci/host/pcie-mediatek.c | 206 ++++++++++++++++++++++-----------------
->  1 file changed, 115 insertions(+), 91 deletions(-)
+>         dma_sync_single_for_cpu(, dir)
 > 
-> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> index c3dc549..dabf1086 100644
-> --- a/drivers/pci/host/pcie-mediatek.c
-> +++ b/drivers/pci/host/pcie-mediatek.c
-> ...
+>         dma_sync_single_for_device(, dir)
+> 
+>         dma_unmap_single(, dir)
+> 
+> In the case of a DMA-incoherent architecture, the operations done at each
+> stage depend on the direction argument:
+> 
+>         map             for_cpu         for_device      unmap
+> TO_DEV  writeback       none            writeback       none
+> TO_CPU  invalidate      invalidate*     invalidate      invalidate*
+> BIDIR   writeback       invalidate      writeback       invalidate
+> 
+> * - only necessary if the CPU speculatively prefetches.
 
-> -static int mtk_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
-> -			    irq_hw_number_t hwirq)
-> +static struct msi_domain_info mtk_msi_domain_info = {
+I think invalidation of DMA buffer is required on for_cpu(TO_CPU) even
+if CPU doesn't preferch - what if we reuse the same buffer for multiple
+reads from DMA device?
 
-I think this patch should be amended to include this:
+> The multiple invalidations for the TO_CPU case handles different
+> conditions that can result in data corruption, and for some CPUs, all
+> four are necessary.
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 0d0177ce436c..368b70d9371b 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -193,7 +193,7 @@ config PCIE_MEDIATEK
- 	bool "MediaTek PCIe controller"
- 	depends on (ARM || ARM64) && (ARCH_MEDIATEK || COMPILE_TEST)
- 	depends on OF
--	depends on PCI
-+	depends on PCI_MSI_IRQ_DOMAIN
- 	select PCIEPORTBUS
- 	help
- 	  Say Y here if you want to enable PCIe controller support on
+I would agree that map()/unmap() a quite a special cases and so depending
+on direction we need to execute in them either for_cpu() or for_device()
+call-backs depending on direction.
 
+As for invalidation in case of for_device(TO_CPU) I still don't see
+a rationale behind it. Would be interesting to see a real example where
+we benefit from this.
 
-Lorenzo, if you want to fold that in and update your branch, I can pull it.
-If not, I can add a patch on top, which should only break compile-testing
-bisection.
+> This is what is implemented for 32-bit ARM, depending on the CPU
+> capabilities, as we have DMA incoherent devices and we have CPUs that
+> speculatively prefetch data, and so may load data into the caches while
+> DMA is in operation.
+> 
+> 
+> Things get more interesting if the implementation behind the DMA API has
+> to copy data between the buffer supplied to the mapping and some DMA
+> accessible buffer:
+> 
+>         map             for_cpu         for_device      unmap
+> TO_DEV  copy to dma     none            copy to dma     none
+> TO_CPU  none            copy to cpu     none            copy to cpu
+> BIDIR   copy to dma     copy to cpu     copy to dma     copy to cpu
+> 
+> So, in both cases, the value of the direction argument defines what you
+> need to do in each call.
+
+Interesting enough in your seond table (which describes more complicated
+case indeed) you set "none" for for_device(TO_CPU) which looks logical
+to me.
+
+So IMHO that's what make sense:
+---------------------------->8-----------------------------
+        map             for_cpu         for_device      unmap
+TO_DEV  writeback       none            writeback       none
+TO_CPU  none            invalidate      none            invalidate*
+BIDIR   writeback       invalidate      writeback       invalidate*
+---------------------------->8-----------------------------
+
+* is the case for prefetching CPU.
+
+-Alexey
