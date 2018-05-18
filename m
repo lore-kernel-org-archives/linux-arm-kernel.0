@@ -1,9 +1,9 @@
 From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Fri, 18 May 2018 23:09:52 +0200
-Subject: [PATCH 4/6] fbdev: omapfb: lcd_ams_delta: use GPIO lookup table
+Date: Fri, 18 May 2018 23:09:51 +0200
+Subject: [PATCH 3/6] ASoC: ams_delta: use GPIO lookup table
 In-Reply-To: <20180518210954.29044-1-jmkrzyszt@gmail.com>
 References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
-Message-ID: <20180518210954.29044-4-jmkrzyszt@gmail.com>
+Message-ID: <20180518210954.29044-3-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,10 +11,19 @@ Now as the Amstrad Delta board provides GPIO lookup tables, switch from
 GPIO numbers to GPIO descriptors and use the table to locate required
 GPIO pins.
 
-Declare static variables for storing GPIO descriptors and replace
-gpio_ functions with their gpiod_ equivalents. Move GPIO lookup
-to the driver probe function so device initialization can be postponed
-instead of aborted if the GPIO pin is not yet available.
+The card uses two pins, one for jack and the other for voice modem
+codec DAI control.
+
+For jack pin, remove hardcoded GPIO number and use GPIO descriptor
+based variant of jack GPIO initialization.
+
+For modem_codec pin, declare static variable for storing its GPIO
+descriptor, obtain it on card initialization and replace obsolete
+ams_delta_latch2_write() with gpiod_set_value().  For that to work,
+don't request the modem_codec pin from the board init code anymore.
+
+If the modem_codec GPIO lookup fails, skip initialization of
+functionality of the card which depends on its availability.
 
 Pin naming used by the driver should be followed while respective GPIO
 lookup table is initialized by a board init code.
@@ -24,118 +33,137 @@ OMAP1: ams-delta: add GPIO lookup tables"
 
 Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
- drivers/video/fbdev/omap/lcd_ams_delta.c | 59 ++++++++++++++------------------
- 1 file changed, 26 insertions(+), 33 deletions(-)
+ arch/arm/mach-omap1/board-ams-delta.c |  5 -----
+ sound/soc/omap/ams-delta.c            | 38 +++++++++++++++++++----------------
+ 2 files changed, 21 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/video/fbdev/omap/lcd_ams_delta.c b/drivers/video/fbdev/omap/lcd_ams_delta.c
-index a4ee947006c7..19b6425b54be 100644
---- a/drivers/video/fbdev/omap/lcd_ams_delta.c
-+++ b/drivers/video/fbdev/omap/lcd_ams_delta.c
-@@ -24,11 +24,10 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/delay.h>
-+#include <linux/gpio/consumer.h>
- #include <linux/lcd.h>
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index 4b78e73f8bf7..80f54cb54276 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -259,11 +259,6 @@ static const struct gpio latch_gpios[] __initconst = {
+ 		.flags	= GPIOF_OUT_INIT_LOW,
+ 		.label	= "scard_cmdvcc",
+ 	},
+-	{
+-		.gpio	= AMS_DELTA_GPIO_PIN_MODEM_CODEC,
+-		.flags	= GPIOF_OUT_INIT_LOW,
+-		.label	= "modem_codec",
+-	},
+ 	{
+ 		.gpio	= AMS_DELTA_LATCH2_GPIO_BASE + 14,
+ 		.flags	= GPIOF_OUT_INIT_LOW,
+diff --git a/sound/soc/omap/ams-delta.c b/sound/soc/omap/ams-delta.c
+index 77a30f0f0c96..4dce494dfbd3 100644
+--- a/sound/soc/omap/ams-delta.c
++++ b/sound/soc/omap/ams-delta.c
+@@ -22,7 +22,7 @@
+  *
+  */
+ 
 -#include <linux/gpio.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/spinlock.h>
+ #include <linux/tty.h>
+ #include <linux/module.h>
+@@ -32,7 +32,6 @@
  
- #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ 
 -#include <mach/board-ams-delta.h>
+ #include <linux/platform_data/asoc-ti-mcbsp.h>
  
- #include "omapfb.h"
+ #include "omap-mcbsp.h"
+@@ -213,7 +212,6 @@ static const struct snd_kcontrol_new ams_delta_audio_controls[] = {
+ static struct snd_soc_jack ams_delta_hook_switch;
+ static struct snd_soc_jack_gpio ams_delta_hook_switch_gpios[] = {
+ 	{
+-		.gpio = 4,
+ 		.name = "hook_switch",
+ 		.report = SND_JACK_HEADSET,
+ 		.invert = 1,
+@@ -259,6 +257,7 @@ static struct timer_list cx81801_timer;
+ static bool cx81801_cmd_pending;
+ static bool ams_delta_muted;
+ static DEFINE_SPINLOCK(ams_delta_lock);
++static struct gpio_desc *gpiod_modem_codec;
  
-@@ -41,6 +40,8 @@
- /* LCD class device section */
- 
- static int ams_delta_lcd;
-+static struct gpio_desc *gpiod_vblen;
-+static struct gpio_desc *gpiod_ndisp;
- 
- static int ams_delta_lcd_set_power(struct lcd_device *dev, int power)
+ static void cx81801_timeout(struct timer_list *unused)
  {
-@@ -99,41 +100,17 @@ static struct lcd_ops ams_delta_lcd_ops = {
+@@ -272,7 +271,7 @@ static void cx81801_timeout(struct timer_list *unused)
+ 	/* Reconnect the codec DAI back from the modem to the CPU DAI
+ 	 * only if digital mute still off */
+ 	if (!muted)
+-		ams_delta_latch2_write(AMS_DELTA_LATCH2_MODEM_CODEC, 0);
++		gpiod_set_value(gpiod_modem_codec, 0);
+ }
  
- /* omapfb panel section */
+ /* Line discipline .open() */
+@@ -381,8 +380,7 @@ static void cx81801_receive(struct tty_struct *tty,
+ 		/* Apply config pulse by connecting the codec to the modem
+ 		 * if not already done */
+ 		if (apply)
+-			ams_delta_latch2_write(AMS_DELTA_LATCH2_MODEM_CODEC,
+-						AMS_DELTA_LATCH2_MODEM_CODEC);
++			gpiod_set_value(gpiod_modem_codec, 1);
+ 		break;
+ 	}
+ }
+@@ -432,8 +430,7 @@ static int ams_delta_digital_mute(struct snd_soc_dai *dai, int mute)
+ 	spin_unlock_bh(&ams_delta_lock);
  
--static const struct gpio _gpios[] = {
--	{
--		.gpio	= AMS_DELTA_GPIO_PIN_LCD_VBLEN,
--		.flags	= GPIOF_OUT_INIT_LOW,
--		.label	= "lcd_vblen",
--	},
--	{
--		.gpio	= AMS_DELTA_GPIO_PIN_LCD_NDISP,
--		.flags	= GPIOF_OUT_INIT_LOW,
--		.label	= "lcd_ndisp",
--	},
--};
--
--static int ams_delta_panel_init(struct lcd_panel *panel,
--		struct omapfb_device *fbdev)
--{
--	return gpio_request_array(_gpios, ARRAY_SIZE(_gpios));
--}
--
--static void ams_delta_panel_cleanup(struct lcd_panel *panel)
--{
--	gpio_free_array(_gpios, ARRAY_SIZE(_gpios));
--}
--
- static int ams_delta_panel_enable(struct lcd_panel *panel)
- {
--	gpio_set_value(AMS_DELTA_GPIO_PIN_LCD_NDISP, 1);
--	gpio_set_value(AMS_DELTA_GPIO_PIN_LCD_VBLEN, 1);
-+	gpiod_set_value(gpiod_ndisp, 1);
-+	gpiod_set_value(gpiod_vblen, 1);
+ 	if (apply)
+-		ams_delta_latch2_write(AMS_DELTA_LATCH2_MODEM_CODEC,
+-				mute ? AMS_DELTA_LATCH2_MODEM_CODEC : 0);
++		gpiod_set_value(gpiod_modem_codec, !!mute);
  	return 0;
  }
  
- static void ams_delta_panel_disable(struct lcd_panel *panel)
- {
--	gpio_set_value(AMS_DELTA_GPIO_PIN_LCD_VBLEN, 0);
--	gpio_set_value(AMS_DELTA_GPIO_PIN_LCD_NDISP, 0);
-+	gpiod_set_value(gpiod_vblen, 0);
-+	gpiod_set_value(gpiod_ndisp, 0);
- }
+@@ -469,14 +466,6 @@ static int ams_delta_cx20442_init(struct snd_soc_pcm_runtime *rtd)
+ 	/* Store a pointer to the codec structure for tty ldisc use */
+ 	cx20442_codec = rtd->codec_dai->component;
  
- static struct lcd_panel ams_delta_panel = {
-@@ -154,8 +131,6 @@ static struct lcd_panel ams_delta_panel = {
- 	.pcd		= 0,
- 	.acb		= 37,
+-	/* Set up digital mute if not provided by the codec */
+-	if (!codec_dai->driver->ops) {
+-		codec_dai->driver->ops = &ams_delta_dai_ops;
+-	} else {
+-		ams_delta_ops.startup = ams_delta_startup;
+-		ams_delta_ops.shutdown = ams_delta_shutdown;
+-	}
+-
+ 	/* Add hook switch - can be used to control the codec from userspace
+ 	 * even if line discipline fails */
+ 	ret = snd_soc_card_jack_new(card, "hook_switch", SND_JACK_HEADSET,
+@@ -486,7 +475,7 @@ static int ams_delta_cx20442_init(struct snd_soc_pcm_runtime *rtd)
+ 				"Failed to allocate resources for hook switch, "
+ 				"will continue without one.\n");
+ 	else {
+-		ret = snd_soc_jack_add_gpios(&ams_delta_hook_switch,
++		ret = snd_soc_jack_add_gpiods(card->dev, &ams_delta_hook_switch,
+ 					ARRAY_SIZE(ams_delta_hook_switch_gpios),
+ 					ams_delta_hook_switch_gpios);
+ 		if (ret)
+@@ -495,6 +484,21 @@ static int ams_delta_cx20442_init(struct snd_soc_pcm_runtime *rtd)
+ 				"will continue with hook switch inactive.\n");
+ 	}
  
--	.init		= ams_delta_panel_init,
--	.cleanup	= ams_delta_panel_cleanup,
- 	.enable		= ams_delta_panel_enable,
- 	.disable	= ams_delta_panel_disable,
- };
-@@ -166,9 +141,27 @@ static struct lcd_panel ams_delta_panel = {
- static int ams_delta_panel_probe(struct platform_device *pdev)
- {
- 	struct lcd_device *lcd_device = NULL;
--#ifdef CONFIG_LCD_CLASS_DEVICE
- 	int ret;
- 
-+	gpiod_vblen = devm_gpiod_get(&pdev->dev, "vblen", GPIOD_OUT_LOW);
-+	if (IS_ERR(gpiod_vblen)) {
-+		ret = PTR_ERR(gpiod_vblen);
-+		dev_err(&pdev->dev, "VBLEN GPIO request failed (%d)\n", ret);
-+		if (ret == -ENODEV || ret == -ENOENT)
-+			ret = -EPROBE_DEFER;
-+		return ret;
++	gpiod_modem_codec = devm_gpiod_get(card->dev, "modem_codec",
++					   GPIOD_OUT_HIGH);
++	if (IS_ERR(gpiod_modem_codec)) {
++		dev_warn(card->dev, "Failed to obtain modem_codec GPIO\n");
++		return 0;
 +	}
 +
-+	gpiod_ndisp = devm_gpiod_get(&pdev->dev, "ndisp", GPIOD_OUT_LOW);
-+	if (IS_ERR(gpiod_ndisp)) {
-+		ret = PTR_ERR(gpiod_ndisp);
-+		dev_err(&pdev->dev, "NDISP GPIO request failed (%d)\n", ret);
-+		if (ret == -ENODEV || ret == -ENOENT)
-+			ret = -EPROBE_DEFER;
-+		return ret;
++	/* Set up digital mute if not provided by the codec */
++	if (!codec_dai->driver->ops) {
++		codec_dai->driver->ops = &ams_delta_dai_ops;
++	} else {
++		ams_delta_ops.startup = ams_delta_startup;
++		ams_delta_ops.shutdown = ams_delta_shutdown;
 +	}
 +
-+#ifdef CONFIG_LCD_CLASS_DEVICE
- 	lcd_device = lcd_device_register("omapfb", &pdev->dev, NULL,
- 						&ams_delta_lcd_ops);
- 
+ 	/* Register optional line discipline for over the modem control */
+ 	ret = tty_register_ldisc(N_V253, &cx81801_ops);
+ 	if (ret) {
 -- 
 2.16.1
