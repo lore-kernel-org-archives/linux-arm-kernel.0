@@ -1,28 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 May 2018 18:45:03 +0100
-Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
-In-Reply-To: <CAKwvOdm1kYedukCq=g74AvqJHp6KC03oNoouQy2nkvfo4idoEw@mail.gmail.com>
-References: <20180518170202.11458-1-samitolvanen@google.com>
- <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
- <CAKwvOdm1kYedukCq=g74AvqJHp6KC03oNoouQy2nkvfo4idoEw@mail.gmail.com>
-Message-ID: <8c7be44f-086d-65e3-9969-8182261ce82f@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 May 2018 18:50:04 +0100
+Subject: dma_sync_*_for_cpu and direction=TO_DEVICE (was Re: [PATCH
+ 02/20] dma-mapping: provide a generic dma-noncoherent implementation)
+In-Reply-To: <5ac5b1e3-9b96-9c7c-4dfe-f65be45ec179@synopsys.com>
+References: <20180511075945.16548-1-hch@lst.de>
+ <20180511075945.16548-3-hch@lst.de>
+ <bad125dff49f6e49c895e818c9d1abb346a46e8e.camel@synopsys.com>
+ <5ac5b1e3-9b96-9c7c-4dfe-f65be45ec179@synopsys.com>
+Message-ID: <20180518175004.GF17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/18 18:40, Nick Desaulniers wrote:
-> On Fri, May 18, 2018 at 10:30 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
->> I'm going to ask the question I've asked before when this patch cropped
->> up (must be the 4th time now):
-> 
->> Is it guaranteed that this is the only case where LLVM/clang is going to
->> generate absolute addresses instead of using relative addressing?
-> 
-> It seems like if there's requirements that only relative addressing be
-> used, then the compiler should be told explicitly about this restriction,
-> no?
+On Fri, May 18, 2018 at 10:20:02AM -0700, Vineet Gupta wrote:
+> I never understood the need for this direction. And if memory serves me
+> right, at that time I was seeing twice the amount of cache flushing !
 
-Certainly. What's the rune?
+It's necessary.  Take a moment to think carefully about this:
 
-	M.
+	dma_map_single(, dir)
+
+	dma_sync_single_for_cpu(, dir)
+
+	dma_sync_single_for_device(, dir)
+
+	dma_unmap_single(, dir)
+
+In the case of a DMA-incoherent architecture, the operations done at each
+stage depend on the direction argument:
+
+	map		for_cpu		for_device	unmap
+TO_DEV	writeback	none		writeback	none
+TO_CPU	invalidate	invalidate*	invalidate	invalidate*
+BIDIR	writeback	invalidate	writeback	invalidate
+
+* - only necessary if the CPU speculatively prefetches.
+
+The multiple invalidations for the TO_CPU case handles different
+conditions that can result in data corruption, and for some CPUs, all
+four are necessary.
+
+This is what is implemented for 32-bit ARM, depending on the CPU
+capabilities, as we have DMA incoherent devices and we have CPUs that
+speculatively prefetch data, and so may load data into the caches while
+DMA is in operation.
+
+
+Things get more interesting if the implementation behind the DMA API has
+to copy data between the buffer supplied to the mapping and some DMA
+accessible buffer:
+
+	map		for_cpu		for_device	unmap
+TO_DEV	copy to dma	none		copy to dma	none
+TO_CPU	none		copy to cpu	none		copy to cpu
+BIDIR	copy to dma	copy to cpu	copy to dma	copy to cpu
+
+So, in both cases, the value of the direction argument defines what you
+need to do in each call.
+
 -- 
-Jazz is not dead. It just smells funny...
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
