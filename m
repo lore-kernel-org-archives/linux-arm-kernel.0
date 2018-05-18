@@ -1,66 +1,41 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 18 May 2018 12:31:21 +0200
-Subject: [PATCH 0/9] PM / Domains: Add support for multi PM domains per device
-Message-ID: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+Date: Fri, 18 May 2018 12:31:25 +0200
+Subject: [PATCH 4/9] PM / Domains: Drop unused parameter in
+ genpd_allocate_dev_data()
+In-Reply-To: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1526639490-12167-5-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are devices that are partitioned across multiple PM domains. Currently
-these can't be supported well by the available PM infrastructures we have in
-the kernel. This series is an attempt to address this.
+The in-parameter struct generic_pm_domain *genpd to
+genpd_allocate_dev_data() is unused, so let's drop it.
 
-The interesting parts happens from patch 5 an onwards, including a minor DT
-update to the existing power-domain bindings, the 4 earlier are just trivial
-clean-ups of some related code in genpd, which I happened to stumble over.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/base/power/domain.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Some additional background:
-
-One existing case where devices are partitioned across multiple PM domains, is
-the Nvida Tegra 124/210 X-USB subsystem. A while ago Jon Hunter (Nvidia) sent a
-series, trying to address these issues, however this is a new approach, while
-it re-uses the same concepts from DT point of view.
-
-The Tegra 124/210 X-USB subsystem contains of a host controller and a device
-controller. Each controller have its own independent PM domain, but are being
-partitioned across another shared PM domain for the USB super-speed logic.
-
-Currently to make the drivers work, either the related PM domains needs to stay
-powered on always or the PM domain topology needs to be in-correctly modelled
-through sub-domains. In both cases PM domains may be powered on while they
-don't need to be, so in the end this means - wasting power -.
-
-As stated above, this series intends to address these problem from a PM
-infrastructure point of view. More details are available in each changelog.
-
-It should be noted that this series has been tested on HW, however only by using
-a home-cooked test PM domain driver for genpd and together with a test driver.
-This allowed me to play with PM domain (genpd), runtime PM and device links.
-
-Any further deployment for real use cases are greatly appreciated. I am happy to
-to help, if needed!
-
-Kind regards
-Ulf Hansson
-
-
-Ulf Hansson (9):
-  PM / Domains: Drop extern declarations of functions in pm_domain.h
-  PM / Domains: Drop __pm_genpd_add_device()
-  PM / Domains: Drop genpd as in-param for pm_genpd_remove_device()
-  PM / Domains: Drop unused parameter in genpd_allocate_dev_data()
-  PM / Domains: dt: Allow power-domain property to be a list of phandles
-  PM / Domains: Don't attach devices in genpd with multi PM domains
-  PM / Domains: Split genpd_dev_pm_attach()
-  PM / Domains: Add support for multi PM domains per device to genpd
-  PM / Domains: Add dev_pm_domain_attach_by_id() to manage multi PM
-    domains
-
- .../devicetree/bindings/power/power_domain.txt     |  18 ++-
- drivers/base/power/common.c                        |  33 ++++-
- drivers/base/power/domain.c                        | 154 ++++++++++++++++-----
- drivers/gpu/drm/amd/amdgpu/amdgpu_acp.c            |   2 +-
- include/linux/pm_domain.h                          |  79 +++++------
- 5 files changed, 208 insertions(+), 78 deletions(-)
-
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index f08fa15..050ce07 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1316,7 +1316,6 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
+ #endif /* CONFIG_PM_SLEEP */
+ 
+ static struct generic_pm_domain_data *genpd_alloc_dev_data(struct device *dev,
+-					struct generic_pm_domain *genpd,
+ 					struct gpd_timing_data *td)
+ {
+ 	struct generic_pm_domain_data *gpd_data;
+@@ -1385,7 +1384,7 @@ static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+ 	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev))
+ 		return -EINVAL;
+ 
+-	gpd_data = genpd_alloc_dev_data(dev, genpd, td);
++	gpd_data = genpd_alloc_dev_data(dev, td);
+ 	if (IS_ERR(gpd_data))
+ 		return PTR_ERR(gpd_data);
+ 
 -- 
 2.7.4
