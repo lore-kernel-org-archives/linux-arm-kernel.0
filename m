@@ -1,74 +1,84 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 18 May 2018 11:48:48 +0100
-Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.18
-In-Reply-To: <20180515230014.GS29062@mai>
-References: <5AF5A94A.4080308@hisilicon.com>
- <20180514201445.6sglddhalvclu36v@localhost> <20180515082811.GL29062@mai>
- <20180515203755.esjnphfep5ep7wbe@localhost> <20180515230014.GS29062@mai>
-Message-ID: <5AFEAF90.2030405@hisilicon.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 18 May 2018 12:46:58 +0200
+Subject: [PATCH 5/9] PM / Domains: dt: Allow power-domain property to be a
+ list of phandles
+In-Reply-To: <1526639490-12167-6-git-send-email-ulf.hansson@linaro.org>
+References: <1526639490-12167-1-git-send-email-ulf.hansson@linaro.org>
+ <1526639490-12167-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAMuHMdUTF-8_V6kMAE0THNES+yv2HhZGJA3f41Yfpd1Bs6txHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Ulf,
 
-On 2018/5/16 0:00, Daniel Lezcano wrote:
-> On Tue, May 15, 2018 at 01:37:55PM -0700, Olof Johansson wrote:
->> On Tue, May 15, 2018 at 10:28:11AM +0200, Daniel Lezcano wrote:
->>> On Mon, May 14, 2018 at 01:14:45PM -0700, Olof Johansson wrote:
->>>> Hi Wei,
->>>>
->>>> On Fri, May 11, 2018 at 03:31:38PM +0100, Wei Xu wrote:
->>>>> Hi Arnd, Hi Olof,
->>>>>
->>>>> Please help to pull the following changes.
->>>>>
->>>>> About the CLOCK_STUB and the MAILBOX consolidate patch,
->>>>> Jassi and Stephen have acked it.
->>>>> Could you let me know how to handle this kind case
->>>>> if it is not OK to be in this pull?
->>>>
->>>> I don't think there's any need to group the Kconfig changes with the defconfig
->>>> updates here, is there?
->>>
->>> I don't have the patches history, but likely this patch should come together with:
->>>
->>> https://patchwork.kernel.org/patch/10399799/
->>> https://patchwork.kernel.org/patch/10399801/
->>>
->>> Otherwise the compilation options won't be consistent with what is enabled in
->>> the DT.
->>
->> As long as neither side regresses due to the changes, there should be no
->> problem. Just because a DT node is added in the tree there's no need to
->> configure the driver. Or am I missing some aspect of it here?
-> 
-> Actually, the DT node being added do not introduce regressions.
-> 
-> However it is expected by adding the clock stub and the mailbox to have the
-> cpufreq working which is not necessarily the case because the config may be
-> inconsistent, so the cpufreq may be working on some config if the user had the
-> options for the clock and the mailbox enabled but these options can disappear
-> and not come back because of this Kconfig inconsistencies.
-> 
->>From my point of view, by adding those DT nodes, it makes sense to give a
-> consolidated Kconfig coming together and ensuring the drivers are enabled when
-> the node is parsed.
-> 
-> On the other side, the patch is simple enough to be split and submitted in
-> separated trees, hoping the maintainer Wu Xei and the branch users keep in mind
-> if the board does not boot or has inconsistent behavior they will have to
-> double check the options are enabled for the clock stub and the mailbox.
-> 
-> I don't have a strong opinion on this actually, whatever the decision is, I
-> will be fine with resubmitting the patch to the different trees, or keep it as
-> is and merge it through the hisi tree.
+On Fri, May 18, 2018 at 12:31 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> To be able to describe topologies where devices are partitioned across
+> multiple power domains, let's extend the power-domain property to allow
+> being a list of phandles.
+>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Suggested-by: Jon Hunter <jonathanh@nvidia.com>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Thanks to make it clear!
-In this case, I will drop this patch in the pull firstly.
+Thanks for your patch!
 
-Best Regards,
-Wei
+> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+> @@ -111,8 +111,9 @@ Example 3:
+>  ==PM domain consumers==
+>
+>  Required properties:
+> - - power-domains : A phandle and PM domain specifier as defined by bindings of
+> -                   the power controller specified by phandle.
+> + - power-domains : A phandle and PM domain specifier, or a list of phandles, as
 
-> 
->   -- Daniel
-> 
+A list of PM domain specifiers?
+
+(A PM domain specifier consists of a phandle, and zero or more indices)
+
+> +                  defined by bindings of the power controller specified by
+> +                  phandle.
+>
+>  Example:
+>
+> @@ -122,9 +123,16 @@ Example:
+>                 power-domains = <&power 0>;
+>         };
+>
+> -The node above defines a typical PM domain consumer device, which is located
+> -inside a PM domain with index 0 of a power controller represented by a node
+> -with the label "power".
+> +       leaky-device at 12350000 {
+
+I know it's just an example, but this uses the same unit-address and
+reg property
+as the device node above.
+
+There's a similar issue with the two other examples below, but they
+use different
+node names (leaky-device0 and leaky-device1).
+
+> +               compatible = "foo,i-leak-current";
+> +               reg = <0x12350000 0x1000>;
+> +               power-domains = <&power0 0>, <&power1 0> ;
+> +       };
+> +
+> +The first example above defines a typical PM domain consumer device, which is
+> +located inside a PM domain with index 0 of a power controller represented by a
+> +node with the label "power". In the second example the consumer device are
+> +partitioned across two PM domains.
+>
+>  Optional properties:
+>  - required-opps: This contains phandle to an OPP node in another device's OPP
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
