@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:16:01 +0200
-Subject: [PATCH 099/102] arm64: dts: renesas: r8a77965: add VIN and CSI-2 nodes
+Date: Fri, 18 May 2018 13:16:00 +0200
+Subject: [PATCH 098/102] arm64: dts: renesas: r8a7796: add VIN and CSI-2 nodes
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <98b6badf77d5a877c918ae12b070caae8f1df968.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <0e5819f10bb1230088c9893aaad7e6884611b061.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,23 +12,23 @@ From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 326 +++++++++++++++++++++++++++++-
- 1 file changed, 316 insertions(+), 10 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 367 +++++++++++++++++++++++++++++++
+ 1 file changed, 367 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 1f67aea49305..486aecacb22a 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -886,43 +886,259 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 6ffab2da07cb..7c25be6b5af3 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -1280,6 +1280,262 @@
+ 			status = "disabled";
  		};
  
- 		vin0: video at e6ef0000 {
-+			compatible = "renesas,vin-r8a77965";
- 			reg = <0 0xe6ef0000 0 0x1000>;
--			/* placeholder */
++		vin0: video at e6ef0000 {
++			compatible = "renesas,vin-r8a7796";
++			reg = <0 0xe6ef0000 0 0x1000>;
 +			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 811>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 811>;
 +			renesas,id = <0>;
 +			status = "disabled";
@@ -53,15 +53,14 @@ index 1f67aea49305..486aecacb22a 100644
 +					};
 +				};
 +			};
- 		};
- 
- 		vin1: video at e6ef1000 {
-+			compatible = "renesas,vin-r8a77965";
- 			reg = <0 0xe6ef1000 0 0x1000>;
--			/* placeholder */
++		};
++
++		vin1: video at e6ef1000 {
++			compatible = "renesas,vin-r8a7796";
++			reg = <0 0xe6ef1000 0 0x1000>;
 +			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 810>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 810>;
 +			renesas,id = <1>;
 +			status = "disabled";
@@ -86,15 +85,14 @@ index 1f67aea49305..486aecacb22a 100644
 +					};
 +				};
 +			};
- 		};
- 
- 		vin2: video at e6ef2000 {
-+			compatible = "renesas,vin-r8a77965";
- 			reg = <0 0xe6ef2000 0 0x1000>;
--			/* placeholder */
++		};
++
++		vin2: video at e6ef2000 {
++			compatible = "renesas,vin-r8a7796";
++			reg = <0 0xe6ef2000 0 0x1000>;
 +			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 809>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 809>;
 +			renesas,id = <2>;
 +			status = "disabled";
@@ -119,15 +117,14 @@ index 1f67aea49305..486aecacb22a 100644
 +					};
 +				};
 +			};
- 		};
- 
- 		vin3: video at e6ef3000 {
-+			compatible = "renesas,vin-r8a77965";
- 			reg = <0 0xe6ef3000 0 0x1000>;
--			/* placeholder */
++		};
++
++		vin3: video at e6ef3000 {
++			compatible = "renesas,vin-r8a7796";
++			reg = <0 0xe6ef3000 0 0x1000>;
 +			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 808>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 808>;
 +			renesas,id = <3>;
 +			status = "disabled";
@@ -152,15 +149,14 @@ index 1f67aea49305..486aecacb22a 100644
 +					};
 +				};
 +			};
- 		};
- 
- 		vin4: video at e6ef4000 {
-+			compatible = "renesas,vin-r8a77965";
- 			reg = <0 0xe6ef4000 0 0x1000>;
--			/* placeholder */
++		};
++
++		vin4: video at e6ef4000 {
++			compatible = "renesas,vin-r8a7796";
++			reg = <0 0xe6ef4000 0 0x1000>;
 +			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 807>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 807>;
 +			renesas,id = <4>;
 +			status = "disabled";
@@ -185,15 +181,14 @@ index 1f67aea49305..486aecacb22a 100644
 +					};
 +				};
 +			};
- 		};
- 
- 		vin5: video at e6ef5000 {
-+			compatible = "renesas,vin-r8a77965";
- 			reg = <0 0xe6ef5000 0 0x1000>;
--			/* placeholder */
++		};
++
++		vin5: video at e6ef5000 {
++			compatible = "renesas,vin-r8a7796";
++			reg = <0 0xe6ef5000 0 0x1000>;
 +			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 806>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 806>;
 +			renesas,id = <5>;
 +			status = "disabled";
@@ -218,15 +213,14 @@ index 1f67aea49305..486aecacb22a 100644
 +					};
 +				};
 +			};
- 		};
- 
- 		vin6: video at e6ef6000 {
-+			compatible = "renesas,vin-r8a77965";
- 			reg = <0 0xe6ef6000 0 0x1000>;
--			/* placeholder */
++		};
++
++		vin6: video at e6ef6000 {
++			compatible = "renesas,vin-r8a7796";
++			reg = <0 0xe6ef6000 0 0x1000>;
 +			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 805>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 805>;
 +			renesas,id = <6>;
 +			status = "disabled";
@@ -251,15 +245,14 @@ index 1f67aea49305..486aecacb22a 100644
 +					};
 +				};
 +			};
- 		};
- 
- 		vin7: video at e6ef7000 {
-+			compatible = "renesas,vin-r8a77965";
- 			reg = <0 0xe6ef7000 0 0x1000>;
--			/* placeholder */
++		};
++
++		vin7: video at e6ef7000 {
++			compatible = "renesas,vin-r8a7796";
++			reg = <0 0xe6ef7000 0 0x1000>;
 +			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 804>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 804>;
 +			renesas,id = <7>;
 +			status = "disabled";
@@ -284,25 +277,27 @@ index 1f67aea49305..486aecacb22a 100644
 +					};
 +				};
 +			};
++		};
++
+ 		drif00: rif at e6f40000 {
+ 			compatible = "renesas,r8a7796-drif",
+ 				     "renesas,rcar-gen3-drif";
+@@ -1998,6 +2254,117 @@
+ 			renesas,fcp = <&fcpvi0>;
  		};
  
- 		rcar_sound: sound at ec500000 {
-@@ -1218,22 +1434,112 @@
- 		};
- 
- 		csi20: csi2 at fea80000 {
-+			compatible = "renesas,r8a77965-csi2";
- 			reg = <0 0xfea80000 0 0x10000>;
--			/* placeholder */
++		csi20: csi2 at fea80000 {
++			compatible = "renesas,r8a7796-csi2";
++			reg = <0 0xfea80000 0 0x10000>;
 +			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 714>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 714>;
 +			status = "disabled";
- 
- 			ports {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
 +
 +				port at 1 {
 +					#address-cells = <1>;
@@ -343,22 +338,21 @@ index 1f67aea49305..486aecacb22a 100644
 +						remote-endpoint = <&vin7csi20>;
 +					};
 +				};
- 			};
- 		};
- 
- 		csi40: csi2 at feaa0000 {
-+			compatible = "renesas,r8a77965-csi2";
- 			reg = <0 0xfeaa0000 0 0x10000>;
--			/* placeholder */
++			};
++		};
++
++		csi40: csi2 at feaa0000 {
++			compatible = "renesas,r8a7796-csi2";
++			reg = <0 0xfeaa0000 0 0x10000>;
 +			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cpg CPG_MOD 716>;
-+			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
 +			resets = <&cpg 716>;
 +			status = "disabled";
- 
- 			ports {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
 +
 +				port at 1 {
 +					#address-cells = <1>;
@@ -399,8 +393,12 @@ index 1f67aea49305..486aecacb22a 100644
 +						remote-endpoint = <&vin7csi40>;
 +					};
 +				};
- 			};
- 		};
- 
++
++			};
++		};
++
+ 		hdmi0: hdmi at fead0000 {
+ 			compatible = "renesas,r8a7796-hdmi", "renesas,rcar-gen3-hdmi";
+ 			reg = <0 0xfead0000 0 0x10000>;
 -- 
 2.11.0
