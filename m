@@ -1,58 +1,35 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 18 May 2018 15:15:12 +0530
-Subject: [PATCH v2 02/26] arm64: dts: allwinner: a64: Add DE2 CCU
+Date: Fri, 18 May 2018 15:15:13 +0530
+Subject: [PATCH v2 03/26] clk: sunxi-ng: Enable DE2_CCU for SUN8I and SUN50I
 In-Reply-To: <20180518094536.17201-1-jagan@amarulasolutions.com>
 References: <20180518094536.17201-1-jagan@amarulasolutions.com>
-Message-ID: <20180518094536.17201-3-jagan@amarulasolutions.com>
+Message-ID: <20180518094536.17201-4-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DE2 CCU in Allwinner A64 has same like H5, so use the
-similar dts details for A64 with fallback compatible.
+Allwinner SoC like SUN8I and SUN50I has DE2 CCU so enable them
+as default.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
-- Add h5 compatible first since A64 came first.
+- Enable for MACH_SUN8I
 
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/clk/sunxi-ng/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 1b2ef28c42bd..26c2a9c44727 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -43,9 +43,11 @@
-  */
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 826674d090fd..e20182aa9748 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -63,6 +63,8 @@ config SUN8I_V3S_CCU
  
- #include <dt-bindings/clock/sun50i-a64-ccu.h>
-+#include <dt-bindings/clock/sun8i-de2.h>
- #include <dt-bindings/clock/sun8i-r-ccu.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset/sun50i-a64-ccu.h>
-+#include <dt-bindings/reset/sun8i-de2.h>
+ config SUN8I_DE2_CCU
+ 	bool "Support for the Allwinner SoCs DE2 CCU"
++	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
++	depends on DRM_SUN4I && (MACH_SUN8I || (ARM64 && ARCH_SUNXI))
  
- / {
- 	interrupt-parent = <&gic>;
-@@ -168,6 +170,19 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		display_clocks: clock at 1000000 {
-+			compatible = "allwinner,sun50i-h5-de2-clk",
-+				     "allwinner,sun50i-a64-de2-clk";
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
- 		syscon: syscon at 1c00000 {
- 			compatible = "allwinner,sun50i-a64-system-controller",
- 				"syscon";
+ config SUN8I_R40_CCU
+ 	bool "Support for the Allwinner R40 CCU"
 -- 
 2.14.3
