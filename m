@@ -1,47 +1,36 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 18 May 2018 11:58:40 +0100
-Subject: [GIT PULL v2] arm64: defconfig: hisilicon config updates for v4.18
-Message-ID: <5AFEB1E0.9030200@hisilicon.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 18 May 2018 13:11:32 +0200
+Subject: [PATCH] ghes_edac: enable HIP08 platform edac driver
+In-Reply-To: <8602b133-e0fa-57e2-5159-9d34a1ded85f@arm.com>
+References: <1526039543-180996-1-git-send-email-zhengqiang10@huawei.com>
+ <20180511121901.GA12705@pd.tnic> <5AF90C70.408@huawei.com>
+ <20180514094709.GC23049@pd.tnic>
+ <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
+ <20180514164720.GH23049@pd.tnic>
+ <da776696-ddbf-c35e-1dd4-b6e0ce91aed6@arm.com>
+ <20180516182958.GB17092@pd.tnic>
+ <8602b133-e0fa-57e2-5159-9d34a1ded85f@arm.com>
+Message-ID: <20180518111132.GC17285@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+On Thu, May 17, 2018 at 07:02:18PM +0100, James Morse wrote:
+> v4.17-rc5 has 'return 0' here. Wouldn't this change means no ghes can be
+> registered unless ghes_edac is also supported by the platform?
+> Shouldn't this be '0' for a silent failure?
 
-Please help to pull the following changes.
-Thanks!
+https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/commit/?h=for-next&id=cc7f3f132658289b6661ab8294ab08a9d32ea026
 
-Best Regards,
-Wei
+> Tested on Seattle and some cranky homebrew-no-DMI firmware:
+> Tested-by: James Morse <james.morse@arm.com>
+> 
+> With the ENODEV/0 thing above:
+> Reviewed-by: James Morse <james.morse@arm.com>
 
----
+Thanks, adding.
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+-- 
+Regards/Gruss,
+    Boris.
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.18v2
-
-for you to fetch changes up to 9ab1c973324566baa314f8dd4e3827e4076a8675:
-
-  arm64: defconfig: Enable HISILICON_LPC (2018-05-11 11:39:01 +0100)
-
-----------------------------------------------------------------
-ARM64: hisilicon: defconfig updates for 4.18
-
-- Sync the arm64 defconfig with savedefconfig
-- Enable the support of ethernet, eMMC, Combo/INNO phy
-  and PCIe for Hi3798CV200
-- Enable the LPC for hip06 and hip07
-
-----------------------------------------------------------------
-John Garry (1):
-      arm64: defconfig: Enable HISILICON_LPC
-
-Shawn Guo (2):
-      arm64: defconfig: sync it with savedefconfig
-      arm64: defconfig: enable drivers for Poplar support
-
- arch/arm64/configs/defconfig | 86 +++++++++++++++++++-------------------------
- 1 file changed, 36 insertions(+), 50 deletions(-)
+Good mailing practices for 400: avoid top-posting and trim the reply.
