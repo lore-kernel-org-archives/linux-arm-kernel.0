@@ -1,57 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 May 2018 10:48:31 +0100
-Subject: [PATCH v2 2/2] KVM: arm/arm64: harden unmap_stage2_ptes in case
- end is not PAGE_SIZE aligned
-In-Reply-To: <1526635630-18917-2-git-send-email-hejianet@gmail.com>
-References: <1526635630-18917-1-git-send-email-hejianet@gmail.com>
- <1526635630-18917-2-git-send-email-hejianet@gmail.com>
-Message-ID: <2185a61e-c157-e177-9bad-83b6f27fd784@arm.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Fri, 18 May 2018 15:15:34 +0530
+Subject: [PATCH v2 24/26] arm64: dts: allwinner: a64: a64-olinuxino: Enable
+ HDMI output
+In-Reply-To: <20180518094536.17201-1-jagan@amarulasolutions.com>
+References: <20180518094536.17201-1-jagan@amarulasolutions.com>
+Message-ID: <20180518094536.17201-25-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/18 10:27, Jia He wrote:
-> If it passes addr=0x202920000,size=0xfe00 to unmap_stage2_range->
-> ...->unmap_stage2_ptes, unmap_stage2_ptes will get addr=0x202920000,
-> end=0x20292fe00. After first while loop addr=0x202930000, end=0x20292fe00,
-> then addr!=end. Thus it will touch another pages by put_pages() in the
-> 2nd loop.
-> 
-> This patch fixes it by hardening the break condition of while loop.
-> 
-> Signed-off-by: jia.he at hxt-semitech.com
-> ---
-> v2: newly added
-> 
->  virt/kvm/arm/mmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 8dac311..45cd040 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -217,7 +217,7 @@ static void unmap_stage2_ptes(struct kvm *kvm, pmd_t *pmd,
->  
->  			put_page(virt_to_page(pte));
->  		}
-> -	} while (pte++, addr += PAGE_SIZE, addr != end);
-> +	} while (pte++, addr += PAGE_SIZE, addr < end);
->  
->  	if (stage2_pte_table_empty(start_pte))
->  		clear_stage2_pmd_entry(kvm, pmd, start_addr);
-> 
+Enable HDMI output on a64-olinuxino board.
 
-I don't think this change is the right thing to do. You get that failure
-because you're being passed a size that is not a multiple of PAGE_SIZE.
-That's the mistake.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v2:
+- none
 
-You should ensure that this never happens, rather than changing the page
-table walkers (which are consistent with the way this kind of code is
-written in other places of the kernel). As you mentioned in your first
-patch, the real issue is that KSM is broken, and this is what should be
-fixed.
+ .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+index 3b3081b10ecb..83329c8fec4f 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+@@ -58,12 +58,38 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+ 	};
+ };
+ 
++&de {
++	status = "okay";
++};
++
++&hdmi {
++	hvcc-supply = <&reg_dldo1>;
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
 -- 
-Jazz is not dead. It just smells funny...
+2.14.3
