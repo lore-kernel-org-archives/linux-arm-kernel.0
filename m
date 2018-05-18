@@ -1,46 +1,60 @@
-From: Alexey.Brodkin@synopsys.com (Alexey Brodkin)
-Date: Fri, 18 May 2018 14:13:47 +0000
-Subject: [PATCH 02/20] dma-mapping: provide a generic dma-noncoherent
- implementation
-In-Reply-To: <20180518132731.GA31125@lst.de>
-References: <20180511075945.16548-1-hch@lst.de>
- <20180511075945.16548-3-hch@lst.de>
- <bad125dff49f6e49c895e818c9d1abb346a46e8e.camel@synopsys.com>
- <20180518132731.GA31125@lst.de>
-Message-ID: <913e288c5aabf0224cedcf2eb0c9be309745eace.camel@synopsys.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 18 May 2018 10:17:51 -0400
+Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
+ translated by the bridge
+In-Reply-To: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+A host bridge is allowed to remap BAR addresses using _TRA attribute in
+_CRS windows.
 
-On Fri, 2018-05-18 at 15:27 +0200, hch at lst.de wrote:
-> On Fri, May 18, 2018 at 01:03:46PM +0000, Alexey Brodkin wrote:
-> > Note mmc_get_dma_dir() is just "data->flags & MMC_DATA_WRITE ? DMA_TO_DEVICE : DMA_FROM_DEVICE".
-> > I.e. if we're preparing for sending data dma_noncoherent_map_sg() will have DMA_TO_DEVICE which
-> > is quite OK for passing to dma_noncoherent_sync_sg_for_device() but in case of reading we'll have
-> > DMA_FROM_DEVICE which we'll pass to dma_noncoherent_sync_sg_for_device() in dma_noncoherent_map_sg().
-> > 
-> > I'd say this is not entirely correct because IMHO arch_sync_dma_for_cpu() is supposed to only be used
-> > in case of DMA_FROM_DEVICE and arch_sync_dma_for_device() only in case of DMA_TO_DEVICE.
-> 
-> arc overrides the dir paramter of the dma_sync_single_for_device/
-> dma_sync_single_for_cpu calls.  My patches dropped that, and I have
-> restored that, and audit for the other architectures is pending.
+pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
+pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
 
-Well at least for me that's a confusion what is a reason to pass direction
-to function which purpose is already known.
+When a VGA device is behind such a host bridge and the resource is
+translated efifb driver is trying to do ioremap against bus address
+rather than the resource address and is failing to probe.
 
-I'd say that XXX_sync_for_device() doesn't need _variable_ direction as an argument,
-otherwise what does that mean if we pass DMA_FROM_DEVICE to that function?
+efifb: probing for efifb
+efifb: cannot reserve video memory at 0x1e000000
+efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
+efifb: mode is 800x600x32, linelength=3200, pages=1
+efifb: scrolling: redraw
+efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
 
-> That being said the existing arc code still looks rather odd as it
-> didn't do the same thing for the scatterlist versions of the calls.
+Use the host bridge offset information to convert bus address to
+resource address in the fixup.
 
-That might easily be the case so good we caught that now and it will be fixed :)
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/video/fbdev/efifb.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> I've thrown in a few patches into my new tree to make the sg versions
-> make the normal calls, and to clean up the area a bit.
-
-I'll try your newer series now, thanks!
-
--Alexey
+diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
+index 6daac8d..429cc85 100644
+--- a/drivers/video/fbdev/efifb.c
++++ b/drivers/video/fbdev/efifb.c
+@@ -431,6 +431,7 @@ static void efifb_fixup_resources(struct pci_dev *dev)
+ 		.end = screen_info.lfb_base + screen_info.lfb_size - 1,
+ 		.flags = IORESOURCE_MEM,
+ 	};
++	struct pci_bus_region region;
+ 	int i;
+ 
+ 	if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+@@ -442,6 +443,10 @@ static void efifb_fixup_resources(struct pci_dev *dev)
+ 	if (!screen_res.start)
+ 		return;
+ 
++	region.start = screen_res.start;
++	region.end = screen_res.end;
++	pcibios_bus_to_resource(dev->bus, &screen_res, &region);
++
+ 	for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
+ 		struct resource *res = &dev->resource[i];
+ 
+-- 
+2.7.4
