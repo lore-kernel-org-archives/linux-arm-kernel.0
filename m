@@ -1,101 +1,141 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 18 May 2018 13:49:20 +0530
-Subject: [PATCH V7 07/12] ARM: dts: ipq4019: Add ipq4019-ap.dk07.1 common data
-In-Reply-To: <1526631565-9972-1-git-send-email-sricharan@codeaurora.org>
-References: <1526631565-9972-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1526631565-9972-8-git-send-email-sricharan@codeaurora.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 18 May 2018 10:48:49 +0200
+Subject: [PATCH] PM / runtime: Fixup reference counting of device link
+ suppliers at probe
+Message-ID: <1526633329-31729-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the common data for all dk07 based boards.
+In the driver core, before it invokes really_probe() it runtime resumes the
+suppliers for the device via calling pm_runtime_get_suppliers(), which also
+increases the runtime PM usage count for each of the available supplier.
 
-Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+This makes sense, as to be able to allow the consumer device to be probed
+by its driver. However, if the driver decides to add a new supplier link
+during ->probe(), hence updating the list of suppliers, the following call
+to pm_runtime_put_suppliers(), invoked after really_probe() in the driver
+core, we get into trouble.
+
+More precisely, pm_runtime_put() gets called also for the new supplier(s),
+which is wrong as the driver core, didn't trigger pm_runtime_get_sync() to
+be called for it in the first place. In other words, the new supplier may
+be runtime suspended even in cases when it shouldn't.
+
+Fix this behaviour, by runtime resume suppliers according to the same
+conditions as managed by the runtime PM core, when runtime resume callbacks
+are being invoked.
+
+Additionally, don't try to runtime suspend any of the suppliers after
+really_probe(), but instead rely on that to happen via the consumer device,
+when it becomes runtime suspended.
+
+Fixes: 21d5c57b3726 ("PM / runtime: Use device links")
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi | 75 +++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
-new file mode 100644
-index 0000000..9f1a5a66
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
-@@ -0,0 +1,75 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, The Linux Foundation. All rights reserved.
-+
-+#include "qcom-ipq4019.dtsi"
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK07.1";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>; /* 512MB */
-+	};
-+
-+	aliases {
-+		serial0 = &blsp1_uart1;
-+		serial1 = &blsp1_uart2;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	soc {
-+		pinctrl at 1000000 {
-+			serial_0_pins: serial0-pinmux {
-+				pins = "gpio16", "gpio17";
-+				function = "blsp_uart0";
-+				bias-disable;
-+			};
-+
-+			i2c_0_pins: i2c-0-pinmux {
-+				pins = "gpio20", "gpio21";
-+				function = "blsp_i2c0";
-+				bias-disable;
-+			};
-+
-+			nand_pins: nand-pins {
-+				pins = "gpio53", "gpio55", "gpio56",
-+				       "gpio57", "gpio58", "gpio59",
-+				       "gpio60", "gpio62", "gpio63",
-+				       "gpio64", "gpio65", "gpio66",
-+				       "gpio67", "gpio68", "gpio69";
-+				function = "qpic";
-+                        };
-+		};
-+
-+		serial at 78af000 {
-+			pinctrl-0 = <&serial_0_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+
-+		dma at 7884000 {
-+			status = "ok";
-+		};
-+
-+		i2c at 78b7000 { /* BLSP1 QUP2 */
-+			pinctrl-0 = <&i2c_0_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+
-+		dma at 7984000 {
-+			status = "ok";
-+		};
-+
-+		qpic-nand at 79b0000 {
-+			pinctrl-0 = <&nand_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+	};
-+};
+An optional solution (requires to add code, rather than remove), in case we
+think it's not suffient to rely on the consumer device to be runtime suspended
+after probe.
+
+This could be done via adding a new bool member to the struct device_link, and
+set it from pm_runtime_get_suppliers(). Check it at pm_runtime_put_suppliers(),
+and only call pm_runtime_put() on those suppliers that has it set.
+
+---
+ drivers/base/dd.c            |  3 +--
+ drivers/base/power/runtime.c | 27 +++------------------------
+ include/linux/pm_runtime.h   |  6 ++----
+ 3 files changed, 6 insertions(+), 30 deletions(-)
+
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index 10454fe..a41c91b 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -580,7 +580,7 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+ 	pr_debug("bus: '%s': %s: matched device %s with driver %s\n",
+ 		 drv->bus->name, __func__, dev_name(dev), drv->name);
+ 
+-	pm_runtime_get_suppliers(dev);
++	pm_runtime_resume_suppliers(dev);
+ 	if (dev->parent)
+ 		pm_runtime_get_sync(dev->parent);
+ 
+@@ -591,7 +591,6 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+ 	if (dev->parent)
+ 		pm_runtime_put(dev->parent);
+ 
+-	pm_runtime_put_suppliers(dev);
+ 	return ret;
+ }
+ 
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index 8bef3cb..6f4f50e 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -1563,37 +1563,16 @@ void pm_runtime_clean_up_links(struct device *dev)
+ }
+ 
+ /**
+- * pm_runtime_get_suppliers - Resume and reference-count supplier devices.
++ * pm_runtime_resume_suppliers - Resume supplier devices.
+  * @dev: Consumer device.
+  */
+-void pm_runtime_get_suppliers(struct device *dev)
++void pm_runtime_resume_suppliers(struct device *dev)
+ {
+-	struct device_link *link;
+ 	int idx;
+ 
+ 	idx = device_links_read_lock();
+ 
+-	list_for_each_entry_rcu(link, &dev->links.suppliers, c_node)
+-		if (link->flags & DL_FLAG_PM_RUNTIME)
+-			pm_runtime_get_sync(link->supplier);
+-
+-	device_links_read_unlock(idx);
+-}
+-
+-/**
+- * pm_runtime_put_suppliers - Drop references to supplier devices.
+- * @dev: Consumer device.
+- */
+-void pm_runtime_put_suppliers(struct device *dev)
+-{
+-	struct device_link *link;
+-	int idx;
+-
+-	idx = device_links_read_lock();
+-
+-	list_for_each_entry_rcu(link, &dev->links.suppliers, c_node)
+-		if (link->flags & DL_FLAG_PM_RUNTIME)
+-			pm_runtime_put(link->supplier);
++	rpm_get_suppliers(dev);
+ 
+ 	device_links_read_unlock(idx);
+ }
+diff --git a/include/linux/pm_runtime.h b/include/linux/pm_runtime.h
+index f0fc470..db5dbbf 100644
+--- a/include/linux/pm_runtime.h
++++ b/include/linux/pm_runtime.h
+@@ -56,8 +56,7 @@ extern void pm_runtime_update_max_time_suspended(struct device *dev,
+ 						 s64 delta_ns);
+ extern void pm_runtime_set_memalloc_noio(struct device *dev, bool enable);
+ extern void pm_runtime_clean_up_links(struct device *dev);
+-extern void pm_runtime_get_suppliers(struct device *dev);
+-extern void pm_runtime_put_suppliers(struct device *dev);
++extern void pm_runtime_resume_suppliers(struct device *dev);
+ extern void pm_runtime_new_link(struct device *dev);
+ extern void pm_runtime_drop_link(struct device *dev);
+ 
+@@ -173,8 +172,7 @@ static inline unsigned long pm_runtime_autosuspend_expiration(
+ static inline void pm_runtime_set_memalloc_noio(struct device *dev,
+ 						bool enable){}
+ static inline void pm_runtime_clean_up_links(struct device *dev) {}
+-static inline void pm_runtime_get_suppliers(struct device *dev) {}
+-static inline void pm_runtime_put_suppliers(struct device *dev) {}
++static inline void pm_runtime_resume_suppliers(struct device *dev) {}
+ static inline void pm_runtime_new_link(struct device *dev) {}
+ static inline void pm_runtime_drop_link(struct device *dev) {}
+ 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.7.4
