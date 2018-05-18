@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:09 +0200
-Subject: [PATCH 36/69] ARM: dts: wheat: Enable watchdog support
+Date: Fri, 18 May 2018 13:17:10 +0200
+Subject: [PATCH 37/69] ARM: dts: gose: Enable watchdog support
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <9a3b0adee13a9a65bee0c305286793ebb96a1cd8.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <80aed52aff94875c600d976d6d94126f31c7c052.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,15 +16,15 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792-wheat.dts | 5 +++++
+ arch/arm/boot/dts/r8a7793-gose.dts | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
-index 95aab56a56ab..db01de7a3811 100644
---- a/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ b/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -168,6 +168,11 @@
- 	};
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 9ed6961f2d9a..7a66d885e657 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -595,6 +595,11 @@
+ 	status = "okay";
  };
  
 +&rwdt {
