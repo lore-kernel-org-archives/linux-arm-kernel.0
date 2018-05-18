@@ -1,60 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:17 +0200
-Subject: [PATCH 44/69] ARM: dts: iwg23s-sbc: Add EtherAVB support
+Date: Fri, 18 May 2018 13:17:21 +0200
+Subject: [PATCH 48/69] ARM: dts: gose: Drop unnecessary address properties
+ from port nodes
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <b6ef074bcadf9f89295bc7ee19424714b6ffc4c8.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <c1eb7457ad6e9f3e2937f39ebfefb82cd729d625.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+The vin port nodes does not have an address and thus does not need
+address-cells or address size-properties.
 
-Define the iW-RainboW-G23S board dependent part of the
-EtherAVB device node.
+This is flagged by dtc as follows:
+ # make dtbs W=1
+ arch/arm/boot/dts/r8a7793-gose.dtb: Warning (avoid_unnecessary_addr_size): /soc/video at e6ef0000/port: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+ arch/arm/boot/dts/r8a7793-gose.dtb: Warning (avoid_unnecessary_addr_size): /soc/video at e6ef1000/port: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
-index d21baad9f0ad..e3585daafdd6 100644
---- a/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
-+++ b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
-@@ -12,11 +12,12 @@
- 	compatible = "iwave,g23s", "renesas,r8a77470";
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 7a66d885e657..ec94e2402bdf 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -759,9 +759,6 @@
+ 	pinctrl-names = "default";
  
- 	aliases {
-+		ethernet0 = &avb;
- 		serial1 = &scif1;
- 	};
+ 	port {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+ 		vin0ep2: endpoint {
+ 			remote-endpoint = <&adv7612_out>;
+ 			bus-width = <24>;
+@@ -781,9 +778,6 @@
+ 	status = "okay";
  
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial1:115200n8";
- 	};
- 
-@@ -26,6 +27,18 @@
- 	};
- };
- 
-+&avb {
-+	phy-handle = <&phy3>;
-+	phy-mode = "gmii";
-+	renesas,no-ether-link;
-+	status = "okay";
-+
-+	phy3: ethernet-phy at 3 {
-+		reg = <3>;
-+		micrel,led-mode = <1>;
-+	};
-+};
-+
- &extal_clk {
- 	clock-frequency = <20000000>;
- };
+ 	port {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+ 		vin1ep: endpoint {
+ 			remote-endpoint = <&adv7180_out>;
+ 			bus-width = <8>;
 -- 
 2.11.0
