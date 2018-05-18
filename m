@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:14:40 +0200
-Subject: [PATCH 018/102] arm64: dts: renesas: r8a7796: decrease temperature
+Date: Fri, 18 May 2018 13:14:39 +0200
+Subject: [PATCH 017/102] arm64: dts: renesas: r8a7795: decrease temperature
  hysteresis
 In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
 References: <cover.1526637994.git.horms+renesas@verge.net.au>
-Message-ID: <1f153093b0bb6a9b46cb410ee3535d990348a2b3.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <02f15e4be78610fbde26aa182ff147f2cc8d2e77.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,14 +16,14 @@ value to 1C.
 Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 12 ++++++------
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++------
  1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 55a64169d3d4..e6254711556c 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -2072,12 +2072,12 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 0e958ecd2a41..acf0c6f72a4d 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -2437,12 +2437,12 @@
  			trips {
  				sensor1_passive: sensor1-passive {
  					temperature = <95000>;
@@ -38,7 +38,7 @@ index 55a64169d3d4..e6254711556c 100644
  					type = "critical";
  				};
  			};
-@@ -2098,12 +2098,12 @@
+@@ -2463,12 +2463,12 @@
  			trips {
  				sensor2_passive: sensor2-passive {
  					temperature = <95000>;
@@ -53,7 +53,7 @@ index 55a64169d3d4..e6254711556c 100644
  					type = "critical";
  				};
  			};
-@@ -2124,12 +2124,12 @@
+@@ -2489,12 +2489,12 @@
  			trips {
  				sensor3_passive: sensor3-passive {
  					temperature = <95000>;
