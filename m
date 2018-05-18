@@ -1,37 +1,90 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 May 2018 17:19:49 -0500
-Subject: [PATCH v3 2/6] mfd: at91-usart: added mfd driver for usart
-In-Reply-To: <20180511103822.31698-3-radu.pirea@microchip.com>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-3-radu.pirea@microchip.com>
-Message-ID: <20180518221949.GA13443@rob-hp-laptop>
+Date: Fri, 18 May 2018 17:24:45 -0500
+Subject: [PATCH v3 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <869aad59-1cc5-28ef-1fb5-4ef846696c40@codeaurora.org>
+References: <cover.1526088081.git.collinsd@codeaurora.org>
+ <41d5df73ddac772551d2966e0752bb0c357b1ded.1526088081.git.collinsd@codeaurora.org>
+ <CAD=FV=XegPeFR8pdZM-YiBBJjrbej=C+2biBt4zJKnE90uTYZA@mail.gmail.com>
+ <869aad59-1cc5-28ef-1fb5-4ef846696c40@codeaurora.org>
+Message-ID: <20180518222445.GA16342@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 11, 2018 at 01:38:18PM +0300, Radu Pirea wrote:
-> This mfd driver is just a wrapper over atmel_serial driver and
-> spi-at91-usart driver. Selection of one of the drivers is based on a
-> property from device tree. If the property is not specified, the default
-> driver is atmel_serial.
+On Thu, May 17, 2018 at 05:16:13PM -0700, David Collins wrote:
+> On 05/17/2018 02:22 PM, Doug Anderson wrote:
+> > On Fri, May 11, 2018 at 7:28 PM, David Collins <collinsd@codeaurora.org> wrote:
+> >> +- qcom,regulator-initial-microvolt
+> >> +       Usage:      optional; VRM regulators only
+> >> +       Value type: <u32>
+> >> +       Definition: Specifies the initial voltage in microvolts to request for a
+> >> +                   VRM regulator.
+> > 
+> > Now that Mark has landed the patch adding support for the
+> > -ENOTRECOVERABLE error code from get_voltage() / get_voltage_sel(), do
+> > we still need the qcom,regulator-initial-microvolt property?
 > 
-> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-> ---
->  drivers/mfd/Kconfig                  | 10 ++++
->  drivers/mfd/Makefile                 |  1 +
->  drivers/mfd/at91-usart.c             | 75 ++++++++++++++++++++++++++++
->  include/dt-bindings/mfd/at91-usart.h | 17 +++++++
->  4 files changed, 103 insertions(+)
->  create mode 100644 drivers/mfd/at91-usart.c
->  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> Yes, this is still needed.  The -ENOTRECOVERABLE patch ensures that
+> qcom-rpmh-regulator devices can be registered even if
+> qcom,regulator-initial-microvolt is not specified.  However, that will
+> result in the regulators being configured for the minimum voltage
+> supported in the DT specified min/max range.  The
+> qcom,regulator-initial-microvolt property allows us to set a specific
+> voltage that is larger than the min constraint.
 > 
+> > If this is really still needed, can it be moved to the regulator core?
+> 
+> I'm not opposed to the idea, but I think that Mark is [1]:
+> 
+> >> Do you have a preference for qcom,regulator-initial-microvolt vs a generic
+> >> framework supported regulator-initial-microvolt property for configuring a
+> >> specific voltage at registration time?  We'll need to have support for one
+> >> or the other in order for the qcom_rpmh-regulator driver to be functional.
+> > 
+> > This is basically specific to Qualcomm, I can't off hand think of any
+> > other devices with similar issues.
+> 
+> 
+> >> +- regulator-initial-mode
+> >> +       Usage:      optional; VRM regulators only
+> >> +       Value type: <u32>
+> >> +       Definition: Specifies the initial mode to request for a VRM regulator.
+> >> +                   Supported values are RPMH_REGULATOR_MODE_* which are defined
+> >> +                   in [1] (i.e. 0 to 3).  This property may be specified even
+> >> +                   if the regulator-allow-set-load property is not specified.
+> > 
+> > Every time I read the above I wonder why you're documenting a standard
+> > regulator regulator property in your bindings.  ...then I realize it's
+> > because you're doing it because you want to explicitly document what
+> > the valid modes are.  I wonder if it makes sense to just put a
+> > reference somewhere else in this document to go look at the header
+> > file where these are all nicely documented.
+> 
+> Isn't that what the [1] in the above snippet is currently doing.  Further
+> down in qcom,rpmh-regulator.txt is this line:
+> 
+> +[1] include/dt-bindings/regulator/qcom,rpmh-regulator.h
+> 
+> 
+> > Speaking of documenting things like that, it might be worth finding
+> > somewhere in this doc to mention that the "bob" regulator on PMI8998
+> > can support "regulator-allow-bypass".  That tidbit got lost when we
+> > moved to the standard regulator bindings for bypass.
+> 
+> I suppose that I could add something like this:
+> 
+> +- regulator-allow-bypass
+> +	Usage:      optional; BOB type VRM regulators only
+> +	Value type: <empty>
+> +	Definition: See [2] for details.
+> ...
+> +[2]: Documentation/devicetree/bindings/regulator.txt
+> 
+> However, I don't want the patch to get NACKed because it is defining a
+> property that is already defined in the common regulator.txt file.
 
-> +#ifndef __DT_BINDINGS_AT91_USART_H__
-> +#define __DT_BINDINGS_AT91_USART_H__
-> +
-> +#define AT91_USART_MODE_SERIAL	1
-> +#define AT91_USART_MODE_SPI	2
-
-Won't this require a DT update for serial mode to add the mode property? 
-That breaks compatibility.
+If all constraints are defined in the common doc, just "see 
+regulator.txt" is fine. You just need to say what properties this 
+binding uses.
 
 Rob
