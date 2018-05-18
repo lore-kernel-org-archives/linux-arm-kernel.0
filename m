@@ -1,70 +1,71 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 18 May 2018 10:59:27 +0100
-Subject: [PATCH v3 0/3] Support Common Not Private translations
-In-Reply-To: <1526636765-11289-1-git-send-email-vladimir.murzin@arm.com>
-References: <1526636765-11289-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <981db1e7-687a-93a9-bea2-1fadcf5a4bd8@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 18 May 2018 11:50:38 +0200
+Subject: [PATCH 3/3] arm64: dts: renesas: r8a7795: add ccree binding
+In-Reply-To: <CAOtvUMcnrPnkx35Sgru+3EUxYn+FY9FmDSYSNnZEaVUODHA7+w@mail.gmail.com>
+References: <1526387370-17142-1-git-send-email-gilad@benyossef.com>
+ <1526387370-17142-4-git-send-email-gilad@benyossef.com>
+ <CAMuHMdWzeNqsho1V6ezZb81T3_HcRzrtuQpmGXsjtFgt9BtZDQ@mail.gmail.com>
+ <20180516074333.i2672u435ymwffk3@verge.net.au>
+ <CAOtvUMfFjokOLCg6aHNQESJ_q4Jiok3izrPtae5wR+cND=XL6g@mail.gmail.com>
+ <20180517090438.pqggltzkcdhzktsp@verge.net.au>
+ <CAOtvUMcnrPnkx35Sgru+3EUxYn+FY9FmDSYSNnZEaVUODHA7+w@mail.gmail.com>
+Message-ID: <20180518095038.lti4lzeadxd4kqsy@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/18 10:46, Vladimir Murzin wrote:
-> Common Not Private (CNP) translations is a feature of ARMv8.2
-> extension which allows translation table entries to be shared between
-> different PEs in the same inner shareable domain, so the hardware can
-> use this fact to optimise the caching of such entries in the TLB.
+On Thu, May 17, 2018 at 04:12:23PM +0300, Gilad Ben-Yossef wrote:
+> On Thu, May 17, 2018 at 12:04 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, May 17, 2018 at 11:01:57AM +0300, Gilad Ben-Yossef wrote:
+> >> On Wed, May 16, 2018 at 10:43 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > On Tue, May 15, 2018 at 04:50:44PM +0200, Geert Uytterhoeven wrote:
+> >> >> Hi Gilad,
+> >> >>
+> >> >> On Tue, May 15, 2018 at 2:29 PM, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+> >> >> > Add bindings for CryptoCell instance in the SoC.
+> >> >> >
+> >> >> > Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+> >> >>
+> >> >> Thanks for your patch!
+> >> >>
+> >> >> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >> >> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >> >> > @@ -528,6 +528,14 @@
+> >> >> >                         status = "disabled";
+> >> >> >                 };
+> >> >> >
+> >> >> > +               arm_cc630p: crypto at e6601000 {
+> >> >> > +                       compatible = "arm,cryptocell-630p-ree";
+> >> >> > +                       interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+> >> >> > +                       #interrupt-cells = <2>;
+> >> >>
+> >> >> I believe the #interrupt-cells property is not needed.
+> >> >>
+> >> >> > +                       reg = <0x0 0xe6601000 0 0x1000>;
+> >> >> > +                       clocks = <&cpg CPG_MOD 229>;
+> >> >> > +               };
+> >> >>
+> >> >> The rest looks good, but I cannot verify the register block.
+> >> >>
+> >> >> > +
+> >> >> >                 i2c3: i2c at e66d0000 {
+> >> >> >                         #address-cells = <1>;
+> >> >> >                         #size-cells = <0>;
+> >> >
+> >> > Thanks, I have applied this after dropping the #interrupt-cells property.
+> >>
+> >> Thanks you!
+> >>
+> >> Alas, it will not work without the clk patch (the previous one in the
+> >> series) so they need to be
+> >> taken or dropped together.
+> >
+> > I think its fine if it does not yet work.
+> > But not if its causes things that previously worked to stop working.
 > 
-> This patch set is an attempt to bring CNP support into Linux. It was
-> tested on a v8.2 Fast Model with exploring traces and checking that
-> TTBRx_ELy and VTTBR_EL2 have CnP bit set where appropriate.
-> 
-> Changelog:
-> 
-> 	 v2 -> v3
-> 	    - do not enable CNP if we are crush kernel (per James)
-> 	    - default to "no"
-> 	    - rebased on 4.17-rc4
+> Based on the further discussion with Geert my recommendation is to
+> drop my patch for now,
+> take Geert CR clock  patch and I will follow up next week with a v2
+> that fixes the clock
+> handing as discussed with Geert.
 
-Please, ignore it - it was generated from outdated branch. I'll resend
-shortly.
-
-Thanks
-Vladimir
-
-> 
->   	 v1 -> v2
->             - handle cpuilde case (per James)
-> 	    - use lm_allias with swapper_pg_dir (per James)
->             - rule out ARM64_SW_TTBR0_PAN case (per Catalin)
-> 	    - s/BUG_ON/WARN_ON/ (per Catalin)
-> 	    - comment and commit message updates (per Catalin)
-> 	    - TTBR_CNP_BIT moved to asm/pgtable-hwdef.h (per Catalin)
-> 	    - has_useable_cnp() simplified (per Julien)
-> 
-> 	RFC -> v1
->             - dropped RFC tag
->             - rebased on 4.14-rc4
-> 
-> Thanks!
-> 
-> Vladimir Murzin (3):
->   arm64: mm: Support Common Not Private translations
->   arm64: KVM: Enable Common Not Private translations
->   arm64: Introduce command line parameter to disable CNP
-> 
->  Documentation/admin-guide/kernel-parameters.txt |  4 +++
->  arch/arm/include/asm/kvm_mmu.h                  |  5 ++++
->  arch/arm64/Kconfig                              | 13 ++++++++
->  arch/arm64/include/asm/cpucaps.h                |  3 +-
->  arch/arm64/include/asm/cpufeature.h             |  6 ++++
->  arch/arm64/include/asm/kvm_mmu.h                |  5 ++++
->  arch/arm64/include/asm/mmu_context.h            | 12 ++++++++
->  arch/arm64/include/asm/pgtable-hwdef.h          |  2 ++
->  arch/arm64/kernel/cpufeature.c                  | 40 +++++++++++++++++++++++++
->  arch/arm64/kernel/hibernate.c                   |  2 +-
->  arch/arm64/kernel/suspend.c                     |  4 +++
->  arch/arm64/kvm/hyp-init.S                       |  3 ++
->  arch/arm64/mm/context.c                         |  3 ++
->  arch/arm64/mm/proc.S                            |  6 ++++
->  virt/kvm/arm/arm.c                              |  4 +--
->  15 files changed, 108 insertions(+), 4 deletions(-)
-> 
+Thanks, I will drop the patch.
