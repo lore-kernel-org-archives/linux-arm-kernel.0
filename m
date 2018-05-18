@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 May 2018 16:22:44 +0200
-Subject: [GIT PULL 4/5] ARM: tegra: Device tree changes for v4.18-rc1
+Date: Fri, 18 May 2018 16:22:45 +0200
+Subject: [GIT PULL 5/5] arm64: tegra: Device tree changes for v4.18-rc1
 In-Reply-To: <20180518142245.20242-1-thierry.reding@gmail.com>
 References: <20180518142245.20242-1-thierry.reding@gmail.com>
-Message-ID: <20180518142245.20242-4-thierry.reding@gmail.com>
+Message-ID: <20180518142245.20242-5-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,31 +15,27 @@ The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.18-arm-dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.18-arm64-dt
 
-for you to fetch changes up to dc4ea601be724d7ad37c8c5b1059417126e97e27:
+for you to fetch changes up to 9df50ba76ac1485b844beffa1f3f5d9659d9cdaf:
 
-  ARM: dts: tegra114: Add IOMMU nodes to Host1x and its clients (2018-05-04 17:21:02 +0200)
+  arm64: tegra: Make BCM89610 PHY interrupt as active low (2018-05-03 11:48:16 +0200)
+
+I already sent this out as a fix for v4.17, so if you decide to pick
+that up you can ignore this one. I've only included it here in case you
+had objections to take it into v4.17 at this point.
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-ARM: tegra: Device tree changes for v4.18-rc1
+arm64: tegra: Device tree changes for v4.18-rc1
 
-Contains a fix for the high-speed UART on Toradex Apalis TK1 boards as
-well as IOMMU enablement for various devices on Tegra30 and Tegra30.
+Contains a single fix for the network PHY interrupt polarity.
 
 ----------------------------------------------------------------
-Dmitry Osipenko (2):
-      ARM: dts: tegra30: Add IOMMU nodes to Host1x and its clients
-      ARM: dts: tegra114: Add IOMMU nodes to Host1x and its clients
+Bhadram Varka (1):
+      arm64: tegra: Make BCM89610 PHY interrupt as active low
 
-Marcel Ziswiler (1):
-      ARM: tegra: apalis-tk1: Fix high speed UART compatible
-
- arch/arm/boot/dts/tegra114.dtsi             |  5 +++++
- arch/arm/boot/dts/tegra124-apalis-v1.2.dtsi |  6 +++---
- arch/arm/boot/dts/tegra124-apalis.dtsi      |  6 +++---
- arch/arm/boot/dts/tegra30.dtsi              | 14 ++++++++++++++
- 4 files changed, 25 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
