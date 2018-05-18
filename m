@@ -1,31 +1,32 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 18 May 2018 15:15:34 +0530
-Subject: [PATCH v2 24/26] arm64: dts: allwinner: a64: a64-olinuxino: Enable
- HDMI output
+Date: Fri, 18 May 2018 15:15:32 +0530
+Subject: [PATCH v2 22/26] arm64: dts: allwinner: a64: nanopi-a64: Enable HDMI
+ output
 In-Reply-To: <20180518094536.17201-1-jagan@amarulasolutions.com>
 References: <20180518094536.17201-1-jagan@amarulasolutions.com>
-Message-ID: <20180518094536.17201-25-jagan@amarulasolutions.com>
+Message-ID: <20180518094536.17201-23-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable HDMI output on a64-olinuxino board.
+Enable HDMI output on nanopi-a64 board.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
 - none
 
- .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    | 26 ++++++++++++++++++++++
+ .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 26 ++++++++++++++++++++++
  1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-index 3b3081b10ecb..83329c8fec4f 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-@@ -58,12 +58,38 @@
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+index e2dce48fa29a..19fe7eed45e9 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+@@ -57,6 +57,21 @@
+ 	chosen {
  		stdout-path = "serial0:115200n8";
  	};
- 
++
 +	connector {
 +		compatible = "hdmi-connector";
 +		type = "a";
@@ -36,17 +37,17 @@ index 3b3081b10ecb..83329c8fec4f 100644
 +			};
 +		};
 +	};
-+
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
- 	};
- };
- 
-+&de {
-+	status = "okay";
 +};
 +
++&de {
++	status = "okay";
+ };
+ 
+ &ehci0 {
+@@ -67,6 +82,17 @@
+ 	status = "okay";
+ };
+ 
 +&hdmi {
 +	hvcc-supply = <&reg_dldo1>;
 +	status = "okay";
@@ -58,8 +59,8 @@ index 3b3081b10ecb..83329c8fec4f 100644
 +	};
 +};
 +
- &mmc0 {
+ /* i2c1 connected with gpio headers like pine64, bananapi */
+ &i2c1 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
 -- 
 2.14.3
