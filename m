@@ -1,85 +1,49 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 18 May 2018 09:01:05 +0800
-Subject: [PATCH V2 2/3] clk: imx7d: correct enet clock CCGR registers
+Date: Fri, 18 May 2018 09:01:06 +0800
+Subject: [PATCH V2 3/3] ARM: dts: imx7: correct enet ipg clock
 In-Reply-To: <1526605266-18464-1-git-send-email-Anson.Huang@nxp.com>
 References: <1526605266-18464-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1526605266-18464-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1526605266-18464-3-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct enet clock gates as below:
-
-CCGR6: IMX7D_ENET_AXI_ROOT_CLK (enet1 and enet2 bus clocks)
-CCGR112: IMX7D_ENET1_TIME_ROOT_CLK, IMX7D_ENET1_IPG_ROOT_CLK
-CCGR113: IMX7D_ENET2_TIME_ROOT_CLK, IMX7D_ENET2_IPG_ROOT_CLK
-
-Just rename unused IMX7D_ENETx_REF_ROOT_CLK for
-IMX7D_ENETx_IPG_ROOT_CLK instead of adding new clocks.
+ENET "ipg" clock should be IMX7D_ENETx_IPG_ROOT_CLK
+rather than IMX7D_ENET_AXI_ROOT_CLK which is for ENET bus
+clock.
 
 Based on Andy Duan's patch from the NXP kernel tree.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- drivers/clk/imx/clk-imx7d.c             | 10 ++++++----
- include/dt-bindings/clock/imx7d-clock.h |  4 ++--
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/imx7d.dtsi | 2 +-
+ arch/arm/boot/dts/imx7s.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 23d5090a..d4936b9 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -26,6 +26,8 @@ static u32 share_count_sai1;
- static u32 share_count_sai2;
- static u32 share_count_sai3;
- static u32 share_count_nand;
-+static u32 share_count_enet1;
-+static u32 share_count_enet2;
- 
- static const struct clk_div_table test_div_table[] = {
- 	{ .val = 3, .div = 1, },
-@@ -805,6 +807,10 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_MIPI_DSI_ROOT_CLK] = imx_clk_gate4("mipi_dsi_root_clk", "mipi_dsi_post_div", base + 0x4650, 0);
- 	clks[IMX7D_MIPI_CSI_ROOT_CLK] = imx_clk_gate4("mipi_csi_root_clk", "mipi_csi_post_div", base + 0x4640, 0);
- 	clks[IMX7D_MIPI_DPHY_ROOT_CLK] = imx_clk_gate4("mipi_dphy_root_clk", "mipi_dphy_post_div", base + 0x4660, 0);
-+	clks[IMX7D_ENET1_IPG_ROOT_CLK] = imx_clk_gate2_shared2("enet1_ipg_root_clk", "enet_axi_post_div", base + 0x4700, 0, &share_count_enet1);
-+	clks[IMX7D_ENET1_TIME_ROOT_CLK] = imx_clk_gate2_shared2("enet1_time_root_clk", "enet1_time_post_div", base + 0x4700, 0, &share_count_enet1);
-+	clks[IMX7D_ENET2_IPG_ROOT_CLK] = imx_clk_gate2_shared2("enet2_ipg_root_clk", "enet_axi_post_div", base + 0x4710, 0, &share_count_enet2);
-+	clks[IMX7D_ENET2_TIME_ROOT_CLK] = imx_clk_gate2_shared2("enet2_time_root_clk", "enet2_time_post_div", base + 0x4710, 0, &share_count_enet2);
- 	clks[IMX7D_SAI1_ROOT_CLK] = imx_clk_gate2_shared2("sai1_root_clk", "sai1_post_div", base + 0x48c0, 0, &share_count_sai1);
- 	clks[IMX7D_SAI1_IPG_CLK]  = imx_clk_gate2_shared2("sai1_ipg_clk",  "ipg_root_clk",  base + 0x48c0, 0, &share_count_sai1);
- 	clks[IMX7D_SAI2_ROOT_CLK] = imx_clk_gate2_shared2("sai2_root_clk", "sai2_post_div", base + 0x48d0, 0, &share_count_sai2);
-@@ -812,10 +818,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_SAI3_ROOT_CLK] = imx_clk_gate2_shared2("sai3_root_clk", "sai3_post_div", base + 0x48e0, 0, &share_count_sai3);
- 	clks[IMX7D_SAI3_IPG_CLK]  = imx_clk_gate2_shared2("sai3_ipg_clk",  "ipg_root_clk",  base + 0x48e0, 0, &share_count_sai3);
- 	clks[IMX7D_SPDIF_ROOT_CLK] = imx_clk_gate4("spdif_root_clk", "spdif_post_div", base + 0x44d0, 0);
--	clks[IMX7D_ENET1_REF_ROOT_CLK] = imx_clk_gate4("enet1_ref_root_clk", "enet1_ref_post_div", base + 0x44e0, 0);
--	clks[IMX7D_ENET1_TIME_ROOT_CLK] = imx_clk_gate4("enet1_time_root_clk", "enet1_time_post_div", base + 0x44f0, 0);
--	clks[IMX7D_ENET2_REF_ROOT_CLK] = imx_clk_gate4("enet2_ref_root_clk", "enet2_ref_post_div", base + 0x4500, 0);
--	clks[IMX7D_ENET2_TIME_ROOT_CLK] = imx_clk_gate4("enet2_time_root_clk", "enet2_time_post_div", base + 0x4510, 0);
- 	clks[IMX7D_EIM_ROOT_CLK] = imx_clk_gate4("eim_root_clk", "eim_post_div", base + 0x4160, 0);
- 	clks[IMX7D_NAND_RAWNAND_CLK] = imx_clk_gate2_shared2("nand_rawnand_clk", "nand_root_clk", base + 0x4140, 0, &share_count_nand);
- 	clks[IMX7D_NAND_USDHC_BUS_RAWNAND_CLK] = imx_clk_gate2_shared2("nand_usdhc_rawnand_clk", "nand_usdhc_root_clk", base + 0x4140, 0, &share_count_nand);
-diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
-index b2325d3e2..0d67f53 100644
---- a/include/dt-bindings/clock/imx7d-clock.h
-+++ b/include/dt-bindings/clock/imx7d-clock.h
-@@ -168,7 +168,7 @@
- #define IMX7D_SPDIF_ROOT_SRC		155
- #define IMX7D_SPDIF_ROOT_CG		156
- #define IMX7D_SPDIF_ROOT_DIV		157
--#define IMX7D_ENET1_REF_ROOT_CLK	158
-+#define IMX7D_ENET1_IPG_ROOT_CLK        158
- #define IMX7D_ENET1_REF_ROOT_SRC	159
- #define IMX7D_ENET1_REF_ROOT_CG		160
- #define IMX7D_ENET1_REF_ROOT_DIV	161
-@@ -176,7 +176,7 @@
- #define IMX7D_ENET1_TIME_ROOT_SRC	163
- #define IMX7D_ENET1_TIME_ROOT_CG	164
- #define IMX7D_ENET1_TIME_ROOT_DIV	165
--#define IMX7D_ENET2_REF_ROOT_CLK	166
-+#define IMX7D_ENET2_IPG_ROOT_CLK        166
- #define IMX7D_ENET2_REF_ROOT_SRC	167
- #define IMX7D_ENET2_REF_ROOT_CG		168
- #define IMX7D_ENET2_REF_ROOT_DIV	169
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 200714e..d74dd7f 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -120,7 +120,7 @@
+ 			<GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
+ 			<GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
+ 			<GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
++		clocks = <&clks IMX7D_ENET2_IPG_ROOT_CLK>,
+ 			<&clks IMX7D_ENET_AXI_ROOT_CLK>,
+ 			<&clks IMX7D_ENET2_TIME_ROOT_CLK>,
+ 			<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 4d42335..b90769d 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -1091,7 +1091,7 @@
+ 					<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
+ 					<GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
+ 					<GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
++				clocks = <&clks IMX7D_ENET1_IPG_ROOT_CLK>,
+ 					<&clks IMX7D_ENET_AXI_ROOT_CLK>,
+ 					<&clks IMX7D_ENET1_TIME_ROOT_CLK>,
+ 					<&clks IMX7D_PLL_ENET_MAIN_125M_CLK>,
 -- 
 2.7.4
