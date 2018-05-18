@@ -1,39 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:25 +0200
-Subject: [PATCH 52/69] ARM: dts: kzm9d: Drop unnecessary address properties
- from gpio_keys node
+Date: Fri, 18 May 2018 13:17:26 +0200
+Subject: [PATCH 53/69] ARM: shmobile: r8a7794: alt: add EEPROM to DTS
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <715d571162e0956a332ef52c5ba465f4f7089746.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <0b3d8740a835b7e5476be617b77f1c494236c306.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio_keys node does not have an address and thus does not need
-address-cells or address size-properties.
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-This is flagged by dtc as follows:
- # make dtbs W=1
- arch/arm/boot/dts/emev2-kzm9d.dtb: Warning (avoid_unnecessary_addr_size): /gpio_keys: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+Same EEPROM as on Koelsch, et al.
 
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/boot/dts/r8a7794-alt.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index c238407133bf..0af44b7eadb9 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -34,9 +34,6 @@
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index c210412f80ec..e17027532941 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -181,6 +181,12 @@
+ 				};
+ 			};
+ 		};
++
++		eeprom at 50 {
++			compatible = "renesas,r1ex24002", "atmel,24c02";
++			reg = <0x50>;
++			pagesize = <16>;
++		};
+ 	};
  
- 	gpio_keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
- 		one {
- 			debounce-interval = <50>;
- 			wakeup-source;
+ 	/*
 -- 
 2.11.0
