@@ -1,92 +1,83 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 18 May 2018 11:07:01 +0100
-Subject: [PATCH v4 2/3] arm64: KVM: Enable Common Not Private translations
-In-Reply-To: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
-References: <1526638022-4137-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1526638022-4137-3-git-send-email-vladimir.murzin@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 18 May 2018 11:22:22 +0100
+Subject: [PATCH 5/6] arm_pmu: Tidy up clear_event_idx call backs
+In-Reply-To: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
+References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1526638943-2110-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We rely on cpufeature framework to detect and enable CNP so for KVM we
-need to patch hyp to set CNP bit just before TTBR0_EL2 gets written.
+The armpmu uses get_event_idx callback to allocate an event
+counter for a given event, which marks the selected counter
+as "used". Now, when we delete the counter, the arm_pmu goes
+ahead and clears the "used" bit and then invokes the "clear_event_idx"
+call back, which kind of splits the job between the core code
+and the backend. Tidy this up by relying on the clear_event_idx
+to do the book keeping, if available. Otherwise, let the core
+driver do the default "clear" bit operation. This will be useful
+for adding the chained event support, where we leave the event
+idx maintenance to the backend.
 
-For the guest we encode CNP bit while building vttbr, so we don't need
-to bother with that in a world switch.
-
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   | 5 +++++
- arch/arm64/include/asm/kvm_mmu.h | 5 +++++
- arch/arm64/kvm/hyp-init.S        | 3 +++
- virt/kvm/arm/arm.c               | 4 ++--
- 4 files changed, 15 insertions(+), 2 deletions(-)
+ arch/arm/kernel/perf_event_v7.c |  2 ++
+ drivers/perf/arm_pmu.c          | 15 +++++++++++----
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 707a1f0..9c83710 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -321,6 +321,11 @@ static inline int kvm_map_vectors(void)
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 2f3c06d..1c28b23 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -1639,6 +1639,7 @@ static void krait_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
+ 	bool venum_event = EVENT_VENUM(hwc->config_base);
+ 	bool krait_event = EVENT_CPU(hwc->config_base);
  
- #define kvm_phys_to_vttbr(addr)		(addr)
++	clear_bit(hwc->idx, cpuc->used_mask);
+ 	if (venum_event || krait_event) {
+ 		bit = krait_event_to_bit(event, region, group);
+ 		clear_bit(bit, cpuc->used_mask);
+@@ -1968,6 +1969,7 @@ static void scorpion_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
+ 	bool venum_event = EVENT_VENUM(hwc->config_base);
+ 	bool scorpion_event = EVENT_CPU(hwc->config_base);
  
-+static inline bool kvm_cpu_has_cnp(void)
-+{
-+	return false;
-+}
-+
- #endif	/* !__ASSEMBLY__ */
- 
- #endif /* __ARM_KVM_MMU_H__ */
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 0821109..c9ee6c3 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -459,5 +459,10 @@ static inline int kvm_map_vectors(void)
- 
- #define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
- 
-+static inline bool kvm_cpu_has_cnp(void)
-+{
-+	return system_supports_cnp();
-+}
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 6fd91b3..94998d5 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -64,6 +64,9 @@ __do_hyp_init:
- 	b.lo	__kvm_handle_stub_hvc
- 
- 	phys_to_ttbr x4, x0
-+alternative_if ARM64_HAS_CNP
-+	orr	x4, x4, #TTBR_CNP_BIT
-+alternative_else_nop_endif
- 	msr	ttbr0_el2, x4
- 
- 	mrs	x4, tcr_el1
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a4c1b76..9a651a2 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -472,7 +472,7 @@ static bool need_new_vmid_gen(struct kvm *kvm)
- static void update_vttbr(struct kvm *kvm)
- {
- 	phys_addr_t pgd_phys;
--	u64 vmid;
-+	u64 vmid, cnp = kvm_cpu_has_cnp() ? 1 : 0;
- 	bool new_gen;
- 
- 	read_lock(&kvm_vmid_lock);
-@@ -522,7 +522,7 @@ static void update_vttbr(struct kvm *kvm)
- 	pgd_phys = virt_to_phys(kvm->arch.pgd);
- 	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
- 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
--	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
-+	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid | cnp;
- 
- 	write_unlock(&kvm_vmid_lock);
++	clear_bit(hwc->idx, cpuc->used_mask);
+ 	if (venum_event || scorpion_event) {
+ 		bit = scorpion_event_to_bit(event, region, group);
+ 		clear_bit(bit, cpuc->used_mask);
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 1adabb5..7207d01 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -240,6 +240,16 @@ static void armpmu_start(struct perf_event *event, int flags)
+ 	armpmu->enable(event);
  }
+ 
++static void armpmu_clear_event_idx(struct arm_pmu *armpmu,
++				   struct pmu_hw_events *hw_events,
++				   struct perf_event *event)
++{
++	if (armpmu->clear_event_idx)
++		armpmu->clear_event_idx(hw_events, event);
++	else
++		clear_bit(event->hw.idx, hw_events->used_mask);
++}
++
+ static void
+ armpmu_del(struct perf_event *event, int flags)
+ {
+@@ -250,10 +260,7 @@ armpmu_del(struct perf_event *event, int flags)
+ 
+ 	armpmu_stop(event, PERF_EF_UPDATE);
+ 	hw_events->events[idx] = NULL;
+-	clear_bit(idx, hw_events->used_mask);
+-	if (armpmu->clear_event_idx)
+-		armpmu->clear_event_idx(hw_events, event);
+-
++	armpmu_clear_event_idx(armpmu, hw_events, event);
+ 	perf_event_update_userpage(event);
+ }
+ 
 -- 
-2.0.0
+2.7.4
