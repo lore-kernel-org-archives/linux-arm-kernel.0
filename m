@@ -1,74 +1,105 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 18 May 2018 18:24:00 +0200
-Subject: [PATCH v5 2/4] Documentation: bindings: add phy_config for
- Rockchip USB Type-C PHY
-In-Reply-To: <1526548680-2552-2-git-send-email-hl@rock-chips.com>
-References: <1526548680-2552-1-git-send-email-hl@rock-chips.com>
- <1526548680-2552-2-git-send-email-hl@rock-chips.com>
-Message-ID: <2417091.oYeT3lua5n@phil>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 May 2018 11:28:15 -0500
+Subject: [PATCH v6 6/9] dt-bindings: counter: Document stm32 quadrature
+ encoder
+In-Reply-To: <CA+M3ks4vjE5JMmLjjPnf6ffD9QYSUmSyrpO+yxADT_8WqAA3Tg@mail.gmail.com>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+ <ccdbbfb2833d274b6bfa234aada57e68d9793dd5.1526487615.git.vilhelm.gray@gmail.com>
+ <CAL_Jsq+a4s=5N6wUWifoHWQoornbDBY-UY2xrwj1kggNH4Q5pQ@mail.gmail.com>
+ <CA+M3ks4vjE5JMmLjjPnf6ffD9QYSUmSyrpO+yxADT_8WqAA3Tg@mail.gmail.com>
+Message-ID: <20180518162815.GA24966@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 17. Mai 2018, 11:17:58 CEST schrieb Lin Huang:
-> If want to do training outside DP Firmware, need phy voltage swing
-> and pre_emphasis value.
+On Thu, May 17, 2018 at 08:59:40PM +0200, Benjamin Gaignard wrote:
+> 2018-05-17 18:23 GMT+02:00 Rob Herring <robh+dt@kernel.org>:
+> > On Wed, May 16, 2018 at 12:51 PM, William Breathitt Gray
+> > <vilhelm.gray@gmail.com> wrote:
+> >> From: Benjamin Gaignard <benjamin.gaignard@st.com>
+> >
+> > v6? Where's v1-v5?
+> >
+> >> Add bindings for STM32 Timer quadrature encoder.
+> >> It is a sub-node of STM32 Timer which implement the
+> >> counter part of the hardware.
+> >>
+> >> Cc: Rob Herring <robh+dt@kernel.org>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> >> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+> >> ---
+> >>  .../bindings/counter/stm32-timer-cnt.txt      | 26 +++++++++++++++++++
+> >>  .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
+> >>  2 files changed, 33 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+> >> new file mode 100644
+> >> index 000000000000..377728128bef
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+> >> @@ -0,0 +1,26 @@
+> >> +STMicroelectronics STM32 Timer quadrature encoder
+> >> +
+> >> +STM32 Timer provides quadrature encoder counter mode to detect
+> >
+> > 'mode' does not sound like a sub-block of the timers block.
 > 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v2:
-> - None 
-> Changes in v3:
-> - modify property description and add this property to Example
-> Change in v4:
-> - None
-> Change in v5:
-> - None
+> quadrature encoding is one of the counting modes of this hardware
+> block which is enable to count on other signals/triggers
+
+You don't need a child node and compatible to set a mode.
+
+> >> +angular position and direction of rotary elements,
+> >> +from IN1 and IN2 input signals.
+> >> +
+> >> +Must be a sub-node of an STM32 Timer device tree node.
+> >> +See ../mfd/stm32-timers.txt for details about the parent node.
+> >> +
+> >> +Required properties:
+> >> +- compatible:          Must be "st,stm32-timer-counter".
+> >> +- pinctrl-names:       Set to "default".
+> >> +- pinctrl-0:           List of phandles pointing to pin configuration nodes,
+> >> +                       to set IN1/IN2 pins in mode of operation for Low-Power
+> >> +                       Timer input on external pin.
+> >> +
+> >> +Example:
+> >> +       timers at 40010000  {
+> >> +               compatible = "st,stm32-timers";
+> >> +               ...
+> >> +               counter {
+> >> +                       compatible = "st,stm32-timer-counter";
+> >
+> > Is there only 1? How is the counter addressed?
 > 
->  .../devicetree/bindings/phy/phy-rockchip-typec.txt | 29 +++++++++++++++++++++-
->  1 file changed, 28 insertions(+), 1 deletion(-)
+> Yes there is only one counter per hardware block.
+> Counter is addressed like the two others sub-nodes and the details
+> about parent mode are describe in stm32-timers.txt
+> Should I add them here too ? so example will be like that:
+
+No, you should drop the child node and add pinctrl to the parent.
+
+Any other functions this block has that you plan on adding? Please make 
+bindings as complete as possible, not what you currently have drivers 
+for.
+
+> timers at 40010000  {
+>   #address-cells = <1>;
+>   #size-cells = <0>;
+>   compatible = "st,stm32-timers";
+>   reg = <0x40010000 0x400>;
+>   clocks = <&rcc 0 160>;
+>   clock-names = "int";
+>   counter {
+>     compatible = "st,stm32-timer-counter";
+>     pinctrl-names = "default";
+>     pinctrl-0 = <&tim1_in_pins>;
+>     };
+>  };
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> index 960da7f..af298f2 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> @@ -17,7 +17,8 @@ Required properties:
->  
->  Optional properties:
->   - extcon : extcon specifier for the Power Delivery
-> -
-> + - rockchip,phy_config : A list of voltage swing(mv) and pre-emphasis
-> +			(dB) pairs.
-
-mv -> mV I'd think.
-
-This needs a bit more explanation please. Especially as the multiple "0 0"
-lines in the examples suggest some deeper ordering requirements.
-Like the 3 blocks of 4 entries as can be seen in the default config in
-patch3. The binding should definitly describe what these are.
-
-
->  Required nodes : a sub-node is required for each port the phy provides.
->  		 The sub-node name is used to identify dp or usb3 port,
->  		 and shall be the following entries:
-> @@ -50,6 +51,19 @@ Example:
->  			 <&cru SRST_P_UPHY0_TCPHY>;
->  		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
->  
-> +		rockchip,phy_config =<0x2a 0x00
-> +			0x1f 0x15
-> +			0x14 0x22
-> +			0x02 0x2b
-> +			0x21 0x00
-> +			0x12 0x15
-> +			0x02 0x22
-> +			0 0
-> +			0x15 0x00
-> +			0x00 0x15
-> +			0 0
-> +			0 0>;
-
-I don't think they should be hex-values, as according to the doc above
-these are values in mV and dB .
-
-
-Heiko
+> Benjamin
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
