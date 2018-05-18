@@ -1,60 +1,30 @@
-From: samitolvanen@google.com (Sami Tolvanen)
-Date: Fri, 18 May 2018 10:02:02 -0700
-Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
-Message-ID: <20180518170202.11458-1-samitolvanen@google.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Fri, 18 May 2018 13:09:53 -0500
+Subject: [PATCH V2] ARM: davinci_all_defconfig: set CONFIG_BACKLIGHT_PWM=m
+Message-ID: <20180518180953.9860-1-aford173@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with LLVM r308050, clang generates a jump table with EL1
-virtual addresses in __init_stage2_translation, which results in a
-kernel panic when booting at EL2:
+The da850-evm came with an LCD with a backlight tied to a pwm. This
+enables CONFIG_BACKLIGHT_PWM as a module so the PWM backlight can be
+used to maintain brightness control of the backlight.
 
-  Kernel panic - not syncing: HYP panic:
-  PS:800003c9 PC:ffff0000089e6fd8 ESR:86000004
-  FAR:ffff0000089e6fd8 HPFAR:0000000009825000 PAR:0000000000000000
-  VCPU:000804fc20001221
-
-  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc7-dirty #3
-  Hardware name: ARM Juno development board (r1) (DT)
-  Call trace:
-  [<ffff000008088ea4>] dump_backtrace+0x0/0x34c
-  [<ffff000008089208>] show_stack+0x18/0x20
-  [<ffff0000089c73ec>] dump_stack+0xc4/0xfc
-  [<ffff0000080c8e1c>] panic+0x138/0x2b4
-  [<ffff0000080c8ce4>] panic+0x0/0x2b4
-  SMP: stopping secondary CPUs
-  SMP: failed to stop secondary CPUs 0-3,5
-  Kernel Offset: disabled
-  CPU features: 0x002086
-  Memory Limit: none
-  ---[ end Kernel panic - not syncing: HYP panic:
-  PS:800003c9 PC:ffff0000089e6fd8 ESR:86000004
-  FAR:ffff0000089e6fd8 HPFAR:0000000009825000 PAR:0000000000000000
-  VCPU:000804fc20001221
-
-This change adds -fno-jump-tables to arm64/hyp to work around the
-bug.
-
-Suggested-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+Signed-off-by: Adam Ford <aford173@gmail.com>
 ---
- arch/arm64/kvm/hyp/Makefile | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 4313f74753332..745b3255e7832 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -5,6 +5,10 @@
- 
- ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
- 
-+ifeq ($(cc-name),clang)
-+ccflags-y += -fno-jump-tables
-+endif
-+
- KVM=../../../../virt/kvm
- 
- obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+V2: Only enable CONFIG_BACKLIGHT_PWM and do not re-sync with savedefconfig
+
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index c302a04e8cbc..48d23956d898 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -153,6 +153,7 @@ CONFIG_TINYDRM_ST7586=m
+ CONFIG_FB=y
+ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_DA8XX=y
++CONFIG_BACKLIGHT_PWM=m
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=m
 -- 
-2.17.0.441.gb46fe60e1d-goog
+2.17.0
