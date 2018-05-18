@@ -1,16 +1,16 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:17:36 +0200
-Subject: [PATCH 63/69] ARM: dts: r8a7792: Add PMU device node
+Date: Fri, 18 May 2018 13:17:35 +0200
+Subject: [PATCH 62/69] ARM: dts: r8a7791: Add PMU device node
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <0f2bcba999463fcc2ad2d6ae0c91b62649d45190.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <8607428c96b94e9f53f46b6e5aa3b9dbd604ad07.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Enable support for the ARM Performance Monitor Units in the Cortex-A15
-CPU cores on R-Car V2H by adding a device node for the PMU.
+CPU cores on R-Car M2-W by adding a device node for the PMU.
 
 New Linux output:
 
@@ -19,14 +19,14 @@ New Linux output:
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792.dtsi | 7 +++++++
+ arch/arm/boot/dts/r8a7791.dtsi | 7 +++++++
  1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index d2cf8dd2d9b0..f44257dd86f6 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -85,6 +85,13 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 570ca12422c5..828ad78c3337 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -126,6 +126,13 @@
  		clock-frequency = <0>;
  	};
  
