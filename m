@@ -1,70 +1,130 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 18 May 2018 13:20:28 +0200
-Subject: [PATCH] EDAC, ghes: Make platform-based whitelisting x86-only
-In-Reply-To: <20180518111132.GC17285@pd.tnic>
-References: <1526039543-180996-1-git-send-email-zhengqiang10@huawei.com>
- <20180511121901.GA12705@pd.tnic> <5AF90C70.408@huawei.com>
- <20180514094709.GC23049@pd.tnic>
- <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
- <20180514164720.GH23049@pd.tnic>
- <da776696-ddbf-c35e-1dd4-b6e0ce91aed6@arm.com>
- <20180516182958.GB17092@pd.tnic>
- <8602b133-e0fa-57e2-5159-9d34a1ded85f@arm.com>
- <20180518111132.GC17285@pd.tnic>
-Message-ID: <20180518112028.GD17285@pd.tnic>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 18 May 2018 14:22:06 +0100
+Subject: [PATCH 3/6] arm_pmu: Add support for long event counters
+In-Reply-To: <1526638943-2110-4-git-send-email-suzuki.poulose@arm.com>
+References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
+ <1526638943-2110-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <72bfd236-65de-6477-7f76-2f10d8bceb99@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Borislav Petkov <bp@suse.de>
+On 18/05/18 11:22, Suzuki K Poulose wrote:
+> Each PMU has a set of fixed width event counters. But in some
+> special cases, the events could be counted using a counter which
+> effectively has twice the normal width of a coutner.
+> e.g, Arm V8 PMUv3 has a 64 bit cycle counter which can count
+> only the CPU cylces. Also, the PMU can chain the event counters
+> to effectively count as a 64bit counter.
 
-ARM machines all have DMI tables so if they request hw error reporting
-through GHES, then the driver should be able to detect DIMMs and report
-errors successfully (famous last words :)).
+Nit: a few typos in that paragraph.
 
-Make the platform-based list x86-specific so that ghes_edac can load on
-ARM.
+> Add support for tracking the events that uses double the normal
+> counter size. This only affects the periods set for each counter.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>   drivers/perf/arm_pmu.c       | 25 ++++++++++++++++++++++---
+>   include/linux/perf/arm_pmu.h |  6 ++++++
+>   2 files changed, 28 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index e23e1a1..1adabb5 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -33,6 +33,21 @@ static inline u64 arm_pmu_max_period(struct arm_pmu *pmu)
+>   	return (((u64)1) << (pmu->counter_width)) - 1;
+>   }
+>   
+> +static inline u64 arm_pmu_get_event_max_period(struct arm_pmu *pmu,
 
-Signed-off-by: Borislav Petkov <bp@suse.de>
-Reviewed-by: James Morse <james.morse@arm.com>
-Tested-by: James Morse <james.morse@arm.com>
-Cc: Qiang Zheng <zhengqiang10@huawei.com>
-Link: https://lkml.kernel.org/r/1526039543-180996-1-git-send-email-zhengqiang10 at huawei.com
----
- drivers/edac/ghes_edac.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+The "get_" here seems a bit at odds with arm_pmu_max_period() - I'd be 
+inlined to go for slightly more consistent naming (with a slight 
+personal preference towards removing it here rather than adding it there)
 
-diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
-index 863fbf3db29f..473aeec4b1da 100644
---- a/drivers/edac/ghes_edac.c
-+++ b/drivers/edac/ghes_edac.c
-@@ -440,12 +440,16 @@ int ghes_edac_register(struct ghes *ghes, struct device *dev)
- 	struct mem_ctl_info *mci;
- 	struct edac_mc_layer layers[1];
- 	struct ghes_edac_dimm_fill dimm_fill;
--	int idx;
-+	int idx = -1;
- 
--	/* Check if safe to enable on this system */
--	idx = acpi_match_platform_list(plat_list);
--	if (!force_load && idx < 0)
--		return -ENODEV;
-+	if (IS_ENABLED(CONFIG_X86)) {
-+		/* Check if safe to enable on this system */
-+		idx = acpi_match_platform_list(plat_list);
-+		if (!force_load && idx < 0)
-+			return -ENODEV;
-+	} else {
-+		idx = 0;
-+	}
- 
- 	/*
- 	 * We have only one logical memory controller to which all DIMMs belong.
--- 
-2.17.0.391.g1f1cddd558b5
+> +					       struct perf_event *event)
+> +{
+> +	u64 period = arm_pmu_max_period(pmu);
+> +
+> +	/*
+> +	 * To prevent shift-counter-overflow warning, create the
+> +	 * mask, by shift + OR sequence.
+> +	 */
+> +	if (event->hw.flags & ARMPMU_EVT_LONG)
+> +		period = (period << pmu->counter_width) | period;
+> +
+> +	return period;
+> +}
+> +
+>   static int
+>   armpmu_map_cache_event(const unsigned (*cache_map)
+>   				      [PERF_COUNT_HW_CACHE_MAX]
+> @@ -122,7 +137,7 @@ int armpmu_event_set_period(struct perf_event *event)
+>   	u64 max_period;
+>   	int ret = 0;
+>   
+> -	max_period = arm_pmu_max_period(armpmu);
+> +	max_period = arm_pmu_get_event_max_period(armpmu, event);
+>   	if (unlikely(left <= -period)) {
+>   		left = period;
+>   		local64_set(&hwc->period_left, left);
+> @@ -148,7 +163,7 @@ int armpmu_event_set_period(struct perf_event *event)
+>   
+>   	local64_set(&hwc->prev_count, (u64)-left);
+>   
+> -	armpmu->write_counter(event, (u64)(-left) & 0xffffffff);
+> +	armpmu->write_counter(event, (u64)(-left) & max_period);
+>   
+>   	perf_event_update_userpage(event);
+>   
+> @@ -160,7 +175,7 @@ u64 armpmu_event_update(struct perf_event *event)
+>   	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+>   	struct hw_perf_event *hwc = &event->hw;
+>   	u64 delta, prev_raw_count, new_raw_count;
+> -	u64 max_period = arm_pmu_max_period(armpmu);
+> +	u64 max_period = arm_pmu_get_event_max_period(armpmu, event);
+>   
+>   again:
+>   	prev_raw_count = local64_read(&hwc->prev_count);
+> @@ -368,6 +383,7 @@ __hw_perf_event_init(struct perf_event *event)
+>   	struct hw_perf_event *hwc = &event->hw;
+>   	int mapping;
+>   
+> +	hwc->flags = 0;
+>   	mapping = armpmu->map_event(event);
+>   
+>   	if (mapping < 0) {
+> @@ -670,6 +686,9 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
+>   			continue;
+>   
+>   		event = hw_events->events[idx];
+> +		/* Chained events could use multiple counters */
+> +		if (!event)
+> +			continue;
 
+This hunk looks a little out of place; does it perhaps belong to patch #6?
 
--- 
-Regards/Gruss,
-    Boris.
+Robin.
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+>   
+>   		switch (cmd) {
+>   		case CPU_PM_ENTER:
+> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+> index 705e8c3..ed7e3f7 100644
+> --- a/include/linux/perf/arm_pmu.h
+> +++ b/include/linux/perf/arm_pmu.h
+> @@ -25,6 +25,12 @@
+>    */
+>   #define ARMPMU_MAX_HWEVENTS		32
+>   
+> +/*
+> + * ARM PMU hw_event flags
+> + */
+> +/* Event uses a counter with double the normal width */
+> +#define ARMPMU_EVT_LONG			1
+> +
+>   #define HW_OP_UNSUPPORTED		0xFFFF
+>   #define C(_x)				PERF_COUNT_HW_CACHE_##_x
+>   #define CACHE_OP_UNSUPPORTED		0xFFFF
+> 
