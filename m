@@ -1,207 +1,207 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sat, 19 May 2018 00:01:24 +0300
-Subject: [PATCH v7 2/2] drivers: soc: Add LLCC driver
-In-Reply-To: <1526492623-20527-3-git-send-email-rishabhb@codeaurora.org>
-References: <1526492623-20527-1-git-send-email-rishabhb@codeaurora.org>
- <1526492623-20527-3-git-send-email-rishabhb@codeaurora.org>
-Message-ID: <CAHp75VdO7+u-PQ+RBH71sxHHG0WkAyEVxv0BNPaycbcRnrZang@mail.gmail.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Fri, 18 May 2018 23:09:49 +0200
+Subject: [PATCH 1/6] ARM: OMAP1: ams-delta: add GPIO lookup tables
+Message-ID: <20180518210954.29044-1-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 8:43 PM, Rishabh Bhatnagar
-<rishabhb@codeaurora.org> wrote:
-> LLCC (Last Level Cache Controller) provides additional cache memory
-> in the system. LLCC is partitioned into multiple slices and each
-> slice gets its own priority, size, ID and other config parameters.
-> LLCC driver programs these parameters for each slice. Clients that
-> are assigned to use LLCC need to get information such size & ID of the
-> slice they get and activate or deactivate the slice as needed. LLCC driver
-> provides API for the clients to perform these operations.
+Scope of the change is limited to GPIO pins used by board specific
+device drivers which will be updated by follow-up patches of the
+series. Those are some OMAP GPIO (gpio-0-15) and most of Amstrad Delta
+latch2 GPIO bank pins. Remaining pins of those banks, as well as
+Amstrad Delta latch1 pins, will be addressed later.
 
-> +static const struct of_device_id sdm845_qcom_llcc_of_match[] = {
-> +       { .compatible = "qcom,sdm845-llcc", },
+Assign a label ("latch2") to the bank, enumerate its pins and put that
+information, together with OMAP GPIO bank pins, in GPIO lookup tables.
+Assign lookup tables to devices as soon as those devices are registered
+and their names can be obtained.
 
-> +       { },
+A step froward in:
+- removal of hard-coded GPIO numbers from drivers,
+- removal of board mach includes from drivers,
+- switching to dynamically assigned GPIO numbers.
 
-Slightly better w/o comma
+Created and compile tested agains linux-4.17-rc3
 
-> +};
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+---
+ arch/arm/mach-omap1/board-ams-delta.c | 102 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 102 insertions(+)
 
-> +static struct platform_driver sdm845_qcom_llcc_driver = {
-> +       .driver = {
-> +               .name = "sdm845-llcc",
-
-> +               .owner = THIS_MODULE,
-
-No need. See below.
-
-> +               .of_match_table = sdm845_qcom_llcc_of_match,
-> +       },
-> +       .probe = sdm845_qcom_llcc_probe,
-> +};
-
-> +
-> +static int __init sdm845_init_qcom_llcc_init(void)
-> +{
-> +       return platform_driver_register(&sdm845_qcom_llcc_driver);
-> +}
-> +module_init(sdm845_init_qcom_llcc_init);
-> +
-> +static void __exit sdm845_exit_qcom_llcc_exit(void)
-> +{
-> +       platform_driver_unregister(&sdm845_qcom_llcc_driver);
-> +}
-> +module_exit(sdm845_exit_qcom_llcc_exit);
-
-Why not to use module_platform_driver() macro?
-
-> +#define ACTIVATE                      0x1
-> +#define DEACTIVATE                    0x2
-> +#define ACT_CTRL_OPCODE_ACTIVATE      0x1
-> +#define ACT_CTRL_OPCODE_DEACTIVATE    0x2
-> +#define ACT_CTRL_ACT_TRIG             0x1
-
-Are these bits? Perhaps BIT() ?
-
-> +#define ACT_CTRL_OPCODE_SHIFT         0x1
-> +#define ATTR1_PROBE_TARGET_WAYS_SHIFT 0x2
-> +#define ATTR1_FIXED_SIZE_SHIFT        0x3
-> +#define ATTR1_PRIORITY_SHIFT          0x4
-> +#define ATTR1_MAX_CAP_SHIFT           0x10
-
-Better to use fixed size pattern, i.e. 0x01, 0x02, 0x03, 0x04, 0x10.
-
-> +#define ATTR0_RES_WAYS_MASK           0x00000fff
-> +#define ATTR0_BONUS_WAYS_MASK         0x0fff0000
-
-GENMASK()
-
-> +#define LLCC_LB_CNT_MASK               0xf0000000
-
-Ditto.
-
-> +#define MAX_CAP_TO_BYTES(n) (n * 1024)
-
-(n * SZ_1K) ?
-
-> +#define LLCC_TRP_ACT_CTRLn(n) (n * 0x1000)
-
-SZ_4K ?
-
-> +#define LLCC_TRP_STATUSn(n)   (4 + n * 0x1000)
-
-Ditto.
-
-> +struct llcc_slice_desc *llcc_slice_getd(u32 uid)
-> +{
-> +       const struct llcc_slice_config *cfg;
-> +       struct llcc_slice_desc *desc;
-> +       u32 sz, count = 0;
-> +
-> +       cfg = drv_data->cfg;
-> +       sz = drv_data->cfg_size;
-> +
-
-> +       while (cfg && count < sz) {
-> +               if (cfg->usecase_id == uid)
-> +                       break;
-> +               cfg++;
-> +               count++;
-> +       }
-> +       if (cfg == NULL || count == sz)
-> +               return ERR_PTR(-ENODEV);
-
-if (!cfg)
-          return ERR_PTR(-ENODEV);
-
-while (cfg->... != uid) {
-  cfg++;
-  count++;
-}
-
-if (count == sz)
- return ...
-
-Though I would rather put it to for () loop.
-
-> +static int llcc_update_act_ctrl(u32 sid,
-> +                               u32 act_ctrl_reg_val, u32 status)
-> +{
-> +       u32 act_ctrl_reg;
-> +       u32 status_reg;
-> +       u32 slice_status;
-
-> +       int ret = 0;
-
-Useless assignment. Check entire patch series for a such.
-
-> +       ret = regmap_read_poll_timeout(drv_data->regmap, status_reg,
-> +       slice_status, !(slice_status & status), 0, LLCC_STATUS_READ_DELAY);
-
-Wrong indentation.
-
-> +       return ret;
-> +}
-
-> +       ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
-> +                                 DEACTIVATE);
-
-Perhaps one line (~83 characters here is OK) ?
-
-> +       ret = llcc_update_act_ctrl(desc->slice_id, act_ctrl_val,
-> +                                 ACTIVATE);
-
-Ditto.
-
-> +               attr1_cfg = bcast_off +
-> +                               LLCC_TRP_ATTR1_CFGn(llcc_table[i].slice_id);
-> +               attr0_cfg = bcast_off +
-> +                               LLCC_TRP_ATTR0_CFGn(llcc_table[i].slice_id);
-
-Ditto.
-
-> +               attr1_val |= llcc_table[i].probe_target_ways <<
-> +                               ATTR1_PROBE_TARGET_WAYS_SHIFT;
-> +               attr1_val |= llcc_table[i].fixed_size <<
-> +                               ATTR1_FIXED_SIZE_SHIFT;
-> +               attr1_val |= llcc_table[i].priority << ATTR1_PRIORITY_SHIFT;
-
-foo |=
-  bar << SHIFT;
-
-would look slightly better.
-
-> +int qcom_llcc_probe(struct platform_device *pdev,
-> +                     const struct llcc_slice_config *llcc_cfg, u32 sz)
-> +{
-
-> +       drv_data->offsets = devm_kzalloc(dev, num_banks * sizeof(u32),
-> +                                                       GFP_KERNEL);
-> +       if (!drv_data->offsets)
-> +               return -ENOMEM;
-
-devm_kcalloc() ?
-
-> +
-> +       for (i = 0; i < num_banks; i++)
-> +               drv_data->offsets[i] = (i * BANK_OFFSET_STRIDE);
-
-Pointless parens.
-
-> +       drv_data->bitmap = devm_kcalloc(dev,
-> +       BITS_TO_LONGS(drv_data->max_slices), sizeof(unsigned long),
-> +                                               GFP_KERNEL);
-> +       if (!drv_data->bitmap)
-> +               return -ENOMEM;
-
-Perhaps at some point someone will add
-bitmap_alloc()
-devm_bitmap_alloc()
-
-> +       bitmap_zero(drv_data->bitmap, drv_data->max_slices);
-
-Pointless
-
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index 52e8e53ca154..4b78e73f8bf7 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -12,6 +12,7 @@
+  * published by the Free Software Foundation.
+  */
+ #include <linux/gpio/driver.h>
++#include <linux/gpio/machine.h>
+ #include <linux/gpio.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -202,7 +203,10 @@ static struct resource latch2_resources[] = {
+ 	},
+ };
+ 
++#define LATCH2_LABEL	"latch2"
++
+ static struct bgpio_pdata latch2_pdata = {
++	.label	= LATCH2_LABEL,
+ 	.base	= AMS_DELTA_LATCH2_GPIO_BASE,
+ 	.ngpio	= AMS_DELTA_LATCH2_NGPIO,
+ };
+@@ -217,6 +221,23 @@ static struct platform_device latch2_gpio_device = {
+ 	},
+ };
+ 
++#define LATCH2_PIN_LCD_VBLEN		0
++#define LATCH2_PIN_LCD_NDISP		1
++#define LATCH2_PIN_NAND_NCE		2
++#define LATCH2_PIN_NAND_NRE		3
++#define LATCH2_PIN_NAND_NWP		4
++#define LATCH2_PIN_NAND_NWE		5
++#define LATCH2_PIN_NAND_ALE		6
++#define LATCH2_PIN_NAND_CLE		7
++#define LATCH2_PIN_KEYBRD_PWR		8
++#define LATCH2_PIN_KEYBRD_DATAOUT	9
++#define LATCH2_PIN_SCARD_RSTIN		10
++#define LATCH2_PIN_SCARD_CMDVCC		11
++#define LATCH2_PIN_MODEM_NRESET		12
++#define LATCH2_PIN_MODEM_CODEC		13
++#define LATCH2_PIN_HOOKFLASH1		14
++#define LATCH2_PIN_HOOKFLASH2		15
++
+ static const struct gpio latch_gpios[] __initconst = {
+ 	{
+ 		.gpio	= LATCH1_GPIO_BASE + 6,
+@@ -323,6 +344,22 @@ static struct platform_device ams_delta_nand_device = {
+ 	.resource	= ams_delta_nand_resources,
+ };
+ 
++#define OMAP_GPIO_LABEL	"gpio-0-15"
++
++static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
++	.table = {
++		GPIO_LOOKUP(OMAP_GPIO_LABEL, AMS_DELTA_GPIO_PIN_NAND_RB, "rdy",
++			    0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_NCE, "nce", 0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_NRE, "nre", 0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_NWP, "nwp", 0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_NWE, "nwe", 0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_ALE, "ale", 0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_CLE, "cle", 0),
++		{ },
++	},
++};
++
+ static struct resource ams_delta_kp_resources[] = {
+ 	[0] = {
+ 		.start	= INT_KEYBOARD,
+@@ -358,6 +395,14 @@ static struct platform_device ams_delta_lcd_device = {
+ 	.id	= -1,
+ };
+ 
++static struct gpiod_lookup_table ams_delta_lcd_gpio_table = {
++	.table = {
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_LCD_VBLEN, "vblen", 0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_LCD_NDISP, "ndisp", 0),
++		{ },
++	},
++};
++
+ static const struct gpio_led gpio_leds[] __initconst = {
+ 	{
+ 		.name		 = "camera",
+@@ -449,11 +494,35 @@ static struct platform_device ams_delta_audio_device = {
+ 	.id     = -1,
+ };
+ 
++static struct gpiod_lookup_table ams_delta_audio_gpio_table = {
++	.table = {
++		GPIO_LOOKUP(OMAP_GPIO_LABEL, AMS_DELTA_GPIO_PIN_HOOK_SWITCH,
++			    "hook_switch", 0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_MODEM_CODEC,
++			    "modem_codec", 0),
++		{ },
++	},
++};
++
+ static struct platform_device cx20442_codec_device = {
+ 	.name   = "cx20442-codec",
+ 	.id     = -1,
+ };
+ 
++static struct gpiod_lookup_table ams_delta_serio_gpio_table = {
++	.table = {
++		GPIO_LOOKUP(OMAP_GPIO_LABEL, AMS_DELTA_GPIO_PIN_KEYBRD_DATA,
++			    "data", 0),
++		GPIO_LOOKUP(OMAP_GPIO_LABEL, AMS_DELTA_GPIO_PIN_KEYBRD_CLK,
++			    "clock", 0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_KEYBRD_PWR,
++			    "power", 0),
++		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_KEYBRD_DATAOUT,
++			    "dataout", 0),
++		{ },
++	},
++};
++
+ static struct platform_device *ams_delta_devices[] __initdata = {
+ 	&latch1_gpio_device,
+ 	&latch2_gpio_device,
+@@ -468,6 +537,16 @@ static struct platform_device *late_devices[] __initdata = {
+ 	&cx20442_codec_device,
+ };
+ 
++static struct gpiod_lookup_table *ams_delta_gpio_tables[] __initdata = {
++	&ams_delta_audio_gpio_table,
++	&ams_delta_serio_gpio_table,
++};
++
++static struct gpiod_lookup_table *late_gpio_tables[] __initdata = {
++	&ams_delta_lcd_gpio_table,
++	&ams_delta_nand_gpio_table,
++};
++
+ static void __init ams_delta_init(void)
+ {
+ 	/* mux pins for uarts */
+@@ -500,6 +579,20 @@ static void __init ams_delta_init(void)
+ 	gpio_led_register_device(-1, &leds_pdata);
+ 	platform_add_devices(ams_delta_devices, ARRAY_SIZE(ams_delta_devices));
+ 
++	/*
++	 * As soon as devices have been registered, assign their dev_names
++	 * to respective GPIO lookup tables before they are added.
++	 */
++	ams_delta_audio_gpio_table.dev_id =
++			dev_name(&ams_delta_audio_device.dev);
++	/*
++	 * No device name is assigned to GPIO lookup table for serio device
++	 * as long as serio driver is not converted to platform device driver.
++	 */
++
++	gpiod_add_lookup_tables(ams_delta_gpio_tables,
++				ARRAY_SIZE(ams_delta_gpio_tables));
++
+ 	ams_delta_init_fiq();
+ 
+ 	omap_writew(omap_readw(ARM_RSTCT1) | 0x0004, ARM_RSTCT1);
+@@ -570,6 +663,15 @@ static int __init late_init(void)
+ 
+ 	platform_add_devices(late_devices, ARRAY_SIZE(late_devices));
+ 
++	/*
++	 * As soon as devices have been registered, assign their dev_names
++	 * to respective GPIO lookup tables before they are added.
++	 */
++	ams_delta_lcd_gpio_table.dev_id = dev_name(&ams_delta_lcd_device.dev);
++	ams_delta_nand_gpio_table.dev_id = dev_name(&ams_delta_nand_device.dev);
++
++	gpiod_add_lookup_tables(late_gpio_tables, ARRAY_SIZE(late_gpio_tables));
++
+ 	err = platform_device_register(&modem_nreset_device);
+ 	if (err) {
+ 		pr_err("Couldn't register the modem regulator device\n");
 -- 
-With Best Regards,
-Andy Shevchenko
+2.16.1
