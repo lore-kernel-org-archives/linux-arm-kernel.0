@@ -1,78 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 May 2018 18:30:41 +0100
-Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
-In-Reply-To: <20180518170202.11458-1-samitolvanen@google.com>
-References: <20180518170202.11458-1-samitolvanen@google.com>
-Message-ID: <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 18 May 2018 19:39:38 +0200 (CEST)
+Subject: [PATCH v3 0/5]
+In-Reply-To: <278cb8b1-d567-2067-2dde-980596821c9c@arm.com>
+References: <20180518143913.26306-1-marc.zyngier@arm.com>
+ <alpine.DEB.2.21.1805181222380.11339@macbook-air>
+ <278cb8b1-d567-2067-2dde-980596821c9c@arm.com>
+Message-ID: <1113496355.72893.1526665178400@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/18 18:02, Sami Tolvanen wrote:
-> Starting with LLVM r308050, clang generates a jump table with EL1
-> virtual addresses in __init_stage2_translation, which results in a
-> kernel panic when booting at EL2:
+> Marc Zyngier <marc.zyngier@arm.com> hat am 18. Mai 2018 um 18:41 geschrieben:
 > 
->   Kernel panic - not syncing: HYP panic:
->   PS:800003c9 PC:ffff0000089e6fd8 ESR:86000004
->   FAR:ffff0000089e6fd8 HPFAR:0000000009825000 PAR:0000000000000000
->   VCPU:000804fc20001221
 > 
->   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc7-dirty #3
->   Hardware name: ARM Juno development board (r1) (DT)
->   Call trace:
->   [<ffff000008088ea4>] dump_backtrace+0x0/0x34c
->   [<ffff000008089208>] show_stack+0x18/0x20
->   [<ffff0000089c73ec>] dump_stack+0xc4/0xfc
->   [<ffff0000080c8e1c>] panic+0x138/0x2b4
->   [<ffff0000080c8ce4>] panic+0x0/0x2b4
->   SMP: stopping secondary CPUs
->   SMP: failed to stop secondary CPUs 0-3,5
->   Kernel Offset: disabled
->   CPU features: 0x002086
->   Memory Limit: none
->   ---[ end Kernel panic - not syncing: HYP panic:
->   PS:800003c9 PC:ffff0000089e6fd8 ESR:86000004
->   FAR:ffff0000089e6fd8 HPFAR:0000000009825000 PAR:0000000000000000
->   VCPU:000804fc20001221
+> [/me beats himself for not writing a subject line...]
 > 
-> This change adds -fno-jump-tables to arm64/hyp to work around the
-> bug.
+> On 18/05/18 17:29, Vince Weaver wrote:
+> > On Fri, 18 May 2018, Marc Zyngier wrote:
+> > 
+> >> There is also the case of people natively running 32bit kernels on
+> >> 64bit HW and trying to upstream unspeakable hacks, hoping that the
+> >> stars will align and that they'll win the lottery (see [1]).
+> > 
+> > I've tested these patches on a Raspberry Pi 3B running a 32-bit upstream 
+> > (4.17-rc5-git) kernel and they work.
+> > 
+> > [    0.472906] hw perfevents: enabled with armv8_cortex_a53 PMU driver, 7 counters available
+> > 
+> > I only needed to add this to the devicetree
+> > 
+> > 	arm-pmu {
+> > 		compatible = "arm,cortex-a53-pmu";
+> > 		interrupt-parent = <&local_intc>;
+> > 		interrupts = <9 IRQ_TYPE_LEVEL_HIGH>;
+> > 	};
 > 
-> Suggested-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
-> ---
->  arch/arm64/kvm/hyp/Makefile | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 4313f74753332..745b3255e7832 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -5,6 +5,10 @@
->  
->  ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
->  
-> +ifeq ($(cc-name),clang)
-> +ccflags-y += -fno-jump-tables
-> +endif
-> +
->  KVM=../../../../virt/kvm
->  
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
-> 
+> That's definitely the sensible thing to have on such hardware. Why isn't
+> it in the upstream DT already, irrespective of the state of the kernel
+> support?
 
-I'm going to ask the question I've asked before when this patch cropped
-up (must be the 4th time now):
+I remember that Vince point out the absence. He asked about how to implement it and i wasn't sure about it. At this time we hadn't IRQ polarity support. So we wanted to get this puzzle piece before. In march i put it on my TODO list, but then RPI 3 B+ support had higher prio to get into 4.18.
 
-Is it guaranteed that this is the only case where LLVM/clang is going to
-generate absolute addresses instead of using relative addressing?
+In general we have the problem that most of the users take the downstream kernel and don't know about the differences. Luckily more distributions switch to the upstream kernel, which increases the feedback.
 
-So far, nobody has answered that question. If you assure me that this is
-the case, I'll take that patch. Otherwise, we're just playing
-whack-a-mole, as with the profiling stuff.
+> 
+> > Tested-by: Vince Weaver <vincent.weaver@maine.edu>
 
-Thanks,
+Thanks again
+Stefan
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> Thanks a lot for testing.
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
