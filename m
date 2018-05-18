@@ -1,31 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:14:51 +0200
-Subject: [PATCH 3/3] arm64: defconfig: enable R8A77990 SoC
-In-Reply-To: <cover.1526548323.git.horms+renesas@verge.net.au>
-References: <cover.1526548323.git.horms+renesas@verge.net.au>
-Message-ID: <c1fcd2ec1b1970e0e7b0c40c64bc51cf667b1a75.1526548323.git.horms+renesas@verge.net.au>
+Date: Fri, 18 May 2018 13:14:23 +0200
+Subject: [PATCH 001/102] arm64: dts: renesas: r8a77965: add usb2_phy nodes
+In-Reply-To: <cover.1526637994.git.horms+renesas@verge.net.au>
+References: <cover.1526637994.git.horms+renesas@verge.net.au>
+Message-ID: <b5857630a829a8d567627e5925a5710e5a80491a.1526637994.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Renesas R-Car E3 (R8A77990) SoC in the ARM64 defconfig.
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
+This patch add usb2_phy nodes for r8a77965.
+
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 79b5b7d9ea55..a952346956fe 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -53,6 +53,7 @@ CONFIG_ARCH_R8A7796=y
- CONFIG_ARCH_R8A77965=y
- CONFIG_ARCH_R8A77970=y
- CONFIG_ARCH_R8A77980=y
-+CONFIG_ARCH_R8A77990=y
- CONFIG_ARCH_R8A77995=y
- CONFIG_ARCH_STRATIX10=y
- CONFIG_ARCH_TEGRA=y
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index f0871fcdd984..d498274fa0f3 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -650,13 +650,26 @@
+ 		};
+ 
+ 		usb2_phy0: usb-phy at ee080200 {
++			compatible = "renesas,usb2-phy-r8a77965",
++				     "renesas,rcar-gen3-usb2-phy";
+ 			reg = <0 0xee080200 0 0x700>;
+-			/* placeholder */
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 703>;
++			#phy-cells = <0>;
++			status = "disabled";
+ 		};
+ 
+ 		usb2_phy1: usb-phy at ee0a0200 {
++			compatible = "renesas,usb2-phy-r8a77965",
++				     "renesas,rcar-gen3-usb2-phy";
+ 			reg = <0 0xee0a0200 0 0x700>;
+-			/* placeholder */
++			clocks = <&cpg CPG_MOD 703>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 703>;
++			#phy-cells = <0>;
++			status = "disabled";
+ 		};
+ 
+ 		ohci1: usb at ee0a0000 {
 -- 
 2.11.0
