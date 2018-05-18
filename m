@@ -1,32 +1,33 @@
-From: vincent.weaver@maine.edu (Vince Weaver)
-Date: Fri, 18 May 2018 12:29:36 -0400 (EDT)
-Subject: [PATCH v3 0/5]
-In-Reply-To: <20180518143913.26306-1-marc.zyngier@arm.com>
-References: <20180518143913.26306-1-marc.zyngier@arm.com>
-Message-ID: <alpine.DEB.2.21.1805181222380.11339@macbook-air>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 May 2018 11:34:08 -0500
+Subject: [PATCH v6 8/9] counter: stm32-lptimer: add counter device
+In-Reply-To: <726de278f09aa4438b97b147cd26a03009522997.1526487615.git.vilhelm.gray@gmail.com>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+ <726de278f09aa4438b97b147cd26a03009522997.1526487615.git.vilhelm.gray@gmail.com>
+Message-ID: <20180518163408.GA6430@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 May 2018, Marc Zyngier wrote:
+On Wed, May 16, 2018 at 01:52:27PM -0400, William Breathitt Gray wrote:
+> From: Fabrice Gasnier <fabrice.gasnier@st.com>
+> 
+> Add support for new counter device to stm32-lptimer.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+> ---
+>  .../{iio => }/counter/stm32-lptimer-cnt.txt   |   0
+>  .../devicetree/bindings/mfd/stm32-lptimer.txt |   2 +-
 
-> There is also the case of people natively running 32bit kernels on
-> 64bit HW and trying to upstream unspeakable hacks, hoping that the
-> stars will align and that they'll win the lottery (see [1]).
+Please split bindings to separate patch.
 
-I've tested these patches on a Raspberry Pi 3B running a 32-bit upstream 
-(4.17-rc5-git) kernel and they work.
-
-[    0.472906] hw perfevents: enabled with armv8_cortex_a53 PMU driver, 7 counters available
-
-I only needed to add this to the devicetree
-
-	arm-pmu {
-		compatible = "arm,cortex-a53-pmu";
-		interrupt-parent = <&local_intc>;
-		interrupts = <9 IRQ_TYPE_LEVEL_HIGH>;
-	};
-
-
-Tested-by: Vince Weaver <vincent.weaver@maine.edu>
-
-Vince
+>  drivers/counter/Kconfig                       |  10 +
+>  drivers/counter/Makefile                      |   1 +
+>  drivers/counter/stm32-lptimer-cnt.c           | 722 ++++++++++++++++++
+>  drivers/iio/counter/Kconfig                   |   9 -
+>  drivers/iio/counter/Makefile                  |   2 -
+>  drivers/iio/counter/stm32-lptimer-cnt.c       | 382 ---------
+>  8 files changed, 734 insertions(+), 394 deletions(-)
+>  rename Documentation/devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt (100%)
+>  create mode 100644 drivers/counter/stm32-lptimer-cnt.c
+>  delete mode 100644 drivers/iio/counter/stm32-lptimer-cnt.c
