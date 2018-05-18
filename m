@@ -1,140 +1,74 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 18 May 2018 11:22:19 +0100
-Subject: [PATCH 2/6] arm_pmu: Change API to support 64bit counter values
-In-Reply-To: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
-References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1526638943-2110-3-git-send-email-suzuki.poulose@arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 18 May 2018 11:48:48 +0100
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.18
+In-Reply-To: <20180515230014.GS29062@mai>
+References: <5AF5A94A.4080308@hisilicon.com>
+ <20180514201445.6sglddhalvclu36v@localhost> <20180515082811.GL29062@mai>
+ <20180515203755.esjnphfep5ep7wbe@localhost> <20180515230014.GS29062@mai>
+Message-ID: <5AFEAF90.2030405@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the {read/write}_counter APIs to handle 64bit values
-to enable supporting chained event counters.
+Hi Daniel,
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm/kernel/perf_event_v6.c     | 4 ++--
- arch/arm/kernel/perf_event_v7.c     | 4 ++--
- arch/arm/kernel/perf_event_xscale.c | 4 ++--
- arch/arm64/kernel/perf_event.c      | 9 ++++-----
- include/linux/perf/arm_pmu.h        | 4 ++--
- 5 files changed, 12 insertions(+), 13 deletions(-)
+On 2018/5/16 0:00, Daniel Lezcano wrote:
+> On Tue, May 15, 2018 at 01:37:55PM -0700, Olof Johansson wrote:
+>> On Tue, May 15, 2018 at 10:28:11AM +0200, Daniel Lezcano wrote:
+>>> On Mon, May 14, 2018 at 01:14:45PM -0700, Olof Johansson wrote:
+>>>> Hi Wei,
+>>>>
+>>>> On Fri, May 11, 2018 at 03:31:38PM +0100, Wei Xu wrote:
+>>>>> Hi Arnd, Hi Olof,
+>>>>>
+>>>>> Please help to pull the following changes.
+>>>>>
+>>>>> About the CLOCK_STUB and the MAILBOX consolidate patch,
+>>>>> Jassi and Stephen have acked it.
+>>>>> Could you let me know how to handle this kind case
+>>>>> if it is not OK to be in this pull?
+>>>>
+>>>> I don't think there's any need to group the Kconfig changes with the defconfig
+>>>> updates here, is there?
+>>>
+>>> I don't have the patches history, but likely this patch should come together with:
+>>>
+>>> https://patchwork.kernel.org/patch/10399799/
+>>> https://patchwork.kernel.org/patch/10399801/
+>>>
+>>> Otherwise the compilation options won't be consistent with what is enabled in
+>>> the DT.
+>>
+>> As long as neither side regresses due to the changes, there should be no
+>> problem. Just because a DT node is added in the tree there's no need to
+>> configure the driver. Or am I missing some aspect of it here?
+> 
+> Actually, the DT node being added do not introduce regressions.
+> 
+> However it is expected by adding the clock stub and the mailbox to have the
+> cpufreq working which is not necessarily the case because the config may be
+> inconsistent, so the cpufreq may be working on some config if the user had the
+> options for the clock and the mailbox enabled but these options can disappear
+> and not come back because of this Kconfig inconsistencies.
+> 
+>>From my point of view, by adding those DT nodes, it makes sense to give a
+> consolidated Kconfig coming together and ensuring the drivers are enabled when
+> the node is parsed.
+> 
+> On the other side, the patch is simple enough to be split and submitted in
+> separated trees, hoping the maintainer Wu Xei and the branch users keep in mind
+> if the board does not boot or has inconsistent behavior they will have to
+> double check the options are enabled for the clock stub and the mailbox.
+> 
+> I don't have a strong opinion on this actually, whatever the decision is, I
+> will be fine with resubmitting the patch to the different trees, or keep it as
+> is and merge it through the hisi tree.
 
-diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-index d52a3fa..720c19e 100644
---- a/arch/arm/kernel/perf_event_v6.c
-+++ b/arch/arm/kernel/perf_event_v6.c
-@@ -233,7 +233,7 @@ armv6_pmcr_counter_has_overflowed(unsigned long pmcr,
- 	return ret;
- }
- 
--static inline u32 armv6pmu_read_counter(struct perf_event *event)
-+static inline u64 armv6pmu_read_counter(struct perf_event *event)
- {
- 	struct hw_perf_event *hwc = &event->hw;
- 	int counter = hwc->idx;
-@@ -251,7 +251,7 @@ static inline u32 armv6pmu_read_counter(struct perf_event *event)
- 	return value;
- }
- 
--static inline void armv6pmu_write_counter(struct perf_event *event, u32 value)
-+static inline void armv6pmu_write_counter(struct perf_event *event, u64 value)
- {
- 	struct hw_perf_event *hwc = &event->hw;
- 	int counter = hwc->idx;
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 3d8ec6a..2f3c06d 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -743,7 +743,7 @@ static inline void armv7_pmnc_select_counter(int idx)
- 	isb();
- }
- 
--static inline u32 armv7pmu_read_counter(struct perf_event *event)
-+static inline u64 armv7pmu_read_counter(struct perf_event *event)
- {
- 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
- 	struct hw_perf_event *hwc = &event->hw;
-@@ -763,7 +763,7 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
- 	return value;
- }
- 
--static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
-+static inline void armv7pmu_write_counter(struct perf_event *event, u64 value)
- {
- 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
- 	struct hw_perf_event *hwc = &event->hw;
-diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
-index 6eb0e21..3f2e398 100644
---- a/arch/arm/kernel/perf_event_xscale.c
-+++ b/arch/arm/kernel/perf_event_xscale.c
-@@ -317,7 +317,7 @@ static void xscale1pmu_stop(struct arm_pmu *cpu_pmu)
- 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
- }
- 
--static inline u32 xscale1pmu_read_counter(struct perf_event *event)
-+static inline u64 xscale1pmu_read_counter(struct perf_event *event)
- {
- 	struct hw_perf_event *hwc = &event->hw;
- 	int counter = hwc->idx;
-@@ -338,7 +338,7 @@ static inline u32 xscale1pmu_read_counter(struct perf_event *event)
- 	return val;
- }
- 
--static inline void xscale1pmu_write_counter(struct perf_event *event, u32 val)
-+static inline void xscale1pmu_write_counter(struct perf_event *event, u64 val)
- {
- 	struct hw_perf_event *hwc = &event->hw;
- 	int counter = hwc->idx;
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 408f92c..7660b7a 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -512,7 +512,7 @@ static inline int armv8pmu_select_counter(int idx)
- 	return idx;
- }
- 
--static inline u32 armv8pmu_read_counter(struct perf_event *event)
-+static inline u64 armv8pmu_read_counter(struct perf_event *event)
- {
- 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
- 	struct hw_perf_event *hwc = &event->hw;
-@@ -530,7 +530,7 @@ static inline u32 armv8pmu_read_counter(struct perf_event *event)
- 	return value;
- }
- 
--static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
-+static inline void armv8pmu_write_counter(struct perf_event *event, u64 value)
- {
- 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
- 	struct hw_perf_event *hwc = &event->hw;
-@@ -545,9 +545,8 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
- 		 * count using the lower 32bits and we want an interrupt when
- 		 * it overflows.
- 		 */
--		u64 value64 = 0xffffffff00000000ULL | value;
--
--		write_sysreg(value64, pmccntr_el0);
-+		value |= 0xffffffff00000000ULL;
-+		write_sysreg(value, pmccntr_el0);
- 	} else if (armv8pmu_select_counter(idx) == idx)
- 		write_sysreg(value, pmxevcntr_el0);
- }
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index c8c31cf..705e8c3 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -87,8 +87,8 @@ struct arm_pmu {
- 					 struct perf_event *event);
- 	int		(*set_event_filter)(struct hw_perf_event *evt,
- 					    struct perf_event_attr *attr);
--	u32		(*read_counter)(struct perf_event *event);
--	void		(*write_counter)(struct perf_event *event, u32 val);
-+	u64		(*read_counter)(struct perf_event *event);
-+	void		(*write_counter)(struct perf_event *event, u64 val);
- 	void		(*start)(struct arm_pmu *);
- 	void		(*stop)(struct arm_pmu *);
- 	void		(*reset)(void *);
--- 
-2.7.4
+Thanks to make it clear!
+In this case, I will drop this patch in the pull firstly.
+
+Best Regards,
+Wei
+
+> 
+>   -- Daniel
+> 
