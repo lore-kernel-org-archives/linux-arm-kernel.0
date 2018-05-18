@@ -1,80 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 May 2018 13:16:40 +0200
-Subject: [PATCH 07/69] ARM: dts: iwg23s-sbc: Add support for iWave G23S-SBC
- based on RZ/G1C
+Date: Fri, 18 May 2018 13:16:42 +0200
+Subject: [PATCH 09/69] ARM: dts: renesas: replace toshiba,
+ mmc-wrprotect-disable with disable-wp
 In-Reply-To: <cover.1526641667.git.horms+renesas@verge.net.au>
 References: <cover.1526641667.git.horms+renesas@verge.net.au>
-Message-ID: <f922fb5af1584c35bcd8bf661738b16dd4f65441.1526641667.git.horms+renesas@verge.net.au>
+Message-ID: <9eb663e838aba244b97fed0000cb3917f6013e96.1526641667.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Add support for iWave iW-RainboW-G23S single board computer based on
- RZ/G1C.
+Follow up commit 788778b0d21a ("mmc: tmio: deprecate "toshiba,
+mmc-wrprotect-disable" DT property").
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile                |  1 +
- arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts | 35 +++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts | 4 ++--
+ arch/arm/boot/dts/sh73a0.dtsi         | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7e2424957809..17e781285a88 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -795,6 +795,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
- 	r8a7745-iwg22d-sodimm.dtb \
- 	r8a7745-iwg22d-sodimm-dbhd-ca.dtb \
- 	r8a7745-sk-rzg1e.dtb \
-+	r8a77470-iwg23s-sbc.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7779-marzen.dtb \
- 	r8a7790-lager.dtb \
-diff --git a/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
-new file mode 100644
-index 000000000000..d21baad9f0ad
---- /dev/null
-+++ b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
-@@ -0,0 +1,35 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the iWave-RZ/G1C single board computer
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ */
-+
-+/dts-v1/;
-+#include "r8a77470.dtsi"
-+/ {
-+	model = "iWave iW-RainboW-G23S single board computer based on RZ/G1C";
-+	compatible = "iwave,g23s", "renesas,r8a77470";
-+
-+	aliases {
-+		serial1 = &scif1;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial1:115200n8";
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x20000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&scif1 {
-+	status = "okay";
-+};
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index ec7c86e06538..125c39c0222f 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -234,7 +234,7 @@
+ &sdhi0 {
+ 	vmmc-supply = <&vcc_sdhi0>;
+ 	bus-width = <4>;
+-	toshiba,mmc-wrprotect-disable;
++	disable-wp;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdhi0_pins>;
+ 	status = "okay";
+@@ -244,7 +244,7 @@
+ 	vmmc-supply = <&ape6evm_fixed_3v3>;
+ 	bus-width = <4>;
+ 	broken-cd;
+-	toshiba,mmc-wrprotect-disable;
++	disable-wp;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdhi1_pins>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 914a7c2a584f..39cc58672bf4 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -336,7 +336,7 @@
+ 			      GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks SH73A0_CLK_SDHI1>;
+ 		power-domains = <&pd_a3sp>;
+-		toshiba,mmc-wrprotect-disable;
++		disable-wp;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+ 	};
+@@ -348,7 +348,7 @@
+ 			      GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks SH73A0_CLK_SDHI2>;
+ 		power-domains = <&pd_a3sp>;
+-		toshiba,mmc-wrprotect-disable;
++		disable-wp;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+ 	};
 -- 
 2.11.0
