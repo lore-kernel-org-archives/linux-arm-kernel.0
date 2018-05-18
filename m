@@ -1,123 +1,232 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 18 May 2018 16:59:13 +0100
-Subject: [PATCH v9 05/11] arm64: kexec_file: load initrd and device-tree
-In-Reply-To: <20180518074203.GM2737@linaro.org>
+Date: Fri, 18 May 2018 17:00:55 +0100
+Subject: [PATCH v9 07/11] arm64: kexec_file: add crash dump support
+In-Reply-To: <20180518103925.GP2737@linaro.org>
 References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
- <20180425062629.29404-6-takahiro.akashi@linaro.org>
- <c10624c0-9962-af38-1dd5-656902180ace@arm.com>
- <20180518071133.GL2737@linaro.org> <20180518074203.GM2737@linaro.org>
-Message-ID: <59963e4b-968f-7251-4000-5a545dd44628@arm.com>
+ <20180425062629.29404-8-takahiro.akashi@linaro.org>
+ <f8d8305d-42f5-e1e2-20c4-733cb38cbb8d@arm.com>
+ <20180518103925.GP2737@linaro.org>
+Message-ID: <fa2468a8-ffc9-1447-933d-de41bea50d1f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Akashi,
 
-On 18/05/18 08:42, AKASHI Takahiro wrote:
-> On Fri, May 18, 2018 at 04:11:35PM +0900, AKASHI Takahiro wrote:
->> On Tue, May 15, 2018 at 05:20:00PM +0100, James Morse wrote:
->>> On 25/04/18 07:26, AKASHI Takahiro wrote:
->>>> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
->>>> index f9ebf54ca247..b3b9b1725d8a 100644
->>>> --- a/arch/arm64/kernel/machine_kexec_file.c
->>>> +++ b/arch/arm64/kernel/machine_kexec_file.c
+On 18/05/18 11:39, AKASHI Takahiro wrote:
+> On Tue, May 15, 2018 at 06:11:15PM +0100, James Morse wrote:
+>> On 25/04/18 07:26, AKASHI Takahiro wrote:
+>>> Enabling crash dump (kdump) includes
+>>> * prepare contents of ELF header of a core dump file, /proc/vmcore,
+>>>   using crash_prepare_elf64_headers(), and
+>>> * add two device tree properties, "linux,usable-memory-range" and
+>>>   "linux,elfcorehdr", which represent repsectively a memory range
 
->>>> @@ -55,3 +74,144 @@ int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+>>> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+>>> index 37c0a9dc2e47..ec674f4d267c 100644
+>>> --- a/arch/arm64/kernel/machine_kexec_file.c
+>>> +++ b/arch/arm64/kernel/machine_kexec_file.c
 
->>>> +	buf = vmalloc(buf_size);
->>>> +	if (!buf) {
->>>> +		ret = -ENOMEM;
->>>> +		goto out_err;
->>>> +	}
->>>> +
->>>> +	ret = fdt_open_into(initial_boot_params, buf, buf_size);
->>>> +	if (ret)
->>>> +		goto out_err;
->>>> +
->>>> +	nodeoffset = fdt_path_offset(buf, "/chosen");
->>>> +	if (nodeoffset < 0)
->>>> +		goto out_err;
->>>> +
->>>> +	/* add bootargs */
->>>> +	if (cmdline) {
->>>> +		ret = fdt_setprop(buf, nodeoffset, "bootargs",
->>>> +						cmdline, cmdline_len + 1);
->>>
->>> fdt_setprop_string()?
+>>> +static void fill_property(void *buf, u64 val64, int cells)
+>>> +{
+>>> +	u32 val32;
+>>> +
+>>> +	if (cells == 1) {
+>>> +		val32 = cpu_to_fdt32((u32)val64);
+>>> +		memcpy(buf, &val32, sizeof(val32));
+>>> +	} else {
 >>
->> OK
+>>> +		memset(buf, 0, cells * sizeof(u32) - sizeof(u64));
+>>> +		buf += cells * sizeof(u32) - sizeof(u64);
+>>
+>> Is this trying to clear the 'top' cells and shuffle the pointer to point at the
+>> 'bottom' 2? I'm pretty sure this isn't endian safe.
+>>
+>> Do we really expect a system to have #address-cells > 2?
 > 
-> cmdline_len is passed by system call, kexec_file_load(), and this means
-> that we can't believe that cmdline is always terminated with '\0'.
+> I don't know, but just for safety.
 
-Yuck, we expect user-space to tell us how long the string is. It may be worth a
-comment that it isn't necessarily null-terminated, as that is surprising!
-
-(I assume the DT's property length is enough to make that safe for the new
-kernel to read).
+Okay, so this is aiming to be a cover-all-cases library function.
 
 
->>>> +		/* within 1GB-aligned window of up to 32GB in size */
->>>> +		kbuf.buf_max = round_down(kern_seg->mem, SZ_1G)
->>>> +						+ (unsigned long)SZ_1G * 32;
->>>> +		kbuf.top_down = false;
->>>> +
->>>> +		ret = kexec_add_buffer(&kbuf);
->>>> +		if (ret)
->>>> +			goto out_err;
->>>> +		initrd_load_addr = kbuf.mem;
->>>> +
->>>> +		pr_debug("Loaded initrd at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
->>>> +				initrd_load_addr, initrd_len, initrd_len);
->>>> +	}
->>>> +
->>>> +	/* load dtb blob */
->>>> +	ret = setup_dtb(image, initrd_load_addr, initrd_len,
->>>> +				cmdline, cmdline_len, &dtb, &dtb_len);
->>>> +	if (ret) {
->>>> +		pr_err("Preparing for new dtb failed\n");
->>>> +		goto out_err;
->>>> +	}
->>>> +
->>>> +	kbuf.buffer = dtb;
->>>> +	kbuf.bufsz = dtb_len;
->>>> +	kbuf.memsz = dtb_len;
->>>> +	/* not across 2MB boundary */
->>>> +	kbuf.buf_align = SZ_2M;
->>>> +	kbuf.buf_max = ULONG_MAX;
->>>> +	kbuf.top_down = true;
->>>> +
->>>> +	ret = kexec_add_buffer(&kbuf);
->>>> +	if (ret)
->>>> +		goto out_err;
->>>> +	image->arch.dtb_mem = kbuf.mem;
->>>> +	image->arch.dtb_buf = dtb;
->>>> +
->>>> +	pr_debug("Loaded dtb at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
->>>> +			kbuf.mem, dtb_len, dtb_len);
->>>> +
->>>> +	return 0;
->>>> +
->>>> +out_err:
->>>> +	vfree(dtb);
->>>> +	image->arch.dtb_buf = NULL;
->>>
->>> Won't kimage_file_post_load_cleanup() always be called if we return an error
->>> here? Why not leave the free()ing until then?
+>>> +		val64 = cpu_to_fdt64(val64);
+>>> +		memcpy(buf, &val64, sizeof(val64));
+>>> +	}
+>>> +}
+>>> +
+>>> +static int fdt_setprop_range(void *fdt, int nodeoffset, const char *name,
+>>> +				unsigned long addr, unsigned long size)
 >>
->> Right.
->> The reason why I left the code here was that we'd better locally clean up
->> all the stuff that were locally allocated if we trivially need to (and can)
->> do so.
->>
->> As it's redundant, I will remove it.
+>> (the device-tree spec describes a 'ranges' property, which had me confused. This
+>> is encoding a prop-encoded-array)
 > 
-> will remove only "image->arch.dtb_buf = NULL."
+> Should we rename it to, say, fdt_setprop_reg()?
 
-Ah, because you haven't set the arch.dtb_buf pointer yet.
+Sure, but I'd really like this code to come from libfdt. I'm hoping for some
+temporary workaround, lets see what the DT folk say.
 
-What about in patch 7 where you expect kimage_file_prepare_segments() to call
-arch_kimage_file_post_load_cleanup() to free the arch.elf_headers? I'd expect
-the free()ing to always happen in one place.
+
+>>> +	if (!buf)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	fill_property(prop, addr, __dt_root_addr_cells);
+>>> +	prop += __dt_root_addr_cells * sizeof(u32);
+>>> +
+>>> +	fill_property(prop, size, __dt_root_size_cells);
+>>> +
+>>> +	result = fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
+>>> +
+>>> +	vfree(buf);
+>>> +
+>>> +	return result;
+>>> +}
+>>
+>> Doesn't this stuff belong in libfdt? I guess there is no 'add array element' api
+>> because this the first time we've wanted to create a node with more than
+>> key=fixed-size-value.
+>>
+>> I don't think this belongs in arch C code. Do we have a plan for getting libfdt
+>> to support encoding prop-arrays? Can we put it somewhere anyone else duplicating
+>> this will find it, until we can (re)move it?
+> 
+> I will temporarily move all fdt-related stuff to a separate file, but
+> 
+>> I have no idea how that happens... it looks like the devicetree list is the
+>> place to ask.
+> 
+> should we always sync with the original dtc/libfdt repository?
+
+I thought so, libfdt is one of those external libraries that the kernel
+consumes, like acpica. For acpica at least the rule is changes go upstream, then
+get sync'd back.
+
+
+>>>  static int setup_dtb(struct kimage *image,
+>>>  		unsigned long initrd_load_addr, unsigned long initrd_len,
+>>>  		char *cmdline, unsigned long cmdline_len,
+>>> @@ -88,10 +165,26 @@ static int setup_dtb(struct kimage *image,
+>>>  	int range_len;
+>>>  	int ret;
+>>>  
+>>> +	/* check ranges against root's #address-cells and #size-cells */
+>>> +	if (image->type == KEXEC_TYPE_CRASH &&
+>>> +		(!cells_size_fitted(image->arch.elf_load_addr,
+>>> +				image->arch.elf_headers_sz) ||
+>>> +		 !cells_size_fitted(crashk_res.start,
+>>> +				crashk_res.end - crashk_res.start + 1))) {
+>>> +		pr_err("Crash memory region doesn't fit into DT's root cell sizes.\n");
+>>> +		ret = -EINVAL;
+>>> +		goto out_err;
+>>> +	}
+>>
+>> To check I've understood this properly: This can happen if the firmware provided
+>> a DTB with 32bit address/size cells, but at least some of the memory requires 64
+>> bit address/size cells. This could only happen on a UEFI system where the
+>> firmware-DTB doesn't describe memory. ACPI-only systems would have the EFIstub DT.
+> 
+> Probably, yes. I assumed the case where #address-cells and #size-cells
+> were just missing in fdt.
+
+Ah, that's another one. I just wanted to check we could boot on a system where
+this can happen.
+
+
+>>>  	/* duplicate dt blob */
+>>>  	buf_size = fdt_totalsize(initial_boot_params);
+>>>  	range_len = (__dt_root_addr_cells + __dt_root_size_cells) * sizeof(u32);
+>>>  
+>>> +	if (image->type == KEXEC_TYPE_CRASH)
+>>> +		buf_size += fdt_prop_len("linux,elfcorehdr", range_len)
+>>> +				+ fdt_prop_len("linux,usable-memory-range",
+>>> +								range_len);
+
+>                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[...]
+
+>> Don't you need to add "linux,usable-memory-range" to the buf_size estimate?
+> 
+> I think the code exists. See above.
+
+Sorry, turns out I can't read!
+
+
+>>> +		if (ret)
+>>> +			goto out_err;
+>>> +	}
+>>
+>>> @@ -148,17 +258,109 @@ static int setup_dtb(struct kimage *image,
+>>
+>>> +static struct crash_mem *get_crash_memory_ranges(void)
+>>> +{
+>>> +	unsigned int nr_ranges;
+>>> +	struct crash_mem *cmem;
+>>> +
+>>> +	nr_ranges = 1; /* for exclusion of crashkernel region */
+>>> +	walk_system_ram_res(0, -1, &nr_ranges, get_nr_ranges_callback);
+>>> +
+>>> +	cmem = vmalloc(sizeof(struct crash_mem) +
+>>> +			sizeof(struct crash_mem_range) * nr_ranges);
+>>> +	if (!cmem)
+>>> +		return NULL;
+>>> +
+>>> +	cmem->max_nr_ranges = nr_ranges;
+>>> +	cmem->nr_ranges = 0;
+>>> +	walk_system_ram_res(0, -1, cmem, add_mem_range_callback);
+>>> +
+>>> +	/* Exclude crashkernel region */
+>>> +	if (crash_exclude_mem_range(cmem, crashk_res.start, crashk_res.end)) {
+>>> +		vfree(cmem);
+>>> +		return NULL;
+>>> +	}
+>>> +
+>>> +	return cmem;
+>>> +}
+>>
+>> Could this function be included in prepare_elf_headers() so that the alloc() and
+>> free() occur together.
+> 
+> Or aiming that arm64 and x86 have similar-look code?
+
+What's the advantage in things looking the same? If they are the same, it
+probably shouldn't be in per-arch code. Otherwise it should be as simple as
+possible, otherwise we can't spot the bugs/leaks.
+
+But I think walking memblock here will remove all 'looks the same' properties here.
+
+
+>>> +static int prepare_elf_headers(void **addr, unsigned long *sz)
+>>> +{
+>>> +	struct crash_mem *cmem;
+>>> +	int ret = 0;
+>>> +
+>>> +	cmem = get_crash_memory_ranges();
+>>> +	if (!cmem)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	ret =  crash_prepare_elf64_headers(cmem, true, addr, sz);
+>>> +
+>>> +	vfree(cmem);
+>>
+>>> +	return ret;
+>>> +}
+>>
+>> All this is moving memory-range information from core-code's
+>> walk_system_ram_res() into core-code's struct crash_mem, and excluding
+>> crashk_res, which again is accessible to the core code.
+>>
+>> It looks like this is duplicated in arch/x86 and arch/arm64 because arm64
+>> doesn't have a second 'crashk_low_res' region, and always wants elf64, instead
+>> of when IS_ENABLED(CONFIG_X86_64).
+>> If we can abstract just those two, more of this could be moved to core code
+>> where powerpc can make use of it if they want to support kdump with
+>> kexec_file_load().
+>>
+>> But, its getting late for cross-architecture dependencies, lets put that on the
+>> for-later list. (assuming there isn't a powerpc-kdump series out there adding a
+>> third copy of this)
+> 
+> Sure. X86 code has so many exceptional lines in the code :)
+
+They also pass the e820 'usable-memory' map on the cmdline...
 
 
 Thanks,
