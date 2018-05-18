@@ -1,46 +1,70 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 18 May 2018 11:59:13 +0200
-Subject: [PATCH v2 00/26] arm64: allwinner: Add A64 DE2 HDMI support
-In-Reply-To: <20180518094536.17201-1-jagan@amarulasolutions.com>
-References: <20180518094536.17201-1-jagan@amarulasolutions.com>
-Message-ID: <20180518095913.nzl3sr5wn6cg4ra5@flea>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 18 May 2018 10:59:27 +0100
+Subject: [PATCH v3 0/3] Support Common Not Private translations
+In-Reply-To: <1526636765-11289-1-git-send-email-vladimir.murzin@arm.com>
+References: <1526636765-11289-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <981db1e7-687a-93a9-bea2-1fadcf5a4bd8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 03:15:10PM +0530, Jagan Teki wrote:
-> Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
+On 18/05/18 10:46, Vladimir Murzin wrote:
+> Common Not Private (CNP) translations is a feature of ARMv8.2
+> extension which allows translation table entries to be shared between
+> different PEs in the same inner shareable domain, so the hardware can
+> use this fact to optimise the caching of such entries in the TLB.
 > 
-> A64 behaviour similar to Allwinner A83T where
-> Mixer0 => TCON0 => LVDS/RGB/MIPI-DSI
-> Mixer1 => TCON1 => HDMI
-> as per Display System Block DiagramAllwinner_A64_User_Manual_V1.1.pdf
+> This patch set is an attempt to bring CNP support into Linux. It was
+> tested on a v8.2 Fast Model with exploring traces and checking that
+> TTBRx_ELy and VTTBR_EL2 have CnP bit set where appropriate.
 > 
-> This is second patch-set followed with previous RFC[1] and first series[2]
-> and merely concentrated on HDMI pipeline through TCON1 and rest will add eventually.
+> Changelog:
 > 
-> This series fixed previous version comments
-> - about documenting fallback compatibles
-> - adding new compatible for mixer1
-> - support for multiple DW HDMI PHY clock parents (thanks, to Jernej)
-> 
-> Note:
-> Pine64 boards are unable to get edid by default like other A64 boards,
-> but forcing 'video=HDMI-A-1:1920x1080 at 60D' kernel command line can
-> create edid with display on penel.
+> 	 v2 -> v3
+> 	    - do not enable CNP if we are crush kernel (per James)
+> 	    - default to "no"
+> 	    - rebased on 4.17-rc4
 
-There's no point in trying to push this without the SRAM issue being
-solved. It is required, and won't be merged unless this is addressed.
+Please, ignore it - it was generated from outdated branch. I'll resend
+shortly.
 
-Maxime
+Thanks
+Vladimir
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/87c56e85/attachment-0001.sig>
+> 
+>   	 v1 -> v2
+>             - handle cpuilde case (per James)
+> 	    - use lm_allias with swapper_pg_dir (per James)
+>             - rule out ARM64_SW_TTBR0_PAN case (per Catalin)
+> 	    - s/BUG_ON/WARN_ON/ (per Catalin)
+> 	    - comment and commit message updates (per Catalin)
+> 	    - TTBR_CNP_BIT moved to asm/pgtable-hwdef.h (per Catalin)
+> 	    - has_useable_cnp() simplified (per Julien)
+> 
+> 	RFC -> v1
+>             - dropped RFC tag
+>             - rebased on 4.14-rc4
+> 
+> Thanks!
+> 
+> Vladimir Murzin (3):
+>   arm64: mm: Support Common Not Private translations
+>   arm64: KVM: Enable Common Not Private translations
+>   arm64: Introduce command line parameter to disable CNP
+> 
+>  Documentation/admin-guide/kernel-parameters.txt |  4 +++
+>  arch/arm/include/asm/kvm_mmu.h                  |  5 ++++
+>  arch/arm64/Kconfig                              | 13 ++++++++
+>  arch/arm64/include/asm/cpucaps.h                |  3 +-
+>  arch/arm64/include/asm/cpufeature.h             |  6 ++++
+>  arch/arm64/include/asm/kvm_mmu.h                |  5 ++++
+>  arch/arm64/include/asm/mmu_context.h            | 12 ++++++++
+>  arch/arm64/include/asm/pgtable-hwdef.h          |  2 ++
+>  arch/arm64/kernel/cpufeature.c                  | 40 +++++++++++++++++++++++++
+>  arch/arm64/kernel/hibernate.c                   |  2 +-
+>  arch/arm64/kernel/suspend.c                     |  4 +++
+>  arch/arm64/kvm/hyp-init.S                       |  3 ++
+>  arch/arm64/mm/context.c                         |  3 ++
+>  arch/arm64/mm/proc.S                            |  6 ++++
+>  virt/kvm/arm/arm.c                              |  4 +--
+>  15 files changed, 108 insertions(+), 4 deletions(-)
+> 
