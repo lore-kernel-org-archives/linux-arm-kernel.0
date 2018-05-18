@@ -1,23 +1,45 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 18 May 2018 10:58:20 +0200
-Subject: [PATCH] PM / runtime: Fixup reference counting of device link
- suppliers at probe
-In-Reply-To: <1526633329-31729-1-git-send-email-ulf.hansson@linaro.org>
-References: <1526633329-31729-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAJZ5v0ikXsWdXq-h8rWLd-vfzi-gFmxyHmOGvRvDUoJHC3L2XA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 18 May 2018 11:01:41 +0200
+Subject: [PATCH 4.9 27/33] futex: Remove duplicated code and fix
+ undefined behaviour
+In-Reply-To: <e8dc5f94-3b52-dcf0-3b5e-b442bde7d803@suse.cz>
+References: <20180518081535.096308218@linuxfoundation.org>
+ <20180518081536.166573281@linuxfoundation.org>
+ <e8dc5f94-3b52-dcf0-3b5e-b442bde7d803@suse.cz>
+Message-ID: <20180518090141.GA10227@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 10:48 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> In the driver core, before it invokes really_probe() it runtime resumes the
-> suppliers for the device via calling pm_runtime_get_suppliers(), which also
-> increases the runtime PM usage count for each of the available supplier.
->
-> This makes sense, as to be able to allow the consumer device to be probed
-> by its driver. However, if the driver decides to add a new supplier link
-> during ->probe(), hence updating the list of suppliers,
+On Fri, May 18, 2018 at 10:30:24AM +0200, Jiri Slaby wrote:
+> On 05/18/2018, 10:16 AM, Greg Kroah-Hartman wrote:
+> > 4.9-stable review patch.  If anyone has any objections, please let me know.
+> > 
+> > ------------------
+> > 
+> > From: Jiri Slaby <jslaby@suse.cz>
+> > 
+> > commit 30d6e0a4190d37740e9447e4e4815f06992dd8c3 upstream.
+> ...
+> > --- a/kernel/futex.c
+> > +++ b/kernel/futex.c
+> > @@ -1458,6 +1458,45 @@ out:
+> >  	return ret;
+> >  }
+> >  
+> > +static int futex_atomic_op_inuser(unsigned int encoded_op, u32 __user *uaddr)
+> > +{
+> > +	unsigned int op =	  (encoded_op & 0x70000000) >> 28;
+> > +	unsigned int cmp =	  (encoded_op & 0x0f000000) >> 24;
+> > +	int oparg = sign_extend32((encoded_op & 0x00fff000) >> 12, 12);
+> > +	int cmparg = sign_extend32(encoded_op & 0x00000fff, 12);
+> 
+> 12 is wrong here ? wherever you apply this, you need also a follow-up fix:
+> commit d70ef22892ed6c066e51e118b225923c9b74af34
+> Author: Jiri Slaby <jslaby@suse.cz>
+> Date:   Thu Nov 30 15:35:44 2017 +0100
+> 
+>     futex: futex_wake_op, fix sign_extend32 sign bits
 
-Do any of the existing drivers do that?
+Thanks for letting me know, I've now queued it up to the needed trees.
 
-> the following call to pm_runtime_put_suppliers(), invoked after really_probe()
-> in the driver core, we get into trouble.
+greg k-h
