@@ -1,31 +1,108 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 18 May 2018 17:11:32 +0200
-Subject: [GIT PULL] ARM: mediatek: soc driver updates for v4.18
-In-Reply-To: <20180517044600.GC20254@sirena.org.uk>
-References: <bd033549-4998-e376-eb92-16111ec71a07@gmail.com>
- <20180517044600.GC20254@sirena.org.uk>
-Message-ID: <3e416f8f-b038-9bfe-7038-98aec5224620@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 18 May 2018 18:12:15 +0300
+Subject: [PATCH v3 2/3] arm64: dts: renesas: draak: Describe CVBS input
+In-Reply-To: <1526654878-11143-3-git-send-email-jacopo+renesas@jmondi.org>
+References: <1526654878-11143-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526654878-11143-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1569661.saMqNra8vc@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jacopo,
 
+Thank you for the patch.
 
-On 17/05/18 06:46, Mark Brown wrote:
-> On Mon, May 14, 2018 at 01:32:49PM +0200, Matthias Brugger wrote:
+On Friday, 18 May 2018 17:47:57 EEST Jacopo Mondi wrote:
+> Describe CVBS video input through analog video decoder ADV7180
+> connected to video input interface VIN4.
 > 
->> ----------------------------------------------------------------
->> Matthias Brugger (1):
->>        Merge commit 'f15cd6d99198e9c15229aefec639a34a6e8174c6' into
->> v.4.17-next/soc-test
+> The video input signal path is shared with HDMI video input, and
+> selected by on-board switches SW-53 and SW-54 with CVBS input selected
+> by the default switches configuration.
 > 
-> There is a signed tag for this - please don't ever pull anything from me
-> without a signed tag, while I try to avoid rewriting history it does
-> sometimes happen but if I've made a signed tag part of that is me saying
-> I know other people might've merged the commit.
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 > 
+> ---
+> v2 -> v3:
+> - Add comment to describe the shared input video path
+> - Add my SoB and Niklas' R-b tags
+> ---
+>  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 42 +++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts index 9d73de8..95745fc
+> 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> @@ -142,6 +142,11 @@
+>  		groups = "usb0";
+>  		function = "usb0";
+>  	};
+> +
+> +	vin4_pins_cvbs: vin4 {
+> +		groups = "vin4_data8", "vin4_sync", "vin4_clk";
+> +		function = "vin4";
+> +	};
+>  };
+> 
+>  &i2c0 {
+> @@ -154,6 +159,23 @@
+>  		reg = <0x50>;
+>  		pagesize = <8>;
+>  	};
+> +
+> +	analog-video at 20 {
+> +		compatible = "adi,adv7180";
+> +		reg = <0x20>;
+> +
+> +		port {
 
-You are right I got confused about this.
-Anrd, Olof do you want me to resubmit?
+The adv7180 DT bindings document the output port as 3 or 6 (respectively for 
+the CP and ST versions of the chip). You should thus number the port. Apart 
+from that the patch looks good.
 
+> +			/*
+> +			 * The VIN4 video input path is shared between
+> +			 * CVBS and HDMI inputs through SW[49-54] switches.
+> +			 *
+> +			 * CVBS is the default selection, link it to VIN4 here.
+> +			 */
+> +			adv7180_out: endpoint {
+> +				remote-endpoint = <&vin4_in>;
+> +			};
+> +		};
+> +	};
+>  };
+> 
+>  &i2c1 {
+> @@ -246,3 +268,23 @@
+>  	timeout-sec = <60>;
+>  	status = "okay";
+>  };
+> +
+> +&vin4 {
+> +	pinctrl-0 = <&vin4_pins_cvbs>;
+> +	pinctrl-names = "default";
+> +
+> +	status = "okay";
+> +
+> +	ports {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +
+> +			vin4_in: endpoint {
+> +				remote-endpoint = <&adv7180_out>;
+> +			};
+> +		};
+> +	};
+> +};
+
+-- 
 Regards,
-Matthias
+
+Laurent Pinchart
