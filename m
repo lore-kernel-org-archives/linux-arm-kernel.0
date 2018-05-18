@@ -1,271 +1,45 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 18 May 2018 12:01:16 +0200
-Subject: [PATCH v2 12/26] drm/sun4i: Add support for multiple DW HDMI PHY
- clock parents
-In-Reply-To: <20180518094536.17201-13-jagan@amarulasolutions.com>
-References: <20180518094536.17201-1-jagan@amarulasolutions.com>
- <20180518094536.17201-13-jagan@amarulasolutions.com>
-Message-ID: <20180518100116.4bf2qcffg7ekxa7u@flea>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 May 2018 10:49:17 +0100
+Subject: [PATCH] arm: bcm2835: Add the PMU to the devicetree.
+In-Reply-To: <1863838560.56771.1526636258081@email.1und1.de>
+References: <20180517131727.29263-1-eric@anholt.net>
+ <1412187220.62585.1526572780332@email.1und1.de>
+ <alpine.DEB.2.21.1805171233500.7984@macbook-air>
+ <307323036.63872.1526576126537@email.1und1.de>
+ <20180517180758.GK12198@hirez.programming.kicks-ass.net>
+ <alpine.DEB.2.21.1805171422450.8529@macbook-air>
+ <alpine.DEB.2.21.1805171530080.8529@macbook-air>
+ <0a643984-1586-8c56-6627-430f0c2a4ba8@gmail.com>
+ <d6b6f632-2051-a239-3e44-4750f2ac89d5@arm.com>
+ <1863838560.56771.1526636258081@email.1und1.de>
+Message-ID: <6097533d-5c77-0bba-a974-53ff65663dd3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 03:15:22PM +0530, Jagan Teki wrote:
-> From: Jernej Skrabec <jernej.skrabec@siol.net>
+On 18/05/18 10:37, Stefan Wahren wrote:
+> Hi Marc,
 > 
-> Some SoCs with DW HDMI have multiple possible clock parents, like A64
-> and R40.
+>> Marc Zyngier <marc.zyngier@arm.com> hat am 18. Mai 2018 um 10:07 geschrieben:
+>>
+>> I have a pretty simple series[1] which I used to profile 32bit guests on
+>> an arm64 KVM host. Nobody really cared about it because running a 32bit
+>> kernel on 64bit HW is a bit odd, to say the least, and I'm probably the
+>> only one actually running 32bit VMs.
+>>
+>>> FWIW, Broadcom STB chips, even when 64-bit capable or often used with an
+>>> 32-bit ARM kernel, so having the ARMv8 PMUs work under a 32-bit ARM
+>>> kernel would be great. The downstream solution we have sued thus far is
+>>> to find the closest compatible string to represent those, which is not
+>>> great...
+>> Ah, so you're *really* doing that? I'm not going to ask why, I'm scared
+>> of the answer... ;-)
+>>
+>> Anyway, I can repost that series if that will prevent people from having
+>> that kind of silly hacks.
 > 
-> Expand HDMI PHY clock driver to support second clock parent.
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v2:
-> - new patch
-> 
->  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h      |  9 ++-
->  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c     | 33 ++++++++---
->  drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c | 89 ++++++++++++++++++++++--------
->  3 files changed, 96 insertions(+), 35 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-> index 79154f0f674a..303189d6602c 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-> +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-> @@ -98,7 +98,8 @@
->  #define SUN8I_HDMI_PHY_PLL_CFG1_LDO2_EN		BIT(29)
->  #define SUN8I_HDMI_PHY_PLL_CFG1_LDO1_EN		BIT(28)
->  #define SUN8I_HDMI_PHY_PLL_CFG1_HV_IS_33	BIT(27)
-> -#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL	BIT(26)
-> +#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK	BIT(26)
-> +#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT	26
->  #define SUN8I_HDMI_PHY_PLL_CFG1_PLLEN		BIT(25)
->  #define SUN8I_HDMI_PHY_PLL_CFG1_LDO_VSET(x)	((x) << 22)
->  #define SUN8I_HDMI_PHY_PLL_CFG1_UNKNOWN(x)	((x) << 20)
-> @@ -146,7 +147,7 @@
->  struct sun8i_hdmi_phy;
->  
->  struct sun8i_hdmi_phy_variant {
-> -	bool has_phy_clk;
-> +	int  phy_clk_num;
->  	void (*phy_init)(struct sun8i_hdmi_phy *phy);
->  	void (*phy_disable)(struct dw_hdmi *hdmi,
->  			    struct sun8i_hdmi_phy *phy);
-> @@ -160,6 +161,7 @@ struct sun8i_hdmi_phy {
->  	struct clk			*clk_mod;
->  	struct clk			*clk_phy;
->  	struct clk			*clk_pll0;
-> +	struct clk			*clk_pll1;
->  	unsigned int			rcal;
->  	struct regmap			*regs;
->  	struct reset_control		*rst_phy;
-> @@ -188,6 +190,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi);
->  void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy);
->  const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void);
->  
-> -int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev);
-> +int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev,
-> +			 int clk_num);
->  
->  #endif /* _SUN8I_DW_HDMI_H_ */
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> index 5a52fc489a9d..0eadf087fc46 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> @@ -183,7 +183,13 @@ static int sun8i_hdmi_phy_config_h3(struct dw_hdmi *hdmi,
->  	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_ANA_CFG1_REG,
->  			   SUN8I_HDMI_PHY_ANA_CFG1_TXEN_MASK, 0);
->  
-> -	regmap_write(phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG, pll_cfg1_init);
-> +	/*
-> +	 * NOTE: We have to be careful not to overwrite PHY parent
-> +	 * clock selection bit and clock divider.
-> +	 */
-> +	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG,
-> +			   (u32)~SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK,
-> +			   pll_cfg1_init);
->  	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_PLL_CFG2_REG,
->  			   (u32)~SUN8I_HDMI_PHY_PLL_CFG2_PREDIV_MSK,
->  			   pll_cfg2_init);
-> @@ -232,7 +238,7 @@ static int sun8i_hdmi_phy_config(struct dw_hdmi *hdmi, void *data,
->  	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_DBG_CTRL_REG,
->  			   SUN8I_HDMI_PHY_DBG_CTRL_POL_MASK, val);
->  
-> -	if (phy->variant->has_phy_clk)
-> +	if (phy->variant->phy_clk_num)
->  		clk_set_rate(phy->clk_phy, mode->crtc_clock * 1000);
->  
->  	return phy->variant->phy_config(hdmi, phy, mode->crtc_clock * 1000);
-> @@ -393,7 +399,7 @@ static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
->  };
->  
->  static const struct sun8i_hdmi_phy_variant sun8i_h3_hdmi_phy = {
-> -	.has_phy_clk = true,
-> +	.phy_clk_num = 1,
->  	.phy_init = &sun8i_hdmi_phy_init_h3,
->  	.phy_disable = &sun8i_hdmi_phy_disable_h3,
->  	.phy_config = &sun8i_hdmi_phy_config_h3,
-> @@ -464,7 +470,7 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
->  		goto err_put_clk_bus;
->  	}
->  
-> -	if (phy->variant->has_phy_clk) {
-> +	if (phy->variant->phy_clk_num) {
->  		phy->clk_pll0 = of_clk_get_by_name(node, "pll-0");
->  		if (IS_ERR(phy->clk_pll0)) {
->  			dev_err(dev, "Could not get pll-0 clock\n");
-> @@ -472,7 +478,16 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
->  			goto err_put_clk_mod;
->  		}
->  
-> -		ret = sun8i_phy_clk_create(phy, dev);
-> +		if (phy->variant->phy_clk_num) {
-> +			phy->clk_pll1 = of_clk_get_by_name(node, "pll-1");
-> +			if (IS_ERR(phy->clk_pll1)) {
-> +				dev_err(dev, "Could not get pll-1 clock\n");
-> +				ret = PTR_ERR(phy->clk_pll1);
-> +				goto err_put_clk_mod;
-> +			}
-> +		}
-> +
+> yes please. But there is a minor nit: some patches introduce new files without SPDX tags.
+I'm shocked! ;-)
 
-You have a bug here. If phy_clk_num == 1, you'll still try to lookup
-pll-1.
-
-And this is a bit sloppy, since if phy_clk_num == 3, you won't try to
-lookup pll-2 either.
-
-> +		ret = sun8i_phy_clk_create(phy, dev, phy->variant->phy_clk_num);
->  		if (ret) {
->  			dev_err(dev, "Couldn't create the PHY clock\n");
->  			goto err_put_clk_pll0;
-> @@ -515,8 +530,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
->  err_put_rst_phy:
->  	reset_control_put(phy->rst_phy);
->  err_put_clk_pll0:
-> -	if (phy->variant->has_phy_clk)
-> -		clk_put(phy->clk_pll0);
-> +	clk_put(phy->clk_pll0);
-> +	clk_put(phy->clk_pll1);
->  err_put_clk_mod:
->  	clk_put(phy->clk_mod);
->  err_put_clk_bus:
-> @@ -536,8 +551,8 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
->  
->  	reset_control_put(phy->rst_phy);
->  
-> -	if (phy->variant->has_phy_clk)
-> -		clk_put(phy->clk_pll0);
-> +	clk_put(phy->clk_pll0);
-> +	clk_put(phy->clk_pll1);
->  	clk_put(phy->clk_mod);
->  	clk_put(phy->clk_bus);
->  }
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
-> index faea449812f8..85b12fc96dbc 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
-> @@ -22,29 +22,36 @@ static int sun8i_phy_clk_determine_rate(struct clk_hw *hw,
->  {
->  	unsigned long rate = req->rate;
->  	unsigned long best_rate = 0;
-> -	struct clk_hw *parent;
-> +	struct clk_hw *best_parent = NULL;
-> +	struct clk_hw *parent = NULL;
->  	int best_div = 1;
-> -	int i;
-> +	int i, p;
->  
-> -	parent = clk_hw_get_parent(hw);
-> -
-> -	for (i = 1; i <= 16; i++) {
-> -		unsigned long ideal = rate * i;
-> -		unsigned long rounded;
-> -
-> -		rounded = clk_hw_round_rate(parent, ideal);
-> -
-> -		if (rounded == ideal) {
-> -			best_rate = rounded;
-> -			best_div = i;
-> -			break;
-> -		}
-> +	for (p = 0; p < clk_hw_get_num_parents(hw); p++) {
-> +		parent = clk_hw_get_parent_by_index(hw, p);
-> +		if (!parent)
-> +			continue;
->  
-> -		if (!best_rate ||
-> -		    abs(rate - rounded / i) <
-> -		    abs(rate - best_rate / best_div)) {
-> -			best_rate = rounded;
-> -			best_div = i;
-> +		for (i = 1; i <= 16; i++) {
-> +			unsigned long ideal = rate * i;
-> +			unsigned long rounded;
-> +
-> +			rounded = clk_hw_round_rate(parent, ideal);
-> +
-> +			if (rounded == ideal) {
-> +				best_rate = rounded;
-> +				best_div = i;
-> +				best_parent = parent;
-> +				break;
-> +			}
-> +
-> +			if (!best_rate ||
-> +			    abs(rate - rounded / i) <
-> +			    abs(rate - best_rate / best_div)) {
-> +				best_rate = rounded;
-> +				best_div = i;
-> +				best_parent = parent;
-> +			}
->  		}
->  	}
->  
-> @@ -95,22 +102,58 @@ static int sun8i_phy_clk_set_rate(struct clk_hw *hw, unsigned long rate,
->  	return 0;
->  }
->  
-> +static u8 sun8i_phy_clk_get_parent(struct clk_hw *hw)
-> +{
-> +	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
-> +	u32 reg;
-> +
-> +	regmap_read(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG, &reg);
-> +	reg = (reg & SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK) >>
-> +	      SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT;
-> +
-> +	return reg;
-> +}
-> +
-> +static int sun8i_phy_clk_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
-> +
-> +	if (index > 1)
-> +		return -EINVAL;
-> +
-> +	regmap_update_bits(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG,
-> +			   SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK,
-> +			   index << SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT);
-> +
-> +	return 0;
-> +}
-> +
-
-The DT bindings changes and the clk changes should be part of separate
-patches.
-
-Maxime
-
+	M.
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180518/cafacca2/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
