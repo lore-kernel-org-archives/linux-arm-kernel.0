@@ -1,199 +1,122 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Sat, 19 May 2018 23:30:59 +0800
-Subject: [PATCH v6 3/9] docs: Add Generic Counter interface documentation
-In-Reply-To: <aa4d62315bb11ddc66d0e1a685c81b1721ffe624.1526487615.git.vilhelm.gray@gmail.com>
-References: <aa4d62315bb11ddc66d0e1a685c81b1721ffe624.1526487615.git.vilhelm.gray@gmail.com>
-Message-ID: <201805192014.VlonzXzA%fengguang.wu@intel.com>
+Date: Sat, 19 May 2018 23:40:46 +0800
+Subject: [rjarzmik:work/dma_slave_map 12/14]
+ drivers/mtd/nand/marvell_nand.c:2621:42: error: 'pxad_filter_fn' undeclared;
+ did you mean 'dma_filter_fn'?
+Message-ID: <201805192338.EpcmyFCI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi William,
+tree:   https://github.com/rjarzmik/linux work/dma_slave_map
+head:   bf8c92cc3a3bd33edd9249f60c2ef96e7f9cd4f5
+commit: 308214fe387eaf6b5547d01e573c41bb309a59fb [12/14] dmaengine: pxa: make the filter function internal
+config: sh-allmodconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 308214fe387eaf6b5547d01e573c41bb309a59fb
+        # save the attached .config to linux build tree
+        make.cross ARCH=sh 
 
-I love your patch! Perhaps something to improve:
+All errors (new ones prefixed by >>):
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.17-rc5 next-20180517]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+   In file included from drivers/mtd/nand/marvell_nand.c:21:0:
+   drivers/mtd/nand/marvell_nand.c: In function 'marvell_nfc_init_dma':
+>> drivers/mtd/nand/marvell_nand.c:2621:42: error: 'pxad_filter_fn' undeclared (first use in this function); did you mean 'dma_filter_fn'?
+      dma_request_slave_channel_compat(mask, pxad_filter_fn,
+                                             ^
+   include/linux/dmaengine.h:1408:46: note: in definition of macro 'dma_request_slave_channel_compat'
+     __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
+                                                 ^
+   drivers/mtd/nand/marvell_nand.c:2621:42: note: each undeclared identifier is reported only once for each function it appears in
+      dma_request_slave_channel_compat(mask, pxad_filter_fn,
+                                             ^
+   include/linux/dmaengine.h:1408:46: note: in definition of macro 'dma_request_slave_channel_compat'
+     __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
+                                                 ^
 
-url:    https://github.com/0day-ci/linux/commits/William-Breathitt-Gray/Introduce-the-Counter-subsystem/20180519-151353
-reproduce: make htmldocs
+vim +2621 drivers/mtd/nand/marvell_nand.c
 
-All warnings (new ones prefixed by >>):
+02f26ecf Miquel Raynal 2018-01-09  2588  
+02f26ecf Miquel Raynal 2018-01-09  2589  static int marvell_nfc_init_dma(struct marvell_nfc *nfc)
+02f26ecf Miquel Raynal 2018-01-09  2590  {
+02f26ecf Miquel Raynal 2018-01-09  2591  	struct platform_device *pdev = container_of(nfc->dev,
+02f26ecf Miquel Raynal 2018-01-09  2592  						    struct platform_device,
+02f26ecf Miquel Raynal 2018-01-09  2593  						    dev);
+02f26ecf Miquel Raynal 2018-01-09  2594  	struct dma_slave_config config = {};
+02f26ecf Miquel Raynal 2018-01-09  2595  	struct resource *r;
+02f26ecf Miquel Raynal 2018-01-09  2596  	dma_cap_mask_t mask;
+02f26ecf Miquel Raynal 2018-01-09  2597  	struct pxad_param param;
+02f26ecf Miquel Raynal 2018-01-09  2598  	int ret;
+02f26ecf Miquel Raynal 2018-01-09  2599  
+02f26ecf Miquel Raynal 2018-01-09  2600  	if (!IS_ENABLED(CONFIG_PXA_DMA)) {
+02f26ecf Miquel Raynal 2018-01-09  2601  		dev_warn(nfc->dev,
+02f26ecf Miquel Raynal 2018-01-09  2602  			 "DMA not enabled in configuration\n");
+02f26ecf Miquel Raynal 2018-01-09  2603  		return -ENOTSUPP;
+02f26ecf Miquel Raynal 2018-01-09  2604  	}
+02f26ecf Miquel Raynal 2018-01-09  2605  
+02f26ecf Miquel Raynal 2018-01-09  2606  	ret = dma_set_mask_and_coherent(nfc->dev, DMA_BIT_MASK(32));
+02f26ecf Miquel Raynal 2018-01-09  2607  	if (ret)
+02f26ecf Miquel Raynal 2018-01-09  2608  		return ret;
+02f26ecf Miquel Raynal 2018-01-09  2609  
+02f26ecf Miquel Raynal 2018-01-09  2610  	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+02f26ecf Miquel Raynal 2018-01-09  2611  	if (!r) {
+02f26ecf Miquel Raynal 2018-01-09  2612  		dev_err(nfc->dev, "No resource defined for data DMA\n");
+02f26ecf Miquel Raynal 2018-01-09  2613  		return -ENXIO;
+02f26ecf Miquel Raynal 2018-01-09  2614  	}
+02f26ecf Miquel Raynal 2018-01-09  2615  
+02f26ecf Miquel Raynal 2018-01-09  2616  	param.drcmr = r->start;
+02f26ecf Miquel Raynal 2018-01-09  2617  	param.prio = PXAD_PRIO_LOWEST;
+02f26ecf Miquel Raynal 2018-01-09  2618  	dma_cap_zero(mask);
+02f26ecf Miquel Raynal 2018-01-09  2619  	dma_cap_set(DMA_SLAVE, mask);
+02f26ecf Miquel Raynal 2018-01-09  2620  	nfc->dma_chan =
+02f26ecf Miquel Raynal 2018-01-09 @2621  		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+02f26ecf Miquel Raynal 2018-01-09  2622  						 &param, nfc->dev,
+02f26ecf Miquel Raynal 2018-01-09  2623  						 "data");
+02f26ecf Miquel Raynal 2018-01-09  2624  	if (!nfc->dma_chan) {
+02f26ecf Miquel Raynal 2018-01-09  2625  		dev_err(nfc->dev,
+02f26ecf Miquel Raynal 2018-01-09  2626  			"Unable to request data DMA channel\n");
+02f26ecf Miquel Raynal 2018-01-09  2627  		return -ENODEV;
+02f26ecf Miquel Raynal 2018-01-09  2628  	}
+02f26ecf Miquel Raynal 2018-01-09  2629  
+02f26ecf Miquel Raynal 2018-01-09  2630  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+02f26ecf Miquel Raynal 2018-01-09  2631  	if (!r)
+02f26ecf Miquel Raynal 2018-01-09  2632  		return -ENXIO;
+02f26ecf Miquel Raynal 2018-01-09  2633  
+02f26ecf Miquel Raynal 2018-01-09  2634  	config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+02f26ecf Miquel Raynal 2018-01-09  2635  	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+02f26ecf Miquel Raynal 2018-01-09  2636  	config.src_addr = r->start + NDDB;
+02f26ecf Miquel Raynal 2018-01-09  2637  	config.dst_addr = r->start + NDDB;
+02f26ecf Miquel Raynal 2018-01-09  2638  	config.src_maxburst = 32;
+02f26ecf Miquel Raynal 2018-01-09  2639  	config.dst_maxburst = 32;
+02f26ecf Miquel Raynal 2018-01-09  2640  	ret = dmaengine_slave_config(nfc->dma_chan, &config);
+02f26ecf Miquel Raynal 2018-01-09  2641  	if (ret < 0) {
+02f26ecf Miquel Raynal 2018-01-09  2642  		dev_err(nfc->dev, "Failed to configure DMA channel\n");
+02f26ecf Miquel Raynal 2018-01-09  2643  		return ret;
+02f26ecf Miquel Raynal 2018-01-09  2644  	}
+02f26ecf Miquel Raynal 2018-01-09  2645  
+02f26ecf Miquel Raynal 2018-01-09  2646  	/*
+02f26ecf Miquel Raynal 2018-01-09  2647  	 * DMA must act on length multiple of 32 and this length may be
+02f26ecf Miquel Raynal 2018-01-09  2648  	 * bigger than the destination buffer. Use this buffer instead
+02f26ecf Miquel Raynal 2018-01-09  2649  	 * for DMA transfers and then copy the desired amount of data to
+02f26ecf Miquel Raynal 2018-01-09  2650  	 * the provided buffer.
+02f26ecf Miquel Raynal 2018-01-09  2651  	 */
+c495a927 Miquel Raynal 2018-01-19  2652  	nfc->dma_buf = kmalloc(MAX_CHUNK_SIZE, GFP_KERNEL | GFP_DMA);
+02f26ecf Miquel Raynal 2018-01-09  2653  	if (!nfc->dma_buf)
+02f26ecf Miquel Raynal 2018-01-09  2654  		return -ENOMEM;
+02f26ecf Miquel Raynal 2018-01-09  2655  
+02f26ecf Miquel Raynal 2018-01-09  2656  	nfc->use_dma = true;
+02f26ecf Miquel Raynal 2018-01-09  2657  
+02f26ecf Miquel Raynal 2018-01-09  2658  	return 0;
+02f26ecf Miquel Raynal 2018-01-09  2659  }
+02f26ecf Miquel Raynal 2018-01-09  2660  
 
-   WARNING: convert(1) not found, for SVG to PDF conversion install ImageMagick (https://www.imagemagick.org)
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.ibss' not described in 'wireless_dev'
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.connect' not described in 'wireless_dev'
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.keys' not described in 'wireless_dev'
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.ie' not described in 'wireless_dev'
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.ie_len' not described in 'wireless_dev'
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.bssid' not described in 'wireless_dev'
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.ssid' not described in 'wireless_dev'
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.default_key' not described in 'wireless_dev'
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.default_mgmt_key' not described in 'wireless_dev'
-   include/net/cfg80211.h:4216: warning: Function parameter or member 'wext.prev_bssid_valid' not described in 'wireless_dev'
-   include/net/mac80211.h:2282: warning: Function parameter or member 'radiotap_timestamp.units_pos' not described in 'ieee80211_hw'
-   include/net/mac80211.h:2282: warning: Function parameter or member 'radiotap_timestamp.accuracy' not described in 'ieee80211_hw'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.rates' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.rts_cts_rate_idx' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.use_rts' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.use_cts_prot' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.short_preamble' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.skip_table' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.jiffies' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.vif' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.hw_key' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.flags' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'control.enqueue_time' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'ack' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'ack.cookie' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'status.rates' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'status.ack_signal' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'status.ampdu_ack_len' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'status.ampdu_len' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'status.antenna' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'status.tx_time' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'status.is_valid_ack_signal' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'status.status_driver_data' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'driver_rates' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'pad' not described in 'ieee80211_tx_info'
-   include/net/mac80211.h:955: warning: Function parameter or member 'rate_driver_data' not described in 'ieee80211_tx_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'rx_stats_avg' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'rx_stats_avg.signal' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'rx_stats_avg.chain_signal' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.filtered' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.retry_failed' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.retry_count' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.lost_packets' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.last_tdls_pkt_time' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.msdu_retries' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.msdu_failed' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.last_ack' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.last_ack_signal' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'status_stats.ack_signal_filled' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'tx_stats.packets' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'tx_stats.bytes' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'tx_stats.last_rate' not described in 'sta_info'
-   net/mac80211/sta_info.h:586: warning: Function parameter or member 'tx_stats.msdu' not described in 'sta_info'
-   kernel/sched/fair.c:3719: warning: Function parameter or member 'flags' not described in 'attach_entity_load_avg'
-   include/linux/dma-buf.h:307: warning: Function parameter or member 'cb_excl.cb' not described in 'dma_buf'
-   include/linux/dma-buf.h:307: warning: Function parameter or member 'cb_excl.poll' not described in 'dma_buf'
-   include/linux/dma-buf.h:307: warning: Function parameter or member 'cb_excl.active' not described in 'dma_buf'
-   include/linux/dma-buf.h:307: warning: Function parameter or member 'cb_shared.cb' not described in 'dma_buf'
-   include/linux/dma-buf.h:307: warning: Function parameter or member 'cb_shared.poll' not described in 'dma_buf'
-   include/linux/dma-buf.h:307: warning: Function parameter or member 'cb_shared.active' not described in 'dma_buf'
-   include/linux/dma-fence-array.h:54: warning: Function parameter or member 'work' not described in 'dma_fence_array'
->> include/linux/counter.h:330: warning: Function parameter or member 'groups_list' not described in 'counter_device_state'
->> include/linux/counter.h:330: warning: Function parameter or member 'num_groups' not described in 'counter_device_state'
-   include/linux/gpio/driver.h:142: warning: Function parameter or member 'request_key' not described in 'gpio_irq_chip'
-   include/linux/iio/iio.h:270: warning: Function parameter or member 'scan_type.sign' not described in 'iio_chan_spec'
-   include/linux/iio/iio.h:270: warning: Function parameter or member 'scan_type.realbits' not described in 'iio_chan_spec'
-   include/linux/iio/iio.h:270: warning: Function parameter or member 'scan_type.storagebits' not described in 'iio_chan_spec'
-   include/linux/iio/iio.h:270: warning: Function parameter or member 'scan_type.shift' not described in 'iio_chan_spec'
-   include/linux/iio/iio.h:270: warning: Function parameter or member 'scan_type.repeat' not described in 'iio_chan_spec'
-   include/linux/iio/iio.h:270: warning: Function parameter or member 'scan_type.endianness' not described in 'iio_chan_spec'
-   include/linux/iio/hw-consumer.h:1: warning: no structured comments found
-   include/linux/input/sparse-keymap.h:46: warning: Function parameter or member 'sw' not described in 'key_entry'
-   include/linux/mtd/rawnand.h:752: warning: Function parameter or member 'timings.sdr' not described in 'nand_data_interface'
-   include/linux/mtd/rawnand.h:817: warning: Function parameter or member 'buf' not described in 'nand_op_data_instr'
-   include/linux/mtd/rawnand.h:817: warning: Function parameter or member 'buf.in' not described in 'nand_op_data_instr'
-   include/linux/mtd/rawnand.h:817: warning: Function parameter or member 'buf.out' not described in 'nand_op_data_instr'
-   include/linux/mtd/rawnand.h:863: warning: Function parameter or member 'ctx' not described in 'nand_op_instr'
-   include/linux/mtd/rawnand.h:863: warning: Function parameter or member 'ctx.cmd' not described in 'nand_op_instr'
-   include/linux/mtd/rawnand.h:863: warning: Function parameter or member 'ctx.addr' not described in 'nand_op_instr'
-   include/linux/mtd/rawnand.h:863: warning: Function parameter or member 'ctx.data' not described in 'nand_op_instr'
-   include/linux/mtd/rawnand.h:863: warning: Function parameter or member 'ctx.waitrdy' not described in 'nand_op_instr'
-   include/linux/mtd/rawnand.h:1010: warning: Function parameter or member 'ctx' not described in 'nand_op_parser_pattern_elem'
-   include/linux/mtd/rawnand.h:1010: warning: Function parameter or member 'ctx.addr' not described in 'nand_op_parser_pattern_elem'
-   include/linux/mtd/rawnand.h:1010: warning: Function parameter or member 'ctx.data' not described in 'nand_op_parser_pattern_elem'
-   include/linux/mtd/rawnand.h:1313: warning: Function parameter or member 'manufacturer.desc' not described in 'nand_chip'
-   include/linux/mtd/rawnand.h:1313: warning: Function parameter or member 'manufacturer.priv' not described in 'nand_chip'
-   include/linux/regulator/driver.h:222: warning: Function parameter or member 'resume_early' not described in 'regulator_ops'
-   drivers/regulator/core.c:4306: warning: Excess function parameter 'state' description in 'regulator_suspend_late'
-   arch/s390/include/asm/cio.h:245: warning: Function parameter or member 'esw.esw0' not described in 'irb'
-   arch/s390/include/asm/cio.h:245: warning: Function parameter or member 'esw.esw1' not described in 'irb'
-   arch/s390/include/asm/cio.h:245: warning: Function parameter or member 'esw.esw2' not described in 'irb'
-   arch/s390/include/asm/cio.h:245: warning: Function parameter or member 'esw.esw3' not described in 'irb'
-   arch/s390/include/asm/cio.h:245: warning: Function parameter or member 'esw.eadm' not described in 'irb'
-   drivers/usb/typec/mux.c:186: warning: Function parameter or member 'mux' not described in 'typec_mux_unregister'
-   drivers/usb/typec/mux.c:186: warning: Excess function parameter 'sw' description in 'typec_mux_unregister'
-   include/drm/drm_drv.h:610: warning: Function parameter or member 'gem_prime_pin' not described in 'drm_driver'
-   include/drm/drm_drv.h:610: warning: Function parameter or member 'gem_prime_unpin' not described in 'drm_driver'
-   include/drm/drm_drv.h:610: warning: Function parameter or member 'gem_prime_res_obj' not described in 'drm_driver'
-   include/drm/drm_drv.h:610: warning: Function parameter or member 'gem_prime_get_sg_table' not described in 'drm_driver'
-   include/drm/drm_drv.h:610: warning: Function parameter or member 'gem_prime_import_sg_table' not described in 'drm_driver'
-   include/drm/drm_drv.h:610: warning: Function parameter or member 'gem_prime_vmap' not described in 'drm_driver'
-   include/drm/drm_drv.h:610: warning: Function parameter or member 'gem_prime_vunmap' not described in 'drm_driver'
-   include/drm/drm_drv.h:610: warning: Function parameter or member 'gem_prime_mmap' not described in 'drm_driver'
-   drivers/gpu/drm/drm_prime.c:342: warning: Function parameter or member 'attach' not described in 'drm_gem_unmap_dma_buf'
-   drivers/gpu/drm/drm_prime.c:342: warning: Function parameter or member 'sgt' not described in 'drm_gem_unmap_dma_buf'
-   drivers/gpu/drm/drm_prime.c:342: warning: Function parameter or member 'dir' not described in 'drm_gem_unmap_dma_buf'
-   drivers/gpu/drm/drm_prime.c:438: warning: Function parameter or member 'dma_buf' not described in 'drm_gem_dmabuf_kmap_atomic'
-   drivers/gpu/drm/drm_prime.c:438: warning: Function parameter or member 'page_num' not described in 'drm_gem_dmabuf_kmap_atomic'
-   drivers/gpu/drm/drm_prime.c:450: warning: Function parameter or member 'dma_buf' not described in 'drm_gem_dmabuf_kunmap_atomic'
-   drivers/gpu/drm/drm_prime.c:450: warning: Function parameter or member 'page_num' not described in 'drm_gem_dmabuf_kunmap_atomic'
-   drivers/gpu/drm/drm_prime.c:450: warning: Function parameter or member 'addr' not described in 'drm_gem_dmabuf_kunmap_atomic'
-   drivers/gpu/drm/drm_prime.c:461: warning: Function parameter or member 'dma_buf' not described in 'drm_gem_dmabuf_kmap'
-   drivers/gpu/drm/drm_prime.c:461: warning: Function parameter or member 'page_num' not described in 'drm_gem_dmabuf_kmap'
-   drivers/gpu/drm/drm_prime.c:473: warning: Function parameter or member 'dma_buf' not described in 'drm_gem_dmabuf_kunmap'
-   drivers/gpu/drm/drm_prime.c:473: warning: Function parameter or member 'page_num' not described in 'drm_gem_dmabuf_kunmap'
-   drivers/gpu/drm/drm_prime.c:473: warning: Function parameter or member 'addr' not described in 'drm_gem_dmabuf_kunmap'
-   include/media/v4l2-dev.h:42: warning: Enum value 'VFL_TYPE_MAX' not described in enum 'vfl_devnode_type'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'dev_scratch' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'ip_defrag_offset' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'skb_mstamp' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member '__cloned_offset' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'head_frag' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member '__unused' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member '__pkt_type_offset' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'pfmemalloc' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'encapsulation' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'encap_hdr_csum' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'csum_valid' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'csum_complete_sw' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'csum_level' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'inner_protocol_type' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'remcsum_offload' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'offload_fwd_mark' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'offload_mr_fwd_mark' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'sender_cpu' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'reserved_tailroom' not described in 'sk_buff'
-   include/linux/skbuff.h:850: warning: Function parameter or member 'inner_ipproto' not described in 'sk_buff'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_addrpair' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_portpair' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_ipv6only' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_net_refcnt' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_v6_daddr' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_v6_rcv_saddr' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_cookie' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_listener' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_tw_dr' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_rcv_wnd' not described in 'sock_common'
-   include/net/sock.h:234: warning: Function parameter or member 'skc_tw_rcv_nxt' not described in 'sock_common'
-   include/net/sock.h:488: warning: Function parameter or member 'sk_backlog.rmem_alloc' not described in 'sock'
-   include/net/sock.h:488: warning: Function parameter or member 'sk_backlog.len' not described in 'sock'
-   include/net/sock.h:488: warning: Function parameter or member 'sk_backlog.head' not described in 'sock'
-   include/net/sock.h:488: warning: Function parameter or member 'sk_backlog.tail' not described in 'sock'
-   include/net/sock.h:488: warning: Function parameter or member 'sk_wq_raw' not described in 'sock'
-   include/net/sock.h:488: warning: Function parameter or member 'tcp_rtx_queue' not described in 'sock'
-   include/net/sock.h:488: warning: Function parameter or member 'sk_route_forced_caps' not described in 'sock'
-   include/linux/netdevice.h:1955: warning: Function parameter or member 'adj_list.upper' not described in 'net_device'
-   include/linux/netdevice.h:1955: warning: Function parameter or member 'adj_list.lower' not described in 'net_device'
-   include/linux/netdevice.h:1955: warning: Function parameter or member 'gso_partial_features' not described in 'net_device'
-   include/linux/netdevice.h:1955: warning: Function parameter or member 'switchdev_ops' not described in 'net_device'
-   include/linux/netdevice.h:1955: warning: Function parameter or member 'l3mdev_ops' not described in 'net_device'
-   include/linux/netdevice.h:1955: warning: Function parameter or member 'xfrmdev_ops' not described in 'net_device'
-   include/linux/netdevice.h:1955: warning: Function parameter or member 'name_assign_type' not described in 'net_device'
-   include/linux/netdevice.h:1955: warning: Function parameter or member 'ieee802154_ptr' not described in 'net_device'
+:::::: The code at line 2621 was first introduced by commit
+:::::: 02f26ecf8c772751d4b24744d487f6b1b20e75d4 mtd: nand: add reworked Marvell NAND controller driver
 
-vim +330 include/linux/counter.h
-
-624995ae William Breathitt Gray 2018-05-16 @330  
-
-:::::: The code at line 330 was first introduced by commit
-:::::: 624995aed3646d19eb4ce4cd7f527fe95a165a92 counter: Introduce the Generic Counter interface
-
-:::::: TO: William Breathitt Gray <vilhelm.gray@gmail.com>
-:::::: CC: 0day robot <lkp@intel.com>
+:::::: TO: Miquel Raynal <miquel.raynal@free-electrons.com>
+:::::: CC: Boris Brezillon <boris.brezillon@free-electrons.com>
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -202,6 +125,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 6365 bytes
+Size: 48061 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180519/0eca97a3/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180519/d18742f6/attachment-0001.gz>
