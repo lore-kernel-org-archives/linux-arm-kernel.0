@@ -1,100 +1,228 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 19 May 2018 20:31:23 +0200
-Subject: [PATCH 11/15] drm/sun4i: DW HDMI PHY: Add support for second PLL
+Date: Sat, 19 May 2018 20:31:26 +0200
+Subject: [PATCH 14/15] ARM: dts: sun8i: r40: Add HDMI pipeline
 In-Reply-To: <20180519183127.2718-1-jernej.skrabec@siol.net>
 References: <20180519183127.2718-1-jernej.skrabec@siol.net>
-Message-ID: <20180519183127.2718-12-jernej.skrabec@siol.net>
+Message-ID: <20180519183127.2718-15-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some DW HDMI PHYs like those found in A64 and R40 SoCs, can select
-between two clock parents.
+Add all entries needed for HDMI to function properly.
 
-Add code which reads second PLL from DT.
+Since R40 has highly configurable pipeline, both mixers and both TCON
+TVs are added. Board specific DT should then connect them together to
+best fit the purpose of the board.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h  |  2 ++
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 22 ++++++++++++++++------
- 2 files changed, 18 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/sun8i-r40.dtsi | 166 +++++++++++++++++++++++++++++++
+ 1 file changed, 166 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-index 79154f0f674a..801a17222762 100644
---- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-@@ -147,6 +147,7 @@ struct sun8i_hdmi_phy;
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index 173dcc1652d2..6d5407964997 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -42,8 +42,11 @@
+  */
  
- struct sun8i_hdmi_phy_variant {
- 	bool has_phy_clk;
-+	bool has_second_pll;
- 	void (*phy_init)(struct sun8i_hdmi_phy *phy);
- 	void (*phy_disable)(struct dw_hdmi *hdmi,
- 			    struct sun8i_hdmi_phy *phy);
-@@ -160,6 +161,7 @@ struct sun8i_hdmi_phy {
- 	struct clk			*clk_mod;
- 	struct clk			*clk_phy;
- 	struct clk			*clk_pll0;
-+	struct clk			*clk_pll1;
- 	unsigned int			rcal;
- 	struct regmap			*regs;
- 	struct reset_control		*rst_phy;
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 5a52fc489a9d..deba47ed69d8 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -472,10 +472,19 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
- 			goto err_put_clk_mod;
- 		}
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/sun8i-de2.h>
+ #include <dt-bindings/clock/sun8i-r40-ccu.h>
++#include <dt-bindings/clock/sun8i-tcon-top.h>
+ #include <dt-bindings/reset/sun8i-r40-ccu.h>
++#include <dt-bindings/reset/sun8i-de2.h>
  
-+		if (phy->variant->has_second_pll) {
-+			phy->clk_pll1 = of_clk_get_by_name(node, "pll-1");
-+			if (IS_ERR(phy->clk_pll1)) {
-+				dev_err(dev, "Could not get pll-1 clock\n");
-+				ret = PTR_ERR(phy->clk_pll1);
-+				goto err_put_clk_pll0;
-+			}
-+		}
+ / {
+ 	#address-cells = <1>;
+@@ -99,12 +102,70 @@
+ 		};
+ 	};
+ 
++	de: display-engine {
++		compatible = "allwinner,sun8i-r40-display-engine",
++			     "allwinner,sun8i-h3-display-engine";
++		allwinner,pipelines = <&mixer0>, <&mixer1>;
++		status = "disabled";
++	};
 +
- 		ret = sun8i_phy_clk_create(phy, dev);
- 		if (ret) {
- 			dev_err(dev, "Couldn't create the PHY clock\n");
--			goto err_put_clk_pll0;
-+			goto err_put_clk_pll1;
- 		}
- 	}
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
  
-@@ -483,7 +492,7 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
- 	if (IS_ERR(phy->rst_phy)) {
- 		dev_err(dev, "Could not get phy reset control\n");
- 		ret = PTR_ERR(phy->rst_phy);
--		goto err_put_clk_pll0;
-+		goto err_put_clk_pll1;
- 	}
++		display_clocks: clock at 1000000 {
++			compatible = "allwinner,sun8i-r40-de2-clk",
++				     "allwinner,sun8i-h3-de2-clk";
++			reg = <0x01000000 0x100000>;
++			clocks = <&ccu CLK_DE>,
++				 <&ccu CLK_BUS_DE>;
++			clock-names = "mod",
++				      "bus";
++			resets = <&ccu RST_BUS_DE>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		mixer0: mixer at 1100000 {
++			compatible = "allwinner,sun8i-r40-de2-mixer-0";
++			reg = <0x01100000 0x100000>;
++			clocks = <&display_clocks CLK_BUS_MIXER0>,
++				 <&display_clocks CLK_MIXER0>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&display_clocks RST_MIXER0>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer0_out: port at 1 {
++					reg = <1>;
++				};
++			};
++		};
++
++		mixer1: mixer at 1200000 {
++			compatible = "allwinner,sun8i-r40-de2-mixer-1";
++			reg = <0x01200000 0x100000>;
++			clocks = <&display_clocks CLK_BUS_MIXER1>,
++				 <&display_clocks CLK_MIXER1>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&display_clocks RST_WB>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer1_out: port at 1 {
++					reg = <1>;
++				};
++			};
++		};
++
+ 		nmi_intc: interrupt-controller at 1c00030 {
+ 			compatible = "allwinner,sun7i-a20-sc-nmi";
+ 			interrupt-controller;
+@@ -451,6 +512,70 @@
+ 			#size-cells = <0>;
+ 		};
  
- 	ret = reset_control_deassert(phy->rst_phy);
-@@ -514,9 +523,10 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
- 	reset_control_assert(phy->rst_phy);
- err_put_rst_phy:
- 	reset_control_put(phy->rst_phy);
-+err_put_clk_pll1:
-+	clk_put(phy->clk_pll1);
- err_put_clk_pll0:
--	if (phy->variant->has_phy_clk)
--		clk_put(phy->clk_pll0);
-+	clk_put(phy->clk_pll0);
- err_put_clk_mod:
- 	clk_put(phy->clk_mod);
- err_put_clk_bus:
-@@ -536,8 +546,8 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
++		tcon_top: tcon-top at 1c70000 {
++			compatible = "allwinner,sun8i-r40-tcon-top";
++			reg = <0x01c70000 0x1000>;
++			clocks = <&ccu CLK_BUS_TCON_TOP>;
++			clock-names = "bus";
++			resets = <&ccu RST_BUS_TCON_TOP>;
++			reset-names = "rst";
++			#clock-cells = <1>;
++		};
++
++		tcon_tv0: lcd-controller at 1c73000 {
++			compatible = "allwinner,sun8i-r40-tcon-tv-0";
++			reg = <0x01c73000 0x1000>;
++			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON_TV0>, <&ccu CLK_TCON_TV0>,
++				 <&tcon_top 1>;
++			clock-names = "ahb", "tcon-ch1", "tcon-top";
++			resets = <&ccu RST_BUS_TCON_TV0>;
++			reset-names = "lcd";
++			allwinner,tcon-top = <&tcon_top>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon_tv0_in: port at 0 {
++					reg = <0>;
++				};
++
++				tcon_tv0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
++		tcon_tv1: lcd-controller at 1c74000 {
++			compatible = "allwinner,sun8i-r40-tcon-tv-1";
++			reg = <0x01c74000 0x1000>;
++			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON_TV1>, <&ccu CLK_TCON_TV1>,
++				 <&tcon_top 2>;
++			clock-names = "ahb", "tcon-ch1", "tcon-top";
++			resets = <&ccu RST_BUS_TCON_TV1>;
++			reset-names = "lcd";
++			allwinner,tcon-top = <&tcon_top>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon_tv1_in: port at 0 {
++					reg = <0>;
++				};
++
++				tcon_tv1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		gic: interrupt-controller at 1c81000 {
+ 			compatible = "arm,gic-400";
+ 			reg = <0x01c81000 0x1000>,
+@@ -461,6 +586,47 @@
+ 			#interrupt-cells = <3>;
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
++
++		hdmi: hdmi at 1ee0000 {
++			compatible = "allwinner,sun8i-r40-dw-hdmi",
++				     "allwinner,sun8i-a83t-dw-hdmi";
++			reg = <0x01ee0000 0x10000>;
++			reg-io-width = <1>;
++			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_HDMI0>, <&ccu CLK_HDMI_SLOW>,
++				 <&ccu CLK_HDMI>;
++			clock-names = "iahb", "isfr", "tmds";
++			resets = <&ccu RST_BUS_HDMI1>;
++			reset-names = "ctrl";
++			phys = <&hdmi_phy>;
++			phy-names = "hdmi-phy";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				hdmi_in: port at 0 {
++					reg = <0>;
++				};
++
++				hdmi_out: port at 1 {
++					reg = <1>;
++				};
++			};
++		};
++
++		hdmi_phy: hdmi-phy at 1ef0000 {
++			compatible = "allwinner,sun8i-r40-hdmi-phy",
++				     "allwinner,sun50i-a64-hdmi-phy";
++			reg = <0x01ef0000 0x10000>;
++			clocks = <&ccu CLK_BUS_HDMI1>, <&ccu CLK_HDMI_SLOW>,
++				 <&ccu 7>, <&ccu 16>;
++			clock-names = "bus", "mod", "pll-0", "pll-1";
++			resets = <&ccu RST_BUS_HDMI0>;
++			reset-names = "phy";
++			#phy-cells = <0>;
++		};
+ 	};
  
- 	reset_control_put(phy->rst_phy);
- 
--	if (phy->variant->has_phy_clk)
--		clk_put(phy->clk_pll0);
-+	clk_put(phy->clk_pll0);
-+	clk_put(phy->clk_pll1);
- 	clk_put(phy->clk_mod);
- 	clk_put(phy->clk_bus);
- }
+ 	timer {
 -- 
 2.17.0
