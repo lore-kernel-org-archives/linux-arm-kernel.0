@@ -1,65 +1,86 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Sat, 19 May 2018 01:15:30 +0200
-Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
-In-Reply-To: <CAHp75VdNUW6KoM6oupyQ80A1WVRk7vewwDt6WEZOyjrAUifqRg@mail.gmail.com>
-References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
- <20180518210954.29044-5-jmkrzyszt@gmail.com>
- <CAHp75VdNUW6KoM6oupyQ80A1WVRk7vewwDt6WEZOyjrAUifqRg@mail.gmail.com>
-Message-ID: <3427199.r4OBoDP6Xz@z50>
+From: Stefan.Bruens@rwth-aachen.de (=?iso-8859-1?Q?Br=FCns=2C_Stefan?=)
+Date: Sat, 19 May 2018 00:26:14 +0000
+Subject: [linux-sunxi] Re: [PATCH v4 3/3] ARM: dts: sun7i: Add support for
+ the Ainol AW1 tablet
+In-Reply-To: <20180518071436.3vvyllghrdxptsxg@flea>
+References: <20180507220413.21990-1-contact@paulk.fr>
+ <0da5787f0ce2309a74db88820bc58b3b3501c451.camel@paulk.fr>
+ <20180518071436.3vvyllghrdxptsxg@flea>
+Message-ID: <33944340.T0tLPSd54F@sbruens-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 18, 2018 11:21:14 PM CEST Andy Shevchenko wrote:
-> On Sat, May 19, 2018 at 12:09 AM, Janusz Krzysztofik
-> 
-> <jmkrzyszt@gmail.com> wrote:
-> > +       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
-> > +       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
-> 
-> So, is it optional or not at the end?
-> If it is, why do we check for NULL?
-
-As far as I can understand, nand_chip->dev_ready() callback is optional. 
-That's why I decided to use the _optional variant of devm_gpiod_get(). In case 
-of ams-delta, the dev_ready() callback depends on availability of the 'rdy' 
-GPIO pin. As a consequence, I'm checking for both NULL and ERR in order to 
-decide if dev_ready() will be supported.
-
-I can pretty well replace it with the standard form and check for ERR only if 
-the purpose of the _optional form is different.
-
-> >                 this->dev_ready = ams_delta_nand_ready;
-> >         
-> >         } else {
-> >         
-> >                 this->dev_ready = NULL;
-> >                 pr_notice("Couldn't request gpio for Delta NAND
-> >                 ready.\n");
-> 
-> dev_notice() ?
-
-Sure, but maybe in a separate patch? That's not a new code just being added 
-but an existing one, not the merit of the change.
-
-> >         }
+On Freitag, 18. Mai 2018 09:14:36 CEST Maxime Ripard wrote:
+> On Mon, May 14, 2018 at 10:36:08PM +0200, Paul Kocialkowski wrote:
+> > > > +	backlight: backlight {
+> > > > +		compatible = "pwm-backlight";
+> > > > +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
+> > > > +		brightness-levels = <  0   1   1   1   1   2   2   2
+> > > > +				       2   3   3   3   3   4   4   4
+> > > > +				       5   5   5   6   6   6   7   7
+> > > > +				       8   8   8   9   9   9  10  10
+> > > > +				      10  11  11  12  12  12  13  13
+> > > > +				      14  14  14  15  15  16  16  17
+> > > > +				      17  17  18  18  19  19  20  20
+> > > > +				      21  21  21  22  22  23  23  24
+> > > > +				      24  25  25  26  26  27  27  28
+> > > > +				      28  29  30  30  31  31  32  32
+> > > > +				      33  33  34  35  35  36  36  37
+> > > > +				      38  38  39  39  40  41  41  42
+> > > > +				      43  43  44  44  45  46  47  47
+> > > > +				      48  49  49  50  51  51  52  53
+> > > > +				      54  54  55  56  57  57  58  59
+> > > > +				      60  61  61  62  63  64  65  65
+> > > > +				      66  67  68  69  70  71  71  72
+> > > > +				      73  74  75  76  77  78  79  80
+> > > > +				      81  82  83  84  85  86  87  88
+> > > > +				      89  90  91  92  93  94  95  96
+> > > > +				      97  98  99 101 102 103 104 105
+> > > > +				     106 108 109 110 111 112 114 115
+> > > > +				     116 117 119 120 121 123 124 125
+> > > > +				     127 128 129 131 132 133 135 136
+> > > > +				     138 139 141 142 144 145 147 148
+> > > > +				     150 151 153 154 156 157 159 161
+> > > > +				     162 164 166 167 169 171 173 174
+> > > > +				     176 178 180 181 183 185 187 189
+> > > > +				     191 192 194 196 198 200 202 204
+> > > > +				     206 208 210 212 214 216 219 221
+> > > > +				     223 225 227 229 232 234 236 238
+> > > > +				     241 242 244 246 248 250 253 255>;
+> > > 
+> > > You kind of overdid it here :)
+> > > 
+> > > What I meant to say before was that if you have 10 elements (and you
+> > > really should have something in that magnitude) each step should
+> > > increase the perceived brightness by 10%.
 > > 
-> > +err_gpiod:
-> > +       if (err == -ENODEV || err == -ENOENT)
-> > +               err = -EPROBE_DEFER;
+> > Mhh I think 10 elements would fall too short to really depict the curve
+> > with appropriate precision. Given the usual size for brightness cursors
+> > in e.g. gnome-shell, it feels like a bigger number would be more
+> > appropriate. Let's make it to 100 with values from 0 to 255!
+> > 
+> > > In this particular case, I really think having something close to <0 4
+> > > 8 16 32 64 128 255> would be enough.
+> > > 
+> > > And in general, that kind of odd looking table without any more
+> > > context is just screaming for a comment :)
+> > 
+> > Noted, I will explain the idea, but probably without the exact formula
+> > that's really a nasty hack written down on a piece of paper sitting in
+> > my garbage at this point.
 > 
-> Hmm...
+> So no one will ever be able to understand where this sequence comes
+> from (yourself-in-two-years included). That sounds like a pretty bad
+> idea.
+> 
+> Maxime
 
-Amstrad Delta uses gpio-mmio driver. Unfortunatelty that driver is not 
-availble before device init phase, unlike other crucial GPIO drivers which are 
-initialized earlier, e.g. during the postcore or at latetst the subsys phase. 
-Hence, devices which depend on GPIO pins provided by gpio-mmio must either be 
-declared late or fail softly so they get another chance of being probed 
-succesfully.
+The following formula yields practically the same table:
 
-I thought of replacing the gpio-mmio platform driver with bgpio functions it 
-exports but for now I haven't implemented it, not even shared the idea.
+out = ceil(255 * (0.245 * in/255  +  0.755 * pow(in/255, 2.6) ))
 
-Does it really hurt to return -EPROBE_DEFER if a GPIO pin can't be obtained?
+Maximum error: 4, maximum relative error: 0.33 
 
-Thanks,
-Janusz
+Kind regards,
+
+Stefan
