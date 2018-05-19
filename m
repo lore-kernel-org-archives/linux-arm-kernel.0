@@ -1,261 +1,91 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 19 May 2018 20:31:24 +0200
-Subject: [PATCH 12/15] drm/sun4i: Add support for second clock parent to DW
- HDMI PHY clk driver
+Date: Sat, 19 May 2018 20:31:19 +0200
+Subject: [PATCH 07/15] dt-bindings: display: sun4i-drm: Add R40 HDMI pipeline
 In-Reply-To: <20180519183127.2718-1-jernej.skrabec@siol.net>
 References: <20180519183127.2718-1-jernej.skrabec@siol.net>
-Message-ID: <20180519183127.2718-13-jernej.skrabec@siol.net>
+Message-ID: <20180519183127.2718-8-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expand HDMI PHY clock driver to support second clock parent.
+Missing compatibles and descriptions needed to implement R40 HDMI
+pipeline are added.
+
+For mixers only compatibles are added.
+
+TCON description is expanded with R40 TV TCON compatibles. If the SoC
+has TCON TOP unit, phandle to that unit has to be specified. Additional
+clock has to be specified if SoC has TCON TOP and TCON is TV TCON.
+
+New compatible is added for DWC HDMI PHY, which has additional clock
+specified.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h      |  6 +-
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c     | 29 ++++++-
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c | 90 ++++++++++++++++------
- 3 files changed, 98 insertions(+), 27 deletions(-)
+ .../bindings/display/sunxi/sun4i-drm.txt         | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-index 801a17222762..aadbe0a10b0c 100644
---- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-@@ -98,7 +98,8 @@
- #define SUN8I_HDMI_PHY_PLL_CFG1_LDO2_EN		BIT(29)
- #define SUN8I_HDMI_PHY_PLL_CFG1_LDO1_EN		BIT(28)
- #define SUN8I_HDMI_PHY_PLL_CFG1_HV_IS_33	BIT(27)
--#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL	BIT(26)
-+#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK	BIT(26)
-+#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT	26
- #define SUN8I_HDMI_PHY_PLL_CFG1_PLLEN		BIT(25)
- #define SUN8I_HDMI_PHY_PLL_CFG1_LDO_VSET(x)	((x) << 22)
- #define SUN8I_HDMI_PHY_PLL_CFG1_UNKNOWN(x)	((x) << 20)
-@@ -190,6 +191,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi);
- void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy);
- const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void);
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index a099957ab62a..634276f713e8 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -101,6 +101,7 @@ DWC HDMI PHY
  
--int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev);
-+int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev,
-+			 bool second_parent);
+ Required properties:
+   - compatible: value must be one of:
++    * allwinner,sun50i-a64-hdmi-phy
+     * allwinner,sun8i-a83t-hdmi-phy
+     * allwinner,sun8i-h3-hdmi-phy
+   - reg: base address and size of memory-mapped region
+@@ -111,8 +112,9 @@ Required properties:
+   - resets: phandle to the reset controller driving the PHY
+   - reset-names: must be "phy"
  
- #endif /* _SUN8I_DW_HDMI_H_ */
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index deba47ed69d8..7a911f0a3ae3 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -183,7 +183,13 @@ static int sun8i_hdmi_phy_config_h3(struct dw_hdmi *hdmi,
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_ANA_CFG1_REG,
- 			   SUN8I_HDMI_PHY_ANA_CFG1_TXEN_MASK, 0);
+-H3 HDMI PHY requires additional clock:
++H3 and A64 HDMI PHY requires additional clocks:
+   - pll-0: parent of phy clock
++  - pll-1: second possible phy clock parent (A64 only)
  
--	regmap_write(phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG, pll_cfg1_init);
-+	/*
-+	 * NOTE: We have to be careful not to overwrite PHY parent
-+	 * clock selection bit and clock divider.
-+	 */
-+	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG,
-+			   ~SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK,
-+			   pll_cfg1_init);
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_PLL_CFG2_REG,
- 			   (u32)~SUN8I_HDMI_PHY_PLL_CFG2_PREDIV_MSK,
- 			   pll_cfg2_init);
-@@ -352,6 +358,10 @@ static void sun8i_hdmi_phy_init_h3(struct sun8i_hdmi_phy *phy)
- 			   SUN8I_HDMI_PHY_ANA_CFG3_SCLEN |
- 			   SUN8I_HDMI_PHY_ANA_CFG3_SDAEN);
+ TV Encoder
+ ----------
+@@ -145,6 +147,8 @@ Required properties:
+    * allwinner,sun8i-a33-tcon
+    * allwinner,sun8i-a83t-tcon-lcd
+    * allwinner,sun8i-a83t-tcon-tv
++   * allwinner,sun8i-r40-tcon-tv-0
++   * allwinner,sun8i-r40-tcon-tv-1
+    * allwinner,sun8i-v3s-tcon
+    * allwinner,sun9i-a80-tcon-lcd
+    * allwinner,sun9i-a80-tcon-tv
+@@ -179,7 +183,7 @@ For TCONs with channel 0, there is one more clock required:
+ For TCONs with channel 1, there is one more clock required:
+    - 'tcon-ch1': The clock driving the TCON channel 1
  
-+	/* reset PLL clock configuration */
-+	regmap_write(phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG, 0);
-+	regmap_write(phy->regs, SUN8I_HDMI_PHY_PLL_CFG2_REG, 0);
+-When TCON support LVDS (all TCONs except TV TCON on A83T and those found
++When TCON support LVDS (all TCONs except TV TCONs on A83T, R40 and those found
+ in A13, H3, H5 and V3s SoCs), you need one more reset line:
+    - 'lvds': The reset line driving the LVDS logic
+ 
+@@ -187,6 +191,12 @@ And on the A23, A31, A31s and A33, you need one more clock line:
+    - 'lvds-alt': An alternative clock source, separate from the TCON channel 0
+                  clock, that can be used to drive the LVDS clock
+ 
++If SoC has TCON TOP, like R40, TCON has to have phandle to TCON TOP:
++   - 'allwinner,tcon-top': Phandle to TCON TOP unit
 +
- 	/* set HW control of CEC pins */
- 	regmap_write(phy->regs, SUN8I_HDMI_PHY_CEC_REG, 0);
- 
-@@ -481,18 +491,28 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
- 			}
- 		}
- 
--		ret = sun8i_phy_clk_create(phy, dev);
-+		ret = sun8i_phy_clk_create(phy, dev,
-+					   phy->variant->has_second_pll);
- 		if (ret) {
- 			dev_err(dev, "Couldn't create the PHY clock\n");
- 			goto err_put_clk_pll1;
- 		}
++TV TCONs which have phandle to TCON TOP need one more clock:
++   - 'tcon-top': TV TCON gate found in TCON TOP unit
 +
-+		/*
-+		 * Even though HDMI PHY clock doesn't have enable/disable
-+		 * handlers, we have to enable it. Otherwise it could happen
-+		 * that parent PLL is not enabled by clock framework in a
-+		 * highly unlikely event when parent PLL is used solely for
-+		 * HDMI PHY clock.
-+		 */
-+		clk_prepare_enable(phy->clk_phy);
- 	}
+ TCON TOP
+ --------
  
- 	phy->rst_phy = of_reset_control_get_shared(node, "phy");
- 	if (IS_ERR(phy->rst_phy)) {
- 		dev_err(dev, "Could not get phy reset control\n");
- 		ret = PTR_ERR(phy->rst_phy);
--		goto err_put_clk_pll1;
-+		goto err_disable_clk_phy;
- 	}
- 
- 	ret = reset_control_deassert(phy->rst_phy);
-@@ -523,6 +543,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
- 	reset_control_assert(phy->rst_phy);
- err_put_rst_phy:
- 	reset_control_put(phy->rst_phy);
-+err_disable_clk_phy:
-+	clk_disable_unprepare(phy->clk_phy);
- err_put_clk_pll1:
- 	clk_put(phy->clk_pll1);
- err_put_clk_pll0:
-@@ -541,6 +563,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
- 
- 	clk_disable_unprepare(phy->clk_mod);
- 	clk_disable_unprepare(phy->clk_bus);
-+	clk_disable_unprepare(phy->clk_phy);
- 
- 	reset_control_assert(phy->rst_phy);
- 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
-index faea449812f8..a4d31fe3abff 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
-@@ -22,35 +22,45 @@ static int sun8i_phy_clk_determine_rate(struct clk_hw *hw,
- {
- 	unsigned long rate = req->rate;
- 	unsigned long best_rate = 0;
-+	struct clk_hw *best_parent = NULL;
- 	struct clk_hw *parent;
- 	int best_div = 1;
--	int i;
-+	int i, p;
- 
--	parent = clk_hw_get_parent(hw);
--
--	for (i = 1; i <= 16; i++) {
--		unsigned long ideal = rate * i;
--		unsigned long rounded;
--
--		rounded = clk_hw_round_rate(parent, ideal);
-+	for (p = 0; p < clk_hw_get_num_parents(hw); p++) {
-+		parent = clk_hw_get_parent_by_index(hw, p);
-+		if (!parent)
-+			continue;
- 
--		if (rounded == ideal) {
--			best_rate = rounded;
--			best_div = i;
--			break;
-+		for (i = 1; i <= 16; i++) {
-+			unsigned long ideal = rate * i;
-+			unsigned long rounded;
-+
-+			rounded = clk_hw_round_rate(parent, ideal);
-+
-+			if (rounded == ideal) {
-+				best_rate = rounded;
-+				best_div = i;
-+				best_parent = parent;
-+				break;
-+			}
-+
-+			if (!best_rate ||
-+			    abs(rate - rounded / i) <
-+			    abs(rate - best_rate / best_div)) {
-+				best_rate = rounded;
-+				best_div = i;
-+				best_parent = parent;
-+			}
- 		}
- 
--		if (!best_rate ||
--		    abs(rate - rounded / i) <
--		    abs(rate - best_rate / best_div)) {
--			best_rate = rounded;
--			best_div = i;
--		}
-+		if (best_rate / best_div == rate)
-+			break;
- 	}
- 
- 	req->rate = best_rate / best_div;
- 	req->best_parent_rate = best_rate;
--	req->best_parent_hw = parent;
-+	req->best_parent_hw = best_parent;
- 
- 	return 0;
- }
-@@ -95,22 +105,58 @@ static int sun8i_phy_clk_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return 0;
- }
- 
-+static u8 sun8i_phy_clk_get_parent(struct clk_hw *hw)
-+{
-+	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
-+	u32 reg;
-+
-+	regmap_read(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG, &reg);
-+	reg = (reg & SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK) >>
-+	      SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT;
-+
-+	return reg;
-+}
-+
-+static int sun8i_phy_clk_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
-+
-+	if (index > 1)
-+		return -EINVAL;
-+
-+	regmap_update_bits(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG,
-+			   SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK,
-+			   index << SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT);
-+
-+	return 0;
-+}
-+
- static const struct clk_ops sun8i_phy_clk_ops = {
- 	.determine_rate	= sun8i_phy_clk_determine_rate,
- 	.recalc_rate	= sun8i_phy_clk_recalc_rate,
- 	.set_rate	= sun8i_phy_clk_set_rate,
-+
-+	.get_parent	= sun8i_phy_clk_get_parent,
-+	.set_parent	= sun8i_phy_clk_set_parent,
- };
- 
--int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev)
-+int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev,
-+			 bool second_parent)
- {
- 	struct clk_init_data init;
- 	struct sun8i_phy_clk *priv;
--	const char *parents[1];
-+	const char *parents[2];
- 
- 	parents[0] = __clk_get_name(phy->clk_pll0);
- 	if (!parents[0])
- 		return -ENODEV;
- 
-+	if (second_parent) {
-+		parents[1] = __clk_get_name(phy->clk_pll1);
-+		if (!parents[1])
-+			return -ENODEV;
-+	}
-+
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
- 		return -ENOMEM;
-@@ -118,7 +164,7 @@ int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev)
- 	init.name = "hdmi-phy-clk";
- 	init.ops = &sun8i_phy_clk_ops;
- 	init.parent_names = parents;
--	init.num_parents = 1;
-+	init.num_parents = second_parent ? 2 : 1;
- 	init.flags = CLK_SET_RATE_PARENT;
- 
- 	priv->phy = phy;
+@@ -330,6 +340,8 @@ Required properties:
+     * allwinner,sun8i-a83t-de2-mixer-0
+     * allwinner,sun8i-a83t-de2-mixer-1
+     * allwinner,sun8i-h3-de2-mixer-0
++    * allwinner,sun8i-r40-de2-mixer-0
++    * allwinner,sun8i-r40-de2-mixer-1
+     * allwinner,sun8i-v3s-de2-mixer
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
 -- 
 2.17.0
