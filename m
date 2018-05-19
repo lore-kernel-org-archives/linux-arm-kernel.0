@@ -1,21 +1,36 @@
-From: hch@lst.de (hch at lst.de)
-Date: Sat, 19 May 2018 08:38:57 +0200
-Subject: [PATCH 02/20] dma-mapping: provide a generic dma-noncoherent
- implementation
-In-Reply-To: <0c5d27e9-2799-eb38-8b09-47a04c48b5c7@gmx.de>
-References: <20180511075945.16548-1-hch@lst.de>
- <20180511075945.16548-3-hch@lst.de>
- <bad125dff49f6e49c895e818c9d1abb346a46e8e.camel@synopsys.com>
- <0c5d27e9-2799-eb38-8b09-47a04c48b5c7@gmx.de>
-Message-ID: <20180519063857.GA18076@lst.de>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Sat, 19 May 2018 09:37:15 +0300
+Subject: [PATCH] firmware: arm_scmi: remove some unnecessary checks
+Message-ID: <20180519063715.GB4991@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 18, 2018 at 10:05:51PM +0200, Helge Deller wrote:
-> This patch seems to fix the dma issues I faced on my 32bit B160L parisc box.
-> 
-> So it leaves only one open issue on parisc:
-> Now every 32 bit parisc system is unnecessarily non-coherent.
+The "pi->dom_info" buffer is allocated in init() and it can't be NULL
+here.  These tests are sort of weird as well because if "pi->dom_info"
+was NULL but "domain" was non-zero then it would lead to an Oops.
 
-I diagree with those comments, let me resend the refactored patch
-to make it more clear.
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+
+diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
+index 2a219b1261b1..721e6c57beae 100644
+--- a/drivers/firmware/arm_scmi/perf.c
++++ b/drivers/firmware/arm_scmi/perf.c
+@@ -363,8 +363,6 @@ static int scmi_dvfs_device_opps_add(const struct scmi_handle *handle,
+ 		return domain;
+ 
+ 	dom = pi->dom_info + domain;
+-	if (!dom)
+-		return -EIO;
+ 
+ 	for (opp = dom->opp, idx = 0; idx < dom->opp_count; idx++, opp++) {
+ 		freq = opp->perf * dom->mult_factor;
+@@ -394,9 +392,6 @@ static int scmi_dvfs_transition_latency_get(const struct scmi_handle *handle,
+ 		return domain;
+ 
+ 	dom = pi->dom_info + domain;
+-	if (!dom)
+-		return -EIO;
+-
+ 	/* uS to nS */
+ 	return dom->opp[dom->opp_count - 1].trans_latency_us * 1000;
+ }
