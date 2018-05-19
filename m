@@ -1,49 +1,89 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 19 May 2018 20:31:25 +0200
-Subject: [PATCH 13/15] drm/sun4i: Add support for A64 HDMI PHY
+Date: Sat, 19 May 2018 20:31:22 +0200
+Subject: [PATCH 10/15] drm/sun4i: Add support for R40 TV TCONs
 In-Reply-To: <20180519183127.2718-1-jernej.skrabec@siol.net>
 References: <20180519183127.2718-1-jernej.skrabec@siol.net>
-Message-ID: <20180519183127.2718-14-jernej.skrabec@siol.net>
+Message-ID: <20180519183127.2718-11-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PHY is the same as in H3, except it can switch between two clock
-parents.
+R40 display pipeline has a lot of possible configurations. HDMI can be
+connected to 2 different TCONs (out of 4) and mixers can be connected to
+any TCON. All this must be configured in TCON TOP.
+
+Along with definition of TCON capabilities also add mux callback, which
+can configure this complex pipeline.
+
+For now, only TCON TV is supported.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 39 ++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 7a911f0a3ae3..0c9d67bb1007 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -396,6 +396,14 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
- 	.name		= "phy"
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index e0c562ce1c22..81b9551e4f78 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -1274,6 +1274,31 @@ static int sun6i_tcon_set_mux(struct sun4i_tcon *tcon,
+ 	return 0;
+ }
+ 
++static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
++				     const struct drm_encoder *encoder,
++				     int index)
++{
++	if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS)
++		sun8i_tcon_top_set_hdmi_src(tcon->tcon_top, index);
++
++	sun8i_tcon_top_de_config(tcon->tcon_top, tcon->id,
++				 tcon_type_tv, index);
++
++	return 0;
++}
++
++static int sun8i_r40_tcon_tv_set_mux_0(struct sun4i_tcon *tcon,
++				       const struct drm_encoder *encoder)
++{
++	return sun8i_r40_tcon_tv_set_mux(tcon, encoder, 0);
++}
++
++static int sun8i_r40_tcon_tv_set_mux_1(struct sun4i_tcon *tcon,
++				       const struct drm_encoder *encoder)
++{
++	return sun8i_r40_tcon_tv_set_mux(tcon, encoder, 1);
++}
++
+ static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
+ 	.has_channel_0		= true,
+ 	.has_channel_1		= true,
+@@ -1321,6 +1346,18 @@ static const struct sun4i_tcon_quirks sun8i_a83t_tv_quirks = {
+ 	.has_channel_1		= true,
  };
  
-+static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
-+	.has_phy_clk = true,
-+	.has_second_pll = true,
-+	.phy_init = &sun8i_hdmi_phy_init_h3,
-+	.phy_disable = &sun8i_hdmi_phy_disable_h3,
-+	.phy_config = &sun8i_hdmi_phy_config_h3,
++static const struct sun4i_tcon_quirks sun8i_r40_tv_0_quirks = {
++	.has_channel_1		= true,
++	.needs_tcon_top		= true,
++	.set_mux		= sun8i_r40_tcon_tv_set_mux_0,
 +};
 +
- static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
- 	.phy_init = &sun8i_hdmi_phy_init_a83t,
- 	.phy_disable = &sun8i_hdmi_phy_disable_a83t,
-@@ -410,6 +418,10 @@ static const struct sun8i_hdmi_phy_variant sun8i_h3_hdmi_phy = {
++static const struct sun4i_tcon_quirks sun8i_r40_tv_1_quirks = {
++	.has_channel_1		= true,
++	.needs_tcon_top		= true,
++	.set_mux		= sun8i_r40_tcon_tv_set_mux_1,
++};
++
+ static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
+ 	.has_channel_0		= true,
  };
- 
- static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
-+	{
-+		.compatible = "allwinner,sun50i-a64-hdmi-phy",
-+		.data = &sun50i_a64_hdmi_phy,
-+	},
- 	{
- 		.compatible = "allwinner,sun8i-a83t-hdmi-phy",
- 		.data = &sun8i_a83t_hdmi_phy,
+@@ -1345,6 +1382,8 @@ const struct of_device_id sun4i_tcon_of_table[] = {
+ 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
+ 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
+ 	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
++	{ .compatible = "allwinner,sun8i-r40-tcon-tv-0", .data = &sun8i_r40_tv_0_quirks },
++	{ .compatible = "allwinner,sun8i-r40-tcon-tv-1", .data = &sun8i_r40_tv_1_quirks },
+ 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
+ 	{ .compatible = "allwinner,sun9i-a80-tcon-lcd", .data = &sun9i_a80_tcon_lcd_quirks },
+ 	{ .compatible = "allwinner,sun9i-a80-tcon-tv", .data = &sun9i_a80_tcon_tv_quirks },
 -- 
 2.17.0
