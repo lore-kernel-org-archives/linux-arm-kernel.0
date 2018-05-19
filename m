@@ -1,93 +1,44 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 19 May 2018 15:41:49 +0530
-Subject: [PATCH 4/5] pinctrl: actions: Add gpio support for Actions S900
- SoC
-In-Reply-To: <12834501.5lBvNSZm06@debian64>
-References: <20180518023056.7869-1-manivannan.sadhasivam@linaro.org>
- <20180518023056.7869-5-manivannan.sadhasivam@linaro.org>
- <12834501.5lBvNSZm06@debian64>
-Message-ID: <20180519101149.7bq6vjiibyrsedv3@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 19 May 2018 11:13:32 +0100
+Subject: [PATCH 03/14] ARM: bugs: hook processor bug checking into SMP
+ and suspend paths
+In-Reply-To: <01094c0d-af69-7e4c-65ec-7acddc778b5e@gmail.com>
+References: <20180516105949.GJ16141@n2100.armlinux.org.uk>
+ <E1fIuAu-0003jr-Kc@rmk-PC.armlinux.org.uk>
+ <01094c0d-af69-7e4c-65ec-7acddc778b5e@gmail.com>
+Message-ID: <20180519101332.GJ17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christian,
-
-On Sat, May 19, 2018 at 11:18:53AM +0200, Christian Lamparter wrote:
-> On Friday, May 18, 2018 4:30:55 AM CEST Manivannan Sadhasivam wrote:
-> > Add gpio support to pinctrl driver for Actions Semi S900 SoC.
-> > 
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
-> > [...]
-> > +static int owl_gpio_init(struct owl_pinctrl *pctrl)
-> > +{
-> > +	struct gpio_chip *chip;
-> > +	int ret;
+On Wed, May 16, 2018 at 09:23:01AM -0700, Florian Fainelli wrote:
+> On 05/16/2018 04:00 AM, Russell King wrote:
+> > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> > index 2da087926ebe..5ad0b67b9e33 100644
+> > --- a/arch/arm/kernel/smp.c
+> > +++ b/arch/arm/kernel/smp.c
+> > @@ -31,6 +31,7 @@
+> >  #include <linux/irq_work.h>
+> >  
+> >  #include <linux/atomic.h>
+> > +#include <asm/bugs.h>
+> >  #include <asm/smp.h>
+> >  #include <asm/cacheflush.h>
+> >  #include <asm/cpu.h>
+> > @@ -405,6 +406,9 @@ asmlinkage void secondary_start_kernel(void)
+> >  	 * before we continue - which happens after __cpu_up returns.
+> >  	 */
+> >  	set_cpu_online(cpu, true);
 > > +
-> > +	chip = &pctrl->chip;
-> > +	chip->base = -1;
-> > +	chip->ngpio = pctrl->soc->ngpios;
-> > +	chip->label = dev_name(pctrl->dev);
-> > +	chip->parent = pctrl->dev;
-> > +	chip->owner = THIS_MODULE;
-> > +	chip->of_node = pctrl->dev->of_node;
-> > +
-> > +	ret = gpiochip_add_data(&pctrl->chip, pctrl);
-> > +	if (ret) {
-> > +		dev_err(pctrl->dev, "failed to register gpiochip\n");
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev),
-> > +							0, 0, chip->ngpio);
-> > +	if (ret) {
-> > +		dev_err(pctrl->dev, "failed to add pin range\n");
-> > +		gpiochip_remove(&pctrl->chip);
-> > +		return ret;
-> > +	}
-> > +
-> gpiochip_add_pin_range()? That's not going to work with gpio-hogs. 
+> > +	check_other_bugs();
 > 
+> Given what is currently implemented, I don't think the location of
+> check_other_bugs() matters too much, but we might have to move this
+> after the local_irq_enable() at some point if we need to check for e.g:
+> a bogus local timer or whatever?
 
-Hmmm. Just looked into the gpio-hog mechanism and the patch you have
-implemented for MSM driver. I agree with you on replacing
-gpiochip_add_pin_range() with gpio-ranges property. But I'm curious
-whether we should document it somewhere or not (probably in [1]).
+We could move it later if we need to.
 
-Anyway I will send the v2 incorporating your suggestion.
-
-Thanks,
-Mani
-
-[1] Documentation/devicetree/bindings/gpio/gpio.txt
-
-> But, you can easily test this. Just add a gpio-hog [0] 
-> ( Section 2. gpio-controller nodes) into the Devicetree's
-> pinctrl node.
-> 
-> something like: (No idea if GPIO1 is already used, but any free
-> gpio will do)
-> | 		[...]
-> |		pinctrl at e01b0000 {
-> |			compatible = "actions,s900-pinctrl";
-> |			reg = <0x0 0xe01b0000 0x0 0x1000>;
-> |			clocks = <&cmu CLK_GPIO>;
-> |			gpio-controller;
-> |			#gpio-cells = <2>;
-> |
-> |			line_b {
-> |				gpio-hog;
-> |				gpios = <1 GPIO_ACTIVE_HIGH>;
-> |				output-low;
-> |				line-name = "foo-bar-gpio";
-> |			};
-> |		};
-> 
-> The pinctrl probe will fail. You can fix this by
-> replacing the gpiochip_add_pin_range() and use
-> the gpio-ranges [0] property to define the range.
-> 
-> [0] <https://www.kernel.org/doc/Documentation/devicetree/bindings/gpio/gpio.txt>
-> 
-> 
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
