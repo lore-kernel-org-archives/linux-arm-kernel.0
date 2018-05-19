@@ -1,94 +1,61 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 20 May 2018 01:56:25 +0800
-Subject: [xlnx:xlnx_rebase_v4.14 74/935] drivers/fpga/zynqmp-fpga.c:79:2:
- error: implicit declaration of function '__flush_cache_user_range'; did you
- mean 'clflush_cache_range'?
-Message-ID: <201805200120.xJ9fMtET%fengguang.wu@intel.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sat, 19 May 2018 21:00:38 +0300
+Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
+In-Reply-To: <3427199.r4OBoDP6Xz@z50>
+References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+ <20180518210954.29044-5-jmkrzyszt@gmail.com>
+ <CAHp75VdNUW6KoM6oupyQ80A1WVRk7vewwDt6WEZOyjrAUifqRg@mail.gmail.com>
+ <3427199.r4OBoDP6Xz@z50>
+Message-ID: <CAHp75VcUxjubx=zOGyCjmpjCk5RBLPCaHcaOieDie9LdTCa+5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
-head:   6b8ad2b85bb2279d13a436396238f0fd150138d1
-commit: d91b9e49c2c2663091e2d71a136ad2db919a91b3 [74/935] fpga manager: Adding FPGA Manager support for Xilinx zynqmp
-config: i386-allyesconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        git checkout d91b9e49c2c2663091e2d71a136ad2db919a91b3
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On Sat, May 19, 2018 at 2:15 AM, Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+> On Friday, May 18, 2018 11:21:14 PM CEST Andy Shevchenko wrote:
+>> On Sat, May 19, 2018 at 12:09 AM, Janusz Krzysztofik
+>>
+>> <jmkrzyszt@gmail.com> wrote:
+>> > +       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
+>> > +       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
+>>
+>> So, is it optional or not at the end?
+>> If it is, why do we check for NULL?
+>
+> As far as I can understand, nand_chip->dev_ready() callback is optional.
+> That's why I decided to use the _optional variant of devm_gpiod_get(). In case
+> of ams-delta, the dev_ready() callback depends on availability of the 'rdy'
+> GPIO pin. As a consequence, I'm checking for both NULL and ERR in order to
+> decide if dev_ready() will be supported.
+>
+> I can pretty well replace it with the standard form and check for ERR only if
+> the purpose of the _optional form is different.
 
-All errors (new ones prefixed by >>):
+NULL check in practice discards the _optional part of gpiod_get(). So,
+either you use non-optional variant and decide how to handle an
+errors, or user _optional w/o NULL check.
 
-   drivers/fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_ops_write':
->> drivers/fpga/zynqmp-fpga.c:79:2: error: implicit declaration of function '__flush_cache_user_range'; did you mean 'clflush_cache_range'? [-Werror=implicit-function-declaration]
-     __flush_cache_user_range((unsigned long)kbuf,
-     ^~~~~~~~~~~~~~~~~~~~~~~~
-     clflush_cache_range
-   cc1: some warnings being treated as errors
+>> > +err_gpiod:
+>> > +       if (err == -ENODEV || err == -ENOENT)
+>> > +               err = -EPROBE_DEFER;
+>>
+>> Hmm...
+>
+> Amstrad Delta uses gpio-mmio driver. Unfortunatelty that driver is not
+> availble before device init phase, unlike other crucial GPIO drivers which are
+> initialized earlier, e.g. during the postcore or at latetst the subsys phase.
+> Hence, devices which depend on GPIO pins provided by gpio-mmio must either be
+> declared late or fail softly so they get another chance of being probed
+> succesfully.
+>
+> I thought of replacing the gpio-mmio platform driver with bgpio functions it
+> exports but for now I haven't implemented it, not even shared the idea.
+>
+> Does it really hurt to return -EPROBE_DEFER if a GPIO pin can't be obtained?
 
-vim +79 drivers/fpga/zynqmp-fpga.c
+I'm only concerned if it would be an infinite defer in the case when
+driver will never appear.
+But I don't remember the details.
 
-    45	
-    46	static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
-    47						const char *buf, size_t size)
-    48	{
-    49		struct zynqmp_fpga_priv *priv;
-    50		char *kbuf;
-    51		size_t dma_size;
-    52		dma_addr_t dma_addr;
-    53		u32 transfer_length;
-    54		int ret;
-    55		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-    56	
-    57		if (!eemi_ops || !eemi_ops->fpga_load)
-    58			return -ENXIO;
-    59	
-    60		priv = mgr->priv;
-    61	
-    62		if (mgr->flags & IXR_FPGA_ENCRYPTION_EN)
-    63			dma_size = size + ENCRYPTED_KEY_LEN + ENCRYPTED_IV_LEN;
-    64		else
-    65			dma_size = size;
-    66	
-    67		kbuf = dma_alloc_coherent(priv->dev, dma_size, &dma_addr, GFP_KERNEL);
-    68		if (!kbuf)
-    69			return -ENOMEM;
-    70	
-    71		memcpy(kbuf, buf, size);
-    72	
-    73		if (mgr->flags & IXR_FPGA_ENCRYPTION_EN) {
-    74			memcpy(kbuf + size, mgr->key, ENCRYPTED_KEY_LEN);
-    75			memcpy(kbuf + size + ENCRYPTED_KEY_LEN, mgr->iv,
-    76							ENCRYPTED_IV_LEN);
-    77		}
-    78	
-  > 79		__flush_cache_user_range((unsigned long)kbuf,
-    80					 (unsigned long)kbuf + dma_size);
-    81	
-    82		/**
-    83		 * Translate size from bytes to number of 32bit words that
-    84		 * the DMA should write to the PCAP interface
-    85		 */
-    86		if (size & 3)
-    87			transfer_length = (size >> 2) + 1;
-    88		else
-    89			transfer_length = size >> 2;
-    90	
-    91		ret = eemi_ops->fpga_load(dma_addr, transfer_length, mgr->flags);
-    92	
-    93		dma_free_coherent(priv->dev, dma_size, kbuf, dma_addr);
-    94	
-    95		return ret;
-    96	}
-    97	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 61100 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180520/f6735637/attachment-0001.gz>
+-- 
+With Best Regards,
+Andy Shevchenko
