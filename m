@@ -1,323 +1,109 @@
-From: ilialin@codeaurora.org (ilialin at codeaurora.org)
-Date: Sat, 19 May 2018 14:45:07 +0300
-Subject: [PATCH v8 10/15] cpufreq: Add Kryo CPU scaling driver
-In-Reply-To: <20180518014538.duphof6enscpm5vp@vireshk-i7>
-References: <1526555955-29960-1-git-send-email-ilialin@codeaurora.org>
- <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
- <20180518014538.duphof6enscpm5vp@vireshk-i7>
-Message-ID: <019201d3ef66$db97aed0$92c70c70$@codeaurora.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 19 May 2018 13:50:05 +0200 (CEST)
+Subject: [RESEND][PATCH] pwm: Set class for exported channels in sysfs
+In-Reply-To: <c1b6b62e-8fcb-bff0-b532-aa0879d301ed@st.com>
+References: <20170926115951.GA29367@sukzessiv.net>
+ <c1b6b62e-8fcb-bff0-b532-aa0879d301ed@st.com>
+Message-ID: <492690429.60492.1526730605765@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hello Fabrice,
 
-If I send patches in reply, it will produce new patches, instead of answers
-in the thread. Please find below the file dump.
-
-->cat drivers/cpufreq/qcom-cpufreq-kryo.c
-// SPDX-License-Identifier: GPL-2.0
-/*
- * Copyright (c) 2018, The Linux Foundation. All rights reserved.
- */
-
-/*
- * In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO processors,
- * the CPU frequency subset and voltage value of each OPP varies
- * based on the silicon variant in use. Qualcomm Process Voltage Scaling
-Tables
- * defines the voltage and frequency value based on the msm-id in SMEM
- * and speedbin blown in the efuse combination.
- * The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the
-SoC
- * to provide the OPP framework with required information.
- * This is used to determine the voltage and frequency value for each OPP of
- * operating-points-v2 table when it is parsed by the OPP framework.
- */
-
-#include <linux/cpu.h>
-#include <linux/err.h>
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/nvmem-consumer.h>
-#include <linux/of.h>
-#include <linux/platform_device.h>
-#include <linux/pm_opp.h>
-#include <linux/slab.h>
-#include <linux/soc/qcom/smem.h>
-
-#define MSM_ID_SMEM     137
-#define SILVER_LEAD     0
-#define GOLD_LEAD       2
-
-enum _msm_id {
-        MSM8996V3 = 0xF6ul,
-        APQ8096V3 = 0x123ul,
-        MSM8996SG = 0x131ul,
-        APQ8096SG = 0x138ul,
-};
-
-enum _msm8996_version {
-        MSM8996_V3,
-        MSM8996_SG,
-        NUM_OF_MSM8996_VERSIONS,
-};
-
-static enum _msm8996_version __init qcom_cpufreq_kryo_get_msm_id(void)
-{
-        size_t len;
-        u32 *msm_id;
-        enum _msm8996_version version;
-
-        msm_id = qcom_smem_get(QCOM_SMEM_HOST_ANY, MSM_ID_SMEM, &len);
-        /* The first 4 bytes are format, next to them is the actual msm-id
-*/
-        msm_id++;
-
-        switch ((enum _msm_id)*msm_id) {
-        case MSM8996V3:
-        case APQ8096V3:
-                version = MSM8996_V3;
-                break;
-        case MSM8996SG:
-        case APQ8096SG:
-                version = MSM8996_SG;
-                break;
-        default:
-                version = NUM_OF_MSM8996_VERSIONS;
-        }
-
-        return version;
-}
-
-static int __init qcom_cpufreq_kryo_driver_init(void)
-{
-        struct device *cpu_dev_silver, *cpu_dev_gold;
-        struct opp_table *opp_silver, *opp_gold;
-        enum _msm8996_version msm8996_version;
-        struct nvmem_cell *speedbin_nvmem;
-        struct platform_device *pdev;
-        struct device_node *np;
-        u8 *speedbin;
-        u32 versions;
-        size_t len;
-        int ret;
-
-        cpu_dev_silver = get_cpu_device(SILVER_LEAD);
-        if (IS_ERR_OR_NULL(cpu_dev_silver))
-                return PTR_ERR(cpu_dev_silver);
-
-        cpu_dev_gold = get_cpu_device(SILVER_LEAD);
-        if (IS_ERR_OR_NULL(cpu_dev_gold))
-                return PTR_ERR(cpu_dev_gold);
-
-        msm8996_version = qcom_cpufreq_kryo_get_msm_id();
-        if (NUM_OF_MSM8996_VERSIONS == msm8996_version) {
-                dev_err(cpu_dev_silver, "Not Snapdragon 820/821!");
-                return -ENODEV;
-        }
-
-        np = dev_pm_opp_of_get_opp_desc_node(cpu_dev_silver);
-        if (IS_ERR_OR_NULL(np))
-                return PTR_ERR(np);
-
-        if (!of_device_is_compatible(np, "operating-points-v2-kryo-cpu")) {
-                ret = -ENOENT;
-                goto free_np;
-        }
-
-        speedbin_nvmem = of_nvmem_cell_get(np, NULL);
-        if (IS_ERR(speedbin_nvmem)) {
-                ret = PTR_ERR(speedbin_nvmem);
-                dev_err(cpu_dev_silver, "Could not get nvmem cell: %d\n",
-ret);
-                goto free_np;
-        }
-
-        speedbin = nvmem_cell_read(speedbin_nvmem, &len);
-        nvmem_cell_put(speedbin_nvmem);
-
-        switch (msm8996_version) {
-        case MSM8996_V3:
-                versions = 1 << (unsigned int)(*speedbin);
-                break;
-        case MSM8996_SG:
-                versions = 1 << ((unsigned int)(*speedbin) + 4);
-                break;
-        default:
-                BUG();
-                break;
-        }
-
-        opp_silver =
-dev_pm_opp_set_supported_hw(cpu_dev_silver,&versions,1);
-        if (IS_ERR(opp_silver)) {
-                dev_err(cpu_dev_silver, "Failed to set supported
-hardware\n");
-                ret = PTR_ERR(opp_silver);
-                goto free_np;
-        }
-
-        opp_gold = dev_pm_opp_set_supported_hw(cpu_dev_gold,&versions,1);
-        if (IS_ERR(opp_gold)) {
-                dev_err(cpu_dev_gold, "Failed to set supported hardware\n");
-                ret = PTR_ERR(opp_gold);
-                goto free_opp_silver;
-        }
-
-        pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-        if (!IS_ERR_OR_NULL(pdev))
-                return 0;
-
-        ret = PTR_ERR(pdev);
-        dev_err(cpu_dev_silver, "Failed to register platform device\n");
-        dev_pm_opp_put_supported_hw(opp_gold);
-
-free_opp_silver:
-        dev_pm_opp_put_supported_hw(opp_silver);
-
-free_np:
-        of_node_put(np);
-
-        return ret;
-}
-late_initcall(qcom_cpufreq_kryo_driver_init);
-
-MODULE_DESCRIPTION("Qualcomm Technologies, Inc. Kryo CPUfreq driver");
-MODULE_LICENSE("GPL v2");
-
-> -----Original Message-----
-> From: Viresh Kumar <viresh.kumar@linaro.org>
-> Sent: Friday, May 18, 2018 04:46
-> To: Ilia Lin <ilialin@codeaurora.org>
-> Cc: mturquette at baylibre.com; sboyd at kernel.org; robh at kernel.org;
-> mark.rutland at arm.com; nm at ti.com; lgirdwood at gmail.com;
-> broonie at kernel.org; andy.gross at linaro.org; david.brown at linaro.org;
-> catalin.marinas at arm.com; will.deacon at arm.com; rjw at rjwysocki.net; linux-
-> clk at vger.kernel.org; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-pm at vger.kernel.org; linux-arm-
-> msm at vger.kernel.org; linux-soc at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; rnayak at codeaurora.org;
-> amit.kucheria at linaro.org; nicolas.dechesne at linaro.org;
-> celster at codeaurora.org; tfinkel at codeaurora.org
-> Subject: Re: [PATCH v8 10/15] cpufreq: Add Kryo CPU scaling driver
+> Fabrice Gasnier <fabrice.gasnier@st.com> hat am 30. M?rz 2018 um 14:40 geschrieben:
 > 
-> On 17-05-18, 14:19, Ilia Lin wrote:
-> > +static int __init qcom_cpufreq_kryo_driver_init(void)
-> > +{
-> > +	size_t len;
-> > +	int ret = 0;
-> > +	u32 versions;
-> > +	enum _msm8996_version msm8996_version;
-> > +	u8 *speedbin;
-> > +	struct device *cpu_dev_silver, *cpu_dev_gold;
-> > +	struct device_node *np;
-> > +	struct nvmem_cell *speedbin_nvmem;
-> > +	struct platform_device *pdev;
-> > +	struct opp_table *opp_silver = NULL;
-> > +	struct opp_table *opp_gold = NULL;
 > 
-> No need to initialize them and you may want to arrange all above in
-> decreasing order of their length.
+> On 09/26/2017 01:59 PM, gohai at sukzessiv.net wrote:
+> > Notifications for devices without bus or class set get dropped by
+> > dev_uevent_filter. Adding the class to the exported child matches
+> > what the gpio subsystem is doing.
+> > 
+> > With this change exporting a channel triggers a udev event, which
+> > gives userspace a chance to fixup permissions and makes it possible
+> > for non-root users to make use of the pwm subsystem.
+> > 
+> > Signed-off-by: Gottfried Haider <gottfried.haider@gmail.com>
+> > CC: Thierry Reding <thierry.reding@gmail.com>
+> > CC: H Hartley Sweeten <hsweeten@visionengravers.com>
+> > CC: linux-pwm at vger.kernel.org
+> > CC: linux-arm-kernel at lists.infradead.org
+> > CC: linux-rpi-kernel at lists.infradead.org
+> > ---
+> >  drivers/pwm/sysfs.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+> > index a813239..83f2b0b 100644
+> > --- a/drivers/pwm/sysfs.c
+> > +++ b/drivers/pwm/sysfs.c
+> > @@ -263,6 +263,7 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
+> >         export->pwm = pwm;
+> >         mutex_init(&export->lock);
+> > 
+> > +       export->child.class = parent->class;
 > 
-> > +
-> > +	cpu_dev_silver = get_cpu_device(SILVER_LEAD);
-> > +	if (IS_ERR_OR_NULL(cpu_dev_silver))
-> > +		return PTR_ERR(cpu_dev_silver);
-> > +
-> > +	cpu_dev_gold = get_cpu_device(SILVER_LEAD);
-> > +	if (IS_ERR_OR_NULL(cpu_dev_gold))
-> > +		return PTR_ERR(cpu_dev_gold);
-> > +
-> > +	msm8996_version = qcom_cpufreq_kryo_get_msm_id();
-> > +	if (NUM_OF_MSM8996_VERSIONS == msm8996_version) {
-> > +		dev_err(cpu_dev_silver, "Not Snapdragon 820/821!");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	np = dev_pm_opp_of_get_opp_desc_node(cpu_dev_silver);
-> > +	if (IS_ERR_OR_NULL(np))
-> > +		return PTR_ERR(np);
-> > +
-> > +	if (!of_device_is_compatible(np, "operating-points-v2-kryo-cpu")) {
-> > +		ret = -ENOENT;
-> > +		goto free_np;
-> > +	}
-> > +
-> > +	speedbin_nvmem = of_nvmem_cell_get(np, NULL);
-> > +	if (IS_ERR(speedbin_nvmem)) {
-> > +		ret = PTR_ERR(speedbin_nvmem);
-> > +		dev_err(cpu_dev_silver, "Could not get nvmem cell: %d\n",
-> ret);
-> > +		goto free_np;
-> > +	}
-> > +
-> > +	speedbin = nvmem_cell_read(speedbin_nvmem, &len);
-> > +	nvmem_cell_put(speedbin_nvmem);
-> > +
-> > +	switch (msm8996_version) {
-> > +	case MSM8996_V3:
-> > +		versions = 1 << (unsigned int)(*speedbin);
-> > +		break;
-> > +	case MSM8996_SG:
-> > +		versions = 1 << ((unsigned int)(*speedbin) + 4);
-> > +		break;
-> > +	default:
-> > +		BUG();
-> > +		break;
-> > +	}
-> > +
-> > +	opp_silver =
-> dev_pm_opp_set_supported_hw(cpu_dev_silver,&versions,1);
-> > +	if (IS_ERR_OR_NULL(opp_silver)) {
+> Hi all,
 > 
-> This API doesn't return NULL and so IS_ERR() would be sufficient.
+> Sorry to raise this old mail thread. I just figured out this patch is
+> causing *regression* on v4.16-rcs.
 > 
-> > +		dev_err(cpu_dev_silver, "Failed to set supported
-> hardware\n");
-> > +		ret = PTR_ERR(opp_silver);
-> > +		goto free_np;
-> > +	}
-> > +
-> > +	opp_gold =
-> dev_pm_opp_set_supported_hw(cpu_dev_gold,&versions,1);
-> > +	if (IS_ERR_OR_NULL(opp_gold)) {
+> This patch has side effect at my end, with multiple pwm chip. It creates
+> a new entry in '/sys/class/pwm' every time a 'pwmX' is exported:
+> - echo X > export
 > 
-> same here.
+> This breaks pwm on platforms that have multiple pwmchip:
+> - 1st time export will create a /sys/class/pwm/pwmX
+> - when another export happens on another pwmchip, it can't be created
+> (e.g. -EEXIST)
 > 
-> > +		dev_err(cpu_dev_gold, "Failed to set supported
-> hardware\n");
-> > +		ret = PTR_ERR(opp_gold);
-> > +		goto free_opp_silver;
-> > +	}
-> > +
-> > +	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-> > +	if (!IS_ERR_OR_NULL(pdev))
-> > +		goto out;
+> I looked at /Documentation/ABI/testing/sysfs-class-pwm:
+> - pmwX should be there: /sys/class/pwm/pwmchipN/pwmX (only ?)
 > 
-> Simply return from here and remove the useless label out.
+> With this patch:
+> - pwmX symlink is created in addition, directly under /sys/class/pwm
 > 
-> > +
-> > +	ret = PTR_ERR(pdev);
-> > +	dev_err(cpu_dev_silver, "Failed to register platform device\n");
-> > +	dev_pm_opp_put_supported_hw(opp_gold);
-> > +
-> > +free_opp_silver:
-> > +	dev_pm_opp_put_supported_hw(opp_silver);
-> > +
-> > +free_np:
-> > +	of_node_put(np);
-> > +
-> > +out:
-> > +	return ret;
-> > +}
-> > +late_initcall(qcom_cpufreq_kryo_driver_init);
+> Example on stm32 (stm32429i-eval) platform:
+> ---
+> $ ls /sys/class/pwm
+> pwmchip0 pwmchip4
 > 
-> Please resend only this patch now or just paste the new code in a mail
-here
-> so that I can review it quickly and then you can resend the final version.
-Most
-> of the patches aren't changing anyway.
+> $ cd /sys/class/pwm/pwmchip0/
+> $ echo 0 > export
 > 
-> --
-> viresh
+> $ ls /sys/class/pwm
+> pwm0 pwmchip0 pwmchip4
+> 
+> $ cd /sys/class/pwm/pwmchip4/
+> $ echo 0 > export
+> 
+> sysfs: cannot create duplicate filename '/class/pwm/pwm0'
+> CPU: 0 PID: 50 Comm: sh Not tainted 4.16.0-rc7-00020-g3361545 #1682
+> Hardware name: STM32 (Device Tree Support)
+> [<0000c0f1>] (unwind_backtrace) from [<0000b23b>] (show_stack+0xb/0xc)
+> [<0000b23b>] (show_stack) from [<0008d2f1>] (sysfs_warn_dup+0x31/0x48)
+> [<0008d2f1>] (sysfs_warn_dup) from [<0008d4a5>]
+> (sysfs_do_create_link_sd+0x75/0x88)
+> [<0008d4a5>] (sysfs_do_create_link_sd) from [<000e8e91>]
+> (device_add+0x111/0x374)
+> [<000e8e91>] (device_add) from [<000ca795>] (export_store+0xb5/0x12c)
+> [<000ca795>] (export_store) from [<0008c899>] (kernfs_fop_write+0x87/0xda)
+> [<0008c899>] (kernfs_fop_write) from [<0005a0a5>] (__vfs_write+0x1d/0xcc)
+> [<0005a0a5>] (__vfs_write) from [<0005a1c7>] (vfs_write+0x4f/0x7c)
+> [<0005a1c7>] (vfs_write) from [<0005a29b>] (SyS_write+0x33/0x70)
+> [<0005a29b>] (SyS_write) from [<00009001>] (ret_fast_syscall+0x1/0x58)
+> Exception stack...
+> -sh: write error: File exists
+> 
+> Not sure what the best fix would be thought :-(
+> 
+> probably pwmX should be named also according with pwmchipN ?
+> - dev_set_name(&export->child, "pwm%u", pwm->hwpwm);
+> + dev_set_name(&export->child, "pwmchip%d-pwm%u", chip->base, pwm->hwpwm);
+> BUT I think this would break existing ABI...
+> 
+> Also this is quite late in the cycle. Maybe a revert would be wise for now ?
+
+sorry i didn't noticed your mail before. Could you please prepare a revert patch?
+
+Thanks
+Stefan
