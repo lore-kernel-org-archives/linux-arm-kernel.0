@@ -1,44 +1,75 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 19 May 2018 11:13:32 +0100
-Subject: [PATCH 03/14] ARM: bugs: hook processor bug checking into SMP
- and suspend paths
-In-Reply-To: <01094c0d-af69-7e4c-65ec-7acddc778b5e@gmail.com>
-References: <20180516105949.GJ16141@n2100.armlinux.org.uk>
- <E1fIuAu-0003jr-Kc@rmk-PC.armlinux.org.uk>
- <01094c0d-af69-7e4c-65ec-7acddc778b5e@gmail.com>
-Message-ID: <20180519101332.GJ17671@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 19 May 2018 11:44:57 +0100
+Subject: [PATCH] arm64: kvm: use -fno-jump-tables with clang
+In-Reply-To: <CAKwvOdk+=JKcQP1ieLEkZftRGf-pqCTTzEuYvT_45YNMkEw_wA@mail.gmail.com>
+References: <20180518170202.11458-1-samitolvanen@google.com>
+ <05d14ac7-0feb-63a3-e7ef-b8ca1ae2fd1d@arm.com>
+ <CAKwvOdm1kYedukCq=g74AvqJHp6KC03oNoouQy2nkvfo4idoEw@mail.gmail.com>
+ <8c7be44f-086d-65e3-9969-8182261ce82f@arm.com>
+ <CAKwvOd=XZqg5=mkXZb-cxq3i_AGoJGAbmF=Fwc7Q98oi0tbN9g@mail.gmail.com>
+ <3fd89842-86cd-ee01-0c2c-5438dd2d5f2a@arm.com>
+ <CAKwvOdk+=JKcQP1ieLEkZftRGf-pqCTTzEuYvT_45YNMkEw_wA@mail.gmail.com>
+Message-ID: <86k1rzc4ba.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 09:23:01AM -0700, Florian Fainelli wrote:
-> On 05/16/2018 04:00 AM, Russell King wrote:
-> > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> > index 2da087926ebe..5ad0b67b9e33 100644
-> > --- a/arch/arm/kernel/smp.c
-> > +++ b/arch/arm/kernel/smp.c
-> > @@ -31,6 +31,7 @@
-> >  #include <linux/irq_work.h>
-> >  
-> >  #include <linux/atomic.h>
-> > +#include <asm/bugs.h>
-> >  #include <asm/smp.h>
-> >  #include <asm/cacheflush.h>
-> >  #include <asm/cpu.h>
-> > @@ -405,6 +406,9 @@ asmlinkage void secondary_start_kernel(void)
-> >  	 * before we continue - which happens after __cpu_up returns.
-> >  	 */
-> >  	set_cpu_online(cpu, true);
-> > +
-> > +	check_other_bugs();
+On Fri, 18 May 2018 19:31:50 +0100,
+Nick Desaulniers wrote:
 > 
-> Given what is currently implemented, I don't think the location of
-> check_other_bugs() matters too much, but we might have to move this
-> after the local_irq_enable() at some point if we need to check for e.g:
-> a bogus local timer or whatever?
+> On Fri, May 18, 2018 at 11:13 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > What I'd really like is to apply that patch knowing that:
+> 
+> > - you have checked that with a released version of the compiler, you
+> > don't observe any absolute address in any of the objects that are going
+> > to be executed at EL2 on a mainline kernel,
+> 
+> To verify, we should disassemble objects from arch/arm64/kvm/hyp/*.o and
+> make sure we don't see absolute addresses?  I can work with Sami to get a
+> sense of what the before and after of this patch looks like in disassembly,
+> then verify those changes are pervasive.
 
-We could move it later if we need to.
+That seems sensible. You definitely want to look for things stored in
+constant pools and subsequently used as an address. Also, you may have
+to look at the .hyp.text section of the vmlinux binary, rather than
+the individual *.o files, as the linker will likely rewrite things
+(the compiler doesn't know about the kernel link address).
+
+> > - you have successfully run guests with a mainline kernel,
+> 
+> I believe Andrey has already done this.  If he can verify (maybe
+> during working hours next week), then maybe we can add his Tested-by
+> to this patches commit message?
+
+That would definitely be the right thing to do. Make sure you (or
+Andrey tests with the latest released mainline kernel (4.16 for now)
+or (even better) the tip of Linus' tree.
+
+> > - it works for a reasonable set of common kernel configurations
+> > (defconfig and some of the most useful debug options),
+> 
+> It's easy for us to test our kernel configs for Android, ChromeOS,
+> and defconfig.  I'd be curious to know the shortlist of "most useful
+> debug options" just to be a better kernel developer, personally.
+
+Activate the various sanitizers, and all the tracing options, for a
+start. They are the most likely to do weird things...
+
+> > - I can reproduce your findings with the same released compiler.
+> 
+> Lets wait for Andrey to confirm his test setup.  On the Android side, I
+> think you should be able to get by with a released version, but I'd be
+> curious to hear from Andrey.
+
+Android has all kind of additional patches, and I'm solely concerned
+with mainline. If it is what Andrey runs, that's great.
+
+> > Is that the case? I don't think any of the above is completely outlandish.
+> 
+> These are all reasonable. Thanks for the feedback.
+
+Cheers,
+
+	M.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Jazz is not dead, it just smell funny.
