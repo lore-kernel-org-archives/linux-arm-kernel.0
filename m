@@ -1,62 +1,116 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 19 May 2018 20:31:15 +0200
-Subject: [PATCH 03/15] clk: sunxi-ng: r40: Export video PLLs
+Date: Sat, 19 May 2018 20:31:18 +0200
+Subject: [PATCH 06/15] drm/sun4i: tcon: Add support for tcon-top
 In-Reply-To: <20180519183127.2718-1-jernej.skrabec@siol.net>
 References: <20180519183127.2718-1-jernej.skrabec@siol.net>
-Message-ID: <20180519183127.2718-4-jernej.skrabec@siol.net>
+Message-ID: <20180519183127.2718-7-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Video PLLs need to be referenced in R40 DT as possible HDMI PHY parent.
+If SoC has TCON TOP unit, it has to be configured from TCON, since it
+has all information needed. Additionally, if it is TCON TV, it must also
+enable bus gate inside TCON TOP unit.
 
-Export them.
+Add support for such TCONs.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-r40.h      | 8 ++++++--
- include/dt-bindings/clock/sun8i-r40-ccu.h | 4 ++++
- 2 files changed, 10 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 28 ++++++++++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  8 ++++++++
+ 2 files changed, 36 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.h b/drivers/clk/sunxi-ng/ccu-sun8i-r40.h
-index 0db8e1e97af8..db2a1243f9ff 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.h
-@@ -25,7 +25,9 @@
- #define CLK_PLL_AUDIO_2X	4
- #define CLK_PLL_AUDIO_4X	5
- #define CLK_PLL_AUDIO_8X	6
--#define CLK_PLL_VIDEO0		7
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 08747fc3ee71..e0c562ce1c22 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -688,6 +688,16 @@ static int sun4i_tcon_init_clocks(struct device *dev,
+ 		dev_err(dev, "Couldn't get the TCON bus clock\n");
+ 		return PTR_ERR(tcon->clk);
+ 	}
 +
-+/* PLL_VIDEO0 is exported */
++	if (tcon->quirks->needs_tcon_top && tcon->quirks->has_channel_1) {
++		tcon->top_clk = devm_clk_get(dev, "tcon-top");
++		if (IS_ERR(tcon->top_clk)) {
++			dev_err(dev, "Couldn't get the TCON TOP bus clock\n");
++			return PTR_ERR(tcon->top_clk);
++		}
++		clk_prepare_enable(tcon->top_clk);
++	}
 +
- #define CLK_PLL_VIDEO0_2X	8
- #define CLK_PLL_VE		9
- #define CLK_PLL_DDR0		10
-@@ -34,7 +36,9 @@
- #define CLK_PLL_PERIPH0_2X	13
- #define CLK_PLL_PERIPH1		14
- #define CLK_PLL_PERIPH1_2X	15
--#define CLK_PLL_VIDEO1		16
-+
-+/* PLL_VIDEO1 is exported */
-+
- #define CLK_PLL_VIDEO1_2X	17
- #define CLK_PLL_SATA		18
- #define CLK_PLL_SATA_OUT	19
-diff --git a/include/dt-bindings/clock/sun8i-r40-ccu.h b/include/dt-bindings/clock/sun8i-r40-ccu.h
-index 4fa5f69fc297..f9e15a235626 100644
---- a/include/dt-bindings/clock/sun8i-r40-ccu.h
-+++ b/include/dt-bindings/clock/sun8i-r40-ccu.h
-@@ -43,6 +43,10 @@
- #ifndef _DT_BINDINGS_CLK_SUN8I_R40_H_
- #define _DT_BINDINGS_CLK_SUN8I_R40_H_
+ 	clk_prepare_enable(tcon->clk);
  
-+#define CLK_PLL_VIDEO0		7
-+
-+#define CLK_PLL_VIDEO1		16
-+
- #define CLK_CPU			24
+ 	if (tcon->quirks->has_channel_0) {
+@@ -712,6 +722,7 @@ static int sun4i_tcon_init_clocks(struct device *dev,
+ static void sun4i_tcon_free_clocks(struct sun4i_tcon *tcon)
+ {
+ 	clk_disable_unprepare(tcon->clk);
++	clk_disable_unprepare(tcon->top_clk);
+ }
  
- #define CLK_BUS_MIPI_DSI	29
+ static int sun4i_tcon_init_irq(struct device *dev,
+@@ -980,6 +991,23 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	tcon->id = engine->id;
+ 	tcon->quirks = of_device_get_match_data(dev);
+ 
++	if (tcon->quirks->needs_tcon_top) {
++		struct device_node *np;
++
++		np = of_parse_phandle(dev->of_node, "allwinner,tcon-top", 0);
++		if (np) {
++			struct platform_device *pdev;
++
++			pdev = of_find_device_by_node(np);
++			if (pdev)
++				tcon->tcon_top = platform_get_drvdata(pdev);
++			of_node_put(np);
++
++			if (!tcon->tcon_top)
++				return -EPROBE_DEFER;
++		}
++	}
++
+ 	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
+ 	if (IS_ERR(tcon->lcd_rst)) {
+ 		dev_err(dev, "Couldn't get our reset line\n");
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index f6a071cd5a6f..26be0d317a38 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -20,6 +20,8 @@
+ #include <linux/list.h>
+ #include <linux/reset.h>
+ 
++#include "sun8i_tcon_top.h"
++
+ #define SUN4I_TCON_GCTL_REG			0x0
+ #define SUN4I_TCON_GCTL_TCON_ENABLE			BIT(31)
+ #define SUN4I_TCON_GCTL_IOMAP_MASK			BIT(0)
+@@ -224,6 +226,7 @@ struct sun4i_tcon_quirks {
+ 	bool	needs_de_be_mux; /* sun6i needs mux to select backend */
+ 	bool    needs_edp_reset; /* a80 edp reset needed for tcon0 access */
+ 	bool	supports_lvds;   /* Does the TCON support an LVDS output? */
++	bool	needs_tcon_top;  /* TCON TOP holds additional muxing configuration */
+ 
+ 	/* callback to handle tcon muxing options */
+ 	int	(*set_mux)(struct sun4i_tcon *, const struct drm_encoder *);
+@@ -249,6 +252,9 @@ struct sun4i_tcon {
+ 	u8				dclk_max_div;
+ 	u8				dclk_min_div;
+ 
++	/* TCON TOP clock */
++	struct clk			*top_clk;
++
+ 	/* Reset control */
+ 	struct reset_control		*lcd_rst;
+ 	struct reset_control		*lvds_rst;
+@@ -263,6 +269,8 @@ struct sun4i_tcon {
+ 
+ 	int				id;
+ 
++	struct sun8i_tcon_top		*tcon_top;
++
+ 	/* TCON list management */
+ 	struct list_head		list;
+ };
 -- 
 2.17.0
