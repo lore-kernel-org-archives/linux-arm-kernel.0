@@ -1,86 +1,117 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Sat, 19 May 2018 23:55:51 +0200
-Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
-In-Reply-To: <CAHp75VcUxjubx=zOGyCjmpjCk5RBLPCaHcaOieDie9LdTCa+5g@mail.gmail.com>
-References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
- <3427199.r4OBoDP6Xz@z50>
- <CAHp75VcUxjubx=zOGyCjmpjCk5RBLPCaHcaOieDie9LdTCa+5g@mail.gmail.com>
-Message-ID: <5456625.lDWjtgZygK@z50>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Sun, 20 May 2018 01:02:46 +0300
+Subject: [PATCH v2 3/6] ARM: trusted_foundations: do not use naked function
+In-Reply-To: <507a66ab9ab530a6d71db7a74f11ddfb@agner.ch>
+References: <20180325180959.28008-1-stefan@agner.ch>
+ <20180325180959.28008-4-stefan@agner.ch>
+ <704c863a-0b5a-6396-d7da-f0ed17b7cca2@gmail.com>
+ <263337af-7541-be9e-3db6-6cb987fd08fb@arm.com>
+ <f627177c-f813-9e10-ade5-c7654375639b@gmail.com>
+ <cf9b916103c0dba1e67682efc69f5bae@agner.ch>
+ <498de826-6e6c-63d8-00d6-f394b2725a34@wwwdotorg.org>
+ <507a66ab9ab530a6d71db7a74f11ddfb@agner.ch>
+Message-ID: <3bc2c0c2-1b8b-5296-4d33-ee8c97c54430@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, May 19, 2018 8:00:38 PM CEST Andy Shevchenko wrote:
-> On Sat, May 19, 2018 at 2:15 AM, Janusz Krzysztofik <jmkrzyszt@gmail.com> 
-wrote:
-> > On Friday, May 18, 2018 11:21:14 PM CEST Andy Shevchenko wrote:
-> >> On Sat, May 19, 2018 at 12:09 AM, Janusz Krzysztofik
-> >> 
-> >> <jmkrzyszt@gmail.com> wrote:
-> >> > +       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy",
-> >> > GPIOD_IN);
-> >> > +       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
-> >> 
-> >> So, is it optional or not at the end?
-> >> If it is, why do we check for NULL?
-> > 
-> > As far as I can understand, nand_chip->dev_ready() callback is optional.
-> > That's why I decided to use the _optional variant of devm_gpiod_get(). In
-> > case of ams-delta, the dev_ready() callback depends on availability of
-> > the 'rdy' GPIO pin. As a consequence, I'm checking for both NULL and ERR
-> > in order to decide if dev_ready() will be supported.
-> > 
-> > I can pretty well replace it with the standard form and check for ERR only
-> > if the purpose of the _optional form is different.
+On 16.04.2018 21:21, Stefan Agner wrote:
+> On 16.04.2018 18:08, Stephen Warren wrote:
+>> On 04/16/2018 09:56 AM, Stefan Agner wrote:
+>>> On 27.03.2018 14:16, Dmitry Osipenko wrote:
+>>>> On 27.03.2018 14:54, Robin Murphy wrote:
+>>>>> On 26/03/18 22:20, Dmitry Osipenko wrote:
+>>>>>> On 25.03.2018 21:09, Stefan Agner wrote:
+>>>>>>> As documented in GCC naked functions should only use Basic asm
+>>>>>>> syntax. The Extended asm or mixture of Basic asm and "C" code is
+>>>>>>> not guaranteed. Currently this works because it was hard coded
+>>>>>>> to follow and check GCC behavior for arguments and register
+>>>>>>> placement.
+>>>>>>>
+>>>>>>> Furthermore with clang using parameters in Extended asm in a
+>>>>>>> naked function is not supported:
+>>>>>>>  ?? arch/arm/firmware/trusted_foundations.c:47:10: error: parameter
+>>>>>>>  ?????????? references not allowed in naked functions
+>>>>>>>  ???????????????? : "r" (type), "r" (arg1), "r" (arg2)
+>>>>>>>  ??????????????????????? ^
+>>>>>>>
+>>>>>>> Use a regular function to be more portable. This aligns also with
+>>>>>>> the other smc call implementations e.g. in qcom_scm-32.c and
+>>>>>>> bcm_kona_smc.c.
+>>>>>>>
+>>>>>>> Cc: Dmitry Osipenko <digetx@gmail.com>
+>>>>>>> Cc: Stephen Warren <swarren@nvidia.com>
+>>>>>>> Cc: Thierry Reding <treding@nvidia.com>
+>>>>>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>>>>>> ---
+>>>>>>> Changes in v2:
+>>>>>>> - Keep stmfd/ldmfd to avoid potential ABI issues
+>>>>>>>
+>>>>>>>  ? arch/arm/firmware/trusted_foundations.c | 14 +++++++++-----
+>>>>>>>  ? 1 file changed, 9 insertions(+), 5 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/firmware/trusted_foundations.c
+>>>>>>> b/arch/arm/firmware/trusted_foundations.c
+>>>>>>> index 3fb1b5a1dce9..689e6565abfc 100644
+>>>>>>> --- a/arch/arm/firmware/trusted_foundations.c
+>>>>>>> +++ b/arch/arm/firmware/trusted_foundations.c
+>>>>>>> @@ -31,21 +31,25 @@
+>>>>>>>  ? ? static unsigned long cpu_boot_addr;
+>>>>>>>  ? -static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+>>>>>>> +static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+>>>>>>>  ? {
+>>>>>>> +??? register u32 r0 asm("r0") = type;
+>>>>>>> +??? register u32 r1 asm("r1") = arg1;
+>>>>>>> +??? register u32 r2 asm("r2") = arg2;
+>>>>>>> +
+>>>>>>>  ????? asm volatile(
+>>>>>>>  ????????? ".arch_extension??? sec\n\t"
+>>>>>>> -??????? "stmfd??? sp!, {r4 - r11, lr}\n\t"
+>>>>>>> +??????? "stmfd??? sp!, {r4 - r11}\n\t"
+>>>>>>>  ????????? __asmeq("%0", "r0")
+>>>>>>>  ????????? __asmeq("%1", "r1")
+>>>>>>>  ????????? __asmeq("%2", "r2")
+>>>>>>>  ????????? "mov??? r3, #0\n\t"
+>>>>>>>  ????????? "mov??? r4, #0\n\t"
+>>>>>>>  ????????? "smc??? #0\n\t"
+>>>>>>> -??????? "ldmfd??? sp!, {r4 - r11, pc}"
+>>>>>>> +??????? "ldmfd??? sp!, {r4 - r11}\n\t"
+>>>>>>>  ????????? :
+>>>>>>> -??????? : "r" (type), "r" (arg1), "r" (arg2)
+>>>>>>> -??????? : "memory");
+>>>>>>> +??????? : "r" (r0), "r" (r1), "r" (r2)
+>>>>>>> +??????? : "memory", "r3", "r12", "lr");
+>>>>>>
+>>>>>> Although seems "lr" won't be affected by SMC invocation because it should be
+>>>>>> banked and hence could be omitted entirely from the code. Maybe somebody could
+>>>>>> confirm this.
+>>>>> Strictly per the letter of the architecture, the SMC could be trapped to Hyp
+>>>>> mode, and a hypervisor might clobber LR_usr in the process of forwarding the
+>>>>> call to the firmware secure monitor (since Hyp doesn't have a banked LR of its
+>>>>> own). Admittedly there are probably no real systems with the appropriate
+>>>>> hardware/software combination to hit that, but on the other hand if this gets
+>>>>> inlined where the compiler has already created a stack frame then an LR clobber
+>>>>> is essentially free, so I reckon we're better off keeping it for reassurance.
+>>>>> This isn't exactly a critical fast path anyway.
+>>>>
+>>>> Okay, thank you for the clarification.
+>>>
+>>> So it seems this change is fine?
+>>>
+>>> Stephen, you picked up changes for this driver before, is this patch
+>>> going through your tree?
+>>
+>> You had best ask Thierry; he's taken over Tegra maintenance upstream.
+>> But that said, don't files in arch/arm go through Russell?
 > 
-> NULL check in practice discards the _optional part of gpiod_get(). So,
-> either you use non-optional variant and decide how to handle an
-> errors, or user _optional w/o NULL check.
-
-OK, I'm going to use something like the below while submitting v2:
-
--	gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
--	if (!IS_ERR_OR_NULL(gpiod_rdy)) {
--		this->dev_ready = ams_delta_nand_ready;
--	} else {
--		this->dev_ready = NULL;
--		pr_notice("Couldn't request gpio for Delta NAND ready.\n");
-+	priv->gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy",
-+						  GPIOD_IN);
-+	if (IS_ERR(priv->gpiod_rdy)) {
-+		err = PTR_ERR(priv->gpiod_nwp);
-+		dev_warn(&pdev->dev, "RDY GPIO request failed (%d)\n", err);
-+		goto err_gpiod;
- 	}
- 
-+	if (priv->gpiod_rdy)
-+		this->dev_ready = ams_delta_nand_ready;
-
+> I think the last patches applied to that file went through your tree.
 > 
-> >> > +err_gpiod:
-> >> > +       if (err == -ENODEV || err == -ENOENT)
-> >> > +               err = -EPROBE_DEFER;
-> >> 
-> >> Hmm...
-> > 
-> > Amstrad Delta uses gpio-mmio driver. Unfortunatelty that driver is not
-> > availble before device init phase, unlike other crucial GPIO drivers which
-> > are initialized earlier, e.g. during the postcore or at latetst the
-> > subsys phase. Hence, devices which depend on GPIO pins provided by
-> > gpio-mmio must either be declared late or fail softly so they get another
-> > chance of being probed succesfully.
-> > 
-> > I thought of replacing the gpio-mmio platform driver with bgpio functions
-> > it exports but for now I haven't implemented it, not even shared the
-> > idea.
-> > 
-> > Does it really hurt to return -EPROBE_DEFER if a GPIO pin can't be
-> > obtained?
-> I'm only concerned if it would be an infinite defer in the case when
-> driver will never appear.
-> But I don't remember the details.
+> Thierry, Russel, any preferences?
 
-Deferred probes are handled effectively during late_initcall, no risk of 
-infinite defer, see drivers/base/dd.c for details.
+I've been preparing patches for upstream to add initial support of L2 cache
+maintance to TF / Tegra30 and noticed that without this patch I'm getting a hang
+early in boot. That is because before this patch registers store / restore was
+incorrect, probably the premature return (lr -> pc) causes stack corruption. Not
+sure whether it's worth to backport this patch, but I want to see it at least in
+-next.
 
-Thanks,
-Janusz
+Thierry, please take care of this patch. Thanks.
