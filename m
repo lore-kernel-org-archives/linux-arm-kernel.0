@@ -1,68 +1,49 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 19 May 2018 20:31:21 +0200
-Subject: [PATCH 09/15] drm/sun4i: Add support for R40 mixers
+Date: Sat, 19 May 2018 20:31:25 +0200
+Subject: [PATCH 13/15] drm/sun4i: Add support for A64 HDMI PHY
 In-Reply-To: <20180519183127.2718-1-jernej.skrabec@siol.net>
 References: <20180519183127.2718-1-jernej.skrabec@siol.net>
-Message-ID: <20180519183127.2718-10-jernej.skrabec@siol.net>
+Message-ID: <20180519183127.2718-14-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both mixers have similar capabilities as others SoCs with DE2.
-
-First mixer has 1 VI and 3 UI planes and supports HW scaling on all
-planes.
-
-Second mixer has 1 VI and 1 UI planes and also supports HW scaling on
-all planes.
+PHY is the same as in H3, except it can switch between two clock
+parents.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 36d90c76317a..78aa878e305c 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -500,6 +500,24 @@ static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
- 	.vi_num		= 1,
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index 7a911f0a3ae3..0c9d67bb1007 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -396,6 +396,14 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
+ 	.name		= "phy"
  };
  
-+static const struct sun8i_mixer_cfg sun8i_r40_mixer0_cfg = {
-+	.ccsc		= 0,
-+	.index		= 0,
-+	.mod_rate	= 297000000,
-+	.scaler_mask	= 0xf,
-+	.ui_num		= 3,
-+	.vi_num		= 1,
++static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
++	.has_phy_clk = true,
++	.has_second_pll = true,
++	.phy_init = &sun8i_hdmi_phy_init_h3,
++	.phy_disable = &sun8i_hdmi_phy_disable_h3,
++	.phy_config = &sun8i_hdmi_phy_config_h3,
 +};
 +
-+static const struct sun8i_mixer_cfg sun8i_r40_mixer1_cfg = {
-+	.ccsc		= 1,
-+	.index		= 1,
-+	.mod_rate	= 297000000,
-+	.scaler_mask	= 0x3,
-+	.ui_num		= 1,
-+	.vi_num		= 1,
-+};
-+
- static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
- 	.vi_num = 2,
- 	.ui_num = 1,
-@@ -521,6 +539,14 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
- 		.compatible = "allwinner,sun8i-h3-de2-mixer-0",
- 		.data = &sun8i_h3_mixer0_cfg,
- 	},
+ static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
+ 	.phy_init = &sun8i_hdmi_phy_init_a83t,
+ 	.phy_disable = &sun8i_hdmi_phy_disable_a83t,
+@@ -410,6 +418,10 @@ static const struct sun8i_hdmi_phy_variant sun8i_h3_hdmi_phy = {
+ };
+ 
+ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
 +	{
-+		.compatible = "allwinner,sun8i-r40-de2-mixer-0",
-+		.data = &sun8i_r40_mixer0_cfg,
-+	},
-+	{
-+		.compatible = "allwinner,sun8i-r40-de2-mixer-1",
-+		.data = &sun8i_r40_mixer1_cfg,
++		.compatible = "allwinner,sun50i-a64-hdmi-phy",
++		.data = &sun50i_a64_hdmi_phy,
 +	},
  	{
- 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
- 		.data = &sun8i_v3s_mixer_cfg,
+ 		.compatible = "allwinner,sun8i-a83t-hdmi-phy",
+ 		.data = &sun8i_a83t_hdmi_phy,
 -- 
 2.17.0
