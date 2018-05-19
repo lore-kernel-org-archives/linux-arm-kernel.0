@@ -1,61 +1,77 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sat, 19 May 2018 21:00:38 +0300
-Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
-In-Reply-To: <3427199.r4OBoDP6Xz@z50>
-References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
- <20180518210954.29044-5-jmkrzyszt@gmail.com>
- <CAHp75VdNUW6KoM6oupyQ80A1WVRk7vewwDt6WEZOyjrAUifqRg@mail.gmail.com>
- <3427199.r4OBoDP6Xz@z50>
-Message-ID: <CAHp75VcUxjubx=zOGyCjmpjCk5RBLPCaHcaOieDie9LdTCa+5g@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 20 May 2018 02:31:50 +0800
+Subject: [xlnx:xlnx_rebase_v4.14 730/935] drivers/crypto/zynqmp-sha.c:133:3:
+ error: implicit declaration of function '__flush_cache_user_range'; did you
+ mean 'clflush_cache_range'?
+Message-ID: <201805200246.wwzUDl5H%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2018 at 2:15 AM, Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
-> On Friday, May 18, 2018 11:21:14 PM CEST Andy Shevchenko wrote:
->> On Sat, May 19, 2018 at 12:09 AM, Janusz Krzysztofik
->>
->> <jmkrzyszt@gmail.com> wrote:
->> > +       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
->> > +       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
->>
->> So, is it optional or not at the end?
->> If it is, why do we check for NULL?
->
-> As far as I can understand, nand_chip->dev_ready() callback is optional.
-> That's why I decided to use the _optional variant of devm_gpiod_get(). In case
-> of ams-delta, the dev_ready() callback depends on availability of the 'rdy'
-> GPIO pin. As a consequence, I'm checking for both NULL and ERR in order to
-> decide if dev_ready() will be supported.
->
-> I can pretty well replace it with the standard form and check for ERR only if
-> the purpose of the _optional form is different.
+tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
+head:   6b8ad2b85bb2279d13a436396238f0fd150138d1
+commit: 5cccc03f86f27a3e9e76ba7a863eaf2f8506e9e2 [730/935] crypto: zynqmp: Use new firmware ops
+config: i386-allyesconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        git checkout 5cccc03f86f27a3e9e76ba7a863eaf2f8506e9e2
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-NULL check in practice discards the _optional part of gpiod_get(). So,
-either you use non-optional variant and decide how to handle an
-errors, or user _optional w/o NULL check.
+All errors (new ones prefixed by >>):
 
->> > +err_gpiod:
->> > +       if (err == -ENODEV || err == -ENOENT)
->> > +               err = -EPROBE_DEFER;
->>
->> Hmm...
->
-> Amstrad Delta uses gpio-mmio driver. Unfortunatelty that driver is not
-> availble before device init phase, unlike other crucial GPIO drivers which are
-> initialized earlier, e.g. during the postcore or at latetst the subsys phase.
-> Hence, devices which depend on GPIO pins provided by gpio-mmio must either be
-> declared late or fail softly so they get another chance of being probed
-> succesfully.
->
-> I thought of replacing the gpio-mmio platform driver with bgpio functions it
-> exports but for now I haven't implemented it, not even shared the idea.
->
-> Does it really hurt to return -EPROBE_DEFER if a GPIO pin can't be obtained?
+   drivers/crypto/zynqmp-sha.c: In function 'zynqmp_sha_update':
+>> drivers/crypto/zynqmp-sha.c:133:3: error: implicit declaration of function '__flush_cache_user_range'; did you mean 'clflush_cache_range'? [-Werror=implicit-function-declaration]
+      __flush_cache_user_range((unsigned long)kbuf,
+      ^~~~~~~~~~~~~~~~~~~~~~~~
+      clflush_cache_range
+   cc1: some warnings being treated as errors
 
-I'm only concerned if it would be an infinite defer in the case when
-driver will never appear.
-But I don't remember the details.
+vim +133 drivers/crypto/zynqmp-sha.c
 
--- 
-With Best Regards,
-Andy Shevchenko
+3abec383 Nava kishore Manne 2017-09-19  111  
+3abec383 Nava kishore Manne 2017-09-19  112  static int zynqmp_sha_update(struct ahash_request *req)
+3abec383 Nava kishore Manne 2017-09-19  113  {
+3abec383 Nava kishore Manne 2017-09-19  114  	struct zynqmp_sha_ctx *tctx = crypto_tfm_ctx(req->base.tfm);
+3abec383 Nava kishore Manne 2017-09-19  115  	struct zynqmp_sha_dev *dd = tctx->dd;
+5cccc03f Rajan Vaja         2018-03-01  116  	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+3abec383 Nava kishore Manne 2017-09-19  117  	char *kbuf;
+3abec383 Nava kishore Manne 2017-09-19  118  	size_t dma_size = req->nbytes;
+3abec383 Nava kishore Manne 2017-09-19  119  	dma_addr_t dma_addr;
+3abec383 Nava kishore Manne 2017-09-19  120  	int ret;
+3abec383 Nava kishore Manne 2017-09-19  121  
+3abec383 Nava kishore Manne 2017-09-19  122  	if (!req->nbytes)
+3abec383 Nava kishore Manne 2017-09-19  123  		return 0;
+3abec383 Nava kishore Manne 2017-09-19  124  
+5cccc03f Rajan Vaja         2018-03-01  125  	if (!eemi_ops || !eemi_ops->sha_hash)
+5cccc03f Rajan Vaja         2018-03-01  126  		return -ENOTSUPP;
+5cccc03f Rajan Vaja         2018-03-01  127  
+3abec383 Nava kishore Manne 2017-09-19  128  	kbuf = dma_alloc_coherent(dd->dev, dma_size, &dma_addr, GFP_KERNEL);
+3abec383 Nava kishore Manne 2017-09-19  129  	if (!kbuf)
+3abec383 Nava kishore Manne 2017-09-19  130  		return -ENOMEM;
+3abec383 Nava kishore Manne 2017-09-19  131  
+3abec383 Nava kishore Manne 2017-09-19  132  	scatterwalk_map_and_copy(kbuf, req->src, 0, req->nbytes, 0);
+3abec383 Nava kishore Manne 2017-09-19 @133  	 __flush_cache_user_range((unsigned long)kbuf,
+3abec383 Nava kishore Manne 2017-09-19  134  				  (unsigned long)kbuf + dma_size);
+5cccc03f Rajan Vaja         2018-03-01  135  	ret = eemi_ops->sha_hash(dma_addr, req->nbytes, ZYNQMP_SHA3_UPDATE);
+3abec383 Nava kishore Manne 2017-09-19  136  	dma_free_coherent(dd->dev, dma_size, kbuf, dma_addr);
+3abec383 Nava kishore Manne 2017-09-19  137  
+3abec383 Nava kishore Manne 2017-09-19  138  	return ret;
+3abec383 Nava kishore Manne 2017-09-19  139  }
+3abec383 Nava kishore Manne 2017-09-19  140  
+
+:::::: The code at line 133 was first introduced by commit
+:::::: 3abec3839538ef5fe79c2873360d84cc92b4df25 crypto: zynqmp-sha: Adopted SHA3 support for ZynqMP Soc
+
+:::::: TO: Nava kishore Manne <nava.manne@xilinx.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 61326 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180520/ad913ab3/attachment-0001.gz>
