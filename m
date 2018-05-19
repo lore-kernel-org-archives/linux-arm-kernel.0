@@ -1,34 +1,86 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 20 May 2018 04:59:58 +0800
-Subject: [arm:sa1100 80/87] ERROR: "ipaq_micro_tx_msg"
- [arch/arm/mach-sa1100/h3xxx-sleeve.ko] undefined!
-Message-ID: <201805200454.F8TwgQD5%fengguang.wu@intel.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Sat, 19 May 2018 23:55:51 +0200
+Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
+In-Reply-To: <CAHp75VcUxjubx=zOGyCjmpjCk5RBLPCaHcaOieDie9LdTCa+5g@mail.gmail.com>
+References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+ <3427199.r4OBoDP6Xz@z50>
+ <CAHp75VcUxjubx=zOGyCjmpjCk5RBLPCaHcaOieDie9LdTCa+5g@mail.gmail.com>
+Message-ID: <5456625.lDWjtgZygK@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
-head:   6713179ef01a294e21b4b2ff808a8d30155af2ad
-commit: 6b9bc7e8128e38bc39eea71789c6e914f13b6d5a [80/87] ARM: sa1100/h3xxx: sleeve support
-config: arm-neponset_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 6b9bc7e8128e38bc39eea71789c6e914f13b6d5a
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Saturday, May 19, 2018 8:00:38 PM CEST Andy Shevchenko wrote:
+> On Sat, May 19, 2018 at 2:15 AM, Janusz Krzysztofik <jmkrzyszt@gmail.com> 
+wrote:
+> > On Friday, May 18, 2018 11:21:14 PM CEST Andy Shevchenko wrote:
+> >> On Sat, May 19, 2018 at 12:09 AM, Janusz Krzysztofik
+> >> 
+> >> <jmkrzyszt@gmail.com> wrote:
+> >> > +       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy",
+> >> > GPIOD_IN);
+> >> > +       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
+> >> 
+> >> So, is it optional or not at the end?
+> >> If it is, why do we check for NULL?
+> > 
+> > As far as I can understand, nand_chip->dev_ready() callback is optional.
+> > That's why I decided to use the _optional variant of devm_gpiod_get(). In
+> > case of ams-delta, the dev_ready() callback depends on availability of
+> > the 'rdy' GPIO pin. As a consequence, I'm checking for both NULL and ERR
+> > in order to decide if dev_ready() will be supported.
+> > 
+> > I can pretty well replace it with the standard form and check for ERR only
+> > if the purpose of the _optional form is different.
+> 
+> NULL check in practice discards the _optional part of gpiod_get(). So,
+> either you use non-optional variant and decide how to handle an
+> errors, or user _optional w/o NULL check.
 
-All errors (new ones prefixed by >>):
+OK, I'm going to use something like the below while submitting v2:
 
->> ERROR: "ipaq_micro_tx_msg" [arch/arm/mach-sa1100/h3xxx-sleeve.ko] undefined!
+-	gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
+-	if (!IS_ERR_OR_NULL(gpiod_rdy)) {
+-		this->dev_ready = ams_delta_nand_ready;
+-	} else {
+-		this->dev_ready = NULL;
+-		pr_notice("Couldn't request gpio for Delta NAND ready.\n");
++	priv->gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy",
++						  GPIOD_IN);
++	if (IS_ERR(priv->gpiod_rdy)) {
++		err = PTR_ERR(priv->gpiod_nwp);
++		dev_warn(&pdev->dev, "RDY GPIO request failed (%d)\n", err);
++		goto err_gpiod;
+ 	}
+ 
++	if (priv->gpiod_rdy)
++		this->dev_ready = ams_delta_nand_ready;
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 15702 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180520/f81d3c9c/attachment-0001.gz>
+> 
+> >> > +err_gpiod:
+> >> > +       if (err == -ENODEV || err == -ENOENT)
+> >> > +               err = -EPROBE_DEFER;
+> >> 
+> >> Hmm...
+> > 
+> > Amstrad Delta uses gpio-mmio driver. Unfortunatelty that driver is not
+> > availble before device init phase, unlike other crucial GPIO drivers which
+> > are initialized earlier, e.g. during the postcore or at latetst the
+> > subsys phase. Hence, devices which depend on GPIO pins provided by
+> > gpio-mmio must either be declared late or fail softly so they get another
+> > chance of being probed succesfully.
+> > 
+> > I thought of replacing the gpio-mmio platform driver with bgpio functions
+> > it exports but for now I haven't implemented it, not even shared the
+> > idea.
+> > 
+> > Does it really hurt to return -EPROBE_DEFER if a GPIO pin can't be
+> > obtained?
+> I'm only concerned if it would be an infinite defer in the case when
+> driver will never appear.
+> But I don't remember the details.
+
+Deferred probes are handled effectively during late_initcall, no risk of 
+infinite defer, see drivers/base/dd.c for details.
+
+Thanks,
+Janusz
