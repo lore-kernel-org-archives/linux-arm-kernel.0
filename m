@@ -1,53 +1,71 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sat, 19 May 2018 20:31:16 +0200
-Subject: [PATCH 04/15] dt-bindings: display: sunxi-drm: Add TCON TOP
- description
-In-Reply-To: <20180519183127.2718-1-jernej.skrabec@siol.net>
-References: <20180519183127.2718-1-jernej.skrabec@siol.net>
-Message-ID: <20180519183127.2718-5-jernej.skrabec@siol.net>
+Date: Sat, 19 May 2018 20:31:12 +0200
+Subject: [PATCH 00/15] Add support for R40 HDMI pipeline
+Message-ID: <20180519183127.2718-1-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TCON TOP main purpose is to configure whole display pipeline. It
-determines relationships between mixers and TCONs, selects source TCON
-for HDMI, muxes LCD and TV encoder GPIO output, selects TV encoder
-clock source and contains additional TV TCON and DSI gates.
+This series adds support for R40 HDMI pipeline. It is a bit special
+than other already supported pipelines because it has additional unit
+called TCON TOP responsible for relationship configuration between
+mixers, TCONs and HDMI. Additionally, it has additional gates for DSI
+and TV TCONs, TV encoder clock settings and pin muxing between LCD
+and TV encoders.
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
- .../bindings/display/sunxi/sun4i-drm.txt      | 20 +++++++++++++++++++
- 1 file changed, 20 insertions(+)
+However, it seems that TCON TOP will become a norm, since newer
+Allwinner SoCs like H6 also have this unit.
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 3346c1e2a7a0..a099957ab62a 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -187,6 +187,26 @@ And on the A23, A31, A31s and A33, you need one more clock line:
-    - 'lvds-alt': An alternative clock source, separate from the TCON channel 0
-                  clock, that can be used to drive the LVDS clock
- 
-+TCON TOP
-+--------
-+
-+TCON TOPs main purpose is to configure whole display pipeline. It determines
-+relationships between mixers and TCONs, selects source TCON for HDMI, muxes
-+LCD and TV encoder GPIO output, selects TV encoder clock source and contains
-+additional TV TCON and DSI gates.
-+
-+Required properties:
-+  - compatible: value must be one of:
-+    * allwinner,sun8i-r40-tcon-top
-+  - reg: base address and size of the memory-mapped region.
-+  - clocks: phandle to the clocks feeding the TCON TOP
-+    * bus: TCON TOP interface clock
-+  - clock-names: clock name mentioned above
-+  - resets: phandle to the reset line driving the DRC
-+    * rst: TCON TOP reset line
-+  - reset-names: reset name mentioned above
-+  - #clock-cells : must contain 1
-+
- DRC
- ---
- 
+I tested different possible configurations:
+- mixer0 <> TCON-TV0 <> HDMI
+- mixer0 <> TCON-TV1 <> HDMI
+- mixer1 <> TCON-TV0 <> HDMI
+- mixer1 <> TCON-TV1 <> HDMI
+
+Please review.
+
+Best regards,
+Jernej
+
+Jernej Skrabec (15):
+  clk: sunxi-ng: r40: Add minimal rate for video PLLs
+  clk: sunxi-ng: r40: Allow setting parent rate to display related
+    clocks
+  clk: sunxi-ng: r40: Export video PLLs
+  dt-bindings: display: sunxi-drm: Add TCON TOP description
+  drm/sun4i: Add TCON TOP driver
+  drm/sun4i: tcon: Add support for tcon-top
+  dt-bindings: display: sun4i-drm: Add R40 HDMI pipeline
+  drm/sun4i: DE2 mixer: Add index quirk
+  drm/sun4i: Add support for R40 mixers
+  drm/sun4i: Add support for R40 TV TCONs
+  drm/sun4i: DW HDMI PHY: Add support for second PLL
+  drm/sun4i: Add support for second clock parent to DW HDMI PHY clk
+    driver
+  drm/sun4i: Add support for A64 HDMI PHY
+  ARM: dts: sun8i: r40: Add HDMI pipeline
+  ARM: dts: sun8i: r40: Enable HDMI output on BananaPi M2 Ultra
+
+ .../bindings/display/sunxi/sun4i-drm.txt      |  36 ++-
+ .../boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |  50 ++++
+ arch/arm/boot/dts/sun8i-r40.dtsi              | 166 ++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.c          |  58 ++--
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.h          |   8 +-
+ drivers/gpu/drm/sun4i/Makefile                |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c            |  67 +++++
+ drivers/gpu/drm/sun4i/sun4i_tcon.h            |   8 +
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h         |   8 +-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c        |  61 ++++-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c    |  90 ++++--
+ drivers/gpu/drm/sun4i/sun8i_mixer.c           |  30 +-
+ drivers/gpu/drm/sun4i/sun8i_mixer.h           |   2 +
+ drivers/gpu/drm/sun4i/sun8i_tcon_top.c        | 256 ++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_tcon_top.h        |  20 ++
+ include/dt-bindings/clock/sun8i-r40-ccu.h     |   4 +
+ include/dt-bindings/clock/sun8i-tcon-top.h    |  11 +
+ 17 files changed, 813 insertions(+), 65 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.h
+ create mode 100644 include/dt-bindings/clock/sun8i-tcon-top.h
+
 -- 
 2.17.0
