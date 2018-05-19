@@ -1,32 +1,74 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 19 May 2018 18:08:30 +0200
-Subject: [PATCH v3 24/26] drm/bridge: remove the .of_node member
-In-Reply-To: <20180516101510.13215-25-peda@axentia.se>
-References: <20180516101510.13215-1-peda@axentia.se>
- <20180516101510.13215-25-peda@axentia.se>
-Message-ID: <5194502.mIuqRB9jFM@phil>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sat, 19 May 2018 12:52:49 -0400
+Subject: [PATCH] PCI: Do not enable PASID when End-to-End TLP is not supported
+Message-ID: <1526748769-701-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 16. Mai 2018, 12:15:08 CEST schrieb Peter Rosin:
-> It is unused.
-> 
-> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+A PCIe endpoint carries the process address space identifier (PASID) in
+the TLP prefix as part of the memory read/write transaction. The address
+information in the TLP is relevant only for a given PASID context.
 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-> index 557e0079c98d..e77d4c909582 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-> @@ -377,8 +377,6 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
->  	}
->  	if (lvds->panel)
->  		remote = lvds->panel->dev->of_node;
-> -	else if (lvds->bridge->of_node)
-> -		remote = lvds->bridge->of_node;
->  	else
->  		remote = lvds->bridge->odev->of_node;
->  	if (of_property_read_string(dev->of_node, "rockchip,output", &name))
+A translation agent takes PASID value and the address information from the
+TLP to look up the physical address in the system.
 
-for the Rockchip-part
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+If a bridge drops the TLP prefix, the translation agent can resolve the
+address to an incorrect location and cause data corruption. Prevent
+this condition by requiring End-to-End TLP prefix to be supported on the
+entire data path between the endpoint and the root port.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/ats.c             | 16 ++++++++++++++++
+ include/uapi/linux/pci_regs.h |  1 +
+ 2 files changed, 17 insertions(+)
+
+diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
+index 89305b5..0bcded5 100644
+--- a/drivers/pci/ats.c
++++ b/drivers/pci/ats.c
+@@ -265,7 +265,9 @@ EXPORT_SYMBOL_GPL(pci_reset_pri);
+ int pci_enable_pasid(struct pci_dev *pdev, int features)
+ {
+ 	u16 control, supported;
++	struct pci_dev *bridge;
+ 	int pos;
++	u32 cap;
+ 
+ 	if (WARN_ON(pdev->pasid_enabled))
+ 		return -EBUSY;
+@@ -274,6 +276,20 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
+ 	if (!pos)
+ 		return -EINVAL;
+ 
++	bridge = pci_upstream_bridge(pdev);
++	while (bridge) {
++		if (!pci_find_capability(bridge, PCI_CAP_ID_EXP))
++			return -EINVAL;
++
++		if (pcie_capability_read_dword(bridge, PCI_EXP_DEVCAP2, &cap))
++			return -EINVAL;
++
++		if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
++			return -EINVAL;
++
++		bridge = pci_upstream_bridge(bridge);
++	}
++
+ 	pci_read_config_word(pdev, pos + PCI_PASID_CAP, &supported);
+ 	supported &= PCI_PASID_CAP_EXEC | PCI_PASID_CAP_PRIV;
+ 
+diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
+index 103ba79..d91dea5 100644
+--- a/include/uapi/linux/pci_regs.h
++++ b/include/uapi/linux/pci_regs.h
+@@ -634,6 +634,7 @@
+ #define  PCI_EXP_DEVCAP2_OBFF_MASK	0x000c0000 /* OBFF support mechanism */
+ #define  PCI_EXP_DEVCAP2_OBFF_MSG	0x00040000 /* New message signaling */
+ #define  PCI_EXP_DEVCAP2_OBFF_WAKE	0x00080000 /* Re-use WAKE# for OBFF */
++#define PCI_EXP_DEVCAP2_E2ETLP		0x00200000 /* End-to-End TLP Prefix */
+ #define PCI_EXP_DEVCTL2		40	/* Device Control 2 */
+ #define  PCI_EXP_DEVCTL2_COMP_TIMEOUT	0x000f	/* Completion Timeout Value */
+ #define  PCI_EXP_DEVCTL2_COMP_TMOUT_DIS	0x0010	/* Completion Timeout Disable */
+-- 
+2.7.4
