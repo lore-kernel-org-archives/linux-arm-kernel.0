@@ -1,49 +1,51 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 19 May 2018 23:42:49 +0800
-Subject: [arm-platforms:kvm-arm/pmuv3-32bit 2/5]
- include/linux/perf/arm_pmuv3.h:21:10: fatal error: asm/arm_pmuv3.h: No such
- file or directory
-Message-ID: <201805192347.6uL3iApo%fengguang.wu@intel.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 19 May 2018 17:55:47 +0200
+Subject: [GIT PULL] pinctrl: samsung: Stuff for v4.18
+Message-ID: <20180519155547.6678-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm/pmuv3-32bit
-head:   582eb41425e31201afb545db00bb25b39d6e3091
-commit: b5297bf07d662cccffbb922e0d0488df25245b0a [2/5] arm64: perf: Abstract system register accesses away
-config: arm-axm55xx_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout b5297bf07d662cccffbb922e0d0488df25245b0a
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Hi Linus,
 
-Note: the arm-platforms/kvm-arm/pmuv3-32bit HEAD 582eb41425e31201afb545db00bb25b39d6e3091 builds fine.
-      It only hurts bisectibility.
+Few patches for next cycle.
 
-All errors (new ones prefixed by >>):
+Best regards,
+Krzysztof
 
-   In file included from include/kvm/arm_pmu.h:22:0,
-                    from arch/arm/kvm/../../../virt/kvm/arm/arm.c:33:
->> include/linux/perf/arm_pmuv3.h:21:10: fatal error: asm/arm_pmuv3.h: No such file or directory
-    #include <asm/arm_pmuv3.h>
-             ^~~~~~~~~~~~~~~~~
-   compilation terminated.
 
-vim +21 include/linux/perf/arm_pmuv3.h
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-    20	
-  > 21	#include <asm/arm_pmuv3.h>
-    22	
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 19846 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180519/3445cbe2/attachment-0001.gz>
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.18
+
+for you to fetch changes up to 0ca0557e3727951bdc44ea47bc6135b37f90338c:
+
+  pinctrl: samsung: Remove support for Exynos5440 (2018-05-02 19:08:55 +0200)
+
+----------------------------------------------------------------
+Samsung pinctrl drivers changes for v4.18
+
+1. Driver expects specific order of GPIO interrupt banks.  For S5Pv220
+   and Exynos5410 this order was not preserved so fix and document it.
+2. Remove support for Exynos5440 (tree-wide, support is dropped because
+   there are no real users of this platform, it also did not get testing
+   since long time).
+
+----------------------------------------------------------------
+Krzysztof Kozlowski (1):
+      pinctrl: samsung: Remove support for Exynos5440
+
+Pawe? Chmiel (2):
+      pinctrl: samsung: Correct EINTG banks order
+      pinctrl: samsung: Document required order of banks
+
+ drivers/pinctrl/samsung/Kconfig                |   10 +-
+ drivers/pinctrl/samsung/Makefile               |    1 -
+ drivers/pinctrl/samsung/pinctrl-exynos-arm.c   |   30 +-
+ drivers/pinctrl/samsung/pinctrl-exynos-arm64.c |   20 +
+ drivers/pinctrl/samsung/pinctrl-exynos5440.c   | 1005 ------------------------
+ 5 files changed, 50 insertions(+), 1016 deletions(-)
+ delete mode 100644 drivers/pinctrl/samsung/pinctrl-exynos5440.c
