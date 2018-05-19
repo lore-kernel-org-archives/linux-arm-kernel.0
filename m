@@ -1,47 +1,46 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Sat, 19 May 2018 09:08:09 +0200
-Subject: [PATCH v3 2/6] mfd: at91-usart: added mfd driver for usart
-In-Reply-To: <20180518221949.GA13443@rob-hp-laptop>
-References: <20180511103822.31698-1-radu.pirea@microchip.com>
- <20180511103822.31698-3-radu.pirea@microchip.com>
- <20180518221949.GA13443@rob-hp-laptop>
-Message-ID: <20180519070809.GB23730@piout.net>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Sat, 19 May 2018 09:11:15 +0200
+Subject: [PATCH v2 12/26] drm/sun4i: Add support for multiple DW HDMI PHY
+ clock parents
+In-Reply-To: <20180518152651.lfymc3kj7npj5tww@flea>
+References: <20180518094536.17201-1-jagan@amarulasolutions.com>
+ <4909574.Q3IFWM0xt6@jernej-laptop> <20180518152651.lfymc3kj7npj5tww@flea>
+Message-ID: <1589389.XrQdaPTFv2@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/2018 17:19:49-0500, Rob Herring wrote:
-> On Fri, May 11, 2018 at 01:38:18PM +0300, Radu Pirea wrote:
-> > This mfd driver is just a wrapper over atmel_serial driver and
-> > spi-at91-usart driver. Selection of one of the drivers is based on a
-> > property from device tree. If the property is not specified, the default
-> > driver is atmel_serial.
+Hi,
+
+Dne petek, 18. maj 2018 ob 17:26:51 CEST je Maxime Ripard napisal(a):
+> On Fri, May 18, 2018 at 04:46:41PM +0200, Jernej ?krabec wrote:
+> > > And this is a bit sloppy, since if phy_clk_num == 3, you won't try to
+> > > lookup pll-2 either.
 > > 
-> > Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-> > ---
-> >  drivers/mfd/Kconfig                  | 10 ++++
-> >  drivers/mfd/Makefile                 |  1 +
-> >  drivers/mfd/at91-usart.c             | 75 ++++++++++++++++++++++++++++
-> >  include/dt-bindings/mfd/at91-usart.h | 17 +++++++
-> >  4 files changed, 103 insertions(+)
-> >  create mode 100644 drivers/mfd/at91-usart.c
-> >  create mode 100644 include/dt-bindings/mfd/at91-usart.h
-> > 
+> > It is highly unlikely this will be higher than 2, at least for this HDMI
+> > PHY, since it has only 1 bit reserved for parent selection. But since I
+> > have to fix it, I'll add ">= 2"
 > 
-> > +#ifndef __DT_BINDINGS_AT91_USART_H__
-> > +#define __DT_BINDINGS_AT91_USART_H__
-> > +
-> > +#define AT91_USART_MODE_SERIAL	1
-> > +#define AT91_USART_MODE_SPI	2
+> If we're only going to have two parents at most, ever, why don't we
+> had just a single other boolean. This would be less intrusive, and we
+> wouldn't have to check for those corner cases.
+
+It seems that usage of "bool" data type in structures is not wanted anymore 
+according to checkpatch and this: https://lkml.org/lkml/2017/11/21/384
+
+I guess I'll use "unsigned int" as recommended by Linus and named it 
+"has_second_parent" to be unambigous that it's boolean in reality.
+
+Best regards,
+Jernej
+
 > 
-> Won't this require a DT update for serial mode to add the mode property? 
-> That breaks compatibility.
+> > BTW, I'll resend fixed version of this patch for my R40 HDMI series, since
+> > there is nothing to hold it back, unlike for this.
 > 
-
-If the mode property is not present, it defaults to serial to keep
-compatibility.
-
-
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> Awesome, thanks!
+> Maxime
+> 
+> --
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
