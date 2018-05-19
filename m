@@ -1,36 +1,47 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Sat, 19 May 2018 09:37:15 +0300
-Subject: [PATCH] firmware: arm_scmi: remove some unnecessary checks
-Message-ID: <20180519063715.GB4991@mwanda>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Sat, 19 May 2018 09:08:09 +0200
+Subject: [PATCH v3 2/6] mfd: at91-usart: added mfd driver for usart
+In-Reply-To: <20180518221949.GA13443@rob-hp-laptop>
+References: <20180511103822.31698-1-radu.pirea@microchip.com>
+ <20180511103822.31698-3-radu.pirea@microchip.com>
+ <20180518221949.GA13443@rob-hp-laptop>
+Message-ID: <20180519070809.GB23730@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "pi->dom_info" buffer is allocated in init() and it can't be NULL
-here.  These tests are sort of weird as well because if "pi->dom_info"
-was NULL but "domain" was non-zero then it would lead to an Oops.
+On 18/05/2018 17:19:49-0500, Rob Herring wrote:
+> On Fri, May 11, 2018 at 01:38:18PM +0300, Radu Pirea wrote:
+> > This mfd driver is just a wrapper over atmel_serial driver and
+> > spi-at91-usart driver. Selection of one of the drivers is based on a
+> > property from device tree. If the property is not specified, the default
+> > driver is atmel_serial.
+> > 
+> > Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
+> > ---
+> >  drivers/mfd/Kconfig                  | 10 ++++
+> >  drivers/mfd/Makefile                 |  1 +
+> >  drivers/mfd/at91-usart.c             | 75 ++++++++++++++++++++++++++++
+> >  include/dt-bindings/mfd/at91-usart.h | 17 +++++++
+> >  4 files changed, 103 insertions(+)
+> >  create mode 100644 drivers/mfd/at91-usart.c
+> >  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> > 
+> 
+> > +#ifndef __DT_BINDINGS_AT91_USART_H__
+> > +#define __DT_BINDINGS_AT91_USART_H__
+> > +
+> > +#define AT91_USART_MODE_SERIAL	1
+> > +#define AT91_USART_MODE_SPI	2
+> 
+> Won't this require a DT update for serial mode to add the mode property? 
+> That breaks compatibility.
+> 
 
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+If the mode property is not present, it defaults to serial to keep
+compatibility.
 
-diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
-index 2a219b1261b1..721e6c57beae 100644
---- a/drivers/firmware/arm_scmi/perf.c
-+++ b/drivers/firmware/arm_scmi/perf.c
-@@ -363,8 +363,6 @@ static int scmi_dvfs_device_opps_add(const struct scmi_handle *handle,
- 		return domain;
- 
- 	dom = pi->dom_info + domain;
--	if (!dom)
--		return -EIO;
- 
- 	for (opp = dom->opp, idx = 0; idx < dom->opp_count; idx++, opp++) {
- 		freq = opp->perf * dom->mult_factor;
-@@ -394,9 +392,6 @@ static int scmi_dvfs_transition_latency_get(const struct scmi_handle *handle,
- 		return domain;
- 
- 	dom = pi->dom_info + domain;
--	if (!dom)
--		return -EIO;
--
- 	/* uS to nS */
- 	return dom->opp[dom->opp_count - 1].trans_latency_us * 1000;
- }
+
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
