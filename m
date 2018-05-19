@@ -1,248 +1,132 @@
-From: ilialin@codeaurora.org (Ilia Lin)
-Date: Sat, 19 May 2018 14:35:01 +0300
-Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
-In-Reply-To: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
-References: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1526729701-8589-1-git-send-email-ilialin@codeaurora.org>
+From: chunkeey@gmail.com (Christian Lamparter)
+Date: Sat, 19 May 2018 13:38:00 +0200
+Subject: [PATCH v4] pinctrl: msm: fix gpio-hog related boot issues
+In-Reply-To: <152654016566.210890.15719083257170941464@swboyd.mtv.corp.google.com>
+References: <20180412190138.12372-1-chunkeey@gmail.com>
+ <3220588.XpgAMh8mx0@debian64>
+ <152654016566.210890.15719083257170941464@swboyd.mtv.corp.google.com>
+Message-ID: <3016210.dAmjALS4pV@debian64>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO processors,
-the CPU frequency subset and voltage value of each OPP varies
-based on the silicon variant in use. Qualcomm Process Voltage Scaling Tables
-defines the voltage and frequency value based on the msm-id in SMEM
-and speedbin blown in the efuse combination.
-The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
-to provide the OPP framework with required information.
-This is used to determine the voltage and frequency value for each OPP of
-operating-points-v2 table when it is parsed by the OPP framework.
+On Thursday, May 17, 2018 8:56:05 AM CEST Stephen Boyd wrote:
+> Quoting Christian Lamparter (2018-05-16 13:29:48)
+> > On Wednesday, May 16, 2018 5:31:16 PM CEST Stephen Boyd wrote:
+> > > Why can't we register the gpiochip and tell it about the pin ranges in
+> > > one API call instead of adding the chip and then adding the ranges? It
+> > > doesn't look right to have to go and update all the DT nodes to list
+> > > this information that is already known in the driver because the kernel
+> > > implementation can't handle the order of operations correctly.
+> > The problem is that gpiochip_add_pin_range() was not intended for
+> > DT-based pinctrls... but it got used anyway.
+> 
+> Are there more users of this on DT based systems? A quick grep shows a
+> couple more potential failures, like the qcom based SPMI gpio controllers
+> and a mediatek one.
+Yes, it there are a few. In the reply to the original report from Sven I found:
+<https://www.spinics.net/lists/linux-arm-msm/msg34726.html>
+pinctrl-mt7622, pinctrl-mtk-common.c, pinctrl-abx500.c, pinctrl-msm.c,
+pinctrl-as3722.c, pinctrl-at91-pio4.c, pinctrl-axp209.c, pinctrl-coh901.c,
+pinctrl-digicolor.c, pinctrl-pistachio.c, pinctrl-sx150x.c
 
-Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/Kconfig.arm          |  10 +++
- drivers/cpufreq/Makefile             |   1 +
- drivers/cpufreq/cpufreq-dt-platdev.c |   3 +
- drivers/cpufreq/qcom-cpufreq-kryo.c  | 164 +++++++++++++++++++++++++++++++++++
- 4 files changed, 178 insertions(+)
- create mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
+.. And now the new Actions S900 gpio/pinctrl patch as well.
+(<https://lkml.org/lkml/2018/5/19/44>)
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index de55c7d..0bfd40e 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -124,6 +124,16 @@ config ARM_OMAP2PLUS_CPUFREQ
- 	depends on ARCH_OMAP2PLUS
- 	default ARCH_OMAP2PLUS
+> It's almost like we should print a huge WARN_ON() if gpio_chip::of_node
+> is non-NULL and gpochip_add_pin_range() is called. But that probably
+> would be noisy and can't be fixed on older DT blobs. It may also be good
+> to bail out of that function if the node pointer exists and the property
+> is there in the node so that we don't have to go update each driver for
+> the backwards compat mode like was done in this patch. Plus the function
+> should get some sort of comment that calling it is not useful on DT
+> based platforms so this is all documented.
+Agreed. Though, adding a warning now is likely a bit much, since the code
+has to be compatible with existing definitions. But if Linus agrees I think
+it would be fair to call drivers out with something like "the use of this 
+function is deprecated for DT" debug level message.
+
+(As for the documentation update to gpiochip_add_pin_range() and 
+gpiochip_add_pingroup_range(). yeah I'll give it a go.)
  
-+config ARM_QCOM_CPUFREQ_KRYO
-+	bool "Qualcomm Kryo based CPUFreq"
-+	depends on QCOM_QFPROM
-+	depends on QCOM_SMEM
-+	select PM_OPP
-+	help
-+	  This adds the CPUFreq driver for Qualcomm Kryo SoC based boards.
-+
-+	  If in doubt, say N.
-+
- config ARM_S3C_CPUFREQ
- 	bool
- 	help
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 8d24ade..fb4a2ec 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -65,6 +65,7 @@ obj-$(CONFIG_MACH_MVEBU_V7)		+= mvebu-cpufreq.o
- obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
- obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
- obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
-+obj-$(CONFIG_ARM_QCOM_CPUFREQ_KRYO)	+= qcom-cpufreq-kryo.o
- obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
- obj-$(CONFIG_ARM_S3C2412_CPUFREQ)	+= s3c2412-cpufreq.o
- obj-$(CONFIG_ARM_S3C2416_CPUFREQ)	+= s3c2416-cpufreq.o
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 3b585e4..77d6ab8 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -118,6 +118,9 @@
- 
- 	{ .compatible = "nvidia,tegra124", },
- 
-+	{ .compatible = "qcom,apq8096", },
-+	{ .compatible = "qcom,msm8996", },
-+
- 	{ .compatible = "st,stih407", },
- 	{ .compatible = "st,stih410", },
- 
-diff --git a/drivers/cpufreq/qcom-cpufreq-kryo.c b/drivers/cpufreq/qcom-cpufreq-kryo.c
-new file mode 100644
-index 0000000..ae2d1b9
---- /dev/null
-+++ b/drivers/cpufreq/qcom-cpufreq-kryo.c
-@@ -0,0 +1,164 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-+ */
-+
-+/*
-+ * In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO processors,
-+ * the CPU frequency subset and voltage value of each OPP varies
-+ * based on the silicon variant in use. Qualcomm Process Voltage Scaling Tables
-+ * defines the voltage and frequency value based on the msm-id in SMEM
-+ * and speedbin blown in the efuse combination.
-+ * The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
-+ * to provide the OPP framework with required information.
-+ * This is used to determine the voltage and frequency value for each OPP of
-+ * operating-points-v2 table when it is parsed by the OPP framework.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/nvmem-consumer.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/slab.h>
-+#include <linux/soc/qcom/smem.h>
-+
-+#define MSM_ID_SMEM	137
-+#define SILVER_LEAD	0
-+#define GOLD_LEAD	2
-+
-+enum _msm_id {
-+	MSM8996V3 = 0xF6ul,
-+	APQ8096V3 = 0x123ul,
-+	MSM8996SG = 0x131ul,
-+	APQ8096SG = 0x138ul,
-+};
-+
-+enum _msm8996_version {
-+	MSM8996_V3,
-+	MSM8996_SG,
-+	NUM_OF_MSM8996_VERSIONS,
-+};
-+
-+static enum _msm8996_version __init qcom_cpufreq_kryo_get_msm_id(void)
-+{
-+	size_t len;
-+	u32 *msm_id;
-+	enum _msm8996_version version;
-+
-+	msm_id = qcom_smem_get(QCOM_SMEM_HOST_ANY, MSM_ID_SMEM, &len);
-+	/* The first 4 bytes are format, next to them is the actual msm-id */
-+	msm_id++;
-+
-+	switch ((enum _msm_id)*msm_id) {
-+	case MSM8996V3:
-+	case APQ8096V3:
-+		version = MSM8996_V3;
-+		break;
-+	case MSM8996SG:
-+	case APQ8096SG:
-+		version = MSM8996_SG;
-+		break;
-+	default:
-+		version = NUM_OF_MSM8996_VERSIONS;
-+	}
-+
-+	return version;
-+}
-+
-+static int __init qcom_cpufreq_kryo_driver_init(void)
-+{
-+	struct device *cpu_dev_silver, *cpu_dev_gold;
-+	struct opp_table *opp_silver, *opp_gold;
-+	enum _msm8996_version msm8996_version;
-+	struct nvmem_cell *speedbin_nvmem;
-+	struct platform_device *pdev;
-+	struct device_node *np;
-+	u8 *speedbin;
-+	u32 versions;
-+	size_t len;
-+	int ret;
-+
-+	cpu_dev_silver = get_cpu_device(SILVER_LEAD);
-+	if (IS_ERR_OR_NULL(cpu_dev_silver))
-+		return PTR_ERR(cpu_dev_silver);
-+
-+	cpu_dev_gold = get_cpu_device(SILVER_LEAD);
-+	if (IS_ERR_OR_NULL(cpu_dev_gold))
-+		return PTR_ERR(cpu_dev_gold);
-+
-+	msm8996_version = qcom_cpufreq_kryo_get_msm_id();
-+	if (NUM_OF_MSM8996_VERSIONS == msm8996_version) {
-+		dev_err(cpu_dev_silver, "Not Snapdragon 820/821!");
-+		return -ENODEV;
-+	}
-+
-+	np = dev_pm_opp_of_get_opp_desc_node(cpu_dev_silver);
-+	if (IS_ERR_OR_NULL(np))
-+		return PTR_ERR(np);
-+
-+	if (!of_device_is_compatible(np, "operating-points-v2-kryo-cpu")) {
-+		ret = -ENOENT;
-+		goto free_np;
-+	}
-+
-+	speedbin_nvmem = of_nvmem_cell_get(np, NULL);
-+	if (IS_ERR(speedbin_nvmem)) {
-+		ret = PTR_ERR(speedbin_nvmem);
-+		dev_err(cpu_dev_silver, "Could not get nvmem cell: %d\n", ret);
-+		goto free_np;
-+	}
-+
-+	speedbin = nvmem_cell_read(speedbin_nvmem, &len);
-+	nvmem_cell_put(speedbin_nvmem);
-+
-+	switch (msm8996_version) {
-+	case MSM8996_V3:
-+		versions = 1 << (unsigned int)(*speedbin);
-+		break;
-+	case MSM8996_SG:
-+		versions = 1 << ((unsigned int)(*speedbin) + 4);
-+		break;
-+	default:
-+		BUG();
-+		break;
-+	}
-+
-+	opp_silver = dev_pm_opp_set_supported_hw(cpu_dev_silver,&versions,1);
-+	if (IS_ERR(opp_silver)) {
-+		dev_err(cpu_dev_silver, "Failed to set supported hardware\n");
-+		ret = PTR_ERR(opp_silver);
-+		goto free_np;
-+	}
-+
-+	opp_gold = dev_pm_opp_set_supported_hw(cpu_dev_gold,&versions,1);
-+	if (IS_ERR(opp_gold)) {
-+		dev_err(cpu_dev_gold, "Failed to set supported hardware\n");
-+		ret = PTR_ERR(opp_gold);
-+		goto free_opp_silver;
-+	}
-+
-+	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+	if (!IS_ERR_OR_NULL(pdev))
-+		return 0;
-+
-+	ret = PTR_ERR(pdev);
-+	dev_err(cpu_dev_silver, "Failed to register platform device\n");
-+	dev_pm_opp_put_supported_hw(opp_gold);
-+
-+free_opp_silver:
-+	dev_pm_opp_put_supported_hw(opp_silver);
-+
-+free_np:
-+	of_node_put(np);
-+
-+	return ret;
-+}
-+late_initcall(qcom_cpufreq_kryo_driver_init);
-+
-+MODULE_DESCRIPTION("Qualcomm Technologies, Inc. Kryo CPUfreq driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+> > This topic came up in an earlier post:
+> > "Re: pinctrl: qcom: ipq4019: Use of gpio-hog's" [0] (you must have gotten
+> > this mail too, since you are on the Cc.) which links to a ML thread titled
+> > "Re: [GIT PULL] SPEAr pinctrl updates for v-3.5" 
+> 
+> I get quite a bit of email as you can tell.
+Everyone does :D.
+
+> > 
+> > For your convenience: (this post is from 2012-09-03 - so it's 5-6 years
+> > old by now and it looks like it predates even the DT pinctrl-msm driver.
+> > (Not entirely sure?))
+> > <http://thread.gmane.org/gmane.linux.ports.arm.kernel/184943>
+> > |[...]
+> > |But I want two similar function named:
+> > |
+> > |gpiochip_add_pin_range();
+> > |gpiochip_remove_pin_range();
+> > |
+> > |*that can be used for platforms that doesn't support DT.*
+> > |
+> > |For example I'd like to convert over some of my existing
+> > |drivers that do not have DT support to do this thing instead
+> > |of registering ranges from the pin controller...
+> > 
+> > I think you must have come across similar issues with the
+> > "gpio-reserved-ranges" property you recently added. Because
+> > from what I can glimpse from the
+> > "[2/3] dt-bindings: pinctrl: Add a ngpios-ranges property" 
+> > <https://patchwork.kernel.org/patch/10153785/> series.
+> > The gpio-reserved-ranges property would also need to be added
+> > to existing products (msm8996) as well, right?
+> > ("I stuck this inside msm8996, but maybe it can go somewhere more generic?")
+> 
+> The gpio-reserved-ranges only affects some SoCs. It should be added to
+> the bindings on whatever chips are affected by those firmware quirks as
+> optional properties. It would be great if you could add it to the ones
+> that may need it. My guess is that it only matters for the pin
+> controllers that spread out each pin into a big range of I/O memory
+> because otherwise pins aren't locked away from non-secure systems.
+(- see text the end - )
+> > 
+> > > Furthermore, it looks like this becomes a silent requirement to add the
+> > > gpio-ranges property into the DT so that hogs work, but none of the
+> > > bindings have been updated in this patch to indicate that.
+> > The pinctrl-msm.c driver will fallback to using gpiochip_add_pin_range(),
+> > if the gpio-ranges property is not present. So all existing and compiled 
+> > devicetree binaries files will remain compatible.
+> 
+> That's good.
+> > 
+> > As for adding the gpio-ranges to the dt binding text files under
+> > Documentation/devicetree/bindings/pinctrl/: Sure. No problem. I can add
+> > them too :).
+> 
+> Great!
+> 
+> > 
+> > But I do have a question: Should I also include the missing declaration
+> > of the gpio-reserved-ranges properties too? (I can make the patches over
+> > the long weekend. If I hear nothing from anyone, I'll post them on Monday).
+> 
+> Sure. Do you have the list of pinctrl devices that may need the
+> gpio-reserved-ranges property?
+> 
+Oh, let me clarify. My plan is to add the binding documentation text for 
+the (now) semi-required gpio-ranges property. And while I'm patching the
+files in Documentation/devicetree/bindings/pinctrl/qcom-* I can also add
+the new gpio-reserved-ranges as an optional property well. This way it is
+in place for the future. (This is nothing fancy. As both properties are
+part of the gpio.txt already).
+
+As for the dtsi updates, I don't think I can add any sensible
+gpio-reserved-ranges to the individual SoC's dts in 
+arch/arm(64)/boot/dts/qcom-*dtsi without the HW/SoC or the documentation
+which ranges need to be reserved. Because unlike the gpio-ranges values
+(which are easy to extract from the drivers in drivers/pinctrl/qcom/)
+the gpio-reserved-ranges for each SoCs is not yet documented (or I can't
+find it?).
+
+Regards,
+Christian 
