@@ -1,56 +1,122 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 19 May 2018 12:54:41 +0100
-Subject: [PATCH v8 10/15] cpufreq: Add Kryo CPU scaling driver
-In-Reply-To: <018701d3ef61$dfd5e700$9f81b500$@codeaurora.org>
-References: <1526555955-29960-1-git-send-email-ilialin@codeaurora.org>
- <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
- <20180518014538.duphof6enscpm5vp@vireshk-i7>
- <018701d3ef61$dfd5e700$9f81b500$@codeaurora.org>
-Message-ID: <20180519115441.GK17671@n2100.armlinux.org.uk>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Sat, 19 May 2018 14:02:02 +0200
+Subject: [PATCH] ARM: DTS: imx53: Add support for imx53 HSC/DDC boards
+ from K+P
+In-Reply-To: <CAOMZO5AexXNEGVoXa9K_GAm+aFLNRQOXOhF_SdKAjV1qmuD2nA@mail.gmail.com>
+References: <20180509153428.1440-1-lukma@denx.de>
+ <CAOMZO5AexXNEGVoXa9K_GAm+aFLNRQOXOhF_SdKAjV1qmuD2nA@mail.gmail.com>
+Message-ID: <20180519140202.3449e3c1@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2018 at 02:09:24PM +0300, ilialin at codeaurora.org wrote:
-> +static int __init qcom_cpufreq_kryo_driver_init(void)
-> +{
-> +       struct device *cpu_dev_silver, *cpu_dev_gold;
-> +       struct opp_table *opp_silver, *opp_gold;
-> +       enum _msm8996_version msm8996_version;
-> +       struct nvmem_cell *speedbin_nvmem;
-> +       struct platform_device *pdev;
-> +       struct device_node *np;
-> +       u8 *speedbin;
-> +       u32 versions;
-> +       size_t len;
-> +       int ret;
-> +
-> +       cpu_dev_silver = get_cpu_device(SILVER_LEAD);
-> +       if (IS_ERR_OR_NULL(cpu_dev_silver))
-> +               return PTR_ERR(cpu_dev_silver);
-> +
-> +       cpu_dev_gold = get_cpu_device(SILVER_LEAD);
-> +       if (IS_ERR_OR_NULL(cpu_dev_gold))
-> +               return PTR_ERR(cpu_dev_gold);
-> +
-> +       msm8996_version = qcom_cpufreq_kryo_get_msm_id();
-> +       if (NUM_OF_MSM8996_VERSIONS == msm8996_version) {
-> +               dev_err(cpu_dev_silver, "Not Snapdragon 820/821!");
-> +               return -ENODEV;
-> +       }
-> +
-> +       np = dev_pm_opp_of_get_opp_desc_node(cpu_dev_silver);
-> +       if (IS_ERR_OR_NULL(np))
-> +               return PTR_ERR(np);
+Hi Fabio,
 
-This function (qcom_cpufreq_kryo_driver_init) returns zero on success.
-You are checking "np" here for being an error pointer, or NULL.
-What value do you think PTR_ERR() returns in the case of PTR_ERR(NULL)?
+Thanks for your feedback.
 
-IS_ERR_OR_NULL() is considered by some (me included) as being _very_
-harmful because programmers generally fail to look at linux/err.h and
-consider what it means when used as above.
+> Hi Lukasz,
+> 
+> On Wed, May 9, 2018 at 12:34 PM, Lukasz Majewski <lukma@denx.de>
+> wrote:
+> 
+> > +&iomuxc {
+> > +       imx53-kp-ddc {  
+> 
+> No need for keeping this imx53-kp-ddc.
+> 
+> > diff --git a/arch/arm/boot/dts/imx53-kp-hsc.dts
+> > b/arch/arm/boot/dts/imx53-kp-hsc.dts new file mode 100644
+> > index 000000000000..fff358395c9d
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx53-kp-hsc.dts
+> > @@ -0,0 +1,53 @@
+> > +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> > +/*
+> > + * Copyright 2018
+> > + * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "imx53-kp.dtsi"
+> > +
+> > +/ {
+> > +       model = "K+P imx53 HSC";
+> > +       compatible = "kiebackpeter,imx53-hsc", "fsl,imx53";
+> > +  
+> 
+> No need for this blank line.
+> 
+> > +};
+> > +
+> > +&fec {
+> > +       status = "okay";  
+> 
+> We usually put the status in the last line.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+After moving status property to the end:
+
+Error: arch/arm/boot/dts/imx53-kp-hsc.dts:21.2-18 Properties must
+precede subnodes FATAL ERROR: Unable to parse input tree
+
+So I opt for leaving it as it was.
+
+> 
+> > +       gpio_buttons {
+> > +               compatible = "gpio-keys";
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&pinctrl_gpiobuttons>;
+> > +
+> > +               button at 1 {  
+> 
+> You pass @1 without a reg property. This triggers a warning when
+> building with W=1.
+> 
+> You could remove the @1.
+> 
+> Please make sure this patch does not introduce any W=1 dtc warning.
+> 
+> > +&iomuxc {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&pinctrl_kp_common>;
+> > +
+> > +       imx53-kp-common {  
+> 
+> No need for this  imx53-kp-common
+
+After removing imx53-kp-ddc and imx53-kp-common iomux subnodes I do see
+following errors in the dmesg (v4.17-rc5):
+
+imx53-pinctrl 53fa8000.iomuxc: function 'iomuxc' not supported
+imx53-pinctrl 53fa8000.iomuxc: invalid function iomuxc in map table
+
+Above statements are not visible when I use the v1 code of this patch.
+
+> 
+> > +&uart4 {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&pinctrl_uart4>;
+> > +  
+> 
+> No need for this blank line.
+
+
+I will sent fixed version in v2.
+
+
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180519/1f5a7146/attachment.sig>
