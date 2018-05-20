@@ -1,26 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 20 May 2018 12:04:51 -0300
-Subject: [PATCH] MAINTAINERS: Update Layerscape PCIe driver maintainers
- list
-In-Reply-To: <CAOMZO5DfHK=2x6+7T1x4n3A4uK5naWkQ_0dmjVt5JyeMAZPGyQ@mail.gmail.com>
-References: <1522288381-470803-1-git-send-email-Minghuan.Lian@nxp.com>
- <CAOMZO5DfHK=2x6+7T1x4n3A4uK5naWkQ_0dmjVt5JyeMAZPGyQ@mail.gmail.com>
-Message-ID: <CAOMZO5A-b_uiU9ci7Nts1EekOYXw9jAtSLu4uTEDkS8sHFWXAA@mail.gmail.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Sun, 20 May 2018 17:37:44 +0200
+Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
+In-Reply-To: <CAHp75Ved2nw1JKnXT2Jxnw4XLsby1eVJU6cfBjE2sp4LP4Kwmg@mail.gmail.com>
+References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+ <5456625.lDWjtgZygK@z50>
+ <CAHp75Ved2nw1JKnXT2Jxnw4XLsby1eVJU6cfBjE2sp4LP4Kwmg@mail.gmail.com>
+Message-ID: <3505791.x6nWYTo8eb@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Sunday, May 20, 2018 4:44:31 PM CEST Andy Shevchenko wrote:
+> On Sun, May 20, 2018 at 12:55 AM, Janusz Krzysztofik
+> 
+> <jmkrzyszt@gmail.com> wrote:
+> > On Saturday, May 19, 2018 8:00:38 PM CEST Andy Shevchenko wrote:
+> >> On Sat, May 19, 2018 at 2:15 AM, Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> > 
+> > wrote:
+> >> NULL check in practice discards the _optional part of gpiod_get(). So,
+> >> either you use non-optional variant and decide how to handle an
+> >> errors, or user _optional w/o NULL check.
+> > 
+> > OK, I'm going to use something like the below while submitting v2:
+> > 
+> > -       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
+> > -       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
+> > -               this->dev_ready = ams_delta_nand_ready;
+> > -       } else {
+> > -               this->dev_ready = NULL;
+> > -               pr_notice("Couldn't request gpio for Delta NAND
+> > ready.\n");
+> > +       priv->gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy",
+> > +                                                 GPIOD_IN);
+> > +       if (IS_ERR(priv->gpiod_rdy)) {
+> > +               err = PTR_ERR(priv->gpiod_nwp);
+> > +               dev_warn(&pdev->dev, "RDY GPIO request failed (%d)\n",
+> > err); +               goto err_gpiod;
+> > 
+> >         }
+> > 
+> > +       if (priv->gpiod_rdy)
+> > +               this->dev_ready = ams_delta_nand_ready;
+> 
+> This makes sense.
+> 
+> Though, I completely dislike "rdy" name of GPIO. Where is it documented?
 
-On Wed, May 2, 2018 at 2:55 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> [Adding Lorenzo]
->
-> On Wed, Mar 28, 2018 at 10:53 PM, Minghuan Lian <Minghuan.Lian@nxp.com> wrote:
->> Change Layerscape PCIe driver maintainers' email address
->> from freescale to nxp.
->>
->> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
->
-> Yes, freescale.com emails are no longer reachable, so hopefully this
-> one can land into 4.17.
+No documentation files for Amstrad Delta nor for its NAND driver specifically 
+exist under Documentation/. However, there exist some for generic GPIO NAND 
+driver where the pin name "rdy" is used explicitly:
+Documentation/driver-api/gpio/drivers-on-gpio.rst
+Documentation/devicetree/bindings/mtd/gpio-control-nand.txt
+You can find that mnemonic used across drivers/mtd/nand/, standalone or as a 
+suffix, including the Amstrad Delta NAND driver before the change discussed.
 
-A gentle ping on this one.
+To be honest, I don't like it much either, but I'm just using it instead of 
+inventing something new.
+
+Thanks,
+Janusz
