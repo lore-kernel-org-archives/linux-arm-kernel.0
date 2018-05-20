@@ -1,201 +1,34 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 20 May 2018 16:53:02 +0100
-Subject: [PATCH v6 9/9] iio: counter: Remove IIO counter subdirectory
-In-Reply-To: <4c335e0eebfbaf6e86f41e0f2864d76993d90b13.1526487615.git.vilhelm.gray@gmail.com>
-References: <cover.1526487615.git.vilhelm.gray@gmail.com>
- <4c335e0eebfbaf6e86f41e0f2864d76993d90b13.1526487615.git.vilhelm.gray@gmail.com>
-Message-ID: <20180520165302.101d37ce@archlinux>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 20 May 2018 19:17:04 +0300
+Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
+In-Reply-To: <3505791.x6nWYTo8eb@z50>
+References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+ <5456625.lDWjtgZygK@z50>
+ <CAHp75Ved2nw1JKnXT2Jxnw4XLsby1eVJU6cfBjE2sp4LP4Kwmg@mail.gmail.com>
+ <3505791.x6nWYTo8eb@z50>
+Message-ID: <CAHp75Vdp5A58JMTf8vaET84QEzzZ_T7eKLUYfWV9qpWt5ptYCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 May 2018 13:52:39 -0400
-William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
+On Sun, May 20, 2018 at 6:37 PM, Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+> On Sunday, May 20, 2018 4:44:31 PM CEST Andy Shevchenko wrote:
 
-> This patch removes the IIO counter subdirectory which is now superceded
-> by the Counter subsystem. Deprecation warnings are added to the
-> documentation of the relevant IIO counter sysfs attributes.
-> 
-> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+>> Though, I completely dislike "rdy" name of GPIO. Where is it documented?
+>
+> No documentation files for Amstrad Delta nor for its NAND driver specifically
+> exist under Documentation/. However, there exist some for generic GPIO NAND
+> driver where the pin name "rdy" is used explicitly:
+> Documentation/driver-api/gpio/drivers-on-gpio.rst
+> Documentation/devicetree/bindings/mtd/gpio-control-nand.txt
+> You can find that mnemonic used across drivers/mtd/nand/, standalone or as a
+> suffix, including the Amstrad Delta NAND driver before the change discussed.
 
-Please drop the directory when it becomes empty rather than in a later
-patch.  IIRC there are some issues with empty Makefiles that will
-make building inbetween tricky.
+> To be honest, I don't like it much either, but I'm just using it instead of
+> inventing something new.
 
-For the deprecated markings.
+OK, that's what I was looking for. Since it's already in use and
+documented, then it's fine for me.
 
-Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
-
-> ---
->  Documentation/ABI/testing/sysfs-bus-iio          |  8 ++++++++
->  .../ABI/testing/sysfs-bus-iio-counter-104-quad-8 | 16 ++++++++++++++++
->  drivers/iio/Kconfig                              |  1 -
->  drivers/iio/Makefile                             |  1 -
->  drivers/iio/counter/Kconfig                      |  8 --------
->  drivers/iio/counter/Makefile                     |  5 -----
->  6 files changed, 24 insertions(+), 15 deletions(-)
->  delete mode 100644 drivers/iio/counter/Kconfig
->  delete mode 100644 drivers/iio/counter/Makefile
-> 
-> diff --git a/Documentation/ABI/testing/sysfs-bus-iio b/Documentation/ABI/testing/sysfs-bus-iio
-> index 731146c3b138..6115d97b075e 100644
-> --- a/Documentation/ABI/testing/sysfs-bus-iio
-> +++ b/Documentation/ABI/testing/sysfs-bus-iio
-> @@ -1637,6 +1637,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_raw
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Raw counter device counts from channel Y. For quadrature
->  		counters, multiplication by an available [Y]_scale results in
->  		the counts of a single quadrature signal phase from channel Y.
-> @@ -1645,6 +1647,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_indexY_raw
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Raw counter device index value from channel Y. This attribute
->  		provides an absolute positional reference (e.g. a pulse once per
->  		revolution) which may be used to home positional systems as
-> @@ -1654,6 +1658,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_count_count_direction_available
->  KernelVersion:	4.12
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		A list of possible counting directions which are:
->  		- "up"	: counter device is increasing.
->  		- "down": counter device is decreasing.
-> @@ -1662,4 +1668,6 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_count_direction
->  KernelVersion:	4.12
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Raw counter device counters direction for channel Y.
-> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8 b/Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
-> index 7fac2c268d9a..bac3d0d48b7b 100644
-> --- a/Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
-> +++ b/Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
-> @@ -6,6 +6,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_index_synchronous_mode_available
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Discrete set of available values for the respective counter
->  		configuration are listed in this file.
->  
-> @@ -13,6 +15,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_count_mode
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Count mode for channel Y. Four count modes are available:
->  		normal, range limit, non-recycle, and modulo-n. The preset value
->  		for channel Y is used by the count mode where required.
-> @@ -47,6 +51,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_noise_error
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Read-only attribute that indicates whether excessive noise is
->  		present at the channel Y count inputs in quadrature clock mode;
->  		irrelevant in non-quadrature clock mode.
-> @@ -55,6 +61,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_preset
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		If the counter device supports preset registers, the preset
->  		count for channel Y is provided by this attribute.
->  
-> @@ -62,6 +70,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_quadrature_mode
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Configure channel Y counter for non-quadrature or quadrature
->  		clock mode. Selecting non-quadrature clock mode will disable
->  		synchronous load mode. In quadrature clock mode, the channel Y
-> @@ -83,6 +93,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_set_to_preset_on_index
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Whether to set channel Y counter with channel Y preset value
->  		when channel Y index input is active, or continuously count.
->  		Valid attribute values are boolean.
-> @@ -91,6 +103,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_indexY_index_polarity
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Active level of channel Y index input; irrelevant in
->  		non-synchronous load mode.
->  
-> @@ -98,6 +112,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_indexY_synchronous_mode
->  KernelVersion:	4.10
->  Contact:	linux-iio at vger.kernel.org
->  Description:
-> +		This interface is deprecated; please use the Counter subsystem.
-> +
->  		Configure channel Y counter for non-synchronous or synchronous
->  		load mode. Synchronous load mode cannot be selected in
->  		non-quadrature clock mode.
-> diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
-> index d69e85a8bdc3..1152efad91a1 100644
-> --- a/drivers/iio/Kconfig
-> +++ b/drivers/iio/Kconfig
-> @@ -74,7 +74,6 @@ source "drivers/iio/afe/Kconfig"
->  source "drivers/iio/amplifiers/Kconfig"
->  source "drivers/iio/chemical/Kconfig"
->  source "drivers/iio/common/Kconfig"
-> -source "drivers/iio/counter/Kconfig"
->  source "drivers/iio/dac/Kconfig"
->  source "drivers/iio/dummy/Kconfig"
->  source "drivers/iio/frequency/Kconfig"
-> diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
-> index d8cba9c229c0..7bdd31f1b88f 100644
-> --- a/drivers/iio/Makefile
-> +++ b/drivers/iio/Makefile
-> @@ -20,7 +20,6 @@ obj-y += amplifiers/
->  obj-y += buffer/
->  obj-y += chemical/
->  obj-y += common/
-> -obj-y += counter/
->  obj-y += dac/
->  obj-y += dummy/
->  obj-y += gyro/
-> diff --git a/drivers/iio/counter/Kconfig b/drivers/iio/counter/Kconfig
-> deleted file mode 100644
-> index 95a7a0df6cac..000000000000
-> --- a/drivers/iio/counter/Kconfig
-> +++ /dev/null
-> @@ -1,8 +0,0 @@
-> -#
-> -# Counter devices
-> -#
-> -# When adding new entries keep the list in alphabetical order
-> -
-> -menu "Counters"
-> -
-> -endmenu
-> diff --git a/drivers/iio/counter/Makefile b/drivers/iio/counter/Makefile
-> deleted file mode 100644
-> index 8fd3d954775a..000000000000
-> --- a/drivers/iio/counter/Makefile
-> +++ /dev/null
-> @@ -1,5 +0,0 @@
-> -#
-> -# Makefile for IIO counter devices
-> -#
-> -
-> -# When adding new entries keep the list in alphabetical order
+-- 
+With Best Regards,
+Andy Shevchenko
