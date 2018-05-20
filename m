@@ -1,88 +1,43 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Sun, 20 May 2018 09:30:22 +0200
-Subject: [linux-sunxi] [PATCH 10/15] drm/sun4i: Add support for R40 TV
- TCONs
-In-Reply-To: <CAGRGNgXbKGhnern4=_W9W5dKM54H5B1dnAD7up-23rUAMWWCSw@mail.gmail.com>
-References: <20180519183127.2718-1-jernej.skrabec@siol.net>
- <CAGRGNgWumzhiiwJenOXRuRN0i-_2uY=YR5L+9m70HW2ibF=C7w@mail.gmail.com>
- <CAGRGNgXbKGhnern4=_W9W5dKM54H5B1dnAD7up-23rUAMWWCSw@mail.gmail.com>
-Message-ID: <8079031.6V9S5xCcmc@jernej-laptop>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Sun, 20 May 2018 13:15:37 +0300
+Subject: [PATCH v1 0/5] Initial support of Trusted Foundations on Tegra30
+Message-ID: <20180520101542.12206-1-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-Dne nedelja, 20. maj 2018 ob 04:09:52 CEST je Julian Calaby napisal(a):
-> Hi Jernej,
-> 
-> On Sun, May 20, 2018 at 11:57 AM, Julian Calaby <julian.calaby@gmail.com> 
-wrote:
-> > Hi Jernej,
-> > 
-> > On Sun, May 20, 2018 at 4:31 AM, Jernej Skrabec <jernej.skrabec@siol.net> 
-wrote:
-> >> R40 display pipeline has a lot of possible configurations. HDMI can be
-> >> connected to 2 different TCONs (out of 4) and mixers can be connected to
-> >> any TCON. All this must be configured in TCON TOP.
-> >> 
-> >> Along with definition of TCON capabilities also add mux callback, which
-> >> can configure this complex pipeline.
-> >> 
-> >> For now, only TCON TV is supported.
-> >> 
-> >> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> >> ---
-> >> 
-> >>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 39 ++++++++++++++++++++++++++++++
-> >>  1 file changed, 39 insertions(+)
-> >> 
-> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> >> b/drivers/gpu/drm/sun4i/sun4i_tcon.c index e0c562ce1c22..81b9551e4f78
-> >> 100644
-> >> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> >> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> >> @@ -1274,6 +1274,31 @@ static int sun6i_tcon_set_mux(struct sun4i_tcon
-> >> *tcon,>> 
-> >>         return 0;
-> >>  
-> >>  }
-> >> 
-> >> +static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
-> >> +                                    const struct drm_encoder *encoder,
-> >> +                                    int index)
-> >> +{
-> >> +       if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS)
-> >> +               sun8i_tcon_top_set_hdmi_src(tcon->tcon_top, index);
-> >> +
-> >> +       sun8i_tcon_top_de_config(tcon->tcon_top, tcon->id,
-> >> +                                tcon_type_tv, index);
-> >> +
-> >> +       return 0;
-> >> +}
-> >> +
-> >> +static int sun8i_r40_tcon_tv_set_mux_0(struct sun4i_tcon *tcon,
-> >> +                                      const struct drm_encoder *encoder)
-> >> +{
-> >> +       return sun8i_r40_tcon_tv_set_mux(tcon, encoder, 0);
-> >> +}
-> >> +
-> >> +static int sun8i_r40_tcon_tv_set_mux_1(struct sun4i_tcon *tcon,
-> >> +                                      const struct drm_encoder *encoder)
-> >> +{
-> >> +       return sun8i_r40_tcon_tv_set_mux(tcon, encoder, 1);
-> >> +}
-> > 
-> > Are TCON-TOPs going to be a common thing in new SoCs from Allwinner?
-> > If so, maybe we should add an index to the TCON quirks and have a
-> > common TCON-TOP set_mux function.
-> 
-> Actually, that only moves it up a level. Should it be a devicetree property?
-> 
+This series of patches brings initial support of Trusted Foundations to
+Tegra30, that is to the consumer-grade Tegra30 devices which do not allow
+to easily replace the proprietary bootloader. Support is initial because
+this series implements only a proper CPU boot-up (main + secondary cores)
+and a basic L2 cache maintenance that is done using the TF firmware.
+Suspend-resume support is missing yet as I couldn't get it to work
+(CPU hangs on resume from suspend after awhile and seems that is related
+to inappropriately done cache maintenance during of suspend-resume using
+the firmware), it is work-in-progress for now.
 
-TCON-TOP is besides R40 part of two newest Allwinner SoCs, H6 and A63. 
-However, they have only one TV TCON and one LCD TCON, so indexes are not 
-needed for them (always 0). This makes R40 somewhat special. I don't think it 
-makes sense to expand everything just for one SoC.
+This patchset is partially based on the work done by Micha? Miros?aw [0].
 
-Best regards,
-Jernej
+Please review, thanks.
+
+[0] https://www.spinics.net/lists/linux-tegra/msg30368.html
+
+Dmitry Osipenko (5):
+  ARM: trusted_foundations: Implement L2 cache initialization callback
+  ARM: trusted_foundations: Provide information about whether firmware
+    is registered
+  ARM: tegra: Setup L2 cache using Trusted Foundations firmware
+  ARM: tegra: Don't apply CPU erratas in insecure mode
+  ARM: tegra: Always boot CPU in ARM-mode
+
+ arch/arm/firmware/trusted_foundations.c    | 28 ++++++++++++++++++++++
+ arch/arm/include/asm/trusted_foundations.h |  7 ++++++
+ arch/arm/mach-tegra/reset-handler.S        | 28 +++++++++++++++-------
+ arch/arm/mach-tegra/reset.c                |  5 +++-
+ arch/arm/mach-tegra/reset.h                |  4 +++-
+ arch/arm/mach-tegra/tegra.c                | 15 ++++++++++++
+ 6 files changed, 77 insertions(+), 10 deletions(-)
+
+-- 
+2.17.0
