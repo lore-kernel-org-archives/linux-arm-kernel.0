@@ -1,72 +1,88 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Sun, 20 May 2018 07:13:40 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIHY0IDExLzEyXSBtbS9tZW1vcnktZmFpbHVyZTogaW5j?=
- =?gb2312?Q?rease_queued_recovery_work's_priority?=
-In-Reply-To: <20180516162829.14348-12-james.morse@arm.com>
-References: <20180516162829.14348-1-james.morse@arm.com>
- <20180516162829.14348-12-james.morse@arm.com>
-Message-ID: <0184EA26B2509940AA629AE1405DD7F201C714B6@DGGEMA503-MBX.china.huawei.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Sun, 20 May 2018 09:30:22 +0200
+Subject: [linux-sunxi] [PATCH 10/15] drm/sun4i: Add support for R40 TV
+ TCONs
+In-Reply-To: <CAGRGNgXbKGhnern4=_W9W5dKM54H5B1dnAD7up-23rUAMWWCSw@mail.gmail.com>
+References: <20180519183127.2718-1-jernej.skrabec@siol.net>
+ <CAGRGNgWumzhiiwJenOXRuRN0i-_2uY=YR5L+9m70HW2ibF=C7w@mail.gmail.com>
+ <CAGRGNgXbKGhnern4=_W9W5dKM54H5B1dnAD7up-23rUAMWWCSw@mail.gmail.com>
+Message-ID: <8079031.6V9S5xCcmc@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> arm64 can take an NMI-like error notification when user-space steps in some corrupt memory. APEI's GHES code will call
-> memory_failure_queue() to schedule the recovery work. We then return to user-space, possibly taking the fault again.
-> 
-> Currently the arch code unconditionally signals user-space from this path, so we don't get stuck in this loop, but the affected process never
-> benefits from memory_failure()s recovery work. To fix this we need to know the recovery work will run before we get back to user-space.
-> 
-> Increase the priority of the recovery work by scheduling it on the system_highpri_wq, then try to bump the current task off this CPU so that
-> the recover work starts immediately.
-> 
-> Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
-> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: Xie XiuQi <xiexiuqi@huawei.com>
-> CC: gengdongjiu <gengdongjiu@huawei.com>
+Hi,
 
-Tested-by: gengdongjiu <gengdongjiu@huawei.com>
+Dne nedelja, 20. maj 2018 ob 04:09:52 CEST je Julian Calaby napisal(a):
+> Hi Jernej,
+> 
+> On Sun, May 20, 2018 at 11:57 AM, Julian Calaby <julian.calaby@gmail.com> 
+wrote:
+> > Hi Jernej,
+> > 
+> > On Sun, May 20, 2018 at 4:31 AM, Jernej Skrabec <jernej.skrabec@siol.net> 
+wrote:
+> >> R40 display pipeline has a lot of possible configurations. HDMI can be
+> >> connected to 2 different TCONs (out of 4) and mixers can be connected to
+> >> any TCON. All this must be configured in TCON TOP.
+> >> 
+> >> Along with definition of TCON capabilities also add mux callback, which
+> >> can configure this complex pipeline.
+> >> 
+> >> For now, only TCON TV is supported.
+> >> 
+> >> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> >> ---
+> >> 
+> >>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 39 ++++++++++++++++++++++++++++++
+> >>  1 file changed, 39 insertions(+)
+> >> 
+> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> b/drivers/gpu/drm/sun4i/sun4i_tcon.c index e0c562ce1c22..81b9551e4f78
+> >> 100644
+> >> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> >> @@ -1274,6 +1274,31 @@ static int sun6i_tcon_set_mux(struct sun4i_tcon
+> >> *tcon,>> 
+> >>         return 0;
+> >>  
+> >>  }
+> >> 
+> >> +static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
+> >> +                                    const struct drm_encoder *encoder,
+> >> +                                    int index)
+> >> +{
+> >> +       if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS)
+> >> +               sun8i_tcon_top_set_hdmi_src(tcon->tcon_top, index);
+> >> +
+> >> +       sun8i_tcon_top_de_config(tcon->tcon_top, tcon->id,
+> >> +                                tcon_type_tv, index);
+> >> +
+> >> +       return 0;
+> >> +}
+> >> +
+> >> +static int sun8i_r40_tcon_tv_set_mux_0(struct sun4i_tcon *tcon,
+> >> +                                      const struct drm_encoder *encoder)
+> >> +{
+> >> +       return sun8i_r40_tcon_tv_set_mux(tcon, encoder, 0);
+> >> +}
+> >> +
+> >> +static int sun8i_r40_tcon_tv_set_mux_1(struct sun4i_tcon *tcon,
+> >> +                                      const struct drm_encoder *encoder)
+> >> +{
+> >> +       return sun8i_r40_tcon_tv_set_mux(tcon, encoder, 1);
+> >> +}
+> > 
+> > Are TCON-TOPs going to be a common thing in new SoCs from Allwinner?
+> > If so, maybe we should add an index to the TCON quirks and have a
+> > common TCON-TOP set_mux function.
+> 
+> Actually, that only moves it up a level. Should it be a devicetree property?
+> 
 
-> ---
->  mm/memory-failure.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/mm/memory-failure.c b/mm/memory-failure.c index 9d142b9b86dc..f0e69d7ac406 100644
-> --- a/mm/memory-failure.c
-> +++ b/mm/memory-failure.c
-> @@ -55,6 +55,7 @@
->  #include <linux/hugetlb.h>
->  #include <linux/memory_hotplug.h>
->  #include <linux/mm_inline.h>
-> +#include <linux/preempt.h>
->  #include <linux/kfifo.h>
->  #include <linux/ratelimit.h>
->  #include "internal.h"
-> @@ -1333,6 +1334,7 @@ static DEFINE_PER_CPU(struct memory_failure_cpu, memory_failure_cpu);
->   */
->  void memory_failure_queue(unsigned long pfn, int flags)  {
-> +	int cpu = smp_processor_id();
->  	struct memory_failure_cpu *mf_cpu;
->  	unsigned long proc_flags;
->  	struct memory_failure_entry entry = {
-> @@ -1342,11 +1344,14 @@ void memory_failure_queue(unsigned long pfn, int flags)
-> 
->  	mf_cpu = &get_cpu_var(memory_failure_cpu);
->  	spin_lock_irqsave(&mf_cpu->lock, proc_flags);
-> -	if (kfifo_put(&mf_cpu->fifo, entry))
-> -		schedule_work_on(smp_processor_id(), &mf_cpu->work);
-> -	else
-> +	if (kfifo_put(&mf_cpu->fifo, entry)) {
-> +		queue_work_on(cpu, system_highpri_wq, &mf_cpu->work);
-> +		set_tsk_need_resched(current);
-> +		preempt_set_need_resched();
-> +	} else {
->  		pr_err("Memory failure: buffer overflow when queuing memory failure at %#lx\n",
->  		       pfn);
-> +	}
->  	spin_unlock_irqrestore(&mf_cpu->lock, proc_flags);
->  	put_cpu_var(memory_failure_cpu);
->  }
-> --
-> 2.16.2
+TCON-TOP is besides R40 part of two newest Allwinner SoCs, H6 and A63. 
+However, they have only one TV TCON and one LCD TCON, so indexes are not 
+needed for them (always 0). This makes R40 somewhat special. I don't think it 
+makes sense to expand everything just for one SoC.
+
+Best regards,
+Jernej
