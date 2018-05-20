@@ -1,46 +1,43 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 20 May 2018 19:23:52 +0200
-Subject: [PATCH 1/2] ARM: dts: meson: build the Meson8b .dtbs with MACH_MESON8
-In-Reply-To: <20180520172353.19256-1-martin.blumenstingl@googlemail.com>
-References: <20180520172353.19256-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180520172353.19256-2-martin.blumenstingl@googlemail.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Sun, 20 May 2018 19:25:23 +0200
+Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
+In-Reply-To: <CAHp75Vdp5A58JMTf8vaET84QEzzZ_T7eKLUYfWV9qpWt5ptYCA@mail.gmail.com>
+References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+ <5456625.lDWjtgZygK@z50>
+ <CAHp75Ved2nw1JKnXT2Jxnw4XLsby1eVJU6cfBjE2sp4LP4Kwmg@mail.gmail.com>
+ <3505791.x6nWYTo8eb@z50>
+ <CAHp75Vdp5A58JMTf8vaET84QEzzZ_T7eKLUYfWV9qpWt5ptYCA@mail.gmail.com>
+Message-ID: <20180520192523.32dde632@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there are two identical Kconfig options where only differences
-are the Kconfig help text and the list of .dtbs that are built:
-- MACH_MESON8
-- MACH_MESON8B
+Hello,
 
-Build the Meson8b .dtbs when MACH_MESON8 is selected to get rid of the
-latter Kconfig symbol later.
+On Sun, 20 May 2018 19:17:04 +0300, Andy Shevchenko
+<andy.shevchenko@gmail.com> wrote:
 
-Suggested-by: Kevin Hilman <khilman@baylibre.com>
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm/boot/dts/Makefile | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+> >> Though, I completely dislike "rdy" name of GPIO. Where is it documented?  
+> >
+> > No documentation files for Amstrad Delta nor for its NAND driver specifically
+> > exist under Documentation/. However, there exist some for generic GPIO NAND
+> > driver where the pin name "rdy" is used explicitly:
+> > Documentation/driver-api/gpio/drivers-on-gpio.rst
+> > Documentation/devicetree/bindings/mtd/gpio-control-nand.txt
+> > You can find that mnemonic used across drivers/mtd/nand/, standalone or as a
+> > suffix, including the Amstrad Delta NAND driver before the change discussed.  
+> 
+> > To be honest, I don't like it much either, but I'm just using it instead of
+> > inventing something new.  
+> 
+> OK, that's what I was looking for. Since it's already in use and
+> documented, then it's fine for me.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4300e86049ee..b7f0b55e0dc5 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -313,14 +313,13 @@ dtb-$(CONFIG_MACH_MESON6) += \
- 	meson6-atv1200.dtb
- dtb-$(CONFIG_MACH_MESON8) += \
- 	meson8-minix-neo-x8.dtb \
-+	meson8b-mxq.dtb \
-+	meson8b-odroidc1.dtb \
- 	meson8m2-mxiii-plus.dtb
- dtb-$(CONFIG_ARCH_MMP) += \
- 	pxa168-aspenite.dtb \
- 	pxa910-dkb.dtb \
- 	mmp2-brownstone.dtb
--dtb-$(CONFIG_MACH_MESON8B) += \
--	meson8b-mxq.dtb \
--	meson8b-odroidc1.dtb
- dtb-$(CONFIG_ARCH_MPS2) += \
- 	mps2-an385.dtb \
- 	mps2-an399.dtb
--- 
-2.17.0
+Do we actually have the possibility to rename this gpio? I guess no
+since it would break DT backward compatibility. Otherwise it would have
+been more descriptive to call it something like 'gpio-rb'.
+
+Anyway, if you find the time, documentation for this controller would be
+welcome!
+
+Thanks,
+Miqu?l
