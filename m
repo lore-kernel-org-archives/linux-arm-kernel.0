@@ -1,43 +1,57 @@
 From: digetx@gmail.com (Dmitry Osipenko)
-Date: Sun, 20 May 2018 13:15:37 +0300
-Subject: [PATCH v1 0/5] Initial support of Trusted Foundations on Tegra30
-Message-ID: <20180520101542.12206-1-digetx@gmail.com>
+Date: Sun, 20 May 2018 13:15:40 +0300
+Subject: [PATCH v1 3/5] ARM: tegra: Setup L2 cache using Trusted Foundations
+ firmware
+In-Reply-To: <20180520101542.12206-1-digetx@gmail.com>
+References: <20180520101542.12206-1-digetx@gmail.com>
+Message-ID: <20180520101542.12206-4-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tegra20/30 L2 cache must be initialized using firmware call if CPU
+is running in insecure mode. Initialize L2 cache and setup the outer-cache
+callbacks in early boot using the firmware API.
 
-This series of patches brings initial support of Trusted Foundations to
-Tegra30, that is to the consumer-grade Tegra30 devices which do not allow
-to easily replace the proprietary bootloader. Support is initial because
-this series implements only a proper CPU boot-up (main + secondary cores)
-and a basic L2 cache maintenance that is done using the TF firmware.
-Suspend-resume support is missing yet as I couldn't get it to work
-(CPU hangs on resume from suspend after awhile and seems that is related
-to inappropriately done cache maintenance during of suspend-resume using
-the firmware), it is work-in-progress for now.
+Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+---
+ arch/arm/mach-tegra/tegra.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-This patchset is partially based on the work done by Micha? Miros?aw [0].
-
-Please review, thanks.
-
-[0] https://www.spinics.net/lists/linux-tegra/msg30368.html
-
-Dmitry Osipenko (5):
-  ARM: trusted_foundations: Implement L2 cache initialization callback
-  ARM: trusted_foundations: Provide information about whether firmware
-    is registered
-  ARM: tegra: Setup L2 cache using Trusted Foundations firmware
-  ARM: tegra: Don't apply CPU erratas in insecure mode
-  ARM: tegra: Always boot CPU in ARM-mode
-
- arch/arm/firmware/trusted_foundations.c    | 28 ++++++++++++++++++++++
- arch/arm/include/asm/trusted_foundations.h |  7 ++++++
- arch/arm/mach-tegra/reset-handler.S        | 28 +++++++++++++++-------
- arch/arm/mach-tegra/reset.c                |  5 +++-
- arch/arm/mach-tegra/reset.h                |  4 +++-
- arch/arm/mach-tegra/tegra.c                | 15 ++++++++++++
- 6 files changed, 77 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index f9587be48235..590b1cf1a8c4 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -38,6 +38,7 @@
+ #include <soc/tegra/fuse.h>
+ #include <soc/tegra/pmc.h>
+ 
++#include <asm/firmware.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+@@ -70,9 +71,23 @@ u32 tegra_uart_config[3] = {
+ 	0,
+ };
+ 
++static void __init tegra_trusted_foundations_l2x0_cache_init(void)
++{
++	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
++	    IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC) &&
++	    of_machine_is_compatible("nvidia,tegra20"))
++		call_firmware_op(l2x0_init);
++
++	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
++	    IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) &&
++	    of_machine_is_compatible("nvidia,tegra30"))
++		call_firmware_op(l2x0_init);
++}
++
+ static void __init tegra_init_early(void)
+ {
+ 	of_register_trusted_foundations();
++	tegra_trusted_foundations_l2x0_cache_init();
+ 	tegra_cpu_reset_handler_init();
+ }
+ 
 -- 
 2.17.0
