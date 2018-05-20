@@ -1,17 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 20 May 2018 20:59:03 +0800
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: cleanup eMMC node
-In-Reply-To: <20180516065349.11160-1-nikita.yoush@cogentembedded.com>
-References: <20180516065349.11160-1-nikita.yoush@cogentembedded.com>
-Message-ID: <20180520125902.GZ26863@dragon>
+Date: Sun, 20 May 2018 21:01:32 +0800
+Subject: [PATCH] clk: imx6sx: disable unnecessary clocks during clock
+ initialization
+In-Reply-To: <1526533248-21990-1-git-send-email-Anson.Huang@nxp.com>
+References: <1526533248-21990-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180520130130.GA26863@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 16, 2018 at 09:53:49AM +0300, Nikita Yushchenko wrote:
-> On RDU1, sdhc1 is used for eMMC, and that is 3.3V only.
+On Thu, May 17, 2018 at 01:00:47PM +0800, Anson Huang wrote:
+> Disable those unnecessary clocks during kernel boot up to save power,
+> those modules clock should be managed by modules driver in runtime.
 > 
-> Thus configure device node not to probe it as SD/SDIO and not try 1.8V.
-> 
-> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Applied, thanks.
+Acked-by: Shawn Guo <shawnguo@kernel.org>
