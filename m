@@ -1,19 +1,18 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 20 May 2018 20:36:07 +0800
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: limit usbh1 to full-speed
-In-Reply-To: <20180515084502.17148-1-nikita.yoush@cogentembedded.com>
-References: <20180515084502.17148-1-nikita.yoush@cogentembedded.com>
-Message-ID: <20180520123606.GU26863@dragon>
+Date: Sun, 20 May 2018 20:39:55 +0800
+Subject: [PATCH V2] ARM: dts: imx7d: correct cpu supply name for voltage
+ scaling
+In-Reply-To: <1526437548-32372-1-git-send-email-Anson.Huang@nxp.com>
+References: <1526437548-32372-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180520123954.GV26863@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 15, 2018 at 11:45:02AM +0300, Nikita Yushchenko wrote:
-> On RDU1, imx51 usbh1 interface is either not used, or used via external
-> block that breaks USB2 signalling.
+On Wed, May 16, 2018 at 10:25:48AM +0800, Anson Huang wrote:
+> Correct CPU supply name to meet cpufreq-dt driver's
+> requirement for voltage scaling.
 > 
-> To keep things working if high-speed device gets connected to that
-> block, use ChipIdea feature to limit port to full speed.
-> 
-> Signed-off-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 
 Applied, thanks.
