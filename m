@@ -1,77 +1,60 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 20 May 2018 17:44:31 +0300
-Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
-In-Reply-To: <5456625.lDWjtgZygK@z50>
-References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
- <3427199.r4OBoDP6Xz@z50>
- <CAHp75VcUxjubx=zOGyCjmpjCk5RBLPCaHcaOieDie9LdTCa+5g@mail.gmail.com>
- <5456625.lDWjtgZygK@z50>
-Message-ID: <CAHp75Ved2nw1JKnXT2Jxnw4XLsby1eVJU6cfBjE2sp4LP4Kwmg@mail.gmail.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Sun, 20 May 2018 17:53:11 +0300
+Subject: [PATCH v1 1/5] ARM: trusted_foundations: Implement L2 cache
+ initialization callback
+In-Reply-To: <20180520140805.GL17671@n2100.armlinux.org.uk>
+References: <20180520101542.12206-1-digetx@gmail.com>
+ <20180520101542.12206-2-digetx@gmail.com>
+ <20180520140805.GL17671@n2100.armlinux.org.uk>
+Message-ID: <a5b6a37c-68e7-eb8b-fb78-2942fe501f28@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 20, 2018 at 12:55 AM, Janusz Krzysztofik
-<jmkrzyszt@gmail.com> wrote:
-> On Saturday, May 19, 2018 8:00:38 PM CEST Andy Shevchenko wrote:
->> On Sat, May 19, 2018 at 2:15 AM, Janusz Krzysztofik <jmkrzyszt@gmail.com>
-> wrote:
+On 20.05.2018 17:08, Russell King - ARM Linux wrote:
+> On Sun, May 20, 2018 at 01:15:38PM +0300, Dmitry Osipenko wrote:
+>> Implement L2 cache initialization firmware callback that should be invoked
+>> early in boot to enable cache HW.
+>>
+>> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+>> ---
+>>  arch/arm/firmware/trusted_foundations.c | 23 +++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>>
+>> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+>> index 3fb1b5a1dce9..198ce5c75ca0 100644
+>> --- a/arch/arm/firmware/trusted_foundations.c
+>> +++ b/arch/arm/firmware/trusted_foundations.c
+>> @@ -18,8 +18,13 @@
+>>  #include <linux/init.h>
+>>  #include <linux/of.h>
+>>  #include <asm/firmware.h>
+>> +#include <asm/outercache.h>
+>>  #include <asm/trusted_foundations.h>
+>>  
+>> +#define TF_CACHE_MAINT		0xfffff100
+>> +
+>> +#define TF_CACHE_INIT		1
+>> +
+>>  #define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
+>>  
+>>  #define TF_CPU_PM		0xfffffffc
+>> @@ -63,9 +68,27 @@ static int tf_prepare_idle(void)
+>>  	return 0;
+>>  }
+>>  
+>> +#ifdef CONFIG_CACHE_L2X0
+>> +static void tf_cache_write_sec(unsigned long val, unsigned int reg)
+>> +{
+>> +	pr_warn("%s: Ignoring write [0x%x]: 0x%08lx\n", __func__, reg, val);
+> 
+> Why at warning level?  Is this some issue that the user needs to be
+> warned about?
+> 
 
->> NULL check in practice discards the _optional part of gpiod_get(). So,
->> either you use non-optional variant and decide how to handle an
->> errors, or user _optional w/o NULL check.
->
-> OK, I'm going to use something like the below while submitting v2:
->
-> -       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
-> -       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
-> -               this->dev_ready = ams_delta_nand_ready;
-> -       } else {
-> -               this->dev_ready = NULL;
-> -               pr_notice("Couldn't request gpio for Delta NAND ready.\n");
-> +       priv->gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy",
-> +                                                 GPIOD_IN);
-> +       if (IS_ERR(priv->gpiod_rdy)) {
-> +               err = PTR_ERR(priv->gpiod_nwp);
-> +               dev_warn(&pdev->dev, "RDY GPIO request failed (%d)\n", err);
-> +               goto err_gpiod;
->         }
->
-> +       if (priv->gpiod_rdy)
-> +               this->dev_ready = ams_delta_nand_ready;
-
-This makes sense.
-
-Though, I completely dislike "rdy" name of GPIO. Where is it documented?
-
->> >> > +err_gpiod:
->> >> > +       if (err == -ENODEV || err == -ENOENT)
->> >> > +               err = -EPROBE_DEFER;
->> >>
->> >> Hmm...
->> >
->> > Amstrad Delta uses gpio-mmio driver. Unfortunatelty that driver is not
->> > availble before device init phase, unlike other crucial GPIO drivers which
->> > are initialized earlier, e.g. during the postcore or at latetst the
->> > subsys phase. Hence, devices which depend on GPIO pins provided by
->> > gpio-mmio must either be declared late or fail softly so they get another
->> > chance of being probed succesfully.
->> >
->> > I thought of replacing the gpio-mmio platform driver with bgpio functions
->> > it exports but for now I haven't implemented it, not even shared the
->> > idea.
->> >
->> > Does it really hurt to return -EPROBE_DEFER if a GPIO pin can't be
->> > obtained?
->> I'm only concerned if it would be an infinite defer in the case when
->> driver will never appear.
->> But I don't remember the details.
->
-> Deferred probes are handled effectively during late_initcall, no risk of
-> infinite defer, see drivers/base/dd.c for details.
-
-Yes, but the code you provided in patch looks somehow suspicious. OK,
-I let Linus decide whtat to do with that.
-
--- 
-With Best Regards,
-Andy Shevchenko
+If cache-l2x0 code will be changed in the future in a way that it will try to do
+something using the secure-registers, then user should be informed about that
+incident as we are ignoring the accesses to secure-registers and this may lead
+to an undesired consequences. If a such change in cache-l2x0 will happen, then
+we will have to take some action by either fixing the invalid accesses or
+silencing the warning message if will be appropriate. For now I'd prefer to have
+verbosity in the KMSG to masking the potential problems.
