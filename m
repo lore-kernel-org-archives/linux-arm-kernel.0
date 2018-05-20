@@ -1,42 +1,42 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Sun, 20 May 2018 15:24:43 -0700
-Subject: [PATCH v3 1/2] soc: imx: gpcv2: Do not pass static memory as
- platform data
-In-Reply-To: <20180520062631.GS26863@dragon>
-References: <20180410183210.28052-1-andrew.smirnov@gmail.com>
- <CAHQ1cqGCG0rwPcpoY+bnjcyupg18x1TvULJzvAjRxSkL6z1U_Q@mail.gmail.com>
- <20180520062631.GS26863@dragon>
-Message-ID: <CAHQ1cqFwm25EAzzL2peOBw=jsLCE3+C=nwF+AHmfynKhVFwxZg@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 21 May 2018 07:28:36 +0800
+Subject: [PATCH v3 2/3] arm64: dts: renesas: draak: Describe CVBS input
+In-Reply-To: <1526654878-11143-3-git-send-email-jacopo+renesas@jmondi.org>
+References: <1526654878-11143-3-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <201805210704.sltVgyYq%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 19, 2018 at 11:26 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Sat, May 19, 2018 at 03:35:55PM -0700, Andrey Smirnov wrote:
->> On Tue, Apr 10, 2018 at 11:32 AM, Andrey Smirnov
->> <andrew.smirnov@gmail.com> wrote:
->> > Platform device core assumes the ownership of dev.platform_data as
->> > well as that it is dynamically allocated and it will try to kfree it
->> > as a part of platform_device_release(). Change the code to use
->> > platform_device_add_data() n instead of a pointer to a static memory
->> > to avoid causing a BUG() when calling platform_device_put().
->> >
->> > The problem can be reproduced by artificially enabling the error path
->> > of platform_device_add() call (around line 357).
->> >
->> > Note that this change also allows us to constify imx7_pgc_domains,
->> > since we no longer need to be able to modify it.
->> >
->>
->> Shawn,
->>
->> What's the status of these two patches? Do I need to change anything
->> or are they good to go?
->
-> The patches were queued on imx/drivers branch for a while.  I forgot to
-> let you know.  Sorry.
->
+Hi Jacopo,
 
-No worries and good to know!
+I love your patch! Yet something to improve:
 
-Thanks,
-Andrey Smirnov
+[auto build test ERROR on linuxtv-media/master]
+[cannot apply to renesas/next v4.17-rc6]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Jacopo-Mondi/arm64-dts-Draak-Enable-video-inputs-and-VIN4/20180521-052159
+base:   git://linuxtv.org/media_tree.git master
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm64/boot/dts/renesas/r8a77995-draak.dts:272.1-6 Label or path vin4 not found
+>> FATAL ERROR: Syntax error parsing input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 37440 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180521/60417e5b/attachment-0001.gz>
