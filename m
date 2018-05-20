@@ -1,40 +1,48 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Mon, 21 May 2018 01:17:03 +0800
-Subject: [PATCH 0/2] Add support for a YUV 10bits pixel format
-Message-ID: <20180520171705.29690-1-ayaka@soulik.info>
+Date: Mon, 21 May 2018 01:17:04 +0800
+Subject: [PATCH 1/2] drm/fourcc: add a 10bits fully packed variant of NV12
+In-Reply-To: <20180520171705.29690-1-ayaka@soulik.info>
+References: <20180520171705.29690-1-ayaka@soulik.info>
+Message-ID: <20180520171705.29690-2-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This pixel format is current used in the rockchip platform. I think any model
-higher than rk322x would support this pixel format. Xilinx may support
-it but I am not sure.
+This pixel format is a fully packed and 10bits variant of NV12.
+A luma pixel would take 10bits in memory, without any
+filled bits between pixels in a stride. The color gamut
+follows the BT.2020 standard.
 
-More than a year ago, I post the patch Add pixel formats for 10/16 bits
-YUV video to the mail list, it has been update to version 8, but they
-are not merged yet. So I decide to submit these independent patches,
-I hope that they would be reviewed and merged in a short time.
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
+ drivers/gpu/drm/drm_fourcc.c  | 1 +
+ include/uapi/drm/drm_fourcc.h | 3 +++
+ 2 files changed, 4 insertions(+)
 
-I have added a patch to Gstreamer and it is merged now.
-Any future information can be found on the bugzilla of the Gstreamer:
-https://bugzilla.gnome.org/show_bug.cgi?id=795462
-
-I have verified this patch on the rk3288, with the following command:
-gst-launch-1.0  filesrc location=conv_3840_2160.nv12_10le40 ! \
- rawvideoparse format=81 width=3840 height=2160 ! imagefreeze ! kmssink
-
-Also you can find video sample video on above page, but you may need to
-set the plane offset and stride when you are using the other files.
-
-Randy Li (2):
-  drm/fourcc: add a 10bits fully packed variant of NV12
-  drm/rockchip: Support 10 bits yuv format in vop
-
- drivers/gpu/drm/drm_fourcc.c                |  1 +
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 27 +++++++++++++++++++++++++--
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  1 +
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c |  2 ++
- include/uapi/drm/drm_fourcc.h               |  3 +++
- 5 files changed, 32 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/gpu/drm/drm_fourcc.c b/drivers/gpu/drm/drm_fourcc.c
+index 5ca6395cd4d3..1f43967c4013 100644
+--- a/drivers/gpu/drm/drm_fourcc.c
++++ b/drivers/gpu/drm/drm_fourcc.c
+@@ -173,6 +173,7 @@ const struct drm_format_info *__drm_format_info(u32 format)
+ 		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
+ 		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
+ 		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
++		{ .format = DRM_FORMAT_NV12_10LE40,	.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2 },
+ 	};
+ 
+ 	unsigned int i;
+diff --git a/include/uapi/drm/drm_fourcc.h b/include/uapi/drm/drm_fourcc.h
+index e04613d30a13..8eabf01e966f 100644
+--- a/include/uapi/drm/drm_fourcc.h
++++ b/include/uapi/drm/drm_fourcc.h
+@@ -140,6 +140,9 @@ extern "C" {
+ #define DRM_FORMAT_NV61		fourcc_code('N', 'V', '6', '1') /* 2x1 subsampled Cb:Cr plane */
+ #define DRM_FORMAT_NV24		fourcc_code('N', 'V', '2', '4') /* non-subsampled Cr:Cb plane */
+ #define DRM_FORMAT_NV42		fourcc_code('N', 'V', '4', '2') /* non-subsampled Cb:Cr plane */
++/* A fully packed variant of NV12_10LE32 */
++#define DRM_FORMAT_NV12_10LE40	fourcc_code('R', 'K', '2', '0') /* 2x2 subsampled Cr:Cb plane */
++
+ 
+ /*
+  * 3 plane YCbCr
 -- 
 2.14.3
