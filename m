@@ -1,18 +1,25 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 20 May 2018 21:02:04 +0800
-Subject: [PATCH] clk: imx6sl: correct ocram_podf clock type
-In-Reply-To: <1526533248-21990-2-git-send-email-Anson.Huang@nxp.com>
-References: <1526533248-21990-1-git-send-email-Anson.Huang@nxp.com>
- <1526533248-21990-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180520130203.GB26863@dragon>
+Date: Sun, 20 May 2018 21:05:30 +0800
+Subject: [PATCH v2 3/3] ARM: dts: imx28/imx53: enable edt-ft5x06 wakeup
+ source
+In-Reply-To: <20180517090552.5704-4-daniel@zonque.org>
+References: <20180517090552.5704-1-daniel@zonque.org>
+ <20180517090552.5704-4-daniel@zonque.org>
+Message-ID: <20180520130528.GC26863@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 17, 2018 at 01:00:48PM +0800, Anson Huang wrote:
-> IMX6SL_CLK_OCRAM_PODF is a busy divider, its name in
-> CCM_CDHIPR register of Reference Manual CCM chapter
-> is axi_podf_busy, correct its clock type.
+On Thu, May 17, 2018 at 11:05:52AM +0200, Daniel Mack wrote:
+> The touchscreen driver no longer configures the device as wakeup source by
+> default. A "wakeup-source" property is needed.
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> To avoid regressions, this patch changes the DTS files for the only two
+> users of this driver that didn't have this property yet.
+> 
+> Signed-off-by: Daniel Mack <daniel@zonque.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Applied this one, thanks.
