@@ -1,46 +1,53 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 20 May 2018 11:38:39 +0900
-Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates for v4.18
-Message-ID: <CAK7LNASUq_9osPdzbiMCbYzeqc=W3Yv7tB63V+5gXqcZ9QBtYA@mail.gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Sun, 20 May 2018 10:47:31 +0530
+Subject: [PATCH v2 0/5] Add gpio support for Action Semi S900 SoC
+Message-ID: <20180520051736.4842-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+This patchset adds gpio support for Actions Semi S900 SoC by extending
+the pinctrl driver. There were previous patches submitted for adding a
+standalone gpio driver based on gpiolib. But later on it has been realised
+that the gpio functionality is closely tied with pinctrl subsystem for this
+OWL family processors. So, having a separate gpio driver will make it hard
+to add further functionalities in future. Hence, we decided to drop the
+previous patches below adding a standalone gpio support:
 
-Here are UniPhier DT (64bit) updates for the v4.18 merge window.
-Please pull!
+dt-bindings: gpio: Add gpio nodes for Actions S900 SoC
+arm64: dts: actions: Add S900 gpio nodes
+arm64: dts: actions: Add gpio line names to Bubblegum-96 board
+gpio: Add gpio driver for Actions OWL S900 SoC
+MAINTAINERS: Add Actions Semi S900 pinctrl and gpio entries
 
+This patchset consits of incremental patches which will apply with the
+previous pinctrl series: Add Actions Semi S900 pinctrl and gpio support,
+excluding the dropped patches mentioned above.
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+Thanks,
+Mani
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+Changes in v2:
 
-are available in the git repository at:
+* Removed gpiochip_add_pin_range() function and added gpio-ranges property
+  in DT.
+* Added Reviewed-by tag from Andy.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt64-v4.18
+Manivannan Sadhasivam (5):
+  dt-bindings: pinctrl: Add gpio bindings for Actions S900 SoC
+  arm64: dts: actions: Add gpio properties to pinctrl node for S900
+  arm64: dts: actions: Add gpio line names to Bubblegum-96 board
+  pinctrl: actions: Add gpio support for Actions S900 SoC
+  MAINTAINERS: Add Actions Semi S900 pinctrl entries
 
-for you to fetch changes up to b076ff8bddfba793d49bca14feb49a0e84f41843:
-
-  arm64: dts: uniphier: add syscon-phy-mode property to each ethernet
-node (2018-04-25 00:21:14 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM64 SoC DT updates for v4.18
-
-- add more properties to ethernet nodes
-
-----------------------------------------------------------------
-Kunihiko Hayashi (2):
-      arm64: dts: uniphier: add clock-names and reset-names to ethernet node
-      arm64: dts: uniphier: add syscon-phy-mode property to each ethernet node
-
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 5 ++++-
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 3 +++
- arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 8 +++++++-
- 3 files changed, 14 insertions(+), 2 deletions(-)
-
+ .../bindings/pinctrl/actions,s900-pinctrl.txt      |  16 ++
+ MAINTAINERS                                        |   2 +
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts  | 175 ++++++++++++++++++
+ arch/arm64/boot/dts/actions/s900.dtsi              |   3 +
+ drivers/pinctrl/actions/Kconfig                    |   1 +
+ drivers/pinctrl/actions/pinctrl-owl.c              | 198 +++++++++++++++++++++
+ drivers/pinctrl/actions/pinctrl-owl.h              |  20 +++
+ drivers/pinctrl/actions/pinctrl-s900.c             |  29 ++-
+ 8 files changed, 443 insertions(+), 1 deletion(-)
 
 -- 
-Best Regards
-Masahiro Yamada
+2.14.1
