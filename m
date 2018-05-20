@@ -1,47 +1,63 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Sun, 20 May 2018 13:15:42 +0300
-Subject: [PATCH v1 5/5] ARM: tegra: Always boot CPU in ARM-mode
-In-Reply-To: <20180520101542.12206-1-digetx@gmail.com>
-References: <20180520101542.12206-1-digetx@gmail.com>
-Message-ID: <20180520101542.12206-6-digetx@gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 20 May 2018 11:26:58 +0100
+Subject: [PATCH] iio: adc: stm32-dfsdm: include stm32-dfsdm-adc.h
+In-Reply-To: <1526397557-31389-1-git-send-email-fabrice.gasnier@st.com>
+References: <1526397557-31389-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180520112658.1c84968b@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU always jumps into the reset handler in ARM-mode from the Trusted
-Foundations firmware, hence make CPU to always jump into kernel in
-ARM-mode regardless of the firmware presence to support Thumb2 kernel + TF
-case.
+On Tue, 15 May 2018 17:19:17 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
----
- arch/arm/mach-tegra/reset-handler.S | 1 +
- arch/arm/mach-tegra/reset.c         | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+> Fix the following sparse warnings:
+>   CHECK   drivers/iio/adc/stm32-dfsdm-adc.c
+> symbol 'stm32_dfsdm_get_buff_cb' was not declared. Should it be static?
+> symbol 'stm32_dfsdm_release_buff_cb' was not declared. Should it be static?
+> 
+> BTW, move interrupt.h to sort headers alphabetically.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Applied to the togreg branch of iio.git and pushed out as testing for
+the autobuilders to play with it.
 
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index d84c74a95806..7e15c3bdf118 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -115,6 +115,7 @@ ENTRY(__tegra_cpu_reset_handler_start)
-  *       must be position-independent.
-  */
- 
-+	.arm
- 	.align L1_CACHE_SHIFT
- ENTRY(__tegra_cpu_reset_handler)
- 
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index b02ae7699842..3f1ef4561298 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -97,7 +97,7 @@ void __init tegra_cpu_reset_handler_init(void)
- 	__tegra_cpu_reset_handler_data[TEGRA_RESET_MASK_PRESENT] =
- 		*((u32 *)cpu_possible_mask);
- 	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_SECONDARY] =
--		__pa_symbol((void *)secondary_startup);
-+		__pa_symbol((void *)secondary_startup_arm);
- #endif
- 
- #ifdef CONFIG_PM_SLEEP
--- 
-2.17.0
+Thanks,
+
+Jonathan
+
+> ---
+>  drivers/iio/adc/stm32-dfsdm-adc.c       | 4 ++--
+>  include/linux/iio/adc/stm32-dfsdm-adc.h | 2 ++
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-dfsdm-adc.c
+> index 1b78bec..31462ae 100644
+> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
+> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+> @@ -8,11 +8,11 @@
+>  
+>  #include <linux/dmaengine.h>
+>  #include <linux/dma-mapping.h>
+> -#include <linux/interrupt.h>
+> +#include <linux/iio/adc/stm32-dfsdm-adc.h>
+>  #include <linux/iio/buffer.h>
+>  #include <linux/iio/hw-consumer.h>
+> -#include <linux/iio/iio.h>
+>  #include <linux/iio/sysfs.h>
+> +#include <linux/interrupt.h>
+>  #include <linux/module.h>
+>  #include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+> diff --git a/include/linux/iio/adc/stm32-dfsdm-adc.h b/include/linux/iio/adc/stm32-dfsdm-adc.h
+> index e7dc7a5..0da298b 100644
+> --- a/include/linux/iio/adc/stm32-dfsdm-adc.h
+> +++ b/include/linux/iio/adc/stm32-dfsdm-adc.h
+> @@ -9,6 +9,8 @@
+>  #ifndef STM32_DFSDM_ADC_H
+>  #define STM32_DFSDM_ADC_H
+>  
+> +#include <linux/iio/iio.h>
+> +
+>  int stm32_dfsdm_get_buff_cb(struct iio_dev *iio_dev,
+>  			    int (*cb)(const void *data, size_t size,
+>  				      void *private),
