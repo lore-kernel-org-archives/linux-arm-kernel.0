@@ -1,44 +1,26 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 20 May 2018 22:58:01 +0800
-Subject: [GIT PULL 5/5] i.MX defconfig updates for 4.18
-In-Reply-To: <1526828281-14664-1-git-send-email-shawnguo@kernel.org>
-References: <1526828281-14664-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1526828281-14664-5-git-send-email-shawnguo@kernel.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 20 May 2018 12:04:51 -0300
+Subject: [PATCH] MAINTAINERS: Update Layerscape PCIe driver maintainers
+ list
+In-Reply-To: <CAOMZO5DfHK=2x6+7T1x4n3A4uK5naWkQ_0dmjVt5JyeMAZPGyQ@mail.gmail.com>
+References: <1522288381-470803-1-git-send-email-Minghuan.Lian@nxp.com>
+ <CAOMZO5DfHK=2x6+7T1x4n3A4uK5naWkQ_0dmjVt5JyeMAZPGyQ@mail.gmail.com>
+Message-ID: <CAOMZO5A-b_uiU9ci7Nts1EekOYXw9jAtSLu4uTEDkS8sHFWXAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+Hi Lorenzo,
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+On Wed, May 2, 2018 at 2:55 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> [Adding Lorenzo]
+>
+> On Wed, Mar 28, 2018 at 10:53 PM, Minghuan Lian <Minghuan.Lian@nxp.com> wrote:
+>> Change Layerscape PCIe driver maintainers' email address
+>> from freescale to nxp.
+>>
+>> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+>
+> Yes, freescale.com emails are no longer reachable, so hopefully this
+> one can land into 4.17.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.18
-
-for you to fetch changes up to 1049167999fc9a078c5914db9f341a275c2376cb:
-
-  ARM: imx_v6_v7_defconfig: Select CONFIG_GPIO_MAX732X by default (2018-05-04 17:03:20 +0800)
-
-----------------------------------------------------------------
-i.MX defconfig update for 4.18:
- - Enable i.MX6SLL SoC support.
- - Build in GPIO_MAX732X support as the GPIO expanders are used on
-   i.MX6 SabreAuto boards.
- - Enable driver for RN5T618 PMIC and Marvell MWIFIEX support which
-   are found on i.MX6/7 Colibri boards.
- - Build in OCOTP NVMEM driver for Vybrid (vf610) SoCs.
-
-----------------------------------------------------------------
-Anson Huang (1):
-      ARM: imx_v6_v7_defconfig: Select CONFIG_GPIO_MAX732X by default
-
-Bai Ping (1):
-      ARM: imx_v6_v7_defconfig: enable imx6sll by default
-
-Stefan Agner (3):
-      ARM: imx_v6_v7_defconfig: add RN5T618 PMIC family support
-      ARM: imx_v6_v7_defconfig: add mwifiex driver
-      ARM: imx_v6_v7_defconfig: enable Vybrid OCOTP driver
-
- arch/arm/configs/imx_v6_v7_defconfig | 9 +++++++++
- 1 file changed, 9 insertions(+)
+A gentle ping on this one.
