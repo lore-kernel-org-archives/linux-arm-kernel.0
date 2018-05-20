@@ -1,66 +1,66 @@
 From: digetx@gmail.com (Dmitry Osipenko)
-Date: Sun, 20 May 2018 13:15:39 +0300
-Subject: [PATCH v1 2/5] ARM: trusted_foundations: Provide information about
- whether firmware is registered
+Date: Sun, 20 May 2018 13:15:38 +0300
+Subject: [PATCH v1 1/5] ARM: trusted_foundations: Implement L2 cache
+ initialization callback
 In-Reply-To: <20180520101542.12206-1-digetx@gmail.com>
 References: <20180520101542.12206-1-digetx@gmail.com>
-Message-ID: <20180520101542.12206-3-digetx@gmail.com>
+Message-ID: <20180520101542.12206-2-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper that provides information about whether Trusted Foundations
-firmware operations have been registered.
+Implement L2 cache initialization firmware callback that should be invoked
+early in boot to enable cache HW.
 
 Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
 ---
- arch/arm/firmware/trusted_foundations.c    | 5 +++++
- arch/arm/include/asm/trusted_foundations.h | 7 +++++++
- 2 files changed, 12 insertions(+)
+ arch/arm/firmware/trusted_foundations.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
 diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
-index 198ce5c75ca0..0428351574de 100644
+index 3fb1b5a1dce9..198ce5c75ca0 100644
 --- a/arch/arm/firmware/trusted_foundations.c
 +++ b/arch/arm/firmware/trusted_foundations.c
-@@ -120,3 +120,8 @@ void of_register_trusted_foundations(void)
- 		panic("Trusted Foundation: missing version-minor property\n");
- 	register_trusted_foundations(&pdata);
- }
-+
-+bool trusted_foundations_registered(void)
-+{
-+	return firmware_ops == &trusted_foundations_ops;
-+}
-diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
-index 00748350cf72..bfd0d780824b 100644
---- a/arch/arm/include/asm/trusted_foundations.h
-+++ b/arch/arm/include/asm/trusted_foundations.h
-@@ -31,6 +31,7 @@
+@@ -18,8 +18,13 @@
+ #include <linux/init.h>
  #include <linux/of.h>
- #include <linux/cpu.h>
- #include <linux/smp.h>
-+#include <linux/types.h>
+ #include <asm/firmware.h>
++#include <asm/outercache.h>
+ #include <asm/trusted_foundations.h>
  
- struct trusted_foundations_platform_data {
- 	unsigned int version_major;
-@@ -41,6 +42,7 @@ struct trusted_foundations_platform_data {
- 
- void register_trusted_foundations(struct trusted_foundations_platform_data *pd);
- void of_register_trusted_foundations(void);
-+bool trusted_foundations_registered(void);
- 
- #else /* CONFIG_TRUSTED_FOUNDATIONS */
- 
-@@ -68,6 +70,11 @@ static inline void of_register_trusted_foundations(void)
- 	if (of_find_compatible_node(NULL, NULL, "tlm,trusted-foundations"))
- 		register_trusted_foundations(NULL);
- }
++#define TF_CACHE_MAINT		0xfffff100
 +
-+static inline bool trusted_foundations_registered(void)
-+{
-+	return false;
-+}
- #endif /* CONFIG_TRUSTED_FOUNDATIONS */
++#define TF_CACHE_INIT		1
++
+ #define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
  
- #endif
+ #define TF_CPU_PM		0xfffffffc
+@@ -63,9 +68,27 @@ static int tf_prepare_idle(void)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_CACHE_L2X0
++static void tf_cache_write_sec(unsigned long val, unsigned int reg)
++{
++	pr_warn("%s: Ignoring write [0x%x]: 0x%08lx\n", __func__, reg, val);
++}
++
++static int tf_init_cache(void)
++{
++	outer_cache.write_sec = tf_cache_write_sec;
++	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_INIT, 0);
++
++	return 0;
++}
++#endif /* CONFIG_CACHE_L2X0 */
++
+ static const struct firmware_ops trusted_foundations_ops = {
+ 	.set_cpu_boot_addr = tf_set_cpu_boot_addr,
+ 	.prepare_idle = tf_prepare_idle,
++#ifdef CONFIG_CACHE_L2X0
++	.l2x0_init = tf_init_cache,
++#endif
+ };
+ 
+ void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
 -- 
 2.17.0
