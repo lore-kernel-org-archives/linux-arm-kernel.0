@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 21 May 2018 16:47:51 +0100
-Subject: Applied "ASoC: qdsp6: q6asm: Add q6asm driver" to the asoc tree
-In-Reply-To: <20180518125610.26200-7-srinivas.kandagatla@linaro.org>
-Message-ID: <E1fKn2N-0007Bw-Tl@debutante>
+Date: Mon, 21 May 2018 16:49:33 +0100
+Subject: Applied "ASoC: qdsp6: qdafe: Add SLIMBus port Support" to the asoc
+ tree
+In-Reply-To: <20180518125610.26200-3-srinivas.kandagatla@linaro.org>
+Message-ID: <E1fKn41-0007Qf-VB@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: qdsp6: q6asm: Add q6asm driver
+   ASoC: qdsp6: qdafe: Add SLIMBus port Support
 
 has been applied to the asoc tree at
 
@@ -33,341 +34,235 @@ to this mail.
 Thanks,
 Mark
 
->From a13e872314ae97d3ec8c70de6a01d5904182b049 Mon Sep 17 00:00:00 2001
+>From 4d430d5a0e9d4d065e0447366caf48d5f580d7fb Mon Sep 17 00:00:00 2001
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Fri, 18 May 2018 13:56:01 +0100
-Subject: [PATCH] ASoC: qdsp6: q6asm: Add q6asm driver
+Date: Fri, 18 May 2018 13:55:57 +0100
+Subject: [PATCH] ASoC: qdsp6: qdafe: Add SLIMBus port Support
 
-This patch adds basic support to Q6 ASM (Audio Stream Manager) module on
-Q6DSP. ASM supports up to 8 concurrent streams. each stream can be setup
-as playback/capture. ASM provides top control functions like
-Pause/flush/resume for playback and record. ASM can Create/destroy encoder,
-decoder and also provides POPP dynamic services.
-
-This patch adds support to basic features to allow hdmi playback.
+This patch adds support to 6 SLIMBus AFE ports, which are used as
+backend dais.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 Reviewed-by: Banajit Goswami <bgoswami@codeaurora.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/qcom/Kconfig        |   4 +
- sound/soc/qcom/qdsp6/Makefile |   1 +
- sound/soc/qcom/qdsp6/q6asm.c  | 252 ++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6asm.h  |  15 ++
- 4 files changed, 272 insertions(+)
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.c
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.h
+ sound/soc/qcom/qdsp6/q6afe.c | 129 +++++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6afe.h |  14 ++++
+ 2 files changed, 143 insertions(+)
 
-diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 971127edbc23..941774abd94f 100644
---- a/sound/soc/qcom/Kconfig
-+++ b/sound/soc/qcom/Kconfig
-@@ -53,6 +53,9 @@ config SND_SOC_QDSP6_AFE
- config SND_SOC_QDSP6_ADM
- 	tristate
+diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
+index 5e0032c13aab..735c0b5eb55a 100644
+--- a/sound/soc/qcom/qdsp6/q6afe.c
++++ b/sound/soc/qcom/qdsp6/q6afe.c
+@@ -28,9 +28,45 @@
+ #define AFE_PARAM_ID_HDMI_CONFIG	0x00010210
+ #define AFE_MODULE_AUDIO_DEV_INTERFACE	0x0001020C
  
-+config SND_SOC_QDSP6_ASM
-+	tristate
++#define AFE_PARAM_ID_CDC_SLIMBUS_SLAVE_CFG 0x00010235
 +
- config SND_SOC_QDSP6
- 	tristate "SoC ALSA audio driver for QDSP6"
- 	depends on QCOM_APR && HAS_DMA
-@@ -60,6 +63,7 @@ config SND_SOC_QDSP6
- 	select SND_SOC_QDSP6_CORE
- 	select SND_SOC_QDSP6_AFE
- 	select SND_SOC_QDSP6_ADM
-+	select SND_SOC_QDSP6_ASM
- 	help
- 	 To add support for MSM QDSP6 Soc Audio.
- 	 This will enable sound soc platform specific
-diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-index 95cdb3a12694..01d9dcf3375c 100644
---- a/sound/soc/qcom/qdsp6/Makefile
-+++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -2,3 +2,4 @@ obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
- obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
- obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
- obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
-+obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
-diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
-new file mode 100644
-index 000000000000..585fcfbada6a
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6asm.c
-@@ -0,0 +1,252 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
-+// Copyright (c) 2018, Linaro Limited
++#define AFE_PARAM_ID_SLIMBUS_CONFIG    0x00010212
 +
-+#include <linux/mutex.h>
-+#include <linux/wait.h>
-+#include <linux/module.h>
-+#include <linux/soc/qcom/apr.h>
-+#include <linux/device.h>
-+#include <linux/of_platform.h>
-+#include <linux/spinlock.h>
-+#include <linux/kref.h>
-+#include <linux/of.h>
-+#include <linux/delay.h>
-+#include <linux/slab.h>
-+#include <linux/mm.h>
-+#include "q6asm.h"
-+#include "q6core.h"
-+#include "q6dsp-errno.h"
-+#include "q6dsp-common.h"
+ /* Port IDs */
+ #define AFE_API_VERSION_HDMI_CONFIG	0x1
+ #define AFE_PORT_ID_MULTICHAN_HDMI_RX	0x100E
 +
-+#define ASM_SYNC_IO_MODE		0x0001
-+#define ASM_ASYNC_IO_MODE		0x0002
-+#define ASM_TUN_READ_IO_MODE		0x0004	/* tunnel read write mode */
-+#define ASM_TUN_WRITE_IO_MODE		0x0008	/* tunnel read write mode */
++#define AFE_API_VERSION_SLIMBUS_CONFIG 0x1
 +
-+struct q6asm {
-+	struct apr_device *adev;
-+	struct device *dev;
-+	struct q6core_svc_api_info ainfo;
-+	wait_queue_head_t mem_wait;
-+	struct platform_device *pcmdev;
-+	spinlock_t slock;
-+	struct audio_client *session[MAX_SESSIONS + 1];
-+	struct platform_device *pdev_dais;
-+};
++/* SLIMbus Rx port on channel 0. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX      0x4000
++/* SLIMbus Tx port on channel 0. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_TX      0x4001
++/* SLIMbus Rx port on channel 1. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX      0x4002
++/* SLIMbus Tx port on channel 1. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_TX      0x4003
++/* SLIMbus Rx port on channel 2. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX      0x4004
++/* SLIMbus Tx port on channel 2. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_TX      0x4005
++/* SLIMbus Rx port on channel 3. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_RX      0x4006
++/* SLIMbus Tx port on channel 3. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_TX      0x4007
++/* SLIMbus Rx port on channel 4. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_RX      0x4008
++/* SLIMbus Tx port on channel 4. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_TX      0x4009
++/* SLIMbus Rx port on channel 5. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX      0x400a
++/* SLIMbus Tx port on channel 5. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_TX      0x400b
++/* SLIMbus Rx port on channel 6. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX      0x400c
++/* SLIMbus Tx port on channel 6. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_TX      0x400d
 +
-+struct audio_client {
-+	int session;
-+	q6asm_cb cb;
-+	void *priv;
-+	uint32_t io_mode;
-+	struct apr_device *adev;
-+	struct mutex cmd_lock;
-+	spinlock_t lock;
-+	struct kref refcount;
-+	wait_queue_head_t cmd_wait;
-+	struct aprv2_ibasic_rsp_result_t result;
-+	int perf_mode;
-+	int stream_id;
-+	struct q6asm *q6asm;
-+	struct device *dev;
-+};
-+
-+static void q6asm_audio_client_release(struct kref *ref)
-+{
-+	struct audio_client *ac;
-+	struct q6asm *a;
-+	unsigned long flags;
-+
-+	ac = container_of(ref, struct audio_client, refcount);
-+	a = ac->q6asm;
-+
-+	spin_lock_irqsave(&a->slock, flags);
-+	a->session[ac->session] = NULL;
-+	spin_unlock_irqrestore(&a->slock, flags);
-+
-+	kfree(ac);
-+}
-+
-+/**
-+ * q6asm_audio_client_free() - Freee allocated audio client
-+ *
-+ * @ac: audio client to free
+ #define TIMEOUT_MS 1000
+ #define AFE_CMD_RESP_AVAIL	0
+ #define AFE_CMD_RESP_NONE	1
+@@ -80,8 +116,53 @@ struct afe_param_id_hdmi_multi_chan_audio_cfg {
+ 	u16 reserved;
+ } __packed;
+ 
++struct afe_param_id_slimbus_cfg {
++	u32                  sb_cfg_minor_version;
++/* Minor version used for tracking the version of the SLIMBUS
++ * configuration interface.
++ * Supported values: #AFE_API_VERSION_SLIMBUS_CONFIG
 + */
-+void q6asm_audio_client_free(struct audio_client *ac)
-+{
-+	kref_put(&ac->refcount, q6asm_audio_client_release);
-+}
-+EXPORT_SYMBOL_GPL(q6asm_audio_client_free);
 +
-+static struct audio_client *q6asm_get_audio_client(struct q6asm *a,
-+						   int session_id)
-+{
-+	struct audio_client *ac = NULL;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&a->slock, flags);
-+	if ((session_id <= 0) || (session_id > MAX_SESSIONS)) {
-+		dev_err(a->dev, "invalid session: %d\n", session_id);
-+		goto err;
-+	}
-+
-+	/* check for valid session */
-+	if (!a->session[session_id])
-+		goto err;
-+	else if (a->session[session_id]->session != session_id)
-+		goto err;
-+
-+	ac = a->session[session_id];
-+	kref_get(&ac->refcount);
-+err:
-+	spin_unlock_irqrestore(&a->slock, flags);
-+	return ac;
-+}
-+
-+static int q6asm_srvc_callback(struct apr_device *adev,
-+			       struct apr_resp_pkt *data)
-+{
-+	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
-+	struct audio_client *ac = NULL;
-+	struct apr_hdr *hdr = &data->hdr;
-+	uint32_t sid = 0;
-+
-+	sid = (hdr->token >> 8) & 0x0F;
-+	ac = q6asm_get_audio_client(q6asm, sid);
-+	if (!ac) {
-+		dev_err(&adev->dev, "Audio Client not active\n");
-+		return 0;
-+	}
-+
-+	if (ac->cb)
-+		ac->cb(hdr->opcode, hdr->token, data->payload, ac->priv);
-+
-+	kref_put(&ac->refcount, q6asm_audio_client_release);
-+
-+	return 0;
-+}
-+
-+/**
-+ * q6asm_get_session_id() - get session id for audio client
-+ *
-+ * @c: audio client pointer
-+ *
-+ * Return: Will be an session id of the audio client.
++	u16                  slimbus_dev_id;
++/* SLIMbus hardware device ID, which is required to handle
++ * multiple SLIMbus hardware blocks.
++ * Supported values: - #AFE_SLIMBUS_DEVICE_1 - #AFE_SLIMBUS_DEVICE_2
 + */
-+int q6asm_get_session_id(struct audio_client *c)
-+{
-+	return c->session;
-+}
-+EXPORT_SYMBOL_GPL(q6asm_get_session_id);
-+
-+/**
-+ * q6asm_audio_client_alloc() - Allocate a new audio client
-+ *
-+ * @dev: Pointer to asm child device.
-+ * @cb: event callback.
-+ * @priv: private data associated with this client.
-+ * @stream_id: stream id
-+ * @perf_mode: performace mode for this client
-+ *
-+ * Return: Will be an error pointer on error or a valid audio client
-+ * on success.
++	u16                  bit_width;
++/* Bit width of the sample.
++ * Supported values: 16, 24
 + */
-+struct audio_client *q6asm_audio_client_alloc(struct device *dev, q6asm_cb cb,
-+					      void *priv, int stream_id,
-+					      int perf_mode)
++	u16                  data_format;
++/* Data format supported by the SLIMbus hardware. The default is
++ * 0 (#AFE_SB_DATA_FORMAT_NOT_INDICATED), which indicates the
++ * hardware does not perform any format conversions before the data
++ * transfer.
++ */
++	u16                  num_channels;
++/* Number of channels.
++ * Supported values: 1 to #AFE_PORT_MAX_AUDIO_CHAN_CNT
++ */
++	u8  shared_ch_mapping[AFE_PORT_MAX_AUDIO_CHAN_CNT];
++/* Mapping of shared channel IDs (128 to 255) to which the
++ * master port is to be connected.
++ * Shared_channel_mapping[i] represents the shared channel assigned
++ * for audio channel i in multichannel audio data.
++ */
++	u32              sample_rate;
++/* Sampling rate of the port.
++ * Supported values:
++ * - #AFE_PORT_SAMPLE_RATE_8K
++ * - #AFE_PORT_SAMPLE_RATE_16K
++ * - #AFE_PORT_SAMPLE_RATE_48K
++ * - #AFE_PORT_SAMPLE_RATE_96K
++ * - #AFE_PORT_SAMPLE_RATE_192K
++ */
++} __packed;
++
++
+ union afe_port_config {
+ 	struct afe_param_id_hdmi_multi_chan_audio_cfg hdmi_multi_ch;
++	struct afe_param_id_slimbus_cfg           slim_cfg;
+ } __packed;
+ 
+ struct q6afe_port {
+@@ -111,6 +192,20 @@ struct afe_port_map {
+ 
+ static struct afe_port_map port_maps[AFE_PORT_MAX] = {
+ 	[HDMI_RX] = { AFE_PORT_ID_MULTICHAN_HDMI_RX, HDMI_RX, 1, 1},
++	[SLIMBUS_0_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX,
++				SLIMBUS_0_RX, 1, 1},
++	[SLIMBUS_1_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX,
++				SLIMBUS_1_RX, 1, 1},
++	[SLIMBUS_2_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX,
++				SLIMBUS_2_RX, 1, 1},
++	[SLIMBUS_3_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_RX,
++				SLIMBUS_3_RX, 1, 1},
++	[SLIMBUS_4_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_RX,
++				SLIMBUS_4_RX, 1, 1},
++	[SLIMBUS_5_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX,
++				SLIMBUS_5_RX, 1, 1},
++	[SLIMBUS_6_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX,
++				SLIMBUS_6_RX, 1, 1},
+ };
+ 
+ static void q6afe_port_free(struct kref *ref)
+@@ -340,6 +435,31 @@ int q6afe_port_stop(struct q6afe_port *port)
+ }
+ EXPORT_SYMBOL_GPL(q6afe_port_stop);
+ 
++/**
++ * q6afe_slim_port_prepare() - Prepare slim afe port.
++ *
++ * @port: Instance of afe port
++ * @cfg: SLIM configuration for the afe port
++ *
++ */
++void q6afe_slim_port_prepare(struct q6afe_port *port,
++			     struct q6afe_slim_cfg *cfg)
 +{
-+	struct q6asm *a = dev_get_drvdata(dev->parent);
-+	struct audio_client *ac;
-+	unsigned long flags;
++	union afe_port_config *pcfg = &port->port_cfg;
 +
-+	ac = q6asm_get_audio_client(a, stream_id + 1);
-+	if (ac) {
-+		dev_err(dev, "Audio Client already active\n");
-+		return ac;
-+	}
++	pcfg->slim_cfg.sb_cfg_minor_version = AFE_API_VERSION_SLIMBUS_CONFIG;
++	pcfg->slim_cfg.sample_rate = cfg->sample_rate;
++	pcfg->slim_cfg.bit_width = cfg->bit_width;
++	pcfg->slim_cfg.num_channels = cfg->num_channels;
++	pcfg->slim_cfg.data_format = cfg->data_format;
++	pcfg->slim_cfg.shared_ch_mapping[0] = cfg->ch_mapping[0];
++	pcfg->slim_cfg.shared_ch_mapping[1] = cfg->ch_mapping[1];
++	pcfg->slim_cfg.shared_ch_mapping[2] = cfg->ch_mapping[2];
++	pcfg->slim_cfg.shared_ch_mapping[3] = cfg->ch_mapping[3];
 +
-+	ac = kzalloc(sizeof(*ac), GFP_KERNEL);
-+	if (!ac)
-+		return ERR_PTR(-ENOMEM);
-+
-+	spin_lock_irqsave(&a->slock, flags);
-+	a->session[stream_id + 1] = ac;
-+	spin_unlock_irqrestore(&a->slock, flags);
-+	ac->session = stream_id + 1;
-+	ac->cb = cb;
-+	ac->dev = dev;
-+	ac->q6asm = a;
-+	ac->priv = priv;
-+	ac->io_mode = ASM_SYNC_IO_MODE;
-+	ac->perf_mode = perf_mode;
-+	/* DSP expects stream id from 1 */
-+	ac->stream_id = 1;
-+	ac->adev = a->adev;
-+	kref_init(&ac->refcount);
-+
-+	init_waitqueue_head(&ac->cmd_wait);
-+	mutex_init(&ac->cmd_lock);
-+	spin_lock_init(&ac->lock);
-+
-+	return ac;
 +}
-+EXPORT_SYMBOL_GPL(q6asm_audio_client_alloc);
++EXPORT_SYMBOL_GPL(q6afe_slim_port_prepare);
 +
+ /**
+  * q6afe_hdmi_port_prepare() - Prepare hdmi afe port.
+  *
+@@ -451,6 +571,15 @@ struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
+ 	case AFE_PORT_ID_MULTICHAN_HDMI_RX:
+ 		cfg_type = AFE_PARAM_ID_HDMI_CONFIG;
+ 		break;
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX:
++		cfg_type = AFE_PARAM_ID_SLIMBUS_CONFIG;
++		break;
+ 	default:
+ 		dev_err(dev, "Invalid port id 0x%x\n", port_id);
+ 		return ERR_PTR(-EINVAL);
+diff --git a/sound/soc/qcom/qdsp6/q6afe.h b/sound/soc/qcom/qdsp6/q6afe.h
+index 3bd991a7c42d..5659966c6b1e 100644
+--- a/sound/soc/qcom/qdsp6/q6afe.h
++++ b/sound/soc/qcom/qdsp6/q6afe.h
+@@ -11,6 +11,9 @@
+ #define MSM_AFE_PORT_TYPE_TX 1
+ #define AFE_MAX_PORTS AFE_PORT_MAX
+ 
++#define AFE_MAX_CHAN_COUNT	8
++#define AFE_PORT_MAX_AUDIO_CHAN_CNT	0x8
 +
-+static int q6asm_probe(struct apr_device *adev)
-+{
-+	struct device *dev = &adev->dev;
-+	struct device_node *dais_np;
-+	struct q6asm *q6asm;
-+
-+	q6asm = devm_kzalloc(dev, sizeof(*q6asm), GFP_KERNEL);
-+	if (!q6asm)
-+		return -ENOMEM;
-+
-+	q6core_get_svc_api_info(adev->svc_id, &q6asm->ainfo);
-+
-+	q6asm->dev = dev;
-+	q6asm->adev = adev;
-+	init_waitqueue_head(&q6asm->mem_wait);
-+	spin_lock_init(&q6asm->slock);
-+	dev_set_drvdata(dev, q6asm);
-+
-+	dais_np = of_get_child_by_name(dev->of_node, "dais");
-+	if (dais_np) {
-+		q6asm->pdev_dais = of_platform_device_create(dais_np,
-+							   "q6asm-dai", dev);
-+		of_node_put(dais_np);
-+	}
-+
-+	return 0;
-+}
-+
-+static int q6asm_remove(struct apr_device *adev)
-+{
-+	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
-+
-+	if (q6asm->pdev_dais)
-+		of_platform_device_destroy(&q6asm->pdev_dais->dev, NULL);
-+
-+	return 0;
-+}
-+static const struct of_device_id q6asm_device_id[]  = {
-+	{ .compatible = "qcom,q6asm" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, q6asm_device_id);
-+
-+static struct apr_driver qcom_q6asm_driver = {
-+	.probe = q6asm_probe,
-+	.remove = q6asm_remove,
-+	.callback = q6asm_srvc_callback,
-+	.driver = {
-+		.name = "qcom-q6asm",
-+		.of_match_table = of_match_ptr(q6asm_device_id),
-+	},
+ struct q6afe_hdmi_cfg {
+ 	u16                  datatype;
+ 	u16                  channel_allocation;
+@@ -18,8 +21,17 @@ struct q6afe_hdmi_cfg {
+ 	u16                  bit_width;
+ };
+ 
++struct q6afe_slim_cfg {
++	u32	sample_rate;
++	u16	bit_width;
++	u16	data_format;
++	u16	num_channels;
++	u8	ch_mapping[AFE_MAX_CHAN_COUNT];
 +};
 +
-+module_apr_driver(qcom_q6asm_driver);
-+MODULE_DESCRIPTION("Q6 Audio Stream Manager driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/sound/soc/qcom/qdsp6/q6asm.h b/sound/soc/qcom/qdsp6/q6asm.h
-new file mode 100644
-index 000000000000..b7816e6384e7
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6asm.h
-@@ -0,0 +1,15 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __Q6_ASM_H__
-+#define __Q6_ASM_H__
-+
-+#define MAX_SESSIONS	8
-+
-+typedef void (*q6asm_cb) (uint32_t opcode, uint32_t token,
-+			  void *payload, void *priv);
-+struct audio_client;
-+struct audio_client *q6asm_audio_client_alloc(struct device *dev,
-+					      q6asm_cb cb, void *priv,
-+					      int session_id, int perf_mode);
-+void q6asm_audio_client_free(struct audio_client *ac);
-+int q6asm_get_session_id(struct audio_client *ac);
-+#endif /* __Q6_ASM_H__ */
+ struct q6afe_port_config {
+ 	struct q6afe_hdmi_cfg hdmi;
++	struct q6afe_slim_cfg slim;
+ };
+ 
+ struct q6afe_port;
+@@ -31,5 +43,7 @@ void q6afe_port_put(struct q6afe_port *port);
+ int q6afe_get_port_id(int index);
+ void q6afe_hdmi_port_prepare(struct q6afe_port *port,
+ 			    struct q6afe_hdmi_cfg *cfg);
++void q6afe_slim_port_prepare(struct q6afe_port *port,
++			  struct q6afe_slim_cfg *cfg);
+ 
+ #endif /* __Q6AFE_H__ */
 -- 
 2.17.0
