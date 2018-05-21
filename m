@@ -1,29 +1,29 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 21 May 2018 22:44:40 +0200
-Subject: [PATCH] EDAC, ghes: Make platform-based whitelisting x86-only
-In-Reply-To: <4ee5f5c3-749d-59de-e753-70bd7fd9411e@codeaurora.org>
-References: <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
- <20180514164720.GH23049@pd.tnic>
- <da776696-ddbf-c35e-1dd4-b6e0ce91aed6@arm.com>
- <20180516182958.GB17092@pd.tnic>
- <8602b133-e0fa-57e2-5159-9d34a1ded85f@arm.com>
- <20180518111132.GC17285@pd.tnic> <20180518112028.GD17285@pd.tnic>
- <b1d606dc-527c-6a7d-ce80-a11ac852a5f9@codeaurora.org>
- <20180521171522.GA14289@pd.tnic>
- <4ee5f5c3-749d-59de-e753-70bd7fd9411e@codeaurora.org>
-Message-ID: <20180521204439.GC14289@pd.tnic>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Mon, 21 May 2018 22:49:05 +0200
+Subject: [PATCH v2] rtc: st-lpc: add range
+Message-ID: <20180521204905.7113-1-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 04:34:11PM -0400, Tyler Baicar wrote:
-> Agreed. Sounds good to me.
+The RTC has a 64 bit counter.
 
-Meaning you're sending me a patch soon or ...?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+---
+ drivers/rtc/rtc-st-lpc.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-:-D
-
+diff --git a/drivers/rtc/rtc-st-lpc.c b/drivers/rtc/rtc-st-lpc.c
+index 2f1ef2c28740..bee75ca7ff79 100644
+--- a/drivers/rtc/rtc-st-lpc.c
++++ b/drivers/rtc/rtc-st-lpc.c
+@@ -258,6 +258,8 @@ static int st_rtc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, rtc);
+ 
+ 	rtc->rtc_dev->ops = &st_rtc_ops;
++	rtc->rtc_dev->range_max = U64_MAX;
++	do_div(rtc->rtc_dev->range_max, rtc->clkrate);
+ 
+ 	ret = rtc_register_device(rtc->rtc_dev);
+ 	if (ret) {
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+2.17.0
