@@ -1,213 +1,101 @@
 From: chunkeey@gmail.com (Christian Lamparter)
-Date: Mon, 21 May 2018 22:57:38 +0200
-Subject: [PATCH v5 3/4] ARM: dts: qcom: add gpio-ranges property
+Date: Mon, 21 May 2018 22:57:37 +0200
+Subject: [PATCH v5 2/4] pinctrl: msm: fix gpio-hog related boot issues
 In-Reply-To: <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
 References: <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
-Message-ID: <0ae3376606a89bcdf3fe753a5c967f7103699e09.1526935804.git.chunkeey@gmail.com>
+Message-ID: <270904bcbf03a6b6ac3150f4a7daa15aa7e97586.1526935804.git.chunkeey@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the gpio-ranges property to almost all of
-the Qualcomm ARM platforms that utilize the pinctrl-msm
-framework.
+Sven Eckelmann reported an issue with the current IPQ4019 pinctrl.
+Setting up any gpio-hog in the device-tree for his device would
+"kill the bootup completely":
 
-The gpio-ranges property is part of the gpiolib subsystem.
-As a result, the binding text is available in section
-"2.1 gpio- and pin-controller interaction" of
-Documentation/devicetree/bindings/gpio/gpio.txt
+| [    0.477838] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
+| [    0.499828] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferring probe
+| [    1.298883] requesting hog GPIO enable USB2 power (chip 1000000.pinctrl, offset 58) failed, -517
+| [    1.299609] gpiochip_add_data: GPIOs 0..99 (1000000.pinctrl) failed to register
+| [    1.308589] ipq4019-pinctrl 1000000.pinctrl: Failed register gpiochip
+| [    1.316586] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
+| [    1.322415] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferri
 
-For more information please see the patch titled:
-"pinctrl: msm: fix gpio-hog related boot issues" from
-this series.
+This was also verified on a RT-AC58U (IPQ4018) which would
+no longer boot, if a gpio-hog was specified. (Tried forcing
+the USB LED PIN (GPIO0) to high.).
+
+The problem is that Pinctrl+GPIO registration is currently
+peformed in the following order in pinctrl-msm.c:
+	1. pinctrl_register()
+	2. gpiochip_add()
+	3. gpiochip_add_pin_range()
+
+The actual error code -517 == -EPROBE_DEFER is coming from
+pinctrl_get_device_gpio_range(), which is called through:
+        gpiochip_add
+            of_gpiochip_add
+                of_gpiochip_scan_gpios
+                    gpiod_hog
+                        gpiochip_request_own_desc
+                            __gpiod_request
+                                chip->request
+                                    gpiochip_generic_request
+                                       pinctrl_gpio_request
+                                          pinctrl_get_device_gpio_range
+
+pinctrl_get_device_gpio_range() is unable to find any valid
+pin ranges, since nothing has been added to the pinctrldev_list yet.
+so the range can't be found, and the operation fails with -EPROBE_DEFER.
+
+This patch fixes the issue by adding the "gpio-ranges" property to
+the pinctrl device node of all upstream Qcom SoC. The pin ranges are
+then added by the gpio core.
+
+In order to remain compatible with older, existing DTs (and ACPI)
+a check for the "gpio-ranges" property has been added to
+msm_gpio_init(). This prevents the driver of adding the same entry
+to the pinctrldev_list twice.
 
 Reported-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
 Tested-by: Sven Eckelmann <sven.eckelmann@openmesh.com> [ipq4019]
 Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
-
 ---
-To help with git bisect, the DT update patch has been intentionally
-placed after the "pinctrl: msm: fix gpio-hog related boot issues".
-Otherwise - if the order was reveresed - and bisect decides to split
-between these two patches, the gpiochip_add_pin_ranges() function
-will be executed twice with the same parameters for the same pinctrl.
----
- arch/arm/boot/dts/qcom-apq8064.dtsi   | 1 +
- arch/arm/boot/dts/qcom-apq8084.dtsi   | 1 +
- arch/arm/boot/dts/qcom-ipq4019.dtsi   | 1 +
- arch/arm/boot/dts/qcom-ipq8064.dtsi   | 1 +
- arch/arm/boot/dts/qcom-mdm9615.dtsi   | 1 +
- arch/arm/boot/dts/qcom-msm8660.dtsi   | 1 +
- arch/arm/boot/dts/qcom-msm8960.dtsi   | 1 +
- arch/arm/boot/dts/qcom-msm8974.dtsi   | 1 +
- arch/arm64/boot/dts/qcom/ipq8074.dtsi | 3 ++-
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
- arch/arm64/boot/dts/qcom/msm8992.dtsi | 1 +
- arch/arm64/boot/dts/qcom/msm8994.dtsi | 1 +
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 1 +
- 13 files changed, 14 insertions(+), 1 deletion(-)
+ drivers/pinctrl/qcom/pinctrl-msm.c | 23 ++++++++++++++++++-----
+ 1 file changed, 18 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 5341a39c0392..4001eeb52f20 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -344,6 +344,7 @@
- 			reg = <0x800000 0x4000>;
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+index ad80a17c9990..ace2bfbf1bee 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -890,11 +890,24 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+ 		return ret;
+ 	}
  
- 			gpio-controller;
-+			gpio-ranges = <&tlmm_pinmux 0 0 90>;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 0e1e98707e3f..d9481d083802 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -396,6 +396,7 @@
- 			compatible = "qcom,apq8084-pinctrl";
- 			reg = <0xfd510000 0x4000>;
- 			gpio-controller;
-+			gpio-ranges = <&tlmm 0 0 147>;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-index 10d112a4078e..9a81d2da87a0 100644
---- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -146,6 +146,7 @@
- 			compatible = "qcom,ipq4019-pinctrl";
- 			reg = <0x01000000 0x300000>;
- 			gpio-controller;
-+			gpio-ranges = <&tlmm 0 0 100>;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-index 1e0a3b446f7a..26eab9a68d90 100644
---- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-@@ -108,6 +108,7 @@
- 			reg = <0x800000 0x4000>;
+-	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
+-	if (ret) {
+-		dev_err(pctrl->dev, "Failed to add pin range\n");
+-		gpiochip_remove(&pctrl->chip);
+-		return ret;
++	/*
++	 * For DeviceTree-supported systems, the gpio core checks the
++	 * pinctrl's device node for the "gpio-ranges" property.
++	 * If it is present, it takes care of adding the pin ranges
++	 * for the driver. In this case the driver can skip ahead.
++	 *
++	 * In order to remain compatible with older, existing DeviceTree
++	 * files which don't set the "gpio-ranges" property or systems that
++	 * utilize ACPI the driver has to call gpiochip_add_pin_range().
++	 */
++	if (!of_property_read_bool(pctrl->dev->of_node, "gpio-ranges")) {
++		ret = gpiochip_add_pin_range(&pctrl->chip,
++			dev_name(pctrl->dev), 0, 0, chip->ngpio);
++		if (ret) {
++			dev_err(pctrl->dev, "Failed to add pin range\n");
++			gpiochip_remove(&pctrl->chip);
++			return ret;
++		}
+ 	}
  
- 			gpio-controller;
-+			gpio-ranges = <&qcom_pinmux 0 0 69>;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-diff --git a/arch/arm/boot/dts/qcom-mdm9615.dtsi b/arch/arm/boot/dts/qcom-mdm9615.dtsi
-index c852b69229c9..cfdaca5f259a 100644
---- a/arch/arm/boot/dts/qcom-mdm9615.dtsi
-+++ b/arch/arm/boot/dts/qcom-mdm9615.dtsi
-@@ -128,6 +128,7 @@
- 		msmgpio: pinctrl at 800000 {
- 			compatible = "qcom,mdm9615-pinctrl";
- 			gpio-controller;
-+			gpio-ranges = <&msmgpio 0 0 88>;
- 			#gpio-cells = <2>;
- 			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-controller;
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 33030f9419fe..47cf9c4ca062 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -110,6 +110,7 @@
- 			reg = <0x800000 0x4000>;
- 
- 			gpio-controller;
-+			gpio-ranges = <&tlmm 0 0 173>;
- 			#gpio-cells = <2>;
- 			interrupts = <0 16 0x4>;
- 			interrupt-controller;
-diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
-index 1733d8f40ab1..f6d8b1af5a8a 100644
---- a/arch/arm/boot/dts/qcom-msm8960.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
-@@ -102,6 +102,7 @@
- 		msmgpio: pinctrl at 800000 {
- 			compatible = "qcom,msm8960-pinctrl";
- 			gpio-controller;
-+			gpio-ranges = <&msmgpio 0 0 152>;
- 			#gpio-cells = <2>;
- 			interrupts = <0 16 0x4>;
- 			interrupt-controller;
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index d9019a49b292..1250e071a6e2 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -696,6 +696,7 @@
- 			compatible = "qcom,msm8974-pinctrl";
- 			reg = <0xfd510000 0x4000>;
- 			gpio-controller;
-+			gpio-ranges = <&msmgpio 0 0 146>;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-index 2bc5dec5614d..d2c36b467466 100644
---- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-+++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-@@ -24,11 +24,12 @@
- 		ranges = <0 0 0 0xffffffff>;
- 		compatible = "simple-bus";
- 
--		pinctrl at 1000000 {
-+		tlmm: pinctrl at 1000000 {
- 			compatible = "qcom,ipq8074-pinctrl";
- 			reg = <0x1000000 0x300000>;
- 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
- 			gpio-controller;
-+			gpio-ranges = <&tlmm 0 0 70>;
- 			#gpio-cells = <0x2>;
- 			interrupt-controller;
- 			#interrupt-cells = <0x2>;
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 66b318e1de80..9d5320b26188 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -326,6 +326,7 @@
- 			reg = <0x1000000 0x300000>;
- 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
- 			gpio-controller;
-+			gpio-ranges = <&msmgpio 0 0 122>;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-diff --git a/arch/arm64/boot/dts/qcom/msm8992.dtsi b/arch/arm64/boot/dts/qcom/msm8992.dtsi
-index 171578747ed0..173b6bc60816 100644
---- a/arch/arm64/boot/dts/qcom/msm8992.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8992.dtsi
-@@ -179,6 +179,7 @@
- 			reg = <0xfd510000 0x4000>;
- 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
- 			gpio-controller;
-+			gpio-ranges = <&msmgpio 0 0 146>;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-diff --git a/arch/arm64/boot/dts/qcom/msm8994.dtsi b/arch/arm64/boot/dts/qcom/msm8994.dtsi
-index f33c41d01c86..68705db4696b 100644
---- a/arch/arm64/boot/dts/qcom/msm8994.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8994.dtsi
-@@ -141,6 +141,7 @@
- 			reg = <0xfd510000 0x4000>;
- 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
- 			gpio-controller;
-+			gpio-ranges = <&msmgpio 0 0 146>;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 410ae787ebb4..b9b57808fc67 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -541,6 +541,7 @@
- 			reg = <0x01010000 0x300000>;
- 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
- 			gpio-controller;
-+			gpio-ranges = <&msmgpio 0 0 150>;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
+ 	ret = gpiochip_irqchip_add(chip,
 -- 
 2.17.0
