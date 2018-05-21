@@ -1,169 +1,234 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 21 May 2018 02:35:17 +0000
-Subject: [PATCH V2 2/3] clk: imx7d: correct enet clock CCGR registers
-In-Reply-To: <c42c4274cfd06297d1699c96d3253125@agner.ch>
-References: <1526605266-18464-1-git-send-email-Anson.Huang@nxp.com>
- <1526605266-18464-2-git-send-email-Anson.Huang@nxp.com>
- <c42c4274cfd06297d1699c96d3253125@agner.ch>
-Message-ID: <AM3PR04MB1315417C51882B554AEBC617F5950@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: tangnianyao@huawei.com (Tangnianyao (ICT))
+Date: Mon, 21 May 2018 02:56:47 +0000
+Subject: [PATCH] arm64: KVM: reduce guest fpsimd trap
+In-Reply-To: <20180520120350.212b4b4d@why.wild-wind.fr.eu.org>
+References: <F348A9E21A573744858FF7E5D32E29D81BDF6C92@dggemi509-mbs.china.huawei.com>
+ <20180520120350.212b4b4d@why.wild-wind.fr.eu.org>
+Message-ID: <F348A9E21A573744858FF7E5D32E29D81BDF72C9@dggemi509-mbs.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stefan
+On Sun, May 20, 2018 at 19:04 PM GST+8, Marc Zyngier wrote:
 
-Anson Huang
-Best Regards!
+> On Sat, 19 May 2018 02:38:33 +0000
+> "Tangnianyao (ICT)" <tangnianyao@huawei.com> wrote:
+> 
+> > On Wed, May 16, 2018 at 20:46 PM GST+8, Christoffer Dall wrote:
+> > > On Wed, May 16, 2018 at 11:32:17AM +0100, Dave Martin wrote:  
+> > > > On Wed, May 16, 2018 at 10:25:40AM +0100, Marc Zyngier wrote:  
+> > > > > [+Dave]
+> > > > > 
+> > > > > Hi Nianyao,
+> > > > > 
+> > > > > On 16/05/18 10:08, Tangnianyao (ICT) wrote:  
+> > > > > > Add last_fpsimd_trap to notify if guest last exit reason is handling fpsimd. If guest is using fpsimd frequently, save host's fpsimd state and restore guest's fpsimd state and deactive fpsimd trap before returning to guest. It can avoid guest fpsimd trap soon to improve performance.  
+> > > > 
+> > > > So, the purpose of this patch is to context switch the FPSIMD 
+> > > > state on initial entry to the guest, instead of enabling the trap 
+> > > > and context switching the FPSIMD state lazily?
+> > > > 
+> > > > And you decide whether to do this or not, based on whether the guest   
+> > > triggered a lazy FPSIMD switch previously?  
+> > 
+> > I try to detect guest using fpsimd , but not overtraining which may 
+> > include more complexity and not suitable for common cases. Therefore I 
+> > just decide whether guest have triggerd a lazy fpsimd switch last time.
+> > 
+> > > >   
+> > > > > > 
+> > > > > > Signed-off-by: Nianyao Tang <tangnianyao@huawei.com>
+> > > > > > ---
+> > > > > >  arch/arm64/kernel/asm-offsets.c |  1 +
+> > > > > >  arch/arm64/kvm/hyp/entry.S      |  5 +++++
+> > > > > >  arch/arm64/kvm/hyp/switch.c     | 38 ++++++++++++++++++++++++++++++++++++--
+> > > > > >  include/linux/kvm_host.h        |  1 +
+> > > > > >  4 files changed, 43 insertions(+), 2 deletions(-)
+> > > > > > 
+> > > > > > diff --git a/arch/arm64/kernel/asm-offsets.c 
+> > > > > > b/arch/arm64/kernel/asm-offsets.c index 5bdda65..35a9c5c 
+> > > > > > 100644
+> > > > > > --- a/arch/arm64/kernel/asm-offsets.c
+> > > > > > +++ b/arch/arm64/kernel/asm-offsets.c
+> > > > > > @@ -136,6 +136,7 @@ int main(void)  #ifdef CONFIG_KVM_ARM_HOST
+> > > > > >    DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
+> > > > > >    DEFINE(VCPU_FAULT_DISR,	offsetof(struct kvm_vcpu, arch.fault.disr_el1));
+> > > > > > +  DEFINE(VCPU_LAST_FPSIMD_TRAP, offsetof(struct kvm_vcpu, 
+> > > > > > + last_fpsimd_trap));
+> > > > > >    DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
+> > > > > >    DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
+> > > > > >    DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+> > > > > > diff --git a/arch/arm64/kvm/hyp/entry.S 
+> > > > > > b/arch/arm64/kvm/hyp/entry.S index e41a161..956e042 100644
+> > > > > > --- a/arch/arm64/kvm/hyp/entry.S
+> > > > > > +++ b/arch/arm64/kvm/hyp/entry.S
+> > > > > > @@ -197,6 +197,11 @@ alternative_endif
+> > > > > >  	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+> > > > > >  	bl	__fpsimd_restore_state
+> > > > > >  
+> > > > > > +	// Mark guest using fpsimd now
+> > > > > > +	ldr x0, [x3, #VCPU_LAST_FPSIMD_TRAP]
+> > > > > > +	add x0, x0, #1
+> > > > 
+> > > > Can this overflow?  
+> > 
+> > It won't overflow. It only trigger one fpsimd trap and restore guest's 
+> > fpsimd state and deactivate fpsimd trap. When next non-fpsimd trap comes, it will be clear unconditionally.
+> > 
+> > > >   
+> > > > > > +	str x0, [x3, #VCPU_LAST_FPSIMD_TRAP]
+> > > > > > +
+> > > > > >  	// Skip restoring fpexc32 for AArch64 guests
+> > > > > >  	mrs	x1, hcr_el2
+> > > > > >  	tbnz	x1, #HCR_RW_SHIFT, 1f
+> > > > > > diff --git a/arch/arm64/kvm/hyp/switch.c 
+> > > > > > b/arch/arm64/kvm/hyp/switch.c index d964523..86eea1b 100644
+> > > > > > --- a/arch/arm64/kvm/hyp/switch.c
+> > > > > > +++ b/arch/arm64/kvm/hyp/switch.c
+> > > > > > @@ -92,7 +92,13 @@ static void activate_traps_vhe(struct 
+> > > > > > kvm_vcpu
+> > > > > > *vcpu)
+> > > > > >  
+> > > > > >  	val = read_sysreg(cpacr_el1);
+> > > > > >  	val |= CPACR_EL1_TTA;
+> > > > > > -	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+> > > > > > +	val &= ~CPACR_EL1_ZEN;
+> > > > > > +
+> > > > > > +	if (vcpu->last_fpsimd_trap)
+> > > > > > +		val |= CPACR_EL1_FPEN;
+> > > > > > +	else
+> > > > > > +		val &= ~CPACR_EL1_FPEN;
+> > > > > > +
+> > > > > >  	write_sysreg(val, cpacr_el1);
+> > > > > >  
+> > > > > >  	write_sysreg(kvm_get_hyp_vector(), vbar_el1); @@ -105,7 +111,13 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+> > > > > >  	__activate_traps_common(vcpu);
+> > > > > >  
+> > > > > >  	val = CPTR_EL2_DEFAULT;
+> > > > > > -	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
+> > > > > > +	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+> > > > > > +
+> > > > > > +	if (vcpu->last_fpsimd_trap)
+> > > > > > +		val &= ~CPTR_EL2_TFP;
+> > > > > > +	else
+> > > > > > +		val |= CPTR_EL2_TFP;
+> > > > > > +
+> > > > > >  	write_sysreg(val, cptr_el2);  }
+> > > > > >  
+> > > > > > @@ -406,6 +418,17 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+> > > > > >  	__activate_traps(vcpu);
+> > > > > >  	__activate_vm(vcpu->kvm);
+> > > > > >  
+> > > > > > +	/*
+> > > > > > +	 * If guest last trap to host for handling fpsimd, last_fpsimd_trap
+> > > > > > +	 * is set. Restore guest's fpsimd state and deactivate fpsimd trap
+> > > > > > +	 * to avoid guest traping soon.
+> > > > > > +	 */
+> > > > > > +	if (vcpu->last_fpsimd_trap) {
+> > > > > > +		__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
+> > > > > > +		__fpsimd_restore_state(&guest_ctxt->gp_regs.fp_regs);
+> > > > > > +		vcpu->last_fpsimd_trap = 0;
+> > > > > > +	}
+> > > > > > +
+> > > > > >  	sysreg_restore_guest_state_vhe(guest_ctxt);
+> > > > > >  	__debug_switch_to_guest(vcpu);
+> > > > > >  
+> > > > > > @@ -454,6 +477,17 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+> > > > > >  	__activate_traps(vcpu);
+> > > > > >  	__activate_vm(kern_hyp_va(vcpu->kvm));
+> > > > > >  
+> > > > > > +	/*
+> > > > > > +	 * If guest last trap to host for handling fpsimd, last_fpsimd_trap
+> > > > > > +	 * is set. Restore guest's fpsimd state and deactivate fpsimd trap
+> > > > > > +	 * to avoid guest traping soon.
+> > > > > > +	 */
+> > > > > > +	if (vcpu->last_fpsimd_trap) {
+> > > > > > +		__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
+> > > > > > +		__fpsimd_restore_state(&guest_ctxt->gp_regs.fp_regs);
+> > > > > > +		vcpu->last_fpsimd_trap = 0;
+> > > > > > +	}
+> > > > > > +
+> > > > > >  	__hyp_vgic_restore_state(vcpu);
+> > > > > >  	__timer_enable_traps(vcpu);
+> > > > > >  
+> > > > > > diff --git a/include/linux/kvm_host.h 
+> > > > > > b/include/linux/kvm_host.h index 6930c63..46bdf0d 100644
+> > > > > > --- a/include/linux/kvm_host.h
+> > > > > > +++ b/include/linux/kvm_host.h
+> > > > > > @@ -274,6 +274,7 @@ struct kvm_vcpu {
+> > > > > >  	bool preempted;
+> > > > > >  	struct kvm_vcpu_arch arch;
+> > > > > >  	struct dentry *debugfs_dentry;
+> > > > > > +	unsigned int last_fpsimd_trap;
+> > > > > >  };
+> > > > > >  
+> > > > > >  static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu
+> > > > > > *vcpu)
+> > > > > > --
+> > > > > > 2.7.4
+> > > > > >   
+> > > > > 
+> > > > > This doesn't seem to be the 100% correct. I can't see how this 
+> > > > > works when being preempted, for example... I suggest you look at 
+> > > > > Dave Martin's series[1], which does this correctly.
+> > > > 
+> > > > If I've understood correctly, this chooses between eager and lazy 
+> > > > switching, which is addressing a different issue from [1].
+> > > > 
+> > > > In effect, this code is attempting to predict whether the guest 
+> > > > will use FPSIMD before the next exit.  If the prediction is 
+> > > > correct and the guest does use FPSIMD, then the overhead of the 
+> > > > lazy FPSIMD trap disappears.  This is probably a good thing, 
+> > > > though it may increase interrupt latency a little.  However, if 
+> > > > the prediction is wrong and the guest doesn't use FPSIMD before 
+> > > > the next exit, then the overhead of guest entry increases for no 
+> > > > benefit, because FPSIMD was switched unnecessarily.
+> > > > 
+> > > > Do you have any benchmarks or metrics on the accuracy of the 
+> > > > prediction and the overall impact on performance?
+> > > > 
+> > > > The changes in [1] should reduce the number of FPSIMD context 
+> > > > switches overall, so may reduce the benefit of this patch.
+> > > >   
+> > 
+> > This idea may be different. It tries to detect guest using fpsimd, do 
+> > eager switching ,and reduce guest trap. [1] reduces fpsimd context 
+> > switches in host when it has already trapped.
+> > 
+> > > 
+> > > 
+> > > Based on previous measurements [2], I found that only in 29% of the times when we return to userspace or are preempted, has the VCPU touched the FPSIMD registers, and therefore a significant majority of the times we enter the guest, the guest doesn't touch the FPSIMD state, even if it has touched it before.
+> > > 
+> > > As Dave suggests, if there is data that shows that an immediately following entry from an exit that had VFP enabled implies with a very high probablity that the guest will touch VFP again, then something like this might make sense, but I'd like to see some data to back up this hypothesis before adding additional complexity to the code.
+> > > 
+> > > [2]: 
+> > > https://lists.cs.columbia.edu/pipermail/kvmarm/2018-February/029835.
+> > > html
+> > 
+> > I try to detect guest using fpsimd, and choose eager switching to avoid trapping to hyp soon.
+> > The reason is, in some micro architecture, vmid switch will flush all 
+> > L1 TLB entry which doesn't contain vmid. It will result in extra 
+> > 2-stage table walk when returning to guest, which could be avoid if not trap to el2. As I know, Maia has this issue.
+> 
+> This looks extremely microarchitectural. Have you tested how this behaves on other implementations?
 
-
-> -----Original Message-----
-> From: Stefan Agner [mailto:stefan at agner.ch]
-> Sent: Friday, May 18, 2018 9:02 PM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
-> mturquette at baylibre.com; sboyd at kernel.org; Adriana Reus
-> <adriana.reus@nxp.com>; rui.silva at linaro.org; dl-linux-imx
-> <linux-imx@nxp.com>; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-clk at vger.kernel.org
-> Subject: Re: [PATCH V2 2/3] clk: imx7d: correct enet clock CCGR registers
-> 
-> On 18.05.2018 03:01, Anson Huang wrote:
-> > Correct enet clock gates as below:
-> >
-> > CCGR6: IMX7D_ENET_AXI_ROOT_CLK (enet1 and enet2 bus clocks)
-> > CCGR112: IMX7D_ENET1_TIME_ROOT_CLK, IMX7D_ENET1_IPG_ROOT_CLK
-> > CCGR113: IMX7D_ENET2_TIME_ROOT_CLK, IMX7D_ENET2_IPG_ROOT_CLK
-> >
-> > Just rename unused IMX7D_ENETx_REF_ROOT_CLK for
-> > IMX7D_ENETx_IPG_ROOT_CLK instead of adding new clocks.
-> 
-> Are you sure that IMX7D_ENETx_REF_ROOT_CLK are not used?
-> 
-> I understand that the reference manual does not a gate at 0x44e0...
-> 
-> But in a earlier revision of our Colibri iMX7 we actually used clock out, and
-> referenced this clock to enable the reference clock (see also:
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpatch
-> work.kernel.org%2Fpatch%2F9211371%2F&data=02%7C01%7CAnson.Huang%
-> 40nxp.com%7Cea0856a68d8e4b921ba608d5bcbf9c02%7C686ea1d3bc2b4c6fa
-> 92cd99c5c301635%7C0%7C1%7C636622453508888330&sdata=rEhwj0innLDc
-> AEgxJyqd5vtG3SNVS05r2hEFvSc%2BQQs%3D&reserved=0).
-> 
-> I guess if the gate really does not exist, then we should/would have to set
-> IMX7D_ENET1_REF_ROOT_DIV to use the SoC provided ref clock.
-> 
-> --
-> Stefan
- 
-I looked into the RTL and also checked with our design team, they confirm that
-there is no CCGR78(0x44e0) and CCGR80(0x4500) on i.MX7D, the register offset
-are there, but no hardware wire connection for them. That is why they did NOT
-list them in Reference Manual. So I think we can remove them. 
-
-For your case of using them as clock input, maybe clock tree auto use its parent
-IMX7D_ENETx_REF_ROOT_DIV which is existing, so it works.
-
-Anson.
+I have only tested on Maia. As I know in research, both Maia and A72 behave in this way, so
+it may be a common problem.
 
 > 
-> >
-> > Based on Andy Duan's patch from the NXP kernel tree.
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > ---
-> >  drivers/clk/imx/clk-imx7d.c             | 10 ++++++----
-> >  include/dt-bindings/clock/imx7d-clock.h |  4 ++--
-> >  2 files changed, 8 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-> > index 23d5090a..d4936b9 100644
-> > --- a/drivers/clk/imx/clk-imx7d.c
-> > +++ b/drivers/clk/imx/clk-imx7d.c
-> > @@ -26,6 +26,8 @@ static u32 share_count_sai1;  static u32
-> > share_count_sai2;  static u32 share_count_sai3;  static u32
-> > share_count_nand;
-> > +static u32 share_count_enet1;
-> > +static u32 share_count_enet2;
-> >
-> >  static const struct clk_div_table test_div_table[] = {
-> >  	{ .val = 3, .div = 1, },
-> > @@ -805,6 +807,10 @@ static void __init imx7d_clocks_init(struct
-> > device_node *ccm_node)
-> >  	clks[IMX7D_MIPI_DSI_ROOT_CLK] = imx_clk_gate4("mipi_dsi_root_clk",
-> > "mipi_dsi_post_div", base + 0x4650, 0);
-> >  	clks[IMX7D_MIPI_CSI_ROOT_CLK] = imx_clk_gate4("mipi_csi_root_clk",
-> > "mipi_csi_post_div", base + 0x4640, 0);
-> >  	clks[IMX7D_MIPI_DPHY_ROOT_CLK] =
-> imx_clk_gate4("mipi_dphy_root_clk",
-> > "mipi_dphy_post_div", base + 0x4660, 0);
-> > +	clks[IMX7D_ENET1_IPG_ROOT_CLK] =
-> > imx_clk_gate2_shared2("enet1_ipg_root_clk", "enet_axi_post_div", base
-> > + 0x4700, 0, &share_count_enet1);
-> > +	clks[IMX7D_ENET1_TIME_ROOT_CLK] =
-> > imx_clk_gate2_shared2("enet1_time_root_clk", "enet1_time_post_div",
-> > base + 0x4700, 0, &share_count_enet1);
-> > +	clks[IMX7D_ENET2_IPG_ROOT_CLK] =
-> > imx_clk_gate2_shared2("enet2_ipg_root_clk", "enet_axi_post_div", base
-> > + 0x4710, 0, &share_count_enet2);
-> > +	clks[IMX7D_ENET2_TIME_ROOT_CLK] =
-> > imx_clk_gate2_shared2("enet2_time_root_clk", "enet2_time_post_div",
-> > base + 0x4710, 0, &share_count_enet2);
-> >  	clks[IMX7D_SAI1_ROOT_CLK] = imx_clk_gate2_shared2("sai1_root_clk",
-> > "sai1_post_div", base + 0x48c0, 0, &share_count_sai1);
-> >  	clks[IMX7D_SAI1_IPG_CLK]  = imx_clk_gate2_shared2("sai1_ipg_clk",
-> > "ipg_root_clk",  base + 0x48c0, 0, &share_count_sai1);
-> >  	clks[IMX7D_SAI2_ROOT_CLK] = imx_clk_gate2_shared2("sai2_root_clk",
-> > "sai2_post_div", base + 0x48d0, 0, &share_count_sai2); @@ -812,10
-> > +818,6 @@ static void __init imx7d_clocks_init(struct device_node
-> > *ccm_node)
-> >  	clks[IMX7D_SAI3_ROOT_CLK] = imx_clk_gate2_shared2("sai3_root_clk",
-> > "sai3_post_div", base + 0x48e0, 0, &share_count_sai3);
-> >  	clks[IMX7D_SAI3_IPG_CLK]  = imx_clk_gate2_shared2("sai3_ipg_clk",
-> > "ipg_root_clk",  base + 0x48e0, 0, &share_count_sai3);
-> >  	clks[IMX7D_SPDIF_ROOT_CLK] = imx_clk_gate4("spdif_root_clk",
-> > "spdif_post_div", base + 0x44d0, 0);
-> > -	clks[IMX7D_ENET1_REF_ROOT_CLK] =
-> imx_clk_gate4("enet1_ref_root_clk",
-> > "enet1_ref_post_div", base + 0x44e0, 0);
-> > -	clks[IMX7D_ENET1_TIME_ROOT_CLK] =
-> > imx_clk_gate4("enet1_time_root_clk", "enet1_time_post_div", base +
-> > 0x44f0, 0);
-> > -	clks[IMX7D_ENET2_REF_ROOT_CLK] =
-> imx_clk_gate4("enet2_ref_root_clk",
-> > "enet2_ref_post_div", base + 0x4500, 0);
-> > -	clks[IMX7D_ENET2_TIME_ROOT_CLK] =
-> > imx_clk_gate4("enet2_time_root_clk", "enet2_time_post_div", base +
-> > 0x4510, 0);
-> >  	clks[IMX7D_EIM_ROOT_CLK] = imx_clk_gate4("eim_root_clk",
-> > "eim_post_div", base + 0x4160, 0);
-> >  	clks[IMX7D_NAND_RAWNAND_CLK] =
-> > imx_clk_gate2_shared2("nand_rawnand_clk", "nand_root_clk", base +
-> > 0x4140, 0, &share_count_nand);
-> >  	clks[IMX7D_NAND_USDHC_BUS_RAWNAND_CLK] =
-> > imx_clk_gate2_shared2("nand_usdhc_rawnand_clk",
-> "nand_usdhc_root_clk",
-> > base + 0x4140, 0, &share_count_nand); diff --git
-> > a/include/dt-bindings/clock/imx7d-clock.h
-> > b/include/dt-bindings/clock/imx7d-clock.h
-> > index b2325d3e2..0d67f53 100644
-> > --- a/include/dt-bindings/clock/imx7d-clock.h
-> > +++ b/include/dt-bindings/clock/imx7d-clock.h
-> > @@ -168,7 +168,7 @@
-> >  #define IMX7D_SPDIF_ROOT_SRC		155
-> >  #define IMX7D_SPDIF_ROOT_CG		156
-> >  #define IMX7D_SPDIF_ROOT_DIV		157
-> > -#define IMX7D_ENET1_REF_ROOT_CLK	158
-> > +#define IMX7D_ENET1_IPG_ROOT_CLK        158
-> >  #define IMX7D_ENET1_REF_ROOT_SRC	159
-> >  #define IMX7D_ENET1_REF_ROOT_CG		160
-> >  #define IMX7D_ENET1_REF_ROOT_DIV	161
-> > @@ -176,7 +176,7 @@
-> >  #define IMX7D_ENET1_TIME_ROOT_SRC	163
-> >  #define IMX7D_ENET1_TIME_ROOT_CG	164
-> >  #define IMX7D_ENET1_TIME_ROOT_DIV	165
-> > -#define IMX7D_ENET2_REF_ROOT_CLK	166
-> > +#define IMX7D_ENET2_IPG_ROOT_CLK        166
-> >  #define IMX7D_ENET2_REF_ROOT_SRC	167
-> >  #define IMX7D_ENET2_REF_ROOT_CG		168
-> >  #define IMX7D_ENET2_REF_ROOT_DIV	169
+> > I have done some benchmark test on guest and find that, frequent 
+> > context switch , which save and restore fpsimd frequently, resulted in 
+> > extra cost compared to host context switch because of fpsimd trap. In 
+> > some benchmarks, like lat_ctx and lat_udp, one asid usually got stuck and scheduled to another, where context switch and handling fpsimd happened very frequently.
+> > In my performance test, lat_ctx with 4 asid switch. In comparison 
+> > between guest and host, without this, guest is 10% worse than host. With this, guest is only 8% worse than host.
+> > 
+> > Detect guest using fpsimd based on lazy fpsimd switch may be not 100% correct. 
+> > I think accurate detection may be overtraining and is not suitable for common cases.
+> > Therefore I just do it in simply way to reduce some fpsimd traps.
+> 
+> Can you please with Dave's series (which I have now merged for 4.18) and let us know if you're still seeing this overhead? If you're still seeing it, we can then look into it.
+
+Ok? I will seeing this based on 4.18.
+
+Thanks,
+-Nianyao Tang
