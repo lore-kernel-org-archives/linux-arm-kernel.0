@@ -1,78 +1,97 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 21 May 2018 18:12:07 +0530
-Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <20180521104008.z6ei5zjve7u5iwho@lakrids.cambridge.arm.com>
-References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
- <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
- <20180426105938.y6unpt36lisb7kbr@lakrids.cambridge.arm.com>
- <CAKTKpr7Q7T9ZCTBi=LQR=XaAoihbBA3OKCO7yFobzNmR8EfyjQ@mail.gmail.com>
- <CAKTKpr61zBW_D6v_Ck1Lcp0NJ4wPFOpgbiM5aU_EtuiFU-qp4Q@mail.gmail.com>
- <20180521103712.gofbrjdtghfwolmd@lakrids.cambridge.arm.com>
- <20180521104008.z6ei5zjve7u5iwho@lakrids.cambridge.arm.com>
-Message-ID: <CAKTKpr7rBj2Ai5jsPgfH308GYNviQm1GWNnkvOhBD_Zak34+-Q@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 21 May 2018 13:50:00 +0100
+Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <1526729701-8589-1-git-send-email-ilialin@codeaurora.org>
+References: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
+ <1526729701-8589-1-git-send-email-ilialin@codeaurora.org>
+Message-ID: <153cc316-dcb5-972f-5a2f-c91fe0f6348b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 4:10 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, May 21, 2018 at 11:37:12AM +0100, Mark Rutland wrote:
->> Hi Ganapat,
->>
->>
->> Sorry for the delay in replying; I was away most of last week.
->>
->> On Tue, May 15, 2018 at 04:03:19PM +0530, Ganapatrao Kulkarni wrote:
->> > On Sat, May 5, 2018 at 12:16 AM, Ganapatrao Kulkarni <gklkml16@gmail.com> wrote:
->> > > On Thu, Apr 26, 2018 at 4:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > >> On Wed, Apr 25, 2018 at 02:30:47PM +0530, Ganapatrao Kulkarni wrote:
->>
->> > >>> +static int alloc_counter(struct thunderx2_pmu_uncore_channel *pmu_uncore)
->> > >>> +{
->> > >>> +     int counter;
->> > >>> +
->> > >>> +     raw_spin_lock(&pmu_uncore->lock);
->> > >>> +     counter = find_first_zero_bit(pmu_uncore->counter_mask,
->> > >>> +                             pmu_uncore->uncore_dev->max_counters);
->> > >>> +     if (counter == pmu_uncore->uncore_dev->max_counters) {
->> > >>> +             raw_spin_unlock(&pmu_uncore->lock);
->> > >>> +             return -ENOSPC;
->> > >>> +     }
->> > >>> +     set_bit(counter, pmu_uncore->counter_mask);
->> > >>> +     raw_spin_unlock(&pmu_uncore->lock);
->> > >>> +     return counter;
->> > >>> +}
->> > >>> +
->> > >>> +static void free_counter(struct thunderx2_pmu_uncore_channel *pmu_uncore,
->> > >>> +                                     int counter)
->> > >>> +{
->> > >>> +     raw_spin_lock(&pmu_uncore->lock);
->> > >>> +     clear_bit(counter, pmu_uncore->counter_mask);
->> > >>> +     raw_spin_unlock(&pmu_uncore->lock);
->> > >>> +}
->> > >>
->> > >> I don't believe that locking is required in either of these, as the perf
->> > >> core serializes pmu::add() and pmu::del(), where these get called.
->> >
->> > without this locking, i am seeing "BUG: scheduling while atomic" when
->> > i run perf with more events together than the maximum counters
->> > supported
->>
->> Did you manage to get to the bottom of this?
->>
->> Do you have a backtrace?
->>
->> It looks like in your latest posting you reserve counters through the
->> userspace ABI, which doesn't seem right to me, and I'd like to
->> understand the problem.
->
-> Looks like I misunderstood -- those are still allocated kernel-side.
->
-> I'll follow that up in the v5 posting.
 
-please review v5.
->
-> Thanks,
-> Mark.
 
-thanks
-Ganapat
+On 19/05/18 12:35, Ilia Lin wrote:
+> In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO processors,
+> the CPU frequency subset and voltage value of each OPP varies
+> based on the silicon variant in use. Qualcomm Process Voltage Scaling Tables
+> defines the voltage and frequency value based on the msm-id in SMEM
+> and speedbin blown in the efuse combination.
+> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
+> to provide the OPP framework with required information.
+> This is used to determine the voltage and frequency value for each OPP of
+> operating-points-v2 table when it is parsed by the OPP framework.
+> 
+> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/cpufreq/Kconfig.arm          |  10 +++
+>  drivers/cpufreq/Makefile             |   1 +
+>  drivers/cpufreq/cpufreq-dt-platdev.c |   3 +
+>  drivers/cpufreq/qcom-cpufreq-kryo.c  | 164 +++++++++++++++++++++++++++++++++++
+>  4 files changed, 178 insertions(+)
+>  create mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
+> 
+
+[..]
+
+> +
+> +/*
+> + * In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO processors,
+> + * the CPU frequency subset and voltage value of each OPP varies
+> + * based on the silicon variant in use. Qualcomm Process Voltage Scaling Tables
+> + * defines the voltage and frequency value based on the msm-id in SMEM
+> + * and speedbin blown in the efuse combination.
+> + * The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
+> + * to provide the OPP framework with required information.
+> + * This is used to determine the voltage and frequency value for each OPP of
+> + * operating-points-v2 table when it is parsed by the OPP framework.
+> + */
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/nvmem-consumer.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_opp.h>
+> +#include <linux/slab.h>
+> +#include <linux/soc/qcom/smem.h>
+> +
+> +#define MSM_ID_SMEM	137
+> +#define SILVER_LEAD	0
+> +#define GOLD_LEAD	2
+> +
+
+So I gather form other emails, that these are physical cpu number(not
+even unique identifier like MPIDR). Will this work on parts or platforms
+that need to boot in GOLD LEAD cpus.
+
+[...]
+
+> +
+> +static int __init qcom_cpufreq_kryo_driver_init(void)
+> +{
+> +	struct device *cpu_dev_silver, *cpu_dev_gold;
+> +	struct opp_table *opp_silver, *opp_gold;
+> +	enum _msm8996_version msm8996_version;
+> +	struct nvmem_cell *speedbin_nvmem;
+> +	struct platform_device *pdev;
+> +	struct device_node *np;
+> +	u8 *speedbin;
+> +	u32 versions;
+> +	size_t len;
+> +	int ret;
+> +
+> +	cpu_dev_silver = get_cpu_device(SILVER_LEAD);
+> +	if (IS_ERR_OR_NULL(cpu_dev_silver))
+> +		return PTR_ERR(cpu_dev_silver);
+> +
+> +	cpu_dev_gold = get_cpu_device(SILVER_LEAD);
+
+s/SILVER/GOLD/ ?
+
+-- 
+Regards,
+Sudeep
