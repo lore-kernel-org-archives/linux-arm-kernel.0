@@ -1,58 +1,72 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Mon, 21 May 2018 19:57:49 +0800
-Subject: [PATCH 12/33] clk: bcm2835: use match_string() helper
-In-Reply-To: <1526903890-35761-1-git-send-email-xieyisheng1@huawei.com>
-References: <1526903890-35761-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <1526903890-35761-13-git-send-email-xieyisheng1@huawei.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 21 May 2018 13:06:44 +0100
+Subject: [PATCH v3 1/6] arm64: cpufeature: Allow early detect of specific
+ features
+In-Reply-To: <697af68e-3cee-4d0d-8493-106cc42eed3b@arm.com>
+References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
+ <1526902515-13769-2-git-send-email-julien.thierry@arm.com>
+ <697af68e-3cee-4d0d-8493-106cc42eed3b@arm.com>
+Message-ID: <20180521120644.g527aawkutf3etzq@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-match_string() returns the index of an array for a matching string,
-which can be used intead of open coded variant.
+On Mon, May 21, 2018 at 12:45:22PM +0100, Suzuki K Poulose wrote:
+> On 21/05/18 12:35, Julien Thierry wrote:
+> > From: Daniel Thompson <daniel.thompson@linaro.org>
+> > 
+> > Currently it is not possible to detect features of the boot CPU
+> > until the other CPUs have been brought up.
+> > 
+> > This prevents us from reacting to features of the boot CPU until
+> > fairly late in the boot process. To solve this we allow a subset
+> > of features (that are likely to be common to all clusters) to be
+> > detected based on the boot CPU alone.
+> > 
+> > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> > [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
+> > 			 duplicates between early features and normal
+> > 			 features]
+> > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> 
+> nit: Since this is completely different from what Daniel started with,
+> you could simply reset the author to yourself. The boot CPU feature was
+> added keeping this user in mind.
 
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@kernel.org>
-Cc: Eric Anholt <eric@anholt.net>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>
-Cc: linux-clk at vger.kernel.org
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
----
- drivers/clk/bcm/clk-bcm2835.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+Agree! It's no longer my patch.
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index fa0d5c8..a27c0d2 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1395,8 +1395,7 @@ static struct clk_hw *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 	struct bcm2835_clock *clock;
- 	struct clk_init_data init;
- 	const char *parents[1 << CM_SRC_BITS];
--	size_t i, j;
--	int ret;
-+	int i, ret;
- 
- 	/*
- 	 * Replace our strings referencing parent clocks with the
-@@ -1405,12 +1404,11 @@ static struct clk_hw *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 	for (i = 0; i < data->num_mux_parents; i++) {
- 		parents[i] = data->parents[i];
- 
--		for (j = 0; j < ARRAY_SIZE(cprman_parent_names); j++) {
--			if (strcmp(parents[i], cprman_parent_names[j]) == 0) {
--				parents[i] = cprman->real_parent_names[j];
--				break;
--			}
--		}
-+		ret = match_string(cprman_parent_names,
-+				   ARRAY_SIZE(cprman_parent_names),
-+				   parents[i]);
-+		if (ret >= 0)
-+			parents[i] = cprman->real_parent_names[ret];
- 	}
- 
- 	memset(&init, 0, sizeof(init));
--- 
-1.7.12.4
+If you want to retain any credit than Suggested-by: would make quite
+sufficient.
+
+
+Daniel.
+
+
+> 
+> The patch as such looks good to me.
+> 
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> 
+> > ---
+> >   arch/arm64/kernel/cpufeature.c | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> > index 9d1b06d..e03e897 100644
+> > --- a/arch/arm64/kernel/cpufeature.c
+> > +++ b/arch/arm64/kernel/cpufeature.c
+> > @@ -1030,7 +1030,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+> >   	{
+> >   		.desc = "GIC system register CPU interface",
+> >   		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+> > -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+> > +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
+> >   		.matches = has_useable_gicv3_cpuif,
+> >   		.sys_reg = SYS_ID_AA64PFR0_EL1,
+> >   		.field_pos = ID_AA64PFR0_GIC_SHIFT,
+> > --
+> > 1.9.1
+> > 
+> 
