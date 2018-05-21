@@ -1,72 +1,133 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 21 May 2018 13:06:44 +0100
-Subject: [PATCH v3 1/6] arm64: cpufeature: Allow early detect of specific
- features
-In-Reply-To: <697af68e-3cee-4d0d-8493-106cc42eed3b@arm.com>
-References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
- <1526902515-13769-2-git-send-email-julien.thierry@arm.com>
- <697af68e-3cee-4d0d-8493-106cc42eed3b@arm.com>
-Message-ID: <20180521120644.g527aawkutf3etzq@holly.lan>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 21 May 2018 14:14:04 +0200
+Subject: [reset-control] How to initialize hardware state with the shared
+ reset line?
+In-Reply-To: <CAK7LNAR1b_F_eLEWAdQc3L=daGz=ttKq0mQP78BkjzTOssaXvw@mail.gmail.com>
+References: <CAK7LNATZgJ4MxOFLUCNARWv3Zz=gpL-jGReDnBnArquiaXRWoQ@mail.gmail.com>
+ <CAFBinCADQsXoc6CUKabH6VX3ZBYb5apo-xBbe1w0BiO8wBAsPw@mail.gmail.com>
+ <CAK7LNAR1b_F_eLEWAdQc3L=daGz=ttKq0mQP78BkjzTOssaXvw@mail.gmail.com>
+Message-ID: <ff14975f-92af-5e84-16cf-231b070fff9e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 12:45:22PM +0100, Suzuki K Poulose wrote:
-> On 21/05/18 12:35, Julien Thierry wrote:
-> > From: Daniel Thompson <daniel.thompson@linaro.org>
-> > 
-> > Currently it is not possible to detect features of the boot CPU
-> > until the other CPUs have been brought up.
-> > 
-> > This prevents us from reacting to features of the boot CPU until
-> > fairly late in the boot process. To solve this we allow a subset
-> > of features (that are likely to be common to all clusters) to be
-> > detected based on the boot CPU alone.
-> > 
-> > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> > [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
-> > 			 duplicates between early features and normal
-> > 			 features]
-> > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Hi,
+
+On 21-05-18 03:27, Masahiro Yamada wrote:
+> Hi.
 > 
-> nit: Since this is completely different from what Daniel started with,
-> you could simply reset the author to yourself. The boot CPU feature was
-> added keeping this user in mind.
-
-Agree! It's no longer my patch.
-
-If you want to retain any credit than Suggested-by: would make quite
-sufficient.
-
-
-Daniel.
-
-
 > 
-> The patch as such looks good to me.
+> 2018-05-20 19:57 GMT+09:00 Martin Blumenstingl
+> <martin.blumenstingl@googlemail.com>:
+>> Hi,
+>>
+>> On Thu, May 10, 2018 at 11:16 AM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>> [snip]
+>>> I may be missing something, but
+>>> one solution might be reset hogging on the
+>>> reset provider side.  This allows us to describe
+>>> the initial state of reset lines in the reset controller.
+>>>
+>>> The idea for "reset-hog" is similar to:
+>>>   - "gpio-hog" defined in
+>>>     Documentation/devicetree/bindings/gpio/gpio.txt
+>>>   - "assigned-clocks" defined in
+>>>     Documetation/devicetree/bindings/clock/clock-bindings.txt
+>>>
+>>>
+>>>
+>>> For example,
+>>>
+>>>     reset-controller {
+>>>              ....
+>>>
+>>>              line_a {
+>>>                    reset-hog;
+>>>                    resets = <1>;
+>>>                    reset-assert;
+>>>              };
+>>>     }
+>>>
+>>>
+>>> When the reset controller is registered,
+>>> the reset ID '1' is asserted.
+>>>
+>>>
+>>> So, all reset consumers that share the reset line '1'
+>>> will start from the asserted state
+>>> (i.e. defined state machine state).
+>> I wonder if a "reset hog" can be board specific:
+>> - GPIO hogs are definitely board specific (meson-gxbb-odroidc2.dts for
+>> example uses it to take the USB hub out of reset)
+>> - assigned-clock-parents (and the like) can also be board specific (I
+>> made up a use-case since I don't know of any actual examples: board A
+>> uses an external XTAL while board B uses some other internal
+>> clock-source because it doesn't have an external XTAL)
+>>
+>> however, can reset lines be board specific? or in other words: do we
+>> need to describe them in device-tree?
 > 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Indeed.
 > 
-> > ---
-> >   arch/arm64/kernel/cpufeature.c | 2 +-
-> >   1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > index 9d1b06d..e03e897 100644
-> > --- a/arch/arm64/kernel/cpufeature.c
-> > +++ b/arch/arm64/kernel/cpufeature.c
-> > @@ -1030,7 +1030,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
-> >   	{
-> >   		.desc = "GIC system register CPU interface",
-> >   		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
-> > -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-> > +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
-> >   		.matches = has_useable_gicv3_cpuif,
-> >   		.sys_reg = SYS_ID_AA64PFR0_EL1,
-> >   		.field_pos = ID_AA64PFR0_GIC_SHIFT,
-> > --
-> > 1.9.1
-> > 
+> I did not come up with board-specific cases.
 > 
+> The problem we are discussing is SoC-specific,
+> and reset-controller drivers are definitely SoC-specific.
+> 
+> So, I think the initial state can be coded in drivers instead of DT.
+> 
+> 
+>> we could extend struct reset_controller_dev (= reset controller
+>> driver) if they are not board specific:
+>> - either assert all reset lines by default except if they are listed
+>> in a new field (may break backwards compatibility, requires testing of
+>> all reset controller drivers)
+> 
+> This is quite simple, but I am afraid there are some cases where the forcible
+> reset-assert is not preferred.
+> 
+> For example, the earlycon.  When we use earlycon, we would expect it has been
+> initialized by a boot-loader, or something.
+> If it is reset-asserted on the while, the console output
+> will not be good.
+> 
+> 
+> 
+>> - specify a list of reset lines and their desired state (or to keep it
+>> easy: specify a list of reset lines that should be asserted)
+>> (I must admit that this is basically your idea but the definition is
+>> moved from device-tree to the reset controller driver)
+> 
+> Yes, I think the list of "reset line ID" and "init state" pairs
+> would be nicer.
+> 
+> 
+>> any "chip" specific differences could be expressed by using a
+>> different of_device_id
+>>
+>> one the other hand: your "reset hog" solution looks fine to me if
+>> reset lines can be board specific
+>>
+>>>  From the discussion with Martin Blumenstingl
+>>> (https://lkml.org/lkml/2018/4/28/115),
+>>> the problem for Amlogic is that
+>>> the reset line is "de-asserted" by default.
+>>> If so, the 'reset-hog' would fix the problem,
+>>> and DWC3 driver would be able to use
+>>> shared, level reset, I think.
+>> I think you are right: if we could control the initial state then we
+>> should be able to use level resets
+> 
+> 
+> Even further, can we drop the shared reset_control_reset() support, maybe?
+> (in other words, revert commit 7da33a37b48f11)
+
+At least one some Allwinner ships shared-reset support accurately
+models how the hardware works. It seems that the case you are
+trying to fix is actually a special version of shared reset support,
+you want shared reset behavior, combined with making sure the reset
+is asserted at reset-controller-driver load time.
+
+Regards,
+
+Hans
