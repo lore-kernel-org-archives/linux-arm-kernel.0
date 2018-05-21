@@ -1,62 +1,38 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 21 May 2018 13:45:58 +0200
-Subject: [GIT PULL] Allwinner arm64 changes for 4.18
-Message-ID: <20180521114558.ozkb4ftf4p56ov7c@flea>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 21 May 2018 12:44:24 +0100
+Subject: [PATCH 01/14] ARM: add CPU part numbers for Cortex A73, A75 and
+ Brahma B15
+In-Reply-To: <20180521114238.GN17671@n2100.armlinux.org.uk>
+References: <20180521114238.GN17671@n2100.armlinux.org.uk>
+Message-ID: <E1fKjEm-00063K-Ua@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Add CPU part numbers for the above mentioned CPUs
 
-Here is our bunch of arm64 DT changes for the next merge window.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/include/asm/cputype.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Thanks!
-Maxime
-
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt64-for-4.18
-
-for you to fetch changes up to 17ebc33afc35094f779ddca92ffcbda800365574:
-
-  arm64: allwinner: h6: add PCF8563 RTC on Pine H64 board (2018-05-04 17:12:13 +0200)
-
-----------------------------------------------------------------
-Allwinner arm64 changes for 4.18
-
-We mostly have some changes to support the H6, Allwinner latest SoC. We're
-still in the preliminary phase, with I2C, pinctrl and clock support.
-
-----------------------------------------------------------------
-Icenowy Zheng (6):
-      arm64: allwinner: h6: restore the usage of CCU slice macros
-      arm64: allwinner: h6: add PRCM CCU device node
-      arm64: allwinner: h6: add node for R_PIO pin controller
-      arm64: allwinner: h6: add R_INTC interrupt controller
-      arm64: allwinner: h6: add R_I2C controller
-      arm64: allwinner: h6: add PCF8563 RTC on Pine H64 board
-
-Jagan Teki (2):
-      arm64: dts: allwinner: axp803: Add drivevbus regulator
-      arm64: dts: allwinner: a64: bananapi-m64: add usb otg
-
- arch/arm64/boot/dts/allwinner/axp803.dtsi          |  5 ++
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 21 +++++++
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 10 ++++
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       | 70 +++++++++++++++++++---
- 4 files changed, 97 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index cb546425da8a..adc4a3eef815 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -77,8 +77,13 @@
+ #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
+ #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
+ #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
++#define ARM_CPU_PART_CORTEX_A73		0x4100d090
++#define ARM_CPU_PART_CORTEX_A75		0x4100d0a0
+ #define ARM_CPU_PART_MASK		0xff00fff0
+ 
++/* Broadcom cores */
++#define ARM_CPU_PART_BRAHMA_B15		0x420000f0
++
+ /* DEC implemented cores */
+ #define ARM_CPU_PART_SA1100		0x4400a110
+ 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180521/b21ded97/attachment.sig>
+2.7.4
