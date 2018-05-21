@@ -1,77 +1,78 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 21 May 2018 18:04:12 +0530
-Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <20180521105511.6ztjk5conf7lfaiz@lakrids.cambridge.arm.com>
-References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
- <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
- <20180426105938.y6unpt36lisb7kbr@lakrids.cambridge.arm.com>
- <CAKTKpr7Q7T9ZCTBi=LQR=XaAoihbBA3OKCO7yFobzNmR8EfyjQ@mail.gmail.com>
- <20180521105511.6ztjk5conf7lfaiz@lakrids.cambridge.arm.com>
-Message-ID: <CAKTKpr7fhR1aRenZBFUAzinjpD9DJ0NoNptCpkXAGx_J7DmMfA@mail.gmail.com>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Mon, 21 May 2018 15:35:07 +0300
+Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <20180521121140.GO17671@n2100.armlinux.org.uk>
+References: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
+ <1526898690-4018-1-git-send-email-ilialin@codeaurora.org>
+ <20180521105428.GM17671@n2100.armlinux.org.uk>
+ <000b01d3f0f3$aa961cc0$ffc25640$@codeaurora.org>
+ <20180521121140.GO17671@n2100.armlinux.org.uk>
+Message-ID: <000d01d3f100$294247e0$7bc6d7a0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+There are 2 CPU clusters in the Kryo, CPU 0 and 1 are called Silver Cluster
+and CPU 2 and 3 - Gold Cluster. Each cluster has single clock. The clusters
+differ in terms of speed capabilities, computing power and power
+consumption. Therefore, I define separate OPP table for each cluster, and my
+driver will choose the appropriate OPP subset for each cluster.
+Lead refers to first CPU in the cluster.
 
-On Mon, May 21, 2018 at 4:25 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Sat, May 05, 2018 at 12:16:13AM +0530, Ganapatrao Kulkarni wrote:
->> On Thu, Apr 26, 2018 at 4:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Wed, Apr 25, 2018 at 02:30:47PM +0530, Ganapatrao Kulkarni wrote:
->
->> >> + *
->> >> + *  L3 Tile and DMC channel selection is through SMC call
->> >> + *  SMC call arguments,
->> >> + *   x0 = THUNDERX2_SMC_CALL_ID      (Vendor SMC call Id)
->> >> + *   x1 = THUNDERX2_SMC_SET_CHANNEL  (Id to set DMC/L3C channel)
->> >> + *   x2 = Node id
->> >
->> > How do we map Linux node IDs to the firmware's view of node IDs?
->> >
->> > I don't believe the two are necessarily the same -- Linux's node IDs are
->> > a Linux-specific construct.
->>
->> both are same, it is numa node id from ACPI/firmware.
->
-> I am very wary about assuming that the Linux nid will always be the same
-> as the ACPI node id.
->
-> For that to *potentially* be true, this driver should depend on
-> CONFIG_NUMA, NUMA must not be disabled on the command line, etc, or the
-> node id will always be NUMA_NO_NODE.
-
-ok, i can check the node id which we get from ACPI helpers in probe.
-if it is NUMA_NO_NODE, I will init first socket uncore only and nid
-param to fw is always zero?
-
->
-> I would be *much* happier if we had an explicit mapping somewhere to the
-> ID the FW expects.
->
->> > It would be much nicer if we could pass something based on the MPIDR,
->> > which is a known HW construct, or if this implicitly affected the
->> > current node.
->>
->> IMO,  node id is sufficient.
->
-> I agree that *a* node ID is sufficient, I just don't think that we're
-> guaranteed to have the specific node ID the FW wants.
-
-for thunderx2 which is 2 socket only platform, pxm and nid should be
-same(either 0 or 1)
-however, i can send PXM id(node_to_pxm) to firmware to make it more sane.
-
->
->> > It would be vastly more sane for this to not be muxed at all. :/
->>
->> i am helpless due to crappy hw design!
->
-> I'm certainly not blaming you for this! :)
->
-> I hope the HW designers don't make the same mistake in future, though...
->
-> Thanks,
-> Mark.
-
-thanks
-Ganapat
+> -----Original Message-----
+> From: Russell King - ARM Linux <linux@armlinux.org.uk>
+> Sent: Monday, May 21, 2018 15:12
+> To: ilialin at codeaurora.org
+> Cc: viresh.kumar at linaro.org; devicetree at vger.kernel.org; linux-
+> pm at vger.kernel.org; linux-arm-msm at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-soc at vger.kernel.org; linux-
+> clk at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] cpufreq: Add Kryo CPU scaling driver
+> 
+> On Mon, May 21, 2018 at 02:05:41PM +0300, ilialin at codeaurora.org wrote:
+> > You are right.
+> > cpu_dev_silver != cpu_dev_gold, and I found this with my tests as well.
+> > Thank you.
+> >
+> > > -----Original Message-----
+> > > From: Russell King - ARM Linux <linux@armlinux.org.uk>
+> > > Sent: Monday, May 21, 2018 13:54
+> > > To: Ilia Lin <ilialin@codeaurora.org>
+> > > Cc: viresh.kumar at linaro.org; devicetree at vger.kernel.org; linux-
+> > > pm at vger.kernel.org; linux-arm-msm at vger.kernel.org; linux-
+> > > kernel at vger.kernel.org; linux-soc at vger.kernel.org; linux-
+> > > clk at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > > Subject: Re: [PATCH] cpufreq: Add Kryo CPU scaling driver
+> > >
+> > > On Mon, May 21, 2018 at 01:31:30PM +0300, Ilia Lin wrote:
+> > > > +#define SILVER_LEAD	0
+> > > > +#define GOLD_LEAD	2
+> > >
+> > > Okay, two different values here, but "GOLD_LEAD" appears unused.
+> > >
+> > > > +	cpu_dev_silver = get_cpu_device(SILVER_LEAD);
+> > > > +	if (NULL == cpu_dev_silver)
+> > > > +		return -ENODEV;
+> > > > +
+> > > > +	cpu_dev_gold = get_cpu_device(SILVER_LEAD);
+> > > > +	if (NULL == cpu_dev_gold)
+> > > > +		return -ENODEV;
+> > >
+> > > get_cpu_device() takes the logical CPU number.  So the above gets
+> > > CPU 0 each time, and so cpu_dev_silver == cpu_dev_gold here.  So
+> > > what's the point of the second get_cpu_device() ?  If it's supposed to
+be:
+> > >
+> > > 	cpu_dev_gold = get_cpu_device(GOLD_LEAD);
+> > >
+> > > That would get CPU 2, but in terms of these defines, it doesn't make
+> > > that much sense.  What exactly does "silver lead" and "gold lead"
+> > > refer to in
+> > these
+> > > definitions?
+> 
+> I think you still need to explain this.
+> 
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps
+> up According to speedtest.net: 8.21Mbps down 510kbps up
