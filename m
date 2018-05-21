@@ -1,137 +1,99 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 21 May 2018 10:27:21 +0900
-Subject: [reset-control] How to initialize hardware state with the shared
- reset line?
-In-Reply-To: <CAFBinCADQsXoc6CUKabH6VX3ZBYb5apo-xBbe1w0BiO8wBAsPw@mail.gmail.com>
-References: <CAK7LNATZgJ4MxOFLUCNARWv3Zz=gpL-jGReDnBnArquiaXRWoQ@mail.gmail.com>
- <CAFBinCADQsXoc6CUKabH6VX3ZBYb5apo-xBbe1w0BiO8wBAsPw@mail.gmail.com>
-Message-ID: <CAK7LNAR1b_F_eLEWAdQc3L=daGz=ttKq0mQP78BkjzTOssaXvw@mail.gmail.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Mon, 21 May 2018 01:58:21 +0000
+Subject: [PATCH] ARM: dts: imx7d: use operating-points-v2 for cpu
+In-Reply-To: <20180520125048.GX26863@dragon>
+References: <1526446097-7111-1-git-send-email-Anson.Huang@nxp.com>
+ <20180520125048.GX26863@dragon>
+Message-ID: <AM3PR04MB1315E332CBFDA4151F6F3FA8F5950@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
 
 
-2018-05-20 19:57 GMT+09:00 Martin Blumenstingl
-<martin.blumenstingl@googlemail.com>:
-> Hi,
->
-> On Thu, May 10, 2018 at 11:16 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
-> [snip]
->> I may be missing something, but
->> one solution might be reset hogging on the
->> reset provider side.  This allows us to describe
->> the initial state of reset lines in the reset controller.
->>
->> The idea for "reset-hog" is similar to:
->>  - "gpio-hog" defined in
->>    Documentation/devicetree/bindings/gpio/gpio.txt
->>  - "assigned-clocks" defined in
->>    Documetation/devicetree/bindings/clock/clock-bindings.txt
->>
->>
->>
->> For example,
->>
->>    reset-controller {
->>             ....
->>
->>             line_a {
->>                   reset-hog;
->>                   resets = <1>;
->>                   reset-assert;
->>             };
->>    }
->>
->>
->> When the reset controller is registered,
->> the reset ID '1' is asserted.
->>
->>
->> So, all reset consumers that share the reset line '1'
->> will start from the asserted state
->> (i.e. defined state machine state).
-> I wonder if a "reset hog" can be board specific:
-> - GPIO hogs are definitely board specific (meson-gxbb-odroidc2.dts for
-> example uses it to take the USB hub out of reset)
-> - assigned-clock-parents (and the like) can also be board specific (I
-> made up a use-case since I don't know of any actual examples: board A
-> uses an external XTAL while board B uses some other internal
-> clock-source because it doesn't have an external XTAL)
->
-> however, can reset lines be board specific? or in other words: do we
-> need to describe them in device-tree?
-
-Indeed.
-
-I did not come up with board-specific cases.
-
-The problem we are discussing is SoC-specific,
-and reset-controller drivers are definitely SoC-specific.
-
-So, I think the initial state can be coded in drivers instead of DT.
+Anson Huang
+Best Regards!
 
 
-> we could extend struct reset_controller_dev (= reset controller
-> driver) if they are not board specific:
-> - either assert all reset lines by default except if they are listed
-> in a new field (may break backwards compatibility, requires testing of
-> all reset controller drivers)
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Sunday, May 20, 2018 8:51 PM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> robh+dt at kernel.org; mark.rutland at arm.com; dl-linux-imx
+> <linux-imx@nxp.com>; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH] ARM: dts: imx7d: use operating-points-v2 for cpu
+> 
+> On Wed, May 16, 2018 at 12:48:17PM +0800, Anson Huang wrote:
+> > This patch uses "operating-points-v2" instead of "operating-points" to
+> > be more fit with cpufreq-dt driver.
+> >
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > ---
+> >  arch/arm/boot/dts/imx7d.dtsi | 24 +++++++++++++++++++-----
+> >  1 file changed, 19 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/imx7d.dtsi
+> > b/arch/arm/boot/dts/imx7d.dtsi index 4c9877e..28980c8 100644
+> > --- a/arch/arm/boot/dts/imx7d.dtsi
+> > +++ b/arch/arm/boot/dts/imx7d.dtsi
+> > @@ -9,12 +9,8 @@
+> >  / {
+> >  	cpus {
+> >  		cpu0: cpu at 0 {
+> > -			operating-points = <
+> > -				/* KHz	uV */
+> > -				996000	1075000
+> > -				792000	975000
+> > -			>;
+> >  			clock-frequency = <996000000>;
+> > +			operating-points-v2 = <&cpu0_opp_table>;
+> >  		};
+> >
+> >  		cpu1: cpu at 1 {
+> > @@ -22,6 +18,24 @@
+> >  			device_type = "cpu";
+> >  			reg = <1>;
+> >  			clock-frequency = <996000000>;
+> > +			operating-points-v2 = <&cpu0_opp_table>;
+> > +		};
+> > +	};
+> > +
+> > +	cpu0_opp_table: opp_table0 {
+> 
+> Hyphen is recommended in node name.  Also the suffix 0 doesn't mean too
+> much here.  That said, a better node name would be 'opp-table'.
+> 
+> > +		compatible = "operating-points-v2";
+> > +		opp-shared;
+> > +
+> > +		opp-792000000 {
+> > +			opp-hz = /bits/ 64 <792000000>;
+> > +			opp-microvolt = <975000>;
+> > +			clock-latency-ns = <150000>;
+> > +		};
+> 
+> We recommend to have a newline between nodes.
+> 
+> I fixed them all and applied the patch.
+> 
+> Shawn
+ 
+Thanks Shawn.
 
-This is quite simple, but I am afraid there are some cases where the forcible
-reset-assert is not preferred.
-
-For example, the earlycon.  When we use earlycon, we would expect it has been
-initialized by a boot-loader, or something.
-If it is reset-asserted on the while, the console output
-will not be good.
+Anson.
 
 
 
-> - specify a list of reset lines and their desired state (or to keep it
-> easy: specify a list of reset lines that should be asserted)
-> (I must admit that this is basically your idea but the definition is
-> moved from device-tree to the reset controller driver)
-
-Yes, I think the list of "reset line ID" and "init state" pairs
-would be nicer.
-
-
-> any "chip" specific differences could be expressed by using a
-> different of_device_id
->
-> one the other hand: your "reset hog" solution looks fine to me if
-> reset lines can be board specific
->
->> From the discussion with Martin Blumenstingl
->> (https://lkml.org/lkml/2018/4/28/115),
->> the problem for Amlogic is that
->> the reset line is "de-asserted" by default.
->> If so, the 'reset-hog' would fix the problem,
->> and DWC3 driver would be able to use
->> shared, level reset, I think.
-> I think you are right: if we could control the initial state then we
-> should be able to use level resets
-
-
-Even further, can we drop the shared reset_control_reset() support, maybe?
-(in other words, revert commit 7da33a37b48f11)
-
-
-Thanks for your comment!
-
-
->
-> Regards
-> Martin
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> 
+> > +		opp-996000000 {
+> > +			opp-hz = /bits/ 64 <996000000>;
+> > +			opp-microvolt = <1075000>;
+> > +			clock-latency-ns = <150000>;
+> > +			opp-suspend;
+> >  		};
+> >  	};
+> >
+> > --
+> > 2.7.4
+> >
