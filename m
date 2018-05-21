@@ -1,112 +1,64 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 21 May 2018 15:17:12 +0100
-Subject: [PATCH v9 11/16] arm64/sve: Move sve_pffr() to fpsimd.h and make
- inline
+Date: Mon, 21 May 2018 15:17:15 +0100
+Subject: [PATCH v9 14/16] KVM: arm64: Remove redundant *exit_code changes in
+ fpsimd_guest_exit()
 In-Reply-To: <1526912237-25308-1-git-send-email-Dave.Martin@arm.com>
 References: <1526912237-25308-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1526912237-25308-12-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1526912237-25308-15-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to make sve_save_state()/sve_load_state() more easily
-reusable and to get rid of a potential branch on context switch
-critical paths, this patch makes sve_pffr() inline and moves it to
-fpsimd.h.
+In fixup_guest_exit(), there are a couple of cases where after
+checking what the exit code was, we assign it explicitly with the
+value it already had.
 
-<asm/processor.h> must be included in fpsimd.h in order to make
-this work, and this creates an #include cycle that is tricky to
-avoid without modifying core code, due to the way the PR_SVE_*()
-prctl helpers are included in the core prctl implementation.
+Assuming this is not indicative of a bug, these assignments are not
+needed.
 
-Instead of breaking the cycle, this patch defers inclusion of
-<asm/fpsimd.h> in <asm/processor.h> until the point where it is
-actually needed: i.e., immediately before the prctl definitions.
+This patch removes the redundant assignments, and simplifies some
+if-nesting that becomes trivial as a result.
 
 No functional change.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h    | 13 +++++++++++++
- arch/arm64/include/asm/processor.h |  3 ++-
- arch/arm64/kernel/fpsimd.c         | 12 ------------
- 3 files changed, 15 insertions(+), 13 deletions(-)
+ arch/arm64/kvm/hyp/switch.c | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index fb60b22..fa92747 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -18,6 +18,8 @@
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index a6a8c7d..18d0faa 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -403,12 +403,8 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+ 		if (valid) {
+ 			int ret = __vgic_v2_perform_cpuif_access(vcpu);
  
- #include <asm/ptrace.h>
- #include <asm/errno.h>
-+#include <asm/processor.h>
-+#include <asm/sigcontext.h>
+-			if (ret == 1) {
+-				if (__skip_instr(vcpu))
+-					return true;
+-				else
+-					*exit_code = ARM_EXCEPTION_TRAP;
+-			}
++			if (ret ==  1 && __skip_instr(vcpu))
++				return true;
  
- #ifndef __ASSEMBLY__
+ 			if (ret == -1) {
+ 				/* Promote an illegal access to an
+@@ -430,12 +426,8 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+ 	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
+ 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
  
-@@ -61,6 +63,17 @@ extern void sve_flush_cpu_state(void);
- /* Maximum VL that SVE VL-agnostic software can transparently support */
- #define SVE_VL_ARCH_MAX 0x100
+-		if (ret == 1) {
+-			if (__skip_instr(vcpu))
+-				return true;
+-			else
+-				*exit_code = ARM_EXCEPTION_TRAP;
+-		}
++		if (ret == 1 && __skip_instr(vcpu))
++			return true;
+ 	}
  
-+/* Offset of FFR in the SVE register dump */
-+static inline size_t sve_ffr_offset(int vl)
-+{
-+	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
-+}
-+
-+static inline void *sve_pffr(struct thread_struct *thread)
-+{
-+	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
-+}
-+
- extern void sve_save_state(void *state, u32 *pfpsr);
- extern void sve_load_state(void const *state, u32 const *pfpsr,
- 			   unsigned long vq_minus_1);
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index f902b6d..ebaadb1 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -40,7 +40,6 @@
- 
- #include <asm/alternative.h>
- #include <asm/cpufeature.h>
--#include <asm/fpsimd.h>
- #include <asm/hw_breakpoint.h>
- #include <asm/lse.h>
- #include <asm/pgtable-hwdef.h>
-@@ -245,6 +244,8 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
- void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
- void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
- 
-+#include <asm/fpsimd.h>
-+
- /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
- #define SVE_GET_VL()	sve_get_current_vl()
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index a456d6f..bf7ce9b 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -161,18 +161,6 @@ static void sve_free(struct task_struct *task)
- 	__sve_free(task);
- }
- 
--
--/* Offset of FFR in the SVE register dump */
--static size_t sve_ffr_offset(int vl)
--{
--	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
--}
--
--static void *sve_pffr(struct thread_struct *thread)
--{
--	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
--}
--
- static void change_cpacr(u64 val, u64 mask)
- {
- 	u64 cpacr = read_sysreg(CPACR_EL1);
+ 	/* Return to the host kernel and handle the exit */
 -- 
 2.1.4
