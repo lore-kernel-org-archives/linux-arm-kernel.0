@@ -1,48 +1,115 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 21 May 2018 12:45:07 +0100
-Subject: [PATCH] arm64: kdump: fix out of memory issue in
- __alloc_bootmem_low
-In-Reply-To: <1526818839-8497-1-git-send-email-chenzhou10@huawei.com>
-References: <1526818839-8497-1-git-send-email-chenzhou10@huawei.com>
-Message-ID: <214aa45e-8b05-6294-a06d-19a867cb2d26@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 21 May 2018 13:37:00 +0200
+Subject: [PATCH 2/3] mmc: sdhci-iproc: fix 32bit writes for TRANSFER_MODE
+ register
+In-Reply-To: <1526681037-2074-3-git-send-email-scott.branden@broadcom.com>
+References: <1526681037-2074-1-git-send-email-scott.branden@broadcom.com>
+ <1526681037-2074-3-git-send-email-scott.branden@broadcom.com>
+Message-ID: <CAPDyKFopxnd_pskfm0mS8rkW+AXJ7MNqdoXwKQYP3iGcqfzvyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/18 13:20, Chen Zhou wrote:
-> From: Mao Wenan <maowenan@huawei.com>
-> 
-> On arm64 kdump capture kernel, ACPI runtime code and data are outside
-> of usable memory range and __alloc_bootmem_low may alloc memory below
-> 4G. If we use "crashkernel=Y[@X]" and the start address is above 4G,
-> there will be out of memory.
-> 
-> In this patch, we get max_zone_dma_phys by memblock_start_of_DRAM
-> and __pa_symbol(_end).
+On 19 May 2018 at 00:03, Scott Branden <scott.branden@broadcom.com> wrote:
+> From: Corneliu Doban <corneliu.doban@broadcom.com>
+>
+> When the host controller accepts only 32bit writes, the value of the
+> 16bit TRANSFER_MODE register, that has the same 32bit address as the
+> 16bit COMMAND register, needs to be saved and it will be written
+> in a 32bit write together with the command as this will trigger the
+> host to send the command on the SD interface.
+> When sending the tuning command, TRANSFER_MODE is written and then
+> sdhci_set_transfer_mode reads it back to clear AUTO_CMD12 bit and
+> write it again resulting in wrong value to be written because the
+> initial write value was saved in a shadow and the read-back returned
+> a wrong value, from the register.
+> Fix sdhci_iproc_readw to return the saved value of TRANSFER_MODE
+> when a saved value exist.
+> Same fix for read of BLOCK_SIZE and BLOCK_COUNT registers, that are
+> saved for a different reason, although a scenario that will cause the
+> mentioned problem on this registers is not probable.
+>
+> Fixes: b580c52d58d9 ("mmc: sdhci-iproc: add IPROC SDHCI driver")
+> Signed-off-by: Corneliu Doban <corneliu.doban@broadcom.com>
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
 
-Entering the crash kernel doesn't magically reconfigure interconnects 
-such that 32-bit DMA masters can suddenly address whatever physical 
-address range the kernel image happens to be loaded at. This change is 
-fundamentally incorrect.
+Thanks, applied for fixes and by adding a stable tag!
 
-Robin.
+Kind regards
+Uffe
 
-> Signed-off-by: Chen Zhou <chenzhou10@huawei.com>
 > ---
->   arch/arm64/mm/init.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 1b18b47..df4d212 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -223,7 +223,8 @@ static void __init reserve_elfcorehdr(void)
->    */
->   static phys_addr_t __init max_zone_dma_phys(void)
->   {
-> -	phys_addr_t offset = memblock_start_of_DRAM() & GENMASK_ULL(63, 32);
-> +	phys_addr_t offset = max(memblock_start_of_DRAM(), __pa_symbol(_end)) &
-> +		GENMASK_ULL(63, 32);
->   	return min(offset + (1ULL << 32), memblock_end_of_DRAM());
->   }
->   
-> 
+>  drivers/mmc/host/sdhci-iproc.c | 30 +++++++++++++++++++++++++-----
+>  1 file changed, 25 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
+> index 6f430da..1f0ab08 100644
+> --- a/drivers/mmc/host/sdhci-iproc.c
+> +++ b/drivers/mmc/host/sdhci-iproc.c
+> @@ -33,6 +33,8 @@ struct sdhci_iproc_host {
+>         const struct sdhci_iproc_data *data;
+>         u32 shadow_cmd;
+>         u32 shadow_blk;
+> +       bool is_cmd_shadowed;
+> +       bool is_blk_shadowed;
+>  };
+>
+>  #define REG_OFFSET_IN_BITS(reg) ((reg) << 3 & 0x18)
+> @@ -48,8 +50,22 @@ static inline u32 sdhci_iproc_readl(struct sdhci_host *host, int reg)
+>
+>  static u16 sdhci_iproc_readw(struct sdhci_host *host, int reg)
+>  {
+> -       u32 val = sdhci_iproc_readl(host, (reg & ~3));
+> -       u16 word = val >> REG_OFFSET_IN_BITS(reg) & 0xffff;
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_iproc_host *iproc_host = sdhci_pltfm_priv(pltfm_host);
+> +       u32 val;
+> +       u16 word;
+> +
+> +       if ((reg == SDHCI_TRANSFER_MODE) && iproc_host->is_cmd_shadowed) {
+> +               /* Get the saved transfer mode */
+> +               val = iproc_host->shadow_cmd;
+> +       } else if ((reg == SDHCI_BLOCK_SIZE || reg == SDHCI_BLOCK_COUNT) &&
+> +                  iproc_host->is_blk_shadowed) {
+> +               /* Get the saved block info */
+> +               val = iproc_host->shadow_blk;
+> +       } else {
+> +               val = sdhci_iproc_readl(host, (reg & ~3));
+> +       }
+> +       word = val >> REG_OFFSET_IN_BITS(reg) & 0xffff;
+>         return word;
+>  }
+>
+> @@ -105,13 +121,15 @@ static void sdhci_iproc_writew(struct sdhci_host *host, u16 val, int reg)
+>
+>         if (reg == SDHCI_COMMAND) {
+>                 /* Write the block now as we are issuing a command */
+> -               if (iproc_host->shadow_blk != 0) {
+> +               if (iproc_host->is_blk_shadowed) {
+>                         sdhci_iproc_writel(host, iproc_host->shadow_blk,
+>                                 SDHCI_BLOCK_SIZE);
+> -                       iproc_host->shadow_blk = 0;
+> +                       iproc_host->is_blk_shadowed = false;
+>                 }
+>                 oldval = iproc_host->shadow_cmd;
+> -       } else if (reg == SDHCI_BLOCK_SIZE || reg == SDHCI_BLOCK_COUNT) {
+> +               iproc_host->is_cmd_shadowed = false;
+> +       } else if ((reg == SDHCI_BLOCK_SIZE || reg == SDHCI_BLOCK_COUNT) &&
+> +                  iproc_host->is_blk_shadowed) {
+>                 /* Block size and count are stored in shadow reg */
+>                 oldval = iproc_host->shadow_blk;
+>         } else {
+> @@ -123,9 +141,11 @@ static void sdhci_iproc_writew(struct sdhci_host *host, u16 val, int reg)
+>         if (reg == SDHCI_TRANSFER_MODE) {
+>                 /* Save the transfer mode until the command is issued */
+>                 iproc_host->shadow_cmd = newval;
+> +               iproc_host->is_cmd_shadowed = true;
+>         } else if (reg == SDHCI_BLOCK_SIZE || reg == SDHCI_BLOCK_COUNT) {
+>                 /* Save the block info until the command is issued */
+>                 iproc_host->shadow_blk = newval;
+> +               iproc_host->is_blk_shadowed = true;
+>         } else {
+>                 /* Command or other regular 32-bit write */
+>                 sdhci_iproc_writel(host, newval, reg & ~3);
+> --
+> 2.5.0
+>
