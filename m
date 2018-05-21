@@ -1,156 +1,216 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 21 May 2018 15:49:05 +0100
-Subject: [PATCH v9 12/16] KVM: arm64: Save host SVE context as appropriate
-In-Reply-To: <eac5821b-c5e0-90c9-cdd6-73643662d68d@arm.com>
-References: <1526912237-25308-1-git-send-email-Dave.Martin@arm.com>
- <1526912237-25308-13-git-send-email-Dave.Martin@arm.com>
- <eac5821b-c5e0-90c9-cdd6-73643662d68d@arm.com>
-Message-ID: <20180521144904.GD13470@e103592.cambridge.arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 21 May 2018 15:49:40 +0100
+Subject: [PATCH v2 07/40] iommu: Add a page fault handler
+In-Reply-To: <20180518110434.150a0e64@jacob-builder>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-8-jean-philippe.brucker@arm.com>
+ <20180518110434.150a0e64@jacob-builder>
+Message-ID: <8a640794-a6f3-fa01-82a9-06479a6f779a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 03:40:02PM +0100, Marc Zyngier wrote:
-> On 21/05/18 15:17, Dave Martin wrote:
-> > This patch adds SVE context saving to the hyp FPSIMD context switch
-> > path.  This means that it is no longer necessary to save the host
-> > SVE state in advance of entering the guest, when in use.
-> > 
-> > In order to avoid adding pointless complexity to the code, VHE is
-> > assumed if SVE is in use.  VHE is an architectural prerequisite for
-> > SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
-> > kernels that support both SVE and KVM.
-> > 
-> > Historically, software models exist that can expose the
-> > architecturally invalid configuration of SVE without VHE, so if
-> > this situation is detected at kvm_init() time then KVM will be
-> > disabled.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > 
-> > ---
-> > 
-> >  * Stripped the following tags, reviewers please reconfirm:
-> > 
-> > Formerly-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> > Formerly-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Formerly-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > (Creation of a new file for this one change may be deemed undesirable,
-> > but there didn't seem to be a correct place to put it.  There may also
-> > be a way around the circular include problem that I missed.)
-> > 
-> > Changes since v8:
-> > 
-> >  * Add kvm_arch_check_supported() hook, and move arm64-specific check
-> >    for SVE-implies-VHE into arch/arm64/.
-> > 
-> >    Due to circular header dependency problems, it is difficult to get
-> >    the prototype for kvm_pr_*() functions in <asm/kvm_host.h>, so this
-> >    patch puts arm64's kvm_arch_check_supported() hook out of line.
-> >    This is not a hot function.
-> > ---
-> >  arch/arm/include/asm/kvm_host.h   |  1 +
-> >  arch/arm64/Kconfig                |  7 +++++++
-> >  arch/arm64/include/asm/kvm_host.h |  1 +
-> >  arch/arm64/kvm/Makefile           |  2 +-
-> >  arch/arm64/kvm/fpsimd.c           |  1 -
-> >  arch/arm64/kvm/hyp/switch.c       | 20 +++++++++++++++++++-
-> >  arch/arm64/kvm/init.c             | 33 +++++++++++++++++++++++++++++++++
-> >  virt/kvm/arm/arm.c                |  6 ++++++
-> >  8 files changed, 68 insertions(+), 3 deletions(-)
-> >  create mode 100644 arch/arm64/kvm/init.c
-> > 
+On 18/05/18 19:04, Jacob Pan wrote:
+>> +struct iopf_context {
+>> +	struct device			*dev;
+>> +	struct iommu_fault_event	evt;
+>> +	struct list_head		head;
+>> +};
+>> +
+>> +struct iopf_group {
+>> +	struct iopf_context		last_fault;
+>> +	struct list_head		faults;
+>> +	struct work_struct		work;
+>> +};
+>> +
+> All the page requests in the group should belong to the same device,
+> perhaps struct device tracking should be in iopf_group instead of
+> iopf_context?
 
-[...]
+Right, this is a leftover from when we kept a global list of partial
+faults. Since the list is now per-device, I can move the dev pointer (I
+think I should also rename iopf_context to iopf_fault, if that's all right)
 
-> > diff --git a/arch/arm64/kvm/init.c b/arch/arm64/kvm/init.c
-> > new file mode 100644
-> > index 0000000..3b6e730
-> > --- /dev/null
-> > +++ b/arch/arm64/kvm/init.c
-> > @@ -0,0 +1,33 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * arch/arm64/kvm/init.c: KVM initialisation support
-> > + *
-> > + * Copyright 2018 Arm Limited
-> > + * Author: Dave Martin <Dave.Martin@arm.com>
-> > + */
-> > +#include <linux/errno.h>
-> > +#include <linux/kvm_host.h>
-> > +#include <asm/cpufeature.h>
-> > +#include <asm/kvm_host.h>
-> > +
-> > +/* Additional arch-dependent checks for KVM usability */
-> > +int kvm_arch_check_supported(void)
-> > +{
-> > +	/*
-> > +	 * VHE is a prerequisite for SVE in the Arm architecture, and
-> > +	 * Kconfig ensures that if system_supports_sve() here then
-> > +	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
-> > +	 * detected and enabled, the CPU is architecturally
-> > +	 * noncompliant.
-> > +	 *
-> > +	 * Just in case this mismatch is seen, detect it, warn and give
-> > +	 * up.  Supporting this forbidden configuration in Hyp would be
-> > +	 * pointless.
-> > +	 */
-> > +	if (system_supports_sve() && !has_vhe()) {
-> > +		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> 
-> [entering bikeshedding territory]
-> 
-> I'm not exactly keen on this. This feels overkill, and a departure from 
-> what we've been doing so far.
-> 
-> Why don't you simply have a helper in kvm_host.h that does:
-> 
-> static inline bool kvm_arm_check_sve_valid(void)
-> {
-> 	return !system_supports_sve() || has_vhe();
-> }
-> 
-> (and a canonical "return true;" implementation for 32bit)
-> 
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index bee226c..8518df0 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
+>> +static int iopf_complete(struct device *dev, struct
+>> iommu_fault_event *evt,
+>> +			 enum page_response_code status)
+>> +{
+>> +	struct page_response_msg resp = {
+>> +		.addr			= evt->addr,
+>> +		.pasid			= evt->pasid,
+>> +		.pasid_present		= evt->pasid_valid,
+>> +		.page_req_group_id	= evt->page_req_group_id,
+>> +		.private_data		= evt->iommu_private,
+>> +		.resp_code		= status,
+>> +	};
+>> +
+>> +	return iommu_page_response(dev, &resp);
+>> +}
+>> +
+>> +static enum page_response_code
+>> +iopf_handle_single(struct iopf_context *fault)
+>> +{
+>> +	/* TODO */
+>> +	return -ENODEV;
+>> +}
+>> +
+>> +static void iopf_handle_group(struct work_struct *work)
+>> +{
+>> +	struct iopf_group *group;
+>> +	struct iopf_context *fault, *next;
+>> +	enum page_response_code status = IOMMU_PAGE_RESP_SUCCESS;
+>> +
+>> +	group = container_of(work, struct iopf_group, work);
+>> +
+>> +	list_for_each_entry_safe(fault, next, &group->faults, head) {
+>> +		struct iommu_fault_event *evt = &fault->evt;
+>> +		/*
+>> +		 * Errors are sticky: don't handle subsequent faults
+>> in the
+>> +		 * group if there is an error.
+>> +		 */
+> There might be performance benefit for certain device to continue in
+> spite of error in that the ATS retry may have less fault. Perhaps a
+> policy decision for later enhancement.
 
-[...]
+Yes I think we should leave it to future work. My current reasoning is
+that subsequent requests are more likely to fail as well and reporting
+the error is more urgent, but we need real workloads to confirm this.
 
-> > @@ -1574,6 +1576,10 @@ int kvm_arch_init(void *opaque)
-> >  		return -ENODEV;
-> >  	}
-> >  
-> > +	err = kvm_arch_check_supported();
-> > +	if (err)
-> > +		return err;
-> > +
-> 
-> And turn this into:
-> 
-> 	if (!kvm_arm_check_sve_valid()) {
-> 		kvm_pr_unimpl("SVE system without VHE unsupported. Broken cpu?");
-> 		return -EINVAL;
-> 	}
-> 
-> It has the advantage of being obvious of what we check for, and doesn't 
-> add any extra file.
+>> +		if (status == IOMMU_PAGE_RESP_SUCCESS)
+>> +			status = iopf_handle_single(fault);
+>> +
+>> +		if (!evt->last_req)
+>> +			kfree(fault);
+>> +	}
+>> +
+>> +	iopf_complete(group->last_fault.dev, &group->last_fault.evt,
+>> status);
+>> +	kfree(group);
+>> +}
+>> +
+>> +/**
+>> + * iommu_queue_iopf - IO Page Fault handler
+>> + * @evt: fault event
+>> + * @cookie: struct device, passed to
+>> iommu_register_device_fault_handler.
+>> + *
+>> + * Add a fault to the device workqueue, to be handled by mm.
+>> + */
+>> +int iommu_queue_iopf(struct iommu_fault_event *evt, void *cookie)
+>> +{
+>> +	struct iopf_group *group;
+>> +	struct iopf_context *fault, *next;
+>> +	struct iopf_device_param *iopf_param;
+>> +
+>> +	struct device *dev = cookie;
+>> +	struct iommu_param *param = dev->iommu_param;
+>> +
+>> +	if (WARN_ON(!mutex_is_locked(&param->lock)))
+>> +		return -EINVAL;
+>> +
+>> +	if (evt->type != IOMMU_FAULT_PAGE_REQ)
+>> +		/* Not a recoverable page fault */
+>> +		return IOMMU_PAGE_RESP_CONTINUE;
+>> +
+>> +	/*
+>> +	 * As long as we're holding param->lock, the queue can't be
+>> unlinked
+>> +	 * from the device and therefore cannot disappear.
+>> +	 */
+>> +	iopf_param = param->iopf_param;
+>> +	if (!iopf_param)
+>> +		return -ENODEV;
+>> +
+>> +	if (!evt->last_req) {
+>> +		fault = kzalloc(sizeof(*fault), GFP_KERNEL);
+>> +		if (!fault)
+>> +			return -ENOMEM;
+>> +
+>> +		fault->evt = *evt;
+>> +		fault->dev = dev;
+>> +
+>> +		/* Non-last request of a group. Postpone until the
+>> last one */
+>> +		list_add(&fault->head, &iopf_param->partial);
+>> +
+>> +		return IOMMU_PAGE_RESP_HANDLED;
+>> +	}
+>> +
+>> +	group = kzalloc(sizeof(*group), GFP_KERNEL);
+>> +	if (!group)
+>> +		return -ENOMEM;
+>> +
+>> +	group->last_fault.evt = *evt;
+>> +	group->last_fault.dev = dev;
+>> +	INIT_LIST_HEAD(&group->faults);
+>> +	list_add(&group->last_fault.head, &group->faults);
+>> +	INIT_WORK(&group->work, iopf_handle_group);
+>> +
+>> +	/* See if we have partial faults for this group */
+>> +	list_for_each_entry_safe(fault, next, &iopf_param->partial,
+>> head) {
+>> +		if (fault->evt.page_req_group_id ==
+>> evt->page_req_group_id)
+> If all 9 bit group index are used, there can be lots of PRGs. For
+> future enhancement, maybe we can have per group partial list ready to
+> go when LPIG comes in? I will be less searching.
 
-Making the call special-purpose makes it more natural to pull the printk
-out of the call, solving the header issues.
+Yes, allocating the PRG from the start could be more efficient. I think
+it's slightly more complicated code so I'd rather see performance
+numbers before implementing it
 
-This would be a bit gross in core code, but arm.c is supported to be
-Arm-specific, so if you prefer this approach it doesn't look too bad
-here.
+>> +			/* Insert *before* the last fault */
+>> +			list_move(&fault->head, &group->faults);
+>> +	}
+>> +
+> If you already sorted the group list with last fault at the end, why do
+> you need a separate entry to track the last fault?
 
-I'm happy to rework along these lines.
+Not sure I understand your question, sorry. Do you mean why the
+iopf_group.last_fault? Just to avoid one more kzalloc.
 
-Cheers
----Dave
+>> +
+>> +	queue->flush(queue->flush_arg, dev);
+>> +
+>> +	/*
+>> +	 * No need to clear the partial list. All PRGs containing
+>> the PASID that
+>> +	 * needs to be decommissioned are whole (the device driver
+>> made sure of
+>> +	 * it before this function was called). They have been
+>> submitted to the
+>> +	 * queue by the above flush().
+>> +	 */
+> So you are saying device driver need to make sure LPIG PRQ is submitted
+> in the flush call above such that partial list is cleared?
+
+Not exactly, it's the IOMMU driver that makes sure all LPIG in its
+queues are submitted by the above flush call. In more details the flow is:
+
+* Either device driver calls unbind()/sva_device_shutdown(), or the
+process exits.
+* If the device driver called, then it already told the device to stop
+using the PASID. Otherwise we use the mm_exit() callback to tell the
+device driver to stop using the PASID.
+* In either case, when receiving a stop request from the driver, the
+device sends the LPIGs to the IOMMU queue.
+* Then, the flush call above ensures that the IOMMU reports the LPIG
+with iommu_report_device_fault.
+* While submitting all LPIGs for this PASID to the work queue,
+ipof_queue_fault also picked up all partial faults, so the partial list
+is clean.
+
+Maybe I should improve this comment?
+
+> what if
+> there are device failures where device needs to reset (either whole
+> function level or PASID level), should there still be a need to clear
+> the partial list for all associated PASID/group?
+
+I guess the simplest way out, when resetting the device, is for the
+device driver to call iommu_sva_device_shutdown(). Both the IOMMU
+driver's sva_device_shutdown() and remove_device() ops should call
+iopf_queue_remove_device(), which clears the partial list.
+
+Thanks,
+Jean
