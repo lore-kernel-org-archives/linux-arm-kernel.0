@@ -1,69 +1,92 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 21 May 2018 16:52:24 +0800
-Subject: [RFT v2 0/4] Perf script: Add python script for CoreSight trace
- disassembler
-Message-ID: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
+Date: Mon, 21 May 2018 16:52:25 +0800
+Subject: [RFT v2 1/4] perf cs-etm: Generate sample for missed packets
+In-Reply-To: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
+References: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1526892748-326-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is to support for using 'perf script' for CoreSight
-trace disassembler, for this purpose this patch series adds a new
-python script to parse CoreSight tracing event and use command 'objdump'
-for disassembled lines, finally this can generate readable program
-execution flow for reviewing tracing data.
+Commit e573e978fb12 ("perf cs-etm: Inject capabilitity for CoreSight
+traces") reworks the samples generation flow from CoreSight trace to
+match the correct format so Perf report tool can display the samples
+properly.  But the change has side effect for packet handling, it only
+generate samples when 'prev_packet->last_instr_taken_branch' is true,
+this results in the start tracing packet and exception packets are
+dropped.
 
-Patch 0001 is one fixing patch to generate samples for the start packet
-and exception packets.
+This patch checks extra two conditions for complete samples:
 
-Patch 0002 is the prerequisite to add addr into sample dict, so this
-value can be used by python script to analyze instruction range.
+- If 'prev_packet->sample_type' is zero we can use this condition to
+  get to know this is the start tracing packet; for this case, the start
+  packet's end_addr is zero as well so we need to handle it in the
+  function cs_etm__last_executed_instr();
 
-Patch 0003 is to add python script for trace disassembler.
+- If 'prev_packet->exc' is true, we can know the previous packet is
+  exception handling packet so need to generate sample for exception
+  flow.
 
-Patch 0004 is to add doc to explain python script usage and give
-example for it.
+Fixes: e573e978fb12 ("perf cs-etm: Inject capabilitity for CoreSight traces")
+Cc: Mike Leach <mike.leach@arm.com>
+Cc: Robert Walker <robert.walker@arm.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ tools/perf/util/cs-etm.c | 35 ++++++++++++++++++++++++++++-------
+ 1 file changed, 28 insertions(+), 7 deletions(-)
 
-This patch series has been rebased on acme git tree [1] with the last
-commit 19422a9f2a3b ("perf tools: Fix kernel_start for PTI on x86") and
-tested on Hikey (ARM64 octa CA53 cores).
-
-In this version the script has no dependency on ARM64 platform and is
-expected to support ARM32 platform, but I am lacking ARM32 platform for
-testing on it, so firstly upstream to support ARM64 platform.
-
-This patch series is firstly to support 'per-thread' recording tracing
-data, but we also need to verify the script can dump trace disassembler
-CPU wide tracing and kernel panic kdump tracing data.  I also verified
-this patch series which can work with kernel panic kdump tracing data,
-because Mathieu is working on CPU wide tracing related work, so after
-this we need to retest for CPU wide tracing and kdump tracing to ensure
-the python script can handle well for all cases.
-
-You are very welcome to test the script in this patch series, your
-testing result and suggestion are very valuable to perfect this script
-to cover more cases.
-
-Changes from v1:
-* According to Mike and Rob suggestion, add the fixing to generate samples
-  for the start packet and exception packets.
-* Simplify the python script to remove the exception prediction algorithm,
-  we can rely on the sane exception packets for disassembler.
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git
-
-
-Leo Yan (4):
-  perf cs-etm: Generate sample for missed packets
-  perf script python: Add addr into perf sample dict
-  perf script python: Add script for CoreSight trace disassembler
-  coresight: Document for CoreSight trace disassembler
-
- Documentation/trace/coresight.txt                  |  52 +++++
- tools/perf/scripts/python/arm-cs-trace-disasm.py   | 234 +++++++++++++++++++++
- tools/perf/util/cs-etm.c                           |  35 ++-
- .../util/scripting-engines/trace-event-python.c    |   2 +
- 4 files changed, 316 insertions(+), 7 deletions(-)
- create mode 100644 tools/perf/scripts/python/arm-cs-trace-disasm.py
-
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 822ba91..378953b 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -495,6 +495,13 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+ static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+ {
+ 	/*
++	 * The packet is the start tracing packet if the end_addr is zero,
++	 * returns 0 for this case.
++	 */
++	if (!packet->end_addr)
++		return 0;
++
++	/*
+ 	 * The packet records the execution range with an exclusive end address
+ 	 *
+ 	 * A64 instructions are constant size, so the last executed
+@@ -897,13 +904,27 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 		etmq->period_instructions = instrs_over;
+ 	}
+ 
+-	if (etm->sample_branches &&
+-	    etmq->prev_packet &&
+-	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+-	    etmq->prev_packet->last_instr_taken_branch) {
+-		ret = cs_etm__synth_branch_sample(etmq);
+-		if (ret)
+-			return ret;
++	if (etm->sample_branches && etmq->prev_packet) {
++		bool generate_sample = false;
++
++		/* Generate sample for start tracing packet */
++		if (etmq->prev_packet->sample_type == 0)
++			generate_sample = true;
++
++		/* Generate sample for exception packet */
++		if (etmq->prev_packet->exc == true)
++			generate_sample = true;
++
++		/* Generate sample for normal branch packet */
++		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
++		    etmq->prev_packet->last_instr_taken_branch)
++			generate_sample = true;
++
++		if (generate_sample) {
++			ret = cs_etm__synth_branch_sample(etmq);
++			if (ret)
++				return ret;
++		}
+ 	}
+ 
+ 	if (etm->sample_branches || etm->synth_opts.last_branch) {
 -- 
 2.7.4
