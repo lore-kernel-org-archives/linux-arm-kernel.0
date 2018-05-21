@@ -1,59 +1,105 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 21 May 2018 14:14:50 +0100
-Subject: [PATCH 1/2] arm64: make is_permission_fault() name clearer
+Date: Mon, 21 May 2018 14:14:51 +0100
+Subject: [PATCH 2/2] arm64: Unify kernel fault reporting
 In-Reply-To: <20180521131451.41040-1-mark.rutland@arm.com>
 References: <20180521131451.41040-1-mark.rutland@arm.com>
-Message-ID: <20180521131451.41040-2-mark.rutland@arm.com>
+Message-ID: <20180521131451.41040-3-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The naming of is_permission_fault() makes it sound like it should return
-true for permission faults from EL0, but by design, it only does so for
-faults from EL1.
+In do_page_fault(), we handle some kernel faults early, and simply
+die() with a message. For faults handled later, we dump the faulting
+address, decode the ESR, walk the page tables, and perform a number of
+steps to ensure that this data is reported.
 
-Let's make this clear by dropping el1 in the name, as we do for
-is_el1_instruction_abort().
+Let's unify the handling of fatal kernel faults with a new
+die_kernel_fault() helper, handling all of these details. This is
+largely the same as the existing logic in __do_kernel_fault(), except
+that addresses are consistently padded to 16 hex characters, as would be
+expected for a 64-bit address.
+
+The messages currently logged in do_page_fault are adjusted to fit into
+the die_kernel_fault() message template.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/fault.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ arch/arm64/mm/fault.c | 37 +++++++++++++++++++++++--------------
+ 1 file changed, 23 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 4165485e8b6e..59990491e72a 100644
+index 59990491e72a..27cbe0b38960 100644
 --- a/arch/arm64/mm/fault.c
 +++ b/arch/arm64/mm/fault.c
-@@ -235,8 +235,9 @@ static bool is_el1_instruction_abort(unsigned int esr)
- 	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
+@@ -255,6 +255,22 @@ static inline bool is_el1_permission_fault(unsigned int esr,
+ 	return false;
  }
  
--static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs,
--				       unsigned long addr)
-+static inline bool is_el1_permission_fault(unsigned int esr,
-+					   struct pt_regs *regs,
-+					   unsigned long addr)
++static void die_kernel_fault(const char *msg, unsigned long addr,
++			     unsigned int esr, struct pt_regs *regs)
++{
++	bust_spinlocks(1);
++
++	pr_alert("Unable to handle kernel %s at virtual address %016lx\n", msg,
++		 addr);
++
++	mem_abort_decode(esr);
++
++	show_pte(addr);
++	die("Oops", regs, esr);
++	bust_spinlocks(0);
++	do_exit(SIGKILL);
++}
++
+ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
+ 			      struct pt_regs *regs)
  {
- 	unsigned int ec       = ESR_ELx_EC(esr);
- 	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
-@@ -268,7 +269,7 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
+@@ -267,8 +283,6 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
+ 	if (!is_el1_instruction_abort(esr) && fixup_exception(regs))
+ 		return;
  
- 	bust_spinlocks(1);
- 
--	if (is_permission_fault(esr, regs, addr)) {
-+	if (is_el1_permission_fault(esr, regs, addr)) {
+-	bust_spinlocks(1);
+-
+ 	if (is_el1_permission_fault(esr, regs, addr)) {
  		if (esr & ESR_ELx_WNR)
  			msg = "write to read-only memory";
- 		else
-@@ -395,7 +396,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		mm_flags |= FAULT_FLAG_WRITE;
+@@ -280,15 +294,7 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
+ 		msg = "paging request";
  	}
  
--	if (addr < TASK_SIZE && is_permission_fault(esr, regs, addr)) {
-+	if (addr < TASK_SIZE && is_el1_permission_fault(esr, regs, addr)) {
+-	pr_alert("Unable to handle kernel %s at virtual address %08lx\n", msg,
+-		 addr);
+-
+-	mem_abort_decode(esr);
+-
+-	show_pte(addr);
+-	die("Oops", regs, esr);
+-	bust_spinlocks(0);
+-	do_exit(SIGKILL);
++	die_kernel_fault(msg, addr, esr, regs);
+ }
+ 
+ static void __do_user_fault(struct siginfo *info, unsigned int esr)
+@@ -399,13 +405,16 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 	if (addr < TASK_SIZE && is_el1_permission_fault(esr, regs, addr)) {
  		/* regs->orig_addr_limit may be 0 if we entered from EL0 */
  		if (regs->orig_addr_limit == KERNEL_DS)
- 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
+-			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
++			die_kernel_fault("access to user memory with fs=KERNEL_DS",
++					 addr, esr, regs);
+ 
+ 		if (is_el1_instruction_abort(esr))
+-			die("Attempting to execute userspace memory", regs, esr);
++			die_kernel_fault("execution of user memory",
++					 addr, esr, regs);
+ 
+ 		if (!search_exception_tables(regs->pc))
+-			die("Accessing user space memory outside uaccess.h routines", regs, esr);
++			die_kernel_fault("access to user memory outside uaccess routines",
++					 addr, esr, regs);
+ 	}
+ 
+ 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
 -- 
 2.11.0
