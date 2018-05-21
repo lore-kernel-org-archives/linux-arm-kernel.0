@@ -1,27 +1,69 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 22 May 2018 00:55:58 +0300
-Subject: [PATCH 17/33] pinctrl: armada-37xx: use match_string() helper
-In-Reply-To: <1526903890-35761-18-git-send-email-xieyisheng1@huawei.com>
-References: <1526903890-35761-1-git-send-email-xieyisheng1@huawei.com>
- <1526903890-35761-18-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <CAHp75Ve5yRKZK5mcCsRBKGevN6jPN++WnQZnc4eetOoKXvxR1w@mail.gmail.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Tue, 22 May 2018 00:00:44 +0200
+Subject: [PATCH 2/2] ARM: pxa: dts: add pin definitions for extended GPIOs
+In-Reply-To: <20180521220044.821-1-daniel@zonque.org>
+References: <20180521220044.821-1-daniel@zonque.org>
+Message-ID: <20180521220044.821-2-daniel@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 2:57 PM, Yisheng Xie <xieyisheng1@huawei.com> wrote:
-> match_string() returns the index of an array for a matching string,
-> which can be used intead of open coded variant.
+The PXA3xx series features some extended GPIO banks which are named GPIO0_2,
+GPIO1_2 etc. The PXA300, PXA310 and PXA320 have different numbers of such
+pins, and they also have variant-specific register offsets.
 
-https://patchwork.kernel.org/patch/10378781/
+Signed-off-by: Daniel Mack <daniel@zonque.org>
+---
+ arch/arm/boot/dts/pxa3xx.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@bootlin.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-gpio at vger.kernel.org
-
+diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
+index a13ac52e4fd2..446e612688c0 100644
+--- a/arch/arm/boot/dts/pxa3xx.dtsi
++++ b/arch/arm/boot/dts/pxa3xx.dtsi
+@@ -8,6 +8,13 @@
+ 	 (gpio <= 98) ? (0x0400 + 4 * (gpio - 27)) :	\
+ 	 (gpio <= 127) ? (0x0600 + 4 * (gpio - 99)) :	\
+ 	 0)
++#define MFP_PIN_PXA300_0_2	0x674
++#define MFP_PIN_PXA300_1_2	0x678
++#define MFP_PIN_PXA300_2_2	0x2dc
++#define MFP_PIN_PXA300_3_2	0x2e0
++#define MFP_PIN_PXA300_4_2	0x2e4
++#define MFP_PIN_PXA300_5_2	0x2e8
++#define MFP_PIN_PXA300_6_2	0x2ec
+ 
+ #define MFP_PIN_PXA310(gpio)				\
+ 	((gpio <= 2) ? (0x00b4 + 4 * gpio) :		\
+@@ -18,6 +25,17 @@
+ 	 (gpio <= 262) ? 0 :				\
+ 	 (gpio <= 268) ? (0x052c + 4 * (gpio - 263)) :	\
+ 	 0)
++#define MFP_PIN_PXA310_0_2	0x674
++#define MFP_PIN_PXA310_1_2	0x678
++#define MFP_PIN_PXA310_2_2	0x2dc
++#define MFP_PIN_PXA310_3_2	0x2e0
++#define MFP_PIN_PXA310_4_2	0x2e4
++#define MFP_PIN_PXA310_5_2	0x2e8
++#define MFP_PIN_PXA310_6_2	0x2ec
++#define MFP_PIN_PXA310_7_2	0x52c
++#define MFP_PIN_PXA310_8_2	0x530
++#define MFP_PIN_PXA310_9_2	0x534
++#define MFP_PIN_PXA310_10_2	0x538
+ 
+ #define MFP_PIN_PXA320(gpio)				\
+ 	((gpio <= 4) ? (0x0124 + 4 * gpio) :		\
+@@ -30,6 +48,12 @@
+ 	 (gpio <= 98) ? (0x04f0 + 4 * (gpio - 74)) :	\
+ 	 (gpio <= 127) ? (0x0600 + 4 * (gpio - 99)) :	\
+ 	 0)
++#define MFP_PIN_PXA320_0_2	0x674
++#define MFP_PIN_PXA320_1_2	0x678
++#define MFP_PIN_PXA320_2_2	0x67c
++#define MFP_PIN_PXA320_3_2	0x680
++#define MFP_PIN_PXA320_4_2	0x284
++#define MFP_PIN_PXA320_5_2	0x28c
+ 
+ /*
+  * MFP Alternate functions for pins having a gpio.
 -- 
-With Best Regards,
-Andy Shevchenko
+2.14.3
