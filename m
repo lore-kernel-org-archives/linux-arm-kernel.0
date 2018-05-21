@@ -1,166 +1,222 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 21 May 2018 12:35:09 +0100
-Subject: [PATCH v3 0/6] arm64: provide pseudo NMI with GICv3
-Message-ID: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
+Date: Mon, 21 May 2018 12:35:11 +0100
+Subject: [PATCH v3 2/6] arm64: alternative: Apply alternatives early in boot
+ process
+In-Reply-To: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
+References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1526902515-13769-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is a continuation of the work started by Daniel [1]. The goal
-is to use GICv3 interrupt priorities to simulate an NMI.
+From: Daniel Thompson <daniel.thompson@linaro.org>
 
-To achieve this, set two priorities, one for standard interrupts and
-another, higher priority, for NMIs. Whenever we want to disable interrupts,
-we mask the standard priority instead so NMIs can still be raised. Some
-corner cases though still require to actually mask all interrupts
-effectively disabling the NMI.
+Currently alternatives are applied very late in the boot process (and
+a long time after we enable scheduling). Some alternative sequences,
+such as those that alter the way CPU context is stored, must be applied
+much earlier in the boot sequence.
 
+Introduce apply_boot_alternatives() to allow some alternatives to be
+applied immediately after we detect the CPU features of the boot CPU.
 
-Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
-hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
-for now. I don't think there is any reason LPIs should be allowed to be set
-as NMI as they do not have an active state.
-When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
+Since alternatives are now applied at different times, provide function
+to check whether alternatives are applied per feature.
 
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+[julien.thierry at arm.com: rename to fit new cpufeature framework better,
+			 apply BOOT_SCOPE feature early in boot,
+			 add per feature alternative checking]
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/alternative.h |  5 +++--
+ arch/arm64/include/asm/cpufeature.h  |  2 ++
+ arch/arm64/kernel/alternative.c      | 39 +++++++++++++++++++++++++++++++++---
+ arch/arm64/kernel/cpufeature.c       |  7 ++++++-
+ arch/arm64/kernel/smp.c              |  7 +++++++
+ 5 files changed, 54 insertions(+), 6 deletions(-)
 
-I did a bit of testing on a board with 8 Cortex-A57 cores:
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index a91933b..36b0703 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -14,8 +14,6 @@
+ #include <linux/stddef.h>
+ #include <linux/stringify.h>
 
-- "hackbench 200 process 1000" (average over 20 runs)
-+-----------+----------+------------+------------------+
-|           | native   | PMR guest  | v4.17-rc6 guest  |
-+-----------+----------+------------+------------------+
-| PMR host  | 40.0336s |   39.3039s |         39.2044s |
-| v4.17-rc6 | 40.4040s |   39.6011s |         39.1147s |
-+-----------+----------+------------+------------------+
+-extern int alternatives_applied;
+-
+ struct alt_instr {
+ 	s32 orig_offset;	/* offset to original instruction */
+ 	s32 alt_offset;		/* offset to replacement instruction */
+@@ -27,9 +25,12 @@ struct alt_instr {
+ typedef void (*alternative_cb_t)(struct alt_instr *alt,
+ 				 __le32 *origptr, __le32 *updptr, int nr_inst);
 
-I'm not sure why guests appear to be faster than hosts, maybe
-because host have full ubuntu system and guest just have a simple rootfs
-with busybox...
++void __init apply_boot_alternatives(void);
+ void __init apply_alternatives_all(void);
+ void apply_alternatives(void *start, size_t length);
 
-It also seems the penalty from using PMR is cushioned by the removal of
-the interrupt acknowledge loop in the GICv3 driver.
++bool feature_alternatives_applied(u16 cpufeature);
++
+ #define ALTINSTR_ENTRY(feature,cb)					      \
+ 	" .word 661b - .\n"				/* label           */ \
+ 	" .if " __stringify(cb) " == 0\n"				      \
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 09b0f2a..19efe4e 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -359,6 +359,8 @@ static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
+ extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
+ extern struct static_key_false arm64_const_caps_ready;
 
++extern unsigned long boot_capabilities;
++
+ bool this_cpu_has_cap(unsigned int cap);
 
-- Kernel build from defconfig:
-PMR host:  13m45.743s
-v4.17-rc6: 13m40.400s
+ static inline bool cpu_have_feature(unsigned int num)
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 5c4bce4..29885eb 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -34,6 +34,8 @@
 
-The difference is ~0.65%, from different runs, this seems to be within
-the noise.
+ int alternatives_applied;
 
++DECLARE_BITMAP(alternatives_status, ARM64_NCAPS);
++
+ struct alt_region {
+ 	struct alt_instr *begin;
+ 	struct alt_instr *end;
+@@ -122,7 +124,8 @@ static void patch_alternative(struct alt_instr *alt,
+ 	}
+ }
 
-Requirements to use this:
-- Have GICv3
-- SCR_EL3.FIQ is set to 1 when linux runs or have single security state
-- Select Kernel Feature -> Use ICC system registers for IRQ masking
+-static void __apply_alternatives(void *alt_region, bool use_linear_alias)
++static void __apply_alternatives(void *alt_region,  bool use_linear_alias,
++				 unsigned long feature_mask)
+ {
+ 	struct alt_instr *alt;
+ 	struct alt_region *region = alt_region;
+@@ -132,6 +135,9 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ 	for (alt = region->begin; alt < region->end; alt++) {
+ 		int nr_inst;
 
-* Patches 1 and 2 allows to detect and enable the use of GICv3 system
-  registers during boot time.
-* Patch 3 introduces the masking of IRQs using priorities replacing irq
-  disabling.
-* Patch 4 adds some utility functions
-* Patch 5 add detection of the view linux has on GICv3 priorities, without
-  this we cannot easily mask specific priorities in an accurate manner
-* Patch 6 adds the support for NMIs
++		if ((BIT(alt->cpufeature) & feature_mask) == 0)
++			continue;
++
+ 		/* Use ARM64_CB_PATCH as an unconditional patch */
+ 		if (alt->cpufeature < ARM64_CB_PATCH &&
+ 		    !cpus_have_cap(alt->cpufeature))
+@@ -142,6 +148,8 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ 		else
+ 			BUG_ON(alt->alt_len != alt->orig_len);
 
++		__set_bit(alt->cpufeature, alternatives_status);
++
+ 		pr_info_once("patching kernel code\n");
 
-Changes since V2[2]:
-* Series rebase to v4.17-rc6
+ 		origptr = ALT_ORIG_PTR(alt);
+@@ -178,7 +186,9 @@ static int __apply_alternatives_multi_stop(void *unused)
+ 		isb();
+ 	} else {
+ 		BUG_ON(alternatives_applied);
+-		__apply_alternatives(&region, true);
++
++		__apply_alternatives(&region, true, ~boot_capabilities);
++
+ 		/* Barriers provided by the cache flushing */
+ 		WRITE_ONCE(alternatives_applied, 1);
+ 	}
+@@ -192,6 +202,24 @@ void __init apply_alternatives_all(void)
+ 	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
+ }
 
-* Adapt pathces 1 and 2 to the rework of cpufeatures framework
++/*
++ * This is called very early in the boot process (directly after we run
++ * a feature detect on the boot CPU). No need to worry about other CPUs
++ * here.
++ */
++void __init apply_boot_alternatives(void)
++{
++	struct alt_region region = {
++		.begin	= (struct alt_instr *)__alt_instructions,
++		.end	= (struct alt_instr *)__alt_instructions_end,
++	};
++
++	/* If called on non-boot cpu things could go wrong */
++	WARN_ON(smp_processor_id() != 0);
++
++	__apply_alternatives(&region, true, boot_capabilities);
++}
++
+ void apply_alternatives(void *start, size_t length)
+ {
+ 	struct alt_region region = {
+@@ -199,5 +227,10 @@ void apply_alternatives(void *start, size_t length)
+ 		.end	= start + length,
+ 	};
 
-* Use the group0 detection scheme in the GICv3 driver to identify
-  the priority view, and drop the use of a fake interrupt
+-	__apply_alternatives(&region, false);
++	__apply_alternatives(&region, false, -1);
++}
++
++bool feature_alternatives_applied(u16 cpufeature)
++{
++	return test_bit(cpufeature, alternatives_status);
+ }
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index e03e897..021ae87 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -52,6 +52,8 @@
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ EXPORT_SYMBOL(cpu_hwcaps);
 
-* Add the case for a GIC configured in a single security state
++unsigned long boot_capabilities;
++
+ /*
+  * Flag to indicate if we have computed the system wide
+  * capabilities based on the boot time active CPUs. This
+@@ -1021,7 +1023,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ 	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
+ 	 * do anything here.
+ 	 */
+-	if (!alternatives_applied)
++	if (!feature_alternatives_applied(ARM64_HAS_VIRT_HOST_EXTN))
+ 		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
+ }
+ #endif
+@@ -1346,6 +1348,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 		if (!cpus_have_cap(caps->capability) && caps->desc)
+ 			pr_info("%s %s\n", info, caps->desc);
+ 		cpus_set_cap(caps->capability);
++
++		if (scope_mask & SCOPE_BOOT_CPU)
++			__set_bit(caps->capability, &boot_capabilities);
+ 	}
+ }
 
-* Use local_daif_restore instead of local_irq_enable the first time
-  we enable interrupts after a bp hardening in the handling of a kernel
-  entry. Otherwise PRS.I remains set...
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index f3e2e3a..b7fb909 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -410,6 +410,13 @@ void __init smp_prepare_boot_cpu(void)
+ 	 */
+ 	jump_label_init();
+ 	cpuinfo_store_boot_cpu();
++
++	/*
++	 * We now know enough about the boot CPU to apply the
++	 * alternatives that cannot wait until interrupt handling
++	 * and/or scheduling is enabled.
++	 */
++	apply_boot_alternatives();
+ }
 
-
-Changes since V1[3]:
-* Series rebased to v4.15-rc8.
-
-* Check for arm64_early_features in this_cpu_has_cap (spotted by Suzuki).
-
-* Fix issue where debug exception were not masked when enabling debug in
-  mdscr_el1.
-
-
-Changes since RFC[4]:
-* The series was rebased to v4.15-rc2 which implied some changes mainly
-  related to the work on exception entries and daif flags by James Morse.
-
-  - The first patch in the previous series was dropped because no longer
-    applicable.
-
-  - With the semantics James introduced of "inheriting" daif flags,
-    handling of PMR on exception entry is simplified as PMR is not altered
-    by taking an exception and already inherited from previous state.
-
-  - James pointed out that taking a PseudoNMI before reading the FAR_EL1
-    register should not be allowed as per the TRM (D10.2.29):
-    "FAR_EL1 is made UNKNOWN on an exception return from EL1."
-    So in this submission PSR.I bit is cleared only after FAR_EL1 is read.
-
-* For KVM, only deal with PMR unmasking/restoring in common code, and VHE
-  specific code makes sure PSR.I bit is set when necessary.
-
-* When detecting the GIC priority view (patch 5), wait for an actual
-  interrupt instead of trying only once.
-
-
-[1] http://www.spinics.net/lists/arm-kernel/msg525077.html
-[2] https://lkml.org/lkml/2018/1/17/335
-[3] https://www.spinics.net/lists/arm-kernel/msg620763.html
-[4] https://www.spinics.net/lists/arm-kernel/msg610736.html
-
-Cheers,
-
-Julien
-
-
-Daniel Thompson (3):
-  arm64: cpufeature: Allow early detect of specific features
-  arm64: alternative: Apply alternatives early in boot process
-  arm64: irqflags: Use ICC sysregs to implement IRQ masking
-
-Julien Thierry (3):
-  irqchip/gic: Add functions to access irq priorities
-  arm64: Detect current view of GIC priorities
-  arm64: Add support for pseudo-NMIs
-
- Documentation/arm64/booting.txt        |   5 +
- arch/arm64/Kconfig                     |  15 ++
- arch/arm64/include/asm/alternative.h   |   5 +-
- arch/arm64/include/asm/arch_gicv3.h    |  25 +++
- arch/arm64/include/asm/assembler.h     |  25 ++-
- arch/arm64/include/asm/cpufeature.h    |   2 +
- arch/arm64/include/asm/daifflags.h     |  36 ++--
- arch/arm64/include/asm/efi.h           |   5 +
- arch/arm64/include/asm/irqflags.h      | 131 ++++++++++++++
- arch/arm64/include/asm/kvm_host.h      |  14 ++
- arch/arm64/include/asm/processor.h     |   4 +
- arch/arm64/include/asm/ptrace.h        |  14 +-
- arch/arm64/include/asm/sysreg.h        |   1 +
- arch/arm64/kernel/alternative.c        |  39 +++-
- arch/arm64/kernel/asm-offsets.c        |   1 +
- arch/arm64/kernel/cpufeature.c         |   9 +-
- arch/arm64/kernel/entry.S              |  84 ++++++++-
- arch/arm64/kernel/head.S               |  37 ++++
- arch/arm64/kernel/process.c            |   6 +
- arch/arm64/kernel/smp.c                |  15 ++
- arch/arm64/kvm/hyp/switch.c            |  25 +++
- arch/arm64/mm/fault.c                  |   5 +-
- arch/arm64/mm/proc.S                   |  23 +++
- drivers/irqchip/irq-gic-common.c       |  10 ++
- drivers/irqchip/irq-gic-common.h       |   2 +
- drivers/irqchip/irq-gic-v3-its.c       |   2 +-
- drivers/irqchip/irq-gic-v3.c           | 320 ++++++++++++++++++++++++++-------
- include/linux/interrupt.h              |   1 +
- include/linux/irqchip/arm-gic-common.h |   6 +
- include/linux/irqchip/arm-gic.h        |   5 -
- 30 files changed, 778 insertions(+), 94 deletions(-)
-
+ static u64 __init of_get_cpu_mpidr(struct device_node *dn)
 --
 1.9.1
