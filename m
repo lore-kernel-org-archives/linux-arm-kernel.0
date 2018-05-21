@@ -1,358 +1,122 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Mon, 21 May 2018 17:15:15 +0200
-Subject: [PATCH 05/15] drm/sun4i: Add TCON TOP driver
-In-Reply-To: <20180521080517.3qmlfajqpn4uw7jv@flea>
-References: <20180519183127.2718-1-jernej.skrabec@siol.net>
- <20180519183127.2718-6-jernej.skrabec@siol.net>
- <20180521080517.3qmlfajqpn4uw7jv@flea>
-Message-ID: <5965231.6ucpJrPIQ5@jernej-laptop>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 21 May 2018 16:29:58 +0100
+Subject: [PATCH 6/6] arm64: perf: Add support for chaining counters
+In-Reply-To: <22ea8f48-dc74-6d84-6085-b41447a79a6d@arm.com>
+References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
+ <1526638943-2110-7-git-send-email-suzuki.poulose@arm.com>
+ <32f2d870-9b9c-0b10-880f-cc99cf969bf6@arm.com>
+ <5d53fe1d-dbd9-2aad-73bd-0c4284540240@arm.com>
+ <c8cb9280-c93d-89c4-43ed-179de8d46dfd@arm.com>
+ <f7ffdcfb-5a32-9a55-32a5-4f8770e23aa0@arm.com>
+ <22ea8f48-dc74-6d84-6085-b41447a79a6d@arm.com>
+Message-ID: <a859c5a1-538a-3dc8-b66e-a767de145501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Dne ponedeljek, 21. maj 2018 ob 10:05:17 CEST je Maxime Ripard napisal(a):
-> On Sat, May 19, 2018 at 08:31:17PM +0200, Jernej Skrabec wrote:
-> > As already described in DT binding, TCON TOP is responsible for
-> > configuring display pipeline. In this initial driver focus is on HDMI
-> > pipeline, so TVE and LCD configuration is not implemented.
-> > 
-> > Implemented features:
-> > - HDMI source selection
-> > - clock driver (TCON and DSI gating)
-> > - connecting mixers and TCONS
-> > 
-> > Something similar also existed in previous SoCs, except that it was part
-> > of first TCON.
-> > 
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > ---
-> > 
-> >  drivers/gpu/drm/sun4i/Makefile             |   3 +-
-> >  drivers/gpu/drm/sun4i/sun8i_tcon_top.c     | 256 +++++++++++++++++++++
-> >  drivers/gpu/drm/sun4i/sun8i_tcon_top.h     |  20 ++
-> >  include/dt-bindings/clock/sun8i-tcon-top.h |  11 +
-> >  4 files changed, 289 insertions(+), 1 deletion(-)
-> >  create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-> >  create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.h
-> >  create mode 100644 include/dt-bindings/clock/sun8i-tcon-top.h
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/Makefile
-> > b/drivers/gpu/drm/sun4i/Makefile index 2589f4acd5ae..09fbfd6304ba 100644
-> > --- a/drivers/gpu/drm/sun4i/Makefile
-> > +++ b/drivers/gpu/drm/sun4i/Makefile
-> > @@ -16,7 +16,8 @@ sun8i-drm-hdmi-y		+= sun8i_hdmi_phy_clk.o
-> > 
-> >  sun8i-mixer-y			+= sun8i_mixer.o sun8i_ui_layer.o \
-> >  
-> >  				   sun8i_vi_layer.o sun8i_ui_scaler.o \
-> > 
-> > -				   sun8i_vi_scaler.o sun8i_csc.o
-> > +				   sun8i_vi_scaler.o sun8i_csc.o \
-> > +				   sun8i_tcon_top.o
-> > 
-> >  sun4i-tcon-y			+= sun4i_crtc.o
-> >  sun4i-tcon-y			+= sun4i_dotclock.o
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-> > b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c new file mode 100644
-> > index 000000000000..075a356a6dfa
-> > --- /dev/null
-> > +++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-> > @@ -0,0 +1,256 @@
-> > +// SPDX-License-Identifier: GPL-2.0+
-> > +/* Copyright (c) 2018 Jernej Skrabec <jernej.skrabec@siol.net> */
-> > +
-> > +#include <drm/drmP.h>
-> > +
-> > +#include <dt-bindings/clock/sun8i-tcon-top.h>
-> > +
-> > +#include <linux/bitfield.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/module.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/reset.h>
-> > +#include <linux/spinlock.h>
-> > +
-> > +#include "sun8i_tcon_top.h"
-> > +
-> > +#define TCON_TOP_PORT_SEL_REG		0x1C
-> > +#define TCON_TOP_PORT_DE0_MSK			GENMASK(1, 0)
-> > +#define TCON_TOP_PORT_DE1_MSK			GENMASK(5, 4)
-> > +#define TCON_TOP_PORT_TCON_LCD0			0
-> > +#define TCON_TOP_PORT_TCON_LCD1			1
-> > +#define TCON_TOP_PORT_TCON_TV0			2
-> > +#define TCON_TOP_PORT_TCON_TV1			3
-> > +
-> > +#define TCON_TOP_GATE_SRC_REG		0x20
-> > +#define TCON_TOP_HDMI_SRC_MSK			GENMASK(29, 28)
-> > +#define TCON_TOP_HDMI_SRC_NONE			0
-> > +#define TCON_TOP_HDMI_SRC_TCON_TV0		1
-> > +#define TCON_TOP_HDMI_SRC_TCON_TV1		2
-> > +#define TCON_TOP_TCON_TV1_GATE			24
-> > +#define TCON_TOP_TCON_TV0_GATE			20
-> > +#define TCON_TOP_TCON_DSI_GATE			16
-> > +
-> > +#define CLK_NUM					3
-> > +
-> > +struct sun8i_tcon_top {
-> > +	struct clk		*bus;
-> > +	void __iomem		*regs;
-> > +	struct reset_control	*rst;
-> > +
-> > +	/*
-> > +	 * spinlock is used for locking access to registers from different
-> > +	 * places - tcon driver and clk subsystem.
-> > +	 */
-> > +	spinlock_t		reg_lock;
-> > +};
-> > +
-> > +struct sun8i_tcon_top_gate {
-> > +	const char	*name;
-> > +	u8		bit;
-> > +	int		index;
-> > +};
-> > +
-> > +static const struct sun8i_tcon_top_gate gates[] = {
-> > +	{"bus-tcon-top-dsi", TCON_TOP_TCON_DSI_GATE, CLK_BUS_TCON_TOP_DSI},
-> > +	{"bus-tcon-top-tv0", TCON_TOP_TCON_TV0_GATE, CLK_BUS_TCON_TOP_TV0},
-> > +	{"bus-tcon-top-tv1", TCON_TOP_TCON_TV1_GATE, CLK_BUS_TCON_TOP_TV1},
-> > +};
-> > +
-> > +void sun8i_tcon_top_set_hdmi_src(struct sun8i_tcon_top *tcon_top, int
-> > tcon) +{
-> > +	unsigned long flags;
-> > +	u32 val;
-> > +
-> > +	if (tcon > 1) {
-> > +		DRM_ERROR("TCON index is too high!\n");
-> > +		return;
-> > +	}
-> > +
-> > +	spin_lock_irqsave(&tcon_top->reg_lock, flags);
-> > +
-> > +	val = readl(tcon_top->regs + TCON_TOP_GATE_SRC_REG);
-> > +	val &= ~TCON_TOP_HDMI_SRC_MSK;
-> > +	val |= FIELD_PREP(TCON_TOP_HDMI_SRC_MSK,
-> > +			  TCON_TOP_HDMI_SRC_TCON_TV0 + tcon);
-> > +	writel(val, tcon_top->regs + TCON_TOP_GATE_SRC_REG);
-> > +
-> > +	spin_unlock_irqrestore(&tcon_top->reg_lock, flags);
-> > +}
-> > +
-> > +void sun8i_tcon_top_de_config(struct sun8i_tcon_top *tcon_top,
-> > +			      int mixer, enum tcon_type tcon_type, int tcon)
-> > +{
-> > +	unsigned long flags;
-> > +	u32 val, reg;
-> > +
-> > +	if (mixer > 1) {
-> > +		DRM_ERROR("Mixer index is too high!\n");
-> > +		return;
-> > +	}
-> > +
-> > +	if (tcon > 1) {
-> > +		DRM_ERROR("TCON index is too high!\n");
-> > +		return;
-> > +	}
-> > +
-> > +	switch (tcon_type) {
-> > +	case tcon_type_lcd:
-> > +		val = TCON_TOP_PORT_TCON_LCD0 + tcon;
-> > +		break;
-> > +	case tcon_type_tv:
-> > +		val = TCON_TOP_PORT_TCON_TV0 + tcon;
-> > +		break;
-> > +	default:
-> > +		DRM_ERROR("Invalid TCON type!\n");
-> > +		return;
-> > +	}
-> > +
-> > +	spin_lock_irqsave(&tcon_top->reg_lock, flags);
-> > +
-> > +	reg = readl(tcon_top->regs + TCON_TOP_PORT_SEL_REG);
-> > +	if (mixer == 0) {
-> > +		reg &= ~TCON_TOP_PORT_DE0_MSK;
-> > +		reg |= FIELD_PREP(TCON_TOP_PORT_DE0_MSK, val);
-> > +	} else {
-> > +		reg &= ~TCON_TOP_PORT_DE1_MSK;
-> > +		reg |= FIELD_PREP(TCON_TOP_PORT_DE1_MSK, val);
-> > +	}
-> > +	writel(reg, tcon_top->regs + TCON_TOP_PORT_SEL_REG);
-> > +
-> > +	spin_unlock_irqrestore(&tcon_top->reg_lock, flags);
-> > +}
-> > +
-> > +static int sun8i_tcon_top_probe(struct platform_device *pdev)
-> > +{
-> > +	struct clk_hw_onecell_data *clk_data;
-> > +	struct sun8i_tcon_top *tcon_top;
-> > +	struct device *dev = &pdev->dev;
-> > +	struct resource *res;
-> > +	int ret, i;
-> > +
-> > +	tcon_top = devm_kzalloc(dev, sizeof(*tcon_top), GFP_KERNEL);
-> > +	if (!tcon_top)
-> > +		return -ENOMEM;
-> > +
-> > +	clk_data = devm_kzalloc(&pdev->dev, sizeof(*clk_data) +
-> > +				sizeof(*clk_data->hws) * CLK_NUM,
-> > +				GFP_KERNEL);
-> > +	if (!clk_data)
-> > +		return -ENOMEM;
-> > +
-> > +	spin_lock_init(&tcon_top->reg_lock);
-> > +
-> > +	tcon_top->rst = devm_reset_control_get(dev, "rst");
-> > +	if (IS_ERR(tcon_top->rst)) {
-> > +		dev_err(dev, "Couldn't get our reset line\n");
-> > +		return PTR_ERR(tcon_top->rst);
-> > +	}
-> > +
-> > +	tcon_top->bus = devm_clk_get(dev, "bus");
-> > +	if (IS_ERR(tcon_top->bus)) {
-> > +		dev_err(dev, "Couldn't get the bus clock\n");
-> > +		return PTR_ERR(tcon_top->bus);
-> > +	}
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	tcon_top->regs = devm_ioremap_resource(dev, res);
-> > +	if (IS_ERR(tcon_top->regs))
-> > +		return PTR_ERR(tcon_top->regs);
-> > +
-> > +	ret = reset_control_deassert(tcon_top->rst);
-> > +	if (ret) {
-> > +		dev_err(dev, "Could not deassert ctrl reset control\n");
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = clk_prepare_enable(tcon_top->bus);
-> > +	if (ret) {
-> > +		dev_err(dev, "Could not enable bus clock\n");
-> > +		goto err_assert_reset;
-> > +	}
-> > +
-> > +	/*
-> > +	 * Default register values might have some reserved bits set, which
-> > +	 * prevents TCON TOP from working properly. Set them to 0 here.
-> > +	 */
-> > +	writel(0, tcon_top->regs + TCON_TOP_PORT_SEL_REG);
-> > +	writel(0, tcon_top->regs + TCON_TOP_GATE_SRC_REG);
-> > +
-> > +	for (i = 0; i < CLK_NUM; i++) {
-> > +		const char *parent_name = "bus-tcon-top";
+On 21/05/18 15:41, Suzuki K Poulose wrote:
+> On 21/05/18 15:00, Robin Murphy wrote:
+>> On 21/05/18 14:42, Suzuki K Poulose wrote:
+>>> On 18/05/18 16:57, Suzuki K Poulose wrote:
+>>>> Hi Robin,
+>>>>
+>>>> On 18/05/18 14:49, Robin Murphy wrote:
+>>>>> On 18/05/18 11:22, Suzuki K Poulose wrote:
+>>>>>> Add support for chained event counters. PMUv3 allows chaining
+>>>>>> a pair of adjacent PMU counters (with the lower counter number
+>>>>>> being always "even"). The low counter is programmed to count
+>>>>>> the event of interest and the high counter(odd numbered) is
+>>>>>> programmed with a special event code (0x1e - Chain). Thus
+>>>>>> we need special allocation schemes to make the full use of
+>>>>>> available counters. So, we allocate the counters from either
+>>>>>> ends. i.e, chained counters are allocated from the lower
+>>>>>> end in pairs of two and the normal counters are allocated
+>>>>>> from the higher number. Also makes necessary changes to
+>>>>>> handle the chained events as a single event with 2 counters.
+>>>>>>
+>>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>
+>>>>
+>>>>>> ? /*
+>>>>>> @@ -845,8 +1016,14 @@ static int __armv8_pmuv3_map_event(struct 
+>>>>>> perf_event *event,
+>>>>>> ???????????????????????? &armv8_pmuv3_perf_cache_map,
+>>>>>> ???????????????????????? ARMV8_PMU_EVTYPE_EVENT);
+>>>>>> -??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES)
+>>>>>> +??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES) {
+>>>>>> +??????? /* Prevent chaining for cycle counter */
+>>>>>
+>>>>> Why? Sure, we want to avoid executing the chaining logic if we're 
+>>>>> scheduling a cycles event in the dedicated counter (which is 
+>>>>> perhaps what the comment above wanted to say), but if one ends up 
+>>>>> allocated into a regular counter (e.g. if the user asks for 
+>>>>> multiple cycle counts with different filters), then I don't see any 
+>>>>> reason to forbid that being chained.
+>>>>
+>>>> Ah, I didn't think about that case. I was under the assumption that the
+>>>> cycles are *only* placed on the cycle counter. I will take care of 
+>>>> that.
+>>>> Thanks for the review.
+>>>
+>>> Robin, Mark, Will
+>>>
+>>> One potential problem I see with allowing chaining of the cycle counter
+>>> *and* the promotion of cycle event to 64bit by default is when the user
+>>> may actually be able to count 1 less event (due to the promotion of
+>>> cycle event to 64bit and thus forcing to use chain, if the cycle counter
+>>> is unavailable).
+>>
+>> Right, I didn't mean to imply we should inject the "chain" attr 
+>> automatically for all cycles events, just that we shouldn't be 
+>> rejecting it if the user does explicitly set it (but then just ignore 
+>> it if using the dedicated counter).
 > 
-> I guess retrieving the parent's clock name at runtime would be more
-> flexible.
+> Right, I was not talking about the automatic "chain" for cycles events. The
+> problem is we don't know if we would get the "cycle" counter for the given
+> event until it is "added", at which point we have already decided
+> whether the event is 32bit or 64bit. So, we cannot really delay the 
+> decision
+> until that. Thats where this comes up. Given a cycle event (without an 
+> explicit
+> chain request), do we treat it as a 64bit event or not ? If we do, we could
 > 
-
-It is, but will it ever be anything else?
-
-> > +		struct clk_init_data init;
-> > +		struct clk_gate *gate;
-> > +
-> > +		gate = devm_kzalloc(dev, sizeof(*gate), GFP_KERNEL);
-> > +		if (!gate) {
-> > +			ret = -ENOMEM;
-> > +			goto err_disable_clock;
-> > +		}
-> > +
-> > +		init.name = gates[i].name;
-> > +		init.ops = &clk_gate_ops;
-> > +		init.flags = CLK_IS_BASIC;
-> > +		init.parent_names = &parent_name;
-> > +		init.num_parents = 1;
-> > +
-> > +		gate->reg = tcon_top->regs + TCON_TOP_GATE_SRC_REG;
-> > +		gate->bit_idx = gates[i].bit;
-> > +		gate->lock = &tcon_top->reg_lock;
-> > +		gate->hw.init = &init;
-> > +
-> > +		ret = devm_clk_hw_register(dev, &gate->hw);
-> > +		if (ret)
-> > +			goto err_disable_clock;
+> 1) get the Cycle counter, all is fine.
 > 
-> Isn't it what clk_hw_register_gate is doing?
+> 2) If not, fallback to Chaining. The user looses a counter.
+
+Ah, I think I see where our wires might be getting crossed here - taking 
+a second look at patch #4 I see you're inherently associating 
+ARMPMU_EVT_LONG with the ARMV8_PMUV3_PERFCTR_CPU_CYCLES event ID. What 
+I'm thinking of is that we would only set that flag if and when we've 
+allocated the cycle counter or a chained pair of regular counters (i.e. 
+in get_event_idx() or later). In other words, it becomes a property of 
+the counter(s) backing the event, rather than of the hardware event 
+itself, which I think makes logical sense.
+
+>>> So one option is to drop automatic promotion of the cycle counter to
+>>> 64bit and do it only when it is requested by the user and use either the
+>>> Cycle counter (preferred) or fall back to chaining. That way, the user
+>>> has the control over the number of events he can count using the given
+>>> set of counters.
+>>
+>> Naively, there doesn't seem to be any inherent harm in always using 
+>> 64-bit arithmetic for the dedicated counter, but it would mean that 
+>> with multiple (non-chained) cycles events, some would be taking an 
+>> interrupt every few seconds while one would effectively never 
+>> overflow. I guess the question is whether that matters or not.
+>>
 > 
+> The problem is we can't have a mask per counter as we don't know where
+> the event would be placed until it is added. Or we should delay the
+> period initialisation/update to post get_event_idx().
 
-Almost, but not exactly. My goal was to use devm_* functions, so there is no 
-need to do any special cleanup.
+...but does indeed mean that we can't initialise period stuff until we 
+know where the event has been placed. I reckon that is a reasonable 
+thing to do, but let's see what Mark and Will think.
 
-> > +		clk_data->hws[gates[i].index] = &gate->hw;
-> > +	}
-> > +
-> > +	clk_data->num = CLK_NUM;
-> > +
-> > +	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get, 
-clk_data);
-> > +	if (ret)
-> > +		goto err_disable_clock;
-> > +
-> > +	platform_set_drvdata(pdev, tcon_top);
-> > +
-> > +	return 0;
-> > +
-> > +err_disable_clock:
-> > +	clk_disable_unprepare(tcon_top->bus);
-> > +err_assert_reset:
-> > +	reset_control_assert(tcon_top->rst);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int sun8i_tcon_top_remove(struct platform_device *pdev)
-> > +{
-> > +	struct sun8i_tcon_top *tcon_top = platform_get_drvdata(pdev);
-> > +
-> > +	clk_disable_unprepare(tcon_top->bus);
-> > +	reset_control_assert(tcon_top->rst);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +const struct of_device_id sun8i_tcon_top_of_table[] = {
-> > +	{ .compatible = "allwinner,sun8i-r40-tcon-top" },
-> > +	{ /* sentinel */ }
-> > +};
-> > +MODULE_DEVICE_TABLE(of, sun8i_tcon_top_of_table);
-> > +
-> > +static struct platform_driver sun8i_tcon_top_platform_driver = {
-> > +	.probe		= sun8i_tcon_top_probe,
-> > +	.remove		= sun8i_tcon_top_remove,
-> > +	.driver		= {
-> > +		.name		= "sun8i-tcon-top",
-> > +		.of_match_table	= sun8i_tcon_top_of_table,
-> > +	},
-> > +};
-> > +module_platform_driver(sun8i_tcon_top_platform_driver);
-> > +
-> > +MODULE_AUTHOR("Jernej Skrabec <jernej.skrabec@siol.net>");
-> > +MODULE_DESCRIPTION("Allwinner R40 TCON TOP driver");
-> > +MODULE_LICENSE("GPL");
-> > diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.h
-> > b/drivers/gpu/drm/sun4i/sun8i_tcon_top.h new file mode 100644
-> > index 000000000000..19126e07d2a6
-> > --- /dev/null
-> > +++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.h
-> > @@ -0,0 +1,20 @@
-> > +/* SPDX-License-Identifier: GPL-2.0+ */
-> > +/* Copyright (c) 2018 Jernej Skrabec <jernej.skrabec@siol.net> */
-> > +
-> > +#ifndef _SUN8I_TCON_TOP_H_
-> > +#define _SUN8I_TCON_TOP_H_
-> > +
-> > +#include <linux/device.h>
-> > +
-> > +struct sun8i_tcon_top;
-> > +
-> > +enum tcon_type {
-> > +	tcon_type_lcd,
-> > +	tcon_type_tv,
-> 
-> The usual practice is to have the enum values upper-case.
+(I guess there's also an ugly compromise in which we could re-run the 
+sample_period setup logic as a special case when allocating the cycle 
+counter, but even I don't like the idea of that)
 
-Ok.
-
-Best regards,
-Jernej
+Robin.
