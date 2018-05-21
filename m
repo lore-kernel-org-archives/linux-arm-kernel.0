@@ -1,88 +1,212 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 21 May 2018 15:41:56 +0100
-Subject: [PATCH 6/6] arm64: perf: Add support for chaining counters
-In-Reply-To: <f7ffdcfb-5a32-9a55-32a5-4f8770e23aa0@arm.com>
-References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
- <1526638943-2110-7-git-send-email-suzuki.poulose@arm.com>
- <32f2d870-9b9c-0b10-880f-cc99cf969bf6@arm.com>
- <5d53fe1d-dbd9-2aad-73bd-0c4284540240@arm.com>
- <c8cb9280-c93d-89c4-43ed-179de8d46dfd@arm.com>
- <f7ffdcfb-5a32-9a55-32a5-4f8770e23aa0@arm.com>
-Message-ID: <22ea8f48-dc74-6d84-6085-b41447a79a6d@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 21 May 2018 22:42:31 +0800
+Subject: [PATCH 2/2] rtc: st-lpc: add range
+In-Reply-To: <20180520123337.14856-2-alexandre.belloni@bootlin.com>
+References: <20180520123337.14856-2-alexandre.belloni@bootlin.com>
+Message-ID: <201805212019.zrThM1dn%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/18 15:00, Robin Murphy wrote:
-> On 21/05/18 14:42, Suzuki K Poulose wrote:
->> On 18/05/18 16:57, Suzuki K Poulose wrote:
->>> Hi Robin,
->>>
->>> On 18/05/18 14:49, Robin Murphy wrote:
->>>> On 18/05/18 11:22, Suzuki K Poulose wrote:
->>>>> Add support for chained event counters. PMUv3 allows chaining
->>>>> a pair of adjacent PMU counters (with the lower counter number
->>>>> being always "even"). The low counter is programmed to count
->>>>> the event of interest and the high counter(odd numbered) is
->>>>> programmed with a special event code (0x1e - Chain). Thus
->>>>> we need special allocation schemes to make the full use of
->>>>> available counters. So, we allocate the counters from either
->>>>> ends. i.e, chained counters are allocated from the lower
->>>>> end in pairs of two and the normal counters are allocated
->>>>> from the higher number. Also makes necessary changes to
->>>>> handle the chained events as a single event with 2 counters.
->>>>>
->>>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>>> Cc: Will Deacon <will.deacon@arm.com>
->>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>
->>>
->>>>> ? /*
->>>>> @@ -845,8 +1016,14 @@ static int __armv8_pmuv3_map_event(struct perf_event *event,
->>>>> ???????????????????????? &armv8_pmuv3_perf_cache_map,
->>>>> ???????????????????????? ARMV8_PMU_EVTYPE_EVENT);
->>>>> -??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES)
->>>>> +??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES) {
->>>>> +??????? /* Prevent chaining for cycle counter */
->>>>
->>>> Why? Sure, we want to avoid executing the chaining logic if we're scheduling a cycles event in the dedicated counter (which is perhaps what the comment above wanted to say), but if one ends up allocated into a regular counter (e.g. if the user asks for multiple cycle counts with different filters), then I don't see any reason to forbid that being chained.
->>>
->>> Ah, I didn't think about that case. I was under the assumption that the
->>> cycles are *only* placed on the cycle counter. I will take care of that.
->>> Thanks for the review.
->>
->> Robin, Mark, Will
->>
->> One potential problem I see with allowing chaining of the cycle counter
->> *and* the promotion of cycle event to 64bit by default is when the user
->> may actually be able to count 1 less event (due to the promotion of
->> cycle event to 64bit and thus forcing to use chain, if the cycle counter
->> is unavailable).
-> 
-> Right, I didn't mean to imply we should inject the "chain" attr automatically for all cycles events, just that we shouldn't be rejecting it if the user does explicitly set it (but then just ignore it if using the dedicated counter).
+Hi Alexandre,
 
-Right, I was not talking about the automatic "chain" for cycles events. The
-problem is we don't know if we would get the "cycle" counter for the given
-event until it is "added", at which point we have already decided
-whether the event is 32bit or 64bit. So, we cannot really delay the decision
-until that. Thats where this comes up. Given a cycle event (without an explicit
-chain request), do we treat it as a 64bit event or not ? If we do, we could
+I love your patch! Yet something to improve:
 
-1) get the Cycle counter, all is fine.
+[auto build test ERROR on abelloni/rtc-next]
+[also build test ERROR on v4.17-rc6 next-20180517]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-2) If not, fallback to Chaining. The user looses a counter.
+url:    https://github.com/0day-ci/linux/commits/Alexandre-Belloni/rtc-st-lpc-fix-possible-race-condition/20180521-192317
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git rtc-next
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> 
->> So one option is to drop automatic promotion of the cycle counter to
->> 64bit and do it only when it is requested by the user and use either the
->> Cycle counter (preferred) or fall back to chaining. That way, the user
->> has the control over the number of events he can count using the given
->> set of counters.
-> 
-> Naively, there doesn't seem to be any inherent harm in always using 64-bit arithmetic for the dedicated counter, but it would mean that with multiple (non-chained) cycles events, some would be taking an interrupt every few seconds while one would effectively never overflow. I guess the question is whether that matters or not.
-> 
+All error/warnings (new ones prefixed by >>):
 
-The problem is we can't have a mask per counter as we don't know where
-the event would be placed until it is added. Or we should delay the
-period initialisation/update to post get_event_idx().
+   drivers/rtc/rtc-st-lpc.c: In function 'st_rtc_probe':
+>> drivers/rtc/rtc-st-lpc.c:261:5: error: 'struct st_rtc' has no member named 'range_max'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+        ^~
+   In file included from arch/arm/include/asm/div64.h:127:0,
+                    from include/linux/kernel.h:173,
+                    from include/linux/clk.h:16,
+                    from drivers/rtc/rtc-st-lpc.c:17:
+>> include/asm-generic/div64.h:226:7: error: lvalue required as left operand of assignment
+      (n) >>= ilog2(__base);   \
+          ^
+>> drivers/rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+>> include/asm-generic/div64.h:230:31: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+      uint32_t __res_lo, __n_lo = (n); \
+                                  ^
+>> drivers/rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+   include/asm-generic/div64.h:231:7: error: lvalue required as left operand of assignment
+      (n) = __div64_const32(n, __base); \
+          ^
+>> drivers/rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+   include/asm-generic/div64.h:233:14: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+      __res_lo = (n);    \
+                 ^
+>> drivers/rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+   include/asm-generic/div64.h:237:7: error: lvalue required as left operand of assignment
+      (n) = (uint32_t)(n) / __base;  \
+          ^
+>> drivers/rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+>> include/asm-generic/div64.h:239:22: error: lvalue required as unary '&' operand
+      __rem = __div64_32(&(n), __base); \
+                         ^
+>> drivers/rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+--
+   drivers//rtc/rtc-st-lpc.c: In function 'st_rtc_probe':
+   drivers//rtc/rtc-st-lpc.c:261:5: error: 'struct st_rtc' has no member named 'range_max'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+        ^~
+   In file included from arch/arm/include/asm/div64.h:127:0,
+                    from include/linux/kernel.h:173,
+                    from include/linux/clk.h:16,
+                    from drivers//rtc/rtc-st-lpc.c:17:
+>> include/asm-generic/div64.h:226:7: error: lvalue required as left operand of assignment
+      (n) >>= ilog2(__base);   \
+          ^
+   drivers//rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+>> include/asm-generic/div64.h:230:31: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+      uint32_t __res_lo, __n_lo = (n); \
+                                  ^
+   drivers//rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+   include/asm-generic/div64.h:231:7: error: lvalue required as left operand of assignment
+      (n) = __div64_const32(n, __base); \
+          ^
+   drivers//rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+   include/asm-generic/div64.h:233:14: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+      __res_lo = (n);    \
+                 ^
+   drivers//rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+   include/asm-generic/div64.h:237:7: error: lvalue required as left operand of assignment
+      (n) = (uint32_t)(n) / __base;  \
+          ^
+   drivers//rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
+>> include/asm-generic/div64.h:239:22: error: lvalue required as unary '&' operand
+      __rem = __div64_32(&(n), __base); \
+                         ^
+   drivers//rtc/rtc-st-lpc.c:261:19: note: in expansion of macro 'do_div'
+     rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+                      ^~~~~~
 
-Suzuki
+vim +261 drivers/rtc/rtc-st-lpc.c
+
+   192	
+   193	static int st_rtc_probe(struct platform_device *pdev)
+   194	{
+   195		struct device_node *np = pdev->dev.of_node;
+   196		struct st_rtc *rtc;
+   197		struct resource *res;
+   198		uint32_t mode;
+   199		int ret = 0;
+   200	
+   201		ret = of_property_read_u32(np, "st,lpc-mode", &mode);
+   202		if (ret) {
+   203			dev_err(&pdev->dev, "An LPC mode must be provided\n");
+   204			return -EINVAL;
+   205		}
+   206	
+   207		/* LPC can either run as a Clocksource or in RTC or WDT mode */
+   208		if (mode != ST_LPC_MODE_RTC)
+   209			return -ENODEV;
+   210	
+   211		rtc = devm_kzalloc(&pdev->dev, sizeof(struct st_rtc), GFP_KERNEL);
+   212		if (!rtc)
+   213			return -ENOMEM;
+   214	
+   215		rtc->rtc_dev = devm_rtc_allocate_device(&pdev->dev);
+   216		if (IS_ERR(rtc->rtc_dev))
+   217			return PTR_ERR(rtc->rtc_dev);
+   218	
+   219		spin_lock_init(&rtc->lock);
+   220	
+   221		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+   222		rtc->ioaddr = devm_ioremap_resource(&pdev->dev, res);
+   223		if (IS_ERR(rtc->ioaddr))
+   224			return PTR_ERR(rtc->ioaddr);
+   225	
+   226		rtc->irq = irq_of_parse_and_map(np, 0);
+   227		if (!rtc->irq) {
+   228			dev_err(&pdev->dev, "IRQ missing or invalid\n");
+   229			return -EINVAL;
+   230		}
+   231	
+   232		ret = devm_request_irq(&pdev->dev, rtc->irq, st_rtc_handler, 0,
+   233				       pdev->name, rtc);
+   234		if (ret) {
+   235			dev_err(&pdev->dev, "Failed to request irq %i\n", rtc->irq);
+   236			return ret;
+   237		}
+   238	
+   239		enable_irq_wake(rtc->irq);
+   240		disable_irq(rtc->irq);
+   241	
+   242		rtc->clk = clk_get(&pdev->dev, NULL);
+   243		if (IS_ERR(rtc->clk)) {
+   244			dev_err(&pdev->dev, "Unable to request clock\n");
+   245			return PTR_ERR(rtc->clk);
+   246		}
+   247	
+   248		clk_prepare_enable(rtc->clk);
+   249	
+   250		rtc->clkrate = clk_get_rate(rtc->clk);
+   251		if (!rtc->clkrate) {
+   252			dev_err(&pdev->dev, "Unable to fetch clock rate\n");
+   253			return -EINVAL;
+   254		}
+   255	
+   256		device_set_wakeup_capable(&pdev->dev, 1);
+   257	
+   258		platform_set_drvdata(pdev, rtc);
+   259	
+   260		rtc->rtc_dev->ops = &st_rtc_ops;
+ > 261		rtc->range_max = do_div(U64_MAX, rtc->clkrate);
+   262	
+   263		ret = rtc_register_device(rtc->rtc_dev);
+   264		if (ret) {
+   265			clk_disable_unprepare(rtc->clk);
+   266			return ret;
+   267		}
+   268	
+   269		return 0;
+   270	}
+   271	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 43343 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180521/7bf5deb2/attachment-0001.gz>
