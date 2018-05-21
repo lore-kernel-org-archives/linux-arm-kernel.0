@@ -1,60 +1,83 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Mon, 21 May 2018 19:57:50 +0800
-Subject: [PATCH 13/33] clk: rockchip: use match_string() helper
-In-Reply-To: <1526903890-35761-1-git-send-email-xieyisheng1@huawei.com>
-References: <1526903890-35761-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <1526903890-35761-14-git-send-email-xieyisheng1@huawei.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Mon, 21 May 2018 13:10:55 +0100
+Subject: [PATCH v3 1/6] arm64: cpufeature: Allow early detect of specific
+ features
+In-Reply-To: <20180521120644.g527aawkutf3etzq@holly.lan>
+References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
+ <1526902515-13769-2-git-send-email-julien.thierry@arm.com>
+ <697af68e-3cee-4d0d-8493-106cc42eed3b@arm.com>
+ <20180521120644.g527aawkutf3etzq@holly.lan>
+Message-ID: <21e20c10-a2f2-c68f-aedf-b53836bc622e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-match_string() returns the index of an array for a matching string,
-which can be used intead of open coded variant.
 
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@kernel.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-clk at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
----
- drivers/clk/rockchip/clk.c | 16 +++++-----------
- 1 file changed, 5 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-index 3cd8ad5..514032d 100644
---- a/drivers/clk/rockchip/clk.c
-+++ b/drivers/clk/rockchip/clk.c
-@@ -274,18 +274,10 @@ static struct clk *rockchip_clk_register_frac_branch(
- 		struct clk_mux *frac_mux = &frac->mux;
- 		struct clk_init_data init;
- 		struct clk *mux_clk;
--		int i, ret;
--
--		frac->mux_frac_idx = -1;
--		for (i = 0; i < child->num_parents; i++) {
--			if (!strcmp(name, child->parent_names[i])) {
--				pr_debug("%s: found fractional parent in mux at pos %d\n",
--					 __func__, i);
--				frac->mux_frac_idx = i;
--				break;
--			}
--		}
-+		int ret;
- 
-+		frac->mux_frac_idx = match_string(child->parent_names,
-+						  child->num_parents, name);
- 		frac->mux_ops = &clk_mux_ops;
- 		frac->clk_nb.notifier_call = rockchip_clk_frac_notifier_cb;
- 
-@@ -312,6 +304,8 @@ static struct clk *rockchip_clk_register_frac_branch(
- 
- 		/* notifier on the fraction divider to catch rate changes */
- 		if (frac->mux_frac_idx >= 0) {
-+			pr_debug("%s: find fractional parent in mux at pos %d\n",
-+				 __func__, frac->mux_frac_idx);
- 			ret = clk_notifier_register(clk, &frac->clk_nb);
- 			if (ret)
- 				pr_err("%s: failed to register clock notifier for %s\n",
+On 21/05/18 13:06, Daniel Thompson wrote:
+> On Mon, May 21, 2018 at 12:45:22PM +0100, Suzuki K Poulose wrote:
+>> On 21/05/18 12:35, Julien Thierry wrote:
+>>> From: Daniel Thompson <daniel.thompson@linaro.org>
+>>>
+>>> Currently it is not possible to detect features of the boot CPU
+>>> until the other CPUs have been brought up.
+>>>
+>>> This prevents us from reacting to features of the boot CPU until
+>>> fairly late in the boot process. To solve this we allow a subset
+>>> of features (that are likely to be common to all clusters) to be
+>>> detected based on the boot CPU alone.
+>>>
+>>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>>> [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
+>>> 			 duplicates between early features and normal
+>>> 			 features]
+>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>
+>> nit: Since this is completely different from what Daniel started with,
+>> you could simply reset the author to yourself. The boot CPU feature was
+>> added keeping this user in mind.
+> 
+> Agree! It's no longer my patch.
+> 
+> If you want to retain any credit than Suggested-by: would make quite
+> sufficient.
+> 
+
+Good point, I didn't think of that.
+
+I'll change this after I get other reviews for this version.
+
+Thanks,
+
+> 
+>>
+>> The patch as such looks good to me.
+>>
+>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>
+>>> ---
+>>>    arch/arm64/kernel/cpufeature.c | 2 +-
+>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>>> index 9d1b06d..e03e897 100644
+>>> --- a/arch/arm64/kernel/cpufeature.c
+>>> +++ b/arch/arm64/kernel/cpufeature.c
+>>> @@ -1030,7 +1030,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+>>>    	{
+>>>    		.desc = "GIC system register CPU interface",
+>>>    		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+>>> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+>>> +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
+>>>    		.matches = has_useable_gicv3_cpuif,
+>>>    		.sys_reg = SYS_ID_AA64PFR0_EL1,
+>>>    		.field_pos = ID_AA64PFR0_GIC_SHIFT,
+>>> --
+>>> 1.9.1
+>>>
+>>
+
 -- 
-1.7.12.4
+Julien Thierry
