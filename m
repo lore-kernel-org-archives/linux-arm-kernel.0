@@ -1,33 +1,50 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 21 May 2018 09:44:20 +0300
-Subject: [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
-In-Reply-To: <20180520192523.32dde632@xps13>
-References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
- <5456625.lDWjtgZygK@z50>
- <CAHp75Ved2nw1JKnXT2Jxnw4XLsby1eVJU6cfBjE2sp4LP4Kwmg@mail.gmail.com>
- <3505791.x6nWYTo8eb@z50>
- <CAHp75Vdp5A58JMTf8vaET84QEzzZ_T7eKLUYfWV9qpWt5ptYCA@mail.gmail.com>
- <20180520192523.32dde632@xps13>
-Message-ID: <CAHp75VcCVNGey1TmAR7EJ3wJL1q+KSOXpbwJ3XmoU70tKOm+Bg@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 21 May 2018 09:57:54 +0300
+Subject: [RFC 12/13] ARM: dts: ti: add dra71-evm FIT description file
+In-Reply-To: <20180417144913.GD5669@atomide.com>
+References: <1523956215-28154-1-git-send-email-t-kristo@ti.com>
+ <1523956215-28154-13-git-send-email-t-kristo@ti.com>
+ <20180417092924.GB20335@flint.armlinux.org.uk>
+ <ad5ef67d-d566-0034-a7cd-09a549cbd6d7@ti.com>
+ <20180417144913.GD5669@atomide.com>
+Message-ID: <43ff3894-a287-1558-687c-40f50712735c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 20, 2018 at 8:25 PM, Miquel Raynal
-<miquel.raynal@bootlin.com> wrote:
-> On Sun, 20 May 2018 19:17:04 +0300, Andy Shevchenko
-> <andy.shevchenko@gmail.com> wrote:
+On 17/04/18 17:49, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [180417 09:36]:
+>> In typical setup, you can boot a large number of different configs via:
+>>
+>> bootm 0x82000000#dra71-evm#nand#lcd-auo-g101evn01.0
+>>
+>> ... assuming the configs were named like that, and assuming they would be
+>> compatible with each other. The am57xx-evm example provided is better, as
+>> you can chain the different cameras to the available evm configs.
+> 
+> Why not just do it in the bootloader to put together the dtb?
+> 
+> Then for external devices, you could just pass info on the
+> kernel cmdline with lcd=foo camera=bar if they cannot be
+> detected over I2C.
 
-> Do we actually have the possibility to rename this gpio? I guess no
-> since it would break DT backward compatibility.
+(Added Linux ARM list to CC, this was not part of the original delivery.)
 
-No we don't.
+Ok trying to resurrect this thread a bit. Is there any kind of consensus 
+how things like this should be handled? Should we add the DT overlay 
+files to kernel tree or not?
 
-> Otherwise it would have
-> been more descriptive to call it something like 'gpio-rb'.
+Should we add any kind of build infra to kernel tree, and at what level 
+would this be? Just DT overlay file building support, and drop the FIT 
+build support as was proposed in this RFC series or...?
 
-"gpio" prefix, actually "gpios" suffix is a mandatory part of the
-name. For sake of convenience it's not used in API calls.
+U-boot can obviously parse the base DTB + overlay DTB:s into a single 
+DTB, but this is somewhat clumsy approach and is relatively error prone 
+to get it right.
 
--- 
-With Best Regards,
-Andy Shevchenko
+Building the FIT image post kernel build would also be possible, but who 
+would be doing this, is there any need to get this done in generic 
+manner or shall we just add SoC vendor specific tools for this?
+
+-Tero
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
