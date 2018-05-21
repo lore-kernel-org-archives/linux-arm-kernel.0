@@ -1,42 +1,19 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Mon, 21 May 2018 13:58:07 -0500
-Subject: [PATCHv2] drivers/perf: arm-ccn: don't log to dmesg in event_init
-In-Reply-To: <20180521171949.31412-1-mark.rutland@arm.com>
-References: <20180521171949.31412-1-mark.rutland@arm.com>
-Message-ID: <20180521135807.3b39d00979b7c416d4f65be2@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 21 May 2018 20:59:49 +0200 (CEST)
+Subject: [PATCH v2] arm: bcm2835: Add the PMU to the devicetree.
+In-Reply-To: <20180521183907.27563-1-eric@anholt.net>
+References: <20180521183907.27563-1-eric@anholt.net>
+Message-ID: <1804311797.71726.1526929189594@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding LKML, linux-perf-users.  Please do so from now on]
 
-On Mon, 21 May 2018 18:19:49 +0100
-Mark Rutland <mark.rutland@arm.com> wrote:
-
-> The ARM CCN PMU driver uses dev_warn() to complain about parameters in
-> the user-provided perf_event_attr. This means that under normal
-> operation (e.g. a single invocation of the perf tool), a number of
-> messages warnings may be logged to dmesg.
+> Eric Anholt <eric@anholt.net> hat am 21. Mai 2018 um 20:39 geschrieben:
 > 
-> Tools may issue multiple syscalls to probe for feature support, and
-> multiple applications (from multiple users) can attempt to open events
-> simultaneously, so this is not very helpful, even if a user happens to
-> have access to dmesg. Worse, this can push important information out of
-> the dmesg ring buffer, and can significantly slow down syscall fuzzers,
-> vastly increasing the time it takes to find critical bugs.
 > 
-> Demote the dev_warn() instances to dev_dbg(), as is the case for all
-> other PMU drivers under drivers/perf/. Users who wish to debug PMU event
-> initialisation can enable dynamic debug to receive these messages.
+> This only probes on arm64 so far, but hopefully that driver will be
+> generalized soon.
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-Care to address my comments to the rationale?:
-
-https://marc.info/?l=linux-arm-kernel&m=152582291919277&w=2
-
-Thanks,
-
-Kim
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
