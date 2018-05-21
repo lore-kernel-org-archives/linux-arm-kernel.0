@@ -1,83 +1,58 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 21 May 2018 13:10:55 +0100
-Subject: [PATCH v3 1/6] arm64: cpufeature: Allow early detect of specific
- features
-In-Reply-To: <20180521120644.g527aawkutf3etzq@holly.lan>
-References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
- <1526902515-13769-2-git-send-email-julien.thierry@arm.com>
- <697af68e-3cee-4d0d-8493-106cc42eed3b@arm.com>
- <20180521120644.g527aawkutf3etzq@holly.lan>
-Message-ID: <21e20c10-a2f2-c68f-aedf-b53836bc622e@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 May 2018 13:11:41 +0100
+Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <000b01d3f0f3$aa961cc0$ffc25640$@codeaurora.org>
+References: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
+ <1526898690-4018-1-git-send-email-ilialin@codeaurora.org>
+ <20180521105428.GM17671@n2100.armlinux.org.uk>
+ <000b01d3f0f3$aa961cc0$ffc25640$@codeaurora.org>
+Message-ID: <20180521121140.GO17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 21/05/18 13:06, Daniel Thompson wrote:
-> On Mon, May 21, 2018 at 12:45:22PM +0100, Suzuki K Poulose wrote:
->> On 21/05/18 12:35, Julien Thierry wrote:
->>> From: Daniel Thompson <daniel.thompson@linaro.org>
->>>
->>> Currently it is not possible to detect features of the boot CPU
->>> until the other CPUs have been brought up.
->>>
->>> This prevents us from reacting to features of the boot CPU until
->>> fairly late in the boot process. To solve this we allow a subset
->>> of features (that are likely to be common to all clusters) to be
->>> detected based on the boot CPU alone.
->>>
->>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->>> [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
->>> 			 duplicates between early features and normal
->>> 			 features]
->>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
->>
->> nit: Since this is completely different from what Daniel started with,
->> you could simply reset the author to yourself. The boot CPU feature was
->> added keeping this user in mind.
+On Mon, May 21, 2018 at 02:05:41PM +0300, ilialin at codeaurora.org wrote:
+> You are right.
+> cpu_dev_silver != cpu_dev_gold, and I found this with my tests as well.
+> Thank you.
 > 
-> Agree! It's no longer my patch.
-> 
-> If you want to retain any credit than Suggested-by: would make quite
-> sufficient.
-> 
+> > -----Original Message-----
+> > From: Russell King - ARM Linux <linux@armlinux.org.uk>
+> > Sent: Monday, May 21, 2018 13:54
+> > To: Ilia Lin <ilialin@codeaurora.org>
+> > Cc: viresh.kumar at linaro.org; devicetree at vger.kernel.org; linux-
+> > pm at vger.kernel.org; linux-arm-msm at vger.kernel.org; linux-
+> > kernel at vger.kernel.org; linux-soc at vger.kernel.org; linux-
+> > clk at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH] cpufreq: Add Kryo CPU scaling driver
+> > 
+> > On Mon, May 21, 2018 at 01:31:30PM +0300, Ilia Lin wrote:
+> > > +#define SILVER_LEAD	0
+> > > +#define GOLD_LEAD	2
+> > 
+> > Okay, two different values here, but "GOLD_LEAD" appears unused.
+> > 
+> > > +	cpu_dev_silver = get_cpu_device(SILVER_LEAD);
+> > > +	if (NULL == cpu_dev_silver)
+> > > +		return -ENODEV;
+> > > +
+> > > +	cpu_dev_gold = get_cpu_device(SILVER_LEAD);
+> > > +	if (NULL == cpu_dev_gold)
+> > > +		return -ENODEV;
+> > 
+> > get_cpu_device() takes the logical CPU number.  So the above gets CPU 0
+> > each time, and so cpu_dev_silver == cpu_dev_gold here.  So what's the
+> > point of the second get_cpu_device() ?  If it's supposed to be:
+> > 
+> > 	cpu_dev_gold = get_cpu_device(GOLD_LEAD);
+> > 
+> > That would get CPU 2, but in terms of these defines, it doesn't make that
+> > much sense.  What exactly does "silver lead" and "gold lead" refer to in
+> these
+> > definitions?
 
-Good point, I didn't think of that.
-
-I'll change this after I get other reviews for this version.
-
-Thanks,
-
-> 
->>
->> The patch as such looks good to me.
->>
->> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>
->>> ---
->>>    arch/arm64/kernel/cpufeature.c | 2 +-
->>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->>> index 9d1b06d..e03e897 100644
->>> --- a/arch/arm64/kernel/cpufeature.c
->>> +++ b/arch/arm64/kernel/cpufeature.c
->>> @@ -1030,7 +1030,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
->>>    	{
->>>    		.desc = "GIC system register CPU interface",
->>>    		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
->>> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->>> +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
->>>    		.matches = has_useable_gicv3_cpuif,
->>>    		.sys_reg = SYS_ID_AA64PFR0_EL1,
->>>    		.field_pos = ID_AA64PFR0_GIC_SHIFT,
->>> --
->>> 1.9.1
->>>
->>
+I think you still need to explain this.
 
 -- 
-Julien Thierry
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
