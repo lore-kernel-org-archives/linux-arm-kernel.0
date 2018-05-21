@@ -1,99 +1,169 @@
 From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 21 May 2018 01:58:21 +0000
-Subject: [PATCH] ARM: dts: imx7d: use operating-points-v2 for cpu
-In-Reply-To: <20180520125048.GX26863@dragon>
-References: <1526446097-7111-1-git-send-email-Anson.Huang@nxp.com>
- <20180520125048.GX26863@dragon>
-Message-ID: <AM3PR04MB1315E332CBFDA4151F6F3FA8F5950@AM3PR04MB1315.eurprd04.prod.outlook.com>
+Date: Mon, 21 May 2018 02:35:17 +0000
+Subject: [PATCH V2 2/3] clk: imx7d: correct enet clock CCGR registers
+In-Reply-To: <c42c4274cfd06297d1699c96d3253125@agner.ch>
+References: <1526605266-18464-1-git-send-email-Anson.Huang@nxp.com>
+ <1526605266-18464-2-git-send-email-Anson.Huang@nxp.com>
+ <c42c4274cfd06297d1699c96d3253125@agner.ch>
+Message-ID: <AM3PR04MB1315417C51882B554AEBC617F5950@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
+Hi, Stefan
 
 Anson Huang
 Best Regards!
 
 
 > -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Sunday, May 20, 2018 8:51 PM
+> From: Stefan Agner [mailto:stefan at agner.ch]
+> Sent: Friday, May 18, 2018 9:02 PM
 > To: Anson Huang <anson.huang@nxp.com>
-> Cc: kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> robh+dt at kernel.org; mark.rutland at arm.com; dl-linux-imx
+> Cc: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
+> mturquette at baylibre.com; sboyd at kernel.org; Adriana Reus
+> <adriana.reus@nxp.com>; rui.silva at linaro.org; dl-linux-imx
 > <linux-imx@nxp.com>; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH] ARM: dts: imx7d: use operating-points-v2 for cpu
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> linux-clk at vger.kernel.org
+> Subject: Re: [PATCH V2 2/3] clk: imx7d: correct enet clock CCGR registers
 > 
-> On Wed, May 16, 2018 at 12:48:17PM +0800, Anson Huang wrote:
-> > This patch uses "operating-points-v2" instead of "operating-points" to
-> > be more fit with cpufreq-dt driver.
+> On 18.05.2018 03:01, Anson Huang wrote:
+> > Correct enet clock gates as below:
 > >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > ---
-> >  arch/arm/boot/dts/imx7d.dtsi | 24 +++++++++++++++++++-----
-> >  1 file changed, 19 insertions(+), 5 deletions(-)
+> > CCGR6: IMX7D_ENET_AXI_ROOT_CLK (enet1 and enet2 bus clocks)
+> > CCGR112: IMX7D_ENET1_TIME_ROOT_CLK, IMX7D_ENET1_IPG_ROOT_CLK
+> > CCGR113: IMX7D_ENET2_TIME_ROOT_CLK, IMX7D_ENET2_IPG_ROOT_CLK
 > >
-> > diff --git a/arch/arm/boot/dts/imx7d.dtsi
-> > b/arch/arm/boot/dts/imx7d.dtsi index 4c9877e..28980c8 100644
-> > --- a/arch/arm/boot/dts/imx7d.dtsi
-> > +++ b/arch/arm/boot/dts/imx7d.dtsi
-> > @@ -9,12 +9,8 @@
-> >  / {
-> >  	cpus {
-> >  		cpu0: cpu at 0 {
-> > -			operating-points = <
-> > -				/* KHz	uV */
-> > -				996000	1075000
-> > -				792000	975000
-> > -			>;
-> >  			clock-frequency = <996000000>;
-> > +			operating-points-v2 = <&cpu0_opp_table>;
-> >  		};
-> >
-> >  		cpu1: cpu at 1 {
-> > @@ -22,6 +18,24 @@
-> >  			device_type = "cpu";
-> >  			reg = <1>;
-> >  			clock-frequency = <996000000>;
-> > +			operating-points-v2 = <&cpu0_opp_table>;
-> > +		};
-> > +	};
-> > +
-> > +	cpu0_opp_table: opp_table0 {
+> > Just rename unused IMX7D_ENETx_REF_ROOT_CLK for
+> > IMX7D_ENETx_IPG_ROOT_CLK instead of adding new clocks.
 > 
-> Hyphen is recommended in node name.  Also the suffix 0 doesn't mean too
-> much here.  That said, a better node name would be 'opp-table'.
+> Are you sure that IMX7D_ENETx_REF_ROOT_CLK are not used?
 > 
-> > +		compatible = "operating-points-v2";
-> > +		opp-shared;
-> > +
-> > +		opp-792000000 {
-> > +			opp-hz = /bits/ 64 <792000000>;
-> > +			opp-microvolt = <975000>;
-> > +			clock-latency-ns = <150000>;
-> > +		};
+> I understand that the reference manual does not a gate at 0x44e0...
 > 
-> We recommend to have a newline between nodes.
+> But in a earlier revision of our Colibri iMX7 we actually used clock out, and
+> referenced this clock to enable the reference clock (see also:
+> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpatch
+> work.kernel.org%2Fpatch%2F9211371%2F&data=02%7C01%7CAnson.Huang%
+> 40nxp.com%7Cea0856a68d8e4b921ba608d5bcbf9c02%7C686ea1d3bc2b4c6fa
+> 92cd99c5c301635%7C0%7C1%7C636622453508888330&sdata=rEhwj0innLDc
+> AEgxJyqd5vtG3SNVS05r2hEFvSc%2BQQs%3D&reserved=0).
 > 
-> I fixed them all and applied the patch.
+> I guess if the gate really does not exist, then we should/would have to set
+> IMX7D_ENET1_REF_ROOT_DIV to use the SoC provided ref clock.
 > 
-> Shawn
+> --
+> Stefan
  
-Thanks Shawn.
+I looked into the RTL and also checked with our design team, they confirm that
+there is no CCGR78(0x44e0) and CCGR80(0x4500) on i.MX7D, the register offset
+are there, but no hardware wire connection for them. That is why they did NOT
+list them in Reference Manual. So I think we can remove them. 
+
+For your case of using them as clock input, maybe clock tree auto use its parent
+IMX7D_ENETx_REF_ROOT_DIV which is existing, so it works.
 
 Anson.
 
-
-
 > 
-> > +		opp-996000000 {
-> > +			opp-hz = /bits/ 64 <996000000>;
-> > +			opp-microvolt = <1075000>;
-> > +			clock-latency-ns = <150000>;
-> > +			opp-suspend;
-> >  		};
-> >  	};
 > >
-> > --
-> > 2.7.4
+> > Based on Andy Duan's patch from the NXP kernel tree.
 > >
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > ---
+> >  drivers/clk/imx/clk-imx7d.c             | 10 ++++++----
+> >  include/dt-bindings/clock/imx7d-clock.h |  4 ++--
+> >  2 files changed, 8 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+> > index 23d5090a..d4936b9 100644
+> > --- a/drivers/clk/imx/clk-imx7d.c
+> > +++ b/drivers/clk/imx/clk-imx7d.c
+> > @@ -26,6 +26,8 @@ static u32 share_count_sai1;  static u32
+> > share_count_sai2;  static u32 share_count_sai3;  static u32
+> > share_count_nand;
+> > +static u32 share_count_enet1;
+> > +static u32 share_count_enet2;
+> >
+> >  static const struct clk_div_table test_div_table[] = {
+> >  	{ .val = 3, .div = 1, },
+> > @@ -805,6 +807,10 @@ static void __init imx7d_clocks_init(struct
+> > device_node *ccm_node)
+> >  	clks[IMX7D_MIPI_DSI_ROOT_CLK] = imx_clk_gate4("mipi_dsi_root_clk",
+> > "mipi_dsi_post_div", base + 0x4650, 0);
+> >  	clks[IMX7D_MIPI_CSI_ROOT_CLK] = imx_clk_gate4("mipi_csi_root_clk",
+> > "mipi_csi_post_div", base + 0x4640, 0);
+> >  	clks[IMX7D_MIPI_DPHY_ROOT_CLK] =
+> imx_clk_gate4("mipi_dphy_root_clk",
+> > "mipi_dphy_post_div", base + 0x4660, 0);
+> > +	clks[IMX7D_ENET1_IPG_ROOT_CLK] =
+> > imx_clk_gate2_shared2("enet1_ipg_root_clk", "enet_axi_post_div", base
+> > + 0x4700, 0, &share_count_enet1);
+> > +	clks[IMX7D_ENET1_TIME_ROOT_CLK] =
+> > imx_clk_gate2_shared2("enet1_time_root_clk", "enet1_time_post_div",
+> > base + 0x4700, 0, &share_count_enet1);
+> > +	clks[IMX7D_ENET2_IPG_ROOT_CLK] =
+> > imx_clk_gate2_shared2("enet2_ipg_root_clk", "enet_axi_post_div", base
+> > + 0x4710, 0, &share_count_enet2);
+> > +	clks[IMX7D_ENET2_TIME_ROOT_CLK] =
+> > imx_clk_gate2_shared2("enet2_time_root_clk", "enet2_time_post_div",
+> > base + 0x4710, 0, &share_count_enet2);
+> >  	clks[IMX7D_SAI1_ROOT_CLK] = imx_clk_gate2_shared2("sai1_root_clk",
+> > "sai1_post_div", base + 0x48c0, 0, &share_count_sai1);
+> >  	clks[IMX7D_SAI1_IPG_CLK]  = imx_clk_gate2_shared2("sai1_ipg_clk",
+> > "ipg_root_clk",  base + 0x48c0, 0, &share_count_sai1);
+> >  	clks[IMX7D_SAI2_ROOT_CLK] = imx_clk_gate2_shared2("sai2_root_clk",
+> > "sai2_post_div", base + 0x48d0, 0, &share_count_sai2); @@ -812,10
+> > +818,6 @@ static void __init imx7d_clocks_init(struct device_node
+> > *ccm_node)
+> >  	clks[IMX7D_SAI3_ROOT_CLK] = imx_clk_gate2_shared2("sai3_root_clk",
+> > "sai3_post_div", base + 0x48e0, 0, &share_count_sai3);
+> >  	clks[IMX7D_SAI3_IPG_CLK]  = imx_clk_gate2_shared2("sai3_ipg_clk",
+> > "ipg_root_clk",  base + 0x48e0, 0, &share_count_sai3);
+> >  	clks[IMX7D_SPDIF_ROOT_CLK] = imx_clk_gate4("spdif_root_clk",
+> > "spdif_post_div", base + 0x44d0, 0);
+> > -	clks[IMX7D_ENET1_REF_ROOT_CLK] =
+> imx_clk_gate4("enet1_ref_root_clk",
+> > "enet1_ref_post_div", base + 0x44e0, 0);
+> > -	clks[IMX7D_ENET1_TIME_ROOT_CLK] =
+> > imx_clk_gate4("enet1_time_root_clk", "enet1_time_post_div", base +
+> > 0x44f0, 0);
+> > -	clks[IMX7D_ENET2_REF_ROOT_CLK] =
+> imx_clk_gate4("enet2_ref_root_clk",
+> > "enet2_ref_post_div", base + 0x4500, 0);
+> > -	clks[IMX7D_ENET2_TIME_ROOT_CLK] =
+> > imx_clk_gate4("enet2_time_root_clk", "enet2_time_post_div", base +
+> > 0x4510, 0);
+> >  	clks[IMX7D_EIM_ROOT_CLK] = imx_clk_gate4("eim_root_clk",
+> > "eim_post_div", base + 0x4160, 0);
+> >  	clks[IMX7D_NAND_RAWNAND_CLK] =
+> > imx_clk_gate2_shared2("nand_rawnand_clk", "nand_root_clk", base +
+> > 0x4140, 0, &share_count_nand);
+> >  	clks[IMX7D_NAND_USDHC_BUS_RAWNAND_CLK] =
+> > imx_clk_gate2_shared2("nand_usdhc_rawnand_clk",
+> "nand_usdhc_root_clk",
+> > base + 0x4140, 0, &share_count_nand); diff --git
+> > a/include/dt-bindings/clock/imx7d-clock.h
+> > b/include/dt-bindings/clock/imx7d-clock.h
+> > index b2325d3e2..0d67f53 100644
+> > --- a/include/dt-bindings/clock/imx7d-clock.h
+> > +++ b/include/dt-bindings/clock/imx7d-clock.h
+> > @@ -168,7 +168,7 @@
+> >  #define IMX7D_SPDIF_ROOT_SRC		155
+> >  #define IMX7D_SPDIF_ROOT_CG		156
+> >  #define IMX7D_SPDIF_ROOT_DIV		157
+> > -#define IMX7D_ENET1_REF_ROOT_CLK	158
+> > +#define IMX7D_ENET1_IPG_ROOT_CLK        158
+> >  #define IMX7D_ENET1_REF_ROOT_SRC	159
+> >  #define IMX7D_ENET1_REF_ROOT_CG		160
+> >  #define IMX7D_ENET1_REF_ROOT_DIV	161
+> > @@ -176,7 +176,7 @@
+> >  #define IMX7D_ENET1_TIME_ROOT_SRC	163
+> >  #define IMX7D_ENET1_TIME_ROOT_CG	164
+> >  #define IMX7D_ENET1_TIME_ROOT_DIV	165
+> > -#define IMX7D_ENET2_REF_ROOT_CLK	166
+> > +#define IMX7D_ENET2_IPG_ROOT_CLK        166
+> >  #define IMX7D_ENET2_REF_ROOT_SRC	167
+> >  #define IMX7D_ENET2_REF_ROOT_CG		168
+> >  #define IMX7D_ENET2_REF_ROOT_DIV	169
