@@ -1,50 +1,135 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 21 May 2018 09:57:54 +0300
-Subject: [RFC 12/13] ARM: dts: ti: add dra71-evm FIT description file
-In-Reply-To: <20180417144913.GD5669@atomide.com>
-References: <1523956215-28154-1-git-send-email-t-kristo@ti.com>
- <1523956215-28154-13-git-send-email-t-kristo@ti.com>
- <20180417092924.GB20335@flint.armlinux.org.uk>
- <ad5ef67d-d566-0034-a7cd-09a549cbd6d7@ti.com>
- <20180417144913.GD5669@atomide.com>
-Message-ID: <43ff3894-a287-1558-687c-40f50712735c@ti.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Mon, 21 May 2018 10:36:52 +0300
+Subject: [PATCH v1 4/5] ARM: tegra: Don't apply CPU erratas in insecure
+ mode
+In-Reply-To: <20180520101542.12206-5-digetx@gmail.com>
+References: <20180520101542.12206-1-digetx@gmail.com>
+ <20180520101542.12206-5-digetx@gmail.com>
+Message-ID: <57fceed2-6ca4-8dcf-dd0c-5e4432c086b9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/04/18 17:49, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [180417 09:36]:
->> In typical setup, you can boot a large number of different configs via:
->>
->> bootm 0x82000000#dra71-evm#nand#lcd-auo-g101evn01.0
->>
->> ... assuming the configs were named like that, and assuming they would be
->> compatible with each other. The am57xx-evm example provided is better, as
->> you can chain the different cameras to the available evm configs.
+On 20.05.2018 13:15, Dmitry Osipenko wrote:
+> CPU isn't allowed to touch secure registers while running under secure
+> monitor. Hence skip applying CPU erratas in the reset handler if Trusted
+> Foundations firmware presents.
 > 
-> Why not just do it in the bootloader to put together the dtb?
+> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+> ---
+>  arch/arm/mach-tegra/reset-handler.S | 27 +++++++++++++++++++--------
+>  arch/arm/mach-tegra/reset.c         |  3 +++
+>  arch/arm/mach-tegra/reset.h         |  4 +++-
+>  3 files changed, 25 insertions(+), 9 deletions(-)
 > 
-> Then for external devices, you could just pass info on the
-> kernel cmdline with lcd=foo camera=bar if they cannot be
-> detected over I2C.
+> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+> index 805f306fa6f7..d84c74a95806 100644
+> --- a/arch/arm/mach-tegra/reset-handler.S
+> +++ b/arch/arm/mach-tegra/reset-handler.S
+> @@ -121,6 +121,12 @@ ENTRY(__tegra_cpu_reset_handler)
+>  	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
+>  
+>  	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
+> +
+> +	adr	r12, __tegra_cpu_reset_handler_data
+> +	ldr	r0, [r12, #RESET_DATA(TF_PRESENT)]
+> +	cmp	r0, #0
+> +	bne	after_errata
+> +
+>  #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+>  t20_check:
+>  	cmp	r6, #TEGRA20
+> @@ -155,7 +161,6 @@ after_errata:
+>  	and	r10, r10, #0x3			@ R10 = CPU number
+>  	mov	r11, #1
+>  	mov	r11, r11, lsl r10  		@ R11 = CPU mask
+> -	adr	r12, __tegra_cpu_reset_handler_data
+>  
+>  #ifdef CONFIG_SMP
+>  	/* Does the OS know about this CPU? */
+> @@ -169,10 +174,9 @@ after_errata:
+>  	cmp	r6, #TEGRA20
+>  	bne	1f
+>  	/* If not CPU0, don't let CPU0 reset CPU1 now that CPU1 is coming up. */
+> -	mov32	r5, TEGRA_IRAM_BASE + TEGRA_IRAM_RESET_HANDLER_OFFSET
+>  	mov	r0, #CPU_NOT_RESETTABLE
+>  	cmp	r10, #0
+> -	strneb	r0, [r5, #__tegra20_cpu1_resettable_status_offset]
+> +	strneb	r0, [r12, #RESET_DATA(RESETTABLE_STATUS)]
+>  1:
+>  #endif
+>  
+> @@ -278,13 +282,20 @@ ENDPROC(__tegra_cpu_reset_handler)
+>  	.type	__tegra_cpu_reset_handler_data, %object
+>  	.globl	__tegra_cpu_reset_handler_data
+>  __tegra_cpu_reset_handler_data:
+> -	.rept	TEGRA_RESET_DATA_SIZE
+> -	.long	0
+> -	.endr
+> +	.long	0	/* TEGRA_RESET_MASK_PRESENT */
+> +	.long	0	/* TEGRA_RESET_MASK_LP1 */
+> +	.long	0	/* TEGRA_RESET_MASK_LP2 */
+> +	.long	0	/* TEGRA_RESET_STARTUP_SECONDARY */
+> +	.long	0	/* TEGRA_RESET_STARTUP_LP2 */
+> +	.long	0	/* TEGRA_RESET_STARTUP_LP1 */
+> +
+>  	.globl	__tegra20_cpu1_resettable_status_offset
+>  	.equ	__tegra20_cpu1_resettable_status_offset, \
+>  					. - __tegra_cpu_reset_handler_start
+> -	.byte	0
+> -	.align L1_CACHE_SHIFT
+> +	.long	0	/* TEGRA_RESET_RESETTABLE_STATUS */
+>  
+> +	.globl	__tegra_tf_present
+> +	.equ	__tegra_tf_present, . - __tegra_cpu_reset_handler_start
 
-(Added Linux ARM list to CC, this was not part of the original delivery.)
+I've noticed that __tegra_tf_present shouldn't belong to this patch, I've missed
+to remove it while was rebasing.
 
-Ok trying to resurrect this thread a bit. Is there any kind of consensus 
-how things like this should be handled? Should we add the DT overlay 
-files to kernel tree or not?
+Also, it occurred to me that it will be much better to remove the whole array
+__tegra_cpu_reset_handler_data definition in the asm and get back to the
+original ".rept   TEGRA_RESET_DATA_SIZE" instead. That will make this part of
+code much nicer, I'll change that in v2.
 
-Should we add any kind of build infra to kernel tree, and at what level 
-would this be? Just DT overlay file building support, and drop the FIT 
-build support as was proposed in this RFC series or...?
+Russell / Thierry, please give you acks-reviews where appropriate and let me
+know if I should change anything else in v2, thanks.
 
-U-boot can obviously parse the base DTB + overlay DTB:s into a single 
-DTB, but this is somewhat clumsy approach and is relatively error prone 
-to get it right.
-
-Building the FIT image post kernel build would also be possible, but who 
-would be doing this, is there any need to get this done in generic 
-manner or shall we just add SoC vendor specific tools for this?
-
--Tero
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> +	.long	0	/* TEGRA_RESET_TF_PRESENT */
+> +	.align L1_CACHE_SHIFT
+>  ENTRY(__tegra_cpu_reset_handler_end)
+> diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+> index dc558892753c..b02ae7699842 100644
+> --- a/arch/arm/mach-tegra/reset.c
+> +++ b/arch/arm/mach-tegra/reset.c
+> @@ -24,6 +24,7 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/firmware.h>
+>  #include <asm/hardware/cache-l2x0.h>
+> +#include <asm/trusted_foundations.h>
+>  
+>  #include "iomap.h"
+>  #include "irammap.h"
+> @@ -89,6 +90,8 @@ static void __init tegra_cpu_reset_handler_enable(void)
+>  
+>  void __init tegra_cpu_reset_handler_init(void)
+>  {
+> +	__tegra_cpu_reset_handler_data[TEGRA_RESET_TF_PRESENT] =
+> +		trusted_foundations_registered();
+>  
+>  #ifdef CONFIG_SMP
+>  	__tegra_cpu_reset_handler_data[TEGRA_RESET_MASK_PRESENT] =
+> diff --git a/arch/arm/mach-tegra/reset.h b/arch/arm/mach-tegra/reset.h
+> index 9c479c7925b8..0d9ddc022ece 100644
+> --- a/arch/arm/mach-tegra/reset.h
+> +++ b/arch/arm/mach-tegra/reset.h
+> @@ -25,7 +25,9 @@
+>  #define TEGRA_RESET_STARTUP_SECONDARY	3
+>  #define TEGRA_RESET_STARTUP_LP2		4
+>  #define TEGRA_RESET_STARTUP_LP1		5
+> -#define TEGRA_RESET_DATA_SIZE		6
+> +#define TEGRA_RESET_RESETTABLE_STATUS	6
+> +#define TEGRA_RESET_TF_PRESENT		7
+> +#define TEGRA_RESET_DATA_SIZE		8
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> 
