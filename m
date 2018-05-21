@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 21 May 2018 16:50:01 +0100
-Subject: Applied "ASoC: qdsp6: q6afe: Add q6afe driver" to the asoc tree
-In-Reply-To: <20180518125610.26200-2-srinivas.kandagatla@linaro.org>
-Message-ID: <E1fKn4T-0007SN-1n@debutante>
+Date: Mon, 21 May 2018 16:49:06 +0100
+Subject: Applied "ASoC: qdsp6: q6afe: Add support to MI2S sysclks" to the asoc
+ tree
+In-Reply-To: <20180518125610.26200-5-srinivas.kandagatla@linaro.org>
+Message-ID: <E1fKn3a-0007Nv-Lv@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: qdsp6: q6afe: Add q6afe driver
+   ASoC: qdsp6: q6afe: Add support to MI2S sysclks
 
 has been applied to the asoc tree at
 
@@ -33,313 +34,113 @@ to this mail.
 Thanks,
 Mark
 
->From 7fa2d70f976657111a5ea4f3d16a738ddaa10c4f Mon Sep 17 00:00:00 2001
+>From a4ae3af59bd58514b5417d7d802a37e82bfcfd8f Mon Sep 17 00:00:00 2001
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Fri, 18 May 2018 13:55:56 +0100
-Subject: [PATCH] ASoC: qdsp6: q6afe: Add q6afe driver
+Date: Fri, 18 May 2018 13:55:59 +0100
+Subject: [PATCH] ASoC: qdsp6: q6afe: Add support to MI2S sysclks
 
-This patch adds support to Q6AFE (Audio Front End) module on Q6DSP.
-
-AFE module sits right at the other end of cpu where the codec/audio
-devices are connected.
-
-AFE provides abstraced interfaces to both hardware and virtual devices.
-Each AFE tx/rx port can be configured to connect to one of the hardware
-devices like codec, hdmi, slimbus, i2s and so on. AFE services include
-starting, stopping, and if needed, any configurations of the ports.
+This patch adds support to LPASS Bit clock, LPASS Digital
+core clock and OSR clock. These clocks are required for both
+MI2S and PCM setup.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 Reviewed-by: Banajit Goswami <bgoswami@codeaurora.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/qcom/Kconfig        |   4 +
- sound/soc/qcom/qdsp6/Makefile |   1 +
- sound/soc/qcom/qdsp6/q6afe.c  | 549 ++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6afe.h  |  35 +++
- 4 files changed, 589 insertions(+)
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.c
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.h
+ sound/soc/qcom/qdsp6/q6afe.c | 166 +++++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6afe.h | 131 +++++++++++++++++++++++++++
+ 2 files changed, 297 insertions(+)
 
-diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 37ee0d958145..bb0a2afb0563 100644
---- a/sound/soc/qcom/Kconfig
-+++ b/sound/soc/qcom/Kconfig
-@@ -47,11 +47,15 @@ config SND_SOC_QDSP6_COMMON
- config SND_SOC_QDSP6_CORE
- 	tristate
- 
-+config SND_SOC_QDSP6_AFE
-+	tristate
-+
- config SND_SOC_QDSP6
- 	tristate "SoC ALSA audio driver for QDSP6"
- 	depends on QCOM_APR && HAS_DMA
- 	select SND_SOC_QDSP6_COMMON
- 	select SND_SOC_QDSP6_CORE
-+	select SND_SOC_QDSP6_AFE
- 	help
- 	 To add support for MSM QDSP6 Soc Audio.
- 	 This will enable sound soc platform specific
-diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-index 03b8e89c9731..7ff666bd10ca 100644
---- a/sound/soc/qcom/qdsp6/Makefile
-+++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
- obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
-+obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
 diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
-new file mode 100644
-index 000000000000..5e0032c13aab
---- /dev/null
+index 0004369b3661..de0030068ecb 100644
+--- a/sound/soc/qcom/qdsp6/q6afe.c
 +++ b/sound/soc/qcom/qdsp6/q6afe.c
-@@ -0,0 +1,549 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
-+// Copyright (c) 2018, Linaro Limited
+@@ -34,6 +34,9 @@
+ 
+ #define AFE_PARAM_ID_CDC_SLIMBUS_SLAVE_CFG 0x00010235
+ 
++#define AFE_PARAM_ID_LPAIF_CLK_CONFIG	0x00010238
++#define AFE_PARAM_ID_INT_DIGITAL_CDC_CLK_CONFIG	0x00010239
 +
-+#include <linux/slab.h>
-+#include <linux/kernel.h>
-+#include <linux/uaccess.h>
-+#include <linux/wait.h>
-+#include <linux/jiffies.h>
-+#include <linux/sched.h>
-+#include <linux/module.h>
-+#include <linux/kref.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/spinlock.h>
-+#include <linux/delay.h>
-+#include <linux/soc/qcom/apr.h>
-+#include "q6dsp-errno.h"
-+#include "q6core.h"
-+#include "q6afe.h"
+ #define AFE_PARAM_ID_SLIMBUS_CONFIG    0x00010212
+ #define AFE_PARAM_ID_I2S_CONFIG	0x0001020D
+ 
+@@ -67,6 +70,11 @@
+ #define AFE_PORT_ID_MULTICHAN_HDMI_RX	0x100E
+ 
+ #define AFE_API_VERSION_SLIMBUS_CONFIG 0x1
++/* Clock set API version */
++#define AFE_API_VERSION_CLOCK_SET 1
++#define Q6AFE_LPASS_CLK_CONFIG_API_VERSION	0x1
++#define AFE_MODULE_CLOCK_SET		0x0001028F
++#define AFE_PARAM_ID_CLOCK_SET		0x00010290
+ 
+ /* SLIMbus Rx port on channel 0. */
+ #define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX      0x4000
+@@ -142,6 +150,13 @@ struct afe_port_param_data_v2 {
+ 	u16 reserved;
+ } __packed;
+ 
++struct afe_svc_cmd_set_param {
++	uint32_t payload_size;
++	uint32_t payload_address_lsw;
++	uint32_t payload_address_msw;
++	uint32_t mem_map_handle;
++} __packed;
 +
-+/* AFE CMDs */
-+#define AFE_PORT_CMD_DEVICE_START	0x000100E5
-+#define AFE_PORT_CMD_DEVICE_STOP	0x000100E6
-+#define AFE_PORT_CMD_SET_PARAM_V2	0x000100EF
-+#define AFE_SVC_CMD_SET_PARAM		0x000100f3
-+#define AFE_PORT_CMDRSP_GET_PARAM_V2	0x00010106
-+#define AFE_PARAM_ID_HDMI_CONFIG	0x00010210
-+#define AFE_MODULE_AUDIO_DEV_INTERFACE	0x0001020C
+ struct afe_port_cmd_set_param_v2 {
+ 	u16 port_id;
+ 	u16 payload_size;
+@@ -202,6 +217,23 @@ struct afe_param_id_slimbus_cfg {
+  */
+ } __packed;
+ 
++struct afe_clk_cfg {
++	u32                  i2s_cfg_minor_version;
++	u32                  clk_val1;
++	u32                  clk_val2;
++	u16                  clk_src;
++	u16                  clk_root;
++	u16                  clk_set_mode;
++	u16                  reserved;
++} __packed;
 +
-+/* Port IDs */
-+#define AFE_API_VERSION_HDMI_CONFIG	0x1
-+#define AFE_PORT_ID_MULTICHAN_HDMI_RX	0x100E
-+#define TIMEOUT_MS 1000
-+#define AFE_CMD_RESP_AVAIL	0
-+#define AFE_CMD_RESP_NONE	1
++struct afe_digital_clk_cfg {
++	u32                  i2s_cfg_minor_version;
++	u32                  clk_val;
++	u16                  clk_root;
++	u16                  reserved;
++} __packed;
 +
-+struct q6afe {
-+	struct apr_device *apr;
-+	struct device *dev;
-+	struct q6core_svc_api_info ainfo;
-+	struct mutex lock;
-+	struct list_head port_list;
-+	spinlock_t port_list_lock;
-+	struct platform_device *pdev_dais;
+ struct afe_param_id_i2s_cfg {
+ 	u32	i2s_cfg_minor_version;
+ 	u16	bit_width;
+@@ -219,6 +251,16 @@ union afe_port_config {
+ 	struct afe_param_id_i2s_cfg	i2s_cfg;
+ } __packed;
+ 
++
++struct afe_clk_set {
++	uint32_t clk_set_minor_version;
++	uint32_t clk_id;
++	uint32_t clk_freq_in_hz;
++	uint16_t clk_attri;
++	uint16_t clk_root;
++	uint32_t enable;
 +};
 +
-+struct afe_port_cmd_device_start {
-+	u16 port_id;
-+	u16 reserved;
-+} __packed;
-+
-+struct afe_port_cmd_device_stop {
-+	u16 port_id;
-+	u16 reserved;
-+/* Reserved for 32-bit alignment. This field must be set to 0.*/
-+} __packed;
-+
-+struct afe_port_param_data_v2 {
-+	u32 module_id;
-+	u32 param_id;
-+	u16 param_size;
-+	u16 reserved;
-+} __packed;
-+
-+struct afe_port_cmd_set_param_v2 {
-+	u16 port_id;
-+	u16 payload_size;
-+	u32 payload_address_lsw;
-+	u32 payload_address_msw;
-+	u32 mem_map_handle;
-+} __packed;
-+
-+struct afe_param_id_hdmi_multi_chan_audio_cfg {
-+	u32 hdmi_cfg_minor_version;
-+	u16 datatype;
-+	u16 channel_allocation;
-+	u32 sample_rate;
-+	u16 bit_width;
-+	u16 reserved;
-+} __packed;
-+
-+union afe_port_config {
-+	struct afe_param_id_hdmi_multi_chan_audio_cfg hdmi_multi_ch;
-+} __packed;
-+
-+struct q6afe_port {
-+	wait_queue_head_t wait;
-+	union afe_port_config port_cfg;
-+	struct aprv2_ibasic_rsp_result_t result;
-+	int token;
-+	int id;
-+	int cfg_type;
-+	struct q6afe *afe;
-+	struct kref refcount;
-+	struct list_head node;
-+};
-+
-+struct afe_port_map {
-+	int port_id;
-+	int token;
-+	int is_rx;
-+	int is_dig_pcm;
-+};
-+
-+/*
-+ * Mapping between Virtual Port IDs to DSP AFE Port ID
-+ * On B Family SoCs DSP Port IDs are consistent across multiple SoCs
-+ * on A Family SoCs DSP port IDs are same as virtual Port IDs.
-+ */
-+
-+static struct afe_port_map port_maps[AFE_PORT_MAX] = {
-+	[HDMI_RX] = { AFE_PORT_ID_MULTICHAN_HDMI_RX, HDMI_RX, 1, 1},
-+};
-+
-+static void q6afe_port_free(struct kref *ref)
+ struct q6afe_port {
+ 	wait_queue_head_t wait;
+ 	union afe_port_config port_cfg;
+@@ -404,6 +446,54 @@ static int afe_apr_send_pkt(struct q6afe *afe, struct apr_pkt *pkt,
+ 	return ret;
+ }
+ 
++static int q6afe_port_set_param(struct q6afe_port *port, void *data,
++				int param_id, int module_id, int psize)
 +{
-+	struct q6afe_port *port;
-+	struct q6afe *afe;
-+	unsigned long flags;
-+
-+	port = container_of(ref, struct q6afe_port, refcount);
-+	afe = port->afe;
-+	spin_lock_irqsave(&afe->port_list_lock, flags);
-+	list_del(&port->node);
-+	spin_unlock_irqrestore(&afe->port_list_lock, flags);
-+	kfree(port);
-+}
-+
-+static struct q6afe_port *q6afe_find_port(struct q6afe *afe, int token)
-+{
-+	struct q6afe_port *p = NULL;
-+	struct q6afe_port *ret = NULL;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&afe->port_list_lock, flags);
-+	list_for_each_entry(p, &afe->port_list, node)
-+		if (p->token == token) {
-+			ret = p;
-+			kref_get(&p->refcount);
-+			break;
-+		}
-+
-+	spin_unlock_irqrestore(&afe->port_list_lock, flags);
-+	return ret;
-+}
-+
-+static int q6afe_callback(struct apr_device *adev, struct apr_resp_pkt *data)
-+{
-+	struct q6afe *afe = dev_get_drvdata(&adev->dev);
-+	struct aprv2_ibasic_rsp_result_t *res;
-+	struct apr_hdr *hdr = &data->hdr;
-+	struct q6afe_port *port;
-+
-+	if (!data->payload_size)
-+		return 0;
-+
-+	res = data->payload;
-+	switch (hdr->opcode) {
-+	case APR_BASIC_RSP_RESULT: {
-+		if (res->status) {
-+			dev_err(afe->dev, "cmd = 0x%x returned error = 0x%x\n",
-+				res->opcode, res->status);
-+		}
-+		switch (res->opcode) {
-+		case AFE_PORT_CMD_SET_PARAM_V2:
-+		case AFE_PORT_CMD_DEVICE_STOP:
-+		case AFE_PORT_CMD_DEVICE_START:
-+		case AFE_SVC_CMD_SET_PARAM:
-+			port = q6afe_find_port(afe, hdr->token);
-+			if (port) {
-+				port->result = *res;
-+				wake_up(&port->wait);
-+				kref_put(&port->refcount, q6afe_port_free);
-+			}
-+			break;
-+		default:
-+			dev_err(afe->dev, "Unknown cmd 0x%x\n",	res->opcode);
-+			break;
-+		}
-+	}
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * q6afe_get_port_id() - Get port id from a given port index
-+ *
-+ * @index: port index
-+ *
-+ * Return: Will be an negative on error or valid port_id on success
-+ */
-+int q6afe_get_port_id(int index)
-+{
-+	if (index < 0 || index > AFE_PORT_MAX)
-+		return -EINVAL;
-+
-+	return port_maps[index].port_id;
-+}
-+EXPORT_SYMBOL_GPL(q6afe_get_port_id);
-+
-+static int afe_apr_send_pkt(struct q6afe *afe, struct apr_pkt *pkt,
-+			    struct q6afe_port *port)
-+{
-+	wait_queue_head_t *wait = &port->wait;
-+	struct apr_hdr *hdr = &pkt->hdr;
-+	int ret;
-+
-+	mutex_lock(&afe->lock);
-+	port->result.opcode = 0;
-+	port->result.status = 0;
-+
-+	ret = apr_send_pkt(afe->apr, pkt);
-+	if (ret < 0) {
-+		dev_err(afe->dev, "packet not transmitted (%d)\n", ret);
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	ret = wait_event_timeout(*wait, (port->result.opcode == hdr->opcode),
-+				 msecs_to_jiffies(TIMEOUT_MS));
-+	if (!ret) {
-+		ret = -ETIMEDOUT;
-+	} else if (port->result.status > 0) {
-+		dev_err(afe->dev, "DSP returned error[%x]\n",
-+			port->result.status);
-+		ret = -EINVAL;
-+	} else {
-+		ret = 0;
-+	}
-+
-+err:
-+	mutex_unlock(&afe->lock);
-+
-+	return ret;
-+}
-+
-+static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
-+				   int param_id, int module_id, int psize)
-+{
-+	struct afe_port_cmd_set_param_v2 *param;
++	struct afe_svc_cmd_set_param *param;
 +	struct afe_port_param_data_v2 *pdata;
 +	struct q6afe *afe = port->afe;
 +	struct apr_pkt *pkt;
@@ -365,9 +166,8 @@ index 000000000000..5e0032c13aab
 +	pkt->hdr.src_port = 0;
 +	pkt->hdr.dest_port = 0;
 +	pkt->hdr.token = port->token;
-+	pkt->hdr.opcode = AFE_PORT_CMD_SET_PARAM_V2;
++	pkt->hdr.opcode = AFE_SVC_CMD_SET_PARAM;
 +
-+	param->port_id = port_id;
 +	param->payload_size = sizeof(*pdata) + psize;
 +	param->payload_address_lsw = 0x00;
 +	param->payload_address_msw = 0x00;
@@ -385,305 +185,238 @@ index 000000000000..5e0032c13aab
 +	return ret;
 +}
 +
-+/**
-+ * q6afe_port_stop() - Stop a afe port
-+ *
-+ * @port: Instance of port to stop
-+ *
-+ * Return: Will be an negative on packet size on success.
-+ */
-+int q6afe_port_stop(struct q6afe_port *port)
+ static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
+ 				   int param_id, int module_id, int psize)
+ {
+@@ -453,6 +543,82 @@ static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
+ 	return ret;
+ }
+ 
++static int q6afe_set_lpass_clock(struct q6afe_port *port,
++				 struct afe_clk_cfg *cfg)
 +{
-+	struct afe_port_cmd_device_stop *stop;
-+	struct q6afe *afe = port->afe;
-+	struct apr_pkt *pkt;
-+	int port_id = port->id;
-+	int ret = 0;
-+	int index, pkt_size;
-+	void *p;
-+
-+	port_id = port->id;
-+	index = port->token;
-+	if (index < 0 || index > AFE_PORT_MAX) {
-+		dev_err(afe->dev, "AFE port index[%d] invalid!\n", index);
-+		return -EINVAL;
-+	}
-+
-+	pkt_size = APR_HDR_SIZE + sizeof(*stop);
-+	p = kzalloc(pkt_size, GFP_KERNEL);
-+	if (!p)
-+		return -ENOMEM;
-+
-+	pkt = p;
-+	stop = p + APR_HDR_SIZE;
-+
-+	pkt->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-+					   APR_HDR_LEN(APR_HDR_SIZE),
-+					   APR_PKT_VER);
-+	pkt->hdr.pkt_size = pkt_size;
-+	pkt->hdr.src_port = 0;
-+	pkt->hdr.dest_port = 0;
-+	pkt->hdr.token = index;
-+	pkt->hdr.opcode = AFE_PORT_CMD_DEVICE_STOP;
-+	stop->port_id = port_id;
-+	stop->reserved = 0;
-+
-+	ret = afe_apr_send_pkt(afe, pkt, port);
-+	if (ret)
-+		dev_err(afe->dev, "AFE close failed %d\n", ret);
-+
-+	kfree(pkt);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(q6afe_port_stop);
-+
-+/**
-+ * q6afe_hdmi_port_prepare() - Prepare hdmi afe port.
-+ *
-+ * @port: Instance of afe port
-+ * @cfg: HDMI configuration for the afe port
-+ *
-+ */
-+void q6afe_hdmi_port_prepare(struct q6afe_port *port,
-+			     struct q6afe_hdmi_cfg *cfg)
-+{
-+	union afe_port_config *pcfg = &port->port_cfg;
-+
-+	pcfg->hdmi_multi_ch.hdmi_cfg_minor_version =
-+					AFE_API_VERSION_HDMI_CONFIG;
-+	pcfg->hdmi_multi_ch.datatype = cfg->datatype;
-+	pcfg->hdmi_multi_ch.channel_allocation = cfg->channel_allocation;
-+	pcfg->hdmi_multi_ch.sample_rate = cfg->sample_rate;
-+	pcfg->hdmi_multi_ch.bit_width = cfg->bit_width;
-+}
-+EXPORT_SYMBOL_GPL(q6afe_hdmi_port_prepare);
-+
-+/**
-+ * q6afe_port_start() - Start a afe port
-+ *
-+ * @port: Instance of port to start
-+ *
-+ * Return: Will be an negative on packet size on success.
-+ */
-+int q6afe_port_start(struct q6afe_port *port)
-+{
-+	struct afe_port_cmd_device_start *start;
-+	struct q6afe *afe = port->afe;
-+	int port_id = port->id;
-+	int ret, param_id = port->cfg_type;
-+	struct apr_pkt *pkt;
-+	int pkt_size;
-+	void *p;
-+
-+	ret  = q6afe_port_set_param_v2(port, &port->port_cfg, param_id,
++	return q6afe_port_set_param_v2(port, cfg,
++				       AFE_PARAM_ID_LPAIF_CLK_CONFIG,
 +				       AFE_MODULE_AUDIO_DEV_INTERFACE,
-+				       sizeof(port->port_cfg));
-+	if (ret) {
-+		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
-+			port_id, ret);
-+		return ret;
-+	}
-+
-+	pkt_size = APR_HDR_SIZE + sizeof(*start);
-+	p = kzalloc(pkt_size, GFP_KERNEL);
-+	if (!p)
-+		return -ENOMEM;
-+
-+	pkt = p;
-+	start = p + APR_HDR_SIZE;
-+
-+	pkt->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
-+					    APR_HDR_LEN(APR_HDR_SIZE),
-+					    APR_PKT_VER);
-+	pkt->hdr.pkt_size = pkt_size;
-+	pkt->hdr.src_port = 0;
-+	pkt->hdr.dest_port = 0;
-+	pkt->hdr.token = port->token;
-+	pkt->hdr.opcode = AFE_PORT_CMD_DEVICE_START;
-+
-+	start->port_id = port_id;
-+
-+	ret = afe_apr_send_pkt(afe, pkt, port);
-+	if (ret)
-+		dev_err(afe->dev, "AFE enable for port 0x%x failed %d\n",
-+			port_id, ret);
-+
-+	kfree(pkt);
-+	return ret;
++				       sizeof(*cfg));
 +}
-+EXPORT_SYMBOL_GPL(q6afe_port_start);
 +
-+/**
-+ * q6afe_port_get_from_id() - Get port instance from a port id
-+ *
-+ * @dev: Pointer to afe child device.
-+ * @id: port id
-+ *
-+ * Return: Will be an error pointer on error or a valid afe port
-+ * on success.
-+ */
-+struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
++static int q6afe_set_lpass_clock_v2(struct q6afe_port *port,
++				 struct afe_clk_set *cfg)
 +{
-+	int port_id;
-+	struct q6afe *afe = dev_get_drvdata(dev->parent);
-+	struct q6afe_port *port;
-+	unsigned long flags;
-+	int cfg_type;
++	return q6afe_port_set_param(port, cfg, AFE_PARAM_ID_CLOCK_SET,
++				    AFE_MODULE_CLOCK_SET, sizeof(*cfg));
++}
 +
-+	if (id < 0 || id > AFE_PORT_MAX) {
-+		dev_err(dev, "AFE port token[%d] invalid!\n", id);
-+		return ERR_PTR(-EINVAL);
-+	}
++static int q6afe_set_digital_codec_core_clock(struct q6afe_port *port,
++					      struct afe_digital_clk_cfg *cfg)
++{
++	return q6afe_port_set_param_v2(port, cfg,
++				       AFE_PARAM_ID_INT_DIGITAL_CDC_CLK_CONFIG,
++				       AFE_MODULE_AUDIO_DEV_INTERFACE,
++				       sizeof(*cfg));
++}
 +
-+	/* if port is multiple times bind/unbind before callback finishes */
-+	port = q6afe_find_port(afe, id);
-+	if (port) {
-+		dev_err(dev, "AFE Port already open\n");
-+		return port;
-+	}
++int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
++			  int clk_src, int clk_root,
++			  unsigned int freq, int dir)
++{
++	struct afe_clk_cfg ccfg = {0,};
++	struct afe_clk_set cset = {0,};
++	struct afe_digital_clk_cfg dcfg = {0,};
++	int ret;
 +
-+	port_id = port_maps[id].port_id;
++	switch (clk_id) {
++	case LPAIF_DIG_CLK:
++		dcfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
++		dcfg.clk_val = freq;
++		dcfg.clk_root = clk_root;
++		ret = q6afe_set_digital_codec_core_clock(port, &dcfg);
++		break;
++	case LPAIF_BIT_CLK:
++		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
++		ccfg.clk_val1 = freq;
++		ccfg.clk_src = clk_src;
++		ccfg.clk_root = clk_root;
++		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK1_VALID;
++		ret = q6afe_set_lpass_clock(port, &ccfg);
++		break;
 +
-+	switch (port_id) {
-+	case AFE_PORT_ID_MULTICHAN_HDMI_RX:
-+		cfg_type = AFE_PARAM_ID_HDMI_CONFIG;
++	case LPAIF_OSR_CLK:
++		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
++		ccfg.clk_val2 = freq;
++		ccfg.clk_src = clk_src;
++		ccfg.clk_root = clk_root;
++		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK2_VALID;
++		ret = q6afe_set_lpass_clock(port, &ccfg);
++		break;
++	case Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT ... Q6AFE_LPASS_CLK_ID_INT_MCLK_1:
++		cset.clk_set_minor_version = AFE_API_VERSION_CLOCK_SET;
++		cset.clk_id = clk_id;
++		cset.clk_freq_in_hz = freq;
++		cset.clk_attri = clk_src;
++		cset.clk_root = clk_root;
++		cset.enable = !!freq;
++		ret = q6afe_set_lpass_clock_v2(port, &cset);
 +		break;
 +	default:
-+		dev_err(dev, "Invalid port id 0x%x\n", port_id);
-+		return ERR_PTR(-EINVAL);
++		ret = -EINVAL;
++		break;
 +	}
 +
-+	port = kzalloc(sizeof(*port), GFP_KERNEL);
-+	if (!port)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init_waitqueue_head(&port->wait);
-+
-+	port->token = id;
-+	port->id = port_id;
-+	port->afe = afe;
-+	port->cfg_type = cfg_type;
-+	kref_init(&port->refcount);
-+
-+	spin_lock_irqsave(&afe->port_list_lock, flags);
-+	list_add_tail(&port->node, &afe->port_list);
-+	spin_unlock_irqrestore(&afe->port_list_lock, flags);
-+
-+	return port;
-+
++	return ret;
 +}
-+EXPORT_SYMBOL_GPL(q6afe_port_get_from_id);
++EXPORT_SYMBOL_GPL(q6afe_port_set_sysclk);
 +
-+/**
-+ * q6afe_port_put() - Release port reference
-+ *
-+ * @port: Instance of port to put
-+ */
-+void q6afe_port_put(struct q6afe_port *port)
-+{
-+	kref_put(&port->refcount, q6afe_port_free);
-+}
-+EXPORT_SYMBOL_GPL(q6afe_port_put);
-+
-+static int q6afe_probe(struct apr_device *adev)
-+{
-+	struct q6afe *afe;
-+	struct device *dev = &adev->dev;
-+	struct device_node *dais_np;
-+
-+	afe = devm_kzalloc(dev, sizeof(*afe), GFP_KERNEL);
-+	if (!afe)
-+		return -ENOMEM;
-+
-+	q6core_get_svc_api_info(adev->svc_id, &afe->ainfo);
-+	afe->apr = adev;
-+	mutex_init(&afe->lock);
-+	afe->dev = dev;
-+	INIT_LIST_HEAD(&afe->port_list);
-+	spin_lock_init(&afe->port_list_lock);
-+
-+	dev_set_drvdata(dev, afe);
-+
-+	dais_np = of_get_child_by_name(dev->of_node, "dais");
-+	if (dais_np) {
-+		afe->pdev_dais = of_platform_device_create(dais_np,
-+							   "q6afe-dai", dev);
-+		of_node_put(dais_np);
-+	}
-+
-+	return 0;
-+}
-+
-+static int q6afe_remove(struct apr_device *adev)
-+{
-+	struct q6afe *afe = dev_get_drvdata(&adev->dev);
-+
-+	if (afe->pdev_dais)
-+		of_platform_device_destroy(&afe->pdev_dais->dev, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id q6afe_device_id[]  = {
-+	{ .compatible = "qcom,q6afe" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, q6afe_device_id);
-+
-+static struct apr_driver qcom_q6afe_driver = {
-+	.probe = q6afe_probe,
-+	.remove = q6afe_remove,
-+	.callback = q6afe_callback,
-+	.driver = {
-+		.name = "qcom-q6afe",
-+		.of_match_table = of_match_ptr(q6afe_device_id),
-+
-+	},
-+};
-+
-+module_apr_driver(qcom_q6afe_driver);
-+MODULE_DESCRIPTION("Q6 Audio Front End");
-+MODULE_LICENSE("GPL v2");
+ /**
+  * q6afe_port_stop() - Stop a afe port
+  *
 diff --git a/sound/soc/qcom/qdsp6/q6afe.h b/sound/soc/qcom/qdsp6/q6afe.h
-new file mode 100644
-index 000000000000..3bd991a7c42d
---- /dev/null
+index 3cb3bb4985a9..5ca54a9bdfd5 100644
+--- a/sound/soc/qcom/qdsp6/q6afe.h
 +++ b/sound/soc/qcom/qdsp6/q6afe.h
-@@ -0,0 +1,35 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
+@@ -16,6 +16,134 @@
+ #define AFE_MAX_CHAN_COUNT	8
+ #define AFE_PORT_MAX_AUDIO_CHAN_CNT	0x8
+ 
++#define Q6AFE_LPASS_CLK_SRC_INTERNAL 1
++#define Q6AFE_LPASS_CLK_ROOT_DEFAULT 0
 +
-+#ifndef __Q6AFE_H__
-+#define __Q6AFE_H__
++#define LPAIF_DIG_CLK	1
++#define LPAIF_BIT_CLK	2
++#define LPAIF_OSR_CLK	3
 +
-+#include <dt-bindings/sound/qcom,q6afe.h>
++/* Clock ID for Primary I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_MI2S_IBIT                          0x100
++/* Clock ID for Primary I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_MI2S_EBIT                          0x101
++/* Clock ID for Secondary I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_MI2S_IBIT                          0x102
++/* Clock ID for Secondary I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_MI2S_EBIT                          0x103
++/* Clock ID for Tertiary I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_MI2S_IBIT                          0x104
++/* Clock ID for Tertiary I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_MI2S_EBIT                          0x105
++/* Clock ID for Quartnery I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_MI2S_IBIT                         0x106
++/* Clock ID for Quartnery I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_MI2S_EBIT                         0x107
++/* Clock ID for Speaker I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_IBIT                       0x108
++/* Clock ID for Speaker I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_EBIT                       0x109
++/* Clock ID for Speaker I2S OSR */
++#define Q6AFE_LPASS_CLK_ID_SPEAKER_I2S_OSR                        0x10A
 +
-+#define AFE_PORT_MAX		48
++/* Clock ID for QUINARY  I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_IBIT			0x10B
++/* Clock ID for QUINARY  I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_EBIT			0x10C
++/* Clock ID for SENARY  I2S IBIT */
++#define Q6AFE_LPASS_CLK_ID_SEN_MI2S_IBIT			0x10D
++/* Clock ID for SENARY  I2S EBIT */
++#define Q6AFE_LPASS_CLK_ID_SEN_MI2S_EBIT			0x10E
++/* Clock ID for INT0 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT0_MI2S_IBIT                       0x10F
++/* Clock ID for INT1 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT1_MI2S_IBIT                       0x110
++/* Clock ID for INT2 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT2_MI2S_IBIT                       0x111
++/* Clock ID for INT3 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT3_MI2S_IBIT                       0x112
++/* Clock ID for INT4 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT4_MI2S_IBIT                       0x113
++/* Clock ID for INT5 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT5_MI2S_IBIT                       0x114
++/* Clock ID for INT6 I2S IBIT  */
++#define Q6AFE_LPASS_CLK_ID_INT6_MI2S_IBIT                       0x115
 +
-+#define MSM_AFE_PORT_TYPE_RX 0
-+#define MSM_AFE_PORT_TYPE_TX 1
-+#define AFE_MAX_PORTS AFE_PORT_MAX
++/* Clock ID for QUINARY MI2S OSR CLK  */
++#define Q6AFE_LPASS_CLK_ID_QUI_MI2S_OSR                         0x116
 +
-+struct q6afe_hdmi_cfg {
-+	u16                  datatype;
-+	u16                  channel_allocation;
-+	u32                  sample_rate;
-+	u16                  bit_width;
-+};
++/* Clock ID for Primary PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_PCM_IBIT                           0x200
++/* Clock ID for Primary PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_PCM_EBIT                           0x201
++/* Clock ID for Secondary PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_PCM_IBIT                           0x202
++/* Clock ID for Secondary PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_PCM_EBIT                           0x203
++/* Clock ID for Tertiary PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_PCM_IBIT                           0x204
++/* Clock ID for Tertiary PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_PCM_EBIT                           0x205
++/* Clock ID for Quartery PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_PCM_IBIT                          0x206
++/* Clock ID for Quartery PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_PCM_EBIT                          0x207
++/* Clock ID for Quinary PCM IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUIN_PCM_IBIT                          0x208
++/* Clock ID for Quinary PCM EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUIN_PCM_EBIT                          0x209
++/* Clock ID for QUINARY PCM OSR  */
++#define Q6AFE_LPASS_CLK_ID_QUI_PCM_OSR                            0x20A
 +
-+struct q6afe_port_config {
-+	struct q6afe_hdmi_cfg hdmi;
-+};
++/** Clock ID for Primary TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_TDM_IBIT                           0x200
++/** Clock ID for Primary TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_PRI_TDM_EBIT                           0x201
++/** Clock ID for Secondary TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_TDM_IBIT                           0x202
++/** Clock ID for Secondary TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_SEC_TDM_EBIT                           0x203
++/** Clock ID for Tertiary TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_TDM_IBIT                           0x204
++/** Clock ID for Tertiary TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_TER_TDM_EBIT                           0x205
++/** Clock ID for Quartery TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_TDM_IBIT                          0x206
++/** Clock ID for Quartery TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUAD_TDM_EBIT                          0x207
++/** Clock ID for Quinary TDM IBIT */
++#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_IBIT                          0x208
++/** Clock ID for Quinary TDM EBIT */
++#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_EBIT                          0x209
++/** Clock ID for Quinary TDM OSR */
++#define Q6AFE_LPASS_CLK_ID_QUIN_TDM_OSR                           0x20A
 +
-+struct q6afe_port;
++/* Clock ID for MCLK1 */
++#define Q6AFE_LPASS_CLK_ID_MCLK_1                                 0x300
++/* Clock ID for MCLK2 */
++#define Q6AFE_LPASS_CLK_ID_MCLK_2                                 0x301
++/* Clock ID for MCLK3 */
++#define Q6AFE_LPASS_CLK_ID_MCLK_3                                 0x302
++/* Clock ID for MCLK4 */
++#define Q6AFE_LPASS_CLK_ID_MCLK_4                                 0x304
++/* Clock ID for Internal Digital Codec Core */
++#define Q6AFE_LPASS_CLK_ID_INTERNAL_DIGITAL_CODEC_CORE            0x303
++/* Clock ID for INT MCLK0 */
++#define Q6AFE_LPASS_CLK_ID_INT_MCLK_0                             0x305
++/* Clock ID for INT MCLK1 */
++#define Q6AFE_LPASS_CLK_ID_INT_MCLK_1                             0x306
 +
-+struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id);
-+int q6afe_port_start(struct q6afe_port *port);
-+int q6afe_port_stop(struct q6afe_port *port);
-+void q6afe_port_put(struct q6afe_port *port);
-+int q6afe_get_port_id(int index);
-+void q6afe_hdmi_port_prepare(struct q6afe_port *port,
-+			    struct q6afe_hdmi_cfg *cfg);
++/* Clock attribute for invalid use (reserved for internal usage) */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_INVALID		0x0
++/* Clock attribute for no couple case */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_NO		0x1
++/* Clock attribute for dividend couple case */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_DIVIDEND	0x2
++/* Clock attribute for divisor couple case */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_DIVISOR	0x3
++/* Clock attribute for invert and no couple case */
++#define Q6AFE_LPASS_CLK_ATTRIBUTE_INVERT_COUPLE_NO	0x4
 +
-+#endif /* __Q6AFE_H__ */
+ struct q6afe_hdmi_cfg {
+ 	u16                  datatype;
+ 	u16                  channel_allocation;
+@@ -59,4 +187,7 @@ void q6afe_slim_port_prepare(struct q6afe_port *port,
+ 			  struct q6afe_slim_cfg *cfg);
+ int q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg);
+ 
++int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
++			  int clk_src, int clk_root,
++			  unsigned int freq, int dir);
+ #endif /* __Q6AFE_H__ */
 -- 
 2.17.0
