@@ -1,284 +1,88 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 21 May 2018 15:40:02 +0100
-Subject: [PATCH v9 12/16] KVM: arm64: Save host SVE context as appropriate
-In-Reply-To: <1526912237-25308-13-git-send-email-Dave.Martin@arm.com>
-References: <1526912237-25308-1-git-send-email-Dave.Martin@arm.com>
- <1526912237-25308-13-git-send-email-Dave.Martin@arm.com>
-Message-ID: <eac5821b-c5e0-90c9-cdd6-73643662d68d@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 21 May 2018 15:41:56 +0100
+Subject: [PATCH 6/6] arm64: perf: Add support for chaining counters
+In-Reply-To: <f7ffdcfb-5a32-9a55-32a5-4f8770e23aa0@arm.com>
+References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
+ <1526638943-2110-7-git-send-email-suzuki.poulose@arm.com>
+ <32f2d870-9b9c-0b10-880f-cc99cf969bf6@arm.com>
+ <5d53fe1d-dbd9-2aad-73bd-0c4284540240@arm.com>
+ <c8cb9280-c93d-89c4-43ed-179de8d46dfd@arm.com>
+ <f7ffdcfb-5a32-9a55-32a5-4f8770e23aa0@arm.com>
+Message-ID: <22ea8f48-dc74-6d84-6085-b41447a79a6d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/18 15:17, Dave Martin wrote:
-> This patch adds SVE context saving to the hyp FPSIMD context switch
-> path.  This means that it is no longer necessary to save the host
-> SVE state in advance of entering the guest, when in use.
+On 21/05/18 15:00, Robin Murphy wrote:
+> On 21/05/18 14:42, Suzuki K Poulose wrote:
+>> On 18/05/18 16:57, Suzuki K Poulose wrote:
+>>> Hi Robin,
+>>>
+>>> On 18/05/18 14:49, Robin Murphy wrote:
+>>>> On 18/05/18 11:22, Suzuki K Poulose wrote:
+>>>>> Add support for chained event counters. PMUv3 allows chaining
+>>>>> a pair of adjacent PMU counters (with the lower counter number
+>>>>> being always "even"). The low counter is programmed to count
+>>>>> the event of interest and the high counter(odd numbered) is
+>>>>> programmed with a special event code (0x1e - Chain). Thus
+>>>>> we need special allocation schemes to make the full use of
+>>>>> available counters. So, we allocate the counters from either
+>>>>> ends. i.e, chained counters are allocated from the lower
+>>>>> end in pairs of two and the normal counters are allocated
+>>>>> from the higher number. Also makes necessary changes to
+>>>>> handle the chained events as a single event with 2 counters.
+>>>>>
+>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>
+>>>
+>>>>> ? /*
+>>>>> @@ -845,8 +1016,14 @@ static int __armv8_pmuv3_map_event(struct perf_event *event,
+>>>>> ???????????????????????? &armv8_pmuv3_perf_cache_map,
+>>>>> ???????????????????????? ARMV8_PMU_EVTYPE_EVENT);
+>>>>> -??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES)
+>>>>> +??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES) {
+>>>>> +??????? /* Prevent chaining for cycle counter */
+>>>>
+>>>> Why? Sure, we want to avoid executing the chaining logic if we're scheduling a cycles event in the dedicated counter (which is perhaps what the comment above wanted to say), but if one ends up allocated into a regular counter (e.g. if the user asks for multiple cycle counts with different filters), then I don't see any reason to forbid that being chained.
+>>>
+>>> Ah, I didn't think about that case. I was under the assumption that the
+>>> cycles are *only* placed on the cycle counter. I will take care of that.
+>>> Thanks for the review.
+>>
+>> Robin, Mark, Will
+>>
+>> One potential problem I see with allowing chaining of the cycle counter
+>> *and* the promotion of cycle event to 64bit by default is when the user
+>> may actually be able to count 1 less event (due to the promotion of
+>> cycle event to 64bit and thus forcing to use chain, if the cycle counter
+>> is unavailable).
 > 
-> In order to avoid adding pointless complexity to the code, VHE is
-> assumed if SVE is in use.  VHE is an architectural prerequisite for
-> SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
-> kernels that support both SVE and KVM.
+> Right, I didn't mean to imply we should inject the "chain" attr automatically for all cycles events, just that we shouldn't be rejecting it if the user does explicitly set it (but then just ignore it if using the dedicated counter).
+
+Right, I was not talking about the automatic "chain" for cycles events. The
+problem is we don't know if we would get the "cycle" counter for the given
+event until it is "added", at which point we have already decided
+whether the event is 32bit or 64bit. So, we cannot really delay the decision
+until that. Thats where this comes up. Given a cycle event (without an explicit
+chain request), do we treat it as a 64bit event or not ? If we do, we could
+
+1) get the Cycle counter, all is fine.
+
+2) If not, fallback to Chaining. The user looses a counter.
+
 > 
-> Historically, software models exist that can expose the
-> architecturally invalid configuration of SVE without VHE, so if
-> this situation is detected at kvm_init() time then KVM will be
-> disabled.
+>> So one option is to drop automatic promotion of the cycle counter to
+>> 64bit and do it only when it is requested by the user and use either the
+>> Cycle counter (preferred) or fall back to chaining. That way, the user
+>> has the control over the number of events he can count using the given
+>> set of counters.
 > 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Naively, there doesn't seem to be any inherent harm in always using 64-bit arithmetic for the dedicated counter, but it would mean that with multiple (non-chained) cycles events, some would be taking an interrupt every few seconds while one would effectively never overflow. I guess the question is whether that matters or not.
 > 
-> ---
-> 
->  * Stripped the following tags, reviewers please reconfirm:
-> 
-> Formerly-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> Formerly-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Formerly-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> (Creation of a new file for this one change may be deemed undesirable,
-> but there didn't seem to be a correct place to put it.  There may also
-> be a way around the circular include problem that I missed.)
-> 
-> Changes since v8:
-> 
->  * Add kvm_arch_check_supported() hook, and move arm64-specific check
->    for SVE-implies-VHE into arch/arm64/.
-> 
->    Due to circular header dependency problems, it is difficult to get
->    the prototype for kvm_pr_*() functions in <asm/kvm_host.h>, so this
->    patch puts arm64's kvm_arch_check_supported() hook out of line.
->    This is not a hot function.
-> ---
->  arch/arm/include/asm/kvm_host.h   |  1 +
->  arch/arm64/Kconfig                |  7 +++++++
->  arch/arm64/include/asm/kvm_host.h |  1 +
->  arch/arm64/kvm/Makefile           |  2 +-
->  arch/arm64/kvm/fpsimd.c           |  1 -
->  arch/arm64/kvm/hyp/switch.c       | 20 +++++++++++++++++++-
->  arch/arm64/kvm/init.c             | 33 +++++++++++++++++++++++++++++++++
->  virt/kvm/arm/arm.c                |  6 ++++++
->  8 files changed, 68 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm64/kvm/init.c
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index ac870b2..e627ef8 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -280,6 +280,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->  
->  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
->  
-> +static inline int kvm_arch_check_supported(void) { return 0; }
->  static inline void kvm_arch_hardware_unsetup(void) {}
->  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index eb2cf49..b0d3820 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1130,6 +1130,7 @@ endmenu
->  config ARM64_SVE
->  	bool "ARM Scalable Vector Extension support"
->  	default y
-> +	depends on !KVM || ARM64_VHE
->  	help
->  	  The Scalable Vector Extension (SVE) is an extension to the AArch64
->  	  execution state which complements and extends the SIMD functionality
-> @@ -1155,6 +1156,12 @@ config ARM64_SVE
->  	  booting the kernel.  If unsure and you are not observing these
->  	  symptoms, you should assume that it is safe to say Y.
->  
-> +	  CPUs that support SVE are architecturally required to support the
-> +	  Virtualization Host Extensions (VHE), so the kernel makes no
-> +	  provision for supporting SVE alongside KVM without VHE enabled.
-> +	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
-> +	  KVM in the same kernel image.
-> +
->  config ARM64_MODULE_PLTS
->  	bool
->  	select HAVE_MOD_ARCH_SPECIFIC
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index b3fe730..80f3985 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -405,6 +405,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
->  	kvm_call_hyp(__kvm_set_tpidr_el2, tpidr_el2);
->  }
->  
-> +int kvm_arch_check_supported(void);
->  static inline void kvm_arch_hardware_unsetup(void) {}
->  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index 0f2a135..5e66afe 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -17,7 +17,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
->  
->  kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o va_layout.o
-> -kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
-> +kvm-$(CONFIG_KVM_ARM_HOST) += init.o hyp.o hyp-init.o handle_exit.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o fpsimd.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/aarch32.o
-> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-> index d9b5f73..52185ec 100644
-> --- a/arch/arm64/kvm/fpsimd.c
-> +++ b/arch/arm64/kvm/fpsimd.c
-> @@ -59,7 +59,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
->   */
->  void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
->  {
-> -	BUG_ON(system_supports_sve());
->  	BUG_ON(!current->mm);
->  
->  	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 118f300..a6a8c7d 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -21,6 +21,7 @@
->  
->  #include <kvm/arm_psci.h>
->  
-> +#include <asm/cpufeature.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_host.h>
-> @@ -28,6 +29,7 @@
->  #include <asm/kvm_mmu.h>
->  #include <asm/fpsimd.h>
->  #include <asm/debug-monitors.h>
-> +#include <asm/processor.h>
->  #include <asm/thread_info.h>
->  
->  /* Check whether the FP regs were dirtied while in the host-side run loop: */
-> @@ -329,6 +331,8 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->  void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
->  				    struct kvm_vcpu *vcpu)
->  {
-> +	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
-> +
->  	if (has_vhe())
->  		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
->  			     cpacr_el1);
-> @@ -339,7 +343,21 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
->  	isb();
->  
->  	if (vcpu->arch.flags & KVM_ARM64_FP_HOST) {
-> -		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
-> +		/*
-> +		 * In the SVE case, VHE is assumed: it is enforced by
-> +		 * Kconfig and kvm_arch_init().
-> +		 */
-> +		if (system_supports_sve() &&
-> +		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
-> +			struct thread_struct *thread = container_of(
-> +				host_fpsimd,
-> +				struct thread_struct, uw.fpsimd_state);
-> +
-> +			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
-> +		} else {
-> +			__fpsimd_save_state(host_fpsimd);
-> +		}
-> +
->  		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
->  	}
->  
-> diff --git a/arch/arm64/kvm/init.c b/arch/arm64/kvm/init.c
-> new file mode 100644
-> index 0000000..3b6e730
-> --- /dev/null
-> +++ b/arch/arm64/kvm/init.c
-> @@ -0,0 +1,33 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * arch/arm64/kvm/init.c: KVM initialisation support
-> + *
-> + * Copyright 2018 Arm Limited
-> + * Author: Dave Martin <Dave.Martin@arm.com>
-> + */
-> +#include <linux/errno.h>
-> +#include <linux/kvm_host.h>
-> +#include <asm/cpufeature.h>
-> +#include <asm/kvm_host.h>
-> +
-> +/* Additional arch-dependent checks for KVM usability */
-> +int kvm_arch_check_supported(void)
-> +{
-> +	/*
-> +	 * VHE is a prerequisite for SVE in the Arm architecture, and
-> +	 * Kconfig ensures that if system_supports_sve() here then
-> +	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
-> +	 * detected and enabled, the CPU is architecturally
-> +	 * noncompliant.
-> +	 *
-> +	 * Just in case this mismatch is seen, detect it, warn and give
-> +	 * up.  Supporting this forbidden configuration in Hyp would be
-> +	 * pointless.
-> +	 */
-> +	if (system_supports_sve() && !has_vhe()) {
-> +		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
-> +		return -ENODEV;
-> +	}
-> +
-> +	return 0;
-> +}
 
-[entering bikeshedding territory]
+The problem is we can't have a mask per counter as we don't know where
+the event would be placed until it is added. Or we should delay the
+period initialisation/update to post get_event_idx().
 
-I'm not exactly keen on this. This feels overkill, and a departure from 
-what we've been doing so far.
-
-Why don't you simply have a helper in kvm_host.h that does:
-
-static inline bool kvm_arm_check_sve_valid(void)
-{
-	return !system_supports_sve() || has_vhe();
-}
-
-(and a canonical "return true;" implementation for 32bit)
-
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index bee226c..8518df0 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -16,6 +16,7 @@
->   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
->   */
->  
-> +#include <linux/bug.h>
->  #include <linux/cpu_pm.h>
->  #include <linux/errno.h>
->  #include <linux/err.h>
-> @@ -41,6 +42,7 @@
->  #include <asm/mman.h>
->  #include <asm/tlbflush.h>
->  #include <asm/cacheflush.h>
-> +#include <asm/cpufeature.h>
->  #include <asm/virt.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_asm.h>
-> @@ -1574,6 +1576,10 @@ int kvm_arch_init(void *opaque)
->  		return -ENODEV;
->  	}
->  
-> +	err = kvm_arch_check_supported();
-> +	if (err)
-> +		return err;
-> +
-
-And turn this into:
-
-	if (!kvm_arm_check_sve_valid()) {
-		kvm_pr_unimpl("SVE system without VHE unsupported. Broken cpu?");
-		return -EINVAL;
-	}
-
-It has the advantage of being obvious of what we check for, and doesn't 
-add any extra file.
-
-Thoughts?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Suzuki
