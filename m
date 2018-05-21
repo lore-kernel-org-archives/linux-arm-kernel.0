@@ -1,87 +1,133 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 21 May 2018 11:55:17 +0200
-Subject: [GIT PULL] Allwinner H3/H5 changes for 4.18
-Message-ID: <20180521095517.liyqgj32d3xd7ejq@flea>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Mon, 21 May 2018 11:57:05 +0200
+Subject: [PATCH v3 2/3] arm64: dts: renesas: draak: Describe CVBS input
+In-Reply-To: <1569661.saMqNra8vc@avalon>
+References: <1526654878-11143-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1526654878-11143-3-git-send-email-jacopo+renesas@jmondi.org>
+ <1569661.saMqNra8vc@avalon>
+Message-ID: <20180521095705.GC4432@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Laurent,
 
-Here is our usual PR with the changes that apply to the H3 and H5,
-shared between arm and arm64.
+On Fri, May 18, 2018 at 06:12:15PM +0300, Laurent Pinchart wrote:
+> Hi Jacopo,
+>
+> Thank you for the patch.
+>
+> On Friday, 18 May 2018 17:47:57 EEST Jacopo Mondi wrote:
+> > Describe CVBS video input through analog video decoder ADV7180
+> > connected to video input interface VIN4.
+> >
+> > The video input signal path is shared with HDMI video input, and
+> > selected by on-board switches SW-53 and SW-54 with CVBS input selected
+> > by the default switches configuration.
+> >
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> > Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> >
+> > ---
+> > v2 -> v3:
+> > - Add comment to describe the shared input video path
+> > - Add my SoB and Niklas' R-b tags
+> > ---
+> >  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 42 +++++++++++++++++++++++
+> >  1 file changed, 42 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts index 9d73de8..95745fc
+> > 100644
+> > --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> > @@ -142,6 +142,11 @@
+> >  		groups = "usb0";
+> >  		function = "usb0";
+> >  	};
+> > +
+> > +	vin4_pins_cvbs: vin4 {
+> > +		groups = "vin4_data8", "vin4_sync", "vin4_clk";
+> > +		function = "vin4";
+> > +	};
+> >  };
+> >
+> >  &i2c0 {
+> > @@ -154,6 +159,23 @@
+> >  		reg = <0x50>;
+> >  		pagesize = <8>;
+> >  	};
+> > +
+> > +	analog-video at 20 {
+> > +		compatible = "adi,adv7180";
+> > +		reg = <0x20>;
+> > +
+> > +		port {
+>
+> The adv7180 DT bindings document the output port as 3 or 6 (respectively for
+> the CP and ST versions of the chip). You should thus number the port. Apart
+> from that the patch looks good.
 
-Maxime
+I admit I have barely copied this from Gen-2 boards DTS, but reading
+the driver code and binding description again, I think this is
+correct, as the output port numbering and mandatory input port (which
+is missing here) only apply to adv7180cp/st chip versions.
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+Here we describe plain adv7180, no need to number output ports afaict.
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+Thanks
+  j
 
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-h3-h5-for-4.18
-
-for you to fetch changes up to 06139c822c5011ff79341000f44eca96151aac92:
-
-  ARM: dts: sun8i: h3: Add SY8106A regulator to Orange Pi PC (2018-05-11 10:00:28 +0200)
-
-----------------------------------------------------------------
-Allwinner H3/H5 support for 4.18
-
-Here is our usual bunch of changes for the H3 and H5 SoCs that share the
-same SoC design but with different CPUs.
-
-This time, most of the changes are about supporting CPUFreq on these SoCs,
-with voltage scaling being enabled for a number of boards.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (5):
-      ARM: dts: sun8i: h3: fix ALL-H3-CC H3 ver VCC-1V2 regulator voltage
-      ARM: dts: sun8i: h2-plus: Sort dtb entries in Makefile
-      ARM: dts: sun8i: h2+: Add Libre Computer Board ALL-H3-CC H2+ ver.
-      arm64: dts: allwinner: h5: Add cpu0 label for first cpu
-      arm64: dts: allwinner: Sort dtb entries in Makefile
-
-Icenowy Zheng (5):
-      ARM: dts: sun8i: h3: add operating-points-v2 table for CPU
-      ARM: dts: sun8i: h2+: add SY8113B regulator used by Orange Pi Zero board
-      ARM: dts: sun8i: h3: add SY8113B regulator used by Orange Pi One board
-      ARM: dts: sun8i: h3: fix ALL-H3-CC H3 ver VDD-CPUX voltage
-      ARM: dts: sun8i: h3: set the cpu-supply to VDD-CPUX on ALL-H3-CC H3 ver
-
-Neil Armstrong (2):
-      arm: dts: sun8i: h3: libretech-all-h3-cc: Move board definition to common dtsi
-      arm64: dts: allwinner: Add dts file for Libre Computer Board ALL-H3-CC H5 ver.
-
-Ondrej Jirman (3):
-      ARM: dts: sunxi: h3/h5: Add r_i2c pinmux node
-      ARM: dts: sunxi: h3/h5: Add r_i2c I2C controller
-      ARM: dts: sun8i: h3: Add SY8106A regulator to Orange Pi PC
-
- arch/arm/boot/dts/Makefile                         |   3 +-
- .../boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dts |  13 ++
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  |  21 ++
- arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 206 +-------------------
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  21 ++
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  28 +++
- arch/arm/boot/dts/sun8i-h3.dtsi                    |  32 ++-
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  18 ++
- arch/arm/boot/dts/sunxi-libretech-all-h3-cc.dtsi   | 215 +++++++++++++++++++++
- arch/arm64/boot/dts/allwinner/Makefile             |   5 +-
- .../allwinner/sun50i-h5-libretech-all-h3-cc.dts    |  14 ++
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       |   2 +-
- 12 files changed, 368 insertions(+), 210 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dts
- create mode 100644 arch/arm/boot/dts/sunxi-libretech-all-h3-cc.dtsi
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+>
+> > +			/*
+> > +			 * The VIN4 video input path is shared between
+> > +			 * CVBS and HDMI inputs through SW[49-54] switches.
+> > +			 *
+> > +			 * CVBS is the default selection, link it to VIN4 here.
+> > +			 */
+> > +			adv7180_out: endpoint {
+> > +				remote-endpoint = <&vin4_in>;
+> > +			};
+> > +		};
+> > +	};
+> >  };
+> >
+> >  &i2c1 {
+> > @@ -246,3 +268,23 @@
+> >  	timeout-sec = <60>;
+> >  	status = "okay";
+> >  };
+> > +
+> > +&vin4 {
+> > +	pinctrl-0 = <&vin4_pins_cvbs>;
+> > +	pinctrl-names = "default";
+> > +
+> > +	status = "okay";
+> > +
+> > +	ports {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		port at 0 {
+> > +			reg = <0>;
+> > +
+> > +			vin4_in: endpoint {
+> > +				remote-endpoint = <&adv7180_out>;
+> > +			};
+> > +		};
+> > +	};
+> > +};
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
+>
+>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 833 bytes
+Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180521/74f9de15/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180521/0d3a8d16/attachment-0001.sig>
