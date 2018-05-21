@@ -1,60 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 21 May 2018 11:55:11 +0100
-Subject: [PATCH v4 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
- driver
-In-Reply-To: <CAKTKpr7Q7T9ZCTBi=LQR=XaAoihbBA3OKCO7yFobzNmR8EfyjQ@mail.gmail.com>
-References: <20180425090047.6485-1-ganapatrao.kulkarni@cavium.com>
- <20180425090047.6485-3-ganapatrao.kulkarni@cavium.com>
- <20180426105938.y6unpt36lisb7kbr@lakrids.cambridge.arm.com>
- <CAKTKpr7Q7T9ZCTBi=LQR=XaAoihbBA3OKCO7yFobzNmR8EfyjQ@mail.gmail.com>
-Message-ID: <20180521105511.6ztjk5conf7lfaiz@lakrids.cambridge.arm.com>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Mon, 21 May 2018 14:05:41 +0300
+Subject: [PATCH] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <20180521105428.GM17671@n2100.armlinux.org.uk>
+References: <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
+ <1526898690-4018-1-git-send-email-ilialin@codeaurora.org>
+ <20180521105428.GM17671@n2100.armlinux.org.uk>
+Message-ID: <000b01d3f0f3$aa961cc0$ffc25640$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 05, 2018 at 12:16:13AM +0530, Ganapatrao Kulkarni wrote:
-> On Thu, Apr 26, 2018 at 4:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Apr 25, 2018 at 02:30:47PM +0530, Ganapatrao Kulkarni wrote:
+You are right.
+cpu_dev_silver != cpu_dev_gold, and I found this with my tests as well.
+Thank you.
 
-> >> + *
-> >> + *  L3 Tile and DMC channel selection is through SMC call
-> >> + *  SMC call arguments,
-> >> + *   x0 = THUNDERX2_SMC_CALL_ID      (Vendor SMC call Id)
-> >> + *   x1 = THUNDERX2_SMC_SET_CHANNEL  (Id to set DMC/L3C channel)
-> >> + *   x2 = Node id
-> >
-> > How do we map Linux node IDs to the firmware's view of node IDs?
-> >
-> > I don't believe the two are necessarily the same -- Linux's node IDs are
-> > a Linux-specific construct.
+> -----Original Message-----
+> From: Russell King - ARM Linux <linux@armlinux.org.uk>
+> Sent: Monday, May 21, 2018 13:54
+> To: Ilia Lin <ilialin@codeaurora.org>
+> Cc: viresh.kumar at linaro.org; devicetree at vger.kernel.org; linux-
+> pm at vger.kernel.org; linux-arm-msm at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-soc at vger.kernel.org; linux-
+> clk at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] cpufreq: Add Kryo CPU scaling driver
 > 
-> both are same, it is numa node id from ACPI/firmware.
-
-I am very wary about assuming that the Linux nid will always be the same
-as the ACPI node id.
-
-For that to *potentially* be true, this driver should depend on
-CONFIG_NUMA, NUMA must not be disabled on the command line, etc, or the
-node id will always be NUMA_NO_NODE.
-
-I would be *much* happier if we had an explicit mapping somewhere to the
-ID the FW expects.
-
-> > It would be much nicer if we could pass something based on the MPIDR,
-> > which is a known HW construct, or if this implicitly affected the
-> > current node.
+> On Mon, May 21, 2018 at 01:31:30PM +0300, Ilia Lin wrote:
+> > +#define SILVER_LEAD	0
+> > +#define GOLD_LEAD	2
 > 
-> IMO,  node id is sufficient.
-
-I agree that *a* node ID is sufficient, I just don't think that we're
-guaranteed to have the specific node ID the FW wants.
-
-> > It would be vastly more sane for this to not be muxed at all. :/
+> Okay, two different values here, but "GOLD_LEAD" appears unused.
 > 
-> i am helpless due to crappy hw design!
-
-I'm certainly not blaming you for this! :)
-
-I hope the HW designers don't make the same mistake in future, though...
-
-Thanks,
-Mark.
+> > +	cpu_dev_silver = get_cpu_device(SILVER_LEAD);
+> > +	if (NULL == cpu_dev_silver)
+> > +		return -ENODEV;
+> > +
+> > +	cpu_dev_gold = get_cpu_device(SILVER_LEAD);
+> > +	if (NULL == cpu_dev_gold)
+> > +		return -ENODEV;
+> 
+> get_cpu_device() takes the logical CPU number.  So the above gets CPU 0
+> each time, and so cpu_dev_silver == cpu_dev_gold here.  So what's the
+> point of the second get_cpu_device() ?  If it's supposed to be:
+> 
+> 	cpu_dev_gold = get_cpu_device(GOLD_LEAD);
+> 
+> That would get CPU 2, but in terms of these defines, it doesn't make that
+> much sense.  What exactly does "silver lead" and "gold lead" refer to in
+these
+> definitions?
+> 
+> > +	opp_silver =
+> dev_pm_opp_set_supported_hw(cpu_dev_silver,&versions,1);
+> > +	if (IS_ERR(opp_silver)) {
+> > +		dev_err(cpu_dev_silver, "Failed to set supported
+> hardware\n");
+> > +		ret = PTR_ERR(opp_silver);
+> > +		goto free_np;
+> > +	}
+> > +
+> > +	opp_gold =
+> dev_pm_opp_set_supported_hw(cpu_dev_gold,&versions,1);
+> > +	if (IS_ERR(opp_gold)) {
+> > +		dev_err(cpu_dev_gold, "Failed to set supported
+> hardware\n");
+> > +		ret = PTR_ERR(opp_gold);
+> > +		goto free_opp_silver;
+> > +	}
+> 
+> Given that cpu_dev_silver == cpu_dev_gold, doesn't the second call to
+> dev_pm_opp_set_supported_hw() always fail, as opp_table-
+> >supported_hw will be set by the first call?
+> 
+> To me, this driver looks completely useless as it will always fail to
+initialise,
+> and I question whether this code has even been runtime tested.
+> 
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps
+> up According to speedtest.net: 8.21Mbps down 510kbps up
