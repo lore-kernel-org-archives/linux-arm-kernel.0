@@ -1,147 +1,113 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 21 May 2018 17:50:50 +0300
-Subject: [PATCH v4 2/3] arm64: dts: renesas: draak: Describe CVBS input
-In-Reply-To: <1526913942-15426-3-git-send-email-jacopo+renesas@jmondi.org>
-References: <1526913942-15426-1-git-send-email-jacopo+renesas@jmondi.org>
- <1526913942-15426-3-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1958464.yiJe0NDHa3@avalon>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 21 May 2018 15:51:29 +0100
+Subject: [PATCH v2 13/40] vfio: Add support for Shared Virtual Addressing
+In-Reply-To: <20180517165845.00000cc9@huawei.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-14-jean-philippe.brucker@arm.com>
+ <20180517165845.00000cc9@huawei.com>
+Message-ID: <5775e215-9a71-355a-98f5-397f1917b7f7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
-
-Thank you for the patch.
-
-On Monday, 21 May 2018 17:45:41 EEST Jacopo Mondi wrote:
-> Describe CVBS video input through analog video decoder ADV7180
-> connected to video input interface VIN4.
+On 17/05/18 16:58, Jonathan Cameron wrote:
+>> +static int vfio_iommu_bind_group(struct vfio_iommu *iommu,
+>> +				 struct vfio_group *group,
+>> +				 struct vfio_mm *vfio_mm)
+>> +{
+>> +	int ret;
+>> +	bool enabled_sva = false;
+>> +	struct vfio_iommu_sva_bind_data data = {
+>> +		.vfio_mm	= vfio_mm,
+>> +		.iommu		= iommu,
+>> +		.count		= 0,
+>> +	};
+>> +
+>> +	if (!group->sva_enabled) {
+>> +		ret = iommu_group_for_each_dev(group->iommu_group, NULL,
+>> +					       vfio_iommu_sva_init);
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +		group->sva_enabled = enabled_sva = true;
+>> +	}
+>> +
+>> +	ret = iommu_group_for_each_dev(group->iommu_group, &data,
+>> +				       vfio_iommu_sva_bind_dev);
+>> +	if (ret && data.count > 1)
 > 
-> The video input signal path is shared with HDMI video input, and
-> selected by on-board switches SW-53 and SW-54 with CVBS input selected
-> by the default switches configuration.
-> 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> Are we safe to run this even if data.count == 1?  I assume that at
+> that point we would always not have an iommu domain associated with the
+> device so the initial check would error out.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+If data.count == 1, then the first bind didn't succeed. But it's not
+necessarily a domain missing, failure to bind may come from various
+places. If this vfio_mm was already bound to another device then it
+contains a valid PASID and it's safe to call unbind(). Otherwise we call
+it with PASID -1 (VFIO_INVALID_PASID) and that's a bit of a grey area.
+-1 is currently invalid everywhere, but in the future someone might
+implement 32 bits of PASIDs, in which case a bond between this dev and
+PASID -1 might exist. But I think it's safe for now, and whoever
+redefines VFIO_INVALID_PASID when such implementation appears will also
+fix this case.
 
-> ---
-> v3 -> v4:
-> - Use 'adi,adv7180cp' compatible string in place of just 'adi,adv7180'
->   as suggested by Laurent.
-> - Re-structure CVBS input ports definition according to adv7180cp
->   bindings: add port at 0 for composite input, add port at 3 for parallel
->   video output.
-> - Change node label to 'composite-in' as in Gose board bindings.
-> 
-> v2 -> v3:
-> - Add comment to describe the shared input video path.
-> - Add my SoB and Niklas' R-b tags.
-> ---
->  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 68
-> ++++++++++++++++++++++++++ 1 file changed, 68 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts index 9d73de8..ad59032
-> 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> @@ -59,6 +59,16 @@
->  		};
->  	};
-> 
-> +	composite-in {
-> +		compatible = "composite-video-connector";
-> +
-> +		port {
-> +			composite_con_in: endpoint {
-> +				remote-endpoint = <&adv7180_in>;
-> +			};
-> +		};
-> +	};
-> +
->  	memory at 48000000 {
->  		device_type = "memory";
->  		/* first 128MB is reserved for secure area. */
-> @@ -142,6 +152,11 @@
->  		groups = "usb0";
->  		function = "usb0";
->  	};
-> +
-> +	vin4_pins_cvbs: vin4 {
-> +		groups = "vin4_data8", "vin4_sync", "vin4_clk";
-> +		function = "vin4";
-> +	};
->  };
-> 
->  &i2c0 {
-> @@ -154,6 +169,39 @@
->  		reg = <0x50>;
->  		pagesize = <8>;
->  	};
-> +
-> +	composite-in at 20 {
-> +		compatible = "adi,adv7180cp";
-> +		reg = <0x20>;
-> +
-> +		port {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				adv7180_in: endpoint {
-> +					remote-endpoint = <&composite_con_in>;
-> +				};
-> +			};
-> +
-> +			port at 3 {
-> +				reg = <3>;
-> +
-> +				/*
-> +				 * The VIN4 video input path is shared between
-> +				 * CVBS and HDMI inputs through SW[49-53]
-> +				 * switches.
-> +				 *
-> +				 * CVBS is the default selection, link it to
-> +				 * VIN4 here.
-> +				 */
-> +				adv7180_out: endpoint {
-> +					remote-endpoint = <&vin4_in>;
-> +				};
-> +			};
-> +		};
-> +	};
->  };
-> 
->  &i2c1 {
-> @@ -246,3 +294,23 @@
->  	timeout-sec = <60>;
->  	status = "okay";
->  };
-> +
-> +&vin4 {
-> +	pinctrl-0 = <&vin4_pins_cvbs>;
-> +	pinctrl-names = "default";
-> +
-> +	status = "okay";
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		port at 0 {
-> +			reg = <0>;
-> +
-> +			vin4_in: endpoint {
-> +				remote-endpoint = <&adv7180_out>;
-> +			};
-> +		};
-> +	};
-> +};
+> Just be nice to get rid of the special casing in this error path as then
+> could just do it all under if (ret) and make it visually clearer these
+> are different aspects of the same error path.
 
+[...]
+>>  static long vfio_iommu_type1_ioctl(void *iommu_data,
+>>  				   unsigned int cmd, unsigned long arg)
+>>  {
+>> @@ -1728,6 +2097,44 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+>>  
+>>  		return copy_to_user((void __user *)arg, &unmap, minsz) ?
+>>  			-EFAULT : 0;
+>> +
+>> +	} else if (cmd == VFIO_IOMMU_BIND) {
+>> +		struct vfio_iommu_type1_bind bind;
+>> +
+>> +		minsz = offsetofend(struct vfio_iommu_type1_bind, flags);
+>> +
+>> +		if (copy_from_user(&bind, (void __user *)arg, minsz))
+>> +			return -EFAULT;
+>> +
+>> +		if (bind.argsz < minsz)
+>> +			return -EINVAL;
+>> +
+>> +		switch (bind.flags) {
+>> +		case VFIO_IOMMU_BIND_PROCESS:
+>> +			return vfio_iommu_type1_bind_process(iommu, (void *)arg,
+>> +							     &bind);
+> 
+> Can we combine these two blocks given it is only this case statement that is different?
 
--- 
-Regards,
+That would be nicer, though I don't know yet what's needed for vSVA (by
+Yi Liu on Cc), which will add statements to the switches.
 
-Laurent Pinchart
+Thanks,
+Jean
+
+> 
+>> +		default:
+>> +			return -EINVAL;
+>> +		}
+>> +
+>> +	} else if (cmd == VFIO_IOMMU_UNBIND) {
+>> +		struct vfio_iommu_type1_bind bind;
+>> +
+>> +		minsz = offsetofend(struct vfio_iommu_type1_bind, flags);
+>> +
+>> +		if (copy_from_user(&bind, (void __user *)arg, minsz))
+>> +			return -EFAULT;
+>> +
+>> +		if (bind.argsz < minsz)
+>> +			return -EINVAL;
+>> +
+>> +		switch (bind.flags) {
+>> +		case VFIO_IOMMU_BIND_PROCESS:
+>> +			return vfio_iommu_type1_unbind_process(iommu, (void *)arg,
+>> +							       &bind);
+>> +		default:
+>> +			return -EINVAL;
+>> +		}
+>>  	}
