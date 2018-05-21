@@ -1,62 +1,148 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 21 May 2018 10:27:11 +0100
-Subject: [PATCH v9 02/12] drivers: base: cacheinfo: setup DT cache
- properties early
-In-Reply-To: <CAHp75VfEYcPdECmDDOd8CLBBXGpcwSUGQRr0x8VTb1-7j51_0Q@mail.gmail.com>
-References: <20180511235807.30834-1-jeremy.linton@arm.com>
- <20180511235807.30834-3-jeremy.linton@arm.com>
- <78b08b68-ff57-8dd8-6eb1-00548f275eac@arm.com>
- <CAHp75VciOAMX1HWifZ+K9GiVicZRFrwHaGteJFVe1uFrh+qu0w@mail.gmail.com>
- <a64ed431-0f60-2711-4138-eeefc7ba2d8b@arm.com>
- <20180517154701.GA20281@e107155-lin>
- <CAHp75VfEYcPdECmDDOd8CLBBXGpcwSUGQRr0x8VTb1-7j51_0Q@mail.gmail.com>
-Message-ID: <7c9a4921-d4da-f1db-85ed-7d7f917be30c@arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 21 May 2018 18:32:29 +0900
+Subject: [PATCH v9 06/11] arm64: kexec_file: allow for loading
+ Image-format kernel
+In-Reply-To: <4a8409dc-27b3-1ddc-0427-0ca55edcb893@arm.com>
+References: <20180425062629.29404-1-takahiro.akashi@linaro.org>
+ <20180425062629.29404-7-takahiro.akashi@linaro.org>
+ <c604b578-6667-3532-eac9-55c428001025@arm.com>
+ <20180507072139.GF11326@linaro.org>
+ <6f0df3a8-a691-80f1-85de-3e0ead852f12@arm.com>
+ <20180515051308.GD2737@linaro.org>
+ <4a8409dc-27b3-1ddc-0427-0ca55edcb893@arm.com>
+Message-ID: <20180521093227.GA9887@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+James,
 
+I haven't commented on this email.
 
-On 18/05/18 22:50, Andy Shevchenko wrote:
-> On Thu, May 17, 2018 at 6:47 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On Tue, May 15, 2018 at 06:14:37PM +0100, James Morse wrote:
+> Hi Akashi,
 > 
->> Is below patch does what you were looking for ?
+> On 15/05/18 06:13, AKASHI Takahiro wrote:
+> > On Fri, May 11, 2018 at 06:07:06PM +0100, James Morse wrote:
+> >> On 07/05/18 08:21, AKASHI Takahiro wrote:
+> >>> On Tue, May 01, 2018 at 06:46:11PM +0100, James Morse wrote:
+> >>>> On 25/04/18 07:26, AKASHI Takahiro wrote:
+> >>>>> This patch provides kexec_file_ops for "Image"-format kernel. In this
+> >>>>> implementation, a binary is always loaded with a fixed offset identified
+> >>>>> in text_offset field of its header.
+> >>
+> >>>>> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> >>>>> index e4de1223715f..3cba4161818a 100644
+> >>>>> --- a/arch/arm64/include/asm/kexec.h
+> >>>>> +++ b/arch/arm64/include/asm/kexec.h
 > 
-> Somewhat.
-> See below for some minors.
+> >>>> Could we check branch_code is non-zero, and text-offset points within image-size?
+> >>>
+> >>> We could do it, but I don't think this check is very useful.
+> >>>
+> >>>>
+> >>>> We could check that this platform supports the page-size/endian config that this
+> >>>> Image was built with... We get a message from the EFI stub if the page-size
+> >>>> can't be supported, it would be nice to do the same here (as we can).
+> >>>
+> >>> There is no restriction on page-size or endianness for kexec.
+> >>
+> >> No, but it won't boot if the hardware doesn't support it. The kernel will spin
+> >> at a magic address that is, difficult, to debug without JTAG. The bug report
+> >> will be "it didn't boot".
+> > 
+> > OK.
+> > Added sanity checks for cpu features, endianness as well as page size.
+> > 
+> >>
+> >>> What will be the purpose of this check?
+> >>
+> >> These values are in the header so that the bootloader can check them, then print
+> >> a meaningful error. Here, kexec_file_load() is playing the part of the bootloader.
 > 
+> >> I'm assuming kexec_file_load() can only be used to kexec linux... unlike regular
+> >> kexec. Is this where I'm going wrong?
+> 
+> Trying to work this out for myself: we can't support any UEFI application as we
+> can't give it the boot-services environment, so I'm pretty sure
+> kexec_file_load() must be linux-specific.
+> 
+> Can we state somewhere that we only expect arm64 linux to be booted with
+> kexec_file_load()? Its not clear from the kconfig text, which refers to kexec,
+> which explicitly states it can boot other OS. But for kexec_file_load() we're
+> following the kernel's booting.txt.
 
-Thanks
+While I don't know anything about requirements in booting other OS's nor
+if we can boot them even with kexec, I agree that kexec_file_load is a more
+limited form of booting mechanism. I will add some statement in Kconfig.
 
->> of_property_read_u64 searches for a property in a device node and read
->> a 64-bit value from it. Instead of using of_get_property to get the
->> property and then read 64-bit value using of_read_number, we can make
->> use of of_property_read_u64.
+> >>>>> diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
+> >>>>> new file mode 100644
+> >>>>> index 000000000000..4dd524ad6611
+> >>>>> --- /dev/null
+> >>>>> +++ b/arch/arm64/kernel/kexec_image.c
+> >>>>> @@ -0,0 +1,79 @@
+> >>>>
+> >>>>> +static void *image_load(struct kimage *image,
+> >>>>> +				char *kernel, unsigned long kernel_len,
+> >>>>> +				char *initrd, unsigned long initrd_len,
+> >>>>> +				char *cmdline, unsigned long cmdline_len)
+> >>>>> +{
+> >>>>> +	struct kexec_buf kbuf;
+> >>>>> +	struct arm64_image_header *h = (struct arm64_image_header *)kernel;
+> >>>>> +	unsigned long text_offset;
+> >>>>> +	int ret;
+> >>>>> +
+> >>>>> +	/* Load the kernel */
+> >>>>> +	kbuf.image = image;
+> >>>>> +	kbuf.buf_min = 0;
+> >>>>> +	kbuf.buf_max = ULONG_MAX;
+> >>>>> +	kbuf.top_down = false;
+> >>>>> +
+> >>>>> +	kbuf.buffer = kernel;
+> >>>>> +	kbuf.bufsz = kernel_len;
+> >>>>> +	kbuf.memsz = le64_to_cpu(h->image_size);
+> >>>>> +	text_offset = le64_to_cpu(h->text_offset);
+> >>>>> +	kbuf.buf_align = SZ_2M;
+> >>>>
+> >>>>> +	/* Adjust kernel segment with TEXT_OFFSET */
+> >>>>> +	kbuf.memsz += text_offset;
+> >>>>> +
+> >>>>> +	ret = kexec_add_buffer(&kbuf);
+> >>>>> +	if (ret)
+> >>>>> +		goto out;
+> >>>>> +
+> >>>>> +	image->arch.kern_segment = image->nr_segments - 1;
+> >>>>
+> >>>> You only seem to use kern_segment here, and in load_other_segments() called
+> >>>> below. Could it not be a local variable passed in? Instead of arch-specific data
+> >>>> we keep forever?
+> >>>
+> >>> No, kern_segment is also used in load_other_segments() in machine_kexec_file.c.
+> >>> To optimize memory hole allocation logic in locate_mem_hole_callback(),
+> >>> we need to know the exact range of kernel image (start and end).
+> >>
+> >> That's the second user. My badly-made point is one calls the other, but passes
+> >> the data via some until-kexec lifetime struct. (its not important, just an
+> >> indicator this worked differently in the past and hasn't been cleaned up).
+> >> I meant something like [0].
+> > 
+> > OK, but instead of adding kern_seg, I want to change the interface to:
+> > 
+> > | extern int load_other_segments(struct kimage *image,
+> > |		unsigned long kernel_load_addr, unsigned long kernel_size,
+> > |		char *initrd, unsigned long initrd_len,
+> > |		char *cmdline, unsigned long cmdline_len);
+> > 
+> > This way, we will in future be able to address an issue I mentioned in
+> > my previous e-mail. (If we support vmlinux, the kernel occupies two segments
+> > for text and data, respectively.)
 > 
-> Suggested-by?
->
+> Aha, its not from old-stuff, its for future-stuff!
 
-Yes indeed, added it locally after I sent out this patch. Will send out
-a proper patch soon.
+I have vmlinux patch, but it is very unlikely for me to submit it :)
 
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> 
-> 
->> -       cache_size = of_get_property(np, propname, NULL);
->> -       if (cache_size)
->> -               this_leaf->size = of_read_number(cache_size, 1);
->> +       if (!of_property_read_u64(np, propname, &cache_size))
->> +               this_leaf->size = cache_size;
-> 
-> I suppose it's something like this
-> 
-> ret = of_property_...(..., &this_leaf->VAR);
-> if (ret)
->  warning / set default / etc
+Thanks,
+-Takahiro AKASHI
 
-OK, I do prefer this but once I was told not to use structure elements
-directly like that, but should be harmless in this particular case, will
-do so.
-
--- 
-Regards,
-Sudeep
+> 
+> James
