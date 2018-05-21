@@ -1,68 +1,41 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 21 May 2018 19:12:40 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Make allocations NUMA-aware
-Message-ID: <b745ecc2acd6aad20b5c3776ecd58022a9019c91.1526926225.git.robin.murphy@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 May 2018 19:14:22 +0100
+Subject: [PATCH] arm64: Kconfig: Enable LSE atomics by default
+Message-ID: <1526926462-19214-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We would generally expect pagetables to be read by the IOMMU more than
-written by the CPU, so in NUMA systems it would be preferable to avoid
-the IOMMU making cross-node pagetable walks if possible. We already have
-a handle on the IOMMU device for the sake of coherency management, so
-it's trivial to grab the appropriate NUMA node when allocating new
-pagetable pages.
+Now that we're seeing CPUs shipping with LSE atomics, default them to
+'on' in Kconfig. CPUs without the instructions will continue to use
+LDXR/STXR-based sequences, but they will be placed out-of-line by the
+compiler.
 
-Note that we drop the semantics of alloc_pages_exact(), but that's fine
-since they have never been necessary: the only time we're allocating
-more than one page is for stage 2 top-level concatenation, but since
-that is based on the number of IPA bits, the size is always some exact
-power of two anyway.
-
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/io-pgtable-arm.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 39c2a056da21..e80ca386c5b4 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -231,12 +231,16 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
- 				    struct io_pgtable_cfg *cfg)
- {
- 	struct device *dev = cfg->iommu_dev;
-+	int order = get_order(size);
-+	struct page *p;
- 	dma_addr_t dma;
--	void *pages = alloc_pages_exact(size, gfp | __GFP_ZERO);
-+	void *pages;
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4d98774cf3c7..3aed13626fd7 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1051,6 +1051,7 @@ config ARM64_PAN
  
--	if (!pages)
-+	p = alloc_pages_node(dev_to_node(dev), gfp | __GFP_ZERO, order);
-+	if (!p)
- 		return NULL;
+ config ARM64_LSE_ATOMICS
+ 	bool "Atomic instructions"
++	default y
+ 	help
+ 	  As part of the Large System Extensions, ARMv8.1 introduces new
+ 	  atomic instructions that are designed specifically to scale in
+@@ -1059,7 +1060,8 @@ config ARM64_LSE_ATOMICS
+ 	  Say Y here to make use of these instructions for the in-kernel
+ 	  atomic routines. This incurs a small overhead on CPUs that do
+ 	  not support these instructions and requires the kernel to be
+-	  built with binutils >= 2.25.
++	  built with binutils >= 2.25 in order for the new instructions
++	  to be used.
  
-+	pages = page_address(p);
- 	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA)) {
- 		dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
- 		if (dma_mapping_error(dev, dma))
-@@ -256,7 +260,7 @@ static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
- 	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page tables\n");
- 	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
- out_free:
--	free_pages_exact(pages, size);
-+	__free_pages(p, order);
- 	return NULL;
- }
- 
-@@ -266,7 +270,7 @@ static void __arm_lpae_free_pages(void *pages, size_t size,
- 	if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA))
- 		dma_unmap_single(cfg->iommu_dev, __arm_lpae_dma_addr(pages),
- 				 size, DMA_TO_DEVICE);
--	free_pages_exact(pages, size);
-+	free_pages((unsigned long)pages, get_order(size));
- }
- 
- static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep,
+ config ARM64_VHE
+ 	bool "Enable support for Virtualization Host Extensions (VHE)"
 -- 
-2.17.0.dirty
+2.1.4
