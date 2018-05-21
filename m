@@ -1,100 +1,69 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Mon, 21 May 2018 13:27:50 +0300
-Subject: [PATCH v6 2/9] iio: Add channel for Position Relative
+Date: Mon, 21 May 2018 13:27:55 +0300
+Subject: [PATCH v6 7/9] dt-bindings: iio: adc: at91-sama5d2_adc: add channel
+ specific consumer info
 In-Reply-To: <1526898477-9952-1-git-send-email-eugen.hristev@microchip.com>
 References: <1526898477-9952-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1526898477-9952-3-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1526898477-9952-8-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new channel type for relative position on a pad.
-
-These type of analog sensor offers the position of a pen
-on a touchpad, and is represented as a voltage, which can be
-converted to a position on X and Y axis on the pad.
-The channel will hand the relative position on the pad in both directions.
-
-The channel can then be consumed by a touchscreen driver or
-read as-is for a raw indication of the touchpen on a touchpad.
+Added defines for channel consumer device-tree binding
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-Changes in v2:
- - modified channel name to relative position as suggested.
- - modified kernel version to 4.18 (presumable)
+ .../devicetree/bindings/iio/adc/at91-sama5d2_adc.txt     |  9 +++++++++
+ include/dt-bindings/iio/adc/at91-sama5d2_adc.h           | 16 ++++++++++++++++
+ 2 files changed, 25 insertions(+)
+ create mode 100644 include/dt-bindings/iio/adc/at91-sama5d2_adc.h
 
- Documentation/ABI/testing/sysfs-bus-iio | 12 ++++++++++++
- drivers/iio/industrialio-core.c         |  1 +
- include/uapi/linux/iio/types.h          |  1 +
- tools/iio/iio_event_monitor.c           |  2 ++
- 4 files changed, 16 insertions(+)
-
-diff --git a/Documentation/ABI/testing/sysfs-bus-iio b/Documentation/ABI/testing/sysfs-bus-iio
-index 6a5f34b..42a9287 100644
---- a/Documentation/ABI/testing/sysfs-bus-iio
-+++ b/Documentation/ABI/testing/sysfs-bus-iio
-@@ -190,6 +190,18 @@ Description:
- 		but should match other such assignments on device).
- 		Units after application of scale and offset are m/s^2.
- 
-+What:		/sys/bus/iio/devices/iio:deviceX/in_positionrelative_x_raw
-+What:		/sys/bus/iio/devices/iio:deviceX/in_positionrelative_y_raw
-+KernelVersion:	4.18
-+Contact:	linux-iio at vger.kernel.org
-+Description:
-+		Relative position in direction x or y on a pad (may be
-+		arbitrarily assigned but should match other such assignments on
-+		device).
-+		Units after application of scale and offset are milli percents
-+		from the pad's size in both directions. Should be calibrated by
-+		the consumer.
+diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+index 6469a4c..4a3c1d4 100644
+--- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+@@ -21,6 +21,14 @@ Optional properties:
+   - dmas: Phandle to dma channel for the ADC.
+   - dma-names: Must be "rx" when dmas property is being used.
+   See ../../dma/dma.txt for details.
++  - #io-channel-cells: in case consumer drivers are attached, this must be 1.
++  See <Documentation/devicetree/bindings/iio/iio-bindings.txt> for details.
 +
- What:		/sys/bus/iio/devices/iio:deviceX/in_anglvel_x_raw
- What:		/sys/bus/iio/devices/iio:deviceX/in_anglvel_y_raw
- What:		/sys/bus/iio/devices/iio:deviceX/in_anglvel_z_raw
-diff --git a/drivers/iio/industrialio-core.c b/drivers/iio/industrialio-core.c
-index 19bdf3d..14bf3d24 100644
---- a/drivers/iio/industrialio-core.c
-+++ b/drivers/iio/industrialio-core.c
-@@ -85,6 +85,7 @@ static const char * const iio_chan_type_name_spec[] = {
- 	[IIO_COUNT] = "count",
- 	[IIO_INDEX] = "index",
- 	[IIO_GRAVITY]  = "gravity",
-+	[IIO_POSITIONRELATIVE]  = "positionrelative",
- };
++Properties for consumer drivers:
++  - Consumer drivers can be connected to this producer device, as specified
++  in <Documentation/devicetree/bindings/iio/iio-bindings.txt>
++  - Channels exposed are specified in:
++  <dt-bindings/iio/adc/at91-sama5d2_adc.txt>
  
- static const char * const iio_modifier_names[] = {
-diff --git a/include/uapi/linux/iio/types.h b/include/uapi/linux/iio/types.h
-index 4213cdf..033c7d2 100644
---- a/include/uapi/linux/iio/types.h
-+++ b/include/uapi/linux/iio/types.h
-@@ -44,6 +44,7 @@ enum iio_chan_type {
- 	IIO_COUNT,
- 	IIO_INDEX,
- 	IIO_GRAVITY,
-+	IIO_POSITIONRELATIVE,
- };
+ Example:
  
- enum iio_modifier {
-diff --git a/tools/iio/iio_event_monitor.c b/tools/iio/iio_event_monitor.c
-index b61245e..148f69d 100644
---- a/tools/iio/iio_event_monitor.c
-+++ b/tools/iio/iio_event_monitor.c
-@@ -58,6 +58,7 @@ static const char * const iio_chan_type_name_spec[] = {
- 	[IIO_PH] = "ph",
- 	[IIO_UVINDEX] = "uvindex",
- 	[IIO_GRAVITY] = "gravity",
-+	[IIO_POSITIONRELATIVE] = "positionrelative",
- };
- 
- static const char * const iio_ev_type_text[] = {
-@@ -151,6 +152,7 @@ static bool event_is_known(struct iio_event_data *event)
- 	case IIO_PH:
- 	case IIO_UVINDEX:
- 	case IIO_GRAVITY:
-+	case IIO_POSITIONRELATIVE:
- 		break;
- 	default:
- 		return false;
+@@ -38,4 +46,5 @@ adc: adc at fc030000 {
+ 	atmel,trigger-edge-type = <IRQ_TYPE_EDGE_BOTH>;
+ 	dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
+ 	dma-names = "rx";
++	#io-channel-cells = <1>;
+ }
+diff --git a/include/dt-bindings/iio/adc/at91-sama5d2_adc.h b/include/dt-bindings/iio/adc/at91-sama5d2_adc.h
+new file mode 100644
+index 0000000..70f99db
+--- /dev/null
++++ b/include/dt-bindings/iio/adc/at91-sama5d2_adc.h
+@@ -0,0 +1,16 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * This header provides constants for configuring the AT91 SAMA5D2 ADC
++ */
++
++#ifndef _DT_BINDINGS_IIO_ADC_AT91_SAMA5D2_ADC_H
++#define _DT_BINDINGS_IIO_ADC_AT91_SAMA5D2_ADC_H
++
++/* X relative position channel index */
++#define AT91_SAMA5D2_ADC_X_CHANNEL		24
++/* Y relative position channel index */
++#define AT91_SAMA5D2_ADC_Y_CHANNEL		25
++/* pressure channel index */
++#define AT91_SAMA5D2_ADC_P_CHANNEL		26
++
++#endif
 -- 
 2.7.4
