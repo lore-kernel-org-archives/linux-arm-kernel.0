@@ -1,91 +1,47 @@
-From: ilialin@codeaurora.org (Ilia Lin)
-Date: Mon, 21 May 2018 14:25:31 +0300
-Subject: [PATCH v9 14/15] dt-bindings: qcom_spmi: Document SAW support
-In-Reply-To: <1526901932-9514-1-git-send-email-ilialin@codeaurora.org>
-References: <1526901932-9514-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1526901932-9514-15-git-send-email-ilialin@codeaurora.org>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Mon, 21 May 2018 12:35:10 +0100
+Subject: [PATCH v3 1/6] arm64: cpufeature: Allow early detect of specific
+ features
+In-Reply-To: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
+References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1526902515-13769-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the DT bindings for the SAW regulators.
+From: Daniel Thompson <daniel.thompson@linaro.org>
 
-The saw-leader is the only property that is configurable in DT.
+Currently it is not possible to detect features of the boot CPU
+until the other CPUs have been brought up.
 
-The saw-slave property allows ganging (grouping) of
-several regulators so that their outputs can be combined.
+This prevents us from reacting to features of the boot CPU until
+fairly late in the boot process. To solve this we allow a subset
+of features (that are likely to be common to all clusters) to be
+detected based on the boot CPU alone.
 
-Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+[julien.thierry at arm.com: check non-boot cpu missing early features, avoid
+			 duplicates between early features and normal
+			 features]
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../bindings/regulator/qcom,spmi-regulator.txt     | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ arch/arm64/kernel/cpufeature.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt b/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
-index 57d2c65..406f2e5 100644
---- a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
-@@ -110,6 +110,11 @@ Qualcomm SPMI Regulators
- 	Definition: Reference to regulator supplying the input pin, as
- 		    described in the data sheet.
- 
-+- qcom,saw-reg:
-+	Usage: optional
-+	Value type: <phandle>
-+	Description: Reference to syscon node defining the SAW registers.
-+
- 
- The regulator node houses sub-nodes for each regulator within the device. Each
- sub-node is identified using the node's name, with valid values listed for each
-@@ -201,6 +206,17 @@ see regulator.txt - with additional custom properties described below:
- 			2 = 0.55 uA
- 			3 = 0.75 uA
- 
-+- qcom,saw-slave:
-+	Usage: optional
-+	Value type: <boo>
-+	Description: SAW controlled gang slave. Will not be configured.
-+
-+- qcom,saw-leader:
-+	Usage: optional
-+	Value type: <boo>
-+	Description: SAW controlled gang leader. Will be configured as
-+		     SAW regulator.
-+
- Example:
- 
- 	regulators {
-@@ -221,3 +237,32 @@ Example:
- 
- 		....
- 	};
-+
-+Example 2:
-+
-+	saw3: syscon at 9A10000 {
-+		compatible = "syscon";
-+		reg = <0x9A10000 0x1000>;
-+	};
-+
-+	...
-+
-+	spm-regulators {
-+		compatible = "qcom,pm8994-regulators";
-+		qcom,saw-reg = <&saw3>;
-+		s8 {
-+			qcom,saw-slave;
-+		};
-+		s9 {
-+			qcom,saw-slave;
-+		};
-+		s10 {
-+			qcom,saw-slave;
-+		};
-+		pm8994_s11_saw: s11 {
-+			qcom,saw-leader;
-+			regulator-always-on;
-+			regulator-min-microvolt = <900000>;
-+			regulator-max-microvolt = <1140000>;
-+		};
-+	};
--- 
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9d1b06d..e03e897 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1030,7 +1030,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ 	{
+ 		.desc = "GIC system register CPU interface",
+ 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+-		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
++		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
+ 		.matches = has_useable_gicv3_cpuif,
+ 		.sys_reg = SYS_ID_AA64PFR0_EL1,
+ 		.field_pos = ID_AA64PFR0_GIC_SHIFT,
+--
 1.9.1
