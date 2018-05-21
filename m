@@ -1,41 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 May 2018 19:14:22 +0100
-Subject: [PATCH] arm64: Kconfig: Enable LSE atomics by default
-Message-ID: <1526926462-19214-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 21 May 2018 19:19:49 +0100
+Subject: [PATCH v3 0/5]
+In-Reply-To: <20180518143913.26306-1-marc.zyngier@arm.com>
+References: <20180518143913.26306-1-marc.zyngier@arm.com>
+Message-ID: <20180521181948.GB19122@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we're seeing CPUs shipping with LSE atomics, default them to
-'on' in Kconfig. CPUs without the instructions will continue to use
-LDXR/STXR-based sequences, but they will be placed out-of-line by the
-compiler.
+Hi Marc,
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Thanks for this.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4d98774cf3c7..3aed13626fd7 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1051,6 +1051,7 @@ config ARM64_PAN
- 
- config ARM64_LSE_ATOMICS
- 	bool "Atomic instructions"
-+	default y
- 	help
- 	  As part of the Large System Extensions, ARMv8.1 introduces new
- 	  atomic instructions that are designed specifically to scale in
-@@ -1059,7 +1060,8 @@ config ARM64_LSE_ATOMICS
- 	  Say Y here to make use of these instructions for the in-kernel
- 	  atomic routines. This incurs a small overhead on CPUs that do
- 	  not support these instructions and requires the kernel to be
--	  built with binutils >= 2.25.
-+	  built with binutils >= 2.25 in order for the new instructions
-+	  to be used.
- 
- config ARM64_VHE
- 	bool "Enable support for Virtualization Host Extensions (VHE)"
--- 
-2.1.4
+On Fri, May 18, 2018 at 03:39:08PM +0100, Marc Zyngier wrote:
+> PMUv3 has been introduced with ARMv8 and, while it has only been used
+> on 64bit systems so far, it would definitely be useful for 32bit
+> guests running under KVM/arm64, for example.
+> 
+> There is also the case of people natively running 32bit kernels on
+> 64bit HW and trying to upstream unspeakable hacks, hoping that the
+> stars will align and that they'll win the lottery (see [1]).
+> 
+> So let's try again, and make the PMUv3 driver usable for everyone.
+> 
+> This is done in three steps:
+> (1) Move the driver from arch/arm64 to drivers/perf
+> (2) Add a handful of system register accessors so that we can reuse
+>     the driver on 32bit
+> (3) Provide the same accessors on 32bit, enable compilation, and
+>     make it the default selection for mach-virt.
+> 
+> Tested on a Seattle box with 32bit guests.
+
+I think we should go ahead with something like this, but I don't think
+we're quite there with these patches. If we're going to move the arch code
+out into drivers, let's do that for the perf_event* files under arch/arm/
+as well. Then we could have a structure along the lines of:
+
+
+  drivers/perf/arm_pmu.c			- As it is today
+  drivers/perf/arm_cpu/xscale_pmu.c		- Only builds for 32-bit
+  drivers/perf/arm_cpu/armv6_pmu.c		- Only builds for 32-bit
+  drivers/perf/arm_cpu/arch_pmu.c		- Works for v7/v8 on
+                                                  both 32-bit and 64-bit
+
+The latter can then pull in whatever accessors it needs from the arch
+code headers.
+
+I know it's more of an invasive change, but this way we always end up
+running the same code on the two architectures and it will be much easier
+to maintain.
+
+Will
