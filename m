@@ -1,29 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 May 2018 14:17:41 +0100
-Subject: [PATCH v9 01/15] soc: qcom: Separate kryo l2 accessors from PMU
- driver
-In-Reply-To: <1526901932-9514-2-git-send-email-ilialin@codeaurora.org>
-References: <1526901932-9514-1-git-send-email-ilialin@codeaurora.org>
- <1526901932-9514-2-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180521131740.GI19713@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 21 May 2018 09:25:26 -0400
+Subject: [PATCH] PCI: Do not enable PASID when End-to-End TLP is not
+ supported
+In-Reply-To: <1526748769-701-1-git-send-email-okaya@codeaurora.org>
+References: <1526748769-701-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <c8184d48-a343-503a-83a3-707e44961f1a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 02:25:18PM +0300, Ilia Lin wrote:
-> The driver provides kernel level API for other drivers
-> to access the MSM8996 L2 cache registers.
-> Separating the L2 access code from the PMU driver and
-> making it public to allow other drivers use it.
-> The accesses must be separated with a single spinlock,
-> maintained in this driver.
++iommu folks.
+
+On 5/19/2018 12:52 PM, Sinan Kaya wrote:
+> A PCIe endpoint carries the process address space identifier (PASID) in
+> the TLP prefix as part of the memory read/write transaction. The address
+> information in the TLP is relevant only for a given PASID context.
 > 
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+> A translation agent takes PASID value and the address information from the
+> TLP to look up the physical address in the system.
+> 
+> If a bridge drops the TLP prefix, the translation agent can resolve the
+> address to an incorrect location and cause data corruption. Prevent
+> this condition by requiring End-to-End TLP prefix to be supported on the
+> entire data path between the endpoint and the root port.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  drivers/perf/Kconfig                 |  1 +
->  drivers/perf/qcom_l2_pmu.c           | 90 ++++++++++--------------------------
+>  drivers/pci/ats.c             | 16 ++++++++++++++++
+>  include/uapi/linux/pci_regs.h |  1 +
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
+> index 89305b5..0bcded5 100644
+> --- a/drivers/pci/ats.c
+> +++ b/drivers/pci/ats.c
+> @@ -265,7 +265,9 @@ EXPORT_SYMBOL_GPL(pci_reset_pri);
+>  int pci_enable_pasid(struct pci_dev *pdev, int features)
+>  {
+>  	u16 control, supported;
+> +	struct pci_dev *bridge;
+>  	int pos;
+> +	u32 cap;
+>  
+>  	if (WARN_ON(pdev->pasid_enabled))
+>  		return -EBUSY;
+> @@ -274,6 +276,20 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
+>  	if (!pos)
+>  		return -EINVAL;
+>  
+> +	bridge = pci_upstream_bridge(pdev);
+> +	while (bridge) {
+> +		if (!pci_find_capability(bridge, PCI_CAP_ID_EXP))
+> +			return -EINVAL;
+> +
+> +		if (pcie_capability_read_dword(bridge, PCI_EXP_DEVCAP2, &cap))
+> +			return -EINVAL;
+> +
+> +		if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
+> +			return -EINVAL;
+> +
+> +		bridge = pci_upstream_bridge(bridge);
+> +	}
+> +
+>  	pci_read_config_word(pdev, pos + PCI_PASID_CAP, &supported);
+>  	supported &= PCI_PASID_CAP_EXEC | PCI_PASID_CAP_PRIV;
+>  
+> diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
+> index 103ba79..d91dea5 100644
+> --- a/include/uapi/linux/pci_regs.h
+> +++ b/include/uapi/linux/pci_regs.h
+> @@ -634,6 +634,7 @@
+>  #define  PCI_EXP_DEVCAP2_OBFF_MASK	0x000c0000 /* OBFF support mechanism */
+>  #define  PCI_EXP_DEVCAP2_OBFF_MSG	0x00040000 /* New message signaling */
+>  #define  PCI_EXP_DEVCAP2_OBFF_WAKE	0x00080000 /* Re-use WAKE# for OBFF */
+> +#define PCI_EXP_DEVCAP2_E2ETLP		0x00200000 /* End-to-End TLP Prefix */
+>  #define PCI_EXP_DEVCTL2		40	/* Device Control 2 */
+>  #define  PCI_EXP_DEVCTL2_COMP_TIMEOUT	0x000f	/* Completion Timeout Value */
+>  #define  PCI_EXP_DEVCTL2_COMP_TMOUT_DIS	0x0010	/* Completion Timeout Disable */
+> 
 
-I'm fine with the perf bits:
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
