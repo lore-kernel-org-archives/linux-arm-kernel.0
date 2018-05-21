@@ -1,224 +1,91 @@
 From: ilialin@codeaurora.org (Ilia Lin)
-Date: Mon, 21 May 2018 14:25:25 +0300
-Subject: [PATCH v9 08/15] clk: qcom: Add ACD path to CPU clock driver for
- msm8996
+Date: Mon, 21 May 2018 14:25:31 +0300
+Subject: [PATCH v9 14/15] dt-bindings: qcom_spmi: Document SAW support
 In-Reply-To: <1526901932-9514-1-git-send-email-ilialin@codeaurora.org>
 References: <1526901932-9514-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1526901932-9514-9-git-send-email-ilialin@codeaurora.org>
+Message-ID: <1526901932-9514-15-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMUX for each duplex allows for selection of ACD clock source.
-The DVM (Dynamic Variation Monitor) will flag an error
-when a voltage droop event is detected. This flagged error
-enables ACD to provide a div-by-2 clock, sourced from the primary PLL.
-The duplex will be provided the divided clock
-until a pre-programmed delay has expired.
+Document the DT bindings for the SAW regulators.
 
-This change configures ACD during the probe and switches
-the PMUXes to the ACD clock source.
+The saw-leader is the only property that is configurable in DT.
+
+The saw-slave property allows ganging (grouping) of
+several regulators so that their outputs can be combined.
 
 Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/clk/qcom/clk-cpu-8996.c | 75 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 65 insertions(+), 10 deletions(-)
+ .../bindings/regulator/qcom,spmi-regulator.txt     | 45 ++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
-index ff5c0a5..0a908d8 100644
---- a/drivers/clk/qcom/clk-cpu-8996.c
-+++ b/drivers/clk/qcom/clk-cpu-8996.c
-@@ -53,9 +53,11 @@
-  */
+diff --git a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt b/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
+index 57d2c65..406f2e5 100644
+--- a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
+@@ -110,6 +110,11 @@ Qualcomm SPMI Regulators
+ 	Definition: Reference to regulator supplying the input pin, as
+ 		    described in the data sheet.
  
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-+#include <soc/qcom/kryo-l2-accessors.h>
- 
- #include "clk-alpha-pll.h"
- #include "clk-regmap.h"
-@@ -69,6 +71,11 @@ enum _pmux_input {
- };
- 
- #define DIV_2_THRESHOLD		600000000
-+#define PWRCL_REG_OFFSET 0x0
-+#define PERFCL_REG_OFFSET 0x80000
-+#define MUX_OFFSET	0x40
-+#define ALT_PLL_OFFSET	0x100
-+#define SSSCTL_OFFSET 0x160
- 
- static const u8 prim_pll_regs[PLL_OFF_MAX_REGS] = {
-        [PLL_OFF_L_VAL] = 0x04,
-@@ -107,7 +114,7 @@ enum _pmux_input {
- };
- 
- static struct clk_alpha_pll perfcl_pll = {
--	.offset = 0x80000,
-+	.offset = PERFCL_REG_OFFSET,
- 	.regs = prim_pll_regs,
- 	.flags = SUPPORTS_DYNAMIC_UPDATE | SUPPORTS_FSM_MODE,
- 	.clkr.hw.init = &(struct clk_init_data){
-@@ -119,7 +126,7 @@ enum _pmux_input {
- };
- 
- static struct clk_alpha_pll pwrcl_pll = {
--	.offset = 0x0,
-+	.offset = PWRCL_REG_OFFSET,
- 	.regs = prim_pll_regs,
- 	.flags = SUPPORTS_DYNAMIC_UPDATE | SUPPORTS_FSM_MODE,
- 	.clkr.hw.init = &(struct clk_init_data){
-@@ -149,7 +156,7 @@ enum _pmux_input {
- };
- 
- static struct clk_alpha_pll perfcl_alt_pll = {
--	.offset = 0x80100,
-+	.offset = PERFCL_REG_OFFSET + ALT_PLL_OFFSET,
- 	.regs = alt_pll_regs,
- 	.vco_table = alt_pll_vco_modes,
- 	.num_vco = ARRAY_SIZE(alt_pll_vco_modes),
-@@ -163,7 +170,7 @@ enum _pmux_input {
- };
- 
- static struct clk_alpha_pll pwrcl_alt_pll = {
--	.offset = 0x100,
-+	.offset = PWRCL_REG_OFFSET + ALT_PLL_OFFSET,
- 	.regs = alt_pll_regs,
- 	.vco_table = alt_pll_vco_modes,
- 	.num_vco = ARRAY_SIZE(alt_pll_vco_modes),
-@@ -176,6 +183,9 @@ enum _pmux_input {
- 	},
- };
- 
-+void __iomem *base;
-+static void qcom_cpu_clk_msm8996_acd_init(void __iomem *base);
++- qcom,saw-reg:
++	Usage: optional
++	Value type: <phandle>
++	Description: Reference to syscon node defining the SAW registers.
 +
- /* Mux'es */
  
- struct clk_cpu_8996_mux {
-@@ -253,6 +263,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 	switch (event) {
- 	case PRE_RATE_CHANGE:
- 		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, ALT_INDEX);
-+		qcom_cpu_clk_msm8996_acd_init(base);
- 		break;
- 	case POST_RATE_CHANGE:
- 		if (cnd->new_rate < DIV_2_THRESHOLD)
-@@ -260,7 +271,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 							  DIV_2_INDEX);
- 		else
- 			ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw,
--							  PLL_INDEX);
-+							  ACD_INDEX);
- 		break;
- 	default:
- 		ret = 0;
-@@ -276,7 +287,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- };
+ The regulator node houses sub-nodes for each regulator within the device. Each
+ sub-node is identified using the node's name, with valid values listed for each
+@@ -201,6 +206,17 @@ see regulator.txt - with additional custom properties described below:
+ 			2 = 0.55 uA
+ 			3 = 0.75 uA
  
- static struct clk_cpu_8996_mux pwrcl_smux = {
--	.reg = 0x40,
-+	.reg = PWRCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 2,
- 	.width = 2,
- 	.clkr.hw.init = &(struct clk_init_data) {
-@@ -292,7 +303,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- };
++- qcom,saw-slave:
++	Usage: optional
++	Value type: <boo>
++	Description: SAW controlled gang slave. Will not be configured.
++
++- qcom,saw-leader:
++	Usage: optional
++	Value type: <boo>
++	Description: SAW controlled gang leader. Will be configured as
++		     SAW regulator.
++
+ Example:
  
- static struct clk_cpu_8996_mux perfcl_smux = {
--	.reg = 0x80040,
-+	.reg = PERFCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 2,
- 	.width = 2,
- 	.clkr.hw.init = &(struct clk_init_data) {
-@@ -308,7 +319,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- };
+ 	regulators {
+@@ -221,3 +237,32 @@ Example:
  
- static struct clk_cpu_8996_mux pwrcl_pmux = {
--	.reg = 0x40,
-+	.reg = PWRCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &pwrcl_pll.clkr.hw,
-@@ -329,7 +340,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- };
- 
- static struct clk_cpu_8996_mux perfcl_pmux = {
--	.reg = 0x80040,
-+	.reg = PERFCL_REG_OFFSET + MUX_OFFSET,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &perfcl_pll.clkr.hw,
-@@ -393,6 +404,10 @@ struct clk_regmap *clks[] = {
- 	clk_alpha_pll_configure(&perfcl_alt_pll, regmap, &altpll_config);
- 	clk_alpha_pll_configure(&pwrcl_alt_pll, regmap, &altpll_config);
- 
-+	/* Enable alt PLLs */
-+	clk_prepare_enable(pwrcl_alt_pll.clkr.hw.clk);
-+	clk_prepare_enable(perfcl_alt_pll.clkr.hw.clk);
+ 		....
+ 	};
 +
- 	ret = clk_notifier_register(pwrcl_pmux.clkr.hw.clk, &pwrcl_pmux.nb);
- 	if (ret)
- 		return ret;
-@@ -402,10 +417,48 @@ struct clk_regmap *clks[] = {
- 	return ret;
- }
- 
-+#define CPU_AFINITY_MASK 0xFFF
-+#define PWRCL_CPU_REG_MASK 0x3
-+#define PERFCL_CPU_REG_MASK 0x103
++Example 2:
 +
-+#define L2ACDCR_REG 0x580ULL
-+#define L2ACDTD_REG 0x581ULL
-+#define L2ACDDVMRC_REG 0x584ULL
-+#define L2ACDSSCR_REG 0x589ULL
++	saw3: syscon at 9A10000 {
++		compatible = "syscon";
++		reg = <0x9A10000 0x1000>;
++	};
 +
-+static DEFINE_SPINLOCK(acd_lock);
++	...
 +
-+static void qcom_cpu_clk_msm8996_acd_init(void __iomem *base)
-+{
-+	u64 hwid;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&acd_lock, flags);
-+
-+	hwid = read_cpuid_mpidr() & CPU_AFINITY_MASK;
-+
-+	kryo_l2_set_indirect_reg(L2ACDTD_REG, 0x00006A11);
-+	kryo_l2_set_indirect_reg(L2ACDDVMRC_REG, 0x000E0F0F);
-+	kryo_l2_set_indirect_reg(L2ACDSSCR_REG, 0x00000601);
-+
-+	if (PWRCL_CPU_REG_MASK == (hwid | PWRCL_CPU_REG_MASK)) {
-+		writel(0xF, base + PWRCL_REG_OFFSET + SSSCTL_OFFSET);
-+		wmb();
-+		kryo_l2_set_indirect_reg(L2ACDCR_REG, 0x002C5FFD);
-+	}
-+
-+	if (PERFCL_CPU_REG_MASK == (hwid | PERFCL_CPU_REG_MASK)) {
-+		kryo_l2_set_indirect_reg(L2ACDCR_REG, 0x002C5FFD);
-+		writel(0xF, base + PERFCL_REG_OFFSET + SSSCTL_OFFSET);
-+		wmb();
-+	}
-+
-+	spin_unlock_irqrestore(&acd_lock, flags);
-+}
-+
- static int qcom_cpu_clk_msm8996_driver_probe(struct platform_device *pdev)
- {
- 	int ret;
--	void __iomem *base;
- 	struct resource *res;
- 	struct regmap *regmap;
- 	struct clk_hw_onecell_data *data;
-@@ -429,6 +482,8 @@ static int qcom_cpu_clk_msm8996_driver_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	qcom_cpu_clk_msm8996_acd_init(base);
-+
- 	data->hws[0] = &pwrcl_pmux.clkr.hw;
- 	data->hws[1] = &perfcl_pmux.clkr.hw;
- 	data->num = 2;
++	spm-regulators {
++		compatible = "qcom,pm8994-regulators";
++		qcom,saw-reg = <&saw3>;
++		s8 {
++			qcom,saw-slave;
++		};
++		s9 {
++			qcom,saw-slave;
++		};
++		s10 {
++			qcom,saw-slave;
++		};
++		pm8994_s11_saw: s11 {
++			qcom,saw-leader;
++			regulator-always-on;
++			regulator-min-microvolt = <900000>;
++			regulator-max-microvolt = <1140000>;
++		};
++	};
 -- 
 1.9.1
