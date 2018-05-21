@@ -1,85 +1,65 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 21 May 2018 09:25:26 -0400
-Subject: [PATCH] PCI: Do not enable PASID when End-to-End TLP is not
- supported
-In-Reply-To: <1526748769-701-1-git-send-email-okaya@codeaurora.org>
-References: <1526748769-701-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <c8184d48-a343-503a-83a3-707e44961f1a@codeaurora.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 21 May 2018 14:42:58 +0100
+Subject: [PATCH 6/6] arm64: perf: Add support for chaining counters
+In-Reply-To: <5d53fe1d-dbd9-2aad-73bd-0c4284540240@arm.com>
+References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
+ <1526638943-2110-7-git-send-email-suzuki.poulose@arm.com>
+ <32f2d870-9b9c-0b10-880f-cc99cf969bf6@arm.com>
+ <5d53fe1d-dbd9-2aad-73bd-0c4284540240@arm.com>
+Message-ID: <c8cb9280-c93d-89c4-43ed-179de8d46dfd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+iommu folks.
+On 18/05/18 16:57, Suzuki K Poulose wrote:
+> Hi Robin,
+> 
+> On 18/05/18 14:49, Robin Murphy wrote:
+>> On 18/05/18 11:22, Suzuki K Poulose wrote:
+>>> Add support for chained event counters. PMUv3 allows chaining
+>>> a pair of adjacent PMU counters (with the lower counter number
+>>> being always "even"). The low counter is programmed to count
+>>> the event of interest and the high counter(odd numbered) is
+>>> programmed with a special event code (0x1e - Chain). Thus
+>>> we need special allocation schemes to make the full use of
+>>> available counters. So, we allocate the counters from either
+>>> ends. i.e, chained counters are allocated from the lower
+>>> end in pairs of two and the normal counters are allocated
+>>> from the higher number. Also makes necessary changes to
+>>> handle the chained events as a single event with 2 counters.
+>>>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-On 5/19/2018 12:52 PM, Sinan Kaya wrote:
-> A PCIe endpoint carries the process address space identifier (PASID) in
-> the TLP prefix as part of the memory read/write transaction. The address
-> information in the TLP is relevant only for a given PASID context.
 > 
-> A translation agent takes PASID value and the address information from the
-> TLP to look up the physical address in the system.
+>>> ? /*
+>>> @@ -845,8 +1016,14 @@ static int __armv8_pmuv3_map_event(struct perf_event *event,
+>>> ???????????????????????? &armv8_pmuv3_perf_cache_map,
+>>> ???????????????????????? ARMV8_PMU_EVTYPE_EVENT);
+>>> -??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES)
+>>> +??? if (hw_event_id == ARMV8_PMUV3_PERFCTR_CPU_CYCLES) {
+>>> +??????? /* Prevent chaining for cycle counter */
+>>
+>> Why? Sure, we want to avoid executing the chaining logic if we're scheduling a cycles event in the dedicated counter (which is perhaps what the comment above wanted to say), but if one ends up allocated into a regular counter (e.g. if the user asks for multiple cycle counts with different filters), then I don't see any reason to forbid that being chained.
 > 
-> If a bridge drops the TLP prefix, the translation agent can resolve the
-> address to an incorrect location and cause data corruption. Prevent
-> this condition by requiring End-to-End TLP prefix to be supported on the
-> entire data path between the endpoint and the root port.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/ats.c             | 16 ++++++++++++++++
->  include/uapi/linux/pci_regs.h |  1 +
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
-> index 89305b5..0bcded5 100644
-> --- a/drivers/pci/ats.c
-> +++ b/drivers/pci/ats.c
-> @@ -265,7 +265,9 @@ EXPORT_SYMBOL_GPL(pci_reset_pri);
->  int pci_enable_pasid(struct pci_dev *pdev, int features)
->  {
->  	u16 control, supported;
-> +	struct pci_dev *bridge;
->  	int pos;
-> +	u32 cap;
->  
->  	if (WARN_ON(pdev->pasid_enabled))
->  		return -EBUSY;
-> @@ -274,6 +276,20 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
->  	if (!pos)
->  		return -EINVAL;
->  
-> +	bridge = pci_upstream_bridge(pdev);
-> +	while (bridge) {
-> +		if (!pci_find_capability(bridge, PCI_CAP_ID_EXP))
-> +			return -EINVAL;
-> +
-> +		if (pcie_capability_read_dword(bridge, PCI_EXP_DEVCAP2, &cap))
-> +			return -EINVAL;
-> +
-> +		if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
-> +			return -EINVAL;
-> +
-> +		bridge = pci_upstream_bridge(bridge);
-> +	}
-> +
->  	pci_read_config_word(pdev, pos + PCI_PASID_CAP, &supported);
->  	supported &= PCI_PASID_CAP_EXEC | PCI_PASID_CAP_PRIV;
->  
-> diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
-> index 103ba79..d91dea5 100644
-> --- a/include/uapi/linux/pci_regs.h
-> +++ b/include/uapi/linux/pci_regs.h
-> @@ -634,6 +634,7 @@
->  #define  PCI_EXP_DEVCAP2_OBFF_MASK	0x000c0000 /* OBFF support mechanism */
->  #define  PCI_EXP_DEVCAP2_OBFF_MSG	0x00040000 /* New message signaling */
->  #define  PCI_EXP_DEVCAP2_OBFF_WAKE	0x00080000 /* Re-use WAKE# for OBFF */
-> +#define PCI_EXP_DEVCAP2_E2ETLP		0x00200000 /* End-to-End TLP Prefix */
->  #define PCI_EXP_DEVCTL2		40	/* Device Control 2 */
->  #define  PCI_EXP_DEVCTL2_COMP_TIMEOUT	0x000f	/* Completion Timeout Value */
->  #define  PCI_EXP_DEVCTL2_COMP_TMOUT_DIS	0x0010	/* Completion Timeout Disable */
-> 
+> Ah, I didn't think about that case. I was under the assumption that the
+> cycles are *only* placed on the cycle counter. I will take care of that.
+> Thanks for the review.
 
+Robin, Mark, Will
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+One potential problem I see with allowing chaining of the cycle counter
+*and* the promotion of cycle event to 64bit by default is when the user
+may actually be able to count 1 less event (due to the promotion of
+cycle event to 64bit and thus forcing to use chain, if the cycle counter
+is unavailable).
+
+So one option is to drop automatic promotion of the cycle counter to
+64bit and do it only when it is requested by the user and use either the
+Cycle counter (preferred) or fall back to chaining. That way, the user
+has the control over the number of events he can count using the given
+set of counters.
+
+Let me know your thoughts.
+
+Suzuki
