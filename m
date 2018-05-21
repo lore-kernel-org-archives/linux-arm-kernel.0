@@ -1,45 +1,39 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 21 May 2018 23:39:53 +0200
-Subject: v4.17-rc1: regressions on N900, N950
-In-Reply-To: <20180423202940.ig6iud5lrbgnu35a@darkstar.musicnaut.iki.fi>
-References: <20180422074213.GA12428@amd>
- <20180423202940.ig6iud5lrbgnu35a@darkstar.musicnaut.iki.fi>
-Message-ID: <20180521213952.GA11596@amd>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 22 May 2018 00:50:23 +0300
+Subject: [PATCH 12/33] clk: bcm2835: use match_string() helper
+In-Reply-To: <1526903890-35761-13-git-send-email-xieyisheng1@huawei.com>
+References: <1526903890-35761-1-git-send-email-xieyisheng1@huawei.com>
+ <1526903890-35761-13-git-send-email-xieyisheng1@huawei.com>
+Message-ID: <CAHp75Vf6rDpFQCt+qG3DSWKZm36F1hkAVPtGzr6NHPuQg4vhXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI!
+On Mon, May 21, 2018 at 2:57 PM, Yisheng Xie <xieyisheng1@huawei.com> wrote:
+> match_string() returns the index of an array for a matching string,
+> which can be used intead of open coded variant.
+>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: linux-clk at vger.kernel.org
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
 
-> On Sun, Apr 22, 2018 at 09:42:13AM +0200, Pavel Machek wrote:
-> > v4.17-rc1 broke display for me on Nokia N900. (I don't know if system
-> > boots, but I can see on red flash LED that at least that driver
-> > succeeded. So it should not be early boot crash).
-> > 
-> > v4.17-rc1 also broke boot on N950.
-> > 
-> > Any ideas? Does it work for you?
-> 
-> Below config works for me on N900 and N950. (On N950, I need to disable to
-> display DTS entry as discussed in other threads.)
+> -       size_t i, j;
+> -       int ret;
+> +       int i, ret;
 
-Thanks... On N900 it works for me in v4.16, but display stays blank in
-v4.17-rc1...
+I do not see any need to change type for i.
 
-And I'm starting to suspect I have somehow special N900, or maybe
-special gcc version... Whether display on N900 works or not seems to
-depend on completely unrelated config options :-(. Maybe it is timing
-during boot or something.
+> +               ret = match_string(cprman_parent_names,
+> +                                  ARRAY_SIZE(cprman_parent_names),
+> +                                  parents[i]);
+> +               if (ret >= 0)
+> +                       parents[i] = cprman->real_parent_names[ret];
 
-Best regards,
 
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180521/f252dd08/attachment.sig>
+With Best Regards,
+Andy Shevchenko
