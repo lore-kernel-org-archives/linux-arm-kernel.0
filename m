@@ -1,145 +1,59 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 21 May 2018 12:45:07 +0100
-Subject: [PATCH 09/14] ARM: spectre-v2: add PSCI based hardening
-In-Reply-To: <20180521114238.GN17671@n2100.armlinux.org.uk>
-References: <20180521114238.GN17671@n2100.armlinux.org.uk>
-Message-ID: <E1fKjFT-00064F-Bs@rmk-PC.armlinux.org.uk>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 21 May 2018 12:45:22 +0100
+Subject: [PATCH v3 1/6] arm64: cpufeature: Allow early detect of specific
+ features
+In-Reply-To: <1526902515-13769-2-git-send-email-julien.thierry@arm.com>
+References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
+ <1526902515-13769-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <697af68e-3cee-4d0d-8493-106cc42eed3b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PSCI based hardening for cores that require more complex handling in
-firmware.
+On 21/05/18 12:35, Julien Thierry wrote:
+> From: Daniel Thompson <daniel.thompson@linaro.org>
+> 
+> Currently it is not possible to detect features of the boot CPU
+> until the other CPUs have been brought up.
+> 
+> This prevents us from reacting to features of the boot CPU until
+> fairly late in the boot process. To solve this we allow a subset
+> of features (that are likely to be common to all clusters) to be
+> detected based on the boot CPU alone.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
+> 			 duplicates between early features and normal
+> 			 features]
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mm/proc-v7-bugs.c | 50 ++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/proc-v7.S      | 21 +++++++++++++++++++
- 2 files changed, 71 insertions(+)
+nit: Since this is completely different from what Daniel started with,
+you could simply reset the author to yourself. The boot CPU feature was
+added keeping this user in mind.
 
-diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
-index 65a9b8141f86..0c37e6a2830d 100644
---- a/arch/arm/mm/proc-v7-bugs.c
-+++ b/arch/arm/mm/proc-v7-bugs.c
-@@ -1,9 +1,12 @@
- // SPDX-License-Identifier: GPL-2.0
-+#include <linux/arm-smccc.h>
- #include <linux/kernel.h>
-+#include <linux/psci.h>
- #include <linux/smp.h>
- 
- #include <asm/cp15.h>
- #include <asm/cputype.h>
-+#include <asm/proc-fns.h>
- #include <asm/system_misc.h>
- 
- void cpu_v7_bugs_init(void);
-@@ -39,6 +42,9 @@ void cpu_v7_ca15_ibe(void)
- #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
- void (*harden_branch_predictor)(void);
- 
-+extern void cpu_v7_smc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
-+extern void cpu_v7_hvc_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
-+
- static void harden_branch_predictor_bpiall(void)
- {
- 	write_sysreg(0, BPIALL);
-@@ -49,6 +55,18 @@ static void harden_branch_predictor_iciallu(void)
- 	write_sysreg(0, ICIALLU);
- }
- 
-+#ifdef CONFIG_ARM_PSCI
-+static void call_smc_arch_workaround_1(void)
-+{
-+	arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-+}
-+
-+static void call_hvc_arch_workaround_1(void)
-+{
-+	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-+}
-+#endif
-+
- void cpu_v7_bugs_init(void)
- {
- 	const char *spectre_v2_method = NULL;
-@@ -73,6 +91,38 @@ void cpu_v7_bugs_init(void)
- 		spectre_v2_method = "ICIALLU";
- 		break;
- 	}
-+
-+#ifdef CONFIG_ARM_PSCI
-+	if (psci_ops.smccc_version != SMCCC_VERSION_1_0) {
-+		struct arm_smccc_res res;
-+
-+		switch (psci_ops.conduit) {
-+		case PSCI_CONDUIT_HVC:
-+			arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+			if ((int)res.a0 < 0)
-+				break;
-+			harden_branch_predictor = call_hvc_arch_workaround_1;
-+			processor.switch_mm = cpu_v7_hvc_switch_mm;
-+			spectre_v2_method = "hypervisor";
-+			break;
-+
-+		case PSCI_CONDUIT_SMC:
-+			arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+			if ((int)res.a0 < 0)
-+				break;
-+			harden_branch_predictor = call_smc_arch_workaround_1;
-+			processor.switch_mm = cpu_v7_smc_switch_mm;
-+			spectre_v2_method = "firmware PSCI";
-+			break;
-+
-+		default:
-+			break;
-+		}
-+	}
-+#endif
-+
- 	if (spectre_v2_method)
- 		pr_info("CPU: Spectre v2: using %s workaround\n",
- 			spectre_v2_method);
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 79510011e7eb..b78d59a1cc05 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -9,6 +9,7 @@
-  *
-  *  This is the "shell" of the ARMv7 processor support.
-  */
-+#include <linux/arm-smccc.h>
- #include <linux/init.h>
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-@@ -93,6 +94,26 @@ ENTRY(cpu_v7_dcache_clean_area)
- 	ret	lr
- ENDPROC(cpu_v7_dcache_clean_area)
- 
-+#ifdef CONFIG_ARM_PSCI
-+	.arch_extension sec
-+ENTRY(cpu_v7_smc_switch_mm)
-+	stmfd	sp!, {r0 - r3}
-+	movw	r0, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
-+	movt	r0, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
-+	smc	#0
-+	ldmfd	sp!, {r0 - r3}
-+	b	cpu_v7_switch_mm
-+ENDPROC(cpu_v7_smc_switch_mm)
-+	.arch_extension virt
-+ENTRY(cpu_v7_hvc_switch_mm)
-+	stmfd	sp!, {r0 - r3}
-+	movw	r0, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
-+	movt	r0, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
-+	hvc	#0
-+	ldmfd	sp!, {r0 - r3}
-+	b	cpu_v7_switch_mm
-+ENDPROC(cpu_v7_smc_switch_mm)
-+#endif
- ENTRY(cpu_v7_iciallu_switch_mm)
- 	mov	r3, #0
- 	mcr	p15, 0, r3, c7, c5, 0		@ ICIALLU
--- 
-2.7.4
+The patch as such looks good to me.
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
+> ---
+>   arch/arm64/kernel/cpufeature.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 9d1b06d..e03e897 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1030,7 +1030,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+>   	{
+>   		.desc = "GIC system register CPU interface",
+>   		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+> +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
+>   		.matches = has_useable_gicv3_cpuif,
+>   		.sys_reg = SYS_ID_AA64PFR0_EL1,
+>   		.field_pos = ID_AA64PFR0_GIC_SHIFT,
+> --
+> 1.9.1
+> 
