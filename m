@@ -1,43 +1,48 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 21 May 2018 12:44:46 +0100
-Subject: [PATCH 05/14] ARM: spectre: add Kconfig symbol for CPUs vulnerable to
- Spectre
-In-Reply-To: <20180521114238.GN17671@n2100.armlinux.org.uk>
-References: <20180521114238.GN17671@n2100.armlinux.org.uk>
-Message-ID: <E1fKjF8-00063n-Dm@rmk-PC.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 21 May 2018 12:45:07 +0100
+Subject: [PATCH] arm64: kdump: fix out of memory issue in
+ __alloc_bootmem_low
+In-Reply-To: <1526818839-8497-1-git-send-email-chenzhou10@huawei.com>
+References: <1526818839-8497-1-git-send-email-chenzhou10@huawei.com>
+Message-ID: <214aa45e-8b05-6294-a06d-19a867cb2d26@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a Kconfig symbol for CPUs which are vulnerable to the Spectre
-attacks.
+On 20/05/18 13:20, Chen Zhou wrote:
+> From: Mao Wenan <maowenan@huawei.com>
+> 
+> On arm64 kdump capture kernel, ACPI runtime code and data are outside
+> of usable memory range and __alloc_bootmem_low may alloc memory below
+> 4G. If we use "crashkernel=Y[@X]" and the start address is above 4G,
+> there will be out of memory.
+> 
+> In this patch, we get max_zone_dma_phys by memblock_start_of_DRAM
+> and __pa_symbol(_end).
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/mm/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Entering the crash kernel doesn't magically reconfigure interconnects 
+such that 32-bit DMA masters can suddenly address whatever physical 
+address range the kernel image happens to be loaded at. This change is 
+fundamentally incorrect.
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 7f14acf67caf..6f3ef86b4cb7 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -415,6 +415,7 @@ config CPU_V7
- 	select CPU_CP15_MPU if !MMU
- 	select CPU_HAS_ASID if MMU
- 	select CPU_PABRT_V7
-+	select CPU_SPECTRE if MMU
- 	select CPU_THUMB_CAPABLE
- 	select CPU_TLB_V7 if MMU
- 
-@@ -826,6 +827,9 @@ config CPU_BPREDICT_DISABLE
- 	help
- 	  Say Y here to disable branch prediction.  If unsure, say N.
- 
-+config CPU_SPECTRE
-+	bool
-+
- config TLS_REG_EMUL
- 	bool
- 	select NEED_KUSER_HELPERS
--- 
-2.7.4
+Robin.
+
+> Signed-off-by: Chen Zhou <chenzhou10@huawei.com>
+> ---
+>   arch/arm64/mm/init.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 1b18b47..df4d212 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -223,7 +223,8 @@ static void __init reserve_elfcorehdr(void)
+>    */
+>   static phys_addr_t __init max_zone_dma_phys(void)
+>   {
+> -	phys_addr_t offset = memblock_start_of_DRAM() & GENMASK_ULL(63, 32);
+> +	phys_addr_t offset = max(memblock_start_of_DRAM(), __pa_symbol(_end)) &
+> +		GENMASK_ULL(63, 32);
+>   	return min(offset + (1ULL << 32), memblock_end_of_DRAM());
+>   }
+>   
+> 
