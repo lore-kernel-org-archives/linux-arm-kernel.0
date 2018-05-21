@@ -1,19 +1,17 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 21 May 2018 20:59:49 +0200 (CEST)
-Subject: [PATCH v2] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <20180521183907.27563-1-eric@anholt.net>
-References: <20180521183907.27563-1-eric@anholt.net>
-Message-ID: <1804311797.71726.1526929189594@email.1und1.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 21 May 2018 12:19:43 -0700
+Subject: [PATCH 1/2] rtc: brcmstb-waketimer: switch to rtc_register_device
+In-Reply-To: <20180520202730.28172-1-alexandre.belloni@bootlin.com>
+References: <20180520202730.28172-1-alexandre.belloni@bootlin.com>
+Message-ID: <2ceb0348-b030-d584-2a20-0bc678a83b14@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/20/2018 01:27 PM, Alexandre Belloni wrote:
+> Switch to devm_rtc_allocate_device/rtc_register_device.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 
-> Eric Anholt <eric@anholt.net> hat am 21. Mai 2018 um 20:39 geschrieben:
-> 
-> 
-> This only probes on arm64 so far, but hopefully that driver will be
-> generalized soon.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+-- 
+Florian
