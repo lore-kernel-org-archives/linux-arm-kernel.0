@@ -1,390 +1,210 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 21 May 2018 12:35:15 +0100
-Subject: [PATCH v3 6/6] arm64: Add support for pseudo-NMIs
+Date: Mon, 21 May 2018 12:35:14 +0100
+Subject: [PATCH v3 5/6] arm64: Detect current view of GIC priorities
 In-Reply-To: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
 References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1526902515-13769-7-git-send-email-julien.thierry@arm.com>
+Message-ID: <1526902515-13769-6-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 does not provide native NMIs. Emulate the NMI behaviour using GIC
-priorities.
+The values non secure EL1 needs to use for PMR and RPR registers depends on
+the value of SCR_EL3.FIQ.
 
-Add the possibility to set an IRQ as an NMI and the handling of the NMI.
+The values non secure EL1 sees from the distributor and redistributor
+depend on whether security is enabled for the GIC or not.
 
-If the view of GIC priorities is the secure one
-(i.e. SCR_EL3.FIQ == 0 && security enabled), do not allow the use of NMIs.
-Emit a warning when attempting to set an IRQ as NMI under this scenario.
+Figure out what values we are dealing with to know if the values we use for
+PMR and RPR match the priority values that have been configured in the
+distributor and redistributors.
+
+Also, add firmware requirements related to SCR_EL3.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arch_gicv3.h |   5 ++
- arch/arm64/include/asm/irqflags.h   |   6 ++
- arch/arm64/kernel/entry.S           |  56 ++++++++++++++
- drivers/irqchip/irq-gic-v3.c        | 141 ++++++++++++++++++++++++++++++++++++
- include/linux/interrupt.h           |   1 +
- 5 files changed, 209 insertions(+)
+ Documentation/arm64/booting.txt |  5 +++
+ arch/arm64/include/asm/sysreg.h |  1 +
+ drivers/irqchip/irq-gic-v3.c    | 99 ++++++++++++++++++++++++++++++-----------
+ 3 files changed, 80 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 6ee27ec..935511f 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -124,6 +124,11 @@ static inline void gic_write_bpr1(u32 val)
- 	write_sysreg_s(val, SYS_ICC_BPR1_EL1);
- }
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 8d0df62..e387938 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -188,6 +188,11 @@ Before jumping into the kernel, the following conditions must be met:
+   the kernel image will be entered must be initialised by software at a
+   higher exception level to prevent execution in an UNKNOWN state.
 
-+static inline u32 gic_read_rpr(void)
-+{
-+	return read_sysreg_s(SYS_ICC_RPR_EL1);
-+}
++  - SCR_EL3.FIQ must have the same value across all CPUs the kernel is
++    executing on.
++  - The value of SCR_EL3.FIQ must be the same as the one present at boot
++    time whenever the kernel is executing.
 +
- #define gic_read_typer(c)		readq_relaxed(c)
- #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
- #define gic_read_lpir(c)		readq_relaxed(c)
-diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-index 3d5d443..d25e7ee 100644
---- a/arch/arm64/include/asm/irqflags.h
-+++ b/arch/arm64/include/asm/irqflags.h
-@@ -217,6 +217,12 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
- 		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
- }
+   For systems with a GICv3 interrupt controller to be used in v3 mode:
+   - If EL3 is present:
+     ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 6171178..fb8320a 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -322,6 +322,7 @@
+ #define SYS_ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
+ #define SYS_ICC_IGRPEN0_EL1		sys_reg(3, 0, 12, 12, 6)
+ #define SYS_ICC_IGRPEN1_EL1		sys_reg(3, 0, 12, 12, 7)
++#define SYS_ICC_RPR_EL1			sys_reg(3, 0, 12, 11, 3)
 
-+/* Mask IRQs at CPU level instead of GIC level */
-+static inline void arch_irqs_daif_disable(void)
-+{
-+	asm volatile ("msr daifset, #2" : : : "memory");
-+}
-+
- void maybe_switch_to_sysreg_gic_cpuif(void);
-
- #endif /* CONFIG_IRQFLAGS_GIC_MASKING */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index a7f753f..a52d5f8 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -395,6 +395,18 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
- 	mov	sp, x19
- 	.endm
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	/* Should be checked on return from irq handlers */
-+	.macro	branch_if_was_nmi, tmp, target
-+	alternative_if ARM64_HAS_SYSREG_GIC_CPUIF
-+	mrs	\tmp, daif
-+	alternative_else
-+	mov	\tmp, #0
-+	alternative_endif
-+	tbnz	\tmp, #7, \target // Exiting an NMI
-+	.endm
-+#endif
-+
- /*
-  * These are the registers used in the syscall handler, and allow us to
-  * have in theory up to 7 arguments to a function - x0 to x6.
-@@ -615,12 +627,30 @@ ENDPROC(el1_sync)
- el1_irq:
- 	kernel_entry 1
- 	enable_da_f
-+
- #ifdef CONFIG_TRACE_IRQFLAGS
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	ldr	x20, [sp, #S_PMR_SAVE]
-+	/* Irqs were disabled, don't trace */
-+	tbz	x20, ICC_PMR_EL1_EN_SHIFT, 1f
-+#endif
- 	bl	trace_hardirqs_off
-+1:
- #endif
-
- 	irq_handler
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	/*
-+	 * Irqs were disabled, we have an nmi.
-+	 * We might have interrupted a context with interrupt disabled that set
-+	 * NEED_RESCHED flag.
-+	 * Skip preemption and irq tracing if needed.
-+	 */
-+	tbz	x20, ICC_PMR_EL1_EN_SHIFT, untraced_irq_exit
-+	branch_if_was_nmi x0, skip_preempt
-+#endif
-+
- #ifdef CONFIG_PREEMPT
- 	ldr	w24, [tsk, #TSK_TI_PREEMPT]	// get preempt count
- 	cbnz	w24, 1f				// preempt count != 0
-@@ -629,9 +659,13 @@ el1_irq:
- 	bl	el1_preempt
- 1:
- #endif
-+
-+skip_preempt:
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_on
- #endif
-+
-+untraced_irq_exit:
- 	kernel_exit 1
- ENDPROC(el1_irq)
-
-@@ -862,6 +896,11 @@ el0_irq_naked:
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_on
- #endif
-+
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	branch_if_was_nmi x2, nmi_ret_to_user
-+#endif
-+
- 	b	ret_to_user
- ENDPROC(el0_irq)
-
-@@ -1162,8 +1201,15 @@ ENTRY(cpu_switch_to)
- 	ldp	x27, x28, [x8], #16
- 	ldp	x29, x9, [x8], #16
- 	ldr	lr, [x8]
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	mrs	x10, daif
-+	msr	daifset, #2
-+#endif
- 	mov	sp, x9
- 	msr	sp_el0, x1
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	msr	daif, x10
-+#endif
- 	ret
- ENDPROC(cpu_switch_to)
- NOKPROBE(cpu_switch_to)
-@@ -1357,3 +1403,13 @@ alternative_else_nop_endif
- ENDPROC(__sdei_asm_handler)
- NOKPROBE(__sdei_asm_handler)
- #endif /* CONFIG_ARM_SDE_INTERFACE */
-+
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+/*
-+ * NMI return path to EL0
-+ */
-+nmi_ret_to_user:
-+	ldr	x1, [tsk, #TSK_TI_FLAGS]
-+	b	finish_ret_to_user
-+ENDPROC(nmi_ret_to_user)
-+#endif
+ #define SYS_CONTEXTIDR_EL1		sys_reg(3, 0, 13, 0, 1)
+ #define SYS_TPIDR_EL1			sys_reg(3, 0, 13, 0, 4)
 diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 3c44918..6d25ead 100644
+index 82cfacf..3c44918 100644
 --- a/drivers/irqchip/irq-gic-v3.c
 +++ b/drivers/irqchip/irq-gic-v3.c
-@@ -34,6 +34,8 @@
- #include <linux/irqchip/arm-gic-v3.h>
- #include <linux/irqchip/irq-partition-percpu.h>
-
-+#include <trace/events/irq.h>
-+
- #include <asm/cputype.h>
- #include <asm/exception.h>
- #include <asm/smp_plat.h>
-@@ -41,6 +43,8 @@
-
- #include "irq-gic-common.h"
-
-+#define GICD_INT_NMI_PRI		0xa0
-+
- struct redist_region {
- 	void __iomem		*redist_base;
- 	phys_addr_t		phys_base;
-@@ -247,6 +251,87 @@ static void gic_unmask_irq(struct irq_data *d)
- 	gic_poke_irq(d, GICD_ISENABLER);
- }
+@@ -63,6 +63,30 @@ struct gic_chip_data {
+ static struct gic_chip_data gic_data __read_mostly;
+ static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
 
 +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
 +/*
-+ * Chip flow handler for SPIs set as NMI
++ * The behaviours of RPR and PMR registers differ depending on the value of
++ * SCR_EL3.FIQ, and the behaviour of non-secure priority registers of the
++ * distributor and redistributors depends on whether security is enabled in the
++ * GIC.
++ *
++ * When security is enabled, non-secure priority values from the (re)distributor
++ * are presented to the GIC CPUIF as follow:
++ *     (GIC_(R)DIST_PRI[irq] >> 1) | 0x80;
++ *
++ * If SCR_EL3.FIQ == 1, the values writen to/read from PMR and RPR at non-secure
++ * EL1 are subject to a similar operation thus matching the priorities presented
++ * from the (re)distributor when security is enabled.
++ *
++ * see GICv3/GICv4 Architecture Specification (IHI0069D):
++ * - section 4.8.1 Non-secure accesses to register fields for Secure interrupt
++ *   priorities.
++ * - Figure 4-7 Secure read of the priority field for a Non-secure Group 1
++ *   interrupt.
 + */
-+static void handle_fasteoi_nmi(struct irq_desc *desc)
++DEFINE_STATIC_KEY_FALSE(have_non_secure_prio_view);
++#endif
++
+ static struct gic_kvm_info gic_v3_kvm_info;
+ static DEFINE_PER_CPU(bool, has_rss);
+
+@@ -531,28 +555,26 @@ static void gic_update_vlpi_properties(void)
+ 		!gic_data.rdists.has_direct_lpi ? "no " : "");
+ }
+
+-static void gic_cpu_sys_reg_init(void)
++/* Check whether it's single security state view */
++static inline bool gic_dist_security_disabled(void)
+ {
+-	int i, cpu = smp_processor_id();
+-	u64 mpidr = cpu_logical_map(cpu);
+-	u64 need_rss = MPIDR_RS(mpidr);
+-	bool group0;
+-	u32 val, pribits;
++	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
++}
+
+-	/*
+-	 * Need to check that the SRE bit has actually been set. If
+-	 * not, it means that SRE is disabled at EL2. We're going to
+-	 * die painfully, and there is nothing we can do about it.
+-	 *
+-	 * Kindly inform the luser.
+-	 */
+-	if (!gic_enable_sre())
+-		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
++static inline u32 gic_get_cpu_pri_bits(void)
 +{
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	struct irqaction *action = desc->action;
-+	unsigned int irq = irq_desc_get_irq(desc);
-+	irqreturn_t res;
++	u32 pribits;
+
+ 	pribits = gic_read_ctlr();
+ 	pribits &= ICC_CTLR_EL1_PRI_BITS_MASK;
+ 	pribits >>= ICC_CTLR_EL1_PRI_BITS_SHIFT;
+-	pribits++;
 +
-+	if (chip->irq_ack)
-+		chip->irq_ack(&desc->irq_data);
-+
-+	trace_irq_handler_entry(irq, action);
-+	res = action->handler(irq, action->dev_id);
-+	trace_irq_handler_exit(irq, action, res);
-+
-+	if (chip->irq_eoi)
-+		chip->irq_eoi(&desc->irq_data);
++	return pribits + 1;
 +}
 +
-+/*
-+ * Chip flow handler for PPIs set as NMI
-+ */
-+static void handle_percpu_devid_nmi(struct irq_desc *desc)
++static inline bool gic_cpu_has_group0(void)
 +{
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	struct irqaction *action = desc->action;
-+	unsigned int irq = irq_desc_get_irq(desc);
-+	irqreturn_t res;
++	u32 pmr_val;
+
+ 	/*
+ 	 * Let's find out if Group0 is under control of EL3 or not by
+@@ -565,13 +587,41 @@ static void gic_cpu_sys_reg_init(void)
+ 	 * becomes 0x80. Reading it back returns 0, indicating that
+ 	 * we're don't have access to Group0.
+ 	 */
+-	write_gicreg(BIT(8 - pribits), ICC_PMR_EL1);
+-	val = read_gicreg(ICC_PMR_EL1);
+-	group0 = val != 0;
++	write_gicreg(BIT(8 - gic_get_cpu_pri_bits()), ICC_PMR_EL1);
++	pmr_val = read_gicreg(ICC_PMR_EL1);
 +
-+	if (chip->irq_ack)
-+		chip->irq_ack(&desc->irq_data);
-+
-+	trace_irq_handler_entry(irq, action);
-+	res = action->handler(irq, raw_cpu_ptr(action->percpu_dev_id));
-+	trace_irq_handler_exit(irq, action, res);
-+
-+	if (chip->irq_eoi)
-+		chip->irq_eoi(&desc->irq_data);
++	return pmr_val != 0;
 +}
 +
-+static int gic_irq_set_irqchip_prio(struct irq_data *d, bool val)
++static void gic_cpu_sys_reg_init(void)
 +{
-+	u8 prio;
-+	irq_flow_handler_t handler;
-+
-+	if (gic_peek_irq(d, GICD_ISENABLER)) {
-+		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
-+		return -EPERM;
-+	}
-+
-+	if (val) {
-+		prio = GICD_INT_NMI_PRI;
-+
-+		if (gic_irq(d) < 32)
-+			handler = handle_percpu_devid_nmi;
-+		else
-+			handler = handle_fasteoi_nmi;
-+	} else {
-+		prio = GICD_INT_DEF_PRI;
-+
-+		if (gic_irq(d) < 32)
-+			handler = handle_percpu_devid_irq;
-+		else
-+			handler = handle_fasteoi_irq;
-+	}
++	int i, cpu = smp_processor_id();
++	u64 mpidr = cpu_logical_map(cpu);
++	u64 need_rss = MPIDR_RS(mpidr);
++	bool group0;
++	u32 pribits;
 +
 +	/*
-+	 * Already in a locked context for the desc from calling
-+	 * irq_set_irq_chip_state.
-+	 * It should be safe to simply modify the handler.
++	 * Need to check that the SRE bit has actually been set. If
++	 * not, it means that SRE is disabled at EL2. We're going to
++	 * die painfully, and there is nothing we can do about it.
++	 *
++	 * Kindly inform the luser.
 +	 */
-+	irq_to_desc(d->irq)->handle_irq = handler;
-+	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), prio);
++	if (!gic_enable_sre())
++		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
 +
-+	return 0;
-+}
-+#endif
++	pribits = gic_get_cpu_pri_bits();
 +
- static int gic_irq_set_irqchip_state(struct irq_data *d,
- 				     enum irqchip_irq_state which, bool val)
- {
-@@ -268,6 +353,18 @@ static int gic_irq_set_irqchip_state(struct irq_data *d,
- 		reg = val ? GICD_ICENABLER : GICD_ISENABLER;
- 		break;
++	group0 = gic_cpu_has_group0();
 
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	case IRQCHIP_STATE_NMI:
-+		if (static_branch_likely(&have_non_secure_prio_view)) {
-+			return gic_irq_set_irqchip_prio(d, val);
-+		} else if (val) {
-+			pr_warn("Failed to set IRQ %u as NMI, NMIs are unsupported\n",
-+				gic_irq(d));
-+			return -EINVAL;
-+		}
-+		return 0;
-+#endif
-+
- 	default:
- 		return -EINVAL;
- 	}
-@@ -295,6 +392,13 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
- 		*val = !gic_peek_irq(d, GICD_ISENABLER);
- 		break;
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	case IRQCHIP_STATE_NMI:
-+		*val = (gic_get_irq_prio(gic_irq(d), gic_dist_base(d)) ==
-+			GICD_INT_NMI_PRI);
-+		break;
-+#endif
-+
- 	default:
- 		return -EINVAL;
- 	}
-@@ -365,6 +469,22 @@ static u64 gic_mpidr_to_affinity(unsigned long mpidr)
- 	return aff;
- }
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+static void do_handle_nmi(unsigned int hwirq, struct pt_regs *regs)
-+{
-+	struct pt_regs *old_regs = set_irq_regs(regs);
-+	unsigned int irq;
-+
-+	nmi_enter();
-+
-+	irq = irq_find_mapping(gic_data.domain, hwirq);
-+	generic_handle_irq(irq);
-+
-+	nmi_exit();
-+	set_irq_regs(old_regs);
-+}
-+#endif
-+
- static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
- {
- 	u32 irqnr;
-@@ -380,6 +500,25 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
- 		int err;
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+		if (static_branch_likely(&have_non_secure_prio_view)
-+		    && unlikely(gic_read_rpr() == GICD_INT_NMI_PRI)) {
-+			/*
-+			 * We need to prevent other NMIs to occur even after a
-+			 * priority drop.
-+			 * We keep I flag set until cpsr is restored from
-+			 * kernel_exit.
-+			 */
-+			arch_irqs_daif_disable();
-+
-+			if (static_branch_likely(&supports_deactivate_key))
-+				gic_write_eoir(irqnr);
-+
-+			do_handle_nmi(irqnr, regs);
-+			return;
-+		}
-+#endif
-+
- 		if (static_branch_likely(&supports_deactivate_key))
- 			gic_write_eoir(irqnr);
- 		else {
-@@ -1177,6 +1316,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
- #ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
- 	if (!gic_cpu_has_group0() || gic_dist_security_disabled())
- 		static_branch_enable(&have_non_secure_prio_view);
-+	else
-+		pr_warn("SCR_EL3.FIQ set, cannot enable use of pseudo-NMIs\n");
+ #ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+ 	/* Set priority mask register */
+ 	write_gicreg(ICC_PMR_EL1_UNMASKED, ICC_PMR_EL1);
++#else
++	if (static_branch_likely(&have_non_secure_prio_view) && group0)
++		/* Mismatch configuration with boot CPU */
++		WARN_ON(group0 && !gic_dist_security_disabled());
  #endif
 
- 	return 0;
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 5426627..02c794f 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -419,6 +419,7 @@ enum irqchip_irq_state {
- 	IRQCHIP_STATE_ACTIVE,		/* Is interrupt in progress? */
- 	IRQCHIP_STATE_MASKED,		/* Is interrupt masked? */
- 	IRQCHIP_STATE_LINE_LEVEL,	/* Is IRQ line high? */
-+	IRQCHIP_STATE_NMI,		/* Is IRQ an NMI? */
- };
+ 	/*
+@@ -825,12 +875,6 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ #endif
 
- extern int irq_get_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
+ #ifdef CONFIG_CPU_PM
+-/* Check whether it's single security state view */
+-static bool gic_dist_security_disabled(void)
+-{
+-	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
+-}
+-
+ static int gic_cpu_pm_notifier(struct notifier_block *self,
+ 			       unsigned long cmd, void *v)
+ {
+@@ -1130,6 +1174,11 @@ static int __init gic_init_bases(void __iomem *dist_base,
+ 	gic_cpu_init();
+ 	gic_cpu_pm_init();
+
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	if (!gic_cpu_has_group0() || gic_dist_security_disabled())
++		static_branch_enable(&have_non_secure_prio_view);
++#endif
++
+ 	return 0;
+
+ out_free:
 --
 1.9.1
