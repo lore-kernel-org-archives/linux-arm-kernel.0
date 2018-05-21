@@ -1,202 +1,81 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 May 2018 18:00:23 +0100
-Subject: [RHEL-8] arm64: add missing early clobber in
- atomic64_dec_if_positive()
-In-Reply-To: <20180520001726.27808-1-msalter@redhat.com>
-References: <20180520001726.27808-1-msalter@redhat.com>
-Message-ID: <20180521170022.GD21034@arm.com>
+Date: Mon, 21 May 2018 18:05:55 +0100
+Subject: [PATCH] perf: hisi: fix uncore PMU index ID
+In-Reply-To: <1526901317-52248-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1526901317-52248-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <20180521170554.GE21034@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Shaokun,
 
-Thanks for reporting this.
+[+DT list]
 
-On Sat, May 19, 2018 at 08:17:26PM -0400, Mark Salter wrote:
-> When running a kernel compiled with gcc8 on a machine using LSE, I
-> get:
+On Mon, May 21, 2018 at 07:15:17PM +0800, Shaokun Zhang wrote:
+> According to ACPI SPEC about _UID (Unique ID), The _UID must be unique
+> across all devices with either a common _HID or _CID. For HiSilion
+> uncore PMU, SCCL_ID and INDEX_ID are used to identify the uncore PMU
+> for the same _HID. Therefore, _UID is not equal to INDEX_ID in
+> multi-sccl scene for the same uncore PMU device.
 > 
->  Unable to handle kernel paging request at virtual address 11111122222221
-
-[...]
-
-> The fault happens at the casal insn of inlined atomic64_dec_if_positive().
-> The inline asm code in that function has:
+> CCL_ID can be used as the INDEX_ID for the L3C PMU and IDX-ID is added
+> in DSDT table for the HHA PMU.
 > 
-> 	"1:	ldr	x30, %[v]\n"
-> 	"	subs	%[ret], x30, #1\n"
-> 	"	b.lt	2f\n"
-> 	"	casal	x30, %[ret], %[v]\n"
-> 	"	sub	x30, x30, #1\n"
-> 	"	sub	x30, x30, %[ret]\n"
-> 	"	cbnz	x30, 1b\n"
-> 	"2:")
-> 	: [ret] "+r" (x0), [v] "+Q" (v->counter)
-> 
-> gcc8 used register x0 for both [ret] and [v] and the subs was
-> clobbering [v] before it was used for casal. Gcc is free to do
-> this because [ret] lacks an early clobber modifier. So add one
-> to tell gcc a separate register is needed for [v].
+> Fixes: 2940bc4("perf: hisi: Add support for HiSilicon SoC L3C PMU driver")
+> Fixes: 2bab3cf("perf: hisi: Add support for HiSilicon SoC HHA PMU driver")
+> Reported-by: Huiqiang Wang <wanghuiqiang@huawei.com>
+> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Huiqiang Wang <wanghuiqiang@huawei.com>
+> ---
+>  drivers/perf/hisilicon/hisi_uncore_hha_pmu.c | 18 ++++++++----------
+>  drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c | 11 ++---------
+>  2 files changed, 10 insertions(+), 19 deletions(-)
 
-Oh blimey, it looks like GCC is realising that counter is at offset 0
-of atomic_t and therefore assigns the same register for [ret] and [v],
-which is actually forced to be x0 by the 'register' local variable in
-C code. The "+Q" constraint only says that the memory is read/write, so
-the pointer is fair game.
+Whilst I'd normally just accept PMU driver submissions for vendor PMUs,
+this part rang my alarm bells:
 
-I agree with your fix, but we also need to fix up the other places relying
-on this. Patch below -- please yell if you think I missed any.
+> diff --git a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+> index 443906e..dcd8e77 100644
+> --- a/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+> +++ b/drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+> @@ -238,19 +238,10 @@ MODULE_DEVICE_TABLE(acpi, hisi_hha_pmu_acpi_match);
+>  static int hisi_hha_pmu_init_data(struct platform_device *pdev,
+>  				  struct hisi_pmu *hha_pmu)
+>  {
+> -	unsigned long long id;
+>  	struct resource *res;
+> -	acpi_status status;
+> -
+> -	status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev),
+> -				       "_UID", NULL, &id);
+> -	if (ACPI_FAILURE(status))
+> -		return -EINVAL;
+> -
+> -	hha_pmu->index_id = id;
+>  
+>  	/*
+> -	 * Use SCCL_ID and UID to identify the HHA PMU, while
+> +	 * Use SCCL_ID and HHA index ID to identify the HHA PMU, while
+>  	 * SCCL_ID is in MPIDR[aff2].
+>  	 */
+>  	if (device_property_read_u32(&pdev->dev, "hisilicon,scl-id",
+> @@ -258,6 +249,13 @@ static int hisi_hha_pmu_init_data(struct platform_device *pdev,
+>  		dev_err(&pdev->dev, "Can not read hha sccl-id!\n");
+>  		return -EINVAL;
+>  	}
+> +
+> +	if (device_property_read_u32(&pdev->dev, "hisilicon,idx-id",
+> +				     &hha_pmu->index_id)) {
+> +		dev_err(&pdev->dev, "Can not read hha index-id!\n");
+> +		return -EINVAL;
+> +	}
 
-Cheers,
+Is this a new DT property? If so, please can you update the binding
+documentation and get an Ack from a DT maintainer? It's not clear to me
+what a "hisilicon,idx-id" is, nor how I would generate on from firmware.
+
+Thanks,
 
 Will
-
---->8
-
->From 3d9417b28ed2588c33b7e54e6681c88f0224201a Mon Sep 17 00:00:00 2001
-From: Will Deacon <will.deacon@arm.com>
-Date: Mon, 21 May 2018 17:44:57 +0100
-Subject: [PATCH] arm64: lse: Add early clobbers to some input/output asm
- operands
-
-For LSE atomics that read and write a register operand, we need to
-ensure that these operands are annotated as "early clobber" if the
-register is written before all of the input operands have been consumed.
-Failure to do so can result in the compiler allocating the same register
-to both operands, leading to splats such as:
-
- Unable to handle kernel paging request at virtual address 11111122222221
- [...]
- x1 : 1111111122222222 x0 : 1111111122222221
- Process swapper/0 (pid: 1, stack limit = 0x000000008209f908)
- Call trace:
-  test_atomic64+0x1360/0x155c
-
-where x0 has been allocated as both the value to be stored and also the
-atomic_t pointer.
-
-This patch adds the missing clobbers.
-
-Cc: <stable@vger.kernel.org>
-Cc: Dave Martin <dave.martin@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Reported-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/atomic_lse.h | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index 9ef0797380cb..f9b0b09153e0 100644
---- a/arch/arm64/include/asm/atomic_lse.h
-+++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -117,7 +117,7 @@ static inline void atomic_and(int i, atomic_t *v)
- 	/* LSE atomics */
- 	"	mvn	%w[i], %w[i]\n"
- 	"	stclr	%w[i], %[v]")
--	: [i] "+r" (w0), [v] "+Q" (v->counter)
-+	: [i] "+&r" (w0), [v] "+Q" (v->counter)
- 	: "r" (x1)
- 	: __LL_SC_CLOBBERS);
- }
-@@ -135,7 +135,7 @@ static inline int atomic_fetch_and##name(int i, atomic_t *v)		\
- 	/* LSE atomics */						\
- 	"	mvn	%w[i], %w[i]\n"					\
- 	"	ldclr" #mb "	%w[i], %w[i], %[v]")			\
--	: [i] "+r" (w0), [v] "+Q" (v->counter)				\
-+	: [i] "+&r" (w0), [v] "+Q" (v->counter)				\
- 	: "r" (x1)							\
- 	: __LL_SC_CLOBBERS, ##cl);					\
- 									\
-@@ -161,7 +161,7 @@ static inline void atomic_sub(int i, atomic_t *v)
- 	/* LSE atomics */
- 	"	neg	%w[i], %w[i]\n"
- 	"	stadd	%w[i], %[v]")
--	: [i] "+r" (w0), [v] "+Q" (v->counter)
-+	: [i] "+&r" (w0), [v] "+Q" (v->counter)
- 	: "r" (x1)
- 	: __LL_SC_CLOBBERS);
- }
-@@ -180,7 +180,7 @@ static inline int atomic_sub_return##name(int i, atomic_t *v)		\
- 	"	neg	%w[i], %w[i]\n"					\
- 	"	ldadd" #mb "	%w[i], w30, %[v]\n"			\
- 	"	add	%w[i], %w[i], w30")				\
--	: [i] "+r" (w0), [v] "+Q" (v->counter)				\
-+	: [i] "+&r" (w0), [v] "+Q" (v->counter)				\
- 	: "r" (x1)							\
- 	: __LL_SC_CLOBBERS , ##cl);					\
- 									\
-@@ -207,7 +207,7 @@ static inline int atomic_fetch_sub##name(int i, atomic_t *v)		\
- 	/* LSE atomics */						\
- 	"	neg	%w[i], %w[i]\n"					\
- 	"	ldadd" #mb "	%w[i], %w[i], %[v]")			\
--	: [i] "+r" (w0), [v] "+Q" (v->counter)				\
-+	: [i] "+&r" (w0), [v] "+Q" (v->counter)				\
- 	: "r" (x1)							\
- 	: __LL_SC_CLOBBERS, ##cl);					\
- 									\
-@@ -314,7 +314,7 @@ static inline void atomic64_and(long i, atomic64_t *v)
- 	/* LSE atomics */
- 	"	mvn	%[i], %[i]\n"
- 	"	stclr	%[i], %[v]")
--	: [i] "+r" (x0), [v] "+Q" (v->counter)
-+	: [i] "+&r" (x0), [v] "+Q" (v->counter)
- 	: "r" (x1)
- 	: __LL_SC_CLOBBERS);
- }
-@@ -332,7 +332,7 @@ static inline long atomic64_fetch_and##name(long i, atomic64_t *v)	\
- 	/* LSE atomics */						\
- 	"	mvn	%[i], %[i]\n"					\
- 	"	ldclr" #mb "	%[i], %[i], %[v]")			\
--	: [i] "+r" (x0), [v] "+Q" (v->counter)				\
-+	: [i] "+&r" (x0), [v] "+Q" (v->counter)				\
- 	: "r" (x1)							\
- 	: __LL_SC_CLOBBERS, ##cl);					\
- 									\
-@@ -358,7 +358,7 @@ static inline void atomic64_sub(long i, atomic64_t *v)
- 	/* LSE atomics */
- 	"	neg	%[i], %[i]\n"
- 	"	stadd	%[i], %[v]")
--	: [i] "+r" (x0), [v] "+Q" (v->counter)
-+	: [i] "+&r" (x0), [v] "+Q" (v->counter)
- 	: "r" (x1)
- 	: __LL_SC_CLOBBERS);
- }
-@@ -377,7 +377,7 @@ static inline long atomic64_sub_return##name(long i, atomic64_t *v)	\
- 	"	neg	%[i], %[i]\n"					\
- 	"	ldadd" #mb "	%[i], x30, %[v]\n"			\
- 	"	add	%[i], %[i], x30")				\
--	: [i] "+r" (x0), [v] "+Q" (v->counter)				\
-+	: [i] "+&r" (x0), [v] "+Q" (v->counter)				\
- 	: "r" (x1)							\
- 	: __LL_SC_CLOBBERS, ##cl);					\
- 									\
-@@ -404,7 +404,7 @@ static inline long atomic64_fetch_sub##name(long i, atomic64_t *v)	\
- 	/* LSE atomics */						\
- 	"	neg	%[i], %[i]\n"					\
- 	"	ldadd" #mb "	%[i], %[i], %[v]")			\
--	: [i] "+r" (x0), [v] "+Q" (v->counter)				\
-+	: [i] "+&r" (x0), [v] "+Q" (v->counter)				\
- 	: "r" (x1)							\
- 	: __LL_SC_CLOBBERS, ##cl);					\
- 									\
-@@ -435,7 +435,7 @@ static inline long atomic64_dec_if_positive(atomic64_t *v)
- 	"	sub	x30, x30, %[ret]\n"
- 	"	cbnz	x30, 1b\n"
- 	"2:")
--	: [ret] "+r" (x0), [v] "+Q" (v->counter)
-+	: [ret] "+&r" (x0), [v] "+Q" (v->counter)
- 	:
- 	: __LL_SC_CLOBBERS, "cc", "memory");
- 
-@@ -516,7 +516,7 @@ static inline long __cmpxchg_double##name(unsigned long old1,		\
- 	"	eor	%[old1], %[old1], %[oldval1]\n"			\
- 	"	eor	%[old2], %[old2], %[oldval2]\n"			\
- 	"	orr	%[old1], %[old1], %[old2]")			\
--	: [old1] "+r" (x0), [old2] "+r" (x1),				\
-+	: [old1] "+&r" (x0), [old2] "+&r" (x1),				\
- 	  [v] "+Q" (*(unsigned long *)ptr)				\
- 	: [new1] "r" (x2), [new2] "r" (x3), [ptr] "r" (x4),		\
- 	  [oldval1] "r" (oldval1), [oldval2] "r" (oldval2)		\
--- 
-2.1.4
