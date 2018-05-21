@@ -1,31 +1,36 @@
 From: christophe.roullier@st.com (Christophe Roullier)
-Date: Mon, 21 May 2018 10:07:26 +0200
-Subject: [PATCH V3 8/8] dt-bindings: stm32: add compatible for syscon
+Date: Mon, 21 May 2018 10:07:22 +0200
+Subject: [PATCH V3 4/8] ARM: dts: stm32: Add syscfg on stm32mp1
 In-Reply-To: <1526890046-10565-1-git-send-email-christophe.roullier@st.com>
 References: <1526890046-10565-1-git-send-email-christophe.roullier@st.com>
-Message-ID: <1526890046-10565-9-git-send-email-christophe.roullier@st.com>
+Message-ID: <1526890046-10565-5-git-send-email-christophe.roullier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch describes syscon DT bindings.
+System configuration controller is mainly used to manage
+the compensation cell and other IOs and system related
+settings.
 
 Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
 ---
- Documentation/devicetree/bindings/arm/stm32.txt | 5 +++++
+ arch/arm/boot/dts/stm32mp157c.dtsi | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/stm32.txt b/Documentation/devicetree/bindings/arm/stm32.txt
-index 6808ed9..e46ebad 100644
---- a/Documentation/devicetree/bindings/arm/stm32.txt
-+++ b/Documentation/devicetree/bindings/arm/stm32.txt
-@@ -8,3 +8,8 @@ using one of the following compatible strings:
-   st,stm32f746
-   st,stm32h743
-   st,stm32mp157
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index bc3eddc..dbc0e707 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -167,6 +167,11 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		syscfg: system-config at 50020000 {
++			compatible = "st,stm32mp157-syscfg", "syscon";
++			reg = <0x50020000 0x400>;
++		};
 +
-+Required nodes:
-+- syscon: the soc bus node must have a system controller node pointing to the
-+  global control registers, with the compatible string
-+  "st,stm32mp157-syscfg", "syscon";
+ 		usart1: serial at 5c000000 {
+ 			compatible = "st,stm32h7-uart";
+ 			reg = <0x5c000000 0x400>;
 -- 
 1.9.1
