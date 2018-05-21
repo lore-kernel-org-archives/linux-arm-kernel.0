@@ -1,208 +1,33 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 21 May 2018 21:28:27 +0200 (CEST)
-Subject: [PATCH RFC] ARM: dts: add Raspberry Pi Compute Module and IO board
-In-Reply-To: <87d0xouapx.fsf@anholt.net>
-References: <1526589872-13459-1-git-send-email-stefan.wahren@i2se.com>
- <87d0xouapx.fsf@anholt.net>
-Message-ID: <1670815145.72020.1526930907735@email.1und1.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 21 May 2018 12:41:30 -0700
+Subject: [GIT PULL 1/3] ti-sysc array access fix for v4.18 merge window
+Message-ID: <pull-1526925630-789198@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Eric Anholt <eric@anholt.net> hat am 21. Mai 2018 um 20:26 geschrieben:
-> 
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> > The Raspberry Pi Compute Module (CM1) is a SoM which contains a
-> > BCM2835 processor, 512 MB RAM and a 4 GB eMMC. There is also a carrier
-> > board which is called Compute Module IO Board.
-> >
-> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile                |  1 +
-> >  arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts | 92 +++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi    | 34 ++++++++++++
-> >  3 files changed, 127 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
-> >  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
-> >
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index ec2024e..a9883e8 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
-> >  	bcm2835-rpi-b-rev2.dtb \
-> >  	bcm2835-rpi-b-plus.dtb \
-> >  	bcm2835-rpi-a-plus.dtb \
-> > +	bcm2835-rpi-cm1-io1.dtb \
-> >  	bcm2836-rpi-2-b.dtb \
-> >  	bcm2837-rpi-3-b.dtb \
-> >  	bcm2837-rpi-3-b-plus.dtb \
-> > diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
-> > new file mode 100644
-> > index 0000000..4d9aa22
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/bcm2835-rpi-cm1-io1.dts
-> > @@ -0,0 +1,92 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/dts-v1/;
-> > +#include "bcm2835-rpi-cm1.dtsi"
-> > +#include "bcm283x-rpi-usb-host.dtsi"
-> > +
-> > +/ {
-> > +	compatible = "raspberrypi,compute-module", "brcm,bcm2835";
-> > +	model = "Raspberry Pi Compute Module IO board rev1";
-> > +};
-> > +
-> > +&dsi1 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&gpio {
-> > +	/*
-> > +	 * This is based on the official GPU firmware DT blob.
-> > +	 *
-> > +	 * Legend:
-> > +	 * "NC" = not connected (no rail from the SoC)
-> > +	 * "FOO" = GPIO line named "FOO" on the schematic
-> > +	 * "FOO_N" = GPIO line named "FOO" on schematic, active low
-> > +	 */
-> > +	gpio-line-names = "GPIO0",
-> > +			  "GPIO1",
-> > +			  "GPIO2",
-> > +			  "GPIO3",
-> > +			  "GPIO4",
-> > +			  "GPIO5",
-> > +			  "GPIO6",
-> > +			  "GPIO7",
-> > +			  "GPIO8",
-> > +			  "GPIO9",
-> > +			  "GPIO10",
-> > +			  "GPIO11",
-> > +			  "GPIO12",
-> > +			  "GPIO13",
-> > +			  "GPIO14",
-> > +			  "GPIO15",
-> > +			  "GPIO16",
-> > +			  "GPIO17",
-> > +			  "GPIO18",
-> > +			  "GPIO19",
-> > +			  "GPIO20",
-> > +			  "GPIO21",
-> > +			  "GPIO22",
-> > +			  "GPIO23",
-> > +			  "GPIO24",
-> > +			  "GPIO25",
-> > +			  "GPIO26",
-> > +			  "GPIO27",
-> > +			  "GPIO28",
-> > +			  "GPIO29",
-> > +			  "GPIO30",
-> > +			  "GPIO31",
-> > +			  "GPIO32",
-> > +			  "GPIO33",
-> > +			  "GPIO34",
-> > +			  "GPIO35",
-> > +			  "GPIO36",
-> > +			  "GPIO37",
-> > +			  "GPIO38",
-> > +			  "GPIO39",
-> > +			  "GPIO40",
-> > +			  "GPIO41",
-> > +			  "GPIO42",
-> > +			  "GPIO43",
-> > +			  "GPIO44",
-> > +			  "GPIO45",
-> > +			  "HDMI_HPD_N",
-> > +			  /* Also used as ACT LED */
-> > +			  "EMMC_EN_N",
-> > +			  /* Used by eMMC */
-> > +			  "SD_CLK_R",
-> > +			  "SD_CMD_R",
-> > +			  "SD_DATA0_R",
-> > +			  "SD_DATA1_R",
-> > +			  "SD_DATA2_R",
-> > +			  "SD_DATA3_R";
-> > +
-> > +	pinctrl-0 = <&gpioout &alt0>;
-> > +};
-> > +
-> > +&hdmi {
-> > +	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
-> > +};
-> 
-> I think this should be ACTIVE_LOW, since it's "HDMI_HPD_N_1V8", right?
+From: "Tony Lindgren" <tony@atomide.com>
 
-I just copy & paste from the rpi-4.14/bcm2708-rpi-cm.dts. I thought the HDMI interface on my IO board is broken, but maybe this is a downstream issue.
+The following changes since commit dc4c85eac6bc8cfe25144936c5636aa1415bbc12:
 
-> 
-> > +
-> > +&uart0 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&uart0_gpio14>;
-> > +	status = "okay";
-> > +};
-> > diff --git a/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
-> > new file mode 100644
-> > index 0000000..ef22c2d
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/bcm2835-rpi-cm1.dtsi
-> > @@ -0,0 +1,34 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/dts-v1/;
-> > +#include "bcm2835.dtsi"
-> > +#include "bcm2835-rpi.dtsi"
-> > +
-> > +/ {
-> > +	leds {
-> > +		act {
-> > +			gpios = <&gpio 47 GPIO_ACTIVE_LOW>;
-> > +		};
-> > +	};
-> > +
-> > +	reg_3v3: fixed-regulator {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "3V3";
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> > +		regulator-always-on;
-> > +	};
-> > +
-> > +	reg_1v8: fixed-regulator {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "1V8";
-> > +		regulator-min-microvolt = <1800000>;
-> > +		regulator-max-microvolt = <1800000>;
-> > +		regulator-always-on;
-> > +	};
-> > +};
-> > +
-> > +&sdhost {
-> > +	non-removable;
-> > +	vmmc-supply = <&reg_3v3>;
-> > +	vqmmc-supply = <&reg_1v8>;
-> > +};
-> 
-> Also, looking at some datasheets I have laying around, it says "eMMC I/O
-> Voltage fixed at 1V8" -- is this regulator setup right, in that case?
+  bus: ti-sysc: Show module information for suspend if DEBUG is enabled (2018-05-01 06:54:17 -0700)
 
-Usually an eMMC has 2 different voltage sources:
-vqmmc-supply -> supply node for IO line power (usually switchable, but fixed on Compute Module)
-vmmc-supply -> supply node for card's power (usually fixed)
+are available in the Git repository at:
 
-Do you have a specific concern (voltage, naming)?
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/ti-sysc-fix-signed
 
-Does this conversation help [1]?
+for you to fetch changes up to c97c8620833e4a55ddb7a43961d3205184a487f0:
 
-Please also look at the CM schematics page 1 and 3.
+  bus: ti-sysc: Fix optional clocks array access (2018-05-18 07:54:44 -0700)
 
-[1] - https://www.raspberrypi.org/forums/viewtopic.php?f=107&t=213772
+----------------------------------------------------------------
+One ti-sysc fix for v4.18 merge window
 
-> 
-> With answers for these two issues, it will be:
-> 
-> Reviewed-by: Eric Anholt <eric@anholt.net>
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This fixes an array access errors if there are more optional clocks
+than one.
+
+----------------------------------------------------------------
+Tony Lindgren (1):
+      bus: ti-sysc: Fix optional clocks array access
+
+ drivers/bus/ti-sysc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
