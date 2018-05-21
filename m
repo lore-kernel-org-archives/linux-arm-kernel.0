@@ -1,382 +1,52 @@
-From: ping.bai@nxp.com (Bai Ping)
-Date: Mon, 21 May 2018 18:46:52 +0800
-Subject: [PATCH v6 2/2] ARM: dts: imx: Add basic dts support for imx6sll EVK
- board
-In-Reply-To: <1526899612-22856-1-git-send-email-ping.bai@nxp.com>
-References: <1526899612-22856-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1526899612-22856-2-git-send-email-ping.bai@nxp.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 21 May 2018 11:49:58 +0100
+Subject: [PATCH 6/6] arm64: perf: Add support for chaining counters
+In-Reply-To: <5ff704da-b767-33d7-68c4-7aa02f83ac0a@arm.com>
+References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
+ <1526638943-2110-7-git-send-email-suzuki.poulose@arm.com>
+ <5ff704da-b767-33d7-68c4-7aa02f83ac0a@arm.com>
+Message-ID: <8fd2f592-c489-8710-92a5-2f4666b1c290@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dts file support for imx6sll EVK board.
+On 18/05/18 15:57, Robin Murphy wrote:
+> One more thing now that I've actually looked at the Arm ARM...
+> 
+> On 18/05/18 11:22, Suzuki K Poulose wrote:
+> [...]
+>> +static inline void armv8pmu_write_event_type(struct perf_event *event)
+>> +{
+>> +??? struct hw_perf_event *hwc = &event->hw;
+>> +??? int idx = hwc->idx;
+>> +
+>> +??? /*
+>> +???? * For chained events, write the high counter event type
+>> +???? * followed by the low counter.
+>> +???? */
+>> +??? if (armv8pmu_event_is_chained(event)) {
+>> +??????? u32 chain_evt = ARMV8_PMUV3_PERFCTR_CHAIN;
+>> +
+>> +??????? /* Set the filters as that of the main event for chain */
+>> +??????? chain_evt |= hwc->config_base & ~ARMV8_PMU_EVTYPE_EVENT;
+> 
+> The description of the chain event says that the filtering must only be set on the lower counter, and that the chain event itself should be set to count everything.
 
-Signed-off-by: Bai Ping <ping.bai@nxp.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- change v3->v4
- - update the license indentifier
- - remove leading zero of node
- - remove unused pin from hog group
- change v4->v5
- - use generic name for device node
- - remove unnecessary hog pin group
- change v5->v6
- - no
----
- Documentation/devicetree/bindings/arm/fsl.txt |   4 +
- arch/arm/boot/dts/Makefile                    |   2 +
- arch/arm/boot/dts/imx6sll-evk.dts             | 315 ++++++++++++++++++++++++++
- 3 files changed, 321 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6sll-evk.dts
+You're right. I intended to fix it, but missed in the rebases.
+Thanks for pointing out.
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index cdb9dd7..8a1baa2 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -53,6 +53,10 @@ i.MX6 Quad SABRE Automotive Board
- Required root node properties:
-     - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
- 
-+i.MX6SLL EVK board
-+Required root node properties:
-+    - compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
-+
- Generic i.MX boards
- -------------------
- 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f4753b0..f3fb85f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -521,6 +521,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- dtb-$(CONFIG_SOC_IMX6SL) += \
- 	imx6sl-evk.dtb \
- 	imx6sl-warp.dtb
-+dtb-$(CONFIG_SOC_IMX6SLL) += \
-+	imx6sll-evk.dtb
- dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-nitrogen6sx.dtb \
- 	imx6sx-sabreauto.dtb \
-diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
-new file mode 100644
-index 0000000..0cfa4a2
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6sll-evk.dts
-@@ -0,0 +1,315 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+/*
-+ * Copyright 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017-2018 NXP.
-+ *
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "imx6sll.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6SLL EVK Board";
-+	compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
-+
-+	memory at 80000000 {
-+		reg = <0x80000000 0x80000000>;
-+	};
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm1 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+		status = "okay";
-+	};
-+
-+	reg_usb_otg1_vbus: regulator-otg1-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usb_otg1_vbus>;
-+		regulator-name = "usb_otg1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_usb_otg2_vbus: regulator-otg2-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usb_otg2_vbus>;
-+		regulator-name = "usb_otg2_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 2 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_aud3v: regulator-aud3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "wm8962-supply-3v15";
-+		regulator-min-microvolt = <3150000>;
-+		regulator-max-microvolt = <3150000>;
-+		regulator-boot-on;
-+	};
-+
-+	reg_aud4v: regulator-aud4v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "wm8962-supply-4v2";
-+		regulator-min-microvolt = <4325000>;
-+		regulator-max-microvolt = <4325000>;
-+		regulator-boot-on;
-+	};
-+
-+	reg_lcd: regulator-lcd {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_lcd>;
-+		regulator-name = "lcd-pwr";
-+		gpio = <&gpio4 8 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_sd1_vmmc: regulator-sd1-vmmc {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_sd1_vmmc>;
-+		regulator-name = "SD1_SPWR";
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		gpio = <&gpio3 30 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+};
-+
-+&cpu0 {
-+	arm-supply = <&sw1a_reg>;
-+	soc-supply = <&sw1c_reg>;
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pfuze100: pmic at 8 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl_usb_otg1_vbus: vbus1grp {
-+		fsl,pins = <
-+			MX6SLL_PAD_KEY_COL4__GPIO4_IO00 0x17059
-+		>;
-+	};
-+
-+	pinctrl_usb_otg2_vbus: vbus2grp {
-+		fsl,pins = <
-+			MX6SLL_PAD_KEY_COL5__GPIO4_IO02 0x17059
-+		>;
-+	};
-+
-+	pinctrl_reg_lcd: reglcdgrp {
-+		fsl,pins = <
-+			MX6SLL_PAD_ECSPI1_SCLK__GPIO4_IO08 0x17059
-+		>;
-+	};
-+
-+	pinctrl_reg_sd1_vmmc: sd1vmmcgrp {
-+		fsl,pins = <
-+			MX6SLL_PAD_KEY_COL3__GPIO3_IO30 0x17059
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX6SLL_PAD_UART1_TXD__UART1_DCE_TX 0x1b0b1
-+			MX6SLL_PAD_UART1_RXD__UART1_DCE_RX 0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX6SLL_PAD_SD1_CMD__SD1_CMD	0x17059
-+			MX6SLL_PAD_SD1_CLK__SD1_CLK	0x13059
-+			MX6SLL_PAD_SD1_DATA0__SD1_DATA0	0x17059
-+			MX6SLL_PAD_SD1_DATA1__SD1_DATA1	0x17059
-+			MX6SLL_PAD_SD1_DATA2__SD1_DATA2	0x17059
-+			MX6SLL_PAD_SD1_DATA3__SD1_DATA3	0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc1_100mhz: usdhc1grp_100mhz {
-+		fsl,pins = <
-+			MX6SLL_PAD_SD1_CMD__SD1_CMD	0x170b9
-+			MX6SLL_PAD_SD1_CLK__SD1_CLK	0x130b9
-+			MX6SLL_PAD_SD1_DATA0__SD1_DATA0	0x170b9
-+			MX6SLL_PAD_SD1_DATA1__SD1_DATA1	0x170b9
-+			MX6SLL_PAD_SD1_DATA2__SD1_DATA2	0x170b9
-+			MX6SLL_PAD_SD1_DATA3__SD1_DATA3	0x170b9
-+		>;
-+	};
-+
-+	pinctrl_usdhc1_200mhz: usdhc1grp_200mhz {
-+		fsl,pins = <
-+			MX6SLL_PAD_SD1_CMD__SD1_CMD	0x170f9
-+			MX6SLL_PAD_SD1_CLK__SD1_CLK	0x130f9
-+			MX6SLL_PAD_SD1_DATA0__SD1_DATA0	0x170f9
-+			MX6SLL_PAD_SD1_DATA1__SD1_DATA1	0x170f9
-+			MX6SLL_PAD_SD1_DATA2__SD1_DATA2	0x170f9
-+			MX6SLL_PAD_SD1_DATA3__SD1_DATA3	0x170f9
-+		>;
-+	};
-+
-+	pinctrl_usbotg1: usbotg1grp {
-+		fsl,pins = <
-+			MX6SLL_PAD_EPDC_PWR_COM__USB_OTG1_ID 0x17059
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX6SLL_PAD_I2C1_SCL__I2C1_SCL	 0x4001b8b1
-+			MX6SLL_PAD_I2C1_SDA__I2C1_SDA	 0x4001b8b1
-+		>;
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
-+	cd-gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	vmmc-supply = <&reg_sd1_vmmc>;
-+	status = "okay";
-+};
-+
-+&usbotg1 {
-+	vbus-supply = <&reg_usb_otg1_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg1>;
-+	disable-over-current;
-+	srp-disable;
-+	hnp-disable;
-+	adp-disable;
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	vbus-supply = <&reg_usb_otg2_vbus>;
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
--- 
-1.9.1
+> 
+>> +??????? armv8pmu_write_evtype(idx, chain_evt);
+>> +??????? isb();
+>> +??????? idx--;
+>> +??? }
+>> +
+>> +??? armv8pmu_write_evtype(idx, hwc->config_base);
+> 
+> It also says that the 'real' event should be set up first and the chain event second, with the rather ominous warning of "If software does not program the event in this way, the count becomes UNPREDICTABLE."
+> 
+
+Yep, will fix it.
+
+Thanks for the review
+
+Suzuki
