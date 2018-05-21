@@ -1,62 +1,58 @@
 From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Mon, 21 May 2018 19:57:54 +0800
-Subject: [PATCH 17/33] pinctrl: armada-37xx: use match_string() helper
+Date: Mon, 21 May 2018 19:57:49 +0800
+Subject: [PATCH 12/33] clk: bcm2835: use match_string() helper
 In-Reply-To: <1526903890-35761-1-git-send-email-xieyisheng1@huawei.com>
 References: <1526903890-35761-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <1526903890-35761-18-git-send-email-xieyisheng1@huawei.com>
+Message-ID: <1526903890-35761-13-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 match_string() returns the index of an array for a matching string,
 which can be used intead of open coded variant.
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@bootlin.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@kernel.org>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: linux-clk at vger.kernel.org
+Cc: linux-rpi-kernel at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-gpio at vger.kernel.org
 Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+ drivers/clk/bcm/clk-bcm2835.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index 5b63248..e338327 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -214,18 +214,6 @@ static inline void armada_37xx_update_reg(unsigned int *reg,
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index fa0d5c8..a27c0d2 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1395,8 +1395,7 @@ static struct clk_hw *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+ 	struct bcm2835_clock *clock;
+ 	struct clk_init_data init;
+ 	const char *parents[1 << CM_SRC_BITS];
+-	size_t i, j;
+-	int ret;
++	int i, ret;
+ 
+ 	/*
+ 	 * Replace our strings referencing parent clocks with the
+@@ -1405,12 +1404,11 @@ static struct clk_hw *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+ 	for (i = 0; i < data->num_mux_parents; i++) {
+ 		parents[i] = data->parents[i];
+ 
+-		for (j = 0; j < ARRAY_SIZE(cprman_parent_names); j++) {
+-			if (strcmp(parents[i], cprman_parent_names[j]) == 0) {
+-				parents[i] = cprman->real_parent_names[j];
+-				break;
+-			}
+-		}
++		ret = match_string(cprman_parent_names,
++				   ARRAY_SIZE(cprman_parent_names),
++				   parents[i]);
++		if (ret >= 0)
++			parents[i] = cprman->real_parent_names[ret];
  	}
- }
  
--static int armada_37xx_get_func_reg(struct armada_37xx_pin_group *grp,
--				    const char *func)
--{
--	int f;
--
--	for (f = 0; (f < NB_FUNCS) && grp->funcs[f]; f++)
--		if (!strcmp(grp->funcs[f], func))
--			return f;
--
--	return -ENOTSUPP;
--}
--
- static struct armada_37xx_pin_group *armada_37xx_find_next_grp_by_pin(
- 	struct armada_37xx_pinctrl *info, int pin, int *grp)
- {
-@@ -344,10 +332,10 @@ static int armada_37xx_pmx_set_by_name(struct pinctrl_dev *pctldev,
- 	dev_dbg(info->dev, "enable function %s group %s\n",
- 		name, grp->name);
- 
--	func = armada_37xx_get_func_reg(grp, name);
-+	func = match_string(grp->funcs, NB_FUNCS, name);
- 
- 	if (func < 0)
--		return func;
-+		return -ENOTSUPP;
- 
- 	val = grp->val[func];
- 
+ 	memset(&init, 0, sizeof(init));
 -- 
 1.7.12.4
