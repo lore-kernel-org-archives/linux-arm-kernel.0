@@ -1,152 +1,382 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 21 May 2018 12:40:44 +0200
-Subject: [reset-control] How to initialize hardware state with the shared
- reset line?
-In-Reply-To: <CAK7LNAR1b_F_eLEWAdQc3L=daGz=ttKq0mQP78BkjzTOssaXvw@mail.gmail.com>
-References: <CAK7LNATZgJ4MxOFLUCNARWv3Zz=gpL-jGReDnBnArquiaXRWoQ@mail.gmail.com>
- <CAFBinCADQsXoc6CUKabH6VX3ZBYb5apo-xBbe1w0BiO8wBAsPw@mail.gmail.com>
- <CAK7LNAR1b_F_eLEWAdQc3L=daGz=ttKq0mQP78BkjzTOssaXvw@mail.gmail.com>
-Message-ID: <CAFBinCBTTmPqD0UP8zzMBjsjzP9fJx9_pmhGz0_Vy-V+wmhLXQ@mail.gmail.com>
+From: ping.bai@nxp.com (Bai Ping)
+Date: Mon, 21 May 2018 18:46:52 +0800
+Subject: [PATCH v6 2/2] ARM: dts: imx: Add basic dts support for imx6sll EVK
+ board
+In-Reply-To: <1526899612-22856-1-git-send-email-ping.bai@nxp.com>
+References: <1526899612-22856-1-git-send-email-ping.bai@nxp.com>
+Message-ID: <1526899612-22856-2-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add dts file support for imx6sll EVK board.
 
-On Mon, May 21, 2018 at 3:27 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi.
->
->
-> 2018-05-20 19:57 GMT+09:00 Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com>:
->> Hi,
->>
->> On Thu, May 10, 2018 at 11:16 AM, Masahiro Yamada
->> <yamada.masahiro@socionext.com> wrote:
->> [snip]
->>> I may be missing something, but
->>> one solution might be reset hogging on the
->>> reset provider side.  This allows us to describe
->>> the initial state of reset lines in the reset controller.
->>>
->>> The idea for "reset-hog" is similar to:
->>>  - "gpio-hog" defined in
->>>    Documentation/devicetree/bindings/gpio/gpio.txt
->>>  - "assigned-clocks" defined in
->>>    Documetation/devicetree/bindings/clock/clock-bindings.txt
->>>
->>>
->>>
->>> For example,
->>>
->>>    reset-controller {
->>>             ....
->>>
->>>             line_a {
->>>                   reset-hog;
->>>                   resets = <1>;
->>>                   reset-assert;
->>>             };
->>>    }
->>>
->>>
->>> When the reset controller is registered,
->>> the reset ID '1' is asserted.
->>>
->>>
->>> So, all reset consumers that share the reset line '1'
->>> will start from the asserted state
->>> (i.e. defined state machine state).
->> I wonder if a "reset hog" can be board specific:
->> - GPIO hogs are definitely board specific (meson-gxbb-odroidc2.dts for
->> example uses it to take the USB hub out of reset)
->> - assigned-clock-parents (and the like) can also be board specific (I
->> made up a use-case since I don't know of any actual examples: board A
->> uses an external XTAL while board B uses some other internal
->> clock-source because it doesn't have an external XTAL)
->>
->> however, can reset lines be board specific? or in other words: do we
->> need to describe them in device-tree?
->
-> Indeed.
->
-> I did not come up with board-specific cases.
->
-> The problem we are discussing is SoC-specific,
-> and reset-controller drivers are definitely SoC-specific.
->
-> So, I think the initial state can be coded in drivers instead of DT.
-OK, let's also hear Philipp's (reset framework maintainer) opinion on this
+Signed-off-by: Bai Ping <ping.bai@nxp.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ change v3->v4
+ - update the license indentifier
+ - remove leading zero of node
+ - remove unused pin from hog group
+ change v4->v5
+ - use generic name for device node
+ - remove unnecessary hog pin group
+ change v5->v6
+ - no
+---
+ Documentation/devicetree/bindings/arm/fsl.txt |   4 +
+ arch/arm/boot/dts/Makefile                    |   2 +
+ arch/arm/boot/dts/imx6sll-evk.dts             | 315 ++++++++++++++++++++++++++
+ 3 files changed, 321 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6sll-evk.dts
 
->> we could extend struct reset_controller_dev (= reset controller
->> driver) if they are not board specific:
->> - either assert all reset lines by default except if they are listed
->> in a new field (may break backwards compatibility, requires testing of
->> all reset controller drivers)
->
-> This is quite simple, but I am afraid there are some cases where the forcible
-> reset-assert is not preferred.
->
-> For example, the earlycon.  When we use earlycon, we would expect it has been
-> initialized by a boot-loader, or something.
-> If it is reset-asserted on the while, the console output
-> will not be good.
-indeed, so let's skip this idea
-
->> - specify a list of reset lines and their desired state (or to keep it
->> easy: specify a list of reset lines that should be asserted)
->> (I must admit that this is basically your idea but the definition is
->> moved from device-tree to the reset controller driver)
->
-> Yes, I think the list of "reset line ID" and "init state" pairs
-> would be nicer.
-$ grep -R "of_reset_n_cells = [^1]" drivers/reset/
-drivers/reset/reset-berlin.c:   priv->rcdev.of_reset_n_cells = 2;
-drivers/reset/hisilicon/reset-hi3660.c: rc->rst.of_reset_n_cells = 2;
-drivers/reset/reset-ti-sci.c:   data->rcdev.of_reset_n_cells = 2;
-drivers/reset/reset-lantiq.c:   priv->rcdev.of_reset_n_cells = 2;
-
-everything else uses only one reset cell
-from the lantiq reset dt-binding documentation: "The first cell takes
-the reset set bit and the second cell takes the status bit."
-
-I'm not sure what to do with drivers that specify != 1 reset-cell
-though if we use a simple "init state pair"
-maybe Philipp can share his opinion on this one as well
-
->> any "chip" specific differences could be expressed by using a
->> different of_device_id
->>
->> one the other hand: your "reset hog" solution looks fine to me if
->> reset lines can be board specific
->>
->>> From the discussion with Martin Blumenstingl
->>> (https://lkml.org/lkml/2018/4/28/115),
->>> the problem for Amlogic is that
->>> the reset line is "de-asserted" by default.
->>> If so, the 'reset-hog' would fix the problem,
->>> and DWC3 driver would be able to use
->>> shared, level reset, I think.
->> I think you are right: if we could control the initial state then we
->> should be able to use level resets
->
->
-> Even further, can we drop the shared reset_control_reset() support, maybe?
-> (in other words, revert commit 7da33a37b48f11)
-I believe we need to keep this if there's hardware out there:
-- where the reset controller only supports reset pulses
-- at least one reset line is shared between multiple devices
-
-I didn't have a closer look at the Amlogic Meson6 SoC yet, but I think
-it matches above criteria. as far as I know:
-- the USB situation there is similar to Meson8b (USB controllers and
-PHYs share a reset line)
-- it uses an older reset controller IP block which does not support
-level resets (only reset pulses)
-
-> Thanks for your comment!
-you're welcome - thank you for bringing up this topic also :)
-
-
-Regards
-Martin
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index cdb9dd7..8a1baa2 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -53,6 +53,10 @@ i.MX6 Quad SABRE Automotive Board
+ Required root node properties:
+     - compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
+ 
++i.MX6SLL EVK board
++Required root node properties:
++    - compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
++
+ Generic i.MX boards
+ -------------------
+ 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f4753b0..f3fb85f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -521,6 +521,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ dtb-$(CONFIG_SOC_IMX6SL) += \
+ 	imx6sl-evk.dtb \
+ 	imx6sl-warp.dtb
++dtb-$(CONFIG_SOC_IMX6SLL) += \
++	imx6sll-evk.dtb
+ dtb-$(CONFIG_SOC_IMX6SX) += \
+ 	imx6sx-nitrogen6sx.dtb \
+ 	imx6sx-sabreauto.dtb \
+diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
+new file mode 100644
+index 0000000..0cfa4a2
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sll-evk.dts
+@@ -0,0 +1,315 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++/*
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017-2018 NXP.
++ *
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include "imx6sll.dtsi"
++
++/ {
++	model = "Freescale i.MX6SLL EVK Board";
++	compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
++
++	memory at 80000000 {
++		reg = <0x80000000 0x80000000>;
++	};
++
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm1 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <6>;
++		status = "okay";
++	};
++
++	reg_usb_otg1_vbus: regulator-otg1-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usb_otg1_vbus>;
++		regulator-name = "usb_otg1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usb_otg2_vbus: regulator-otg2-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usb_otg2_vbus>;
++		regulator-name = "usb_otg2_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio4 2 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_aud3v: regulator-aud3v {
++		compatible = "regulator-fixed";
++		regulator-name = "wm8962-supply-3v15";
++		regulator-min-microvolt = <3150000>;
++		regulator-max-microvolt = <3150000>;
++		regulator-boot-on;
++	};
++
++	reg_aud4v: regulator-aud4v {
++		compatible = "regulator-fixed";
++		regulator-name = "wm8962-supply-4v2";
++		regulator-min-microvolt = <4325000>;
++		regulator-max-microvolt = <4325000>;
++		regulator-boot-on;
++	};
++
++	reg_lcd: regulator-lcd {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_lcd>;
++		regulator-name = "lcd-pwr";
++		gpio = <&gpio4 8 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_sd1_vmmc: regulator-sd1-vmmc {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_sd1_vmmc>;
++		regulator-name = "SD1_SPWR";
++		regulator-min-microvolt = <3000000>;
++		regulator-max-microvolt = <3000000>;
++		gpio = <&gpio3 30 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++};
++
++&cpu0 {
++	arm-supply = <&sw1a_reg>;
++	soc-supply = <&sw1c_reg>;
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	pfuze100: pmic at 8 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++				regulator-always-on;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&iomuxc {
++	pinctrl_usb_otg1_vbus: vbus1grp {
++		fsl,pins = <
++			MX6SLL_PAD_KEY_COL4__GPIO4_IO00 0x17059
++		>;
++	};
++
++	pinctrl_usb_otg2_vbus: vbus2grp {
++		fsl,pins = <
++			MX6SLL_PAD_KEY_COL5__GPIO4_IO02 0x17059
++		>;
++	};
++
++	pinctrl_reg_lcd: reglcdgrp {
++		fsl,pins = <
++			MX6SLL_PAD_ECSPI1_SCLK__GPIO4_IO08 0x17059
++		>;
++	};
++
++	pinctrl_reg_sd1_vmmc: sd1vmmcgrp {
++		fsl,pins = <
++			MX6SLL_PAD_KEY_COL3__GPIO3_IO30 0x17059
++		>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			MX6SLL_PAD_UART1_TXD__UART1_DCE_TX 0x1b0b1
++			MX6SLL_PAD_UART1_RXD__UART1_DCE_RX 0x1b0b1
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX6SLL_PAD_SD1_CMD__SD1_CMD	0x17059
++			MX6SLL_PAD_SD1_CLK__SD1_CLK	0x13059
++			MX6SLL_PAD_SD1_DATA0__SD1_DATA0	0x17059
++			MX6SLL_PAD_SD1_DATA1__SD1_DATA1	0x17059
++			MX6SLL_PAD_SD1_DATA2__SD1_DATA2	0x17059
++			MX6SLL_PAD_SD1_DATA3__SD1_DATA3	0x17059
++		>;
++	};
++
++	pinctrl_usdhc1_100mhz: usdhc1grp_100mhz {
++		fsl,pins = <
++			MX6SLL_PAD_SD1_CMD__SD1_CMD	0x170b9
++			MX6SLL_PAD_SD1_CLK__SD1_CLK	0x130b9
++			MX6SLL_PAD_SD1_DATA0__SD1_DATA0	0x170b9
++			MX6SLL_PAD_SD1_DATA1__SD1_DATA1	0x170b9
++			MX6SLL_PAD_SD1_DATA2__SD1_DATA2	0x170b9
++			MX6SLL_PAD_SD1_DATA3__SD1_DATA3	0x170b9
++		>;
++	};
++
++	pinctrl_usdhc1_200mhz: usdhc1grp_200mhz {
++		fsl,pins = <
++			MX6SLL_PAD_SD1_CMD__SD1_CMD	0x170f9
++			MX6SLL_PAD_SD1_CLK__SD1_CLK	0x130f9
++			MX6SLL_PAD_SD1_DATA0__SD1_DATA0	0x170f9
++			MX6SLL_PAD_SD1_DATA1__SD1_DATA1	0x170f9
++			MX6SLL_PAD_SD1_DATA2__SD1_DATA2	0x170f9
++			MX6SLL_PAD_SD1_DATA3__SD1_DATA3	0x170f9
++		>;
++	};
++
++	pinctrl_usbotg1: usbotg1grp {
++		fsl,pins = <
++			MX6SLL_PAD_EPDC_PWR_COM__USB_OTG1_ID 0x17059
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX6SLL_PAD_I2C1_SCL__I2C1_SCL	 0x4001b8b1
++			MX6SLL_PAD_I2C1_SDA__I2C1_SDA	 0x4001b8b1
++		>;
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
++	cd-gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
++	keep-power-in-suspend;
++	wakeup-source;
++	vmmc-supply = <&reg_sd1_vmmc>;
++	status = "okay";
++};
++
++&usbotg1 {
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg1>;
++	disable-over-current;
++	srp-disable;
++	hnp-disable;
++	adp-disable;
++	status = "okay";
++};
++
++&usbotg2 {
++	vbus-supply = <&reg_usb_otg2_vbus>;
++	dr_mode = "host";
++	disable-over-current;
++	status = "okay";
++};
+-- 
+1.9.1
