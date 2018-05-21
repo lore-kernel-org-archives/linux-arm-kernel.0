@@ -1,113 +1,36 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 21 May 2018 15:51:29 +0100
-Subject: [PATCH v2 13/40] vfio: Add support for Shared Virtual Addressing
-In-Reply-To: <20180517165845.00000cc9@huawei.com>
+Date: Mon, 21 May 2018 15:52:39 +0100
+Subject: [PATCH v2 35/40] iommu/arm-smmu-v3: Add support for PCI ATS
+In-Reply-To: <922474e8-0aa5-e022-0502-f1e51b0d4859@codeaurora.org>
 References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-14-jean-philippe.brucker@arm.com>
- <20180517165845.00000cc9@huawei.com>
-Message-ID: <5775e215-9a71-355a-98f5-397f1917b7f7@arm.com>
+ <20180511190641.23008-36-jean-philippe.brucker@arm.com>
+ <922474e8-0aa5-e022-0502-f1e51b0d4859@codeaurora.org>
+Message-ID: <08f53ea4-bd39-a567-9c79-f4381e5fb461@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/18 16:58, Jonathan Cameron wrote:
->> +static int vfio_iommu_bind_group(struct vfio_iommu *iommu,
->> +				 struct vfio_group *group,
->> +				 struct vfio_mm *vfio_mm)
->> +{
->> +	int ret;
->> +	bool enabled_sva = false;
->> +	struct vfio_iommu_sva_bind_data data = {
->> +		.vfio_mm	= vfio_mm,
->> +		.iommu		= iommu,
->> +		.count		= 0,
->> +	};
->> +
->> +	if (!group->sva_enabled) {
->> +		ret = iommu_group_for_each_dev(group->iommu_group, NULL,
->> +					       vfio_iommu_sva_init);
->> +		if (ret)
->> +			return ret;
->> +
->> +		group->sva_enabled = enabled_sva = true;
->> +	}
->> +
->> +	ret = iommu_group_for_each_dev(group->iommu_group, &data,
->> +				       vfio_iommu_sva_bind_dev);
->> +	if (ret && data.count > 1)
+Hi Sinan,
+
+On 19/05/18 18:25, Sinan Kaya wrote:
+> Nothing specific about this patch but just a general observation. Last time I
+> looked at the code, it seemed to require both ATS and PRI support from a given
+> hardware.
 > 
-> Are we safe to run this even if data.count == 1?  I assume that at
-> that point we would always not have an iommu domain associated with the
-> device so the initial check would error out.
+> I think you can assume that for ATS 1.1 specification but ATS 1.0 specification
+> allows a system to have ATS+PASID without PRI. 
 
-If data.count == 1, then the first bind didn't succeed. But it's not
-necessarily a domain missing, failure to bind may come from various
-places. If this vfio_mm was already bound to another device then it
-contains a valid PASID and it's safe to call unbind(). Otherwise we call
-it with PASID -1 (VFIO_INVALID_PASID) and that's a bit of a grey area.
--1 is currently invalid everywhere, but in the future someone might
-implement 32 bits of PASIDs, in which case a bond between this dev and
-PASID -1 might exist. But I think it's safe for now, and whoever
-redefines VFIO_INVALID_PASID when such implementation appears will also
-fix this case.
+As far as I know, the latest ATS spec also states that "device that
+supports ATS need not support PRI". I'm referring to the version
+integrated into PCIe v4.0r1.0, which I think corresponds to ATS 1.1.
 
-> Just be nice to get rid of the special casing in this error path as then
-> could just do it all under if (ret) and make it visually clearer these
-> are different aspects of the same error path.
-
-[...]
->>  static long vfio_iommu_type1_ioctl(void *iommu_data,
->>  				   unsigned int cmd, unsigned long arg)
->>  {
->> @@ -1728,6 +2097,44 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->>  
->>  		return copy_to_user((void __user *)arg, &unmap, minsz) ?
->>  			-EFAULT : 0;
->> +
->> +	} else if (cmd == VFIO_IOMMU_BIND) {
->> +		struct vfio_iommu_type1_bind bind;
->> +
->> +		minsz = offsetofend(struct vfio_iommu_type1_bind, flags);
->> +
->> +		if (copy_from_user(&bind, (void __user *)arg, minsz))
->> +			return -EFAULT;
->> +
->> +		if (bind.argsz < minsz)
->> +			return -EINVAL;
->> +
->> +		switch (bind.flags) {
->> +		case VFIO_IOMMU_BIND_PROCESS:
->> +			return vfio_iommu_type1_bind_process(iommu, (void *)arg,
->> +							     &bind);
+> QDF2400 is ATS 1.0 compatible as an example. 
 > 
-> Can we combine these two blocks given it is only this case statement that is different?
+> Is this an assumption / my misinterpretation?
 
-That would be nicer, though I don't know yet what's needed for vSVA (by
-Yi Liu on Cc), which will add statements to the switches.
+In this series you can enable ATS and PASID without PRI. The SMMU
+enables ATS and PASID in add_device() if supported. Then PRI is only
+enabled if users request IOMMU_SVA_FEAT_IOPF in sva_init_device(). If
+the device driver pins all DMA memory, it can use PASID without PRI.
 
 Thanks,
 Jean
-
-> 
->> +		default:
->> +			return -EINVAL;
->> +		}
->> +
->> +	} else if (cmd == VFIO_IOMMU_UNBIND) {
->> +		struct vfio_iommu_type1_bind bind;
->> +
->> +		minsz = offsetofend(struct vfio_iommu_type1_bind, flags);
->> +
->> +		if (copy_from_user(&bind, (void __user *)arg, minsz))
->> +			return -EFAULT;
->> +
->> +		if (bind.argsz < minsz)
->> +			return -EINVAL;
->> +
->> +		switch (bind.flags) {
->> +		case VFIO_IOMMU_BIND_PROCESS:
->> +			return vfio_iommu_type1_unbind_process(iommu, (void *)arg,
->> +							       &bind);
->> +		default:
->> +			return -EINVAL;
->> +		}
->>  	}
