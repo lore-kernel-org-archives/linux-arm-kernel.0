@@ -1,52 +1,122 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 21 May 2018 11:49:58 +0100
-Subject: [PATCH 6/6] arm64: perf: Add support for chaining counters
-In-Reply-To: <5ff704da-b767-33d7-68c4-7aa02f83ac0a@arm.com>
-References: <1526638943-2110-1-git-send-email-suzuki.poulose@arm.com>
- <1526638943-2110-7-git-send-email-suzuki.poulose@arm.com>
- <5ff704da-b767-33d7-68c4-7aa02f83ac0a@arm.com>
-Message-ID: <8fd2f592-c489-8710-92a5-2f4666b1c290@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 21 May 2018 13:54:55 +0300
+Subject: [PATCH v3 2/3] arm64: dts: renesas: draak: Describe CVBS input
+In-Reply-To: <20180521095705.GC4432@w540>
+References: <1526654878-11143-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1569661.saMqNra8vc@avalon> <20180521095705.GC4432@w540>
+Message-ID: <6943843.2osudLfTFd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/18 15:57, Robin Murphy wrote:
-> One more thing now that I've actually looked at the Arm ARM...
-> 
-> On 18/05/18 11:22, Suzuki K Poulose wrote:
-> [...]
->> +static inline void armv8pmu_write_event_type(struct perf_event *event)
->> +{
->> +??? struct hw_perf_event *hwc = &event->hw;
->> +??? int idx = hwc->idx;
->> +
->> +??? /*
->> +???? * For chained events, write the high counter event type
->> +???? * followed by the low counter.
->> +???? */
->> +??? if (armv8pmu_event_is_chained(event)) {
->> +??????? u32 chain_evt = ARMV8_PMUV3_PERFCTR_CHAIN;
->> +
->> +??????? /* Set the filters as that of the main event for chain */
->> +??????? chain_evt |= hwc->config_base & ~ARMV8_PMU_EVTYPE_EVENT;
-> 
-> The description of the chain event says that the filtering must only be set on the lower counter, and that the chain event itself should be set to count everything.
+Hi Jacopo,
 
-You're right. I intended to fix it, but missed in the rebases.
-Thanks for pointing out.
-
+On Monday, 21 May 2018 12:57:05 EEST jacopo mondi wrote:
+> On Fri, May 18, 2018 at 06:12:15PM +0300, Laurent Pinchart wrote:
+> > On Friday, 18 May 2018 17:47:57 EEST Jacopo Mondi wrote:
+> >> Describe CVBS video input through analog video decoder ADV7180
+> >> connected to video input interface VIN4.
+> >> 
+> >> The video input signal path is shared with HDMI video input, and
+> >> selected by on-board switches SW-53 and SW-54 with CVBS input selected
+> >> by the default switches configuration.
+> >> 
+> >> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> >> Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> >> 
+> >> ---
+> >> v2 -> v3:
+> >> - Add comment to describe the shared input video path
+> >> - Add my SoB and Niklas' R-b tags
+> >> ---
+> >> 
+> >>  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 42 +++++++++++++++++++
+> >>  1 file changed, 42 insertions(+)
+> >> 
+> >> diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> >> b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts index 9d73de8..95745fc
+> >> 100644
+> >> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> >> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> >> @@ -142,6 +142,11 @@
+> >>  		groups = "usb0";
+> >>  		function = "usb0";
+> >>  	};
+> >> +
+> >> +	vin4_pins_cvbs: vin4 {
+> >> +		groups = "vin4_data8", "vin4_sync", "vin4_clk";
+> >> +		function = "vin4";
+> >> +	};
+> >>  };
+> >>  
+> >>  &i2c0 {
+> >> @@ -154,6 +159,23 @@
+> >>  		reg = <0x50>;
+> >>  		pagesize = <8>;
+> >>  	};
+> >> +
+> >> +	analog-video at 20 {
+> >> +		compatible = "adi,adv7180";
+> >> +		reg = <0x20>;
+> >> +
+> >> +		port {
+> > 
+> > The adv7180 DT bindings document the output port as 3 or 6 (respectively
+> > for the CP and ST versions of the chip). You should thus number the port.
+> > Apart from that the patch looks good.
 > 
->> +??????? armv8pmu_write_evtype(idx, chain_evt);
->> +??????? isb();
->> +??????? idx--;
->> +??? }
->> +
->> +??? armv8pmu_write_evtype(idx, hwc->config_base);
+> I admit I have barely copied this from Gen-2 boards DTS, but reading
+> the driver code and binding description again, I think this is
+> correct, as the output port numbering and mandatory input port (which
+> is missing here) only apply to adv7180cp/st chip versions.
 > 
-> It also says that the 'real' event should be set up first and the chain event second, with the rather ominous warning of "If software does not program the event in this way, the count becomes UNPREDICTABLE."
-> 
+> Here we describe plain adv7180, no need to number output ports afaict.
 
-Yep, will fix it.
+Indeed, my bad.
 
-Thanks for the review
+Shouldn't you however use "adi,adv7180cp" as that's the chip we are using ? 
+The "adi,adv7180" has no port documented in its DT bindings, so it shouldn't 
+have any port node at all.
 
-Suzuki
+> >> +			/*
+> >> +			 * The VIN4 video input path is shared between
+> >> +			 * CVBS and HDMI inputs through SW[49-54] switches.
+> >> +			 *
+> >> +			 * CVBS is the default selection, link it to VIN4 here.
+> >> +			 */
+> >> +			adv7180_out: endpoint {
+> >> +				remote-endpoint = <&vin4_in>;
+> >> +			};
+> >> +		};
+> >> +	};
+> >>  };
+> >>  
+> >>  &i2c1 {
+> >> @@ -246,3 +268,23 @@
+> >>  	timeout-sec = <60>;
+> >>  	status = "okay";
+> >>  };
+> >> +
+> >> +&vin4 {
+> >> +	pinctrl-0 = <&vin4_pins_cvbs>;
+> >> +	pinctrl-names = "default";
+> >> +
+> >> +	status = "okay";
+> >> +
+> >> +	ports {
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		port at 0 {
+> >> +			reg = <0>;
+> >> +
+> >> +			vin4_in: endpoint {
+> >> +				remote-endpoint = <&adv7180_out>;
+> >> +			};
+> >> +		};
+> >> +	};
+> >> +};
+
+-- 
+Regards,
+
+Laurent Pinchart
