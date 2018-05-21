@@ -1,79 +1,224 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 21 May 2018 16:52:28 +0800
-Subject: [RFT v2 4/4] coresight: Document for CoreSight trace disassembler
-In-Reply-To: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
-References: <1526892748-326-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1526892748-326-5-git-send-email-leo.yan@linaro.org>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Mon, 21 May 2018 12:00:09 +0300
+Subject: [PATCH v8 10/15] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <20180521044938.bnr2sdkmvdorfxqm@vireshk-i7>
+References: <1526555955-29960-1-git-send-email-ilialin@codeaurora.org>
+ <1526555955-29960-11-git-send-email-ilialin@codeaurora.org>
+ <20180518014538.duphof6enscpm5vp@vireshk-i7>
+ <019201d3ef66$db97aed0$92c70c70$@codeaurora.org>
+ <20180521044938.bnr2sdkmvdorfxqm@vireshk-i7>
+Message-ID: <000501d3f0e2$23500c00$69f02400$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit documents CoreSight trace disassembler usage and gives
-example for it.
+Final version (addressing Russel's comment as well):
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- Documentation/trace/coresight.txt | 52 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
 
-diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-index 6f0120c..b8f2359 100644
---- a/Documentation/trace/coresight.txt
-+++ b/Documentation/trace/coresight.txt
-@@ -381,3 +381,55 @@ sort example is from the AutoFDO tutorial (https://gcc.gnu.org/wiki/AutoFDO/Tuto
- 	$ taskset -c 2 ./sort_autofdo
- 	Bubble sorting array of 30000 elements
- 	5806 ms
-+
-+
-+Tracing data disassembler
-+-------------------------
-+
-+'perf script' supports to use script to parse tracing packet and rely on
-+'objdump' for disassembled lines, this can convert tracing data to readable
-+program execution flow for easily reviewing tracing data.
-+
-+The CoreSight trace disassembler is located in the folder:
-+tools/perf/scripts/python/arm-cs-trace-disasm.py.  This script support below
-+options:
-+
-+	-d, --objdump: Set path to objdump executable, this option is
-+		       mandatory.
-+	-k, --vmlinux: Set path to vmlinux file.
-+	-v, --verbose: Enable debugging log, after enable this option the
-+		       script dumps every event data.
-+
-+Below is one example for using python script to dump CoreSight trace
-+disassembler:
-+
-+	$ perf script -s arm-cs-trace-disasm.py -i perf.data \
-+	    -F cpu,event,ip,addr,sym -- -d objdump -k ./vmlinux > cs-disasm.log
-+
-+Below is one example for the disassembler log:
-+
-+ARM CoreSight Trace Data Assembler Dump
-+	ffff000008a5f2dc <etm4_enable_hw+0x344>:
-+	ffff000008a5f2dc:	340000a0 	cbz	w0, ffff000008a5f2f0 <etm4_enable_hw+0x358>
-+	ffff000008a5f2f0 <etm4_enable_hw+0x358>:
-+	ffff000008a5f2f0:	f9400260 	ldr	x0, [x19]
-+	ffff000008a5f2f4:	d5033f9f 	dsb	sy
-+	ffff000008a5f2f8:	913ec000 	add	x0, x0, #0xfb0
-+	ffff000008a5f2fc:	b900001f 	str	wzr, [x0]
-+	ffff000008a5f300:	f9400bf3 	ldr	x19, [sp, #16]
-+	ffff000008a5f304:	a8c27bfd 	ldp	x29, x30, [sp], #32
-+	ffff000008a5f308:	d65f03c0 	ret
-+	ffff000008a5fa18 <etm4_enable+0x1b0>:
-+	ffff000008a5fa18:	14000025 	b	ffff000008a5faac <etm4_enable+0x244>
-+	ffff000008a5faac <etm4_enable+0x244>:
-+	ffff000008a5faac:	b9406261 	ldr	w1, [x19, #96]
-+	ffff000008a5fab0:	52800015 	mov	w21, #0x0                   	// #0
-+	ffff000008a5fab4:	f901ca61 	str	x1, [x19, #912]
-+	ffff000008a5fab8:	2a1503e0 	mov	w0, w21
-+	ffff000008a5fabc:	3940e261 	ldrb	w1, [x19, #56]
-+	ffff000008a5fac0:	f901ce61 	str	x1, [x19, #920]
-+	ffff000008a5fac4:	a94153f3 	ldp	x19, x20, [sp, #16]
-+	ffff000008a5fac8:	a9425bf5 	ldp	x21, x22, [sp, #32]
-+	ffff000008a5facc:	a94363f7 	ldp	x23, x24, [sp, #48]
-+	ffff000008a5fad0:	a8c47bfd 	ldp	x29, x30, [sp], #64
-+	ffff000008a5fad4:	d65f03c0 	ret
--- 
-2.7.4
+
+
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ */
+
+/*
+ * In Certain QCOM SoCs like apq8096 and msm8996 that have KRYO processors,
+ * the CPU frequency subset and voltage value of each OPP varies
+ * based on the silicon variant in use. Qualcomm Process Voltage Scaling
+Tables
+ * defines the voltage and frequency value based on the msm-id in SMEM
+ * and speedbin blown in the efuse combination.
+ * The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the
+SoC
+ * to provide the OPP framework with required information.
+ * This is used to determine the voltage and frequency value for each OPP of
+ * operating-points-v2 table when it is parsed by the OPP framework.
+ */
+
+#include <linux/cpu.h>
+#include <linux/err.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/nvmem-consumer.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
+#include <linux/pm_opp.h>
+#include <linux/slab.h>
+#include <linux/soc/qcom/smem.h>
+
+#define MSM_ID_SMEM	137
+#define SILVER_LEAD	0
+#define GOLD_LEAD	2
+
+enum _msm_id {
+	MSM8996V3 = 0xF6ul,
+	APQ8096V3 = 0x123ul,
+	MSM8996SG = 0x131ul,
+	APQ8096SG = 0x138ul,
+};
+
+enum _msm8996_version {
+	MSM8996_V3,
+	MSM8996_SG,
+	NUM_OF_MSM8996_VERSIONS,
+};
+
+static enum _msm8996_version __init qcom_cpufreq_kryo_get_msm_id(void)
+{
+	size_t len;
+	u32 *msm_id;
+	enum _msm8996_version version;
+
+	msm_id = qcom_smem_get(QCOM_SMEM_HOST_ANY, MSM_ID_SMEM, &len);
+	/* The first 4 bytes are format, next to them is the actual msm-id
+*/
+	msm_id++;
+
+	switch ((enum _msm_id)*msm_id) {
+	case MSM8996V3:
+	case APQ8096V3:
+		version = MSM8996_V3;
+		break;
+	case MSM8996SG:
+	case APQ8096SG:
+		version = MSM8996_SG;
+		break;
+	default:
+		version = NUM_OF_MSM8996_VERSIONS;
+	}
+
+	return version;
+}
+
+static int __init qcom_cpufreq_kryo_driver_init(void)
+{
+	struct device *cpu_dev_silver, *cpu_dev_gold;
+	struct opp_table *opp_silver, *opp_gold;
+	enum _msm8996_version msm8996_version;
+	struct nvmem_cell *speedbin_nvmem;
+	struct platform_device *pdev;
+	struct device_node *np;
+	u8 *speedbin;
+	u32 versions;
+	size_t len;
+	int ret;
+
+	cpu_dev_silver = get_cpu_device(SILVER_LEAD);
+	if (NULL == cpu_dev_silver)
+		return -ENODEV;
+
+	cpu_dev_gold = get_cpu_device(SILVER_LEAD);
+	if (NULL == cpu_dev_gold)
+		return -ENODEV;
+
+	msm8996_version = qcom_cpufreq_kryo_get_msm_id();
+	if (NUM_OF_MSM8996_VERSIONS == msm8996_version) {
+		dev_err(cpu_dev_silver, "Not Snapdragon 820/821!");
+		return -ENODEV;
+	}
+
+	np = dev_pm_opp_of_get_opp_desc_node(cpu_dev_silver);
+	if (IS_ERR(np))
+		return PTR_ERR(np);
+
+	if (!of_device_is_compatible(np, "operating-points-v2-kryo-cpu")) {
+		ret = -ENOENT;
+		goto free_np;
+	}
+
+	speedbin_nvmem = of_nvmem_cell_get(np, NULL);
+	if (IS_ERR(speedbin_nvmem)) {
+		ret = PTR_ERR(speedbin_nvmem);
+		dev_err(cpu_dev_silver, "Could not get nvmem cell: %d\n",
+ret);
+		goto free_np;
+	}
+
+	speedbin = nvmem_cell_read(speedbin_nvmem, &len);
+	nvmem_cell_put(speedbin_nvmem);
+
+	switch (msm8996_version) {
+	case MSM8996_V3:
+		versions = 1 << (unsigned int)(*speedbin);
+		break;
+	case MSM8996_SG:
+		versions = 1 << ((unsigned int)(*speedbin) + 4);
+		break;
+	default:
+		BUG();
+		break;
+	}
+
+	opp_silver =
+dev_pm_opp_set_supported_hw(cpu_dev_silver,&versions,1);
+	if (IS_ERR(opp_silver)) {
+		dev_err(cpu_dev_silver, "Failed to set supported
+hardware\n");
+		ret = PTR_ERR(opp_silver);
+		goto free_np;
+	}
+
+	opp_gold = dev_pm_opp_set_supported_hw(cpu_dev_gold,&versions,1);
+	if (IS_ERR(opp_gold)) {
+		dev_err(cpu_dev_gold, "Failed to set supported hardware\n");
+		ret = PTR_ERR(opp_gold);
+		goto free_opp_silver;
+	}
+
+	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+	if (!IS_ERR(pdev))
+		return 0;
+
+	ret = PTR_ERR(pdev);
+	dev_err(cpu_dev_silver, "Failed to register platform device\n");
+	dev_pm_opp_put_supported_hw(opp_gold);
+
+free_opp_silver:
+	dev_pm_opp_put_supported_hw(opp_silver);
+
+free_np:
+	of_node_put(np);
+
+	return ret;
+}
+late_initcall(qcom_cpufreq_kryo_driver_init);
+
+MODULE_DESCRIPTION("Qualcomm Technologies, Inc. Kryo CPUfreq driver");
+MODULE_LICENSE("GPL v2");
+
+
+
+
+
+
+> -----Original Message-----
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Sent: Monday, May 21, 2018 07:50
+> To: ilialin at codeaurora.org
+> Cc: mturquette at baylibre.com; sboyd at kernel.org; robh at kernel.org;
+> mark.rutland at arm.com; nm at ti.com; lgirdwood at gmail.com;
+> broonie at kernel.org; andy.gross at linaro.org; david.brown at linaro.org;
+> catalin.marinas at arm.com; will.deacon at arm.com; rjw at rjwysocki.net; linux-
+> clk at vger.kernel.org; devicetree at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-pm at vger.kernel.org; linux-arm-
+> msm at vger.kernel.org; linux-soc at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; rnayak at codeaurora.org;
+> amit.kucheria at linaro.org; nicolas.dechesne at linaro.org;
+> celster at codeaurora.org; tfinkel at codeaurora.org
+> Subject: Re: [PATCH v8 10/15] cpufreq: Add Kryo CPU scaling driver
+> 
+> On 19-05-18, 14:45, ilialin at codeaurora.org wrote:
+> > Hi Viresh,
+> >
+> > If I send patches in reply, it will produce new patches, instead of
+> > answers in the thread. Please find below the file dump.
+> 
+> There is one email from you which appears to be just fine and appears to
+be
+> in reply to this thread only. Maybe its your email client that screwed it
+up for
+> you ? Things look good in mutt.
+> 
+> --
+> viresh
