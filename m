@@ -1,46 +1,184 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Mon, 21 May 2018 09:48:23 -0400
-Subject: [PATCH] EDAC, ghes: Make platform-based whitelisting x86-only
-In-Reply-To: <20180518112028.GD17285@pd.tnic>
-References: <1526039543-180996-1-git-send-email-zhengqiang10@huawei.com>
- <20180511121901.GA12705@pd.tnic> <5AF90C70.408@huawei.com>
- <20180514094709.GC23049@pd.tnic>
- <cb24735c-d251-4dd2-a02f-91e476776824@arm.com>
- <20180514164720.GH23049@pd.tnic>
- <da776696-ddbf-c35e-1dd4-b6e0ce91aed6@arm.com>
- <20180516182958.GB17092@pd.tnic>
- <8602b133-e0fa-57e2-5159-9d34a1ded85f@arm.com>
- <20180518111132.GC17285@pd.tnic> <20180518112028.GD17285@pd.tnic>
-Message-ID: <b1d606dc-527c-6a7d-ce80-a11ac852a5f9@codeaurora.org>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Mon, 21 May 2018 15:50:32 +0200
+Subject: [PATCH v6 3/5] soc: rockchip: split rockchip_typec_phy struct to
+ separate header
+In-Reply-To: <1526895424-22894-3-git-send-email-hl@rock-chips.com>
+References: <1526895424-22894-1-git-send-email-hl@rock-chips.com>
+ <1526895424-22894-3-git-send-email-hl@rock-chips.com>
+Message-ID: <CAFqH_51DrUQh24XWJ2=MAi8EiGCdiK3dKTV_YexRJawJHN7H0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/18/2018 7:20 AM, Borislav Petkov wrote:
-> From: Borislav Petkov <bp@suse.de>
+Hi Lin,
+
+2018-05-21 11:37 GMT+02:00 Lin Huang <hl@rock-chips.com>:
+> we may use rockchip_phy_typec struct in other driver, so split
+> it to separate header.
 >
-> ARM machines all have DMI tables so if they request hw error reporting
-> through GHES, then the driver should be able to detect DIMMs and report
-> errors successfully (famous last words :)).
+
+That patch does more than just split some structs to a public header,
+it also introduces new structs and new parameters related to the
+phy_config feature. IMHO you should first move the current structs and
+introduce the new phy_config stuff in the following patch (4/5). I am
+not sure about the maintainer preferences, but at least, if the
+maintainer is fine like is now, I'd explain that you introduce new
+elements in the commit message.
+
+Best regards,
+ Enric
+
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v2:
+> - None
+> Changes in v3:
+> - None
+> Changes in v4:
+> - None
+> Changes in v5:
+> - None
+> Changes in v6:
+> - new patch here
 >
-> Make the platform-based list x86-specific so that ghes_edac can load on
-> ARM.
+>  drivers/phy/rockchip/phy-rockchip-typec.c | 47 +----------------------
+>  include/soc/rockchip/rockchip_phy_typec.h | 63 +++++++++++++++++++++++++++++++
+>  2 files changed, 64 insertions(+), 46 deletions(-)
+>  create mode 100644 include/soc/rockchip/rockchip_phy_typec.h
 >
-> Signed-off-by: Borislav Petkov <bp@suse.de>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> Tested-by: James Morse <james.morse@arm.com>
-> Cc: Qiang Zheng <zhengqiang10@huawei.com>
-Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-
-Was it intentional to make idx=0 so that the pr_info later in this function no 
-longer hits?
-
-I don't see an issue with not printing out the long BIOS statement, but the 
-number of DIMM sockets print could still be useful.
-
-Thanks,
-Tyler
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
+> index 76a4b58..795055f 100644
+> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
+> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
+> @@ -63,6 +63,7 @@
+>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/phy/phy.h>
+> +#include <soc/rockchip/rockchip_phy_typec.h>
+>
+>  #define CMN_SSM_BANDGAP                        (0x21 << 2)
+>  #define CMN_SSM_BIAS                   (0x22 << 2)
+> @@ -349,52 +350,6 @@
+>  #define MODE_DFP_USB                   BIT(1)
+>  #define MODE_DFP_DP                    BIT(2)
+>
+> -struct usb3phy_reg {
+> -       u32 offset;
+> -       u32 enable_bit;
+> -       u32 write_enable;
+> -};
+> -
+> -/**
+> - * struct rockchip_usb3phy_port_cfg: usb3-phy port configuration.
+> - * @reg: the base address for usb3-phy config.
+> - * @typec_conn_dir: the register of type-c connector direction.
+> - * @usb3tousb2_en: the register of type-c force usb2 to usb2 enable.
+> - * @external_psm: the register of type-c phy external psm clock.
+> - * @pipe_status: the register of type-c phy pipe status.
+> - * @usb3_host_disable: the register of type-c usb3 host disable.
+> - * @usb3_host_port: the register of type-c usb3 host port.
+> - * @uphy_dp_sel: the register of type-c phy DP select control.
+> - */
+> -struct rockchip_usb3phy_port_cfg {
+> -       unsigned int reg;
+> -       struct usb3phy_reg typec_conn_dir;
+> -       struct usb3phy_reg usb3tousb2_en;
+> -       struct usb3phy_reg external_psm;
+> -       struct usb3phy_reg pipe_status;
+> -       struct usb3phy_reg usb3_host_disable;
+> -       struct usb3phy_reg usb3_host_port;
+> -       struct usb3phy_reg uphy_dp_sel;
+> -};
+> -
+> -struct rockchip_typec_phy {
+> -       struct device *dev;
+> -       void __iomem *base;
+> -       struct extcon_dev *extcon;
+> -       struct regmap *grf_regs;
+> -       struct clk *clk_core;
+> -       struct clk *clk_ref;
+> -       struct reset_control *uphy_rst;
+> -       struct reset_control *pipe_rst;
+> -       struct reset_control *tcphy_rst;
+> -       const struct rockchip_usb3phy_port_cfg *port_cfgs;
+> -       /* mutex to protect access to individual PHYs */
+> -       struct mutex lock;
+> -
+> -       bool flip;
+> -       u8 mode;
+> -};
+> -
+>  struct phy_reg {
+>         u16 value;
+>         u32 addr;
+> diff --git a/include/soc/rockchip/rockchip_phy_typec.h b/include/soc/rockchip/rockchip_phy_typec.h
+> new file mode 100644
+> index 0000000..be6af0e
+> --- /dev/null
+> +++ b/include/soc/rockchip/rockchip_phy_typec.h
+> @@ -0,0 +1,63 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
+> + * Author: Lin Huang <hl@rock-chips.com>
+> + */
+> +
+> +#ifndef __SOC_ROCKCHIP_PHY_TYPEC_H
+> +#define __SOC_ROCKCHIP_PHY_TYPEC_H
+> +
+> +struct usb3phy_reg {
+> +       u32 offset;
+> +       u32 enable_bit;
+> +       u32 write_enable;
+> +};
+> +
+> +/**
+> + * struct rockchip_usb3phy_port_cfg: usb3-phy port configuration.
+> + * @reg: the base address for usb3-phy config.
+> + * @typec_conn_dir: the register of type-c connector direction.
+> + * @usb3tousb2_en: the register of type-c force usb2 to usb2 enable.
+> + * @external_psm: the register of type-c phy external psm clock.
+> + * @pipe_status: the register of type-c phy pipe status.
+> + * @usb3_host_disable: the register of type-c usb3 host disable.
+> + * @usb3_host_port: the register of type-c usb3 host port.
+> + * @uphy_dp_sel: the register of type-c phy DP select control.
+> + */
+> +struct rockchip_usb3phy_port_cfg {
+> +       unsigned int reg;
+> +       struct usb3phy_reg typec_conn_dir;
+> +       struct usb3phy_reg usb3tousb2_en;
+> +       struct usb3phy_reg external_psm;
+> +       struct usb3phy_reg pipe_status;
+> +       struct usb3phy_reg usb3_host_disable;
+> +       struct usb3phy_reg usb3_host_port;
+> +       struct usb3phy_reg uphy_dp_sel;
+> +};
+> +
+> +struct phy_config {
+> +       int swing;
+> +       int pe;
+> +};
+> +
+> +struct rockchip_typec_phy {
+> +       struct device *dev;
+> +       void __iomem *base;
+> +       struct extcon_dev *extcon;
+> +       struct regmap *grf_regs;
+> +       struct clk *clk_core;
+> +       struct clk *clk_ref;
+> +       struct reset_control *uphy_rst;
+> +       struct reset_control *pipe_rst;
+> +       struct reset_control *tcphy_rst;
+> +       const struct rockchip_usb3phy_port_cfg *port_cfgs;
+> +       /* mutex to protect access to individual PHYs */
+> +       struct mutex lock;
+> +       struct phy_config config[3][4];
+> +       bool flip;
+> +       u8 mode;
+> +       int (*typec_phy_config)(struct phy *phy, int link_rate,
+> +                               int lanes, u8 swing, u8 pre_emp);
+> +};
+> +
+> +#endif
+> --
+> 2.7.4
+>
