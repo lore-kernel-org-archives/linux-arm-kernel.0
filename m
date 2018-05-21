@@ -1,105 +1,213 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 21 May 2018 13:57:11 -0700
-Subject: [alsa-devel] [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO
- lookup table
-In-Reply-To: <19579964.NkVAqtTb47@z50>
-References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
- <20180520192705.GA12883@lenoch> <20180520200822.GA119427@dtor-ws>
- <19579964.NkVAqtTb47@z50>
-Message-ID: <20180521205711.GA74396@dtor-ws>
+From: chunkeey@gmail.com (Christian Lamparter)
+Date: Mon, 21 May 2018 22:57:38 +0200
+Subject: [PATCH v5 3/4] ARM: dts: qcom: add gpio-ranges property
+In-Reply-To: <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
+References: <910e5a85a6a8020069996e2ff397c93e9c5fe18c.1526935804.git.chunkeey@gmail.com>
+Message-ID: <0ae3376606a89bcdf3fe753a5c967f7103699e09.1526935804.git.chunkeey@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 21, 2018 at 10:21:46PM +0200, Janusz Krzysztofik wrote:
-> On Sunday, May 20, 2018 10:08:22 PM CEST Dmitry Torokhov wrote:
-> > On Sun, May 20, 2018 at 09:27:05PM +0200, Ladislav Michl wrote:
-> > > On Sat, May 19, 2018 at 11:55:51PM +0200, Janusz Krzysztofik wrote:
-> > > > On Saturday, May 19, 2018 8:00:38 PM CEST Andy Shevchenko wrote:
-> > > > > On Sat, May 19, 2018 at 2:15 AM, Janusz Krzysztofik
-> > > > > <jmkrzyszt@gmail.com>
-> > > > 
-> > > > wrote:
-> > > > > > On Friday, May 18, 2018 11:21:14 PM CEST Andy Shevchenko wrote:
-> > > > > >> On Sat, May 19, 2018 at 12:09 AM, Janusz Krzysztofik
-> > > > > >> 
-> > > > > >> <jmkrzyszt@gmail.com> wrote:
-> > > > > >> > +       gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy",
-> > > > > >> > GPIOD_IN);
-> > > > > >> > +       if (!IS_ERR_OR_NULL(gpiod_rdy)) {
-> > > > > >> 
-> > > > > >> So, is it optional or not at the end?
-> > > > > >> If it is, why do we check for NULL?
-> > > > > > 
-> > > > > > As far as I can understand, nand_chip->dev_ready() callback is
-> > > > > > optional.
-> > > > > > That's why I decided to use the _optional variant of
-> > > > > > devm_gpiod_get(). In
-> > > > > > case of ams-delta, the dev_ready() callback depends on availability
-> > > > > > of
-> > > > > > the 'rdy' GPIO pin. As a consequence, I'm checking for both NULL and
-> > > > > > ERR
-> > > > > > in order to decide if dev_ready() will be supported.
-> > > > > > 
-> > > > > > I can pretty well replace it with the standard form and check for
-> > > > > > ERR only
-> > > > > > if the purpose of the _optional form is different.
-> > > > > 
-> > > > > NULL check in practice discards the _optional part of gpiod_get(). So,
-> > > > > either you use non-optional variant and decide how to handle an
-> > > > > errors, or user _optional w/o NULL check.
-> > > > 
-> > > > OK, I'm going to use something like the below while submitting v2:
-> > > > 
-> > > > -	gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
-> > > > -	if (!IS_ERR_OR_NULL(gpiod_rdy)) {
-> > > > -		this->dev_ready = ams_delta_nand_ready;
-> > > > -	} else {
-> > > > -		this->dev_ready = NULL;
-> > > > -		pr_notice("Couldn't request gpio for Delta NAND ready.\n");
-> > > > +	priv->gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy",
-> > > > +						  GPIOD_IN);
-> > > > +	if (IS_ERR(priv->gpiod_rdy)) {
-> > > > +		err = PTR_ERR(priv->gpiod_nwp);
-> > > 
-> > > ??? --------------------------------^^^^^^^^^
-> > > 
-> > > > +		dev_warn(&pdev->dev, "RDY GPIO request failed (%d)\n", err);
-> > > > +		goto err_gpiod;
-> > > 
-> > > Driver will just use worst case delay instead of RDY signal, so this
-> > > is perhaps too strict. I will work with degraded performance.
-> > 
-> > If RDY signal is not available then the board should not define it.
-> > Degrading performance and having users wondering because RDY is
-> > sometimes not available is not great. Especially if we get -EPROBE_DEFER
-> > here.
-> 
-> Hi,
-> 
-> I'm a bit lost after your comments.
-> 
-> As far as I can read the code of gpiod_get_optional and underlying functions, 
-> if a board doesn't define the "rdy" pin in a respective lookup table, the 
-> function returns NULL and the device gets a chance to work in degraded mode.
-> 
-> NULL may also happen if the driver probes the device before the lookup table 
-> is added. In that case other non-optional pin requests fail with -ENOENT, the 
-> probe is deferred and the device gets a chance to probe successfully in 
-> late_init if the table is added but fails if not.
-> 
-> If the pin is defined but GPIO device providing that pin is not available 
-> (-ENODEV), the probe is initially deferred and may succeed in late_init if the 
-> GPIO device appears but fails otherwise. 
-> 
-> Isn't that behavior acceptable, close enough to the expected even if not 
-> strictly because of that -EPROBE_DEFER?
+This patch adds the gpio-ranges property to almost all of
+the Qualcomm ARM platforms that utilize the pinctrl-msm
+framework.
 
-Yes, this is correct. I was responding to the comment that erroring out
-in "if (IS_ERR(priv->gpiod_rdy))" branch is too strict. My assertion
-that it is not. If a board defines RDY pin we should use it and not try
-to degrade to lower performance mode.
+The gpio-ranges property is part of the gpiolib subsystem.
+As a result, the binding text is available in section
+"2.1 gpio- and pin-controller interaction" of
+Documentation/devicetree/bindings/gpio/gpio.txt
 
-Thanks.
+For more information please see the patch titled:
+"pinctrl: msm: fix gpio-hog related boot issues" from
+this series.
 
+Reported-by: Sven Eckelmann <sven.eckelmann@openmesh.com>
+Tested-by: Sven Eckelmann <sven.eckelmann@openmesh.com> [ipq4019]
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
+
+---
+To help with git bisect, the DT update patch has been intentionally
+placed after the "pinctrl: msm: fix gpio-hog related boot issues".
+Otherwise - if the order was reveresed - and bisect decides to split
+between these two patches, the gpiochip_add_pin_ranges() function
+will be executed twice with the same parameters for the same pinctrl.
+---
+ arch/arm/boot/dts/qcom-apq8064.dtsi   | 1 +
+ arch/arm/boot/dts/qcom-apq8084.dtsi   | 1 +
+ arch/arm/boot/dts/qcom-ipq4019.dtsi   | 1 +
+ arch/arm/boot/dts/qcom-ipq8064.dtsi   | 1 +
+ arch/arm/boot/dts/qcom-mdm9615.dtsi   | 1 +
+ arch/arm/boot/dts/qcom-msm8660.dtsi   | 1 +
+ arch/arm/boot/dts/qcom-msm8960.dtsi   | 1 +
+ arch/arm/boot/dts/qcom-msm8974.dtsi   | 1 +
+ arch/arm64/boot/dts/qcom/ipq8074.dtsi | 3 ++-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
+ arch/arm64/boot/dts/qcom/msm8992.dtsi | 1 +
+ arch/arm64/boot/dts/qcom/msm8994.dtsi | 1 +
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 1 +
+ 13 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 5341a39c0392..4001eeb52f20 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -344,6 +344,7 @@
+ 			reg = <0x800000 0x4000>;
+ 
+ 			gpio-controller;
++			gpio-ranges = <&tlmm_pinmux 0 0 90>;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+index 0e1e98707e3f..d9481d083802 100644
+--- a/arch/arm/boot/dts/qcom-apq8084.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+@@ -396,6 +396,7 @@
+ 			compatible = "qcom,apq8084-pinctrl";
+ 			reg = <0xfd510000 0x4000>;
+ 			gpio-controller;
++			gpio-ranges = <&tlmm 0 0 147>;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+index 10d112a4078e..9a81d2da87a0 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -146,6 +146,7 @@
+ 			compatible = "qcom,ipq4019-pinctrl";
+ 			reg = <0x01000000 0x300000>;
+ 			gpio-controller;
++			gpio-ranges = <&tlmm 0 0 100>;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+index 1e0a3b446f7a..26eab9a68d90 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+@@ -108,6 +108,7 @@
+ 			reg = <0x800000 0x4000>;
+ 
+ 			gpio-controller;
++			gpio-ranges = <&qcom_pinmux 0 0 69>;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+diff --git a/arch/arm/boot/dts/qcom-mdm9615.dtsi b/arch/arm/boot/dts/qcom-mdm9615.dtsi
+index c852b69229c9..cfdaca5f259a 100644
+--- a/arch/arm/boot/dts/qcom-mdm9615.dtsi
++++ b/arch/arm/boot/dts/qcom-mdm9615.dtsi
+@@ -128,6 +128,7 @@
+ 		msmgpio: pinctrl at 800000 {
+ 			compatible = "qcom,mdm9615-pinctrl";
+ 			gpio-controller;
++			gpio-ranges = <&msmgpio 0 0 88>;
+ 			#gpio-cells = <2>;
+ 			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-controller;
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 33030f9419fe..47cf9c4ca062 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -110,6 +110,7 @@
+ 			reg = <0x800000 0x4000>;
+ 
+ 			gpio-controller;
++			gpio-ranges = <&tlmm 0 0 173>;
+ 			#gpio-cells = <2>;
+ 			interrupts = <0 16 0x4>;
+ 			interrupt-controller;
+diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
+index 1733d8f40ab1..f6d8b1af5a8a 100644
+--- a/arch/arm/boot/dts/qcom-msm8960.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
+@@ -102,6 +102,7 @@
+ 		msmgpio: pinctrl at 800000 {
+ 			compatible = "qcom,msm8960-pinctrl";
+ 			gpio-controller;
++			gpio-ranges = <&msmgpio 0 0 152>;
+ 			#gpio-cells = <2>;
+ 			interrupts = <0 16 0x4>;
+ 			interrupt-controller;
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index d9019a49b292..1250e071a6e2 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -696,6 +696,7 @@
+ 			compatible = "qcom,msm8974-pinctrl";
+ 			reg = <0xfd510000 0x4000>;
+ 			gpio-controller;
++			gpio-ranges = <&msmgpio 0 0 146>;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+index 2bc5dec5614d..d2c36b467466 100644
+--- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
++++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+@@ -24,11 +24,12 @@
+ 		ranges = <0 0 0 0xffffffff>;
+ 		compatible = "simple-bus";
+ 
+-		pinctrl at 1000000 {
++		tlmm: pinctrl at 1000000 {
+ 			compatible = "qcom,ipq8074-pinctrl";
+ 			reg = <0x1000000 0x300000>;
+ 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+ 			gpio-controller;
++			gpio-ranges = <&tlmm 0 0 70>;
+ 			#gpio-cells = <0x2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <0x2>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 66b318e1de80..9d5320b26188 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -326,6 +326,7 @@
+ 			reg = <0x1000000 0x300000>;
+ 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+ 			gpio-controller;
++			gpio-ranges = <&msmgpio 0 0 122>;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8992.dtsi b/arch/arm64/boot/dts/qcom/msm8992.dtsi
+index 171578747ed0..173b6bc60816 100644
+--- a/arch/arm64/boot/dts/qcom/msm8992.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8992.dtsi
+@@ -179,6 +179,7 @@
+ 			reg = <0xfd510000 0x4000>;
+ 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+ 			gpio-controller;
++			gpio-ranges = <&msmgpio 0 0 146>;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8994.dtsi b/arch/arm64/boot/dts/qcom/msm8994.dtsi
+index f33c41d01c86..68705db4696b 100644
+--- a/arch/arm64/boot/dts/qcom/msm8994.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8994.dtsi
+@@ -141,6 +141,7 @@
+ 			reg = <0xfd510000 0x4000>;
+ 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+ 			gpio-controller;
++			gpio-ranges = <&msmgpio 0 0 146>;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 410ae787ebb4..b9b57808fc67 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -541,6 +541,7 @@
+ 			reg = <0x01010000 0x300000>;
+ 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+ 			gpio-controller;
++			gpio-ranges = <&msmgpio 0 0 150>;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
 -- 
-Dmitry
+2.17.0
