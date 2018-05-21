@@ -1,59 +1,62 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 21 May 2018 12:45:22 +0100
-Subject: [PATCH v3 1/6] arm64: cpufeature: Allow early detect of specific
- features
-In-Reply-To: <1526902515-13769-2-git-send-email-julien.thierry@arm.com>
-References: <1526902515-13769-1-git-send-email-julien.thierry@arm.com>
- <1526902515-13769-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <697af68e-3cee-4d0d-8493-106cc42eed3b@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 21 May 2018 13:45:58 +0200
+Subject: [GIT PULL] Allwinner arm64 changes for 4.18
+Message-ID: <20180521114558.ozkb4ftf4p56ov7c@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/18 12:35, Julien Thierry wrote:
-> From: Daniel Thompson <daniel.thompson@linaro.org>
-> 
-> Currently it is not possible to detect features of the boot CPU
-> until the other CPUs have been brought up.
-> 
-> This prevents us from reacting to features of the boot CPU until
-> fairly late in the boot process. To solve this we allow a subset
-> of features (that are likely to be common to all clusters) to be
-> detected based on the boot CPU alone.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
-> 			 duplicates between early features and normal
-> 			 features]
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Hi Arnd, Olof,
 
-nit: Since this is completely different from what Daniel started with,
-you could simply reset the author to yourself. The boot CPU feature was
-added keeping this user in mind.
+Here is our bunch of arm64 DT changes for the next merge window.
 
-The patch as such looks good to me.
+Thanks!
+Maxime
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-> ---
->   arch/arm64/kernel/cpufeature.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 9d1b06d..e03e897 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1030,7 +1030,7 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
->   	{
->   		.desc = "GIC system register CPU interface",
->   		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
-> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-> +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
->   		.matches = has_useable_gicv3_cpuif,
->   		.sys_reg = SYS_ID_AA64PFR0_EL1,
->   		.field_pos = ID_AA64PFR0_GIC_SHIFT,
-> --
-> 1.9.1
-> 
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
+
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt64-for-4.18
+
+for you to fetch changes up to 17ebc33afc35094f779ddca92ffcbda800365574:
+
+  arm64: allwinner: h6: add PCF8563 RTC on Pine H64 board (2018-05-04 17:12:13 +0200)
+
+----------------------------------------------------------------
+Allwinner arm64 changes for 4.18
+
+We mostly have some changes to support the H6, Allwinner latest SoC. We're
+still in the preliminary phase, with I2C, pinctrl and clock support.
+
+----------------------------------------------------------------
+Icenowy Zheng (6):
+      arm64: allwinner: h6: restore the usage of CCU slice macros
+      arm64: allwinner: h6: add PRCM CCU device node
+      arm64: allwinner: h6: add node for R_PIO pin controller
+      arm64: allwinner: h6: add R_INTC interrupt controller
+      arm64: allwinner: h6: add R_I2C controller
+      arm64: allwinner: h6: add PCF8563 RTC on Pine H64 board
+
+Jagan Teki (2):
+      arm64: dts: allwinner: axp803: Add drivevbus regulator
+      arm64: dts: allwinner: a64: bananapi-m64: add usb otg
+
+ arch/arm64/boot/dts/allwinner/axp803.dtsi          |  5 ++
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 21 +++++++
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 10 ++++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       | 70 +++++++++++++++++++---
+ 4 files changed, 97 insertions(+), 9 deletions(-)
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180521/b21ded97/attachment.sig>
