@@ -1,35 +1,34 @@
 From: ilialin@codeaurora.org (Ilia Lin)
-Date: Mon, 21 May 2018 14:25:19 +0300
-Subject: [PATCH v9 02/15] clk: qcom: Make clk_alpha_pll_configure available to
- modules
+Date: Mon, 21 May 2018 14:25:20 +0300
+Subject: [PATCH v9 03/15] clk: Use devm_ in the register fixed factor clock
 In-Reply-To: <1526901932-9514-1-git-send-email-ilialin@codeaurora.org>
 References: <1526901932-9514-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1526901932-9514-3-git-send-email-ilialin@codeaurora.org>
+Message-ID: <1526901932-9514-4-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@codeaurora.org>
+Use devm_clk_hw_register instead of clk_hw_register
+to simplify the usage of this API. This way drivers that call
+the clk_hw_register_fixed_factor won't need to maintain
+a data structure for further cleanup.
 
-Allow clk_alpha_pll_configure to be called from loadable
-kernel modules.
-
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
 ---
- drivers/clk/qcom/clk-alpha-pll.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/clk-fixed-factor.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
-index 9722b70..57f2084 100644
---- a/drivers/clk/qcom/clk-alpha-pll.c
-+++ b/drivers/clk/qcom/clk-alpha-pll.c
-@@ -228,6 +228,7 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
- 	if (pll->flags & SUPPORTS_FSM_MODE)
- 		qcom_pll_set_fsm_mode(regmap, PLL_MODE(pll), 6, 0);
- }
-+EXPORT_SYMBOL_GPL(clk_alpha_pll_configure);
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index a5d402d..8e39bda 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -94,7 +94,7 @@ struct clk_hw *clk_hw_register_fixed_factor(struct device *dev,
+ 	init.num_parents = 1;
  
- static int clk_alpha_pll_hwfsm_enable(struct clk_hw *hw)
- {
+ 	hw = &fix->hw;
+-	ret = clk_hw_register(dev, hw);
++	ret = devm_clk_hw_register(dev, hw);
+ 	if (ret) {
+ 		kfree(fix);
+ 		hw = ERR_PTR(ret);
 -- 
 1.9.1
