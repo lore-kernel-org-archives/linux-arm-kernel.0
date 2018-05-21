@@ -1,58 +1,44 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 21 May 2018 13:53:05 +0200
-Subject: [GIT PULL] Allwinner fixes for 4.17
-Message-ID: <20180521115305.6ebm26zqx4a3rftv@flea>
+From: manu@freebsd.org (Emmanuel Vadot)
+Date: Mon, 21 May 2018 13:54:13 +0200
+Subject: [PATCH v2] ARM64: dts: sun50i: a64: Add spi flash node for sopine
+Message-ID: <20180521115413.92070-1-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+The Sopine and Pine64-LTS have a winbond w25q128 spi flash on spi0.
+Add a node for it.
 
-Here are our fixes for the 4.17 release.
+Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+---
+Changes in v2:
+ - Only use the compatible 'jedec,spi-nor' since the device answer to
+ the jedec command 0x9F
 
-Thanks!
-Maxime
+ arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git sunxi-fixes-for-4.17
-
-for you to fetch changes up to d89ad4f0b44dde8c5333ef7a5d5824829cc72de3:
-
-  ARM: sun8i: v3s: fix spelling mistake: "disbaled" -> "disabled" (2018-05-02 14:10:58 +0200)
-
-----------------------------------------------------------------
-Allwinner fixes for 4.17
-
-Here is a bunch of fixes for merge issues, typos and wrong clocks being
-described for simplefb, resulting in non-working displays.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (1):
-      ARM: dts: sun8i: h3: Re-enable EMAC on Orange Pi One
-
-Colin Ian King (1):
-      ARM: sun8i: v3s: fix spelling mistake: "disbaled" -> "disabled"
-
-Pascal Roeleven (1):
-      ARM: dts: sun4i: Fix incorrect clocks for displays
-
- arch/arm/boot/dts/sun4i-a10.dtsi                   | 6 +++---
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        | 1 +
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 2 +-
- 3 files changed, 5 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
+index 43418bd881d8..b94f93c04acb 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
+@@ -66,6 +66,18 @@
+ 	};
+ };
+ 
++&spi0  {
++	status = "okay";
++
++	flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <40000000>;
++	};
++};
++
+ #include "axp803.dtsi"
+ 
+ &reg_aldo2 {
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180521/67e3a62e/attachment.sig>
+2.17.0
