@@ -1,184 +1,249 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Mon, 21 May 2018 15:50:32 +0200
-Subject: [PATCH v6 3/5] soc: rockchip: split rockchip_typec_phy struct to
- separate header
-In-Reply-To: <1526895424-22894-3-git-send-email-hl@rock-chips.com>
-References: <1526895424-22894-1-git-send-email-hl@rock-chips.com>
- <1526895424-22894-3-git-send-email-hl@rock-chips.com>
-Message-ID: <CAFqH_51DrUQh24XWJ2=MAi8EiGCdiK3dKTV_YexRJawJHN7H0A@mail.gmail.com>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Mon, 21 May 2018 09:51:27 -0400
+Subject: [PATCH v6 4/9] counter: 104-quad-8: Add Generic Counter
+ interface support
+In-Reply-To: <20180520164253.5432d2a4@archlinux>
+References: <cover.1526487615.git.vilhelm.gray@gmail.com>
+ <881ede525a87ef68fad76cc757ce0ba72df03e5a.1526487615.git.vilhelm.gray@gmail.com>
+ <20180520164253.5432d2a4@archlinux>
+Message-ID: <20180521135127.GC5723@sophia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lin,
+On Sun, May 20, 2018 at 04:42:53PM +0100, Jonathan Cameron wrote:
+>On Wed, 16 May 2018 13:51:25 -0400
+>William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
+>
+>> This patch adds support for the Generic Counter interface to the
+>> 104-QUAD-8 driver. The existing 104-QUAD-8 device interface should not
+>> be affected by this patch; all changes are intended as supplemental
+>> additions as perceived by the user.
+>> 
+>> Generic Counter Counts are created for the eight quadrature channel
+>> counts, as well as their respective quadrature A and B Signals (which
+>> are associated via respective Synapse structures) and respective index
+>> Signals.
+>> 
+>> The new Generic Counter interface sysfs attributes are intended to
+>> expose the same functionality and data available via the existing
+>> 104-QUAD-8 IIO device interface; the Generic Counter interface serves
+>> to provide the respective functionality and data in a standard way
+>> expected of counter devices.
+>> 
+>> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+>
+>A few general comments that applied just as well to the original driver
+>as they do to the modified version.
+>
+>I wonder if this would be easier to review as two patches.
+>Move the driver then add the counter interfaces?
+>
+>Right now people kind of have to review the old IIO driver and
+>all the new stuff which is a big job..
+>
+>Jonathan
 
-2018-05-21 11:37 GMT+02:00 Lin Huang <hl@rock-chips.com>:
-> we may use rockchip_phy_typec struct in other driver, so split
-> it to separate header.
->
+This looks like more simple cleanup, so I expect to incorporate your
+suggestions without problem here as well. I'll also try to make the code
+easier to read by writing some defines for the magic numbers throughout.
 
-That patch does more than just split some structs to a public header,
-it also introduces new structs and new parameters related to the
-phy_config feature. IMHO you should first move the current structs and
-introduce the new phy_config stuff in the following patch (4/5). I am
-not sure about the maintainer preferences, but at least, if the
-maintainer is fine like is now, I'd explain that you introduce new
-elements in the commit message.
+William Breathitt Gray
 
-Best regards,
- Enric
-
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v2:
-> - None
-> Changes in v3:
-> - None
-> Changes in v4:
-> - None
-> Changes in v5:
-> - None
-> Changes in v6:
-> - new patch here
+>> ---
+>>  MAINTAINERS                      |    4 +-
+>>  drivers/counter/104-quad-8.c     | 1335 ++++++++++++++++++++++++++++++
+>>  drivers/counter/Kconfig          |   21 +
+>>  drivers/counter/Makefile         |    2 +
+>>  drivers/iio/counter/104-quad-8.c |  596 -------------
+>>  drivers/iio/counter/Kconfig      |   17 -
+>>  drivers/iio/counter/Makefile     |    1 -
+>>  7 files changed, 1360 insertions(+), 616 deletions(-)
+>>  create mode 100644 drivers/counter/104-quad-8.c
+>>  delete mode 100644 drivers/iio/counter/104-quad-8.c
+>> 
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 7a01aa63fb33..f11bf7885aeb 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -266,12 +266,12 @@ L:	linux-gpio at vger.kernel.org
+>>  S:	Maintained
+>>  F:	drivers/gpio/gpio-104-idio-16.c
+>>  
+>> -ACCES 104-QUAD-8 IIO DRIVER
+>> +ACCES 104-QUAD-8 DRIVER
+>>  M:	William Breathitt Gray <vilhelm.gray@gmail.com>
+>>  L:	linux-iio at vger.kernel.org
+>>  S:	Maintained
+>>  F:	Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
+>> -F:	drivers/iio/counter/104-quad-8.c
+>> +F:	drivers/counter/104-quad-8.c
+>>  
+>>  ACCES PCI-IDIO-16 GPIO DRIVER
+>>  M:	William Breathitt Gray <vilhelm.gray@gmail.com>
+>> diff --git a/drivers/counter/104-quad-8.c b/drivers/counter/104-quad-8.c
+>> new file mode 100644
+>> index 000000000000..7c72fb72d660
+>> --- /dev/null
+>> +++ b/drivers/counter/104-quad-8.c
+>> @@ -0,0 +1,1335 @@
+>> +// SPDX-License-Identifier: GPL-2.0-only
 >
->  drivers/phy/rockchip/phy-rockchip-typec.c | 47 +----------------------
->  include/soc/rockchip/rockchip_phy_typec.h | 63 +++++++++++++++++++++++++++++++
->  2 files changed, 64 insertions(+), 46 deletions(-)
->  create mode 100644 include/soc/rockchip/rockchip_phy_typec.h
+>If you are happy with SPDX drop the GPL text below to keep things
+>short.
 >
-> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
-> index 76a4b58..795055f 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-> @@ -63,6 +63,7 @@
+>> +/*
+>> + * IIO driver for the ACCES 104-QUAD-8
+>> + * Copyright (C) 2016 William Breathitt Gray
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License, version 2, as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful, but
+>> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>> + * General Public License for more details.
+>> + *
+>> + * This driver supports the ACCES 104-QUAD-8 and ACCES 104-QUAD-4.
+>> + */
+>> +#include <linux/bitops.h>
+>...
+>> +static int quad8_probe(struct device *dev, unsigned int id)
+>> +{
+>> +	struct iio_dev *indio_dev;
+>> +	struct quad8_iio *quad8iio;
+>> +	int i, j;
+>> +	unsigned int base_offset;
+>> +	int err;
+>> +
+>> +	if (!devm_request_region(dev, base[id], QUAD8_EXTENT, dev_name(dev))) {
+>> +		dev_err(dev, "Unable to lock port addresses (0x%X-0x%X)\n",
+>> +			base[id], base[id] + QUAD8_EXTENT);
+>> +		return -EBUSY;
+>> +	}
+>> +
+>> +	/* Allocate IIO device; this also allocates driver data structure */
+>> +	indio_dev = devm_iio_device_alloc(dev, sizeof(*quad8iio));
+>> +	if (!indio_dev)
+>> +		return -ENOMEM;
+>> +
+>> +	/* Initialize IIO device */
+>> +	indio_dev->info = &quad8_info;
+>> +	indio_dev->modes = INDIO_DIRECT_MODE;
+>> +	indio_dev->num_channels = ARRAY_SIZE(quad8_channels);
+>> +	indio_dev->channels = quad8_channels;
+>> +	indio_dev->name = dev_name(dev);
+>> +	indio_dev->dev.parent = dev;
+>> +
+>> +	/* Initialize Counter device and driver data */
+>> +	quad8iio = iio_priv(indio_dev);
+>> +	quad8iio->counter.name = dev_name(dev);
+>> +	quad8iio->counter.parent = dev;
+>> +	quad8iio->counter.ops = &quad8_ops;
+>> +	quad8iio->counter.counts = quad8_counts;
+>> +	quad8iio->counter.num_counts = ARRAY_SIZE(quad8_counts);
+>> +	quad8iio->counter.signals = quad8_signals;
+>> +	quad8iio->counter.num_signals = ARRAY_SIZE(quad8_signals);
+>> +	quad8iio->counter.priv = quad8iio;
+>> +	quad8iio->base = base[id];
+>> +
+>> +	/* Reset all counters and disable interrupt function */
+>> +	outb(0x01, base[id] + 0x11);
+>> +	/* Set initial configuration for all counters */
+>> +	for (i = 0; i < QUAD8_NUM_COUNTERS; i++) {
+>> +		base_offset = base[id] + 2 * i;
+>> +		/* Reset Byte Pointer */
+>> +		outb(0x01, base_offset + 1);
 >
->  #include <linux/mfd/syscon.h>
->  #include <linux/phy/phy.h>
-> +#include <soc/rockchip/rockchip_phy_typec.h>
+>I'm going to be fussy.  There are lots of values
+>in here that look like register bits and you could exchange much of
+>this documentation for a some good defines...
 >
->  #define CMN_SSM_BANDGAP                        (0x21 << 2)
->  #define CMN_SSM_BIAS                   (0x22 << 2)
-> @@ -349,52 +350,6 @@
->  #define MODE_DFP_USB                   BIT(1)
->  #define MODE_DFP_DP                    BIT(2)
+>Taking base_offset + 1 bits 5 and 6 look to select the actual register
+>and the rest of them do the control.
 >
-> -struct usb3phy_reg {
-> -       u32 offset;
-> -       u32 enable_bit;
-> -       u32 write_enable;
-> -};
-> -
-> -/**
-> - * struct rockchip_usb3phy_port_cfg: usb3-phy port configuration.
-> - * @reg: the base address for usb3-phy config.
-> - * @typec_conn_dir: the register of type-c connector direction.
-> - * @usb3tousb2_en: the register of type-c force usb2 to usb2 enable.
-> - * @external_psm: the register of type-c phy external psm clock.
-> - * @pipe_status: the register of type-c phy pipe status.
-> - * @usb3_host_disable: the register of type-c usb3 host disable.
-> - * @usb3_host_port: the register of type-c usb3 host port.
-> - * @uphy_dp_sel: the register of type-c phy DP select control.
-> - */
-> -struct rockchip_usb3phy_port_cfg {
-> -       unsigned int reg;
-> -       struct usb3phy_reg typec_conn_dir;
-> -       struct usb3phy_reg usb3tousb2_en;
-> -       struct usb3phy_reg external_psm;
-> -       struct usb3phy_reg pipe_status;
-> -       struct usb3phy_reg usb3_host_disable;
-> -       struct usb3phy_reg usb3_host_port;
-> -       struct usb3phy_reg uphy_dp_sel;
-> -};
-> -
-> -struct rockchip_typec_phy {
-> -       struct device *dev;
-> -       void __iomem *base;
-> -       struct extcon_dev *extcon;
-> -       struct regmap *grf_regs;
-> -       struct clk *clk_core;
-> -       struct clk *clk_ref;
-> -       struct reset_control *uphy_rst;
-> -       struct reset_control *pipe_rst;
-> -       struct reset_control *tcphy_rst;
-> -       const struct rockchip_usb3phy_port_cfg *port_cfgs;
-> -       /* mutex to protect access to individual PHYs */
-> -       struct mutex lock;
-> -
-> -       bool flip;
-> -       u8 mode;
-> -};
-> -
->  struct phy_reg {
->         u16 value;
->         u32 addr;
-> diff --git a/include/soc/rockchip/rockchip_phy_typec.h b/include/soc/rockchip/rockchip_phy_typec.h
-> new file mode 100644
-> index 0000000..be6af0e
-> --- /dev/null
-> +++ b/include/soc/rockchip/rockchip_phy_typec.h
-> @@ -0,0 +1,63 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
-> + * Author: Lin Huang <hl@rock-chips.com>
-> + */
-> +
-> +#ifndef __SOC_ROCKCHIP_PHY_TYPEC_H
-> +#define __SOC_ROCKCHIP_PHY_TYPEC_H
-> +
-> +struct usb3phy_reg {
-> +       u32 offset;
-> +       u32 enable_bit;
-> +       u32 write_enable;
-> +};
-> +
-> +/**
-> + * struct rockchip_usb3phy_port_cfg: usb3-phy port configuration.
-> + * @reg: the base address for usb3-phy config.
-> + * @typec_conn_dir: the register of type-c connector direction.
-> + * @usb3tousb2_en: the register of type-c force usb2 to usb2 enable.
-> + * @external_psm: the register of type-c phy external psm clock.
-> + * @pipe_status: the register of type-c phy pipe status.
-> + * @usb3_host_disable: the register of type-c usb3 host disable.
-> + * @usb3_host_port: the register of type-c usb3 host port.
-> + * @uphy_dp_sel: the register of type-c phy DP select control.
-> + */
-> +struct rockchip_usb3phy_port_cfg {
-> +       unsigned int reg;
-> +       struct usb3phy_reg typec_conn_dir;
-> +       struct usb3phy_reg usb3tousb2_en;
-> +       struct usb3phy_reg external_psm;
-> +       struct usb3phy_reg pipe_status;
-> +       struct usb3phy_reg usb3_host_disable;
-> +       struct usb3phy_reg usb3_host_port;
-> +       struct usb3phy_reg uphy_dp_sel;
-> +};
-> +
-> +struct phy_config {
-> +       int swing;
-> +       int pe;
-> +};
-> +
-> +struct rockchip_typec_phy {
-> +       struct device *dev;
-> +       void __iomem *base;
-> +       struct extcon_dev *extcon;
-> +       struct regmap *grf_regs;
-> +       struct clk *clk_core;
-> +       struct clk *clk_ref;
-> +       struct reset_control *uphy_rst;
-> +       struct reset_control *pipe_rst;
-> +       struct reset_control *tcphy_rst;
-> +       const struct rockchip_usb3phy_port_cfg *port_cfgs;
-> +       /* mutex to protect access to individual PHYs */
-> +       struct mutex lock;
-> +       struct phy_config config[3][4];
-> +       bool flip;
-> +       u8 mode;
-> +       int (*typec_phy_config)(struct phy *phy, int link_rate,
-> +                               int lanes, u8 swing, u8 pre_emp);
-> +};
-> +
-> +#endif
-> --
-> 2.7.4
+>Anyhow, not critical but the readability of this code could be improved
+>somewhat.
 >
+>> +		/* Reset Preset Register */
+>> +		for (j = 0; j < 3; j++)
+>> +			outb(0x00, base_offset);
+>> +		/* Reset Borrow, Carry, Compare, and Sign flags */
+>> +		outb(0x04, base_offset + 1);
+>> +		/* Reset Error flag */
+>> +		outb(0x06, base_offset + 1);
+>> +		/* Binary encoding; Normal count; non-quadrature mode */
+>> +		outb(0x20, base_offset + 1);
+>> +		/* Disable A and B inputs; preset on index; FLG1 as Carry */
+>> +		outb(0x40, base_offset + 1);
+>> +		/* Disable index function; negative index polarity */
+>> +		outb(0x60, base_offset + 1);
+>> +	}
+>> +	/* Enable all counters */
+>> +	outb(0x00, base[id] + 0x11);
+>> +
+>> +	/* Register IIO device */
+>> +	err = devm_iio_device_register(dev, indio_dev);
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	/* Register Counter device */
+>> +	return devm_counter_register(dev, &quad8iio->counter);
+>> +}
+>> +
+>> +static struct isa_driver quad8_driver = {
+>> +	.probe = quad8_probe,
+>> +	.driver = {
+>> +		.name = "104-quad-8"
+>> +	}
+>> +};
+>> +
+>> +module_isa_driver(quad8_driver, num_quad8);
+>> +
+>> +MODULE_AUTHOR("William Breathitt Gray <vilhelm.gray@gmail.com>");
+>> +MODULE_DESCRIPTION("ACCES 104-QUAD-8 IIO driver");
+>> +MODULE_LICENSE("GPL v2");
+>> diff --git a/drivers/counter/Kconfig b/drivers/counter/Kconfig
+>> index 65fa92abd5a4..73f03372484f 100644
+>> --- a/drivers/counter/Kconfig
+>> +++ b/drivers/counter/Kconfig
+>> @@ -16,3 +16,24 @@ menuconfig COUNTER
+>>  	  consumption. The Generic Counter interface enables drivers to support
+>>  	  and expose a common set of components and functionality present in
+>>  	  counter devices.
+>> +
+>> +if COUNTER
+>> +
+>> +config 104_QUAD_8
+>> +	tristate "ACCES 104-QUAD-8 driver"
+>> +	depends on PC104 && X86 && IIO
+>> +	select ISA_BUS_API
+>> +	help
+>> +	  Say yes here to build support for the ACCES 104-QUAD-8 quadrature
+>> +	  encoder counter/interface device family (104-QUAD-8, 104-QUAD-4).
+>> +
+>> +	  Performing a write to a counter's IIO_CHAN_INFO_RAW sets the counter and
+>> +	  also clears the counter's respective error flag. Although the counters
+>> +	  have a 25-bit range, only the lower 24 bits may be set, either directly
+>> +	  or via a counter's preset attribute. Interrupts are not supported by
+>> +	  this driver.
+>
+>This text probably wants to be updated to reflect the new counter subsystem support..
+>
+>> +
+>> +	  The base port addresses for the devices may be configured via the base
+>> +	  array module parameter.
+>> +
+>> +endif # COUNTER
+>> diff --git a/drivers/counter/Makefile b/drivers/counter/Makefile
+>> index ad1ba7109cdc..23a4f6263e45 100644
+>> --- a/drivers/counter/Makefile
+>> +++ b/drivers/counter/Makefile
+>> @@ -6,3 +6,5 @@
+>>  
+>>  obj-$(CONFIG_COUNTER) += counter.o
+>>  counter-y := generic-counter.o
+>> +
+>> +obj-$(CONFIG_104_QUAD_8)	+= 104-quad-8.o
+>> diff --git a/drivers/iio/counter/104-quad-8.c b/drivers/iio/counter/104-quad-8.c
+>...
