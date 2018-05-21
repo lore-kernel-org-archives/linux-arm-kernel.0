@@ -1,90 +1,239 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 May 2018 12:41:32 -0700
-Subject: [GIT PULL 3/3] more omap dts changes for v4.18 merge window
-In-Reply-To: <pull-1526925630-789198@atomide.com>
-References: <pull-1526925630-789198@atomide.com>
-Message-ID: <pull-1526925630-789198@atomide.com-3>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Mon, 21 May 2018 12:56:59 -0700
+Subject: [PATCH v4 00/10] PECI device driver introduction
+Message-ID: <20180521195659.27672-1-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+Introduction of the Platform Environment Control Interface (PECI) bus
+device driver. PECI is a one-wire bus interface that provides a
+communication channel between an Intel processor and chipset components to
+external monitoring or control devices. PECI is designed to support the
+following sideband functions:
 
-The following changes since commit 8dfa75524a0e0e2b4eaf2a3dc178f6b4d8db85d9:
+* Processor and DRAM thermal management
+  - Processor fan speed control is managed by comparing Digital Thermal
+    Sensor (DTS) thermal readings acquired via PECI against the
+    processor-specific fan speed control reference point, or TCONTROL. Both
+    TCONTROL and DTS thermal readings are accessible via the processor PECI
+    client. These variables are referenced to a common temperature, the TCC
+    activation point, and are both defined as negative offsets from that
+    reference.
+  - PECI based access to the processor package configuration space provides
+    a means for Baseboard Management Controllers (BMC) or other platform
+    management devices to actively manage the processor and memory power
+    and thermal features.
 
-  ARM: dts: correct invalid I/O definition for MMC/SD card detect on T410 (2018-05-03 10:03:01 -0700)
+* Platform Manageability
+  - Platform manageability functions including thermal, power, and error
+    monitoring. Note that platform 'power' management includes monitoring
+    and control for both the processor and DRAM subsystem to assist with
+    data center power limiting.
+  - PECI allows read access to certain error registers in the processor MSR
+    space and status monitoring registers in the PCI configuration space
+    within the processor and downstream devices.
+  - PECI permits writes to certain registers in the processor PCI
+    configuration space.
 
-are available in the Git repository at:
+* Processor Interface Tuning and Diagnostics
+  - Processor interface tuning and diagnostics capabilities
+    (Intel Interconnect BIST). The processors Intel Interconnect Built In
+    Self Test (Intel IBIST) allows for infield diagnostic capabilities in
+    the Intel UPI and memory controller interfaces. PECI provides a port to
+    execute these diagnostics via its PCI Configuration read and write
+    capabilities.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/dt-part2-signed
+* Failure Analysis
+  - Output the state of the processor after a failure for analysis via
+    Crashdump.
 
-for you to fetch changes up to 0dbf99542caf8a767ea0ac286ca8077cc5e8bd32:
+PECI uses a single wire for self-clocking and data transfer. The bus
+requires no additional control lines. The physical layer is a self-clocked
+one-wire bus that begins each bit with a driven, rising edge from an idle
+level near zero volts. The duration of the signal driven high depends on
+whether the bit value is a logic '0' or logic '1'. PECI also includes
+variable data transfer rate established with every message. In this way, it
+is highly flexible even though underlying logic is simple.
 
-  ARM: dts: am3517-evm: Add User LEDs and Pushbutton (2018-05-18 14:07:38 -0700)
+The interface design was optimized for interfacing between an Intel
+processor and chipset components in both single processor and multiple
+processor environments. The single wire interface provides low board
+routing overhead for the multiple load connections in the congested routing
+area near the processor and chipset components. Bus speed, error checking,
+and low protocol overhead provides adequate link bandwidth and reliability
+to transfer critical device operating conditions and configuration
+information.
 
-----------------------------------------------------------------
-Second set of dts changes for omap variants for v4.18 merge window
+This implementation provides the basic framework to add PECI extensions to
+the Linux bus and device models. A hardware specific 'Adapter' driver can
+be attached to the PECI bus to provide sideband functions described above.
+It is also possible to access all devices on an adapter from userspace
+through the /dev interface. A device specific 'Client' driver also can be
+attached to the PECI bus so each processor client's features can be
+supported by the 'Client' driver through an adapter connection in the bus.
+This patch set includes Aspeed 24xx/25xx PECI driver and PECI
+cputemp/dimmtemp drivers as the first implementation for both adapter and
+client drivers on the PECI bus framework.
 
-This series of changes contains fixes for already queued tps65218
-IRQ_TYPE, and fixes for omap3 and am335x use of IRQ_TYPE. There are
-also addition of oscillator clock for logicpd omap3 boards and a series
-of changes to improve support for am3517-evm board. And there is also
-a change to configure WLAN for am437x-sk-evm.
+Please review.
 
-----------------------------------------------------------------
-Adam Ford (11):
-      ARM: dts: logicpd-torpedo: Add fixed 26MHz clock as fck for twl
-      ARM: dts: logicpd-som-lv: Add fixed 26MHz clock as fck for twl
-      ARM: dts: am3517: Add pinmuxing, CD and WP for MMC1
-      ARM: dts: am3517-evm: Split off SOM features from baseboard
-      ARM: dts: am3517-som: Add TI TPS65023 regulators
-      ARM: dts: am3517-som: Associate cpu to regulator supply
-      ARM: dts: am3517-evm: Add LCD panel type 15 support
-      ARM: dts: am3517-som: Add Seiko Instruments RTC s35390a
-      ARM: dts: logicpd-som-lv: Fix Touchscreen controller
-      ARM: dts: am3517-evm: Add I/O expander for User DIP switches and LEDS
-      ARM: dts: am3517-evm: Add User LEDs and Pushbutton
+Thanks,
 
-Eyal Reizer (1):
-      ARM: dts: am437x-sk-evm: add wilink8 support
+-Jae
 
-Hern?n Gonzalez (5):
-      ARM: dts: am335x-baltos-ir3220: Use IRQ_TYPE specifier
-      ARM: dts: am335x-baltos-ir5221: Use IRQ_TYPE specifier
-      ARM: dts: am335x-baltos.dtsi: Use IRQ_TYPE specifier
-      ARM: dts: am335x-boneblue: Use IRQ_TYPE specifier
-      ARM: dts: omap3-pandora-common: Use IRQ_TYPE specifier
+Changes from v3:
+* Made code more simple and compact.
+* Removed unused header file inclusion.
+* Fixed incorrect error return values and messages.
+* Removed DTS margin temperature from the peci-cputemp.
+* Made some magic numbers use defines.
+* Moved peci_get_cpu_id() into peci-core as a common function.
+* Replaced the cancel_delayed_work() call with a cancel_delayed_work_sync().
+* Replaced AST and Aspeed uses with ASPEED.
+* Simplified peci command timeout checking logic using
+  regmap_read_poll_timeout().
+* Simplified endian swap codes using endian handling macros.
+* Dropped regmap read/write error checking except for the first access.
+* Added a PECI reset setting in the device tree node.
+* Removed unnecessary sleep from the probe context.
+* Removed IRQF_SHARED flag from irq request code in the ASPEED PECI driver.
+* Fixed typos in documents.
+* Combined peci-bus.txt, peci-adapter.txt and peci-client.txt into peci.txt.
+* Fixed and swept documents to drop some incorrect or unnecessary
+  descriptions.
+* Fixed device tree to make unit-address format use reg contents.
+* Simplified bit manipulations using <linux/bitfield.h>.
+* Made client CPU model checking use <asm/intel-family.h> if available.
+* Modified adapter heap allocation method to use kobject reference count
+  based.
+* Added the low-level PECI xfer IOCTL again to support the Redfish
+  requirement.
+* Added PM domain attach/detach code.
+* Added logic for device instantiation through sysfs.
+* Fix a bug of interrupt status checking code in peci-aspeed driver.
 
-Peter Ujfalusi (5):
-      ARM: dts: am335x-evmsk: Add phandle for the backlight for the panel
-      ARM: dts: am437x-gp-evm: Fixup (again) tps65218 irq type
-      ARM: dts: am437x-cm-t43: Fixup (again) tps65218 irq type
-      ARM: dts: am437x-epos-evm: Fixup (again) tps65218 irq type
-      Revert "ARM: dts: am437x-sk-evm: Correct tps65218 irq type"
+Changes from v2:
+* Divided peci-hwmon driver into two drivers, peci-cputemp and
+  peci-dimmtemp.
+* Added generic dt binding documents for PECI bus, adapter and client.
+* Removed in_atomic() call from the PECI core driver.
+* Improved PECI commands masking logic.
+* Added permission check logic for PECI ioctls.
+* Removed unnecessary type casts.
+* Fixed some invalid error return codes.
+* Added the mark_updated() function to improve update interval checking
+  logic.
+* Fixed a bug in populated DIMM checking function.
+* Fixed some typo, grammar and style issues in documents.
+* Rewrote hwmon drivers to use devm_hwmon_device_register_with_info API.
+* Made peci_match_id() function as a static.
+* Replaced a deprecated create_singlethread_workqueue() call with an
+  alloc_ordered_workqueue() call.
+* Reordered local variable definitions in reversed xmas tree notation.
+* Listed up client CPUs that can be supported by peci-cputemp and
+  peci-dimmtemp hwmon drivers.
+* Added CPU generation detection logic which checks CPUID signature through
+  PECI connection.
+* Improved interrupt handling logic in the Aspeed PECI adapter driver.
+* Fixed SPDX license identifier style in header files.
+* Changed some macros in peci.h to static inline functions.
+* Dropped sleepable context checking code in peci-core.
+* Adjusted rt_mutex protection scope in peci-core.
+* Moved adapter->xfer() checking code into peci_register_adapter().
+* Improved PECI command retry checking logic.
+* Changed ioctl base from 'P' to 0xb6 to avoid confiliction and updated
+  ioctl-number.txt to reflect the ioctl number of PECI subsystem.
+* Added a comment to describe PECI retry action.
+* Simplified return code handling of peci_ioctl_ping().
+* Changed type of peci_ioctl_fn[] to static const.
+* Fixed range checking code for valid PECI commands.
+* Fixed the error return code on invalid PECI commands.
+* Fixed incorrect definitions of PECI ioctl and its handling logic.
 
-Rob Herring (2):
-      ARM: dts: omap: fix OF graph in omap3-devkit8000
-      ARM: dts: omap: fix OMAP3 CM-T3x OF graph video connectors
+Changes from v1:
+* Additionally implemented a core driver to support PECI linux bus driver
+  model.
+* Modified Aspeed PECI driver to make that to be an adapter driver in PECI
+  bus.
+* Modified PECI hwmon driver to make that to be a client driver in PECI
+  bus.
+* Simplified hwmon driver attribute labels and removed redundant strings.
+* Removed core_nums from device tree setting of hwmon driver and modified
+  core number detection logic to check the resolved_core register in client
+  CPU's local PCI configuration area.
+* Removed dimm_nums from device tree setting of hwmon driver and added
+  populated DIMM detection logic to support dynamic creation.
+* Removed indexing gap on core temperature and DIMM temperature attributes.
+* Improved hwmon registration and dynamic attribute creation logic.
+* Fixed structure definitions in PECI uapi header to make that use __u8,
+  __u16 and etc.
+* Modified wait_for_completion_interruptible_timeout error handling logic
+  in Aspeed PECI driver to deliver errors correctly.
+* Removed low-level xfer command from ioctl and kept only high-level PECI
+  command suite as ioctls.
+* Fixed I/O timeout logic in Aspeed PECI driver using ktime.
+* Added a function into hwmon driver to simplify update delay checking.
+* Added a function into hwmon driver to convert 10.6 to millidegree.
+* Dropped non-standard attributes in hwmon driver.
+* Fixed OF table for hwmon to make it indicate as a PECI client of Intel
+  CPU target.
+* Added a maintainer of PECI subsystem into MAINTAINERS document.
 
-Tony Lindgren (1):
-      Merge branch 'omap-for-v4.18/dt-fixes' into omap-for-v4.18/dt
+Jae Hyun Yoo (11):
+  dt-bindings: Add a document of PECI subsystem
+  Documentation: ioctl: Add ioctl numbers for PECI subsystem
+  drivers/peci: Add support for PECI bus driver core
+  dt-bindings: Add a document of PECI adapter driver for ASPEED
+    AST24xx/25xx SoCs
+  ARM: dts: aspeed: peci: Add PECI node
+  drivers/peci: Add a PECI adapter driver for Aspeed AST24xx/AST25xx
+  dt-bindings: hwmon: Add documents for PECI hwmon client drivers
+  Documentation: hwmon: Add documents for PECI hwmon client drivers
+  drivers/hwmon: Add PECI cputemp driver
+  drivers/hwmon: Add PECI dimmtemp driver
+  Add maintainers for the PECI subsystem
 
- arch/arm/boot/dts/am335x-baltos-ir3220.dts         |   2 +-
- arch/arm/boot/dts/am335x-baltos-ir5221.dts         |   2 +-
- arch/arm/boot/dts/am335x-baltos.dtsi               |   2 +-
- arch/arm/boot/dts/am335x-boneblue.dts              |   2 +-
- arch/arm/boot/dts/am335x-evmsk.dts                 |   3 +-
- arch/arm/boot/dts/am3517-evm.dts                   | 233 ++++++++++++++++++++-
- arch/arm/boot/dts/am3517-som.dtsi                  | 142 +++++++++++++
- arch/arm/boot/dts/am437x-cm-t43.dts                |   2 +-
- arch/arm/boot/dts/am437x-gp-evm.dts                |   2 +-
- arch/arm/boot/dts/am437x-sk-evm.dts                | 117 ++++++++++-
- arch/arm/boot/dts/am43x-epos-evm.dts               |   2 +-
- arch/arm/boot/dts/logicpd-som-lv.dtsi              |  21 +-
- arch/arm/boot/dts/logicpd-torpedo-som.dtsi         |  10 +
- arch/arm/boot/dts/omap3-cm-t3x.dtsi                |   2 +-
- arch/arm/boot/dts/omap3-devkit8000-common.dtsi     |   9 +-
- arch/arm/boot/dts/omap3-devkit8000-lcd-common.dtsi |   5 +-
- arch/arm/boot/dts/omap3-pandora-common.dtsi        |   2 +-
- arch/arm/boot/dts/omap3-sb-t35.dtsi                |   2 +-
- 18 files changed, 538 insertions(+), 22 deletions(-)
- create mode 100644 arch/arm/boot/dts/am3517-som.dtsi
+ .../bindings/hwmon/peci-cputemp.txt           |   23 +
+ .../bindings/hwmon/peci-dimmtemp.txt          |   24 +
+ .../devicetree/bindings/peci/peci-aspeed.txt  |   57 +
+ .../devicetree/bindings/peci/peci.txt         |   59 +
+ Documentation/hwmon/peci-cputemp              |   78 +
+ Documentation/hwmon/peci-dimmtemp             |   50 +
+ Documentation/ioctl/ioctl-number.txt          |    2 +
+ MAINTAINERS                                   |   10 +
+ arch/arm/boot/dts/aspeed-g4.dtsi              |   26 +
+ arch/arm/boot/dts/aspeed-g5.dtsi              |   26 +
+ drivers/Kconfig                               |    2 +
+ drivers/Makefile                              |    1 +
+ drivers/hwmon/Kconfig                         |   28 +
+ drivers/hwmon/Makefile                        |    2 +
+ drivers/hwmon/peci-cputemp.c                  |  407 +++++
+ drivers/hwmon/peci-dimmtemp.c                 |  300 ++++
+ drivers/hwmon/peci-hwmon.c                    |  124 ++
+ drivers/hwmon/peci-hwmon.h                    |   51 +
+ drivers/peci/Kconfig                          |   44 +
+ drivers/peci/Makefile                         |    9 +
+ drivers/peci/peci-aspeed.c                    |  496 ++++++
+ drivers/peci/peci-core.c                      | 1451 +++++++++++++++++
+ include/linux/peci.h                          |  105 ++
+ include/uapi/linux/peci-ioctl.h               |  265 +++
+ 24 files changed, 3640 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
+ create mode 100644 Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
+ create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
+ create mode 100644 Documentation/devicetree/bindings/peci/peci.txt
+ create mode 100644 Documentation/hwmon/peci-cputemp
+ create mode 100644 Documentation/hwmon/peci-dimmtemp
+ create mode 100644 drivers/hwmon/peci-cputemp.c
+ create mode 100644 drivers/hwmon/peci-dimmtemp.c
+ create mode 100644 drivers/hwmon/peci-hwmon.c
+ create mode 100644 drivers/hwmon/peci-hwmon.h
+ create mode 100644 drivers/peci/Kconfig
+ create mode 100644 drivers/peci/Makefile
+ create mode 100644 drivers/peci/peci-aspeed.c
+ create mode 100644 drivers/peci/peci-core.c
+ create mode 100644 include/linux/peci.h
+ create mode 100644 include/uapi/linux/peci-ioctl.h
+
+-- 
+2.17.0
