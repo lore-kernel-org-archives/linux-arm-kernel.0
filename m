@@ -1,568 +1,284 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 21 May 2018 15:17:09 +0100
-Subject: [PATCH v9 08/16] KVM: arm64: Optimise FPSIMD handling to reduce
- guest/host thrashing
-In-Reply-To: <1526912237-25308-1-git-send-email-Dave.Martin@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 21 May 2018 15:40:02 +0100
+Subject: [PATCH v9 12/16] KVM: arm64: Save host SVE context as appropriate
+In-Reply-To: <1526912237-25308-13-git-send-email-Dave.Martin@arm.com>
 References: <1526912237-25308-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1526912237-25308-9-git-send-email-Dave.Martin@arm.com>
+ <1526912237-25308-13-git-send-email-Dave.Martin@arm.com>
+Message-ID: <eac5821b-c5e0-90c9-cdd6-73643662d68d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch refactors KVM to align the host and guest FPSIMD
-save/restore logic with each other for arm64.  This reduces the
-number of redundant save/restore operations that must occur, and
-reduces the common-case IRQ blackout time during guest exit storms
-by saving the host state lazily and optimising away the need to
-restore the host state before returning to the run loop.
+On 21/05/18 15:17, Dave Martin wrote:
+> This patch adds SVE context saving to the hyp FPSIMD context switch
+> path.  This means that it is no longer necessary to save the host
+> SVE state in advance of entering the guest, when in use.
+> 
+> In order to avoid adding pointless complexity to the code, VHE is
+> assumed if SVE is in use.  VHE is an architectural prerequisite for
+> SVE, so there is no good reason to turn CONFIG_ARM64_VHE off in
+> kernels that support both SVE and KVM.
+> 
+> Historically, software models exist that can expose the
+> architecturally invalid configuration of SVE without VHE, so if
+> this situation is detected at kvm_init() time then KVM will be
+> disabled.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
+> ---
+> 
+>  * Stripped the following tags, reviewers please reconfirm:
+> 
+> Formerly-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+> Formerly-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Formerly-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> (Creation of a new file for this one change may be deemed undesirable,
+> but there didn't seem to be a correct place to put it.  There may also
+> be a way around the circular include problem that I missed.)
+> 
+> Changes since v8:
+> 
+>  * Add kvm_arch_check_supported() hook, and move arm64-specific check
+>    for SVE-implies-VHE into arch/arm64/.
+> 
+>    Due to circular header dependency problems, it is difficult to get
+>    the prototype for kvm_pr_*() functions in <asm/kvm_host.h>, so this
+>    patch puts arm64's kvm_arch_check_supported() hook out of line.
+>    This is not a hot function.
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  1 +
+>  arch/arm64/Kconfig                |  7 +++++++
+>  arch/arm64/include/asm/kvm_host.h |  1 +
+>  arch/arm64/kvm/Makefile           |  2 +-
+>  arch/arm64/kvm/fpsimd.c           |  1 -
+>  arch/arm64/kvm/hyp/switch.c       | 20 +++++++++++++++++++-
+>  arch/arm64/kvm/init.c             | 33 +++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/arm.c                |  6 ++++++
+>  8 files changed, 68 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm64/kvm/init.c
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index ac870b2..e627ef8 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -280,6 +280,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>  
+>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>  
+> +static inline int kvm_arch_check_supported(void) { return 0; }
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index eb2cf49..b0d3820 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1130,6 +1130,7 @@ endmenu
+>  config ARM64_SVE
+>  	bool "ARM Scalable Vector Extension support"
+>  	default y
+> +	depends on !KVM || ARM64_VHE
+>  	help
+>  	  The Scalable Vector Extension (SVE) is an extension to the AArch64
+>  	  execution state which complements and extends the SIMD functionality
+> @@ -1155,6 +1156,12 @@ config ARM64_SVE
+>  	  booting the kernel.  If unsure and you are not observing these
+>  	  symptoms, you should assume that it is safe to say Y.
+>  
+> +	  CPUs that support SVE are architecturally required to support the
+> +	  Virtualization Host Extensions (VHE), so the kernel makes no
+> +	  provision for supporting SVE alongside KVM without VHE enabled.
+> +	  Thus, you will need to enable CONFIG_ARM64_VHE if you want to support
+> +	  KVM in the same kernel image.
+> +
+>  config ARM64_MODULE_PLTS
+>  	bool
+>  	select HAVE_MOD_ARCH_SPECIFIC
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index b3fe730..80f3985 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -405,6 +405,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>  	kvm_call_hyp(__kvm_set_tpidr_el2, tpidr_el2);
+>  }
+>  
+> +int kvm_arch_check_supported(void);
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index 0f2a135..5e66afe 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -17,7 +17,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
+>  
+>  kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o va_layout.o
+> -kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+> +kvm-$(CONFIG_KVM_ARM_HOST) += init.o hyp.o hyp-init.o handle_exit.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o fpsimd.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/aarch32.o
+> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+> index d9b5f73..52185ec 100644
+> --- a/arch/arm64/kvm/fpsimd.c
+> +++ b/arch/arm64/kvm/fpsimd.c
+> @@ -59,7 +59,6 @@ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
+>   */
+>  void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
+>  {
+> -	BUG_ON(system_supports_sve());
+>  	BUG_ON(!current->mm);
+>  
+>  	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 118f300..a6a8c7d 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -21,6 +21,7 @@
+>  
+>  #include <kvm/arm_psci.h>
+>  
+> +#include <asm/cpufeature.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_host.h>
+> @@ -28,6 +29,7 @@
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/fpsimd.h>
+>  #include <asm/debug-monitors.h>
+> +#include <asm/processor.h>
+>  #include <asm/thread_info.h>
+>  
+>  /* Check whether the FP regs were dirtied while in the host-side run loop: */
+> @@ -329,6 +331,8 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+>  void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  				    struct kvm_vcpu *vcpu)
+>  {
+> +	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
+> +
+>  	if (has_vhe())
+>  		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+>  			     cpacr_el1);
+> @@ -339,7 +343,21 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
+>  	isb();
+>  
+>  	if (vcpu->arch.flags & KVM_ARM64_FP_HOST) {
+> -		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
+> +		/*
+> +		 * In the SVE case, VHE is assumed: it is enforced by
+> +		 * Kconfig and kvm_arch_init().
+> +		 */
+> +		if (system_supports_sve() &&
+> +		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
+> +			struct thread_struct *thread = container_of(
+> +				host_fpsimd,
+> +				struct thread_struct, uw.fpsimd_state);
+> +
+> +			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
+> +		} else {
+> +			__fpsimd_save_state(host_fpsimd);
+> +		}
+> +
+>  		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
+>  	}
+>  
+> diff --git a/arch/arm64/kvm/init.c b/arch/arm64/kvm/init.c
+> new file mode 100644
+> index 0000000..3b6e730
+> --- /dev/null
+> +++ b/arch/arm64/kvm/init.c
+> @@ -0,0 +1,33 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * arch/arm64/kvm/init.c: KVM initialisation support
+> + *
+> + * Copyright 2018 Arm Limited
+> + * Author: Dave Martin <Dave.Martin@arm.com>
+> + */
+> +#include <linux/errno.h>
+> +#include <linux/kvm_host.h>
+> +#include <asm/cpufeature.h>
+> +#include <asm/kvm_host.h>
+> +
+> +/* Additional arch-dependent checks for KVM usability */
+> +int kvm_arch_check_supported(void)
+> +{
+> +	/*
+> +	 * VHE is a prerequisite for SVE in the Arm architecture, and
+> +	 * Kconfig ensures that if system_supports_sve() here then
+> +	 * CONFIG_ARM64_VHE is enabled, so if VHE support wasn't already
+> +	 * detected and enabled, the CPU is architecturally
+> +	 * noncompliant.
+> +	 *
+> +	 * Just in case this mismatch is seen, detect it, warn and give
+> +	 * up.  Supporting this forbidden configuration in Hyp would be
+> +	 * pointless.
+> +	 */
+> +	if (system_supports_sve() && !has_vhe()) {
+> +		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
+> +		return -ENODEV;
+> +	}
+> +
+> +	return 0;
+> +}
 
-Four hooks are defined in order to enable this:
+[entering bikeshedding territory]
 
- * kvm_arch_vcpu_run_map_fp():
-   Called on PID change to map necessary bits of current to Hyp.
+I'm not exactly keen on this. This feels overkill, and a departure from 
+what we've been doing so far.
 
- * kvm_arch_vcpu_load_fp():
-   Set up FP/SIMD for entering the KVM run loop (parse as
-   "vcpu_load fp").
+Why don't you simply have a helper in kvm_host.h that does:
 
- * kvm_arch_vcpu_ctxsync_fp():
-   Get FP/SIMD into a safe state for re-enabling interrupts after a
-   guest exit back to the run loop.
+static inline bool kvm_arm_check_sve_valid(void)
+{
+	return !system_supports_sve() || has_vhe();
+}
 
-   For arm64 specifically, this involves updating the host kernel's
-   FPSIMD context tracking metadata so that kernel-mode NEON use
-   will cause the vcpu's FPSIMD state to be saved back correctly
-   into the vcpu struct.  This must be done before re-enabling
-   interrupts because kernel-mode NEON may be used by softirqs.
+(and a canonical "return true;" implementation for 32bit)
 
- * kvm_arch_vcpu_put_fp():
-   Save guest FP/SIMD state back to memory and dissociate from the
-   CPU ("vcpu_put fp").
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index bee226c..8518df0 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -16,6 +16,7 @@
+>   * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+>   */
+>  
+> +#include <linux/bug.h>
+>  #include <linux/cpu_pm.h>
+>  #include <linux/errno.h>
+>  #include <linux/err.h>
+> @@ -41,6 +42,7 @@
+>  #include <asm/mman.h>
+>  #include <asm/tlbflush.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/cpufeature.h>
+>  #include <asm/virt.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_asm.h>
+> @@ -1574,6 +1576,10 @@ int kvm_arch_init(void *opaque)
+>  		return -ENODEV;
+>  	}
+>  
+> +	err = kvm_arch_check_supported();
+> +	if (err)
+> +		return err;
+> +
 
-Also, the arm64 FPSIMD context switch code is updated to enable it
-to save back FPSIMD state for a vcpu, not just current.  A few
-helpers drive this:
+And turn this into:
 
- * fpsimd_bind_state_to_cpu(struct user_fpsimd_state *fp):
-   mark this CPU as having context fp (which may belong to a vcpu)
-   currently loaded in its registers.  This is the non-task
-   equivalent of the static function fpsimd_bind_to_cpu() in
-   fpsimd.c.
+	if (!kvm_arm_check_sve_valid()) {
+		kvm_pr_unimpl("SVE system without VHE unsupported. Broken cpu?");
+		return -EINVAL;
+	}
 
- * task_fpsimd_save():
-   exported to allow KVM to save the guest's FPSIMD state back to
-   memory on exit from the run loop.
+It has the advantage of being obvious of what we check for, and doesn't 
+add any extra file.
 
- * fpsimd_flush_state():
-   invalidate any context's FPSIMD state that is currently loaded.
-   Used to disassociate the vcpu from the CPU regs on run loop exit.
+Thoughts?
 
-These changes allow the run loop to enable interrupts (and thus
-softirqs that may use kernel-mode NEON) without having to save the
-guest's FPSIMD state eagerly.
-
-Some new vcpu_arch fields are added to make all this work.  Because
-host FPSIMD state can now be saved back directly into current's
-thread_struct as appropriate, host_cpu_context is no longer used
-for preserving the FPSIMD state.  However, it is still needed for
-preserving other things such as the host's system registers.  To
-avoid ABI churn, the redundant storage space in host_cpu_context is
-not removed for now.
-
-arch/arm is not addressed by this patch and continues to use its
-current save/restore logic.  It could provide implementations of
-the helpers later if desired.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-squash! KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
----
-
-Changes since v8:
-
- * Fix arch/arm version of kvm_arch_vcpu_park_fp() to match new naming.
-
-   Without this, the build was breaking on arm.
-
-   Acks retained, since this is a trivial change.
----
- arch/arm/include/asm/kvm_host.h   |   8 +++
- arch/arm64/include/asm/fpsimd.h   |   6 ++
- arch/arm64/include/asm/kvm_host.h |  21 +++++++
- arch/arm64/kernel/fpsimd.c        |  17 +++++-
- arch/arm64/kvm/Kconfig            |   1 +
- arch/arm64/kvm/Makefile           |   2 +-
- arch/arm64/kvm/fpsimd.c           | 112 ++++++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/hyp/switch.c       |  51 +++++++++--------
- virt/kvm/arm/arm.c                |   4 ++
- 9 files changed, 192 insertions(+), 30 deletions(-)
- create mode 100644 arch/arm64/kvm/fpsimd.c
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index c7c28c8..ac870b2 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -303,6 +303,14 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
- int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
- 			       struct kvm_device_attr *attr);
- 
-+/*
-+ * VFP/NEON switching is all done by the hyp switch code, so no need to
-+ * coordinate with host context handling for this state:
-+ */
-+static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
-+
- /* All host FP/SIMD state is restored on guest exit, so nothing to save: */
- static inline void kvm_fpsimd_flush_cpu_state(void) {}
- 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index aa7162a..3e00f70 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -41,6 +41,8 @@ struct task_struct;
- extern void fpsimd_save_state(struct user_fpsimd_state *state);
- extern void fpsimd_load_state(struct user_fpsimd_state *state);
- 
-+extern void fpsimd_save(void);
-+
- extern void fpsimd_thread_switch(struct task_struct *next);
- extern void fpsimd_flush_thread(void);
- 
-@@ -49,7 +51,11 @@ extern void fpsimd_preserve_current_state(void);
- extern void fpsimd_restore_current_state(void);
- extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
- 
-+extern void fpsimd_bind_task_to_cpu(void);
-+extern void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *state);
-+
- extern void fpsimd_flush_task_state(struct task_struct *target);
-+extern void fpsimd_flush_cpu_state(void);
- extern void sve_flush_cpu_state(void);
- 
- /* Maximum VL that SVE VL-agnostic software can transparently support */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 146c167..b3fe730 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -30,6 +30,7 @@
- #include <asm/kvm.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
-+#include <asm/thread_info.h>
- 
- #define __KVM_HAVE_ARCH_INTC_INITIALIZED
- 
-@@ -238,6 +239,10 @@ struct kvm_vcpu_arch {
- 
- 	/* Pointer to host CPU context */
- 	kvm_cpu_context_t *host_cpu_context;
-+
-+	struct thread_info *host_thread_info;	/* hyp VA */
-+	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
-+
- 	struct {
- 		/* {Break,watch}point registers */
- 		struct kvm_guest_debug_arch regs;
-@@ -295,6 +300,9 @@ struct kvm_vcpu_arch {
- 
- /* vcpu_arch flags field values: */
- #define KVM_ARM64_DEBUG_DIRTY		(1 << 0)
-+#define KVM_ARM64_FP_ENABLED		(1 << 1) /* guest FP regs loaded */
-+#define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded */
-+#define KVM_ARM64_HOST_SVE_IN_USE	(1 << 3) /* backup for host TIF_SVE */
- 
- #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
- 
-@@ -423,6 +431,19 @@ static inline void __cpu_init_stage2(void)
- 		  "PARange is %d bits, unsupported configuration!", parange);
- }
- 
-+/* Guest/host FPSIMD coordination helpers */
-+int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu);
-+void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu);
-+void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu);
-+void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu);
-+
-+#ifdef CONFIG_KVM /* Avoid conflicts with core headers if CONFIG_KVM=n */
-+static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
-+{
-+	return kvm_arch_vcpu_run_map_fp(vcpu);
-+}
-+#endif
-+
- /*
-  * All host FP/SIMD state is restored on guest exit, so nothing needs
-  * doing here except in the SVE case:
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index f98b9a4..051b455 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -265,7 +265,7 @@ static void task_fpsimd_load(void)
-  *
-  * Softirqs (and preemption) must be disabled.
-  */
--static void fpsimd_save(void)
-+void fpsimd_save(void)
- {
- 	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
- 
-@@ -991,7 +991,7 @@ void fpsimd_signal_preserve_current_state(void)
-  * Associate current's FPSIMD context with this cpu
-  * Preemption must be disabled when calling this function.
-  */
--static void fpsimd_bind_task_to_cpu(void)
-+void fpsimd_bind_task_to_cpu(void)
- {
- 	struct fpsimd_last_state_struct *last =
- 		this_cpu_ptr(&fpsimd_last_state);
-@@ -1011,6 +1011,17 @@ static void fpsimd_bind_task_to_cpu(void)
- 	}
- }
- 
-+void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
-+{
-+	struct fpsimd_last_state_struct *last =
-+		this_cpu_ptr(&fpsimd_last_state);
-+
-+	WARN_ON(!in_softirq() && !irqs_disabled());
-+
-+	last->st = st;
-+	last->sve_in_use = false;
-+}
-+
- /*
-  * Load the userland FPSIMD state of 'current' from memory, but only if the
-  * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
-@@ -1063,7 +1074,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
- 	t->thread.fpsimd_cpu = NR_CPUS;
- }
- 
--static inline void fpsimd_flush_cpu_state(void)
-+void fpsimd_flush_cpu_state(void)
- {
- 	__this_cpu_write(fpsimd_last_state.st, NULL);
- }
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index a2e3a5a..47b23bf 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -39,6 +39,7 @@ config KVM
- 	select HAVE_KVM_IRQ_ROUTING
- 	select IRQ_BYPASS_MANAGER
- 	select HAVE_KVM_IRQ_BYPASS
-+	select HAVE_KVM_VCPU_RUN_PID_CHANGE
- 	---help---
- 	  Support hosting virtualized guest machines.
- 	  We don't support KVM with 16K page tables yet, due to the multiple
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 93afff9..0f2a135 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -19,7 +19,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
- kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o va_layout.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
--kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o fpsimd.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/aarch32.o
- 
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
-diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-new file mode 100644
-index 0000000..d9b5f73
---- /dev/null
-+++ b/arch/arm64/kvm/fpsimd.c
-@@ -0,0 +1,112 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * arch/arm64/kvm/fpsimd.c: Guest/host FPSIMD context coordination helpers
-+ *
-+ * Copyright 2018 Arm Limited
-+ * Author: Dave Martin <Dave.Martin@arm.com>
-+ */
-+#include <linux/bottom_half.h>
-+#include <linux/sched.h>
-+#include <linux/thread_info.h>
-+#include <linux/kvm_host.h>
-+#include <asm/kvm_asm.h>
-+#include <asm/kvm_host.h>
-+#include <asm/kvm_mmu.h>
-+
-+/*
-+ * Called on entry to KVM_RUN unless this vcpu previously ran at least
-+ * once and the most recent prior KVM_RUN for this vcpu was called from
-+ * the same task as current (highly likely).
-+ *
-+ * This is guaranteed to execute before kvm_arch_vcpu_load_fp(vcpu),
-+ * such that on entering hyp the relevant parts of current are already
-+ * mapped.
-+ */
-+int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu)
-+{
-+	int ret;
-+
-+	struct thread_info *ti = &current->thread_info;
-+	struct user_fpsimd_state *fpsimd = &current->thread.uw.fpsimd_state;
-+
-+	/*
-+	 * Make sure the host task thread flags and fpsimd state are
-+	 * visible to hyp:
-+	 */
-+	ret = create_hyp_mappings(ti, ti + 1, PAGE_HYP);
-+	if (ret)
-+		goto error;
-+
-+	ret = create_hyp_mappings(fpsimd, fpsimd + 1, PAGE_HYP);
-+	if (ret)
-+		goto error;
-+
-+	vcpu->arch.host_thread_info = kern_hyp_va(ti);
-+	vcpu->arch.host_fpsimd_state = kern_hyp_va(fpsimd);
-+error:
-+	return ret;
-+}
-+
-+/*
-+ * Prepare vcpu for saving the host's FPSIMD state and loading the guest's.
-+ * The actual loading is done by the FPSIMD access trap taken to hyp.
-+ *
-+ * Here, we just set the correct metadata to indicate that the FPSIMD
-+ * state in the cpu regs (if any) belongs to current on the host.
-+ *
-+ * TIF_SVE is backed up here, since it may get clobbered with guest state.
-+ * This flag is restored by kvm_arch_vcpu_put_fp(vcpu).
-+ */
-+void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu)
-+{
-+	BUG_ON(system_supports_sve());
-+	BUG_ON(!current->mm);
-+
-+	vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED | KVM_ARM64_HOST_SVE_IN_USE);
-+	vcpu->arch.flags |= KVM_ARM64_FP_HOST;
-+	if (test_thread_flag(TIF_SVE))
-+		vcpu->arch.flags |= KVM_ARM64_HOST_SVE_IN_USE;
-+}
-+
-+/*
-+ * If the guest FPSIMD state was loaded, update the host's context
-+ * tracking data mark the CPU FPSIMD regs as dirty and belonging to vcpu
-+ * so that they will be written back if the kernel clobbers them due to
-+ * kernel-mode NEON before re-entry into the guest.
-+ */
-+void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
-+{
-+	WARN_ON_ONCE(!irqs_disabled());
-+
-+	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
-+		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs);
-+		clear_thread_flag(TIF_FOREIGN_FPSTATE);
-+		clear_thread_flag(TIF_SVE);
-+	}
-+}
-+
-+/*
-+ * Write back the vcpu FPSIMD regs if they are dirty, and invalidate the
-+ * cpu FPSIMD regs so that they can't be spuriously reused if this vcpu
-+ * disappears and another task or vcpu appears that recycles the same
-+ * struct fpsimd_state.
-+ */
-+void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
-+{
-+	local_bh_disable();
-+
-+	update_thread_flag(TIF_SVE,
-+			   vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE);
-+
-+	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
-+		/* Clean guest FP state to memory and invalidate cpu view */
-+		fpsimd_save();
-+		fpsimd_flush_cpu_state();
-+		set_thread_flag(TIF_FOREIGN_FPSTATE);
-+	} else if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
-+		/* Ensure user trap controls are correctly restored */
-+		fpsimd_bind_task_to_cpu();
-+	}
-+
-+	local_bh_enable();
-+}
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index c0796c4..118f300 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -23,19 +23,21 @@
- 
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-+#include <asm/kvm_host.h>
- #include <asm/kvm_hyp.h>
- #include <asm/kvm_mmu.h>
- #include <asm/fpsimd.h>
- #include <asm/debug-monitors.h>
-+#include <asm/thread_info.h>
- 
--static bool __hyp_text __fpsimd_enabled_nvhe(void)
-+/* Check whether the FP regs were dirtied while in the host-side run loop: */
-+static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
- {
--	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
--}
-+	if (vcpu->arch.host_thread_info->flags & _TIF_FOREIGN_FPSTATE)
-+		vcpu->arch.flags &= ~(KVM_ARM64_FP_ENABLED |
-+				      KVM_ARM64_FP_HOST);
- 
--static bool fpsimd_enabled_vhe(void)
--{
--	return !!(read_sysreg(cpacr_el1) & CPACR_EL1_FPEN);
-+	return !!(vcpu->arch.flags & KVM_ARM64_FP_ENABLED);
- }
- 
- /* Save the 32-bit only FPSIMD system register state */
-@@ -92,7 +94,10 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
- 
- 	val = read_sysreg(cpacr_el1);
- 	val |= CPACR_EL1_TTA;
--	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
-+	val &= ~CPACR_EL1_ZEN;
-+	if (!update_fp_enabled(vcpu))
-+		val &= ~CPACR_EL1_FPEN;
-+
- 	write_sysreg(val, cpacr_el1);
- 
- 	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
-@@ -105,7 +110,10 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
- 	__activate_traps_common(vcpu);
- 
- 	val = CPTR_EL2_DEFAULT;
--	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
-+	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
-+	if (!update_fp_enabled(vcpu))
-+		val |= CPTR_EL2_TFP;
-+
- 	write_sysreg(val, cptr_el2);
- }
- 
-@@ -321,8 +329,6 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
- 				    struct kvm_vcpu *vcpu)
- {
--	kvm_cpu_context_t *host_ctxt;
--
- 	if (has_vhe())
- 		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
- 			     cpacr_el1);
-@@ -332,14 +338,19 @@ void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
- 
- 	isb();
- 
--	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
--	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
-+	if (vcpu->arch.flags & KVM_ARM64_FP_HOST) {
-+		__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
-+		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
-+	}
-+
- 	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
- 
- 	/* Skip restoring fpexc32 for AArch64 guests */
- 	if (!(read_sysreg(hcr_el2) & HCR_RW))
- 		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
- 			     fpexc32_el2);
-+
-+	vcpu->arch.flags |= KVM_ARM64_FP_ENABLED;
- }
- 
- /*
-@@ -418,7 +429,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *host_ctxt;
- 	struct kvm_cpu_context *guest_ctxt;
--	bool fp_enabled;
- 	u64 exit_code;
- 
- 	host_ctxt = vcpu->arch.host_cpu_context;
-@@ -440,19 +450,14 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 		/* And we're baaack! */
- 	} while (fixup_guest_exit(vcpu, &exit_code));
- 
--	fp_enabled = fpsimd_enabled_vhe();
--
- 	sysreg_save_guest_state_vhe(guest_ctxt);
- 
- 	__deactivate_traps(vcpu);
- 
- 	sysreg_restore_host_state_vhe(host_ctxt);
- 
--	if (fp_enabled) {
--		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
--		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
-+	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED)
- 		__fpsimd_save_fpexc32(vcpu);
--	}
- 
- 	__debug_switch_to_host(vcpu);
- 
-@@ -464,7 +469,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *host_ctxt;
- 	struct kvm_cpu_context *guest_ctxt;
--	bool fp_enabled;
- 	u64 exit_code;
- 
- 	vcpu = kern_hyp_va(vcpu);
-@@ -496,8 +500,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 		/* And we're baaack! */
- 	} while (fixup_guest_exit(vcpu, &exit_code));
- 
--	fp_enabled = __fpsimd_enabled_nvhe();
--
- 	__sysreg_save_state_nvhe(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
- 	__timer_disable_traps(vcpu);
-@@ -508,11 +510,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 
- 	__sysreg_restore_state_nvhe(host_ctxt);
- 
--	if (fp_enabled) {
--		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
--		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
-+	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED)
- 		__fpsimd_save_fpexc32(vcpu);
--	}
- 
- 	/*
- 	 * This must come after restoring the host sysregs, since a non-VHE
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a4c1b76..bee226c 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -363,10 +363,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 	kvm_vgic_load(vcpu);
- 	kvm_timer_vcpu_load(vcpu);
- 	kvm_vcpu_load_sysregs(vcpu);
-+	kvm_arch_vcpu_load_fp(vcpu);
- }
- 
- void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- {
-+	kvm_arch_vcpu_put_fp(vcpu);
- 	kvm_vcpu_put_sysregs(vcpu);
- 	kvm_timer_vcpu_put(vcpu);
- 	kvm_vgic_put(vcpu);
-@@ -778,6 +780,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		if (static_branch_unlikely(&userspace_irqchip_in_use))
- 			kvm_timer_sync_hwstate(vcpu);
- 
-+		kvm_arch_vcpu_ctxsync_fp(vcpu);
-+
- 		/*
- 		 * We may have taken a host interrupt in HYP mode (ie
- 		 * while executing the guest). This interrupt is still
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
