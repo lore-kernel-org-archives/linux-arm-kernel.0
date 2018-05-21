@@ -1,120 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 21 May 2018 18:19:49 +0100
-Subject: [PATCHv2] drivers/perf: arm-ccn: don't log to dmesg in event_init
-Message-ID: <20180521171949.31412-1-mark.rutland@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 May 2018 18:21:08 +0100
+Subject: arm64: add missing early clobber in atomic64_dec_if_positive()
+In-Reply-To: <c540dd519065316c859e5cb1290de7f5041cb816.camel@redhat.com>
+References: <20180520001726.27808-1-msalter@redhat.com>
+ <20180521170022.GD21034@arm.com>
+ <c540dd519065316c859e5cb1290de7f5041cb816.camel@redhat.com>
+Message-ID: <20180521172108.GH21034@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM CCN PMU driver uses dev_warn() to complain about parameters in
-the user-provided perf_event_attr. This means that under normal
-operation (e.g. a single invocation of the perf tool), a number of
-messages warnings may be logged to dmesg.
+On Mon, May 21, 2018 at 01:18:39PM -0400, Mark Salter wrote:
+> On Mon, 2018-05-21 at 18:00 +0100, Will Deacon wrote:
+> > Hi Mark,
+> > 
+> > Thanks for reporting this.
+> > 
+> > On Sat, May 19, 2018 at 08:17:26PM -0400, Mark Salter wrote:
+> > > When running a kernel compiled with gcc8 on a machine using LSE, I
+> > > get:
+> > > 
+> > >  Unable to handle kernel paging request at virtual address 11111122222221
+> > 
+> > [...]
+> > 
+> > > The fault happens at the casal insn of inlined atomic64_dec_if_positive().
+> > > The inline asm code in that function has:
+> > > 
+> > > 	"1:	ldr	x30, %[v]\n"
+> > > 	"	subs	%[ret], x30, #1\n"
+> > > 	"	b.lt	2f\n"
+> > > 	"	casal	x30, %[ret], %[v]\n"
+> > > 	"	sub	x30, x30, #1\n"
+> > > 	"	sub	x30, x30, %[ret]\n"
+> > > 	"	cbnz	x30, 1b\n"
+> > > 	"2:")
+> > > 	: [ret] "+r" (x0), [v] "+Q" (v->counter)
+> > > 
+> > > gcc8 used register x0 for both [ret] and [v] and the subs was
+> > > clobbering [v] before it was used for casal. Gcc is free to do
+> > > this because [ret] lacks an early clobber modifier. So add one
+> > > to tell gcc a separate register is needed for [v].
+> > 
+> > Oh blimey, it looks like GCC is realising that counter is at offset 0
+> > of atomic_t and therefore assigns the same register for [ret] and [v],
+> > which is actually forced to be x0 by the 'register' local variable in
+> > C code. The "+Q" constraint only says that the memory is read/write, so
+> > the pointer is fair game.
+> > 
+> > I agree with your fix, but we also need to fix up the other places relying
+> > on this. Patch below -- please yell if you think I missed any.
+> 
+> I looked at the other places but figured they were okay because we're
+> explicitly using separate registers. But I suppose the early clobber
+> is the right thing to do in any case.
 
-Tools may issue multiple syscalls to probe for feature support, and
-multiple applications (from multiple users) can attempt to open events
-simultaneously, so this is not very helpful, even if a user happens to
-have access to dmesg. Worse, this can push important information out of
-the dmesg ring buffer, and can significantly slow down syscall fuzzers,
-vastly increasing the time it takes to find critical bugs.
+I was worried about silly things like a caller doing:
 
-Demote the dev_warn() instances to dev_dbg(), as is the case for all
-other PMU drivers under drivers/perf/. Users who wish to debug PMU event
-initialisation can enable dynamic debug to receive these messages.
+  atomic64_and((long)v, v);
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- drivers/perf/arm-ccn.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+and then GCC figuring out that the two values were equal and allocating
+the same register..
 
-Since v1 [1]:
-* tidy up commit message.
-
-Mark
-
-[1] https://lkml.kernel.org/r/20180504104117.8086-1-mark.rutland at arm.com
-
-diff --git a/drivers/perf/arm-ccn.c b/drivers/perf/arm-ccn.c
-index 65b7e4042ece..07771e28f572 100644
---- a/drivers/perf/arm-ccn.c
-+++ b/drivers/perf/arm-ccn.c
-@@ -736,7 +736,7 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 	ccn = pmu_to_arm_ccn(event->pmu);
- 
- 	if (hw->sample_period) {
--		dev_warn(ccn->dev, "Sampling not supported!\n");
-+		dev_dbg(ccn->dev, "Sampling not supported!\n");
- 		return -EOPNOTSUPP;
- 	}
- 
-@@ -744,12 +744,12 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 			event->attr.exclude_kernel || event->attr.exclude_hv ||
- 			event->attr.exclude_idle || event->attr.exclude_host ||
- 			event->attr.exclude_guest) {
--		dev_warn(ccn->dev, "Can't exclude execution levels!\n");
-+		dev_dbg(ccn->dev, "Can't exclude execution levels!\n");
- 		return -EINVAL;
- 	}
- 
- 	if (event->cpu < 0) {
--		dev_warn(ccn->dev, "Can't provide per-task data!\n");
-+		dev_dbg(ccn->dev, "Can't provide per-task data!\n");
- 		return -EOPNOTSUPP;
- 	}
- 	/*
-@@ -771,13 +771,13 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 	switch (type) {
- 	case CCN_TYPE_MN:
- 		if (node_xp != ccn->mn_id) {
--			dev_warn(ccn->dev, "Invalid MN ID %d!\n", node_xp);
-+			dev_dbg(ccn->dev, "Invalid MN ID %d!\n", node_xp);
- 			return -EINVAL;
- 		}
- 		break;
- 	case CCN_TYPE_XP:
- 		if (node_xp >= ccn->num_xps) {
--			dev_warn(ccn->dev, "Invalid XP ID %d!\n", node_xp);
-+			dev_dbg(ccn->dev, "Invalid XP ID %d!\n", node_xp);
- 			return -EINVAL;
- 		}
- 		break;
-@@ -785,11 +785,11 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 		break;
- 	default:
- 		if (node_xp >= ccn->num_nodes) {
--			dev_warn(ccn->dev, "Invalid node ID %d!\n", node_xp);
-+			dev_dbg(ccn->dev, "Invalid node ID %d!\n", node_xp);
- 			return -EINVAL;
- 		}
- 		if (!arm_ccn_pmu_type_eq(type, ccn->node[node_xp].type)) {
--			dev_warn(ccn->dev, "Invalid type 0x%x for node %d!\n",
-+			dev_dbg(ccn->dev, "Invalid type 0x%x for node %d!\n",
- 					type, node_xp);
- 			return -EINVAL;
- 		}
-@@ -808,19 +808,19 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 		if (event_id != e->event)
- 			continue;
- 		if (e->num_ports && port >= e->num_ports) {
--			dev_warn(ccn->dev, "Invalid port %d for node/XP %d!\n",
-+			dev_dbg(ccn->dev, "Invalid port %d for node/XP %d!\n",
- 					port, node_xp);
- 			return -EINVAL;
- 		}
- 		if (e->num_vcs && vc >= e->num_vcs) {
--			dev_warn(ccn->dev, "Invalid vc %d for node/XP %d!\n",
-+			dev_dbg(ccn->dev, "Invalid vc %d for node/XP %d!\n",
- 					vc, node_xp);
- 			return -EINVAL;
- 		}
- 		valid = 1;
- 	}
- 	if (!valid) {
--		dev_warn(ccn->dev, "Invalid event 0x%x for node/XP %d!\n",
-+		dev_dbg(ccn->dev, "Invalid event 0x%x for node/XP %d!\n",
- 				event_id, node_xp);
- 		return -EINVAL;
- 	}
--- 
-2.11.0
+Will
